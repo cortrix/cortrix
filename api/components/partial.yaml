@@ -1,0 +1,136 @@
+# components/partial.yaml — PartialSuccessByIdV1 + PartialSuccessByNamespaceV1 (v1.0.1 dual schema)
+#
+# SoT: P04 § 4.2 + AGENT_FRIENDLY § 2 principle 3 + § 3.2
+# Selection rule: unique ID → ById; across NS/domain/shard → ByNamespace; mixed → allOf combination (P04 § 4.2.3).
+components:
+  schemas:
+    # ---- ById: for batch upload / batch delete / memory extract (primary key = id) ----
+    PartialSuccessByIdV1:
+      x-cortrix-version: "v1"
+      x-cortrix-deprecation-policy: "stable until Phase 2 D0 review"
+      x-cortrix-usage: "Use when items have unique IDs (document_id / memory_id / task_id)"
+      type: object
+      required: [succeeded, failed, coverage_ratio]
+      properties:
+        succeeded:
+          type: array
+          description: "Succeeded items (each endpoint defines its own result fields; at least includes id)"
+          items:
+            type: object
+            required: [id]
+            properties:
+              id:
+                type: string
+                example: "doc_001"
+            additionalProperties: true
+        failed:
+          type: array
+          items:
+            type: object
+            required: [id, error_code, retryable, category]
+            properties:
+              id:
+                type: string
+                example: "doc_002"
+              error_code:
+                type: string
+                pattern: "^CX_ERR_[A-Z][A-Z_]*$"   # v1.0.1 option B: enforce the CX_ERR_ prefix
+                example: "CX_ERR_NS_QUOTA_EXCEEDED"
+              retryable:
+                type: boolean
+              category:
+                type: string
+                enum: [auth, quota, transient, permanent, timeout]
+              retry_after_ms:
+                type: integer
+                nullable: true
+              structured_data:
+                type: object
+                additionalProperties: true
+        coverage_ratio:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: "succeeded.length / (succeeded.length + failed.length)"
+          example: 0.667
+        warnings:
+          type: array
+          items:
+            type: string
+      example:
+        succeeded:
+          - { id: "doc_001", task_id: "task_xxx_001", status: "submitted" }
+          - { id: "doc_003", task_id: "task_xxx_003", status: "submitted" }
+        failed:
+          - id: "doc_002"
+            error_code: "CX_ERR_NS_QUOTA_EXCEEDED"
+            retryable: false
+            category: quota
+            retry_after_ms: null
+            structured_data: { ns_quota_used: 1000, ns_quota_limit: 1000 }
+        coverage_ratio: 0.667
+        warnings: []
+
+    # ---- ByNamespace: for cross-NS query / cross-NS memory search / sync status (primary key = namespace) ----
+    PartialSuccessByNamespaceV1:
+      x-cortrix-version: "v1"
+      x-cortrix-deprecation-policy: "stable until Phase 2 D0 review"
+      x-cortrix-usage: "Use when operation spans multiple namespaces (cross-NS query / sync)"
+      type: object
+      required: [namespaces_succeeded, namespaces_failed, coverage_ratio]
+      properties:
+        namespaces_succeeded:
+          type: array
+          description: "Succeeded NS (each endpoint defines its own result fields, e.g. query includes results[], sync includes last_sync_at)"
+          items:
+            type: object
+            required: [namespace]
+            properties:
+              namespace:
+                type: string
+                example: "contracts"
+            additionalProperties: true
+        namespaces_failed:
+          type: array
+          items:
+            type: object
+            required: [namespace, error_code, retryable, category]
+            properties:
+              namespace:
+                type: string
+                example: "support_docs"
+              error_code:
+                type: string
+                pattern: "^CX_ERR_[A-Z][A-Z_]*$"   # v1.0.1 option B: enforce the CX_ERR_ prefix
+                example: "CX_ERR_NS_TIMEOUT"
+              retryable:
+                type: boolean
+              category:
+                type: string
+                enum: [auth, quota, transient, permanent, timeout]
+              retry_after_ms:
+                type: integer
+                nullable: true
+        coverage_ratio:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: "namespaces_succeeded.length / (namespaces_succeeded.length + namespaces_failed.length)"
+          example: 0.5
+        warnings:
+          type: array
+          items:
+            type: string
+      example:
+        namespaces_succeeded:
+          - { namespace: "contracts" }
+        namespaces_failed:
+          - namespace: "support_docs"
+            error_code: "CX_ERR_NS_TIMEOUT"
+            retryable: true
+            category: timeout
+            retry_after_ms: 1000
+        coverage_ratio: 0.5
+        warnings: []

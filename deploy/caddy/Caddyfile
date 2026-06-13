@@ -1,0 +1,46 @@
+# ==========================================================
+# Cortrix Cloud Demo — Caddy Reverse Proxy
+#
+# Replace "demo.cortrix.ai" with your actual domain.
+# Caddy auto-provisions Let's Encrypt HTTPS certificates.
+#
+# Install: apt install caddy
+# Deploy:  cp Caddyfile /etc/caddy/Caddyfile && systemctl reload caddy
+# ==========================================================
+
+demo.cortrix.ai {
+    # Main application — C++ HTTP server
+    reverse_proxy localhost:8080 {
+        # Pass original client IP
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # Compress responses
+    encode gzip zstd
+
+    # Security headers
+    header {
+        X-Content-Type-Options   "nosniff"
+        X-Frame-Options          "DENY"
+        X-XSS-Protection         "1; mode=block"
+        Referrer-Policy           "strict-origin-when-cross-origin"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+
+    # Request size limit (match cortrix max_payload_bytes)
+    request_body {
+        max_size 100MB
+    }
+
+    # Access log
+    log {
+        output file /var/log/caddy/cortrix-access.log {
+            roll_size 50MiB
+            roll_keep 5
+        }
+        format json
+    }
+}

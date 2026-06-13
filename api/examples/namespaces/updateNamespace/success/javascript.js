@@ -1,0 +1,7 @@
+// PATCH /api/v1/namespaces/{ns} — success
+const resp = await fetch("https://api.cortrix.io/api/v1/namespaces/{ns}", {
+  method: "PATCH",
+  headers: { "X-API-Key": "cx_live_xxx", "Content-Type": "application/json" },
+  body: JSON.stringify({ /* TODO: payload */ }),
+});
+const result = await resp.json();

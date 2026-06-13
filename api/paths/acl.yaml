@@ -1,0 +1,91 @@
+# paths/acl.yaml — /api/v1/namespaces/{ns_id}/acl/* (P09 v1.0.4 V3-C-04) — 3 endpoint
+# SoT: P09 v1.0 § 4.1.x + components/schemas.yaml (NsAclEntry)
+paths:
+  /namespaces/{ns_id}/acl:
+    parameters:
+      - name: ns_id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [admin]
+      operationId: listNsAcl
+      summary: List NS ACL
+      description: List NS ACL grants (Admin+).
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: ACL list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [acl]
+                properties:
+                  acl:
+                    type: array
+                    items:
+                      $ref: '../components/schemas.yaml#/components/schemas/NsAclEntry'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    post:
+      tags: [admin]
+      operationId: grantNsAcl
+      summary: Grant NS ACL
+      description: Add an ACL grant (cross-tenant shared NS, Admin+).
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/components/schemas/NsAclEntry'
+      responses:
+        '201':
+          description: Grant added
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/NsAclEntry'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /namespaces/{ns_id}/acl/{grantee_tenant_id}:
+    parameters:
+      - name: ns_id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: grantee_tenant_id
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [admin]
+      operationId: revokeNsAcl
+      summary: Revoke NS ACL
+      description: Revoke an ACL grant (Admin+).
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: destructive
+      responses:
+        '204':
+          description: Grant revoked
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

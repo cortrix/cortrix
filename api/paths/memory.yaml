@@ -1,0 +1,764 @@
+# paths/memory.yaml — /api/v1/memory/* (ARCH § 4.1.5 + MEM01/02/03/05) — 6 endpoint
+# SoT: ARCH § 4.1.5 + MEM03 v1.0 §3.A + components/schemas.yaml (Memory / MemorySearchRequest)
+paths:
+  /memory:
+    post:
+      tags: [public]
+      operationId: createMemory
+      summary: Create memory
+      description: Create a user-explicit memory (no LLM validation, MEM03 §3.A, Write+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/components/schemas/MemoryCreateRequest'
+      responses:
+        '201':
+          description: Memory created
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Memory'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    get:
+      tags: [public]
+      operationId: listMemory
+      summary: List memory
+      description: List all of a user's memories (paginated/filter; ?include_invalidated=true includes deprecated history, MEM03, Read+). Enforces user_id ownership check.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      parameters:
+        - name: namespace
+          in: query
+          required: true
+          schema: { type: string }
+        - name: memory_type
+          in: query
+          schema: { type: string, enum: [fact, preference, event] }
+        - name: include_invalidated
+          in: query
+          schema: { type: boolean, default: false }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: Memory list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [memories]
+                properties:
+                  memories:
+                    type: array
+                    items:
+                      $ref: '../components/schemas.yaml#/components/schemas/Memory'
+                  total: { type: integer }
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  include_invalidated: { type: boolean }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '429': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /memory/search:
+    post:
+      tags: [public]
+      operationId: searchMemory
+      summary: Memory semantic search
+      description: Semantic memory search (enforced user_id filter, MEM05 isolation, Read+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-typical-latency:
+        p50_ms: 150
+        p99_ms: 600
+      x-cortrix-side-effects: read_only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/components/schemas/MemorySearchRequest'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/MemorySearchResponse'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '429': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /memory/extract:
+    post:
+      tags: [public]
+      operationId: extractMemory
+      summary: Extract memory (LLM)
+      description: |
+        LLM memory extraction from a single interaction (MEM02, Write+). Requires ns + the turn (content,
+        or a query_text/response_text pair) in the body. Returns the extracted memories + extract_meta.
+        For batch extraction over a list of interactions use POST /memory/extract/batch.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-typical-latency:
+        p50_ms: 800
+        p99_ms: 4000
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ns]
+              properties:
+                ns: { type: string, description: "Namespace (also accepts 'namespace')." }
+                session_id: { type: string }
+                user_id: { type: string }
+                content: { type: string, description: "Full turn text; or supply query_text + response_text." }
+                query_text: { type: string }
+                response_text: { type: string }
+                remember: { type: boolean, default: true }
+      responses:
+        '200':
+          description: Extraction results
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/MemoryExtractResponse'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '429': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '500': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /memory/extract/batch:
+    post:
+      tags: [public]
+      operationId: extractMemoryBatch
+      summary: Extract memory batch (LLM, partial-success)
+      description: |
+        LLM memory extraction over a list of interactions (MEM02, Write+). Returns HTTP 200 with
+        per-item partial-success status (results[] each carry id/ok and either extracted_count or error).
+        Requires ns + interactions[] in the body.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ns, interactions]
+              properties:
+                ns: { type: string, description: "Namespace (also accepts 'namespace')." }
+                interactions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      session_id: { type: string }
+                      user_id: { type: string }
+                      content: { type: string, description: "Full turn text; or supply query_text + response_text." }
+                      query_text: { type: string }
+                      response_text: { type: string }
+                      remember: { type: boolean, default: true }
+      responses:
+        '200':
+          description: Per-interaction extraction results (partial-success)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results, succeeded, failed]
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, ok]
+                      properties:
+                        id: { type: string, description: "session_id of the interaction." }
+                        ok: { type: boolean }
+                        extracted_count: { type: integer, description: "Present when ok=true." }
+                        error: { type: string, description: "Error code when ok=false." }
+                  succeeded: { type: integer }
+                  failed: { type: integer }
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /memory/extract/run_for_ns:
+    post:
+      tags: [public]
+      operationId: extractMemoryForNamespace
+      summary: Run namespace-level extraction backfill
+      description: |
+        Trigger an NS-level extraction backfill (MEM02, Write+). Enumerates unextracted interactions and
+        enqueues them through the async extraction queue; returns immediately with status=scheduled.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ns]
+              properties:
+                ns: { type: string, description: "Namespace (also accepts 'namespace')." }
+      responses:
+        '202':
+          description: Backfill scheduled (async)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ns, status]
+                properties:
+                  ns: { type: string }
+                  status: { type: string, enum: [scheduled] }
+                  note: { type: string }
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /memory/invalidations:
+    get:
+      tags: [public]
+      operationId: listMemoryInvalidations
+      summary: List memory invalidations (audit)
+      description: |
+        List the memory invalidation/revoke audit trail (MEM03 D6/D9, Read+). The trail lives in the F18a
+        operation_log; this endpoint returns the canonical /operations pointer the SDK can follow.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: Invalidation audit list (+ source pointer)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [invalidations, source]
+                properties:
+                  invalidations:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                  source:
+                    type: string
+                    example: "/api/v1/operations?action_in=memory_invalidate,memory_revoke"
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /memory/invalidations/{id}/revoke:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+        description: block_id of the invalidated memory
+    post:
+      tags: [admin]
+      operationId: revokeMemoryInvalidation
+      summary: Revoke a memory invalidation (admin)
+      description: Revoke a memory invalidation (MEM03 D9, Admin+). Requires ns in the body; optional reason.
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ns]
+              properties:
+                ns: { type: string, description: "Namespace (also accepts 'namespace')." }
+                reason: { type: string, default: "admin revoke" }
+      responses:
+        '200':
+          description: Revoke accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [block_id, status]
+                properties:
+                  block_id: { type: string }
+                  reason: { type: string }
+                  status: { type: string, enum: [accepted] }
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '503': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /memory/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+        description: memory_id
+    patch:
+      tags: [public]
+      operationId: editMemory
+      summary: Edit memory
+      description: Edit a memory (MEM03 topic 2 B — create a new user_edit + invalidate the old one; semantically not a wholesale replace, hence PATCH not PUT, Write+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content: { type: string }
+                metadata: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Edited (returns the new user_edit memory)
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Memory'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    delete:
+      tags: [public]
+      operationId: deleteMemory
+      summary: Delete memory (soft)
+      description: Soft-delete a memory (marks status='invalidated'; always retained, never hard-deleted, MEM03 §3.A, Write+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: write
+      responses:
+        '200':
+          description: Soft-deleted (status=invalidated)
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Memory'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  # --- MEM04 Memory Immunity (session opt-out) ---
+  /memory/session/{session_id}/opt-out:
+    parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [public]
+      operationId: optOutSession
+      summary: Opt a session out of memory
+      description: Opt a session out of memory extraction (MEM04, Write+). NS-scoped, so ns is required in the body.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ns]
+              properties:
+                ns: { type: string, description: "Namespace (also accepts 'namespace')." }
+                reason: { type: string }
+      responses:
+        '200':
+          description: Session opted out
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [session_id, opt_out_at, opted_out_by]
+                properties:
+                  session_id: { type: string }
+                  opt_out_at: { type: string }
+                  opted_out_by: { type: string }
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '409': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /memory/session/{session_id}/opt-out/revoke:
+    parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [admin]
+      operationId: revokeSessionOptOut
+      summary: Revoke a session opt-out (admin)
+      description: Revoke a session's memory opt-out (MEM04, Admin+). Requires ns + reason in the body.
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ns, reason]
+              properties:
+                ns: { type: string, description: "Namespace (also accepts 'namespace')." }
+                reason: { type: string }
+      responses:
+        '200':
+          description: Opt-out revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [session_id, revoked_at]
+                properties:
+                  session_id: { type: string }
+                  revoked_at: { type: string }
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  # --- Session + interaction lifecycle (conversation memory) ---
+  /memory/sessions:
+    post:
+      tags: [public]
+      operationId: createMemorySession
+      summary: Create memory session
+      description: |
+        Create a conversation memory session (Write+). namespace is required; an optional client-provided
+        session_id that already exists returns 409. MEM05 isolation: user_id defaults to "default" in CE
+        no-auth mode.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [namespace]
+              properties:
+                namespace: { type: string }
+                session_id: { type: string, description: "Optional client-provided id (duplicate -> 409)." }
+                user_id: { type: string, description: "Defaults to 'default' (CE no-auth)." }
+                title: { type: string }
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [session_id, namespace, user_id, title, created_at]
+                properties:
+                  session_id: { type: string }
+                  namespace: { type: string }
+                  user_id: { type: string }
+                  title: { type: string }
+                  created_at: { type: string }
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '409': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    get:
+      tags: [public]
+      operationId: listMemorySessions
+      summary: List memory sessions
+      description: List conversation memory sessions in a namespace (Read+). MEM05 isolation post-filters to the requester's own sessions.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      parameters:
+        - name: namespace
+          in: query
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: Session list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions, total_count, has_more, limit, offset]
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        session_id: { type: string }
+                        namespace: { type: string }
+                        user_id: { type: string }
+                        title: { type: string }
+                        interaction_count: { type: integer }
+                        created_at: { type: string }
+                        updated_at: { type: string }
+                  total_count: { type: integer }
+                  has_more: { type: boolean }
+                  limit: { type: integer }
+                  offset: { type: integer }
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /memory/sessions/{session_id}:
+    parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [public]
+      operationId: getMemorySession
+      summary: Get memory session detail
+      description: |
+        Get a session + its interactions (Read+). namespace is required. MEM05 ownership: another user's
+        session returns 404 (anti-enumeration, not 403).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      parameters:
+        - name: namespace
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Session detail + interactions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [session, interactions]
+                properties:
+                  session:
+                    type: object
+                    properties:
+                      session_id: { type: string }
+                      namespace: { type: string }
+                      user_id: { type: string }
+                      title: { type: string }
+                      interaction_count: { type: integer }
+                      created_at: { type: string }
+                      updated_at: { type: string }
+                  interactions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        role: { type: string }
+                        content: { type: string }
+                        query_type: { type: string }
+                        status: { type: string }
+                        latency_ms: { type: integer }
+                        metadata: { type: object, additionalProperties: true }
+                        created_at: { type: string }
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    delete:
+      tags: [public]
+      operationId: deleteMemorySession
+      summary: Delete memory session
+      description: |
+        Delete a session and its interactions (Write+). namespace is required. MEM05 ownership: another
+        user's (or missing) session returns 404 (anti-enumeration).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: destructive
+      parameters:
+        - name: namespace
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Session deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted, session_id, interactions_deleted]
+                properties:
+                  deleted: { type: boolean, example: true }
+                  session_id: { type: string }
+                  interactions_deleted: { type: integer }
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /memory/sessions/{session_id}/interactions:
+    parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [public]
+      operationId: writeMemoryInteraction
+      summary: Write a session interaction
+      description: |
+        Append a query/response interaction to a session (Write+). namespace + query_text + response_text
+        are required. The turn is enqueued for async MEM02 LLM extraction (subject to MEM04 opt-out/remember).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [namespace, query_text, response_text]
+              properties:
+                namespace: { type: string }
+                query_text: { type: string }
+                response_text: { type: string }
+                user_id: { type: string }
+                query_type: { type: string, default: chat }
+                response_status: { type: string, default: success }
+                latency_ms: { type: integer, default: 0 }
+                result_source: { type: string, default: conversation }
+                ttl_seconds: { type: integer, default: 0 }
+                remember: { type: boolean, default: true }
+                metadata: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: Interaction written + extraction enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [session_id, turn, spc_enqueued, memory_extraction_enqueued]
+                properties:
+                  session_id: { type: string }
+                  turn: { type: integer }
+                  spc_enqueued: { type: boolean }
+                  memory_extraction_enqueued: { type: boolean }
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /memory/inject:
+    post:
+      tags: [public]
+      operationId: injectMemoryContext
+      summary: Inject session context
+      description: |
+        Assemble recent conversation context for a session as injectable text (Read+). namespace +
+        session_id are required; the text is truncated to inject_max_tokens.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [namespace, session_id]
+              properties:
+                namespace: { type: string }
+                session_id: { type: string }
+      responses:
+        '200':
+          description: Assembled context
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [session_id, context_text, turn_count, token_count_approx]
+                properties:
+                  session_id: { type: string }
+                  context_text: { type: string }
+                  turn_count: { type: integer }
+                  token_count_approx: { type: integer }
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

@@ -1,0 +1,222 @@
+# paths/documents.yaml — /api/v1/documents/* (ARCH § 4.1.2 + F42 + TD-F42-BULK) — 7 endpoint
+# SoT: ARCH § 4.1.2 + F42 detailed design + TD-F42-BULK detailed design + components/schemas.yaml (Document / DocumentTask / BatchSubmit*)
+paths:
+  /documents:
+    post:
+      tags: [public]
+      operationId: uploadDocument
+      summary: Upload document (async)
+      description: |
+        Unified asynchronous upload endpoint (namespace in body, F42, Write+). Returns a task_id; query progress via
+        GET /documents/tasks/{task_id}/progress. Partial failures in batch upload use PartialSuccessById semantics.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: write
+      x-cortrix-rate-limit: "60/min/api_key"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [namespace, content]
+              properties:
+                namespace: { type: string, example: "contracts" }
+                content: { type: string, description: "Document content or base64 (use the multipart endpoint for large files)" }
+                filename: { type: string }
+                metadata: { type: object, additionalProperties: true }
+      responses:
+        '202':
+          description: Upload accepted (asynchronous task created)
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/DocumentTask'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '413': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '429': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    get:
+      tags: [public]
+      operationId: listDocuments
+      summary: List documents
+      description: List documents (paginated, Read+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      parameters:
+        - name: namespace
+          in: query
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: Document list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [documents]
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      $ref: '../components/schemas.yaml#/components/schemas/Document'
+                  total: { type: integer }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '429': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  # --- TD-F42-BULK Agent-first batch submit (Wave D-R1) ---
+  # was batch-submit in spec era; aligned to P12 tool wire memory.py:109 (D3.5: P04 spec reconcile)
+  /documents/batch:
+    post:
+      tags: [public]
+      operationId: batchSubmitDocuments
+      summary: Batch submit documents (async, partial-success)
+      description: |
+        Submit 1-100 documents to a namespace in one request (TD-F42-BULK, Write+). Each accepted document
+        is queued as an F42 async task (poll GET /documents/tasks/{task_id}/progress). Returns HTTP 200 with
+        partial-success semantics: results[] holds the accepted docs (task_id + status) and meta.failed[] holds
+        per-doc failures with the GEN-Agent 5-field schema. A batch-level rejection (size/payload/empty/duplicate
+        doc_id) returns a single GEN-Agent error envelope (CX_ERR_BATCH_*).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: write
+      x-cortrix-rate-limit: "60/min/api_key"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/components/schemas/BatchSubmitRequest'
+      responses:
+        '200':
+          description: Batch processed (partial-success; inspect meta.failed[])
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/BatchSubmitResponse'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '413': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '429': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /documents/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+        description: document_id
+    get:
+      tags: [public]
+      operationId: getDocument
+      summary: Get document
+      description: Get document details (Read+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: Document details
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Document'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    delete:
+      tags: [public]
+      operationId: deleteDocument
+      summary: Delete document
+      description: |
+        Delete a document and all its Blocks (Write+). Soft delete (OPEN-2): the doc is marked
+        status=deleted and stays recoverable for gc.soft_delete_retention_days (default 30; 0 = immediate).
+        Inside the window, ops can restore via POST /gc/restore; after it, GC sweeps/purges it permanently.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: destructive
+      responses:
+        '204':
+          description: Deleted
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /documents/tasks/{task_id}/progress:
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [public]
+      operationId: getDocumentTaskProgress
+      summary: Get async task progress
+      description: Query asynchronous upload task progress (F42, Read+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: Task progress
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/DocumentTask'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /documents/tasks/{task_id}:
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [public]
+      operationId: cancelDocumentTask
+      summary: Cancel async task
+      description: Cancel an asynchronous upload task (F42, Write+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: write
+      responses:
+        '200':
+          description: Task cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/DocumentTask'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '409': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

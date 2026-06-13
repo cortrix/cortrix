@@ -1,0 +1,97 @@
+#pragma once
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "cortrix/common/status.h"
+#include "cortrix/spc/cleaning_errors.h"
+#include "cortrix/spc/cleaning_types.h"
+
+// Forward declarations — F10 does not hard-depend on these Features' headers.
+//  - TraceContext (GEN-Observability): Phase 1 noop pointer, Phase 2 OTel.
+//  - IOperationLogger (F18a, CE Operation Log): audit sink. NOT in the L0 base
+//    yet (sibling Wave-A Feature) — taken as a *nullable* shared_ptr so F10
+//    builds + tests standalone; the live F18a wiring is D3.5.
+namespace cortrix::observability { struct TraceContext; }
+namespace cortrix::operation_log { class IOperationLogger; }
+
+namespace cortrix::spc {
+
+/// SPC Pipeline data-cleaning module (F10). Runs *before* Block assembly to
+/// drop duplicate chunks (exact hash + semantic cosine, D2/D3) and to mark
+/// anomalous chunks (5 reasons, D4) so Storage Write keeps them out of P-HNSW
+/// (D5). chunk-level; orthogonal to file-level dedup (tenants.dedup_scope).
+///
+/// D3 standalone: Dedup / DetectAnomaly / config validation are fully
+/// implemented + tested against the F10 `Block` contract view. The §4.3
+/// SpcPipeline wiring (ChunkResult/EmbeddingResult ↔ Block, Storage-Write
+/// skip-index) is cross-Feature → D3.5. The op_logger audit sink (F18a) is
+/// optional/nullable for the same reason.
+class DataCleaner {
+public:
+    /// @param config     resolved cleaning config (post ConfigResolver merge)
+    /// @param op_logger  F18a audit sink; may be nullptr (D3.5 wiring). When
+    ///                   present, B2 path stats are logged there (not in the API
+    ///                   response — §5.2). Default nullptr keeps F10 standalone.
+    explicit DataCleaner(
+        const CleaningConfig& config,
+        std::shared_ptr<operation_log::IOperationLogger> op_logger = nullptr);
+
+    /// Validate the config (threshold ∈ [0,1], max_chunk_chars > 0). Returns the
+    /// matching CX_ERR_F10_* Status on violation. Called by the ctor's consumers
+    /// before use; exposed for the pipeline to fail fast / surface to the Agent.
+    Status ValidateConfig() const;
+
+    /// ★ Main entry 1: dedup (in-place; removes duplicates). D2 chaining: exact SHA-256 of
+    /// chunk_text, then semantic cosine over the upstream embeddings (D3). No-op
+    /// (returns 0 removed) when dedup_enabled=false. TraceContext: Phase-1 noop.
+    DedupResult Dedup(std::vector<Block>& blocks,
+                      const observability::TraceContext* ctx = nullptr);
+
+    /// ★ Main entry 2: anomaly detection (in-place mark). Sets flags_ext bit2 kFlagExtIsAnomalous
+    /// + metadata "cleaning.anomaly_reason" / "cleaning.skip_index". Anomalous
+    /// blocks are NOT removed — Storage Write reads the flag to skip P-HNSW (D5).
+    /// No-op when anomaly_detection_enabled=false.
+    AnomalyResult DetectAnomaly(std::vector<Block>& blocks,
+                                const observability::TraceContext* ctx = nullptr);
+
+    /// Convenience: the §5.2 A-class summary from a dedup + anomaly run over an
+    /// `input_count`-sized batch (chunks_input / chunks_indexed /
+    /// chunks_skipped_dedup / chunks_marked_anomalous).
+    static CleaningResult Summarize(int input_count, const DedupResult& dedup,
+                                    const AnomalyResult& anomaly);
+
+    /// ★ Cleaning-plugin seam (F11 coordination, D8 — F10 ships the stub; the
+    /// full plugin ecosystem lands with F11).
+    void RegisterPlugin(std::function<void(std::vector<Block>&)> plugin);
+    void ApplyPlugins(std::vector<Block>& blocks,
+                      const observability::TraceContext* ctx = nullptr);
+
+private:
+    CleaningConfig config_;
+    std::shared_ptr<operation_log::IOperationLogger> op_logger_;
+
+    std::vector<std::function<void(std::vector<Block>&)>> plugins_;
+};
+
+/// ICleaningPlugin stub abstract base (F10 v1.0.1 Minor-3). F10 D1 gives the
+/// signature; F11 D1 implements the full ecosystem (interface + sample plugins +
+/// loader + docs).
+class ICleaningPlugin {
+public:
+    virtual ~ICleaningPlugin() = default;
+    virtual const char* Name() const = 0;          ///< plugin name (log/metric label)
+    virtual void Apply(std::vector<Block>& blocks) = 0;  ///< in-place transform
+};
+
+/// F09 anomaly flag (F10 §3.3, D6) — the frozen bit2 of BlockFlagsExt. Mirrors
+/// cortrix::kFlagExtIsAnomalous so F10 code reads self-documenting; the SoT is
+/// common/block_types.h (V14 J1 whole-bitmap lock).
+constexpr uint8_t kBlockFlagExtAnomalous = 0x04;
+
+/// True iff `block` was marked anomalous (Storage Write reads this to skip
+/// P-HNSW — D5). Equivalent to the metadata "cleaning.skip_index" == true.
+bool ShouldSkipIndex(const Block& block);
+
+}  // namespace cortrix::spc

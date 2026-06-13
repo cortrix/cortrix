@@ -1,0 +1,69 @@
+# paths/query.yaml — /api/v1/query (ARCH § 4.1.3 + F04 cross-NS) — 1 endpoint
+# SoT: ARCH § 4.1.3 + F04 v1.0.3 § 2.4/2.5 + AGENT_FRIENDLY § 2 (Class-A meta + degraded partial 200)
+paths:
+  /query:
+    post:
+      tags: [public]
+      operationId: query
+      summary: Semantic search across namespaces
+      description: |
+        Unified semantic query (including cross-NS). namespaces array: single NS / multiple NS / ["*"] all NS (hard cap 100).
+        Partial failures return 200 + meta.namespaces_failed[] (degraded path, PartialSuccessByNamespace semantics).
+        ?explain=true additionally exposes Class-B LLM-path fields (AGENT_FRIENDLY § 2 phased rollout).
+        Routing/fusion knobs (route, rag_fusion) may be passed in the body or as query params (query param wins).
+        meta carries path markers when applicable: via_path (chat route), crag_verdict + crag_action (F37, Complex route).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-typical-latency:
+        p50_ms: 200
+        p99_ms: 800
+      x-cortrix-rate-limit: "100/min/api_key"
+      x-cortrix-side-effects: read_only
+      parameters:
+        - name: explain
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+          description: "When true, the response includes an explain section (Class-B LLM-path fields + upgrade suggestions)"
+        - name: route
+          in: query
+          required: false
+          schema: { type: string, enum: [auto, simple, complex, chat] }
+          description: "F39 route override (query param wins over the body field)."
+        - name: rag_fusion
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: "F36 RAG-Fusion opt-in (query param wins over the body field)."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/components/schemas/QueryRequest'
+            examples:
+              single_ns:
+                summary: Single-NS query
+                value: { query: "Party A breach-of-contract clauses", namespaces: ["contracts"], top_k: 10, rerank: true }
+              cross_ns:
+                summary: Cross-NS query
+                value: { query: "customer complaint handling process", namespaces: ["contracts", "support_docs"], top_k: 10 }
+              all_ns:
+                summary: All-NS query (hard cap 100)
+                value: { query: "company annual goals", namespaces: ["*"], top_k: 10 }
+      responses:
+        '200':
+          description: |
+            Query results. Returns 200 even if some NS fail (degraded path); failure details are in meta.namespaces_failed[]
+            (PartialSuccessByNamespace semantics).
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/QueryResult'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '429': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

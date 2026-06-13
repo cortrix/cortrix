@@ -1,0 +1,48 @@
+name: Bug report
+description: Report a problem with cortrix-skills (CortrixToolKit or a framework adapter)
+labels: ["bug", "P14"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug in **cortrix-skills**. Please fill in the details below.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CortrixToolKit (a cortrix_* method)
+        - LangChain adapter
+        - Claude Tools adapter
+        - OpenAI Function Calling adapter
+        - Packaging / install / dependencies
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: method
+    attributes:
+      label: Method / adapter name
+      description: e.g. cortrix_memory_invalidate, as_langchain_tools
+      placeholder: cortrix_query
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead? Include any error code / category / retry_after_ms surfaced.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: A short snippet that reproduces the issue.
+      render: python
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      description: Output of `pip show cortrix-skills cortrix` plus the framework version (langchain / anthropic / openai) and your Python version.
+      render: text
+    validations:
+      required: true

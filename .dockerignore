@@ -1,0 +1,64 @@
+# Git and version control
+.git
+.gitignore
+.github
+
+# Build artifacts
+build/
+build-*/
+*.o
+*.a
+CMakeCache.txt
+CMakeFiles/
+
+# Documentation (tests/ must stay in context: root CMakeLists
+# add_subdirectory(tests) is unconditional, BUILD_TESTS=OFF only skips targets)
+docs/
+*.md
+!README.md
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Python cache / tooling state
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Data files
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.DS_Store
+
+# Deployment configs: exclude by default (deploy/.env and *.local.yaml may
+# hold API keys), allowlist only the files the Dockerfile COPYs.
+deployment/
+deploy/
+!deploy/cortrix.yaml
+!deploy/supervisord.conf
+!deploy/entrypoint.sh
+!deploy/healthcheck.sh
+
+# Design docs
+designs/
+discussions/
+
+# Local model assets (bind-mounted at runtime, never COPYed; multi-GB)
+models/

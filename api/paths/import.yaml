@@ -1,0 +1,211 @@
+# paths/import.yaml — /api/v1/import/* + /api/v1/admin/db-connections/* (F16a Database Import) — 6 endpoints
+# SoT: F16a detailed design + live CE implementation
+#   src/server/routes/import_routes.cpp + src/server/import_handler.cpp + src/import/import_response.cpp.
+# /import/* is admin-scoped (WithAuth kPermAdmin) but not under the AdminGuard loopback prefix;
+# /admin/db-connections/* is under the AdminGuard prefix (Layer 1) + handler.is_admin() (Layer 2).
+paths:
+  /import/database:
+    post:
+      tags: [admin]
+      operationId: startDatabaseImport
+      summary: Start database import (async)
+      description: |
+        Start an asynchronous database import into a namespace (F16a, Admin+). Rows are fetched via a
+        registered connection_ref, textualized (per_row | merge), and fed to the SPC pipeline. Returns a
+        task_id whose status is deterministically "queued"; poll progress via
+        GET /import/tasks/{task_id}/progress. Exactly one of {table, sql} must be provided.
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/components/schemas/ImportRequest'
+      responses:
+        '200':
+          description: Import accepted (asynchronous task queued)
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/ImportTaskStarted'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '503': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /import/tasks/{task_id}/progress:
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [admin]
+      operationId: getImportTaskProgress
+      summary: Get import task progress
+      description: Query asynchronous import task progress (F16a §5.2, Admin+).
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: Task progress
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/ImportTaskProgress'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /import/tasks/{task_id}:
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [admin]
+      operationId: cancelImportTask
+      summary: Cancel import task
+      description: Cancel an asynchronous import task (F16a §5.4, Admin+). Cancel is not an error; the task resolves to status=cancelling then cancelled.
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      responses:
+        '200':
+          description: Cancellation accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task_id, status]
+                properties:
+                  task_id: { type: string }
+                  status:
+                    type: string
+                    enum: [queued, running, completed, failed, cancelling, cancelled]
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /admin/db-connections:
+    post:
+      tags: [admin]
+      operationId: adminRegisterDbConnection
+      summary: Register a database connection
+      description: |
+        Register a database connection for import (F16a, Admin+). The DSN is stored server-side and never
+        returned (R2). Returns only the generated ref_id + name.
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, dsn]
+              properties:
+                name: { type: string, example: "prod-pg" }
+                dsn:
+                  type: string
+                  description: "Database connection string (stored server-side, never returned). e.g. postgres://user:pass@host:5432/db"
+                expire_days:
+                  type: integer
+                  minimum: 1
+                  description: "Optional auto-expiry window in days"
+      responses:
+        '200':
+          description: Connection registered
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ref_id, name]
+                properties:
+                  ref_id: { type: string, example: "db_conn_01H..." }
+                  name: { type: string }
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    get:
+      tags: [admin]
+      operationId: adminListDbConnections
+      summary: List database connections
+      description: List registered database connections (F16a, Admin+). The DSN is never included (R2).
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: Connection list (no DSN)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [connections]
+                properties:
+                  connections:
+                    type: array
+                    items:
+                      $ref: '../components/schemas.yaml#/components/schemas/DbConnection'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /admin/db-connections/{ref_id}:
+    parameters:
+      - name: ref_id
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [admin]
+      operationId: adminRevokeDbConnection
+      summary: Revoke a database connection
+      description: Revoke a registered database connection (F16a, Admin+). Accepts an optional reason.
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: destructive
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+      responses:
+        '200':
+          description: Connection revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ref_id, revoked]
+                properties:
+                  ref_id: { type: string }
+                  revoked: { type: boolean, example: true }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

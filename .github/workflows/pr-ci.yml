@@ -1,0 +1,135 @@
+# =============================================================
+# F23 Stage 1: PR CI  (design: dev-cortrix-hub F23-tests.md §6.2)
+# Target < 10 min design budget; real-world C++ build needs ccache
+# warm cache to approach it, so job timeout is set wider.
+#
+# Repo-reality adaptations vs the design sketch (all intentional):
+#   - web uses npm + vitest (no pnpm, no separate test:unit script)
+#   - python tests live per-component (cortrix-agent/, sdk/python, ...)
+#   - ctest selects suites via -L labels (added in tests/CMakeLists.txt)
+#   - lint is SOFT until the legacy-formatting decision is made
+# Hard gates: unit tests 100% PASS, build OK.
+# =============================================================
+name: PR CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+jobs:
+  cpp_unit:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake build-essential libssl-dev libsqlite3-dev libpq-dev ccache
+
+      - name: ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: ccache-${{ runner.os }}-
+
+      - name: Configure (Debug)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      # Suites run as separate processes via ctest (one proc per test);
+      # never run the whole suite in a single process (known SIGSEGV mode).
+      - name: Unit Tests (C++)
+        run: ctest --test-dir build -L unit --output-on-failure
+
+  frontend_unit:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Component Tests (Vitest)
+        run: |
+          cd web
+          npm ci --ignore-scripts
+          npm test
+
+  python_unit:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Python Unit Tests (per component)
+        run: |
+          set -e
+          for comp in cortrix-agent cortrix-mcp sdk/python; do
+            if [ -f "$comp/requirements.txt" ]; then
+              pip install -q -r "$comp/requirements.txt" || true
+            fi
+            if [ -f "$comp/pyproject.toml" ]; then
+              pip install -q -e "$comp" || true
+            fi
+            if [ -d "$comp/tests" ]; then
+              echo "── pytest: $comp"
+              (cd "$comp" && python -m pytest tests -m "not slow" -q)
+            fi
+          done
+
+  lint:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    # SOFT gate: legacy code predates .clang-format; hardening mode
+    # (full reformat vs diff-only) is a pending Derek decision.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: clang-format (changed files only)
+        run: |
+          sudo apt-get install -y clang-format
+          git fetch origin ${{ github.base_ref || 'main' }} --depth=1 || true
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} -- '*.cpp' '*.h' | grep -E '^(src|include|tests)/' || true)
+          if [ -n "$CHANGED" ]; then
+            clang-format --dry-run --Werror $CHANGED
+          else
+            echo "no C++ changes"
+          fi
+      - name: ruff (python)
+        run: |
+          pip install -q ruff
+          ruff check cortrix-agent cortrix-mcp sdk/python || true
+
+  # Coverage diff is record-only at Stage 1 (soft, per §6.2)
+  coverage_soft:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 50
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake build-essential libssl-dev libsqlite3-dev libpq-dev lcov ccache
+      - name: Coverage build + report (record only)
+        run: ./scripts/ci/coverage.sh --report-only
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build-cov/coverage/
+          if-no-files-found: ignore

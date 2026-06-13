@@ -1,0 +1,14 @@
+{
+  "error": {
+    "code": "CX_ERR_NS_QUOTA_EXCEEDED",
+    "message": "Namespace document quota exceeded",
+    "retryable": false,
+    "category": "quota",
+    "retry_after_ms": null,
+    "structured_data": {
+      "ns_quota_used": 1000,
+      "ns_quota_limit": 1000
+    },
+    "request_id": "req_up429"
+  }
+}

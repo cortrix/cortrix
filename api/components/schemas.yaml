@@ -1,0 +1,1147 @@
+# components/schemas.yaml — core dataclasses (gathered in reverse from ARCH § 4.1.x + P03 v1.0.1 types)
+#
+# SoT: ARCHITECTURE.md § 4.1.1-4.1.11 per-domain request/response examples + each Feature's detailed design + P03 v1.0.1 types.
+# Field names are stable and backward-compatible (AGENT_FRIENDLY principle 7). ULID uses string (ARCH § 1.8 + V5 resolution #6A).
+#
+# Relational-model fields (P03-1 collaboration): visibility / ns_acl / dedup_scope / isolation_mode / owner_node_id.
+components:
+  schemas:
+
+    # ============ Namespace domain (ARCH § 4.1.1) ============
+    ChunkStrategy:
+      type: object
+      properties:
+        max_tokens:
+          type: integer
+          minimum: 1
+          example: 512
+        overlap_tokens:
+          type: integer
+          minimum: 0
+          example: 64
+
+    NamespaceCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: "contracts"
+        display_name:
+          type: string
+          example: "Contract Document Library"
+        description:
+          type: string
+          example: "Stores all customer contracts"
+        embedding_model:
+          type: string
+          example: "bge-m3"
+        chunk_strategy:
+          $ref: '#/components/schemas/ChunkStrategy'
+        # relational-model fields (P03-1)
+        visibility:
+          type: string
+          enum: [private, tenant, public]
+          default: private
+          description: "NS visibility (private / within tenant / public)"
+        isolation_mode:
+          type: string
+          enum: [shared, dedicated]
+          description: "Resource isolation mode"
+
+    Namespace:
+      type: object
+      required: [namespace, status]
+      properties:
+        namespace:
+          type: string
+          example: "contracts"
+        display_name:
+          type: string
+        description:
+          type: string
+        embedding_model:
+          type: string
+          example: "bge-m3"
+        chunk_strategy:
+          $ref: '#/components/schemas/ChunkStrategy'
+        status:
+          type: string
+          enum: [active, creating, deleting, error]
+          example: active
+        visibility:
+          type: string
+          enum: [private, tenant, public]
+        isolation_mode:
+          type: string
+          enum: [shared, dedicated]
+        owner_node_id:
+          type: string
+          nullable: true
+          description: "ID of the node that owns this NS's data (distributed deployment, P03-1)"
+        ns_acl:
+          type: array
+          description: "NS ACL grant list (P09 / P03-1; see NsAclEntry)"
+          items:
+            $ref: '#/components/schemas/NsAclEntry'
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-04-02T10:00:00Z"
+
+    # ============ Document domain (ARCH § 4.1.2 + F42) ============
+    DocumentProgress:
+      type: object
+      properties:
+        stage:
+          type: string
+          enum: [pending, parsing, chunking, embedding, indexing, ready, failed]
+          example: embedding
+        chunks_total:
+          type: integer
+          example: 42
+        chunks_done:
+          type: integer
+          example: 28
+        semantic_score:
+          type: number
+          format: float
+          nullable: true
+          example: 0.6
+
+    Document:
+      type: object
+      required: [document_id, status]
+      properties:
+        document_id:
+          type: string
+          example: "doc_abc123"
+        namespace:
+          type: string
+          example: "contracts"
+        filename:
+          type: string
+          example: "contract_001.pdf"
+        status:
+          type: string
+          enum: [pending, parsing, chunking, embedding, indexing, ready, failed]
+          example: processing
+        progress:
+          $ref: '#/components/schemas/DocumentProgress'
+        content_hash:
+          type: string
+          example: "sha256:abc..."
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+
+    DocumentTask:
+      type: object
+      description: "F42 asynchronous upload task"
+      required: [task_id, status]
+      properties:
+        task_id:
+          type: string
+          example: "task_xxx_001"
+        document_id:
+          type: string
+          nullable: true
+        namespace:
+          type: string
+        status:
+          type: string
+          enum: [submitted, queued, processing, ready, failed, cancelled]
+          example: processing
+        progress:
+          $ref: '#/components/schemas/DocumentProgress'
+        created_at:
+          type: string
+          format: date-time
+
+    # ============ Query domain (ARCH § 4.1.3 + F04 v1.0.3) ============
+    QueryFilter:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+        date_range:
+          type: object
+          properties:
+            start:
+              type: string
+              format: date
+            end:
+              type: string
+              format: date
+
+    QueryRequest:
+      type: object
+      required: [query, namespaces]
+      properties:
+        query:
+          type: string
+          example: "Party A breach-of-contract clauses"
+        namespaces:
+          type: array
+          description: >-
+            Target NS array (the only valid format in V1). Single NS = ["contracts"]; cross-NS = multiple elements;
+            all NS (those authorized, hard cap 100) = ["*"]. The MVP singular `namespace` → 400 CX_ERR_DEPRECATED_FIELD.
+          items:
+            type: string
+          example: ["contracts", "support_docs"]
+        top_k:
+          type: integer
+          minimum: 1
+          default: 10
+          example: 10
+        rerank:
+          type: boolean
+          default: true
+        filter:
+          $ref: '#/components/schemas/QueryFilter'
+        include_sources:
+          type: boolean
+          description: "When true, results include provenance information"
+        route:
+          type: string
+          enum: [auto, simple, complex, chat]
+          description: "F39 query-complexity route override (also accepted as ?route query param; default auto). 'chat' takes the MEM02-only memory path."
+        rag_fusion:
+          type: boolean
+          default: false
+          description: "F36 RAG-Fusion opt-in (also accepted as ?rag_fusion=true). Off by default until the NS-config resolver lands (D3.5)."
+
+    QueryResultItem:
+      type: object
+      properties:
+        child_id:
+          type: string
+          description: "child block ULID (ARCH § 1.8)"
+          example: "01HXYZA0BC9876543ZYXWVU321"
+        parent_id:
+          type: string
+          example: "01HXYZA0BC1234567890ABCDEF"
+        content:
+          type: string
+        parent_content:
+          type: string
+          description: "F34 parent full text"
+        score:
+          type: number
+          format: float
+          description: "final_score (output of the F07 SemanticScorer)"
+          example: 0.892
+        rerank_score:
+          type: number
+          format: float
+          description: "cross-encoder score (F02)"
+          example: 0.945
+        namespace:
+          type: string
+          description: "NS source with the highest rerank_score"
+        content_hash:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    QueryMeta:
+      type: object
+      description: "Class-A fields (data integrity) — mandatory; cross-NS partial-success semantics."
+      required: [namespaces_queried, namespaces_succeeded, coverage_ratio, latency_ms]
+      properties:
+        namespaces_queried:
+          type: array
+          items:
+            type: string
+        namespaces_succeeded:
+          type: array
+          items:
+            type: string
+        namespaces_failed:
+          type: array
+          items:
+            type: object
+            required: [namespace, error_code, retryable, category]
+            properties:
+              namespace: { type: string }
+              error_code:
+                type: string
+                pattern: "^CX_ERR_[A-Z][A-Z_]*$"
+              retryable: { type: boolean }
+              category:
+                type: string
+                enum: [auth, quota, transient, permanent, timeout]
+              retry_after_ms:
+                type: integer
+                nullable: true
+              message: { type: string }
+        coverage_ratio:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        latency_ms:
+          type: integer
+        deduplicated_chunks:
+          type: array
+          items:
+            type: string
+        deduplicated_chunks_count:
+          type: integer
+        warnings:
+          type: array
+          items:
+            type: object
+        via_path:
+          type: string
+          description: "F39 path marker, present on the chat route (e.g. 'chat_memory_only')."
+        crag_verdict:
+          type: string
+          description: "F37 CRAG B-class verdict; present only when F37 ran (Complex route)."
+        crag_action:
+          type: string
+          description: "F37 action taken for an ambiguous CRAG verdict; present alongside crag_verdict when set."
+
+    QueryResult:
+      type: object
+      required: [results, meta]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueryResultItem'
+        meta:
+          $ref: '#/components/schemas/QueryMeta'
+
+    # ============ Memory domain (ARCH § 4.1.5 + MEM01/02/03/05) ============
+    MemorySearchRequest:
+      type: object
+      required: [query, namespace, user_id]
+      properties:
+        query:
+          type: string
+          example: "the project progress the user mentioned last time"
+        namespace:
+          type: string
+          example: "user_memory"
+        user_id:
+          type: string
+          description: "Mandatory user_id filter (MEM05 isolation)"
+          example: "user_001"
+        top_k:
+          type: integer
+          default: 5
+
+    MemorySearchResultItem:
+      type: object
+      description: "One MEM02 conversation-memory search hit (live MemorySearcher result)."
+      required: [interaction_id, session_id, query_text, response_text, score, expired, created_at]
+      properties:
+        interaction_id: { type: string }
+        session_id: { type: string }
+        query_text: { type: string }
+        response_text: { type: string }
+        query_type: { type: string }
+        score:
+          type: number
+          format: float
+        expired: { type: boolean }
+        created_at: { type: string }
+        metadata: { type: string, description: "Raw metadata_json string (passed through as stored)." }
+
+    MemorySearchResponse:
+      type: object
+      description: "POST /memory/search body (live MemorySearchResponse). Semantic search over conversation memory with MEM05 user isolation."
+      required: [results, total_results, latency_ms, degraded]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemorySearchResultItem'
+        total_results: { type: integer }
+        latency_ms: { type: integer }
+        degraded:
+          type: boolean
+          description: "True when the query pipeline fell back to a degraded path."
+
+    MemoryExtractedItem:
+      type: object
+      required: [block_id, type, content, confidence]
+      properties:
+        block_id: { type: string }
+        type:
+          type: string
+          enum: [fact, preference, event]
+        content: { type: string }
+        confidence:
+          type: number
+          format: float
+
+    MemoryExtractResponse:
+      type: object
+      description: "POST /memory/extract body (live ExtractOne result). error is always null on success (GEN-Agent stable schema)."
+      required: [extracted_memories, error]
+      properties:
+        extracted_memories:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryExtractedItem'
+        extract_meta:
+          type: object
+          description: "Present when the LLM ran."
+          properties:
+            llm_model: { type: string }
+            contradictions_found: { type: integer }
+        error:
+          type: object
+          nullable: true
+          description: "Always null on success."
+
+    MemoryCreateRequest:
+      type: object
+      required: [namespace, content, memory_type]
+      properties:
+        namespace:
+          type: string
+        content:
+          type: string
+          example: "User preference: use Markdown for report format"
+        memory_type:
+          type: string
+          enum: [fact, preference, event]
+        metadata:
+          type: object
+          additionalProperties: true
+
+    Memory:
+      type: object
+      required: [memory_id, content, memory_type, status]
+      properties:
+        memory_id:
+          type: string
+          example: "mem_001"
+        content:
+          type: string
+        memory_type:
+          type: string
+          enum: [fact, preference, event]
+          description: "fact/preference are immune to decay; event decays by exp(-λ×age)"
+        status:
+          type: string
+          enum: [valid, invalidated]
+          description: "invalidated = deprecated but retained (always retained, never overwritten)"
+        source_session_id:
+          type: string
+          nullable: true
+        source_interaction_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        score:
+          type: number
+          format: float
+          nullable: true
+
+    # ============ Import domain (F16a Database Import) ============
+    # Shapes mirror the live CE implementation:
+    #   src/import/import_types.h (ImportRequest / ImportTaskProgress / ImportTaskStatus)
+    #   src/import/import_response.cpp (BuildImportStartedResponse / BuildProgressResponse).
+    ImportRequest:
+      type: object
+      description: |
+        Database import request (POST /import/database, F16a §6.2). Exactly one of {table, sql} must be
+        provided; table mode additionally accepts a filter JSON DSL (NOT raw SQL) + columns projection.
+      required: [namespace, connection_ref]
+      properties:
+        namespace:
+          type: string
+          example: "sales"
+        connection_ref:
+          type: string
+          description: "ref_id of a connection previously registered via POST /admin/db-connections."
+          example: "db_conn_01H..."
+        text_strategy:
+          type: string
+          enum: [per_row, merge]
+          default: per_row
+          description: "Row textualization strategy. 'template' was removed in v1.0.2."
+        merge_size:
+          type: integer
+          default: 10
+          minimum: 1
+          description: "Rows concatenated into one Block (only used when text_strategy=merge)."
+        table:
+          type: string
+          description: "Table mode: source table name (mutually exclusive with sql)."
+        filter:
+          type: object
+          additionalProperties: true
+          description: "Table mode: v1.0.2 JSON filter DSL (NOT raw SQL)."
+        columns:
+          type: array
+          items:
+            type: string
+          description: "Table mode: column projection (empty = all)."
+        sql:
+          type: string
+          description: "Custom SQL mode: the SELECT to import (mutually exclusive with table)."
+
+    ImportTaskStarted:
+      type: object
+      description: "Acceptance ack for POST /import/database (F16a §5.1). status is always 'queued'; live status comes from GET /import/tasks/{task_id}/progress."
+      required: [task_id, status, namespace, connection_ref, estimated_rows, queued_at, progress_endpoint, cancel_endpoint, error]
+      properties:
+        task_id:
+          type: string
+          example: "import_01H..."
+        status:
+          type: string
+          enum: [queued]
+        namespace:
+          type: string
+        connection_ref:
+          type: string
+        estimated_rows:
+          type: integer
+          format: int64
+          description: "Seeded from the COUNT(*) pre-check (0 if unknown)."
+        queued_at:
+          type: string
+          format: date-time
+        progress_endpoint:
+          type: string
+          example: "/api/v1/import/tasks/import_01H.../progress"
+        cancel_endpoint:
+          type: string
+          example: "/api/v1/import/tasks/import_01H..."
+        error:
+          type: object
+          nullable: true
+          description: "Always null on the success ack (GEN-Agent stable schema)."
+
+    ImportTaskProgress:
+      type: object
+      description: "Import task progress snapshot (F16a §5.2). error is set only in the FAILED terminal state; cancel resolves to status=cancelled with no error."
+      required: [task_id, status, progress, rows_imported, rows_total, rows_failed, started_at, estimated_completion_at, error]
+      properties:
+        task_id:
+          type: string
+        status:
+          type: string
+          enum: [queued, running, completed, failed, cancelling, cancelled]
+        progress:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: "0.0 - 1.0"
+        rows_imported:
+          type: integer
+        rows_total:
+          type: integer
+        rows_failed:
+          type: integer
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        estimated_completion_at:
+          type: string
+          format: date-time
+          nullable: true
+        error:
+          type: object
+          nullable: true
+          description: "Set only in the FAILED terminal state; the GEN-Agent error object (same shape as ErrorResponseV1.error, NOT the {error:{...}} envelope)."
+          required: [code, message, retryable, category]
+          properties:
+            code:
+              type: string
+              pattern: "^CX_ERR_[A-Z][A-Z_]*$"
+            message: { type: string }
+            retryable: { type: boolean }
+            category:
+              type: string
+              enum: [auth, quota, transient, permanent, timeout]
+            retry_after_ms:
+              type: integer
+              nullable: true
+            structured_data:
+              type: object
+              additionalProperties: true
+
+    DbConnection:
+      type: object
+      description: "A registered import connection as listed by GET /admin/db-connections. The DSN is never returned (R2)."
+      required: [ref_id, name, host, db_name, registered_by, revoked]
+      properties:
+        ref_id:
+          type: string
+          example: "db_conn_01H..."
+        name:
+          type: string
+        host:
+          type: string
+        db_name:
+          type: string
+        registered_by:
+          type: string
+        revoked:
+          type: boolean
+
+    # ============ Observability domain (F13 Agent Observability) ============
+    # Shapes mirror the live CE serializers in src/server/routes/observability_routes.cpp
+    # (TraceEntryToJson / TracesResponseToJson / SourcesViewToJson / InteractionListToJson).
+    # Timestamps are raw stored Unix-ms integers (the writer stamps Unix ms).
+    TraceEntry:
+      type: object
+      description: "One agent_trace row (F13 §8.1). Optional columns are JSON null when unset (GEN-Agent stable schema)."
+      required: [session_id, trace_id, agent_id, method, params, result_summary, duration_ms, source, status, error_code, namespace_id, created_at]
+      properties:
+        session_id: { type: string, nullable: true }
+        trace_id: { type: string, nullable: true }
+        agent_id: { type: string, nullable: true }
+        method: { type: string }
+        params: { type: string, nullable: true }
+        result_summary: { type: string, nullable: true }
+        duration_ms: { type: integer }
+        source: { type: string }
+        status: { type: string }
+        error_code: { type: string, nullable: true }
+        namespace_id: { type: string, nullable: true }
+        created_at:
+          type: integer
+          format: int64
+          description: "Raw stored Unix-ms timestamp."
+
+    TraceSessionMeta:
+      type: object
+      required: [session_start, session_end, total_duration_ms, total_count, has_next, next_offset, response_size_warning]
+      properties:
+        session_start: { type: integer, format: int64, nullable: true }
+        session_end: { type: integer, format: int64, nullable: true }
+        total_duration_ms: { type: integer }
+        total_count:
+          type: integer
+          description: "Total rows matching the filter (across pages)."
+        has_next: { type: boolean }
+        next_offset:
+          type: integer
+          nullable: true
+          description: "Null when has_next is false."
+        response_size_warning:
+          type: boolean
+          description: "§8.1 soft-limit flag."
+
+    TraceSession:
+      type: object
+      description: "GET /traces/{session_id} body (F13 §8.1)."
+      required: [session_id, trace_count, traces, meta]
+      properties:
+        session_id: { type: string }
+        trace_count:
+          type: integer
+          description: "Rows in this page."
+        traces:
+          type: array
+          items:
+            $ref: '#/components/schemas/TraceEntry'
+        meta:
+          $ref: '#/components/schemas/TraceSessionMeta'
+
+    InteractionListItem:
+      type: object
+      required: [interaction_id, session_id, user_id, namespace_id, role, query_text, query_type, created_at]
+      properties:
+        interaction_id: { type: string }
+        session_id: { type: string }
+        user_id: { type: string }
+        namespace_id: { type: string }
+        role: { type: string }
+        query_text:
+          type: string
+          description: "Returned in full (not truncated)."
+        query_type: { type: string }
+        created_at: { type: integer, format: int64 }
+
+    InteractionListMeta:
+      type: object
+      required: [total_count, has_next, next_offset]
+      properties:
+        total_count: { type: integer }
+        has_next: { type: boolean }
+        next_offset:
+          type: integer
+          nullable: true
+          description: "Null when has_next is false."
+
+    InteractionList:
+      type: object
+      description: "GET /interactions body (F13 §8.3)."
+      required: [interactions, meta]
+      properties:
+        interactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/InteractionListItem'
+        meta:
+          $ref: '#/components/schemas/InteractionListMeta'
+
+    InteractionSource:
+      type: object
+      required: [source_id, source_type, snippet, relevance_score]
+      properties:
+        source_id: { type: string }
+        source_type: { type: string }
+        snippet: { type: string }
+        relevance_score:
+          type: number
+          format: float
+
+    InteractionSources:
+      type: object
+      description: "GET /interactions/{id}/sources body (F13 §8.2). highlight_ranges is Enterprise-only (absent in CE)."
+      required: [interaction_id, source_count, deleted_sources_count, sources]
+      properties:
+        interaction_id: { type: string }
+        source_count: { type: integer }
+        deleted_sources_count: { type: integer }
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/InteractionSource'
+
+    # ============ Watch domain (ARCH § 4.1.4 + F21) ============
+    Watcher:
+      type: object
+      required: [id, path]
+      properties:
+        id:
+          type: string
+          example: "watch_001"
+        path:
+          type: string
+          example: "/data/shared/engineering"
+        target_namespaces:
+          type: array
+          items:
+            type: string
+          example: ["team_a", "team_b"]
+        recursive:
+          type: boolean
+          default: true
+        status:
+          type: string
+          enum: [active, paused, error]
+
+    WatchEvent:
+      type: object
+      properties:
+        event_id:
+          type: string
+        watcher_id:
+          type: string
+        event_type:
+          type: string
+          enum: [created, modified, deleted, moved]
+        path:
+          type: string
+        namespace:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    # ============ Auth domain (ARCH § 4.1.9 + P08) ============
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        password:
+          type: string
+          format: password
+        display_name:
+          type: string
+          example: "Jane Doe"
+
+    TenantRef:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "tenant_001"
+        name:
+          type: string
+          example: "Cortrix"
+        role:
+          type: string
+          enum: [owner, admin, member]
+
+    User:
+      type: object
+      required: [id, email]
+      properties:
+        id:
+          type: string
+          example: "usr_001"
+        email:
+          type: string
+          format: email
+        display_name:
+          type: string
+        status:
+          type: string
+          enum: [active, disabled, pending_verification]
+        tenants:
+          type: array
+          items:
+            $ref: '#/components/schemas/TenantRef'
+        created_at:
+          type: string
+          format: date-time
+
+    LoginResponse:
+      type: object
+      required: [access_token, refresh_token, expires_in]
+      properties:
+        access_token:
+          type: string
+          example: "eyJ..."
+        refresh_token:
+          type: string
+          example: "eyJ..."
+        expires_in:
+          type: integer
+          example: 3600
+        user:
+          $ref: '#/components/schemas/User'
+
+    ApiKey:
+      type: object
+      required: [id, prefix]
+      properties:
+        id:
+          type: string
+          example: "key_001"
+        name:
+          type: string
+        prefix:
+          type: string
+          description: "key prefix (cx_live_ / cx_test_); the full key is returned only once, at creation time"
+          example: "cx_live_"
+        key:
+          type: string
+          nullable: true
+          description: "Full API Key — returned only once at creation time, null thereafter"
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    # ============ Tenant / ACL domain (P09) ============
+    Quota:
+      type: object
+      properties:
+        max_namespaces:
+          type: integer
+        max_documents:
+          type: integer
+        max_storage_bytes:
+          type: integer
+          format: int64
+        used_namespaces:
+          type: integer
+        used_documents:
+          type: integer
+        used_storage_bytes:
+          type: integer
+          format: int64
+
+    TenantMember:
+      type: object
+      required: [user_id, role]
+      properties:
+        user_id:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [owner, admin, member]
+        joined_at:
+          type: string
+          format: date-time
+
+    Tenant:
+      type: object
+      required: [tenant_id, name]
+      properties:
+        tenant_id:
+          type: string
+          example: "tenant_001"
+        name:
+          type: string
+        owner_user_id:
+          type: string
+        quota:
+          $ref: '#/components/schemas/Quota'
+        created_at:
+          type: string
+          format: date-time
+
+    NsAclEntry:
+      type: object
+      required: [grantee_tenant_id, permission]
+      properties:
+        grantee_tenant_id:
+          type: string
+          description: "ID of the tenant being granted access"
+        permission:
+          type: string
+          enum: [read, write]
+          description: "dedup_scope related: permission level for cross-tenant shared NS"
+        granted_at:
+          type: string
+          format: date-time
+
+    # ============ Agent domain (F48 v1.0.2 / V14 J8) ============
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: "Help me look up last month's sales contracts"
+        session_id:
+          type: string
+          nullable: true
+          description: "Continue an existing session; null = new session"
+        namespace:
+          type: string
+          nullable: true
+
+    AgentSession:
+      type: object
+      required: [session_id]
+      properties:
+        session_id:
+          type: string
+          example: "sess_abc"
+        tenant_id:
+          type: string
+          nullable: true
+          description: >-
+            Class-A field, always returned (AGENT_FRIENDLY § 2). In a CE single-tenant environment the value is null
+            (Class-A null-allowed clause, F48's first instance) — treat as default/unset, not as an error.
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+                enum: [user, assistant, system]
+              content:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    # ============ System domain (ARCH § 4.1.11 + V14 J8) ============
+    AgentLlmConfig:
+      type: object
+      description: "F48 § 6.3 agent LLM config (GET reads redacted / PUT admin-only update)"
+      properties:
+        provider:
+          type: string
+          enum: [openai, deepseek, azure]
+        model:
+          type: string
+          example: "gpt-4o-mini"
+        api_key_set:
+          type: boolean
+          description: "Redacted: only exposes whether a key is configured, never returns the key in plaintext"
+        base_url:
+          type: string
+          nullable: true
+
+    NsStats:
+      type: object
+      description: "per-NS metrics dictionary (V3 resolution 10, replaces the PromQL ns_id label)"
+      properties:
+        namespace:
+          type: string
+        document_count:
+          type: integer
+        chunk_count:
+          type: integer
+        storage_bytes:
+          type: integer
+          format: int64
+        last_query_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    # ============ GC / ops domain (P03 v1.0.1 § 2.13) ============
+    GcStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [idle, running]
+        soft_deleted_count:
+          type: integer
+        reclaimable_bytes:
+          type: integer
+          format: int64
+        last_gc_at:
+          type: integer
+          format: int64
+          nullable: true
+          description: "Unix epoch milliseconds of the last GC run (same convention as latency_ms / F13 timestamps); null if GC has never run."
+
+    # ============ Batch submit domain (TD-F42-BULK §2.2/§2.3, Wave D-R1) ============
+    BatchSubmitDocument:
+      type: object
+      description: "One document in a batch submission (TD-F42-BULK §2.2)."
+      required: [doc_id, content]
+      properties:
+        doc_id:
+          type: string
+          description: "Client-provided stable identifier, unique within the batch."
+          example: "doc_001"
+        content:
+          type: string
+          description: "Document content (inline). url / file_path variants are Phase 2."
+        metadata:
+          type: object
+          additionalProperties: true
+
+    BatchSubmitOptions:
+      type: object
+      description: "Batch submission options (TD-F42-BULK §2.2, topics 2/3)."
+      properties:
+        async:
+          type: boolean
+          default: true
+          description: "Always true in V1 (F42 async processing, topic 3)."
+        on_duplicate:
+          type: string
+          enum: [skip, overwrite, error]
+          default: skip
+          description: "Per-doc duplicate-content policy (topic 2)."
+
+    BatchSubmitRequest:
+      type: object
+      required: [namespace, documents]
+      properties:
+        namespace:
+          type: string
+          example: "my-docs"
+        documents:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/BatchSubmitDocument'
+        options:
+          $ref: '#/components/schemas/BatchSubmitOptions'
+
+    BatchSubmitResultItem:
+      type: object
+      description: "Accepted per-doc submission result (TD-F42-BULK §2.3 results[])."
+      required: [doc_id, task_id, status]
+      properties:
+        doc_id:
+          type: string
+          example: "doc_001"
+        task_id:
+          type: string
+          description: "F42 task_id for polling GET /documents/tasks/{task_id}/progress."
+          example: "task_xxx_001"
+        status:
+          type: string
+          enum: [submitted, skipped]
+          description: "submitted = queued to F42; skipped = on_duplicate=skip matched."
+          example: submitted
+
+    BatchSubmitFailureItem:
+      type: object
+      description: "Per-doc failure with the GEN-Agent 5-field schema (TD-F42-BULK §2.3 / §2.4.2). error_code reuses the originating Feature's existing CX_ERR_* code."
+      required: [doc_id, error_code, category, retryable]
+      properties:
+        doc_id:
+          type: string
+          example: "doc_003"
+        error_code:
+          type: string
+          pattern: "^CX_ERR_[A-Z][A-Z_]*$"
+          example: "CX_ERR_NS_QUOTA_EXCEEDED"
+        category:
+          type: string
+          enum: [auth, quota, transient, permanent, timeout]
+        retryable:
+          type: boolean
+        retry_after_ms:
+          type: integer
+          nullable: true
+        structured_data:
+          type: object
+          nullable: true
+          additionalProperties: true
+
+    BatchSubmitMeta:
+      type: object
+      description: "Class-A partial-success meta (TD-F42-BULK §2.3); coverage_ratio = succeeded / total_submitted."
+      required: [succeeded, failed, coverage_ratio, total_submitted]
+      properties:
+        succeeded:
+          type: array
+          items:
+            type: string
+          description: "doc_ids successfully submitted (or skipped)."
+        failed:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchSubmitFailureItem'
+        coverage_ratio:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          example: 0.5
+        total_submitted:
+          type: integer
+          example: 4
+
+    BatchSubmitResponse:
+      type: object
+      description: "Batch submission partial-success response (TD-F42-BULK §2.3). HTTP 200 even with per-doc failures; batch-level rejection returns a GEN-Agent error envelope (§2.4.1)."
+      required: [results, meta]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchSubmitResultItem'
+        meta:
+          $ref: '#/components/schemas/BatchSubmitMeta'

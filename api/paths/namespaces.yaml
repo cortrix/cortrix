@@ -1,0 +1,156 @@
+# paths/namespaces.yaml — /api/v1/namespaces/* (ARCH § 4.1.1) — 5 endpoint
+# SoT: ARCH § 4.1.1 + components/schemas.yaml (Namespace / NamespaceCreateRequest)
+paths:
+  /namespaces:
+    post:
+      tags: [admin]
+      operationId: createNamespace
+      summary: Create namespace
+      description: Create a namespace (Admin+).
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      x-cortrix-rate-limit: "20/min/tenant"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/components/schemas/NamespaceCreateRequest'
+      responses:
+        '201':
+          description: Namespace created
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Namespace'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '409': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '429': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    get:
+      tags: [public]
+      operationId: listNamespaces
+      summary: List namespaces
+      description: List authorized namespaces (Read+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: Namespace list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [namespaces]
+                properties:
+                  namespaces:
+                    type: array
+                    items:
+                      $ref: '../components/schemas.yaml#/components/schemas/Namespace'
+                  total: { type: integer }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '429': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /namespaces/{ns}:
+    parameters:
+      - name: ns
+        in: path
+        required: true
+        schema: { type: string }
+        description: namespace name
+    get:
+      tags: [public]
+      operationId: getNamespace
+      summary: Get namespace
+      description: Get namespace details (Read+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: Namespace details
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Namespace'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    patch:
+      tags: [admin]
+      operationId: updateNamespace
+      summary: Update namespace
+      description: Update namespace configuration (Admin+).
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name: { type: string }
+                description: { type: string }
+                chunk_strategy:
+                  $ref: '../components/schemas.yaml#/components/schemas/ChunkStrategy'
+                visibility:
+                  type: string
+                  enum: [private, tenant, public]
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Namespace'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    delete:
+      tags: [admin]
+      operationId: deleteNamespace
+      summary: Delete namespace
+      description: Delete a namespace and all its data (Owner). Irreversible.
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: destructive
+      responses:
+        '202':
+          description: Deletion accepted (asynchronous)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  namespace: { type: string }
+                  status: { type: string, enum: [deleting] }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

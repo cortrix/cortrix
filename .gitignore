@@ -1,0 +1,66 @@
+# Build artifacts
+build/
+build-*/
+dist/
+*.o
+*.a
+CMakeCache.txt
+CMakeFiles/
+
+# IDE and editor files
+.vscode/
+.idea/
+.cache/
+*.swp
+*.swo
+
+# Python cache
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# Node/Web
+node_modules/
+*.tsbuildinfo
+
+# Data files (data/ holds runtime state — catalog.db, namespaces.json, tasks.db)
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.db
+*.db-wal
+*.db-shm
+data/
+
+# Web UI build output (image builds it from web/ source; never commit artifacts)
+web/static/
+
+# Local MCP client config (absolute local paths)
+.mcp.json
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+
+# Model files (large binary, download via deploy/download-models.sh)
+models/
+*.onnx
+*.onnx_data
+
+# Deleted buffer
+.deleted/
+
+# llvm-cov / coverage scattered artifacts
+*.profraw
+*.profdata
+
+# Local deployment overrides (may contain API keys — never commit)
+deploy/*.local.yaml
+deploy/*.local.yml

@@ -1,0 +1,148 @@
+# =============================================================
+# F23 Stage 2: Nightly CI  (design: dev-cortrix-hub F23-tests.md §6.3)
+# Cron 02:00 UTC+8 = 18:00 UTC. Target < 60 min.
+#
+# Hard gates (topic 2 rev B):
+#   - Coverage overall ≥ 80%, core-17 ≥ 90% line / ≥ 80% branch
+#   - P0 100% PASS / P1 ≥ 98% PASS
+#   - No High/Critical security findings
+# Soft: P95 latency vs baseline ±10%.
+#
+# Repo-reality adaptations vs the design sketch:
+#   - server listens on 8080 (not 9090) → ZAP target fixed
+#   - snyk: no account/token yet → step disabled, Trivy covers
+#     image CVEs at Stage 3 (noted in PROGRESS as pending)
+#   - E2E via npm playwright (web/e2e), 4 browsers
+# =============================================================
+name: Nightly CI
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+jobs:
+  cpp_full:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake build-essential libssl-dev libsqlite3-dev libpq-dev lcov ccache
+      - name: ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-nightly-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            ccache-nightly-${{ runner.os }}-
+            ccache-${{ runner.os }}-
+
+      - name: Configure (RelWithDebInfo)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      - name: Build
+        run: cmake --build build --parallel
+
+      # one process per test via ctest; single-process full-suite runs SIGSEGV
+      - name: Unit Tests
+        run: ctest --test-dir build -L unit --output-on-failure
+      - name: Integration Tests
+        run: ctest --test-dir build -L integration --output-on-failure
+
+      - name: Coverage Aggregate + Quality Gate (hard)
+        run: ./scripts/ci/coverage.sh --check
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightly-coverage
+          path: build-cov/coverage/
+          if-no-files-found: ignore
+
+  asan:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake build-essential libssl-dev libsqlite3-dev libpq-dev
+      - name: Configure (ASAN)
+        run: |
+          cmake -B build-asan -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
+      - name: Build
+        run: cmake --build build-asan --parallel
+      - name: Unit under ASAN
+        run: ASAN_OPTIONS=detect_leaks=1 ctest --test-dir build-asan -L unit --output-on-failure
+
+  e2e_web:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: E2E (Playwright, 4 browsers)
+        run: |
+          cd web
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium firefox webkit msedge
+          npx playwright test
+
+  perf_load:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    # Soft gate: P95 vs baseline ±10% — alert, don't block (§6.3)
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build server image
+        run: docker build -t cortrix:nightly -f cortrix/deploy/Dockerfile ..
+        working-directory: .
+      - name: Boot stack
+        run: |
+          docker run -d --name cortrix -p 8080:8080 -v /tmp/cortrix-data:/data cortrix:nightly
+          timeout 90 bash -c 'until curl -sf http://localhost:8080/api/v1/health; do sleep 3; done'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Locust load (100 users, 5 min)
+        run: |
+          pip install -q locust
+          locust -f tests/load/locustfile.py --headless -u 100 -r 10 \
+            --run-time 5m --host http://localhost:8080 \
+            --csv build-load/nightly --exit-code-on-error 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: load-results
+          path: build-load/
+          if-no-files-found: ignore
+
+  security_zap:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build + boot server
+        run: |
+          docker build -t cortrix:nightly -f cortrix/deploy/Dockerfile ..
+          docker run -d --name cortrix --network host -v /tmp/cortrix-data:/data cortrix:nightly
+          timeout 90 bash -c 'until curl -sf http://localhost:8080/api/v1/health; do sleep 3; done'
+      - name: OWASP ZAP baseline (hard gate on High/Critical)
+        run: |
+          docker run --rm --network host -v $(pwd):/zap/wrk ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://localhost:8080 -c tests/security/zap-baseline.conf
+      # snyk disabled: no org token provisioned yet (design lists it;
+      # tracked in PROGRESS — Trivy image scan runs at Release Gate)

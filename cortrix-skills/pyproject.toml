@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cortrix-skills"
+version = "1.0.0"
+description = "Cortrix Skill SDK — framework adapters (LangChain / Claude Tools / OpenAI Function Calling) over the Cortrix Python SDK"
+readme = "README.md"
+license = { text = "AGPL-3.0" }
+requires-python = ">=3.9"
+authors = [{ name = "Cortrix" }]
+keywords = [
+    "cortrix",
+    "agent",
+    "langchain",
+    "claude",
+    "openai",
+    "function-calling",
+    "tools",
+    "rag",
+    "semantic-storage",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Typing :: Typed",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "cortrix>=1.0.0,<2.0.0",
+    "pydantic>=2.0,<3.0",
+]
+
+[project.optional-dependencies]
+langchain = ["langchain>=0.2.0,<0.3.0"]
+claude = ["anthropic>=0.40.0,<1.0.0"]
+openai = ["openai>=1.0,<2.0"]
+all = [
+    "langchain>=0.2.0,<0.3.0",
+    "anthropic>=0.40.0,<1.0.0",
+    "openai>=1.0,<2.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/cortrix/cortrix"
+Repository = "https://github.com/cortrix/cortrix/tree/main/cortrix-skills"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["cortrix_skills*"]
+
+[tool.setuptools.package-data]
+cortrix_skills = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["cortrix_skills"]
+omit = ["*/adapters/langchain.py", "*/adapters/claude.py", "*/adapters/openai.py"]

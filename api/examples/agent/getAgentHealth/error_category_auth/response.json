@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "CX_ERR_NS_UNAUTHORIZED",
+    "message": "TODO: human-readable message",
+    "retryable": false,
+    "category": "auth",
+    "retry_after_ms": null,
+    "structured_data": {},
+    "request_id": "req_xxx"
+  }
+}

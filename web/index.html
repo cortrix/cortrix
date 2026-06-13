@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Content-Security-Policy (P02a design § 4.8 + § 4.6 V5-B4).
+      This <meta> CSP is the in-document baseline; the AUTHORITATIVE production
+      policy is the response header emitted by cortrix-server (SoT: F20 security
+      hardening / SECURITY_BASELINE.md § 2.5). Header-only directives that are
+      ignored in <meta> — frame-ancestors / report-uri — are enforced there
+      (frame-ancestors 'none' for clickjacking + HSTS on HTTPS deploys).
+
+      connect-src: 'self' only (§ 4.6 V5-B4 — production HTTPS, no localhost; the
+      OTLP /v1/metrics push and all /api/v1/* fetches are same-origin; third-party
+      LLMs are reached via the cortrix-server reverse proxy, never directly).
+      style-src allows 'unsafe-inline' for Tailwind/Monaco runtime styles.
+      font-src + style-src include the Google Fonts CDN used in dev/self-host;
+      self-hosting the fonts (V1.5) lets this tighten to 'self' data:.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self'; font-src 'self' data: https://fonts.gstatic.com; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'"
+    />
+    <title>Cortrix</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="h-full font-sans">
+    <div id="root" class="h-full"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

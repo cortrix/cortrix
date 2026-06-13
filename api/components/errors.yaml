@@ -1,0 +1,143 @@
+# components/errors.yaml — ErrorResponseV1 + error-code enum + x-cortrix-error-codes + request_id
+#
+# SoT: P04 § 4.1 + AGENT_FRIENDLY § 3.1/3.3 + ERROR_CODE_SDK_MAP + ARCH § 4.1.11
+# GEN-Agent first principle: error responses are machine-readable (code/retryable/category/retry_after_ms/structured_data).
+components:
+  schemas:
+    ErrorResponseV1:
+      # version annotation (evolution anchor L3)
+      x-cortrix-version: "v1"
+      x-cortrix-deprecation-policy: "stable until Phase 2 D0 review"
+      x-cortrix-migration-target: "ErrorResponseV2 (TBD Phase 2)"
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, retryable, category]
+          properties:
+            code:
+              type: string
+              # v1.0.1 fix for Major-2 (option B): enforce a single CX_ERR_ prefix convention.
+              pattern: "^CX_ERR_[A-Z][A-Z_]*$"
+              example: "CX_ERR_NAMESPACE_NOT_FOUND"
+              x-cortrix-naming-policy: |
+                V1.0 single convention: all error codes must use the CX_ERR_ prefix (Phase 1 first release, evolvability first).
+                Phase 2 evolution anchor: evaluate per-submodule prefixes (CX_PG_ERR_* / CX_MEM_ERR_* / CX_AUTH_ERR_* / CX_NS_ERR_*);
+                the V1 single prefix stays backward-compatible, with new codes split by submodule prefix.
+              x-cortrix-naming-rationale: |
+                (a) Namespace isolation: isolated from third-party library/framework error strings
+                (b) Filter Cortrix errors by prefix in logs/monitoring
+                (c) Reserves an evolution path for submodule prefixes
+                (d) Agents can quickly identify Cortrix errors via prefix matching
+            message:
+              type: string
+              description: "Human-readable error description (do not have Agents regex-parse it; structured info goes in structured_data)"
+              example: "API Key lacks read permission for NS 'memory'"
+            retryable:
+              type: boolean
+              description: "Agent decision field: whether to retry (specific error codes may override this in x-cortrix-error-codes)"
+            category:
+              type: string
+              enum: [auth, quota, transient, permanent, timeout]
+              description: "Enumerable status value (AGENT_FRIENDLY principle 4)"
+            retry_after_ms:
+              type: integer
+              nullable: true
+              example: 1000
+              description: >-
+                Retry hint in ms. Client priority: retry_after_ms > Retry-After HTTP Header (s) > exponential backoff
+                (consistent with the P03 SDK should_retry decision). Usually non-null when category=transient/timeout/quota(429).
+            structured_data:
+              type: object
+              additionalProperties: true
+              description: "Error-specific structured data for Agent automation (e.g. unauthorized_namespaces[])"
+            request_id:
+              type: string
+              # v1.0.1 addition: ARCH § 4.1.11 error responses already include request_id (essential for ops).
+              pattern: "^req_[a-zA-Z0-9]+$"
+              example: "req_abc123"
+              description: "Server-generated request ID for cross-log correlation (works together with P03 SDK ErrorContext.trace_id)"
+
+    # x-cortrix-error-codes is the global error-code metadata registry (exposed in the spec as a machine-readable reference table).
+    # The strict schema is defined in components/x-cortrix.yaml (S3); this is an instantiated sample associated with ErrorResponseV1,
+    # covering high-frequency cross-Feature error codes (the full ~291 are registered in ARCH § 4.1.11.X / ERROR_CODE_SDK_MAP).
+    XCortrixErrorCodeRegistry:
+      type: object
+      description: |
+        Error code → metadata mapping (after parsing error.code, an Agent can look up retryable/category/suggested_action).
+        This schema is a reference sample (high-frequency codes); the server's actual error responses are authoritative via error.{retryable,category,retry_after_ms}.
+      x-cortrix-error-codes:
+        CX_ERR_NAMESPACE_NOT_FOUND:
+          retryable: false
+          category: permanent
+          retry_after_ms: null
+          typical_cause: "namespace name misspelled or already deleted"
+          suggested_action: "GET /namespaces to confirm the name; or POST /namespaces to create it"
+        CX_ERR_NS_UNAUTHORIZED:
+          retryable: false
+          category: auth
+          retry_after_ms: null
+          typical_cause: "API Key lacks access permission for this NS"
+          suggested_action: "Extract from structured_data.unauthorized_namespaces → query only authorized NS"
+        CX_ERR_NS_TIMEOUT:
+          retryable: true
+          category: timeout
+          retry_after_ms: 1000
+          typical_cause: "single-NS query timed out (large index / high load)"
+          suggested_action: "Use partial results + optionally retry the single NS"
+        CX_ERR_RATE_LIMIT:
+          retryable: true
+          category: transient
+          retry_after_ms: 60000
+          typical_cause: "rate limit exceeded"
+          suggested_action: "Retry after sleep(retry_after_ms); or lower QPS"
+        CX_ERR_AUTH_INVALID_API_KEY:
+          retryable: false
+          category: auth
+          retry_after_ms: null
+          typical_cause: "API Key invalid/revoked"
+          suggested_action: "Update the API Key (POST /auth/api-keys to recreate)"
+        CX_ERR_INDEX_CORRUPT:
+          retryable: false
+          category: permanent
+          retry_after_ms: null
+          typical_cause: "vector index corrupted"
+          suggested_action: "partial results + notify ops to reindex (POST /maintenance/reindex)"
+
+  responses:
+    ErrorResponseV1:
+      description: Error response (Cortrix V1 schema — GEN-Agent machine-readable)
+      headers:
+        Retry-After:
+          $ref: './headers.yaml#/components/headers/RetryAfter'
+        x-cortrix-trace-id:
+          $ref: './headers.yaml#/components/headers/XCortrixTraceId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseV1'
+          examples:
+            auth_permanent:
+              summary: "auth category (non-retryable)"
+              value:
+                error:
+                  code: "CX_ERR_NS_UNAUTHORIZED"
+                  message: "Some namespaces are unauthorized"
+                  retryable: false
+                  category: auth
+                  retry_after_ms: null
+                  structured_data:
+                    unauthorized_namespaces: ["finance", "hr"]
+                  request_id: "req_abc123"
+            transient_retryable:
+              summary: "transient category (retryable, includes retry_after_ms)"
+              value:
+                error:
+                  code: "CX_ERR_RATE_LIMIT"
+                  message: "Rate limit exceeded"
+                  retryable: true
+                  category: transient
+                  retry_after_ms: 60000
+                  structured_data: {}
+                  request_id: "req_def456"

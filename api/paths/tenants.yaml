@@ -1,0 +1,237 @@
+# paths/tenants.yaml — /api/v1/tenants/* (P09 v1.0.4 V3-C-04, user-level) — 8 endpoint
+# SoT: P09 v1.0 § 4.1.x + components/schemas.yaml (Tenant / TenantMember / Quota)
+# user-level (distinct from the 4 admin tenant ops in admin.yaml).
+paths:
+  /tenants:
+    get:
+      tags: [public]
+      operationId: listMyTenants
+      summary: List my tenants
+      description: List the tenants the current user belongs to.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: Tenant list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tenants]
+                properties:
+                  tenants:
+                    type: array
+                    items:
+                      $ref: '../components/schemas.yaml#/components/schemas/Tenant'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /tenants/{tenant_id}:
+    parameters:
+      - name: tenant_id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [public]
+      operationId: getTenant
+      summary: Get tenant
+      description: Get tenant details (Member+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: Tenant details
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Tenant'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /tenants/{tenant_id}/members:
+    parameters:
+      - name: tenant_id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [public]
+      operationId: listTenantMembers
+      summary: List tenant members
+      description: List members (Member+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: Member list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [members]
+                properties:
+                  members:
+                    type: array
+                    items:
+                      $ref: '../components/schemas.yaml#/components/schemas/TenantMember'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    post:
+      tags: [public]
+      operationId: addTenantMember
+      summary: Add tenant member
+      description: Add a member (Owner/Admin).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { type: string, enum: [admin, member] }
+      responses:
+        '201':
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/TenantMember'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /tenants/{tenant_id}/members/{user_id}:
+    parameters:
+      - name: tenant_id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: user_id
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [public]
+      operationId: updateTenantMember
+      summary: Update member role
+      description: Update a member's role (Owner/Admin).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [admin, member] }
+      responses:
+        '200':
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/TenantMember'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    delete:
+      tags: [public]
+      operationId: removeTenantMember
+      summary: Remove member
+      description: Remove a member (Owner/Admin).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-side-effects: destructive
+      responses:
+        '204':
+          description: Member removed
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /tenants/{tenant_id}/transfer-ownership:
+    parameters:
+      - name: tenant_id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [public]
+      operationId: transferTenantOwnership
+      summary: Transfer ownership
+      description: Transfer tenant ownership (Owner only).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_owner_user_id]
+              properties:
+                new_owner_user_id: { type: string }
+      responses:
+        '200':
+          description: Ownership transferred
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Tenant'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /tenants/{tenant_id}/quota:
+    parameters:
+      - name: tenant_id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [public]
+      operationId: getTenantQuota
+      summary: Get tenant quota
+      description: Query tenant quota (Member+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: Quota information
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Quota'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

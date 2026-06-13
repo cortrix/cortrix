@@ -1,0 +1,122 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { useAppStore } from './useAppStore';
+import { useFeatureFlagsStore } from '../hooks/useFeatureFlags';
+
+// Mock fetch for API calls in jsdom environment.
+//
+// Isolation (R5/S11 flaky fix): each test gets a FRESH mock — mockReset() in
+// beforeEach drops every queued mockReturnValueOnce + clears call history so a
+// rejection queued by one test can never leak into the next (the previous
+// shared-queue ordering was the root cause of the 2 "flaky" failures). The
+// stores are also reset to their initial slice so a value set by an earlier
+// test (e.g. namespaces) doesn't satisfy a later assertion.
+const mockFetch = vi.fn();
+
+beforeEach(() => {
+  vi.stubGlobal('fetch', mockFetch);
+  mockFetch.mockReset();
+  useAppStore.setState({ namespaces: [], systemStatus: null, globalError: null });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+// Spec-complete Response stub. The shared api client (src/api/client.ts) reads
+// res.headers.get('content-length') after a 2xx, so the mock MUST expose a real
+// Headers object — omitting it (the old helper did) made client.ts throw a
+// TypeError that the store swallowed, leaving state empty. That, not timing,
+// is why "loads namespaces" / "loads system status" failed.
+function jsonResponse(data: unknown) {
+  const body = JSON.stringify(data);
+  return Promise.resolve({
+    ok: true,
+    status: 200,
+    headers: new Headers({ 'content-type': 'application/json' }),
+    json: () => Promise.resolve(data),
+    text: () => Promise.resolve(body),
+  } as Response);
+}
+
+describe('useAppStore', () => {
+  it('has default namespace', () => {
+    const state = useAppStore.getState();
+    expect(state.currentNamespace).toBe('default');
+  });
+
+  it('switches namespace', () => {
+    useAppStore.getState().setCurrentNamespace('legal-docs');
+    expect(useAppStore.getState().currentNamespace).toBe('legal-docs');
+    // Reset
+    useAppStore.getState().setCurrentNamespace('default');
+  });
+
+  // Page navigation moved to react-router (R3/S5); the store no longer tracks
+  // `activePage`. The remaining store-owned UI concern is the theme toggle.
+  it('toggles theme', () => {
+    const initial = useAppStore.getState().theme;
+    useAppStore.getState().toggleTheme();
+    expect(useAppStore.getState().theme).toBe(initial === 'dark' ? 'light' : 'dark');
+    // Reset to the initial value so other tests are unaffected.
+    useAppStore.getState().toggleTheme();
+    expect(useAppStore.getState().theme).toBe(initial);
+  });
+
+  it('loads namespaces', async () => {
+    mockFetch.mockReturnValueOnce(jsonResponse({
+      namespaces: [
+        { name: 'default', doc_count: 5, block_count: 100 },
+        { name: 'legal', doc_count: 2, block_count: 30 },
+      ],
+    }));
+
+    await useAppStore.getState().loadNamespaces();
+    const ns = useAppStore.getState().namespaces;
+    expect(ns.length).toBeGreaterThan(0);
+    expect(ns[0].name).toBe('default');
+  });
+
+  // Feature flags moved to their own store in R4/S6 (useFeatureFlagsStore,
+  // P02a § 5.3). On a failed fetch it falls back to the CE default with no
+  // enabled features; the Ent placeholder probes return false.
+  it('feature flags fall back to CE on error', async () => {
+    // mockImplementationOnce (not mockReturnValueOnce(Promise.reject)) so the
+    // rejected promise is created lazily on call and consumed in-band — avoids
+    // the "unhandled rejection" Vitest warning from an eagerly-built reject.
+    mockFetch.mockImplementationOnce(() => Promise.reject(new Error('not found')));
+
+    await useFeatureFlagsStore.getState().loadFeatures();
+    const state = useFeatureFlagsStore.getState();
+    expect(state.edition).toBe('ce');
+    expect(state.isEnabled('text_to_sql')).toBe(false);
+  });
+
+  it('loads system status with LLM info', async () => {
+    // First call: /api/v1/health
+    mockFetch.mockReturnValueOnce(jsonResponse({
+      version: '0.1.0',
+      status: 'healthy',
+      uptime_seconds: 120,
+      llm_enabled: true,
+      llm_provider: 'openai',
+      llm_model: 'gpt-4',
+    }));
+    // Second call: /agent/config (may fail, that's OK — lazy reject, see above).
+    mockFetch.mockImplementationOnce(() => Promise.reject(new Error('agent not running')));
+
+    // Pre-populate namespaces so the reducer can compute totals
+    useAppStore.setState({
+      namespaces: [
+        { name: 'default', created_at: '2026-01-01T00:00:00Z', doc_count: 3, block_count: 50 },
+      ],
+    });
+
+    await useAppStore.getState().loadSystemStatus();
+    const status = useAppStore.getState().systemStatus;
+    expect(status).toBeTruthy();
+    expect(status!.version).toBe('0.1.0');
+    // F4: mock API returns LLM fields
+    expect(status!.llm_enabled).toBeDefined();
+    expect(status!.llm_provider).toBeDefined();
+  });
+});

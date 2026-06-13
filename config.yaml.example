@@ -1,0 +1,197 @@
+# =============================================================================
+# Cortrix Server configuration template
+#
+# Usage:
+#   cp config.yaml.example build/config.yaml
+#   Edit build/config.yaml:
+#     1. Fill in and uncomment the LLM role sections you need (see the LLM
+#        configuration block below — 5 flat roles, one section each)
+#     3. Adjust the other path settings as needed
+#   ./dev.sh
+#
+# Note: build/config.yaml is not committed to git (build/ is already gitignored)
+#       Never commit a real API Key to version control
+#       config.yaml.example contains no real Key and is safe to commit
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# server — HTTP server
+# -----------------------------------------------------------------------------
+server:
+  host: "0.0.0.0"       # Listen address; "127.0.0.1" = local only, "0.0.0.0" = allow external access
+  port: 8080             # HTTP port
+  thread_count: 4        # Worker thread count, recommended = number of CPU cores
+
+# -----------------------------------------------------------------------------
+# auth — API Key authentication
+# Keep false during development; production must set it to true
+# -----------------------------------------------------------------------------
+auth:
+  enabled: false
+
+  # Production example:
+  # enabled: true
+  # api_keys:
+  #   - key_hash: "<echo -n 'your-key' | shasum -a 256 | cut -d' ' -f1>"
+  #     tenant_id: "default"
+  #     allowed_namespaces: []   # empty = allow all namespaces
+  #     permissions: 7           # READ=1, WRITE=2, ADMIN=4; 7=all
+  #     expires_at: 0            # 0 = never expires
+
+# -----------------------------------------------------------------------------
+# log — logging
+# -----------------------------------------------------------------------------
+log:
+  level: "info"          # debug / info / warning / error
+  format: "text"         # text (development) / json (production / log collection)
+  output: "stdout"       # stdout / stderr / /path/to/file.log
+
+# -----------------------------------------------------------------------------
+# namespace — data storage
+# Note: paths are relative to the directory of the cortrix-server binary (codes/cortrix/)
+# -----------------------------------------------------------------------------
+namespace:
+  data_dir: "./build/data"   # Data root directory (SQLite, vector index, Blob files)
+  max_active: 10             # Max number of namespaces kept active simultaneously
+  idle_timeout_s: 300        # Auto-unload after this many idle seconds; 0=never unload
+
+# -----------------------------------------------------------------------------
+# embedding — semantic vector model (bge-m3 ONNX)
+#
+# Requires downloading ~2.8GB of model files into models/bge-m3/:
+#   model.onnx       (~708KB)
+#   model.onnx_data  (~2.1GB)
+#   tokenizer.json   (~16MB)
+#
+# When unconfigured, runs in Stub mode (random vectors); BM25 full-text search still works
+# -----------------------------------------------------------------------------
+embedding:
+  model_path: "./models/bge-m3/model.onnx"
+  dimension: 1024            # bge-m3 fixed at 1024 dimensions, not modifiable
+  max_seq_length: 512        # Max tokens per encode
+  gpu_provider: "auto"       # auto=automatic / cpu=CPU-only / coreml=Apple CoreML
+
+# -----------------------------------------------------------------------------
+# spc — document processing pipeline
+# Supports: PDF, DOCX, TXT, MD, CSV, JSON, images (OCR)
+# -----------------------------------------------------------------------------
+spc:
+  worker_count: 2            # Parallel processing thread count (recommended 2~4)
+  chunk_size: 512            # Target token count per text chunk
+  chunk_overlap: 50          # Overlap tokens between adjacent chunks (preserves context continuity)
+  embedding_batch_size: 1    # Chunks vectorized per batch
+  onnx_intra_threads: 4      # ONNX inference intra-op parallel thread count
+  onnx_inter_threads: 1      # ONNX inter-inference parallel count
+
+  # Python parsing scripts (create the OCR virtual environment first, see README)
+  python_bin: "./scripts/ocr_venv/bin/python3.12"
+  parse_pdf_script: "./scripts/parse_pdf.py"
+  parse_word_script: "./scripts/parse_word.py"
+  ocr_script: "./scripts/run_ocr.py"
+  parser_timeout_s: 120      # Document parsing timeout (seconds)
+  ocr_timeout_s: 3600        # OCR timeout (seconds; scanned files may be slow)
+
+  # Vision LLM enhancement (optional): after OCR, use the vision_llm role's model to refine recognition quality
+  # Also configure the vision_llm role section below and uncomment
+  # vision_llm_script: "./scripts/run_vision_llm.py"
+  # vision_llm_timeout_s: 120
+
+# =============================================================================
+# LLM configuration — five independent roles, each a flat section
+#
+# The server parses exactly these sections (src/config/config.cpp):
+#   semantic_llm     — intent classification & reranking (every query; fast/cheap)
+#   vision_llm       — OCR image refinement (model must support vision input)
+#   agent_llm        — conversational RAG/chat (also read by cortrix-agent; prefer quality)
+#   doc_summary_llm  — F41 ingest-side document summary (async via F42)
+#   enricher_llm     — F03 SPC ingest enricher (NER + summary)
+#
+# Each role takes the same four fields; a role with provider/api_key/model all
+# set counts as configured, anything else leaves that feature OFF:
+#   provider: "openai" | "glm" | "claude" | "ollama" | ...  (OpenAI-compatible wire)
+#   api_key:  vendor API key
+#   model:    vendor model id
+#   base_url: API endpoint (e.g. https://open.bigmodel.cn/api/paas/v4 for GLM)
+#
+# Example (Zhipu GLM, https://open.bigmodel.cn → Console → API Keys):
+# semantic_llm:
+#   provider: "glm"
+#   api_key: "your-glm-api-key"
+#   model: "glm-4-flash"
+#   base_url: "https://open.bigmodel.cn/api/paas/v4"
+#
+# vision_llm:
+#   provider: "glm"
+#   api_key: "your-glm-api-key"
+#   model: "glm-4v-flash"
+#   base_url: "https://open.bigmodel.cn/api/paas/v4"
+#
+# agent_llm:
+#   provider: "glm"
+#   api_key: "your-glm-api-key"
+#   model: "glm-4.6"
+#   base_url: "https://open.bigmodel.cn/api/paas/v4"
+#
+# doc_summary_llm:
+#   provider: "glm"
+#   api_key: "your-glm-api-key"
+#   model: "glm-4-flash"
+#   base_url: "https://open.bigmodel.cn/api/paas/v4"
+#
+# enricher_llm:
+#   provider: "glm"
+#   api_key: "your-glm-api-key"
+#   model: "glm-4-flash"
+#   base_url: "https://open.bigmodel.cn/api/paas/v4"
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# watch_dir — local directory auto-monitoring
+# Monitors the given directory; files added/modified are auto-parsed and ingested
+# When the directory does not exist, prints a warning and skips, without affecting other features
+# -----------------------------------------------------------------------------
+watch_dir:
+  data_dir: ""               # Absolute path of the local directory to monitor; empty=disabled
+  namespace_name: "local"    # Which namespace files import into (auto-created if missing)
+  watch_enabled: true        # false=only import existing files, do not watch for changes
+
+# -----------------------------------------------------------------------------
+# memory — conversational memory
+# Records user-Agent conversations, supporting cross-session semantic retrieval
+# -----------------------------------------------------------------------------
+memory:
+  default_ttl_seconds: 0     # Memory retention time (seconds); 0=retain forever
+  inject_recent_turns: 5     # Include the most recent N turns when injecting context
+  inject_max_tokens: 2000    # Max token budget for injected context
+
+# -----------------------------------------------------------------------------
+# rag_fusion — F36 RAG-Fusion multi-query fusion (global default / IGlobalConfig §4.7)
+# The LLM expands a single query into N variants; each variant is retrieved independently + RRF re-fusion (NDCG +8-15%).
+# Topic 3: V1.0 OSS defaults to disabled — must be explicitly enabled via the namespace-level rag_fusion_config,
+# and only runs when an LLM role is configured (see the LLM configuration block above); on LLM failure it degrades to a single query.
+# Three-tier override: this global default ← namespaces.rag_fusion_config ← request (not supported in Phase 1).
+# Note: in Phase 1 these keys fall back to RagFusionConfig defaults (interface reserved, server read = D3.5).
+# -----------------------------------------------------------------------------
+rag_fusion:
+  default_enabled: false        # Global default (V1.0 OSS / Cloud V1 both false)
+  default_variant_count: 3      # Topic 1: N=3 (NS-level adjustable [1-10])
+  default_rrf_k: 60             # RRF fusion constant
+  default_timeout_ms: 5000      # LLM variant generation timeout
+  llm_prompt_template_zh: "default-zh"
+  llm_prompt_template_en: "default-en"
+
+# -----------------------------------------------------------------------------
+# gc — OPEN-2 three-stage garbage collection (ARCH §5.x, A6 §10.8)
+# Stage 1 soft-delete (30d retention, restorable) -> Stage 2 hard-delete + ref_count
+# fix-up (blob enqueued, not unlinked) -> Stage 3 blob GC (90d second-confirm window,
+# then physical unlink). A built-in background thread scans every scan_interval_hours.
+# -----------------------------------------------------------------------------
+gc:
+  enabled: true                    # Background GC thread on/off (V1.0 default on, can disable)
+  soft_delete_retention_days: 30   # Stage 1 -> 2 window
+  blob_gc_retention_days: 90       # Stage 2 -> 3 window (blob second-confirm wait)
+  scan_interval_hours: 24          # Background scan cadence
+  max_purge_per_run: 10000         # Cap on blobs unlinked per run (runaway guard)
+  max_run_duration_minutes: 5      # Cap on a single run's wall time (IO guard)
+  dry_run: false                   # Scan but do not delete (test/inspection)
+  immediate_purge_enabled: false   # GDPR immediate-purge API (Cloud V1+; CE keeps false)

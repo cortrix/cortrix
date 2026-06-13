@@ -1,0 +1,38 @@
+# =============================================================
+# F23 W1: RAGAS evaluation config (design: F23-tests.md §3.2)
+# Evaluates F03 enrich + retrieval quality: Context Precision /
+# Context Recall over a pinned Q-A-context dataset.
+# Runner: tests/ragas/run_eval.py (Nightly + Release; needs an
+# LLM judge key — skipped when CORTRIX_LLM_API_KEY is unset).
+# =============================================================
+
+dataset:
+  # Pinned evaluation set, versioned with the repo: each item is
+  # {question, ground_truth, contexts[]} produced against the
+  # sample corpus in tests/integration/test_data/.
+  path: tests/ragas/dataset.jsonl
+  min_items: 20
+
+target:
+  base_url: http://localhost:8080
+  namespace: ragas-eval
+  top_k: 5
+
+metrics:
+  - context_precision
+  - context_recall
+  - faithfulness
+  - answer_relevancy
+
+judge:
+  provider: openai            # any OpenAI-compatible endpoint
+  model: gpt-4o-mini
+  api_key_env: CORTRIX_LLM_API_KEY
+  base_url_env: CORTRIX_LLM_BASE_URL
+
+thresholds:
+  # Phase 1 V1.0 baselines — recorded first, hardened after F44
+  # benchmark calibration (topic 5 coordination).
+  context_precision: 0.70
+  context_recall: 0.70
+  mode: record-only           # record-only | enforce

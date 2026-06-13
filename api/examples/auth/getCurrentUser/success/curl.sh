@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# GET /api/v1/auth/me — success
+curl -X GET "https://api.cortrix.io/api/v1/auth/me" \
+  -H "X-API-Key: cx_live_xxx"

@@ -1,0 +1,10 @@
+# F06 Document Parser — Python bridge dependencies.
+# Installed into the parser venv (real docling/paddleocr are D3.5 — not required
+# for D3 standalone, where the C++ wrappers are tested against mock bridges).
+
+# Docling structured parser (MIT, IBM): DocLayNet layout + TableFormer tables.
+docling>=2.0.0
+
+# PaddleOCR fallback for scanned / image documents (F06 S3).
+paddleocr>=2.8
+paddlepaddle>=2.6

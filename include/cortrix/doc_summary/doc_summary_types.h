@@ -1,0 +1,62 @@
+#pragma once
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "cortrix/agent_friendly/error.h"
+#include "cortrix/async/task_type.h"
+
+namespace cortrix::doc_summary {
+
+/// The 4 structured fields the LLM produces (F41 §5.1 / §4.2 metadata_json).
+struct DocSummaryStructured {
+    std::string summary_text;            ///< 200-500 chars (the §4.2 main embedding field)
+    std::vector<std::string> keywords;   ///< 3-8 keywords/phrases (Agent direct-read)
+    std::vector<std::string> topics;     ///< 1-3 topic categories (Agent direct-read)
+    std::string one_liner;               ///< <= 50 chars (UI display)
+};
+
+/// DocSummaryGenerator output (F41 §5.1). On success `summary` + `embedding` are
+/// filled; on failure `error` carries the Agent-friendly CX_ERR_F41_* identity.
+struct GenerationResult {
+    bool success = false;
+    DocSummaryStructured summary;
+    std::vector<float> embedding;        ///< BGE-M3 1024-dim (empty standalone → D3.5 pipeline)
+    std::optional<agent_friendly::AgentFriendlyError> error;
+    bool is_chunked = false;             ///< true when the map-reduce path ran (long doc)
+};
+
+/// F41 async task payload (F41 §5.2). TaskType SoT = F42 §3.2
+/// (async::TaskType::kTaskDocSummary=3) — reverse-referenced, not redeclared.
+struct DocSummaryTask {
+    std::string task_id;
+    async::TaskType task_type = async::TaskType::kTaskDocSummary;
+    std::string doc_id;
+    std::string ns_id;
+    int attempt_count = 0;
+    // F42 retry policy: 3 retries + exponential backoff; DLQ after 3 (F42 owns it).
+};
+
+/// doc_summary_status state machine values (F41 §7.1). String form is what the
+/// metadata_json `status` field stores.
+enum class DocSummaryStatus { kPending = 0, kGenerated, kFailed };
+const char* ToString(DocSummaryStatus status);
+
+/// One doc-discovery hit (F41 §6.1 response). via_path distinguishes the two
+/// hybrid recall paths. The LLM-summary path carries the 4 structured fields; the
+/// FTS5-fallback path carries the F08 fields instead.
+struct DocDiscoveryHit {
+    std::string doc_id;
+    std::string via_path;            ///< "llm_summary" | "fts5_fallback"
+    float match_score = 0.0f;
+    // llm_summary path:
+    std::string summary_text;
+    std::vector<std::string> keywords;
+    std::vector<std::string> topics;
+    std::string one_liner;
+    // fts5_fallback path:
+    std::string filename;
+    std::string doc_title;
+};
+
+}  // namespace cortrix::doc_summary

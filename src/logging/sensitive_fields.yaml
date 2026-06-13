@@ -1,0 +1,60 @@
+# F20 Security Hardening — log sanitization field rules (design topic 4 / sec 6.1).
+#
+# Single source of truth for which log/structured_data fields LogSanitizer
+# redacts, masks, truncates, or hashes before anything is written to a log sink
+# or returned in an error body. 22 controlled fields total (GDPR / SOC2 PII +
+# content). Every new Feature that introduces a sensitive field MUST add it here
+# (D1_MUST_COVER GEN-LOG-Agent rule). The Python SDK loads a synced copy of this
+# same file (design sec 6.4) so C++ and Python share one rule set.
+
+# P0 fully redacted (11 fields) — value replaced with "****"
+P0_redact_completely:
+  - api_key
+  - access_token
+  - bearer_token
+  - jwt_secret
+  - password
+  - openai_api_key
+  - smtp_password
+  - license_key
+  - admin_token
+  - connection_string
+  - master_key
+
+# P0 partial mask (1 field) — keep a debuggable prefix: sk-prod-***xyz
+P0_mask_partial:
+  - api_key_prefix
+
+# P1 PII redaction (5 fields)
+P1_redact_pii:
+  - email          # user@example.com -> ****@***
+  - phone
+  - ip_address     # 192.168.***.***
+  - real_name
+  - postal_code
+
+# P1 content truncation + hash (4 fields)
+P1_truncate_content:
+  - query_text       # first 50 chars + full hash
+  - document_content # hash only
+  - memory_text      # MEM02 user_facts
+  - prompt           # F03 LLM prompt
+
+# P2 correlation-key hash (2 fields)
+P2_hash_only:
+  - doc_id
+  - user_id
+
+# Explicitly safe fields (never sanitized) — documents intent so reviewers don't
+# wonder why these flow through untouched.
+safe_fields:
+  - request_id
+  - trace_id
+  - ns_id
+  - error_code
+  - category
+  - reason
+  - retryable
+  - retry_after_ms
+  - api_version
+  - status_code

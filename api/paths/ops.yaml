@@ -1,0 +1,174 @@
+# paths/ops.yaml — /api/v1/gc/* + /api/v1/maintenance/* (P03 v1.0.1 § 2.13 + OPEN-2 GC) — 6 endpoint
+# SoT: P03 v1.0.1 § 2.13 GC + ARCH ops + components/schemas.yaml (GcStatus)
+# All tag=ops (only exposed in development/self-hosted, see § 5.2 environment tiers); destructive run/purge require X-Ops-Confirm.
+#
+# OPEN-2 three-stage soft-delete lifecycle (Derek 2026-06-12): DELETE /documents/{id} marks the doc
+# soft-deleted (status=deleted, deleted_at=now) and recoverable for gc.soft_delete_retention_days
+# (default 30; 0 = immediate, collapsing the window). Inside the window, POST /gc/restore brings docs
+# back; POST /gc/run sweeps expired docs to stage 2 (blob unlink), and POST /gc/purge bypasses the
+# window to hard-delete immediately (irreversible).
+paths:
+  /gc/status:
+    get:
+      tags: [ops]
+      operationId: gcStatus
+      summary: GC status
+      description: Query GC status (soft-deleted count / reclaimable bytes, ops).
+      x-cortrix-agent-workflow: ops
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ops:admin"
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: GC status
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/GcStatus'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /gc/run:
+    post:
+      tags: [ops]
+      operationId: gcRun
+      summary: Run GC
+      description: |
+        Trigger one GC sweep over both layers (ops). Sweeps docs whose soft-delete retention window
+        (gc.soft_delete_retention_days, default 30) has elapsed to stage 2 (blob unlink). Must include
+        the X-Ops-Confirm: true header (guards against accidental calls).
+      x-cortrix-agent-workflow: ops
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ops:admin"
+      x-cortrix-side-effects: destructive
+      parameters:
+        - name: X-Ops-Confirm
+          in: header
+          required: true
+          schema: { type: string, enum: ["true"] }
+          description: "Confirmation header guarding ops destructive operations against accidental calls"
+      responses:
+        '202':
+          description: GC triggered
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/GcStatus'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /gc/restore:
+    post:
+      tags: [ops]
+      operationId: gcRestore
+      summary: Restore soft-deleted
+      description: |
+        Restore soft-deleted documents (ops). Only documents still inside the soft-delete retention
+        window (gc.soft_delete_retention_days) are recoverable; purged/expired documents cannot be
+        restored. Partial success per document_id (PartialSuccessById).
+      x-cortrix-agent-workflow: ops
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ops:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                document_ids:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: '../components/partial.yaml#/components/schemas/PartialSuccessByIdV1'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /gc/purge:
+    post:
+      tags: [ops]
+      operationId: gcPurge
+      summary: Purge soft-deleted
+      description: |
+        Permanently purge soft-deleted data (ops, irreversible). Bypasses the soft-delete retention
+        window so every soft-deleted document is hard-deleted immediately (no restore afterwards).
+        Must include X-Ops-Confirm: true.
+      x-cortrix-agent-workflow: ops
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ops:admin"
+      x-cortrix-side-effects: destructive
+      parameters:
+        - name: X-Ops-Confirm
+          in: header
+          required: true
+          schema: { type: string, enum: ["true"] }
+          description: "Confirmation header guarding ops destructive operations against accidental calls"
+      responses:
+        '202':
+          description: Purge accepted
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/GcStatus'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /maintenance/vacuum:
+    post:
+      tags: [ops]
+      operationId: maintenanceVacuum
+      summary: Vacuum
+      description: vacuum maintenance (ops, reclaims space + compaction).
+      x-cortrix-agent-workflow: ops
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ops:admin"
+      x-cortrix-side-effects: write
+      responses:
+        '202':
+          description: vacuum triggered
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /maintenance/reindex:
+    post:
+      tags: [ops]
+      operationId: maintenanceReindex
+      summary: Reindex
+      description: Rebuild the index (ops, repairs a corrupted index).
+      x-cortrix-agent-workflow: ops
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ops:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                namespace: { type: string, description: "if omitted, reindex all NS" }
+      responses:
+        '202':
+          description: reindex triggered
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

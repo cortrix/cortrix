@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "CX_ERR_INVALID_REQUEST",
+    "message": "TODO: human-readable message",
+    "retryable": false,
+    "category": "permanent",
+    "retry_after_ms": null,
+    "structured_data": {},
+    "request_id": "req_xxx"
+  }
+}

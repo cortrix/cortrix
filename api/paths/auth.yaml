@@ -1,0 +1,295 @@
+# paths/auth.yaml — /api/v1/auth/* (ARCH § 4.1.9 + P08 v1.0.2) — 11 endpoints
+# SoT: P08 v1.0.2 § 2 + ERROR_CODE_SDK_MAP § 3.2 (CX_ERR_AUTH_* 11) + components/schemas.yaml
+# Agent self-service first: API Key (create once, use forever) is preferred over email+password (AGENT_FRIENDLY § 8).
+paths:
+  /auth/register:
+    post:
+      tags: [public]
+      operationId: register
+      summary: Register account
+      description: Register an account (email + password). After registration, verify-email is required to activate.
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: false
+      x-cortrix-side-effects: write
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registration succeeded (pending email verification)
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/User'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '409': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /auth/login:
+    post:
+      tags: [public]
+      operationId: login
+      summary: Login
+      description: Log in; returns a JWT access_token + refresh_token.
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: false
+      x-cortrix-side-effects: write
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Login succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/LoginResponse'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /auth/logout:
+    post:
+      tags: [public]
+      operationId: logout
+      summary: Logout
+      description: Log out (revokes the refresh_token).
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-side-effects: write
+      responses:
+        '204':
+          description: Logged out
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /auth/refresh:
+    post:
+      tags: [public]
+      operationId: refreshToken
+      summary: Refresh access token
+      description: Exchange a refresh_token for a new access_token.
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: immediate
+      x-cortrix-auth-required: false
+      x-cortrix-side-effects: write
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '200':
+          description: New token
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/LoginResponse'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /auth/password-reset:
+    post:
+      tags: [public]
+      operationId: requestPasswordReset
+      summary: Request password reset
+      description: Request a password reset (sends a verification email + 6-digit code).
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: false
+      x-cortrix-side-effects: write
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '202':
+          description: Reset email sent (if the address exists)
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '503': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /auth/password-reset/confirm:
+    post:
+      tags: [public]
+      operationId: confirmPasswordReset
+      summary: Confirm password reset
+      description: Complete the password reset using the email + 6-digit code.
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: false
+      x-cortrix-side-effects: write
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code, new_password]
+              properties:
+                email: { type: string, format: email }
+                code: { type: string, example: "123456" }
+                new_password: { type: string, format: password }
+      responses:
+        '200':
+          description: Password reset
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /auth/verify-email:
+    post:
+      tags: [public]
+      operationId: verifyEmail
+      summary: Verify email
+      description: Email verification (activates the account after registration).
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: false
+      x-cortrix-side-effects: write
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '200':
+          description: Email verified
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /auth/me:
+    get:
+      tags: [public]
+      operationId: getCurrentUser
+      summary: Get current user
+      description: Get the currently logged-in user's info (user + tenants + role).
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/User'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /auth/api-keys:
+    post:
+      tags: [public]
+      operationId: createApiKey
+      summary: Create API Key
+      description: Create an API Key (Agent self-service first; create once, use forever). The full key is returned only once.
+      x-cortrix-edition: ce   # API Key auth is the CE-native surface (Agent self-service first)
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, example: "my-agent-key" }
+      responses:
+        '201':
+          description: API Key created (the key field is returned only this once)
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/ApiKey'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    get:
+      tags: [public]
+      operationId: listApiKeys
+      summary: List API Keys
+      description: List API Keys (excludes the full key, prefix only).
+      x-cortrix-edition: ce   # API Key auth is the CE-native surface (Agent self-service first)
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: API Key list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [api_keys]
+                properties:
+                  api_keys:
+                    type: array
+                    items:
+                      $ref: '../components/schemas.yaml#/components/schemas/ApiKey'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /auth/api-keys/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [public]
+      operationId: revokeApiKey
+      summary: Revoke API Key
+      description: Revoke an API Key (Write+).
+      x-cortrix-edition: ce   # API Key auth is the CE-native surface (Agent self-service first)
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-side-effects: destructive
+      responses:
+        '204':
+          description: Revoked
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

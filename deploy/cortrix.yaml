@@ -1,0 +1,48 @@
+# =============================================================
+# Cortrix all-in-one container — default configuration
+# Baked into the image at /app/config/cortrix.yaml and consumed
+# by supervisord:  cortrix_server --config /app/config/cortrix.yaml
+#
+# Every value can be overridden per deployment:
+#   - bind-mount a replacement file over /app/config/cortrix.yaml, or
+#   - set CORTRIX_* environment variables (env wins over this file;
+#     see src/config/config.cpp ApplyEnvOverrides for the list).
+# =============================================================
+
+server:
+  host: 0.0.0.0
+  port: 8080
+
+# Local-development stack default. The C++ core defaults to auth ON
+# (secure-by-default); this dev compose ships with it off so the stack
+# is usable out of the box. PRODUCTION: set enabled: true and provision
+# api_keys (key_hash/tenant_id/permissions), or override via
+# CORTRIX_AUTH_ENABLED=true.
+auth:
+  enabled: false
+
+log:
+  level: info
+
+namespace:
+  data_dir: /data
+
+embedding:
+  # bge-m3 ONNX assets are NOT baked into the image (too large).
+  # Place them in the data volume; when absent the server starts in
+  # deterministic stub-embedding mode (WARN at startup, still serves).
+  model_path: /data/models/bge-m3.onnx
+  tokenizer_path: /data/models/tokenizer.json
+
+# --- LLM roles (all optional; unset = feature stays off) ---
+# Connection trio per role: provider / api_key / model / base_url.
+#
+# semantic_llm:      # intent classification & reranking
+# vision_llm:        # image/PDF visual parsing
+# agent_llm:         # agent demo chat
+# doc_summary_llm:   # F41 document summary index
+# enricher_llm:      # F03 LLM enricher (NER + summary)
+#   provider: openai
+#   api_key: sk-...
+#   model: gpt-4o-mini
+#   base_url: https://api.openai.com/v1

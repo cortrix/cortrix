@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Cortrix Magma VI — theme variables (SoT: design/vi-mockup/
+   cortrix-vi-console.html). `:root` = light/day (default), `html.dark` =
+   dark/night. Values are space-separated RGB triplets so Tailwind's
+   `rgb(var(--x) / <alpha-value>)` tokens support opacity modifiers.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Light / Day (default) */
+:root {
+  --bg: 248 250 252;       /* #F8FAFC */
+  --bgalt: 255 255 255;    /* #FFFFFF */
+  --surface: 255 255 255;  /* #FFFFFF */
+  --surface2: 241 245 249; /* #F1F5F9 */
+  --line: 226 232 240;     /* #E2E8F0 */
+  --txt: 15 23 42;         /* #0F172A */
+  --muted: 100 116 139;    /* #64748B */
+  --magma: 255 100 5;      /* #FF6405 */
+  --magma-h: 234 80 0;     /* #EA5000 — deeper for light */
+  --amber: 217 119 6;      /* #D97706 — readable amber on light */
+  --codebg: 248 250 252;   /* #F8FAFC */
+  --ok: 5 150 105;         /* #059669 */
+  --dot: rgba(255, 100, 5, 0.06);
+}
+
+/* Dark / Night */
+html.dark {
+  --bg: 11 15 25;          /* #0B0F19 */
+  --bgalt: 14 18 33;       /* #0E1221 */
+  --surface: 19 27 42;     /* #131B2A */
+  --surface2: 26 34 54;    /* #1A2236 */
+  --line: 30 41 59;        /* #1E293B */
+  --txt: 241 245 249;      /* #F1F5F9 */
+  --muted: 148 163 184;    /* #94A3B8 */
+  --magma: 255 100 5;      /* #FF6405 */
+  --magma-h: 255 138 48;   /* #FF8A30 — brighter for dark */
+  --amber: 255 176 32;     /* #FFB020 */
+  --codebg: 10 14 23;      /* #0A0E17 */
+  --ok: 52 211 153;        /* #34D399 */
+  --dot: rgba(255, 100, 5, 0.07);
+}
+
+@layer base {
+  /* VI mockup § head — Inter primary, JetBrains Mono for code. */
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  code, pre, kbd, samp {
+    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  }
+
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--line));
+    border-radius: 8px;
+  }
+}
+
+@layer utilities {
+  /* Subtle dotted background texture (main content area). */
+  .dots {
+    background-image: radial-gradient(circle at 1px 1px, var(--dot) 1px, transparent 0);
+    background-size: 26px 26px;
+  }
+  /* Magma gradient — primary buttons / brand avatar. */
+  .magma-grad {
+    background: linear-gradient(135deg, #ff6405 0%, #ff8a30 100%);
+  }
+  /* Soft card elevation in light; flat in dark (matches mockup). */
+  .card-shadow {
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+  }
+  .dark .card-shadow {
+    box-shadow: none;
+  }
+}
+
+/* Smooth theme transition */
+body {
+  transition: background-color 0.3s, color 0.3s;
+}
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease,
+    box-shadow 0.3s ease;
+}

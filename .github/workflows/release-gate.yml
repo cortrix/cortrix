@@ -1,0 +1,135 @@
+# =============================================================
+# F23 Stage 3: Release Gate  (design: dev-cortrix-hub F23-tests.md §6.4)
+# Manual workflow_dispatch before a release. Target < 4 hr.
+#
+# Hard gates: all Stage-2 gates + cross-platform E2E 100% +
+# CE/Ent isolation 0 leaks + Lighthouse Perf≥80/A11y≥90 +
+# Trivy no HIGH/CRITICAL + SBOM artifacts (V4 decision 4) + HF integrity.
+# Soft: bundle size vs baseline +5%.
+#
+# Repo-reality adaptations:
+#   - image tag = cortrix:<release_tag> built from cortrix/deploy/Dockerfile
+#   - F44 trigger guarded: f44-benchmark.yml lands with F44 (D-R3 #481);
+#     until then the step records SKIP instead of failing the gate
+# =============================================================
+name: Release Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+
+jobs:
+  stage2_full:
+    uses: ./.github/workflows/nightly-ci.yml
+
+  cross_platform_e2e:
+    needs: stage2_full
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, macos-13, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: E2E
+        run: |
+          cd web
+          npm ci --ignore-scripts
+          npx playwright install --with-deps
+          npx playwright test
+
+  isolation_and_image:
+    needs: stage2_full
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CE/Ent isolation scan (0 leaks, MUST)
+        run: |
+          # Commercial-edition symbols/headers must never leak into this tree.
+          set -e
+          LEAKS=$(grep -rniE "cortrix.enterprise|text_to_sql|cdc_connector" \
+            --include='*.cpp' --include='*.h' src/ include/ \
+            || true)
+          if [ -n "$LEAKS" ]; then
+            echo "CE tree references commercial internals:"; echo "$LEAKS"; exit 1
+          fi
+          echo "isolation OK"
+
+      - name: Build release image
+        run: docker build -t cortrix:${{ inputs.release_tag }} -f cortrix/deploy/Dockerfile ..
+
+      - name: Trivy image scan (hard gate)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: cortrix:${{ inputs.release_tag }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+      - name: SBOM generation (Syft → SPDX + CycloneDX, V4 decision 4)
+        run: |
+          mkdir -p artifacts
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          syft cortrix:${{ inputs.release_tag }} -o spdx-json=artifacts/sbom.spdx.json
+          syft cortrix:${{ inputs.release_tag }} -o cyclonedx-json=artifacts/sbom.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ inputs.release_tag }}
+          path: artifacts/sbom.*.json
+
+  lighthouse:
+    needs: stage2_full
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Lighthouse CI (Perf ≥ 80 / A11y ≥ 90)
+        run: |
+          cd web
+          npm ci --ignore-scripts
+          npm run build
+          npx @lhci/cli autorun --config=lighthouserc.json
+
+  hf_model_integrity:
+    needs: stage2_full
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: HF model integrity (sha256 manifest)
+        run: |
+          # bge-m3 ONNX + tokenizer assets pinned by checksum manifest
+          if [ -f models/MANIFEST.sha256 ]; then
+            (cd models && sha256sum -c MANIFEST.sha256)
+          else
+            echo "MANIFEST.sha256 not present yet (models distributed out-of-band) — recording SKIP"
+          fi
+
+  f44_benchmark_trigger:
+    needs: [cross_platform_e2e, isolation_and_image, lighthouse]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: F23 D4 PASS marker → trigger F44 (topic 5 coordination)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "F23 D4 PASS for ${{ inputs.release_tag }}"
+          if gh workflow list | grep -q f44-benchmark; then
+            gh workflow run f44-benchmark.yml --ref ${{ inputs.release_tag }}
+          else
+            echo "f44-benchmark.yml not landed yet (D-R3 #481) — SKIP trigger"
+          fi

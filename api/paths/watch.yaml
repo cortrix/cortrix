@@ -1,0 +1,132 @@
+# paths/watch.yaml — /api/v1/watch/* (ARCH § 4.1.4/4.1.7 + F21/F42) — 4 endpoint
+# SoT: ARCH § 4.1.4 + F21 detailed design + components/schemas.yaml (Watcher / WatchEvent)
+# Live: the F21 watcher surface is served under /api/v1/connector/watchers (+ /connector/watchers/{id}/scan);
+# the /watch alias (POST /watch, GET /watch, DELETE /watch/{id}) is the Agent-friendly canonical name.
+# /watch/{id}/events has no live backing yet (see x-cortrix-status: not-implemented below).
+paths:
+  /watch:
+    post:
+      tags: [admin]
+      operationId: addWatcher
+      summary: Add/append directory watcher
+      description: |
+        Add/append a directory watch (fan-out, Admin+). Only one OS-level watcher is created per directory;
+        file changes are fanned out to all NS subscribed to that directory. Backward-compatible with the old {namespace_name, data_dir} format.
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path, target_namespaces]
+              properties:
+                path: { type: string, example: "/data/shared/engineering" }
+                target_namespaces:
+                  type: array
+                  items: { type: string }
+                  example: ["team_a", "team_b", "archive"]
+                recursive: { type: boolean, default: true }
+      responses:
+        '201':
+          description: Watch created/appended
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Watcher'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    get:
+      tags: [public]
+      operationId: listWatchers
+      summary: List watchers
+      description: List all watches (Read+).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: Watch list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [watchers]
+                properties:
+                  watchers:
+                    type: array
+                    items:
+                      $ref: '../components/schemas.yaml#/components/schemas/Watcher'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /watch/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+        description: watcher id
+    delete:
+      tags: [admin]
+      operationId: deleteWatcher
+      summary: Remove watcher
+      description: Remove an entire watch (including all NS subscriptions, Admin+).
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: destructive
+      responses:
+        '204':
+          description: Removed
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /watch/{id}/events:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [public]
+      operationId: getWatcherEvents
+      summary: Get watcher events
+      description: Get the watch event stream (Read+).
+      x-cortrix-status: not-implemented   # no live events endpoint (connector mounts watchers + scan only); deferred to a future Phase
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Event list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: '../components/schemas.yaml#/components/schemas/WatchEvent'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

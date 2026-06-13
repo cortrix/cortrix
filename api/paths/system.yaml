@@ -1,0 +1,242 @@
+# paths/system.yaml — /api/v1/health + /api/v1/system/* (ARCH § 4.1.11)
+# Live surface (reconciled S2): /health (general) + /system/health/live + /system/health/ready
+# + /system/version + /system/features + /system/agent_llm_config GET/PUT (V14 J8 F48 § 6.3).
+# /system/namespaces/{ns}/stats is the F20 per-NS metrics design surface (NsStats).
+paths:
+  /health:
+    get:
+      tags: [public]
+      operationId: getHealth
+      summary: General health check
+      description: General service health (status + version + uptime + per-component status + LLM info). No authentication required.
+      x-cortrix-agent-workflow: ops
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: false
+      x-cortrix-side-effects: read_only
+      security: []
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, version]
+                properties:
+                  status: { type: string, example: healthy }
+                  version: { type: string, example: "1.0.0" }
+                  uptime_seconds: { type: integer }
+                  components:
+                    type: object
+                    additionalProperties: { type: string }
+                  llm_enabled: { type: boolean }
+                  llm_provider: { type: string }
+                  llm_model: { type: string }
+
+  /system/health/live:
+    get:
+      tags: [public]
+      operationId: getSystemHealthLive
+      summary: Liveness probe
+      description: Liveness probe (always 200 while the process answers). No authentication required. Carries uptime_seconds + version.
+      x-cortrix-agent-workflow: ops
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: false
+      x-cortrix-side-effects: read_only
+      security: []
+      responses:
+        '200':
+          description: Process alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [alive] }
+                  uptime_seconds: { type: integer }
+                  version: { type: string }
+
+  /system/health/ready:
+    get:
+      tags: [public]
+      operationId: getSystemHealthReady
+      summary: Readiness probe
+      description: |
+        Readiness probe. Aggregates the F20 ReadinessRegistry plus a shutdown gate. 200 when not shutting
+        down AND all components are ready; otherwise 503 listing the failing components. No authentication required.
+      x-cortrix-agent-workflow: ops
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: false
+      x-cortrix-side-effects: read_only
+      security: []
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ready, not_ready] }
+                  version: { type: string }
+                  components:
+                    type: object
+                    additionalProperties: true
+        '503':
+          description: Not ready (shutting down or a component not ready)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ready, not_ready] }
+                  version: { type: string }
+                  components:
+                    type: object
+                    additionalProperties: true
+
+  /system/features:
+    get:
+      tags: [public]
+      operationId: getSystemFeatures
+      summary: Build feature flags
+      description: |
+        Report the edition + which optional features this build provides (Agent-friendly principle 7:
+        unavailable features report false rather than disappearing). No authentication required.
+      x-cortrix-agent-workflow: ops
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: false
+      x-cortrix-side-effects: read_only
+      security: []
+      responses:
+        '200':
+          description: Edition + feature flags
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [edition, features]
+                properties:
+                  edition: { type: string, example: ce }
+                  features:
+                    type: object
+                    additionalProperties: { type: boolean }
+                    example:
+                      cdc: false
+                      text_to_sql: false
+                      fuse: false
+                      s3_proxy: false
+
+  /system/version:
+    get:
+      tags: [public]
+      operationId: getSystemVersion
+      summary: Version info
+      description: Version information. No authentication required.
+      x-cortrix-agent-workflow: ops
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: false
+      x-cortrix-side-effects: read_only
+      security: []
+      responses:
+        '200':
+          description: Version information
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version]
+                properties:
+                  version: { type: string, example: "1.0.0" }
+                  build: { type: string }
+                  commit: { type: string }
+
+  /system/namespaces/{ns}/stats:
+    parameters:
+      - name: ns
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [public]
+      operationId: getNamespaceStats
+      summary: Per-NS metrics
+      description: Per-NS metrics dictionary (V3 resolution 10 — replaces the PromQL ns_id label).
+      x-cortrix-status: not-implemented   # no live /system/namespaces/{ns}/stats route yet (design blueprint retained; deferred to a future Phase)
+      x-cortrix-agent-workflow: ops
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: NS stats
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/NsStats'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /system/agent_llm_config:
+    get:
+      tags: [admin]
+      operationId: getAgentLlmConfig
+      summary: Get agent LLM config
+      description: F48 § 6.3 redacted read of the agent LLM config (does not return the key in plaintext, only api_key_set).
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: agent LLM config (redacted)
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/AgentLlmConfig'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    put:
+      tags: [admin]
+      operationId: updateAgentLlmConfig
+      summary: Update agent LLM config
+      description: F48 § 6.3 update of the agent LLM config (admin only).
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider: { type: string, enum: [openai, deepseek, azure] }
+                model: { type: string }
+                api_key: { type: string, description: "for writing; not echoed back on GET" }
+                base_url: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Updated (redacted response)
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/AgentLlmConfig'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

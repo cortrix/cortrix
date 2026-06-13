@@ -1,0 +1,14 @@
+{
+  "error": {
+    "code": "CX_ERR_RATE_LIMIT",
+    "message": "Rate limit exceeded: 100/min/api_key",
+    "retryable": true,
+    "category": "transient",
+    "retry_after_ms": 60000,
+    "structured_data": {
+      "limit": "100/min/api_key",
+      "reset_at": "2026-05-31T10:01:00Z"
+    },
+    "request_id": "req_q429abc"
+  }
+}

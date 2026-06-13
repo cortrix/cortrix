@@ -1,0 +1,14 @@
+<svg width="148" height="32" viewBox="0 0 148 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cortrix">
+  <!-- Cortrix horizontal logo (light background): Magma orange cube + wordmark (VI mockup) -->
+  <defs>
+    <linearGradient id="lf-top" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FFB020"/><stop offset="100%" stop-color="#FF9500"/></linearGradient>
+    <linearGradient id="lf-left" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FF6405"/><stop offset="100%" stop-color="#E65000"/></linearGradient>
+    <linearGradient id="lf-bot" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#B33600"/><stop offset="100%" stop-color="#661A00"/></linearGradient>
+  </defs>
+  <g transform="translate(-3.6 1.6) scale(0.34)">
+    <polygon points="16,31 16,69 34,58 34,42" fill="url(#lf-left)"/>
+    <polygon points="18,72 50,90 83,71 63,60 50,67.5 36,59.5" fill="url(#lf-bot)"/>
+    <polygon points="50,10 83,29 63,40 50,32.5 36,40.5 18,28" fill="url(#lf-top)"/>
+  </g>
+  <text x="34" y="21.5" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="700" fill="#0F172A" letter-spacing="-0.3">Cortrix</text>
+</svg>

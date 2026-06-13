@@ -1,0 +1,270 @@
+# Cortrix API — OpenAPI 3.0 Spec (Single Source of Truth)
+#
+# Main file: only holds info + servers + tags + security + $ref (no inline definitions).
+# Actual definitions live in the components/ and paths/ sub-files; CI merges them via
+# `redocly bundle` into build/openapi.bundled.yaml (= the full API SSoT, consumed by
+# Swagger UI / P03 SDK codegen / contract tests).
+#
+# Detailed design: dev-cortrix-hub/design/features/P04-api-docs.md
+# bundle:  scripts/bundle_openapi.sh  →  build/openapi.bundled.yaml
+#
+# ⚠️ S1 = skeleton (well-structured + bundleable + loadable by Swagger UI).
+#    Per-domain path operations / schemas are filled in progressively by S2-S6.
+openapi: 3.0.3
+
+info:
+  title: Cortrix API
+  version: 1.0.0
+  description: |
+    Cortrix Agent-first Data Infrastructure API.
+
+    All endpoints follow the GEN-Agent first principle (dev-cortrix-hub/design/AGENT_FRIENDLY.md):
+    - Error responses are machine-readable, including `retryable` / `category` / `retry_after_ms` / `structured_data` fields
+    - Endpoint-level `x-cortrix-*` extensions provide Agent-parseable machine-readable metadata
+      (workflow / retryable / retry-strategy / auth-scope / latency / rate-limit / side-effects)
+    - Error codes use a unified `CX_ERR_` prefix (pattern `^CX_ERR_[A-Z][A-Z_]*$`)
+
+    Primary consumers = Agents (Claude / GPT / LangChain / LlamaIndex, etc.), including ops scenarios.
+  contact:
+    name: Cortrix
+    url: https://cortrix.io
+  license:
+    name: AGPL-3.0
+    url: https://www.gnu.org/licenses/agpl-3.0.html
+
+servers:
+  - url: https://api.cortrix.io/api/v1
+    description: Cortrix Cloud
+  - url: http://localhost:9090/api/v1
+    description: Local development (cortrix-server default port)
+
+# Security schemes: API Key (Agent self-service first, create once use forever) or Bearer JWT.
+# See ARCH § 4.1 + P08 auth. Endpoints are annotated with x-cortrix-auth-required / x-cortrix-auth-scope.
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+tags:
+  - name: public
+    description: Public APIs accessible to all Agents
+    x-cortrix-default-auth: api_key
+  - name: admin
+    description: Admin APIs for tenant owners / cluster admins
+    x-cortrix-default-auth: admin_api_key
+  - name: ops
+    description: Ops APIs for runtime / maintenance Agents
+    x-cortrix-default-auth: admin_api_key
+    x-cortrix-extra-headers:
+      X-Ops-Confirm: "true"   # ops APIs require an extra confirm header (guards against accidental calls)
+
+# paths pulls in 15 resource-domain sub-files via $ref (aligned with ARCH § 4.1 resource domains).
+# redocly bundle inlines all $ref into build/openapi.bundled.yaml.
+# S1: sub-files are skeletons (with 1 placeholder health probe to keep bundle/lint passing); S4-S6 fill in the full endpoints.
+paths:
+  # ==== S4: core 7 domains ====
+  # ---- Namespace domain ----
+  /namespaces:
+    $ref: './paths/namespaces.yaml#/paths/~1namespaces'
+  /namespaces/{ns}:
+    $ref: './paths/namespaces.yaml#/paths/~1namespaces~1{ns}'
+  # ---- Document domain ----
+  /documents:
+    $ref: './paths/documents.yaml#/paths/~1documents'
+  /documents/batch:  # [TD-F42-BULK] Wave D-R1
+    $ref: './paths/documents.yaml#/paths/~1documents~1batch'
+  /documents/{id}:
+    $ref: './paths/documents.yaml#/paths/~1documents~1{id}'
+  /documents/tasks/{task_id}/progress:
+    $ref: './paths/documents.yaml#/paths/~1documents~1tasks~1{task_id}~1progress'
+  /documents/tasks/{task_id}:
+    $ref: './paths/documents.yaml#/paths/~1documents~1tasks~1{task_id}'
+  # ---- Query domain ----
+  /query:
+    $ref: './paths/query.yaml#/paths/~1query'
+  # ---- Memory domain ----
+  /memory:
+    $ref: './paths/memory.yaml#/paths/~1memory'
+  /memory/search:
+    $ref: './paths/memory.yaml#/paths/~1memory~1search'
+  /memory/extract:
+    $ref: './paths/memory.yaml#/paths/~1memory~1extract'
+  /memory/extract/batch:
+    $ref: './paths/memory.yaml#/paths/~1memory~1extract~1batch'
+  /memory/extract/run_for_ns:
+    $ref: './paths/memory.yaml#/paths/~1memory~1extract~1run_for_ns'
+  /memory/invalidations:
+    $ref: './paths/memory.yaml#/paths/~1memory~1invalidations'
+  /memory/invalidations/{id}/revoke:
+    $ref: './paths/memory.yaml#/paths/~1memory~1invalidations~1{id}~1revoke'
+  /memory/{id}:
+    $ref: './paths/memory.yaml#/paths/~1memory~1{id}'
+  /memory/session/{session_id}/opt-out:
+    $ref: './paths/memory.yaml#/paths/~1memory~1session~1{session_id}~1opt-out'
+  /memory/session/{session_id}/opt-out/revoke:
+    $ref: './paths/memory.yaml#/paths/~1memory~1session~1{session_id}~1opt-out~1revoke'
+  /memory/sessions:
+    $ref: './paths/memory.yaml#/paths/~1memory~1sessions'
+  /memory/sessions/{session_id}:
+    $ref: './paths/memory.yaml#/paths/~1memory~1sessions~1{session_id}'
+  /memory/sessions/{session_id}/interactions:
+    $ref: './paths/memory.yaml#/paths/~1memory~1sessions~1{session_id}~1interactions'
+  /memory/inject:
+    $ref: './paths/memory.yaml#/paths/~1memory~1inject'
+  # ---- Watch domain ----
+  /watch:
+    $ref: './paths/watch.yaml#/paths/~1watch'
+  /watch/{id}:
+    $ref: './paths/watch.yaml#/paths/~1watch~1{id}'
+  /watch/{id}/events:
+    $ref: './paths/watch.yaml#/paths/~1watch~1{id}~1events'
+  # ---- Import domain (F16a — database import + db-connections) ----
+  /import/database:
+    $ref: './paths/import.yaml#/paths/~1import~1database'
+  /import/tasks/{task_id}/progress:
+    $ref: './paths/import.yaml#/paths/~1import~1tasks~1{task_id}~1progress'
+  /import/tasks/{task_id}:
+    $ref: './paths/import.yaml#/paths/~1import~1tasks~1{task_id}'
+  /admin/db-connections:
+    $ref: './paths/import.yaml#/paths/~1admin~1db-connections'
+  /admin/db-connections/{ref_id}:
+    $ref: './paths/import.yaml#/paths/~1admin~1db-connections~1{ref_id}'
+  # ---- Observability domain (F13 — traces + interactions) ----
+  /traces/{session_id}:
+    $ref: './paths/observability.yaml#/paths/~1traces~1{session_id}'
+  /interactions:
+    $ref: './paths/observability.yaml#/paths/~1interactions'
+  /interactions/{id}/sources:
+    $ref: './paths/observability.yaml#/paths/~1interactions~1{id}~1sources'
+  # ==== S5: latter 7 domains ====
+  # ---- Auth domain (11) ----
+  /auth/register: { $ref: './paths/auth.yaml#/paths/~1auth~1register' }
+  /auth/login: { $ref: './paths/auth.yaml#/paths/~1auth~1login' }
+  /auth/logout: { $ref: './paths/auth.yaml#/paths/~1auth~1logout' }
+  /auth/refresh: { $ref: './paths/auth.yaml#/paths/~1auth~1refresh' }
+  /auth/password-reset: { $ref: './paths/auth.yaml#/paths/~1auth~1password-reset' }
+  /auth/password-reset/confirm: { $ref: './paths/auth.yaml#/paths/~1auth~1password-reset~1confirm' }
+  /auth/verify-email: { $ref: './paths/auth.yaml#/paths/~1auth~1verify-email' }
+  /auth/me: { $ref: './paths/auth.yaml#/paths/~1auth~1me' }
+  /auth/api-keys: { $ref: './paths/auth.yaml#/paths/~1auth~1api-keys' }
+  /auth/api-keys/{id}: { $ref: './paths/auth.yaml#/paths/~1auth~1api-keys~1{id}' }
+  # ---- Admin domain (15) ----
+  /admin/users: { $ref: './paths/admin.yaml#/paths/~1admin~1users' }
+  /admin/users/{id}: { $ref: './paths/admin.yaml#/paths/~1admin~1users~1{id}' }
+  /admin/users/{id}/disable: { $ref: './paths/admin.yaml#/paths/~1admin~1users~1{id}~1disable' }
+  /admin/users/{id}/enable: { $ref: './paths/admin.yaml#/paths/~1admin~1users~1{id}~1enable' }
+  /admin/auth/rotate-jwt-secret: { $ref: './paths/admin.yaml#/paths/~1admin~1auth~1rotate-jwt-secret' }
+  /admin/config/smtp: { $ref: './paths/admin.yaml#/paths/~1admin~1config~1smtp' }
+  /admin/bootstrap: { $ref: './paths/admin.yaml#/paths/~1admin~1bootstrap' }
+  /admin/tenants: { $ref: './paths/admin.yaml#/paths/~1admin~1tenants' }
+  /admin/tenants/{id}: { $ref: './paths/admin.yaml#/paths/~1admin~1tenants~1{id}' }
+  /admin/tenants/{id}/quota: { $ref: './paths/admin.yaml#/paths/~1admin~1tenants~1{id}~1quota' }
+  /admin/audit_log: { $ref: './paths/admin.yaml#/paths/~1admin~1audit_log' }
+  # ---- Tenant domain (8, user-level) ----
+  /tenants: { $ref: './paths/tenants.yaml#/paths/~1tenants' }
+  /tenants/{tenant_id}: { $ref: './paths/tenants.yaml#/paths/~1tenants~1{tenant_id}' }
+  /tenants/{tenant_id}/members: { $ref: './paths/tenants.yaml#/paths/~1tenants~1{tenant_id}~1members' }
+  /tenants/{tenant_id}/members/{user_id}: { $ref: './paths/tenants.yaml#/paths/~1tenants~1{tenant_id}~1members~1{user_id}' }
+  /tenants/{tenant_id}/transfer-ownership: { $ref: './paths/tenants.yaml#/paths/~1tenants~1{tenant_id}~1transfer-ownership' }
+  /tenants/{tenant_id}/quota: { $ref: './paths/tenants.yaml#/paths/~1tenants~1{tenant_id}~1quota' }
+  # ---- ACL domain (3) ----
+  /namespaces/{ns_id}/acl: { $ref: './paths/acl.yaml#/paths/~1namespaces~1{ns_id}~1acl' }
+  /namespaces/{ns_id}/acl/{grantee_tenant_id}: { $ref: './paths/acl.yaml#/paths/~1namespaces~1{ns_id}~1acl~1{grantee_tenant_id}' }
+  # ---- Agent domain (3, F48 — chat SSE) ----
+  /agent/chat: { $ref: './paths/agent.yaml#/paths/~1agent~1chat' }
+  /agent/sessions/{session_id}: { $ref: './paths/agent.yaml#/paths/~1agent~1sessions~1{session_id}' }
+  /agent/health: { $ref: './paths/agent.yaml#/paths/~1agent~1health' }
+  # ---- System domain (health probes + version/features/stats/agent_llm_config) ----
+  /health:
+    $ref: './paths/system.yaml#/paths/~1health'
+  /system/health/live:
+    $ref: './paths/system.yaml#/paths/~1system~1health~1live'
+  /system/health/ready:
+    $ref: './paths/system.yaml#/paths/~1system~1health~1ready'
+  /system/features:
+    $ref: './paths/system.yaml#/paths/~1system~1features'
+  /system/version: { $ref: './paths/system.yaml#/paths/~1system~1version' }
+  /system/namespaces/{ns}/stats: { $ref: './paths/system.yaml#/paths/~1system~1namespaces~1{ns}~1stats' }
+  /system/agent_llm_config: { $ref: './paths/system.yaml#/paths/~1system~1agent_llm_config' }
+  # ==== S6: ops domain (6, tag=ops — only exposed in development/self-hosted) ====
+  /gc/status: { $ref: './paths/ops.yaml#/paths/~1gc~1status' }
+  /gc/run: { $ref: './paths/ops.yaml#/paths/~1gc~1run' }
+  /gc/restore: { $ref: './paths/ops.yaml#/paths/~1gc~1restore' }
+  /gc/purge: { $ref: './paths/ops.yaml#/paths/~1gc~1purge' }
+  /maintenance/vacuum: { $ref: './paths/ops.yaml#/paths/~1maintenance~1vacuum' }
+  /maintenance/reindex: { $ref: './paths/ops.yaml#/paths/~1maintenance~1reindex' }
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: "Cortrix API Key (recommended for Agent self-service scenarios; create once, use forever). Format: cx_live_* / cx_test_*."
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "JWT Bearer token (issued by P08 auth/login, with refresh)."
+
+  # Global schemas/responses/headers are gathered from each components/*.yaml (S2 fills errors/partial/headers, S3 fills schemas/x-cortrix).
+  # This way the bundle validates all component definitions inline; each paths/*.yaml references them via internal '#/components/...' $ref.
+  schemas:
+    # --- Errors / partial success (S2) ---
+    ErrorResponseV1:
+      $ref: './components/errors.yaml#/components/schemas/ErrorResponseV1'
+    XCortrixErrorCodeRegistry:
+      $ref: './components/errors.yaml#/components/schemas/XCortrixErrorCodeRegistry'
+    PartialSuccessByIdV1:
+      $ref: './components/partial.yaml#/components/schemas/PartialSuccessByIdV1'
+    PartialSuccessByNamespaceV1:
+      $ref: './components/partial.yaml#/components/schemas/PartialSuccessByNamespaceV1'
+    # --- Core dataclasses (S3, by resource domain; see components/schemas.yaml) ---
+    ChunkStrategy: { $ref: './components/schemas.yaml#/components/schemas/ChunkStrategy' }
+    NamespaceCreateRequest: { $ref: './components/schemas.yaml#/components/schemas/NamespaceCreateRequest' }
+    Namespace: { $ref: './components/schemas.yaml#/components/schemas/Namespace' }
+    DocumentProgress: { $ref: './components/schemas.yaml#/components/schemas/DocumentProgress' }
+    Document: { $ref: './components/schemas.yaml#/components/schemas/Document' }
+    DocumentTask: { $ref: './components/schemas.yaml#/components/schemas/DocumentTask' }
+    QueryFilter: { $ref: './components/schemas.yaml#/components/schemas/QueryFilter' }
+    QueryRequest: { $ref: './components/schemas.yaml#/components/schemas/QueryRequest' }
+    QueryResultItem: { $ref: './components/schemas.yaml#/components/schemas/QueryResultItem' }
+    QueryMeta: { $ref: './components/schemas.yaml#/components/schemas/QueryMeta' }
+    QueryResult: { $ref: './components/schemas.yaml#/components/schemas/QueryResult' }
+    MemorySearchRequest: { $ref: './components/schemas.yaml#/components/schemas/MemorySearchRequest' }
+    MemorySearchResponse: { $ref: './components/schemas.yaml#/components/schemas/MemorySearchResponse' }
+    MemoryExtractResponse: { $ref: './components/schemas.yaml#/components/schemas/MemoryExtractResponse' }
+    MemoryCreateRequest: { $ref: './components/schemas.yaml#/components/schemas/MemoryCreateRequest' }
+    Memory: { $ref: './components/schemas.yaml#/components/schemas/Memory' }
+    ImportRequest: { $ref: './components/schemas.yaml#/components/schemas/ImportRequest' }
+    ImportTaskStarted: { $ref: './components/schemas.yaml#/components/schemas/ImportTaskStarted' }
+    ImportTaskProgress: { $ref: './components/schemas.yaml#/components/schemas/ImportTaskProgress' }
+    DbConnection: { $ref: './components/schemas.yaml#/components/schemas/DbConnection' }
+    TraceSession: { $ref: './components/schemas.yaml#/components/schemas/TraceSession' }
+    InteractionList: { $ref: './components/schemas.yaml#/components/schemas/InteractionList' }
+    InteractionSources: { $ref: './components/schemas.yaml#/components/schemas/InteractionSources' }
+    Watcher: { $ref: './components/schemas.yaml#/components/schemas/Watcher' }
+    WatchEvent: { $ref: './components/schemas.yaml#/components/schemas/WatchEvent' }
+    RegisterRequest: { $ref: './components/schemas.yaml#/components/schemas/RegisterRequest' }
+    TenantRef: { $ref: './components/schemas.yaml#/components/schemas/TenantRef' }
+    User: { $ref: './components/schemas.yaml#/components/schemas/User' }
+    LoginResponse: { $ref: './components/schemas.yaml#/components/schemas/LoginResponse' }
+    ApiKey: { $ref: './components/schemas.yaml#/components/schemas/ApiKey' }
+    Quota: { $ref: './components/schemas.yaml#/components/schemas/Quota' }
+    TenantMember: { $ref: './components/schemas.yaml#/components/schemas/TenantMember' }
+    Tenant: { $ref: './components/schemas.yaml#/components/schemas/Tenant' }
+    NsAclEntry: { $ref: './components/schemas.yaml#/components/schemas/NsAclEntry' }
+    ChatRequest: { $ref: './components/schemas.yaml#/components/schemas/ChatRequest' }
+    AgentSession: { $ref: './components/schemas.yaml#/components/schemas/AgentSession' }
+    AgentLlmConfig: { $ref: './components/schemas.yaml#/components/schemas/AgentLlmConfig' }
+    NsStats: { $ref: './components/schemas.yaml#/components/schemas/NsStats' }
+    GcStatus: { $ref: './components/schemas.yaml#/components/schemas/GcStatus' }
+  responses:
+    ErrorResponseV1:
+      $ref: './components/errors.yaml#/components/responses/ErrorResponseV1'
+  headers:
+    RetryAfter:
+      $ref: './components/headers.yaml#/components/headers/RetryAfter'
+    Traceparent:
+      $ref: './components/headers.yaml#/components/headers/Traceparent'
+    XCortrixTraceId:
+      $ref: './components/headers.yaml#/components/headers/XCortrixTraceId'

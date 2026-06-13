@@ -1,0 +1,104 @@
+# components/x-cortrix.yaml — strict schema definition for x-cortrix-* extension fields (D7 resolution)
+#
+# SoT: P04 § 3.1
+# CI-enforced (S7 validate_x_cortrix_extensions.py): every x-cortrix-* field used in any paths/*.yaml
+# must be defined here; out-of-range enum values / undefined fields → lint fail.
+#
+# Note: x-cortrix-* are OpenAPI specification extensions (not standard components nodes). This file is the
+# central definition source for the extension-field schemas; redocly does not strictly validate them (spec
+# extensions are free-form), so this file is not inlined via the main spec $ref and is consumed separately by
+# validate_x_cortrix_extensions.py.
+x-cortrix-extensions:
+
+  # ---- endpoint-level metadata ----
+
+  x-cortrix-agent-workflow:
+    type: string
+    enum: [public, admin, ops]          # consistent with the D5 tags, avoids duplication
+    description: "Which type of Agent typically uses this endpoint"
+
+  x-cortrix-retryable:
+    type: boolean
+    description: "Typical retryability (specific error codes may override)"
+
+  x-cortrix-retry-strategy:
+    type: string
+    enum: [exponential_backoff, linear, no_retry, immediate]
+    description: "Recommended retry pattern for retryable failures"
+
+  x-cortrix-auth-required:
+    type: boolean
+    description: "Whether authentication is required"
+
+  x-cortrix-auth-scope:
+    type: string
+    pattern: "^(ns:read|ns:write|tenant:admin|ops:admin)$"
+    description: "Required auth scope (machine-readable)"
+
+  x-cortrix-typical-latency:
+    type: object
+    properties:
+      p50_ms:
+        type: integer
+        minimum: 0
+      p99_ms:
+        type: integer
+        minimum: 0
+    required: [p50_ms, p99_ms]
+    description: "P50 + P99 latency estimates (P50/P99 double-value, not single point — D7 supplement)"
+
+  x-cortrix-rate-limit:
+    type: string
+    pattern: "^\\d+/(sec|min|hour|day)/(api_key|tenant|ip)$"
+    description: "Rate limit in format <count>/<period>/<scope>"
+
+  x-cortrix-side-effects:
+    type: string
+    enum: [none, read_only, write, destructive]
+    description: "Effect category for Agent decision making"
+
+  x-cortrix-stream:
+    type: string
+    enum: [SSE]
+    description: |
+      Marks an endpoint as a server-sent-events (text/event-stream) streaming endpoint
+      (V14 J8 — F48 agent/chat). Schemathesis / response_schema_conformance skips JSON schema
+      validation on streaming endpoints (chat streaming chunks + the terminal meta JSON frame do not go through standard OpenAPI response validation).
+
+  x-cortrix-edition:
+    type: string
+    enum: [ce, cloud-enterprise, cloud]
+    description: |
+      Which edition(s) expose this endpoint. The spec is the full all-edition blueprint;
+      this field tells Agents which build actually serves the endpoint:
+      - ce: served by the Community Edition (CE-native surface, e.g. API-Key auth, bootstrap, tenant/quota admin)
+      - cloud-enterprise: only Cloud / Enterprise builds; CE returns 404 (P08 acceptance item, e.g. JWT account family, user/audit management, SMTP)
+      - cloud: only the managed Cloud build (e.g. GDPR export/delete)
+      Endpoints without this field are served by every edition.
+
+  x-cortrix-status:
+    type: string
+    enum: [stable, not-implemented]
+    description: |
+      Implementation status of the endpoint relative to the live server.
+      - stable (default if omitted): live server serves it
+      - not-implemented: defined in the spec blueprint but not yet wired in the live server (deferred to a future Phase)
+
+  # ---- error-code-level metadata (referenced in ErrorResponseV1 / XCortrixErrorCodeRegistry) ----
+
+  x-cortrix-error-codes:
+    type: object
+    additionalProperties:
+      type: object
+      properties:
+        retryable: { type: boolean }
+        category:
+          type: string
+          enum: [auth, quota, transient, permanent, timeout]
+        retry_after_ms:
+          type: integer
+          nullable: true
+        typical_cause:
+          type: string
+        suggested_action:
+          type: string

@@ -1,0 +1,156 @@
+# paths/observability.yaml — /api/v1/traces/* + /api/v1/interactions/* (F13 Agent Observability) — 3 endpoints
+# SoT: F13 detailed design (§8.1/§8.2/§8.3) + live CE implementation
+#   src/server/routes/observability_routes.cpp + src/agent_trace/ handlers.
+# Storage is per-namespace (each NS's memory.db holds agent_trace + interaction_log + interaction_sources),
+# so the namespace query param is REQUIRED (GET /interactions reuses namespace_id as the per-NS selector).
+paths:
+  /traces/{session_id}:
+    parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [public]
+      operationId: getSessionTraces
+      summary: Get session traces
+      description: |
+        Get the agent trace timeline for a session (F13 §8.1, Read+). Per-namespace storage, so namespace
+        is required. Pagination via limit/offset; meta carries total_count/has_next/next_offset + a
+        response_size_warning soft-limit flag.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      parameters:
+        - name: namespace
+          in: query
+          required: true
+          schema: { type: string }
+          description: "Selects the per-NS observability store (required)."
+        - name: from_timestamp
+          in: query
+          schema: { type: integer, format: int64 }
+          description: "Unix-ms lower bound (inclusive)."
+        - name: to_timestamp
+          in: query
+          schema: { type: integer, format: int64 }
+          description: "Unix-ms upper bound (inclusive)."
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [success, failed, cancelled, session_timeout]
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0 }
+      responses:
+        '200':
+          description: Session trace timeline
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/TraceSession'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /interactions:
+    get:
+      tags: [public]
+      operationId: listInteractions
+      summary: List interactions
+      description: |
+        List agent interactions (F13 §8.3, Read+). Per-namespace storage, so namespace_id is required and
+        doubles as the per-NS store selector. query_text is returned in full (not truncated).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      parameters:
+        - name: namespace_id
+          in: query
+          required: true
+          schema: { type: string }
+          description: "Selects the per-NS observability store (required); also filters by namespace."
+        - name: user_id
+          in: query
+          schema: { type: string }
+        - name: session_id
+          in: query
+          schema: { type: string }
+        - name: from_timestamp
+          in: query
+          schema: { type: integer, format: int64 }
+          description: "Unix-ms lower bound (inclusive)."
+        - name: to_timestamp
+          in: query
+          schema: { type: integer, format: int64 }
+          description: "Unix-ms upper bound (inclusive)."
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0 }
+      responses:
+        '200':
+          description: Interaction list
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/InteractionList'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /interactions/{id}/sources:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+        description: interaction_id
+    get:
+      tags: [public]
+      operationId: getInteractionSources
+      summary: Get interaction sources
+      description: |
+        Get the retrieval sources cited by an interaction (F13 §8.2, Read+). Per-namespace storage, so
+        namespace is required. highlight_ranges is an Enterprise-only field (absent in CE).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      parameters:
+        - name: namespace
+          in: query
+          required: true
+          schema: { type: string }
+          description: "Selects the per-NS observability store (required)."
+      responses:
+        '200':
+          description: Interaction sources
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/InteractionSources'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

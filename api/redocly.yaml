@@ -1,0 +1,28 @@
+# redocly.yaml — redocly CLI configuration (bundle + lint)
+# SoT: P04 § 2.3 / § 6.3
+#
+# Usage:
+#   redocly bundle cortrix-api -o ../build/openapi.bundled.yaml --ext yaml
+#   redocly lint cortrix-api
+# (or operate directly on the openapi.yaml path, see scripts/bundle_openapi.sh)
+
+apis:
+  cortrix-api:
+    root: ./openapi.yaml
+
+# Lint rule set. S1 starts with minimal (skeleton phase, operations not yet fully filled,
+# avoids noise like no-empty-servers blocking the skeleton). S4-S7 tighten gradually to
+# recommended, and S7 adds custom x-cortrix-* lint rules.
+extends:
+  - minimal
+
+rules:
+  # x-cortrix-* is a Cortrix custom specification extension; disable unknown-extension warnings.
+  spec-strict-refs: off
+  # Skeleton phase allows operations to temporarily lack 4xx (recommended takes over once S2/S4 fill error responses).
+  operation-4xx-response: off
+  # The localhost:9090 dev server is a design requirement (P04 § 2.2 Local development); kept by-design.
+  no-server-example.com: off
+  # Skeleton phase defines components before they are referenced (path operations consume them only in S4-S6) → disable the unused warning.
+  # Re-enable when S7 tightens to recommended (by then all endpoints are filled, so unreferenced = a real anomaly).
+  no-unused-components: off

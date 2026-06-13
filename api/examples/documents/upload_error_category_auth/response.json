@@ -1,0 +1,14 @@
+{
+  "error": {
+    "code": "CX_ERR_NS_UNAUTHORIZED",
+    "message": "API Key lacks write permission for namespace 'contracts'",
+    "retryable": false,
+    "category": "auth",
+    "retry_after_ms": null,
+    "structured_data": {
+      "namespace": "contracts",
+      "required_scope": "ns:write"
+    },
+    "request_id": "req_up403"
+  }
+}

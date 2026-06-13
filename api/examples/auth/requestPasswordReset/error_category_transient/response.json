@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "CX_ERR_SERVICE_UNAVAILABLE",
+    "message": "TODO: human-readable message",
+    "retryable": true,
+    "category": "transient",
+    "retry_after_ms": 1000,
+    "structured_data": {},
+    "request_id": "req_xxx"
+  }
+}

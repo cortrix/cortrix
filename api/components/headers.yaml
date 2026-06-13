@@ -1,0 +1,31 @@
+# components/headers.yaml — Retry-After + traceparent (W3C) + x-cortrix-trace-id
+#
+# SoT: P04 § 4.1 + OBSERVABILITY_SPEC § 5.3/5.4 + P03 topic 3 (P04-rev-6 collaboration)
+components:
+  headers:
+    RetryAfter:
+      description: >-
+        Standard HTTP Retry-After header (unit: seconds). Declared alongside error.retry_after_ms (ms);
+        clients should prefer retry_after_ms (finer-grained).
+      schema:
+        type: integer
+        minimum: 0
+      example: 60
+
+    Traceparent:
+      description: >-
+        W3C Trace Context traceparent header (distributed tracing). Works together with the P03 SDK trace_id_provider
+        (P04-rev-6 / OBSERVABILITY § 5.3).
+      schema:
+        type: string
+        # W3C: version-traceid(32hex)-spanid(16hex)-flags(2hex)
+        pattern: "^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+      example: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+
+    XCortrixTraceId:
+      description: >-
+        Cortrix internal trace id (cross-log/metric correlation). Aligned with the P03 SDK ErrorContext.trace_id
+        (OBSERVABILITY § 5.4).
+      schema:
+        type: string
+        example: "trace_abc123def456"

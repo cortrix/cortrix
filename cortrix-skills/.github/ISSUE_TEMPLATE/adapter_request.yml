@@ -1,0 +1,35 @@
+name: Framework adapter request
+description: Request support for an additional agent framework
+labels: ["enhancement", "adapter", "P14"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        cortrix-skills ships LangChain, Claude Tools, and OpenAI Function Calling adapters in
+        V1.0. Additional frameworks (LlamaIndex, AutoGen, CrewAI, …) are tracked for later
+        releases. Use this to request or discuss one.
+  - type: input
+    id: framework
+    attributes:
+      label: Framework
+      placeholder: LlamaIndex
+    validations:
+      required: true
+  - type: textarea
+    id: tool-shape
+    attributes:
+      label: Tool interface
+      description: How does this framework expect tools to be defined / invoked? Link to its tool docs if possible.
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What are you building, and why does this framework matter for it?
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: Notes
+      options:
+        - label: I understand all 29 CortrixToolKit methods would be exposed via the new adapter (admin tools stay out of scope).

@@ -1,0 +1,12 @@
+# Docker build context exclusions (P02a § 11.1 / S9).
+# Keep the web-builder context minimal + reproducible: deps are installed from
+# the lockfile inside the image, and build output is regenerated there.
+node_modules
+static
+.deleted
+playwright-report
+test-results
+coverage
+.git
+*.log
+.DS_Store

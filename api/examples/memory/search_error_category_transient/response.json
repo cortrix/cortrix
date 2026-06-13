@@ -1,0 +1,14 @@
+{
+  "error": {
+    "code": "CX_ERR_NS_TIMEOUT",
+    "message": "Memory index query timed out",
+    "retryable": true,
+    "category": "timeout",
+    "retry_after_ms": 1000,
+    "structured_data": {
+      "namespace": "user_memory",
+      "timeout_ms": 5000
+    },
+    "request_id": "req_ms504"
+  }
+}

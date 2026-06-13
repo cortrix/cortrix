@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cortrix"
+version = "1.0.0"
+description = "Official Python SDK for Cortrix — semantic storage for AI agents"
+readme = "README.md"
+license = {text = "AGPL-3.0"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Cortrix"}
+]
+keywords = ["cortrix", "semantic-storage", "rag", "ai", "agents", "vector-search"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Typing :: Typed",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "httpx>=0.25.0,<1.0",
+    "typing-extensions>=4.7.0; python_version<'3.12'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-httpx>=0.30",
+    "respx>=0.21",
+    "pytest-cov>=4.0",
+    "mypy>=1.5",
+    "ruff>=0.1",
+    "pyyaml>=6.0",  # scripts/generate_types.py reads the OpenAPI YAML spec
+]
+
+[project.urls]
+Homepage = "https://github.com/cortrix/cortrix"
+Repository = "https://github.com/cortrix/cortrix/tree/main/sdk/python"
+
+[tool.setuptools.packages.find]
+include = ["cortrix*"]
+
+[tool.setuptools.package-data]
+cortrix = ["py.typed"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+# Package targets 3.9+ (requires-python), but mypy itself only supports
+# --python-version >= 3.10; checking against 3.10 is a strict superset.
+python_version = "3.10"
+strict = true
+warn_unused_configs = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"

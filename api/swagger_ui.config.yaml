@@ -1,0 +1,49 @@
+# swagger_ui.config.yaml — Swagger UI deployment config + environment-tiered exposure (D4 + D5 resolutions)
+#
+# SoT: P04 § 5.2 (environment-tiered exposure) + § 7.1 (Swagger UI deployment config).
+# This is the swagger_ui config fragment for cortrix-server (merged into config.yaml). Consumed by the C++ SwaggerHandler in S7:
+# on startup it reads expose_tags[env] by current_env → filters the paths of build/openapi.bundled.yaml (by tag) → renders /docs.
+#
+# ⚠️ The actual server-side SwaggerHandler implementation + /docs route = S7 (needs a live server; under D3 standalone this is config + draft,
+#    end-to-end integration FLAG → D3.5). This file is the config contract (declarative; the server implementation aligns with it).
+
+swagger_ui:
+  enabled: true
+  path: /docs                         # industry-standard path, self-hosting friendly
+
+  # spec source (server also serves the spec file)
+  spec_url: /openapi.bundled.yaml     # = build/openapi.bundled.yaml
+  # alternative JSON format
+  spec_url_json: /openapi.json
+
+  # rendering config (Agent-debug friendly)
+  deep_linking: true                  # URL anchors can pinpoint a specific endpoint
+  display_request_duration: true      # show request duration
+  try_it_out_enabled: true            # enable "Try it out" by default
+
+  # authentication
+  authorization_required: false       # /docs itself requires no auth (spec is readable)
+  try_it_out_auth: api_key            # use API Key auth for "Try it out"
+
+  # ---- environment-tiered exposure (D5 resolution — expose different tags per environment) ----
+  # prod exposes only public by default; staging does not expose ops; dev/self_hosted expose everything.
+  # Guards against R5 (production-exposed spec being scanned by attackers for ops/admin endpoints).
+  expose_tags:
+    development: [public, admin, ops]   # dev exposes everything
+    staging:     [public, admin]        # staging does not expose ops
+    production:  [public]               # prod exposes only public by default
+    self_hosted: [public, admin, ops]   # self-hosted deployments expose everything
+
+  # injected by the deployment script at deploy time (overrides this default)
+  current_env: production
+
+# ---- server endpoints (landed in S7, see P04 § 7.2) ----
+# | Path                    | Purpose                    | Auth |
+# | /docs                   | Swagger UI HTML page       | no   |
+# | /openapi.bundled.yaml   | bundled spec file          | no   |
+# | /openapi.json           | bundled spec JSON (alt)    | no   |
+#
+# ---- evolution anchors (L4 audience + L5 deployment form, P04 § 5.4) ----
+# Adding a new tag (internal/partner) only requires extending openapi.yaml tags + this file's expose_tags.
+# Adding a new environment (qa/pre-release) only requires extending expose_tags.
+# Phase 2 adds /redoc (Redoc) / /stoplight (Stoplight Elements) as alternative UIs (P04 § 7.3).

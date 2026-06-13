@@ -1,0 +1,474 @@
+# paths/admin.yaml — /api/v1/admin/* (ARCH § 4.1.9 + P08 v1.0.2 + P09) — 15 endpoints
+# SoT: P08 v1.0.2 § 2.13/2.13-bis + P09 + components/schemas.yaml (User / Tenant)
+# Note: admin/* binds 127.0.0.1 by default (loopback only, AdminGuard, ARCH § 4.1.10).
+paths:
+  /admin/users:
+    get:
+      tags: [admin]
+      operationId: adminListUsers
+      summary: List users
+      description: List users (admin).
+      x-cortrix-edition: cloud-enterprise   # User/JWT management: CE returns 404; only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: read_only
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [users]
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '../components/schemas.yaml#/components/schemas/User'
+                  total: { type: integer }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    post:
+      tags: [admin]
+      operationId: adminCreateUser
+      summary: Create user
+      description: Create a user (admin).
+      x-cortrix-edition: cloud-enterprise   # User/JWT management: CE returns 404; only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/User'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '409': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /admin/users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [admin]
+      operationId: adminUpdateUser
+      summary: Update user
+      description: Update a user (V5-B4 P0-V5-33).
+      x-cortrix-edition: cloud-enterprise   # User/JWT management: CE returns 404; only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name: { type: string }
+                role: { type: string, enum: [admin, member] }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/User'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /admin/users/{id}/disable:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [admin]
+      operationId: adminDisableUser
+      summary: Disable user
+      description: Disable a user (V5-B4 P0-V5-33).
+      x-cortrix-edition: cloud-enterprise   # User/JWT management: CE returns 404; only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      responses:
+        '200':
+          description: Disabled
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/User'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /admin/users/{id}/enable:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [admin]
+      operationId: adminEnableUser
+      summary: Enable user
+      description: Enable a user (V5-B4 P0-V5-33).
+      x-cortrix-edition: cloud-enterprise   # User/JWT management: CE returns 404; only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      responses:
+        '200':
+          description: Enabled
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/User'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /admin/auth/rotate-jwt-secret:
+    post:
+      tags: [admin]
+      operationId: adminRotateJwtSecret
+      summary: Rotate JWT secret
+      description: Rotate the JWT secret (P08 topic 1.1 C). All existing tokens are invalidated.
+      x-cortrix-edition: cloud-enterprise   # JWT secret management: CE returns 404; only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: destructive
+      responses:
+        '200':
+          description: Secret rotated
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /admin/config/smtp:
+    post:
+      tags: [admin]
+      operationId: adminConfigSmtp
+      summary: Configure SMTP
+      description: Configure SMTP (P08 topic 8 D).
+      x-cortrix-edition: cloud-enterprise   # SMTP (email delivery for JWT flows): CE returns 404; only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host, port, from_address]
+              properties:
+                host: { type: string }
+                port: { type: integer }
+                username: { type: string }
+                password: { type: string }
+                from_address: { type: string, format: email }
+      responses:
+        '200':
+          description: SMTP configured
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /admin/bootstrap:
+    get:
+      tags: [admin]
+      operationId: adminBootstrapPage
+      summary: Bootstrap page (HTML)
+      description: Bootstrap page (Content-Type text/html, V3 resolution 5). Initializes the admin on first deployment.
+      x-cortrix-edition: ce   # First-deploy bootstrap is a CE-native surface
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: false
+      x-cortrix-side-effects: read_only
+      security: []
+      responses:
+        '200':
+          description: Bootstrap page HTML
+          content:
+            text/html:
+              schema:
+                type: string
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    post:
+      tags: [admin]
+      operationId: adminBootstrapSubmit
+      summary: Bootstrap submit (JSON)
+      description: Bootstrap submit (Content-Type application/json, V3 resolution 5). Creates the first admin account.
+      x-cortrix-edition: ce   # First-deploy bootstrap is a CE-native surface
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: false
+      x-cortrix-side-effects: write
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bootstrap_token, email, password]
+              properties:
+                bootstrap_token: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        '201':
+          description: First admin created
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/User'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /admin/tenants:
+    get:
+      tags: [admin]
+      operationId: adminListTenants
+      summary: List tenants (admin)
+      description: List all tenants (cluster admin).
+      x-cortrix-edition: ce   # Tenant/quota management is a CE-native surface
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: read_only
+      responses:
+        '200':
+          description: Tenant list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tenants]
+                properties:
+                  tenants:
+                    type: array
+                    items:
+                      $ref: '../components/schemas.yaml#/components/schemas/Tenant'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    post:
+      tags: [admin]
+      operationId: adminCreateTenant
+      summary: Create tenant (admin)
+      description: Create a tenant (cluster admin).
+      x-cortrix-edition: ce   # Tenant/quota management is a CE-native surface
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, owner_user_id]
+              properties:
+                name: { type: string }
+                owner_user_id: { type: string }
+      responses:
+        '201':
+          description: Tenant created
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Tenant'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /admin/tenants/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [admin]
+      operationId: adminUpdateTenant
+      summary: Update tenant (admin)
+      description: Update a tenant (cluster admin).
+      x-cortrix-edition: ce   # Tenant/quota management is a CE-native surface
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Tenant'
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+    delete:
+      tags: [admin]
+      operationId: adminDeleteTenant
+      summary: Delete tenant (admin)
+      description: Delete a tenant (cluster admin, irreversible).
+      x-cortrix-edition: ce   # Tenant/quota management is a CE-native surface
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: destructive
+      responses:
+        '204':
+          description: Deleted
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /admin/tenants/{id}/quota:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [admin]
+      operationId: adminUpdateTenantQuota
+      summary: Override tenant quota
+      description: Quota override (V3-C-04 admin).
+      x-cortrix-edition: ce   # Tenant/quota management is a CE-native surface
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/components/schemas/Quota'
+      responses:
+        '200':
+          description: Quota updated
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/Quota'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /admin/audit_log:
+    get:
+      tags: [admin]
+      operationId: adminGetAuditLog
+      summary: Audit log query (extended deployments)
+      description: Audit log query (extended deployments). Supports action/user_id/timestamp filtering + JSON export.
+      x-cortrix-edition: cloud-enterprise   # Audit log: CE returns 404; only Cloud/Enterprise expose it
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: read_only
+      parameters:
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: user_id
+          in: query
+          schema: { type: string }
+        - name: timestamp_from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: timestamp_to
+          in: query
+          schema: { type: string, format: date-time }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: Audit log
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries]
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                  total: { type: integer }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
