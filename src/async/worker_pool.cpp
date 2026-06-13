@@ -1,10 +1,12 @@
 #include "cortrix/async/worker_pool.h"
 
 #include <chrono>
+#include <exception>
 
 #include <spdlog/spdlog.h>
 
 #include "cortrix/async/f42_error.h"
+#include "cortrix/async/f42_metrics.h"
 
 namespace cortrix::async {
 
@@ -89,14 +91,44 @@ void WorkerPool::WorkerLoop(int worker_id) {
             const TaskInfo& task = *dq.value();
             // Dispatch by task_type to the registered handler (F42 §4.1 / F41 §10.2).
             // Process outside any lock; ProcessTask drives progress + finalize.
+            //
+            // R2-C1 — a handler MUST NOT throw (it returns a CX_ERR_* Status on
+            // failure), but if one does we catch it here so the misbehaving task
+            // fails in isolation. An uncaught exception would escape the thread
+            // entry point and call std::terminate(), crashing the whole process.
+            // OnTaskCompleted (below) then runs UNCONDITIONALLY on every path —
+            // normal return, no-handler, caught exception — because the catch
+            // blocks swallow the throw and let control fall through to it. Skipping
+            // it on the throw path would leak the per-doc_id reservation: the
+            // doc_id would stay in active_doc_ids_ until process restart and that
+            // doc would forever report in-progress (no worker can re-dequeue it).
             auto it = handlers_.find(task.task_type);
             if (it != handlers_.end() && it->second != nullptr) {
-                it->second->ProcessTask(task);
+                try {
+                    it->second->ProcessTask(task);
+                } catch (const std::exception& e) {
+                    spdlog::error(
+                        "F42 WorkerPool: handler threw for task {} (task_type {}): "
+                        "{} — task failed, worker continues",
+                        task.task_id, task.task_type, e.what());
+                    F42Metrics::Instance().RecordCompleted(
+                        static_cast<TaskType>(task.task_type),
+                        F42Metrics::CompletionStatus::kFailed);
+                } catch (...) {
+                    spdlog::error(
+                        "F42 WorkerPool: handler threw a non-std exception for task "
+                        "{} (task_type {}) — task failed, worker continues",
+                        task.task_id, task.task_type);
+                    F42Metrics::Instance().RecordCompleted(
+                        static_cast<TaskType>(task.task_type),
+                        F42Metrics::CompletionStatus::kFailed);
+                }
             } else {
                 spdlog::error("F42 WorkerPool: no handler for task_type {} (task {})",
                               task.task_type, task.task_id);
             }
-            // Release the per-doc_id reservation regardless of terminal outcome.
+            // Release the per-doc_id reservation regardless of terminal outcome
+            // (success, failure, or a caught handler exception above).
             scheduler_->OnTaskCompleted(task.doc_id);
             continue;  // immediately try for the next queued task
         }

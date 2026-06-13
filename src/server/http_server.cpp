@@ -1,5 +1,6 @@
 #include "cortrix/server/http_server.h"
 #include "cortrix/auth/auth_middleware.h"
+#include "cortrix/agent_friendly/error.h"         // GEN-Agent error category enum
 #include "cortrix/catalog/i_ns_router.h"          // F12 INSRouter (F13 create path)
 #include "cortrix/catalog/catalog_types.h"        // NSMetadata
 #include "cortrix/resource/namespace_facade.h"    // per-request façade over F05 pool
@@ -12,6 +13,9 @@
 #include <fstream>
 #include <chrono>
 #include <ctime>
+#include <optional>
+#include <unordered_map>
+#include <utility>
 
 #include <openssl/rand.h>
 
@@ -30,11 +34,137 @@ std::string GenerateRequestId() {
     return ss.str();
 }
 
+namespace {
+
+using agent_friendly::ErrorCategory;
+
+// CX_ERR_* -> {category, retryable} for the codes ERROR_CODE_SDK_MAP.md sec.3
+// (the L2 high-frequency subclass set) annotates explicitly. This is the doc SoT
+// the coarse StatusCode cannot reconstruct: e.g. quota / timeout codes coarsen
+// onto kPermissionDenied / kInvalidArgument and would otherwise mislabel as
+// auth / permanent. Scoped to sec.3's curated L2 set on purpose - the broader
+// in-repo registries include shared codes (e.g. CX_ERR_INTERNAL_ERROR carries
+// conflicting category across auth vs catalog) and divergent spellings, so a
+// global string map is not 1:1; sec.3 is conflict-free and authoritative for
+// these high-frequency identities. Anything not listed falls back to the
+// StatusCode approximation below.
+const std::unordered_map<std::string, std::pair<ErrorCategory, bool>>& Sdk3Map() {
+    static const std::unordered_map<std::string, std::pair<ErrorCategory, bool>> kMap = {
+        // sec.3.2 Auth (P08, 11 codes)
+        {"CX_ERR_AUTH_EMAIL_ALREADY_EXISTS",     {ErrorCategory::kPermanent, false}},
+        {"CX_ERR_AUTH_INVALID_CREDENTIALS",      {ErrorCategory::kAuth,      false}},
+        {"CX_ERR_AUTH_INVALID_RESET_CODE",       {ErrorCategory::kPermanent, false}},
+        {"CX_ERR_AUTH_TOKEN_EXPIRED",            {ErrorCategory::kAuth,      false}},
+        {"CX_ERR_AUTH_BOOTSTRAP_TOKEN_INVALID",  {ErrorCategory::kAuth,      false}},
+        {"CX_ERR_AUTH_INVALID_API_KEY",          {ErrorCategory::kAuth,      false}},
+        {"CX_ERR_AUTH_ADMIN_REQUIRED",           {ErrorCategory::kAuth,      false}},
+        {"CX_ERR_AUTH_TOKEN_VERIFICATION_FAILED",{ErrorCategory::kAuth,      false}},
+        {"CX_ERR_AUTH_EMAIL_SEND_FAILED",        {ErrorCategory::kTransient, true}},
+        {"CX_ERR_AUTH_BCRYPT_TIMEOUT",           {ErrorCategory::kPermanent, false}},
+        {"CX_ERR_AUTH_JWT_INIT_FAILED",          {ErrorCategory::kPermanent, false}},
+        // sec.3.3 Store
+        {"CX_ERR_STORE_NOT_FOUND",               {ErrorCategory::kPermanent, false}},
+        {"CX_ERR_STORE_DB_ERROR",                {ErrorCategory::kTransient, true}},
+        // sec.3.4 F14 pgcortrix
+        {"CX_ERR_F14_INVALID_FILTER",            {ErrorCategory::kPermanent, false}},
+        // sec.3.5 retrieval chain (F36 / F38 / F48)
+        {"CX_ERR_RAG_FUSION_LLM_TIMEOUT",        {ErrorCategory::kTimeout,   true}},
+        {"CX_ERR_RAG_FUSION_LLM_QUOTA",          {ErrorCategory::kQuota,     true}},
+        {"CX_ERR_F38_LLM_TIMEOUT",               {ErrorCategory::kTimeout,   true}},
+        {"CX_ERR_F38_PARENT_NOT_FOUND",          {ErrorCategory::kPermanent, false}},
+        {"CX_ERR_F48_LLM_TIMEOUT",               {ErrorCategory::kTimeout,   true}},
+        {"CX_ERR_F48_LLM_QUOTA_EXCEEDED",        {ErrorCategory::kQuota,     true}},
+        {"CX_ERR_F48_LLM_UNAVAILABLE",           {ErrorCategory::kTransient, true}},
+        {"CX_ERR_F48_RAG_FAILED",                {ErrorCategory::kTransient, true}},
+        // sec.3.6 rate limit
+        {"CX_ERR_RATE_LIMITED",                  {ErrorCategory::kQuota,     true}},
+        // sec.3.7 MEM02 extraction
+        {"CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT",     {ErrorCategory::kTimeout,   true}},
+        {"CX_ERR_MEM02_EXTRACT_BUDGET_EXCEEDED", {ErrorCategory::kQuota,     false}},
+        // sec.3.1 Namespace (NotFoundError -> permanent/false)
+        {"CX_ERR_NAMESPACE_NOT_FOUND",           {ErrorCategory::kPermanent, false}},
+    };
+    return kMap;
+}
+
+// StatusCode -> GEN-Agent category fallback (ERROR_CODE_SDK_MAP sec.4.1 HTTP-default
+// column / AGENT_FRIENDLY #4) for codes the sec.3 map does not list (incl. bare
+// Status with no token). The Status primitive is a lossy carrier (catalog_error.h:
+// "deliberately do NOT widen cortrix::Status"), so quota/timeout domain codes that
+// coarsen onto kPermissionDenied/kInvalidArgument approximate here - the sec.3 map
+// is what restores their true category for the high-frequency identities.
+ErrorCategory StatusCodeToCategory(StatusCode code) {
+    switch (code) {
+        case StatusCode::kUnauthenticated:  return ErrorCategory::kAuth;       // 401
+        case StatusCode::kPermissionDenied: return ErrorCategory::kAuth;       // 403
+        case StatusCode::kInternal:         return ErrorCategory::kTransient;  // 500
+        case StatusCode::kUnavailable:      return ErrorCategory::kTransient;  // 503
+        case StatusCode::kInvalidArgument:                                     // 400
+        case StatusCode::kNotFound:                                            // 404
+        case StatusCode::kAlreadyExists:                                       // 409
+        case StatusCode::kOk:
+        default:                            return ErrorCategory::kPermanent;
+    }
+}
+
+// StatusCode -> retry signal fallback (AGENT_FRIENDLY #6). Only the transient class
+// (500 Internal / 503 Unavailable) is retryable; client-fault classes are not.
+bool StatusCodeRetryable(StatusCode code) {
+    return code == StatusCode::kInternal || code == StatusCode::kUnavailable;
+}
+
+// Lift the rich CX_ERR_* token an Agent should route on. The catalog/tenant/auth
+// boundary prefixes the message as "CX_ERR_X: detail" (CatalogStatus / TenantStatus
+// / MakeAuthError convention); return "" when the message carries no such token.
+std::string ExtractCxToken(const std::string& msg) {
+    if (msg.rfind("CX_ERR_", 0) != 0) return "";
+    auto end = msg.find_first_of(": ");
+    return end == std::string::npos ? msg : msg.substr(0, end);
+}
+
+struct ResolvedError {
+    std::string code;
+    ErrorCategory category;
+    bool retryable;
+};
+
+// Resolve the GEN-Agent {code, category, retryable} for a Status. Prefers the rich
+// CX_ERR_* token (then the sec.3 SoT map for its true category/retryable); falls
+// back to the StatusCode-derived generic code + HTTP-default category otherwise.
+ResolvedError ResolveError(const Status& status) {
+    const std::string token = ExtractCxToken(status.message());
+    if (!token.empty()) {
+        auto it = Sdk3Map().find(token);
+        if (it != Sdk3Map().end()) {
+            return {token, it->second.first, it->second.second};
+        }
+        // Rich token but not in the sec.3 set: keep the precise code, approximate
+        // category/retryable from the coarse StatusCode.
+        return {token, StatusCodeToCategory(status.code()),
+                StatusCodeRetryable(status.code())};
+    }
+    return {status.error_code_string(), StatusCodeToCategory(status.code()),
+            StatusCodeRetryable(status.code())};
+}
+
+}  // namespace
+
 void WriteJsonError(httplib::Response& res, const Status& status,
                     const std::string& request_id) {
     nlohmann::json body;
-    body["error"]["code"] = status.error_code_string();
-    body["error"]["message"] = status.message();
+    // GEN-Agent error schema (AGENT_FRIENDLY sec.3.1 - 6 fields). The legacy
+    // code/message/request_id/timestamp are preserved; retryable/category/
+    // retry_after_ms/structured_data are added so Agents can route deterministically
+    // (R2-C3). code/category/retryable resolve via the CX_ERR_* token + sec.3 SoT
+    // map (StatusCode fallback); structured_data defaults to an empty object
+    // (always present per principle 7's stable schema).
+    const ResolvedError resolved = ResolveError(status);
+    body["error"]["code"]      = resolved.code;
+    body["error"]["message"]   = status.message();
+    body["error"]["retryable"] = resolved.retryable;
+    body["error"]["category"]  = agent_friendly::ToString(resolved.category);
+    body["error"]["retry_after_ms"]  = nullptr;  // coarse Status carries no hint
+    body["error"]["structured_data"] = nlohmann::json::object();
     if (!request_id.empty()) {
         body["error"]["request_id"] = request_id;
         res.set_header("X-Request-Id", request_id);
@@ -93,6 +223,41 @@ void CortrixHttpServer::RegisterRoutes() {
             WriteJsonError(res, Status::NotFound("The requested resource was not found"), req_id);
         }
     });
+
+    // Global exception handler (R2-M2). Without this, any exception a route
+    // handler fails to catch escapes to cpp-httplib's default, which returns a
+    // bare text/plain 500 - an Agent cannot route on it (violates AGENT_FRIENDLY
+    // principle 1). Re-emit the GEN-Agent error envelope so the schema stays
+    // uniform. An uncaught exception is an internal *bug*, not a transient blip,
+    // so it is category=permanent / retryable=false (a blind retry would just
+    // re-trigger the same fault), diverging intentionally from the kInternal
+    // default WriteJsonError would assign.
+    svr_.set_exception_handler(
+        [](const httplib::Request& req, httplib::Response& res, std::exception_ptr ep) {
+            agent_friendly::AgentFriendlyError err;
+            err.code = "CX_ERR_INTERNAL_ERROR";
+            err.category = agent_friendly::ErrorCategory::kPermanent;
+            err.retryable = false;
+            try {
+                if (ep) std::rethrow_exception(ep);
+                err.message = "Internal server error";
+            } catch (const std::exception& e) {
+                err.message = std::string("Internal server error: ") + e.what();
+            } catch (...) {
+                err.message = "Internal server error: unknown exception";
+            }
+            // Echo the inbound correlation id when the client supplied one;
+            // otherwise mint a fresh one (mirrors the 404 handler).
+            std::string req_id = req.has_header("X-Request-Id")
+                                     ? req.get_header_value("X-Request-Id")
+                                     : GenerateRequestId();
+            nlohmann::json body;
+            body["error"] = agent_friendly::ToJson(err);
+            body["error"]["request_id"] = req_id;
+            res.set_header("X-Request-Id", req_id);
+            res.set_content(body.dump(), "application/json");
+            res.status = 500;
+        });
 }
 
 void CortrixHttpServer::EnableWebUi(const std::string& dir) {

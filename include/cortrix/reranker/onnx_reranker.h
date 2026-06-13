@@ -7,11 +7,26 @@
 #include "cortrix/reranker.h"
 #include "cortrix/reranker/circuit_breaker.h"
 #include "cortrix/reranker/reranker_config.h"
+#include "cortrix/reranker/reranker_metrics.h"
 #include "cortrix/reranker/reranker_thread_pool.h"
 #include "cortrix/spc/hf_tokenizer.h"
 #include "cortrix/store/chunk_store.h"
 
 namespace cortrix::reranker {
+
+/// Result of one ScoreBatch per-passage inference task, returned BY VALUE from the
+/// pool task (R02-C2 use-after-free / data-race fix). The previous design captured
+/// the per-iteration `task_failed` / `reason` stack locals by reference; a task that
+/// timed out kept running on its worker and wrote those fields after the stack slot
+/// had been destroyed / reused by the next loop iteration (UAF + concurrent write
+/// across the 4 workers). Returning the outcome by value confines it to the task's
+/// own future, which the caller discards on timeout — the worker never touches the
+/// caller's frame.
+struct RerankTaskResult {
+    float score = 0.0f;                          ///< inference score (0 on failure)
+    bool failed = false;                         ///< true on ONNX-exception / OOM
+    RerankerMetrics::FailedTaskReason reason{};  ///< failure label (valid iff failed)
+};
 
 /// OnnxReranker — V1 sole IReranker implementation (bge-reranker-v2-m3 ONNX
 /// Cross-Encoder, F02 §2.2).
@@ -89,7 +104,7 @@ private:
     RerankerConfig config_;
     store::ChunkStore* chunk_store_;             // borrowed, not owned
     std::shared_ptr<HfTokenizer> tokenizer_;     // shared via TokenizerRegistry
-    std::unique_ptr<RerankerThreadPool> thread_pool_;     // S2.1 (built in Init)
+    std::unique_ptr<RerankerThreadPool<RerankTaskResult>> thread_pool_;  // S2.1 (built in Init)
     std::unique_ptr<CircuitBreaker> circuit_breaker_;     // S2.4 (built in Init)
     bool stub_mode_ = true;
     bool coreml_active_ = false;

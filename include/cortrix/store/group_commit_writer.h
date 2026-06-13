@@ -84,6 +84,9 @@ private:
 
     void FlushLoop();
     void FlushBatch(std::vector<Pending>& batch);
+    // Last-resort waiter resolution if FlushBatch throws unexpectedly (R2-M3):
+    // resolve any still-pending promise so no Submit() future hangs forever.
+    static void ResolvePendingWaiters(std::vector<Pending>& batch);
 
     IWalSink* const sink_;
     const std::size_t max_batch_;

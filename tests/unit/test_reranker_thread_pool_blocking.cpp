@@ -35,7 +35,7 @@ struct Gate {
 TEST(RerankerThreadPoolBlockingTest, SubmitBlocksWhenQueueFullThenUnblocks) {
     // 1 worker, queue capacity 1. Pin the worker, fill the 1 queue slot, then the
     // next Submit must block until the worker is released.
-    RerankerThreadPool pool(1, /*queue_size=*/1, 5000);
+    RerankerThreadPool<float> pool(1, /*queue_size=*/1, 5000);
     Gate gate;
 
     // Occupy the single worker.
@@ -68,7 +68,7 @@ TEST(RerankerThreadPoolBlockingTest, SubmitBlocksWhenQueueFullThenUnblocks) {
 
 TEST(RerankerThreadPoolBlockingTest, FifoExecutionOrderWithSingleWorker) {
     // 1 worker → tasks execute strictly in submission (FIFO) order.
-    RerankerThreadPool pool(1, /*queue_size=*/100, 5000);
+    RerankerThreadPool<float> pool(1, /*queue_size=*/100, 5000);
     Gate gate;
     // Pin the worker until all tasks are queued, so queue order == submit order.
     auto pin = pool.Submit([&gate] { gate.Wait(); return 0.0f; });
@@ -95,7 +95,7 @@ TEST(RerankerThreadPoolBlockingTest, FifoExecutionOrderWithSingleWorker) {
 TEST(RerankerThreadPoolBlockingTest, NoRequestsDroppedUnderBackpressure) {
     // Tiny queue + many submitters → every task must still run exactly once
     // (blocking, not dropping).
-    RerankerThreadPool pool(2, /*queue_size=*/2, 5000);
+    RerankerThreadPool<float> pool(2, /*queue_size=*/2, 5000);
     std::atomic<int> ran{0};
     constexpr int kTotal = 300;
     std::vector<std::future<float>> fs;
@@ -111,7 +111,7 @@ TEST(RerankerThreadPoolBlockingTest, NoRequestsDroppedUnderBackpressure) {
 }
 
 TEST(RerankerThreadPoolBlockingTest, QueueDepthNeverExceedsCapacity) {
-    RerankerThreadPool pool(2, /*queue_size=*/4, 5000);
+    RerankerThreadPool<float> pool(2, /*queue_size=*/4, 5000);
     Gate gate;
     // Pin both workers so submitted tasks accumulate in the queue.
     auto p1 = pool.Submit([&gate] { gate.Wait(); return 0.0f; });

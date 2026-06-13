@@ -1,6 +1,7 @@
 #include "cortrix/async/task_cleanup_cron.h"
 
 #include <chrono>
+#include <exception>
 
 #include <spdlog/spdlog.h>
 
@@ -112,7 +113,22 @@ void TaskCleanupCron::RunLoop() {
         if (stop_) break;
         // Release the cv lock while sweeping (cleanup takes the TaskManager lock).
         lock.unlock();
-        RunCleanupNow();
+        // R2-M3 — a sweep failure must not kill this background thread. An
+        // exception escaping RunLoop reaches the thread entry point and calls
+        // std::terminate(), crashing the whole process; swallow it here and let
+        // the loop retry on the next scheduled tick. The catch runs while the cv
+        // lock is still released, so we re-acquire it BELOW on every path (caught
+        // or not) — keeping the unique_lock's locked/unlocked state consistent
+        // with the loop top (unlocking an already-unlocked mutex is UB).
+        try {
+            RunCleanupNow();
+        } catch (const std::exception& e) {
+            spdlog::error("F42 tasks cleanup sweep threw: {} — skipped this run, "
+                          "will retry next tick", e.what());
+        } catch (...) {
+            spdlog::error("F42 tasks cleanup sweep threw a non-std exception — "
+                          "skipped this run, will retry next tick");
+        }
         lock.lock();
     }
 }

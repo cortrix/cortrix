@@ -72,7 +72,7 @@ LlmEnricher::LlmEnricher(const EnricherConfig& config,
     // S3.1: bounded-concurrency pool (4 workers / queue 100 / task_timeout 30s,
     // topic 1.3) — F02 RerankerThreadPool reused (B-R1 §2). Parallelizes the
     // per-batch LLM calls of one EnrichBatch across workers.
-    thread_pool_ = std::make_unique<reranker::RerankerThreadPool>(
+    thread_pool_ = std::make_unique<reranker::RerankerThreadPool<float>>(
         config_.workers, config_.queue_size, config_.task_timeout_ms);
 
     // S3.2: independent breaker (threshold 10 / cooldown 60s, topic 3.4) — F02

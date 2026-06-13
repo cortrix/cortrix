@@ -131,7 +131,7 @@ Status OnnxReranker::Init() {
     // model vs stub mode — ScoreBatch routes work through them in both. The
     // breaker drives the status/metric/log via the S2.5 reporter on each
     // transition. (Config ranges were validated by RerankerGuc upstream.)
-    thread_pool_ = std::make_unique<RerankerThreadPool>(
+    thread_pool_ = std::make_unique<RerankerThreadPool<RerankTaskResult>>(
         config_.workers, config_.queue_size, config_.task_timeout_ms);
     if (config_.circuit_breaker_enabled) {
         circuit_breaker_ = std::make_unique<CircuitBreaker>(
@@ -335,25 +335,26 @@ std::vector<float> OnnxReranker::ScoreBatch(const char* query,
         }
 
         // Guarded task: never throws out of the worker. On an ONNX exception /
-        // OOM it records the reason + score=0 (S3.4). Each task owns its own
-        // failure slots → no data race across the future boundary.
-        bool task_failed = false;
-        RerankerMetrics::FailedTaskReason reason{};
+        // OOM it returns failed=true + reason + score=0 (S3.4). The outcome is
+        // returned BY VALUE (RerankTaskResult) — never written back through a
+        // captured reference. This is the R02-C2 fix: a task that times out keeps
+        // running on its worker, so writing into the per-iteration stack locals
+        // (the old `&task_failed` / `&reason` capture) was a use-after-free once
+        // the iteration's stack slot was destroyed / reused, plus a data race
+        // across the 4 workers. Returning by value confines the outcome to this
+        // task's own future, which the caller discards on timeout.
         const std::string passage_text = pre.text;
-        auto task = [this, &q, passage_text, &task_failed, &reason]() -> float {
+        auto task = [this, &q, passage_text]() -> RerankTaskResult {
             try {
-                return this->ScoreForTask(q.c_str(), passage_text.c_str());
+                return {this->ScoreForTask(q.c_str(), passage_text.c_str()),
+                        false, {}};
             } catch (const std::bad_alloc&) {
-                task_failed = true;
-                reason = RerankerMetrics::FailedTaskReason::kOom;
-                return 0.0f;
+                return {0.0f, true, RerankerMetrics::FailedTaskReason::kOom};
             } catch (...) {
                 // ONNX exception / any internal error → score=0 (candidate ranked
                 // last). The rich identity is observed via the metric, not thrown
                 // to the query user (§5.1).
-                task_failed = true;
-                reason = RerankerMetrics::FailedTaskReason::kOnnxException;
-                return 0.0f;
+                return {0.0f, true, RerankerMetrics::FailedTaskReason::kOnnxException};
             }
         };
 
@@ -361,26 +362,28 @@ std::vector<float> OnnxReranker::ScoreBatch(const char* query,
         if (thread_pool_) {
             // Refresh the gauge with the live depth around each submit (D35-MET-04).
             RerankerMetrics::Instance().SetQueueDepth(thread_pool_->QueueDepth());
-            std::pair<float, bool> r = thread_pool_->SubmitWaitFor(task);
+            std::pair<RerankTaskResult, bool> r = thread_pool_->SubmitWaitFor(task);
             if (!r.second) {
                 // §1.2 / §5.1: per-task timeout → score=0 + timeout metric +
-                // counts toward the breaker.
+                // counts toward the breaker. The abandoned task's RerankTaskResult
+                // (whatever it eventually returns) stays inside the dropped future.
                 scores[i] = 0.0f;
                 RerankerMetrics::Instance().RecordFailedTask(
                     RerankerMetrics::FailedTaskReason::kTimeout);
                 failed = true;
             } else {
-                scores[i] = r.first;
-                if (task_failed) {
-                    RerankerMetrics::Instance().RecordFailedTask(reason);
+                scores[i] = r.first.score;
+                if (r.first.failed) {
+                    RerankerMetrics::Instance().RecordFailedTask(r.first.reason);
                     failed = true;
                 }
             }
         } else {
             // No pool (defensive): run inline with the same guard.
-            scores[i] = task();
-            if (task_failed) {
-                RerankerMetrics::Instance().RecordFailedTask(reason);
+            RerankTaskResult r = task();
+            scores[i] = r.score;
+            if (r.failed) {
+                RerankerMetrics::Instance().RecordFailedTask(r.reason);
                 failed = true;
             }
         }

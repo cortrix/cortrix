@@ -3,8 +3,11 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <exception>
 #include <iterator>
 #include <utility>
+
+#include <spdlog/spdlog.h>
 
 namespace cortrix::store {
 
@@ -99,8 +102,43 @@ void GroupCommitWriter::FlushLoop() {
         }
         // Slow path (WriteBatch + Sync) runs without the lock so concurrent
         // Submit() calls are never blocked on I/O — the point of group commit.
+        //
+        // R2-M3 — defensive catch-all around the whole flush so nothing escapes
+        // this background thread's entry point (uncaught → std::terminate, whole-
+        // process crash). FlushBatch already maps a throwing sink to an error
+        // Status internally; this outer guard covers any other throw (e.g. a
+        // promise resolution) so the flush thread keeps draining. On such a throw
+        // we still resolve every waiter in this batch — set_value on an
+        // already-satisfied promise throws future_error, which we ignore per
+        // waiter — so no Submit() caller is left blocked forever.
         if (!batch.empty()) {
-            FlushBatch(batch);
+            try {
+                FlushBatch(batch);
+            } catch (const std::exception& e) {
+                spdlog::error("GroupCommitWriter: unexpected exception flushing {} "
+                              "entries: {} — resolving waiters, loop continues",
+                              batch.size(), e.what());
+                ResolvePendingWaiters(batch);
+            } catch (...) {
+                spdlog::error("GroupCommitWriter: unexpected non-std exception "
+                              "flushing {} entries — resolving waiters, loop continues",
+                              batch.size());
+                ResolvePendingWaiters(batch);
+            }
+        }
+    }
+}
+
+void GroupCommitWriter::ResolvePendingWaiters(std::vector<Pending>& batch) {
+    // Last-resort resolution after an unexpected flush exception: ensure no
+    // Submit() future is left hanging. A promise that FlushBatch already resolved
+    // throws future_error on a second set_value — swallow it per waiter.
+    for (auto& p : batch) {
+        try {
+            p.done.set_value(
+                Status::Unavailable("GroupCommitWriter flush failed unexpectedly"));
+        } catch (...) {
+            // Already satisfied by FlushBatch — nothing to do.
         }
     }
 }
@@ -112,9 +150,29 @@ void GroupCommitWriter::FlushBatch(std::vector<Pending>& batch) {
         entries.push_back(std::move(p.bytes));
     }
 
-    Status st = sink_->WriteBatch(entries);
-    if (st.ok()) {
-        st = sink_->Sync();
+    // R2-M3 — a throwing sink must not escape the flush thread (uncaught →
+    // std::terminate, whole-process crash). Treat any exception from WriteBatch/
+    // Sync as a non-durable batch: map it to an Unavailable Status and fall
+    // through to resolve every waiter below. This preserves the contract that
+    // every Submit() future is resolved (callers see a clean error Status, never
+    // a broken_promise future_error) and that an Ok future implies a durable
+    // Sync().
+    Status st;
+    try {
+        st = sink_->WriteBatch(entries);
+        if (st.ok()) {
+            st = sink_->Sync();
+        }
+    } catch (const std::exception& e) {
+        spdlog::error("GroupCommitWriter: sink threw during flush of {} entries: {} "
+                      "— batch reported not durable",
+                      batch.size(), e.what());
+        st = Status::Unavailable("GroupCommitWriter sink threw during flush");
+    } catch (...) {
+        spdlog::error("GroupCommitWriter: sink threw a non-std exception during "
+                      "flush of {} entries — batch reported not durable",
+                      batch.size());
+        st = Status::Unavailable("GroupCommitWriter sink threw during flush");
     }
 
     // Resolve every waiter with the batch's durability status. A future only

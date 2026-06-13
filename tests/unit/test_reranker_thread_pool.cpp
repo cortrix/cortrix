@@ -13,26 +13,26 @@ namespace cortrix::reranker {
 namespace {
 
 TEST(RerankerThreadPoolTest, CreatesRequestedWorkerCount) {
-    RerankerThreadPool pool(4, 200, 5000);
+    RerankerThreadPool<float> pool(4, 200, 5000);
     EXPECT_EQ(pool.num_workers(), 4);
     EXPECT_EQ(pool.task_timeout_ms(), 5000);
     EXPECT_EQ(pool.queue_capacity(), 200u);
 }
 
 TEST(RerankerThreadPoolTest, ClampsDegenerateParams) {
-    RerankerThreadPool pool(0, 0, 1000);
+    RerankerThreadPool<float> pool(0, 0, 1000);
     EXPECT_GE(pool.num_workers(), 1);          // workers clamped to >= 1
     EXPECT_GE(pool.queue_capacity(), 1u);      // queue clamped to >= 1
 }
 
 TEST(RerankerThreadPoolTest, SubmitRunsTaskAndReturnsValue) {
-    RerankerThreadPool pool(4, 200, 5000);
+    RerankerThreadPool<float> pool(4, 200, 5000);
     auto fut = pool.Submit([] { return 0.5f; });
     EXPECT_FLOAT_EQ(fut.get(), 0.5f);
 }
 
 TEST(RerankerThreadPoolTest, ManyTasksAllExecuteOnce) {
-    RerankerThreadPool pool(4, 200, 5000);
+    RerankerThreadPool<float> pool(4, 200, 5000);
     std::atomic<int> counter{0};
     std::vector<std::future<float>> futures;
     constexpr int kN = 200;
@@ -48,7 +48,7 @@ TEST(RerankerThreadPoolTest, ManyTasksAllExecuteOnce) {
 }
 
 TEST(RerankerThreadPoolTest, ConcurrentSubmittersAreSafe) {
-    RerankerThreadPool pool(4, 50, 5000);
+    RerankerThreadPool<float> pool(4, 50, 5000);
     std::atomic<int> done{0};
     std::vector<std::thread> submitters;
     constexpr int kThreads = 8;
@@ -70,14 +70,14 @@ TEST(RerankerThreadPoolTest, ConcurrentSubmittersAreSafe) {
 }
 
 TEST(RerankerThreadPoolTest, SubmitWaitForReturnsValueWithinBudget) {
-    RerankerThreadPool pool(4, 200, 5000);
+    RerankerThreadPool<float> pool(4, 200, 5000);
     auto [val, ok] = pool.SubmitWaitFor([] { return 0.9f; });
     EXPECT_TRUE(ok);
     EXPECT_FLOAT_EQ(val, 0.9f);
 }
 
 TEST(RerankerThreadPoolTest, SubmitWaitForTimesOutReturnsFalse) {
-    RerankerThreadPool pool(1, 200, /*task_timeout_ms=*/20);
+    RerankerThreadPool<float> pool(1, 200, /*task_timeout_ms=*/20);
     // Task sleeps well past the 20ms budget → SubmitWaitFor reports timeout.
     auto [val, ok] = pool.SubmitWaitFor([] {
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -88,7 +88,7 @@ TEST(RerankerThreadPoolTest, SubmitWaitForTimesOutReturnsFalse) {
 }
 
 TEST(RerankerThreadPoolTest, ShutdownIsIdempotentAndUnblocks) {
-    RerankerThreadPool pool(2, 200, 5000);
+    RerankerThreadPool<float> pool(2, 200, 5000);
     pool.Submit([] { return 1.0f; }).get();
     pool.Shutdown();
     pool.Shutdown();  // idempotent, no crash/hang

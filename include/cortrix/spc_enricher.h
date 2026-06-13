@@ -12,7 +12,7 @@
 
 namespace cortrix::reranker {            // F02 frozen classes F03 reuses (B-R1 §2)
 class CircuitBreaker;
-class RerankerThreadPool;
+template <typename R> class RerankerThreadPool;  // R=float here (task payload via Slot)
 }  // namespace cortrix::reranker
 
 namespace cortrix::llm { class IHttpTransport; }  // startup-probe seam (S4.2)
@@ -270,7 +270,7 @@ private:
     bool enabled_ = false;
 
     // Wave 3 (forward-declared, wired in W3 — F02 frozen classes reused):
-    std::unique_ptr<reranker::RerankerThreadPool> thread_pool_;
+    std::unique_ptr<reranker::RerankerThreadPool<float>> thread_pool_;
     std::unique_ptr<reranker::CircuitBreaker> circuit_breaker_;
     // Wave 4: global budget cap (topic 3.5). null == cap disabled.
     std::unique_ptr<BudgetTracker> budget_tracker_;
