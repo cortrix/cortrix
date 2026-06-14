@@ -85,13 +85,15 @@ protected:
     sqlite3* db_ = nullptr;
 };
 
-TEST_F(F13CleanupRegistrarTest, RegistersBothTables) {
+TEST_F(F13CleanupRegistrarTest, RegistersAgentTraceOnly) {
+    // TC4: the registrar registers ONLY agent_trace (global, single-db). interaction_log
+    // is per-NS and swept by InteractionLogSweeper, not registered here.
     observability::CleanupScheduler sched;
-    registrar_->Register(sched);
-    EXPECT_EQ(sched.registered_count(), 2u);
+    registrar_->RegisterAgentTrace(sched);
+    EXPECT_EQ(sched.registered_count(), 1u);
 }
 
-TEST_F(F13CleanupRegistrarTest, RunCleanupNowPrunesBoth) {
+TEST_F(F13CleanupRegistrarTest, RunCleanupNowPrunesAgentTrace) {
     const int64_t now = NowMs();
 
     // agent_trace: one 91-day-old + one fresh.
@@ -104,32 +106,33 @@ TEST_F(F13CleanupRegistrarTest, RunCleanupNowPrunesBoth) {
     new_at.created_at = now - 1000;
     writer_->Write(new_at);
 
-    // interaction_log: one 181-day-old + one fresh (created_at ISO-8601 TEXT).
+    EXPECT_EQ(QueryInt(db_, "SELECT COUNT(*) FROM agent_trace"), 2);
+
+    observability::CleanupScheduler sched;
+    registrar_->RegisterAgentTrace(sched);
+    sched.RunCleanupNow();
+
+    // agent_trace: 91d row gone, fresh kept.
+    EXPECT_EQ(QueryInt(db_, "SELECT COUNT(*) FROM agent_trace"), 1);
+    EXPECT_EQ(QueryInt(db_, "SELECT COUNT(*) FROM agent_trace WHERE method='b'"), 1);
+}
+
+TEST_F(F13CleanupRegistrarTest, CleanupInteractionLogPrunesAndCascades) {
+    // interaction_log cleanup still operates on the one db_ handle (the per-NS sweeper
+    // calls this per namespace). 181d row gone + its interaction_sources cascade.
+    const int64_t now = NowMs();
     const std::string old_iso = F13CleanupRegistrar::FormatIso8601Utc(now - 181LL * 86400000LL);
     const std::string new_iso = F13CleanupRegistrar::FormatIso8601Utc(now - 1000);
     Exec(db_, "INSERT INTO interaction_log(id, session_id, namespace_name, user_id, role, content, created_at) "
               "VALUES('old','s','sales','alice','user','q','" + old_iso + "');");
     Exec(db_, "INSERT INTO interaction_log(id, session_id, namespace_name, user_id, role, content, created_at) "
               "VALUES('new','s','sales','alice','user','q','" + new_iso + "');");
-    // a source row on the old interaction (must cascade-delete).
     Exec(db_, "INSERT INTO interaction_sources(interaction_id, source_block_id, source_type, relevance_score, snippet) "
               "VALUES('old','b1','block',0.5,'x');");
 
-    EXPECT_EQ(QueryInt(db_, "SELECT COUNT(*) FROM agent_trace"), 2);
-    EXPECT_EQ(QueryInt(db_, "SELECT COUNT(*) FROM interaction_log"), 2);
-    EXPECT_EQ(QueryInt(db_, "SELECT COUNT(*) FROM interaction_sources"), 1);
-
-    observability::CleanupScheduler sched;
-    registrar_->Register(sched);
-    sched.RunCleanupNow();
-
-    // agent_trace: 91d row gone, fresh kept.
-    EXPECT_EQ(QueryInt(db_, "SELECT COUNT(*) FROM agent_trace"), 1);
-    EXPECT_EQ(QueryInt(db_, "SELECT COUNT(*) FROM agent_trace WHERE method='b'"), 1);
-    // interaction_log: 181d row gone, fresh kept.
+    EXPECT_EQ(registrar_->CleanupInteractionLog(), 1);
     EXPECT_EQ(QueryInt(db_, "SELECT COUNT(*) FROM interaction_log"), 1);
     EXPECT_EQ(QueryInt(db_, "SELECT COUNT(*) FROM interaction_log WHERE id='new'"), 1);
-    // interaction_sources cascaded with the deleted interaction.
     EXPECT_EQ(QueryInt(db_, "SELECT COUNT(*) FROM interaction_sources"), 0);
 }
 

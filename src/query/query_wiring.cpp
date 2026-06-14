@@ -1,6 +1,7 @@
 #include "cortrix/query/query_wiring.h"
 
 #include <cstdlib>
+#include <chrono>
 #include <memory>
 #include <string>
 #include <vector>
@@ -10,6 +11,7 @@
 #include <vector>
 
 #include "cortrix/agent_friendly/error.h"
+#include "cortrix/agent_trace/engine_instrumentation.h"  // F13 §11 Engine instrumentation (S6)
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/query/complexity_config.h"
 #include "cortrix/query/cross_ns_error.h"
@@ -163,8 +165,10 @@ struct CrossNsQueryWiring::Impl {
     Impl(cortrix::resource::INamespacePool& pool, cortrix::OnnxEmbedder& embedder,
          RRFFusion& fusion, cortrix::tenant::PermissionService& perm_svc,
          cortrix::retrieval::SparseIndexRegistry* sparse_registry,
-         std::shared_ptr<cortrix::llm::ILlmClient> llm)
+         std::shared_ptr<cortrix::llm::ILlmClient> llm,
+         std::shared_ptr<agent_trace::EngineInstrumentation> engine_instr)
         : pool(pool),
+          engine_instr(std::move(engine_instr)),
           perm_adapter(perm_svc, pool),
           // The shared fan-out pool (F04 §2.7 executor.workers / queue_size defaults).
           engine(8, 500),
@@ -205,6 +209,10 @@ struct CrossNsQueryWiring::Impl {
           crag_stage(&crag_evaluator) {}
 
     cortrix::resource::INamespacePool& pool;  ///< for the chat path's per-NS user_facts
+    /// F13 Engine instrumentation (§11, S6). null when tracing is off (standalone /
+    /// tests). Declared right after `pool` so it is initialized early (its init in the
+    /// ctor list is order-independent — it depends on nothing else).
+    std::shared_ptr<agent_trace::EngineInstrumentation> engine_instr;
     TenantPermissionAdapter perm_adapter;
     ExecutorEngine engine;
     reranker::IReranker* reranker = nullptr;  // owned (CreateReranker → raw new); freed in dtor
@@ -225,9 +233,11 @@ CrossNsQueryWiring::CrossNsQueryWiring(cortrix::resource::INamespacePool& pool,
                                        RRFFusion& fusion,
                                        cortrix::tenant::PermissionService& perm_svc,
                                        cortrix::retrieval::SparseIndexRegistry* sparse_registry,
-                                       std::shared_ptr<cortrix::llm::ILlmClient> llm)
+                                       std::shared_ptr<cortrix::llm::ILlmClient> llm,
+                                       std::shared_ptr<agent_trace::EngineInstrumentation> engine_instr)
     : impl_(std::make_unique<Impl>(pool, embedder, fusion, perm_svc,
-                                   sparse_registry, std::move(llm))) {}
+                                   sparse_registry, std::move(llm),
+                                   std::move(engine_instr))) {}
 
 CrossNsQueryWiring::~CrossNsQueryWiring() {
     if (impl_ && impl_->reranker) delete impl_->reranker;
@@ -245,6 +255,22 @@ std::optional<std::string> ReadRouteOverride(const httplib::Request& req,
         return body["route"].get<std::string>();
     }
     return std::nullopt;
+}
+
+// Read the F41 ?granularity value (query-string wins over the JSON body, default
+// "auto") — same precedence as ?route / ?explain on this path. Validation is the
+// caller's (an invalid value is a generic 400, mirroring the single-NS
+// query_routes.cpp path: the frozen CX_ERR_F41_* set has no request-param identity).
+std::string ReadGranularity(const httplib::Request& req, const json& body) {
+    if (req.has_param("granularity")) return req.get_param_value("granularity");
+    if (body.is_object() && body.contains("granularity") && body["granularity"].is_string()) {
+        return body["granularity"].get<std::string>();
+    }
+    return "auto";
+}
+
+bool IsValidGranularity(const std::string& g) {
+    return g == "auto" || g == "chunk" || g == "doc" || g == "both";
 }
 
 // Build the per-request QueryContext that carries both the F04 execution fields
@@ -356,6 +382,62 @@ RagFusionConfig ResolveRagFusionConfig(const httplib::Request& req, const json& 
     return cfg;
 }
 
+// [F13 §11 / S6] Record one finished query as an agent_trace row via the Engine
+// instrumentation. No-op when tracing is off (engine_instr null → standalone/tests).
+// The helper itself never throws (EngineInstrumentation::Record isolates both
+// writes, C4), so it is safe to call on the request path. Identity
+// (trace_id/session_id/agent_id/user_id) is read from the thread-local
+// ObservabilityContext WithAuth installed (§5.1); a cross-NS query stamps no single
+// namespace_id (NULL = global call, §4.1). `params_summary` is a compact JSON
+// (truncated to ≤2KB on write); on failure the error code + message are kept.
+//
+// op_summary (the F18a operation_log summary, §11 — query_text prefix) is filled too,
+// but the operation_log write happens ONLY when the bootstrap constructs this
+// EngineInstrumentation WITH an operation_logger. This cell wires agent_trace, so the
+// recommended query instance is trace-only (op_logger null) → Record skips the F18a
+// block and op_summary is unused; the field is set so enabling op_logger later is
+// correct without touching this code.
+void RecordQueryTrace(agent_trace::EngineInstrumentation* engine_instr,
+                      const std::string& params_summary, int duration_ms,
+                      bool is_success, const std::string& result_summary,
+                      const std::string& query_text_summary,
+                      const std::optional<std::string>& error_code,
+                      const std::string& error_message) {
+    if (engine_instr == nullptr) return;
+    agent_trace::EngineCall call;
+    call.method = "query";
+    call.source = "http";
+    call.params_json = params_summary;
+    call.duration_ms = duration_ms;
+    call.is_success = is_success;
+    call.op_summary = query_text_summary;  // §11 operation_log summary (op_logger-gated)
+    if (is_success) {
+        call.result_summary = result_summary;
+    } else {
+        call.error_code = error_code;
+        call.error_message = error_message;
+    }
+    engine_instr->Record(call);
+}
+
+// First 100 chars of the query text — the F18a operation_log summary shape (§11).
+std::string QueryTextSummary(const QueryContext& qctx) {
+    return qctx.query.size() > 100 ? qctx.query.substr(0, 100) : qctx.query;
+}
+
+// Build the compact params JSON for the trace row (§4.1 — params ≤2KB, the writer
+// truncates). Keeps just the routing-relevant request shape (query text is the
+// Agent's own input; top_k / route / granularity describe the call), not the full
+// body, so a trace row stays small and PII-light.
+std::string BuildQueryParamsSummary(const QueryContext& qctx) {
+    json p;
+    p["query"] = qctx.query;
+    p["top_k"] = qctx.top_k;
+    p["route"] = qctx.routing_path;
+    p["granularity"] = qctx.granularity;
+    return p.dump();
+}
+
 // Serialize a scatter response, applying the F37 CRAG verdict action + surfacing
 // meta.crag_verdict (B-class) when F37 ran (Complex route). CragStage is a no-op on
 // simple/chat (ShouldSkipF37) so this is safe to call on every scatter path.
@@ -383,8 +465,11 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
     ScatterGather* scatter = &impl_->scatter;
     CragStage* crag_stage = &impl_->crag_stage;
     cortrix::resource::INamespacePool* pool = &impl_->pool;
+    // F13 §11 Engine instrumentation (raw ptr; Impl outlives the closure). null →
+    // tracing off; RecordQueryTrace then no-ops, leaving the path unchanged.
+    agent_trace::EngineInstrumentation* engine_instr = impl_->engine_instr.get();
     svr.Post("/api/v1/query", WithAuth(auth, kPermRead,
-        [handler, classifier, rag_stage, scatter, crag_stage, pool](
+        [handler, classifier, rag_stage, scatter, crag_stage, pool, engine_instr](
             const httplib::Request& req, httplib::Response& res,
             const RequestContext& ctx) {
             // Parse the JSON body up-front so a malformed body is a clean 400 here
@@ -414,6 +499,21 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             // CX_ERR_F39_FORCE_ROUTE_INVALID and ctx is left untouched.
             QueryContext qctx = MakeRoutingContext(body, auth_ctx);
             qctx.ns_id.clear();  // cross-NS: per-NS id is bound inside the executor
+
+            // F41 §6.2 ?granularity (auto|chunk|doc|both, query-string wins over body).
+            // Validate before routing so an invalid value is a clean 400 (the frozen
+            // CX_ERR_F41_* set has no request-param identity → generic InvalidArgument,
+            // matching the single-NS query_routes.cpp path). The default "auto" / "chunk"
+            // leave retrieval behavior unchanged; only doc/both engage the §8.1 dispatch
+            // in LiveSingleUnitExecutor. ScatterGather/Gather are untouched (pass-through).
+            qctx.granularity = ReadGranularity(req, body);
+            if (!IsValidGranularity(qctx.granularity)) {
+                WriteJsonError(res, Status::InvalidArgument(
+                    "granularity must be one of: auto, chunk, doc, both"),
+                    ctx.request_id);
+                return;
+            }
+
             std::optional<std::string> route_override = ReadRouteOverride(req, body);
             Status routed = classifier->RouteAndUpdateContext(qctx, route_override);
             if (!routed.ok()) {
@@ -423,6 +523,17 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             }
             QueryRouterMetrics::Instance().RecordDecision(
                 DecisionOf(qctx.routing_path, qctx.routing_decision_source));
+
+            // [F13 §11] Time the actual query execution (chat / scatter) for the
+            // agent_trace duration_ms. Started after routing resolves so it measures
+            // the execution, not the pre-execution validation (those 400s are request
+            // -shape errors, not Engine calls, and are not traced — matching §11 which
+            // instruments DoQuery, and F18a which logs success only).
+            const auto exec_start = std::chrono::steady_clock::now();
+            auto elapsed_ms = [&exec_start]() -> int {
+                return static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - exec_start).count());
+            };
 
             // Chat path (§9.1 / F39-5 A): skip retrieval + F36/F37/F38 entirely,
             // return only MEM02 user_facts + meta.via_path. The deprecated-field
@@ -436,6 +547,11 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                 QueryRequest chat_req;
                 if (CrossNsQueryHandler::ParseRequest(body, &chat_req).ok()) {
                     json chat_body = BuildChatResponse(*pool, qctx, chat_req.namespaces);
+                    // [F13 §11] Trace the chat-path query (memory-only retrieval).
+                    RecordQueryTrace(engine_instr, BuildQueryParamsSummary(qctx),
+                                     elapsed_ms(), /*is_success=*/true,
+                                     "chat_memory_only", QueryTextSummary(qctx),
+                                     std::nullopt, "");
                     res.status = 200;
                     res.set_header("X-Request-Id", ctx.request_id);
                     res.set_content(chat_body.dump(), "application/json");
@@ -473,6 +589,14 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                         use_rag_fusion
                             ? rag_stage->Run(f04_req, auth_ctx, qctx, rag_cfg)
                             : scatter->Execute(f04_req, auth_ctx, &qctx);
+                    // [F13 §11] Trace the executed retrieval query (success). Summary
+                    // = result count + coverage (the writer truncates to ≤512).
+                    RecordQueryTrace(
+                        engine_instr, BuildQueryParamsSummary(qctx), elapsed_ms(),
+                        /*is_success=*/true,
+                        "results=" + std::to_string(resp.results.size()) +
+                            " coverage=" + std::to_string(resp.meta.coverage_ratio),
+                        QueryTextSummary(qctx), std::nullopt, "");
                     json out = SerializeWithCrag(resp, qctx, crag_stage);
                     if (explain) {
                         // C-class debug fields surface only when a capability ran AND
@@ -484,6 +608,9 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                             qctx.routing_decision_source == "inference_failed_fallback";
                         out["explain"] =
                             cortrix::query::BuildExplainNode(qctx, include_debug);
+                        // F41 §6.2: echo the resolved granularity so the Agent sees the
+                        // effective value (mirrors the single-NS query_routes.cpp echo).
+                        out["explain"]["granularity"] = qctx.granularity;
                     }
                     res.status = 200;
                     res.set_header("X-Request-Id", ctx.request_id);
@@ -491,6 +618,11 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                     return;
                 } catch (const CrossNsException& e) {
                     const int http = GetCrossNsErrorInfo(e.code()).http_status;
+                    // [F13 §11] Trace the failed query (status=failed + error code).
+                    RecordQueryTrace(engine_instr, BuildQueryParamsSummary(qctx),
+                                     elapsed_ms(), /*is_success=*/false, "",
+                                     QueryTextSummary(qctx), e.GetError().code,
+                                     e.GetError().message);
                     json eb;
                     eb["error"] = agent_friendly::ToJson(e.GetError());
                     res.status = http;

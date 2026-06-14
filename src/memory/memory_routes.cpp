@@ -973,7 +973,19 @@ void RegisterMemoryRoutes(
         QueryPipeline pipeline(vec_searcher, bm25_searcher, fusion,
                                classifier, post_filter, deg_mgr, sql_stub);
 
-        MemorySearcher searcher(pipeline, *mem_store, config);
+        // MEM01: inject the classified-decay scorer so /memory/search applies
+        // event-decay ranking (fact/preference immune, invalidated filtered).
+        // Decay params come from the global GUC (config.decay_*, design § 2.5;
+        // D5 lock: V1.0 global-only). llm_available is logging-only and does not
+        // affect scoring (memory_type "" and "event" decay identically, § 4.2);
+        // RegisterMemoryRoutes does not receive the LLM config, so it is left at
+        // its default — wiring it through is a follow-up (does not change ranking).
+        MemoryDecayConfig decay_config;
+        decay_config.lambda = config.decay_lambda;
+        decay_config.min_score = config.decay_min_score;
+        MemoryScorer scorer(decay_config);
+
+        MemorySearcher searcher(pipeline, *mem_store, config, &scorer);
         MemorySearchResponse search_resp = searcher.Search(search_req);
 
         json resp;
@@ -991,6 +1003,10 @@ void RegisterMemoryRoutes(
             if (!item.memory_type.empty()) j["memory_type"] = item.memory_type;
             if (!item.block_id.empty()) j["block_id"] = item.block_id;
             j["score"] = item.score;
+            // MEM01 classified-decay transparency (design § 2.1 / S2 step 3):
+            // score = raw RRF; final_score = raw * decay_factor (the ranking key).
+            j["decay_factor"] = item.decay_factor;
+            j["final_score"] = item.final_score;
             j["expired"] = item.expired;
             j["created_at"] = item.created_at;
             if (!item.metadata_json.empty()) j["metadata"] = item.metadata_json;

@@ -46,19 +46,24 @@ OperationLogEntry MakeEngineEntry(EmitSite site,
     e.resource_id = std::move(resource_id);
     e.summary = TruncateSummary(summary);
 
-    // C1: read trace_id / session_id / user_id from the thread-local context.
+    // C1/C2: read trace_id / session_id / user_id from the thread-local context.
+    // The entry point (WithAuth, auth_middleware.cpp) now fills the ObservabilityContext
+    // from the F13 identity headers + the authenticated principal before the handler
+    // runs, so this fulfils the previously-deferred D3.5 wiring: trace_id comes from the
+    // W3C TraceContext; session_id (C2) + user_id come from the F13 identity fields.
     const ObservabilityContext& octx = ObservabilityContext::ThreadLocal();
     if (const TraceContext* tc = octx.GetTraceContext(); tc != nullptr) {
         if (!tc->trace_id.empty()) e.trace_id = tc->trace_id;
-        // span_id is not the session_id; session correlation (C2) is supplied by
-        // the caller's context when the full ObservabilityContext carries it.
-        // Phase 1: trace_id from the W3C TraceContext; session_id stays unset here
-        // unless the caller sets it explicitly on the returned entry.
     }
-    // user_id: §9.2 default "anonymous" until Auth (P08) populates a real id on
-    // the context. The Phase-1 ObservabilityContext does not yet carry user_id;
-    // the instrumentation site sets it from its request context (D3.5 wiring). Default here.
-    e.user_id = "anonymous";
+    // C2 session correlation — set when the entry point populated it (NULL allowed).
+    if (octx.session_id.has_value() && !octx.session_id->empty()) {
+        e.session_id = octx.session_id;
+    }
+    // user_id: from the authenticated principal the entry point installed; §9.2
+    // default "anonymous" when the context carries none (dev / no-auth path).
+    e.user_id = (octx.user_id.has_value() && !octx.user_id->empty())
+                    ? *octx.user_id
+                    : "anonymous";
     return e;
 }
 

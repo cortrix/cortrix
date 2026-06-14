@@ -60,15 +60,14 @@ int F13CleanupRegistrar::CleanupInteractionLog() {
     return deleted;
 }
 
-void F13CleanupRegistrar::Register(observability::CleanupScheduler& scheduler) {
-    // agent_trace 90d — delegate to the writer (it owns the DELETE + retention read).
+void F13CleanupRegistrar::RegisterAgentTrace(observability::CleanupScheduler& scheduler) {
+    // agent_trace 90d (global, TC4) — delegate to the writer (it owns the DELETE +
+    // retention read). interaction_log is per-NS and is swept by InteractionLogSweeper,
+    // NOT registered here (a single-db registrar cannot reach the N per-NS tables).
     auto writer = writer_;
     scheduler.RegisterTable("agent_trace", [writer] {
         if (writer) writer->Cleanup();
     });
-
-    // interaction_log 180d — F13 §10.1 / §11. interaction_sources cascades via FK.
-    scheduler.RegisterTable("interaction_log", [this] { CleanupInteractionLog(); });
 }
 
 }  // namespace cortrix::agent_trace

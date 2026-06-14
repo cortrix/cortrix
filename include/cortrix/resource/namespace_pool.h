@@ -113,14 +113,22 @@ public:
                                size_t estimated_size_bytes) = 0;
 
     // —— Access path ——
-    /// Borrow a resident NS's bundle (Phase 1 always hot → O(1) hit). The pointer
-    /// is owned by the pool and valid until EvictForDelete (Phase 1 never evicts
-    /// otherwise). Error: CX_ERR_NS_NOT_FOUND (never created / load failed).
+    /// Borrow a resident NS's bundle (Phase 1 always hot → O(1) hit) and take a
+    /// reference on it: the returned pointer is owned by the pool and stays valid
+    /// until the caller's paired Release(). A concurrent EvictForDelete will not
+    /// pull the bundle out from under an outstanding borrow (it defers the erase to
+    /// the last Release). Errors: CX_ERR_NS_NOT_FOUND (never created / load failed)
+    /// or — when the NS is mid-delete (pending_delete) — CX_ERR_NS_NOT_FOUND as
+    /// well (the NS is no longer acquirable). Every Ok() Acquire MUST be matched by
+    /// exactly one Release (NamespaceFacade does this via RAII).
     virtual Result<NamespaceResourceBundle*> Acquire(
         const std::string& namespace_id) = 0;
 
-    /// Phase 1 no-op (the refcount/drain seam reserved for Phase 2 eviction,
-    /// §14 TD-F05-EVICTION). Present so callers (F25 BeginWrite) pair Acquire.
+    /// Drop the reference taken by a paired Acquire. If this was the last reference
+    /// AND the NS is marked pending_delete (a DeleteNamespace raced an in-flight
+    /// borrow), this call reaps the slot — releasing index / WriteCoordinator /
+    /// store.db. (Phase 2 extends this seam with full drain/grace, §14
+    /// TD-F05-EVICTION.) Calling Release for a non-resident NS is a safe no-op.
     virtual void Release(const std::string& namespace_id) = 0;
 
     // —— Startup path ——
@@ -137,6 +145,12 @@ public:
     /// Drop a NS's resources from the pool. Called only by F12.DeleteNamespace
     /// (NS soft-delete, §13.1) and by the F12 admission rollback (§5.2) to undo a
     /// pool add when the catalog INSERT fails. Idempotent: absent NS returns Ok.
+    /// If the NS still has outstanding Acquire references, the erase is DEFERRED:
+    /// the slot is marked pending_delete (blocking new Acquires) and the resources
+    /// are released by the last Release rather than here — so an in-flight borrow is
+    /// never invalidated mid-request. Returns Ok either way (the delete is durably
+    /// recorded in the catalog regardless; pool reclamation just completes when the
+    /// last reader leaves).
     virtual Status EvictForDelete(const std::string& namespace_id) = 0;
 
     // —— State queries ——
@@ -146,9 +160,42 @@ public:
 
 // ── DefaultNamespacePool (F05 §3.3) ──────────────────────────────────────────
 
+/// One resident NS slot: the resource bundle plus the minimal Phase-1 lifecycle
+/// gate that makes the §13.1 DeleteNamespace → EvictForDelete path safe against an
+/// in-flight Acquire. `Acquire` hands out `&bundle` as a borrowed raw pointer that
+/// a NamespaceFacade holds across a whole request; an unguarded EvictForDelete
+/// erase would invalidate that pointer → UAF. So Acquire ++refcount, Release
+/// --refcount (no longer a no-op), and EvictForDelete only erases when refcount==0
+/// — otherwise it sets pending_delete and the last Release reaps the slot. Once
+/// pending_delete is set, Acquire refuses the NS (it is being torn down), so the
+/// count can only fall to zero. This is the minimal refcount gate; the full
+/// drain/grace-period machinery is still Phase 2 (§14 TD-F05-EVICTION).
+///
+/// Concurrency: refcount/pending_delete are atomics so Acquire/Release can touch
+/// them under the shared lock; the erase decision in EvictForDelete and the
+/// last-Release reap both take the exclusive lock, which excludes every Acquire,
+/// so no Acquire can be mid-flight when a slot is removed. Slots are node-stable
+/// (`unordered_map` never moves elements), so the address handed out by Acquire
+/// stays valid while a reader holds refcount.
+struct NamespaceSlot {
+    NamespaceResourceBundle bundle;
+    std::atomic<int> refcount{0};
+    std::atomic<bool> pending_delete{false};
+
+    NamespaceSlot() = default;
+    // Non-movable (atomics) — the slot is constructed in place in `bundles_` and
+    // only its `bundle` field is move-assigned at load time. unordered_map keeps
+    // node addresses stable, so this is exactly what the borrowed-pointer + atomic
+    // refcount contract needs.
+    NamespaceSlot(const NamespaceSlot&) = delete;
+    NamespaceSlot& operator=(const NamespaceSlot&) = delete;
+};
+
 /// Phase-1 in-process implementation of INamespacePool. Resources are held in a
 /// flat `bundles_` map under a shared_mutex (concurrent Acquire readers; exclusive
-/// admit/load/evict writers). No eviction in Phase 1 (topic 4 deleted).
+/// admit/load/evict writers). No LRU eviction in Phase 1 (topic 4 deleted); the
+/// only runtime removal is DeleteNamespace → EvictForDelete, gated by the
+/// per-slot refcount above.
 class DefaultNamespacePool : public INamespacePool {
 public:
     /// @param index_factory        borrowed F01 factory (Open per Unit)
@@ -200,7 +247,9 @@ private:
     Result<NamespaceResourceBundle> LoadOneNamespace(const std::string& ns_id);
 
     mutable std::shared_mutex pool_mutex_;
-    std::unordered_map<std::string, NamespaceResourceBundle> bundles_;
+    // Node-stable so the &slot.bundle pointer Acquire returns survives rehash; the
+    // per-slot refcount/pending_delete gate the DeleteNamespace evict (NamespaceSlot).
+    std::unordered_map<std::string, NamespaceSlot> bundles_;
 
     cortrix::store::IIndexFactory* index_factory_;
     WriteCoordinatorFactory write_coord_factory_;

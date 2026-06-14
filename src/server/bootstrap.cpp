@@ -59,7 +59,17 @@
 #include "cortrix/retrieval/sparse_index_registry.h"  // [Q4 F40] shared per-NS SPLADE index
 #include "cortrix/memory/memory_routes.h"
 #include "cortrix/memory/memory_extraction_service.h"  // M1 MEM02 extraction runtime
-#include "cortrix/server/routes/observability_routes.h" // M6 F13 RegisterObservabilityRoutesPerNs
+#include "cortrix/server/routes/observability_routes.h" // [F13 TC4] RegisterTracesRoutesGlobal + RegisterInteractionsRoutesPerNs
+// [V1.0 acceptance · Wave2 integration] A3 startup validation / A4+TC4 F13 agent_trace
+// global wiring / A6 doc-summary discover route / F query-trace EngineInstrumentation.
+#include "cortrix/onnx/startup_validator.h"               // A3 F22 fail-fast ONNX validation
+#include "cortrix/auth/auth_middleware.h"                 // A6 WithAuth for the discover route
+#include "cortrix/doc_summary/discover_handler.h"         // A6 GET /documents/discover
+#include "cortrix/agent_trace/agent_trace_schema.h"       // TC4 agent_trace in global catalog.db
+#include "cortrix/agent_trace/agent_trace_writer_impl.h"  // TC4/A4/F shared agent_trace writer
+#include "cortrix/agent_trace/engine_instrumentation.h"   // F query agent_trace write side
+#include "cortrix/agent_trace/f13_cleanup_registrar.h"    // A4 agent_trace 90d cleanup
+#include "cortrix/agent_trace/interaction_log_sweeper.h"  // A4 interaction_log 180d per-NS sweep
 #include "cortrix/server/routes/agent_proxy_routes.h"
 #include "cortrix/server/routes/document_routes.h"
 #include "cortrix/server/routes/flat_document_routes.h"
@@ -266,7 +276,12 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         // catalog/global DB at startup so ObservabilityModule attaches to an
         // already-migrated handle (its ctor doc requires the schema to exist).
         cortrix::observability::OperationLogSchemaProvider oplog_schema;
-        auto cs = catalog_db.Open(catalog_path, {&oplog_schema});
+        // [F13 TC4] agent_trace lives in the global catalog.db now (moved out of the
+        // per-NS memory.db, where memory_store keeps only interaction_sources). Migrate
+        // its schema here so the writer (A4/F) + reader (RegisterTracesRoutesGlobal) both
+        // bind an already-built table.
+        cortrix::agent_trace::AgentTraceSchemaProvider agent_trace_schema;
+        auto cs = catalog_db.Open(catalog_path, {&oplog_schema, &agent_trace_schema});
         if (!cs.ok()) {
             CORTRIX_LOG_ERROR("main", "Failed to open catalog.db ({}): {}",
                               catalog_path, cs.message());
@@ -337,6 +352,23 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     }
     embedder.set_max_seq_length(config.embedding.max_seq_length);
     embedder.set_gpu_provider(config.embedding.gpu_provider);
+    // [F22 D3.5 · A3] Fail-fast ONNX startup validation BEFORE the embedder initializes:
+    // an ABI-mismatched runtime, or an out-of-range opset on a PRESENT model, aborts the
+    // process here (in the operator's startup window) rather than at the first inference.
+    // skip_missing_models=true preserves the OnnxEmbedder stub-fallback contract (a dev
+    // box without the model files still starts); only a present+incompatible model (or a
+    // runtime ABI mismatch) is the hard stop. F02 reranker / F40 sparse models
+    // self-register in CollectRegisteredOnnxModels only once their files exist.
+    {
+        auto onnx_val = cortrix::onnx::StartupValidator::CollectRegisteredOnnxModels(config);
+        onnx_val.skip_missing_models = true;
+        if (auto vs = cortrix::onnx::StartupValidator::Validate(onnx_val); !vs.ok()) {
+            CORTRIX_LOG_ERROR("main", "ONNX startup validation failed: {}", vs.message());
+            return 1;
+        }
+        CORTRIX_LOG_INFO("main", "ONNX startup validation passed ({} model(s) registered)",
+                         onnx_val.registered_model_paths.size());
+    }
     s = embedder.Init();
     if (!s.ok()) {
         CORTRIX_LOG_WARN("main", "OnnxEmbedder init failed (stub mode): {}", s.message());
@@ -636,6 +668,28 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         global_config->SetAgentLlmConfig(seed);
     }
     cortrix::observability::ObservabilityModule obs_module(catalog_db.db(), global_config);
+    // [F13 TC4 · A4] agent_trace now lives in the global catalog.db. Build ONE writer over
+    // that handle, shared by the F13 90-day retention cleanup here AND the F-path query
+    // EngineInstrumentation write side (below, ~line 710). Register the F13 retention
+    // callbacks on the shared F18a CleanupScheduler BEFORE Initialize() so its startup
+    // catch-up sweep covers agent_trace + interaction_log too (Initialize() registers
+    // operation_log then StartScheduler()s the catch-up). agent_trace is single-db
+    // (delegated to writer->Cleanup); interaction_log is per-NS, so it gets a fan-out
+    // sweeper rather than a single-db RegisterTable callback.
+    auto at_writer = std::make_shared<cortrix::agent_trace::AgentTraceWriterImpl>(
+        catalog_db.db(), global_config);
+    {
+        // The registrar is transient: RegisterAgentTrace's callback captures at_writer
+        // (shared_ptr), not the registrar. db=nullptr — interaction_log is per-NS (swept
+        // below), not reachable through one catalog.db handle.
+        cortrix::agent_trace::F13CleanupRegistrar f13_cleanup(at_writer, /*db=*/nullptr,
+                                                              global_config);
+        f13_cleanup.RegisterAgentTrace(obs_module.scheduler());
+    }
+    auto il_sweeper = std::make_shared<cortrix::agent_trace::InteractionLogSweeper>(
+        &ns_router, &ns_pool, global_config);
+    obs_module.scheduler().RegisterTable("interaction_log",
+                                         [il_sweeper] { il_sweeper->RunOnce(); });
     obs_module.Initialize();
 
     // 10d. [D3.5 r2 · Wave P · P2] F16a DB-import assembly. The ConnectionManager
@@ -706,8 +760,15 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         q_cfg.default_model = config.semantic_llm.model;
         query_llm = std::make_shared<cortrix::llm::OpenAiLlmClient>(std::move(q_cfg));
     }
+    // [F13 · F] Query-path agent_trace write side: one EngineInstrumentation over the
+    // shared global at_writer (built at ~line 640). op_logger=nullptr — the query path
+    // already audits via F18a, so tracing only here avoids a double operation_log write.
+    // The closure reads trace/session/agent/user from the thread-local ObservabilityContext
+    // that WithAuth fills (auth_middleware InstallObservabilityContext).
+    auto engine_instr = std::make_shared<cortrix::agent_trace::EngineInstrumentation>(
+        at_writer, /*op_logger=*/nullptr);
     cortrix::query::CrossNsQueryWiring cross_ns_query_wiring(
-        ns_pool, embedder, fusion, perm_svc, &sparse_index_registry, query_llm);
+        ns_pool, embedder, fusion, perm_svc, &sparse_index_registry, query_llm, engine_instr);
     cross_ns_query_wiring.Register(server.server(), auth);
 
     // [M1] MEM02 extraction service: a MemoryQueue draining interactions through
@@ -751,15 +812,36 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // outlive `server`, so declared here at end-of-scope).
     cortrix::async::DocumentTaskHandler doc_task_handler(
         &task_scheduler, &task_mgr, &worker_pool, f42_config.get());
+    // [F41 · A6] GET /api/v1/documents/discover — doc-summary granularity recall (HNSW
+    // over doc_summary blocks + FTS5 fallback). MUST be mounted BEFORE RegisterFlatDocumentRoutes
+    // below, whose GET /documents/{id} catch-all would otherwise swallow the literal
+    // "discover" path segment. The DocSummaryConfig is resolved once from f42_config — the
+    // same source the F41AsyncWorker write side uses (~line 560), so read and write agree.
+    {
+        auto ds_cfg = cortrix::doc_summary::ResolveDocSummaryConfig(f42_config.get());
+        server.server().Get(
+            "/api/v1/documents/discover",
+            cortrix::WithAuth(auth, cortrix::kPermRead,
+                [&ns_pool, &embedder, ds_cfg](const httplib::Request& req,
+                                              httplib::Response& res,
+                                              const cortrix::RequestContext& rctx) {
+                    cortrix::doc_summary::HandleDocumentsDiscover(
+                        req, res, rctx, ns_pool, embedder, ds_cfg);
+                }));
+    }
     cortrix::RegisterFlatDocumentRoutes(server.server(), ns_pool, upload_handler,
                                         batch_service, doc_task_handler, auth);
     cortrix::RegisterMemoryRoutes(server.server(), auth, ns_pool, spc_mgr,
                                   embedder, classifier, fusion, config.memory, mem_services);
-    // [M6 · F13] Agent-observability routes (per-NS): /traces/{session_id} +
-    // /interactions/{id}/sources + /interactions, built per-request over the request's
-    // namespace memory.db (interaction_log + agent_trace + interaction_sources live
-    // there). ?namespace= required on the two path-id routes (per-NS storage model).
-    cortrix::RegisterObservabilityRoutesPerNs(server.server(), ns_pool, global_config, auth);
+    // [F13 TC4] Agent-observability routes split across two DBs: agent_trace moved back to
+    // the global catalog.db (a session may span namespaces -> trace read is GLOBAL, no
+    // ?namespace=), while interaction_log + interaction_sources stay per-NS memory.db.
+    // RegisterTracesRoutesGlobal builds its own writer + the section 8.1 cross-NS owner
+    // resolver internally (global agent_trace -> namespace_id -> per-NS memory.db user_id
+    // via pool). interaction reads stay per-NS (?namespace= / namespace_id selector).
+    cortrix::RegisterTracesRoutesGlobal(server.server(), catalog_db.db(), ns_pool,
+                                        global_config, auth);
+    cortrix::RegisterInteractionsRoutesPerNs(server.server(), ns_pool, auth);
     cortrix::RegisterConnectorRoutes(server.server(), connector_state, ns_pool, ns_router, ns_mgr, spc_mgr, auth);
     // [D3.5 r2 · Wave S routes] /watch aliases (openapi/SDK/MCP fan-out shape) mapped
     // onto the same connector watcher mechanism (POST reuses ConnectorAddWatcher; each

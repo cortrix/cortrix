@@ -7,6 +7,8 @@
 #include <utility>
 #include <vector>
 
+#include "cortrix/doc_summary/discover_handler.h"  // RecallDocSummaryHnsw (granularity=doc/both)
+#include "cortrix/doc_summary/doc_summary_types.h"  // DocDiscoveryHit
 #include "cortrix/query/bm25_searcher.h"
 #include "cortrix/query/cross_ns_error.h"
 #include "cortrix/query/scored_block.h"
@@ -60,6 +62,21 @@ int LiveSingleUnitExecutor::CandidateK(int top_k, float oversample) const {
 }
 
 NamespaceQueryResult LiveSingleUnitExecutor::ExecuteForNamespace(
+    const QueryContext& ctx, const std::string& namespace_id, float oversample) {
+    // F41 §6.2 granularity dispatch. The default "auto" / "chunk" (and any unknown
+    // value) take the existing chunk-level pipeline verbatim — the iron rule is that
+    // the default path is 100% unchanged. Only "doc" / "both" engage the F41 §8.1
+    // doc-summary branches. ScatterGather / the cross-NS gather are untouched.
+    if (ctx.granularity == "doc") {
+        return ExecuteDocRetrieval(ctx, namespace_id);
+    }
+    if (ctx.granularity == "both") {
+        return ExecuteHybridRetrieval(ctx, namespace_id, oversample);
+    }
+    return ExecuteChunkRetrieval(ctx, namespace_id, oversample);
+}
+
+NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
     const QueryContext& ctx, const std::string& namespace_id, float oversample) {
     using clock = std::chrono::steady_clock;
     const auto t0 = clock::now();
@@ -261,6 +278,121 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteForNamespace(
         finish_latency();
         return out;
     }
+}
+
+NamespaceQueryResult LiveSingleUnitExecutor::ExecuteDocRetrieval(
+    const QueryContext& ctx, const std::string& namespace_id) {
+    using clock = std::chrono::steady_clock;
+    const auto t0 = clock::now();
+
+    NamespaceQueryResult out;
+    out.namespace_id = namespace_id;
+    auto finish_latency = [&]() {
+        out.latency_ms = static_cast<int>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(clock::now() - t0)
+                .count());
+    };
+
+    try {
+        // Acquire the NS façade (F05 Pool.Acquire, RAII-released at scope exit) — same
+        // contract as the chunk path; a missing NS / store fault folds in-band as
+        // CX_ERR_INDEX_CORRUPT (topic 2.4 partial success), never thrown.
+        cortrix::resource::NamespaceFacade facade(pool_, namespace_id);
+        if (!facade.Acquire().ok()) {
+            const auto& info = GetCrossNsErrorInfo(CrossNsErrorCode::kIndexCorrupt);
+            out.error_code = info.cx_code;
+            out.error_category = agent_friendly::ToString(info.category);
+            out.retryable = info.retryable;
+            finish_latency();
+            return out;
+        }
+
+        const int top_k = ctx.top_k < 1 ? 1 : ctx.top_k;
+
+        // §8.1 doc branch ≅ GET /documents/discover (main path): doc_summary embedding
+        // HNSW recall over THIS NS's P-HNSW, via the shared doc_summary read core (one
+        // recall implementation for both the endpoint and this path). The per-Unit
+        // doc-level FTS5 fallback is the discover ENDPOINT's job (it owns the F08-field
+        // index); the in-NS doc path surfaces the LLM-summary recall as doc-level units.
+        std::vector<cortrix::doc_summary::DocDiscoveryHit> hits =
+            cortrix::doc_summary::RecallDocSummaryHnsw(
+                facade.vec_index(), facade.store(), embedder_, ctx.query, top_k);
+
+        // Convert each doc-summary hit into a doc-level RankedChunk. child_id = doc_id
+        // (the doc-level identity for this path; the cross-NS dedupe keys on content_hash
+        // / child_id). chunk_text = summary_text so the §6.1 fields are available
+        // downstream; metadata carries the B-class explain provenance (§8.3). No rerank:
+        // doc summaries are not chunk passages, so HNSW similarity order is kept (the
+        // §8.1 doc branch does not rerank doc-summary hits).
+        out.chunks.reserve(hits.size());
+        for (const auto& h : hits) {
+            RankedChunk rc;
+            rc.child_id = h.doc_id;             // doc-level identity for this path
+            rc.chunk_text = h.summary_text;     // §4.2 summary_text
+            rc.score = h.match_score;           // HNSW similarity (pre-rerank)
+            rc.rerank_score = h.match_score;    // no rerank on the doc path → mirror score
+            rc.metadata["via_path"] = "doc_summary";  // §8.3 B-class provenance
+            rc.metadata["source_doc_id"] = h.doc_id;
+            rc.metadata["doc_summary_match_score"] = std::to_string(h.match_score);
+            if (!h.one_liner.empty()) rc.metadata["one_liner"] = h.one_liner;
+            out.chunks.push_back(std::move(rc));
+        }
+
+        out.error_code.clear();  // success (an empty doc-summary set is still success)
+        finish_latency();
+        return out;
+    } catch (const std::exception&) {
+        const auto& info = GetCrossNsErrorInfo(CrossNsErrorCode::kIndexCorrupt);
+        out.chunks.clear();
+        out.error_code = info.cx_code;
+        out.error_category = agent_friendly::ToString(info.category);
+        out.retryable = info.retryable;
+        finish_latency();
+        return out;
+    }
+}
+
+NamespaceQueryResult LiveSingleUnitExecutor::ExecuteHybridRetrieval(
+    const QueryContext& ctx, const std::string& namespace_id, float oversample) {
+    // §8.1 both branch: run BOTH paths and concatenate (chunk units first, then
+    // doc-level). The cross-NS gather re-sorts by rerank_score and dedupes, so keeping
+    // both kinds in the candidate set is correct; the per-NS top_k cap is applied here
+    // so a NS does not over-contribute. A per-path NS failure (error_code set) is
+    // surfaced if BOTH fail; if only one fails we still return the other's results
+    // (partial success — the chunk path is the primary).
+    NamespaceQueryResult chunk_part = ExecuteChunkRetrieval(ctx, namespace_id, oversample);
+    NamespaceQueryResult doc_part = ExecuteDocRetrieval(ctx, namespace_id);
+
+    NamespaceQueryResult out;
+    out.namespace_id = namespace_id;
+    // Latency = the larger of the two (they run sequentially here; the sum would
+    // double-count the shared façade acquire — max is the honest single-NS wall time
+    // floor, and this path is not on the default hot path).
+    out.latency_ms = std::max(chunk_part.latency_ms, doc_part.latency_ms);
+
+    const bool chunk_ok = chunk_part.error_code.empty();
+    const bool doc_ok = doc_part.error_code.empty();
+    if (!chunk_ok && !doc_ok) {
+        // Both failed → surface the chunk path's error (the primary path).
+        out.error_code = chunk_part.error_code;
+        out.error_category = chunk_part.error_category;
+        out.retryable = chunk_part.retryable;
+        out.retry_after_ms = chunk_part.retry_after_ms;
+        return out;
+    }
+
+    if (chunk_ok) {
+        for (auto& rc : chunk_part.chunks) out.chunks.push_back(std::move(rc));
+    }
+    if (doc_ok) {
+        for (auto& rc : doc_part.chunks) out.chunks.push_back(std::move(rc));
+    }
+    const int top_k = ctx.top_k < 1 ? 1 : ctx.top_k;
+    if (static_cast<int>(out.chunks.size()) > top_k) {
+        out.chunks.resize(static_cast<std::size_t>(top_k));
+    }
+    out.error_code.clear();  // success (at least one path succeeded)
+    return out;
 }
 
 }  // namespace cortrix::query

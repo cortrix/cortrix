@@ -100,6 +100,11 @@ struct MemoryConfig {
     int max_sessions_per_namespace = 10000;
     int max_interactions_per_session = 1000;
     std::string chunk_strategy = "per_turn";
+    // [MEM01] Classified-decay scoring for memory search (design § 2.5).
+    // D5 lock: V1.0 is global-GUC only (no per-namespace override). These feed
+    // MemoryDecayConfig at the MemorySearcher wiring site (memory_routes.cpp).
+    double decay_lambda = 0.01;     // memory.decay.lambda  — decay coefficient (half-life ~70d)
+    double decay_min_score = 0.0;   // memory.decay.min_score — decay floor (0 = old events sink)
 };
 
 // === [OPEN-2] three-stage GC (ARCH §5.x, A6 §10.8) ===

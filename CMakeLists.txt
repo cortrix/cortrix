@@ -193,6 +193,7 @@ add_library(cortrix_core STATIC
     src/doc_summary/doc_fts5_index.cpp
     src/doc_summary/doc_summary_generator.cpp
     src/doc_summary/f41_async_worker.cpp
+    src/doc_summary/discover_handler.cpp
     src/connector/file_filter.cpp
     src/connector/file_utils.cpp
     src/connector/file_watcher.cpp
@@ -228,6 +229,7 @@ add_library(cortrix_core STATIC
     src/server/routes/observability_routes.cpp
     src/agent_trace/engine_instrumentation.cpp
     src/agent_trace/f13_cleanup_registrar.cpp
+    src/agent_trace/interaction_log_sweeper.cpp
     src/agent_trace/observability_audit_log.cpp
     src/catalog/schema_migrator.cpp
     src/catalog/catalog_schema.cpp

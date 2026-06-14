@@ -44,10 +44,11 @@ CREATE TYPE pgcortrix_doc_info AS (
 CREATE TYPE pgcortrix_memory_result AS (
     memory_id   TEXT,
     content     TEXT,
-    score       FLOAT,
+    score       FLOAT,       -- raw RRF score (pre-decay)
     created_at  TIMESTAMPTZ,
     memory_type TEXT,        -- fact | preference | event
-    status      TEXT         -- active | invalidated
+    status      TEXT,        -- active | invalidated
+    final_score FLOAT        -- MEM01: raw * decay_factor (ranking key, design § 2.1)
 );
 
 -- v1.0.1: interaction_log list type. MEM05 v1.0 D4 forces per-user isolation,
@@ -171,6 +172,7 @@ AS $$
             r.get('created_at'),
             r.get('memory_type'),
             r.get('status'),
+            r.get('final_score'),    # MEM01: decayed ranking key
         )
 $$;
 

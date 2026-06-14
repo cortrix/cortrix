@@ -150,8 +150,8 @@ DefaultNamespacePool::DefaultNamespacePool(
 
 size_t DefaultNamespacePool::CurrentMemoryUsedLocked() const {
     size_t used = 0;
-    for (const auto& [ns_id, bundle] : bundles_) {
-        used += bundle.TotalMemoryEstimateBytes();
+    for (const auto& [ns_id, slot] : bundles_) {
+        used += slot.bundle.TotalMemoryEstimateBytes();
     }
     return used;
 }
@@ -460,7 +460,16 @@ Status DefaultNamespacePool::AdmitCreate(const std::string& namespace_id,
 
     // Gate 1 — NS count (§5.1). Re-admitting an already-resident NS is not a quota
     // hit (idempotent create from a retried catalog op): only a *new* NS counts.
-    const bool already_resident = bundles_.count(namespace_id) > 0;
+    // A slot still marked pending_delete (a DeleteNamespace racing this create) is
+    // treated as NOT resident: we cancel the pending reap and reload below, so the
+    // recreate wins with fresh resources rather than aliasing a being-torn-down
+    // slot. (On the live path the catalog PK on the soft-deleted row blocks a
+    // same-name recreate before reaching here, so this is a belt-and-suspenders
+    // guard.)
+    auto resident_it = bundles_.find(namespace_id);
+    const bool already_resident =
+        resident_it != bundles_.end() &&
+        !resident_it->second.pending_delete.load(std::memory_order_acquire);
     if (!already_resident && bundles_.size() + 1 > config_.max_namespaces_per_instance) {
         rejected_ns_count_.fetch_add(1, std::memory_order_relaxed);
         RecordRejection(namespace_id, "ns_count_exceeded",
@@ -495,7 +504,14 @@ Status DefaultNamespacePool::AdmitCreate(const std::string& namespace_id,
     if (!loaded.ok()) {
         return loaded.status();
     }
-    bundles_[namespace_id] = std::move(loaded.value());
+    // Insert in place: construct (or reuse) the slot and move-assign just its
+    // bundle, leaving the slot's refcount/pending_delete to reset to a fresh state.
+    // Reusing a pending_delete slot (the recreate-races-delete guard above) cancels
+    // its pending reap — the new resources own the slot now.
+    NamespaceSlot& slot = bundles_[namespace_id];
+    slot.bundle = std::move(loaded.value());
+    slot.refcount.store(0, std::memory_order_relaxed);
+    slot.pending_delete.store(false, std::memory_order_release);
     // §10.1 size / memory_budget_used gauges — set under the lock we already hold
     // (RefreshPoolGauges would re-lock → deadlock here).
     NsPoolMetrics::Instance().SetSize(static_cast<int64_t>(bundles_.size()));
@@ -516,22 +532,91 @@ Result<NamespaceResourceBundle*> DefaultNamespacePool::Acquire(
     if (it == bundles_.end()) {
         return PoolStatus(PoolErrorCode::kNsNotFound, namespace_id);
     }
-    return Result<NamespaceResourceBundle*>(&it->second);
+    NamespaceSlot& slot = it->second;
+    // Refuse an NS that is being torn down (EvictForDelete marked it). New borrows
+    // must not revive a slot whose reap is pending, so the refcount can only fall to
+    // zero. EvictForDelete takes the exclusive lock, so it cannot flip pending_delete
+    // between this check and the increment below — the shared lock excludes it.
+    if (slot.pending_delete.load(std::memory_order_acquire)) {
+        return PoolStatus(PoolErrorCode::kNsNotFound, namespace_id);
+    }
+    // Take a reference: keeps the bundle alive past a racing EvictForDelete (which
+    // will then defer its erase to the matching Release). The returned pointer is
+    // node-stable (unordered_map) so it survives concurrent inserts/rehash.
+    slot.refcount.fetch_add(1, std::memory_order_acq_rel);
+    return Result<NamespaceResourceBundle*>(&slot.bundle);
 }
 
-void DefaultNamespacePool::Release(const std::string& /*namespace_id*/) {
-    // Phase 1 no-op (§3.2 / §14): NS stay hot, there is no refcount to decrement.
-    // The seam exists so F25.BeginWrite can pair Acquire/Release for Phase 2.
+void DefaultNamespacePool::Release(const std::string& namespace_id) {
+    // Drop the reference taken by Acquire (no longer the Phase-1 no-op). If this is
+    // the last reference of an NS already marked pending_delete (a DeleteNamespace
+    // raced an in-flight borrow), reap the slot here — releasing index /
+    // WriteCoordinator / store.db. The common case (refcount stays >0, or the NS
+    // was never pending_delete) takes only the shared lock.
+    bool maybe_reap = false;
+    {
+        std::shared_lock<std::shared_mutex> lock(pool_mutex_);
+        auto it = bundles_.find(namespace_id);
+        if (it == bundles_.end()) {
+            return;  // safe no-op: NS not resident (already reaped / never present)
+        }
+        NamespaceSlot& slot = it->second;
+        const int prev = slot.refcount.fetch_sub(1, std::memory_order_acq_rel);
+        // prev <= 0 would mean an unbalanced Release; the gate relies on exact
+        // Acquire/Release pairing (NamespaceFacade RAII), so we only reap on the
+        // clean last-release transition (prev == 1 → now 0).
+        maybe_reap = (prev == 1) &&
+                     slot.pending_delete.load(std::memory_order_acquire);
+    }
+    if (!maybe_reap) return;
+
+    // Last reader of a pending-delete NS: re-acquire exclusively and re-verify under
+    // the write lock (a concurrent recreate via AdmitCreate could have replaced the
+    // slot and cleared pending_delete — in which case we must NOT erase it).
+    std::unique_lock<std::shared_mutex> lock(pool_mutex_);
+    auto it = bundles_.find(namespace_id);
+    if (it == bundles_.end()) return;
+    NamespaceSlot& slot = it->second;
+    if (slot.pending_delete.load(std::memory_order_acquire) &&
+        slot.refcount.load(std::memory_order_acquire) == 0) {
+        bundles_.erase(it);
+        // §10.1 size / memory_budget_used gauges — set under the lock we already hold.
+        NsPoolMetrics::Instance().SetSize(static_cast<int64_t>(bundles_.size()));
+        NsPoolMetrics::Instance().SetMemoryBudgetUsedBytes(
+            static_cast<int64_t>(CurrentMemoryUsedLocked()));
+        LogEvent(obs::LogLevel::kDebug, "F05_POOL_EVICT_REAPED",
+                 {{"namespace_id", namespace_id},
+                  {"pool_size_after", bundles_.size()}});
+    }
 }
 
 // ── unload (§5.2 / §13.1) ────────────────────────────────────────────────────
 
 Status DefaultNamespacePool::EvictForDelete(const std::string& namespace_id) {
     std::unique_lock<std::shared_mutex> lock(pool_mutex_);
-    // Idempotent: erasing an absent NS is Ok (the F12 rollback path may call this
-    // for an NS that never made it into the pool, §5.2). Erasing the bundle drops
-    // its unique_ptrs → index / WriteCoordinator / store.db all released here.
-    bundles_.erase(namespace_id);
+    auto it = bundles_.find(namespace_id);
+    // Idempotent: evicting an absent NS is Ok (the F12 rollback path may call this
+    // for an NS that never made it into the pool, §5.2).
+    if (it == bundles_.end()) return Status::Ok();
+
+    NamespaceSlot& slot = it->second;
+    // Gate the erase on outstanding Acquire references. The exclusive lock excludes
+    // every Acquire, so this refcount read is stable: no new reference can appear
+    // while we decide. If readers are in flight, DEFER — mark pending_delete (which
+    // blocks new Acquires) and let the last Release reap the slot. This is the fix
+    // for the §13.1 DeleteNamespace UAF: erasing here while a NamespaceFacade holds
+    // &slot.bundle would dangle its pointer for the rest of the request.
+    if (slot.refcount.load(std::memory_order_acquire) > 0) {
+        slot.pending_delete.store(true, std::memory_order_release);
+        LogEvent(obs::LogLevel::kDebug, "F05_POOL_EVICT_DEFERRED",
+                 {{"namespace_id", namespace_id},
+                  {"refcount", slot.refcount.load(std::memory_order_acquire)}});
+        return Status::Ok();
+    }
+
+    // No readers in flight → erase now. Dropping the bundle's unique_ptrs releases
+    // index / WriteCoordinator / store.db here.
+    bundles_.erase(it);
     // §10.1 size / memory_budget_used gauges — set under the lock we already hold.
     NsPoolMetrics::Instance().SetSize(static_cast<int64_t>(bundles_.size()));
     NsPoolMetrics::Instance().SetMemoryBudgetUsedBytes(
@@ -584,7 +669,8 @@ Result<StartupReport> DefaultNamespacePool::StartupLoadAll() {
         Result<NamespaceResourceBundle> loaded = futures[i].get();
         if (loaded.ok()) {
             std::unique_lock<std::shared_mutex> lock(pool_mutex_);
-            bundles_[ns_list[i]] = std::move(loaded.value());
+            // Fresh slot (refcount 0, not pending_delete); move just the bundle in.
+            bundles_[ns_list[i]].bundle = std::move(loaded.value());
             report.loaded_successfully++;
         } else {
             startup_load_failures_.fetch_add(1, std::memory_order_relaxed);
@@ -628,7 +714,10 @@ Status DefaultNamespacePool::ReloadNamespace(const std::string& namespace_id) {
         return loaded.status();
     }
     std::unique_lock<std::shared_mutex> lock(pool_mutex_);
-    bundles_[namespace_id] = std::move(loaded.value());
+    // Reload replaces the bundle in place (or creates a fresh slot). A reload only
+    // applies to a load-failed NS — which was never inserted, so refcount is 0 and
+    // there is no pending_delete to worry about; assign just the bundle field.
+    bundles_[namespace_id].bundle = std::move(loaded.value());
     // Clear it from the startup-failed list on a successful reload (§8.3.3).
     for (auto it = startup_failed_namespaces_.begin();
          it != startup_failed_namespaces_.end();) {
@@ -667,7 +756,8 @@ ExplainState DefaultNamespacePool::GetExplainState() const {
     {
         std::shared_lock<std::shared_mutex> lock(pool_mutex_);
         state.active_namespaces.reserve(bundles_.size());
-        for (const auto& [ns_id, bundle] : bundles_) {
+        for (const auto& [ns_id, slot] : bundles_) {
+            (void)slot;
             state.active_namespaces.push_back(ns_id);
         }
         state.memory_estimate_bytes = CurrentMemoryUsedLocked();

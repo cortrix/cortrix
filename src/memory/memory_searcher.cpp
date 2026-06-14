@@ -1,7 +1,9 @@
 #include "cortrix/memory/memory_searcher.h"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <ctime>
 
 #include "cortrix/memory/mem05_metrics.h"
@@ -31,6 +33,42 @@ bool IsValidUserIdFormat(const std::string& user_id) {
         if (c < 0x20 || c > 0x7E) return false;
     }
     return true;
+}
+
+// MEM01: parse an ISO 8601 "YYYY-MM-DDTHH:MM:SSZ" timestamp to Unix seconds.
+// Returns 0 on a malformed / empty string — the scorer treats created_at <= 0
+// as "unknown age" (age_days=0, decay_factor=1.0), i.e. no decay rather than a
+// penalty (design § 5 boundary: created_at missing -> no decay).
+int64_t ParseCreatedAtToEpoch(const std::string& iso) {
+    if (iso.size() < 19) return 0;
+    std::tm tm_utc{};
+    int y, mo, d, h, mi, s;
+    if (std::sscanf(iso.c_str(), "%d-%d-%dT%d:%d:%d", &y, &mo, &d, &h, &mi, &s) != 6) {
+        return 0;
+    }
+    tm_utc.tm_year = y - 1900;
+    tm_utc.tm_mon = mo - 1;
+    tm_utc.tm_mday = d;
+    tm_utc.tm_hour = h;
+    tm_utc.tm_min = mi;
+    tm_utc.tm_sec = s;
+#if defined(_WIN32)
+    return static_cast<int64_t>(_mkgmtime(&tm_utc));
+#else
+    return static_cast<int64_t>(timegm(&tm_utc));
+#endif
+}
+
+// MEM01: read the memory block status ("active"/"tentative"/"invalidated") from
+// item metadata. Missing/non-string -> "active" (design § 5: status missing ->
+// treated as a valid/active state). ToMemoryResult does not surface status, so
+// the scoring path reads it directly here.
+std::string ExtractStatus(const json& metadata) {
+    if (!metadata.is_null() && metadata.contains("status") &&
+        metadata["status"].is_string()) {
+        return metadata["status"].get<std::string>();
+    }
+    return "active";
 }
 }  // namespace
 
@@ -82,7 +120,14 @@ MemorySearchResponse MemorySearcher::Search(const MemorySearchRequest& request) 
 
     response.degraded = qresp.meta.degraded;
 
-    // 4. Post-filter: scope + TTL
+    // 4. Post-filter: scope + TTL. Collect all surviving rows first (no early
+    //    top_k cut) — MEM01 re-ranks by final_score below, so truncation must
+    //    happen after scoring, not in pipeline (raw RRF) order.
+    std::vector<MemorySearchResultItem> kept;
+    std::vector<MemoryCandidate> candidates;  // parallel to `kept` (scorer path)
+    kept.reserve(qresp.results.size());
+    candidates.reserve(qresp.results.size());
+
     for (const auto& item : qresp.results) {
         // 4a. Scope filter (MEM05: always applied — items without user_id in
         //     metadata, including null metadata, fail the user_id check and are
@@ -101,16 +146,62 @@ MemorySearchResponse MemorySearcher::Search(const MemorySearchRequest& request) 
         // 5. Convert to MemorySearchResultItem
         MemorySearchResultItem result = ToMemoryResult(item);
         result.expired = expired;
+        // Default (null-scorer / no-decay): final_score mirrors the raw RRF score
+        // so the field is always meaningful and ordering is unchanged.
+        result.final_score = static_cast<double>(result.score);
 
         // Keep interaction rows (interaction_id) AND MEM02 fact/preference/event
         // blocks (content). A result with neither is a non-memory row that slipped
         // the MEMORY block_type filter — drop it.
-        if (!result.interaction_id.empty() || !result.content.empty()) {
-            response.results.push_back(std::move(result));
+        if (result.interaction_id.empty() && result.content.empty()) {
+            continue;
         }
 
-        if (static_cast<int>(response.results.size()) >= request.top_k) {
-            break;
+        // 5b. MEM01 (scorer path only): build the scoring candidate parallel to
+        //     `kept`. block_id is repurposed as a back-correlation index into
+        //     `kept` (real block ids are ULID strings carried on the result item;
+        //     the scorer only passes this field through and never matches on it).
+        //     status is read from metadata (ToMemoryResult does not surface it).
+        if (scorer_ != nullptr) {
+            MemoryCandidate cand;
+            cand.block_id = candidates.size();  // index handle, not a real id
+            cand.content = result.content;
+            cand.memory_type = result.memory_type;
+            cand.status = ExtractStatus(item.metadata);
+            cand.raw_score = static_cast<double>(result.score);
+            cand.created_at = ParseCreatedAtToEpoch(result.created_at);
+            candidates.push_back(std::move(cand));
+        }
+
+        kept.push_back(std::move(result));
+    }
+
+    if (scorer_ != nullptr) {
+        // MEM01 path: classified-decay scoring + invalidated filter + rank by
+        // final_score + top_k truncation (all in MemoryScorer::ScoreAndRank,
+        // design § 4.1 step 4). Map each ScoredMemory back to its kept row via
+        // the index stashed in block_id, writing final_score / decay_factor.
+        const int64_t now = std::chrono::system_clock::to_time_t(
+            std::chrono::system_clock::now());
+        std::vector<ScoredMemory> scored = scorer_->ScoreAndRank(
+            candidates, now, request.top_k, request.include_invalidated);
+        response.results.reserve(scored.size());
+        for (const auto& sm : scored) {
+            size_t idx = static_cast<size_t>(sm.block_id);
+            if (idx >= kept.size()) continue;  // defensive; should not happen
+            MemorySearchResultItem result = std::move(kept[idx]);
+            result.decay_factor = sm.decay_factor;
+            result.final_score = sm.final_score;
+            response.results.push_back(std::move(result));
+        }
+    } else {
+        // Null-scorer fallback (pre-MEM01 behavior): keep raw RRF order, truncate
+        // to top_k by count. final_score already mirrors score (set above).
+        for (auto& result : kept) {
+            response.results.push_back(std::move(result));
+            if (static_cast<int>(response.results.size()) >= request.top_k) {
+                break;
+            }
         }
     }
 

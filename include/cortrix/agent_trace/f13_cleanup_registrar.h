@@ -10,40 +10,48 @@ struct sqlite3;
 
 namespace cortrix::agent_trace {
 
-/// Registers F13's two retention-cleanup tables onto the shared F18a
-/// CleanupScheduler (F13 §10.1, S10 + S11 — reuses the F18a framework, no separate
-/// timer):
+/// Registers F13's retention-cleanup callbacks onto the shared F18a CleanupScheduler
+/// (F13 §10.1, S10 + S11 — reuses the F18a framework, no separate timer).
+///
+/// TC4 split F13's two retention tables across two DBs, so this registrar covers ONLY
+/// the single-db tables it can reach through `db_`:
 ///   - agent_trace  : 90 days (IGlobalConfig.agent_trace_retention_days), delegated
 ///                    to writer->Cleanup() (the writer owns the agent_trace DELETE).
-///   - interaction_log : 180 days (IGlobalConfig.interaction_log_retention_days),
-///                    a DELETE on the MVP interaction_log table. The real frozen
-///                    created_at column is ISO-8601 TEXT (MEM01), so the cutoff is
-///                    formatted as an ISO-8601 string and compared lexically (ISO
-///                    8601 UTC sorts lexicographically). interaction_sources rows
-///                    cascade via the FK (ON DELETE CASCADE).
+///                    Lives in cortrix_global.db (TC4); the writer + this registrar
+///                    are built over that handle.
+///   - interaction_log : 180 days — TC4 keeps it PER-NS (one table per namespace
+///                    memory.db), which a single-db registrar cannot reach. Its
+///                    cleanup is the InteractionLogSweeper (per-NS), NOT this class.
+///                    CleanupInteractionLog() below still operates on the one `db_`
+///                    handle (used by the sweeper per NS + by tests); the
+///                    Register*() surface no longer registers interaction_log here.
 ///
 /// Standalone: the daily UTC-02:00 wall-clock loop is the scheduler's (real); this
 /// just registers the callbacks. Tests drive scheduler.RunCleanupNow().
 class F13CleanupRegistrar {
 public:
     /// @param writer  agent_trace writer (its Cleanup() is the agent_trace callback).
-    /// @param db      borrowed handle holding interaction_log (for that callback). Not owned.
+    /// @param db      borrowed handle holding interaction_log (for CleanupInteractionLog,
+    ///                used per-NS by the sweeper + by tests). Not owned. May be null
+    ///                when only the agent_trace callback is needed (global wiring).
     /// @param config  retention source (read live each sweep).
     F13CleanupRegistrar(std::shared_ptr<IAgentTraceWriter> writer,
                         sqlite3* db,
                         std::shared_ptr<IGlobalConfig> config);
 
-    /// Register both tables on `scheduler`. Idempotent registration is the caller's
-    /// responsibility (call once at startup), mirroring F18a.
-    void Register(observability::CleanupScheduler& scheduler);
+    /// Register the global agent_trace 90d cleanup on `scheduler` (TC4 — the only
+    /// single-db F13 table; interaction_log is per-NS, see InteractionLogSweeper).
+    /// Idempotent registration is the caller's responsibility (call once at startup),
+    /// mirroring F18a.
+    void RegisterAgentTrace(observability::CleanupScheduler& scheduler);
 
-    /// Delete interaction_log rows older than the retention window (exposed for the
-    /// callback + tests). Computes the cutoff as an ISO-8601 string. Returns the
-    /// number of rows deleted (best-effort; a DB error returns 0).
+    /// Delete interaction_log rows older than the retention window from `db_` (exposed
+    /// for the per-NS sweeper + tests). Computes the cutoff as an ISO-8601 string.
+    /// Returns the number of rows deleted (best-effort; a DB error returns 0).
     int CleanupInteractionLog();
 
     /// Format `unix_ms` as an ISO-8601 UTC string "YYYY-MM-DDTHH:MM:SS.mmmZ"
-    /// matching the interaction_log.created_at default. Exposed for tests.
+    /// matching the interaction_log.created_at default. Exposed for tests + the sweeper.
     static std::string FormatIso8601Utc(int64_t unix_ms);
 
 private:

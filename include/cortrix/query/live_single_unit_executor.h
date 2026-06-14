@@ -55,6 +55,12 @@ public:
                            int candidate_multiplier = 3,
                            int max_candidates = 50);
 
+    /// Per-NS entry. Dispatches on ctx.granularity (F41 §6.2 / §8.1):
+    ///   "auto" | "chunk" (and any unknown value) → ExecuteChunkRetrieval (the existing
+    ///       chunk-level pipeline, 100% unchanged — the default path is untouched);
+    ///   "doc"  → ExecuteDocRetrieval (doc_summary embedding HNSW recall, §8.1 doc branch);
+    ///   "both" → ExecuteHybridRetrieval (chunk + doc, §8.1 both branch).
+    /// The cross-NS gather/dedupe (ScatterGather) is granularity-agnostic and untouched.
     retrieval::NamespaceQueryResult ExecuteForNamespace(
         const QueryContext& ctx,
         const std::string& namespace_id,
@@ -65,6 +71,29 @@ public:
     int CandidateK(int top_k, float oversample) const;
 
 private:
+    /// The existing chunk-level per-NS pipeline (Vector+BM25[+sparse] → multi-path RRF →
+    /// rerank → top_k). This is the verbatim former ExecuteForNamespace body; the
+    /// granularity=auto/chunk path calls it so the default behavior is byte-for-byte
+    /// identical (F41 wiring iron rule — only doc/both diverge).
+    retrieval::NamespaceQueryResult ExecuteChunkRetrieval(
+        const QueryContext& ctx, const std::string& namespace_id, float oversample);
+
+    /// granularity=doc (§8.1 doc branch ≅ GET /documents/discover): recall doc_summary
+    /// blocks (block_type=17) from the per-NS P-HNSW via the shared
+    /// doc_summary::RecallDocSummaryHnsw, surfaced as doc-level RankedChunks (child_id =
+    /// doc_id, chunk_text = summary_text, metadata.via_path = "doc_summary"). No rerank
+    /// (doc summaries are not chunk passages); HNSW order is kept. A NS with no
+    /// doc_summary blocks returns an empty success result (not an error).
+    retrieval::NamespaceQueryResult ExecuteDocRetrieval(
+        const QueryContext& ctx, const std::string& namespace_id);
+
+    /// granularity=both (§8.1 both branch): run the chunk path AND the doc path, then
+    /// concatenate (chunk RankedChunks first, then doc-level), capped to top_k. The
+    /// cross-NS gather still re-sorts by rerank_score, so this preserves both kinds in
+    /// the candidate set; doc-level hits carry metadata.via_path = "doc_summary".
+    retrieval::NamespaceQueryResult ExecuteHybridRetrieval(
+        const QueryContext& ctx, const std::string& namespace_id, float oversample);
+
     cortrix::resource::INamespacePool& pool_;
     cortrix::OnnxEmbedder& embedder_;
     // Retained for ctor/DI compatibility; the per-NS recall now uses the chunk-level

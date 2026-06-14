@@ -46,7 +46,13 @@ struct MemorySearchResultItem {
     std::string content;
     std::string memory_type;
     std::string block_id;
-    float score = 0.0f;               // RRF fusion score
+    float score = 0.0f;               // RRF fusion score (raw_score before decay)
+    // MEM01 classified-decay scoring (design § 2.1). Populated only when a
+    // MemoryScorer is injected; on the null-scorer fallback path they stay at
+    // their defaults (decay_factor=1.0, final_score==score) so callers see raw
+    // RRF behavior unchanged.
+    double decay_factor = 1.0;        // fact/preference=1.0, event=exp(-lambda*age)
+    double final_score = 0.0;         // raw_score * decay_factor (ranking key)
     bool expired = false;              // TTL expired (when include_expired=true)
     std::string created_at;
     std::string metadata_json;

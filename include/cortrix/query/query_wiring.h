@@ -19,6 +19,9 @@ class ILlmClient;
 namespace retrieval {
 class SparseIndexRegistry;
 }  // namespace retrieval
+namespace agent_trace {
+class EngineInstrumentation;
+}  // namespace agent_trace
 }  // namespace cortrix
 
 namespace cortrix::query {
@@ -49,12 +52,20 @@ public:
     /// @param llm       shared LLM client for F36 query-variant expansion (NOT
     ///                 owned via raw ptr — shared_ptr). null → F36 stays off (it
     ///                 needs an LLM to expand; default-disabled either way).
+    /// @param engine_instr  F13 Engine-layer instrumentation (§11, S6). When set,
+    ///                 the query closure records one agent_trace row per executed
+    ///                 query (success + failure), reading trace/session/agent/user
+    ///                 from the thread-local ObservabilityContext WithAuth filled.
+    ///                 null → tracing off (standalone / tests), behavior otherwise
+    ///                 unchanged.
     CrossNsQueryWiring(cortrix::resource::INamespacePool& pool,
                        cortrix::OnnxEmbedder& embedder,
                        RRFFusion& fusion,
                        cortrix::tenant::PermissionService& perm_svc,
                        cortrix::retrieval::SparseIndexRegistry* sparse_registry = nullptr,
-                       std::shared_ptr<cortrix::llm::ILlmClient> llm = nullptr);
+                       std::shared_ptr<cortrix::llm::ILlmClient> llm = nullptr,
+                       std::shared_ptr<agent_trace::EngineInstrumentation> engine_instr =
+                           nullptr);
     ~CrossNsQueryWiring();
 
     CrossNsQueryWiring(const CrossNsQueryWiring&) = delete;

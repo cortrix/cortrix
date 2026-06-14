@@ -106,6 +106,7 @@ add_executable(cortrix_unit_tests
     unit/test_observability_routes.cpp
     unit/test_engine_instrumentation.cpp
     unit/test_f13_cleanup_registrar.cpp
+    unit/test_interaction_log_sweeper.cpp
     unit/test_observability_audit_log.cpp
     unit/test_operation_log_error.cpp
     unit/test_operation_log_schema.cpp

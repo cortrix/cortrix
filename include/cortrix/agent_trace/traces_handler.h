@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -37,11 +38,35 @@ struct TracesResponse {
 /// session->owner lookup). The HTTP route registration is D3.5.
 class TracesHandler {
 public:
+    /// Resolution of a session's owner (session_id -> user_id). `found` is false when
+    /// no record ties the session to a user (then ownership is "unknown"). A NULL
+    /// user_id is reported as found with an empty string.
+    struct Owner { bool found = false; std::string user_id; };
+
+    /// Strategy for resolving a session's owner. Used by the global GET /traces wiring
+    /// (TC4): agent_trace lives in cortrix_global.db but the session->user mapping
+    /// (interaction_log / memory_sessions) is per-NS, so a global trace read resolves
+    /// ownership out-of-band (read the session's namespace_id off the global
+    /// agent_trace, then look up user_id in that namespace's memory.db). When unset,
+    /// the handler falls back to the borrowed `db` interaction_log query (the path
+    /// used when the owner source is co-located with the writer, e.g. tests).
+    using OwnerResolver = std::function<Owner(const std::string& session_id)>;
+
     /// @param writer  the agent_trace writer (query sink).
     /// @param db      borrowed handle to the DB holding interaction_log (for the
     ///                session->owner lookup). Not owned. May be null in tests that
-    ///                only exercise admin paths (then ownership is "unknown").
+    ///                only exercise admin paths (then ownership is "unknown"), or in
+    ///                the TC4 global wiring (which sets an OwnerResolver instead).
     TracesHandler(std::shared_ptr<IAgentTraceWriter> writer, sqlite3* db);
+
+    /// [F13 TC4] Install an out-of-band owner resolver (global wiring). When set it
+    /// supersedes the co-located `db` interaction_log lookup — agent_trace is global
+    /// but the session->user mapping is per-NS, so the global GET /traces resolves
+    /// ownership through this strategy. Returns *this for call-chaining at the wiring.
+    TracesHandler& SetOwnerResolver(OwnerResolver owner_resolver) {
+        owner_resolver_ = std::move(owner_resolver);
+        return *this;
+    }
 
     /// GET /traces/{session_id}. Permission-checks, then returns the filtered +
     /// paginated session. Errors carried as a Status with the CX_ERR_F13_* token.
@@ -50,15 +75,15 @@ public:
                                       const RequesterContext& ctx);
 
 private:
-    /// Resolve the session's owner user_id via interaction_log (session_id ->
-    /// user_id). Returns {found, user_id}. `found` is false when no interaction_log
-    /// row references the session (then ownership is unknown). A NULL user_id is
-    /// reported as found with an empty string.
-    struct Owner { bool found = false; std::string user_id; };
+    /// Resolve the session's owner. Uses `owner_resolver_` when set (global wiring),
+    /// else the borrowed-`db` interaction_log query (co-located wiring).
     Owner ResolveOwner(const std::string& session_id);
+    /// The co-located interaction_log query (session_id -> user_id over `db_`).
+    Owner ResolveOwnerFromDb(const std::string& session_id);
 
     std::shared_ptr<IAgentTraceWriter> writer_;
     sqlite3* db_;  ///< borrowed (not owned)
+    OwnerResolver owner_resolver_;  ///< when set, supersedes the db_ lookup (TC4 global)
 };
 
 }  // namespace cortrix::agent_trace

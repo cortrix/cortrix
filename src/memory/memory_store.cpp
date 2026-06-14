@@ -4,8 +4,7 @@
 #include <chrono>
 #include <cstring>
 #include <spdlog/spdlog.h>
-#include "cortrix/agent_trace/agent_trace_schema.h"           // F13 AgentTraceSchemaProvider
-#include "cortrix/agent_trace/interaction_sources_schema.h"   // F13 InteractionSourcesSchemaProvider
+#include "cortrix/agent_trace/interaction_sources_schema.h"   // F13 InteractionSourcesSchemaProvider (per-NS; agent_trace is global, TC4)
 
 namespace cortrix {
 
@@ -123,9 +122,12 @@ Status MemoryStore::Init(const std::string& db_path) {
     s = MigrateMem04OptOutColumns();
     if (!s.ok()) return s;
 
-    // [F13 D3.5] agent_trace + interaction_sources live in this memory.db (alongside
-    // interaction_log). Idempotent; failure here is non-fatal to the memory path —
-    // F13 observability degrades but sessions/interactions keep working.
+    // [F13 TC4] interaction_sources lives in this memory.db (its FK references the
+    // per-NS interaction_log.id, so it must share that db). agent_trace does NOT —
+    // TC4 moved it back to the global cortrix_global.db (F13 §4.1), where GET /traces
+    // can read a session whose calls span namespaces. Idempotent; failure here is
+    // non-fatal to the memory path — F13 source attribution degrades but
+    // sessions/interactions keep working.
     if (Status f13 = CreateF13ObservabilityTables(); !f13.ok()) {
         // log-and-continue: do not block memory.db init on the observability tables.
     }
@@ -139,13 +141,11 @@ Status MemoryStore::Init(const std::string& db_path) {
 
 Status MemoryStore::CreateF13ObservabilityTables() {
     if (!db_) return Status::InvalidArgument("CreateF13ObservabilityTables: null db");
-    // Run the frozen F13 providers 0 -> CurrentVersion against this memory.db. Both
-    // are idempotent (CREATE TABLE IF NOT EXISTS), so re-running on an existing db is
-    // a no-op.
-    agent_trace::AgentTraceSchemaProvider trace_provider;
-    if (Status s = trace_provider.Migrate(db_, 0, trace_provider.CurrentVersion()); !s.ok()) {
-        return s;
-    }
+    // [F13 TC4] Only interaction_sources is per-NS here: its FK references this db's
+    // interaction_log.id (MEM01 frozen), so the two must co-locate. agent_trace is
+    // global (created against cortrix_global.db at startup, F13 §4.1) — it is NOT
+    // created here any more. The provider is idempotent (CREATE TABLE IF NOT EXISTS),
+    // so re-running on an existing db is a no-op.
     agent_trace::InteractionSourcesSchemaProvider sources_provider;
     if (Status s = sources_provider.Migrate(db_, 0, sources_provider.CurrentVersion());
         !s.ok()) {

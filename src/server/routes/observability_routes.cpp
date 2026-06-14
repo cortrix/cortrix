@@ -10,6 +10,7 @@
 #include <functional>
 
 #include <nlohmann/json.hpp>
+#include <sqlite3.h>
 
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/agent_trace/agent_trace_error.h"
@@ -448,18 +449,144 @@ bool RequireNamespaceParam(const httplib::Request& req, httplib::Response& res,
 
 }  // namespace
 
-void RegisterObservabilityRoutesPerNs(httplib::Server& server,
-                                      resource::INamespacePool& pool,
-                                      std::shared_ptr<IGlobalConfig> global_config,
-                                      ApiKeyAuth& auth) {
-    // For each route: require ?namespace=, acquire the façade, build the F13 handlers
-    // over THIS namespace's memory.db (interaction_log + agent_trace +
-    // interaction_sources all live there), then delegate to the shared Serve* body.
-    auto with_ns = [&pool, global_config](
+// [F13 TC4] The old combined RegisterObservabilityRoutesPerNs (all 3 routes over the
+// per-NS memory.db) was REMOVED: TC4 moved agent_trace to the global DB, so building
+// the trace writer over a per-NS memory.db (where agent_trace no longer exists) is
+// wrong. The live wiring is now RegisterTracesRoutesGlobal (trace read, global) +
+// RegisterInteractionsRoutesPerNs (the two interaction reads, per-NS), below.
+
+// ===== TC4: GET /traces global + interactions per-NS ========================
+
+namespace {
+
+// Local mirror of TracesHandler::Owner so the helper signature reads cleanly.
+struct TracesHandlerOwnerResolverResult {
+    bool found = false;
+    std::string user_id;
+};
+
+// Read the single user_id for `session_id` from one per-NS memory.db. `table` is
+// "interaction_log" or "memory_sessions" (both carry session_id + user_id). Sets
+// *out and returns true when a row exists (NULL user_id => found with empty string);
+// false (out untouched) when the session is absent from that table / on a query
+// error / when the table does not exist in this db.
+bool ReadOwnerFromNsTable(sqlite3* mem_db, const char* table,
+                          const std::string& session_id,
+                          TracesHandlerOwnerResolverResult* out) {
+    if (mem_db == nullptr) return false;
+    const std::string sql =
+        std::string("SELECT user_id FROM ") + table + " WHERE session_id = ? LIMIT 1";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(mem_db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        return false;  // table absent / error -> unknown
+    }
+    sqlite3_bind_text(stmt, 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+    bool found = false;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        found = true;
+        out->found = true;
+        out->user_id.clear();
+        if (sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
+            const char* t = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            if (t) out->user_id = t;
+        }
+    }
+    sqlite3_finalize(stmt);
+    return found;
+}
+
+// [F13 TC4] Resolve a session's owner for the GLOBAL /traces permission check.
+// agent_trace is global but carries no user_id; the session->user mapping lives in
+// each namespace's memory.db (interaction_log / memory_sessions). A session belongs
+// to one user, and every agent_trace row stamps the namespace_id of the call, so:
+//   1) read the namespaces this session touched off the global agent_trace, then
+//   2) look up user_id in THOSE namespaces' memory.db (interaction_log first — the
+//      §11 closed loop ties interactions/traces by session_id; memory_sessions is
+//      the fallback for a session with traces but no logged interaction yet).
+// Returns {found=false} when the session appears in no global trace, or its
+// namespace is gone / has no owner record (then ownership is "unknown" and the
+// §8.1 anti-leak rule denies a non-admin / yields SESSION_NOT_FOUND for an admin).
+TracesHandlerOwnerResolverResult ResolveGlobalTraceOwner(
+    sqlite3* global_db, resource::INamespacePool& pool, const std::string& session_id) {
+    TracesHandlerOwnerResolverResult out;
+    if (global_db == nullptr) return out;
+
+    // 1) Distinct namespaces this session touched (most calls share one NS; a session
+    //    that legitimately spans NS yields a few). DISTINCT keeps it bounded; NULL
+    //    namespace_id rows (global calls) cannot resolve an owner so they are skipped.
+    std::vector<std::string> namespaces;
+    {
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(global_db,
+                "SELECT DISTINCT namespace_id FROM agent_trace "
+                "WHERE session_id = ? AND namespace_id IS NOT NULL",
+                -1, &stmt, nullptr) != SQLITE_OK) {
+            return out;  // agent_trace absent / error -> unknown
+        }
+        sqlite3_bind_text(stmt, 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            const char* t = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            if (t && t[0] != '\0') namespaces.emplace_back(t);
+        }
+        sqlite3_finalize(stmt);
+    }
+    if (namespaces.empty()) return out;  // session not in any namespaced trace
+
+    // 2) Resolve the owner from the first namespace that yields one. A session is
+    //    single-user, so the first hit is authoritative.
+    for (const std::string& ns : namespaces) {
+        resource::NamespaceFacade facade(pool, ns);
+        if (!facade.Acquire().ok()) continue;  // NS gone / unloadable -> try the next
+        sqlite3* mem_db = facade.memory().db_handle();
+        if (ReadOwnerFromNsTable(mem_db, "interaction_log", session_id, &out)) return out;
+        if (ReadOwnerFromNsTable(mem_db, "memory_sessions", session_id, &out)) return out;
+    }
+    return out;  // traces exist but no owner record found -> unknown
+}
+
+}  // namespace
+
+void RegisterTracesRoutesGlobal(httplib::Server& server,
+                                sqlite3* global_db,
+                                resource::INamespacePool& pool,
+                                std::shared_ptr<IGlobalConfig> global_config,
+                                ApiKeyAuth& auth) {
+    // One writer over the global agent_trace (shared across requests; AgentTraceWriterImpl
+    // is internally mutex-guarded). The owner resolver closes over the global db + pool
+    // so the §8.1 permission check works across namespaces (TC4).
+    auto writer = std::make_shared<agent_trace::AgentTraceWriterImpl>(global_db, global_config);
+    auto owner_resolver = [global_db, &pool](const std::string& session_id)
+        -> agent_trace::TracesHandler::Owner {
+        TracesHandlerOwnerResolverResult r =
+            ResolveGlobalTraceOwner(global_db, pool, session_id);
+        return agent_trace::TracesHandler::Owner{r.found, r.user_id};
+    };
+    // The handler is stateless beyond writer + resolver, so one instance serves every
+    // request. db handle is null (the resolver supersedes it, TC4 global). Capture by
+    // value (shared_ptr writer + copyable resolver) into the route.
+    auto traces = std::make_shared<agent_trace::TracesHandler>(writer, /*db=*/nullptr);
+    traces->SetOwnerResolver(owner_resolver);
+
+    server.Get("/api/v1/traces/:session_id", WithAuth(auth, kPermRead,
+        [traces](const httplib::Request& req, httplib::Response& res,
+                 const RequestContext& rctx) {
+            // No ?namespace= — the read is global (a session may span namespaces, TC4).
+            ServeTraces(*traces, req, res, rctx);
+        }));
+}
+
+void RegisterInteractionsRoutesPerNs(httplib::Server& server,
+                                     resource::INamespacePool& pool,
+                                     ApiKeyAuth& auth) {
+    // Same per-request, per-NS construction as the old combined registrar, minus the
+    // /traces route (now global). interaction_log + interaction_sources live in the
+    // namespace memory.db, so each read acquires the façade and builds the handler over
+    // that db. The agent_trace writer arg is unused on these two routes but the
+    // InteractionsHandler only needs the memory.db handle.
+    auto with_ns = [&pool](
         const httplib::Request& req, httplib::Response& res, const RequestContext& rctx,
         const char* ns_param,
-        const std::function<void(agent_trace::TracesHandler&,
-                                 agent_trace::InteractionsHandler&)>& fn) {
+        const std::function<void(agent_trace::InteractionsHandler&)>& fn) {
         std::string ns;
         if (!RequireNamespaceParam(req, res, rctx, ns_param, &ns)) return;
         resource::NamespaceFacade facade(pool, ns);
@@ -470,37 +597,26 @@ void RegisterObservabilityRoutesPerNs(httplib::Server& server,
             return;
         }
         sqlite3* mem_db = facade.memory().db_handle();
-        auto writer = std::make_shared<agent_trace::AgentTraceWriterImpl>(mem_db, global_config);
-        agent_trace::TracesHandler traces(writer, mem_db);
         agent_trace::InteractionsHandler inter(mem_db);
-        fn(traces, inter);
+        fn(inter);
     };
-
-    server.Get("/api/v1/traces/:session_id", WithAuth(auth, kPermRead,
-        [with_ns](const httplib::Request& req, httplib::Response& res,
-                  const RequestContext& rctx) {
-            with_ns(req, res, rctx, "namespace",
-                    [&](agent_trace::TracesHandler& t, agent_trace::InteractionsHandler&) {
-                        ServeTraces(t, req, res, rctx);
-                    });
-        }));
 
     server.Get("/api/v1/interactions/:id/sources", WithAuth(auth, kPermRead,
         [with_ns](const httplib::Request& req, httplib::Response& res,
                   const RequestContext& rctx) {
             with_ns(req, res, rctx, "namespace",
-                    [&](agent_trace::TracesHandler&, agent_trace::InteractionsHandler& i) {
+                    [&](agent_trace::InteractionsHandler& i) {
                         ServeSources(i, req, res, rctx);
                     });
         }));
 
-    // GET /interactions reuses its existing `namespace_id` filter param as the
-    // per-NS DB selector (contract addendum) — not the `namespace` param.
+    // GET /interactions reuses its existing `namespace_id` filter param as the per-NS
+    // DB selector (contract addendum) — not the `namespace` param.
     server.Get("/api/v1/interactions", WithAuth(auth, kPermRead,
         [with_ns](const httplib::Request& req, httplib::Response& res,
                   const RequestContext& rctx) {
             with_ns(req, res, rctx, "namespace_id",
-                    [&](agent_trace::TracesHandler&, agent_trace::InteractionsHandler& i) {
+                    [&](agent_trace::InteractionsHandler& i) {
                         ServeListInteractions(i, req, res, rctx);
                     });
         }));

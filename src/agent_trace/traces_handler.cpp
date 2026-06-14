@@ -29,6 +29,13 @@ TracesHandler::TracesHandler(std::shared_ptr<IAgentTraceWriter> writer, sqlite3*
     : writer_(std::move(writer)), db_(db) {}
 
 TracesHandler::Owner TracesHandler::ResolveOwner(const std::string& session_id) {
+    // TC4 global wiring supplies an out-of-band resolver (agent_trace is global but
+    // the session->user mapping is per-NS); when present it is authoritative.
+    if (owner_resolver_) return owner_resolver_(session_id);
+    return ResolveOwnerFromDb(session_id);
+}
+
+TracesHandler::Owner TracesHandler::ResolveOwnerFromDb(const std::string& session_id) {
     Owner o;
     if (db_ == nullptr) return o;  // no lookup source -> unknown
     sqlite3_stmt* stmt = nullptr;
