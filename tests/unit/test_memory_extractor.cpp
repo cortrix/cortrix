@@ -6,6 +6,8 @@
 #include <queue>
 #include <string>
 #include <vector>
+#include <chrono>
+#include <ctime>
 
 #include "cortrix/memory/contradiction_detector.h"
 #include "cortrix/memory/mem02_error.h"
@@ -19,6 +21,26 @@
 // writes, the D9 revoke path, and the D8 preference-immunity helper.
 namespace cortrix::memory {
 namespace {
+
+// Build an ISO-8601 UTC timestamp `days` days before now. D8 immunity asserts a
+// "within window" condition against the real wall clock (MemoryExtractor uses
+// NowIso8601()), so a hard-coded absolute first_mentioned_at silently crosses the
+// 30-day window boundary as the calendar advances (the 2026-06-14 S2b time-bomb:
+// hard-coded 2026-05-15 + 30d == today). A relative timestamp keeps the test stable.
+inline std::string IsoDaysAgo(int days) {
+    const auto tp = std::chrono::system_clock::now() -
+                    std::chrono::hours(static_cast<long long>(24) * days);
+    const std::time_t t = std::chrono::system_clock::to_time_t(tp);
+    std::tm tm_utc{};
+#if defined(_WIN32)
+    gmtime_s(&tm_utc, &t);
+#else
+    gmtime_r(&t, &tm_utc);
+#endif
+    char buf[32];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm_utc);
+    return std::string(buf);
+}
 
 using ::testing::_;
 
@@ -277,8 +299,10 @@ TEST_F(MemoryExtractorTest, S2b_RepeatPreferenceUpgradesMentionCountAndImmunity)
     pref.ns_id = "memory";
     pref.user_id = "user_123";
     pref.content = "user likes the dark theme";
+    // (Time-bomb fix) relative date so the D8 "within 30d window" immunity assertion
+    // below stays valid regardless of the wall-clock date (was hard-coded 2026-05-15).
     pref.metadata_json = {{"memory_type", "preference"}, {"status", "active"},
-                          {"mention_count", 1}, {"first_mentioned_at", "2026-05-15T10:00:00Z"}};
+                          {"mention_count", 1}, {"first_mentioned_at", IsoDaysAgo(1)}};
     store_->Seed(pref);
     cq_->preference_match =
         CandidateBlock{"block_pref_dark", "user likes the dark theme", MemoryType::kPreference, 0.95};

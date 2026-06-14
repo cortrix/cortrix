@@ -240,7 +240,9 @@ SpladeSparseRetriever::GetPostingList(const NamespaceId& ns_id, uint32_t term_id
     // Insert into LRU front; evict LRU tail if over capacity.
     lru_.emplace_front(key, std::move(pl));
     cache_index_[key] = lru_.begin();
-    if (lru_.size() > config_.posting_cache_capacity) {
+    // (Minor) Guard a misconfigured posting_cache_capacity==0: we return a reference to
+    // the entry just inserted at the front, so never evict down to empty -- keep >=1.
+    if (lru_.size() > config_.posting_cache_capacity && lru_.size() > 1) {
         auto& victim = lru_.back();
         cache_index_.erase(victim.first);
         lru_.pop_back();

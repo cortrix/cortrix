@@ -97,11 +97,15 @@ void ScoringMetrics::ObserveAssignDuration(double seconds) {
 }
 
 void ScoringMetrics::RecordError(F07ErrorCode code) {
-    S().error_by_code[static_cast<int>(code)].fetch_add(1, std::memory_order_relaxed);
+    const auto idx = static_cast<size_t>(code);
+    if (idx >= S().error_by_code.size()) return;  // (Minor) bounds guard vs an out-of-range cast
+    S().error_by_code[idx].fetch_add(1, std::memory_order_relaxed);
 }
 
 uint64_t ScoringMetrics::ErrorCount(F07ErrorCode code) const {
-    return S().error_by_code[static_cast<int>(code)].load(std::memory_order_relaxed);
+    const auto idx = static_cast<size_t>(code);
+    if (idx >= S().error_by_code.size()) return 0;  // (Minor) bounds guard
+    return S().error_by_code[idx].load(std::memory_order_relaxed);
 }
 
 std::string ScoringMetrics::Render() const {

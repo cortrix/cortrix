@@ -46,6 +46,8 @@ int CortrixBlobLocal::store(const std::string& ns, const std::string& doc_id,
         out.write(reinterpret_cast<const char*>(data), static_cast<std::streamsize>(len));
         if (!out) {
             CORTRIX_LOG_ERROR("blob", "Write failed: {}", tmp_path);
+            out.close();
+            std::remove(tmp_path.c_str());  // (Minor) clean up the partial tmp on write failure
             return -1;
         }
         out.flush();
