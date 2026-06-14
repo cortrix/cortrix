@@ -131,6 +131,17 @@ nlohmann::json ImportHandler::HandleStartImport(const nlohmann::json& body,
         nlohmann::json out;
         out["error"] = cortrix::agent_friendly::ToJson(e.GetError());
         return out;
+    } catch (const std::exception& e) {
+        // (R2-M5) Any other throw from the import stack (DB driver, std::bad_alloc, ...)
+        // returns a structured Agent-friendly 500 here, instead of escaping to the
+        // generic global exception handler. CX_ERR_F16A_INTERNAL = transient/retryable.
+        out_http_status =
+            GetF16aErrorInfo(cortrix::import::F16aErrorCode::kInternal).http_status;
+        nlohmann::json out;
+        out["error"] = cortrix::agent_friendly::ToJson(cortrix::import::MakeF16aError(
+            cortrix::import::F16aErrorCode::kInternal, nlohmann::json::object(),
+            std::string("import failed: ") + e.what()));
+        return out;
     }
 }
 

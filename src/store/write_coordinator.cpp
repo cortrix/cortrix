@@ -290,6 +290,15 @@ Status WriteCoordinator::Commit(TxnHandle txn) {
         }
     }
     if (!w.ok()) {
+        // (R2-M6) The three-way stores already hold the data and recovery (S3) infers
+        // COMMITTED from the consistency check, so the doc IS committed even though the
+        // WAL record was lost. Release its active-doc lock here exactly like the success
+        // path below — otherwise doc_id leaks in active_docs_ and can never be written
+        // again (BeginWrite rejects an already-active doc_id).
+        {
+            std::lock_guard<std::mutex> lk(txn_map_mu_);
+            if (!orig.doc_id.empty()) active_docs_.erase(orig.doc_id);
+        }
         return PwlStatus(StatusCode::kUnavailable, pwl_errors::kWriteFailed,
                          "append COMMITTED failed after retries: " + w.message());
     }

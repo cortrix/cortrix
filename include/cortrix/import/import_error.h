@@ -33,11 +33,16 @@ enum class F16aErrorCode {
     kTimeout,             ///< 504 timeout   — query exceeded the 5-minute limit
     kRowsLimitExceeded,   ///< 413 quota     — rows over the 10M cap
     kCrossTenantRef,      ///< 403 auth      — cross-tenant connection_ref rejected
+    // [R2-M5] Appended (GEN-Agent #7 allows new codes; the existing 6 stay unchanged).
+    // Catch-all for an unexpected throw from the import stack (DB driver / allocation),
+    // so the handler returns a structured 500 rather than the generic global fallback.
+    kInternal,            ///< 500 transient — unexpected internal import failure
 };
 
-/// Total number of F16a error codes (F16a §5.4 = 6). Compile-time anchor for the
-/// API-compatibility regression test (the set must not shrink).
-constexpr int kF16aErrorCodeCount = 6;
+/// Total number of F16a error codes. Compile-time anchor for the API-compatibility
+/// regression test (the set must not shrink; new codes may be appended — GEN-Agent #7).
+/// Was 6 (F16a §5.4); +kInternal (R2-M5) = 7.
+constexpr int kF16aErrorCodeCount = 7;
 
 /// Canonical, immutable attributes of one error code (F16a §5.4 columns).
 struct F16aErrorInfo {

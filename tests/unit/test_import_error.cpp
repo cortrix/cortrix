@@ -31,13 +31,15 @@ const std::vector<F16aErrorCode>& AllCodes() {
         F16aErrorCode::kTimeout,
         F16aErrorCode::kRowsLimitExceeded,
         F16aErrorCode::kCrossTenantRef,
+        F16aErrorCode::kInternal,  // [R2-M5] appended
     };
     return codes;
 }
 
-TEST(F16aErrorTest, SixCodesTotal) {
-    EXPECT_EQ(AllCodes().size(), 6u);
-    EXPECT_EQ(kF16aErrorCodeCount, 6);
+TEST(F16aErrorTest, SevenCodesTotal) {
+    // [R2-M5] 6 -> 7: kInternal appended (GEN-Agent #7 allows new codes; none removed).
+    EXPECT_EQ(AllCodes().size(), 7u);
+    EXPECT_EQ(kF16aErrorCodeCount, 7);
 }
 
 // Every code's CX_ERR_F16A_* string is unique and matches the P04 ErrorResponseV1
@@ -50,7 +52,7 @@ TEST(F16aErrorTest, EveryCodeHasUniqueWellFormedCxString) {
         EXPECT_TRUE(std::regex_match(cx, kPattern)) << cx;
         EXPECT_TRUE(seen.insert(cx).second) << "duplicate " << cx;
     }
-    EXPECT_EQ(seen.size(), 6u);
+    EXPECT_EQ(seen.size(), 7u);
 }
 
 // §5.4 column values pinned exactly (HTTP / category / retryable).
@@ -80,6 +82,11 @@ TEST(F16aErrorTest, RegistryMatchesSpecTable) {
     EXPECT_EQ(info(F16aErrorCode::kCrossTenantRef).http_status, 403);
     EXPECT_EQ(info(F16aErrorCode::kCrossTenantRef).category, ErrorCategory::kAuth);
     EXPECT_FALSE(info(F16aErrorCode::kCrossTenantRef).retryable);
+
+    // [R2-M5] kInternal: 500 transient, retryable with a short backoff.
+    EXPECT_EQ(info(F16aErrorCode::kInternal).http_status, 500);
+    EXPECT_EQ(info(F16aErrorCode::kInternal).category, ErrorCategory::kTransient);
+    EXPECT_TRUE(info(F16aErrorCode::kInternal).retryable);
 }
 
 // retry_after_ms is present iff retryable (GEN-Agent #6 — machine-readable retry).

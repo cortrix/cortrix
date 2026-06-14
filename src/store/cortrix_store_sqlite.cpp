@@ -450,32 +450,54 @@ int CortrixStoreSqlite::doc_delete(const std::string& doc_id) {
     }
     sqlite3_free(err);
 
-    // Delete blocks (triggers will clean up FTS5)
+    // Delete blocks (triggers will clean up FTS5). (R2-M4) Check every rc: a failed
+    // prepare/step must ROLLBACK and report failure, not be silently swallowed.
     const char* del_blocks = "DELETE FROM blocks WHERE doc_id = ?";
     sqlite3_stmt* stmt = nullptr;
     int rc = sqlite3_prepare_v2(db_, del_blocks, -1, &stmt, nullptr);
-    if (rc == SQLITE_OK) {
-        sqlite3_bind_text(stmt, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
-        sqlite3_step(stmt);
-        sqlite3_finalize(stmt);
+    if (rc != SQLITE_OK) {
+        CORTRIX_LOG_ERROR("store", "doc_delete prepare(blocks) failed: {}", sqlite3_errmsg(db_));
+        sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
+        return -1;
+    }
+    sqlite3_bind_text(stmt, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
+    int step_rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (step_rc != SQLITE_DONE) {
+        CORTRIX_LOG_ERROR("store", "doc_delete DELETE blocks failed: {}", sqlite3_errmsg(db_));
+        sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
+        return -1;
     }
 
     // Delete document
     const char* del_doc = "DELETE FROM documents WHERE doc_id = ?";
     rc = sqlite3_prepare_v2(db_, del_doc, -1, &stmt, nullptr);
     if (rc != SQLITE_OK) {
+        CORTRIX_LOG_ERROR("store", "doc_delete prepare(document) failed: {}", sqlite3_errmsg(db_));
+        sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
+        return -1;
+    }
+    sqlite3_bind_text(stmt, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
+    step_rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (step_rc != SQLITE_DONE) {
+        CORTRIX_LOG_ERROR("store", "doc_delete DELETE document failed: {}", sqlite3_errmsg(db_));
         sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
         return -1;
     }
 
-    sqlite3_bind_text(stmt, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_step(stmt);
-    sqlite3_finalize(stmt);
-
     int changes = sqlite3_changes(db_);
 
+    // (R2-M4) A failed COMMIT must surface as an error, not a silent success: roll back
+    // and return -1 so the caller never treats a partial/lost delete as done.
     err = nullptr;
-    sqlite3_exec(db_, "COMMIT", nullptr, nullptr, &err);
+    int commit_rc = sqlite3_exec(db_, "COMMIT", nullptr, nullptr, &err);
+    if (commit_rc != SQLITE_OK) {
+        CORTRIX_LOG_ERROR("store", "doc_delete COMMIT failed: {}", err ? err : "unknown");
+        sqlite3_free(err);
+        sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
+        return -1;
+    }
     sqlite3_free(err);
 
     return (changes == 0) ? -2 : 0;

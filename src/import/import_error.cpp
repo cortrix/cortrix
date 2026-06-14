@@ -31,6 +31,11 @@ constexpr F16aErrorInfo kRowsLimitExceeded
     {"CX_ERR_F16A_ROWS_LIMIT_EXCEEDED", ErrorCategory::kQuota,     false, std::nullopt, 413};
 constexpr F16aErrorInfo kCrossTenantRef
     {"CX_ERR_F16A_CROSS_TENANT_REF",    ErrorCategory::kAuth,      false, std::nullopt, 403};
+// [R2-M5] Catch-all for an unexpected import throw (DB driver / allocation). Transient +
+// retryable with a short backoff — a transient cause may clear on a re-run, and the
+// retryable<->retry_after_ms invariant (GEN-Agent #6, test_import_error) requires a value.
+constexpr F16aErrorInfo kInternal
+    {"CX_ERR_F16A_INTERNAL",            ErrorCategory::kTransient, true,  1000,         500};
 
 }  // namespace
 
@@ -42,6 +47,7 @@ const F16aErrorInfo& GetF16aErrorInfo(F16aErrorCode code) {
         case F16aErrorCode::kTimeout:           return kTimeout;
         case F16aErrorCode::kRowsLimitExceeded: return kRowsLimitExceeded;
         case F16aErrorCode::kCrossTenantRef:    return kCrossTenantRef;
+        case F16aErrorCode::kInternal:          return kInternal;
     }
     // Unreachable for a valid enum value; defensive fallback keeps the function
     // total (and avoids a -Wreturn-type warning).
@@ -79,6 +85,7 @@ const std::vector<std::string>& RequiredStructuredDataKeys(F16aErrorCode code) {
         case F16aErrorCode::kTimeout:           return kTimeoutKeys;
         case F16aErrorCode::kRowsLimitExceeded: return kRowsKeys;
         case F16aErrorCode::kCrossTenantRef:    return kCrossTenantKeys;
+        case F16aErrorCode::kInternal:          return kEmpty;  // contextual (detail in message)
     }
     return kEmpty;  // unreachable for a valid enum
 }
@@ -124,6 +131,7 @@ StatusCode F16aErrorToStatusCode(F16aErrorCode code) {
         // quota → kInvalidArgument (closest coarse code; rich category=quota
         // preserved via the token).
         case F16aErrorCode::kRowsLimitExceeded: return StatusCode::kInvalidArgument;
+        case F16aErrorCode::kInternal:          return StatusCode::kInternal;
     }
     return StatusCode::kInternal;  // unreachable for a valid enum
 }
