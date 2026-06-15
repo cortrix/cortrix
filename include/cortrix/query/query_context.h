@@ -66,7 +66,7 @@ struct QueryContext {
     // --- §2.2 F39 writes (routing decision; write logic = Wave C-R2) ---
     std::string routing_path;            ///< "simple" / "complex" / "chat" (SPEC §2.2)
     float complexity_score = 0.0f;       ///< classifier softmax confidence
-    std::string routing_decision_source; ///< 7-value enum (SPEC §2.2: rule/llm/force_route/...)
+    std::string routing_decision_source; ///< 8-value enum (SPEC §2.2: rule/llm/force_route/.../chat_demoted_guard)
     bool chat_path_triggered = false;
     bool multi_turn_context_warning = false;  ///< F39-6 (Agent-framework responsibility)
 
