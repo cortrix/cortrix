@@ -219,8 +219,14 @@ void CortrixHttpServer::RegisterRoutes() {
                 res.set_content(web_ui_index_, "text/html");
                 return;
             }
-            std::string req_id = GenerateRequestId();
-            WriteJsonError(res, Status::NotFound("The requested resource was not found"), req_id);
+            // Only synthesize a generic body when NO handler matched (body still empty).
+            // httplib invokes the error handler for ANY >=400 status, so a handler that ran
+            // and wrote its own 4xx body (e.g. CX_ERR_F13_SESSION_NOT_FOUND) would otherwise
+            // be clobbered into a misleading generic "resource not found".
+            if (res.body.empty()) {
+                std::string req_id = GenerateRequestId();
+                WriteJsonError(res, Status::NotFound("The requested resource was not found"), req_id);
+            }
         }
     });
 
