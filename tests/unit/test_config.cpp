@@ -49,7 +49,7 @@ protected:
 TEST_F(ConfigTest, DefaultValues) {
     auto config = LoadConfig("");
     EXPECT_EQ(config.server.host, "0.0.0.0");
-    EXPECT_EQ(config.server.port, 8080);
+    EXPECT_EQ(config.server.port, 8420);
     EXPECT_EQ(config.server.thread_count, 8);
     EXPECT_TRUE(config.auth.enabled);
     EXPECT_EQ(config.log.level, "info");
@@ -156,7 +156,7 @@ log:
 TEST_F(ConfigTest, MissingYamlFile) {
     auto config = LoadConfig("/nonexistent/path/cortrix.yaml");
     // Should not crash, use defaults
-    EXPECT_EQ(config.server.port, 8080);
+    EXPECT_EQ(config.server.port, 8420);
     EXPECT_EQ(config.log.level, "info");
 }
 
@@ -165,7 +165,7 @@ TEST_F(ConfigTest, InvalidYaml) {
 
     auto config = LoadConfig(yaml_path_);
     // Should not crash, use defaults
-    EXPECT_EQ(config.server.port, 8080);
+    EXPECT_EQ(config.server.port, 8420);
 }
 
 TEST_F(ConfigTest, PartialYaml) {
@@ -739,7 +739,7 @@ TEST_F(ConfigTest, EnvBoolFalseForRandomString) {
 TEST_F(ConfigTest, EnvIntInvalidFallsBackToDefault) {
     setenv("CORTRIX_SERVER_PORT", "not_a_number", 1);
     auto config = LoadConfig("");
-    EXPECT_EQ(config.server.port, 8080);  // default
+    EXPECT_EQ(config.server.port, 8420);  // default
 }
 
 TEST_F(ConfigTest, EnvIntZero) {
@@ -803,7 +803,7 @@ TEST_F(ConfigTest, YamlFileExistsButEmpty) {
     WriteYaml("");
     auto config = LoadConfig(yaml_path_);
     // Should use defaults
-    EXPECT_EQ(config.server.port, 8080);
+    EXPECT_EQ(config.server.port, 8420);
 }
 
 TEST_F(ConfigTest, ValidateMaxPayloadNegative) {
@@ -870,7 +870,7 @@ TEST_F(ConfigTest, LoadConfigNonexistentPathReturnsDefaults) {
     auto config = LoadConfig("/this/path/does/not/exist.yaml");
     // Should not crash, returns defaults
     EXPECT_EQ(config.server.host, "0.0.0.0");
-    EXPECT_EQ(config.server.port, 8080);
+    EXPECT_EQ(config.server.port, 8420);
     EXPECT_EQ(config.ns.data_dir, "./data");
     EXPECT_EQ(config.log.level, "info");
 }
