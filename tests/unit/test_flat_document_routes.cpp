@@ -216,8 +216,8 @@ TEST_F(FlatDocumentRoutesTest, ListMissingNamespace400WithStructuredData) {
     ASSERT_TRUE(res);
     ASSERT_EQ(res->status, 400);
     auto j = json::parse(res->body);
-    EXPECT_EQ(j["code"], "CX_ERR_MISSING_PARAM");
-    EXPECT_EQ(j["structured_data"]["missing_param"], "namespace");
+    EXPECT_EQ(j["error"]["code"], "CX_ERR_MISSING_PARAM");
+    EXPECT_EQ(j["error"]["structured_data"]["missing_param"], "namespace");
 }
 
 TEST_F(FlatDocumentRoutesTest, ListReturnsSpecShape) {
@@ -318,7 +318,7 @@ TEST_F(FlatDocumentRoutesTest, TaskProgressNotFound404) {
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 404);
     auto j = json::parse(res->body);
-    EXPECT_EQ(j["code"], "CX_ERR_TASK_NOT_FOUND");
+    EXPECT_EQ(j["error"]["code"], "CX_ERR_TASK_NOT_FOUND");
 }
 
 TEST_F(FlatDocumentRoutesTest, TaskCancelQueuedTask) {

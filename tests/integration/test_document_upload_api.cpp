@@ -336,12 +336,12 @@ TEST_F(DocumentUploadApiTest, Upload_DiskFull_Rejected507) {
     EXPECT_EQ(res->status, 507) << res->body;
 
     auto body = json::parse(res->body);
-    EXPECT_EQ(body["code"], "CX_ERR_DISK_FULL");
-    EXPECT_EQ(body["retryable"], false);
-    EXPECT_EQ(body["category"], "permanent");
-    ASSERT_TRUE(body.contains("structured_data"));
-    EXPECT_TRUE(body["structured_data"].contains("disk_usage_ratio"));
-    EXPECT_TRUE(body["structured_data"].contains("crit_threshold"));
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_DISK_FULL");
+    EXPECT_EQ(body["error"]["retryable"], false);
+    EXPECT_EQ(body["error"]["category"], "permanent");
+    ASSERT_TRUE(body["error"].contains("structured_data"));
+    EXPECT_TRUE(body["error"]["structured_data"].contains("disk_usage_ratio"));
+    EXPECT_TRUE(body["error"]["structured_data"].contains("crit_threshold"));
 
     // Pressure clears → NORMAL → the same upload succeeds (201).
     deploy::DiskUsage normal;

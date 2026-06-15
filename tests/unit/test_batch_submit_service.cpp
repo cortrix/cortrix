@@ -77,7 +77,7 @@ TEST(BatchSubmitServiceTest, EmptyDocumentsRejected) {
 
     auto r = svc.Submit(req);
     EXPECT_EQ(r.status, 400);
-    EXPECT_EQ(r.body["code"], "CX_ERR_BATCH_EMPTY");
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_BATCH_EMPTY");
     EXPECT_EQ(stub.calls(), 0);  // no per-doc submit on a rejected envelope
 }
 
@@ -88,9 +88,9 @@ TEST(BatchSubmitServiceTest, SizeExceededAt101Docs) {
 
     auto r = svc.Submit(req);
     EXPECT_EQ(r.status, 400);
-    EXPECT_EQ(r.body["code"], "CX_ERR_BATCH_SIZE_EXCEEDED");
-    EXPECT_EQ(r.body["structured_data"]["max_size"], 100);
-    EXPECT_EQ(r.body["structured_data"]["actual_size"], 101);
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_BATCH_SIZE_EXCEEDED");
+    EXPECT_EQ(r.body["error"]["structured_data"]["max_size"], 100);
+    EXPECT_EQ(r.body["error"]["structured_data"]["actual_size"], 101);
     EXPECT_EQ(stub.calls(), 0);
 }
 
@@ -126,8 +126,8 @@ TEST(BatchSubmitServiceTest, PayloadTooLargeOverTotalCap) {
 
     auto r = svc.Submit(req);
     EXPECT_EQ(r.status, 413);
-    EXPECT_EQ(r.body["code"], "CX_ERR_BATCH_PAYLOAD_TOO_LARGE");
-    EXPECT_EQ(r.body["structured_data"]["max_bytes"], 10);
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_BATCH_PAYLOAD_TOO_LARGE");
+    EXPECT_EQ(r.body["error"]["structured_data"]["max_bytes"], 10);
 }
 
 TEST(BatchSubmitServiceTest, PayloadTooLargeOverPerDocCap) {
@@ -143,7 +143,7 @@ TEST(BatchSubmitServiceTest, PayloadTooLargeOverPerDocCap) {
 
     auto r = svc.Submit(req);
     EXPECT_EQ(r.status, 413);
-    EXPECT_EQ(r.body["code"], "CX_ERR_BATCH_PAYLOAD_TOO_LARGE");
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_BATCH_PAYLOAD_TOO_LARGE");
 }
 
 TEST(BatchSubmitServiceTest, DuplicateDocIdRejectedWithAllOffenders) {
@@ -158,8 +158,8 @@ TEST(BatchSubmitServiceTest, DuplicateDocIdRejectedWithAllOffenders) {
 
     auto r = svc.Submit(req);
     EXPECT_EQ(r.status, 400);
-    EXPECT_EQ(r.body["code"], "CX_ERR_BATCH_DUPLICATE_DOC_ID");
-    auto dups = r.body["structured_data"]["duplicate_doc_ids"];
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_BATCH_DUPLICATE_DOC_ID");
+    auto dups = r.body["error"]["structured_data"]["duplicate_doc_ids"];
     ASSERT_TRUE(dups.is_array());
     EXPECT_EQ(dups.size(), 2u);  // both x and y reported
     EXPECT_EQ(stub.calls(), 0);
@@ -172,7 +172,7 @@ TEST(BatchSubmitServiceTest, EmptyTakesPriorityOverSize) {
     BatchRequest req;
     req.namespace_id = "ns";
     auto r = svc.Submit(req);
-    EXPECT_EQ(r.body["code"], "CX_ERR_BATCH_EMPTY");
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_BATCH_EMPTY");
 }
 
 // ---------------------------------------------------------------------------

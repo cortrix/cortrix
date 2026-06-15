@@ -67,10 +67,10 @@ TEST_F(DocumentTaskHandlerTest, AsyncOverflowLargeDocMintsAsyncTask) {
 TEST_F(DocumentTaskHandlerTest, CeLargeDocRejected403MaxPages) {
     auto r = handler_->SubmitAsync(MakeParams("docC", /*pages=*/800, /*ent=*/false));
     EXPECT_EQ(r.status, 403);  // Issue 1.3 A — CE sync-only
-    EXPECT_EQ(r.body["code"], "CX_ERR_MAX_PAGES_EXCEEDED");
-    EXPECT_EQ(r.body["category"], "permanent");
-    EXPECT_EQ(r.body["retryable"], false);
-    EXPECT_EQ(r.body["structured_data"]["async_overflow"], false);
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_MAX_PAGES_EXCEEDED");
+    EXPECT_EQ(r.body["error"]["category"], "permanent");
+    EXPECT_EQ(r.body["error"]["retryable"], false);
+    EXPECT_EQ(r.body["error"]["structured_data"]["async_overflow"], false);
     EXPECT_EQ(mgr_.CountAll().value(), 0);
 }
 
@@ -78,9 +78,9 @@ TEST_F(DocumentTaskHandlerTest, OverEntCapRejectedForEveryone) {
     cfg_.Set("f42.async_max_pages", "2000");
     auto r = handler_->SubmitAsync(MakeParams("docHuge", /*pages=*/3000, /*ent=*/true));
     EXPECT_EQ(r.status, 403);
-    EXPECT_EQ(r.body["code"], "CX_ERR_MAX_PAGES_EXCEEDED");
-    EXPECT_EQ(r.body["structured_data"]["max_pages"], 2000);
-    EXPECT_EQ(r.body["structured_data"]["actual_pages"], 3000);
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_MAX_PAGES_EXCEEDED");
+    EXPECT_EQ(r.body["error"]["structured_data"]["max_pages"], 2000);
+    EXPECT_EQ(r.body["error"]["structured_data"]["actual_pages"], 3000);
 }
 
 TEST_F(DocumentTaskHandlerTest, MissingFieldsRejected400) {
@@ -88,8 +88,8 @@ TEST_F(DocumentTaskHandlerTest, MissingFieldsRejected400) {
     p.filepath = "";  // missing
     auto r = handler_->SubmitAsync(p);
     EXPECT_EQ(r.status, 400);
-    EXPECT_EQ(r.body["code"], "CX_ERR_INVALID_REQUEST");
-    ASSERT_TRUE(r.body["structured_data"].contains("rules_violated"));
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_INVALID_REQUEST");
+    ASSERT_TRUE(r.body["error"]["structured_data"].contains("rules_violated"));
 }
 
 // The 400 guard is a 3-way OR; MissingFieldsRejected400 only trips the filepath
@@ -99,7 +99,7 @@ TEST_F(DocumentTaskHandlerTest, MissingNamespaceRejected400) {
     p.namespace_id = "";
     auto r = handler_->SubmitAsync(p);
     EXPECT_EQ(r.status, 400);
-    EXPECT_EQ(r.body["code"], "CX_ERR_INVALID_REQUEST");
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_INVALID_REQUEST");
 }
 
 TEST_F(DocumentTaskHandlerTest, MissingFilenameRejected400) {
@@ -107,7 +107,7 @@ TEST_F(DocumentTaskHandlerTest, MissingFilenameRejected400) {
     p.filename = "";
     auto r = handler_->SubmitAsync(p);
     EXPECT_EQ(r.status, 400);
-    EXPECT_EQ(r.body["code"], "CX_ERR_INVALID_REQUEST");
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_INVALID_REQUEST");
 }
 
 // Over the hard cap with async overflow enabled: the policy ternary's
@@ -117,7 +117,7 @@ TEST_F(DocumentTaskHandlerTest, OverHardCapLabelsAsyncOverflow) {
     cfg_.Set("f42.async_max_pages", "1000");
     auto r = handler_->SubmitAsync(MakeParams("docHugeEnt", 5000, /*ent=*/true));
     EXPECT_EQ(r.status, 403);
-    EXPECT_EQ(r.body["structured_data"]["async_overflow"], true);
+    EXPECT_EQ(r.body["error"]["structured_data"]["async_overflow"], true);
 }
 
 // Over the Ent hard cap as a CE caller: the edition ternary's "CE" arm.
@@ -125,7 +125,7 @@ TEST_F(DocumentTaskHandlerTest, OverEntCapAsCeLabelsCe) {
     cfg_.Set("f42.async_max_pages", "1000");
     auto r = handler_->SubmitAsync(MakeParams("docHugeCe", 5000, /*ent=*/false));
     EXPECT_EQ(r.status, 403);
-    EXPECT_EQ(r.body["structured_data"]["async_overflow"], false);
+    EXPECT_EQ(r.body["error"]["structured_data"]["async_overflow"], false);
 }
 
 TEST_F(DocumentTaskHandlerTest, ThresholdConfigurable) {
@@ -180,8 +180,8 @@ TEST_F(DocumentTaskHandlerTest, GetProgressCompletedHint) {
 TEST_F(DocumentTaskHandlerTest, GetProgressUnknownTask404) {
     auto r = handler_->GetProgress("nope");
     EXPECT_EQ(r.status, 404);
-    EXPECT_EQ(r.body["code"], "CX_ERR_TASK_NOT_FOUND");
-    EXPECT_EQ(r.body["retryable"], false);
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_TASK_NOT_FOUND");
+    EXPECT_EQ(r.body["error"]["retryable"], false);
 }
 
 // ---- DELETE cancel (§4.3) --------------------------------------------------
@@ -213,14 +213,14 @@ TEST_F(DocumentTaskHandlerTest, RepeatCancelReturns423) {
     ASSERT_EQ(handler_->CancelTask(task_id).status, 200);  // first → cancelling
     auto r = handler_->CancelTask(task_id);                // second → 423
     EXPECT_EQ(r.status, 423);
-    EXPECT_EQ(r.body["code"], "CX_ERR_TASK_CANCELLING");
-    EXPECT_EQ(r.body["structured_data"]["current_status"], "cancelling");
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_TASK_CANCELLING");
+    EXPECT_EQ(r.body["error"]["structured_data"]["current_status"], "cancelling");
 }
 
 TEST_F(DocumentTaskHandlerTest, CancelUnknownTask404) {
     auto r = handler_->CancelTask("ghost");
     EXPECT_EQ(r.status, 404);
-    EXPECT_EQ(r.body["code"], "CX_ERR_TASK_NOT_FOUND");
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_TASK_NOT_FOUND");
 }
 
 // ---- agent_decision_hint per status (§6.3 BuildProgressBody, all branches) -
@@ -272,9 +272,9 @@ TEST(DocumentTaskHandlerErrorTest, EnqueueFailureMapsToServiceUnavailable) {
 
     auto r = handler.SubmitAsync(p);
     EXPECT_EQ(r.status, 503);
-    EXPECT_EQ(r.body["code"], "CX_ERR_SERVICE_UNAVAILABLE");
-    EXPECT_EQ(r.body["structured_data"]["component"], "tasks_db");
-    EXPECT_EQ(r.body["retryable"], true);
+    EXPECT_EQ(r.body["error"]["code"], "CX_ERR_SERVICE_UNAVAILABLE");
+    EXPECT_EQ(r.body["error"]["structured_data"]["component"], "tasks_db");
+    EXPECT_EQ(r.body["error"]["retryable"], true);
 }
 
 // ---- branch coverage: config fallbacks, pool Notify, cancelling-progress hint -
@@ -303,7 +303,7 @@ TEST(DocumentTaskHandlerConfigTest, NullConfigUsesDefaultThresholdAndCap) {
     p.page_count = 5000;
     auto over = handler.SubmitAsync(p);
     EXPECT_EQ(over.status, 403);
-    EXPECT_EQ(over.body["structured_data"]["max_pages"], 2000);  // default cap
+    EXPECT_EQ(over.body["error"]["structured_data"]["max_pages"], 2000);  // default cap
 }
 
 // When a WorkerPool is wired in, the successful enqueue path calls pool_->Notify()

@@ -195,7 +195,7 @@ BatchHttpResult BatchSubmitService::Submit(const BatchRequest& req) {
     if (auto env_err = ValidateEnvelope(req)) {
         BatchHttpResult r;
         r.status = BatchErrorHttpStatus(env_err->code);
-        r.body = agent_friendly::ToJson(
+        r.body["error"] = agent_friendly::ToJson(
             MakeBatchError(env_err->code, std::move(env_err->structured_data),
                            env_err->message));
         return r;

@@ -9,13 +9,15 @@ namespace cortrix::async {
 namespace {
 
 /// Build the GEN-Agent error HttpResult (topic 5): http status from the §6.2
-/// registry, body = agent_friendly::ToJson(MakeF42Error(...)). The single error
-/// exit for every handler so the 4-field schema is emitted uniformly.
+/// registry, body = {"error": agent_friendly::ToJson(MakeF42Error(...))}. The
+/// single error exit for every handler so the wrapped envelope (R2-M8: fields
+/// under the "error" key, matching WriteJsonError + the 16 other ToJson call
+/// sites) is emitted uniformly.
 HttpResult ErrorResult(F42ErrorCode code, nlohmann::json structured_data,
                        const std::string& message = "") {
     HttpResult r;
     r.status = F42ErrorHttpStatus(code);
-    r.body = agent_friendly::ToJson(MakeF42Error(code, std::move(structured_data), message));
+    r.body["error"] = agent_friendly::ToJson(MakeF42Error(code, std::move(structured_data), message));
     return r;
 }
 

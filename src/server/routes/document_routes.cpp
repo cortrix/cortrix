@@ -63,9 +63,12 @@ void RegisterDocumentRoutes(httplib::Server& server,
                 // blob.store below would only deepen the pressure). 507 + the full
                 // CX_ERR_DISK_FULL Agent-friendly body.
                 if (disk_monitor && disk_monitor->ShouldRejectWrites()) {
-                    WriteJsonResponse(res, 507,
-                        agent_friendly::ToJson(disk_monitor->MakeDiskFullError()),
-                        rctx.request_id);
+                    // R2-M8: wrapped envelope ("error" key) to match WriteJsonError
+                    // + the other 16 ToJson call sites.
+                    nlohmann::json disk_full_body;
+                    disk_full_body["error"] =
+                        agent_friendly::ToJson(disk_monitor->MakeDiskFullError());
+                    WriteJsonResponse(res, 507, disk_full_body, rctx.request_id);
                     return;
                 }
 

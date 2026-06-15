@@ -197,9 +197,9 @@ TEST_F(BatchRoutesTest, EmptyDocumentsReturnsBatchEmpty) {
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 400);
     auto body = json::parse(res->body);
-    EXPECT_EQ(body["code"], "CX_ERR_BATCH_EMPTY");  // GEN-Agent envelope (flat code)
-    EXPECT_EQ(body["category"], "permanent");
-    EXPECT_EQ(body["retryable"], false);
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_BATCH_EMPTY");  // GEN-Agent wrapped envelope (R2-M8)
+    EXPECT_EQ(body["error"]["category"], "permanent");
+    EXPECT_EQ(body["error"]["retryable"], false);
 }
 
 TEST_F(BatchRoutesTest, SizeExceededReturns400Batch) {
@@ -208,7 +208,7 @@ TEST_F(BatchRoutesTest, SizeExceededReturns400Batch) {
                         "application/json");
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 400);
-    EXPECT_EQ(json::parse(res->body)["code"], "CX_ERR_BATCH_SIZE_EXCEEDED");
+    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_BATCH_SIZE_EXCEEDED");
 }
 
 TEST_F(BatchRoutesTest, DuplicateDocIdReturnsBatchError) {
@@ -221,7 +221,7 @@ TEST_F(BatchRoutesTest, DuplicateDocIdReturnsBatchError) {
                         "application/json");
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 400);
-    EXPECT_EQ(json::parse(res->body)["code"], "CX_ERR_BATCH_DUPLICATE_DOC_ID");
+    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_BATCH_DUPLICATE_DOC_ID");
 }
 
 // ---- happy path + partial success -----------------------------------------
