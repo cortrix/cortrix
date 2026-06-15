@@ -7,7 +7,7 @@ namespace cortrix {
 
 struct ServerConfig {
     std::string host = "0.0.0.0";
-    int port = 8080;
+    int port = 8420;
     int thread_count = 8;
     int64_t max_payload_bytes = 100 * 1024 * 1024;  // 100MB
 };

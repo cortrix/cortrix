@@ -93,10 +93,10 @@ else
     fail "Missing VOLUME declaration"
 fi
 
-if grep -q "EXPOSE 8080" "$DF"; then
-    pass "EXPOSE 8080 present"
+if grep -q "EXPOSE 8420" "$DF"; then
+    pass "EXPOSE 8420 present"
 else
-    fail "Missing EXPOSE 8080"
+    fail "Missing EXPOSE 8420"
 fi
 
 if grep -q "useradd.*cortrix" "$DF"; then

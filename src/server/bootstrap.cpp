@@ -254,7 +254,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         // loopback by default, so this is local-operator-only.
         std::printf(
             "\n>>> First-time admin setup URL (60s, single-use):\n"
-            ">>>   http://localhost:9090/api/v1/admin/bootstrap?token=%s\n"
+            ">>>   http://localhost:8420/api/v1/admin/bootstrap?token=%s\n"
             ">>>\n"
             ">>> Visit this URL in your browser within 60 seconds to obtain the "
             "admin API Key.\n\n",

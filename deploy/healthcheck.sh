@@ -8,7 +8,7 @@
 #   1 — unreachable / error
 # ==========================================================
 
-PORT="${CORTRIX_HTTP_PORT:-8080}"
+PORT="${CORTRIX_HTTP_PORT:-8420}"
 ENDPOINT="http://localhost:${PORT}/api/v1/health"
 TIMEOUT=4  # seconds — must be < Docker HEALTHCHECK timeout (5s)
 

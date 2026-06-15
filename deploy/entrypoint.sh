@@ -13,7 +13,7 @@ echo "============================================"
 
 # ---------- 1. Environment defaults ----------
 export CORTRIX_DATA_DIR="${CORTRIX_DATA_DIR:-/data}"
-export CORTRIX_HTTP_PORT="${CORTRIX_HTTP_PORT:-8080}"
+export CORTRIX_HTTP_PORT="${CORTRIX_HTTP_PORT:-8420}"
 export CORTRIX_LOG_LEVEL="${CORTRIX_LOG_LEVEL:-info}"
 export CORTRIX_ENABLE_MEMORY="${CORTRIX_ENABLE_MEMORY:-true}"
 

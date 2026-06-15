@@ -10,7 +10,7 @@
 
 demo.cortrix.ai {
     # Main application — C++ HTTP server
-    reverse_proxy localhost:8080 {
+    reverse_proxy localhost:8420 {
         # Pass original client IP
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}

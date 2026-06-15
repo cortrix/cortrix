@@ -149,8 +149,8 @@ echo ""
 echo "Test 5: Caddy config"
 CADDY="$DEPLOY_DIR/caddy/Caddyfile"
 
-if grep -q "reverse_proxy localhost:8080" "$CADDY"; then
-    pass "proxies to localhost:8080"
+if grep -q "reverse_proxy localhost:8420" "$CADDY"; then
+    pass "proxies to localhost:8420"
 else
     fail "wrong proxy target"
 fi

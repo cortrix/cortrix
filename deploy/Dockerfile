@@ -3,7 +3,7 @@
 # Multi-stage Dockerfile
 #
 # Build:  docker build -t cortrix:latest -f deploy/Dockerfile ..
-# Run:    docker run -d -p 8080:8080 -v ./data:/data \
+# Run:    docker run -d -p 8420:8420 -v ./data:/data \
 #           -e CORTRIX_LLM_API_KEY=sk-xxx cortrix:latest
 # ==========================================================
 
@@ -181,7 +181,7 @@ RUN chmod +x /app/entrypoint.sh /app/healthcheck.sh && \
 
 # --- Runtime settings ---
 USER cortrix
-EXPOSE 8080
+EXPOSE 8420
 VOLUME ["/data"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \

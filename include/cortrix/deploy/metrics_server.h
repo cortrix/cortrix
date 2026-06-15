@@ -15,7 +15,7 @@ namespace cortrix::deploy {
 /// OpenMetrics endpoint server (F24 §5, F24-3 decision B — a single, separate
 /// metrics port + anonymous access). Runs an independent httplib::Server on
 /// :9091 serving `GET /metrics` in OpenMetrics text exposition. Separate from the
-/// main :8080 API server so the metrics port can be kept inside the network
+/// main :8420 API server so the metrics port can be kept inside the network
 /// (K8s ServiceMonitor / Prometheus scrape) while the API is public.
 ///
 ///   GET /metrics
