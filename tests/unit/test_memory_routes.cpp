@@ -1335,5 +1335,23 @@ TEST_F(MemoryRoutesInteractionLimitTest, WriteInteractionAtMaxLimitRejected) {
     EXPECT_EQ(res2->status, 400);
 }
 
+// D9 admin revoke is deferred to Wave S2 (the underlying RevokeInvalidation engine
+// exists + is unit-tested, but this HTTP route is not wired to it). It must NOT
+// fake-succeed with 200 "accepted" -- that would tell the Agent the revoke happened
+// (GEN-Agent honesty, CLAUDE.md sec.5). With no extraction service wired (fixture
+// default) the route returns 503; a wired build returns 501 CX_ERR_NOT_IMPLEMENTED.
+// Either way it is an honest non-2xx, never a misleading accepted.
+TEST_F(MemoryRoutesTest, AdminRevokeDoesNotFakeAccept) {
+    httplib::Client cli("127.0.0.1", port_);
+    auto res = cli.Post("/api/v1/memory/invalidations/blk_x/revoke", AuthHeaders(),
+                        R"({"ns":"default","reason":"t"})", "application/json");
+    ASSERT_TRUE(res);
+    EXPECT_NE(res->status, 200);
+    EXPECT_TRUE(res->status == 501 || res->status == 503) << res->status;
+    auto j = json::parse(res->body);
+    ASSERT_TRUE(j.contains("error"));             // wrapped GEN-Agent envelope
+    EXPECT_NE(j["error"].value("code", ""), "");  // machine-readable code, not empty
+}
+
 }  // namespace
 }  // namespace cortrix

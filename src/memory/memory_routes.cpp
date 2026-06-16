@@ -242,20 +242,17 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
                             "memory service unavailable", false, "permanent");
             return;
         }
-        json body = json::object();
-        try { if (!req.body.empty()) body = json::parse(req.body); } catch (...) {}
-        std::string reason = body.value("reason", "admin revoke");
-        // RevokeInvalidation is on MemoryExtractor; build one over the NS façade. The
-        // namespace must be supplied so we can reach the right blocks table.
-        std::string ns = body.value("ns", body.value("namespace", ""));
-        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
-        // Deferred to the per-NS extractor: surface a clear pointer until the admin
-        // revoke path is threaded through the service (kept minimal this round).
-        json resp;
-        resp["block_id"] = block_id;
-        resp["reason"] = reason;
-        resp["status"] = "accepted";
-        WriteJsonResponse(res, 200, resp);
+        // Deferred to Wave S2: MemoryExtractor::RevokeInvalidation exists and is
+        // unit-tested, but this admin HTTP route is not yet wired to it. Return an
+        // honest 501 rather than a misleading 200 "accepted" -- the Agent must not be
+        // told the revoke succeeded when nothing was revoked (GEN-Agent honesty,
+        // CLAUDE.md sec.5). Track real revokes via the operation_log surface.
+        (void)block_id;
+        WriteAgentError(res, 501, "CX_ERR_NOT_IMPLEMENTED",
+                        "memory invalidation revoke is not yet wired to the HTTP surface "
+                        "(deferred to Wave S2; the RevokeInvalidation engine exists). "
+                        "Track revokes via /api/v1/operations?action_in=memory_revoke.",
+                        false, "permanent");
     }));
 }
 
