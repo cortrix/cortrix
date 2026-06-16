@@ -62,7 +62,7 @@ cortrix-server --check-onnx
 sudo systemctl restart cortrix-server
 
 # 5. Verify with a real query.
-curl -X POST http://localhost:9090/v1/search -d '{...}'
+curl -X POST http://localhost:8420/v1/search -d '{...}'
 ```
 
 Expected `--check-onnx` output on a compatible upgrade:

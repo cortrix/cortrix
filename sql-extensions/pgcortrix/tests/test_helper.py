@@ -39,7 +39,7 @@ class FakePlpy:
 
     def __init__(self, gucs=None, session_user="alice", pid=4242):
         self.gucs = {
-            "pgcortrix.endpoint": "http://localhost:9090",
+            "pgcortrix.endpoint": "http://localhost:8420",
             "pgcortrix.api_key": "",
             "pgcortrix.timeout_ms": "30000",
             "pgcortrix.retry_max": "3",
@@ -320,9 +320,9 @@ class TestMem05AndFilter(unittest.TestCase):
 
 class TestSsrf(unittest.TestCase):
     def test_allow_loopback_and_service_name(self):
-        for ep in ("http://localhost:9090", "http://127.0.0.1:9091",
-                   "http://cortrix-server:9090"):
-            self.assertEqual(h.validate_endpoint(ep)[1] in (9090, 9091), True)
+        for ep in ("http://localhost:8420", "http://127.0.0.1:9091",
+                   "http://cortrix-server:8420"):
+            self.assertEqual(h.validate_endpoint(ep)[1] in (8420, 9091), True)
 
     def test_block_cloud_metadata_ip(self):
         with self.assertRaises(h.CortrixError) as ctx:
@@ -330,14 +330,14 @@ class TestSsrf(unittest.TestCase):
         self.assertEqual(ctx.exception.code, "CX_ERR_F14_ENDPOINT_BLOCKED")
 
     def test_block_private_ranges(self):
-        for ep in ("http://10.0.0.5:9090", "http://172.16.0.1:9090",
-                   "http://192.168.1.1:9090"):
+        for ep in ("http://10.0.0.5:8420", "http://172.16.0.1:8420",
+                   "http://192.168.1.1:8420"):
             with self.assertRaises(h.CortrixError):
                 h.validate_endpoint(ep)
 
     def test_block_non_allowlist_host(self):
         with self.assertRaises(h.CortrixError):
-            h.validate_endpoint("http://evil.example.com:9090")
+            h.validate_endpoint("http://evil.example.com:8420")
 
     def test_block_disallowed_port(self):
         with self.assertRaises(h.CortrixError):
@@ -345,7 +345,7 @@ class TestSsrf(unittest.TestCase):
 
     def test_block_ipv6_link_local(self):
         with self.assertRaises(h.CortrixError):
-            h.validate_endpoint("http://[fe80::1]:9090")
+            h.validate_endpoint("http://[fe80::1]:8420")
 
     def test_request_validates_endpoint(self):
         # A malicious endpoint GUC is caught before any HTTP call.
@@ -365,7 +365,7 @@ class TestSsrf(unittest.TestCase):
 class TestRetryAndErrors(unittest.TestCase):
     def _http_error(self, code):
         return error.HTTPError(
-            "http://localhost:9090/x", code, "err", {}, io.BytesIO(b"body"))
+            "http://localhost:8420/x", code, "err", {}, io.BytesIO(b"body"))
 
     def test_5xx_retries_then_succeeds(self):
         # First two 503s, third returns OK (F14 §7.2 case 6).
@@ -446,7 +446,7 @@ class TestStatus(unittest.TestCase):
         s = client.status()
         self.assertTrue(s["http_connected"])
         self.assertEqual(s["version"], "1.0.0")
-        self.assertEqual(s["endpoint"], "http://localhost:9090")
+        self.assertEqual(s["endpoint"], "http://localhost:8420")
         self.assertIn("latency_ms", s)
 
     def test_status_disconnected_never_raises(self):

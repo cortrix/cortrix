@@ -38,7 +38,7 @@
 ### Step 1: Start Cortrix Server (Docker, demo data pre-loaded)
 
 ```bash
-docker run -d -p 8080:8080 \
+docker run -d -p 8420:8420 \
   -v cortrix-data:/data \
   cortrix/cortrix-demo:v1.0   # Includes a pre-built "demo" namespace (5 self-referential docs)
 ```
@@ -46,7 +46,7 @@ docker run -d -p 8080:8080 \
 Verify it's running:
 
 ```bash
-curl http://localhost:8080/api/v1/system/health/ready
+curl http://localhost:8420/api/v1/system/health/ready
 # → {"status": "ok", "version": "1.0.0"}
 ```
 
@@ -62,7 +62,7 @@ pip install cortrix   # Python 3.9+
 from cortrix import Cortrix
 
 # The SDK owns the /api/v1 prefix — pass only the host.
-client = Cortrix(base_url="http://localhost:8080")
+client = Cortrix(base_url="http://localhost:8420")
 results = client.search("demo", "What is Cortrix?", top_k=10)
 for r in results.results:
     print(f"[{r.score:.2f}] {r.content[:200]}")
@@ -80,7 +80,7 @@ Expected output:
 <summary>curl example</summary>
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/query \
+curl -X POST http://localhost:8420/api/v1/query \
   -H "Content-Type: application/json" \
   -d '{"namespaces": ["demo"], "query": "What is Cortrix?", "top_k": 10}'
 ```
@@ -90,7 +90,7 @@ curl -X POST http://localhost:8080/api/v1/query \
 <summary>JavaScript (fetch) example</summary>
 
 ```javascript
-const response = await fetch("http://localhost:8080/api/v1/query", {
+const response = await fetch("http://localhost:8420/api/v1/query", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ namespaces: ["demo"], query: "What is Cortrix?", top_k: 10 }),
@@ -137,7 +137,7 @@ The simplest path for Agent IDE users:
     "cortrix": {
       "command": "cortrix-mcp",
       "env": {
-        "CORTRIX_URL": "http://localhost:8080",
+        "CORTRIX_URL": "http://localhost:8420",
         "CORTRIX_NAMESPACE": "demo",
         "CORTRIX_API_KEY": "your-api-key"
       }
@@ -155,7 +155,7 @@ Claude Code / Cline / Cursor will auto-discover **31 Cortrix tools** (search, me
 import requests
 
 response = requests.post(
-    "http://localhost:8080/api/v1/query",
+    "http://localhost:8420/api/v1/query",
     json={"namespaces": ["demo"], "query": "What is Cortrix?", "top_k": 10},
 )
 ```
@@ -189,7 +189,7 @@ Coming in Phase 1.5:
 from cortrix_skills.adapters.langchain import CortrixRetriever
 from langchain.chains import RetrievalQA
 
-retriever = CortrixRetriever(base_url="http://localhost:8080", namespace="knowledge_base")
+retriever = CortrixRetriever(base_url="http://localhost:8420", namespace="knowledge_base")
 qa = RetrievalQA.from_chain_type(llm=..., retriever=retriever)
 answer = qa.run("How do I configure Cortrix?")
 ```
@@ -199,7 +199,7 @@ answer = qa.run("How do I configure Cortrix?")
 ```python
 from cortrix import Cortrix
 
-client = Cortrix(base_url="http://localhost:8080")
+client = Cortrix(base_url="http://localhost:8420")
 
 # Log an interaction — Cortrix auto-extracts memory (type=preference, "user prefers dark mode").
 client.memory.log(
@@ -243,7 +243,7 @@ SELECT * FROM pgcortrix_search('contracts', 'breach of confidentiality clauses',
 
 The three main paths for Cortrix CE users:
 
-- **Local Swagger UI** — `http://localhost:8080/docs` (after `docker compose up` or `cortrix-server` start).
+- **Local Swagger UI** — `http://localhost:8420/docs` (after `docker compose up` or `cortrix-server` start).
 - **OpenAPI Spec** — [`api/openapi.yaml`](api/openapi.yaml) — OpenAPI 3.0, 71+ endpoints.
 - **Python SDK** — [`pip install cortrix`](https://pypi.org/project/cortrix) — generated from the spec.
 

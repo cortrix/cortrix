@@ -52,7 +52,7 @@ The audit trail is the F18a operation_log (CE) — there is **no** separate
 
 ```python
 from cortrix import Cortrix
-client = Cortrix(base_url="http://localhost:9090/api/v1")
+client = Cortrix(base_url="http://localhost:8420/api/v1")
 
 # 2. read recent invalidations
 recent = client.memory.get_audit(ns="memory", user_id="user_123",

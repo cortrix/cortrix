@@ -35,7 +35,7 @@ Cortrix consists of three services, managed uniformly via `dev.sh`:
                    │ /api/*       │ /agent/*
                    ▼              ▼
     ┌──────────────────┐  ┌──────────────────────┐
-    │  C++ backend :8080│  │  Python Agent :8001   │
+    │  C++ backend :8420│  │  Python Agent :8001   │
     │  cortrix-server    │  │  cortrix-agent (FastAPI)  │
     │                   │  │                        │
     │  • Doc ingestion   │  │  • Frontend chat/RAG   │
@@ -214,7 +214,7 @@ Output after startup:
 [cortrix] Cortrix Agent ready ✓  (LLM: glm)
 [cortrix] =====================================
 [cortrix]   Frontend: http://localhost:5173
-[cortrix]   Backend:  http://localhost:8080/api/v1/health
+[cortrix]   Backend:  http://localhost:8420/api/v1/health
 [cortrix]   Agent:    http://localhost:8001/health
 [cortrix]   Config:   build/config.yaml
 [cortrix]   LLM:      cortrix-agent/.env
@@ -257,7 +257,7 @@ npm run dev --prefix web
 
 ```bash
 # Check the backend health status
-curl http://localhost:8080/api/v1/health
+curl http://localhost:8420/api/v1/health
 
 # Expected response (llm_enabled=true means the LLM is loaded):
 # {
@@ -283,7 +283,7 @@ curl http://localhost:8001/config/llm/providers | python3 -m json.tool
 ### Create a Namespace
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/namespaces \
+curl -X POST http://localhost:8420/api/v1/namespaces \
   -H "Content-Type: application/json" \
   -d '{"name": "my-docs"}'
 ```
@@ -292,11 +292,11 @@ curl -X POST http://localhost:8080/api/v1/namespaces \
 
 ```bash
 # Upload a single file
-curl -X POST http://localhost:8080/api/v1/namespaces/my-docs/documents \
+curl -X POST http://localhost:8420/api/v1/namespaces/my-docs/documents \
   -F "file=@/path/to/document.pdf"
 
 # Upload with attached metadata
-curl -X POST http://localhost:8080/api/v1/namespaces/my-docs/documents \
+curl -X POST http://localhost:8420/api/v1/namespaces/my-docs/documents \
   -F "file=@report.pdf" \
   -F 'metadata={"author":"Jane Doe","year":2025}'
 ```
@@ -304,14 +304,14 @@ curl -X POST http://localhost:8080/api/v1/namespaces/my-docs/documents \
 ### Query Document Processing Status
 
 ```bash
-curl http://localhost:8080/api/v1/namespaces/my-docs/documents/1/status
+curl http://localhost:8420/api/v1/namespaces/my-docs/documents/1/status
 # status: pending → processing → ready / error
 ```
 
 ### Semantic Search
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/query \
+curl -X POST http://localhost:8420/api/v1/query \
   -H "Content-Type: application/json" \
   -d '{
     "query": "What is the refund policy?",
@@ -450,7 +450,7 @@ auth:
 ### Sending the Key with a Request
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/query \
+curl -X POST http://localhost:8420/api/v1/query \
   -H "Authorization: Bearer my-cortrix-secret-2026" \
   -H "Content-Type: application/json" \
   -d '{"query": "test", "namespace": "demo"}'
@@ -482,14 +482,14 @@ watch_dir:
 ```bash
 docker run -d \
   --name cortrix \
-  -p 8080:8080 \
+  -p 8420:8420 \
   -v $(pwd)/data:/data \
   -v $(pwd)/config.yaml:/app/config.yaml \
   -v $(pwd)/models:/app/models \
   cortrix/cortrix:latest
 
 # Check
-curl http://localhost:8080/api/v1/health
+curl http://localhost:8420/api/v1/health
 ```
 
 ### Recommended Production Configuration
@@ -520,7 +520,7 @@ server {
     server_name cortrix.yourdomain.com;
 
     location /api/ {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:8420;
         proxy_set_header Host $host;
     }
 
@@ -550,7 +550,7 @@ A: The SPC worker may have hit a parsing error. Check the backend logs; common c
 **Q: Semantic search results are poor quality?**
 A: It may be running in Stub mode (random vectors). Check:
 ```bash
-curl http://localhost:8080/api/v1/health
+curl http://localhost:8420/api/v1/health
 # In the startup logs you should see: OnnxEmbedder initialized (real_model=true)
 ```
 
@@ -566,10 +566,10 @@ cmake -B build -DOPENSSL_ROOT_DIR=$OPENSSL_ROOT_DIR ..
 **Q: A port is already in use?**
 ```bash
 # Find the process using the port
-lsof -i :8080
+lsof -i :8420
 # Or change the port in config.yaml
 server:
-  port: 9090
+  port: 8420
 ```
 
 ---

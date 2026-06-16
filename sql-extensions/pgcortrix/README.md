@@ -54,7 +54,7 @@ the **V3+ roadmap** (§9 of the SoT), not V1.
 
 | GUC | Default | Scope | Notes |
 |---|---|---|---|
-| `pgcortrix.endpoint` | `http://localhost:9090` | **SUSET** | Superuser-only (SSRF defence, V3-E-02). |
+| `pgcortrix.endpoint` | `http://localhost:8420` | **SUSET** | Superuser-only (SSRF defence, V3-E-02). |
 | `pgcortrix.api_key` | `''` | USERSET | Empty = anonymous (CE default). |
 | `pgcortrix.timeout_ms` | `30000` | USERSET | HTTP request timeout. |
 | `pgcortrix.retry_max` | `3` | USERSET | Max retries on 5xx. |

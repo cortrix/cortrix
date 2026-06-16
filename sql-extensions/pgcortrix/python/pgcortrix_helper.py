@@ -162,7 +162,7 @@ def validate_filter(filter_jsonb):
 # ===========================================================================
 
 ALLOWED_HOSTS = frozenset(["localhost", "127.0.0.1", "cortrix-server"])
-ALLOWED_PORTS = frozenset([9090, 9091])  # main API + OpenMetrics
+ALLOWED_PORTS = frozenset([8420, 9091])  # main API + OpenMetrics
 
 # Private / metadata networks that must never be reachable via the endpoint GUC.
 # loopback (127/8) is allowed explicitly (cortrix-server runs on loopback), so

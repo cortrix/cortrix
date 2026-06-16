@@ -78,7 +78,7 @@ CREATE TYPE pgcortrix_interaction_info AS (
 -- pure-SQL/plpython3u extension installs with no compiled module.
 DO $$
 BEGIN
-    PERFORM set_config('pgcortrix.endpoint',   'http://localhost:9090', false);
+    PERFORM set_config('pgcortrix.endpoint',   'http://localhost:8420', false);
     PERFORM set_config('pgcortrix.api_key',    '',                      false);
     PERFORM set_config('pgcortrix.timeout_ms', '30000',                 false);
     PERFORM set_config('pgcortrix.retry_max',  '3',                     false);

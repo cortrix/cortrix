@@ -18,7 +18,7 @@
 # + /watch. This sweep covers the design-face shapes.
 #
 # Usage:
-#   python3 scripts/e2e_llm_sweep.py [--base http://localhost:8080] \
+#   python3 scripts/e2e_llm_sweep.py [--base http://localhost:8420] \
 #       [--corpus tests/integration/test_data] [--report /tmp/e2e_report.json]
 #
 # Exit code: 0 if no check FAILed (SKIPs allowed), 1 otherwise.
@@ -48,7 +48,7 @@ def skip(name, why):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base", default="http://localhost:8080")
+    ap.add_argument("--base", default="http://localhost:8420")
     ap.add_argument("--corpus", default="tests/integration/test_data")
     ap.add_argument("--ns", default="e2e-llm")
     ap.add_argument("--report", default="/tmp/e2e_llm_report.json")

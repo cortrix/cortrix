@@ -20,7 +20,7 @@ if docker compose version >/dev/null 2>&1; then
 else
   COMPOSE="docker-compose -f $ROOT/deploy/docker-compose.yml"
 fi
-BASE="http://localhost:${CORTRIX_HTTP_PORT:-8080}"
+BASE="http://localhost:${CORTRIX_HTTP_PORT:-8420}"
 NS="smoke"
 KEEP="${1:-}"
 
