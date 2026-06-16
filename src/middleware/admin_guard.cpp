@@ -81,7 +81,11 @@ nlohmann::json BuildAdminDeniedBody(const std::string& client_ip) {
         {"client_ip", client_ip},
         {"required", "loopback"},
     };
-    return agent_friendly::ToJson(err);
+    // R2-M8: wrapped envelope ("error" key) so SDK/MCP/WebUI parse
+    // body["error"]["code"] consistently (this pre-routing 403 was a flat holdout).
+    nlohmann::json body;
+    body["error"] = agent_friendly::ToJson(err);
+    return body;
 }
 
 void AdminGuard::ValidateConfigOrAbort() {

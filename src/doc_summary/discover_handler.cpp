@@ -173,8 +173,17 @@ nlohmann::json ExecuteDocDiscovery(cortrix::resource::INamespacePool& pool,
     }
 
     // Step 1 (main): doc_summary embedding HNSW recall (via_path = "llm_summary").
-    std::vector<DocDiscoveryHit> llm_hits =
-        RecallDocSummaryHnsw(facade.vec_index(), facade.store(), embedder, query, k);
+    // A query-time HNSW/index/embed fault is a graceful degrade (GEN-Agent #3,
+    // mirroring the fts5 fallback below + the §161 partial-success contract):
+    // record a warning and fall back to the fts5 path only — never let it escape
+    // as a generic 500.
+    std::vector<DocDiscoveryHit> llm_hits;
+    try {
+        llm_hits =
+            RecallDocSummaryHnsw(facade.vec_index(), facade.store(), embedder, query, k);
+    } catch (const std::exception& e) {
+        warnings.push_back(std::string("doc_summary_hnsw_failed: ") + e.what());
+    }
 
     // Step 2 (fallback): per-Unit doc-level FTS5 over the F08 fields (via_path =
     // "fts5_fallback"). Gated by config.fts5_fallback_enabled (F41 §4.4). A query-time

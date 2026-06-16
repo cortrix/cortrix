@@ -80,11 +80,11 @@ TEST(AdminGuardPolicyTest, PublicWhitelistAllowsAll) {
 
 TEST(AdminGuardDeniedBodyTest, MatchesAgentFriendlySchema) {
     json body = BuildAdminDeniedBody("192.168.1.10");
-    EXPECT_EQ(body["code"], "CX_ERR_ADMIN_LOOPBACK_REQUIRED");
-    EXPECT_EQ(body["retryable"], false);
-    EXPECT_EQ(body["category"], "auth");
-    EXPECT_EQ(body["structured_data"]["client_ip"], "192.168.1.10");
-    EXPECT_EQ(body["structured_data"]["required"], "loopback");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_ADMIN_LOOPBACK_REQUIRED");
+    EXPECT_EQ(body["error"]["retryable"], false);
+    EXPECT_EQ(body["error"]["category"], "auth");
+    EXPECT_EQ(body["error"]["structured_data"]["client_ip"], "192.168.1.10");
+    EXPECT_EQ(body["error"]["structured_data"]["required"], "loopback");
 }
 
 // ---- pre-routing handler behavior (E2E-V3E06 matrix, design sec 13) ----

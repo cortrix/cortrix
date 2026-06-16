@@ -154,16 +154,16 @@ TEST(RateLimiterTest, ErrorBodySchema) {
     d.locked_until_unix_ms = 1700000000000;
 
     json body = RateLimiter::BuildErrorBody(d);
-    EXPECT_EQ(body["code"], "CX_ERR_RATE_LIMITED");
-    EXPECT_EQ(body["retryable"], true);
-    EXPECT_EQ(body["category"], "quota");
-    EXPECT_EQ(body["retry_after_ms"], 300000);
-    EXPECT_EQ(body["structured_data"]["stratum"], "per_api_key");
-    EXPECT_EQ(body["structured_data"]["limit"], 300);
-    EXPECT_EQ(body["structured_data"]["window"], "60s");
-    EXPECT_EQ(body["structured_data"]["remaining"], 0);
-    EXPECT_TRUE(body["structured_data"].contains("reset_at"));
-    EXPECT_TRUE(body["structured_data"].contains("locked_until"));
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_RATE_LIMITED");
+    EXPECT_EQ(body["error"]["retryable"], true);
+    EXPECT_EQ(body["error"]["category"], "quota");
+    EXPECT_EQ(body["error"]["retry_after_ms"], 300000);
+    EXPECT_EQ(body["error"]["structured_data"]["stratum"], "per_api_key");
+    EXPECT_EQ(body["error"]["structured_data"]["limit"], 300);
+    EXPECT_EQ(body["error"]["structured_data"]["window"], "60s");
+    EXPECT_EQ(body["error"]["structured_data"]["remaining"], 0);
+    EXPECT_TRUE(body["error"]["structured_data"].contains("reset_at"));
+    EXPECT_TRUE(body["error"]["structured_data"].contains("locked_until"));
 }
 
 }  // namespace

@@ -343,8 +343,12 @@ std::vector<float> OnnxReranker::ScoreBatch(const char* query,
         // the iteration's stack slot was destroyed / reused, plus a data race
         // across the 4 workers. Returning by value confines the outcome to this
         // task's own future, which the caller discards on timeout.
+        // Capture BOTH query and passage BY VALUE. A timed-out task keeps running
+        // on its worker after ScoreBatch returns and `q` (a ScoreBatch stack local)
+        // is destroyed, so a `&q` capture would be a use-after-free on the abandoned
+        // task — the read-side companion to the R02-C2 by-value fix above.
         const std::string passage_text = pre.text;
-        auto task = [this, &q, passage_text]() -> RerankTaskResult {
+        auto task = [this, q, passage_text]() -> RerankTaskResult {
             try {
                 return {this->ScoreForTask(q.c_str(), passage_text.c_str()),
                         false, {}};

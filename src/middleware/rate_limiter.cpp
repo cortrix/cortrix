@@ -186,7 +186,11 @@ nlohmann::json RateLimiter::BuildErrorBody(const RateLimitDecision& decision) {
         {"reset_at", unix_ms_to_iso(decision.reset_at_unix_ms)},
         {"locked_until", unix_ms_to_iso(decision.locked_until_unix_ms)},
     };
-    return agent_friendly::ToJson(err);
+    // R2-M8: wrapped envelope ("error" key) for consumer consistency once this
+    // limiter is wired (currently built but not yet installed as a handler).
+    nlohmann::json body;
+    body["error"] = agent_friendly::ToJson(err);
+    return body;
 }
 
 }  // namespace cortrix::middleware
