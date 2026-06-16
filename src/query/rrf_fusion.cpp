@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/query/rrf_fusion.h"
 #include <algorithm>
 #include <unordered_map>

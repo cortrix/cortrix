@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/retrieval/splade_sparse_retriever.h"
 
 #include <sqlite3.h>

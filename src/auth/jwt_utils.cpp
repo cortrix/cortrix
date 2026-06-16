@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/auth/jwt_utils.h"
 
 #include <openssl/crypto.h>

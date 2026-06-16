@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/catalog/default_content_ref_store.h"
 
 #include <sqlite3.h>

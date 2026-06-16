@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/observability/cleanup_scheduler.h"
 
 #include <chrono>

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/doc_summary/f41_async_worker.h"
 
 #include <chrono>

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/scoring/scoring_store.h"
 
 #include <string>

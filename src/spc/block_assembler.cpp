@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc/block_assembler.h"
 
 #include "cortrix/id/hash.h"   // id::HashChildIdToBlockId

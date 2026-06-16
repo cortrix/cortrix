@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc/spc_pipeline.h"
 
 #include <nlohmann/json.hpp>

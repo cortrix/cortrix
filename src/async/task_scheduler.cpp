@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/async/task_scheduler.h"
 
 #include "cortrix/async/f42_error.h"

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/store/pending_entry.h"
 
 #include <cstring>

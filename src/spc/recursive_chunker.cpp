@@ -1,6 +1,7 @@
 #include "cortrix/spc/recursive_chunker.h"
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 
 namespace cortrix {
 

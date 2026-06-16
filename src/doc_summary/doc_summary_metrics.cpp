@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/doc_summary/doc_summary_metrics.h"
 
 #include <sstream>

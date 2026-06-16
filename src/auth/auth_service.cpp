@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/auth/auth_service.h"
 
 #include <sqlite3.h>

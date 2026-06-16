@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/memory/memory_extractor.h"
 
 #include <algorithm>

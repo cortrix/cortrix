@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/agent_trace/agent_trace_writer_impl.h"
 
 #include <sqlite3.h>

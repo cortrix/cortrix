@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/middleware/rate_limiter.h"
 
 #include <algorithm>

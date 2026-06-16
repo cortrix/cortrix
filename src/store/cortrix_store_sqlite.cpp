@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/store/cortrix_store_sqlite.h"
 #include "cortrix/store/per_unit_schema_ddl.h"  // [D3.5-B] kPerUnitFrameworkDdl (single DDL SoT)
 #include "cortrix/store/f34_schema_provider.h"  // [A unified-blocks] standalone child cols + parents

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc/hype_metrics.h"
 
 #include <sstream>

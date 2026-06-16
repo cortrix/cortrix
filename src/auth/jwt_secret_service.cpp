@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/auth/jwt_secret_service.h"
 
 #include <sqlite3.h>

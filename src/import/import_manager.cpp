@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/import/import_manager.h"
 
 #include <ctime>

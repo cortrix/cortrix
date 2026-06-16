@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/import/import_metrics.h"
 
 #include <array>

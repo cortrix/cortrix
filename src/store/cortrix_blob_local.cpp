@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/store/cortrix_blob_local.h"
 #include "cortrix/logging/logging.h"
 

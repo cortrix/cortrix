@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/import/spc_manager_feeder.h"
 
 #include <string>

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/agent_trace/f13_cleanup_registrar.h"
 
 #include <sqlite3.h>

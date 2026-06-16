@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/async/task_manager.h"
 
 #include <sqlite3.h>

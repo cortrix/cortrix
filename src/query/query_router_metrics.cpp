@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/query/query_router_metrics.h"
 
 #include <sstream>

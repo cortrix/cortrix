@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/server/routes/document_routes.h"
 #include "cortrix/upload/upload_handler.h"
 #include "cortrix/resource/namespace_facade.h"

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/async/task_cleanup_cron.h"
 
 #include <chrono>

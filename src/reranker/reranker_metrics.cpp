@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/reranker/reranker_metrics.h"
 
 #include <cstring>

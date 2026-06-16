@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/upload/upload_handler.h"
 #include "cortrix/spc/spc_router.h"
 #include "cortrix/logging/logging.h"

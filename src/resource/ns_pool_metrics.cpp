@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/resource/ns_pool_metrics.h"
 
 #include <sstream>

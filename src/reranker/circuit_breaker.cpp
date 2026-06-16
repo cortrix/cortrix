@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/reranker/circuit_breaker.h"
 
 #include <chrono>

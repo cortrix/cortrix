@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/query/bm25_searcher.h"
 #include <chrono>
 #include <string>

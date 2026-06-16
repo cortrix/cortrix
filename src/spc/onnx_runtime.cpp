@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/onnx/runtime.h"
 
 #include <algorithm>

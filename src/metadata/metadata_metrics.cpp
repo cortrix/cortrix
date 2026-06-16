@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/metadata/metadata_metrics.h"
 
 #include <array>

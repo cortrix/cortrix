@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/retrieval/sparse_codec.h"
 
 #include <cstring>

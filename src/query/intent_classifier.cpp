@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/query/intent_classifier.h"
 #include <cctype>
 

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/server/http_server.h"
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/catalog/i_ns_router.h"          // F12 INSRouter (F13 create path)

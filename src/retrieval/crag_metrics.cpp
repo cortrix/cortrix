@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/retrieval/crag_metrics.h"
 
 #include <sstream>

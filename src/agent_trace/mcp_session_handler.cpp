@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/agent_trace/mcp_session_handler.h"
 
 #include <chrono>

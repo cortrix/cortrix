@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/tenant/quota_service.h"
 
 #include <sqlite3.h>

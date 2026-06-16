@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/retrieval/sparse_metrics.h"
 
 #include <cstring>

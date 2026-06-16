@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/auth/bootstrap_handler.h"
 
 #include <sqlite3.h>

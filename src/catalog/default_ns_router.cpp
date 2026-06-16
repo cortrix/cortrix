@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/catalog/default_ns_router.h"
 
 #include <sqlite3.h>

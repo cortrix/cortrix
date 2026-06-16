@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/agent_trace/agent_trace_metrics.h"
 
 #include <sstream>

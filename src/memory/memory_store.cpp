@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/memory/memory_store.h"
 #include <sqlite3.h>
 #include <random>

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/reranker/onnx_reranker.h"
 
 #include <algorithm>

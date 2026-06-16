@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/catalog/gc/document_gc_sweeper.h"
 
 #include <chrono>

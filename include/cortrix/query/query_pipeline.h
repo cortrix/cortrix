@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include "cortrix/query/query_request.h"
 #include "cortrix/query/query_response.h"
 #include "cortrix/query/vector_searcher.h"

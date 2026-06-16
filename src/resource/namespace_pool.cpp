@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/resource/namespace_pool.h"
 
 #include <sqlite3.h>

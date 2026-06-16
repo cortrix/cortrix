@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/store/group_commit_writer.h"
 
 #include <algorithm>

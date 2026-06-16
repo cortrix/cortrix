@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/query/live_single_unit_executor.h"
 
 #include <algorithm>
