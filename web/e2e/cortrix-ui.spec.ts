@@ -48,7 +48,7 @@ test('2. Search page renders the query box and runs a search', async ({ page }) 
 // ── 3. Chat ─────────────────────────────────────────────────────────────────
 test('3. Chat page renders input + send control', async ({ page }) => {
   await goto(page, '/agent');
-  await expect(page.getByRole('heading', { name: /Chat with Cortrix/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Cortrix Agent/i })).toBeVisible();
   await expect(page.getByTestId('chat-input')).toBeVisible();
   await expect(page.getByTestId('chat-send-btn')).toBeVisible();
 });

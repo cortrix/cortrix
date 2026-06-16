@@ -38,7 +38,12 @@ export default defineConfig({
       // real contract). OTLP metrics (§ 23-bis.2) post to /v1/metrics.
       '/api': 'http://localhost:8080',
       '/v1/metrics': 'http://localhost:8080',
-      '/agent': {
+      // Scope the agent-server proxy to the '/agent/config' subtree only. A bare
+      // '/agent' prefix also swallowed the client-side SPA route '/agent' (the
+      // Chat page), so the dev server proxied it to :8001 and the page 500'd /
+      // failed to load. The agent API is entirely under '/agent/config*', so the
+      // narrower key proxies the API while leaving '/agent' (exact) for the SPA.
+      '/agent/config': {
         target: 'http://localhost:8001',
         rewrite: (path) => path.replace(/^\/agent/, ''),
       },
