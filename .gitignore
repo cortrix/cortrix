@@ -67,3 +67,4 @@ deploy/*.local.yml
 
 # project files
 CLAUDE.md
+scripts/ocr_venv/
