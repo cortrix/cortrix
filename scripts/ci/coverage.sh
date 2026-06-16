@@ -49,7 +49,11 @@ cmake -B "$BUILD" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug \
 # `all` target would waste instrumented-build time on integration/benchmark
 # binaries this run never executes (benchmarks are F44 domain, #481 cloud).
 echo "── build (cortrix_unit_tests)"
-cmake --build "$BUILD" --parallel --target cortrix_unit_tests >/dev/null
+# Instrumented (-O0 + coverage mapping) compiles take 2-3 GB PER translation unit;
+# the default --parallel (= all 10 cores here) OOMs a 16 GB box (~30 GB peak →
+# crash). Cap at COV_JOBS (default 2 => <10 GB). A big-memory CI / cloud VM can
+# raise it (COV_JOBS=<cores>) for full speed.
+cmake --build "$BUILD" -j "${COV_JOBS:-2}" --target cortrix_unit_tests >/dev/null
 
 echo "── run unit suite (one process per test via ctest)"
 # Zero stale counters first: on an incremental build, leftover .gcda from a

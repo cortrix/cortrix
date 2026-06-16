@@ -45,7 +45,9 @@ cmake -B "$BUILD" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug \
   "${ONNX_ARG[@]}" >/dev/null
 
 echo "── build (cortrix_unit_tests)"
-cmake --build "$BUILD" --parallel --target cortrix_unit_tests >/dev/null
+# Instrumented compiles take 2-3 GB per TU; cap at COV_JOBS (default 2 => <10 GB)
+# to avoid OOM on a 16 GB box (see coverage.sh). A cloud VM can raise COV_JOBS.
+cmake --build "$BUILD" -j "${COV_JOBS:-2}" --target cortrix_unit_tests >/dev/null
 
 echo "── run unit suite (profile merge pool %5m)"
 mkdir -p "$PROF" "$OUT"
