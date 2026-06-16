@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc/hype_block.h"
 
 #include <nlohmann/json.hpp>

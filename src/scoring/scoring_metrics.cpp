@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/scoring/scoring_metrics.h"
 
 #include <array>

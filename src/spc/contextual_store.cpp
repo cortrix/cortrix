@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc/contextual_store.h"
 
 #include <cstring>

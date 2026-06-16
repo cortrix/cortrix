@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc_enricher/enricher_store.h"
 
 #include <nlohmann/json.hpp>

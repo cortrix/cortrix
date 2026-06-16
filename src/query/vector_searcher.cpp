@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/query/vector_searcher.h"
 #include "cortrix/spc/onnx_embedder.h"
 #include <chrono>

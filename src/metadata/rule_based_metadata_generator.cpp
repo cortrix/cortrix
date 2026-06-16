@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/metadata/rule_based_metadata_generator.h"
 
 #include <chrono>

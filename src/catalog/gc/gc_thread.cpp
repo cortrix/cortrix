@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/catalog/gc/gc_thread.h"
 
 #include <chrono>

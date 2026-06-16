@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/server/batch_submit_service.h"
 
 #include <filesystem>

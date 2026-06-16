@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc/docling_parser.h"
 
 #include <utility>

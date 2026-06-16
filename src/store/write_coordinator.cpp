@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/store/write_coordinator.h"
 
 #include <algorithm>

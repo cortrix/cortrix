@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include "cortrix/store/cortrix_store.h"
 #include <string>
 #include <atomic>

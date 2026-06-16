@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/memory/memory_queue.h"
 
 #include <chrono>

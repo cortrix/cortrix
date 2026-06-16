@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/config/config.h"
 
 #include <cstdlib>

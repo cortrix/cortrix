@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/memory/mem03_metrics.h"
 
 #include <sstream>

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/observability/observability_context.h"
 
 #include <chrono>

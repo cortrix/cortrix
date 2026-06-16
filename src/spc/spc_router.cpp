@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc/spc_router.h"
 #include "cortrix/common/block_types.h"
 #include <algorithm>

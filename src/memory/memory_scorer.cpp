@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/memory_scorer.h"
 
 #include <spdlog/spdlog.h>

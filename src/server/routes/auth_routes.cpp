@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/server/routes/auth_routes.h"
 
 #include <string>

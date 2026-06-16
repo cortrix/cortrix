@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc/hf_tokenizer.h"
 #include <nlohmann/json.hpp>
 #include <fstream>

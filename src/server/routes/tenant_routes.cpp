@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/server/routes/tenant_routes.h"
 
 #include <optional>

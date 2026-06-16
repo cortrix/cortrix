@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/namespace/namespace_manager.h"
 #include "cortrix/logging/logging.h"
 

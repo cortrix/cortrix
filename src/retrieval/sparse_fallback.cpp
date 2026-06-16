@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/retrieval/sparse_fallback.h"
 
 namespace cortrix::retrieval {

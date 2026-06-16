@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/agent_trace/http_observability_middleware.h"
 
 #include <array>

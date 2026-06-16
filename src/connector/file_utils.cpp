@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/connector/file_utils.h"
 #include <filesystem>
 #include <fstream>

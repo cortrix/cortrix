@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/store/pending_log_writer.h"
 
 #include <fcntl.h>

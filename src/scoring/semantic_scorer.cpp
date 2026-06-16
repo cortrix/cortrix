@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/scoring/semantic_scorer.h"
 
 #include <chrono>

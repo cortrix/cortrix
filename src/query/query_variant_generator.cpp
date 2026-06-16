@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/query/query_variant_generator.h"
 
 #include <algorithm>

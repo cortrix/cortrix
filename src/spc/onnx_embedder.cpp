@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/spc/hf_tokenizer.h"
 #include "cortrix/onnx/onnx_error.h"

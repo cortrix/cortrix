@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc/contextual_metrics.h"
 
 #include <cmath>

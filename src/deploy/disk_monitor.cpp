@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/deploy/disk_monitor.h"
 
 #include <sys/statvfs.h>

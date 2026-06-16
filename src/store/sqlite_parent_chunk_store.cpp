@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/store/sqlite_parent_chunk_store.h"
 
 #include <sqlite3.h>

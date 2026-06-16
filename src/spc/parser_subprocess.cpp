@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc/parser_subprocess.h"
 
 #include <spdlog/spdlog.h>

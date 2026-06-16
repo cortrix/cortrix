@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/connector/directory_importer.h"
 #include "cortrix/connector/file_utils.h"
 #include "cortrix/logging/logging.h"

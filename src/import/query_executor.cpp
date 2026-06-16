@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/import/query_executor.h"
 
 #include <algorithm>

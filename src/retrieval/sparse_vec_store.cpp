@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/retrieval/sparse_vec_store.h"
 
 #include <vector>

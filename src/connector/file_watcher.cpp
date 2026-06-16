@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/connector/file_watcher.h"
 
 #if defined(__APPLE__)

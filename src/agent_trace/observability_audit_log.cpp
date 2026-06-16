@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/agent_trace/observability_audit_log.h"
 
 #include <chrono>

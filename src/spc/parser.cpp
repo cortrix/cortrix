@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc/parser.h"
 
 #include <algorithm>

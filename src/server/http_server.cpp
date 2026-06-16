@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/server/http_server.h"
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/agent_friendly/error.h"         // GEN-Agent error category enum

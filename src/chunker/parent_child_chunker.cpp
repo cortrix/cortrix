@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/chunker/parent_child_chunker.h"
 
 #include <algorithm>

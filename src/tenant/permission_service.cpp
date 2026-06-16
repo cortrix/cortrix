@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/tenant/permission_service.h"
 
 #include <chrono>

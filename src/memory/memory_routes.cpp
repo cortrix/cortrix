@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/memory/memory_routes.h"
 #include "cortrix/memory/memory_store.h"
 #include "cortrix/memory/memory_writer.h"

@@ -235,7 +235,11 @@ int my_fcntl(int fd, int cmd, ...) {
   va_start(ap, cmd);
   void* arg = va_arg(ap, void*);
   va_end(ap);
+#ifdef F_FULLFSYNC
   if (cmd == F_FULLFSYNC && ShouldFailFd(Op::kFullFsync, fd)) {
+#else
+  if (false && ShouldFailFd(Op::kFullFsync, fd)) {
+#endif
     errno = g_err.load(std::memory_order_relaxed);
     return -1;
   }

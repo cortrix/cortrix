@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/observability/operation_logger_impl.h"
 
 #include <sqlite3.h>

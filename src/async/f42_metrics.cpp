@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/async/f42_metrics.h"
 
 #include <sstream>

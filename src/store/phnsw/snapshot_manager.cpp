@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/store/phnsw/snapshot_manager.h"
 
 #include <fcntl.h>

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc_enricher/enricher_metrics.h"
 
 #include <sstream>

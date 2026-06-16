@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/memory/memory_block_adapter.h"
 
 #include <sqlite3.h>

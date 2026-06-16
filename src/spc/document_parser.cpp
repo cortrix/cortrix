@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc/document_parser.h"
 #include "cortrix/spc/subprocess_utils.h"
 #include "cortrix/config/config.h"

@@ -17,6 +17,7 @@ BACKEND="$SCRIPT_DIR/build/cortrix-server"
 WEB_DIR="$SCRIPT_DIR/web"
 AGENT_DIR="$SCRIPT_DIR/cortrix-agent"
 DEFAULT_CONFIG="$SCRIPT_DIR/build/config.yaml"
+EDITION="CE"
 
 # Colored output
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -61,7 +62,7 @@ info "Using config file: $CONFIG_FILE"
 # Check frontend dependencies
 [[ -d "$WEB_DIR/node_modules" ]] || {
     warn "Frontend dependencies not installed, installing..."
-    npm install --prefix "$WEB_DIR"
+    (cd "$WEB_DIR" && npm install)
 }
 
 # Clean up old processes and ports
@@ -122,7 +123,7 @@ fi
 
 # ── Start frontend ──────────────────────────────────────
 info "Starting frontend (http://localhost:5173)..."
-npm run dev --prefix "$WEB_DIR" &
+(cd "$WEB_DIR" && npm run dev) &
 FRONTEND_PID=$!
 
 sleep 2

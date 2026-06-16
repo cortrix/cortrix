@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/deploy/deploy_metrics.h"
 
 #include <atomic>

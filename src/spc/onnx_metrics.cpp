@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/onnx/onnx_metrics.h"
 
 #include <cstring>

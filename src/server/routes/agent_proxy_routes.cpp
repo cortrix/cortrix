@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/server/routes/agent_proxy_routes.h"
 
 #include <cctype>

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/catalog/gc/gc_manager.h"
 
 #include <sqlite3.h>

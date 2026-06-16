@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <string>
 #include "cortrix/query/route_result.h"
 #include "cortrix/store/iindex.h"

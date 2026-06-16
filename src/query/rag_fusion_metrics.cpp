@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/query/rag_fusion_metrics.h"
 
 #include <sstream>

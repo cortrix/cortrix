@@ -349,26 +349,29 @@ target_link_libraries(cortrix_unit_tests PRIVATE
 # F23 §4.6 syscall fault-injection seam: MUST be a SHARED library — dyld
 # only applies __DATA,__interpose sections found in dylibs, never in the
 # main executable. Test-only; production targets never link it.
+# macOS-only: dyld interpose and F_FULLFSYNC are not available on Linux.
 # ASAN builds force this OFF: the __DATA,__interpose table and ASAN's own
 # interceptors wrap the same POSIX I/O symbols and SIGSEGV at startup. The
 # sweeps stay covered by the non-ASAN unit run; ASAN coverage for them is
 # the Linux LD_PRELOAD lane (#481 cloud).
-option(CORTRIX_ENABLE_FAULT_INJECT
-    "Build the dyld-interpose syscall fault-injection seam + sweeps" ON)
-if(CORTRIX_SANITIZE STREQUAL "address" AND CORTRIX_ENABLE_FAULT_INJECT)
-    message(STATUS "CORTRIX_ENABLE_FAULT_INJECT forced OFF under ASAN "
-                   "(interpose/interceptor conflict)")
-    set(CORTRIX_ENABLE_FAULT_INJECT OFF)
-endif()
-if(CORTRIX_ENABLE_FAULT_INJECT)
-    add_library(cortrix_fault_inject SHARED
-        fault_inject/fault_inject.cpp
-    )
-    target_sources(cortrix_unit_tests PRIVATE
-        unit/test_syscall_fault_inject.cpp
-    )
-    target_link_libraries(cortrix_unit_tests PRIVATE cortrix_fault_inject)
-endif()
+if(APPLE)
+    option(CORTRIX_ENABLE_FAULT_INJECT
+        "Build the dyld-interpose syscall fault-injection seam + sweeps" ON)
+    if(CORTRIX_SANITIZE STREQUAL "address" AND CORTRIX_ENABLE_FAULT_INJECT)
+        message(STATUS "CORTRIX_ENABLE_FAULT_INJECT forced OFF under ASAN "
+                       "(interpose/interceptor conflict)")
+        set(CORTRIX_ENABLE_FAULT_INJECT OFF)
+    endif()
+    if(CORTRIX_ENABLE_FAULT_INJECT)
+        add_library(cortrix_fault_inject SHARED
+            fault_inject/fault_inject.cpp
+        )
+        target_sources(cortrix_unit_tests PRIVATE
+            unit/test_syscall_fault_inject.cpp
+        )
+        target_link_libraries(cortrix_unit_tests PRIVATE cortrix_fault_inject)
+    endif()
+endif() # APPLE
 
 target_include_directories(cortrix_unit_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}

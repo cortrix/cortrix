@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/common/block_header.h"
 #include <chrono>
 #include <cstdio>

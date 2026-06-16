@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/scoring/score_map.h"
 
 #include "cortrix/agent_friendly/error.h"

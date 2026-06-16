@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/memory/memory_writer.h"
 #include "cortrix/store/cortrix_store.h"
 #include <nlohmann/json.hpp>

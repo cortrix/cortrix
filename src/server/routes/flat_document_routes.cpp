@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/server/routes/flat_document_routes.h"
 
 #include "cortrix/server/routes/connector_routes.h"

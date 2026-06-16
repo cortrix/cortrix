@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/store/phnsw/wal_entry.h"
 
 #include <chrono>

@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/query/query_pipeline.h"
 #include <future>
 #include <chrono>

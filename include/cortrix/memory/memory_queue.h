@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <atomic>
 #include <condition_variable>
 #include <deque>

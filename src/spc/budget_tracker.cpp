@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "cortrix/spc_enricher/budget_tracker.h"
 
 #include <utility>
