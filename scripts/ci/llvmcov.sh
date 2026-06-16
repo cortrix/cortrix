@@ -34,9 +34,15 @@ CORE_DIRS=(
 )
 
 echo "── configure (clang source-based coverage)"
+# Reuse the onnxruntime already fetched into the main build/ to avoid a slow,
+# flaky re-download (see coverage.sh). No-op in CI where build/_deps is absent.
+ONNX_SRC="$ROOT/build/_deps/onnxruntime-src"
+ONNX_ARG=()
+[ -d "$ONNX_SRC" ] && ONNX_ARG=(-DFETCHCONTENT_SOURCE_DIR_ONNXRUNTIME="$ONNX_SRC")
 cmake -B "$BUILD" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_CXX_FLAGS="-fprofile-instr-generate -fcoverage-mapping -O0" \
-  -DCMAKE_EXE_LINKER_FLAGS="-fprofile-instr-generate" >/dev/null
+  -DCMAKE_EXE_LINKER_FLAGS="-fprofile-instr-generate" \
+  "${ONNX_ARG[@]}" >/dev/null
 
 echo "── build (cortrix_unit_tests)"
 cmake --build "$BUILD" --parallel --target cortrix_unit_tests >/dev/null
@@ -46,11 +52,14 @@ mkdir -p "$PROF" "$OUT"
 rm -f "$PROF"/*.profraw "$PROF"/merged.profdata
 # %5m = online-merged pool of 5 files: constant disk footprint across
 # 4000+ single-process ctest runs (one .profraw per pid would be ~10s of GB).
-# Exclude the P-HNSW concurrency SOAK suite (same rationale as coverage.sh):
-# thread-stress tests, ~zero unique region/branch coverage, pathologically slow
-# under -O0 instrumentation. Gated for correctness by the Release ctest run.
+# Exclude timing/concurrency tests (same rationale + list as coverage.sh):
+# P-HNSW soak (slow), GcThreadTest.LoopRunsSweep (env-flaky SEGFAULT under
+# instrumentation), NamespacePool StartupLoadEightWorkers... (elapsed<2s bound
+# blown by -O0). All gated for correctness by the Release ctest run.
 LLVM_PROFILE_FILE="$PROF/%5m.profraw" \
-  ctest --test-dir "$BUILD" -L unit -E 'PHnswConcurrencyTest' --output-on-failure
+  ctest --test-dir "$BUILD" -L unit \
+    -E 'PHnswConcurrencyTest|GcThreadTest.LoopRunsSweep|NamespacePoolTest.StartupLoadEightWorkersConcurrency' \
+    --output-on-failure
 
 echo "── merge + report"
 xcrun llvm-profdata merge -sparse "$PROF"/*.profraw -o "$PROF/merged.profdata"

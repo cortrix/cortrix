@@ -34,9 +34,16 @@ CORE_DIRS=(
 )
 
 echo "── configure (coverage instrumented)"
+# Reuse the onnxruntime already fetched into the main build/ to avoid a slow,
+# flaky re-download into this instrumented build dir. No-op in CI (or any clean
+# checkout) where build/_deps is absent — FetchContent then downloads as usual.
+ONNX_SRC="$ROOT/build/_deps/onnxruntime-src"
+ONNX_ARG=()
+[ -d "$ONNX_SRC" ] && ONNX_ARG=(-DFETCHCONTENT_SOURCE_DIR_ONNXRUNTIME="$ONNX_SRC")
 cmake -B "$BUILD" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_CXX_FLAGS="--coverage -O0" \
-  -DCMAKE_EXE_LINKER_FLAGS="--coverage" >/dev/null
+  -DCMAKE_EXE_LINKER_FLAGS="--coverage" \
+  "${ONNX_ARG[@]}" >/dev/null
 
 # Build ONLY the unit-suite binary: the gate runs `ctest -L unit`, so the full
 # `all` target would waste instrumented-build time on integration/benchmark
@@ -49,13 +56,16 @@ echo "── run unit suite (one process per test via ctest)"
 # prior run mixed with re-compiled .gcno silently drops whole files from the
 # capture (mismatch), deflating coverage.
 find "$BUILD" -name "*.gcda" -delete
-# Exclude the P-HNSW concurrency SOAK suite from the coverage run only. These are
-# thread-stress/timing tests (each re-runs the SAME read/write/lock source lines
-# under contention) so they add ~zero UNIQUE branch coverage, but under -O0
-# +--coverage they are pathologically slow — Concurrent_ReadDuringWrite alone ran
-# 47 min instrumented vs ~seconds in Release. They are still gated for CORRECTNESS
-# by the Release `ctest -L unit` run; this exclusion is coverage-measurement only.
-COV_EXCLUDE='PHnswConcurrencyTest'
+# Exclude timing/concurrency tests from the coverage run only. (1) The P-HNSW
+# concurrency SOAK suite re-runs the SAME read/write/lock lines under contention
+# (~zero UNIQUE coverage) and is pathologically slow under -O0 +--coverage
+# (Concurrent_ReadDuringWrite alone: 47 min instrumented vs ~seconds in Release).
+# (2) GcThreadTest.LoopRunsSweep is a known env-flaky GC-thread timing test that
+# SEGFAULTs under instrumentation. (3) NamespacePool StartupLoadEightWorkers...
+# asserts an elapsed<2s wall-clock bound that -O0 instrumentation always blows.
+# All three stay gated for CORRECTNESS by the Release `ctest -L unit` run; this
+# exclusion is coverage-measurement only (one flaky abort must not kill the gate).
+COV_EXCLUDE='PHnswConcurrencyTest|GcThreadTest.LoopRunsSweep|NamespacePoolTest.StartupLoadEightWorkersConcurrency'
 echo "   (coverage-only exclusion: -E '$COV_EXCLUDE' — soak tests, gated in Release)"
 ctest --test-dir "$BUILD" -L unit -E "$COV_EXCLUDE" --output-on-failure
 

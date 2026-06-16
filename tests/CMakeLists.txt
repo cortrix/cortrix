@@ -312,6 +312,7 @@ add_executable(cortrix_unit_tests
     unit/test_prompt_templates.cpp
     unit/test_memory_queue.cpp
     unit/test_memory_extractor.cpp
+    unit/test_memory_extraction_service.cpp
     # --- P09 Tenant Management (Wave D-R1) ---
     unit/test_tenant_error.cpp
     unit/test_tenant_types.cpp
