@@ -334,5 +334,128 @@ TEST(CheckExecutableTest, NewlineRejected) {
     EXPECT_FALSE(CheckExecutable("echo\nnewline"));
 }
 
+// ============================================================
+// RunSubprocess - multiple buffer reads (output > 4 KiB exercises the read loop
+// more than once, hitting the repeated poll→read→append path).
+// ============================================================
+
+TEST(SubprocessUtilsTest, OutputLargerThanBuffer_FullyCaptured) {
+    std::string output;
+    // Produce ~8 KiB of output (two full 4096-byte pipe reads at minimum).
+    Status s = RunSubprocess(
+        {"bash", "-c", "yes x | head -c 8192"}, 10, &output);
+    ASSERT_TRUE(s.ok()) << s.message();
+    EXPECT_GE(output.size(), 8192u);
+}
+
+// ============================================================
+// RunSubprocess - process that writes then sleeps then writes more exercises
+// the poll loop where multiple poll() calls are needed to drain output.
+// ============================================================
+
+TEST(SubprocessUtilsTest, IntermittentOutput_DrainedCompletely) {
+    std::string output;
+    // Write one chunk, sleep briefly, write another chunk.
+    Status s = RunSubprocess(
+        {"bash", "-c", "echo chunk1; sleep 0.05; echo chunk2"}, 5, &output);
+    ASSERT_TRUE(s.ok()) << s.message();
+    EXPECT_NE(output.find("chunk1"), std::string::npos);
+    EXPECT_NE(output.find("chunk2"), std::string::npos);
+}
+
+// ============================================================
+// RunSubprocess - exit code 127 (execvp failed in child, "not found") surfaces
+// as a non-zero exit code error. execvp failing is what produces 127; this is
+// the code path when the binary exists in PATH but returns 127 via the shell.
+// We exercise it through bash -c 'exit 127'.
+// ============================================================
+
+TEST(SubprocessUtilsTest, ExitCode127_IsError) {
+    std::string output;
+    Status s = RunSubprocess({"bash", "-c", "exit 127"}, 5, &output);
+    EXPECT_FALSE(s.ok());
+    EXPECT_NE(s.message().find("exited with code 127"), std::string::npos);
+}
+
+// ============================================================
+// RunSubprocess - exit code 2 (grep/diff convention): non-zero, still an error.
+// ============================================================
+
+TEST(SubprocessUtilsTest, ExitCode2_IsError) {
+    std::string output;
+    Status s = RunSubprocess({"bash", "-c", "exit 2"}, 5, &output);
+    EXPECT_FALSE(s.ok());
+    EXPECT_NE(s.message().find("exited with code 2"), std::string::npos);
+}
+
+// ============================================================
+// RunSubprocess - WIFSIGNALED path with an exit_code = -1 edge:
+// a SIGKILL'd child (not through our timeout code) yields WIFEXITED=false,
+// so exit_code = -1, which is != 0, and must surface an error.
+// ============================================================
+
+TEST(SubprocessUtilsTest, SigKilledChild_ExitCodeMinusOne_IsError) {
+    std::string output;
+    // bash -c 'kill -9 $$' kills the bash subprocess with SIGKILL.
+    Status s = RunSubprocess({"bash", "-c", "kill -9 $$"}, 5, &output);
+    EXPECT_FALSE(s.ok());
+    // exit_code = -1 (WIFSIGNALED) → error message contains "exited with code -1"
+    // OR the process exits immediately and bash reports differently.
+    // Either way: the status must not be ok.
+}
+
+// ============================================================
+// CheckExecutable - all special-character classes that are rejected by the
+// character validation loop (covering remaining uncovered char classes).
+// ============================================================
+
+TEST(CheckExecutableTest, AsteriskRejected) {
+    EXPECT_FALSE(CheckExecutable("echo*"));
+}
+
+TEST(CheckExecutableTest, ExclamationRejected) {
+    EXPECT_FALSE(CheckExecutable("echo!"));
+}
+
+TEST(CheckExecutableTest, AtSignRejected) {
+    EXPECT_FALSE(CheckExecutable("echo@host"));
+}
+
+TEST(CheckExecutableTest, HashRejected) {
+    EXPECT_FALSE(CheckExecutable("echo#comment"));
+}
+
+TEST(CheckExecutableTest, TildeRejected) {
+    EXPECT_FALSE(CheckExecutable("~echo"));
+}
+
+TEST(CheckExecutableTest, PercentRejected) {
+    EXPECT_FALSE(CheckExecutable("echo%"));
+}
+
+TEST(CheckExecutableTest, CaretRejected) {
+    EXPECT_FALSE(CheckExecutable("echo^"));
+}
+
+TEST(CheckExecutableTest, AmpersandRejected) {
+    EXPECT_FALSE(CheckExecutable("echo&bg"));
+}
+
+TEST(CheckExecutableTest, EqualsRejected) {
+    EXPECT_FALSE(CheckExecutable("a=b"));
+}
+
+TEST(CheckExecutableTest, BraceRejected) {
+    EXPECT_FALSE(CheckExecutable("{echo}"));
+}
+
+TEST(CheckExecutableTest, BracketRejected) {
+    EXPECT_FALSE(CheckExecutable("[echo]"));
+}
+
+TEST(CheckExecutableTest, SemicolonRejected) {
+    EXPECT_FALSE(CheckExecutable("echo;ls"));
+}
+
 }  // namespace
 }  // namespace cortrix

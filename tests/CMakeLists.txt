@@ -115,6 +115,7 @@ add_executable(cortrix_unit_tests
     unit/test_cleanup_scheduler.cpp
     unit/test_schema_migrator.cpp
     unit/test_catalog_schema.cpp
+    unit/test_catalog_schema_extra.cpp
     unit/test_catalog_providers.cpp
     unit/test_catalog_error.cpp
     unit/test_ns_router_contract.cpp
@@ -124,6 +125,7 @@ add_executable(cortrix_unit_tests
     unit/test_unit_router.cpp
     unit/test_content_ref_store.cpp
     unit/test_gc_manager.cpp
+    unit/test_gc_manager_extra.cpp
     unit/test_gc_thread.cpp
     unit/test_gc_blob_sink.cpp
     unit/test_gc_routes.cpp
@@ -144,6 +146,7 @@ add_executable(cortrix_unit_tests
     unit/test_memory_writer.cpp
     unit/test_memory_injector.cpp
     unit/test_memory_searcher.cpp
+    unit/test_memory_searcher_mem05.cpp
     unit/test_memory_routes.cpp
     unit/test_query_routes.cpp
     unit/test_rrf_fusion.cpp
@@ -179,6 +182,7 @@ add_executable(cortrix_unit_tests
     unit/test_f40_sparse_metrics.cpp
     unit/test_f40_sparse_rrf.cpp
     unit/test_f40_sparse_fallback.cpp
+    unit/test_sparse_index_registry.cpp
     # --- F41 Document Summary Index (Wave C-R2) ---
     unit/test_f41_doc_summary_error.cpp
     unit/test_f41_doc_summary_metrics.cpp
@@ -197,6 +201,10 @@ add_executable(cortrix_unit_tests
     unit/test_spc_router.cpp
     unit/test_http_server.cpp
     unit/test_document_routes.cpp
+    unit/test_document_routes_extra.cpp
+    unit/test_connector_routes.cpp
+    unit/test_directory_importer.cpp
+    unit/test_http_transport_unit.cpp
     unit/test_flat_document_routes.cpp
     unit/test_namespace_pool.cpp
     unit/test_namespace_pool_branches.cpp

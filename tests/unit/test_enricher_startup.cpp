@@ -120,5 +120,118 @@ TEST_F(FactoryFallbackTest, Scenario1NullTypeNoFallbackMetric) {
     EXPECT_EQ(m.FallbackToNullCount(EnricherMetrics::FallbackReason::kEndpointUnreachable), 0u);
 }
 
+// --- ToString coverage for every StartupCheck enumerator -------------------
+
+TEST(StartupValidateTest, ToString_Ok) {
+    EXPECT_STREQ(ToString(StartupCheck::kOk), "ok");
+}
+
+TEST(StartupValidateTest, ToString_NullType) {
+    EXPECT_STREQ(ToString(StartupCheck::kNullType), "null_type");
+}
+
+TEST(StartupValidateTest, ToString_ApiKeyMissing) {
+    EXPECT_STREQ(ToString(StartupCheck::kApiKeyMissing), "api_key_missing");
+}
+
+TEST(StartupValidateTest, ToString_EndpointUnreachable) {
+    EXPECT_STREQ(ToString(StartupCheck::kEndpointUnreachable), "endpoint_unreachable");
+}
+
+// --- HTTP status-code branches: only 2xx is OK; every other status maps to
+// kEndpointUnreachable. Cover the common failure codes individually so the
+// `resp.ok()` false branch is exercised with diverse status values. ----------
+
+TEST(StartupValidateTest, ProbeHttp500IsUnreachable) {
+    auto cfg = LlmCfg();
+    llm::FakeHttpTransport t;
+    t.canned = llm::FakeHttpTransport::Http(500, "internal server error");
+    EXPECT_EQ(StartupValidate(cfg, t), StartupCheck::kEndpointUnreachable);
+    // Probe was issued (exactly one request).
+    EXPECT_EQ(t.requests.size(), 1u);
+}
+
+TEST(StartupValidateTest, ProbeHttp503IsUnreachable) {
+    auto cfg = LlmCfg();
+    llm::FakeHttpTransport t;
+    t.canned = llm::FakeHttpTransport::Http(503, "service unavailable");
+    EXPECT_EQ(StartupValidate(cfg, t), StartupCheck::kEndpointUnreachable);
+}
+
+TEST(StartupValidateTest, ProbeHttp404IsUnreachable) {
+    auto cfg = LlmCfg();
+    llm::FakeHttpTransport t;
+    t.canned = llm::FakeHttpTransport::Http(404, "not found");
+    EXPECT_EQ(StartupValidate(cfg, t), StartupCheck::kEndpointUnreachable);
+}
+
+TEST(StartupValidateTest, ProbeHttp403IsUnreachable) {
+    auto cfg = LlmCfg();
+    llm::FakeHttpTransport t;
+    t.canned = llm::FakeHttpTransport::Http(403, "forbidden");
+    EXPECT_EQ(StartupValidate(cfg, t), StartupCheck::kEndpointUnreachable);
+}
+
+TEST(StartupValidateTest, ProbeHttp429IsUnreachable) {
+    auto cfg = LlmCfg();
+    llm::FakeHttpTransport t;
+    t.canned = llm::FakeHttpTransport::Http(429, "too many requests");
+    EXPECT_EQ(StartupValidate(cfg, t), StartupCheck::kEndpointUnreachable);
+}
+
+// A 201 Created is technically 2xx and should be accepted as kOk (range check).
+TEST(StartupValidateTest, ProbeHttp201IsOk) {
+    auto cfg = LlmCfg();
+    llm::FakeHttpTransport t;
+    t.canned = llm::FakeHttpTransport::Json2xx("{}", 201);
+    EXPECT_EQ(StartupValidate(cfg, t), StartupCheck::kOk);
+}
+
+// --- Probe URL construction: endpoint without trailing slash -----------------
+
+TEST(StartupValidateTest, ProbeUrlConstructedFromEndpointField) {
+    auto cfg = LlmCfg();
+    cfg.endpoint = "https://custom.llm.host/api/v2";
+    llm::FakeHttpTransport t;
+    t.canned = llm::FakeHttpTransport::Json2xx("{}");
+    StartupValidate(cfg, t);
+    ASSERT_EQ(t.requests.size(), 1u);
+    EXPECT_EQ(t.last_request.url, "https://custom.llm.host/api/v2/models");
+}
+
+// --- Probe timeout carries startup_probe_timeout_ms from config --------------
+
+TEST(StartupValidateTest, ProbeTimeoutFromConfig) {
+    auto cfg = LlmCfg();
+    cfg.startup_probe_timeout_ms = 7654;
+    llm::FakeHttpTransport t;
+    t.canned = llm::FakeHttpTransport::NetworkFail();
+    StartupValidate(cfg, t);
+    ASSERT_EQ(t.requests.size(), 1u);
+    EXPECT_EQ(t.last_request.timeout_ms, 7654);
+}
+
+// --- Bearer token from api_key -----------------------------------------------
+
+TEST(StartupValidateTest, ProbeAuthHeaderContainsApiKey) {
+    auto cfg = LlmCfg();
+    cfg.api_key = "sk-secret-key-123";
+    llm::FakeHttpTransport t;
+    t.canned = llm::FakeHttpTransport::Json2xx("{}");
+    StartupValidate(cfg, t);
+    ASSERT_EQ(t.requests.size(), 1u);
+    EXPECT_EQ(t.last_request.headers.at("Authorization"), "Bearer sk-secret-key-123");
+}
+
+// --- kLocalNer type (non-LLM) yields kNullType without probe -----------------
+
+TEST(StartupValidateTest, LocalNerType_IsNullType_NoProbe) {
+    EnricherConfig cfg;
+    cfg.type = EnricherType::kLocalNer;
+    llm::FakeHttpTransport t;
+    EXPECT_EQ(StartupValidate(cfg, t), StartupCheck::kNullType);
+    EXPECT_TRUE(t.requests.empty());
+}
+
 }  // namespace
 }  // namespace cortrix::spc

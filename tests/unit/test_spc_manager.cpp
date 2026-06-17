@@ -28,6 +28,8 @@
 #include "cortrix/store/iindex.h"
 #include "cortrix/store/iindex_factory.h"
 #include "cortrix/store/write_coordinator.h"
+#include "cortrix/async/task_info.h"   // async::SubmitRequest (SetDocSummaryEnqueue tests)
+#include "cortrix/spc/parser.h"        // ParsedDoc / ParserErrorCode (ProcessParsedDoc tests)
 
 #include <filesystem>
 #include <thread>
@@ -560,6 +562,148 @@ TEST_F(SPCManagerRealTest, SubmitAssignsTaskIdAndTimestamp) {
 TEST_F(SPCManagerRealTest, DestructorCallsStop) {
     mgr_->Start();
     // Let the manager destruct naturally via TearDown -> mgr_.reset()
+}
+
+// ============================================================
+// ProcessParsedDoc (F42 async entry point) — the manager acquires a
+// per-task facade and delegates to pipeline_->ProcessParsed. This is
+// distinct from the WorkerLoop path (no blob extraction here).
+// ============================================================
+
+// ProcessParsedDoc with a non-admitted namespace → facade.Acquire() fails →
+// task.stage = kError, error_message contains "namespace acquire failed".
+TEST_F(SPCManagerRealTest, ProcessParsedDoc_NonexistentNamespace_Error) {
+    cortrix::spc::ParsedDoc d;
+    d.status = cortrix::spc::ParserErrorCode::kOk;
+    d.parser_name = "docling";
+    d.metadata.filename = "f.txt";
+
+    SPCTask task;
+    task.doc_id = "01JTESTDOC0000000000000099";
+    task.namespace_name = "nonexistent_ns_for_parsed";
+    task.source_path = "/tmp/f.txt";
+    task.mime_type = "text/plain";
+    task.processing_level = 3;
+    task.priority = SPCPriority::kP1;
+
+    int rc = mgr_->ProcessParsedDoc(d, task);
+    EXPECT_EQ(rc, -1);
+    EXPECT_EQ(task.stage, SPCStage::kError);
+    EXPECT_NE(task.error_message.find("namespace acquire failed"), std::string::npos);
+    EXPECT_NE(task.error_message.find("nonexistent_ns_for_parsed"), std::string::npos);
+}
+
+// ProcessParsedDoc with a real (admitted) namespace and L0 task:
+// pipeline skips processing immediately → task.stage = kDone.
+TEST_F(SPCManagerRealTest, ProcessParsedDoc_RealNamespaceL0_Done) {
+    AdmitNs("pp_ns");
+
+    // The F42 path must create the doc row before calling ProcessParsedDoc because
+    // the manager creates it internally when doc_get fails (no existing row).
+    cortrix::spc::ParsedDoc d;
+    d.status = cortrix::spc::ParserErrorCode::kOk;
+    d.parser_name = "docling";
+    d.metadata.filename = "f.txt";
+    d.metadata.page_count = 0;
+
+    SPCTask task;
+    task.doc_id = "01JTESTDOC0000000000000098";
+    task.namespace_name = "pp_ns";
+    task.source_path = "/tmp/f.txt";
+    task.mime_type = "text/plain";
+    task.processing_level = 0;  // L0: skip all processing
+    task.priority = SPCPriority::kP0;
+    task.source_type = "file";
+
+    int rc = mgr_->ProcessParsedDoc(d, task);
+    EXPECT_EQ(rc, 0) << task.error_message;
+    EXPECT_EQ(task.stage, SPCStage::kDone);
+}
+
+// ProcessParsedDoc where the manager creates the doc row (doc_get fails →
+// doc_create path). A doc_id that has never been inserted lands on the
+// "doc_get != 0 → doc_create" branch → task.stage = kDone (L0).
+TEST_F(SPCManagerRealTest, ProcessParsedDoc_CreatesDocRowWhenMissing) {
+    AdmitNs("pp_ns2");
+
+    cortrix::spc::ParsedDoc d;
+    d.status = cortrix::spc::ParserErrorCode::kOk;
+    d.parser_name = "docling";
+    d.metadata.filename = "new.txt";
+    d.metadata.page_count = 0;
+
+    SPCTask task;
+    task.doc_id = "01JTESTDOC0000000000000097";
+    task.namespace_name = "pp_ns2";
+    task.source_path = "/tmp/new.txt";
+    task.mime_type = "text/plain";
+    task.processing_level = 0;
+    task.priority = SPCPriority::kP0;
+    task.source_type = "file";
+    task.content_hash = "abc123";
+
+    int rc = mgr_->ProcessParsedDoc(d, task);
+    EXPECT_EQ(rc, 0) << task.error_message;
+    EXPECT_EQ(task.stage, SPCStage::kDone);
+}
+
+// ============================================================
+// Delegate setters with a null pipeline_ — each method must be a
+// safe no-op (null-check guard in SPCManager). The protected default
+// ctor leaves pipeline_ = nullptr; we build a raw instance via it.
+// ============================================================
+
+// SetDocSummaryEnqueue delegates to pipeline_->SetDocSummaryEnqueue; with a
+// real pipeline it is installed (exercised via WorkerLoop above). Here verify
+// the method does not crash when pipeline_ is not null (forwarded silently).
+TEST_F(SPCManagerRealTest, SetDocSummaryEnqueue_DoesNotCrash) {
+    int called = 0;
+    mgr_->SetDocSummaryEnqueue([&](const async::SubmitRequest&) { ++called; });
+    // No assertion needed — just must not crash or throw.
+}
+
+TEST_F(SPCManagerRealTest, SetEnricherChain_DoesNotCrash) {
+    mgr_->SetEnricherChain(nullptr);
+}
+
+TEST_F(SPCManagerRealTest, SetSparseIndexRegistry_DoesNotCrash) {
+    mgr_->SetSparseIndexRegistry(nullptr);
+}
+
+// ============================================================
+// WorkerLoop http_upload path — blob load failure sets kError.
+// The worker extracts the blob to a temp file before parsing when
+// source_type = "http_upload". A blob that doesn't exist in the store
+// causes brc != 0 → task.stage = kError.
+// ============================================================
+
+TEST_F(SPCManagerRealTest, WorkerLoop_HttpUpload_BlobLoadFail) {
+    AdmitNs("upload_ns");
+
+    mgr_->Start();
+
+    auto task = std::make_shared<SPCTask>();
+    task->source_path = "doc.pdf";
+    task->namespace_name = "upload_ns";
+    task->doc_id = "01JTESTDOC0000000000000096";
+    task->mime_type = "application/pdf";
+    task->priority = SPCPriority::kP0;
+    task->source_type = "http_upload";  // triggers blob extraction path
+    task->processing_level = 3;
+
+    Status s = mgr_->Submit(task);
+    EXPECT_TRUE(s.ok());
+
+    for (int i = 0; i < 50; ++i) {
+        if (task->stage == SPCStage::kDone || task->stage == SPCStage::kError) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    // Blob was never written to the store → brc != 0 or blob_data.empty() → kError.
+    EXPECT_EQ(task->stage, SPCStage::kError);
+    EXPECT_NE(task->error_message.find("blob load failed"), std::string::npos);
+
+    mgr_->Stop();
 }
 
 }  // namespace

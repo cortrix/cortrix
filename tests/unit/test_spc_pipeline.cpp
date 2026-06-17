@@ -1547,5 +1547,242 @@ TEST_F(SPCPipelineTest, NonObjectCustomMetadata_NotFoldedButCompletes) {
     EXPECT_GT(BlocksOf(doc_id).size(), 0u);
 }
 
+// ============================================================
+// BeginWrite failure branches (WAL append injection via SetWalAppendFailuresForTest).
+// These cover the "BeginWrite (X): …" error paths in every Process() variant
+// that calls write_coordinator().BeginWrite(). The WAL seam forces the append
+// to fail so the coordinator returns CX_ERR_PWL_WRITE_FAILED → pipeline sets
+// kError and surfaces the "BeginWrite" prefix in error_message.
+// ============================================================
+
+// Memory path: BeginWrite is the only coordinator call before the block_insert;
+// force it to fail → kError + "BeginWrite" in message, zero blocks persisted.
+TEST_F(SPCPipelineTest, MemorySession_BeginWriteFailure_SetsError) {
+    std::string doc_id = CreateDoc();
+    auto task_uptr = MakeTask("/n/a", "text/plain", doc_id);
+    task_uptr->source_type = "memory_session";
+    task_uptr->content_hash = "q\n---\na";
+
+    // Fail the WAL PENDING append so BeginWrite returns an error.
+    facade_->write_coordinator().SetWalAppendFailuresForTest(1);
+
+    int rc = pipeline_->Process(*task_uptr, *facade_);
+    EXPECT_EQ(rc, -1);
+    EXPECT_EQ(task_uptr->stage, SPCStage::kError);
+    EXPECT_NE(task_uptr->error_message.find("BeginWrite"), std::string::npos);
+    EXPECT_EQ(BlocksOf(doc_id).size(), 0u);
+}
+
+// L1 path: BeginWrite fails → kError + "BeginWrite (L1)" prefix in message.
+TEST_F(SPCPipelineTest, L1_BeginWriteFailure_SetsError) {
+    std::string doc_id = CreateDoc();
+    auto task_uptr = MakeTask(txt_path_, "text/plain", doc_id);
+    task_uptr->processing_level = 1;
+
+    facade_->write_coordinator().SetWalAppendFailuresForTest(1);
+
+    int rc = pipeline_->Process(*task_uptr, *facade_);
+    EXPECT_EQ(rc, -1);
+    EXPECT_EQ(task_uptr->stage, SPCStage::kError);
+    EXPECT_NE(task_uptr->error_message.find("BeginWrite"), std::string::npos);
+    EXPECT_EQ(BlocksOf(doc_id).size(), 0u);
+}
+
+// L2 path (no vector AddPoints): BeginWrite is the first coordinator call; fail
+// it before any parent/block insert → kError + "BeginWrite" in message.
+TEST_F(SPCPipelineTest, L2_BeginWriteFailure_SetsError) {
+    std::string doc_id = CreateDoc();
+    auto task_uptr = MakeTask(txt_path_, "text/plain", doc_id);
+    task_uptr->processing_level = 2;
+
+    facade_->write_coordinator().SetWalAppendFailuresForTest(1);
+
+    int rc = pipeline_->Process(*task_uptr, *facade_);
+    EXPECT_EQ(rc, -1);
+    EXPECT_EQ(task_uptr->stage, SPCStage::kError);
+    EXPECT_NE(task_uptr->error_message.find("BeginWrite"), std::string::npos);
+    EXPECT_EQ(BlocksOf(doc_id).size(), 0u);
+}
+
+// ============================================================
+// Commit failure branches (SetWalAppendFailuresForTest after all block_inserts).
+// For each Process() variant the COMMITTED append is the last WAL write; arm the
+// injector AFTER the parent/block inserts succeed so the fault lands on Commit.
+// SetFailNextOps keeps the store-ops clean; we only corrupt the WAL commit.
+// ============================================================
+
+// BeginWrite fails when the same doc_id is already in-flight (the coordinator
+// returns CX_ERR_PWL_DOC_WRITE_IN_PROGRESS). Covers the BeginWrite error branch
+// in the memory path reached from a concurrent-or-duplicate-submit scenario.
+// Note: Commit failure (2nd WAL append) is not reachable without interposing
+// between BeginWrite and Commit in a synchronous call; the in-progress case is
+// the practical equivalent and is tested here.
+TEST_F(SPCPipelineTest, MemorySession_BeginWriteInProgress_SetsError) {
+    std::string doc_id = CreateDoc();
+    auto task_uptr = MakeTask("/n/a", "text/plain", doc_id);
+    task_uptr->source_type = "memory_session";
+    task_uptr->content_hash = "q\n---\na";
+
+    // Hold the doc_id slot open so the pipeline's BeginWrite gets DOC_WRITE_IN_PROGRESS.
+    store::TxnHandle hold_txn;
+    std::vector<cortrix::BlockId> dummy_ids = {1234567890ULL};
+    Status bw = facade_->write_coordinator().BeginWrite(
+        doc_id, dummy_ids, /*writes_blob=*/false, &hold_txn);
+    ASSERT_TRUE(bw.ok()) << bw.message();
+
+    int rc = pipeline_->Process(*task_uptr, *facade_);
+    EXPECT_EQ(rc, -1);
+    EXPECT_EQ(task_uptr->stage, SPCStage::kError);
+    EXPECT_NE(task_uptr->error_message.find("BeginWrite"), std::string::npos);
+
+    // Release the held slot so the coordinator can be cleaned up.
+    facade_->write_coordinator().Rollback(hold_txn);
+}
+
+// ============================================================
+// Chunker EMPTY_DOCUMENT sub-branch in ProcessParsed. When a ParsedDoc has no
+// paragraphs the chunker returns EMPTY_DOCUMENT; the pipeline treats it as kDone
+// with zero blocks (not an error). This covers the empty-document success path
+// in ProcessParsed distinct from the L0/L1 early-return paths.
+// ============================================================
+
+// Empty paragraphs in ParsedDoc → chunker yields EMPTY_DOCUMENT → pipeline
+// marks kDone with zero blocks and does not return -1.
+TEST_F(SPCPipelineTest, ProcessParsed_EmptyParagraphs_DoneZeroBlocks) {
+    std::string doc_id = CreateDoc();
+    auto task_uptr = MakeTask(txt_path_, "text/plain", doc_id);
+    task_uptr->processing_level = 3;
+
+    cortrix::spc::ParsedDoc d;
+    d.status = cortrix::spc::ParserErrorCode::kOk;
+    d.parser_name = "docling";
+    d.metadata.filename = "empty.txt";
+    d.metadata.page_count = 1;
+    d.metadata.doc_language = "en";
+    // Page with an empty paragraph: produces zero meaningful text → EMPTY_DOCUMENT.
+    cortrix::spc::ParsedPage page;
+    page.page_num = 1;
+    page.page_text = "";
+    page.page_metadata.page_num = 1;
+    page.page_metadata.page_confidence = 0.95f;
+    // No paragraphs → chunker sees zero content.
+    d.pages.push_back(page);
+
+    int rc = pipeline_->ProcessParsed(d, *task_uptr, *facade_);
+    EXPECT_EQ(rc, 0) << task_uptr->error_message;
+    EXPECT_EQ(task_uptr->stage, SPCStage::kDone);
+    EXPECT_EQ(BlocksOf(doc_id).size(), 0u);
+}
+
+// ============================================================
+// SetEnricherChain / SetSparseIndexRegistry / SetDocSummaryEnqueue setters.
+// Each just stores a pointer; verify they don't crash and are accepted
+// by the pipeline without altering the basic processing result.
+// ============================================================
+
+// SetEnricherChain(nullptr) is a valid reset (chain = single-enricher path).
+TEST_F(SPCPipelineTest, SetEnricherChain_NullptrAccepted) {
+    pipeline_->SetEnricherChain(nullptr);
+    // Pipeline should still run the NullEnricher path cleanly.
+    std::string doc_id = CreateDoc();
+    auto task_uptr = MakeTask(txt_path_, "text/plain", doc_id);
+    int rc = pipeline_->Process(*task_uptr, *facade_);
+    EXPECT_EQ(rc, 0) << task_uptr->error_message;
+    EXPECT_EQ(task_uptr->stage, SPCStage::kDone);
+}
+
+// SetSparseIndexRegistry(nullptr) is a valid reset (dense-only path).
+TEST_F(SPCPipelineTest, SetSparseIndexRegistry_NullptrAccepted) {
+    pipeline_->SetSparseIndexRegistry(nullptr);
+    std::string doc_id = CreateDoc();
+    auto task_uptr = MakeTask(txt_path_, "text/plain", doc_id);
+    int rc = pipeline_->Process(*task_uptr, *facade_);
+    EXPECT_EQ(rc, 0) << task_uptr->error_message;
+    EXPECT_EQ(task_uptr->stage, SPCStage::kDone);
+}
+
+// SetDocSummaryEnqueue installs the seam; a subsequent successful full-doc write
+// fires the hook exactly once (OnDocumentWritten call at the end of Process()).
+TEST_F(SPCPipelineTest, SetDocSummaryEnqueue_FiredAfterSuccessfulProcess) {
+    int fired = 0;
+    pipeline_->SetDocSummaryEnqueue(
+        [&](const async::SubmitRequest&) { ++fired; });
+
+    std::string doc_id = CreateDoc();
+    auto task_uptr = MakeTask(txt_path_, "text/plain", doc_id);
+    int rc = pipeline_->Process(*task_uptr, *facade_);
+    ASSERT_EQ(rc, 0) << task_uptr->error_message;
+    EXPECT_EQ(fired, 1);
+}
+
+// The seam is NOT fired when processing is cancelled (no successful write).
+TEST_F(SPCPipelineTest, SetDocSummaryEnqueue_NotFiredOnCancel) {
+    int fired = 0;
+    pipeline_->SetDocSummaryEnqueue(
+        [&](const async::SubmitRequest&) { ++fired; });
+
+    auto task_uptr = MakeTask(txt_path_, "text/plain", "01JTESTDOC0000000000000099");
+    task_uptr->cancelled.store(true);
+
+    int rc = pipeline_->Process(*task_uptr, *facade_);
+    EXPECT_EQ(rc, -1);
+    EXPECT_EQ(fired, 0);
+}
+
+// The seam is NOT fired on L0 (no write, doc is skipped).
+TEST_F(SPCPipelineTest, SetDocSummaryEnqueue_NotFiredOnL0) {
+    int fired = 0;
+    pipeline_->SetDocSummaryEnqueue(
+        [&](const async::SubmitRequest&) { ++fired; });
+
+    std::string doc_id = CreateDoc();
+    auto task_uptr = MakeTask(txt_path_, "text/plain", doc_id);
+    task_uptr->processing_level = 0;
+
+    int rc = pipeline_->Process(*task_uptr, *facade_);
+    EXPECT_EQ(rc, 0);
+    EXPECT_EQ(fired, 0);
+}
+
+// ============================================================
+// L3 cancellation at the embedding stage (cancelled.store(true) set AFTER
+// parse+chunk succeed, exercising the cancel check inside Stage 4).
+// ============================================================
+
+// Set cancelled AFTER chunking would have completed to exercise the Stage-4
+// cancellation check. Since cancelled is checked before the embed stage, a
+// pre-cancelled task still hits that check. We already have L3_PreCancelled;
+// this ensures the cancel in ProcessParsed's Stage-4 check is also reached
+// by directly feeding ProcessParsed with a pre-cancelled task.
+TEST_F(SPCPipelineTest, ProcessParsed_L3_PreCancelled_HitsStage4CancelCheck) {
+    auto task_uptr = MakeTask(txt_path_, "text/plain", "01JTESTDOC0000000000000088");
+    task_uptr->processing_level = 3;
+    task_uptr->cancelled.store(true);
+
+    // Build a non-empty ParsedDoc so that chunking would succeed if not cancelled.
+    cortrix::spc::ParsedDoc d;
+    d.status = cortrix::spc::ParserErrorCode::kOk;
+    d.parser_name = "docling";
+    d.metadata.filename = "test.txt";
+    d.metadata.page_count = 1;
+    d.metadata.doc_language = "en";
+    cortrix::spc::ParsedPage page;
+    page.page_num = 1;
+    page.page_metadata.page_num = 1;
+    page.page_metadata.page_confidence = 0.95f;
+    cortrix::spc::ParsedChunk c;
+    c.text = std::string(200, 'x');
+    c.page = 1;
+    c.type = cortrix::spc::ChunkType::TEXT;
+    c.confidence = 0.95f;
+    page.paragraphs.push_back(c);
+    d.pages.push_back(page);
+
+    int rc = pipeline_->ProcessParsed(d, *task_uptr, *facade_);
+    EXPECT_EQ(rc, -1);
+    EXPECT_EQ(task_uptr->stage, SPCStage::kCancelled);
+    EXPECT_EQ(TotalBlocks(), 0);
+}
+
 }  // namespace
 }  // namespace cortrix

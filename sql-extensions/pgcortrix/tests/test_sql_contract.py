@@ -51,7 +51,7 @@ class TestCompositeTypes(unittest.TestCase):
         "pgcortrix_memory_result": [
             ("memory_id", "TEXT"), ("content", "TEXT"), ("score", "FLOAT"),
             ("created_at", "TIMESTAMPTZ"), ("memory_type", "TEXT"),
-            ("status", "TEXT"),
+            ("status", "TEXT"), ("final_score", "FLOAT"),
         ],
         "pgcortrix_interaction_info": [
             ("interaction_id", "TEXT"), ("user_id", "TEXT"),
