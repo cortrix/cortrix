@@ -468,8 +468,14 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
     // F13 §11 Engine instrumentation (raw ptr; Impl outlives the closure). null →
     // tracing off; RecordQueryTrace then no-ops, leaving the path unchanged.
     agent_trace::EngineInstrumentation* engine_instr = impl_->engine_instr.get();
+    // [R7] Whether an LLM is configured — F36 rag-fusion needs one to expand query
+    // variants. When absent (CE OSS default) the gate below skips rag-fusion and
+    // runs plain scatter, so a `rag_fusion=true` request degrades gracefully instead
+    // of dereferencing a null LLM client (the §F36 LLM-unavailable contract).
+    const bool rag_fusion_llm_available = impl_->variant_generator->has_llm();
     svr.Post("/api/v1/query", WithAuth(auth, kPermRead,
-        [handler, classifier, rag_stage, scatter, crag_stage, pool, engine_instr](
+        [handler, classifier, rag_stage, scatter, crag_stage, pool, engine_instr,
+         rag_fusion_llm_available](
             const httplib::Request& req, httplib::Response& res,
             const RequestContext& ctx) {
             // Parse the JSON body up-front so a malformed body is a clean 400 here
@@ -582,8 +588,11 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                     explain = (v == "true" || v == "TRUE" || v == "True" || v == "1");
                 }
                 RagFusionConfig rag_cfg = ResolveRagFusionConfig(req, body);
-                const bool use_rag_fusion =
-                    qctx.routing_path == "complex" && rag_cfg.enabled;
+                // [R7] rag-fusion also requires a configured LLM (variant expansion
+                // calls it); without one a `rag_fusion=true` request degrades to
+                // plain scatter rather than crashing on a null LLM client.
+                const bool use_rag_fusion = qctx.routing_path == "complex" &&
+                                            rag_cfg.enabled && rag_fusion_llm_available;
                 try {
                     CrossNsResponse resp =
                         use_rag_fusion

@@ -247,6 +247,12 @@ Status DirWatcherRegistry::Subscribe(
         catalog::NSMetadata meta;
         meta.namespace_id = ns;
         meta.name         = ns;
+        // [R7 fix] Single-tenant OSS runs as 'default_tenant' (catalog_schema.cpp
+        // §188). Without this, namespaces/units.tenant_id (NOT NULL, FK->tenants)
+        // gets an empty string, the FK fails, CreateNamespace returns an error, the
+        // NS is never admitted, and the importer silently skips every file — a
+        // live-only watch_dir bug caught by the full-stack fan-out E2E.
+        meta.tenant_id    = "default_tenant";
         Status cs = ins_router_.CreateNamespace(meta);
         if (!cs.ok() && cs.code() != StatusCode::kAlreadyExists) {
             CORTRIX_LOG_WARN(kModule, "namespace create failed ns={}: {}",

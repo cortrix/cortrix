@@ -200,6 +200,17 @@ Result<QueryVariants> QueryVariantGenerator::Generate(
     const std::string& original_query,
     const RagFusionConfig& config,
     const observability::TraceContext* ctx) {
+    // [R7] No LLM configured (CE OSS default) → cannot expand. Degrade to single
+    // query instead of dereferencing a null llm_ (defense-in-depth: the F36 gate in
+    // query_wiring already skips rag-fusion when no LLM is available, but this guard
+    // keeps the generator safe for any caller). Mirrors the §F36 "LLM unavailable →
+    // single-query fallback" contract; kDegraded is the C-class warning code.
+    if (!llm_) {
+        RagFusionMetrics::Instance().RecordDegraded(
+            ToDegradeReason(RagFusionErrorCode::kDegraded));
+        return RagFusionStatus(RagFusionErrorCode::kDegraded,
+                               "rag-fusion degraded: no LLM client configured");
+    }
     // §9: TraceContext is interface-reserved in V1.0 OSS (always nullptr → no
     // inject). Wiring real span propagation is D3.5.
     if (ctx != nullptr) {

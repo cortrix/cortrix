@@ -29,10 +29,16 @@ namespace cortrix::query {
 ///      → warning logged (the delimiter + schema are the actual defense)
 class QueryVariantGenerator {
 public:
-    /// @param llm  the shared OpenAI-compatible client (real or mock). MUST be
-    ///             non-null; a null client is a programming error (the server only
-    ///             constructs the generator when `config.llm.enabled`, F36 §10.1).
+    /// @param llm  the shared OpenAI-compatible client (real or mock), or null when
+    ///             no LLM is configured (CE OSS default). A null client is allowed:
+    ///             Generate() then degrades to a single-query fallback (it never
+    ///             dereferences a null llm), and callers can pre-check via has_llm().
     explicit QueryVariantGenerator(std::shared_ptr<llm::ILlmClient> llm);
+
+    /// True iff an LLM client is configured (non-null). The F36 rag-fusion gate
+    /// (query_wiring) checks this to skip variant expansion entirely when no LLM is
+    /// available, degrading the query to plain scatter (dense + BM25) — [R7].
+    bool has_llm() const { return llm_ != nullptr; }
 
     /// Generate up to `config.variant_count` variants (NOT including the original
     /// query). On success returns the parsed QueryVariants; on failure returns a
