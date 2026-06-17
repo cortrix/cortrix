@@ -6,11 +6,18 @@
 
   ### Agent-Native Semantic Storage Engine
 
-  [![CI](https://img.shields.io/github/actions/workflow/status/cortrix/cortrix/ci.yml?branch=main)](https://github.com/cortrix/cortrix/actions)
   [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+  [![Version](https://img.shields.io/badge/version-0.1.0--rc.1-FF6405)](https://github.com/cortrix/cortrix/releases)
+
+  <!-- Dynamic badges below need a PUBLIC repo + live infra to render (shields.io
+       cannot read a private repo's CI/stars; the Discord/PyPI ids are placeholders).
+       Re-enable at the public release once CI, the Discord server, and the PyPI
+       package exist:
+  [![CI](https://img.shields.io/github/actions/workflow/status/cortrix/cortrix/ci.yml?branch=main)](https://github.com/cortrix/cortrix/actions)
   [![PyPI](https://img.shields.io/pypi/v/cortrix)](https://pypi.org/project/cortrix)
-  [![Discord](https://img.shields.io/discord/0?label=Discord&logo=discord)](https://discord.gg/cortrix)
+  [![Discord](https://img.shields.io/discord/SERVER_ID?label=Discord&logo=discord)](https://discord.gg/cortrix)
   [![GitHub stars](https://img.shields.io/github/stars/cortrix/cortrix?style=social)](https://github.com/cortrix/cortrix/stargazers)
+  -->
 
   [Watch Demo Video (60s)](https://cortrix.ai) <!-- Video coming Phase 1.5 -->
 
