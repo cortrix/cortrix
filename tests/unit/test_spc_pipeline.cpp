@@ -556,44 +556,15 @@ TEST_F(SPCPipelineTest, F10_ParseFailedPropagatesToChild) {
 // OFF (dedup_enabled=false), so two byte-identical child chunks that WOULD collapse
 // under the default config (see F10_DedupRemovesDuplicateChildren) both survive —
 // proving the resolved NS config took effect on the owned DataCleaner.
-TEST_F(SPCPipelineTest, F10_NsConfigResolver_DisablesDedup) {
-    const std::string para(4400, 'x');  // > parent_size → each para its own parent
-    const std::string json =
-        std::string(R"JSON({"status":0,"parser":"docling",)JSON") +
-        R"JSON("metadata":{"filename":"dup.txt","page_count":1,"doc_language":"en"},)JSON" +
-        R"JSON("pages":[{"page_num":1,"page_text":"x","page_metadata":{"page_num":1,)JSON" +
-        R"JSON("parser_used":"docling","page_confidence":0.95,"is_scan_page":false,"char_count":1},)JSON" +
-        R"JSON("paragraphs":[{"text":")JSON" + para +
-        R"JSON(","page":1,"type":"TEXT","confidence":0.95,"language":"en"},)JSON" +
-        R"JSON({"text":")JSON" + para +
-        R"JSON(","page":1,"type":"TEXT","confidence":0.95,"language":"en"}]}]})JSON";
-    RebuildFactory(json);
-
-    // NS resolver: dedup OFF (the other fields keep defaults). The pipeline calls
-    // this with the task's namespace_id before each cleaning run.
-    pipeline_->SetCleaningConfigResolver(
-        [](const std::string&) {
-            cortrix::spc::CleaningConfig c;  // struct defaults
-            c.dedup_enabled = false;         // NS override under test
-            return c;
-        });
-
-    std::string doc_id = CreateDoc();
-    auto task_uptr_ = MakeTask(txt_path_, "text/plain", doc_id);
-    SPCTask& task = *task_uptr_;
-    int rc = pipeline_->Process(task, *facade_);
-    ASSERT_EQ(rc, 0) << task.error_message;
-
-    int identical = 0;
-    for (const auto& b : BlocksOf(doc_id)) {
-        if (b.block_type == static_cast<int>(kBlockFile) &&
-            b.content_text == para) {
-            ++identical;
-        }
-    }
-    EXPECT_EQ(identical, 2)
-        << "dedup disabled via NS config → both identical children must survive";
-}
+// [R7] SPCPipelineTest.F10_NsConfigResolver_DisablesDedup was removed here — it had
+// an assertion bug (failed in BOTH release and coverage builds, identical==0):
+// para(4400,'x') has no separators, so child chunking splits it into ~16 fragments,
+// none of which equals the full 4400-char string, making the `content_text == para`
+// count always 0 regardless of whether dedup ran. The source (DataCleaner::Dedup
+// early-returning when dedup_enabled==false) is correct. Replaced by
+// test_spc_pipeline_r7.cpp::F10_NsResolverDisablesDedup_KeepsDuplicateChildren,
+// which asserts survivor-count > distinct-text-count (no dependence on the broken
+// "one child == full paragraph" assumption).
 
 TEST_F(SPCPipelineTest, ProcessMarkdownFile_Parses) {
     std::string doc_id = CreateDoc();

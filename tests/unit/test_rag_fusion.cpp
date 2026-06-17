@@ -160,6 +160,22 @@ TEST_F(RagFusionTest, QueryVariantGenerator_InvalidLlmResponse) {
               std::string::npos);
 }
 
+// UT 6 [R7]: no LLM client (null) -> Generate degrades instead of dereferencing a
+// null llm_ (defense-in-depth for the guard in query_variant_generator.cpp; the F36
+// gate in query_wiring normally skips rag-fusion when no LLM is available, but a
+// direct caller must also be safe). Returns CX_WARN_RAG_FUSION_DEGRADED, records one
+// "other" degrade, and must not crash. (Regression for the R7 no-LLM SIGSEGV bug.)
+TEST_F(RagFusionTest, QueryVariantGenerator_NullLlm_DegradesNoCrash) {
+    QueryVariantGenerator gen(/*llm=*/nullptr);
+    auto out = gen.Generate("q", EnabledConfig());
+    ASSERT_FALSE(out.ok());
+    EXPECT_NE(out.status().message().find("CX_WARN_RAG_FUSION_DEGRADED"),
+              std::string::npos);
+    EXPECT_GE(RagFusionMetrics::Instance().DegradedCount(
+                  RagFusionMetrics::DegradeReason::kOther),
+              1u);
+}
+
 // Schema validation: missing 'variants' key, non-object element, empty query.
 TEST_F(RagFusionTest, ParseVariantsJson_SchemaViolations) {
     std::vector<std::string> out;

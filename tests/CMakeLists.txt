@@ -167,7 +167,16 @@ add_executable(cortrix_unit_tests
     unit/test_vector_searcher.cpp
     unit/test_sql_executor.cpp
     unit/test_spc_pipeline.cpp
+    unit/test_spc_pipeline_r7.cpp
+    unit/test_enricher_chain_r7.cpp
+    unit/test_spc_manager_r7.cpp
     unit/test_onnx_embedder.cpp
+    unit/test_onnx_embedder_real.cpp
+    unit/test_reranker_real.cpp
+    unit/test_memory_branches_r7b.cpp
+    unit/test_memory_routes_r7b.cpp
+    unit/test_spc_branches_r7b.cpp
+    unit/test_query_branches_r7b.cpp
     unit/test_f40_onnx_embedder_sparse.cpp
     unit/test_f40_sparse_error.cpp
     unit/test_f40_sparse_codec.cpp
@@ -344,6 +353,7 @@ add_executable(cortrix_unit_tests
     # --- ID System Infrastructure (D3.5 Batch 0 prerequisite) ---
     unit/test_siphash.cpp
     unit/test_id_hash.cpp
+    unit/test_store_persistence_r7.cpp
 )
 
 target_link_libraries(cortrix_unit_tests PRIVATE
@@ -376,6 +386,7 @@ if(APPLE)
             unit/test_syscall_fault_inject.cpp
         )
         target_link_libraries(cortrix_unit_tests PRIVATE cortrix_fault_inject)
+        target_compile_definitions(cortrix_unit_tests PRIVATE CORTRIX_ENABLE_FAULT_INJECT)
     endif()
 endif() # APPLE
 
@@ -400,6 +411,11 @@ gtest_discover_tests(cortrix_unit_tests PROPERTIES LABELS unit
 # --- Integration tests ---
 add_executable(cortrix_integration_tests
     integration/test_health_endpoint.cpp
+    integration/test_f13_observability_e2e.cpp
+    integration/test_ingest_pipeline_e2e.cpp
+    integration/test_multi_ns_fanout_e2e.cpp
+    integration/test_query_llm_modes_e2e.cpp
+    integration/test_real_model_query_e2e.cpp
     integration/test_auth_middleware.cpp
     integration/test_namespace_api.cpp
     integration/test_storage_roundtrip.cpp
