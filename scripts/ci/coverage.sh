@@ -83,7 +83,7 @@ mkdir -p "$OUT"
 # constantly; ignore them all (1.x behavior).
 LCOV_OPTS=(--rc branch_coverage=1 --rc no_exception_branch=1 --rc max_message_count=10
            --filter branch,function
-           --ignore-errors mismatch,negative,unused,inconsistent,deprecated,format,count,empty,source,unsupported,graph,path)
+           --ignore-errors mismatch,negative,unused,inconsistent,deprecated,format,count,empty,source,unsupported,graph,path,range)
 lcov "${LCOV_OPTS[@]}" --capture --directory "$BUILD" --output-file "$OUT/raw.info" >/dev/null
 # project code only: drop system headers, fetched deps, tests themselves.
 # Also drop vendored third-party sources living inside src/ (hnswlib ships its
@@ -104,7 +104,7 @@ genhtml --branch-coverage "$OUT/all.info" --output-directory "$OUT/html" >/dev/n
 pct() { # pct <info-file> <lines|branches>
   # lcov 2.x summary line: "  lines.......: 91.5% (27133 of 29654 lines)".
   # Match field 1 = "<key>...:" (dots vary) and take the % off field 2.
-  lcov --rc branch_coverage=1 --ignore-errors inconsistent,format,count --summary "$1" 2>&1 \
+  lcov --rc branch_coverage=1 --ignore-errors inconsistent,format,count,range --summary "$1" 2>&1 \
     | awk -v k="$2" '$1 ~ "^"k"\\.*:" {gsub(/%/,"",$2); print $2; exit}'
 }
 
