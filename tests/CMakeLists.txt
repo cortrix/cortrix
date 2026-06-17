@@ -23,7 +23,6 @@ add_executable(cortrix_unit_tests
     unit/test_namespace_manager.cpp
     unit/test_logging.cpp
     unit/test_recursive_chunker.cpp
-    unit/test_document_parser.cpp
     unit/test_parser_interface.cpp
     unit/test_parser_factory.cpp
     unit/test_docling_parser.cpp
@@ -35,6 +34,7 @@ add_executable(cortrix_unit_tests
     unit/test_parser_branches.cpp
     unit/test_parser_subprocess_branches.cpp
     unit/test_data_cleaner.cpp
+    unit/test_cleaning_config_resolver.cpp
     unit/test_cleaning_errors.cpp
     unit/test_cleaning_plugin_stub.cpp
     unit/test_block_assembler.cpp
@@ -167,8 +167,6 @@ add_executable(cortrix_unit_tests
     unit/test_vector_searcher.cpp
     unit/test_sql_executor.cpp
     unit/test_spc_pipeline.cpp
-    unit/test_subprocess_utils.cpp
-    unit/test_ocr_processor.cpp
     unit/test_onnx_embedder.cpp
     unit/test_f40_onnx_embedder_sparse.cpp
     unit/test_f40_sparse_error.cpp

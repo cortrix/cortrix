@@ -108,6 +108,11 @@ void SPCManager::SetSparseIndexRegistry(
     if (pipeline_) pipeline_->SetSparseIndexRegistry(registry);
 }
 
+void SPCManager::SetCleaningConfigResolver(
+    std::function<cortrix::spc::CleaningConfig(const std::string& ns_id)> fn) {
+    if (pipeline_) pipeline_->SetCleaningConfigResolver(std::move(fn));
+}
+
 void SPCManager::SetWriteRejectProbe(std::function<bool()> probe) {
     write_reject_probe_ = std::move(probe);
 }

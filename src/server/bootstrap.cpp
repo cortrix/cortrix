@@ -42,6 +42,7 @@
 #include "cortrix/llm/openai_client.h"             // OpenAiLlmClient (shared enricher LLM)
 #include "cortrix/spc/spc_pipeline.h"
 #include "cortrix/spc/spc_manager.h"
+#include "cortrix/spc/cleaning_config_resolver.h"  // [F10 §3.4] per-NS CleaningConfig resolve
 // [F42 main wiring] async subsystem + F41 doc-summary worker + LLM client
 #include "cortrix/async/task_manager.h"
 #include "cortrix/async/task_scheduler.h"
@@ -663,6 +664,30 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         seed.base_url = config.agent_llm.base_url;
         global_config->SetAgentLlmConfig(seed);
     }
+    // [F10 §3.4 · D3.5] Wire the per-NS CleaningConfig resolver onto the SPC pipeline
+    // (proxied through spc_mgr). The NS cleaning_config lives in the catalog (not on
+    // the per-request façade), so the pipeline reaches it through this seam: resolve
+    // global defaults once from global_config, then per task merge global ←
+    // namespaces.cleaning_config (INSRouter::GetNamespace). A missing NS / absent blob
+    // / merge failure degrades to the global defaults (never blocks ingest). Wired here
+    // (not at the §8 pipeline build) because global_config is constructed in this block.
+    const cortrix::spc::CleaningConfig cleaning_global =
+        cortrix::spc::LoadGlobalCleaningConfig(global_config.get());
+    spc_mgr.SetCleaningConfigResolver(
+        [&ns_router, cleaning_global](
+            const std::string& ns_id) -> cortrix::spc::CleaningConfig {
+            std::string blob;
+            if (auto md = ns_router.GetNamespace(ns_id);
+                md.ok() && md.value().cleaning_config) {
+                blob = *md.value().cleaning_config;
+            }
+            if (auto resolved =
+                    cortrix::spc::ResolveCleaningConfig(cleaning_global, blob);
+                resolved.ok()) {
+                return resolved.value();
+            }
+            return cleaning_global;  // bad NS blob → safe global defaults
+        });
     cortrix::observability::ObservabilityModule obs_module(catalog_db.db(), global_config);
     upload_handler.SetOperationLogger(obs_module.logger());  // [F18a M3] upload-site operation_log
     // [F13 TC4 · A4] agent_trace now lives in the global catalog.db. Build ONE writer over

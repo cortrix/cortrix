@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <iostream>
 
 // Storage
@@ -18,7 +19,6 @@
 #include "cortrix/common/block_types.h"
 
 // SPC pipeline
-#include "cortrix/spc/document_parser.h"
 #include "cortrix/spc/recursive_chunker.h"
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/spc/block_assembler.h"
@@ -60,6 +60,19 @@ static std::string FindModelDir() {
         }
     }
     return "";
+}
+
+// Read a UTF-8 text file into a string. The test inputs are plain .txt files
+// written by the fixtures below, so this is the in-process equivalent of the
+// (removed in R6b) MVP TxtParser used purely to obtain text for the chunker.
+// The F06 parser path (DoclingParser / PaddleOCRParser) runs via a Python
+// subprocess bridge and is not appropriate here — these tests exercise the
+// chunk -> embed -> store -> query chain, not document parsing.
+static std::string ReadFile(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
 }
 
 // ==================================================================
@@ -118,28 +131,27 @@ protected:
         fs::remove_all(test_dir_, ec);
     }
 
-    // Helper: ingest a document through SPC pipeline (parse → chunk → embed → store)
+    // Helper: ingest a document through SPC pipeline (read text → chunk → embed → store)
     int IngestDocument(const std::string& file_path, const std::string& mime_type,
                        std::string* out_doc_id = nullptr) {
-        // Parse
-        TxtParser parser;
-        ParseResult parse_result;
-        Status s = parser.Parse(file_path, mime_type, &parse_result);
-        if (!s.ok()) return -1;
+        // Read text (plain .txt inputs; parser step replaced by ReadFile in R6b).
+        // mime_type is still recorded on the doc record below.
+        std::string text = ReadFile(file_path);
+        if (text.empty()) return -1;
 
         // Chunk
         ChunkConfig chunk_cfg;
         chunk_cfg.chunk_size = 256;
         chunk_cfg.chunk_overlap = 30;
         RecursiveChunker chunker(chunk_cfg);
-        auto chunks = chunker.Chunk(parse_result.text);
+        auto chunks = chunker.Chunk(text);
         if (chunks.empty()) return -1;
 
         // Embed (real ONNX)
         std::vector<std::string> chunk_texts;
         for (const auto& c : chunks) chunk_texts.push_back(c.text);
         std::vector<EmbeddingResult> embeddings;
-        s = embedder_->EmbedBatch(chunk_texts, &embeddings);
+        Status s = embedder_->EmbedBatch(chunk_texts, &embeddings);
         if (!s.ok()) return -1;
 
         // Create doc record

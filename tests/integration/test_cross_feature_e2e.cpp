@@ -13,6 +13,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <cstdlib>
 
 #include "httplib.h"
@@ -26,7 +27,6 @@
 #include "cortrix/common/block_types.h"
 
 // SPC pipeline (F03)
-#include "cortrix/spc/document_parser.h"
 #include "cortrix/spc/recursive_chunker.h"
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/spc/block_assembler.h"
@@ -72,6 +72,18 @@ namespace fs = std::filesystem;
 using json = nlohmann::json;
 using cortrix::store::PHnsw;        // F01 PHnsw replaces MVP CortrixVectorHnswlib
 using cortrix::store::PhnswConfig;
+
+// Read a UTF-8 text file into a string. Test inputs are plain .txt files; this
+// is the in-process equivalent of the (removed in R6b) MVP TxtParser used purely
+// to obtain text for the chunker. The F06 parser path (DoclingParser /
+// PaddleOCRParser) runs via a Python subprocess bridge and is not used here —
+// this test exercises the SPC -> store -> query chain, not document parsing.
+static std::string ReadFile(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
 
 // ==================================================================
 // Test 1: SPC → Store → Query Pipeline (no HTTP, direct API)
@@ -141,19 +153,16 @@ protected:
 // Core E2E: Upload doc → Parse → Chunk → Embed → Store (SQLite+HNSW) → Query (BM25+Vector)
 TEST_F(SpcStoreQueryTest, FullPipelineUploadToQuery) {
     // ===== Phase 1: SPC Pipeline (F03) =====
-    // 1a. Parse document
-    TxtParser parser;
-    ParseResult parse_result;
-    Status s = parser.Parse(doc_path_, "text/plain", &parse_result);
-    ASSERT_TRUE(s.ok()) << s.message();
-    ASSERT_FALSE(parse_result.text.empty());
+    // 1a. Read document text (plain .txt input; see ReadFile note)
+    std::string doc_text = ReadFile(doc_path_);
+    ASSERT_FALSE(doc_text.empty());
 
     // 1b. Chunk
     ChunkConfig chunk_cfg;
     chunk_cfg.chunk_size = 256;
     chunk_cfg.chunk_overlap = 30;
     RecursiveChunker chunker(chunk_cfg);
-    auto chunks = chunker.Chunk(parse_result.text);
+    auto chunks = chunker.Chunk(doc_text);
     ASSERT_GT(chunks.size(), 1u) << "Expected multiple chunks";
 
     // 1c. Embed all chunks
@@ -161,7 +170,7 @@ TEST_F(SpcStoreQueryTest, FullPipelineUploadToQuery) {
     for (const auto& c : chunks) chunk_texts.push_back(c.text);
 
     std::vector<EmbeddingResult> embeddings;
-    s = embedder_->EmbedBatch(chunk_texts, &embeddings);
+    Status s = embedder_->EmbedBatch(chunk_texts, &embeddings);
     ASSERT_TRUE(s.ok()) << s.message();
     ASSERT_EQ(embeddings.size(), chunks.size());
 
@@ -177,7 +186,7 @@ TEST_F(SpcStoreQueryTest, FullPipelineUploadToQuery) {
     ASSERT_FALSE(doc.doc_id.empty());  // [D-I6] doc_id is a ULID string now
 
     // 2b. Store blob (raw content)
-    std::string raw_content = parse_result.text;
+    std::string raw_content = doc_text;
     ASSERT_EQ(blob_->store("default", doc.doc_id,
               raw_content.data(), raw_content.size()), 0);
 

@@ -498,6 +498,37 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     std::unordered_map<uint64_t, float> score_by_block;
     child_blocks.reserve(out.children.size());
 
+    // [F10 §3.2 PARSE_FAILED · M2] F06 reports failed pages doc-level (d.failed_pages,
+    // page numbers). MetaToJson only carries the 8 DocumentMetadata fields, so the
+    // F10 DetectAnomaly parse_status signals (meta.parse_status / meta.parse_failed_page,
+    // the F08 SoT key format — rule_based_metadata_generator.cpp) never reached the
+    // child Blocks → PARSE_FAILED was dead. Stamp them per child here. Per-chunk
+    // semantics (metadata_types.h: "the page in failed_pages this chunk sits on"):
+    // a child sits on its parent's [page_start, page_end] span (parent page_num from
+    // the F34 chunker, same 1-based numbering as failed_pages), so only children whose
+    // span intersects a failed page are flagged — NOT every child of a partly-failed
+    // doc. parse_status = "ok" when the doc fully parsed, else "partial".
+    const bool doc_parse_partial = !d.failed_pages.empty();
+    std::unordered_map<std::string, std::pair<uint32_t, uint32_t>> parent_page_span;
+    if (doc_parse_partial) {
+        for (const auto& p : out.parents) {
+            parent_page_span[p.parent_id] = {p.page_start, p.page_end};
+        }
+    }
+    // The specific failed page a child's parent span covers, or -1 if none.
+    auto failed_page_for_parent = [&](const std::string& parent_id) -> int {
+        auto it = parent_page_span.find(parent_id);
+        if (it == parent_page_span.end()) return -1;
+        const uint32_t lo = it->second.first, hi = it->second.second;
+        for (int fp : d.failed_pages) {
+            if (fp >= 0 && static_cast<uint32_t>(fp) >= lo &&
+                static_cast<uint32_t>(fp) <= hi) {
+                return fp;
+            }
+        }
+        return -1;
+    };
+
     std::vector<cortrix::spc::Block> clean_blocks;
     std::unordered_map<std::string, size_t> child_idx_by_id;
     clean_blocks.reserve(out.children.size());
@@ -510,8 +541,24 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         cb.metadata_json = nlohmann::json::parse(
             MetaToJson(child.metadata), nullptr, /*allow_exceptions=*/false);
         if (cb.metadata_json.is_discarded()) cb.metadata_json = nlohmann::json::object();
+        // [M2] parse_status passthrough (F08 SoT key format): "ok" unless the doc
+        // had failed pages; meta.parse_failed_page set only when THIS child's parent
+        // span covers a failed page (→ DetectAnomaly marks PARSE_FAILED for it).
+        if (doc_parse_partial) {
+            const int fp = failed_page_for_parent(child.parent_id);
+            cb.metadata_json["meta.parse_status"] = "partial";
+            if (fp >= 0) cb.metadata_json["meta.parse_failed_page"] = fp;
+        } else {
+            cb.metadata_json["meta.parse_status"] = "ok";
+        }
         clean_blocks.push_back(std::move(cb));
         child_idx_by_id[child.child_id] = i;
+    }
+    // [F10 §3.4 · D3.5] Apply the per-NS effective CleaningConfig (global ← NS
+    // cleaning_config) before cleaning. The seam resolves from the catalog (which
+    // the façade does not expose); unset → data_cleaner_ keeps its default config.
+    if (cleaning_config_resolver_) {
+        data_cleaner_.SetConfig(cleaning_config_resolver_(facade.namespace_id()));
     }
     data_cleaner_.Dedup(clean_blocks);          // drops exact + semantic duplicates
     data_cleaner_.DetectAnomaly(clean_blocks);  // marks skip-index (kept, not indexed)
@@ -821,6 +868,11 @@ void SPCPipeline::SetEnricherChain(cortrix::spc::EnricherChain* chain) {
 void SPCPipeline::SetSparseIndexRegistry(
     cortrix::retrieval::SparseIndexRegistry* registry) {
     sparse_registry_ = registry;
+}
+
+void SPCPipeline::SetCleaningConfigResolver(
+    std::function<cortrix::spc::CleaningConfig(const std::string& ns_id)> fn) {
+    cleaning_config_resolver_ = std::move(fn);
 }
 
 void SPCPipeline::OnDocumentWritten(const std::string& doc_id,

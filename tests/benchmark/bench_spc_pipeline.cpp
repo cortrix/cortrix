@@ -1,8 +1,8 @@
 #include <benchmark/benchmark.h>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
-#include "cortrix/spc/document_parser.h"
 #include "cortrix/spc/recursive_chunker.h"
 #include "cortrix/spc/block_assembler.h"
 #include "cortrix/spc/onnx_embedder.h"
@@ -43,6 +43,16 @@ static void WriteTextFile(const fs::path& path, const std::string& content) {
     f << content;
 }
 
+// Read a text file into a string. In-process equivalent of the (removed in R6b)
+// MVP TxtParser used purely to obtain text for the chunker; the F06 parser path
+// runs via a Python subprocess bridge and is not appropriate for a benchmark.
+static std::string ReadTextFile(const fs::path& path) {
+    std::ifstream f(path, std::ios::binary);
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
 // ---------------------------------------------------------------------------
 // BM_RecursiveChunker – chunking throughput at various sizes
 // ---------------------------------------------------------------------------
@@ -66,55 +76,11 @@ static void BM_RecursiveChunker(benchmark::State& state) {
 }
 BENCHMARK(BM_RecursiveChunker)->Arg(10)->Arg(50)->Arg(200);
 
-// ---------------------------------------------------------------------------
-// BM_TxtParser – text file parsing
-// ---------------------------------------------------------------------------
-
-static void BM_TxtParser(benchmark::State& state) {
-    auto dir = MakeTempDir("txt_parse");
-    auto file = dir / "test.txt";
-    WriteTextFile(file, GenerateText(50));
-
-    cortrix::TxtParser parser;
-
-    for (auto _ : state) {
-        cortrix::ParseResult result;
-        auto s = parser.Parse(file.string(), "text/plain", &result);
-        benchmark::DoNotOptimize(result);
-    }
-
-    fs::remove_all(dir);
-}
-BENCHMARK(BM_TxtParser);
-
-// ---------------------------------------------------------------------------
-// BM_MarkdownParser – markdown file parsing
-// ---------------------------------------------------------------------------
-
-static void BM_MarkdownParser(benchmark::State& state) {
-    auto dir = MakeTempDir("md_parse");
-    auto file = dir / "test.md";
-
-    std::string md_content;
-    for (int i = 0; i < 50; ++i) {
-        md_content += "## Section " + std::to_string(i) + "\n\n";
-        md_content += "This is a **benchmark** paragraph with `code` and "
-                      "[links](http://example.com). It tests the markdown "
-                      "parser throughput for the SPC pipeline.\n\n";
-    }
-    WriteTextFile(file, md_content);
-
-    cortrix::MarkdownParser parser;
-
-    for (auto _ : state) {
-        cortrix::ParseResult result;
-        auto s = parser.Parse(file.string(), "text/markdown", &result);
-        benchmark::DoNotOptimize(result);
-    }
-
-    fs::remove_all(dir);
-}
-BENCHMARK(BM_MarkdownParser);
+// NOTE: BM_TxtParser / BM_MarkdownParser were removed in R6b. They benchmarked
+// the deleted MVP parser path (cortrix::TxtParser / cortrix::MarkdownParser),
+// which has no F06 equivalent for plain text/markdown (F06 DoclingParser /
+// PaddleOCRParser run via a Python subprocess bridge, not in-process). The
+// chunker / pipeline benchmarks below remain the meaningful SPC throughput tests.
 
 // ---------------------------------------------------------------------------
 // BM_BlockAssembler – block assembly with mock embeddings
@@ -152,7 +118,6 @@ static void BM_SPCFullPath(benchmark::State& state) {
     auto file = dir / "test.txt";
     WriteTextFile(file, GenerateText(50));
 
-    cortrix::TxtParser parser;
     cortrix::ChunkConfig chunk_cfg;
     chunk_cfg.chunk_size = 512;
     chunk_cfg.chunk_overlap = 50;
@@ -165,12 +130,11 @@ static void BM_SPCFullPath(benchmark::State& state) {
     mock_emb.dim = kDim;
 
     for (auto _ : state) {
-        // Parse
-        cortrix::ParseResult parse_result;
-        parser.Parse(file.string(), "text/plain", &parse_result);
+        // Read text (replaces MVP parser; see ReadTextFile note)
+        std::string text = ReadTextFile(file.string());
 
         // Chunk
-        auto chunks = chunker.Chunk(parse_result.text);
+        auto chunks = chunker.Chunk(text);
 
         // Assemble
         for (size_t i = 0; i < chunks.size(); ++i) {

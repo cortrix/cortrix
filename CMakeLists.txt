@@ -61,8 +61,6 @@ add_library(cortrix_core STATIC
     src/store/phnsw/snapshot_manager.cpp
     src/store/cortrix_store_sqlite.cpp
     src/store/cortrix_blob_local.cpp
-    src/spc/subprocess_utils.cpp
-    src/spc/document_parser.cpp
     src/spc/parser_errors.cpp
     src/spc/parser.cpp
     src/spc/parser_subprocess.cpp
@@ -73,6 +71,7 @@ add_library(cortrix_core STATIC
     src/spc/recursive_chunker.cpp
     src/spc/cleaning_errors.cpp
     src/spc/data_cleaner.cpp
+    src/spc/cleaning_config_resolver.cpp
     src/spc/onnx_embedder.cpp
     src/spc/onnx_runtime.cpp
     src/spc/onnx_error.cpp
@@ -80,8 +79,6 @@ add_library(cortrix_core STATIC
     src/spc/startup_validator.cpp
     src/spc/onnx_cli.cpp
     src/spc/hf_tokenizer.cpp
-    src/spc/ocr_processor.cpp
-    src/spc/vision_llm_processor.cpp
     src/spc/block_assembler.cpp
     # --- F03 NER + Summary Enricher (Wave B) ---
     src/spc/enricher_error.cpp

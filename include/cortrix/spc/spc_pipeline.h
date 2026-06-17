@@ -59,6 +59,20 @@ public:
     int ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                       resource::NamespaceFacade& facade);
 
+    /// [F10 §3.4 · D3.5 NS-override wiring] Install the per-NS CleaningConfig
+    /// resolver. When set, each Process/ProcessParsed resolves the effective
+    /// CleaningConfig for the task's namespace (global ← namespaces.cleaning_config,
+    /// §3.4 three-layer; V1.0 has no request layer) and applies it to the owned
+    /// DataCleaner before dedup/anomaly. Bootstrap wires it to
+    /// INSRouter::GetNamespace(ns).cleaning_config + the global defaults
+    /// (ResolveCleaningConfig); the NS metadata lives in the catalog, which the
+    /// per-request NamespaceFacade does not expose, so this seam (not the façade)
+    /// carries it. Unset / nullptr = feature off: the DataCleaner keeps its default
+    /// CleaningConfig{} (F10 standalone behavior, backward compatible). The bound
+    /// callable must outlive the pipeline (bootstrap owns the router + config).
+    void SetCleaningConfigResolver(
+        std::function<cortrix::spc::CleaningConfig(const std::string& ns_id)> fn);
+
     /// [⑤c] Install the F41 doc-summary enqueue seam (F41 §5.2 / §10.1). When set
     /// (production wires it to F42 TaskScheduler::Enqueue via the adapter), a
     /// successfully written full document fires OnDocumentWritten → enqueue a
@@ -113,9 +127,16 @@ private:
     // needed and the SPCPipeline ctor signature is unchanged.
     cortrix::metadata::RuleBasedMetadataGenerator meta_generator_;
     // F10 data cleaner (dedup + anomaly detection). Owned with the default
-    // CleaningConfig (NS-override merge is a separate D3.5 item); the F18a audit
-    // sink is nullable (left null here) — so again no ctor ripple.
+    // CleaningConfig; the per-task NS-override (§3.4) is applied via SetConfig from
+    // cleaning_config_resolver_ when that seam is installed. The F18a audit sink is
+    // nullable (left null here) — so no ctor ripple.
     cortrix::spc::DataCleaner data_cleaner_{cortrix::spc::CleaningConfig{}};
+    // [F10 §3.4] Optional per-NS CleaningConfig resolver (nullable = feature off →
+    // default CleaningConfig{}). Production wires it to INSRouter::GetNamespace +
+    // ResolveCleaningConfig (bootstrap); given a ns_id it returns the resolved
+    // effective config, applied to data_cleaner_ before each cleaning run.
+    std::function<cortrix::spc::CleaningConfig(const std::string& ns_id)>
+        cleaning_config_resolver_;
     // F07 semantic scorer (write-time processing_level + semantic_score, D7). Owned:
     // stateless, default-constructible, sole V1 impl — so no ctor wiring / DI needed.
     cortrix::scoring::SemanticScorer scorer_;

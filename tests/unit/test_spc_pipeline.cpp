@@ -504,6 +504,97 @@ TEST_F(SPCPipelineTest, F10_DedupRemovesDuplicateChildren) {
                 << "F10 dedup: no two surviving child rows may share identical text";
 }
 
+// [F10 §3.2 PARSE_FAILED · M2] A doc parsed with a failed page (d.failed_pages
+// non-empty) must propagate the F08-format meta.parse_status / meta.parse_failed_page
+// keys onto the child Blocks so F10 DetectAnomaly can fire PARSE_FAILED. The child's
+// parent span covers page 1, which is the failed page → the child is marked anomalous
+// (kept, but flagged skip-index). Regression for the dead-code gap where MetaToJson
+// dropped parse_status so PARSE_FAILED never triggered in the live pipeline.
+TEST_F(SPCPipelineTest, F10_ParseFailedPropagatesToChild) {
+    // One distinct paragraph on page 1, sized like the default fixture paragraphs so
+    // the chunker reliably emits a child (small enough to stay one parent on page 1).
+    std::string para;
+    for (int i = 0; i < 30; ++i) para += "PARSE_FAILED_BODY ";
+    const std::string json =
+        std::string(R"JSON({"status":0,"parser":"docling","failed_pages":[1],)JSON") +
+        R"JSON("metadata":{"filename":"pf.txt","page_count":1,"doc_language":"en"},)JSON" +
+        R"JSON("pages":[{"page_num":1,"page_text":"q","page_metadata":{"page_num":1,)JSON" +
+        R"JSON("parser_used":"docling","page_confidence":0.95,"is_scan_page":false,"char_count":1},)JSON" +
+        R"JSON("paragraphs":[{"text":")JSON" + para +
+        R"JSON(","page":1,"type":"TEXT","confidence":0.95,"language":"en"}]}]})JSON";
+    RebuildFactory(json);
+
+    std::string doc_id = CreateDoc();
+    auto task_uptr_ = MakeTask(txt_path_, "text/plain", doc_id);
+    SPCTask& task = *task_uptr_;
+    int rc = pipeline_->Process(task, *facade_);
+    ASSERT_EQ(rc, 0) << task.error_message;
+
+    int child_count = 0;
+    for (const auto& b : BlocksOf(doc_id)) {
+        if (b.block_type != static_cast<int>(kBlockFile)) continue;  // skip F08 META
+        ++child_count;
+        nlohmann::json m =
+            nlohmann::json::parse(b.metadata_json, nullptr, /*allow_exceptions=*/false);
+        ASSERT_FALSE(m.is_discarded()) << "child metadata_json must be valid JSON";
+        // M2 passthrough (F08 SoT key format).
+        ASSERT_TRUE(m.contains("meta.parse_status"));
+        EXPECT_EQ(m["meta.parse_status"], "partial");
+        ASSERT_TRUE(m.contains("meta.parse_failed_page"));
+        EXPECT_EQ(m["meta.parse_failed_page"], 1);
+        // DetectAnomaly fired PARSE_FAILED off the propagated key.
+        ASSERT_TRUE(m.contains("cleaning.anomaly_reason"));
+        EXPECT_NE(m["cleaning.anomaly_reason"].get<std::string>().find("parse_failed"),
+                  std::string::npos);
+        EXPECT_EQ(m["cleaning.skip_index"], true);
+    }
+    EXPECT_GT(child_count, 0) << "expected at least one child block";
+}
+
+// [F10 §3.4 · M1] When a per-NS CleaningConfig resolver seam is installed, the
+// pipeline applies it to the DataCleaner before cleaning. Here the NS turns dedup
+// OFF (dedup_enabled=false), so two byte-identical child chunks that WOULD collapse
+// under the default config (see F10_DedupRemovesDuplicateChildren) both survive —
+// proving the resolved NS config took effect on the owned DataCleaner.
+TEST_F(SPCPipelineTest, F10_NsConfigResolver_DisablesDedup) {
+    const std::string para(4400, 'x');  // > parent_size → each para its own parent
+    const std::string json =
+        std::string(R"JSON({"status":0,"parser":"docling",)JSON") +
+        R"JSON("metadata":{"filename":"dup.txt","page_count":1,"doc_language":"en"},)JSON" +
+        R"JSON("pages":[{"page_num":1,"page_text":"x","page_metadata":{"page_num":1,)JSON" +
+        R"JSON("parser_used":"docling","page_confidence":0.95,"is_scan_page":false,"char_count":1},)JSON" +
+        R"JSON("paragraphs":[{"text":")JSON" + para +
+        R"JSON(","page":1,"type":"TEXT","confidence":0.95,"language":"en"},)JSON" +
+        R"JSON({"text":")JSON" + para +
+        R"JSON(","page":1,"type":"TEXT","confidence":0.95,"language":"en"}]}]})JSON";
+    RebuildFactory(json);
+
+    // NS resolver: dedup OFF (the other fields keep defaults). The pipeline calls
+    // this with the task's namespace_id before each cleaning run.
+    pipeline_->SetCleaningConfigResolver(
+        [](const std::string&) {
+            cortrix::spc::CleaningConfig c;  // struct defaults
+            c.dedup_enabled = false;         // NS override under test
+            return c;
+        });
+
+    std::string doc_id = CreateDoc();
+    auto task_uptr_ = MakeTask(txt_path_, "text/plain", doc_id);
+    SPCTask& task = *task_uptr_;
+    int rc = pipeline_->Process(task, *facade_);
+    ASSERT_EQ(rc, 0) << task.error_message;
+
+    int identical = 0;
+    for (const auto& b : BlocksOf(doc_id)) {
+        if (b.block_type == static_cast<int>(kBlockFile) &&
+            b.content_text == para) {
+            ++identical;
+        }
+    }
+    EXPECT_EQ(identical, 2)
+        << "dedup disabled via NS config → both identical children must survive";
+}
+
 TEST_F(SPCPipelineTest, ProcessMarkdownFile_Parses) {
     std::string doc_id = CreateDoc();
     auto task_uptr_ = MakeTask(md_path_, "text/markdown", doc_id);

@@ -1,8 +1,6 @@
 #include <gtest/gtest.h>
-#include "cortrix/spc/document_parser.h"
 #include "cortrix/spc/recursive_chunker.h"
 #include "cortrix/spc/onnx_embedder.h"
-#include "cortrix/spc/ocr_processor.h"
 #include "cortrix/spc/block_assembler.h"
 #include "cortrix/spc/spc_router.h"
 #include "cortrix/spc/spc_pipeline.h"
@@ -12,10 +10,22 @@
 #include "cortrix/common/block_types.h"
 #include "cortrix/config/config.h"
 #include <fstream>
+#include <sstream>
 #include <cstdio>
 
 namespace cortrix {
 namespace {
+
+// Read a text file into a string. In-process equivalent of the (removed in R6b)
+// MVP TxtParser/MarkdownParser used purely to obtain text for the chunker; the
+// F06 parser path (DoclingParser/PaddleOCRParser) runs via a Python subprocess
+// bridge. These tests exercise the chunk -> embed -> assemble chain, not parsing.
+static std::string ReadFile(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
 
 // ---- Helper: create temp files for testing ----
 
@@ -75,20 +85,17 @@ TEST_F(SPCEndToEndTest, RouterInfersMimeTypes) {
 // ---- Test: Full pipeline TXT: parse → chunk → embed → assemble ----
 
 TEST_F(SPCEndToEndTest, FullPipelineTxt) {
-    // 1. Parse
-    TxtParser parser;
-    ParseResult parse_result;
-    Status s = parser.Parse(txt_path_, "text/plain", &parse_result);
-    ASSERT_TRUE(s.ok()) << s.message();
-    ASSERT_FALSE(parse_result.text.empty());
-    ASSERT_GT(parse_result.char_count, 0);
+    // 1. Read text (plain .txt input; see ReadFile note)
+    std::string doc_text = ReadFile(txt_path_);
+    ASSERT_FALSE(doc_text.empty());
+    ASSERT_GT(doc_text.size(), 0u);
 
     // 2. Chunk
     ChunkConfig chunk_config;
     chunk_config.chunk_size = 512;
     chunk_config.chunk_overlap = 50;
     RecursiveChunker chunker(chunk_config);
-    auto chunks = chunker.Chunk(parse_result.text);
+    auto chunks = chunker.Chunk(doc_text);
     ASSERT_GT(chunks.size(), 1u) << "Expected multiple chunks from large text";
 
     // Verify chunk properties
@@ -100,7 +107,7 @@ TEST_F(SPCEndToEndTest, FullPipelineTxt) {
 
     // 3. Embed (stub mode)
     OnnxEmbedder embedder("", 1024);
-    s = embedder.Init();
+    Status s = embedder.Init();
     ASSERT_TRUE(s.ok()) << s.message();
 
     std::vector<std::string> chunk_texts;
@@ -147,19 +154,17 @@ TEST_F(SPCEndToEndTest, FullPipelineTxt) {
 // ---- Test: Full pipeline Markdown: parse → chunk → embed → assemble ----
 
 TEST_F(SPCEndToEndTest, FullPipelineMarkdown) {
-    // 1. Parse
-    MarkdownParser parser;
-    ParseResult parse_result;
-    Status s = parser.Parse(md_path_, "text/markdown", &parse_result);
-    ASSERT_TRUE(s.ok()) << s.message();
-    ASSERT_FALSE(parse_result.text.empty());
-
-    // Markdown markers should be stripped
-    EXPECT_EQ(parse_result.text.find("**"), std::string::npos);
+    // 1. Read text (markdown input read as raw text; see ReadFile note).
+    //    NOTE: the old MVP MarkdownParser stripped markdown markers ("**"), which
+    //    was a parser-layer behavior. With the parser removed (R6b) the chunker
+    //    receives raw markdown; this test now exercises chunk -> embed -> assemble
+    //    only, so the marker-stripping assertion is intentionally dropped.
+    std::string doc_text = ReadFile(md_path_);
+    ASSERT_FALSE(doc_text.empty());
 
     // 2. Chunk
     RecursiveChunker chunker;
-    auto chunks = chunker.Chunk(parse_result.text);
+    auto chunks = chunker.Chunk(doc_text);
     ASSERT_GE(chunks.size(), 1u);
 
     // 3. Embed
@@ -204,18 +209,6 @@ TEST_F(SPCEndToEndTest, EmbedderDeterministicButVaried) {
     float norm = 0.0f;
     for (float v : r1.vector) norm += v * v;
     EXPECT_NEAR(norm, 1.0f, 0.01f);
-}
-
-// ---- Test: OCR gracefully fails when script/file unavailable ----
-
-TEST_F(SPCEndToEndTest, OcrGracefulFailure) {
-    OcrProcessor ocr("python3", "run_ocr.py", 60);
-    OcrResult result;
-    Status s = ocr.Process("/tmp/nonexistent.png", &result);
-    // OCR subprocess not available in test env → should fail gracefully
-    EXPECT_FALSE(s.ok());
-    EXPECT_TRUE(result.merged_text.empty());
-    EXPECT_TRUE(result.lines.empty());
 }
 
 // ---- Test: TaskQueue priority + cancel integration ----

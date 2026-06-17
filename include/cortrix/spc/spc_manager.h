@@ -53,6 +53,15 @@ public:
     /// (bootstrap) and shared with the query read path; nullptr = sparse off.
     virtual void SetSparseIndexRegistry(cortrix::retrieval::SparseIndexRegistry* registry);
 
+    /// [F10 §3.4] Install the per-NS CleaningConfig resolver on the managed pipeline
+    /// (proxy, same reason as SetEnricherChain). Given a ns_id it returns the
+    /// effective CleaningConfig (global ← namespaces.cleaning_config); bootstrap binds
+    /// it to INSRouter::GetNamespace + ResolveCleaningConfig. nullptr = NS-override off
+    /// (the DataCleaner keeps its default config). The bound callable's captured
+    /// dependencies (router + global config) must outlive this manager.
+    virtual void SetCleaningConfigResolver(
+        std::function<cortrix::spc::CleaningConfig(const std::string& ns_id)> fn);
+
     /// [D3.5 wire · gap②] Disk write-reject probe (F24 §6, F24-4 decision A). When
     /// set and returning true (disk usage >= CRIT), Submit() refuses NEW task
     /// admission with Unavailable("CX_ERR_DISK_FULL ..."). This is the catch-all

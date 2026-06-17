@@ -44,6 +44,19 @@ public:
     /// before use; exposed for the pipeline to fail fast / surface to the Agent.
     Status ValidateConfig() const;
 
+    /// Replace the active cleaning config (D3.5 NS-override wiring). The SPCPipeline
+    /// owns one DataCleaner and re-resolves the effective CleaningConfig per task
+    /// (global ← NS cleaning_config, §3.4) before Dedup/DetectAnomaly, so the owned
+    /// instance must be reconfigurable. Dedup/DetectAnomaly read config_ on each
+    /// call, so this takes effect on the next call. Not thread-safe with concurrent
+    /// Dedup/DetectAnomaly on the same instance (the pipeline runs one task at a
+    /// time per worker over its own DataCleaner — wire⑤ per-task façade model).
+    void SetConfig(const CleaningConfig& config) { config_ = config; }
+
+    /// The active cleaning config (post any SetConfig). Exposed for tests / the
+    /// pipeline to confirm the resolved values took effect.
+    const CleaningConfig& config() const { return config_; }
+
     /// ★ Main entry 1: dedup (in-place; removes duplicates). D2 chaining: exact SHA-256 of
     /// chunk_text, then semantic cosine over the upstream embeddings (D3). No-op
     /// (returns 0 removed) when dedup_enabled=false. TraceContext: Phase-1 noop.
