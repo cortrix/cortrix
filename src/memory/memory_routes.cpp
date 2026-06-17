@@ -61,6 +61,63 @@ static void RecordIsolationDecision(memory::Mem05Metrics::Action action, bool ow
     }
 }
 
+// MEM05 IDOR guard: resolve the effective user_id from a caller-supplied value
+// (body or query param) and decide whether the authenticated principal may act on
+// it. A non-admin principal may only target its own user_id — supplying someone
+// else's user_id is a body-spoof cross-user attempt and is denied. This is the
+// single source of truth behind every memory CRUD route (list/create/edit/delete/
+// search), so they all enforce isolation identically (matching the original GET
+// list guard at /api/v1/memory).
+//
+// @param requested  [in/out] the caller-supplied user_id; on entry empty means
+//                   "use my own", and it is rewritten to the effective user_id
+//                   (auth.user_id, or "default" in CE no-auth mode).
+// @return true  = allowed; `requested` holds the effective user_id to use.
+//         false = cross-user denial; the caller must emit the route's mask
+//                 response (404 for mutations, empty 200 for list/search) and
+//                 return. One isolation_violation_total{reason=mismatch} is
+//                 recorded here; the caller adds no further metric.
+static bool EnforceOwnUserId(const RequestContext& rc, std::string& requested,
+                             memory::Mem05Metrics::Action action) {
+    if (requested.empty()) {
+        requested = rc.auth.user_id.empty() ? "default" : rc.auth.user_id;
+    }
+    // Admins may target any user_id; a principal with no user_id (e.g. the CE
+    // no-auth path where auth.user_id is empty) is not subject to the per-user
+    // mismatch check — P08 per-key isolation still applies upstream.
+    const bool owned = rc.auth.is_admin() || rc.auth.user_id.empty() ||
+                       requested == rc.auth.user_id;
+    RecordIsolationDecision(action, owned);
+    return owned;
+}
+
+// MEM05 IDOR guard for session-scoped operations (inject / write-interaction /
+// opt-out). The session's owner is the authoritative user_id (the memory_sessions
+// row), so a caller cannot self-assert ownership via the body. A non-admin
+// principal may only act on a session it owns; acting on another principal's
+// session is denied. Looks the owner up via MemoryStore::SessionGet.
+//
+// Semantics (anti-enumeration, design § 4.5):
+//   - session exists & owned (or admin / no-auth empty principal) → true (proceed).
+//   - session exists & owned by another principal → false; the caller emits a 404
+//     mask and returns. One isolation_violation_total{reason=mismatch} recorded.
+//   - session does NOT exist → true (proceed); the downstream service emits its own
+//     not-found, so we neither double-handle it nor leak existence. No metric.
+static bool EnforceSessionOwner(const RequestContext& rc, MemoryStore& store,
+                                const std::string& session_id,
+                                memory::Mem05Metrics::Action action) {
+    // Admin and the no-auth empty principal are not subject to the per-user check
+    // (P08 per-key isolation still applies upstream); skip the lookup entirely.
+    if (rc.auth.is_admin() || rc.auth.user_id.empty()) return true;
+    MemorySession session;
+    if (!store.SessionGet(session_id, session).ok()) {
+        return true;  // unknown session — let the downstream path 404 it.
+    }
+    const bool owned = (session.user_id == rc.auth.user_id);
+    RecordIsolationDecision(action, owned);
+    return owned;
+}
+
 // Write a GEN-Agent 4-field error envelope (code/retryable/category + structured_data)
 // with an explicit HTTP status. Used by the M-wave endpoints whose errors carry a
 // CX_ERR_MEM0x_* identity rather than a generic Status.
@@ -280,10 +337,8 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
         // MEM05 L1: the requester may only list their own user_id (admin may query any).
         std::string user_id = req.get_param_value("user_id");
-        if (user_id.empty()) user_id = rc.auth.user_id.empty() ? "default" : rc.auth.user_id;
-        if (!rc.auth.is_admin() && !rc.auth.user_id.empty() && user_id != rc.auth.user_id) {
-            RecordIsolationDecision(memory::Mem05Metrics::Action::kSearch, false);
-            // 404-mask: do not reveal another user's memories exist.
+        if (!EnforceOwnUserId(rc, user_id, memory::Mem05Metrics::Action::kSearch)) {
+            // Empty-result mask: do not reveal another user's memories exist.
             json resp; resp["memories"] = json::array(); resp["total"] = 0;
             WriteJsonResponse(res, 200, resp);
             return;
@@ -334,7 +389,14 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         if (ns.empty() || content.empty()) {
             WriteJsonError(res, Status::InvalidArgument("ns + content are required")); return;
         }
-        std::string user_id = body.value("user_id", rc.auth.user_id.empty() ? "default" : rc.auth.user_id);
+        // MEM05 L1: a non-admin may only create memories under its own user_id;
+        // a spoofed body user_id is a cross-user write and is refused. 404 (not 403)
+        // keeps the response shape uniform with the other masked routes and does not
+        // confirm/deny anything about the target user.
+        std::string user_id = body.value("user_id", "");
+        if (!EnforceOwnUserId(rc, user_id, memory::Mem05Metrics::Action::kEdit)) {
+            WriteJsonError(res, Status::NotFound("Cannot create memory for the requested user")); return;
+        }
         resource::NamespaceFacade facade(pool, ns);
         if (Status acq = facade.Acquire(); !acq.ok()) {
             WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found")); return;
@@ -366,7 +428,12 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         if (ns.empty() || content.empty()) {
             WriteJsonError(res, Status::InvalidArgument("ns + content are required")); return;
         }
-        std::string user_id = body.value("user_id", rc.auth.user_id.empty() ? "default" : rc.auth.user_id);
+        // MEM05 L1: a non-admin may only edit memories under its own user_id; a
+        // spoofed body user_id would let A invalidate+rewrite B's memory → 404-mask.
+        std::string user_id = body.value("user_id", "");
+        if (!EnforceOwnUserId(rc, user_id, memory::Mem05Metrics::Action::kEdit)) {
+            WriteJsonError(res, Status::NotFound("Memory not found: " + mem_id)); return;
+        }
         resource::NamespaceFacade facade(pool, ns);
         if (Status acq = facade.Acquire(); !acq.ok()) {
             WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found")); return;
@@ -393,8 +460,12 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         std::string ns = req.get_param_value("ns");
         if (ns.empty()) ns = req.get_param_value("namespace");
         if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
+        // MEM05 L1: a non-admin may only soft-delete memories under its own user_id;
+        // a spoofed user_id would let A invalidate B's memory → 404-mask.
         std::string user_id = req.get_param_value("user_id");
-        if (user_id.empty()) user_id = rc.auth.user_id.empty() ? "default" : rc.auth.user_id;
+        if (!EnforceOwnUserId(rc, user_id, memory::Mem05Metrics::Action::kDelete)) {
+            WriteJsonError(res, Status::NotFound("Memory not found: " + mem_id)); return;
+        }
         resource::NamespaceFacade facade(pool, ns);
         if (Status acq = facade.Acquire(); !acq.ok()) {
             WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found")); return;
@@ -448,7 +519,7 @@ static void RegisterMemoryOptOutRoutes(httplib::Server& svr, ApiKeyAuth& auth,
     }));
 
     svr.Post(R"(/api/v1/memory/session/([A-Za-z0-9_\-]+)/opt-out)", WithAuth(auth, kPermWrite,
-        [&pool, resolve_ns](const httplib::Request& req, httplib::Response& res, const RequestContext&) {
+        [&pool, resolve_ns](const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         std::string session_id = req.matches[1].str();
         std::string ns;
         if (!resolve_ns(req, ns)) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
@@ -458,6 +529,14 @@ static void RegisterMemoryOptOutRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         resource::NamespaceFacade facade(pool, ns);
         if (Status acq = facade.Acquire(); !acq.ok()) {
             WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found")); return;
+        }
+        // MEM05 L2: a non-admin may only opt out a session it owns; opting out
+        // another user's session is 404-masked (anti-enumeration). (The revoke
+        // sibling is kPermAdmin, so it is already restricted to admins.)
+        if (!EnforceSessionOwner(rc, facade.memory(), session_id,
+                                 memory::Mem05Metrics::Action::kSession)) {
+            WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+            return;
         }
         memory::immunity::MemoryStoreOptOutAdapter opt_store(facade.memory());
         memory::immunity::OptOutManager opt_out(
@@ -573,7 +652,7 @@ void RegisterMemoryRoutes(
 
     // GET /api/v1/memory/sessions — List sessions
     svr.Get("/api/v1/memory/sessions", WithAuth(auth, kPermRead,
-        [&](const httplib::Request& req, httplib::Response& res, const RequestContext&) {
+        [&](const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         std::string ns_name = req.get_param_value("namespace");
         if (ns_name.empty()) {
             WriteJsonError(res, Status::InvalidArgument("namespace query param is required"));
@@ -618,10 +697,14 @@ void RegisterMemoryRoutes(
         }
 
         // MEM05: list isolation — only return the requester's own sessions.
-        // Requester user_id: query param, CE no-auth defaults to "default".
+        // Authenticated non-admin: the principal (rc.auth.user_id) is authoritative,
+        // so a spoofed ?user_id= cannot list another user's sessions. Admin / CE
+        // no-auth fall back to the query-param self-identification ("default").
         // (Post-filter here keeps SessionList's store signature stable; pushing
         //  the user_id predicate into the SQL WHERE is a D3.5 store optimization.)
-        std::string req_user_id = ResolveRequesterUserId(req);
+        std::string req_user_id = (!rc.auth.is_admin() && !rc.auth.user_id.empty())
+                                      ? rc.auth.user_id
+                                      : ResolveRequesterUserId(req);
         // §8.bis: list enforces isolation by post-filtering (no cross-user leak),
         // so the request itself is one isolation_check_total{result=pass,action=list}.
         memory::Mem05Metrics::Instance().RecordIsolationCheck(
@@ -663,7 +746,7 @@ void RegisterMemoryRoutes(
     // GET /api/v1/memory/sessions/:session_id — Get session detail
     svr.Get(R"(/api/v1/memory/sessions/([A-Za-z0-9_\-]+))",
         WithAuth(auth, kPermRead,
-        [&](const httplib::Request& req, httplib::Response& res, const RequestContext&) {
+        [&](const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         std::string session_id = req.matches[1].str();
 
         std::string ns_name = req.get_param_value("namespace");
@@ -689,13 +772,30 @@ void RegisterMemoryRoutes(
 
         // MEM05: ownership check — a session belonging to another user must not
         // be readable. Return 404 (not 403) to avoid leaking existence (anti-enumeration,
-        // design § 2.7 / § 4.5). Requester user_id: query param, CE default.
-        std::string req_user_id = ResolveRequesterUserId(req);
-        const bool owned = (session.user_id == req_user_id);
-        RecordIsolationDecision(memory::Mem05Metrics::Action::kSessionAccess, owned);
-        if (!owned) {
+        // design § 2.7 / § 4.5).
+        //
+        // When authenticated, the principal (rc.auth.user_id) is authoritative: a
+        // non-admin must not read another user's session even if it passes the
+        // victim's id in ?user_id= (that would be an IDOR). In CE no-auth mode the
+        // principal is empty, so the requester self-identifies via the query param
+        // (CE single-user compat) — the legacy param check below covers that case.
+        if (!EnforceSessionOwner(rc, *mem_store, session_id,
+                                 memory::Mem05Metrics::Action::kSessionAccess)) {
             WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
             return;
+        }
+        // CE no-auth / admin: the authenticated principal is absent or unrestricted,
+        // so the requester self-identifies via the query param. (For an
+        // authenticated non-admin, EnforceSessionOwner above is the authoritative
+        // gate and already passed; the param is not consulted.)
+        if (rc.auth.is_admin() || rc.auth.user_id.empty()) {
+            std::string req_user_id = ResolveRequesterUserId(req);
+            const bool owned = (session.user_id == req_user_id);
+            RecordIsolationDecision(memory::Mem05Metrics::Action::kSessionAccess, owned);
+            if (!owned) {
+                WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+                return;
+            }
         }
 
         std::vector<InteractionLog> interactions;
@@ -736,7 +836,7 @@ void RegisterMemoryRoutes(
     // DELETE /api/v1/memory/sessions/:session_id — Delete session
     svr.Delete(R"(/api/v1/memory/sessions/([A-Za-z0-9_\-]+))",
         WithAuth(auth, kPermWrite,
-        [&](const httplib::Request& req, httplib::Response& res, const RequestContext&) {
+        [&](const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         std::string session_id = req.matches[1].str();
         std::string ns_name = req.get_param_value("namespace");
         if (ns_name.empty()) {
@@ -754,18 +854,30 @@ void RegisterMemoryRoutes(
 
         // MEM05: verify ownership before deleting. Cross-user (or missing)
         // session -> 404, not leaking existence (anti-enumeration, design § 4.5).
-        MemorySession session;
-        auto get_s = mem_store->SessionGet(session_id, session);
-        std::string req_user_id = ResolveRequesterUserId(req);
-        // Only count the isolation decision when the session exists; a missing
-        // session is a not-found, not a cross-user denial (§8.bis semantics).
-        if (get_s.ok()) {
-            RecordIsolationDecision(memory::Mem05Metrics::Action::kDelete,
-                                    session.user_id == req_user_id);
-        }
-        if (!get_s.ok() || session.user_id != req_user_id) {
+        // Authenticated principal is authoritative (a non-admin cannot delete
+        // another user's session by passing its id in ?user_id=); CE no-auth falls
+        // back to the param self-identification below.
+        if (!EnforceSessionOwner(rc, *mem_store, session_id,
+                                 memory::Mem05Metrics::Action::kDelete)) {
             WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
             return;
+        }
+        MemorySession session;
+        auto get_s = mem_store->SessionGet(session_id, session);
+        if (!get_s.ok()) {  // unknown session → not-found (no cross-user signal).
+            WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+            return;
+        }
+        // CE no-auth / admin self-identify via the query param (EnforceSessionOwner
+        // is a no-op for them); an authenticated non-admin was already gated above.
+        if (rc.auth.is_admin() || rc.auth.user_id.empty()) {
+            std::string req_user_id = ResolveRequesterUserId(req);
+            const bool owned = (session.user_id == req_user_id);
+            RecordIsolationDecision(memory::Mem05Metrics::Action::kDelete, owned);
+            if (!owned) {
+                WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+                return;
+            }
         }
 
         int64_t count = 0;
@@ -790,7 +902,7 @@ void RegisterMemoryRoutes(
     svr.Post(R"(/api/v1/memory/sessions/([A-Za-z0-9_\-]+)/interactions)",
         WithAuth(auth, kPermWrite,
         [&, extraction_svc = services.extraction](
-            const httplib::Request& req, httplib::Response& res, const RequestContext&) {
+            const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         std::string session_id = req.matches[1].str();
 
         json body;
@@ -821,6 +933,14 @@ void RegisterMemoryRoutes(
             return;
         }
         MemoryStore* mem_store = &facade.memory();
+
+        // MEM05 L2: only the session's owner (or an admin) may append interactions;
+        // writing into another user's session is 404-masked (anti-enumeration).
+        if (!EnforceSessionOwner(rc, *mem_store, session_id,
+                                 memory::Mem05Metrics::Action::kSession)) {
+            WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+            return;
+        }
 
         // Enforce max_interactions_per_session limit
         int64_t interaction_count = 0;
@@ -893,7 +1013,7 @@ void RegisterMemoryRoutes(
     // Design spec (6.5.3): Uses QueryPipeline for semantic vector search,
     // NOT SQL LIKE. Falls back to SQL LIKE if QueryPipeline is unavailable.
     svr.Post("/api/v1/memory/search", WithAuth(auth, kPermRead,
-        [&](const httplib::Request& req, httplib::Response& res, const RequestContext&) {
+        [&](const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         json body;
         try {
             body = json::parse(req.body);
@@ -931,18 +1051,24 @@ void RegisterMemoryRoutes(
         // MEM05: user_id is always required. With auth (P08) it comes from the
         // AuthContext (JWT/API Key); in CE no-auth mode it defaults to "default"
         // (design § CE single-user compatibility). Real AuthContext extraction is D3.5.
+        // L1 IDOR guard: a non-admin requesting another user's memories via a
+        // spoofed body user_id gets an empty result (no cross-user leak), the same
+        // mask as GET /api/v1/memory list. EnforceOwnUserId records the isolation
+        // decision (pass/violation); on a no-auth empty principal it resolves to
+        // "default" — that fallback is also the cortrix_mem05_default_user_used
+        // signal.
         std::string user_id = body.value("user_id", "");
-        if (user_id.empty()) {
-            user_id = "default";  // CE no-auth fallback
-            memory::Mem05Metrics::Instance().RecordDefaultUserUsed();
+        const bool user_id_was_supplied = !user_id.empty();
+        if (!EnforceOwnUserId(rc, user_id, memory::Mem05Metrics::Action::kSearch)) {
+            json resp; resp["results"] = json::array();
+            resp["total_results"] = 0; resp["latency_ms"] = 0; resp["degraded"] = false;
+            WriteJsonResponse(res, 200, resp);
+            return;
+        }
+        if (!user_id_was_supplied && user_id == "default") {
+            memory::Mem05Metrics::Instance().RecordDefaultUserUsed();  // CE no-auth fallback
         }
         search_req.user_id = user_id;
-        // §8.bis: the search request enforces isolation via MatchScope (per-item
-        // pre-filter, recorded separately); count the entry as one
-        // isolation_check_total{result=pass,action=search}.
-        memory::Mem05Metrics::Instance().RecordIsolationCheck(
-            memory::Mem05Metrics::CheckResult::kPass,
-            memory::Mem05Metrics::Action::kSearch);
 
         // MEM05: scope is session or user only (kAll removed). Default = user.
         std::string scope_str = body.value("scope", "user");
@@ -1021,7 +1147,7 @@ void RegisterMemoryRoutes(
     // assembled as "User: ...\nAssistant: ...\n\n..." format,
     // truncated to inject_max_tokens.
     svr.Post("/api/v1/memory/inject", WithAuth(auth, kPermRead,
-        [&](const httplib::Request& req, httplib::Response& res, const RequestContext&) {
+        [&](const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         json body;
         try {
             body = json::parse(req.body);
@@ -1049,6 +1175,15 @@ void RegisterMemoryRoutes(
             return;
         }
         MemoryStore* mem_store = &facade.memory();
+
+        // MEM05 L2: injecting a session's recent context returns its conversation
+        // history — only the owner (or an admin) may read it. Cross-user → 404-mask
+        // (anti-enumeration), consistent with GET /sessions/{id}.
+        if (!EnforceSessionOwner(rc, *mem_store, session_id,
+                                 memory::Mem05Metrics::Action::kSessionAccess)) {
+            WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+            return;
+        }
 
         MemoryInjector injector(*mem_store, config);
         InjectedContext ctx = injector.GetRecentContext(session_id);

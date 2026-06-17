@@ -42,6 +42,11 @@ using ::testing::_;
 
 class MemoryRoutesTest : public ::testing::Test {
 protected:
+    // Second, non-admin principal (see SetUp): authenticates as user_id=kNonAdminUserId
+    // with read+write but no admin bit, for route-level MEM05 IDOR tests.
+    static constexpr const char* kNonAdminKey = "non-admin-key-b-67890";
+    static constexpr const char* kNonAdminUserId = "user_b_principal";
+
     void SetUp() override {
         tmp_dir_ = "/tmp/cortrix_test_memroutes_" + std::to_string(getpid());
         system(("mkdir -p " + tmp_dir_).c_str());
@@ -63,13 +68,26 @@ protected:
         if (interaction_limit_override_ > 0)
             config_.memory.max_interactions_per_session = interaction_limit_override_;
 
-        // Auth - register a test API key
+        // Auth - register a test API key (admin: read+write+admin)
         std::string test_key = "test-api-key-12345";
         ApiKeyConfig key_config;
         key_config.key_hash = ApiKeyAuth::HashKey(test_key);
         key_config.tenant_id = "test-tenant";
         key_config.permissions = 7;  // read + write + admin
         config_.auth.api_keys.push_back(key_config);
+
+        // MEM05 IDOR coverage: a SECOND, non-admin principal on the same server.
+        // ApiKeyAuth sets rc.auth.user_id = tenant_id (api_key_auth.cpp:65), so this
+        // key authenticates as user_id="user_b_principal" with NO admin bit. It lets
+        // route-level IDOR tests prove that authenticating as B cannot act on A's
+        // data via a spoofed body/param user_id — the admin test key would bypass
+        // the guard (is_admin() short-circuits) and hide the vulnerability.
+        ApiKeyConfig na_key_config;
+        na_key_config.key_hash = ApiKeyAuth::HashKey(kNonAdminKey);
+        na_key_config.tenant_id = kNonAdminUserId;
+        na_key_config.permissions = 3;  // read + write, deliberately NO admin(4)
+        config_.auth.api_keys.push_back(na_key_config);
+
         auth_.LoadKeys(config_.auth.api_keys);
 
         // F05 namespace pool (real DefaultNamespacePool over a temp dir via the
@@ -117,9 +135,15 @@ protected:
         system(("rm -rf " + tmp_dir_).c_str());
     }
 
-    // Helper: make authenticated request headers
+    // Helper: make authenticated request headers (admin principal, user_id="test-tenant").
     httplib::Headers AuthHeaders() {
         return {{"Authorization", "Bearer test-api-key-12345"}};
+    }
+
+    // Helper: non-admin principal headers (user_id=kNonAdminUserId, no admin bit).
+    // Used by the MEM05 route-level IDOR tests where the admin key would bypass the guard.
+    httplib::Headers NonAdminAuthHeaders() {
+        return {{"Authorization", std::string("Bearer ") + kNonAdminKey}};
     }
 
     // Helper: create a session and return session_id
@@ -476,18 +500,26 @@ TEST_F(MemoryRoutesTest, GetSessionDetailNamespaceNotFound) {
     EXPECT_EQ(res->status, 404);
 }
 
-// MEM05: GET detail for a session owned by ANOTHER user must 404-mask (the
-// cross-user ownership branch, owned=false). Create as user_a, read as user_b.
+// MEM05 IDOR: GET detail for a session owned by ANOTHER principal must 404-mask.
+// The session is created by the ADMIN principal (owner user_id="test-tenant"); a
+// DIFFERENT authenticated principal (the non-admin key, user_id="user_b_principal")
+// then tries to read it AND spoofs ?user_id=test-tenant to self-assert ownership.
+// The authenticated principal — not the param — is authoritative, so this is 404.
+// (Previously this used the admin key + a mismatched param, which the admin bypass
+// made pass for the wrong reason and hid the IDOR.)
 TEST_F(MemoryRoutesTest, GetSessionDetailCrossUserReturns404Mask) {
-    std::string sid = CreateSession("default", "user_a");
+    // Session owned by principal "victim_a" (created with the admin key, which may
+    // set any owner). The attacker is the non-admin principal "user_b_principal".
+    std::string sid = CreateSession("default", "victim_a");
     ASSERT_FALSE(sid.empty());
 
     httplib::Client cli("127.0.0.1", port_);
+    // Non-admin principal B spoofs the victim's user_id in the param — must NOT work.
     auto res = cli.Get(
-        ("/api/v1/memory/sessions/" + sid + "?namespace=default&user_id=user_b").c_str(),
-        AuthHeaders());
+        ("/api/v1/memory/sessions/" + sid + "?namespace=default&user_id=victim_a").c_str(),
+        NonAdminAuthHeaders());
     ASSERT_TRUE(res);
-    EXPECT_EQ(res->status, 404);  // anti-enumeration: not 403
+    EXPECT_EQ(res->status, 404);  // anti-enumeration: not 403, and the spoof is ignored
 }
 
 // MEM05: GET detail for an owned session returns 200 with the full session body
@@ -568,17 +600,30 @@ TEST_F(MemoryRoutesTest, ListSessionsExcludesOtherUsersSessions) {
 
 // ===== DELETE /api/v1/memory/sessions/:session_id (Delete Session, lines 249-287) =====
 
-// MEM05: DELETE of a session owned by ANOTHER user 404-masks (mismatch branch).
+// MEM05 IDOR: DELETE of a session owned by ANOTHER principal 404-masks. The
+// session is owned by "del_owner"; the attacker is the non-admin principal
+// "user_b_principal" and even spoofs ?user_id=del_owner. The authenticated
+// principal is authoritative, so the delete is refused (404, anti-enumeration).
+// (Previously used the admin key + mismatched param, which passed for the wrong
+// reason — admin bypass + param mismatch — and hid the IDOR.)
 TEST_F(MemoryRoutesTest, DeleteSessionCrossUserReturns404Mask) {
     std::string sid = CreateSession("default", "del_owner");
     ASSERT_FALSE(sid.empty());
 
     httplib::Client cli("127.0.0.1", port_);
     auto res = cli.Delete(
-        ("/api/v1/memory/sessions/" + sid + "?namespace=default&user_id=attacker").c_str(),
-        AuthHeaders());
+        ("/api/v1/memory/sessions/" + sid + "?namespace=default&user_id=del_owner").c_str(),
+        NonAdminAuthHeaders());
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 404);
+
+    // And the session must still exist (the cross-user delete was a no-op): the
+    // admin can still read it back.
+    auto check = cli.Get(
+        ("/api/v1/memory/sessions/" + sid + "?namespace=default&user_id=del_owner").c_str(),
+        AuthHeaders());
+    ASSERT_TRUE(check);
+    EXPECT_EQ(check->status, 200);
 }
 
 // MEM05: DELETE of an owned session succeeds (200) with the deletion summary.
@@ -1919,6 +1964,255 @@ TEST_F(MemoryRoutesTest, E2E_Mem03TransparencyCrudSmoke) {
     EXPECT_EQ(inv->status, 200);
     auto inv_resp = json::parse(inv->body);
     EXPECT_TRUE(inv_resp.contains("source"));
+}
+
+// ===========================================================================
+// MEM05 route-level IDOR — authenticate as a NON-ADMIN principal and prove a
+// spoofed body/param user_id cannot reach another user's data.
+//
+// These tests use NonAdminAuthHeaders() (principal user_id="user_b_principal",
+// no admin bit, registered alongside the admin key in SetUp). The earlier
+// cross-user tests authenticated with the ADMIN key and relied on a param
+// mismatch, so the admin bypass (is_admin() short-circuit) made them pass for
+// the wrong reason and HID the IDOR. With a real second principal, every guard
+// is exercised on the path that production attackers would take: "I am B, give
+// me A's data by claiming user_id=A".
+// ===========================================================================
+
+// L1 POST /api/v1/memory — a non-admin creating under another user's id is
+// 404-masked (the create is refused; the memory must not land under user_a).
+TEST_F(MemoryRoutesTest, CreateMemoryCrossUserBodyUserIdMasked) {
+    httplib::Client cli("127.0.0.1", port_);
+    json body;
+    body["ns"] = "default";
+    body["content"] = "B trying to plant a memory under A.";
+    body["memory_type"] = "fact";
+    body["user_id"] = "victim_a";  // spoofed — B is "user_b_principal"
+    auto res = cli.Post("/api/v1/memory", NonAdminAuthHeaders(),
+                        body.dump(), "application/json");
+    ASSERT_TRUE(res);
+    EXPECT_EQ(res->status, 404);  // mutation mask, not created under victim_a
+
+    // Confirm nothing was written under victim_a (admin lists victim_a → empty).
+    auto lr = cli.Get("/api/v1/memory?ns=default&user_id=victim_a", AuthHeaders());
+    ASSERT_TRUE(lr);
+    ASSERT_EQ(lr->status, 200);
+    EXPECT_EQ(json::parse(lr->body)["memories"].size(), 0u);
+}
+
+// L1 POST /api/v1/memory — a non-admin creating under ITS OWN id succeeds (the
+// guard must not over-block the legitimate owner).
+TEST_F(MemoryRoutesTest, CreateMemoryOwnUserIdSucceedsForNonAdmin) {
+    httplib::Client cli("127.0.0.1", port_);
+    json body;
+    body["ns"] = "default";
+    body["content"] = "B's own memory.";
+    body["memory_type"] = "fact";
+    body["user_id"] = kNonAdminUserId;  // matches the authenticated principal
+    auto res = cli.Post("/api/v1/memory", NonAdminAuthHeaders(),
+                        body.dump(), "application/json");
+    ASSERT_TRUE(res);
+    EXPECT_EQ(res->status, 201);
+}
+
+// L1 POST /api/v1/memory — a non-admin omitting user_id defaults to ITS OWN
+// principal (not the literal "default"), so the create succeeds under B.
+TEST_F(MemoryRoutesTest, CreateMemoryNonAdminDefaultsToOwnPrincipal) {
+    httplib::Client cli("127.0.0.1", port_);
+    json body;
+    body["ns"] = "default";
+    body["content"] = "B's memory with implicit owner.";
+    auto res = cli.Post("/api/v1/memory", NonAdminAuthHeaders(),
+                        body.dump(), "application/json");
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 201);
+    // It must be listed under B's principal, confirming the implicit owner binding.
+    auto lr = cli.Get(std::string("/api/v1/memory?ns=default&user_id=") + kNonAdminUserId,
+                      NonAdminAuthHeaders());
+    ASSERT_TRUE(lr);
+    ASSERT_EQ(lr->status, 200);
+    EXPECT_GE(json::parse(lr->body)["memories"].size(), 1u);
+}
+
+// L1 PATCH /api/v1/memory/{id} — admin creates a memory owned by victim_a; the
+// non-admin B tries to edit it via a spoofed user_id=victim_a → 404-masked, and
+// the original content is unchanged.
+TEST_F(MemoryRoutesTest, EditMemoryCrossUserBodyUserIdMasked) {
+    httplib::Client cli("127.0.0.1", port_);
+    // Admin plants a memory under victim_a.
+    json cb;
+    cb["ns"] = "default";
+    cb["content"] = "A's private fact.";
+    cb["memory_type"] = "fact";
+    cb["user_id"] = "victim_a";
+    auto cr = cli.Post("/api/v1/memory", AuthHeaders(), cb.dump(), "application/json");
+    ASSERT_TRUE(cr);
+    ASSERT_EQ(cr->status, 201);
+    std::string block_id = json::parse(cr->body)["memory_id"].get<std::string>();
+    ASSERT_FALSE(block_id.empty());
+
+    // B tries to edit A's block by claiming to be A.
+    json pb;
+    pb["ns"] = "default";
+    pb["content"] = "Tampered by B.";
+    pb["user_id"] = "victim_a";
+    auto pr = cli.Patch("/api/v1/memory/" + block_id,
+                        NonAdminAuthHeaders(), pb.dump(), "application/json");
+    ASSERT_TRUE(pr);
+    EXPECT_EQ(pr->status, 404);  // IDOR refused before the edit
+}
+
+// L1 DELETE /api/v1/memory/{id} — same setup: B cannot soft-delete A's memory
+// even when spoofing user_id=victim_a. 404-mask; the memory stays active.
+TEST_F(MemoryRoutesTest, SoftDeleteMemoryCrossUserMasked) {
+    httplib::Client cli("127.0.0.1", port_);
+    json cb;
+    cb["ns"] = "default";
+    cb["content"] = "A's deletable fact.";
+    cb["memory_type"] = "fact";
+    cb["user_id"] = "victim_a";
+    auto cr = cli.Post("/api/v1/memory", AuthHeaders(), cb.dump(), "application/json");
+    ASSERT_TRUE(cr);
+    ASSERT_EQ(cr->status, 201);
+    std::string block_id = json::parse(cr->body)["memory_id"].get<std::string>();
+
+    auto dr = cli.Delete("/api/v1/memory/" + block_id + "?ns=default&user_id=victim_a",
+                         NonAdminAuthHeaders());
+    ASSERT_TRUE(dr);
+    EXPECT_EQ(dr->status, 404);
+
+    // The block is still listed as active under victim_a (delete was a no-op).
+    auto lr = cli.Get("/api/v1/memory?ns=default&user_id=victim_a", AuthHeaders());
+    ASSERT_TRUE(lr);
+    ASSERT_EQ(lr->status, 200);
+    bool still_active = false;
+    auto list_json = json::parse(lr->body);
+    for (const auto& m : list_json["memories"]) {
+        if (m.value("memory_id", "") == block_id && m.value("status", "") == "active")
+            still_active = true;
+    }
+    EXPECT_TRUE(still_active);
+}
+
+// L1 POST /api/v1/memory/search — a non-admin searching another user's memories
+// via a spoofed body user_id gets an empty 200 (no cross-user leak), the same
+// mask as the list route. Admin first plants a memory under victim_a so a leak
+// would actually return a row.
+TEST_F(MemoryRoutesTest, SearchCrossUserBodyUserIdReturnsEmpty) {
+    httplib::Client cli("127.0.0.1", port_);
+    json cb;
+    cb["ns"] = "default";
+    cb["content"] = "A's searchable secret about revenue.";
+    cb["memory_type"] = "fact";
+    cb["user_id"] = "victim_a";
+    auto cr = cli.Post("/api/v1/memory", AuthHeaders(), cb.dump(), "application/json");
+    ASSERT_TRUE(cr);
+    ASSERT_EQ(cr->status, 201);
+
+    json sb;
+    sb["namespace"] = "default";
+    sb["query"] = "revenue";
+    sb["scope"] = "user";
+    sb["user_id"] = "victim_a";  // B claims to be A
+    auto res = cli.Post("/api/v1/memory/search", NonAdminAuthHeaders(),
+                        sb.dump(), "application/json");
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 200);
+    auto resp = json::parse(res->body);
+    EXPECT_TRUE(resp["results"].is_array());
+    EXPECT_EQ(resp["total_results"], 0);  // masked — A's memory not leaked to B
+    EXPECT_EQ(resp["results"].size(), 0u);
+}
+
+// L1 GET /api/v1/memory list — non-admin B requesting victim_a's memories is
+// masked to an empty list (same-server variant of the standalone-server test).
+TEST_F(MemoryRoutesTest, ListMemoriesCrossUserNonAdminMaskedSameServer) {
+    httplib::Client cli("127.0.0.1", port_);
+    auto res = cli.Get("/api/v1/memory?ns=default&user_id=victim_a", NonAdminAuthHeaders());
+    ASSERT_TRUE(res);
+    EXPECT_EQ(res->status, 200);
+    auto body = json::parse(res->body);
+    EXPECT_TRUE(body["memories"].is_array());
+    EXPECT_EQ(body["memories"].size(), 0u);
+    EXPECT_EQ(body["total"], 0);
+}
+
+// L2 POST /sessions/{id}/interactions — admin creates a session owned by
+// "sess_owner_a"; non-admin B cannot append an interaction to it (session-owner
+// lookup binds to the authenticated principal) → 404-mask.
+TEST_F(MemoryRoutesTest, WriteInteractionCrossUserSessionMasked) {
+    ON_CALL(mock_spc_, Submit(_)).WillByDefault(Return(Status::Ok()));
+    std::string sid = CreateSession("default", "sess_owner_a");
+    ASSERT_FALSE(sid.empty());
+
+    httplib::Client cli("127.0.0.1", port_);
+    json wb;
+    wb["namespace"] = "default";
+    wb["user_id"] = "sess_owner_a";  // spoofed; B is user_b_principal
+    wb["query_text"] = "B injecting into A's session";
+    wb["response_text"] = "should be refused";
+    auto res = cli.Post("/api/v1/memory/sessions/" + sid + "/interactions",
+                        NonAdminAuthHeaders(), wb.dump(), "application/json");
+    ASSERT_TRUE(res);
+    EXPECT_EQ(res->status, 404);
+}
+
+// L2 POST /memory/inject — non-admin B cannot read another user's session
+// context (inject returns the conversation history) → 404-mask.
+TEST_F(MemoryRoutesTest, InjectCrossUserSessionMasked) {
+    std::string sid = CreateSession("default", "inj_owner_a");
+    ASSERT_FALSE(sid.empty());
+
+    httplib::Client cli("127.0.0.1", port_);
+    json ib;
+    ib["namespace"] = "default";
+    ib["session_id"] = sid;
+    auto res = cli.Post("/api/v1/memory/inject", NonAdminAuthHeaders(),
+                        ib.dump(), "application/json");
+    ASSERT_TRUE(res);
+    EXPECT_EQ(res->status, 404);
+}
+
+// L2 POST /memory/inject — the session's OWNER (authenticated as itself) reads
+// its own context successfully (guard does not over-block). B owns the session.
+TEST_F(MemoryRoutesTest, InjectOwnSessionSucceedsForNonAdmin) {
+    // Create a session owned by B's principal. (The create-session route currently
+    // takes the owner from the body user_id; B sets it to its own principal. See the
+    // layer-2 note on binding the create-session owner to rc.auth for non-admins.)
+    httplib::Client cli("127.0.0.1", port_);
+    json cb;
+    cb["namespace"] = "default";
+    cb["user_id"] = kNonAdminUserId;
+    auto cr = cli.Post("/api/v1/memory/sessions", NonAdminAuthHeaders(),
+                       cb.dump(), "application/json");
+    ASSERT_TRUE(cr);
+    ASSERT_EQ(cr->status, 201);
+    std::string sid = json::parse(cr->body)["session_id"].get<std::string>();
+    ASSERT_FALSE(sid.empty());
+
+    json ib;
+    ib["namespace"] = "default";
+    ib["session_id"] = sid;
+    auto res = cli.Post("/api/v1/memory/inject", NonAdminAuthHeaders(),
+                        ib.dump(), "application/json");
+    ASSERT_TRUE(res);
+    EXPECT_EQ(res->status, 200);
+}
+
+// L2 POST /session/{id}/opt-out — non-admin B cannot opt out another user's
+// session → 404-mask (the revoke sibling is admin-only and not IDOR-exposed).
+TEST_F(MemoryRoutesTest, OptOutCrossUserSessionMasked) {
+    std::string sid = CreateSession("default", "opt_owner_a");
+    ASSERT_FALSE(sid.empty());
+
+    httplib::Client cli("127.0.0.1", port_);
+    json ob;
+    ob["ns"] = "default";
+    ob["reason"] = "B tampering";
+    auto res = cli.Post("/api/v1/memory/session/" + sid + "/opt-out",
+                        NonAdminAuthHeaders(), ob.dump(), "application/json");
+    ASSERT_TRUE(res);
+    EXPECT_EQ(res->status, 404);
 }
 
 }  // namespace
