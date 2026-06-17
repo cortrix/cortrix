@@ -568,7 +568,7 @@ void RegisterMemoryRoutes(
 {
     // POST /api/v1/memory/sessions — Create session
     svr.Post("/api/v1/memory/sessions", WithAuth(auth, kPermWrite,
-        [&](const httplib::Request& req, httplib::Response& res, const RequestContext&) {
+        [&](const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         json body;
         try {
             body = json::parse(req.body);
@@ -606,11 +606,17 @@ void RegisterMemoryRoutes(
         MemorySession session;
         session.session_id = body.value("session_id", "");  // Accept client-provided ID
         session.namespace_name = ns_name;
-        // MEM05 CE no-auth fallback: store the same effective user_id the list /
-        // detail isolation checks resolve to, or freshly created sessions are
-        // invisible to their own creator.
+        // MEM05: a non-admin session owner is pinned to the authenticated principal
+        // — a spoofed body user_id cannot create a session owned by another user
+        // (closes the create-session owner-spoof griefing gap). Admin may set any
+        // owner; the CE no-auth path (empty principal) falls back to body then
+        // "default" so a session stays visible to its own creator.
         session.user_id = body.value("user_id", "");
-        if (session.user_id.empty()) session.user_id = "default";
+        if (!rc.auth.is_admin() && !rc.auth.user_id.empty()) {
+            session.user_id = rc.auth.user_id;
+        } else if (session.user_id.empty()) {
+            session.user_id = "default";
+        }
         session.title = body.value("title", "");
 
         // Issue-12: a duplicate client-provided session_id must be a 409 with the
