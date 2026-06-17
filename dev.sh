@@ -26,6 +26,26 @@ ok()    { echo -e "${GREEN}[cortrix]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[cortrix]${NC} $*"; }
 error() { echo -e "${RED}[cortrix]${NC} $*" >&2; exit 1; }
 
+# Detect whether npm resolves to a Windows binary (WSL interop path starts with /mnt/ or /c/)
+NPM_IS_WINDOWS=false
+NPM_PATH="$(which npm 2>/dev/null || true)"
+if [[ "$NPM_PATH" == /c/* || "$NPM_PATH" == /mnt/c/* ]]; then
+    NPM_IS_WINDOWS=true
+    warn "Windows npm detected ($NPM_PATH). Install Linux Node.js for best compatibility."
+fi
+
+# Kill Windows node/npm processes on a port range via taskkill (WSL interop)
+kill_windows_vite_ports() {
+    for PORT in 5173 5174 5175 5176 5177 5178 5179 5180; do
+        PIDS=$(cmd.exe /c "netstat -ano 2>nul | findstr :${PORT}" 2>/dev/null \
+               | awk '{print $NF}' | grep -E '^[0-9]+$' | sort -u)
+        for PID in $PIDS; do
+            [[ "$PID" == "0" ]] && continue
+            cmd.exe /c "taskkill /F /PID $PID" 2>/dev/null || true
+        done
+    done
+}
+
 # Cleanup function: kill all services when the script exits
 BACKEND_PID=""
 AGENT_PID=""
@@ -37,10 +57,12 @@ cleanup() {
     info "Backend stopped"
     [[ -n "$AGENT_PID"   ]] && kill "$AGENT_PID"   2>/dev/null || true
     info "Agent stopped"
-    # Kill the npm subshell and any vite/node children it spawned
     [[ -n "$FRONTEND_PID" ]] && kill "$FRONTEND_PID" 2>/dev/null || true
     pkill -f "vite" 2>/dev/null || true
     pkill -TERM -f "node.*vite" 2>/dev/null || true
+    if [[ "$NPM_IS_WINDOWS" == true ]]; then
+        kill_windows_vite_ports
+    fi
     info "Frontend stopped"
     exit 0
 }
@@ -72,20 +94,14 @@ info "Using config file: $CONFIG_FILE"
 }
 
 # Clean up old processes and ports
-pkill -f "cortrix-server"  2>/dev/null || true
-pkill -f "vite"            2>/dev/null || true
-pkill -f "node.*vite"      2>/dev/null || true
+pkill -f "cortrix-server"   2>/dev/null || true
+pkill -f "vite"             2>/dev/null || true
+pkill -f "node.*vite"       2>/dev/null || true
 pkill -f "uvicorn main:app" 2>/dev/null || true
+if [[ "$NPM_IS_WINDOWS" == true ]]; then
+    kill_windows_vite_ports
+fi
 sleep 0.5
-# Release backend, agent, and the full vite port range (5173-5180)
-for PORT in 8080 8001 5173 5174 5175 5176 5177 5178 5179 5180; do
-    PID=$(lsof -ti :"$PORT" -sTCP:LISTEN 2>/dev/null || true)
-    if [[ -n "$PID" ]]; then
-        warn "Port $PORT still in use (PID $PID), forcing release..."
-        kill -9 "$PID" 2>/dev/null || true
-        sleep 0.3
-    fi
-done
 
 # ── Start backend ──────────────────────────────────────
 info "Starting backend (http://localhost:8080)..."
