@@ -6,6 +6,7 @@
 #include "spdlog/pattern_formatter.h"
 
 #include <nlohmann/json.hpp>
+#include <chrono>
 
 namespace cortrix {
 
@@ -56,6 +57,12 @@ void InitLogging(const LogConfig& config) {
 
     spdlog::set_default_logger(logger);
     spdlog::set_level(ParseLevel(config.level));
+
+    // Flush immediately on warn/error so file output is always up-to-date.
+    // Also flush every second so info/debug lines appear in real time when
+    // writing to a file (the OS file buffer is otherwise only flushed on exit).
+    logger->flush_on(spdlog::level::warn);
+    spdlog::flush_every(std::chrono::seconds(1));
 }
 
 void ShutdownLogging() {
