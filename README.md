@@ -7,7 +7,10 @@
   ### Agent-Native Semantic Storage Engine
 
   [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-  [![Version](https://img.shields.io/badge/version-0.1.0--rc.1-FF6405)](https://github.com/cortrix/cortrix/releases)
+  [![Version](https://img.shields.io/badge/version-0.1.0--rc.1-orange.svg)](https://github.com/cortrix/cortrix/releases)
+  [![C++17](https://img.shields.io/badge/C%2B%2B-17-blueviolet.svg)](https://en.cppreference.com/w/cpp/17)
+  [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey.svg)](#-installation)
+  [![Tests](https://img.shields.io/badge/tests-4590%20passing-success.svg)](#-testing)
 
   <!-- Dynamic badges below need a PUBLIC repo + live infra to render (shields.io
        cannot read a private repo's CI/stars; the Discord/PyPI ids are placeholders).
