@@ -33,9 +33,15 @@ FRONTEND_PID=""
 cleanup() {
     echo ""
     info "Stopping services..."
-    [[ -n "$BACKEND_PID"  ]] && kill "$BACKEND_PID"  2>/dev/null; info "Backend stopped"
-    [[ -n "$AGENT_PID"    ]] && kill "$AGENT_PID"    2>/dev/null; info "Agent stopped"
-    [[ -n "$FRONTEND_PID" ]] && kill "$FRONTEND_PID" 2>/dev/null; info "Frontend stopped"
+    [[ -n "$BACKEND_PID" ]] && kill "$BACKEND_PID" 2>/dev/null || true
+    info "Backend stopped"
+    [[ -n "$AGENT_PID"   ]] && kill "$AGENT_PID"   2>/dev/null || true
+    info "Agent stopped"
+    # Kill the npm subshell and any vite/node children it spawned
+    [[ -n "$FRONTEND_PID" ]] && kill "$FRONTEND_PID" 2>/dev/null || true
+    pkill -f "vite" 2>/dev/null || true
+    pkill -TERM -f "node.*vite" 2>/dev/null || true
+    info "Frontend stopped"
     exit 0
 }
 trap cleanup INT TERM
@@ -66,11 +72,13 @@ info "Using config file: $CONFIG_FILE"
 }
 
 # Clean up old processes and ports
-pkill -f "cortrix-server" 2>/dev/null || true
-pkill -f "vite"          2>/dev/null || true
+pkill -f "cortrix-server"  2>/dev/null || true
+pkill -f "vite"            2>/dev/null || true
+pkill -f "node.*vite"      2>/dev/null || true
 pkill -f "uvicorn main:app" 2>/dev/null || true
 sleep 0.5
-for PORT in 8080 8001 5173; do
+# Release backend, agent, and the full vite port range (5173-5180)
+for PORT in 8080 8001 5173 5174 5175 5176 5177 5178 5179 5180; do
     PID=$(lsof -ti :"$PORT" -sTCP:LISTEN 2>/dev/null || true)
     if [[ -n "$PID" ]]; then
         warn "Port $PORT still in use (PID $PID), forcing release..."
