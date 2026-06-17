@@ -1,6 +1,6 @@
 <!-- Hero -->
 <div align="center">
-  <img src="docs/assets/cortrix-logo.svg" width="200" alt="Cortrix logo">
+  <img src="docs/assets/cortrix-logo.svg" width="80" alt="Cortrix logo">
 
   # Cortrix
 
