@@ -119,6 +119,17 @@ private:
     // Apply one decoded WAL record to the graph. Caller holds the write lock.
     void ApplyEntryLocked(const WalEntry& entry);
 
+    // Apply an INSERT record. Caller holds the write lock (inside
+    // ApplyEntryLocked's try). Resurrects the SAME block_id when it is currently
+    // marked deleted (the re-write path: a marked-deleted label would otherwise
+    // make hnswlib's addPoint throw under allow_replace_deleted_, silently
+    // dropping the durably-logged vector).
+    void ApplyInsertLocked(const WalEntry& entry);
+
+    // True iff `label` is present in the graph AND marked deleted (the re-write
+    // precondition). Caller holds the write lock; reads hnswlib's own label map.
+    bool IsLabelMarkedDeletedLocked(uint64_t label) const;
+
     // KNN search body; caller holds mutex_ (shared for the default-ef path,
     // exclusive when a per-query ef_search is applied). Pure graph read (S5).
     std::vector<std::pair<uint64_t, float>> SearchLocked(const float* query, int top_k);

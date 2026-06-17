@@ -122,6 +122,68 @@ TEST_F(PHnswTest, MarkDeleteIsIdempotent) {
     EXPECT_TRUE(index.MarkDelete(99999).ok());
 }
 
+TEST_F(PHnswTest, AddPoint_AfterMarkDelete_SameBlockId_Reinserts) {
+    // Regression for the store-C1 silent data-loss bug. F01 design § 5 sanctions a
+    // re-write as "MarkDelete(id) then AddPoint(id)" with the SAME block_id. The
+    // index is built with allow_replace_deleted_=true, under which hnswlib's 2-arg
+    // addPoint THROWS on a marked-deleted label; that throw was swallowed by
+    // ApplyEntryLocked's outer catch, so the re-inserted vector — already durable
+    // in hnsw.wal — never re-entered the graph. After the fix the same id must come
+    // back live, be searchable, and the vector must reflect the NEW value.
+    PHnsw index(unit_dir_, config_);
+
+    // A second, well-separated point so the graph is non-trivial and Search has a
+    // real choice of nearest neighbour.
+    auto other = MakeVector(kDim, 80);
+    ASSERT_TRUE(index.AddPoint(other.data(), 200).ok());
+
+    // Original vector for id 5, then delete id 5.
+    auto v_old = MakeVector(kDim, 5);
+    ASSERT_TRUE(index.AddPoint(v_old.data(), 5).ok());
+    EXPECT_TRUE(index.Exists(5));
+    ASSERT_TRUE(index.MarkDelete(5).ok());
+    EXPECT_FALSE(index.Exists(5));
+    EXPECT_EQ(index.GetStats().vector_count, 1u);   // only id 200 live
+    EXPECT_EQ(index.GetStats().deleted_count, 1u);
+
+    // Re-write id 5 with a DIFFERENT vector (the bug dropped this insert silently).
+    auto v_new = MakeVector(kDim, 30);
+    ASSERT_TRUE(index.AddPoint(v_new.data(), 5).ok());
+
+    // id 5 is live again, the deletion was reclaimed, and both ids are searchable.
+    EXPECT_TRUE(index.Exists(5));
+    EXPECT_EQ(index.GetStats().vector_count, 2u);   // ids 5 and 200 live
+    EXPECT_EQ(index.GetStats().deleted_count, 0u);  // resurrected, not double-counted
+
+    // Querying with the NEW vector returns id 5 first → its stored vector was
+    // overwritten with v_new (a stale v_old would not be nearest to v_new).
+    auto hit_new = index.Search(v_new.data(), /*top_k=*/1);
+    ASSERT_EQ(hit_new.size(), 1u);
+    EXPECT_EQ(hit_new[0].first, 5u);
+}
+
+TEST_F(PHnswTest, AddPoint_AfterMarkDelete_SameBlockId_SurvivesRecovery) {
+    // The re-write must also survive a reopen: the WAL holds DELETE(5) then
+    // INSERT(5), and recovery replay must apply the same resurrection logic rather
+    // than dropping the post-delete INSERT.
+    auto v_new = MakeVector(kDim, 33);
+    {
+        PHnsw index(unit_dir_, config_);
+        auto v_old = MakeVector(kDim, 5);
+        ASSERT_TRUE(index.AddPoint(v_old.data(), 5).ok());
+        ASSERT_TRUE(index.MarkDelete(5).ok());
+        ASSERT_TRUE(index.AddPoint(v_new.data(), 5).ok());
+        EXPECT_TRUE(index.Exists(5));
+    }
+    PHnsw reopened(unit_dir_, config_);
+    EXPECT_TRUE(reopened.Exists(5));               // re-inserted id replayed live
+    EXPECT_EQ(reopened.GetStats().vector_count, 1u);
+    EXPECT_EQ(reopened.GetStats().deleted_count, 0u);
+    auto hit = reopened.Search(v_new.data(), /*top_k=*/1);
+    ASSERT_EQ(hit.size(), 1u);
+    EXPECT_EQ(hit[0].first, 5u);
+}
+
 TEST_F(PHnswTest, SearchOnEmptyReturnsEmpty) {
     PHnsw index(unit_dir_, config_);
     auto q = MakeVector(kDim, 0);

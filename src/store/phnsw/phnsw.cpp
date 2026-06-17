@@ -173,7 +173,16 @@ Status PHnsw::RecoverInternal() {
             /*random_seed=*/100, /*allow_replace_deleted=*/true);
         index_->setEf(config_.ef_search);
     }
-    deleted_count_ = 0;
+    // Seed deleted_count_ from the loaded graph, NOT 0. A snapshot persists its
+    // marked-deleted elements (hnswlib saveIndex writes the DELETE_MARK bits, and
+    // loadIndex rebuilds num_deleted_ by scanning them), so a "delete then
+    // snapshot then reopen" leaves deleted elements in the snapshot that the WAL
+    // replay below will NOT re-see (the DELETE record was truncated with the WAL
+    // at snapshot time). Resetting to 0 under-counted deletions → SearchLocked's
+    // live = total - deleted_count_ over-estimated → it could ask hnswlib for more
+    // than the live count (Bug store-M1). getDeletedCount() returns 0 for a fresh
+    // empty graph, so the no-snapshot path is unaffected.
+    deleted_count_ = index_->getDeletedCount();
     applied_lsn_ = snapshot_lsn;
 
     // 2. Replay WAL records whose global LSN > snapshot_lsn (design § 4.4 step 2).
@@ -266,20 +275,23 @@ PHnsw::~PHnsw() {
 
 void PHnsw::ApplyEntryLocked(const WalEntry& entry) {
     // Caller holds the write lock (mutex_), OR is the single-threaded constructor
-    // recovery path (no committer yet). Mirrors the MVP semantics: INSERT ->
-    // addPoint, DELETE -> markDelete (idempotent). Exceptions from hnswlib are
-    // swallowed to keep replay total; a genuinely fatal graph error would have
-    // shown up at WAL-decode time. applied_lsn_ advances 1:1 with WAL order so a
-    // later Snapshot records exactly the graph state it captured.
+    // recovery path (no committer yet). INSERT -> addPoint, DELETE -> markDelete
+    // (idempotent). Exceptions from hnswlib are swallowed to keep replay total; a
+    // genuinely fatal graph error would have shown up at WAL-decode time.
+    // applied_lsn_ advances 1:1 with WAL order so a later Snapshot records exactly
+    // the graph state it captured.
     try {
         if (entry.type == WalEntry::Type::kInsert) {
-            index_->addPoint(entry.vector.data(), static_cast<hnswlib::labeltype>(entry.block_id));
+            ApplyInsertLocked(entry);
         } else {
             try {
                 index_->markDelete(static_cast<hnswlib::labeltype>(entry.block_id));
                 ++deleted_count_;
             } catch (const std::exception&) {
-                // block_id absent — idempotent no-op (F25 Q6 + V5 #9).
+                // block_id absent OR already marked deleted — idempotent no-op
+                // (F25 Q6 + V5 #9). markDelete throws "Label not found" for an
+                // absent id and "already deleted" for a repeated delete; both are
+                // legitimately no-ops here (a re-delete must NOT double-count).
             }
         }
     } catch (const std::exception& e) {
@@ -287,6 +299,56 @@ void PHnsw::ApplyEntryLocked(const WalEntry& entry) {
                           e.what());
     }
     ++applied_lsn_;
+}
+
+void PHnsw::ApplyInsertLocked(const WalEntry& entry) {
+    // Caller holds the write lock and is inside ApplyEntryLocked's try.
+    //
+    // An INSERT for a block_id that is currently MARKED DELETED is a re-write.
+    // F01 design § 5 (boundary table) sanctions this: a duplicate-block_id write
+    // is "MarkDelete then AddPoint" with the same id (caller-guaranteed ordering),
+    // because hnswlib disallows two live nodes with the same label.
+    // The index is built with allow_replace_deleted_=true (RecoverInternal), and
+    // under that flag hnswlib's 2-arg addPoint THROWS on a marked-deleted label
+    // ("Can't use addPoint to update deleted elements if replacement of deleted
+    // elements is enabled."). Before this branch that throw was swallowed by the
+    // outer catch, so the INSERT's vector — already durable in hnsw.wal — never
+    // entered the graph: silent data loss on every re-write (Bug store-C1).
+    //
+    // We therefore detect the marked-deleted case and resurrect the SAME label in
+    // place: unmarkDelete clears the delete mark (decrementing num_deleted_), then
+    // the 2-arg addPoint finds the now-live label and routes to updatePoint,
+    // overwriting its vector. This keeps the block_id stable (vs. replace_deleted,
+    // which grabs an arbitrary vacant slot and relabels it) and keeps
+    // deleted_count_ in lock-step with hnswlib's num_deleted_.
+    const auto label = static_cast<hnswlib::labeltype>(entry.block_id);
+    if (IsLabelMarkedDeletedLocked(label)) {
+        index_->unmarkDelete(label);  // clears DELETE_MARK, num_deleted_ -= 1
+        if (deleted_count_ > 0) {
+            --deleted_count_;
+        }
+    }
+    // Live-or-absent label: addPoint inserts a new node, or (label already live —
+    // a fresh INSERT for a still-present id, or the resurrected re-write above)
+    // routes to updatePoint and overwrites the vector. No replace_deleted here, so
+    // an unrelated marked-deleted slot is never silently relabeled to this id.
+    index_->addPoint(entry.vector.data(), label);
+}
+
+bool PHnsw::IsLabelMarkedDeletedLocked(uint64_t label) const {
+    // Caller holds mutex_. Probes hnswlib's label map (its own label_lookup_lock,
+    // distinct from mutex_) for "present AND marked deleted" — the re-write
+    // precondition. Mirrors Exists()'s membership probe.
+    try {
+        std::unique_lock<std::mutex> label_lock(index_->label_lookup_lock);
+        auto it = index_->label_lookup_.find(static_cast<hnswlib::labeltype>(label));
+        if (it == index_->label_lookup_.end()) {
+            return false;  // absent
+        }
+        return index_->isMarkedDeleted(it->second);
+    } catch (const std::exception&) {
+        return false;
+    }
 }
 
 // --- Writes ---------------------------------------------------------------

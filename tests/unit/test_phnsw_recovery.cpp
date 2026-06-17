@@ -144,6 +144,58 @@ TEST_F(PHnswRecoveryTest, Recovery_SnapshotThenDeleteThenReopen) {
     EXPECT_TRUE(reopened.Exists(1));
 }
 
+TEST_F(PHnswRecoveryTest, Recovery_DeleteThenSnapshotThenReopen) {
+    // Regression for the store-M1 deleted_count_ undercount bug. When a DELETE
+    // happens BEFORE a Snapshot, the snapshot persists the marked-deleted element
+    // (hnswlib saveIndex writes the DELETE_MARK; loadIndex rebuilds num_deleted_)
+    // and Snapshot() truncates the WAL — so the DELETE record is GONE from the WAL
+    // and recovery's replay never re-sees it. RecoverInternal used to hardcode
+    // deleted_count_ = 0, so after reopen it undercounted deletions:
+    // SearchLocked's live = total - deleted_count_ over-estimated and could ask
+    // hnswlib for more neighbours than exist live. The fix seeds deleted_count_
+    // from index_->getDeletedCount() after the snapshot load.
+    constexpr int kN = 12;
+    constexpr int kDeleted = 4;
+    {
+        PHnsw idx(dir_, config_);
+        for (int i = 0; i < kN; ++i) {
+            auto v = MakeVec(kDim, i);
+            ASSERT_TRUE(idx.AddPoint(v.data(), static_cast<uint64_t>(i + 1)).ok());
+        }
+        // Delete a few ids, THEN snapshot so the deletions live in the snapshot.
+        for (int i = 0; i < kDeleted; ++i) {
+            ASSERT_TRUE(idx.MarkDelete(static_cast<uint64_t>(i + 1)).ok());
+        }
+        ASSERT_TRUE(idx.Snapshot().ok());
+        EXPECT_EQ(idx.GetWalStats().entry_count, 0u);  // WAL truncated post-snapshot
+        // Pre-reopen the counts are correct (deletions tracked in-process).
+        EXPECT_EQ(idx.GetStats().deleted_count, static_cast<std::size_t>(kDeleted));
+        EXPECT_EQ(idx.GetStats().vector_count, static_cast<std::size_t>(kN - kDeleted));
+    }
+
+    PHnsw reopened(dir_, config_);
+    // The crux: deleted_count_ must be reconstructed from the snapshot, not 0.
+    EXPECT_EQ(reopened.GetStats().deleted_count, static_cast<std::size_t>(kDeleted));
+    EXPECT_EQ(reopened.GetStats().vector_count, static_cast<std::size_t>(kN - kDeleted));
+
+    // Deleted ids stay gone; surviving ids remain present after reopen.
+    for (int i = 0; i < kDeleted; ++i) {
+        EXPECT_FALSE(reopened.Exists(static_cast<uint64_t>(i + 1))) << "deleted id " << (i + 1);
+    }
+    EXPECT_TRUE(reopened.Exists(static_cast<uint64_t>(kN)));  // a survivor
+
+    // Over-ask top_k far beyond the live count: with the bug's inflated `live` the
+    // search could request more than exist live; the result must be capped at the
+    // true number of live elements (kN - kDeleted) and never include a deleted id.
+    auto q = MakeVec(kDim, kN - 1);  // == id kN's vector (seed kN-1 → a survivor)
+    auto results = reopened.Search(q.data(), /*top_k=*/kN);
+    EXPECT_EQ(results.size(), static_cast<std::size_t>(kN - kDeleted));
+    for (const auto& [id, dist] : results) {
+        EXPECT_GT(id, static_cast<uint64_t>(kDeleted))
+            << "search returned a deleted id " << id;
+    }
+}
+
 TEST_F(PHnswRecoveryTest, Recovery_SearchConsistentAfterReopen) {
     auto q = MakeVec(kDim, 3);
     {
