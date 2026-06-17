@@ -177,6 +177,10 @@ add_executable(cortrix_unit_tests
     unit/test_memory_routes_r7b.cpp
     unit/test_spc_branches_r7b.cpp
     unit/test_query_branches_r7b.cpp
+    unit/test_wordpiece_unicode_r8.cpp
+    unit/test_query_request_r8.cpp
+    unit/test_memory_routes_success_r8.cpp
+    unit/test_memory_routes_transparency_r8.cpp
     unit/test_f40_onnx_embedder_sparse.cpp
     unit/test_f40_sparse_error.cpp
     unit/test_f40_sparse_codec.cpp
