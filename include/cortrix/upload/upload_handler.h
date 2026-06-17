@@ -10,6 +10,7 @@
 #include "cortrix/spc/spc_manager.h"
 #include "cortrix/spc/spc_task.h"
 #include "cortrix/spc/spc_router.h"
+#include "cortrix/observability/operation_logger.h"
 
 namespace cortrix {
 
@@ -34,7 +35,18 @@ class UploadHandler {
 public:
     /// @param config: upload configuration
     /// @param spc_mgr: SPC pipeline manager (task enqueue)
-    UploadHandler(const UploadConfig& config, SPCManager& spc_mgr);
+    /// @param op_logger: F18a operation_log writer (SpcPipeline upload site, §9.1).
+    ///        Optional — null leaves the upload path unchanged (observability is
+    ///        strictly additive, C4); the success path then simply skips the write.
+    UploadHandler(const UploadConfig& config, SPCManager& spc_mgr,
+                  std::shared_ptr<observability::IOperationLogger> op_logger = nullptr);
+
+    /// [F18a] Set the operation_log writer after construction. The bootstrap builds
+    /// the ObservabilityModule *after* the UploadHandler, so the op_logger is wired
+    /// here rather than at construction. No-op-safe: null leaves the path unchanged.
+    void SetOperationLogger(std::shared_ptr<observability::IOperationLogger> op_logger) {
+        op_logger_ = std::move(op_logger);
+    }
 
     /// Handle single file upload.
     ///
@@ -81,8 +93,17 @@ private:
                               const std::string& filename,
                               CortrixDoc* existing_doc);
 
+    /// [F18a §9.1 SpcPipeline · upload site] Emit one operation_log `upload` row on a
+    /// successful upload. No-op when op_logger_ is null. Identity (user_id / trace_id /
+    /// session_id) is read from the thread-local ObservabilityContext by MakeEngineEntry
+    /// (HandleUpload runs synchronously on the request thread WithAuth populated). Never
+    /// throws across the business path (C4 — the logger itself is no-throw, §5.1).
+    void EmitUploadLog(const std::string& namespace_name, const std::string& doc_id,
+                       const std::string& filename, const std::string& status);
+
     UploadConfig config_;
     SPCManager& spc_mgr_;
+    std::shared_ptr<observability::IOperationLogger> op_logger_;
 };
 
 }  // namespace cortrix

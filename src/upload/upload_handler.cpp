@@ -2,15 +2,34 @@
 #include "cortrix/upload/upload_handler.h"
 #include "cortrix/spc/spc_router.h"
 #include "cortrix/logging/logging.h"
+#include "cortrix/observability/operation_log_emitter.h"
 
 #include <openssl/evp.h>
 #include <sstream>
 #include <iomanip>
+#include <utility>
 
 namespace cortrix {
 
-UploadHandler::UploadHandler(const UploadConfig& config, SPCManager& spc_mgr)
-    : config_(config), spc_mgr_(spc_mgr) {}
+UploadHandler::UploadHandler(const UploadConfig& config, SPCManager& spc_mgr,
+                             std::shared_ptr<observability::IOperationLogger> op_logger)
+    : config_(config), spc_mgr_(spc_mgr), op_logger_(std::move(op_logger)) {}
+
+void UploadHandler::EmitUploadLog(const std::string& namespace_name,
+                                  const std::string& doc_id,
+                                  const std::string& filename,
+                                  const std::string& status) {
+    if (!op_logger_) return;  // observability strictly additive (C4)
+    // §9.1 SpcPipeline → resource_type "document"; resource_id = doc_id. Summary
+    // carries the filename + outcome (skipped / pending / updating) and is truncated
+    // to ≤100 by the emitter. user_id / trace_id / session_id come from the
+    // thread-local ObservabilityContext.
+    auto entry = observability::MakeEngineEntry(
+        observability::EmitSite::kSpcPipeline, "upload", namespace_name,
+        /*resource_id=*/doc_id,
+        "upload " + status + ": " + filename);
+    op_logger_->Log(entry);
+}
 
 std::string UploadHandler::ComputeContentHash(const void* data, size_t len) {
     unsigned char hash[EVP_MAX_MD_SIZE];
@@ -139,6 +158,9 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
         result->content_hash = content_hash;
         result->status = "skipped";
         result->is_duplicate = true;
+        // [F18a §9.1] The upload operation completed successfully (idempotent no-op);
+        // record it so the Agent sees the call landed against the existing doc.
+        EmitUploadLog(req.namespace_name, existing_doc.doc_id, req.filename, "skipped");
         return Status::Ok();
     }
 
@@ -204,6 +226,10 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
 
     CORTRIX_LOG_INFO("upload", "Upload success: doc_id={}, filename={}, status={}",
                     doc.doc_id, req.filename, result->status);
+    // [F18a §9.1] Record the accepted upload (doc created + SPC task queued). The
+    // SPC-submit-failed path above returns a non-Ok Status and is deliberately NOT
+    // logged (operation_log records successful operations only, §4.1).
+    EmitUploadLog(req.namespace_name, doc.doc_id, req.filename, result->status);
     return Status::Ok();
 }
 

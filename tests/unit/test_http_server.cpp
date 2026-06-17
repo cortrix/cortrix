@@ -12,6 +12,11 @@
 #include "cortrix/namespace/namespace_manager.h"
 #include "cortrix/server/http_server.h"
 #include "cortrix/common/version.h"
+#include "cortrix/observability/operation_logger.h"
+
+#include <memory>
+#include <mutex>
+#include <vector>
 
 namespace cortrix {
 namespace {
@@ -307,6 +312,67 @@ TEST_F(HttpServerTest, CreateNamespaceNoAuth) {
     auto body = json::parse(res->body);
     EXPECT_EQ(body["name"], "test-ns");
     EXPECT_TRUE(body.contains("created_at"));
+}
+
+// [F18a §9.1 NamespaceManager site] A capturing operation logger. The route runs on
+// a server worker thread, so Log can be called concurrently — guard the vector.
+class CapturingNsOpLogger : public observability::IOperationLogger {
+public:
+    std::mutex mu;
+    std::vector<observability::OperationLogEntry> logged;
+    void Log(const observability::OperationLogEntry& e,
+             const observability::TraceContext*) override {
+        std::lock_guard<std::mutex> lk(mu);
+        logged.push_back(e);
+    }
+    void BatchLog(const std::vector<observability::OperationLogEntry>&,
+                  const observability::TraceContext*) override {}
+    Result<observability::OperationLogQueryResult> Query(
+        const observability::OperationLogFilter&,
+        const observability::TraceContext*) override { return Status::Internal("unused"); }
+    void Cleanup() override {}
+    observability::OperationLogStats GetStats() override { return {}; }
+    observability::HealthStatus Health() override { return {}; }
+};
+
+TEST_F(HttpServerTest, NamespaceCreateDeleteEmitOperationLog) {
+    auto op_logger = std::make_shared<CapturingNsOpLogger>();
+    server_->SetOperationLogger(op_logger.get());  // inject before the routes run
+    StartServer();
+    httplib::Client cli("127.0.0.1", config_.server.port);
+
+    auto created = cli.Post("/api/v1/namespaces", R"({"name":"audit-ns"})",
+                            "application/json");
+    ASSERT_TRUE(created);
+    ASSERT_EQ(created->status, 201);
+
+    auto deleted = cli.Delete("/api/v1/namespaces/audit-ns");
+    ASSERT_TRUE(deleted);
+    ASSERT_EQ(deleted->status, 204);
+
+    std::lock_guard<std::mutex> lk(op_logger->mu);
+    ASSERT_EQ(op_logger->logged.size(), 2u);
+    EXPECT_EQ(op_logger->logged[0].action, "ns_create");
+    EXPECT_EQ(op_logger->logged[0].resource_type, "namespace");
+    EXPECT_EQ(op_logger->logged[0].resource_id, "audit-ns");
+    EXPECT_EQ(op_logger->logged[0].namespace_id, "audit-ns");
+    EXPECT_EQ(op_logger->logged[1].action, "ns_delete");
+    EXPECT_EQ(op_logger->logged[1].resource_id, "audit-ns");
+}
+
+TEST_F(HttpServerTest, NamespaceCreateFailureDoesNotEmitOperationLog) {
+    auto op_logger = std::make_shared<CapturingNsOpLogger>();
+    server_->SetOperationLogger(op_logger.get());
+    StartServer();
+    httplib::Client cli("127.0.0.1", config_.server.port);
+
+    // Missing 'name' → 400 before the manager runs → success-only log stays empty.
+    auto res = cli.Post("/api/v1/namespaces", R"({"foo":"bar"})", "application/json");
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 400);
+
+    std::lock_guard<std::mutex> lk(op_logger->mu);
+    EXPECT_TRUE(op_logger->logged.empty());
 }
 
 TEST_F(HttpServerTest, CreateNamespaceInvalidJson) {

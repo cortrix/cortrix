@@ -7,6 +7,8 @@
 #include "cortrix/resource/namespace_facade.h"    // per-request façade over F05 pool
 #include "cortrix/logging/logging.h"
 #include "cortrix/common/version.h"                // [P5] version SoT
+#include "cortrix/observability/operation_logger.h"        // F18a ns_* operation_log
+#include "cortrix/observability/operation_log_emitter.h"   // §9.1 MakeEngineEntry / EmitSite
 
 #include <random>
 #include <iomanip>
@@ -314,6 +316,22 @@ void CortrixHttpServer::SetNamespaceRouter(cortrix::catalog::INSRouter* router) 
     ns_router_ = router;
 }
 
+void CortrixHttpServer::SetOperationLogger(
+    cortrix::observability::IOperationLogger* op_logger) {
+    op_logger_ = op_logger;
+}
+
+void CortrixHttpServer::EmitNsLog(const std::string& action, const std::string& name) {
+    if (!op_logger_) return;  // observability strictly additive (C4)
+    // §9.1 NamespaceManager → resource_type "namespace"; resource_id = the NS name
+    // (the namespace_id in this single-SoT model). user_id / trace_id / session_id
+    // come from the thread-local ObservabilityContext (request thread, WithAuth).
+    auto entry = observability::MakeEngineEntry(
+        observability::EmitSite::kNamespaceManager, action, /*namespace_id=*/name,
+        /*resource_id=*/name, action + ": " + name);
+    op_logger_->Log(entry);
+}
+
 httplib::Server& CortrixHttpServer::server() {
     return svr_;
 }
@@ -517,6 +535,7 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                     resp["block_count"] = info.block_count;
                 }
 
+                EmitNsLog("ns_create", name);  // [F18a §9.1] success-only
                 WriteJsonResponse(res, 201, resp, rctx.request_id);
             }
         ));
@@ -584,6 +603,7 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                     resp["block_count"] = info.block_count;
                 }
 
+                EmitNsLog("ns_create", name);  // [F18a §9.1] success-only
                 WriteJsonResponse(res, 201, resp, rctx.request_id);
             }
         ));
@@ -651,6 +671,7 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                     return;
                 }
 
+                EmitNsLog("ns_delete", name);  // [F18a §9.1] success-only
                 res.set_header("X-Request-Id", rctx.request_id);
                 res.status = 204;
             }
@@ -666,6 +687,7 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                     return;
                 }
 
+                EmitNsLog("ns_delete", name);  // [F18a §9.1] success-only
                 res.set_header("X-Request-Id", rctx.request_id);
                 res.status = 204;
             }

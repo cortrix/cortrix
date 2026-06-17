@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 #include "cortrix/upload/upload_handler.h"
 #include "cortrix/spc/spc_router.h"
+#include "cortrix/observability/operation_logger.h"
+#include "cortrix/observability/observability_context.h"
+
+#include <memory>
 
 // D3.5 wire⑤c: UploadHandler's methods now take the narrow store/blob windows
 // (CortrixStore& / CortrixBlobStore&) instead of a CortrixNamespace&. The fakes
@@ -1130,6 +1134,105 @@ TEST_F(UploadHandlerTest, HandleUpload_UpdateSubmitFail_UpdatingStatus) {
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kUnavailable);
     EXPECT_EQ(result2.status, "updating");
+}
+
+// ============================================================
+// F18a §9.1 — SpcPipeline upload site writes operation_log on success
+// ============================================================
+
+// Capturing mock operation logger (mirrors test_engine_instrumentation.cpp).
+class CapturingOpLogger : public observability::IOperationLogger {
+public:
+    std::vector<observability::OperationLogEntry> logged;
+    void Log(const observability::OperationLogEntry& e,
+             const observability::TraceContext*) override { logged.push_back(e); }
+    void BatchLog(const std::vector<observability::OperationLogEntry>&,
+                  const observability::TraceContext*) override {}
+    Result<observability::OperationLogQueryResult> Query(
+        const observability::OperationLogFilter&,
+        const observability::TraceContext*) override { return Status::Internal("unused"); }
+    void Cleanup() override {}
+    observability::OperationLogStats GetStats() override { return {}; }
+    observability::HealthStatus Health() override { return {}; }
+};
+
+class UploadOpLogTest : public UploadHandlerTest {
+protected:
+    void SetUp() override {
+        UploadHandlerTest::SetUp();
+        op_logger_ = std::make_shared<CapturingOpLogger>();
+        handler_ = std::make_unique<UploadHandler>(config_, *spc_, op_logger_);
+        // Seed the thread-local identity the emitter reads (C1).
+        auto& octx = observability::ObservabilityContext::ThreadLocal();
+        octx.user_id = "alice";
+    }
+    void TearDown() override {
+        observability::ObservabilityContext::ThreadLocal().user_id.reset();
+    }
+    std::shared_ptr<CapturingOpLogger> op_logger_;
+};
+
+TEST_F(UploadOpLogTest, NewUploadEmitsOperationLog) {
+    std::string content = "hello world";
+    auto req = MakeRequest("notes.txt", content, "text/plain");
+    UploadResult result;
+    ASSERT_TRUE(handler_->HandleUpload(req, *store_, *blob_, &result).ok());
+
+    ASSERT_EQ(op_logger_->logged.size(), 1u);
+    const auto& e = op_logger_->logged[0];
+    EXPECT_EQ(e.action, "upload");
+    EXPECT_EQ(e.resource_type, "document");          // §9.1 SpcPipeline (non-db_import)
+    EXPECT_EQ(e.namespace_id, "test-ns");
+    EXPECT_EQ(e.resource_id, result.doc_id);         // doc_id is the resource id
+    EXPECT_EQ(e.user_id, "alice");                   // from the thread-local context
+    ASSERT_TRUE(e.summary.has_value());
+    EXPECT_NE(e.summary->find("notes.txt"), std::string::npos);
+}
+
+TEST_F(UploadOpLogTest, DuplicateSkipEmitsOperationLog) {
+    std::string content = "same bytes";
+    auto req = MakeRequest("dup.txt", content, "text/plain");
+    UploadResult r1;
+    ASSERT_TRUE(handler_->HandleUpload(req, *store_, *blob_, &r1).ok());
+    ASSERT_EQ(op_logger_->logged.size(), 1u);
+
+    // Re-upload identical content → dedup skip, still a successful operation.
+    UploadResult r2;
+    ASSERT_TRUE(handler_->HandleUpload(req, *store_, *blob_, &r2).ok());
+    EXPECT_TRUE(r2.is_duplicate);
+    ASSERT_EQ(op_logger_->logged.size(), 2u);
+    EXPECT_EQ(op_logger_->logged[1].action, "upload");
+    EXPECT_EQ(op_logger_->logged[1].resource_id, r1.doc_id);
+    ASSERT_TRUE(op_logger_->logged[1].summary.has_value());
+    EXPECT_NE(op_logger_->logged[1].summary->find("skipped"), std::string::npos);
+}
+
+TEST_F(UploadOpLogTest, SpcSubmitFailureDoesNotEmit) {
+    // The doc + blob are saved, but Submit fails → non-Ok Status → success-only
+    // operation_log must NOT record it (§4.1).
+    spc_->set_should_fail(true);
+    std::string content = "will not queue";
+    auto req = MakeRequest("fail.txt", content, "text/plain");
+    UploadResult result;
+    EXPECT_FALSE(handler_->HandleUpload(req, *store_, *blob_, &result).ok());
+    EXPECT_TRUE(op_logger_->logged.empty());
+}
+
+TEST_F(UploadOpLogTest, ValidationFailureDoesNotEmit) {
+    // Unsupported MIME → early reject before any work → no operation_log.
+    auto req = MakeRequest("cache.tmp", "temp data", "");
+    UploadResult result;
+    EXPECT_FALSE(handler_->HandleUpload(req, *store_, *blob_, &result).ok());
+    EXPECT_TRUE(op_logger_->logged.empty());
+}
+
+TEST_F(UploadHandlerTest, NullOpLoggerUploadStillSucceeds) {
+    // The default 2-arg handler_ (op_logger == null) must run the upload unchanged.
+    std::string content = "no logger";
+    auto req = MakeRequest("plain.txt", content, "text/plain");
+    UploadResult result;
+    EXPECT_TRUE(handler_->HandleUpload(req, *store_, *blob_, &result).ok());
+    EXPECT_EQ(result.status, "pending");
 }
 
 }  // namespace

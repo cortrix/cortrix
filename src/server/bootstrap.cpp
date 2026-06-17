@@ -103,9 +103,11 @@
 #include "cortrix/observability/operation_log_schema.h"
 #include "cortrix/common/in_memory_global_config.h"
 #include "cortrix/connector/directory_importer.h"
+#include "cortrix/connector/dir_watcher_registry.h"       // [F21] ConnectorState holds unique_ptr<DirWatcherRegistry> (complete type for dtor)
 #include "cortrix/server/http_server.h"
 // [F20] security hardening
 #include "cortrix/middleware/admin_guard.h"
+#include "cortrix/middleware/rate_limiter.h"               // [F20 §8.bis] pre-routing rate-limit gate
 #include "cortrix/logging/sanitizer.h"
 // [F24] deployment: dual health endpoint + OpenMetrics :9091 + disk monitor + graceful shutdown
 #include "cortrix/deploy/graceful_shutdown.h"
@@ -620,21 +622,15 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
             });
     }
 
-    // 8b. ConnectorState (multi-watcher; optionally seed from config)
+    // 8b. [F21] ConnectorState holds a single DirWatcherRegistry (fan-out), built
+    // lazily by RegisterConnectorRoutes. The config watch_dir is subscribed AFTER
+    // the routes build the registry (see just after RegisterConnectorRoutes below) —
+    // a fresh NS is created via INSRouter::CreateNamespace inside Subscribe (catalog
+    // INSERT + F05 AdmitCreate), not the JSON-only NamespaceManager::Create.
     cortrix::ConnectorState connector_state;
     connector_state.data_dir = config.ns.data_dir;  // for watchers.json persistence
-    if (config.watch_dir.watch_enabled && !config.watch_dir.data_dir.empty()) {
-        // Auto-create namespace if it doesn't exist yet (idempotent)
-        ns_mgr.Create(config.watch_dir.namespace_name);  // ignore AlreadyExists
-        unsigned h = static_cast<unsigned>(
-            std::hash<std::string>{}(config.watch_dir.data_dir) & 0xFFFFFFFFu);
-        char idbuf[9]; snprintf(idbuf, sizeof(idbuf), "%08x", h);
-        auto imp = std::make_unique<cortrix::DirectoryImporter>(
-            config.watch_dir, ns_pool, spc_mgr);
-        connector_state.watchers.push_back({std::string(idbuf), std::move(imp)});
-    }
 
-    // 9. UploadHandler
+    // 9. UploadHandler (F18a op_logger wired via setter after ObservabilityModule, below)
     cortrix::UploadHandler upload_handler(config.upload, spc_mgr);
 
     // 10. Query components
@@ -668,6 +664,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         global_config->SetAgentLlmConfig(seed);
     }
     cortrix::observability::ObservabilityModule obs_module(catalog_db.db(), global_config);
+    upload_handler.SetOperationLogger(obs_module.logger());  // [F18a M3] upload-site operation_log
     // [F13 TC4 · A4] agent_trace now lives in the global catalog.db. Build ONE writer over
     // that handle, shared by the F13 90-day retention cleanup here AND the F-path query
     // EngineInstrumentation write side (below, ~line 710). Register the F13 retention
@@ -719,10 +716,38 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::server::ImportHandler import_handler(import_mgr, import_conn_mgr);
 
     // 11. Create HTTP server and register all routes
+    // [F20 §8.bis] Rate limiter is declared before the server so the pre-routing
+    // handler's capture outlives every in-flight request the server may dispatch.
+    cortrix::middleware::RateLimiter rate_limiter;
     cortrix::CortrixHttpServer server(config, auth, ns_mgr);
     server.SetNamespacePool(&ns_pool);       // [wire⑤c] live doc/block counts via per-request façade
     server.SetNamespaceRouter(&ns_router);   // [wire⑤c/F13] namespace-create path
+    server.SetOperationLogger(obs_module.logger().get());  // [F18a M2] ns_create/ns_delete operation_log
     server.RegisterRoutes();
+    // [F20 §8.bis] Pre-routing rate-limit gate (per-ip / per-api-key / global token
+    // buckets). A denied request short-circuits with 429 + the GEN-Agent error
+    // envelope before any route handler runs — defends unauthenticated DDoS /
+    // brute force. api_key is read from the same headers as WithAuth so per-key
+    // strata key off the real caller; both inputs may be empty (that stratum skips).
+    server.server().set_pre_routing_handler(
+        [&rate_limiter](const httplib::Request& req, httplib::Response& res) {
+            std::string api_key = req.get_header_value("X-API-Key");
+            if (api_key.empty()) {
+                const std::string ah = req.get_header_value("Authorization");
+                const std::string pfx = "Bearer ";
+                if (ah.size() > pfx.size() && ah.compare(0, pfx.size(), pfx) == 0)
+                    api_key = ah.substr(pfx.size());
+            }
+            const auto d = rate_limiter.Allow(req.remote_addr, api_key);
+            if (!d.allowed) {
+                res.status = 429;
+                res.set_content(
+                    cortrix::middleware::RateLimiter::BuildErrorBody(d).dump(),
+                    "application/json");
+                return httplib::Server::HandlerResponse::Handled;
+            }
+            return httplib::Server::HandlerResponse::Unhandled;
+        });
 
     // P02a web UI: serve the SPA bundle when a dist dir is provided (container
     // entrypoint exports CORTRIX_WEB_UI_DIR=/app/web-ui; unset = headless).
@@ -761,12 +786,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         query_llm = std::make_shared<cortrix::llm::OpenAiLlmClient>(std::move(q_cfg));
     }
     // [F13 · F] Query-path agent_trace write side: one EngineInstrumentation over the
-    // shared global at_writer (built at ~line 640). op_logger=nullptr — the query path
-    // already audits via F18a, so tracing only here avoids a double operation_log write.
+    // shared global at_writer (built at ~line 640). [F18a M1] op_logger is now wired
+    // (was nullptr) so the query site ALSO writes operation_log on success — the
+    // EngineInstrumentation::Record success path emits the F18a entry (action="query").
     // The closure reads trace/session/agent/user from the thread-local ObservabilityContext
     // that WithAuth fills (auth_middleware InstallObservabilityContext).
     auto engine_instr = std::make_shared<cortrix::agent_trace::EngineInstrumentation>(
-        at_writer, /*op_logger=*/nullptr);
+        at_writer, import_op_logger);
     cortrix::query::CrossNsQueryWiring cross_ns_query_wiring(
         ns_pool, embedder, fusion, perm_svc, &sparse_index_registry, query_llm, engine_instr);
     cross_ns_query_wiring.Register(server.server(), auth);
@@ -842,10 +868,19 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::RegisterTracesRoutesGlobal(server.server(), catalog_db.db(), ns_pool,
                                         global_config, auth);
     cortrix::RegisterInteractionsRoutesPerNs(server.server(), ns_pool, auth);
-    cortrix::RegisterConnectorRoutes(server.server(), connector_state, ns_pool, ns_router, ns_mgr, spc_mgr, auth);
+    cortrix::RegisterConnectorRoutes(server.server(), connector_state, ns_pool, ns_router, spc_mgr, auth);
+    // [F21] The registry is now built (RegisterConnectorRoutes lazily creates it).
+    // Subscribe the config watch_dir as a fan-out watcher over its namespace. Subscribe
+    // creates a fresh NS via INSRouter (catalog INSERT + F05 AdmitCreate) so the importer
+    // can Acquire it; autostart is deferred to StartAll() below.
+    if (config.watch_dir.watch_enabled && !config.watch_dir.data_dir.empty() &&
+        connector_state.registry) {
+        connector_state.registry->Subscribe(config.watch_dir.data_dir,
+                                             {config.watch_dir.namespace_name},
+                                             /*recursive=*/true, /*autostart=*/false);
+    }
     // [D3.5 r2 · Wave S routes] /watch aliases (openapi/SDK/MCP fan-out shape) mapped
-    // onto the same connector watcher mechanism (POST reuses ConnectorAddWatcher; each
-    // target namespace = one connector watcher over `path`). /connector/* stays.
+    // onto the same connector registry (POST = one Subscribe(path, target_namespaces)).
     cortrix::RegisterWatchAliasRoutes(server.server(), connector_state, ns_pool, ns_router, spc_mgr, auth);
     // [D3.5 batch1] P09 tenant/permission/quota REST (15 endpoints, sec 4.5). In CE
     // no-auth mode WithAuth grants admin so the admin-gated endpoints are reachable
@@ -1027,15 +1062,11 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         }
     }
 
-    // 13b. Start directory monitoring (all configured watchers)
-    for (auto& wentry : connector_state.watchers) {
-        s = wentry.importer->Start();
-        if (!s.ok()) {
-            CORTRIX_LOG_WARN("main", "Directory monitoring failed to start: {}", s.message());
-        } else {
-            CORTRIX_LOG_INFO("main", "Directory monitoring started: {}",
-                            wentry.importer->GetConfig().data_dir);
-        }
+    // 13b. [F21] Start all subscribed directory watchers (fan-out registry; one OS
+    // watcher per directory, autostart was deferred to here at Subscribe time).
+    if (connector_state.registry) {
+        connector_state.registry->StartAll();
+        CORTRIX_LOG_INFO("main", "Directory watcher registry started");
     }
 
     CORTRIX_LOG_INFO("main", "Cortrix server v{} ready on {}:{}",
@@ -1048,12 +1079,11 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         return 1;
     }
 
-    // Graceful shutdown — stop all directory watchers
-    {
-        std::lock_guard<std::mutex> lock(connector_state.mu);
-        for (auto& wentry : connector_state.watchers) {
-            wentry.importer->Stop();
-        }
+    // [F21] Graceful shutdown — stop all directory watchers. The registry serializes
+    // its own teardown (its dtor also StopAll()s, but do it explicitly before the
+    // catalog/pool handles are torn down).
+    if (connector_state.registry) {
+        connector_state.registry->StopAll();
     }
     // [OPEN-2] stop the GC thread (also RAII-handled, but explicit so an in-flight
     // sweep finishes + the thread joins before the catalog handle is torn down).
