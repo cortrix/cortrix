@@ -47,13 +47,23 @@ Cortrix consists of three services, managed uniformly via `dev.sh`:
     └──────────────────┘  └──────────────────────────┘
 ```
 
-**Two-stage unified LLM configuration (new v0.2 design):**
+**LLM configuration (five role-based sections):**
 
-| Config section | Location | Description |
-|--------|------|------|
-| `llm_providers` | `build/config.yaml` | Provider registry: fill in an API Key to activate; the UI shows it automatically |
-| `llm_roles` | `build/config.yaml` | Default assignment for the three roles; written to SQLite on first startup |
-| UI runtime selection | Browser settings page | Each role independently selects a provider + model, persisted to SQLite |
+The C++ backend reads its LLM settings directly from `build/config.yaml`. Each of
+five roles is its own flat section with `provider` / `api_key` / `model` /
+`base_url` (see [LLM Configuration in Detail](#llm-configuration-in-detail)):
+
+| Role | Consumer | Purpose |
+|------|------|------|
+| `semantic_llm` | C++ backend | Intent classification + reranking (every query; fast/cheap) |
+| `vision_llm` | C++ backend | OCR image refinement (vision model) |
+| `agent_llm` | Python Agent | Conversational RAG/chat |
+| `doc_summary_llm` | C++ backend | Ingest-side document summary (F41) |
+| `enricher_llm` | C++ backend | SPC ingest enricher — NER + summary (F03) |
+
+> The Python Agent (`cortrix-agent/`) resolves its provider from `cortrix-agent/.env`,
+> falling back to the `agent_llm` section of `config.yaml`. See
+> [LLM Configuration in Detail](#llm-configuration-in-detail).
 
 **Performance metrics (MVP, measured)**: API P50 ~127μs, vector search 1K ~304μs, BM25 full-text search 1K ~72μs
 
@@ -125,33 +135,35 @@ cp config.yaml.example build/config.yaml
 **User workflow:**
 
 1. `cp config.yaml.example build/config.yaml`
-2. Find the provider you need in `llm_providers`, fill in its `api_key`, and uncomment it
-3. In `llm_roles`, fill in each role's default `provider` + `model` and uncomment it
-4. Run `./dev.sh`; the corresponding provider and models appear automatically in the UI
+2. In `build/config.yaml`, find the LLM role sections you need, fill in each
+   role's `provider` / `api_key` / `model` / `base_url`, and uncomment it
+3. Run `./dev.sh`
 
 > **Note**: `build/config.yaml` is not committed to git (`build/` is already in `.gitignore`),
 > so API Keys are kept safe locally. `config.yaml.example` contains no real keys and can be committed safely.
 
 **Minimal example** (using Zhipu GLM):
 
-```bash
-# Edit build/config.yaml, find the GLM section, uncomment it, and fill in the Key:
-#
-#   llm_providers:
-#     - id: "glm"
-#       name: "Zhipu GLM"
-#       type: "openai_compat"
-#       api_key: "your-real-key-here"     ← fill in here
-#       base_url: "https://open.bigmodel.cn/api/paas/v4"
-#       models:
-#         - { id: "glm-4-flash", ... }
-#         ...
-#
-#   llm_roles:
-#     semantic_llm: { provider: "glm", model: "glm-4-flash" }   ← uncomment
-#     vision_llm:   { provider: "glm", model: "glm-4v-flash" }
-#     agent_llm:    { provider: "glm", model: "glm-4-flash" }
+```yaml
+# Edit build/config.yaml and uncomment the role sections you need, filling in the
+# Key. Each role is a flat section with the same four fields:
+semantic_llm:
+  provider: "glm"
+  api_key: "your-real-key-here"      # ← fill in here
+  model: "glm-4-flash"
+  base_url: "https://open.bigmodel.cn/api/paas/v4"
+
+agent_llm:
+  provider: "glm"
+  api_key: "your-real-key-here"
+  model: "glm-4.6"
+  base_url: "https://open.bigmodel.cn/api/paas/v4"
 ```
+
+> The five roles are `semantic_llm`, `vision_llm`, `agent_llm`, `doc_summary_llm`,
+> and `enricher_llm`. Configure only the ones you need; an unconfigured role simply
+> stays off. See [LLM Configuration in Detail](#llm-configuration-in-detail) for
+> the full list and per-provider notes (OpenAI, Anthropic Claude, …).
 
 ---
 
@@ -172,22 +184,22 @@ namespace:
 embedding:
   model_path: "./models/bge-m3/model.onnx"
 
-# LLM provider registry (uncomment and fill in api_key to activate)
-llm_providers:
-  - id: "glm"
-    name: "Zhipu GLM"
-    type: "openai_compat"
-    api_key: "your-glm-api-key"   # ← fill in the real Key
-    base_url: "https://open.bigmodel.cn/api/paas/v4"
-    models:
-      - { id: "glm-4-flash",  label: "GLM-4-Flash (free)",   caps: [text] }
-      - { id: "glm-4v-flash", label: "GLM-4V-Flash (vision)",  caps: [text, vision] }
-
-# Default provider + model for each role (written to the database on first startup)
-llm_roles:
-  semantic_llm: { provider: "glm", model: "glm-4-flash" }
-  vision_llm:   { provider: "glm", model: "glm-4v-flash" }
-  agent_llm:    { provider: "glm", model: "glm-4-flash" }
+# LLM roles (each a flat section; uncomment and fill in api_key to activate)
+semantic_llm:
+  provider: "glm"
+  api_key: "your-glm-api-key"   # ← fill in the real Key
+  model: "glm-4-flash"
+  base_url: "https://open.bigmodel.cn/api/paas/v4"
+vision_llm:
+  provider: "glm"
+  api_key: "your-glm-api-key"
+  model: "glm-4v-flash"
+  base_url: "https://open.bigmodel.cn/api/paas/v4"
+agent_llm:
+  provider: "glm"
+  api_key: "your-glm-api-key"
+  model: "glm-4.6"
+  base_url: "https://open.bigmodel.cn/api/paas/v4"
 
 # Local directory auto-watching (file changes are ingested automatically)
 watch_dir:
@@ -332,64 +344,97 @@ Open http://localhost:5173, where you can:
 
 ## LLM Configuration in Detail
 
-### Two-Stage Design
+### Role-based configuration
 
-```
-config.yaml (provider registry)    SQLite (runtime role selection)
-──────────────────────────         ──────────────────────────
-llm_providers:              →UI→   role          provider  model
-  - id: "glm"                      semantic_llm  glm       glm-4-flash
-    api_key: "xxx"                  vision_llm    glm       glm-4v-flash
-    models: [...]                   agent_llm     glm       glm-4-flash
-  - id: "openai"
-    api_key: "yyy"
-```
-
-- **config.yaml** = which providers are available (credentials, model list)
-- **SQLite** = which provider + model each role currently uses (persisted here after UI changes)
-- **UI settings page** = runtime switching, takes effect immediately, no restart needed
-
-### The Three LLM Roles
-
-| Role | Purpose | Model suggestion |
-|------|------|---------|
-| `semantic_llm` | Intent classification + future reranking (called on every query) | fast/cheap, e.g. glm-4-flash |
-| `vision_llm` | Secondary OCR image enhancement (optional feature) | must be a vision model, e.g. glm-4v-flash |
-| `agent_llm` | Frontend RAG conversation | high quality, e.g. glm-4-plus / gpt-4o |
-
-### Adding a New Provider
-
-In the `llm_providers` section of `build/config.yaml`, uncomment the corresponding provider, fill in its `api_key`, and after a restart it appears in the UI:
+LLM settings live in `build/config.yaml` as **five flat role sections**, each
+with the same four fields. A role with `provider` + `api_key` + `model` all set
+counts as configured; anything else leaves that role's feature off.
 
 ```yaml
-llm_providers:
-  - id: "glm"
-    name: "Zhipu GLM"
-    type: "openai_compat"
-    api_key: "your-glm-key"      # fill in the real Key, then uncomment
-    base_url: "https://open.bigmodel.cn/api/paas/v4"
-    models:
-      - { id: "glm-4-flash",  label: "GLM-4-Flash (free)",  caps: [text] }
-      - { id: "glm-4v-flash", label: "GLM-4V-Flash (vision)", caps: [text, vision] }
+<role>:
+  provider: "openai" | "glm" | "claude" | "ollama" | "deepseek" | "mock"
+  api_key:  "..."          # vendor API key
+  model:    "..."          # vendor model id
+  base_url: "..."          # API endpoint (see the wire-protocol note below)
 ```
 
-**Supported provider types:**
+Changes take effect on the next service restart — there is no separate runtime
+provider registry and no database-backed role selection.
 
-| Provider | `type` field | API Key source |
-|------|------------|-------------|
-| Zhipu GLM | `openai_compat` | https://open.bigmodel.cn |
-| OpenAI | `openai` | https://platform.openai.com |
-| Anthropic | `anthropic` | https://console.anthropic.com |
-| Ollama (local) | `ollama` | no key needed, runs locally |
+### The five LLM roles
+
+| Role | Consumer | Purpose | Model suggestion |
+|------|------|------|---------|
+| `semantic_llm` | C++ backend | Intent classification + reranking (every query) | fast/cheap, e.g. glm-4-flash |
+| `vision_llm` | C++ backend | OCR image enhancement (optional) | a vision model, e.g. glm-4v-flash |
+| `agent_llm` | Python Agent | Frontend RAG conversation | high quality, e.g. glm-4.6 / gpt-4o |
+| `doc_summary_llm` | C++ backend | Ingest-side document summary (F41) | fast/cheap |
+| `enricher_llm` | C++ backend | SPC ingest enricher — NER + summary (F03) | fast/cheap |
+
+> `vision_llm` inherits any unset `provider` / `api_key` / `base_url` from
+> `semantic_llm` (typically only the `model` differs).
+
+### Two consumers, two wire protocols
+
+This determines which providers you can use for each role:
+
+- **`agent_llm`** is consumed by the **Python Agent** (`cortrix-agent/`), which
+  has a per-provider adapter and speaks each vendor's **native** protocol. So
+  `provider: "claude"` here talks to the Anthropic Messages API directly — no
+  proxy needed. (For Claude, do **not** set `base_url`: the adapter pins the
+  Anthropic endpoint and ignores it.)
+- **The other four roles** are consumed by the **C++ backend**, which speaks
+  **only the OpenAI-compatible wire** (`POST {base_url}/chat/completions` with
+  `Authorization: Bearer`). Any OpenAI-compatible service works directly (OpenAI,
+  GLM, DeepSeek, a local vLLM/Ollama gateway, …). A provider whose native API is
+  **not** OpenAI-compatible (e.g. Anthropic Claude) must be reached through an
+  OpenAI-compatible **proxy gateway**, with `base_url` pointing at that proxy.
+
+### Provider reference
+
+| Provider | `provider` value | API Key source | Notes |
+|------|------------|-------------|------|
+| Zhipu GLM | `glm` | https://open.bigmodel.cn | OpenAI-compatible; works in any role |
+| OpenAI | `openai` | https://platform.openai.com | OpenAI-compatible; works in any role |
+| DeepSeek | `deepseek` | https://platform.deepseek.com | OpenAI-compatible; works in any role |
+| Ollama (local) | `ollama` | no key needed, runs locally | OpenAI-compatible gateway |
+| Anthropic Claude | `claude` | https://console.anthropic.com | Native in `agent_llm`; needs an OpenAI-compatible proxy for the other four roles |
+
+Example — OpenAI (works in any role, OpenAI-compatible):
+
+```yaml
+semantic_llm:
+  provider: "openai"
+  api_key: "your-api-key"
+  model: "gpt-4o-mini"
+  base_url: "https://api.openai.com/v1"
+agent_llm:
+  provider: "openai"
+  api_key: "your-api-key"
+  model: "gpt-4o"
+  base_url: "https://api.openai.com/v1"
+```
+
+Example — Anthropic Claude in `agent_llm` (native; no `base_url`):
+
+```yaml
+agent_llm:
+  provider: "claude"
+  api_key: "your-api-key"
+  model: "claude-haiku-4-5-20251001"   # fast/low-cost; "claude-sonnet-4-6" for stronger results
+```
+
+> The Python Agent can also be configured (and overridden) via `cortrix-agent/.env`
+> — see `cortrix-agent/.env.example`. Resolution order, highest first: real
+> environment variables > `cortrix-agent/.env` > `config.yaml` `agent_llm` >
+> built-in defaults.
 
 ### How Configuration Changes Take Effect
 
 | Change type | How it takes effect |
 |---------|---------|
-| Switching a role's model in the UI | Immediately, no restart needed |
-| Adding/removing a provider in config.yaml | UI updates the provider list after a service restart |
-| Editing `llm_roles` in config.yaml | Resets the role defaults after a restart (overrides SQLite) |
-| Editing `api_key` in config.yaml | Takes effect after a service restart |
+| Editing any role section in `config.yaml` | Takes effect after a service restart |
+| Editing `cortrix-agent/.env` (Python Agent) | Takes effect after restarting the Agent service |
 
 ---
 
@@ -536,7 +581,7 @@ server {
 ## FAQ
 
 **Q: The backend shows `llm_enabled: false` after startup?**
-A: Check that at least one provider in `llm_providers` of `build/config.yaml` is uncommented and has an `api_key` filled in, and that `semantic_llm` in `llm_roles` has a matching `provider` + `model` configuration.
+A: Check that the `semantic_llm` section in `build/config.yaml` is uncommented and has `provider` + `api_key` + `model` all filled in (a role counts as configured only when all three are set).
 
 **Q: The frontend LLM settings dialog reports a JSON error?**
 A: The Cortrix Agent service (port 8001) is not running. Start everything with `./dev.sh`, or start it manually:

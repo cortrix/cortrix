@@ -16,7 +16,7 @@ class ClaudeAdapter(BaseLLMAdapter):
     adapter inside an async context that calls ``close()`` on teardown.
     """
 
-    DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
+    DEFAULT_MODEL = "claude-haiku-4-5-20251001"
     API_URL = "https://api.anthropic.com/v1/messages"
     API_VERSION = "2023-06-01"
 

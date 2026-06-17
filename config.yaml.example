@@ -5,8 +5,9 @@
 #   cp config.yaml.example build/config.yaml
 #   Edit build/config.yaml:
 #     1. Fill in and uncomment the LLM role sections you need (see the LLM
-#        configuration block below — 5 flat roles, one section each)
-#     3. Adjust the other path settings as needed
+#        configuration block below — 5 flat roles, one section each; note that
+#        agent_llm and the other 4 roles use different wire protocols / providers)
+#     2. Adjust the other path settings as needed
 #   ./dev.sh
 #
 # Note: build/config.yaml is not committed to git (build/ is already gitignored)
@@ -102,47 +103,102 @@ spc:
 # The server parses exactly these sections (src/config/config.cpp):
 #   semantic_llm     — intent classification & reranking (every query; fast/cheap)
 #   vision_llm       — OCR image refinement (model must support vision input)
-#   agent_llm        — conversational RAG/chat (also read by cortrix-agent; prefer quality)
+#   agent_llm        — conversational RAG/chat
 #   doc_summary_llm  — F41 ingest-side document summary (async via F42)
 #   enricher_llm     — F03 SPC ingest enricher (NER + summary)
 #
 # Each role takes the same four fields; a role with provider/api_key/model all
 # set counts as configured, anything else leaves that feature OFF:
-#   provider: "openai" | "glm" | "claude" | "ollama" | ...  (OpenAI-compatible wire)
+#   provider: "openai" | "glm" | "claude" | "ollama" | "deepseek" | "mock"
 #   api_key:  vendor API key
 #   model:    vendor model id
 #   base_url: API endpoint (e.g. https://open.bigmodel.cn/api/paas/v4 for GLM)
 #
-# Example (Zhipu GLM, https://open.bigmodel.cn → Console → API Keys):
+# Two consumers, two wire protocols — this matters for the provider you pick:
+#   • agent_llm    — consumed by the Python Agent (cortrix-agent/, F48). It has a
+#                    per-provider adapter and talks each vendor's NATIVE protocol
+#                    (e.g. Anthropic /v1/messages for "claude"). The agent_llm
+#                    block here is also picked up by the Python Agent as a default
+#                    (it maps the fields to env vars; cortrix-agent/.env overrides
+#                    it — see cortrix-agent/.env.example).
+#   • the other 4  — consumed by the C++ backend (OpenAiLlmClient), which speaks
+#     (semantic/      ONLY the OpenAI-compatible wire: it POSTs to
+#      vision/        {base_url}/chat/completions with "Authorization: Bearer".
+#      doc_summary/   Any OpenAI-compatible service works directly here (OpenAI,
+#      enricher)      GLM, DeepSeek, a local vLLM/Ollama gateway, …). A provider
+#                     whose native API is NOT OpenAI-compatible (e.g. Anthropic
+#                     Claude) must be reached through an OpenAI-compatible proxy
+#                     gateway, with base_url pointing at that proxy.
+#
+# ---------------------------------------------------------------------------
+# Example A — Zhipu GLM (https://open.bigmodel.cn → Console → API Keys).
+# OpenAI-compatible, so the same block shape works for every role:
 # semantic_llm:
 #   provider: "glm"
-#   api_key: "your-glm-api-key"
+#   api_key: "your-api-key"
 #   model: "glm-4-flash"
 #   base_url: "https://open.bigmodel.cn/api/paas/v4"
 #
 # vision_llm:
 #   provider: "glm"
-#   api_key: "your-glm-api-key"
+#   api_key: "your-api-key"
 #   model: "glm-4v-flash"
 #   base_url: "https://open.bigmodel.cn/api/paas/v4"
 #
 # agent_llm:
 #   provider: "glm"
-#   api_key: "your-glm-api-key"
+#   api_key: "your-api-key"
 #   model: "glm-4.6"
 #   base_url: "https://open.bigmodel.cn/api/paas/v4"
 #
 # doc_summary_llm:
 #   provider: "glm"
-#   api_key: "your-glm-api-key"
+#   api_key: "your-api-key"
 #   model: "glm-4-flash"
 #   base_url: "https://open.bigmodel.cn/api/paas/v4"
 #
 # enricher_llm:
 #   provider: "glm"
-#   api_key: "your-glm-api-key"
+#   api_key: "your-api-key"
 #   model: "glm-4-flash"
 #   base_url: "https://open.bigmodel.cn/api/paas/v4"
+#
+# ---------------------------------------------------------------------------
+# Example B — OpenAI (https://platform.openai.com). OpenAI-compatible, so it
+# works directly in every role. A cheap model for the high-frequency roles, a
+# stronger one for agent_llm:
+# semantic_llm:
+#   provider: "openai"
+#   api_key: "your-api-key"
+#   model: "gpt-4o-mini"
+#   base_url: "https://api.openai.com/v1"
+#
+# agent_llm:
+#   provider: "openai"
+#   api_key: "your-api-key"
+#   model: "gpt-4o"
+#   base_url: "https://api.openai.com/v1"
+#
+# ---------------------------------------------------------------------------
+# Example C — Anthropic Claude (https://console.anthropic.com). Claude is split
+# by consumer (see "Two consumers" above):
+#
+#   • agent_llm: NATIVE, direct — the Python Agent's Claude adapter calls
+#     api.anthropic.com directly. DO NOT set base_url here (the adapter pins the
+#     Anthropic endpoint itself; a base_url is ignored for "claude"):
+# agent_llm:
+#   provider: "claude"
+#   api_key: "your-api-key"
+#   model: "claude-haiku-4-5-20251001"   # fast/low-cost; "claude-sonnet-4-6" for stronger results
+#
+#   • semantic_llm / vision_llm / doc_summary_llm / enricher_llm: the C++ backend
+#     is OpenAI-compatible only, so Claude must go through an OpenAI-compatible
+#     proxy gateway here — point base_url at the proxy, not at api.anthropic.com:
+# enricher_llm:
+#   provider: "claude"
+#   api_key: "your-api-key"
+#   model: "claude-haiku-4-5-20251001"
+#   base_url: "https://your-openai-compatible-proxy.example.com/v1"
 # =============================================================================
 
 # -----------------------------------------------------------------------------
