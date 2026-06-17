@@ -3,6 +3,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "cortrix/common/status.h"
@@ -12,7 +13,7 @@
 namespace cortrix {
 
 namespace resource { class INamespacePool; }  // D3.5 wire⑤c: F05 pool dependency
-class NamespaceManager;
+namespace catalog  { class INSRouter; }        // F13 catalog: namespace create+admit
 class SPCManager;
 
 /// F21 Watcher Fan-out (TD-WATCHER-001).
@@ -43,8 +44,17 @@ struct WatchInfo {
 
 class DirWatcherRegistry {
 public:
+    /// @param pool       F05 resource pool the importers acquire per-operation.
+    /// @param ins_router F13 catalog router used to create a subscribed namespace
+    ///                   (catalog INSERT + F05 AdmitCreate, idempotent on
+    ///                   AlreadyExists). This is the ONLY admission path that makes
+    ///                   a freshly-subscribed namespace resolvable by the importer's
+    ///                   facade.Acquire() — a bare metadata create does NOT admit
+    ///                   into the pool, so the importer would silently fail to
+    ///                   ingest (live-only bug). Mirrors the MVP ConnectorAddWatcher.
+    /// @param spc_mgr    SPC pipeline each importer submits work to.
     DirWatcherRegistry(cortrix::resource::INamespacePool& pool,
-                       NamespaceManager& meta_mgr,
+                       cortrix::catalog::INSRouter& ins_router,
                        SPCManager& spc_mgr);
     ~DirWatcherRegistry();
 
@@ -76,8 +86,23 @@ public:
                        const std::string& namespace_id);
 
     /// Remove the whole watcher for a directory (unsubscribe every namespace).
+    /// @param delete_docs when true, each namespace's importer purges every
+    ///                    document it indexed from this directory (cascade:
+    ///                    blocks + HNSW + blob) BEFORE the watcher is stopped —
+    ///                    matches the MVP DELETE /connector/watchers/:id
+    ///                    semantics (the route exposes the count to the caller).
+    /// @param out_deleted_docs if non-null, receives the total documents purged
+    ///                    across all namespaces (0 when delete_docs is false).
     /// @return Ok / NotFound
-    Status RemoveWatch(const std::string& directory);
+    Status RemoveWatch(const std::string& directory,
+                       bool delete_docs = false,
+                       int* out_deleted_docs = nullptr);
+
+    /// Resolve a watcher id (hash of canonical path) back to its directory.
+    /// The REST DELETE/scan routes receive an :id path param but the registry's
+    /// mutating methods key on directory; this bridges the two without exposing
+    /// internal slots. @return the canonical directory, or nullopt if unknown.
+    std::optional<std::string> DirectoryForId(const std::string& id) const;
 
     // --- Queries ---
 
@@ -85,6 +110,17 @@ public:
 
     /// Look a watcher up by its id (hash of the canonical path).
     std::optional<WatchInfo> GetWatch(const std::string& id) const;
+
+    /// Per-namespace import stats for one watched directory, in the same order
+    /// as WatchInfo::target_namespaces. Used by GET /connector/watchers to nest
+    /// `stats: { ns: {...} }` under each watcher. @return empty when not watched.
+    std::vector<std::pair<std::string, ImportStats>>
+    GetStats(const std::string& directory) const;
+
+    /// Aggregate import stats across every namespace of every watcher (sum of
+    /// all importers). Used by the backward-compat GET /connector/stats and
+    /// POST /connector/scan aggregate responses.
+    ImportStats AggregateStats() const;
 
     // --- Control ---
 
@@ -117,12 +153,19 @@ public:
 private:
     /// One entry per watched directory: a single OS watcher fanning out to a
     /// per-namespace importer list.
+    ///
+    /// `importers` holds shared_ptr (not unique_ptr) so FanOutEvents can take a
+    /// reference-counted snapshot under mu_ and then dispatch outside the lock:
+    /// a concurrent Unsubscribe may erase an importer from the vector mid-batch,
+    /// but the snapshot keeps that importer alive until the in-flight fan-out
+    /// finishes (rev-deploy M-4 UAF fix — the OS event thread no longer touches
+    /// the live vector while Unsubscribe mutates it).
     struct WatcherSlot {
         std::string canonical_dir;
         std::vector<std::string> target_namespaces;        ///< subscriber list
         bool recursive = true;
         std::unique_ptr<FileWatcher> watcher;               ///< 1 OS watcher per dir
-        std::vector<std::unique_ptr<DirectoryImporter>> importers;  ///< 1 per namespace
+        std::vector<std::shared_ptr<DirectoryImporter>> importers;  ///< 1 per namespace
         std::string id;                                     ///< hash of canonical_dir
     };
 
@@ -143,7 +186,7 @@ private:
     void FanOutEvents(WatcherSlot& slot, const std::vector<FileEvent>& events);
 
     cortrix::resource::INamespacePool& pool_;
-    NamespaceManager& meta_mgr_;
+    cortrix::catalog::INSRouter& ins_router_;
     SPCManager& spc_mgr_;
 
     mutable std::mutex mu_;

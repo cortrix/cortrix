@@ -1,219 +1,118 @@
 #include "cortrix/server/routes/connector_routes.h"
-#include "cortrix/connector/directory_importer.h"
+#include "cortrix/connector/dir_watcher_registry.h"
+#include "cortrix/connector/directory_importer.h"  // ImportStats
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/server/http_server.h"
 #include "cortrix/catalog/i_ns_router.h"          // F12 INSRouter (F13 create path)
-#include "cortrix/catalog/catalog_types.h"        // NSMetadata
 #include "cortrix/namespace/namespace_manager.h"
 #include "cortrix/resource/namespace_pool.h"      // F05 INamespacePool
 #include "cortrix/spc/spc_manager.h"
 #include "cortrix/logging/logging.h"
 
 #include <nlohmann/json.hpp>
+#include <algorithm>
 #include <filesystem>
-#include <fstream>
+#include <vector>
 
 namespace cortrix {
 
 static const char* kModule = "ConnectorRoutes";
 
-// Generate a deterministic 8-hex-char ID from data_dir + namespace_name.
-// Using a composite key allows the same directory to be watched by multiple
-// namespaces independently (each gets a distinct ID).
-static std::string MakeWatcherId(const std::string& data_dir, const std::string& ns_name) {
-    std::string key = data_dir + ":" + ns_name;
-    unsigned h = static_cast<unsigned>(std::hash<std::string>{}(key) & 0xFFFFFFFFu);
-    char buf[9];
-    snprintf(buf, sizeof(buf), "%08x", h);
-    return std::string(buf);
-}
+namespace {
 
-// Serialize a WatcherEntry to JSON
-static nlohmann::json WatcherToJson(const WatcherEntry& entry) {
+// Serialize one ImportStats block into a JSON object (shared by the per-NS and
+// the backward-compat aggregate responses).
+nlohmann::json StatsToJson(const ImportStats& s) {
     nlohmann::json j;
-    j["id"]             = entry.id;
-    j["data_dir"]       = entry.importer->GetConfig().data_dir;
-    j["namespace_name"] = entry.importer->GetConfig().namespace_name;
-    j["watching"]       = entry.importer->IsWatching();
-    j["status"]         = entry.importer->IsWatching() ? "watching" : "stopped";
-    auto stats = entry.importer->GetStats();
-    j["stats"]["total_files"]       = stats.total_files;
-    j["stats"]["imported"]          = stats.imported;
-    j["stats"]["updated"]           = stats.updated;
-    j["stats"]["skipped_unchanged"] = stats.skipped_unchanged;
-    j["stats"]["skipped_filtered"]  = stats.skipped_filtered;
-    j["stats"]["skipped_error"]     = stats.skipped_error;
-    j["stats"]["deleted"]           = stats.deleted;
-    j["stats"]["elapsed_s"]         = stats.elapsed_s;
+    j["total_files"]       = s.total_files;
+    j["imported"]          = s.imported;
+    j["updated"]           = s.updated;
+    j["skipped_unchanged"] = s.skipped_unchanged;
+    j["skipped_filtered"]  = s.skipped_filtered;
+    j["skipped_error"]     = s.skipped_error;
+    j["deleted"]           = s.deleted;
+    j["elapsed_s"]         = s.elapsed_s;
     return j;
 }
 
-// ---------------------------------------------------------------------------
-// Persistence helpers — watchers.json
-// ---------------------------------------------------------------------------
-
-// Serialize current watcher list to {state.data_dir}/watchers.json
-// Caller must hold state.mu. Public (shared with the /watch aliases).
-void ConnectorSaveWatchers(const ConnectorState& state) {
-    if (state.data_dir.empty()) return;
-    namespace fs = std::filesystem;
-    fs::path path = fs::path(state.data_dir) / "watchers.json";
-
+// Serialize one watcher (a directory + its fan-out subscribers) to the F21 GET
+// shape: id / directory / target_namespaces[] / subscriber_count / watching /
+// recursive + nested per-NS stats.
+nlohmann::json WatchToJson(const DirWatcherRegistry& reg, const WatchInfo& w) {
     nlohmann::json j;
-    j["version"]  = 1;
-    j["watchers"] = nlohmann::json::array();
-    for (const auto& entry : state.watchers) {
-        nlohmann::json w;
-        w["data_dir"]       = entry.importer->GetConfig().data_dir;
-        w["namespace_name"] = entry.importer->GetConfig().namespace_name;
-        j["watchers"].push_back(w);
+    j["id"]                = w.id;
+    j["directory"]         = w.directory;
+    j["target_namespaces"] = w.target_namespaces;
+    j["subscriber_count"]  = w.subscriber_count;
+    j["watching"]          = w.watching;
+    j["status"]            = w.watching ? "watching" : "stopped";
+    j["recursive"]         = w.recursive;
+    nlohmann::json stats = nlohmann::json::object();
+    for (const auto& [ns, st] : reg.GetStats(w.directory)) {
+        stats[ns] = StatsToJson(st);
     }
-
-    try {
-        std::ofstream out(path);
-        out << j.dump(2) << "\n";
-        spdlog::info("[ConnectorRoutes] watchers persisted ({} entries): {}",
-                     state.watchers.size(), path.string());
-    } catch (const std::exception& e) {
-        spdlog::warn("[ConnectorRoutes] failed to save watchers.json: {}", e.what());
-    }
+    j["stats"] = std::move(stats);
+    return j;
 }
 
-// Restore watchers from {state.data_dir}/watchers.json on startup
-// Caller must hold state.mu (ConnectorAddWatcher requires it)
-static void LoadAndRestoreWatchers(ConnectorState& state,
-                                    catalog::INSRouter& ins_router,
-                                    resource::INamespacePool& pool,
-                                    SPCManager& spc_mgr) {
-    if (state.data_dir.empty()) return;
-    namespace fs = std::filesystem;
-    fs::path path = fs::path(state.data_dir) / "watchers.json";
-
-    std::error_code ec;
-    if (!fs::exists(path, ec)) return;  // First run: no persisted watchers
-
-    nlohmann::json j;
-    try {
-        std::ifstream in(path);
-        in >> j;
-    } catch (const std::exception& e) {
-        spdlog::warn("[ConnectorRoutes] failed to load watchers.json: {}", e.what());
-        return;
-    }
-
-    int restored = 0;
-    for (const auto& w : j.value("watchers", nlohmann::json::array())) {
-        std::string data_dir = w.value("data_dir", "");
-        std::string ns_name  = w.value("namespace_name", "default");
-        if (data_dir.empty()) continue;
-
-        if (!fs::exists(data_dir, ec) || !fs::is_directory(data_dir, ec)) {
-            spdlog::warn("[ConnectorRoutes] persisted watcher dir gone, skipping: {}", data_dir);
-            continue;
-        }
-
-        // autostart=false: let the main.cpp startup loop call Start() to avoid double-scan
-        Status s = ConnectorAddWatcher(state, ins_router, pool, spc_mgr, data_dir, ns_name,
-                                nullptr, /*autostart=*/false);
-        if (s.ok()) {
-            restored++;
-            spdlog::info("[ConnectorRoutes] watcher registered (pending start): dir={}, ns={}", data_dir, ns_name);
-        } else {
-            spdlog::warn("[ConnectorRoutes] restore failed dir={}: {}", data_dir, s.message());
-        }
-    }
-    if (restored > 0)
-        spdlog::info("[ConnectorRoutes] {} watcher(s) restored from watchers.json", restored);
-}
+}  // namespace
 
 // ---------------------------------------------------------------------------
-// Shared helper: create + start a watcher (replaces same (dir, ns) if present).
-// Caller must hold state.mu. Public (shared with the /watch aliases).
-Status ConnectorAddWatcher(ConnectorState& state,
-                            catalog::INSRouter& ins_router,
-                            resource::INamespacePool& pool,
-                            SPCManager& spc_mgr,
-                            const std::string& data_dir,
-                            const std::string& ns_name,
-                            WatcherEntry** out_entry,
-                            bool autostart) {
-    // Auto-create namespace (idempotent), routed through the F12 catalog (F13):
-    // the catalog INSERT admits the NS into the F05 pool, so the per-op façade the
-    // importer acquires below resolves. An existing NS is not an error here.
-    {
-        catalog::NSMetadata meta;
-        meta.namespace_id = ns_name;
-        meta.name         = ns_name;
-        Status ns_s = ins_router.CreateNamespace(meta);
-        if (!ns_s.ok() && ns_s.code() != StatusCode::kAlreadyExists) {
-            return ns_s;
+// Registry lifecycle
+// ---------------------------------------------------------------------------
+
+void ConnectorEnsureRegistry(ConnectorState& state,
+                             resource::INamespacePool& pool,
+                             catalog::INSRouter& ins_router,
+                             SPCManager& spc_mgr) {
+    if (state.registry) return;  // idempotent: shared by /connector + /watch
+    state.registry =
+        std::make_unique<DirWatcherRegistry>(pool, ins_router, spc_mgr);
+    // Restore persisted watchers (v1 layouts auto-migrate to v2). autostart is
+    // deferred: bootstrap calls StartAll() once the server is ready so OS
+    // watching + the initial scan do not run during route registration.
+    if (!state.data_dir.empty()) {
+        Status s = state.registry->LoadState(state.data_dir);
+        if (!s.ok()) {
+            CORTRIX_LOG_WARN(kModule, "watchers.json restore failed: {}",
+                             s.message());
         }
     }
-
-    std::string id = MakeWatcherId(data_dir, ns_name);
-
-    // Stop & remove existing watcher for same data_dir (update in-place)
-    for (auto it = state.watchers.begin(); it != state.watchers.end(); ++it) {
-        if (it->id == id) {
-            it->importer->Stop();
-            state.watchers.erase(it);
-            break;
-        }
-    }
-
-    WatchDirConfig config;
-    config.data_dir       = data_dir;
-    config.namespace_name = ns_name;
-    config.watch_enabled  = true;
-
-    auto importer = std::make_unique<DirectoryImporter>(config, pool, spc_mgr);
-    if (autostart) {
-        Status s = importer->Start();
-        if (!s.ok()) return s;
-    }
-
-    state.watchers.push_back({id, std::move(importer)});
-    if (out_entry) *out_entry = &state.watchers.back();
-    return Status::Ok();
 }
 
 void RegisterConnectorRoutes(httplib::Server& server,
                               ConnectorState& state,
                               cortrix::resource::INamespacePool& pool,
                               cortrix::catalog::INSRouter& ins_router,
-                              NamespaceManager& /*meta_mgr*/,
                               SPCManager& spc_mgr,
                               ApiKeyAuth& /*auth*/) {
 
-    // Restore persisted watchers from watchers.json (no-op on first run)
-    {
-        std::lock_guard<std::mutex> lock(state.mu);
-        LoadAndRestoreWatchers(state, ins_router, pool, spc_mgr);
-    }
+    ConnectorEnsureRegistry(state, pool, ins_router, spc_mgr);
+    DirWatcherRegistry& reg = *state.registry;
 
     // ----------------------------------------------------------------
-    // Multi-watcher endpoints
+    // Multi-watcher endpoints (F21 fan-out)
     // ----------------------------------------------------------------
 
-    // GET /api/v1/connector/watchers — list all configured watchers
+    // GET /api/v1/connector/watchers — list all watchers with per-NS stats.
     server.Get("/api/v1/connector/watchers", NoAuth(
-        [&state](const httplib::Request&, httplib::Response& res,
-                 const RequestContext& rctx) {
-            std::lock_guard<std::mutex> lock(state.mu);
+        [&reg](const httplib::Request&, httplib::Response& res,
+               const RequestContext& rctx) {
             nlohmann::json body;
             body["watchers"] = nlohmann::json::array();
-            for (const auto& entry : state.watchers) {
-                body["watchers"].push_back(WatcherToJson(entry));
+            for (const auto& w : reg.ListWatches()) {
+                body["watchers"].push_back(WatchToJson(reg, w));
             }
             WriteJsonResponse(res, 200, body, rctx.request_id);
         }
     ));
 
-    // POST /api/v1/connector/watchers — add a new watcher (keeps existing ones)
+    // POST /api/v1/connector/watchers — subscribe namespace(s) to a directory.
+    // F21: accepts `target_namespaces: [...]` (fan-out); the MVP single
+    // `namespace_name` is still honored (mapped to a one-element array).
     server.Post("/api/v1/connector/watchers", NoAuth(
-        [&state, &pool, &ins_router, &spc_mgr](const httplib::Request& req,
-                                                 httplib::Response& res,
-                                                 const RequestContext& rctx) {
+        [&reg, &state](const httplib::Request& req, httplib::Response& res,
+                       const RequestContext& rctx) {
             nlohmann::json body;
             try {
                 body = nlohmann::json::parse(req.body);
@@ -223,48 +122,62 @@ void RegisterConnectorRoutes(httplib::Server& server,
                 return;
             }
 
-            std::string data_dir = body.value("data_dir", "");
-            std::string ns_name  = body.value("namespace_name", "default");
-
+            // `path` is the F21 field; `data_dir` is the MVP alias.
+            std::string data_dir = body.value("path", body.value("data_dir", std::string{}));
             if (data_dir.empty()) {
-                WriteJsonError(res, Status::InvalidArgument("data_dir is required"),
+                WriteJsonError(res, Status::InvalidArgument("path (or data_dir) is required"),
                                rctx.request_id);
                 return;
             }
 
-            namespace fs = std::filesystem;
-            std::error_code ec;
-            if (!fs::exists(data_dir, ec) || !fs::is_directory(data_dir, ec)) {
-                WriteJsonError(res,
-                    Status::NotFound("Directory not found: " + data_dir),
-                    rctx.request_id);
-                return;
+            // target_namespaces[] (F21) OR namespace_name (MVP, default "default").
+            std::vector<std::string> target_namespaces;
+            if (body.contains("target_namespaces") &&
+                body["target_namespaces"].is_array()) {
+                for (const auto& ns : body["target_namespaces"]) {
+                    if (ns.is_string() && !ns.get<std::string>().empty()) {
+                        target_namespaces.push_back(ns.get<std::string>());
+                    }
+                }
+                if (target_namespaces.empty()) {
+                    WriteJsonError(res, Status::InvalidArgument(
+                        "target_namespaces must contain non-empty strings"),
+                        rctx.request_id);
+                    return;
+                }
+            } else {
+                target_namespaces.push_back(body.value("namespace_name", "default"));
             }
 
-            std::lock_guard<std::mutex> lock(state.mu);
-            WatcherEntry* entry = nullptr;
-            Status s = ConnectorAddWatcher(state, ins_router, pool, spc_mgr,
-                                    data_dir, ns_name, &entry);
+            bool recursive = body.value("recursive", true);
+
+            Status s = reg.Subscribe(data_dir, target_namespaces, recursive);
             if (!s.ok()) {
-                CORTRIX_LOG_ERROR(kModule, "failed to add watcher: {}", s.message());
+                CORTRIX_LOG_ERROR(kModule, "failed to subscribe dir={}: {}",
+                                  data_dir, s.message());
                 WriteJsonError(res, s, rctx.request_id);
                 return;
             }
+            if (!state.data_dir.empty()) reg.SaveState(state.data_dir);
 
-            CORTRIX_LOG_INFO(kModule, "watcher added: dir={}, ns={}, id={}",
-                            data_dir, ns_name, entry->id);
-            ConnectorSaveWatchers(state);
-
-            nlohmann::json resp = WatcherToJson(*entry);
-            resp["message"] = "Watcher added and monitoring started";
+            // Return the watcher's F21 view (canonical dir + full subscriber list).
+            // Subscribe succeeded so the dir resolves; canonicalize defensively.
+            std::error_code cec;
+            std::string canon = std::filesystem::canonical(data_dir, cec).string();
+            std::string id = DirWatcherRegistry::MakeId(cec ? data_dir : canon);
+            auto info = reg.GetWatch(id);
+            nlohmann::json resp = info ? WatchToJson(reg, *info) : nlohmann::json::object();
+            resp["message"] = "Watcher subscribed and monitoring started";
+            CORTRIX_LOG_INFO(kModule, "watcher subscribed: dir={}, subscribers={}",
+                             data_dir, target_namespaces.size());
             WriteJsonResponse(res, 200, resp, rctx.request_id);
         }
     ));
 
-    // DELETE /api/v1/connector/watchers/:id — remove a specific watcher
+    // DELETE /api/v1/connector/watchers/:id — remove a watcher (all NS) + purge docs.
     server.Delete("/api/v1/connector/watchers/:id", NoAuth(
-        [&state](const httplib::Request& req, httplib::Response& res,
-                 const RequestContext& rctx) {
+        [&reg, &state](const httplib::Request& req, httplib::Response& res,
+                       const RequestContext& rctx) {
             std::string id = req.path_params.count("id")
                              ? req.path_params.at("id") : "";
             if (id.empty()) {
@@ -273,53 +186,94 @@ void RegisterConnectorRoutes(httplib::Server& server,
                 return;
             }
 
-            std::lock_guard<std::mutex> lock(state.mu);
-            for (auto it = state.watchers.begin(); it != state.watchers.end(); ++it) {
-                if (it->id == id) {
-                    // Delete all indexed documents from this directory before stopping
-                    int deleted_docs = it->importer->DeleteAllDocs();
-                    it->importer->Stop();
-                    std::string removed_dir = it->importer->GetConfig().data_dir;
-                    state.watchers.erase(it);
-                    CORTRIX_LOG_INFO(kModule, "watcher removed: id={}, deleted_docs={}", id, deleted_docs);
-                    ConnectorSaveWatchers(state);
-                    nlohmann::json resp;
-                    resp["message"] = "Watcher removed";
-                    resp["deleted_docs"] = deleted_docs;
-                    resp["data_dir"] = removed_dir;
-                    WriteJsonResponse(res, 200, resp, rctx.request_id);
-                    return;
-                }
+            auto dir = reg.DirectoryForId(id);
+            if (!dir) {
+                WriteJsonError(res, Status::NotFound("Watcher not found: " + id),
+                               rctx.request_id);
+                return;
             }
-            WriteJsonError(res, Status::NotFound("Watcher not found: " + id),
-                           rctx.request_id);
+            int deleted_docs = 0;
+            Status s = reg.RemoveWatch(*dir, /*delete_docs=*/true, &deleted_docs);
+            if (!s.ok()) {
+                WriteJsonError(res, s, rctx.request_id);
+                return;
+            }
+            if (!state.data_dir.empty()) reg.SaveState(state.data_dir);
+            CORTRIX_LOG_INFO(kModule, "watcher removed: id={}, deleted_docs={}",
+                             id, deleted_docs);
+            nlohmann::json resp;
+            resp["message"]      = "Watcher removed";
+            resp["deleted_docs"] = deleted_docs;
+            resp["data_dir"]     = *dir;
+            WriteJsonResponse(res, 200, resp, rctx.request_id);
         }
     ));
 
-    // POST /api/v1/connector/watchers/:id/scan — scan a specific watcher
-    server.Post("/api/v1/connector/watchers/:id/scan", NoAuth(
-        [&state](const httplib::Request& req, httplib::Response& res,
-                 const RequestContext& rctx) {
+    // DELETE /api/v1/connector/watchers/:id/namespaces/:ns — F21: unsubscribe a
+    // single namespace. The last unsubscribe destroys the watcher (no doc purge
+    // on a per-NS unsubscribe — that is the whole-watcher DELETE's job).
+    server.Delete("/api/v1/connector/watchers/:id/namespaces/:ns", NoAuth(
+        [&reg, &state](const httplib::Request& req, httplib::Response& res,
+                       const RequestContext& rctx) {
             std::string id = req.path_params.count("id")
                              ? req.path_params.at("id") : "";
-
-            std::lock_guard<std::mutex> lock(state.mu);
-            for (auto& entry : state.watchers) {
-                if (entry.id == id) {
-                    entry.importer->Stop();
-                    Status s = entry.importer->Start();
-                    if (!s.ok()) {
-                        WriteJsonError(res, s, rctx.request_id);
-                        return;
-                    }
-                    nlohmann::json resp = WatcherToJson(entry);
-                    resp["message"] = "Scan completed";
-                    WriteJsonResponse(res, 200, resp, rctx.request_id);
-                    return;
-                }
+            std::string ns = req.path_params.count("ns")
+                             ? req.path_params.at("ns") : "";
+            if (id.empty() || ns.empty()) {
+                WriteJsonError(res, Status::InvalidArgument("id and ns are required"),
+                               rctx.request_id);
+                return;
             }
-            WriteJsonError(res, Status::NotFound("Watcher not found: " + id),
-                           rctx.request_id);
+
+            auto dir = reg.DirectoryForId(id);
+            if (!dir) {
+                WriteJsonError(res, Status::NotFound("Watcher not found: " + id),
+                               rctx.request_id);
+                return;
+            }
+            Status s = reg.Unsubscribe(*dir, ns);
+            if (!s.ok()) {
+                WriteJsonError(res, s, rctx.request_id);  // NotFound if NS not subscribed
+                return;
+            }
+            if (!state.data_dir.empty()) reg.SaveState(state.data_dir);
+
+            // After unsubscribe the watcher is gone iff GetWatch(id) is now empty.
+            auto info = reg.GetWatch(id);
+            bool removed = !info.has_value();
+            int remaining = info ? info->subscriber_count : 0;
+            CORTRIX_LOG_INFO(kModule,
+                "namespace unsubscribed: id={}, ns={}, remaining={}, watcher_removed={}",
+                id, ns, remaining, removed);
+            nlohmann::json resp;
+            resp["status"]               = "ok";
+            resp["remaining_subscribers"] = remaining;
+            resp["watcher_removed"]      = removed;
+            WriteJsonResponse(res, 200, resp, rctx.request_id);
+        }
+    ));
+
+    // POST /api/v1/connector/watchers/:id/scan — trigger a fan-out rescan.
+    server.Post("/api/v1/connector/watchers/:id/scan", NoAuth(
+        [&reg](const httplib::Request& req, httplib::Response& res,
+               const RequestContext& rctx) {
+            std::string id = req.path_params.count("id")
+                             ? req.path_params.at("id") : "";
+            auto dir = reg.DirectoryForId(id);
+            if (!dir) {
+                WriteJsonError(res, Status::NotFound("Watcher not found: " + id),
+                               rctx.request_id);
+                return;
+            }
+            Status s = reg.TriggerScan(*dir);
+            if (!s.ok()) {
+                WriteJsonError(res, s, rctx.request_id);
+                return;
+            }
+            auto info = reg.GetWatch(id);
+            nlohmann::json resp = info ? WatchToJson(reg, *info) : nlohmann::json::object();
+            resp["message"] = "Scan completed";
+            WriteJsonResponse(res, 200, resp, rctx.request_id);
         }
     ));
 
@@ -327,39 +281,37 @@ void RegisterConnectorRoutes(httplib::Server& server,
     // Backward-compat single-watcher endpoints
     // ----------------------------------------------------------------
 
-    // GET /api/v1/connector/status — first watcher status (backward compat)
+    // GET /api/v1/connector/status — first watcher status (backward compat).
     server.Get("/api/v1/connector/status", NoAuth(
-        [&state](const httplib::Request&, httplib::Response& res,
-                 const RequestContext& rctx) {
-            std::lock_guard<std::mutex> lock(state.mu);
+        [&reg](const httplib::Request&, httplib::Response& res,
+               const RequestContext& rctx) {
             nlohmann::json body;
-
-            if (state.watchers.empty()) {
+            auto watches = reg.ListWatches();
+            if (watches.empty()) {
                 body["enabled"]       = false;
                 body["watching"]      = false;
                 body["status"]        = "not_configured";
                 body["message"]       = "No watchers configured";
                 body["watcher_count"] = 0;
             } else {
-                const auto& entry = state.watchers.front();
-                bool watching = entry.importer->IsWatching();
-                body["enabled"]         = true;
-                body["watching"]        = watching;
-                body["status"]          = watching ? "watching" : "stopped";
-                body["watch_dir"]       = entry.importer->GetConfig().data_dir;
-                body["namespace_name"]  = entry.importer->GetConfig().namespace_name;
-                body["watcher_count"]   = static_cast<int>(state.watchers.size());
+                const auto& w = watches.front();
+                body["enabled"]        = true;
+                body["watching"]       = w.watching;
+                body["status"]         = w.watching ? "watching" : "stopped";
+                body["watch_dir"]      = w.directory;
+                // Compat: surface the first subscriber as namespace_name.
+                body["namespace_name"] = w.target_namespaces.empty()
+                                         ? "" : w.target_namespaces.front();
+                body["watcher_count"]  = static_cast<int>(watches.size());
             }
-
             WriteJsonResponse(res, 200, body, rctx.request_id);
         }
     ));
 
-    // POST /api/v1/connector/watch — backward compat: replace ALL watchers with one
+    // POST /api/v1/connector/watch — backward compat: replace ALL watchers with one.
     server.Post("/api/v1/connector/watch", NoAuth(
-        [&state, &pool, &ins_router, &spc_mgr](const httplib::Request& req,
-                                                  httplib::Response& res,
-                                                  const RequestContext& rctx) {
+        [&reg, &state](const httplib::Request& req, httplib::Response& res,
+                       const RequestContext& rctx) {
             nlohmann::json body;
             try {
                 body = nlohmann::json::parse(req.body);
@@ -369,43 +321,28 @@ void RegisterConnectorRoutes(httplib::Server& server,
                 return;
             }
 
-            std::string data_dir = body.value("data_dir", "");
+            std::string data_dir = body.value("data_dir", body.value("path", std::string{}));
             std::string ns_name  = body.value("namespace_name", "default");
-
             if (data_dir.empty()) {
                 WriteJsonError(res, Status::InvalidArgument("data_dir is required"),
                                rctx.request_id);
                 return;
             }
 
-            namespace fs = std::filesystem;
-            std::error_code ec;
-            if (!fs::exists(data_dir, ec) || !fs::is_directory(data_dir, ec)) {
-                WriteJsonError(res, Status::NotFound("Directory not found: " + data_dir),
-                               rctx.request_id);
-                return;
+            // Replace ALL watchers with the single requested one (compat
+            // semantics). RemoveWatch each existing directory first.
+            for (const auto& w : reg.ListWatches()) {
+                reg.RemoveWatch(w.directory);
             }
-
-            std::lock_guard<std::mutex> lock(state.mu);
-
-            // Stop + clear ALL existing watchers, then add the new one
-            for (auto& entry : state.watchers) {
-                entry.importer->Stop();
-            }
-            state.watchers.clear();
-
-            WatcherEntry* entry = nullptr;
-            Status s = ConnectorAddWatcher(state, ins_router, pool, spc_mgr,
-                                    data_dir, ns_name, &entry);
+            Status s = reg.Subscribe(data_dir, {ns_name}, /*recursive=*/true);
             if (!s.ok()) {
-                CORTRIX_LOG_ERROR(kModule, "failed to start directory importer: {}", s.message());
+                CORTRIX_LOG_ERROR(kModule, "failed to start watch (compat): {}", s.message());
                 WriteJsonError(res, s, rctx.request_id);
                 return;
             }
-
-            CORTRIX_LOG_INFO(kModule, "directory importer started (compat): dir={}, ns={}",
-                            data_dir, ns_name);
-            ConnectorSaveWatchers(state);
+            if (!state.data_dir.empty()) reg.SaveState(state.data_dir);
+            CORTRIX_LOG_INFO(kModule, "watch configured (compat): dir={}, ns={}",
+                             data_dir, ns_name);
 
             nlohmann::json resp;
             resp["message"]        = "Watch directory configured and monitoring started";
@@ -416,98 +353,47 @@ void RegisterConnectorRoutes(httplib::Server& server,
         }
     ));
 
-    // GET /api/v1/connector/stats — aggregate stats from all watchers
+    // GET /api/v1/connector/stats — aggregate stats across all watchers.
     server.Get("/api/v1/connector/stats", NoAuth(
-        [&state](const httplib::Request&, httplib::Response& res,
-                 const RequestContext& rctx) {
-            std::lock_guard<std::mutex> lock(state.mu);
+        [&reg](const httplib::Request&, httplib::Response& res,
+               const RequestContext& rctx) {
+            auto watches = reg.ListWatches();
             nlohmann::json body;
-
-            if (state.watchers.empty()) {
+            if (watches.empty()) {
                 body["enabled"] = false;
                 body["message"] = "No watchers configured";
                 WriteJsonResponse(res, 200, body, rctx.request_id);
                 return;
             }
-
-            int total_files = 0, imported = 0, updated = 0;
-            int skipped_unchanged = 0, skipped_filtered = 0, skipped_error = 0, deleted = 0;
-            double elapsed_s = 0.0;
             bool any_watching = false;
+            for (const auto& w : watches) any_watching |= w.watching;
 
-            for (const auto& entry : state.watchers) {
-                auto stats = entry.importer->GetStats();
-                total_files       += stats.total_files;
-                imported          += stats.imported;
-                updated           += stats.updated;
-                skipped_unchanged += stats.skipped_unchanged;
-                skipped_filtered  += stats.skipped_filtered;
-                skipped_error     += stats.skipped_error;
-                deleted           += stats.deleted;
-                elapsed_s         += stats.elapsed_s;
-                if (entry.importer->IsWatching()) any_watching = true;
-            }
-
-            body["enabled"]           = true;
-            body["watching"]          = any_watching;
-            body["watcher_count"]     = static_cast<int>(state.watchers.size());
-            body["total_files"]       = total_files;
-            body["imported"]          = imported;
-            body["updated"]           = updated;
-            body["skipped_unchanged"] = skipped_unchanged;
-            body["skipped_filtered"]  = skipped_filtered;
-            body["skipped_error"]     = skipped_error;
-            body["deleted"]           = deleted;
-            body["elapsed_s"]         = elapsed_s;
-
+            ImportStats agg = reg.AggregateStats();
+            body              = StatsToJson(agg);  // total_files / imported / ...
+            body["enabled"]       = true;
+            body["watching"]      = any_watching;
+            body["watcher_count"] = static_cast<int>(watches.size());
             WriteJsonResponse(res, 200, body, rctx.request_id);
         }
     ));
 
-    // POST /api/v1/connector/scan — scan all watchers
+    // POST /api/v1/connector/scan — rescan all watchers.
     server.Post("/api/v1/connector/scan", NoAuth(
-        [&state](const httplib::Request&, httplib::Response& res,
-                 const RequestContext& rctx) {
-            std::lock_guard<std::mutex> lock(state.mu);
-
-            if (state.watchers.empty()) {
+        [&reg](const httplib::Request&, httplib::Response& res,
+               const RequestContext& rctx) {
+            auto watches = reg.ListWatches();
+            if (watches.empty()) {
                 WriteJsonError(res,
                     Status::InvalidArgument("No watchers configured. Use POST /api/v1/connector/watchers first."),
                     rctx.request_id);
                 return;
             }
-
-            for (auto& entry : state.watchers) {
-                entry.importer->Stop();
-                entry.importer->Start();
+            for (const auto& w : watches) {
+                reg.TriggerScan(w.directory);
             }
-
-            int total_files = 0, imported = 0, updated = 0;
-            int skipped_unchanged = 0, skipped_filtered = 0, skipped_error = 0, deleted = 0;
-            double elapsed_s = 0.0;
-
-            for (const auto& entry : state.watchers) {
-                auto stats = entry.importer->GetStats();
-                total_files       += stats.total_files;
-                imported          += stats.imported;
-                updated           += stats.updated;
-                skipped_unchanged += stats.skipped_unchanged;
-                skipped_filtered  += stats.skipped_filtered;
-                skipped_error     += stats.skipped_error;
-                deleted           += stats.deleted;
-                elapsed_s         += stats.elapsed_s;
-            }
-
-            nlohmann::json body;
-            body["message"]           = "Scan completed";
-            body["imported"]          = imported;
-            body["updated"]           = updated;
-            body["skipped_unchanged"] = skipped_unchanged;
-            body["skipped_filtered"]  = skipped_filtered;
-            body["skipped_error"]     = skipped_error;
-            body["deleted"]           = deleted;
-            body["total_files"]       = total_files;
-            body["elapsed_s"]         = elapsed_s;
+            ImportStats agg = reg.AggregateStats();
+            nlohmann::json body = StatsToJson(agg);
+            body["message"] = "Scan completed";
             WriteJsonResponse(res, 200, body, rctx.request_id);
         }
     ));

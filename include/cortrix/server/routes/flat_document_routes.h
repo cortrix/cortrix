@@ -12,6 +12,7 @@ namespace async { class DocumentTaskHandler; }
 class UploadHandler;
 class ApiKeyAuth;
 class SPCManager;
+class NamespaceManager;
 struct ConnectorState;
 
 /// Register the flat (design-surface) /documents family + /watch aliases that the
@@ -41,21 +42,22 @@ void RegisterFlatDocumentRoutes(httplib::Server& server,
                                 ApiKeyAuth& auth);
 
 /// Register the /watch alias family that maps the spec/SDK/MCP fan-out shape
-/// ({path, target_namespaces[], recursive}) onto the existing /connector/* watcher
-/// handlers (each target namespace becomes one connector watcher over `path`; the
-/// connector already keys watchers by (dir, ns) so one directory fanning out to N
-/// namespaces = N connector watchers). The nested /connector/* routes are kept.
+/// ({path, target_namespaces[], recursive}) onto the F21 DirWatcherRegistry. With
+/// F21 a directory fanning out to N namespaces is ONE registry watcher carrying
+/// all N target_namespaces (the MVP keyed by (dir, ns) and emitted N watchers).
+/// The nested /connector/* routes are kept and share the SAME registry.
 ///
 /// Endpoints (all under /api/v1):
-///   POST   /watch              -- add/append a directory watch -> 201 Watcher
+///   POST   /watch              -- subscribe target_namespaces[] to a dir -> 201 Watcher
 ///   GET    /watch              -- list watchers -> {watchers:[...]}
-///   DELETE /watch/{id}         -- remove a watch -> 204
+///   DELETE /watch/{id}         -- remove a watch (+ purge docs) -> 204
 ///
 /// NOTE: GET /watch/{id}/events from the spec has NO live event-store implementation
 /// in the connector today, so it is intentionally NOT mounted here (recorded in the
 /// Wave S2 spec-reconcile). `state`, `pool`, `ins_router` and `spc_mgr` are the same
-/// objects the /connector/* routes own (POST /watch reuses ConnectorAddWatcher); all
-/// must outlive the server.
+/// objects the /connector/* routes own; this function calls ConnectorEnsureRegistry
+/// so it is independent of /connector route registration order (idempotent — only
+/// one registry per ConnectorState). All must outlive the server.
 void RegisterWatchAliasRoutes(httplib::Server& server,
                               ConnectorState& state,
                               resource::INamespacePool& pool,

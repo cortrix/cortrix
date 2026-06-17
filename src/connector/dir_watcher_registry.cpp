@@ -7,12 +7,14 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 
+#include "cortrix/catalog/catalog_types.h"   // NSMetadata
+#include "cortrix/catalog/i_ns_router.h"      // F13 INSRouter (create + F05 admit)
 #include "cortrix/connector/file_filter.h"
 #include "cortrix/logging/logging.h"
-#include "cortrix/namespace/namespace_manager.h"
 
 namespace cortrix {
 
@@ -56,9 +58,9 @@ WatchDirConfig MakeImporterConfig(const std::string& canonical_dir,
 // --- ctor / dtor ---
 
 DirWatcherRegistry::DirWatcherRegistry(cortrix::resource::INamespacePool& pool,
-                                       NamespaceManager& meta_mgr,
+                                       cortrix::catalog::INSRouter& ins_router,
                                        SPCManager& spc_mgr)
-    : pool_(pool), meta_mgr_(meta_mgr), spc_mgr_(spc_mgr) {}
+    : pool_(pool), ins_router_(ins_router), spc_mgr_(spc_mgr) {}
 
 DirWatcherRegistry::~DirWatcherRegistry() {
     StopAll();
@@ -139,7 +141,21 @@ void DirWatcherRegistry::FanOutEvents(WatcherSlot& slot,
     }
     if (filtered.empty()) return;
 
-    for (auto& importer : slot.importers) {
+    // rev-deploy M-4 UAF fix: this runs on the OS watcher's event thread
+    // (FSEvents dispatch queue / inotify poll loop), concurrently with
+    // Subscribe/Unsubscribe mutating slot.importers under mu_. Snapshot the
+    // importer shared_ptrs under the lock, then dispatch OUTSIDE the lock — the
+    // refcounted snapshot keeps each importer alive even if a concurrent
+    // Unsubscribe erases it from the vector mid-batch, and HandleFileEvents
+    // (hash + SPC submit, potentially slow) never serializes against, or
+    // re-enters under, mu_.
+    std::vector<std::shared_ptr<DirectoryImporter>> targets;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        targets = slot.importers;  // shared_ptr copies bump the refcount
+    }
+
+    for (auto& importer : targets) {
         // Per-NS isolation (§ 5.2.3): a failure in one importer must not stop
         // fan-out to the others. HandleFileEvents swallows per-file errors into
         // its own stats, so a try/catch here is purely defensive.
@@ -222,8 +238,16 @@ Status DirWatcherRegistry::Subscribe(
                                  ns) != slot->target_namespaces.end();
         if (already) continue;  // idempotent per namespace
 
-        // Auto-create the namespace metadata (idempotent — AlreadyExists is OK).
-        Status cs = meta_mgr_.Create(ns);
+        // Auto-create the namespace through the F13 catalog router: this does the
+        // catalog INSERT *and* the F05 AdmitCreate (idempotent — AlreadyExists is
+        // OK). Admission is required for the importer's facade.Acquire() to resolve
+        // below; a bare metadata create does NOT admit into the pool, so the
+        // importer would silently skip every file (live-only bug). Mirrors the MVP
+        // ConnectorAddWatcher path.
+        catalog::NSMetadata meta;
+        meta.namespace_id = ns;
+        meta.name         = ns;
+        Status cs = ins_router_.CreateNamespace(meta);
         if (!cs.ok() && cs.code() != StatusCode::kAlreadyExists) {
             CORTRIX_LOG_WARN(kModule, "namespace create failed ns={}: {}",
                              ns, cs.message());
@@ -231,7 +255,7 @@ Status DirWatcherRegistry::Subscribe(
             // genuinely unusable. Continue wiring the subscription.
         }
 
-        auto importer = std::make_unique<DirectoryImporter>(
+        auto importer = std::make_shared<DirectoryImporter>(
             MakeImporterConfig(canonical_dir, ns), pool_, spc_mgr_);
         new_importers.push_back(importer.get());
         slot->target_namespaces.push_back(ns);
@@ -298,24 +322,46 @@ Status DirWatcherRegistry::Unsubscribe(const std::string& directory,
     return Status::Ok();
 }
 
-Status DirWatcherRegistry::RemoveWatch(const std::string& directory) {
+Status DirWatcherRegistry::RemoveWatch(const std::string& directory,
+                                       bool delete_docs,
+                                       int* out_deleted_docs) {
     std::string canonical_dir = CanonicalDir(directory);
     const std::string& key = canonical_dir.empty() ? directory : canonical_dir;
+    if (out_deleted_docs) *out_deleted_docs = 0;
 
     std::lock_guard<std::mutex> lock(mu_);
 
     for (auto sit = slots_.begin(); sit != slots_.end(); ++sit) {
         if ((*sit)->canonical_dir != key) continue;
         WatcherSlot* slot = sit->get();
+        // Stop the OS watcher FIRST so no fan-out batch races the doc purge /
+        // importer teardown below (macOS Stop drains in-flight callbacks; Linux
+        // joins the poll thread).
         if (slot->watcher && slot->watcher->IsRunning()) {
             slot->watcher->Stop();
         }
-        for (auto& imp : slot->importers) imp->Stop();
+        for (auto& imp : slot->importers) {
+            if (delete_docs) {
+                int n = imp->DeleteAllDocs();  // cascade: blocks + HNSW + blob
+                if (n > 0 && out_deleted_docs) *out_deleted_docs += n;
+            }
+            imp->Stop();
+        }
         slots_.erase(sit);
-        CORTRIX_LOG_INFO(kModule, "watcher removed dir={}", key);
+        CORTRIX_LOG_INFO(kModule, "watcher removed dir={} delete_docs={}",
+                         key, delete_docs);
         return Status::Ok();
     }
     return Status::NotFound("directory not watched: " + directory);
+}
+
+std::optional<std::string> DirWatcherRegistry::DirectoryForId(
+    const std::string& id) const {
+    std::lock_guard<std::mutex> lock(mu_);
+    for (const auto& s : slots_) {
+        if (s->id == id) return s->canonical_dir;
+    }
+    return std::nullopt;
 }
 
 // --- queries ---
@@ -335,6 +381,46 @@ std::optional<WatchInfo> DirWatcherRegistry::GetWatch(
         if (s->id == id) return MakeInfo(*s);
     }
     return std::nullopt;
+}
+
+std::vector<std::pair<std::string, ImportStats>>
+DirWatcherRegistry::GetStats(const std::string& directory) const {
+    std::string canonical_dir = CanonicalDir(directory);
+    const std::string& key = canonical_dir.empty() ? directory : canonical_dir;
+
+    std::lock_guard<std::mutex> lock(mu_);
+    std::vector<std::pair<std::string, ImportStats>> out;
+    const WatcherSlot* slot = FindSlot(key);
+    if (!slot) return out;
+    out.reserve(slot->importers.size());
+    // target_namespaces[i] corresponds to importers[i] (kept in lockstep by
+    // Subscribe/Unsubscribe).
+    for (size_t i = 0; i < slot->importers.size(); ++i) {
+        const std::string& ns =
+            i < slot->target_namespaces.size() ? slot->target_namespaces[i]
+                                               : std::string{};
+        out.emplace_back(ns, slot->importers[i]->GetStats());
+    }
+    return out;
+}
+
+ImportStats DirWatcherRegistry::AggregateStats() const {
+    std::lock_guard<std::mutex> lock(mu_);
+    ImportStats agg;
+    for (const auto& s : slots_) {
+        for (const auto& imp : s->importers) {
+            ImportStats st = imp->GetStats();
+            agg.total_files       += st.total_files;
+            agg.imported          += st.imported;
+            agg.updated           += st.updated;
+            agg.skipped_unchanged += st.skipped_unchanged;
+            agg.skipped_filtered  += st.skipped_filtered;
+            agg.skipped_error     += st.skipped_error;
+            agg.deleted           += st.deleted;
+            agg.elapsed_s         += st.elapsed_s;
+        }
+    }
+    return agg;
 }
 
 // --- control ---

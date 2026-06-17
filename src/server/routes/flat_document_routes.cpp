@@ -1,10 +1,10 @@
 #include <cstdint>
 #include "cortrix/server/routes/flat_document_routes.h"
 
-#include "cortrix/server/routes/connector_routes.h"
-#include "cortrix/connector/directory_importer.h"   // WatcherEntry::importer ops (/watch)
-#include "cortrix/catalog/i_ns_router.h"             // INSRouter (ConnectorAddWatcher)
-#include "cortrix/spc/spc_manager.h"                 // SPCManager (ConnectorAddWatcher)
+#include "cortrix/server/routes/connector_routes.h"  // ConnectorState (shared registry)
+#include "cortrix/connector/dir_watcher_registry.h"  // F21 fan-out registry (/watch)
+#include "cortrix/catalog/i_ns_router.h"             // INSRouter (signature compat)
+#include "cortrix/spc/spc_manager.h"                 // SPCManager (signature compat)
 #include "cortrix/upload/upload_handler.h"
 #include "cortrix/server/batch_submit_service.h"
 #include "cortrix/async/document_task_handler.h"
@@ -376,20 +376,19 @@ std::string WatcherStatusToSpec(bool watching) {
     return watching ? "active" : "paused";
 }
 
-// Reshape a live connector watcher (keyed by one (dir, ns)) into the openapi
-// Watcher object {id, path, target_namespaces[], recursive, status}. One connector
-// watcher fans out to exactly one namespace, so target_namespaces is single-element;
-// a directory fanned out to N namespaces appears as N Watcher rows (the connector's
-// (dir, ns) keying — see ConnectorAddWatcher).
-nlohmann::json WatcherToSpecJson(const WatcherEntry& entry) {
-    nlohmann::json w;
-    w["id"] = entry.id;
-    w["path"] = entry.importer->GetConfig().data_dir;
-    w["target_namespaces"] =
-        nlohmann::json::array({entry.importer->GetConfig().namespace_name});
-    w["recursive"] = true;  // connector importer is recursive; spec default true
-    w["status"] = WatcherStatusToSpec(entry.importer->IsWatching());
-    return w;
+// Reshape a F21 fan-out watcher (one directory, N subscribed namespaces) into
+// the openapi Watcher object {id, path, target_namespaces[], recursive, status}.
+// api/components/schemas.yaml#/Watcher. With F21 a directory fanned out to N
+// namespaces is ONE Watcher carrying all N target_namespaces (the MVP emitted N
+// rows under (dir, ns) keying — the spec's fan-out shape is now native).
+nlohmann::json WatcherToSpecJson(const WatchInfo& w) {
+    nlohmann::json j;
+    j["id"] = w.id;
+    j["path"] = w.directory;
+    j["target_namespaces"] = w.target_namespaces;
+    j["recursive"] = w.recursive;
+    j["status"] = WatcherStatusToSpec(w.watching);
+    return j;
 }
 
 }  // namespace
@@ -401,16 +400,25 @@ void RegisterWatchAliasRoutes(httplib::Server& server,
                               SPCManager& spc_mgr,
                               ApiKeyAuth& auth) {
 
+    // The /watch aliases share the SAME DirWatcherRegistry the /connector/* routes
+    // own (one registry per ConnectorState). ConnectorEnsureRegistry is idempotent,
+    // so calling it here makes /watch independent of /connector route-registration
+    // order: whichever registers first builds the registry, the other reuses it.
+    ConnectorEnsureRegistry(state, pool, ins_router, spc_mgr);
+
     // POST /api/v1/watch — add/append a directory watch (api/paths/watch.yaml
     // addWatcher; body {path, target_namespaces[], recursive?}) -> 201 Watcher.
-    // Each target namespace becomes one connector watcher over `path` (fan-out
-    // mapped onto the connector's (dir, ns) keying). The Watcher returned describes
-    // the first target namespace (the fan-out as a whole is target_namespaces[]).
+    // F21: one Subscribe() call fans `path` out to every target namespace via a
+    // single OS watcher (the MVP created one watcher per (dir, ns)).
     server.Post("/api/v1/watch",
         WithAuth(auth, kPermAdmin,
-            [&state, &pool, &ins_router, &spc_mgr](const httplib::Request& req,
-                                                   httplib::Response& res,
-                                                   const RequestContext& rctx) {
+            [&state](const httplib::Request& req, httplib::Response& res,
+                     const RequestContext& rctx) {
+                if (!state.registry) {
+                    WriteJsonError(res, Status::Internal("watcher registry not initialized"),
+                                   rctx.request_id);
+                    return;
+                }
                 nlohmann::json body;
                 try {
                     body = nlohmann::json::parse(req.body);
@@ -433,14 +441,6 @@ void RegisterWatchAliasRoutes(httplib::Server& server,
                 }
                 const std::string path = body["path"].get<std::string>();
 
-                namespace fs = std::filesystem;
-                std::error_code ec;
-                if (!fs::exists(path, ec) || !fs::is_directory(path, ec)) {
-                    WriteJsonError(res, Status::NotFound("Directory not found: " + path),
-                                   rctx.request_id);
-                    return;
-                }
-
                 std::vector<std::string> target_namespaces;
                 for (const auto& ns : body["target_namespaces"]) {
                     if (ns.is_string() && !ns.get<std::string>().empty()) {
@@ -452,30 +452,27 @@ void RegisterWatchAliasRoutes(httplib::Server& server,
                         "'target_namespaces' must contain non-empty strings"), rctx.request_id);
                     return;
                 }
-
-                std::lock_guard<std::mutex> lock(state.mu);
-                WatcherEntry* first_entry = nullptr;
-                for (const std::string& ns_name : target_namespaces) {
-                    WatcherEntry* entry = nullptr;
-                    Status s = ConnectorAddWatcher(state, ins_router, pool, spc_mgr,
-                                                   path, ns_name, &entry);
-                    if (!s.ok()) {
-                        CORTRIX_LOG_ERROR("WatchAlias", "failed to add watcher dir={} ns={}: {}",
-                                          path, ns_name, s.message());
-                        WriteJsonError(res, s, rctx.request_id);
-                        return;
-                    }
-                    if (!first_entry) first_entry = entry;
-                }
-                ConnectorSaveWatchers(state);
-
-                // 201 Watcher describing the fan-out: the first watcher's id/path +
-                // the full target_namespaces[] the caller requested.
-                nlohmann::json w = WatcherToSpecJson(*first_entry);
-                w["target_namespaces"] = target_namespaces;
+                bool recursive = true;
                 if (body.contains("recursive") && body["recursive"].is_boolean()) {
-                    w["recursive"] = body["recursive"].get<bool>();
+                    recursive = body["recursive"].get<bool>();
                 }
+
+                Status s = state.registry->Subscribe(path, target_namespaces, recursive);
+                if (!s.ok()) {  // NotFound(dir) / InvalidArgument(empty) / Internal
+                    CORTRIX_LOG_ERROR("WatchAlias", "subscribe failed dir={}: {}",
+                                      path, s.message());
+                    WriteJsonError(res, s, rctx.request_id);
+                    return;
+                }
+                if (!state.data_dir.empty()) state.registry->SaveState(state.data_dir);
+
+                // 201 Watcher describing the fan-out (canonical dir + full subscriber
+                // list). Resolve by the canonical id Subscribe just created.
+                std::error_code cec;
+                std::string canon = std::filesystem::canonical(path, cec).string();
+                auto info = state.registry->GetWatch(
+                    DirWatcherRegistry::MakeId(cec ? path : canon));
+                nlohmann::json w = info ? WatcherToSpecJson(*info) : nlohmann::json::object();
                 WriteJsonResponse(res, 201, w, rctx.request_id);
             }
         )
@@ -487,10 +484,11 @@ void RegisterWatchAliasRoutes(httplib::Server& server,
         WithAuth(auth, kPermRead,
             [&state](const httplib::Request&, httplib::Response& res,
                      const RequestContext& rctx) {
-                std::lock_guard<std::mutex> lock(state.mu);
                 nlohmann::json watchers = nlohmann::json::array();
-                for (const auto& entry : state.watchers) {
-                    watchers.push_back(WatcherToSpecJson(entry));
+                if (state.registry) {
+                    for (const auto& w : state.registry->ListWatches()) {
+                        watchers.push_back(WatcherToSpecJson(w));
+                    }
                 }
                 nlohmann::json out;
                 out["watchers"] = std::move(watchers);
@@ -500,26 +498,27 @@ void RegisterWatchAliasRoutes(httplib::Server& server,
     );
 
     // DELETE /api/v1/watch/{id} — remove a watch (api/paths/watch.yaml
-    // deleteWatcher) -> 204. Deletes the directory's indexed docs (connector
+    // deleteWatcher) -> 204. Purges the directory's indexed docs (connector
     // semantics) before stopping, matching DELETE /connector/watchers/:id.
     server.Delete(R"(/api/v1/watch/([^/]+))",
         WithAuth(auth, kPermAdmin,
             [&state](const httplib::Request& req, httplib::Response& res,
                      const RequestContext& rctx) {
                 const std::string id = req.matches[1];
-                std::lock_guard<std::mutex> lock(state.mu);
-                for (auto it = state.watchers.begin(); it != state.watchers.end(); ++it) {
-                    if (it->id == id) {
-                        it->importer->DeleteAllDocs();
-                        it->importer->Stop();
-                        state.watchers.erase(it);
-                        ConnectorSaveWatchers(state);
-                        res.status = 204;  // body-less, idempotent
-                        return;
-                    }
+                if (!state.registry) {
+                    WriteJsonError(res, Status::NotFound("Watcher not found: " + id),
+                                   rctx.request_id);
+                    return;
                 }
-                WriteJsonError(res, Status::NotFound("Watcher not found: " + id),
-                               rctx.request_id);
+                auto dir = state.registry->DirectoryForId(id);
+                if (!dir) {
+                    WriteJsonError(res, Status::NotFound("Watcher not found: " + id),
+                                   rctx.request_id);
+                    return;
+                }
+                state.registry->RemoveWatch(*dir, /*delete_docs=*/true);
+                if (!state.data_dir.empty()) state.registry->SaveState(state.data_dir);
+                res.status = 204;  // body-less, idempotent
             }
         )
     );

@@ -1,78 +1,80 @@
 #pragma once
 
-#include <mutex>
 #include <memory>
-#include <vector>
 #include <string>
 
 namespace httplib { class Server; }
 
 namespace cortrix {
 
-class DirectoryImporter;
+class DirWatcherRegistry;
 class ApiKeyAuth;
 class NamespaceManager;
 class SPCManager;
 
 // D3.5 wire⑤c: connector routes acquire per-operation NamespaceFacades over the
-// F05 resource pool, and route namespace creation through the F12 catalog router.
+// F05 resource pool, and route namespace creation+admission through the F12/F13
+// catalog router (the DirWatcherRegistry holds these two; the MVP NamespaceManager
+// is no longer on the watcher path).
 namespace resource { class INamespacePool; }
 namespace catalog  { class INSRouter; }
 
-struct WatcherEntry {
-    std::string id;                              ///< Deterministic 8-hex-char ID (hash of data_dir)
-    std::unique_ptr<DirectoryImporter> importer;
-    // non-copyable due to unique_ptr
-};
-
-/// Shared mutable state for connector routes (thread-safe via mutex)
+/// Shared state for the connector routes.
+///
+/// F21 (TD-WATCHER-001): the MVP `vector<WatcherEntry>` (one OS FileWatcher per
+/// (dir, namespace) pair) is replaced by a single DirWatcherRegistry that keeps
+/// exactly one OS watcher per directory and fans its events out to every
+/// subscribed namespace. The registry is internally synchronised (its own mu_),
+/// so this struct no longer carries a mutex or a watcher vector.
+///
+/// `registry` is created lazily by RegisterConnectorRoutes (the only place that
+/// has the F05 pool + NamespaceManager + SPCManager it needs). bootstrap.cpp
+/// constructs the struct, sets `data_dir`, then calls RegisterConnectorRoutes /
+/// RegisterWatchAliasRoutes which share the SAME ConnectorState, so both the
+/// /connector/* routes and the /watch aliases drive one registry.
 struct ConnectorState {
-    std::mutex mu;
-    std::vector<WatcherEntry> watchers;          ///< All active directory watchers
-    std::string data_dir;                        ///< Data root for watchers.json persistence
+    std::string data_dir;                          ///< root for watchers.json persistence
+    std::unique_ptr<DirWatcherRegistry> registry;  ///< F21 fan-out registry (lazily built)
 };
 
-class Status;
+/// Lazily create `state.registry` if it is null, wiring it to the F05 pool, the
+/// F13 catalog router and the SPC pipeline, then restore persisted watchers from
+/// {state.data_dir}/watchers.json (v1 layouts auto-migrate to v2). Idempotent:
+/// a second call with an already-built registry is a no-op. Shared by the
+/// /connector/* routes and the /watch aliases so both mount the SAME registry.
+/// After this returns, callers should invoke `state.registry->StartAll()` once
+/// the server is ready to begin OS watching + the initial scan (bootstrap owns
+/// that call, mirroring the MVP startup loop).
+void ConnectorEnsureRegistry(ConnectorState& state,
+                             cortrix::resource::INamespacePool& pool,
+                             cortrix::catalog::INSRouter& ins_router,
+                             SPCManager& spc_mgr);
 
-/// Add (or replace, when (dir, ns) is already watched) a single directory watcher
-/// and return its entry. Shared by the /connector/* routes and the design-surface
-/// /watch aliases (flat_document_routes) so both mount the SAME watcher mechanism.
-/// Caller MUST hold `state.mu`. `out_entry` (if non-null) receives the new entry.
-Status ConnectorAddWatcher(ConnectorState& state,
-                           cortrix::catalog::INSRouter& ins_router,
-                           cortrix::resource::INamespacePool& pool,
-                           SPCManager& spc_mgr,
-                           const std::string& data_dir,
-                           const std::string& ns_name,
-                           WatcherEntry** out_entry,
-                           bool autostart = true);
-
-/// Persist the current watcher list to {state.data_dir}/watchers.json.
-/// Caller MUST hold `state.mu`. Shared with the /watch aliases.
-void ConnectorSaveWatchers(const ConnectorState& state);
-
-/// Register connector HTTP routes
+/// Register connector HTTP routes (F21 fan-out model).
 ///
 /// Multi-watcher endpoints:
-///   GET    /api/v1/connector/watchers           -- list all watchers with status + stats
-///   POST   /api/v1/connector/watchers           -- add a new watcher (keeps existing ones)
-///   DELETE /api/v1/connector/watchers/:id       -- remove a specific watcher
-///   POST   /api/v1/connector/watchers/:id/scan  -- trigger scan for a specific watcher
+///   GET    /api/v1/connector/watchers                     -- list watchers (per-NS stats)
+///   POST   /api/v1/connector/watchers                     -- subscribe target_namespaces[] to a dir
+///   DELETE /api/v1/connector/watchers/:id                 -- remove a watcher (all NS) + purge docs
+///   DELETE /api/v1/connector/watchers/:id/namespaces/:ns  -- F21: unsubscribe a single NS
+///   POST   /api/v1/connector/watchers/:id/scan            -- trigger a fan-out rescan
 ///
 /// Backward-compat single-watcher endpoints:
-///   GET    /api/v1/connector/status             -- status of first watcher
-///   POST   /api/v1/connector/watch              -- replace ALL watchers with one
-///   GET    /api/v1/connector/stats              -- aggregate stats across all watchers
-///   POST   /api/v1/connector/scan               -- scan all watchers
+///   GET    /api/v1/connector/status   -- status of the first watcher
+///   POST   /api/v1/connector/watch    -- replace ALL watchers with one (single NS)
+///   GET    /api/v1/connector/stats    -- aggregate stats across all watchers
+///   POST   /api/v1/connector/scan     -- rescan all watchers
 ///
 /// Directory picker:
-///   GET    /api/v1/browse?path=<dir>            -- list subdirectories
+///   GET    /api/v1/browse?path=<dir>  -- list subdirectories
 ///
+/// `pool`, `ins_router` and `spc_mgr` must outlive `server`; they are captured
+/// into `state.registry`. (The MVP NamespaceManager param was dropped — namespace
+/// creation/admission now goes through `ins_router`.)
 void RegisterConnectorRoutes(httplib::Server& server,
                               ConnectorState& state,
                               cortrix::resource::INamespacePool& pool,
                               cortrix::catalog::INSRouter& ins_router,
-                              NamespaceManager& meta_mgr,
                               SPCManager& spc_mgr,
                               ApiKeyAuth& auth);
 

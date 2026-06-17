@@ -19,7 +19,7 @@
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/server/batch_submit_service.h"
 #include "cortrix/server/i_task_submitter.h"
-#include "cortrix/connector/directory_importer.h"
+#include "cortrix/connector/dir_watcher_registry.h"  // complete type: ConnectorState's unique_ptr dtor
 #include "cortrix/server/routes/connector_routes.h"
 #include "cortrix/server/routes/flat_document_routes.h"
 #include "cortrix/spc/spc_manager.h"
@@ -116,6 +116,8 @@ protected:
         server_ = std::make_unique<httplib::Server>();
         RegisterFlatDocumentRoutes(*server_, harness_->ipool(), *handler_,
                                    *batch_service_, *task_handler_, *auth_);
+        // F21: /watch aliases build the DirWatcherRegistry from the pool + catalog
+        // router (ns_router_) + SPC; namespace create/admit goes through the router.
         RegisterWatchAliasRoutes(*server_, connector_state_, harness_->ipool(),
                                  ns_router_, *spc_, *auth_);
         server_thread_ = std::thread([this]() { server_->listen("127.0.0.1", port_); });
