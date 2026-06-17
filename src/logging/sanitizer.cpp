@@ -184,4 +184,13 @@ const LogSanitizer* LogSanitizer::Global() {
     return g_sanitizer.get();
 }
 
+std::string SanitizeForLog(const std::string& field_name,
+                           const std::string& value) {
+    const LogSanitizer* s = LogSanitizer::Global();
+    // No global sanitizer installed yet (tests / pre-Initialize startup): return
+    // the value untouched rather than crash. Once Initialize() runs, controlled
+    // fields are scrubbed; uncontrolled field names also pass through unchanged.
+    return s ? s->SanitizeField(field_name, value) : value;
+}
+
 }  // namespace cortrix::logging

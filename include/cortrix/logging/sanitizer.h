@@ -64,4 +64,21 @@ private:
     std::unordered_set<std::string> p2_hash_;
 };
 
+/// Convenience wrapper for log call sites that hold a single named sensitive
+/// value (e.g. an email or api_key) before formatting it into a log message.
+/// Routes through the process-wide LogSanitizer so the field is redacted /
+/// masked / truncated / hashed per sensitive_fields.yaml.
+///
+/// Null-safe by design: if LogSanitizer::Initialize() was never called (tests,
+/// early startup) the process-wide instance is absent and the value is returned
+/// unchanged — logging must never crash because sanitization is unconfigured.
+///
+/// Why a per-field helper and not a logger/formatter hook: CORTRIX_LOG_* emit
+/// free-text messages (fmt::format -> opaque string) with no field keys, so the
+/// key-based LogSanitizer cannot reliably scrub an arbitrary formatted line.
+/// Sanitization therefore happens at the call site, where the field name is
+/// known, by wrapping the sensitive argument in SanitizeForLog("<field>", value).
+std::string SanitizeForLog(const std::string& field_name,
+                           const std::string& value);
+
 }  // namespace cortrix::logging

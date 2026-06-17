@@ -9,12 +9,42 @@
 # ==========================================================
 
 demo.cortrix.ai {
-    # Main application — C++ HTTP server
-    reverse_proxy localhost:8420 {
-        # Pass original client IP
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
+    # ------------------------------------------------------------------
+    # Admin / system endpoints are loopback-only by design (AdminGuard,
+    # src/middleware/admin_guard.cpp kAdminPrefixes). Because this reverse
+    # proxy forwards over localhost, every proxied request reaches the app
+    # with remote_addr=127.0.0.1, which would make AdminGuard's loopback
+    # check pass for the whole public internet. Block these prefixes at the
+    # edge so they are NEVER reachable through Caddy; legitimate admin use
+    # goes straight to the loopback listener on the host (curl localhost:8420)
+    # or via an SSH tunnel. This is the deployment-side guarantee that admin
+    # stays loopback-only even when the app sits behind a proxy.
+    #
+    # NOTE: ordering matters. In Caddy's standard directive order reverse_proxy
+    # runs before respond, so a catch-all reverse_proxy would swallow admin
+    # paths before a matcher-scoped respond could fire. We therefore use
+    # mutually-exclusive `handle` blocks: Caddy evaluates handle blocks in
+    # source order and the first match wins and stops, so the admin block below
+    # is guaranteed to pre-empt the proxy.
+    @admin {
+        path /api/v1/admin/*
+        path /api/v1/system/tenants/*
+        path /api/v1/system/units/*
+    }
+    handle @admin {
+        respond "Admin and system endpoints are restricted to loopback access and are not reachable through this proxy." 403 {
+            close
+        }
+    }
+
+    # Everything else — C++ HTTP server (non-admin API + UI)
+    handle {
+        reverse_proxy localhost:8420 {
+            # Pass original client IP
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
     }
 
     # Compress responses
