@@ -36,27 +36,35 @@ export interface ReadyResponse {
 }
 
 export async function getLive(): Promise<LiveResponse> {
-  // Standalone (D3): fall back to the mock when the backend is unreachable.
+  // Standalone (D3): fall back to the mock only when the backend is genuinely
+  // unreachable (network failure). A reachable-but-failing probe (non-2xx) is a
+  // real liveness signal — it must surface as an error (HealthPage shows
+  // "down"), not be masked as a healthy mock response.
+  let res: Response;
   try {
-    const res = await fetch(`${API_BASE}/api/v1/system/health/live`, {
+    res = await fetch(`${API_BASE}/api/v1/system/health/live`, {
       credentials: 'include',
     });
-    if (!res.ok) throw new Error(`live probe failed (${res.status})`);
-    return await res.json();
   } catch {
     return mockApi.getLive();
   }
+  if (!res.ok) throw new Error(`live probe failed (${res.status})`);
+  return await res.json();
 }
 
 export async function getReady(): Promise<ReadyResponse> {
   // Read the body on both 200 (ready) and 503 (not_ready) — the component
-  // breakdown lives in the body in either case. Standalone: mock fallback.
+  // breakdown lives in the body in either case, so a 503 is NOT an error here.
+  // Standalone: fall back to the mock only on a network failure; once we have a
+  // response we parse and return it (a malformed/empty error body from a broken
+  // backend surfaces as an error rather than a fabricated healthy mock).
+  let res: Response;
   try {
-    const res = await fetch(`${API_BASE}/api/v1/system/health/ready`, {
+    res = await fetch(`${API_BASE}/api/v1/system/health/ready`, {
       credentials: 'include',
     });
-    return await res.json();
   } catch {
     return mockApi.getReady();
   }
+  return await res.json();
 }

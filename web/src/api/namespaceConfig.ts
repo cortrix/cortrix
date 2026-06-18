@@ -18,10 +18,17 @@ import type {
 
 const BASE = '/api/v1/namespaces';
 
+// Standalone fallback (D3): only substitute the in-memory mock when the backend
+// is genuinely unreachable (network failure → plain Error). An explicit HTTP
+// status (ApiError from client.ts, e.g. 404 unknown namespace / 403 forbidden /
+// 409 admission) MUST re-throw so the page surfaces the real GEN-Agent error
+// instead of masking it as a fabricated success.
+
 export async function getNamespaceDetail(name: string): Promise<NamespaceDetail> {
   try {
     return await get<NamespaceDetail>(`${BASE}/${encodeURIComponent(name)}`);
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && 'status' in e) throw e;
     return mockApi.getNamespaceDetail(name);
   }
 }
@@ -31,7 +38,10 @@ export async function createNamespaceFull(
 ): Promise<NamespaceDetail> {
   try {
     return await post<NamespaceDetail>(BASE, req);
-  } catch {
+  } catch (e) {
+    // F05 admission errors (4xx) must reach AdmissionError on the page; only a
+    // network failure falls back to the mock.
+    if (e instanceof Error && 'status' in e) throw e;
     return mockApi.createNamespaceFull(req);
   }
 }
@@ -42,7 +52,8 @@ export async function updateNamespace(
 ): Promise<NamespaceDetail> {
   try {
     return await put<NamespaceDetail>(`${BASE}/${encodeURIComponent(name)}`, req);
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && 'status' in e) throw e;
     return mockApi.updateNamespace(name, req);
   }
 }

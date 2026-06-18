@@ -16,10 +16,15 @@ export async function fetchMe(): Promise<AuthMeResponse | null> {
   try {
     const res = await fetch('/api/v1/auth/me', { credentials: 'include' });
     if (res.status === 401 || res.status === 403) return null;
-    if (!res.ok) throw new Error(`auth/me ${res.status}`);
+    if (!res.ok) {
+      throw Object.assign(new Error(`auth/me ${res.status}`), { status: res.status });
+    }
     return (await res.json()) as AuthMeResponse;
-  } catch {
-    // Backend unreachable → defer to the mock session (standalone).
+  } catch (e) {
+    // Only fall back to the mock session for network failures, not for an
+    // explicit backend HTTP status — a real 5xx must surface, not be masked
+    // as an authenticated session.
+    if (e instanceof Error && 'status' in e) throw e;
     return mockApi.authMe();
   }
 }
@@ -49,6 +54,10 @@ export async function login(email: string, password: string): Promise<AuthMeResp
 
 /** POST /api/v1/auth/logout — backend clears the auth + csrf cookies. */
 export async function logout(): Promise<void> {
+  // Logout is best-effort: the caller clears local UI state regardless, so a
+  // backend error must never strand the user "logged in". We only touch the
+  // mock session on a network failure (standalone); an HTTP error from a live
+  // backend is swallowed silently rather than mutating the mock.
   try {
     await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' });
   } catch {
@@ -64,7 +73,12 @@ export async function logout(): Promise<void> {
 export async function bootstrap(token: string): Promise<BootstrapResponse> {
   try {
     return await post<BootstrapResponse>('/api/v1/admin/bootstrap', { token });
-  } catch {
+  } catch (e) {
+    // Security: only synthesise a mock admin key when the backend is genuinely
+    // unreachable (network failure). An explicit HTTP status — e.g. a 4xx for an
+    // invalid or already-consumed token — MUST surface, otherwise a failed
+    // exchange would hand the caller a fabricated `cortrix_sk_mock` admin key.
+    if (e instanceof Error && 'status' in e) throw e;
     return mockApi.bootstrap(token);
   }
 }
