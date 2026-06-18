@@ -1,5 +1,6 @@
 import { API_BASE } from '../utils/constants';
 import { mockApi } from './mock';
+import { isClientError } from './fallback';
 
 // Health endpoints (P02a design § 4.2, F20-7). Two K8s-style probes:
 //   GET /api/v1/system/health/live   — process liveness (always 200 when up)
@@ -36,35 +37,40 @@ export interface ReadyResponse {
 }
 
 export async function getLive(): Promise<LiveResponse> {
-  // Standalone (D3): fall back to the mock only when the backend is genuinely
-  // unreachable (network failure). A reachable-but-failing probe (non-2xx) is a
-  // real liveness signal — it must surface as an error (HealthPage shows
-  // "down"), not be masked as a healthy mock response.
-  let res: Response;
+  // Standalone (D3): a 4xx is a real client error → surface (HealthPage shows
+  // "down"). A 5xx (incl. the dev proxy's down-target 500) or a network failure
+  // means the backend is unreachable → fall back to the mock. See ./fallback.ts.
   try {
-    res = await fetch(`${API_BASE}/api/v1/system/health/live`, {
+    const res = await fetch(`${API_BASE}/api/v1/system/health/live`, {
       credentials: 'include',
     });
-  } catch {
+    if (!res.ok) {
+      throw Object.assign(new Error(`live probe failed (${res.status})`), {
+        status: res.status,
+      });
+    }
+    return await res.json();
+  } catch (e) {
+    if (isClientError(e)) throw e;
     return mockApi.getLive();
   }
-  if (!res.ok) throw new Error(`live probe failed (${res.status})`);
-  return await res.json();
 }
 
 export async function getReady(): Promise<ReadyResponse> {
   // Read the body on both 200 (ready) and 503 (not_ready) — the component
-  // breakdown lives in the body in either case, so a 503 is NOT an error here.
-  // Standalone: fall back to the mock only on a network failure; once we have a
-  // response we parse and return it (a malformed/empty error body from a broken
-  // backend surfaces as an error rather than a fabricated healthy mock).
-  let res: Response;
+  // breakdown lives in the body in either case, so a 503 is NOT an error and
+  // parses normally. A 4xx surfaces; any other failure (5xx with a non-JSON
+  // body, or a network failure → backend unreachable) falls back to the mock.
   try {
-    res = await fetch(`${API_BASE}/api/v1/system/health/ready`, {
+    const res = await fetch(`${API_BASE}/api/v1/system/health/ready`, {
       credentials: 'include',
     });
-  } catch {
+    if (res.status >= 400 && res.status < 500) {
+      throw Object.assign(new Error(`ready probe ${res.status}`), { status: res.status });
+    }
+    return await res.json();
+  } catch (e) {
+    if (isClientError(e)) throw e;
     return mockApi.getReady();
   }
-  return await res.json();
 }

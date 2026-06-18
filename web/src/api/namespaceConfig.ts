@@ -1,5 +1,6 @@
 import { get, post, put } from './client';
 import { mockApi } from './mock';
+import { isClientError } from './fallback';
 import type {
   NamespaceDetail,
   CreateNamespaceFullRequest,
@@ -18,17 +19,16 @@ import type {
 
 const BASE = '/api/v1/namespaces';
 
-// Standalone fallback (D3): only substitute the in-memory mock when the backend
-// is genuinely unreachable (network failure → plain Error). An explicit HTTP
-// status (ApiError from client.ts, e.g. 404 unknown namespace / 403 forbidden /
-// 409 admission) MUST re-throw so the page surfaces the real GEN-Agent error
-// instead of masking it as a fabricated success.
+// Standalone fallback (D3): a 4xx (404 unknown namespace / 403 forbidden / 409
+// F05 admission) is a real client error and MUST re-throw so the page surfaces
+// the GEN-Agent envelope; only a 5xx / network failure (backend unreachable)
+// falls back to the in-memory mock. See ./fallback.ts for the why (dev proxy).
 
 export async function getNamespaceDetail(name: string): Promise<NamespaceDetail> {
   try {
     return await get<NamespaceDetail>(`${BASE}/${encodeURIComponent(name)}`);
   } catch (e) {
-    if (e instanceof Error && 'status' in e) throw e;
+    if (isClientError(e)) throw e;
     return mockApi.getNamespaceDetail(name);
   }
 }
@@ -39,9 +39,8 @@ export async function createNamespaceFull(
   try {
     return await post<NamespaceDetail>(BASE, req);
   } catch (e) {
-    // F05 admission errors (4xx) must reach AdmissionError on the page; only a
-    // network failure falls back to the mock.
-    if (e instanceof Error && 'status' in e) throw e;
+    // F05 admission errors (4xx) must reach AdmissionError on the page.
+    if (isClientError(e)) throw e;
     return mockApi.createNamespaceFull(req);
   }
 }
@@ -53,7 +52,7 @@ export async function updateNamespace(
   try {
     return await put<NamespaceDetail>(`${BASE}/${encodeURIComponent(name)}`, req);
   } catch (e) {
-    if (e instanceof Error && 'status' in e) throw e;
+    if (isClientError(e)) throw e;
     return mockApi.updateNamespace(name, req);
   }
 }

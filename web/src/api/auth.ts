@@ -1,5 +1,6 @@
 import { post } from './client';
 import { mockApi } from './mock';
+import { isClientError } from './fallback';
 import type { AuthMeResponse, LoginResponse, BootstrapResponse } from '../types/api';
 
 // Auth client (P08 / P02a § 9.2 — HttpOnly cookie model). All calls send
@@ -10,6 +11,12 @@ import type { AuthMeResponse, LoginResponse, BootstrapResponse } from '../types/
 // but falls back to the in-memory mock session when the backend is unreachable,
 // so the auth flow (bootstrap → login → guarded pages) is fully exercisable
 // without a live server. Real Set-Cookie wiring lands at D3.5.
+//
+// Fallback rule (see ./fallback.ts): a real *client* error (4xx) carries
+// meaning the caller must see (a rejected token, a forbidden resource), so it
+// re-throws. A 5xx or a network failure means the backend is unreachable/broken
+// → fall back to the mock (standalone). This is what stops a bad 4xx from being
+// laundered into a fabricated mock success (e.g. bootstrap minting a fake key).
 
 /** GET /api/v1/auth/me — cookie probe. Returns null when unauthenticated. */
 export async function fetchMe(): Promise<AuthMeResponse | null> {
@@ -21,10 +28,10 @@ export async function fetchMe(): Promise<AuthMeResponse | null> {
     }
     return (await res.json()) as AuthMeResponse;
   } catch (e) {
-    // Only fall back to the mock session for network failures, not for an
-    // explicit backend HTTP status — a real 5xx must surface, not be masked
-    // as an authenticated session.
-    if (e instanceof Error && 'status' in e) throw e;
+    // 4xx other than the 401/403 handled above is a genuine client error →
+    // surface it. A 5xx or network failure means the backend is unreachable →
+    // defer to the mock session (standalone) so the app shell still boots.
+    if (isClientError(e)) throw e;
     return mockApi.authMe();
   }
 }
@@ -74,11 +81,11 @@ export async function bootstrap(token: string): Promise<BootstrapResponse> {
   try {
     return await post<BootstrapResponse>('/api/v1/admin/bootstrap', { token });
   } catch (e) {
-    // Security: only synthesise a mock admin key when the backend is genuinely
-    // unreachable (network failure). An explicit HTTP status — e.g. a 4xx for an
-    // invalid or already-consumed token — MUST surface, otherwise a failed
-    // exchange would hand the caller a fabricated `cortrix_sk_mock` admin key.
-    if (e instanceof Error && 'status' in e) throw e;
+    // Security: a 4xx (invalid / already-consumed / expired token) MUST surface
+    // — otherwise a failed exchange would hand the caller a fabricated
+    // `cortrix_sk_mock` admin key. Only a 5xx / network failure (backend
+    // unreachable) falls back to the mock for standalone exercising.
+    if (isClientError(e)) throw e;
     return mockApi.bootstrap(token);
   }
 }
