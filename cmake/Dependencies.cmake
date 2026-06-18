@@ -35,6 +35,17 @@ FetchContent_Declare(
     GIT_TAG        v1.17.0
 )
 
+# rapidcheck (property-based testing; R9 robustness lane). Test-only — linked only
+# by the unit-test target. RC_ENABLE_GTEST exposes the `rapidcheck_gtest` interface
+# target that provides the <rapidcheck/gtest.h> RC_GTEST_PROP macro, which integrates
+# a property as a normal gtest case. Pinned to a commit (rapidcheck is unversioned).
+FetchContent_Declare(
+    rapidcheck
+    GIT_REPOSITORY https://github.com/emil-e/rapidcheck.git
+    GIT_TAG        ff6af6fc683159deb51c543b065eba14dfcf329b  # 2023-12, last stable HEAD
+)
+set(RC_ENABLE_GTEST ON CACHE BOOL "" FORCE)
+
 # hnswlib (vector index): NOT fetched anymore — vendored in-tree as the F01
 # P-HNSW shallow fork at src/store/phnsw/hnswlib/ (see CMakeLists.txt there).
 
@@ -54,7 +65,7 @@ FetchContent_Declare(
 set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
 set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
 
-FetchContent_MakeAvailable(httplib yaml-cpp json spdlog googletest benchmark)
+FetchContent_MakeAvailable(httplib yaml-cpp json spdlog googletest benchmark rapidcheck)
 
 # --- CoreML support (Apple platforms only) ---
 if(APPLE)

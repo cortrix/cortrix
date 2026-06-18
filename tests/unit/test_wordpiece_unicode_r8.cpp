@@ -110,16 +110,18 @@ INSTANTIATE_TEST_SUITE_P(Latin1Lower, AccentFoldTest, ::testing::Values(
 ));
 
 INSTANTIATE_TEST_SUITE_P(LatinExtendedA, AccentFoldTest, ::testing::Values(
-    // U+0100–017F: the StripLatinAccent second switch. Lowercase odd code points
-    // map directly; uppercase even ones rely on the table too (ToLower does NOT
-    // touch >U+00DE, so the uppercase Extended-A folds via StripLatinAccent only,
-    // staying uppercase base letter — assert accordingly).
+    // U+0100–017F: the StripLatinAccent second switch. The pipeline is uncased —
+    // ToLower now lowercases the whole Extended-A block (HF Unicode-aware lowercase)
+    // BEFORE StripAccents — so every Extended-A letter, upper- or lower-case, folds
+    // to the LOWERCASE base letter (R9 wordpiece fidelity fix; matches HF
+    // BertNormalizer ground truth).
     AccentCase{0x0101, "a"}, AccentCase{0x0103, "a"}, AccentCase{0x0105, "a"},  // ā ă ą
     AccentCase{0x0107, "c"}, AccentCase{0x010D, "c"},                            // ć č
     AccentCase{0x0113, "e"}, AccentCase{0x011B, "e"},                            // ē ě
     AccentCase{0x011F, "g"}, AccentCase{0x0121, "g"},                            // ğ ġ
     AccentCase{0x0129, "i"}, AccentCase{0x012B, "i"},                            // ĩ ī
-    AccentCase{0x0142, "l"},                                                     // ł
+    // ł (U+0142): the stroke is NOT a combining mark, so HF keeps it ł (not "l").
+    AccentCase{0x0142, "ł"},                                                     // ł → ł
     AccentCase{0x0144, "n"}, AccentCase{0x0148, "n"},                            // ń ň
     AccentCase{0x014D, "o"}, AccentCase{0x0151, "o"},                            // ō ő
     AccentCase{0x0155, "r"}, AccentCase{0x0159, "r"},                            // ŕ ř
@@ -127,6 +129,26 @@ INSTANTIATE_TEST_SUITE_P(LatinExtendedA, AccentFoldTest, ::testing::Values(
     AccentCase{0x0163, "t"}, AccentCase{0x0165, "t"},                            // ţ ť
     AccentCase{0x0169, "u"}, AccentCase{0x0173, "u"},                            // ũ ų
     AccentCase{0x017A, "z"}, AccentCase{0x017E, "z"}                             // ź ž
+));
+
+// R9 wordpiece fidelity fix — the UPPERCASE Latin Extended-A letters now fold to the
+// LOWERCASE base (ToLower lowercases the block before StripAccents, matching HF).
+// Before the fix these stayed uppercase (Ā→"A"); the idempotence property test
+// (test_wordpiece_property_r9.cpp) surfaced the divergence. Uppercase Ł folds to ł.
+INSTANTIATE_TEST_SUITE_P(LatinExtendedAUpper, AccentFoldTest, ::testing::Values(
+    AccentCase{0x0100, "a"}, AccentCase{0x0104, "a"},                            // Ā Ą
+    AccentCase{0x0106, "c"}, AccentCase{0x010C, "c"},                            // Ć Č
+    AccentCase{0x0112, "e"}, AccentCase{0x011A, "e"},                            // Ē Ě
+    AccentCase{0x011E, "g"},                                                     // Ğ
+    AccentCase{0x0128, "i"}, AccentCase{0x012A, "i"},                            // Ĩ Ī
+    AccentCase{0x0141, "ł"},                                                     // Ł → ł (lowercased, stroke kept)
+    AccentCase{0x0143, "n"}, AccentCase{0x0147, "n"},                            // Ń Ň
+    AccentCase{0x014C, "o"}, AccentCase{0x0150, "o"},                            // Ō Ő
+    AccentCase{0x0154, "r"}, AccentCase{0x0158, "r"},                            // Ŕ Ř
+    AccentCase{0x015A, "s"}, AccentCase{0x0160, "s"},                            // Ś Š
+    AccentCase{0x0162, "t"}, AccentCase{0x0164, "t"},                            // Ţ Ť
+    AccentCase{0x0168, "u"}, AccentCase{0x0170, "u"},                            // Ũ Ű
+    AccentCase{0x0179, "z"}, AccentCase{0x017D, "z"}                             // Ź Ž
 ));
 
 // The accent-table "pass-through" arms (Æ/Ð/× and out-of-table code points return

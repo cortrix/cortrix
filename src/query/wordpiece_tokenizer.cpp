@@ -47,34 +47,42 @@ char32_t StripLatinAccent(char32_t cp) {
     }
     // Latin Extended-A (U+0100–U+017F): every even/odd pair is an accented
     // upper/lower letter that NFD-decomposes to a base ASCII letter. We map the
-    // handful most common in European text; the rest fall through unchanged
-    // (they would [UNK] anyway, which still matches HF for vocab-absent forms).
+    // handful most common in European text to the LOWERCASE base (the pipeline is
+    // uncased — ToLower runs before this — so both members of each pair fold to the
+    // lowercase letter, matching HF); the rest fall through unchanged (they would
+    // [UNK] anyway, which still matches HF for vocab-absent forms).
     switch (cp) {
-        case 0x0100: case 0x0102: case 0x0104: return 'A';
+        case 0x0100: case 0x0102: case 0x0104:               // upper Ā Ă Ą
         case 0x0101: case 0x0103: case 0x0105: return 'a';
-        case 0x0106: case 0x0108: case 0x010A: case 0x010C: return 'C';
+        case 0x0106: case 0x0108: case 0x010A: case 0x010C:  // upper Ć Ĉ Ċ Č
         case 0x0107: case 0x0109: case 0x010B: case 0x010D: return 'c';
-        case 0x0112: case 0x0114: case 0x0116: case 0x0118: case 0x011A: return 'E';
+        case 0x0112: case 0x0114: case 0x0116: case 0x0118: case 0x011A:  // upper Ē Ĕ Ė Ę Ě
         case 0x0113: case 0x0115: case 0x0117: case 0x0119: case 0x011B: return 'e';
-        case 0x011E: case 0x0120: return 'G';
+        case 0x011E: case 0x0120:                            // upper Ğ Ġ
         case 0x011F: case 0x0121: return 'g';
-        case 0x0128: case 0x012A: case 0x012C: case 0x012E: return 'I';
+        // Extended-A folds to the LOWERCASE base: in the pipeline ToLower runs first
+        // (so StripAccents only sees lowercased code points), and the checkpoint is
+        // uncased — matching HF, whose lowercase+strip_accents yields the lowercase
+        // base. Both the upper- and lower-cased members of each pair fold here so the
+        // helper is correct even if called directly on an uppercase code point.
+        case 0x0128: case 0x012A: case 0x012C: case 0x012E:  // upper Ĩ Ī Ĭ Į
         case 0x0129: case 0x012B: case 0x012D: case 0x012F: return 'i';
-        case 0x0141: return 'L';
-        case 0x0142: return 'l';
-        case 0x0143: case 0x0145: case 0x0147: return 'N';
+        // Ł/ł (U+0141/0142): HF does NOT strip the stroke (NFD gives no combining
+        // mark), so it stays ł (U+0142) — it is a vocab token in its own right.
+        case 0x0141: case 0x0142: return 0x0142;
+        case 0x0143: case 0x0145: case 0x0147:               // upper Ń Ņ Ň
         case 0x0144: case 0x0146: case 0x0148: return 'n';
-        case 0x014C: case 0x014E: case 0x0150: return 'O';
+        case 0x014C: case 0x014E: case 0x0150:               // upper Ō Ŏ Ő
         case 0x014D: case 0x014F: case 0x0151: return 'o';
-        case 0x0154: case 0x0156: case 0x0158: return 'R';
+        case 0x0154: case 0x0156: case 0x0158:               // upper Ŕ Ŗ Ř
         case 0x0155: case 0x0157: case 0x0159: return 'r';
-        case 0x015A: case 0x015C: case 0x015E: case 0x0160: return 'S';
+        case 0x015A: case 0x015C: case 0x015E: case 0x0160:  // upper Ś Ŝ Ş Š
         case 0x015B: case 0x015D: case 0x015F: case 0x0161: return 's';
-        case 0x0162: case 0x0164: return 'T';
+        case 0x0162: case 0x0164:                            // upper Ţ Ť
         case 0x0163: case 0x0165: return 't';
-        case 0x0168: case 0x016A: case 0x016C: case 0x016E: case 0x0170: case 0x0172: return 'U';
+        case 0x0168: case 0x016A: case 0x016C: case 0x016E: case 0x0170: case 0x0172:  // upper Ũ Ū Ŭ Ů Ű Ų
         case 0x0169: case 0x016B: case 0x016D: case 0x016F: case 0x0171: case 0x0173: return 'u';
-        case 0x0179: case 0x017B: case 0x017D: return 'Z';
+        case 0x0179: case 0x017B: case 0x017D:               // upper Ź Ż Ž
         case 0x017A: case 0x017C: case 0x017E: return 'z';
         default: return cp;
     }
@@ -237,6 +245,34 @@ std::string WordPieceTokenizer::PadChineseChars(const std::string& text) {
     return out;
 }
 
+namespace {
+
+// Lowercase a Latin Extended-A (U+0100–U+017F) code point, matching HF's
+// Unicode-aware lowercase. In this block every uppercase letter lowercases to the
+// next code point (cp+1) — the upper/lower pairs are interleaved — except İ
+// (U+0130, whose Unicode lowering is "i" + combining dot; we emit plain 'i' since
+// StripAccents would drop the mark) and Ÿ (U+0178 → ÿ U+00FF). The uppercase code
+// points form five step-2 runs (the L/N/Z sub-blocks flip parity, hence separate
+// runs). A non-uppercase code point in the block is returned unchanged.
+char32_t LowerLatinExtendedA(char32_t cp) {
+    if (cp == 0x0130) return 'i';     // İ → i (combining dot dropped by StripAccents)
+    if (cp == 0x0178) return 0x00FF;  // Ÿ → ÿ
+    // The uppercase letters are cp where (cp - run_start) is even within a run.
+    auto in_run = [cp](char32_t start, char32_t end) {
+        return cp >= start && cp <= end && ((cp - start) % 2 == 0);
+    };
+    if (in_run(0x0100, 0x012E) ||   // Ā..Į (even)
+        in_run(0x0132, 0x0136) ||   // Ĳ..Ķ (even)
+        in_run(0x0139, 0x0147) ||   // Ĺ..Ň (odd parity sub-block)
+        in_run(0x014A, 0x0176) ||   // Ŋ..Ŷ (even)
+        in_run(0x0179, 0x017D)) {   // Ź..Ž (odd parity sub-block)
+        return cp + 1;
+    }
+    return cp;  // already lowercase, or a non-letter in the block
+}
+
+}  // namespace
+
 std::string WordPieceTokenizer::ToLower(const std::string& text) {
     std::string out;
     out.reserve(text.size());
@@ -248,6 +284,12 @@ std::string WordPieceTokenizer::ToLower(const std::string& text) {
         } else if (cp >= 0x00C0 && cp <= 0x00DE && cp != 0x00D7) {
             // Latin-1 uppercase → lowercase (offset 0x20), excluding × (0x00D7).
             cp += 0x20;
+        } else if (cp >= 0x0100 && cp <= 0x017F) {
+            // Latin Extended-A: HF lowercases this block too (Unicode-aware). Without
+            // this, an uppercase Extended-A letter (e.g. Ł, Ā) reaches StripAccents
+            // un-lowercased and folds to an UPPERCASE base, diverging from HF (which
+            // emits the lowercase form). See LowerLatinExtendedA.
+            cp = LowerLatinExtendedA(cp);
         }
         AppendUtf8(cp, out);
     }
