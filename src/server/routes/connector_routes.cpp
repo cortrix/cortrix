@@ -95,7 +95,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
     // ----------------------------------------------------------------
 
     // GET /api/v1/connector/watchers — list all watchers with per-NS stats.
-    server.Get("/api/v1/connector/watchers", NoAuth(
+    server.Get("/api/v1/connector/watchers", WithAuth(auth, kPermAdmin,
         [&reg](const httplib::Request&, httplib::Response& res,
                const RequestContext& rctx) {
             nlohmann::json body;
@@ -110,7 +110,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
     // POST /api/v1/connector/watchers — subscribe namespace(s) to a directory.
     // F21: accepts `target_namespaces: [...]` (fan-out); the MVP single
     // `namespace_name` is still honored (mapped to a one-element array).
-    server.Post("/api/v1/connector/watchers", NoAuth(
+    server.Post("/api/v1/connector/watchers", WithAuth(auth, kPermAdmin,
         [&reg, &state](const httplib::Request& req, httplib::Response& res,
                        const RequestContext& rctx) {
             nlohmann::json body;
@@ -175,7 +175,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
     ));
 
     // DELETE /api/v1/connector/watchers/:id — remove a watcher (all NS) + purge docs.
-    server.Delete("/api/v1/connector/watchers/:id", NoAuth(
+    server.Delete("/api/v1/connector/watchers/:id", WithAuth(auth, kPermAdmin,
         [&reg, &state](const httplib::Request& req, httplib::Response& res,
                        const RequestContext& rctx) {
             std::string id = req.path_params.count("id")
@@ -212,7 +212,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
     // DELETE /api/v1/connector/watchers/:id/namespaces/:ns — F21: unsubscribe a
     // single namespace. The last unsubscribe destroys the watcher (no doc purge
     // on a per-NS unsubscribe — that is the whole-watcher DELETE's job).
-    server.Delete("/api/v1/connector/watchers/:id/namespaces/:ns", NoAuth(
+    server.Delete("/api/v1/connector/watchers/:id/namespaces/:ns", WithAuth(auth, kPermAdmin,
         [&reg, &state](const httplib::Request& req, httplib::Response& res,
                        const RequestContext& rctx) {
             std::string id = req.path_params.count("id")
@@ -254,7 +254,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
     ));
 
     // POST /api/v1/connector/watchers/:id/scan — trigger a fan-out rescan.
-    server.Post("/api/v1/connector/watchers/:id/scan", NoAuth(
+    server.Post("/api/v1/connector/watchers/:id/scan", WithAuth(auth, kPermAdmin,
         [&reg](const httplib::Request& req, httplib::Response& res,
                const RequestContext& rctx) {
             std::string id = req.path_params.count("id")
@@ -282,7 +282,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
     // ----------------------------------------------------------------
 
     // GET /api/v1/connector/status — first watcher status (backward compat).
-    server.Get("/api/v1/connector/status", NoAuth(
+    server.Get("/api/v1/connector/status", WithAuth(auth, kPermAdmin,
         [&reg](const httplib::Request&, httplib::Response& res,
                const RequestContext& rctx) {
             nlohmann::json body;
@@ -309,7 +309,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
     ));
 
     // POST /api/v1/connector/watch — backward compat: replace ALL watchers with one.
-    server.Post("/api/v1/connector/watch", NoAuth(
+    server.Post("/api/v1/connector/watch", WithAuth(auth, kPermAdmin,
         [&reg, &state](const httplib::Request& req, httplib::Response& res,
                        const RequestContext& rctx) {
             nlohmann::json body;
@@ -354,7 +354,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
     ));
 
     // GET /api/v1/connector/stats — aggregate stats across all watchers.
-    server.Get("/api/v1/connector/stats", NoAuth(
+    server.Get("/api/v1/connector/stats", WithAuth(auth, kPermAdmin,
         [&reg](const httplib::Request&, httplib::Response& res,
                const RequestContext& rctx) {
             auto watches = reg.ListWatches();
@@ -378,7 +378,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
     ));
 
     // POST /api/v1/connector/scan — rescan all watchers.
-    server.Post("/api/v1/connector/scan", NoAuth(
+    server.Post("/api/v1/connector/scan", WithAuth(auth, kPermAdmin,
         [&reg](const httplib::Request&, httplib::Response& res,
                const RequestContext& rctx) {
             auto watches = reg.ListWatches();
