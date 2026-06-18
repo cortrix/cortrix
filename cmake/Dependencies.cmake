@@ -143,6 +143,20 @@ if(NOT sqlite3_POPULATED)
     target_compile_definitions(sqlite3 PRIVATE
         SQLITE_ENABLE_FTS5
         SQLITE_ENABLE_JSON1
-        SQLITE_THREADSAFE=2
+        # SQLITE_THREADSAFE=1 (serialized), NOT =2 (multi-thread). The catalog.db
+        # handle (owned by CatalogDb) is borrowed and used concurrently by multiple
+        # threads — the GC background thread (GcManager) and HTTP request threads
+        # (F12) — with no owner-level mutex. Under multi-thread mode (=2), concurrent
+        # use of a single connection is undefined behavior and crashed intermittently
+        # (GcThreadTest.LoopRunsSweep SEGFAULT, ~2/3 in isolation). Serialized mode
+        # gives each connection its own recursive mutex: independent connections
+        # (per-Unit store.db in the F05 pool) still run fully in parallel; only
+        # concurrent use of the SAME connection is serialized. The cost is an
+        # uncontended lock/unlock per API call on single-threaded connections
+        # (negligible) plus real serialization on the shared catalog connection
+        # (low-volume metadata, cached behind F12 bloom filter).
+        # Phase-2 perf upgrade path (per-connection owner mutex / per-thread WAL
+        # connections) is tracked in hub PHASE2_BACKLOG (TD-CATALOG-CONN-CONCURRENCY).
+        SQLITE_THREADSAFE=1
     )
 endif()
