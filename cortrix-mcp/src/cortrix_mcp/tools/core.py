@@ -20,10 +20,10 @@ route table in src/server, not just api/paths/*.yaml):
   * add_watcher      -> POST /watch  body {path, target_namespaces:[...]}
                         (MVP used /connector/watchers {data_dir, namespace_name} — stale)
   * list_watchers    -> GET  /watch
-  * log_interaction  -> POST /interactions          (D3.5 deferred: endpoint not yet in api/paths/*.yaml,
-                        designed per feature section 4.5.quater — standalone mock)
-  * list_interactions-> GET  /interactions          (same; renamed from MVP cortrix_list_sessions
-                        per feature section 4.5.quater 5-layer alignment)
+  * log_interaction  -> POST /memory/sessions/{session_id}/interactions
+                        (session_id in the path; MVP-era POST /interactions did not exist)
+  * list_interactions-> GET  /interactions          (live; renamed from MVP cortrix_list_sessions
+                        per feature section 4.5.quater 5-layer alignment; namespace -> namespace_id)
 """
 
 from __future__ import annotations
@@ -155,18 +155,33 @@ def register(mcp) -> None:
         limit: int = 50,
         offset: int = 0,
     ) -> dict:
-        """List interactions for a user_id (GET /interactions mirror).
+        """List interactions for a user_id (GET /interactions).
 
-        Signature aligns 5 layers (MCP / HTTP / pgcortrix / P14 / P03) per feature
-        section 4.5.quater. ``filter`` whitelist (5 fields): session_id / namespace_id /
-        from_ts / to_ts / sort_order; out-of-whitelist keys pass through the backend's
-        CX_ERR_F14_INVALID_FILTER.
+        Backed by the live GET /interactions route (observability_routes.cpp); per-NS
+        storage, so the namespace selects the store (sent as namespace_id).
 
-        D3.5 deferred: GET /interactions is not yet in api/paths/*.yaml — standalone mock.
+        ``filter`` is a convenience sub-object whose whitelisted keys (session_id /
+        namespace_id / from_ts / to_ts / sort_order) are flattened onto the HTTP query
+        string, since the backend reads them as flat params (from_ts -> from_timestamp,
+        to_ts -> to_timestamp). Out-of-whitelist keys are dropped here rather than sent.
         """
-        params: dict = {"namespace": namespace, "user_id": user_id, "limit": limit, "offset": offset}
+        params: dict = {
+            "namespace_id": namespace,
+            "user_id": user_id,
+            "limit": limit,
+            "offset": offset,
+        }
         if filter:
-            params["filter"] = filter
+            key_map = {
+                "session_id": "session_id",
+                "namespace_id": "namespace_id",
+                "from_ts": "from_timestamp",
+                "to_ts": "to_timestamp",
+                "sort_order": "sort_order",
+            }
+            for k, backend_key in key_map.items():
+                if filter.get(k) is not None:
+                    params[backend_key] = filter[k]
         return request("GET", "/interactions", params=params, data_key="interactions", timeout=10.0)
 
     @mcp.tool()

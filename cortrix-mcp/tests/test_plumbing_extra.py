@@ -100,6 +100,30 @@ def test_list_operations_passes_all_filters(mock_request):
     assert params["limit"] == 200  # clamped to max 200
 
 
+def test_list_interactions_flattens_filter_to_backend_params(mock_request):
+    # GET /interactions (observability_routes.cpp) reads flat params: namespace_id +
+    # user_id/session_id/from_timestamp/to_timestamp/sort_order. The MCP filter sub-object
+    # is flattened (from_ts -> from_timestamp, to_ts -> to_timestamp); namespace -> namespace_id.
+    mock_request.set(json_body={"interactions": []})
+    get_tool_fn("cortrix_list_interactions")(
+        namespace="default",
+        user_id="u1",
+        filter={"session_id": "s1", "from_ts": 1, "to_ts": 2, "sort_order": "ASC", "bogus": "x"},
+    )
+    args, kwargs = mock_request.last_call
+    assert args[0] == "GET"
+    assert args[1].endswith("/api/v1/interactions")
+    params = kwargs["params"]
+    assert params["namespace_id"] == "default"
+    assert "namespace" not in params  # renamed, not duplicated
+    assert "filter" not in params  # flattened, not nested
+    assert params["session_id"] == "s1"
+    assert params["from_timestamp"] == 1
+    assert params["to_timestamp"] == 2
+    assert params["sort_order"] == "ASC"
+    assert "bogus" not in params  # out-of-whitelist dropped
+
+
 def test_memory_invalidate_without_optional_params(mock_request):
     mock_request.set(json_body={"memory_id": "m", "status": "invalidated"})
     get_tool_fn("cortrix_memory_invalidate")(memory_id="m1")
