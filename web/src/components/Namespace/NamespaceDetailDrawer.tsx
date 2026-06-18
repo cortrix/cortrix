@@ -77,8 +77,8 @@ export function NamespaceDetailDrawer({
               <MetaRow label={t('namespace.isolationMode')} value={ns.isolation_mode} />
               <MetaRow label={t('namespace.visibility')} value={ns.visibility} />
               <MetaRow label={t('namespace.status')} value={<Badge variant={ns.status === 'active' ? 'ok' : 'error'}>{ns.status}</Badge>} />
-              <MetaRow label={t('namespace.documents')} value={<span className="font-mono">{ns.doc_count.toLocaleString()}</span>} />
-              <MetaRow label={t('namespace.blocks')} value={<span className="font-mono">{ns.block_count.toLocaleString()}</span>} />
+              <MetaRow label={t('namespace.documents')} value={<span className="font-mono">{(ns.doc_count ?? 0).toLocaleString()}</span>} />
+              <MetaRow label={t('namespace.blocks')} value={<span className="font-mono">{(ns.block_count ?? 0).toLocaleString()}</span>} />
             </div>
           </section>
 
@@ -122,7 +122,12 @@ export function NamespaceDetailDrawer({
             </h3>
             <div className="space-y-2">
               {CONFIG_META.map((meta) => {
-                const cfg = ns.configs[meta.key] ?? {};
+                // Defensive: the backend (F12 BuildNamespaceJson) may omit the
+                // whole `configs` object or individual *_config keys. Optional-
+                // chain through both so a missing field degrades to a "default"
+                // accordion instead of throwing (undefined[key]) into the
+                // ErrorBoundary.
+                const cfg = ns.configs?.[meta.key] ?? {};
                 const empty = Object.keys(cfg).length === 0;
                 return (
                   <details

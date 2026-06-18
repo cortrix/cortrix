@@ -79,6 +79,52 @@ test('7. Upload page exposes the bulk-submit panel that expands', async ({ page 
   await expect(page.getByTestId('bulk-json-input')).toBeVisible();
 });
 
+// ── 6. Namespace detail drawer survives a backend that omits `configs` ───────
+// Regression for the View Details P0 crash (Scott R9 black-box): the real F12
+// BuildNamespaceJson can return a namespace detail with no `configs` object (or
+// missing doc_count/block_count). The drawer mapped CONFIG_META over
+// `ns.configs[key]`, so undefined[key] threw a TypeError into the ErrorBoundary.
+// Here we intercept the list + detail endpoints to serve exactly that degraded
+// payload and assert the drawer opens without tripping app-error-boundary.
+test('6. Namespace detail drawer renders when backend omits configs', async ({ page }) => {
+  await page.route('**/api/v1/namespaces', async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      // doc_count/block_count present here (list contract); the detail below is
+      // the degraded one.
+      body: JSON.stringify({
+        namespaces: [{ name: 'degraded-ns', created_at: '2026-06-01T00:00:00Z', doc_count: 1, block_count: 2 }],
+      }),
+    });
+  });
+  await page.route('**/api/v1/namespaces/degraded-ns', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      // Intentionally missing `configs`, doc_count, block_count — the shape the
+      // live backend returned that crashed the drawer.
+      body: JSON.stringify({
+        ns_id: 'ns_degr',
+        name: 'degraded-ns',
+        created_at: '2026-06-01T00:00:00Z',
+        isolation_mode: 'shared',
+        visibility: 'tenant',
+        status: 'active',
+      }),
+    });
+  });
+
+  await goto(page, '/');
+  await page.getByRole('row', { name: /degraded-ns/ }).getByTestId('namespace-view-btn').click();
+
+  // Drawer opened with all 11 config accordions (each degraded to "default"),
+  // and crucially the app did NOT trip the error boundary.
+  await expect(page.getByTestId('drawer-config-reranker_config')).toBeVisible();
+  await expect(page.getByTestId('app-error-boundary')).toHaveCount(0);
+});
+
 // ── 8. Dual-theme toggle (Magma light ↔ dark) ───────────────────────────────
 test('8. Theme toggle switches the document between light and dark', async ({ page }) => {
   await goto(page, '/');
