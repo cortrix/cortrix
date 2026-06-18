@@ -54,10 +54,15 @@ struct EnricherRequestParams {
 /// `enabled` cascades request → NS → global; model / score_threshold /
 /// prompt_template_id cascade NS → global only (no request layer, topic 2.5).
 ///
-/// Standalone (D3): reading the NS blob from the NS-router cache + the request
-/// `enrich` arg from the SQL/HTTP layer is cross-Feature wiring → D3.5; this
-/// resolves whatever it is handed (the global EnricherConfig + an NS blob +
-/// request params), producing the EnricherConfig the factory / LlmEnricher use.
+/// Standalone (D3): this resolves whatever it is handed (the global EnricherConfig +
+/// an NS blob + request params), producing the EnricherConfig the factory /
+/// LlmEnricher use. Phasing of the live wiring that hands it those inputs:
+///   - the request `enrich` arg from the SQL/HTTP layer is the Phase-1 per-request
+///     override (§2.9 three-layer priority); wiring it in is D3.5 cross-Feature work.
+///   - reading the NS blob from the NS-router cache (namespaces.enricher_config) is
+///     PHASE-2 (F03 §2.7.bis Plan B: Phase-1 enricher connection is global via the
+///     config.yaml enricher_llm role; per-NS api_key/model/budget is Phase 2). The
+///     resolver is the Phase-2-ready pre-build — NOT a D3.5 wiring gap.
 class EnricherConfigResolver {
 public:
     explicit EnricherConfigResolver(const EnricherConfig& global) : global_(global) {}
