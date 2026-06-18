@@ -85,7 +85,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
                               cortrix::resource::INamespacePool& pool,
                               cortrix::catalog::INSRouter& ins_router,
                               SPCManager& spc_mgr,
-                              ApiKeyAuth& /*auth*/) {
+                              ApiKeyAuth& auth) {
 
     ConnectorEnsureRegistry(state, pool, ins_router, spc_mgr);
     DirWatcherRegistry& reg = *state.registry;
@@ -403,7 +403,11 @@ void RegisterConnectorRoutes(httplib::Server& server,
     // ----------------------------------------------------------------
 
     // GET /api/v1/browse?path=<dir>
-    server.Get("/api/v1/browse", NoAuth(
+    // ADMIN-gated: this lists arbitrary server filesystem directories (the watch_dir
+    // picker), so an unauthenticated caller could enumerate the host fs (info leak).
+    // Listing the server fs is an admin-level operation; in the no-auth CE deployment
+    // mode WithAuth grants admin, so the directory-picker UI flow is unaffected.
+    server.Get("/api/v1/browse", WithAuth(auth, kPermAdmin,
         [](const httplib::Request& req, httplib::Response& res,
            const RequestContext& rctx) {
             namespace fs = std::filesystem;

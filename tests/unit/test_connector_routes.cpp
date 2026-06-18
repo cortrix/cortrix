@@ -95,7 +95,12 @@ protected:
             .WillByDefault(Return(Status::Ok()));
 
         spc_ = std::make_unique<StubSPC>();
-        auth_ = std::make_unique<ApiKeyAuth>();  // no keys loaded — routes are NoAuth
+        // No-auth CE deployment mode: auth disabled → WithAuth(auth, kPermAdmin, ...)
+        // grants admin and passes through (the /browse directory picker is admin-gated
+        // now, but stays usable without credentials in this mode). With auth ENABLED
+        // (production), /browse requires an admin key — the security gate this models.
+        auth_ = std::make_unique<ApiKeyAuth>();
+        auth_->set_enabled(false);
 
         port_ = 18700 + (getpid() % 400);
         server_ = std::make_unique<httplib::Server>();
