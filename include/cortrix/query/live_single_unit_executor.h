@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 #include <string>
 
 #include "cortrix/query/i_scatter_executor.h"
@@ -14,6 +15,18 @@ class OnnxEmbedder;
 }  // namespace cortrix
 
 namespace cortrix::query {
+
+/// Parse a block's raw metadata_json and flatten its top-level fields into a
+/// RankedChunk.metadata map (string→string). Each top-level key becomes a map
+/// entry: string values are kept verbatim; non-string values are serialized with
+/// json::dump() so the original scalar/array survives as text. This makes the
+/// document's identity fields (e.g. beir_corpus_id) addressable as TOP-LEVEL
+/// result-metadata keys — the cross-NS runner matches qrels on those keys, so
+/// stuffing the whole blob under a single "metadata_json" key hid the identity
+/// (the FiQA result-identity bug). Invalid / non-object JSON is ignored (no throw,
+/// existing entries untouched), mirroring post_filter.cpp's try-catch tolerance.
+void FlattenMetadataIntoMap(const std::string& metadata_json,
+                            std::map<std::string, std::string>& out);
 
 /// LiveSingleUnitExecutor — the D3.5 IScatterExecutor that runs F04's per-NS
 /// pipeline against the live MVP retrieval stack (Q2 wiring).

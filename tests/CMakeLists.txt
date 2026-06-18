@@ -253,6 +253,7 @@ add_executable(cortrix_unit_tests
     scatter/test_content_hash.cpp
     scatter/test_authorize_namespaces.cpp
     scatter/test_single_unit_executor.cpp
+    scatter/test_live_metadata_flatten.cpp
     scatter/test_scatter_gather.cpp
     scatter/test_cross_ns_response.cpp
     # --- F04 Cross-NS Query (Wave 3 + Wave 4) ---

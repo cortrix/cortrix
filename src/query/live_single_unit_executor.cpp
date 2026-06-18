@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "cortrix/common/types.h"  // json alias (metadata_json flatten)
 #include "cortrix/doc_summary/discover_handler.h"  // RecallDocSummaryHnsw (granularity=doc/both)
 #include "cortrix/doc_summary/doc_summary_types.h"  // DocDiscoveryHit
 #include "cortrix/query/bm25_searcher.h"
@@ -37,6 +38,25 @@ namespace {
 constexpr int64_t kRouteTimeoutUs = 5'000'000;  // 5s
 
 }  // namespace
+
+void FlattenMetadataIntoMap(const std::string& metadata_json,
+                            std::map<std::string, std::string>& out) {
+    if (metadata_json.empty()) return;
+    try {
+        json parsed = json::parse(metadata_json);
+        if (!parsed.is_object()) return;  // only object-shaped metadata flattens
+        for (auto it = parsed.begin(); it != parsed.end(); ++it) {
+            // Keep string values verbatim (so beir_corpus_id stays its raw id, not a
+            // quoted "\"id\""); serialize any non-string scalar/array/object via dump()
+            // so it survives as text in the string→string result map.
+            out[it.key()] = it.value().is_string()
+                                ? it.value().get<std::string>()
+                                : it.value().dump();
+        }
+    } catch (...) {
+        // Invalid metadata JSON: ignore, leave the map as-is (post_filter.cpp parity).
+    }
+}
 
 LiveSingleUnitExecutor::LiveSingleUnitExecutor(cortrix::resource::INamespacePool& pool,
                                                cortrix::OnnxEmbedder& embedder,
@@ -217,9 +237,10 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             // parent_id to its default until that F34 reverse-lookup lands (D3.5+).
             rc.score = fh.rrf_score;        // pre-rerank (multi-path RRF) score
             rc.rerank_score = fh.rrf_score;  // overwritten below when reranking
-            if (!row.metadata_json.empty()) {
-                rc.metadata["metadata_json"] = row.metadata_json;
-            }
+            // Flatten the block's metadata_json into TOP-LEVEL result-metadata keys
+            // (e.g. beir_corpus_id), not a single opaque "metadata_json" blob — the
+            // cross-NS runner matches qrels on those top-level keys (FiQA identity).
+            FlattenMetadataIntoMap(row.metadata_json, rc.metadata);
             ranked.push_back(std::move(rc));
         }
 
