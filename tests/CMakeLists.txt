@@ -360,6 +360,7 @@ add_executable(cortrix_unit_tests
     unit/test_siphash.cpp
     unit/test_id_hash.cpp
     unit/test_store_persistence_r7.cpp
+    unit/test_fault_sweep_r9.cpp
 )
 
 target_link_libraries(cortrix_unit_tests PRIVATE
