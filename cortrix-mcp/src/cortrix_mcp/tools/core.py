@@ -133,18 +133,19 @@ def register(mcp) -> None:
     ) -> dict:
         """Save a conversation turn (user query + assistant response) to memory.
 
-        D3.5 deferred: backed by POST /interactions, which is not yet present in
-        api/paths/*.yaml; designed per feature section 4.5.quater. Standalone uses a
-        mocked HTTP response.
+        Backed by POST /memory/sessions/{session_id}/interactions (memory_routes.cpp): the
+        session id is carried in the URL path; the body holds namespace + query_text +
+        response_text (all required server-side). Append is gated by MEM05 session ownership.
         """
         ns = namespace or CORTRIX_NAMESPACE
         body = {
             "namespace": ns,
-            "session_id": session_id,
             "query_text": query_text,
             "response_text": response_text,
         }
-        return request("POST", "/interactions", json_body=body, timeout=10.0)
+        return request(
+            "POST", f"/memory/sessions/{session_id}/interactions", json_body=body, timeout=10.0
+        )
 
     @mcp.tool()
     def cortrix_list_interactions(

@@ -4,12 +4,11 @@ These run under an independent admin scope and are NOT counted in the 29 main to
 Bearer claim role=admin is required (V1.0 fallback: CORTRIX_MCP_ADMIN=true env var);
 otherwise CX_ERR_MCP_ADMIN_REQUIRED (403) is raised.
 
-  A1 cortrix_admin_db_credential_register -> POST /admin/db/credential  (F16a D1) [D3.5]
-  A2 cortrix_admin_db_import_run          -> POST /admin/db/import      (F16a D2) [D3.5]
+  A1 cortrix_admin_db_credential_register -> POST /admin/db-connections  (F16a D1)
+  A2 cortrix_admin_db_import_run          -> POST /import/database        (F16a D2)
 
-[D3.5] = endpoint not yet present in api/paths/*.yaml (admin.yaml has users/tenants/auth/
-config/bootstrap/audit_log only); implemented per the F16a contract and exercised with
-mocked HTTP responses during standalone development.
+Both routes are live in the backend (import_routes.cpp) under kPermAdmin; the register
+route additionally sits behind the /api/v1/admin/* AdminGuard prefix.
 """
 
 from __future__ import annotations
@@ -22,28 +21,28 @@ from ..transport import request, require_admin
 def register(mcp) -> None:
     @mcp.tool()
     def cortrix_admin_db_credential_register(
-        connection_ref: str,
+        name: str,
         dsn: str,
-        description: str = "",
+        expire_days: Optional[int] = None,
     ) -> dict:
         """Register a database connection credential (F16a D1; admin only).
 
-        Stores the secret in the encrypted secret store with a 30-day expiry and returns a
-        connection_ref handle for later imports (the plaintext secret is never echoed back).
+        Stores the secret in the encrypted secret store and returns a ref_id handle for
+        later imports (the plaintext secret is never echoed back).
 
         Args:
-            connection_ref: logical handle to register the credential under.
+            name: logical name to register the credential under (returned as ref_id's label).
             dsn: database connection string / secret (write-only, stored encrypted).
-            description: optional human-readable description.
+            expire_days: optional credential expiry in days (backend default applies if omitted).
 
+        Maps to POST /admin/db-connections (import_routes.cpp); the backend requires name + dsn.
         Raises CX_ERR_MCP_ADMIN_REQUIRED (403) when the caller lacks the admin role.
-        D3.5 deferred: POST /admin/db/credential not yet in api/paths/*.yaml — standalone mock.
         """
         require_admin()
-        body: dict = {"connection_ref": connection_ref, "dsn": dsn}
-        if description:
-            body["description"] = description
-        return request("POST", "/admin/db/credential", json_body=body, timeout=15.0)
+        body: dict = {"name": name, "dsn": dsn}
+        if expire_days is not None:
+            body["expire_days"] = expire_days
+        return request("POST", "/admin/db-connections", json_body=body, timeout=15.0)
 
     @mcp.tool()
     def cortrix_admin_db_import_run(
@@ -66,8 +65,9 @@ def register(mcp) -> None:
             filter: optional row filter (table mode).
             sql: raw SQL query (SQL mode).
 
+        Exactly one of {table, sql} must be provided (the backend rejects neither/both with
+        CX_ERR_F16A_INVALID_SQL). Maps to POST /import/database (import_routes.cpp).
         Raises CX_ERR_MCP_ADMIN_REQUIRED (403) when the caller lacks the admin role.
-        D3.5 deferred: POST /admin/db/import not yet in api/paths/*.yaml — standalone mock.
         """
         require_admin()
         body: dict = {"connection_ref": connection_ref, "namespace": namespace}
@@ -77,4 +77,4 @@ def register(mcp) -> None:
             body["table"] = table
         if filter is not None:
             body["filter"] = filter
-        return request("POST", "/admin/db/import", json_body=body, timeout=60.0)
+        return request("POST", "/import/database", json_body=body, timeout=60.0)

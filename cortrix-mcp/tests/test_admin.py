@@ -29,7 +29,7 @@ def admin_off(monkeypatch):
 @pytest.mark.parametrize("name", ADMIN_TOOLS)
 def test_admin_tool_denied_without_role(name, admin_off, mock_request):
     kwargs = (
-        {"connection_ref": "pg1", "dsn": "postgres://x"}
+        {"name": "pg1", "dsn": "postgres://x"}
         if name == "cortrix_admin_db_credential_register"
         else {"connection_ref": "pg1", "namespace": "ns", "table": "t"}
     )
@@ -44,17 +44,21 @@ def test_admin_tool_denied_without_role(name, admin_off, mock_request):
 
 
 def test_credential_register_success(admin_on, mock_request):
-    mock_request.set(json_body={"connection_ref": "pg1", "expires_in_days": 30})
+    mock_request.set(json_body={"ref_id": "ref-1", "name": "pg1"})
     out = get_tool_fn("cortrix_admin_db_credential_register")(
-        connection_ref="pg1", dsn="postgres://u:p@h/db", description="prod"
+        name="pg1", dsn="postgres://u:p@h/db", expire_days=30
     )
     assert out["meta"]["category"] == "success"
-    assert out["data"]["connection_ref"] == "pg1"
+    assert out["data"]["name"] == "pg1"
     args, kwargs = mock_request.last_call
     assert args[0] == "POST"
-    assert args[1].endswith("/api/v1/admin/db/credential")
+    # Backend route is /api/v1/admin/db-connections; body is {name, dsn, expire_days?}.
+    assert args[1].endswith("/api/v1/admin/db-connections")
+    assert kwargs["json"]["name"] == "pg1"
     assert kwargs["json"]["dsn"] == "postgres://u:p@h/db"
-    assert kwargs["json"]["description"] == "prod"
+    assert kwargs["json"]["expire_days"] == 30
+    assert "connection_ref" not in kwargs["json"]
+    assert "description" not in kwargs["json"]
 
 
 def test_db_import_run_table_mode(admin_on, mock_request):
@@ -64,7 +68,7 @@ def test_db_import_run_table_mode(admin_on, mock_request):
     )
     assert out["meta"]["category"] == "success"
     body = mock_request.last_call.kwargs["json"]
-    assert args_endswith(mock_request, "/api/v1/admin/db/import")
+    assert args_endswith(mock_request, "/api/v1/import/database")
     assert body["table"] == "users"
     assert body["filter"] == "active=true"
     assert "sql" not in body
