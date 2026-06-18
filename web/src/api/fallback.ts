@@ -32,10 +32,22 @@ const ENV: Record<string, unknown> | undefined =
   typeof import.meta !== 'undefined' ? (import.meta as { env?: Record<string, unknown> }).env : undefined;
 
 /**
- * Whether the in-memory mock is allowed to serve as a fallback. OFF in a
- * production build so the mock can never mask a live backend error.
+ * Whether the in-memory mock is allowed to serve as a fallback.
+ *
+ * MUST be false in a production build so the mock can never mask a live backend
+ * error. It is true ONLY when:
+ *   - VITE_USE_MOCK is explicitly '1' / 'true' (the Playwright webServer, or an
+ *     intentional standalone demo build), or
+ *   - this is the Vitest run (MODE === 'test'), or
+ *   - this is a dev server (DEV === true).
+ * A production `vite build` sets PROD=true / DEV=false / MODE='production' and
+ * leaves VITE_USE_MOCK unset → all three disjuncts are false → USE_MOCK = false.
  */
-export const USE_MOCK: boolean = ENV?.VITE_USE_MOCK === '1' || ENV?.VITE_USE_MOCK === 'true' || ENV?.DEV === true;
+export const USE_MOCK: boolean =
+  ENV?.VITE_USE_MOCK === '1' ||
+  ENV?.VITE_USE_MOCK === 'true' ||
+  ENV?.MODE === 'test' ||
+  ENV?.DEV === true;
 
 /** Extract an HTTP status from either an ApiError or a `{status}`-tagged Error. */
 function statusOf(e: unknown): number | undefined {
