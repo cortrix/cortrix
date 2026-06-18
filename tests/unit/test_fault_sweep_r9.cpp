@@ -221,6 +221,51 @@ TEST_F(StoreFaultSweepTest, DocSoftDeletePwriteFaultSweep) {
         });
 }
 
+// doc_restore: clears the soft-delete stamp (UPDATE). Seed = create + soft_delete.
+TEST_F(StoreFaultSweepTest, DocRestorePwriteFaultSweep) {
+    SweepStoreWrite(this, "doc_restore",
+        [](CortrixStoreSqlite& s, int k) {
+            CortrixDoc d = MakeDoc("rdoc_" + std::to_string(k));
+            ASSERT_EQ(s.doc_create(d), 0);
+            ASSERT_EQ(s.doc_soft_delete(d.doc_id, 1700000000000LL), 0);
+        },
+        [](CortrixStoreSqlite& s, int k) {
+            return s.doc_restore("rdoc_" + std::to_string(k));
+        });
+}
+
+// doc_delete_by_source_prefix: a prefix-scoped DELETE (its own prepare/step path).
+TEST_F(StoreFaultSweepTest, DocDeleteBySourcePrefixPwriteFaultSweep) {
+    SweepStoreWrite(this, "doc_delete_by_source_prefix",
+        [](CortrixStoreSqlite& s, int k) {
+            CortrixDoc d = MakeDoc("pdoc_" + std::to_string(k));
+            d.source_path = "/prefix/" + std::to_string(k) + "/f.txt";
+            ASSERT_EQ(s.doc_create(d), 0);
+        },
+        [](CortrixStoreSqlite& s, int k) {
+            int64_t deleted = 0;
+            return s.doc_delete_by_source_prefix("/prefix/" + std::to_string(k) + "/", &deleted);
+        });
+}
+
+// block_delete_by_doc: deletes a doc's blocks (DELETE prepare/step). Seed a block.
+TEST_F(StoreFaultSweepTest, BlockDeleteByDocPwriteFaultSweep) {
+    SweepStoreWrite(this, "block_delete_by_doc",
+        [](CortrixStoreSqlite& s, int k) {
+            CortrixDoc d = MakeDoc("kdoc_" + std::to_string(k));
+            ASSERT_EQ(s.doc_create(d), 0);
+            CortrixBlock b;
+            b.doc_id = d.doc_id;
+            b.block_type = 1;
+            b.content_text = "body";
+            b.data = {0x09};
+            ASSERT_EQ(s.block_insert(b), 0);
+        },
+        [](CortrixStoreSqlite& s, int k) {
+            return s.block_delete_by_doc("kdoc_" + std::to_string(k));
+        });
+}
+
 // Sweep pwrite over the doc_delete TRANSACTION path (BEGIN → DELETE blocks → DELETE
 // doc → COMMIT, each with a ROLLBACK-on-failure arm). Per k: open a clean store, seed
 // a doc + a block fault-free, then arm pwrite and delete — a write fault inside the
