@@ -51,6 +51,17 @@ describe('useAppStore', () => {
     useAppStore.getState().setCurrentNamespace('default');
   });
 
+  // Persistence (R9 bug): the selection must survive a reload/remount, so
+  // setCurrentNamespace mirrors it to localStorage (same hand-rolled pattern as
+  // the theme toggle). initialNamespace() reads this key on the next boot.
+  it('persists the current namespace to localStorage', () => {
+    useAppStore.getState().setCurrentNamespace('finance');
+    expect(localStorage.getItem('cortrix-namespace')).toBe('finance');
+    // Reset so neither the store nor the persisted key leaks into later tests.
+    useAppStore.getState().setCurrentNamespace('default');
+    expect(localStorage.getItem('cortrix-namespace')).toBe('default');
+  });
+
   // Page navigation moved to react-router (R3/S5); the store no longer tracks
   // `activePage`. The remaining store-owned UI concern is the theme toggle.
   it('toggles theme', () => {

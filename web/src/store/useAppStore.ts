@@ -16,6 +16,18 @@ interface HealthResponse {
 // the URL (react-router-dom, see src/routes.tsx). The store no longer tracks
 // the active page — Sidebar/Header use <NavLink> / useNavigate instead.
 
+// currentNamespace is persisted to localStorage (same hand-rolled pattern as the
+// theme toggle below — this store deliberately uses no zustand persist
+// middleware). Without it a full reload / remount reverted the selection to
+// 'default', losing the user's working namespace across chat / search / upload.
+const NAMESPACE_KEY = 'cortrix-namespace';
+
+function initialNamespace(): string {
+  if (typeof window === 'undefined') return 'default';
+  const stored = localStorage.getItem(NAMESPACE_KEY);
+  return stored && stored.trim() ? stored : 'default';
+}
+
 interface AppState {
   currentNamespace: string;
   setCurrentNamespace: (ns: string) => void;
@@ -34,8 +46,11 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, _get) => ({
-  currentNamespace: 'default',
-  setCurrentNamespace: (ns) => set({ currentNamespace: ns }),
+  currentNamespace: initialNamespace(),
+  setCurrentNamespace: (ns) => {
+    if (typeof window !== 'undefined') localStorage.setItem(NAMESPACE_KEY, ns);
+    set({ currentNamespace: ns });
+  },
 
   namespaces: [],
   loadNamespaces: async () => {
