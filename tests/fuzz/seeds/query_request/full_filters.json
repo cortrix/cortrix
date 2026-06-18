@@ -1,0 +1,1 @@
+{"query":"x","namespace":"ns","top_k":10,"timeout_ms":5000,"filters":{"block_type":["FILE","DATABASE"],"exclude_types":["SCAN"],"source_path":"/c/*","created_after":"2025-01-01","doc_id":"d1"}}

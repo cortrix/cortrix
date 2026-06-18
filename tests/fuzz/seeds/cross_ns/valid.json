@@ -1,0 +1,1 @@
+{"query":"hi","namespaces":["a","b"],"top_k":5,"rerank":true,"filter":{"k":"v"}}

@@ -68,3 +68,9 @@ deploy/*.local.yml
 # project files
 CLAUDE.md
 scripts/ocr_venv/
+# libFuzzer scratch (regenerable; seeds live in tests/fuzz/seeds/)
+/build-fuzz/
+tests/fuzz/corpus/
+tests/fuzz/crashes/*.dSYM/
+# fuzzer-generated 40-hex corpus blobs (never commit; named seeds in seeds/ are tracked)
+tests/fuzz/seeds/**/[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]

@@ -1,0 +1,1 @@
+{"query":"x","namespace":"ns","explain":true,"route":"complex","granularity":"both","search_config":{"enable_vector":false,"enable_bm25":true,"enable_sql":false}}
