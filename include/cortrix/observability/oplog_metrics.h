@@ -40,6 +40,12 @@ public:
     static OplogMetrics& Instance();
 
     // --- cortrix_oplog_writes_total (Counter, labels: action, resource_type) ---
+    /// `action` is bounded-by-convention: it is the F18a §3.1 closed action
+    /// vocabulary (CE domain = 20 values, `{resource}_{verb}` naming), NOT free user
+    /// input — so it is low-cardinality and safe as a label (OBSERVABILITY_SPEC §3.2).
+    /// `resource_type` is one of the 6 §9.1 site categories. A caller passing an
+    /// off-vocabulary action would be a caller bug, not a design defect (mirrors the
+    /// F13 agent_trace bounded-label posture).
     void RecordWrite(const std::string& action, const std::string& resource_type);
     uint64_t WriteCount(const std::string& action,
                         const std::string& resource_type) const;
