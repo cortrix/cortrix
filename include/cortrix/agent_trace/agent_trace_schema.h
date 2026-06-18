@@ -19,7 +19,9 @@ constexpr int kAgentTraceSchemaVersion = 1;
 /// agent_trace_extension table (input_tokens / output_tokens / query_pattern_id)
 /// is a SEPARATE downstream migration keyed by agent_trace.id — it
 /// does NOT alter this table (GEN-OpenCore-Boundary). cortrix/ has no
-/// conditional compilation and does not know that table exists.
+/// conditional compilation and does not know that table exists. This boundary is
+/// enforced by tests/unit/test_open_core_boundary.cpp (scans the CE tree, fails on
+/// any enterprise macro / namespace / interface / #include / *_extension DDL).
 ///
 /// SQLite dialect note (cortrix_global.db is SQLite WAL): the §4.1 spec spells
 /// session_id/trace_id/agent_id as VARCHAR(128); SQLite is dynamically typed and

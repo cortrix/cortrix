@@ -368,6 +368,8 @@ add_executable(cortrix_unit_tests
     unit/test_rag_fusion_property_r9.cpp
     # --- R9 robustness: metadata deep-nesting DoS guard (json_depth.h) ---
     unit/test_json_depth_guard.cpp
+    # --- Open-Core boundary guard (ARCHITECTURE Sec.1.0.10) ---
+    unit/test_open_core_boundary.cpp
 )
 
 target_link_libraries(cortrix_unit_tests PRIVATE
@@ -378,6 +380,12 @@ target_link_libraries(cortrix_unit_tests PRIVATE
     rapidcheck
     rapidcheck_gtest
 )
+
+# Open-Core boundary guard (test_open_core_boundary.cpp) scans the CE src/+include/
+# trees at run time. PROJECT_SOURCE_DIR is the CE repo root and stays correct even
+# when Ent builds CE via add_subdirectory (each project() sets its own).
+target_compile_definitions(cortrix_unit_tests PRIVATE
+    CORTRIX_CE_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 
 # F23 §4.6 syscall fault-injection seam: MUST be a SHARED library — dyld
 # only applies __DATA,__interpose sections found in dylibs, never in the
