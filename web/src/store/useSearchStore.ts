@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { SearchResult, QueryMeta, AgentError } from '../types/api';
 import { query } from '../api/query';
 import { mockApi } from '../api/mock';
+import { USE_MOCK } from '../api/fallback';
 import { parseAgentError } from '../api/errors';
 import { useAppStore } from './useAppStore';
 
@@ -51,10 +52,11 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       });
       set({ results: res.results, meta: res.meta, error: null });
     } catch (e) {
-      // Standalone (D3): a network failure (TypeError) falls back to the mock
-      // so search demos work offline; a real backend error is surfaced inline
-      // as a structured GEN-Agent error (§ 16.4 inline placement).
-      if (e instanceof TypeError) {
+      // Standalone (D3): a network failure (TypeError) falls back to the mock so
+      // search demos work offline; a real backend error is surfaced inline as a
+      // structured GEN-Agent error (§ 16.4). The mock is build-time gated
+      // (./fallback.ts) so it never runs in a production build.
+      if (USE_MOCK && e instanceof TypeError) {
         try {
           const res = await mockApi.search(ns, q);
           set({ results: res.results, meta: res.meta, error: null });

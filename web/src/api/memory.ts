@@ -1,5 +1,6 @@
 import { get, post, patch, del } from './client';
 import { mockApi } from './mock';
+import { fallbackToMock } from './fallback';
 import type {
   MemoryListFilter,
   MemoryListResponse,
@@ -16,10 +17,10 @@ import type {
 //   PATCH  /api/v1/memory/{id}             edit (server sets extraction_method=user_edit)
 //   DELETE /api/v1/memory/{id}             invalidate (soft delete — NOT a hard delete)
 //
-// Standalone discipline (D3): each call targets the frozen contract endpoint but
-// falls back to the in-memory mock when the backend is unreachable, so the UI is
-// fully exercisable without a live server. Cross-feature wiring (content
-// materialization, real auth) is deferred to D3.5.
+// Mock fallback is build-time gated (./fallback.ts): production surfaces every
+// error; only a standalone build falls back to the in-memory mock (and a 4xx
+// still surfaces). Cross-feature wiring (content materialization, real auth) is
+// deferred to D3.5.
 
 const BASE = '/api/v1/memory';
 
@@ -37,16 +38,16 @@ function buildQuery(filter: MemoryListFilter): string {
 export async function listMemory(filter: MemoryListFilter): Promise<MemoryListResponse> {
   try {
     return await get<MemoryListResponse>(`${BASE}?${buildQuery(filter)}`);
-  } catch {
-    return mockApi.listMemory(filter);
+  } catch (e) {
+    return fallbackToMock(e, () => mockApi.listMemory(filter));
   }
 }
 
 export async function createMemory(req: MemoryCreateRequest): Promise<MemoryCreateResponse> {
   try {
     return await post<MemoryCreateResponse>(BASE, req);
-  } catch {
-    return mockApi.createMemory(req);
+  } catch (e) {
+    return fallbackToMock(e, () => mockApi.createMemory(req));
   }
 }
 
@@ -56,8 +57,8 @@ export async function editMemory(
 ): Promise<MemoryEditResponse> {
   try {
     return await patch<MemoryEditResponse>(`${BASE}/${encodeURIComponent(id)}`, req);
-  } catch {
-    return mockApi.editMemory(id, req);
+  } catch (e) {
+    return fallbackToMock(e, () => mockApi.editMemory(id, req));
   }
 }
 
@@ -65,7 +66,7 @@ export async function editMemory(
 export async function invalidateMemory(id: string): Promise<MemoryInvalidateResponse> {
   try {
     return await del<MemoryInvalidateResponse>(`${BASE}/${encodeURIComponent(id)}`);
-  } catch {
-    return mockApi.invalidateMemory(id);
+  } catch (e) {
+    return fallbackToMock(e, () => mockApi.invalidateMemory(id));
   }
 }

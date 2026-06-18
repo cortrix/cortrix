@@ -7,9 +7,11 @@ import { defineConfig, devices } from '@playwright/test';
 // subset via `--project=<name>`; locally `npx playwright test` runs Chromium.
 //
 // Standalone (D3): `webServer` boots `vite dev` on :5173 so the spec runs with no
-// backend — every api module falls back to its in-memory mock (src/api/*.ts), and
-// the mock auth session is authenticated-as-admin by default, so guarded routes
-// render directly. mcp__claude-in-chrome agent acceptance stays out of CI (§ 17.5).
+// backend. The mock fallback is build-time gated (src/api/fallback.ts) — OFF in a
+// production build — so the webServer command sets VITE_USE_MOCK=1 to force it on,
+// letting every api module fall back to its in-memory mock and the mock
+// authenticated-as-admin session render the guarded routes directly.
+// mcp__claude-in-chrome agent acceptance stays out of CI (§ 17.5).
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
@@ -32,7 +34,7 @@ export default defineConfig({
     { name: 'edge', use: { ...devices['Desktop Edge'], channel: 'msedge' } },
   ],
   webServer: {
-    command: 'npm run dev -- --port 5173',
+    command: 'VITE_USE_MOCK=1 npm run dev -- --port 5173',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

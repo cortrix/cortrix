@@ -1,5 +1,6 @@
 import { get } from './client';
 import { mockApi } from './mock';
+import { fallbackToMock } from './fallback';
 import type { OperationLogFilter, OperationLogResponse } from '../types/api';
 
 // Operation Log client (F18a CE — GET /api/v1/operations, P02a § 9-bis.2).
@@ -9,8 +10,9 @@ import type { OperationLogFilter, OperationLogResponse } from '../types/api';
 // queries (user_id != current) trigger the AdminGuard double-protection on the
 // backend (F18a § 6.1); the UI just passes the optional user_id filter.
 //
-// Standalone discipline (D3): falls back to the in-memory mock when the backend
-// is unreachable so the log table + filters are exercisable without a server.
+// Mock fallback is build-time gated (./fallback.ts): production surfaces every
+// error; only a standalone build exercises the log table + filters against the
+// in-memory mock (and a 4xx still surfaces).
 
 const BASE = '/api/v1/operations';
 
@@ -32,7 +34,7 @@ export async function listOperations(
 ): Promise<OperationLogResponse> {
   try {
     return await get<OperationLogResponse>(`${BASE}?${buildQuery(filter)}`);
-  } catch {
-    return mockApi.listOperations(filter);
+  } catch (e) {
+    return fallbackToMock(e, () => mockApi.listOperations(filter));
   }
 }

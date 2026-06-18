@@ -1,6 +1,6 @@
 import { API_BASE } from '../utils/constants';
 import { mockApi } from './mock';
-import { isClientError } from './fallback';
+import { fallbackToMock } from './fallback';
 
 // Health endpoints (P02a design § 4.2, F20-7). Two K8s-style probes:
 //   GET /api/v1/system/health/live   — process liveness (always 200 when up)
@@ -37,9 +37,10 @@ export interface ReadyResponse {
 }
 
 export async function getLive(): Promise<LiveResponse> {
-  // Standalone (D3): a 4xx is a real client error → surface (HealthPage shows
-  // "down"). A 5xx (incl. the dev proxy's down-target 500) or a network failure
-  // means the backend is unreachable → fall back to the mock. See ./fallback.ts.
+  // Production surfaces every failure (HealthPage shows "down"). Standalone falls
+  // back to the mock on a 5xx (incl. the dev proxy's down-target 500) / network
+  // failure; a 4xx still surfaces. See ./fallback.ts. The status is attached so
+  // the gate can classify it (raw fetch does not throw on a non-2xx).
   try {
     const res = await fetch(`${API_BASE}/api/v1/system/health/live`, {
       credentials: 'include',
@@ -51,16 +52,16 @@ export async function getLive(): Promise<LiveResponse> {
     }
     return await res.json();
   } catch (e) {
-    if (isClientError(e)) throw e;
-    return mockApi.getLive();
+    return fallbackToMock(e, () => mockApi.getLive());
   }
 }
 
 export async function getReady(): Promise<ReadyResponse> {
   // Read the body on both 200 (ready) and 503 (not_ready) — the component
   // breakdown lives in the body in either case, so a 503 is NOT an error and
-  // parses normally. A 4xx surfaces; any other failure (5xx with a non-JSON
-  // body, or a network failure → backend unreachable) falls back to the mock.
+  // parses normally. A 4xx surfaces; production surfaces every other failure too,
+  // while a standalone build falls back to the mock (5xx with a non-JSON body, or
+  // a network failure → backend unreachable).
   try {
     const res = await fetch(`${API_BASE}/api/v1/system/health/ready`, {
       credentials: 'include',
@@ -70,7 +71,6 @@ export async function getReady(): Promise<ReadyResponse> {
     }
     return await res.json();
   } catch (e) {
-    if (isClientError(e)) throw e;
-    return mockApi.getReady();
+    return fallbackToMock(e, () => mockApi.getReady());
   }
 }

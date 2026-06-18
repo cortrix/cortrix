@@ -1,5 +1,6 @@
 import { get, post, patch } from './client';
 import { mockApi } from './mock';
+import { fallbackToMock } from './fallback';
 import type {
   UserListFilter,
   UserListResponse,
@@ -16,8 +17,9 @@ import type {
 //   POST   /api/v1/admin/users/:id/enable   enable (disabled -> active)
 //
 // Note (P02a-9bis-3 / V6 Stage 3 A30): the 5 endpoints are a disable+enable
-// pair, NOT a hard delete — disabled users are retained. Standalone (D3): each
-// call falls back to the in-memory mock when the backend is unreachable.
+// pair, NOT a hard delete — disabled users are retained. Mock fallback is
+// build-time gated (./fallback.ts): production surfaces every error; only a
+// standalone build falls back to the in-memory mock (and a 4xx still surfaces).
 
 const BASE = '/api/v1/admin/users';
 
@@ -34,39 +36,39 @@ function buildQuery(filter: UserListFilter): string {
 export async function listUsers(filter: UserListFilter = {}): Promise<UserListResponse> {
   try {
     return await get<UserListResponse>(`${BASE}?${buildQuery(filter)}`);
-  } catch {
-    return mockApi.listUsers(filter);
+  } catch (e) {
+    return fallbackToMock(e, () => mockApi.listUsers(filter));
   }
 }
 
 export async function createUser(req: UserCreateRequest): Promise<UserMutationResponse> {
   try {
     return await post<UserMutationResponse>(BASE, req);
-  } catch {
-    return mockApi.createUser(req);
+  } catch (e) {
+    return fallbackToMock(e, () => mockApi.createUser(req));
   }
 }
 
 export async function updateUser(id: string, req: UserUpdateRequest): Promise<UserMutationResponse> {
   try {
     return await patch<UserMutationResponse>(`${BASE}/${encodeURIComponent(id)}`, req);
-  } catch {
-    return mockApi.updateUser(id, req);
+  } catch (e) {
+    return fallbackToMock(e, () => mockApi.updateUser(id, req));
   }
 }
 
 export async function disableUser(id: string): Promise<UserMutationResponse> {
   try {
     return await post<UserMutationResponse>(`${BASE}/${encodeURIComponent(id)}/disable`);
-  } catch {
-    return mockApi.setUserStatus(id, 'disabled');
+  } catch (e) {
+    return fallbackToMock(e, () => mockApi.setUserStatus(id, 'disabled'));
   }
 }
 
 export async function enableUser(id: string): Promise<UserMutationResponse> {
   try {
     return await post<UserMutationResponse>(`${BASE}/${encodeURIComponent(id)}/enable`);
-  } catch {
-    return mockApi.setUserStatus(id, 'active');
+  } catch (e) {
+    return fallbackToMock(e, () => mockApi.setUserStatus(id, 'active'));
   }
 }

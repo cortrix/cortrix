@@ -4,6 +4,7 @@ import type { SearchResult } from '../types/api';
 import { useAppStore } from './useAppStore';
 import { getCsrfToken, CSRF_HEADER } from '../utils/csrf';
 import { mockApi } from '../api/mock';
+import { USE_MOCK } from '../api/fallback';
 import { errorMessage } from '../api/errors';
 
 // F48 Cortrix Agent endpoint (P02a § 4.1, F48-rev-1): chat is served by
@@ -174,8 +175,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
         // Standalone (D3): backend unreachable (fetch throws TypeError) → stream
         // the mock SSE so the chat demo works without cortrix-server. A real
-        // HTTP error (thrown Error with a status) surfaces a message instead.
-        if (err instanceof TypeError) {
+        // HTTP error surfaces a message instead. The mock is build-time gated
+        // (./fallback.ts) so it never runs in a production build.
+        if (USE_MOCK && err instanceof TypeError) {
           let mockContent = '';
           let mockSources: SearchResult[] = [];
           const cancel = mockApi.streamChat(

@@ -1,5 +1,6 @@
 import { get } from './client';
 import { mockApi } from './mock';
+import { fallbackToMock } from './fallback';
 import type { SystemStatus } from '../types/api';
 import type { SystemFeaturesResponse } from '../types/api';
 
@@ -8,11 +9,13 @@ export async function getSystemStatus(): Promise<SystemStatus> {
 }
 
 export async function getFeatureFlags(): Promise<SystemFeaturesResponse> {
-  // Standalone (D3): fall back to the CE mock when the backend is unreachable.
+  // Mock fallback is build-time gated (./fallback.ts): production surfaces the
+  // error (the caller — useFeatureFlagsStore — then applies its own CE default);
+  // only a standalone build falls back to the CE mock here.
   try {
     return await get<SystemFeaturesResponse>('/api/v1/system/features');
-  } catch {
-    return mockApi.getFeatureFlags();
+  } catch (e) {
+    return fallbackToMock(e, () => mockApi.getFeatureFlags());
   }
 }
 
