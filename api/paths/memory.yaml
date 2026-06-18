@@ -314,19 +314,22 @@ paths:
                 reason: { type: string, default: "admin revoke" }
       responses:
         '200':
-          description: Revoke accepted
+          description: Revoke applied — the invalidation was undone and the block is active again.
           content:
             application/json:
               schema:
                 type: object
                 required: [block_id, status]
                 properties:
-                  block_id: { type: string }
-                  reason: { type: string }
-                  status: { type: string, enum: [accepted] }
+                  block_id: { type: string, description: "The restored memory block's id." }
+                  status: { type: string, enum: [active], description: "Always 'active' (revoke restores the block)." }
+                  revoked_by: { type: string, description: "The acting admin's user_id (from auth, not the request body)." }
+                  revoked_at: { type: string, description: "Revocation timestamp (ISO-8601), when recorded by the engine." }
+                  namespace: { type: string, description: "The namespace the block was revoked in." }
         '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
         '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
         '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
         '503': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
 
   /memory/{id}:
