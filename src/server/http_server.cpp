@@ -433,12 +433,39 @@ nlohmann::json CortrixHttpServer::BuildNamespaceListJson(
 
 Status CortrixHttpServer::BuildNamespaceJson(const std::string& name,
                                              nlohmann::json* out) {
+    // Emit an optional string/int as a stable key — JSON null when absent — so the
+    // Agent-facing detail schema is fixed-shape (GEN-Agent principle 7: every field
+    // always present, never silently dropped on absence).
+    auto opt_str = [](const std::optional<std::string>& v) -> nlohmann::json {
+        return v.has_value() ? nlohmann::json(*v) : nlohmann::json(nullptr);
+    };
+    auto opt_int = [](const std::optional<int64_t>& v) -> nlohmann::json {
+        return v.has_value() ? nlohmann::json(*v) : nlohmann::json(nullptr);
+    };
+
     int64_t created = 0, updated = 0, dc = 0, bc = 0;
     if (ns_router_) {
         auto got = ns_router_->GetNamespace(name);
         if (!got.ok()) return got.status();
-        created = got.value().created_at;
+        const cortrix::catalog::NSMetadata& md = got.value();
+        created = md.created_at;
+        // namespaces (F12 §4.1) has no updated_at column — mirror the create/list
+        // responses and surface created_at as updated_at (NSMetadata carries no
+        // separate mutation timestamp).
         updated = created;
+        // Full catalog identity/relationship fields (F12 §4.1 namespaces row). The
+        // prior code emitted only name/created/updated/dc/bc and dropped these 8,
+        // so View Details could not show tenant / isolation / visibility / clone
+        // lineage / status (F12 Major under-serialization).
+        (*out)["namespace_id"] = md.namespace_id;
+        (*out)["tenant_id"] = md.tenant_id;
+        (*out)["isolation_mode"] = md.isolation_mode;
+        (*out)["visibility"] = md.visibility;
+        (*out)["owner_user_id"] = opt_str(md.owner_user_id);
+        (*out)["status"] = md.status;
+        (*out)["cloned_from_ns_id"] = opt_str(md.cloned_from_ns_id);
+        (*out)["clone_type"] = opt_str(md.clone_type);
+        (*out)["cloned_at"] = opt_int(md.cloned_at);
     } else {
         NamespaceInfo info;
         Status s = ns_mgr_.Get(name, &info);

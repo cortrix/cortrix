@@ -11,6 +11,7 @@
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/namespace/namespace_manager.h"
 #include "cortrix/server/http_server.h"
+#include "cortrix/catalog/i_ns_router.h"      // INSRouter + NSMetadata/UnitDescriptor/BatchResult (detail test)
 #include "cortrix/common/version.h"
 #include "cortrix/observability/operation_logger.h"
 
@@ -442,6 +443,83 @@ TEST_F(HttpServerTest, GetNonexistentNamespace) {
     auto res = cli.Get("/api/v1/namespaces/does-not-exist");
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 404);
+}
+
+// A catalog-backed (ns_router_) detail response must serialize the FULL NSMetadata
+// (F12 §4.1) — not just name/created/updated/dc/bc. Regression for the F12 Major
+// under-serialization (Scott P0 root cause: View Details dropped tenant / isolation
+// / visibility / status / clone lineage). Optionals are stable keys (null on absent).
+namespace {
+class DetailFakeNSRouter : public cortrix::catalog::INSRouter {
+public:
+    cortrix::catalog::NSMetadata md;  // returned verbatim by GetNamespace
+    cortrix::Result<std::vector<cortrix::catalog::UnitDescriptor>> LookupUnits(
+        const std::string&) const override {
+        return std::vector<cortrix::catalog::UnitDescriptor>{};
+    }
+    cortrix::Result<cortrix::catalog::UnitDescriptor> GetActiveUnit(
+        const std::string&) const override {
+        return cortrix::catalog::UnitDescriptor{};
+    }
+    cortrix::Result<cortrix::catalog::NSMetadata> GetNamespace(
+        const std::string& ns) const override {
+        if (ns != md.name) {
+            return cortrix::Status::NotFound("CX_ERR_NS_NOT_FOUND: " + ns);
+        }
+        return md;
+    }
+    cortrix::Result<cortrix::catalog::BatchResult<std::string>> ListNamespaces(
+        const cortrix::catalog::ListNamespacesOptions&) const override {
+        cortrix::catalog::BatchResult<std::string> b;
+        b.results.push_back(md.name);
+        return b;
+    }
+    cortrix::Status CreateNamespace(const cortrix::catalog::NSMetadata&) override {
+        return cortrix::Status::Ok();
+    }
+    cortrix::Status DeleteNamespace(const std::string&) override {
+        return cortrix::Status::Ok();
+    }
+};
+}  // namespace
+
+TEST_F(HttpServerTest, GetNamespaceDetailSerializesFullNSMetadata) {
+    DetailFakeNSRouter router;
+    router.md.namespace_id = "ns_01H";
+    router.md.name = "detail-ns";
+    router.md.tenant_id = "tenant_acme";
+    router.md.isolation_mode = "isolated";
+    router.md.visibility = "private";
+    router.md.owner_user_id = "user_42";
+    router.md.status = "active";
+    router.md.created_at = 1700000000000LL;
+    // cloned_from_ns_id / clone_type / cloned_at left unset → must serialize as null.
+    server_->SetNamespaceRouter(&router);
+
+    StartServer();
+    httplib::Client cli("127.0.0.1", config_.server.port);
+    auto res = cli.Get("/api/v1/namespaces/detail-ns");
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 200);
+
+    auto body = json::parse(res->body);
+    EXPECT_EQ(body["name"], "detail-ns");
+    EXPECT_EQ(body["namespace_id"], "ns_01H");
+    EXPECT_EQ(body["tenant_id"], "tenant_acme");
+    EXPECT_EQ(body["isolation_mode"], "isolated");
+    EXPECT_EQ(body["visibility"], "private");
+    EXPECT_EQ(body["owner_user_id"], "user_42");
+    EXPECT_EQ(body["status"], "active");
+    EXPECT_EQ(body["created_at"], 1700000000000LL);
+    // No updated_at column in F12 §4.1 → mirrors created_at.
+    EXPECT_EQ(body["updated_at"], body["created_at"]);
+    // Stable-shape optionals: present-but-null when the NS was never cloned.
+    ASSERT_TRUE(body.contains("cloned_from_ns_id"));
+    EXPECT_TRUE(body["cloned_from_ns_id"].is_null());
+    ASSERT_TRUE(body.contains("clone_type"));
+    EXPECT_TRUE(body["clone_type"].is_null());
+    ASSERT_TRUE(body.contains("cloned_at"));
+    EXPECT_TRUE(body["cloned_at"].is_null());
 }
 
 TEST_F(HttpServerTest, DeleteNamespace) {
