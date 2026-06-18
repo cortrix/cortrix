@@ -1,12 +1,17 @@
 """MVP 12 tools — migrated from mcp-server/cortrix_mcp_server.py and adapted to the
 GEN-Agent two-layer 4-field schema, calling the frozen P04 endpoints.
 
-Endpoint reconciliation vs the MVP single-file server (verified against api/paths/*.yaml):
-  * health           -> GET  /system/health        (MVP used /health — stale)
+Endpoint reconciliation vs the MVP single-file server (verified against the live backend
+route table in src/server, not just api/paths/*.yaml):
+  * health           -> GET  /system/health/live    (deploy/health_routes.cpp; the backend
+                        exposes /system/health/{live,ready} + a bare /health, but no bare
+                        /system/health — the prior "/system/health" call 404'd)
   * query            -> POST /query  body {query, namespaces:[...], top_k, rerank}
                         (MVP used single `namespace` + search_config — P04 uses a namespaces array)
   * upload           -> POST /documents body {namespace, content, filename} async -> task_id
-                        (MVP used multipart /namespaces/{ns}/documents — stale)
+                        (JSON content-upload entry. The multipart POST /namespaces/{ns}/documents
+                        is a *second, equally live* entry — file uploads — not stale; both routes
+                        are served, double-track by design.)
   * list_documents   -> GET  /documents?namespace&limit&offset
   * list_namespaces  -> GET  /namespaces
   * create_namespace -> POST /namespaces
@@ -32,8 +37,8 @@ from ..transport import CORTRIX_NAMESPACE, request
 def register(mcp) -> None:
     @mcp.tool()
     def cortrix_health() -> dict:
-        """Check that the Cortrix backend is running and reachable (GET /system/health)."""
-        return request("GET", "/system/health", timeout=5.0)
+        """Check that the Cortrix backend is running and reachable (GET /system/health/live)."""
+        return request("GET", "/system/health/live", timeout=5.0)
 
     @mcp.tool()
     def cortrix_query(

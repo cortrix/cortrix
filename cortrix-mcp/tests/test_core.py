@@ -123,7 +123,8 @@ def test_health_hits_system_health(mock_request):
     get_tool_fn("cortrix_health")()
     args, _ = mock_request.last_call
     assert args[0] == "GET"
-    assert args[1].endswith("/api/v1/system/health")
+    # Backend exposes /system/health/{live,ready}; there is no bare /system/health.
+    assert args[1].endswith("/api/v1/system/health/live")
 
 
 def test_upload_posts_documents_with_namespace_in_body(mock_request):

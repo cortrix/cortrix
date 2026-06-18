@@ -54,23 +54,49 @@ def test_async_upload_includes_filename_and_metadata(mock_request):
     assert body["metadata"] == {"k": "v"}
 
 
-def test_memory_get_audit_with_memory_id_filter(mock_request):
-    mock_request.set(json_body={"entries": []})
-    get_tool_fn("cortrix_memory_get_audit")(memory_id="m1")
-    assert mock_request.last_call.kwargs["params"]["memory_id"] == "m1"
+def test_memory_get_audit_maps_to_operations(mock_request):
+    # No dedicated /memory/audit route: maps to GET /operations filtered to the memory
+    # lifecycle actions. memory_id is NOT a backend param (operation_log has no such
+    # filter) — it is applied client-side over the returned rows' resource_id.
+    mock_request.set(json_body={"operations": [
+        {"op_id": "o1", "resource_id": "m1", "action": "memory_invalidate"},
+        {"op_id": "o2", "resource_id": "m2", "action": "memory_extract"},
+    ]})
+    out = get_tool_fn("cortrix_memory_get_audit")(memory_id="m1")
+    args, kwargs = mock_request.last_call
+    assert args[0] == "GET"
+    assert args[1].endswith("/api/v1/operations")
+    assert kwargs["params"]["action_in"] == "memory_extract,memory_invalidate,memory_revoke"
+    assert "memory_id" not in kwargs["params"]
+    # Client-side resource_id filter keeps only the requested memory's row.
+    assert out["data"] == [{"op_id": "o1", "resource_id": "m1", "action": "memory_invalidate"}]
+
+
+def test_memory_get_audit_without_memory_id_returns_all(mock_request):
+    mock_request.set(json_body={"operations": [{"op_id": "o1", "resource_id": "m1"}]})
+    out = get_tool_fn("cortrix_memory_get_audit")()
+    assert out["data"] == [{"op_id": "o1", "resource_id": "m1"}]
 
 
 def test_list_operations_passes_all_filters(mock_request):
+    # Param names mirror the backend operations route (operations_routes.cpp):
+    # namespace_id / from_timestamp / to_timestamp (Unix ms) / offset / action_in.
     mock_request.set(json_body={"operations": []})
     get_tool_fn("cortrix_list_operations")(
         user_id="u1", namespace="ns", action="memory_create",
-        start_time="2026-01-01T00:00:00Z", end_time="2026-02-01T00:00:00Z",
-        limit=500, cursor="abc",
+        action_in=["memory_invalidate", "memory_revoke"],
+        start_time=1735689600000, end_time=1738368000000,
+        limit=500, offset=20, sort_order="ASC",
     )
     params = mock_request.last_call.kwargs["params"]
     assert params["user_id"] == "u1"
+    assert params["namespace_id"] == "ns"
     assert params["action"] == "memory_create"
-    assert params["cursor"] == "abc"
+    assert params["action_in"] == "memory_invalidate,memory_revoke"
+    assert params["from_timestamp"] == 1735689600000
+    assert params["to_timestamp"] == 1738368000000
+    assert params["offset"] == 20
+    assert params["sort_order"] == "ASC"
     assert params["limit"] == 200  # clamped to max 200
 
 
