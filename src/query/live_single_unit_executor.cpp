@@ -13,7 +13,6 @@
 #include "cortrix/doc_summary/doc_summary_types.h"  // DocDiscoveryHit
 #include "cortrix/query/bm25_searcher.h"
 #include "cortrix/query/cross_ns_error.h"
-#include "cortrix/query/scored_block.h"
 #include "cortrix/query/vector_searcher.h"
 #include "cortrix/reranker/score_fusion.h"
 #include "cortrix/resource/namespace_facade.h"
