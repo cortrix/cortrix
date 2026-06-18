@@ -39,6 +39,10 @@
 #include "cortrix/memory/memory_store.h"
 #include "cortrix/memory/memory_session.h"
 #include "cortrix/memory/interaction_log.h"
+#include "cortrix/memory/memory_block_adapter.h"
+#include "cortrix/memory/memory_extractor.h"  // memory::MemoryBlockRecord
+#include "cortrix/store/phnsw.h"
+#include "cortrix/spc/onnx_embedder.h"
 #include "fault_inject/fault_inject.h"
 
 namespace cortrix {
@@ -397,6 +401,87 @@ TEST_F(MemoryStoreFaultSweepTest, SessionDeleteCascadePwriteFaultSweep) {
         if (k > 512) { ADD_FAILURE() << "SessionDelete sweep did not terminate"; break; }
     }
     EXPECT_TRUE(any) << "no interposable pwrite on the SessionDelete cascade path";
+}
+
+// ---------------------------------------------------------------------------
+// memory::MemoryBlockAdapter — store-error mapping arms (CX_ERR_MEM02_STORE / MEM03_STORE)
+// ---------------------------------------------------------------------------
+// The adapter wraps the per-NS CortrixStore; its own error arms fire when the store
+// write fails. InsertMemoryBlock → store_.block_insert (block.db pwrite); the direct
+// UpdateMemoryBlock prepare/step also hits store_.db_handle()'s db. Arming "block.db"
+// drives these adapter error-mapping branches (distinct from the raw store arms).
+class BlockAdapterFaultSweepTest : public ::testing::Test {
+public:
+    void SetUp() override {
+        dir_ = fs::temp_directory_path() /
+               ("cortrix_blk_fault_" + std::to_string(::getpid()) + "_" +
+                std::to_string(rand()));
+        fs::create_directories(dir_);
+        db_path_ = (dir_ / "block.db").string();
+        embedder_ = std::make_unique<OnnxEmbedder>("stub_model.onnx", 128);
+        embedder_->Init();
+        store::PhnswConfig cfg;
+        cfg.dim = 128;
+        cfg.max_elements = 1000;
+        index_ = std::make_unique<store::PHnsw>((dir_ / "idx").string(), cfg);
+    }
+    void TearDown() override {
+        fi::Disarm();
+        std::error_code ec;
+        fs::remove_all(dir_, ec);
+    }
+
+    // Open a fresh file-backed store (recording its fds) + an adapter over it.
+    std::unique_ptr<CortrixStoreSqlite> OpenStoreRecordingFds() {
+        fi::FailOp("open", kRecordOnlySkip, 1, EIO, "block.db");
+        auto s = std::make_unique<CortrixStoreSqlite>(db_path_);
+        EXPECT_EQ(s->Open(), 0);
+        return s;
+    }
+
+    static memory::MemoryBlockRecord Block(const std::string& id) {
+        memory::MemoryBlockRecord b;
+        b.block_id = id;
+        b.ns_id = "default";
+        b.user_id = "u1";
+        b.content = "the user lives in Tokyo";
+        b.metadata_json = {{"memory_type", "fact"}, {"status", "active"},
+                           {"user_id", "u1"}};
+        return b;
+    }
+
+    fs::path dir_;
+    std::string db_path_;
+    std::unique_ptr<OnnxEmbedder> embedder_;
+    std::unique_ptr<store::PHnsw> index_;
+};
+
+// Sweep pwrite over InsertMemoryBlock: a store write fault must surface as the
+// adapter's CX_ERR_MEM02_STORE (non-ok), never a crash.
+TEST_F(BlockAdapterFaultSweepTest, InsertMemoryBlockPwriteFaultSweep) {
+    bool any = false;
+    for (int k = 0;; ++k) {
+        auto store = OpenStoreRecordingFds();
+        fi::Disarm();
+        memory::MemoryBlockAdapter adapter(*store, embedder_.get(), index_.get());
+
+        fi::FailOp("pwrite", /*skip=*/k, /*count=*/1, EIO, "block.db");
+        memory::MemoryBlockRecord b = Block("blk_" + std::to_string(k));
+        const Status st = adapter.InsertMemoryBlock(b).status();
+        const int consumed = fi::ConsumedCount();
+        const int matched = fi::MatchedCount();
+        fi::Disarm();
+        if (consumed > 0) {
+            any = true;
+            EXPECT_FALSE(st.ok()) << "k=" << k
+                                  << ": InsertMemoryBlock must map a store pwrite EIO to an error";
+        }
+        store->Close();
+        store.reset();
+        if (matched <= k && consumed == 0) break;
+        if (k > 512) { ADD_FAILURE() << "InsertMemoryBlock sweep did not terminate"; break; }
+    }
+    EXPECT_TRUE(any) << "no interposable pwrite on the InsertMemoryBlock store path";
 }
 
 }  // namespace
