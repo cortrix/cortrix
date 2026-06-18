@@ -111,6 +111,7 @@ add_executable(cortrix_unit_tests
     unit/test_operation_log_error.cpp
     unit/test_operation_log_schema.cpp
     unit/test_operation_logger.cpp
+    unit/test_oplog_metrics.cpp
     unit/test_operations_routes.cpp
     unit/test_cleanup_scheduler.cpp
     unit/test_schema_migrator.cpp

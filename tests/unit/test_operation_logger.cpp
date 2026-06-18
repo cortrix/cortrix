@@ -2,6 +2,8 @@
 
 #include <sqlite3.h>
 
+#include <chrono>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -11,6 +13,7 @@
 #include "cortrix/observability/operation_log_error.h"
 #include "cortrix/observability/operation_log_schema.h"
 #include "cortrix/observability/operation_logger_impl.h"
+#include "cortrix/observability/oplog_metrics.h"  // §11 emit-integration assertions
 
 // S2 coverage: OperationLogger CE implementation (F18a §5.2) — Log / BatchLog
 // (all-or-nothing) / Query (filters + pagination + validation) / Cleanup
@@ -526,6 +529,62 @@ TEST_F(OperationLoggerTest, BatchLogBeginFailureAborts) {
     sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
     EXPECT_EQ(RowCount(), 0);
     EXPECT_FALSE(logger_->Health().last_error.empty());
+}
+
+// ---- §11 OBS_SPEC metric emit-integration (real Log/Query/Cleanup drive the
+// process-wide OplogMetrics recorder) -------------------------------------------
+
+// A successful Log() bumps cortrix_oplog_writes_total{action, resource_type}.
+TEST_F(OperationLoggerTest, LogEmitsWritesMetric) {
+    OplogMetrics::Instance().ResetForTest();
+    logger_->Log(Entry("u1", "query", "query"));
+    logger_->Log(Entry("u1", "query", "query"));
+    logger_->Log(Entry("u1", "namespace_create", "namespace"));
+    EXPECT_EQ(OplogMetrics::Instance().WriteCount("query", "query"), 2u);
+    EXPECT_EQ(OplogMetrics::Instance().WriteCount("namespace_create", "namespace"), 1u);
+    OplogMetrics::Instance().ResetForTest();
+}
+
+// Query() observes cortrix_oplog_query_latency_seconds at the active-filter count.
+TEST_F(OperationLoggerTest, QueryEmitsLatencyMetricWithFilterDimensions) {
+    OplogMetrics::Instance().ResetForTest();
+    logger_->Log(Entry("u1", "query", "query"));
+
+    OperationLogFilter f0;  // no filters → filter_dimensions = 0
+    ASSERT_TRUE(logger_->Query(f0).ok());
+    EXPECT_EQ(OplogMetrics::Instance().QueryLatencyCount(0), 1u);
+
+    OperationLogFilter f2;  // action + resource_type → filter_dimensions = 2
+    f2.action = "query";
+    f2.resource_type = "query";
+    ASSERT_TRUE(logger_->Query(f2).ok());
+    EXPECT_EQ(OplogMetrics::Instance().QueryLatencyCount(2), 1u);
+
+    // A validation-rejected query is NOT a latency sample.
+    OperationLogFilter bad;
+    bad.limit = 9999;  // > 200 → kInvalidFilter before any DB work
+    EXPECT_FALSE(logger_->Query(bad).ok());
+    EXPECT_EQ(OplogMetrics::Instance().QueryLatencyCount(0), 1u);  // unchanged
+    OplogMetrics::Instance().ResetForTest();
+}
+
+// Cleanup() emits cleanup_deleted_total{reason=age} for the retention sweep, plus
+// the duration histogram and the size_rows gauge.
+TEST_F(OperationLoggerTest, CleanupEmitsAgeDeletedAndSizeMetrics) {
+    OplogMetrics::Instance().ResetForTest();
+    config_->operation_log_retention_days = 1;  // 1-day window
+    const int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::system_clock::now().time_since_epoch())
+                            .count();
+    logger_->Log(Entry("u1", "query", "query", 1000));  // ~1970 → age-deleted
+    logger_->Log(Entry("u1", "query", "query", now));   // fresh → kept
+
+    logger_->Cleanup();
+
+    EXPECT_EQ(OplogMetrics::Instance().CleanupDeletedCount(OplogMetrics::CleanupReason::kAge), 1u);
+    EXPECT_GE(OplogMetrics::Instance().CleanupDurationCount(), 1u);
+    EXPECT_EQ(OplogMetrics::Instance().SizeRows(), 1);  // one fresh row remains
+    OplogMetrics::Instance().ResetForTest();
 }
 
 }  // namespace

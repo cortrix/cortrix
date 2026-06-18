@@ -213,6 +213,7 @@ add_library(cortrix_core STATIC
     src/observability/operation_logger_impl.cpp
     src/observability/cleanup_scheduler.cpp
     src/observability/operation_log_emitter.cpp
+    src/observability/oplog_metrics.cpp
     src/observability/observability_module.cpp
     src/agent_trace/agent_trace_schema.cpp
     src/agent_trace/agent_trace_error.cpp

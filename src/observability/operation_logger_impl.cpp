@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "cortrix/observability/operation_log_error.h"
+#include "cortrix/observability/oplog_metrics.h"
 
 namespace cortrix::observability {
 
@@ -104,8 +105,17 @@ bool OperationLogger::InsertLocked(const OperationLogEntry& entry,
 }
 
 void OperationLogger::Log(const OperationLogEntry& entry, const TraceContext* ctx) {
-    std::lock_guard<std::mutex> lock(mu_);
-    InsertLocked(entry, ctx);
+    bool ok;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        ok = InsertLocked(entry, ctx);
+    }
+    // §11 cortrix_oplog_writes_total{action, resource_type}: count successful writes
+    // only (operation_log records successful operations — §4.1). Recorded outside mu_
+    // so the metric's own lock never nests under the DB lock.
+    if (ok) {
+        OplogMetrics::Instance().RecordWrite(entry.action, entry.resource_type);
+    }
     // No-throw: a write failure records last_error_ (surfaced via Health()) but
     // never propagates — the Engine instrumentation site must not let observability break the
     // business path (C4 exception isolation).
@@ -130,6 +140,19 @@ void OperationLogger::BatchLog(const std::vector<OperationLogEntry>& entries,
 
 Result<OperationLogQueryResult> OperationLogger::Query(
     const OperationLogFilter& filter, const TraceContext* /*ctx*/) {
+    const int64_t query_start_ms = NowMs();
+    // §11 filter_dimensions label = number of active query filter fields (the 8 §6.1
+    // query dimensions). Low-cardinality (0-8), bucketed by the metric recorder.
+    int filter_dimensions = 0;
+    if (filter.action.has_value())         ++filter_dimensions;
+    if (filter.action_in.has_value())      ++filter_dimensions;
+    if (filter.namespace_id.has_value())   ++filter_dimensions;
+    if (filter.user_id.has_value())        ++filter_dimensions;
+    if (filter.resource_type.has_value())  ++filter_dimensions;
+    if (filter.trace_id.has_value())       ++filter_dimensions;
+    if (filter.from_timestamp.has_value()) ++filter_dimensions;
+    if (filter.to_timestamp.has_value())   ++filter_dimensions;
+
     // ---- validate (§7.2 permanent input faults) ----
     if (filter.limit < 1 || filter.limit > 200) {
         return OplogStatus(OplogErrorCode::kInvalidFilter,
@@ -250,56 +273,83 @@ Result<OperationLogQueryResult> OperationLogger::Query(
 
     result.next_offset = filter.offset + static_cast<int>(result.entries.size());
     result.has_next = result.next_offset < total_count;
+    // §11 cortrix_oplog_query_latency_seconds{filter_dimensions}: observe the
+    // successful read path latency (validation-reject paths return before the DB
+    // work and are not query-latency samples).
+    OplogMetrics::Instance().ObserveQueryLatency(
+        filter_dimensions, static_cast<int>(NowMs() - query_start_ms));
     return result;
 }
 
 void OperationLogger::Cleanup() {
-    std::lock_guard<std::mutex> lock(mu_);
-    last_cleanup_deleted_ = 0;
+    const int64_t cleanup_start_ms = NowMs();
+    int64_t deleted_age = 0;
+    int64_t deleted_quota = 0;
+    bool failed = false;
+    int64_t final_rows = -1;
 
-    const int retention_days = config_ ? config_->operation_log_retention_days : 30;
-    const int64_t max_rows = config_ ? config_->operation_log_max_rows : 100000;
-    const int64_t cutoff = NowMs() - static_cast<int64_t>(retention_days) * 86400000LL;
-
-    int64_t deleted = 0;
-
-    // 1. age-based deletion (rows older than the retention window).
     {
-        sqlite3_stmt* stmt = nullptr;
-        if (sqlite3_prepare_v2(db_,
-                "DELETE FROM operation_log WHERE timestamp < ?", -1, &stmt, nullptr) == SQLITE_OK) {
-            sqlite3_bind_int64(stmt, 1, cutoff);
-            if (sqlite3_step(stmt) == SQLITE_DONE) deleted += sqlite3_changes(db_);
-            else last_error_ = sqlite3_errmsg(db_);
-            sqlite3_finalize(stmt);
-        }
-    }
+        std::lock_guard<std::mutex> lock(mu_);
+        last_cleanup_deleted_ = 0;
 
-    // 2. row-cap: delete the oldest rows beyond max_rows (0 = unbounded, Ent).
-    if (max_rows > 0) {
-        int64_t count = 0;
-        sqlite3_stmt* cnt = nullptr;
-        if (sqlite3_prepare_v2(db_, "SELECT COUNT(*) FROM operation_log", -1, &cnt, nullptr) == SQLITE_OK) {
-            if (sqlite3_step(cnt) == SQLITE_ROW) count = sqlite3_column_int64(cnt, 0);
-            sqlite3_finalize(cnt);
-        }
-        if (count > max_rows) {
-            sqlite3_stmt* del = nullptr;
+        const int retention_days = config_ ? config_->operation_log_retention_days : 30;
+        const int64_t max_rows = config_ ? config_->operation_log_max_rows : 100000;
+        const int64_t cutoff = NowMs() - static_cast<int64_t>(retention_days) * 86400000LL;
+
+        // 1. age-based deletion (rows older than the retention window). A prepare
+        //    failure (e.g. the table is absent) is SILENTLY tolerated — only a step
+        //    failure is a real error (records last_error_ + the cleanup_failed metric).
+        {
+            sqlite3_stmt* stmt = nullptr;
             if (sqlite3_prepare_v2(db_,
-                    "DELETE FROM operation_log WHERE id IN "
-                    "(SELECT id FROM operation_log ORDER BY timestamp ASC, id ASC LIMIT ?)",
-                    -1, &del, nullptr) == SQLITE_OK) {
-                sqlite3_bind_int64(del, 1, count - max_rows);
-                if (sqlite3_step(del) == SQLITE_DONE) deleted += sqlite3_changes(db_);
-                else last_error_ = sqlite3_errmsg(db_);
-                sqlite3_finalize(del);
+                    "DELETE FROM operation_log WHERE timestamp < ?", -1, &stmt, nullptr) == SQLITE_OK) {
+                sqlite3_bind_int64(stmt, 1, cutoff);
+                if (sqlite3_step(stmt) == SQLITE_DONE) deleted_age += sqlite3_changes(db_);
+                else { last_error_ = sqlite3_errmsg(db_); failed = true; }
+                sqlite3_finalize(stmt);
             }
         }
+
+        // 2. row-cap: delete the oldest rows beyond max_rows (0 = unbounded, Ent).
+        if (max_rows > 0) {
+            int64_t count = 0;
+            sqlite3_stmt* cnt = nullptr;
+            if (sqlite3_prepare_v2(db_, "SELECT COUNT(*) FROM operation_log", -1, &cnt, nullptr) == SQLITE_OK) {
+                if (sqlite3_step(cnt) == SQLITE_ROW) count = sqlite3_column_int64(cnt, 0);
+                sqlite3_finalize(cnt);
+            }
+            if (count > max_rows) {
+                sqlite3_stmt* del = nullptr;
+                if (sqlite3_prepare_v2(db_,
+                        "DELETE FROM operation_log WHERE id IN "
+                        "(SELECT id FROM operation_log ORDER BY timestamp ASC, id ASC LIMIT ?)",
+                        -1, &del, nullptr) == SQLITE_OK) {
+                    sqlite3_bind_int64(del, 1, count - max_rows);
+                    if (sqlite3_step(del) == SQLITE_DONE) deleted_quota += sqlite3_changes(db_);
+                    else { last_error_ = sqlite3_errmsg(db_); failed = true; }
+                    sqlite3_finalize(del);
+                }
+            }
+        }
+
+        last_cleanup_deleted_ = deleted_age + deleted_quota;
+        last_cleanup_timestamp_ = NowMs();
+
+        // Post-sweep row count for the size_rows gauge (reuses the open lock).
+        sqlite3_stmt* sz = nullptr;
+        if (sqlite3_prepare_v2(db_, "SELECT COUNT(*) FROM operation_log", -1, &sz, nullptr) == SQLITE_OK) {
+            if (sqlite3_step(sz) == SQLITE_ROW) final_rows = sqlite3_column_int64(sz, 0);
+            sqlite3_finalize(sz);
+        }
     }
 
-    last_cleanup_deleted_ = deleted;
-    last_cleanup_timestamp_ = NowMs();
-    // §11 metric (cortrix_oplog_cleanup_deleted_total{reason}) wires with OBS_SPEC.
+    // §11 metrics emitted outside mu_ (the metric recorder has its own locking).
+    OplogMetrics& m = OplogMetrics::Instance();
+    m.RecordCleanupDeleted(OplogMetrics::CleanupReason::kAge, deleted_age);
+    m.RecordCleanupDeleted(OplogMetrics::CleanupReason::kQuota, deleted_quota);
+    m.ObserveCleanupDuration(static_cast<int>(NowMs() - cleanup_start_ms));
+    if (failed) m.RecordCleanupFailed();
+    if (final_rows >= 0) m.SetSizeRows(final_rows);
 }
 
 OperationLogStats OperationLogger::GetStats() {
@@ -328,6 +378,9 @@ OperationLogStats OperationLogger::GetStats() {
         sqlite3_finalize(pg);
     }
     s.size_bytes = page_count * page_size;
+    // §11 cortrix_oplog_size_rows: refresh the gauge from the live row count so it
+    // stays current between cleanup sweeps (GetStats already counted the rows).
+    OplogMetrics::Instance().SetSizeRows(s.total_count);
     return s;
 }
 

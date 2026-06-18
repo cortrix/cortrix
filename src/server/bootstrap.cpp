@@ -141,6 +141,7 @@
 #include "cortrix/memory/mem04_metrics.h"
 #include "cortrix/memory/mem05_metrics.h"
 #include "cortrix/agent_trace/agent_trace_metrics.h"
+#include "cortrix/observability/oplog_metrics.h"
 
 #include <atomic>
 #include <csignal>
@@ -989,7 +990,8 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         ms.AddSource([] { return cortrix::memory::immunity::Mem04Metrics::Instance().RenderOpenMetrics(); });
         ms.AddSource([] { return cortrix::memory::Mem05Metrics::Instance().RenderOpenMetrics(); });
         ms.AddSource([] { return cortrix::agent_trace::AgentTraceMetrics::Instance().RenderOpenMetrics(); });
-        CORTRIX_LOG_INFO("metrics", "OpenMetrics endpoint on :9091/metrics (21 subsystem recorders)");
+        ms.AddSource([] { return cortrix::observability::OplogMetrics::Instance().RenderOpenMetrics(); });
+        CORTRIX_LOG_INFO("metrics", "OpenMetrics endpoint on :9091/metrics (22 subsystem recorders)");
     } else {
         CORTRIX_LOG_WARN("metrics", "OpenMetrics endpoint failed to bind :9091 (port in use?)");
     }
