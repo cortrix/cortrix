@@ -48,7 +48,9 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         query: q,
         namespaces: [ns],
         top_k: filters.topK,
-        filters: filters.blockType.length ? { block_type: filters.blockType } : undefined,
+        // F04 §2.4: the wire field is the singular `filter` (JSONB pass-through);
+        // `filters` (the store's local UI slice) stays as-is.
+        filter: filters.blockType.length ? { block_type: filters.blockType } : undefined,
       });
       set({ results: res.results, meta: res.meta, error: null });
     } catch (e) {
