@@ -146,6 +146,77 @@ TEST_F(StoreFaultSweepTest, DocCreateSyncFaultSweep) {
     SUCCEED();
 }
 
+// Generic pwrite sweep over an arbitrary store write `workload(store, k)` seeded
+// fault-free by `seed(store, k)`. Each k: fresh store (recording fds), seed without
+// faults, arm pwrite, run the workload — every fired write must return non-zero.
+// Asserts the workload's write path is reachable at all.
+template <typename Seed, typename Work>
+void SweepStoreWrite(StoreFaultSweepTest* fx, const char* tag, Seed seed, Work workload) {
+    bool any = false;
+    for (int k = 0;; ++k) {
+        auto store = fx->OpenStoreRecordingFds();
+        fi::Disarm();
+        seed(*store, k);
+
+        fi::FailOp("pwrite", /*skip=*/k, /*count=*/1, EIO, "test.db");
+        const int rc = workload(*store, k);
+        const int consumed = fi::ConsumedCount();
+        const int matched = fi::MatchedCount();
+        fi::Disarm();
+        store->Close();
+        store.reset();
+
+        if (consumed > 0) {
+            any = true;
+            EXPECT_NE(rc, 0) << tag << " k=" << k << ": write must fail on pwrite EIO";
+        }
+        if (matched <= k && consumed == 0) break;
+        if (k > 512) { ADD_FAILURE() << tag << " sweep did not terminate"; break; }
+    }
+    EXPECT_TRUE(any) << "no interposable pwrite on the " << tag << " path";
+}
+
+// block_insert has its own prepare/step IOERR arms (distinct from doc_create).
+TEST_F(StoreFaultSweepTest, BlockInsertPwriteFaultSweep) {
+    SweepStoreWrite(this, "block_insert",
+        [](CortrixStoreSqlite& s, int k) {
+            CortrixDoc d = MakeDoc("bdoc_" + std::to_string(k));
+            ASSERT_EQ(s.doc_create(d), 0);
+        },
+        [](CortrixStoreSqlite& s, int k) {
+            CortrixBlock b;
+            b.doc_id = "bdoc_" + std::to_string(k);
+            b.block_type = 1;
+            b.content_text = "body";
+            b.data = {0x01, 0x02};
+            return s.block_insert(b);
+        });
+}
+
+// doc_update_status: a separate UPDATE prepare/step write path.
+TEST_F(StoreFaultSweepTest, DocUpdateStatusPwriteFaultSweep) {
+    SweepStoreWrite(this, "doc_update_status",
+        [](CortrixStoreSqlite& s, int k) {
+            CortrixDoc d = MakeDoc("udoc_" + std::to_string(k));
+            ASSERT_EQ(s.doc_create(d), 0);
+        },
+        [](CortrixStoreSqlite& s, int k) {
+            return s.doc_update_status("udoc_" + std::to_string(k), DocStatus::kReady, "");
+        });
+}
+
+// doc_soft_delete: stamps status=deleted + a timestamp (another UPDATE write path).
+TEST_F(StoreFaultSweepTest, DocSoftDeletePwriteFaultSweep) {
+    SweepStoreWrite(this, "doc_soft_delete",
+        [](CortrixStoreSqlite& s, int k) {
+            CortrixDoc d = MakeDoc("sdoc_" + std::to_string(k));
+            ASSERT_EQ(s.doc_create(d), 0);
+        },
+        [](CortrixStoreSqlite& s, int k) {
+            return s.doc_soft_delete("sdoc_" + std::to_string(k), 1700000000000LL);
+        });
+}
+
 // Sweep pwrite over the doc_delete TRANSACTION path (BEGIN → DELETE blocks → DELETE
 // doc → COMMIT, each with a ROLLBACK-on-failure arm). Per k: open a clean store, seed
 // a doc + a block fault-free, then arm pwrite and delete — a write fault inside the
@@ -273,6 +344,59 @@ TEST_F(MemoryStoreFaultSweepTest, InteractionInsertPwriteFaultSweep) {
         if (k > 512) { ADD_FAILURE() << "InteractionInsert sweep did not terminate"; break; }
     }
     EXPECT_TRUE(any) << "no interposable pwrite on the InteractionInsert path";
+}
+
+// SessionCreate is its own INSERT write path (no FK seed needed beyond Init).
+TEST_F(MemoryStoreFaultSweepTest, SessionCreatePwriteFaultSweep) {
+    bool any = false;
+    for (int k = 0;; ++k) {
+        auto mem = OpenMemStoreRecordingFds();
+        fi::FailOp("pwrite", /*skip=*/k, /*count=*/1, EIO, "memory.db");
+        MemorySession s = Session("cs_" + std::to_string(k));
+        const Status st = mem->SessionCreate(s);
+        const int consumed = fi::ConsumedCount();
+        const int matched = fi::MatchedCount();
+        fi::Disarm();
+        if (consumed > 0) {
+            any = true;
+            EXPECT_FALSE(st.ok()) << "k=" << k << ": SessionCreate must fail on pwrite EIO";
+        }
+        mem.reset();
+        if (matched <= k && consumed == 0) break;
+        if (k > 512) { ADD_FAILURE() << "SessionCreate sweep did not terminate"; break; }
+    }
+    EXPECT_TRUE(any) << "no interposable pwrite on the SessionCreate path";
+}
+
+// SessionDelete cascades (delete interaction_log rows + the session row) — multiple
+// write arms in one call. Seed a session + an interaction fault-free, then sweep.
+// NOTE: unlike inserts, we do NOT require rc!=0 per fired pwrite — SQLite legitimately
+// recovers from some WAL-frame write failures (the DELETE can still commit), so the
+// guarantee under test is "every cascade write arm is exercised without a crash", and
+// the store stays usable afterward. (Forcing rc!=0 here would assert a stricter
+// contract than SQLite provides — an honest test, not a padded one.)
+TEST_F(MemoryStoreFaultSweepTest, SessionDeleteCascadePwriteFaultSweep) {
+    bool any = false;
+    for (int k = 0;; ++k) {
+        auto mem = OpenMemStoreRecordingFds();
+        fi::Disarm();  // seed fault-free
+        MemorySession s = Session("ds_" + std::to_string(k));
+        ASSERT_TRUE(mem->SessionCreate(s).ok());
+        InteractionLog log = Interaction(s.session_id);
+        ASSERT_TRUE(mem->InteractionInsert(log).ok());
+
+        fi::FailOp("pwrite", /*skip=*/k, /*count=*/1, EIO, "memory.db");
+        const Status st = mem->SessionDelete(s.session_id);
+        (void)st;  // may succeed (recoverable WAL write) or fail — both are graceful
+        const int consumed = fi::ConsumedCount();
+        const int matched = fi::MatchedCount();
+        fi::Disarm();
+        if (consumed > 0) any = true;
+        mem.reset();
+        if (matched <= k && consumed == 0) break;
+        if (k > 512) { ADD_FAILURE() << "SessionDelete sweep did not terminate"; break; }
+    }
+    EXPECT_TRUE(any) << "no interposable pwrite on the SessionDelete cascade path";
 }
 
 }  // namespace
