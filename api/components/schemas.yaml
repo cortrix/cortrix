@@ -161,6 +161,29 @@ components:
           type: string
           format: date-time
 
+    UploadDocumentResult:
+      type: object
+      description: >-
+        Synchronous result of the multipart POST /namespaces/{ns}/documents file upload.
+        Unlike the async POST /documents (which returns a task_id), this returns the doc_id
+        directly. status reflects the outcome (uploaded → processing queued; updating →
+        reprocessing queued; unchanged → duplicate skipped).
+      required: [doc_id, content_hash, status, source_path, message]
+      properties:
+        doc_id:
+          type: string
+        content_hash:
+          type: string
+          description: Content hash used for duplicate detection.
+        status:
+          type: string
+          description: "Processing status (e.g. queued / updating / unchanged)."
+        source_path:
+          type: string
+          description: The uploaded file's original filename.
+        message:
+          type: string
+
     # ============ Query domain (ARCH § 4.1.3 + F04 v1.0.3) ============
     QueryFilter:
       type: object
@@ -215,6 +238,37 @@ components:
           type: boolean
           default: false
           description: "F36 RAG-Fusion opt-in (also accepted as ?rag_fusion=true). Off by default until the NS-config resolver lands (D3.5)."
+        search_config:
+          $ref: '#/components/schemas/SearchConfig'
+        timeout_ms:
+          type: integer
+          minimum: 100
+          maximum: 30000
+          description: >-
+            Per-query wall-clock budget in milliseconds, distributed across the parallel
+            vector / BM25 / SQL routes (F08 CalculateRouteTimeout). Must be in [100, 30000];
+            out-of-range → 400 CX_ERR_QUERY_INVALID_ARGUMENT.
+          example: 5000
+
+    SearchConfig:
+      type: object
+      description: >-
+        Per-query route toggles (F07/F08). Each route defaults to enabled; set a flag false
+        to skip that route (e.g. {"enable_sql": false} runs vector + BM25 only). Disabling a
+        route is reflected in the response meta.routes_used / degradation fields.
+      properties:
+        enable_vector:
+          type: boolean
+          default: true
+          description: "Run the dense-vector (HNSW) route."
+        enable_bm25:
+          type: boolean
+          default: true
+          description: "Run the lexical BM25 route."
+        enable_sql:
+          type: boolean
+          default: true
+          description: "Allow the SQL route to fire when the query intent is SQL/hybrid (F08; otherwise skipped)."
 
     QueryResultItem:
       type: object
@@ -718,6 +772,63 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InteractionSource'
+
+    # ============ Operation log domain (F18a §6.1) ============
+    OperationLogEntry:
+      type: object
+      description: "One operation_log row (F18a §6.1). Optional columns are JSON null when unset."
+      required: [id, timestamp, user_id, action, resource_type]
+      properties:
+        id: { type: string }
+        timestamp:
+          type: integer
+          format: int64
+          description: "Unix-ms event time."
+        user_id: { type: string }
+        action:
+          type: string
+          description: "Action enum value (e.g. memory_extract, memory_invalidate, memory_revoke, document_upload, ...)."
+        namespace_id:
+          type: string
+          nullable: true
+        resource_type: { type: string }
+        resource_id:
+          type: string
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+          description: "≤100 chars; an LLM-extracted summary is prefixed '[auto] '."
+        trace_id:
+          type: string
+          nullable: true
+        session_id:
+          type: string
+          nullable: true
+
+    OperationLogPage:
+      type: object
+      description: "GET /operations body (F18a §6.1). Pagination is offset-based (no opaque cursor)."
+      required: [operations, total_count, limit, offset, meta]
+      properties:
+        operations:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperationLogEntry'
+        total_count:
+          type: integer
+          format: int64
+        limit: { type: integer }
+        offset: { type: integer }
+        meta:
+          type: object
+          required: [total_count, has_next, next_offset]
+          properties:
+            total_count:
+              type: integer
+              format: int64
+            has_next: { type: boolean }
+            next_offset: { type: integer }
 
     # ============ Watch domain (ARCH § 4.1.4 + F21) ============
     Watcher:

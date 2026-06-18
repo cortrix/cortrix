@@ -1,4 +1,5 @@
-# paths/observability.yaml — /api/v1/traces/* + /api/v1/interactions/* (F13 Agent Observability) — 3 endpoints
+# paths/observability.yaml — /api/v1/traces/* + /api/v1/interactions/* (F13 Agent Observability)
+#                            + /api/v1/operations (F18a operation_log audit) — 4 endpoints
 # SoT: F13 detailed design (§8.1/§8.2/§8.3) + live CE implementation
 #   src/server/routes/observability_routes.cpp + src/agent_trace/ handlers.
 # Storage is per-namespace (each NS's memory.db holds agent_trace + interaction_log + interaction_sources),
@@ -154,3 +155,75 @@ paths:
         '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
         '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
         '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /operations:
+    get:
+      tags: [public]
+      operationId: listOperations
+      summary: Query the operation log
+      description: |
+        Query the F18a operation_log audit trail (CE 30-day retention + 100K cap). The default
+        scope is the caller's own user_id; querying another user_id requires an admin key
+        (otherwise 403 CX_ERR_OPLOG_UNAUTHORIZED). This is also the canonical surface the
+        memory subsystem points to for audit — e.g. GET /operations?action_in=memory_extract,memory_invalidate,memory_revoke
+        is the MEM02 memory audit trail, and /memory/invalidations forwards here.
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:read"
+      x-cortrix-side-effects: read_only
+      parameters:
+        - name: user_id
+          in: query
+          schema: { type: string }
+          description: "Defaults to the caller's own user_id; a different value requires an admin key."
+        - name: namespace_id
+          in: query
+          schema: { type: string }
+          description: "Filter by namespace (optional)."
+        - name: action
+          in: query
+          schema: { type: string }
+          description: "Single action-enum filter."
+        - name: action_in
+          in: query
+          schema: { type: string }
+          description: "Comma-separated multi-select of action-enum values (e.g. memory_extract,memory_invalidate,memory_revoke)."
+        - name: resource_type
+          in: query
+          schema: { type: string }
+        - name: trace_id
+          in: query
+          schema: { type: string }
+          description: "Correlate to an ObservabilityContext trace."
+        - name: from_timestamp
+          in: query
+          schema: { type: integer, format: int64 }
+          description: "Unix-ms lower bound (inclusive)."
+        - name: to_timestamp
+          in: query
+          schema: { type: integer, format: int64 }
+          description: "Unix-ms upper bound (inclusive)."
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: Operation log page
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/OperationLogPage'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

@@ -1,14 +1,25 @@
-# paths/documents.yaml — /api/v1/documents/* (ARCH § 4.1.2 + F42 + TD-F42-BULK) — 7 endpoint
+# paths/documents.yaml — /api/v1/documents/* (ARCH § 4.1.2 + F42 + TD-F42-BULK)
+#                         + POST /api/v1/namespaces/{ns}/documents (multipart file upload) — 8 endpoints
 # SoT: ARCH § 4.1.2 + F42 detailed design + TD-F42-BULK detailed design + components/schemas.yaml (Document / DocumentTask / BatchSubmit*)
+#
+# Two legitimate upload entries (double-track, by design — both routes are live in the backend):
+#   1. POST /documents                   — JSON body {namespace, content, ...}, async, returns a task_id.
+#   2. POST /namespaces/{ns}/documents   — multipart/form-data file upload, returns doc_id synchronously.
+# The flat JSON entry is for inline / programmatic content; the namespace-scoped multipart entry is the
+# file-upload path (e.g. the Web UI / large binary files).
 paths:
   /documents:
     post:
       tags: [public]
       operationId: uploadDocument
-      summary: Upload document (async)
+      summary: Upload document (async, JSON content)
       description: |
-        Unified asynchronous upload endpoint (namespace in body, F42, Write+). Returns a task_id; query progress via
-        GET /documents/tasks/{task_id}/progress. Partial failures in batch upload use PartialSuccessById semantics.
+        Unified asynchronous upload endpoint (namespace in body, F42, Write+). Accepts inline document
+        content as JSON and returns a task_id; query progress via GET /documents/tasks/{task_id}/progress.
+        Partial failures in batch upload use PartialSuccessById semantics.
+
+        This is one of two upload entries (double-track): for file uploads, use the multipart
+        POST /namespaces/{ns}/documents instead.
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff
@@ -220,3 +231,68 @@ paths:
         '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
         '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
         '409': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  # --- Namespace-scoped multipart file upload (second of the two upload entries) ---
+  /namespaces/{ns}/documents:
+    post:
+      tags: [public]
+      operationId: uploadDocumentFile
+      summary: Upload document file (multipart)
+      description: |
+        File-upload entry (multipart/form-data, namespace in the path, Write+). This is the second of
+        the two legitimate upload tracks: use it to upload a file/binary, as opposed to the JSON inline
+        content of POST /documents. Returns the doc_id synchronously (201 created / 200 unchanged
+        duplicate / 201 updating). At disk CRIT pressure the upload is rejected with 507 CX_ERR_DISK_FULL
+        before any byte is written (F24 §6).
+      x-cortrix-agent-workflow: public
+      x-cortrix-retryable: true
+      x-cortrix-retry-strategy: exponential_backoff
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "ns:write"
+      x-cortrix-side-effects: write
+      x-cortrix-rate-limit: "60/min/api_key"
+      parameters:
+        - name: ns
+          in: path
+          required: true
+          schema: { type: string }
+          description: Target namespace.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The document file (required). If multiple are sent, the first is used.
+                metadata:
+                  type: string
+                  description: Optional custom metadata as a JSON string.
+                title:
+                  type: string
+                  description: Optional document title.
+      responses:
+        '201':
+          description: Document uploaded (processing queued) / updated (reprocessing queued)
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/UploadDocumentResult'
+        '200':
+          description: Document unchanged (duplicate content_hash) — reprocessing skipped
+          content:
+            application/json:
+              schema:
+                $ref: '../components/schemas.yaml#/components/schemas/UploadDocumentResult'
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '413': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '415': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '429': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '507': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

@@ -78,6 +78,8 @@ paths:
     $ref: './paths/documents.yaml#/paths/~1documents~1tasks~1{task_id}~1progress'
   /documents/tasks/{task_id}:
     $ref: './paths/documents.yaml#/paths/~1documents~1tasks~1{task_id}'
+  /namespaces/{ns}/documents:  # multipart file-upload track (second upload entry)
+    $ref: './paths/documents.yaml#/paths/~1namespaces~1{ns}~1documents'
   # ---- Query domain ----
   /query:
     $ref: './paths/query.yaml#/paths/~1query'
@@ -128,13 +130,15 @@ paths:
     $ref: './paths/import.yaml#/paths/~1admin~1db-connections'
   /admin/db-connections/{ref_id}:
     $ref: './paths/import.yaml#/paths/~1admin~1db-connections~1{ref_id}'
-  # ---- Observability domain (F13 — traces + interactions) ----
+  # ---- Observability domain (F13 — traces + interactions; F18a — operation_log) ----
   /traces/{session_id}:
     $ref: './paths/observability.yaml#/paths/~1traces~1{session_id}'
   /interactions:
     $ref: './paths/observability.yaml#/paths/~1interactions'
   /interactions/{id}/sources:
     $ref: './paths/observability.yaml#/paths/~1interactions~1{id}~1sources'
+  /operations:
+    $ref: './paths/observability.yaml#/paths/~1operations'
   # ==== S5: latter 7 domains ====
   # ---- Auth domain (11) ----
   /auth/register: { $ref: './paths/auth.yaml#/paths/~1auth~1register' }
