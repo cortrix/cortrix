@@ -161,6 +161,25 @@ TEST_F(BatchRoutesTest, DocItemMissingContentRejected) {
     EXPECT_EQ(res->status, 400);
 }
 
+// R9 robustness: a batch item with deeply-nested metadata must be rejected (422) and
+// must NOT crash the server inside item["metadata"].dump() (deep-JSON overflow DoS).
+TEST_F(BatchRoutesTest, DeepMetadataRejected422) {
+    httplib::Client cli("127.0.0.1", port_);
+    json deep = 1;
+    for (int i = 0; i < 5000; ++i) deep = json{{"a", deep}};
+    json b;
+    b["namespace"] = "ns";
+    b["documents"] = json::array(
+        {{{"doc_id", "a"}, {"content", "x"}, {"metadata", deep}}});
+    auto res = cli.Post("/api/v1/documents/batch", WriteHeaders(), b.dump(),
+                        "application/json");
+    ASSERT_TRUE(res) << "server crashed / no response on deep metadata";
+    EXPECT_EQ(res->status, 422) << res->body;
+    auto j = json::parse(res->body);
+    ASSERT_TRUE(j.contains("error"));
+    EXPECT_EQ(j["error"]["code"], "CX_ERR_METADATA_TOO_DEEP");
+}
+
 TEST_F(BatchRoutesTest, InvalidOnDuplicateRejected) {
     httplib::Client cli("127.0.0.1", port_);
     json b;

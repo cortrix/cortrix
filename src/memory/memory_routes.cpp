@@ -19,6 +19,8 @@
 #include "cortrix/query/sql_executor.h"
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/server/http_server.h"
+#include "cortrix/agent_friendly/error.h"
+#include "cortrix/common/json_depth.h"  // metadata depth guard (DoS: deep-JSON dump)
 #include "cortrix/memory/mem05_metrics.h"
 // M1/M2/M4/M5 — MEM02 extraction + MEM03 transparency + MEM04 opt-out runtime
 #include "cortrix/memory/interaction_log.h"
@@ -994,6 +996,16 @@ void RegisterMemoryRoutes(
         write_req.result_source = body.value("result_source", "conversation");
         write_req.ttl_seconds = body.value("ttl_seconds", 0);
         if (body.contains("metadata")) {
+            // Reject over-deep metadata before dump() (json_depth.h): a deeply nested
+            // value would otherwise overflow the stack inside dump().
+            const int meta_depth = JsonMaxDepth(body["metadata"]);
+            if (meta_depth > kMaxMetadataDepth) {
+                nlohmann::json error_body;
+                error_body["error"] =
+                    agent_friendly::ToJson(MakeMetadataTooDeepError(meta_depth));
+                WriteJsonResponse(res, 422, error_body);
+                return;
+            }
             write_req.metadata_json = body["metadata"].dump();
         }
 

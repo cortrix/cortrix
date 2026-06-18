@@ -582,6 +582,33 @@ TEST_F(MemoryRoutesTest, GetSessionDetailOwnedWithInteractionSerializesFields) {
     EXPECT_TRUE(saw_meta);
 }
 
+// R9 robustness: an interaction whose metadata is deeply-nested must be rejected
+// (422) and must NOT crash the server inside body["metadata"].dump() (deep-JSON
+// stack-overflow DoS). Mirrors the append-interaction path above.
+TEST_F(MemoryRoutesTest, AppendInteractionDeepMetadataRejected422) {
+    ON_CALL(mock_spc_, Submit(_)).WillByDefault(Return(Status::Ok()));
+    std::string sid = CreateSession("default", "deep_u");
+    ASSERT_FALSE(sid.empty());
+
+    json deep = 1;
+    for (int i = 0; i < 5000; ++i) deep = json{{"a", deep}};
+    json wbody;
+    wbody["namespace"] = "default";
+    wbody["user_id"] = "deep_u";
+    wbody["query_text"] = "Q";
+    wbody["response_text"] = "A";
+    wbody["metadata"] = deep;
+
+    httplib::Client cli("127.0.0.1", port_);
+    auto w = cli.Post("/api/v1/memory/sessions/" + sid + "/interactions",
+                      AuthHeaders(), wbody.dump(), "application/json");
+    ASSERT_TRUE(w) << "server crashed / no response on deep metadata";
+    EXPECT_EQ(w->status, 422) << w->body;
+    auto resp = json::parse(w->body);
+    ASSERT_TRUE(resp.contains("error"));
+    EXPECT_EQ(resp["error"]["code"], "CX_ERR_METADATA_TOO_DEEP");
+}
+
 // MEM05: list isolation drops sessions owned by other users (the post-filter
 // excludes a non-matching user_id, line 184).
 TEST_F(MemoryRoutesTest, ListSessionsExcludesOtherUsersSessions) {

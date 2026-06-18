@@ -15,6 +15,7 @@
 #include "cortrix/auth/api_key_auth.h"
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/common/in_memory_global_config.h"
+#include "cortrix/common/json_depth.h"  // kMaxMetadataDepth (deep-metadata guard test)
 #include "cortrix/config/config.h"
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/server/batch_submit_service.h"
@@ -198,6 +199,33 @@ TEST_F(FlatDocumentRoutesTest, UploadMissingNamespace400) {
     auto res = cli.Post("/api/v1/documents", WriteHeaders(), body.dump(), "application/json");
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 400);
+}
+
+// R9 robustness: deeply-nested metadata must be rejected at ingest (422) and must NOT
+// crash the server inside body["metadata"].dump() (deep-JSON stack-overflow DoS).
+TEST_F(FlatDocumentRoutesTest, UploadDeepMetadataRejected422) {
+    httplib::Client cli("127.0.0.1", port_);
+    // Build metadata nesting far past the limit (would SIGSEGV in dump() unguarded).
+    json deep = 1;
+    for (int i = 0; i < 5000; ++i) deep = json{{"a", deep}};
+    json body = {{"namespace", "default"}, {"content", "x"}, {"metadata", deep}};
+    auto res = cli.Post("/api/v1/documents", WriteHeaders(), body.dump(), "application/json");
+    ASSERT_TRUE(res) << "server crashed / no response on deep metadata";
+    EXPECT_EQ(res->status, 422) << res->body;
+    auto j = json::parse(res->body);
+    ASSERT_TRUE(j.contains("error"));
+    EXPECT_EQ(j["error"]["code"], "CX_ERR_METADATA_TOO_DEEP");
+    EXPECT_EQ(j["error"]["structured_data"]["max_depth"], cortrix::kMaxMetadataDepth);
+}
+
+// A normal shallow metadata object still succeeds (guard does not over-reject).
+TEST_F(FlatDocumentRoutesTest, UploadShallowMetadataAccepted) {
+    httplib::Client cli("127.0.0.1", port_);
+    json body = {{"namespace", "default"}, {"content", "x"},
+                 {"metadata", {{"source", "unit"}, {"tags", {"a", "b"}}}}};
+    auto res = cli.Post("/api/v1/documents", WriteHeaders(), body.dump(), "application/json");
+    ASSERT_TRUE(res);
+    EXPECT_EQ(res->status, 202) << res->body;
 }
 
 TEST_F(FlatDocumentRoutesTest, UploadReadKeyForbidden) {

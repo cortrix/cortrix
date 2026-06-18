@@ -4,7 +4,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include "cortrix/agent_friendly/error.h"
 #include "cortrix/auth/auth_middleware.h"
+#include "cortrix/common/json_depth.h"  // metadata depth guard (DoS: deep-JSON dump)
 #include "cortrix/server/batch_submit_service.h"
 #include "cortrix/server/http_server.h"
 
@@ -69,6 +71,16 @@ bool ParseBatchRequest(const httplib::Request& req, httplib::Response& res,
             doc.filename = item["filename"].get<std::string>();
         }
         if (item.contains("metadata") && item["metadata"].is_object()) {
+            // Reject over-deep metadata before dump() (json_depth.h): a deeply nested
+            // object would otherwise overflow the stack inside dump().
+            const int meta_depth = JsonMaxDepth(item["metadata"]);
+            if (meta_depth > kMaxMetadataDepth) {
+                nlohmann::json error_body;
+                error_body["error"] =
+                    agent_friendly::ToJson(MakeMetadataTooDeepError(meta_depth));
+                WriteJsonResponse(res, 422, error_body, request_id);
+                return false;
+            }
             doc.metadata_json = item["metadata"].dump();
         }
         out->documents.push_back(std::move(doc));

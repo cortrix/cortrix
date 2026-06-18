@@ -7,6 +7,7 @@
 #include "cortrix/logging/logging.h"
 #include "cortrix/deploy/disk_monitor.h"     // [D3.5 gap②] disk pressure gate
 #include "cortrix/agent_friendly/error.h"    // CX_ERR_DISK_FULL body serialization
+#include "cortrix/common/json_depth.h"       // metadata depth guard (DoS: deep-JSON dump)
 
 #include <nlohmann/json.hpp>
 #include <algorithm>
@@ -118,7 +119,27 @@ void RegisterDocumentRoutes(httplib::Server& server,
 
                 // Extract optional fields
                 if (req.has_file("metadata")) {
-                    upload_req.metadata_json = req.get_file_value("metadata").content;
+                    const std::string& meta_raw =
+                        req.get_file_value("metadata").content;
+                    // This field is stored verbatim (never parsed here), so a deeply
+                    // nested metadata JSON would only crash later -- in the SPC ingest
+                    // worker / query-time flatten -- when it is dumped/torn down (a
+                    // persistent poisoned-doc DoS). Reject it at the boundary: parse
+                    // (depth-check) only when it IS JSON; non-JSON content keeps its
+                    // existing verbatim-store behavior. (json_depth.h)
+                    auto meta_parsed = nlohmann::json::parse(
+                        meta_raw, nullptr, /*allow_exceptions=*/false);
+                    if (!meta_parsed.is_discarded()) {
+                        const int meta_depth = JsonMaxDepth(meta_parsed);
+                        if (meta_depth > kMaxMetadataDepth) {
+                            nlohmann::json error_body;
+                            error_body["error"] = agent_friendly::ToJson(
+                                MakeMetadataTooDeepError(meta_depth));
+                            WriteJsonResponse(res, 422, error_body, rctx.request_id);
+                            return;
+                        }
+                    }
+                    upload_req.metadata_json = meta_raw;
                 }
                 if (req.has_file("title")) {
                     upload_req.title = req.get_file_value("title").content;

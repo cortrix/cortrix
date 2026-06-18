@@ -361,12 +361,22 @@ add_executable(cortrix_unit_tests
     unit/test_id_hash.cpp
     unit/test_store_persistence_r7.cpp
     unit/test_fault_sweep_r9.cpp
+    # --- R9 robustness: property-based tests (rapidcheck via RC_GTEST_PROP) ---
+    unit/test_wordpiece_property_r9.cpp
+    unit/test_query_request_property_r9.cpp
+    unit/test_live_metadata_flatten_property_r9.cpp
+    unit/test_rag_fusion_property_r9.cpp
+    # --- R9 robustness: metadata deep-nesting DoS guard (json_depth.h) ---
+    unit/test_json_depth_guard.cpp
 )
 
 target_link_libraries(cortrix_unit_tests PRIVATE
     cortrix_core
     gtest_main
     gmock
+    # R9 property lane: rapidcheck + its gtest integration (RC_GTEST_PROP).
+    rapidcheck
+    rapidcheck_gtest
 )
 
 # F23 §4.6 syscall fault-injection seam: MUST be a SHARED library — dyld

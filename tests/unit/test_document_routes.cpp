@@ -138,6 +138,42 @@ TEST_F(DocumentRoutesTest, UploadSuccess) {
     EXPECT_TRUE(body.contains("message"));
 }
 
+// R9 robustness: a multipart upload whose "metadata" field is deeply-nested JSON must
+// be rejected at ingest (422), not stored verbatim to crash the SPC worker / query
+// flatten later (the persistent poisoned-doc DoS). The field is stored verbatim here,
+// so the guard parses it and rejects on excessive depth.
+TEST_F(DocumentRoutesTest, UploadDeepMetadataRejected422) {
+    httplib::Client cli("127.0.0.1", port_);
+
+    std::string deep;
+    for (int i = 0; i < 5000; ++i) deep += "{\"a\":";
+    deep += "1";
+    for (int i = 0; i < 5000; ++i) deep += "}";
+
+    httplib::MultipartFormDataItems items = {
+        {"file", "Hello World", "test.txt", "text/plain"},
+        {"metadata", deep, "", "application/json"},
+    };
+    auto res = cli.Post("/api/v1/namespaces/default/documents", AuthHeaders(), items);
+    ASSERT_TRUE(res) << "server crashed / no response on deep metadata";
+    EXPECT_EQ(res->status, 422) << res->body;
+    auto body = json::parse(res->body);
+    ASSERT_TRUE(body.contains("error"));
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_METADATA_TOO_DEEP");
+}
+
+// Shallow JSON metadata in a multipart upload is accepted (guard does not over-reject).
+TEST_F(DocumentRoutesTest, UploadShallowMetadataAccepted) {
+    httplib::Client cli("127.0.0.1", port_);
+    httplib::MultipartFormDataItems items = {
+        {"file", "Hello World", "test.txt", "text/plain"},
+        {"metadata", R"({"tag":"unit","n":3})", "", "application/json"},
+    };
+    auto res = cli.Post("/api/v1/namespaces/default/documents", AuthHeaders(), items);
+    ASSERT_TRUE(res);
+    EXPECT_EQ(res->status, 201) << res->body;
+}
+
 TEST_F(DocumentRoutesTest, UploadNoAuth) {
     httplib::Client cli("127.0.0.1", port_);
 

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "cortrix/common/types.h"  // json alias (metadata_json flatten)
+#include "cortrix/common/json_depth.h"  // metadata depth guard (DoS: deep-JSON dump)
 #include "cortrix/doc_summary/discover_handler.h"  // RecallDocSummaryHnsw (granularity=doc/both)
 #include "cortrix/doc_summary/doc_summary_types.h"  // DocDiscoveryHit
 #include "cortrix/query/bm25_searcher.h"
@@ -44,6 +45,12 @@ void FlattenMetadataIntoMap(const std::string& metadata_json,
     try {
         json parsed = json::parse(metadata_json);
         if (!parsed.is_object()) return;  // only object-shaped metadata flattens
+        // Defense-in-depth: ingest now rejects over-deep metadata (json_depth.h), but
+        // data stored before that guard -- or via any path that bypassed it -- could
+        // still be deep enough to overflow the stack inside the it.value().dump()
+        // below (a stack overflow is a SIGSEGV the catch cannot stop). Skip flattening
+        // such a value rather than crash the query worker.
+        if (JsonExceedsMaxDepth(parsed)) return;
         for (auto it = parsed.begin(); it != parsed.end(); ++it) {
             // Keep string values verbatim (so beir_corpus_id stays its raw id, not a
             // quoted "\"id\""); serialize any non-string scalar/array/object via dump()

@@ -12,6 +12,7 @@
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/server/http_server.h"
 #include "cortrix/agent_friendly/error.h"
+#include "cortrix/common/json_depth.h"  // metadata depth guard (DoS: deep-JSON dump)
 #include "cortrix/id/ulid.h"
 #include "cortrix/logging/logging.h"
 
@@ -156,6 +157,16 @@ void RegisterFlatDocumentRoutes(httplib::Server& server,
                     doc.filename = body["filename"].get<std::string>();
                 }
                 if (body.contains("metadata") && body["metadata"].is_object()) {
+                    // Reject over-deep metadata before dump() (json_depth.h): a deeply
+                    // nested object would otherwise overflow the stack inside dump().
+                    const int meta_depth = JsonMaxDepth(body["metadata"]);
+                    if (meta_depth > kMaxMetadataDepth) {
+                        nlohmann::json error_body;
+                        error_body["error"] =
+                            agent_friendly::ToJson(MakeMetadataTooDeepError(meta_depth));
+                        WriteJsonResponse(res, 422, error_body, rctx.request_id);
+                        return;
+                    }
                     doc.metadata_json = body["metadata"].dump();
                 }
                 batch.documents.push_back(std::move(doc));
