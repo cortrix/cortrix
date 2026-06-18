@@ -292,25 +292,47 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
     }));
 
     // POST /api/v1/memory/invalidations/{id}/revoke — D9 admin revoke.
+    // Body: { "ns": "<namespace>", "reason": "<why>" }. `ns` is required (the block is
+    // NS-scoped; mirrors the opt-out/revoke admin sibling which also reads ns from the
+    // body). `revoked_by` is the acting admin's user_id from auth — NEVER the body, so
+    // an admin cannot spoof another identity into the audit trail (memory_revoke oplog).
     svr.Post(R"(/api/v1/memory/invalidations/([A-Za-z0-9_\-]+)/revoke)", WithAuth(auth, kPermAdmin,
-        [extraction](const httplib::Request& req, httplib::Response& res, const RequestContext&) {
+        [extraction](const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         std::string block_id = req.matches[1].str();
         if (!extraction) {
             WriteAgentError(res, 503, "CX_ERR_MEM02_LLM_DISABLED",
                             "memory service unavailable", false, "permanent");
             return;
         }
-        // Deferred to Wave S2: MemoryExtractor::RevokeInvalidation exists and is
-        // unit-tested, but this admin HTTP route is not yet wired to it. Return an
-        // honest 501 rather than a misleading 200 "accepted" -- the Agent must not be
-        // told the revoke succeeded when nothing was revoked (GEN-Agent honesty,
-        // CLAUDE.md sec.5). Track real revokes via the operation_log surface.
-        (void)block_id;
-        WriteAgentError(res, 501, "CX_ERR_NOT_IMPLEMENTED",
-                        "memory invalidation revoke is not yet wired to the HTTP surface "
-                        "(deferred to Wave S2; the RevokeInvalidation engine exists). "
-                        "Track revokes via /api/v1/operations?action_in=memory_revoke.",
-                        false, "permanent");
+        json body = json::object();
+        try { if (!req.body.empty()) body = json::parse(req.body); } catch (...) {}
+        std::string ns = body.value("ns", body.value("namespace", ""));
+        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
+        std::string reason = body.value("reason", "");
+        const std::string revoked_by =
+            rc.auth.user_id.empty() ? "anonymous" : rc.auth.user_id;
+
+        auto r = extraction->RevokeInvalidation(ns, block_id, reason, revoked_by);
+        if (!r.ok()) {
+            // Map the engine/Status to HTTP: NS / block not found → 404, else 500.
+            const Status& s = r.status();
+            const int http = s.code() == StatusCode::kNotFound ? 404 : 500;
+            WriteAgentError(res, http,
+                            http == 404 ? "CX_ERR_MEM02_BLOCK_NOT_FOUND"
+                                        : "CX_ERR_MEM02_REVOKE_FAILED",
+                            s.message(), false, "permanent");
+            return;
+        }
+        const memory::MemoryBlockRecord& blk = r.value();
+        json resp;
+        resp["block_id"] = blk.block_id.empty() ? block_id : blk.block_id;
+        resp["status"] = "active";  // revoke restores the block to active
+        resp["revoked_by"] = revoked_by;
+        if (blk.metadata_json.is_object() && blk.metadata_json.contains("revoked_at")) {
+            resp["revoked_at"] = blk.metadata_json["revoked_at"];
+        }
+        resp["namespace"] = ns;
+        WriteJsonResponse(res, 200, resp);
     }));
 }
 

@@ -74,6 +74,21 @@ public:
     MemoryExtractionResult ExtractOne(const InteractionLog& interaction,
                                       const observability::TraceContext* ctx = nullptr);
 
+    /// D9 admin revoke (#22 HTTP wiring): restore a prior invalidation. Acquires the
+    /// NS façade and builds the NS-scoped MemoryExtractor (same construction as
+    /// ExtractOne — sessions / blocks are NS-scoped), then delegates to
+    /// MemoryExtractor::RevokeInvalidation. Unlike extraction this works even when the
+    /// service has no LLM (revoke is a pure store transition). `revoked_by` is the
+    /// acting admin's user_id (the route derives it from auth, never from the body).
+    /// Errors: CX_ERR_NS_NOT_FOUND (namespace gone) → NotFound; block-not-found /
+    /// store-update failures propagate from the engine via the returned Status.
+    Result<MemoryBlockRecord> RevokeInvalidation(
+        const std::string& ns,
+        const std::string& invalidated_block_id,
+        const std::string& reason,
+        const std::string& revoked_by,
+        const observability::TraceContext* ctx = nullptr);
+
 private:
     bool HandleItem(const MemoryQueueItem& item);
 

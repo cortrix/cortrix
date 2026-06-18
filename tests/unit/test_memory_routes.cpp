@@ -14,6 +14,8 @@
 #include "cortrix/memory/memory_routes.h"
 #include "cortrix/memory/memory_store.h"
 #include "cortrix/memory/memory_config.h"
+#include "cortrix/memory/memory_extraction_service.h"   // #22 wired revoke path
+#include "cortrix/memory/memory_block_adapter.h"         // seed invalidated block
 #include "cortrix/auth/api_key_auth.h"
 #include "cortrix/auth/auth_context.h"
 #include "cortrix/resource/namespace_facade.h"
@@ -1380,22 +1382,92 @@ TEST_F(MemoryRoutesInteractionLimitTest, WriteInteractionAtMaxLimitRejected) {
     EXPECT_EQ(res2->status, 400);
 }
 
-// D9 admin revoke is deferred to Wave S2 (the underlying RevokeInvalidation engine
-// exists + is unit-tested, but this HTTP route is not wired to it). It must NOT
-// fake-succeed with 200 "accepted" -- that would tell the Agent the revoke happened
-// (GEN-Agent honesty, CLAUDE.md sec.5). With no extraction service wired (fixture
-// default) the route returns 503; a wired build returns 501 CX_ERR_NOT_IMPLEMENTED.
-// Either way it is an honest non-2xx, never a misleading accepted.
-TEST_F(MemoryRoutesTest, AdminRevokeDoesNotFakeAccept) {
+// D9 admin revoke when NO extraction service is wired (this fixture's default): the
+// route cannot honor the revoke, so it returns an honest 503 (service unavailable) —
+// never a misleading 200 "accepted" (GEN-Agent honesty, CLAUDE.md sec.5). The wired
+// 200 path is covered by AdminRevokeWiredRestoresActive below (separate server with a
+// real MemoryExtractionService). #22 replaced the former 501 stub with real wiring.
+TEST_F(MemoryRoutesTest, AdminRevokeNoServiceReturns503) {
     httplib::Client cli("127.0.0.1", port_);
     auto res = cli.Post("/api/v1/memory/invalidations/blk_x/revoke", AuthHeaders(),
                         R"({"ns":"default","reason":"t"})", "application/json");
     ASSERT_TRUE(res);
     EXPECT_NE(res->status, 200);
-    EXPECT_TRUE(res->status == 501 || res->status == 503) << res->status;
+    EXPECT_EQ(res->status, 503) << res->status;
     auto j = json::parse(res->body);
     ASSERT_TRUE(j.contains("error"));             // wrapped GEN-Agent envelope
     EXPECT_NE(j["error"].value("code", ""), "");  // machine-readable code, not empty
+}
+
+// #22 wired path: a server with a REAL MemoryExtractionService honors the admin
+// revoke end-to-end. Seeds an invalidated block into the live "default" NS store,
+// POSTs the revoke, and asserts 200 + the block is active again (real dependency
+// stack — only the live stack proves a D3.5-mounted wiring, not a mock).
+TEST_F(MemoryRoutesTest, AdminRevokeWiredRestoresActive) {
+    // A real extraction service (no LLM needed — revoke is a pure store transition).
+    memory::MemoryExtractionService extraction(
+        harness_->ipool(), /*llm=*/nullptr, *embedder_, /*op_logger=*/nullptr,
+        memory::MemoryExtractorConfig{}, memory::MemoryQueue::Config{});
+    cortrix::MemoryServices services;
+    services.extraction = &extraction;
+
+    httplib::Server wired_svr;
+    RegisterMemoryRoutes(wired_svr, auth_, harness_->ipool(), mock_spc_,
+                         *embedder_, *classifier_, *fusion_, config_.memory, services);
+    int wired_port = 19080 + ((getpid() + 7) % 1000);
+    std::thread wired_thread([&] { wired_svr.listen("127.0.0.1", wired_port); });
+    for (int i = 0; i < 50 && !wired_svr.is_running(); ++i)
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+    // Seed an invalidated memory block into the live "default" NS store.
+    std::string block_id;
+    {
+        resource::NamespaceFacade facade(harness_->ipool(), "default");
+        ASSERT_TRUE(facade.Acquire().ok());
+        memory::MemoryBlockAdapter store(facade.store(), embedder_.get(), &facade.vec_index());
+        memory::MemoryBlockRecord b;
+        b.block_id = "blk_revoke_http";  // explicit id (InsertMemoryBlock echoes it back)
+        b.ns_id = "default";
+        b.user_id = "user_123";
+        b.content = "user is in Shanghai";
+        b.metadata_json = {{"memory_type", "fact"}, {"status", "invalidated"},
+                           {"user_id", "user_123"}};
+        auto ins = store.InsertMemoryBlock(b);
+        ASSERT_TRUE(ins.ok());
+        block_id = ins.value();
+        ASSERT_FALSE(block_id.empty());
+    }
+
+    httplib::Client cli("127.0.0.1", wired_port);
+
+    // Missing ns → 400 (the block is NS-scoped; ns is required).
+    auto bad = cli.Post("/api/v1/memory/invalidations/" + block_id + "/revoke",
+                        AuthHeaders(), R"({"reason":"t"})", "application/json");
+    ASSERT_TRUE(bad);
+    EXPECT_EQ(bad->status, 400) << bad->status;
+
+    // Wired success → 200 + block restored to active.
+    auto ok = cli.Post("/api/v1/memory/invalidations/" + block_id + "/revoke",
+                       AuthHeaders(), R"({"ns":"default","reason":"business trip"})",
+                       "application/json");
+    ASSERT_TRUE(ok);
+    ASSERT_EQ(ok->status, 200) << ok->body;
+    auto body = json::parse(ok->body);
+    EXPECT_EQ(body.value("status", ""), "active");
+    EXPECT_EQ(body.value("block_id", ""), block_id);
+
+    // Verify the persisted block is now active in the live store.
+    {
+        resource::NamespaceFacade facade(harness_->ipool(), "default");
+        ASSERT_TRUE(facade.Acquire().ok());
+        memory::MemoryBlockAdapter store(facade.store(), embedder_.get(), &facade.vec_index());
+        auto got = store.GetMemoryBlock(block_id);
+        ASSERT_TRUE(got.ok());
+        EXPECT_EQ(got.value().metadata_json.value("status", ""), "active");
+    }
+
+    wired_svr.stop();
+    if (wired_thread.joinable()) wired_thread.join();
 }
 
 // ===========================================================================

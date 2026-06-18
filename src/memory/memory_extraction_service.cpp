@@ -118,4 +118,28 @@ MemoryExtractionResult MemoryExtractionService::ExtractOne(
     return result;
 }
 
+Result<MemoryBlockRecord> MemoryExtractionService::RevokeInvalidation(
+    const std::string& ns, const std::string& invalidated_block_id,
+    const std::string& reason, const std::string& revoked_by,
+    const observability::TraceContext* ctx) {
+    // Revoke is a pure store transition (status invalidated → active); it does NOT
+    // call the LLM, so — unlike ExtractOne — it is available even when the service has
+    // no LLM configured. Acquire the NS façade (blocks are NS-scoped); a vanished /
+    // unavailable namespace is a NotFound (CX_ERR_NS_NOT_FOUND) for the caller.
+    resource::NamespaceFacade facade(pool_, ns);
+    if (Status acq = facade.Acquire(); !acq.ok()) {
+        return Status::NotFound("CX_ERR_NS_NOT_FOUND: namespace '" + ns +
+                                "' not available: " + acq.message());
+    }
+
+    // Same NS-scoped construction as ExtractOne. The contradiction adapter + llm are
+    // unused by RevokeInvalidation (a store-only path) but the extractor ctor requires
+    // them; passing the real wiring keeps the object identical to the extract path.
+    auto block_store = std::make_shared<MemoryBlockAdapter>(
+        facade.store(), &embedder_, &facade.vec_index());
+    auto contradiction = std::make_shared<MemoryContradictionAdapter>(facade.store());
+    MemoryExtractor extractor(llm_, block_store, contradiction, op_logger_, config_);
+    return extractor.RevokeInvalidation(invalidated_block_id, reason, revoked_by, ctx);
+}
+
 }  // namespace cortrix::memory

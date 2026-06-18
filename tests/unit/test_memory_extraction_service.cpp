@@ -28,10 +28,12 @@
 #include "cortrix/memory/interaction_log.h"
 #include "cortrix/memory/memory_extraction_service.h"
 #include "cortrix/memory/memory_extractor.h"
+#include "cortrix/memory/memory_block_adapter.h"   // seed/read real NS memory blocks
 #include "cortrix/memory/memory_queue.h"
 #include "cortrix/memory/memory_session.h"
 #include "cortrix/llm/i_llm_client.h"
 #include "cortrix/common/status.h"
+#include "cortrix/observability/operation_logger.h"  // CountingOpLogger (revoke audit)
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/spc/onnx_embedder.h"
 #include "ns_pool_test_helper.h"
@@ -389,6 +391,96 @@ TEST_F(MemoryExtractionServiceTest, ExtractOne_Branch5b_LlmErrorResultNotOk) {
     // MemoryExtractor maps kUnavailable to the LLM_TIMEOUT error code.
     EXPECT_EQ(result.error->code, "CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT");
     EXPECT_GE(llm->call_count, 1);
+}
+
+// ---------------------------------------------------------------------------
+// RevokeInvalidation (#22 D9 admin revoke) — real NS dependency stack
+// ---------------------------------------------------------------------------
+
+// Minimal IOperationLogger recorder (local; the test_memory_extractor.cpp copy is in
+// an anonymous namespace and cannot be #included).
+class CountingOpLogger : public observability::IOperationLogger {
+public:
+    void Log(const observability::OperationLogEntry& e,
+             const observability::TraceContext* = nullptr) override { logged.push_back(e); }
+    void BatchLog(const std::vector<observability::OperationLogEntry>& es,
+                  const observability::TraceContext* = nullptr) override {
+        for (const auto& e : es) logged.push_back(e);
+    }
+    Result<observability::OperationLogQueryResult> Query(
+        const observability::OperationLogFilter&,
+        const observability::TraceContext* = nullptr) override {
+        return observability::OperationLogQueryResult{};
+    }
+    void Cleanup() override {}
+    observability::OperationLogStats GetStats() override { return {}; }
+    observability::HealthStatus Health() override { return {}; }
+    int CountAction(const std::string& a) const {
+        int n = 0; for (const auto& e : logged) if (e.action == a) ++n; return n;
+    }
+    std::vector<observability::OperationLogEntry> logged;
+};
+
+// Real-dependency-stack revoke: seed an invalidated block into the live "default" NS
+// store via the same MemoryBlockAdapter the service uses, revoke through the service,
+// then read the block back from the store and assert it is active again + the audit
+// entry was written. (A D3.5-mounted wiring is only proven by the real dependency
+// stack, not a mocked store — single-unit tests can pass while live assembly is broken.)
+TEST_F(MemoryExtractionServiceTest, RevokeInvalidationRestoresActiveOnRealStore) {
+    auto oplog = std::make_shared<CountingOpLogger>();
+    // A service with a real op_logger so the memory_revoke audit entry is observable.
+    auto svc = std::make_unique<MemoryExtractionService>(
+        harness_->ipool(), /*llm=*/nullptr, *embedder_, oplog,
+        MemoryExtractorConfig{}, MemoryQueue::Config{});
+
+    // Seed an invalidated memory block into the live NS store.
+    resource::NamespaceFacade facade(harness_->ipool(), "default");
+    ASSERT_TRUE(facade.Acquire().ok());
+    MemoryBlockAdapter seed_store(facade.store(), embedder_.get(), &facade.vec_index());
+    MemoryBlockRecord b;
+    b.block_id = "blk_revoke_svc";  // explicit id (InsertMemoryBlock echoes it back)
+    b.ns_id = "default";
+    b.user_id = "user_123";
+    b.content = "user is in Shanghai";
+    b.metadata_json = {{"memory_type", "fact"}, {"status", "invalidated"},
+                       {"user_id", "user_123"}};
+    auto ins = seed_store.InsertMemoryBlock(b);
+    ASSERT_TRUE(ins.ok());
+    const std::string block_id = ins.value();
+    ASSERT_FALSE(block_id.empty());
+
+    // Revoke through the service (NS-scoped extractor built internally).
+    auto r = svc->RevokeInvalidation("default", block_id, "business trip not a move",
+                                     /*revoked_by=*/"admin_op");
+    ASSERT_TRUE(r.ok()) << r.status().message();
+    EXPECT_EQ(r.value().metadata_json.value("status", ""), "active");
+    EXPECT_EQ(r.value().metadata_json.value("revoked_by", ""), "admin_op");
+
+    // Read back from the live store: the persisted block must be active now.
+    auto got = seed_store.GetMemoryBlock(block_id);
+    ASSERT_TRUE(got.ok());
+    EXPECT_EQ(got.value().metadata_json.value("status", ""), "active");
+
+    // The D9 revoke wrote exactly one memory_revoke audit entry.
+    EXPECT_EQ(oplog->CountAction("memory_revoke"), 1);
+}
+
+// A revoke against a non-existent namespace is a NotFound (CX_ERR_NS_NOT_FOUND),
+// not a crash — the façade acquire fails before any store work.
+TEST_F(MemoryExtractionServiceTest, RevokeUnknownNamespaceIsNotFound) {
+    auto svc = MakeService(nullptr);
+    auto r = svc->RevokeInvalidation("no_such_ns", "blk", "x", "admin_op");
+    ASSERT_FALSE(r.ok());
+    EXPECT_EQ(r.status().code(), StatusCode::kNotFound);
+}
+
+// Revoke works even when the service has no LLM (it is a pure store transition,
+// unlike ExtractOne which short-circuits when disabled).
+TEST_F(MemoryExtractionServiceTest, RevokeMissingBlockReturnsNotFoundWithoutLlm) {
+    auto svc = MakeService(nullptr);  // disabled (no LLM)
+    auto r = svc->RevokeInvalidation("default", "no_such_block", "x", "admin_op");
+    ASSERT_FALSE(r.ok());  // block not found, but it DID reach the store (not a disabled-skip)
+    EXPECT_EQ(r.status().code(), StatusCode::kNotFound);
 }
 
 }  // namespace
