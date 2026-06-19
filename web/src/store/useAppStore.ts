@@ -66,6 +66,12 @@ export const useAppStore = create<AppState>((set, _get) => ({
   loadSystemStatus: async () => {
     try {
       const health = await get<HealthResponse>('/api/v1/health');
+      // total_doc_count / total_block_count are derived by summing the namespace
+      // list. Ensure it is loaded first, otherwise on pages that mount before (or
+      // without) loadNamespaces the header would sum an empty list and show 0.
+      if (_get().namespaces.length === 0) {
+        await _get().loadNamespaces();
+      }
       const nsList = _get().namespaces;
       const totalDocs = nsList.reduce((sum, ns) => sum + ns.doc_count, 0);
       const totalBlocks = nsList.reduce((sum, ns) => sum + ns.block_count, 0);
