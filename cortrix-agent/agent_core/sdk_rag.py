@@ -164,9 +164,11 @@ class SdkRagProvider:
         names: List[str] = []
         for d in docs or []:
             get = d.get if isinstance(d, dict) else (lambda k, _d=d: getattr(_d, k, None))
-            if get("source_type") == "memory_session":
+            # Exclude conversation-memory artifacts (memory-session docs + the synthetic
+            # memory-facts doc) — they are not user files.
+            if get("source_type") in ("memory_session", "memory"):
                 continue
-            sp = get("source_path") or get("filename")
+            sp = get("filename") or get("source_path")
             if sp:
                 names.append(str(sp))
         return names

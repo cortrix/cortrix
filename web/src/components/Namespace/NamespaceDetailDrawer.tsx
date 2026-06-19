@@ -51,7 +51,12 @@ export function NamespaceDetailDrawer({
     let active = true;
     listDocuments(ns.name, 200, 0)
       .then((r) => {
-        if (active) setDocs(r.documents.filter((d) => d.source_type !== 'memory_session'));
+        if (active)
+          setDocs(
+            r.documents.filter(
+              (d) => d.source_type !== 'memory_session' && d.source_type !== 'memory',
+            ),
+          );
       })
       .catch(() => {
         if (active) setDocs([]);

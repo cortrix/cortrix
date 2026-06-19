@@ -66,6 +66,7 @@ class Document:
     status: Literal["pending", "parsing", "chunking", "embedding", "indexing", "ready", "failed"]
     namespace: Optional[str] = None
     filename: Optional[str] = None
+    source_type: Optional[str] = None
     progress: Optional["DocumentProgress"] = None
     content_hash: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
