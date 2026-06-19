@@ -67,6 +67,7 @@ class Document:
     namespace: Optional[str] = None
     filename: Optional[str] = None
     source_type: Optional[str] = None
+    source_ref: Optional[str] = None
     progress: Optional["DocumentProgress"] = None
     content_hash: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None

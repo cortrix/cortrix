@@ -12,6 +12,8 @@ export interface DocumentStatus {
   doc_id: number;
   source_type: string;
   source_path: string;
+  /** External origin locator (watch_dir data dir, S3/connector URI); empty for managed uploads. */
+  source_ref?: string;
   status: 'pending' | 'processing' | 'ready' | 'error';
   error_message?: string;
   block_count: number;

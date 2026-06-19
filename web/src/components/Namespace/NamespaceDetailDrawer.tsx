@@ -156,6 +156,14 @@ export function NamespaceDetailDrawer({
                 {docs.map((d) => {
                   const fname =
                     d.source_path.replace(/\\/g, '/').split('/').pop() || d.source_path;
+                  // Source locator: where the original file can be found. Prefer the
+                  // external origin ref (S3/connector URI, watch dir); else the full
+                  // path when source_path is path-like (watch_dir); else note it is
+                  // retained in the Cortrix store (managed upload).
+                  const isPathLike =
+                    d.source_path.includes('/') || d.source_path.includes('\\');
+                  const locator =
+                    d.source_ref || (isPathLike ? d.source_path : 'stored in Cortrix store');
                   return (
                     <div key={d.doc_id} className="px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
@@ -177,9 +185,9 @@ export function NamespaceDetailDrawer({
                       <div className="mt-0.5 flex items-center justify-between gap-2">
                         <span
                           className="truncate font-mono text-[11px] text-muted"
-                          title={d.source_path}
+                          title={`${d.source_type} · ${locator}`}
                         >
-                          {d.source_path}
+                          <span className="text-txt/70">{d.source_type}</span> · {locator}
                         </span>
                         <span className="shrink-0 text-[11px] text-muted tabular-nums">
                           {d.block_count} blocks

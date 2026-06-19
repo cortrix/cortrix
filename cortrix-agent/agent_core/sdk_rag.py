@@ -120,6 +120,32 @@ def normalize_query_result(result: Any) -> RagResult:
     return RagResult(chunks=chunks, latency_ms=latency)
 
 
+def describe_origin(name: str, source_type: str, source_ref: str, namespace: str) -> str:
+    """Human/agent-readable locator for a document's source file.
+
+    The goal (Derek 2026-06-20): no matter where a source file originally lived, the chat
+    must be able to say how to find it. We surface the most specific locator available:
+
+    * ``source_ref`` set        -> the external origin captured at ingest (e.g. an S3 URI
+                                    ``s3://bucket/key`` from a connector, or a watch dir).
+    * a path-like ``name``      -> the full filesystem path (watch_dir stores the resolved
+                                    path in source_path), shown verbatim.
+    * a bare filename (uploads) -> the canonical location IS the Cortrix store; the original
+                                    is retained and addressable by namespace + filename.
+    """
+    st = (source_type or "").lower()
+    if source_ref:
+        return f"{source_type or 'external'} — {source_ref}"
+    if name and ("/" in name or "\\" in name):
+        return f"{source_type or 'file'} — {name}"
+    if st in ("memory", "memory_session"):
+        return "Cortrix conversation memory"
+    return (
+        f"stored in Cortrix namespace '{namespace}' (uploaded; the original is retained "
+        f"in the Cortrix store and addressable by its filename)"
+    )
+
+
 class SdkRagProvider:
     """RAG provider backed by the P03 ``AsyncCortrix`` SDK (design P-12 dogfood).
 
@@ -145,13 +171,19 @@ class SdkRagProvider:
         logger.info("sdk_rag_retrieved", namespace=ns, chunks=len(rag.chunks))
         return rag
 
-    async def list_document_names(
+    async def list_document_summaries(
         self, *, namespace: Optional[str] = None, limit: int = 100
-    ) -> List[str]:
-        """Best-effort list of the namespace's document names (source_path), so the chat
-        can answer inventory questions like "what files are here" / "list the documents"
-        (RAG retrieval alone only sees query-relevant chunks). Memory-session docs (chat
-        history) are filtered out. Returns [] on any failure — never blocks the chat."""
+    ) -> List[dict[str, str]]:
+        """Best-effort list of the namespace's documents so the chat can answer inventory
+        AND provenance questions — "what files are here" / "list the documents" / "where
+        did this come from / how do I find the source file" (RAG retrieval alone only sees
+        query-relevant chunks, never the catalog or the origin).
+
+        Each entry is ``{"name", "source_type", "origin"}`` where ``origin`` is a human-
+        readable locator (full filesystem path for watch_dir, S3/connector URI from
+        source_ref, or "stored in Cortrix" for managed uploads — see :func:`describe_origin`).
+        Memory-session docs (chat history) are filtered out. Returns [] on any failure —
+        never blocks the chat."""
         ns = namespace or self.namespace
         try:
             result = await self._client.documents.list(ns, limit=limit, offset=0)
@@ -161,14 +193,23 @@ class SdkRagProvider:
         docs = getattr(result, "documents", None)
         if docs is None and isinstance(result, dict):
             docs = result.get("documents", [])
-        names: List[str] = []
+        out: List[dict[str, str]] = []
         for d in docs or []:
             get = d.get if isinstance(d, dict) else (lambda k, _d=d: getattr(_d, k, None))
+            source_type = get("source_type") or ""
             # Exclude conversation-memory artifacts (memory-session docs + the synthetic
             # memory-facts doc) — they are not user files.
-            if get("source_type") in ("memory_session", "memory"):
+            if source_type in ("memory_session", "memory"):
                 continue
-            sp = get("filename") or get("source_path")
-            if sp:
-                names.append(str(sp))
-        return names
+            name = get("filename") or get("source_path")
+            if not name:
+                continue
+            source_ref = get("source_ref") or ""
+            out.append(
+                {
+                    "name": str(name),
+                    "source_type": str(source_type),
+                    "origin": describe_origin(str(name), str(source_type), str(source_ref), ns),
+                }
+            )
+        return out

@@ -146,14 +146,19 @@ class ChatExecutor(IAgentExecutor):
         chunk_ids = [c.chunk_id for c in chunks]
 
         # Best-effort namespace document inventory so the chat can answer "what files /
-        # documents are here" — RAG retrieval alone only sees query-relevant chunks, not
-        # the full catalog. Never blocks the chat (getattr guards stub rag; the lister is
-        # itself fail-soft and returns []).
+        # documents are here" AND "where did this come from / how do I find the source"
+        # — RAG retrieval alone only sees query-relevant chunks, not the full catalog or
+        # the origin. Each line carries the filename + a source locator (full path for
+        # watch_dir, S3/connector URI, or "stored in Cortrix" for uploads). Never blocks
+        # the chat (getattr guards stub rag; the lister is itself fail-soft, returns []).
         doc_inventory: list[str] = []
-        lister = getattr(self._rag, "list_document_names", None)
+        lister = getattr(self._rag, "list_document_summaries", None)
         if lister is not None:
             try:
-                doc_inventory = await lister(namespace=context.namespace)
+                summaries = await lister(namespace=context.namespace)
+                doc_inventory = [
+                    f"{s.get('name')} — location: {s.get('origin')}" for s in summaries
+                ]
             except Exception:  # noqa: BLE001 — inventory is best-effort
                 doc_inventory = []
 

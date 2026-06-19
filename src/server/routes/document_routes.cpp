@@ -322,6 +322,7 @@ void RegisterDocumentRoutes(httplib::Server& server,
                     d["doc_id"] = doc.doc_id;
                     d["source_type"] = doc.source_type;
                     d["source_path"] = doc.source_path;
+                    d["source_ref"] = doc.source_ref;
                     d["status"] = DocStatusToString(doc.status);
                     d["block_count"] = real_block_count;
                     d["content_hash"] = doc.content_hash;

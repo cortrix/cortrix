@@ -55,6 +55,11 @@ nlohmann::json DocToSpecJson(const CortrixDoc& doc, const std::string& namespace
     d["namespace"] = namespace_id;
     d["filename"] = doc.source_path;
     d["source_type"] = doc.source_type;
+    // source_ref carries the external origin locator when one exists (watch_dir data
+    // dir, S3 URI for connector-ingested docs, …); empty for managed uploads whose
+    // canonical location is the Cortrix store itself. Surfaced so consumers (SDK /
+    // agent / UI) can answer "where did this come from / how do I find the source".
+    d["source_ref"] = doc.source_ref;
     d["status"] = DocStatusToSpec(doc.status);
     d["content_hash"] = doc.content_hash;
     d["created_at"] = doc.created_at;
