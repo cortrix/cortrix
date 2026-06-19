@@ -168,20 +168,28 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             std::string doc_id;  // owning document, for doc-level metadata round-trip
         };
         std::unordered_map<std::string, ChunkRow> by_child;
-        // doc_id → document.metadata_json cache (caller-supplied doc metadata such as an
-        // external corpus id lives on the doc row, not the content block; flattened into
-        // result metadata below so it round-trips alongside block metadata). One doc_get
-        // per distinct doc in the result set.
-        std::unordered_map<std::string, std::string> doc_meta_cache;
-        auto doc_metadata_json = [&](const std::string& doc_id) -> const std::string& {
-            static const std::string kEmpty;
+        // doc_id → owning-document fields cache. The friendly source_path (the original
+        // filename) and any caller-supplied metadata live on the doc ROW, not the content
+        // block (the block only carries the internal materialize name). Both are surfaced
+        // into result metadata below so query results / chat citations show the real file
+        // name instead of an internal id. One doc_get per distinct doc in the result set.
+        struct DocFields {
+            std::string metadata_json;
+            std::string source_path;
+        };
+        std::unordered_map<std::string, DocFields> doc_meta_cache;
+        auto doc_fields = [&](const std::string& doc_id) -> const DocFields& {
+            static const DocFields kEmpty;
             if (doc_id.empty()) return kEmpty;
             auto it = doc_meta_cache.find(doc_id);
             if (it != doc_meta_cache.end()) return it->second;
             CortrixDoc doc;
-            std::string mj;
-            if (store.doc_get(doc_id, doc) == 0) mj = doc.metadata_json;
-            return doc_meta_cache.emplace(doc_id, std::move(mj)).first->second;
+            DocFields df;
+            if (store.doc_get(doc_id, doc) == 0) {
+                df.metadata_json = doc.metadata_json;
+                df.source_path = doc.source_path;
+            }
+            return doc_meta_cache.emplace(doc_id, std::move(df)).first->second;
         };
 
         // Convert a block_id-keyed RouteResult into a child_id-keyed ranked list
@@ -266,8 +274,14 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             // on those top-level keys (FiQA identity). Doc-level metadata (caller-supplied
             // on the row) is the base; block-level metadata overlays it (block wins on
             // collision), matching post_filter's doc→block precedence.
-            FlattenMetadataIntoMap(doc_metadata_json(row.doc_id), rc.metadata);
+            const DocFields& df = doc_fields(row.doc_id);
+            FlattenMetadataIntoMap(df.metadata_json, rc.metadata);
             FlattenMetadataIntoMap(row.metadata_json, rc.metadata);
+            // Surface the friendly document source_path (original filename) as the
+            // authoritative source name — the block only carries the internal materialize
+            // name, so this overrides it so callers (search UI, chat citations) show the
+            // real file name.
+            if (!df.source_path.empty()) rc.metadata["source_path"] = df.source_path;
             ranked.push_back(std::move(rc));
         }
 

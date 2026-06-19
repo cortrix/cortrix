@@ -144,3 +144,29 @@ class SdkRagProvider:
         rag = normalize_query_result(result)
         logger.info("sdk_rag_retrieved", namespace=ns, chunks=len(rag.chunks))
         return rag
+
+    async def list_document_names(
+        self, *, namespace: Optional[str] = None, limit: int = 100
+    ) -> List[str]:
+        """Best-effort list of the namespace's document names (source_path), so the chat
+        can answer inventory questions like "what files are here" / "list the documents"
+        (RAG retrieval alone only sees query-relevant chunks). Memory-session docs (chat
+        history) are filtered out. Returns [] on any failure — never blocks the chat."""
+        ns = namespace or self.namespace
+        try:
+            result = await self._client.documents.list(ns, limit=limit, offset=0)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("sdk_rag_list_documents_failed", namespace=ns, error=str(exc))
+            return []
+        docs = getattr(result, "documents", None)
+        if docs is None and isinstance(result, dict):
+            docs = result.get("documents", [])
+        names: List[str] = []
+        for d in docs or []:
+            get = d.get if isinstance(d, dict) else (lambda k, _d=d: getattr(_d, k, None))
+            if get("source_type") == "memory_session":
+                continue
+            sp = get("source_path") or get("filename")
+            if sp:
+                names.append(str(sp))
+        return names

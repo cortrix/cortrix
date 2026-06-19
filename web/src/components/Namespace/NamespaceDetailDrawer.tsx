@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
-import type { NamespaceDetail } from '../../types/api';
+import type { NamespaceDetail, DocumentStatus } from '../../types/api';
+import { listDocuments } from '../../api/documents';
 import { Drawer } from '../Common/Drawer';
 import { Badge, Button } from '../ui';
 import { formatFileSize } from '../../utils/formatters';
@@ -36,6 +38,28 @@ export function NamespaceDetailDrawer({
 }: NamespaceDetailDrawerProps) {
   const { t } = useTranslation();
   const ns = namespace;
+
+  // Fetch the namespace's documents so the drawer can show the actual file list
+  // (name + path), not just a count. Memory-session docs (chat history) are filtered
+  // out — they are not user files.
+  const [docs, setDocs] = useState<DocumentStatus[]>([]);
+  useEffect(() => {
+    if (!open || !ns) {
+      setDocs([]);
+      return;
+    }
+    let active = true;
+    listDocuments(ns.name, 200, 0)
+      .then((r) => {
+        if (active) setDocs(r.documents.filter((d) => d.source_type !== 'memory_session'));
+      })
+      .catch(() => {
+        if (active) setDocs([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, ns]);
 
   return (
     <Drawer
@@ -114,6 +138,55 @@ export function NamespaceDetailDrawer({
               </div>
             </section>
           )}
+
+          {/* Documents: actual file list (name + path), not just the count */}
+          <section>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
+              {t('namespace.documents')} ({docs.length})
+            </h3>
+            {docs.length === 0 ? (
+              <p className="text-xs text-muted">{t('kb.empty')}</p>
+            ) : (
+              <div className="divide-y divide-line overflow-hidden rounded-lg border border-line">
+                {docs.map((d) => {
+                  const fname =
+                    d.source_path.replace(/\\/g, '/').split('/').pop() || d.source_path;
+                  return (
+                    <div key={d.doc_id} className="px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-medium text-txt" title={fname}>
+                          {fname}
+                        </span>
+                        <Badge
+                          variant={
+                            d.status === 'ready'
+                              ? 'ok'
+                              : d.status === 'error'
+                                ? 'error'
+                                : 'warning'
+                          }
+                        >
+                          {d.status}
+                        </Badge>
+                      </div>
+                      <div className="mt-0.5 flex items-center justify-between gap-2">
+                        <span
+                          className="truncate font-mono text-[11px] text-muted"
+                          title={d.source_path}
+                        >
+                          {d.source_path}
+                        </span>
+                        <span className="shrink-0 text-[11px] text-muted tabular-nums">
+                          {d.block_count} blocks
+                          {d.file_size > 0 ? ` · ${formatFileSize(d.file_size)}` : ''}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
 
           {/* 11 *_config accordions */}
           <section>

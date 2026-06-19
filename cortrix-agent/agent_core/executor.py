@@ -139,11 +139,28 @@ class ChatExecutor(IAgentExecutor):
             rag_failed_detail = {"cortrix_server_error": str(rag_err) if rag_err else "unknown"}
             logger.warning("rag_degraded_llm_only", error=str(rag_err) if rag_err else None)
 
-        rag_texts = [c.content for c in chunks]
+        # Prefix each chunk with its source_path so the prompt's "Cite sources using
+        # [source_path]" instruction is actionable — without it the LLM only has chunk
+        # text and (correctly) reports it cannot name/list the source files.
+        rag_texts = [f"[source_path: {c.source_path}]\n{c.content}" for c in chunks]
         chunk_ids = [c.chunk_id for c in chunks]
 
+        # Best-effort namespace document inventory so the chat can answer "what files /
+        # documents are here" — RAG retrieval alone only sees query-relevant chunks, not
+        # the full catalog. Never blocks the chat (getattr guards stub rag; the lister is
+        # itself fail-soft and returns []).
+        doc_inventory: list[str] = []
+        lister = getattr(self._rag, "list_document_names", None)
+        if lister is not None:
+            try:
+                doc_inventory = await lister(namespace=context.namespace)
+            except Exception:  # noqa: BLE001 — inventory is best-effort
+                doc_inventory = []
+
         # --- 2. Build injection-hardened prompt (design section 6.5) ---
-        prompt = build_chat_prompt(message, rag_texts, history=context.history)
+        prompt = build_chat_prompt(
+            message, rag_texts, history=context.history, doc_inventory=doc_inventory
+        )
 
         # --- 3. Stream the LLM ---
         t_llm = time.monotonic()

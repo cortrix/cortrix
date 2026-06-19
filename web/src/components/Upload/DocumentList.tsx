@@ -176,8 +176,8 @@ function FileRow({
           <p className="text-xs font-medium text-txt truncate" title={doc.source_path}>
             {node.name}
           </p>
-          <p className="text-[10px] text-muted">
-            #{doc.doc_id} · {doc.mime_type || 'unknown'}
+          <p className="text-[10px] text-muted truncate" title={doc.source_path}>
+            {doc.source_path} · {doc.mime_type || 'unknown'}
           </p>
         </div>
       </div>
