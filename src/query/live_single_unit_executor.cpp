@@ -165,8 +165,24 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         struct ChunkRow {
             std::string content_text;
             std::string metadata_json;
+            std::string doc_id;  // owning document, for doc-level metadata round-trip
         };
         std::unordered_map<std::string, ChunkRow> by_child;
+        // doc_id → document.metadata_json cache (caller-supplied doc metadata such as an
+        // external corpus id lives on the doc row, not the content block; flattened into
+        // result metadata below so it round-trips alongside block metadata). One doc_get
+        // per distinct doc in the result set.
+        std::unordered_map<std::string, std::string> doc_meta_cache;
+        auto doc_metadata_json = [&](const std::string& doc_id) -> const std::string& {
+            static const std::string kEmpty;
+            if (doc_id.empty()) return kEmpty;
+            auto it = doc_meta_cache.find(doc_id);
+            if (it != doc_meta_cache.end()) return it->second;
+            CortrixDoc doc;
+            std::string mj;
+            if (store.doc_get(doc_id, doc) == 0) mj = doc.metadata_json;
+            return doc_meta_cache.emplace(doc_id, std::move(mj)).first->second;
+        };
 
         // Convert a block_id-keyed RouteResult into a child_id-keyed ranked list
         // (RrfPath input), caching each resolved block. raw_score order is preserved
@@ -183,7 +199,8 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
                 h.child_id = block.child_id;
                 h.score = it.raw_score;
                 by_child.emplace(block.child_id,
-                                 ChunkRow{block.content_text, block.metadata_json});
+                                 ChunkRow{block.content_text, block.metadata_json,
+                                          block.doc_id});
                 hits.push_back(std::move(h));
             }
             return hits;
@@ -214,7 +231,8 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
                             auto rec = chunk_store.Get(h.child_id);
                             if (!rec.ok()) continue;  // not resolvable → drop from fusion
                             by_child.emplace(h.child_id,
-                                             ChunkRow{rec.value().content, std::string()});
+                                             ChunkRow{rec.value().content, std::string(),
+                                                      std::string()});
                         }
                         rrf_in.sparse.push_back(h);
                     }
@@ -243,9 +261,12 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             // parent_id to its default until that F34 reverse-lookup lands (D3.5+).
             rc.score = fh.rrf_score;        // pre-rerank (multi-path RRF) score
             rc.rerank_score = fh.rrf_score;  // overwritten below when reranking
-            // Flatten the block's metadata_json into TOP-LEVEL result-metadata keys
-            // (e.g. beir_corpus_id), not a single opaque "metadata_json" blob — the
-            // cross-NS runner matches qrels on those top-level keys (FiQA identity).
+            // Flatten metadata into TOP-LEVEL result-metadata keys (e.g. beir_corpus_id),
+            // not a single opaque "metadata_json" blob — the cross-NS runner matches qrels
+            // on those top-level keys (FiQA identity). Doc-level metadata (caller-supplied
+            // on the row) is the base; block-level metadata overlays it (block wins on
+            // collision), matching post_filter's doc→block precedence.
+            FlattenMetadataIntoMap(doc_metadata_json(row.doc_id), rc.metadata);
             FlattenMetadataIntoMap(row.metadata_json, rc.metadata);
             ranked.push_back(std::move(rc));
         }
