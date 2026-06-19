@@ -54,6 +54,7 @@ nlohmann::json DocToSpecJson(const CortrixDoc& doc, const std::string& namespace
     d["document_id"] = doc.doc_id;
     d["namespace"] = namespace_id;
     d["filename"] = doc.source_path;
+    d["source_type"] = doc.source_type;
     d["status"] = DocStatusToSpec(doc.status);
     d["content_hash"] = doc.content_hash;
     d["created_at"] = doc.created_at;
