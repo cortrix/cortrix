@@ -60,6 +60,22 @@ def build_response_meta(
         "rag_status": rag_status,
     }
 
+    # A-class citations: the lightweight per-source provenance the chat UI needs to
+    # render its "sources" list — source name + score + a short content snippet. The
+    # full chunk text and the prompt stay B-class (explain). Built from the same
+    # rag_chunks_full the executor always supplies (independent of explain); empty when
+    # nothing was retrieved. Without this the UI could only show bare chunk_ids, so each
+    # source rendered blank with a 0.000 score.
+    meta["citations"] = [
+        {
+            "chunk_id": c.get("chunk_id"),
+            "source_path": c.get("source_path"),
+            "score": c.get("score"),
+            "snippet": str(c.get("content") or "")[:240],
+        }
+        for c in (rag_chunks_full or [])
+    ]
+
     # --- B class: LLM dependency path, exposed under ?explain=true ---
     if explain:
         meta["prompt_text"] = prompt_text

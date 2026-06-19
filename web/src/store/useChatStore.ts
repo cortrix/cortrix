@@ -135,19 +135,41 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 fullContent += data.chunk;
                 applyContent(fullContent);
               }
-              // Legacy/mock path may stream `sources`; F48 carries chunk_ids in
-              // meta — map them to lightweight citations so the UI stays useful.
+              // Legacy/mock path may stream `sources`. F48 carries real per-source
+              // provenance in `meta.citations` (source_path + score + snippet) — map
+              // those so each source shows real text + score. Fall back to bare
+              // `chunk_ids` only for an older agent that predates citations.
               if (Array.isArray(data.sources)) {
                 sources = data.sources;
+              } else if (data.meta && Array.isArray(data.meta.citations)) {
+                sources = data.meta.citations.map(
+                  (c: {
+                    chunk_id?: string;
+                    source_path?: string;
+                    score?: number;
+                    snippet?: string;
+                  }) => ({
+                    child_id: c.chunk_id ?? '',
+                    parent_id: '',
+                    content: c.snippet ?? '',
+                    parent_content: '',
+                    score: typeof c.score === 'number' ? c.score : 0,
+                    rerank_score: typeof c.score === 'number' ? c.score : 0,
+                    namespace,
+                    content_hash: '',
+                    metadata: c.source_path ? { source_path: c.source_path } : undefined,
+                  }),
+                );
               } else if (data.meta && Array.isArray(data.meta.chunk_ids)) {
-                sources = data.meta.chunk_ids.map((cid: string, i: number) => ({
-                  block_id: cid,
-                  doc_id: i,
+                sources = data.meta.chunk_ids.map((cid: string) => ({
+                  child_id: cid,
+                  parent_id: '',
+                  content: '',
+                  parent_content: '',
                   score: 0,
-                  source_path: cid,
-                  block_type: 'FILE',
-                  chunk_text: '',
-                  related_blocks_count: 0,
+                  rerank_score: 0,
+                  namespace,
+                  content_hash: '',
                 }));
               }
             } catch {
