@@ -1,5 +1,4 @@
 import { BookOpenIcon } from '@heroicons/react/24/outline';
-import { Badge } from '../ui';
 import { JsonEditor } from './JsonEditor';
 import type { ConfigMeta } from './namespaceConfigMeta';
 
@@ -36,7 +35,6 @@ export function ConfigSection({
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h4 className="text-sm font-semibold text-txt">{meta.label}</h4>
-          <Badge variant="magma">{meta.feature}</Badge>
           <code className="font-mono text-[11px] text-muted">{meta.key}</code>
         </div>
         <div className="flex items-center gap-3">
