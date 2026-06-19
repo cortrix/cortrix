@@ -32,4 +32,15 @@ void RegisterBootstrapRoutes(httplib::Server& server, auth::BootstrapHandler& ha
 void RegisterApiKeyRoutes(httplib::Server& server, auth::ApiKeyService& keys,
                           ApiKeyAuth& auth);
 
+/// Register the CE Web UI session probe: GET /api/v1/auth/me.
+///
+/// The JWT email/password /auth/me is a cloud-enterprise endpoint (absent in CE).
+/// This CE shim makes the self-hosted Web UI usable out-of-the-box: when auth is
+/// DISABLED (the V1 default for "quick experience") it returns 200 with a synthetic
+/// single-operator identity so the UI's startup probe authenticates and renders the
+/// app shell instead of dead-ending on a login wall whose backend is cloud-enterprise.
+/// When auth is ENABLED it returns 401 (UI shows login; full CE auth-on Web UI flow is
+/// a V1.5 multi-user item). NOT WithAuth-wrapped — this is the pre-auth probe.
+void RegisterAuthSessionRoute(httplib::Server& server, ApiKeyAuth& auth);
+
 }  // namespace cortrix

@@ -189,4 +189,40 @@ void RegisterApiKeyRoutes(httplib::Server& server, ApiKeyService& keys,
             }));
 }
 
+void RegisterAuthSessionRoute(httplib::Server& server, ApiKeyAuth& auth) {
+    // GET /api/v1/auth/me — CE Web UI session probe (P02a §9.2 / quick-experience mode).
+    //
+    // The JWT email/password /auth/me is a cloud-enterprise endpoint, absent in CE (an
+    // un-shimmed CE would 404 here). The self-hosted Web UI probes this on startup to
+    // decide isAuthenticated. When auth is DISABLED (the V1 default — out-of-the-box
+    // "quick experience"), report a synthetic single-operator identity so the probe
+    // authenticates and the app shell renders; otherwise the UI dead-ends on a login
+    // wall whose email/password backend is itself cloud-enterprise. When auth is
+    // ENABLED, return 401 so the UI shows login (the full CE auth-on Web UI login flow
+    // is a V1.5 multi-user item — hub PHASE2_BACKLOG TD-CE-WEBUI-AUTH-ON).
+    //
+    // Not WithAuth-wrapped by design: this IS the pre-auth probe; its only gate is
+    // reading auth.enabled().
+    server.Get("/api/v1/auth/me",
+        [&auth](const httplib::Request& /*req*/, httplib::Response& res) {
+            const std::string request_id = GenerateRequestId();
+            if (auth.enabled()) {
+                WriteAuthError(res, cortrix::auth::AuthErrorCode::kUnauthorized,
+                               "authentication required", request_id);
+                return;
+            }
+            // auth disabled → single local operator (full access; the backend already
+            // grants admin to every request in no-auth mode).
+            nlohmann::json body;
+            body["id"]             = "operator";
+            body["email"]          = "operator@localhost";
+            body["display_name"]   = "Operator";
+            body["email_verified"] = true;
+            body["role"]           = "admin";
+            body["edition"]        = "ce";
+            body["auth_disabled"]  = true;
+            WriteJsonResponse(res, 200, body, request_id);
+        });
+}
+
 }  // namespace cortrix

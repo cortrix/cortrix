@@ -920,6 +920,10 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // ambient gate. /auth/api-keys CRUD is WithAuth(admin).
     cortrix::RegisterBootstrapRoutes(server.server(), bootstrap_handler);
     cortrix::RegisterApiKeyRoutes(server.server(), api_key_service, auth);
+    // CE Web UI session probe (GET /auth/me): auth-disabled → 200 single-operator so
+    // the self-hosted UI is usable out-of-the-box; auth-enabled → 401 (login). The
+    // JWT /auth/me is cloud-enterprise; this CE shim avoids the no-auth login dead-end.
+    cortrix::RegisterAuthSessionRoute(server.server(), auth);
     // [D3.5 r2 · Wave P · P2] F16a DB-import 6-endpoint surface (admin-gated;
     // /admin/db-connections* under AdminGuard, /import/* Layer-2 only per §6.1).
     cortrix::RegisterImportRoutes(server.server(), import_handler, auth);
