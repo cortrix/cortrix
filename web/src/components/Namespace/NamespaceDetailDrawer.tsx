@@ -138,7 +138,6 @@ export function NamespaceDetailDrawer({
                     <summary className="flex cursor-pointer items-center justify-between gap-2 px-4 py-2.5 text-sm">
                       <span className="flex items-center gap-2">
                         <span className="font-medium text-txt">{meta.label}</span>
-                        <Badge variant="magma">{meta.feature}</Badge>
                       </span>
                       <Badge variant={empty ? 'warning' : 'ok'}>
                         {empty ? 'default' : 'configured'}

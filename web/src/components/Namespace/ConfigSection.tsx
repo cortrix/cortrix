@@ -1,4 +1,3 @@
-import { BookOpenIcon } from '@heroicons/react/24/outline';
 import { JsonEditor } from './JsonEditor';
 import type { ConfigMeta } from './namespaceConfigMeta';
 
@@ -15,7 +14,6 @@ interface ConfigSectionProps {
   onChange: (text: string) => void;
   /** Parse error message, if the current text is not valid JSON. */
   error?: string | null;
-  learnMoreLabel: string;
 }
 
 export function ConfigSection({
@@ -23,7 +21,6 @@ export function ConfigSection({
   value,
   onChange,
   error,
-  learnMoreLabel,
 }: ConfigSectionProps) {
   const isEmpty = value.trim() === '' || value.trim() === '{}';
 
@@ -48,15 +45,6 @@ export function ConfigSection({
               Insert example
             </button>
           )}
-          <a
-            href={`/docs/features/${meta.feature.toLowerCase()}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-muted hover:text-txt"
-          >
-            <BookOpenIcon className="h-4 w-4" aria-hidden="true" />
-            {learnMoreLabel}
-          </a>
         </div>
       </div>
       <JsonEditor

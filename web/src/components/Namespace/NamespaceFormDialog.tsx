@@ -288,7 +288,6 @@ export function NamespaceFormDialog({
                   value={configText[meta.key]}
                   onChange={(text) => setConfig(meta.key, text)}
                   error={configErrors[meta.key]}
-                  learnMoreLabel={t('common.learnMore')}
                 />
               ))}
             </TabPanel>
@@ -303,7 +302,6 @@ export function NamespaceFormDialog({
                 value={configText[meta.key]}
                 onChange={(text) => setConfig(meta.key, text)}
                 error={configErrors[meta.key]}
-                learnMoreLabel={t('common.learnMore')}
               />
             ))}
             <div>

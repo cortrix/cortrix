@@ -17,14 +17,13 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
-        // § 14.2 vendor chunking. Monaco (editor-vendor) is the heaviest and is
-        // reached only via the React.lazy JsonEditor, so it is pulled fully out
-        // of the entry graph here + on demand at the import site.
+        // § 14.2 vendor chunking. (The former editor-vendor / Monaco chunk was
+        // dropped: JsonEditor is now a self-contained textarea — see JsonEditor.tsx
+        // for why Monaco's CDN-loaded core did not work in the self-hosted deploy.)
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'state-vendor': ['zustand', '@tanstack/react-query'],
           'ui-vendor': ['@headlessui/react', '@heroicons/react'],
-          'editor-vendor': ['@monaco-editor/react'],
         },
       },
     },
