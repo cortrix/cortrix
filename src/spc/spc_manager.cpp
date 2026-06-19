@@ -77,6 +77,13 @@ int SPCManager::ProcessParsedDoc(spc::ParsedDoc& parsed, SPCTask& task) {
         doc.mime_type = task.mime_type;
         doc.processing_level = task.processing_level;
         doc.status = DocStatus::kProcessing;
+        // Persist caller-supplied document metadata onto the row, mirroring
+        // upload_handler (doc.metadata_json = req.metadata_json). The F42 async batch
+        // path dropped this, so user metadata (e.g. an external corpus id) survived
+        // only inside the F08 META block and never round-tripped to query results
+        // (post_filter reads documents.metadata_json). System/block metadata still wins
+        // on key collision via post_filter's doc→block overlay.
+        doc.metadata_json = task.metadata_json;
         if (facade.store().doc_create(doc) != 0) {
             task.stage = SPCStage::kError;
             task.error_message = "doc_create failed for doc_id=" + task.doc_id;

@@ -131,11 +131,19 @@ Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
         SPCTask spc_task;
         spc_task.doc_id = task.doc_id;
         spc_task.namespace_name = task.namespace_id;
-        spc_task.source_path = task.filepath;
+        // source_path is the document's identity/display name on the row (the list
+        // surfaces it as "filename"), NOT the parse input — parsing already ran on
+        // task.filepath above. Use the caller's original filename so batch-ingested
+        // docs show their real name (mirroring upload_handler), instead of the internal
+        // batch_tmp materialize path. Fall back to filepath if no filename was given.
+        spc_task.source_path = task.filename.empty() ? task.filepath : task.filename;
         spc_task.content_hash = task.content_hash;
         spc_task.processing_level = 3;  // L3 full processing for async large docs
         spc_task.source_type = "file";
         spc_task.mime_type = InferMimeFromFilename(task.filename);
+        // Carry caller-supplied document metadata (e.g. an external corpus id) so it
+        // round-trips to query results (post_filter reads documents.metadata_json).
+        spc_task.metadata_json = task.metadata_json;
         // §4.1.2 ② — the sync call leaves SPCTask.cancelled false; post-parse mid-flight
         // cancel is Phase 2 (cancel's main checkpoint is the F06 per-page parse above).
         int rc = spc_mgr_->ProcessParsedDoc(result, spc_task);

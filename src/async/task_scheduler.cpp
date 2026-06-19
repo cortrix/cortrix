@@ -53,6 +53,7 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
     task.doc_id = req.doc_id;
     task.content_hash = req.content_hash;
     task.trace_id = req.trace_id;  // topic 6 — populated during D3 implementation
+    task.metadata_json = req.metadata_json;  // caller doc metadata → persisted on the task
     task.total_pages = req.total_pages;
     task.task_type = req.task_type;
     task.status = task_status::kQueued;

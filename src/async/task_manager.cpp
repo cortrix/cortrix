@@ -101,12 +101,13 @@ void BindText(sqlite3_stmt* stmt, int idx, const std::string& v) {
 /// 6 status, 7 task_type, 8 cancel_requested, 9 total_pages, 10 processed_pages,
 /// 11 failed_pages, 12 progress_pct, 13 eta_seconds, 14 current_phase,
 /// 15 worker_id, 16 trace_id, 17 error_code, 18 error_msg, 19 structured_data,
-/// 20 created_at, 21 updated_at, 22 started_at, 23 completed_at.
+/// 20 created_at, 21 updated_at, 22 started_at, 23 completed_at, 24 metadata_json.
 constexpr const char* kSelectColumns =
     "task_id, namespace_id, filename, filepath, doc_id, content_hash, status, "
     "task_type, cancel_requested, total_pages, processed_pages, failed_pages, "
     "progress_pct, eta_seconds, current_phase, worker_id, trace_id, error_code, "
-    "error_msg, structured_data, created_at, updated_at, started_at, completed_at";
+    "error_msg, structured_data, created_at, updated_at, started_at, completed_at, "
+    "metadata_json";
 
 TaskInfo ReadRow(sqlite3_stmt* stmt) {
     TaskInfo t;
@@ -137,6 +138,7 @@ TaskInfo ReadRow(sqlite3_stmt* stmt) {
     t.updated_at       = SafeColText(stmt, 21);
     t.started_at       = SafeColText(stmt, 22);
     t.completed_at     = SafeColText(stmt, 23);
+    t.metadata_json    = SafeColText(stmt, 24);
     return t;
 }
 
@@ -198,6 +200,7 @@ Status TaskManager::CreateTasksTable() {
             updated_at       TEXT NOT NULL,
             started_at       TEXT,
             completed_at     TEXT,
+            metadata_json    TEXT,
             CHECK (status IN ('queued','processing','cancelling','completed','failed','cancelled'))
         );
         CREATE INDEX IF NOT EXISTS idx_tasks_namespace  ON tasks(namespace_id);
@@ -208,6 +211,10 @@ Status TaskManager::CreateTasksTable() {
     if (ExecSQL(db_, sql) != SQLITE_OK) {
         return F42Status(F42ErrorCode::kStorageFailed, "create tasks table");
     }
+    // Idempotent migration for tasks.db created before metadata_json existed. ALTER
+    // fails harmlessly ("duplicate column name") when the column is already present
+    // (fresh DBs got it from CREATE above), so the return code is intentionally ignored.
+    ExecSQL(db_, "ALTER TABLE tasks ADD COLUMN metadata_json TEXT");
     return Status::Ok();
 }
 
@@ -228,8 +235,8 @@ Result<TaskInfo> TaskManager::CreateTask(TaskInfo task) {
         " status, task_type, cancel_requested, total_pages, processed_pages, "
         " failed_pages, progress_pct, eta_seconds, current_phase, worker_id, "
         " trace_id, error_code, error_msg, structured_data, created_at, updated_at, "
-        " started_at, completed_at) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        " started_at, completed_at, metadata_json) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -261,6 +268,7 @@ Result<TaskInfo> TaskManager::CreateTask(TaskInfo task) {
     BindText(stmt, 22, task.updated_at);
     BindNullableText(stmt, 23, task.started_at);
     BindNullableText(stmt, 24, task.completed_at);
+    BindNullableText(stmt, 25, task.metadata_json);
 
     int rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);

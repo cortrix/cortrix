@@ -81,6 +81,9 @@ TEST_F(TaskManagerTest, GetRoundTripsAllFields) {
     TaskInfo t = MakeTask("ns1", "doc1", "hash-abc");
     t.trace_id = "trace-123";
     t.total_pages = 1500;
+    // Caller document metadata must survive the queue so it can reach the doc row and
+    // round-trip to query results (the batch path dropped it before this column existed).
+    t.metadata_json = R"({"beir_corpus_id":"CID-42","tag":"unit"})";
     auto created = mgr_.CreateTask(t);
     ASSERT_TRUE(created.ok());
 
@@ -93,6 +96,7 @@ TEST_F(TaskManagerTest, GetRoundTripsAllFields) {
     EXPECT_EQ(got.value().total_pages, 1500);
     EXPECT_EQ(got.value().worker_id, -1);  // unassigned → NULL → -1
     EXPECT_TRUE(got.value().failed_pages.empty());
+    EXPECT_EQ(got.value().metadata_json, R"({"beir_corpus_id":"CID-42","tag":"unit"})");
 }
 
 TEST_F(TaskManagerTest, GetMissingReturnsTaskNotFound) {

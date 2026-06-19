@@ -228,6 +228,7 @@ BatchHttpResult BatchSubmitService::Submit(const BatchRequest& req) {
         // The client filename's extension drives parser selection (".txt" fallback).
         sreq.filepath = MaterializeContent(d.doc_id, d.content, d.filename);
         sreq.filename = d.filename.empty() ? (d.doc_id + ".txt") : d.filename;
+        sreq.metadata_json = d.metadata_json;  // carry caller doc metadata through the F42 task
         sreq.task_type = async::kTaskDocParse;
 
         Result<async::TaskInfo> r = submitter_->Submit(sreq);

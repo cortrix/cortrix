@@ -55,6 +55,7 @@ struct TaskInfo {
     std::string updated_at;
     std::string started_at;          ///< actual processing start time
     std::string completed_at;
+    std::string metadata_json;       ///< caller-supplied document metadata (JSON object string); rides to the doc row so it round-trips to query results
 };
 
 /// Submission request handed to TaskScheduler::Enqueue / TaskManager::CreateTask
@@ -66,6 +67,7 @@ struct SubmitRequest {
     std::string doc_id;          ///< Phase 1: content-hash-derived doc identity
     std::string content_hash;    ///< topic 2.2 debounce/dedup
     std::string trace_id;        ///< topic 6 — extracted from the traceparent header at D3 implementation
+    std::string metadata_json;   ///< caller-supplied document metadata (JSON object string); persisted on the task so it survives the queue to the doc row
     int total_pages = 0;         ///< total page count estimated by pre-check
     int task_type = 1;           ///< async::TaskType value; default kTaskDocParse
 };
