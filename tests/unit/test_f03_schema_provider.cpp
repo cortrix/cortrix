@@ -58,7 +58,7 @@ bool HasIndex(sqlite3* db, const char* index) {
 TEST(F03SchemaProviderTest, IdentityAndVersion) {
     F03SchemaProvider p;
     EXPECT_EQ(p.FeatureName(), "F03");
-    EXPECT_EQ(p.CurrentVersion(), 1);
+    EXPECT_EQ(p.CurrentVersion(), 2);
 }
 
 TEST(F03SchemaProviderTest, AddsThreeBlockColumnsAndEntities) {
@@ -109,7 +109,7 @@ TEST(F03SchemaProviderTest, UnexpectedVersionStepIsError) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     F03SchemaProvider p;
-    Status st = p.Migrate(db, 1, 2);  // no Phase 2 bump yet
+    Status st = p.Migrate(db, 2, 3);  // beyond CurrentVersion() (2) — no v3 yet
     EXPECT_FALSE(st.ok());
     EXPECT_NE(st.message().find("CX_ERR_SCHEMA_VERSION_MISMATCH"), std::string::npos);
     sqlite3_close(db);
@@ -169,9 +169,75 @@ TEST(F03SchemaProviderTest, RegistersAndMigratesViaMigratorUnit) {
     m.Register(&p);
     Status st = m.MigrateUnit(db, "unit-1");
     ASSERT_TRUE(st.ok()) << st.message();
-    EXPECT_EQ(m.CurrentVersion(db, "F03"), 1);
+    EXPECT_EQ(m.CurrentVersion(db, "F03"), 2);
     EXPECT_TRUE(HasColumn(db, "blocks", "enriched_score"));
     EXPECT_TRUE(HasTable(db, "entities"));
+    sqlite3_close(db);
+}
+
+// R9 Tier C regression: the entities.block_id FK must be ON DELETE CASCADE so GC
+// hard-delete / purge (DELETE FROM blocks) reclaims blocks instead of failing with
+// "FOREIGN KEY constraint failed". Pins the live finding that unit-level GC tests
+// missed — their store had no entity rows pinning the blocks.
+TEST(F03SchemaProviderTest, EntitiesFkCascadeAllowsBlockDelete) {
+    sqlite3* db = nullptr;
+    ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    ASSERT_EQ(sqlite3_exec(db, "PRAGMA foreign_keys=ON", nullptr, nullptr, nullptr), SQLITE_OK);
+    CreateBlocksTable(db);
+    F03SchemaProvider p;
+    ASSERT_TRUE(p.Migrate(db, 0, 1).ok());
+    ASSERT_EQ(sqlite3_exec(db,
+        "INSERT INTO blocks (block_id, doc_id, chunk_index, content_text) VALUES (1,'d1',0,'x');"
+        "INSERT INTO entities (block_id, text, type) VALUES (1,'Acme','ORG');",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    // Deleting the block must succeed and cascade-remove the entity (not FK-fail).
+    char* err = nullptr;
+    EXPECT_EQ(sqlite3_exec(db, "DELETE FROM blocks WHERE block_id=1", nullptr, nullptr, &err),
+              SQLITE_OK) << (err ? err : "");
+    sqlite3_free(err);
+    sqlite3_stmt* st = nullptr;
+    ASSERT_EQ(sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM entities", -1, &st, nullptr), SQLITE_OK);
+    ASSERT_EQ(sqlite3_step(st), SQLITE_ROW);
+    EXPECT_EQ(sqlite3_column_int(st, 0), 0);  // cascade removed the orphan entity
+    sqlite3_finalize(st);
+    sqlite3_close(db);
+}
+
+// The in-place rebuild of a pre-CASCADE entities table preserves rows and yields a
+// cascading FK. Simulates an existing unit created before the R9 Tier C fix.
+TEST(F03SchemaProviderTest, RebuildsPreCascadeEntitiesTable) {
+    sqlite3* db = nullptr;
+    ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    ASSERT_EQ(sqlite3_exec(db, "PRAGMA foreign_keys=ON", nullptr, nullptr, nullptr), SQLITE_OK);
+    CreateBlocksTable(db);
+    // Old-shape entities table (no ON DELETE CASCADE) + a block and a referencing entity.
+    ASSERT_EQ(sqlite3_exec(db,
+        "CREATE TABLE entities (entity_id INTEGER PRIMARY KEY, "
+        "  block_id INTEGER NOT NULL REFERENCES blocks(block_id), "
+        "  text TEXT NOT NULL, type TEXT NOT NULL, start_offset INTEGER, end_offset INTEGER);"
+        "INSERT INTO blocks (block_id, doc_id, chunk_index, content_text) VALUES (1,'d1',0,'x');"
+        "INSERT INTO entities (entity_id, block_id, text, type) VALUES (7,1,'Acme','ORG');",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    // Pre-state: deleting the block FK-fails (the bug being fixed).
+    EXPECT_NE(sqlite3_exec(db, "DELETE FROM blocks WHERE block_id=1", nullptr, nullptr, nullptr),
+              SQLITE_OK);
+
+    F03SchemaProvider p;
+    ASSERT_TRUE(p.Migrate(db, 0, 1).ok());  // rebuilds entities with CASCADE
+
+    // Row preserved through the rebuild.
+    sqlite3_stmt* st = nullptr;
+    ASSERT_EQ(sqlite3_prepare_v2(db, "SELECT block_id FROM entities WHERE entity_id=7",
+                                 -1, &st, nullptr), SQLITE_OK);
+    ASSERT_EQ(sqlite3_step(st), SQLITE_ROW);
+    EXPECT_EQ(sqlite3_column_int(st, 0), 1);
+    sqlite3_finalize(st);
+
+    // Now the block delete cascades cleanly.
+    char* err = nullptr;
+    EXPECT_EQ(sqlite3_exec(db, "DELETE FROM blocks WHERE block_id=1", nullptr, nullptr, &err),
+              SQLITE_OK) << (err ? err : "");
+    sqlite3_free(err);
     sqlite3_close(db);
 }
 

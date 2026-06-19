@@ -31,12 +31,15 @@ public:
     /// F12 registration key (aligns with F02/F06/F09 SchemaProvider naming).
     std::string FeatureName() const override { return "F03"; }
 
-    /// Schema version. V1 = blocks +3 cols + entities + FTS5.
-    int CurrentVersion() const override { return 1; }
+    /// Schema version. V1 = blocks +3 cols + entities + FTS5. V2 (R9 Tier C) =
+    /// entities.block_id FK gains ON DELETE CASCADE so GC hard-delete / purge can
+    /// reclaim blocks; bumped from 1 so existing units re-run Migrate and rebuild
+    /// their pre-cascade entities table in place.
+    int CurrentVersion() const override { return 2; }
 
-    /// Phase 1 (from_ver 0 → 1): apply the per-Unit DDL above (idempotent).
-    /// An already-current (n → n) call is accepted defensively. Any other step
-    /// is a version mismatch until a future schema bump implements it.
+    /// Forward, idempotent migration (0→1, 0→2, 1→2). The single pass applies the
+    /// per-Unit DDL and, at v2, rebuilds any pre-cascade entities table. Backward
+    /// or beyond-current steps are a version mismatch.
     Status Migrate(sqlite3* db, int from_ver, int to_ver) override;
 };
 

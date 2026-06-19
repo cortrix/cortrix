@@ -47,11 +47,35 @@ Status AddBlocksColumnIfAbsent(sqlite3* db, const char* column, const char* ddl,
     return Exec(db, ddl, what);
 }
 
+// True iff the existing `entities` table's stored DDL declares ON DELETE CASCADE
+// on its blocks(block_id) FK. Older units created the table WITHOUT cascade, which
+// made every GC hard-delete / purge fail with "FOREIGN KEY constraint failed"
+// (the orphan entity rows pin the block) — R9 Tier C live finding.
+bool EntitiesFkHasCascade(sqlite3* db) {
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='entities'";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    bool has_cascade = false;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        const unsigned char* s = sqlite3_column_text(stmt, 0);
+        if (s != nullptr) {
+            has_cascade =
+                std::string(reinterpret_cast<const char*>(s)).find("CASCADE") !=
+                std::string::npos;
+        }
+    }
+    sqlite3_finalize(stmt);
+    return has_cascade;
+}
+
 }  // namespace
 
 Status F03SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
-    const bool init = (from_ver == 0 && to_ver == 1);
-    if (!init && from_ver != to_ver) {
+    // Forward-only, idempotent. A single pass covers 0->1, 0->2 and the 1->2 backfill
+    // (the entities FK CASCADE rebuild below), so accept any forward step up to the
+    // current version; reject backward / beyond-current as a mismatch.
+    if (from_ver < 0 || to_ver > CurrentVersion() || to_ver < from_ver) {
         return Status::InvalidArgument(
             "CX_ERR_SCHEMA_VERSION_MISMATCH: F03 unsupported migration " +
             std::to_string(from_ver) + " -> " + std::to_string(to_ver));
@@ -91,10 +115,32 @@ Status F03SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
     }
 
     // --- entities table + indexes + FTS5 (topic 2.6, F03 self-maintained) — idempotent ---
+    // R9 Tier C fix: rebuild pre-cascade `entities` tables in place. SQLite cannot
+    // ALTER a FK, so when an old (no-CASCADE) table is present we recreate it via the
+    // standard table-rebuild and copy the rows. block_id values still reference live
+    // blocks, so the FK holds during the copy with foreign_keys ON. entities_fts is an
+    // external-content vtable keyed on entity_id (preserved by the copy) — left intact.
+    if (TableExists(db, "entities") && !EntitiesFkHasCascade(db)) {
+        if (Status s = Exec(db,
+                "CREATE TABLE entities_new ("
+                "  entity_id INTEGER PRIMARY KEY,"
+                "  block_id INTEGER NOT NULL REFERENCES blocks(block_id) ON DELETE CASCADE,"
+                "  text TEXT NOT NULL,"
+                "  type TEXT NOT NULL,"
+                "  start_offset INTEGER,"
+                "  end_offset INTEGER);"
+                "INSERT INTO entities_new (entity_id, block_id, text, type, start_offset, end_offset) "
+                "  SELECT entity_id, block_id, text, type, start_offset, end_offset FROM entities;"
+                "DROP TABLE entities;"
+                "ALTER TABLE entities_new RENAME TO entities;",
+                "rebuild entities FK -> ON DELETE CASCADE"); !s.ok()) {
+            return s;
+        }
+    }
     if (Status s = Exec(db,
             "CREATE TABLE IF NOT EXISTS entities ("
             "  entity_id INTEGER PRIMARY KEY,"
-            "  block_id INTEGER NOT NULL REFERENCES blocks(block_id),"
+            "  block_id INTEGER NOT NULL REFERENCES blocks(block_id) ON DELETE CASCADE,"
             "  text TEXT NOT NULL,"
             "  type TEXT NOT NULL,"
             "  start_offset INTEGER,"
