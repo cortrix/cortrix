@@ -29,7 +29,7 @@ This installs the `cortrix-mcp` console command (the MCP stdio server entry poin
 
 ```bash
 docker run -i --rm \
-  -e CORTRIX_URL=http://host.docker.internal:8080 \
+  -e CORTRIX_URL=http://host.docker.internal:8420 \
   -e CORTRIX_API_KEY=sk-cortrix-... \
   cortrix/mcp:v1.0.0
 ```
@@ -40,13 +40,13 @@ All configuration is via environment variables:
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `CORTRIX_URL` | cortrix-server base URL | `http://127.0.0.1:8080` |
+| `CORTRIX_URL` | cortrix-server base URL | `http://127.0.0.1:8420` |
 | `CORTRIX_NAMESPACE` | default namespace | `default` |
 | `CORTRIX_API_KEY` | Bearer token (P08 API key) | *(empty)* |
 | `CORTRIX_MCP_ADMIN` | admin override for the 2 admin tools (P08 role fallback) | `false` |
 | `CORTRIX_MCP_TIMEOUT` | HTTP timeout in seconds | `30` |
 
-> The server connects to cortrix-server on port **8080** by default (matching the
+> The server connects to cortrix-server on port **8420** by default (matching the
 > server's `config.h` default and the MVP).
 
 ## IDE configuration examples
@@ -61,7 +61,7 @@ All configuration is via environment variables:
     "cortrix": {
       "command": "cortrix-mcp",
       "env": {
-        "CORTRIX_URL": "http://127.0.0.1:8080",
+        "CORTRIX_URL": "http://127.0.0.1:8420",
         "CORTRIX_API_KEY": "sk-cortrix-..."
       }
     }
@@ -78,7 +78,7 @@ Docker variant:
       "command": "docker",
       "args": [
         "run", "-i", "--rm",
-        "-e", "CORTRIX_URL=http://host.docker.internal:8080",
+        "-e", "CORTRIX_URL=http://host.docker.internal:8420",
         "-e", "CORTRIX_API_KEY=sk-cortrix-...",
         "cortrix/mcp:v1.0.0"
       ]
@@ -97,7 +97,7 @@ Docker variant:
     "cortrix": {
       "command": "cortrix-mcp",
       "env": {
-        "CORTRIX_URL": "http://127.0.0.1:8080",
+        "CORTRIX_URL": "http://127.0.0.1:8420",
         "CORTRIX_API_KEY": "sk-cortrix-..."
       },
       "disabled": false
@@ -116,7 +116,7 @@ Docker variant:
     "cortrix": {
       "command": "cortrix-mcp",
       "env": {
-        "CORTRIX_URL": "http://127.0.0.1:8080",
+        "CORTRIX_URL": "http://127.0.0.1:8420",
         "CORTRIX_API_KEY": "sk-cortrix-..."
       }
     }

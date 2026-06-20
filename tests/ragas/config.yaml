@@ -14,7 +14,7 @@ dataset:
   min_items: 20
 
 target:
-  base_url: http://localhost:8080
+  base_url: http://localhost:8420
   namespace: ragas-eval
   top_k: 5
 

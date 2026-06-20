@@ -29,7 +29,7 @@ for i in $(seq 1 "$TOTAL_CHECKS"); do
 
     # Health check
     HEALTH_START=$(date +%s.%N)
-    if HEALTH=$(curl -s --max-time 5 http://localhost:8080/api/v1/health 2>&1); then
+    if HEALTH=$(curl -s --max-time 5 http://localhost:8420/api/v1/health 2>&1); then
         HEALTH_END=$(date +%s.%N)
         RESPONSE_TIME=$(echo "$HEALTH_END - $HEALTH_START" | bc)
 

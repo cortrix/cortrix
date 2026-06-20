@@ -1,7 +1,7 @@
 # =============================================================
 # F23 W3: Locust load profile (design: F23-tests.md §3.2 / §6.3)
 # Nightly: locust -f tests/load/locustfile.py --headless -u 100 -r 10
-#          --run-time 5m --host http://localhost:8080
+#          --run-time 5m --host http://localhost:8420
 #
 # Exercises the agent-facing hot paths: health, doc upload, query,
 # memory read. P95 is compared against the F08 baseline out-of-band

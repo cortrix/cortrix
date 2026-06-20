@@ -32,7 +32,7 @@ class Cortrix(BaseClient):
 
     Usage::
 
-        client = Cortrix(base_url="http://localhost:9090", api_key="sk-xxx")
+        client = Cortrix(base_url="http://localhost:8420", api_key="sk-xxx")
         results = client.search("contracts", "Party A breach clause", top_k=10)
     """
 

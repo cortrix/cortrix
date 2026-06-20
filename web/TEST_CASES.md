@@ -24,13 +24,13 @@ Test all six features of the Cortrix Web UI running at `http://localhost:5173`, 
 | Service | URL | Role |
 |---------|-----|------|
 | Vite Dev Server (React UI) | `http://localhost:5173` | Frontend SPA |
-| C++ Cortrix Engine | `http://localhost:8080` | Storage/Search API (`/api` proxy) |
+| C++ Cortrix Engine | `http://localhost:8420` | Storage/Search API (`/api` proxy) |
 | Cortrix Agent (FastAPI) | `http://localhost:8001` | Chat/LLM API (`/agent` proxy) |
 
 ### Vite Proxy Configuration
 
 ```
-/api  → http://localhost:8080    (C++ backend)
+/api  → http://localhost:8420    (C++ backend)
 /agent → http://localhost:8001   (FastAPI, strips /agent prefix)
 ```
 
@@ -48,7 +48,7 @@ Test all six features of the Cortrix Web UI running at `http://localhost:5173`, 
 ### Prerequisites
 
 - Node.js + pnpm installed, `cd web && pnpm dev` running on port 5173
-- C++ Cortrix binary running: `./cortrix-server --config config.yaml` on port 8080
+- C++ Cortrix binary running: `./cortrix-server --config config.yaml` on port 8420
 - Cortrix Agent running: `cd cortrix-agent && uvicorn main:app --port 8001`
 - Test files present:
   - `/tmp/test_cortrix_upload.pdf` (1.1 KB test PDF)
@@ -318,7 +318,7 @@ The upload feature is the primary data ingestion path. All tests must pass.
 3. Click submit button
 
 **Expected Results**:
-- POST `http://localhost:5173/api/v1/query` (proxied to 8080) returns HTTP 200
+- POST `http://localhost:5173/api/v1/query` (proxied to 8420) returns HTTP 200
 - Response JSON contains `results` array and `meta` object
 - `meta.routes_used` includes "vector" and "bm25"
 - `meta.latency_ms` is populated
@@ -897,7 +897,7 @@ The upload feature is the primary data ingestion path. All tests must pass.
 **Priority**: High
 **Category**: Integration
 
-**API Call**: `GET http://localhost:8080/api/v1/connector/status`
+**API Call**: `GET http://localhost:8420/api/v1/connector/status`
 
 **Expected Response**:
 ```json

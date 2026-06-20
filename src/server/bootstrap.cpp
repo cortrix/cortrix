@@ -15,6 +15,9 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/auth/api_key_service.h"
 #include "cortrix/auth/bootstrap_handler.h"
+#include "cortrix/auth/admin_users_service.h"      // [FA1 R11] §2.13-bis admin/users
+#include "cortrix/auth/jwt_secret_service.h"        // [FA1 R11] §2.11 JWT rotation
+#include "cortrix/auth/pbkdf2_password_hasher.h"    // [FA1 R11] invite-mode create hasher
 #include "cortrix/server/routes/auth_routes.h"
 #include "cortrix/namespace/namespace_manager.h"
 // [D3.5 wire ①②] F12 catalog + F05 NamespacePool runtime resource stack
@@ -115,6 +118,8 @@
 #include "cortrix/resource/namespace_facade.h"   // [gap⑤] resume re-hydrates tasks from the doc row
 #include "cortrix/deploy/health_routes.h"
 #include "cortrix/health/readiness.h"  // F20 readiness contract — components registered at wiring
+#include "cortrix/security/env_secret_provider.h"      // F20-6 CreateSecretProvider() for /ready
+#include "cortrix/security/secret_provider_readiness.h" // F20-6 secret_provider readiness adapter
 #include "cortrix/deploy/metrics_server.h"
 #include "cortrix/deploy/deploy_metrics.h"
 #include "cortrix/deploy/disk_monitor.h"
@@ -251,6 +256,19 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::auth::ApiKeyService api_key_service(platform_db.db());
     auth.SetApiKeyService(&api_key_service);
     cortrix::auth::BootstrapHandler bootstrap_handler(platform_db.db(), &api_key_service);
+
+    // [FA1 R11] P08 admin/users (§2.13-bis) + JWT rotation (§2.11) backends.
+    // The PBKDF2 hasher is the invite-mode create path's password hasher (same
+    // TECH_DEBT-P08-PBKDF2-PLACEHOLDER seam as the login flow). JwtSecretService
+    // LoadOrInit reads/auto-generates the HS256 secret in platform.db auth_secrets
+    // (§2.11) so the rotation route has a live current secret to rotate.
+    cortrix::auth::Pbkdf2PasswordHasher admin_users_hasher;
+    cortrix::auth::AdminUsersService admin_users_service(platform_db.db(), &admin_users_hasher);
+    cortrix::auth::JwtSecretService jwt_secret_service(platform_db.db());
+    if (auto js = jwt_secret_service.LoadOrInit(); !js.ok()) {
+        CORTRIX_LOG_ERROR("main", "JWT secret LoadOrInit failed (rotation route disabled): {}",
+                          js.message());
+    }
     if (auto token = bootstrap_handler.GenerateToken(); token.ok() && !token.value().empty()) {
         // First start: surface the one-time setup URL on stdout (P08 §2.13.1). The
         // token lives in memory only; visiting either bootstrap endpoint mints the
@@ -926,6 +944,12 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // the self-hosted UI is usable out-of-the-box; auth-enabled → 401 (login). The
     // JWT /auth/me is cloud-enterprise; this CE shim avoids the no-auth login dead-end.
     cortrix::RegisterAuthSessionRoute(server.server(), auth);
+    // [FA1 R11] P08 §2.13-bis admin/users 5 endpoints (admin-gated; mutations write
+    // operation_log) + §2.11 JWT secret rotation endpoint. AdminGuard adds the
+    // loopback IP layer on the /api/v1/admin/* prefix.
+    cortrix::RegisterAdminUsersRoutes(server.server(), admin_users_service, auth,
+                                      obs_module.logger().get());
+    cortrix::RegisterJwtRotateRoute(server.server(), jwt_secret_service, auth);
     // [D3.5 r2 · Wave P · P2] F16a DB-import 6-endpoint surface (admin-gated;
     // /admin/db-connections* under AdminGuard, /import/* Layer-2 only per §6.1).
     cortrix::RegisterImportRoutes(server.server(), import_handler, auth);
@@ -946,18 +970,66 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // Dual health endpoint (F24 main impl): /api/v1/system/health/{live,ready}.
     // [D3.5 wire · Derek approach A] /ready aggregates the F20 ReadinessRegistry (unified
     // abstraction — replaced F24's standalone HealthProviders). Register the readiness
-    // components here. `disk` has a real probe today (DiskMonitor::ShouldRejectWrites).
-    // The other 4 design-sec-8.4 components — catalog (F12 IBloomFilter), vector_index
-    // (F01 model load + WAL replay), spc_pipeline (F06/F03 workers), memory_store (MEM)
-    // — plus secret_provider register here as their owning Features expose IsReady()
-    // (F20-S5, deferred — intentionally NOT stubbed ready, to avoid a false 200).
+    // components here (design F20 §8.3/§8.4). Every probe below reflects REAL runtime state
+    // — none is a constant-200 stub (a false-ready probe is worse than an honest deferral,
+    // because it makes K8s route traffic to a not-yet-ready pod). Probes are lambdas
+    // evaluated per request, so they observe live state (e.g. before spc_mgr.Start() the
+    // worker pool reports 0 workers → spc_pipeline not_ready → /ready returns 503, as
+    // designed for the "warming up" window).
     cortrix::health::ReadinessRegistry readiness;
+
+    // disk (real): DiskMonitor admission gate.
     readiness.Register("disk", [&f24_disk_monitor]() {
         cortrix::health::ComponentReadiness r;
         r.ready = !f24_disk_monitor.ShouldRejectWrites();
         r.detail["stage"] = std::string(cortrix::deploy::ToString(f24_disk_monitor.Usage().stage));
         return r;
     });
+
+    // catalog (real): the global catalog.db handle is non-null only after a successful
+    // CatalogDb::Open() above (which also ran the schema migration). That is the
+    // startup-completion signal design §8.4 refers to as "catalog.db ready". The per-NS F12
+    // IBloomFilter::IsReady() lives on each namespace's BloomFilter (no global accessor in
+    // bootstrap scope — namespaces are created lazily via INSRouter), so bloom_filter_ready
+    // is reported per-NS through that Feature's own surface, not aggregated here; the
+    // catalog component honestly probes only the global catalog.db open state.
+    readiness.Register("catalog", [&catalog_db]() {
+        cortrix::health::ComponentReadiness r;
+        r.ready = (catalog_db.db() != nullptr);
+        r.detail["catalog_db_open"] = r.ready;
+        return r;
+    });
+
+    // secret_provider (real, F20-6): construct the configured provider (env in V1.0) and
+    // register the F20 adapter, which reports ready iff ISecretProvider::IsHealthy() and
+    // surfaces provider_type.
+    auto secret_provider = cortrix::security::CreateSecretProvider();
+    readiness.Register(
+        std::make_shared<cortrix::security::SecretProviderReadiness>(secret_provider));
+
+    // spc_pipeline (real, F06/F03): ready iff the WorkerPool has live worker threads
+    // (worker_count() > 0 only after WorkerPool::Start(), driven by spc_mgr.Start() below).
+    // queue_depth = SPCManager::QueueSize() — design §8.3 example field. Captures the two
+    // objects by reference so the probe sees the current (post-Start) state.
+    readiness.Register("spc_pipeline", [&worker_pool, &spc_mgr]() {
+        cortrix::health::ComponentReadiness r;
+        const int workers = worker_pool.worker_count();
+        r.ready = (workers > 0);
+        r.detail["workers"] = workers;
+        r.detail["queue_depth"] = static_cast<int64_t>(spc_mgr.QueueSize());
+        if (!r.ready) {
+            r.detail["reason"] = "workers_not_started";
+        }
+        return r;
+    });
+
+    // vector_index (F01) + memory_store (MEM): honest deferred. Both are PER-NAMESPACE in
+    // V1.0 — the P-HNSW index (model load + WAL replay) and memory.db are created lazily
+    // when a namespace is first used, so there is no single global "loaded/initialized"
+    // signal to probe at the process level. Rather than stub a false 200, we do NOT register
+    // them here (so they are absent from the /ready body, not falsely "ok"). Per-NS readiness
+    // is exposed through F01 / MEM surfaces; a global aggregate is a Phase-1.5 item once a
+    // namespace registry with readiness rollup exists.
     cortrix::deploy::RegisterHealthRoutes(
         server.server(), readiness,
         []() { return g_shutting_down.load(); },

@@ -30,9 +30,12 @@ import { LoadingSpinner } from './components/Common/LoadingSpinner';
 //
 // Ent placeholder routes (/ent/text-to-sql, /ent/audit-log, /ent/multi-tenant,
 // § 10.1) are registered in V1.0 already (R4/S6) so bookmarks survive the V1.5
-// swap; each page is a feature-flag gate (§ 10.2) rendering the marketing
-// placeholder until the backend reports the feature enabled. The Health
-// dashboard (/health, F20-7 /live + /ready) is also a guarded route (R4/S7).
+// swap; each page is a feature-flag gate (§ 10.2 — EntPages) rendering the
+// marketing PlaceholderPage until the backend reports the feature enabled. The
+// Health dashboard (/health, F20-7 /live + /ready) is also a guarded route
+// (R4/S7).
+//   /ent/text-to-sql  -> TextToSqlPage   /ent/audit-log -> AuditLogPage
+//   /ent/multi-tenant -> MultiTenantPage
 
 // Lazy route chunks (named exports → resolve to a default for React.lazy).
 const UploadPage = lazy(() =>
@@ -58,6 +61,15 @@ const UsersPage = lazy(() =>
 );
 const OperationLogPage = lazy(() =>
   import('./pages/admin/OperationLogPage').then((m) => ({ default: m.OperationLogPage })),
+);
+const TextToSqlPage = lazy(() =>
+  import('./components/EntPlaceholder/EntPages').then((m) => ({ default: m.TextToSqlPage })),
+);
+const AuditLogPage = lazy(() =>
+  import('./components/EntPlaceholder/EntPages').then((m) => ({ default: m.AuditLogPage })),
+);
+const MultiTenantPage = lazy(() =>
+  import('./components/EntPlaceholder/EntPages').then((m) => ({ default: m.MultiTenantPage })),
 );
 
 function RouteFallback() {
@@ -95,6 +107,12 @@ export function AppRoutes() {
             <Route path="memory" element={<MemoryPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="health" element={<HealthPage />} />
+
+            {/* Ent placeholders (P02a § 6 / § 10.1) — feature-flag gated pages,
+                registered in V1.0 so V1.5 bookmarks survive the swap. */}
+            <Route path="ent/text-to-sql" element={<TextToSqlPage />} />
+            <Route path="ent/audit-log" element={<AuditLogPage />} />
+            <Route path="ent/multi-tenant" element={<MultiTenantPage />} />
 
             {/* Admin (Day-2) — gated by admin role (P02a § 9-bis) */}
             <Route

@@ -219,6 +219,34 @@ class TestHttpShape(unittest.TestCase):
             cap.last.full_url.endswith("/api/v1/namespaces/my-ns/documents"))
         self.assertEqual(docs[0]["doc_id"], "d1")
 
+    def test_batch_submit_posts_documents_with_options(self):
+        resp = {
+            "results": [{"doc_id": "d1", "task_id": "t1", "status": "submitted"}],
+            "meta": {"succeeded": ["d1"], "failed": [],
+                     "coverage_ratio": 1.0, "total_submitted": 1},
+        }
+        client, _, cap = make_client(payloads=[resp])
+        out = client.batch_submit(
+            "ns",
+            [{"doc_id": "d1", "content": "x", "metadata": {"src": "web"}}],
+            on_duplicate="overwrite")
+        self.assertEqual(cap.last.method, "POST")
+        self.assertTrue(cap.last.full_url.endswith("/api/v1/documents/batch"))
+        body = cap.body_of()
+        self.assertEqual(body["namespace"], "ns")
+        self.assertEqual(body["documents"][0]["doc_id"], "d1")
+        self.assertEqual(
+            body["options"], {"async": True, "on_duplicate": "overwrite"})
+        # Full partial-success envelope returned verbatim (JSONB-out shape).
+        self.assertEqual(out["meta"]["coverage_ratio"], 1.0)
+
+    def test_batch_submit_defaults_async_true_skip(self):
+        client, _, cap = make_client(payloads=[{"results": [], "meta": {}}])
+        client.batch_submit("ns", [{"doc_id": "d1", "content": "x"}])
+        body = cap.body_of()
+        self.assertEqual(
+            body["options"], {"async": True, "on_duplicate": "skip"})
+
     def test_memory_search_posts_with_user_id(self):
         client, _, cap = make_client(payloads=[{"results": []}])
         client.memory_search("ns", "q", "user-42", 5)

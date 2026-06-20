@@ -35,7 +35,7 @@ info:
 servers:
   - url: https://api.cortrix.io/api/v1
     description: Cortrix Cloud
-  - url: http://localhost:9090/api/v1
+  - url: http://localhost:8420/api/v1
     description: Local development (cortrix-server default port)
 
 # Security schemes: API Key (Agent self-service first, create once use forever) or Bearer JWT.

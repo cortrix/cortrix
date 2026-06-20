@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "cortrix/chunker/types.h"
+#include "cortrix/store/parent_chunk_store_metrics.h"
 #include "cortrix/store/sqlite_parent_chunk_store.h"
 #include "cortrix/store/store_errors.h"
 
@@ -136,6 +137,71 @@ TEST_F(ParentChunkStoreTest, UnopenedStoreReturnsDbError) {
     auto r = closed.GetParent("x");
     EXPECT_FALSE(r.ok());
     EXPECT_NE(r.status().message().find(store_errors::kDbError), std::string::npos);
+}
+
+// --- F34 §2.5 lookup metrics (cortrix_parent_chunk_store_lookup_*) -------------
+
+// Uses an injected, isolated ParentChunkStoreMetrics so assertions don't depend
+// on the process-wide Instance() (other tests may also feed the singleton).
+class ParentChunkStoreMetricsTest : public ::testing::Test {
+protected:
+    ParentChunkStoreMetrics metrics;
+    SqliteParentChunkStore store{":memory:", &metrics};
+    void SetUp() override { ASSERT_TRUE(store.Open().ok()); }
+
+    using Result = ParentChunkStoreMetrics::LookupResult;
+};
+
+TEST_F(ParentChunkStoreMetricsTest, GetParentHitIncrementsHitAndLatency) {
+    ASSERT_TRUE(store.PutParentWithChildren(MakeParent("PM1"), {}).ok());
+    ASSERT_TRUE(store.GetParent("PM1").ok());
+    EXPECT_EQ(metrics.LookupCount(Result::kHit), 1u);
+    EXPECT_EQ(metrics.LookupCount(Result::kMiss), 0u);
+    EXPECT_EQ(metrics.LookupLatencyCount(), 1u);
+}
+
+TEST_F(ParentChunkStoreMetricsTest, GetParentMissIncrementsMissAndLatency) {
+    auto r = store.GetParent("nope");
+    EXPECT_FALSE(r.ok());
+    EXPECT_EQ(metrics.LookupCount(Result::kHit), 0u);
+    EXPECT_EQ(metrics.LookupCount(Result::kMiss), 1u);
+    EXPECT_EQ(metrics.LookupLatencyCount(), 1u);
+}
+
+TEST_F(ParentChunkStoreMetricsTest, BulkGetCountsHitsAndMissesPerId) {
+    ASSERT_TRUE(store.PutParentWithChildren(MakeParent("B1"), {}).ok());
+    ASSERT_TRUE(store.PutParentWithChildren(MakeParent("B2"), {}).ok());
+    auto r = store.BulkGetParents({"B1", "missing", "B2"});
+    ASSERT_TRUE(r.ok());
+    EXPECT_EQ(r.value().size(), 2u);
+    EXPECT_EQ(metrics.LookupCount(Result::kHit), 2u);
+    EXPECT_EQ(metrics.LookupCount(Result::kMiss), 1u);
+    EXPECT_EQ(metrics.LookupLatencyCount(), 3u);  // one observation per requested id
+}
+
+TEST_F(ParentChunkStoreMetricsTest, RenderOpenMetricsExposesBothSeries) {
+    ASSERT_TRUE(store.PutParentWithChildren(MakeParent("R1"), {}).ok());
+    ASSERT_TRUE(store.GetParent("R1").ok());
+    (void)store.GetParent("absent");
+    const std::string out = metrics.RenderOpenMetrics();
+    EXPECT_NE(out.find("cortrix_parent_chunk_store_lookup_total{result=\"hit\"} 1"),
+              std::string::npos);
+    EXPECT_NE(out.find("cortrix_parent_chunk_store_lookup_total{result=\"miss\"} 1"),
+              std::string::npos);
+    EXPECT_NE(out.find("cortrix_parent_chunk_store_lookup_latency_seconds_count 2"),
+              std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_parent_chunk_store_lookup_latency_seconds histogram"),
+              std::string::npos);
+}
+
+TEST_F(ParentChunkStoreMetricsTest, DefaultCtorBindsSingletonInstance) {
+    // Backward-compatible single-arg ctor routes to the process-wide singleton.
+    ParentChunkStoreMetrics::Instance().ResetForTest();
+    SqliteParentChunkStore s{":memory:"};
+    ASSERT_TRUE(s.Open().ok());
+    (void)s.GetParent("x");  // miss
+    EXPECT_EQ(ParentChunkStoreMetrics::Instance().LookupCount(Result::kMiss), 1u);
+    ParentChunkStoreMetrics::Instance().ResetForTest();
 }
 
 }  // namespace

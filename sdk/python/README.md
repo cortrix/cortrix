@@ -22,7 +22,7 @@ Requires Python 3.9+. The only runtime dependency is [`httpx`](https://www.pytho
 ```python
 from cortrix import Cortrix
 
-client = Cortrix(base_url="http://localhost:9090", api_key="cx_live_xxx")
+client = Cortrix(base_url="http://localhost:8420", api_key="cx_live_xxx")
 
 # Create a namespace and upload a document (async processing -> task)
 client.namespaces.create("contracts", display_name="Contracts")
@@ -47,7 +47,7 @@ import asyncio
 from cortrix import AsyncCortrix
 
 async def main():
-    async with AsyncCortrix(base_url="http://localhost:9090", api_key="cx_live_xxx") as client:
+    async with AsyncCortrix(base_url="http://localhost:8420", api_key="cx_live_xxx") as client:
         results = await client.search(["contracts", "support_docs"], "refund policy")
         return results
 

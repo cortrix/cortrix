@@ -7,10 +7,10 @@ mcp-server/cortrix_mcp_server.py.
 Usage:
     cortrix-mcp                          # stdio mode (installed entry point)
     python -m cortrix_mcp.server         # stdio mode (module)
-    CORTRIX_URL=http://127.0.0.1:8080 cortrix-mcp
+    CORTRIX_URL=http://127.0.0.1:8420 cortrix-mcp
 
 Environment variables (feature design section 5.3):
-    CORTRIX_URL         Cortrix backend URL                 (default http://127.0.0.1:8080)
+    CORTRIX_URL         Cortrix backend URL                 (default http://127.0.0.1:8420)
     CORTRIX_NAMESPACE   default namespace                   (default "default")
     CORTRIX_API_KEY     Bearer token (P08 API key)          (default empty)
     CORTRIX_MCP_ADMIN   admin override for F16a admin tools (default false)

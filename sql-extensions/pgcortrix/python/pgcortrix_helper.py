@@ -513,6 +513,24 @@ class PgcortrixClient:
         resp = self._get("/api/v1/namespaces/%s/documents" % namespace)
         return resp.get("documents", resp.get("results", []))
 
+    def batch_submit(self, namespace, documents, async_=True,
+                     on_duplicate="skip"):
+        """TD-F42-BULK: batch-submit up to 100 documents in one call.
+
+        ``documents`` is the already-decoded list of per-doc dicts (each with a
+        client-supplied doc_id + content; optional filename / metadata). Returns
+        the full partial-success envelope (results + meta) verbatim so the SQL
+        layer can hand it back as JSONB — per-doc failures live in
+        meta.failed[] (GEN-Agent 5 fields), not as PG ERRORs; only batch-level
+        faults (size/payload/empty/duplicate-doc_id) surface as HTTP 4xx ->
+        plpy.error via _do_with_retry. async_ must stay True in V1."""
+        resp = self._post("/api/v1/documents/batch", {
+            "namespace": namespace,
+            "documents": documents,
+            "options": {"async": async_, "on_duplicate": on_duplicate},
+        })
+        return resp
+
     def memory_search(self, namespace, query, user_id, top_k):
         if not user_id:
             raise CortrixError(

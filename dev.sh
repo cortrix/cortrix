@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Cortrix end-to-end development launcher
-# Starts the backend (8080) + Cortrix Agent (8001) + frontend dev server (5173) together
+# Starts the backend (8420) + Cortrix Agent (8001) + frontend dev server (5173) together
 #
 # Usage:
 #   ./dev.sh                       # default: CE mode
@@ -108,7 +108,7 @@ fi
 sleep 0.5
 
 # ── Start backend ──────────────────────────────────────
-info "Starting backend (http://localhost:8080)..."
+info "Starting backend (http://localhost:8420)..."
 ENABLE_AGENT_PROXY=false
 if [[ -x "$AGENT_PYTHON" || -n "${CORTRIX_AGENT_BASE_URL:-}" ]]; then
     ENABLE_AGENT_PROXY=true
@@ -127,7 +127,7 @@ BACKEND_PID=$!
 
 # Wait for the backend to be ready (up to 10 seconds)
 for i in {1..33}; do
-    if curl -sf http://localhost:8080/api/v1/health &>/dev/null; then
+    if curl -sf http://localhost:8420/api/v1/health &>/dev/null; then
         ok "Backend ready ✓"
         break
     fi
@@ -166,7 +166,7 @@ sleep 2
 ok "====================================="
 ok "  Cortrix started"
 ok "  Frontend: http://localhost:5173"
-ok "  Backend:  http://localhost:8080/api/v1/health"
+ok "  Backend:  http://localhost:8420/api/v1/health"
 ok "  Agent:    $AGENT_BASE_URL/health"
 ok "  Edition:  $EDITION"
 ok "  Config:   $CONFIG_FILE"

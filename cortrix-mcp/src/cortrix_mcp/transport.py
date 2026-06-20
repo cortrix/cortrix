@@ -23,10 +23,10 @@ from .errors import mcp_error, passthrough_business_error, success_envelope
 
 # ---------------------------------------------------------------------------
 # Configuration (feature design section 5.3).
-# NOTE: default port is 8080 (config.h int port = 8080 + MVP); the design doc's 9090
-# is stale and intentionally NOT propagated here (brief section 3).
+# NOTE: default port is 8420 (config.h int port = 8420, post WC-R4 port reconcile;
+# the historical 8080/9090 ports are stale and intentionally NOT propagated here).
 # ---------------------------------------------------------------------------
-CORTRIX_URL = os.environ.get("CORTRIX_URL", "http://127.0.0.1:8080")
+CORTRIX_URL = os.environ.get("CORTRIX_URL", "http://127.0.0.1:8420")
 CORTRIX_NAMESPACE = os.environ.get("CORTRIX_NAMESPACE", "default")
 CORTRIX_API_KEY = os.environ.get("CORTRIX_API_KEY", "")
 CORTRIX_MCP_ADMIN = os.environ.get("CORTRIX_MCP_ADMIN", "false").lower() == "true"

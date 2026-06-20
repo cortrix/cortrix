@@ -121,11 +121,11 @@ class TestFunctionSignatures(unittest.TestCase):
                 names.append(raw.split()[0])
         return names
 
-    def test_all_seven_functions_present(self):
+    def test_all_eight_functions_present(self):
         for name in ("pgcortrix_search", "pgcortrix_upload",
-                     "pgcortrix_list_documents", "pgcortrix_memory_search",
-                     "pgcortrix_list_interactions", "pgcortrix_configure",
-                     "pgcortrix_status"):
+                     "pgcortrix_list_documents", "pgcortrix_batch_submit",
+                     "pgcortrix_memory_search", "pgcortrix_list_interactions",
+                     "pgcortrix_configure", "pgcortrix_status"):
             self._fn(name)
 
     def test_search_signature(self):
@@ -180,6 +180,18 @@ class TestFunctionSignatures(unittest.TestCase):
         self.assertRegex(tail, r"RETURNS\s+VOID")
         self.assertRegex(tail, r"\bVOLATILE\b")
 
+    def test_batch_submit_signature(self):
+        params, tail = self._fn("pgcortrix_batch_submit")
+        # TD-F42-BULK-5-rev-3: namespace + documents JSONB + on_duplicate.
+        self.assertEqual(
+            self._param_names(params), ["namespace", "documents", "on_duplicate"])
+        self.assertRegex(params, r"documents\s+JSONB")
+        self.assertRegex(params, r"on_duplicate\s+TEXT\s+DEFAULT\s+'skip'")
+        # Partial-success envelope returned as JSONB (like pgcortrix_status).
+        self.assertRegex(tail, r"RETURNS\s+JSONB")
+        # Write path.
+        self.assertRegex(tail, r"\bVOLATILE\b")
+
     def test_status_returns_jsonb(self):
         params, tail = self._fn("pgcortrix_status")
         self.assertEqual(params.strip(), "")  # no params
@@ -188,9 +200,9 @@ class TestFunctionSignatures(unittest.TestCase):
 
     def test_all_functions_are_plpython3u(self):
         for name in ("pgcortrix_search", "pgcortrix_upload",
-                     "pgcortrix_list_documents", "pgcortrix_memory_search",
-                     "pgcortrix_list_interactions", "pgcortrix_configure",
-                     "pgcortrix_status"):
+                     "pgcortrix_list_documents", "pgcortrix_batch_submit",
+                     "pgcortrix_memory_search", "pgcortrix_list_interactions",
+                     "pgcortrix_configure", "pgcortrix_status"):
             _, tail = self._fn(name)
             self.assertRegex(
                 tail, r"LANGUAGE\s+plpython3u",

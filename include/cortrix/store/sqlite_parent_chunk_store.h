@@ -7,6 +7,7 @@
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
 #include "cortrix/store/parent_chunk_store.h"
+#include "cortrix/store/parent_chunk_store_metrics.h"
 
 struct sqlite3;
 
@@ -22,7 +23,12 @@ namespace cortrix::store {
 class SqliteParentChunkStore : public ParentChunkStore {
 public:
     /// @param db_path  SQLite file path, or ":memory:" for an in-process DB.
-    explicit SqliteParentChunkStore(std::string db_path);
+    /// @param metrics  optional F34 §2.5 lookup-metrics recorder. nullptr (the
+    ///   default — backward-compatible with the original single-arg ctor) binds
+    ///   the process-wide ParentChunkStoreMetrics::Instance(); tests inject a
+    ///   private recorder for isolated assertions.
+    explicit SqliteParentChunkStore(std::string db_path,
+                                    ParentChunkStoreMetrics* metrics = nullptr);
     ~SqliteParentChunkStore() override;
 
     SqliteParentChunkStore(const SqliteParentChunkStore&) = delete;
@@ -60,6 +66,7 @@ private:
     std::string db_path_;
     sqlite3* db_ = nullptr;
     mutable std::mutex mu_;
+    ParentChunkStoreMetrics* metrics_;  // never null after ctor (Instance() fallback)
 };
 
 }  // namespace cortrix::store

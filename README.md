@@ -156,7 +156,7 @@ The simplest path for Agent IDE users:
 }
 ```
 
-Claude Code / Cline / Cursor will auto-discover **31 Cortrix tools** (search, memory, upload, extract, task status, and more). See the [`cortrix-mcp/`](cortrix-mcp/) README for the full tool reference.
+Claude Code / Cline / Cursor will auto-discover **31 Cortrix tools** (29 core + 2 admin: search, memory, upload, extract, task status, and more). See the [`cortrix-mcp/`](cortrix-mcp/) README for the full tool reference.
 
 ### Direct HTTP API (for custom Agents)
 
@@ -179,15 +179,15 @@ See the [OpenAPI spec](api/openapi.yaml) for the full reference (71+ endpoints).
 
 ### Framework Integrations (via Cortrix Skill SDK)
 
-Available now — 2 adapters (`pip install cortrix-skills[langchain|claude|all]`):
+Available now — 3 adapters (`pip install cortrix-skills[langchain|claude|openai|all]`):
 
 - **LangChain** — `from cortrix_skills.adapters.langchain import as_langchain_tools` (29 LangChain tools).
 - **Claude Tools** — `from cortrix_skills.adapters.claude import as_claude_tools` (29 tool definitions for the Anthropic API `tool_use`).
+- **OpenAI Function Calling** — `from cortrix_skills.adapters.openai import as_openai_functions` (29 OpenAI Chat Completions tool definitions).
 
 Coming in Phase 1.5:
 
 - **LlamaIndex** — `from cortrix_skills.adapters.llamaindex import ...`
-- **OpenAI Function Calling** — `from cortrix_skills.adapters.openai import ...`
 
 ---
 
@@ -283,7 +283,7 @@ The three main paths for Cortrix CE users:
 ## 🎯 Roadmap
 
 - ✅ **v1.0 (Now)** — Community Edition: Cortrix Server + P-HNSW + BM25 hybrid + pgcortrix + MCP Server + Python SDK.
-- 🚧 **v1.5 (Q3 2026)** — Cloud SaaS launch + Web UI + async document processing + LlamaIndex / OpenAI adapters.
+- 🚧 **v1.5 (Q3 2026)** — Cloud SaaS launch + Web UI + async document processing + LlamaIndex adapter.
 - 🔮 **v2.0 (Q1 2027)** — multi-tenant + TypeScript SDK + advanced RAG.
 
 ---

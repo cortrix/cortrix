@@ -406,5 +406,46 @@
     "description": "The interface hit an unexpected error. You can try again, or open the troubleshooting guide.",
     "reset": "Try again",
     "docs": "Troubleshooting"
+  },
+  "entPlaceholder": {
+    "group": "Enterprise",
+    "nav": {
+      "textToSql": "Text-to-SQL",
+      "auditLog": "Audit Log",
+      "multiTenant": "Multi-tenant"
+    },
+    "textToSql": {
+      "title": "Text-to-SQL",
+      "description": "Ask questions in natural language and have Cortrix translate them into governed SQL against your structured stores — no hand-written queries.",
+      "problemSolved": "Analysts and Agents spend hours translating intent into SQL across unfamiliar schemas. Text-to-SQL closes that gap with schema-aware generation, guardrails, and query review before execution.",
+      "useCases": [
+        "Let an Agent answer analytics questions over relational data without a SQL expert",
+        "Self-service reporting for non-technical teams",
+        "Schema-aware query generation with managed PostgreSQL"
+      ],
+      "availableIn": "V1.5 with managed PG"
+    },
+    "auditLog": {
+      "title": "Audit Log",
+      "description": "A tamper-evident, enterprise-grade audit trail that records who did what, when, and from where — with full request context.",
+      "problemSolved": "CE operation logging captures successful operations, but compliance and security teams need source IP, user-agent, structured detail payloads, and failure reasons. The Ent audit log adds those columns and retention controls.",
+      "useCases": [
+        "Meet SOC 2 / ISO 27001 audit requirements with a verifiable trail",
+        "Investigate security incidents with full request context (IP, user-agent, details)",
+        "Track denied and failed operations alongside successful ones"
+      ],
+      "availableIn": "V1.5"
+    },
+    "multiTenant": {
+      "title": "Multi-tenant",
+      "description": "Switch between isolated tenants from a single deployment, each with its own namespaces, users, and policies.",
+      "problemSolved": "Service providers and large organizations need hard isolation between teams or customers without running a deployment per tenant. Multi-tenant switching gives one control plane over many isolated tenants.",
+      "useCases": [
+        "Serve multiple customers from one Cortrix Cloud deployment with strict isolation",
+        "Separate environments (dev / staging / prod) under one console",
+        "Per-tenant quotas, billing, and access policies"
+      ],
+      "availableIn": "Cloud V1.5"
+    }
   }
 }

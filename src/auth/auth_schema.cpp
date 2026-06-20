@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash   TEXT NOT NULL,                     -- bcrypt hash
     display_name    TEXT NOT NULL,
     email_verified  INTEGER NOT NULL DEFAULT 0,        -- 0=unverified 1=verified
+    role            TEXT NOT NULL DEFAULT 'user',      -- admin | user (§2.13-bis admin/users)
     status          TEXT NOT NULL DEFAULT 'active',    -- active | locked | disabled
     locked_until    INTEGER,                           -- Unix ts, lockout expiry
     login_attempts  INTEGER NOT NULL DEFAULT 0,        -- consecutive failure count

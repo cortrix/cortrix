@@ -41,6 +41,7 @@ add_library(cortrix_core STATIC
     src/auth/email_sender.cpp
     src/auth/api_key_service.cpp
     src/auth/bootstrap_handler.cpp
+    src/auth/admin_users_service.cpp
     src/namespace/namespace_manager.cpp
     src/server/bootstrap.cpp
     src/server/gc_cli.cpp
@@ -277,6 +278,7 @@ add_library(cortrix_core STATIC
     src/chunker/chunker_agent_error.cpp
     src/chunker/chunker_response_meta.cpp
     src/store/sqlite_parent_chunk_store.cpp
+    src/store/parent_chunk_store_metrics.cpp
     src/store/sqlite_chunk_store.cpp
     # --- F42 Document Async Processing (Wave B-R2) ---
     src/async/f42_error.cpp

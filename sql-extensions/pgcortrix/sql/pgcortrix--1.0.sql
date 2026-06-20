@@ -10,10 +10,13 @@
 -- module (not inlined here) so it is unit-testable off a live PG (mock urllib),
 -- which is how the standalone DoD is met (L1-α briefing §6).
 --
--- Function inventory (F14 §2.1): 5 main + 2 helper.
+-- Function inventory (F14 §2.1): 6 main + 2 helper.
 --   main:   pgcortrix_search / pgcortrix_upload / pgcortrix_list_documents /
---           pgcortrix_memory_search / pgcortrix_list_interactions
+--           pgcortrix_batch_submit / pgcortrix_memory_search /
+--           pgcortrix_list_interactions
 --   helper: pgcortrix_configure / pgcortrix_status
+-- pgcortrix_batch_submit (TD-F42-BULK-5-rev-3, D3 impl layer) wraps
+-- POST /api/v1/documents/batch and returns the partial-success envelope as JSONB.
 
 \echo Use "CREATE EXTENSION pgcortrix" to load this file. \quit
 
@@ -149,6 +152,34 @@ AS $$
             r.get('chunks'),
             r.get('created_at'),
         )
+$$;
+
+-- 3.bis Batch document submit (TD-F42-BULK-5-rev-3, D3 impl layer).
+-- Wraps POST /api/v1/documents/batch — Agent-first bulk upload of up to 100
+-- documents. `documents` is a JSONB array of per-doc objects (client-supplied
+-- doc_id + content; optional filename / metadata). Returns the partial-success
+-- envelope (results + meta with succeeded / failed[] GEN-Agent 5 fields /
+-- coverage_ratio / total_submitted) as JSONB, mirroring pgcortrix_status's
+-- JSONB-out shape: per-doc failures live in meta.failed[] (the caller branches
+-- on them in SQL), while batch-level faults (size / payload / empty /
+-- duplicate-doc_id) surface as PG ERRORs via the helper's HTTP error mapping.
+-- VOLATILE (write path); options default async=true / on_duplicate=skip
+-- (TD-F42-BULK §2.2 — V1 is always async).
+CREATE FUNCTION pgcortrix_batch_submit(
+    namespace    TEXT,
+    documents    JSONB,
+    on_duplicate TEXT DEFAULT 'skip'
+) RETURNS JSONB
+LANGUAGE plpython3u
+VOLATILE                         -- write path
+AS $$
+    import json
+    from pgcortrix_helper import get_client
+    client = get_client(plpy, GD)
+    docs = json.loads(documents) if documents is not None else []
+    resp = client.batch_submit(namespace, docs, async_=True,
+                               on_duplicate=on_duplicate)
+    return json.dumps(resp)
 $$;
 
 -- 4. Memory search (MEM05: user_id is mandatory for per-user isolation).

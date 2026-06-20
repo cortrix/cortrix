@@ -10,6 +10,9 @@ import {
   UsersIcon,
   ClipboardDocumentListIcon,
   HeartIcon,
+  CircleStackIcon,
+  ClipboardDocumentCheckIcon,
+  BuildingOffice2Icon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -43,6 +46,14 @@ const PRIMARY: NavItem[] = [
 const ADMIN: NavItem[] = [
   { to: '/admin/users', label: 'admin.users.navLabel', icon: UsersIcon },
   { to: '/admin/operation-log', label: 'admin.operations.navLabel', icon: ClipboardDocumentListIcon },
+];
+
+// Enterprise group (P02a § 6.3) — always rendered on CE with marketing
+// placeholders; each item carries a "Coming" badge until V1.5.
+const ENTERPRISE: NavItem[] = [
+  { to: '/ent/text-to-sql', label: 'entPlaceholder.nav.textToSql', icon: CircleStackIcon, badge: 'Coming' },
+  { to: '/ent/audit-log', label: 'entPlaceholder.nav.auditLog', icon: ClipboardDocumentCheckIcon, badge: 'Coming' },
+  { to: '/ent/multi-tenant', label: 'entPlaceholder.nav.multiTenant', icon: BuildingOffice2Icon, badge: 'Coming' },
 ];
 
 function navClass({ isActive }: { isActive: boolean }): string {
@@ -91,6 +102,15 @@ export function Sidebar() {
             ))}
           </div>
         )}
+
+        <div className="pt-4">
+          <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+            {t('entPlaceholder.group')}
+          </p>
+          {ENTERPRISE.map((item) => (
+            <NavRow key={item.to} item={item} />
+          ))}
+        </div>
       </nav>
 
       {/* Settings at bottom */}

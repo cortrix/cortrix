@@ -20,7 +20,7 @@
 # -----------------------------------------------------------------------------
 server:
   host: "0.0.0.0"       # Listen address; "127.0.0.1" = local only, "0.0.0.0" = allow external access
-  port: 8080             # HTTP port
+  port: 8420             # HTTP port
   thread_count: 4        # Worker thread count, recommended = number of CPU cores
 
 # -----------------------------------------------------------------------------

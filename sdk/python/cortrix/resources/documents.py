@@ -28,6 +28,14 @@ PATH_DOCUMENTS = "/documents"
 PATH_DOCUMENT = "/documents/{id}"
 PATH_TASK_PROGRESS = "/documents/tasks/{task_id}/progress"
 PATH_TASK = "/documents/tasks/{task_id}"
+# TD-F42-BULK Agent-first batch submit. The design (P03 §2.12 / TD-F42-BULK §2.1)
+# names this ``/documents/batch-submit``; the real-arch wire is ``/documents/batch``
+# (server route POST /api/v1/documents/batch, RegisterBatchRoutes), so per the
+# "SDK shape = P03, wire = real architecture" rule we map to the live route.
+PATH_BATCH = "/documents/batch"
+
+# on_duplicate policy values (TD-F42-BULK §2.2 options.on_duplicate).
+_ON_DUPLICATE_VALUES = frozenset({"skip", "overwrite", "error"})
 
 # Terminal async-task states (F42 DocumentTask.status enum).
 _TERMINAL_TASK_STATES = frozenset({"ready", "failed", "cancelled"})
@@ -77,6 +85,32 @@ def _upload_body(
 
 def _list_params(namespace: str, limit: int, offset: int) -> dict[str, Any]:
     return {"namespace": namespace, "limit": limit, "offset": offset}
+
+
+def _batch_body(
+    namespace: str,
+    documents: list[dict[str, Any]],
+    async_: bool,
+    on_duplicate: str,
+) -> dict[str, Any]:
+    """Build the batch-submit request body (TD-F42-BULK §2.2).
+
+    ``documents`` items are passed through verbatim (each needs a ``doc_id`` +
+    ``content``; optional ``filename`` / ``metadata``) so the caller controls the
+    client-supplied ``doc_id``. ``on_duplicate`` is validated client-side to fail
+    fast before the round-trip.
+    """
+    if on_duplicate not in _ON_DUPLICATE_VALUES:
+        raise InvalidRequestError(
+            f"on_duplicate must be one of {sorted(_ON_DUPLICATE_VALUES)}",
+            category="permanent",
+            retryable=False,
+        )
+    return {
+        "namespace": namespace,
+        "documents": documents,
+        "options": {"async": async_, "on_duplicate": on_duplicate},
+    }
 
 
 class Documents(SyncResource):
@@ -129,6 +163,37 @@ class Documents(SyncResource):
             time.sleep(poll_interval)
             task = self.task_progress(task.task_id)
         return task
+
+    def batch_submit(
+        self,
+        namespace: str,
+        documents: list[dict[str, Any]],
+        *,
+        async_: bool = True,
+        on_duplicate: str = "skip",
+    ) -> dict[str, Any]:
+        """Batch-submit up to 100 documents (TD-F42-BULK). ``POST /documents/batch``.
+
+        Agent-first bulk upload: one request submits many documents instead of N
+        single ``upload()`` calls. Each ``documents`` item is a dict with a
+        client-supplied ``doc_id`` + ``content`` (optionally ``filename`` /
+        ``metadata``).
+
+        ``async_`` must stay ``True`` in V1 (synchronous batch is unsupported).
+        ``on_duplicate`` is one of ``skip`` / ``overwrite`` / ``error``.
+
+        Returns the raw partial-success envelope (``results`` + ``meta`` with
+        ``succeeded`` / ``failed[]`` GEN-Agent 5-field entries / ``coverage_ratio``
+        / ``total_submitted``) so the Agent can branch per-doc on retryable
+        failures. Batch-level faults (size/payload/empty/duplicate-doc_id) raise
+        the standard ``CortrixError`` envelope.
+        """
+        return self._client._request(
+            "POST",
+            PATH_BATCH,
+            json=_batch_body(namespace, documents, async_, on_duplicate),
+            response_model=None,
+        )
 
     def list(
         self, namespace: str, *, limit: int = 50, offset: int = 0
@@ -211,6 +276,26 @@ class AsyncDocuments(AsyncResource):
             await asyncio.sleep(poll_interval)
             task = await self.task_progress(task.task_id)
         return task
+
+    async def batch_submit(
+        self,
+        namespace: str,
+        documents: list[dict[str, Any]],
+        *,
+        async_: bool = True,
+        on_duplicate: str = "skip",
+    ) -> dict[str, Any]:
+        """Batch-submit up to 100 documents (TD-F42-BULK). ``POST /documents/batch``.
+
+        Async-symmetric to :meth:`Documents.batch_submit`. Returns the raw
+        partial-success envelope (``results`` + ``meta``).
+        """
+        return await self._client._request(
+            "POST",
+            PATH_BATCH,
+            json=_batch_body(namespace, documents, async_, on_duplicate),
+            response_model=None,
+        )
 
     async def list(
         self, namespace: str, *, limit: int = 50, offset: int = 0

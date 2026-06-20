@@ -504,6 +504,50 @@ TEST_F(SPCPipelineTest, F10_DedupRemovesDuplicateChildren) {
                 << "F10 dedup: no two surviving child rows may share identical text";
 }
 
+// [F10 §5.2] The doc-processing response meta carries the 4 A-class cleaning
+// fields. The two identical paragraphs above (own-parent each) feed 2 children
+// into cleaning; exact-hash dedup drops one → chunks_input=2, chunks_skipped_dedup=1,
+// chunks_indexed=1. The pipeline records the summary onto the SPCTask, surfaced via
+// ResponseMetaJson() (= what the HTTP/MCP doc response folds into meta).
+TEST_F(SPCPipelineTest, F10_ResponseMetaCarriesCleaningSummary) {
+    const std::string para(4400, 'y');  // > parent_size → its own parent, duplicated below
+    const std::string json =
+        std::string(R"JSON({"status":0,"parser":"docling",)JSON") +
+        R"JSON("metadata":{"filename":"meta.txt","page_count":1,"doc_language":"en"},)JSON" +
+        R"JSON("pages":[{"page_num":1,"page_text":"y","page_metadata":{"page_num":1,)JSON" +
+        R"JSON("parser_used":"docling","page_confidence":0.95,"is_scan_page":false,"char_count":1},)JSON" +
+        R"JSON("paragraphs":[{"text":")JSON" + para +
+        R"JSON(","page":1,"type":"TEXT","confidence":0.95,"language":"en"},)JSON" +
+        R"JSON({"text":")JSON" + para +
+        R"JSON(","page":1,"type":"TEXT","confidence":0.95,"language":"en"}]}]})JSON";
+    RebuildFactory(json);
+
+    std::string doc_id = CreateDoc();
+    auto task_uptr_ = MakeTask(txt_path_, "text/plain", doc_id);
+    SPCTask& task = *task_uptr_;
+    int rc = pipeline_->Process(task, *facade_);
+    ASSERT_EQ(rc, 0) << task.error_message;
+
+    // 4 flat A-class fields present in the response meta (§5.2 v1.0.2 contract).
+    nlohmann::json meta = task.ResponseMetaJson();
+    ASSERT_TRUE(meta.contains("chunks_input"));
+    ASSERT_TRUE(meta.contains("chunks_indexed"));
+    ASSERT_TRUE(meta.contains("chunks_skipped_dedup"));
+    ASSERT_TRUE(meta.contains("chunks_marked_anomalous"));
+
+    // The parent-child chunker splits each 4400-char paragraph into several
+    // children, so we assert on invariants rather than exact counts (which depend
+    // on chunk sizing). The two paragraphs are identical, so dedup MUST fire.
+    const int input = meta["chunks_input"].get<int>();
+    const int skipped = meta["chunks_skipped_dedup"].get<int>();
+    const int indexed = meta["chunks_indexed"].get<int>();
+    EXPECT_GT(input, 0);
+    EXPECT_GT(skipped, 0);                              // duplicated paragraph → dedup removes ≥1
+    EXPECT_EQ(meta["chunks_marked_anomalous"].get<int>(), 0);  // clean input, no anomalies
+    // chunks_input == chunks_indexed + chunks_skipped_dedup (data-completeness invariant).
+    EXPECT_EQ(input, indexed + skipped);
+}
+
 // [F10 §3.2 PARSE_FAILED · M2] A doc parsed with a failed page (d.failed_pages
 // non-empty) must propagate the F08-format meta.parse_status / meta.parse_failed_page
 // keys onto the child Blocks so F10 DetectAnomaly can fire PARSE_FAILED. The child's

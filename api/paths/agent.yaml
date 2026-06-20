@@ -1,4 +1,4 @@
-# paths/agent.yaml — /api/v1/agent/* (F48 v1.0.2 / V14 J8, reverse-proxied through cortrix-server :9090) — 3 endpoints
+# paths/agent.yaml — /api/v1/agent/* (F48 v1.0.2 / V14 J8, reverse-proxied through cortrix-server :8420) — 3 endpoints
 # SoT: F48 v1.0.2 § 9 + components/schemas.yaml (ChatRequest / AgentSession)
 # Key: chat = SSE streaming (x-cortrix-stream: SSE; Schemathesis skips JSON schema validation).
 paths:

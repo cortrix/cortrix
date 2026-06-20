@@ -3,11 +3,13 @@
 
 #include <sqlite3.h>
 
+#include <chrono>
 #include <nlohmann/json.hpp>
 #include <utility>
 
 #include "cortrix/logging/logging.h"
 #include "cortrix/store/parent_chunk_schema.h"
+#include "cortrix/store/parent_chunk_store_metrics.h"
 #include "cortrix/store/store_errors.h"
 
 namespace cortrix::store {
@@ -56,8 +58,10 @@ void BindTextOrNull(sqlite3_stmt* st, int idx, const std::string& s) {
 
 }  // namespace
 
-SqliteParentChunkStore::SqliteParentChunkStore(std::string db_path)
-    : db_path_(std::move(db_path)) {}
+SqliteParentChunkStore::SqliteParentChunkStore(std::string db_path,
+                                               ParentChunkStoreMetrics* metrics)
+    : db_path_(std::move(db_path)),
+      metrics_(metrics ? metrics : &ParentChunkStoreMetrics::Instance()) {}
 
 SqliteParentChunkStore::~SqliteParentChunkStore() { Close(); }
 
@@ -229,6 +233,16 @@ Result<ParentChunk> SqliteParentChunkStore::GetParent(const std::string& parent_
     std::lock_guard<std::mutex> lock(mu_);
     if (!db_) return StoreStatus(StatusCode::kInternal, store_errors::kDbError, "store not open");
 
+    // F34 §2.5: emit lookup_total{result=hit|miss} + lookup_latency_seconds. The
+    // latency covers the prepare+step work of one reverse-lookup; a DB-error exit
+    // (neither a hit nor a miss) records latency only.
+    const auto t0 = std::chrono::steady_clock::now();
+    auto observe_latency = [&] {
+        const auto dt = std::chrono::steady_clock::now() - t0;
+        metrics_->ObserveLookupLatency(
+            std::chrono::duration<double>(dt).count());
+    };
+
     std::string sql = std::string("SELECT ") + kParentSelectCols + " FROM parents WHERE parent_id = ?";
     sqlite3_stmt* st = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
@@ -240,10 +254,14 @@ Result<ParentChunk> SqliteParentChunkStore::GetParent(const std::string& parent_
     if (rc == SQLITE_ROW) {
         ParentChunk p = ReadParentRow(st);
         sqlite3_finalize(st);
+        metrics_->RecordLookup(ParentChunkStoreMetrics::LookupResult::kHit);
+        observe_latency();
         return p;
     }
     sqlite3_finalize(st);
     if (rc == SQLITE_DONE) {
+        metrics_->RecordLookup(ParentChunkStoreMetrics::LookupResult::kMiss);
+        observe_latency();
         return StoreStatus(StatusCode::kNotFound, store_errors::kNotFound,
                            "parent_id '" + parent_id + "' not found");
     }
@@ -269,15 +287,22 @@ Result<std::vector<ParentChunk>> SqliteParentChunkStore::BulkGetParents(
     }
     out.reserve(parent_ids.size());
     for (const auto& id : parent_ids) {
+        // F34 §2.5: each requested id is one lookup → hit/miss + per-id latency.
+        const auto t0 = std::chrono::steady_clock::now();
         sqlite3_bind_text(st, 1, id.c_str(), -1, SQLITE_TRANSIENT);
         int rc = sqlite3_step(st);
         if (rc == SQLITE_ROW) {
             out.push_back(ReadParentRow(st));
-        } else if (rc != SQLITE_DONE) {
+            metrics_->RecordLookup(ParentChunkStoreMetrics::LookupResult::kHit);
+        } else if (rc == SQLITE_DONE) {
+            metrics_->RecordLookup(ParentChunkStoreMetrics::LookupResult::kMiss);
+        } else {
             std::string msg = std::string("step BulkGetParents '") + id + "': " + sqlite3_errmsg(db_);
             sqlite3_finalize(st);
             return StoreStatus(StatusCode::kInternal, store_errors::kDbError, msg);
         }
+        const auto dt = std::chrono::steady_clock::now() - t0;
+        metrics_->ObserveLookupLatency(std::chrono::duration<double>(dt).count());
         sqlite3_reset(st);
     }
     sqlite3_finalize(st);

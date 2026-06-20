@@ -59,7 +59,7 @@ mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j$(nproc)
 
-# Run it (defaults to http://localhost:8080)
+# Run it (defaults to http://localhost:8420)
 ./cortrix-server --config ../deploy/config.yaml
 ```
 

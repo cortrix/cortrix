@@ -93,8 +93,8 @@ Result<BootstrapHandler::BootstrapResult> BootstrapHandler::Consume(
     sqlite3_stmt* ins = nullptr;
     const char* usql =
         "INSERT INTO users(id, email, password_hash, display_name, email_verified, "
-        "status, login_attempts, created_at, updated_at) "
-        "VALUES(?, ?, '!bootstrap-no-password', 'System Admin', 1, 'active', 0, ?, ?)";
+        "role, status, login_attempts, created_at, updated_at) "
+        "VALUES(?, ?, '!bootstrap-no-password', 'System Admin', 1, 'admin', 'active', 0, ?, ?)";
     if (sqlite3_prepare_v2(db_, usql, -1, &ins, nullptr) != SQLITE_OK) {
         return AuthStatus(AuthErrorCode::kServiceUnavailable, "admin user insert prepare failed");
     }

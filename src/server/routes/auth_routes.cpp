@@ -1,24 +1,33 @@
 #include <cstdint>
 #include "cortrix/server/routes/auth_routes.h"
 
+#include <cstdlib>
+#include <optional>
 #include <string>
 
 #include <nlohmann/json.hpp>
 
+#include "cortrix/auth/admin_users_service.h"
 #include "cortrix/auth/api_key_service.h"
 #include "cortrix/auth/auth_error.h"
 #include "cortrix/auth/bootstrap_handler.h"
 #include "cortrix/auth/auth_middleware.h"
+#include "cortrix/auth/jwt_secret_service.h"
+#include "cortrix/observability/operation_logger.h"
 #include "cortrix/server/http_server.h"
 
 namespace cortrix {
 
 namespace {
 
+using cortrix::auth::AdminUserListFilter;
+using cortrix::auth::AdminUserRecord;
+using cortrix::auth::AdminUsersService;
 using cortrix::auth::ApiKeyInfo;
 using cortrix::auth::ApiKeyService;
 using cortrix::auth::AuthErrorCode;
 using cortrix::auth::BootstrapHandler;
+using cortrix::auth::JwtSecretService;
 using cortrix::auth::MakeAuthError;
 
 // Write the GEN-Agent 4-field auth error body for `code` (§5.x) with the matching
@@ -52,6 +61,60 @@ nlohmann::json ApiKeyInfoToJson(const ApiKeyInfo& k) {
                                           : nlohmann::json(k.expires_at);
     j["status"]       = k.status;
     return j;
+}
+
+// Serialize one AdminUserRecord to the §2.13-bis UserRecord shape. created_at is
+// surfaced as Unix seconds (the frontend treats it as an opaque timestamp).
+nlohmann::json AdminUserToJson(const AdminUserRecord& u) {
+    nlohmann::json j;
+    j["id"]             = u.id;
+    j["email"]          = u.email;
+    j["display_name"]   = u.display_name;
+    j["role"]           = u.role;
+    j["status"]         = u.status;
+    j["email_verified"] = u.email_verified;
+    j["created_at"]     = u.created_at;
+    return j;
+}
+
+// Recover the AuthErrorCode an AdminUsersService Status carries (the CX_ERR_*
+// token is the leading word of the message). Only the codes the service emits
+// are matched; anything else falls back to a generic 503/internal mapping.
+AuthErrorCode AdminUserErrorCode(const Status& s) {
+    const std::string& m = s.message();
+    if (m.rfind("CX_ERR_USER_NOT_FOUND", 0) == 0)    return AuthErrorCode::kUserNotFound;
+    if (m.rfind("CX_ERR_USER_EMAIL_EXISTS", 0) == 0) return AuthErrorCode::kUserEmailExists;
+    if (m.rfind("CX_ERR_USER_VALIDATION", 0) == 0)   return AuthErrorCode::kUserValidation;
+    if (m.rfind("CX_ERR_INVALID_REQUEST", 0) == 0)   return AuthErrorCode::kInvalidRequest;
+    if (m.rfind("CX_ERR_INTERNAL_ERROR", 0) == 0)    return AuthErrorCode::kInternalError;
+    return AuthErrorCode::kServiceUnavailable;
+}
+
+// Write the GEN-Agent error body for an AdminUsersService failure. Mirrors
+// WriteAuthError but pins the §2.13-bis HTTP statuses: 404 / 409 / 422 / 400.
+// (CX_ERR_USER_VALIDATION is 422 per §2.13-bis — distinct from the coarse
+// kInvalidArgument→400 Status mapping, so it is set explicitly here.)
+void WriteAdminUserError(httplib::Response& res, const Status& s,
+                         const std::string& request_id) {
+    const AuthErrorCode code = AdminUserErrorCode(s);
+    WriteAuthError(res, code, s.message(), request_id);
+    if (code == AuthErrorCode::kUserValidation) res.status = 422;
+}
+
+// Best-effort operation_log write for the admin/users mutations (§2.13-bis: the
+// 4 mutating endpoints log user.created / user.updated / user.disabled /
+// user.enabled). `logger` may be null (the route can be registered without an
+// observability module in tests) — a null logger is a silent no-op.
+void LogAdminUserAction(observability::IOperationLogger* logger,
+                        const std::string& actor_user_id, const std::string& action,
+                        const std::string& target_user_id) {
+    if (logger == nullptr) return;
+    observability::OperationLogEntry e;
+    e.user_id = actor_user_id;
+    e.action = action;                 // user.created / user.updated / ...
+    e.resource_type = "user";
+    e.resource_id = target_user_id;
+    logger->Log(e);
 }
 
 }  // namespace
@@ -223,6 +286,171 @@ void RegisterAuthSessionRoute(httplib::Server& server, ApiKeyAuth& auth) {
             body["auth_disabled"]  = true;
             WriteJsonResponse(res, 200, body, request_id);
         });
+}
+
+void RegisterAdminUsersRoutes(httplib::Server& server, AdminUsersService& users,
+                              ApiKeyAuth& auth,
+                              observability::IOperationLogger* logger) {
+    // GET /api/v1/admin/users — list with q / status / role / page / limit (§2.13-bis).
+    server.Get("/api/v1/admin/users",
+        WithAuth(auth, kPermAdmin,
+            [&users](const httplib::Request& req, httplib::Response& res,
+                     const RequestContext& rctx) {
+                AdminUserListFilter f;
+                if (req.has_param("q"))      f.q = req.get_param_value("q");
+                if (req.has_param("status")) f.status = req.get_param_value("status");
+                if (req.has_param("role"))   f.role = req.get_param_value("role");
+                if (req.has_param("page"))   f.page = std::atoi(req.get_param_value("page").c_str());
+                if (req.has_param("limit"))  f.limit = std::atoi(req.get_param_value("limit").c_str());
+                auto r = users.List(f);
+                if (!r.ok()) {
+                    WriteAdminUserError(res, r.status(), rctx.request_id);
+                    return;
+                }
+                nlohmann::json arr = nlohmann::json::array();
+                for (const auto& u : r.value().users) arr.push_back(AdminUserToJson(u));
+                nlohmann::json out;
+                out["users"] = arr;
+                out["total"] = r.value().total;
+                out["page"]  = r.value().page;
+                out["limit"] = r.value().limit;
+                WriteJsonResponse(res, 200, out, rctx.request_id);
+            }));
+
+    // POST /api/v1/admin/users — invite-mode create (§2.13-bis).
+    server.Post("/api/v1/admin/users",
+        WithAuth(auth, kPermAdmin,
+            [&users, logger](const httplib::Request& req, httplib::Response& res,
+                             const RequestContext& rctx) {
+                nlohmann::json body;
+                try {
+                    body = nlohmann::json::parse(req.body);
+                } catch (...) {
+                    WriteAuthError(res, AuthErrorCode::kUserValidation,
+                                   "request body must be a JSON object", rctx.request_id);
+                    res.status = 422;
+                    return;
+                }
+                if (!body.is_object()) {
+                    WriteAuthError(res, AuthErrorCode::kUserValidation,
+                                   "request body must be a JSON object", rctx.request_id);
+                    res.status = 422;
+                    return;
+                }
+                auto str = [&](const char* k) -> std::string {
+                    return (body.contains(k) && body[k].is_string())
+                               ? body[k].get<std::string>() : std::string();
+                };
+                auto r = users.Create(str("email"), str("password"), str("role"),
+                                      str("display_name"));
+                if (!r.ok()) {
+                    WriteAdminUserError(res, r.status(), rctx.request_id);
+                    return;
+                }
+                LogAdminUserAction(logger, rctx.auth.user_id, "user.created", r.value().id);
+                nlohmann::json out;
+                out["user"] = AdminUserToJson(r.value());
+                WriteJsonResponse(res, 200, out, rctx.request_id);
+            }));
+
+    // PATCH /api/v1/admin/users/:id — update display_name / role / email_verified.
+    server.Patch(R"(/api/v1/admin/users/([^/]+))",
+        WithAuth(auth, kPermAdmin,
+            [&users, logger](const httplib::Request& req, httplib::Response& res,
+                             const RequestContext& rctx) {
+                const std::string id = req.matches.size() > 1 ? req.matches[1].str() : "";
+                nlohmann::json body;
+                try {
+                    body = nlohmann::json::parse(req.body);
+                } catch (...) {
+                    WriteAuthError(res, AuthErrorCode::kUserValidation,
+                                   "request body must be a JSON object", rctx.request_id);
+                    res.status = 422;
+                    return;
+                }
+                std::optional<std::string> display_name, role;
+                std::optional<bool> email_verified;
+                if (body.is_object()) {
+                    if (body.contains("display_name") && body["display_name"].is_string())
+                        display_name = body["display_name"].get<std::string>();
+                    if (body.contains("role") && body["role"].is_string())
+                        role = body["role"].get<std::string>();
+                    if (body.contains("email_verified") && body["email_verified"].is_boolean())
+                        email_verified = body["email_verified"].get<bool>();
+                }
+                auto r = users.Update(id, display_name, role, email_verified);
+                if (!r.ok()) {
+                    WriteAdminUserError(res, r.status(), rctx.request_id);
+                    return;
+                }
+                LogAdminUserAction(logger, rctx.auth.user_id, "user.updated", id);
+                nlohmann::json out;
+                out["user"] = AdminUserToJson(r.value());
+                WriteJsonResponse(res, 200, out, rctx.request_id);
+            }));
+
+    // POST /api/v1/admin/users/:id/disable — active → disabled (soft, §2.13-bis).
+    server.Post(R"(/api/v1/admin/users/([^/]+)/disable)",
+        WithAuth(auth, kPermAdmin,
+            [&users, logger](const httplib::Request& req, httplib::Response& res,
+                             const RequestContext& rctx) {
+                const std::string id = req.matches.size() > 1 ? req.matches[1].str() : "";
+                auto r = users.Disable(id);
+                if (!r.ok()) {
+                    WriteAdminUserError(res, r.status(), rctx.request_id);
+                    return;
+                }
+                LogAdminUserAction(logger, rctx.auth.user_id, "user.disabled", id);
+                nlohmann::json out;
+                out["user"] = AdminUserToJson(r.value());
+                WriteJsonResponse(res, 200, out, rctx.request_id);
+            }));
+
+    // POST /api/v1/admin/users/:id/enable — disabled → active (§2.13-bis).
+    server.Post(R"(/api/v1/admin/users/([^/]+)/enable)",
+        WithAuth(auth, kPermAdmin,
+            [&users, logger](const httplib::Request& req, httplib::Response& res,
+                             const RequestContext& rctx) {
+                const std::string id = req.matches.size() > 1 ? req.matches[1].str() : "";
+                auto r = users.Enable(id);
+                if (!r.ok()) {
+                    WriteAdminUserError(res, r.status(), rctx.request_id);
+                    return;
+                }
+                LogAdminUserAction(logger, rctx.auth.user_id, "user.enabled", id);
+                nlohmann::json out;
+                out["user"] = AdminUserToJson(r.value());
+                WriteJsonResponse(res, 200, out, rctx.request_id);
+            }));
+}
+
+void RegisterJwtRotateRoute(httplib::Server& server, JwtSecretService& jwt,
+                            ApiKeyAuth& auth) {
+    // POST /api/v1/admin/auth/rotate-jwt-secret — topic 1.1 C (§2.11). Rotates the
+    // HS256 signing secret (current → prev 24h window + new current) and returns the
+    // Agent-friendly RotationResult. kPermAdmin-gated; AdminGuard adds the loopback
+    // IP layer (§ "Admin Endpoint dual-layer protection").
+    server.Post("/api/v1/admin/auth/rotate-jwt-secret",
+        WithAuth(auth, kPermAdmin,
+            [&jwt](const httplib::Request& /*req*/, httplib::Response& res,
+                   const RequestContext& rctx) {
+                auto r = jwt.RotateJwtSecret();
+                if (!r.ok()) {
+                    WriteJsonError(res, r.status(), rctx.request_id);
+                    return;
+                }
+                const auto& rot = r.value();
+                // §2.11 response shape: rotated / new_key_id / prev_key_id /
+                // prev_expires_at + the Agent-friendly warning.
+                nlohmann::json out;
+                out["rotated"]      = true;
+                out["new_key_id"]   = rot.new_key_id;
+                out["prev_key_id"]  = rot.prev_key_id;
+                out["prev_expires_at"] = rot.prev_expires_at_ms;
+                out["warning"] =
+                    "Prev key expires in 24h; ensure all clients refresh before then";
+                WriteJsonResponse(res, 200, out, rctx.request_id);
+            }));
 }
 
 }  // namespace cortrix

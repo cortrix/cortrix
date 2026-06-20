@@ -560,8 +560,17 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     if (cleaning_config_resolver_) {
         data_cleaner_.SetConfig(cleaning_config_resolver_(facade.namespace_id()));
     }
-    data_cleaner_.Dedup(clean_blocks);          // drops exact + semantic duplicates
-    data_cleaner_.DetectAnomaly(clean_blocks);  // marks skip-index (kept, not indexed)
+    // [F10 §5.2] Capture the dedup + anomaly results (not just their in-place side
+    // effects) to build the A-class cleaning summary the doc-processing response
+    // surfaces (chunks_input / chunks_indexed / chunks_skipped_dedup /
+    // chunks_marked_anomalous). chunks_input = the child count fed into cleaning.
+    const int cleaning_input_count = static_cast<int>(clean_blocks.size());
+    const cortrix::spc::DedupResult dedup_result =
+        data_cleaner_.Dedup(clean_blocks);          // drops exact + semantic duplicates
+    const cortrix::spc::AnomalyResult anomaly_result =
+        data_cleaner_.DetectAnomaly(clean_blocks);  // marks skip-index (kept, not indexed)
+    task.cleaning_summary = cortrix::spc::DataCleaner::Summarize(
+        cleaning_input_count, dedup_result, anomaly_result);
 
     for (auto& b : clean_blocks) {
         const cortrix::chunker::ChildChunk& child = out.children[child_idx_by_id[b.id]];

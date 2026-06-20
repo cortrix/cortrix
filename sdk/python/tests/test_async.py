@@ -37,6 +37,26 @@ async def test_async_upload(api_base: str, aclient: AsyncCortrix, tmp_path) -> N
 
 
 @respx.mock
+async def test_async_batch_submit(api_base: str, aclient: AsyncCortrix) -> None:
+    import json
+
+    route = respx.post(api_base + "/documents/batch").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "results": [{"doc_id": "d1", "task_id": "t1", "status": "submitted"}],
+                "meta": {"succeeded": ["d1"], "failed": [], "coverage_ratio": 1.0,
+                         "total_submitted": 1},
+            },
+        )
+    )
+    out = await aclient.documents.batch_submit("ns", [{"doc_id": "d1", "content": "x"}])
+    assert out["meta"]["coverage_ratio"] == 1.0
+    body = json.loads(route.calls.last.request.content)
+    assert body["options"] == {"async": True, "on_duplicate": "skip"}
+
+
+@respx.mock
 async def test_async_memory_search(api_base: str, aclient: AsyncCortrix) -> None:
     respx.post(api_base + "/memory/search").mock(
         return_value=httpx.Response(

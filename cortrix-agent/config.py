@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Cortrix Backend
-    cortrix_base_url: str = "http://localhost:8080"
+    cortrix_base_url: str = "http://localhost:8420"
     cortrix_api_key: str = ""
     cortrix_namespace: str = "default"
 
