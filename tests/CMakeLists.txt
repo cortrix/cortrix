@@ -373,6 +373,19 @@ add_executable(cortrix_unit_tests
     unit/test_json_depth_guard.cpp
     # --- Open-Core boundary guard (ARCHITECTURE Sec.1.0.10) ---
     unit/test_open_core_boundary.cpp
+    # --- R11+ error-path coverage: genuinely trigger previously-zero-coverage
+    #     CX_ERR_* codes and assert code/category/envelope surface ---
+    unit/test_errpath_auth.cpp
+    unit/test_errpath_tenant.cpp
+    unit/test_errpath_secret.cpp
+    unit/test_errpath_parser.cpp
+    unit/test_errpath_catalog.cpp
+    unit/test_errpath_ingest.cpp
+    unit/test_errpath_agent_llm.cpp
+    unit/test_errpath_gc.cpp
+    unit/test_errpath_memory.cpp
+    unit/test_errpath_phnsw.cpp
+    unit/test_errpath_import.cpp
 )
 
 target_link_libraries(cortrix_unit_tests PRIVATE
