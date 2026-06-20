@@ -72,7 +72,9 @@ def register(mcp) -> None:
         """
         ns = namespace or CORTRIX_NAMESPACE
         body = {"namespace": ns}
-        return request("POST", f"/memory/{memory_id}/revoke", json_body=body, timeout=10.0)
+        return request(
+            "POST", f"/memory/invalidations/{memory_id}/revoke", json_body=body, timeout=10.0
+        )
 
     # ---- MEM04 reverse +1 ---------------------------------------------------
     @mcp.tool()
@@ -231,6 +233,7 @@ def register(mcp) -> None:
     @mcp.tool()
     def cortrix_memory_edit(
         memory_id: str,
+        namespace: str = "",
         content: Optional[str] = None,
         metadata: Optional[dict] = None,
     ) -> dict:
@@ -244,7 +247,8 @@ def register(mcp) -> None:
         CX_ERR_MEM03_ALREADY_INVALIDATED / CX_ERR_MEM03_CONTENT_TOO_LONG /
         CX_ERR_MEM03_EDIT_FAILED / CX_ERR_MEM03_QUOTA.
         """
-        body: dict = {}
+        ns = namespace or CORTRIX_NAMESPACE
+        body: dict = {"namespace": ns}
         if content is not None:
             body["content"] = content
         if metadata is not None:

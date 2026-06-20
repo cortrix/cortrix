@@ -2,13 +2,13 @@
 
 Per Derek's ruling (briefing § 9): SDK shape = P03 § 2.12; wire = real
 architecture. Method -> endpoint:
-  - ``search``   -> POST   /memory/search   ({memories})
+  - ``search``   -> POST   /memory/search   ({results,total_results,...})
   - ``log``      -> POST   /memory/sessions/{id}/interactions  (live wire)
   - ``extract``  -> POST   /memory/extract  (real-arch, MEM02; PartialSuccessById)
   - ``list``     -> GET    /memory          ({memories,total,...})
-  - ``create``   -> POST   /memory          (Memory)
-  - ``update``/``edit``       -> PATCH  /memory/{id}  (editMemory -> Memory)
-  - ``delete``/``invalidate`` -> DELETE /memory/{id}  (soft-delete -> Memory)
+  - ``create``   -> POST   /memory          (MemoryCreateAck)
+  - ``update``/``edit``       -> PATCH  /memory/{id}  (MemoryEditAck)
+  - ``delete``/``invalidate`` -> DELETE /memory/{id}  (MemoryDeleteAck)
   - ``opt_out``  -> POST   /memory/session/{id}/opt-out  (§2.12-only -> D3.5 spec)
 """
 
@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from .._exceptions import CortrixError, NotFoundError
-from ..types import Memory
+from ..types import MemoryCreateAck, MemoryDeleteAck, MemoryEditAck, MemorySearchResponse
 from ..types.lists import MemoryList
 from ._base import AsyncResource, SyncResource
 
@@ -107,13 +107,25 @@ def _create_body(
     return body
 
 
-def _edit_body(content: Optional[str], metadata: Optional[dict[str, Any]]) -> dict[str, Any]:
+def _edit_body(
+    content: Optional[str],
+    metadata: Optional[dict[str, Any]],
+    namespace: Optional[str],
+) -> dict[str, Any]:
     body: dict[str, Any] = {}
+    if namespace is not None:
+        body["namespace"] = namespace
     if content is not None:
         body["content"] = content
     if metadata is not None:
         body["metadata"] = metadata
     return body
+
+
+def _delete_params(namespace: Optional[str]) -> Optional[dict[str, Any]]:
+    if namespace is None:
+        return None
+    return {"namespace": namespace}
 
 
 class Memory_(SyncResource):
@@ -123,15 +135,28 @@ class Memory_(SyncResource):
     internally to avoid clashing with the ``Memory`` dataclass.)
     """
 
+    def __init__(self, client: Any) -> None:
+        super().__init__(client)
+        self._memory_namespaces: dict[str, str] = {}
+        self._session_namespaces: dict[str, str] = {}
+
+    def _remember_memory(self, memory_id: Optional[str], namespace: Optional[str]) -> None:
+        if memory_id and namespace:
+            self._memory_namespaces[memory_id] = namespace
+
+    def _remember_session(self, session_id: Optional[str], namespace: Optional[str]) -> None:
+        if session_id and namespace:
+            self._session_namespaces[session_id] = namespace
+
     def search(
         self, namespace: str, query: str, *, user_id: str, top_k: int = 5
-    ) -> MemoryList:
-        """Semantic memory search. ``POST /memory/search`` -> {memories}."""
+    ) -> MemorySearchResponse:
+        """Semantic memory search. ``POST /memory/search`` -> {results}."""
         return self._client._request(
             "POST",
             PATH_MEMORY_SEARCH,
             json=_search_body(namespace, query, user_id, top_k),
-            response_model=MemoryList,
+            response_model=MemorySearchResponse,
         )
 
     def log(
@@ -155,7 +180,9 @@ class Memory_(SyncResource):
         path = PATH_MEMORY_LOG.format(session_id=session_id)
         body = _interaction_body(namespace, query, response, user_id, context)
         try:
-            return self._client._request("POST", path, json=body)
+            result = self._client._request("POST", path, json=body)
+            self._remember_session(session_id, namespace)
+            return result
         except NotFoundError:
             # The live route requires the session row to exist — create it
             # (best-effort: a concurrent create races to a UNIQUE error) and retry.
@@ -165,7 +192,9 @@ class Memory_(SyncResource):
                 })
             except CortrixError:
                 pass
-            return self._client._request("POST", path, json=body)
+            result = self._client._request("POST", path, json=body)
+            self._remember_session(session_id, namespace)
+            return result
 
     def extract(
         self,
@@ -179,11 +208,13 @@ class Memory_(SyncResource):
     ) -> Any:
         """Trigger LLM extraction over an interaction. ``POST /memory/extract``
         (real-arch MEM02; PartialSuccessById)."""
-        return self._client._request(
+        result = self._client._request(
             "POST",
             PATH_MEMORY_EXTRACT,
             json=_log_body(namespace, query, response, user_id, session_id, context),
         )
+        self._remember_session(session_id, namespace)
+        return result
 
     def list(
         self,
@@ -209,14 +240,16 @@ class Memory_(SyncResource):
         *,
         memory_type: str,
         metadata: Optional[dict[str, Any]] = None,
-    ) -> Memory:
-        """Create a memory. ``POST /memory`` -> Memory."""
-        return self._client._request(
+    ) -> MemoryCreateAck:
+        """Create a memory. ``POST /memory`` -> acknowledgement."""
+        result = self._client._request(
             "POST",
             PATH_MEMORY,
             json=_create_body(namespace, content, memory_type, metadata),
-            response_model=Memory,
+            response_model=MemoryCreateAck,
         )
+        self._remember_memory(result.memory_id, namespace)
+        return result
 
     def update(
         self,
@@ -224,46 +257,71 @@ class Memory_(SyncResource):
         *,
         content: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
-    ) -> Memory:
+        namespace: Optional[str] = None,
+    ) -> MemoryEditAck:
         """Edit a memory (new user_edit + invalidate old). ``PATCH /memory/{id}``."""
-        return self._client._request(
+        effective_namespace = namespace or self._memory_namespaces.get(memory_id)
+        result = self._client._request(
             "PATCH",
             PATH_MEMORY_ID.format(id=memory_id),
-            json=_edit_body(content, metadata),
-            response_model=Memory,
+            json=_edit_body(content, metadata, effective_namespace),
+            response_model=MemoryEditAck,
         )
+        self._remember_memory(result.invalidated_memory_id or memory_id, effective_namespace)
+        self._remember_memory(result.new_memory_id or result.memory_id, effective_namespace)
+        return result
 
     # design alias: edit == update (MEM03 §7.bis #28)
     edit = update
 
-    def delete(self, memory_id: str) -> Memory:
-        """Soft-delete a memory (status=invalidated). ``DELETE /memory/{id}`` -> Memory."""
+    def delete(self, memory_id: str, *, namespace: Optional[str] = None) -> MemoryDeleteAck:
+        """Soft-delete a memory. ``DELETE /memory/{id}`` -> acknowledgement."""
+        effective_namespace = namespace or self._memory_namespaces.get(memory_id)
         return self._client._request(
-            "DELETE", PATH_MEMORY_ID.format(id=memory_id), response_model=Memory
+            "DELETE",
+            PATH_MEMORY_ID.format(id=memory_id),
+            params=_delete_params(effective_namespace),
+            response_model=MemoryDeleteAck,
         )
 
     # design alias: invalidate == delete (MEM03 §7.bis #29, soft-delete)
     invalidate = delete
 
-    def opt_out(self, session_id: str) -> Any:
+    def opt_out(self, session_id: str, *, namespace: Optional[str] = None) -> Any:
         """Session memory opt-out. ``POST /memory/session/{id}/opt-out``
         (§2.12-only; P04 spec to be added -> D3.5)."""
+        effective_namespace = namespace or self._session_namespaces.get(session_id)
         return self._client._request(
-            "POST", PATH_MEMORY_OPT_OUT.format(session_id=session_id)
+            "POST",
+            PATH_MEMORY_OPT_OUT.format(session_id=session_id),
+            json={"namespace": effective_namespace} if effective_namespace else None,
         )
 
 
 class AsyncMemory(AsyncResource):
     """Async Memory (symmetric to :class:`Memory_`)."""
 
+    def __init__(self, client: Any) -> None:
+        super().__init__(client)
+        self._memory_namespaces: dict[str, str] = {}
+        self._session_namespaces: dict[str, str] = {}
+
+    def _remember_memory(self, memory_id: Optional[str], namespace: Optional[str]) -> None:
+        if memory_id and namespace:
+            self._memory_namespaces[memory_id] = namespace
+
+    def _remember_session(self, session_id: Optional[str], namespace: Optional[str]) -> None:
+        if session_id and namespace:
+            self._session_namespaces[session_id] = namespace
+
     async def search(
         self, namespace: str, query: str, *, user_id: str, top_k: int = 5
-    ) -> MemoryList:
+    ) -> MemorySearchResponse:
         return await self._client._request(
             "POST",
             PATH_MEMORY_SEARCH,
             json=_search_body(namespace, query, user_id, top_k),
-            response_model=MemoryList,
+            response_model=MemorySearchResponse,
         )
 
     async def log(
@@ -285,7 +343,9 @@ class AsyncMemory(AsyncResource):
         path = PATH_MEMORY_LOG.format(session_id=session_id)
         body = _interaction_body(namespace, query, response, user_id, context)
         try:
-            return await self._client._request("POST", path, json=body)
+            result = await self._client._request("POST", path, json=body)
+            self._remember_session(session_id, namespace)
+            return result
         except NotFoundError:
             try:
                 await self._client._request("POST", PATH_MEMORY_SESSIONS, json={
@@ -293,7 +353,9 @@ class AsyncMemory(AsyncResource):
                 })
             except CortrixError:
                 pass
-            return await self._client._request("POST", path, json=body)
+            result = await self._client._request("POST", path, json=body)
+            self._remember_session(session_id, namespace)
+            return result
 
     async def extract(
         self,
@@ -305,11 +367,13 @@ class AsyncMemory(AsyncResource):
         session_id: Optional[str] = None,
         context: Optional[dict[str, Any]] = None,
     ) -> Any:
-        return await self._client._request(
+        result = await self._client._request(
             "POST",
             PATH_MEMORY_EXTRACT,
             json=_log_body(namespace, query, response, user_id, session_id, context),
         )
+        self._remember_session(session_id, namespace)
+        return result
 
     async def list(
         self,
@@ -334,13 +398,15 @@ class AsyncMemory(AsyncResource):
         *,
         memory_type: str,
         metadata: Optional[dict[str, Any]] = None,
-    ) -> Memory:
-        return await self._client._request(
+    ) -> MemoryCreateAck:
+        result = await self._client._request(
             "POST",
             PATH_MEMORY,
             json=_create_body(namespace, content, memory_type, metadata),
-            response_model=Memory,
+            response_model=MemoryCreateAck,
         )
+        self._remember_memory(result.memory_id, namespace)
+        return result
 
     async def update(
         self,
@@ -348,24 +414,38 @@ class AsyncMemory(AsyncResource):
         *,
         content: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
-    ) -> Memory:
-        return await self._client._request(
+        namespace: Optional[str] = None,
+    ) -> MemoryEditAck:
+        effective_namespace = namespace or self._memory_namespaces.get(memory_id)
+        result = await self._client._request(
             "PATCH",
             PATH_MEMORY_ID.format(id=memory_id),
-            json=_edit_body(content, metadata),
-            response_model=Memory,
+            json=_edit_body(content, metadata, effective_namespace),
+            response_model=MemoryEditAck,
         )
+        self._remember_memory(result.invalidated_memory_id or memory_id, effective_namespace)
+        self._remember_memory(result.new_memory_id or result.memory_id, effective_namespace)
+        return result
 
     edit = update
 
-    async def delete(self, memory_id: str) -> Memory:
+    async def delete(
+        self, memory_id: str, *, namespace: Optional[str] = None
+    ) -> MemoryDeleteAck:
+        effective_namespace = namespace or self._memory_namespaces.get(memory_id)
         return await self._client._request(
-            "DELETE", PATH_MEMORY_ID.format(id=memory_id), response_model=Memory
+            "DELETE",
+            PATH_MEMORY_ID.format(id=memory_id),
+            params=_delete_params(effective_namespace),
+            response_model=MemoryDeleteAck,
         )
 
     invalidate = delete
 
-    async def opt_out(self, session_id: str) -> Any:
+    async def opt_out(self, session_id: str, *, namespace: Optional[str] = None) -> Any:
+        effective_namespace = namespace or self._session_namespaces.get(session_id)
         return await self._client._request(
-            "POST", PATH_MEMORY_OPT_OUT.format(session_id=session_id)
+            "POST",
+            PATH_MEMORY_OPT_OUT.format(session_id=session_id),
+            json={"namespace": effective_namespace} if effective_namespace else None,
         )

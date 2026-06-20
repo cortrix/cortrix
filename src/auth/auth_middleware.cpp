@@ -59,9 +59,11 @@ httplib::Server::Handler WithAuth(
 
         // If auth is disabled, behave like NoAuth (grant full permissions)
         if (!auth.enabled()) {
+            rctx.auth.tenant_id = "default_tenant";
+            rctx.auth.user_id = "anonymous";
             rctx.auth.permissions = kPermRead | kPermWrite | kPermAdmin;
             // [F13 S2] Dev/no-auth: still install the obs context from headers (no
-            // authenticated user_id, so it stays unset → emitter defaults anonymous).
+            // real authenticated user_id, so use the CE no-auth identity).
             InstallObservabilityContext(req, res, /*user_id=*/rctx.auth.user_id,
                                         /*agent_id=*/rctx.auth.agent_id);
             handler(req, res, rctx);
@@ -125,6 +127,8 @@ httplib::Server::Handler NoAuth(HttpHandler handler) {
         rctx.request_id = GenerateRequestId();
         rctx.start_time = std::chrono::steady_clock::now();
         // Default AuthContext with admin permissions for unauthenticated endpoints
+        rctx.auth.tenant_id = "default_tenant";
+        rctx.auth.user_id = "anonymous";
         rctx.auth.permissions = kPermRead | kPermWrite | kPermAdmin;
         handler(req, res, rctx);
     };

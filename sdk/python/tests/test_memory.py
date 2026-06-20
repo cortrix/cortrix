@@ -8,18 +8,32 @@ import httpx
 import respx
 
 from cortrix import Cortrix
-from cortrix.types import Memory, MemoryList
+from cortrix.types import MemoryCreateAck, MemoryDeleteAck, MemoryEditAck, MemoryList, MemorySearchResponse
 
 _MEM = {"memory_id": "m1", "content": "x", "memory_type": "fact", "status": "valid"}
+_SEARCH = {
+    "results": [
+        {
+            "block_id": "m1",
+            "content": "x",
+            "memory_type": "fact",
+            "score": 0.8,
+            "expired": False,
+        }
+    ],
+    "total_results": 1,
+    "latency_ms": 1,
+    "degraded": False,
+}
 
 
 @respx.mock
 def test_search_posts_to_memory_search(api_base: str, client: Cortrix) -> None:
     route = respx.post(api_base + "/memory/search").mock(
-        return_value=httpx.Response(200, json={"memories": [_MEM]})
+        return_value=httpx.Response(200, json=_SEARCH)
     )
     out = client.memory.search("user_memory", "last progress", user_id="u1", top_k=3)
-    assert isinstance(out, MemoryList) and out.memories[0].memory_id == "m1"
+    assert isinstance(out, MemorySearchResponse) and out.results[0].block_id == "m1"
     body = json.loads(route.calls.last.request.content)
     assert body == {"namespace": "user_memory", "query": "last progress", "user_id": "u1", "top_k": 3}
 
@@ -68,40 +82,56 @@ def test_list_params(api_base: str, client: Cortrix) -> None:
 
 @respx.mock
 def test_create(api_base: str, client: Cortrix) -> None:
-    route = respx.post(api_base + "/memory").mock(return_value=httpx.Response(201, json=_MEM))
+    route = respx.post(api_base + "/memory").mock(
+        return_value=httpx.Response(201, json={"memory_id": "m1", "status": "active"})
+    )
     m = client.memory.create("ns", "User prefers Markdown", memory_type="preference")
-    assert isinstance(m, Memory)
+    assert isinstance(m, MemoryCreateAck) and m.memory_id == "m1"
     body = json.loads(route.calls.last.request.content)
     assert body == {"namespace": "ns", "content": "User prefers Markdown", "memory_type": "preference"}
 
 
 @respx.mock
 def test_update_is_patch(api_base: str, client: Cortrix) -> None:
-    route = respx.patch(api_base + "/memory/m1").mock(return_value=httpx.Response(200, json=_MEM))
-    client.memory.update("m1", content="new")
+    route = respx.patch(api_base + "/memory/m1").mock(
+        return_value=httpx.Response(
+            200, json={"new_memory_id": "m2", "invalidated_memory_id": "m1"}
+        )
+    )
+    out = client.memory.update("m1", content="new", namespace="ns")
+    assert isinstance(out, MemoryEditAck) and out.new_memory_id == "m2"
     assert route.calls.last.request.method == "PATCH"
-    assert json.loads(route.calls.last.request.content) == {"content": "new"}
+    assert json.loads(route.calls.last.request.content) == {"namespace": "ns", "content": "new"}
 
 
 @respx.mock
-def test_delete_is_soft_returns_memory(api_base: str, client: Cortrix) -> None:
-    inv = {**_MEM, "status": "invalidated"}
-    respx.delete(api_base + "/memory/m1").mock(return_value=httpx.Response(200, json=inv))
-    m = client.memory.delete("m1")
+def test_delete_is_soft_returns_ack(api_base: str, client: Cortrix) -> None:
+    inv = {"block_id": "m1", "status": "invalidated"}
+    route = respx.delete(api_base + "/memory/m1").mock(
+        return_value=httpx.Response(200, json=inv)
+    )
+    m = client.memory.delete("m1", namespace="ns")
+    assert isinstance(m, MemoryDeleteAck)
     assert m.status == "invalidated"
+    assert route.calls.last.request.url.params["namespace"] == "ns"
 
 
 @respx.mock
 def test_edit_alias_calls_patch(api_base: str, client: Cortrix) -> None:
-    route = respx.patch(api_base + "/memory/m2").mock(return_value=httpx.Response(200, json=_MEM))
-    client.memory.edit("m2", content="z")
+    route = respx.patch(api_base + "/memory/m2").mock(
+        return_value=httpx.Response(
+            200, json={"new_memory_id": "m4", "invalidated_memory_id": "m2"}
+        )
+    )
+    client.memory.edit("m2", content="z", namespace="ns")
     assert route.calls.last.request.method == "PATCH"
 
 
 @respx.mock
 def test_invalidate_alias_calls_delete(api_base: str, client: Cortrix) -> None:
     route = respx.delete(api_base + "/memory/m3").mock(
-        return_value=httpx.Response(200, json={**_MEM, "status": "invalidated"})
+        return_value=httpx.Response(200, json={"block_id": "m3", "status": "invalidated"})
     )
-    client.memory.invalidate("m3")
+    client.memory.invalidate("m3", namespace="ns")
     assert route.calls.last.request.method == "DELETE"
+    assert route.calls.last.request.url.params["namespace"] == "ns"

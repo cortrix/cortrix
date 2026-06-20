@@ -10,6 +10,9 @@
 #include "cortrix/observability/operation_logger.h"        // F18a ns_* operation_log
 #include "cortrix/observability/operation_log_emitter.h"   // §9.1 MakeEngineEntry / EmitSite
 
+#include <cstdlib>
+#include <cctype>
+#include <algorithm>
 #include <random>
 #include <iomanip>
 #include <sstream>
@@ -19,8 +22,10 @@
 #include <optional>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include <openssl/rand.h>
+#include <yaml-cpp/yaml.h>
 
 namespace cortrix {
 
@@ -116,6 +121,103 @@ bool StatusCodeRetryable(StatusCode code) {
     return code == StatusCode::kInternal || code == StatusCode::kUnavailable;
 }
 
+std::string OpenApiRoot() {
+    const char* env = std::getenv("CORTRIX_OPENAPI_ROOT");
+    if (env && *env) return std::string(env);
+    return ".";
+}
+
+bool ReadFirstFile(const std::vector<std::string>& paths,
+                   std::string* content,
+                   std::string* path_used) {
+    for (const auto& path : paths) {
+        std::ifstream in(path, std::ios::binary);
+        if (!in) continue;
+        std::stringstream ss;
+        ss << in.rdbuf();
+        *content = ss.str();
+        *path_used = path;
+        return true;
+    }
+    return false;
+}
+
+std::vector<std::string> OpenApiYamlCandidates() {
+    std::string root = OpenApiRoot();
+    return {
+        root + "/build/openapi.bundled.yaml",
+        root + "/api/openapi.yaml",
+    };
+}
+
+std::vector<std::string> OpenApiJsonCandidates() {
+    std::string root = OpenApiRoot();
+    return {
+        root + "/build/openapi.json",
+        root + "/api/openapi.json",
+    };
+}
+
+bool LooksLikeInt(const std::string& value) {
+    if (value.empty()) return false;
+    size_t i = value[0] == '-' ? 1 : 0;
+    if (i == value.size()) return false;
+    for (; i < value.size(); ++i) {
+        if (!std::isdigit(static_cast<unsigned char>(value[i]))) return false;
+    }
+    return true;
+}
+
+bool LooksLikeFloat(const std::string& value) {
+    bool dot = false;
+    bool digit = false;
+    size_t i = value[0] == '-' ? 1 : 0;
+    for (; i < value.size(); ++i) {
+        unsigned char c = static_cast<unsigned char>(value[i]);
+        if (std::isdigit(c)) {
+            digit = true;
+            continue;
+        }
+        if (value[i] == '.' && !dot) {
+            dot = true;
+            continue;
+        }
+        return false;
+    }
+    return dot && digit;
+}
+
+nlohmann::json YamlScalarToJson(const std::string& value) {
+    if (value == "true") return true;
+    if (value == "false") return false;
+    if (value == "null" || value == "~") return nullptr;
+    try {
+        if (LooksLikeInt(value)) return std::stoll(value);
+        if (LooksLikeFloat(value)) return std::stod(value);
+    } catch (...) {
+        // Keep the original string if numeric coercion overflows.
+    }
+    return value;
+}
+
+nlohmann::json YamlToJson(const YAML::Node& node) {
+    if (!node || node.IsNull()) return nullptr;
+    if (node.IsScalar()) return YamlScalarToJson(node.as<std::string>());
+    if (node.IsSequence()) {
+        nlohmann::json out = nlohmann::json::array();
+        for (const auto& child : node) out.push_back(YamlToJson(child));
+        return out;
+    }
+    if (node.IsMap()) {
+        nlohmann::json out = nlohmann::json::object();
+        for (const auto& item : node) {
+            out[item.first.as<std::string>()] = YamlToJson(item.second);
+        }
+        return out;
+    }
+    return nullptr;
+}
+
 // Lift the rich CX_ERR_* token an Agent should route on. The catalog/tenant/auth
 // boundary prefixes the message as "CX_ERR_X: detail" (CatalogStatus / TenantStatus
 // / MakeAuthError convention); return "" when the message carries no such token.
@@ -207,6 +309,7 @@ CortrixHttpServer::CortrixHttpServer(const CortrixConfig& config,
 
 void CortrixHttpServer::RegisterRoutes() {
     RegisterHealthRoutes();
+    RegisterOpenApiRoutes();
     RegisterSystemRoutes();
     RegisterNamespaceRoutes();
 
@@ -267,6 +370,79 @@ void CortrixHttpServer::RegisterRoutes() {
             res.set_content(body.dump(), "application/json");
             res.status = 500;
         });
+}
+
+void CortrixHttpServer::RegisterOpenApiRoutes() {
+    svr_.Get("/docs", NoAuth(
+        [](const httplib::Request&, httplib::Response& res, const RequestContext&) {
+            const std::string html = R"(<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cortrix API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.ui = SwaggerUIBundle({
+      url: "/openapi.json",
+      dom_id: "#swagger-ui",
+      deepLinking: true,
+      displayRequestDuration: true,
+      tryItOutEnabled: true
+    });
+  </script>
+</body>
+</html>)";
+            res.set_content(html, "text/html");
+            res.status = 200;
+        }
+    ));
+
+    svr_.Get("/openapi.bundled.yaml", NoAuth(
+        [](const httplib::Request&, httplib::Response& res, const RequestContext& rctx) {
+            std::string content;
+            std::string path;
+            if (!ReadFirstFile(OpenApiYamlCandidates(), &content, &path)) {
+                WriteJsonError(res, Status::NotFound("OpenAPI YAML not found"), rctx.request_id);
+                return;
+            }
+            res.set_header("X-Cortrix-OpenAPI-Source", path);
+            res.set_content(content, "application/yaml");
+            res.status = 200;
+        }
+    ));
+
+    svr_.Get("/openapi.json", NoAuth(
+        [](const httplib::Request&, httplib::Response& res, const RequestContext& rctx) {
+            std::string content;
+            std::string path;
+            if (ReadFirstFile(OpenApiJsonCandidates(), &content, &path)) {
+                res.set_header("X-Cortrix-OpenAPI-Source", path);
+                res.set_content(content, "application/json");
+                res.status = 200;
+                return;
+            }
+            if (!ReadFirstFile(OpenApiYamlCandidates(), &content, &path)) {
+                WriteJsonError(res, Status::NotFound("OpenAPI spec not found"), rctx.request_id);
+                return;
+            }
+            try {
+                nlohmann::json body = YamlToJson(YAML::Load(content));
+                res.set_header("X-Cortrix-OpenAPI-Source", path);
+                res.set_content(body.dump(), "application/json");
+                res.status = 200;
+            } catch (const std::exception& e) {
+                WriteJsonError(
+                    res,
+                    Status::Internal(std::string("OpenAPI YAML parse failed: ") + e.what()),
+                    rctx.request_id);
+            }
+        }
+    ));
 }
 
 void CortrixHttpServer::EnableWebUi(const std::string& dir) {
@@ -360,6 +536,41 @@ void CortrixHttpServer::RegisterHealthRoutes() {
 }
 
 void CortrixHttpServer::RegisterSystemRoutes() {
+    auto write_ns_stats =
+        [this](const httplib::Request& req, httplib::Response& res,
+               const RequestContext& rctx) {
+            const std::string name = req.path_params.at("ns");
+            if (!rctx.auth.namespaces.empty() &&
+                std::find(rctx.auth.namespaces.begin(), rctx.auth.namespaces.end(), name)
+                    == rctx.auth.namespaces.end()) {
+                WriteJsonError(res, Status::NotFound("Namespace '" + name + "' not found"),
+                               rctx.request_id);
+                return;
+            }
+
+            nlohmann::json ns_json;
+            Status s = BuildNamespaceJson(name, &ns_json);
+            if (!s.ok()) {
+                WriteJsonError(res, s, rctx.request_id);
+                return;
+            }
+
+            nlohmann::json body;
+            body["namespace"] = name;
+            body["document_count"] = ns_json.value("doc_count", 0);
+            body["chunk_count"] = ns_json.value("block_count", 0);
+            body["storage_bytes"] = 0;
+            body["last_query_at"] = nullptr;
+            WriteJsonResponse(res, 200, body, rctx.request_id);
+        };
+
+    if (config_.auth.enabled) {
+        svr_.Get("/api/v1/system/namespaces/:ns/stats",
+                 WithAuth(auth_, kPermRead, write_ns_stats));
+    } else {
+        svr_.Get("/api/v1/system/namespaces/:ns/stats", NoAuth(write_ns_stats));
+    }
+
     // GET /api/v1/system/features
     // Returns the edition plus which optional features this build provides.
     // Stable schema (Agent-friendly principle 7): unavailable features report
@@ -396,6 +607,8 @@ nlohmann::json CortrixHttpServer::BuildNamespaceListJson(
         }
         nlohmann::json j;
         j["name"] = name;
+        j["namespace"] = name;
+        j["status"] = "active";
         j["created_at"] = created_at;
         j["updated_at"] = updated_at;
         j["doc_count"] = dc;
@@ -483,6 +696,10 @@ Status CortrixHttpServer::BuildNamespaceJson(const std::string& name,
         }
     }
     (*out)["name"] = name;
+    (*out)["namespace"] = name;
+    if (!out->contains("status")) {
+        (*out)["status"] = "active";
+    }
     (*out)["created_at"] = created;
     (*out)["updated_at"] = updated;
     (*out)["doc_count"] = dc;
@@ -541,6 +758,8 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                     auto got = ns_router_->GetNamespace(name);
                     if (got.ok()) created_at = got.value().created_at;
                     resp["name"]        = name;
+                    resp["namespace"]   = name;
+                    resp["status"]      = "active";
                     resp["created_at"]  = created_at;
                     resp["updated_at"]  = created_at;
                     resp["doc_count"]   = 0;
@@ -556,6 +775,8 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                     NamespaceInfo info;
                     ns_mgr_.Get(name, &info);
                     resp["name"]        = info.name;
+                    resp["namespace"]   = info.name;
+                    resp["status"]      = "active";
                     resp["created_at"]  = info.created_at;
                     resp["updated_at"]  = info.updated_at;
                     resp["doc_count"]   = info.doc_count;
@@ -609,6 +830,8 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                     auto got = ns_router_->GetNamespace(name);
                     if (got.ok()) created_at = got.value().created_at;
                     resp["name"]        = name;
+                    resp["namespace"]   = name;
+                    resp["status"]      = "active";
                     resp["created_at"]  = created_at;
                     resp["updated_at"]  = created_at;
                     resp["doc_count"]   = 0;
@@ -624,6 +847,8 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                     NamespaceInfo info;
                     ns_mgr_.Get(name, &info);
                     resp["name"]        = info.name;
+                    resp["namespace"]   = info.name;
+                    resp["status"]      = "active";
                     resp["created_at"]  = info.created_at;
                     resp["updated_at"]  = info.updated_at;
                     resp["doc_count"]   = info.doc_count;

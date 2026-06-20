@@ -58,7 +58,7 @@ class NamespaceList:
 
 @dataclass
 class MemoryList:
-    """``GET /memory`` and ``POST /memory/search`` responses (``{memories: [...]}``)."""
+    """``GET /memory`` response (``{memories: [...]}``)."""
 
     memories: List[Memory] = field(default_factory=list)
     total: Optional[int] = None
@@ -71,6 +71,75 @@ class MemoryList:
 
     def __len__(self) -> int:
         return len(self.memories)
+
+
+@dataclass
+class MemorySearchResultItem:
+    """One ``POST /memory/search`` result item from the live MEM03 wire."""
+
+    interaction_id: Optional[str] = None
+    session_id: Optional[str] = None
+    query_text: Optional[str] = None
+    response_text: Optional[str] = None
+    query_type: Optional[str] = None
+    score: Optional[float] = None
+    expired: Optional[bool] = None
+    created_at: Optional[str] = None
+    metadata: Optional[str] = None
+    block_id: Optional[str] = None
+    content: Optional[str] = None
+    memory_type: Optional[str] = None
+    decay_factor: Optional[float] = None
+    final_score: Optional[float] = None
+
+
+@dataclass
+class MemorySearchResponse:
+    """``POST /memory/search`` response (``{results,total_results,...}``)."""
+
+    results: List[MemorySearchResultItem] = field(default_factory=list)
+    total_results: Optional[int] = None
+    latency_ms: Optional[int] = None
+    degraded: Optional[bool] = None
+
+    def __iter__(self) -> Iterator[MemorySearchResultItem]:
+        return iter(self.results)
+
+    def __len__(self) -> int:
+        return len(self.results)
+
+
+@dataclass
+class MemoryCreateAck:
+    """``POST /memory`` acknowledgement."""
+
+    memory_id: Optional[str] = None
+    status: Optional[str] = None
+    namespace: Optional[str] = None
+    memory_type: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+@dataclass
+class MemoryEditAck:
+    """``PATCH /memory/{id}`` acknowledgement."""
+
+    new_memory_id: Optional[str] = None
+    invalidated_memory_id: Optional[str] = None
+    memory_id: Optional[str] = None
+    content: Optional[str] = None
+    metadata_json: Optional[str] = None
+    updated_at: Optional[str] = None
+    extraction_method: Optional[str] = None
+
+
+@dataclass
+class MemoryDeleteAck:
+    """``DELETE /memory/{id}`` soft-delete acknowledgement."""
+
+    block_id: Optional[str] = None
+    memory_id: Optional[str] = None
+    status: Optional[str] = None
 
 
 @dataclass

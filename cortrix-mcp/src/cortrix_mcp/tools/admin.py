@@ -17,13 +17,17 @@ from typing import Optional
 
 from ..transport import request, require_admin
 
+_CONNECTION_REF_ALIASES: dict[str, str] = {}
+
 
 def register(mcp) -> None:
     @mcp.tool()
     def cortrix_admin_db_credential_register(
-        name: str,
-        dsn: str,
+        name: str = "",
+        dsn: str = "",
         expire_days: Optional[int] = None,
+        connection_ref: Optional[str] = None,
+        description: Optional[str] = None,
     ) -> dict:
         """Register a database connection credential (F16a D1; admin only).
 
@@ -34,15 +38,24 @@ def register(mcp) -> None:
             name: logical name to register the credential under (returned as ref_id's label).
             dsn: database connection string / secret (write-only, stored encrypted).
             expire_days: optional credential expiry in days (backend default applies if omitted).
+            connection_ref: compatibility alias for older agent call sites; maps to name.
+            description: compatibility metadata accepted by older agent call sites.
 
         Maps to POST /admin/db-connections (import_routes.cpp); the backend requires name + dsn.
         Raises CX_ERR_MCP_ADMIN_REQUIRED (403) when the caller lacks the admin role.
         """
         require_admin()
-        body: dict = {"name": name, "dsn": dsn}
+        alias = connection_ref or name
+        body: dict = {"name": name or connection_ref or "", "dsn": dsn}
         if expire_days is not None:
             body["expire_days"] = expire_days
-        return request("POST", "/admin/db-connections", json_body=body, timeout=15.0)
+        result = request("POST", "/admin/db-connections", json_body=body, timeout=15.0)
+        data = result.get("data") if isinstance(result, dict) else {}
+        if alias and isinstance(data, dict):
+            ref_id = data.get("ref_id") or data.get("connection_ref")
+            if isinstance(ref_id, str) and ref_id:
+                _CONNECTION_REF_ALIASES[alias] = ref_id
+        return result
 
     @mcp.tool()
     def cortrix_admin_db_import_run(
@@ -70,7 +83,8 @@ def register(mcp) -> None:
         Raises CX_ERR_MCP_ADMIN_REQUIRED (403) when the caller lacks the admin role.
         """
         require_admin()
-        body: dict = {"connection_ref": connection_ref, "namespace": namespace}
+        resolved_ref = _CONNECTION_REF_ALIASES.get(connection_ref, connection_ref)
+        body: dict = {"connection_ref": resolved_ref, "namespace": namespace}
         if sql is not None:
             body["sql"] = sql
         if table is not None:

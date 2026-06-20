@@ -132,7 +132,7 @@ async def test_async_resource_sweep() -> None:
         ("post", "/sync/start"), ("get", "/sync/status"),
         ("post", "/auth/register"), ("post", "/auth/login"), ("get", "/auth/me"),
         ("get", "/tenants/t1"), ("post", "/admin/tenants"),
-        ("post", "/import/database"), ("get", "/system/health"),
+        ("post", "/import/database"), ("get", "/system/health/live"),
         ("get", "/gc/status"), ("post", "/gc/run"),
     ]:
         getattr(respx, m)(API + p).mock(return_value=httpx.Response(200, json=_SWEEP_JSON))

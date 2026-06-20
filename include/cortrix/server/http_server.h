@@ -56,6 +56,7 @@ public:
 
 private:
     void RegisterHealthRoutes();
+    void RegisterOpenApiRoutes();
     void RegisterSystemRoutes();
     void RegisterNamespaceRoutes();
 
