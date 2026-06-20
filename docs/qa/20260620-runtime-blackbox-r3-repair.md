@@ -134,6 +134,7 @@ Additional PR-CI closeout checks:
 
 - `clang-format` was applied to the changed C++ files because the PR CI runs whole-file `clang-format --dry-run --Werror` on every changed C++ file.
 - `cortrix-mcp/tests/test_core.py` now asserts the default namespace sent by `cortrix_memory_edit`, matching the runtime-compatible MCP request body.
+- PR CI now installs component test extras where the repo already declares them: `cortrix-mcp[test]` and `sdk/python[dev]`. This keeps SDK test-only dependencies such as `respx` out of runtime dependencies while making CI collect the SDK tests correctly.
 - Local `ctest --test-dir build -L unit --output-on-failure` reached the full unit matrix. The only first-pass local failure was `NamespacePoolTest.StartupLoadEightWorkersConcurrency` due `Too many open files`; rerunning that single test with `ulimit -n 4096` passed.
 
 ## Residual Failures

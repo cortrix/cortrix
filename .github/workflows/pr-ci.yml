@@ -83,7 +83,17 @@ jobs:
               pip install -q -r "$comp/requirements.txt" || true
             fi
             if [ -f "$comp/pyproject.toml" ]; then
-              pip install -q -e "$comp" || true
+              case "$comp" in
+                cortrix-mcp)
+                  pip install -q -e "$comp[test]" || pip install -q -e "$comp" || true
+                  ;;
+                sdk/python)
+                  pip install -q -e "$comp[dev]" || pip install -q -e "$comp" || true
+                  ;;
+                *)
+                  pip install -q -e "$comp" || true
+                  ;;
+              esac
             fi
             if [ -d "$comp/tests" ]; then
               echo "── pytest: $comp"
