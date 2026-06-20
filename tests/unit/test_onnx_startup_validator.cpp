@@ -270,22 +270,24 @@ TEST(OnnxStartupValidatorTest, MissingModelSkippedWhenConfigured) {
 // ============================================================
 
 // CollectRegisteredOnnxModels also conditionally registers the F39
-// query-complexity model when models/query-complexity/model.onnx exists
-// relative to the test cwd (Q3/#26 wiring). Pin the override env to a
-// nonexistent dir so these exact-set assertions hold regardless of where
-// the suite runs (repo root has the real model; worktrees do not).
+// query-complexity model (config.query_complexity.model_dir) and the F02
+// reranker model (config.reranker.model_dir) when their model.onnx exists.
+// Pin both dirs to nonexistent paths via config (NOT env — the collector now
+// resolves them from config only) so these exact-set assertions hold
+// regardless of where the suite runs (repo root has the real models;
+// worktrees do not).
 class OnnxCollectModelsTest : public ::testing::Test {
  protected:
-    void SetUp() override {
-        setenv("CORTRIX_QUERY_COMPLEXITY_MODEL_DIR", "/nonexistent-query-complexity", 1);
-    }
-    void TearDown() override {
-        unsetenv("CORTRIX_QUERY_COMPLEXITY_MODEL_DIR");
+    CortrixConfig BaseConfig() {
+        CortrixConfig config;
+        config.query_complexity.model_dir = "/nonexistent-query-complexity";
+        config.reranker.model_dir = "/nonexistent-reranker";
+        return config;
     }
 };
 
 TEST_F(OnnxCollectModelsTest, RegistersEmbedderModelPath) {
-    CortrixConfig config;
+    CortrixConfig config = BaseConfig();
     config.embedding.model_path = "/models/bge-m3/model.onnx";
     auto cfg = StartupValidator::CollectRegisteredOnnxModels(config);
     ASSERT_EQ(cfg.registered_model_paths.size(), 1u);
@@ -295,7 +297,7 @@ TEST_F(OnnxCollectModelsTest, RegistersEmbedderModelPath) {
 TEST_F(OnnxCollectModelsTest, EmptyModelPathRegistersNothing) {
     // Stub-only deployment: no model_path → nothing registered (validation
     // becomes a no-op pass).
-    CortrixConfig config;  // embedding.model_path defaults empty
+    CortrixConfig config = BaseConfig();  // embedding.model_path defaults empty
     auto cfg = StartupValidator::CollectRegisteredOnnxModels(config);
     EXPECT_TRUE(cfg.registered_model_paths.empty());
 }
@@ -313,7 +315,7 @@ TEST_F(OnnxCollectModelsTest, EmptyModelPathRegistersNothing) {
 TEST_F(OnnxCollectModelsTest, F40SparseReusesBgeM3SingleRegistration) {
     // The bge-m3 registration is shared: registering it once covers both the
     // dense embedder and the F40 sparse activation (single model, single path).
-    CortrixConfig config;
+    CortrixConfig config = BaseConfig();
     config.embedding.model_path = "/models/bge-m3/model.onnx";
     auto cfg = StartupValidator::CollectRegisteredOnnxModels(config);
     ASSERT_EQ(cfg.registered_model_paths.size(), 1u)
@@ -324,7 +326,7 @@ TEST_F(OnnxCollectModelsTest, F40SparseReusesBgeM3SingleRegistration) {
 TEST_F(OnnxCollectModelsTest, F40SparseStubOnlyRegistersNothing) {
     // Stub-only (no model) deployment: F40 sparse runs on the deterministic stub
     // too, so — like the dense path — there is nothing to validate at startup.
-    CortrixConfig config;  // empty embedding.model_path
+    CortrixConfig config = BaseConfig();  // empty embedding.model_path
     auto cfg = StartupValidator::CollectRegisteredOnnxModels(config);
     EXPECT_TRUE(cfg.registered_model_paths.empty());
 }

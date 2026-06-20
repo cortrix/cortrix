@@ -65,7 +65,9 @@ public:
                        cortrix::retrieval::SparseIndexRegistry* sparse_registry = nullptr,
                        std::shared_ptr<cortrix::llm::ILlmClient> llm = nullptr,
                        std::shared_ptr<agent_trace::EngineInstrumentation> engine_instr =
-                           nullptr);
+                           nullptr,
+                       std::string reranker_model_dir = "",
+                       std::string query_complexity_model_dir = "models/query-complexity");
     ~CrossNsQueryWiring();
 
     CrossNsQueryWiring(const CrossNsQueryWiring&) = delete;

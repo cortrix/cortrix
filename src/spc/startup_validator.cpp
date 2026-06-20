@@ -281,29 +281,39 @@ StartupValidator::ValidationConfig StartupValidator::CollectRegisteredOnnxModels
         cfg.registered_model_paths.push_back(config.embedding.model_path);
     }
     // [Q3/#26 · F39-rev-1/F22-2 D3.5 wiring] The F39 query-complexity DistilBERT
-    // model (models/query-complexity/model.onnx, env override
-    // CORTRIX_QUERY_COMPLEXITY_MODEL_DIR). Registered ONLY when the file is present,
-    // so an offline / model-less deployment validates nothing for it and the F39
-    // backend takes its heuristic fallback (OnnxComplexityBackend Init() leaves it
-    // unavailable → QueryComplexityClassifier L2 default-Complex). When the model IS
-    // present, this lets StartupValidator catch an opset/ABI mismatch up front.
-    {
-        std::string dir = "models/query-complexity";
-        if (const char* env = std::getenv("CORTRIX_QUERY_COMPLEXITY_MODEL_DIR");
-            env != nullptr && env[0] != '\0') {
-            dir = env;
+    // model dir comes from config.query_complexity.model_dir — the SAME field the
+    // query wiring (MakeComplexityBackend) resolves, so this pre-flight check and
+    // the runtime backend always agree. The env var CORTRIX_QUERY_COMPLEXITY_MODEL_DIR
+    // is folded into that field upstream by ApplyEnvOverrides (single env-read site).
+    // Registered ONLY when the file is present, so an offline / model-less deployment
+    // validates nothing for it and the F39 backend takes its heuristic fallback
+    // (OnnxComplexityBackend Init() leaves it unavailable → QueryComplexityClassifier
+    // L2 default-Complex). When the model IS present, this catches an opset/ABI
+    // mismatch up front instead of silently degrading to the heuristic.
+    if (!config.query_complexity.model_dir.empty()) {
+        const std::string model = config.query_complexity.model_dir + "/model.onnx";
+        std::error_code ec;
+        if (std::filesystem::exists(model, ec) && !ec) {
+            cfg.registered_model_paths.push_back(model);
         }
-        const std::string model = dir + "/model.onnx";
+    }
+    // [F02] The reranker model dir comes from config.reranker.model_dir — same field
+    // the query wiring (MakeRerankerConfig) resolves. Registered ONLY when present,
+    // so a stub-mode deployment (empty dir / model absent) validates nothing and the
+    // reranker runs deterministic stub scoring; when the model IS present this catches
+    // an opset/ABI mismatch up front rather than letting OnnxReranker silently fall
+    // back to stub (which would tank rerank quality invisibly).
+    if (!config.reranker.model_dir.empty()) {
+        const std::string model = config.reranker.model_dir + "/model.onnx";
         std::error_code ec;
         if (std::filesystem::exists(model, ec) && !ec) {
             cfg.registered_model_paths.push_back(model);
         }
     }
     // --- D3.5 wiring (do NOT add here during D3 standalone) ---
-    // When F02 lands its reranker model_path config field, append it here
-    // (bge-reranker-v2-m3); same for the F40 Wave C sparse model. Both keep
-    // ZERO code changes to F02 / OnnxEmbedder themselves (D5=A static binding) —
-    // this collector is the only place that learns about them.
+    // The F40 Wave C sparse model reuses bge-m3 (config.embedding.model_path) — no
+    // distinct model to register. Any future *distinct* ONNX model appends here; the
+    // collector is the only place that learns about them (D5=A static binding).
     return cfg;
 }
 

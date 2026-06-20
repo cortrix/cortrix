@@ -118,44 +118,36 @@ private:
     cortrix::resource::INamespacePool& pool_;
 };
 
-// Build the F02 reranker. The model dir is taken from CORTRIX_RERANKER_MODEL_DIR
-// (mirrors the embedder's model-path convention); when unset or the model is
-// absent, OnnxReranker falls back to deterministic stub scoring so the rerank link
-// is exercised end-to-end without a model present (model drop-in is replacement-only).
-reranker::RerankerConfig MakeRerankerConfig() {
+// Build the F02 reranker config from the supplied model dir (resolved from
+// config.reranker.model_dir before this call). Empty dir = stub mode (no
+// cross-encoder; OnnxReranker falls back to deterministic stub scoring).
+reranker::RerankerConfig MakeRerankerConfig(const std::string& model_dir) {
     reranker::RerankerConfig cfg;
-    if (const char* dir = std::getenv("CORTRIX_RERANKER_MODEL_DIR");
-        dir != nullptr && dir[0] != '\0') {
-        cfg.model_path = std::string(dir) + "/model.onnx";
-        cfg.tokenizer_path = std::string(dir) + "/tokenizer.json";
+    if (!model_dir.empty()) {
+        cfg.model_path = model_dir + "/model.onnx";
+        cfg.tokenizer_path = model_dir + "/tokenizer.json";
     }
     return cfg;
 }
 
-// Build the F39 complexity-classifier backend (Q3 + #26). Prefer the real
-// DistilBERT OnnxComplexityBackend at CORTRIX_QUERY_COMPLEXITY_MODEL_DIR (default
-// "models/query-complexity"); Init() is offline-friendly (Ok + unavailable when the
-// 256 MB model is absent / ONNX not linked). When the ONNX backend is unavailable
-// we fall back to the HeuristicComplexityBackend so the routing link still works
-// without the model (CI / offline). Either way QueryComplexityClassifier's §6.1
-// rule-guard / force-route / confidence fail-safe logic is unchanged.
-std::shared_ptr<IComplexityClassifierBackend> MakeComplexityBackend() {
-    std::string dir = "models/query-complexity";
-    if (const char* env = std::getenv("CORTRIX_QUERY_COMPLEXITY_MODEL_DIR");
-        env != nullptr && env[0] != '\0') {
-        dir = env;
-    }
+// Build the F39 complexity-classifier backend from the supplied model dir
+// (resolved from config.query_complexity.model_dir before this call).
+// Init() is offline-friendly: returns Ok + unavailable when the model files
+// are absent, falling back to HeuristicComplexityBackend so the routing link
+// works without the model (CI / offline).
+std::shared_ptr<IComplexityClassifierBackend> MakeComplexityBackend(
+    const std::string& model_dir) {
     auto onnx = std::make_shared<OnnxComplexityBackend>(
-        dir + "/model.onnx", dir + "/vocab.txt", /*max_seq_length=*/64);
+        model_dir + "/model.onnx", model_dir + "/vocab.txt", /*max_seq_length=*/64);
     onnx->Init();  // Ok + unavailable when the model is absent (offline-friendly)
     if (onnx->IsAvailable()) {
         CORTRIX_LOG_INFO("main", "F39 complexity router: OnnxComplexityBackend (model={})",
-                         dir);
+                         model_dir);
         return onnx;
     }
     CORTRIX_LOG_INFO("main",
                      "F39 complexity router: model unavailable ({}), using heuristic backend",
-                     dir);
+                     model_dir);
     return std::make_shared<HeuristicComplexityBackend>();
 }
 
@@ -166,16 +158,17 @@ struct CrossNsQueryWiring::Impl {
          RRFFusion& fusion, cortrix::tenant::PermissionService& perm_svc,
          cortrix::retrieval::SparseIndexRegistry* sparse_registry,
          std::shared_ptr<cortrix::llm::ILlmClient> llm,
-         std::shared_ptr<agent_trace::EngineInstrumentation> engine_instr)
+         std::shared_ptr<agent_trace::EngineInstrumentation> engine_instr,
+         const std::string& reranker_model_dir,
+         const std::string& query_complexity_model_dir)
         : pool(pool),
           engine_instr(std::move(engine_instr)),
           perm_adapter(perm_svc, pool),
           // The shared fan-out pool (F04 §2.7 executor.workers / queue_size defaults).
           engine(8, 500),
-          // Shared F02 reranker — only its stateless ScoreBatch is used (the live
-          // executor binds chunk-text lookup to the per-NS store), so we pass a null
-          // ChunkStore. When no model dir is set OnnxReranker scores in stub mode.
-          reranker(reranker::CreateReranker(MakeRerankerConfig(), /*chunk_store=*/nullptr)),
+          // Shared F02 reranker. model_dir from config.reranker.model_dir; empty = stub.
+          reranker(reranker::CreateReranker(MakeRerankerConfig(reranker_model_dir),
+                                            /*chunk_store=*/nullptr)),
           // F40 per-NS SPLADE index owner (Q4 read path). The SAME registry instance
           // the SPC ingest write path indexes into (bootstrap owns it), so the read
           // path serves exactly what was indexed; null → sparse off (dense+FTS5).
@@ -190,7 +183,7 @@ struct CrossNsQueryWiring::Impl {
           // (MakeComplexityBackend). The classifier is total (never throws): a
           // missing/failed backend degrades to Complex (L2 "classifier_unavailable"),
           // so the link is safe with either backend.
-          classifier(MakeComplexityBackend(), ComplexityConfig{}),
+          classifier(MakeComplexityBackend(query_complexity_model_dir), ComplexityConfig{}),
           // F36 RAG-Fusion (Q5). The variant generator needs an LLM; when none is
           // configured (`llm` null) ExpandQueries can't expand → F36 is effectively
           // off (it is also default-disabled per NS config). rag_rrf is a dedicated
@@ -234,10 +227,14 @@ CrossNsQueryWiring::CrossNsQueryWiring(cortrix::resource::INamespacePool& pool,
                                        cortrix::tenant::PermissionService& perm_svc,
                                        cortrix::retrieval::SparseIndexRegistry* sparse_registry,
                                        std::shared_ptr<cortrix::llm::ILlmClient> llm,
-                                       std::shared_ptr<agent_trace::EngineInstrumentation> engine_instr)
+                                       std::shared_ptr<agent_trace::EngineInstrumentation> engine_instr,
+                                       std::string reranker_model_dir,
+                                       std::string query_complexity_model_dir)
     : impl_(std::make_unique<Impl>(pool, embedder, fusion, perm_svc,
                                    sparse_registry, std::move(llm),
-                                   std::move(engine_instr))) {}
+                                   std::move(engine_instr),
+                                   reranker_model_dir,
+                                   query_complexity_model_dir)) {}
 
 CrossNsQueryWiring::~CrossNsQueryWiring() {
     if (impl_ && impl_->reranker) delete impl_->reranker;

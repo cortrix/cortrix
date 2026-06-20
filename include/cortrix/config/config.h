@@ -114,6 +114,14 @@ struct MemoryConfig {
     double decay_min_score = 0.0;   // memory.decay.min_score — decay floor (0 = old events sink)
 };
 
+struct RerankerTopConfig {
+    std::string model_dir;  ///< dir with model.onnx + tokenizer.json; empty = stub mode
+};
+
+struct QueryComplexityTopConfig {
+    std::string model_dir = "models/query-complexity";  ///< F39 DistilBERT ONNX dir
+};
+
 // === [OPEN-2] three-stage GC (ARCH §5.x, A6 §10.8) ===
 // Config for the built-in background GC thread + manual ops endpoints. Defaults
 // mirror the ARCH `gc:` section. CE runs with immediate_purge_enabled=false
@@ -168,6 +176,8 @@ struct CortrixConfig {
     UploadConfig upload;
     WatchDirConfig watch_dir;
     MemoryConfig memory;
+    RerankerTopConfig reranker;              // F02 reranker model dir
+    QueryComplexityTopConfig query_complexity;  // F39 complexity classifier model dir
     SecurityConfig security;  // [F20] admin access policy
     GcConfig gc;              // [OPEN-2] three-stage GC + ops endpoints
 };

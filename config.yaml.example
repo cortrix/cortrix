@@ -73,6 +73,31 @@ embedding:
   gpu_provider: "auto"       # auto=automatic / cpu=CPU-only / coreml=Apple CoreML
 
 # -----------------------------------------------------------------------------
+# reranker — F02 cross-encoder reranker (bge-reranker-v2-m3 ONNX)
+#
+# Download model files from BAAI/bge-reranker-v2-m3 on HuggingFace:
+#   models/bge-reranker-v2-m3/model.onnx + tokenizer.json
+#
+# When model_dir is empty or files are absent, reranker runs in stub mode
+# (no cross-encoder; results still returned but not semantically reranked).
+# Override via env CORTRIX_RERANKER_MODEL_DIR (env wins over yaml).
+# -----------------------------------------------------------------------------
+reranker:
+  model_dir: "./models/bge-reranker-v2-m3"
+
+# -----------------------------------------------------------------------------
+# query_complexity — F39 query complexity classifier (DistilBERT-tiny ONNX)
+#
+# Download model files into models/query-complexity/:
+#   model.onnx + vocab.txt
+#
+# When absent, F39 falls back to heuristic backend (all queries routed as Complex).
+# Override via env CORTRIX_QUERY_COMPLEXITY_MODEL_DIR (env wins over yaml).
+# -----------------------------------------------------------------------------
+query_complexity:
+  model_dir: "./models/query-complexity"
+
+# -----------------------------------------------------------------------------
 # spc — document processing pipeline
 # Supports: PDF, DOCX, TXT, MD, CSV, JSON, images (OCR)
 # -----------------------------------------------------------------------------

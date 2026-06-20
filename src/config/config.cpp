@@ -228,6 +228,18 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (sec["allow_public_admin"]) config.security.allow_public_admin = sec["allow_public_admin"].as<bool>();
     }
 
+    // F02 reranker model dir
+    if (root["reranker"]) {
+        auto r = root["reranker"];
+        if (r["model_dir"]) config.reranker.model_dir = r["model_dir"].as<std::string>();
+    }
+
+    // F39 query complexity classifier model dir
+    if (root["query_complexity"]) {
+        auto qc = root["query_complexity"];
+        if (qc["model_dir"]) config.query_complexity.model_dir = qc["model_dir"].as<std::string>();
+    }
+
     // [OPEN-2] three-stage GC
     if (root["gc"]) {
         auto g = root["gc"];
@@ -271,6 +283,11 @@ void ApplyEnvOverrides(CortrixConfig& config) {
 
     val = GetEnv("CORTRIX_AUTH_ENABLED");
     if (!val.empty()) config.auth.enabled = GetEnvBool("CORTRIX_AUTH_ENABLED", config.auth.enabled);
+
+    val = GetEnv("CORTRIX_RERANKER_MODEL_DIR");
+    if (!val.empty()) config.reranker.model_dir = val;
+    val = GetEnv("CORTRIX_QUERY_COMPLEXITY_MODEL_DIR");
+    if (!val.empty()) config.query_complexity.model_dir = val;
 
     // [F20] security — admin access policy
     val = GetEnv("CORTRIX_ADMIN_BIND");
