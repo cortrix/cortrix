@@ -56,6 +56,7 @@ NamespaceQueryResult SingleUnitExecutor::ExecuteForNamespace(
         out.error_code = info.cx_code;
         out.error_category = agent_friendly::ToString(info.category);
         out.retryable = info.retryable;
+        out.structured_data = {{"index_state", "reranker_unconfigured"}};  // GEN-Agent #5
         finish_latency();
         return out;
     }
@@ -107,6 +108,7 @@ NamespaceQueryResult SingleUnitExecutor::ExecuteForNamespace(
         out.error_code = info.cx_code;
         out.error_category = agent_friendly::ToString(info.category);
         out.retryable = info.retryable;
+        out.structured_data = {{"index_state", "query_failed"}};  // GEN-Agent #5
         finish_latency();
         return out;
     }

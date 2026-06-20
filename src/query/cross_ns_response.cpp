@@ -32,6 +32,18 @@ nlohmann::json FailureToJson(const NamespaceFailure& f) {
                               ? nlohmann::json(*f.retry_after_ms)
                               : nlohmann::json(nullptr);
     j["message"] = f.message;
+    // GEN-Agent #5: every failure body carries the structured_data its code
+    // requires (cross_ns_error.h RequiredStructuredDataKeys). "namespace" is
+    // always required and always known here, so inject it; overlay any code-
+    // specific keys the producer set (e.g. kIndexCorrupt's index_state).
+    nlohmann::json sd = nlohmann::json::object();
+    sd["namespace"] = f.namespace_id;
+    if (f.structured_data.is_object()) {
+        for (auto it = f.structured_data.begin(); it != f.structured_data.end(); ++it) {
+            sd[it.key()] = it.value();
+        }
+    }
+    j["structured_data"] = std::move(sd);
     return j;
 }
 

@@ -122,6 +122,26 @@ components:
         filename:
           type: string
           example: "contract_001.pdf"
+        source_type:
+          type: string
+          description: >
+            Origin class of the document row. `upload`/`http_upload` = direct upload;
+            `watch_dir` = ingested from a watched directory (full path in source_path);
+            `memory_session`/`memory` = synthetic conversation-memory artifacts (these
+            are excluded from user file listings in the agent inventory + UI namespace
+            drawer).
+          enum: [upload, http_upload, watch_dir, memory_session, memory]
+          nullable: true
+          example: http_upload
+        source_ref:
+          type: string
+          description: >
+            External-origin locator for documents whose bytes live outside Cortrix
+            (e.g. a watch_dir absolute path or an S3/object-store URI). Lets a caller
+            answer "where is the source file" without Cortrix retaining the original.
+            Null for plain uploads.
+          nullable: true
+          example: "s3://corp-docs/contracts/contract_001.pdf"
         status:
           type: string
           enum: [pending, parsing, chunking, embedding, indexing, ready, failed]

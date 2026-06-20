@@ -208,6 +208,36 @@ def build_app(
     app.include_router(session_routes.router)
     app.include_router(config_routes.router)
 
+    # Agent-friendly validation errors (GEN-Agent #1): FastAPI's default 422 body
+    # is a raw `{"detail": [...]}` array that an Agent cannot parse against the
+    # CX_ERR envelope every other endpoint uses. Wrap it in the same 4-field shape
+    # (code / category / retryable / structured_data) so a chat caller that sends a
+    # malformed body gets a machine-readable, non-retryable validation error.
+    from fastapi.encoders import jsonable_encoder  # local import (light module import)
+    from fastapi.exceptions import RequestValidationError
+    from fastapi.responses import JSONResponse
+    from starlette.requests import Request as _Request
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_exception_handler(  # noqa: WPS430 (closure by FastAPI design)
+        _request: _Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        errors = exc.errors()
+        first_msg = errors[0]["msg"] if errors else "request validation failed"
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {
+                    "code": "CX_ERR_F48_VALIDATION_ERROR",
+                    "message": str(first_msg),
+                    "category": "permanent",
+                    "retryable": False,
+                    "retry_after_ms": None,
+                    "structured_data": {"validation_errors": jsonable_encoder(errors)},
+                }
+            },
+        )
+
     @app.get("/health")
     async def health() -> dict[str, Any]:
         """Health check (design section 9.1).

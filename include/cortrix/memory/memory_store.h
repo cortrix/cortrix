@@ -47,10 +47,14 @@ public:
     /// @return Ok / NotFound
     Status SessionGet(const std::string& session_id, MemorySession& session);
 
-    /// List all sessions (sorted by updated_at descending)
+    /// List sessions (sorted by updated_at descending). When `user_id` is
+    /// non-empty the result is filtered to that owner in SQL — this keeps
+    /// pagination correct under MEM05 per-user isolation (offset/limit apply to
+    /// the owner's sessions, not the NS-wide set). Empty `user_id` = no filter.
     Status SessionList(const std::string& namespace_name,
                        int limit, int offset,
-                       std::vector<MemorySession>& sessions);
+                       std::vector<MemorySession>& sessions,
+                       const std::string& user_id = "");
 
     /// Delete session: cascade delete all interaction_log rows
     /// @return Ok / NotFound
@@ -115,8 +119,11 @@ public:
     /// @return Ok / NotFound (no such session) / Internal on DB error.
     Status SessionClearOptOut(const std::string& session_id);
 
-    /// Count sessions in a namespace (for pagination total_count)
-    Status SessionCount(const std::string& namespace_name, int64_t* count);
+    /// Count sessions in a namespace (for pagination total_count). When
+    /// `user_id` is non-empty the count is scoped to that owner so total_count
+    /// matches the filtered SessionList page (MEM05 isolation). Empty = NS-wide.
+    Status SessionCount(const std::string& namespace_name, int64_t* count,
+                        const std::string& user_id = "");
 
     /// Atomically insert user + assistant interaction pair and touch the session.
     /// All three operations are performed within a single BEGIN/COMMIT transaction

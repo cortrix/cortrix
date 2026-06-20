@@ -93,6 +93,48 @@ TEST(CrossNsResponseTest, FailedNamespaceEntryIsAgentFriendly) {
     EXPECT_EQ(fj["message"], "ns_b timed out");
 }
 
+// R10 GAP-E4: every namespaces_failed[] entry must carry the structured_data its
+// code requires (GEN-Agent #5 / cross_ns_error.h RequiredStructuredDataKeys). The
+// serializer always injects "namespace"; the producer supplies code-specific keys
+// (kIndexCorrupt → index_state). Pre-fix the entry had no structured_data at all,
+// violating the response's own schema contract.
+TEST(CrossNsResponseTest, FailedEntryCarriesRequiredStructuredData) {
+    CrossNsMeta meta;
+    NamespaceFailure f;
+    f.namespace_id = "ns_b";
+    f.error_code = "CX_ERR_INDEX_CORRUPT";
+    f.retryable = false;
+    f.category = "permanent";
+    f.structured_data = {{"index_state", "unavailable"}};  // producer-supplied key
+    meta.namespaces_failed.push_back(f);
+
+    auto j = meta.ToJson();
+    const auto& sd = j["namespaces_failed"][0]["structured_data"];
+    ASSERT_TRUE(sd.is_object());
+    EXPECT_EQ(sd["namespace"], "ns_b");       // injected by serializer
+    EXPECT_EQ(sd["index_state"], "unavailable");  // from producer
+    // The serialized body satisfies the code's required-key contract.
+    EXPECT_TRUE(HasRequiredStructuredData(CrossNsErrorCode::kIndexCorrupt, sd));
+}
+
+// kNsTimeout requires only {namespace}; the serializer injects it even when the
+// producer set no structured_data, so the contract still holds.
+TEST(CrossNsResponseTest, TimeoutFailureGetsNamespaceStructuredData) {
+    CrossNsMeta meta;
+    NamespaceFailure f;
+    f.namespace_id = "ns_c";
+    f.error_code = "CX_ERR_NS_TIMEOUT";
+    f.retryable = true;
+    f.category = "timeout";
+    f.retry_after_ms = 1000;
+    meta.namespaces_failed.push_back(f);  // no producer structured_data
+
+    auto j = meta.ToJson();
+    const auto& sd = j["namespaces_failed"][0]["structured_data"];
+    EXPECT_EQ(sd["namespace"], "ns_c");
+    EXPECT_TRUE(HasRequiredStructuredData(CrossNsErrorCode::kNsTimeout, sd));
+}
+
 // A non-retryable failure serializes retry_after_ms as null (GEN-Agent #6).
 TEST(CrossNsResponseTest, NonRetryableFailureHasNullRetryAfterMs) {
     CrossNsMeta meta;

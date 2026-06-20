@@ -719,39 +719,34 @@ void RegisterMemoryRoutes(
 
         MemoryStore* mem_store = &facade.memory();
 
+        // MEM05: list isolation — only return the requester's own sessions.
+        // Authenticated non-admin: the principal (rc.auth.user_id) is authoritative,
+        // so a spoofed ?user_id= cannot list another user's sessions. Admin / CE
+        // no-auth fall back to the query-param self-identification ("default").
+        // The user_id predicate is pushed into the store (SessionList/SessionCount)
+        // so LIMIT/OFFSET paginate over the OWNER's sessions — a previous app-layer
+        // post-filter on an NS-wide page made total_count (NS-wide) diverge from the
+        // filtered rows, yielding has_more=true with 0 returned (infinite paging).
+        std::string req_user_id = (!rc.auth.is_admin() && !rc.auth.user_id.empty())
+                                      ? rc.auth.user_id
+                                      : ResolveRequesterUserId(req);
+        // §8.bis: list enforces isolation in SQL (no cross-user leak), so the
+        // request itself is one isolation_check_total{result=pass,action=list}.
+        memory::Mem05Metrics::Instance().RecordIsolationCheck(
+            memory::Mem05Metrics::CheckResult::kPass,
+            memory::Mem05Metrics::Action::kList);
+
         std::vector<MemorySession> sessions;
-        auto s = mem_store->SessionList(ns_name, limit, offset, sessions);
+        auto s = mem_store->SessionList(ns_name, limit, offset, sessions, req_user_id);
         if (!s.ok()) {
             WriteJsonError(res, s);
             return;
         }
 
-        // MEM05: list isolation — only return the requester's own sessions.
-        // Authenticated non-admin: the principal (rc.auth.user_id) is authoritative,
-        // so a spoofed ?user_id= cannot list another user's sessions. Admin / CE
-        // no-auth fall back to the query-param self-identification ("default").
-        // (Post-filter here keeps SessionList's store signature stable; pushing
-        //  the user_id predicate into the SQL WHERE is a D3.5 store optimization.)
-        std::string req_user_id = (!rc.auth.is_admin() && !rc.auth.user_id.empty())
-                                      ? rc.auth.user_id
-                                      : ResolveRequesterUserId(req);
-        // §8.bis: list enforces isolation by post-filtering (no cross-user leak),
-        // so the request itself is one isolation_check_total{result=pass,action=list}.
-        memory::Mem05Metrics::Instance().RecordIsolationCheck(
-            memory::Mem05Metrics::CheckResult::kPass,
-            memory::Mem05Metrics::Action::kList);
-        {
-            std::vector<MemorySession> owned;
-            owned.reserve(sessions.size());
-            for (auto& sess : sessions) {
-                if (sess.user_id == req_user_id) owned.push_back(std::move(sess));
-            }
-            sessions.swap(owned);
-        }
-
-        // Get total count for pagination (design spec: total_count + has_more)
+        // Get total count for pagination (design spec: total_count + has_more),
+        // scoped to the same owner so it matches the filtered page.
         int64_t total_count = 0;
-        mem_store->SessionCount(ns_name, &total_count);
+        mem_store->SessionCount(ns_name, &total_count, req_user_id);
 
         json resp;
         resp["sessions"] = json::array();

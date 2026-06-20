@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #include "cortrix/retrieval/types.h"  // ChildId / ParentId / RankedChunk (F02 frozen)
 
 namespace cortrix::retrieval {
@@ -30,6 +32,10 @@ struct NamespaceQueryResult {
     std::string error_category;        ///< auth/quota/transient/permanent/timeout
     bool retryable = false;
     int retry_after_ms = 0;
+    /// GEN-Agent #5 structured_data the failure body MUST carry for its code
+    /// (cross_ns_error.h RequiredStructuredDataKeys). e.g. kIndexCorrupt needs
+    /// {index_state}; "namespace" is injected at serialization. Empty on success.
+    nlohmann::json structured_data = nlohmann::json::object();
 };
 
 /// F04 client-facing top-level item — fuses RankedChunk + content_hash + dedupe

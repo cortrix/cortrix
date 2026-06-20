@@ -417,24 +417,35 @@ Status MemoryStore::SessionGet(const std::string& session_id, MemorySession& ses
 
 Status MemoryStore::SessionList(const std::string& namespace_name,
                                 int limit, int offset,
-                                std::vector<MemorySession>& sessions) {
+                                std::vector<MemorySession>& sessions,
+                                const std::string& user_id) {
     if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
     std::lock_guard<std::mutex> lock(mu_);
 
-    const char* sql =
-        "SELECT session_id, namespace_name, user_id, title, interaction_count, "
-        "doc_id, created_at, updated_at FROM memory_sessions "
-        "WHERE namespace_name = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?";
+    // MEM05: when a user_id is supplied, push the per-user predicate into SQL so
+    // LIMIT/OFFSET paginate over the owner's sessions (a post-filter on an
+    // NS-wide page breaks pagination — total_count/has_more diverge from the
+    // returned rows). The user_id predicate sits before ORDER/LIMIT/OFFSET.
+    const std::string sql =
+        std::string("SELECT session_id, namespace_name, user_id, title, interaction_count, "
+                    "doc_id, created_at, updated_at FROM memory_sessions "
+                    "WHERE namespace_name = ?") +
+        (user_id.empty() ? "" : " AND user_id = ?") +
+        " ORDER BY updated_at DESC LIMIT ? OFFSET ?";
 
     sqlite3_stmt* stmt = nullptr;
-    int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    int rc = sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr);
     if (rc != SQLITE_OK) {
         return Status::Internal("SessionList prepare: " + std::string(sqlite3_errmsg(db_)));
     }
 
-    sqlite3_bind_text(stmt, 1, namespace_name.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int(stmt, 2, limit);
-    sqlite3_bind_int(stmt, 3, offset);
+    int bind_idx = 1;
+    sqlite3_bind_text(stmt, bind_idx++, namespace_name.c_str(), -1, SQLITE_TRANSIENT);
+    if (!user_id.empty()) {
+        sqlite3_bind_text(stmt, bind_idx++, user_id.c_str(), -1, SQLITE_TRANSIENT);
+    }
+    sqlite3_bind_int(stmt, bind_idx++, limit);
+    sqlite3_bind_int(stmt, bind_idx++, offset);
 
     sessions.clear();
     while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
@@ -747,18 +758,26 @@ Status MemoryStore::InteractionCount(const std::string& session_id, int64_t* cou
     return Status::Ok();
 }
 
-Status MemoryStore::SessionCount(const std::string& namespace_name, int64_t* count) {
+Status MemoryStore::SessionCount(const std::string& namespace_name, int64_t* count,
+                                 const std::string& user_id) {
     if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
     std::lock_guard<std::mutex> lock(mu_);
 
-    const char* sql = "SELECT COUNT(*) FROM memory_sessions WHERE namespace_name = ?";
+    // MEM05: when a user_id is supplied, scope the count to that owner so the
+    // total_count returned to a per-user list matches the filtered page.
+    const std::string sql =
+        std::string("SELECT COUNT(*) FROM memory_sessions WHERE namespace_name = ?") +
+        (user_id.empty() ? "" : " AND user_id = ?");
     sqlite3_stmt* stmt = nullptr;
-    int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    int rc = sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr);
     if (rc != SQLITE_OK) {
         return Status::Internal("SessionCount prepare: " + std::string(sqlite3_errmsg(db_)));
     }
 
     sqlite3_bind_text(stmt, 1, namespace_name.c_str(), -1, SQLITE_TRANSIENT);
+    if (!user_id.empty()) {
+        sqlite3_bind_text(stmt, 2, user_id.c_str(), -1, SQLITE_TRANSIENT);
+    }
 
     rc = sqlite3_step(stmt);
     if (rc == SQLITE_ROW) {

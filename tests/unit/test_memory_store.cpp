@@ -143,6 +143,41 @@ TEST_F(MemoryStoreTest, SessionListFilterByNamespace) {
     EXPECT_EQ(sessions.size(), 2u);
 }
 
+// R10 GAP-E1 regression: the per-user filter must be applied IN SQL so that
+// SessionList rows and SessionCount agree under MEM05 isolation. The pre-fix bug
+// post-filtered an NS-wide page in the app layer while total_count stayed NS-wide,
+// yielding total_count > returned rows (has_more=true with 0 items → infinite paging).
+TEST_F(MemoryStoreTest, SessionListAndCountScopedByUserId) {
+    MemorySession a1; a1.namespace_name = "default"; a1.user_id = "userA"; store_->SessionCreate(a1);
+    MemorySession a2; a2.namespace_name = "default"; a2.user_id = "userA"; store_->SessionCreate(a2);
+    MemorySession b1; b1.namespace_name = "default"; b1.user_id = "userB"; store_->SessionCreate(b1);
+
+    // List scoped to userA returns only userA's 2 sessions.
+    std::vector<MemorySession> sessions;
+    auto s = store_->SessionList("default", 20, 0, sessions, "userA");
+    ASSERT_TRUE(s.ok());
+    EXPECT_EQ(sessions.size(), 2u);
+    for (const auto& sess : sessions) EXPECT_EQ(sess.user_id, "userA");
+
+    // Count scoped to userA == filtered list size (the has_more invariant).
+    int64_t count = 0;
+    ASSERT_TRUE(store_->SessionCount("default", &count, "userA").ok());
+    EXPECT_EQ(count, 2);
+
+    // A user with no sessions: empty list AND zero count (no phantom has_more).
+    sessions.clear();
+    ASSERT_TRUE(store_->SessionList("default", 20, 0, sessions, "ghost").ok());
+    EXPECT_EQ(sessions.size(), 0u);
+    int64_t ghost_count = -1;
+    ASSERT_TRUE(store_->SessionCount("default", &ghost_count, "ghost").ok());
+    EXPECT_EQ(ghost_count, 0);
+
+    // Empty user_id = NS-wide (unchanged legacy behavior): all 3 sessions.
+    int64_t all = 0;
+    ASSERT_TRUE(store_->SessionCount("default", &all).ok());
+    EXPECT_EQ(all, 3);
+}
+
 TEST_F(MemoryStoreTest, SessionDeleteCascade) {
     MemorySession session;
     session.namespace_name = "default";

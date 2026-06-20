@@ -191,6 +191,7 @@ CrossNsResponse ScatterGather::GatherAndRerank(
             f.category = r.error_category;
             if (r.retryable && r.retry_after_ms > 0) f.retry_after_ms = r.retry_after_ms;
             f.message = r.error_code;
+            f.structured_data = std::move(r.structured_data);  // GEN-Agent #5 (e.g. index_state)
             meta.namespaces_failed.push_back(std::move(f));
         }
     }

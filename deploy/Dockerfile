@@ -104,6 +104,14 @@ RUN if [ -f "web-ui/package.json" ]; then \
              '</div></body></html>' > web-ui/dist/index.html; \
     fi
 
+# Bundle the OpenAPI spec (resolve $refs from api/openapi.yaml + components/* +
+# paths/*) into a single self-contained spec the runtime serves at /openapi.json
+# and /docs (Swagger UI). Without this the spec files are absent from the image,
+# /openapi.json 404s, and the error handler rewrites it to the SPA — so Swagger
+# UI and Agent API-discovery silently break. (R10 C-M1; SoT scripts/bundle_openapi.sh)
+COPY api/ ./api/
+RUN npx --yes @redocly/cli@1 bundle api/openapi.yaml -o openapi.bundled.yaml --ext yaml
+
 # ========== Stage 3: Runtime ==========
 FROM ubuntu:22.04
 
@@ -150,6 +158,10 @@ COPY src/logging/sensitive_fields.yaml /app/config/sensitive_fields.yaml
 
 # Web UI static files
 COPY --from=web-builder /build/web-ui/dist /app/web-ui
+
+# Bundled OpenAPI spec — the server (WORKDIR /app, OpenApiRoot()=".") serves it
+# from /app/build/openapi.bundled.yaml at /openapi.json + /docs. (R10 C-M1)
+COPY --from=web-builder /build/openapi.bundled.yaml /app/build/openapi.bundled.yaml
 
 # Python code + pre-built wheels (image layout keeps /app/python/cortrix-agent
 # with the P03 SDK as its sibling at /app/python/sdk/python — main.py resolves

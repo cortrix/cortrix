@@ -20,6 +20,10 @@ struct NamespaceFailure {
     std::string category;                      ///< GEN-Agent #4 enum string
     std::optional<int> retry_after_ms;         ///< GEN-Agent #6 (null when not retryable)
     std::string message;
+    /// GEN-Agent #5 structured_data (cross_ns_error.h RequiredStructuredDataKeys).
+    /// "namespace" is injected at serialization; codes like kIndexCorrupt also
+    /// carry {index_state}. Serialized as meta.namespaces_failed[].structured_data.
+    nlohmann::json structured_data = nlohmann::json::object();
 };
 
 /// One source of a deduplicated chunk (F04 §2.5 deduplicated_chunks[].namespaces[]).

@@ -125,6 +125,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         out.error_code = info.cx_code;
         out.error_category = agent_friendly::ToString(info.category);
         out.retryable = info.retryable;
+        out.structured_data = {{"index_state", "reranker_unconfigured"}};  // GEN-Agent #5
         finish_latency();
         return out;
     }
@@ -138,6 +139,12 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             out.error_code = info.cx_code;
             out.error_category = agent_friendly::ToString(info.category);
             out.retryable = info.retryable;
+            // GEN-Agent #5: kIndexCorrupt requires {namespace, index_state}.
+            // "unavailable" is deliberately non-committal — per cross_ns_error.h
+            // anti-enumeration (§2.6/§5), a per-NS failure must NOT leak whether
+            // the NS is absent vs internally broken, so we do not surface
+            // "not_found" here.
+            out.structured_data = {{"index_state", "unavailable"}};
             finish_latency();
             return out;
         }
@@ -338,6 +345,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         out.error_code = info.cx_code;
         out.error_category = agent_friendly::ToString(info.category);
         out.retryable = info.retryable;
+        out.structured_data = {{"index_state", "query_failed"}};  // GEN-Agent #5
         finish_latency();
         return out;
     }
@@ -366,6 +374,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteDocRetrieval(
             out.error_code = info.cx_code;
             out.error_category = agent_friendly::ToString(info.category);
             out.retryable = info.retryable;
+            out.structured_data = {{"index_state", "unavailable"}};  // GEN-Agent #5 (non-leaky)
             finish_latency();
             return out;
         }
@@ -410,6 +419,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteDocRetrieval(
         out.error_code = info.cx_code;
         out.error_category = agent_friendly::ToString(info.category);
         out.retryable = info.retryable;
+        out.structured_data = {{"index_state", "query_failed"}};  // GEN-Agent #5
         finish_latency();
         return out;
     }

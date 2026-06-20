@@ -177,6 +177,26 @@ def test_chat_rejects_empty_message():
     client, _ = _client()
     resp = client.post("/chat", json={"message": "", "session_id": "s1"})
     assert resp.status_code == 422  # pydantic min_length
+    # R10 GAP-E2: validation errors are wrapped in the GEN-Agent envelope (not the
+    # raw FastAPI {"detail": [...]} array) so an Agent can parse them like any other
+    # CX_ERR response.
+    body = resp.json()
+    assert "error" in body, body
+    err = body["error"]
+    assert err["code"] == "CX_ERR_F48_VALIDATION_ERROR"
+    assert err["retryable"] is False
+    assert err["category"] == "permanent"
+    assert "validation_errors" in err["structured_data"]
+
+
+def test_chat_missing_message_field_is_agent_friendly():
+    """A body missing `message` entirely also gets the CX_ERR envelope (GAP-E2)."""
+    client, _ = _client()
+    resp = client.post("/chat", json={"session_id": "s1"})
+    assert resp.status_code == 422
+    err = resp.json()["error"]
+    assert err["code"] == "CX_ERR_F48_VALIDATION_ERROR"
+    assert err["structured_data"]["validation_errors"]
 
 
 def test_get_session_returns_history():
