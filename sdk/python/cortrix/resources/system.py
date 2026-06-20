@@ -1,7 +1,7 @@
 """System resource. ``/system/*`` (ARCH § 4.1.11).
 
 Per Derek's ruling (briefing § 9): SDK shape = P03 § 2.12; wire = real
-architecture. Real-arch endpoints: ``health`` / ``version`` /
+architecture. Real-arch endpoints: ``health/live`` / ``version`` /
 ``namespaces/{ns}/stats`` / ``agent_llm_config``. ``features()``
 (``GET /system/features``) is **§2.12-only** -> § 2.12 wire (P04 spec to be
 added -> D3.5).
@@ -14,7 +14,7 @@ from typing import Any
 from ..types import AgentLlmConfig, NsStats
 from ._base import AsyncResource, SyncResource
 
-PATH_HEALTH = "/system/health"
+PATH_HEALTH = "/system/health/live"
 PATH_VERSION = "/system/version"
 PATH_NS_STATS = "/system/namespaces/{ns}/stats"
 PATH_AGENT_LLM_CONFIG = "/system/agent_llm_config"
@@ -25,7 +25,7 @@ class System(SyncResource):
     """System info. ``/system/*``."""
 
     def health(self) -> Any:
-        """Health check. ``GET /system/health`` -> {status, version}."""
+        """Health check. ``GET /system/health/live``."""
         return self._client._request("GET", PATH_HEALTH)
 
     def version(self) -> Any:

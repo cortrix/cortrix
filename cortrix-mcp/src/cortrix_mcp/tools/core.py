@@ -143,9 +143,19 @@ def register(mcp) -> None:
             "query_text": query_text,
             "response_text": response_text,
         }
-        return request(
-            "POST", f"/memory/sessions/{session_id}/interactions", json_body=body, timeout=10.0
-        )
+        path = f"/memory/sessions/{session_id}/interactions"
+        try:
+            return request("POST", path, json_body=body, timeout=10.0)
+        except Exception as exc:  # noqa: BLE001 - retry only for the live session precondition.
+            if "Session not found" not in str(exc) and "CX_ERR_MEM04_SESSION_NOT_FOUND" not in str(exc):
+                raise
+            request(
+                "POST",
+                "/memory/sessions",
+                json_body={"session_id": session_id, "namespace": ns, "user_id": "default"},
+                timeout=10.0,
+            )
+            return request("POST", path, json_body=body, timeout=10.0)
 
     @mcp.tool()
     def cortrix_list_interactions(

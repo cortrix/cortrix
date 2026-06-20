@@ -9,7 +9,7 @@ import pytest
 import respx
 
 from cortrix import AsyncCortrix, AuthenticationError
-from cortrix.types import DocumentTask, MemoryList, QueryResult
+from cortrix.types import DocumentTask, MemorySearchResponse, QueryResult
 
 _QUERY_OK = {
     "results": [{"child_id": "c1", "content": "x", "score": 0.5, "namespace": "ns"}],
@@ -40,12 +40,17 @@ async def test_async_upload(api_base: str, aclient: AsyncCortrix, tmp_path) -> N
 async def test_async_memory_search(api_base: str, aclient: AsyncCortrix) -> None:
     respx.post(api_base + "/memory/search").mock(
         return_value=httpx.Response(
-            200, json={"memories": [{"memory_id": "m1", "content": "x",
-                                     "memory_type": "fact", "status": "valid"}]}
+            200,
+            json={
+                "results": [{"block_id": "m1", "content": "x", "score": 0.9}],
+                "total_results": 1,
+                "latency_ms": 1,
+                "degraded": False,
+            },
         )
     )
     out = await aclient.memory.search("ns", "q", user_id="u1")
-    assert isinstance(out, MemoryList) and len(out) == 1
+    assert isinstance(out, MemorySearchResponse) and len(out) == 1
 
 
 @respx.mock

@@ -84,11 +84,11 @@ def test_auth_register_and_me(api_base: str, client: Cortrix) -> None:
 # --- system ---
 @respx.mock
 def test_system_health(api_base: str, client: Cortrix) -> None:
-    respx.get(api_base + "/system/health").mock(
-        return_value=httpx.Response(200, json={"status": "ok", "version": "1.0.0"})
+    respx.get(api_base + "/system/health/live").mock(
+        return_value=httpx.Response(200, json={"status": "alive", "version": "1.0.0"})
     )
     h = client.system.health()
-    assert h["status"] == "ok"  # raw dict (no dedicated model in spec)
+    assert h["status"] == "alive"  # raw dict (no dedicated model in spec)
 
 
 # --- tenants ---

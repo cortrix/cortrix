@@ -47,7 +47,12 @@ from ._generated import Namespace as Namespace
 # Hand-written list / wrapper types + ergonomics (design § 4.1).
 from .lists import (
     DocumentList,
+    MemoryCreateAck,
+    MemoryDeleteAck,
+    MemoryEditAck,
     MemoryList,
+    MemorySearchResponse,
+    MemorySearchResultItem,
     NamespaceList,
     SearchResults,
     WatcherList,
@@ -88,7 +93,12 @@ __all__ = [
     "Watcher",
     # hand-written
     "DocumentList",
+    "MemoryCreateAck",
+    "MemoryDeleteAck",
+    "MemoryEditAck",
     "MemoryList",
+    "MemorySearchResponse",
+    "MemorySearchResultItem",
     "NamespaceList",
     "SearchResults",
     "WatcherList",

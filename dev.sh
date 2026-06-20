@@ -16,6 +16,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND="$SCRIPT_DIR/build/cortrix-server"
 WEB_DIR="$SCRIPT_DIR/web"
 AGENT_DIR="$SCRIPT_DIR/cortrix-agent"
+AGENT_PYTHON="$AGENT_DIR/venv/bin/python"
+AGENT_PORT="${CORTRIX_AGENT_PORT:-8001}"
+AGENT_BASE_URL="${CORTRIX_AGENT_BASE_URL:-http://127.0.0.1:${AGENT_PORT}}"
 DEFAULT_CONFIG="$SCRIPT_DIR/build/config.yaml"
 EDITION="CE"
 
@@ -86,6 +89,7 @@ done
 # Check the config file
 [[ -f "$CONFIG_FILE" ]] || error "Config file does not exist: $CONFIG_FILE"
 info "Using config file: $CONFIG_FILE"
+export CORTRIX_OPENAPI_ROOT="${CORTRIX_OPENAPI_ROOT:-$SCRIPT_DIR}"
 
 # Check frontend dependencies
 [[ -d "$WEB_DIR/node_modules" ]] || {
@@ -105,7 +109,16 @@ sleep 0.5
 
 # ── Start backend ──────────────────────────────────────
 info "Starting backend (http://localhost:8080)..."
-if [[ -n "$AUTH_OVERRIDE" ]]; then
+ENABLE_AGENT_PROXY=false
+if [[ -x "$AGENT_PYTHON" || -n "${CORTRIX_AGENT_BASE_URL:-}" ]]; then
+    ENABLE_AGENT_PROXY=true
+fi
+
+if [[ "$ENABLE_AGENT_PROXY" == true && -n "$AUTH_OVERRIDE" ]]; then
+    CORTRIX_AUTH_ENABLED="$AUTH_OVERRIDE" CORTRIX_AGENT_BASE_URL="$AGENT_BASE_URL" "$BACKEND" --config "$CONFIG_FILE" &
+elif [[ "$ENABLE_AGENT_PROXY" == true ]]; then
+    CORTRIX_AGENT_BASE_URL="$AGENT_BASE_URL" "$BACKEND" --config "$CONFIG_FILE" &
+elif [[ -n "$AUTH_OVERRIDE" ]]; then
     CORTRIX_AUTH_ENABLED="$AUTH_OVERRIDE" "$BACKEND" --config "$CONFIG_FILE" &
 else
     "$BACKEND" --config "$CONFIG_FILE" &
@@ -125,14 +138,13 @@ for i in {1..33}; do
 done
 
 # ── Start Cortrix Agent ────────────────────────────────────
-AGENT_PYTHON="$AGENT_DIR/venv/bin/python"
 if [[ -x "$AGENT_PYTHON" ]]; then
-    info "Starting Cortrix Agent (http://localhost:8001)..."
-    (cd "$AGENT_DIR" && "$AGENT_PYTHON" -m uvicorn main:app --host 0.0.0.0 --port 8001 --log-level warning) &
+    info "Starting Cortrix Agent ($AGENT_BASE_URL)..."
+    (cd "$AGENT_DIR" && "$AGENT_PYTHON" -m uvicorn main:app --host 0.0.0.0 --port "$AGENT_PORT" --log-level warning) &
     AGENT_PID=$!
     # Wait for the Agent to be ready (up to 8 seconds)
     for i in {1..26}; do
-        if curl -sf http://localhost:8001/health &>/dev/null; then
+        if curl -sf "$AGENT_BASE_URL/health" &>/dev/null; then
             ok "Cortrix Agent ready ✓  (LLM: $(grep LLM_PROVIDER "$AGENT_DIR/.env" 2>/dev/null | cut -d= -f2 || echo unknown))"
             break
         fi
@@ -155,7 +167,7 @@ ok "====================================="
 ok "  Cortrix started"
 ok "  Frontend: http://localhost:5173"
 ok "  Backend:  http://localhost:8080/api/v1/health"
-ok "  Agent:    http://localhost:8001/health"
+ok "  Agent:    $AGENT_BASE_URL/health"
 ok "  Edition:  $EDITION"
 ok "  Config:   $CONFIG_FILE"
 ok "  LLM:      cortrix-agent/.env"
