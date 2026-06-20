@@ -58,12 +58,12 @@ Review notes:
 
 ### PR CI Stability
 
-- `cpp_unit` now caps the GitHub Actions C++ build at `--parallel 2`.
+- `cpp_unit` now caps the GitHub Actions C++ build at `--parallel 2` and builds the `cortrix_unit_tests` target used by `ctest -L unit`.
 
 Review notes:
 
 - The original PR run was canceled after `cc1plus` was killed by the runner during unconstrained parallel compilation.
-- A local full build passed before this change; the CI cap is intended to make the GitHub runner match the already documented coverage build memory strategy.
+- A local full build passed before this change; the CI cap and unit-test target boundary are intended to make the GitHub runner match the already documented coverage build memory strategy.
 
 ### Auth-disabled Context
 

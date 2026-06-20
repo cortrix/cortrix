@@ -44,7 +44,7 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Build
-        run: cmake --build build --parallel 2
+        run: cmake --build build --parallel 2 --target cortrix_unit_tests
 
       # Suites run as separate processes via ctest (one proc per test);
       # never run the whole suite in a single process (known SIGSEGV mode).
