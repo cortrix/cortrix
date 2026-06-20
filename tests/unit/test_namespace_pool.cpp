@@ -285,7 +285,7 @@ TEST(F05ConfigTest, Defaults) {
     EXPECT_EQ(c.max_namespaces_per_instance, 64u);
     EXPECT_EQ(c.memory_budget_bytes, 0u);  // disabled by default
     EXPECT_EQ(c.startup_load_workers, 8);
-    EXPECT_EQ(c.load_timeout_ms_per_ns, 5000);
+    EXPECT_EQ(c.load_timeout_ms_per_ns, 30000);  // raised from 5000: large healthy NS load guard
     // SQLite PRAGMA defaults (§4.1 / §7.1).
     EXPECT_EQ(c.pragmas.journal_mode, "WAL");
     EXPECT_EQ(c.pragmas.synchronous, "NORMAL");
@@ -630,6 +630,45 @@ TEST_F(NamespacePoolTest, StartupSingleNsTimeoutCountsAsFailure) {
     auto ex = pool.GetExplainState();
     EXPECT_EQ(ex.startup_failed_namespaces.size(), 1u);
     EXPECT_EQ(ex.startup_failed_namespaces[0], "slow-1");
+}
+
+// ── UT10b — ReloadNamespace recovers a startup-timed-out NS WITHOUT the timeout ──
+// Regression for the F05 large-NS bug (2026-06-20): a large-but-healthy NS whose load
+// exceeds the per-NS startup timeout was left permanently un-admitted because
+// ReloadNamespace reused the SAME timeout. ReloadNamespace now loads without the
+// timeout, so a slow load that exceeds the (tight) startup timeout still recovers.
+TEST_F(NamespacePoolTest, ReloadRecoversStartupTimedOutNsIgnoringTimeout) {
+    config_.startup_load_workers = 4;
+    config_.load_timeout_ms_per_ns = 150;  // tight: the 600ms load times out at startup
+    std::vector<std::string> ids = {"big-slow-1"};
+    MakeUnitDir("big-slow-1-u");
+    StubListNamespaces(ids);
+    using ::testing::Invoke;
+    ON_CALL(ns_router_, GetActiveUnit(_))
+        .WillByDefault(Invoke([this](const std::string& ns) {
+            return Result<cortrix::catalog::UnitDescriptor>(Unit(ns + "-u"));
+        }));
+    ON_CALL(index_factory_, Open(_))
+        .WillByDefault(Invoke([](const std::string& /*unit_dir*/) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(600));  // > 150ms timeout
+            return Result<std::unique_ptr<IIndex>>(std::make_unique<FakeIndex>(0));
+        }));
+    DefaultNamespacePool pool(&index_factory_, MakeRealCoordFactory(), &ns_router_,
+                              &unit_router_, config_);
+
+    // Startup: the slow load exceeds the 150ms guard -> NS not admitted (the bug's setup).
+    auto rep = pool.StartupLoadAll();
+    ASSERT_TRUE(rep.ok());
+    EXPECT_EQ(rep.value().failed, 1u);
+    EXPECT_FALSE(pool.Acquire("big-slow-1").ok());
+
+    // The fix: ReloadNamespace loads WITHOUT the per-NS timeout, so the 600ms load that
+    // would time out at startup (and under the OLD timeout-guarded reload) now succeeds.
+    Status reload = pool.ReloadNamespace("big-slow-1");
+    ASSERT_TRUE(reload.ok()) << reload.message();
+    EXPECT_TRUE(pool.Acquire("big-slow-1").ok());
+    // And it's scrubbed from the startup-failed explain list.
+    EXPECT_TRUE(pool.GetExplainState().startup_failed_namespaces.empty());
 }
 
 // ── UT11 — a failing NS load does not block the others ───────────────────────

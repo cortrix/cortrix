@@ -319,6 +319,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     };
     cortrix::resource::F05Config f05_config;
     f05_config.data_root = config.ns.data_dir + "/units";  // per-Unit layout root
+    f05_config.load_timeout_ms_per_ns = config.ns.load_timeout_ms_per_ns;  // configurable startup-load guard
     cortrix::resource::DefaultNamespacePool ns_pool(
         &index_factory, std::move(wc_factory), &ns_router, &unit_router, f05_config);
     {

@@ -33,9 +33,17 @@ struct F05Config {
     // topic 3 — memory budget admission (0 = disabled, the default).
     size_t memory_budget_bytes = 0;
 
-    // topic 5 — eager startup load (8 workers, 5s per-NS timeout).
+    // topic 5 — eager startup load (8 workers, per-NS load timeout).
+    // The timeout is a guard against ONE hung NS stalling startup (§6.3 C1), not a
+    // performance budget: a large-but-healthy NS legitimately needs many seconds to
+    // load (open 100MB+ store.db, replay the HNSW WAL, mmap a multi-hundred-MB sparse
+    // index, run per-Unit schema migrations). 5s was too aggressive — it mis-classified
+    // big healthy namespaces as "hung" and abandoned them, leaving them invisible after
+    // restart (their data is on disk but never admitted). 30s tolerates large NSs while
+    // still bounding a truly hung load. Overridable via IGlobalConfig (config.yaml
+    // `ns_pool.load_timeout_ms_per_ns`); <=0 means "no timeout, wait fully".
     int startup_load_workers = 8;
-    int64_t load_timeout_ms_per_ns = 5000;
+    int64_t load_timeout_ms_per_ns = 30000;
 
     // topic 7 — per-Unit store.db PRAGMAs.
     SqlitePragmas pragmas;

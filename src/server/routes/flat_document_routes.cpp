@@ -539,6 +539,31 @@ void RegisterWatchAliasRoutes(httplib::Server& server,
             }
         )
     );
+
+    // POST /api/v1/namespaces/{id}/reload — admin recovery for a namespace the bounded
+    // startup load could not admit in time (F05 §6.3 C1). A large NS (100MB+ store,
+    // big HNSW/sparse indexes) can exceed the per-NS startup timeout and be left
+    // un-admitted (its data is on disk but the pool never loaded it). This endpoint
+    // calls ReloadNamespace, which loads WITHOUT the startup timeout, so the NS becomes
+    // available again with no server restart and no data movement. Admin-scoped.
+    server.Post(R"(/api/v1/namespaces/([^/]+)/reload)",
+        WithAuth(auth, kPermAdmin,
+            [&pool](const httplib::Request& req, httplib::Response& res,
+                    const RequestContext& rctx) {
+                const std::string ns_id = req.matches[1];
+                Status s = pool.ReloadNamespace(ns_id);
+                if (!s.ok()) {
+                    WriteJsonError(res, s, rctx.request_id);
+                    return;
+                }
+                nlohmann::json body;
+                body["namespace_id"] = ns_id;
+                body["status"] = "reloaded";
+                res.status = 200;
+                res.set_content(body.dump(), "application/json");
+            }
+        )
+    );
 }
 
 }  // namespace cortrix

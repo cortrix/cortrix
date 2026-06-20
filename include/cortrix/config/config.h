@@ -28,6 +28,11 @@ struct NamespaceConfig {
     std::string data_dir = "./data";
     int max_active = 20;
     int idle_timeout_s = 300;
+    // F05 per-NS startup-load timeout guard (§6.3 C1). A large-but-healthy namespace
+    // (100MB+ store, big HNSW/sparse indexes) legitimately needs many seconds to load;
+    // too small a value mis-classifies it as hung and leaves it un-admitted (invisible)
+    // after restart. <=0 means "no timeout, wait fully". See resource::F05Config.
+    int64_t load_timeout_ms_per_ns = 30000;
 };
 
 struct EmbeddingConfig {

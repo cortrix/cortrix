@@ -707,7 +707,13 @@ Result<StartupReport> DefaultNamespacePool::StartupLoadAll() {
 }
 
 Status DefaultNamespacePool::ReloadNamespace(const std::string& namespace_id) {
-    auto loaded = LoadOneNamespace(namespace_id);
+    // Recovery path: load WITHOUT the startup timeout (LoadOneNamespaceInner, not the
+    // timeout-guarded LoadOneNamespace). ReloadNamespace exists precisely to admit an
+    // NS the bounded startup load could not finish in time (a large NS); reusing the
+    // same per-NS timeout here would make recovery impossible for exactly those NSs.
+    // This is a deliberate, admin/on-demand call (not the concurrent startup sweep),
+    // so blocking until the load completes is correct.
+    auto loaded = LoadOneNamespaceInner(namespace_id);
     if (!loaded.ok()) {
         LogEvent(obs::LogLevel::kError, "F05_POOL_NS_LOAD_FAILED",
                  {{"namespace_id", namespace_id},

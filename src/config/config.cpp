@@ -88,6 +88,8 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (n["data_dir"]) config.ns.data_dir = n["data_dir"].as<std::string>();
         if (n["max_active"]) config.ns.max_active = n["max_active"].as<int>();
         if (n["idle_timeout_s"]) config.ns.idle_timeout_s = n["idle_timeout_s"].as<int>();
+        if (n["load_timeout_ms_per_ns"])
+            config.ns.load_timeout_ms_per_ns = n["load_timeout_ms_per_ns"].as<int64_t>();
     }
 
     // embedding
