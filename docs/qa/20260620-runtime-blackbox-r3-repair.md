@@ -59,11 +59,13 @@ Review notes:
 ### PR CI Stability
 
 - `cpp_unit` now caps the GitHub Actions C++ build at `--parallel 2`, uses Ninja on the GitHub runner, and builds the `cortrix_unit_tests` target used by `ctest -L unit`.
+- `PHnswConcurrencyTest.Concurrent_ReadDuringWrite` no longer relies on `std::shared_mutex` writer fairness: reader loops are bounded and yield between searches so GitHub hosted runners cannot starve the writer indefinitely.
 
 Review notes:
 
 - The original PR run was canceled after `cc1plus` was killed by the runner during unconstrained parallel compilation.
 - A local full build passed before this change; the CI cap, Ninja generator, and unit-test target boundary are intended to make the GitHub runner match the already documented coverage build memory strategy without changing the tested binary.
+- The next CI run proved the build can finish but timed out in `ctest -L unit` at `PHnswConcurrencyTest.Concurrent_ReadDuringWrite`; the test now keeps the same read-during-write coverage without depending on platform-specific `shared_mutex` scheduling fairness.
 
 ### Auth-disabled Context
 
@@ -136,6 +138,7 @@ Additional PR-CI closeout checks:
 - `cortrix-mcp/tests/test_core.py` now asserts the default namespace sent by `cortrix_memory_edit`, matching the runtime-compatible MCP request body.
 - PR CI now installs component test extras where the repo already declares them: `cortrix-mcp[test]` and `sdk/python[dev]`. This keeps SDK test-only dependencies such as `respx` out of runtime dependencies while making CI collect the SDK tests correctly.
 - Local `ctest --test-dir build -L unit --output-on-failure` reached the full unit matrix. The only first-pass local failure was `NamespacePoolTest.StartupLoadEightWorkersConcurrency` due `Too many open files`; rerunning that single test with `ulimit -n 4096` passed.
+- Remote PR CI then proved `cpp_unit` can build on GitHub but timed out during `PHnswConcurrencyTest.Concurrent_ReadDuringWrite`. After bounding the reader loop and yielding between shared-lock reads, local `ctest --test-dir build -R PHnswConcurrencyTest --output-on-failure` passed 6/6 in 21.88s.
 
 ## Residual Failures
 

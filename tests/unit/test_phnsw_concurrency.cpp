@@ -103,20 +103,26 @@ TEST_F(PHnswConcurrencyTest, Concurrent_ReadDuringWrite) {
     PHnsw idx(dir_, config_);
     Seed(idx, 100);
 
+    std::atomic<bool> start{false};
     std::atomic<bool> stop{false};
     std::atomic<int> reads{0};
     std::vector<std::thread> readers;
     for (int t = 0; t < 4; ++t) {
         readers.emplace_back([&, t] {
-            while (!stop.load(std::memory_order_relaxed)) {
+            while (!start.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+            for (int i = 0; i < 1000 && !stop.load(std::memory_order_relaxed); ++i) {
                 auto q = MakeVec(kDim, t);
                 auto r = idx.Search(q.data(), 3);
                 (void)r;
                 reads.fetch_add(1, std::memory_order_relaxed);
+                std::this_thread::yield();
             }
         });
     }
     // One writer adds 200 more vectors while readers run.
+    start.store(true, std::memory_order_release);
     for (int i = 100; i < 300; ++i) {
         auto v = MakeVec(kDim, i);
         ASSERT_TRUE(idx.AddPoint(v.data(), static_cast<uint64_t>(i + 1)).ok());
@@ -155,6 +161,7 @@ TEST_F(PHnswConcurrencyTest, Concurrent_ReadWriteAlternate) {
             auto q = MakeVec(kDim, 1);
             auto r = idx.Search(q.data(), 5);
             (void)r;
+            std::this_thread::yield();
         }
     });
     // Interleave writes and deletes.
@@ -180,6 +187,7 @@ TEST_F(PHnswConcurrencyTest, Concurrent_SnapshotDuringReadWrite) {
         while (!stop.load(std::memory_order_relaxed)) {
             auto q = MakeVec(kDim, 2);
             (void)idx.Search(q.data(), 5);
+            std::this_thread::yield();
         }
     });
     std::thread writer([&] {
@@ -188,6 +196,7 @@ TEST_F(PHnswConcurrencyTest, Concurrent_SnapshotDuringReadWrite) {
             auto v = MakeVec(kDim, i);
             (void)idx.AddPoint(v.data(), static_cast<uint64_t>(i + 1));
             ++i;
+            std::this_thread::yield();
         }
     });
 
