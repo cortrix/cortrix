@@ -178,7 +178,7 @@ def test_memory_crud_endpoints(mock_request):
     args, kwargs = mock_request.last_call
     assert args[0] == "PATCH"
     assert args[1].endswith("/api/v1/memory/m1")
-    assert kwargs["json"] == {"content": "new", "metadata": {"k": "v"}}
+    assert kwargs["json"] == {"namespace": "default", "content": "new", "metadata": {"k": "v"}}
 
     mock_request.set(json_body={"memory_id": "m", "status": "invalidated"})
     get_tool_fn("cortrix_memory_invalidate")(memory_id="m1", reason="x")

@@ -12,15 +12,19 @@ namespace cortrix {
 
 // D3.5 wire⑤c: live doc/block counts come from a per-request NamespaceFacade over
 // the F05 resource pool; namespace creation is routed through the F12 catalog.
-namespace resource { class INamespacePool; }
-namespace catalog  { class INSRouter; }
-namespace observability { class IOperationLogger; }
+namespace resource {
+class INamespacePool;
+}
+namespace catalog {
+class INSRouter;
+}
+namespace observability {
+class IOperationLogger;
+}
 
 class CortrixHttpServer {
 public:
-    CortrixHttpServer(const CortrixConfig& config,
-                     ApiKeyAuth& auth,
-                     NamespaceManager& ns_mgr);
+    CortrixHttpServer(const CortrixConfig& config, ApiKeyAuth& auth, NamespaceManager& ns_mgr);
 
     /// Register all routes (F01 routes + extension points for later Features)
     void RegisterRoutes();
@@ -88,8 +92,7 @@ private:
 /// Write JSON error response
 void WriteJsonError(httplib::Response& res, const Status& status,
                     const std::string& request_id = "");
-void WriteJsonResponse(httplib::Response& res, int http_status,
-                       const nlohmann::json& body,
+void WriteJsonResponse(httplib::Response& res, int http_status, const nlohmann::json& body,
                        const std::string& request_id = "");
 
 }  // namespace cortrix

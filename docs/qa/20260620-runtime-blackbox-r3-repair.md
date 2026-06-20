@@ -27,7 +27,7 @@ The goal is to make the current runtime pass the agreed local black-box gate whi
 7. `cortrix-mcp/src/cortrix_mcp/tools/core.py`
 8. `cortrix-mcp/src/cortrix_mcp/tools/memory.py`
 9. SDK test updates under `sdk/python/tests/`
-10. `dev.sh`
+10. CI and local-runtime support files: `.github/workflows/pr-ci.yml`, `dev.sh`
 
 ## Changed Areas
 
@@ -55,6 +55,15 @@ Review notes:
 
 - This is local development wiring, not a deployment architecture change.
 - R&D should confirm no hard-coded local port assumption remains where production deployment expects a different agent route.
+
+### PR CI Stability
+
+- `cpp_unit` now caps the GitHub Actions C++ build at `--parallel 2`.
+
+Review notes:
+
+- The original PR run was canceled after `cc1plus` was killed by the runner during unconstrained parallel compilation.
+- A local full build passed before this change; the CI cap is intended to make the GitHub runner match the already documented coverage build memory strategy.
 
 ### Auth-disabled Context
 
@@ -120,6 +129,12 @@ Checks recorded in the evidence package:
 - `cmake --build ... --target cortrix-server -j2`
 - Targeted smoke script for repaired paths
 - Full clean-run script for the final black-box matrix
+
+Additional PR-CI closeout checks:
+
+- `clang-format` was applied to the changed C++ files because the PR CI runs whole-file `clang-format --dry-run --Werror` on every changed C++ file.
+- `cortrix-mcp/tests/test_core.py` now asserts the default namespace sent by `cortrix_memory_edit`, matching the runtime-compatible MCP request body.
+- Local `ctest --test-dir build -L unit --output-on-failure` reached the full unit matrix. The only first-pass local failure was `NamespacePoolTest.StartupLoadEightWorkersConcurrency` due `Too many open files`; rerunning that single test with `ulimit -n 4096` passed.
 
 ## Residual Failures
 

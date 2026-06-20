@@ -24,8 +24,7 @@ namespace {
 // cannot affect auth — it runs only after the auth decision and touches nothing but
 // the thread-local context + a response warning header.
 void InstallObservabilityContext(const httplib::Request& req, httplib::Response& res,
-                                 const std::string& user_id,
-                                 const std::string& agent_id) {
+                                 const std::string& user_id, const std::string& agent_id) {
     observability::HttpHeaders headers;
     for (const char* name : {"X-Session-Id", "X-Trace-Id", "X-Agent-Id"}) {
         if (req.has_header(name)) headers.values[name] = req.get_header_value(name);
@@ -47,78 +46,77 @@ void InstallObservabilityContext(const httplib::Request& req, httplib::Response&
 
 }  // namespace
 
-httplib::Server::Handler WithAuth(
-    ApiKeyAuth& auth,
-    int required_permission,
-    HttpHandler handler) {
+httplib::Server::Handler WithAuth(ApiKeyAuth& auth, int required_permission, HttpHandler handler) {
+    return
+        [&auth, required_permission, handler](const httplib::Request& req, httplib::Response& res) {
+            RequestContext rctx;
+            rctx.request_id = GenerateRequestId();
+            rctx.start_time = std::chrono::steady_clock::now();
 
-    return [&auth, required_permission, handler](const httplib::Request& req, httplib::Response& res) {
-        RequestContext rctx;
-        rctx.request_id = GenerateRequestId();
-        rctx.start_time = std::chrono::steady_clock::now();
-
-        // If auth is disabled, behave like NoAuth (grant full permissions)
-        if (!auth.enabled()) {
-            rctx.auth.tenant_id = "default_tenant";
-            rctx.auth.user_id = "anonymous";
-            rctx.auth.permissions = kPermRead | kPermWrite | kPermAdmin;
-            // [F13 S2] Dev/no-auth: still install the obs context from headers (no
-            // real authenticated user_id, so use the CE no-auth identity).
-            InstallObservabilityContext(req, res, /*user_id=*/rctx.auth.user_id,
-                                        /*agent_id=*/rctx.auth.agent_id);
-            handler(req, res, rctx);
-            return;
-        }
-
-        // Extract token from Authorization header or X-API-Key
-        std::string auth_header = req.get_header_value("Authorization");
-        std::string api_key = req.get_header_value("X-API-Key");
-
-        std::string token;
-        if (!auth_header.empty()) {
-            const std::string prefix = "Bearer ";
-            if (auth_header.size() > prefix.size() &&
-                auth_header.substr(0, prefix.size()) == prefix) {
-                token = auth_header.substr(prefix.size());
+            // If auth is disabled, behave like NoAuth (grant full permissions)
+            if (!auth.enabled()) {
+                rctx.auth.tenant_id = "default_tenant";
+                rctx.auth.user_id = "anonymous";
+                rctx.auth.permissions = kPermRead | kPermWrite | kPermAdmin;
+                // [F13 S2] Dev/no-auth: still install the obs context from headers (no
+                // real authenticated user_id, so use the CE no-auth identity).
+                InstallObservabilityContext(req, res, /*user_id=*/rctx.auth.user_id,
+                                            /*agent_id=*/rctx.auth.agent_id);
+                handler(req, res, rctx);
+                return;
             }
-        }
-        if (token.empty()) {
-            token = api_key;
-        }
-        if (token.empty()) {
-            WriteJsonError(res, Status::Unauthenticated("Missing Authorization header or X-API-Key"), rctx.request_id);
-            return;
-        }
 
-        // Authenticate
-        AuthContext actx;
-        Status s = auth.Authenticate(token, &actx);
-        if (!s.ok()) {
-            WriteJsonError(res, s, rctx.request_id);
-            return;
-        }
+            // Extract token from Authorization header or X-API-Key
+            std::string auth_header = req.get_header_value("Authorization");
+            std::string api_key = req.get_header_value("X-API-Key");
 
-        // Extract namespace from URL path if present (e.g., /api/v1/namespaces/:name)
-        std::string ns;
-        auto it = req.path_params.find("name");
-        if (it != req.path_params.end()) {
-            ns = it->second;
-        }
+            std::string token;
+            if (!auth_header.empty()) {
+                const std::string prefix = "Bearer ";
+                if (auth_header.size() > prefix.size() &&
+                    auth_header.substr(0, prefix.size()) == prefix) {
+                    token = auth_header.substr(prefix.size());
+                }
+            }
+            if (token.empty()) {
+                token = api_key;
+            }
+            if (token.empty()) {
+                WriteJsonError(res,
+                               Status::Unauthenticated("Missing Authorization header or X-API-Key"),
+                               rctx.request_id);
+                return;
+            }
 
-        // Authorize
-        s = auth.Authorize(actx, ns, required_permission);
-        if (!s.ok()) {
-            WriteJsonError(res, s, rctx.request_id);
-            return;
-        }
+            // Authenticate
+            AuthContext actx;
+            Status s = auth.Authenticate(token, &actx);
+            if (!s.ok()) {
+                WriteJsonError(res, s, rctx.request_id);
+                return;
+            }
 
-        rctx.auth = actx;
-        // [F13 S2] Auth succeeded: install the obs context from the F13 identity
-        // headers + the authenticated user_id (§5.1 C1/C2). Runs after the auth
-        // decision so it cannot influence authn/authz (pure-ADD).
-        InstallObservabilityContext(req, res, actx.user_id, actx.agent_id);
-        handler(req, res, rctx);
-    };
+            // Extract namespace from URL path if present (e.g., /api/v1/namespaces/:name)
+            std::string ns;
+            auto it = req.path_params.find("name");
+            if (it != req.path_params.end()) {
+                ns = it->second;
+            }
+
+            // Authorize
+            s = auth.Authorize(actx, ns, required_permission);
+            if (!s.ok()) {
+                WriteJsonError(res, s, rctx.request_id);
+                return;
+            }
+
+            rctx.auth = actx;
+            // [F13 S2] Auth succeeded: install the obs context from the F13 identity
+            // headers + the authenticated user_id (§5.1 C1/C2). Runs after the auth
+            // decision so it cannot influence authn/authz (pure-ADD).
+            InstallObservabilityContext(req, res, actx.user_id, actx.agent_id);
+            handler(req, res, rctx);
+        };
 }
 
 httplib::Server::Handler NoAuth(HttpHandler handler) {
