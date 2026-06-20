@@ -28,7 +28,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake build-essential libssl-dev libsqlite3-dev libpq-dev ccache
+            cmake ninja-build build-essential libssl-dev libsqlite3-dev libpq-dev ccache
 
       - name: ccache
         uses: actions/cache@v4
@@ -39,7 +39,7 @@ jobs:
 
       - name: Configure (Debug)
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Debug \
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
