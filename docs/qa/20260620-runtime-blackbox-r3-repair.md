@@ -6,6 +6,10 @@ Related Hub feedback package:
 
 `dev-cortrix-hub/market/rd-feedback/20260620-cortrix-runtime-blackbox-r3-repair-feedback/`
 
+Related Hub PR:
+
+`https://github.com/cortrix/dev-cortrix-hub/pull/5`
+
 ## Purpose
 
 This PR applies lightweight API-first fixes from the Round-3 runtime black-box repair loop. It does not add new public product surfaces beyond the existing route/API contracts under review, and it does not change architecture boundaries.
