@@ -39,11 +39,12 @@ struct F05Config {
     // load (open 100MB+ store.db, replay the HNSW WAL, mmap a multi-hundred-MB sparse
     // index, run per-Unit schema migrations). 5s was too aggressive — it mis-classified
     // big healthy namespaces as "hung" and abandoned them, leaving them invisible after
-    // restart (their data is on disk but never admitted). 30s tolerates large NSs while
-    // still bounding a truly hung load. Overridable via IGlobalConfig (config.yaml
-    // `ns_pool.load_timeout_ms_per_ns`); <=0 means "no timeout, wait fully".
+    // restart (their data is on disk but never admitted). 60s tolerates large NSs
+    // (measured: a 5183-doc / 100MB-store / 329MB-sparse NS loads in ~42s) while still
+    // bounding a truly hung load. Overridable via IGlobalConfig (config.yaml
+    // `namespace.load_timeout_ms_per_ns`); <=0 means "no timeout, wait fully".
     int startup_load_workers = 8;
-    int64_t load_timeout_ms_per_ns = 30000;
+    int64_t load_timeout_ms_per_ns = 60000;
 
     // topic 7 — per-Unit store.db PRAGMAs.
     SqlitePragmas pragmas;

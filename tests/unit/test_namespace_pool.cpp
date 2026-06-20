@@ -285,7 +285,7 @@ TEST(F05ConfigTest, Defaults) {
     EXPECT_EQ(c.max_namespaces_per_instance, 64u);
     EXPECT_EQ(c.memory_budget_bytes, 0u);  // disabled by default
     EXPECT_EQ(c.startup_load_workers, 8);
-    EXPECT_EQ(c.load_timeout_ms_per_ns, 30000);  // raised from 5000: large healthy NS load guard
+    EXPECT_EQ(c.load_timeout_ms_per_ns, 60000);  // raised from 5000: large healthy NS load guard (~42s for 5183-doc NS)
     // SQLite PRAGMA defaults (§4.1 / §7.1).
     EXPECT_EQ(c.pragmas.journal_mode, "WAL");
     EXPECT_EQ(c.pragmas.synchronous, "NORMAL");
