@@ -27,7 +27,8 @@ The goal is to make the current runtime pass the agreed local black-box gate whi
 7. `cortrix-mcp/src/cortrix_mcp/tools/core.py`
 8. `cortrix-mcp/src/cortrix_mcp/tools/memory.py`
 9. SDK test updates under `sdk/python/tests/`
-10. CI and local-runtime support files: `.github/workflows/pr-ci.yml`, `dev.sh`
+10. `src/connector/file_watcher.cpp`
+11. CI and local-runtime support files: `.github/workflows/pr-ci.yml`, `dev.sh`
 
 ## Changed Areas
 
@@ -60,12 +61,14 @@ Review notes:
 
 - `cpp_unit` now caps the GitHub Actions C++ build at `--parallel 2`, uses Ninja on the GitHub runner, and builds the `cortrix_unit_tests` target used by `ctest -L unit`.
 - `PHnswConcurrencyTest.Concurrent_ReadDuringWrite` no longer relies on `std::shared_mutex` writer fairness: reader loops are bounded and yield between searches so GitHub hosted runners cannot starve the writer indefinitely.
+- Linux `InotifyWatcher::Start()` now matches the public `FileWatcher` contract and the macOS implementation: `Start()` returns `-1` before `Init()` instead of starting an invalid watcher thread.
 
 Review notes:
 
 - The original PR run was canceled after `cc1plus` was killed by the runner during unconstrained parallel compilation.
 - A local full build passed before this change; the CI cap, Ninja generator, and unit-test target boundary are intended to make the GitHub runner match the already documented coverage build memory strategy without changing the tested binary.
 - The next CI run proved the build can finish but timed out in `ctest -L unit` at `PHnswConcurrencyTest.Concurrent_ReadDuringWrite`; the test now keeps the same read-during-write coverage without depending on platform-specific `shared_mutex` scheduling fairness.
+- The following CI run reached the full C++ matrix and exposed `FileWatcherTest.StartWithoutInit` as the only failure. That was a Linux implementation gap: macOS already guarded `Start()` with `initialized_`, while Linux did not.
 
 ### Auth-disabled Context
 
@@ -139,6 +142,8 @@ Additional PR-CI closeout checks:
 - PR CI now installs component test extras where the repo already declares them: `cortrix-mcp[test]` and `sdk/python[dev]`. This keeps SDK test-only dependencies such as `respx` out of runtime dependencies while making CI collect the SDK tests correctly.
 - Local `ctest --test-dir build -L unit --output-on-failure` reached the full unit matrix. The only first-pass local failure was `NamespacePoolTest.StartupLoadEightWorkersConcurrency` due `Too many open files`; rerunning that single test with `ulimit -n 4096` passed.
 - Remote PR CI then proved `cpp_unit` can build on GitHub but timed out during `PHnswConcurrencyTest.Concurrent_ReadDuringWrite`. After bounding the reader loop and yielding between shared-lock reads, local `ctest --test-dir build -R PHnswConcurrencyTest --output-on-failure` passed 6/6 in 21.88s.
+- Remote PR CI then reached the full C++ matrix and failed only `FileWatcherTest.StartWithoutInit`. After aligning Linux `InotifyWatcher::Start()` with the API contract, local `ctest --test-dir build -R FileWatcherTest.StartWithoutInit --output-on-failure` passed 1/1, and local `ctest --test-dir build -R PHnswConcurrencyTest --output-on-failure` still passed 6/6.
+- Final local C++ unit label rerun with `ulimit -n 4096` passed the full label matrix: `ctest --test-dir build -L unit --output-on-failure` reported `100% tests passed, 0 tests failed out of 5073` in 172.21s. The existing disabled/offline skipped tests remained skipped.
 
 ## Residual Failures
 

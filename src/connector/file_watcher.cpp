@@ -11,15 +11,11 @@ namespace cortrix {
 
 class FSEventsWatcher : public FileWatcher {
 public:
-    explicit FSEventsWatcher(double latency_s = 0.5)
-        : latency_s_(latency_s) {}
+    explicit FSEventsWatcher(double latency_s = 0.5) : latency_s_(latency_s) {}
 
-    ~FSEventsWatcher() override {
-        Stop();
-    }
+    ~FSEventsWatcher() override { Stop(); }
 
-    int Init(const std::string& root_path,
-             FileEventCallback callback) override {
+    int Init(const std::string& root_path, FileEventCallback callback) override {
         namespace fs = std::filesystem;
         std::error_code ec;
         if (!fs::exists(root_path, ec) || !fs::is_directory(root_path, ec)) {
@@ -41,30 +37,24 @@ public:
     int Start() override {
         if (!initialized_ || running_.load()) return -1;
 
-        CFStringRef path_ref = CFStringCreateWithCString(
-            kCFAllocatorDefault, root_path_.c_str(), kCFStringEncodingUTF8);
-        CFArrayRef paths = CFArrayCreate(
-            kCFAllocatorDefault, (const void**)&path_ref, 1, &kCFTypeArrayCallBacks);
+        CFStringRef path_ref = CFStringCreateWithCString(kCFAllocatorDefault, root_path_.c_str(),
+                                                         kCFStringEncodingUTF8);
+        CFArrayRef paths =
+            CFArrayCreate(kCFAllocatorDefault, (const void**)&path_ref, 1, &kCFTypeArrayCallBacks);
 
         FSEventStreamContext ctx = {0, this, nullptr, nullptr, nullptr};
 
         stream_ = FSEventStreamCreate(
-            kCFAllocatorDefault,
-            &FSEventsWatcher::FSEventsCallback,
-            &ctx,
-            paths,
-            kFSEventStreamEventIdSinceNow,
-            latency_s_,
-            kFSEventStreamCreateFlagFileEvents |
-            kFSEventStreamCreateFlagUseCFTypes);
+            kCFAllocatorDefault, &FSEventsWatcher::FSEventsCallback, &ctx, paths,
+            kFSEventStreamEventIdSinceNow, latency_s_,
+            kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes);
 
         CFRelease(paths);
         CFRelease(path_ref);
 
         if (!stream_) return -1;
 
-        dispatch_queue_ = dispatch_queue_create(
-            "cortrix.fsevents", DISPATCH_QUEUE_SERIAL);
+        dispatch_queue_ = dispatch_queue_create("cortrix.fsevents", DISPATCH_QUEUE_SERIAL);
         FSEventStreamSetDispatchQueue(stream_, dispatch_queue_);
 
         if (!FSEventStreamStart(stream_)) {
@@ -101,19 +91,12 @@ public:
         }
     }
 
-    bool IsRunning() const override {
-        return running_.load();
-    }
+    bool IsRunning() const override { return running_.load(); }
 
 private:
-    static void FSEventsCallback(
-        ConstFSEventStreamRef /*stream*/,
-        void* context,
-        size_t num_events,
-        void* event_paths,
-        const FSEventStreamEventFlags event_flags[],
-        const FSEventStreamEventId /*event_ids*/[]) {
-
+    static void FSEventsCallback(ConstFSEventStreamRef /*stream*/, void* context, size_t num_events,
+                                 void* event_paths, const FSEventStreamEventFlags event_flags[],
+                                 const FSEventStreamEventId /*event_ids*/[]) {
         auto* self = static_cast<FSEventsWatcher*>(context);
         if (!self->running_.load()) return;
 
@@ -125,8 +108,7 @@ private:
             CFStringRef cf_path = static_cast<CFStringRef>(
                 CFArrayGetValueAtIndex(paths_array, static_cast<CFIndex>(i)));
             char path_buf[PATH_MAX];
-            if (!CFStringGetCString(cf_path, path_buf, sizeof(path_buf),
-                                     kCFStringEncodingUTF8)) {
+            if (!CFStringGetCString(cf_path, path_buf, sizeof(path_buf), kCFStringEncodingUTF8)) {
                 continue;
             }
 
@@ -138,8 +120,9 @@ private:
             ev.is_directory = (flags & kFSEventStreamEventFlagItemIsDir) != 0;
 
             auto now = std::chrono::system_clock::now();
-            ev.timestamp_us = std::chrono::duration_cast<std::chrono::microseconds>(
-                now.time_since_epoch()).count();
+            ev.timestamp_us =
+                std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch())
+                    .count();
 
             if (flags & kFSEventStreamEventFlagItemRenamed) {
                 namespace fs = std::filesystem;
@@ -207,8 +190,7 @@ public:
         if (pipe_fd_[1] >= 0) close(pipe_fd_[1]);
     }
 
-    int Init(const std::string& root_path,
-             FileEventCallback callback) override {
+    int Init(const std::string& root_path, FileEventCallback callback) override {
         namespace fs = std::filesystem;
         std::error_code ec;
         if (!fs::exists(root_path, ec) || !fs::is_directory(root_path, ec)) {
@@ -226,11 +208,12 @@ public:
 
         if (AddWatchRecursive(root_path_) < 0) return -1;
 
+        initialized_ = true;
         return 0;
     }
 
     int Start() override {
-        if (running_.load()) return -1;
+        if (!initialized_ || running_.load()) return -1;
         running_ = true;
         watch_thread_ = std::thread([this]() { EventLoop(); });
         return 0;
@@ -247,14 +230,12 @@ public:
         }
     }
 
-    bool IsRunning() const override {
-        return running_.load();
-    }
+    bool IsRunning() const override { return running_.load(); }
 
 private:
     int AddWatchRecursive(const std::string& dir_path) {
-        uint32_t mask = IN_CREATE | IN_MODIFY | IN_DELETE |
-                        IN_MOVED_FROM | IN_MOVED_TO | IN_DELETE_SELF;
+        uint32_t mask =
+            IN_CREATE | IN_MODIFY | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO | IN_DELETE_SELF;
         int wd = inotify_add_watch(inotify_fd_, dir_path.c_str(), mask);
         if (wd < 0) return -1;
 
@@ -310,7 +291,8 @@ private:
                         fe.is_directory = (ev->mask & IN_ISDIR) != 0;
                         auto now = std::chrono::system_clock::now();
                         fe.timestamp_us = std::chrono::duration_cast<std::chrono::microseconds>(
-                            now.time_since_epoch()).count();
+                                              now.time_since_epoch())
+                                              .count();
 
                         if (ev->mask & IN_CREATE) {
                             fe.type = FileEventType::kCreated;
@@ -348,6 +330,7 @@ private:
 
     std::thread watch_thread_;
     std::atomic<bool> running_{false};
+    bool initialized_ = false;
 };
 
 std::unique_ptr<FileWatcher> FileWatcher::Create() {
