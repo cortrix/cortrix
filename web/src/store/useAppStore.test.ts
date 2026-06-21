@@ -12,10 +12,36 @@ import { useFeatureFlagsStore } from '../hooks/useFeatureFlags';
 // test (e.g. namespaces) doesn't satisfy a later assertion.
 const mockFetch = vi.fn();
 
+function makeStorage(): Storage {
+  const data = new Map<string, string>();
+  return {
+    get length() {
+      return data.size;
+    },
+    clear: () => data.clear(),
+    getItem: (key: string) => data.get(key) ?? null,
+    key: (index: number) => Array.from(data.keys())[index] ?? null,
+    removeItem: (key: string) => { data.delete(key); },
+    setItem: (key: string, value: string) => { data.set(key, value); },
+  };
+}
+
 beforeEach(() => {
+  const storage = makeStorage();
   vi.stubGlobal('fetch', mockFetch);
+  vi.stubGlobal('localStorage', storage);
+  Object.defineProperty(window, 'localStorage', {
+    value: storage,
+    configurable: true,
+  });
   mockFetch.mockReset();
-  useAppStore.setState({ namespaces: [], systemStatus: null, globalError: null });
+  window.localStorage?.clear?.();
+  useAppStore.setState({
+    currentNamespace: 'default',
+    namespaces: [],
+    systemStatus: null,
+    globalError: null,
+  });
 });
 
 afterEach(() => {
@@ -85,6 +111,21 @@ describe('useAppStore', () => {
     const ns = useAppStore.getState().namespaces;
     expect(ns.length).toBeGreaterThan(0);
     expect(ns[0].name).toBe('default');
+  });
+
+  it('uses the first real namespace when the persisted namespace is missing', async () => {
+    useAppStore.getState().setCurrentNamespace('default');
+    mockFetch.mockReturnValueOnce(jsonResponse({
+      namespaces: [
+        { name: 'legal', doc_count: 2, block_count: 30 },
+        { name: 'finance', doc_count: 1, block_count: 10 },
+      ],
+    }));
+
+    await useAppStore.getState().loadNamespaces();
+
+    expect(useAppStore.getState().currentNamespace).toBe('legal');
+    expect(window.localStorage?.getItem?.('cortrix-namespace')).toBe('legal');
   });
 
   // Feature flags moved to their own store in R4/S6 (useFeatureFlagsStore,

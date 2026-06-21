@@ -10,13 +10,17 @@ import { ProgrammaticBanner } from '../Common/ProgrammaticBanner';
 export function ChatPage() {
   const { messages, sendMessage, isStreaming, stopStreaming, newSession, sessions, loadSessions, switchSession, deleteSession, sessionId } = useChatStore();
   const { systemStatus, currentNamespace } = useAppStore();
+  const namespaceReady = useAppStore((s) =>
+    s.namespaces.some((ns) => ns.name === s.currentNamespace),
+  );
   const { t } = useTranslation();
 
   const llmEnabled = systemStatus?.llm_enabled ?? true;
 
   useEffect(() => {
+    if (!namespaceReady) return;
     loadSessions();
-  }, [loadSessions, currentNamespace]);
+  }, [loadSessions, currentNamespace, namespaceReady]);
 
   return (
     <div className="flex h-full">

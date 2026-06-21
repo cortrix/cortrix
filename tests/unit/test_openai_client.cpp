@@ -98,6 +98,16 @@ TEST(OpenAiLlmClientTest, NetworkFailureIsUnavailableTransportToken) {
     EXPECT_EQ(resp.status.message().rfind(llm_tokens::kTransport, 0), 0u);
 }
 
+TEST(OpenAiLlmClientTest, NetworkFailureIncludesTransportDetailWhenPresent) {
+    auto cf = MakeClient();
+    cf.fake->canned = FakeHttpTransport::NetworkFail();
+    cf.fake->canned.transport_error = "Could not establish connection";
+    auto resp = cf.client->Chat("q", LlmCallConfig{});
+    EXPECT_FALSE(resp.ok());
+    EXPECT_EQ(resp.status.code(), StatusCode::kUnavailable);
+    EXPECT_NE(resp.status.message().find("Could not establish connection"), std::string::npos);
+}
+
 TEST(OpenAiLlmClientTest, Http5xxIsUnavailableHttpToken) {
     auto cf = MakeClient();
     cf.fake->canned = FakeHttpTransport::Http(503, "upstream down");

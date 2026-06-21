@@ -13,7 +13,7 @@ route additionally sits behind the /api/v1/admin/* AdminGuard prefix.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from ..transport import request, require_admin
 
@@ -62,7 +62,7 @@ def register(mcp) -> None:
         connection_ref: str,
         namespace: str,
         table: Optional[str] = None,
-        filter: Optional[str] = None,
+        filter: Optional[dict[str, Any]] = None,
         sql: Optional[str] = None,
     ) -> dict:
         """Trigger a database import run (F16a D2; admin only).
@@ -75,7 +75,7 @@ def register(mcp) -> None:
             connection_ref: a credential previously registered via the register tool.
             namespace: target namespace to import into.
             table: source table name (table mode).
-            filter: optional row filter (table mode).
+            filter: optional JSON filter DSL object (table mode).
             sql: raw SQL query (SQL mode).
 
         Exactly one of {table, sql} must be provided (the backend rejects neither/both with

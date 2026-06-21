@@ -36,6 +36,11 @@ export default defineConfig({
       // no CORS, CSP connect-src stays 'self'). Backend API port = 8080 (F24
       // real contract). OTLP metrics (§ 23-bis.2) post to /v1/metrics.
       '/api': 'http://localhost:8080',
+      '/docs': 'http://localhost:8080',
+      '/openapi.yaml': 'http://localhost:8080',
+      '/openapi.json': 'http://localhost:8080',
+      '/paths': 'http://localhost:8080',
+      '/components': 'http://localhost:8080',
       '/v1/metrics': 'http://localhost:8080',
       // Scope the agent-server proxy to the '/agent/config' subtree only. A bare
       // '/agent' prefix also swallowed the client-side SPA route '/agent' (the

@@ -46,7 +46,7 @@ SUCCESS_CASES = [
     ("cortrix_memory_search", {"query": "past"}, {"memories": [{"id": "m1"}]}),
     ("cortrix_log_interaction", {"session_id": "s1", "query_text": "q", "response_text": "r"}, {"status": "ok"}),
     ("cortrix_list_interactions", {"namespace": "default", "user_id": "u1"}, {"interactions": [{"id": "i1"}], "total": 1}),
-    ("cortrix_document_status", {"doc_id": "d1"}, {"id": "d1", "status": "ready"}),
+    ("cortrix_document_status", {"doc_id": "d1", "namespace": "ns"}, {"id": "d1", "status": "ready"}),
     ("cortrix_add_watcher", {"data_dir": "__DIR__"}, {"id": "w1", "status": "active"}),
     ("cortrix_list_watchers", {}, {"watchers": [{"id": "w1"}]}),
     # --- extended 4 ---
@@ -134,6 +134,45 @@ def test_upload_posts_documents_with_namespace_in_body(mock_request):
     assert args[1].endswith("/api/v1/documents")
     assert kwargs["json"]["namespace"] == "ns"
     assert kwargs["json"]["filename"] == "f.txt"
+
+
+def test_document_status_passes_namespace_query_param(mock_request):
+    mock_request.set(json_body={"document_id": "d1", "status": "ready"})
+    get_tool_fn("cortrix_document_status")(doc_id="d1", namespace="ns")
+    args, kwargs = mock_request.last_call
+    assert args[0] == "GET"
+    assert args[1].endswith("/api/v1/documents/d1")
+    assert kwargs["params"] == {"namespace": "ns"}
+
+
+def test_batch_submit_maps_options_object(mock_request):
+    mock_request.set(json_body={"results": [], "meta": {"succeeded": 0, "failed": 0, "total": 0}})
+    get_tool_fn("cortrix_batch_submit")(
+        namespace="ns",
+        documents=[{"doc_id": "d1", "content": "body"}],
+        async_=True,
+        on_duplicate="error",
+    )
+    body = mock_request.last_call.kwargs["json"]
+    assert body["documents"][0]["doc_id"] == "d1"
+    assert body["options"] == {"async": True, "on_duplicate": "error"}
+    assert "async" not in body
+    assert "on_duplicate" not in body
+
+
+def test_memory_extract_formats_messages_as_content(mock_request):
+    mock_request.set(json_body={"extracted_memories": [], "error": None})
+    get_tool_fn("cortrix_memory_extract")(
+        messages=[
+            {"role": "user", "content": "Remember the red folder"},
+            {"role": "assistant", "content": "I will remember it"},
+        ],
+        namespace="ns",
+    )
+    body = mock_request.last_call.kwargs["json"]
+    assert body["namespace"] == "ns"
+    assert body["content"] == "user: Remember the red folder\nassistant: I will remember it"
+    assert "messages" not in body
 
 
 def test_add_watcher_posts_watch_with_target_namespaces(mock_request, tmp_path):

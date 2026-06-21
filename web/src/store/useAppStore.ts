@@ -22,10 +22,32 @@ interface HealthResponse {
 // 'default', losing the user's working namespace across chat / search / upload.
 const NAMESPACE_KEY = 'cortrix-namespace';
 
+function browserStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  const storage = window.localStorage;
+  return storage &&
+    typeof storage.getItem === 'function' &&
+    typeof storage.setItem === 'function'
+    ? storage
+    : null;
+}
+
 function initialNamespace(): string {
-  if (typeof window === 'undefined') return 'default';
-  const stored = localStorage.getItem(NAMESPACE_KEY);
+  const stored = browserStorage()?.getItem(NAMESPACE_KEY);
   return stored && stored.trim() ? stored : 'default';
+}
+
+function persistNamespace(ns: string): void {
+  browserStorage()?.setItem(NAMESPACE_KEY, ns);
+}
+
+function resolveCurrentNamespace(current: string, namespaces: NamespaceInfo[]): string {
+  if (namespaces.some((ns) => ns.name === current)) return current;
+  return namespaces[0]?.name ?? current;
+}
+
+function isResolvedNamespace(current: string, namespaces: NamespaceInfo[]): boolean {
+  return namespaces.some((ns) => ns.name === current);
 }
 
 interface AppState {
@@ -48,7 +70,7 @@ interface AppState {
 export const useAppStore = create<AppState>((set, _get) => ({
   currentNamespace: initialNamespace(),
   setCurrentNamespace: (ns) => {
-    if (typeof window !== 'undefined') localStorage.setItem(NAMESPACE_KEY, ns);
+    persistNamespace(ns);
     set({ currentNamespace: ns });
   },
 
@@ -56,7 +78,10 @@ export const useAppStore = create<AppState>((set, _get) => ({
   loadNamespaces: async () => {
     try {
       const ns = await listNamespaces();
-      set({ namespaces: ns });
+      const current = _get().currentNamespace;
+      const nextNamespace = resolveCurrentNamespace(current, ns);
+      if (nextNamespace !== current) persistNamespace(nextNamespace);
+      set({ namespaces: ns, currentNamespace: nextNamespace });
     } catch (e) {
       set({ globalError: `Failed to load namespaces: ${e}` });
     }
@@ -110,14 +135,14 @@ export const useAppStore = create<AppState>((set, _get) => ({
 
   theme: (() => {
     if (typeof window === 'undefined') return 'light';
-    const stored = localStorage.getItem('cortrix-theme');
+    const stored = browserStorage()?.getItem('cortrix-theme');
     if (stored === 'dark' || stored === 'light') return stored;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   })(),
   toggleTheme: () =>
     set((s) => {
       const next = s.theme === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('cortrix-theme', next);
+      browserStorage()?.setItem('cortrix-theme', next);
       if (next === 'dark') {
         document.documentElement.classList.add('dark');
       } else {
@@ -126,3 +151,18 @@ export const useAppStore = create<AppState>((set, _get) => ({
       return { theme: next };
     }),
 }));
+
+export function isCurrentNamespaceResolved(): boolean {
+  const state = useAppStore.getState();
+  return isResolvedNamespace(state.currentNamespace, state.namespaces);
+}
+
+export async function ensureCurrentNamespace(): Promise<string | null> {
+  if (isCurrentNamespaceResolved()) return useAppStore.getState().currentNamespace;
+
+  await useAppStore.getState().loadNamespaces();
+  const state = useAppStore.getState();
+  return isResolvedNamespace(state.currentNamespace, state.namespaces)
+    ? state.currentNamespace
+    : null;
+}

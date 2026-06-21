@@ -332,15 +332,19 @@ export interface MemoryListResponse {
 }
 
 export interface MemoryListFilter {
+  namespace: string;
   user_id: string;
   include_invalidated?: boolean;
   memory_type?: MemoryType;
   page?: number;
   page_size?: number;
+  limit?: number;
+  offset?: number;
   explain?: boolean;
 }
 
 export interface MemoryCreateRequest {
+  namespace: string;
   user_id: string;
   content: string;
   memory_type: MemoryType;

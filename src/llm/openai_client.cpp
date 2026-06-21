@@ -67,8 +67,10 @@ ChatCompletionResponse OpenAiLlmClient::Chat(const std::string& prompt,
 
     if (!http.network_ok) {
         // DNS / connect / TLS / timeout — no HTTP status reached.
+        std::string detail = "transport failure to " + config_.endpoint;
+        if (!http.transport_error.empty()) detail += ": " + http.transport_error;
         resp.status = MakeStatus(StatusCode::kUnavailable, llm_tokens::kTransport,
-                                 "transport failure to " + config_.endpoint);
+                                 detail);
         return resp;
     }
 

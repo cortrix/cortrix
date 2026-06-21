@@ -13,6 +13,16 @@ from typing import Optional
 from ..transport import CORTRIX_NAMESPACE, request
 
 
+def _messages_to_content(messages: list[dict]) -> str:
+    lines: list[str] = []
+    for item in messages:
+        role = str(item.get("role", "unknown")) if isinstance(item, dict) else "unknown"
+        content = str(item.get("content", "")) if isinstance(item, dict) else str(item)
+        if content:
+            lines.append(f"{role}: {content}")
+    return "\n".join(lines)
+
+
 def register(mcp) -> None:
     @mcp.tool()
     def cortrix_memory_extract(
@@ -30,7 +40,7 @@ def register(mcp) -> None:
         extraction for an existing session by session_id.)
         """
         ns = namespace or CORTRIX_NAMESPACE
-        body = {"namespace": ns, "messages": messages}
+        body = {"namespace": ns, "content": _messages_to_content(messages)}
         return request("POST", "/memory/extract", json_body=body, timeout=60.0)
 
     @mcp.tool()

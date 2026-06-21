@@ -13,6 +13,7 @@ import { ProgrammaticBanner } from '../Common/ProgrammaticBanner';
 import { MemoryCard } from './MemoryCard';
 import { MemoryFormDialog } from './MemoryFormDialog';
 import { InvalidateMemoryDialog } from './InvalidateMemoryDialog';
+import { useAppStore } from '../../store/useAppStore';
 
 // Memory CRUD page (P02a design § 7 / MEM03). Toolbar (user_id + type filter +
 // explain toggle + show-invalidated toggle + Create) → card list → pagination,
@@ -66,6 +67,10 @@ function ToggleRow({
 export function MemoryPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const currentNamespace = useAppStore((s) => s.currentNamespace);
+  const namespaceReady = useAppStore((s) =>
+    s.namespaces.some((ns) => ns.name === s.currentNamespace),
+  );
 
   const [userId, setUserId] = useState('user_demo');
   const [memType, setMemType] = useState<MemoryType | ''>('');
@@ -78,26 +83,29 @@ export function MemoryPage() {
   const [invalidateTarget, setInvalidateTarget] = useState<MemoryItem | null>(null);
 
   const filter = {
+    namespace: currentNamespace,
     user_id: userId,
     include_invalidated: showInvalidated,
     memory_type: memType || undefined,
     explain,
     page,
     page_size: PAGE_SIZE,
+    limit: PAGE_SIZE,
+    offset: page * PAGE_SIZE,
   };
 
   const queryKey = ['memory', filter];
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey,
     queryFn: () => listMemory(filter),
-    enabled: userId.trim().length > 0,
+    enabled: userId.trim().length > 0 && namespaceReady,
   });
 
   const invalidateList = () => qc.invalidateQueries({ queryKey: ['memory'] });
 
   const createMut = useMutation({
     mutationFn: (values: { content: string; memory_type: MemoryType }) =>
-      createMemory({ user_id: userId, ...values }),
+      createMemory({ namespace: currentNamespace, user_id: userId, ...values }),
     onSuccess: () => {
       notify.success(t('memory.created'));
       void invalidateList();

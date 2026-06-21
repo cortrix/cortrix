@@ -67,6 +67,11 @@ def test_extract_posts_to_memory_extract(api_base: str, client: Cortrix) -> None
     )
     client.memory.extract("ns", query="q", response="r", user_id="u1")
     assert route.calls.last.request.url.path == "/api/v1/memory/extract"
+    body = json.loads(route.calls.last.request.content.decode())
+    assert body["query_text"] == "q"
+    assert body["response_text"] == "r"
+    assert "query" not in body
+    assert "response" not in body
 
 
 @respx.mock

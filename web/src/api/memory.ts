@@ -26,18 +26,32 @@ const BASE = '/api/v1/memory';
 
 function buildQuery(filter: MemoryListFilter): string {
   const params = new URLSearchParams();
-  params.set('user_id', filter.user_id);
+  params.set('namespace', filter.namespace);
+  if (filter.user_id) params.set('user_id', filter.user_id);
   if (filter.include_invalidated) params.set('include_invalidated', 'true');
   if (filter.memory_type) params.set('memory_type', filter.memory_type);
   if (filter.explain) params.set('explain', 'true');
-  params.set('page', String(filter.page ?? 0));
-  params.set('page_size', String(filter.page_size ?? 20));
+  const limit = filter.limit ?? filter.page_size ?? 20;
+  const offset = filter.offset ?? (filter.page ?? 0) * limit;
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
   return params.toString();
 }
 
 export async function listMemory(filter: MemoryListFilter): Promise<MemoryListResponse> {
   try {
-    return await get<MemoryListResponse>(`${BASE}?${buildQuery(filter)}`);
+    const data = await get<MemoryListResponse & { total?: number }>(`${BASE}?${buildQuery(filter)}`);
+    if (data.meta) return data;
+    const limit = filter.limit ?? filter.page_size ?? 20;
+    const offset = filter.offset ?? (filter.page ?? 0) * limit;
+    return {
+      memories: data.memories ?? [],
+      meta: {
+        total: data.total ?? data.memories?.length ?? 0,
+        page: Math.floor(offset / limit),
+        page_size: limit,
+      },
+    };
   } catch (e) {
     return fallbackToMock(e, () => mockApi.listMemory(filter));
   }

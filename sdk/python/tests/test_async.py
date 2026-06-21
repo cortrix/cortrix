@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 
 import httpx
 import pytest
@@ -135,3 +136,6 @@ async def test_async_memory_log_and_extract(api_base: str, aclient: AsyncCortrix
     await aclient.memory.log("ns", query="q", response="r", user_id="u", session_id="s1")
     await aclient.memory.extract("ns", query="q", response="r", user_id="u")
     assert lg.called and ex.called
+    body = json.loads(ex.calls.last.request.content.decode())
+    assert body["query_text"] == "q"
+    assert body["response_text"] == "r"

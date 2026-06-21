@@ -24,6 +24,7 @@ struct HttpRequest {
 struct HttpResponse {
     bool network_ok = false;                    ///< false = connect/TLS/timeout failed
     int status_code = 0;                        ///< HTTP status (valid iff network_ok)
+    std::string transport_error;                ///< transport error detail when network_ok=false
     std::string body;                           ///< response body
     std::map<std::string, std::string> headers; ///< response headers (e.g. Retry-After)
 
