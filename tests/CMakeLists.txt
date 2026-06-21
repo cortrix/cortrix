@@ -468,6 +468,27 @@ add_executable(cortrix_unit_tests
     unit/test_crag_breaker_depth.cpp
     unit/test_splade_depth.cpp
     unit/test_catalog_txn_depth.cpp
+    # Test-expansion wave 5 (schema / store-roundtrip / route-validation / enum-roundtrip)
+    unit/test_schema_matrix_blocks_enrichers.cpp
+    unit/test_schema_matrix_config_providers.cpp
+    unit/test_schema_matrix_table_providers.cpp
+    unit/test_schema_matrix_observability_providers.cpp
+    unit/test_schema_matrix_catalog_base.cpp
+    unit/test_store_roundtrip_doc.cpp
+    unit/test_store_roundtrip_block.cpp
+    unit/test_route_validation_query.cpp
+    unit/test_route_validation_operations.cpp
+    unit/test_route_validation_admin.cpp
+    unit/test_route_validation_batch.cpp
+    unit/test_route_validation_status.cpp
+    unit/test_enum_roundtrip_tenant.cpp
+    unit/test_enum_roundtrip_catalog.cpp
+    unit/test_enum_roundtrip_import.cpp
+    unit/test_enum_roundtrip_memory.cpp
+    unit/test_enum_roundtrip_pipeline.cpp
+    unit/test_enum_roundtrip_query.cpp
+    unit/test_enum_roundtrip_infra.cpp
+    unit/test_enum_roundtrip_async.cpp
 )
 
 target_link_libraries(cortrix_unit_tests PRIVATE
