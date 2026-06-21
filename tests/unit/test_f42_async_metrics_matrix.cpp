@@ -1,0 +1,183 @@
+// F42 F42Metrics — exhaustive matrix coverage (TaskType + CompletionStatus +
+// QueueState + CancelPhase ToString, (task_type x status) combos, duration
+// histogram boundaries, queue_depth gauge, RenderOpenMetrics, ResetForTest).
+// Separate suite namespace from test_f42_metrics.cpp.
+#include <gtest/gtest.h>
+
+#include <array>
+#include <string>
+#include <tuple>
+
+#include "cortrix/async/f42_metrics.h"
+#include "cortrix/async/task_type.h"
+
+namespace cortrix::async {
+namespace matrix_test {
+
+using CS = F42Metrics::CompletionStatus;
+using QS = F42Metrics::QueueState;
+using CP = F42Metrics::CancelPhase;
+
+constexpr std::array<TaskType, 3> kTypes{kTaskDocParse, kTaskWatcherFanout,
+                                         kTaskDocSummary};
+constexpr std::array<CS, 4> kStatuses{CS::kSuccess, CS::kFailed, CS::kCancelled,
+                                      CS::kTimeout};
+constexpr std::array<QS, 2> kStates{QS::kQueued, QS::kProcessing};
+constexpr std::array<CP, 3> kPhases{CP::kPreDequeue, CP::kMidProcessing,
+                                    CP::kPostChunkIdx};
+
+class F42AsyncFx : public ::testing::Test {
+protected:
+    void SetUp() override { F42Metrics::Instance().ResetForTest(); }
+    void TearDown() override { F42Metrics::Instance().ResetForTest(); }
+    F42Metrics& m() { return F42Metrics::Instance(); }
+};
+
+TEST_F(F42AsyncFx, ToStringTaskType) {
+    EXPECT_STREQ(ToString(kTaskDocParse), "kTaskDocParse");
+    EXPECT_STREQ(ToString(kTaskWatcherFanout), "kTaskWatcherFanout");
+    EXPECT_STREQ(ToString(kTaskDocSummary), "kTaskDocSummary");
+}
+TEST_F(F42AsyncFx, ToStringCompletionStatus) {
+    EXPECT_STREQ(ToString(CS::kSuccess), "success");
+    EXPECT_STREQ(ToString(CS::kFailed), "failed");
+    EXPECT_STREQ(ToString(CS::kCancelled), "cancelled");
+    EXPECT_STREQ(ToString(CS::kTimeout), "timeout");
+}
+TEST_F(F42AsyncFx, ToStringQueueState) {
+    EXPECT_STREQ(ToString(QS::kQueued), "queued");
+    EXPECT_STREQ(ToString(QS::kProcessing), "processing");
+}
+TEST_F(F42AsyncFx, ToStringCancelPhase) {
+    EXPECT_STREQ(ToString(CP::kPreDequeue), "pre_dequeue");
+    EXPECT_STREQ(ToString(CP::kMidProcessing), "mid_processing");
+    EXPECT_STREQ(ToString(CP::kPostChunkIdx), "post_chunk_idx");
+}
+TEST_F(F42AsyncFx, TaskTypeIndexMapping) {
+    EXPECT_EQ(TaskTypeIndex(kTaskDocParse), 0);
+    EXPECT_EQ(TaskTypeIndex(kTaskWatcherFanout), 1);
+    EXPECT_EQ(TaskTypeIndex(kTaskDocSummary), 2);
+}
+
+// submitted_total per task_type
+class F42AsyncSubmittedMatrix : public F42AsyncFx,
+                        public ::testing::WithParamInterface<TaskType> {};
+TEST_P(F42AsyncSubmittedMatrix, Increments) {
+    m().RecordSubmitted(GetParam());
+    m().RecordSubmitted(GetParam());
+    EXPECT_EQ(m().SubmittedCount(GetParam()), 2u);
+    for (TaskType t : kTypes)
+        if (t != GetParam()) EXPECT_EQ(m().SubmittedCount(t), 0u);
+}
+INSTANTIATE_TEST_SUITE_P(All, F42AsyncSubmittedMatrix, ::testing::ValuesIn(kTypes));
+
+// completed_total: every (task_type x status) cell
+using CompParam = std::tuple<TaskType, CS>;
+class F42AsyncCompletedMatrix : public F42AsyncFx,
+                        public ::testing::WithParamInterface<CompParam> {};
+TEST_P(F42AsyncCompletedMatrix, IncrementsOnlyTargetCell) {
+    auto [t, st] = GetParam();
+    m().RecordCompleted(t, st);
+    EXPECT_EQ(m().CompletedCount(t, st), 1u);
+    for (TaskType tt : kTypes)
+        for (CS s : kStatuses)
+            if (!(tt == t && s == st)) EXPECT_EQ(m().CompletedCount(tt, s), 0u);
+}
+INSTANTIATE_TEST_SUITE_P(AllCells, F42AsyncCompletedMatrix,
+                         ::testing::Combine(::testing::ValuesIn(kTypes),
+                                            ::testing::ValuesIn(kStatuses)));
+
+// cancel_total per phase
+class F42AsyncCancelMatrix : public F42AsyncFx, public ::testing::WithParamInterface<CP> {};
+TEST_P(F42AsyncCancelMatrix, Increments) {
+    m().RecordCancel(GetParam());
+    EXPECT_EQ(m().CancelCount(GetParam()), 1u);
+}
+INSTANTIATE_TEST_SUITE_P(All, F42AsyncCancelMatrix, ::testing::ValuesIn(kPhases));
+
+// queue_depth gauge per state (set/read, last-write-wins)
+class F42AsyncQueueMatrix : public F42AsyncFx, public ::testing::WithParamInterface<QS> {};
+TEST_P(F42AsyncQueueMatrix, SetReadLastWriteWins) {
+    m().SetQueueDepth(GetParam(), 7);
+    EXPECT_EQ(m().QueueDepth(GetParam()), 7);
+    m().SetQueueDepth(GetParam(), 3);
+    EXPECT_EQ(m().QueueDepth(GetParam()), 3);
+}
+INSTANTIATE_TEST_SUITE_P(All, F42AsyncQueueMatrix, ::testing::ValuesIn(kStates));
+
+TEST_F(F42AsyncFx, ZombieCleanedCounter) {
+    m().AddZombieCleaned(4);
+    m().AddZombieCleaned(1);
+    EXPECT_EQ(m().ZombieCleanedCount(), 5u);
+}
+
+// duration histogram bounds {1,5,15,30,60,300,900,1800}s.
+TEST_F(F42AsyncFx, DurationHistogramRenderAndSum) {
+    m().ObserveDuration(kTaskDocParse, 0.5);   // under first bound
+    m().ObserveDuration(kTaskDocParse, 1.0);   // exactly at first bound
+    m().ObserveDuration(kTaskDocParse, 9999.0);  // above largest -> only +Inf
+    std::string out = m().RenderOpenMetrics();
+    EXPECT_NE(out.find("# TYPE cortrix_tasks_duration_seconds histogram"),
+              std::string::npos);
+    EXPECT_NE(out.find("cortrix_tasks_duration_seconds_count{task_type=\"kTaskDocParse\"} 3"),
+              std::string::npos);
+    // le="1" cumulative holds the 0.5 and the exactly-1.0 sample.
+    EXPECT_NE(out.find("cortrix_tasks_duration_seconds_bucket{task_type=\"kTaskDocParse\",le=\"1\"} 2"),
+              std::string::npos);
+}
+
+TEST_F(F42AsyncFx, DurationNegativeClampsToSmallest) {
+    m().ObserveDuration(kTaskDocSummary, -10.0);
+    std::string out = m().RenderOpenMetrics();
+    EXPECT_NE(out.find("cortrix_tasks_duration_seconds_bucket{task_type=\"kTaskDocSummary\",le=\"1\"} 1"),
+              std::string::npos);
+    EXPECT_NE(out.find("cortrix_tasks_duration_seconds_bucket{task_type=\"kTaskDocSummary\",le=\"+Inf\"} 1"),
+              std::string::npos);
+}
+
+TEST_F(F42AsyncFx, RenderHasTypeHelpAndStableSeries) {
+    m().RecordSubmitted(kTaskDocParse);
+    m().RecordCompleted(kTaskDocParse, CS::kSuccess);
+    m().SetQueueDepth(QS::kQueued, 2);
+    m().AddZombieCleaned(1);
+    m().RecordCancel(CP::kPreDequeue);
+    std::string out = m().RenderOpenMetrics();
+    EXPECT_NE(out.find("# TYPE cortrix_tasks_submitted_total counter"),
+              std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_tasks_completed_total counter"),
+              std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_tasks_queue_depth gauge"),
+              std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_tasks_zombie_cleaned_total counter"),
+              std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_tasks_cancel_total counter"),
+              std::string::npos);
+    // names are cortrix_tasks_* (NOT cortrix_f42_*).
+    EXPECT_EQ(out.find("cortrix_f42_"), std::string::npos);
+}
+
+TEST_F(F42AsyncFx, RenderNoHighCardinalityLabels) {
+    m().RecordSubmitted(kTaskDocParse);
+    std::string out = m().RenderOpenMetrics();
+    EXPECT_EQ(out.find("task_id="), std::string::npos);
+    EXPECT_EQ(out.find("namespace_id="), std::string::npos);
+    EXPECT_EQ(out.find("doc_id="), std::string::npos);
+}
+
+TEST_F(F42AsyncFx, ResetClearsEverything) {
+    m().RecordSubmitted(kTaskDocParse);
+    m().RecordCompleted(kTaskDocParse, CS::kSuccess);
+    m().ObserveDuration(kTaskDocParse, 1.0);
+    m().SetQueueDepth(QS::kQueued, 5);
+    m().AddZombieCleaned(3);
+    m().RecordCancel(CP::kPreDequeue);
+    m().ResetForTest();
+    EXPECT_EQ(m().SubmittedCount(kTaskDocParse), 0u);
+    EXPECT_EQ(m().CompletedCount(kTaskDocParse, CS::kSuccess), 0u);
+    EXPECT_EQ(m().QueueDepth(QS::kQueued), 0);
+    EXPECT_EQ(m().ZombieCleanedCount(), 0u);
+    EXPECT_EQ(m().CancelCount(CP::kPreDequeue), 0u);
+}
+
+}  // namespace matrix_test
+}  // namespace cortrix::async

@@ -400,6 +400,36 @@ add_executable(cortrix_unit_tests
     unit/test_openai_client_errors.cpp
     unit/test_jwt_auth_middleware_extra.cpp
     unit/test_tenant_permission_seam.cpp
+    # Test-expansion breadth wave 1 (error-registry + metrics exhaustive matrices)
+    unit/test_catalog_error_matrix.cpp
+    unit/test_doc_summary_error_matrix.cpp
+    unit/test_metadata_error_matrix.cpp
+    unit/test_agent_trace_error_matrix.cpp
+    unit/test_chunker_error_matrix.cpp
+    unit/test_import_error_matrix.cpp
+    unit/test_mem02_error_matrix.cpp
+    unit/test_mem03_error_matrix.cpp
+    unit/test_mem04_error_matrix.cpp
+    unit/test_auth_error_matrix.cpp
+    unit/test_tenant_error_matrix.cpp
+    unit/test_cross_ns_error_matrix.cpp
+    unit/test_rag_fusion_error_matrix.cpp
+    unit/test_router_error_matrix.cpp
+    unit/test_cleaning_error_matrix.cpp
+    unit/test_contextual_error_matrix.cpp
+    unit/test_enricher_error_matrix.cpp
+    unit/test_hype_error_matrix.cpp
+    unit/test_onnx_error_matrix.cpp
+    unit/test_parser_error_matrix.cpp
+    unit/test_reranker_error_matrix.cpp
+    unit/test_sparse_error_matrix.cpp
+    unit/test_crag_error_matrix.cpp
+    unit/test_agent_trace_metrics_matrix.cpp
+    unit/test_f42_async_metrics_matrix.cpp
+    unit/test_memory_metrics_matrix.cpp
+    unit/test_query_retrieval_metrics_matrix.cpp
+    unit/test_spc_scoring_metrics_matrix.cpp
+    unit/test_infra_metrics_matrix.cpp
 )
 
 target_link_libraries(cortrix_unit_tests PRIVATE
