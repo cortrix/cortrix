@@ -49,6 +49,7 @@ struct LlmConfig {
     std::string api_key;
     std::string model;
     std::string base_url;
+    int timeout_ms = 0;          ///< per-call LLM deadline; 0 = use the consumer's default
 
     bool IsConfigured() const {
         return !provider.empty() && !api_key.empty() && !model.empty();

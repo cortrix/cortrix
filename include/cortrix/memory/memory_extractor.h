@@ -188,7 +188,9 @@ public:
 struct MemoryExtractorConfig {
     bool enabled = true;                       ///< false = NullEnricher mode (LLM disabled)
     std::string llm_model = "gpt-4o-mini";     ///< default extraction model
-    int llm_timeout_ms = 30000;                ///< per-call timeout
+    int llm_timeout_ms = 60000;                ///< per-call timeout (structured extraction +
+                                               ///< contradiction judge are slower than a chat
+                                               ///< turn; override via enricher_llm.timeout_ms)
     int window_size_default = 3;               ///< D3 multi-turn window (1-10)
     int window_size_max = 10;
     int preference_immunization_threshold = 2; ///< D8 N=2

@@ -896,6 +896,14 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     if (config.enricher_llm.IsConfigured()) {
         mem02_cfg.llm_model = config.enricher_llm.model;
     }
+    // [MEM02] Plumb the extraction LLM timeout from config — it was hardcoded at the
+    // 30s struct default with no override path, too short for slow structured
+    // extraction plus the contradiction judge's second call (the failure the R4
+    // black-box hit as an extraction timeout). enricher_llm.timeout_ms > 0 overrides
+    // the 60s default; the extractor reuses that same LLM client.
+    if (config.enricher_llm.timeout_ms > 0) {
+        mem02_cfg.llm_timeout_ms = config.enricher_llm.timeout_ms;
+    }
     cortrix::memory::MemoryQueue::Config mem02_queue_cfg;  // worker_count=4, 1h periodic
     cortrix::memory::MemoryExtractionService mem02_service(
         ns_pool, enricher_chain_llm, embedder, obs_module.logger(), mem02_cfg,
