@@ -118,6 +118,19 @@ Result<std::vector<ExtractedMemory>>
 MemoryExtractor::ParseExtractionJson(const std::string& llm_output) const {
     nlohmann::json j = nlohmann::json::parse(llm_output, /*cb=*/nullptr,
                                              /*allow_exceptions=*/false);
+    // LLMs frequently wrap the JSON in a ```json … ``` markdown fence, add a line of
+    // prose, or nest the array inside an object — even with response_format=json_object
+    // (GLM, Claude and GPT all do it intermittently; raw json::parse then fails as
+    // "not a JSON array"). Fallback: narrow to the outermost [ … ] span and re-parse.
+    // This tolerates fences, surrounding prose, and {"...":[ … ]} object wrappers.
+    if (j.is_discarded() || !j.is_array()) {
+        const auto lb = llm_output.find('[');
+        const auto rb = llm_output.rfind(']');
+        if (lb != std::string::npos && rb != std::string::npos && rb > lb) {
+            j = nlohmann::json::parse(llm_output.substr(lb, rb - lb + 1), /*cb=*/nullptr,
+                                      /*allow_exceptions=*/false);
+        }
+    }
     if (j.is_discarded() || !j.is_array()) {
         return Mem02Status(Mem02ErrorCode::kExtractInvalidOutput,
                            "extraction output is not a JSON array");

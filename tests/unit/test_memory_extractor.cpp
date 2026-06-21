@@ -274,6 +274,32 @@ TEST_F(MemoryExtractorTest, S1_FactClassification) {
     EXPECT_FALSE(r.extracted_memories[0].block_id.empty());  // ULID minted
 }
 
+// R4/GLM: chat models routinely wrap the JSON array in a ```json … ``` markdown
+// fence (and add prose) even with response_format=json_object. The parser must
+// tolerate that — otherwise live GLM extraction fails as kExtractInvalidOutput.
+TEST_F(MemoryExtractorTest, S1b_FencedAndProseWrappedJsonStillParses) {
+    llm_->PushOk("Here are the extracted facts:\n```json\n"
+                 R"([{"type":"fact","content":"user is a doctor","confidence":0.95}])"
+                 "\n```\n");
+    auto ex = Make();
+    auto r = ex->ExtractFromWindow({MakeTurn("i1", "user", "I am a doctor")});
+    ASSERT_TRUE(r.ok()) << (r.error ? r.error->message : "");
+    ASSERT_EQ(r.extracted_memories.size(), 1u);
+    EXPECT_EQ(r.extracted_memories[0].type, MemoryType::kFact);
+    EXPECT_EQ(r.extracted_memories[0].content, "user is a doctor");
+}
+
+// Some providers in json_object mode nest the array in an object; narrowing to the
+// outermost [ … ] span recovers it.
+TEST_F(MemoryExtractorTest, S1c_ObjectWrappedArrayStillParses) {
+    llm_->PushOk(R"({"memories":[{"type":"fact","content":"user is a doctor"}]})");
+    auto ex = Make();
+    auto r = ex->ExtractFromWindow({MakeTurn("i1", "user", "I am a doctor")});
+    ASSERT_TRUE(r.ok()) << (r.error ? r.error->message : "");
+    ASSERT_EQ(r.extracted_memories.size(), 1u);
+    EXPECT_EQ(r.extracted_memories[0].content, "user is a doctor");
+}
+
 // Scenario 2: preference classification.
 TEST_F(MemoryExtractorTest, S2_PreferenceClassification) {
     llm_->PushOk(R"([{"type":"preference","content":"user likes the dark theme","confidence":0.9}])");
