@@ -4,7 +4,7 @@ import type { DocumentStatus, BatchSubmitResponse, AgentError } from '../types/a
 import { uploadDocument, getDocumentStatus, listDocuments, deleteDocument } from '../api/documents';
 import { batchSubmit } from '../api/batch';
 import { parseAgentError } from '../api/errors';
-import { useAppStore } from './useAppStore';
+import { ensureCurrentNamespace, useAppStore } from './useAppStore';
 
 interface UploadState {
   files: UploadFile[];
@@ -47,7 +47,15 @@ export const useUploadStore = create<UploadState>((set, get) => ({
   removeFile: (id) => set((s) => ({ files: s.files.filter((f) => f.id !== id) })),
 
   uploadFile: async (uf) => {
-    const ns = useAppStore.getState().currentNamespace;
+    const ns = await ensureCurrentNamespace();
+    if (!ns) {
+      set((s) => ({
+        files: s.files.map((f) =>
+          f.id === uf.id ? { ...f, status: 'error' as const, error: 'No namespace available' } : f,
+        ),
+      }));
+      return;
+    }
     set((s) => ({
       files: s.files.map((f) => (f.id === uf.id ? { ...f, status: 'uploading' as const } : f)),
     }));
@@ -75,7 +83,8 @@ export const useUploadStore = create<UploadState>((set, get) => ({
   },
 
   pollProcessing: async () => {
-    const ns = useAppStore.getState().currentNamespace;
+    const ns = await ensureCurrentNamespace();
+    if (!ns) return;
     const processing = get().files.filter((f) => f.status === 'processing' && f.doc_id);
     await Promise.all(
       processing.map(async (f) => {
@@ -104,7 +113,11 @@ export const useUploadStore = create<UploadState>((set, get) => ({
   },
 
   loadDocuments: async () => {
-    const ns = useAppStore.getState().currentNamespace;
+    const ns = await ensureCurrentNamespace();
+    if (!ns) {
+      set({ documents: [], documentsLoading: false });
+      return;
+    }
     set({ documentsLoading: true });
     try {
       const data = await listDocuments(ns);
@@ -115,7 +128,8 @@ export const useUploadStore = create<UploadState>((set, get) => ({
   },
 
   deleteDoc: async (docId) => {
-    const ns = useAppStore.getState().currentNamespace;
+    const ns = await ensureCurrentNamespace();
+    if (!ns) return;
     try {
       await deleteDocument(ns, docId);
       set((s) => ({
@@ -131,7 +145,20 @@ export const useUploadStore = create<UploadState>((set, get) => ({
   // (empty, >100, duplicate) lands in `batchError`; otherwise the per-doc
   // partial-success envelope lands in `batchResult` (succeeded[] / failed[]).
   submitBatch: async (docsJson) => {
-    const ns = useAppStore.getState().currentNamespace;
+    const ns = await ensureCurrentNamespace();
+    if (!ns) {
+      set({
+        batchSubmitting: false,
+        batchError: {
+          code: 'CX_ERR_NS_UNAVAILABLE',
+          message: 'No namespace available.',
+          retryable: false,
+          category: 'permanent',
+          retry_after_ms: null,
+        },
+      });
+      return;
+    }
     set({ batchSubmitting: true, batchResult: null, batchError: null });
     let documents: unknown;
     try {

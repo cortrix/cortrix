@@ -12,10 +12,14 @@ export function UploadPage() {
   const { t } = useTranslation();
   const { loadDocuments } = useUploadStore();
   const currentNamespace = useAppStore((s) => s.currentNamespace);
+  const namespaceReady = useAppStore((s) =>
+    s.namespaces.some((ns) => ns.name === s.currentNamespace),
+  );
 
   useEffect(() => {
+    if (!namespaceReady) return;
     loadDocuments();
-  }, [loadDocuments, currentNamespace]);
+  }, [loadDocuments, currentNamespace, namespaceReady]);
 
   return (
     <div className="p-6 max-w-4xl mx-auto">

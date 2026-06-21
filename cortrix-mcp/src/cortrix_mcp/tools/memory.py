@@ -127,8 +127,10 @@ def register(mcp) -> None:
         body = {
             "namespace": namespace,
             "documents": documents,
-            "async": async_,
-            "on_duplicate": on_duplicate,
+            "options": {
+                "async": async_,
+                "on_duplicate": on_duplicate,
+            },
         }
         return request("POST", "/documents/batch", json_body=body, timeout=120.0)
 

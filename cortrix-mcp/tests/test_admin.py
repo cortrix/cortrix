@@ -63,14 +63,15 @@ def test_credential_register_success(admin_on, mock_request):
 
 def test_db_import_run_table_mode(admin_on, mock_request):
     mock_request.set(json_body={"import_id": "imp-1", "status": "running"})
+    filter_body = {"where": [{"column": "active", "op": "eq", "value": True}]}
     out = get_tool_fn("cortrix_admin_db_import_run")(
-        connection_ref="pg1", namespace="ns", table="users", filter="active=true"
+        connection_ref="pg1", namespace="ns", table="users", filter=filter_body
     )
     assert out["meta"]["category"] == "success"
     body = mock_request.last_call.kwargs["json"]
     assert args_endswith(mock_request, "/api/v1/import/database")
     assert body["table"] == "users"
-    assert body["filter"] == "active=true"
+    assert body["filter"] == filter_body
     assert "sql" not in body
 
 

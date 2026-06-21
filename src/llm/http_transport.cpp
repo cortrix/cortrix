@@ -49,7 +49,10 @@ public:
     HttpResponse Send(const HttpRequest& request) override {
         HttpResponse resp;
         SplitUrl split = SplitBaseAndPath(request.url);
-        if (!split.ok) return resp;  // network_ok=false → treated as transport failure
+        if (!split.ok) {
+            resp.transport_error = "malformed_url";
+            return resp;  // network_ok=false → treated as transport failure
+        }
 
         httplib::Client cli(split.base);
         cli.set_connection_timeout(0, request.timeout_ms * 1000);  // (sec, usec)
@@ -65,6 +68,7 @@ public:
                 : cli.Post(split.path, headers, request.body, "application/json");
         if (!result) {
             // DNS / connect / TLS / timeout — no HTTP status. network_ok stays false.
+            resp.transport_error = httplib::to_string(result.error());
             return resp;
         }
         resp.network_ok = true;

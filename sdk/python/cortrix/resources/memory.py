@@ -27,7 +27,7 @@ PATH_MEMORY_SEARCH = "/memory/search"
 # the designed one-shot /memory/log (interaction + MEM02 trigger) is not mounted.
 PATH_MEMORY_LOG = "/memory/sessions/{session_id}/interactions"
 PATH_MEMORY_SESSIONS = "/memory/sessions"
-PATH_MEMORY_EXTRACT = "/memory/extract"  # designed (MEM02); not mounted yet -> D3.5
+PATH_MEMORY_EXTRACT = "/memory/extract"
 PATH_MEMORY_ID = "/memory/{id}"
 PATH_MEMORY_OPT_OUT = "/memory/session/{session_id}/opt-out"  # §2.12-only -> D3.5 spec
 
@@ -65,8 +65,8 @@ def _log_body(
 ) -> dict[str, Any]:
     body: dict[str, Any] = {
         "namespace": namespace,
-        "query": query,
-        "response": response,
+        "query_text": query,
+        "response_text": response,
         "user_id": user_id,
     }
     if session_id is not None:

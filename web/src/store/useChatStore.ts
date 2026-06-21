@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ChatMessage } from '../types/state';
 import type { SearchResult } from '../types/api';
-import { useAppStore } from './useAppStore';
+import { ensureCurrentNamespace, useAppStore } from './useAppStore';
 import { getCsrfToken, CSRF_HEADER } from '../utils/csrf';
 import { mockApi } from '../api/mock';
 import { USE_MOCK } from '../api/fallback';
@@ -238,7 +238,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   loadSessions: async () => {
     try {
-      const ns = useAppStore.getState().currentNamespace;
+      const ns = await ensureCurrentNamespace();
+      if (!ns) {
+        set({ sessions: [] });
+        return;
+      }
       const res = await fetch(`/api/v1/memory/sessions?namespace=${ns}&limit=50`);
       if (!res.ok) return;
       const data = await res.json();

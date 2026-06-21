@@ -16,7 +16,8 @@ route table in src/server, not just api/paths/*.yaml):
   * list_namespaces  -> GET  /namespaces
   * create_namespace -> POST /namespaces
   * memory_search    -> POST /memory/search
-  * document_status  -> GET  /documents/{id}        (P04 getDocument; MVP /documents/{id}/status — stale)
+  * document_status  -> GET  /documents/{id}?namespace=...
+                        (P04 getDocument; live storage is namespace-scoped)
   * add_watcher      -> POST /watch  body {path, target_namespaces:[...]}
                         (MVP used /connector/watchers {data_dir, namespace_name} — stale)
   * list_watchers    -> GET  /watch
@@ -196,13 +197,14 @@ def register(mcp) -> None:
 
     @mcp.tool()
     def cortrix_document_status(doc_id: str, namespace: str = "") -> dict:
-        """Get a document's processing status / details (GET /documents/{id}).
+        """Get a document's processing status / details (GET /documents/{id}?namespace=...).
 
         Args:
             doc_id: document id returned from upload.
-            namespace: reserved for forward compatibility (P04 resolves by id).
+            namespace: target namespace (uses default if empty).
         """
-        return request("GET", f"/documents/{doc_id}", timeout=10.0)
+        ns = namespace or CORTRIX_NAMESPACE
+        return request("GET", f"/documents/{doc_id}", params={"namespace": ns}, timeout=10.0)
 
     @mcp.tool()
     def cortrix_add_watcher(

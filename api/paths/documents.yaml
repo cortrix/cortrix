@@ -136,11 +136,16 @@ paths:
         required: true
         schema: { type: string }
         description: document_id
+      - name: namespace
+        in: query
+        required: true
+        schema: { type: string }
+        description: Namespace that owns the document. The flat document route is namespace-scoped in the live store.
     get:
       tags: [public]
       operationId: getDocument
       summary: Get document
-      description: Get document details (Read+).
+      description: Get document details (Read+). Requires namespace because documents are stored per namespace.
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff
@@ -161,7 +166,8 @@ paths:
       operationId: deleteDocument
       summary: Delete document
       description: |
-        Delete a document and all its Blocks (Write+). Soft delete (OPEN-2): the doc is marked
+        Delete a document and all its Blocks (Write+). Requires namespace because documents are stored per namespace.
+        Soft delete (OPEN-2): the doc is marked
         status=deleted and stays recoverable for gc.soft_delete_retention_days (default 30; 0 = immediate).
         Inside the window, ops can restore via POST /gc/restore; after it, GC sweeps/purges it permanently.
       x-cortrix-agent-workflow: public

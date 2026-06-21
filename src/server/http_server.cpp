@@ -165,6 +165,42 @@ std::vector<std::string> OpenApiJsonCandidates() {
     };
 }
 
+bool IsSafeOpenApiAssetPath(const std::string& value) {
+    return !value.empty() && value.find("..") == std::string::npos &&
+           value.find('\\') == std::string::npos && value[0] != '/';
+}
+
+bool ReadOpenApiAsset(const std::string& group, const std::string& rel,
+                      std::string* content, std::string* path_used) {
+    if ((group != "paths" && group != "components") || !IsSafeOpenApiAssetPath(rel)) {
+        return false;
+    }
+    const std::string root = OpenApiRoot();
+    return ReadFirstFile({root + "/api/" + group + "/" + rel}, content, path_used);
+}
+
+const char* WebUiContentSecurityPolicy() {
+    return "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' "
+           "https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self'; "
+           "font-src 'self' data: https://fonts.gstatic.com; base-uri 'self'; "
+           "form-action 'self'; object-src 'none'; frame-ancestors 'none'";
+}
+
+httplib::Headers WebUiSecurityHeaders() {
+    return {
+        {"Content-Security-Policy", WebUiContentSecurityPolicy()},
+        {"X-Frame-Options", "DENY"},
+        {"X-Content-Type-Options", "nosniff"},
+        {"Referrer-Policy", "no-referrer"},
+    };
+}
+
+void ApplyWebUiSecurityHeaders(httplib::Response& res) {
+    for (const auto& header : WebUiSecurityHeaders()) {
+        res.set_header(header.first, header.second);
+    }
+}
+
 bool LooksLikeInt(const std::string& value) {
     if (value.empty()) return false;
     size_t i = value[0] == '-' ? 1 : 0;
@@ -324,6 +360,7 @@ void CortrixHttpServer::RegisterRoutes() {
         if (res.status == 404) {
             if (!web_ui_index_.empty() && req.method == "GET" && req.path.rfind("/api/", 0) != 0) {
                 res.status = 200;
+                ApplyWebUiSecurityHeaders(res);
                 res.set_content(web_ui_index_, "text/html");
                 return;
             }
@@ -403,6 +440,21 @@ void CortrixHttpServer::RegisterOpenApiRoutes() {
                  res.status = 200;
              }));
 
+    svr_.Get(R"(/(paths|components)/(.+\.ya?ml))",
+             NoAuth([](const httplib::Request& req, httplib::Response& res,
+                       const RequestContext& rctx) {
+                 std::string content;
+                 std::string path;
+                 if (!ReadOpenApiAsset(req.matches[1], req.matches[2], &content, &path)) {
+                     WriteJsonError(res, Status::NotFound("OpenAPI asset not found"),
+                                    rctx.request_id);
+                     return;
+                 }
+                 res.set_header("X-Cortrix-OpenAPI-Source", path);
+                 res.set_content(content, "application/yaml");
+                 res.status = 200;
+             }));
+
     svr_.Get(
         "/openapi.bundled.yaml",
         NoAuth([](const httplib::Request&, httplib::Response& res, const RequestContext& rctx) {
@@ -454,7 +506,7 @@ void CortrixHttpServer::EnableWebUi(const std::string& dir) {
     std::stringstream ss;
     ss << index.rdbuf();
     web_ui_index_ = ss.str();
-    svr_.set_mount_point("/", dir);
+    svr_.set_mount_point("/", dir, WebUiSecurityHeaders());
     CORTRIX_LOG_INFO("server", "Web UI enabled from {}", dir);
 }
 

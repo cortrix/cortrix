@@ -4,6 +4,7 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <system_error>
 #include <vector>
 
 #include <sqlite3.h>
@@ -225,6 +226,14 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // without CORTRIX_ALLOW_PUBLIC_ADMIN=true aborts startup here.
     cortrix::logging::LogSanitizer::Initialize("/app/config/sensitive_fields.yaml");
     cortrix::middleware::AdminGuard::ValidateConfigOrAbort();
+
+    std::error_code data_dir_ec;
+    std::filesystem::create_directories(config.ns.data_dir, data_dir_ec);
+    if (data_dir_ec) {
+        CORTRIX_LOG_ERROR("main", "Failed to create namespace data_dir ({}): {}",
+                          config.ns.data_dir, data_dir_ec.message());
+        return 1;
+    }
 
     // 3. Initialize namespace metadata manager
     cortrix::NamespaceManager ns_mgr(config.ns.data_dir);
