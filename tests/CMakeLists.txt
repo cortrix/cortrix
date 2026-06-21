@@ -489,6 +489,21 @@ add_executable(cortrix_unit_tests
     unit/test_enum_roundtrip_query.cpp
     unit/test_enum_roundtrip_infra.cpp
     unit/test_enum_roundtrip_async.cpp
+    # Test-expansion wave 6 (store-ops / util / response-oplog / infra-ops matrices)
+    unit/test_store_ops_fault.cpp
+    unit/test_store_ops_blob.cpp
+    unit/test_store_ops_content_ref.cpp
+    unit/test_util_matrix_file_utils.cpp
+    unit/test_util_matrix_file_filter.cpp
+    unit/test_util_matrix_ulid.cpp
+    unit/test_util_matrix_data_cleaner.cpp
+    unit/test_util_matrix_common_helpers.cpp
+    unit/test_response_matrix_agent_envelope.cpp
+    unit/test_oplog_matrix_record_query.cpp
+    unit/test_infra_ops_bloom.cpp
+    unit/test_infra_ops_rate_limiter.cpp
+    unit/test_infra_ops_api_key.cpp
+    unit/test_infra_ops_router.cpp
 )
 
 target_link_libraries(cortrix_unit_tests PRIVATE

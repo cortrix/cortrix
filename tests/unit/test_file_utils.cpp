@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 #include "cortrix/connector/file_utils.h"
+#include <unistd.h>
+#include <atomic>
 #include <fstream>
 #include <filesystem>
 #include <cstdlib>
@@ -11,7 +13,13 @@ class FileUtilsTest : public ::testing::Test {
 protected:
     void SetUp() override {
         namespace fs = std::filesystem;
-        test_dir_ = fs::temp_directory_path() / "cortrix_test_file_utils";
+        // Unique per process + per SetUp so parallel ctest (-j2, each case its own
+        // process) never shares this dir; a fixed name + TearDown remove_all would
+        // let concurrent cases delete each other's files.
+        static std::atomic<unsigned> seq{0};
+        test_dir_ = fs::temp_directory_path() /
+                    ("cortrix_test_file_utils_" + std::to_string(getpid()) + "_" +
+                     std::to_string(seq.fetch_add(1)));
         fs::create_directories(test_dir_);
     }
 
