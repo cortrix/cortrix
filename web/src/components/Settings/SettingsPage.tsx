@@ -2,18 +2,32 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   CpuChipIcon, EyeIcon, ChatBubbleLeftRightIcon, CheckIcon, ArrowPathIcon, EyeSlashIcon,
   Cog6ToothIcon, ServerIcon, CircleStackIcon, FolderIcon, ShieldCheckIcon, KeyIcon,
-  PlusIcon, ClipboardIcon, TrashIcon, ExclamationTriangleIcon,
+  LockClosedIcon, PlusIcon, ClipboardIcon, TrashIcon, ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store/useAppStore';
-import type { LLMRolesResponse, LLMProvider, LLMModel } from '../../types/api';
+import type { LLMProvider } from '../../types/api';
 import { listApiKeys, createApiKey, revokeApiKey } from '../../api/apiKeys';
 import { parseAgentError } from '../../api/errors';
 import { Button, Input, Modal, Badge, notify } from '../ui';
 import { ProgrammaticBanner } from '../Common/ProgrammaticBanner';
 
 const AGENT_URL = '/agent';
+
+// V1.0 agent config surface (cortrix-agent/routes/config.py). Only THREE endpoints
+// exist: GET /config (current agent_llm), GET /config/providers (catalog, no models),
+// PUT /config/agent_llm (forwards to the cortrix-server admin endpoint
+// /api/v1/system/agent_llm_config). There is no per-role config and no provider-key
+// endpoint — semantic_llm/vision_llm are config.yaml-only and are shown read-only here.
+
+// Shape of GET /config (cortrix-agent AgentLlmConfigView; api_key is masked).
+interface AgentLlmConfig {
+  llm_provider: string;
+  model: string;
+  base_url?: string;
+  api_key_masked?: string | null;
+}
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -51,7 +65,10 @@ function ProviderIcon({ id }: { id: string }) {
   );
 }
 
-function ProviderBadge({ provider }: { provider: LLMProvider }) {
+// Read-only provider-type badge. The V1 agent exposes no per-provider `configured`
+// flag (GET /config/providers is a catalog), so this reflects only the static
+// provider kind, not a stored key state.
+function ProviderTypeBadge({ provider }: { provider: LLMProvider }) {
   const { t } = useTranslation();
   if (!provider.needs_key && !provider.needs_url) {
     return (
@@ -61,7 +78,7 @@ function ProviderBadge({ provider }: { provider: LLMProvider }) {
       </span>
     );
   }
-  if (!provider.needs_key && provider.needs_url) {
+  if (provider.needs_url) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-magma/15 text-magma-h">
         <span className="w-1.5 h-1.5 rounded-full bg-magma" />
@@ -69,45 +86,80 @@ function ProviderBadge({ provider }: { provider: LLMProvider }) {
       </span>
     );
   }
-  return provider.configured ? (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-ok/10 text-ok">
-      <span className="w-1.5 h-1.5 rounded-full bg-ok" />
-      {t('settings.providerConfigured')}
-    </span>
-  ) : (
+  return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-surface2 text-muted">
       <span className="w-1.5 h-1.5 rounded-full bg-muted" />
-      {t('settings.providerNotConfigured')}
+      {t('settings.providerRequiresKey')}
     </span>
   );
 }
 
-// ─── Provider Config Card ──────────────────────────────────────────────────────
+// ─── Provider catalog card (read-only) ─────────────────────────────────────────
+// The V1 agent has no PUT /config/providers/{id}; provider keys are set as part of
+// the agent_llm config (below) or in config.yaml. This card is purely informational.
 
-interface ProviderCardProps {
-  provider: LLMProvider;
-  onSaved: (id: string) => void;
+function ProviderCatalogCard({ provider, active }: { provider: LLMProvider; active: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <div className="bg-surface rounded-xl border border-line p-5">
+      <div className="flex items-center gap-3">
+        <ProviderIcon id={provider.id} />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-txt truncate">{provider.name}</p>
+          <ProviderTypeBadge provider={provider} />
+        </div>
+        {active && (
+          <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-ok/10 text-ok">
+            <span className="w-1.5 h-1.5 rounded-full bg-ok" />
+            {t('settings.providerActive')}
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
-function ProviderConfigCard({ provider, onSaved }: ProviderCardProps) {
+// ─── Agent LLM card (the only runtime-editable role) ───────────────────────────
+// Saves via PUT /agent/config/agent_llm, which forwards to the cortrix-server admin
+// endpoint PUT /api/v1/system/agent_llm_config (owns the authoritative C++
+// IGlobalConfig, api_key encrypted at rest). The agent exposes no per-provider model
+// catalog, so the model is a free-text field pre-filled from GET /config.
+
+interface AgentLlmCardProps {
+  providers: LLMProvider[];
+  current: AgentLlmConfig;
+  onSaved: (provider: string, model: string) => void;
+}
+
+function AgentLlmCard({ providers, current, onSaved }: AgentLlmCardProps) {
   const { t } = useTranslation();
-  const [apiKey,  setApiKey]  = useState('');
-  const [baseUrl, setBaseUrl] = useState(provider.base_url || '');
-  const [showKey, setShowKey] = useState(false);
-  const [saving,  setSaving]  = useState(false);
-  const [saved,   setSaved]   = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
+  const [provider, setProvider] = useState(current.llm_provider);
+  const [model,    setModel]    = useState(current.model);
+  const [apiKey,   setApiKey]   = useState('');
+  const [baseUrl,  setBaseUrl]  = useState(current.base_url ?? '');
+  const [showKey,  setShowKey]  = useState(false);
+  const [saving,   setSaving]   = useState(false);
+  const [saved,    setSaved]    = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+
+  useEffect(() => {
+    setProvider(current.llm_provider);
+    setModel(current.model);
+    setBaseUrl(current.base_url ?? '');
+  }, [current.llm_provider, current.model, current.base_url]);
+
+  const selected = providers.find((p) => p.id === provider);
 
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      const body: Record<string, string> = {};
-      if (provider.needs_key && apiKey.trim()) body.api_key = apiKey.trim();
-      if (provider.needs_url && baseUrl.trim()) body.base_url = baseUrl.trim();
+      const body: Record<string, string> = { provider, model };
+      if (apiKey.trim())  body.api_key  = apiKey.trim();
+      if (baseUrl.trim()) body.base_url = baseUrl.trim();
 
-      const resp = await fetch(`${AGENT_URL}/config/providers/${provider.id}`, {
+      const resp = await fetch(`${AGENT_URL}/config/agent_llm`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -115,137 +167,9 @@ function ProviderConfigCard({ provider, onSaved }: ProviderCardProps) {
       if (!resp.ok) throw new Error(await resp.text() || resp.statusText);
 
       setSaved(true);
-      if (provider.needs_key) setApiKey('');  // clear after save
+      setApiKey('');  // clear after save
       setTimeout(() => setSaved(false), 2000);
-      onSaved(provider.id);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const noConfig = !provider.needs_key && !provider.needs_url;
-
-  return (
-    <div className="bg-surface rounded-xl border border-line p-5">
-      <div className="flex items-center gap-6">
-        {/* Left: identity */}
-        <div className="flex items-center gap-3 w-52 shrink-0">
-          <ProviderIcon id={provider.id} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-txt truncate">{provider.name}</p>
-            <ProviderBadge provider={provider} />
-          </div>
-        </div>
-
-        {/* Right: input or status */}
-        {noConfig ? (
-          <p className="flex-1 text-sm text-muted">{t('settings.noConfigNeeded')}</p>
-        ) : (
-          <div className="flex-1 min-w-0">
-            <div className="flex items-end gap-3">
-              {provider.needs_key && (
-                <div className="flex-1 min-w-0">
-                  <label className="block text-xs font-medium text-muted mb-1">
-                    {t('settings.apiKey')}
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showKey ? 'text' : 'password'}
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder={provider.configured ? t('settings.keyHint') : t('settings.keyPlaceholder')}
-                      className="w-full px-3 py-2 pr-9 rounded-lg border border-line bg-surface text-txt text-sm focus:ring-2 focus:ring-magma/20 focus:border-magma"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowKey((v) => !v)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-muted"
-                    >
-                      {showKey ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              )}
-              {provider.needs_url && (
-                <div className="flex-1 min-w-0">
-                  <label className="block text-xs font-medium text-muted mb-1">
-                    {t('settings.baseUrl')}
-                  </label>
-                  <input
-                    type="text"
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                    placeholder={t('settings.baseUrlPlaceholder')}
-                    className="w-full px-3 py-2 rounded-lg border border-line bg-surface text-txt text-sm focus:ring-2 focus:ring-magma/20 focus:border-magma"
-                  />
-                </div>
-              )}
-              <SaveButton saving={saving} saved={saved} onClick={handleSave} />
-            </div>
-            {error && <p className="text-xs text-red-500 dark:text-red-400 mt-2">{error}</p>}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── LLM Role Card (horizontal) ───────────────────────────────────────────────
-
-interface RoleCardProps {
-  icon: React.ReactNode;
-  roleKey: string;
-  title: string;
-  description: string;
-  provider: string;
-  model: string;
-  providers: LLMProvider[];
-  models: Record<string, LLMModel[]>;
-  visionOnly?: boolean;
-  onSave: (provider: string, model: string) => Promise<void>;
-}
-
-function LLMRoleCard({
-  icon, roleKey, title, description,
-  provider, model,
-  providers, models,
-  visionOnly = false,
-  onSave,
-}: RoleCardProps) {
-  const { t } = useTranslation();
-  const [selectedProvider, setSelectedProvider] = useState(provider);
-  const [selectedModel,    setSelectedModel]    = useState(model);
-  const [saving, setSaving] = useState(false);
-  const [saved,  setSaved]  = useState(false);
-  const [error,  setError]  = useState<string | null>(null);
-
-  useEffect(() => {
-    setSelectedProvider(provider);
-    setSelectedModel(model);
-  }, [provider, model]);
-
-  const currentModels = (models[selectedProvider] || []).filter(
-    (m) => !visionOnly || m.caps?.includes('vision'),
-  );
-
-  const handleProviderChange = (pid: string) => {
-    setSelectedProvider(pid);
-    const ms = (models[pid] || []).filter((m) => !visionOnly || m.caps?.includes('vision'));
-    if (ms.length > 0) setSelectedModel(ms[0].id);
-    setSaved(false);
-    setError(null);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    setError(null);
-    setSaved(false);
-    try {
-      await onSave(selectedProvider, selectedModel);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      onSaved(provider, model);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -259,57 +183,116 @@ function LLMRoleCard({
         {/* Left */}
         <div className="flex items-start gap-3 w-52 shrink-0">
           <div className="w-9 h-9 rounded-lg bg-cortrix-50 dark:bg-cortrix-800/20 flex items-center justify-center text-cortrix-600 dark:text-cortrix-400 shrink-0">
+            <ChatBubbleLeftRightIcon className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-semibold text-txt">{t('settings.agentLlmTitle')}</h3>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface2 text-muted">agent_llm</span>
+            </div>
+            <p className="text-xs text-muted mt-0.5 leading-relaxed">{t('settings.agentLlmDesc')}</p>
+          </div>
+        </div>
+
+        {/* Right */}
+        <div className="flex-1 min-w-0 space-y-3">
+          <div className="flex items-end gap-3">
+            <div className="flex-1 min-w-0">
+              <label className="block text-xs font-medium text-muted mb-1">{t('settings.provider')}</label>
+              <select
+                value={provider}
+                onChange={(e) => { setProvider(e.target.value); setSaved(false); }}
+                className="w-full px-3 py-2 rounded-lg border border-line bg-surface text-txt text-sm focus:ring-2 focus:ring-magma/20 focus:border-magma"
+              >
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1 min-w-0">
+              <label className="block text-xs font-medium text-muted mb-1">{t('settings.model')}</label>
+              <input
+                type="text"
+                value={model}
+                onChange={(e) => { setModel(e.target.value); setSaved(false); }}
+                placeholder={t('settings.modelPlaceholder')}
+                className="w-full px-3 py-2 rounded-lg border border-line bg-surface text-txt text-sm focus:ring-2 focus:ring-magma/20 focus:border-magma"
+              />
+            </div>
+            <SaveButton saving={saving} saved={saved} onClick={handleSave} />
+          </div>
+
+          {selected?.needs_key && (
+            <div>
+              <label className="block text-xs font-medium text-muted mb-1">
+                {t('settings.apiKey')}
+                <span className="text-xs text-muted ml-2">{t('settings.keyHint')}</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={apiKey}
+                  onChange={(e) => { setApiKey(e.target.value); setSaved(false); }}
+                  placeholder={current.api_key_masked || t('settings.keyPlaceholder')}
+                  className="w-full px-3 py-2 pr-9 rounded-lg border border-line bg-surface text-txt text-sm focus:ring-2 focus:ring-magma/20 focus:border-magma"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-muted"
+                >
+                  {showKey ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {selected?.needs_url && (
+            <div>
+              <label className="block text-xs font-medium text-muted mb-1">{t('settings.baseUrl')}</label>
+              <input
+                type="text"
+                value={baseUrl}
+                onChange={(e) => { setBaseUrl(e.target.value); setSaved(false); }}
+                placeholder={t('settings.baseUrlPlaceholder')}
+                className="w-full px-3 py-2 rounded-lg border border-line bg-surface text-txt text-sm focus:ring-2 focus:ring-magma/20 focus:border-magma"
+              />
+            </div>
+          )}
+
+          {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Read-only role card (semantic_llm / vision_llm — config.yaml only) ─────────
+
+function ReadOnlyRoleCard({
+  icon, roleKey, title, description,
+}: { icon: React.ReactNode; roleKey: string; title: string; description: string }) {
+  const { t } = useTranslation();
+  return (
+    <div className="bg-surface rounded-xl border border-line p-5">
+      <div className="flex items-start gap-6">
+        <div className="flex items-start gap-3 w-52 shrink-0">
+          <div className="w-9 h-9 rounded-lg bg-cortrix-50 dark:bg-cortrix-800/20 flex items-center justify-center text-cortrix-600 dark:text-cortrix-400 shrink-0">
             {icon}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-sm font-semibold text-txt">{title}</h3>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface2 text-muted">
-                {roleKey}
-              </span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface2 text-muted">{roleKey}</span>
             </div>
             <p className="text-xs text-muted mt-0.5 leading-relaxed">{description}</p>
           </div>
         </div>
-
-        {/* Right */}
-        <div className="flex-1 min-w-0">
-          {providers.length === 0 ? (
-            <p className="text-sm text-muted italic">{t('settings.noProviderAvailable')}</p>
-          ) : (
-            <div className="flex items-end gap-3">
-              <div className="flex-1 min-w-0">
-                <label className="block text-xs font-medium text-muted mb-1">
-                  {t('settings.provider')}
-                </label>
-                <select
-                  value={selectedProvider}
-                  onChange={(e) => handleProviderChange(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-line bg-surface text-txt text-sm focus:ring-2 focus:ring-magma/20 focus:border-magma"
-                >
-                  {providers.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex-1 min-w-0">
-                <label className="block text-xs font-medium text-muted mb-1">
-                  {t('settings.model')}
-                </label>
-                <select
-                  value={selectedModel}
-                  onChange={(e) => { setSelectedModel(e.target.value); setSaved(false); }}
-                  className="w-full px-3 py-2 rounded-lg border border-line bg-surface text-txt text-sm focus:ring-2 focus:ring-magma/20 focus:border-magma"
-                >
-                  {currentModels.map((m) => (
-                    <option key={m.id} value={m.id}>{m.name} — {m.description}</option>
-                  ))}
-                </select>
-              </div>
-              <SaveButton saving={saving} saved={saved} onClick={handleSave} />
-            </div>
-          )}
-          {error && <p className="text-xs text-red-500 dark:text-red-400 mt-2">{error}</p>}
+        <div className="flex-1 min-w-0 flex items-center">
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+            <LockClosedIcon className="w-3.5 h-3.5" />
+            {t('settings.configFileHint')}
+          </span>
         </div>
       </div>
     </div>
@@ -356,13 +339,7 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
 
 // ─── Main Settings Page ───────────────────────────────────────────────────────
 
-type RoleKey = 'semantic_llm' | 'vision_llm' | 'agent_llm';
-
-const EMPTY_ROLES = {
-  semantic_llm: { provider: '', model: '' },
-  vision_llm:   { provider: '', model: '' },
-  agent_llm:    { provider: '', model: '' },
-};
+const EMPTY_AGENT_LLM: AgentLlmConfig = { llm_provider: '', model: '', base_url: '', api_key_masked: null };
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -370,49 +347,35 @@ export function SettingsPage() {
 
   const [loading,   setLoading]   = useState(true);
   const [providers, setProviders] = useState<LLMProvider[]>([]);
-  const [models,    setModels]    = useState<Record<string, LLMModel[]>>({});
-  const [roles,     setRoles]     = useState(EMPTY_ROLES);
+  const [agentLlm,  setAgentLlm]  = useState<AgentLlmConfig>(EMPTY_AGENT_LLM);
 
-  const loadRoles = useCallback(() => {
+  // Load the V1 agent config surface: the provider catalog (GET /config/providers)
+  // and the current agent_llm (GET /config). Both degrade to empty on failure so the
+  // page renders without throwing (the removed /config/llm/roles call used to 404).
+  const loadConfig = useCallback(() => {
     setLoading(true);
-    fetch(`${AGENT_URL}/config/llm/roles`)
-      .then((r) => r.json())
-      .then((data: LLMRolesResponse) => {
-        setProviders(data.providers ?? []);
-        setModels(data.models ?? {});
-        setRoles({ ...EMPTY_ROLES, ...(data.roles ?? {}) });
+    Promise.all([
+      fetch(`${AGENT_URL}/config/providers`)
+        .then((r) => (r.ok ? r.json() : { providers: [] }))
+        .catch(() => ({ providers: [] })),
+      fetch(`${AGENT_URL}/config`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+    ])
+      .then(([cat, cfg]: [{ providers?: LLMProvider[] }, AgentLlmConfig | null]) => {
+        setProviders(cat.providers ?? []);
+        if (cfg) setAgentLlm({ ...EMPTY_AGENT_LLM, ...cfg });
       })
-      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { loadRoles(); }, [loadRoles]);
+  useEffect(() => { loadConfig(); }, [loadConfig]);
 
-  // After a provider key is saved, refresh the full providers list so role
-  // dropdowns immediately show the newly-configured provider.
-  const handleProviderSaved = (_id: string) => {
-    fetch(`${AGENT_URL}/config/llm/roles`)
-      .then((r) => r.json())
-      .then((data: LLMRolesResponse) => {
-        setProviders(data.providers ?? []);
-        setModels(data.models ?? {});
-      })
-      .catch(() => {});
+  const handleAgentLlmSaved = (provider: string, model: string) => {
+    setAgentLlm((prev) => ({ ...prev, llm_provider: provider, model }));
   };
 
-  const handleSaveRole = (role: RoleKey) => async (provider: string, model: string) => {
-    const resp = await fetch(`${AGENT_URL}/config/llm/roles/${role}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, model }),
-    });
-    if (!resp.ok) throw new Error(await resp.text() || resp.statusText);
-    setRoles((prev) => ({ ...prev, [role]: { provider, model } }));
-  };
-
-  // Only configured providers appear in role dropdowns
-  const configuredProviders = providers.filter((p) => p.configured);
-  const semanticEnabled     = !!systemStatus?.llm_enabled;
+  const semanticEnabled = !!systemStatus?.llm_enabled;
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
@@ -427,18 +390,18 @@ export function SettingsPage() {
         </div>
       </div>
 
-      {/* ── Section 1: Provider API Keys ── */}
+      {/* ── Section 1: Provider catalog (read-only) ── */}
       <Section icon={<KeyIcon className="w-4 h-4" />} title={t('settings.providerSection')}>
-        <p className="text-xs text-muted mb-4">{t('settings.providerSectionDesc')}</p>
+        <p className="text-xs text-muted mb-4">{t('settings.providerCatalogDesc')}</p>
         {loading ? (
           <div className="flex items-center gap-2 text-muted py-4">
             <ArrowPathIcon className="w-4 h-4 animate-spin" />
             <span className="text-sm">{t('common.loading')}</span>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {providers.map((p) => (
-              <ProviderConfigCard key={p.id} provider={p} onSaved={handleProviderSaved} />
+              <ProviderCatalogCard key={p.id} provider={p} active={p.id === agentLlm.llm_provider} />
             ))}
           </div>
         )}
@@ -453,39 +416,18 @@ export function SettingsPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            <LLMRoleCard
+            <AgentLlmCard providers={providers} current={agentLlm} onSaved={handleAgentLlmSaved} />
+            <ReadOnlyRoleCard
               icon={<CpuChipIcon className="w-5 h-5" />}
               roleKey="semantic_llm"
               title={t('settings.semanticLlmTitle')}
               description={t('settings.semanticLlmDesc')}
-              provider={roles.semantic_llm.provider}
-              model={roles.semantic_llm.model}
-              providers={configuredProviders}
-              models={models}
-              onSave={handleSaveRole('semantic_llm')}
             />
-            <LLMRoleCard
+            <ReadOnlyRoleCard
               icon={<EyeIcon className="w-5 h-5" />}
               roleKey="vision_llm"
               title={t('settings.visionLlmTitle')}
               description={t('settings.visionLlmDesc')}
-              provider={roles.vision_llm.provider}
-              model={roles.vision_llm.model}
-              providers={configuredProviders}
-              models={models}
-              visionOnly={true}
-              onSave={handleSaveRole('vision_llm')}
-            />
-            <LLMRoleCard
-              icon={<ChatBubbleLeftRightIcon className="w-5 h-5" />}
-              roleKey="agent_llm"
-              title={t('settings.agentLlmTitle')}
-              description={t('settings.agentLlmDesc')}
-              provider={roles.agent_llm.provider}
-              model={roles.agent_llm.model}
-              providers={configuredProviders}
-              models={models}
-              onSave={handleSaveRole('agent_llm')}
             />
           </div>
         )}
@@ -548,10 +490,7 @@ export function SettingsPage() {
         </div>
       </Section>
 
-      {/* ── Section 7: API Keys (P08 Bootstrap — framework only, R1-S1) ──
-          Scaffold for user-level API key management. The full flow (Bootstrap
-          URL -> useAuthStore -> LoginPage -> list/create/revoke) lands in
-          P02a-R3/S5 (P02a design § 9.3). R1 only stands up the section shell. */}
+      {/* ── Section 7: API Keys (P02a § 9.3 — user-level API keys, P08 § 2.13.3) ── */}
       <ApiKeysSection />
     </div>
   );
