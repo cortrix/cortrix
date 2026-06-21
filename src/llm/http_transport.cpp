@@ -5,6 +5,8 @@
 
 #include <httplib.h>
 
+#include "cortrix/logging/logging.h"
+
 namespace cortrix::llm {
 
 namespace {
@@ -69,6 +71,12 @@ public:
         if (!result) {
             // DNS / connect / TLS / timeout — no HTTP status. network_ok stays false.
             resp.transport_error = httplib::to_string(result.error());
+            // Surface the low-level transport reason (it was previously swallowed when
+            // callers remap to a generic timeout/unavailable — e.g. MEM02 reported
+            // "extraction timed out" for an instant TLS/connect failure).
+            CORTRIX_LOG_WARN("llm", "transport failure: {} {} -> {}",
+                             request.method == HttpMethod::kGet ? "GET" : "POST",
+                             split.base, resp.transport_error);
             return resp;
         }
         resp.network_ok = true;
