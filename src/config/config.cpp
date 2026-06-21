@@ -64,11 +64,8 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
                 if (key_node["tenant_id"]) kc.tenant_id = key_node["tenant_id"].as<std::string>();
                 if (key_node["permissions"]) kc.permissions = key_node["permissions"].as<int>();
                 if (key_node["expires_at"]) kc.expires_at = key_node["expires_at"].as<int64_t>();
-                if (key_node["allowed_namespaces"]) {
-                    for (const auto& ns : key_node["allowed_namespaces"]) {
-                        kc.allowed_namespaces.push_back(ns.as<std::string>());
-                    }
-                }
+                // allowed_namespaces removed (ARCHITECTURE V6): namespace authz is
+                // runtime PermissionService::BatchCheck, not a static per-key list.
                 config.auth.api_keys.push_back(std::move(kc));
             }
         }

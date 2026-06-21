@@ -66,7 +66,11 @@ private:
 
     // F12 single-SoT accessors: read/delete through the catalog router when
     // injected (creation already does), legacy NamespaceManager otherwise.
-    nlohmann::json BuildNamespaceListJson(const std::vector<std::string>& allowed);
+    // `filter`=false lists every namespace (no-auth dev mode). `filter`=true
+    // restricts the result to `allowed` (the principal's authorized set from
+    // PermissionService::ListAuthorizedNamespaces); an empty `allowed` under
+    // filter mode lists NONE (deny-by-default), not all.
+    nlohmann::json BuildNamespaceListJson(const std::vector<std::string>& allowed, bool filter);
     Status BuildNamespaceJson(const std::string& name, nlohmann::json* out);
     Status DeleteNamespaceUnified(const std::string& name);
 

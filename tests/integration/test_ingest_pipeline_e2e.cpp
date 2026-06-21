@@ -184,9 +184,16 @@ class IngestPipelineE2E : public ::testing::Test {
           return c;
         });
 
-    // Admit both namespaces through the real catalog router.
-    ASSERT_TRUE(h_->CreateNamespace(kNsDedupOn).ok());
-    ASSERT_TRUE(h_->CreateNamespace(kNsDedupOff).ok());
+    // Admit both namespaces through the real catalog router, OWNED BY the tenant
+    // of the API key these tests upload/query with. [V6] Namespace authorization is
+    // now runtime PermissionService::BatchCheck (no static per-key allow-list): a
+    // caller is authorized iff the namespace's owner_tenant_id == its
+    // AuthContext.tenant_id. These tests drive the routes with h_->user_key(), whose
+    // tenant_id is "alice" (MakeKey sets tenant_id == the key's user name). So the
+    // namespaces MUST be owned by "alice" — CreateNamespace() owns by
+    // "default_tenant", which alice is NOT authorized for (would 403 at upload).
+    ASSERT_TRUE(h_->CreateNamespaceOwnedBy(kNsDedupOn, "alice").ok());
+    ASSERT_TRUE(h_->CreateNamespaceOwnedBy(kNsDedupOff, "alice").ok());
 
     // Register the HTTP routes this E2E drives.
     cortrix::RegisterDocumentRoutes(h_->server(), h_->upload_handler(), h_->pool(),

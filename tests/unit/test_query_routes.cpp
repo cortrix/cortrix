@@ -14,6 +14,9 @@
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/logging/logging.h"
 #include "ns_pool_test_helper.h"  // [wire⑤c] F05 NsPoolHarness replaces MVP NamespaceManager
+// [V6] Runtime namespace authorization seam over a real PermissionService
+// (the static per-key allow-list / can_access_namespace was removed).
+#include "unit/namespace_authz_test_helper.h"
 
 using json = nlohmann::json;
 
@@ -43,14 +46,14 @@ protected:
         kc.expires_at = 0;
         config_.auth.api_keys.push_back(kc);
 
-        // Restricted key (no namespace access)
+        // Restricted key: a different tenant that owns no test namespace, so its
+        // query to "default" is denied by the real PermissionService (403).
         restricted_key_ = "restricted-key";
         auto rhash = ApiKeyAuth::HashKey(restricted_key_);
         ApiKeyConfig rkc;
         rkc.key_hash = rhash;
         rkc.tenant_id = "restricted-tenant";
         rkc.permissions = kPermRead;
-        rkc.allowed_namespaces = {"other-namespace"};  // Cannot access "default"
         rkc.expires_at = 0;
         config_.auth.api_keys.push_back(rkc);
 
@@ -59,6 +62,17 @@ protected:
         // [wire⑤c] F05 NS resource pool replaces the MVP NamespaceManager +
         // CortrixNamespaceManager (RegisterQueryRoutes now takes INamespacePool&).
         harness_ = std::make_unique<test::NsPoolHarness>(tmp_dir_);
+
+        // [V6] Real PermissionService authz: seed every namespace the admin key
+        // (tenant "test-tenant") queries so it is an authorized principal. The
+        // ones admitted into the pool in test bodies (testns / rt-ns / gr-ns /
+        // ex-ns / ...) return 200/503; "nonexistent-namespace" is authorized but
+        // never admitted → facade miss → 404 NOT_FOUND for an authorized caller.
+        // "restricted-tenant" owns none of these, so its query to "default" → 403.
+        authz_ = std::make_unique<test::NamespaceAuthzHarness>(
+            auth_, &harness_->pool(), "test-tenant",
+            std::vector<std::string>{"default", "testns", "nonexistent-namespace",
+                                     "rt-ns", "gr-ns", "ex-ns", "ex1-ns", "exf-ns"});
 
         // Initialize embedder and classifier
         embedder_ = std::make_unique<OnnxEmbedder>("fake.onnx", 128);
@@ -101,6 +115,7 @@ protected:
     CortrixConfig config_;
     ApiKeyAuth auth_;
     std::unique_ptr<test::NsPoolHarness> harness_;
+    std::unique_ptr<test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<OnnxEmbedder> embedder_;
     std::unique_ptr<IntentClassifier> classifier_;
     std::unique_ptr<RRFFusion> fusion_;
@@ -171,8 +186,10 @@ TEST_F(QueryRoutesIntegrationTest, NamespaceAccessDenied_Returns403) {
     EXPECT_EQ(res->status, 403);
 
     auto body = json::parse(res->body);
-    // Per API_GATEWAY_DESIGN.md section 2.5.2: namespace access denied -> NAMESPACE_DENIED
-    EXPECT_EQ(body["error"]["code"], "NAMESPACE_DENIED");
+    // Anti-enumeration (F04 issue 2.6): denied/not-found share the canonical
+    // CX_ERR_NS_UNAUTHORIZED identity, and the namespace name is never echoed.
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_NS_UNAUTHORIZED");
+    EXPECT_EQ(body["error"]["message"], "CX_ERR_NS_UNAUTHORIZED");
     // Per API_GATEWAY_DESIGN.md section 2.5.1: all error responses must include timestamp
     EXPECT_TRUE(body["error"].contains("timestamp"));
 }

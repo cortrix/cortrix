@@ -16,7 +16,6 @@ protected:
         kc.tenant_id = "tenant_001";
         kc.permissions = kPermRead | kPermWrite | kPermAdmin;
         kc.expires_at = 0;  // never expires
-        kc.allowed_namespaces = {};
 
         auth_.LoadKeys({kc});
     }
@@ -104,16 +103,17 @@ TEST_F(ApiKeyAuthTest, AuthenticateWithNamespaces) {
     kc.key_hash = hash;
     kc.tenant_id = "tenant_ns";
     kc.permissions = kPermRead;
-    kc.allowed_namespaces = {"ns1", "ns2"};
 
     auth_.LoadKeys({kc});
 
+    // Authenticate fills the principal identity; namespace scope is no longer
+    // carried on the key (ARCHITECTURE V6) -- it is resolved at Authorize time by
+    // the PermissionService seam.
     AuthContext ctx;
     Status s = auth_.Authenticate(key, &ctx);
     EXPECT_TRUE(s.ok());
-    EXPECT_EQ(ctx.namespaces.size(), 2u);
-    EXPECT_EQ(ctx.namespaces[0], "ns1");
-    EXPECT_EQ(ctx.namespaces[1], "ns2");
+    EXPECT_EQ(ctx.tenant_id, "tenant_ns");
+    EXPECT_EQ(ctx.permissions, kPermRead);
 }
 
 TEST_F(ApiKeyAuthTest, AuthorizeReadPermission) {
@@ -141,37 +141,51 @@ TEST_F(ApiKeyAuthTest, AuthorizeWriteInsufficient) {
     EXPECT_EQ(s.message(), "WRITE permission required");
 }
 
-TEST_F(ApiKeyAuthTest, AuthorizeNamespaceAllowed) {
+// Namespace authorization now delegates to the runtime PermissionService seam
+// (ARCHITECTURE V6). These tests install a lambda authorizer to verify Authorize
+// honors it; production wires the seam to PermissionService::BatchCheck.
+TEST_F(ApiKeyAuthTest, AuthorizeNamespaceAllowedViaSeam) {
+    auth_.SetNamespaceAuthorizer(
+        [](const AuthContext&, const std::string& ns) { return ns == "ns1" || ns == "ns2"; });
     AuthContext ctx;
     ctx.permissions = kPermRead;
-    ctx.namespaces = {"ns1", "ns2"};
-    Status s = auth_.Authorize(ctx, "ns1", kPermRead);
-    EXPECT_TRUE(s.ok());
+    EXPECT_TRUE(auth_.Authorize(ctx, "ns1", kPermRead).ok());
 }
 
-TEST_F(ApiKeyAuthTest, AuthorizeNamespaceDenied) {
+TEST_F(ApiKeyAuthTest, AuthorizeNamespaceDeniedViaSeam) {
+    auth_.SetNamespaceAuthorizer(
+        [](const AuthContext&, const std::string& ns) { return ns == "ns1" || ns == "ns2"; });
     AuthContext ctx;
     ctx.permissions = kPermRead;
-    ctx.namespaces = {"ns1", "ns2"};
     Status s = auth_.Authorize(ctx, "ns3", kPermRead);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kPermissionDenied);
-    EXPECT_EQ(s.message(), "Access denied for namespace 'ns3'");
+    // Anti-enumeration (F04 issue 2.6): denial returns the canonical identity
+    // and never echoes the namespace name back to the caller.
+    EXPECT_EQ(s.message(), "CX_ERR_NS_UNAUTHORIZED");
 }
 
-TEST_F(ApiKeyAuthTest, AuthorizeEmptyNamespaceList) {
+// With no authorizer installed the namespace is left ungated (e.g. routes that
+// carry no namespace; no-auth dev mode short-circuits before Authorize anyway).
+TEST_F(ApiKeyAuthTest, AuthorizeNoSeamLeavesNamespaceUngated) {
     AuthContext ctx;
     ctx.permissions = kPermRead;
-    ctx.namespaces = {};  // empty = all allowed
-    Status s = auth_.Authorize(ctx, "any-ns", kPermRead);
-    EXPECT_TRUE(s.ok());
+    EXPECT_TRUE(auth_.Authorize(ctx, "any-ns", kPermRead).ok());
+}
+
+// An empty namespace parameter skips the namespace check entirely (the route has
+// no namespace to gate), even when the authorizer would deny everything.
+TEST_F(ApiKeyAuthTest, AuthorizeEmptyNamespaceParamSkipsSeam) {
+    auth_.SetNamespaceAuthorizer([](const AuthContext&, const std::string&) { return false; });
+    AuthContext ctx;
+    ctx.permissions = kPermRead;
+    EXPECT_TRUE(auth_.Authorize(ctx, "", kPermRead).ok());
 }
 
 TEST_F(ApiKeyAuthTest, AuthorizeEmptyNamespaceParam) {
     AuthContext ctx;
     ctx.permissions = kPermRead;
-    ctx.namespaces = {"ns1"};
-    // Empty namespace param should skip namespace check
+    // Empty namespace param should skip the namespace check entirely.
     Status s = auth_.Authorize(ctx, "", kPermRead);
     EXPECT_TRUE(s.ok());
 }
@@ -262,14 +276,6 @@ TEST_F(ApiKeyAuthTest, HashKeyEmptyInput) {
     EXPECT_EQ(hash, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
 }
 
-TEST_F(ApiKeyAuthTest, AuthContextCanAccessNamespaceWildcard) {
-    // Empty namespace list = wildcard access to all namespaces
-    AuthContext ctx;
-    ctx.namespaces = {};
-    EXPECT_TRUE(ctx.can_access_namespace("anything"));
-    EXPECT_TRUE(ctx.can_access_namespace("ns1"));
-}
-
 TEST_F(ApiKeyAuthTest, AuthContextPermissionHelpers) {
     AuthContext ctx;
     ctx.permissions = kPermRead | kPermWrite;
@@ -284,10 +290,11 @@ TEST_F(ApiKeyAuthTest, AuthContextPermissionHelpers) {
 }
 
 TEST_F(ApiKeyAuthTest, AuthorizeNamespaceCaseSensitive) {
-    // Namespace matching should be case-sensitive
+    // Namespace matching is case-sensitive (delegated to the authorizer seam).
+    auth_.SetNamespaceAuthorizer(
+        [](const AuthContext&, const std::string& ns) { return ns == "MyNs"; });
     AuthContext ctx;
     ctx.permissions = kPermRead;
-    ctx.namespaces = {"MyNs"};
     EXPECT_TRUE(auth_.Authorize(ctx, "MyNs", kPermRead).ok());
     EXPECT_FALSE(auth_.Authorize(ctx, "myns", kPermRead).ok());
     EXPECT_FALSE(auth_.Authorize(ctx, "MYNS", kPermRead).ok());
@@ -342,10 +349,12 @@ TEST_F(ApiKeyAuthTest, LoadKeysMultipleKeys) {
 }
 
 TEST_F(ApiKeyAuthTest, AuthorizeMultipleNamespaces) {
-    // Verify access against a longer namespace list
+    // Verify access against an authorizer that grants a set of namespaces.
+    auth_.SetNamespaceAuthorizer([](const AuthContext&, const std::string& ns) {
+        return ns == "ns1" || ns == "ns2" || ns == "ns3" || ns == "ns4" || ns == "ns5";
+    });
     AuthContext ctx;
     ctx.permissions = kPermRead;
-    ctx.namespaces = {"ns1", "ns2", "ns3", "ns4", "ns5"};
 
     EXPECT_TRUE(auth_.Authorize(ctx, "ns3", kPermRead).ok());
     EXPECT_TRUE(auth_.Authorize(ctx, "ns5", kPermRead).ok());
@@ -401,12 +410,17 @@ TEST_F(ApiKeyAuthTest, EmptyKeyErrorCode) {
 }
 
 TEST_F(ApiKeyAuthTest, NamespaceDeniedErrorCode) {
-    // Per API_GATEWAY_DESIGN.md section 2.5.2: namespace denied -> NAMESPACE_DENIED
+    // Anti-enumeration (F04 issue 2.6): namespace denial now carries the single
+    // canonical CX_ERR_NS_UNAUTHORIZED identity in the message (extracted into the
+    // envelope code by ResolveError), and never echoes the namespace name -- so a
+    // scoped caller cannot probe which namespaces exist.
+    auth_.SetNamespaceAuthorizer(
+        [](const AuthContext&, const std::string& ns) { return ns == "ns1"; });
     AuthContext ctx;
     ctx.permissions = kPermRead;
-    ctx.namespaces = {"ns1"};
     Status s = auth_.Authorize(ctx, "ns99", kPermRead);
-    EXPECT_EQ(s.error_code_string(), "NAMESPACE_DENIED");
+    EXPECT_FALSE(s.ok());
+    EXPECT_EQ(s.message(), "CX_ERR_NS_UNAUTHORIZED");
 }
 
 TEST_F(ApiKeyAuthTest, PermissionDeniedErrorCode) {

@@ -139,10 +139,13 @@ void RegisterQueryRoutes(
                 return;
             }
 
-            // Step 3: Namespace access check
-            if (!ctx.auth.can_access_namespace(query_req.namespace_name)) {
-                WriteJsonError(res, Status::PermissionDenied(
-                    "Access denied for namespace '" + query_req.namespace_name + "'"), ctx.request_id);
+            // Step 3: Namespace access check via the runtime PermissionService
+            // seam (ARCHITECTURE V6). Anti-enumeration (F04 issue 2.6):
+            // unauthorized and not-found share CX_ERR_NS_UNAUTHORIZED, and the
+            // namespace name is never echoed back (no existence oracle).
+            if (!auth.Authorize(ctx.auth, query_req.namespace_name, kPermRead).ok()) {
+                WriteJsonError(res, Status::PermissionDenied("CX_ERR_NS_UNAUTHORIZED"),
+                               ctx.request_id);
                 return;
             }
 

@@ -45,6 +45,7 @@
 #include "cortrix/query/intent_classifier.h"
 #include "cortrix/query/rrf_fusion.h"
 #include "ns_pool_test_helper.h"  // [wire⑤c] F05 NsPoolHarness replaces MVP NamespaceManager
+#include "unit/namespace_authz_test_helper.h"  // [V6] runtime NS-authz seam over a real PermissionService
 
 namespace cortrix {
 namespace {
@@ -103,6 +104,19 @@ protected:
         // CortrixNamespaceManager. All route groups now take INamespacePool&;
         // tests admit each namespace via harness_->Admit(ns) instead of Create.
         harness_ = std::make_unique<test::NsPoolHarness>(tmp_dir_);
+
+        // [V6] Runtime namespace authorization: a real PermissionService over an
+        // in-memory catalog. All three keys share tenant "e2e", so every namespace
+        // these tests exercise is seeded as owned by "e2e" (ownership hot path →
+        // CanRead/CanWrite true). The "no_such_ns" / "ghost_ns" probes are
+        // intentionally NOT seeded so they still resolve to 404.
+        authz_ = std::make_unique<cortrix::test::NamespaceAuthzHarness>(
+            *auth_, &harness_->pool(), "e2e",
+            std::vector<std::string>{
+                "user_proj", "auth_test", "dedup_test", "proj_alpha", "proj_beta",
+                "conc_test", "qval_test", "list_test", "msearch_test", "mime_test",
+                "unicode_test", "trunc_test", "empty_test", "multi_test",
+                "recreate_test", "meta_test", "inject_test"});
 
         embedder_ = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
         embedder_->Init();
@@ -170,6 +184,7 @@ protected:
     fs::path tmp_dir_;
     std::unique_ptr<ApiKeyAuth> auth_;
     std::unique_ptr<test::NsPoolHarness> harness_;
+    std::unique_ptr<cortrix::test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<OnnxEmbedder> embedder_;
     std::unique_ptr<IntentClassifier> classifier_;
     std::unique_ptr<RRFFusion> fusion_;
@@ -511,12 +526,21 @@ TEST_F(FullServerE2ETest, QueryParameterValidation) {
     ASSERT_TRUE(r2);
     EXPECT_EQ(r2->status, 400);
 
-    // Nonexistent namespace → 404
+    // Nonexistent namespace → 403 CX_ERR_NS_UNAUTHORIZED (ARCHITECTURE V6
+    // anti-enumeration, F04 issue 2.6). The empty-query / missing-namespace probes
+    // above still return 400 because request validation runs BEFORE the authz check;
+    // but once the request shape is valid, the query route runs the runtime
+    // PermissionService authz check before acquiring the namespace. "no_such_ns" is
+    // intentionally not seeded as owned by tenant "e2e", so ownership denies — and an
+    // unauthorized vs non-existent namespace are indistinguishable (both 403, same
+    // code, name never echoed). Existence is not leaked via a 404 oracle.
     auto r3 = cli.Post("/api/v1/query", Admin(),
                        json({{"query","test"},{"namespace","no_such_ns"}}).dump(),
                        "application/json");
     ASSERT_TRUE(r3);
-    EXPECT_EQ(r3->status, 404);
+    EXPECT_EQ(r3->status, 403);
+    auto r3body = json::parse(r3->body);
+    EXPECT_EQ(r3body["error"]["code"].get<std::string>(), "CX_ERR_NS_UNAUTHORIZED");
 
     // Valid query on empty namespace → 200 or 503
     auto r4 = cli.Post("/api/v1/query", Admin(),
@@ -872,20 +896,38 @@ TEST_F(FullServerE2ETest, InjectMultipleTurns) {
 TEST_F(FullServerE2ETest, NamespaceNotFoundAllRoutes) {
     httplib::Client cli("127.0.0.1", port_);
 
-    // Upload to nonexistent namespace → 404
+    // Upload to a nonexistent namespace → 403 CX_ERR_NS_UNAUTHORIZED (ARCHITECTURE
+    // V6 anti-enumeration, F04 issue 2.6). WithAuth extracts the :name path param and
+    // runs the runtime PermissionService authz check (auth.Authorize) BEFORE the
+    // handler ever acquires the namespace. "ghost_ns" is not seeded as owned by
+    // tenant "e2e", so the ownership check denies — an UNAUTHORIZED and a
+    // NON-EXISTENT namespace are indistinguishable to the caller (both 403, same
+    // code, name never echoed). Existence is not leaked via a 404 oracle.
     httplib::MultipartFormDataItems items = {
         {"file", "test", "test.txt", "text/plain"},
     };
     auto r1 = cli.Post("/api/v1/namespaces/ghost_ns/documents", Admin(), items);
     ASSERT_TRUE(r1);
-    EXPECT_EQ(r1->status, 404);
+    EXPECT_EQ(r1->status, 403);
+    auto r1body = json::parse(r1->body);
+    EXPECT_EQ(r1body["error"]["code"].get<std::string>(), "CX_ERR_NS_UNAUTHORIZED");
 
-    // Query nonexistent namespace → 404
+    // Query a nonexistent namespace → 403 CX_ERR_NS_UNAUTHORIZED (ARCHITECTURE V6
+    // anti-enumeration, F04 issue 2.6). The query route runs the runtime
+    // PermissionService authz check (auth.Authorize) BEFORE acquiring the namespace:
+    // an UNAUTHORIZED and a NON-EXISTENT namespace are INDISTINGUISHABLE to the
+    // caller — both 403 with the same code, and the namespace name is never echoed
+    // back. "ghost_ns" is intentionally not seeded as owned by tenant "e2e", so the
+    // ownership check denies before the not-found path is ever reached. This is the
+    // design-correct behavior (it STRENGTHENS anti-enumeration: existence is not
+    // leaked via a 404-vs-403 oracle).
     auto r2 = cli.Post("/api/v1/query", Admin(),
                        json({{"query","test"},{"namespace","ghost_ns"}}).dump(),
                        "application/json");
     ASSERT_TRUE(r2);
-    EXPECT_EQ(r2->status, 404);
+    EXPECT_EQ(r2->status, 403);
+    auto r2body = json::parse(r2->body);
+    EXPECT_EQ(r2body["error"]["code"].get<std::string>(), "CX_ERR_NS_UNAUTHORIZED");
 }
 
 }  // namespace

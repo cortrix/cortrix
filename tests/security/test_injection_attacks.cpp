@@ -21,6 +21,7 @@
 #include "cortrix/auth/api_key_auth.h"
 #include "cortrix/auth/auth_context.h"
 #include "cortrix/config/config.h"
+#include "unit/namespace_authz_test_helper.h"
 #include "unit/ns_pool_test_helper.h"
 #include "cortrix/query/query_routes.h"
 #include "cortrix/query/rrf_fusion.h"
@@ -234,6 +235,13 @@ protected:
         kc.permissions = kPermRead | kPermWrite | kPermAdmin;
         auth_->LoadKeys({kc});
 
+        // ARCHITECTURE V6: grant the test key access to "default" (the namespace
+        // the HTTP injection probes target) via a REAL PermissionService seam,
+        // seeding "default" as owned by the key's tenant.
+        authz_ = std::make_unique<cortrix::test::NamespaceAuthzHarness>(
+            *auth_, &harness_->ipool(), "sec-tenant",
+            std::vector<std::string>{"default"});
+
         embedder_ = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
         embedder_->Init();
         LlmConfig llm_cfg;
@@ -288,6 +296,7 @@ protected:
     fs::path tmp_dir_;
     std::unique_ptr<test::NsPoolHarness> harness_;
     std::unique_ptr<ApiKeyAuth> auth_;
+    std::unique_ptr<cortrix::test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<OnnxEmbedder> embedder_;
     std::unique_ptr<IntentClassifier> classifier_;
     std::unique_ptr<RRFFusion> fusion_;

@@ -81,6 +81,7 @@
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/store/iindex_factory.h"
 #include "cortrix/store/write_coordinator.h"
+#include "cortrix/tenant/permission_service.h"   // [V6] runtime NS-authz over the real catalog
 
 // SPC (only needed by BuildIngest, but cheap to include).
 #include <iterator>
@@ -244,6 +245,31 @@ class FullStackE2E {
         MakeKey(user_key_, "alice", kPermRead | kPermWrite),
         MakeKey(other_key_, "mallory", kPermRead | kPermWrite),
     });
+
+    // [V6] Runtime namespace authorization wired DIRECTLY over the harness's own
+    // real catalog db (the same handle CreateNamespace inserts into). A namespace
+    // created via the real router with tenant T (CreateNamespace uses
+    // "default_tenant"; CreateNamespaceOwnedBy uses an explicit owner) authorizes
+    // for the key whose AuthContext.tenant_id == that owner — exactly the
+    // production ownership hot path (no static allow-list).
+    perm_svc_ = std::make_unique<cortrix::tenant::PermissionService>(
+        catalog_db_->db());
+    auth_->SetNamespaceAuthorizer(
+        [this](const cortrix::AuthContext& ctx, const std::string& ns) -> bool {
+          auto c = perm_svc_->BatchCheck(ctx, {ns});
+          return !c.empty() && c.front().can_read;
+        });
+    auth_->SetNamespaceLister(
+        [this](const cortrix::AuthContext& ctx) -> std::vector<std::string> {
+          std::vector<std::string> active =
+              pool_->GetExplainState().active_namespaces;
+          if (active.empty()) return active;
+          auto c = perm_svc_->BatchCheck(ctx, active);
+          std::vector<std::string> out;
+          for (auto& x : c)
+            if (x.can_read) out.push_back(x.ns_id);
+          return out;
+        });
 
     server_ = std::make_unique<httplib::Server>();
   }
@@ -427,6 +453,8 @@ class FullStackE2E {
     k.key_hash = ApiKeyAuth::HashKey(plaintext);
     k.tenant_id = tenant;  // -> AuthContext.user_id (MVP user_id == tenant_id)
     k.permissions = perms;
+    // [V6] No static allow-list: namespace authorization is the runtime
+    // PermissionService seam wired in BuildCore() over the real catalog.
     return k;
   }
 
@@ -467,6 +495,10 @@ class FullStackE2E {
   cortrix::resource::F05Config f05_config_;
   std::unique_ptr<cortrix::resource::DefaultNamespacePool> pool_;
   std::unique_ptr<ApiKeyAuth> auth_;
+  // [V6] Runtime NS-authz service over catalog_db_ (borrowed handle); the seams
+  // installed on auth_ capture `this` and call through it. Declared after pool_/
+  // auth_ so it tears down before the catalog db it borrows.
+  std::unique_ptr<cortrix::tenant::PermissionService> perm_svc_;
 
   // SPC (BuildIngest only).
   cortrix::SPCConfig spc_config_;

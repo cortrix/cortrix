@@ -3,6 +3,12 @@ add_executable(cortrix_security_tests
     test_auth_bypass.cpp
     test_namespace_crossing.cpp
     test_malformed_input.cpp
+    # --- coverage Wave 2: systematic security matrices ---
+    test_sec_anti_enumeration.cpp
+    test_sec_rbac_matrix.cpp
+    test_sec_jwt_hardening.cpp
+    test_sec_injection_ext.cpp
+    test_sec_tenant_isolation.cpp
 )
 
 target_link_libraries(cortrix_security_tests PRIVATE

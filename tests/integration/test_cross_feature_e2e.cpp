@@ -64,6 +64,7 @@
 // [wire⑤c] F05 NsPoolHarness replaces the MVP NamespaceManager +
 // CortrixNamespaceManager (Register*Routes now take resource::INamespacePool&).
 #include "ns_pool_test_helper.h"
+#include "unit/namespace_authz_test_helper.h"  // [V6] runtime NS-authz seam over a real PermissionService
 
 namespace cortrix {
 namespace {
@@ -314,6 +315,13 @@ protected:
         kc.permissions = kPermRead | kPermWrite | kPermAdmin;
         auth_->LoadKeys({kc});
 
+        // [V6] Runtime namespace authorization: real PermissionService over an
+        // in-memory catalog. The key's tenant is "e2e-tenant"; these tests only
+        // use the "default" namespace, seeded as owned by that tenant.
+        authz_ = std::make_unique<cortrix::test::NamespaceAuthzHarness>(
+            *auth_, &harness_->pool(), "e2e-tenant",
+            std::vector<std::string>{"default"});
+
         embedder_ = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
         embedder_->Init();
         LlmConfig llm_cfg;
@@ -368,6 +376,7 @@ protected:
     fs::path tmp_dir_;
     std::unique_ptr<test::NsPoolHarness> harness_;
     std::unique_ptr<ApiKeyAuth> auth_;
+    std::unique_ptr<cortrix::test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<OnnxEmbedder> embedder_;
     std::unique_ptr<IntentClassifier> classifier_;
     std::unique_ptr<RRFFusion> fusion_;
@@ -613,6 +622,13 @@ protected:
         kc.permissions = kPermRead | kPermWrite | kPermAdmin;
         auth_->LoadKeys({kc});
 
+        // [V6] Runtime namespace authorization: real PermissionService over an
+        // in-memory catalog. Key tenant "full-e2e"; "default" is the only
+        // namespace this fixture exercises, seeded as owned by that tenant.
+        authz_ = std::make_unique<cortrix::test::NamespaceAuthzHarness>(
+            *auth_, &harness_->pool(), "full-e2e",
+            std::vector<std::string>{"default"});
+
         embedder_ = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
         embedder_->Init();
         LlmConfig llm_cfg;
@@ -672,6 +688,7 @@ protected:
     fs::path tmp_dir_;
     std::unique_ptr<test::NsPoolHarness> harness_;
     std::unique_ptr<ApiKeyAuth> auth_;
+    std::unique_ptr<cortrix::test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<OnnxEmbedder> embedder_;
     std::unique_ptr<IntentClassifier> classifier_;
     std::unique_ptr<RRFFusion> fusion_;
@@ -843,6 +860,14 @@ protected:
         kc.permissions = kPermRead | kPermWrite | kPermAdmin;
         auth_->LoadKeys({kc});
 
+        // [V6] Runtime namespace authorization: real PermissionService over an
+        // in-memory catalog. Key tenant "ns-iso"; seed every namespace these
+        // isolation tests touch as owned by that tenant.
+        authz_ = std::make_unique<cortrix::test::NamespaceAuthzHarness>(
+            *auth_, &harness_->pool(), "ns-iso",
+            std::vector<std::string>{"project_alpha", "project_beta",
+                                     "ns_x", "ns_y"});
+
         embedder_ = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
         embedder_->Init();
         LlmConfig llm_cfg;
@@ -894,6 +919,7 @@ protected:
     fs::path tmp_dir_;
     std::unique_ptr<test::NsPoolHarness> harness_;
     std::unique_ptr<ApiKeyAuth> auth_;
+    std::unique_ptr<cortrix::test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<OnnxEmbedder> embedder_;
     std::unique_ptr<IntentClassifier> classifier_;
     std::unique_ptr<RRFFusion> fusion_;

@@ -16,6 +16,7 @@
 #include "cortrix/auth/api_key_auth.h"
 #include "cortrix/auth/auth_context.h"
 // [wire⑤c follow-up] MVP managers removed; fixture stands on the F05 pool.
+#include "unit/namespace_authz_test_helper.h"
 #include "unit/ns_pool_test_helper.h"
 #include "cortrix/memory/memory_routes.h"
 #include "cortrix/query/query_routes.h"
@@ -56,6 +57,13 @@ protected:
         kc.tenant_id = "malform-tenant";
         kc.permissions = kPermRead | kPermWrite | kPermAdmin;
         auth_->LoadKeys({kc});
+
+        // ARCHITECTURE V6: grant the test key access to "default" (the namespace
+        // every malformed-input probe targets) via a REAL PermissionService seam,
+        // seeding "default" as owned by the key's tenant.
+        authz_ = std::make_unique<cortrix::test::NamespaceAuthzHarness>(
+            *auth_, &harness_->ipool(), "malform-tenant",
+            std::vector<std::string>{"default"});
 
         embedder_ = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
         embedder_->Init();
@@ -108,6 +116,7 @@ protected:
     fs::path tmp_dir_;
     std::unique_ptr<test::NsPoolHarness> harness_;
     std::unique_ptr<ApiKeyAuth> auth_;
+    std::unique_ptr<cortrix::test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<OnnxEmbedder> embedder_;
     std::unique_ptr<IntentClassifier> classifier_;
     std::unique_ptr<RRFFusion> fusion_;

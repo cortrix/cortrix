@@ -20,6 +20,9 @@
 // CortrixNamespaceManager&). The shared harness stands up a real DefaultNamespacePool
 // (mocked F12 routers + FakeIndex + real WriteCoordinator over a temp dir).
 #include "ns_pool_test_helper.h"
+// [V6] Runtime namespace authorization seam over a real PermissionService
+// (the static per-key allow-list / can_access_namespace was removed).
+#include "unit/namespace_authz_test_helper.h"
 
 namespace cortrix {
 namespace {
@@ -62,7 +65,8 @@ protected:
         kc.permissions = kPermRead | kPermWrite | kPermAdmin;
         auth_->LoadKeys({kc});
 
-        // Read-only key
+        // Read-only key (different tenant; its only test asserts the WRITE perm
+        // gate fires with 403 before namespace authz is ever consulted).
         read_key_ = "docroute-readonly-key";
         ApiKeyConfig ro_kc;
         ro_kc.key_hash = ApiKeyAuth::HashKey(read_key_);
@@ -71,6 +75,17 @@ protected:
 
         // Load both keys
         auth_->LoadKeys({kc, ro_kc});
+
+        // [V6] Real PermissionService over an in-memory catalog. Seed every
+        // namespace the tests reach so the admin key (tenant "test-tenant") is an
+        // authorized principal. Only "default" is admitted into the F05 pool; the
+        // others ("nonexistent", "nonexistent-ns", "ghost-ns") are authorized but
+        // absent from the pool, so the facade miss yields the expected 404
+        // NOT_FOUND (a 404 for an authorized caller, not an anti-enumeration 403).
+        authz_ = std::make_unique<cortrix::test::NamespaceAuthzHarness>(
+            *auth_, &harness_->pool(), "test-tenant",
+            std::vector<std::string>{"default", "nonexistent", "nonexistent-ns",
+                                     "ghost-ns"});
 
         spc_ = std::make_unique<StubSPCManager>();
         handler_ = std::make_unique<UploadHandler>(config_.upload, *spc_);
@@ -106,6 +121,7 @@ protected:
     fs::path temp_dir_;
     std::unique_ptr<cortrix::test::NsPoolHarness> harness_;
     std::unique_ptr<ApiKeyAuth> auth_;
+    std::unique_ptr<cortrix::test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<StubSPCManager> spc_;
     std::unique_ptr<UploadHandler> handler_;
     std::unique_ptr<httplib::Server> server_;

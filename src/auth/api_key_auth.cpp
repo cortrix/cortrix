@@ -41,7 +41,6 @@ Status ApiKeyAuth::Authenticate(const std::string& bearer_token, AuthContext* co
                 context->tenant_id = "default";  // CE single tenant (R1 fallback)
                 context->user_id = v.value();    // owning user_id from api_keys row
                 context->agent_id = "";
-                context->namespaces.clear();     // empty = all-namespace access
                 context->permissions = kPermRead | kPermWrite | kPermAdmin;
                 return Status::Ok();
             }
@@ -64,7 +63,6 @@ Status ApiKeyAuth::Authenticate(const std::string& bearer_token, AuthContext* co
     context->tenant_id = kc.tenant_id;
     context->user_id = kc.tenant_id;  // MVP: user_id == tenant_id
     context->agent_id = "";
-    context->namespaces = kc.allowed_namespaces;
     context->permissions = kc.permissions;
 
     return Status::Ok();
@@ -82,9 +80,15 @@ Status ApiKeyAuth::Authorize(const AuthContext& ctx,
         return Status::PermissionDenied(perm_name + " permission required");
     }
 
-    // Check namespace access
-    if (!ns.empty() && !ctx.can_access_namespace(ns)) {
-        return Status::PermissionDenied("Access denied for namespace '" + ns + "'");
+    // Runtime namespace authorization (ARCHITECTURE V6): delegate to the
+    // PermissionService seam (ownership + ns_acl). Anti-enumeration (F04 issue
+    // 2.6): unauthorized and not-found share the single CX_ERR_NS_UNAUTHORIZED
+    // identity, and the namespace name is NEVER echoed back -- otherwise the
+    // 403/404 split and the echoed name would let a caller probe which
+    // namespaces exist. When no authorizer is installed the namespace is left
+    // ungated (routes with no namespace; no-auth dev mode short-circuits earlier).
+    if (!ns.empty() && ns_authz_ && !ns_authz_(ctx, ns)) {
+        return Status::PermissionDenied("CX_ERR_NS_UNAUTHORIZED");
     }
 
     return Status::Ok();

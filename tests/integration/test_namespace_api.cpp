@@ -43,6 +43,18 @@ protected:
 
         auth_.LoadKeys(config_.auth.api_keys);
 
+        // [V6] The per-key static allow-list was removed; namespace visibility is now
+        // a runtime seam. This MVP server stores namespaces in NamespaceManager (the
+        // F12 catalog the real PermissionService reads is not wired on this path), so
+        // the per-namespace gate stays ungated (admin tenant in single-tenant CE) and
+        // the authorized-set lister — consumed by GET /namespaces (filter=true) —
+        // resolves to the manager's namespaces, mirroring ListAuthorizedNamespaces.
+        auth_.SetNamespaceLister([this](const AuthContext&) {
+            std::vector<std::string> names;
+            for (const auto& ns : ns_mgr_->List({})) names.push_back(ns.name);
+            return names;
+        });
+
         server_ = std::make_unique<CortrixHttpServer>(config_, auth_, *ns_mgr_);
         server_->RegisterRoutes();
 

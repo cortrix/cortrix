@@ -668,6 +668,31 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::tenant::QuotaService quota_svc(
         std::make_shared<cortrix::tenant::UnlimitedPlanProvider>(), catalog_db.db());
 
+    // [ARCHITECTURE V6] Wire the runtime namespace-authorization seams into the
+    // auth middleware: every namespace gate (WithAuth -> ApiKeyAuth::Authorize,
+    // the query single-NS check, GET /namespaces list) now resolves through
+    // PermissionService::BatchCheck (ownership + ns_acl) instead of a static
+    // per-key allow-list. perm_svc + ns_pool are bootstrap-scoped and outlive the
+    // server's request loop. The seams are only invoked when auth is enabled
+    // (WithAuth short-circuits to full-access in no-auth dev mode before Authorize).
+    auth.SetNamespaceAuthorizer(
+        [&perm_svc](const cortrix::AuthContext& ctx, const std::string& ns) -> bool {
+            auto checks = perm_svc.BatchCheck(ctx, {ns});
+            return !checks.empty() && checks.front().can_read;
+        });
+    auth.SetNamespaceLister(
+        [&perm_svc, &ns_pool](const cortrix::AuthContext& ctx) -> std::vector<std::string> {
+            std::vector<std::string> active = ns_pool.GetExplainState().active_namespaces;
+            if (active.empty()) return active;
+            auto checks = perm_svc.BatchCheck(ctx, active);
+            std::vector<std::string> out;
+            out.reserve(checks.size());
+            for (const auto& c : checks) {
+                if (c.can_read) out.push_back(c.ns_id);
+            }
+            return out;
+        });
+
     // 10c. [D3.5 batch1/F18a] Operation-log query surface. ObservabilityModule owns
     // the CE OperationLogger (over catalog.db, schema migrated at startup above) +
     // the daily UTC-02:00 cleanup sweep. Phase-1 OSS uses an in-memory global config

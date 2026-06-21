@@ -70,6 +70,9 @@ const std::unordered_map<std::string, std::pair<ErrorCategory, bool>>& Sdk3Map()
         {"CX_ERR_AUTH_EMAIL_SEND_FAILED", {ErrorCategory::kTransient, true}},
         {"CX_ERR_AUTH_BCRYPT_TIMEOUT", {ErrorCategory::kPermanent, false}},
         {"CX_ERR_AUTH_JWT_INIT_FAILED", {ErrorCategory::kPermanent, false}},
+        // Anti-enumeration (F04 issue 2.6): namespace not-found and unauthorized
+        // share this single identity so existence is never leaked.
+        {"CX_ERR_NS_UNAUTHORIZED", {ErrorCategory::kAuth, false}},
         // sec.3.3 Store
         {"CX_ERR_STORE_NOT_FOUND", {ErrorCategory::kPermanent, false}},
         {"CX_ERR_STORE_DB_ERROR", {ErrorCategory::kTransient, true}},
@@ -535,10 +538,11 @@ void CortrixHttpServer::RegisterSystemRoutes() {
     auto write_ns_stats = [this](const httplib::Request& req, httplib::Response& res,
                                  const RequestContext& rctx) {
         const std::string name = req.path_params.at("ns");
-        if (!rctx.auth.namespaces.empty() &&
-            std::find(rctx.auth.namespaces.begin(), rctx.auth.namespaces.end(), name) ==
-                rctx.auth.namespaces.end()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + name + "' not found"),
+        // Runtime namespace authorization (ARCHITECTURE V6) + anti-enumeration
+        // (F04 issue 2.6): unauthorized and not-found share CX_ERR_NS_UNAUTHORIZED
+        // and the namespace name is never echoed back.
+        if (!auth_.Authorize(rctx.auth, name, kPermRead).ok()) {
+            WriteJsonError(res, Status::PermissionDenied("CX_ERR_NS_UNAUTHORIZED"),
                            rctx.request_id);
             return;
         }
@@ -583,9 +587,16 @@ void CortrixHttpServer::RegisterSystemRoutes() {
              }));
 }
 
-nlohmann::json CortrixHttpServer::BuildNamespaceListJson(const std::vector<std::string>& allowed) {
+nlohmann::json CortrixHttpServer::BuildNamespaceListJson(const std::vector<std::string>& allowed,
+                                                        bool filter) {
     nlohmann::json resp;
     resp["namespaces"] = nlohmann::json::array();
+    // Under filter mode an empty authorized set means "see nothing" (deny-by-
+    // default); short-circuit so the empty-list paths below don't list all.
+    if (filter && allowed.empty()) {
+        resp["total"] = 0;
+        return resp;
+    }
     auto append = [&](const std::string& name, int64_t created_at, int64_t updated_at, int64_t dc,
                       int64_t bc) {
         // Live counts from the store when the NS is resident in the pool
@@ -612,7 +623,7 @@ nlohmann::json CortrixHttpServer::BuildNamespaceListJson(const std::vector<std::
         auto listed = ns_router_->ListNamespaces({});
         if (listed.ok()) {
             for (const auto& ns_id : listed.value().results) {
-                if (!allowed.empty() &&
+                if (filter &&
                     std::find(allowed.begin(), allowed.end(), ns_id) == allowed.end()) {
                     continue;
                 }
@@ -628,7 +639,7 @@ nlohmann::json CortrixHttpServer::BuildNamespaceListJson(const std::vector<std::
         }
     }
 
-    auto nss = ns_mgr_.List(allowed);
+    auto nss = ns_mgr_.List(filter ? allowed : std::vector<std::string>{});
     for (const auto& ns : nss) {
         append(ns.name, ns.created_at, ns.updated_at, ns.doc_count, ns.block_count);
     }
@@ -865,14 +876,17 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                  WithAuth(auth_, kPermRead,
                           [this](const httplib::Request&, httplib::Response& res,
                                  const RequestContext& rctx) {
-                              nlohmann::json resp = BuildNamespaceListJson(rctx.auth.namespaces);
+                              // Runtime authorized set (ARCHITECTURE V6): show only
+                              // namespaces the principal may see.
+                              nlohmann::json resp = BuildNamespaceListJson(
+                                  auth_.ListAuthorizedNamespaces(rctx.auth), /*filter=*/true);
                               WriteJsonResponse(res, 200, resp, rctx.request_id);
                           }));
     } else {
         svr_.Get("/api/v1/namespaces",
                  NoAuth([this](const httplib::Request&, httplib::Response& res,
                                const RequestContext& rctx) {
-                     nlohmann::json resp = BuildNamespaceListJson({});
+                     nlohmann::json resp = BuildNamespaceListJson({}, /*filter=*/false);
                      WriteJsonResponse(res, 200, resp, rctx.request_id);
                  }));
     }

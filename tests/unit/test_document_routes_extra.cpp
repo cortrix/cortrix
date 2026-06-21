@@ -35,6 +35,9 @@
 #include "cortrix/deploy/disk_monitor.h"
 
 #include "ns_pool_test_helper.h"
+// [V6] Runtime namespace authorization seam over a real PermissionService
+// (the static per-key allow-list / can_access_namespace was removed).
+#include "unit/namespace_authz_test_helper.h"
 
 namespace cortrix {
 namespace {
@@ -79,6 +82,13 @@ protected:
         kc.permissions = kPermRead | kPermWrite | kPermAdmin;
         auth_->LoadKeys({kc});
 
+        // [V6] Real PermissionService authz. Seed "default" (admitted to the pool)
+        // plus the not-found namespace "ghost" (authorized but never admitted →
+        // facade miss → 404 NOT_FOUND for an authorized caller).
+        authz_ = std::make_unique<cortrix::test::NamespaceAuthzHarness>(
+            *auth_, &harness_->pool(), "t1",
+            std::vector<std::string>{"default", "ghost"});
+
         spc_ = std::make_unique<StubSPCX>();
         handler_ = std::make_unique<UploadHandler>(config_.upload, *spc_);
 
@@ -122,6 +132,7 @@ protected:
     fs::path temp_dir_;
     std::unique_ptr<cortrix::test::NsPoolHarness> harness_;
     std::unique_ptr<ApiKeyAuth> auth_;
+    std::unique_ptr<cortrix::test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<StubSPCX> spc_;
     std::unique_ptr<UploadHandler> handler_;
     std::unique_ptr<httplib::Server> server_;
@@ -343,6 +354,11 @@ protected:
         auth_->LoadKeys({kc});
         auth_header_ = {{"Authorization", "Bearer " + key}};
 
+        // [V6] Authorize "default" so the disk-gate handler (which runs after the
+        // WithAuth namespace gate) is reached and can return its 507.
+        authz_ = std::make_unique<cortrix::test::NamespaceAuthzHarness>(
+            *auth_, &harness_->pool(), "t1", std::vector<std::string>{"default"});
+
         spc_ = std::make_unique<StubSPCX>();
         handler_ = std::make_unique<UploadHandler>(config_.upload, *spc_);
 
@@ -382,6 +398,7 @@ protected:
     fs::path temp_dir_;
     std::unique_ptr<cortrix::test::NsPoolHarness> harness_;
     std::unique_ptr<ApiKeyAuth> auth_;
+    std::unique_ptr<cortrix::test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<StubSPCX> spc_;
     std::unique_ptr<UploadHandler> handler_;
     std::unique_ptr<deploy::DiskMonitor> disk_monitor_;
@@ -438,6 +455,11 @@ protected:
         auth_->LoadKeys({kc});
         auth_header_ = {{"Authorization", "Bearer " + key}};
 
+        // [V6] Authorize "default" so the upload reaches the MapStatusToHttp path
+        // (the file-too-large 413/400 mapping) instead of an authz rejection.
+        authz_ = std::make_unique<cortrix::test::NamespaceAuthzHarness>(
+            *auth_, &harness_->pool(), "t1", std::vector<std::string>{"default"});
+
         spc_ = std::make_unique<StubSPCX>();
         handler_ = std::make_unique<UploadHandler>(config_.upload, *spc_);
 
@@ -462,6 +484,7 @@ protected:
     fs::path temp_dir_;
     std::unique_ptr<cortrix::test::NsPoolHarness> harness_;
     std::unique_ptr<ApiKeyAuth> auth_;
+    std::unique_ptr<cortrix::test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<StubSPCX> spc_;
     std::unique_ptr<UploadHandler> handler_;
     std::unique_ptr<httplib::Server> server_;

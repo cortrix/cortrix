@@ -19,6 +19,7 @@
 #include "cortrix/auth/auth_context.h"
 #include "cortrix/namespace/namespace_manager.h"
 #include "cortrix/server/http_server.h"
+#include "unit/namespace_authz_test_helper.h"
 
 namespace cortrix {
 namespace {
@@ -57,14 +58,16 @@ protected:
         rkc.expires_at = 0;
         config_.auth.api_keys.push_back(rkc);
 
-        // Namespace-restricted key
+        // Namespace-restricted key. ARCHITECTURE V6 removed the static per-key
+        // allow-list; namespace scope is now expressed as ownership in the runtime
+        // PermissionService (installed below). The key's tenant ("ns-tenant") owns
+        // ONLY "allowed-ns", so any OTHER namespace is denied (CX_ERR_NS_UNAUTHORIZED).
         ns_restricted_key_ = "ns-restricted-key";
         ApiKeyConfig nkc;
         nkc.key_hash = ApiKeyAuth::HashKey(ns_restricted_key_);
         nkc.tenant_id = "ns-tenant";
         nkc.permissions = kPermRead | kPermWrite;
         nkc.expires_at = 0;
-        nkc.allowed_namespaces = {"allowed-ns"};
         config_.auth.api_keys.push_back(nkc);
 
         port_ = 19200 + (getpid() % 500);
@@ -74,6 +77,17 @@ protected:
         ns_mgr_->Init();
 
         auth_.LoadKeys(config_.auth.api_keys);
+
+        // ARCHITECTURE V6: wire auth_'s runtime namespace-authorization seam to a
+        // REAL PermissionService. Seed ONLY "allowed-ns" owned by the restricted
+        // key's tenant ("ns-tenant"), preserving the original intent that this key
+        // is scoped to "allowed-ns" and DENIED any other namespace. This fixture
+        // drives the real CortrixHttpServer/NamespaceManager (no F05 pool), so the
+        // list seam is left unwired (nullptr pool); the per-namespace gate is what
+        // the ownership seeding governs.
+        authz_ = std::make_unique<cortrix::test::NamespaceAuthzHarness>(
+            auth_, /*pool=*/nullptr, "ns-tenant",
+            std::vector<std::string>{"allowed-ns"});
 
         server_ = std::make_unique<CortrixHttpServer>(config_, auth_, *ns_mgr_);
         server_->RegisterRoutes();
@@ -98,6 +112,7 @@ protected:
 
     CortrixConfig config_;
     ApiKeyAuth auth_;
+    std::unique_ptr<cortrix::test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<NamespaceManager> ns_mgr_;
     std::unique_ptr<CortrixHttpServer> server_;
     std::thread server_thread_;

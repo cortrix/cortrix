@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -15,7 +16,11 @@ namespace auth { class ApiKeyService; }
 struct ApiKeyConfig {
     std::string key_hash;
     std::string tenant_id;
-    std::vector<std::string> allowed_namespaces;
+    // NOTE: the per-key static `allowed_namespaces` allow-list was removed
+    // (ARCHITECTURE V6 / P08 issue 3.3-4). Namespace authorization is now a
+    // runtime PermissionService::BatchCheck (ownership + ns_acl), wired into
+    // ApiKeyAuth via SetNamespaceAuthorizer() — least-privilege, immediately
+    // reflects Admin grant/revoke without re-issuing the key.
     int permissions = 0;
     int64_t expires_at = 0;
 };
@@ -37,6 +42,28 @@ public:
     /// service must outlive this object. nullptr (default) = config keys only.
     void SetApiKeyService(auth::ApiKeyService* svc) { db_keys_ = svc; }
 
+    /// Runtime namespace-authorization seam (ARCHITECTURE V6 / P08 issue 3.3-4).
+    /// Returns true iff the principal may access `ns` (the real wiring calls
+    /// PermissionService::BatchCheck — ownership + ns_acl). When unset, Authorize
+    /// leaves the namespace ungated (e.g. routes with no namespace, or no-auth
+    /// dev mode); bootstrap installs the production authorizer. Borrowed state in
+    /// the closure must outlive this object.
+    using NamespaceAuthorizer =
+        std::function<bool(const AuthContext& ctx, const std::string& ns)>;
+    void SetNamespaceAuthorizer(NamespaceAuthorizer fn) { ns_authz_ = std::move(fn); }
+
+    /// Runtime "authorized namespace set" seam — the universe a wildcard / list
+    /// request resolves to (PermissionService::ListAuthorizedNamespaces). Used by
+    /// the GET /namespaces list endpoint so it shows only what the principal may
+    /// see. Unset returns nullopt (caller decides the fallback).
+    using NamespaceLister =
+        std::function<std::vector<std::string>(const AuthContext& ctx)>;
+    void SetNamespaceLister(NamespaceLister fn) { ns_lister_ = std::move(fn); }
+    bool has_namespace_lister() const { return static_cast<bool>(ns_lister_); }
+    std::vector<std::string> ListAuthorizedNamespaces(const AuthContext& ctx) const {
+        return ns_lister_ ? ns_lister_(ctx) : std::vector<std::string>{};
+    }
+
     /// Authenticate bearer token, fill AuthContext on success
     /// @return Ok / Unauthenticated
     Status Authenticate(const std::string& bearer_token, AuthContext* context);
@@ -56,6 +83,8 @@ private:
     mutable std::mutex mu_;
     std::unordered_map<std::string, ApiKeyConfig> keys_;
     auth::ApiKeyService* db_keys_ = nullptr;  ///< borrowed; nullptr = config keys only
+    NamespaceAuthorizer ns_authz_;  ///< runtime PermissionService seam; unset = ungated
+    NamespaceLister ns_lister_;     ///< runtime authorized-set seam (list endpoint)
 };
 
 }  // namespace cortrix

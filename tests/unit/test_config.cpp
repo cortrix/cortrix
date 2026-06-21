@@ -73,7 +73,6 @@ auth:
       tenant_id: "tenant_001"
       permissions: 7
       expires_at: 0
-      allowed_namespaces: ["ns1", "ns2"]
 
 log:
   level: "debug"
@@ -96,7 +95,6 @@ namespace:
     EXPECT_EQ(config.auth.api_keys[0].key_hash, "abc123");
     EXPECT_EQ(config.auth.api_keys[0].tenant_id, "tenant_001");
     EXPECT_EQ(config.auth.api_keys[0].permissions, 7);
-    EXPECT_EQ(config.auth.api_keys[0].allowed_namespaces.size(), 2u);
     EXPECT_EQ(config.log.level, "debug");
     EXPECT_EQ(config.log.format, "text");
     EXPECT_EQ(config.log.output, "stderr");

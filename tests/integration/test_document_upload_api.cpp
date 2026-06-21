@@ -9,6 +9,7 @@
 #include "cortrix/upload/upload_handler.h"
 #include "cortrix/deploy/disk_monitor.h"  // [gap②] F24 disk gate on the upload route
 #include "ns_pool_test_helper.h"  // [wire⑤c] F05 NsPoolHarness replaces MVP NamespaceManager
+#include "unit/namespace_authz_test_helper.h"  // [V6] runtime NS-authz seam over a real PermissionService
 #include "cortrix/auth/api_key_auth.h"
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/auth/auth_context.h"
@@ -68,7 +69,6 @@ protected:
         kc.key_hash = ApiKeyAuth::HashKey(test_key);
         kc.tenant_id = "test-tenant";
         kc.permissions = kPermRead | kPermWrite | kPermAdmin;
-        // Empty allowed_namespaces = all namespaces allowed
         auth_->LoadKeys({kc});
 
         // Read-only key
@@ -78,6 +78,16 @@ protected:
         ro_kc.tenant_id = "test-tenant-ro";
         ro_kc.permissions = kPermRead;
         auth_->LoadKeys({kc, ro_kc});
+
+        // [V6] Runtime namespace authorization: a real PermissionService over an
+        // in-memory catalog seeding the namespaces the admin key's tenant owns.
+        // "default" is owned by "test-tenant" (the admin key's tenant), admitted to
+        // the pool -> uploads pass. "nonexistent" is seeded as OWNED (so the caller
+        // is authorized) but NOT admitted to the pool -> facade miss -> 404 NOT_FOUND
+        // for an authorized caller (vs 403 anti-enumeration for a non-owned NS).
+        authz_ = std::make_unique<cortrix::test::NamespaceAuthzHarness>(
+            *auth_, &harness_->pool(), "test-tenant",
+            std::vector<std::string>{"default", "nonexistent"});
 
         // Set up SPC + upload handler
         spc_ = std::make_unique<TestSPCManager>();
@@ -158,6 +168,7 @@ protected:
     fs::path temp_dir_;
     std::unique_ptr<test::NsPoolHarness> harness_;
     std::unique_ptr<ApiKeyAuth> auth_;
+    std::unique_ptr<cortrix::test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<TestSPCManager> spc_;
     std::unique_ptr<UploadHandler> handler_;
     std::unique_ptr<deploy::DiskMonitor> disk_monitor_;  // [gap②] upload-route disk gate
