@@ -283,13 +283,20 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         // token lives in memory only; visiting either bootstrap endpoint mints the
         // admin API Key and invalidates it. AdminGuard restricts the path to
         // loopback by default, so this is local-operator-only.
+        // Print the actually-configured bind host/port, not a hardcoded :8420.
+        // A wildcard/empty bind host is shown as localhost since the setup URL is
+        // opened from the local operator's browser (AdminGuard is loopback-only).
+        std::string setup_host = config.server.host;
+        if (setup_host.empty() || setup_host == "0.0.0.0" || setup_host == "::") {
+            setup_host = "localhost";
+        }
         std::printf(
             "\n>>> First-time admin setup URL (60s, single-use):\n"
-            ">>>   http://localhost:8420/api/v1/admin/bootstrap?token=%s\n"
+            ">>>   http://%s:%d/api/v1/admin/bootstrap?token=%s\n"
             ">>>\n"
             ">>> Visit this URL in your browser within 60 seconds to obtain the "
             "admin API Key.\n\n",
-            token.value().c_str());
+            setup_host.c_str(), static_cast<int>(config.server.port), token.value().c_str());
         std::fflush(stdout);
     } else if (!token.ok()) {
         CORTRIX_LOG_WARN("main", "bootstrap token generation skipped: {}",

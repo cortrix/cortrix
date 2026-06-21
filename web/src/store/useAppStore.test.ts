@@ -143,6 +143,38 @@ describe('useAppStore', () => {
     expect(state.isEnabled('text_to_sql')).toBe(false);
   });
 
+  // Degrade branch: a failed namespace fetch must not throw — it records a
+  // globalError and leaves the namespace list empty (no partial/corrupt state).
+  it('records globalError and keeps namespaces empty when the fetch fails', async () => {
+    mockFetch.mockImplementationOnce(() => Promise.reject(new Error('network down')));
+
+    await expect(useAppStore.getState().loadNamespaces()).resolves.toBeUndefined();
+    expect(useAppStore.getState().namespaces).toEqual([]);
+    expect(useAppStore.getState().globalError).toBeTruthy();
+  });
+
+  // Null/empty branch: an empty namespace list keeps the current selection
+  // (resolveCurrentNamespace falls back to `current` when there is no first ns).
+  it('keeps the current namespace when the backend returns no namespaces', async () => {
+    useAppStore.getState().setCurrentNamespace('default');
+    mockFetch.mockReturnValueOnce(jsonResponse({ namespaces: [] }));
+
+    await useAppStore.getState().loadNamespaces();
+
+    expect(useAppStore.getState().namespaces).toEqual([]);
+    expect(useAppStore.getState().currentNamespace).toBe('default');
+  });
+
+  // Degrade branch: a failed health probe must fail silently — systemStatus
+  // stays null and the call resolves (the header just renders nothing rather
+  // than crashing the app).
+  it('leaves systemStatus null when the health probe fails', async () => {
+    mockFetch.mockImplementationOnce(() => Promise.reject(new Error('health unreachable')));
+
+    await expect(useAppStore.getState().loadSystemStatus()).resolves.toBeUndefined();
+    expect(useAppStore.getState().systemStatus).toBeNull();
+  });
+
   it('loads system status with LLM info', async () => {
     // First call: /api/v1/health
     mockFetch.mockReturnValueOnce(jsonResponse({

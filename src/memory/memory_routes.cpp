@@ -378,6 +378,24 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         filter.user_id = user_id;
         filter.include_invalidated = req.get_param_value("status") == "invalidated" ||
                                      req.get_param_value("include_invalidated") == "true";
+        // MEM03 §4.3.1 pagination. The web client sends limit/offset; the backend
+        // filter is page-based (start = page * page_size). Accept limit/offset
+        // (primary) and page/page_size (aliases); normalise offset to a page index.
+        // Unparseable/negative values fall back to the filter defaults so the route
+        // never throws on a bad query string (List clamps page_size to kMaxPageSize).
+        auto param_int = [&req](const char* key, int fallback) -> int {
+            const std::string v = req.get_param_value(key);
+            if (v.empty()) return fallback;
+            try { return std::stoi(v); } catch (...) { return fallback; }
+        };
+        const int limit = param_int("limit", param_int("page_size", filter.page_size));
+        if (limit > 0) filter.page_size = limit;
+        const int offset = param_int("offset", -1);
+        if (offset >= 0 && filter.page_size > 0) {
+            filter.page = offset / filter.page_size;
+        } else {
+            filter.page = param_int("page", filter.page);
+        }
         bool explain = req.get_param_value("explain") == "true";
         auto list = transparency.List(filter, user_id, explain);
         json resp;
@@ -393,9 +411,16 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
                 if (it.revoked_at) m["revoked_at"] = *it.revoked_at;
                 resp["memories"].push_back(m);
             }
+            // Echo the pagination envelope so the UI can page (page/page_size were
+            // previously dropped, making limit/offset a backend no-op).
             resp["total"] = list.value().total;
+            resp["page"] = list.value().page;
+            resp["page_size"] = list.value().page_size;
+            if (!list.value().warnings.empty()) resp["warnings"] = list.value().warnings;
         } else {
             resp["total"] = 0;
+            resp["page"] = filter.page < 0 ? 0 : filter.page;
+            resp["page_size"] = filter.page_size;
         }
         WriteJsonResponse(res, 200, resp);
     }));

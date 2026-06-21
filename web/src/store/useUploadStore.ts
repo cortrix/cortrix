@@ -150,7 +150,10 @@ export const useUploadStore = create<UploadState>((set, get) => ({
       set({
         batchSubmitting: false,
         batchError: {
-          code: 'CX_ERR_NS_UNAVAILABLE',
+          // Client-side precondition (no namespace resolved before any request).
+          // Use the canonical client code (errors.ts) rather than a CX_ERR_NS_*
+          // name that impersonates the backend-registered namespace error family.
+          code: 'CX_ERR_CLIENT',
           message: 'No namespace available.',
           retryable: false,
           category: 'permanent',

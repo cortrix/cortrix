@@ -27,6 +27,20 @@ int ExecSQL(sqlite3* db, const char* sql) {
     return rc;
 }
 
+/// Whether `table` already has a column named `column` (via pragma_table_info).
+/// SQLite ADD COLUMN is not "if not exists"; gating on this avoids the noisy
+/// "duplicate column name" exec error logged on every existing/fresh DB.
+bool ColumnExists(sqlite3* db, const char* table, const char* column) {
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql = "SELECT 1 FROM pragma_table_info(?1) WHERE name=?2";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    sqlite3_bind_text(stmt, 1, table, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, column, -1, SQLITE_STATIC);
+    const bool found = (sqlite3_step(stmt) == SQLITE_ROW);
+    sqlite3_finalize(stmt);
+    return found;
+}
+
 std::string SafeColText(sqlite3_stmt* stmt, int col) {
     const unsigned char* t = sqlite3_column_text(stmt, col);
     return t ? reinterpret_cast<const char*>(t) : "";
@@ -211,10 +225,13 @@ Status TaskManager::CreateTasksTable() {
     if (ExecSQL(db_, sql) != SQLITE_OK) {
         return F42Status(F42ErrorCode::kStorageFailed, "create tasks table");
     }
-    // Idempotent migration for tasks.db created before metadata_json existed. ALTER
-    // fails harmlessly ("duplicate column name") when the column is already present
-    // (fresh DBs got it from CREATE above), so the return code is intentionally ignored.
-    ExecSQL(db_, "ALTER TABLE tasks ADD COLUMN metadata_json TEXT");
+    // Idempotent migration for tasks.db created before metadata_json existed.
+    // Gate on pragma_table_info: fresh DBs already have the column from CREATE
+    // above, and existing migrated DBs have it too — running ALTER unconditionally
+    // logged a spurious "duplicate column name" exec error on every startup.
+    if (!ColumnExists(db_, "tasks", "metadata_json")) {
+        ExecSQL(db_, "ALTER TABLE tasks ADD COLUMN metadata_json TEXT");
+    }
     return Status::Ok();
 }
 
