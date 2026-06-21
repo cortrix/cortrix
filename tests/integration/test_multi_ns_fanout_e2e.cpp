@@ -84,7 +84,9 @@ class MultiNsFanoutE2E : public ::testing::Test {
                         const std::vector<std::string>& namespaces) {
     auto c = h_->Client();
     json body = {{"path", dir}, {"target_namespaces", namespaces}};
-    auto res = c.Post("/api/v1/connector/watchers", body.dump(), "application/json");
+    // /connector/watchers is admin-gated (WithAuth kPermAdmin) -> send the admin key.
+    auto res = c.Post("/api/v1/connector/watchers", h_->Bearer(h_->admin_key()),
+                      body.dump(), "application/json");
     EXPECT_TRUE(res);
     EXPECT_EQ(res ? res->status : 0, 200) << (res ? res->body : "no response");
     if (!res || res->status != 200) return "";
@@ -97,7 +99,8 @@ class MultiNsFanoutE2E : public ::testing::Test {
   // dependence on OS-watcher event timing).
   void Scan(const std::string& id) {
     auto c = h_->Client();
-    auto res = c.Post("/api/v1/connector/watchers/" + id + "/scan", "", "application/json");
+    auto res = c.Post("/api/v1/connector/watchers/" + id + "/scan",
+                      h_->Bearer(h_->admin_key()), "", "application/json");
     EXPECT_TRUE(res);
     EXPECT_EQ(res ? res->status : 0, 200) << (res ? res->body : "no response");
   }
@@ -119,10 +122,11 @@ class MultiNsFanoutE2E : public ::testing::Test {
 // One directory → two namespaces: after a scan, BOTH namespaces hold the directory's
 // documents. This is the F21 fan-out core over the live registry + real pool.
 TEST_F(MultiNsFanoutE2E, FanOutToMultipleNamespaces) {
-  // Pre-create both namespaces (with the default tenant) so the assertion isolates
-  // fan-out, not NS creation (the bare-create path has its own probe below).
-  ASSERT_TRUE(h_->CreateNamespace("team_a").ok());
-  ASSERT_TRUE(h_->CreateNamespace("team_b").ok());
+  // Pre-create both namespaces OWNED BY the query principal (user_key == "alice")
+  // so the per-NS query below passes V6 runtime authorization; this isolates the
+  // assertion to fan-out, not NS creation (the bare-create path has its own probe).
+  ASSERT_TRUE(h_->CreateNamespaceOwnedBy("team_a", "alice").ok());
+  ASSERT_TRUE(h_->CreateNamespaceOwnedBy("team_b", "alice").ok());
 
   const std::string id = Subscribe(watch_dir_.string(), {"team_a", "team_b"});
   ASSERT_FALSE(id.empty());
@@ -152,12 +156,13 @@ TEST_F(MultiNsFanoutE2E, PerNamespaceUnsubscribeKeepsOthers) {
   ASSERT_FALSE(id.empty());
 
   auto c = h_->Client();
-  auto del = c.Delete("/api/v1/connector/watchers/" + id + "/namespaces/team_b");
+  auto del = c.Delete("/api/v1/connector/watchers/" + id + "/namespaces/team_b",
+                      h_->Bearer(h_->admin_key()));
   ASSERT_TRUE(del);
   EXPECT_EQ(del->status, 200) << del->body;
 
   // The watcher still exists with team_a as its remaining subscriber.
-  auto got = c.Get("/api/v1/connector/watchers");
+  auto got = c.Get("/api/v1/connector/watchers", h_->Bearer(h_->admin_key()));
   ASSERT_TRUE(got);
   ASSERT_EQ(got->status, 200) << got->body;
   auto j = json::parse(got->body);
