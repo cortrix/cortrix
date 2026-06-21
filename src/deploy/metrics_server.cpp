@@ -52,6 +52,13 @@ bool MetricsServer::Start() {
     }
     running_.store(true);
     thread_ = std::thread([this] { svr_->listen_after_bind(); });
+    // Wait until the listening loop is actually up before returning. Without this,
+    // a Stop() that races immediately after Start() can call svr_->stop() before
+    // the accept loop observes the stop flag, leaving listen_after_bind() spinning
+    // forever and Stop()'s thread_.join() blocked indefinitely.
+    while (!svr_->is_running()) {
+        std::this_thread::yield();
+    }
     return true;
 }
 

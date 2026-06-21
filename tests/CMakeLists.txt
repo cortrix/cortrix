@@ -386,6 +386,20 @@ add_executable(cortrix_unit_tests
     unit/test_errpath_memory.cpp
     unit/test_errpath_phnsw.cpp
     unit/test_errpath_import.cpp
+    # Test-expansion wave 1 (depth: query / server-auth / doc_summary)
+    unit/test_discover_handler.cpp
+    unit/test_query_variant_generator.cpp
+    unit/test_query_wiring.cpp
+    unit/test_live_single_unit_executor.cpp
+    unit/test_query_tiebreak.cpp
+    unit/test_metrics_server.cpp
+    unit/test_gc_cli.cpp
+    unit/test_api_key_db_fallback.cpp
+    unit/test_error_handler_anticlobber.cpp
+    unit/test_auth_middleware_precedence.cpp
+    unit/test_openai_client_errors.cpp
+    unit/test_jwt_auth_middleware_extra.cpp
+    unit/test_tenant_permission_seam.cpp
 )
 
 target_link_libraries(cortrix_unit_tests PRIVATE
