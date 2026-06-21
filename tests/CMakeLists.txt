@@ -430,6 +430,24 @@ add_executable(cortrix_unit_tests
     unit/test_query_retrieval_metrics_matrix.cpp
     unit/test_spc_scoring_metrics_matrix.cpp
     unit/test_infra_metrics_matrix.cpp
+    # Test-expansion wave 3 (depth: store/async/import/agent_trace + breadth matrices)
+    unit/test_store_depth.cpp
+    unit/test_async_depth.cpp
+    unit/test_import_depth.cpp
+    unit/test_agent_trace_depth.cpp
+    unit/test_text_matrix_fts5.cpp
+    unit/test_text_matrix_prompt.cpp
+    unit/test_text_matrix_chunker.cpp
+    unit/test_config_matrix_sparse.cpp
+    unit/test_config_matrix_hype.cpp
+    unit/test_config_matrix_reranker.cpp
+    unit/test_config_matrix_enricher.cpp
+    unit/test_config_matrix_cleaning.cpp
+    unit/test_value_matrix_sparse_codec.cpp
+    unit/test_value_matrix_block_header.cpp
+    unit/test_value_matrix_scorer.cpp
+    unit/test_value_matrix_rrf.cpp
+    unit/test_value_matrix_crag.cpp
 )
 
 target_link_libraries(cortrix_unit_tests PRIVATE
