@@ -448,6 +448,26 @@ add_executable(cortrix_unit_tests
     unit/test_value_matrix_scorer.cpp
     unit/test_value_matrix_rrf.cpp
     unit/test_value_matrix_crag.cpp
+    # Test-expansion wave 4 (json-tolerance / pagination / validate / depth gaps)
+    unit/test_json_tolerance_extractor.cpp
+    unit/test_json_tolerance_judgment.cpp
+    unit/test_json_tolerance_docsummary.cpp
+    unit/test_json_tolerance_enricher.cpp
+    unit/test_pagination_memory_store.cpp
+    unit/test_pagination_observability.cpp
+    unit/test_pagination_catalog_tasks.cpp
+    unit/test_validate_matrix_request.cpp
+    unit/test_validate_matrix_config.cpp
+    unit/test_validate_matrix_obs_identity.cpp
+    unit/test_budget_tracker_extra.cpp
+    unit/test_namespace_pool_extra.cpp
+    unit/test_tenant_types_extra.cpp
+    unit/test_contradiction_parse_depth.cpp
+    unit/test_memory_store_unicode_depth.cpp
+    unit/test_mem03_quota_depth.cpp
+    unit/test_crag_breaker_depth.cpp
+    unit/test_splade_depth.cpp
+    unit/test_catalog_txn_depth.cpp
 )
 
 target_link_libraries(cortrix_unit_tests PRIVATE
