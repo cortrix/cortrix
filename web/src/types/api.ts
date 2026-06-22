@@ -357,6 +357,10 @@ export interface MemoryCreateResponse {
 }
 
 export interface MemoryEditRequest {
+  namespace: string;
+  user_id: string;
+  content: string;
+  memory_type?: MemoryType;
   new_content?: string;
   new_memory_type?: MemoryType;
   expected_modified_at?: number;
@@ -367,9 +371,14 @@ export interface MemoryEditResponse {
   old_memory_id: string;
 }
 
+export interface MemoryInvalidateRequest {
+  namespace: string;
+  user_id: string;
+}
+
 export interface MemoryInvalidateResponse {
-  memory_id: string;
-  deleted_at: number;
+  block_id: string;
+  status: 'invalidated';
 }
 
 // --- Namespace configs (F12 two-layer mapping, v1.0.8 — 11 *_config) ---
@@ -503,7 +512,7 @@ export interface UserRecord {
   role: UserRole;
   status: UserStatus;
   email_verified?: boolean;
-  created_at?: string;
+  created_at?: string | number;
 }
 
 export interface UserListFilter {

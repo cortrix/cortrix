@@ -201,6 +201,26 @@ void ApplyWebUiSecurityHeaders(httplib::Response& res) {
     }
 }
 
+void ApplyBaselineSecurityHeaders(httplib::Response& res) {
+    res.set_header("X-Frame-Options", "DENY");
+    res.set_header("X-Content-Type-Options", "nosniff");
+    res.set_header("Referrer-Policy", "no-referrer");
+}
+
+bool HasFileLikeSuffix(const std::string& path) {
+    const auto slash = path.find_last_of('/');
+    const std::string segment = slash == std::string::npos ? path : path.substr(slash + 1);
+    return segment.find('.') != std::string::npos;
+}
+
+bool ShouldServeSpaFallback(const httplib::Request& req) {
+    if (req.method != "GET") return false;
+    if (req.path.rfind("/api/", 0) == 0) return false;
+    if (req.path.rfind("/assets/", 0) == 0) return false;
+    if (HasFileLikeSuffix(req.path)) return false;
+    return true;
+}
+
 bool LooksLikeInt(const std::string& value) {
     if (value.empty()) return false;
     size_t i = value[0] == '-' ? 1 : 0;
@@ -329,6 +349,7 @@ void WriteJsonError(httplib::Response& res, const Status& status, const std::str
         ts << buf << "." << std::setfill('0') << std::setw(3) << ms.count() << "Z";
         body["error"]["timestamp"] = ts.str();
     }
+    ApplyBaselineSecurityHeaders(res);
     res.set_content(body.dump(), "application/json");
     res.status = status.http_status();
 }
@@ -338,6 +359,7 @@ void WriteJsonResponse(httplib::Response& res, int http_status, const nlohmann::
     if (!request_id.empty()) {
         res.set_header("X-Request-Id", request_id);
     }
+    ApplyBaselineSecurityHeaders(res);
     res.set_content(body.dump(), "application/json");
     res.status = http_status;
 }
@@ -358,7 +380,7 @@ void CortrixHttpServer::RegisterRoutes() {
     // unmatched non-/api GETs serve index.html instead (SPA deep links).
     svr_.set_error_handler([this](const httplib::Request& req, httplib::Response& res) {
         if (res.status == 404) {
-            if (!web_ui_index_.empty() && req.method == "GET" && req.path.rfind("/api/", 0) != 0) {
+            if (!web_ui_index_.empty() && ShouldServeSpaFallback(req)) {
                 res.status = 200;
                 ApplyWebUiSecurityHeaders(res);
                 res.set_content(web_ui_index_, "text/html");
@@ -454,6 +476,20 @@ void CortrixHttpServer::RegisterOpenApiRoutes() {
                  res.set_content(content, "application/yaml");
                  res.status = 200;
              }));
+
+    svr_.Get(
+        "/openapi.yaml",
+        NoAuth([](const httplib::Request&, httplib::Response& res, const RequestContext& rctx) {
+            std::string content;
+            std::string path;
+            if (!ReadFirstFile(OpenApiYamlCandidates(), &content, &path)) {
+                WriteJsonError(res, Status::NotFound("OpenAPI YAML not found"), rctx.request_id);
+                return;
+            }
+            res.set_header("X-Cortrix-OpenAPI-Source", path);
+            res.set_content(content, "application/yaml");
+            res.status = 200;
+        }));
 
     svr_.Get(
         "/openapi.bundled.yaml",
