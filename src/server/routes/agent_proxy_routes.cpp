@@ -61,6 +61,8 @@ struct StreamState {
     std::mutex mu;
     std::condition_variable cv;
     std::string pending;
+    int upstream_status = 0;
+    std::string upstream_content_type;
     bool upstream_done = false;
     bool upstream_failed = false;
 };
@@ -93,7 +95,13 @@ void ProxyChatStreaming(const std::string& base, const httplib::Request& req,
         };
         auto result = client.send(up);
         std::lock_guard<std::mutex> lk(st->mu);
-        if (!result || result->status >= 500) st->upstream_failed = true;
+        if (!result) {
+            st->upstream_failed = true;
+        } else {
+            st->upstream_status = result->status;
+            st->upstream_content_type = result->get_header_value("Content-Type");
+            if (result->status >= 500) st->upstream_failed = true;
+        }
         st->upstream_done = true;
         st->cv.notify_all();
     }).detach();
@@ -109,6 +117,18 @@ void ProxyChatStreaming(const std::string& base, const httplib::Request& req,
                 R"({"error":{"code":"CX_ERR_AGENT_UPSTREAM","message":"agent service unreachable","retryable":true,"category":"transient"}})",
                 "application/json");
             return;
+        }
+        if (!st->pending.empty() &&
+            st->pending.rfind("data:", 0) != 0 &&
+            st->pending.rfind("event:", 0) != 0) {
+            st->cv.wait(lk, [&] { return st->upstream_done; });
+            if (st->upstream_status >= 400) {
+                res.status = st->upstream_status;
+                res.set_content(st->pending, st->upstream_content_type.empty()
+                                                 ? "application/json"
+                                                 : st->upstream_content_type);
+                return;
+            }
         }
     }
 

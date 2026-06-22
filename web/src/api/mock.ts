@@ -422,7 +422,7 @@ export const mockApi = {
     const now = Date.now();
     m.status = 'invalidated';
     m.invalidated_at = m.invalidated_at ?? now;
-    return { memory_id: id, deleted_at: now };
+    return { block_id: id, status: 'invalidated' };
   },
 
   // ─── Namespace CRUD (F12) ─────────────────────────────────────────────────

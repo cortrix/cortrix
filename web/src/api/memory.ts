@@ -8,6 +8,7 @@ import type {
   MemoryCreateResponse,
   MemoryEditRequest,
   MemoryEditResponse,
+  MemoryInvalidateRequest,
   MemoryInvalidateResponse,
 } from '../types/api';
 
@@ -77,9 +78,15 @@ export async function editMemory(
 }
 
 /** Soft delete (invalidate). HTTP DELETE verb; semantic = memory_invalidate. */
-export async function invalidateMemory(id: string): Promise<MemoryInvalidateResponse> {
+export async function invalidateMemory(
+  id: string,
+  req: MemoryInvalidateRequest,
+): Promise<MemoryInvalidateResponse> {
+  const params = new URLSearchParams();
+  params.set('namespace', req.namespace);
+  params.set('user_id', req.user_id);
   try {
-    return await del<MemoryInvalidateResponse>(`${BASE}/${encodeURIComponent(id)}`);
+    return await del<MemoryInvalidateResponse>(`${BASE}/${encodeURIComponent(id)}?${params.toString()}`);
   } catch (e) {
     return fallbackToMock(e, () => mockApi.invalidateMemory(id));
   }

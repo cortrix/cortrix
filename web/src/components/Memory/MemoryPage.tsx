@@ -114,7 +114,14 @@ export function MemoryPage() {
 
   const editMut = useMutation({
     mutationFn: (args: { id: string; content: string; memory_type: MemoryType }) =>
-      editMemory(args.id, { new_content: args.content, new_memory_type: args.memory_type }),
+      editMemory(args.id, {
+        namespace: currentNamespace,
+        user_id: userId,
+        content: args.content,
+        memory_type: args.memory_type,
+        new_content: args.content,
+        new_memory_type: args.memory_type,
+      }),
     onSuccess: () => {
       notify.success(t('memory.edited'));
       void invalidateList();
@@ -122,7 +129,8 @@ export function MemoryPage() {
   });
 
   const invalidateMut = useMutation({
-    mutationFn: (m: MemoryItem) => invalidateMemory(m.memory_id),
+    mutationFn: (m: MemoryItem) =>
+      invalidateMemory(m.memory_id, { namespace: currentNamespace, user_id: userId }),
     onSuccess: () => {
       notify.success(t('memory.invalidated'));
       void invalidateList();

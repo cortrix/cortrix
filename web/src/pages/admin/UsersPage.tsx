@@ -28,6 +28,17 @@ import { UserFormModal, type UserFormValues } from './UserFormModal';
 
 const PAGE_SIZE = 20;
 
+function formatCreatedDate(value?: string | number): string {
+  if (value == null) return '—';
+  if (typeof value === 'number') {
+    const millis = value < 1_000_000_000_000 ? value * 1000 : value;
+    const date = new Date(millis);
+    return Number.isNaN(date.getTime()) ? '—' : date.toISOString().slice(0, 10);
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value.slice(0, 10) : date.toISOString().slice(0, 10);
+}
+
 function StatusBadge({ status }: { status: UserStatus }) {
   const { t } = useTranslation();
   return (
@@ -225,7 +236,7 @@ export function UsersPage() {
                       <StatusBadge status={u.status} />
                     </td>
                     <td className="px-5 py-3.5 font-mono text-xs text-muted">
-                      {u.created_at ? u.created_at.slice(0, 10) : '—'}
+                      {formatCreatedDate(u.created_at)}
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-end gap-2">
