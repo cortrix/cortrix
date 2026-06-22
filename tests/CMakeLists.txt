@@ -505,6 +505,11 @@ add_executable(cortrix_unit_tests
     unit/test_connector_routes_full.cpp
     unit/test_route_obs_ops_gc_arms.cpp
     unit/test_route_tenant_auth_arms.cpp
+    # Test-expansion 90%-closure wave (config/connector/tenant over 90% line)
+    unit/test_config_arms.cpp
+    unit/test_tenant_service_arms.cpp
+    unit/test_directory_importer_arms.cpp
+    unit/test_dir_watcher_registry_arms.cpp
     unit/test_enum_roundtrip_tenant.cpp
     unit/test_enum_roundtrip_catalog.cpp
     unit/test_enum_roundtrip_import.cpp
