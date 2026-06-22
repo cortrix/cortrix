@@ -3,6 +3,7 @@
 #include "cortrix/store/cortrix_blob_local.h"
 #include "cortrix/store/phnsw.h"
 #include "cortrix/common/block_header.h"
+#include <unistd.h>
 #include <filesystem>
 #include <random>
 
@@ -13,7 +14,9 @@ namespace fs = std::filesystem;
 class StorageRoundtripTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        test_dir_ = fs::temp_directory_path() / ("cortrix_rt_test_" + std::to_string(rand()));
+        test_dir_ = fs::temp_directory_path() /
+                    ("cortrix_rt_test_" + std::to_string(::getpid()) + "_" +
+                     std::to_string(rand()));
         fs::create_directories(test_dir_);
 
         db_path_ = (test_dir_ / "test.db").string();

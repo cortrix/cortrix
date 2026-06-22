@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "cortrix/store/cortrix_store_sqlite.h"
 #include "cortrix/common/block_header.h"
+#include <unistd.h>
 #include <filesystem>
 #include <thread>
 #include <chrono>
@@ -11,7 +12,7 @@ namespace fs = std::filesystem;
 class StoreSqliteTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        test_dir_ = fs::temp_directory_path() / ("cortrix_store_test_" + std::to_string(rand()));
+        test_dir_ = fs::temp_directory_path() / ("cortrix_store_test_" + std::to_string(::getpid()) + "_" + std::to_string(rand()));
         fs::create_directories(test_dir_);
         db_path_ = (test_dir_ / "test.db").string();
         store_ = std::make_unique<CortrixStoreSqlite>(db_path_);
@@ -1664,7 +1665,7 @@ TEST_F(StoreSqliteTest, ParentInsertGetRoundTripAndDuplicate) {
 class StoreSqliteClosedTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        test_dir_ = fs::temp_directory_path() / ("cortrix_store_closed_" + std::to_string(rand()));
+        test_dir_ = fs::temp_directory_path() / ("cortrix_store_closed_" + std::to_string(::getpid()) + "_" + std::to_string(rand()));
         fs::create_directories(test_dir_);
         db_path_ = (test_dir_ / "test.db").string();
         store_ = std::make_unique<CortrixStoreSqlite>(db_path_);
@@ -1805,7 +1806,7 @@ TEST_F(StoreSqliteTest, FailNextOpsDrainsExactlyN) {
 // RecoverCrashedDocs (production per-facade connection, D-I1.bis). The tables
 // were already created by a prior standalone open of the same file, so reads work.
 TEST(StoreSqliteOptionsTest, SkipsSchemaAndRecoveryWhenDisabled) {
-    auto dir = fs::temp_directory_path() / ("cortrix_store_opts_" + std::to_string(rand()));
+    auto dir = fs::temp_directory_path() / ("cortrix_store_opts_" + std::to_string(::getpid()) + "_" + std::to_string(rand()));
     fs::create_directories(dir);
     std::string path = (dir / "opts.db").string();
 

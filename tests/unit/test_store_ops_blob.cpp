@@ -13,6 +13,9 @@
 
 #include <gtest/gtest.h>
 
+#include <unistd.h>
+
+#include <atomic>
 #include <cctype>
 #include <cstdint>
 #include <filesystem>
@@ -29,8 +32,14 @@ namespace {
 class BlobLocalOpsBase : public ::testing::Test {
 protected:
     void SetUp() override {
+        // Unique per PROCESS (gtest_discover_tests runs each case in its own
+        // process; rand() is unseeded and identical across them -> all
+        // concurrent processes picked the same dir and clobbered each other's
+        // blob .tmp files under -j>1, rename ENOENT) AND per SetUp.
+        static std::atomic<unsigned> seq{0};
         test_dir_ = fs::temp_directory_path() /
-                    ("cortrix_blob_ops_" + std::to_string(rand()));
+                    ("cortrix_blob_ops_" + std::to_string(getpid()) + "_" +
+                     std::to_string(seq.fetch_add(1)));
         fs::create_directories(test_dir_);
         blob_ = std::make_unique<CortrixBlobLocal>(test_dir_.string());
     }

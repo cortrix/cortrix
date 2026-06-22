@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "cortrix/store/cortrix_blob_local.h"
+#include <unistd.h>
 #include <filesystem>
 #include <fstream>
 #include <cstring>
@@ -27,7 +28,12 @@ fs::path BlobPath(const fs::path& base, const std::string& ns,
 class BlobLocalTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        test_dir_ = fs::temp_directory_path() / ("cortrix_blob_test_" + std::to_string(rand()));
+        // getpid() prefix: rand() is unseeded/identical across the per-test
+        // processes gtest_discover_tests spawns, so without it concurrent -j>1
+        // runs share a dir and clobber each other's blobs.
+        test_dir_ = fs::temp_directory_path() /
+                    ("cortrix_blob_test_" + std::to_string(::getpid()) + "_" +
+                     std::to_string(rand()));
         fs::create_directories(test_dir_);
         blob_ = std::make_unique<CortrixBlobLocal>(test_dir_.string());
     }
