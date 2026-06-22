@@ -1,101 +1,133 @@
-# Cortrix Agent (F48)
+# Cortrix Agent
 
-Cortrix's built-in Agent — a FastAPI middleware that lets a user chat with their Cortrix
-semantic storage without configuring any external agent. It dogfoods the public access
-strategy: RAG runs through the **P03 Python SDK** exactly like any third-party agent (no
-privileged channel). This is the Cortrix Agent, not a "chatbot".
+Cortrix Agent is the built-in FastAPI service for fixed-flow chat over Cortrix
+semantic storage. It uses the public Python SDK path to query cortrix-server and
+does not use a privileged backend channel.
 
+> Status: `RD review required`. Fixed-flow chat mode is documented, but
+> deployment, LLM provider behavior, and API compatibility should be verified
+> against your target runtime. See [Agent access](../docs/agent-access.md) and
+> [Compatibility](../docs/compatibility.md).
+
+```text
+Web UI chat -> Cortrix Agent (:8001) -> Python SDK -> cortrix-server (:8420)
+                                    -> configured LLM provider
 ```
-Web UI (Chat)  ->  Cortrix Agent (FastAPI, :8001 internal)  ->  P03 SDK  ->  cortrix-server
-                          |
-                          +->  LLM provider (OpenAI / Claude / Ollama / GLM / Mock; DeepSeek in V1.5)
-```
 
-Phase 1 V1.0 ships the **chat mode** (`ChatExecutor`): a fixed RAG flow with no
-autonomous tool selection. `ToolUseExecutor` (V1.5) and `PlanExecuteExecutor` (V2) are
-reserved behind the shared `IAgentExecutor` interface.
+The current public path is chat mode: a fixed RAG flow with no autonomous tool
+selection. Advanced tool-use and plan-execute modes are roadmap items.
 
 ## Layout
 
 | Path | Role |
-|------|------|
-| `agent_core/` | UI-agnostic kernel: `executor` (ChatExecutor + L1/L2/L3 degradation), `sdk_rag` (P03 SDK RAG seam), `prompt` (injection-hardened), `explain` (A/B/C meta tiers), `errors` (GEN-Agent 4-field), `session_store` (in-memory N=10 window) |
-| `routes/` | HTTP layer: `chat` (SSE), `sessions`, `config` — thin encoders over `agent_core` |
-| `llm/` | LLM adapter interface + implementations |
-| `main.py` | FastAPI assembly + dependency injection + startup sequence (design §11.bis) |
-| `config.py` | Pydantic settings (4-layer priority, design §6.1) |
+|---|---|
+| `agent_core/` | UI-agnostic chat, retrieval, prompt, error, explanation, and session logic |
+| `routes/` | FastAPI routes for chat, sessions, and configuration |
+| `llm/` | LLM provider adapter interface and implementations |
+| `main.py` | FastAPI app assembly and startup sequence |
+| `config.py` | Pydantic settings |
 
 ## Setup
 
 ```bash
-cd cortrix/cortrix-agent
+cd cortrix-agent
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt   # add -i <mirror> if pip is slow
-cp .env.example .env                          # then edit LLM keys
-
-# Start (mock mode — no LLM key needed; cortrix-server not required for boot)
+.venv/bin/pip install -r requirements.txt
+cp .env.example .env
 .venv/bin/uvicorn main:app --port 8001 --reload
 ```
 
-## API (design §9.1)
+Use placeholder values in documentation and real provider keys only in local
+ignored files such as `.env`.
 
-### POST /chat — SSE streaming
+## Health Check
+
+```bash
+curl http://localhost:8001/health
+```
+
+Expected response shape:
+
+```json
+{
+  "status": "ok",
+  "cortrix_server": true,
+  "llm_reachable": true
+}
+```
+
+If `cortrix_server` or `llm_reachable` is false, check backend startup and LLM
+provider configuration.
+
+## Chat API
+
+### POST /chat
+
+Streams a chat response over server-sent events.
 
 ```bash
 curl -N -X POST 'http://localhost:8001/chat?explain=true' \
   -H 'Content-Type: application/json' \
-  -H 'X-Cortrix-Tenant-Id: ' \
   -H 'X-Cortrix-Namespace: default' \
   -d '{"message": "find privacy documents", "session_id": "s-001"}'
 ```
 
-Headers: `Authorization` (optional Bearer; not validated in CE), `X-Cortrix-Tenant-Id`
-(optional, P-5 forward-compat), `X-Cortrix-Namespace` (optional, P-1 request-level NS
-override). Query: `?explain=true` exposes B-class meta; `?debug=true` exposes C-class
-failure detail.
+Common request inputs:
 
-SSE frames:
+| Input | Location | Notes |
+|---|---|---|
+| `message` | JSON body | User message |
+| `session_id` | JSON body | Optional session identifier |
+| `Authorization` | Header | Optional Bearer token, depending on server auth mode |
+| `X-Cortrix-Tenant-Id` | Header | Optional tenant identifier |
+| `X-Cortrix-Namespace` | Header | Optional namespace override |
+| `explain=true` | Query | Includes additional explanation metadata |
+| `debug=true` | Query | Includes additional failure detail |
 
-```
+Example SSE frames:
+
+```text
 data: {"chunk": "Based on"}
 data: {"chunk": " the retrieved documents..."}
-data: {"meta": {"session_id": "s-001", "chunk_ids": [...], "latency_ms": {...},
-                "rag_status": "success", "tenant_id": null, ...}}
+data: {"meta": {"session_id": "s-001", "chunk_ids": [], "rag_status": "success"}}
 data: [DONE]
 ```
 
-`meta` tiers (design §1.7): **A** (always) `session_id` / `tenant_id` / `chunks_used` /
-`chunk_ids` / `latency_ms` / `rag_status`; **B** (`?explain=true`) `prompt_text` /
-`rag_chunks_full` / `model_used` / `llm_token_count`; **C** (`?debug=true` on failure)
-`*_call_failed_detail`. Errors use the GEN-Agent 4-field envelope as an SSE `error`
-event (`{error:{code, message, retryable, category, retry_after_ms, structured_data}}`).
+Errors are returned as structured SSE error events with code, message,
+retryability, category, optional retry delay, and structured data.
 
 ### GET /sessions/{id}
 
-Returns the in-memory windowed history (`messages` / `window_size` / `created_at` /
-`tenant_id`); missing session -> `CX_ERR_F48_SESSION_NOT_FOUND` (404).
+Returns the in-memory windowed history for a session.
 
-### GET /config, GET /config/providers, PUT /config/agent_llm
+### GET /config
 
-`GET /config` returns the current agent LLM config with the API key masked.
-`GET /config/providers` returns the provider catalog reused by the P02a Settings UI.
-`PUT /config/agent_llm` is admin-only; live persistence is `TODO(D3.5)` (cortrix-server
-IGlobalConfig admin endpoint).
+Returns the current Agent LLM configuration with the API key masked.
+
+### GET /config/providers
+
+Returns the provider catalog used by the Agent configuration UI.
+
+### PUT /config/agent_llm
+
+Updates Agent LLM configuration when the runtime supports the required admin
+path. Live persistence is not a current verified capability.
 
 ### GET /health
 
-`{status, cortrix_server, llm_reachable}` (design §9.1).
+Returns service status, backend reachability, and LLM reachability.
+
+## Compatibility Notes
+
+- Built-in Agent chat is the current documented path.
+- Advanced autonomous executor modes are `Roadmap`.
+- Live persistence for `PUT /config/agent_llm` is not a current verified
+  capability.
+- Auth and tenant/RBAC claims should follow
+  [Compatibility](../docs/compatibility.md).
 
 ## Tests
 
 ```bash
 .venv/bin/pytest -q
 ```
-
-## V1.5 / D3.5 scope (not in this V1.0 ①-kernel round)
-
-- DeepSeek adapter (catalog lists it; adapter ships in V1.5)
-- MEM co-processing: F13 interaction_log write + MEM02 extract trigger + MEM05 user_id
-  filter (design F48-rev-9/10/11)
-- Live cortrix-server health ping (§11.bis Step 4) + IGlobalConfig admin getter/setter
-- `ToolUseExecutor` (V1.5) / `PlanExecuteExecutor` (V2)

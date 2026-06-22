@@ -1,13 +1,14 @@
 # Cortrix Python SDK
 
-Official Python SDK for [Cortrix](https://cortrix.io) — Agent-first semantic
+Official Python SDK for [Cortrix](https://cortrix.ai) — Agent-first semantic
 storage. Synchronous (`Cortrix`) and asynchronous (`AsyncCortrix`) clients with
-a Resource-style API, full type hints (`py.typed`), and GEN-Agent-friendly error
+a Resource-style API, full type hints (`py.typed`), and structured error
 handling.
 
-> Status: v1.0.0. SDK surface follows the P03 detailed
-> design (§ 2.12); HTTP wire follows the real Cortrix architecture. Real-server
-> integration paths are exercised in D3.5.
+> Status: `RD review required`. The SDK surface is documented and test-covered,
+> but public-readiness labeling still depends on live API compatibility. See
+> [Agent access](../../docs/agent-access.md) and
+> [Compatibility](../../docs/compatibility.md).
 
 ## Installation
 
@@ -22,7 +23,7 @@ Requires Python 3.9+. The only runtime dependency is [`httpx`](https://www.pytho
 ```python
 from cortrix import Cortrix
 
-client = Cortrix(base_url="http://localhost:8420", api_key="cx_live_xxx")
+client = Cortrix(base_url="http://localhost:8420", api_key="your-cortrix-api-key")
 
 # Create a namespace and upload a document (async processing -> task)
 client.namespaces.create("contracts", display_name="Contracts")
@@ -34,11 +35,16 @@ results = client.search("contracts", "Party A breach clause", top_k=10)
 for item in results.results:
     print(item.score, item.content)
 
-# Coverage / partial-success metadata (AGENT_FRIENDLY A-class meta)
+# Coverage / partial-success metadata
 print(results.meta.coverage_ratio, results.meta.namespaces_succeeded)
 
 client.close()
 ```
+
+Expected success signal: the client can reach the configured server and returns
+resource objects or typed `CortrixError` exceptions. Check the server status in
+[Compatibility](../../docs/compatibility.md) before relying on auth, tenant,
+RBAC, quota, or MEM02 extraction paths.
 
 ### Async
 
@@ -47,7 +53,7 @@ import asyncio
 from cortrix import AsyncCortrix
 
 async def main():
-    async with AsyncCortrix(base_url="http://localhost:8420", api_key="cx_live_xxx") as client:
+    async with AsyncCortrix(base_url="http://localhost:8420", api_key="your-cortrix-api-key") as client:
         results = await client.search(["contracts", "support_docs"], "refund policy")
         return results
 
@@ -72,13 +78,15 @@ The async client mirrors the sync API exactly — every resource method has an
 | `client.system` | `health` / `version` / `namespace_stats` / `agent_llm_config` |
 | `client.tenants` | `list` / `get` / `invite` / `update_role` / `quota` / `create` |
 | `client.ops.gc` | `status` / `run` / `restore` / `purge` |
-| `client.import_database(...)` | manual DB import (F16a) |
+| `client.import_database(...)` | manual database import |
+
+Some resources map to API areas that are currently blocked or under RD review.
+Do not treat resource presence as a production-readiness claim.
 
 ## Ops namespace
 
-Runtime / maintenance operations live under `client.ops` (Agent-first — no web
-console required). GC is the Phase 1 sub-namespace; `admin` / `tenant` are
-Phase 2 evolution hooks.
+Runtime and maintenance operations live under `client.ops` so scripts and
+Agents can perform server operations without a web console.
 
 ```python
 status = client.ops.gc.status()
@@ -90,13 +98,13 @@ client.ops.gc.purge()              # permanent (irreversible) -> X-Ops-Confirm: 
 
 ## Agent-friendly error handling
 
-Every exception derives from `CortrixError` and carries the four GEN-Agent
-fields so Agent frameworks can make autonomous decisions:
+Every exception derives from `CortrixError` and carries structured fields so
+Agent frameworks can make retry and escalation decisions:
 
 ```python
 from cortrix import Cortrix, CortrixError, AuthInvalidCredentialsError, RateLimitError
 
-client = Cortrix(api_key="cx_live_xxx")
+client = Cortrix(api_key="your-cortrix-api-key")
 try:
     client.documents.upload("docs", "report.pdf")
 except AuthInvalidCredentialsError:
@@ -127,15 +135,25 @@ def traceparent() -> str:
     return f"00-{ctx.trace_id:032x}-{ctx.span_id:016x}-01"
 
 client = Cortrix(
-    api_key="cx_live_xxx",
+    api_key="your-cortrix-api-key",
     client_id="my-rag-app",        # -> X-Client-Id header (distinguishes callers)
     trace_id_provider=traceparent, # -> traceparent header (W3C trace context)
 )
 ```
 
 `client_id` and `trace_id_provider` are injected on every request; a failing
-provider never breaks the request. Phase 2 adds a `cortrix[otel]` extra for
-automatic instrumentation (no manual provider needed).
+provider never breaks the request. Automatic instrumentation is not required for
+the minimal SDK path.
+
+## Compatibility Notes
+
+- Auth login is currently `Blocked` in the public status baseline.
+- Tenant/member/ACL/quota behavior is currently `Blocked` pending contract
+  reconciliation.
+- MEM02 extraction is currently `Blocked` because the latest runtime verification
+  found an LLM transport timeout path.
+- Built-in retry/error behavior should be verified against your target
+  cortrix-server build.
 
 ## Development
 
