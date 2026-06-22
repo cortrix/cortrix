@@ -495,6 +495,16 @@ add_executable(cortrix_unit_tests
     unit/test_connector_coverage_gaps.cpp
     unit/test_query_coverage_gaps.cpp
     unit/test_catalog_coverage_gaps.cpp
+    # Test-expansion server wave (push src/server toward 90%: lifecycle + route arms)
+    unit/test_http_server_lifecycle.cpp
+    unit/test_import_handler_gaps.cpp
+    unit/test_gc_cli_gaps.cpp
+    unit/test_flat_document_routes_full.cpp
+    unit/test_document_routes_full.cpp
+    unit/test_agent_proxy_routes_full.cpp
+    unit/test_connector_routes_full.cpp
+    unit/test_route_obs_ops_gc_arms.cpp
+    unit/test_route_tenant_auth_arms.cpp
     unit/test_enum_roundtrip_tenant.cpp
     unit/test_enum_roundtrip_catalog.cpp
     unit/test_enum_roundtrip_import.cpp

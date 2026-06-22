@@ -535,8 +535,6 @@ Status DirWatcherRegistry::LoadState(const std::string& data_dir) {
         return Status::Ok();
     }
 
-    int version = j.value("version", 1);
-
     // Normalize both layouts into directory -> (recursive, [namespaces]).
     struct Restored {
         bool recursive = true;
@@ -562,25 +560,38 @@ Status DirWatcherRegistry::LoadState(const std::string& data_dir) {
         }
     };
 
-    for (const auto& w : j.value("watchers", nlohmann::json::array())) {
-        if (version >= 2) {
-            std::string dir = w.value("directory", "");
-            if (dir.empty()) continue;
-            bool recursive = w.value("recursive", true);
-            auto nss = w.value("target_namespaces",
-                               std::vector<std::string>{});
-            if (nss.empty()) {
-                add(dir, "", recursive);  // dir with no NS (degenerate) — skip on subscribe
+    // Deserialization is non-fatal too: a well-formed-but-mistyped field (e.g. a
+    // string "version" or "recursive") makes nlohmann throw type_error, which must
+    // be treated like a parse failure (WARN + skip) — a corrupt state file must
+    // never block startup (§ 5 edge case). The field reads below live inside the
+    // try for exactly this reason.
+    int version = 1;
+    try {
+        version = j.value("version", 1);
+        for (const auto& w : j.value("watchers", nlohmann::json::array())) {
+            if (version >= 2) {
+                std::string dir = w.value("directory", "");
+                if (dir.empty()) continue;
+                bool recursive = w.value("recursive", true);
+                auto nss = w.value("target_namespaces",
+                                   std::vector<std::string>{});
+                if (nss.empty()) {
+                    add(dir, "", recursive);  // dir with no NS (degenerate) — skip on subscribe
+                }
+                for (const auto& ns : nss) add(dir, ns, recursive);
+            } else {
+                // v1: each entry = (data_dir, namespace_name). Merge same data_dir
+                // entries into one watcher's target_namespaces (§ 3.1 / § 4.4).
+                std::string dir = w.value("data_dir", "");
+                std::string ns = w.value("namespace_name", "default");
+                if (dir.empty()) continue;
+                add(dir, ns, /*recursive=*/true);
             }
-            for (const auto& ns : nss) add(dir, ns, recursive);
-        } else {
-            // v1: each entry = (data_dir, namespace_name). Merge same data_dir
-            // entries into one watcher's target_namespaces (§ 3.1 / § 4.4).
-            std::string dir = w.value("data_dir", "");
-            std::string ns = w.value("namespace_name", "default");
-            if (dir.empty()) continue;
-            add(dir, ns, /*recursive=*/true);
         }
+    } catch (const std::exception& e) {
+        CORTRIX_LOG_WARN(kModule, "watchers.json deserialize failed, skipping: {}",
+                         e.what());
+        return Status::Ok();
     }
 
     int restored = 0;
