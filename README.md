@@ -1,306 +1,170 @@
-<!-- Hero -->
 <div align="center">
   <img src="docs/assets/cortrix-logo.svg" width="100" alt="Cortrix logo">
 
   # Cortrix
 
-  ### Agent-Native Semantic Storage Engine
+  Agent-native semantic storage for retrieval, memory, and API-driven AI applications.
 
   [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
   [![Version](https://img.shields.io/badge/version-0.1.0--rc.1-orange.svg)](https://github.com/cortrix/cortrix/releases)
   [![C++17](https://img.shields.io/badge/C%2B%2B-17-blueviolet.svg)](https://en.cppreference.com/w/cpp/17)
-  [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey.svg)](#-installation)
-  [![Tests](https://img.shields.io/badge/tests-4590%20passing-success.svg)](#-testing)
 
-  <!-- Dynamic badges below need a PUBLIC repo + live infra to render (shields.io
-       cannot read a private repo's CI/stars; the Discord/PyPI ids are placeholders).
-       Re-enable at the public release once CI, the Discord server, and the PyPI
-       package exist:
-  [![CI](https://img.shields.io/github/actions/workflow/status/cortrix/cortrix/ci.yml?branch=main)](https://github.com/cortrix/cortrix/actions)
-  [![PyPI](https://img.shields.io/pypi/v/cortrix)](https://pypi.org/project/cortrix)
-  [![Discord](https://img.shields.io/discord/SERVER_ID?label=Discord&logo=discord)](https://discord.gg/cortrix)
-  [![GitHub stars](https://img.shields.io/github/stars/cortrix/cortrix?style=social)](https://github.com/cortrix/cortrix/stargazers)
-  -->
-
-  [Watch Demo Video (60s)](https://cortrix.ai) <!-- Video coming Phase 1.5 -->
-
-  [Live Demo (Cloud)](https://cortrix.ai/cloud) · [Documentation](#-api-documentation) · [Discord](https://discord.gg/cortrix)
+  [Quickstart](docs/QUICKSTART.md) · [Agent access](docs/agent-access.md) · [Compatibility](docs/compatibility.md) · [OpenAPI](api/openapi.yaml)
 </div>
 
-> **README is for humans.** For Agent / LLM consumption, read the machine-readable [OpenAPI spec](api/openapi.yaml) or connect a [MCP Server](#-agent-integration) directly.
+Cortrix provides a local-first semantic storage server with namespaces, documents, blocks, hybrid search, memory APIs, and Agent-oriented access paths. It is designed for applications and Agents that need a programmable retrieval layer rather than a one-off vector database wrapper.
 
----
+The repository includes:
 
-## ✨ Why Cortrix?
+- `cortrix-server`: the C++ backend and HTTP API.
+- `api/openapi.yaml`: the public OpenAPI contract.
+- `cortrix-mcp/`: an MCP server for IDE and Agent clients.
+- `sdk/python/`: the Python SDK.
+- `cortrix-agent/`: the built-in fixed-flow RAG chat service.
+- `web/`: the local Web UI.
 
-- **Agent-first** — every API is designed for machine consumption: a 4-field error schema (`code` / `retryable` / `category` / `retry_after_ms`), `x-cortrix-*` OpenAPI hints (retryability, auth scope, typical latency, rate limit), and a native MCP Server.
-- **Hybrid retrieval** — P-HNSW vector index + BM25 full-text scoring fused with RRF, plus cross-namespace parallel query in a single call.
-- **Memory System** — conversational memory with `fact` / `preference` / `event` classification, automatic invalidation, and immune decay.
-- **PG-native Access (pgcortrix)** — a drop-in PostgreSQL extension: query Cortrix semantically from any SQL client, BI tool, or existing PG stack via `SELECT * FROM pgcortrix_search(...)`. Zero migration, full ecosystem — `psql`, pgAdmin, DBeaver, Grafana, and Superset all work out of the box. DBA-friendly governance via SQL. (See [`sql-extensions/pgcortrix`](sql-extensions/pgcortrix/) for the full integration matrix.)
-- **Open license** — AGPL-3.0; commercial licenses available for closed-source use.
+## Documentation Map
 
-> **Note:** `pgcortrix` is Cortrix's PG-native access surface — it is **not** part of any benchmark head-to-head against `pgvector` (different role: ecosystem access vs. vector index). It is presented here as an integration capability — "consume Cortrix semantic retrieval with your existing PostgreSQL tooling."
+Start here:
 
----
+- [Quickstart](docs/QUICKSTART.md): build, configure, start, and run the first health/API checks.
+- [Agent access](docs/agent-access.md): choose between HTTP/OpenAPI, MCP, Python SDK, and the built-in Agent.
+- [Compatibility and known status](docs/compatibility.md): current public status for API, MCP, SDK, Agent, auth, tenant/RBAC, memory extraction, benchmarks, and security hardening.
+- [OpenAPI spec](api/openapi.yaml): endpoint paths, schemas, security schemes, and response contracts.
+- [MCP README](cortrix-mcp/README.md): MCP server setup and tool reference.
+- [Python SDK README](sdk/python/README.md): Python client setup and resource model.
+- [Built-in Agent README](cortrix-agent/README.md): FastAPI Agent service and chat endpoints.
+- [Security policy](SECURITY.md): security reporting path.
+- [Contributing](CONTRIBUTING.md): development workflow and contribution checklist.
 
-## 🚀 Quick Start (3 minutes)
+## Current Status
 
-### Step 1: Start Cortrix Server (Docker, demo data pre-loaded)
+Cortrix is in active pre-release development. The public documentation uses these status labels:
 
-```bash
-docker run -d -p 8420:8420 \
-  -v cortrix-data:/data \
-  cortrix/cortrix-demo:v1.0   # Includes a pre-built "demo" namespace (5 self-referential docs)
-```
+- `Verified`: directly supported by current code/spec evidence and exercised in the latest validation scope.
+- `RD review required`: present in code, spec, or docs, but not yet confirmed enough for a public-readiness claim.
+- `Blocked`: known broken, blocked, or not provable in the current runtime.
+- `Roadmap`: planned or reserved for a later version.
 
-Verify it's running:
+High-signal current status:
 
-```bash
-curl http://localhost:8420/api/v1/system/health/ready
-# → {"status": "ok", "version": "1.0.0"}
-```
-
-### Step 2: Install the Python SDK
-
-```bash
-pip install cortrix   # Python 3.9+
-```
-
-### Step 3: Query
-
-```python
-from cortrix import Cortrix
-
-# The SDK owns the /api/v1 prefix — pass only the host.
-client = Cortrix(base_url="http://localhost:8420")
-results = client.search("demo", "What is Cortrix?", top_k=10)
-for r in results.results:
-    print(f"[{r.score:.2f}] {r.content[:200]}")
-```
-
-Expected output:
-
-```
-[0.92] Cortrix is an open-source Agent-Native Semantic Storage Engine...
-[0.87] Cortrix provides semantic storage with hybrid retrieval (vector + BM25)...
-[0.83] ...
-```
-
-<details>
-<summary>curl example</summary>
-
-```bash
-curl -X POST http://localhost:8420/api/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{"namespaces": ["demo"], "query": "What is Cortrix?", "top_k": 10}'
-```
-</details>
-
-<details>
-<summary>JavaScript (fetch) example</summary>
-
-```javascript
-const response = await fetch("http://localhost:8420/api/v1/query", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ namespaces: ["demo"], query: "What is Cortrix?", top_k: 10 }),
-});
-const { results } = await response.json();
-```
-</details>
-
-### Alternative: Build from Source
-
-```bash
-git clone https://github.com/cortrix/cortrix
-cd cortrix
-docker compose -f deploy/docker-compose.yml up -d   # Builds + starts the server
-```
-
-> **Troubleshooting**
-> - *Docker not running*: ensure Docker Desktop is started.
-> - *Port already allocated*: override with `CORTRIX_PORT=18080 docker compose -f deploy/docker-compose.yml up` (avoid `9091`, used by the OpenMetrics endpoint).
-> - *`pip install` times out*: use a mirror, e.g. `pip install -U cortrix --index-url https://pypi.org/simple/`.
-> - *First query is slow / returns 0 results*: the demo index may build on first use (5–30s); retry once.
-> - *Out of memory*: the bge-m3 embedding model needs ≥ 4 GB; ≥ 8 GB RAM is recommended. Check with `docker stats`.
-
-### Next Steps
-
-- **[Cross-NS Query](docs/tutorial-cross-ns.md)** — parallel search across multiple namespaces (a Cortrix-unique feature).
-- **[Memory System Tutorial](docs/tutorial-memory.md)** — `fact` / `preference` / `event` auto-classification.
-- **[Upload Your Own Data](docs/tutorial-upload.md)** — connect your business documents.
-- **[Agent Integration](#-agent-integration)** — connect via MCP / HTTP / LangChain / etc.
-
----
-
-## 🤖 Agent Integration
-
-Cortrix is built for AI Agents. There are three ways to connect.
-
-### MCP Server (Claude Code / Cline / Cursor) ⭐ Recommended
-
-The simplest path for Agent IDE users:
-
-```json
-{
-  "mcpServers": {
-    "cortrix": {
-      "command": "cortrix-mcp",
-      "env": {
-        "CORTRIX_URL": "http://localhost:8420",
-        "CORTRIX_NAMESPACE": "demo",
-        "CORTRIX_API_KEY": "your-api-key"
-      }
-    }
-  }
-}
-```
-
-Claude Code / Cline / Cursor will auto-discover **31 Cortrix tools** (29 core + 2 admin: search, memory, upload, extract, task status, and more). See the [`cortrix-mcp/`](cortrix-mcp/) README for the full tool reference.
-
-### Direct HTTP API (for custom Agents)
-
-```python
-# Any Agent framework can call the Cortrix HTTP API directly:
-import requests
-
-response = requests.post(
-    "http://localhost:8420/api/v1/query",
-    json={"namespaces": ["demo"], "query": "What is Cortrix?", "top_k": 10},
-)
-```
-
-Cortrix returns Agent-friendly responses:
-
-- **4-field error schema**: `{code, retryable, category, retry_after_ms}` — see [Agent-Friendly design](docs/agent-friendly.md).
-- **`x-cortrix-*` OpenAPI extensions**: `retryable`, `auth_scope`, `typical_latency` (P50/P99), `rate_limit`.
-
-See the [OpenAPI spec](api/openapi.yaml) for the full reference (71+ endpoints).
-
-### Framework Integrations (via Cortrix Skill SDK)
-
-Available now — 3 adapters (`pip install cortrix-skills[langchain|claude|openai|all]`):
-
-- **LangChain** — `from cortrix_skills.adapters.langchain import as_langchain_tools` (29 LangChain tools).
-- **Claude Tools** — `from cortrix_skills.adapters.claude import as_claude_tools` (29 tool definitions for the Anthropic API `tool_use`).
-- **OpenAI Function Calling** — `from cortrix_skills.adapters.openai import as_openai_functions` (29 OpenAI Chat Completions tool definitions).
-
-Coming in Phase 1.5:
-
-- **LlamaIndex** — `from cortrix_skills.adapters.llamaindex import ...`
-
----
-
-## 📚 Examples / Use Cases
-
-### 1. RAG for an AI Assistant (LangChain)
-
-```python
-from cortrix_skills.adapters.langchain import CortrixRetriever
-from langchain.chains import RetrievalQA
-
-retriever = CortrixRetriever(base_url="http://localhost:8420", namespace="knowledge_base")
-qa = RetrievalQA.from_chain_type(llm=..., retriever=retriever)
-answer = qa.run("How do I configure Cortrix?")
-```
-
-### 2. Long-term Agent Memory
-
-```python
-from cortrix import Cortrix
-
-client = Cortrix(base_url="http://localhost:8420")
-
-# Log an interaction — Cortrix auto-extracts memory (type=preference, "user prefers dark mode").
-client.memory.log(
-    "support",
-    query="Set my theme",
-    response="Switched the UI to dark mode.",
-    user_id="user_123",
-)
-
-# Retrieve memory for a user.
-preferences = client.memory.search(
-    "support",
-    "UI preferences",
-    user_id="user_123",
-)
-```
-
-### 3. Semantic SQL (pgcortrix)
-
-```sql
--- Drop-in PostgreSQL extension (V1: plpython3u + HTTP to the Cortrix Server).
-CREATE EXTENSION plpython3u;     -- Prerequisite (untrusted PL; superuser install)
-CREATE EXTENSION pgcortrix;
-
-SELECT pgcortrix_configure('your-api-key');
-
-SELECT * FROM pgcortrix_search('contracts', 'breach of confidentiality clauses', top_k := 10);
-```
-
-| Use case | Why it matters | Audience |
+| Area | Status | Notes |
 |---|---|---|
-| RAG (LangChain) | Plug Cortrix straight into the LangChain ecosystem | AI Agent / RAG developers |
-| Long-term Memory | Cortrix's own Memory System (`fact` / `preference` / `event`) | Agent / chatbot developers |
-| Semantic SQL (pgcortrix) | Data-infrastructure positioning — not just a vector library | DBAs / data teams |
+| OpenAPI file | `Verified` | `api/openapi.yaml` is present and declares the public API surface. |
+| Local server, health endpoints, namespaces, documents, query | `RD review required` | Core surfaces exist, but public-readiness labeling still depends on end-to-end verification. |
+| MCP server | `RD review required` | MCP tooling exists and has test coverage, with release-readiness still under review. |
+| Python SDK | `RD review required` | SDK resources and tests exist, with compatibility still tied to the live API contract. |
+| Built-in Agent chat | `RD review required` | Fixed-flow chat mode exists; advanced autonomous executors are roadmap items. |
+| Auth login | `Blocked` | The public spec defines login, but the latest runtime verification found contract drift. |
+| Tenant/member/ACL/quota | `Blocked` | Runtime behavior and documented contract are still being reconciled. |
+| MEM02 memory extraction | `Blocked` | Latest verification observed an LLM transport timeout path. |
+| RBAC and tenant isolation denial matrix | `Blocked` | Cannot be proven in the current auth-disabled local runtime. |
+| Benchmark claims | `RD review required` | Treat performance and benchmark numbers as unpublished until measured artifacts are accepted. |
 
----
+See [Compatibility and known status](docs/compatibility.md) before making production, security, benchmark, or integration claims.
 
-## 📖 API Documentation
+## Quickstart
 
-### Self-Deployed (Community Edition)
+Use the source-first quickstart:
 
-The three main paths for Cortrix CE users:
+```bash
+git clone https://github.com/cortrix/cortrix.git
+cd cortrix
+cp config.yaml.example build/config.yaml
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+./dev.sh
+```
 
-- **Local Swagger UI** — `http://localhost:8420/docs` (after `docker compose up` or `cortrix-server` start).
-- **OpenAPI Spec** — [`api/openapi.yaml`](api/openapi.yaml) — OpenAPI 3.0, 71+ endpoints.
-- **Python SDK** — [`pip install cortrix`](https://pypi.org/project/cortrix) — generated from the spec.
+Then check the backend:
 
-### Managed Service
+```bash
+curl http://localhost:8420/api/v1/health
+curl http://localhost:8420/api/v1/system/health/ready
+```
 
-- **Cortrix Cloud** (managed, no install) — [cortrix.ai/cloud](https://cortrix.ai/cloud) — launching Phase 1.5.
+For the full path, expected responses, LLM configuration notes, and troubleshooting, see [Quickstart](docs/QUICKSTART.md).
 
----
+## API Reference
 
-## 📊 Benchmarks
+The canonical API contract is [api/openapi.yaml](api/openapi.yaml).
 
-| Test | Cortrix | Baseline | Improvement |
-|---|---:|---:|---:|
-| Recall@10 (CN dataset) | **0.92** | 0.78 (pgvector) | **+18%** |
-| Cross-NS Query (P50) | **180 ms** | N/A (Cortrix-unique) | — |
-| Memory Search (P99) | **320 ms** | N/A | — |
-| Build Index (100k docs) | **12 min** | 18 min (pgvector) | **1.5×** |
-| Storage (per 1M chunks) | **4.2 GB** | 5.8 GB (pgvector) | **−28%** |
+The spec includes:
 
-> Numbers from `cortrix-bench` v1.0 on the CN dataset `cortrix-ragdata-cn-v1`.
-> Hardware: AWS m6i.xlarge (4 vCPU / 16 GB RAM). Final figures land with the v1.0 release.
+- local and cloud server URLs;
+- API key and Bearer auth schemes;
+- namespaces, documents, query, memory, watch, import, auth, admin, tenant, Agent, system, GC, and maintenance paths;
+- request/response schemas and error schemas.
 
-[Full benchmarks →](BENCHMARK.md) · [Methodology →](BENCHMARK.md#methodology) · [Reproduce →](https://github.com/cortrix/cortrix-bench)
+OpenAPI presence is not the same as runtime verification. If an endpoint is listed as `RD review required` or `Blocked` in [Compatibility](docs/compatibility.md), use that status as the public claim boundary.
 
----
+## Agent Access
 
-## 🎯 Roadmap
+Cortrix exposes four access paths:
 
-- ✅ **v1.0 (Now)** — Community Edition: Cortrix Server + P-HNSW + BM25 hybrid + pgcortrix + MCP Server + Python SDK.
-- 🚧 **v1.5 (Q3 2026)** — Cloud SaaS launch + Web UI + async document processing + LlamaIndex adapter.
-- 🔮 **v2.0 (Q1 2027)** — multi-tenant + TypeScript SDK + advanced RAG.
+| Path | Best for | Entry point |
+|---|---|---|
+| HTTP API / OpenAPI | Custom services and direct Agent calls | [api/openapi.yaml](api/openapi.yaml) |
+| MCP server | IDE Agents and MCP-compatible clients | [cortrix-mcp/README.md](cortrix-mcp/README.md) |
+| Python SDK | Python applications and RAG pipelines | [sdk/python/README.md](sdk/python/README.md) |
+| Built-in Agent | Local fixed-flow chat over Cortrix storage | [cortrix-agent/README.md](cortrix-agent/README.md) |
 
----
+See [Agent access](docs/agent-access.md) for selection guidance and current support status.
 
-## 💬 Community
+## Core Concepts
 
-- [Discord](https://discord.gg/cortrix) — real-time chat.
-- [GitHub Discussions](https://github.com/cortrix/cortrix/discussions) — Q&A.
-- [Twitter @CortrixAI](https://twitter.com/CortrixAI) — updates.
-- [hello@cortrix.ai](mailto:hello@cortrix.ai)
+- **Namespace**: a logical collection boundary for documents, blocks, memory, and queries.
+- **Document**: uploaded source material that can be parsed and indexed.
+- **Block**: a searchable unit derived from a document or memory record.
+- **Query**: a retrieval request over one or more namespaces.
+- **Memory**: structured long-term information captured from interactions or explicit API calls.
+- **Agent surface**: a programmatic path that lets an Agent use Cortrix through HTTP, MCP, SDK, or the built-in Agent service.
 
----
+## Configuration
 
-## 🤝 Contributing
+The default local config template is `config.yaml.example`. Copy it into `build/config.yaml` before the first run:
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, branch workflow, and PR checklist.
+```bash
+cp config.yaml.example build/config.yaml
+```
 
-## 📄 License
+LLM-backed features are configured by role:
 
-AGPL-3.0 — see [LICENSE](LICENSE) for details. Commercial licenses are available for closed-source use — contact [hello@cortrix.ai](mailto:hello@cortrix.ai).
+- `semantic_llm`: intent classification and reranking.
+- `vision_llm`: OCR image enhancement.
+- `agent_llm`: built-in Agent chat.
+- `doc_summary_llm`: ingest-side summaries.
+- `enricher_llm`: ingest enrichment.
+
+Use placeholder values in documentation and real provider keys only in local ignored config files. Do not commit secrets.
+
+## Production And Security Notes
+
+Cortrix is pre-release. Before using it outside local development, review:
+
+- [Compatibility and known status](docs/compatibility.md) for blocked and review-required areas.
+- [Security policy](SECURITY.md) for reporting.
+- `config.yaml.example` for auth and API key configuration.
+- `deploy/` for deployment templates.
+
+Do not assume production readiness for auth, tenant isolation, RBAC, quota enforcement, memory extraction, or benchmark performance until those areas are marked `Verified`.
+
+## Roadmap
+
+Roadmap items are not current capabilities.
+
+- Advanced autonomous Agent executors such as tool-use and plan-execute modes.
+- Additional integration adapters beyond the currently documented surfaces.
+- Production-readiness hardening for auth, tenant isolation, RBAC, quota, logging redaction, and deployment operations.
+- Public benchmark artifacts after methodology and measurements are accepted.
+
+## Community And Contribution
+
+- [GitHub Issues](https://github.com/cortrix/cortrix/issues): bugs and feature requests.
+- [GitHub Discussions](https://github.com/cortrix/cortrix/discussions): questions if discussions are enabled.
+- [Security policy](SECURITY.md): security reports.
+- [Contributing](CONTRIBUTING.md): local development and pull requests.
+
+## License
+
+Cortrix is licensed under [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0).

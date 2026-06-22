@@ -5,15 +5,24 @@ over the Model Context Protocol (stdio), so IDE agents like **Claude Code**, **C
 and **Cursor** can index documents, run hybrid semantic search, manage conversation
 memory, and trigger admin database imports.
 
+> Status: `RD review required`. The MCP package and tool groups are documented and
+> test-covered, but public-readiness labeling still depends on the target
+> cortrix-server runtime and API compatibility. See
+> [Agent access](../docs/agent-access.md) and
+> [Compatibility](../docs/compatibility.md).
+
 Built on [FastMCP](https://github.com/modelcontextprotocol) + [httpx](https://www.python-httpx.org/).
 It talks HTTP directly to a running `cortrix-server` (no Python SDK in the path).
 
 ## Why MCP
 
-`cortrix-mcp` is the **IDE path** of the Cortrix 3-path agent-access strategy
-(MCP for IDEs / Skill SDK for agent frameworks / Python SDK for direct API). Every tool
-response carries the GEN-Agent two-layer schema so agents can reason about retries and
-data integrity (see [Response schema](#response-schema)).
+`cortrix-mcp` is the IDE-oriented path for Agent access. Every tool response
+uses a structured data/meta envelope so agents can reason about retries and data
+integrity (see [Response schema](#response-schema)).
+
+Use MCP when your client supports Model Context Protocol over stdio. Use the
+Python SDK or direct HTTP API when you need application-level control over
+transport, retries, deployment, or custom auth handling.
 
 ## Install
 
@@ -30,7 +39,7 @@ This installs the `cortrix-mcp` console command (the MCP stdio server entry poin
 ```bash
 docker run -i --rm \
   -e CORTRIX_URL=http://host.docker.internal:8420 \
-  -e CORTRIX_API_KEY=sk-cortrix-... \
+  -e CORTRIX_API_KEY=your-cortrix-api-key \
   cortrix/mcp:v1.0.0
 ```
 
@@ -42,12 +51,13 @@ All configuration is via environment variables:
 |---|---|---|
 | `CORTRIX_URL` | cortrix-server base URL | `http://127.0.0.1:8420` |
 | `CORTRIX_NAMESPACE` | default namespace | `default` |
-| `CORTRIX_API_KEY` | Bearer token (P08 API key) | *(empty)* |
-| `CORTRIX_MCP_ADMIN` | admin override for the 2 admin tools (P08 role fallback) | `false` |
+| `CORTRIX_API_KEY` | Bearer token or API key for the target server | *(empty)* |
+| `CORTRIX_MCP_ADMIN` | Enables admin-only tools when the server accepts the caller as admin | `false` |
 | `CORTRIX_MCP_TIMEOUT` | HTTP timeout in seconds | `30` |
 
-> The server connects to cortrix-server on port **8420** by default (matching the
-> server's `config.h` default and the MVP).
+> The server connects to cortrix-server on port **8420** by default.
+
+Use placeholder values in examples. Do not commit real API keys.
 
 ## IDE configuration examples
 
@@ -62,7 +72,7 @@ All configuration is via environment variables:
       "command": "cortrix-mcp",
       "env": {
         "CORTRIX_URL": "http://127.0.0.1:8420",
-        "CORTRIX_API_KEY": "sk-cortrix-..."
+        "CORTRIX_API_KEY": "your-cortrix-api-key"
       }
     }
   }
@@ -79,7 +89,7 @@ Docker variant:
       "args": [
         "run", "-i", "--rm",
         "-e", "CORTRIX_URL=http://host.docker.internal:8420",
-        "-e", "CORTRIX_API_KEY=sk-cortrix-...",
+        "-e", "CORTRIX_API_KEY=your-cortrix-api-key",
         "cortrix/mcp:v1.0.0"
       ]
     }
@@ -98,7 +108,7 @@ Docker variant:
       "command": "cortrix-mcp",
       "env": {
         "CORTRIX_URL": "http://127.0.0.1:8420",
-        "CORTRIX_API_KEY": "sk-cortrix-..."
+        "CORTRIX_API_KEY": "your-cortrix-api-key"
       },
       "disabled": false
     }
@@ -117,7 +127,7 @@ Docker variant:
       "command": "cortrix-mcp",
       "env": {
         "CORTRIX_URL": "http://127.0.0.1:8420",
-        "CORTRIX_API_KEY": "sk-cortrix-..."
+        "CORTRIX_API_KEY": "your-cortrix-api-key"
       }
     }
   }
@@ -155,7 +165,7 @@ Docker variant:
 
 ## Response schema
 
-Every tool returns the **GEN-Agent two-layer 4-field** envelope:
+Every tool returns a structured two-layer envelope:
 
 ```json
 {
@@ -183,6 +193,16 @@ On error the tool raises an `McpError` (MCP `isError=true`) whose `data` carries
 
 Business errors from cortrix-server (`CX_ERR_NS_*`, `CX_ERR_MEM03_*`, …) pass through
 unchanged.
+
+## Compatibility Notes
+
+- MEM02 memory extraction is currently `Blocked` in the latest public status
+  baseline because the runtime verification found an LLM transport timeout path.
+- Auth, tenant/member/ACL/quota, RBAC, and tenant isolation behavior must be
+  checked against [Compatibility](../docs/compatibility.md) before making a
+  production or security claim.
+- Tool count and tool names describe this package surface. They do not prove that
+  every backend route is verified in every runtime.
 
 ## Development
 

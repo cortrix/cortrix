@@ -1,406 +1,234 @@
-# Cortrix User Guide
+# Cortrix Quickstart
 
-> **Version**: v0.1.0 | **Updated**: 2026-02
+This guide starts Cortrix from source, checks the backend, and gives you the first API calls to verify the local runtime.
 
----
+Cortrix is in active pre-release development. For current feature status, read [Compatibility and known status](compatibility.md).
 
-## Table of Contents
+## Prerequisites
 
-1. [Architecture Overview](#architecture-overview)
-2. [Environment Setup](#environment-setup)
-3. [Building](#building)
-4. [Configuration](#configuration)
-5. [One-Command Startup (recommended)](#one-command-startup-recommended)
-6. [Manual Startup](#manual-startup)
-7. [Verification and Testing](#verification-and-testing)
-8. [Using the Features](#using-the-features)
-9. [LLM Configuration in Detail](#llm-configuration-in-detail)
-10. [Vector Model Configuration](#vector-model-configuration)
-11. [Authentication Configuration](#authentication-configuration)
-12. [Automatic Directory Watching](#automatic-directory-watching)
-13. [Production Deployment](#production-deployment)
-14. [FAQ](#faq)
+Minimum local tools:
 
----
+- CMake
+- A C++17 compiler
+- OpenSSL development headers
+- Node.js 20 or newer for the Web UI
+- Python 3.9 or newer for document parsing, the Python SDK, and the built-in Agent
+- Docker, only if you use the deployment templates
 
-## Architecture Overview
-
-Cortrix consists of three services, managed uniformly via `dev.sh`:
-
-```
-┌─────────────────────────────────────────────────────┐
-│                  Browser :5173                        │
-│              React + Vite frontend                    │
-└──────────────────┬──────────────────────────────────┘
-                   │ /api/*       │ /agent/*
-                   ▼              ▼
-    ┌──────────────────┐  ┌──────────────────────┐
-    │  C++ backend :8420│  │  Python Agent :8001   │
-    │  cortrix-server    │  │  cortrix-agent (FastAPI)  │
-    │                   │  │                        │
-    │  • Doc ingestion   │  │  • Frontend chat/RAG   │
-    │  • Vector search   │  │  • LLM settings mgmt   │
-    │  • Memory mgmt     │  │  • Session history     │
-    │  • Intent classify │  │                        │
-    │  config: build/   │  │  config: cortrix-agent/.env │
-    │        config.yaml│  │                        │
-    └──────────────────┘  └──────────────────────────┘
-```
-
-**LLM configuration (five role-based sections):**
-
-The C++ backend reads its LLM settings directly from `build/config.yaml`. Each of
-five roles is its own flat section with `provider` / `api_key` / `model` /
-`base_url` (see [LLM Configuration in Detail](#llm-configuration-in-detail)):
-
-| Role | Consumer | Purpose |
-|------|------|------|
-| `semantic_llm` | C++ backend | Intent classification + reranking (every query; fast/cheap) |
-| `vision_llm` | C++ backend | OCR image refinement (vision model) |
-| `agent_llm` | Python Agent | Conversational RAG/chat |
-| `doc_summary_llm` | C++ backend | Ingest-side document summary (F41) |
-| `enricher_llm` | C++ backend | SPC ingest enricher — NER + summary (F03) |
-
-> The Python Agent (`cortrix-agent/`) resolves its provider from `cortrix-agent/.env`,
-> falling back to the `agent_llm` section of `config.yaml`. See
-> [LLM Configuration in Detail](#llm-configuration-in-detail).
-
-**Performance metrics (MVP, measured)**: API P50 ~127μs, vector search 1K ~304μs, BM25 full-text search 1K ~72μs
-
----
-
-## Environment Setup
-
-### macOS
+macOS:
 
 ```bash
-xcode-select --install          # Clang + build tools
-brew install cmake openssl node  # CMake, OpenSSL, Node.js
+xcode-select --install
+brew install cmake openssl node
 ```
 
-### Ubuntu / Debian
+Ubuntu / Debian:
 
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake libssl-dev git curl
-# Node.js (required by the frontend)
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-### Python Environment (document parsing)
-
-```bash
-# OCR virtual environment (for PDF/DOCX/image parsing)
-python3 -m venv scripts/ocr_venv
-source scripts/ocr_venv/bin/activate
-pip install pymupdf python-docx pillow pytesseract
-
-# Cortrix Agent virtual environment (for the frontend chat service)
-python3 -m venv cortrix-agent/venv
-source cortrix-agent/venv/bin/activate
-pip install -r cortrix-agent/requirements.txt
-```
-
----
-
-## Building
+## 1. Clone And Configure
 
 ```bash
 git clone https://github.com/cortrix/cortrix.git
-cd cortrix-codes/cortrix
-
-# Standard build (includes ONNX vector model support)
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
-```
-
-The build takes about 2-3 minutes; dependencies are downloaded automatically. Artifact: `build/cortrix-server`
-
-**Lightweight build without ONNX** (no semantic search, BM25 full-text search only):
-```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DCORTRIX_USE_ONNX=OFF
-```
-
----
-
-## Initial Configuration (required on first run)
-
-The repository ships a configuration template; **copy and fill it in before the first run**:
-
-```bash
+cd cortrix
+mkdir -p build
 cp config.yaml.example build/config.yaml
 ```
 
-**User workflow:**
+`build/config.yaml` is ignored by Git. Put real provider keys only in that local file or in local environment variables.
 
-1. `cp config.yaml.example build/config.yaml`
-2. In `build/config.yaml`, find the LLM role sections you need, fill in each
-   role's `provider` / `api_key` / `model` / `base_url`, and uncomment it
-3. Run `./dev.sh`
+For a first backend smoke test, you can leave LLM roles disabled. LLM-backed features such as reranking, OCR enhancement, memory extraction, and built-in Agent chat require provider configuration.
 
-> **Note**: `build/config.yaml` is not committed to git (`build/` is already in `.gitignore`),
-> so API Keys are kept safe locally. `config.yaml.example` contains no real keys and can be committed safely.
-
-**Minimal example** (using Zhipu GLM):
-
-```yaml
-# Edit build/config.yaml and uncomment the role sections you need, filling in the
-# Key. Each role is a flat section with the same four fields:
-semantic_llm:
-  provider: "glm"
-  api_key: "your-real-key-here"      # ← fill in here
-  model: "glm-4-flash"
-  base_url: "https://open.bigmodel.cn/api/paas/v4"
-
-agent_llm:
-  provider: "glm"
-  api_key: "your-real-key-here"
-  model: "glm-4.6"
-  base_url: "https://open.bigmodel.cn/api/paas/v4"
-```
-
-> The five roles are `semantic_llm`, `vision_llm`, `agent_llm`, `doc_summary_llm`,
-> and `enricher_llm`. Configure only the ones you need; an unconfigured role simply
-> stays off. See [LLM Configuration in Detail](#llm-configuration-in-detail) for
-> the full list and per-provider notes (OpenAI, Anthropic Claude, …).
-
----
-
-## Configuration
-
-### Main config file: `build/config.yaml`
-
-Edit this file to configure the C++ backend's behavior. For the fully-commented version, see `build/config.yaml` (it has detailed inline documentation).
-
-**The config keys you'll most often need to change:**
-
-```yaml
-# Data storage directory (relative to codes/cortrix/)
-namespace:
-  data_dir: "./build/data"
-
-# Vector model path (must be downloaded, see the "Vector Model Configuration" section)
-embedding:
-  model_path: "./models/bge-m3/model.onnx"
-
-# LLM roles (each a flat section; uncomment and fill in api_key to activate)
-semantic_llm:
-  provider: "glm"
-  api_key: "your-glm-api-key"   # ← fill in the real Key
-  model: "glm-4-flash"
-  base_url: "https://open.bigmodel.cn/api/paas/v4"
-vision_llm:
-  provider: "glm"
-  api_key: "your-glm-api-key"
-  model: "glm-4v-flash"
-  base_url: "https://open.bigmodel.cn/api/paas/v4"
-agent_llm:
-  provider: "glm"
-  api_key: "your-glm-api-key"
-  model: "glm-4.6"
-  base_url: "https://open.bigmodel.cn/api/paas/v4"
-
-# Local directory auto-watching (file changes are ingested automatically)
-watch_dir:
-  data_dir: "/path/to/your/documents"
-  namespace_name: "local"
-  watch_enabled: true
-```
-
----
-
-## One-Command Startup (recommended)
+## 2. Build
 
 ```bash
-cd codes/cortrix
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+```
 
-# Start all three services (backend + Agent + frontend)
+The backend binary is created at:
+
+```text
+build/cortrix-server
+```
+
+If you want a lighter build without ONNX semantic embeddings, use:
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCORTRIX_USE_ONNX=OFF
+cmake --build build -j
+```
+
+BM25 full-text search can still work in this mode, but semantic search quality should not be treated as representative.
+
+## 3. Start Cortrix
+
+Recommended local path:
+
+```bash
 ./dev.sh
 ```
 
-Output after startup:
-```
-[cortrix] Using config file: .../build/config.yaml
-[cortrix] Backend ready ✓
-[cortrix] Cortrix Agent ready ✓  (LLM: glm)
-[cortrix] =====================================
-[cortrix]   Frontend: http://localhost:5173
-[cortrix]   Backend:  http://localhost:8420/api/v1/health
-[cortrix]   Agent:    http://localhost:8001/health
-[cortrix]   Config:   build/config.yaml
-[cortrix]   LLM:      cortrix-agent/.env
-[cortrix]   Press Ctrl+C to stop all services
-[cortrix] =====================================
+`dev.sh` starts the backend, the built-in Agent service, and the Web UI when their dependencies are available.
+
+Expected service URLs:
+
+```text
+Backend:  http://localhost:8420
+Agent:    http://localhost:8001
+Web UI:   http://localhost:5173
 ```
 
-Open **http://localhost:5173** in a browser.
-
-### Startup Parameters
+Manual backend-only startup:
 
 ```bash
-./dev.sh                          # default config
-./dev.sh --config /path/x.yaml   # specify a config file
-./dev.sh --auth                   # force authentication on
-./dev.sh --no-auth                # force authentication off
-```
-
----
-
-## Manual Startup
-
-To start each service individually:
-
-```bash
-# 1. Start the C++ backend
 ./build/cortrix-server --config build/config.yaml
+```
 
-# 2. Start the Cortrix Agent (in a new terminal)
+Manual Agent startup:
+
+```bash
 cd cortrix-agent
-venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8001
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001
+```
 
-# 3. Start the frontend (in a new terminal)
+Manual Web UI startup:
+
+```bash
+npm install --prefix web
 npm run dev --prefix web
 ```
 
----
+## 4. Verify Health
 
-## Verification and Testing
+Backend health:
 
 ```bash
-# Check the backend health status
 curl http://localhost:8420/api/v1/health
-
-# Expected response (llm_enabled=true means the LLM is loaded):
-# {
-#   "status": "healthy",
-#   "version": "0.1.0",
-#   "llm_enabled": true,
-#   "llm_model": "glm-4-flash",
-#   "llm_provider": "openai"
-# }
-
-# Check the Agent status
-curl http://localhost:8001/health
-# {"status":"ok"}
-
-# Check the Agent's current LLM configuration
-curl http://localhost:8001/config/llm/providers | python3 -m json.tool
 ```
 
----
+Expected response shape:
 
-## Using the Features
+```json
+{
+  "status": "healthy",
+  "version": "0.1.0",
+  "llm_enabled": false
+}
+```
 
-### Create a Namespace
+Readiness:
+
+```bash
+curl http://localhost:8420/api/v1/system/health/ready
+```
+
+Expected response shape:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+Agent health, if the Agent service is running:
+
+```bash
+curl http://localhost:8001/health
+```
+
+Expected response shape:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+`llm_enabled: false` means the backend did not load a configured LLM role. That is acceptable for a basic backend smoke test. Configure the relevant LLM roles before testing LLM-backed features.
+
+## 5. First API Calls
+
+Create a namespace:
 
 ```bash
 curl -X POST http://localhost:8420/api/v1/namespaces \
   -H "Content-Type: application/json" \
-  -d '{"name": "my-docs"}'
+  -d '{"name": "quickstart"}'
 ```
 
-### Upload Documents
+List namespaces:
 
 ```bash
-# Upload a single file
-curl -X POST http://localhost:8420/api/v1/namespaces/my-docs/documents \
-  -F "file=@/path/to/document.pdf"
-
-# Upload with attached metadata
-curl -X POST http://localhost:8420/api/v1/namespaces/my-docs/documents \
-  -F "file=@report.pdf" \
-  -F 'metadata={"author":"Jane Doe","year":2025}'
+curl http://localhost:8420/api/v1/namespaces
 ```
 
-### Query Document Processing Status
-
-```bash
-curl http://localhost:8420/api/v1/namespaces/my-docs/documents/1/status
-# status: pending → processing → ready / error
-```
-
-### Semantic Search
+Query:
 
 ```bash
 curl -X POST http://localhost:8420/api/v1/query \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "What is the refund policy?",
-    "namespace": "my-docs",
+    "query": "What is Cortrix?",
+    "namespace": "quickstart",
     "top_k": 5
   }'
 ```
 
-### Using the Web UI
+Expected response shape:
 
-Open http://localhost:5173, where you can:
-- **Document management**: upload, view processing status, delete documents
-- **Semantic search**: real-time hybrid search (vector + BM25)
-- **Chat**: RAG conversation based on the document knowledge base
-- **LLM settings**: gear icon in the top-right → switch LLM provider and model
-
----
-
-## LLM Configuration in Detail
-
-### Role-based configuration
-
-LLM settings live in `build/config.yaml` as **five flat role sections**, each
-with the same four fields. A role with `provider` + `api_key` + `model` all set
-counts as configured; anything else leaves that role's feature off.
-
-```yaml
-<role>:
-  provider: "openai" | "glm" | "claude" | "ollama" | "deepseek" | "mock"
-  api_key:  "..."          # vendor API key
-  model:    "..."          # vendor model id
-  base_url: "..."          # API endpoint (see the wire-protocol note below)
+```json
+{
+  "results": [],
+  "meta": {
+    "...": "..."
+  }
+}
 ```
 
-Changes take effect on the next service restart — there is no separate runtime
-provider registry and no database-backed role selection.
+An empty result set is acceptable before you upload documents. If the server returns a structured error, compare it with [Compatibility and known status](compatibility.md) and the [OpenAPI spec](../api/openapi.yaml).
 
-### The five LLM roles
+## 6. Upload A Document
 
-| Role | Consumer | Purpose | Model suggestion |
-|------|------|------|---------|
-| `semantic_llm` | C++ backend | Intent classification + reranking (every query) | fast/cheap, e.g. glm-4-flash |
-| `vision_llm` | C++ backend | OCR image enhancement (optional) | a vision model, e.g. glm-4v-flash |
-| `agent_llm` | Python Agent | Frontend RAG conversation | high quality, e.g. glm-4.6 / gpt-4o |
-| `doc_summary_llm` | C++ backend | Ingest-side document summary (F41) | fast/cheap |
-| `enricher_llm` | C++ backend | SPC ingest enricher — NER + summary (F03) | fast/cheap |
+Create a small local file:
 
-> `vision_llm` inherits any unset `provider` / `api_key` / `base_url` from
-> `semantic_llm` (typically only the `model` differs).
+```bash
+printf "Cortrix stores documents for agent-native retrieval.\\n" > quickstart.txt
+```
 
-### Two consumers, two wire protocols
+Upload it:
 
-This determines which providers you can use for each role:
+```bash
+curl -X POST http://localhost:8420/api/v1/namespaces/quickstart/documents \
+  -F "file=@quickstart.txt"
+```
 
-- **`agent_llm`** is consumed by the **Python Agent** (`cortrix-agent/`), which
-  has a per-provider adapter and speaks each vendor's **native** protocol. So
-  `provider: "claude"` here talks to the Anthropic Messages API directly — no
-  proxy needed. (For Claude, do **not** set `base_url`: the adapter pins the
-  Anthropic endpoint and ignores it.)
-- **The other four roles** are consumed by the **C++ backend**, which speaks
-  **only the OpenAI-compatible wire** (`POST {base_url}/chat/completions` with
-  `Authorization: Bearer`). Any OpenAI-compatible service works directly (OpenAI,
-  GLM, DeepSeek, a local vLLM/Ollama gateway, …). A provider whose native API is
-  **not** OpenAI-compatible (e.g. Anthropic Claude) must be reached through an
-  OpenAI-compatible **proxy gateway**, with `base_url` pointing at that proxy.
+Check document processing status using the returned document or task identifier. The exact response shape is part of the current API contract and should be verified against [OpenAPI](../api/openapi.yaml).
 
-### Provider reference
+Query again after processing completes:
 
-| Provider | `provider` value | API Key source | Notes |
-|------|------------|-------------|------|
-| Zhipu GLM | `glm` | https://open.bigmodel.cn | OpenAI-compatible; works in any role |
-| OpenAI | `openai` | https://platform.openai.com | OpenAI-compatible; works in any role |
-| DeepSeek | `deepseek` | https://platform.deepseek.com | OpenAI-compatible; works in any role |
-| Ollama (local) | `ollama` | no key needed, runs locally | OpenAI-compatible gateway |
-| Anthropic Claude | `claude` | https://console.anthropic.com | Native in `agent_llm`; needs an OpenAI-compatible proxy for the other four roles |
+```bash
+curl -X POST http://localhost:8420/api/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What does Cortrix store?",
+    "namespace": "quickstart",
+    "top_k": 5
+  }'
+```
 
-Example — OpenAI (works in any role, OpenAI-compatible):
+## 7. Configure LLM Roles
+
+LLM roles live in `build/config.yaml`.
+
+Each role uses:
 
 ```yaml
 semantic_llm:
@@ -408,223 +236,62 @@ semantic_llm:
   api_key: "your-api-key"
   model: "gpt-4o-mini"
   base_url: "https://api.openai.com/v1"
-agent_llm:
-  provider: "openai"
-  api_key: "your-api-key"
-  model: "gpt-4o"
-  base_url: "https://api.openai.com/v1"
 ```
 
-Example — Anthropic Claude in `agent_llm` (native; no `base_url`):
+Supported role names:
 
-```yaml
-agent_llm:
-  provider: "claude"
-  api_key: "your-api-key"
-  model: "claude-haiku-4-5-20251001"   # fast/low-cost; "claude-sonnet-4-6" for stronger results
-```
+- `semantic_llm`
+- `vision_llm`
+- `agent_llm`
+- `doc_summary_llm`
+- `enricher_llm`
 
-> The Python Agent can also be configured (and overridden) via `cortrix-agent/.env`
-> — see `cortrix-agent/.env.example`. Resolution order, highest first: real
-> environment variables > `cortrix-agent/.env` > `config.yaml` `agent_llm` >
-> built-in defaults.
+Changes take effect after restarting the relevant service.
 
-### How Configuration Changes Take Effect
+Provider notes:
 
-| Change type | How it takes effect |
-|---------|---------|
-| Editing any role section in `config.yaml` | Takes effect after a service restart |
-| Editing `cortrix-agent/.env` (Python Agent) | Takes effect after restarting the Agent service |
+- OpenAI-compatible providers can be used by the C++ backend roles.
+- The built-in Agent uses its Python provider adapters for `agent_llm`.
+- If a provider uses a native protocol that is not OpenAI-compatible, use it only where the implementation supports that provider or route it through a compatible gateway.
 
----
+## 8. Choose An Agent Access Path
 
-## Vector Model Configuration
+Use [Agent access](agent-access.md) to choose the integration path:
 
-Cortrix uses **bge-m3** (1024-dim) for semantic vectorization via ONNX Runtime 1.17.1, requiring about 2.8GB of disk.
+- HTTP API / OpenAPI for custom clients.
+- MCP for IDE Agents and MCP-compatible clients.
+- Python SDK for Python applications.
+- Built-in Agent for local fixed-flow chat.
+
+## Troubleshooting
+
+### The backend starts with `llm_enabled: false`
+
+Check that the relevant role in `build/config.yaml` has `provider`, `api_key`, and `model` set. Some roles also need `base_url`.
+
+### The Agent health check fails
+
+Start the Agent service:
 
 ```bash
-# Download the model files (about 2.8GB) to codes/cortrix/models/bge-m3/
-# Required files:
-#   model.onnx        (~708KB, model graph structure)
-#   model.onnx_data   (~2.1GB, model weights)
-#   tokenizer.json    (~16MB, tokenizer vocabulary)
-mkdir -p models/bge-m3
-# Download from Hugging Face: BAAI/bge-m3
+cd cortrix-agent
+.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001
 ```
 
-After downloading, verify the configuration:
-```yaml
-embedding:
-  model_path: "./models/bge-m3/model.onnx"
-  dimension: 1024
-  gpu_provider: "auto"   # macOS automatically uses CoreML acceleration
-```
+### A port is already in use
 
-**When no model is configured** (Stub mode): the system uses random vectors; BM25 full-text search works normally, but semantic search quality is very poor.
-
----
-
-## Authentication Configuration
-
-Enabling authentication is recommended in production.
-
-### Generate an API Key
+Find the process:
 
 ```bash
-# Pick a secret string
-API_KEY="my-cortrix-secret-2026"
-
-# Generate the SHA-256 hash
-echo -n "$API_KEY" | shasum -a 256 | cut -d' ' -f1
-# Output: 7c222fb2927d828af22f592134e8932480637c0d2... (example)
-```
-
-### Config File
-
-```yaml
-auth:
-  enabled: true
-  api_keys:
-    - key_hash: "7c222fb2927d828af22f592134e8932480637c0d2..."
-      tenant_id: "default"
-      allowed_namespaces: []    # empty = allow all namespaces
-      permissions: 7            # 7 = READ(1) + WRITE(2) + ADMIN(4)
-      expires_at: 0             # 0 = never expires
-```
-
-### Sending the Key with a Request
-
-```bash
-curl -X POST http://localhost:8420/api/v1/query \
-  -H "Authorization: Bearer my-cortrix-secret-2026" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "test", "namespace": "demo"}'
-```
-
----
-
-## Automatic Directory Watching
-
-Once configured, files added to or modified in the specified directory are automatically parsed and ingested:
-
-```yaml
-watch_dir:
-  data_dir: "/Users/yourname/Documents/my-notes"   # watched directory
-  namespace_name: "notes"    # which namespace to ingest into
-  watch_enabled: true
-```
-
-**Supported formats**: PDF, DOCX, TXT, MD, CSV, JSON, JPG/PNG (OCR)
-
-> If the directory does not exist, only a warning is printed; other functionality is unaffected.
-
----
-
-## Production Deployment
-
-### Single-Host Docker Deployment
-
-```bash
-docker run -d \
-  --name cortrix \
-  -p 8420:8420 \
-  -v $(pwd)/data:/data \
-  -v $(pwd)/config.yaml:/app/config.yaml \
-  -v $(pwd)/models:/app/models \
-  cortrix/cortrix:latest
-
-# Check
-curl http://localhost:8420/api/v1/health
-```
-
-### Recommended Production Configuration
-
-```yaml
-server:
-  thread_count: 8       # tune to the number of CPU cores
-
-auth:
-  enabled: true         # must be on
-
-log:
-  level: "warning"      # reduce log volume in production
-  format: "json"        # structured logs for easy collection
-
-namespace:
-  data_dir: "/data"     # mount a persistent volume
-
-spc:
-  worker_count: 4       # raise document-processing concurrency
-```
-
-### Reverse Proxy (Nginx)
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name cortrix.yourdomain.com;
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:8420;
-        proxy_set_header Host $host;
-    }
-
-    location /agent/ {
-        proxy_pass http://127.0.0.1:8001/;
-        proxy_set_header Host $host;
-    }
-}
-```
-
----
-
-## FAQ
-
-**Q: The backend shows `llm_enabled: false` after startup?**
-A: Check that the `semantic_llm` section in `build/config.yaml` is uncommented and has `provider` + `api_key` + `model` all filled in (a role counts as configured only when all three are set).
-
-**Q: The frontend LLM settings dialog reports a JSON error?**
-A: The Cortrix Agent service (port 8001) is not running. Start everything with `./dev.sh`, or start it manually:
-```bash
-cd cortrix-agent && venv/bin/python -m uvicorn main:app --port 8001
-```
-
-**Q: A document stays in `pending` status after upload?**
-A: The SPC worker may have hit a parsing error. Check the backend logs; common causes: Python dependencies not installed, OCR environment issues.
-
-**Q: Semantic search results are poor quality?**
-A: It may be running in Stub mode (random vectors). Check:
-```bash
-curl http://localhost:8420/api/v1/health
-# In the startup logs you should see: OnnxEmbedder initialized (real_model=true)
-```
-
-**Q: The ONNX model load shows a CoreML Warning?**
-A: This is normal. CoreML does not support the embedding weight layer (dimension over 16384), so it automatically falls back to CPU; results are unaffected.
-
-**Q: macOS build reports OpenSSL not found?**
-```bash
-export OPENSSL_ROOT_DIR=$(brew --prefix openssl)
-cmake -B build -DOPENSSL_ROOT_DIR=$OPENSSL_ROOT_DIR ..
-```
-
-**Q: A port is already in use?**
-```bash
-# Find the process using the port
 lsof -i :8420
-# Or change the port in config.yaml
-server:
-  port: 8420
 ```
 
----
+Then stop that process or change the configured port.
 
-## Documentation Index
+### Semantic quality is poor
 
-| Document | Content |
-|------|------|
-| [QUICKSTART.md](QUICKSTART.md) | This document: the full user guide |
-| [../api/openapi.yaml](../api/openapi.yaml) | OpenAPI spec - the REST API reference |
-| [../deployment/DEPLOYMENT_GUIDE.md](../deployment/DEPLOYMENT_GUIDE.md) | Docker/cloud deployment guide |
-| [../cortrix-agent/README.md](../cortrix-agent/README.md) | Cortrix Agent service documentation |
-| [../README.md](../README.md) | Project overview and architecture |
+The ONNX embedding model may be missing or disabled. Verify your embedding model path in `build/config.yaml`.
+
+### Auth, tenant, ACL, RBAC, quota, or memory extraction behaves differently from the docs
+
+Check [Compatibility and known status](compatibility.md). Several advanced areas are documented in the API surface but remain blocked or under RD review in the current verification baseline.
