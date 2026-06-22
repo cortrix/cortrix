@@ -510,6 +510,8 @@ add_executable(cortrix_unit_tests
     unit/test_tenant_service_arms.cpp
     unit/test_directory_importer_arms.cpp
     unit/test_dir_watcher_registry_arms.cpp
+    # Test-expansion query-closure (query module over 90% line)
+    unit/test_query_module_arms.cpp
     unit/test_enum_roundtrip_tenant.cpp
     unit/test_enum_roundtrip_catalog.cpp
     unit/test_enum_roundtrip_import.cpp
