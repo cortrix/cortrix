@@ -13,6 +13,7 @@ add_executable(cortrix_unit_tests
     unit/test_jwt_utils.cpp
     unit/test_login.cpp
     unit/test_pbkdf2_hasher.cpp
+    unit/test_auth_coverage_gaps.cpp
     unit/test_auth_middleware_jwt.cpp
     unit/test_password_reset.cpp
     unit/test_api_keys.cpp
@@ -344,6 +345,7 @@ add_executable(cortrix_unit_tests
     unit/test_permission_service.cpp
     unit/test_quota_service.cpp
     unit/test_permission_middleware.cpp
+    unit/test_tenant_coverage_gaps.cpp
     # --- TD-F42 Bulk Submit (Wave D-R1) ---
     unit/test_batch_error.cpp
     unit/test_batch_submit_service.cpp
@@ -481,6 +483,18 @@ add_executable(cortrix_unit_tests
     unit/test_route_validation_admin.cpp
     unit/test_route_validation_batch.cpp
     unit/test_route_validation_status.cpp
+    # Test-expansion server wave (tenant/auth/system_config/http_server/gc_cli full-surface)
+    unit/test_route_tenant_full.cpp
+    unit/test_route_auth_full.cpp
+    unit/test_route_system_config.cpp
+    unit/test_http_server_purefns.cpp
+    unit/test_gc_cli_full.cpp
+    # Test-expansion coverage-closure wave (low-module unit gap closure)
+    unit/test_config_coverage_gaps.cpp
+    unit/test_deploy_coverage_gaps.cpp
+    unit/test_connector_coverage_gaps.cpp
+    unit/test_query_coverage_gaps.cpp
+    unit/test_catalog_coverage_gaps.cpp
     unit/test_enum_roundtrip_tenant.cpp
     unit/test_enum_roundtrip_catalog.cpp
     unit/test_enum_roundtrip_import.cpp

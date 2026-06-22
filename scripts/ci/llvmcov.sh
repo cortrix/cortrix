@@ -39,10 +39,15 @@ echo "── configure (clang source-based coverage)"
 ONNX_SRC="$ROOT/build/_deps/onnxruntime-src"
 ONNX_ARG=()
 [ -d "$ONNX_SRC" ] && ONNX_ARG=(-DFETCHCONTENT_SOURCE_DIR_ONNXRUNTIME="$ONNX_SRC")
+# Reuse googletest already fetched into the main build/ too: a fresh build dir
+# otherwise re-populates it via FetchContent, which is flaky (download step fails).
+GTEST_SRC="$ROOT/build/_deps/googletest-src"
+GTEST_ARG=()
+[ -d "$GTEST_SRC" ] && GTEST_ARG=(-DFETCHCONTENT_SOURCE_DIR_GOOGLETEST="$GTEST_SRC")
 cmake -B "$BUILD" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_CXX_FLAGS="-fprofile-instr-generate -fcoverage-mapping -O0" \
   -DCMAKE_EXE_LINKER_FLAGS="-fprofile-instr-generate" \
-  "${ONNX_ARG[@]}" >/dev/null
+  "${ONNX_ARG[@]}" "${GTEST_ARG[@]}" >/dev/null
 
 echo "── build (cortrix_unit_tests)"
 # Instrumented compiles take 2-3 GB per TU; cap at COV_JOBS (default 2 => <10 GB)
