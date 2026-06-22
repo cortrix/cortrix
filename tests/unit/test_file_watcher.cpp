@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "cortrix/connector/file_watcher.h"
+#include <unistd.h>
 #include <filesystem>
 #include <fstream>
 #include <thread>
@@ -14,7 +15,13 @@ class FileWatcherTest : public ::testing::Test {
 protected:
     void SetUp() override {
         namespace fs = std::filesystem;
-        test_dir_ = fs::temp_directory_path() / "cortrix_test_watcher";
+        // Per-process dir: gtest_discover_tests runs each case in its own
+        // process and this fixture used a FIXED name, so under -j>1 concurrent
+        // watcher tests created/deleted files in each other's watched dir (and
+        // one TearDown's remove_all wiped another's files mid-test) -> flaky
+        // event counts. getpid() isolates each process.
+        test_dir_ = fs::temp_directory_path() /
+                    ("cortrix_test_watcher_" + std::to_string(::getpid()));
         fs::create_directories(test_dir_);
         watcher_ = FileWatcher::Create();
     }
@@ -279,7 +286,8 @@ TEST_F(FileWatcherTest, RapidCreateDelete) {
 
 TEST_F(FileWatcherTest, DeletedWatchDirectory) {
     namespace fs = std::filesystem;
-    auto volatile_dir = fs::temp_directory_path() / "cortrix_test_watcher_volatile";
+    auto volatile_dir = fs::temp_directory_path() /
+                        ("cortrix_test_watcher_volatile_" + std::to_string(::getpid()));
     fs::create_directories(volatile_dir);
 
     auto local_watcher = FileWatcher::Create();
