@@ -584,6 +584,10 @@ void CortrixHttpServer::SetOperationLogger(cortrix::observability::IOperationLog
     op_logger_ = op_logger;
 }
 
+void CortrixHttpServer::SetEdition(const std::string& edition) {
+    edition_ = edition;
+}
+
 void CortrixHttpServer::EmitNsLog(const std::string& action, const std::string& name) {
     if (!op_logger_) return;  // observability strictly additive (C4)
     // §9.1 NamespaceManager → resource_type "namespace"; resource_id = the NS name
@@ -661,10 +665,10 @@ void CortrixHttpServer::RegisterSystemRoutes() {
     // Returns the edition plus which optional features this build provides.
     // Stable schema (Agent-friendly principle 7): unavailable features report
     // false rather than disappearing from the body.
-    svr_.Get("/api/v1/system/features", NoAuth([](const httplib::Request&, httplib::Response& res,
+    svr_.Get("/api/v1/system/features", NoAuth([this](const httplib::Request&, httplib::Response& res,
                                                   const RequestContext& rctx) {
                  nlohmann::json body;
-                 body["edition"] = "ce";
+                 body["edition"] = edition_;
                  body["features"]["cdc"] = false;
                  body["features"]["text_to_sql"] = false;
                  // Phase 2+ features (not yet implemented)

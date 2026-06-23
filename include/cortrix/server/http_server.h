@@ -50,6 +50,14 @@ public:
     /// outlives the server (bootstrap owns the ObservabilityModule).
     void SetOperationLogger(cortrix::observability::IOperationLogger* op_logger);
 
+    /// Open-Core edition seam (ARCH OPEN-6 / §8.2.7). The stock CE binary leaves
+    /// this at the default "ce". An enterprise embedder sets "enterprise" from its
+    /// on_assembled hook, so GET /api/v1/system/features advertises the enterprise
+    /// edition; the web UI gates the Enterprise nav group on this value. Must be
+    /// called before Start() — on_assembled runs before the listener, so the value
+    /// is in place by the time any request reads it (no concurrent write/read).
+    void SetEdition(const std::string& edition);
+
     /// Serve the P02a web UI (SPA) from `dir` at the server root. Static assets
     /// are mounted at "/"; unmatched non-/api GET paths fall back to index.html
     /// (BrowserRouter deep links). No-op if dir/index.html is unreadable.
@@ -88,6 +96,7 @@ private:
     cortrix::catalog::INSRouter* ns_router_ = nullptr;
     cortrix::observability::IOperationLogger* op_logger_ = nullptr;
     httplib::Server svr_;
+    std::string edition_ = "ce";  // Open-Core edition reported by GET /system/features
     std::string web_ui_index_;  // index.html payload for the SPA 404 fallback
     std::atomic<bool> running_{false};
     std::chrono::steady_clock::time_point start_time_;
