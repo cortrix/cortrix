@@ -41,6 +41,15 @@ bool ParseBatchRequest(const httplib::Request& req, httplib::Response& res,
         return false;
     }
     out->namespace_id = body["namespace"].get<std::string>();
+    // Reject an empty namespace, matching the flat-document surface
+    // (flat_document_routes rejects an empty ?namespace= with 400). Documents
+    // are namespace-scoped; an empty string would silently create a junk ""
+    // partition instead of surfacing the caller's missing-namespace mistake.
+    if (out->namespace_id.empty()) {
+        WriteJsonError(res, Status::InvalidArgument("'namespace' must be non-empty"),
+                       request_id);
+        return false;
+    }
 
     if (!body.contains("documents") || !body["documents"].is_array()) {
         WriteJsonError(res, Status::InvalidArgument("missing or invalid 'documents' array"),

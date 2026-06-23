@@ -206,19 +206,19 @@ TEST_F(BatchRouteValMatrix, MissingNamespace400) {
     EXPECT_EQ(json::parse(res->body)["error"]["code"], "INVALID_ARGUMENT");
 }
 
-TEST_F(BatchRouteValMatrix, EmptyNamespaceAccepted) {
-    // Real behavior: the batch handler does NOT reject an empty "namespace" field
-    // at the request-validation layer (it is treated downstream) and returns 2xx.
-    // Pinned to the actual contract; the missing empty-namespace rejection is logged
-    // as a potential input-validation gap for product review (see BUGS_FOUND.md).
+TEST_F(BatchRouteValMatrix, EmptyNamespace400) {
+    // An empty "namespace" field is rejected at the request-validation layer,
+    // consistent with the flat-document surface (an empty ?namespace= → 400).
+    // Documents are namespace-scoped; accepting "" would silently create a junk
+    // partition instead of surfacing the caller's missing-namespace mistake.
     httplib::Client cli("127.0.0.1", port_);
     json b;
     b["namespace"] = "";
     b["documents"] = json::array({{{"doc_id", "a"}, {"content", "c"}}});
     auto res = cli.Post("/api/v1/documents/batch", Write(), b.dump(), "application/json");
     ASSERT_TRUE(res);
-    EXPECT_GE(res->status, 200);
-    EXPECT_LT(res->status, 300);
+    EXPECT_EQ(res->status, 400);
+    EXPECT_EQ(json::parse(res->body)["error"]["code"], "INVALID_ARGUMENT");
 }
 
 TEST_F(BatchRouteValMatrix, MissingDocumentsArray400) {
