@@ -5,7 +5,7 @@
 // (RunCrossEncoder: tokenize query+passage → session->Run → sigmoid) are ONLY
 // exercised by tests/integration/test_reranker_real_inference.cpp, which is
 // integration-label and excluded from the `-L unit` coverage gate — so the
-// reranker's real path is at 0% in the unit coverage口径. This is a unit-label
+// reranker's real path is at 0% in the unit coverage metric. This is a unit-label
 // MIRROR that runs the SAME real path against models/bge-reranker-v2-m3, so real
 // Init+Score+ScoreBatch land in the unit gate. Adds a default-EP (auto) case so the
 // CoreML-vs-CPU EP selection branch is covered on Apple boxes.

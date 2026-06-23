@@ -85,12 +85,12 @@ bool QueryComplexityClassifier::IsChatQuery(const std::string& query) {
         "bye", "goodbye", "good morning", "good afternoon", "good evening",
         "how are you", "what's up", "whats up", "sup",
         // CJK greetings/acknowledgements (raw UTF-8 bytes — functional matching data):
-        "\xe4\xbd\xa0\xe5\xa5\xbd",                       // "你好" hello
-        "\xe5\x97\xa8",                                   // "嗨" hi
-        "\xe8\xb0\xa2\xe8\xb0\xa2",                       // "谢谢" thanks
-        "\xe5\xa4\x9a\xe8\xb0\xa2",                       // "多谢" thanks
-        "\xe5\x86\x8d\xe8\xa7\x81",                       // "再见" bye
-        "\xe6\x97\xa9\xe4\xb8\x8a\xe5\xa5\xbd",           // "早上好" good morning
+        "\xe4\xbd\xa0\xe5\xa5\xbd",                       // hello
+        "\xe5\x97\xa8",                                   // hi
+        "\xe8\xb0\xa2\xe8\xb0\xa2",                       // thanks
+        "\xe5\xa4\x9a\xe8\xb0\xa2",                       // thanks
+        "\xe5\x86\x8d\xe8\xa7\x81",                       // bye
+        "\xe6\x97\xa9\xe4\xb8\x8a\xe5\xa5\xbd",           // good morning
     };
     for (const char* g : chat_exact) {
         if (n == g) return true;
@@ -127,15 +127,15 @@ bool QueryComplexityClassifier::HasMultiTurnSignal(const std::string& query) {
     }
     // CJK anaphora / follow-up cues (raw UTF-8 bytes — functional matching data):
     static const char* cn_cues[] = {
-        "\xe5\xae\x83",                       // "它" it
-        "\xe4\xbb\x96",                       // "他" he
-        "\xe5\xa5\xb9",                       // "她" she
-        "\xe8\xbf\x99\xe4\xb8\xaa",           // "这个" this one
-        "\xe9\x82\xa3\xe4\xb8\xaa",           // "那个" that one
-        "\xe7\xbb\xa7\xe7\xbb\xad",           // "继续" continue
-        "\xe5\x86\x8d\xe8\xaf\xb4\xe8\xaf\xb4",  // "再说说" say more
-        "\xe8\xaf\xa6\xe7\xbb\x86\xe8\xaf\xb4\xe8\xaf\xb4",  // "详细说说" elaborate
-        "\xe6\xb7\xb1\xe5\x85\xa5",           // "深入" go deeper
+        "\xe5\xae\x83",                       // it
+        "\xe4\xbb\x96",                       // he
+        "\xe5\xa5\xb9",                       // she
+        "\xe8\xbf\x99\xe4\xb8\xaa",           // this one
+        "\xe9\x82\xa3\xe4\xb8\xaa",           // that one
+        "\xe7\xbb\xa7\xe7\xbb\xad",           // continue
+        "\xe5\x86\x8d\xe8\xaf\xb4\xe8\xaf\xb4",  // say more
+        "\xe8\xaf\xa6\xe7\xbb\x86\xe8\xaf\xb4\xe8\xaf\xb4",  // elaborate
+        "\xe6\xb7\xb1\xe5\x85\xa5",           // go deeper
     };
     for (const char* cue : cn_cues) {
         if (query.find(cue) != std::string::npos) return true;

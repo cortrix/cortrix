@@ -223,7 +223,7 @@ TEST_F(F39ClassifierTest, IsChatQueryRecognizesPleasantries) {
     EXPECT_TRUE(QueryComplexityClassifier::IsChatQuery("Thanks!"));
     EXPECT_TRUE(QueryComplexityClassifier::IsChatQuery("thank you"));
     EXPECT_TRUE(QueryComplexityClassifier::IsChatQuery("  bye  "));
-    EXPECT_TRUE(QueryComplexityClassifier::IsChatQuery("\xe4\xbd\xa0\xe5\xa5\xbd"));  // 你好
+    EXPECT_TRUE(QueryComplexityClassifier::IsChatQuery("\xe4\xbd\xa0\xe5\xa5\xbd"));  // hello
 }
 
 TEST_F(F39ClassifierTest, IsChatQueryRejectsContentQueries) {
@@ -427,7 +427,7 @@ TEST_F(F39ClassifierTest, HasMultiTurnSignalDetectsCuesAndAvoidsFalsePositives) 
     EXPECT_TRUE(QueryComplexityClassifier::HasMultiTurnSignal("what is it used for"));
     EXPECT_TRUE(QueryComplexityClassifier::HasMultiTurnSignal("tell me more about that"));
     EXPECT_TRUE(QueryComplexityClassifier::HasMultiTurnSignal(
-        "\xe7\xbb\xa7\xe7\xbb\xad\xe8\xaf\xb4"));  // 继续说 (continue)
+        "\xe7\xbb\xa7\xe7\xbb\xad\xe8\xaf\xb4"));  // (continue)
     // "item" contains "it" but must NOT trigger (whole-word matching).
     EXPECT_FALSE(QueryComplexityClassifier::HasMultiTurnSignal("list every item in stock"));
     EXPECT_FALSE(QueryComplexityClassifier::HasMultiTurnSignal("find the revenue report"));

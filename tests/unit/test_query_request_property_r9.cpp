@@ -34,7 +34,7 @@ using json = nlohmann::json;
 rc::Gen<std::string> genUtf8String() {
     static const std::vector<std::string> kAtoms = {
         "a", "Z", "0", "_", "-", " ", "auto", "simple", "complex", "doc",
-        "é" /* é */, "中" /* 中 */};
+        "é" /* é */, "中" /* U+4E2D */};
     return rc::gen::map(
         rc::gen::container<std::vector<std::size_t>>(
             rc::gen::inRange<std::size_t>(0, kAtoms.size())),

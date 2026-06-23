@@ -4,7 +4,7 @@
 // real Embed inference path (tokenize → session->Run → CLS extract → L2 normalize)
 // are ONLY exercised by tests/integration/test_onnx_real_inference.cpp, which is
 // (a) integration-label and (b) excluded from the `-L unit` coverage gate — so the
-// embedder's real path is at 0% in the unit coverage口径 (the file sits at 47.9%,
+// embedder's real path is at 0% in the unit coverage metric (the file sits at 47.9%,
 // the rest being the stub path). This is a unit-label MIRROR that runs the SAME real
 // path against the on-disk models/bge-m3 model, so the real Init+Embed+EmbedBatch
 // (and the F40 EmbedWithSparse dense half) land in the unit coverage gate.
@@ -171,7 +171,7 @@ TEST_F(OnnxEmbedderRealTest, EmbedBatchRealAllDims) {
 // F40 EmbedWithSparse over the REAL model: the dense half runs the real inference
 // path (1024-dim unit vector), the sparse half is the standalone stub (D3) keyed off
 // the same text. Exercises the EmbedWithSparse dense=real branch + sparse stub on a
-// real session (the dense path is the part that was uncovered in the unit口径).
+// real session (the dense path is the part that was uncovered in the unit metric).
 TEST_F(OnnxEmbedderRealTest, EmbedWithSparseRealDenseHalf) {
     auto e = MakeRealEmbedder();
     ASSERT_TRUE(e->Init().ok());

@@ -83,7 +83,7 @@ public:
     static constexpr int kNumCleanupBuckets = 8;  // {0.01,0.05,0.1,0.5,1,5,10,30}
 
     /// filter_dimensions histogram: one series per dimension count 0..8 (§11 label
-    /// "filter_dimensions (0-8 数值)"); index 8 also absorbs any clamp overflow.
+    /// "filter_dimensions (0-8 values)"); index 8 also absorbs any clamp overflow.
     static constexpr int kMaxFilterDimensions = 8;
     static constexpr int kFilterDimensionSeries = kMaxFilterDimensions + 1;  // 0..8
 

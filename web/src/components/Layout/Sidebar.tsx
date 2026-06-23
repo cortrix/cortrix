@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 
 type IconType = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -31,8 +32,10 @@ interface NavItem {
 // Primary navigation (P02a design § 10 / § 9-bis). Migrated from the old
 // `activePage` zustand selection to react-router <NavLink> in R3/S5 — the active
 // state now derives from the URL. The Admin group (Users / Operation Log,
-// § 9-bis) renders only for admin-role sessions.
-// always renders (CE shows the marketing placeholders) with a "Coming" badge.
+// § 9-bis) renders only for admin-role sessions. The Enterprise group renders
+// only on enterprise builds (edition === 'enterprise'); CE hides it entirely
+// (Derek 2026-06-23: the community edition must not advertise enterprise-only
+// surfaces).
 
 const PRIMARY: NavItem[] = [
   { to: '/namespaces', label: 'sidebar.namespaces', icon: FolderIcon },
@@ -48,8 +51,9 @@ const ADMIN: NavItem[] = [
   { to: '/admin/operation-log', label: 'admin.operations.navLabel', icon: ClipboardDocumentListIcon },
 ];
 
-// Enterprise group (P02a § 6.3) — always rendered on CE with marketing
-// placeholders; each item carries a "Coming" badge until V1.5.
+// Enterprise group (P02a § 6.3) — rendered only on enterprise builds. On the
+// enterprise edition each item carries a "Coming" badge until its feature ships
+// (V1.5); on CE the whole group is hidden (see Sidebar gating below).
 const ENTERPRISE: NavItem[] = [
   { to: '/ent/text-to-sql', label: 'entPlaceholder.nav.textToSql', icon: CircleStackIcon, badge: 'Coming' },
   { to: '/ent/audit-log', label: 'entPlaceholder.nav.auditLog', icon: ClipboardDocumentCheckIcon, badge: 'Coming' },
@@ -84,6 +88,8 @@ function NavRow({ item }: { item: NavItem }) {
 export function Sidebar() {
   const { t } = useTranslation();
   const isAdmin = useAuthStore((s) => s.currentUser?.role === 'admin');
+  const { edition } = useFeatureFlags();
+  const isEnterprise = edition === 'enterprise';
 
   return (
     <aside className="w-56 flex flex-col shrink-0 bg-bgalt border-r border-line">
@@ -103,14 +109,16 @@ export function Sidebar() {
           </div>
         )}
 
-        <div className="pt-4">
-          <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
-            {t('entPlaceholder.group')}
-          </p>
-          {ENTERPRISE.map((item) => (
-            <NavRow key={item.to} item={item} />
-          ))}
-        </div>
+        {isEnterprise && (
+          <div className="pt-4">
+            <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+              {t('entPlaceholder.group')}
+            </p>
+            {ENTERPRISE.map((item) => (
+              <NavRow key={item.to} item={item} />
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* Settings at bottom */}

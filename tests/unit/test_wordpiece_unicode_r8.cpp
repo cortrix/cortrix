@@ -199,11 +199,11 @@ TEST_P(CjkCharTest, EmitsOwnToken) {
 }
 
 INSTANTIATE_TEST_SUITE_P(CjkBlocks, CjkCharTest, ::testing::Values(
-    CjkCase{0x4E2D},   // 中  — CJK Unified Ideographs 0x4E00–0x9FFF
-    CjkCase{0x9FA5},   // 龥  — near top of the main block
+    CjkCase{0x4E2D},   // U+4E2D — CJK Unified Ideographs 0x4E00–0x9FFF
+    CjkCase{0x9FA5},   // U+9FA5 — near top of the main block
     CjkCase{0x3400},   // 㐀  — CJK Ext A 0x3400–0x4DBF
     CjkCase{0x4DBF},   // Ext A top
-    CjkCase{0xF900},   // 豈  — CJK Compatibility Ideographs 0xF900–0xFAFF
+    CjkCase{0xF900},   // U+F900 — CJK Compatibility Ideographs 0xF900–0xFAFF
     CjkCase{0x20000},  // 𠀀 — CJK Ext B 0x20000–0x2A6DF (4-byte UTF-8)
     CjkCase{0x2A700},  // CJK Ext C 0x2A700–0x2B73F
     CjkCase{0x2B740},  // CJK Ext D
@@ -359,11 +359,11 @@ INSTANTIATE_TEST_SUITE_P(CombiningMarks, CombiningMarkTest, ::testing::Values(
 
 TEST(WordPieceUnicodeR8, BasicTokenizeMixedMultilingual) {
     WordPieceTokenizer t;
-    // "Café 中文!" + a zero-width joiner: Café→cafe (accent fold), 中/文 each own
+    // "Café U+4E2D U+6587!" + a zero-width joiner: Café→cafe (accent fold), U+4E2D/U+6587 each own
     // token (CJK pad), '!' own token (punct), ZWJ stripped (control).
     auto words = t.BasicTokenize("Caf" + U8(0x00E9) + " " + U8(0x4E2D) + U8(0x6587) +
                                  "!" + U8(0x200D));
-    // Expected: ["cafe", "中", "文", "!"]
+    // Expected: ["cafe", "U+4E2D", "U+6587", "!"]
     ASSERT_EQ(words.size(), 4u);
     EXPECT_EQ(words[0], "cafe");
     EXPECT_EQ(words[1], U8(0x4E2D));
