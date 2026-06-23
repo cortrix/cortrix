@@ -301,10 +301,15 @@ class _PlpyAdapter:
     def __init__(self, plpy):
         self._plpy = plpy
 
-    def show(self, guc):
-        # `SHOW x` returns a single row {x: value}.
-        rows = self._plpy.execute("SHOW %s" % guc)
-        return rows[0][guc]
+    def setting(self, guc, default=""):
+        # current_setting(..., true) is allowed inside STABLE functions, unlike
+        # SHOW. The GUC name is internal and never user supplied.
+        rows = self._plpy.execute(
+            "SELECT current_setting('%s', true) AS value" % guc)
+        if not rows:
+            return default
+        value = rows[0].get("value")
+        return default if value is None else value
 
     def scalar(self, sql):
         rows = self._plpy.execute(sql)
@@ -354,10 +359,11 @@ class PgcortrixClient:
 
     def _get_config(self):
         cfg = {
-            "endpoint": self._pg.show("pgcortrix.endpoint"),
-            "api_key": self._pg.show("pgcortrix.api_key"),
-            "timeout_ms": int(self._pg.show("pgcortrix.timeout_ms")),
-            "retry_max": int(self._pg.show("pgcortrix.retry_max")),
+            "endpoint": self._pg.setting(
+                "pgcortrix.endpoint", "http://localhost:8420"),
+            "api_key": self._pg.setting("pgcortrix.api_key", ""),
+            "timeout_ms": int(self._pg.setting("pgcortrix.timeout_ms", "30000")),
+            "retry_max": int(self._pg.setting("pgcortrix.retry_max", "3")),
         }
         if self._session_api_key:
             cfg["api_key"] = self._session_api_key
@@ -491,13 +497,28 @@ class PgcortrixClient:
 
     def search(self, namespace, query, top_k, filter, rerank):
         resp = self._post("/api/v1/query", {
-            "namespace": namespace,
+            "namespaces": [namespace],
             "query": query,
             "top_k": top_k,
             "filter": filter,
             "rerank": rerank,
         })
-        return resp.get("results", [])
+        results = resp.get("results", [])
+        normalized = []
+        for row in results:
+            if not isinstance(row, dict):
+                normalized.append(row)
+                continue
+            item = dict(row)
+            metadata = item.get("metadata")
+            if isinstance(metadata, dict):
+                if "chunk_id" not in item and "child_id" in item:
+                    item["chunk_id"] = item.get("child_id")
+                if not item.get("filename"):
+                    item["filename"] = (
+                        metadata.get("source_path") or metadata.get("filename"))
+            normalized.append(item)
+        return normalized
 
     def upload(self, namespace, file_path):
         with open(file_path, "rb") as f:
@@ -511,7 +532,19 @@ class PgcortrixClient:
 
     def list_documents(self, namespace):
         resp = self._get("/api/v1/namespaces/%s/documents" % namespace)
-        return resp.get("documents", resp.get("results", []))
+        documents = resp.get("documents", resp.get("results", []))
+        normalized = []
+        for doc in documents:
+            if not isinstance(doc, dict):
+                normalized.append(doc)
+                continue
+            item = dict(doc)
+            if "filename" not in item and "source_path" in item:
+                item["filename"] = item.get("source_path")
+            if "chunks" not in item and "block_count" in item:
+                item["chunks"] = item.get("block_count")
+            normalized.append(item)
+        return normalized
 
     def batch_submit(self, namespace, documents, async_=True,
                      on_duplicate="skip"):
@@ -569,8 +602,8 @@ class PgcortrixClient:
         return resp.get("interactions", resp.get("results", []))
 
     def status(self):
-        """V23 D6: JSONB-friendly dict. Probes /health for connectivity +
-        latency. Never raises — a disconnected server still yields a status
+        """V23 D6: JSONB-friendly dict. Probes /api/v1/health for connectivity
+        with a /health fallback. Never raises — a disconnected server still yields a status
         blob with http_connected=false (diagnostics must always answer)."""
         cfg = self._get_config()
         result = {
@@ -582,10 +615,20 @@ class PgcortrixClient:
         try:
             t0 = time.time()
             validate_endpoint(cfg["endpoint"])
-            url = build_url(cfg["endpoint"], "/health")
-            req = request.Request(url, headers=self._headers(cfg), method="GET")
-            with self._urlopen(req, timeout=cfg["timeout_ms"] / 1000.0) as resp:
-                resp.read()
+            for path in ("/api/v1/health", "/health"):
+                try:
+                    url = build_url(cfg["endpoint"], path)
+                    req = request.Request(
+                        url, headers=self._headers(cfg), method="GET")
+                    with self._urlopen(
+                            req, timeout=cfg["timeout_ms"] / 1000.0) as resp:
+                        resp.read()
+                    break
+                except error.HTTPError as e:
+                    if path == "/health":
+                        raise
+                    e.close()
+                    continue
             result["http_connected"] = True
             result["latency_ms"] = int((time.time() - t0) * 1000)
         except Exception as e:

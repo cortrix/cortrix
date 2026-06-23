@@ -38,9 +38,9 @@ def _sql_client_calls():
 class TestSqlHelperSeam(unittest.TestCase):
     def test_every_sql_call_matches_a_helper_method(self):
         calls = list(_sql_client_calls())
-        # Sanity: we expect exactly the 7 functions to each make one call.
-        self.assertEqual(len(calls), 7,
-                         "expected 7 client.* calls (5 main + 2 helper)")
+        # Sanity: each exposed SQL function should make exactly one client call.
+        self.assertEqual(len(calls), 8,
+                         "expected 8 client.* calls")
         for method, argc in calls:
             with self.subTest(method=method):
                 self.assertTrue(
@@ -58,11 +58,12 @@ class TestSqlHelperSeam(unittest.TestCase):
                     f"{method}: SQL passes {argc} args but helper takes "
                     f"{len(positional)}")
 
-    def test_all_seven_methods_called(self):
+    def test_all_eight_methods_called(self):
         called = {m for m, _ in _sql_client_calls()}
         self.assertEqual(
             called,
-            {"search", "upload", "list_documents", "memory_search",
+            {"search", "upload", "list_documents", "batch_submit",
+             "memory_search",
              "list_interactions", "configure", "status"})
 
 

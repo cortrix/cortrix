@@ -57,6 +57,9 @@ class FakePlpy:
         if s.upper().startswith("SHOW "):
             guc = s[5:].strip()
             return [{guc: self.gucs[guc]}]
+        if s.startswith("SELECT current_setting("):
+            guc = s.split("'", 2)[1]
+            return [{"value": self.gucs.get(guc)}]
         if s == "SELECT 1":
             if self.cancel_on_ping:
                 raise PgCanceled("canceled")
@@ -185,13 +188,25 @@ class TestHttpShape(unittest.TestCase):
         self.assertEqual(cap.last.method, "POST")
         self.assertTrue(cap.last.full_url.endswith("/api/v1/query"))
         body = cap.body_of()
-        self.assertEqual(body, {"namespace": "ns", "query": "hello",
+        self.assertEqual(body, {"namespaces": ["ns"], "query": "hello",
                                 "top_k": 5, "filter": {"year": 2026},
                                 "rerank": True})
         self.assertEqual(rows[0]["chunk_id"], "c1")
         # Content-Type header present.
         self.assertEqual(cap.last.headers.get("Content-type"),
                          "application/json")
+
+    def test_search_normalizes_current_api_fields(self):
+        client, _, _ = make_client(payloads=[{"results": [{
+            "child_id": "chunk-1",
+            "content": "hi",
+            "score": 0.9,
+            "metadata": {"source_path": "acct_northstar-account-brief.md"},
+        }]}])
+        rows = client.search("ns", "hello", 5, None, False)
+        self.assertEqual(rows[0]["chunk_id"], "chunk-1")
+        self.assertEqual(rows[0]["filename"],
+                         "acct_northstar-account-brief.md")
 
     def test_upload_posts_documents_with_hex(self):
         client, _, cap = make_client(payloads=[{"doc_id": "doc-9"}])
@@ -218,6 +233,14 @@ class TestHttpShape(unittest.TestCase):
         self.assertTrue(
             cap.last.full_url.endswith("/api/v1/namespaces/my-ns/documents"))
         self.assertEqual(docs[0]["doc_id"], "d1")
+
+    def test_list_documents_normalizes_current_api_fields(self):
+        client, _, _ = make_client(payloads=[{"documents": [
+            {"doc_id": "d1", "source_path": "a.md", "status": "ready",
+             "block_count": 3, "created_at": 1782139283}]}])
+        docs = client.list_documents("my-ns")
+        self.assertEqual(docs[0]["filename"], "a.md")
+        self.assertEqual(docs[0]["chunks"], 3)
 
     def test_batch_submit_posts_documents_with_options(self):
         resp = {
@@ -470,12 +493,25 @@ class TestCancel(unittest.TestCase):
 
 class TestStatus(unittest.TestCase):
     def test_status_connected(self):
-        client, _, _ = make_client(payloads=[{"status": "ok"}])
+        client, _, cap = make_client(payloads=[{"status": "ok"}])
         s = client.status()
         self.assertTrue(s["http_connected"])
         self.assertEqual(s["version"], "1.0.0")
         self.assertEqual(s["endpoint"], "http://localhost:8420")
         self.assertIn("latency_ms", s)
+        self.assertTrue(cap.last.full_url.endswith("/api/v1/health"))
+
+    def test_status_falls_back_to_root_health(self):
+        client, _, cap = make_client(payloads=[
+            error.HTTPError(
+                "http://localhost:8420/api/v1/health", 404, "not found",
+                {}, io.BytesIO(b"not found")),
+            {"status": "ok"},
+        ])
+        s = client.status()
+        self.assertTrue(s["http_connected"])
+        self.assertTrue(cap.requests[0].full_url.endswith("/api/v1/health"))
+        self.assertTrue(cap.requests[1].full_url.endswith("/health"))
 
     def test_status_disconnected_never_raises(self):
         client, _, _ = make_client(payloads=[error.URLError("refused")])

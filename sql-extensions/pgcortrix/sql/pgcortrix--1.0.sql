@@ -88,7 +88,7 @@ BEGIN
 END $$;
 
 -- ===========================================================================
--- §2.1.2  Main functions (5)
+-- §2.1.2  Main functions (6)
 -- ===========================================================================
 -- Each body defers to the cached PgcortrixClient helper (GD-cached so the module
 -- is imported once per backend, not per call — F14 §2.3). The helper does the
@@ -107,9 +107,13 @@ LANGUAGE plpython3u
 STABLE                          -- L3.4: LATERAL JOIN friendly
 PARALLEL SAFE
 AS $$
+    import json
     from pgcortrix_helper import get_client
     client = get_client(plpy, GD)
     for r in client.search(namespace, query, top_k, filter, rerank):
+        metadata = r.get('metadata')
+        if metadata is not None and not isinstance(metadata, str):
+            metadata = json.dumps(metadata)
         yield (
             r.get('chunk_id'),
             r.get('content'),
@@ -117,7 +121,7 @@ AS $$
             r.get('rerank_score'),
             r.get('doc_id'),
             r.get('filename'),
-            r.get('metadata'),
+            metadata,
         )
 $$;
 
@@ -224,9 +228,13 @@ LANGUAGE plpython3u
 STABLE
 PARALLEL SAFE
 AS $$
+    import json
     from pgcortrix_helper import get_client
     client = get_client(plpy, GD)
     for r in client.list_interactions(namespace, user_id, filter, limit_n, offset_n):
+        metadata = r.get('metadata')
+        if metadata is not None and not isinstance(metadata, str):
+            metadata = json.dumps(metadata)
         yield (
             r.get('interaction_id'),
             r.get('user_id'),
@@ -234,12 +242,12 @@ AS $$
             r.get('role'),
             r.get('content'),
             r.get('created_at'),
-            r.get('metadata'),
+            metadata,
         )
 $$;
 
 -- ===========================================================================
--- §2.1.3  Helper functions (2)  — main = 1..5, helpers numbered from 6
+-- §2.1.3  Helper functions (2)  — main = 1..6, helpers numbered from 7
 -- ===========================================================================
 
 -- 6. Session-level API key configuration.
