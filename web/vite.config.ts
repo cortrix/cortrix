@@ -33,15 +33,16 @@ export default defineConfig({
     proxy: {
       // § 11.3 — API + agent + OTLP metrics all proxied to the local backend in
       // dev so the SPA runs same-origin (matches the production reverse proxy;
-      // no CORS, CSP connect-src stays 'self'). Backend API port = 8080 (F24
-      // real contract). OTLP metrics (§ 23-bis.2) post to /v1/metrics.
-      '/api': 'http://localhost:8080',
-      '/docs': 'http://localhost:8080',
-      '/openapi.yaml': 'http://localhost:8080',
-      '/openapi.json': 'http://localhost:8080',
-      '/paths': 'http://localhost:8080',
-      '/components': 'http://localhost:8080',
-      '/v1/metrics': 'http://localhost:8080',
+      // no CORS, CSP connect-src stays 'self'). Backend API port = 8420 — the
+      // local dev default in config.yaml.example and the port dev.sh starts the
+      // server on. OTLP metrics (§ 23-bis.2) post to /v1/metrics.
+      '/api': 'http://localhost:8420',
+      '/docs': 'http://localhost:8420',
+      '/openapi.yaml': 'http://localhost:8420',
+      '/openapi.json': 'http://localhost:8420',
+      '/paths': 'http://localhost:8420',
+      '/components': 'http://localhost:8420',
+      '/v1/metrics': 'http://localhost:8420',
       // Scope the agent-server proxy to the '/agent/config' subtree only. A bare
       // '/agent' prefix also swallowed the client-side SPA route '/agent' (the
       // Chat page), so the dev server proxied it to :8001 and the page 500'd /
