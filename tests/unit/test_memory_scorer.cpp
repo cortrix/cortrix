@@ -364,6 +364,12 @@ TEST(MemoryScorerLog, UnknownType_LogsWarn) {
     }
 
     spdlog::set_default_logger(prev);  // restore for other tests
+    // Drop the capture logger from spdlog's global registry. set_default_logger
+    // also registered it under its name; without this drop the sink (which holds a
+    // reference to the stack-local oss destroyed at function exit) lingers in the
+    // registry, and the flush_every() background thread's flush_all() later
+    // dereferences the dead ostream -> use-after-free / SIGSEGV.
+    spdlog::drop("mem01_test_capture");
     const std::string logged = oss.str();
     EXPECT_NE(logged.find("Unknown memory_type"), std::string::npos) << logged;
     EXPECT_NE(logged.find("opinion"), std::string::npos) << logged;
@@ -386,6 +392,7 @@ TEST(MemoryScorerLog, KnownTypes_DoNotWarn) {
     }
 
     spdlog::set_default_logger(prev);
+    spdlog::drop("mem01_test_capture2");  // see UnknownType_LogsWarn: avoid dead-sink UAF
     EXPECT_EQ(oss.str().find("Unknown memory_type"), std::string::npos) << oss.str();
 }
 
