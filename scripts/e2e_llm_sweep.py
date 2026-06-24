@@ -190,6 +190,20 @@ def main():
             check("P4 chat via_path", via == "chat_memory_only", f"via_path={via}")
         check(f"P4 route={route} 200", ok, f"{r.status_code} {r.text[:200]}")
 
+    # F37 CRAG runs only on the Complex route; with explain the verdict is surfaced.
+    # Exercises the CRAG explain branch (crag_verdict / crag_score / ambiguous_action_taken).
+    r = query({"query": q, "namespaces": [args.ns], "top_k": 5}, "?route=complex&explain=true")
+    if check("P4 F37 complex+explain 200", r.status_code == 200, r.text[:250]):
+        ex = (r.json() or {}).get("explain", {}) or {}
+        flat = json.dumps(ex)
+        # crag_verdict appears somewhere in the explain tree when F37 ran.
+        has_crag = "crag_verdict" in flat
+        check("P4 F37 CRAG verdict surfaced in explain", has_crag, flat[:300])
+        if has_crag:
+            # verdict must be one of the known F37 classes (not an empty/garbage value).
+            verdict_ok = any(v in flat for v in ('"correct"', '"ambiguous"', '"incorrect"', '"disabled"'))
+            check("P4 F37 CRAG verdict is a known class", verdict_ok, flat[:300])
+
     r = query({"query": q, "namespaces": ["no-such-ns-xyz"], "top_k": 3})
     if 400 <= r.status_code < 500:
         err = (r.json() or {}).get("error", {})
@@ -272,6 +286,20 @@ def main():
         # F13 observability (M6, per-NS): /interactions is live now.
         r = s.get(f"{api}/interactions", params={"namespace_id": args.ns, "session_id": sid}, timeout=15)
         check("P5 F13 /interactions 200", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+        # F13 §8.2 sources view: if any interaction exists, its /sources sub-resource must
+        # respond 200 with a source_count field (exercises the interaction-sources branch).
+        if r.status_code == 200:
+            inters = (r.json() or {}).get("interactions", [])
+            iid = inters[0].get("interaction_id") if inters else None
+            if iid:
+                # NB: the sources sub-resource uses the `namespace` param (per-NS storage),
+                # NOT `namespace_id` like the /interactions list above — a documented F13
+                # contract addendum (observability_routes.cpp §TC4), so pass `namespace`.
+                rs = s.get(f"{api}/interactions/{iid}/sources",
+                           params={"namespace": args.ns}, timeout=15)
+                check("P5 F13 /interactions/{id}/sources 200 + source_count",
+                      rs.status_code == 200 and "source_count" in (rs.text or ""),
+                      f"{rs.status_code} {rs.text[:200]}")
         r = s.get(f"{api}/traces/{sid}", params={"namespace": args.ns}, timeout=15)
         check("P5 F13 /traces (ns param) responds", r.status_code in (200, 404), f"{r.status_code} {r.text[:160]}")
         # /traces is the GLOBAL agent_trace read (F13 §8.1 / TC4): ?namespace is NOT
@@ -281,6 +309,30 @@ def main():
         # "missing ns → 400" assertion applied the per-NS /interactions contract here.
         r = s.get(f"{api}/traces/{sid}", timeout=15)
         check("P5 F13 /traces no-ns (global, ns not required) responds", r.status_code in (200, 404), f"{r.status_code} {r.text[:160]}")
+
+        # F13 agent-trace WRITE path (folds in the 2026-06-24 standalone write check so it
+        # is permanent sweep coverage): a /query carrying X-Session-Id/X-Agent-Id makes the
+        # engine instrumentation Record() a row into the GLOBAL agent_trace table; that row
+        # must then surface at GET /traces/{that_sid} as 200 with total_count >= 1. This also
+        # negatively confirms the 404 contract above is "no traces yet" and not a dead route.
+        trace_sid = f"qa-trace-{int(time.time())}"
+        s.post(f"{api}/query",
+               json={"query": "Which planet is the hottest in the Solar System?",
+                     "namespaces": [args.ns], "top_k": 3},
+               headers={"X-Session-Id": trace_sid, "X-Agent-Id": "qa-e2e-agent"}, timeout=120)
+        wrote = False
+        for _ in range(8):  # trace write is on the query path; allow brief settle
+            r = s.get(f"{api}/traces/{trace_sid}", timeout=15)
+            if r.status_code == 200:
+                b = r.json() or {}
+                # §8.1 body: trace_count = rows on this page; meta.total_count = total match.
+                n = b.get("trace_count", 0) or (b.get("meta") or {}).get("total_count", 0)
+                if n >= 1:
+                    wrote = True
+                    break
+            time.sleep(2)
+        check("P5 F13 agent-trace write (X-Session-Id query → /traces trace_count>=1)",
+              wrote, f"last={r.status_code} {r.text[:200]}")
 
         # MEM03 transparency CRUD on /memory.
         r = s.post(f"{api}/memory",
@@ -309,6 +361,27 @@ def main():
     r = s.get(f"{api}/system/version", timeout=10)
     if check("P6 /system/version 200", r.status_code == 200, r.text[:160]):
         check("P6 version == 1.0.0", (r.json() or {}).get("version") == "1.0.0", r.text[:160])
+
+    # F18a operation_log read surface (/operations). By now uploads + memory CRUD +
+    # namespace creates have logged rows. Exercises: list, namespace_id filter branch,
+    # resource_type filter branch — and asserts the ns filter actually scopes results.
+    r = s.get(f"{api}/operations", timeout=15)
+    if check("P6 F18a /operations 200", r.status_code == 200, f"{r.status_code} {r.text[:200]}"):
+        body = r.json() or {}
+        ops = body.get("operations", [])
+        total = (body.get("meta") or {}).get("total_count", body.get("total_count"))
+        check("P6 F18a /operations shape (operations[] + total_count)",
+              isinstance(ops, list) and total is not None, json.dumps(body)[:250])
+        # namespace_id filter branch: every returned row must match the filter.
+        rf = s.get(f"{api}/operations", params={"namespace_id": args.ns}, timeout=15)
+        if check("P6 F18a /operations?namespace_id 200", rf.status_code == 200, rf.text[:200]):
+            fops = (rf.json() or {}).get("operations", [])
+            scoped = all((o.get("namespace_id") in (args.ns, None)) for o in fops)
+            check("P6 F18a /operations ns filter scopes rows", scoped,
+                  json.dumps([o.get("namespace_id") for o in fops[:10]])[:200])
+        # resource_type filter branch (memory ops were logged in P5).
+        rt = s.get(f"{api}/operations", params={"resource_type": "memory"}, timeout=15)
+        check("P6 F18a /operations?resource_type=memory 200", rt.status_code == 200, rt.text[:200])
 
     # P08-CE api-keys CRUD (no-auth mode grants admin for local integration).
     r = s.post(f"{api}/auth/api-keys", json={"name": "e2e-key"}, timeout=15)
