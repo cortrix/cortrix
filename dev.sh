@@ -91,6 +91,27 @@ done
 info "Using config file: $CONFIG_FILE"
 export CORTRIX_OPENAPI_ROOT="${CORTRIX_OPENAPI_ROOT:-$SCRIPT_DIR}"
 
+# Check the local models are provisioned (fail fast — the server would otherwise
+# silently fall back to stub embedding / stub reranker / heuristic complexity and
+# skip PDF/image parsing, which is rarely what a one-command launch wants).
+# Set CORTRIX_ALLOW_MISSING_MODELS=1 to start anyway in degraded/stub mode.
+MISSING_MODELS=()
+[[ -f "$SCRIPT_DIR/models/bge-m3/model.onnx" ]]            || MISSING_MODELS+=("bge-m3 (embedding)")
+[[ -f "$SCRIPT_DIR/models/bge-reranker-v2-m3/model.onnx" ]] || MISSING_MODELS+=("bge-reranker-v2-m3 (rerank)")
+[[ -f "$SCRIPT_DIR/models/query-complexity/model.onnx" ]]  || MISSING_MODELS+=("query-complexity (F39 routing)")
+[[ -x "$SCRIPT_DIR/scripts/ocr_venv/bin/python3" || -x "$SCRIPT_DIR/scripts/ocr_venv/bin/python3.12" ]] \
+    || MISSING_MODELS+=("docling/paddleocr parser venv (PDF/image parsing)")
+if [[ ${#MISSING_MODELS[@]} -gt 0 ]]; then
+    if [[ "${CORTRIX_ALLOW_MISSING_MODELS:-}" == "1" ]]; then
+        warn "Missing models (degraded mode, CORTRIX_ALLOW_MISSING_MODELS=1):"
+        for m in "${MISSING_MODELS[@]}"; do warn "  - $m"; done
+    else
+        echo "" >&2
+        for m in "${MISSING_MODELS[@]}"; do echo -e "${RED}[cortrix]${NC}   missing: $m" >&2; done
+        error "Local models are not provisioned.\nRun the one-click setup first:  ./scripts/setup_models.sh\n(see deploy/MODELS.md for download/hosting options)\nOr start anyway in degraded/stub mode:  CORTRIX_ALLOW_MISSING_MODELS=1 ./dev.sh"
+    fi
+fi
+
 # Check frontend dependencies
 [[ -d "$WEB_DIR/node_modules" ]] || {
     warn "Frontend dependencies not installed, installing..."
@@ -125,14 +146,17 @@ else
 fi
 BACKEND_PID=$!
 
-# Wait for the backend to be ready (up to 10 seconds)
-for i in {1..33}; do
+# Wait for the backend to be ready (up to 60 seconds).
+# Real-model cold start (bge-m3 2.1GB + reranker + complexity, with CoreML
+# graph compilation on first run) blocks before the HTTP server begins
+# listening and can take ~20s; the old 10s window timed out prematurely.
+for i in {1..200}; do
     if curl -sf http://localhost:8420/api/v1/health &>/dev/null; then
         ok "Backend ready ✓"
         break
     fi
     sleep 0.3
-    if [[ $i -eq 33 ]]; then
+    if [[ $i -eq 200 ]]; then
         error "Backend startup timed out, please check the logs"
     fi
 done

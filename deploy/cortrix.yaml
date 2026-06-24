@@ -28,11 +28,30 @@ namespace:
   data_dir: /data
 
 embedding:
-  # bge-m3 ONNX assets are NOT baked into the image (too large).
-  # Place them in the data volume; when absent the server starts in
-  # deterministic stub-embedding mode (WARN at startup, still serves).
-  model_path: /data/models/bge-m3.onnx
-  tokenizer_path: /data/models/tokenizer.json
+  # bge-m3 ONNX assets are NOT baked into the image (too large). On first run
+  # entrypoint.sh provisions them into the data volume at the paths below
+  # (PROFILE=full); when absent the server starts in deterministic
+  # stub-embedding mode (WARN at startup, still serves).
+  model_path: /data/models/bge-m3/model.onnx
+  tokenizer_path: /data/models/bge-m3/tokenizer.json
+
+# F02 reranker — provisioned to the data volume on first run when
+# CORTRIX_RERANKER_MODEL_URL is set; absent = deterministic stub. (Also
+# overridable via CORTRIX_RERANKER_MODEL_DIR, which entrypoint.sh sets.)
+reranker:
+  model_dir: /data/models/bge-reranker-v2-m3
+
+# F39/F37 query-complexity classifier — provisioned when
+# CORTRIX_QUERY_COMPLEXITY_MODEL_URL is set; absent = heuristic fallback.
+query_complexity:
+  model_dir: /data/models/query-complexity
+
+# F06 document parser — the docling/paddleocr bridge scripts are auto-located
+# at /app/scripts; python_bin points at the parser venv that entrypoint.sh
+# provisions on the data volume (PROFILE=full). Absent venv = PDF/image
+# parsing unavailable (txt/md still work via the plain-text fast path).
+spc:
+  python_bin: /data/ocr_venv/bin/python3
 
 # --- LLM roles (all optional; unset = feature stays off) ---
 # Connection trio per role: provider / api_key / model / base_url.

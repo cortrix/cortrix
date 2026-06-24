@@ -33,7 +33,47 @@ export CORTRIX_WEB_UI_PATH="${CORTRIX_WEB_UI_PATH:-/ui}"
 if [ "$CORTRIX_WEB_UI_ENABLED" = "true" ]; then
     export CORTRIX_WEB_UI_DIR="${CORTRIX_WEB_UI_DIR:-/app/web-ui}"
 fi
-# F02 reranker (real model when bind-mounted; absent = deterministic stub).
+# ---------- 1b. First-run provisioning (PROFILE != lite) ----------
+# Models and the docling/paddleocr parser stack are NOT baked into the image;
+# on first run (PROFILE=full, the default) they are provisioned into the /data
+# volume so they persist across restarts (only the first boot pays the cost).
+# PROFILE=lite skips this: txt/md ingestion + BM25 still work, embedding runs in
+# stub mode, and PDF/image parsing is unavailable.
+export CORTRIX_PROFILE="${CORTRIX_PROFILE:-full}"
+CORTRIX_MODELS_DIR="$CORTRIX_DATA_DIR/models"
+CORTRIX_OCR_VENV="$CORTRIX_DATA_DIR/ocr_venv"
+# Keep parser model caches on the volume (docling→HF hub, paddleocr→PaddleX).
+export HF_HOME="${HF_HOME:-$CORTRIX_DATA_DIR/cache/huggingface}"
+export PADDLE_PDX_CACHE_HOME="${PADDLE_PDX_CACHE_HOME:-$CORTRIX_DATA_DIR/cache/paddlex}"
+mkdir -p "$CORTRIX_MODELS_DIR" "$HF_HOME" "$PADDLE_PDX_CACHE_HOME" 2>/dev/null || true
+
+if [ "$CORTRIX_PROFILE" = "lite" ]; then
+    echo "PROFILE=lite — skipping model/parser provisioning"
+    echo "  (txt/md + BM25 available; embedding=stub; PDF/image parsing off)"
+else
+    # (1) ONNX models → data volume. bge-m3 always; reranker/query-complexity
+    #     only when their *_MODEL_URL env is set (see download-models.sh).
+    if [ ! -f "$CORTRIX_MODELS_DIR/bge-m3/model.onnx" ]; then
+        echo "[provision] fetching ONNX models into $CORTRIX_MODELS_DIR"
+        echo "            (first run only; bge-m3 ~2GB, may take 10-20 min)…"
+        bash /app/scripts/download-models.sh "$CORTRIX_MODELS_DIR" \
+            || echo "WARN: model fetch incomplete — affected features degrade (embedding/reranker stub, heuristic complexity)"
+    fi
+    # (2) docling/paddleocr parser stack → venv on the data volume.
+    if [ ! -x "$CORTRIX_OCR_VENV/bin/python3" ]; then
+        echo "[provision] creating parser venv + installing docling/paddleocr"
+        echo "            (first run only; ~2GB, may take several minutes)…"
+        if python3 -m venv "$CORTRIX_OCR_VENV"; then
+            "$CORTRIX_OCR_VENV/bin/pip" install --no-cache-dir -q --upgrade pip >/dev/null 2>&1 || true
+            "$CORTRIX_OCR_VENV/bin/pip" install --no-cache-dir -q -r /app/scripts/requirements-parser.txt \
+                || echo "WARN: parser stack install failed — PDF/image ingestion off (text formats still work)"
+        else
+            echo "WARN: parser venv creation failed — PDF/image ingestion off"
+        fi
+    fi
+fi
+
+# F02 reranker (real model when provisioned/bind-mounted; absent = stub).
 if [ -d "${CORTRIX_RERANKER_MODEL_DIR:-/data/models/bge-reranker-v2-m3}" ]; then
     export CORTRIX_RERANKER_MODEL_DIR="${CORTRIX_RERANKER_MODEL_DIR:-/data/models/bge-reranker-v2-m3}"
 fi
