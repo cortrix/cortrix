@@ -274,8 +274,13 @@ def main():
         check("P5 F13 /interactions 200", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
         r = s.get(f"{api}/traces/{sid}", params={"namespace": args.ns}, timeout=15)
         check("P5 F13 /traces (ns param) responds", r.status_code in (200, 404), f"{r.status_code} {r.text[:160]}")
+        # /traces is the GLOBAL agent_trace read (F13 §8.1 / TC4): ?namespace is NOT
+        # required (a session's calls span namespaces, aggregated by session_id). So
+        # omitting it is NOT a 400 — it behaves like the ns-param case above (200 if the
+        # session has traces, 404 CX_ERR_F13_SESSION_NOT_FOUND if it has none). The old
+        # "missing ns → 400" assertion applied the per-NS /interactions contract here.
         r = s.get(f"{api}/traces/{sid}", timeout=15)
-        check("P5 F13 /traces missing ns → 400", r.status_code == 400, f"{r.status_code} {r.text[:160]}")
+        check("P5 F13 /traces no-ns (global, ns not required) responds", r.status_code in (200, 404), f"{r.status_code} {r.text[:160]}")
 
         # MEM03 transparency CRUD on /memory.
         r = s.post(f"{api}/memory",
