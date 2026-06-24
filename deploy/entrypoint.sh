@@ -71,6 +71,14 @@ else
             echo "WARN: parser venv creation failed — PDF/image ingestion off"
         fi
     fi
+    # Point the F06 parser at the venv (docling/paddleocr live there). The baked
+    # config defaults python_bin to system python3 so the txt/md plain-text path
+    # always works (incl. lite); repoint it here only when the venv is present so
+    # PDF/image parsing is enabled without breaking text ingestion when it is not.
+    if [ -x "$CORTRIX_OCR_VENV/bin/python3" ] && [ -w /app/config/cortrix.yaml ]; then
+        sed -i "s|^  python_bin:.*|  python_bin: $CORTRIX_OCR_VENV/bin/python3|" /app/config/cortrix.yaml
+        echo "[provision] parser python_bin -> $CORTRIX_OCR_VENV/bin/python3"
+    fi
 fi
 
 # F02 reranker (real model when provisioned/bind-mounted; absent = stub).

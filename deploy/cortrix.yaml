@@ -47,11 +47,12 @@ query_complexity:
   model_dir: /data/models/query-complexity
 
 # F06 document parser — the docling/paddleocr bridge scripts are auto-located
-# at /app/scripts; python_bin points at the parser venv that entrypoint.sh
-# provisions on the data volume (PROFILE=full). Absent venv = PDF/image
-# parsing unavailable (txt/md still work via the plain-text fast path).
+# at /app/scripts. python_bin defaults to the system python3 so the txt/md
+# plain-text fast path (stdlib only) works out of the box, including PROFILE=lite.
+# In PROFILE=full, entrypoint.sh repoints this at the provisioned parser venv
+# (/data/ocr_venv) once it exists, enabling docling/paddleocr for PDF/image.
 spc:
-  python_bin: /data/ocr_venv/bin/python3
+  python_bin: python3
 
 # --- LLM roles (all optional; unset = feature stays off) ---
 # Connection trio per role: provider / api_key / model / base_url.

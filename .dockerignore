@@ -55,6 +55,7 @@ deploy/
 !deploy/supervisord.conf
 !deploy/entrypoint.sh
 !deploy/healthcheck.sh
+!deploy/download-models.sh
 
 # Design docs
 designs/
