@@ -102,10 +102,9 @@ std::unique_ptr<ISpcEnricher> CreateEnricher(const EnricherConfig& config,
 
 std::unique_ptr<ISpcEnricher> CreateEnricher(const EnricherConfig& config) {
     // Production path: probe via the default cpp-httplib transport. The probe is
-    // a real network GET {endpoint}/models — at server bootstrap this is live
-    // (HTTPS needs CPPHTTPLIB_OPENSSL_SUPPORT, a D3.5 build-flag concern). For
-    // the non-LLM / disabled / no-key cases StartupValidate short-circuits before
-    // any network use.
+    // a real network GET {endpoint}/models at server bootstrap. For the non-LLM /
+    // disabled / no-key cases StartupValidate short-circuits before any network
+    // use.
     auto transport = llm::MakeDefaultHttpTransport();
     return CreateEnricher(config, *transport);
 }

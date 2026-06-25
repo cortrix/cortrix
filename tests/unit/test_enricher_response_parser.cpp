@@ -108,6 +108,26 @@ TEST(EnricherResponseParserTest, L1SkipsMalformedEntityElements) {
     EXPECT_EQ(r[0].entities[1].end_offset, 4);
 }
 
+TEST(EnricherResponseParserTest, L1NumericStringEntityOffsetsRecover) {
+    auto r = ParseEnrichBatchResponse(
+        R"({"0":{"entities":[{"text":"Cortrix","type":"PRODUCT","start_offset":"0","end_offset":"7"}],
+            "summary":"s","score":0.5}})",
+        1, "m", "default-zh");
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_TRUE(r[0].ok());
+    ASSERT_EQ(r[0].entities.size(), 1u);
+    EXPECT_EQ(r[0].entities[0].start_offset, 0);
+    EXPECT_EQ(r[0].entities[0].end_offset, 7);
+}
+
+TEST(EnricherResponseParserTest, CompleteFencedJsonBodyParses) {
+    auto r = ParseEnrichBatchResponse(
+        std::string("```json\n") + kGoodBody + "\n```", 2, "m", "default-zh");
+    ASSERT_EQ(r.size(), 2u);
+    EXPECT_TRUE(r[0].ok());
+    EXPECT_TRUE(r[1].ok());
+}
+
 TEST(EnricherResponseParserTest, ScoreClampedIntoRange) {
     auto r = ParseEnrichBatchResponse(
         R"({"0":{"summary":"hi","score":1.7},"1":{"summary":"lo","score":-0.5}})",

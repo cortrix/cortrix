@@ -32,8 +32,11 @@ struct LlmClientConfig {
 struct ChatCompletionResponse {
     Status status;                 ///< ok() == success; otherwise the error
     std::string content;           ///< assistant message text
+    std::string content_source = "message.content";  ///< response field used as content
     std::string model;             ///< model that served the request
     std::string finish_reason;     ///< "stop" / "length" / ...
+    int content_length = 0;
+    int reasoning_content_length = 0;
     int prompt_tokens = 0;
     int completion_tokens = 0;
 

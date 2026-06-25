@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <utility>
 
 #include <httplib.h>
 
@@ -41,11 +42,15 @@ SplitUrl SplitBaseAndPath(const std::string& url) {
     return out;
 }
 
-/// cpp-httplib transport. HTTP works as-is; HTTPS requires the build to define
-/// CPPHTTPLIB_OPENSSL_SUPPORT (a shared-dependency decision deferred to D3.5 —
-/// see http_transport.h). When that macro is absent, an https:// URL cannot be
-/// served and Send() reports network_ok=false (the client maps it to
-/// CX_ERR_ENRICHER_LLM_API), exactly as a connect failure would.
+std::pair<int, int> SplitTimeoutMs(int timeout_ms) {
+    const int safe_timeout_ms = std::max(timeout_ms, 1);
+    return {safe_timeout_ms / 1000, (safe_timeout_ms % 1000) * 1000};
+}
+
+/// cpp-httplib transport. The project build enables CPPHTTPLIB_OPENSSL_SUPPORT
+/// so OpenAI-compatible HTTPS endpoints can be used by runtime LLM features.
+/// Transport failures still return network_ok=false and are mapped by callers to
+/// feature-specific LLM API errors.
 class HttplibTransport : public IHttpTransport {
 public:
     HttpResponse Send(const HttpRequest& request) override {
@@ -57,9 +62,10 @@ public:
         }
 
         httplib::Client cli(split.base);
-        cli.set_connection_timeout(0, request.timeout_ms * 1000);  // (sec, usec)
-        cli.set_read_timeout(request.timeout_ms / 1000, (request.timeout_ms % 1000) * 1000);
-        cli.set_write_timeout(request.timeout_ms / 1000, (request.timeout_ms % 1000) * 1000);
+        const auto [timeout_sec, timeout_usec] = SplitTimeoutMs(request.timeout_ms);
+        cli.set_connection_timeout(timeout_sec, timeout_usec);
+        cli.set_read_timeout(timeout_sec, timeout_usec);
+        cli.set_write_timeout(timeout_sec, timeout_usec);
 
         httplib::Headers headers;
         for (const auto& [k, v] : request.headers) headers.emplace(k, v);

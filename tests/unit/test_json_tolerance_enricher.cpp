@@ -13,10 +13,11 @@
 //       stays status = 0 (success).  entities missing -> empty; summary missing ->
 //       ""; score missing/non-number -> 0; score clamped to [0,1].
 //
-// This is the MOST tolerant parser: fenced / prose-wrapped bodies that happen to
-// parse to a JSON object simply miss the integer index keys -> uniform L2; bodies
-// that are not even objects -> uniform L3. The invariant under test is "no crash,
-// correct vector size, documented layer status" -- never a thrown exception.
+// The parser accepts a complete Markdown JSON fence (```json ... ```) because
+// live OpenAI-compatible providers may return that despite response_format.
+// It still does not recover JSON from surrounding prose or partial text. The
+// invariant under test is "no crash, correct vector size, documented layer
+// status" -- never a thrown exception.
 //
 // kClean=the 2-chunk happy body, expected status [0,0].  We parameterise the body +
 // the expected per-index status vector (length 2 unless noted via batch_size).
@@ -95,12 +96,12 @@ const std::vector<EnricherJsonCase> kEnricherCases = {
      2, {kParseStatus, 0}},
     {"l2_empty_object_body", "{}", 2, {kParseStatus, kParseStatus}},
 
-    // ---- ```json fenced -> NOT a JSON object -> L3 all ----
+    // ---- complete fenced JSON -> unwraps to the clean object ----
     {"l3_fenced_json", "```json\n" + std::string(kClean) + "\n```",
-     2, {kParseStatus, kParseStatus}},
-    // ---- ``` bare-fenced -> L3 all ----
+     2, {0, 0}},
+    // ---- complete bare-fenced JSON -> unwraps to the clean object ----
     {"l3_fenced_bare", "```\n" + std::string(kClean) + "\n```",
-     2, {kParseStatus, kParseStatus}},
+     2, {0, 0}},
 
     // ---- object-wrapped: parses to object but index keys nested -> L2 all ----
     {"l2_wrapped_result", R"({"result":)" + std::string(kClean) + "}",
@@ -146,6 +147,11 @@ const std::vector<EnricherJsonCase> kEnricherCases = {
     // ---- nested-bracket inside a string field is fine (L1 success) ----
     {"nested_bracket_in_summary",
      R"({"0":{"summary":"covers [1,2] and {a:b}","score":0.1}})", 1, {0}},
+
+    // ---- numeric string entity offsets are field-level recoverable ----
+    {"l1_numeric_string_offsets",
+     R"({"0":{"entities":[{"text":"Cortrix","type":"PRODUCT","start_offset":"0","end_offset":"7"}],"summary":"s"}})",
+     1, {0}},
 
     // ---- batch_size 0 -> empty vector, no crash ----
     {"batch_size_zero", std::string(kClean), 0, {}},

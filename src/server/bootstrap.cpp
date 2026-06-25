@@ -626,10 +626,12 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         llm_cfg.api_key = config.doc_summary_llm.api_key;
         llm_cfg.default_model = config.doc_summary_llm.model;
         doc_summary_llm = std::make_shared<cortrix::llm::OpenAiLlmClient>(std::move(llm_cfg));
+        auto doc_summary_cfg = cortrix::doc_summary::ResolveDocSummaryConfig(f42_config.get());
+        if (!config.doc_summary_llm.model.empty()) {
+            doc_summary_cfg.llm_model = config.doc_summary_llm.model;
+        }
         doc_summary_worker = std::make_unique<cortrix::doc_summary::F41AsyncWorker>(
-            ns_pool, doc_summary_llm,
-            cortrix::doc_summary::ResolveDocSummaryConfig(f42_config.get()),
-            embedder, assembler, &task_mgr);
+            ns_pool, doc_summary_llm, doc_summary_cfg, embedder, assembler, &task_mgr);
     }
 
     // The pool is the LAST async object constructed → the FIRST destroyed (its dtor

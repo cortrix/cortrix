@@ -1,7 +1,12 @@
 #include "cortrix/spc_enricher/enricher_response_parser.h"
 
+#include <cerrno>
+#include <cstdlib>
+#include <limits>
+
 #include <nlohmann/json.hpp>
 
+#include "cortrix/common/json_contract.h"
 #include "cortrix/spc_enricher/enricher_error.h"
 
 namespace cortrix::spc {
@@ -22,6 +27,31 @@ void FillParseError(EnrichResult& r, const char* layer, int batch_size,
                   " (" + layer + ")";
 }
 
+int ReadIntField(const json& obj, const char* key, int fallback = 0) {
+    auto it = obj.find(key);
+    if (it == obj.end()) return fallback;
+    if (it->is_number_integer()) return it->get<int>();
+    if (it->is_number_unsigned()) {
+        const auto v = it->get<unsigned long long>();
+        if (v > static_cast<unsigned long long>(std::numeric_limits<int>::max())) {
+            return fallback;
+        }
+        return static_cast<int>(v);
+    }
+    if (it->is_string()) {
+        const std::string s = it->get<std::string>();
+        char* end = nullptr;
+        errno = 0;
+        const long v = std::strtol(s.c_str(), &end, 10);
+        if (errno == 0 && end != s.c_str() && *end == '\0' &&
+            v >= std::numeric_limits<int>::min() &&
+            v <= std::numeric_limits<int>::max()) {
+            return static_cast<int>(v);
+        }
+    }
+    return fallback;
+}
+
 // L1: extract entities defensively — skip malformed array elements, default
 // missing fields. Never throws (caller already has a parsed object).
 std::vector<Entity> ParseEntities(const json& chunk_obj) {
@@ -33,8 +63,8 @@ std::vector<Entity> ParseEntities(const json& chunk_obj) {
         Entity ent;
         ent.text = e.value("text", std::string{});
         ent.type = e.value("type", std::string{});
-        ent.start_offset = e.value("start_offset", 0);
-        ent.end_offset = e.value("end_offset", 0);
+        ent.start_offset = ReadIntField(e, "start_offset");
+        ent.end_offset = ReadIntField(e, "end_offset");
         out.push_back(std::move(ent));
     }
     return out;
@@ -49,7 +79,8 @@ std::vector<EnrichResult> ParseEnrichBatchResponse(const std::string& body,
     std::vector<EnrichResult> results(static_cast<size_t>(batch_size < 0 ? 0 : batch_size));
 
     // --- L3: whole-batch parse ---
-    json root = json::parse(body, /*cb=*/nullptr, /*allow_exceptions=*/false);
+    const std::string normalized_body = common::UnwrapCompleteJsonFence(body);
+    json root = json::parse(normalized_body, /*cb=*/nullptr, /*allow_exceptions=*/false);
     if (root.is_discarded() || !root.is_object()) {
         for (auto& r : results) FillParseError(r, "L3", batch_size, model);
         return results;

@@ -70,7 +70,13 @@ Status F41AsyncWorker::ProcessTask(const async::TaskInfo& task) {
             result.error ? result.error->code : "CX_ERR_F41_GENERATION_FAILED";
         const std::string msg =
             result.error ? result.error->message : "doc summary generation failed";
-        return finalizer_.Fail(task, code, msg, {{"doc_id", task.doc_id}}, t_start);
+        nlohmann::json structured_data = {{"doc_id", task.doc_id}};
+        if (result.error && result.error->structured_data.has_value() &&
+            result.error->structured_data->is_object()) {
+            structured_data = *result.error->structured_data;
+            structured_data["doc_id"] = task.doc_id;
+        }
+        return finalizer_.Fail(task, code, msg, structured_data, t_start);
     }
 
     // (3) Re-embed the summary_text (Generate leaves embedding empty by design).
