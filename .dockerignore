@@ -63,3 +63,13 @@ discussions/
 
 # Local model assets (bind-mounted at runtime, never COPYed; multi-GB)
 models/
+
+# Dependency/build dirs regenerated inside the image (never needed in the build
+# context; sending them bloats the context and stalls the legacy builder).
+**/node_modules/
+**/venv/
+**/ocr_venv/
+**/__pycache__/
+**/.venv/
+sdk/python/dist/
+sdk/python/*.egg-info/
