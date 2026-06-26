@@ -64,6 +64,8 @@ models/
 # Local deployment overrides (may contain API keys — never commit)
 deploy/*.local.yaml
 deploy/*.local.yml
+deploy/*.bench.yaml
+deploy/*.bench.yml
 
 # project files
 CLAUDE.md
