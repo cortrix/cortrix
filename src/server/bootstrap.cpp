@@ -626,10 +626,19 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         llm_cfg.api_key = config.doc_summary_llm.api_key;
         llm_cfg.default_model = config.doc_summary_llm.model;
         doc_summary_llm = std::make_shared<cortrix::llm::OpenAiLlmClient>(std::move(llm_cfg));
+        // D5 wiring (2026-06-26): ResolveDocSummaryConfig leaves llm_model at the
+        // kDefaultLlmModel "gpt-4o-mini" default — the generator sends call.model =
+        // config_.llm_model, so without this the request ALWAYS asks for gpt-4o-mini,
+        // ignoring the configured doc_summary_llm.model. Any non-OpenAI provider (GLM,
+        // Claude, local) then returns HTTP 400 and every summary silently fails. Wire
+        // the configured model through here (mirrors LlmEnricher, which uses its real
+        // config_.model). See qa DEFECT#3.
+        auto ds_cfg = cortrix::doc_summary::ResolveDocSummaryConfig(f42_config.get());
+        if (!config.doc_summary_llm.model.empty()) {
+            ds_cfg.llm_model = config.doc_summary_llm.model;
+        }
         doc_summary_worker = std::make_unique<cortrix::doc_summary::F41AsyncWorker>(
-            ns_pool, doc_summary_llm,
-            cortrix::doc_summary::ResolveDocSummaryConfig(f42_config.get()),
-            embedder, assembler, &task_mgr);
+            ns_pool, doc_summary_llm, ds_cfg, embedder, assembler, &task_mgr);
     }
 
     // The pool is the LAST async object constructed → the FIRST destroyed (its dtor

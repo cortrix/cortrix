@@ -19,6 +19,7 @@ namespace cortrix::doc_summary {
 namespace {
 
 using ::testing::_;
+using ::testing::Field;
 using ::testing::Return;
 
 llm::ChatCompletionResponse OkChat(std::string content) {
@@ -170,6 +171,25 @@ TEST(F41DocSummaryGeneratorTest, ShortDocLlmFailureIsTimeout) {
     auto r = g.GenerateSummary(NChunks(3), "R", &mr);
     EXPECT_FALSE(r.ok());
     EXPECT_NE(r.status().message().find("CX_ERR_F41_LLM_TIMEOUT"), std::string::npos);
+}
+
+// Regression (DEFECT#3, 2026-06-26): the generator must send the CONFIGURED
+// llm_model, not the kDefaultLlmModel "gpt-4o-mini". A live GLM deployment
+// (doc_summary_llm.model=glm-5.2) was sending "gpt-4o-mini" — the DocSummaryConfig
+// default, never overridden by the bootstrap wiring — which GLM rejects with HTTP
+// 400, so every summary silently failed. Guard that config_.llm_model reaches the
+// LLM call. (The bootstrap-side wiring is verified by the live E2E; this unit guard
+// catches any regression that re-hardcodes the model in the generator.)
+TEST(F41DocSummaryGeneratorTest, SendsConfiguredModelNotDefault) {
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    DocSummaryConfig cfg;
+    cfg.llm_model = "glm-5.2";
+    EXPECT_CALL(*llm, Chat(_, Field(&llm::LlmCallConfig::model, "glm-5.2")))
+        .WillOnce(Return(OkChat(kGoodJson)));
+    DocSummaryGenerator g = MakeGen(llm, std::make_shared<store::MockChunkStore>(), cfg);
+    bool mr = false;
+    auto r = g.GenerateSummary(NChunks(3), "Report", &mr);
+    ASSERT_TRUE(r.ok()) << r.status().message();
 }
 
 // ---------- GenerateSummary: map-reduce long path (§9.2) ----------
