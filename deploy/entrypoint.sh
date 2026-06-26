@@ -42,10 +42,22 @@ fi
 export CORTRIX_PROFILE="${CORTRIX_PROFILE:-full}"
 CORTRIX_MODELS_DIR="$CORTRIX_DATA_DIR/models"
 CORTRIX_OCR_VENV="$CORTRIX_DATA_DIR/ocr_venv"
-# Keep parser model caches on the volume (docling→HF hub, paddleocr→PaddleX).
+# Keep parser model caches on the volume so they persist across restarts.
+# DEFECT#7 root cause: docling's layout/TableFormer models load via huggingface_hub
+# into HF_HOME. On a fresh volume HF_HOME is empty, so the FIRST PDF parse downloads
+# ~0.5GB from the HF Hub on the hot path; unauthenticated (no HF_TOKEN) that is
+# rate-limited to ~100-150s, which blows the 60s parser subprocess timeout → the
+# document errors as "All parsers failed". HF_HOME is already on the volume, but an
+# empty cache still pays the download on first use — so (2b) below pre-warms it
+# during provisioning, and after provisioning we flip the runtime to offline so a
+# warm cache never pays online revalidation latency. The server exports these before
+# launch and posix_spawn passes environ through, so the docling_bridge subprocess
+# inherits them. DOCLING_CACHE_DIR pins docling's own scratch dir (sentinel lives
+# there); the actual models cache under HF_HOME.
 export HF_HOME="${HF_HOME:-$CORTRIX_DATA_DIR/cache/huggingface}"
 export PADDLE_PDX_CACHE_HOME="${PADDLE_PDX_CACHE_HOME:-$CORTRIX_DATA_DIR/cache/paddlex}"
-mkdir -p "$CORTRIX_MODELS_DIR" "$HF_HOME" "$PADDLE_PDX_CACHE_HOME" 2>/dev/null || true
+export DOCLING_CACHE_DIR="${DOCLING_CACHE_DIR:-$CORTRIX_DATA_DIR/cache/docling}"
+mkdir -p "$CORTRIX_MODELS_DIR" "$HF_HOME" "$PADDLE_PDX_CACHE_HOME" "$DOCLING_CACHE_DIR" 2>/dev/null || true
 
 if [ "$CORTRIX_PROFILE" = "lite" ]; then
     echo "PROFILE=lite — skipping model/parser provisioning"
@@ -70,6 +82,46 @@ else
         else
             echo "WARN: parser venv creation failed — PDF/image ingestion off"
         fi
+    fi
+    # (2b) Pre-warm the docling model cache (HF_HOME) by running a REAL parse of a
+    #      tiny image PDF, so the FIRST user upload doesn't pay the one-time HF Hub
+    #      download on the hot path and blow the 60s parser timeout (DEFECT#7). A
+    #      real DocumentConverter().convert() is used on purpose — download_models()
+    #      fetches a different artifact layout than the converter loads, leaving the
+    #      runtime still hitting the HF Hub; the real converter populates exactly the
+    #      blobs the runtime needs (verified: warm parse ~1.5-3s, 0 HF-hub calls).
+    #      Gated on a sentinel so it runs once per volume; failure is non-fatal
+    #      (runtime falls back to lazy online download).
+    if [ -x "$CORTRIX_OCR_VENV/bin/python3" ] && [ ! -f "$DOCLING_CACHE_DIR/.warmed" ]; then
+        echo "[provision] pre-warming docling model cache (real parse of a sample PDF)"
+        echo "            (first run only; downloads layout+OCR models, a few minutes)…"
+        if "$CORTRIX_OCR_VENV/bin/python3" - <<'PYWARM'
+import tempfile, os
+from PIL import Image, ImageDraw  # Pillow ships as a docling dependency
+img = Image.new("RGB", (640, 200), "white")
+ImageDraw.Draw(img).text((24, 90), "Cortrix docling warmup sample 0123456789", fill="black")
+sample = os.path.join(tempfile.gettempdir(), "docling_warmup.pdf")
+img.save(sample, "PDF", resolution=150.0)
+# Same code path as the runtime bridge: default DocumentConverter (layout + OCR).
+from docling.document_converter import DocumentConverter
+DocumentConverter().convert(sample)
+print("docling warmup parse OK")
+PYWARM
+        then
+            touch "$DOCLING_CACHE_DIR/.warmed"
+            echo "[provision] docling model cache warm (HF_HOME=$HF_HOME)"
+        else
+            echo "WARN: docling warm-up failed — first PDF may be slow/time out until cached"
+        fi
+    fi
+    # Once the docling cache is warm, pin the runtime offline so cached-model loads
+    # never pay HF Hub online revalidation (rate-limited without a token). Only when
+    # the warm-up succeeded — otherwise leave online so the runtime can still fetch
+    # lazily rather than failing every parse against an incomplete offline cache.
+    if [ -f "$DOCLING_CACHE_DIR/.warmed" ]; then
+        export HF_HUB_OFFLINE=1
+        export TRANSFORMERS_OFFLINE=1
+        echo "[provision] docling runtime pinned offline (cache warm)"
     fi
     # Point the F06 parser at the venv (docling/paddleocr live there). The baked
     # config defaults python_bin to system python3 so the txt/md plain-text path
