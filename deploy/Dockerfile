@@ -125,6 +125,9 @@ LABEL version="1.0.0"
 # wget + python3.10-venv are needed by the first-run provisioning in
 # entrypoint.sh (download-models.sh fetches ONNX assets; a venv is created
 # for the docling/paddleocr parser stack). tar is in the base image.
+# libgl1 / libglib2.0-0 / libgomp1: paddleocr imports opencv (libGL.so.1) and
+# paddlepaddle needs OpenMP — without them the provisioned parser venv installs
+# but fails to import at runtime, breaking PDF/image OCR + the vision_llm path.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     libsqlite3-0 \
@@ -132,6 +135,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 \
     python3-pip \
     python3.10-venv \
+    libgl1 \
+    libglib2.0-0 \
+    libgomp1 \
     supervisor \
     curl \
     wget \
