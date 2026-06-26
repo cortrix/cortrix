@@ -23,7 +23,13 @@ void FillParseError(EnrichResult& r, const char* layer, int batch_size,
 }
 
 // L1: extract entities defensively — skip malformed array elements, default
-// missing fields. Never throws (caller already has a parsed object).
+// missing OR wrong-typed fields. Never throws (caller already has a parsed
+// object). NOTE: json::value(key, default) only covers the missing case — if the
+// key is present with the wrong type (e.g. a reasoning LLM emits
+// "start_offset":"5" as a string), value<int>() internally calls get<int>() and
+// throws type_error.302. That escaped here and dropped the whole batch's
+// enrichment, defeating the per-field-default L1 contract. Guard numeric fields
+// with is_number() (mirrors the score handling in ParseEnrichBatchResponse).
 std::vector<Entity> ParseEntities(const json& chunk_obj) {
     std::vector<Entity> out;
     auto it = chunk_obj.find("entities");
@@ -33,8 +39,10 @@ std::vector<Entity> ParseEntities(const json& chunk_obj) {
         Entity ent;
         ent.text = e.value("text", std::string{});
         ent.type = e.value("type", std::string{});
-        ent.start_offset = e.value("start_offset", 0);
-        ent.end_offset = e.value("end_offset", 0);
+        auto so = e.find("start_offset");
+        if (so != e.end() && so->is_number()) ent.start_offset = so->get<int>();
+        auto eo = e.find("end_offset");
+        if (eo != e.end() && eo->is_number()) ent.end_offset = eo->get<int>();
         out.push_back(std::move(ent));
     }
     return out;
