@@ -72,13 +72,37 @@ else
             || echo "WARN: model fetch incomplete — affected features degrade (embedding/reranker stub, heuristic complexity)"
     fi
     # (2) docling/paddleocr parser stack → venv on the data volume.
-    if [ ! -x "$CORTRIX_OCR_VENV/bin/python3" ]; then
+    # Self-healing gate: re-provision whenever docling is not importable. The old
+    # `-x python3` gate skipped repair forever once the venv directory existed, so a
+    # venv left half-installed by an interrupted/failed pip run never recovered on a
+    # later boot — the import probe catches that case too.
+    if ! "$CORTRIX_OCR_VENV/bin/python3" -c "import docling" >/dev/null 2>&1; then
         echo "[provision] creating parser venv + installing docling/paddleocr"
         echo "            (first run only; ~2GB, may take several minutes)…"
-        if python3 -m venv "$CORTRIX_OCR_VENV"; then
-            "$CORTRIX_OCR_VENV/bin/pip" install --no-cache-dir -q --upgrade pip >/dev/null 2>&1 || true
-            "$CORTRIX_OCR_VENV/bin/pip" install --no-cache-dir -q -r /app/scripts/requirements-parser.txt \
-                || echo "WARN: parser stack install failed — PDF/image ingestion off (text formats still work)"
+        [ -x "$CORTRIX_OCR_VENV/bin/python3" ] || python3 -m venv "$CORTRIX_OCR_VENV"
+        if [ -x "$CORTRIX_OCR_VENV/bin/python3" ]; then
+            # DEFECT#8: a single `pip install` does not survive a flaky network.
+            # pip's --retries re-downloads each wheel from scratch, so a connection
+            # that truncates mid-stream (IncompleteRead) never completes a large
+            # wheel (torch ~426MB) regardless of retry count. A persistent wheel
+            # cache on the volume lets fully-downloaded wheels accumulate ACROSS
+            # invocations, so a bounded outer loop converges (verified: a single
+            # call with --retries 15 failed against both PyPI and a mirror; the loop
+            # succeeded on attempt 2). The cache also lets container recreates skip
+            # already-downloaded wheels.
+            export PIP_CACHE_DIR="$CORTRIX_DATA_DIR/cache/pip"
+            mkdir -p "$PIP_CACHE_DIR" 2>/dev/null || true
+            "$CORTRIX_OCR_VENV/bin/pip" install -q --upgrade pip >/dev/null 2>&1 || true
+            _attempt=1
+            while [ "$_attempt" -le 8 ]; do
+                "$CORTRIX_OCR_VENV/bin/pip" install -q --retries 5 --timeout 120 \
+                    -r /app/scripts/requirements-parser.txt && break
+                echo "[provision] parser install attempt $_attempt/8 failed (network); retrying with cached wheels…"
+                _attempt=$((_attempt + 1))
+                sleep 3
+            done
+            "$CORTRIX_OCR_VENV/bin/python3" -c "import docling" >/dev/null 2>&1 \
+                || echo "WARN: parser stack install failed after 8 attempts — PDF/image ingestion off (text formats still work)"
         else
             echo "WARN: parser venv creation failed — PDF/image ingestion off"
         fi
@@ -131,6 +155,22 @@ PYWARM
         sed -i "s|^  python_bin:.*|  python_bin: $CORTRIX_OCR_VENV/bin/python3|" /app/config/cortrix.yaml
         echo "[provision] parser python_bin -> $CORTRIX_OCR_VENV/bin/python3"
     fi
+fi
+
+# DEFECT#8 (b): surface the OCR parser provisioning outcome to /health so a server
+# that came up with PDF/image parsing unavailable does not silently report a bare
+# "healthy". The server reads CORTRIX_PARSER_STATUS and adds a components.parser
+# entry, degrading overall status only when "unavailable". States:
+#   disabled    — PROFILE=lite, OCR intentionally off (not an error)
+#   ok          — docling imports, OCR ready
+#   unavailable — full profile but the parser stack failed to provision (the alarm)
+# Left unset on dev/native runs → the server omits the component (prior behaviour).
+if [ "$CORTRIX_PROFILE" = "lite" ]; then
+    export CORTRIX_PARSER_STATUS="disabled"
+elif "$CORTRIX_OCR_VENV/bin/python3" -c "import docling" >/dev/null 2>&1; then
+    export CORTRIX_PARSER_STATUS="ok"
+else
+    export CORTRIX_PARSER_STATUS="unavailable"
 fi
 
 # F02 reranker (real model when provisioned/bind-mounted; absent = stub).
