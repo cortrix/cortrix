@@ -107,6 +107,36 @@ TEST_F(SqliteChunkStoreTest, GetBatchNullMissingPtrIsSafe) {
     EXPECT_EQ(recs[0].child_id, "c1");
 }
 
+TEST_F(SqliteChunkStoreTest, ReadsOptionalScoreSignalsWhenColumnsExist) {
+    Exec("ALTER TABLE blocks ADD COLUMN enriched_score REAL DEFAULT NULL");
+    Exec("ALTER TABLE blocks ADD COLUMN semantic_score REAL DEFAULT NULL");
+    InsertChild(205, "d1", 0, "c1", "p1", "one");
+    InsertChild(206, "d1", 1, "c2", "p1", "two");
+    Exec("UPDATE blocks SET enriched_score=0.8, semantic_score=1.0 WHERE child_id='c1'");
+    Exec("UPDATE blocks SET semantic_score=0.6 WHERE child_id='c2'");
+
+    SqliteChunkStore store(db_);
+    auto one = store.Get("c1");
+    ASSERT_TRUE(one.ok());
+    ASSERT_TRUE(one->score_signals.enriched_score.has_value());
+    ASSERT_TRUE(one->score_signals.semantic_score.has_value());
+    EXPECT_FLOAT_EQ(*one->score_signals.enriched_score, 0.8f);
+    EXPECT_FLOAT_EQ(*one->score_signals.semantic_score, 1.0f);
+
+    std::vector<std::string> missing;
+    auto batch = store.GetBatch({"c2", "c1"}, &missing);
+    ASSERT_TRUE(missing.empty());
+    ASSERT_EQ(batch.size(), 2u);
+    EXPECT_FALSE(batch[0].score_signals.enriched_score.has_value());
+    ASSERT_TRUE(batch[0].score_signals.semantic_score.has_value());
+    EXPECT_FLOAT_EQ(*batch[0].score_signals.semantic_score, 0.6f);
+
+    auto by_doc = store.GetChunksByDocId("d1");
+    ASSERT_EQ(by_doc.size(), 2u);
+    ASSERT_TRUE(by_doc[0].score_signals.enriched_score.has_value());
+    ASSERT_TRUE(by_doc[1].score_signals.semantic_score.has_value());
+}
+
 TEST_F(SqliteChunkStoreTest, GetChunksByDocIdOrdersByChunkIndex) {
     InsertChild(301, "d1", 2, "c-c", "p1", "third");   // inserted out of order
     InsertChild(302, "d1", 0, "c-a", "p1", "first");

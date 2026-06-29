@@ -3,6 +3,8 @@
 #include <vector>
 #include <cstdint>
 
+#include "cortrix/common/score_signals.h"
+
 namespace cortrix {
 
 enum class DocStatus {
@@ -61,6 +63,7 @@ struct CortrixBlock {
     int64_t              token_count = -1;   // F34: child token count (-1 = NULL)
     int64_t              parent_offset = -1; // F34: offset within parent_text (-1 = NULL)
     std::string          metadata_json;   // F09-framework shared JSONB (MEM/F34 child/F08 META); empty = NULL
+    ScoreSignals         score_signals;   // F03/F07 optional query-time scoring signals
 };
 
 // [A unified-blocks] Storage DTO for the per-Unit `parents` table (F34 § 3.1).

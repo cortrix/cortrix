@@ -29,13 +29,14 @@ struct NamespaceFailure {
 /// One source of a deduplicated chunk (F04 §2.5 deduplicated_chunks[].namespaces[]).
 struct DedupSourceNs {
     std::string namespace_id;   ///< serialized as "namespace"
+    float score = 0.0f;
     float rerank_score = 0.0f;
 };
 
 /// A chunk that was found in >1 NS and collapsed to one primary (F04 §3.3 B simplified).
 struct DeduplicatedChunkInfo {
     std::string content_hash;                ///< "sha256:..."
-    std::string primary_namespace;           ///< the NS whose copy was kept (highest rerank_score)
+    std::string primary_namespace;           ///< the NS whose copy was kept (highest final score)
     std::vector<DedupSourceNs> namespaces;   ///< brief multi-source array (NS + score), >= 2 entries
 };
 

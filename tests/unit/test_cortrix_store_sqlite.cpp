@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "cortrix/store/cortrix_store_sqlite.h"
 #include "cortrix/common/block_header.h"
+#include <sqlite3.h>
 #include <unistd.h>
 #include <filesystem>
 #include <thread>
@@ -24,6 +25,14 @@ protected:
         store_.reset();
         std::error_code ec;
         fs::remove_all(test_dir_, ec);
+    }
+
+    void ExecSql(const std::string& sql) {
+        char* err = nullptr;
+        int rc = sqlite3_exec(store_->db_handle(), sql.c_str(), nullptr, nullptr, &err);
+        std::string msg = err ? err : "";
+        sqlite3_free(err);
+        ASSERT_EQ(rc, SQLITE_OK) << msg << " :: " << sql;
     }
 
     fs::path test_dir_;
@@ -344,6 +353,52 @@ TEST_F(StoreSqliteTest, BlockInsertAndGet) {
     EXPECT_EQ(retrieved.processing_level, 2);
     EXPECT_EQ(retrieved.content_text, "test content");
     EXPECT_FALSE(retrieved.data.empty());
+}
+
+TEST_F(StoreSqliteTest, BlockGetReadsOptionalScoreSignalsWhenColumnsExist) {
+    CortrixDoc doc;
+    doc.source_type = "test";
+    doc.source_path = "score-signals.txt";
+    ASSERT_EQ(store_->doc_create(doc), 0);
+
+    auto blob = BlockBuild(kBlockFile, kLevelL3, "scored content", "", "", 0, 0);
+    CortrixBlock first;
+    first.doc_id = doc.doc_id;
+    first.chunk_index = 0;
+    first.block_type = 1;
+    first.processing_level = 3;
+    first.data = blob;
+    first.content_text = "scored content";
+    ASSERT_EQ(store_->block_insert(first), 0);
+
+    CortrixBlock second = first;
+    second.block_id = 0;
+    second.chunk_index = 1;
+    second.content_text = "semantic only";
+    ASSERT_EQ(store_->block_insert(second), 0);
+
+    ExecSql("ALTER TABLE blocks ADD COLUMN enriched_score REAL DEFAULT NULL");
+    ExecSql("ALTER TABLE blocks ADD COLUMN semantic_score REAL DEFAULT NULL");
+    ExecSql("UPDATE blocks SET enriched_score=0.8, semantic_score=1.0 WHERE block_id=" +
+            std::to_string(first.block_id));
+    ExecSql("UPDATE blocks SET semantic_score=0.6 WHERE block_id=" +
+            std::to_string(second.block_id));
+
+    CortrixBlock got;
+    ASSERT_EQ(store_->block_get(first.block_id, got), 0);
+    ASSERT_TRUE(got.score_signals.enriched_score.has_value());
+    ASSERT_TRUE(got.score_signals.semantic_score.has_value());
+    EXPECT_FLOAT_EQ(*got.score_signals.enriched_score, 0.8f);
+    EXPECT_FLOAT_EQ(*got.score_signals.semantic_score, 1.0f);
+
+    std::vector<CortrixBlock> by_doc;
+    ASSERT_EQ(store_->block_get_by_doc(doc.doc_id, by_doc), 0);
+    ASSERT_EQ(by_doc.size(), 2u);
+    EXPECT_TRUE(by_doc[0].score_signals.enriched_score.has_value());
+    EXPECT_TRUE(by_doc[0].score_signals.semantic_score.has_value());
+    EXPECT_FALSE(by_doc[1].score_signals.enriched_score.has_value());
+    ASSERT_TRUE(by_doc[1].score_signals.semantic_score.has_value());
+    EXPECT_FLOAT_EQ(*by_doc[1].score_signals.semantic_score, 0.6f);
 }
 
 // [A unified-blocks] block_insert/block_get round-trip the F34 child columns

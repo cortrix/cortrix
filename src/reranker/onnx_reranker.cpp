@@ -445,6 +445,7 @@ std::vector<retrieval::RankedChunk> OnnxReranker::Rerank(
         rc.score = c.score;  // pre-rerank (RRF) score
         if (const store::ChunkRecord* rec = find_record(c.child_id)) {
             rc.chunk_text = rec->content;
+            rc.score_signals = rec->score_signals;
         }
         passage_storage.push_back(rc.chunk_text);
         result.push_back(std::move(rc));
@@ -459,16 +460,18 @@ std::vector<retrieval::RankedChunk> OnnxReranker::Rerank(
         result[i].rerank_score = rerank_scores[i];
     }
 
-    // 4. F02-owned RRF fusion (§4.2-ter): fused ordering score =
+    // 4. F02-owned RRF fusion (§4.2-ter): base ordering score =
     //    rerank_score*0.7 + rrf_score*0.3 (rrf_score = the candidate's RRF score,
-    //    carried as RankedChunk.score). The fused score is LOCAL sort-use only —
-    //    it is NOT written into RankedChunk (§4.2-bis step 4 note).
+    //    carried as RankedChunk.score), then optional F03/F07 semantic multiplier.
+    //    Write the final score back so downstream query surfaces use one score
+    //    contract.
     const RerankerScoreFusion fusion;
     std::vector<std::pair<float, size_t>> order;  // (fused_score, original index)
     order.reserve(result.size());
     for (size_t i = 0; i < result.size(); ++i) {
         const float fused = fusion.ComputeRerankRrfScore(
             result[i].rerank_score, result[i].score, result[i], query);
+        result[i].score = fused;
         order.emplace_back(fused, i);
     }
 

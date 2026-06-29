@@ -105,6 +105,8 @@ public:
 private:
     int ExecutePragma();
     int CreateTables();
+    void EnsureScoreColumnCacheLocked();
+    ScoreSignals LoadBlockScoreSignalsLocked(uint64_t block_id);
 
     /// Consume one injected op fault if armed (SetFailNextOps seam).
     bool TryConsumeOpFault();
@@ -115,6 +117,9 @@ private:
     OpenOptions opts_;      ///< owns-mode startup responsibilities (D-I1.bis)
     std::atomic<int> fail_next_ops_{0};  ///< testing seam (SetFailNextOps)
     mutable std::mutex mu_;
+    bool score_columns_checked_ = false;
+    bool has_enriched_score_ = false;
+    bool has_semantic_score_ = false;
 };
 
 }  // namespace cortrix

@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "cortrix/common/score_signals.h"
 #include "cortrix/id/types.h"  // ARCH §1.8.1 ID type SoT (cortrix::id::*)
 
 namespace cortrix::retrieval {
@@ -32,8 +33,9 @@ struct RankedChunk {
     ChildId     child_id;
     std::string chunk_text;
     std::string parent_text;   ///< F34 §2.5 ParentChunkStore reverse-lookup (empty until F34 wires in)
-    float       score = 0.0f;        ///< pre-rerank score (the RRF score)
+    float       score = 0.0f;        ///< final ordering score after F02/F07 composition
     float       rerank_score = 0.0f; ///< F02 cross-encoder score
+    ScoreSignals score_signals;      ///< optional F03/F07 query-time scoring signals
     std::map<std::string, std::string> metadata;
 };
 

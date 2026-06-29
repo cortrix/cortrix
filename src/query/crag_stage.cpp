@@ -26,6 +26,7 @@ void CragStage::Apply(CrossNsResponse& resp, QueryContext& qctx) {
         rc.parent_text = it.parent_content;
         rc.score = it.score;
         rc.rerank_score = it.rerank_score;
+        rc.score_signals = it.score_signals;
         chunks.push_back(std::move(rc));
     }
 

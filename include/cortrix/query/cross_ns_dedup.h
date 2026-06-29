@@ -9,18 +9,19 @@ namespace cortrix::query {
 /// DedupeByContentHash — F04 §3.3 / §4.3 B simplified cross-NS deduplication.
 ///
 /// When the same chunk (identical `content_hash`) is returned by more than one NS,
-/// the copies collapse to a single result whose **primary = the highest-rerank_score
+/// the copies collapse to a single result whose **primary = the highest final score
 /// source** (§3.3.1). The primary's full metadata / content / parent_content is kept
 /// (§3.3.3 "primary metadata"); the other sources are recorded — only their NS +
-/// rerank_score — as a brief multi-source entry in `meta.deduplicated_chunks[]` (§2.5), and
+/// final score + rerank_score — as a brief multi-source entry in
+/// `meta.deduplicated_chunks[]` (§2.5), and
 /// `meta.deduplicated_chunks_count` is set to the number of collapsed (removed)
 /// copies. Singletons (a hash seen in exactly one NS) pass through untouched and are
 /// NOT listed in deduplicated_chunks.
 ///
 /// Order is preserved by **first appearance of each hash** in `items`, so a caller
-/// that pre-sorts by rerank_score (the gather order, ARCH §3.3) keeps the deduped
-/// list in descending rerank_score (the primary of each group is, by construction,
-/// the first occurrence of its hash in a rerank_score-descending list). Items with
+/// that pre-sorts by final score (the gather order, ARCH §3.3) keeps the deduped
+/// list in descending final score (the primary of each group is, by construction,
+/// the first occurrence of its hash in a final-score-descending list). Items with
 /// an empty content_hash are treated as distinct (never collapsed) — a missing hash
 /// must not merge unrelated chunks.
 ///

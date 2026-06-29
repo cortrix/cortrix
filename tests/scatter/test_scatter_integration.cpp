@@ -65,7 +65,7 @@ TEST(ScatterIntegrationTest, IT1_SingleNsDirectPath) {
     EXPECT_FLOAT_EQ(r.body["meta"]["coverage_ratio"].get<float>(), 1.0f);
 }
 
-// === IT-F04-2: 3 NS Cross-NS query (merged + sorted by rerank_score across NS) ===
+// === IT-F04-2: 3 NS Cross-NS query (merged + sorted by final score across NS) ===
 TEST(ScatterIntegrationTest, IT2_ThreeNsCrossQuery) {
     Stack s({"ns_a", "ns_b", "ns_c"});
     EXPECT_CALL(s.executor, ExecuteForNamespace(_, "ns_a", _))
@@ -155,7 +155,7 @@ TEST(ScatterIntegrationTest, IT6_CrossNsContentHashDedup) {
 
     HandlerResult r = s.handler.Handle(QueryBody({"ns_a", "ns_b"}), Auth());
     EXPECT_EQ(r.status, 200);
-    // Collapsed to one result, primary = ns_b (highest rerank_score).
+    // Collapsed to one result, primary = ns_b (highest final score).
     ASSERT_EQ(r.body["results"].size(), 1u);
     EXPECT_EQ(r.body["results"][0]["namespace"], "ns_b");
     // meta.deduplicated_chunks records the abbreviated multi-source (both NS + scores).

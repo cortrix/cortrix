@@ -46,8 +46,13 @@ public:
     std::vector<ChunkRecord> GetChunksByDocId(const std::string& doc_id) override;
 
 private:
+    void EnsureScoreColumnCacheLocked();
+
     sqlite3* db_;       // borrowed (non-owning)
     std::mutex mu_;
+    bool score_columns_checked_ = false;
+    bool has_enriched_score_ = false;
+    bool has_semantic_score_ = false;
 };
 
 }  // namespace cortrix::store
