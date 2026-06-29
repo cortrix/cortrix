@@ -20,7 +20,9 @@ namespace cortrix::doc_summary {
 namespace {
 
 using ::testing::_;
+using ::testing::DoAll;
 using ::testing::Return;
+using ::testing::SaveArg;
 
 llm::ChatCompletionResponse OkChat(std::string content) {
     llm::ChatCompletionResponse r;
@@ -170,6 +172,50 @@ TEST(F41DocSummaryGeneratorTest, ShortDocSingleCall) {
     ASSERT_TRUE(r.ok());
     EXPECT_FALSE(mr);  // short doc → no map-reduce
     EXPECT_NE(r.value().summary_text.find("Q3 2026"), std::string::npos);
+}
+
+TEST(F41DocSummaryGeneratorTest, StructuredCallUsesDeepSeekJsonContract) {
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    llm::LlmCallConfig captured;
+    EXPECT_CALL(*llm, Chat(_, _))
+        .WillOnce(DoAll(SaveArg<1>(&captured), Return(OkChat(kGoodJson))));
+    auto store = std::make_shared<store::MockChunkStore>();
+    DocSummaryConfig cfg;
+    cfg.llm_model = "deepseek-v4-flash";
+    DocSummaryGenerator g = MakeGen(llm, store, cfg);
+
+    bool mr = true;
+    auto r = g.GenerateSummary(NChunks(5), "Report", &mr);
+
+    ASSERT_TRUE(r.ok()) << r.status().message();
+    EXPECT_FALSE(mr);
+    EXPECT_EQ(captured.model, "deepseek-v4-flash");
+    EXPECT_EQ(captured.max_tokens, 4096);
+    EXPECT_EQ(captured.response_format, "json_object");
+    EXPECT_EQ(captured.thinking_type, "disabled");
+    EXPECT_FALSE(captured.allow_reasoning_content_fallback);
+}
+
+TEST(F41DocSummaryGeneratorTest, StructuredCallKeepsGlmPromptOnlyContract) {
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    llm::LlmCallConfig captured;
+    EXPECT_CALL(*llm, Chat(_, _))
+        .WillOnce(DoAll(SaveArg<1>(&captured), Return(OkChat(kGoodJson))));
+    auto store = std::make_shared<store::MockChunkStore>();
+    DocSummaryConfig cfg;
+    cfg.llm_model = "glm-5.2";
+    DocSummaryGenerator g = MakeGen(llm, store, cfg);
+
+    bool mr = true;
+    auto r = g.GenerateSummary(NChunks(5), "Report", &mr);
+
+    ASSERT_TRUE(r.ok()) << r.status().message();
+    EXPECT_FALSE(mr);
+    EXPECT_EQ(captured.model, "glm-5.2");
+    EXPECT_EQ(captured.max_tokens, 4096);
+    EXPECT_EQ(captured.response_format, "");
+    EXPECT_EQ(captured.thinking_type, "");
+    EXPECT_FALSE(captured.allow_reasoning_content_fallback);
 }
 
 TEST(F41DocSummaryGeneratorTest, ShortDocLlmFailureIsTimeout) {

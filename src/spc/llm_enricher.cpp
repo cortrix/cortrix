@@ -1,10 +1,13 @@
 #include <cstdint>
 #include <algorithm>
 #include <chrono>
+#include <cctype>
+#include <optional>
 #include <memory>
 #include <string>
 #include <thread>
 
+#include "cortrix/logging/logging.h"
 #include "cortrix/llm/llm_error_tokens.h"
 #include "cortrix/reranker/circuit_breaker.h"        // F02 frozen — reused (B-R1 §2)
 #include "cortrix/reranker/reranker_thread_pool.h"   // F02 frozen — reused (B-R1 §2)
@@ -35,6 +38,22 @@ EnricherErrorCode ClassifyLlmFailure(const std::string& status_msg) {
     return EnricherErrorCode::kLlmApi;
 }
 
+bool ModelSupportsThinkingControl(std::string model) {
+    std::transform(model.begin(), model.end(), model.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return model.find("deepseek") != std::string::npos;
+}
+
+std::optional<std::string> ParseFailureLayer(const EnrichResult& r) {
+    if (r.status != static_cast<int>(EnricherErrorCode::kParse)) {
+        return std::nullopt;
+    }
+    if (r.error_msg.find("(L2)") != std::string::npos) return std::string("L2");
+    if (r.error_msg.find("(L3)") != std::string::npos) return std::string("L3");
+    return std::string("unknown");
+}
+
 // Whole-batch error results (score=0 + registry-filled EnricherErrorMeta) when a
 // batch ultimately fails (after retries / on timeout / breaker open).
 std::vector<EnrichResult> BatchError(int n, EnricherErrorCode code,
@@ -59,6 +78,40 @@ std::vector<EnrichResult> BatchError(int n, EnricherErrorCode code,
         r.error_msg = std::string(EnricherErrorCodeString(code)) + ": " + detail;
     }
     return out;
+}
+
+void StampResultDefaults(EnrichResult& r,
+                         int duration_ms,
+                         int token_count,
+                         int64_t enriched_at,
+                         const std::string& model,
+                         const std::string& prompt_version) {
+    r.duration_ms = duration_ms;
+    r.token_count = token_count;
+    r.enriched_at = enriched_at;
+    if (r.model_used.empty()) r.model_used = model;
+    if (r.enricher_name.empty()) r.enricher_name = "LlmEnricher";
+    if (r.prompt_version.empty()) r.prompt_version = prompt_version;
+}
+
+void LogParseFailureSample(const EnrichResult& r,
+                           int batch_size,
+                           size_t result_index,
+                           int chunk_index,
+                           const std::string& model,
+                           const llm::ChatCompletionResponse& chat,
+                           const std::string& prompt_version,
+                           const char* event) {
+    const auto layer = ParseFailureLayer(r).value_or("unknown");
+    CORTRIX_LOG_WARN(
+        "spc",
+        "F03 LlmEnricher parse failure {}: layer={} batch_size={} "
+        "result_index={} chunk_index={} model={} content_source={} "
+        "finish_reason={} content_length={} reasoning_content_length={} "
+        "prompt_version={} error={}",
+        event, layer, batch_size, result_index, chunk_index, model,
+        chat.content_source, chat.finish_reason, chat.content_length,
+        chat.reasoning_content_length, prompt_version, r.error_msg);
 }
 
 }  // namespace
@@ -197,7 +250,15 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
             llm::LlmCallConfig call;
             call.model = slot->model;
             call.timeout_ms = slot->task_timeout_ms;
+            call.max_tokens = 4096;
             call.response_format = "json_object";
+            call.allow_reasoning_content_fallback = false;
+            if (ModelSupportsThinkingControl(call.model)) {
+                // F03 requires the batch JSON in message.content. DeepSeek
+                // thinking mode can spend the response budget in reasoning_content
+                // and leave incomplete or non-final structured output.
+                call.thinking_type = "disabled";
+            }
             constexpr int kMaxHttpAttempts = 3;  // §5.1 LLM_API: retry 3 times
             llm::ChatCompletionResponse chat;
             for (slot->attempts = 1; slot->attempts <= kMaxHttpAttempts; ++slot->attempts) {
@@ -274,18 +335,73 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
     // PARSE failure metric only.
     auto results = ParseEnrichBatchResponse(chat.content, n, model,
                                             prompt_template_->id());
-    bool any_parse_fail = false;
+    std::vector<size_t> parse_fail_indices;
     const int64_t now = NowMs();
-    for (auto& r : results) {
-        r.duration_ms = duration_ms;
-        r.token_count = token_count;
-        r.enriched_at = now;
-        if (r.model_used.empty()) r.model_used = model;
-        if (r.enricher_name.empty()) r.enricher_name = "LlmEnricher";
-        if (r.prompt_version.empty()) r.prompt_version = prompt_template_->id();
-        if (r.status == static_cast<int>(EnricherErrorCode::kParse)) any_parse_fail = true;
+    for (size_t i = 0; i < results.size(); ++i) {
+        auto& r = results[i];
+        StampResultDefaults(r, duration_ms, token_count, now, model,
+                            prompt_template_->id());
+        if (r.status == static_cast<int>(EnricherErrorCode::kParse)) {
+            parse_fail_indices.push_back(i);
+            const int chunk_index =
+                i < group.size() ? group[i].chunk_index : static_cast<int>(i);
+            LogParseFailureSample(r, n, i, chunk_index, model, chat,
+                                  prompt_template_->id(), "before_single_retry");
+        }
     }
-    if (any_parse_fail) metrics.RecordFailedTask(EnricherErrorCode::kParse);
+
+    std::vector<bool> parse_failure_counted_by_retry(results.size(), false);
+    if (!parse_fail_indices.empty() && n > 1) {
+        CORTRIX_LOG_WARN(
+            "spc",
+            "F03 LlmEnricher retrying parse failures individually: "
+            "parse_failures={} batch_size={} model={} content_source={} "
+            "finish_reason={} content_length={} reasoning_content_length={} "
+            "prompt_version={}",
+            parse_fail_indices.size(), n, model, chat.content_source,
+            chat.finish_reason, chat.content_length, chat.reasoning_content_length,
+            prompt_template_->id());
+        for (const size_t failed_index : parse_fail_indices) {
+            if (failed_index >= group.size()) continue;
+            auto retry_results = RunOneBatch({group[failed_index]});
+            if (retry_results.size() == 1) {
+                parse_failure_counted_by_retry[failed_index] =
+                    retry_results[0].status ==
+                    static_cast<int>(EnricherErrorCode::kParse);
+                results[failed_index] = std::move(retry_results[0]);
+            }
+        }
+    }
+
+    int final_parse_fail_count = 0;
+    int uncounted_final_parse_fail_count = 0;
+    for (size_t i = 0; i < results.size(); ++i) {
+        const auto& r = results[i];
+        if (r.status == static_cast<int>(EnricherErrorCode::kParse)) {
+            ++final_parse_fail_count;
+            if (!parse_failure_counted_by_retry[i]) {
+                ++uncounted_final_parse_fail_count;
+                const int chunk_index =
+                    i < group.size() ? group[i].chunk_index : static_cast<int>(i);
+                LogParseFailureSample(r, n, i, chunk_index, model, chat,
+                                      prompt_template_->id(), "final");
+            }
+        }
+    }
+    if (uncounted_final_parse_fail_count > 0) {
+        metrics.RecordFailedTask(EnricherErrorCode::kParse);
+    }
+    if (final_parse_fail_count > 0) {
+        CORTRIX_LOG_WARN(
+            "spc",
+            "F03 LlmEnricher parse failure batch: parse_failures={} batch_size={} "
+            "uncounted_parse_failures={} model={} content_source={} "
+            "finish_reason={} content_length={} reasoning_content_length={} "
+            "prompt_version={}",
+            final_parse_fail_count, n, uncounted_final_parse_fail_count, model,
+            chat.content_source, chat.finish_reason, chat.content_length, chat.reasoning_content_length,
+            prompt_template_->id());
+    }
     return results;
 }
 

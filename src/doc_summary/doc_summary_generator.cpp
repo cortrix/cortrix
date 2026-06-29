@@ -1,5 +1,7 @@
 #include "cortrix/doc_summary/doc_summary_generator.h"
 
+#include <algorithm>
+#include <cctype>
 #include <sstream>
 #include <utility>
 
@@ -98,6 +100,20 @@ std::string DescribeLlmResponseForError(const llm::ChatCompletionResponse& resp,
        << "; prompt_tokens=" << resp.prompt_tokens
        << "; completion_tokens=" << resp.completion_tokens;
     return os.str();
+}
+
+bool ModelPrefersJsonObjectResponseFormat(std::string model) {
+    std::transform(model.begin(), model.end(), model.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return model.find("deepseek") != std::string::npos;
+}
+
+bool ModelSupportsThinkingControl(std::string model) {
+    std::transform(model.begin(), model.end(), model.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return model.find("deepseek") != std::string::npos;
 }
 
 json StructuredDataForCode(DocSummaryErrorCode code,
@@ -261,11 +277,24 @@ Result<DocSummaryStructured> DocSummaryGenerator::CallLlmStructured(
     llm::LlmCallConfig call;
     call.model = config_.llm_model;
     call.temperature = 0.0;
-    call.max_tokens = 2048;
+    call.max_tokens = 4096;
+    call.allow_reasoning_content_fallback = false;
     // GLM-5.2's OpenAI-compatible JSON response_format can inject a conflicting
     // provider-side instruction to end with a markdown fence. F41 owns a strict
-    // JSON-only prompt and parser, so avoid provider-specific wrapper prompts here.
-    call.response_format.clear();
+    // JSON-only prompt and parser, so avoid provider-specific wrapper prompts there.
+    // DeepSeek's reasoning models need the JSON object contract to put the final
+    // answer in message.content instead of running until length in reasoning_content.
+    if (ModelPrefersJsonObjectResponseFormat(call.model)) {
+        call.response_format = "json_object";
+    } else {
+        call.response_format.clear();
+    }
+    if (ModelSupportsThinkingControl(call.model)) {
+        // F41 requires the final structured object in message.content. DeepSeek
+        // thinking mode can spend the full token budget in reasoning_content and
+        // leave message.content empty on real documents.
+        call.thinking_type = "disabled";
+    }
 
     metrics.RecordLlmCall(DocSummaryMetrics::LlmCallStatus::kStarted);
     llm::ChatCompletionResponse resp = llm_client_->Chat(prompt, call);

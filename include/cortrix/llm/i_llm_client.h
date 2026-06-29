@@ -13,6 +13,10 @@ struct LlmCallConfig {
     int max_tokens = 1024;
     int timeout_ms = 0;            ///< 0 = use client default
     std::string response_format;   ///< e.g. "json_object" for structured output; empty = text
+    std::string thinking_type;     ///< e.g. "disabled" for providers that expose thinking control
+    bool allow_reasoning_content_fallback = true;
+    ///< If true, use message.reasoning_content when message.content is empty.
+    ///  Disable for consumers that require a final answer in message.content.
 };
 
 /// Client-level configuration: endpoint, auth, defaults, resilience. Sourced

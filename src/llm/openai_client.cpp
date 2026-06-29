@@ -87,6 +87,11 @@ ChatCompletionResponse OpenAiLlmClient::Chat(const std::string& prompt,
         // e.g. {"type":"json_object"} for structured output (topic 3.3 L3 parsing).
         body["response_format"] = {{"type", call.response_format}};
     }
+    if (!call.thinking_type.empty()) {
+        // DeepSeek-compatible providers expose thinking control through this
+        // request object. Leave it absent by default for broad compatibility.
+        body["thinking"] = {{"type", call.thinking_type}};
+    }
 
     HttpRequest req;
     req.url = config_.endpoint + "/chat/completions";
@@ -158,7 +163,8 @@ ChatCompletionResponse OpenAiLlmClient::Chat(const std::string& prompt,
             const std::string message_content = ReadStringField(*mit, "content");
             const std::string reasoning_content = ReadStringField(*mit, "reasoning_content");
             resp.reasoning_content_length = static_cast<int>(reasoning_content.size());
-            if (!message_content.empty() || reasoning_content.empty()) {
+            if (!message_content.empty() || reasoning_content.empty() ||
+                !call.allow_reasoning_content_fallback) {
                 resp.content = message_content;
                 resp.content_source = "message.content";
             } else {
