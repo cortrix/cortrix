@@ -618,6 +618,21 @@ void CortrixHttpServer::RegisterHealthRoutes() {
                  body["components"]["logging"] = "ok";
                  body["components"]["namespace_manager"] = "ok";
 
+                 // DEFECT#8: reflect the OCR parser provisioning outcome so a server
+                 // whose parser stack failed to install does not silently report a
+                 // bare "healthy". The entrypoint sets CORTRIX_PARSER_STATUS after
+                 // provisioning (ok / disabled=lite / unavailable=failed). Absent on
+                 // dev/native runs → omit the component and keep prior behaviour;
+                 // only "unavailable" degrades the overall status.
+                 if (const char* parser_status = std::getenv("CORTRIX_PARSER_STATUS")) {
+                     if (parser_status[0] != '\0') {
+                         body["components"]["parser"] = parser_status;
+                         if (std::string(parser_status) == "unavailable") {
+                             body["status"] = "degraded";
+                         }
+                     }
+                 }
+
                  body["llm_enabled"] = config_.semantic_llm.IsConfigured();
                  body["llm_provider"] = config_.semantic_llm.provider;
                  body["llm_model"] = config_.semantic_llm.model;

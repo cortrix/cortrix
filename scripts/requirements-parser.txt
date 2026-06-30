@@ -3,7 +3,16 @@
 # for D3 standalone, where the C++ wrappers are tested against mock bridges).
 
 # Docling structured parser (MIT, IBM): DocLayNet layout + TableFormer tables.
-docling>=2.0.0
+# Pinned: docling's bundled OCR engine (rapidocr) default changed across versions;
+# 2.107.0 + onnxruntime below is the combo verified to OCR scanned/image PDFs.
+docling==2.107.0
+
+# rapidocr (docling's OCR) inference engine. WITHOUT onnxruntime, rapidocr 3.x
+# falls back to its torch engine, which lacks the PP-OCRv6 models docling requests
+# → "ValueError: Unsupported configuration: torch.PP-OCRv6.det.small" and every
+# PDF/scanned/image parse fails (DEFECT#6). onnxruntime is rapidocr's default
+# backend and ships working PP-OCR models.
+onnxruntime>=1.20.0
 
 # PaddleOCR fallback for scanned / image documents (F06 S3).
 paddleocr>=2.8

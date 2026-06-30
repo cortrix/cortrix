@@ -108,6 +108,26 @@ TEST(EnricherResponseParserTest, L1SkipsMalformedEntityElements) {
     EXPECT_EQ(r[0].entities[1].end_offset, 4);
 }
 
+TEST(EnricherResponseParserTest, L1ToleratesStringTypedOffsets) {
+    // Regression (2026-06-26 QA): a reasoning LLM (e.g. GLM-5.2) occasionally
+    // emits numeric fields as JSON strings. A present string previously threw
+    // type_error.302, which escaped ParseEntities (despite its "never throws"
+    // contract) and dropped the ENTIRE batch's enrichment. ReadIntField now
+    // recovers a numeric-string offset; the chunk stays success either way.
+    auto r = ParseEnrichBatchResponse(
+        R"({"0":{"entities":[{"text":"A","type":"ORG","start_offset":"5","end_offset":"9"}],
+            "summary":"s","score":0.5}})",
+        1, "m", "default-zh");
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_TRUE(r[0].ok());                       // did NOT throw / drop the chunk
+    ASSERT_EQ(r[0].entities.size(), 1u);
+    EXPECT_EQ(r[0].entities[0].text, "A");
+    EXPECT_EQ(r[0].entities[0].start_offset, 5);  // numeric string offset → recovered
+    EXPECT_EQ(r[0].entities[0].end_offset, 9);
+    EXPECT_EQ(r[0].summary, "s");                 // rest of the chunk survives
+    EXPECT_FLOAT_EQ(r[0].enriched_score, 0.5f);
+}
+
 TEST(EnricherResponseParserTest, L1NumericStringEntityOffsetsRecover) {
     auto r = ParseEnrichBatchResponse(
         R"({"0":{"entities":[{"text":"Cortrix","type":"PRODUCT","start_offset":"0","end_offset":"7"}],

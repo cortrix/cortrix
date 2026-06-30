@@ -121,15 +121,26 @@ LABEL maintainer="Cortrix Team <team@cortrix.ai>"
 LABEL description="Cortrix — Semantic Storage for the Agentic Era"
 LABEL version="1.0.0"
 
-# Runtime dependencies only — no compilers
+# Runtime dependencies only — no compilers.
+# wget + python3.10-venv are needed by the first-run provisioning in
+# entrypoint.sh (download-models.sh fetches ONNX assets; a venv is created
+# for the docling/paddleocr parser stack). tar is in the base image.
+# libgl1 / libglib2.0-0 / libgomp1: paddleocr imports opencv (libGL.so.1) and
+# paddlepaddle needs OpenMP — without them the provisioned parser venv installs
+# but fails to import at runtime, breaking PDF/image OCR + the vision_llm path.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     libsqlite3-0 \
     libpq5 \
     python3.10 \
     python3-pip \
+    python3.10-venv \
+    libgl1 \
+    libglib2.0-0 \
+    libgomp1 \
     supervisor \
     curl \
+    wget \
     ca-certificates \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
@@ -172,11 +183,18 @@ COPY --from=builder /wheels /tmp/wheels
 
 # F06 parser bridge scripts (auto-located at /app/scripts by the server).
 # txt/md parse via the bridge's plain-text fast path with zero extra deps;
-# the heavy docling/paddleocr stacks install only for the real-model pass
-# (D-R3 #483: pip install -r /app/scripts/requirements-parser.txt).
+# the heavy docling/paddleocr stacks are installed on first run by
+# entrypoint.sh into a venv on the /data volume (PROFILE=full default),
+# from /app/scripts/requirements-parser.txt.
 COPY scripts/docling_bridge.py \
      scripts/paddleocr_bridge.py \
      scripts/requirements-parser.txt /app/scripts/
+
+# Model fetcher — invoked by entrypoint.sh on first run (PROFILE=full) to
+# populate the /data volume with the ONNX assets that are too large to bake
+# into the image (bge-m3; reranker/query-complexity when their URLs are set).
+COPY deploy/download-models.sh /app/scripts/download-models.sh
+RUN chmod +x /app/scripts/download-models.sh
 
 # Install Python deps from wheels (fast, no compilation)
 # Fail the build loudly if the cortrix-agent deps cannot install — a silent

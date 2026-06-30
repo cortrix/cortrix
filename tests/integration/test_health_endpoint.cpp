@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <thread>
 #include <chrono>
+#include <cstdlib>
 
 #include "httplib.h"
 #include <nlohmann/json.hpp>
@@ -83,6 +84,56 @@ TEST_F(HealthEndpointTest, ReturnsHealthy) {
     EXPECT_EQ(body["components"]["config"], "ok");
     EXPECT_EQ(body["components"]["logging"], "ok");
     EXPECT_EQ(body["components"]["namespace_manager"], "ok");
+}
+
+// DEFECT#8: /health reflects the OCR parser provisioning outcome via the
+// CORTRIX_PARSER_STATUS env var (set by the deploy entrypoint after provisioning),
+// read per-request. Absent → component omitted + "healthy" (back-compat); a failed
+// parser stack ("unavailable") degrades overall status so it is not silently green.
+TEST_F(HealthEndpointTest, ParserStatusReflectedInComponents) {
+    httplib::Client cli("127.0.0.1", port_);
+
+    // Unset: no parser component, status stays healthy.
+    ::unsetenv("CORTRIX_PARSER_STATUS");
+    {
+        auto res = cli.Get("/api/v1/health");
+        ASSERT_TRUE(res);
+        auto body = nlohmann::json::parse(res->body);
+        EXPECT_EQ(body["status"], "healthy");
+        EXPECT_FALSE(body["components"].contains("parser"));
+    }
+
+    // Failed provisioning → component "unavailable" + overall "degraded".
+    ::setenv("CORTRIX_PARSER_STATUS", "unavailable", 1);
+    {
+        auto res = cli.Get("/api/v1/health");
+        ASSERT_TRUE(res);
+        auto body = nlohmann::json::parse(res->body);
+        EXPECT_EQ(body["components"]["parser"], "unavailable");
+        EXPECT_EQ(body["status"], "degraded");
+    }
+
+    // Provisioned OK → component "ok", status not degraded.
+    ::setenv("CORTRIX_PARSER_STATUS", "ok", 1);
+    {
+        auto res = cli.Get("/api/v1/health");
+        ASSERT_TRUE(res);
+        auto body = nlohmann::json::parse(res->body);
+        EXPECT_EQ(body["components"]["parser"], "ok");
+        EXPECT_EQ(body["status"], "healthy");
+    }
+
+    // Lite profile → OCR intentionally off, reported but not degraded.
+    ::setenv("CORTRIX_PARSER_STATUS", "disabled", 1);
+    {
+        auto res = cli.Get("/api/v1/health");
+        ASSERT_TRUE(res);
+        auto body = nlohmann::json::parse(res->body);
+        EXPECT_EQ(body["components"]["parser"], "disabled");
+        EXPECT_EQ(body["status"], "healthy");
+    }
+
+    ::unsetenv("CORTRIX_PARSER_STATUS");
 }
 
 TEST_F(HealthEndpointTest, HasRequestIdHeader) {

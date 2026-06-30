@@ -53,7 +53,13 @@ int ReadIntField(const json& obj, const char* key, int fallback = 0) {
 }
 
 // L1: extract entities defensively — skip malformed array elements, default
-// missing fields. Never throws (caller already has a parsed object).
+// missing OR wrong-typed fields. Never throws (caller already has a parsed
+// object). NOTE: json::value(key, default) only covers the missing case — if the
+// key is present with the wrong type (e.g. a reasoning LLM emits
+// "start_offset":"5" as a string), value<int>() internally calls get<int>() and
+// throws type_error.302. That escaped here and dropped the whole batch's
+// enrichment, defeating the per-field-default L1 contract. Guard numeric fields
+// with is_number() (mirrors the score handling in ParseEnrichBatchResponse).
 std::vector<Entity> ParseEntities(const json& chunk_obj) {
     std::vector<Entity> out;
     auto it = chunk_obj.find("entities");
