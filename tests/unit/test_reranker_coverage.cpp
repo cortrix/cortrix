@@ -245,9 +245,9 @@ TEST(RerankerCoverageTest, MockScoreBatchAllZero) {
 TEST(RerankerCoverageTest, MockRerankVariedScoreDistribution) {
     MockReranker mock;
     std::vector<RankedChunk> canned{
-        RankedChunk{"01C1", "t1", "p1", 0.30f, 0.95f, {}},
-        RankedChunk{"01C2", "t2", "p2", 0.40f, 0.50f, {}},
-        RankedChunk{"01C3", "t3", "p3", 0.10f, 0.05f, {}},
+        RankedChunk{"01C1", "t1", "p1", 0.30f, 0.95f, {}, {}},
+        RankedChunk{"01C2", "t2", "p2", 0.40f, 0.50f, {}, {}},
+        RankedChunk{"01C3", "t3", "p3", 0.10f, 0.05f, {}, {}},
     };
     EXPECT_CALL(mock, Rerank(_, _)).WillOnce(Return(canned));
     std::vector<ScoredResult> cands{{"01C1", 0.3f}, {"01C2", 0.4f}, {"01C3", 0.1f}};

@@ -161,8 +161,9 @@ TEST(CragBreakerDepthTest, OpenSinceMsIsNegativeWhenNotOpen) {
 // ---------------- (2) top1_top5_gap off-by-one boundary ----------------
 
 RankedChunk Chunk(float score) {
-    // RankedChunk{child_id, chunk_text, parent_text, score, rerank_score, metadata}
-    return RankedChunk{"c", "t", "p", score, 0.0f, {}};
+    // RankedChunk{child_id, chunk_text, parent_text, score, rerank_score,
+    //             score_signals, metadata}
+    return RankedChunk{"c", "t", "p", score, 0.0f, {}, {}};
 }
 
 CragEvaluator MakeEvaluator() {

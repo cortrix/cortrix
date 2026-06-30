@@ -54,7 +54,9 @@ public:
     std::vector<RankedChunk> Rerank(const std::vector<ScoredResult>& c,
                                     const std::string&) override {
         std::vector<RankedChunk> out;
-        for (const auto& s : c) out.push_back(RankedChunk{s.child_id, "", "", s.score, 1.0f, {}});
+        for (const auto& s : c) {
+            out.push_back(RankedChunk{s.child_id, "", "", s.score, 1.0f, {}, {}});
+        }
         return out;
     }
     const char* Name() const override { return "StubReranker"; }
@@ -96,8 +98,8 @@ TEST(MockRerankerTest, GmockDoubleHonoursExpectations) {
 TEST(MockRerankerTest, RerankExpectationReturnsRankedChunks) {
     MockReranker mock;
     std::vector<RankedChunk> canned{
-        RankedChunk{"01CHILDA", "ta", "pa", 0.2f, 0.9f, {}},
-        RankedChunk{"01CHILDB", "tb", "pb", 0.1f, 0.8f, {}},
+        RankedChunk{"01CHILDA", "ta", "pa", 0.2f, 0.9f, {}, {}},
+        RankedChunk{"01CHILDB", "tb", "pb", 0.1f, 0.8f, {}, {}},
     };
     EXPECT_CALL(mock, Rerank(_, _)).WillOnce(Return(canned));
 

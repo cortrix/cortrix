@@ -24,7 +24,9 @@
 namespace cortrix::retrieval {
 namespace {
 
-RankedChunk C(float score) { return RankedChunk{"id", "chunk text here", "p", score, 0.0f, {}}; }
+RankedChunk C(float score) {
+    return RankedChunk{"id", "chunk text here", "p", score, 0.0f, {}, {}};
+}
 
 // One labeled eval example: a chunk score distribution + its gold CRAG class.
 struct Example {

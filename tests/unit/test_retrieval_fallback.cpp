@@ -17,8 +17,8 @@ TEST(RetrievalFallbackTest, NullFallbackReturnsOriginalChunks) {
     EXPECT_EQ(fb.Name(), "null_fallback");
 
     std::vector<RankedChunk> chunks = {
-        RankedChunk{"01A", "ta", "pa", 0.9f, 0.8f, {}},
-        RankedChunk{"01B", "tb", "pb", 0.2f, 0.1f, {}},
+        RankedChunk{"01A", "ta", "pa", 0.9f, 0.8f, {}, {}},
+        RankedChunk{"01B", "tb", "pb", 0.2f, 0.1f, {}, {}},
     };
     query::QueryContext ctx;  // ctx is ignored by the Null impl
     auto out = fb.Fallback(ctx, chunks);
@@ -40,7 +40,8 @@ TEST(RetrievalFallbackTest, NullFallbackEmptyInput) {
 TEST(RetrievalFallbackTest, UsableThroughInterfacePointer) {
     NullRetrievalFallback impl;
     IRetrievalFallback* fb = &impl;
-    std::vector<RankedChunk> chunks = {RankedChunk{"01C", "tc", "pc", 0.5f, 0.4f, {}}};
+    std::vector<RankedChunk> chunks = {
+        RankedChunk{"01C", "tc", "pc", 0.5f, 0.4f, {}, {}}};
     query::QueryContext ctx;
     auto out = fb->Fallback(ctx, chunks);
     ASSERT_EQ(out.size(), 1u);

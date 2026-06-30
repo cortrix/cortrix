@@ -121,6 +121,18 @@ TEST(RerankerScoreFusionTest, ScoreSignalsApplyF07MultiplierAfterBaseFusion) {
                 0.68f * 1.06f, 1e-6f);
 }
 
+TEST(RerankerScoreFusionTest, AnomalySentinelOverridesEnrichedScore) {
+    RerankerScoreFusion fusion;
+    RankedChunk chunk;
+    chunk.score_signals.enriched_score = 0.8f;
+    chunk.score_signals.semantic_score = 0.0f;  // F07 persisted anomaly sentinel
+
+    // base = 0.8*0.7 + 0.4*0.3 = 0.68. Anomaly priority forces effective=0.0
+    // and multiplier=0.9; enriched=0.8 must not re-boost the block to 1.06x.
+    EXPECT_NEAR(fusion.ComputeRerankRrfScore(0.8f, 0.4f, chunk, "q"),
+                0.68f * 0.9f, 1e-6f);
+}
+
 // ---- (2) Rerank sorts by the FUSED score ----------------------------------
 
 // HIGH rerank + LOW rrf  vs  LOW rerank + HIGH rrf:
