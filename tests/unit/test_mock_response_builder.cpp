@@ -113,7 +113,13 @@ TEST(MockResponseBuilderDrivesEnricher, NormalAllSucceed) {
 
 TEST(MockResponseBuilderDrivesEnricher, PartialBatchTriggersL2) {
     auto mock = std::make_shared<MockLlmClient>();
-    EXPECT_CALL(*mock, Chat(_, _)).WillOnce(Return(MockResponseBuilder::PartialBatch(1, 3)));
+    // F03 now retries each parse-failed chunk individually (RunOneBatch, n==1) when
+    // the batch response is partial — so Chat() is called once for the batch plus
+    // once per failed chunk. The single-item retries return malformed output, so the
+    // missing chunks stay parse failures and the final result set is unchanged.
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Return(MockResponseBuilder::PartialBatch(1, 3)))
+        .WillRepeatedly(Return(MockResponseBuilder::MalformedJson()));
     spc::DocumentMetadata meta;
     spc::LlmEnricher enr(LlmCfg(), mock);
     auto r = enr.EnrichBatch(Batch(meta, 3));
@@ -125,7 +131,11 @@ TEST(MockResponseBuilderDrivesEnricher, PartialBatchTriggersL2) {
 
 TEST(MockResponseBuilderDrivesEnricher, MalformedTriggersL3) {
     auto mock = std::make_shared<MockLlmClient>();
-    EXPECT_CALL(*mock, Chat(_, _)).WillOnce(Return(MockResponseBuilder::MalformedJson()));
+    // Whole-batch malformed → each chunk is retried individually (RunOneBatch,
+    // n==1); the retries are malformed too, so every chunk stays a parse failure.
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Return(MockResponseBuilder::MalformedJson()))
+        .WillRepeatedly(Return(MockResponseBuilder::MalformedJson()));
     spc::DocumentMetadata meta;
     spc::LlmEnricher enr(LlmCfg(), mock);
     auto r = enr.EnrichBatch(Batch(meta, 2));

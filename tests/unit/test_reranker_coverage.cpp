@@ -7,6 +7,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -125,9 +126,10 @@ TEST(RerankerCoverageTest, RerankOpenBreakerYieldsZeroRerankScores) {
     for (const auto& rc : ranked) EXPECT_FLOAT_EQ(rc.rerank_score, 0.0f);
 }
 
-// Field assembly: score (pre-rerank RRF) carried through, chunk_text from the
-// store, rerank_score set, output sorted by the F02 FUSED score desc (§4.2-ter:
-// rerank_score*0.7 + rrf_score*0.3 — fused score is sort-use only, not a field).
+// Field assembly: chunk_text from the store, rerank_score set, and the NEW F02
+// contract (§4.2-ter) — RankedChunk.score is the FUSED ordering score written
+// back (rerank_score*0.7 + rrf_score*0.3), with the output sorted by that fused
+// score descending (no score_signals here, so the multiplier is identity).
 TEST(RerankerCoverageTest, RerankAssemblesAllFields) {
     store::MockChunkStore store;
     EXPECT_CALL(store, GetBatch(_, _)).WillOnce(AllPresentGetBatch());
@@ -138,16 +140,17 @@ TEST(RerankerCoverageTest, RerankAssemblesAllFields) {
     auto ranked = r.Rerank(cands, "the query");
 
     ASSERT_EQ(ranked.size(), 3u);
-    auto fused = [](const RankedChunk& c) {
-        return c.rerank_score * RerankerScoreFusion::kRerankWeight +
-               c.score * RerankerScoreFusion::kRrfWeight;
-    };
+    // .score now holds the fused ordering score, so the output is sorted by it.
     for (size_t i = 0; i + 1 < ranked.size(); ++i) {
-        EXPECT_GE(fused(ranked[i]), fused(ranked[i + 1]));  // sorted by fused score desc
+        EXPECT_GE(ranked[i].score, ranked[i + 1].score);
     }
+    const std::map<std::string, float> rrf_by_id{
+        {"01CHILDA", 0.2f}, {"01CHILDB", 0.8f}, {"01CHILDC", 0.5f}};
     for (const auto& rc : ranked) {
         EXPECT_TRUE(rc.chunk_text.rfind("text for ", 0) == 0);
-        EXPECT_TRUE(rc.score == 0.2f || rc.score == 0.8f || rc.score == 0.5f);
+        EXPECT_FLOAT_EQ(rc.score,
+                        rc.rerank_score * RerankerScoreFusion::kRerankWeight +
+                            rrf_by_id.at(rc.child_id) * RerankerScoreFusion::kRrfWeight);
     }
 }
 
