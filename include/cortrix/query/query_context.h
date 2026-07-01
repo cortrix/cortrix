@@ -41,12 +41,13 @@ struct QueryContext {
     bool rerank = true;      ///< topic 4.3 — pass-through to all NS; false → RRF fallback path
     std::map<std::string, std::string> filter;  ///< topic 4.3 JSONB filter passed through (flattened)
 
-    // --- F41 §6.2 retrieval granularity (pure ADD; safe default "auto") ---
+    // --- F41 §6.2 retrieval granularity ---
     // Passed through ScatterGather to every NS's executor unchanged (like rerank /
-    // filter). The default "auto" AND "chunk" keep the existing chunk-level retrieval
-    // path 100% intact; only "doc" / "both" engage the F41 §8.1 doc-summary dispatch
-    // in LiveSingleUnitExecutor. ScatterGather itself never branches on this — it is a
-    // per-NS executor concern (the cross-NS gather/dedupe stays granularity-agnostic).
+    // filter). "chunk" is the explicit chunk-level baseline; "doc" uses doc-summary
+    // recall; "both" and the default "auto" run the hybrid fallback so doc-summary
+    // candidates can enter the official query candidate set. ScatterGather itself never
+    // branches on this — it is a per-NS executor concern (the cross-NS gather/dedupe stays
+    // granularity-agnostic).
     std::string granularity = "auto";  ///< "auto" | "chunk" | "doc" | "both" (F41 §6.2)
 
     // --- Identity pass-through (topic §11.bis MEM05-4: AuthContext.user_id flows through) ---

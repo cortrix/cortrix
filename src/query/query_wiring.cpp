@@ -506,9 +506,9 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             // F41 §6.2 ?granularity (auto|chunk|doc|both, query-string wins over body).
             // Validate before routing so an invalid value is a clean 400 (the frozen
             // CX_ERR_F41_* set has no request-param identity → generic InvalidArgument,
-            // matching the single-NS query_routes.cpp path). The default "auto" / "chunk"
-            // leave retrieval behavior unchanged; only doc/both engage the §8.1 dispatch
-            // in LiveSingleUnitExecutor. ScatterGather/Gather are untouched (pass-through).
+            // matching the single-NS query_routes.cpp path). "chunk" is the explicit
+            // baseline; "auto" and "both" engage the hybrid doc-summary fallback inside
+            // LiveSingleUnitExecutor. ScatterGather/Gather are untouched (pass-through).
             qctx.granularity = ReadGranularity(req, body);
             if (!IsValidGranularity(qctx.granularity)) {
                 WriteJsonError(res, Status::InvalidArgument(
