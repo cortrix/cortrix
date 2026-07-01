@@ -3,12 +3,14 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <map>
 #include <string>
 #include <vector>
 
 #include "cortrix/ml/ort_env_singleton.h"
 #include "cortrix/ml/tokenizer_registry.h"
 #include "cortrix/reranker/onnx_reranker.h"
+#include "cortrix/reranker/score_fusion.h"
 #include "mock_chunk_store.h"
 
 namespace cortrix::reranker {
@@ -102,11 +104,17 @@ TEST(OnnxRerankerSkeletonTest, RerankReversesLookupViaChunkStoreAndSortsByFusedS
         EXPECT_FALSE(rc.chunk_text.empty());
         EXPECT_TRUE(rc.chunk_text.rfind("text for ", 0) == 0);
     }
-    // Output is sorted by rerank_score descending.
+    // Cross-encoder order preserved on rerank_score.
     EXPECT_GE(ranked[0].rerank_score, ranked[1].rerank_score);
-    // pre-rerank score carried through from ScoredResult.
+    // New F02 contract (§4.2-ter): RankedChunk.score is the FUSED ordering score
+    // written back (rerank*0.7 + rrf*0.3; no score_signals here), so the output is
+    // sorted by the fused score and `score` is no longer the raw pre-rerank RRF.
+    EXPECT_GE(ranked[0].score, ranked[1].score);
+    const std::map<std::string, float> rrf_by_id{{"01CHILDA", 0.9f}, {"01CHILDB", 0.1f}};
     for (const auto& rc : ranked) {
-        EXPECT_TRUE(rc.score == 0.9f || rc.score == 0.1f);
+        EXPECT_FLOAT_EQ(rc.score,
+                        rc.rerank_score * RerankerScoreFusion::kRerankWeight +
+                            rrf_by_id.at(rc.child_id) * RerankerScoreFusion::kRrfWeight);
     }
 }
 

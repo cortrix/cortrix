@@ -105,7 +105,14 @@ void WorkerPool::WorkerLoop(int worker_id) {
             auto it = handlers_.find(task.task_type);
             if (it != handlers_.end() && it->second != nullptr) {
                 try {
-                    it->second->ProcessTask(task);
+                    Status handler_status = it->second->ProcessTask(task);
+                    if (!handler_status.ok()) {
+                        spdlog::warn(
+                            "F42 WorkerPool: handler returned failure for task {} "
+                            "(task_type {}, namespace_id {}, doc_id {}): {}",
+                            task.task_id, task.task_type, task.namespace_id, task.doc_id,
+                            handler_status.message());
+                    }
                 } catch (const std::exception& e) {
                     spdlog::error(
                         "F42 WorkerPool: handler threw for task {} (task_type {}): "

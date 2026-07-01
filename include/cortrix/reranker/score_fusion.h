@@ -14,8 +14,10 @@ namespace cortrix::reranker {
 /// fusion of enriched+semantic scores, SoT = F07 §4.1), which is a separate
 /// operation F02 neither redefines nor impersonates.
 ///
-/// The fused score is **local sort-use only** — it is NOT written into
-/// RankedChunk (RankedChunk fields are unchanged; §4.2-bis step 4 note).
+/// The fused score is the post-F02/F07 ordering score. Callers that return
+/// RankedChunk objects must write it back to RankedChunk::score so downstream
+/// scatter, dedup, response serialization, and replay surfaces agree on the same
+/// final score.
 ///
 /// V1 simplified: weighted_sum(rerank_score * 0.7 + rrf_score * 0.3), returning a
 /// normalized [0,1] ordering score. Phase 2 extends with business-hotness signals
@@ -34,7 +36,7 @@ public:
     /// @param rrf_score     F36 RRF score (ScoredResult.score / RankedChunk.score)
     /// @param chunk         the candidate (Phase 2 hotness/recency hook; unused in V1)
     /// @param query         the query (Phase 2 hook; unused in V1)
-    /// @return              weighted_sum = rerank_score*0.7 + rrf_score*0.3
+    /// @return              final ordering score
     float ComputeRerankRrfScore(float rerank_score, float rrf_score,
                                 const cortrix::retrieval::RankedChunk& chunk,
                                 const std::string& query) const;

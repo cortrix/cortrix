@@ -363,6 +363,9 @@ add_library(cortrix_core STATIC
 target_include_directories(cortrix_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+target_compile_definitions(cortrix_core PUBLIC
+    CPPHTTPLIB_OPENSSL_SUPPORT
+)
 target_link_libraries(cortrix_core PUBLIC
     httplib
     yaml-cpp
@@ -370,6 +373,7 @@ target_link_libraries(cortrix_core PUBLIC
     spdlog::spdlog
     sqlite3
     OpenSSL::Crypto
+    OpenSSL::SSL
     z
     cortrix::hnswlib_vendored
 )

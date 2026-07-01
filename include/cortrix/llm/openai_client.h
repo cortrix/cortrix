@@ -11,16 +11,19 @@ namespace cortrix::llm {
 ///
 /// F03 Wave B (S2.1) delivers the real transport: POST {endpoint}/chat/completions
 /// with Bearer api_key, JSON body {model, messages:[{role:user, content:prompt}],
-/// temperature, max_tokens, response_format}; parses choices[0].message.content +
-/// usage.{prompt,completion}_tokens; classifies transport / HTTP / rate-limit
+/// temperature, max_tokens, response_format}; parses choices[0].message.content
+/// with an OpenAI-compatible reasoning_content fallback for providers that place
+/// the final structured answer there, plus usage.{prompt,completion}_tokens;
+/// classifies transport / HTTP / rate-limit
 /// failures into Agent-friendly Status categories (CX_ERR_ENRICHER_*).
 ///
-/// 🔌 Network seam: the byte-level round-trip goes through an injectable
+/// Network seam: the byte-level round-trip goes through an injectable
 /// IHttpTransport (briefing "an injectable transport"). The default ctor uses
-/// MakeDefaultHttpTransport() (cpp-httplib); tests inject a fake. Retries +
-/// circuit-breaker live in the LlmEnricher layer (F03 §4.2) — this client does a
-/// single round-trip per Chat() and reports the outcome; the enricher owns the
-/// retry/backoff/breaker policy so all 6+ consumers share one resilience model.
+/// MakeDefaultHttpTransport() (cpp-httplib); tests inject a fake. The client uses
+/// LlmClientConfig::max_retries for transport-level failures so shared consumers
+/// without their own retry shell (for example F41) can tolerate transient TLS /
+/// connection failures. Feature-specific retry/backoff/breaker policy remains in
+/// the owning feature layer where applicable (for example F03 LlmEnricher).
 class OpenAiLlmClient : public ILlmClient {
 public:
     /// Production ctor — default cpp-httplib transport.

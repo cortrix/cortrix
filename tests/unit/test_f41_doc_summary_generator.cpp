@@ -11,6 +11,7 @@
 
 #include "cortrix/common/in_memory_global_config.h"
 #include "cortrix/doc_summary/doc_summary_generator.h"
+#include "cortrix/doc_summary/doc_summary_error.h"
 #include "cortrix/doc_summary/doc_summary_metrics.h"
 #include "mock_chunk_store.h"
 #include "mock_llm_client.h"
@@ -19,13 +20,18 @@ namespace cortrix::doc_summary {
 namespace {
 
 using ::testing::_;
+using ::testing::DoAll;
 using ::testing::Field;
 using ::testing::Return;
+using ::testing::SaveArg;
 
 llm::ChatCompletionResponse OkChat(std::string content) {
     llm::ChatCompletionResponse r;
+    r.content_length = static_cast<int>(content.size());
     r.content = std::move(content);
+    r.content_source = "message.content";
     r.model = "gpt-4o-mini";
+    r.finish_reason = "stop";
     r.prompt_tokens = 100;
     r.completion_tokens = 60;
     return r;  // status defaults ok()
@@ -88,6 +94,14 @@ TEST(F41DocSummaryGeneratorTest, ParseGarbageIsInvalidOutput) {
     EXPECT_FALSE(r.ok());
     EXPECT_NE(r.status().message().find("CX_ERR_F41_LLM_INVALID_OUTPUT"),
               std::string::npos);
+}
+
+TEST(F41DocSummaryGeneratorTest, ParseCompleteFencedJson) {
+    DocSummaryGenerator g = MakeGen(std::make_shared<llm::MockLlmClient>(),
+                                    std::make_shared<store::MockChunkStore>());
+    auto r = g.ParseStructuredOutput(std::string("```json\n") + kGoodJson + "\n```", 500);
+    ASSERT_TRUE(r.ok()) << r.status().message();
+    EXPECT_NE(r.value().summary_text.find("Q3 2026"), std::string::npos);
 }
 
 TEST(F41DocSummaryGeneratorTest, ParseMissingSummaryTextIsInvalid) {
@@ -159,6 +173,50 @@ TEST(F41DocSummaryGeneratorTest, ShortDocSingleCall) {
     ASSERT_TRUE(r.ok());
     EXPECT_FALSE(mr);  // short doc → no map-reduce
     EXPECT_NE(r.value().summary_text.find("Q3 2026"), std::string::npos);
+}
+
+TEST(F41DocSummaryGeneratorTest, StructuredCallUsesDeepSeekJsonContract) {
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    llm::LlmCallConfig captured;
+    EXPECT_CALL(*llm, Chat(_, _))
+        .WillOnce(DoAll(SaveArg<1>(&captured), Return(OkChat(kGoodJson))));
+    auto store = std::make_shared<store::MockChunkStore>();
+    DocSummaryConfig cfg;
+    cfg.llm_model = "deepseek-v4-flash";
+    DocSummaryGenerator g = MakeGen(llm, store, cfg);
+
+    bool mr = true;
+    auto r = g.GenerateSummary(NChunks(5), "Report", &mr);
+
+    ASSERT_TRUE(r.ok()) << r.status().message();
+    EXPECT_FALSE(mr);
+    EXPECT_EQ(captured.model, "deepseek-v4-flash");
+    EXPECT_EQ(captured.max_tokens, 4096);
+    EXPECT_EQ(captured.response_format, "json_object");
+    EXPECT_EQ(captured.thinking_type, "disabled");
+    EXPECT_FALSE(captured.allow_reasoning_content_fallback);
+}
+
+TEST(F41DocSummaryGeneratorTest, StructuredCallKeepsGlmPromptOnlyContract) {
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    llm::LlmCallConfig captured;
+    EXPECT_CALL(*llm, Chat(_, _))
+        .WillOnce(DoAll(SaveArg<1>(&captured), Return(OkChat(kGoodJson))));
+    auto store = std::make_shared<store::MockChunkStore>();
+    DocSummaryConfig cfg;
+    cfg.llm_model = "glm-5.2";
+    DocSummaryGenerator g = MakeGen(llm, store, cfg);
+
+    bool mr = true;
+    auto r = g.GenerateSummary(NChunks(5), "Report", &mr);
+
+    ASSERT_TRUE(r.ok()) << r.status().message();
+    EXPECT_FALSE(mr);
+    EXPECT_EQ(captured.model, "glm-5.2");
+    EXPECT_EQ(captured.max_tokens, 4096);
+    EXPECT_EQ(captured.response_format, "");
+    EXPECT_EQ(captured.thinking_type, "");
+    EXPECT_FALSE(captured.allow_reasoning_content_fallback);
 }
 
 TEST(F41DocSummaryGeneratorTest, ShortDocLlmFailureIsTimeout) {
@@ -272,6 +330,13 @@ TEST(F41DocSummaryGeneratorTest, GenerateLlmFailureCarriesTimeoutError) {
     EXPECT_FALSE(res.success);
     ASSERT_TRUE(res.error.has_value());
     EXPECT_EQ(res.error->code, "CX_ERR_F41_LLM_TIMEOUT");
+    ASSERT_TRUE(res.error->structured_data.has_value());
+    EXPECT_TRUE(HasRequiredStructuredData(DocSummaryErrorCode::kLlmTimeout,
+                                          *res.error->structured_data));
+    EXPECT_EQ((*res.error->structured_data)["doc_id"], "doc1");
+    EXPECT_EQ((*res.error->structured_data)["attempt_count"], 1);
+    EXPECT_NE((*res.error->structured_data)["last_error_message"].get<std::string>().find("net"),
+              std::string::npos);
 }
 
 TEST(F41DocSummaryGeneratorTest, GenerateInvalidOutputCarriesInvalidError) {
@@ -285,6 +350,42 @@ TEST(F41DocSummaryGeneratorTest, GenerateInvalidOutputCarriesInvalidError) {
     EXPECT_FALSE(res.success);
     ASSERT_TRUE(res.error.has_value());
     EXPECT_EQ(res.error->code, "CX_ERR_F41_LLM_INVALID_OUTPUT");
+    ASSERT_TRUE(res.error->structured_data.has_value());
+    EXPECT_TRUE(HasRequiredStructuredData(DocSummaryErrorCode::kLlmInvalidOutput,
+                                          *res.error->structured_data));
+    EXPECT_EQ((*res.error->structured_data)["doc_id"], "doc1");
+    EXPECT_EQ((*res.error->structured_data)["raw_output_preview"], "not json");
+    EXPECT_EQ((*res.error->structured_data)["llm_content_source"], "message.content");
+    EXPECT_EQ((*res.error->structured_data)["llm_model"], "gpt-4o-mini");
+    EXPECT_EQ((*res.error->structured_data)["llm_finish_reason"], "stop");
+    EXPECT_EQ((*res.error->structured_data)["llm_content_length"], 8);
+    EXPECT_EQ((*res.error->structured_data)["llm_reasoning_content_length"], 0);
+    EXPECT_NE((*res.error->structured_data)["parse_error"].get<std::string>().find(
+                  "CX_ERR_F41_LLM_INVALID_OUTPUT"),
+              std::string::npos);
+    EXPECT_NE(res.error->message.find("content_source=message.content"),
+              std::string::npos);
+}
+
+TEST(F41DocSummaryGeneratorTest, GenerateInvalidOutputCapturesReasoningDiagnostics) {
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    llm::ChatCompletionResponse response = OkChat("not json");
+    response.model = "glm-5.2";
+    response.finish_reason = "stop";
+    response.reasoning_content_length = 1234;
+    EXPECT_CALL(*llm, Chat(_, _)).WillOnce(Return(response));
+    auto store = std::make_shared<store::MockChunkStore>();
+    EXPECT_CALL(*store, GetChunksByDocId("doc1")).WillOnce(Return(NChunks(2)));
+    DocSummaryGenerator g = MakeGen(llm, store);
+
+    GenerationResult res = g.Generate("doc1", "ns1");
+    EXPECT_FALSE(res.success);
+    ASSERT_TRUE(res.error.has_value());
+    ASSERT_TRUE(res.error->structured_data.has_value());
+    EXPECT_EQ((*res.error->structured_data)["llm_model"], "glm-5.2");
+    EXPECT_EQ((*res.error->structured_data)["llm_reasoning_content_length"], 1234);
+    EXPECT_NE(res.error->message.find("reasoning_content_length=1234"),
+              std::string::npos);
 }
 
 TEST(F41DocSummaryGeneratorTest, GenerateNullChunkStoreErrors) {

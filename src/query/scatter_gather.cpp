@@ -196,14 +196,14 @@ CrossNsResponse ScatterGather::GatherAndRerank(
         }
     }
 
-    // Gather (§4.1 step 3): rank by rerank_score (cross-NS comparable, ARCH §3.3),
-    // then B-simplified cross-NS dedup (§3.3 — collapses copies of one content_hash to
-    // the highest-rerank_score primary + records a brief multi-source note in meta), then truncate to
-    // top_k. Sort-before-dedup keeps the deduped list in descending rerank_score
+    // Gather (§4.1 step 3): rank by final score, then B-simplified cross-NS
+    // dedup (§3.3 — collapses copies of one content_hash to the highest-score
+    // primary + records a brief multi-source note in meta), then truncate to
+    // top_k. Sort-before-dedup keeps the deduped list in descending final score
     // (each group's primary is its first occurrence in the sorted list).
     std::stable_sort(items.begin(), items.end(),
                      [](const ResultItem& a, const ResultItem& b) {
-                         return a.rerank_score > b.rerank_score;
+                         return a.score > b.score;
                      });
 
     // §3.3 / §4.3: populates meta.deduplicated_chunks[] + deduplicated_chunks_count.

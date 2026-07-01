@@ -1,5 +1,7 @@
 #include "cortrix/query/cross_ns_response.h"
 
+#include <utility>
+
 namespace cortrix::query {
 
 namespace {
@@ -18,6 +20,16 @@ nlohmann::json ResultItemToJson(const retrieval::ResultItem& it) {
     j["namespace"] = it.namespace_id;
     j["content_hash"] = it.content_hash;
     j["metadata"] = it.metadata;  // std::map<string,string> → JSON object
+    if (it.score_signals.HasAny()) {
+        nlohmann::json signals = nlohmann::json::object();
+        if (it.score_signals.enriched_score.has_value()) {
+            signals["enriched_score"] = *it.score_signals.enriched_score;
+        }
+        if (it.score_signals.semantic_score.has_value()) {
+            signals["semantic_score"] = *it.score_signals.semantic_score;
+        }
+        j["score_signals"] = std::move(signals);
+    }
     return j;
 }
 
@@ -54,7 +66,9 @@ nlohmann::json DedupToJson(const DeduplicatedChunkInfo& d) {
     j["primary_namespace"] = d.primary_namespace;
     nlohmann::json arr = nlohmann::json::array();
     for (const auto& src : d.namespaces) {
-        arr.push_back({{"namespace", src.namespace_id}, {"rerank_score", src.rerank_score}});
+        arr.push_back({{"namespace", src.namespace_id},
+                       {"score", src.score},
+                       {"rerank_score", src.rerank_score}});
     }
     j["namespaces"] = std::move(arr);
     return j;

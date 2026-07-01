@@ -173,6 +173,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             std::string content_text;
             std::string metadata_json;
             std::string doc_id;  // owning document, for doc-level metadata round-trip
+            ScoreSignals score_signals;
         };
         std::unordered_map<std::string, ChunkRow> by_child;
         // doc_id → owning-document fields cache. The friendly source_path (the original
@@ -215,7 +216,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
                 h.score = it.raw_score;
                 by_child.emplace(block.child_id,
                                  ChunkRow{block.content_text, block.metadata_json,
-                                          block.doc_id});
+                                          block.doc_id, block.score_signals});
                 hits.push_back(std::move(h));
             }
             return hits;
@@ -247,7 +248,8 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
                             if (!rec.ok()) continue;  // not resolvable → drop from fusion
                             by_child.emplace(h.child_id,
                                              ChunkRow{rec.value().content, std::string(),
-                                                      std::string()});
+                                                      std::string(),
+                                                      rec.value().score_signals});
                         }
                         rrf_in.sparse.push_back(h);
                     }
@@ -276,6 +278,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             // parent_id to its default until that F34 reverse-lookup lands (D3.5+).
             rc.score = fh.rrf_score;        // pre-rerank (multi-path RRF) score
             rc.rerank_score = fh.rrf_score;  // overwritten below when reranking
+            rc.score_signals = row.score_signals;
             // Flatten metadata into TOP-LEVEL result-metadata keys (e.g. beir_corpus_id),
             // not a single opaque "metadata_json" blob — the cross-NS runner matches qrels
             // on those top-level keys (FiQA identity). Doc-level metadata (caller-supplied
@@ -311,6 +314,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             for (std::size_t i = 0; i < ranked.size(); ++i) {
                 const float f = fusion.ComputeRerankRrfScore(
                     ranked[i].rerank_score, ranked[i].score, ranked[i], ctx.query);
+                ranked[i].score = f;
                 order.emplace_back(f, i);
             }
             std::stable_sort(order.begin(), order.end(),

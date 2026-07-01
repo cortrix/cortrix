@@ -5,6 +5,7 @@
 #include <chrono>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "cortrix/common/executor_engine.h"
@@ -44,6 +45,22 @@ AuthContext Auth() {
     return a;
 }
 
+NamespaceQueryResult OneChunk(const std::string& ns_id,
+                              const std::string& suffix,
+                              float final_score,
+                              float rerank_score) {
+    NamespaceQueryResult r;
+    r.namespace_id = ns_id;
+    r.latency_ms = 10;
+    retrieval::RankedChunk c;
+    c.child_id = ns_id + "_" + suffix;
+    c.chunk_text = ns_id + " " + suffix;
+    c.score = final_score;
+    c.rerank_score = rerank_score;
+    r.chunks.push_back(std::move(c));
+    return r;
+}
+
 // Helper to build a ScatterGather with the standard mocks. The ExecutorEngine and
 // MockReranker outlive the call.
 struct Harness {
@@ -75,7 +92,7 @@ TEST(ScatterGatherTest, SingleNsDirectPath) {
     EXPECT_FALSE(resp.error.has_value());
 }
 
-// --- Multi-NS fan-out: results merged, sorted by rerank_score across NS. ---
+// --- Multi-NS fan-out: results merged, sorted by final score across NS. ---
 TEST(ScatterGatherTest, MultiNsGatherSortedByRerankScore) {
     Harness h({"ns_a", "ns_b"});
     EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _))
@@ -92,6 +109,23 @@ TEST(ScatterGatherTest, MultiNsGatherSortedByRerankScore) {
     EXPECT_FLOAT_EQ(resp.results[2].rerank_score, 0.5f);  // ns_b
     EXPECT_EQ(resp.meta.namespaces_succeeded.size(), 2u);
     EXPECT_FLOAT_EQ(resp.meta.coverage_ratio, 1.0f);
+}
+
+TEST(ScatterGatherTest, MultiNsGatherSortedByFinalScoreOverRerankScore) {
+    Harness h({"ns_a", "ns_b"});
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _))
+        .WillOnce(Return(OneChunk("ns_a", "low_rerank_high_final", 0.9f, 0.1f)));
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_b", _))
+        .WillOnce(Return(OneChunk("ns_b", "high_rerank_low_final", 0.5f, 0.99f)));
+
+    auto sg = h.Make();
+    auto resp = sg.Execute(Req({"ns_a", "ns_b"}, /*top_k=*/2), Auth());
+
+    ASSERT_EQ(resp.results.size(), 2u);
+    EXPECT_EQ(resp.results[0].namespace_id, "ns_a");
+    EXPECT_FLOAT_EQ(resp.results[0].score, 0.9f);
+    EXPECT_FLOAT_EQ(resp.results[0].rerank_score, 0.1f);
+    EXPECT_EQ(resp.results[1].namespace_id, "ns_b");
 }
 
 // --- Partial success: one NS index-corrupt → meta.namespaces_failed + coverage<1. ---

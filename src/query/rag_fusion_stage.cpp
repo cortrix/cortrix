@@ -23,8 +23,9 @@ std::vector<ScoredResult> ToScoredResults(const CrossNsResponse& resp) {
     for (const auto& it : resp.results) {
         ScoredResult sr;
         sr.child_id = it.child_id;
-        // rerank_score carries the ordering when present; else the fused score.
-        sr.score = it.rerank_score != 0.0f ? it.rerank_score : it.score;
+        // Carry the post-F02/F07 final score into the second-pass RRF. Older
+        // responses may only have rerank_score populated, so keep it as fallback.
+        sr.score = it.score != 0.0f ? it.score : it.rerank_score;
         out.push_back(std::move(sr));
     }
     return out;

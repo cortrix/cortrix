@@ -17,7 +17,10 @@ namespace cortrix::spc {
 namespace {
 
 using ::testing::_;
+using ::testing::DoAll;
+using ::testing::InSequence;
 using ::testing::Return;
+using ::testing::SaveArg;
 
 llm::ChatCompletionResponse OkChat(std::string content, int pt = 10, int ct = 5) {
     llm::ChatCompletionResponse r;
@@ -101,6 +104,27 @@ TEST(LlmEnricherTest, EnrichBatchSuccessFillsTwelveFields) {
     // chunk 1
     EXPECT_EQ(results[1].summary, "second");
     EXPECT_FLOAT_EQ(results[1].enriched_score, 0.4f);
+}
+
+TEST(LlmEnricherTest, DeepSeekStructuredCallDisablesThinkingAndUsesLargeTokenBudget) {
+    auto mock = std::make_shared<llm::MockLlmClient>();
+    llm::LlmCallConfig captured;
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(DoAll(SaveArg<1>(&captured),
+                        Return(OkChat(R"({"0":{"summary":"ok","score":0.9}})"))));
+
+    DocumentMetadata meta;
+    auto cfg = LlmCfg();
+    cfg.model = "deepseek-v4-flash";
+    LlmEnricher enr(cfg, mock);
+    auto results = enr.EnrichBatch(Batch(meta, 1));
+
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_TRUE(results[0].ok());
+    EXPECT_EQ(captured.max_tokens, 4096);
+    EXPECT_EQ(captured.response_format, "json_object");
+    EXPECT_EQ(captured.thinking_type, "disabled");
+    EXPECT_FALSE(captured.allow_reasoning_content_fallback);
 }
 
 TEST(LlmEnricherTest, BatchSplitByBatchSize) {
@@ -205,8 +229,8 @@ TEST(LlmEnricherTest, ParseFailureStampsDefaultsAndRecordsParseMetric) {
 
     DocumentMetadata meta;
     LlmEnricher enr(LlmCfg(), mock);
-    auto results = enr.EnrichBatch(Batch(meta, 2));
-    ASSERT_EQ(results.size(), 2u);
+    auto results = enr.EnrichBatch(Batch(meta, 1));
+    ASSERT_EQ(results.size(), 1u);
     for (const auto& r : results) {
         EXPECT_EQ(r.status, static_cast<int>(EnricherErrorCode::kParse));
         // Defaults were stamped even though the parse failed.
@@ -215,6 +239,60 @@ TEST(LlmEnricherTest, ParseFailureStampsDefaultsAndRecordsParseMetric) {
         EXPECT_EQ(r.prompt_version, "default-zh");
         EXPECT_EQ(r.token_count, 10);  // 5 + 5
     }
+}
+
+TEST(LlmEnricherTest, RetriesWholeBatchParseFailureBySingleChunk) {
+    auto mock = std::make_shared<llm::MockLlmClient>();
+    {
+        InSequence seq;
+        EXPECT_CALL(*mock, Chat(_, _))
+            .WillOnce(Return(OkChat(R"({"0":{"summary":"truncated")")));
+        EXPECT_CALL(*mock, Chat(_, _))
+            .WillOnce(Return(OkChat(R"({"0":{"entities":[],"summary":"retry zero","score":0.8}})")));
+        EXPECT_CALL(*mock, Chat(_, _))
+            .WillOnce(Return(OkChat(R"({"0":{"entities":[],"summary":"retry one","score":0.7}})")));
+    }
+
+    DocumentMetadata meta;
+    auto cfg = LlmCfg();
+    cfg.batch_size = 2;
+    LlmEnricher enr(cfg, mock);
+    auto results = enr.EnrichBatch(Batch(meta, 2));
+
+    ASSERT_EQ(results.size(), 2u);
+    EXPECT_TRUE(results[0].ok());
+    EXPECT_TRUE(results[1].ok());
+    EXPECT_EQ(results[0].summary, "retry zero");
+    EXPECT_EQ(results[1].summary, "retry one");
+    EXPECT_FLOAT_EQ(results[0].enriched_score, 0.8f);
+    EXPECT_FLOAT_EQ(results[1].enriched_score, 0.7f);
+}
+
+TEST(LlmEnricherTest, RetriesMissingChunkIndexBySingleChunk) {
+    auto mock = std::make_shared<llm::MockLlmClient>();
+    {
+        InSequence seq;
+        EXPECT_CALL(*mock, Chat(_, _))
+            .WillOnce(Return(OkChat(
+                R"({"0":{"entities":[],"summary":"first pass zero","score":0.6}})")));
+        EXPECT_CALL(*mock, Chat(_, _))
+            .WillOnce(Return(OkChat(
+                R"({"0":{"entities":[],"summary":"retried missing one","score":0.5}})")));
+    }
+
+    DocumentMetadata meta;
+    auto cfg = LlmCfg();
+    cfg.batch_size = 2;
+    LlmEnricher enr(cfg, mock);
+    auto results = enr.EnrichBatch(Batch(meta, 2));
+
+    ASSERT_EQ(results.size(), 2u);
+    EXPECT_TRUE(results[0].ok());
+    EXPECT_TRUE(results[1].ok());
+    EXPECT_EQ(results[0].summary, "first pass zero");
+    EXPECT_EQ(results[1].summary, "retried missing one");
+    EXPECT_FLOAT_EQ(results[0].enriched_score, 0.6f);
+    EXPECT_FLOAT_EQ(results[1].enriched_score, 0.5f);
 }
 
 // Factory: kLlm + api_key + probe-OK builds an LlmEnricher (uses the S4.2 probe

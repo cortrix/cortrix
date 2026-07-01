@@ -15,6 +15,7 @@ ResultItem ToResultItem(const RankedChunk& rc,
     item.parent_content = rc.parent_text;
     item.score = rc.score;
     item.rerank_score = rc.rerank_score;
+    item.score_signals = rc.score_signals;
     item.content_hash = content_hash_str;
     item.metadata = rc.metadata;
     return item;

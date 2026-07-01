@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "cortrix/common/result.h"
+#include "cortrix/common/score_signals.h"
 
 namespace cortrix::store {
 
@@ -13,6 +14,7 @@ struct ChunkRecord {
     std::string parent_id;    ///< doc-level parent block id
     std::string content;      ///< chunk text
     std::int32_t chunk_index = 0;  ///< chunk order within the doc (F34 parent-child mapping)
+    ScoreSignals score_signals;   ///< optional F03/F07 query-time scoring signals
 };
 
 /// Child-level chunk content reverse-lookup interface (scaffolding D2-pre-8,

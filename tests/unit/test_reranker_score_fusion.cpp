@@ -6,12 +6,13 @@
 //       high rerank / low RRF can be re-ordered past / behind one with low rerank /
 //       high RRF, and the RRF component can flip the rerank-only order.
 //
-// The fused score is local sort-use only — RankedChunk fields are unchanged.
+// The fused score is the query-time final score carried in RankedChunk::score.
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "cortrix/reranker/onnx_reranker.h"
@@ -41,6 +42,24 @@ auto AllPresentGetBatch() {
             rec.child_id = id;
             rec.parent_id = "doc_1";
             rec.content = "text for " + id;
+            out.push_back(rec);
+        }
+        return out;
+    };
+}
+
+auto GetBatchWithSignals(std::map<std::string, ScoreSignals> signals_by_id) {
+    return [signals_by_id = std::move(signals_by_id)](
+               const std::vector<std::string>& ids, std::vector<std::string>* missing) {
+        if (missing) missing->clear();
+        std::vector<store::ChunkRecord> out;
+        for (const auto& id : ids) {
+            store::ChunkRecord rec;
+            rec.child_id = id;
+            rec.parent_id = "doc_1";
+            rec.content = "text for " + id;
+            auto sig = signals_by_id.find(id);
+            if (sig != signals_by_id.end()) rec.score_signals = sig->second;
             out.push_back(rec);
         }
         return out;
@@ -77,7 +96,7 @@ TEST(RerankerScoreFusionTest, WeightsAreV1Contract) {
 
 TEST(RerankerScoreFusionTest, ComputeRerankRrfScoreIsWeightedSum) {
     RerankerScoreFusion fusion;
-    RankedChunk chunk;  // unused by V1 fusion
+    RankedChunk chunk;  // no F03/F07 signals
     // 0.8*0.7 + 0.4*0.3 = 0.56 + 0.12 = 0.68
     EXPECT_FLOAT_EQ(fusion.ComputeRerankRrfScore(0.8f, 0.4f, chunk, "q"), 0.68f);
     // boundary: both 1 → 1; both 0 → 0.
@@ -86,6 +105,32 @@ TEST(RerankerScoreFusionTest, ComputeRerankRrfScoreIsWeightedSum) {
     // pure-rerank (rrf=0) and pure-rrf (rerank=0) reduce to the single weight.
     EXPECT_FLOAT_EQ(fusion.ComputeRerankRrfScore(1.0f, 0.0f, chunk, "q"), 0.7f);
     EXPECT_FLOAT_EQ(fusion.ComputeRerankRrfScore(0.0f, 1.0f, chunk, "q"), 0.3f);
+}
+
+TEST(RerankerScoreFusionTest, ScoreSignalsApplyF07MultiplierAfterBaseFusion) {
+    RerankerScoreFusion fusion;
+    RankedChunk chunk;
+    chunk.score_signals.semantic_score = 1.0f;
+
+    // base = 0.8*0.7 + 0.4*0.3 = 0.68; semantic=1.0 => multiplier 1.1.
+    EXPECT_NEAR(fusion.ComputeRerankRrfScore(0.8f, 0.4f, chunk, "q"), 0.748f, 1e-6f);
+
+    // enriched_score wins over semantic_score when both are present.
+    chunk.score_signals.enriched_score = 0.8f;
+    EXPECT_NEAR(fusion.ComputeRerankRrfScore(0.8f, 0.4f, chunk, "q"),
+                0.68f * 1.06f, 1e-6f);
+}
+
+TEST(RerankerScoreFusionTest, AnomalySentinelOverridesEnrichedScore) {
+    RerankerScoreFusion fusion;
+    RankedChunk chunk;
+    chunk.score_signals.enriched_score = 0.8f;
+    chunk.score_signals.semantic_score = 0.0f;  // F07 persisted anomaly sentinel
+
+    // base = 0.8*0.7 + 0.4*0.3 = 0.68. Anomaly priority forces effective=0.0
+    // and multiplier=0.9; enriched=0.8 must not re-boost the block to 1.06x.
+    EXPECT_NEAR(fusion.ComputeRerankRrfScore(0.8f, 0.4f, chunk, "q"),
+                0.68f * 0.9f, 1e-6f);
 }
 
 // ---- (2) Rerank sorts by the FUSED score ----------------------------------
@@ -109,11 +154,11 @@ TEST(RerankerScoreFusionTest, RerankRanksByFusedScoreNotRawRrf) {
     ASSERT_EQ(ranked.size(), 2u);
     EXPECT_EQ(ranked[0].child_id, "01CHILDA");  // fused 0.63 > 0.37
     EXPECT_EQ(ranked[1].child_id, "01CHILDB");
-    // RankedChunk fields unchanged: raw rerank_score + pre-rerank RRF score kept.
+    // RankedChunk carries raw rerank_score plus final fused score.
     EXPECT_FLOAT_EQ(ranked[0].rerank_score, 0.90f);
-    EXPECT_FLOAT_EQ(ranked[0].score, 0.0f);
+    EXPECT_FLOAT_EQ(ranked[0].score, 0.63f);
     EXPECT_FLOAT_EQ(ranked[1].rerank_score, 0.10f);
-    EXPECT_FLOAT_EQ(ranked[1].score, 1.0f);
+    EXPECT_FLOAT_EQ(ranked[1].score, 0.37f);
 }
 
 // RRF component FLIPS a rerank-only order:
@@ -137,6 +182,8 @@ TEST(RerankerScoreFusionTest, RrfComponentCanFlipRerankOnlyOrder) {
     EXPECT_EQ(ranked[1].child_id, "01CHILDP");
     // The winner has the LOWER raw rerank_score → proves sort is by fused score.
     EXPECT_LT(ranked[0].rerank_score, ranked[1].rerank_score);
+    EXPECT_FLOAT_EQ(ranked[0].score, 0.58f);
+    EXPECT_FLOAT_EQ(ranked[1].score, 0.35f);
 }
 
 // Stable on ties: equal fused scores preserve input order.
@@ -155,6 +202,30 @@ TEST(RerankerScoreFusionTest, EqualFusedScoresPreserveInputOrder) {
     ASSERT_EQ(ranked.size(), 2u);
     EXPECT_EQ(ranked[0].child_id, "01CHILD1");  // tie → input order kept
     EXPECT_EQ(ranked[1].child_id, "01CHILD2");
+    EXPECT_FLOAT_EQ(ranked[0].score, 0.5f);
+    EXPECT_FLOAT_EQ(ranked[1].score, 0.5f);
+}
+
+TEST(RerankerScoreFusionTest, ScoreSignalsCanChangeFinalRerankOrder) {
+    store::MockChunkStore store;
+    ScoreSignals boosted;
+    boosted.semantic_score = 1.0f;
+    EXPECT_CALL(store, GetBatch(_, _))
+        .WillOnce(GetBatchWithSignals({{"01CHILDA", boosted}}));
+
+    ScriptedReranker r(StubConfig(), &store,
+                       {{"01CHILDA", 0.50f}, {"01CHILDB", 0.60f}});
+    ASSERT_TRUE(r.Init().ok());
+
+    std::vector<ScoredResult> cands{{"01CHILDA", 0.5f}, {"01CHILDB", 0.33333334f}};
+    auto ranked = r.Rerank(cands, "q");
+
+    ASSERT_EQ(ranked.size(), 2u);
+    EXPECT_EQ(ranked[0].child_id, "01CHILDA");
+    EXPECT_EQ(ranked[1].child_id, "01CHILDB");
+    EXPECT_NEAR(ranked[0].score, 0.55f, 1e-6f);
+    EXPECT_NEAR(ranked[1].score, 0.52f, 1e-6f);
+    EXPECT_TRUE(ranked[0].score_signals.semantic_score.has_value());
 }
 
 }  // namespace

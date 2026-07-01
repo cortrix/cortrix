@@ -23,8 +23,8 @@ public:
             retrieval::RankedChunk c;
             c.child_id = ns_id + "_c" + std::to_string(i);
             c.chunk_text = ns_id + " chunk " + std::to_string(i);
-            c.score = 0.5f;
             c.rerank_score = 0.9f - 0.01f * static_cast<float>(i);  // descending
+            c.score = c.rerank_score;
             r.chunks.push_back(std::move(c));
         }
         return r;
@@ -76,8 +76,8 @@ public:
         retrieval::RankedChunk c;
         c.child_id = ns_id + "_dup";
         c.chunk_text = content;  // identical text across NS → identical content_hash
-        c.score = 0.5f;
         c.rerank_score = rerank_score;
+        c.score = c.rerank_score;
         r.chunks.push_back(std::move(c));
         return r;
     }
@@ -94,8 +94,8 @@ public:
             retrieval::RankedChunk c;
             c.child_id = ns_id + "_s" + std::to_string(i++);
             c.chunk_text = ns_id + " score " + std::to_string(s);
-            c.score = 0.5f;
             c.rerank_score = s;
+            c.score = c.rerank_score;
             r.chunks.push_back(std::move(c));
         }
         return r;

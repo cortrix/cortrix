@@ -49,6 +49,21 @@ TEST(CrossNsResponseTest, ResultItemUsesStringChildId) {
     }
     EXPECT_EQ(item["namespace"], "ns_a");
     EXPECT_EQ(item["content_hash"], "sha256:00000000000000000000000000000000");
+    EXPECT_FALSE(item.contains("score_signals"));
+}
+
+TEST(CrossNsResponseTest, ResultItemSerializesScoreSignalsWhenPresent) {
+    CrossNsResponse resp;
+    auto item = MakeItem("01HSIGNAL", "ns_a", 0.9f);
+    item.score_signals.enriched_score = 0.8f;
+    item.score_signals.semantic_score = 1.0f;
+    resp.results.push_back(item);
+
+    auto j = resp.ToJson();
+    const auto& signals = j["results"][0]["score_signals"];
+    ASSERT_TRUE(signals.is_object());
+    EXPECT_FLOAT_EQ(signals["enriched_score"].get<float>(), 0.8f);
+    EXPECT_FLOAT_EQ(signals["semantic_score"].get<float>(), 1.0f);
 }
 
 // meta serializes exactly the 8 A/C-class fields (§2.5 / Issue 3.5 v1.0.2).
@@ -155,7 +170,7 @@ TEST(CrossNsResponseTest, DeduplicatedChunkEntryShape) {
     DeduplicatedChunkInfo d;
     d.content_hash = "sha256:abc";
     d.primary_namespace = "ns_a";
-    d.namespaces = {{"ns_a", 0.92f}, {"ns_b", 0.85f}};
+    d.namespaces = {{"ns_a", 0.92f, 0.91f}, {"ns_b", 0.85f, 0.84f}};
     meta.deduplicated_chunks.push_back(d);
     meta.deduplicated_chunks_count = 1;
 
@@ -166,7 +181,8 @@ TEST(CrossNsResponseTest, DeduplicatedChunkEntryShape) {
     EXPECT_EQ(dj["primary_namespace"], "ns_a");
     ASSERT_EQ(dj["namespaces"].size(), 2u);
     EXPECT_EQ(dj["namespaces"][0]["namespace"], "ns_a");
-    EXPECT_FLOAT_EQ(dj["namespaces"][0]["rerank_score"].get<float>(), 0.92f);
+    EXPECT_FLOAT_EQ(dj["namespaces"][0]["score"].get<float>(), 0.92f);
+    EXPECT_FLOAT_EQ(dj["namespaces"][0]["rerank_score"].get<float>(), 0.91f);
     EXPECT_EQ(j["deduplicated_chunks_count"], 1);
 }
 
@@ -193,6 +209,7 @@ TEST(CrossNsResponseTest, ToResultItemMapsRankedChunk) {
     rc.parent_text = "parent";
     rc.score = 0.4f;
     rc.rerank_score = 0.88f;
+    rc.score_signals.enriched_score = 0.75f;
     rc.metadata = {{"k", "v"}};
 
     auto it = retrieval::ToResultItem(rc, "ns_x", "sha256:deadbeef");
@@ -201,6 +218,8 @@ TEST(CrossNsResponseTest, ToResultItemMapsRankedChunk) {
     EXPECT_EQ(it.content, "hello");
     EXPECT_EQ(it.parent_content, "parent");
     EXPECT_FLOAT_EQ(it.rerank_score, 0.88f);
+    ASSERT_TRUE(it.score_signals.enriched_score.has_value());
+    EXPECT_FLOAT_EQ(*it.score_signals.enriched_score, 0.75f);
     EXPECT_EQ(it.content_hash, "sha256:deadbeef");
     EXPECT_EQ(it.metadata.at("k"), "v");
 }

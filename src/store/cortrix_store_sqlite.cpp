@@ -38,6 +38,25 @@ std::string ColText(sqlite3_stmt* stmt, int col) {
     return t ? std::string(t) : std::string();
 }
 
+bool ColumnExists(sqlite3* db, const char* table, const char* column) {
+    if (db == nullptr) return false;
+    const std::string sql = "PRAGMA table_info(" + std::string(table) + ")";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        return false;
+    }
+    bool exists = false;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        const unsigned char* name = sqlite3_column_text(stmt, 1);
+        if (name != nullptr && std::string(reinterpret_cast<const char*>(name)) == column) {
+            exists = true;
+            break;
+        }
+    }
+    sqlite3_finalize(stmt);
+    return exists;
+}
+
 void ReadDocFromStmt(sqlite3_stmt* stmt, CortrixDoc& doc) {
     doc.doc_id           = ColText(stmt, 0);
     doc.source_type      = ColText(stmt, 1);
@@ -230,6 +249,50 @@ int CortrixStoreSqlite::Close() {
 // inside the per-NS F25 write (same discipline as the §9.4 rollback callback, which
 // also captures and uses the bare handle); returning the pointer races with nothing.
 sqlite3* CortrixStoreSqlite::db_handle() { return db_; }
+
+void CortrixStoreSqlite::EnsureScoreColumnCacheLocked() {
+    if (score_columns_checked_) return;
+    has_enriched_score_ = ColumnExists(db_, "blocks", "enriched_score");
+    has_semantic_score_ = ColumnExists(db_, "blocks", "semantic_score");
+    score_columns_checked_ = true;
+}
+
+ScoreSignals CortrixStoreSqlite::LoadBlockScoreSignalsLocked(uint64_t block_id) {
+    ScoreSignals signals;
+    EnsureScoreColumnCacheLocked();
+    if (db_ == nullptr || (!has_enriched_score_ && !has_semantic_score_)) return signals;
+
+    std::string cols;
+    if (has_enriched_score_) cols += "enriched_score";
+    if (has_semantic_score_) {
+        if (!cols.empty()) cols += ", ";
+        cols += "semantic_score";
+    }
+
+    const std::string sql = "SELECT " + cols + " FROM blocks WHERE block_id = ?1 LIMIT 1";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        return signals;
+    }
+    sqlite3_bind_int64(stmt, 1, id::ToSqliteInt(block_id));
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        int col = 0;
+        if (has_enriched_score_) {
+            if (sqlite3_column_type(stmt, col) != SQLITE_NULL) {
+                signals.enriched_score = static_cast<float>(sqlite3_column_double(stmt, col));
+            }
+            ++col;
+        }
+        if (has_semantic_score_) {
+            if (sqlite3_column_type(stmt, col) != SQLITE_NULL) {
+                signals.semantic_score = static_cast<float>(sqlite3_column_double(stmt, col));
+            }
+            ++col;
+        }
+    }
+    sqlite3_finalize(stmt);
+    return signals;
+}
 
 int CortrixStoreSqlite::ExecutePragma() {
     const char* pragmas[] = {
@@ -929,6 +992,7 @@ int CortrixStoreSqlite::block_get(uint64_t block_id, CortrixBlock& block) {
         block.metadata_json = ColText(stmt, 13);
 
         sqlite3_finalize(stmt);
+        block.score_signals = LoadBlockScoreSignalsLocked(block.block_id);
         return 0;
     }
 
@@ -994,6 +1058,9 @@ int CortrixStoreSqlite::block_get_by_doc(const std::string& doc_id,
     }
 
     sqlite3_finalize(stmt);
+    for (auto& b : out) {
+        b.score_signals = LoadBlockScoreSignalsLocked(b.block_id);
+    }
     return 0;
 }
 

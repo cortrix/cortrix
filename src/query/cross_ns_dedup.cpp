@@ -11,7 +11,7 @@ using retrieval::ResultItem;
 
 int DedupeByContentHash(std::vector<ResultItem>& items, CrossNsMeta& meta) {
     // Group the indices of every item by its content_hash, preserving the order in
-    // which each *distinct* hash first appears (so a rerank_score-sorted input keeps
+    // which each *distinct* hash first appears (so a final-score-sorted input keeps
     // its order through the dedup). Empty-hash items are never grouped — a missing
     // hash must not merge unrelated chunks — so each gets its own singleton bucket.
     std::unordered_map<std::string, std::size_t> hash_to_group;  // hash → groups[] idx
@@ -43,16 +43,16 @@ int DedupeByContentHash(std::vector<ResultItem>& items, CrossNsMeta& meta) {
             continue;
         }
 
-        // Multi-NS hit on one content_hash. primary = highest rerank_score source
+        // Multi-NS hit on one content_hash. primary = highest final score source
         // (§3.3.1); ties resolve to the earliest occurrence (stable).
         std::size_t primary_idx = group[0];
         for (std::size_t k = 1; k < group.size(); ++k) {
-            if (items[group[k]].rerank_score > items[primary_idx].rerank_score) {
+            if (items[group[k]].score > items[primary_idx].score) {
                 primary_idx = group[k];
             }
         }
 
-        // brief multi-source entry (§2.5): content_hash + primary NS + (NS, rerank_score) per
+        // brief multi-source entry (§2.5): content_hash + primary NS + scores per
         // source, in the items' encounter order so it is deterministic.
         DeduplicatedChunkInfo info;
         info.content_hash = items[primary_idx].content_hash;
@@ -61,6 +61,7 @@ int DedupeByContentHash(std::vector<ResultItem>& items, CrossNsMeta& meta) {
         for (std::size_t idx : group) {
             DedupSourceNs src;
             src.namespace_id = items[idx].namespace_id;
+            src.score = items[idx].score;
             src.rerank_score = items[idx].rerank_score;
             info.namespaces.push_back(std::move(src));
         }

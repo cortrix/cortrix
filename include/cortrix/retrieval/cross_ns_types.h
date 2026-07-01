@@ -45,11 +45,12 @@ struct NamespaceQueryResult {
 struct ResultItem {
     ChildId     child_id;              ///< ★ primary identifier (V5 ruling #6A)
     ParentId    parent_id;             ///< ★ primary identifier (V5 ruling #6A)
-    std::string namespace_id;          ///< primary NS (highest rerank_score source)
+    std::string namespace_id;          ///< primary NS (highest final-score source)
     std::string content;               ///< ≅ RankedChunk.chunk_text
     std::string parent_content;        ///< ≅ RankedChunk.parent_text
     float       score = 0.0f;          ///< fused final_score (F07-5 SemanticScorer output)
     float       rerank_score = 0.0f;   ///< primary NS cross-encoder score
+    ScoreSignals score_signals;        ///< optional F03/F07 signals used for score
     std::string content_hash;          ///< "sha256:<32-hex>" (§6 unified representation)
     std::map<std::string, std::string> metadata;  ///< primary NS full metadata
 };

@@ -20,8 +20,9 @@ namespace cortrix::retrieval {
 namespace {
 
 RankedChunk Chunk(const std::string& id, float score, const std::string& text = "t") {
-    // RankedChunk{child_id, chunk_text, parent_text, score, rerank_score, metadata}
-    return RankedChunk{id, text, "p", score, 0.0f, {}};
+    // RankedChunk{child_id, chunk_text, parent_text, score, rerank_score,
+    //             score_signals, metadata}
+    return RankedChunk{id, text, "p", score, 0.0f, {}, {}};
 }
 
 // A backend that always throws → exercises the L3 retry/degrade path.

@@ -41,21 +41,18 @@ struct HttpResponse {
 /// request + parses the response (fully unit-testable); the raw byte round-trip
 /// goes through this interface so:
 ///   - downstream features (F35/F38/F41/F15/MEM02/F36) + F03 tests inject a fake;
-///   - D3.5 swaps in the real network transport against a live endpoint.
+///   - runtime wiring uses the default network transport against a live endpoint.
 ///
-/// 🔌 D3.5 deferred wiring: the DefaultHttpTransport below is HTTP-capable via
-/// cpp-httplib; HTTPS to api.openai.com needs CPPHTTPLIB_OPENSSL_SUPPORT enabled
-/// in the build (a shared-dependency decision deferred to D3.5). Standalone tests
-/// never touch the network.
+/// The project build enables cpp-httplib's OpenSSL support so HTTPS endpoints
+/// are available at runtime. Standalone tests never touch the network.
 class IHttpTransport {
 public:
     virtual ~IHttpTransport() = default;
     virtual HttpResponse Send(const HttpRequest& request) = 0;
 };
 
-/// Default transport (S2.1) backed by cpp-httplib. HTTP works now; HTTPS is a
-/// D3.5 build-flag concern (see above). Returns network_ok=false on any
-/// transport-level failure so the client maps it to CX_ERR_ENRICHER_LLM_API.
+/// Default transport (S2.1) backed by cpp-httplib. Returns network_ok=false on
+/// any transport-level failure so the client maps it to CX_ERR_ENRICHER_LLM_API.
 std::unique_ptr<IHttpTransport> MakeDefaultHttpTransport();
 
 }  // namespace cortrix::llm

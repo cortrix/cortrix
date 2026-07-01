@@ -21,7 +21,7 @@ namespace cortrix::retrieval {
 namespace {
 
 RankedChunk Chunk(const std::string& id, float score) {
-    return RankedChunk{id, "t", "p", score, 0.0f, {}};
+    return RankedChunk{id, "t", "p", score, 0.0f, {}, {}};
 }
 
 class CragContextTest : public ::testing::Test {

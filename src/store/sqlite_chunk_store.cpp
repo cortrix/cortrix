@@ -2,6 +2,8 @@
 
 #include <sqlite3.h>
 
+#include <string>
+
 #include "cortrix/store/store_errors.h"
 
 namespace cortrix::store {
@@ -13,7 +15,33 @@ namespace {
 // reverse-lookup needs no F09 blob deserialization (A unified blocks, F02 §2.1-bis).
 constexpr const char* kChildCols = "child_id, parent_id, content_text, chunk_index";
 
-ChunkRecord ReadChunkRow(sqlite3_stmt* st) {
+bool ColumnExists(sqlite3* db, const char* table, const char* column) {
+    if (db == nullptr) return false;
+    const std::string sql = "PRAGMA table_info(" + std::string(table) + ")";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
+        return false;
+    }
+    bool exists = false;
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        const unsigned char* name = sqlite3_column_text(st, 1);
+        if (name != nullptr && std::string(reinterpret_cast<const char*>(name)) == column) {
+            exists = true;
+            break;
+        }
+    }
+    sqlite3_finalize(st);
+    return exists;
+}
+
+std::string SelectCols(bool has_enriched_score, bool has_semantic_score) {
+    std::string cols = kChildCols;
+    if (has_enriched_score) cols += ", enriched_score";
+    if (has_semantic_score) cols += ", semantic_score";
+    return cols;
+}
+
+ChunkRecord ReadChunkRow(sqlite3_stmt* st, bool has_enriched_score, bool has_semantic_score) {
     ChunkRecord r;
     auto col_text = [&](int i) -> std::string {
         const unsigned char* t = sqlite3_column_text(st, i);
@@ -23,6 +51,21 @@ ChunkRecord ReadChunkRow(sqlite3_stmt* st) {
     r.parent_id = col_text(1);
     r.content = col_text(2);
     r.chunk_index = sqlite3_column_int(st, 3);
+    int col = 4;
+    if (has_enriched_score) {
+        if (sqlite3_column_type(st, col) != SQLITE_NULL) {
+            r.score_signals.enriched_score =
+                static_cast<float>(sqlite3_column_double(st, col));
+        }
+        ++col;
+    }
+    if (has_semantic_score) {
+        if (sqlite3_column_type(st, col) != SQLITE_NULL) {
+            r.score_signals.semantic_score =
+                static_cast<float>(sqlite3_column_double(st, col));
+        }
+        ++col;
+    }
     return r;
 }
 
@@ -30,14 +73,23 @@ ChunkRecord ReadChunkRow(sqlite3_stmt* st) {
 
 SqliteChunkStore::SqliteChunkStore(sqlite3* db) : db_(db) {}
 
+void SqliteChunkStore::EnsureScoreColumnCacheLocked() {
+    if (score_columns_checked_) return;
+    has_enriched_score_ = ColumnExists(db_, "blocks", "enriched_score");
+    has_semantic_score_ = ColumnExists(db_, "blocks", "semantic_score");
+    score_columns_checked_ = true;
+}
+
 Result<ChunkRecord> SqliteChunkStore::Get(const std::string& child_id) {
     std::lock_guard<std::mutex> lock(mu_);
     if (!db_) {
         return StoreStatus(StatusCode::kInternal, store_errors::kDbError,
                            "chunk store: null db handle");
     }
+    EnsureScoreColumnCacheLocked();
     const std::string sql =
-        std::string("SELECT ") + kChildCols + " FROM blocks WHERE child_id = ?1";
+        std::string("SELECT ") + SelectCols(has_enriched_score_, has_semantic_score_) +
+        " FROM blocks WHERE child_id = ?1";
     sqlite3_stmt* st = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
         return StoreStatus(StatusCode::kInternal, store_errors::kDbError,
@@ -46,7 +98,7 @@ Result<ChunkRecord> SqliteChunkStore::Get(const std::string& child_id) {
     sqlite3_bind_text(st, 1, child_id.c_str(), -1, SQLITE_TRANSIENT);
     int rc = sqlite3_step(st);
     if (rc == SQLITE_ROW) {
-        ChunkRecord r = ReadChunkRow(st);
+        ChunkRecord r = ReadChunkRow(st, has_enriched_score_, has_semantic_score_);
         sqlite3_finalize(st);
         return r;
     }
@@ -71,9 +123,11 @@ std::vector<ChunkRecord> SqliteChunkStore::GetBatch(
         }
     };
     if (!db_) { all_missing(); return out; }
+    EnsureScoreColumnCacheLocked();
 
     const std::string sql =
-        std::string("SELECT ") + kChildCols + " FROM blocks WHERE child_id = ?1";
+        std::string("SELECT ") + SelectCols(has_enriched_score_, has_semantic_score_) +
+        " FROM blocks WHERE child_id = ?1";
     sqlite3_stmt* st = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
         all_missing();
@@ -84,7 +138,7 @@ std::vector<ChunkRecord> SqliteChunkStore::GetBatch(
         sqlite3_bind_text(st, 1, cid.c_str(), -1, SQLITE_TRANSIENT);
         int rc = sqlite3_step(st);
         if (rc == SQLITE_ROW) {
-            out.push_back(ReadChunkRow(st));
+            out.push_back(ReadChunkRow(st, has_enriched_score_, has_semantic_score_));
         } else if (missing_ids) {
             missing_ids->push_back(cid);
         }
@@ -98,8 +152,10 @@ std::vector<ChunkRecord> SqliteChunkStore::GetChunksByDocId(const std::string& d
     std::lock_guard<std::mutex> lock(mu_);
     std::vector<ChunkRecord> out;
     if (!db_) return out;
+    EnsureScoreColumnCacheLocked();
 
-    const std::string sql = std::string("SELECT ") + kChildCols +
+    const std::string sql = std::string("SELECT ") +
+        SelectCols(has_enriched_score_, has_semantic_score_) +
         " FROM blocks WHERE doc_id = ?1 AND child_id IS NOT NULL ORDER BY chunk_index ASC";
     sqlite3_stmt* st = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
@@ -107,7 +163,7 @@ std::vector<ChunkRecord> SqliteChunkStore::GetChunksByDocId(const std::string& d
     }
     sqlite3_bind_text(st, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
     while (sqlite3_step(st) == SQLITE_ROW) {
-        out.push_back(ReadChunkRow(st));
+        out.push_back(ReadChunkRow(st, has_enriched_score_, has_semantic_score_));
     }
     sqlite3_finalize(st);
     return out;

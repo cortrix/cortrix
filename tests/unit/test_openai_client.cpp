@@ -21,6 +21,7 @@ TEST(LlmConfigTest, Defaults) {
     LlmCallConfig call;
     EXPECT_EQ(call.temperature, 0.0);
     EXPECT_EQ(call.max_tokens, 1024);
+    EXPECT_EQ(call.thinking_type, "");
 
     LlmClientConfig client;
     EXPECT_EQ(client.default_model, "gpt-4o-mini");
@@ -61,6 +62,7 @@ TEST(OpenAiLlmClientTest, BuildsOpenAiRequestShape) {
     LlmCallConfig call;
     call.model = "gpt-4o-mini";
     call.response_format = "json_object";
+    call.thinking_type = "disabled";
     auto resp = cf.client->Chat("summarize this", call);
 
     ASSERT_TRUE(resp.ok());
@@ -73,6 +75,7 @@ TEST(OpenAiLlmClientTest, BuildsOpenAiRequestShape) {
     EXPECT_EQ(body["messages"][0]["role"], "user");
     EXPECT_EQ(body["messages"][0]["content"], "summarize this");
     EXPECT_EQ(body["response_format"]["type"], "json_object");
+    EXPECT_EQ(body["thinking"]["type"], "disabled");
 }
 
 TEST(OpenAiLlmClientTest, ParsesContentAndUsage) {
@@ -87,6 +90,57 @@ TEST(OpenAiLlmClientTest, ParsesContentAndUsage) {
     EXPECT_EQ(resp.model, "gpt-4o-mini");
     EXPECT_EQ(resp.prompt_tokens, 11);
     EXPECT_EQ(resp.completion_tokens, 7);
+    EXPECT_EQ(resp.content_source, "message.content");
+    EXPECT_EQ(resp.content_length, 10);
+    EXPECT_EQ(resp.reasoning_content_length, 0);
+}
+
+TEST(OpenAiLlmClientTest, FallsBackToReasoningContentWhenContentEmpty) {
+    auto cf = MakeClient();
+    cf.fake->canned = FakeHttpTransport::Json2xx(
+        R"({"choices":[{"message":{"content":"","reasoning_content":"{\"ok\":true}"},"finish_reason":"length"}],
+            "model":"glm-5.2","usage":{"prompt_tokens":"11","completion_tokens":"7"}})");
+    auto resp = cf.client->Chat("q", LlmCallConfig{});
+    ASSERT_TRUE(resp.ok());
+    EXPECT_EQ(resp.content, R"({"ok":true})");
+    EXPECT_EQ(resp.content_source, "message.reasoning_content");
+    EXPECT_EQ(resp.finish_reason, "length");
+    EXPECT_EQ(resp.model, "glm-5.2");
+    EXPECT_EQ(resp.prompt_tokens, 11);
+    EXPECT_EQ(resp.completion_tokens, 7);
+    EXPECT_EQ(resp.content_length, 11);
+    EXPECT_EQ(resp.reasoning_content_length, 11);
+}
+
+TEST(OpenAiLlmClientTest, CanDisableReasoningContentFallback) {
+    auto cf = MakeClient();
+    cf.fake->canned = FakeHttpTransport::Json2xx(
+        R"({"choices":[{"message":{"content":"","reasoning_content":"scratch output"},"finish_reason":"length"}],
+            "model":"deepseek-v4-flash","usage":{"prompt_tokens":11,"completion_tokens":7}})");
+    LlmCallConfig call;
+    call.allow_reasoning_content_fallback = false;
+
+    auto resp = cf.client->Chat("q", call);
+
+    ASSERT_TRUE(resp.ok());
+    EXPECT_EQ(resp.content, "");
+    EXPECT_EQ(resp.content_source, "message.content");
+    EXPECT_EQ(resp.finish_reason, "length");
+    EXPECT_EQ(resp.model, "deepseek-v4-flash");
+    EXPECT_EQ(resp.content_length, 0);
+    EXPECT_EQ(resp.reasoning_content_length, 14);
+}
+
+TEST(OpenAiLlmClientTest, PrefersMessageContentOverReasoningContent) {
+    auto cf = MakeClient();
+    cf.fake->canned = FakeHttpTransport::Json2xx(
+        R"({"choices":[{"message":{"content":"final","reasoning_content":"scratch"},"finish_reason":"stop"}]})");
+    auto resp = cf.client->Chat("q", LlmCallConfig{});
+    ASSERT_TRUE(resp.ok());
+    EXPECT_EQ(resp.content, "final");
+    EXPECT_EQ(resp.content_source, "message.content");
+    EXPECT_EQ(resp.content_length, 5);
+    EXPECT_EQ(resp.reasoning_content_length, 7);
 }
 
 TEST(OpenAiLlmClientTest, NetworkFailureIsUnavailableTransportToken) {
@@ -106,6 +160,33 @@ TEST(OpenAiLlmClientTest, NetworkFailureIncludesTransportDetailWhenPresent) {
     EXPECT_FALSE(resp.ok());
     EXPECT_EQ(resp.status.code(), StatusCode::kUnavailable);
     EXPECT_NE(resp.status.message().find("Could not establish connection"), std::string::npos);
+}
+
+TEST(OpenAiLlmClientTest, RetriesTransportFailureThenParsesSuccess) {
+    LlmClientConfig cfg;
+    cfg.endpoint = "https://api.example.com/v1";
+    cfg.api_key = "sk-test";
+    cfg.max_retries = 2;
+    auto cf = MakeClient(cfg);
+    int calls = 0;
+    cf.fake->responder = [&calls](const HttpRequest&) {
+        ++calls;
+        if (calls == 1) {
+            HttpResponse failed = FakeHttpTransport::NetworkFail();
+            failed.transport_error = "SSL connection failed";
+            return failed;
+        }
+        return FakeHttpTransport::Json2xx(
+            R"({"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}],
+                "usage":{"prompt_tokens":1,"completion_tokens":1}})");
+    };
+
+    auto resp = cf.client->Chat("q", LlmCallConfig{});
+
+    ASSERT_TRUE(resp.ok());
+    EXPECT_EQ(resp.content, "ok");
+    EXPECT_EQ(calls, 2);
+    EXPECT_EQ(cf.fake->requests.size(), 2u);
 }
 
 TEST(OpenAiLlmClientTest, Http5xxIsUnavailableHttpToken) {

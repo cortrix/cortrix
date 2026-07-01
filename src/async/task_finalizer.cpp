@@ -1,9 +1,12 @@
 #include "cortrix/async/task_finalizer.h"
 
 #include <chrono>
+#include <sstream>
 
 #include "cortrix/async/f42_error.h"
 #include "cortrix/async/f42_metrics.h"
+
+#include <spdlog/spdlog.h>
 
 namespace cortrix::async {
 namespace {
@@ -11,6 +14,18 @@ namespace {
 double ElapsedSeconds(std::chrono::steady_clock::time_point t_start) {
     return std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start)
         .count();
+}
+
+std::string StructuredDataKeys(const nlohmann::json& structured_data) {
+    if (!structured_data.is_object()) return "<non-object>";
+    std::ostringstream os;
+    bool first = true;
+    for (auto it = structured_data.begin(); it != structured_data.end(); ++it) {
+        if (!first) os << ",";
+        first = false;
+        os << it.key();
+    }
+    return os.str();
 }
 
 }  // namespace
@@ -36,6 +51,11 @@ Status TaskFinalizer::Fail(const TaskInfo& task, const std::string& error_code,
     // Best-effort persist (mirrors DocumentProcessor: the business outcome is what the
     // returned Status reports; a Mark* DB failure is logged via the store layer).
     mgr_->MarkFailed(task.task_id, error_code, error_msg, structured_data.dump());
+    spdlog::warn(
+        "F42 TaskFinalizer: task failed task_id={} task_type={} namespace_id={} doc_id={} "
+        "error_code={} error_msg={} structured_data_keys={}",
+        task.task_id, task.task_type, task.namespace_id, task.doc_id, error_code,
+        error_msg, StructuredDataKeys(structured_data));
     const auto tt = static_cast<TaskType>(task.task_type);
     F42Metrics::Instance().RecordCompleted(tt, F42Metrics::CompletionStatus::kFailed);
     F42Metrics::Instance().ObserveDuration(tt, ElapsedSeconds(t_start));

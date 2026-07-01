@@ -1,10 +1,13 @@
 #include "cortrix/doc_summary/doc_summary_generator.h"
 
+#include <algorithm>
+#include <cctype>
 #include <sstream>
 #include <utility>
 
 #include <nlohmann/json.hpp>
 
+#include "cortrix/common/json_contract.h"
 #include "cortrix/common/i_global_config.h"
 #include "cortrix/doc_summary/doc_summary_error.h"
 #include "cortrix/doc_summary/doc_summary_metrics.h"
@@ -57,6 +60,101 @@ std::vector<std::string> ToStringArray(const json& node, const std::string& key)
     return out;
 }
 
+std::string TruncateForDiagnostics(const std::string& value, size_t max_bytes) {
+    if (value.size() <= max_bytes) return value;
+    return value.substr(0, max_bytes) + "...[truncated]";
+}
+
+json BuildLlmInvalidOutputDiagnostics(const llm::ChatCompletionResponse& resp,
+                                      const std::string& parse_error) {
+    return json{
+        {"raw_output_preview", TruncateForDiagnostics(resp.content, 4000)},
+        {"raw_output_length", resp.content.size()},
+        {"parse_error", parse_error},
+        {"llm_content_source", resp.content_source},
+        {"llm_model", resp.model},
+        {"llm_finish_reason", resp.finish_reason},
+        {"llm_content_length", resp.content_length},
+        {"llm_reasoning_content_length", resp.reasoning_content_length},
+        {"llm_prompt_tokens", resp.prompt_tokens},
+        {"llm_completion_tokens", resp.completion_tokens},
+    };
+}
+
+json BuildLlmTimeoutDiagnostics(const std::string& error_message) {
+    return json{
+        {"attempt_count", 1},
+        {"last_error_message", error_message},
+    };
+}
+
+std::string DescribeLlmResponseForError(const llm::ChatCompletionResponse& resp,
+                                        const std::string& parse_error) {
+    std::ostringstream os;
+    os << parse_error
+       << "; content_source=" << resp.content_source
+       << "; model=" << resp.model
+       << "; finish_reason=" << resp.finish_reason
+       << "; content_length=" << resp.content_length
+       << "; reasoning_content_length=" << resp.reasoning_content_length
+       << "; prompt_tokens=" << resp.prompt_tokens
+       << "; completion_tokens=" << resp.completion_tokens;
+    return os.str();
+}
+
+bool ModelPrefersJsonObjectResponseFormat(std::string model) {
+    std::transform(model.begin(), model.end(), model.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return model.find("deepseek") != std::string::npos;
+}
+
+bool ModelSupportsThinkingControl(std::string model) {
+    std::transform(model.begin(), model.end(), model.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return model.find("deepseek") != std::string::npos;
+}
+
+json StructuredDataForCode(DocSummaryErrorCode code,
+                           const json& diagnostics,
+                           const std::string& doc_id,
+                           const std::string& fallback_message) {
+    json sd = diagnostics.is_object() ? diagnostics : json::object();
+    sd["doc_id"] = doc_id;
+    switch (code) {
+        case DocSummaryErrorCode::kLlmTimeout:
+            if (!sd.contains("attempt_count")) sd["attempt_count"] = 1;
+            if (!sd.contains("last_error_message")) sd["last_error_message"] = fallback_message;
+            break;
+        case DocSummaryErrorCode::kLlmInvalidOutput:
+            if (!sd.contains("raw_output_preview")) sd["raw_output_preview"] = "";
+            if (!sd.contains("parse_error")) sd["parse_error"] = fallback_message;
+            break;
+        case DocSummaryErrorCode::kLlmBudgetExceeded:
+            if (!sd.contains("budget_remaining_usd")) sd["budget_remaining_usd"] = nullptr;
+            if (!sd.contains("budget_reset_at")) sd["budget_reset_at"] = nullptr;
+            break;
+        case DocSummaryErrorCode::kDocTooLarge:
+            if (!sd.contains("doc_size_bytes")) sd["doc_size_bytes"] = 0;
+            if (!sd.contains("max_allowed_bytes")) sd["max_allowed_bytes"] = 0;
+            break;
+        case DocSummaryErrorCode::kSchemaVersionMismatch:
+            if (!sd.contains("expected_version")) sd["expected_version"] = nullptr;
+            if (!sd.contains("actual_version")) sd["actual_version"] = nullptr;
+            break;
+        case DocSummaryErrorCode::kFallbackFailed:
+            if (!sd.contains("fallback_type")) sd["fallback_type"] = nullptr;
+            if (!sd.contains("error_message")) sd["error_message"] = fallback_message;
+            break;
+        case DocSummaryErrorCode::kFts5FallbackFailed:
+            if (!sd.contains("fts5_query")) sd["fts5_query"] = nullptr;
+            if (!sd.contains("error_message")) sd["error_message"] = fallback_message;
+            break;
+    }
+    return sd;
+}
+
 }  // namespace
 
 DocSummaryConfig ResolveDocSummaryConfig(const cortrix::IGlobalConfig* global) {
@@ -91,6 +189,8 @@ std::string DocSummaryGenerator::BuildPrompt(
     // §9.1 Phase-1 English template v1 (structured JSON output).
     std::ostringstream os;
     os << "System: You are a document summarizer for semantic search.\n"
+       << "Return only one valid JSON object. Do not include analysis, reasoning, "
+          "markdown fences, bullets, or explanatory text before or after the JSON.\n"
        << "User: Generate a summary of the following document with structured JSON "
           "output.\n\n"
        << "Requirements:\n"
@@ -125,6 +225,8 @@ std::string DocSummaryGenerator::BuildReducePrompt(
     // §9.2 Reduce stage — combine the Map partials into the final structured JSON.
     std::ostringstream os;
     os << "System: You are a document summarizer for semantic search.\n"
+       << "Return only one valid JSON object. Do not include analysis, reasoning, "
+          "markdown fences, bullets, or explanatory text before or after the JSON.\n"
        << "User: The following are section summaries of one document. Combine them "
           "into a single structured JSON summary of the whole document.\n\n"
        << "Requirements:\n"
@@ -144,7 +246,8 @@ std::string DocSummaryGenerator::BuildReducePrompt(
 
 Result<DocSummaryStructured> DocSummaryGenerator::ParseStructuredOutput(
     const std::string& llm_output, int max_chars) {
-    json root = json::parse(llm_output, /*cb=*/nullptr, /*allow_exceptions=*/false);
+    const std::string normalized_output = common::UnwrapCompleteJsonFence(llm_output);
+    json root = json::parse(normalized_output, /*cb=*/nullptr, /*allow_exceptions=*/false);
     if (root.is_discarded() || !root.is_object()) {
         return DocSummaryStatus(DocSummaryErrorCode::kLlmInvalidOutput,
                                 "output is not a JSON object");
@@ -166,27 +269,53 @@ Result<DocSummaryStructured> DocSummaryGenerator::ParseStructuredOutput(
 Result<DocSummaryStructured> DocSummaryGenerator::CallLlmStructured(
     const std::string& prompt) {
     auto& metrics = DocSummaryMetrics::Instance();
+    last_llm_failure_structured_data_ = json::object();
     if (llm_client_ == nullptr) {
+        last_llm_failure_structured_data_ = BuildLlmTimeoutDiagnostics("no LLM client");
         return DocSummaryStatus(DocSummaryErrorCode::kLlmTimeout, "no LLM client");
     }
     llm::LlmCallConfig call;
     call.model = config_.llm_model;
     call.temperature = 0.0;
-    call.response_format = "json_object";  // §9.1 structured output
+    call.max_tokens = 4096;
+    call.allow_reasoning_content_fallback = false;
+    // GLM-5.2's OpenAI-compatible JSON response_format can inject a conflicting
+    // provider-side instruction to end with a markdown fence. F41 owns a strict
+    // JSON-only prompt and parser, so avoid provider-specific wrapper prompts there.
+    // DeepSeek's reasoning models need the JSON object contract to put the final
+    // answer in message.content instead of running until length in reasoning_content.
+    if (ModelPrefersJsonObjectResponseFormat(call.model)) {
+        call.response_format = "json_object";
+    } else {
+        call.response_format.clear();
+    }
+    if (ModelSupportsThinkingControl(call.model)) {
+        // F41 requires the final structured object in message.content. DeepSeek
+        // thinking mode can spend the full token budget in reasoning_content and
+        // leave message.content empty on real documents.
+        call.thinking_type = "disabled";
+    }
 
     metrics.RecordLlmCall(DocSummaryMetrics::LlmCallStatus::kStarted);
     llm::ChatCompletionResponse resp = llm_client_->Chat(prompt, call);
     if (!resp.ok()) {
         metrics.RecordLlmCall(DocSummaryMetrics::LlmCallStatus::kFailed);
+        last_llm_failure_structured_data_ =
+            BuildLlmTimeoutDiagnostics(resp.status.message());
         return DocSummaryStatus(DocSummaryErrorCode::kLlmTimeout, resp.status.message());
     }
     Result<DocSummaryStructured> parsed =
         ParseStructuredOutput(resp.content, config_.max_chars);
     if (!parsed.ok()) {
         metrics.RecordLlmCall(DocSummaryMetrics::LlmCallStatus::kFailed);
-        return parsed.status();
+        last_llm_failure_structured_data_ =
+            BuildLlmInvalidOutputDiagnostics(resp, parsed.status().message());
+        return DocSummaryStatus(
+            DocSummaryErrorCode::kLlmInvalidOutput,
+            DescribeLlmResponseForError(resp, parsed.status().message()));
     }
     metrics.RecordLlmCall(DocSummaryMetrics::LlmCallStatus::kSuccess);
+    last_llm_failure_structured_data_ = json::object();
     return parsed;
 }
 
@@ -194,6 +323,7 @@ Result<DocSummaryStructured> DocSummaryGenerator::GenerateSummary(
     const std::vector<store::ChunkRecord>& chunks, const std::string& doc_title,
     bool* used_map_reduce) {
     if (used_map_reduce) *used_map_reduce = false;
+    last_llm_failure_structured_data_ = json::object();
 
     if (static_cast<int>(chunks.size()) <= config_.chunk_threshold) {
         // Short doc: one structured call (§9.2).
@@ -208,6 +338,7 @@ Result<DocSummaryStructured> DocSummaryGenerator::GenerateSummary(
         std::vector<store::ChunkRecord> group(chunks.begin() + start,
                                               chunks.begin() + end);
         if (llm_client_ == nullptr) {
+            last_llm_failure_structured_data_ = BuildLlmTimeoutDiagnostics("no LLM client");
             return DocSummaryStatus(DocSummaryErrorCode::kLlmTimeout, "no LLM client");
         }
         llm::LlmCallConfig call;
@@ -220,6 +351,8 @@ Result<DocSummaryStructured> DocSummaryGenerator::GenerateSummary(
         if (!resp.ok()) {
             DocSummaryMetrics::Instance().RecordLlmCall(
                 DocSummaryMetrics::LlmCallStatus::kFailed);
+            last_llm_failure_structured_data_ =
+                BuildLlmTimeoutDiagnostics("map stage: " + resp.status.message());
             return DocSummaryStatus(DocSummaryErrorCode::kLlmTimeout,
                                     "map stage: " + resp.status.message());
         }
@@ -268,7 +401,10 @@ GenerationResult DocSummaryGenerator::Generate(const std::string& doc_id,
             code = DocSummaryErrorCode::kLlmTimeout;
         else if (msg.find("CX_ERR_F41_LLM_BUDGET_EXCEEDED") != std::string::npos)
             code = DocSummaryErrorCode::kLlmBudgetExceeded;
-        result.error = MakeDocSummaryError(code, {{"doc_id", doc_id}}, msg);
+        result.error = MakeDocSummaryError(
+            code,
+            StructuredDataForCode(code, last_llm_failure_structured_data_, doc_id, msg),
+            msg);
         return result;
     }
 

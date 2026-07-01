@@ -1,18 +1,20 @@
 // JSON parse-tolerance matrix for DocSummaryGenerator::ParseStructuredOutput (F41 §9.1).
 //
 // Real parser (src/doc_summary/doc_summary_generator.cpp ParseStructuredOutput):
-//   1. json::parse(allow_exceptions=false). discarded OR not object -> error Result
+//   1. Complete Markdown JSON fences are unwrapped first. Then json::parse
+//      (allow_exceptions=false). discarded OR not object -> error Result
 //      (DocSummaryStatus kLlmInvalidOutput; message carries
-//      "CX_ERR_F41_LLM_INVALID_OUTPUT").  *** NO fence / wrapper / span recovery. ***
+//      "CX_ERR_F41_LLM_INVALID_OUTPUT").  *** NO prose / wrapper / span recovery. ***
 //   2. "summary_text" REQUIRED + must be a string, else error.
 //   3. summary_text is UTF-8-truncated to max_chars; keywords/topics pulled via
 //      ToStringArray (missing/non-array -> empty; non-string elements skipped);
 //      one_liner optional string.
 //
-// Tolerance is strict like the judgment parser: only a clean JSON object with a
-// string summary_text parses; fenced / prose-wrapped / object-wrapped / truncated
-// inputs are gracefully rejected (no crash). The generator is constructed with a
-// MockLlmClient + MockChunkStore (ParseStructuredOutput itself uses neither).
+// Tolerance is strict like the judgment parser: only a clean JSON object or a
+// complete fenced JSON object with a string summary_text parses; prose-wrapped /
+// object-wrapped / truncated inputs are gracefully rejected (no crash). The
+// generator is constructed with a MockLlmClient + MockChunkStore
+// (ParseStructuredOutput itself uses neither).
 
 #include <gtest/gtest.h>
 
@@ -85,10 +87,10 @@ const std::vector<DocSummaryJsonCase> kDocSummaryCases = {
     {"clean_keywords_not_array",
      R"({"summary_text":"x text here","keywords":"oops"})", DTol::kParsed, 5, 0},
 
-    // ---- ```json fenced -> NOT an object, rejected ----
-    {"fenced_json", "```json\n" + std::string(kGood) + "\n```", DTol::kRejected, 0, -1},
-    // ---- ``` bare-fenced -> rejected ----
-    {"fenced_bare", "```\n" + std::string(kGood) + "\n```", DTol::kRejected, 0, -1},
+    // ---- complete fenced JSON -> parses ----
+    {"fenced_json", "```json\n" + std::string(kGood) + "\n```", DTol::kParsed, 10, 3},
+    // ---- complete bare-fenced JSON -> parses ----
+    {"fenced_bare", "```\n" + std::string(kGood) + "\n```", DTol::kParsed, 10, 3},
 
     // ---- object-wrapped (top-level lacks summary_text) ----
     {"wrapped_result", R"({"result":)" + std::string(kGood) + "}", DTol::kRejected, 0, -1},

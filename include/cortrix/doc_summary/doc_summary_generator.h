@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #include "cortrix/common/i_global_config.h"     // cortrix::IGlobalConfig (config resolver)
 #include "cortrix/common/result.h"
 #include "cortrix/doc_summary/doc_summary_config.h"
@@ -103,6 +105,7 @@ private:
     DocSummaryConfig config_;
     std::shared_ptr<llm::ILlmClient> llm_client_;
     std::shared_ptr<store::ChunkStore> chunk_store_;
+    nlohmann::json last_llm_failure_structured_data_ = nlohmann::json::object();
 };
 
 }  // namespace cortrix::doc_summary
