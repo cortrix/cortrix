@@ -38,6 +38,9 @@ bool ValidateRagFusionConfig(const RagFusionConfig& cfg,
     if (cfg.timeout_ms <= 0) {
         return fail("timeout_ms", "[1, ]");
     }
+    if (cfg.locale != "zh" && cfg.locale != "en") {
+        return fail("locale", "zh|en");
+    }
     // At least one strategy when enabled (an empty strategy list would generate
     // nothing). Allowed to be empty when disabled (config is inert then).
     if (cfg.enabled && cfg.variant_strategies.empty()) {

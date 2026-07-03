@@ -31,14 +31,25 @@ struct DocFtsHit {
     double score = 0.0;
 };
 
+/// Borrowed-handle product helpers over the per-Unit `doc_fts5_index` table.
+/// These functions do not own/open/migrate SQLite; the caller supplies the Unit
+/// store handle after F41SchemaProvider has created the virtual table. They are
+/// shared by the product SPC write hook, rollback cleanup, HTTP/query discovery,
+/// and the standalone DocFts5Index wrapper below so benchmark and unit paths
+/// cannot drift.
+Status UpsertDocFts5Row(sqlite3* db, const DocFtsRow& row);
+Status DeleteDocFts5Row(sqlite3* db, const std::string& doc_id);
+Result<std::vector<DocFtsHit>> SearchDocFts5(sqlite3* db, const std::string& query,
+                                             int top_k);
+
 /// Self-contained doc-level FTS5 index (F41 §4.3 / §8.2 hybrid fallback).
 ///
 /// Standalone (D3): owns its own SQLite DB (Open(":memory:") in tests), creating
 /// the `doc_fts5_index` virtual table from the F41SchemaProvider DDL SoT so the
-/// two never drift. Wiring this to the F05 per-Unit store.db (so it shares the
-/// blocks/F08 tables) is cross-Feature integration → D3.5. The query path uses
-/// BM25 column weights (§8.2: doc_title 2.0 / topics 1.5 / filename 1.0) and the
-/// shared SanitizeFts5Query guard (M-SEC-001) against FTS5 operator injection.
+/// two never drift. Product code uses the borrowed-handle helpers above against
+/// the F05 per-Unit store.db. The query path uses BM25 column weights (§8.2:
+/// doc_title 2.0 / topics 1.5 / filename 1.0) and the shared SanitizeFts5Query
+/// guard (M-SEC-001) against FTS5 operator injection.
 class DocFts5Index {
 public:
     DocFts5Index() = default;

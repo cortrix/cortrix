@@ -1,6 +1,7 @@
 #pragma once
 #include <map>
 #include <string>
+#include <vector>
 
 #include "cortrix/query/i_scatter_executor.h"
 #include "cortrix/query/query_context.h"
@@ -27,6 +28,16 @@ namespace cortrix::query {
 /// existing entries untouched), mirroring post_filter.cpp's try-catch tolerance.
 void FlattenMetadataIntoMap(const std::string& metadata_json,
                             std::map<std::string, std::string>& out);
+
+/// Hybrid RRF for granularity=auto/both. The fusion identity is the owning doc_id
+/// (metadata.doc_id / source_doc_id), not child_id, so a doc-summary candidate and
+/// its best chunk candidate reinforce each other instead of remaining disjoint. If a
+/// document has both chunk and doc-summary evidence, the chunk is kept as the
+/// user-facing representative and the doc evidence is preserved in metadata.
+std::vector<retrieval::RankedChunk> FuseHybridChunksByDocId(
+    std::vector<retrieval::RankedChunk> chunk_chunks,
+    std::vector<retrieval::RankedChunk> doc_chunks,
+    int top_k);
 
 /// LiveSingleUnitExecutor — the D3.5 IScatterExecutor that runs F04's per-NS
 /// pipeline against the live MVP retrieval stack (Q2 wiring).
@@ -60,18 +71,22 @@ public:
     ///                 no indexed sparse vectors yields an empty sparse list → the
     ///                 fusion degrades to the other paths (F40 §7.2 L2 fallback).
     /// @param candidate_multiplier / max_candidates  over-fetch sizing (F02 §top_N).
+    /// @param doc_fts5_fallback_enabled  whether the doc path runs F41 doc-level
+    ///                 FTS5 fallback in addition to doc-summary HNSW.
     LiveSingleUnitExecutor(cortrix::resource::INamespacePool& pool,
                            cortrix::OnnxEmbedder& embedder,
                            RRFFusion& fusion,
                            reranker::IReranker* reranker,
                            cortrix::retrieval::SparseIndexRegistry* sparse_registry = nullptr,
                            int candidate_multiplier = 3,
-                           int max_candidates = 50);
+                           int max_candidates = 50,
+                           bool doc_fts5_fallback_enabled = true);
 
     /// Per-NS entry. Dispatches on ctx.granularity (F41 §6.2 / §8.1):
     ///   "auto" | "both" → ExecuteHybridRetrieval (chunk + doc-summary fallback);
     ///   "chunk" (and any unknown value) → ExecuteChunkRetrieval (explicit baseline);
-    ///   "doc"  → ExecuteDocRetrieval (doc_summary embedding HNSW recall, §8.1 doc branch);
+    ///   "doc"  → ExecuteDocRetrieval (F41 doc-discovery core: doc_summary HNSW +
+    ///             optional doc-level FTS5 fallback);
     /// The cross-NS gather/dedupe (ScatterGather) is granularity-agnostic and untouched.
     retrieval::NamespaceQueryResult ExecuteForNamespace(
         const QueryContext& ctx,
@@ -88,19 +103,18 @@ private:
     retrieval::NamespaceQueryResult ExecuteChunkRetrieval(
         const QueryContext& ctx, const std::string& namespace_id, float oversample);
 
-    /// granularity=doc (§8.1 doc branch ≅ GET /documents/discover): recall doc_summary
-    /// blocks (block_type=17) from the per-NS P-HNSW via the shared
-    /// doc_summary::RecallDocSummaryHnsw, surfaced as doc-level RankedChunks (child_id =
-    /// doc_id, chunk_text = summary_text, metadata.via_path = "doc_summary"). No rerank
-    /// (doc summaries are not chunk passages); HNSW order is kept. A NS with no
-    /// doc_summary blocks returns an empty success result (not an error).
+    /// granularity=doc (§8.1 doc branch ≅ GET /documents/discover): run the shared
+    /// F41 doc-discovery core (doc_summary HNSW + doc-level FTS5 fallback + doc_id
+    /// RRF), surfaced as doc-level RankedChunks (child_id = doc_id). No rerank (doc
+    /// summaries / doc pseudos are not chunk passages). A NS with no doc candidates
+    /// returns an empty success result (not an error).
     retrieval::NamespaceQueryResult ExecuteDocRetrieval(
         const QueryContext& ctx, const std::string& namespace_id);
 
     /// granularity=auto/both (§8.1 hybrid branch): run the chunk path AND the doc path,
-    /// then fuse the two ranked lists with two-path RRF before top_k. If either path has
-    /// no candidates, return the other path unchanged. Doc-level hits carry
-    /// metadata.via_path = "doc_summary".
+    /// then fuse the two ranked lists with doc_id-keyed RRF before top_k. If a doc has
+    /// both chunk and doc evidence, keep the chunk as the representative result while
+    /// preserving doc-path evidence in metadata.
     retrieval::NamespaceQueryResult ExecuteHybridRetrieval(
         const QueryContext& ctx, const std::string& namespace_id, float oversample);
 
@@ -114,6 +128,7 @@ private:
     cortrix::retrieval::SparseIndexRegistry* sparse_registry_;
     int candidate_multiplier_;
     int max_candidates_;
+    bool doc_fts5_fallback_enabled_;
 };
 
 }  // namespace cortrix::query

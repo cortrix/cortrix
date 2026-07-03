@@ -48,11 +48,22 @@ public:
     ///
     /// @param original_query the user/Agent query (untrusted — injection-guarded)
     /// @param config         the resolved NS config (variant_count / strategies / timeout)
+    /// @param locale         prompt locale ("zh" default, "en" for English corpora such as BEIR)
     /// @param ctx            optional TraceContext (V1.0 OSS always nullptr; §9)
     Result<QueryVariants> Generate(
         const std::string& original_query,
         const RagFusionConfig& config,
+        const std::string& locale = "zh",
         const observability::TraceContext* ctx = nullptr);
+
+    /// Backward-compatible overload for existing callers that only pass a
+    /// TraceContext; keeps the historical zh prompt default.
+    Result<QueryVariants> Generate(
+        const std::string& original_query,
+        const RagFusionConfig& config,
+        const observability::TraceContext* ctx) {
+        return Generate(original_query, config, "zh", ctx);
+    }
 
     /// The prompt-template version string surfaced in QueryVariants (B-class,
     /// ?explain=true only) and the IGlobalConfig default (§4.7). Stable token.

@@ -73,7 +73,7 @@ class RagFusionValidateMatrix
 
 TEST_P(RagFusionValidateMatrix, Field) {
     const auto& c = GetParam();
-    cortrix::query::RagFusionConfig cfg;  // defaults: enabled=false, vc=3, rrf_k=60, timeout=5000
+    cortrix::query::RagFusionConfig cfg;  // defaults: enabled=false, vc=3, rrf_k=60, timeout=5000, locale=zh
     c.mutate(cfg);
     std::string field;
     std::string range;
@@ -93,6 +93,8 @@ INSTANTIATE_TEST_SUITE_P(
         RagFusionCase{"vc_min_1_ok", [](cortrix::query::RagFusionConfig& c) { c.variant_count = cortrix::query::kVariantCountMin; }, true, ""},
         RagFusionCase{"vc_max_10_ok", [](cortrix::query::RagFusionConfig& c) { c.variant_count = cortrix::query::kVariantCountMax; }, true, ""},
         RagFusionCase{"vc_zero_bad", [](cortrix::query::RagFusionConfig& c) { c.variant_count = 0; }, false, "variant_count"},
+        RagFusionCase{"locale_en_ok", [](cortrix::query::RagFusionConfig& c) { c.locale = "en"; }, true, ""},
+        RagFusionCase{"locale_bad", [](cortrix::query::RagFusionConfig& c) { c.locale = "fr"; }, false, "locale"},
         RagFusionCase{"vc_negative_bad", [](cortrix::query::RagFusionConfig& c) { c.variant_count = -1; }, false, "variant_count"},
         RagFusionCase{"vc_eleven_bad", [](cortrix::query::RagFusionConfig& c) { c.variant_count = 11; }, false, "variant_count"},
         // rrf_k > 0

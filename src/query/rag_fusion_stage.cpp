@@ -56,7 +56,9 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
     bool degraded = false;
     auto expanded = fusion_->ExpandQueries(request.query, cfg, /*trace_ctx=*/nullptr, &qctx);
     if (expanded.ok()) {
-        for (auto& v : expanded.value()) all_queries.push_back(v);
+        // ExpandQueries already returns [original + variants]. Do not prepend the
+        // original again; duplicate original queries skew global RRF attribution.
+        all_queries = std::move(expanded.value());
     } else {
         degraded = true;
     }

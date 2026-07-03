@@ -40,31 +40,39 @@ Status DocFts5Index::Open(const std::string& db_path) {
     return Status::Ok();
 }
 
-Status DocFts5Index::Upsert(const DocFtsRow& row) {
-    if (!db_) {
+Status UpsertDocFts5Row(sqlite3* db, const DocFtsRow& row) {
+    if (!db) {
         return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
-                                "Upsert on closed index");
+                                "Upsert on closed doc_fts5_index handle");
+    }
+    if (row.doc_id.empty()) {
+        return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
+                                "Upsert doc_fts5_index requires doc_id");
     }
     // Idempotent on doc_id: delete-then-insert (FTS5 external-content tables have
     // no UPSERT; doc_id is UNINDEXED but still a column we can filter on).
     {
         const char* del = "DELETE FROM doc_fts5_index WHERE doc_id = ?";
         sqlite3_stmt* st = nullptr;
-        if (sqlite3_prepare_v2(db_, del, -1, &st, nullptr) != SQLITE_OK) {
+        if (sqlite3_prepare_v2(db, del, -1, &st, nullptr) != SQLITE_OK) {
             return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
-                                    std::string("prepare delete: ") + sqlite3_errmsg(db_));
+                                    std::string("prepare delete: ") + sqlite3_errmsg(db));
         }
         sqlite3_bind_text(st, 1, row.doc_id.c_str(), -1, SQLITE_TRANSIENT);
-        sqlite3_step(st);
+        const int rc = sqlite3_step(st);
         sqlite3_finalize(st);
+        if (rc != SQLITE_DONE) {
+            return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
+                                    std::string("delete: ") + sqlite3_errmsg(db));
+        }
     }
     const char* ins =
         "INSERT INTO doc_fts5_index(doc_id, filename, doc_title, "
         "topics_rule_extracted, authors) VALUES (?, ?, ?, ?, ?)";
     sqlite3_stmt* st = nullptr;
-    if (sqlite3_prepare_v2(db_, ins, -1, &st, nullptr) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(db, ins, -1, &st, nullptr) != SQLITE_OK) {
         return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
-                                std::string("prepare insert: ") + sqlite3_errmsg(db_));
+                                std::string("prepare insert: ") + sqlite3_errmsg(db));
     }
     sqlite3_bind_text(st, 1, row.doc_id.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, row.filename.c_str(), -1, SQLITE_TRANSIENT);
@@ -75,18 +83,41 @@ Status DocFts5Index::Upsert(const DocFtsRow& row) {
     sqlite3_finalize(st);
     if (rc != SQLITE_DONE) {
         return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
-                                std::string("insert: ") + sqlite3_errmsg(db_));
+                                std::string("insert: ") + sqlite3_errmsg(db));
     }
     return Status::Ok();
 }
 
-Result<std::vector<DocFtsHit>> DocFts5Index::Search(const std::string& query,
-                                                    int top_k) const {
+Status DeleteDocFts5Row(sqlite3* db, const std::string& doc_id) {
+    if (!db) {
+        return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
+                                "Delete on closed doc_fts5_index handle");
+    }
+    if (doc_id.empty()) return Status::Ok();
+
+    const char* del = "DELETE FROM doc_fts5_index WHERE doc_id = ?";
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(db, del, -1, &st, nullptr) != SQLITE_OK) {
+        return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
+                                std::string("prepare delete: ") + sqlite3_errmsg(db));
+    }
+    sqlite3_bind_text(st, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
+    const int rc = sqlite3_step(st);
+    sqlite3_finalize(st);
+    if (rc != SQLITE_DONE) {
+        return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
+                                std::string("delete: ") + sqlite3_errmsg(db));
+    }
+    return Status::Ok();
+}
+
+Result<std::vector<DocFtsHit>> SearchDocFts5(sqlite3* db, const std::string& query,
+                                             int top_k) {
     std::vector<DocFtsHit> hits;
     if (top_k <= 0) return hits;
-    if (!db_) {
+    if (!db) {
         return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
-                                "Search on closed index");
+                                "Search on closed doc_fts5_index handle");
     }
     // Sanitize against FTS5 operator injection (M-SEC-001, shared helper). An
     // empty / whitespace-only query returns no results (not an error).
@@ -102,13 +133,14 @@ Result<std::vector<DocFtsHit>> DocFts5Index::Search(const std::string& query,
         "FROM doc_fts5_index WHERE doc_fts5_index MATCH ? "
         "ORDER BY rank LIMIT ?";
     sqlite3_stmt* st = nullptr;
-    if (sqlite3_prepare_v2(db_, sql, -1, &st, nullptr) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
         return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
-                                std::string("prepare search: ") + sqlite3_errmsg(db_));
+                                std::string("prepare search: ") + sqlite3_errmsg(db));
     }
     sqlite3_bind_text(st, 1, sanitized.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(st, 2, top_k);
-    while (sqlite3_step(st) == SQLITE_ROW) {
+    int rc = SQLITE_ROW;
+    while ((rc = sqlite3_step(st)) == SQLITE_ROW) {
         DocFtsHit h;
         const unsigned char* doc_id = sqlite3_column_text(st, 0);
         const unsigned char* fn = sqlite3_column_text(st, 1);
@@ -123,7 +155,20 @@ Result<std::vector<DocFtsHit>> DocFts5Index::Search(const std::string& query,
         hits.push_back(std::move(h));
     }
     sqlite3_finalize(st);
+    if (rc != SQLITE_DONE) {
+        return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
+                                std::string("search: ") + sqlite3_errmsg(db));
+    }
     return hits;
+}
+
+Status DocFts5Index::Upsert(const DocFtsRow& row) {
+    return UpsertDocFts5Row(db_, row);
+}
+
+Result<std::vector<DocFtsHit>> DocFts5Index::Search(const std::string& query,
+                                                    int top_k) const {
+    return SearchDocFts5(db_, query, top_k);
 }
 
 std::vector<DocDiscoveryHit> FuseDocDiscovery(

@@ -7,6 +7,9 @@
 #include <vector>
 
 #include "cortrix/doc_summary/doc_fts5_index.h"
+#include "cortrix/doc_summary/f41_schema_provider.h"
+
+#include <sqlite3.h>
 
 namespace cortrix::doc_summary {
 namespace {
@@ -110,6 +113,38 @@ TEST(F41DocFts5IndexLifecycleTest, OpenOnUncreatablePathErrors) {
     EXPECT_NE(st.message().find("CX_ERR_F41_FTS5_FALLBACK_FAILED"),
               std::string::npos);
     EXPECT_FALSE(idx.is_open());
+}
+
+TEST(F41DocFts5SharedHandleTest, BorrowedHandleUpsertSearchDelete) {
+    sqlite3* db = nullptr;
+    ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    ASSERT_EQ(sqlite3_exec(db, kDocFts5IndexDdl, nullptr, nullptr, nullptr), SQLITE_OK);
+
+    ASSERT_TRUE(UpsertDocFts5Row(db, Row("d1", "Shared Handle", "rollbacktoken")).ok());
+    auto before = SearchDocFts5(db, "rollbacktoken", 10);
+    ASSERT_TRUE(before.ok()) << before.status().message();
+    ASSERT_EQ(before.value().size(), 1u);
+    EXPECT_EQ(before.value()[0].doc_id, "d1");
+
+    ASSERT_TRUE(DeleteDocFts5Row(db, "d1").ok());
+    ASSERT_TRUE(DeleteDocFts5Row(db, "d1").ok()) << "delete must be idempotent";
+    auto after = SearchDocFts5(db, "rollbacktoken", 10);
+    ASSERT_TRUE(after.ok()) << after.status().message();
+    EXPECT_TRUE(after.value().empty());
+
+    sqlite3_close(db);
+}
+
+TEST(F41DocFts5SharedHandleTest, BorrowedHandleErrorsWithoutMigratedTable) {
+    sqlite3* db = nullptr;
+    ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+
+    Status st = UpsertDocFts5Row(db, Row("d1", "Missing Table"));
+    EXPECT_FALSE(st.ok());
+    EXPECT_NE(st.message().find("CX_ERR_F41_FTS5_FALLBACK_FAILED"),
+              std::string::npos);
+
+    sqlite3_close(db);
 }
 
 // ---------- FuseDocDiscovery (two-path RRF, §8.2) ----------

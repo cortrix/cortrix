@@ -199,6 +199,7 @@ bool QueryVariantGenerator::ParseVariantsJson(const std::string& llm_content,
 Result<QueryVariants> QueryVariantGenerator::Generate(
     const std::string& original_query,
     const RagFusionConfig& config,
+    const std::string& locale,
     const observability::TraceContext* ctx) {
     // [R7] No LLM configured (CE OSS default) → cannot expand. Degrade to single
     // query instead of dereferencing a null llm_ (defense-in-depth: the F36 gate in
@@ -226,7 +227,7 @@ Result<QueryVariants> QueryVariantGenerator::Generate(
 
     const std::string suffix = RandomSuffix();
     const std::string prompt =
-        BuildPrompt(original_query, config.variant_count, suffix, /*locale=*/"zh");
+        BuildPrompt(original_query, config.variant_count, suffix, locale);
 
     llm::LlmCallConfig call;
     call.temperature = 0.3;            // a little diversity, still focused

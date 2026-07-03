@@ -27,6 +27,7 @@
 #include "cortrix/spc_enricher/f03_schema_provider.h"  // [A unified-blocks] F03 enriched_score +3 + entities + FTS5 (§1.3.bis.3 #5)
 #include "cortrix/scoring/scoring_schema_provider.h"   // [A unified-blocks] F07 semantic_score col (§1.3.bis.3 #6, gap-fill 2026-06-08)
 #include "cortrix/doc_summary/f41_schema_provider.h"   // [A unified-blocks] F41 doc-level doc_fts5_index (§1.3.bis.3 #10)
+#include "cortrix/doc_summary/doc_fts5_index.h"        // F41 rollback cleanup for doc_fts5_index rows
 #include "cortrix/spc_enricher/f35_schema_provider.h"  // [A unified-blocks] contextualized/embedding cols
 #include "cortrix/retrieval/f40_schema_provider.h"     // [A unified-blocks] sparse_vec col + inverted index
 
@@ -358,6 +359,13 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
                         sqlite3_step(pstmt);  // idempotent
                         sqlite3_finalize(pstmt);
                     }
+                }
+                // [F44/F41 path validation] SPC now also syncs one F08-derived row
+                // into doc_fts5_index for doc-level fallback retrieval. Rollback must
+                // drop it by doc_id, otherwise failed ingest can leave a benchmark-visible
+                // orphan doc candidate with no committed blocks.
+                if (db_handle && !e.doc_id.empty()) {
+                    (void)cortrix::doc_summary::DeleteDocFts5Row(db_handle, e.doc_id);
                 }
                 return Status::Ok();
             });

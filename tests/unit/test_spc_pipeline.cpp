@@ -35,6 +35,8 @@
 #include "cortrix/catalog/i_unit_router.h"
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
+#include "cortrix/doc_summary/doc_fts5_index.h"
+#include "cortrix/doc_summary/discover_handler.h"
 #include "cortrix/resource/f05_config.h"
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/resource/namespace_pool.h"
@@ -470,6 +472,42 @@ TEST_F(SPCPipelineTest, F08MetadataBlock_Persisted) {
     EXPECT_EQ(meta_count, 1) << "exactly one F08 META block per doc (idx_blocks_meta_doc)";
 }
 
+// [F44/F41 path validation] F08 metadata must also populate the per-Unit
+// doc_fts5_index row that query/discover uses as the doc-level fallback candidate
+// path. This is a product-level test: real NamespaceFacade + real Unit SQLite,
+// not the standalone DocFts5Index :memory: wrapper.
+TEST_F(SPCPipelineTest, F41DocFts5Index_RowWrittenFromF08Metadata) {
+    std::string doc_id = CreateDoc();
+    auto task_uptr = MakeTask(txt_path_, "text/plain", doc_id);
+    task_uptr->metadata_json = R"({"authors":["Ada","Lovelace"]})";
+
+    int rc = pipeline_->Process(*task_uptr, *facade_);
+    ASSERT_EQ(rc, 0) << task_uptr->error_message;
+
+    auto hits = cortrix::doc_summary::SearchDocFts5(
+        facade_->store().db_handle(), "Lovelace", /*top_k=*/10);
+    ASSERT_TRUE(hits.ok()) << hits.status().message();
+    ASSERT_EQ(hits.value().size(), 1u);
+    EXPECT_EQ(hits.value()[0].doc_id, doc_id);
+    EXPECT_EQ(hits.value()[0].filename, "doc.txt");
+    EXPECT_EQ(hits.value()[0].doc_title, "doc");
+    EXPECT_GT(hits.value()[0].score, 0.0);
+
+    cortrix::doc_summary::DocDiscoveryCoreOptions opts;
+    opts.top_k = 10;
+    opts.fts5_fallback_enabled = true;
+    cortrix::doc_summary::DocDiscoveryCoreResult core =
+        cortrix::doc_summary::RunDocDiscoveryCore(
+            facade_->vec_index(), facade_->store(), *embedder_, "Lovelace", opts);
+    EXPECT_TRUE(core.hnsw_ran);
+    EXPECT_TRUE(core.fts5_ran);
+    EXPECT_FALSE(core.fts5_failed);
+    EXPECT_EQ(core.fts5_hit_count, 1);
+    ASSERT_EQ(core.hits.size(), 1u);
+    EXPECT_EQ(core.hits[0].doc_id, doc_id);
+    EXPECT_EQ(core.hits[0].via_path, "fts5_fallback");
+}
+
 // [A unified-blocks F10] The SPC pipeline runs F10 dedup (exact + semantic) over the
 // children before the write. Two byte-identical large paragraphs (each > parent_size
 // so each forms its own parent → byte-identical child chunks) must collapse: no two
@@ -651,6 +689,7 @@ TEST_F(SPCPipelineTest, VectorIndexAddFailure_Error) {
 
     std::string doc_id = CreateDoc();
     auto task_uptr_ = MakeTask(txt_path_, "text/plain", doc_id);
+    task_uptr_->metadata_json = R"({"authors":["VectorRollbackSentinel"]})";
     SPCTask& task = *task_uptr_;
 
     int rc = pipeline_->Process(task, *facade_);
@@ -661,6 +700,13 @@ TEST_F(SPCPipelineTest, VectorIndexAddFailure_Error) {
     EXPECT_NE(task.error_message.find("AddPoints"), std::string::npos);
     // Rollback before any block_insert / parent_insert → nothing persisted.
     EXPECT_EQ(BlocksOf(doc_id).size(), 0u);
+
+    // F44/F41: doc_fts5_index is now written immediately after BeginWrite so it
+    // must be compensated by the same rollback when a later vector write fails.
+    auto hits = cortrix::doc_summary::SearchDocFts5(
+        facade_->store().db_handle(), "VectorRollbackSentinel", /*top_k=*/10);
+    ASSERT_TRUE(hits.ok()) << hits.status().message();
+    EXPECT_TRUE(hits.value().empty());
 }
 
 TEST_F(SPCPipelineTest, EmptyDoc_DoneWithZeroBlocks) {
@@ -1197,6 +1243,40 @@ TEST_F(SPCPipelineTest, RollbackCallbackDeletesInsertedParentsInProcess) {
     EXPECT_NE(facade_->store().parent_get(p.parent_id, got), 0)
         << "rollback callback must delete the inserted parents in-process";
     EXPECT_EQ(BlocksOf(doc_id).size(), 0u);
+}
+
+// [F44/F41 path validation] The rollback callback must also delete the doc-level
+// FTS5 fallback row. Otherwise a failed ingest leaves a searchable orphan doc
+// candidate even though blocks/parents/vectors were compensated.
+TEST_F(SPCPipelineTest, RollbackCallbackDeletesDocFts5IndexRowInProcess) {
+    std::string doc_id = CreateDoc();
+
+    store::TxnHandle txn;
+    ASSERT_TRUE(facade_->write_coordinator()
+                    .BeginWrite(doc_id, /*block_ids=*/{}, /*writes_blob=*/false, &txn)
+                    .ok());
+
+    cortrix::doc_summary::DocFtsRow row;
+    row.doc_id = doc_id;
+    row.filename = "rollback.txt";
+    row.doc_title = "Rollback Sentinel";
+    row.topics_rule_extracted = "rollbacktoken";
+    ASSERT_TRUE(cortrix::doc_summary::UpsertDocFts5Row(
+                    facade_->store().db_handle(), row)
+                    .ok());
+
+    auto before = cortrix::doc_summary::SearchDocFts5(
+        facade_->store().db_handle(), "rollbacktoken", /*top_k=*/10);
+    ASSERT_TRUE(before.ok()) << before.status().message();
+    ASSERT_EQ(before.value().size(), 1u);
+
+    ASSERT_TRUE(facade_->write_coordinator().Rollback(txn).ok());
+
+    auto after = cortrix::doc_summary::SearchDocFts5(
+        facade_->store().db_handle(), "rollbacktoken", /*top_k=*/10);
+    ASSERT_TRUE(after.ok()) << after.status().message();
+    EXPECT_TRUE(after.value().empty())
+        << "rollback callback must delete doc_fts5_index rows by doc_id";
 }
 
 // ============================================================

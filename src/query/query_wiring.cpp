@@ -376,6 +376,15 @@ RagFusionConfig ResolveRagFusionConfig(const httplib::Request& req, const json& 
                body["rag_fusion"].is_boolean()) {
         cfg.enabled = body["rag_fusion"].get<bool>();
     }
+    auto maybe_set_locale = [&cfg](const std::string& locale) {
+        if (locale == "en" || locale == "zh") cfg.locale = locale;
+    };
+    if (body.is_object() && body.contains("locale") && body["locale"].is_string()) {
+        maybe_set_locale(body["locale"].get<std::string>());
+    }
+    if (req.has_param("locale")) {
+        maybe_set_locale(req.get_param_value("locale"));
+    }
     return cfg;
 }
 
@@ -459,6 +468,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
     CrossNsQueryHandler* handler = &impl_->handler;
     QueryComplexityClassifier* classifier = &impl_->classifier;
     RagFusionStage* rag_stage = &impl_->rag_stage;
+    RagFusion* rag_fusion = &impl_->rag_fusion;
     ScatterGather* scatter = &impl_->scatter;
     CragStage* crag_stage = &impl_->crag_stage;
     cortrix::resource::INamespacePool* pool = &impl_->pool;
@@ -471,7 +481,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
     // of dereferencing a null LLM client (the §F36 LLM-unavailable contract).
     const bool rag_fusion_llm_available = impl_->variant_generator->has_llm();
     svr.Post("/api/v1/query", WithAuth(auth, kPermRead,
-        [handler, classifier, rag_stage, scatter, crag_stage, pool, engine_instr,
+        [handler, classifier, rag_stage, rag_fusion, scatter, crag_stage, pool, engine_instr,
          rag_fusion_llm_available](
             const httplib::Request& req, httplib::Response& res,
             const RequestContext& ctx) {
@@ -617,6 +627,27 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                         // F41 §6.2: echo the resolved granularity so the Agent sees the
                         // effective value (mirrors the single-NS query_routes.cpp echo).
                         out["explain"]["granularity"] = qctx.granularity;
+                        if (use_rag_fusion) {
+                            const auto es = rag_fusion->GetExplainState();
+                            json rf = {
+                                {"active", es.active},
+                                {"feature_id", "F36"},
+                                {"reason", es.reason},
+                                {"variant_count", es.variant_count},
+                                {"degraded", es.degraded},
+                            };
+                            if (!es.variants_used.empty()) {
+                                rf["variants_used"] = es.variants_used;
+                            }
+                            if (!es.degrade_reason.empty()) {
+                                rf["degrade_reason"] = es.degrade_reason;
+                            }
+                            if (es.llm_latency_ms.has_value()) {
+                                rf["llm_latency_ms"] = *es.llm_latency_ms;
+                            }
+                            out["explain"]["llm_dependent_features"]["rag_fusion"] =
+                                std::move(rf);
+                        }
                     }
                     res.status = 200;
                     res.set_header("X-Request-Id", ctx.request_id);

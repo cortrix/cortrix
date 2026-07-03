@@ -36,6 +36,7 @@ namespace cortrix::query {
 namespace {
 
 using ::testing::_;
+using ::testing::HasSubstr;
 using ::testing::Return;
 using llm::ChatCompletionResponse;
 using llm::LlmCallConfig;
@@ -219,6 +220,16 @@ TEST_F(RagFusionTest, BuildPrompt_EnLocale) {
     std::string en = QueryVariantGenerator::BuildPrompt("revenue", 3, "abcd1234", "en");
     EXPECT_NE(en.find("RAG query-expansion expert"), std::string::npos);
     EXPECT_NE(en.find("<USER_QUERY_abcd1234>"), std::string::npos);
+}
+
+TEST_F(RagFusionTest, Generate_UsesConfiguredEnLocalePrompt) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(HasSubstr("RAG query-expansion expert"), _))
+        .WillOnce(Return(OkResponse(ThreeVariantJson())));
+    QueryVariantGenerator gen(mock);
+    auto out = gen.Generate("semantic retrieval", EnabledConfig(3), "en");
+    ASSERT_TRUE(out.ok()) << out.status().message();
+    EXPECT_EQ(out.value().variants.size(), 3u);
 }
 
 // ===========================================================================
@@ -436,6 +447,12 @@ TEST_F(RagFusionTest, ValidateRagFusionConfig_Ranges) {
 
     RagFusionConfig ok = EnabledConfig(3);
     EXPECT_TRUE(ValidateRagFusionConfig(ok));
+    ok.locale = "en";
+    EXPECT_TRUE(ValidateRagFusionConfig(ok));
+    ok.locale = "fr";
+    EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
+    EXPECT_EQ(field, "locale");
+    EXPECT_EQ(range, "zh|en");
 }
 
 // ===========================================================================
@@ -537,7 +554,7 @@ TEST_F(RagFusionTest, TraceContext_AllMethods_NullableCtx) {
     auto mock2 = std::make_shared<MockLlmClient>();
     EXPECT_CALL(*mock2, Chat(_, _)).WillOnce(Return(OkResponse(ThreeVariantJson())));
     QueryVariantGenerator gen(mock2);
-    EXPECT_TRUE(gen.Generate("q", EnabledConfig(), nullptr).ok());
+    EXPECT_TRUE(gen.Generate("q", EnabledConfig(), "zh", nullptr).ok());
 }
 
 // Error model: all 6 codes have a stable string, category, and the count anchor.

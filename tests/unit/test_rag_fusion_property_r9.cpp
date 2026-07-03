@@ -154,6 +154,7 @@ RC_GTEST_PROP(RagFusionPropR9, ValidateMatchesFieldRanges, ()) {
     cfg.variant_count = *rc::gen::inRange(-2, 14);
     cfg.rrf_k = *rc::gen::inRange(-2, 5);
     cfg.timeout_ms = *rc::gen::inRange<int64_t>(-2, 5);
+    cfg.locale = *rc::gen::element(std::string("zh"), std::string("en"), std::string("fr"));
     cfg.variant_strategies.clear();
     const int n = *rc::gen::inRange(0, 4);
     for (int i = 0; i < n; ++i) cfg.variant_strategies.push_back(VariantStrategy::kParaphrase);
@@ -163,6 +164,7 @@ RC_GTEST_PROP(RagFusionPropR9, ValidateMatchesFieldRanges, ()) {
         (cfg.variant_count >= kVariantCountMin && cfg.variant_count <= kVariantCountMax) &&
         (cfg.rrf_k > 0) &&
         (cfg.timeout_ms > 0) &&
+        (cfg.locale == "zh" || cfg.locale == "en") &&
         !(cfg.enabled && cfg.variant_strategies.empty());
 
     std::string field, range;
@@ -175,7 +177,8 @@ RC_GTEST_PROP(RagFusionPropR9, ValidateMatchesFieldRanges, ()) {
         RC_ASSERT(!field.empty());
         RC_ASSERT(!range.empty());
         RC_ASSERT(field == "variant_count" || field == "rrf_k" ||
-                  field == "timeout_ms" || field == "variant_strategies");
+                  field == "timeout_ms" || field == "locale" ||
+                  field == "variant_strategies");
     }
 }
 

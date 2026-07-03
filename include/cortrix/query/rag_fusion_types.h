@@ -51,10 +51,11 @@ struct RagFusionConfig {
     };
     int rrf_k = 60;                                         ///< sentinel ARCH RRFFusion default
     int64_t timeout_ms = 5000;                              ///< LLM call timeout (topic 4)
+    std::string locale = "zh";                              ///< prompt locale: "zh" (default) or "en"
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RagFusionConfig, enabled, variant_count,
-                                   variant_strategies, rrf_k, timeout_ms)
+                                   variant_strategies, rrf_k, timeout_ms, locale)
 
 /// The inclusive bounds for variant_count (topic 1: NS-tunable [1-10]).
 constexpr int kVariantCountMin = 1;

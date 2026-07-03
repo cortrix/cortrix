@@ -63,7 +63,8 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
 
     // Generate variants via the LLM (§4.2). Time the call for the explain latency.
     const auto t0 = std::chrono::steady_clock::now();
-    Result<QueryVariants> gen = generator_->Generate(query, ns_config, trace_ctx);
+    Result<QueryVariants> gen = generator_->Generate(
+        query, ns_config, ns_config.locale, trace_ctx);
     const auto t1 = std::chrono::steady_clock::now();
     const int latency_ms = static_cast<int>(
         std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());

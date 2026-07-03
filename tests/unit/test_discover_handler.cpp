@@ -4,8 +4,8 @@
 //   - ExecuteDocDiscovery degrade paths (Acquire fail / HNSW throw / fts5 gate / fts5
 //     fault / explain.fallback_triggered / top_k clamp / happy coverage_ratio)
 //   - RecallDocSummaryHnsw filtering / parsing / over-fetch / sort
-//   - SearchDocFts5OverHandle + HitToJson exercised THROUGH ExecuteDocDiscovery
-//     (both are file-local statics, not exported).
+//   - Shared SearchDocFts5 fallback + file-local HitToJson exercised THROUGH
+//     ExecuteDocDiscovery.
 //
 // All inputs are deterministic: a stub OnnxEmbedder (no real model / no Init() => an
 // embed-failure double), an in-memory FakeDocStore, a configurable FakeDiscoveryIndex,
