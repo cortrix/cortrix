@@ -138,21 +138,21 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
     CrossNsResponse base;
     std::unordered_map<std::string, ResultItem> items_by_child;  // union across variants
     const int candidate_top_k = ExpandedCandidateTopK(request.top_k, cfg);
-    // In final-rerank mode the per-variant scatter pass is candidate generation,
-    // not final ordering. Running the reranker inside every variant would both
-    // multiply latency (N variants + final pass) and prematurely truncate the
-    // candidate pool before the global F36 union. Defer reranking to the single
-    // original-query final pass below.
+    // In final-rerank mode, keep the original query's normal reranked baseline
+    // signal, but treat LLM variants as candidate generation only. Running the
+    // reranker inside every LLM variant would multiply latency and prematurely
+    // truncate variant candidates before the global F36 union. The final pass then
+    // reranks the union against the original query.
     const bool defer_inner_rerank = cfg.final_rerank && qctx.rerank && reranker_ != nullptr;
     for (std::size_t i = 0; i < all_queries.size(); ++i) {
         QueryRequest vr = request;
         vr.query = all_queries[i];
         vr.top_k = candidate_top_k;
-        if (defer_inner_rerank) vr.rerank = false;
+        if (defer_inner_rerank && i > 0) vr.rerank = false;
         QueryContext vctx = qctx;
         vctx.query = all_queries[i];
         vctx.top_k = candidate_top_k;
-        if (defer_inner_rerank) vctx.rerank = false;
+        if (defer_inner_rerank && i > 0) vctx.rerank = false;
         CrossNsResponse vresp = scatter_->Execute(vr, auth, &vctx);
         per_variant.push_back(ToScoredResults(vresp));
         if (i == 0) base = vresp;  // base meta + the original query's items

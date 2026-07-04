@@ -726,7 +726,10 @@ TEST_F(RagFusionTest, RagFusionStage_ExpandedCandidatePoolThenFinalRerank) {
     ASSERT_GE(executor.seen_top_k.size(), 2u);
     EXPECT_TRUE(std::all_of(executor.seen_top_k.begin(), executor.seen_top_k.end(),
                             [](int k) { return k == 3; }));
-    EXPECT_TRUE(std::all_of(executor.seen_rerank.begin(), executor.seen_rerank.end(),
+    ASSERT_EQ(executor.seen_rerank.size(), executor.seen_top_k.size());
+    EXPECT_TRUE(executor.seen_rerank.front());
+    EXPECT_TRUE(std::all_of(std::next(executor.seen_rerank.begin()),
+                            executor.seen_rerank.end(),
                             [](bool rerank) { return !rerank; }));
 }
 
