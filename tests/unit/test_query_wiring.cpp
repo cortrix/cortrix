@@ -195,6 +195,9 @@ TEST_F(QueryWiringTest, RagFusionConfigDefaultsDisabled) {
     EXPECT_EQ(cfg.candidate_multiplier, 1);
     EXPECT_EQ(cfg.max_candidates, 50);
     EXPECT_FALSE(cfg.final_rerank);
+    EXPECT_EQ(cfg.activation_policy, "always");
+    EXPECT_NEAR(cfg.activation_score_margin, 0.0f, 1e-6f);
+    EXPECT_EQ(cfg.activation_min_results, 2);
 }
 
 // use_rag_fusion = (routing_path=="complex") && cfg.enabled && llm_available. With
@@ -242,6 +245,11 @@ TEST_F(QueryWiringTest, RagFusionConfigValidationRejectsExpandedCandidateBounds)
     bad_candidates.max_candidates = kRagFusionMaxCandidatesMax + 1;
     EXPECT_FALSE(ValidateRagFusionConfig(bad_candidates, &field, &range));
     EXPECT_EQ(field, "max_candidates");
+
+    RagFusionConfig bad_policy;
+    bad_policy.activation_policy = "sometimes";
+    EXPECT_FALSE(ValidateRagFusionConfig(bad_policy, &field, &range));
+    EXPECT_EQ(field, "activation_policy");
 }
 
 }  // namespace

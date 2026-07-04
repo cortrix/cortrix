@@ -90,6 +90,12 @@ public:
     /// this instance). Pure accessor — no side effects.
     ExplainState GetExplainState() const { return explain_; }
 
+    /// Mark the current request as skipped before LLM expansion by an activation
+    /// policy (v1.0.11 selective activation). This keeps ?explain=true from
+    /// exposing stale state from a previous ExpandQueries call.
+    void MarkSkippedByActivationPolicy(const std::string& query,
+                                       const std::string& reason);
+
 private:
     std::shared_ptr<QueryVariantGenerator> generator_;
     std::shared_ptr<RRFFusion> rrf_;

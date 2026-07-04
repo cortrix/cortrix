@@ -397,6 +397,17 @@ RagFusionConfig ResolveRagFusionConfig(const httplib::Request& req, const json& 
         if (obj.contains("final_rerank") && obj["final_rerank"].is_boolean()) {
             cfg.final_rerank = obj["final_rerank"].get<bool>();
         }
+        if (obj.contains("activation_policy") && obj["activation_policy"].is_string()) {
+            cfg.activation_policy = obj["activation_policy"].get<std::string>();
+        }
+        if (obj.contains("activation_score_margin") &&
+            obj["activation_score_margin"].is_number()) {
+            cfg.activation_score_margin = obj["activation_score_margin"].get<float>();
+        }
+        if (obj.contains("activation_min_results") &&
+            obj["activation_min_results"].is_number_integer()) {
+            cfg.activation_min_results = obj["activation_min_results"].get<int>();
+        }
     };
 
     if (req.has_param("rag_fusion")) {
@@ -434,6 +445,23 @@ RagFusionConfig ResolveRagFusionConfig(const httplib::Request& req, const json& 
     if (req.has_param("rag_fusion_final_rerank")) {
         const std::string v = req.get_param_value("rag_fusion_final_rerank");
         cfg.final_rerank = (v == "true" || v == "1");
+    }
+    if (req.has_param("rag_fusion_activation_policy")) {
+        cfg.activation_policy = req.get_param_value("rag_fusion_activation_policy");
+    }
+    if (req.has_param("rag_fusion_activation_score_margin")) {
+        try {
+            cfg.activation_score_margin =
+                std::stof(req.get_param_value("rag_fusion_activation_score_margin"));
+        } catch (...) {
+        }
+    }
+    if (req.has_param("rag_fusion_activation_min_results")) {
+        try {
+            cfg.activation_min_results =
+                std::stoi(req.get_param_value("rag_fusion_activation_min_results"));
+        } catch (...) {
+        }
     }
     return cfg;
 }

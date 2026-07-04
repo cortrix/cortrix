@@ -105,6 +105,15 @@ RagFusion::RagFusion(std::shared_ptr<QueryVariantGenerator> generator,
                      std::shared_ptr<RRFFusion> rrf)
     : generator_(std::move(generator)), rrf_(std::move(rrf)) {}
 
+void RagFusion::MarkSkippedByActivationPolicy(const std::string& query,
+                                              const std::string& reason) {
+    explain_ = ExplainState{};
+    explain_.active = false;
+    explain_.reason = reason;
+    explain_.variant_count = 1;
+    explain_.variants_used = {query};
+}
+
 Result<std::vector<std::string>> RagFusion::ExpandQueries(
     const std::string& query,
     const RagFusionConfig& ns_config,

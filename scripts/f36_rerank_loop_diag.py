@@ -240,7 +240,12 @@ def ingest_sample(
     return counts
 
 
-def profile_matrix(max_candidates: int, rag_fusion_timeout_ms: int) -> Dict[str, Mapping[str, object]]:
+def profile_matrix(
+    max_candidates: int,
+    rag_fusion_timeout_ms: int,
+    activation_score_margin: float,
+    activation_min_results: int,
+) -> Dict[str, Mapping[str, object]]:
     return {
         "baseline_rrf": {
             "rerank": False,
@@ -286,6 +291,21 @@ def profile_matrix(max_candidates: int, rag_fusion_timeout_ms: int) -> Dict[str,
                 "final_rerank": True,
             },
         },
+        "llm_m3_selective_final_rerank": {
+            "rerank": True,
+            "rag_fusion": True,
+            "rag_fusion_config": {
+                "enabled": True,
+                "locale": "en",
+                "timeout_ms": rag_fusion_timeout_ms,
+                "candidate_multiplier": 3,
+                "max_candidates": max_candidates,
+                "final_rerank": True,
+                "activation_policy": "selective_margin",
+                "activation_score_margin": activation_score_margin,
+                "activation_min_results": activation_min_results,
+            },
+        },
         "llm_m5_final_rerank": {
             "rerank": True,
             "rag_fusion": True,
@@ -312,6 +332,8 @@ def main() -> int:
     ap.add_argument("--batch-size", type=int, default=30)
     ap.add_argument("--max-candidates", type=int, default=50)
     ap.add_argument("--rag-fusion-timeout-ms", type=int, default=15000)
+    ap.add_argument("--activation-score-margin", type=float, default=0.0)
+    ap.add_argument("--activation-min-results", type=int, default=10)
     ap.add_argument("--target-score", type=float, default=0.80)
     ap.add_argument("--namespace", default="")
     ap.add_argument("--max-queries", type=int, default=0)
@@ -356,7 +378,12 @@ def main() -> int:
     if args.max_queries > 0:
         queries = dict(list(queries.items())[: args.max_queries])
     qrels = load_qrels(qrels_path)
-    profiles = profile_matrix(args.max_candidates, args.rag_fusion_timeout_ms)
+    profiles = profile_matrix(
+        args.max_candidates,
+        args.rag_fusion_timeout_ms,
+        args.activation_score_margin,
+        args.activation_min_results,
+    )
     if args.profiles:
         requested_profiles = [p.strip() for p in args.profiles.split(",") if p.strip()]
         if "baseline_rrf" not in requested_profiles:
@@ -406,6 +433,9 @@ def main() -> int:
                 raise SystemExit(f"query failed; aborting invalid benchmark run: {detail}")
             docs_out = extract_doc_ids(response)[: args.top_k]
             rag = extract_rag_state(response)
+            rag_reason = None
+            if rag:
+                rag_reason = rag.get("reason") or rag.get("degrade_reason")
             runs[name][qid] = docs_out
             latencies[name].append(latency_ms)
             rag_states[name].append(rag)
@@ -416,6 +446,7 @@ def main() -> int:
                     "latency_ms": latency_ms,
                     "retrieved_doc_ids": docs_out,
                     "rag_fusion": rag,
+                    "rag_reason": rag_reason,
                     "rag_degrade_reason": rag.get("degrade_reason") if rag else None,
                     "rag_degrade_detail": rag.get("degrade_detail") if rag else None,
                     "rag_variant_count": rag.get("variant_count") if rag else None,
@@ -425,7 +456,7 @@ def main() -> int:
             )
             print(
                 f"[query-profile] {qid} {name} done docs={len(docs_out)} "
-                f"rag_reason={rag.get('degrade_reason') if rag else ''} "
+                f"rag_reason={rag_reason or ''} "
                 f"rag_detail={rag.get('degrade_detail') if rag else ''} "
                 f"rag_variants={rag.get('variant_count') if rag else ''} "
                 f"latency_ms={latency_ms:.1f}",

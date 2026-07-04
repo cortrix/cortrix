@@ -55,12 +55,16 @@ struct RagFusionConfig {
     int candidate_multiplier = 1;                            ///< v1.0.9: per-variant top_k multiplier before outer fusion
     int max_candidates = 50;                                 ///< v1.0.9: cap for expanded per-variant candidate pool
     bool final_rerank = false;                               ///< v1.0.9: optional final rerank after outer fusion
+    std::string activation_policy = "always";                ///< v1.0.11: "always" or "selective_margin"
+    float activation_score_margin = 0.0f;                    ///< v1.0.11: skip LLM when original top1-top2 margin >= this
+    int activation_min_results = 2;                           ///< v1.0.11: need at least this many original results to skip
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RagFusionConfig, enabled, variant_count,
                                    variant_strategies, rrf_k, timeout_ms, locale,
                                    candidate_multiplier, max_candidates,
-                                   final_rerank)
+                                   final_rerank, activation_policy,
+                                   activation_score_margin, activation_min_results)
 
 /// The inclusive bounds for variant_count (topic 1: NS-tunable [1-10]).
 constexpr int kVariantCountMin = 1;
@@ -69,6 +73,10 @@ constexpr int kRagFusionCandidateMultiplierMin = 1;
 constexpr int kRagFusionCandidateMultiplierMax = 5;
 constexpr int kRagFusionMaxCandidatesMin = 1;
 constexpr int kRagFusionMaxCandidatesMax = 200;
+constexpr int kRagFusionActivationMinResultsMin = 2;
+constexpr int kRagFusionActivationMinResultsMax = 200;
+constexpr float kRagFusionActivationScoreMarginMin = 0.0f;
+constexpr float kRagFusionActivationScoreMarginMax = 10.0f;
 
 /// Validate a config's fields against the §4.4 / §7 ranges. Returns false (and
 /// fills `field`/`valid_range` for a CX_ERR_RAG_FUSION_CONFIG_INVALID body) on the

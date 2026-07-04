@@ -49,6 +49,18 @@ bool ValidateRagFusionConfig(const RagFusionConfig& cfg,
         cfg.max_candidates > kRagFusionMaxCandidatesMax) {
         return fail("max_candidates", "[1, 200]");
     }
+    if (cfg.activation_policy != "always" &&
+        cfg.activation_policy != "selective_margin") {
+        return fail("activation_policy", "always|selective_margin");
+    }
+    if (cfg.activation_score_margin < kRagFusionActivationScoreMarginMin ||
+        cfg.activation_score_margin > kRagFusionActivationScoreMarginMax) {
+        return fail("activation_score_margin", "[0, 10]");
+    }
+    if (cfg.activation_min_results < kRagFusionActivationMinResultsMin ||
+        cfg.activation_min_results > kRagFusionActivationMinResultsMax) {
+        return fail("activation_min_results", "[2, 200]");
+    }
     // At least one strategy when enabled (an empty strategy list would generate
     // nothing). Allowed to be empty when disabled (config is inert then).
     if (cfg.enabled && cfg.variant_strategies.empty()) {

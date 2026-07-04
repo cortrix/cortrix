@@ -110,8 +110,21 @@ retrieval::RankedChunk ChunkForStage(const std::string& child_id,
     return rc;
 }
 
+retrieval::RankedChunk ChunkForStageWithScores(const std::string& child_id,
+                                               const std::string& content,
+                                               float score,
+                                               float rerank_score) {
+    retrieval::RankedChunk rc;
+    rc.child_id = child_id;
+    rc.chunk_text = content;
+    rc.score = score;
+    rc.rerank_score = rerank_score;
+    return rc;
+}
+
 class StageFakeExecutor : public IScatterExecutor {
 public:
+    std::vector<std::string> seen_queries;
     std::vector<int> seen_top_k;
     std::vector<bool> seen_rerank;
 
@@ -119,6 +132,7 @@ public:
         const QueryContext& ctx,
         const std::string& namespace_id,
         float /*oversample*/) override {
+        seen_queries.push_back(ctx.query);
         seen_top_k.push_back(ctx.top_k);
         seen_rerank.push_back(ctx.rerank);
         retrieval::NamespaceQueryResult out;
@@ -137,6 +151,55 @@ public:
                 ChunkForStage("original_head", "original exact company financial hit", 0.10f),
             };
         }
+        if (static_cast<int>(out.chunks.size()) > ctx.top_k) {
+            out.chunks.resize(static_cast<std::size_t>(ctx.top_k));
+        }
+        return out;
+    }
+};
+
+class StageFinalScoreExecutor : public IScatterExecutor {
+public:
+    std::vector<std::string> seen_queries;
+
+    retrieval::NamespaceQueryResult ExecuteForNamespace(
+        const QueryContext& ctx,
+        const std::string& namespace_id,
+        float /*oversample*/) override {
+        seen_queries.push_back(ctx.query);
+        retrieval::NamespaceQueryResult out;
+        out.namespace_id = namespace_id;
+        out.chunks = {
+            // Final score is the response ordering contract. The deliberately
+            // inverted rerank_score protects the selective gate from regressing
+            // to a raw rerank-only margin.
+            ChunkForStageWithScores("final_head", "highest fused final score", 0.90f, 0.10f),
+            ChunkForStageWithScores("rerank_head", "highest raw rerank score", 0.20f, 0.95f),
+            ChunkForStageWithScores("tail", "weak tail", 0.10f, 0.10f),
+        };
+        if (static_cast<int>(out.chunks.size()) > ctx.top_k) {
+            out.chunks.resize(static_cast<std::size_t>(ctx.top_k));
+        }
+        return out;
+    }
+};
+
+class StageTiedScoreExecutor : public IScatterExecutor {
+public:
+    std::vector<std::string> seen_queries;
+
+    retrieval::NamespaceQueryResult ExecuteForNamespace(
+        const QueryContext& ctx,
+        const std::string& namespace_id,
+        float /*oversample*/) override {
+        seen_queries.push_back(ctx.query);
+        retrieval::NamespaceQueryResult out;
+        out.namespace_id = namespace_id;
+        out.chunks = {
+            ChunkForStageWithScores("tie_a", "first tied final score", 0.50f, 0.50f),
+            ChunkForStageWithScores("tie_b", "second tied final score", 0.50f, 0.50f),
+            ChunkForStageWithScores("tail", "weak tail", 0.10f, 0.10f),
+        };
         if (static_cast<int>(out.chunks.size()) > ctx.top_k) {
             out.chunks.resize(static_cast<std::size_t>(ctx.top_k));
         }
@@ -671,6 +734,22 @@ TEST_F(RagFusionTest, ValidateRagFusionConfig_Ranges) {
     EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
     EXPECT_EQ(field, "max_candidates");
     EXPECT_EQ(range, "[1, 200]");
+
+    ok.max_candidates = 50;
+    ok.activation_policy = "sometimes";
+    EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
+    EXPECT_EQ(field, "activation_policy");
+    EXPECT_EQ(range, "always|selective_margin");
+
+    ok.activation_policy = "selective_margin";
+    ok.activation_score_margin = -0.01f;
+    EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
+    EXPECT_EQ(field, "activation_score_margin");
+
+    ok.activation_score_margin = 0.05f;
+    ok.activation_min_results = 1;
+    EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
+    EXPECT_EQ(field, "activation_min_results");
 }
 
 TEST_F(RagFusionTest, RagFusionStage_ExpandedCandidatePoolThenFinalRerank) {
@@ -731,6 +810,186 @@ TEST_F(RagFusionTest, RagFusionStage_ExpandedCandidatePoolThenFinalRerank) {
     EXPECT_TRUE(std::all_of(std::next(executor.seen_rerank.begin()),
                             executor.seen_rerank.end(),
                             [](bool rerank) { return !rerank; }));
+}
+
+TEST_F(RagFusionTest, RagFusionStage_SelectiveActivationSkipsLlmOnConfidentOriginal) {
+    auto mock_llm = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock_llm, Chat(_, _)).Times(0);
+    auto svc = MakeService(mock_llm);
+
+    StageFakeExecutor executor;
+    ExecutorEngine engine(/*workers=*/1, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    QueryRequest req;
+    req.query = "company financial status";
+    req.namespaces = {"bench"};
+    req.top_k = 2;
+    req.rerank = false;
+
+    QueryContext qctx;
+    qctx.query = req.query;
+    qctx.top_k = req.top_k;
+    qctx.rerank = false;
+    qctx.routing_path = "complex";
+
+    AuthContext auth;
+    auth.user_id = "user";
+
+    RagFusionConfig cfg = EnabledConfig();
+    cfg.locale = "en";
+    cfg.activation_policy = "selective_margin";
+    cfg.activation_score_margin = 0.50f;  // original scores 1.0 vs 0.2 => skip
+    cfg.activation_min_results = 2;
+
+    CrossNsResponse resp = stage.Run(req, auth, qctx, cfg);
+
+    ASSERT_EQ(resp.results.size(), 2u);
+    EXPECT_EQ(resp.results[0].child_id, "original_head");
+    EXPECT_EQ(resp.results[1].child_id, "semantic_tail");
+    ASSERT_EQ(executor.seen_queries.size(), 1u);
+    EXPECT_EQ(executor.seen_queries[0], "company financial status");
+    const auto es = svc->GetExplainState();
+    EXPECT_FALSE(es.active);
+    EXPECT_EQ(es.reason, "skipped_by_activation_policy");
+    EXPECT_EQ(es.variant_count, 1);
+}
+
+TEST_F(RagFusionTest, RagFusionStage_SelectiveActivationUsesFinalScoreMargin) {
+    auto mock_llm = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock_llm, Chat(_, _)).Times(0);
+    auto svc = MakeService(mock_llm);
+
+    StageFinalScoreExecutor executor;
+    ExecutorEngine engine(/*workers=*/1, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    QueryRequest req;
+    req.query = "company financial status";
+    req.namespaces = {"bench"};
+    req.top_k = 2;
+    req.rerank = true;
+
+    QueryContext qctx;
+    qctx.query = req.query;
+    qctx.top_k = req.top_k;
+    qctx.rerank = true;
+    qctx.routing_path = "complex";
+
+    AuthContext auth;
+    auth.user_id = "user";
+
+    RagFusionConfig cfg = EnabledConfig();
+    cfg.locale = "en";
+    cfg.activation_policy = "selective_margin";
+    cfg.activation_score_margin = 0.60f;  // final score margin 0.90 - 0.20 => skip
+    cfg.activation_min_results = 2;
+
+    CrossNsResponse resp = stage.Run(req, auth, qctx, cfg);
+
+    ASSERT_EQ(resp.results.size(), 2u);
+    EXPECT_EQ(resp.results[0].child_id, "final_head");
+    EXPECT_EQ(resp.results[1].child_id, "rerank_head");
+    ASSERT_EQ(executor.seen_queries.size(), 1u);
+    const auto es = svc->GetExplainState();
+    EXPECT_FALSE(es.active);
+    EXPECT_EQ(es.reason, "skipped_by_activation_policy");
+}
+
+TEST_F(RagFusionTest, RagFusionStage_SelectiveActivationDoesNotSkipTiedScores) {
+    auto mock_llm = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock_llm, Chat(_, _)).WillOnce(Return(OkResponse(ThreeVariantJson())));
+    auto svc = MakeService(mock_llm);
+
+    StageTiedScoreExecutor executor;
+    ExecutorEngine engine(/*workers=*/1, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    QueryRequest req;
+    req.query = "company financial status";
+    req.namespaces = {"bench"};
+    req.top_k = 2;
+    req.rerank = true;
+
+    QueryContext qctx;
+    qctx.query = req.query;
+    qctx.top_k = req.top_k;
+    qctx.rerank = true;
+    qctx.routing_path = "complex";
+
+    AuthContext auth;
+    auth.user_id = "user";
+
+    RagFusionConfig cfg = EnabledConfig();
+    cfg.locale = "en";
+    cfg.activation_policy = "selective_margin";
+    cfg.activation_score_margin = 0.0f;  // a tied margin is not confidence
+    cfg.activation_min_results = 2;
+
+    (void)stage.Run(req, auth, qctx, cfg);
+
+    ASSERT_EQ(executor.seen_queries.size(), 4u);  // preflight original + 3 variants
+    const auto es = svc->GetExplainState();
+    EXPECT_TRUE(es.active);
+    EXPECT_FALSE(es.degraded);
+}
+
+TEST_F(RagFusionTest, RagFusionStage_SelectiveActivationRunsLlmAndReusesOriginal) {
+    auto mock_llm = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock_llm, Chat(_, _)).WillOnce(Return(OkResponse(ThreeVariantJson())));
+    auto svc = MakeService(mock_llm);
+
+    StageFakeExecutor executor;
+    ExecutorEngine engine(/*workers=*/1, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    QueryRequest req;
+    req.query = "company financial status";
+    req.namespaces = {"bench"};
+    req.top_k = 1;
+    req.rerank = false;
+
+    QueryContext qctx;
+    qctx.query = req.query;
+    qctx.top_k = req.top_k;
+    qctx.rerank = false;
+    qctx.routing_path = "complex";
+
+    AuthContext auth;
+    auth.user_id = "user";
+
+    RagFusionConfig cfg = EnabledConfig();
+    cfg.locale = "en";
+    cfg.candidate_multiplier = 3;
+    cfg.max_candidates = 3;
+    cfg.activation_policy = "selective_margin";
+    cfg.activation_score_margin = 0.95f;  // original margin 0.8 => not confident
+    cfg.activation_min_results = 2;
+
+    CrossNsResponse resp = stage.Run(req, auth, qctx, cfg);
+
+    ASSERT_EQ(resp.results.size(), 1u);
+    ASSERT_EQ(executor.seen_queries.size(), 4u);  // preflight original + 3 variants
+    EXPECT_EQ(std::count(executor.seen_queries.begin(), executor.seen_queries.end(),
+                         "company financial status"),
+              1);
+    EXPECT_EQ(executor.seen_queries[0], "company financial status");
+    const auto es = svc->GetExplainState();
+    EXPECT_TRUE(es.active);
+    EXPECT_FALSE(es.degraded);
+    EXPECT_EQ(es.variant_count, 4);
 }
 
 // ===========================================================================

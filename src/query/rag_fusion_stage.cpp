@@ -73,6 +73,37 @@ retrieval::RankedChunk ToRankedChunkForFinalRerank(const ResultItem& item) {
     return rc;
 }
 
+float EffectiveScore(const ResultItem& item) {
+    // `score` is the downstream ordering contract: F02 writes rerank+RRF fused
+    // scores back to RankedChunk::score, and ScatterGather sorts ResultItem by
+    // score. Use rerank_score only as a compatibility fallback for legacy/fake
+    // responses that did not populate the final score.
+    return item.score != 0.0f ? item.score : item.rerank_score;
+}
+
+void TrimToRequestedTopK(CrossNsResponse* resp, int top_k) {
+    if (resp == nullptr) return;
+    const int k = RequestedTopK(top_k);
+    if (static_cast<int>(resp->results.size()) > k) {
+        resp->results.resize(static_cast<std::size_t>(k));
+    }
+}
+
+bool ShouldSkipLlmBySelectiveMargin(const CrossNsResponse& original,
+                                    const RagFusionConfig& cfg) {
+    if (cfg.activation_policy != "selective_margin") return false;
+    if (original.results.size() <
+        static_cast<std::size_t>(cfg.activation_min_results)) {
+        return false;
+    }
+    if (original.results.size() < 2u) return false;
+
+    const float top = EffectiveScore(original.results[0]);
+    const float second = EffectiveScore(original.results[1]);
+    if (top <= second) return false;
+    return (top - second) >= cfg.activation_score_margin;
+}
+
 void ApplyFinalRerankIfEnabled(std::vector<ResultItem>* items,
                                const std::string& original_query,
                                const QueryContext& qctx,
@@ -107,6 +138,24 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
                                     const AuthContext& auth,
                                     const QueryContext& qctx,
                                     const RagFusionConfig& cfg) {
+    const int candidate_top_k = ExpandedCandidateTopK(request.top_k, cfg);
+    CrossNsResponse original_preflight;
+    bool has_original_preflight = false;
+    if (cfg.activation_policy == "selective_margin") {
+        QueryRequest vr = request;
+        vr.top_k = candidate_top_k;
+        QueryContext vctx = qctx;
+        vctx.top_k = candidate_top_k;
+        original_preflight = scatter_->Execute(vr, auth, &vctx);
+        has_original_preflight = true;
+        if (ShouldSkipLlmBySelectiveMargin(original_preflight, cfg)) {
+            fusion_->MarkSkippedByActivationPolicy(
+                request.query, "skipped_by_activation_policy");
+            TrimToRequestedTopK(&original_preflight, request.top_k);
+            return original_preflight;
+        }
+    }
+
     // 1. Expand the query into [original + N variants] (§4.3). On LLM failure
     //    ExpandQueries returns non-ok → degrade to the single original query +
     //    the CX_WARN_RAG_FUSION_DEGRADED warning (topic 4).
@@ -124,7 +173,13 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
     // Single query (no variants, or expansion degraded) → plain scatter, plus the
     // degraded warning when expansion failed.
     if (all_queries.size() == 1) {
-        CrossNsResponse resp = scatter_->Execute(request, auth, &qctx);
+        CrossNsResponse resp;
+        if (has_original_preflight) {
+            resp = original_preflight;
+            TrimToRequestedTopK(&resp, request.top_k);
+        } else {
+            resp = scatter_->Execute(request, auth, &qctx);
+        }
         if (degraded) resp.meta.warnings.push_back(DegradedWarning());
         return resp;
     }
@@ -137,7 +192,6 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
     per_variant.reserve(all_queries.size());
     CrossNsResponse base;
     std::unordered_map<std::string, ResultItem> items_by_child;  // union across variants
-    const int candidate_top_k = ExpandedCandidateTopK(request.top_k, cfg);
     // In final-rerank mode, keep the original query's normal reranked baseline
     // signal, but treat LLM variants as candidate generation only. Running the
     // reranker inside every LLM variant would multiply latency and prematurely
@@ -153,7 +207,12 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
         vctx.query = all_queries[i];
         vctx.top_k = candidate_top_k;
         if (defer_inner_rerank && i > 0) vctx.rerank = false;
-        CrossNsResponse vresp = scatter_->Execute(vr, auth, &vctx);
+        CrossNsResponse vresp;
+        if (has_original_preflight && i == 0) {
+            vresp = original_preflight;
+        } else {
+            vresp = scatter_->Execute(vr, auth, &vctx);
+        }
         per_variant.push_back(ToScoredResults(vresp));
         if (i == 0) base = vresp;  // base meta + the original query's items
         for (auto& it : vresp.results) {
