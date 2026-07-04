@@ -154,7 +154,7 @@ Status OnnxEmbedder::Embed(const std::string& text, EmbeddingResult* result) {
 
         // Tokenize input text
         HfTokenizer::Encoded encoded;
-        auto tok_status = tokenizer->Encode(text, max_seq_length_, &encoded);
+        auto tok_status = tokenizer->EncodeNoPad(text, max_seq_length_, &encoded);
         if (!tok_status.ok()) {
             return tok_status;
         }

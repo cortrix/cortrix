@@ -139,6 +139,22 @@ TEST_F(HfTokenizerTest, Encode_NullOutput) {
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
 }
 
+TEST_F(HfTokenizerTest, Encode_RejectsMaxLengthBelowSpecialTokenFloor) {
+    std::string path = CreateMinimalTokenizerJson(test_dir_.string());
+
+    HfTokenizer tok;
+    ASSERT_TRUE(tok.Load(path).ok());
+
+    HfTokenizer::Encoded enc;
+    Status s = tok.Encode("hello", 1, &enc);
+    EXPECT_FALSE(s.ok());
+    EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
+
+    s = tok.EncodeNoPad("hello", 1, &enc);
+    EXPECT_FALSE(s.ok());
+    EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
+}
+
 TEST_F(HfTokenizerTest, Encode_BasicOutput) {
     std::string path = CreateMinimalTokenizerJson(test_dir_.string());
 
@@ -160,6 +176,25 @@ TEST_F(HfTokenizerTest, Encode_BasicOutput) {
     EXPECT_EQ(enc.attention_mask[0], 1);  // CLS
     // Last positions should be padding (0)
     EXPECT_EQ(enc.attention_mask[31], 0);
+}
+
+TEST_F(HfTokenizerTest, EncodeNoPad_DoesNotPadShortBpeText) {
+    std::string path = CreateMinimalTokenizerJson(test_dir_.string());
+
+    HfTokenizer tok;
+    ASSERT_TRUE(tok.Load(path).ok());
+
+    HfTokenizer::Encoded enc;
+    Status s = tok.EncodeNoPad("hello", 32, &enc);
+    ASSERT_TRUE(s.ok()) << s.message();
+
+    EXPECT_LT(static_cast<int>(enc.input_ids.size()), 32);
+    EXPECT_EQ(enc.attention_mask.size(), enc.input_ids.size());
+    EXPECT_EQ(enc.input_ids.front(), 0);
+    EXPECT_EQ(enc.input_ids.back(), 2);
+    for (auto m : enc.attention_mask) {
+        EXPECT_EQ(m, 1);
+    }
 }
 
 TEST_F(HfTokenizerTest, Encode_EmptyText) {
@@ -342,6 +377,23 @@ TEST_F(HfTokenizerTest, Encode_UnigramViterbiSegmentation) {
     }
     EXPECT_TRUE(has_he);
     EXPECT_TRUE(has_llo);
+}
+
+TEST_F(HfTokenizerTest, EncodeNoPad_DoesNotPadShortUnigramText) {
+    std::string path = CreateMinimalUnigramJson(test_dir_.string());
+    HfTokenizer tok;
+    ASSERT_TRUE(tok.Load(path).ok());
+
+    HfTokenizer::Encoded enc;
+    ASSERT_TRUE(tok.EncodeNoPad("hello", 32, &enc).ok());
+
+    EXPECT_LT(static_cast<int>(enc.input_ids.size()), 32);
+    EXPECT_EQ(enc.attention_mask.size(), enc.input_ids.size());
+    EXPECT_EQ(enc.input_ids.front(), 0);
+    EXPECT_EQ(enc.input_ids.back(), 2);
+    for (auto m : enc.attention_mask) {
+        EXPECT_EQ(m, 1);
+    }
 }
 
 TEST_F(HfTokenizerTest, Encode_UnigramEmptyText) {
