@@ -54,6 +54,7 @@ using ::testing::Return;
 constexpr const char* kNs = "sales";
 
 bool HasResultDocId(const json& body, const std::string& doc_id);
+int ResultDocPosition(const json& body, const std::string& doc_id);
 
 // Two small documents let the E2E prove F36 variants affect final order, not just
 // that Chat() was called. We drive `granularity=doc`, so matching is deterministic
@@ -171,7 +172,7 @@ class QueryLlmModesBase : public ::testing::Test {
                  {"rag_fusion", true},     // opt into F36
                  {"locale", "en"},         // BEIR-style English query expansion
                  {"granularity", "doc"},   // deterministic F08/F41 metadata path
-                 {"top_k", 1},
+                 {"top_k", 2},
                  {"explain", true}};
     return c.Post("/api/v1/query?granularity=doc&explain=true",
                   h_->Bearer(h_->user_key()), body.dump(),
@@ -203,7 +204,9 @@ class QueryWithLlm : public QueryLlmModesBase {
 
 // The LLM-configured query runs rag-fusion: the MockLlmClient's Chat MUST be invoked
 // (variant expansion entered the query chain) — the core "LLM full-chain" probe — and
-// the fused query returns a 200 with a well-formed result envelope.
+// the fused query returns a 200 with a well-formed result envelope. F36 v1.0.7 uses
+// anchored conservative weighted RRF, so the original strong hit should stay first
+// while the variant-only doc still enters the final order as additive evidence.
 TEST_F(QueryWithLlm, RagFusionInvokesLlmAndReturnsResults) {
   auto res = Query();
   ASSERT_TRUE(res);
@@ -213,7 +216,9 @@ TEST_F(QueryWithLlm, RagFusionInvokesLlmAndReturnsResults) {
   EXPECT_TRUE(j["results"].is_array());
   ASSERT_FALSE(j["results"].empty()) << res->body;
   EXPECT_TRUE(HasResultDocId(j, variant_doc_id_)) << res->body;
-  EXPECT_FALSE(HasResultDocId(j, original_doc_id_)) << res->body;
+  EXPECT_TRUE(HasResultDocId(j, original_doc_id_)) << res->body;
+  EXPECT_LT(ResultDocPosition(j, original_doc_id_),
+            ResultDocPosition(j, variant_doc_id_)) << res->body;
   EXPECT_TRUE(j.contains("meta"));
   ASSERT_TRUE(j.contains("explain"));
   ASSERT_TRUE(j["explain"].contains("llm_dependent_features"));
@@ -287,6 +292,22 @@ bool HasResultDocId(const json& body, const std::string& doc_id) {
     }
   }
   return false;
+}
+
+int ResultDocPosition(const json& body, const std::string& doc_id) {
+  if (!body.contains("results") || !body["results"].is_array()) return 1'000'000;
+  for (size_t i = 0; i < body["results"].size(); ++i) {
+    const auto& r = body["results"][i];
+    if (r.value("doc_id", "") == doc_id) return static_cast<int>(i);
+    if (r.value("child_id", "") == doc_id) return static_cast<int>(i);
+    if (r.contains("metadata") && r["metadata"].is_object()) {
+      const auto& m = r["metadata"];
+      if (m.value("doc_id", "") == doc_id) return static_cast<int>(i);
+      if (m.value("source_doc_id", "") == doc_id) return static_cast<int>(i);
+      if (m.value("hybrid_doc_id", "") == doc_id) return static_cast<int>(i);
+    }
+  }
+  return 1'000'000;
 }
 
 bool HasMetadataValue(const json& body, const std::string& key,

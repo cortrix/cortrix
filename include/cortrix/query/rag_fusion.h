@@ -23,10 +23,14 @@ namespace cortrix::query {
 /// block_id — that is the INNER per-NS fusion of vector/BM25 routes that F04
 /// already performs. F36's FuseResults is the OUTER second-pass fusion across
 /// variants, over already-fused `cortrix::retrieval::ScoredResult` (keyed by the
-/// string ChildId, RETRIEVAL_TYPES_SPEC §1). It applies the SAME RRF formula
-/// (`sum(1/(k+rank))`, dedup keep-max) over the ChildId keyspace. The injected
-/// RRFFusion (held per the §4.3 ctor + §10.1 DI) carries the resolved default k;
-/// FuseResults takes an explicit rrf_k so the NS-config value (§4.4) wins.
+/// string ChildId, RETRIEVAL_TYPES_SPEC §1). F36 v1.0.7 applies an anchored
+/// conservative weighted RRF formula over that keyspace: `per_variant_results[0]`
+/// is the original query, receives the primary role weight, and its top-3 head is
+/// emitted first as a strong-hit guardrail; LLM variants receive weaker additive
+/// weights for the remaining order so variants can improve recall without
+/// displacing the original query's strongest evidence. The injected RRFFusion
+/// (held per the §4.3 ctor + §10.1 DI) carries the resolved default k; FuseResults
+/// takes an explicit rrf_k so the NS-config value (§4.4) wins.
 class RagFusion {
 public:
     /// @param generator the LLM variant generator (§4.2)
@@ -56,8 +60,11 @@ public:
 
     /// Global RRF second-pass fusion of the per-variant retrieval results (§4.3 /
     /// topic 2 B). `per_variant_results[i]` is variant i's ranked candidates (each
-    /// list assumed sorted best-first; rank = position). Returns one fused,
-    /// de-duplicated (by ChildId, keep-max) list sorted by RRF score descending.
+    /// list assumed sorted best-first; rank = position). Contract: index 0 is the
+    /// original query; indexes 1..N are LLM variants. Returns one fused,
+    /// de-duplicated (by ChildId, keep-sum) list with the original query's top-3
+    /// head anchored first, followed by remaining candidates sorted by weighted RRF
+    /// score descending.
     ///
     /// @param rrf_k RRF constant (§4.4 NS value; default 60). k ≤ 0 → treated as 60.
     Result<std::vector<retrieval::ScoredResult>> FuseResults(

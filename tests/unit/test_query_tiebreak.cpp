@@ -8,6 +8,11 @@
 // explicit `first_seen` (insertion-order) secondary key in its comparator; these
 // tests lock that determinism so a refactor that drops the tiebreak is caught.
 //
+// F36 v1.0.7 makes outer RRF anchored + role-weighted: list 0 is the original
+// query, while lists 1..N are LLM variants. Equal-score tests therefore construct
+// ties within the same role class (variant-only lists) instead of assuming every
+// list is equal, and keep the original list empty where anchoring is irrelevant.
+//
 // NOTE (honest scope): the design phrasing "equal score -> child_id ascending" is
 // NOT what FuseResults implements -- it breaks ties by first-seen insertion order
 // (rag_fusion.cpp comparator). We test the REAL, implemented tiebreak (stable across
@@ -42,13 +47,15 @@ std::shared_ptr<RagFusion> MakeFusion() {
 
 // --- RagFusion::FuseResults: equal RRF score -> insertion-order tiebreak ------
 
-// Three child_ids each hit at rank-1 in exactly one variant => identical RRF score
-// 1/(60+1). The output order is the order in which they were first seen, which is
-// the variant/list traversal order. This is deterministic and run-independent.
+// Three child_ids each hit at rank-1 in exactly one LLM-variant list => identical
+// weighted RRF score 0.5/(60+1). The output order is the order in which they were
+// first seen, which is the variant/list traversal order. This is deterministic and
+// run-independent.
 TEST(QueryTiebreakTest, FuseResultsEqualScoreKeepsInsertionOrder) {
     auto svc = MakeFusion();
     std::vector<std::vector<ScoredResult>> per_variant = {
-        {{"zeta", 0.9f}},   // first seen: zeta
+        {},                 // original query has no materialized hits in this tie test
+        {{"zeta", 0.9f}},   // first seen variant hit: zeta
         {{"alpha", 0.9f}},  // then alpha
         {{"mike", 0.9f}},   // then mike
     };
@@ -59,16 +66,18 @@ TEST(QueryTiebreakTest, FuseResultsEqualScoreKeepsInsertionOrder) {
     EXPECT_EQ(out.value()[0].child_id, "zeta");
     EXPECT_EQ(out.value()[1].child_id, "alpha");
     EXPECT_EQ(out.value()[2].child_id, "mike");
-    const double expected = 1.0 / 61.0;
+    const double expected = 0.5 / 61.0;
     for (const auto& r : out.value()) EXPECT_NEAR(r.score, expected, 1e-6);
 }
 
 // Determinism across repeated runs: the same input always yields the same order
 // (guards against a regression to raw unordered_map iteration order).
 TEST(QueryTiebreakTest, FuseResultsTiebreakIsStableAcrossRuns) {
-    // Three single-hit variants, all rank-1 => identical RRF score. The tiebreak is
-    // first-seen order; the point of this test is run-to-run stability.
+    // Three single-hit variant lists, all rank-1 => identical weighted RRF score.
+    // The tiebreak is first-seen order; the point of this test is run-to-run
+    // stability.
     std::vector<std::vector<ScoredResult>> per_variant = {
+        {},
         {{"c3", 0.9f}},
         {{"c1", 0.9f}},
         {{"c2", 0.9f}},
@@ -93,19 +102,21 @@ TEST(QueryTiebreakTest, FuseResultsTiebreakIsStableAcrossRuns) {
     EXPECT_EQ(first[0], "c3");  // first-seen variant wins the tie
 }
 
-// A genuine tie produced by two variants contributing symmetric ranks: child "a"
-// (rank1 then rank2) and child "b" (rank2 then rank1) sum to the SAME RRF score.
-// The tiebreak resolves to first-seen ("a" appears at list[0] position 0 first).
+// A genuine tie produced by two LLM variants contributing symmetric ranks: child
+// "a" (rank1 then rank2) and child "b" (rank2 then rank1) sum to the SAME
+// weighted RRF score. The tiebreak resolves to first-seen ("a" appears at the
+// first variant position 0 first).
 TEST(QueryTiebreakTest, FuseResultsSymmetricRanksTieToFirstSeen) {
     auto svc = MakeFusion();
     std::vector<std::vector<ScoredResult>> per_variant = {
+        {},
         {{"a", 0.9f}, {"b", 0.8f}},  // a=rank1, b=rank2
         {{"b", 0.9f}, {"a", 0.7f}},  // b=rank1, a=rank2
     };
     auto out = svc->FuseResults(per_variant, 60);
     ASSERT_TRUE(out.ok());
     ASSERT_EQ(out.value().size(), 2u);
-    const double tie = 1.0 / 61.0 + 1.0 / 62.0;
+    const double tie = 0.5 / 61.0 + 0.5 / 62.0;
     EXPECT_NEAR(out.value()[0].score, tie, 1e-6);
     EXPECT_NEAR(out.value()[1].score, tie, 1e-6);
     EXPECT_EQ(out.value()[0].child_id, "a");  // a first-seen at position 0
@@ -122,9 +133,9 @@ TEST(QueryTiebreakTest, FuseResultsDistinctScoresSortByScore) {
     auto out = svc->FuseResults(per_variant, 60);
     ASSERT_TRUE(out.ok());
     ASSERT_EQ(out.value().size(), 3u);
-    EXPECT_EQ(out.value()[0].child_id, "top");  // rank1 1/61
-    EXPECT_EQ(out.value()[1].child_id, "mid");  // rank2 1/62
-    EXPECT_EQ(out.value()[2].child_id, "low");  // rank3 1/63
+    EXPECT_EQ(out.value()[0].child_id, "top");  // original rank1 1.7/61
+    EXPECT_EQ(out.value()[1].child_id, "mid");  // original rank2 1.7/62
+    EXPECT_EQ(out.value()[2].child_id, "low");  // original rank3 1.7/63
     EXPECT_GT(out.value()[0].score, out.value()[1].score);
     EXPECT_GT(out.value()[1].score, out.value()[2].score);
 }

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 #include "cortrix/query/rag_fusion_error.h"
@@ -11,6 +12,20 @@
 namespace cortrix::query {
 
 namespace {
+
+// F36 v1.0.7 anchored conservative outer-fusion policy.
+//
+// `per_variant_results[0]` is the original query and should remain the primary
+// ranking signal. Its top-3 head is anchored as a strong-hit guardrail. LLM
+// variants are additive weak evidence: they can promote a candidate that is
+// repeatedly found by variants, but they reorder only the non-anchored tail.
+constexpr double kOriginalQueryRrfWeight = 1.7;
+constexpr double kVariantQueryRrfWeight = 0.5;
+constexpr size_t kOriginalQueryAnchorCount = 3;
+
+double QueryRoleWeight(size_t query_index) {
+    return query_index == 0 ? kOriginalQueryRrfWeight : kVariantQueryRrfWeight;
+}
 
 // Map a failed-Status (carrying a CX_ERR_RAG_FUSION_* prefix from
 // RagFusionStatus) back to a human "degrade_reason" token for the ExplainState
@@ -128,11 +143,17 @@ Result<std::vector<retrieval::ScoredResult>> RagFusion::FuseResults(
 
     const auto t0 = std::chrono::steady_clock::now();
 
-    // Global second-pass RRF over the ChildId keyspace (topic 2 B): for each
-    // variant's ranked list, the contribution of a result at 0-based position r is
-    // 1/(k + (r+1)). Sum per ChildId (dedup keep-sum); keep the max raw score seen
-    // for tie-context / downstream display. Same formula as the frozen
-    // cortrix::RRFFusion::Merge, applied to retrieval::ScoredResult.
+    // Global second-pass RRF over the ChildId keyspace (topic 2 B). v1.0.7 makes
+    // this an anchored conservative weighted RRF: list 0 is the original query and
+    // carries the primary weight; its top head is emitted first as a strong-hit
+    // guardrail; LLM-variant lists carry weaker additive evidence for the
+    // remaining order.
+    //
+    // contribution(query_index, rank) = role_weight / (k + rank)
+    //
+    // Sum per ChildId (dedup keep-sum); keep the max raw score seen for
+    // tie-context / downstream display. This is the outer F36 fusion over
+    // retrieval::ScoredResult, distinct from the inner per-NS RRFFusion.
     struct Acc {
         double rrf = 0.0;
         float  best_raw = 0.0f;
@@ -142,25 +163,50 @@ Result<std::vector<retrieval::ScoredResult>> RagFusion::FuseResults(
     acc.reserve(per_variant_results.size() * 32);
     size_t order = 0;
 
-    for (const auto& variant_list : per_variant_results) {
+    for (size_t query_index = 0; query_index < per_variant_results.size(); ++query_index) {
+        const auto& variant_list = per_variant_results[query_index];
+        const double role_weight = QueryRoleWeight(query_index);
         for (size_t r = 0; r < variant_list.size(); ++r) {
             const retrieval::ScoredResult& sr = variant_list[r];
             Acc& a = acc[sr.child_id];
             if (a.rrf == 0.0 && a.best_raw == 0.0f) a.first_seen = order++;
-            a.rrf += 1.0 / (static_cast<double>(rrf_k) + static_cast<double>(r + 1));
+            a.rrf += role_weight /
+                     (static_cast<double>(rrf_k) + static_cast<double>(r + 1));
             a.best_raw = std::max(a.best_raw, sr.score);
         }
     }
 
-    std::vector<retrieval::ScoredResult> fused;
-    fused.reserve(acc.size());
     std::vector<std::pair<retrieval::ChildId, Acc>> rows(acc.begin(), acc.end());
     std::sort(rows.begin(), rows.end(),
               [](const auto& x, const auto& y) {
                   if (x.second.rrf != y.second.rrf) return x.second.rrf > y.second.rrf;
                   return x.second.first_seen < y.second.first_seen;  // stable
               });
+
+    std::vector<retrieval::ScoredResult> fused;
+    fused.reserve(acc.size());
+    std::unordered_set<retrieval::ChildId> emitted;
+    emitted.reserve(std::min(acc.size(), kOriginalQueryAnchorCount) + 8);
+
+    if (!per_variant_results.empty()) {
+        const auto& original_results = per_variant_results.front();
+        size_t anchored_count = 0;
+        for (const auto& sr : original_results) {
+            if (anchored_count >= kOriginalQueryAnchorCount) break;
+            const retrieval::ChildId& child_id = sr.child_id;
+            if (!emitted.insert(child_id).second) continue;
+            auto found = acc.find(child_id);
+            if (found == acc.end()) continue;
+            retrieval::ScoredResult out;
+            out.child_id = child_id;
+            out.score = static_cast<float>(found->second.rrf);
+            fused.push_back(std::move(out));
+            ++anchored_count;
+        }
+    }
+
     for (auto& row : rows) {
+        if (emitted.find(row.first) != emitted.end()) continue;
         retrieval::ScoredResult out;
         out.child_id = row.first;
         out.score = static_cast<float>(row.second.rrf);  // the RRF score

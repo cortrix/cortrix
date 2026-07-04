@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <algorithm>
 #include <chrono>
 #include <memory>
 #include <set>
@@ -330,21 +331,25 @@ TEST_F(RagFusionTest, ExpandQueries_QctxThreaded_NoSkipYet) {
 // RagFusion::FuseResults -- global RRF (design UT 8-11)
 // ===========================================================================
 
-// UT 8: 4 variants x M global RRF math correctness (rank-based).
+// UT 8: 4 variants x M global RRF math correctness (v1.0.7 anchored role-weighted).
 TEST_F(RagFusionTest, RagFusion_FuseResults_GlobalRRF) {
     auto svc = MakeService(std::make_shared<MockLlmClient>());
     std::vector<std::vector<ScoredResult>> per_variant = {
-        {{"a", 0.9f}, {"b", 0.8f}, {"c", 0.7f}},  // variant 0: ranks 1,2,3
-        {{"b", 0.95f}, {"a", 0.6f}},               // variant 1: ranks 1,2
+        {{"a", 0.9f}, {"b", 0.8f}, {"c", 0.7f}},  // original: ranks 1,2,3
+        {{"b", 0.95f}, {"a", 0.6f}},               // variant: ranks 1,2
     };
     auto out = svc->FuseResults(per_variant, 60);
     ASSERT_TRUE(out.ok());
-    // a: 1/61 + 1/62 ; b: 1/62 + 1/61 (== a) ; c: 1/63
-    // a and b tie (both rank-1 once + rank-2 once); c lowest.
+    // a: 1.7/61 + 0.5/62 ; b: 1.7/62 + 0.5/61 ; c: 1.7/63.
+    // Original-query head anchoring preserves the original top-3 order.
     ASSERT_EQ(out.value().size(), 3u);  // deduped to {a,b,c}
-    EXPECT_EQ(out.value().back().child_id, "c");  // c is last
-    const double expected_ab = 1.0 / 61 + 1.0 / 62;
-    EXPECT_NEAR(out.value()[0].score, expected_ab, 1e-6);
+    EXPECT_EQ(out.value()[0].child_id, "a");
+    EXPECT_EQ(out.value()[1].child_id, "b");
+    EXPECT_EQ(out.value()[2].child_id, "c");
+    const double expected_a = 1.7 / 61.0 + 0.5 / 62.0;
+    const double expected_b = 1.7 / 62.0 + 0.5 / 61.0;
+    EXPECT_NEAR(out.value()[0].score, expected_a, 1e-6);
+    EXPECT_NEAR(out.value()[1].score, expected_b, 1e-6);
 }
 
 // UT 9: multiple variants hitting the same chunk -> dedup (keep one row, summed).
@@ -357,7 +362,7 @@ TEST_F(RagFusionTest, RagFusion_FuseResults_Deduplication) {
     ASSERT_TRUE(out.ok());
     ASSERT_EQ(out.value().size(), 1u);  // deduped
     EXPECT_EQ(out.value()[0].child_id, "x");
-    EXPECT_NEAR(out.value()[0].score, 3.0 / 61, 1e-6);  // rank-1 in all 3
+    EXPECT_NEAR(out.value()[0].score, (1.7 + 0.5 + 0.5) / 61.0, 1e-6);
 }
 
 // UT 10: default k=60.
@@ -366,7 +371,7 @@ TEST_F(RagFusionTest, RagFusion_FuseResults_RrfKDefault) {
     std::vector<std::vector<ScoredResult>> pv = {{{"a", 1.0f}}};
     auto out = svc->FuseResults(pv);  // default k
     ASSERT_TRUE(out.ok());
-    EXPECT_NEAR(out.value()[0].score, 1.0 / 61, 1e-6);
+    EXPECT_NEAR(out.value()[0].score, 1.7 / 61.0, 1e-6);
 }
 
 // UT 11: NS config rrf_k=30 override changes the score.
@@ -375,7 +380,7 @@ TEST_F(RagFusionTest, RagFusion_FuseResults_RrfKCustom) {
     std::vector<std::vector<ScoredResult>> pv = {{{"a", 1.0f}}};
     auto out = svc->FuseResults(pv, 30);
     ASSERT_TRUE(out.ok());
-    EXPECT_NEAR(out.value()[0].score, 1.0 / 31, 1e-6);
+    EXPECT_NEAR(out.value()[0].score, 1.7 / 31.0, 1e-6);
 }
 
 // k <= 0 falls back to 60 (RRF formula needs k > 0).
@@ -384,7 +389,106 @@ TEST_F(RagFusionTest, RagFusion_FuseResults_RrfKNonPositiveFallback) {
     std::vector<std::vector<ScoredResult>> pv = {{{"a", 1.0f}}};
     auto out = svc->FuseResults(pv, 0);
     ASSERT_TRUE(out.ok());
-    EXPECT_NEAR(out.value()[0].score, 1.0 / 61, 1e-6);
+    EXPECT_NEAR(out.value()[0].score, 1.7 / 61.0, 1e-6);
+}
+
+// v1.0.7 regression guard: a variant-only distractor hit at rank1 in all three
+// variants must not push an original-query strong hit out of the anchored head.
+TEST_F(RagFusionTest, RagFusion_FuseResults_ConservativeProtectsOriginalStrongHit) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        {{"relevant_original_top", 0.99f}, {"original_second", 0.8f}},
+        {{"variant_distractor", 0.95f}},
+        {{"variant_distractor", 0.94f}},
+        {{"variant_distractor", 0.93f}},
+    };
+    auto out = svc->FuseResults(per_variant, 60);
+    ASSERT_TRUE(out.ok());
+    ASSERT_GE(out.value().size(), 2u);
+    EXPECT_EQ(out.value()[0].child_id, "relevant_original_top");
+    auto distractor = std::find_if(out.value().begin(), out.value().end(), [](const auto& r) {
+        return r.child_id == "variant_distractor";
+    });
+    ASSERT_NE(distractor, out.value().end());
+    EXPECT_GT(out.value()[0].score, distractor->score);
+}
+
+// v1.0.7 anchor guard: even when a lower original-query candidate is heavily
+// boosted by LLM variants and has a higher fused score, the original top-3 head is
+// preserved before the weighted-RRF remainder.
+TEST_F(RagFusionTest, RagFusion_FuseResults_AnchorsOriginalTopThreeBeforeBoostedTail) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        {{"orig_01", 1.0f},
+         {"orig_02", 0.9f},
+         {"orig_03", 0.8f},
+         {"tail_boosted_by_variants", 0.7f}},
+        {{"tail_boosted_by_variants", 0.95f}},
+        {{"tail_boosted_by_variants", 0.94f}},
+        {{"tail_boosted_by_variants", 0.93f}},
+    };
+    auto out = svc->FuseResults(per_variant, 60);
+    ASSERT_TRUE(out.ok());
+    ASSERT_GE(out.value().size(), 4u);
+    EXPECT_EQ(out.value()[0].child_id, "orig_01");
+    EXPECT_EQ(out.value()[1].child_id, "orig_02");
+    EXPECT_EQ(out.value()[2].child_id, "orig_03");
+    EXPECT_EQ(out.value()[3].child_id, "tail_boosted_by_variants");
+    EXPECT_GT(out.value()[3].score, out.value()[0].score);
+}
+
+// The anchor is defined over the original query's first three unique child_ids,
+// not merely the first three positions. This keeps the guardrail robust if an
+// upstream retrieval path accidentally emits a duplicate child in the original
+// list before F36's final dedup.
+TEST_F(RagFusionTest, RagFusion_FuseResults_AnchorsTopThreeUniqueOriginalChildren) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        {{"orig_01", 1.0f},
+         {"orig_01", 0.99f},
+         {"orig_02", 0.9f},
+         {"orig_03", 0.8f},
+         {"tail_boosted_by_variants", 0.7f}},
+        {{"tail_boosted_by_variants", 0.95f}},
+        {{"tail_boosted_by_variants", 0.94f}},
+        {{"tail_boosted_by_variants", 0.93f}},
+    };
+    auto out = svc->FuseResults(per_variant, 60);
+    ASSERT_TRUE(out.ok());
+    ASSERT_GE(out.value().size(), 4u);
+    EXPECT_EQ(out.value()[0].child_id, "orig_01");
+    EXPECT_EQ(out.value()[1].child_id, "orig_02");
+    EXPECT_EQ(out.value()[2].child_id, "orig_03");
+    EXPECT_EQ(out.value()[3].child_id, "tail_boosted_by_variants");
+}
+
+// v1.0.7 additive-coverage guard: repeated variant evidence can still beat an
+// original-query weak tail result, so RAG-Fusion remains useful rather than locked
+// to the original list.
+TEST_F(RagFusionTest, RagFusion_FuseResults_VariantEvidenceCanBeatWeakOriginalTail) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<ScoredResult> original = {
+        {"orig_01", 1.0f}, {"orig_02", 0.9f}, {"orig_03", 0.8f}, {"orig_04", 0.7f},
+        {"orig_05", 0.6f}, {"orig_06", 0.5f}, {"orig_07", 0.4f}, {"orig_08", 0.3f},
+        {"orig_09", 0.2f}, {"orig_tail", 0.1f},
+    };
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        original,
+        {{"variant_only_relevant", 0.95f}},
+        {{"variant_only_relevant", 0.94f}},
+        {{"variant_only_relevant", 0.93f}},
+    };
+    auto out = svc->FuseResults(per_variant, 60);
+    ASSERT_TRUE(out.ok());
+    auto pos = [&](const std::string& child_id) {
+        auto it = std::find_if(out.value().begin(), out.value().end(), [&](const auto& r) {
+            return r.child_id == child_id;
+        });
+        EXPECT_NE(it, out.value().end());
+        return static_cast<size_t>(std::distance(out.value().begin(), it));
+    };
+    EXPECT_LT(pos("orig_01"), pos("variant_only_relevant"));
+    EXPECT_LT(pos("variant_only_relevant"), pos("orig_tail"));
 }
 
 // ===========================================================================
