@@ -22,26 +22,35 @@
 #include <nlohmann/json.hpp>
 
 #include "cortrix/catalog/config_resolver.h"
+#include "cortrix/common/executor_engine.h"
 #include "cortrix/common/result.h"
 #include "cortrix/query/query_variant_generator.h"
 #include "cortrix/query/rag_fusion.h"
 #include "cortrix/query/rag_fusion_error.h"
 #include "cortrix/query/rag_fusion_metrics.h"
+#include "cortrix/query/rag_fusion_stage.h"
 #include "cortrix/query/rag_fusion_types.h"
 #include "cortrix/query/rrf_fusion.h"
+#include "cortrix/query/scatter_gather.h"
+#include "cortrix/retrieval/cross_ns_types.h"
 #include "cortrix/retrieval/types.h"
 
 #include "mocks/mock_llm_client.h"
+#include "mocks/mock_reranker.h"
+#include "scatter/mock_permission_service.h"
 
 namespace cortrix::query {
 namespace {
 
 using ::testing::_;
 using ::testing::HasSubstr;
+using ::testing::Invoke;
 using ::testing::Return;
 using llm::ChatCompletionResponse;
 using llm::LlmCallConfig;
 using llm::MockLlmClient;
+using retrieval::NamespaceQueryResult;
+using retrieval::RankedChunk;
 using retrieval::ScoredResult;
 
 // --- helpers ---------------------------------------------------------------
@@ -72,7 +81,7 @@ ChatCompletionResponse ErrResponse(StatusCode code, const std::string& msg) {
 std::string ThreeVariantJson() {
     return R"({"variants":[
         {"strategy":"paraphrase","query":"latest company earnings report data"},
-        {"strategy":"subquery","query":"last quarter revenue and profit"},
+        {"strategy":"subquery","query":"last quarter company revenue and profit"},
         {"strategy":"reverse","query":"company revenue growth trend"}
     ]})";
 }
@@ -89,6 +98,51 @@ std::shared_ptr<RagFusion> MakeService(std::shared_ptr<MockLlmClient> mock) {
     auto rrf = std::make_shared<RRFFusion>(60);
     return std::make_shared<RagFusion>(gen, rrf);
 }
+
+retrieval::RankedChunk ChunkForStage(const std::string& child_id,
+                                     const std::string& content,
+                                     float score) {
+    retrieval::RankedChunk rc;
+    rc.child_id = child_id;
+    rc.chunk_text = content;
+    rc.score = score;
+    rc.rerank_score = score;
+    return rc;
+}
+
+class StageFakeExecutor : public IScatterExecutor {
+public:
+    std::vector<int> seen_top_k;
+    std::vector<bool> seen_rerank;
+
+    retrieval::NamespaceQueryResult ExecuteForNamespace(
+        const QueryContext& ctx,
+        const std::string& namespace_id,
+        float /*oversample*/) override {
+        seen_top_k.push_back(ctx.top_k);
+        seen_rerank.push_back(ctx.rerank);
+        retrieval::NamespaceQueryResult out;
+        out.namespace_id = namespace_id;
+
+        if (ctx.query == "company financial status") {
+            out.chunks = {
+                ChunkForStage("original_head", "original exact company financial hit", 1.0f),
+                ChunkForStage("semantic_tail", "semantic answer that reranker should prefer", 0.20f),
+                ChunkForStage("original_noise", "weak original distractor", 0.10f),
+            };
+        } else {
+            out.chunks = {
+                ChunkForStage("semantic_tail", "semantic answer that reranker should prefer", 0.95f),
+                ChunkForStage("variant_noise", "variant-only distractor", 0.80f),
+                ChunkForStage("original_head", "original exact company financial hit", 0.10f),
+            };
+        }
+        if (static_cast<int>(out.chunks.size()) > ctx.top_k) {
+            out.chunks.resize(static_cast<std::size_t>(ctx.top_k));
+        }
+        return out;
+    }
+};
 
 // Reset the process-wide metrics before each metric-sensitive test.
 class RagFusionTest : public ::testing::Test {
@@ -231,6 +285,26 @@ TEST_F(RagFusionTest, Generate_UsesConfiguredEnLocalePrompt) {
     auto out = gen.Generate("semantic retrieval", EnabledConfig(3), "en");
     ASSERT_TRUE(out.ok()) << out.status().message();
     EXPECT_EQ(out.value().variants.size(), 3u);
+}
+
+TEST_F(RagFusionTest, QueryVariantGenerator_Generate_FiltersSemanticDriftVariant) {
+    auto mock = std::make_shared<MockLlmClient>();
+    const std::string json = R"({"variants":[
+        {"strategy":"paraphrase","query":"ANCA stimulated neutrophils release extracellular traps called NETs"},
+        {"strategy":"subquery","query":"How do neutrophils release NETs after ANCA stimulation?"},
+        {"strategy":"reverse","query":"Macrolides protect against myocardial infarction"}
+    ]})";
+    EXPECT_CALL(*mock, Chat(_, _)).WillOnce(Return(OkResponse(json)));
+    QueryVariantGenerator gen(mock);
+    auto out = gen.Generate(
+        "Neutrophil extracellular traps NETs are released by ANCA stimulated neutrophils",
+        EnabledConfig(3), "en");
+    ASSERT_TRUE(out.ok()) << out.status().message();
+    ASSERT_EQ(out.value().variants.size(), 2u);
+    EXPECT_EQ(out.value().variants[0],
+              "ANCA stimulated neutrophils release extracellular traps called NETs");
+    EXPECT_EQ(out.value().variants[1],
+              "How do neutrophils release NETs after ANCA stimulation?");
 }
 
 // ===========================================================================
@@ -462,6 +536,34 @@ TEST_F(RagFusionTest, RagFusion_FuseResults_AnchorsTopThreeUniqueOriginalChildre
     EXPECT_EQ(out.value()[3].child_id, "tail_boosted_by_variants");
 }
 
+// v1.0.8 dynamic-anchor guard: when the original query has a steep score drop
+// after rank1, only the first original hit is anchored. Strong repeated variant
+// evidence may then enter before the weak original tail instead of being forced
+// behind a fixed top-3 head.
+TEST_F(RagFusionTest, RagFusion_FuseResults_DynamicAnchorLetsVariantsCompeteAfterWeakHead) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        {{"orig_01", 1.0f},
+         {"orig_02_weak", 0.2f},
+         {"orig_03_weak", 0.1f},
+         {"tail_boosted_by_variants", 0.05f}},
+        {{"tail_boosted_by_variants", 0.95f}},
+        {{"tail_boosted_by_variants", 0.94f}},
+        {{"tail_boosted_by_variants", 0.93f}},
+    };
+    auto out = svc->FuseResults(per_variant, 60);
+    ASSERT_TRUE(out.ok());
+    ASSERT_GE(out.value().size(), 4u);
+    EXPECT_EQ(out.value()[0].child_id, "orig_01");
+    EXPECT_EQ(out.value()[1].child_id, "tail_boosted_by_variants");
+    EXPECT_LT(std::find_if(out.value().begin(), out.value().end(), [](const auto& r) {
+                  return r.child_id == "tail_boosted_by_variants";
+              }),
+              std::find_if(out.value().begin(), out.value().end(), [](const auto& r) {
+                  return r.child_id == "orig_02_weak";
+              }));
+}
+
 // v1.0.7 additive-coverage guard: repeated variant evidence can still beat an
 // original-query weak tail result, so RAG-Fusion remains useful rather than locked
 // to the original list.
@@ -557,6 +659,75 @@ TEST_F(RagFusionTest, ValidateRagFusionConfig_Ranges) {
     EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
     EXPECT_EQ(field, "locale");
     EXPECT_EQ(range, "zh|en");
+
+    ok.locale = "en";
+    ok.candidate_multiplier = 0;
+    EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
+    EXPECT_EQ(field, "candidate_multiplier");
+    EXPECT_EQ(range, "[1, 5]");
+
+    ok.candidate_multiplier = 3;
+    ok.max_candidates = 0;
+    EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
+    EXPECT_EQ(field, "max_candidates");
+    EXPECT_EQ(range, "[1, 200]");
+}
+
+TEST_F(RagFusionTest, RagFusionStage_ExpandedCandidatePoolThenFinalRerank) {
+    auto mock_llm = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock_llm, Chat(_, _)).WillOnce(Return(OkResponse(ThreeVariantJson())));
+    auto svc = MakeService(mock_llm);
+
+    StageFakeExecutor executor;
+    ExecutorEngine engine(/*workers=*/1, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    EXPECT_CALL(reranker, ScoreBatch(_, _))
+        .WillOnce(Invoke([](const char* query, const std::vector<const char*>& passages) {
+            EXPECT_STREQ(query, "company financial status");
+            std::vector<float> scores;
+            scores.reserve(passages.size());
+            for (const char* passage : passages) {
+                const std::string text = passage == nullptr ? std::string() : passage;
+                scores.push_back(text.find("semantic answer") != std::string::npos ? 0.99f
+                                                                                    : 0.01f);
+            }
+            return scores;
+        }));
+
+    QueryRequest req;
+    req.query = "company financial status";
+    req.namespaces = {"bench"};
+    req.top_k = 1;
+    req.rerank = true;
+
+    QueryContext qctx;
+    qctx.query = req.query;
+    qctx.top_k = req.top_k;
+    qctx.rerank = true;
+    qctx.routing_path = "complex";
+
+    AuthContext auth;
+    auth.user_id = "user";
+
+    RagFusionConfig cfg = EnabledConfig();
+    cfg.locale = "en";
+    cfg.candidate_multiplier = 3;
+    cfg.max_candidates = 3;
+    cfg.final_rerank = true;
+
+    CrossNsResponse resp = stage.Run(req, auth, qctx, cfg);
+
+    ASSERT_EQ(resp.results.size(), 1u);
+    EXPECT_EQ(resp.results[0].child_id, "semantic_tail");
+    ASSERT_GE(executor.seen_top_k.size(), 2u);
+    EXPECT_TRUE(std::all_of(executor.seen_top_k.begin(), executor.seen_top_k.end(),
+                            [](int k) { return k == 3; }));
+    EXPECT_TRUE(std::all_of(executor.seen_rerank.begin(), executor.seen_rerank.end(),
+                            [](bool rerank) { return !rerank; }));
 }
 
 // ===========================================================================
@@ -870,6 +1041,53 @@ TEST_F(RagFusionTest, ClassifyLlmFailure_DefaultIsTimeout) {
     ASSERT_FALSE(out.ok());
     EXPECT_NE(out.status().message().find("CX_ERR_RAG_FUSION_LLM_TIMEOUT"),
               std::string::npos);
+}
+
+// ClassifyLlmFailure: provider/client HTTP 400 is a permanent contract/body
+// failure, not a true timeout. The nested CX_LLM_HTTP token remains available for
+// explain.degrade_reason/detail.
+TEST_F(RagFusionTest, ClassifyLlmFailure_Http400IsInvalidResponse) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Return(ErrResponse(
+            StatusCode::kInternal,
+            "CX_LLM_HTTP: http_status=400")));
+    QueryVariantGenerator gen(mock);
+    auto out = gen.Generate("q", EnabledConfig());
+    ASSERT_FALSE(out.ok());
+    EXPECT_NE(out.status().message().find("CX_ERR_RAG_FUSION_INVALID_RESPONSE"),
+              std::string::npos);
+    EXPECT_NE(out.status().message().find("CX_LLM_HTTP"), std::string::npos);
+}
+
+// ClassifyLlmFailure: auth/permission-style provider errors map to the existing
+// quota/permission identity while the nested HTTP detail stays intact.
+TEST_F(RagFusionTest, ClassifyLlmFailure_Http401IsQuota) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Return(ErrResponse(StatusCode::kInternal,
+                                     "CX_LLM_HTTP: http_status=401")));
+    QueryVariantGenerator gen(mock);
+    auto out = gen.Generate("q", EnabledConfig());
+    ASSERT_FALSE(out.ok());
+    EXPECT_NE(out.status().message().find("CX_ERR_RAG_FUSION_LLM_QUOTA"),
+              std::string::npos);
+    EXPECT_NE(out.status().message().find("CX_LLM_HTTP"), std::string::npos);
+}
+
+// ClassifyLlmFailure: provider 5xx remains timeout/transient so callers can
+// retry/degrade conservatively.
+TEST_F(RagFusionTest, ClassifyLlmFailure_Http503IsTimeout) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Return(ErrResponse(StatusCode::kUnavailable,
+                                     "CX_LLM_HTTP: http_status=503")));
+    QueryVariantGenerator gen(mock);
+    auto out = gen.Generate("q", EnabledConfig());
+    ASSERT_FALSE(out.ok());
+    EXPECT_NE(out.status().message().find("CX_ERR_RAG_FUSION_LLM_TIMEOUT"),
+              std::string::npos);
+    EXPECT_NE(out.status().message().find("CX_LLM_HTTP"), std::string::npos);
 }
 
 // ClassifyLlmFailure: the "rate"-keyword quota operand (distinct from the "quota"/

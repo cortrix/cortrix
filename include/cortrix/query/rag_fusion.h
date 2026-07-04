@@ -81,7 +81,8 @@ public:
         int variant_count = 0;          ///< actual variant count executed (degraded → 1)
         std::vector<std::string> variants_used;  ///< returned only on explain
         bool degraded = false;
-        std::string degrade_reason;     ///< "llm_timeout" / "circuit_open" / ""
+        std::string degrade_reason;     ///< "llm_timeout" / "llm_http" / ...
+        std::string degrade_detail;     ///< safe hint: e.g. "http_status=401"
         std::optional<int> llm_latency_ms;
     };
 

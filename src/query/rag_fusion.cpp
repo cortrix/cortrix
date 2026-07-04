@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -21,23 +22,81 @@ namespace {
 // repeatedly found by variants, but they reorder only the non-anchored tail.
 constexpr double kOriginalQueryRrfWeight = 1.7;
 constexpr double kVariantQueryRrfWeight = 0.5;
-constexpr size_t kOriginalQueryAnchorCount = 3;
+constexpr size_t kOriginalQueryAnchorMax = 3;
 
 double QueryRoleWeight(size_t query_index) {
     return query_index == 0 ? kOriginalQueryRrfWeight : kVariantQueryRrfWeight;
 }
 
+size_t DynamicOriginalAnchorCount(
+    const std::vector<retrieval::ScoredResult>& original_results) {
+    if (original_results.empty()) return 0;
+    if (original_results.size() == 1) return 1;
+
+    // Scores arrive from the original query's already-fused retrieval list. They
+    // are not cross-query calibrated, so use only head-shape/coherence: a coherent
+    // original head deserves the full top-3 guardrail; a steep drop after rank1/2
+    // means the tail is weak enough for variant evidence to compete earlier.
+    const float top = std::max(0.0f, original_results[0].score);
+    if (top <= 0.0f) return 1;
+    const float second = std::max(0.0f, original_results[1].score);
+    const float third = original_results.size() > 2
+                            ? std::max(0.0f, original_results[2].score)
+                            : second;
+    if (third >= top * 0.45f) {
+        return std::min(kOriginalQueryAnchorMax, original_results.size());
+    }
+    if (second >= top * 0.35f) {
+        return std::min(static_cast<size_t>(2), original_results.size());
+    }
+    return 1;
+}
+
 // Map a failed-Status (carrying a CX_ERR_RAG_FUSION_* prefix from
-// RagFusionStatus) back to a human "degrade_reason" token for the ExplainState
-// (§4.3) — "llm_timeout" / "circuit_open" / "quota_exceeded" / "invalid_response".
+// RagFusionStatus, and sometimes a nested generic CX_LLM_* token from the shared
+// LLM client) back to a human "degrade_reason" token for the ExplainState.
 std::string DegradeReasonToken(const Status& status) {
     const std::string& m = status.message();
     auto has = [&](const char* k) { return m.find(k) != std::string::npos; };
-    if (has("LLM_TIMEOUT"))      return "llm_timeout";
+    // Prefer generic transport/client diagnostics when present. Otherwise a
+    // transport/auth/HTTP failure wrapped as CX_ERR_RAG_FUSION_LLM_TIMEOUT would
+    // be indistinguishable from a true deadline in benchmark explain output.
+    if (has("CX_LLM_TRANSPORT")) return "llm_transport";
+    if (has("CX_LLM_RATE_LIMIT")) return "quota_exceeded";
+    if (has("CX_LLM_BAD_BODY")) return "invalid_response";
+    if (has("CX_LLM_HTTP")) return "llm_http";
+    if (has("LLM_TIMEOUT")) return "llm_timeout";
     if (has("LLM_CIRCUIT_OPEN")) return "circuit_open";
-    if (has("LLM_QUOTA"))        return "quota_exceeded";
+    if (has("LLM_QUOTA")) return "quota_exceeded";
     if (has("INVALID_RESPONSE")) return "invalid_response";
     return "llm_error";
+}
+
+std::string SafeDegradeDetail(const Status& status) {
+    const std::string& m = status.message();
+    const std::string needle = "http_status=";
+    std::string detail;
+    const auto http_pos = m.find(needle);
+    if (http_pos != std::string::npos) {
+        std::size_t end = http_pos + needle.size();
+        while (end < m.size() && std::isdigit(static_cast<unsigned char>(m[end]))) {
+            ++end;
+        }
+        if (end > http_pos + needle.size()) {
+            detail = m.substr(http_pos, end - http_pos);
+        }
+    }
+    if (!detail.empty()) {
+        return detail;
+    }
+    auto has = [&](const char* k) { return m.find(k) != std::string::npos; };
+    if (has("CX_LLM_TRANSPORT")) return "transport_failure";
+    if (has("CX_LLM_RATE_LIMIT")) return "rate_limited";
+    if (has("CX_LLM_BAD_BODY")) return "bad_response_body";
+    if (has("ETIMEDOUT") || has("timed out") || has("deadline")) {
+        return "deadline_exceeded";
+    }
+    return "";
 }
 
 }  // namespace
@@ -92,6 +151,7 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
         explain_.active = true;
         explain_.degraded = true;
         explain_.degrade_reason = DegradeReasonToken(gen.status());
+        explain_.degrade_detail = SafeDegradeDetail(gen.status());
         explain_.reason = "active";
         explain_.variant_count = 1;  // single query
         metrics.RecordInvocation(RagFusionMetrics::Result::kDegraded);
@@ -186,13 +246,14 @@ Result<std::vector<retrieval::ScoredResult>> RagFusion::FuseResults(
     std::vector<retrieval::ScoredResult> fused;
     fused.reserve(acc.size());
     std::unordered_set<retrieval::ChildId> emitted;
-    emitted.reserve(std::min(acc.size(), kOriginalQueryAnchorCount) + 8);
+    emitted.reserve(std::min(acc.size(), kOriginalQueryAnchorMax) + 8);
 
     if (!per_variant_results.empty()) {
         const auto& original_results = per_variant_results.front();
+        const size_t anchor_limit = DynamicOriginalAnchorCount(original_results);
         size_t anchored_count = 0;
         for (const auto& sr : original_results) {
-            if (anchored_count >= kOriginalQueryAnchorCount) break;
+            if (anchored_count >= anchor_limit) break;
             const retrieval::ChildId& child_id = sr.child_id;
             if (!emitted.insert(child_id).second) continue;
             auto found = acc.find(child_id);

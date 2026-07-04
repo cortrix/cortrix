@@ -197,15 +197,21 @@ TEST(OpenAiLlmClientTest, Http5xxIsUnavailableHttpToken) {
     EXPECT_EQ(resp.status.code(), StatusCode::kUnavailable);
     EXPECT_EQ(resp.status.message().rfind(llm_tokens::kHttp, 0), 0u);
     EXPECT_NE(resp.status.message().find("503"), std::string::npos);
+    EXPECT_EQ(resp.status.message().find("upstream down"), std::string::npos);
+    EXPECT_EQ(resp.status.message().find("body_prefix="), std::string::npos);
 }
 
 TEST(OpenAiLlmClientTest, Http4xxIsInternalHttpToken) {
     auto cf = MakeClient();
-    cf.fake->canned = FakeHttpTransport::Http(400, "bad request");
+    cf.fake->canned = FakeHttpTransport::Http(400, "bad\nrequest\tbody");
     auto resp = cf.client->Chat("q", LlmCallConfig{});
     EXPECT_FALSE(resp.ok());
     EXPECT_EQ(resp.status.code(), StatusCode::kInternal);
     EXPECT_EQ(resp.status.message().rfind(llm_tokens::kHttp, 0), 0u);
+    EXPECT_NE(resp.status.message().find("http_status=400"), std::string::npos);
+    EXPECT_EQ(resp.status.message().find("bad"), std::string::npos);
+    EXPECT_EQ(resp.status.message().find("body_prefix="), std::string::npos);
+    EXPECT_EQ(resp.status.message().find('\n'), std::string::npos);
 }
 
 TEST(OpenAiLlmClientTest, RateLimitSurfacesRetryAfter) {

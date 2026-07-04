@@ -127,6 +127,9 @@ RC_GTEST_PROP(RagFusionPropR9, ConfigJsonRoundTrips, ()) {
     cfg.variant_count = *rc::gen::inRange(-5, 20);
     cfg.rrf_k = *rc::gen::inRange(-5, 200);
     cfg.timeout_ms = *rc::gen::inRange<int64_t>(-100, 60000);
+    cfg.candidate_multiplier = *rc::gen::inRange(-2, 8);
+    cfg.max_candidates = *rc::gen::inRange(-5, 250);
+    cfg.final_rerank = *rc::gen::arbitrary<bool>();
     cfg.variant_strategies.clear();
     const int n = *rc::gen::inRange(0, 6);
     for (int i = 0; i < n; ++i) cfg.variant_strategies.push_back(*genStrategy());
@@ -137,6 +140,9 @@ RC_GTEST_PROP(RagFusionPropR9, ConfigJsonRoundTrips, ()) {
     RC_ASSERT(back.variant_count == cfg.variant_count);
     RC_ASSERT(back.rrf_k == cfg.rrf_k);
     RC_ASSERT(back.timeout_ms == cfg.timeout_ms);
+    RC_ASSERT(back.candidate_multiplier == cfg.candidate_multiplier);
+    RC_ASSERT(back.max_candidates == cfg.max_candidates);
+    RC_ASSERT(back.final_rerank == cfg.final_rerank);
     RC_ASSERT(back.variant_strategies == cfg.variant_strategies);
 }
 
@@ -154,6 +160,8 @@ RC_GTEST_PROP(RagFusionPropR9, ValidateMatchesFieldRanges, ()) {
     cfg.variant_count = *rc::gen::inRange(-2, 14);
     cfg.rrf_k = *rc::gen::inRange(-2, 5);
     cfg.timeout_ms = *rc::gen::inRange<int64_t>(-2, 5);
+    cfg.candidate_multiplier = *rc::gen::inRange(-2, 8);
+    cfg.max_candidates = *rc::gen::inRange(-2, 205);
     cfg.locale = *rc::gen::element(std::string("zh"), std::string("en"), std::string("fr"));
     cfg.variant_strategies.clear();
     const int n = *rc::gen::inRange(0, 4);
@@ -164,6 +172,10 @@ RC_GTEST_PROP(RagFusionPropR9, ValidateMatchesFieldRanges, ()) {
         (cfg.variant_count >= kVariantCountMin && cfg.variant_count <= kVariantCountMax) &&
         (cfg.rrf_k > 0) &&
         (cfg.timeout_ms > 0) &&
+        (cfg.candidate_multiplier >= kRagFusionCandidateMultiplierMin &&
+         cfg.candidate_multiplier <= kRagFusionCandidateMultiplierMax) &&
+        (cfg.max_candidates >= kRagFusionMaxCandidatesMin &&
+         cfg.max_candidates <= kRagFusionMaxCandidatesMax) &&
         (cfg.locale == "zh" || cfg.locale == "en") &&
         !(cfg.enabled && cfg.variant_strategies.empty());
 
@@ -178,6 +190,8 @@ RC_GTEST_PROP(RagFusionPropR9, ValidateMatchesFieldRanges, ()) {
         RC_ASSERT(!range.empty());
         RC_ASSERT(field == "variant_count" || field == "rrf_k" ||
                   field == "timeout_ms" || field == "locale" ||
+                  field == "candidate_multiplier" ||
+                  field == "max_candidates" ||
                   field == "variant_strategies");
     }
 }

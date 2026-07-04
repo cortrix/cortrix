@@ -50,7 +50,7 @@ ChatCompletionResponse OkJson(const std::string& content) {
 std::string FinanceVariants() {
     return R"({"variants":[
         {"strategy":"paraphrase","query":"latest company earnings report data"},
-        {"strategy":"subquery","query":"last quarter revenue and profit"},
+        {"strategy":"subquery","query":"last quarter company revenue and profit"},
         {"strategy":"reverse","query":"company revenue growth trend"}
     ]})";
 }

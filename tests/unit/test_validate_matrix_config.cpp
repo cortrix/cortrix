@@ -73,7 +73,7 @@ class RagFusionValidateMatrix
 
 TEST_P(RagFusionValidateMatrix, Field) {
     const auto& c = GetParam();
-    cortrix::query::RagFusionConfig cfg;  // defaults: enabled=false, vc=3, rrf_k=60, timeout=5000, locale=zh
+    cortrix::query::RagFusionConfig cfg;  // defaults: disabled, vc=3, rrf_k=60, timeout=5000, locale=zh, candidate_multiplier=1
     c.mutate(cfg);
     std::string field;
     std::string range;
@@ -105,6 +105,23 @@ INSTANTIATE_TEST_SUITE_P(
         RagFusionCase{"timeout_one_ok", [](cortrix::query::RagFusionConfig& c) { c.timeout_ms = 1; }, true, ""},
         RagFusionCase{"timeout_zero_bad", [](cortrix::query::RagFusionConfig& c) { c.timeout_ms = 0; }, false, "timeout_ms"},
         RagFusionCase{"timeout_neg_bad", [](cortrix::query::RagFusionConfig& c) { c.timeout_ms = -5; }, false, "timeout_ms"},
+        // v1.0.9 rerank-loop candidate-pool knobs
+        RagFusionCase{"candidate_multiplier_min_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.candidate_multiplier = cortrix::query::kRagFusionCandidateMultiplierMin; }, true, ""},
+        RagFusionCase{"candidate_multiplier_max_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.candidate_multiplier = cortrix::query::kRagFusionCandidateMultiplierMax; }, true, ""},
+        RagFusionCase{"candidate_multiplier_zero_bad",
+            [](cortrix::query::RagFusionConfig& c) { c.candidate_multiplier = 0; }, false, "candidate_multiplier"},
+        RagFusionCase{"candidate_multiplier_too_high_bad",
+            [](cortrix::query::RagFusionConfig& c) { c.candidate_multiplier = cortrix::query::kRagFusionCandidateMultiplierMax + 1; }, false, "candidate_multiplier"},
+        RagFusionCase{"max_candidates_min_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.max_candidates = cortrix::query::kRagFusionMaxCandidatesMin; }, true, ""},
+        RagFusionCase{"max_candidates_max_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.max_candidates = cortrix::query::kRagFusionMaxCandidatesMax; }, true, ""},
+        RagFusionCase{"max_candidates_zero_bad",
+            [](cortrix::query::RagFusionConfig& c) { c.max_candidates = 0; }, false, "max_candidates"},
+        RagFusionCase{"max_candidates_too_high_bad",
+            [](cortrix::query::RagFusionConfig& c) { c.max_candidates = cortrix::query::kRagFusionMaxCandidatesMax + 1; }, false, "max_candidates"},
         // strategies non-empty when enabled (empty allowed when disabled)
         RagFusionCase{"empty_strategies_disabled_ok",
             [](cortrix::query::RagFusionConfig& c) { c.enabled = false; c.variant_strategies.clear(); }, true, ""},

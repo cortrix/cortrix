@@ -192,7 +192,7 @@ struct CrossNsQueryWiring::Impl {
           variant_generator(std::make_shared<QueryVariantGenerator>(llm)),
           rag_rrf(std::make_shared<RRFFusion>()),
           rag_fusion(variant_generator, rag_rrf),
-          rag_stage(&scatter, &rag_fusion),
+          rag_stage(&scatter, &rag_fusion, reranker),
           // F37 CRAG evaluator (Q6). Standalone backend = the heuristic guard; the
           // real DistilBERT-tiny OnnxCragBackend drops in behind the same interface
           // (R4). The evaluator is total: a missing/failed backend degrades to the
@@ -369,6 +369,36 @@ json BuildChatResponse(cortrix::resource::INamespacePool& pool, const QueryConte
 // (body) or `?rag_fusion=true`. variant_count / rrf_k keep the design defaults.
 RagFusionConfig ResolveRagFusionConfig(const httplib::Request& req, const json& body) {
     RagFusionConfig cfg;  // enabled = false default (topic 3)
+    auto apply_object = [&cfg](const json& obj) {
+        if (!obj.is_object()) return;
+        if (obj.contains("enabled") && obj["enabled"].is_boolean()) {
+            cfg.enabled = obj["enabled"].get<bool>();
+        }
+        if (obj.contains("variant_count") && obj["variant_count"].is_number_integer()) {
+            cfg.variant_count = obj["variant_count"].get<int>();
+        }
+        if (obj.contains("rrf_k") && obj["rrf_k"].is_number_integer()) {
+            cfg.rrf_k = obj["rrf_k"].get<int>();
+        }
+        if (obj.contains("timeout_ms") && obj["timeout_ms"].is_number_integer()) {
+            cfg.timeout_ms = obj["timeout_ms"].get<int64_t>();
+        }
+        if (obj.contains("locale") && obj["locale"].is_string()) {
+            const std::string locale = obj["locale"].get<std::string>();
+            if (locale == "en" || locale == "zh") cfg.locale = locale;
+        }
+        if (obj.contains("candidate_multiplier") &&
+            obj["candidate_multiplier"].is_number_integer()) {
+            cfg.candidate_multiplier = obj["candidate_multiplier"].get<int>();
+        }
+        if (obj.contains("max_candidates") && obj["max_candidates"].is_number_integer()) {
+            cfg.max_candidates = obj["max_candidates"].get<int>();
+        }
+        if (obj.contains("final_rerank") && obj["final_rerank"].is_boolean()) {
+            cfg.final_rerank = obj["final_rerank"].get<bool>();
+        }
+    };
+
     if (req.has_param("rag_fusion")) {
         const std::string v = req.get_param_value("rag_fusion");
         cfg.enabled = (v == "true" || v == "1");
@@ -382,10 +412,41 @@ RagFusionConfig ResolveRagFusionConfig(const httplib::Request& req, const json& 
     if (body.is_object() && body.contains("locale") && body["locale"].is_string()) {
         maybe_set_locale(body["locale"].get<std::string>());
     }
+    if (body.is_object() && body.contains("rag_fusion_config")) {
+        apply_object(body["rag_fusion_config"]);
+    }
     if (req.has_param("locale")) {
         maybe_set_locale(req.get_param_value("locale"));
     }
+    if (req.has_param("rag_fusion_candidate_multiplier")) {
+        try {
+            cfg.candidate_multiplier =
+                std::stoi(req.get_param_value("rag_fusion_candidate_multiplier"));
+        } catch (...) {
+        }
+    }
+    if (req.has_param("rag_fusion_max_candidates")) {
+        try {
+            cfg.max_candidates = std::stoi(req.get_param_value("rag_fusion_max_candidates"));
+        } catch (...) {
+        }
+    }
+    if (req.has_param("rag_fusion_final_rerank")) {
+        const std::string v = req.get_param_value("rag_fusion_final_rerank");
+        cfg.final_rerank = (v == "true" || v == "1");
+    }
     return cfg;
+}
+
+Status ValidateResolvedRagFusionConfigForRequest(const RagFusionConfig& cfg) {
+    std::string field;
+    std::string valid_range;
+    if (ValidateRagFusionConfig(cfg, &field, &valid_range)) {
+        return Status::Ok();
+    }
+    return Status::InvalidArgument(
+        "CX_ERR_RAG_FUSION_CONFIG_INVALID: rag_fusion_config." + field +
+        " must be " + valid_range);
 }
 
 // [F13 §11 / S6] Record one finished query as an agent_trace row via the Engine
@@ -595,6 +656,11 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                     explain = (v == "true" || v == "TRUE" || v == "True" || v == "1");
                 }
                 RagFusionConfig rag_cfg = ResolveRagFusionConfig(req, body);
+                Status rag_cfg_status = ValidateResolvedRagFusionConfigForRequest(rag_cfg);
+                if (!rag_cfg_status.ok()) {
+                    WriteJsonError(res, rag_cfg_status, ctx.request_id);
+                    return;
+                }
                 // [R7] rag-fusion also requires a configured LLM (variant expansion
                 // calls it); without one a `rag_fusion=true` request degrades to
                 // plain scatter rather than crashing on a null LLM client.
@@ -641,6 +707,9 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                             }
                             if (!es.degrade_reason.empty()) {
                                 rf["degrade_reason"] = es.degrade_reason;
+                            }
+                            if (!es.degrade_detail.empty()) {
+                                rf["degrade_detail"] = es.degrade_detail;
                             }
                             if (es.llm_latency_ms.has_value()) {
                                 rf["llm_latency_ms"] = *es.llm_latency_ms;

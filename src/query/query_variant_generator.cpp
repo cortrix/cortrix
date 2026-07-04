@@ -86,13 +86,44 @@ void ReplaceAll(std::string& s, const std::string& from, const std::string& to) 
 RagFusionErrorCode ClassifyLlmFailure(const Status& status) {
     const std::string msg = ToLower(status.message());
     auto has = [&](const char* k) { return msg.find(k) != std::string::npos; };
+    auto http_status = [&]() -> int {
+        const std::string needle = "http_status=";
+        const auto pos = msg.find(needle);
+        if (pos == std::string::npos) return 0;
+        const size_t begin = pos + needle.size();
+        size_t end = begin;
+        while (end < msg.size() &&
+               std::isdigit(static_cast<unsigned char>(msg[end]))) {
+            ++end;
+        }
+        if (end == begin) return 0;
+        try {
+            return std::stoi(msg.substr(begin, end - begin));
+        } catch (...) {
+            return 0;
+        }
+    };
 
     if (has("circuit") || has("cx_err_rag_fusion_llm_circuit_open")) {
         return RagFusionErrorCode::kLlmCircuitOpen;
     }
-    if (has("quota") || has("rate") || has("429") ||
+    if (has("cx_llm_rate_limit") || has("quota") || has("rate") || has("429") ||
         has("cx_err_rag_fusion_llm_quota") || status.code() == StatusCode::kPermissionDenied) {
         return RagFusionErrorCode::kLlmQuota;
+    }
+    if (has("cx_llm_bad_body")) {
+        return RagFusionErrorCode::kInvalidResponse;
+    }
+    if (has("cx_llm_http")) {
+        const int code = http_status();
+        if (code == 401 || code == 403) {
+            return RagFusionErrorCode::kLlmQuota;
+        }
+        if (code == 408 || code == 500 || code == 502 || code == 503 || code == 504 ||
+            (code >= 520 && code <= 599)) {
+            return RagFusionErrorCode::kLlmTimeout;
+        }
+        return RagFusionErrorCode::kInvalidResponse;
     }
     if (has("timeout") || has("timed out") || has("etimedout") || has("deadline") ||
         has("cx_err_rag_fusion_llm_timeout")) {
@@ -104,7 +135,16 @@ RagFusionErrorCode ClassifyLlmFailure(const Status& status) {
     return RagFusionErrorCode::kLlmTimeout;
 }
 
-RagFusionMetrics::DegradeReason ToDegradeReason(RagFusionErrorCode code) {
+RagFusionMetrics::DegradeReason ToDegradeReason(RagFusionErrorCode code,
+                                                const Status* llm_status = nullptr) {
+    if (llm_status != nullptr) {
+        const std::string msg = ToLower(llm_status->message());
+        auto has = [&](const char* k) { return msg.find(k) != std::string::npos; };
+        if (has("cx_llm_transport")) return RagFusionMetrics::DegradeReason::kLlmTransport;
+        if (has("cx_llm_rate_limit")) return RagFusionMetrics::DegradeReason::kQuotaExceeded;
+        if (has("cx_llm_bad_body")) return RagFusionMetrics::DegradeReason::kInvalidResponse;
+        if (has("cx_llm_http")) return RagFusionMetrics::DegradeReason::kLlmHttp;
+    }
     switch (code) {
         case RagFusionErrorCode::kLlmTimeout:      return RagFusionMetrics::DegradeReason::kLlmTimeout;
         case RagFusionErrorCode::kLlmCircuitOpen:  return RagFusionMetrics::DegradeReason::kCircuitOpen;
@@ -139,6 +179,51 @@ bool QueryVariantGenerator::ContainsInjectionKeyword(const std::string& query) {
         if (lower.find(k) != std::string::npos) return true;
     }
     return false;
+}
+
+std::unordered_set<std::string> ContentTokens(const std::string& text) {
+    static const std::unordered_set<std::string> kStopwords = {
+        "the", "and", "are", "for", "with", "when", "what", "how", "does",
+        "from", "into", "that", "this", "than", "then", "they", "their",
+        "there", "have", "has", "had", "been", "being", "during", "about",
+        "against", "between", "called", "known", "only", "very", "similar",
+    };
+    std::unordered_set<std::string> out;
+    std::string token;
+    auto flush = [&]() {
+        if (token.size() >= 3 && kStopwords.find(token) == kStopwords.end()) {
+            out.insert(token);
+        }
+        token.clear();
+    };
+    for (unsigned char ch : text) {
+        if (std::isalnum(ch)) {
+            token.push_back(static_cast<char>(std::tolower(ch)));
+        } else {
+            flush();
+        }
+    }
+    flush();
+    return out;
+}
+
+bool QueryVariantGenerator::ShouldKeepVariant(const std::string& original_query,
+                                              const std::string& variant_query) {
+    if (ToLower(original_query) == ToLower(variant_query)) return false;
+    const std::unordered_set<std::string> original = ContentTokens(original_query);
+    const std::unordered_set<std::string> variant = ContentTokens(variant_query);
+    if (original.size() < 3) return true;
+    if (variant.empty()) return false;
+
+    size_t overlap = 0;
+    for (const auto& token : original) {
+        if (variant.find(token) != variant.end()) ++overlap;
+    }
+    const double ratio = static_cast<double>(overlap) /
+                         static_cast<double>(original.size());
+    if (original.size() <= 5) return overlap >= 1;
+    if (original.size() <= 8) return overlap >= 2 || ratio >= 0.35;
+    return overlap >= 3 || ratio >= 0.30;
 }
 
 std::string QueryVariantGenerator::BuildPrompt(const std::string& original_query,
@@ -238,7 +323,7 @@ Result<QueryVariants> QueryVariantGenerator::Generate(
     llm::ChatCompletionResponse resp = llm_->Chat(prompt, call);
     if (!resp.ok()) {
         const RagFusionErrorCode code = ClassifyLlmFailure(resp.status);
-        RagFusionMetrics::Instance().RecordDegraded(ToDegradeReason(code));
+        RagFusionMetrics::Instance().RecordDegraded(ToDegradeReason(code, &resp.status));
         return RagFusionStatus(code, resp.status.message());
     }
 
@@ -261,6 +346,12 @@ Result<QueryVariants> QueryVariantGenerator::Generate(
             ToDegradeReason(RagFusionErrorCode::kInvalidResponse));
         return RagFusionStatus(RagFusionErrorCode::kInvalidResponse, schema_error);
     }
+    variants.erase(
+        std::remove_if(variants.begin(), variants.end(),
+                       [&](const std::string& v) {
+                           return !ShouldKeepVariant(original_query, v);
+                       }),
+        variants.end());
 
     QueryVariants qv;
     qv.original_query = original_query;

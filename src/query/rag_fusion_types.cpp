@@ -41,6 +41,14 @@ bool ValidateRagFusionConfig(const RagFusionConfig& cfg,
     if (cfg.locale != "zh" && cfg.locale != "en") {
         return fail("locale", "zh|en");
     }
+    if (cfg.candidate_multiplier < kRagFusionCandidateMultiplierMin ||
+        cfg.candidate_multiplier > kRagFusionCandidateMultiplierMax) {
+        return fail("candidate_multiplier", "[1, 5]");
+    }
+    if (cfg.max_candidates < kRagFusionMaxCandidatesMin ||
+        cfg.max_candidates > kRagFusionMaxCandidatesMax) {
+        return fail("max_candidates", "[1, 200]");
+    }
     // At least one strategy when enabled (an empty strategy list would generate
     // nothing). Allowed to be empty when disabled (config is inert then).
     if (cfg.enabled && cfg.variant_strategies.empty()) {

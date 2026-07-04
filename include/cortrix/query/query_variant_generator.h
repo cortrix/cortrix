@@ -88,6 +88,14 @@ public:
     /// Case-insensitive substring match over a fixed keyword set.
     static bool ContainsInjectionKeyword(const std::string& query);
 
+    /// v1.0.8 semantic-drift guard: true iff `variant_query` keeps a minimum
+    /// overlap with `original_query`'s content tokens. Short keyword queries have
+    /// too little lexical signal and are allowed through; longer factual queries
+    /// must preserve at least one/two anchor terms so broad generic rewrites do not
+    /// dominate BEIR-style retrieval.
+    static bool ShouldKeepVariant(const std::string& original_query,
+                                  const std::string& variant_query);
+
     /// Parse the LLM's JSON response into variant strings (F36 §4.2 #3 strict
     /// schema). Expects `{"variants":[{"strategy":"..","query":".."}, ...]}`.
     /// Returns false (and fills `schema_error`) on any schema violation — a missing
