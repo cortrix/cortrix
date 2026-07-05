@@ -416,6 +416,21 @@ class F44DocFtsFallbackE2E : public ::testing::Test {
 };
 
 TEST_F(F44DocFtsFallbackE2E,
+       InvalidCragQueryParamReturns400BeforeRetrieval) {
+  auto c = h_->Client();
+  json body = {{"query", "Lovelace"},
+               {"namespaces", json::array({kF44Ns})},
+               {"route", "complex"},
+               {"granularity", "chunk"},
+               {"top_k", 5}};
+  auto res = c.Post("/api/v1/query?crag=maybe", h_->Bearer(h_->user_key()),
+                    body.dump(), "application/json");
+  ASSERT_TRUE(res);
+  EXPECT_EQ(res->status, 400) << res->body;
+  EXPECT_THAT(res->body, HasSubstr("crag must be one of"));
+}
+
+TEST_F(F44DocFtsFallbackE2E,
        MetadataAuthorsReachDiscoverAndQueryDocAndBothGranularity) {
   const std::string doc_id = IngestProbeDoc();
   ASSERT_FALSE(doc_id.empty());

@@ -246,6 +246,11 @@ def profile_matrix(
     activation_score_margin: float,
     activation_min_results: int,
 ) -> Dict[str, Mapping[str, object]]:
+    dense_search_config = {
+        "enable_vector": True,
+        "enable_bm25": False,
+        "enable_sparse": False,
+    }
     return {
         "baseline_rrf": {
             "rerank": False,
@@ -254,11 +259,12 @@ def profile_matrix(
         "dense_only": {
             "rerank": False,
             "rag_fusion": False,
-            "search_config": {
-                "enable_vector": True,
-                "enable_bm25": False,
-                "enable_sparse": False,
-            },
+            "search_config": dense_search_config,
+        },
+        "dense_rerank": {
+            "rerank": True,
+            "rag_fusion": False,
+            "search_config": dense_search_config,
         },
         "rerank_only": {
             "rerank": True,
@@ -291,6 +297,19 @@ def profile_matrix(
         "llm_m3_final_rerank": {
             "rerank": True,
             "rag_fusion": True,
+            "rag_fusion_config": {
+                "enabled": True,
+                "locale": "en",
+                "timeout_ms": rag_fusion_timeout_ms,
+                "candidate_multiplier": 3,
+                "max_candidates": max_candidates,
+                "final_rerank": True,
+            },
+        },
+        "dense_llm_m3_final_rerank": {
+            "rerank": True,
+            "rag_fusion": True,
+            "search_config": dense_search_config,
             "rag_fusion_config": {
                 "enabled": True,
                 "locale": "en",
@@ -343,6 +362,12 @@ def main() -> int:
         choices=("auto", "chunk", "doc", "both"),
         default="both",
         help="Query granularity for all profiles; use chunk for strict retrieval/rerank/LLM ablations.",
+    )
+    ap.add_argument(
+        "--crag",
+        choices=("true", "false"),
+        default="true",
+        help="Enable F37 CRAG post-processing; use false for pure retrieval/rerank/LLM ablations.",
     )
     ap.add_argument("--batch-size", type=int, default=30)
     ap.add_argument("--max-candidates", type=int, default=50)
@@ -423,6 +448,7 @@ def main() -> int:
                 "top_k": args.top_k,
                 "route": "complex",
                 "granularity": args.granularity,
+                "crag": args.crag == "true",
                 "locale": "en",
                 "explain": True,
             }
@@ -430,7 +456,7 @@ def main() -> int:
             started = time.perf_counter()
             response = post_json(
                 args.base_url,
-                f"/api/v1/query?granularity={args.granularity}&explain=true",
+                f"/api/v1/query?granularity={args.granularity}&crag={args.crag}&explain=true",
                 body,
                 timeout=args.query_timeout_seconds,
             )
@@ -539,6 +565,7 @@ def main() -> int:
         "dataset": args.dataset,
         "namespace": namespace,
         "granularity": args.granularity,
+        "crag_enabled": args.crag == "true",
         "server": {"health": health, "readiness": readiness},
         "sample": {
             "sampled_corpus_path": str(corpus_path),

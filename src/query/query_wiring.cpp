@@ -270,6 +270,31 @@ bool IsValidGranularity(const std::string& g) {
     return g == "auto" || g == "chunk" || g == "doc" || g == "both";
 }
 
+std::optional<bool> ParseBoolToken(const std::string& v) {
+    if (v == "true" || v == "TRUE" || v == "True" || v == "1") return true;
+    if (v == "false" || v == "FALSE" || v == "False" || v == "0") return false;
+    return std::nullopt;
+}
+
+Status ReadCragEnabled(const httplib::Request& req, const json& body, bool* out) {
+    if (out == nullptr) return Status::InvalidArgument("crag output pointer is null");
+    *out = true;
+    if (body.is_object() && body.contains("crag")) {
+        if (!body["crag"].is_boolean()) {
+            return Status::InvalidArgument("crag must be a boolean when supplied in body");
+        }
+        *out = body["crag"].get<bool>();
+    }
+    if (req.has_param("crag")) {
+        std::optional<bool> parsed = ParseBoolToken(req.get_param_value("crag"));
+        if (!parsed.has_value()) {
+            return Status::InvalidArgument("crag must be one of: true, false, 1, 0");
+        }
+        *out = *parsed;
+    }
+    return Status::Ok();
+}
+
 // Build the per-request QueryContext that carries both the F04 execution fields
 // (mirrors ScatterGather::MakeContext) and the F39 routing decision, so the
 // per-NS executors run with the resolved route + the request's top_k/rerank/filter.
@@ -282,6 +307,8 @@ QueryContext MakeRoutingContext(const json& body, const AuthContext& auth) {
             qctx.top_k = body["top_k"].get<int>();
         if (body.contains("rerank") && body["rerank"].is_boolean())
             qctx.rerank = body["rerank"].get<bool>();
+        if (body.contains("crag") && body["crag"].is_boolean())
+            qctx.enable_crag = body["crag"].get<bool>();
         if (body.contains("search_config") && body["search_config"].is_object()) {
             const auto& sc = body["search_config"];
             if (sc.contains("enable_vector") && sc["enable_vector"].is_boolean())
@@ -539,6 +566,7 @@ std::string BuildQueryParamsSummary(const QueryContext& qctx) {
     p["top_k"] = qctx.top_k;
     p["route"] = qctx.routing_path;
     p["granularity"] = qctx.granularity;
+    p["crag"] = qctx.enable_crag;
     return p.dump();
 }
 
@@ -624,6 +652,13 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                     ctx.request_id);
                 return;
             }
+            bool crag_enabled = true;
+            Status crag_status = ReadCragEnabled(req, body, &crag_enabled);
+            if (!crag_status.ok()) {
+                WriteJsonError(res, crag_status, ctx.request_id);
+                return;
+            }
+            qctx.enable_crag = crag_enabled;
 
             std::optional<std::string> route_override = ReadRouteOverride(req, body);
             Status routed = classifier->RouteAndUpdateContext(qctx, route_override);

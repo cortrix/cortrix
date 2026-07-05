@@ -27,8 +27,9 @@ public:
     explicit CragStage(retrieval::CragEvaluator* evaluator) : evaluator_(evaluator) {}
 
     /// Evaluate `resp` for `qctx.query` and apply the §6.3 verdict action in place.
-    /// No-op when ShouldSkipF37(qctx) (simple/chat) or the evaluator is null. Writes
-    /// qctx.crag_verdict / crag_score / ambiguous_action_taken. Never throws.
+    /// No-op when qctx.enable_crag is false, ShouldSkipF37(qctx) (simple/chat), or
+    /// the evaluator is null. Writes qctx.crag_verdict / crag_score /
+    /// ambiguous_action_taken. Never throws.
     void Apply(CrossNsResponse& resp, QueryContext& qctx);
 
 private:

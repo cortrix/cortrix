@@ -1,10 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "cortrix/query/query_context.h"
 #include "cortrix/query/query_context_explain.h"
+#include "cortrix/query/crag_stage.h"
+#include "cortrix/query/cross_ns_response.h"
 #include "cortrix/retrieval/crag_classifier_backend.h"
 #include "cortrix/retrieval/crag_config.h"
 #include "cortrix/retrieval/crag_error.h"  // CragInferenceError (Throwing mock)
@@ -22,6 +27,21 @@ namespace {
 
 RankedChunk Chunk(const std::string& id, float score) {
     return RankedChunk{id, "t", "p", score, 0.0f, {}, {}};
+}
+
+query::CrossNsResponse ResponseWithScores(std::initializer_list<float> scores) {
+    query::CrossNsResponse resp;
+    int idx = 0;
+    for (float score : scores) {
+        ResultItem item;
+        item.child_id = "child-" + std::to_string(idx++);
+        item.content = "t";
+        item.parent_content = "p";
+        item.score = score;
+        item.rerank_score = score;
+        resp.results.push_back(std::move(item));
+    }
+    return resp;
 }
 
 class CragContextTest : public ::testing::Test {
@@ -139,6 +159,23 @@ TEST_F(CragContextTest, ShouldSkipF37MockByRoutingPath) {
 
     query::QueryContext unrouted;  // empty routing_path → default to running (fail-safe)
     EXPECT_FALSE(ShouldSkipF37(unrouted));
+}
+
+TEST_F(CragContextTest, CragStageDisabledDoesNotEvaluateOrTruncate) {
+    CragEvaluator ev(std::make_shared<HeuristicGuardBackend>(), CragConfig{});
+    query::CragStage stage(&ev);
+    query::QueryContext ctx;
+    ctx.query = "a real query";
+    ctx.routing_path = "complex";
+    ctx.enable_crag = false;
+    query::CrossNsResponse resp = ResponseWithScores({0.5f, 0.2f, 0.1f});
+
+    stage.Apply(resp, ctx);
+
+    EXPECT_EQ(resp.results.size(), 3u);
+    EXPECT_EQ(ctx.crag_verdict, "");
+    EXPECT_EQ(ctx.ambiguous_action_taken, "");
+    EXPECT_EQ(CragMetrics::Instance().EvaluationCount(CragMetrics::Decision::kAmbiguous), 0u);
 }
 
 // ---------------- §5.1 explain-endpoint dump ----------------------------------

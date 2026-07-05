@@ -49,6 +49,7 @@ struct QueryContext {
     bool enable_vector = true;
     bool enable_bm25 = true;
     bool enable_sparse = true;
+    bool enable_crag = true;    ///< F37 CRAG post-rerank evaluation/action; diagnostic switch
 
     // --- F41 §6.2 retrieval granularity ---
     // Passed through ScatterGather to every NS's executor unchanged (like rerank /
