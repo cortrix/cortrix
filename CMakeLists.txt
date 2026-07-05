@@ -171,6 +171,8 @@ add_library(cortrix_core STATIC
     src/query/query_variant_generator.cpp
     src/query/rag_fusion.cpp
     src/query/rag_fusion_stage.cpp
+    # --- F36-LR LLM listwise rerank (2026-07-05 addendum) ---
+    src/query/llm_rerank_stage.cpp
     src/query/crag_stage.cpp
     # --- F40 BGE-M3 Sparse (Wave C) ---
     src/retrieval/sparse_error.cpp

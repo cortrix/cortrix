@@ -137,6 +137,17 @@ def extract_rag_state(response: Mapping[str, object]) -> Mapping[str, object]:
     return rag if isinstance(rag, dict) else {}
 
 
+def extract_llm_rerank_state(response: Mapping[str, object]) -> Mapping[str, object]:
+    explain = response.get("explain")
+    if not isinstance(explain, dict):
+        return {}
+    features = explain.get("llm_dependent_features")
+    if not isinstance(features, dict):
+        return {}
+    lr = features.get("llm_rerank")
+    return lr if isinstance(lr, dict) else {}
+
+
 def extract_query_failure(response: Mapping[str, object]) -> Mapping[str, object]:
     meta = response.get("meta")
     if not isinstance(meta, dict):
@@ -245,12 +256,23 @@ def profile_matrix(
     rag_fusion_timeout_ms: int,
     activation_score_margin: float,
     activation_min_results: int,
+    llm_rerank_top_n: int = 20,
+    llm_rerank_model: str = "",
+    llm_rerank_timeout_ms: int = 60000,
 ) -> Dict[str, Mapping[str, object]]:
     dense_search_config = {
         "enable_vector": True,
         "enable_bm25": False,
         "enable_sparse": False,
     }
+    llm_rerank_config = {
+        "enabled": True,
+        "top_n": llm_rerank_top_n,
+        "timeout_ms": llm_rerank_timeout_ms,
+        "locale": "en",
+    }
+    if llm_rerank_model:
+        llm_rerank_config["model"] = llm_rerank_model
     return {
         "baseline_rrf": {
             "rerank": False,
@@ -319,6 +341,43 @@ def profile_matrix(
                 "final_rerank": True,
             },
         },
+        # Attribution control for F36-LR: same widened candidate window as the
+        # listwise profiles (top_k = llm_rerank top_n) but NO LLM — the metric
+        # trim to args.top_k keeps the CE-ordered head. D vs this isolates the
+        # LLM's pure ORDERING contribution; this vs dense_rerank isolates the
+        # window effect.
+        "dense_rerank_w20": {
+            "rerank": True,
+            "rag_fusion": False,
+            "search_config": dense_search_config,
+            "top_k": llm_rerank_top_n,
+        },
+        # F36-LR §3 profile D: strict dense candidates + F02 CE + LLM listwise
+        # rerank — isolates the LLM's direct ORDERING contribution vs dense_rerank.
+        "dense_rerank_llm_listwise": {
+            "rerank": True,
+            "rag_fusion": False,
+            "search_config": dense_search_config,
+            "llm_rerank": True,
+            "llm_rerank_config": llm_rerank_config,
+        },
+        # F36-LR §3 profile E: full LLM path — F36 variants (candidate side) +
+        # CE + LLM listwise (ordering side).
+        "dense_llm_full_listwise": {
+            "rerank": True,
+            "rag_fusion": True,
+            "search_config": dense_search_config,
+            "rag_fusion_config": {
+                "enabled": True,
+                "locale": "en",
+                "timeout_ms": rag_fusion_timeout_ms,
+                "candidate_multiplier": 3,
+                "max_candidates": max_candidates,
+                "final_rerank": True,
+            },
+            "llm_rerank": True,
+            "llm_rerank_config": llm_rerank_config,
+        },
         "llm_m3_selective_final_rerank": {
             "rerank": True,
             "rag_fusion": True,
@@ -374,6 +433,10 @@ def main() -> int:
     ap.add_argument("--rag-fusion-timeout-ms", type=int, default=15000)
     ap.add_argument("--activation-score-margin", type=float, default=0.0)
     ap.add_argument("--activation-min-results", type=int, default=10)
+    ap.add_argument("--llm-rerank-top-n", type=int, default=20)
+    ap.add_argument("--llm-rerank-model", default="",
+                    help="Per-call model override for the F36-LR listwise rerank profiles.")
+    ap.add_argument("--llm-rerank-timeout-ms", type=int, default=60000)
     ap.add_argument("--target-score", type=float, default=0.80)
     ap.add_argument("--namespace", default="")
     ap.add_argument("--max-queries", type=int, default=0)
@@ -423,6 +486,9 @@ def main() -> int:
         args.rag_fusion_timeout_ms,
         args.activation_score_margin,
         args.activation_min_results,
+        args.llm_rerank_top_n,
+        args.llm_rerank_model,
+        args.llm_rerank_timeout_ms,
     )
     if args.profiles:
         requested_profiles = [p.strip() for p in args.profiles.split(",") if p.strip()]
@@ -437,6 +503,7 @@ def main() -> int:
     runs: Dict[str, Dict[str, List[str]]] = {name: {} for name in profiles}
     latencies: Dict[str, List[float]] = {name: [] for name in profiles}
     rag_states: Dict[str, List[Mapping[str, object]]] = {name: [] for name in profiles}
+    lr_states: Dict[str, List[Mapping[str, object]]] = {name: [] for name in profiles}
     query_rows: List[Mapping[str, object]] = []
 
     for qid, qtext in queries.items():
@@ -474,12 +541,14 @@ def main() -> int:
                 raise SystemExit(f"query failed; aborting invalid benchmark run: {detail}")
             docs_out = extract_doc_ids(response)[: args.top_k]
             rag = extract_rag_state(response)
+            lr = extract_llm_rerank_state(response)
             rag_reason = None
             if rag:
                 rag_reason = rag.get("reason") or rag.get("degrade_reason")
             runs[name][qid] = docs_out
             latencies[name].append(latency_ms)
             rag_states[name].append(rag)
+            lr_states[name].append(lr)
             query_rows.append(
                 {
                     "query_id": qid,
@@ -491,6 +560,7 @@ def main() -> int:
                     "rag_degrade_reason": rag.get("degrade_reason") if rag else None,
                     "rag_degrade_detail": rag.get("degrade_detail") if rag else None,
                     "rag_variant_count": rag.get("variant_count") if rag else None,
+                    "llm_rerank": lr,
                     "query_failure": query_failure,
                     "body_switches": switches,
                 }
@@ -500,6 +570,9 @@ def main() -> int:
                 f"rag_reason={rag_reason or ''} "
                 f"rag_detail={rag.get('degrade_detail') if rag else ''} "
                 f"rag_variants={rag.get('variant_count') if rag else ''} "
+                f"lr_active={lr.get('active') if lr else ''} "
+                f"lr_changed={lr.get('order_changed') if lr else ''} "
+                f"lr_degrade={lr.get('degrade_reason') if lr else ''} "
                 f"latency_ms={latency_ms:.1f}",
                 flush=True,
             )
@@ -529,6 +602,7 @@ def main() -> int:
 
     def summarize(name: str) -> Mapping[str, object]:
         states = rag_states[name]
+        lrs = lr_states[name]
         mean_recall = mean(recall[name].values())
         mean_ndcg = mean(ndcg[name].values())
         degrade_reasons: Dict[str, int] = {}
@@ -540,6 +614,11 @@ def main() -> int:
             detail = state.get("degrade_detail") if state else None
             if isinstance(detail, str) and detail:
                 degrade_details[detail] = degrade_details.get(detail, 0) + 1
+        lr_degrade_reasons: Dict[str, int] = {}
+        for state in lrs:
+            reason = state.get("degrade_reason") if state else None
+            if isinstance(reason, str) and reason:
+                lr_degrade_reasons[reason] = lr_degrade_reasons.get(reason, 0) + 1
         return {
             f"recall@{args.top_k}": mean_recall,
             f"ndcg@{args.top_k}": mean_ndcg,
@@ -554,6 +633,10 @@ def main() -> int:
             "rag_degrade_reasons": degrade_reasons,
             "rag_degrade_details": degrade_details,
             "rag_variant_counts": sorted({int(s.get("variant_count", 0)) for s in states if s}),
+            "llm_rerank_active_count": sum(1 for s in lrs if bool(s.get("active"))),
+            "llm_rerank_degraded_count": sum(1 for s in lrs if bool(s.get("degraded"))),
+            "llm_rerank_order_changed_count": sum(1 for s in lrs if bool(s.get("order_changed"))),
+            "llm_rerank_degrade_reasons": lr_degrade_reasons,
         }
 
     profile_summary = {name: summarize(name) for name in profiles}

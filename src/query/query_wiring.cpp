@@ -26,6 +26,8 @@
 #include "cortrix/query/query_router_metrics.h"
 #include "cortrix/query/crag_stage.h"
 #include "cortrix/query/query_variant_generator.h"
+#include "cortrix/query/llm_rerank_stage.h"
+#include "cortrix/query/llm_rerank_types.h"
 #include "cortrix/query/rag_fusion.h"
 #include "cortrix/query/rag_fusion_stage.h"
 #include "cortrix/query/rag_fusion_types.h"
@@ -199,7 +201,11 @@ struct CrossNsQueryWiring::Impl {
           // "correct" path, so the result set is never wrongly truncated.
           crag_evaluator(std::make_shared<retrieval::HeuristicGuardBackend>(),
                          retrieval::CragConfig{}),
-          crag_stage(&crag_evaluator) {}
+          crag_stage(&crag_evaluator),
+          // F36-LR LLM listwise rerank (addendum §2). Shares the F03 LLM client
+          // with F36; null llm → the wiring gate skips the stage (llm_rerank=true
+          // then degrades to the pre-stage order, mirroring the F36 [R7] stance).
+          llm_rerank_stage(llm) {}
 
     cortrix::resource::INamespacePool& pool;  ///< for the chat path's per-NS user_facts
     /// F13 Engine instrumentation (§11, S6). null when tracing is off (standalone /
@@ -219,6 +225,7 @@ struct CrossNsQueryWiring::Impl {
     RagFusionStage rag_stage;
     retrieval::CragEvaluator crag_evaluator;
     CragStage crag_stage;
+    LlmRerankStage llm_rerank_stage;
 };
 
 CrossNsQueryWiring::CrossNsQueryWiring(cortrix::resource::INamespacePool& pool,
@@ -513,6 +520,74 @@ Status ValidateResolvedRagFusionConfigForRequest(const RagFusionConfig& cfg) {
         " must be " + valid_range);
 }
 
+// Resolve the F36-LR LLM listwise rerank config (addendum §2.1). Default off;
+// an Agent opts in per request via `llm_rerank: true` (body) or `?llm_rerank=true`,
+// with knobs in the `llm_rerank_config` body object / `llm_rerank_*` params.
+// Mirrors ResolveRagFusionConfig so the two LLM-dependent features stay uniform.
+LlmRerankConfig ResolveLlmRerankConfig(const httplib::Request& req, const json& body) {
+    LlmRerankConfig cfg;  // enabled = false default
+    auto apply_object = [&cfg](const json& obj) {
+        if (!obj.is_object()) return;
+        if (obj.contains("enabled") && obj["enabled"].is_boolean()) {
+            cfg.enabled = obj["enabled"].get<bool>();
+        }
+        if (obj.contains("top_n") && obj["top_n"].is_number_integer()) {
+            cfg.top_n = obj["top_n"].get<int>();
+        }
+        if (obj.contains("max_doc_chars") && obj["max_doc_chars"].is_number_integer()) {
+            cfg.max_doc_chars = obj["max_doc_chars"].get<int>();
+        }
+        if (obj.contains("timeout_ms") && obj["timeout_ms"].is_number_integer()) {
+            cfg.timeout_ms = obj["timeout_ms"].get<int64_t>();
+        }
+        if (obj.contains("model") && obj["model"].is_string()) {
+            cfg.model = obj["model"].get<std::string>();
+        }
+        if (obj.contains("locale") && obj["locale"].is_string()) {
+            const std::string locale = obj["locale"].get<std::string>();
+            if (locale == "en" || locale == "zh") cfg.locale = locale;
+        }
+    };
+
+    if (req.has_param("llm_rerank")) {
+        const std::string v = req.get_param_value("llm_rerank");
+        cfg.enabled = (v == "true" || v == "1");
+    } else if (body.is_object() && body.contains("llm_rerank") &&
+               body["llm_rerank"].is_boolean()) {
+        cfg.enabled = body["llm_rerank"].get<bool>();
+    }
+    if (body.is_object() && body.contains("llm_rerank_config")) {
+        apply_object(body["llm_rerank_config"]);
+    }
+    if (req.has_param("llm_rerank_top_n")) {
+        try {
+            cfg.top_n = std::stoi(req.get_param_value("llm_rerank_top_n"));
+        } catch (...) {
+        }
+    }
+    if (req.has_param("llm_rerank_model")) {
+        cfg.model = req.get_param_value("llm_rerank_model");
+    }
+    if (req.has_param("llm_rerank_timeout_ms")) {
+        try {
+            cfg.timeout_ms = std::stoll(req.get_param_value("llm_rerank_timeout_ms"));
+        } catch (...) {
+        }
+    }
+    return cfg;
+}
+
+Status ValidateResolvedLlmRerankConfigForRequest(const LlmRerankConfig& cfg) {
+    std::string field;
+    std::string valid_range;
+    if (ValidateLlmRerankConfig(cfg, &field, &valid_range)) {
+        return Status::Ok();
+    }
+    return Status::InvalidArgument(
+        "CX_ERR_LLM_RERANK_CONFIG_INVALID: llm_rerank_config." + field +
+        " must be " + valid_range);
+}
+
 // [F13 §11 / S6] Record one finished query as an agent_trace row via the Engine
 // instrumentation. No-op when tracing is off (engine_instr null → standalone/tests).
 // The helper itself never throws (EngineInstrumentation::Record isolates both
@@ -606,9 +681,14 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
     // runs plain scatter, so a `rag_fusion=true` request degrades gracefully instead
     // of dereferencing a null LLM client (the §F36 LLM-unavailable contract).
     const bool rag_fusion_llm_available = impl_->variant_generator->has_llm();
+    // F36-LR listwise rerank stage (addendum §2). Same availability stance: no
+    // LLM configured → the gate below skips the stage and the response keeps the
+    // pre-stage (F02 cross-encoder) order.
+    LlmRerankStage* llm_rerank_stage = &impl_->llm_rerank_stage;
+    const bool llm_rerank_available = impl_->llm_rerank_stage.has_llm();
     svr.Post("/api/v1/query", WithAuth(auth, kPermRead,
         [handler, classifier, rag_stage, rag_fusion, scatter, crag_stage, pool, engine_instr,
-         rag_fusion_llm_available](
+         rag_fusion_llm_available, llm_rerank_stage, llm_rerank_available](
             const httplib::Request& req, httplib::Response& res,
             const RequestContext& ctx) {
             // Parse the JSON body up-front so a malformed body is a clean 400 here
@@ -733,16 +813,39 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                     WriteJsonError(res, rag_cfg_status, ctx.request_id);
                     return;
                 }
+                LlmRerankConfig lr_cfg = ResolveLlmRerankConfig(req, body);
+                Status lr_cfg_status = ValidateResolvedLlmRerankConfigForRequest(lr_cfg);
+                if (!lr_cfg_status.ok()) {
+                    WriteJsonError(res, lr_cfg_status, ctx.request_id);
+                    return;
+                }
                 // [R7] rag-fusion also requires a configured LLM (variant expansion
                 // calls it); without one a `rag_fusion=true` request degrades to
                 // plain scatter rather than crashing on a null LLM client.
                 const bool use_rag_fusion = qctx.routing_path == "complex" &&
                                             rag_cfg.enabled && rag_fusion_llm_available;
+                // F36-LR gate (addendum §2): needs an LLM; the listwise window
+                // needs top_n candidates, so widen the retrieval top_k and trim
+                // back to the Agent's requested top_k after the stage.
+                const bool use_llm_rerank = lr_cfg.enabled && llm_rerank_available;
+                const int requested_top_k = f04_req.top_k;
+                if (use_llm_rerank && f04_req.top_k < lr_cfg.top_n) {
+                    f04_req.top_k = lr_cfg.top_n;
+                    qctx.top_k = lr_cfg.top_n;
+                }
                 try {
                     CrossNsResponse resp =
                         use_rag_fusion
                             ? rag_stage->Run(f04_req, auth_ctx, qctx, rag_cfg)
                             : scatter->Execute(f04_req, auth_ctx, &qctx);
+                    LlmRerankStage::ExplainState lr_es;
+                    if (use_llm_rerank) {
+                        lr_es = llm_rerank_stage->Apply(&resp, f04_req.query, lr_cfg);
+                        if (static_cast<int>(resp.results.size()) > requested_top_k) {
+                            resp.results.resize(
+                                static_cast<std::size_t>(requested_top_k));
+                        }
+                    }
                     // [F13 §11] Trace the executed retrieval query (success). Summary
                     // = result count + coverage (the writer truncates to ≤512).
                     RecordQueryTrace(
@@ -788,6 +891,31 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                             }
                             out["explain"]["llm_dependent_features"]["rag_fusion"] =
                                 std::move(rf);
+                        }
+                        if (use_llm_rerank) {
+                            // F36-LR explain (addendum §2.5) — B-class, explain-only.
+                            json lr = {
+                                {"active", lr_es.active},
+                                {"feature_id", "F36-LR"},
+                                {"reason", lr_es.reason},
+                                {"top_n_effective", lr_es.top_n_effective},
+                                {"order_changed", lr_es.order_changed},
+                                {"degraded", lr_es.degraded},
+                            };
+                            if (!lr_es.model_used.empty()) {
+                                lr["model"] = lr_es.model_used;
+                            }
+                            if (!lr_es.degrade_reason.empty()) {
+                                lr["degrade_reason"] = lr_es.degrade_reason;
+                            }
+                            if (!lr_es.degrade_detail.empty()) {
+                                lr["degrade_detail"] = lr_es.degrade_detail;
+                            }
+                            if (lr_es.active) {
+                                lr["llm_latency_ms"] = lr_es.llm_latency_ms;
+                            }
+                            out["explain"]["llm_dependent_features"]["llm_rerank"] =
+                                std::move(lr);
                         }
                     }
                     res.status = 200;
