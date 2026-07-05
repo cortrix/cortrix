@@ -36,6 +36,94 @@ namespace {
 // Route-level deadline for the live two-route fan-out (the F04 per-NS timeout is
 // enforced one level up by the ScatterGather join).
 constexpr int64_t kRouteTimeoutUs = 5'000'000;  // 5s
+constexpr int kHybridRrfK = 60;
+
+struct HybridCandidate {
+    RankedChunk chunk;
+    float fused_score = 0.0f;
+    float best_contribution = -1.0f;
+    std::vector<std::string> paths;
+};
+
+std::string JoinPaths(const std::vector<std::string>& paths) {
+    std::string out;
+    for (std::size_t i = 0; i < paths.size(); ++i) {
+        if (i > 0) out += ",";
+        out += paths[i];
+    }
+    return out;
+}
+
+std::vector<RankedChunk> FuseHybridChunks(std::vector<RankedChunk> chunk_chunks,
+                                          std::vector<RankedChunk> doc_chunks,
+                                          int top_k) {
+    if (chunk_chunks.empty()) return doc_chunks;
+    if (doc_chunks.empty()) return chunk_chunks;
+
+    std::vector<HybridCandidate> candidates;
+    candidates.reserve(chunk_chunks.size() + doc_chunks.size());
+    std::unordered_map<std::string, std::size_t> by_child;
+
+    auto add_path = [&](std::vector<RankedChunk>& source, const std::string& path) {
+        for (std::size_t rank = 0; rank < source.size(); ++rank) {
+            RankedChunk rc = std::move(source[rank]);
+            if (rc.child_id.empty()) continue;
+
+            const float source_score = rc.score;
+            const float source_rerank_score = rc.rerank_score;
+            const float contribution =
+                1.0f / (static_cast<float>(kHybridRrfK) + static_cast<float>(rank));
+
+            if (rc.metadata.find("via_path") == rc.metadata.end()) {
+                rc.metadata["via_path"] = path;
+            }
+            rc.metadata["hybrid_source_path"] = path;
+            rc.metadata["hybrid_source_score"] = std::to_string(source_score);
+            rc.metadata["hybrid_source_rerank_score"] = std::to_string(source_rerank_score);
+
+            auto it = by_child.find(rc.child_id);
+            if (it == by_child.end()) {
+                HybridCandidate cand;
+                cand.chunk = std::move(rc);
+                cand.fused_score = contribution;
+                cand.best_contribution = contribution;
+                cand.paths.push_back(path);
+                by_child.emplace(cand.chunk.child_id, candidates.size());
+                candidates.push_back(std::move(cand));
+                continue;
+            }
+
+            HybridCandidate& cand = candidates[it->second];
+            cand.fused_score += contribution;
+            cand.paths.push_back(path);
+            if (contribution > cand.best_contribution) {
+                rc.metadata["hybrid_source_path"] = path;
+                cand.chunk = std::move(rc);
+                cand.best_contribution = contribution;
+            }
+        }
+    };
+
+    add_path(chunk_chunks, "chunk");
+    add_path(doc_chunks, "doc_summary");
+
+    std::stable_sort(candidates.begin(), candidates.end(),
+                     [](const HybridCandidate& a, const HybridCandidate& b) {
+                         return a.fused_score > b.fused_score;
+                     });
+
+    const int k = top_k < 1 ? 1 : top_k;
+    std::vector<RankedChunk> fused;
+    fused.reserve(std::min<std::size_t>(candidates.size(), static_cast<std::size_t>(k)));
+    for (HybridCandidate& cand : candidates) {
+        cand.chunk.score = cand.fused_score;
+        cand.chunk.metadata["hybrid_rrf_score"] = std::to_string(cand.fused_score);
+        cand.chunk.metadata["hybrid_paths"] = JoinPaths(cand.paths);
+        fused.push_back(std::move(cand.chunk));
+        if (static_cast<int>(fused.size()) >= k) break;
+    }
+    return fused;
+}
 
 }  // namespace
 
@@ -90,14 +178,10 @@ int LiveSingleUnitExecutor::CandidateK(int top_k, float oversample) const {
 
 NamespaceQueryResult LiveSingleUnitExecutor::ExecuteForNamespace(
     const QueryContext& ctx, const std::string& namespace_id, float oversample) {
-    // F41 §6.2 granularity dispatch. The default "auto" / "chunk" (and any unknown
-    // value) take the existing chunk-level pipeline verbatim — the iron rule is that
-    // the default path is 100% unchanged. Only "doc" / "both" engage the F41 §8.1
-    // doc-summary branches. ScatterGather / the cross-NS gather are untouched.
     if (ctx.granularity == "doc") {
         return ExecuteDocRetrieval(ctx, namespace_id);
     }
-    if (ctx.granularity == "both") {
+    if (ctx.granularity == "auto" || ctx.granularity == "both") {
         return ExecuteHybridRetrieval(ctx, namespace_id, oversample);
     }
     return ExecuteChunkRetrieval(ctx, namespace_id, oversample);
@@ -431,12 +515,11 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteDocRetrieval(
 
 NamespaceQueryResult LiveSingleUnitExecutor::ExecuteHybridRetrieval(
     const QueryContext& ctx, const std::string& namespace_id, float oversample) {
-    // §8.1 both branch: run BOTH paths and concatenate (chunk units first, then
-    // doc-level). The cross-NS gather re-sorts by rerank_score and dedupes, so keeping
-    // both kinds in the candidate set is correct; the per-NS top_k cap is applied here
-    // so a NS does not over-contribute. A per-path NS failure (error_code set) is
-    // surfaced if BOTH fail; if only one fails we still return the other's results
-    // (partial success — the chunk path is the primary).
+    // §8.1 hybrid branch: run BOTH paths and fuse their ranked lists with RRF before
+    // the per-NS top_k cap. This keeps doc-summary candidates from being suppressed by
+    // a chunk-first concatenation while avoiding raw-score comparisons across different
+    // scoring scales. A per-path NS failure (error_code set) is surfaced if BOTH fail; if
+    // only one fails we still return the other's results (partial success).
     NamespaceQueryResult chunk_part = ExecuteChunkRetrieval(ctx, namespace_id, oversample);
     NamespaceQueryResult doc_part = ExecuteDocRetrieval(ctx, namespace_id);
 
@@ -458,16 +541,19 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteHybridRetrieval(
         return out;
     }
 
-    if (chunk_ok) {
-        for (auto& rc : chunk_part.chunks) out.chunks.push_back(std::move(rc));
+    if (!chunk_ok) {
+        out.chunks = std::move(doc_part.chunks);
+        out.error_code.clear();
+        return out;
     }
-    if (doc_ok) {
-        for (auto& rc : doc_part.chunks) out.chunks.push_back(std::move(rc));
+    if (!doc_ok) {
+        out.chunks = std::move(chunk_part.chunks);
+        out.error_code.clear();
+        return out;
     }
-    const int top_k = ctx.top_k < 1 ? 1 : ctx.top_k;
-    if (static_cast<int>(out.chunks.size()) > top_k) {
-        out.chunks.resize(static_cast<std::size_t>(top_k));
-    }
+
+    out.chunks = FuseHybridChunks(std::move(chunk_part.chunks), std::move(doc_part.chunks),
+                                  ctx.top_k);
     out.error_code.clear();  // success (at least one path succeeded)
     return out;
 }

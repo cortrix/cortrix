@@ -69,10 +69,9 @@ public:
                            int max_candidates = 50);
 
     /// Per-NS entry. Dispatches on ctx.granularity (F41 §6.2 / §8.1):
-    ///   "auto" | "chunk" (and any unknown value) → ExecuteChunkRetrieval (the existing
-    ///       chunk-level pipeline, 100% unchanged — the default path is untouched);
+    ///   "auto" | "both" → ExecuteHybridRetrieval (chunk + doc-summary fallback);
+    ///   "chunk" (and any unknown value) → ExecuteChunkRetrieval (explicit baseline);
     ///   "doc"  → ExecuteDocRetrieval (doc_summary embedding HNSW recall, §8.1 doc branch);
-    ///   "both" → ExecuteHybridRetrieval (chunk + doc, §8.1 both branch).
     /// The cross-NS gather/dedupe (ScatterGather) is granularity-agnostic and untouched.
     retrieval::NamespaceQueryResult ExecuteForNamespace(
         const QueryContext& ctx,
@@ -85,9 +84,7 @@ public:
 
 private:
     /// The existing chunk-level per-NS pipeline (Vector+BM25[+sparse] → multi-path RRF →
-    /// rerank → top_k). This is the verbatim former ExecuteForNamespace body; the
-    /// granularity=auto/chunk path calls it so the default behavior is byte-for-byte
-    /// identical (F41 wiring iron rule — only doc/both diverge).
+    /// rerank → top_k). The granularity=chunk path calls it as the explicit baseline.
     retrieval::NamespaceQueryResult ExecuteChunkRetrieval(
         const QueryContext& ctx, const std::string& namespace_id, float oversample);
 
@@ -100,10 +97,10 @@ private:
     retrieval::NamespaceQueryResult ExecuteDocRetrieval(
         const QueryContext& ctx, const std::string& namespace_id);
 
-    /// granularity=both (§8.1 both branch): run the chunk path AND the doc path, then
-    /// concatenate (chunk RankedChunks first, then doc-level), capped to top_k. The
-    /// cross-NS gather still re-sorts by rerank_score, so this preserves both kinds in
-    /// the candidate set; doc-level hits carry metadata.via_path = "doc_summary".
+    /// granularity=auto/both (§8.1 hybrid branch): run the chunk path AND the doc path,
+    /// then fuse the two ranked lists with two-path RRF before top_k. If either path has
+    /// no candidates, return the other path unchanged. Doc-level hits carry
+    /// metadata.via_path = "doc_summary".
     retrieval::NamespaceQueryResult ExecuteHybridRetrieval(
         const QueryContext& ctx, const std::string& namespace_id, float oversample);
 
