@@ -417,6 +417,18 @@ def profile_matrix(
             "llm_rerank": True,
             "llm_rerank_config": llm_rerank_config_v2,
         },
+        # §3.5.5 H-v2: hybrid candidate stream (dense + BM25 [+ sparse]) + CE +
+        # v2 listwise ordering. Stage-A2 found the dense route's recall ceiling
+        # (Recall@20 == Recall@30); BM25 adds lexical-match candidates the dense
+        # route misses, and the LLM final ordering absorbs the score-scale mix
+        # that used to make hybrid WORSE under pure RRF/CE ordering.
+        "hybrid_rerank_llm_listwise_v2": {
+            "rerank": True,
+            "rag_fusion": False,
+            "top_k": 20,
+            "llm_rerank": True,
+            "llm_rerank_config": llm_rerank_config_v2,
+        },
         "llm_m3_selective_final_rerank": {
             "rerank": True,
             "rag_fusion": True,
