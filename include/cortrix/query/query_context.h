@@ -41,6 +41,15 @@ struct QueryContext {
     bool rerank = true;      ///< topic 4.3 — pass-through to all NS; false → RRF fallback path
     std::map<std::string, std::string> filter;  ///< topic 4.3 JSONB filter passed through (flattened)
 
+    // --- Retrieval route switches ---
+    // Cross-NS diagnostic/profile controls. Defaults preserve existing behavior:
+    // dense vector + FTS5/BM25 + optional F40 sparse all contribute to the chunk-level
+    // RRF candidate set. Benchmarks can disable individual routes to produce strict
+    // ablations such as dense-only embedding recall.
+    bool enable_vector = true;
+    bool enable_bm25 = true;
+    bool enable_sparse = true;
+
     // --- F41 §6.2 retrieval granularity ---
     // Passed through ScatterGather to every NS's executor unchanged (like rerank /
     // filter). "chunk" is the explicit chunk-level baseline; "doc" uses doc-summary

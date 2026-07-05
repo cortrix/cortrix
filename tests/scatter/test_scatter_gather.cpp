@@ -92,6 +92,26 @@ TEST(ScatterGatherTest, SingleNsDirectPath) {
     EXPECT_FALSE(resp.error.has_value());
 }
 
+TEST(ScatterGatherTest, SearchConfigPropagatesToQueryContext) {
+    Harness h({"ns_a"});
+    QueryRequest req = Req({"ns_a"}, /*top_k=*/2, /*rerank=*/false);
+    req.search_config.enable_vector = true;
+    req.search_config.enable_bm25 = false;
+    req.search_config.enable_sparse = false;
+
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _))
+        .WillOnce(Invoke([](const QueryContext& ctx, const std::string& ns, float) {
+            EXPECT_TRUE(ctx.enable_vector);
+            EXPECT_FALSE(ctx.enable_bm25);
+            EXPECT_FALSE(ctx.enable_sparse);
+            return ScatterMockResponseBuilder::Normal(ns, 1);
+        }));
+
+    auto sg = h.Make();
+    auto resp = sg.Execute(req, Auth());
+    EXPECT_EQ(resp.meta.namespaces_succeeded, (std::vector<std::string>{"ns_a"}));
+}
+
 // --- Multi-NS fan-out: results merged, sorted by final score across NS. ---
 TEST(ScatterGatherTest, MultiNsGatherSortedByRerankScore) {
     Harness h({"ns_a", "ns_b"});

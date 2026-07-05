@@ -384,19 +384,29 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         const int candidate_k = CandidateK(ctx.top_k, oversample);
         CortrixStore& store = facade.store();
 
-        // 2. Run the per-NS recall routes. Vector + BM25 are the always-on dense +
-        //    FTS5 paths; F40 sparse is added when a sparse registry is wired (else
-        //    the fusion is just dense + FTS5). The retrieval-link boundary keys on
-        //    child_id (ULID), so each route's block_id hits are mapped to child_id
-        //    by reading the per-NS store; a legacy non-child row (empty child_id) is
-        //    dropped. Blocks are cached here so the final RankedChunk assembly reuses
-        //    them (one block_get per distinct child).
-        VectorSearcher vec_searcher(facade.vec_index(), embedder_);
-        BM25Searcher bm25_searcher(facade.store());
-        RouteResult vector_result =
-            vec_searcher.Search(ctx.query, candidate_k, kRouteTimeoutUs);
-        RouteResult bm25_result =
-            bm25_searcher.Search(ctx.query, candidate_k, kRouteTimeoutUs);
+        // 2. Run the enabled per-NS recall routes. By default vector + BM25 are on
+        //    and F40 sparse joins when a sparse registry is wired; search_config can
+        //    disable individual routes for diagnostic ablations such as dense-only.
+        //    The retrieval-link boundary keys on child_id (ULID), so each route's
+        //    block_id hits are mapped to child_id by reading the per-NS store; a
+        //    legacy non-child row (empty child_id) is dropped. Blocks are cached here
+        //    so the final RankedChunk assembly reuses them (one block_get per
+        //    distinct child).
+        RouteResult vector_result;
+        vector_result.route_name = "vector";
+        vector_result.status = RouteStatus::kSkipped;
+        if (ctx.enable_vector) {
+            VectorSearcher vec_searcher(facade.vec_index(), embedder_);
+            vector_result = vec_searcher.Search(ctx.query, candidate_k, kRouteTimeoutUs);
+        }
+
+        RouteResult bm25_result;
+        bm25_result.route_name = "bm25";
+        bm25_result.status = RouteStatus::kSkipped;
+        if (ctx.enable_bm25) {
+            BM25Searcher bm25_searcher(facade.store());
+            bm25_result = bm25_searcher.Search(ctx.query, candidate_k, kRouteTimeoutUs);
+        }
 
         // child_id → resolved chunk (text + optional metadata) cache, built as the
         // routes are converted. Dense/FTS5 resolve the full block (metadata_json);
@@ -462,7 +472,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         // per-NS SPLADE inverted index. A NS with no indexed sparse vectors (or a
         // missing registry / index open failure) yields an empty list → the fusion
         // degrades to dense+FTS5 (F40 §7.2 L2 fallback), no error.
-        if (sparse_registry_ != nullptr) {
+        if (ctx.enable_sparse && sparse_registry_ != nullptr) {
             retrieval::ISparseRetriever* sparse = sparse_registry_->GetOrOpen(namespace_id);
             if (sparse != nullptr && sparse->IsAvailable()) {
                 EmbedWithSparseResult sp;

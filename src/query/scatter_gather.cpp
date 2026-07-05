@@ -43,6 +43,9 @@ QueryContext ScatterGather::MakeContext(const QueryRequest& request,
     ctx.top_k = request.top_k < 1 ? 1 : request.top_k;
     ctx.rerank = request.rerank;
     ctx.filter = request.filter;
+    ctx.enable_vector = request.search_config.enable_vector;
+    ctx.enable_bm25 = request.search_config.enable_bm25;
+    ctx.enable_sparse = request.search_config.enable_sparse;
     ctx.user_id = auth.user_id;
     ctx.tenant_id = auth.tenant_id;
     if (trace_ctx != nullptr) ctx.trace_id = trace_ctx->trace_id;

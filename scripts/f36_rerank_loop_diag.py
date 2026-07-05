@@ -251,6 +251,15 @@ def profile_matrix(
             "rerank": False,
             "rag_fusion": False,
         },
+        "dense_only": {
+            "rerank": False,
+            "rag_fusion": False,
+            "search_config": {
+                "enable_vector": True,
+                "enable_bm25": False,
+                "enable_sparse": False,
+            },
+        },
         "rerank_only": {
             "rerank": True,
             "rag_fusion": False,
@@ -329,6 +338,12 @@ def main() -> int:
     ap.add_argument("--run-id", default=time.strftime("f36-rerank-loop-%Y%m%dT%H%M%SZ", time.gmtime()))
     ap.add_argument("--dataset", default="scifact")
     ap.add_argument("--top-k", type=int, default=10)
+    ap.add_argument(
+        "--granularity",
+        choices=("auto", "chunk", "doc", "both"),
+        default="both",
+        help="Query granularity for all profiles; use chunk for strict retrieval/rerank/LLM ablations.",
+    )
     ap.add_argument("--batch-size", type=int, default=30)
     ap.add_argument("--max-candidates", type=int, default=50)
     ap.add_argument("--rag-fusion-timeout-ms", type=int, default=15000)
@@ -407,7 +422,7 @@ def main() -> int:
                 "namespaces": [namespace],
                 "top_k": args.top_k,
                 "route": "complex",
-                "granularity": "both",
+                "granularity": args.granularity,
                 "locale": "en",
                 "explain": True,
             }
@@ -415,7 +430,7 @@ def main() -> int:
             started = time.perf_counter()
             response = post_json(
                 args.base_url,
-                "/api/v1/query?granularity=both&explain=true",
+                f"/api/v1/query?granularity={args.granularity}&explain=true",
                 body,
                 timeout=args.query_timeout_seconds,
             )
@@ -523,6 +538,7 @@ def main() -> int:
         "run_id": args.run_id,
         "dataset": args.dataset,
         "namespace": namespace,
+        "granularity": args.granularity,
         "server": {"health": health, "readiness": readiness},
         "sample": {
             "sampled_corpus_path": str(corpus_path),

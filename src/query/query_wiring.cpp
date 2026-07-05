@@ -282,6 +282,15 @@ QueryContext MakeRoutingContext(const json& body, const AuthContext& auth) {
             qctx.top_k = body["top_k"].get<int>();
         if (body.contains("rerank") && body["rerank"].is_boolean())
             qctx.rerank = body["rerank"].get<bool>();
+        if (body.contains("search_config") && body["search_config"].is_object()) {
+            const auto& sc = body["search_config"];
+            if (sc.contains("enable_vector") && sc["enable_vector"].is_boolean())
+                qctx.enable_vector = sc["enable_vector"].get<bool>();
+            if (sc.contains("enable_bm25") && sc["enable_bm25"].is_boolean())
+                qctx.enable_bm25 = sc["enable_bm25"].get<bool>();
+            if (sc.contains("enable_sparse") && sc["enable_sparse"].is_boolean())
+                qctx.enable_sparse = sc["enable_sparse"].get<bool>();
+        }
         if (body.contains("filter") && body["filter"].is_object()) {
             for (auto it = body["filter"].begin(); it != body["filter"].end(); ++it) {
                 if (it.value().is_string()) qctx.filter[it.key()] = it.value().get<std::string>();
