@@ -320,6 +320,11 @@ Result<QueryVariants> QueryVariantGenerator::Generate(
     call.max_tokens = 512;
     call.timeout_ms = static_cast<int>(config.timeout_ms);
     call.response_format = "json_object";  // request structured output (#3)
+    // Reasoning-capable providers (glm-4.5+/deepseek) default to a thinking
+    // phase that eats the 512-token budget / the timeout before the JSON is
+    // emitted — E-v2 measured 53/120 degrades with glm-4.5-air until this was
+    // disabled. Variant expansion wants the schema'd answer, not CoT.
+    call.thinking_type = "disabled";
 
     llm::ChatCompletionResponse resp = llm_->Chat(prompt, call);
     if (!resp.ok()) {

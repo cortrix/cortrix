@@ -233,6 +233,26 @@ TEST_F(RagFusionTest, QueryVariantGenerator_Generate_Success_3Variants) {
     EXPECT_EQ(out.value().token_count, 12 + 30);
 }
 
+// UT 1b: the Chat call carries the structured-output + reasoning-off contract
+// and the per-call model override (§3.5.4). E-v2 measured 53/120 degrades with
+// glm-4.5-air until thinking was disabled — lock the call shape here.
+TEST_F(RagFusionTest, QueryVariantGenerator_CallDisablesThinkingAndOverridesModel) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Invoke([](const std::string&, const LlmCallConfig& call) {
+            EXPECT_EQ(call.thinking_type, "disabled");
+            EXPECT_EQ(call.response_format, "json_object");
+            EXPECT_EQ(call.model, "glm-4.5-air");
+            return OkResponse(ThreeVariantJson());
+        }));
+
+    QueryVariantGenerator gen(mock);
+    RagFusionConfig cfg = EnabledConfig(3);
+    cfg.model = "glm-4.5-air";
+    auto out = gen.Generate("company financial status", cfg);
+    ASSERT_TRUE(out.ok()) << out.status().message();
+}
+
 // UT 2: LLM timeout -> CX_ERR_RAG_FUSION_LLM_TIMEOUT.
 TEST_F(RagFusionTest, QueryVariantGenerator_LlmTimeout) {
     auto mock = std::make_shared<MockLlmClient>();

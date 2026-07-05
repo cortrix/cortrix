@@ -429,6 +429,16 @@ def profile_matrix(
             "llm_rerank": True,
             "llm_rerank_config": llm_rerank_config_v2,
         },
+        # §3.5.5 HE-v2: widest LLM path — hybrid candidate routes + F36 variant
+        # expansion (candidate side) + v2 listwise (ordering side).
+        "hybrid_llm_full_listwise_v2": {
+            "rerank": True,
+            "rag_fusion": True,
+            "rag_fusion_config": rag_fusion_config_variants,
+            "top_k": 20,
+            "llm_rerank": True,
+            "llm_rerank_config": llm_rerank_config_v2,
+        },
         "llm_m3_selective_final_rerank": {
             "rerank": True,
             "rag_fusion": True,
