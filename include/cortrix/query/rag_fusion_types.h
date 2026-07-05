@@ -52,6 +52,7 @@ struct RagFusionConfig {
     int rrf_k = 60;                                         ///< sentinel ARCH RRFFusion default
     int64_t timeout_ms = 5000;                              ///< LLM call timeout (topic 4)
     std::string locale = "zh";                              ///< prompt locale: "zh" (default) or "en"
+    std::string model;                                      ///< §3.5.4 per-call variant-LLM override; empty = client default
     int candidate_multiplier = 1;                            ///< v1.0.9: per-variant top_k multiplier before outer fusion
     int max_candidates = 50;                                 ///< v1.0.9: cap for expanded per-variant candidate pool
     bool final_rerank = false;                               ///< v1.0.9: optional final rerank after outer fusion
@@ -62,7 +63,7 @@ struct RagFusionConfig {
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RagFusionConfig, enabled, variant_count,
                                    variant_strategies, rrf_k, timeout_ms, locale,
-                                   candidate_multiplier, max_candidates,
+                                   model, candidate_multiplier, max_candidates,
                                    final_rerank, activation_policy,
                                    activation_score_margin, activation_min_results)
 

@@ -19,15 +19,28 @@ struct LlmRerankConfig {
     int64_t timeout_ms = 45000;  ///< listwise LLM call timeout
     std::string model;           ///< per-call model override; empty = client default
     std::string locale = "en";   ///< prompt locale: "en" (default) or "zh"
+    /// §3.5.1 presentation-order consensus votes per window. GLM at t=0 is
+    /// deterministic, so extra votes vary the PRESENTATION order (identity /
+    /// reversed / odd-even interleave) and Borda-aggregate — this debiases the
+    /// known listwise position bias instead of re-sampling the same answer.
+    int consensus_runs = 1;
 };
 
-/// Inclusive validation bounds (§2.1).
+/// Inclusive validation bounds (§2.1 / §3.5.1).
 constexpr int kLlmRerankTopNMin = 2;
 constexpr int kLlmRerankTopNMax = 50;
 constexpr int kLlmRerankMaxDocCharsMin = 100;
 constexpr int kLlmRerankMaxDocCharsMax = 4000;
 constexpr int64_t kLlmRerankTimeoutMsMin = 1000;
 constexpr int64_t kLlmRerankTimeoutMsMax = 120000;
+constexpr int kLlmRerankConsensusRunsMin = 1;
+constexpr int kLlmRerankConsensusRunsMax = 3;
+
+/// §3.5.2 sliding-window geometry for top_n > kLlmRerankWindowSize (RankGPT
+/// bottom-up: rank the tail window first so strong tail candidates bubble
+/// upward through the overlap into the head window).
+constexpr int kLlmRerankWindowSize = 20;
+constexpr int kLlmRerankWindowStride = 10;
 
 /// Validate against the §2.1 ranges. Returns false (and fills `field` /
 /// `valid_range` for the CX_ERR_LLM_RERANK_CONFIG_INVALID body) on the first

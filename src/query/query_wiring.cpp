@@ -430,6 +430,9 @@ RagFusionConfig ResolveRagFusionConfig(const httplib::Request& req, const json& 
             const std::string locale = obj["locale"].get<std::string>();
             if (locale == "en" || locale == "zh") cfg.locale = locale;
         }
+        if (obj.contains("model") && obj["model"].is_string()) {
+            cfg.model = obj["model"].get<std::string>();
+        }
         if (obj.contains("candidate_multiplier") &&
             obj["candidate_multiplier"].is_number_integer()) {
             cfg.candidate_multiplier = obj["candidate_multiplier"].get<int>();
@@ -547,6 +550,10 @@ LlmRerankConfig ResolveLlmRerankConfig(const httplib::Request& req, const json& 
             const std::string locale = obj["locale"].get<std::string>();
             if (locale == "en" || locale == "zh") cfg.locale = locale;
         }
+        if (obj.contains("consensus_runs") &&
+            obj["consensus_runs"].is_number_integer()) {
+            cfg.consensus_runs = obj["consensus_runs"].get<int>();
+        }
     };
 
     if (req.has_param("llm_rerank")) {
@@ -571,6 +578,13 @@ LlmRerankConfig ResolveLlmRerankConfig(const httplib::Request& req, const json& 
     if (req.has_param("llm_rerank_timeout_ms")) {
         try {
             cfg.timeout_ms = std::stoll(req.get_param_value("llm_rerank_timeout_ms"));
+        } catch (...) {
+        }
+    }
+    if (req.has_param("llm_rerank_consensus_runs")) {
+        try {
+            cfg.consensus_runs =
+                std::stoi(req.get_param_value("llm_rerank_consensus_runs"));
         } catch (...) {
         }
     }
@@ -913,6 +927,8 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                             }
                             if (lr_es.active) {
                                 lr["llm_latency_ms"] = lr_es.llm_latency_ms;
+                                lr["llm_calls"] = lr_es.llm_calls;
+                                lr["votes_ok"] = lr_es.votes_ok;
                             }
                             out["explain"]["llm_dependent_features"]["llm_rerank"] =
                                 std::move(lr);

@@ -315,6 +315,7 @@ Result<QueryVariants> QueryVariantGenerator::Generate(
         BuildPrompt(original_query, config.variant_count, suffix, locale);
 
     llm::LlmCallConfig call;
+    call.model = config.model;         // §3.5.4 per-call override; empty = client default
     call.temperature = 0.3;            // a little diversity, still focused
     call.max_tokens = 512;
     call.timeout_ms = static_cast<int>(config.timeout_ms);

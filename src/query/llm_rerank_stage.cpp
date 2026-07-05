@@ -148,6 +148,10 @@ bool ValidateLlmRerankConfig(const LlmRerankConfig& cfg, std::string* field,
     if (cfg.locale != "en" && cfg.locale != "zh") {
         return fail("locale", "one of: en, zh");
     }
+    if (cfg.consensus_runs < kLlmRerankConsensusRunsMin ||
+        cfg.consensus_runs > kLlmRerankConsensusRunsMax) {
+        return fail("consensus_runs", "an integer in [1, 3]");
+    }
     return true;
 }
 
@@ -184,26 +188,47 @@ std::string LlmRerankStage::SanitizePassage(const std::string& text, int max_cha
     return out;
 }
 
-std::string LlmRerankStage::BuildPrompt(const CrossNsResponse& resp, std::size_t n,
+std::string LlmRerankStage::BuildPrompt(const CrossNsResponse& resp,
+                                        const std::vector<std::size_t>& presented,
                                         const std::string& original_query,
                                         const LlmRerankConfig& cfg,
                                         const std::string& suffix) {
     std::string passages;
-    for (std::size_t i = 0; i < n && i < resp.results.size(); ++i) {
-        const auto& item = resp.results[i];
+    std::size_t shown = 0;
+    for (std::size_t idx : presented) {
+        if (idx >= resp.results.size()) continue;
+        const auto& item = resp.results[idx];
         const std::string& raw =
             !item.content.empty() ? item.content : item.parent_content;
-        passages += "[" + std::to_string(i + 1) + "] " +
+        passages += "[" + std::to_string(++shown) + "] " +
                     SanitizePassage(raw, cfg.max_doc_chars) + "\n";
     }
     std::string tmpl = (cfg.locale == "zh") ? kListwisePromptZh : kListwisePromptEn;
-    ReplaceAll(tmpl, "{N}", std::to_string(n));
+    ReplaceAll(tmpl, "{N}", std::to_string(shown));
     // {suffix} before user-controlled content so a query/passage containing the
     // literal "{suffix}" cannot influence the delimiter tag name (F36 pattern).
     ReplaceAll(tmpl, "{suffix}", suffix);
     ReplaceAll(tmpl, "{passages}", passages);
     ReplaceAll(tmpl, "{query}", original_query);
     return tmpl;
+}
+
+std::vector<std::size_t> LlmRerankStage::PresentationOrder(std::size_t n, int run) {
+    std::vector<std::size_t> order;
+    order.reserve(n);
+    switch (run % 3) {
+        case 1:  // reversed
+            for (std::size_t i = n; i > 0; --i) order.push_back(i - 1);
+            break;
+        case 2:  // odd-even interleave: 0,2,4,... then 1,3,5,...
+            for (std::size_t i = 0; i < n; i += 2) order.push_back(i);
+            for (std::size_t i = 1; i < n; i += 2) order.push_back(i);
+            break;
+        default:  // identity (the CE order)
+            for (std::size_t i = 0; i < n; ++i) order.push_back(i);
+            break;
+    }
+    return order;
 }
 
 bool LlmRerankStage::ParseRankingJson(const std::string& llm_content, std::size_t n,
@@ -224,25 +249,41 @@ bool LlmRerankStage::ParseRankingJson(const std::string& llm_content, std::size_
     const nlohmann::json& ranking = j["ranking"];
     if (!ranking.is_array()) return fail("'ranking' is not an array");
 
+    // §3.5.3 tolerant entry decoding: integer / string carrying an integer
+    // ("3", "[3]", "3.", "passage 3") / object with an index-ish integer key.
+    auto first_int_in_string = [](const std::string& s) -> long long {
+        std::size_t i = 0;
+        while (i < s.size() && !std::isdigit(static_cast<unsigned char>(s[i]))) ++i;
+        if (i == s.size()) return -1;
+        std::size_t end = i;
+        while (end < s.size() && std::isdigit(static_cast<unsigned char>(s[end]))) ++end;
+        try {
+            return std::stoll(s.substr(i, end - i));
+        } catch (...) {
+            return -1;
+        }
+    };
+    auto entry_to_index = [&](const nlohmann::json& entry) -> long long {
+        if (entry.is_number_integer()) return entry.get<long long>();
+        if (entry.is_string()) return first_int_in_string(entry.get<std::string>());
+        if (entry.is_object()) {
+            for (const char* key : {"index", "id", "passage", "rank"}) {
+                if (entry.contains(key) && entry[key].is_number_integer()) {
+                    return entry[key].get<long long>();
+                }
+                if (entry.contains(key) && entry[key].is_string()) {
+                    return first_int_in_string(entry[key].get<std::string>());
+                }
+            }
+        }
+        return -1;
+    };
+
     std::vector<std::size_t> order;
     order.reserve(n);
     std::unordered_set<std::size_t> seen;
     for (const auto& entry : ranking) {
-        long long v = -1;
-        if (entry.is_number_integer()) {
-            v = entry.get<long long>();
-        } else if (entry.is_string()) {
-            const std::string s = entry.get<std::string>();
-            if (!s.empty() &&
-                std::all_of(s.begin(), s.end(),
-                            [](unsigned char c) { return std::isdigit(c); })) {
-                try {
-                    v = std::stoll(s);
-                } catch (...) {
-                    v = -1;
-                }
-            }
-        }
+        const long long v = entry_to_index(entry);
         if (v < 1 || v > static_cast<long long>(n)) continue;  // drop out-of-range
         const std::size_t idx = static_cast<std::size_t>(v - 1);
         if (seen.insert(idx).second) order.push_back(idx);
@@ -284,9 +325,6 @@ LlmRerankStage::ExplainState LlmRerankStage::Apply(CrossNsResponse* resp,
         static_cast<std::size_t>(cfg.top_n), resp->results.size());
     es.top_n_effective = static_cast<int>(n);
 
-    const std::string suffix = RandomSuffix();
-    const std::string prompt = BuildPrompt(*resp, n, original_query, cfg, suffix);
-
     llm::LlmCallConfig call;
     call.model = cfg.model;  // empty = client default
     call.temperature = 0.0;  // deterministic ordering judgment
@@ -295,39 +333,125 @@ LlmRerankStage::ExplainState LlmRerankStage::Apply(CrossNsResponse* resp,
     call.response_format = "json_object";
     call.thinking_type = "disabled";  // ordering wants the final answer, not CoT
 
-    const auto t0 = std::chrono::steady_clock::now();
-    llm::ChatCompletionResponse llm_resp = llm_->Chat(prompt, call);
-    const auto t1 = std::chrono::steady_clock::now();
-    es.llm_latency_ms = static_cast<int>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+    const int consensus =
+        std::max(kLlmRerankConsensusRunsMin,
+                 std::min(cfg.consensus_runs, kLlmRerankConsensusRunsMax));
+
+    // `position[i]` = the result index currently holding rank i of the head.
+    // Windows permute this mapping in place; resp->results is only reordered
+    // once at the end (so a mid-window degrade leaves the response untouched).
+    std::vector<std::size_t> position(n);
+    for (std::size_t i = 0; i < n; ++i) position[i] = i;
+
+    // §3.5.2 bottom-up sliding windows over [0, n): the LAST window starts at 0.
+    std::vector<std::size_t> window_starts;
+    {
+        const std::size_t w = static_cast<std::size_t>(kLlmRerankWindowSize);
+        const std::size_t stride = static_cast<std::size_t>(kLlmRerankWindowStride);
+        if (n <= w) {
+            window_starts.push_back(0);
+        } else {
+            std::size_t start = n - w;
+            window_starts.push_back(start);
+            while (start > 0) {
+                start = start > stride ? start - stride : 0;
+                window_starts.push_back(start);
+            }
+        }
+    }
+
     es.active = true;
     es.reason = "active";
-    es.model_used = llm_resp.model;
+    std::string last_fail_reason;
+    std::string last_fail_detail;
 
-    std::vector<std::size_t> order;
-    std::string schema_error;
-    if (!llm_resp.ok()) {
-        es.degraded = true;
-        es.degrade_reason = DegradeReasonToken(llm_resp.status);
-        es.degrade_detail = SafeDegradeDetail(llm_resp.status);
-        resp->meta.warnings.push_back(DegradedWarning());
-        spdlog::warn("[llm_rerank] degraded ({}): {}", es.degrade_reason,
-                     llm_resp.status.message());
-        return es;
-    }
-    if (!ParseRankingJson(llm_resp.content, n, &order, &schema_error)) {
-        es.degraded = true;
-        es.degrade_reason = "invalid_response";
-        es.degrade_detail = schema_error;
-        resp->meta.warnings.push_back(DegradedWarning());
-        spdlog::warn("[llm_rerank] unusable ranking JSON: {}", schema_error);
-        return es;
+    for (std::size_t window_start : window_starts) {
+        const std::size_t count =
+            std::min<std::size_t>(static_cast<std::size_t>(kLlmRerankWindowSize),
+                                  n - window_start);
+        // Borda points per window slot (slot k = position[window_start + k]).
+        std::vector<double> points(count, 0.0);
+        int window_votes = 0;
+
+        for (int run = 0; run < consensus; ++run) {
+            // Presentation permutation over the window slots for this vote.
+            const std::vector<std::size_t> presented_slots =
+                PresentationOrder(count, run);
+            std::vector<std::size_t> presented_result_indices;
+            presented_result_indices.reserve(count);
+            for (std::size_t slot : presented_slots) {
+                presented_result_indices.push_back(position[window_start + slot]);
+            }
+
+            const std::string suffix = RandomSuffix();
+            const std::string prompt = BuildPrompt(
+                *resp, presented_result_indices, original_query, cfg, suffix);
+
+            const auto t0 = std::chrono::steady_clock::now();
+            llm::ChatCompletionResponse llm_resp = llm_->Chat(prompt, call);
+            const auto t1 = std::chrono::steady_clock::now();
+            es.llm_latency_ms += static_cast<int>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0)
+                    .count());
+            ++es.llm_calls;
+            if (es.model_used.empty()) es.model_used = llm_resp.model;
+
+            if (!llm_resp.ok()) {
+                last_fail_reason = DegradeReasonToken(llm_resp.status);
+                last_fail_detail = SafeDegradeDetail(llm_resp.status);
+                spdlog::warn("[llm_rerank] vote failed ({}): {}", last_fail_reason,
+                             llm_resp.status.message());
+                continue;
+            }
+            std::vector<std::size_t> presented_rank;  // over [0, count)
+            std::string schema_error;
+            if (!ParseRankingJson(llm_resp.content, count, &presented_rank,
+                                  &schema_error)) {
+                last_fail_reason = "invalid_response";
+                last_fail_detail = schema_error;
+                spdlog::warn("[llm_rerank] unusable ranking JSON: {}", schema_error);
+                continue;
+            }
+            ++window_votes;
+            ++es.votes_ok;
+            // Map the ranked presented positions back to window slots and add
+            // Borda points (rank 0 → count points … last → 1 point).
+            for (std::size_t r = 0; r < presented_rank.size(); ++r) {
+                const std::size_t slot = presented_slots[presented_rank[r]];
+                points[slot] += static_cast<double>(count - r);
+            }
+        }
+
+        if (window_votes == 0) {
+            // §2.4: no usable vote for this window → whole stage degrades and the
+            // response keeps its pre-stage order (never a partially-LLM order).
+            es.degraded = true;
+            es.degrade_reason =
+                last_fail_reason.empty() ? "llm_error" : last_fail_reason;
+            es.degrade_detail = last_fail_detail;
+            resp->meta.warnings.push_back(DegradedWarning());
+            return es;
+        }
+
+        // Aggregate: sort window slots by Borda points desc; ties keep the
+        // incoming (CE) order (stable on slot index).
+        std::vector<std::size_t> slot_order(count);
+        for (std::size_t i = 0; i < count; ++i) slot_order[i] = i;
+        std::stable_sort(slot_order.begin(), slot_order.end(),
+                         [&points](std::size_t a, std::size_t b) {
+                             return points[a] > points[b];
+                         });
+        std::vector<std::size_t> new_window(count);
+        for (std::size_t i = 0; i < count; ++i) {
+            new_window[i] = position[window_start + slot_order[i]];
+        }
+        std::copy(new_window.begin(), new_window.end(),
+                  position.begin() + static_cast<std::ptrdiff_t>(window_start));
     }
 
-    // Apply the permutation to the head; the tail keeps its order and scores.
     bool identity = true;
-    for (std::size_t i = 0; i < order.size(); ++i) {
-        if (order[i] != i) {
+    for (std::size_t i = 0; i < n; ++i) {
+        if (position[i] != i) {
             identity = false;
             break;
         }
@@ -337,7 +461,7 @@ LlmRerankStage::ExplainState LlmRerankStage::Apply(CrossNsResponse* resp,
 
     std::vector<retrieval::ResultItem> head;
     head.reserve(n);
-    for (std::size_t idx : order) head.push_back(std::move(resp->results[idx]));
+    for (std::size_t idx : position) head.push_back(std::move(resp->results[idx]));
 
     // Rewrite head scores to a strictly decreasing rank score above the tail's
     // max, so "sorted by score desc" holds across head + tail. The F02

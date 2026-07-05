@@ -259,6 +259,8 @@ def profile_matrix(
     llm_rerank_top_n: int = 20,
     llm_rerank_model: str = "",
     llm_rerank_timeout_ms: int = 60000,
+    llm_rerank_consensus_runs: int = 1,
+    rag_fusion_model: str = "",
 ) -> Dict[str, Mapping[str, object]]:
     dense_search_config = {
         "enable_vector": True,
@@ -270,9 +272,24 @@ def profile_matrix(
         "top_n": llm_rerank_top_n,
         "timeout_ms": llm_rerank_timeout_ms,
         "locale": "en",
+        "consensus_runs": llm_rerank_consensus_runs,
     }
     if llm_rerank_model:
         llm_rerank_config["model"] = llm_rerank_model
+    # v2 window: widened listwise (§3.5.2 sliding window) + doc-dedup slots via
+    # top_k=20 (metric layer dedups doc ids and keeps @10).
+    llm_rerank_config_v2 = dict(llm_rerank_config)
+    llm_rerank_config_v2["top_n"] = 30
+    rag_fusion_config_variants = {
+        "enabled": True,
+        "locale": "en",
+        "timeout_ms": rag_fusion_timeout_ms,
+        "candidate_multiplier": 3,
+        "max_candidates": max_candidates,
+        "final_rerank": True,
+    }
+    if rag_fusion_model:
+        rag_fusion_config_variants["model"] = rag_fusion_model
     return {
         "baseline_rrf": {
             "rerank": False,
@@ -367,16 +384,38 @@ def profile_matrix(
             "rerank": True,
             "rag_fusion": True,
             "search_config": dense_search_config,
-            "rag_fusion_config": {
-                "enabled": True,
-                "locale": "en",
-                "timeout_ms": rag_fusion_timeout_ms,
-                "candidate_multiplier": 3,
-                "max_candidates": max_candidates,
-                "final_rerank": True,
-            },
+            "rag_fusion_config": rag_fusion_config_variants,
             "llm_rerank": True,
             "llm_rerank_config": llm_rerank_config,
+        },
+        # §3.5.5 attribution control: CE-only over the same widened pool as v2
+        # (top_k=30). Metric layer trims to @10; artifacts keep the full list so
+        # Recall@20/@30 ceilings are measurable offline.
+        "dense_rerank_w30": {
+            "rerank": True,
+            "rag_fusion": False,
+            "search_config": dense_search_config,
+            "top_k": 30,
+        },
+        # §3.5.5 D-v2: sliding-window listwise over top 30 + presentation-order
+        # consensus + doc-dedup slots (top_k=20 response, metric dedups to @10).
+        "dense_rerank_llm_listwise_v2": {
+            "rerank": True,
+            "rag_fusion": False,
+            "search_config": dense_search_config,
+            "top_k": 20,
+            "llm_rerank": True,
+            "llm_rerank_config": llm_rerank_config_v2,
+        },
+        # §3.5.5 E-v2: F36 variants widen candidates + v2 listwise ordering.
+        "dense_llm_full_listwise_v2": {
+            "rerank": True,
+            "rag_fusion": True,
+            "search_config": dense_search_config,
+            "rag_fusion_config": rag_fusion_config_variants,
+            "top_k": 20,
+            "llm_rerank": True,
+            "llm_rerank_config": llm_rerank_config_v2,
         },
         "llm_m3_selective_final_rerank": {
             "rerank": True,
@@ -437,6 +476,10 @@ def main() -> int:
     ap.add_argument("--llm-rerank-model", default="",
                     help="Per-call model override for the F36-LR listwise rerank profiles.")
     ap.add_argument("--llm-rerank-timeout-ms", type=int, default=60000)
+    ap.add_argument("--llm-rerank-consensus-runs", type=int, default=1,
+                    help="Presentation-order consensus votes per listwise window (1-3).")
+    ap.add_argument("--rag-fusion-model", default="",
+                    help="Per-call model override for F36 variant generation profiles.")
     ap.add_argument("--target-score", type=float, default=0.80)
     ap.add_argument("--namespace", default="")
     ap.add_argument("--max-queries", type=int, default=0)
@@ -489,6 +532,8 @@ def main() -> int:
         args.llm_rerank_top_n,
         args.llm_rerank_model,
         args.llm_rerank_timeout_ms,
+        args.llm_rerank_consensus_runs,
+        args.rag_fusion_model,
     )
     if args.profiles:
         requested_profiles = [p.strip() for p in args.profiles.split(",") if p.strip()]
@@ -539,7 +584,9 @@ def main() -> int:
                     ensure_ascii=False,
                 )
                 raise SystemExit(f"query failed; aborting invalid benchmark run: {detail}")
-            docs_out = extract_doc_ids(response)[: args.top_k]
+            # Keep the FULL deduped doc list in artifacts (§3.5.5 — offline
+            # Recall@20/@30 ceilings); metric helpers slice to @k themselves.
+            docs_out = extract_doc_ids(response)
             rag = extract_rag_state(response)
             lr = extract_llm_rerank_state(response)
             rag_reason = None

@@ -32,10 +32,12 @@ public:
     /// the stage itself is stateless across requests.
     struct ExplainState {
         bool active = false;         ///< an LLM listwise call actually ran
-        bool degraded = false;       ///< call ran but failed → original order kept
+        bool degraded = false;       ///< stage could not produce an LLM order → original kept
         bool order_changed = false;  ///< the permutation differs from identity
         int top_n_effective = 0;     ///< min(cfg.top_n, results.size())
-        int llm_latency_ms = 0;
+        int llm_latency_ms = 0;      ///< summed across windows × consensus votes
+        int llm_calls = 0;           ///< total listwise calls issued (§3.5.1/.2)
+        int votes_ok = 0;            ///< calls whose ranking was usable
         std::string model_used;
         std::string reason;          ///< "active" / "disabled" / "too_few_results" / "llm_unavailable"
         std::string degrade_reason;  ///< F36 reason-token vocabulary (llm_timeout / ...)
@@ -56,19 +58,28 @@ public:
 
     // ---- testing seams (pure helpers) ----
 
-    /// Build the listwise prompt over the first `n` results (§2.2).
-    static std::string BuildPrompt(const CrossNsResponse& resp, std::size_t n,
+    /// Build the listwise prompt over `presented` (result indices in
+    /// presentation order — §3.5.1 consensus varies this order per vote).
+    /// Passage [k] in the prompt is resp.results[presented[k-1]].
+    static std::string BuildPrompt(const CrossNsResponse& resp,
+                                   const std::vector<std::size_t>& presented,
                                    const std::string& original_query,
                                    const LlmRerankConfig& cfg,
                                    const std::string& suffix);
 
     /// Parse {"ranking":[...]} into a 0-based permutation of [0, n). Tolerates
-    /// integer or digit-string entries; drops out-of-range / duplicate entries;
-    /// appends missing indices in original order. Returns false (with
-    /// `schema_error`) when the content is not usable at all.
+    /// integer entries, strings carrying an integer ("3", "[3]", "passage 3"),
+    /// and objects with an index/id/passage integer key (§3.5.3); drops
+    /// out-of-range / duplicate entries; appends missing indices in original
+    /// order. Returns false (with `schema_error`) when nothing is usable.
     static bool ParseRankingJson(const std::string& llm_content, std::size_t n,
                                  std::vector<std::size_t>* order_out,
                                  std::string* schema_error);
+
+    /// §3.5.1 presentation order for consensus vote `run` over `n` items:
+    /// run 0 = identity (CE order), run 1 = reversed, run 2 = odd-even
+    /// interleave. Deterministic (reproducible benchmarks).
+    static std::vector<std::size_t> PresentationOrder(std::size_t n, int run);
 
     /// UTF-8-safe prefix truncation to at most `max_chars` bytes (never splits
     /// a multibyte sequence); newlines collapsed to spaces for [i] list layout.
