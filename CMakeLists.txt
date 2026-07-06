@@ -89,6 +89,8 @@ add_library(cortrix_core STATIC
     src/spc/enricher_config_resolver.cpp
     src/spc/f03_schema_provider.cpp
     src/spc/f35_schema_provider.cpp
+    src/spc/enrich_state_schema_provider.cpp
+    src/spc/enrich_state_store.cpp
     src/spc/enricher_store.cpp
     src/spc/spc_enricher.cpp
     src/spc/prompt_template.cpp

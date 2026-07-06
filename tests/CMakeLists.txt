@@ -75,6 +75,7 @@ add_executable(cortrix_unit_tests
     unit/test_f03_schema_provider.cpp
     unit/test_f34_schema_provider.cpp
     unit/test_f35_schema_provider.cpp
+    unit/test_enrich_state_store.cpp
     unit/test_f38_schema_provider.cpp
     unit/test_f38_hype_enricher.cpp
     unit/test_f38_hype_block.cpp
