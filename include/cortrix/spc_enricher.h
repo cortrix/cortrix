@@ -158,6 +158,10 @@ struct EnricherConfig {
     int circuit_breaker_cooldown_sec = 60;        ///< F03 60s (differs from F02's 30s)
     int budget_cap_usd = 0;                       ///< topic 3.5 (0 = disabled)
     int startup_probe_timeout_ms = 5000;          ///< topic 3.6
+    int http_retry_backoff_ms = 5000;             ///< §5.1 transport/5xx retry backoff base
+                                                  ///< (sleep = base × attempt; addendum §3.7
+                                                  ///< A-part raises the old 50ms to seconds
+                                                  ///< so inline retries survive short bursts)
 
     // B-class NS-overridable (topic 2.2 V1.0, 4 items)
     bool enabled = true;
@@ -165,6 +169,10 @@ struct EnricherConfig {
     float score_threshold = 0.0f;
     std::string prompt_template_id = "default-zh";
 };
+
+/// §5.1 inline HTTP attempts per LLM call (transport/5xx only; 429 returns
+/// immediately for higher-level handling).
+inline constexpr int kEnricherMaxHttpAttempts = 3;
 
 // -----------------------------------------------------------------------------
 // ISpcEnricher abstract interface (design §2.1, 🔒 base SoT lock)

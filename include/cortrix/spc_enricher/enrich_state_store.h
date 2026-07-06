@@ -21,6 +21,10 @@ inline constexpr char kEnrichStatusOk[] = "ok";
 inline constexpr char kEnrichStatusPendingRetry[] = "pending_retry";
 inline constexpr char kEnrichStatusFailedPermanent[] = "failed_permanent";
 
+/// First retry delay stamped by the ingest write phase when a chunk lands with
+/// enrichment debt; the backfill worker owns the subsequent exponential schedule.
+inline constexpr int kEnrichRetryFirstDelaySec = 60;
+
 struct EnrichStateRow {
     uint64_t block_id = 0;
     std::string doc_id;

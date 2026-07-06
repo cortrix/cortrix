@@ -55,6 +55,7 @@ EnricherConfig FastCfg() {
     cfg.workers = 2;
     cfg.queue_size = 16;
     cfg.task_timeout_ms = 200;          // small so timeout tests are fast
+    cfg.http_retry_backoff_ms = 1;      // §3.7 seconds-level default would stall tests
     cfg.circuit_breaker_enabled = true;
     cfg.circuit_breaker_threshold = 3;  // trip quickly for the test
     cfg.circuit_breaker_cooldown_sec = 60;
@@ -163,6 +164,32 @@ TEST_F(ResilienceTest, CircuitBreakerOpensAndDegradesWithoutCalling) {
     EXPECT_GE(EnricherMetrics::Instance().CircuitBreakerTripsCount(), 1u);
     EXPECT_GE(EnricherMetrics::Instance().FallbackToNullCount(
                   EnricherMetrics::FallbackReason::kCircuitOpen), 1u);
+}
+
+TEST_F(ResilienceTest, TransportBackoffEngagesBetweenRetries) {
+    // Contract: the default base is seconds-level (addendum §3.7 A-part).
+    EXPECT_EQ(EnricherConfig{}.http_retry_backoff_ms, 5000);
+
+    auto client = std::make_shared<ConfigurableLlmClient>();
+    client->fail_first_n = 2;  // calls 1,2 fail → two backoff gaps → call 3 succeeds
+    client->fail_token = llm::llm_tokens::kTransport;
+
+    auto cfg = FastCfg();
+    cfg.circuit_breaker_enabled = false;
+    cfg.http_retry_backoff_ms = 40;  // schedule: 40ms + 80ms = 120ms of sleeps
+    LlmEnricher enr(cfg, client);
+
+    const auto t0 = std::chrono::steady_clock::now();
+    auto results = enr.EnrichBatch(OneChunk(meta));
+    const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - t0)
+                                .count();
+
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_TRUE(results[0].ok());
+    EXPECT_EQ(client->calls.load(), 3);
+    // Sleeps guarantee a lower bound (no upper bound → not flaky).
+    EXPECT_GE(elapsed_ms, 100);
 }
 
 TEST_F(ResilienceTest, SuccessRecordsTokensMetric) {

@@ -51,6 +51,7 @@ EnricherConfig LlmCfg() {
     cfg.model = "gpt-4o-mini";
     cfg.batch_size = 8;
     cfg.prompt_template_id = "default-zh";
+    cfg.http_retry_backoff_ms = 1;  // §3.7 seconds-level default would stall tests
     return cfg;
 }
 
