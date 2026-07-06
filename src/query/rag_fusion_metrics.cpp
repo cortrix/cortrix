@@ -46,6 +46,8 @@ const char* ToString(RagFusionMetrics::DegradeReason reason) {
         case RagFusionMetrics::DegradeReason::kCircuitOpen:     return "circuit_open";
         case RagFusionMetrics::DegradeReason::kQuotaExceeded:   return "quota_exceeded";
         case RagFusionMetrics::DegradeReason::kInvalidResponse: return "invalid_response";
+        case RagFusionMetrics::DegradeReason::kLlmTransport:    return "llm_transport";
+        case RagFusionMetrics::DegradeReason::kLlmHttp:         return "llm_http";
         case RagFusionMetrics::DegradeReason::kOther:           return "other";
     }
     return "other";

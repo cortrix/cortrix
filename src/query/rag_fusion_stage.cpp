@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "cortrix/query/rag_fusion_error.h"
+#include "cortrix/reranker/score_fusion.h"
 #include "cortrix/retrieval/types.h"
 
 namespace cortrix::query {
@@ -43,12 +44,118 @@ nlohmann::json DegradedWarning() {
     return w;
 }
 
+int RequestedTopK(int top_k) {
+    return top_k < 1 ? 1 : top_k;
+}
+
+int ExpandedCandidateTopK(int top_k, const RagFusionConfig& cfg) {
+    const int requested = RequestedTopK(top_k);
+    const int multiplier = std::max(kRagFusionCandidateMultiplierMin,
+                                    cfg.candidate_multiplier);
+    if (multiplier <= 1) return requested;
+
+    long long expanded = static_cast<long long>(requested) * multiplier;
+    const int cap = std::max(kRagFusionMaxCandidatesMin, cfg.max_candidates);
+    if (expanded > cap) expanded = cap;
+    if (expanded < requested) expanded = requested;
+    return static_cast<int>(expanded);
+}
+
+retrieval::RankedChunk ToRankedChunkForFinalRerank(const ResultItem& item) {
+    retrieval::RankedChunk rc;
+    rc.child_id = item.child_id;
+    rc.chunk_text = item.content;
+    rc.parent_text = item.parent_content;
+    rc.score = item.score;
+    rc.rerank_score = item.rerank_score;
+    rc.score_signals = item.score_signals;
+    rc.metadata = item.metadata;
+    return rc;
+}
+
+float EffectiveScore(const ResultItem& item) {
+    // `score` is the downstream ordering contract: F02 writes rerank+RRF fused
+    // scores back to RankedChunk::score, and ScatterGather sorts ResultItem by
+    // score. Use rerank_score only as a compatibility fallback for legacy/fake
+    // responses that did not populate the final score.
+    return item.score != 0.0f ? item.score : item.rerank_score;
+}
+
+void TrimToRequestedTopK(CrossNsResponse* resp, int top_k) {
+    if (resp == nullptr) return;
+    const int k = RequestedTopK(top_k);
+    if (static_cast<int>(resp->results.size()) > k) {
+        resp->results.resize(static_cast<std::size_t>(k));
+    }
+}
+
+bool ShouldSkipLlmBySelectiveMargin(const CrossNsResponse& original,
+                                    const RagFusionConfig& cfg) {
+    if (cfg.activation_policy != "selective_margin") return false;
+    if (original.results.size() <
+        static_cast<std::size_t>(cfg.activation_min_results)) {
+        return false;
+    }
+    if (original.results.size() < 2u) return false;
+
+    const float top = EffectiveScore(original.results[0]);
+    const float second = EffectiveScore(original.results[1]);
+    if (top <= second) return false;
+    return (top - second) >= cfg.activation_score_margin;
+}
+
+void ApplyFinalRerankIfEnabled(std::vector<ResultItem>* items,
+                               const std::string& original_query,
+                               const QueryContext& qctx,
+                               const RagFusionConfig& cfg,
+                               reranker::IReranker* reranker) {
+    if (items == nullptr || items->empty()) return;
+    if (!cfg.final_rerank || !qctx.rerank || reranker == nullptr) return;
+
+    std::vector<const char*> passages;
+    passages.reserve(items->size());
+    for (const auto& item : *items) passages.push_back(item.content.c_str());
+
+    std::vector<float> scores = reranker->ScoreBatch(original_query.c_str(), passages);
+    const reranker::RerankerScoreFusion score_fusion;
+    for (std::size_t i = 0; i < items->size(); ++i) {
+        ResultItem& item = (*items)[i];
+        if (i < scores.size()) item.rerank_score = scores[i];
+        retrieval::RankedChunk rc = ToRankedChunkForFinalRerank(item);
+        item.score = score_fusion.ComputeRerankRrfScore(
+            item.rerank_score, item.score, rc, original_query);
+    }
+
+    std::stable_sort(items->begin(), items->end(),
+                     [](const ResultItem& a, const ResultItem& b) {
+                         return a.score > b.score;
+                     });
+}
+
 }  // namespace
 
 CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
                                     const AuthContext& auth,
                                     const QueryContext& qctx,
                                     const RagFusionConfig& cfg) {
+    const int candidate_top_k = ExpandedCandidateTopK(request.top_k, cfg);
+    CrossNsResponse original_preflight;
+    bool has_original_preflight = false;
+    if (cfg.activation_policy == "selective_margin") {
+        QueryRequest vr = request;
+        vr.top_k = candidate_top_k;
+        QueryContext vctx = qctx;
+        vctx.top_k = candidate_top_k;
+        original_preflight = scatter_->Execute(vr, auth, &vctx);
+        has_original_preflight = true;
+        if (ShouldSkipLlmBySelectiveMargin(original_preflight, cfg)) {
+            fusion_->MarkSkippedByActivationPolicy(
+                request.query, "skipped_by_activation_policy");
+            TrimToRequestedTopK(&original_preflight, request.top_k);
+            return original_preflight;
+        }
+    }
+
     // 1. Expand the query into [original + N variants] (§4.3). On LLM failure
     //    ExpandQueries returns non-ok → degrade to the single original query +
     //    the CX_WARN_RAG_FUSION_DEGRADED warning (topic 4).
@@ -56,7 +163,9 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
     bool degraded = false;
     auto expanded = fusion_->ExpandQueries(request.query, cfg, /*trace_ctx=*/nullptr, &qctx);
     if (expanded.ok()) {
-        for (auto& v : expanded.value()) all_queries.push_back(v);
+        // ExpandQueries already returns [original + variants]. Do not prepend the
+        // original again; duplicate original queries skew global RRF attribution.
+        all_queries = std::move(expanded.value());
     } else {
         degraded = true;
     }
@@ -64,7 +173,13 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
     // Single query (no variants, or expansion degraded) → plain scatter, plus the
     // degraded warning when expansion failed.
     if (all_queries.size() == 1) {
-        CrossNsResponse resp = scatter_->Execute(request, auth, &qctx);
+        CrossNsResponse resp;
+        if (has_original_preflight) {
+            resp = original_preflight;
+            TrimToRequestedTopK(&resp, request.top_k);
+        } else {
+            resp = scatter_->Execute(request, auth, &qctx);
+        }
         if (degraded) resp.meta.warnings.push_back(DegradedWarning());
         return resp;
     }
@@ -77,12 +192,27 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
     per_variant.reserve(all_queries.size());
     CrossNsResponse base;
     std::unordered_map<std::string, ResultItem> items_by_child;  // union across variants
+    // In final-rerank mode, keep the original query's normal reranked baseline
+    // signal, but treat LLM variants as candidate generation only. Running the
+    // reranker inside every LLM variant would multiply latency and prematurely
+    // truncate variant candidates before the global F36 union. The final pass then
+    // reranks the union against the original query.
+    const bool defer_inner_rerank = cfg.final_rerank && qctx.rerank && reranker_ != nullptr;
     for (std::size_t i = 0; i < all_queries.size(); ++i) {
         QueryRequest vr = request;
         vr.query = all_queries[i];
+        vr.top_k = candidate_top_k;
+        if (defer_inner_rerank && i > 0) vr.rerank = false;
         QueryContext vctx = qctx;
         vctx.query = all_queries[i];
-        CrossNsResponse vresp = scatter_->Execute(vr, auth, &vctx);
+        vctx.top_k = candidate_top_k;
+        if (defer_inner_rerank && i > 0) vctx.rerank = false;
+        CrossNsResponse vresp;
+        if (has_original_preflight && i == 0) {
+            vresp = original_preflight;
+        } else {
+            vresp = scatter_->Execute(vr, auth, &vctx);
+        }
         per_variant.push_back(ToScoredResults(vresp));
         if (i == 0) base = vresp;  // base meta + the original query's items
         for (auto& it : vresp.results) {
@@ -107,7 +237,8 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
             ri.score = sr.score;  // carry the global RRF score as the final score
             reordered.push_back(std::move(ri));
         }
-        const int k = request.top_k < 1 ? 1 : request.top_k;
+        ApplyFinalRerankIfEnabled(&reordered, request.query, qctx, cfg, reranker_);
+        const int k = RequestedTopK(request.top_k);
         if (static_cast<int>(reordered.size()) > k) {
             reordered.resize(static_cast<std::size_t>(k));
         }

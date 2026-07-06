@@ -11,6 +11,7 @@
 #include "cortrix/query/rag_fusion.h"
 #include "cortrix/query/rag_fusion_types.h"
 #include "cortrix/query/scatter_gather.h"
+#include "cortrix/reranker.h"
 
 namespace cortrix::query {
 
@@ -30,10 +31,13 @@ namespace cortrix::query {
 /// original query and the response gains meta.warnings[CX_WARN_RAG_FUSION_DEGRADED].
 class RagFusionStage {
 public:
-    /// @param scatter  the F04 ScatterGather (NOT owned).
-    /// @param fusion   the F36 RagFusion service (NOT owned).
-    RagFusionStage(ScatterGather* scatter, RagFusion* fusion)
-        : scatter_(scatter), fusion_(fusion) {}
+    /// @param scatter   the F04 ScatterGather (NOT owned).
+    /// @param fusion    the F36 RagFusion service (NOT owned).
+    /// @param reranker  optional F02 reranker used only for v1.0.9 final rerank
+    ///                  after outer fusion; null keeps the pre-v1.0.9 behavior.
+    RagFusionStage(ScatterGather* scatter, RagFusion* fusion,
+                   reranker::IReranker* reranker = nullptr)
+        : scatter_(scatter), fusion_(fusion), reranker_(reranker) {}
 
     /// Run the F36 expand + per-variant scatter + global RRF fusion. `request` is the
     /// already-parsed F04 request; `qctx` carries the resolved route + execution
@@ -45,6 +49,7 @@ public:
 private:
     ScatterGather* scatter_;
     RagFusion* fusion_;
+    reranker::IReranker* reranker_;
 };
 
 }  // namespace cortrix::query

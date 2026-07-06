@@ -40,10 +40,57 @@ constexpr int kHybridRrfK = 60;
 
 struct HybridCandidate {
     RankedChunk chunk;
+    std::string doc_id;
     float fused_score = 0.0f;
     float best_contribution = -1.0f;
+    float best_chunk_contribution = -1.0f;
+    float best_doc_contribution = -1.0f;
+    float best_chunk_score = 0.0f;
+    float best_doc_score = 0.0f;
+    float best_chunk_rerank_score = 0.0f;
+    float best_doc_rerank_score = 0.0f;
+    bool has_chunk = false;
+    bool has_doc = false;
     std::vector<std::string> paths;
+    std::map<std::string, std::string> doc_evidence_metadata;
 };
+
+std::string MetadataValue(const RankedChunk& rc, const std::string& key) {
+    auto it = rc.metadata.find(key);
+    return it == rc.metadata.end() ? std::string() : it->second;
+}
+
+std::string HybridDocId(const RankedChunk& rc) {
+    std::string doc_id = MetadataValue(rc, "doc_id");
+    if (!doc_id.empty()) return doc_id;
+    doc_id = MetadataValue(rc, "source_doc_id");
+    if (!doc_id.empty()) return doc_id;
+    doc_id = MetadataValue(rc, "hybrid_doc_id");
+    if (!doc_id.empty()) return doc_id;
+    // Compatibility fallback: a doc-path RankedChunk uses child_id=doc_id, while a
+    // legacy chunk-path result may have no doc metadata. Falling back preserves the
+    // candidate, but production chunk results now set doc_id explicitly below.
+    return rc.child_id;
+}
+
+std::string HybridPath(const RankedChunk& rc, const std::string& fallback) {
+    if (fallback == "chunk") return "chunk";
+    const std::string via = MetadataValue(rc, "via_path");
+    if (!via.empty()) return via;
+    return fallback;
+}
+
+bool IsDocEvidencePath(const std::string& path) {
+    return path != "chunk";
+}
+
+bool ContainsPath(const std::vector<std::string>& paths, const std::string& path) {
+    return std::find(paths.begin(), paths.end(), path) != paths.end();
+}
+
+void AppendUniquePath(std::vector<std::string>& paths, const std::string& path) {
+    if (!ContainsPath(paths, path)) paths.push_back(path);
+}
 
 std::string JoinPaths(const std::vector<std::string>& paths) {
     std::string out;
@@ -54,58 +101,136 @@ std::string JoinPaths(const std::vector<std::string>& paths) {
     return out;
 }
 
-std::vector<RankedChunk> FuseHybridChunks(std::vector<RankedChunk> chunk_chunks,
-                                          std::vector<RankedChunk> doc_chunks,
-                                          int top_k) {
-    if (chunk_chunks.empty()) return doc_chunks;
-    if (doc_chunks.empty()) return chunk_chunks;
+bool ShouldOverlayDocEvidence(const std::string& key) {
+    return key == "doc_discovery_match_score" ||
+           key == "doc_summary_match_score" ||
+           key == "doc_fts5_match_score" ||
+           key == "one_liner" ||
+           key == "doc_title" ||
+           key == "filename" ||
+           key == "doc_discovery_via_path";
+}
 
+void CaptureDocEvidenceMetadata(HybridCandidate& cand, const RankedChunk& rc) {
+    for (const auto& kv : rc.metadata) {
+        if (kv.first == "via_path") continue;
+        auto it = cand.doc_evidence_metadata.find(kv.first);
+        if (it == cand.doc_evidence_metadata.end() || ShouldOverlayDocEvidence(kv.first)) {
+            cand.doc_evidence_metadata[kv.first] = kv.second;
+        }
+    }
+}
+
+void ApplyDocEvidenceMetadata(HybridCandidate& cand) {
+    for (const auto& kv : cand.doc_evidence_metadata) {
+        auto it = cand.chunk.metadata.find(kv.first);
+        if (it == cand.chunk.metadata.end() || ShouldOverlayDocEvidence(kv.first)) {
+            cand.chunk.metadata[kv.first] = kv.second;
+        }
+    }
+}
+
+}  // namespace
+
+std::vector<RankedChunk> FuseHybridChunksByDocId(std::vector<RankedChunk> chunk_chunks,
+                                                 std::vector<RankedChunk> doc_chunks,
+                                                 int top_k) {
     std::vector<HybridCandidate> candidates;
     candidates.reserve(chunk_chunks.size() + doc_chunks.size());
-    std::unordered_map<std::string, std::size_t> by_child;
+    std::unordered_map<std::string, std::size_t> by_doc;
 
     auto add_path = [&](std::vector<RankedChunk>& source, const std::string& path) {
         for (std::size_t rank = 0; rank < source.size(); ++rank) {
             RankedChunk rc = std::move(source[rank]);
-            if (rc.child_id.empty()) continue;
+            const std::string doc_id = HybridDocId(rc);
+            if (doc_id.empty()) continue;
 
+            const std::string source_path = HybridPath(rc, path);
+            const bool is_doc_path = IsDocEvidencePath(source_path);
             const float source_score = rc.score;
             const float source_rerank_score = rc.rerank_score;
             const float contribution =
                 1.0f / (static_cast<float>(kHybridRrfK) + static_cast<float>(rank));
 
-            if (rc.metadata.find("via_path") == rc.metadata.end()) {
-                rc.metadata["via_path"] = path;
+            if (!is_doc_path || rc.metadata.find("via_path") == rc.metadata.end()) {
+                rc.metadata["via_path"] = source_path;
             }
-            rc.metadata["hybrid_source_path"] = path;
+            if (rc.metadata.find("doc_id") == rc.metadata.end()) rc.metadata["doc_id"] = doc_id;
+            if (rc.metadata.find("source_doc_id") == rc.metadata.end()) {
+                rc.metadata["source_doc_id"] = doc_id;
+            }
+            rc.metadata["hybrid_doc_id"] = doc_id;
+            rc.metadata["hybrid_source_path"] = source_path;
             rc.metadata["hybrid_source_score"] = std::to_string(source_score);
             rc.metadata["hybrid_source_rerank_score"] = std::to_string(source_rerank_score);
 
-            auto it = by_child.find(rc.child_id);
-            if (it == by_child.end()) {
+            auto it = by_doc.find(doc_id);
+            if (it == by_doc.end()) {
                 HybridCandidate cand;
+                cand.doc_id = doc_id;
                 cand.chunk = std::move(rc);
                 cand.fused_score = contribution;
                 cand.best_contribution = contribution;
-                cand.paths.push_back(path);
-                by_child.emplace(cand.chunk.child_id, candidates.size());
+                AppendUniquePath(cand.paths, source_path);
+                if (is_doc_path) {
+                    cand.has_doc = true;
+                    cand.best_doc_contribution = contribution;
+                    cand.best_doc_score = source_score;
+                    cand.best_doc_rerank_score = source_rerank_score;
+                    CaptureDocEvidenceMetadata(cand, cand.chunk);
+                } else {
+                    cand.has_chunk = true;
+                    cand.best_chunk_contribution = contribution;
+                    cand.best_chunk_score = source_score;
+                    cand.best_chunk_rerank_score = source_rerank_score;
+                }
+                by_doc.emplace(cand.doc_id, candidates.size());
                 candidates.push_back(std::move(cand));
                 continue;
             }
 
             HybridCandidate& cand = candidates[it->second];
             cand.fused_score += contribution;
-            cand.paths.push_back(path);
-            if (contribution > cand.best_contribution) {
-                rc.metadata["hybrid_source_path"] = path;
+            AppendUniquePath(cand.paths, source_path);
+
+            if (is_doc_path) {
+                cand.has_doc = true;
+                CaptureDocEvidenceMetadata(cand, rc);
+                if (contribution > cand.best_doc_contribution) {
+                    cand.best_doc_contribution = contribution;
+                    cand.best_doc_score = source_score;
+                    cand.best_doc_rerank_score = source_rerank_score;
+                }
+                // Keep a doc pseudo-result only when no chunk representative exists.
+                if (!cand.has_chunk && contribution > cand.best_contribution) {
+                    rc.metadata["hybrid_source_path"] = source_path;
+                    cand.chunk = std::move(rc);
+                    cand.best_contribution = contribution;
+                }
+                continue;
+            }
+
+            cand.has_chunk = true;
+            if (contribution > cand.best_chunk_contribution) {
+                cand.best_chunk_contribution = contribution;
+                cand.best_chunk_score = source_score;
+                cand.best_chunk_rerank_score = source_rerank_score;
+            }
+            // User-facing hybrid result should be the best chunk if one exists; doc
+            // evidence remains attached via metadata. This avoids returning an LLM
+            // pseudo-document when an actual passage for the same doc is available.
+            if (contribution > cand.best_contribution ||
+                IsDocEvidencePath(MetadataValue(cand.chunk, "via_path"))) {
+                rc.metadata["hybrid_source_path"] = source_path;
                 cand.chunk = std::move(rc);
                 cand.best_contribution = contribution;
+                ApplyDocEvidenceMetadata(cand);
             }
         }
     };
 
     add_path(chunk_chunks, "chunk");
-    add_path(doc_chunks, "doc_summary");
+    add_path(doc_chunks, "doc");
 
     std::stable_sort(candidates.begin(), candidates.end(),
                      [](const HybridCandidate& a, const HybridCandidate& b) {
@@ -116,16 +241,37 @@ std::vector<RankedChunk> FuseHybridChunks(std::vector<RankedChunk> chunk_chunks,
     std::vector<RankedChunk> fused;
     fused.reserve(std::min<std::size_t>(candidates.size(), static_cast<std::size_t>(k)));
     for (HybridCandidate& cand : candidates) {
+        ApplyDocEvidenceMetadata(cand);
         cand.chunk.score = cand.fused_score;
+        cand.chunk.metadata["doc_id"] = cand.doc_id;
+        cand.chunk.metadata["source_doc_id"] = cand.doc_id;
+        cand.chunk.metadata["hybrid_doc_id"] = cand.doc_id;
         cand.chunk.metadata["hybrid_rrf_score"] = std::to_string(cand.fused_score);
         cand.chunk.metadata["hybrid_paths"] = JoinPaths(cand.paths);
+        cand.chunk.metadata["hybrid_has_chunk"] = cand.has_chunk ? "true" : "false";
+        cand.chunk.metadata["hybrid_has_doc"] = cand.has_doc ? "true" : "false";
+        if (cand.has_chunk) {
+            cand.chunk.metadata["hybrid_chunk_score"] = std::to_string(cand.best_chunk_score);
+            cand.chunk.metadata["hybrid_chunk_rerank_score"] =
+                std::to_string(cand.best_chunk_rerank_score);
+        }
+        if (cand.has_doc) {
+            cand.chunk.metadata["hybrid_doc_score"] = std::to_string(cand.best_doc_score);
+            cand.chunk.metadata["hybrid_doc_rerank_score"] =
+                std::to_string(cand.best_doc_rerank_score);
+        }
+        if (cand.has_chunk && cand.has_doc) {
+            cand.chunk.metadata["via_path"] = "hybrid";
+        } else if (cand.has_chunk) {
+            cand.chunk.metadata["via_path"] = "chunk";
+        } else if (!cand.paths.empty()) {
+            cand.chunk.metadata["via_path"] = cand.paths.front();
+        }
         fused.push_back(std::move(cand.chunk));
         if (static_cast<int>(fused.size()) >= k) break;
     }
     return fused;
 }
-
-}  // namespace
 
 void FlattenMetadataIntoMap(const std::string& metadata_json,
                             std::map<std::string, std::string>& out) {
@@ -158,14 +304,16 @@ LiveSingleUnitExecutor::LiveSingleUnitExecutor(cortrix::resource::INamespacePool
                                                reranker::IReranker* reranker,
                                                cortrix::retrieval::SparseIndexRegistry* sparse_registry,
                                                int candidate_multiplier,
-                                               int max_candidates)
+                                               int max_candidates,
+                                               bool doc_fts5_fallback_enabled)
     : pool_(pool),
       embedder_(embedder),
       fusion_(fusion),
       reranker_(reranker),
       sparse_registry_(sparse_registry),
       candidate_multiplier_(candidate_multiplier < 1 ? 1 : candidate_multiplier),
-      max_candidates_(max_candidates < 1 ? 1 : max_candidates) {}
+      max_candidates_(max_candidates < 1 ? 1 : max_candidates),
+      doc_fts5_fallback_enabled_(doc_fts5_fallback_enabled) {}
 
 int LiveSingleUnitExecutor::CandidateK(int top_k, float oversample) const {
     int k = top_k < 1 ? 1 : top_k;
@@ -236,19 +384,29 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         const int candidate_k = CandidateK(ctx.top_k, oversample);
         CortrixStore& store = facade.store();
 
-        // 2. Run the per-NS recall routes. Vector + BM25 are the always-on dense +
-        //    FTS5 paths; F40 sparse is added when a sparse registry is wired (else
-        //    the fusion is just dense + FTS5). The retrieval-link boundary keys on
-        //    child_id (ULID), so each route's block_id hits are mapped to child_id
-        //    by reading the per-NS store; a legacy non-child row (empty child_id) is
-        //    dropped. Blocks are cached here so the final RankedChunk assembly reuses
-        //    them (one block_get per distinct child).
-        VectorSearcher vec_searcher(facade.vec_index(), embedder_);
-        BM25Searcher bm25_searcher(facade.store());
-        RouteResult vector_result =
-            vec_searcher.Search(ctx.query, candidate_k, kRouteTimeoutUs);
-        RouteResult bm25_result =
-            bm25_searcher.Search(ctx.query, candidate_k, kRouteTimeoutUs);
+        // 2. Run the enabled per-NS recall routes. By default vector + BM25 are on
+        //    and F40 sparse joins when a sparse registry is wired; search_config can
+        //    disable individual routes for diagnostic ablations such as dense-only.
+        //    The retrieval-link boundary keys on child_id (ULID), so each route's
+        //    block_id hits are mapped to child_id by reading the per-NS store; a
+        //    legacy non-child row (empty child_id) is dropped. Blocks are cached here
+        //    so the final RankedChunk assembly reuses them (one block_get per
+        //    distinct child).
+        RouteResult vector_result;
+        vector_result.route_name = "vector";
+        vector_result.status = RouteStatus::kSkipped;
+        if (ctx.enable_vector) {
+            VectorSearcher vec_searcher(facade.vec_index(), embedder_);
+            vector_result = vec_searcher.Search(ctx.query, candidate_k, kRouteTimeoutUs);
+        }
+
+        RouteResult bm25_result;
+        bm25_result.route_name = "bm25";
+        bm25_result.status = RouteStatus::kSkipped;
+        if (ctx.enable_bm25) {
+            BM25Searcher bm25_searcher(facade.store());
+            bm25_result = bm25_searcher.Search(ctx.query, candidate_k, kRouteTimeoutUs);
+        }
 
         // child_id → resolved chunk (text + optional metadata) cache, built as the
         // routes are converted. Dense/FTS5 resolve the full block (metadata_json);
@@ -314,7 +472,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         // per-NS SPLADE inverted index. A NS with no indexed sparse vectors (or a
         // missing registry / index open failure) yields an empty list → the fusion
         // degrades to dense+FTS5 (F40 §7.2 L2 fallback), no error.
-        if (sparse_registry_ != nullptr) {
+        if (ctx.enable_sparse && sparse_registry_ != nullptr) {
             retrieval::ISparseRetriever* sparse = sparse_registry_->GetOrOpen(namespace_id);
             if (sparse != nullptr && sparse->IsAvailable()) {
                 EmbedWithSparseResult sp;
@@ -376,6 +534,10 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             // name, so this overrides it so callers (search UI, chat citations) show the
             // real file name.
             if (!df.source_path.empty()) rc.metadata["source_path"] = df.source_path;
+            if (!row.doc_id.empty()) {
+                rc.metadata["doc_id"] = row.doc_id;
+                rc.metadata["source_doc_id"] = row.doc_id;
+            }
             ranked.push_back(std::move(rc));
         }
 
@@ -469,32 +631,70 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteDocRetrieval(
 
         const int top_k = ctx.top_k < 1 ? 1 : ctx.top_k;
 
-        // §8.1 doc branch ≅ GET /documents/discover (main path): doc_summary embedding
-        // HNSW recall over THIS NS's P-HNSW, via the shared doc_summary read core (one
-        // recall implementation for both the endpoint and this path). The per-Unit
-        // doc-level FTS5 fallback is the discover ENDPOINT's job (it owns the F08-field
-        // index); the in-NS doc path surfaces the LLM-summary recall as doc-level units.
-        std::vector<cortrix::doc_summary::DocDiscoveryHit> hits =
-            cortrix::doc_summary::RecallDocSummaryHnsw(
-                facade.vec_index(), facade.store(), embedder_, ctx.query, top_k);
+        cortrix::doc_summary::DocDiscoveryCoreOptions core_opts;
+        core_opts.top_k = top_k;
+        core_opts.fts5_fallback_enabled = doc_fts5_fallback_enabled_;
+        cortrix::doc_summary::DocDiscoveryCoreResult core =
+            cortrix::doc_summary::RunDocDiscoveryCore(
+                facade.vec_index(), facade.store(), embedder_, ctx.query, core_opts);
 
-        // Convert each doc-summary hit into a doc-level RankedChunk. child_id = doc_id
-        // (the doc-level identity for this path; the cross-NS dedupe keys on content_hash
-        // / child_id). chunk_text = summary_text so the §6.1 fields are available
-        // downstream; metadata carries the B-class explain provenance (§8.3). No rerank:
-        // doc summaries are not chunk passages, so HNSW similarity order is kept (the
-        // §8.1 doc branch does not rerank doc-summary hits).
-        out.chunks.reserve(hits.size());
-        for (const auto& h : hits) {
+        // Convert each doc-discovery hit into a doc-level RankedChunk. child_id = doc_id
+        // (doc-level identity for this path). llm_summary hits carry summary_text;
+        // fts5_fallback hits may only carry document metadata, so they become a
+        // doc-level pseudo-result with the best available title/filename text.
+        out.chunks.reserve(core.hits.size());
+        for (const auto& h : core.hits) {
             RankedChunk rc;
             rc.child_id = h.doc_id;             // doc-level identity for this path
-            rc.chunk_text = h.summary_text;     // §4.2 summary_text
-            rc.score = h.match_score;           // HNSW similarity (pre-rerank)
+            rc.score = h.match_score;           // doc-discovery RRF score
             rc.rerank_score = h.match_score;    // no rerank on the doc path → mirror score
-            rc.metadata["via_path"] = "doc_summary";  // §8.3 B-class provenance
+            rc.metadata["via_path"] = h.via_path;
+            rc.metadata["doc_discovery_via_path"] = h.via_path;
+            rc.metadata["doc_id"] = h.doc_id;
             rc.metadata["source_doc_id"] = h.doc_id;
-            rc.metadata["doc_summary_match_score"] = std::to_string(h.match_score);
+            rc.metadata["doc_discovery_match_score"] = std::to_string(h.match_score);
+            if (h.via_path == "llm_summary") {
+                rc.metadata["doc_summary_match_score"] = std::to_string(h.match_score);
+            } else if (h.via_path == "fts5_fallback") {
+                rc.metadata["doc_fts5_match_score"] = std::to_string(h.match_score);
+            }
             if (!h.one_liner.empty()) rc.metadata["one_liner"] = h.one_liner;
+
+            CortrixDoc doc;
+            if (facade.store().doc_get(h.doc_id, doc) == 0) {
+                FlattenMetadataIntoMap(doc.metadata_json, rc.metadata);
+                if (!doc.source_path.empty()) rc.metadata["source_path"] = doc.source_path;
+                if (!doc.title.empty()) rc.metadata["doc_title"] = doc.title;
+            }
+            if (!h.filename.empty() && rc.metadata.find("source_path") == rc.metadata.end()) {
+                rc.metadata["source_path"] = h.filename;
+            }
+            if (!h.doc_title.empty()) rc.metadata["doc_title"] = h.doc_title;
+
+            if (!h.summary_text.empty()) {
+                rc.chunk_text = h.summary_text;
+            } else if (!h.doc_title.empty()) {
+                rc.chunk_text = h.doc_title;
+            } else if (rc.metadata.find("doc_title") != rc.metadata.end()) {
+                rc.chunk_text = rc.metadata["doc_title"];
+            } else if (rc.metadata.find("source_path") != rc.metadata.end()) {
+                rc.chunk_text = rc.metadata["source_path"];
+            } else {
+                rc.chunk_text = h.doc_id;
+            }
+            // Re-assert internal provenance after flattening caller-supplied document
+            // metadata so a user metadata key named doc_id/source_doc_id/via_path cannot
+            // break query-time candidate identity.
+            rc.metadata["via_path"] = h.via_path;
+            rc.metadata["doc_discovery_via_path"] = h.via_path;
+            rc.metadata["doc_id"] = h.doc_id;
+            rc.metadata["source_doc_id"] = h.doc_id;
+            rc.metadata["doc_discovery_match_score"] = std::to_string(h.match_score);
+            if (h.via_path == "llm_summary") {
+                rc.metadata["doc_summary_match_score"] = std::to_string(h.match_score);
+            } else if (h.via_path == "fts5_fallback") {
+                rc.metadata["doc_fts5_match_score"] = std::to_string(h.match_score);
+            }
             out.chunks.push_back(std::move(rc));
         }
 
@@ -520,15 +720,19 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteHybridRetrieval(
     // a chunk-first concatenation while avoiding raw-score comparisons across different
     // scoring scales. A per-path NS failure (error_code set) is surfaced if BOTH fail; if
     // only one fails we still return the other's results (partial success).
+    using clock = std::chrono::steady_clock;
+    const auto t0 = clock::now();
     NamespaceQueryResult chunk_part = ExecuteChunkRetrieval(ctx, namespace_id, oversample);
     NamespaceQueryResult doc_part = ExecuteDocRetrieval(ctx, namespace_id);
+    auto elapsed_ms = [&]() {
+        return static_cast<int>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(clock::now() - t0)
+                .count());
+    };
 
     NamespaceQueryResult out;
     out.namespace_id = namespace_id;
-    // Latency = the larger of the two (they run sequentially here; the sum would
-    // double-count the shared façade acquire — max is the honest single-NS wall time
-    // floor, and this path is not on the default hot path).
-    out.latency_ms = std::max(chunk_part.latency_ms, doc_part.latency_ms);
+    out.latency_ms = elapsed_ms();
 
     const bool chunk_ok = chunk_part.error_code.empty();
     const bool doc_ok = doc_part.error_code.empty();
@@ -538,23 +742,28 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteHybridRetrieval(
         out.error_category = chunk_part.error_category;
         out.retryable = chunk_part.retryable;
         out.retry_after_ms = chunk_part.retry_after_ms;
+        out.structured_data = std::move(chunk_part.structured_data);
         return out;
     }
 
     if (!chunk_ok) {
         out.chunks = std::move(doc_part.chunks);
         out.error_code.clear();
+        out.latency_ms = elapsed_ms();
         return out;
     }
     if (!doc_ok) {
         out.chunks = std::move(chunk_part.chunks);
         out.error_code.clear();
+        out.latency_ms = elapsed_ms();
         return out;
     }
 
-    out.chunks = FuseHybridChunks(std::move(chunk_part.chunks), std::move(doc_part.chunks),
-                                  ctx.top_k);
+    out.chunks = FuseHybridChunksByDocId(std::move(chunk_part.chunks),
+                                         std::move(doc_part.chunks),
+                                         ctx.top_k);
     out.error_code.clear();  // success (at least one path succeeded)
+    out.latency_ms = elapsed_ms();
     return out;
 }
 

@@ -319,6 +319,40 @@ TEST_F(QueryCovGapRagFusionTest, ExpandQueries_DegradeReason_InvalidResponse) {
     EXPECT_EQ(svc->GetExplainState().degrade_reason, "invalid_response");
 }
 
+// Nested generic LLM transport token should not be masked as llm_timeout by the
+// F36 wrapper. This is critical for benchmark explainability: "network/TLS" and
+// "deadline exceeded" require different follow-up actions.
+TEST_F(QueryCovGapRagFusionTest, ExpandQueries_DegradeReason_LlmTransport) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Return(QcgErr(StatusCode::kUnavailable,
+                                "CX_LLM_TRANSPORT: transport failure to endpoint")));
+    auto svc = QcgService(mock);
+    auto out = svc->ExpandQueries("q", QcgEnabled());
+    ASSERT_FALSE(out.ok());
+    EXPECT_EQ(svc->GetExplainState().degrade_reason, "llm_transport");
+    EXPECT_EQ(svc->GetExplainState().degrade_detail, "transport_failure");
+    EXPECT_EQ(RagFusionMetrics::Instance().DegradedCount(
+                  RagFusionMetrics::DegradeReason::kLlmTransport), 1u);
+}
+
+// Non-429 HTTP failures from the shared LLM client stay a degraded fallback, but
+// explain/metrics must preserve that they were HTTP/auth/provider errors rather
+// than true timeouts.
+TEST_F(QueryCovGapRagFusionTest, ExpandQueries_DegradeReason_LlmHttp) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Return(QcgErr(StatusCode::kInternal,
+                                "CX_LLM_HTTP: http_status=401")));
+    auto svc = QcgService(mock);
+    auto out = svc->ExpandQueries("q", QcgEnabled());
+    ASSERT_FALSE(out.ok());
+    EXPECT_EQ(svc->GetExplainState().degrade_reason, "llm_http");
+    EXPECT_EQ(svc->GetExplainState().degrade_detail, "http_status=401");
+    EXPECT_EQ(RagFusionMetrics::Instance().DegradedCount(
+                  RagFusionMetrics::DegradeReason::kLlmHttp), 1u);
+}
+
 // ObserveLlmLatency with a non-empty model name on the success path
 // (rag_fusion.cpp 113-116). The mock's Chat sleeps a bounded 2ms so the measured
 // llm_latency_ms is > 0 (the gate on line 113), and the response carries a model

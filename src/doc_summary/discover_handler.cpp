@@ -1,13 +1,10 @@
 #include "cortrix/doc_summary/discover_handler.h"
 
-#include <sqlite3.h>
-
 #include <algorithm>
-#include <cmath>
 
 #include "cortrix/common/block_types.h"          // kBlockDocSummary
 #include "cortrix/common/data_types.h"            // CortrixBlock
-#include "cortrix/doc_summary/doc_fts5_index.h"   // DocFtsHit / FuseDocDiscovery
+#include "cortrix/doc_summary/doc_fts5_index.h"   // SearchDocFts5 / FuseDocDiscovery
 #include "cortrix/doc_summary/doc_summary_config.h"     // kDocDiscoveryRrfK
 #include "cortrix/doc_summary/doc_summary_generator.h"  // DocSummaryConfig (full def for config.fts5_fallback_enabled)
 #include "cortrix/doc_summary/doc_summary_metrics.h"
@@ -16,7 +13,6 @@
 #include "cortrix/server/request_context.h"
 #include "cortrix/spc/onnx_embedder.h"            // OnnxEmbedder / EmbeddingResult
 #include "cortrix/store/cortrix_store.h"           // CortrixStore
-#include "cortrix/store/cortrix_store_sqlite.h"    // SanitizeFts5Query (M-SEC-001)
 #include "cortrix/store/iindex.h"                  // IIndex
 
 #include "httplib.h"
@@ -24,48 +20,6 @@
 namespace cortrix::doc_summary {
 
 namespace {
-
-// §8.2 doc-level BM25 query against a per-Unit `doc_fts5_index` table reached through
-// an existing store handle (the F41SchemaProvider creates this table per Unit;
-// populating it is the F08-rev-N write hook = D3.5, so live it is empty until that
-// lands — an empty result here just means the main HNSW path stands alone). The query,
-// column weights (filename 1.0 / doc_title 2.0 / topics 1.5 / authors 1.0), and the
-// bm25→(0,1] score map MIRROR DocFts5Index::Search exactly; we read the per-Unit table
-// directly rather than via DocFts5Index because that class owns its own DB connection.
-// Throws std::runtime_error on a SQLite fault so the caller can graceful-degrade (§8.2).
-std::vector<DocFtsHit> SearchDocFts5OverHandle(sqlite3* db, const std::string& query,
-                                               int top_k) {
-    std::vector<DocFtsHit> hits;
-    if (db == nullptr || top_k <= 0) return hits;
-    const std::string sanitized = cortrix::SanitizeFts5Query(query);
-    if (sanitized.empty()) return hits;  // empty / operator-only query → no rows (not an error)
-
-    const char* sql =
-        "SELECT doc_id, filename, doc_title, "
-        "bm25(doc_fts5_index, 0.0, 1.0, 2.0, 1.5, 1.0) AS rank "
-        "FROM doc_fts5_index WHERE doc_fts5_index MATCH ? "
-        "ORDER BY rank LIMIT ?";
-    sqlite3_stmt* st = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
-        throw std::runtime_error(std::string("doc_fts5 prepare: ") + sqlite3_errmsg(db));
-    }
-    sqlite3_bind_text(st, 1, sanitized.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int(st, 2, top_k);
-    while (sqlite3_step(st) == SQLITE_ROW) {
-        DocFtsHit h;
-        const unsigned char* doc_id = sqlite3_column_text(st, 0);
-        const unsigned char* fn = sqlite3_column_text(st, 1);
-        const unsigned char* title = sqlite3_column_text(st, 2);
-        h.doc_id = doc_id ? reinterpret_cast<const char*>(doc_id) : "";
-        h.filename = fn ? reinterpret_cast<const char*>(fn) : "";
-        h.doc_title = title ? reinterpret_cast<const char*>(title) : "";
-        const double rank = sqlite3_column_double(st, 3);
-        h.score = 1.0 / (1.0 + std::max(0.0, -rank));
-        hits.push_back(std::move(h));
-    }
-    sqlite3_finalize(st);
-    return hits;
-}
 
 // Serialize one fused DocDiscoveryHit into the §6.1 result object. The llm_summary
 // path carries the 4 structured fields; the fts5_fallback path carries the F08 fields.
@@ -144,6 +98,50 @@ std::vector<DocDiscoveryHit> RecallDocSummaryHnsw(store::IIndex& index,
     return out;
 }
 
+DocDiscoveryCoreResult RunDocDiscoveryCore(store::IIndex& index,
+                                           cortrix::CortrixStore& store,
+                                           cortrix::OnnxEmbedder& embedder,
+                                           const std::string& query,
+                                           const DocDiscoveryCoreOptions& options) {
+    DocDiscoveryCoreResult result;
+    const int k = options.top_k < 1 ? 1 : options.top_k;
+
+    // Step 1 (main): doc_summary embedding HNSW recall. A query-time HNSW/index/embed
+    // fault is a graceful degrade: record a warning and let the doc-level FTS5 fallback
+    // still generate doc candidates. This is the same partial-success behavior used by
+    // the HTTP discover endpoint and now by the query granularity=doc/both path.
+    std::vector<DocDiscoveryHit> llm_hits;
+    result.hnsw_ran = true;
+    try {
+        llm_hits = RecallDocSummaryHnsw(index, store, embedder, query, k);
+        result.summary_hit_count = static_cast<int>(llm_hits.size());
+    } catch (const std::exception& e) {
+        result.hnsw_failed = true;
+        result.warnings.push_back(std::string("doc_summary_hnsw_failed: ") + e.what());
+    }
+
+    // Step 2 (fallback): per-Unit doc-level FTS5 over the F08 fields. Query-time
+    // FTS5 faults are graceful degrade events, counted by the existing F41 metric.
+    std::vector<DocFtsHit> fts5_hits;
+    if (options.fts5_fallback_enabled) {
+        result.fts5_ran = true;
+        auto fts5 = SearchDocFts5(store.db_handle(), query, k);
+        if (fts5.ok()) {
+            fts5_hits = std::move(fts5.value());
+            result.fts5_hit_count = static_cast<int>(fts5_hits.size());
+        } else {
+            result.fts5_failed = true;
+            DocSummaryMetrics::Instance().RecordFts5FallbackFailed();
+            result.warnings.push_back(
+                std::string("fts5_fallback_failed: ") + fts5.status().message());
+        }
+    }
+
+    // Step 3: RRF-fuse the two doc-level recall paths by doc_id.
+    result.hits = FuseDocDiscovery(llm_hits, fts5_hits, k, kDocDiscoveryRrfK);
+    return result;
+}
+
 nlohmann::json ExecuteDocDiscovery(cortrix::resource::INamespacePool& pool,
                                    cortrix::OnnxEmbedder& embedder,
                                    const std::string& ns, const std::string& query,
@@ -172,39 +170,14 @@ nlohmann::json ExecuteDocDiscovery(cortrix::resource::INamespacePool& pool,
         return out;
     }
 
-    // Step 1 (main): doc_summary embedding HNSW recall (via_path = "llm_summary").
-    // A query-time HNSW/index/embed fault is a graceful degrade (GEN-Agent #3,
-    // mirroring the fts5 fallback below + the §161 partial-success contract):
-    // record a warning and fall back to the fts5 path only — never let it escape
-    // as a generic 500.
-    std::vector<DocDiscoveryHit> llm_hits;
-    try {
-        llm_hits =
-            RecallDocSummaryHnsw(facade.vec_index(), facade.store(), embedder, query, k);
-    } catch (const std::exception& e) {
-        warnings.push_back(std::string("doc_summary_hnsw_failed: ") + e.what());
-    }
+    DocDiscoveryCoreOptions core_opts;
+    core_opts.top_k = k;
+    core_opts.fts5_fallback_enabled = config.fts5_fallback_enabled;
+    DocDiscoveryCoreResult core =
+        RunDocDiscoveryCore(facade.vec_index(), facade.store(), embedder, query, core_opts);
+    for (const auto& warning : core.warnings) warnings.push_back(warning);
 
-    // Step 2 (fallback): per-Unit doc-level FTS5 over the F08 fields (via_path =
-    // "fts5_fallback"). Gated by config.fts5_fallback_enabled (F41 §4.4). A query-time
-    // FTS5 fault is a graceful degrade (F41-8 / §8.2): record the metric + a warning,
-    // and return the main-path results only — never fail the request.
-    std::vector<DocFtsHit> fts5_hits;
-    bool fts5_failed = false;
-    if (config.fts5_fallback_enabled) {
-        try {
-            fts5_hits = SearchDocFts5OverHandle(facade.store().db_handle(), query, k);
-        } catch (const std::exception& e) {
-            fts5_failed = true;
-            DocSummaryMetrics::Instance().RecordFts5FallbackFailed();
-            warnings.push_back(std::string("fts5_fallback_failed: ") + e.what());
-        }
-    }
-
-    // Step 3: RRF-fuse the two paths (dedup by doc_id) → top_k (FuseDocDiscovery SoT).
-    // k = kDocDiscoveryRrfK (60, §8.2 industry default; NS-configurable is Phase 2).
-    std::vector<DocDiscoveryHit> fused =
-        FuseDocDiscovery(llm_hits, fts5_hits, k, kDocDiscoveryRrfK);
+    const std::vector<DocDiscoveryHit>& fused = core.hits;
     for (const auto& h : fused) results.push_back(HitToJson(h));
 
     succeeded.push_back(ns);
@@ -219,7 +192,7 @@ nlohmann::json ExecuteDocDiscovery(cortrix::resource::INamespacePool& pool,
         int fallback_docs = 0;
         for (const auto& h : fused)
             if (h.via_path == "fts5_fallback") ++fallback_docs;
-        const bool triggered = fts5_failed || fallback_docs > 0;
+        const bool triggered = core.fts5_failed || fallback_docs > 0;
         if (triggered) {
             meta["fallback_triggered"] = true;
             meta["fallback_docs_count"] = fallback_docs;

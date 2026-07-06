@@ -272,6 +272,8 @@ add_executable(cortrix_unit_tests
     # --- F36 RAG-Fusion (Wave B) ---
     unit/test_rag_fusion.cpp
     unit/test_query_response_branches.cpp
+    # --- F36-LR LLM listwise rerank (2026-07-05 addendum) ---
+    unit/test_llm_rerank_stage.cpp
     # --- F37 CRAG Retrieval Evaluation (Wave C-R1) ---
     unit/test_crag_error.cpp
     unit/test_crag_evaluator.cpp

@@ -363,8 +363,22 @@ Status HfTokenizer::Load(const std::string& tokenizer_json_path) {
 // ================================================================
 
 Status HfTokenizer::Encode(const std::string& text, int max_length, Encoded* output) const {
+    return EncodeInternal(text, max_length, /*pad_to_max_length=*/true, output);
+}
+
+Status HfTokenizer::EncodeNoPad(const std::string& text,
+                                int max_length,
+                                Encoded* output) const {
+    return EncodeInternal(text, max_length, /*pad_to_max_length=*/false, output);
+}
+
+Status HfTokenizer::EncodeInternal(const std::string& text,
+                                   int max_length,
+                                   bool pad_to_max_length,
+                                   Encoded* output) const {
     if (!output) return Status::InvalidArgument("null output pointer");
     if (!loaded_) return Status::Internal("tokenizer not loaded");
+    if (max_length < 2) return Status::InvalidArgument("max_length must be >= 2");
 
     std::vector<int64_t> ids;
     ids.push_back(cls_id_);  // <s>
@@ -405,10 +419,11 @@ Status HfTokenizer::Encode(const std::string& text, int max_length, Encoded* out
     output->input_ids = std::move(ids);
     output->attention_mask.assign(real_len, 1);
 
-    // Pad to max_length
-    while (static_cast<int>(output->input_ids.size()) < max_length) {
-        output->input_ids.push_back(pad_id_);
-        output->attention_mask.push_back(0);
+    if (pad_to_max_length) {
+        while (static_cast<int>(output->input_ids.size()) < max_length) {
+            output->input_ids.push_back(pad_id_);
+            output->attention_mask.push_back(0);
+        }
     }
 
     return Status::Ok();

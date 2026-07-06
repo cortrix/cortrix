@@ -51,6 +51,8 @@ public:
         kCircuitOpen,
         kQuotaExceeded,
         kInvalidResponse,
+        kLlmTransport,
+        kLlmHttp,
         kOther,
     };
 
@@ -113,7 +115,7 @@ private:
     RagFusionMetrics() = default;
 
     static constexpr int kResultCount = 3;       // success / degraded / disabled
-    static constexpr int kDegradeReasonCount = 5;
+    static constexpr int kDegradeReasonCount = 7;
     static constexpr int kStrategyCount = 3;     // paraphrase / subquery / reverse
     static constexpr int kDirectionCount = 2;    // input / output
     // Per-model latency: a tiny fixed-size table keyed by model name (low

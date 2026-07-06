@@ -48,11 +48,22 @@ public:
     ///
     /// @param original_query the user/Agent query (untrusted — injection-guarded)
     /// @param config         the resolved NS config (variant_count / strategies / timeout)
+    /// @param locale         prompt locale ("zh" default, "en" for English corpora such as BEIR)
     /// @param ctx            optional TraceContext (V1.0 OSS always nullptr; §9)
     Result<QueryVariants> Generate(
         const std::string& original_query,
         const RagFusionConfig& config,
+        const std::string& locale = "zh",
         const observability::TraceContext* ctx = nullptr);
+
+    /// Backward-compatible overload for existing callers that only pass a
+    /// TraceContext; keeps the historical zh prompt default.
+    Result<QueryVariants> Generate(
+        const std::string& original_query,
+        const RagFusionConfig& config,
+        const observability::TraceContext* ctx) {
+        return Generate(original_query, config, "zh", ctx);
+    }
 
     /// The prompt-template version string surfaced in QueryVariants (B-class,
     /// ?explain=true only) and the IGlobalConfig default (§4.7). Stable token.
@@ -76,6 +87,14 @@ public:
     /// True iff `query` contains a known prompt-injection keyword (F36 §4.2 #4).
     /// Case-insensitive substring match over a fixed keyword set.
     static bool ContainsInjectionKeyword(const std::string& query);
+
+    /// v1.0.8 semantic-drift guard: true iff `variant_query` keeps a minimum
+    /// overlap with `original_query`'s content tokens. Short keyword queries have
+    /// too little lexical signal and are allowed through; longer factual queries
+    /// must preserve at least one/two anchor terms so broad generic rewrites do not
+    /// dominate BEIR-style retrieval.
+    static bool ShouldKeepVariant(const std::string& original_query,
+                                  const std::string& variant_query);
 
     /// Parse the LLM's JSON response into variant strings (F36 §4.2 #3 strict
     /// schema). Expects `{"variants":[{"strategy":"..","query":".."}, ...]}`.

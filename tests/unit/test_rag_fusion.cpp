@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <algorithm>
 #include <chrono>
 #include <memory>
 #include <set>
@@ -21,25 +22,35 @@
 #include <nlohmann/json.hpp>
 
 #include "cortrix/catalog/config_resolver.h"
+#include "cortrix/common/executor_engine.h"
 #include "cortrix/common/result.h"
 #include "cortrix/query/query_variant_generator.h"
 #include "cortrix/query/rag_fusion.h"
 #include "cortrix/query/rag_fusion_error.h"
 #include "cortrix/query/rag_fusion_metrics.h"
+#include "cortrix/query/rag_fusion_stage.h"
 #include "cortrix/query/rag_fusion_types.h"
 #include "cortrix/query/rrf_fusion.h"
+#include "cortrix/query/scatter_gather.h"
+#include "cortrix/retrieval/cross_ns_types.h"
 #include "cortrix/retrieval/types.h"
 
 #include "mocks/mock_llm_client.h"
+#include "mocks/mock_reranker.h"
+#include "scatter/mock_permission_service.h"
 
 namespace cortrix::query {
 namespace {
 
 using ::testing::_;
+using ::testing::HasSubstr;
+using ::testing::Invoke;
 using ::testing::Return;
 using llm::ChatCompletionResponse;
 using llm::LlmCallConfig;
 using llm::MockLlmClient;
+using retrieval::NamespaceQueryResult;
+using retrieval::RankedChunk;
 using retrieval::ScoredResult;
 
 // --- helpers ---------------------------------------------------------------
@@ -70,7 +81,7 @@ ChatCompletionResponse ErrResponse(StatusCode code, const std::string& msg) {
 std::string ThreeVariantJson() {
     return R"({"variants":[
         {"strategy":"paraphrase","query":"latest company earnings report data"},
-        {"strategy":"subquery","query":"last quarter revenue and profit"},
+        {"strategy":"subquery","query":"last quarter company revenue and profit"},
         {"strategy":"reverse","query":"company revenue growth trend"}
     ]})";
 }
@@ -87,6 +98,114 @@ std::shared_ptr<RagFusion> MakeService(std::shared_ptr<MockLlmClient> mock) {
     auto rrf = std::make_shared<RRFFusion>(60);
     return std::make_shared<RagFusion>(gen, rrf);
 }
+
+retrieval::RankedChunk ChunkForStage(const std::string& child_id,
+                                     const std::string& content,
+                                     float score) {
+    retrieval::RankedChunk rc;
+    rc.child_id = child_id;
+    rc.chunk_text = content;
+    rc.score = score;
+    rc.rerank_score = score;
+    return rc;
+}
+
+retrieval::RankedChunk ChunkForStageWithScores(const std::string& child_id,
+                                               const std::string& content,
+                                               float score,
+                                               float rerank_score) {
+    retrieval::RankedChunk rc;
+    rc.child_id = child_id;
+    rc.chunk_text = content;
+    rc.score = score;
+    rc.rerank_score = rerank_score;
+    return rc;
+}
+
+class StageFakeExecutor : public IScatterExecutor {
+public:
+    std::vector<std::string> seen_queries;
+    std::vector<int> seen_top_k;
+    std::vector<bool> seen_rerank;
+
+    retrieval::NamespaceQueryResult ExecuteForNamespace(
+        const QueryContext& ctx,
+        const std::string& namespace_id,
+        float /*oversample*/) override {
+        seen_queries.push_back(ctx.query);
+        seen_top_k.push_back(ctx.top_k);
+        seen_rerank.push_back(ctx.rerank);
+        retrieval::NamespaceQueryResult out;
+        out.namespace_id = namespace_id;
+
+        if (ctx.query == "company financial status") {
+            out.chunks = {
+                ChunkForStage("original_head", "original exact company financial hit", 1.0f),
+                ChunkForStage("semantic_tail", "semantic answer that reranker should prefer", 0.20f),
+                ChunkForStage("original_noise", "weak original distractor", 0.10f),
+            };
+        } else {
+            out.chunks = {
+                ChunkForStage("semantic_tail", "semantic answer that reranker should prefer", 0.95f),
+                ChunkForStage("variant_noise", "variant-only distractor", 0.80f),
+                ChunkForStage("original_head", "original exact company financial hit", 0.10f),
+            };
+        }
+        if (static_cast<int>(out.chunks.size()) > ctx.top_k) {
+            out.chunks.resize(static_cast<std::size_t>(ctx.top_k));
+        }
+        return out;
+    }
+};
+
+class StageFinalScoreExecutor : public IScatterExecutor {
+public:
+    std::vector<std::string> seen_queries;
+
+    retrieval::NamespaceQueryResult ExecuteForNamespace(
+        const QueryContext& ctx,
+        const std::string& namespace_id,
+        float /*oversample*/) override {
+        seen_queries.push_back(ctx.query);
+        retrieval::NamespaceQueryResult out;
+        out.namespace_id = namespace_id;
+        out.chunks = {
+            // Final score is the response ordering contract. The deliberately
+            // inverted rerank_score protects the selective gate from regressing
+            // to a raw rerank-only margin.
+            ChunkForStageWithScores("final_head", "highest fused final score", 0.90f, 0.10f),
+            ChunkForStageWithScores("rerank_head", "highest raw rerank score", 0.20f, 0.95f),
+            ChunkForStageWithScores("tail", "weak tail", 0.10f, 0.10f),
+        };
+        if (static_cast<int>(out.chunks.size()) > ctx.top_k) {
+            out.chunks.resize(static_cast<std::size_t>(ctx.top_k));
+        }
+        return out;
+    }
+};
+
+class StageTiedScoreExecutor : public IScatterExecutor {
+public:
+    std::vector<std::string> seen_queries;
+
+    retrieval::NamespaceQueryResult ExecuteForNamespace(
+        const QueryContext& ctx,
+        const std::string& namespace_id,
+        float /*oversample*/) override {
+        seen_queries.push_back(ctx.query);
+        retrieval::NamespaceQueryResult out;
+        out.namespace_id = namespace_id;
+        out.chunks = {
+            ChunkForStageWithScores("tie_a", "first tied final score", 0.50f, 0.50f),
+            ChunkForStageWithScores("tie_b", "second tied final score", 0.50f, 0.50f),
+            ChunkForStageWithScores("tail", "weak tail", 0.10f, 0.10f),
+        };
+        if (static_cast<int>(out.chunks.size()) > ctx.top_k) {
+            out.chunks.resize(static_cast<std::size_t>(ctx.top_k));
+        }
+        return out;
+    }
+};
 
 // Reset the process-wide metrics before each metric-sensitive test.
 class RagFusionTest : public ::testing::Test {
@@ -112,6 +231,26 @@ TEST_F(RagFusionTest, QueryVariantGenerator_Generate_Success_3Variants) {
     EXPECT_EQ(out.value().llm_model_used, "gpt-4o-mini");
     EXPECT_EQ(out.value().llm_prompt_version, QueryVariantGenerator::kPromptVersion);
     EXPECT_EQ(out.value().token_count, 12 + 30);
+}
+
+// UT 1b: the Chat call carries the structured-output + reasoning-off contract
+// and the per-call model override (§3.5.4). E-v2 measured 53/120 degrades with
+// glm-4.5-air until thinking was disabled — lock the call shape here.
+TEST_F(RagFusionTest, QueryVariantGenerator_CallDisablesThinkingAndOverridesModel) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Invoke([](const std::string&, const LlmCallConfig& call) {
+            EXPECT_EQ(call.thinking_type, "disabled");
+            EXPECT_EQ(call.response_format, "json_object");
+            EXPECT_EQ(call.model, "glm-4.5-air");
+            return OkResponse(ThreeVariantJson());
+        }));
+
+    QueryVariantGenerator gen(mock);
+    RagFusionConfig cfg = EnabledConfig(3);
+    cfg.model = "glm-4.5-air";
+    auto out = gen.Generate("company financial status", cfg);
+    ASSERT_TRUE(out.ok()) << out.status().message();
 }
 
 // UT 2: LLM timeout -> CX_ERR_RAG_FUSION_LLM_TIMEOUT.
@@ -221,6 +360,36 @@ TEST_F(RagFusionTest, BuildPrompt_EnLocale) {
     EXPECT_NE(en.find("<USER_QUERY_abcd1234>"), std::string::npos);
 }
 
+TEST_F(RagFusionTest, Generate_UsesConfiguredEnLocalePrompt) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(HasSubstr("RAG query-expansion expert"), _))
+        .WillOnce(Return(OkResponse(ThreeVariantJson())));
+    QueryVariantGenerator gen(mock);
+    auto out = gen.Generate("semantic retrieval", EnabledConfig(3), "en");
+    ASSERT_TRUE(out.ok()) << out.status().message();
+    EXPECT_EQ(out.value().variants.size(), 3u);
+}
+
+TEST_F(RagFusionTest, QueryVariantGenerator_Generate_FiltersSemanticDriftVariant) {
+    auto mock = std::make_shared<MockLlmClient>();
+    const std::string json = R"({"variants":[
+        {"strategy":"paraphrase","query":"ANCA stimulated neutrophils release extracellular traps called NETs"},
+        {"strategy":"subquery","query":"How do neutrophils release NETs after ANCA stimulation?"},
+        {"strategy":"reverse","query":"Macrolides protect against myocardial infarction"}
+    ]})";
+    EXPECT_CALL(*mock, Chat(_, _)).WillOnce(Return(OkResponse(json)));
+    QueryVariantGenerator gen(mock);
+    auto out = gen.Generate(
+        "Neutrophil extracellular traps NETs are released by ANCA stimulated neutrophils",
+        EnabledConfig(3), "en");
+    ASSERT_TRUE(out.ok()) << out.status().message();
+    ASSERT_EQ(out.value().variants.size(), 2u);
+    EXPECT_EQ(out.value().variants[0],
+              "ANCA stimulated neutrophils release extracellular traps called NETs");
+    EXPECT_EQ(out.value().variants[1],
+              "How do neutrophils release NETs after ANCA stimulation?");
+}
+
 // ===========================================================================
 // RagFusion::ExpandQueries (design UT 6-7, 14-16)
 // ===========================================================================
@@ -319,21 +488,25 @@ TEST_F(RagFusionTest, ExpandQueries_QctxThreaded_NoSkipYet) {
 // RagFusion::FuseResults -- global RRF (design UT 8-11)
 // ===========================================================================
 
-// UT 8: 4 variants x M global RRF math correctness (rank-based).
+// UT 8: 4 variants x M global RRF math correctness (v1.0.7 anchored role-weighted).
 TEST_F(RagFusionTest, RagFusion_FuseResults_GlobalRRF) {
     auto svc = MakeService(std::make_shared<MockLlmClient>());
     std::vector<std::vector<ScoredResult>> per_variant = {
-        {{"a", 0.9f}, {"b", 0.8f}, {"c", 0.7f}},  // variant 0: ranks 1,2,3
-        {{"b", 0.95f}, {"a", 0.6f}},               // variant 1: ranks 1,2
+        {{"a", 0.9f}, {"b", 0.8f}, {"c", 0.7f}},  // original: ranks 1,2,3
+        {{"b", 0.95f}, {"a", 0.6f}},               // variant: ranks 1,2
     };
     auto out = svc->FuseResults(per_variant, 60);
     ASSERT_TRUE(out.ok());
-    // a: 1/61 + 1/62 ; b: 1/62 + 1/61 (== a) ; c: 1/63
-    // a and b tie (both rank-1 once + rank-2 once); c lowest.
+    // a: 1.7/61 + 0.5/62 ; b: 1.7/62 + 0.5/61 ; c: 1.7/63.
+    // Original-query head anchoring preserves the original top-3 order.
     ASSERT_EQ(out.value().size(), 3u);  // deduped to {a,b,c}
-    EXPECT_EQ(out.value().back().child_id, "c");  // c is last
-    const double expected_ab = 1.0 / 61 + 1.0 / 62;
-    EXPECT_NEAR(out.value()[0].score, expected_ab, 1e-6);
+    EXPECT_EQ(out.value()[0].child_id, "a");
+    EXPECT_EQ(out.value()[1].child_id, "b");
+    EXPECT_EQ(out.value()[2].child_id, "c");
+    const double expected_a = 1.7 / 61.0 + 0.5 / 62.0;
+    const double expected_b = 1.7 / 62.0 + 0.5 / 61.0;
+    EXPECT_NEAR(out.value()[0].score, expected_a, 1e-6);
+    EXPECT_NEAR(out.value()[1].score, expected_b, 1e-6);
 }
 
 // UT 9: multiple variants hitting the same chunk -> dedup (keep one row, summed).
@@ -346,7 +519,7 @@ TEST_F(RagFusionTest, RagFusion_FuseResults_Deduplication) {
     ASSERT_TRUE(out.ok());
     ASSERT_EQ(out.value().size(), 1u);  // deduped
     EXPECT_EQ(out.value()[0].child_id, "x");
-    EXPECT_NEAR(out.value()[0].score, 3.0 / 61, 1e-6);  // rank-1 in all 3
+    EXPECT_NEAR(out.value()[0].score, (1.7 + 0.5 + 0.5) / 61.0, 1e-6);
 }
 
 // UT 10: default k=60.
@@ -355,7 +528,7 @@ TEST_F(RagFusionTest, RagFusion_FuseResults_RrfKDefault) {
     std::vector<std::vector<ScoredResult>> pv = {{{"a", 1.0f}}};
     auto out = svc->FuseResults(pv);  // default k
     ASSERT_TRUE(out.ok());
-    EXPECT_NEAR(out.value()[0].score, 1.0 / 61, 1e-6);
+    EXPECT_NEAR(out.value()[0].score, 1.7 / 61.0, 1e-6);
 }
 
 // UT 11: NS config rrf_k=30 override changes the score.
@@ -364,7 +537,7 @@ TEST_F(RagFusionTest, RagFusion_FuseResults_RrfKCustom) {
     std::vector<std::vector<ScoredResult>> pv = {{{"a", 1.0f}}};
     auto out = svc->FuseResults(pv, 30);
     ASSERT_TRUE(out.ok());
-    EXPECT_NEAR(out.value()[0].score, 1.0 / 31, 1e-6);
+    EXPECT_NEAR(out.value()[0].score, 1.7 / 31.0, 1e-6);
 }
 
 // k <= 0 falls back to 60 (RRF formula needs k > 0).
@@ -373,7 +546,134 @@ TEST_F(RagFusionTest, RagFusion_FuseResults_RrfKNonPositiveFallback) {
     std::vector<std::vector<ScoredResult>> pv = {{{"a", 1.0f}}};
     auto out = svc->FuseResults(pv, 0);
     ASSERT_TRUE(out.ok());
-    EXPECT_NEAR(out.value()[0].score, 1.0 / 61, 1e-6);
+    EXPECT_NEAR(out.value()[0].score, 1.7 / 61.0, 1e-6);
+}
+
+// v1.0.7 regression guard: a variant-only distractor hit at rank1 in all three
+// variants must not push an original-query strong hit out of the anchored head.
+TEST_F(RagFusionTest, RagFusion_FuseResults_ConservativeProtectsOriginalStrongHit) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        {{"relevant_original_top", 0.99f}, {"original_second", 0.8f}},
+        {{"variant_distractor", 0.95f}},
+        {{"variant_distractor", 0.94f}},
+        {{"variant_distractor", 0.93f}},
+    };
+    auto out = svc->FuseResults(per_variant, 60);
+    ASSERT_TRUE(out.ok());
+    ASSERT_GE(out.value().size(), 2u);
+    EXPECT_EQ(out.value()[0].child_id, "relevant_original_top");
+    auto distractor = std::find_if(out.value().begin(), out.value().end(), [](const auto& r) {
+        return r.child_id == "variant_distractor";
+    });
+    ASSERT_NE(distractor, out.value().end());
+    EXPECT_GT(out.value()[0].score, distractor->score);
+}
+
+// v1.0.7 anchor guard: even when a lower original-query candidate is heavily
+// boosted by LLM variants and has a higher fused score, the original top-3 head is
+// preserved before the weighted-RRF remainder.
+TEST_F(RagFusionTest, RagFusion_FuseResults_AnchorsOriginalTopThreeBeforeBoostedTail) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        {{"orig_01", 1.0f},
+         {"orig_02", 0.9f},
+         {"orig_03", 0.8f},
+         {"tail_boosted_by_variants", 0.7f}},
+        {{"tail_boosted_by_variants", 0.95f}},
+        {{"tail_boosted_by_variants", 0.94f}},
+        {{"tail_boosted_by_variants", 0.93f}},
+    };
+    auto out = svc->FuseResults(per_variant, 60);
+    ASSERT_TRUE(out.ok());
+    ASSERT_GE(out.value().size(), 4u);
+    EXPECT_EQ(out.value()[0].child_id, "orig_01");
+    EXPECT_EQ(out.value()[1].child_id, "orig_02");
+    EXPECT_EQ(out.value()[2].child_id, "orig_03");
+    EXPECT_EQ(out.value()[3].child_id, "tail_boosted_by_variants");
+    EXPECT_GT(out.value()[3].score, out.value()[0].score);
+}
+
+// The anchor is defined over the original query's first three unique child_ids,
+// not merely the first three positions. This keeps the guardrail robust if an
+// upstream retrieval path accidentally emits a duplicate child in the original
+// list before F36's final dedup.
+TEST_F(RagFusionTest, RagFusion_FuseResults_AnchorsTopThreeUniqueOriginalChildren) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        {{"orig_01", 1.0f},
+         {"orig_01", 0.99f},
+         {"orig_02", 0.9f},
+         {"orig_03", 0.8f},
+         {"tail_boosted_by_variants", 0.7f}},
+        {{"tail_boosted_by_variants", 0.95f}},
+        {{"tail_boosted_by_variants", 0.94f}},
+        {{"tail_boosted_by_variants", 0.93f}},
+    };
+    auto out = svc->FuseResults(per_variant, 60);
+    ASSERT_TRUE(out.ok());
+    ASSERT_GE(out.value().size(), 4u);
+    EXPECT_EQ(out.value()[0].child_id, "orig_01");
+    EXPECT_EQ(out.value()[1].child_id, "orig_02");
+    EXPECT_EQ(out.value()[2].child_id, "orig_03");
+    EXPECT_EQ(out.value()[3].child_id, "tail_boosted_by_variants");
+}
+
+// v1.0.8 dynamic-anchor guard: when the original query has a steep score drop
+// after rank1, only the first original hit is anchored. Strong repeated variant
+// evidence may then enter before the weak original tail instead of being forced
+// behind a fixed top-3 head.
+TEST_F(RagFusionTest, RagFusion_FuseResults_DynamicAnchorLetsVariantsCompeteAfterWeakHead) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        {{"orig_01", 1.0f},
+         {"orig_02_weak", 0.2f},
+         {"orig_03_weak", 0.1f},
+         {"tail_boosted_by_variants", 0.05f}},
+        {{"tail_boosted_by_variants", 0.95f}},
+        {{"tail_boosted_by_variants", 0.94f}},
+        {{"tail_boosted_by_variants", 0.93f}},
+    };
+    auto out = svc->FuseResults(per_variant, 60);
+    ASSERT_TRUE(out.ok());
+    ASSERT_GE(out.value().size(), 4u);
+    EXPECT_EQ(out.value()[0].child_id, "orig_01");
+    EXPECT_EQ(out.value()[1].child_id, "tail_boosted_by_variants");
+    EXPECT_LT(std::find_if(out.value().begin(), out.value().end(), [](const auto& r) {
+                  return r.child_id == "tail_boosted_by_variants";
+              }),
+              std::find_if(out.value().begin(), out.value().end(), [](const auto& r) {
+                  return r.child_id == "orig_02_weak";
+              }));
+}
+
+// v1.0.7 additive-coverage guard: repeated variant evidence can still beat an
+// original-query weak tail result, so RAG-Fusion remains useful rather than locked
+// to the original list.
+TEST_F(RagFusionTest, RagFusion_FuseResults_VariantEvidenceCanBeatWeakOriginalTail) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<ScoredResult> original = {
+        {"orig_01", 1.0f}, {"orig_02", 0.9f}, {"orig_03", 0.8f}, {"orig_04", 0.7f},
+        {"orig_05", 0.6f}, {"orig_06", 0.5f}, {"orig_07", 0.4f}, {"orig_08", 0.3f},
+        {"orig_09", 0.2f}, {"orig_tail", 0.1f},
+    };
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        original,
+        {{"variant_only_relevant", 0.95f}},
+        {{"variant_only_relevant", 0.94f}},
+        {{"variant_only_relevant", 0.93f}},
+    };
+    auto out = svc->FuseResults(per_variant, 60);
+    ASSERT_TRUE(out.ok());
+    auto pos = [&](const std::string& child_id) {
+        auto it = std::find_if(out.value().begin(), out.value().end(), [&](const auto& r) {
+            return r.child_id == child_id;
+        });
+        EXPECT_NE(it, out.value().end());
+        return static_cast<size_t>(std::distance(out.value().begin(), it));
+    };
+    EXPECT_LT(pos("orig_01"), pos("variant_only_relevant"));
+    EXPECT_LT(pos("variant_only_relevant"), pos("orig_tail"));
 }
 
 // ===========================================================================
@@ -436,6 +736,280 @@ TEST_F(RagFusionTest, ValidateRagFusionConfig_Ranges) {
 
     RagFusionConfig ok = EnabledConfig(3);
     EXPECT_TRUE(ValidateRagFusionConfig(ok));
+    ok.locale = "en";
+    EXPECT_TRUE(ValidateRagFusionConfig(ok));
+    ok.locale = "fr";
+    EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
+    EXPECT_EQ(field, "locale");
+    EXPECT_EQ(range, "zh|en");
+
+    ok.locale = "en";
+    ok.candidate_multiplier = 0;
+    EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
+    EXPECT_EQ(field, "candidate_multiplier");
+    EXPECT_EQ(range, "[1, 5]");
+
+    ok.candidate_multiplier = 3;
+    ok.max_candidates = 0;
+    EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
+    EXPECT_EQ(field, "max_candidates");
+    EXPECT_EQ(range, "[1, 200]");
+
+    ok.max_candidates = 50;
+    ok.activation_policy = "sometimes";
+    EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
+    EXPECT_EQ(field, "activation_policy");
+    EXPECT_EQ(range, "always|selective_margin");
+
+    ok.activation_policy = "selective_margin";
+    ok.activation_score_margin = -0.01f;
+    EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
+    EXPECT_EQ(field, "activation_score_margin");
+
+    ok.activation_score_margin = 0.05f;
+    ok.activation_min_results = 1;
+    EXPECT_FALSE(ValidateRagFusionConfig(ok, &field, &range));
+    EXPECT_EQ(field, "activation_min_results");
+}
+
+TEST_F(RagFusionTest, RagFusionStage_ExpandedCandidatePoolThenFinalRerank) {
+    auto mock_llm = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock_llm, Chat(_, _)).WillOnce(Return(OkResponse(ThreeVariantJson())));
+    auto svc = MakeService(mock_llm);
+
+    StageFakeExecutor executor;
+    ExecutorEngine engine(/*workers=*/1, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    EXPECT_CALL(reranker, ScoreBatch(_, _))
+        .WillOnce(Invoke([](const char* query, const std::vector<const char*>& passages) {
+            EXPECT_STREQ(query, "company financial status");
+            std::vector<float> scores;
+            scores.reserve(passages.size());
+            for (const char* passage : passages) {
+                const std::string text = passage == nullptr ? std::string() : passage;
+                scores.push_back(text.find("semantic answer") != std::string::npos ? 0.99f
+                                                                                    : 0.01f);
+            }
+            return scores;
+        }));
+
+    QueryRequest req;
+    req.query = "company financial status";
+    req.namespaces = {"bench"};
+    req.top_k = 1;
+    req.rerank = true;
+
+    QueryContext qctx;
+    qctx.query = req.query;
+    qctx.top_k = req.top_k;
+    qctx.rerank = true;
+    qctx.routing_path = "complex";
+
+    AuthContext auth;
+    auth.user_id = "user";
+
+    RagFusionConfig cfg = EnabledConfig();
+    cfg.locale = "en";
+    cfg.candidate_multiplier = 3;
+    cfg.max_candidates = 3;
+    cfg.final_rerank = true;
+
+    CrossNsResponse resp = stage.Run(req, auth, qctx, cfg);
+
+    ASSERT_EQ(resp.results.size(), 1u);
+    EXPECT_EQ(resp.results[0].child_id, "semantic_tail");
+    ASSERT_GE(executor.seen_top_k.size(), 2u);
+    EXPECT_TRUE(std::all_of(executor.seen_top_k.begin(), executor.seen_top_k.end(),
+                            [](int k) { return k == 3; }));
+    ASSERT_EQ(executor.seen_rerank.size(), executor.seen_top_k.size());
+    EXPECT_TRUE(executor.seen_rerank.front());
+    EXPECT_TRUE(std::all_of(std::next(executor.seen_rerank.begin()),
+                            executor.seen_rerank.end(),
+                            [](bool rerank) { return !rerank; }));
+}
+
+TEST_F(RagFusionTest, RagFusionStage_SelectiveActivationSkipsLlmOnConfidentOriginal) {
+    auto mock_llm = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock_llm, Chat(_, _)).Times(0);
+    auto svc = MakeService(mock_llm);
+
+    StageFakeExecutor executor;
+    ExecutorEngine engine(/*workers=*/1, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    QueryRequest req;
+    req.query = "company financial status";
+    req.namespaces = {"bench"};
+    req.top_k = 2;
+    req.rerank = false;
+
+    QueryContext qctx;
+    qctx.query = req.query;
+    qctx.top_k = req.top_k;
+    qctx.rerank = false;
+    qctx.routing_path = "complex";
+
+    AuthContext auth;
+    auth.user_id = "user";
+
+    RagFusionConfig cfg = EnabledConfig();
+    cfg.locale = "en";
+    cfg.activation_policy = "selective_margin";
+    cfg.activation_score_margin = 0.50f;  // original scores 1.0 vs 0.2 => skip
+    cfg.activation_min_results = 2;
+
+    CrossNsResponse resp = stage.Run(req, auth, qctx, cfg);
+
+    ASSERT_EQ(resp.results.size(), 2u);
+    EXPECT_EQ(resp.results[0].child_id, "original_head");
+    EXPECT_EQ(resp.results[1].child_id, "semantic_tail");
+    ASSERT_EQ(executor.seen_queries.size(), 1u);
+    EXPECT_EQ(executor.seen_queries[0], "company financial status");
+    const auto es = svc->GetExplainState();
+    EXPECT_FALSE(es.active);
+    EXPECT_EQ(es.reason, "skipped_by_activation_policy");
+    EXPECT_EQ(es.variant_count, 1);
+}
+
+TEST_F(RagFusionTest, RagFusionStage_SelectiveActivationUsesFinalScoreMargin) {
+    auto mock_llm = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock_llm, Chat(_, _)).Times(0);
+    auto svc = MakeService(mock_llm);
+
+    StageFinalScoreExecutor executor;
+    ExecutorEngine engine(/*workers=*/1, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    QueryRequest req;
+    req.query = "company financial status";
+    req.namespaces = {"bench"};
+    req.top_k = 2;
+    req.rerank = true;
+
+    QueryContext qctx;
+    qctx.query = req.query;
+    qctx.top_k = req.top_k;
+    qctx.rerank = true;
+    qctx.routing_path = "complex";
+
+    AuthContext auth;
+    auth.user_id = "user";
+
+    RagFusionConfig cfg = EnabledConfig();
+    cfg.locale = "en";
+    cfg.activation_policy = "selective_margin";
+    cfg.activation_score_margin = 0.60f;  // final score margin 0.90 - 0.20 => skip
+    cfg.activation_min_results = 2;
+
+    CrossNsResponse resp = stage.Run(req, auth, qctx, cfg);
+
+    ASSERT_EQ(resp.results.size(), 2u);
+    EXPECT_EQ(resp.results[0].child_id, "final_head");
+    EXPECT_EQ(resp.results[1].child_id, "rerank_head");
+    ASSERT_EQ(executor.seen_queries.size(), 1u);
+    const auto es = svc->GetExplainState();
+    EXPECT_FALSE(es.active);
+    EXPECT_EQ(es.reason, "skipped_by_activation_policy");
+}
+
+TEST_F(RagFusionTest, RagFusionStage_SelectiveActivationDoesNotSkipTiedScores) {
+    auto mock_llm = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock_llm, Chat(_, _)).WillOnce(Return(OkResponse(ThreeVariantJson())));
+    auto svc = MakeService(mock_llm);
+
+    StageTiedScoreExecutor executor;
+    ExecutorEngine engine(/*workers=*/1, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    QueryRequest req;
+    req.query = "company financial status";
+    req.namespaces = {"bench"};
+    req.top_k = 2;
+    req.rerank = true;
+
+    QueryContext qctx;
+    qctx.query = req.query;
+    qctx.top_k = req.top_k;
+    qctx.rerank = true;
+    qctx.routing_path = "complex";
+
+    AuthContext auth;
+    auth.user_id = "user";
+
+    RagFusionConfig cfg = EnabledConfig();
+    cfg.locale = "en";
+    cfg.activation_policy = "selective_margin";
+    cfg.activation_score_margin = 0.0f;  // a tied margin is not confidence
+    cfg.activation_min_results = 2;
+
+    (void)stage.Run(req, auth, qctx, cfg);
+
+    ASSERT_EQ(executor.seen_queries.size(), 4u);  // preflight original + 3 variants
+    const auto es = svc->GetExplainState();
+    EXPECT_TRUE(es.active);
+    EXPECT_FALSE(es.degraded);
+}
+
+TEST_F(RagFusionTest, RagFusionStage_SelectiveActivationRunsLlmAndReusesOriginal) {
+    auto mock_llm = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock_llm, Chat(_, _)).WillOnce(Return(OkResponse(ThreeVariantJson())));
+    auto svc = MakeService(mock_llm);
+
+    StageFakeExecutor executor;
+    ExecutorEngine engine(/*workers=*/1, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    QueryRequest req;
+    req.query = "company financial status";
+    req.namespaces = {"bench"};
+    req.top_k = 1;
+    req.rerank = false;
+
+    QueryContext qctx;
+    qctx.query = req.query;
+    qctx.top_k = req.top_k;
+    qctx.rerank = false;
+    qctx.routing_path = "complex";
+
+    AuthContext auth;
+    auth.user_id = "user";
+
+    RagFusionConfig cfg = EnabledConfig();
+    cfg.locale = "en";
+    cfg.candidate_multiplier = 3;
+    cfg.max_candidates = 3;
+    cfg.activation_policy = "selective_margin";
+    cfg.activation_score_margin = 0.95f;  // original margin 0.8 => not confident
+    cfg.activation_min_results = 2;
+
+    CrossNsResponse resp = stage.Run(req, auth, qctx, cfg);
+
+    ASSERT_EQ(resp.results.size(), 1u);
+    ASSERT_EQ(executor.seen_queries.size(), 4u);  // preflight original + 3 variants
+    EXPECT_EQ(std::count(executor.seen_queries.begin(), executor.seen_queries.end(),
+                         "company financial status"),
+              1);
+    EXPECT_EQ(executor.seen_queries[0], "company financial status");
+    const auto es = svc->GetExplainState();
+    EXPECT_TRUE(es.active);
+    EXPECT_FALSE(es.degraded);
+    EXPECT_EQ(es.variant_count, 4);
 }
 
 // ===========================================================================
@@ -537,7 +1111,7 @@ TEST_F(RagFusionTest, TraceContext_AllMethods_NullableCtx) {
     auto mock2 = std::make_shared<MockLlmClient>();
     EXPECT_CALL(*mock2, Chat(_, _)).WillOnce(Return(OkResponse(ThreeVariantJson())));
     QueryVariantGenerator gen(mock2);
-    EXPECT_TRUE(gen.Generate("q", EnabledConfig(), nullptr).ok());
+    EXPECT_TRUE(gen.Generate("q", EnabledConfig(), "zh", nullptr).ok());
 }
 
 // Error model: all 6 codes have a stable string, category, and the count anchor.
@@ -749,6 +1323,53 @@ TEST_F(RagFusionTest, ClassifyLlmFailure_DefaultIsTimeout) {
     ASSERT_FALSE(out.ok());
     EXPECT_NE(out.status().message().find("CX_ERR_RAG_FUSION_LLM_TIMEOUT"),
               std::string::npos);
+}
+
+// ClassifyLlmFailure: provider/client HTTP 400 is a permanent contract/body
+// failure, not a true timeout. The nested CX_LLM_HTTP token remains available for
+// explain.degrade_reason/detail.
+TEST_F(RagFusionTest, ClassifyLlmFailure_Http400IsInvalidResponse) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Return(ErrResponse(
+            StatusCode::kInternal,
+            "CX_LLM_HTTP: http_status=400")));
+    QueryVariantGenerator gen(mock);
+    auto out = gen.Generate("q", EnabledConfig());
+    ASSERT_FALSE(out.ok());
+    EXPECT_NE(out.status().message().find("CX_ERR_RAG_FUSION_INVALID_RESPONSE"),
+              std::string::npos);
+    EXPECT_NE(out.status().message().find("CX_LLM_HTTP"), std::string::npos);
+}
+
+// ClassifyLlmFailure: auth/permission-style provider errors map to the existing
+// quota/permission identity while the nested HTTP detail stays intact.
+TEST_F(RagFusionTest, ClassifyLlmFailure_Http401IsQuota) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Return(ErrResponse(StatusCode::kInternal,
+                                     "CX_LLM_HTTP: http_status=401")));
+    QueryVariantGenerator gen(mock);
+    auto out = gen.Generate("q", EnabledConfig());
+    ASSERT_FALSE(out.ok());
+    EXPECT_NE(out.status().message().find("CX_ERR_RAG_FUSION_LLM_QUOTA"),
+              std::string::npos);
+    EXPECT_NE(out.status().message().find("CX_LLM_HTTP"), std::string::npos);
+}
+
+// ClassifyLlmFailure: provider 5xx remains timeout/transient so callers can
+// retry/degrade conservatively.
+TEST_F(RagFusionTest, ClassifyLlmFailure_Http503IsTimeout) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Return(ErrResponse(StatusCode::kUnavailable,
+                                     "CX_LLM_HTTP: http_status=503")));
+    QueryVariantGenerator gen(mock);
+    auto out = gen.Generate("q", EnabledConfig());
+    ASSERT_FALSE(out.ok());
+    EXPECT_NE(out.status().message().find("CX_ERR_RAG_FUSION_LLM_TIMEOUT"),
+              std::string::npos);
+    EXPECT_NE(out.status().message().find("CX_LLM_HTTP"), std::string::npos);
 }
 
 // ClassifyLlmFailure: the "rate"-keyword quota operand (distinct from the "quota"/

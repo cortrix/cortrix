@@ -8,9 +8,11 @@
 namespace cortrix::query {
 
 void CragStage::Apply(CrossNsResponse& resp, QueryContext& qctx) {
-    // Skip when F39 says so (simple / chat routes) or no evaluator is wired. F37
-    // runs only on the Complex path (§6.3 / F39 ShouldSkipF37) — keep this gate in
-    // exact lockstep with the F39 helper so the route decision drives it.
+    // Skip when the request explicitly disables CRAG, F39 says so (simple / chat
+    // routes), or no evaluator is wired. F37 runs only on the Complex path (§6.3 /
+    // F39 ShouldSkipF37) — keep this gate in exact lockstep with the F39 helper so
+    // the route decision drives it.
+    if (!qctx.enable_crag) return;
     if (evaluator_ == nullptr) return;
     if (QueryComplexityClassifier::ShouldSkipF37(qctx)) return;
 

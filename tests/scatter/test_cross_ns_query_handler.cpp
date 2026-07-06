@@ -47,6 +47,10 @@ TEST(CrossNsQueryHandlerParseTest, ParsesFullRequest) {
                                {"namespaces", {"ns_a", "ns_b"}},
                                {"top_k", 5},
                                {"rerank", false},
+                               {"search_config",
+                                {{"enable_vector", true},
+                                 {"enable_bm25", false},
+                                 {"enable_sparse", false}}},
                                {"filter", {{"block_type", "FILE"}}}};
     QueryRequest req;
     Status s = CrossNsQueryHandler::ParseRequest(body, &req);
@@ -55,6 +59,9 @@ TEST(CrossNsQueryHandlerParseTest, ParsesFullRequest) {
     EXPECT_EQ(req.namespaces, (std::vector<std::string>{"ns_a", "ns_b"}));
     EXPECT_EQ(req.top_k, 5);
     EXPECT_FALSE(req.rerank);
+    EXPECT_TRUE(req.search_config.enable_vector);
+    EXPECT_FALSE(req.search_config.enable_bm25);
+    EXPECT_FALSE(req.search_config.enable_sparse);
     EXPECT_EQ(req.filter.at("block_type"), "FILE");
 }
 

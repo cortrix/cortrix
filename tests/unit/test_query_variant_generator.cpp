@@ -190,6 +190,42 @@ TEST(QueryVariantGeneratorTest, ContainsInjectionKeywordRejectsBenign) {
     EXPECT_FALSE(Gen::ContainsInjectionKeyword(""));
 }
 
+// --- ShouldKeepVariant: v1.0.8 semantic drift guard -------------------------
+
+TEST(QueryVariantGeneratorTest, ShouldKeepVariantAllowsShortKeywordQueries) {
+    // Short metadata/keyword queries do not have enough lexical anchors for a safe
+    // overlap test; leave them to retrieval scoring.
+    EXPECT_TRUE(Gen::ShouldKeepVariant("baselinequarter", "zephyrmarker"));
+    EXPECT_TRUE(Gen::ShouldKeepVariant("semantic retrieval", "company earnings"));
+}
+
+TEST(QueryVariantGeneratorTest, ShouldKeepVariantKeepsAnchoredFactualRewrite) {
+    EXPECT_TRUE(Gen::ShouldKeepVariant(
+        "Neutrophil extracellular traps NETs are released by ANCA stimulated neutrophils",
+        "ANCA stimulated neutrophils release extracellular traps called NETs"));
+    EXPECT_TRUE(Gen::ShouldKeepVariant(
+        "Cytochrome c is released from the mitochondrial intermembrane space to cytosol during apoptosis",
+        "During apoptosis mitochondria release cytochrome c into the cytosol"));
+}
+
+TEST(QueryVariantGeneratorTest, ShouldKeepVariantRejectsBroadSemanticDrift) {
+    EXPECT_FALSE(Gen::ShouldKeepVariant(
+        "Neutrophil extracellular traps NETs are released by ANCA stimulated neutrophils",
+        "Macrolides protect against myocardial infarction"));
+    EXPECT_FALSE(Gen::ShouldKeepVariant(
+        "Auditory entrainment is strengthened when people see congruent visual and auditory information",
+        "What are general factors that improve human perception?"));
+}
+
+TEST(QueryVariantGeneratorTest, ShouldKeepVariantRejectsEmptyContentForLongFactualQuery) {
+    EXPECT_FALSE(Gen::ShouldKeepVariant(
+        "Neutrophil extracellular traps NETs are released by ANCA stimulated neutrophils",
+        "the and what how"));
+    EXPECT_FALSE(Gen::ShouldKeepVariant(
+        "Auditory entrainment is strengthened when people see congruent visual and auditory information",
+        "?!"));
+}
+
 // kPromptVersion is the stable B-class token surfaced in explain output.
 TEST(QueryVariantGeneratorTest, PromptVersionIsStableToken) {
     EXPECT_STREQ(Gen::kPromptVersion, "default-v1");

@@ -20,9 +20,15 @@ public:
     /// Load tokenizer from HuggingFace tokenizer.json file
     Status Load(const std::string& tokenizer_json_path);
 
-    /// Encode text into token IDs with attention mask
-    /// Adds [CLS] and [SEP] tokens, pads/truncates to max_length
+    /// Encode text into token IDs with attention mask.
+    /// Adds [CLS] and [SEP] tokens, then pads/truncates to max_length.
     Status Encode(const std::string& text, int max_length, Encoded* output) const;
+
+    /// Encode text into token IDs with attention mask.
+    /// Adds [CLS] and [SEP] tokens and truncates to max_length, but does not pad.
+    /// Use this for dynamic-shape ONNX inference so `max_length` remains a safety
+    /// cap instead of forcing every short text through a max-length tensor.
+    Status EncodeNoPad(const std::string& text, int max_length, Encoded* output) const;
 
     bool loaded() const { return loaded_; }
 
@@ -76,6 +82,10 @@ private:
     std::string UnigramPreProcess(const std::string& text) const;
     /// Viterbi decode: find best segmentation for processed text
     std::vector<int> UnigramEncode(const std::string& text) const;
+    Status EncodeInternal(const std::string& text,
+                          int max_length,
+                          bool pad_to_max_length,
+                          Encoded* output) const;
 
     // --- UTF-8 utilities ---
     static std::vector<std::string> Utf8Chars(const std::string& s);

@@ -45,6 +45,36 @@ std::vector<DocDiscoveryHit> RecallDocSummaryHnsw(store::IIndex& index,
                                                   cortrix::OnnxEmbedder& embedder,
                                                   const std::string& query, int top_k);
 
+/// Shared doc-discovery core used by BOTH the HTTP discover endpoint and query
+/// granularity=doc/both. It runs:
+///   1) doc_summary embedding HNSW recall ("llm_summary");
+///   2) optional doc-level FTS5 fallback over F08 fields ("fts5_fallback");
+///   3) FuseDocDiscovery RRF over doc_id.
+/// The core is intentionally below the NamespaceFacade boundary so callers that
+/// already acquired a per-NS facade can reuse the exact same candidate-generation
+/// logic without reacquiring the namespace.
+struct DocDiscoveryCoreOptions {
+    int top_k = 10;
+    bool fts5_fallback_enabled = true;
+};
+
+struct DocDiscoveryCoreResult {
+    std::vector<DocDiscoveryHit> hits;
+    bool hnsw_ran = false;
+    bool hnsw_failed = false;
+    bool fts5_ran = false;
+    bool fts5_failed = false;
+    int summary_hit_count = 0;
+    int fts5_hit_count = 0;
+    std::vector<std::string> warnings;
+};
+
+DocDiscoveryCoreResult RunDocDiscoveryCore(store::IIndex& index,
+                                           cortrix::CortrixStore& store,
+                                           cortrix::OnnxEmbedder& embedder,
+                                           const std::string& query,
+                                           const DocDiscoveryCoreOptions& options);
+
 /// Pure doc-discovery executor (F41 §6.1 / §8.2 — test-friendly, no httplib). Acquires
 /// the NS facade from `pool`, runs the two hybrid recall paths and RRF-fuses them:
 ///   Step 1 (main):     RecallDocSummaryHnsw (doc_summary embedding HNSW) → "llm_summary"

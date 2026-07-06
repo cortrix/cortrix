@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 #include "cortrix/query/rag_fusion_error.h"
@@ -12,17 +14,89 @@ namespace cortrix::query {
 
 namespace {
 
+// F36 v1.0.7 anchored conservative outer-fusion policy.
+//
+// `per_variant_results[0]` is the original query and should remain the primary
+// ranking signal. Its top-3 head is anchored as a strong-hit guardrail. LLM
+// variants are additive weak evidence: they can promote a candidate that is
+// repeatedly found by variants, but they reorder only the non-anchored tail.
+constexpr double kOriginalQueryRrfWeight = 1.7;
+constexpr double kVariantQueryRrfWeight = 0.5;
+constexpr size_t kOriginalQueryAnchorMax = 3;
+
+double QueryRoleWeight(size_t query_index) {
+    return query_index == 0 ? kOriginalQueryRrfWeight : kVariantQueryRrfWeight;
+}
+
+size_t DynamicOriginalAnchorCount(
+    const std::vector<retrieval::ScoredResult>& original_results) {
+    if (original_results.empty()) return 0;
+    if (original_results.size() == 1) return 1;
+
+    // Scores arrive from the original query's already-fused retrieval list. They
+    // are not cross-query calibrated, so use only head-shape/coherence: a coherent
+    // original head deserves the full top-3 guardrail; a steep drop after rank1/2
+    // means the tail is weak enough for variant evidence to compete earlier.
+    const float top = std::max(0.0f, original_results[0].score);
+    if (top <= 0.0f) return 1;
+    const float second = std::max(0.0f, original_results[1].score);
+    const float third = original_results.size() > 2
+                            ? std::max(0.0f, original_results[2].score)
+                            : second;
+    if (third >= top * 0.45f) {
+        return std::min(kOriginalQueryAnchorMax, original_results.size());
+    }
+    if (second >= top * 0.35f) {
+        return std::min(static_cast<size_t>(2), original_results.size());
+    }
+    return 1;
+}
+
 // Map a failed-Status (carrying a CX_ERR_RAG_FUSION_* prefix from
-// RagFusionStatus) back to a human "degrade_reason" token for the ExplainState
-// (§4.3) — "llm_timeout" / "circuit_open" / "quota_exceeded" / "invalid_response".
+// RagFusionStatus, and sometimes a nested generic CX_LLM_* token from the shared
+// LLM client) back to a human "degrade_reason" token for the ExplainState.
 std::string DegradeReasonToken(const Status& status) {
     const std::string& m = status.message();
     auto has = [&](const char* k) { return m.find(k) != std::string::npos; };
-    if (has("LLM_TIMEOUT"))      return "llm_timeout";
+    // Prefer generic transport/client diagnostics when present. Otherwise a
+    // transport/auth/HTTP failure wrapped as CX_ERR_RAG_FUSION_LLM_TIMEOUT would
+    // be indistinguishable from a true deadline in benchmark explain output.
+    if (has("CX_LLM_TRANSPORT")) return "llm_transport";
+    if (has("CX_LLM_RATE_LIMIT")) return "quota_exceeded";
+    if (has("CX_LLM_BAD_BODY")) return "invalid_response";
+    if (has("CX_LLM_HTTP")) return "llm_http";
+    if (has("LLM_TIMEOUT")) return "llm_timeout";
     if (has("LLM_CIRCUIT_OPEN")) return "circuit_open";
-    if (has("LLM_QUOTA"))        return "quota_exceeded";
+    if (has("LLM_QUOTA")) return "quota_exceeded";
     if (has("INVALID_RESPONSE")) return "invalid_response";
     return "llm_error";
+}
+
+std::string SafeDegradeDetail(const Status& status) {
+    const std::string& m = status.message();
+    const std::string needle = "http_status=";
+    std::string detail;
+    const auto http_pos = m.find(needle);
+    if (http_pos != std::string::npos) {
+        std::size_t end = http_pos + needle.size();
+        while (end < m.size() && std::isdigit(static_cast<unsigned char>(m[end]))) {
+            ++end;
+        }
+        if (end > http_pos + needle.size()) {
+            detail = m.substr(http_pos, end - http_pos);
+        }
+    }
+    if (!detail.empty()) {
+        return detail;
+    }
+    auto has = [&](const char* k) { return m.find(k) != std::string::npos; };
+    if (has("CX_LLM_TRANSPORT")) return "transport_failure";
+    if (has("CX_LLM_RATE_LIMIT")) return "rate_limited";
+    if (has("CX_LLM_BAD_BODY")) return "bad_response_body";
+    if (has("ETIMEDOUT") || has("timed out") || has("deadline")) {
+        return "deadline_exceeded";
+    }
+    return "";
 }
 
 }  // namespace
@@ -30,6 +104,15 @@ std::string DegradeReasonToken(const Status& status) {
 RagFusion::RagFusion(std::shared_ptr<QueryVariantGenerator> generator,
                      std::shared_ptr<RRFFusion> rrf)
     : generator_(std::move(generator)), rrf_(std::move(rrf)) {}
+
+void RagFusion::MarkSkippedByActivationPolicy(const std::string& query,
+                                              const std::string& reason) {
+    explain_ = ExplainState{};
+    explain_.active = false;
+    explain_.reason = reason;
+    explain_.variant_count = 1;
+    explain_.variants_used = {query};
+}
 
 Result<std::vector<std::string>> RagFusion::ExpandQueries(
     const std::string& query,
@@ -63,7 +146,8 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
 
     // Generate variants via the LLM (§4.2). Time the call for the explain latency.
     const auto t0 = std::chrono::steady_clock::now();
-    Result<QueryVariants> gen = generator_->Generate(query, ns_config, trace_ctx);
+    Result<QueryVariants> gen = generator_->Generate(
+        query, ns_config, ns_config.locale, trace_ctx);
     const auto t1 = std::chrono::steady_clock::now();
     const int latency_ms = static_cast<int>(
         std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
@@ -76,6 +160,7 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
         explain_.active = true;
         explain_.degraded = true;
         explain_.degrade_reason = DegradeReasonToken(gen.status());
+        explain_.degrade_detail = SafeDegradeDetail(gen.status());
         explain_.reason = "active";
         explain_.variant_count = 1;  // single query
         metrics.RecordInvocation(RagFusionMetrics::Result::kDegraded);
@@ -127,11 +212,17 @@ Result<std::vector<retrieval::ScoredResult>> RagFusion::FuseResults(
 
     const auto t0 = std::chrono::steady_clock::now();
 
-    // Global second-pass RRF over the ChildId keyspace (topic 2 B): for each
-    // variant's ranked list, the contribution of a result at 0-based position r is
-    // 1/(k + (r+1)). Sum per ChildId (dedup keep-sum); keep the max raw score seen
-    // for tie-context / downstream display. Same formula as the frozen
-    // cortrix::RRFFusion::Merge, applied to retrieval::ScoredResult.
+    // Global second-pass RRF over the ChildId keyspace (topic 2 B). v1.0.7 makes
+    // this an anchored conservative weighted RRF: list 0 is the original query and
+    // carries the primary weight; its top head is emitted first as a strong-hit
+    // guardrail; LLM-variant lists carry weaker additive evidence for the
+    // remaining order.
+    //
+    // contribution(query_index, rank) = role_weight / (k + rank)
+    //
+    // Sum per ChildId (dedup keep-sum); keep the max raw score seen for
+    // tie-context / downstream display. This is the outer F36 fusion over
+    // retrieval::ScoredResult, distinct from the inner per-NS RRFFusion.
     struct Acc {
         double rrf = 0.0;
         float  best_raw = 0.0f;
@@ -141,25 +232,51 @@ Result<std::vector<retrieval::ScoredResult>> RagFusion::FuseResults(
     acc.reserve(per_variant_results.size() * 32);
     size_t order = 0;
 
-    for (const auto& variant_list : per_variant_results) {
+    for (size_t query_index = 0; query_index < per_variant_results.size(); ++query_index) {
+        const auto& variant_list = per_variant_results[query_index];
+        const double role_weight = QueryRoleWeight(query_index);
         for (size_t r = 0; r < variant_list.size(); ++r) {
             const retrieval::ScoredResult& sr = variant_list[r];
             Acc& a = acc[sr.child_id];
             if (a.rrf == 0.0 && a.best_raw == 0.0f) a.first_seen = order++;
-            a.rrf += 1.0 / (static_cast<double>(rrf_k) + static_cast<double>(r + 1));
+            a.rrf += role_weight /
+                     (static_cast<double>(rrf_k) + static_cast<double>(r + 1));
             a.best_raw = std::max(a.best_raw, sr.score);
         }
     }
 
-    std::vector<retrieval::ScoredResult> fused;
-    fused.reserve(acc.size());
     std::vector<std::pair<retrieval::ChildId, Acc>> rows(acc.begin(), acc.end());
     std::sort(rows.begin(), rows.end(),
               [](const auto& x, const auto& y) {
                   if (x.second.rrf != y.second.rrf) return x.second.rrf > y.second.rrf;
                   return x.second.first_seen < y.second.first_seen;  // stable
               });
+
+    std::vector<retrieval::ScoredResult> fused;
+    fused.reserve(acc.size());
+    std::unordered_set<retrieval::ChildId> emitted;
+    emitted.reserve(std::min(acc.size(), kOriginalQueryAnchorMax) + 8);
+
+    if (!per_variant_results.empty()) {
+        const auto& original_results = per_variant_results.front();
+        const size_t anchor_limit = DynamicOriginalAnchorCount(original_results);
+        size_t anchored_count = 0;
+        for (const auto& sr : original_results) {
+            if (anchored_count >= anchor_limit) break;
+            const retrieval::ChildId& child_id = sr.child_id;
+            if (!emitted.insert(child_id).second) continue;
+            auto found = acc.find(child_id);
+            if (found == acc.end()) continue;
+            retrieval::ScoredResult out;
+            out.child_id = child_id;
+            out.score = static_cast<float>(found->second.rrf);
+            fused.push_back(std::move(out));
+            ++anchored_count;
+        }
+    }
+
     for (auto& row : rows) {
+        if (emitted.find(row.first) != emitted.end()) continue;
         retrieval::ScoredResult out;
         out.child_id = row.first;
         out.score = static_cast<float>(row.second.rrf);  // the RRF score

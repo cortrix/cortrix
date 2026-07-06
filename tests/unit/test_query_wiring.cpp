@@ -192,6 +192,12 @@ TEST_F(QueryWiringTest, RagFusionConfigDefaultsDisabled) {
     EXPECT_FALSE(cfg.enabled);
     EXPECT_EQ(cfg.variant_count, 3);  // topic 1 N=3 default kept
     EXPECT_EQ(cfg.rrf_k, 60);
+    EXPECT_EQ(cfg.candidate_multiplier, 1);
+    EXPECT_EQ(cfg.max_candidates, 50);
+    EXPECT_FALSE(cfg.final_rerank);
+    EXPECT_EQ(cfg.activation_policy, "always");
+    EXPECT_NEAR(cfg.activation_score_margin, 0.0f, 1e-6f);
+    EXPECT_EQ(cfg.activation_min_results, 2);
 }
 
 // use_rag_fusion = (routing_path=="complex") && cfg.enabled && llm_available. With
@@ -226,6 +232,24 @@ TEST_F(QueryWiringTest, RagFusionConfigValidation) {
     std::string field, range;
     EXPECT_FALSE(ValidateRagFusionConfig(bad, &field, &range));
     EXPECT_EQ(field, "variant_count");
+}
+
+TEST_F(QueryWiringTest, RagFusionConfigValidationRejectsExpandedCandidateBounds) {
+    RagFusionConfig bad_multiplier;
+    bad_multiplier.candidate_multiplier = kRagFusionCandidateMultiplierMax + 1;
+    std::string field, range;
+    EXPECT_FALSE(ValidateRagFusionConfig(bad_multiplier, &field, &range));
+    EXPECT_EQ(field, "candidate_multiplier");
+
+    RagFusionConfig bad_candidates;
+    bad_candidates.max_candidates = kRagFusionMaxCandidatesMax + 1;
+    EXPECT_FALSE(ValidateRagFusionConfig(bad_candidates, &field, &range));
+    EXPECT_EQ(field, "max_candidates");
+
+    RagFusionConfig bad_policy;
+    bad_policy.activation_policy = "sometimes";
+    EXPECT_FALSE(ValidateRagFusionConfig(bad_policy, &field, &range));
+    EXPECT_EQ(field, "activation_policy");
 }
 
 }  // namespace

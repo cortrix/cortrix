@@ -38,6 +38,29 @@ bool ValidateRagFusionConfig(const RagFusionConfig& cfg,
     if (cfg.timeout_ms <= 0) {
         return fail("timeout_ms", "[1, ]");
     }
+    if (cfg.locale != "zh" && cfg.locale != "en") {
+        return fail("locale", "zh|en");
+    }
+    if (cfg.candidate_multiplier < kRagFusionCandidateMultiplierMin ||
+        cfg.candidate_multiplier > kRagFusionCandidateMultiplierMax) {
+        return fail("candidate_multiplier", "[1, 5]");
+    }
+    if (cfg.max_candidates < kRagFusionMaxCandidatesMin ||
+        cfg.max_candidates > kRagFusionMaxCandidatesMax) {
+        return fail("max_candidates", "[1, 200]");
+    }
+    if (cfg.activation_policy != "always" &&
+        cfg.activation_policy != "selective_margin") {
+        return fail("activation_policy", "always|selective_margin");
+    }
+    if (cfg.activation_score_margin < kRagFusionActivationScoreMarginMin ||
+        cfg.activation_score_margin > kRagFusionActivationScoreMarginMax) {
+        return fail("activation_score_margin", "[0, 10]");
+    }
+    if (cfg.activation_min_results < kRagFusionActivationMinResultsMin ||
+        cfg.activation_min_results > kRagFusionActivationMinResultsMax) {
+        return fail("activation_min_results", "[2, 200]");
+    }
     // At least one strategy when enabled (an empty strategy list would generate
     // nothing). Allowed to be empty when disabled (config is inert then).
     if (cfg.enabled && cfg.variant_strategies.empty()) {

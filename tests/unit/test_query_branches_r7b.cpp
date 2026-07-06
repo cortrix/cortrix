@@ -115,6 +115,17 @@ TEST(RagFusionTypesBranchR7b, ValidateTimeoutNonPositive) {
     EXPECT_EQ(range, "[1, ]");
 }
 
+// locale outside zh|en → the locale fail() arm. This matters for F44/BEIR, where
+// English benchmark queries must request the English prompt instead of zh.
+TEST(RagFusionTypesBranchR7b, ValidateLocaleInvalid) {
+    RagFusionConfig cfg;
+    cfg.locale = "fr";
+    std::string field, range;
+    EXPECT_FALSE(ValidateRagFusionConfig(cfg, &field, &range));
+    EXPECT_EQ(field, "locale");
+    EXPECT_EQ(range, "zh|en");
+}
+
 // enabled=true with an EMPTY strategy list → the last fail() arm (line 43-44).
 // Other fields valid so we reach this check.
 TEST(RagFusionTypesBranchR7b, ValidateEnabledWithEmptyStrategies) {

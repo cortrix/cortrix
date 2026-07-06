@@ -18,10 +18,9 @@ namespace cortrix::metadata {
 ///
 /// Standalone (B_R3_BRIEFING §2): the embedding vector is left empty — embedding(block_text)
 /// + P-HNSW insert is D3.5 pipeline wiring. parent_count / child_count come from the
-/// caller's ProcessingStats (real source = F34, D6 lock F06→F34→F08). The F41 doc_fts5_index
-/// sync hook (§9.quater) is NOT wired here — F41 is unbuilt; the InsertDocFts5 call site
-/// is a documented D3.5 deferred item (see DeriveDocFts5Columns below, which exposes the
-/// derived mapping for the future F41 SchemaProvider without depending on it).
+/// caller's ProcessingStats (real source = F34, D6 lock F06→F34→F08). The F41
+/// doc_fts5_index product sync is wired in SPCPipeline from the derived columns below,
+/// keeping this generator pure and free of SQLite/F41 table dependencies.
 class RuleBasedMetadataGenerator : public IMetadataGenerator {
 public:
     RuleBasedMetadataGenerator() = default;
@@ -49,11 +48,11 @@ public:
     static nlohmann::json BuildMetadataJson(const GeneratorInput& input,
                                             std::vector<std::string>* missing_fields);
 
-    /// §9.quater.2 derivation rule for doc_fts5_index fields ← F08 fields (V1.0). Pure mapping, no
-    /// table dependency: {doc_id, filename, doc_title(=filename without extension),
-    /// topics_rule_extracted(=tags.join(' ')), authors(=custom_metadata.authors ?? null)}.
-    /// Exposed so the future F41 SchemaProvider.InsertDocFts5 can compute column values
-    /// from an F08 block without re-implementing the rule (the actual INSERT is D3.5).
+    /// §9.quater.2 derivation rule for doc_fts5_index fields ← F08 fields (V1.0).
+    /// Pure mapping, no table dependency: {doc_id, filename, doc_title(=filename
+    /// without extension), topics_rule_extracted(=tags.join(' ')),
+    /// authors(=custom_metadata.authors ?? null)}. SPCPipeline uses this as the
+    /// sole product write source for the F41 doc-level FTS5 fallback row.
     static nlohmann::json DeriveDocFts5Columns(const GeneratorInput& input);
 };
 

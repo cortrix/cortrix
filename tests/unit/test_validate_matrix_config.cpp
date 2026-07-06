@@ -73,7 +73,7 @@ class RagFusionValidateMatrix
 
 TEST_P(RagFusionValidateMatrix, Field) {
     const auto& c = GetParam();
-    cortrix::query::RagFusionConfig cfg;  // defaults: enabled=false, vc=3, rrf_k=60, timeout=5000
+    cortrix::query::RagFusionConfig cfg;  // defaults: disabled, vc=3, rrf_k=60, timeout=5000, locale=zh, candidate_multiplier=1
     c.mutate(cfg);
     std::string field;
     std::string range;
@@ -93,6 +93,8 @@ INSTANTIATE_TEST_SUITE_P(
         RagFusionCase{"vc_min_1_ok", [](cortrix::query::RagFusionConfig& c) { c.variant_count = cortrix::query::kVariantCountMin; }, true, ""},
         RagFusionCase{"vc_max_10_ok", [](cortrix::query::RagFusionConfig& c) { c.variant_count = cortrix::query::kVariantCountMax; }, true, ""},
         RagFusionCase{"vc_zero_bad", [](cortrix::query::RagFusionConfig& c) { c.variant_count = 0; }, false, "variant_count"},
+        RagFusionCase{"locale_en_ok", [](cortrix::query::RagFusionConfig& c) { c.locale = "en"; }, true, ""},
+        RagFusionCase{"locale_bad", [](cortrix::query::RagFusionConfig& c) { c.locale = "fr"; }, false, "locale"},
         RagFusionCase{"vc_negative_bad", [](cortrix::query::RagFusionConfig& c) { c.variant_count = -1; }, false, "variant_count"},
         RagFusionCase{"vc_eleven_bad", [](cortrix::query::RagFusionConfig& c) { c.variant_count = 11; }, false, "variant_count"},
         // rrf_k > 0
@@ -103,6 +105,46 @@ INSTANTIATE_TEST_SUITE_P(
         RagFusionCase{"timeout_one_ok", [](cortrix::query::RagFusionConfig& c) { c.timeout_ms = 1; }, true, ""},
         RagFusionCase{"timeout_zero_bad", [](cortrix::query::RagFusionConfig& c) { c.timeout_ms = 0; }, false, "timeout_ms"},
         RagFusionCase{"timeout_neg_bad", [](cortrix::query::RagFusionConfig& c) { c.timeout_ms = -5; }, false, "timeout_ms"},
+        // v1.0.9 rerank-loop candidate-pool knobs
+        RagFusionCase{"candidate_multiplier_min_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.candidate_multiplier = cortrix::query::kRagFusionCandidateMultiplierMin; }, true, ""},
+        RagFusionCase{"candidate_multiplier_max_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.candidate_multiplier = cortrix::query::kRagFusionCandidateMultiplierMax; }, true, ""},
+        RagFusionCase{"candidate_multiplier_zero_bad",
+            [](cortrix::query::RagFusionConfig& c) { c.candidate_multiplier = 0; }, false, "candidate_multiplier"},
+        RagFusionCase{"candidate_multiplier_too_high_bad",
+            [](cortrix::query::RagFusionConfig& c) { c.candidate_multiplier = cortrix::query::kRagFusionCandidateMultiplierMax + 1; }, false, "candidate_multiplier"},
+        RagFusionCase{"max_candidates_min_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.max_candidates = cortrix::query::kRagFusionMaxCandidatesMin; }, true, ""},
+        RagFusionCase{"max_candidates_max_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.max_candidates = cortrix::query::kRagFusionMaxCandidatesMax; }, true, ""},
+        RagFusionCase{"max_candidates_zero_bad",
+            [](cortrix::query::RagFusionConfig& c) { c.max_candidates = 0; }, false, "max_candidates"},
+        RagFusionCase{"max_candidates_too_high_bad",
+            [](cortrix::query::RagFusionConfig& c) { c.max_candidates = cortrix::query::kRagFusionMaxCandidatesMax + 1; }, false, "max_candidates"},
+        // v1.0.11 selective activation knobs
+        RagFusionCase{"activation_policy_always_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.activation_policy = "always"; }, true, ""},
+        RagFusionCase{"activation_policy_selective_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.activation_policy = "selective_margin"; }, true, ""},
+        RagFusionCase{"activation_policy_bad",
+            [](cortrix::query::RagFusionConfig& c) { c.activation_policy = "sometimes"; }, false, "activation_policy"},
+        RagFusionCase{"activation_margin_min_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.activation_score_margin = cortrix::query::kRagFusionActivationScoreMarginMin; }, true, ""},
+        RagFusionCase{"activation_margin_max_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.activation_score_margin = cortrix::query::kRagFusionActivationScoreMarginMax; }, true, ""},
+        RagFusionCase{"activation_margin_neg_bad",
+            [](cortrix::query::RagFusionConfig& c) { c.activation_score_margin = -0.01f; }, false, "activation_score_margin"},
+        RagFusionCase{"activation_margin_too_high_bad",
+            [](cortrix::query::RagFusionConfig& c) { c.activation_score_margin = cortrix::query::kRagFusionActivationScoreMarginMax + 0.01f; }, false, "activation_score_margin"},
+        RagFusionCase{"activation_min_results_min_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.activation_min_results = cortrix::query::kRagFusionActivationMinResultsMin; }, true, ""},
+        RagFusionCase{"activation_min_results_max_ok",
+            [](cortrix::query::RagFusionConfig& c) { c.activation_min_results = cortrix::query::kRagFusionActivationMinResultsMax; }, true, ""},
+        RagFusionCase{"activation_min_results_too_low_bad",
+            [](cortrix::query::RagFusionConfig& c) { c.activation_min_results = cortrix::query::kRagFusionActivationMinResultsMin - 1; }, false, "activation_min_results"},
+        RagFusionCase{"activation_min_results_too_high_bad",
+            [](cortrix::query::RagFusionConfig& c) { c.activation_min_results = cortrix::query::kRagFusionActivationMinResultsMax + 1; }, false, "activation_min_results"},
         // strategies non-empty when enabled (empty allowed when disabled)
         RagFusionCase{"empty_strategies_disabled_ok",
             [](cortrix::query::RagFusionConfig& c) { c.enabled = false; c.variant_strategies.clear(); }, true, ""},

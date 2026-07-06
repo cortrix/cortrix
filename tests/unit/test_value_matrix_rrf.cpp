@@ -372,7 +372,8 @@ class RrfValMatrixFuseResultsK
 TEST_P(RrfValMatrixFuseResultsK, RankOneBasedContribution) {
     const auto& tc = GetParam();
     cortrix::query::RagFusion rf = MakeRagFusion();
-    // One variant, one result at position 0 -> rank r+1 = 1 -> 1/(k+1).
+    // One list means the original query role. F36 v1.0.7 anchored weighted RRF
+    // makes its rank-1 contribution 1.7/(k+1); anchoring changes order, not score.
     std::vector<std::vector<cortrix::retrieval::ScoredResult>> per_variant = {
         {SR("ID1", 0.9f)}};
     cortrix::Result<std::vector<cortrix::retrieval::ScoredResult>> res =
@@ -381,7 +382,7 @@ TEST_P(RrfValMatrixFuseResultsK, RankOneBasedContribution) {
     const std::vector<cortrix::retrieval::ScoredResult>& out = res.value();
     ASSERT_EQ(out.size(), 1u);
     EXPECT_FLOAT_EQ(out[0].score,
-                    static_cast<float>(1.0 / (tc.rrf_k_eff + 1)));
+                    static_cast<float>(1.7 / (tc.rrf_k_eff + 1)));
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -395,29 +396,29 @@ INSTANTIATE_TEST_SUITE_P(
 TEST(RrfValMatrixFuseResults, SumsAcrossVariants) {
     cortrix::query::RagFusion rf = MakeRagFusion();
     std::vector<std::vector<cortrix::retrieval::ScoredResult>> per_variant = {
-        {SR("DUP", 0.9f)},                 // variant 0, rank1
-        {SR("OTHER", 0.5f), SR("DUP", 0.4f)}  // variant 1: DUP at rank2
+        {SR("DUP", 0.9f)},                    // original, rank1
+        {SR("OTHER", 0.5f), SR("DUP", 0.4f)}  // variant: OTHER rank1, DUP rank2
     };
     cortrix::Result<std::vector<cortrix::retrieval::ScoredResult>> res =
         rf.FuseResults(per_variant, 60);
     ASSERT_TRUE(res.ok());
     const std::vector<cortrix::retrieval::ScoredResult>& out = res.value();
     ASSERT_EQ(out.size(), 2u);
-    // DUP = 1/61 + 1/62, the largest.
+    // DUP = 1.7/61 + 0.5/62, the largest.
     EXPECT_EQ(out[0].child_id, "DUP");
     EXPECT_FLOAT_EQ(out[0].score,
-                    static_cast<float>(1.0 / 61.0 + 1.0 / 62.0));
+                    static_cast<float>(1.7 / 61.0 + 0.5 / 62.0));
     EXPECT_EQ(out[1].child_id, "OTHER");
-    EXPECT_FLOAT_EQ(out[1].score, static_cast<float>(1.0 / 61.0));
+    EXPECT_FLOAT_EQ(out[1].score, static_cast<float>(0.5 / 61.0));
 }
 
 // C3. Tie-break by first_seen (insertion order across variants).
 TEST(RrfValMatrixFuseResults, TieBreakByFirstSeenInsertionOrder) {
     cortrix::query::RagFusion rf = MakeRagFusion();
-    // All single-variant rank-1 hits -> identical RRF score -> stable by
-    // first-seen insertion order (A then B then C).
+    // Empty original + all variant-only rank-1 hits -> identical weighted RRF score
+    // -> stable by first-seen insertion order (A then B then C).
     std::vector<std::vector<cortrix::retrieval::ScoredResult>> per_variant = {
-        {SR("A", 0.1f)}, {SR("B", 0.1f)}, {SR("C", 0.1f)}};
+        {}, {SR("A", 0.1f)}, {SR("B", 0.1f)}, {SR("C", 0.1f)}};
     cortrix::Result<std::vector<cortrix::retrieval::ScoredResult>> res =
         rf.FuseResults(per_variant, 60);
     ASSERT_TRUE(res.ok());
@@ -443,12 +444,12 @@ TEST(RrfValMatrixFuseResults, DefaultRrfKParamIs60) {
     cortrix::query::RagFusion rf = MakeRagFusion();
     std::vector<std::vector<cortrix::retrieval::ScoredResult>> per_variant = {
         {SR("Z", 0.9f)}};
-    // Call WITHOUT rrf_k -> uses default 60 -> 1/61.
+    // Call WITHOUT rrf_k -> uses default 60. Single list is original role -> 1.7/61.
     cortrix::Result<std::vector<cortrix::retrieval::ScoredResult>> res =
         rf.FuseResults(per_variant);
     ASSERT_TRUE(res.ok());
     ASSERT_EQ(res.value().size(), 1u);
-    EXPECT_FLOAT_EQ(res.value()[0].score, static_cast<float>(1.0 / 61.0));
+    EXPECT_FLOAT_EQ(res.value()[0].score, static_cast<float>(1.7 / 61.0));
 }
 
 }  // namespace

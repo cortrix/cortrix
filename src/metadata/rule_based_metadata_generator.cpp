@@ -148,8 +148,9 @@ nlohmann::json RuleBasedMetadataGenerator::BuildMetadataJson(
 }
 
 nlohmann::json RuleBasedMetadataGenerator::DeriveDocFts5Columns(const GeneratorInput& input) {
-    // §9.quater.2 V1.0 derivation rules. Pure logical mapping — zero F08 schema change, no
-    // F41 dependency. The future F41 SchemaProvider.InsertDocFts5 reads these.
+    // §9.quater.2 V1.0 derivation rules. Pure logical mapping — zero F08 schema
+    // change, no SQLite/F41 table dependency. SPCPipeline writes these columns into
+    // the product doc_fts5_index row after the F08 META block is assembled.
     nlohmann::json cols;
     cols["doc_id"] = input.doc_id;
     cols["filename"] = input.doc_metadata.filename;

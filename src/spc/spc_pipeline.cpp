@@ -13,6 +13,7 @@
 #include "cortrix/spc/spc_router.h"
 #include "cortrix/chunker/parent_child_chunker.h" // F34 ParentChildChunker
 #include "cortrix/chunker/i_chunker.h"            // ChunkerInput / ChunkerOutput
+#include "cortrix/doc_summary/doc_fts5_index.h"   // F41 doc-level FTS5 product write hook
 #include "cortrix/metadata/metadata_types.h"      // F08 GeneratorInput / MetadataBlock
 #include "cortrix/spc/data_cleaner.h"              // F10 DataCleaner / spc::Block / ShouldSkipIndex
 #include "cortrix/spc_enricher.h"                  // F03 ISpcEnricher / CreateEnricher / EnrichResult
@@ -55,6 +56,32 @@ std::string MetaToJson(const cortrix::spc::DocumentMetadata& m) {
     j["upload_timestamp"] = m.upload_timestamp;
     j["parse_time_ms"] = m.parse_time_ms;
     return j.dump();
+}
+
+std::string JsonToFtsText(const nlohmann::json& v) {
+    if (v.is_null() || v.is_discarded()) return "";
+    if (v.is_string()) return v.get<std::string>();
+    if (v.is_array()) {
+        std::string out;
+        for (const auto& item : v) {
+            if (!out.empty()) out += " ";
+            out += item.is_string() ? item.get<std::string>() : item.dump();
+        }
+        return out;
+    }
+    return v.dump();
+}
+
+cortrix::doc_summary::DocFtsRow DocFtsRowFromDerivedColumns(const nlohmann::json& cols) {
+    cortrix::doc_summary::DocFtsRow row;
+    if (cols.contains("doc_id")) row.doc_id = JsonToFtsText(cols["doc_id"]);
+    if (cols.contains("filename")) row.filename = JsonToFtsText(cols["filename"]);
+    if (cols.contains("doc_title")) row.doc_title = JsonToFtsText(cols["doc_title"]);
+    if (cols.contains("topics_rule_extracted")) {
+        row.topics_rule_extracted = JsonToFtsText(cols["topics_rule_extracted"]);
+    }
+    if (cols.contains("authors")) row.authors = JsonToFtsText(cols["authors"]);
+    return row;
 }
 
 // Convert a chunker ParentChunk → storage CortrixParent (its DocumentMetadata
@@ -310,9 +337,13 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     // Stage 3.5: F08 document-level Metadata Block GENERATION (D6 lock F06→F34→F08;
     // ARCH §2.3 SoT — F08 runs after chunk, before enrich/embed). Generate ONLY here;
     // the META block is embedded in Stage 4 and assembled into the write set after the
-    // child loop. META gen is non-fatal (a truly empty doc logs + skips; parents/children
-    // stay valid). One META per doc is enforced by idx_blocks_meta_doc (F34SchemaProvider).
+    // child loop. In the same successful F08 branch, derive the F41 doc-level FTS5
+    // row from the exact F08 fields so benchmark/query doc fallback observes the
+    // same document identity. META gen is non-fatal (a truly empty doc logs + skips;
+    // parents/children stay valid). One META per doc is enforced by idx_blocks_meta_doc
+    // (F34SchemaProvider).
     std::optional<cortrix::metadata::MetadataBlock> meta_mb;
+    std::optional<cortrix::doc_summary::DocFtsRow> doc_fts5_row;
     {
         cortrix::metadata::GeneratorInput gin;
         gin.doc_id = task.doc_id;
@@ -339,6 +370,8 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                              task.doc_id, gres.status().message());
         } else {
             meta_mb = std::move(gres.value().block);
+            doc_fts5_row = DocFtsRowFromDerivedColumns(
+                cortrix::metadata::RuleBasedMetadataGenerator::DeriveDocFts5Columns(gin));
         }
     }
 
@@ -737,6 +770,32 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         task.stage = SPCStage::kError;
         task.error_message = "BeginWrite: " + bw.message();
         return -1;
+    }
+
+    // F08→F41 product sync: the row is a doc-level candidate source used by
+    // `/documents/discover` and query `granularity=doc|both|auto`. Unlike F03/F07/F40
+    // auxiliary columns below, this is part of the benchmark-visible candidate path.
+    //
+    // Write it immediately after BeginWrite, before vector/block stores. F25 PWL is a
+    // compensating lifecycle, not a SQLite transaction; writing this row first means:
+    //   - a later vector/block/store failure rolls it back through the registered callback;
+    //   - a crash before blocks are complete is recovered as ROLLBACK and cleans it;
+    //   - a crash after blocks are complete can be inferred COMMITTED with the row present.
+    if (doc_fts5_row) {
+        sqlite3* db = facade.store().db_handle();
+        if (!db) {
+            facade.write_coordinator().Rollback(txn);
+            task.stage = SPCStage::kError;
+            task.error_message = "doc_fts5_index upsert failed: store db unavailable";
+            return -1;
+        }
+        Status wf = cortrix::doc_summary::UpsertDocFts5Row(db, *doc_fts5_row);
+        if (!wf.ok()) {
+            facade.write_coordinator().Rollback(txn);
+            task.stage = SPCStage::kError;
+            task.error_message = "doc_fts5_index upsert failed: " + wf.message();
+            return -1;
+        }
     }
 
     if (!vec_points.empty()) {

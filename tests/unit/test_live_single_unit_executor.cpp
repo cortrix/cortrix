@@ -22,6 +22,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "cortrix/common/json_depth.h"
 #include "cortrix/query/live_single_unit_executor.h"
@@ -170,6 +171,151 @@ TEST_F(LiveExecutorTest, FlattenMetadataOverridesOnCollision) {
     out["source"] = "seed";
     FlattenMetadataIntoMap(R"({"source":"doc"})", out);
     EXPECT_EQ(out["source"], "doc");
+}
+
+// --- FuseHybridChunksByDocId: granularity=auto/both candidate fusion ----------
+
+retrieval::RankedChunk MakeChunkHit(const std::string& child_id,
+                                    const std::string& doc_id,
+                                    float score) {
+    retrieval::RankedChunk rc;
+    rc.child_id = child_id;
+    rc.chunk_text = "chunk text " + child_id;
+    rc.score = score;
+    rc.rerank_score = score;
+    rc.metadata["doc_id"] = doc_id;
+    rc.metadata["source_doc_id"] = doc_id;
+    return rc;
+}
+
+retrieval::RankedChunk MakeDocHit(const std::string& doc_id,
+                                  const std::string& via_path,
+                                  float score) {
+    retrieval::RankedChunk rc;
+    rc.child_id = doc_id;
+    rc.chunk_text = "doc text " + doc_id;
+    rc.score = score;
+    rc.rerank_score = score;
+    rc.metadata["doc_id"] = doc_id;
+    rc.metadata["source_doc_id"] = doc_id;
+    rc.metadata["via_path"] = via_path;
+    rc.metadata["doc_discovery_match_score"] = std::to_string(score);
+    rc.metadata["one_liner"] = "doc one liner";
+    return rc;
+}
+
+TEST(LiveHybridFusionTest, FusesChunkAndDocEvidenceByDocIdNotChildId) {
+    std::vector<retrieval::RankedChunk> chunks;
+    chunks.push_back(MakeChunkHit("child-1", "doc-1", 0.90f));
+
+    std::vector<retrieval::RankedChunk> docs;
+    docs.push_back(MakeDocHit("doc-1", "llm_summary", 0.80f));
+
+    std::vector<retrieval::RankedChunk> fused =
+        FuseHybridChunksByDocId(std::move(chunks), std::move(docs), 10);
+
+    ASSERT_EQ(fused.size(), 1u);
+    EXPECT_EQ(fused[0].child_id, "child-1");  // keep actual chunk representative
+    EXPECT_EQ(fused[0].metadata["doc_id"], "doc-1");
+    EXPECT_EQ(fused[0].metadata["source_doc_id"], "doc-1");
+    EXPECT_EQ(fused[0].metadata["via_path"], "hybrid");
+    EXPECT_EQ(fused[0].metadata["hybrid_paths"], "chunk,llm_summary");
+    EXPECT_EQ(fused[0].metadata["hybrid_has_chunk"], "true");
+    EXPECT_EQ(fused[0].metadata["hybrid_has_doc"], "true");
+    EXPECT_EQ(fused[0].metadata["one_liner"], "doc one liner");
+    EXPECT_NEAR(fused[0].score, (1.0f / 60.0f) + (1.0f / 60.0f), 1e-6f);
+}
+
+TEST(LiveHybridFusionTest, PreservesDocOnlyFts5FallbackCandidate) {
+    std::vector<retrieval::RankedChunk> chunks;
+
+    std::vector<retrieval::RankedChunk> docs;
+    docs.push_back(MakeDocHit("doc-fts", "fts5_fallback", 0.50f));
+
+    std::vector<retrieval::RankedChunk> fused =
+        FuseHybridChunksByDocId(std::move(chunks), std::move(docs), 10);
+
+    ASSERT_EQ(fused.size(), 1u);
+    EXPECT_EQ(fused[0].child_id, "doc-fts");
+    EXPECT_EQ(fused[0].metadata["via_path"], "fts5_fallback");
+    EXPECT_EQ(fused[0].metadata["hybrid_paths"], "fts5_fallback");
+    EXPECT_EQ(fused[0].metadata["hybrid_has_chunk"], "false");
+    EXPECT_EQ(fused[0].metadata["hybrid_has_doc"], "true");
+}
+
+TEST(LiveHybridFusionTest, OrdersByDocLevelRrfAndTruncatesTopK) {
+    std::vector<retrieval::RankedChunk> chunks;
+    chunks.push_back(MakeChunkHit("child-a", "doc-a", 0.90f));
+    chunks.push_back(MakeChunkHit("child-b", "doc-b", 0.80f));
+
+    std::vector<retrieval::RankedChunk> docs;
+    docs.push_back(MakeDocHit("doc-b", "llm_summary", 0.70f));
+    docs.push_back(MakeDocHit("doc-c", "llm_summary", 0.60f));
+
+    std::vector<retrieval::RankedChunk> fused =
+        FuseHybridChunksByDocId(std::move(chunks), std::move(docs), 2);
+
+    ASSERT_EQ(fused.size(), 2u);
+    EXPECT_EQ(fused[0].metadata["doc_id"], "doc-b");  // two-path evidence wins
+    EXPECT_EQ(fused[0].metadata["via_path"], "hybrid");
+    EXPECT_EQ(fused[1].metadata["doc_id"], "doc-a");
+}
+
+TEST(LiveHybridFusionTest, KeepsBestChunkRepresentativeForSameDoc) {
+    std::vector<retrieval::RankedChunk> chunks;
+    chunks.push_back(MakeChunkHit("child-best", "doc-1", 0.95f));
+    chunks.push_back(MakeChunkHit("child-later", "doc-1", 0.50f));
+
+    std::vector<retrieval::RankedChunk> docs;
+    docs.push_back(MakeDocHit("doc-1", "llm_summary", 0.80f));
+
+    std::vector<retrieval::RankedChunk> fused =
+        FuseHybridChunksByDocId(std::move(chunks), std::move(docs), 10);
+
+    ASSERT_EQ(fused.size(), 1u);
+    EXPECT_EQ(fused[0].child_id, "child-best");
+    EXPECT_EQ(fused[0].metadata["doc_id"], "doc-1");
+    EXPECT_EQ(fused[0].metadata["hybrid_paths"], "chunk,llm_summary");
+    EXPECT_EQ(fused[0].metadata["via_path"], "hybrid");
+}
+
+TEST(LiveHybridFusionTest, DocEvidenceDoesNotOverrideChunkIdentityOrSourcePath) {
+    std::vector<retrieval::RankedChunk> chunks;
+    retrieval::RankedChunk chunk = MakeChunkHit("child-1", "doc-1", 0.90f);
+    chunk.metadata["source_path"] = "chunk-source.pdf";
+    chunk.metadata["one_liner"] = "chunk one liner";
+    chunks.push_back(std::move(chunk));
+
+    std::vector<retrieval::RankedChunk> docs;
+    retrieval::RankedChunk doc = MakeDocHit("doc-1", "llm_summary", 0.80f);
+    doc.metadata["source_path"] = "doc-source.pdf";
+    doc.metadata["one_liner"] = "doc one liner";
+    docs.push_back(std::move(doc));
+
+    std::vector<retrieval::RankedChunk> fused =
+        FuseHybridChunksByDocId(std::move(chunks), std::move(docs), 10);
+
+    ASSERT_EQ(fused.size(), 1u);
+    EXPECT_EQ(fused[0].child_id, "child-1");
+    EXPECT_EQ(fused[0].metadata["doc_id"], "doc-1");
+    EXPECT_EQ(fused[0].metadata["source_doc_id"], "doc-1");
+    EXPECT_EQ(fused[0].metadata["source_path"], "chunk-source.pdf");
+    EXPECT_EQ(fused[0].metadata["one_liner"], "doc one liner");
+}
+
+TEST(LiveHybridFusionTest, TopKFloorReturnsAtLeastOneCandidate) {
+    std::vector<retrieval::RankedChunk> chunks;
+    chunks.push_back(MakeChunkHit("child-a", "doc-a", 0.90f));
+    chunks.push_back(MakeChunkHit("child-b", "doc-b", 0.80f));
+
+    std::vector<retrieval::RankedChunk> docs;
+    docs.push_back(MakeDocHit("doc-b", "llm_summary", 0.70f));
+
+    std::vector<retrieval::RankedChunk> fused =
+        FuseHybridChunksByDocId(std::move(chunks), std::move(docs), 0);
+
+    ASSERT_EQ(fused.size(), 1u);
+    EXPECT_EQ(fused[0].metadata["doc_id"], "doc-b");
 }
 
 }  // namespace
