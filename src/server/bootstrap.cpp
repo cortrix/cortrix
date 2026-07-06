@@ -505,7 +505,15 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                                     : config.enricher_llm.base_url;
         enricher_cfg.api_key = config.enricher_llm.api_key;
         enricher_cfg.model = config.enricher_llm.model;
-        CORTRIX_LOG_INFO("main", "F03 enricher enabled (model={})", config.enricher_llm.model);
+        // Wire the configured per-call timeout through (the YAML enricher_llm
+        // timeout_ms was parsed but never reached EnricherConfig, leaving the
+        // 30s default — too tight for batch-of-8 JSON generation on slower
+        // providers, where it turns healthy calls into pool timeouts).
+        if (config.enricher_llm.timeout_ms > 0) {
+            enricher_cfg.task_timeout_ms = config.enricher_llm.timeout_ms;
+        }
+        CORTRIX_LOG_INFO("main", "F03 enricher enabled (model={} timeout_ms={})",
+                         config.enricher_llm.model, enricher_cfg.task_timeout_ms);
     } else {
         CORTRIX_LOG_INFO("main", "F03 enricher disabled (enricher_llm not configured)");
     }
