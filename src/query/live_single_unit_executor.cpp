@@ -599,6 +599,12 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         std::vector<retrieval::RrfFusedHit> fused =
             retrieval::FuseFivePathRrf(rrf_in, candidate_k);
 
+        // [addendum §3.8 W2 · Agent-friendly 原则 2] Under ?explain, each result
+        // carries an `rrf_paths` field (which of the five chunk-level paths ranked
+        // it) so a caller can SEE whether the ingest-LLM paths (contextualized /
+        // hype_question) actually voted, not just infer it (assembled per-chunk
+        // below). A caller aggregates path hit-rates from the per-result fields.
+
         // 3. Assemble RankedChunks from the fused child_ids using the block cache.
         std::vector<RankedChunk> ranked;
         ranked.reserve(fused.size());
@@ -616,6 +622,17 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             rc.score = fh.rrf_score;        // pre-rerank (multi-path RRF) score
             rc.rerank_score = fh.rrf_score;  // overwritten below when reranking
             rc.score_signals = row.score_signals;
+            // [§3.8 W2] Which of the five chunk-level paths ranked THIS candidate
+            // (explain only). Comma-joined in label order; lets the caller confirm
+            // an ingest-LLM path (contextualized/hype_question) contributed.
+            if (ctx.explain && !fh.contributing_paths.empty()) {
+                std::string paths;
+                for (const auto& p : fh.contributing_paths) {
+                    if (!paths.empty()) paths += ",";
+                    paths += retrieval::ToString(p);
+                }
+                rc.metadata["rrf_paths"] = paths;
+            }
             // Flatten metadata into TOP-LEVEL result-metadata keys (e.g. beir_corpus_id),
             // not a single opaque "metadata_json" blob — the cross-NS runner matches qrels
             // on those top-level keys (FiQA identity). Doc-level metadata (caller-supplied

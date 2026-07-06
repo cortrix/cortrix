@@ -821,6 +821,10 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                     const std::string v = req.get_param_value("explain");
                     explain = (v == "true" || v == "TRUE" || v == "True" || v == "1");
                 }
+                // Pass the presentation flag into the per-NS executor so it attaches
+                // the chunk-level RRF `rrf_paths` explain detail (§3.8 W2). Read
+                // above from body/param; set before scatter/rag runs (line ~850).
+                qctx.explain = explain;
                 RagFusionConfig rag_cfg = ResolveRagFusionConfig(req, body);
                 Status rag_cfg_status = ValidateResolvedRagFusionConfigForRequest(rag_cfg);
                 if (!rag_cfg_status.ok()) {

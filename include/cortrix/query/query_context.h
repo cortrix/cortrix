@@ -88,6 +88,11 @@ struct QueryContext {
     std::string ambiguous_action_taken;  ///< "filtered_top_n_by_2" / "marked_meta_only"
     bool web_fallback_triggered = false; ///< Phase 1 always false (Phase 2 Web fallback → true)
     bool routing_misclassified = false;  ///< Phase 1 always false (Phase 2 bidirectional feedback → true)
+
+    // --- §2.bis presentation flag (pass-through to the per-NS executor) ---
+    bool explain = false;  ///< ?explain=true — per-NS executors attach B/C-class
+                           ///< explain detail (e.g. chunk-level RRF `rrf_paths`,
+                           ///< §3.8 W2) only when set. Default off (no overhead).
 };
 
 }  // namespace cortrix::query
