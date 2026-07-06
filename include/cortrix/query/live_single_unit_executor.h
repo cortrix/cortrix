@@ -29,6 +29,18 @@ namespace cortrix::query {
 void FlattenMetadataIntoMap(const std::string& metadata_json,
                             std::map<std::string, std::string>& out);
 
+/// addendum §3.8 W2 (F38 §8.1 split): classify one vector-route ANN hit for the
+/// five-path RRF. A normal child block votes dense under its own child_id; a
+/// hype_question block (block_type=16) votes hype under its SOURCE child
+/// (metadata_json.source_child_id — the F38-4 expansion; the question text never
+/// impersonates a chunk). kDropped = missing identity (legacy row / bad metadata).
+/// Contextual dual-vector hits are NOT classified here — they have no blocks row
+/// (the caller resolves them through contextual_vec_labels).
+enum class VectorHitPath { kDense, kHype, kDropped };
+VectorHitPath ClassifyVectorHit(int block_type, const std::string& block_child_id,
+                                const std::string& metadata_json,
+                                std::string* out_child_id);
+
 /// Hybrid RRF for granularity=auto/both. The fusion identity is the owning doc_id
 /// (metadata.doc_id / source_doc_id), not child_id, so a doc-summary candidate and
 /// its best chunk candidate reinforce each other instead of remaining disjoint. If a

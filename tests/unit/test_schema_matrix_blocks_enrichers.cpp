@@ -283,7 +283,7 @@ protected:
 
 TEST_F(F35BlkMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "F35");
-    EXPECT_EQ(p_.CurrentVersion(), 1);
+    EXPECT_EQ(p_.CurrentVersion(), 2);  // V2 = + contextual_vec_labels (§3.8 W2)
 }
 
 TEST_F(F35BlkMatrix, MigrateAddsFourColumns) {
@@ -336,12 +336,18 @@ TEST_P(F35BlkVersionMatrix, Gate) {
     }
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
 }
+// V2 gate contract (forward-only up to CurrentVersion()==2, F03-style): any
+// 0 ≤ from ≤ to ≤ 2 passes the version gate (then trips the null-db arm here);
+// backward steps and beyond-current versions (incl. same-version pairs > 2,
+// formerly tolerated) are CX_ERR_SCHEMA_VERSION_MISMATCH.
 INSTANTIATE_TEST_SUITE_P(
     F35BlkSteps, F35BlkVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
-                      InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
-                      InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{4, 4, true},
-                      InitStep{3, 3, true}, InitStep{4, 4, true}, InitStep{10, 10, true}, InitStep{0, 3, false}, InitStep{0, 4, false}, InitStep{2, 5, false}, InitStep{3, 2, false}, InitStep{5, 1, false}));
+                      InitStep{0, 0, true}, InitStep{1, 2, true}, InitStep{0, 2, true},
+                      InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{4, 4, false},
+                      InitStep{3, 3, false}, InitStep{10, 10, false}, InitStep{0, 3, false},
+                      InitStep{0, 4, false}, InitStep{2, 5, false}, InitStep{3, 2, false},
+                      InitStep{5, 1, false}));
 
 // ============================ F34 (version 1, parents + child cols) ============================
 

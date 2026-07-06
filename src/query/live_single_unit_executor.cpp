@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "cortrix/common/types.h"  // json alias (metadata_json flatten)
+#include "cortrix/common/block_types.h"  // kBlockHypeQuestion (vector-hit split, §3.8 W2)
 #include "cortrix/common/json_depth.h"  // metadata depth guard (DoS: deep-JSON dump)
 #include "cortrix/doc_summary/discover_handler.h"  // RecallDocSummaryHnsw (granularity=doc/both)
 #include "cortrix/doc_summary/doc_summary_types.h"  // DocDiscoveryHit
@@ -20,11 +21,13 @@
 #include "cortrix/retrieval/sparse_codec.h"
 #include "cortrix/retrieval/sparse_retriever.h"
 #include "cortrix/retrieval/sparse_rrf.h"
+#include "cortrix/spc/contextual_store.h"  // GetContextualVecLabel (F35-9 B dual-vector, §3.8 W2)
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/store/cortrix_store.h"
 #include "cortrix/store/sqlite_chunk_store.h"
 
 #include <unordered_map>
+#include <unordered_set>
 
 namespace cortrix::query {
 
@@ -298,6 +301,31 @@ void FlattenMetadataIntoMap(const std::string& metadata_json,
     }
 }
 
+VectorHitPath ClassifyVectorHit(int block_type, const std::string& block_child_id,
+                                const std::string& metadata_json,
+                                std::string* out_child_id) {
+    if (block_type == static_cast<int>(cortrix::kBlockHypeQuestion)) {
+        // F38-4 expansion: a hype hit is a vote FOR its source chunk. No valid
+        // source_child_id (legacy row / corrupt metadata) → dropped, never surfaced
+        // as its own result (the question text must not impersonate a chunk).
+        json j = json::parse(metadata_json, nullptr, /*allow_exceptions=*/false);
+        if (!j.is_discarded() && j.is_object()) {
+            auto it = j.find("source_child_id");
+            if (it != j.end() && it->is_string()) {
+                std::string src = it->get<std::string>();
+                if (!src.empty()) {
+                    *out_child_id = std::move(src);
+                    return VectorHitPath::kHype;
+                }
+            }
+        }
+        return VectorHitPath::kDropped;
+    }
+    if (block_child_id.empty()) return VectorHitPath::kDropped;
+    *out_child_id = block_child_id;
+    return VectorHitPath::kDense;
+}
+
 LiveSingleUnitExecutor::LiveSingleUnitExecutor(cortrix::resource::INamespacePool& pool,
                                                cortrix::OnnxEmbedder& embedder,
                                                RRFFusion& fusion,
@@ -392,12 +420,22 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         //    legacy non-child row (empty child_id) is dropped. Blocks are cached here
         //    so the final RankedChunk assembly reuses them (one block_get per
         //    distinct child).
+        // F38 §8 routing contract: simple/chat are chunk-only (no hype / contextual
+        // votes); complex (default) consumes the mixed ANN pool.
+        const bool chunk_only_route =
+            ctx.routing_path == "simple" || ctx.routing_path == "chat";
+
         RouteResult vector_result;
         vector_result.route_name = "vector";
         vector_result.status = RouteStatus::kSkipped;
         if (ctx.enable_vector) {
             VectorSearcher vec_searcher(facade.vec_index(), embedder_);
-            vector_result = vec_searcher.Search(ctx.query, candidate_k, kRouteTimeoutUs);
+            // §3.8 W2: the ANN pool mixes chunk + hype (≤3) + contextual (≤1)
+            // points per fully-enriched chunk, so over-fetch to keep the
+            // distinct-chunk depth (F38 §8.1 top_k*4 spirit; the aux points are
+            // votes for their chunks, not waste, so 3× is enough headroom).
+            const int vec_k = chunk_only_route ? candidate_k : candidate_k * 3;
+            vector_result = vec_searcher.Search(ctx.query, vec_k, kRouteTimeoutUs);
         }
 
         RouteResult bm25_result;
@@ -464,8 +502,72 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             return hits;
         };
 
+        // Ensure the SOURCE child of a hype/contextual vote is resolvable for the
+        // final assembly (same reverse-lookup contract as the sparse route: text +
+        // score_signals; block metadata joins when the child was also a dense hit).
+        cortrix::store::SqliteChunkStore reverse_chunk_store(store.db_handle());
+        auto resolve_child_row = [&](const std::string& child_id) -> bool {
+            if (by_child.find(child_id) != by_child.end()) return true;
+            auto rec = reverse_chunk_store.Get(child_id);
+            if (!rec.ok()) return false;
+            by_child.emplace(child_id, ChunkRow{rec.value().content, std::string(),
+                                                std::string(), rec.value().score_signals});
+            return true;
+        };
+
         retrieval::FivePathInput rrf_in;
-        rrf_in.dense = to_child_hits(vector_result);
+        // [addendum §3.8 W2] Vector-route split (F38 §8.1 / F35-9 B): the ANN pool
+        // mixes chunk points, hype-question points (block_type=16 → vote for their
+        // source child) and contextual dual-vector points (no blocks row → resolved
+        // through contextual_vec_labels). Each hit lands in its five-path slot;
+        // simple/chat keep the chunk-only contract.
+        if (vector_result.ok()) {
+            std::unordered_set<std::string> hype_seen;  // ≤3 questions/chunk → dedupe votes
+            rrf_in.dense.reserve(vector_result.items.size());
+            for (const auto& it : vector_result.items) {
+                CortrixBlock block;
+                if (store.block_get(it.block_id, block) == 0) {
+                    std::string hit_child;
+                    switch (ClassifyVectorHit(block.block_type, block.child_id,
+                                              block.metadata_json, &hit_child)) {
+                        case VectorHitPath::kDense: {
+                            retrieval::SparseHit h;
+                            h.child_id = hit_child;
+                            h.score = it.raw_score;
+                            by_child.emplace(hit_child,
+                                             ChunkRow{block.content_text, block.metadata_json,
+                                                      block.doc_id, block.score_signals});
+                            rrf_in.dense.push_back(std::move(h));
+                            break;
+                        }
+                        case VectorHitPath::kHype: {
+                            if (chunk_only_route) break;
+                            if (!hype_seen.insert(hit_child).second) break;
+                            if (!resolve_child_row(hit_child)) break;
+                            retrieval::SparseHit h;
+                            h.child_id = hit_child;
+                            h.score = it.raw_score;
+                            rrf_in.hype.push_back(std::move(h));
+                            break;
+                        }
+                        case VectorHitPath::kDropped:
+                            break;
+                    }
+                    continue;
+                }
+                // No blocks row → possibly a contextual dual-vector label (F35-9 B).
+                if (chunk_only_route) continue;
+                if (sqlite3* label_db = store.db_handle()) {
+                    auto lr = cortrix::spc::GetContextualVecLabel(label_db, it.block_id);
+                    if (lr.ok() && resolve_child_row(lr.value().child_id)) {
+                        retrieval::SparseHit h;
+                        h.child_id = lr.value().child_id;
+                        h.score = it.raw_score;
+                        rrf_in.contextualized.push_back(std::move(h));
+                    }
+                }
+            }
+        }
         rrf_in.fts5 = to_child_hits(bm25_result);
 
         // F40 sparse path (§6.3): embed the query's sparse vector and search the
@@ -482,25 +584,18 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
                     std::vector<retrieval::SparseHit> sparse_hits =
                         sparse->Search(qvec, namespace_id, candidate_k);
                     // Resolve text for sparse-only children (no dense/fts5 hit) via the
-                    // ChunkStore reverse-lookup over this NS's blocks table.
-                    cortrix::store::SqliteChunkStore chunk_store(store.db_handle());
+                    // shared ChunkStore reverse-lookup (same contract as hype/ctx votes).
                     for (const auto& h : sparse_hits) {
-                        if (by_child.find(h.child_id) == by_child.end()) {
-                            auto rec = chunk_store.Get(h.child_id);
-                            if (!rec.ok()) continue;  // not resolvable → drop from fusion
-                            by_child.emplace(h.child_id,
-                                             ChunkRow{rec.value().content, std::string(),
-                                                      std::string(),
-                                                      rec.value().score_signals});
-                        }
+                        if (!resolve_child_row(h.child_id)) continue;  // unresolvable → drop
                         rrf_in.sparse.push_back(h);
                     }
                 }
             }
         }
 
-        // chunk-level multi-path RRF (F40 §9.1). contextualized (F35) + hype (F38)
-        // are fed empty this round per the design (mocked until those paths wire in).
+        // chunk-level multi-path RRF (F40 §9.1) — all five paths live: dense +
+        // fts5 + sparse + contextualized (F35-9 B) + hype (F38 §8.1), wired by the
+        // vector-route split above (addendum §3.8 W2).
         std::vector<retrieval::RrfFusedHit> fused =
             retrieval::FuseFivePathRrf(rrf_in, candidate_k);
 

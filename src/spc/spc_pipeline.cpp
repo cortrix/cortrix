@@ -572,6 +572,10 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     std::vector<std::pair<const float*, uint64_t>> vec_points;
     // ④ F07: block_id → write-time semantic_score, drained in the write phase (WriteScore).
     std::unordered_map<uint64_t, float> score_by_block;
+    // [addendum §3.8 W2 · F35-9 B] contextual dual-vector label rows: one per child
+    // whose contextualized embedding enters P-HNSW as its own point. Written to
+    // contextual_vec_labels in the write phase (same PWL lifecycle as the blocks).
+    std::vector<cortrix::spc::ContextualVecLabelRow> ctx_label_rows;
     child_blocks.reserve(out.children.size());
 
     // [F10 §3.2 PARSE_FAILED · M2] F06 reports failed pages doc-level (d.failed_pages,
@@ -703,6 +707,25 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             // vec_points borrows the embedding storage inside clean_blocks (stable
             // through the write below).
             vec_points.push_back({b.embedding.data(), child_blocks.back().block_id});
+        }
+        // [addendum §3.8 W2 · F35-9 B] Dual-vector coexistence: the contextualized
+        // embedding becomes its OWN P-HNSW point under the deterministic derived
+        // label; the mapping row resolves ANN hits back to this child at query
+        // time. The embedding storage lives in enrich_by_child (function scope,
+        // stable node addresses) so the borrowed pointer survives the write.
+        // Anomalous (skip-index) chunks skip their contextual point too.
+        if (level >= 3 && (child_flags_ext & kFlagExtHasContextualized) &&
+            !cortrix::spc::ShouldSkipIndex(b)) {
+            auto ctx_it = enrich_by_child.find(b.id);
+            if (ctx_it != enrich_by_child.end()) {
+                cortrix::spc::ContextualVecLabelRow lr;
+                lr.label = cortrix::spc::DeriveContextualVecLabel(b.id);
+                lr.block_id = child_blocks.back().block_id;
+                lr.child_id = b.id;
+                vec_points.push_back(
+                    {ctx_it->second.contextualized_embedding->data(), lr.label});
+                ctx_label_rows.push_back(std::move(lr));
+            }
         }
     }
 
@@ -859,6 +882,23 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             task.stage = SPCStage::kError;
             task.error_message = "AddPoints: " + av.message();
             return -1;
+        }
+    }
+
+    // [addendum §3.8 W2] contextual dual-vector label mapping rows (same PWL
+    // lifecycle as the block writes). Non-fatal like the other auxiliary persists:
+    // a missing row degrades that contextual point to an unresolvable (dropped)
+    // ANN hit, never the doc write.
+    if (!ctx_label_rows.empty()) {
+        if (sqlite3* label_db = facade.store().db_handle()) {
+            for (const auto& lr : ctx_label_rows) {
+                Status wl = cortrix::spc::WriteContextualVecLabel(label_db, lr);
+                if (!wl.ok()) {
+                    CORTRIX_LOG_WARN("spc",
+                        "contextual_vec_labels persist skipped for child_id={} (doc_id={}): {}",
+                        lr.child_id, task.doc_id, wl.message());
+                }
+            }
         }
     }
 

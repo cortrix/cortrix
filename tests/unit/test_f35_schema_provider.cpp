@@ -48,22 +48,23 @@ bool HasTable(sqlite3* db, const char* table) {
 TEST(F35SchemaProviderTest, IdentityAndVersion) {
     F35SchemaProvider p;
     EXPECT_EQ(p.FeatureName(), "F35");
-    EXPECT_EQ(p.CurrentVersion(), 1);
+    EXPECT_EQ(p.CurrentVersion(), 2);  // V2 = + contextual_vec_labels (§3.8 W2)
 }
 
-TEST(F35SchemaProviderTest, AddsFourContextualColumns) {
+TEST(F35SchemaProviderTest, AddsFourContextualColumnsAndLabelTable) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     CreateBlocksTable(db);
     EXPECT_FALSE(HasColumn(db, "blocks", "contextualized_text"));
 
     F35SchemaProvider p;
-    ASSERT_TRUE(p.Migrate(db, 0, 1).ok());
+    ASSERT_TRUE(p.Migrate(db, 0, p.CurrentVersion()).ok());
 
     EXPECT_TRUE(HasColumn(db, "blocks", "embedding"));
     EXPECT_TRUE(HasColumn(db, "blocks", "contextualized_text"));
     EXPECT_TRUE(HasColumn(db, "blocks", "contextualized_embedding"));
     EXPECT_TRUE(HasColumn(db, "blocks", "contextualized_status"));
+    EXPECT_TRUE(HasTable(db, "contextual_vec_labels"));
     sqlite3_close(db);
 }
 
@@ -72,19 +73,39 @@ TEST(F35SchemaProviderTest, MigrationIdempotent) {
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     CreateBlocksTable(db);
     F35SchemaProvider p;
-    ASSERT_TRUE(p.Migrate(db, 0, 1).ok());
-    EXPECT_TRUE(p.Migrate(db, 0, 1).ok());  // re-run
-    EXPECT_TRUE(p.Migrate(db, 1, 1).ok());  // already current
+    ASSERT_TRUE(p.Migrate(db, 0, 2).ok());
+    EXPECT_TRUE(p.Migrate(db, 0, 2).ok());  // re-run
+    EXPECT_TRUE(p.Migrate(db, 2, 2).ok());  // already current
+    EXPECT_TRUE(p.Migrate(db, 0, 1).ok());  // partial forward step still tolerated
     EXPECT_TRUE(HasColumn(db, "blocks", "embedding"));
+    EXPECT_TRUE(HasTable(db, "contextual_vec_labels"));
     sqlite3_close(db);
 }
 
-TEST(F35SchemaProviderTest, NoBlocksTableNoOp) {
+TEST(F35SchemaProviderTest, NoBlocksTableStillCreatesLabelTable) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     F35SchemaProvider p;
-    EXPECT_TRUE(p.Migrate(db, 0, 1).ok());  // no blocks → no-op, not error
+    EXPECT_TRUE(p.Migrate(db, 0, 2).ok());  // no blocks → columns no-op, not error
     EXPECT_FALSE(HasTable(db, "blocks"));
+    // The label table has no blocks dependency (created regardless).
+    EXPECT_TRUE(HasTable(db, "contextual_vec_labels"));
+    sqlite3_close(db);
+}
+
+TEST(F35SchemaProviderTest, V1ToV2UpgradeCreatesLabelTable) {
+    sqlite3* db = nullptr;
+    ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    CreateBlocksTable(db);
+    F35SchemaProvider p;
+    ASSERT_TRUE(p.Migrate(db, 0, 2).ok());
+    // Simulate a real V1 store (columns present, no label table yet).
+    ASSERT_EQ(sqlite3_exec(db, "DROP TABLE contextual_vec_labels",
+                           nullptr, nullptr, nullptr), SQLITE_OK);
+    ASSERT_FALSE(HasTable(db, "contextual_vec_labels"));
+    ASSERT_TRUE(p.Migrate(db, 1, 2).ok());  // the upgrade step old stores take
+    EXPECT_TRUE(HasTable(db, "contextual_vec_labels"));
+    EXPECT_TRUE(HasColumn(db, "blocks", "contextualized_text"));  // untouched
     sqlite3_close(db);
 }
 
@@ -92,9 +113,11 @@ TEST(F35SchemaProviderTest, UnexpectedVersionStepIsError) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     F35SchemaProvider p;
-    Status st = p.Migrate(db, 1, 2);  // no Phase 2 bump yet
-    EXPECT_FALSE(st.ok());
-    EXPECT_NE(st.message().find("CX_ERR_SCHEMA_VERSION_MISMATCH"), std::string::npos);
+    Status beyond = p.Migrate(db, 2, 3);  // beyond CurrentVersion
+    EXPECT_FALSE(beyond.ok());
+    EXPECT_NE(beyond.message().find("CX_ERR_SCHEMA_VERSION_MISMATCH"), std::string::npos);
+    Status backward = p.Migrate(db, 2, 1);  // backward
+    EXPECT_FALSE(backward.ok());
     sqlite3_close(db);
 }
 
@@ -107,8 +130,9 @@ TEST(F35SchemaProviderTest, RegistersAndMigratesViaMigratorUnit) {
     m.Register(&p);
     Status st = m.MigrateUnit(db, "unit-1");
     ASSERT_TRUE(st.ok()) << st.message();
-    EXPECT_EQ(m.CurrentVersion(db, "F35"), 1);
+    EXPECT_EQ(m.CurrentVersion(db, "F35"), 2);
     EXPECT_TRUE(HasColumn(db, "blocks", "contextualized_text"));
+    EXPECT_TRUE(HasTable(db, "contextual_vec_labels"));
     sqlite3_close(db);
 }
 

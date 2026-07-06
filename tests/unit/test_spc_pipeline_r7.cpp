@@ -28,6 +28,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -45,6 +46,7 @@
 #include "cortrix/spc/block_assembler.h"
 #include "cortrix/spc_enricher.h"            // NullEnricher (ctor injection)
 #include "cortrix/spc/enricher_chain.h"      // I1 EnricherChain
+#include "cortrix/spc/contextual_store.h"    // §3.8 W2 DeriveContextualVecLabel
 #include "cortrix/spc/hype_enricher.h"       // F38 HyPEEnricher (real, drives the hype side channel)
 #include "cortrix/spc/spc_task.h"
 #include "cortrix/chunker/parent_child_chunker.h"
@@ -739,6 +741,48 @@ TEST_F(SPCPipelineR7Test, EnrichState_HypeFailureOwedAsF38) {
     ASSERT_GT(rows, 0);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members='f38'"), rows);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"), rows);
+    pipeline_->SetEnricherChain(nullptr);
+}
+
+// §3.8 W2 dual-vector (F35-9 B): a chain producing contextualized embeddings
+// writes one contextual_vec_labels row per child, the label is the deterministic
+// derivation, and the label POINT actually entered the vector index alongside
+// the child's own point.
+TEST_F(SPCPipelineR7Test, ContextualDualVector_LabelRowsAndIndexPoints) {
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    chain.Append(std::make_shared<FakeContextualEnricher>());
+    pipeline_->SetEnricherChain(&chain);
+
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+
+    const int children = CountSql(
+        "SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL AND child_id != ''");
+    ASSERT_GT(children, 0);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM contextual_vec_labels"), children);
+
+    sqlite3* db = facade_->store().db_handle();
+    sqlite3_stmt* st = nullptr;
+    ASSERT_EQ(sqlite3_prepare_v2(
+                  db, "SELECT label, child_id FROM contextual_vec_labels",
+                  -1, &st, nullptr),
+              SQLITE_OK);
+    const auto& ids = fake_index_->added_ids();
+    int rows = 0;
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        ++rows;
+        const auto label = static_cast<uint64_t>(sqlite3_column_int64(st, 0));
+        const std::string child =
+            reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
+        EXPECT_EQ(label, cortrix::spc::DeriveContextualVecLabel(child));
+        EXPECT_NE(std::find(ids.begin(), ids.end(), label), ids.end())
+            << "contextual label point missing from the vector index";
+    }
+    sqlite3_finalize(st);
+    EXPECT_EQ(rows, children);
     pipeline_->SetEnricherChain(nullptr);
 }
 
