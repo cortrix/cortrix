@@ -608,7 +608,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     auto f42_config = std::make_shared<cortrix::InMemoryGlobalConfig>();
     f42_config->Set("f42.worker_pool_size",
                     std::to_string(config.spc.worker_count > 0 ? config.spc.worker_count : 2));
-    f42_config->Set("f06.parser_max_concurrent", "4");
+    // Default 4 (parser-subprocess memory protection); explicitly raisable via
+    // spc.parser_max_concurrent for workloads that spawn no parsers (the F42
+    // pool-size gate compares against this value).
+    f42_config->Set("f06.parser_max_concurrent",
+                    std::to_string(config.spc.parser_max_concurrent > 0
+                                       ? config.spc.parser_max_concurrent
+                                       : 4));
 
     cortrix::async::TaskManager task_mgr;
     if (cortrix::Status ti = task_mgr.Init(config.ns.data_dir + "/tasks.db"); !ti.ok()) {

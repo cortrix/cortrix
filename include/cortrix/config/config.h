@@ -62,6 +62,10 @@ struct LlmConfig {
 struct SPCConfig {
     // 0 = auto: 1 if CoreML active (GPU), 2 if CPU-only; set after embedder.Init()
     int worker_count = 0;
+    // Parser-subprocess concurrency cap (memory protection; the F42 pool-size
+    // startup gate compares against it). Default 4 unchanged — raise EXPLICITLY
+    // only for workloads that spawn no/few parsers (e.g. enrich backfill).
+    int parser_max_concurrent = 4;
     int max_queue_size = 10000;
     int task_timeout_s = 300;
     std::string python_bin = "python3";
