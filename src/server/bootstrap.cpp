@@ -512,8 +512,15 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         if (config.enricher_llm.timeout_ms > 0) {
             enricher_cfg.task_timeout_ms = config.enricher_llm.timeout_ms;
         }
-        CORTRIX_LOG_INFO("main", "F03 enricher enabled (model={} timeout_ms={})",
-                         config.enricher_llm.model, enricher_cfg.task_timeout_ms);
+        // Same plumb for batch_size (clamped to the §2.7 documented 1-32 range):
+        // batch-8 JSON generation can outlast provider gateway idle windows on
+        // slower models — observed live as mid-read connection resets.
+        if (config.enricher_llm.batch_size > 0) {
+            enricher_cfg.batch_size = std::min(config.enricher_llm.batch_size, 32);
+        }
+        CORTRIX_LOG_INFO("main", "F03 enricher enabled (model={} timeout_ms={} batch_size={})",
+                         config.enricher_llm.model, enricher_cfg.task_timeout_ms,
+                         enricher_cfg.batch_size);
     } else {
         CORTRIX_LOG_INFO("main", "F03 enricher disabled (enricher_llm not configured)");
     }

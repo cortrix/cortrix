@@ -106,6 +106,7 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (n["model"])    cfg.model    = n["model"].as<std::string>();
         if (n["base_url"]) cfg.base_url = n["base_url"].as<std::string>();
         if (n["timeout_ms"]) cfg.timeout_ms = n["timeout_ms"].as<int>();
+        if (n["batch_size"]) cfg.batch_size = n["batch_size"].as<int>();
     };
 
     // semantic_llm — fast/cheap model for intent classification & reranking
