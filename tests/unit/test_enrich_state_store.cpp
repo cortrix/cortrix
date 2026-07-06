@@ -156,6 +156,91 @@ TEST_F(EnrichStateStoreTest, CountEnrichStatesGroupsByStatus) {
     EXPECT_EQ(counts.value().failed_permanent, 1);
 }
 
+class EnrichAuditTest : public EnrichStateStoreTest {
+protected:
+    void SetUp() override {
+        EnrichStateStoreTest::SetUp();
+        // Minimal blocks shape the audit reads (framework + F03/F35 columns).
+        ASSERT_EQ(sqlite3_exec(db_,
+            "CREATE TABLE blocks (block_id INTEGER PRIMARY KEY, doc_id TEXT,"
+            " child_id TEXT, block_type INTEGER DEFAULT 1, enriched_score REAL,"
+            " contextualized_status SMALLINT DEFAULT 0, metadata_json TEXT)",
+            nullptr, nullptr, nullptr), SQLITE_OK);
+    }
+
+    void SeedChild(uint64_t block_id, const std::string& child, bool score,
+                   int ctx_status) {
+        sqlite3_stmt* st = nullptr;
+        ASSERT_EQ(sqlite3_prepare_v2(db_,
+            "INSERT INTO blocks(block_id, doc_id, child_id, block_type,"
+            " enriched_score, contextualized_status) VALUES(?1,'doc-a',?2,1,?3,?4)",
+            -1, &st, nullptr), SQLITE_OK);
+        sqlite3_bind_int64(st, 1, static_cast<sqlite3_int64>(block_id));
+        sqlite3_bind_text(st, 2, child.c_str(), -1, SQLITE_TRANSIENT);
+        if (score) sqlite3_bind_double(st, 3, 0.5); else sqlite3_bind_null(st, 3);
+        sqlite3_bind_int(st, 4, ctx_status);
+        ASSERT_EQ(sqlite3_step(st), SQLITE_DONE);
+        sqlite3_finalize(st);
+    }
+
+    void SeedHypeFor(const std::string& source_child) {
+        // Explicit high block_id so auto-rowid never collides with seeded children.
+        const std::string sql =
+            "INSERT INTO blocks(block_id, doc_id, child_id, block_type, metadata_json)"
+            " VALUES(" + std::to_string(9000 + next_hype_id_++) +
+            ",'doc-a','',16,'{\"source_child_id\":\"" + source_child + "\"}')";
+        ASSERT_EQ(sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, nullptr), SQLITE_OK);
+    }
+
+    int next_hype_id_ = 0;
+};
+
+// Audit synthesizes pending rows exactly for the missing configured artifacts;
+// covered chunks and already-pending rows are untouched.
+TEST_F(EnrichAuditTest, SynthesizesOwedMembersOnly) {
+    SeedChild(1, "child-full", /*score=*/true, /*ctx=*/1);   // fully covered
+    SeedHypeFor("child-full");
+    SeedChild(2, "child-bare", false, 0);                    // owes all three
+    SeedChild(3, "child-partial", true, 2);                  // owes f35,f38 (ctx failed)
+    SeedChild(4, "child-tracked", false, 0);                 // already pending (attempts=3)
+    EnrichStateRow tracked = MakeRow(4, "doc-a", kEnrichStatusPendingRetry, 99);
+    tracked.attempts = 3;
+    tracked.failed_members = "f03";
+    ASSERT_TRUE(UpsertEnrichState(db_, tracked).ok());
+
+    auto n = SynthesizeEnrichAuditRows(db_, {"f03", "f35", "f38"}, /*now=*/500);
+    ASSERT_TRUE(n.ok());
+    EXPECT_EQ(n.value(), 2);  // child-bare + child-partial
+
+    auto rows = ListEnrichStateForDoc(db_, "doc-a", "");
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 3u);  // 2 synthesized + 1 pre-tracked
+    for (const auto& r : rows.value()) {
+        if (r.block_id == 2) {
+            EXPECT_EQ(r.failed_members, "f03,f35,f38");
+            EXPECT_EQ(r.next_retry_at, 500);
+        } else if (r.block_id == 3) {
+            EXPECT_EQ(r.failed_members, "f35,f38");
+        } else if (r.block_id == 4) {
+            EXPECT_EQ(r.attempts, 3);           // untouched
+            EXPECT_EQ(r.next_retry_at, 99);     // backoff kept
+        }
+    }
+}
+
+// Members outside the configured chain are never owed (f38 unconfigured here).
+TEST_F(EnrichAuditTest, RespectsConfiguredMemberUniverse) {
+    SeedChild(11, "child-x", /*score=*/true, /*ctx=*/1);  // no hype block anywhere
+    SeedChild(12, "child-y", false, 1);
+    auto n = SynthesizeEnrichAuditRows(db_, {"f03", "f35"}, 500);
+    ASSERT_TRUE(n.ok());
+    EXPECT_EQ(n.value(), 1);  // only child-y owes f03; f38 not in the universe
+    auto rows = ListEnrichStateForDoc(db_, "doc-a", kEnrichStatusPendingRetry);
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 1u);
+    EXPECT_EQ(rows.value()[0].failed_members, "f03");
+}
+
 TEST_F(EnrichStateStoreTest, HelpersFailCleanlyWithoutTable) {
     sqlite3* bare = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &bare), SQLITE_OK);

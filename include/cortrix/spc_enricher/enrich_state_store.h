@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include <sqlite3.h>
@@ -65,5 +66,16 @@ struct EnrichStateCounts {
 
 /// Coverage counters for the namespace (ops API / metrics gauge source).
 Result<EnrichStateCounts> CountEnrichStates(sqlite3* db);
+
+/// addendum §3.7 G4 — legacy/silent-degrade audit. Scans the namespace's child
+/// blocks against the CONFIGURED chain members and synthesizes 'pending_retry'
+/// rows (due at now_unix) for chunks whose artifacts are missing:
+///   f03 ⇔ blocks.enriched_score non-NULL; f35 ⇔ contextualized_status == 1;
+///   f38 ⇔ a block_type=16 row whose metadata source_child_id == the child.
+/// Chunks already tracked as 'pending_retry' keep their attempts/backoff (not
+/// clobbered); fully-covered chunks get no row. Returns the synthesized count.
+Result<int> SynthesizeEnrichAuditRows(
+    sqlite3* db, const std::unordered_set<std::string>& configured_members,
+    int64_t now_unix);
 
 }  // namespace cortrix::spc

@@ -18,6 +18,9 @@ enum TaskType {
     kTaskDocParse        = 1,   ///< F06/F08 established (PDF/Office parse task)
     kTaskWatcherFanout   = 2,   ///< F21 established (Watcher cross-NS broadcast task)
     kTaskDocSummary      = 3,   ///< F41 added (document-level summary index generation task)
+    kTaskEnrichBackfill  = 4,   ///< addendum §3.7 added (per-doc chunk-enrichment backfill;
+                                ///< payload = namespace_id + doc_id, owed members re-read
+                                ///< from enrich_state — idempotent)
 };
 
 }  // namespace cortrix::async

@@ -149,6 +149,92 @@ Status LeaseDocRetries(sqlite3* db, const std::string& doc_id, int64_t lease_unt
     return Status::Ok();
 }
 
+Result<int> SynthesizeEnrichAuditRows(
+    sqlite3* db, const std::unordered_set<std::string>& configured_members,
+    int64_t now_unix) {
+    if (!db) return Status::InvalidArgument("SynthesizeEnrichAuditRows: null db");
+
+    // Pass 1: child_ids that already have hype blocks (f38 done set).
+    std::unordered_set<std::string> hype_sources;
+    {
+        sqlite3_stmt* st = nullptr;
+        const char* sql =
+            "SELECT DISTINCT json_extract(metadata_json, '$.source_child_id')"
+            " FROM blocks WHERE block_type=16 AND metadata_json IS NOT NULL";
+        if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
+            return SqlErr(db, "prepare audit hype sources");
+        }
+        while (sqlite3_step(st) == SQLITE_ROW) {
+            const unsigned char* c = sqlite3_column_text(st, 0);
+            if (c) hype_sources.insert(reinterpret_cast<const char*>(c));
+        }
+        sqlite3_finalize(st);
+    }
+
+    // Pass 2: rows already tracked as pending (keep their attempts/backoff).
+    std::unordered_set<uint64_t> already_pending;
+    {
+        sqlite3_stmt* st = nullptr;
+        const char* sql = "SELECT block_id FROM enrich_state WHERE status=?1";
+        if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
+            return SqlErr(db, "prepare audit tracked");
+        }
+        sqlite3_bind_text(st, 1, kEnrichStatusPendingRetry, -1, SQLITE_STATIC);
+        while (sqlite3_step(st) == SQLITE_ROW) {
+            already_pending.insert(static_cast<uint64_t>(sqlite3_column_int64(st, 0)));
+        }
+        sqlite3_finalize(st);
+    }
+
+    // Pass 3: child rows vs configured artifacts → synthesize.
+    sqlite3_stmt* st = nullptr;
+    const char* sql =
+        "SELECT block_id, child_id, doc_id, enriched_score, contextualized_status"
+        " FROM blocks WHERE child_id IS NOT NULL AND child_id != ''";
+    if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
+        return SqlErr(db, "prepare audit children");
+    }
+    int synthesized = 0;
+    int rc = SQLITE_OK;
+    while ((rc = sqlite3_step(st)) == SQLITE_ROW) {
+        const uint64_t block_id = static_cast<uint64_t>(sqlite3_column_int64(st, 0));
+        const unsigned char* cid = sqlite3_column_text(st, 1);
+        const unsigned char* did = sqlite3_column_text(st, 2);
+        const bool has_score = sqlite3_column_type(st, 3) != SQLITE_NULL;
+        const int ctx_status = sqlite3_column_type(st, 4) == SQLITE_NULL
+                                   ? 0
+                                   : sqlite3_column_int(st, 4);
+        const std::string child_id = cid ? reinterpret_cast<const char*>(cid) : "";
+        std::string owed;
+        auto owe = [&owed](const char* tok) {
+            if (!owed.empty()) owed += ",";
+            owed += tok;
+        };
+        if (configured_members.count("f03") && !has_score) owe("f03");
+        if (configured_members.count("f35") && ctx_status != 1) owe("f35");
+        if (configured_members.count("f38") &&
+            hype_sources.find(child_id) == hype_sources.end()) {
+            owe("f38");
+        }
+        if (owed.empty()) continue;
+        if (already_pending.count(block_id)) continue;
+        EnrichStateRow row;
+        row.block_id = block_id;
+        row.doc_id = did ? reinterpret_cast<const char*>(did) : "";
+        row.child_id = child_id;
+        row.status = kEnrichStatusPendingRetry;
+        row.failed_members = std::move(owed);
+        row.attempts = 0;
+        row.last_error = "audit: artifacts missing";
+        row.next_retry_at = now_unix;
+        row.updated_at = now_unix;
+        if (UpsertEnrichState(db, row).ok()) ++synthesized;
+    }
+    sqlite3_finalize(st);
+    if (rc != SQLITE_DONE) return SqlErr(db, "audit children scan");
+    return synthesized;
+}
+
 Result<EnrichStateCounts> CountEnrichStates(sqlite3* db) {
     if (!db) return Status::InvalidArgument("CountEnrichStates: null db");
     sqlite3_stmt* stmt = nullptr;

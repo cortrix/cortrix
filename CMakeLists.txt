@@ -91,6 +91,8 @@ add_library(cortrix_core STATIC
     src/spc/f35_schema_provider.cpp
     src/spc/enrich_state_schema_provider.cpp
     src/spc/enrich_state_store.cpp
+    src/spc/enrich_backfill_worker.cpp
+    src/spc/enrich_retry_sweeper.cpp
     src/spc/enricher_store.cpp
     src/spc/spc_enricher.cpp
     src/spc/prompt_template.cpp
@@ -205,6 +207,7 @@ add_library(cortrix_core STATIC
     src/upload/upload_handler.cpp
     src/server/routes/agent_proxy_routes.cpp
     src/server/routes/document_routes.cpp
+    src/server/routes/enrich_routes.cpp
     src/server/routes/flat_document_routes.cpp
     src/server/routes/connector_routes.cpp
     src/server/routes/operations_routes.cpp
