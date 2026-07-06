@@ -548,13 +548,26 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                 enricher_chain.Append(
                     std::shared_ptr<cortrix::spc::ISpcEnricher>(enricher.get(), [](auto*) {}));
             } else if (tok == "f35" && enricher_chain_llm) {
+                auto f35_cfg =
+                    cortrix::spc::ResolveContextualConfig(enricher_chain_config.get());
+                // Wire the configured enricher_llm model through (mirrors the F41
+                // DEFECT#3 fix): the built-in "gpt-4o-mini" default is rejected
+                // with HTTP 400 by non-OpenAI providers (GLM/Claude/local), which
+                // silently zeroed all F35 output.
+                if (!config.enricher_llm.model.empty()) {
+                    f35_cfg.llm_model = config.enricher_llm.model;
+                }
                 auto f35 = std::make_shared<cortrix::spc::ContextualRetrievalEnricher>(
-                    cortrix::spc::ResolveContextualConfig(enricher_chain_config.get()),
-                    enricher_chain_llm,
+                    f35_cfg, enricher_chain_llm,
                     std::make_shared<cortrix::spc::ContextualOnnxEmbedder>(embedder_alias));
                 enricher_chain.Append(std::move(f35));
             } else if (tok == "f38" && enricher_chain_llm) {
                 cortrix::spc::HyPEConfig hype_cfg;  // K=3 default; parent_text bound in pipeline
+                // Same DEFECT#3-family wiring as F35 above: send the configured
+                // model, not the OpenAI-only built-in default.
+                if (!config.enricher_llm.model.empty()) {
+                    hype_cfg.llm_model = config.enricher_llm.model;
+                }
                 auto f38 = std::make_shared<cortrix::spc::HyPEEnricher>(
                     hype_cfg, enricher_chain_llm,
                     /*parent_store=*/nullptr);  // parent_text supplied per-chunk by the pipeline
