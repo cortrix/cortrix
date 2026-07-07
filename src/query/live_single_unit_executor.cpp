@@ -599,7 +599,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         std::vector<retrieval::RrfFusedHit> fused =
             retrieval::FuseFivePathRrf(rrf_in, candidate_k);
 
-        // [addendum §3.8 W2 · Agent-friendly 原则 2] Under ?explain, each result
+        // [addendum §3.8 W2 · Agent-friendly principle 2] Under ?explain, each result
         // carries an `rrf_paths` field (which of the five chunk-level paths ranked
         // it) so a caller can SEE whether the ingest-LLM paths (contextualized /
         // hype_question) actually voted, not just infer it (assembled per-chunk
