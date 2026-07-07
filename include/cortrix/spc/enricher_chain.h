@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "cortrix/common/i_global_config.h"  // IGlobalConfig (enricher.chain GUC + NS override)
@@ -95,14 +96,24 @@ public:
     /// "" == no parent context — F38 reconcile 2). `source_child_ids` /
     /// `source_parent_ids` are the F38-4 provenance stamped on each generated
     /// question (index-aligned; empty vectors → provenance left blank).
+    ///
+    /// `member_filter` (addendum §3.7 backfill): when non-null, only members whose
+    /// ChainMemberToken is in the set run; the rest record a skipped step (same
+    /// bookkeeping as an unavailable member). nullptr == run all (ingest path).
     std::vector<ChunkChainResult> EnrichChunks(
         const std::vector<ChunkContext>& contexts,
         const std::vector<std::string>& parent_texts,
         const std::vector<std::string>& source_child_ids,
-        const std::vector<std::string>& source_parent_ids);
+        const std::vector<std::string>& source_parent_ids,
+        const std::unordered_set<std::string>* member_filter = nullptr);
 
 private:
     std::vector<std::shared_ptr<ISpcEnricher>> enrichers_;
 };
+
+/// Map an enricher's Name() to its chain-spec token ("f03" / "f35" / "f38").
+/// The head slot (LlmEnricher / LocalNer / test fakes) is "f03"; the token is the
+/// vocabulary of enricher.chain specs AND of enrich_state.failed_members.
+std::string ChainMemberToken(const std::string& enricher_name);
 
 }  // namespace cortrix::spc

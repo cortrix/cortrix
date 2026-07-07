@@ -124,8 +124,9 @@ LlmEnricher::LlmEnricher(const EnricherConfig& config,
     enabled_ = config_.enabled && llm_client_ != nullptr;
 
     // S3.1: bounded-concurrency pool (4 workers / queue 100 / task_timeout 30s,
-    // topic 1.3) — F02 RerankerThreadPool reused (B-R1 §2). Parallelizes the
-    // per-batch LLM calls of one EnrichBatch across workers.
+    // topic 1.3) — F02 RerankerThreadPool reused (B-R1 §2). One pool task = one
+    // Chat call (the §5.1 retry schedule runs on the caller thread), so the pool
+    // timeout keeps its single-call meaning.
     thread_pool_ = std::make_unique<reranker::RerankerThreadPool<float>>(
         config_.workers, config_.queue_size, config_.task_timeout_ms);
 
@@ -238,7 +239,12 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
         int64_t duration_ms = 0;
     };
 
-    auto run_attempt = [this, &prompt, &model]() -> std::shared_ptr<Slot> {
+    // ONE pool task == ONE Chat call, bounded by task_timeout_ms at both the
+    // transport (call.timeout_ms) and the pool level. The §5.1 retry schedule
+    // (transport retries + backoff sleeps + the timeout retry) is driven from the
+    // caller thread below — the seconds-level backoff (addendum §3.7 A-part) must
+    // not run inside the pool task or it would eat the per-call timeout budget.
+    auto submit_one_call = [this, &prompt, &model]() -> std::shared_ptr<Slot> {
         auto slot = std::make_shared<Slot>();
         slot->client = llm_client_;
         slot->prompt = prompt;
@@ -259,22 +265,7 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
                 // and leave incomplete or non-final structured output.
                 call.thinking_type = "disabled";
             }
-            constexpr int kMaxHttpAttempts = 3;  // §5.1 LLM_API: retry 3 times
-            llm::ChatCompletionResponse chat;
-            for (slot->attempts = 1; slot->attempts <= kMaxHttpAttempts; ++slot->attempts) {
-                chat = slot->client->Chat(slot->prompt, call);
-                if (chat.ok()) break;
-                // Only HTTP-5xx / transport are busy-retried; rate-limit + bad-body
-                // return immediately for higher-level handling (§5.1).
-                const std::string& msg = chat.status.message();
-                const bool retryable =
-                    msg.rfind(llm::llm_tokens::kHttp, 0) == 0 ||
-                    msg.rfind(llm::llm_tokens::kTransport, 0) == 0;
-                if (!retryable || slot->attempts == kMaxHttpAttempts) break;
-                std::this_thread::sleep_for(
-                    std::chrono::milliseconds(50 * slot->attempts));  // backoff
-            }
-            slot->chat = chat;
+            slot->chat = slot->client->Chat(slot->prompt, call);
             slot->duration_ms = NowMs() - t0;
             return 1.0f;  // pool is float-typed; payload travels via the slot
         };
@@ -282,10 +273,34 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
         return completed ? slot : nullptr;  // nullptr == pool-level timeout
     };
 
-    // First attempt; on timeout retry once more (§5.1 timeout → retry 1 time).
-    std::shared_ptr<Slot> slot = run_attempt();
-    bool timed_out = (slot == nullptr);
-    if (timed_out) slot = run_attempt();
+    // §5.1 retry schedule, caller-thread driven: transport/HTTP-5xx failures are
+    // retried up to kEnricherMaxHttpAttempts calls with backoff base × attempt
+    // between them; a pool-level timeout is retried exactly once (no backoff);
+    // rate-limit + bad-body return immediately for higher-level handling.
+    std::shared_ptr<Slot> slot;
+    int transport_attempts = 0;
+    bool timeout_retried = false;
+    while (true) {
+        slot = submit_one_call();
+        if (slot == nullptr) {
+            if (!timeout_retried) {
+                timeout_retried = true;  // §5.1 timeout → retry 1 time
+                continue;
+            }
+            break;  // hard timeout after the retry
+        }
+        ++transport_attempts;
+        if (slot->chat.ok()) break;
+        const std::string& msg = slot->chat.status.message();
+        const bool retryable = msg.rfind(llm::llm_tokens::kHttp, 0) == 0 ||
+                               msg.rfind(llm::llm_tokens::kTransport, 0) == 0;
+        if (!retryable || transport_attempts >= kEnricherMaxHttpAttempts) break;
+        // Seconds-level backoff (addendum §3.7 A-part): base × attempt.
+        std::this_thread::sleep_for(std::chrono::milliseconds(
+            static_cast<int64_t>(config_.http_retry_backoff_ms) *
+            transport_attempts));
+    }
+    if (slot) slot->attempts = transport_attempts;
 
     auto& metrics = EnricherMetrics::Instance();
 

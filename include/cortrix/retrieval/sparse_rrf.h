@@ -15,10 +15,10 @@ inline constexpr int kRrfKDefault = 60;
 /// these names; the index order is the stable label order.
 enum class RrfPath {
     kDense = 0,           ///< original child embedding (BGE-M3 dense)
-    kContextualized,      ///< F35 contextualized_embedding — MOCK this round
+    kContextualized,      ///< F35 contextualized_embedding (dual-vector ANN hit, §3.8 W2)
     kSparse,              ///< F40 sparse_vec → SpladeSparseRetriever.Search
     kFts5,                ///< literal BM25
-    kHypeQuestion,        ///< F38 hype_question Block — MOCK this round
+    kHypeQuestion,        ///< F38 hype_question hit expanded to its source child (F38-4)
 };
 inline constexpr int kRrfPathCount = 5;
 const char* ToString(RrfPath path);
@@ -34,15 +34,15 @@ struct RrfFusedHit {
 
 /// The 5 per-path ranked candidate lists (each already sorted by its own score
 /// DESC; only rank position matters to RRF). A path that did not run / produced
-/// nothing is an empty list — that is exactly how the F35 contextualized and F38
-/// hype paths are fed this round (mock: empty), and how an L2 sparse fallback
-/// drops the sparse list (§7.2). dense + sparse + fts5 carry real structure.
+/// nothing is an empty list — e.g. an un-enriched namespace feeds contextualized
+/// and hype empty, an L2 sparse fallback drops the sparse list (§7.2), and
+/// simple/chat routes stay chunk-only (F38 §8).
 struct FivePathInput {
     std::vector<SparseHit> dense;
-    std::vector<SparseHit> contextualized;  ///< MOCK (F35 not frozen this round)
+    std::vector<SparseHit> contextualized;  ///< F35-9 B dual-vector votes (§3.8 W2)
     std::vector<SparseHit> sparse;
     std::vector<SparseHit> fts5;
-    std::vector<SparseHit> hype;            ///< MOCK (F38 not frozen this round)
+    std::vector<SparseHit> hype;            ///< F38 hype votes for their source child
 };
 
 /// chunk-level 5-path RRF fusion (F40 §9.1). For each path, a candidate's
@@ -51,10 +51,8 @@ struct FivePathInput {
 /// contributes 1/k). Results are deduped by child_id (scores summed across
 /// paths), sorted by rrf_score DESC, truncated to `top_n` (<=0 → all).
 ///
-/// Standalone (D3): this is the pure fusion function. Wiring the real dense /
-/// FTS5 / contextualized / hype retrievers that produce these lists into the
-/// QueryPipeline is cross-Feature integration → D3.5; here each list is provided
-/// directly (mock for F35/F38).
+/// This is the pure fusion function; the producing retrievers are wired in the
+/// live executor's vector-route split (live_single_unit_executor.cpp, §3.8 W2).
 std::vector<RrfFusedHit> FuseFivePathRrf(const FivePathInput& input,
                                          int top_n = 0, int k = kRrfKDefault);
 

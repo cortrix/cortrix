@@ -51,11 +51,13 @@ TEST(F35SchemaProviderBranchR7b, NullDbInvalidArgument) {
     EXPECT_NE(st.message().find("null db"), std::string::npos);
 }
 
-// A non-init same-version step with a null db still hits the null-db arm (the
-// !init && from!=to mismatch guard is false for from==to, so it proceeds to !db).
+// A same-version step (within CurrentVersion) with a null db still hits the
+// null-db arm: the forward-only guard tolerates from==to==CurrentVersion, so
+// execution proceeds to the !db check. (Beyond-current pairs like (3,3) are now
+// rejected by the version guard first — covered by the mismatch tests.)
 TEST(F35SchemaProviderBranchR7b, NullDbSameVersionNonInit) {
     spc::F35SchemaProvider p;
-    Status st = p.Migrate(nullptr, 3, 3);
+    Status st = p.Migrate(nullptr, 2, 2);
     EXPECT_FALSE(st.ok());
     EXPECT_NE(st.message().find("null db"), std::string::npos);
 }

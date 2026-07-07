@@ -106,6 +106,7 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (n["model"])    cfg.model    = n["model"].as<std::string>();
         if (n["base_url"]) cfg.base_url = n["base_url"].as<std::string>();
         if (n["timeout_ms"]) cfg.timeout_ms = n["timeout_ms"].as<int>();
+        if (n["batch_size"]) cfg.batch_size = n["batch_size"].as<int>();
     };
 
     // semantic_llm — fast/cheap model for intent classification & reranking
@@ -142,6 +143,8 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
     if (root["spc"]) {
         auto s = root["spc"];
         if (s["worker_count"]) config.spc.worker_count = s["worker_count"].as<int>();
+        if (s["parser_max_concurrent"])
+            config.spc.parser_max_concurrent = s["parser_max_concurrent"].as<int>();
         if (s["max_queue_size"]) config.spc.max_queue_size = s["max_queue_size"].as<int>();
         if (s["task_timeout_s"]) config.spc.task_timeout_s = s["task_timeout_s"].as<int>();
         if (s["python_bin"]) config.spc.python_bin = s["python_bin"].as<std::string>();

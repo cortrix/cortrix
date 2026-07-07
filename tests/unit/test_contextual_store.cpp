@@ -112,5 +112,43 @@ TEST_F(ContextualStoreTest, WritesStatusOnFailedDegrade) {
     EXPECT_TRUE(EmbCol(7).empty());
 }
 
+// --- contextual_vec_labels helpers (addendum §3.8 W2, F35-9 B dual-vector) ----
+
+TEST_F(ContextualStoreTest, VecLabelUpsertGetRoundTrip) {
+    ContextualVecLabelRow row;
+    row.label = DeriveContextualVecLabel("01CHILDULID");
+    row.block_id = 42;
+    row.child_id = "01CHILDULID";
+    ASSERT_TRUE(WriteContextualVecLabel(db_, row).ok());
+
+    auto got = GetContextualVecLabel(db_, row.label);
+    ASSERT_TRUE(got.ok());
+    EXPECT_EQ(got.value().label, row.label);
+    EXPECT_EQ(got.value().block_id, 42u);
+    EXPECT_EQ(got.value().child_id, "01CHILDULID");
+
+    // Upsert overwrites (idempotent backfill re-write).
+    row.block_id = 43;
+    ASSERT_TRUE(WriteContextualVecLabel(db_, row).ok());
+    auto again = GetContextualVecLabel(db_, row.label);
+    ASSERT_TRUE(again.ok());
+    EXPECT_EQ(again.value().block_id, 43u);
+}
+
+TEST_F(ContextualStoreTest, VecLabelMissingIsNotFoundAndDeriveIsDeterministic) {
+    EXPECT_FALSE(GetContextualVecLabel(db_, 999).ok());
+    // Deterministic + input-sensitive.
+    EXPECT_EQ(DeriveContextualVecLabel("abc"), DeriveContextualVecLabel("abc"));
+    EXPECT_NE(DeriveContextualVecLabel("abc"), DeriveContextualVecLabel("abd"));
+}
+
+TEST_F(ContextualStoreTest, VecLabelNullDbRejected) {
+    ContextualVecLabelRow row;
+    row.label = 1;
+    row.child_id = "c";
+    EXPECT_FALSE(WriteContextualVecLabel(nullptr, row).ok());
+    EXPECT_FALSE(GetContextualVecLabel(nullptr, 1).ok());
+}
+
 }  // namespace
 }  // namespace cortrix::spc

@@ -821,6 +821,10 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                     const std::string v = req.get_param_value("explain");
                     explain = (v == "true" || v == "TRUE" || v == "True" || v == "1");
                 }
+                // Pass the presentation flag into the per-NS executor so it attaches
+                // the chunk-level RRF `rrf_paths` explain detail (§3.8 W2). Read
+                // above from body/param; set before scatter/rag runs (line ~850).
+                qctx.explain = explain;
                 RagFusionConfig rag_cfg = ResolveRagFusionConfig(req, body);
                 Status rag_cfg_status = ValidateResolvedRagFusionConfigForRequest(rag_cfg);
                 if (!rag_cfg_status.ok()) {
@@ -882,6 +886,40 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                         // F41 §6.2: echo the resolved granularity so the Agent sees the
                         // effective value (mirrors the single-NS query_routes.cpp echo).
                         out["explain"]["granularity"] = qctx.granularity;
+                        // [addendum §3.8 W2 · P5] Aggregate per-path vote counts over
+                        // the RETURNED results: rrf_path_counts = how many results each
+                        // of the five chunk-level paths helped rank (dense / fts5 /
+                        // sparse / contextualized / hype_question); via_path_counts =
+                        // doc-route provenance (chunk / hybrid / llm_summary / …). Lets
+                        // a caller split the F41 doc-route vs F35/F38 chunk-path
+                        // contribution without client-side counting.
+                        {
+                            json path_counts = json::object();
+                            json via_counts = json::object();
+                            for (const auto& item : resp.results) {
+                                auto rp = item.metadata.find("rrf_paths");
+                                if (rp != item.metadata.end()) {
+                                    std::stringstream ss(rp->second);
+                                    std::string tok;
+                                    while (std::getline(ss, tok, ',')) {
+                                        if (tok.empty()) continue;
+                                        path_counts[tok] =
+                                            path_counts.value(tok, 0) + 1;
+                                    }
+                                }
+                                auto vp = item.metadata.find("via_path");
+                                if (vp != item.metadata.end() && !vp->second.empty()) {
+                                    via_counts[vp->second] =
+                                        via_counts.value(vp->second, 0) + 1;
+                                }
+                            }
+                            if (!path_counts.empty()) {
+                                out["explain"]["rrf_path_counts"] = path_counts;
+                            }
+                            if (!via_counts.empty()) {
+                                out["explain"]["via_path_counts"] = via_counts;
+                            }
+                        }
                         if (use_rag_fusion) {
                             const auto es = rag_fusion->GetExplainState();
                             json rf = {

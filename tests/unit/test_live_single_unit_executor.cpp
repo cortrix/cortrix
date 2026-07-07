@@ -152,6 +152,43 @@ TEST_F(LiveExecutorTest, FlattenToleratesEmptyNonObjectInvalid) {
     EXPECT_EQ(out["x"], "1");
 }
 
+// --- ClassifyVectorHit: the §3.8 W2 vector-route split (pure function) --------
+
+TEST_F(LiveExecutorTest, ClassifyVectorHitDenseUsesOwnChildId) {
+    std::string child;
+    EXPECT_EQ(ClassifyVectorHit(/*block_type=*/1, "01CHILD", "{}", &child),
+              VectorHitPath::kDense);
+    EXPECT_EQ(child, "01CHILD");
+}
+
+TEST_F(LiveExecutorTest, ClassifyVectorHitEmptyChildDropped) {
+    std::string child;
+    EXPECT_EQ(ClassifyVectorHit(/*block_type=*/1, "", "{}", &child),
+              VectorHitPath::kDropped);
+}
+
+TEST_F(LiveExecutorTest, ClassifyVectorHitHypeExpandsToSourceChild) {
+    std::string child;
+    // Real hype rows have an EMPTY own child_id; the vote must go to the source.
+    EXPECT_EQ(ClassifyVectorHit(/*block_type=*/16, "",
+                                R"({"source_child_id":"01SRC","question_text":"q?"})",
+                                &child),
+              VectorHitPath::kHype);
+    EXPECT_EQ(child, "01SRC");
+}
+
+TEST_F(LiveExecutorTest, ClassifyVectorHitHypeWithoutSourceDropped) {
+    std::string child;
+    // Missing key / empty value / non-string / invalid JSON: all dropped — the
+    // question text must never impersonate a chunk.
+    EXPECT_EQ(ClassifyVectorHit(16, "", "{}", &child), VectorHitPath::kDropped);
+    EXPECT_EQ(ClassifyVectorHit(16, "", R"({"source_child_id":""})", &child),
+              VectorHitPath::kDropped);
+    EXPECT_EQ(ClassifyVectorHit(16, "", R"({"source_child_id":7})", &child),
+              VectorHitPath::kDropped);
+    EXPECT_EQ(ClassifyVectorHit(16, "", "{bad", &child), VectorHitPath::kDropped);
+}
+
 // String values are kept verbatim (no surrounding quotes); non-strings dump().
 TEST_F(LiveExecutorTest, FlattenStringVerbatimNonStringDumped) {
     std::map<std::string, std::string> out;

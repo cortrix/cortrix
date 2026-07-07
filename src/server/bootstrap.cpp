@@ -41,6 +41,9 @@
 #include "cortrix/spc/block_assembler.h"
 #include "cortrix/spc_enricher.h"                  // F03 CreateEnricher / EnricherConfig
 #include "cortrix/spc/enricher_chain.h"            // I1 EnricherChain (F03→F35→F38)
+#include "cortrix/spc_enricher/enrich_backfill_worker.h"  // §3.7 kTaskEnrichBackfill handler
+#include "cortrix/spc_enricher/enrich_retry_sweeper.h"    // §3.7 enrich_state due-row sweeper
+#include "cortrix/server/routes/enrich_routes.h"          // §3.7 backfill ops surface
 #include "cortrix/spc/contextual_enricher.h"       // I2 ContextualRetrievalEnricher / ResolveContextualConfig
 #include "cortrix/spc/hype_enricher.h"             // I3 HyPEEnricher / HyPEConfig
 #include "cortrix/llm/openai_client.h"             // OpenAiLlmClient (shared enricher LLM)
@@ -502,7 +505,22 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                                     : config.enricher_llm.base_url;
         enricher_cfg.api_key = config.enricher_llm.api_key;
         enricher_cfg.model = config.enricher_llm.model;
-        CORTRIX_LOG_INFO("main", "F03 enricher enabled (model={})", config.enricher_llm.model);
+        // Wire the configured per-call timeout through (the YAML enricher_llm
+        // timeout_ms was parsed but never reached EnricherConfig, leaving the
+        // 30s default — too tight for batch-of-8 JSON generation on slower
+        // providers, where it turns healthy calls into pool timeouts).
+        if (config.enricher_llm.timeout_ms > 0) {
+            enricher_cfg.task_timeout_ms = config.enricher_llm.timeout_ms;
+        }
+        // Same plumb for batch_size (clamped to the §2.7 documented 1-32 range):
+        // batch-8 JSON generation can outlast provider gateway idle windows on
+        // slower models — observed live as mid-read connection resets.
+        if (config.enricher_llm.batch_size > 0) {
+            enricher_cfg.batch_size = std::min(config.enricher_llm.batch_size, 32);
+        }
+        CORTRIX_LOG_INFO("main", "F03 enricher enabled (model={} timeout_ms={} batch_size={})",
+                         config.enricher_llm.model, enricher_cfg.task_timeout_ms,
+                         enricher_cfg.batch_size);
     } else {
         CORTRIX_LOG_INFO("main", "F03 enricher disabled (enricher_llm not configured)");
     }
@@ -545,13 +563,26 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                 enricher_chain.Append(
                     std::shared_ptr<cortrix::spc::ISpcEnricher>(enricher.get(), [](auto*) {}));
             } else if (tok == "f35" && enricher_chain_llm) {
+                auto f35_cfg =
+                    cortrix::spc::ResolveContextualConfig(enricher_chain_config.get());
+                // Wire the configured enricher_llm model through (mirrors the F41
+                // DEFECT#3 fix): the built-in "gpt-4o-mini" default is rejected
+                // with HTTP 400 by non-OpenAI providers (GLM/Claude/local), which
+                // silently zeroed all F35 output.
+                if (!config.enricher_llm.model.empty()) {
+                    f35_cfg.llm_model = config.enricher_llm.model;
+                }
                 auto f35 = std::make_shared<cortrix::spc::ContextualRetrievalEnricher>(
-                    cortrix::spc::ResolveContextualConfig(enricher_chain_config.get()),
-                    enricher_chain_llm,
+                    f35_cfg, enricher_chain_llm,
                     std::make_shared<cortrix::spc::ContextualOnnxEmbedder>(embedder_alias));
                 enricher_chain.Append(std::move(f35));
             } else if (tok == "f38" && enricher_chain_llm) {
                 cortrix::spc::HyPEConfig hype_cfg;  // K=3 default; parent_text bound in pipeline
+                // Same DEFECT#3-family wiring as F35 above: send the configured
+                // model, not the OpenAI-only built-in default.
+                if (!config.enricher_llm.model.empty()) {
+                    hype_cfg.llm_model = config.enricher_llm.model;
+                }
                 auto f38 = std::make_shared<cortrix::spc::HyPEEnricher>(
                     hype_cfg, enricher_chain_llm,
                     /*parent_store=*/nullptr);  // parent_text supplied per-chunk by the pipeline
@@ -577,7 +608,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     auto f42_config = std::make_shared<cortrix::InMemoryGlobalConfig>();
     f42_config->Set("f42.worker_pool_size",
                     std::to_string(config.spc.worker_count > 0 ? config.spc.worker_count : 2));
-    f42_config->Set("f06.parser_max_concurrent", "4");
+    // Default 4 (parser-subprocess memory protection); explicitly raisable via
+    // spc.parser_max_concurrent for workloads that spawn no parsers (the F42
+    // pool-size gate compares against this value).
+    f42_config->Set("f06.parser_max_concurrent",
+                    std::to_string(config.spc.parser_max_concurrent > 0
+                                       ? config.spc.parser_max_concurrent
+                                       : 4));
 
     cortrix::async::TaskManager task_mgr;
     if (cortrix::Status ti = task_mgr.Init(config.ns.data_dir + "/tasks.db"); !ti.ok()) {
@@ -641,6 +678,16 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
             ns_pool, doc_summary_llm, ds_cfg, embedder, assembler, &task_mgr);
     }
 
+    // [addendum §3.7] Enrich-backfill worker (kTaskEnrichBackfill): repairs the
+    // chunk-enrichment debt recorded in enrich_state. Constructed BEFORE the
+    // WorkerPool (handlers must outlive the worker threads); enabled only when the
+    // enricher chain has an available member (no LLM ⇒ no debt concept).
+    std::unique_ptr<cortrix::spc::EnrichBackfillWorker> enrich_backfill_worker;
+    if (enricher_chain.AnyAvailable()) {
+        enrich_backfill_worker = std::make_unique<cortrix::spc::EnrichBackfillWorker>(
+            ns_pool, &enricher_chain, embedder, &task_mgr);
+    }
+
     // The pool is the LAST async object constructed → the FIRST destroyed (its dtor
     // Stop()s + joins the workers), so the scheduler + both handlers (doc_processor /
     // doc_summary_worker) it dispatches to outlive the worker threads.
@@ -652,6 +699,21 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                          config.doc_summary_llm.model);
     } else {
         CORTRIX_LOG_INFO("main", "F41 doc-summary disabled (doc_summary_llm not configured)");
+    }
+    if (enrich_backfill_worker) {
+        worker_pool.RegisterHandler(cortrix::async::kTaskEnrichBackfill,
+                                    enrich_backfill_worker.get());
+        CORTRIX_LOG_INFO("main", "enrich backfill worker enabled (chain=[{}])",
+                         [&] {
+                             std::string s;
+                             for (const auto& n : enricher_chain.Names()) {
+                                 if (!s.empty()) s += ",";
+                                 s += cortrix::spc::ChainMemberToken(n);
+                             }
+                             return s;
+                         }());
+    } else {
+        CORTRIX_LOG_INFO("main", "enrich backfill disabled (no enricher chain member)");
     }
 
     // [⑤c] Install the F41 doc-summary enqueue seam NOW — the WorkerPool exists (the seam
@@ -667,6 +729,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                 if (sched->Enqueue(req).ok()) pool->Notify();
             });
     }
+
+    // [addendum §3.7] Retry sweeper: enrich_state IS the durable queue SoT; the
+    // sweeper turns due 'pending_retry' rows into kTaskEnrichBackfill tasks.
+    // Declared after the WorkerPool (destroyed before it; its dtor joins the
+    // sweep thread) and Start()ed only after worker_pool.Start() succeeds below.
+    cortrix::spc::EnrichRetrySweeper enrich_sweeper(ns_pool, &task_scheduler,
+                                                    &worker_pool, f42_config.get());
 
     // 8b. [F21] ConnectorState holds a single DirWatcherRegistry (fan-out), built
     // lazily by RegisterConnectorRoutes. The config watch_dir is subscribed AFTER
@@ -992,6 +1061,18 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::RegisterTenantRoutes(server.server(), tenant_svc, perm_svc, quota_svc, auth);
     // [D3.5 batch1/F18a] operation-log query route (GET /api/v1/operations, read-only).
     cortrix::RegisterOperationsRoutes(server.server(), *obs_module.logger(), auth);
+    // [addendum §3.7 G4] enrichment-backfill ops surface (admin; audit + enqueue).
+    {
+        std::vector<std::string> enrich_chain_tokens;
+        if (enrich_backfill_worker) {
+            for (const auto& n : enricher_chain.Names()) {
+                enrich_chain_tokens.push_back(cortrix::spc::ChainMemberToken(n));
+            }
+        }
+        cortrix::RegisterEnrichRoutes(server.server(), ns_pool, auth, &enrich_sweeper,
+                                      std::move(enrich_chain_tokens),
+                                      obs_module.logger().get());
+    }
     // [D3.5 r2 · Wave P · P1] P08-CE auth REST surface. Bootstrap GET+POST are NOT
     // WithAuth-wrapped (on first run no key exists; the bootstrap token IS the
     // credential) — AdminGuard's loopback IP filter on /api/v1/admin/* is the
@@ -1143,11 +1224,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     gs_cfg.data_dir = config.ns.data_dir;
     cortrix::deploy::GracefulShutdown graceful(gs_cfg, {
         /*close_http=*/ nullptr,  // server already stopped before Run() (plan B)
-        /*drain_tasks=*/ [&worker_pool, &spc_mgr](std::chrono::steady_clock::time_point) {
-            // Order matters (original Plan B teardown): the F42 pool stops first so
+        /*drain_tasks=*/ [&worker_pool, &spc_mgr, &enrich_sweeper](std::chrono::steady_clock::time_point) {
+            // Order matters (original Plan B teardown): the enrich sweeper stops
+            // first (no new backfill enqueues), then the F42 pool stops so
             // doc_processor→spc_mgr quiesces, then the SPC drain joins its workers
             // (each finishes at most its in-hand task) and exports the untouched
             // queue remainder for .pending_tasks.json.
+            enrich_sweeper.Stop();
             worker_pool.Stop();
             std::vector<cortrix::deploy::PendingTask> leftovers;
             for (const auto& t : spc_mgr.DrainRemainingTasks()) {
@@ -1191,6 +1274,11 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         return 1;
     }
     CORTRIX_LOG_INFO("main", "SPC + F42 workers started ({} SPC threads)", config.spc.worker_count);
+    if (enrich_backfill_worker) {
+        enrich_sweeper.Start();
+        CORTRIX_LOG_INFO("main", "enrich retry sweeper started ({}s interval)",
+                         cortrix::spc::EnrichRetrySweeper::kDefaultSweepIntervalSec);
+    }
 
     // [OPEN-2] Launch the background GC thread (no-op when gc.enabled=false).
     gc_thread.Start();

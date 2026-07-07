@@ -28,6 +28,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -45,6 +46,14 @@
 #include "cortrix/spc/block_assembler.h"
 #include "cortrix/spc_enricher.h"            // NullEnricher (ctor injection)
 #include "cortrix/spc/enricher_chain.h"      // I1 EnricherChain
+#include "cortrix/spc/contextual_store.h"    // §3.8 W2 DeriveContextualVecLabel
+#include "cortrix/spc_enricher/enrich_backfill_worker.h"  // §3.7 backfill worker
+#include "cortrix/spc_enricher/enrich_retry_sweeper.h"    // §3.7 retry sweeper
+#include "cortrix/spc_enricher/enrich_state_store.h"      // §3.7 coverage SoT helpers
+#include "cortrix/async/task_manager.h"
+#include "cortrix/async/task_scheduler.h"
+#include "cortrix/async/task_info.h"
+#include "cortrix/common/in_memory_global_config.h"
 #include "cortrix/spc/hype_enricher.h"       // F38 HyPEEnricher (real, drives the hype side channel)
 #include "cortrix/spc/spc_task.h"
 #include "cortrix/chunker/parent_child_chunker.h"
@@ -597,6 +606,348 @@ TEST_F(SPCPipelineR7Test, EnricherChain_L2_EnrichesButSkipsHypeBlocks) {
 
     EXPECT_GT(CountSql("SELECT COUNT(*) FROM entities"), 0);     // F03 ran on L2
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM blocks WHERE block_type = 16"), 0);  // no hype on L2
+}
+
+// ============================================================
+// enrich_state coverage rows (addendum §3.7) — the per-chunk SoT the retry
+// sweeper scans. One row per enriched-eligible child; 'ok' when every owed
+// chain member succeeded, 'pending_retry' + failed_members csv otherwise.
+// ============================================================
+
+// F03-slot fake that always degrades (step status != 0, the F03/F38 failure shape).
+class FailingSummaryEnricher : public cortrix::spc::ISpcEnricher {
+public:
+    cortrix::spc::EnrichResult Enrich(const std::string&,
+                                      const cortrix::spc::DocumentMetadata&,
+                                      const cortrix::spc::ChunkContext&) override {
+        cortrix::spc::EnrichResult r;
+        r.status = 3;  // any non-zero step status (kLlmApi-shaped degrade)
+        r.error_msg = "CX_ERR_ENRICHER_LLM_API: synthetic transport burst";
+        return r;
+    }
+    std::vector<cortrix::spc::EnrichResult> EnrichBatch(
+        const std::vector<cortrix::spc::ChunkContext>& c) override {
+        std::vector<cortrix::spc::EnrichResult> out;
+        for (const auto& ctx : c)
+            out.push_back(Enrich(ctx.chunk_text, *ctx.doc_metadata, ctx));
+        return out;
+    }
+    bool IsAvailable() const override { return true; }
+    std::string Name() const override { return "LlmEnricher"; }
+};
+
+// F35-style fake failing the F35 way: the step status stays 0 (fail-soft) and the
+// outcome is only visible in contextualized_status == 2 — exactly the shape the
+// member-aware debt detection must catch.
+class FailingContextualEnricher : public cortrix::spc::ISpcEnricher {
+public:
+    cortrix::spc::EnrichResult Enrich(const std::string&,
+                                      const cortrix::spc::DocumentMetadata&,
+                                      const cortrix::spc::ChunkContext&) override {
+        cortrix::spc::EnrichResult r;
+        r.contextualized_status = 2;  // failed (LLM error inside F35)
+        r.error_msg = "CX_ERR_F35_LLM_FAILED: synthetic";
+        return r;
+    }
+    std::vector<cortrix::spc::EnrichResult> EnrichBatch(
+        const std::vector<cortrix::spc::ChunkContext>& c) override {
+        std::vector<cortrix::spc::EnrichResult> out;
+        for (const auto& ctx : c)
+            out.push_back(Enrich(ctx.chunk_text, *ctx.doc_metadata, ctx));
+        return out;
+    }
+    bool IsAvailable() const override { return true; }
+    std::string Name() const override { return "f35_contextual_retrieval"; }
+};
+
+// All chain members succeed → every child row lands status='ok', no retry stamp,
+// and there is exactly one enrich_state row per child block.
+TEST_F(SPCPipelineR7Test, EnrichState_OkChainWritesOkRowPerChild) {
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    chain.Append(std::make_shared<FakeContextualEnricher>());
+    chain.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, MakeHypeLlm(), nullptr));
+    pipeline_->SetEnricherChain(&chain);
+
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+
+    const int children =
+        CountSql("SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL AND child_id != ''");
+    ASSERT_GT(children, 0);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state"), children);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='ok'"), children);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE next_retry_at IS NOT NULL"), 0);
+    pipeline_->SetEnricherChain(nullptr);
+}
+
+// F03 slot fails (step status != 0) → pending_retry rows owing exactly f03, with
+// the retry stamp and the error detail.
+TEST_F(SPCPipelineR7Test, EnrichState_F03FailureOwedAsPendingRetry) {
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FailingSummaryEnricher>());
+    pipeline_->SetEnricherChain(&chain);
+
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+
+    const int rows = CountSql("SELECT COUNT(*) FROM enrich_state");
+    ASSERT_GT(rows, 0);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"), rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members='f03'"), rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE next_retry_at IS NOT NULL"), rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE last_error LIKE 'CX_ERR%'"), rows);
+    pipeline_->SetEnricherChain(nullptr);
+}
+
+// F35 fail-soft (step status 0, contextualized_status 2) → the member-aware
+// detection still owes f35; the ok F03 head is NOT owed.
+TEST_F(SPCPipelineR7Test, EnrichState_F35SoftFailureDetectedViaContextualizedStatus) {
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());        // ok F03
+    chain.Append(std::make_shared<FailingContextualEnricher>());  // f35 soft-fail
+    pipeline_->SetEnricherChain(&chain);
+
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+
+    const int rows = CountSql("SELECT COUNT(*) FROM enrich_state");
+    ASSERT_GT(rows, 0);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members='f35'"), rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"), rows);
+    pipeline_->SetEnricherChain(nullptr);
+}
+
+// F38 hype degrade (LLM fails inside GenerateHypeQuestions → step status != 0)
+// → rows owe exactly f38 while the ok F03 head stays un-owed.
+TEST_F(SPCPipelineR7Test, EnrichState_HypeFailureOwedAsF38) {
+    auto failing_llm = std::make_shared<llm::MockLlmClient>();
+    llm::ChatCompletionResponse fail;
+    fail.status = Status::Unavailable("LLM_TRANSPORT: synthetic");
+    EXPECT_CALL(*failing_llm, Chat(_, _)).WillRepeatedly(Return(fail));
+
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    chain.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, failing_llm, nullptr));
+    pipeline_->SetEnricherChain(&chain);
+
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+
+    const int rows = CountSql("SELECT COUNT(*) FROM enrich_state");
+    ASSERT_GT(rows, 0);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members='f38'"), rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"), rows);
+    pipeline_->SetEnricherChain(nullptr);
+}
+
+// §3.8 W2 dual-vector (F35-9 B): a chain producing contextualized embeddings
+// writes one contextual_vec_labels row per child, the label is the deterministic
+// derivation, and the label POINT actually entered the vector index alongside
+// the child's own point.
+TEST_F(SPCPipelineR7Test, ContextualDualVector_LabelRowsAndIndexPoints) {
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    chain.Append(std::make_shared<FakeContextualEnricher>());
+    pipeline_->SetEnricherChain(&chain);
+
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+
+    const int children = CountSql(
+        "SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL AND child_id != ''");
+    ASSERT_GT(children, 0);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM contextual_vec_labels"), children);
+
+    sqlite3* db = facade_->store().db_handle();
+    sqlite3_stmt* st = nullptr;
+    ASSERT_EQ(sqlite3_prepare_v2(
+                  db, "SELECT label, child_id FROM contextual_vec_labels",
+                  -1, &st, nullptr),
+              SQLITE_OK);
+    const auto& ids = fake_index_->added_ids();
+    int rows = 0;
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        ++rows;
+        const auto label = static_cast<uint64_t>(sqlite3_column_int64(st, 0));
+        const std::string child =
+            reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
+        EXPECT_EQ(label, cortrix::spc::DeriveContextualVecLabel(child));
+        EXPECT_NE(std::find(ids.begin(), ids.end(), label), ids.end())
+            << "contextual label point missing from the vector index";
+    }
+    sqlite3_finalize(st);
+    EXPECT_EQ(rows, children);
+    pipeline_->SetEnricherChain(nullptr);
+}
+
+// No available enricher at all → the enrich stage never ran → no coverage debt
+// concept → zero enrich_state rows (rows would otherwise fake 'ok' coverage).
+TEST_F(SPCPipelineR7Test, EnrichState_NoEnricherWritesNoRows) {
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state"), 0);
+}
+
+// ============================================================
+// §3.7 backfill worker + retry sweeper (enrich_state → repair).
+// ============================================================
+
+TEST(EnrichBackfillSchedule, ExponentialCappedForwardOnly) {
+    using W = cortrix::spc::EnrichBackfillWorker;
+    EXPECT_EQ(W::NextRetryDelaySec(0), 60);
+    EXPECT_EQ(W::NextRetryDelaySec(1), 300);
+    EXPECT_EQ(W::NextRetryDelaySec(2), 900);
+    EXPECT_EQ(W::NextRetryDelaySec(3), 3600);
+    EXPECT_EQ(W::NextRetryDelaySec(4), 21600);
+    EXPECT_EQ(W::NextRetryDelaySec(7), 21600);   // capped
+    EXPECT_EQ(W::NextRetryDelaySec(-1), 60);     // clamped
+}
+
+// Full repair cycle: ingest under a fully-failing chain (debt f03,f35,f38) →
+// run the backfill worker with a WORKING chain → every artifact lands with
+// write-parity and the rows flip 'ok'. A second run is a no-op (idempotent).
+TEST_F(SPCPipelineR7Test, EnrichBackfill_RepairsPendingRowsEndToEnd) {
+    // (1) ingest with everything failing → pending rows owing all three members.
+    auto failing_llm = std::make_shared<llm::MockLlmClient>();
+    llm::ChatCompletionResponse fail;
+    fail.status = Status::Unavailable("LLM_TRANSPORT: synthetic burst");
+    EXPECT_CALL(*failing_llm, Chat(_, _)).WillRepeatedly(Return(fail));
+    cortrix::spc::EnricherChain broken;
+    broken.Append(std::make_shared<FailingSummaryEnricher>());
+    broken.Append(std::make_shared<FailingContextualEnricher>());
+    broken.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, failing_llm, nullptr));
+    pipeline_->SetEnricherChain(&broken);
+
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+    pipeline_->SetEnricherChain(nullptr);
+
+    const int rows = CountSql("SELECT COUNT(*) FROM enrich_state");
+    ASSERT_GT(rows, 0);
+    ASSERT_EQ(CountSql(
+        "SELECT COUNT(*) FROM enrich_state WHERE failed_members='f03,f35,f38'"), rows);
+    ASSERT_EQ(CountSql("SELECT COUNT(*) FROM entities"), 0);
+    ASSERT_EQ(CountSql("SELECT COUNT(*) FROM contextual_vec_labels"), 0);
+    ASSERT_EQ(CountSql("SELECT COUNT(*) FROM blocks WHERE block_type=16"), 0);
+
+    // (2) repair with a working chain.
+    cortrix::spc::EnricherChain working;
+    working.Append(std::make_shared<FakeSummaryEnricher>());
+    working.Append(std::make_shared<FakeContextualEnricher>());
+    working.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, MakeHypeLlm(), nullptr));
+
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks.db").string()).ok());
+    cortrix::spc::EnrichBackfillWorker worker(*pool_, &working, *embedder_, &mgr);
+    async::TaskInfo t;
+    t.task_id = 1;
+    t.namespace_id = "test-ns";
+    t.doc_id = doc_id;
+    ASSERT_TRUE(worker.ProcessTask(t).ok());
+
+    const int children = CountSql(
+        "SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL AND child_id != ''");
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='ok'"), rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE attempts=1"), rows);
+    EXPECT_GT(CountSql("SELECT COUNT(*) FROM entities"), 0);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM contextual_vec_labels"), children);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM blocks WHERE block_type=16"), children * 3);
+    EXPECT_GT(CountSql("SELECT COUNT(*) FROM blocks WHERE enriched_score IS NOT NULL"), 0);
+
+    // (3) idempotent: nothing pending → Complete, no duplicate artifacts.
+    const int entities_before = CountSql("SELECT COUNT(*) FROM entities");
+    const int hype_before = CountSql("SELECT COUNT(*) FROM blocks WHERE block_type=16");
+    ASSERT_TRUE(worker.ProcessTask(t).ok());
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM entities"), entities_before);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM blocks WHERE block_type=16"), hype_before);
+}
+
+// Partial repair: the working chain still fails one member (hype LLM down) →
+// only that member stays owed, attempts advance, next_retry_at follows the
+// backoff schedule.
+TEST_F(SPCPipelineR7Test, EnrichBackfill_PartialRepairKeepsOwedMember) {
+    cortrix::spc::EnricherChain broken;
+    broken.Append(std::make_shared<FailingSummaryEnricher>());
+    pipeline_->SetEnricherChain(&broken);
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+    pipeline_->SetEnricherChain(nullptr);
+    const int rows = CountSql("SELECT COUNT(*) FROM enrich_state");
+    ASSERT_GT(rows, 0);
+
+    // Repair chain whose f03 STILL fails → still owed, attempts=1, future retry.
+    cortrix::spc::EnricherChain still_broken;
+    still_broken.Append(std::make_shared<FailingSummaryEnricher>());
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks2.db").string()).ok());
+    cortrix::spc::EnrichBackfillWorker worker(*pool_, &still_broken, *embedder_, &mgr);
+    async::TaskInfo t;
+    t.task_id = 2;
+    t.namespace_id = "test-ns";
+    t.doc_id = doc_id;
+    ASSERT_TRUE(worker.ProcessTask(t).ok());
+
+    EXPECT_EQ(CountSql(
+        "SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"), rows);
+    EXPECT_EQ(CountSql(
+        "SELECT COUNT(*) FROM enrich_state WHERE failed_members='f03' AND attempts=1"),
+        rows);
+    EXPECT_EQ(CountSql(
+        "SELECT COUNT(*) FROM enrich_state WHERE next_retry_at IS NOT NULL"), rows);
+}
+
+// Sweeper: due rows → lease + one kTaskEnrichBackfill enqueue per doc; not-due /
+// leased rows are skipped on the next tick.
+TEST_F(SPCPipelineR7Test, EnrichSweeper_EnqueuesDueDocsAndLeases) {
+    sqlite3* db = facade_->store().db_handle();
+    ASSERT_NE(db, nullptr);
+    auto seed = [&](uint64_t block_id, const std::string& doc, int64_t due) {
+        cortrix::spc::EnrichStateRow r;
+        r.block_id = block_id;
+        r.doc_id = doc;
+        r.child_id = "c" + std::to_string(block_id);
+        r.status = cortrix::spc::kEnrichStatusPendingRetry;
+        r.failed_members = "f03";
+        r.next_retry_at = due;
+        r.updated_at = 1;
+        ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());
+    };
+    seed(901, "doc-due", /*due=*/1);                       // long past → due
+    seed(902, "doc-later", /*due=*/32503680000LL);         // year 3000 → not due
+
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks3.db").string()).ok());
+    cortrix::InMemoryGlobalConfig cfg;
+    async::TaskScheduler sched(&mgr, &cfg);
+    cortrix::spc::EnrichRetrySweeper sweeper(*pool_, &sched, /*workers=*/nullptr,
+                                             /*config=*/nullptr);
+
+    EXPECT_EQ(sweeper.RunSweepNow("test-ns"), 1);  // doc-due only
+    // Leased: an immediate second sweep finds nothing due.
+    EXPECT_EQ(sweeper.RunSweepNow("test-ns"), 0);
+    EXPECT_EQ(CountSql(
+        "SELECT COUNT(*) FROM enrich_state WHERE doc_id='doc-later' AND next_retry_at > 32503670000"), 1);
 }
 
 // ============================================================

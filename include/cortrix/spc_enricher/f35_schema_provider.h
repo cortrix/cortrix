@@ -21,6 +21,13 @@ namespace cortrix::spc {
 /// (chunk_index is NOT owned by F35 — it is an F09 framework blocks column.
 /// metadata is in blocks.metadata_json, the shared framework JSONB column.)
 ///
+/// V2 adds `contextual_vec_labels` (addendum §3.8 W2 wiring): the F35-9 B
+/// dual-vector decision puts the contextualized embedding into P-HNSW as its OWN
+/// point, under a derived label (HashChildIdToBlockId(child_id + ":ctx")). The
+/// label is not a blocks row, so this mapping table is what lets the query side
+/// resolve an ANN hit on a contextual point back to its child:
+///   contextual_vec_labels(label PK, block_id, child_id)
+///
 /// Implements the frozen cortrix::catalog::ISchemaProvider (F12 § 3.7). Migrate
 /// returns Status (CODING_CONVENTIONS § 3). All DDL is idempotent (column
 /// existence guards); if `blocks` is absent (isolated unit test) it no-ops.
@@ -30,9 +37,11 @@ public:
     std::string FeatureName() const override { return "F35"; }
 
     /// Schema version. V1 = blocks +4 contextual-retrieval columns.
-    int CurrentVersion() const override { return 1; }
+    /// V2 = + contextual_vec_labels (dual-vector ANN label → child mapping).
+    int CurrentVersion() const override { return 2; }
 
-    /// Phase 1 (from_ver 0 → 1): ALTER blocks ADD the 4 columns above (idempotent).
+    /// Forward-only, idempotent: 0→1/0→2 create the columns; 1→2/0→2 create the
+    /// label mapping table.
     Status Migrate(sqlite3* db, int from_ver, int to_ver) override;
 };
 

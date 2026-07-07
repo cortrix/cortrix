@@ -49,13 +49,31 @@ Status AddBlocksColumnIfAbsent(sqlite3* db, const char* column, const char* ddl,
 }  // namespace
 
 Status F35SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
-    const bool init = (from_ver == 0 && to_ver == 1);
-    if (!init && from_ver != to_ver) {
+    // Forward-only, idempotent (mirrors the F03 multi-version pattern): a single
+    // pass covers 0→1, 0→2 and the 1→2 label-table add; reject backward /
+    // beyond-current steps as a mismatch.
+    if (from_ver < 0 || to_ver > CurrentVersion() || to_ver < from_ver) {
         return Status::InvalidArgument(
             "CX_ERR_SCHEMA_VERSION_MISMATCH: F35 unsupported migration " +
             std::to_string(from_ver) + " -> " + std::to_string(to_ver));
     }
     if (!db) return Status::InvalidArgument("F35 migrate: null db");
+
+    // --- V2: contextual_vec_labels (addendum §3.8 dual-vector ANN label map) ---
+    // Independent of blocks (no FK) so it is created even in isolated unit tests;
+    // rows are written by the ingest write phase / backfill worker alongside the
+    // contextual vector point.
+    if (Status s = Exec(db,
+            "CREATE TABLE IF NOT EXISTS contextual_vec_labels ("
+            "  label    INTEGER PRIMARY KEY,"
+            "  block_id INTEGER NOT NULL,"
+            "  child_id TEXT NOT NULL"
+            ");"
+            "CREATE INDEX IF NOT EXISTS idx_ctx_vec_labels_block"
+            "  ON contextual_vec_labels(block_id);",
+            "create contextual_vec_labels"); !s.ok()) {
+        return s;
+    }
 
     // blocks is the F09-owned per-Unit table, created before F35's provider runs.
     // If absent (isolated unit test), no-op so the migrator batch isn't blocked.

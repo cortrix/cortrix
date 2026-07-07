@@ -29,6 +29,7 @@
 #include "cortrix/doc_summary/f41_schema_provider.h"   // [A unified-blocks] F41 doc-level doc_fts5_index (§1.3.bis.3 #10)
 #include "cortrix/doc_summary/doc_fts5_index.h"        // F41 rollback cleanup for doc_fts5_index rows
 #include "cortrix/spc_enricher/f35_schema_provider.h"  // [A unified-blocks] contextualized/embedding cols
+#include "cortrix/spc_enricher/enrich_state_schema_provider.h"  // enrich_state sidecar (coverage SoT)
 #include "cortrix/retrieval/f40_schema_provider.h"     // [A unified-blocks] sparse_vec col + inverted index
 
 namespace cortrix::resource {
@@ -268,6 +269,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
         cortrix::spc::F35SchemaProvider f35_provider;    // [A unified-blocks] contextualized/embedding cols
         cortrix::doc_summary::F41SchemaProvider f41_provider;  // [A unified-blocks] doc-level doc_fts5_index (block_type=17 reuses blocks)
         cortrix::retrieval::F40SchemaProvider f40_provider;  // [A unified-blocks] sparse_vec + inverted index
+        cortrix::spc::EnrichStateSchemaProvider enrich_state_provider;  // enrich_state sidecar (coverage SoT)
         cortrix::catalog::SchemaMigrator unit_migrator;
         unit_migrator.Register(&f09_provider);   // #3 framework: documents/blocks/blocks_fts
         unit_migrator.Register(&f34_provider);   // #4 child cols + parents + idx (incl idx_blocks_meta_doc)
@@ -276,6 +278,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
         unit_migrator.Register(&f35_provider);   // #7 blocks +embedding/contextualized_*
         unit_migrator.Register(&f41_provider);   // #10 doc_fts5_index (doc-level FTS5; doc_summary block reuses blocks)
         unit_migrator.Register(&f40_provider);   // #11 blocks +sparse_vec + sparse_inverted_index
+        unit_migrator.Register(&enrich_state_provider);  // #12 enrich_state (standalone table, no blocks dep)
         Status migrated = unit_migrator.MigrateUnit(store_db->handle(), unit.unit_id);
         if (!migrated.ok()) {
             return PoolStatus(PoolErrorCode::kNsLoadFailed,

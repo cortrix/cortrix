@@ -1,7 +1,10 @@
 #pragma once
 #include <cstdint>
+#include <string>
+
 #include <sqlite3.h>
 
+#include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
 #include "cortrix/spc_enricher.h"  // EnrichResult (contextualized_* fields)
 
@@ -25,5 +28,29 @@ namespace cortrix::spc {
 // contiguously (the same byte layout the embedder produces); the read path
 // (F40 5-path RRF, Wave Q) decodes them symmetrically.
 Status WriteContextualized(sqlite3* db, uint64_t block_id, const EnrichResult& result);
+
+// --- addendum §3.8 W2: dual-vector ANN label mapping (F35-9 B) ----------------
+// The contextualized embedding enters P-HNSW as its OWN point under a derived
+// label (not a blocks row). contextual_vec_labels (F35SchemaProvider V2) maps
+// that label back to the owning child so the query side can resolve an ANN hit
+// on a contextual point into a contextualized-path RRF vote (F35 §9.1).
+
+struct ContextualVecLabelRow {
+    uint64_t label = 0;     ///< derived P-HNSW label of the contextual point
+    uint64_t block_id = 0;  ///< owning child block
+    std::string child_id;   ///< owning child ULID
+};
+
+/// Deterministic ANN label of a child's contextual point (idempotent across
+/// re-ingest / backfill): HashChildIdToBlockId(child_id + ":ctx").
+uint64_t DeriveContextualVecLabel(const std::string& child_id);
+
+/// Upsert the label → (block_id, child_id) mapping (idempotent — the label is a
+/// deterministic derivation, so re-ingest/backfill rewrites the same row).
+Status WriteContextualVecLabel(sqlite3* db, const ContextualVecLabelRow& row);
+
+/// Resolve one ANN label. Ok(row) on hit; CX_ERR-style NotFound when absent
+/// (the caller treats an unknown label as a dropped hit, same as a missing block).
+Result<ContextualVecLabelRow> GetContextualVecLabel(sqlite3* db, uint64_t label);
 
 }  // namespace cortrix::spc

@@ -50,6 +50,9 @@ struct LlmConfig {
     std::string model;
     std::string base_url;
     int timeout_ms = 0;          ///< per-call LLM deadline; 0 = use the consumer's default
+    int batch_size = 0;          ///< enricher role only: chunks per LLM call (0 = consumer
+                                 ///< default). Large batches push the non-streaming
+                                 ///< generation past provider gateway idle windows.
 
     bool IsConfigured() const {
         return !provider.empty() && !api_key.empty() && !model.empty();
@@ -59,6 +62,10 @@ struct LlmConfig {
 struct SPCConfig {
     // 0 = auto: 1 if CoreML active (GPU), 2 if CPU-only; set after embedder.Init()
     int worker_count = 0;
+    // Parser-subprocess concurrency cap (memory protection; the F42 pool-size
+    // startup gate compares against it). Default 4 unchanged — raise EXPLICITLY
+    // only for workloads that spawn no/few parsers (e.g. enrich backfill).
+    int parser_max_concurrent = 4;
     int max_queue_size = 10000;
     int task_timeout_s = 300;
     std::string python_bin = "python3";

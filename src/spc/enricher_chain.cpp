@@ -99,11 +99,18 @@ std::vector<std::string> EnricherChain::Names() const {
     return names;
 }
 
+std::string ChainMemberToken(const std::string& enricher_name) {
+    if (enricher_name == "hype") return "f38";
+    if (enricher_name == "f35_contextual_retrieval") return "f35";
+    return "f03";  // the head slot (LlmEnricher / LocalNer / test fakes)
+}
+
 std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
     const std::vector<ChunkContext>& contexts,
     const std::vector<std::string>& parent_texts,
     const std::vector<std::string>& source_child_ids,
-    const std::vector<std::string>& source_parent_ids) {
+    const std::vector<std::string>& source_parent_ids,
+    const std::unordered_set<std::string>* member_filter) {
     std::vector<ChunkChainResult> results(contexts.size());
 
     for (const auto& enricher : enrichers_) {
@@ -117,6 +124,14 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
             continue;
         }
         const std::string name = enricher->Name();
+        // addendum §3.7 backfill: only the owed members run — a filtered-out
+        // member records a skipped step (same bookkeeping as unavailable), so the
+        // debt detection downstream never re-owes an already-repaired member.
+        if (member_filter &&
+            member_filter->find(ChainMemberToken(name)) == member_filter->end()) {
+            for (auto& r : results) r.steps.push_back({name, 0, "", /*skipped=*/true});
+            continue;
+        }
 
         // F38 has a side channel (GenerateHypeQuestions): the frozen EnrichResult
         // carries no hype slot (reconcile 1). Detect it by Name() == "hype" and
