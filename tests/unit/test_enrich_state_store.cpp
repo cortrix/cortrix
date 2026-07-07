@@ -228,6 +228,27 @@ TEST_F(EnrichAuditTest, SynthesizesOwedMembersOnly) {
     }
 }
 
+// P4: a failed_permanent row (terminal give-up at the 8x/48h ceiling) must NOT be
+// resurrected by audit. Its artifact is still missing by definition, so a naive audit
+// would re-synthesize it and INSERT OR REPLACE would reset attempts=0 → infinite retry.
+TEST_F(EnrichAuditTest, DoesNotResurrectFailedPermanent) {
+    SeedChild(5, "child-doomed", /*score=*/false, /*ctx=*/0);  // bare: artifacts missing
+    EnrichStateRow gaveup = MakeRow(5, "doc-a", kEnrichStatusFailedPermanent, 0);
+    gaveup.attempts = 8;                    // hit the ceiling
+    gaveup.failed_members = "f38";
+    ASSERT_TRUE(UpsertEnrichState(db_, gaveup).ok());
+
+    auto n = SynthesizeEnrichAuditRows(db_, {"f03", "f35", "f38"}, /*now=*/500);
+    ASSERT_TRUE(n.ok());
+    EXPECT_EQ(n.value(), 0);  // nothing synthesized — the terminal row is skipped
+
+    auto rows = ListEnrichStateForDoc(db_, "doc-a", "");
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 1u);
+    EXPECT_EQ(rows.value()[0].status, kEnrichStatusFailedPermanent);  // stayed terminal
+    EXPECT_EQ(rows.value()[0].attempts, 8);                            // NOT reset to 0
+}
+
 // Members outside the configured chain are never owed (f38 unconfigured here).
 TEST_F(EnrichAuditTest, RespectsConfiguredMemberUniverse) {
     SeedChild(11, "child-x", /*score=*/true, /*ctx=*/1);  // no hype block anywhere

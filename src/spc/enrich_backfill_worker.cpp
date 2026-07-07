@@ -382,22 +382,28 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
         }
     }
 
-    // Column/row-level artifacts (idempotent; same non-fatal posture as ingest).
-    for (const auto& rep : repairs) {
+    // Column/row-level artifacts (idempotent UPDATEs). A persist FAILURE must not
+    // count as repaired (P3): keeping the member in still_owed re-arms the retry so
+    // the next round re-runs the idempotent write, instead of flipping the row to ok
+    // with the columns permanently missing.
+    for (auto& rep : repairs) {
         if (owes(rep, "f03") && rep.merged.ok() &&
         !BlockHasEnrichedScore(db, rep.block->block_id)) {
             Status we = WriteEnrichment(db, rep.block->block_id, rep.merged);
             if (!we.ok()) {
-                CORTRIX_LOG_WARN("spc", "backfill F03 persist skipped block_id={}: {}",
+                CORTRIX_LOG_WARN("spc", "backfill F03 persist failed, keep owed block_id={}: {}",
                                  rep.block->block_id, we.message());
+                rep.still_owed.push_back("f03");
+            } else {
+                UpdateBlockMetadataSummary(db, rep.block->block_id, rep.merged.summary);
             }
-            UpdateBlockMetadataSummary(db, rep.block->block_id, rep.merged.summary);
         }
         if (owes(rep, "f35")) {
             Status wc = WriteContextualized(db, rep.block->block_id, rep.merged);
             if (!wc.ok()) {
-                CORTRIX_LOG_WARN("spc", "backfill F35 persist skipped block_id={}: {}",
+                CORTRIX_LOG_WARN("spc", "backfill F35 persist failed, keep owed block_id={}: {}",
                                  rep.block->block_id, wc.message());
+                rep.still_owed.push_back("f35");
             }
         }
     }

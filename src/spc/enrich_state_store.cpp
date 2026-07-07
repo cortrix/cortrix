@@ -171,17 +171,23 @@ Result<int> SynthesizeEnrichAuditRows(
         sqlite3_finalize(st);
     }
 
-    // Pass 2: rows already tracked as pending (keep their attempts/backoff).
-    std::unordered_set<uint64_t> already_pending;
+    // Pass 2: rows the audit must NOT re-synthesize. Two cases: in-flight
+    // pending_retry (keep their attempts/backoff) AND failed_permanent (P4: a
+    // terminal give-up must stay terminal — re-synthesizing via INSERT OR REPLACE
+    // would reset attempts=0 and resurrect a chunk that already hit the 8x/48h
+    // ceiling, spinning it forever).
+    std::unordered_set<uint64_t> audit_skip;
     {
         sqlite3_stmt* st = nullptr;
-        const char* sql = "SELECT block_id FROM enrich_state WHERE status=?1";
+        const char* sql =
+            "SELECT block_id FROM enrich_state WHERE status=?1 OR status=?2";
         if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
             return SqlErr(db, "prepare audit tracked");
         }
         sqlite3_bind_text(st, 1, kEnrichStatusPendingRetry, -1, SQLITE_STATIC);
+        sqlite3_bind_text(st, 2, kEnrichStatusFailedPermanent, -1, SQLITE_STATIC);
         while (sqlite3_step(st) == SQLITE_ROW) {
-            already_pending.insert(static_cast<uint64_t>(sqlite3_column_int64(st, 0)));
+            audit_skip.insert(static_cast<uint64_t>(sqlite3_column_int64(st, 0)));
         }
         sqlite3_finalize(st);
     }
@@ -217,7 +223,7 @@ Result<int> SynthesizeEnrichAuditRows(
             owe("f38");
         }
         if (owed.empty()) continue;
-        if (already_pending.count(block_id)) continue;
+        if (audit_skip.count(block_id)) continue;
         EnrichStateRow row;
         row.block_id = block_id;
         row.doc_id = did ? reinterpret_cast<const char*>(did) : "";
