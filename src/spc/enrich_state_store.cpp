@@ -171,6 +171,27 @@ Result<int> SynthesizeEnrichAuditRows(
         sqlite3_finalize(st);
     }
 
+    // Pass 1.5 (P7): block_ids whose contextual dual-vector LABEL row exists.
+    // f35 "done" requires BOTH the columns (ctx_status==1) AND the ANN label —
+    // a store that wrote the columns but never indexed the vector (pre-V2 data,
+    // or a partially-lost index) must be re-owed or the contextualized path
+    // never gets its votes. Defensive: when the table is absent (isolated
+    // pre-V2 store), skip the label check and keep the legacy ctx_status-only
+    // semantics rather than re-owing everything.
+    std::unordered_set<uint64_t> ctx_labels;
+    bool ctx_labels_available = false;
+    {
+        sqlite3_stmt* st = nullptr;
+        const char* sql = "SELECT block_id FROM contextual_vec_labels";
+        if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) == SQLITE_OK) {
+            ctx_labels_available = true;
+            while (sqlite3_step(st) == SQLITE_ROW) {
+                ctx_labels.insert(static_cast<uint64_t>(sqlite3_column_int64(st, 0)));
+            }
+            sqlite3_finalize(st);
+        }
+    }
+
     // Pass 2: rows the audit must NOT re-synthesize. Two cases: in-flight
     // pending_retry (keep their attempts/backoff) AND failed_permanent (P4: a
     // terminal give-up must stay terminal — re-synthesizing via INSERT OR REPLACE
@@ -217,7 +238,12 @@ Result<int> SynthesizeEnrichAuditRows(
             owed += tok;
         };
         if (configured_members.count("f03") && !has_score) owe("f03");
-        if (configured_members.count("f35") && ctx_status != 1) owe("f35");
+        // f35 done ⇔ columns written AND the ANN label indexed (P7): columns-only
+        // data (pre-V2 / partial loss) is invisible to the contextualized path.
+        const bool f35_done =
+            ctx_status == 1 &&
+            (!ctx_labels_available || ctx_labels.count(block_id) > 0);
+        if (configured_members.count("f35") && !f35_done) owe("f35");
         if (configured_members.count("f38") &&
             hype_sources.find(child_id) == hype_sources.end()) {
             owe("f38");

@@ -249,6 +249,37 @@ TEST_F(EnrichAuditTest, DoesNotResurrectFailedPermanent) {
     EXPECT_EQ(rows.value()[0].attempts, 8);                            // NOT reset to 0
 }
 
+// P7: f35 "done" requires the ANN label row too — columns-only data (pre-V2 store /
+// partial index loss) must be re-owed, or the contextualized path never gets votes.
+// When contextual_vec_labels is absent entirely (isolated pre-V2 store) the audit
+// keeps the legacy ctx_status-only semantics (covered by the other tests above,
+// whose fixture has no label table).
+TEST_F(EnrichAuditTest, OwesF35WhenLabelMissingDespiteColumns) {
+    ASSERT_EQ(sqlite3_exec(db_,
+        "CREATE TABLE contextual_vec_labels (label INTEGER PRIMARY KEY,"
+        " block_id INTEGER NOT NULL, child_id TEXT NOT NULL)",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    // Both children have full columns + hype; only child-21 has its label indexed.
+    SeedChild(21, "child-labeled", /*score=*/true, /*ctx=*/1);
+    SeedHypeFor("child-labeled");
+    SeedChild(22, "child-lostlabel", /*score=*/true, /*ctx=*/1);
+    SeedHypeFor("child-lostlabel");
+    ASSERT_EQ(sqlite3_exec(db_,
+        "INSERT INTO contextual_vec_labels(label, block_id, child_id)"
+        " VALUES(7001, 21, 'child-labeled')",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+
+    auto n = SynthesizeEnrichAuditRows(db_, {"f03", "f35", "f38"}, /*now=*/500);
+    ASSERT_TRUE(n.ok());
+    EXPECT_EQ(n.value(), 1);  // only the label-less child is re-owed
+
+    auto rows = ListEnrichStateForDoc(db_, "doc-a", kEnrichStatusPendingRetry);
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 1u);
+    EXPECT_EQ(rows.value()[0].block_id, 22u);
+    EXPECT_EQ(rows.value()[0].failed_members, "f35");
+}
+
 // Members outside the configured chain are never owed (f38 unconfigured here).
 TEST_F(EnrichAuditTest, RespectsConfiguredMemberUniverse) {
     SeedChild(11, "child-x", /*score=*/true, /*ctx=*/1);  // no hype block anywhere
