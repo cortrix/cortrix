@@ -57,6 +57,9 @@ ContextualRetrievalConfig ResolveContextualConfig(const IGlobalConfig* global) {
     if (auto r = global->GetString(kContextualLlmModelKey); r.ok() && !r.value().empty()) {
         cfg.llm_model = r.value();
     }
+    if (auto r = global->GetInt(kContextualTimeoutMsKey); r.ok()) {
+        cfg.timeout_ms = std::max(r.value(), kContextualTimeoutMsMin);
+    }
     return cfg;
 }
 
@@ -160,7 +163,7 @@ Result<std::string> ContextualRetrievalEnricher::GenerateContextualizedText(
     call.model = config_.llm_model;
     call.temperature = 0.0;                       // §6.1 deterministic
     call.max_tokens = config_.max_output_tokens;  // §6.1 (80 default, 40-200)
-    call.timeout_ms = kContextualTimeoutMs;       // §6.1 10s
+    call.timeout_ms = config_.timeout_ms;         // §6.1 10s default, configurable
 
     llm::ChatCompletionResponse resp =
         llm_client_->Chat(BuildPrompt(chunk_text, doc_meta, ctx), call);

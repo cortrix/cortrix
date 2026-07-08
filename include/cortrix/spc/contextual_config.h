@@ -26,6 +26,16 @@ inline constexpr const char* kContextualMaxOutputTokensKey =
 /// IGlobalConfig key: LLM model for prefix generation (§6.2).
 inline constexpr const char* kContextualLlmModelKey =
     "contextual_retrieval.llm_model";
+/// IGlobalConfig key: per-call LLM timeout in ms for prefix generation. The
+/// §6.1 10s default assumed sub-10s provider latency; large prompts on a
+/// loaded provider (observed live 2026-07-08: GLM evening peak) exceed it on
+/// every attempt, so the affected chunks can never be enriched — not by the
+/// inline call, not by the retry sweeper. Absent/unparseable keeps the 10s
+/// default (fail-soft), so existing deployments are unchanged.
+inline constexpr const char* kContextualTimeoutMsKey =
+    "contextual_retrieval.timeout_ms";
+/// Floor for the configurable timeout (guards nonsense values like 0/negative).
+inline constexpr int kContextualTimeoutMsMin = 1000;
 
 /// Default prefix length in tokens (F35-3 ruling B+D: 80 default, NS-configurable
 /// 40-200).
