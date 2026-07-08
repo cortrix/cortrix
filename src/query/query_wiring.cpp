@@ -162,7 +162,9 @@ struct CrossNsQueryWiring::Impl {
          std::shared_ptr<cortrix::llm::ILlmClient> llm,
          std::shared_ptr<agent_trace::EngineInstrumentation> engine_instr,
          const std::string& reranker_model_dir,
-         const std::string& query_complexity_model_dir)
+         const std::string& query_complexity_model_dir,
+         int candidate_multiplier,
+         int max_candidates)
         : pool(pool),
           engine_instr(std::move(engine_instr)),
           perm_adapter(perm_svc, pool),
@@ -175,7 +177,7 @@ struct CrossNsQueryWiring::Impl {
           // the SPC ingest write path indexes into (bootstrap owns it), so the read
           // path serves exactly what was indexed; null → sparse off (dense+FTS5).
           executor(pool, embedder, fusion, reranker, sparse_registry,
-                   /*candidate_multiplier=*/3, /*max_candidates=*/50),
+                   candidate_multiplier, max_candidates),
           scatter(&executor, &engine, reranker, &perm_adapter),
           handler(&scatter),
           // F39 query-complexity router (Q3). Standalone backend = the heuristic
@@ -236,12 +238,16 @@ CrossNsQueryWiring::CrossNsQueryWiring(cortrix::resource::INamespacePool& pool,
                                        std::shared_ptr<cortrix::llm::ILlmClient> llm,
                                        std::shared_ptr<agent_trace::EngineInstrumentation> engine_instr,
                                        std::string reranker_model_dir,
-                                       std::string query_complexity_model_dir)
+                                       std::string query_complexity_model_dir,
+                                       int candidate_multiplier,
+                                       int max_candidates)
     : impl_(std::make_unique<Impl>(pool, embedder, fusion, perm_svc,
                                    sparse_registry, std::move(llm),
                                    std::move(engine_instr),
                                    reranker_model_dir,
-                                   query_complexity_model_dir)) {}
+                                   query_complexity_model_dir,
+                                   candidate_multiplier,
+                                   max_candidates)) {}
 
 CrossNsQueryWiring::~CrossNsQueryWiring() {
     if (impl_ && impl_->reranker) delete impl_->reranker;

@@ -241,6 +241,15 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (qc["model_dir"]) config.query_complexity.model_dir = qc["model_dir"].as<std::string>();
     }
 
+    // Retrieval candidate-pool sizing (F02 over-fetch cap)
+    if (root["retrieval"]) {
+        auto rt = root["retrieval"];
+        if (rt["candidate_multiplier"])
+            config.retrieval.candidate_multiplier = rt["candidate_multiplier"].as<int>();
+        if (rt["max_candidates"])
+            config.retrieval.max_candidates = rt["max_candidates"].as<int>();
+    }
+
     // [OPEN-2] three-stage GC
     if (root["gc"]) {
         auto g = root["gc"];
@@ -289,6 +298,11 @@ void ApplyEnvOverrides(CortrixConfig& config) {
     if (!val.empty()) config.reranker.model_dir = val;
     val = GetEnv("CORTRIX_QUERY_COMPLEXITY_MODEL_DIR");
     if (!val.empty()) config.query_complexity.model_dir = val;
+
+    config.retrieval.candidate_multiplier =
+        GetEnvInt("CORTRIX_RETRIEVAL_CANDIDATE_MULTIPLIER", config.retrieval.candidate_multiplier);
+    config.retrieval.max_candidates =
+        GetEnvInt("CORTRIX_RETRIEVAL_MAX_CANDIDATES", config.retrieval.max_candidates);
 
     // [F20] security — admin access policy
     val = GetEnv("CORTRIX_ADMIN_BIND");

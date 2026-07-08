@@ -959,7 +959,8 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         at_writer, import_op_logger);
     cortrix::query::CrossNsQueryWiring cross_ns_query_wiring(
         ns_pool, embedder, fusion, perm_svc, &sparse_index_registry, query_llm, engine_instr,
-        config.reranker.model_dir, config.query_complexity.model_dir);
+        config.reranker.model_dir, config.query_complexity.model_dir,
+        config.retrieval.candidate_multiplier, config.retrieval.max_candidates);
     cross_ns_query_wiring.Register(server.server(), auth);
 
     // [M1] MEM02 extraction service: a MemoryQueue draining interactions through
