@@ -76,8 +76,17 @@ public:
     /// non-object / missing-summary_text / unparseable body →
     /// CX_ERR_F41_LLM_INVALID_OUTPUT. summary_text is truncated to config.max_chars.
     /// Static so it is unit-testable in isolation.
+    ///
+    /// Acceptance order (deep-QA 2026-07-10, recorded method change): 1) strict —
+    /// complete-fence unwrap + whole-body parse; 2) repair — first balanced JSON
+    /// object extracted from the body (prose-wrapped / unclosed-fence outputs,
+    /// observed live with DeepSeek-V4-Flash). When the repair path accepted the
+    /// output, `parse_repair` (if non-null) is set to "balanced_extract" so the
+    /// caller can surface it; the strict path leaves it empty. Truncated /
+    /// unbalanced JSON still fails.
     Result<DocSummaryStructured> ParseStructuredOutput(const std::string& llm_output,
-                                                       int max_chars);
+                                                       int max_chars,
+                                                       std::string* parse_repair = nullptr);
 
     /// Build the §9.1 v1 English structured-output prompt for the full document
     /// (short-doc path / Reduce input is BuildReducePrompt). `chunks_concatenated`

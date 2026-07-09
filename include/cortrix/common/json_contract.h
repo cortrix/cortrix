@@ -19,6 +19,46 @@ inline std::string_view TrimAsciiWhitespace(std::string_view s) {
     return s;
 }
 
+// Extract the first balanced top-level JSON object from `input`: from the
+// first '{' to its matching '}', honoring strings and escapes so braces inside
+// string values do not miscount. Returns "" when no balanced object exists
+// (no '{', or the object never closes — e.g. a truncated generation).
+//
+// This is the SECOND-CHANCE repair layer for LLM JSON contracts (deep-QA
+// 2026-07-10, DeepSeek-V4-Flash x F41 field failure): providers occasionally
+// wrap the object in prose ("Here is the JSON: {...}") or an UNCLOSED fence,
+// which the strict path below rightly refuses. Callers must treat a repair as
+// an observable event (log/diagnostics), never as the silent normal path.
+inline std::string ExtractFirstBalancedJsonObject(const std::string& input) {
+    const size_t start = input.find('{');
+    if (start == std::string::npos) return "";
+    int depth = 0;
+    bool in_string = false;
+    bool escaped = false;
+    for (size_t i = start; i < input.size(); ++i) {
+        const char c = input[i];
+        if (in_string) {
+            if (escaped) {
+                escaped = false;
+            } else if (c == '\\') {
+                escaped = true;
+            } else if (c == '"') {
+                in_string = false;
+            }
+            continue;
+        }
+        if (c == '"') {
+            in_string = true;
+        } else if (c == '{') {
+            ++depth;
+        } else if (c == '}') {
+            --depth;
+            if (depth == 0) return input.substr(start, i - start + 1);
+        }
+    }
+    return "";  // unbalanced (e.g. truncated) — nothing safe to repair
+}
+
 // Accept only a complete Markdown JSON code fence:
 //   ```json
 //   {...}

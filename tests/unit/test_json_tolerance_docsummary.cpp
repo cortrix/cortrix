@@ -96,9 +96,14 @@ const std::vector<DocSummaryJsonCase> kDocSummaryCases = {
     {"wrapped_result", R"({"result":)" + std::string(kGood) + "}", DTol::kRejected, 0, -1},
     {"wrapped_summary", R"({"summary":)" + std::string(kGood) + "}", DTol::kRejected, 0, -1},
 
-    // ---- prose-surrounded -> rejected ----
-    {"prose_before", "Here is your summary:\n" + std::string(kGood), DTol::kRejected, 0, -1},
-    {"prose_after", std::string(kGood) + "\nLet me know if you need more.", DTol::kRejected, 0, -1},
+    // ---- prose-surrounded -> ACCEPTED via balanced-extract repair ----
+    // Contract revision 2026-07-10 (recorded method change, F41 doc §9.1
+    // as-built note): prose wrappers around one balanced object are provider
+    // noise (observed live with DeepSeek-V4-Flash), rescued by the
+    // second-chance extraction. Wrong STRUCTURES (array/scalar/wrapped-object
+    // rows below) still reject.
+    {"prose_before", "Here is your summary:\n" + std::string(kGood), DTol::kParsed, 10, 3},
+    {"prose_after", std::string(kGood) + "\nLet me know if you need more.", DTol::kParsed, 10, 3},
 
     // ---- leading/trailing whitespace: nlohmann tolerates ----
     {"ws_leading", "   \n\t" + std::string(kGood), DTol::kParsed, 10, 3},

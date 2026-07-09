@@ -111,6 +111,67 @@ TEST(F41DocSummaryGeneratorTest, ParseMissingSummaryTextIsInvalid) {
     EXPECT_FALSE(r.ok());
 }
 
+// ---------- Parse-repair second chance (deep-QA 2026-07-10, DeepSeek field
+// failure: valid object wrapped in prose or an UNCLOSED fence rejected by the
+// strict path -> CX_ERR_F41_LLM_INVALID_OUTPUT mid-drain) ----------
+
+TEST(F41DocSummaryGeneratorTest, ParseRepairsProseWrappedJson) {
+    DocSummaryGenerator g = MakeGen(std::make_shared<llm::MockLlmClient>(),
+                                    std::make_shared<store::MockChunkStore>());
+    std::string repair;
+    auto r = g.ParseStructuredOutput(
+        std::string("Here is the JSON you asked for:\n") + kGoodJson +
+            "\nLet me know if you need anything else.",
+        500, &repair);
+    ASSERT_TRUE(r.ok()) << r.status().message();
+    EXPECT_NE(r.value().summary_text.find("Q3 2026"), std::string::npos);
+    EXPECT_EQ(repair, "balanced_extract");
+}
+
+TEST(F41DocSummaryGeneratorTest, ParseRepairsUnclosedFence) {
+    DocSummaryGenerator g = MakeGen(std::make_shared<llm::MockLlmClient>(),
+                                    std::make_shared<store::MockChunkStore>());
+    std::string repair;
+    auto r = g.ParseStructuredOutput(std::string("```json\n") + kGoodJson, 500,
+                                     &repair);
+    ASSERT_TRUE(r.ok()) << r.status().message();
+    EXPECT_EQ(repair, "balanced_extract");
+}
+
+TEST(F41DocSummaryGeneratorTest, ParseRepairHonorsBracesInsideStrings) {
+    DocSummaryGenerator g = MakeGen(std::make_shared<llm::MockLlmClient>(),
+                                    std::make_shared<store::MockChunkStore>());
+    std::string repair;
+    auto r = g.ParseStructuredOutput(
+        "prefix {\"summary_text\": \"has a brace } and quote \\\" inside\", "
+        "\"keywords\": [\"k\"], \"topics\": [\"t\"], \"one_liner\": \"o\"} suffix",
+        500, &repair);
+    ASSERT_TRUE(r.ok()) << r.status().message();
+    EXPECT_NE(r.value().summary_text.find("has a brace }"), std::string::npos);
+    EXPECT_EQ(repair, "balanced_extract");
+}
+
+TEST(F41DocSummaryGeneratorTest, ParseTruncatedJsonStillFails) {
+    DocSummaryGenerator g = MakeGen(std::make_shared<llm::MockLlmClient>(),
+                                    std::make_shared<store::MockChunkStore>());
+    std::string repair;
+    auto r = g.ParseStructuredOutput(
+        R"({"summary_text": "cut off mid-genera)", 500, &repair);
+    EXPECT_FALSE(r.ok());
+    EXPECT_TRUE(repair.empty());
+    EXPECT_NE(r.status().message().find("CX_ERR_F41_LLM_INVALID_OUTPUT"),
+              std::string::npos);
+}
+
+TEST(F41DocSummaryGeneratorTest, ParseStrictPathSetsNoRepairMarker) {
+    DocSummaryGenerator g = MakeGen(std::make_shared<llm::MockLlmClient>(),
+                                    std::make_shared<store::MockChunkStore>());
+    std::string repair = "stale";
+    auto r = g.ParseStructuredOutput(kGoodJson, 500, &repair);
+    ASSERT_TRUE(r.ok());
+    EXPECT_TRUE(repair.empty());
+}
+
 TEST(F41DocSummaryGeneratorTest, ParseTruncatesSummaryToMaxChars) {
     DocSummaryGenerator g = MakeGen(std::make_shared<llm::MockLlmClient>(),
                                     std::make_shared<store::MockChunkStore>());

@@ -11,6 +11,7 @@
 #include "cortrix/common/i_global_config.h"
 #include "cortrix/doc_summary/doc_summary_error.h"
 #include "cortrix/doc_summary/doc_summary_metrics.h"
+#include "cortrix/logging/logging.h"
 
 namespace cortrix::doc_summary {
 
@@ -245,9 +246,28 @@ std::string DocSummaryGenerator::BuildReducePrompt(
 }
 
 Result<DocSummaryStructured> DocSummaryGenerator::ParseStructuredOutput(
-    const std::string& llm_output, int max_chars) {
+    const std::string& llm_output, int max_chars, std::string* parse_repair) {
+    if (parse_repair) parse_repair->clear();
     const std::string normalized_output = common::UnwrapCompleteJsonFence(llm_output);
     json root = json::parse(normalized_output, /*cb=*/nullptr, /*allow_exceptions=*/false);
+    if (root.is_discarded()) {
+        // Second chance (deep-QA 2026-07-10, recorded method change): providers
+        // occasionally wrap the object in prose or an UNCLOSED fence — both
+        // rightly refused by the strict path, both observed live as
+        // CX_ERR_F41_LLM_INVALID_OUTPUT with DeepSeek-V4-Flash mid-drain. A
+        // balanced-brace extraction rescues exactly that WRAPPER NOISE. It runs
+        // only when the whole body failed to parse: output that parses to a
+        // wrong structure (top-level array/string) is a real contract
+        // violation and still rejects, as does truncated/unbalanced JSON.
+        const std::string extracted =
+            common::ExtractFirstBalancedJsonObject(llm_output);
+        if (!extracted.empty()) {
+            root = json::parse(extracted, /*cb=*/nullptr, /*allow_exceptions=*/false);
+            if (!root.is_discarded() && root.is_object()) {
+                if (parse_repair) *parse_repair = "balanced_extract";
+            }
+        }
+    }
     if (root.is_discarded() || !root.is_object()) {
         return DocSummaryStatus(DocSummaryErrorCode::kLlmInvalidOutput,
                                 "output is not a JSON object");
@@ -304,8 +324,9 @@ Result<DocSummaryStructured> DocSummaryGenerator::CallLlmStructured(
             BuildLlmTimeoutDiagnostics(resp.status.message());
         return DocSummaryStatus(DocSummaryErrorCode::kLlmTimeout, resp.status.message());
     }
+    std::string parse_repair;
     Result<DocSummaryStructured> parsed =
-        ParseStructuredOutput(resp.content, config_.max_chars);
+        ParseStructuredOutput(resp.content, config_.max_chars, &parse_repair);
     if (!parsed.ok()) {
         metrics.RecordLlmCall(DocSummaryMetrics::LlmCallStatus::kFailed);
         last_llm_failure_structured_data_ =
@@ -313,6 +334,14 @@ Result<DocSummaryStructured> DocSummaryGenerator::CallLlmStructured(
         return DocSummaryStatus(
             DocSummaryErrorCode::kLlmInvalidOutput,
             DescribeLlmResponseForError(resp, parsed.status().message()));
+    }
+    if (!parse_repair.empty()) {
+        // Observable-by-design: a repair is a provider-contract deviation worth
+        // tracking per model, never a silent normal path.
+        CORTRIX_LOG_WARN("doc_summary",
+                         "F41 structured output accepted via parse repair '{}' "
+                         "(model={} content_length={})",
+                         parse_repair, resp.model, resp.content_length);
     }
     metrics.RecordLlmCall(DocSummaryMetrics::LlmCallStatus::kSuccess);
     last_llm_failure_structured_data_ = json::object();
