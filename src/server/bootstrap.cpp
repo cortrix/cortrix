@@ -46,6 +46,7 @@
 #include "cortrix/server/routes/enrich_routes.h"          // §3.7 backfill ops surface
 #include "cortrix/spc/contextual_enricher.h"       // I2 ContextualRetrievalEnricher / ResolveContextualConfig
 #include "cortrix/spc/hype_enricher.h"             // I3 HyPEEnricher / HyPEConfig
+#include "cortrix/spc/hype_ns_config.h"            // ClampHypeK (F38 §4.3 yaml wiring)
 #include "cortrix/llm/openai_client.h"             // OpenAiLlmClient (shared enricher LLM)
 #include "cortrix/spc/spc_pipeline.h"
 #include "cortrix/spc/spc_manager.h"
@@ -589,6 +590,19 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                 // model, not the OpenAI-only built-in default.
                 if (!config.enricher_llm.model.empty()) {
                     hype_cfg.llm_model = config.enricher_llm.model;
+                }
+                // F38 §4.3 global config path, as-built 2026-07-10: the design's
+                // hype_questions_per_chunk knob existed end to end (KV key +
+                // NsHyPEConfig + ResolveHypeK + tests) but nothing in production
+                // ever fed it — K was effectively frozen at 3. yaml
+                // enricher_llm.hype_questions_per_chunk now reaches the enricher
+                // (0 = keep default; clamped to the design range [1, 10]). The
+                // per-NS hype_config JSONB path is still unwired (registered gap).
+                if (config.enricher_llm.hype_questions_per_chunk > 0) {
+                    hype_cfg.questions_per_chunk =
+                        cortrix::spc::ClampHypeK(config.enricher_llm.hype_questions_per_chunk);
+                    CORTRIX_LOG_INFO("main", "F38 hype questions_per_chunk={} (yaml override)",
+                                     hype_cfg.questions_per_chunk);
                 }
                 auto f38 = std::make_shared<cortrix::spc::HyPEEnricher>(
                     hype_cfg, enricher_chain_llm,

@@ -53,6 +53,10 @@ struct LlmConfig {
     int batch_size = 0;          ///< enricher role only: chunks per LLM call (0 = consumer
                                  ///< default). Large batches push the non-streaming
                                  ///< generation past provider gateway idle windows.
+    int hype_questions_per_chunk = 0;  ///< enricher role only: F38 §4.3 hypothetical
+                                       ///< questions per chunk (0 = built-in default 3;
+                                       ///< clamped to the design range [1, 10]). The
+                                       ///< first-order candidate-pool-coverage lever.
 
     bool IsConfigured() const {
         return !provider.empty() && !api_key.empty() && !model.empty();

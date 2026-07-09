@@ -135,6 +135,29 @@ TEST_F(ConfigTest, IngestLlmRolesDefaultUnconfigured) {
     EXPECT_FALSE(config.enricher_llm.IsConfigured());
 }
 
+// F38 §4.3 as-built (2026-07-10): enricher_llm.hype_questions_per_chunk reaches
+// the parsed config; absent = 0 (consumer keeps the built-in default 3).
+TEST_F(ConfigTest, EnricherHypeQuestionsPerChunkParsed) {
+    WriteYaml(R"(
+enricher_llm:
+  provider: "glm"
+  api_key: "sk-enrich"
+  model: "glm-4-flash"
+  hype_questions_per_chunk: 6
+)");
+    auto config = LoadConfig(yaml_path_);
+    EXPECT_EQ(config.enricher_llm.hype_questions_per_chunk, 6);
+
+    WriteYaml(R"(
+enricher_llm:
+  provider: "glm"
+  api_key: "sk-enrich"
+  model: "glm-4-flash"
+)");
+    auto absent = LoadConfig(yaml_path_);
+    EXPECT_EQ(absent.enricher_llm.hype_questions_per_chunk, 0);
+}
+
 TEST_F(ConfigTest, EnvOverridesYaml) {
     WriteYaml(R"(
 server:
