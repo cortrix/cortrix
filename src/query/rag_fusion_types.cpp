@@ -61,6 +61,19 @@ bool ValidateRagFusionConfig(const RagFusionConfig& cfg,
         cfg.activation_min_results > kRagFusionActivationMinResultsMax) {
         return fail("activation_min_results", "[2, 200]");
     }
+    // v1.0.13 fusion-policy knobs (§4.3.bis.5).
+    if (cfg.fusion_original_weight < kRagFusionOriginalWeightMin ||
+        cfg.fusion_original_weight > kRagFusionFusionWeightMax) {
+        return fail("fusion_original_weight", "[0.1, 10]");
+    }
+    if (cfg.fusion_variant_weight < kRagFusionVariantWeightMin ||
+        cfg.fusion_variant_weight > kRagFusionFusionWeightMax) {
+        return fail("fusion_variant_weight", "[0, 10]");
+    }
+    if (cfg.fusion_anchor_max < kRagFusionAnchorMaxMin ||
+        cfg.fusion_anchor_max > kRagFusionAnchorMaxMax) {
+        return fail("fusion_anchor_max", "[0, 10]");
+    }
     // At least one strategy when enabled (an empty strategy list would generate
     // nothing). Allowed to be empty when disabled (config is inert then).
     if (cfg.enabled && cfg.variant_strategies.empty()) {

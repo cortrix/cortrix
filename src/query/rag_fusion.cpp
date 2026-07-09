@@ -17,19 +17,20 @@ namespace {
 // F36 v1.0.7 anchored conservative outer-fusion policy.
 //
 // `per_variant_results[0]` is the original query and should remain the primary
-// ranking signal. Its top-3 head is anchored as a strong-hit guardrail. LLM
+// ranking signal. Its top head is anchored as a strong-hit guardrail. LLM
 // variants are additive weak evidence: they can promote a candidate that is
 // repeatedly found by variants, but they reorder only the non-anchored tail.
-constexpr double kOriginalQueryRrfWeight = 1.7;
-constexpr double kVariantQueryRrfWeight = 0.5;
-constexpr size_t kOriginalQueryAnchorMax = 3;
-
-double QueryRoleWeight(size_t query_index) {
-    return query_index == 0 ? kOriginalQueryRrfWeight : kVariantQueryRrfWeight;
-}
+//
+// v1.0.13 (§4.3.bis.5): the three policy constants moved into RagFusionConfig
+// (fusion_original_weight / fusion_variant_weight / fusion_anchor_max) with
+// these values as byte-identical defaults — the fixed policy proved
+// scale-sensitive (FiQA-5000: -10.8pp recall@10 vs listwise on identical pools).
 
 size_t DynamicOriginalAnchorCount(
-    const std::vector<retrieval::ScoredResult>& original_results) {
+    const std::vector<retrieval::ScoredResult>& original_results,
+    int anchor_max) {
+    if (anchor_max <= 0) return 0;
+    const size_t cap = static_cast<size_t>(anchor_max);
     if (original_results.empty()) return 0;
     if (original_results.size() == 1) return 1;
 
@@ -44,10 +45,11 @@ size_t DynamicOriginalAnchorCount(
                             ? std::max(0.0f, original_results[2].score)
                             : second;
     if (third >= top * 0.45f) {
-        return std::min(kOriginalQueryAnchorMax, original_results.size());
+        return std::min(cap, original_results.size());
     }
     if (second >= top * 0.35f) {
-        return std::min(static_cast<size_t>(2), original_results.size());
+        return std::min(std::min(static_cast<size_t>(2), cap),
+                        original_results.size());
     }
     return 1;
 }
@@ -207,8 +209,23 @@ Result<std::vector<retrieval::ScoredResult>> RagFusion::FuseResults(
     const std::vector<std::vector<retrieval::ScoredResult>>& per_variant_results,
     int rrf_k,
     const observability::TraceContext* ctx) {
+    // Legacy rrf_k-only entry: delegate with the default-constructed policy
+    // (fusion_original_weight 1.7 / fusion_variant_weight 0.5 / anchor 3 —
+    // byte-identical to the pre-v1.0.13 constants).
+    RagFusionConfig cfg;
+    cfg.rrf_k = rrf_k;
+    return FuseResults(per_variant_results, cfg, ctx);
+}
+
+Result<std::vector<retrieval::ScoredResult>> RagFusion::FuseResults(
+    const std::vector<std::vector<retrieval::ScoredResult>>& per_variant_results,
+    const RagFusionConfig& cfg,
+    const observability::TraceContext* ctx) {
     (void)ctx;  // §9: interface-reserved
+    int rrf_k = cfg.rrf_k;
     if (rrf_k <= 0) rrf_k = 60;  // RRF formula needs k > 0 (sentinel ARCH default)
+    const double original_weight = static_cast<double>(cfg.fusion_original_weight);
+    const double variant_weight = static_cast<double>(cfg.fusion_variant_weight);
 
     const auto t0 = std::chrono::steady_clock::now();
 
@@ -234,7 +251,7 @@ Result<std::vector<retrieval::ScoredResult>> RagFusion::FuseResults(
 
     for (size_t query_index = 0; query_index < per_variant_results.size(); ++query_index) {
         const auto& variant_list = per_variant_results[query_index];
-        const double role_weight = QueryRoleWeight(query_index);
+        const double role_weight = query_index == 0 ? original_weight : variant_weight;
         for (size_t r = 0; r < variant_list.size(); ++r) {
             const retrieval::ScoredResult& sr = variant_list[r];
             Acc& a = acc[sr.child_id];
@@ -255,11 +272,14 @@ Result<std::vector<retrieval::ScoredResult>> RagFusion::FuseResults(
     std::vector<retrieval::ScoredResult> fused;
     fused.reserve(acc.size());
     std::unordered_set<retrieval::ChildId> emitted;
-    emitted.reserve(std::min(acc.size(), kOriginalQueryAnchorMax) + 8);
+    emitted.reserve(std::min(acc.size(),
+                             static_cast<size_t>(std::max(cfg.fusion_anchor_max, 0))) +
+                    8);
 
     if (!per_variant_results.empty()) {
         const auto& original_results = per_variant_results.front();
-        const size_t anchor_limit = DynamicOriginalAnchorCount(original_results);
+        const size_t anchor_limit =
+            DynamicOriginalAnchorCount(original_results, cfg.fusion_anchor_max);
         size_t anchored_count = 0;
         for (const auto& sr : original_results) {
             if (anchored_count >= anchor_limit) break;

@@ -59,13 +59,23 @@ struct RagFusionConfig {
     std::string activation_policy = "always";                ///< v1.0.11: "always" or "selective_margin"
     float activation_score_margin = 0.0f;                    ///< v1.0.11: skip LLM when original top1-top2 margin >= this
     int activation_min_results = 2;                           ///< v1.0.11: need at least this many original results to skip
+    /// v1.0.13 (§4.3.bis.5): the anchored-fusion policy constants, previously
+    /// hardcoded (1.7 / 0.5 / 3). The fixed policy proved scale-sensitive: at
+    /// 5000-doc FiQA, variant evidence at 0.5×N displaces original rank-4..10
+    /// strong hits (identical candidate pools, -10.8pp recall@10 vs listwise).
+    /// Defaults are byte-identical to the v1.0.7 behavior.
+    float fusion_original_weight = 1.7f;                      ///< v1.0.13: outer-RRF original-query role weight
+    float fusion_variant_weight = 0.5f;                       ///< v1.0.13: outer-RRF LLM-variant role weight (0 = variants only fill the pool)
+    int fusion_anchor_max = 3;                                ///< v1.0.13: original head anchor cap [0-10]; 0 = no anchor segment
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RagFusionConfig, enabled, variant_count,
                                    variant_strategies, rrf_k, timeout_ms, locale,
                                    model, candidate_multiplier, max_candidates,
                                    final_rerank, activation_policy,
-                                   activation_score_margin, activation_min_results)
+                                   activation_score_margin, activation_min_results,
+                                   fusion_original_weight, fusion_variant_weight,
+                                   fusion_anchor_max)
 
 /// The inclusive bounds for variant_count (topic 1: NS-tunable [1-10]).
 constexpr int kVariantCountMin = 1;
@@ -78,6 +88,11 @@ constexpr int kRagFusionActivationMinResultsMin = 2;
 constexpr int kRagFusionActivationMinResultsMax = 200;
 constexpr float kRagFusionActivationScoreMarginMin = 0.0f;
 constexpr float kRagFusionActivationScoreMarginMax = 10.0f;
+constexpr float kRagFusionOriginalWeightMin = 0.1f;   ///< v1.0.13: original must stay a positive signal
+constexpr float kRagFusionVariantWeightMin = 0.0f;    ///< v1.0.13: 0 = pool-membership only
+constexpr float kRagFusionFusionWeightMax = 10.0f;
+constexpr int kRagFusionAnchorMaxMin = 0;             ///< v1.0.13: 0 disables the anchor segment
+constexpr int kRagFusionAnchorMaxMax = 10;
 
 /// Validate a config's fields against the §4.4 / §7 ranges. Returns false (and
 /// fills `field`/`valid_range` for a CX_ERR_RAG_FUSION_CONFIG_INVALID body) on the

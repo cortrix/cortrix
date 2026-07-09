@@ -252,5 +252,30 @@ TEST_F(QueryWiringTest, RagFusionConfigValidationRejectsExpandedCandidateBounds)
     EXPECT_EQ(field, "activation_policy");
 }
 
+// v1.0.13 fusion-policy knobs: bounds enforced, edge values accepted.
+TEST_F(QueryWiringTest, RagFusionConfigValidationFusionPolicyBounds) {
+    std::string field, range;
+
+    RagFusionConfig bad_original;
+    bad_original.fusion_original_weight = 0.0f;  // < 0.1 floor
+    EXPECT_FALSE(ValidateRagFusionConfig(bad_original, &field, &range));
+    EXPECT_EQ(field, "fusion_original_weight");
+
+    RagFusionConfig bad_variant;
+    bad_variant.fusion_variant_weight = kRagFusionFusionWeightMax + 1.0f;
+    EXPECT_FALSE(ValidateRagFusionConfig(bad_variant, &field, &range));
+    EXPECT_EQ(field, "fusion_variant_weight");
+
+    RagFusionConfig bad_anchor;
+    bad_anchor.fusion_anchor_max = kRagFusionAnchorMaxMax + 1;
+    EXPECT_FALSE(ValidateRagFusionConfig(bad_anchor, &field, &range));
+    EXPECT_EQ(field, "fusion_anchor_max");
+
+    RagFusionConfig edges;  // 0-weight variants + no anchor are both legal
+    edges.fusion_variant_weight = 0.0f;
+    edges.fusion_anchor_max = 0;
+    EXPECT_TRUE(ValidateRagFusionConfig(edges));
+}
+
 }  // namespace
 }  // namespace cortrix::query
