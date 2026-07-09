@@ -98,6 +98,17 @@ query_complexity:
   model_dir: "./models/query-complexity"
 
 # -----------------------------------------------------------------------------
+# retrieval — candidate-pool over-fetch sizing (F02 §top_N)
+# candidate_k = min(top_k * candidate_multiplier * oversample, max_candidates).
+# Defaults 3 / 50 match the historical behavior. On large corpora relevant docs
+# spread past rank 50, so raise max_candidates to lift the recall ceiling.
+# Env override: CORTRIX_RETRIEVAL_MAX_CANDIDATES / CORTRIX_RETRIEVAL_CANDIDATE_MULTIPLIER
+# -----------------------------------------------------------------------------
+retrieval:
+  candidate_multiplier: 3     # top_k multiplier before the cap (>=1)
+  max_candidates: 50          # hard ceiling on the candidate pool (>=1)
+
+# -----------------------------------------------------------------------------
 # spc — document processing pipeline
 # Supports: PDF, DOCX, TXT, MD, CSV, JSON, images (OCR)
 # -----------------------------------------------------------------------------

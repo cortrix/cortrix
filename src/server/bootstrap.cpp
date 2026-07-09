@@ -572,6 +572,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                 if (!config.enricher_llm.model.empty()) {
                     f35_cfg.llm_model = config.enricher_llm.model;
                 }
+                // Same wiring for the per-call deadline: a configured
+                // enricher_llm.timeout_ms overrides the §6.1 10s built-in,
+                // which slow providers exceed on every large-prompt call.
+                if (config.enricher_llm.timeout_ms > 0) {
+                    f35_cfg.timeout_ms = std::max(config.enricher_llm.timeout_ms,
+                                                  cortrix::spc::kContextualTimeoutMsMin);
+                }
                 auto f35 = std::make_shared<cortrix::spc::ContextualRetrievalEnricher>(
                     f35_cfg, enricher_chain_llm,
                     std::make_shared<cortrix::spc::ContextualOnnxEmbedder>(embedder_alias));
@@ -959,7 +966,8 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         at_writer, import_op_logger);
     cortrix::query::CrossNsQueryWiring cross_ns_query_wiring(
         ns_pool, embedder, fusion, perm_svc, &sparse_index_registry, query_llm, engine_instr,
-        config.reranker.model_dir, config.query_complexity.model_dir);
+        config.reranker.model_dir, config.query_complexity.model_dir,
+        config.retrieval.candidate_multiplier, config.retrieval.max_candidates);
     cross_ns_query_wiring.Register(server.server(), auth);
 
     // [M1] MEM02 extraction service: a MemoryQueue draining interactions through

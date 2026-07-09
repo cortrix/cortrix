@@ -44,6 +44,7 @@ struct ContextualRetrievalConfig {
     std::string prompt_template;   ///< empty == use the built-in Anthropic default (§6.1)
     int max_output_tokens = kContextualMaxOutputTokensDefault;  ///< 80 default (40-200)
     std::string llm_model = kContextualDefaultLlmModel;          ///< "gpt-4o-mini"
+    int timeout_ms = kContextualTimeoutMs;  ///< per-call LLM deadline (§6.1 10s default)
 };
 
 /// Resolve a ContextualRetrievalConfig from `global` (F35 §6.2 three-layer

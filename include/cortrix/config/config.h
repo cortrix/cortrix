@@ -130,6 +130,17 @@ struct QueryComplexityTopConfig {
     std::string model_dir = "models/query-complexity";  ///< F39 DistilBERT ONNX dir
 };
 
+// === Retrieval candidate-pool sizing (F02 §top_N over-fetch) ===
+// candidate_k = min(top_k * candidate_multiplier * oversample, max_candidates).
+// Defaults preserve the historical hardcoded 3 / 50. Raising max_candidates
+// matters on large corpora where relevant docs spread past rank 50 and the pool
+// cap otherwise ceilings recall. Env: CORTRIX_RETRIEVAL_MAX_CANDIDATES /
+// CORTRIX_RETRIEVAL_CANDIDATE_MULTIPLIER (env wins over yaml).
+struct RetrievalConfig {
+    int candidate_multiplier = 3;   ///< top_k multiplier before the max cap (>=1)
+    int max_candidates = 50;        ///< hard ceiling on the candidate pool (>=1)
+};
+
 // === [OPEN-2] three-stage GC (ARCH §5.x, A6 §10.8) ===
 // Config for the built-in background GC thread + manual ops endpoints. Defaults
 // mirror the ARCH `gc:` section. CE runs with immediate_purge_enabled=false
@@ -186,6 +197,7 @@ struct CortrixConfig {
     MemoryConfig memory;
     RerankerTopConfig reranker;              // F02 reranker model dir
     QueryComplexityTopConfig query_complexity;  // F39 complexity classifier model dir
+    RetrievalConfig retrieval;               // candidate-pool sizing (over-fetch cap)
     SecurityConfig security;  // [F20] admin access policy
     GcConfig gc;              // [OPEN-2] three-stage GC + ops endpoints
 };

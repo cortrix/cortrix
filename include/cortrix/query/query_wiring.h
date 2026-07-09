@@ -67,7 +67,9 @@ public:
                        std::shared_ptr<agent_trace::EngineInstrumentation> engine_instr =
                            nullptr,
                        std::string reranker_model_dir = "",
-                       std::string query_complexity_model_dir = "models/query-complexity");
+                       std::string query_complexity_model_dir = "models/query-complexity",
+                       int candidate_multiplier = 3,
+                       int max_candidates = 50);
     ~CrossNsQueryWiring();
 
     CrossNsQueryWiring(const CrossNsQueryWiring&) = delete;

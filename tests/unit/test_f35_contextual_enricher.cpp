@@ -381,6 +381,34 @@ TEST(F35ContextualConfigTest, ResolveUnparseableValueKeepsDefault) {
               kContextualMaxOutputTokensDefault);
 }
 
+TEST(F35ContextualConfigTest, ResolveReadsTimeoutAndFloors) {
+    InMemoryGlobalConfig gc;
+    gc.Set(kContextualTimeoutMsKey, "60000");
+    EXPECT_EQ(ResolveContextualConfig(&gc).timeout_ms, 60000);
+    gc.Set(kContextualTimeoutMsKey, "0");  // nonsense → floored, never a 0ms deadline
+    EXPECT_EQ(ResolveContextualConfig(&gc).timeout_ms, kContextualTimeoutMsMin);
+}
+
+TEST(F35ContextualConfigTest, ResolveTimeoutAbsentKeepsFrozenDefault) {
+    InMemoryGlobalConfig gc;
+    EXPECT_EQ(ResolveContextualConfig(&gc).timeout_ms, kContextualTimeoutMs);
+}
+
+TEST(F35ContextualEnricherTest, GeneratePassesConfiguredTimeout) {
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    llm::LlmCallConfig captured;
+    EXPECT_CALL(*llm, Chat(_, _))
+        .WillOnce([&](const std::string&, const llm::LlmCallConfig& c) {
+            captured = c;
+            return OkChat("ctx");
+        });
+    ContextualRetrievalConfig cfg;
+    cfg.timeout_ms = 60000;
+    ContextualRetrievalEnricher e(cfg, llm, MakeEmbedder());
+    (void)e.GenerateContextualizedText("chunk", DocMeta(), MakeCtx("chunk"));
+    EXPECT_EQ(captured.timeout_ms, 60000);
+}
+
 TEST(F35ContextualConfigTest, ResolveMissingKeysKeepDefaults) {
     InMemoryGlobalConfig gc;  // nothing set
     ContextualRetrievalConfig cfg = ResolveContextualConfig(&gc);

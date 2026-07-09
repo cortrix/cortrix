@@ -151,6 +151,40 @@ log:
     EXPECT_EQ(config.log.level, "debug");
 }
 
+// Retrieval candidate-pool sizing: default preserves the historical 3 / 50,
+// yaml configures it, env wins over yaml. Raising max_candidates lifts the
+// pool ceiling that otherwise caps recall on large corpora.
+TEST_F(ConfigTest, RetrievalPoolDefault) {
+    auto config = LoadConfig("");
+    EXPECT_EQ(config.retrieval.candidate_multiplier, 3);
+    EXPECT_EQ(config.retrieval.max_candidates, 50);
+}
+
+TEST_F(ConfigTest, RetrievalPoolFromYaml) {
+    WriteYaml(R"(
+retrieval:
+  candidate_multiplier: 5
+  max_candidates: 400
+)");
+    auto config = LoadConfig(yaml_path_);
+    EXPECT_EQ(config.retrieval.candidate_multiplier, 5);
+    EXPECT_EQ(config.retrieval.max_candidates, 400);
+}
+
+TEST_F(ConfigTest, RetrievalPoolEnvOverridesYaml) {
+    WriteYaml(R"(
+retrieval:
+  max_candidates: 400
+)");
+    setenv("CORTRIX_RETRIEVAL_MAX_CANDIDATES", "1000", 1);
+    setenv("CORTRIX_RETRIEVAL_CANDIDATE_MULTIPLIER", "8", 1);
+    auto config = LoadConfig(yaml_path_);
+    EXPECT_EQ(config.retrieval.max_candidates, 1000);
+    EXPECT_EQ(config.retrieval.candidate_multiplier, 8);
+    unsetenv("CORTRIX_RETRIEVAL_MAX_CANDIDATES");
+    unsetenv("CORTRIX_RETRIEVAL_CANDIDATE_MULTIPLIER");
+}
+
 TEST_F(ConfigTest, MissingYamlFile) {
     auto config = LoadConfig("/nonexistent/path/cortrix.yaml");
     // Should not crash, use defaults
