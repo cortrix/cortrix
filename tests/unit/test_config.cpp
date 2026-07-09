@@ -135,6 +135,37 @@ TEST_F(ConfigTest, IngestLlmRolesDefaultUnconfigured) {
     EXPECT_FALSE(config.enricher_llm.IsConfigured());
 }
 
+// Deep-QA 2026-07-10 config seams: F35 ctx knobs on enricher_llm, parser
+// hard-fail gate, F42 sweeper pacing. Absent = 0/false (built-ins unchanged).
+TEST_F(ConfigTest, DeepQaConfigSeamsParsed) {
+    WriteYaml(R"(
+enricher_llm:
+  provider: "glm"
+  api_key: "sk-enrich"
+  model: "glm-4-flash"
+  ctx_max_output_tokens: 120
+  ctx_guard_chars_per_token: 6
+
+spc:
+  require_parsers: true
+  enrich_sweep_interval_sec: 15
+  enrich_sweep_batch: 128
+)");
+    auto config = LoadConfig(yaml_path_);
+    EXPECT_EQ(config.enricher_llm.ctx_max_output_tokens, 120);
+    EXPECT_EQ(config.enricher_llm.ctx_guard_chars_per_token, 6);
+    EXPECT_TRUE(config.spc.require_parsers);
+    EXPECT_EQ(config.spc.enrich_sweep_interval_sec, 15);
+    EXPECT_EQ(config.spc.enrich_sweep_batch, 128);
+
+    auto absent = LoadConfig("");
+    EXPECT_EQ(absent.enricher_llm.ctx_max_output_tokens, 0);
+    EXPECT_EQ(absent.enricher_llm.ctx_guard_chars_per_token, 0);
+    EXPECT_FALSE(absent.spc.require_parsers);
+    EXPECT_EQ(absent.spc.enrich_sweep_interval_sec, 0);
+    EXPECT_EQ(absent.spc.enrich_sweep_batch, 0);
+}
+
 // F38 §4.3 as-built (2026-07-10): enricher_llm.hype_questions_per_chunk reaches
 // the parsed config; absent = 0 (consumer keeps the built-in default 3).
 TEST_F(ConfigTest, EnricherHypeQuestionsPerChunkParsed) {

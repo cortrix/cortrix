@@ -394,6 +394,40 @@ TEST(F35ContextualConfigTest, ResolveTimeoutAbsentKeepsFrozenDefault) {
     EXPECT_EQ(ResolveContextualConfig(&gc).timeout_ms, kContextualTimeoutMs);
 }
 
+TEST(F35ContextualConfigTest, ResolveReadsGuardCharsPerTokenAndClamps) {
+    InMemoryGlobalConfig gc;
+    gc.Set(kContextualGuardCharsPerTokenKey, "6");
+    EXPECT_EQ(ResolveContextualConfig(&gc).guard_chars_per_token, 6);
+    gc.Set(kContextualGuardCharsPerTokenKey, "99");  // above max 20
+    EXPECT_EQ(ResolveContextualConfig(&gc).guard_chars_per_token,
+              kContextualGuardCharsPerTokenMax);
+    gc.Set(kContextualGuardCharsPerTokenKey, "0");   // below min 1
+    EXPECT_EQ(ResolveContextualConfig(&gc).guard_chars_per_token,
+              kContextualGuardCharsPerTokenMin);
+}
+
+TEST(F35ContextualConfigTest, ResolveGuardAbsentKeepsFrozenDefault) {
+    InMemoryGlobalConfig gc;
+    EXPECT_EQ(ResolveContextualConfig(&gc).guard_chars_per_token,
+              kContextualGuardCharsPerTokenDefault);
+}
+
+// §8 guard with a widened multiplier: a legitimate long context (300 bytes >
+// the historical 2x80=160 ceiling) is ACCEPTED at guard_chars_per_token=5
+// (limit 400) — the deep-QA fix for silently dropped contextualized vectors.
+TEST(F35ContextualEnricherTest, GenerateGuardMultiplierWidensLimit) {
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    EXPECT_CALL(*llm, Chat(_, _))
+        .WillOnce(Return(OkChat(std::string(300, 'x'))));
+    ContextualRetrievalConfig cfg;
+    cfg.guard_chars_per_token = 5;  // 80 tokens x 5 = 400-byte limit
+    ContextualRetrievalEnricher e(cfg, llm, MakeEmbedder());
+
+    auto r = e.GenerateContextualizedText("chunk", DocMeta(), MakeCtx("chunk"));
+    ASSERT_TRUE(r.ok());
+    EXPECT_EQ(r.value().size(), 300u);
+}
+
 TEST(F35ContextualEnricherTest, GeneratePassesConfiguredTimeout) {
     auto llm = std::make_shared<llm::MockLlmClient>();
     llm::LlmCallConfig captured;

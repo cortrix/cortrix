@@ -115,6 +115,37 @@ TEST(F38HyPEEnricherTest, GenerateNullClientReturnsError) {
     EXPECT_FALSE(r.ok());
 }
 
+// enricher_llm.timeout_ms wiring (deep-QA 2026-07-10): a configured deadline
+// reaches the Chat call; 0 keeps the client default (call config untouched).
+TEST(F38HyPEEnricherTest, GeneratePassesConfiguredTimeout) {
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    llm::LlmCallConfig captured;
+    EXPECT_CALL(*llm, Chat(_, _))
+        .WillOnce([&](const std::string&, const llm::LlmCallConfig& c) {
+            captured = c;
+            return OkChat("q1\nq2\nq3");
+        });
+    HyPEConfig cfg;
+    cfg.timeout_ms = 60000;
+    HyPEEnricher e(cfg, llm, nullptr);
+    (void)e.GenerateHypeQuestions("chunk", "", DocMeta(), "c", "p");
+    EXPECT_EQ(captured.timeout_ms, 60000);
+}
+
+TEST(F38HyPEEnricherTest, GenerateZeroTimeoutKeepsClientDefault) {
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    llm::LlmCallConfig captured;
+    llm::LlmCallConfig untouched;  // reference default-constructed call config
+    EXPECT_CALL(*llm, Chat(_, _))
+        .WillOnce([&](const std::string&, const llm::LlmCallConfig& c) {
+            captured = c;
+            return OkChat("q1\nq2\nq3");
+        });
+    HyPEEnricher e(HyPEConfig{}, llm, nullptr);  // timeout_ms = 0 default
+    (void)e.GenerateHypeQuestions("chunk", "", DocMeta(), "c", "p");
+    EXPECT_EQ(captured.timeout_ms, untouched.timeout_ms);
+}
+
 TEST(F38HyPEEnricherTest, PromptIncludesParentTextWhenProvided) {
     // Capture the prompt to confirm parent_text context is threaded in (reconcile 2).
     auto llm = std::make_shared<llm::MockLlmClient>();

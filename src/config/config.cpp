@@ -109,6 +109,10 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (n["batch_size"]) cfg.batch_size = n["batch_size"].as<int>();
         if (n["hype_questions_per_chunk"])
             cfg.hype_questions_per_chunk = n["hype_questions_per_chunk"].as<int>();
+        if (n["ctx_max_output_tokens"])
+            cfg.ctx_max_output_tokens = n["ctx_max_output_tokens"].as<int>();
+        if (n["ctx_guard_chars_per_token"])
+            cfg.ctx_guard_chars_per_token = n["ctx_guard_chars_per_token"].as<int>();
     };
 
     // semantic_llm — fast/cheap model for intent classification & reranking
@@ -165,6 +169,9 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (s["enable_crash_recovery"]) config.spc.enable_crash_recovery = s["enable_crash_recovery"].as<bool>();
         if (s["vision_llm_script"]) config.spc.vision_llm_script = s["vision_llm_script"].as<std::string>();
         if (s["vision_llm_timeout_s"]) config.spc.vision_llm_timeout_s = s["vision_llm_timeout_s"].as<int>();
+        if (s["require_parsers"]) config.spc.require_parsers = s["require_parsers"].as<bool>();
+        if (s["enrich_sweep_interval_sec"]) config.spc.enrich_sweep_interval_sec = s["enrich_sweep_interval_sec"].as<int>();
+        if (s["enrich_sweep_batch"]) config.spc.enrich_sweep_batch = s["enrich_sweep_batch"].as<int>();
     }
 
     // upload
@@ -305,6 +312,9 @@ void ApplyEnvOverrides(CortrixConfig& config) {
         GetEnvInt("CORTRIX_RETRIEVAL_CANDIDATE_MULTIPLIER", config.retrieval.candidate_multiplier);
     config.retrieval.max_candidates =
         GetEnvInt("CORTRIX_RETRIEVAL_MAX_CANDIDATES", config.retrieval.max_candidates);
+
+    val = GetEnv("CORTRIX_REQUIRE_PARSERS");
+    if (!val.empty()) config.spc.require_parsers = GetEnvBool("CORTRIX_REQUIRE_PARSERS", config.spc.require_parsers);
 
     // [F20] security — admin access policy
     val = GetEnv("CORTRIX_ADMIN_BIND");

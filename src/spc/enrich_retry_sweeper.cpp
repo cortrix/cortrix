@@ -39,6 +39,16 @@ int EnrichRetrySweeper::SweepIntervalSec() const {
     return kDefaultSweepIntervalSec;
 }
 
+int EnrichRetrySweeper::MaxDocsPerSweep() const {
+    // Same seed path as the interval (yaml spc.enrich_sweep_batch → f42 KV).
+    // Absent/non-positive keeps the built-in 32 — byte-identical default.
+    if (config_) {
+        auto r = config_->GetInt("f42.enrich_sweep_batch");
+        if (r.ok() && r.value() > 0) return static_cast<int>(r.value());
+    }
+    return kMaxDocsPerSweep;
+}
+
 void EnrichRetrySweeper::Start() {
     std::lock_guard<std::mutex> lk(cv_mu_);
     if (started_) return;
@@ -95,7 +105,7 @@ int EnrichRetrySweeper::RunSweepNow(const std::string& only_ns) {
         sqlite3* db = facade.store().db_handle();
         if (!db) continue;
 
-        auto due = ListDueDocs(db, now, kMaxDocsPerSweep);
+        auto due = ListDueDocs(db, now, MaxDocsPerSweep());
         if (!due.ok()) {
             CORTRIX_LOG_WARN("spc", "enrich sweep ListDueDocs failed ns={}: {}", ns,
                              due.status().message());

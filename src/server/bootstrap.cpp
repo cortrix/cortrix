@@ -463,6 +463,19 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     };
     const std::string docling_script = locate_script("docling_bridge.py");
     if (docling_script.empty()) {
+        if (config.spc.require_parsers) {
+            // spc.require_parsers / CORTRIX_REQUIRE_PARSERS: a host that cannot
+            // parse documents must fail at STARTUP, not answer health 200 while
+            // 100% of ingests die CX_ERR_PARSE_FAILED (observed as a full
+            // 5000-doc wipeout, 2026-07-09).
+            CORTRIX_LOG_ERROR(
+                "main",
+                "docling_bridge.py not found and spc.require_parsers=true — "
+                "checked CORTRIX_SCRIPTS_DIR, /app/scripts, ./scripts (cwd={})",
+                std::filesystem::current_path().string());
+            cortrix::ShutdownLogging();
+            return 1;
+        }
         CORTRIX_LOG_WARN("main", "docling_bridge.py not found (CORTRIX_SCRIPTS_DIR? /app/scripts? ./scripts?) — document parsing will fail");
     }
 
@@ -580,6 +593,22 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                     f35_cfg.timeout_ms = std::max(config.enricher_llm.timeout_ms,
                                                   cortrix::spc::kContextualTimeoutMsMin);
                 }
+                // F35 §6.2 knobs without a yaml alias until 2026-07-10 (deep-QA):
+                // context token budget + the §8 injection-guard multiplier (whose
+                // fixed 2 rejected legitimate >160-byte contexts and silently
+                // dropped their contextualized vectors). 0 = built-in defaults.
+                if (config.enricher_llm.ctx_max_output_tokens > 0) {
+                    f35_cfg.max_output_tokens =
+                        std::clamp(config.enricher_llm.ctx_max_output_tokens,
+                                   cortrix::spc::kContextualMaxOutputTokensMin,
+                                   cortrix::spc::kContextualMaxOutputTokensMax);
+                }
+                if (config.enricher_llm.ctx_guard_chars_per_token > 0) {
+                    f35_cfg.guard_chars_per_token =
+                        std::clamp(config.enricher_llm.ctx_guard_chars_per_token,
+                                   cortrix::spc::kContextualGuardCharsPerTokenMin,
+                                   cortrix::spc::kContextualGuardCharsPerTokenMax);
+                }
                 auto f35 = std::make_shared<cortrix::spc::ContextualRetrievalEnricher>(
                     f35_cfg, enricher_chain_llm,
                     std::make_shared<cortrix::spc::ContextualOnnxEmbedder>(embedder_alias));
@@ -603,6 +632,11 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                         cortrix::spc::ClampHypeK(config.enricher_llm.hype_questions_per_chunk);
                     CORTRIX_LOG_INFO("main", "F38 hype questions_per_chunk={} (yaml override)",
                                      hype_cfg.questions_per_chunk);
+                }
+                // Same enricher_llm.timeout_ms wiring F03/F35 already honor —
+                // F38 historically ignored it and rode the client's default.
+                if (config.enricher_llm.timeout_ms > 0) {
+                    hype_cfg.timeout_ms = std::max(config.enricher_llm.timeout_ms, 1000);
                 }
                 auto f38 = std::make_shared<cortrix::spc::HyPEEnricher>(
                     hype_cfg, enricher_chain_llm,
@@ -636,6 +670,17 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                     std::to_string(config.spc.parser_max_concurrent > 0
                                        ? config.spc.parser_max_concurrent
                                        : 4));
+    // F42 enrich-retry sweeper pacing (deep-QA 2026-07-10): the sweeper already
+    // reads these keys but nothing ever seeded them, freezing the 60s x 32
+    // built-ins (a multi-hour drain at 5000-doc scale). 0/absent = unchanged.
+    if (config.spc.enrich_sweep_interval_sec > 0) {
+        f42_config->Set("f42.enrich_sweep_interval_sec",
+                        std::to_string(config.spc.enrich_sweep_interval_sec));
+    }
+    if (config.spc.enrich_sweep_batch > 0) {
+        f42_config->Set("f42.enrich_sweep_batch",
+                        std::to_string(config.spc.enrich_sweep_batch));
+    }
 
     cortrix::async::TaskManager task_mgr;
     if (cortrix::Status ti = task_mgr.Init(config.ns.data_dir + "/tasks.db"); !ti.ok()) {
