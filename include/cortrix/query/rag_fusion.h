@@ -72,6 +72,15 @@ public:
         int rrf_k = 60,
         const observability::TraceContext* ctx = nullptr);
 
+    /// v1.0.13 (§4.3.bis.5) config-aware overload: reads rrf_k plus the fusion
+    /// policy knobs (fusion_original_weight / fusion_variant_weight /
+    /// fusion_anchor_max) from `cfg`. The rrf_k-only overload above delegates
+    /// here with a default-constructed config (byte-identical v1.0.7 policy).
+    Result<std::vector<retrieval::ScoredResult>> FuseResults(
+        const std::vector<std::vector<retrieval::ScoredResult>>& per_variant_results,
+        const RagFusionConfig& cfg,
+        const observability::TraceContext* ctx);
+
     /// F36 path state for the explain endpoint (§4.3 / topic 5 revised + topic 6).
     /// Only surfaced via ?explain=true — never in a default query response.
     struct ExplainState {

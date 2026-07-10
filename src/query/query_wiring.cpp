@@ -460,6 +460,18 @@ RagFusionConfig ResolveRagFusionConfig(const httplib::Request& req, const json& 
             obj["activation_min_results"].is_number_integer()) {
             cfg.activation_min_results = obj["activation_min_results"].get<int>();
         }
+        if (obj.contains("fusion_original_weight") &&
+            obj["fusion_original_weight"].is_number()) {
+            cfg.fusion_original_weight = obj["fusion_original_weight"].get<float>();
+        }
+        if (obj.contains("fusion_variant_weight") &&
+            obj["fusion_variant_weight"].is_number()) {
+            cfg.fusion_variant_weight = obj["fusion_variant_weight"].get<float>();
+        }
+        if (obj.contains("fusion_anchor_max") &&
+            obj["fusion_anchor_max"].is_number_integer()) {
+            cfg.fusion_anchor_max = obj["fusion_anchor_max"].get<int>();
+        }
     };
 
     if (req.has_param("rag_fusion")) {

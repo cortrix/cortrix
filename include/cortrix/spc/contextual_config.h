@@ -43,6 +43,20 @@ inline constexpr int kContextualMaxOutputTokensDefault = 80;
 inline constexpr int kContextualMaxOutputTokensMin = 40;
 inline constexpr int kContextualMaxOutputTokensMax = 200;
 
+/// IGlobalConfig key: §8 injection-guard chars-per-token multiplier. The guard
+/// rejects a generation longer than max_output_tokens x this value, COUNTING
+/// BYTES (no tokenizer in this seam). The historical hardcoded 2 under-counts
+/// real text — 80 English tokens is ~320+ chars, CJK is 3 bytes/char in UTF-8 —
+/// so legitimate contexts were rejected as injection and the contextualized
+/// vector silently dropped (deep-QA finding 2026-07-10). Default stays 2
+/// (byte-identical); deployments should raise it (4-6) after measuring their
+/// kPromptInjection reject rate.
+inline constexpr const char* kContextualGuardCharsPerTokenKey =
+    "contextual_retrieval.guard_chars_per_token";
+inline constexpr int kContextualGuardCharsPerTokenDefault = 2;
+inline constexpr int kContextualGuardCharsPerTokenMin = 1;
+inline constexpr int kContextualGuardCharsPerTokenMax = 20;
+
 /// Default LLM model for contextual prefix generation (shared with the F03
 /// enricher / F38 HyPE default).
 inline constexpr const char* kContextualDefaultLlmModel = "gpt-4o-mini";

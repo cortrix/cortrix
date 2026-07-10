@@ -60,6 +60,11 @@ ContextualRetrievalConfig ResolveContextualConfig(const IGlobalConfig* global) {
     if (auto r = global->GetInt(kContextualTimeoutMsKey); r.ok()) {
         cfg.timeout_ms = std::max(r.value(), kContextualTimeoutMsMin);
     }
+    if (auto r = global->GetInt(kContextualGuardCharsPerTokenKey); r.ok()) {
+        cfg.guard_chars_per_token =
+            std::clamp(static_cast<int>(r.value()), kContextualGuardCharsPerTokenMin,
+                       kContextualGuardCharsPerTokenMax);
+    }
     return cfg;
 }
 
@@ -173,16 +178,21 @@ Result<std::string> ContextualRetrievalEnricher::GenerateContextualizedText(
         return ContextualStatus(ContextualErrorCode::kLlmFailed, resp.status.message());
     }
 
-    // §8 prompt-injection defense: an output longer than 2 x max_output_tokens
-    // (chars as a conservative proxy for token budget — no tokenizer in this seam)
-    // is treated as a hostile / runaway generation → permanent reject.
+    // §8 prompt-injection defense: an output longer than guard_chars_per_token x
+    // max_output_tokens (BYTES as a proxy for token budget — no tokenizer in this
+    // seam) is treated as a hostile / runaway generation → permanent reject.
+    // CAUTION: the historical fixed 2 under-counts real text (80 English tokens
+    // ~= 320+ chars) and rejected legitimate contexts; the multiplier is now
+    // config (default unchanged) so deployments can size it to their language.
     const size_t guard_limit =
-        static_cast<size_t>(config_.max_output_tokens) * 2u;
+        static_cast<size_t>(config_.max_output_tokens) *
+        static_cast<size_t>(std::max(config_.guard_chars_per_token, 1));
     if (resp.content.size() > guard_limit) {
         return ContextualStatus(
             ContextualErrorCode::kPromptInjection,
             "output length " + std::to_string(resp.content.size()) +
-                " exceeds 2x max_output_tokens " +
+                " exceeds " + std::to_string(config_.guard_chars_per_token) +
+                "x max_output_tokens " +
                 std::to_string(config_.max_output_tokens));
     }
     return resp.content;

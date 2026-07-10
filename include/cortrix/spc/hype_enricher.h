@@ -16,6 +16,11 @@ struct HyPEConfig {
     int questions_per_chunk = kHypeQuestionsDefault;   ///< K, default 3 (NS 1-10)
     std::string prompt_version = kHypePromptVersionDefault;  ///< "v1"
     std::string llm_model = kHypeDefaultLlmModel;      ///< "gpt-4o-mini"
+    /// Per-call LLM deadline in ms; 0 = the shared client's default. F35/F03
+    /// honor enricher_llm.timeout_ms while F38 historically ignored it — at
+    /// provider peak (GLM evening, observed 2026-07-08) the 30s client default
+    /// is the only protection hype generation gets. Wired from the same yaml key.
+    int timeout_ms = 0;
 };
 
 /// One generated hypothetical question for a child chunk (F38 §5.1). The embedding

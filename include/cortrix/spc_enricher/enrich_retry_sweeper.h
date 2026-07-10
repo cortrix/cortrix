@@ -68,6 +68,9 @@ public:
 private:
     void RunLoop();
     int SweepIntervalSec() const;
+    /// Per-NS per-tick doc cap: `f42.enrich_sweep_batch` KV when seeded (yaml
+    /// spc.enrich_sweep_batch), else the built-in kMaxDocsPerSweep.
+    int MaxDocsPerSweep() const;
 
     resource::INamespacePool& pool_;
     async::TaskScheduler* scheduler_;

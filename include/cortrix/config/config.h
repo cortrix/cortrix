@@ -53,6 +53,18 @@ struct LlmConfig {
     int batch_size = 0;          ///< enricher role only: chunks per LLM call (0 = consumer
                                  ///< default). Large batches push the non-streaming
                                  ///< generation past provider gateway idle windows.
+    int hype_questions_per_chunk = 0;  ///< enricher role only: F38 §4.3 hypothetical
+                                       ///< questions per chunk (0 = built-in default 3;
+                                       ///< clamped to the design range [1, 10]). The
+                                       ///< first-order candidate-pool-coverage lever.
+    int ctx_max_output_tokens = 0;     ///< enricher role only: F35 §6.2 context-prefix
+                                       ///< token budget (0 = built-in default 80;
+                                       ///< clamped to [40, 200]).
+    int ctx_guard_chars_per_token = 0; ///< enricher role only: F35 §8 injection-guard
+                                       ///< bytes-per-token multiplier (0 = built-in
+                                       ///< default 2; clamped to [1, 20]). The fixed 2
+                                       ///< rejected legitimate >160-byte English
+                                       ///< contexts and dropped their vectors.
 
     bool IsConfigured() const {
         return !provider.empty() && !api_key.empty() && !model.empty();
@@ -85,6 +97,15 @@ struct SPCConfig {
     bool enable_crash_recovery = true;
     std::string vision_llm_script;       // Path to run_vision_llm.py (empty = disabled)
     int vision_llm_timeout_s = 120;      // Per-call timeout for vision LLM
+    // Refuse to start when no document parser script can be located (default
+    // false = legacy WARN-and-boot). Without it a mis-provisioned host (missing
+    // CORTRIX_SCRIPTS_DIR) answers health 200 while 100% of ingests fail
+    // CX_ERR_PARSE_FAILED — observed as a full 5000-doc wipeout 2026-07-09.
+    bool require_parsers = false;
+    // F42 enrich-retry sweeper pacing. 0 = built-in defaults (60s tick, 32
+    // docs/NS/tick). At 5000-doc scale the defaults mean a multi-hour drain.
+    int enrich_sweep_interval_sec = 0;
+    int enrich_sweep_batch = 0;
 };
 
 struct UploadConfig {

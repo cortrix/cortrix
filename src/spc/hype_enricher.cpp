@@ -112,6 +112,9 @@ Result<std::vector<HypeQuestion>> HyPEEnricher::GenerateHypeQuestions(
 
     llm::LlmCallConfig call;
     call.model = config_.llm_model;
+    if (config_.timeout_ms > 0) {
+        call.timeout_ms = config_.timeout_ms;  // 0 = keep the client default
+    }
     llm::ChatCompletionResponse resp =
         llm_client_->Chat(BuildPrompt(chunk_text, parent_text, doc_meta, k), call);
     if (!resp.ok()) {

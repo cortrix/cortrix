@@ -549,6 +549,105 @@ TEST_F(RagFusionTest, RagFusion_FuseResults_RrfKNonPositiveFallback) {
     EXPECT_NEAR(out.value()[0].score, 1.7 / 61.0, 1e-6);
 }
 
+// ===========================================================================
+// v1.0.13 (§4.3.bis.5): fusion-policy knobs. Defaults are byte-identical to the
+// v1.0.7 constants — every pre-v1.0.13 test above already exercises the default
+// path through the legacy rrf_k-only overload's delegation.
+// ===========================================================================
+
+// Custom role weights honored (anchor off isolates the pure weighted-RRF order).
+TEST_F(RagFusionTest, RagFusion_FuseResults_ConfigCustomWeights) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        {{"a", 0.9f}, {"b", 0.8f}},  // original: a rank1, b rank2
+        {{"b", 0.95f}},              // variant: b rank1
+    };
+    RagFusionConfig cfg;
+    cfg.rrf_k = 60;
+    cfg.fusion_original_weight = 1.0f;
+    cfg.fusion_variant_weight = 1.0f;  // equal roles
+    cfg.fusion_anchor_max = 0;         // no guardrail: order = weighted RRF only
+    auto out = svc->FuseResults(per_variant, cfg, nullptr);
+    ASSERT_TRUE(out.ok());
+    ASSERT_EQ(out.value().size(), 2u);
+    // b: 1.0/62 + 1.0/61 > a: 1.0/61 — equal weights let the variant vote win.
+    EXPECT_EQ(out.value()[0].child_id, "b");
+    EXPECT_NEAR(out.value()[0].score, 1.0 / 62.0 + 1.0 / 61.0, 1e-6);
+    EXPECT_EQ(out.value()[1].child_id, "a");
+    EXPECT_NEAR(out.value()[1].score, 1.0 / 61.0, 1e-6);
+}
+
+// anchor_max = 0 disables the original-head guardrail entirely: a strong
+// multi-variant candidate may outrank the original top hit.
+TEST_F(RagFusionTest, RagFusion_FuseResults_AnchorMaxZeroDisablesGuardrail) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        {{"original_top", 0.99f}},
+        {{"variant_hit", 0.95f}},
+        {{"variant_hit", 0.94f}},
+        {{"variant_hit", 0.93f}},
+    };
+    RagFusionConfig cfg;
+    cfg.fusion_variant_weight = 1.7f;  // equal to original weight
+    cfg.fusion_anchor_max = 0;
+    auto out = svc->FuseResults(per_variant, cfg, nullptr);
+    ASSERT_TRUE(out.ok());
+    ASSERT_EQ(out.value().size(), 2u);
+    // variant_hit: 3 × 1.7/61 far above original_top: 1.7/61. With the default
+    // anchor (3) original_top would be emitted first; anchor 0 removes that.
+    EXPECT_EQ(out.value()[0].child_id, "variant_hit");
+    EXPECT_EQ(out.value()[1].child_id, "original_top");
+}
+
+// fusion_variant_weight = 0: variants contribute pool membership only — a
+// variant-only candidate stays in the fused list but never outranks any
+// original-scored candidate.
+TEST_F(RagFusionTest, RagFusion_FuseResults_VariantWeightZeroPoolOnly) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        {{"a", 0.9f}, {"b", 0.8f}},
+        {{"c", 0.99f}},  // variant-only candidate, rank1 in its list
+        {{"c", 0.98f}},
+    };
+    RagFusionConfig cfg;
+    cfg.fusion_variant_weight = 0.0f;
+    auto out = svc->FuseResults(per_variant, cfg, nullptr);
+    ASSERT_TRUE(out.ok());
+    ASSERT_EQ(out.value().size(), 3u);  // c still present (pool widened) ...
+    EXPECT_EQ(out.value()[0].child_id, "a");
+    EXPECT_EQ(out.value()[1].child_id, "b");
+    EXPECT_EQ(out.value()[2].child_id, "c");  // ... but strictly after original hits
+    EXPECT_NEAR(out.value()[2].score, 0.0, 1e-9);
+}
+
+// anchor_max above the built-in 3 extends the guardrail: with a coherent
+// original head, the full original top-5 stays ahead of a triple-variant
+// distractor that outscores original ranks 4-5 on fused RRF.
+TEST_F(RagFusionTest, RagFusion_FuseResults_AnchorMaxExtendsGuardrail) {
+    auto svc = MakeService(std::make_shared<MockLlmClient>());
+    std::vector<std::vector<ScoredResult>> per_variant = {
+        {{"o1", 0.9f}, {"o2", 0.89f}, {"o3", 0.88f}, {"o4", 0.87f}, {"o5", 0.86f}},
+        {{"distractor", 0.95f}},
+        {{"distractor", 0.94f}},
+        {{"distractor", 0.93f}},
+    };
+    // Variant weight 0.7 puts the distractor (3 × 0.7/61 = 0.03443) above even
+    // o1 (1.7/61 = 0.02787) on fused score, so ONLY the extended anchor keeps
+    // the original head intact — the assertion below fails if anchor_max stays 3.
+    RagFusionConfig cfg;
+    cfg.fusion_variant_weight = 0.7f;
+    cfg.fusion_anchor_max = 5;
+    auto out = svc->FuseResults(per_variant, cfg, nullptr);
+    ASSERT_TRUE(out.ok());
+    ASSERT_EQ(out.value().size(), 6u);
+    EXPECT_EQ(out.value()[0].child_id, "o1");
+    EXPECT_EQ(out.value()[1].child_id, "o2");
+    EXPECT_EQ(out.value()[2].child_id, "o3");
+    EXPECT_EQ(out.value()[3].child_id, "o4");
+    EXPECT_EQ(out.value()[4].child_id, "o5");
+    EXPECT_EQ(out.value()[5].child_id, "distractor");
+}
+
 // v1.0.7 regression guard: a variant-only distractor hit at rank1 in all three
 // variants must not push an original-query strong hit out of the anchored head.
 TEST_F(RagFusionTest, RagFusion_FuseResults_ConservativeProtectsOriginalStrongHit) {

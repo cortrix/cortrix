@@ -221,7 +221,7 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
     }
 
     // 3. Global RRF second-pass fusion across variants (§4.3 step 9 / topic 2 B).
-    auto fused = fusion_->FuseResults(per_variant, cfg.rrf_k, /*ctx=*/nullptr);
+    auto fused = fusion_->FuseResults(per_variant, cfg, /*ctx=*/nullptr);
 
     // 4. Re-order the union of ResultItems by the fused order. A fused child that
     //    has no materialized ResultItem (shouldn't happen — every fused child came

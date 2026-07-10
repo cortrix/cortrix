@@ -45,6 +45,9 @@ struct ContextualRetrievalConfig {
     int max_output_tokens = kContextualMaxOutputTokensDefault;  ///< 80 default (40-200)
     std::string llm_model = kContextualDefaultLlmModel;          ///< "gpt-4o-mini"
     int timeout_ms = kContextualTimeoutMs;  ///< per-call LLM deadline (§6.1 10s default)
+    /// §8 injection-guard bytes-per-token multiplier (default 2, range 1-20).
+    /// guard_limit = max_output_tokens x this; see kContextualGuardCharsPerTokenKey.
+    int guard_chars_per_token = kContextualGuardCharsPerTokenDefault;
 };
 
 /// Resolve a ContextualRetrievalConfig from `global` (F35 §6.2 three-layer
