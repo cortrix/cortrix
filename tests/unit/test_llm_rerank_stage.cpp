@@ -86,9 +86,16 @@ TEST(LlmRerankConfigTest, RejectsOutOfRangeFields) {
     EXPECT_EQ(field, "top_n");
 
     cfg = LlmRerankConfig{};
-    cfg.top_n = 51;
+    cfg.top_n = 201;  // cap raised 50 → 200 for deep-window probing (2026-07-12)
     EXPECT_FALSE(ValidateLlmRerankConfig(cfg, &field, &range));
     EXPECT_EQ(field, "top_n");
+
+    // The old cap boundary is now legal (deep window opt-in).
+    cfg = LlmRerankConfig{};
+    cfg.top_n = 51;
+    EXPECT_TRUE(ValidateLlmRerankConfig(cfg, &field, &range));
+    cfg.top_n = 200;
+    EXPECT_TRUE(ValidateLlmRerankConfig(cfg, &field, &range));
 
     cfg = LlmRerankConfig{};
     cfg.max_doc_chars = 99;
