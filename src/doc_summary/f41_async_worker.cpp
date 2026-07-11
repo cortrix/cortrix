@@ -79,6 +79,12 @@ Status F41AsyncWorker::ProcessTask(const async::TaskInfo& task) {
         return finalizer_.Fail(task, code, msg, structured_data, t_start);
     }
 
+    if (result.no_summary_content) {
+        // Empty documents have an explicit doc_id but no summary material. Mark the
+        // task complete without adding a synthetic doc_summary block.
+        return finalizer_.Complete(task, task.doc_id, t_start);
+    }
+
     // (3) Re-embed the summary_text (Generate leaves embedding empty by design).
     EmbeddingResult emb;
     Status es = embedder_.Embed(result.summary.summary_text, &emb);

@@ -24,6 +24,7 @@ struct GenerationResult {
     std::vector<float> embedding;        ///< BGE-M3 1024-dim (empty standalone → D3.5 pipeline)
     std::optional<agent_friendly::AgentFriendlyError> error;
     bool is_chunked = false;             ///< true when the map-reduce path ran (long doc)
+    bool no_summary_content = false;     ///< true when the doc exists but has no chunks to summarize
 };
 
 /// F41 async task payload (F41 §5.2). TaskType SoT = F42 §3.2

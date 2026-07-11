@@ -169,14 +169,14 @@ TEST_F(F41AsyncWorkerTest, WritesDocSummaryBlockOnSuccess) {
     EXPECT_EQ(DocSummaryMetrics::Instance().SummariesGeneratedCount(), 1u);
 }
 
-TEST_F(F41AsyncWorkerTest, GenerationFailureWritesNoBlock) {
-    // No child chunks → DocSummaryGenerator has nothing to summarize → failure;
-    // the worker must NOT write a doc_summary block (F41 §7.1 → FTS5 fallback).
+TEST_F(F41AsyncWorkerTest, EmptyDocumentCompletesWithoutWritingBlock) {
+    // No child chunks means an explicit empty document. The worker completes the
+    // task without writing a synthetic doc_summary block.
     const std::string doc_id = SeedDoc(0);
     F41AsyncWorker worker = MakeWorker(MakeLlm(kSummaryJson));
 
     Status s = worker.ProcessTask(SummaryTask(doc_id));
-    EXPECT_FALSE(s.ok());
+    EXPECT_TRUE(s.ok()) << s.message();
     EXPECT_FALSE(DocSummaryBlockOf(doc_id).has_value());
     EXPECT_EQ(DocSummaryMetrics::Instance().SummariesGeneratedCount(), 0u);
 }

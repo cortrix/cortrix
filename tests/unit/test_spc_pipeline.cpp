@@ -1833,11 +1833,14 @@ TEST_F(SPCPipelineTest, MemorySession_BeginWriteInProgress_SetsError) {
 // ============================================================
 
 // Empty paragraphs in ParsedDoc → chunker yields EMPTY_DOCUMENT → pipeline
-// marks kDone with zero blocks and does not return -1.
+// marks kDone with zero blocks and still fires the downstream summary seam.
 TEST_F(SPCPipelineTest, ProcessParsed_EmptyParagraphs_DoneZeroBlocks) {
     std::string doc_id = CreateDoc();
     auto task_uptr = MakeTask(txt_path_, "text/plain", doc_id);
     task_uptr->processing_level = 3;
+    std::vector<async::SubmitRequest> captured;
+    pipeline_->SetDocSummaryEnqueue(
+        [&](const async::SubmitRequest& r) { captured.push_back(r); });
 
     cortrix::spc::ParsedDoc d;
     d.status = cortrix::spc::ParserErrorCode::kOk;
@@ -1858,6 +1861,10 @@ TEST_F(SPCPipelineTest, ProcessParsed_EmptyParagraphs_DoneZeroBlocks) {
     EXPECT_EQ(rc, 0) << task_uptr->error_message;
     EXPECT_EQ(task_uptr->stage, SPCStage::kDone);
     EXPECT_EQ(BlocksOf(doc_id).size(), 0u);
+    ASSERT_EQ(captured.size(), 1u);
+    EXPECT_EQ(captured[0].doc_id, doc_id);
+    EXPECT_EQ(captured[0].namespace_id, facade_->namespace_id());
+    EXPECT_EQ(captured[0].task_type, async::kTaskDocSummary);
 }
 
 // ============================================================

@@ -321,6 +321,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             msg.find("empty") != std::string::npos) {
             facade.store().doc_update_status(task.doc_id, DocStatus::kReady);
             task.stage = SPCStage::kDone;
+            OnDocumentWritten(task.doc_id, facade.namespace_id());
             return 0;
         }
         task.stage = SPCStage::kError;
@@ -333,6 +334,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     if (out.parents.empty() && out.children.empty()) {
         facade.store().doc_update_status(task.doc_id, DocStatus::kReady);
         task.stage = SPCStage::kDone;
+        OnDocumentWritten(task.doc_id, facade.namespace_id());
         return 0;
     }
 
