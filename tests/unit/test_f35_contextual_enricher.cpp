@@ -143,15 +143,32 @@ TEST(F35ContextualEnricherTest, GenerateLlmFailureIsLlmFailed) {
 
 TEST(F35ContextualEnricherTest, GenerateOverlongOutputIsPromptInjection) {
     auto llm = std::make_shared<llm::MockLlmClient>();
-    // max_output_tokens default 80 → guard = 160 chars. Return 200 chars.
+    // Pin the multiplier (the mechanism under test, not the default): 80
+    // tokens x 2 = 160-byte ceiling. Return 200 chars → rejected.
     EXPECT_CALL(*llm, Chat(_, _))
         .WillOnce(Return(OkChat(std::string(200, 'x'))));
-    ContextualRetrievalEnricher e(ContextualRetrievalConfig{}, llm, MakeEmbedder());
+    ContextualRetrievalConfig cfg;
+    cfg.guard_chars_per_token = 2;
+    ContextualRetrievalEnricher e(cfg, llm, MakeEmbedder());
 
     auto r = e.GenerateContextualizedText("chunk", DocMeta(), MakeCtx("chunk"));
     EXPECT_FALSE(r.ok());
     EXPECT_NE(r.status().message().find("CX_ERR_F35_PROMPT_INJECTION"),
               std::string::npos);
+}
+
+// D12 regression: the default multiplier must accept a provider's natural
+// output at the default 80-token budget (~400 bytes observed live on the 5k
+// ingest). At the old default of 2 this exact case was rejected as injection
+// (41% false-reject rate).
+TEST(F35ContextualEnricherTest, GenerateNaturalLengthOutputAcceptedAtDefaultGuard) {
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    EXPECT_CALL(*llm, Chat(_, _))
+        .WillOnce(Return(OkChat(std::string(400, 'x'))));
+    ContextualRetrievalEnricher e(ContextualRetrievalConfig{}, llm, MakeEmbedder());
+
+    auto r = e.GenerateContextualizedText("chunk", DocMeta(), MakeCtx("chunk"));
+    EXPECT_TRUE(r.ok()) << r.status().message();
 }
 
 TEST(F35ContextualEnricherTest, GeneratePassesCallConfig) {
