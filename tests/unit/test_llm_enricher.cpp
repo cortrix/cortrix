@@ -128,6 +128,27 @@ TEST(LlmEnricherTest, DeepSeekStructuredCallDisablesThinkingAndUsesLargeTokenBud
     EXPECT_FALSE(captured.allow_reasoning_content_fallback);
 }
 
+// D5b operational relief: the batch-call response budget is a config knob now
+// (default stays 4096); deployments size it with batch_size instead of hitting
+// the hardcoded ceiling (~128 tokens/chunk at batch 32 truncated the JSON).
+TEST(LlmEnricherTest, ConfiguredMaxTokensFlowsToCall) {
+    auto mock = std::make_shared<llm::MockLlmClient>();
+    llm::LlmCallConfig captured;
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(DoAll(SaveArg<1>(&captured),
+                        Return(OkChat(R"({"0":{"summary":"ok","score":0.9}})"))));
+
+    DocumentMetadata meta;
+    auto cfg = LlmCfg();
+    cfg.max_tokens = 8192;
+    LlmEnricher enr(cfg, mock);
+    auto results = enr.EnrichBatch(Batch(meta, 1));
+
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_TRUE(results[0].ok());
+    EXPECT_EQ(captured.max_tokens, 8192);
+}
+
 TEST(LlmEnricherTest, BatchSplitByBatchSize) {
     auto mock = std::make_shared<llm::MockLlmClient>();
     auto cfg = LlmCfg();

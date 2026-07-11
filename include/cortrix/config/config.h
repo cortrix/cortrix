@@ -53,6 +53,12 @@ struct LlmConfig {
     int batch_size = 0;          ///< enricher role only: chunks per LLM call (0 = consumer
                                  ///< default). Large batches push the non-streaming
                                  ///< generation past provider gateway idle windows.
+    int max_tokens = 0;          ///< enricher role only: response token budget for the
+                                 ///< F03 batch call (0 = built-in default 4096). Size it
+                                 ///< with batch_size — 4096 across a 32-chunk batch is
+                                 ///< ~128 tokens/chunk and truncates the batch JSON (D5b
+                                 ///< evidence); the budget/batch policy itself stays a
+                                 ///< deployment decision until the D5b design round.
     int hype_questions_per_chunk = 0;  ///< enricher role only: F38 §4.3 hypothetical
                                        ///< questions per chunk (0 = built-in default 3;
                                        ///< clamped to the design range [1, 10]). The
@@ -62,9 +68,9 @@ struct LlmConfig {
                                        ///< clamped to [40, 200]).
     int ctx_guard_chars_per_token = 0; ///< enricher role only: F35 §8 injection-guard
                                        ///< bytes-per-token multiplier (0 = built-in
-                                       ///< default 2; clamped to [1, 20]). The fixed 2
-                                       ///< rejected legitimate >160-byte English
-                                       ///< contexts and dropped their vectors.
+                                       ///< default 6; clamped to [1, 20]). The old
+                                       ///< default 2 rejected legitimate >160-byte
+                                       ///< outputs as injection (D12).
 
     bool IsConfigured() const {
         return !provider.empty() && !api_key.empty() && !model.empty();
