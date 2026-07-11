@@ -134,7 +134,13 @@ std::string SanitizeFts5Query(const std::string& raw_query) {
         }
 
         if (!first_token) {
-            sanitized += ' ';
+            // OR-join (D6): FTS5 treats a bare space between terms as implicit
+            // AND, so a natural-language query required every token to co-occur
+            // inside ONE block — the BM25 route returned zero rows on ~98% of
+            // benchmark queries. OR restores bag-of-words BM25 (rank still
+            // rewards blocks matching more/rarer terms); every token stays
+            // quoted, so user-supplied operator words remain literals (M-SEC-001).
+            sanitized += " OR ";
         }
         // Wrap token in double quotes to force literal matching
         sanitized += '"';

@@ -188,9 +188,11 @@ TEST(Fts5SanitizeTextExact, SingleWordIsQuoteWrapped) {
     EXPECT_EQ(SanitizeFts5Query("hello"), std::string("\"hello\""));
 }
 
-TEST(Fts5SanitizeTextExact, TwoWordsSpaceJoinedQuoted) {
+TEST(Fts5SanitizeTextExact, TwoWordsOrJoinedQuoted) {
+    // OR-join (D6): a bare space is implicit AND in FTS5 and starved the BM25
+    // route on natural-language queries.
     EXPECT_EQ(SanitizeFts5Query("hello world"),
-              std::string("\"hello\" \"world\""));
+              std::string("\"hello\" OR \"world\""));
 }
 
 TEST(Fts5SanitizeTextExact, EmbeddedQuoteDoubled) {
@@ -205,7 +207,7 @@ TEST(Fts5SanitizeTextExact, PureOperatorTokenDropped) {
 
 TEST(Fts5SanitizeTextExact, WhitespaceCollapsedAroundContent) {
     EXPECT_EQ(SanitizeFts5Query("   foo  \t bar \n"),
-              std::string("\"foo\" \"bar\""));
+              std::string("\"foo\" OR \"bar\""));
 }
 
 }  // namespace

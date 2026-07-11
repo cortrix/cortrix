@@ -677,17 +677,20 @@ TEST(Fts5SanitizeTest, SimpleWord) {
     EXPECT_EQ(SanitizeFts5Query("hello"), "\"hello\"");
 }
 
-// Test 19: SanitizeFts5Query - multiple words are individually quoted
+// Test 19: SanitizeFts5Query - multiple words are individually quoted and
+// OR-joined (D6: a bare space is implicit AND in FTS5, which forced every
+// token to co-occur in one block and starved the BM25 route).
 TEST(Fts5SanitizeTest, MultipleWords) {
-    EXPECT_EQ(SanitizeFts5Query("hello world"), "\"hello\" \"world\"");
+    EXPECT_EQ(SanitizeFts5Query("hello world"), "\"hello\" OR \"world\"");
 }
 
 // Test 20: SanitizeFts5Query - FTS5 operators are quoted (treated as literals)
 TEST(Fts5SanitizeTest, OperatorsQuoted) {
-    // AND, OR, NOT should be treated as literal words, not operators
-    EXPECT_EQ(SanitizeFts5Query("cat AND dog"), "\"cat\" \"AND\" \"dog\"");
-    EXPECT_EQ(SanitizeFts5Query("cat OR dog"), "\"cat\" \"OR\" \"dog\"");
-    EXPECT_EQ(SanitizeFts5Query("NOT cat"), "\"NOT\" \"cat\"");
+    // AND, OR, NOT should be treated as literal words, not operators; the only
+    // bare OR tokens are the sanitizer's own joiners.
+    EXPECT_EQ(SanitizeFts5Query("cat AND dog"), "\"cat\" OR \"AND\" OR \"dog\"");
+    EXPECT_EQ(SanitizeFts5Query("cat OR dog"), "\"cat\" OR \"OR\" OR \"dog\"");
+    EXPECT_EQ(SanitizeFts5Query("NOT cat"), "\"NOT\" OR \"cat\"");
     EXPECT_EQ(SanitizeFts5Query("NEAR(cat,dog)"), "\"NEAR(cat,dog)\"");
 }
 
@@ -724,7 +727,7 @@ TEST(Fts5SanitizeTest, Utf8Preserved) {
     EXPECT_EQ(result, "\"测试\"");
 
     result = SanitizeFts5Query("hello 世界");
-    EXPECT_EQ(result, "\"hello\" \"世界\"");
+    EXPECT_EQ(result, "\"hello\" OR \"世界\"");
 }
 
 // Test 26: FTS5 search with operator injection is safe
@@ -756,7 +759,63 @@ TEST_F(StoreSqliteTest, FTS5OperatorInjectionSafe) {
     ret = store_->search_fulltext("machine AND learning", 10, results);
     EXPECT_EQ(ret, 0);
     // Should find result since "machine" and "learning" are both present
-    // (they are quoted individually so it's an implicit AND in FTS5)
+    // (tokens are quoted individually and OR-joined by the sanitizer)
+}
+
+// D6 regression: a natural-language query must match blocks that contain only
+// a SUBSET of its terms. Under the old implicit-AND join this returned zero
+// rows (live 5k evidence: fts5 path had 0 votes on ~98% of queries).
+TEST_F(StoreSqliteTest, FTS5NaturalLanguageMatchesPartialTerms) {
+    CortrixDoc doc;
+    doc.source_type = "test";
+    doc.source_path = "test.txt";
+    store_->doc_create(doc);
+
+    const char* texts[] = {"machine learning model", "distributed training pipeline"};
+    for (int i = 0; i < 2; ++i) {
+        auto blob = BlockBuild(kBlockFile, kLevelL2, texts[i], "", "", 0, 0);
+        CortrixBlock block;
+        block.doc_id = doc.doc_id;
+        block.chunk_index = i;
+        block.block_type = 1;
+        block.processing_level = 2;
+        block.data = blob;
+        block.content_text = texts[i];
+        store_->block_insert(block);
+    }
+
+    std::vector<SearchResult> results;
+    int ret = store_->search_fulltext("what is machine training", 10, results);
+    EXPECT_EQ(ret, 0);
+    EXPECT_EQ(results.size(), 2u);  // each block matches one informative term
+}
+
+// D6 regression: bm25 rank still rewards the block matching more query terms,
+// so OR-joining does not degrade ordering quality.
+TEST_F(StoreSqliteTest, FTS5RankPrefersMoreMatchedTerms) {
+    CortrixDoc doc;
+    doc.source_type = "test";
+    doc.source_path = "test.txt";
+    store_->doc_create(doc);
+
+    const char* texts[] = {"machine learning model", "machine parts catalog"};
+    for (int i = 0; i < 2; ++i) {
+        auto blob = BlockBuild(kBlockFile, kLevelL2, texts[i], "", "", 0, 0);
+        CortrixBlock block;
+        block.doc_id = doc.doc_id;
+        block.chunk_index = i;
+        block.block_type = 1;
+        block.processing_level = 2;
+        block.data = blob;
+        block.content_text = texts[i];
+        store_->block_insert(block);
+    }
+
+    std::vector<SearchResult> results;
+    int ret = store_->search_fulltext("machine learning", 10, results);
+    EXPECT_EQ(ret, 0);
+    ASSERT_EQ(results.size(), 2u);
+    EXPECT_EQ(results[0].content_text, "machine learning model");
 }
 
 // Test 27: FTS5 search with empty query returns empty results
@@ -1221,17 +1280,17 @@ TEST_F(StoreSqliteTest, DocListByStatusDeleting) {
 
 // Test 51: SanitizeFts5Query with tabs and newlines mixed with words
 TEST(Fts5SanitizeTest, TabsAndNewlines) {
-    EXPECT_EQ(SanitizeFts5Query("hello\tworld\nfoo"), "\"hello\" \"world\" \"foo\"");
+    EXPECT_EQ(SanitizeFts5Query("hello\tworld\nfoo"), "\"hello\" OR \"world\" OR \"foo\"");
 }
 
 // Test 52: SanitizeFts5Query with carriage return
 TEST(Fts5SanitizeTest, CarriageReturn) {
-    EXPECT_EQ(SanitizeFts5Query("a\rb"), "\"a\" \"b\"");
+    EXPECT_EQ(SanitizeFts5Query("a\rb"), "\"a\" OR \"b\"");
 }
 
 // Test 53: SanitizeFts5Query with multiple consecutive spaces
 TEST(Fts5SanitizeTest, MultipleSpaces) {
-    EXPECT_EQ(SanitizeFts5Query("  hello    world  "), "\"hello\" \"world\"");
+    EXPECT_EQ(SanitizeFts5Query("  hello    world  "), "\"hello\" OR \"world\"");
 }
 
 // ============================================================
