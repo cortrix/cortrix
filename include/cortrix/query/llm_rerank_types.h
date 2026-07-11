@@ -28,7 +28,13 @@ struct LlmRerankConfig {
 
 /// Inclusive validation bounds (§2.1 / §3.5.1).
 constexpr int kLlmRerankTopNMin = 2;
-constexpr int kLlmRerankTopNMax = 50;
+/// 50 → 200 (2026-07-12): deep-window probing. The 5k separation probe put
+/// recall@200 at 0.9024 vs 0.8318 within the top-50 window — the remaining
+/// headroom lives at ranks 51-200, unreachable under the old cap. The wiring
+/// already widens retrieval top_k to top_n and trims back after the stage, so
+/// the cap was the only blocker. Default top_n (30) is unchanged; cost scales
+/// linearly with top_n and remains the Agent's per-request opt-in.
+constexpr int kLlmRerankTopNMax = 200;
 constexpr int kLlmRerankMaxDocCharsMin = 100;
 constexpr int kLlmRerankMaxDocCharsMax = 4000;
 constexpr int64_t kLlmRerankTimeoutMsMin = 1000;

@@ -65,9 +65,15 @@ public:
     /// TEST-ONLY: wake every `ms` instead of the configured interval.
     void set_test_interval_ms(int64_t ms) { test_interval_ms_ = ms; }
 
+    /// Effective sweep interval: `f42.enrich_sweep_interval_sec` KV when seeded
+    /// (yaml spc.enrich_sweep_interval_sec), else kDefaultSweepIntervalSec.
+    /// Public so startup logging can report the value actually in force —
+    /// the old log printed the compile-time constant and masked live knob
+    /// state twice (2026-07-10/11, D7b).
+    int SweepIntervalSec() const;
+
 private:
     void RunLoop();
-    int SweepIntervalSec() const;
     /// Per-NS per-tick doc cap: `f42.enrich_sweep_batch` KV when seeded (yaml
     /// spc.enrich_sweep_batch), else the built-in kMaxDocsPerSweep.
     int MaxDocsPerSweep() const;

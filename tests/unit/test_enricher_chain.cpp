@@ -84,6 +84,30 @@ public:
     std::string Name() const override { return "f35_contextual_retrieval"; }
 };
 
+// A fake F35-style enricher whose member FAILS while the step stays OK
+// (status 0, contextualized_status 2, error_msg set) — the real F35 degrade
+// shape (§7.3 transparent degrade / §8 injection-guard reject).
+class FailSoftContextualEnricher : public ISpcEnricher {
+public:
+    EnrichResult Enrich(const std::string&, const DocumentMetadata&,
+                        const ChunkContext&) override {
+        EnrichResult r;
+        r.contextualized_status = 2;  // failed (fail-soft: step status stays 0)
+        r.error_msg = "output length 300 exceeds 2x max_output_tokens 80";
+        r.error_meta.structured_data =
+            "{\"enricher\":\"f35_contextual_retrieval\"}";
+        return r;
+    }
+    std::vector<EnrichResult> EnrichBatch(const std::vector<ChunkContext>& c) override {
+        std::vector<EnrichResult> out;
+        for (size_t i = 0; i < c.size(); ++i)
+            out.push_back(Enrich(c[i].chunk_text, *c[i].doc_metadata, c[i]));
+        return out;
+    }
+    bool IsAvailable() const override { return true; }
+    std::string Name() const override { return "f35_contextual_retrieval"; }
+};
+
 // A fake enricher that always throws (exercises the fail-soft catch).
 class ThrowingEnricher : public ISpcEnricher {
 public:
@@ -167,6 +191,34 @@ TEST(EnricherChainRun, MergesF03AndF35PerChunk) {
         // both steps recorded, neither skipped
         EXPECT_EQ(res[i].steps.size(), 2u);
     }
+}
+
+// D12 (2026-07-11): the F35 fail-soft outcome (step OK, contextualized_status 2)
+// must carry its error_msg into the step record — otherwise the debt row is
+// written with a blank last_error and the real cause (live 5k ingest: the §8
+// injection-guard byte limit, 4,139 blank rows) is unobservable.
+TEST(EnricherChainRun, F35FailSoftCarriesErrorCodeInStepRecord) {
+    auto dm = DocMeta();
+    EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>("kept"));
+    chain.Append(std::make_shared<FailSoftContextualEnricher>());
+
+    auto ctxs = MakeContexts({"c1"}, &dm);
+    auto res = chain.EnrichChunks(ctxs, {}, {}, {});
+    ASSERT_EQ(res.size(), 1u);
+    // The member failure is recorded in the merged result...
+    EXPECT_EQ(res[0].merged.contextualized_status, 2);
+    // ...the step itself stays OK (fail-soft: chunk keeps original embedding)...
+    const EnricherStepOutcome* f35 = nullptr;
+    for (const auto& s : res[0].steps)
+        if (s.name == "f35_contextual_retrieval") f35 = &s;
+    ASSERT_NE(f35, nullptr);
+    EXPECT_EQ(f35->status, 0);
+    EXPECT_FALSE(f35->skipped);
+    // ...but the cause is preserved for the debt-row writers (the fix).
+    EXPECT_EQ(f35->error_code, "output length 300 exceeds 2x max_output_tokens 80");
+    // F03 output unaffected by the F35 member failure.
+    EXPECT_EQ(res[0].merged.summary, "kept");
 }
 
 TEST(EnricherChainRun, FailSoftSkipsThrowingEnricher) {

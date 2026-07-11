@@ -225,6 +225,14 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
                     merged.error_meta = step.error_meta;
                     merged.error_msg = step.error_msg;
                 }
+            } else if (step.contextualized_status == 2 && !step.error_msg.empty()) {
+                // F35 fail-soft: the step reports OK (the chunk keeps its original
+                // embedding) but the member outcome is a failure recorded only in
+                // contextualized_status. Without this, the f35 debt row is written
+                // with an empty last_error and the real cause (e.g. the §8
+                // injection-guard byte limit) is unobservable — 2026-07-11 live 5k
+                // ingest: 4,139 such rows, all blank (D12).
+                err_code = step.error_msg;
             }
             results[i].steps.push_back({name, step.status, err_code, false});
         }

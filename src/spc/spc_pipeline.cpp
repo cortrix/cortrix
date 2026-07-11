@@ -448,7 +448,14 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                 bool f03_failed = false, f35_failed = false, f38_failed = false;
                 std::string first_err;
                 for (const auto& st : chain_res[i].steps) {
-                    if (st.skipped || st.status == 0) continue;
+                    if (st.skipped) continue;
+                    if (st.status == 0) {
+                        // F35 fail-soft carries its cause in error_code with
+                        // status==0 (see enricher_chain); harvest it so the debt
+                        // row records why instead of a blank last_error (D12).
+                        if (first_err.empty() && !st.error_code.empty()) first_err = st.error_code;
+                        continue;
+                    }
                     if (st.name == "hype") f38_failed = true;
                     else if (st.name == "f35_contextual_retrieval") f35_failed = true;
                     else f03_failed = true;  // the F03 head slot (LlmEnricher / …)

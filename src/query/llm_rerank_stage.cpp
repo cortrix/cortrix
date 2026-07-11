@@ -135,7 +135,7 @@ bool ValidateLlmRerankConfig(const LlmRerankConfig& cfg, std::string* field,
         return false;
     };
     if (cfg.top_n < kLlmRerankTopNMin || cfg.top_n > kLlmRerankTopNMax) {
-        return fail("top_n", "an integer in [2, 50]");
+        return fail("top_n", "an integer in [2, 200]");
     }
     if (cfg.max_doc_chars < kLlmRerankMaxDocCharsMin ||
         cfg.max_doc_chars > kLlmRerankMaxDocCharsMax) {
