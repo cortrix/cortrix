@@ -104,6 +104,23 @@ TEST(F41DocSummaryGeneratorTest, ParseCompleteFencedJson) {
     EXPECT_NE(r.value().summary_text.find("Q3 2026"), std::string::npos);
 }
 
+TEST(F41DocSummaryGeneratorTest, ParseRepairsInvalidBackslashEscapeInJsonString) {
+    DocSummaryGenerator g = MakeGen(std::make_shared<llm::MockLlmClient>(),
+                                    std::make_shared<store::MockChunkStore>());
+    const char* deepseek_style_json = R"({
+      "summary_text": "This document includes an escaped shrug example: ¯\_(ツ)_/¯.",
+      "keywords": ["summary", "escape", "json"],
+      "topics": ["Technical Documentation"],
+      "one_liner": "Invalid backslash escape"
+    })";
+
+    auto r = g.ParseStructuredOutput(deepseek_style_json, 500);
+
+    ASSERT_TRUE(r.ok()) << r.status().message();
+    EXPECT_NE(r.value().summary_text.find(R"(¯\_(ツ)_/¯)"), std::string::npos);
+    EXPECT_EQ(r.value().keywords.size(), 3u);
+}
+
 TEST(F41DocSummaryGeneratorTest, ParseMissingSummaryTextIsInvalid) {
     DocSummaryGenerator g = MakeGen(std::make_shared<llm::MockLlmClient>(),
                                     std::make_shared<store::MockChunkStore>());
@@ -126,6 +143,26 @@ TEST(F41DocSummaryGeneratorTest, ParseRepairsProseWrappedJson) {
     ASSERT_TRUE(r.ok()) << r.status().message();
     EXPECT_NE(r.value().summary_text.find("Q3 2026"), std::string::npos);
     EXPECT_EQ(repair, "balanced_extract");
+}
+
+TEST(F41DocSummaryGeneratorTest, ParseRepairsProseWrappedJsonWithInvalidEscape) {
+    DocSummaryGenerator g = MakeGen(std::make_shared<llm::MockLlmClient>(),
+                                    std::make_shared<store::MockChunkStore>());
+    const char* wrapped = R"(Here is the requested object:
+{
+  "summary_text": "A shrug example: ¯\_(ツ)_/¯.",
+  "keywords": ["summary", "escape"],
+  "topics": ["Technical Documentation"],
+  "one_liner": "Wrapped invalid escape"
+}
+End of response.)";
+    std::string repair;
+
+    auto r = g.ParseStructuredOutput(wrapped, 500, &repair);
+
+    ASSERT_TRUE(r.ok()) << r.status().message();
+    EXPECT_NE(r.value().summary_text.find(R"(¯\_(ツ)_/¯)"), std::string::npos);
+    EXPECT_EQ(repair, "balanced_extract_invalid_string_escape");
 }
 
 TEST(F41DocSummaryGeneratorTest, ParseRepairsUnclosedFence) {
@@ -365,17 +402,22 @@ TEST(F41DocSummaryGeneratorTest, GenerateSuccess) {
     DocSummaryMetrics::Instance().ResetForTest();
 }
 
-TEST(F41DocSummaryGeneratorTest, GenerateNoChunksIsDocTooLarge) {
+TEST(F41DocSummaryGeneratorTest, GenerateNoChunksCompletesWithoutSummaryContent) {
+    DocSummaryMetrics::Instance().ResetForTest();
     auto llm = std::make_shared<llm::MockLlmClient>();
     auto store = std::make_shared<store::MockChunkStore>();
     EXPECT_CALL(*store, GetChunksByDocId("empty"))
         .WillOnce(Return(std::vector<store::ChunkRecord>{}));
+    EXPECT_CALL(*llm, Chat(_, _)).Times(0);
     DocSummaryGenerator g = MakeGen(llm, store);
 
     GenerationResult res = g.Generate("empty", "ns1");
-    EXPECT_FALSE(res.success);
-    ASSERT_TRUE(res.error.has_value());
-    EXPECT_EQ(res.error->code, "CX_ERR_F41_DOC_TOO_LARGE");
+    EXPECT_TRUE(res.success);
+    EXPECT_TRUE(res.no_summary_content);
+    EXPECT_FALSE(res.error.has_value());
+    EXPECT_TRUE(res.summary.summary_text.empty());
+    EXPECT_EQ(DocSummaryMetrics::Instance().SummariesGeneratedCount(), 0u);
+    DocSummaryMetrics::Instance().ResetForTest();
 }
 
 TEST(F41DocSummaryGeneratorTest, GenerateLlmFailureCarriesTimeoutError) {

@@ -58,10 +58,12 @@ public:
 
     /// Main entry (F42 async-task callback target). Loads the doc's chunks via
     /// ChunkStore, runs the single-call or map-reduce summary, parses the
-    /// structured output, and returns it. On any failure GenerationResult.success
-    /// is false and .error carries the CX_ERR_F41_* identity (the F42 worker maps
-    /// it to retry / DLQ + doc_summary_status="failed"). `embedding` is left empty
-    /// (the OnnxEmbedder re-embed is D3.5 pipeline wiring).
+    /// structured output, and returns it. Empty documents succeed with
+    /// no_summary_content=true so the F42 task can complete as a no-op. On any
+    /// failure GenerationResult.success is false and .error carries the
+    /// CX_ERR_F41_* identity (the F42 worker maps it to retry / DLQ +
+    /// doc_summary_status="failed"). `embedding` is left empty (the OnnxEmbedder
+    /// re-embed is D3.5 pipeline wiring).
     GenerationResult Generate(const std::string& doc_id, const std::string& ns_id);
 
     /// §9.2 map-reduce: short docs (chunks <= chunk_threshold) → one structured

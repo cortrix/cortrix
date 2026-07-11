@@ -61,6 +61,66 @@ std::vector<std::string> ToStringArray(const json& node, const std::string& key)
     return out;
 }
 
+bool IsValidJsonEscape(char c) {
+    switch (c) {
+        case '"':
+        case '\\':
+        case '/':
+        case 'b':
+        case 'f':
+        case 'n':
+        case 'r':
+        case 't':
+        case 'u':
+            return true;
+        default:
+            return false;
+    }
+}
+
+std::string EscapeInvalidJsonStringBackslashes(const std::string& value) {
+    std::string out;
+    out.reserve(value.size());
+
+    bool in_string = false;
+    bool after_backslash = false;
+    for (char c : value) {
+        if (!in_string) {
+            if (c == '"') in_string = true;
+            out.push_back(c);
+            continue;
+        }
+
+        if (after_backslash) {
+            if (!IsValidJsonEscape(c)) out.push_back('\\');
+            out.push_back(c);
+            after_backslash = false;
+            continue;
+        }
+
+        if (c == '\\') {
+            out.push_back(c);
+            after_backslash = true;
+            continue;
+        }
+
+        if (c == '"') in_string = false;
+        out.push_back(c);
+    }
+
+    if (after_backslash) out.push_back('\\');
+    return out;
+}
+
+json ParseJsonObjectWithLlmStringEscapeRepair(const std::string& value) {
+    json root = json::parse(value, /*cb=*/nullptr, /*allow_exceptions=*/false);
+    if (!root.is_discarded() && root.is_object()) return root;
+
+    const std::string repaired = EscapeInvalidJsonStringBackslashes(value);
+    if (repaired == value) return root;
+    return json::parse(repaired, /*cb=*/nullptr, /*allow_exceptions=*/false);
+}
+
 std::string TruncateForDiagnostics(const std::string& value, size_t max_bytes) {
     if (value.size() <= max_bytes) return value;
     return value.substr(0, max_bytes) + "...[truncated]";
@@ -251,6 +311,12 @@ Result<DocSummaryStructured> DocSummaryGenerator::ParseStructuredOutput(
     const std::string normalized_output = common::UnwrapCompleteJsonFence(llm_output);
     json root = json::parse(normalized_output, /*cb=*/nullptr, /*allow_exceptions=*/false);
     if (root.is_discarded()) {
+        root = ParseJsonObjectWithLlmStringEscapeRepair(normalized_output);
+        if (!root.is_discarded() && root.is_object()) {
+            if (parse_repair) *parse_repair = "invalid_string_escape";
+        }
+    }
+    if (root.is_discarded()) {
         // Second chance (deep-QA 2026-07-10, recorded method change): providers
         // occasionally wrap the object in prose or an UNCLOSED fence — both
         // rightly refused by the strict path, both observed live as
@@ -263,8 +329,17 @@ Result<DocSummaryStructured> DocSummaryGenerator::ParseStructuredOutput(
             common::ExtractFirstBalancedJsonObject(llm_output);
         if (!extracted.empty()) {
             root = json::parse(extracted, /*cb=*/nullptr, /*allow_exceptions=*/false);
+            bool repaired_escape = false;
+            if (root.is_discarded()) {
+                root = ParseJsonObjectWithLlmStringEscapeRepair(extracted);
+                repaired_escape = !root.is_discarded();
+            }
             if (!root.is_discarded() && root.is_object()) {
-                if (parse_repair) *parse_repair = "balanced_extract";
+                if (parse_repair) {
+                    *parse_repair = repaired_escape
+                                        ? "balanced_extract_invalid_string_escape"
+                                        : "balanced_extract";
+                }
             }
         }
     }
@@ -406,12 +481,11 @@ GenerationResult DocSummaryGenerator::Generate(const std::string& doc_id,
     }
     std::vector<store::ChunkRecord> chunks = chunk_store_->GetChunksByDocId(doc_id);
     if (chunks.empty()) {
-        // No content to summarize — treat as a permanent doc-too-large/empty case
-        // (the F42 worker marks status=failed; no retry helps an empty doc).
-        result.error = MakeDocSummaryError(
-            DocSummaryErrorCode::kDocTooLarge,
-            {{"doc_id", doc_id}, {"doc_size_bytes", 0}, {"max_allowed_bytes", 0}},
-            "document has no chunks to summarize");
+        // An explicit doc_id with no chunks is a valid empty document. Complete the
+        // downstream task without calling the LLM or writing a summary block so the
+        // task lifecycle count still matches the imported document count.
+        result.success = true;
+        result.no_summary_content = true;
         return result;
     }
 
