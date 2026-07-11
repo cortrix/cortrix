@@ -107,6 +107,7 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (n["base_url"]) cfg.base_url = n["base_url"].as<std::string>();
         if (n["timeout_ms"]) cfg.timeout_ms = n["timeout_ms"].as<int>();
         if (n["batch_size"]) cfg.batch_size = n["batch_size"].as<int>();
+        if (n["max_tokens"]) cfg.max_tokens = n["max_tokens"].as<int>();
         if (n["hype_questions_per_chunk"])
             cfg.hype_questions_per_chunk = n["hype_questions_per_chunk"].as<int>();
         if (n["ctx_max_output_tokens"])

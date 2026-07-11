@@ -143,6 +143,7 @@ enricher_llm:
   provider: "glm"
   api_key: "sk-enrich"
   model: "glm-4-flash"
+  max_tokens: 8192
   ctx_max_output_tokens: 120
   ctx_guard_chars_per_token: 6
 
@@ -152,6 +153,7 @@ spc:
   enrich_sweep_batch: 128
 )");
     auto config = LoadConfig(yaml_path_);
+    EXPECT_EQ(config.enricher_llm.max_tokens, 8192);
     EXPECT_EQ(config.enricher_llm.ctx_max_output_tokens, 120);
     EXPECT_EQ(config.enricher_llm.ctx_guard_chars_per_token, 6);
     EXPECT_TRUE(config.spc.require_parsers);
@@ -159,6 +161,7 @@ spc:
     EXPECT_EQ(config.spc.enrich_sweep_batch, 128);
 
     auto absent = LoadConfig("");
+    EXPECT_EQ(absent.enricher_llm.max_tokens, 0);
     EXPECT_EQ(absent.enricher_llm.ctx_max_output_tokens, 0);
     EXPECT_EQ(absent.enricher_llm.ctx_guard_chars_per_token, 0);
     EXPECT_FALSE(absent.spc.require_parsers);

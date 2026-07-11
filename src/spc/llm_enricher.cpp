@@ -233,6 +233,7 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
         std::string prompt;
         std::string model;
         int task_timeout_ms = 30000;
+        int max_tokens = 4096;
         // outputs:
         llm::ChatCompletionResponse chat;
         int attempts = 0;
@@ -250,13 +251,14 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
         slot->prompt = prompt;
         slot->model = model;
         slot->task_timeout_ms = config_.task_timeout_ms;
+        slot->max_tokens = config_.max_tokens > 0 ? config_.max_tokens : 4096;
         const int64_t t0 = NowMs();
         // Task captures ONLY the slot (shared_ptr) + t0 by value.
         auto task = [slot, t0]() -> float {
             llm::LlmCallConfig call;
             call.model = slot->model;
             call.timeout_ms = slot->task_timeout_ms;
-            call.max_tokens = 4096;
+            call.max_tokens = slot->max_tokens;
             call.response_format = "json_object";
             call.allow_reasoning_content_fallback = false;
             if (ModelSupportsThinkingControl(call.model)) {

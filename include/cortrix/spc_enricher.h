@@ -153,6 +153,9 @@ struct EnricherConfig {
     int queue_size = 100;
     int task_timeout_ms = 30000;
     int batch_size = 8;                           ///< topic 1.2 (1-32)
+    int max_tokens = 4096;                        ///< batch-call response budget; size it
+                                                  ///< with batch_size (128 tokens/chunk at
+                                                  ///< batch 32 truncates the batch JSON — D5b)
     bool circuit_breaker_enabled = true;          ///< topic 3.4
     int circuit_breaker_threshold = 10;
     int circuit_breaker_cooldown_sec = 60;        ///< F03 60s (differs from F02's 30s)
