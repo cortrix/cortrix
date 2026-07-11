@@ -264,7 +264,17 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
             // Member-aware outcome (same rules as the ingest write phase).
             bool f03_failed = false, f35_failed = false, f38_failed = false;
             for (const auto& st : res[i].steps) {
-                if (st.skipped || st.status == 0) continue;
+                if (st.skipped) continue;
+                if (st.status == 0) {
+                    // F35 fail-soft: status==0 with a populated error_code (see
+                    // enricher_chain). Harvest it — this was the writer that left
+                    // 4,139 f35 debt rows with a blank last_error on the 2026-07-11
+                    // live 5k ingest (D12).
+                    if (rep.last_error.empty() && !st.error_code.empty()) {
+                        rep.last_error = st.error_code;
+                    }
+                    continue;
+                }
                 const std::string tok = ChainMemberToken(st.name);
                 if (tok == "f38") f38_failed = true;
                 else if (tok == "f35") f35_failed = true;

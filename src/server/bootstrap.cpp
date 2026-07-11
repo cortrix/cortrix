@@ -1343,8 +1343,10 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     CORTRIX_LOG_INFO("main", "SPC + F42 workers started ({} SPC threads)", config.spc.worker_count);
     if (enrich_backfill_worker) {
         enrich_sweeper.Start();
+        // D7b: report the EFFECTIVE interval (KV-seeded knob or default), not the
+        // compile-time constant — the constant masked live knob state twice.
         CORTRIX_LOG_INFO("main", "enrich retry sweeper started ({}s interval)",
-                         cortrix::spc::EnrichRetrySweeper::kDefaultSweepIntervalSec);
+                         enrich_sweeper.SweepIntervalSec());
     }
 
     // [OPEN-2] Launch the background GC thread (no-op when gc.enabled=false).

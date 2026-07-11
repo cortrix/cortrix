@@ -43,7 +43,10 @@ std::vector<std::string> ResolveEnricherChain(const IGlobalConfig* global,
 /// One enricher's outcome for a single chunk (per-enricher status/error_code, the
 /// fail-soft bookkeeping the design requires). `name` = ISpcEnricher::Name();
 /// `status` mirrors EnrichResult.status (0 == ok); `error_code` is the CX_ERR_*
-/// token when the enricher degraded (empty on success / skip).
+/// token when the enricher degraded (empty on success / skip). Exception: the
+/// F35 fail-soft shape keeps status==0 (the chunk retains its original
+/// embedding) while contextualized_status==2 — there error_code carries the
+/// member's cause so debt rows record why (D12, 2026-07-11).
 struct EnricherStepOutcome {
     std::string name;
     int status = 0;
