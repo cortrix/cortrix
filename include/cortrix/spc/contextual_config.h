@@ -48,12 +48,14 @@ inline constexpr int kContextualMaxOutputTokensMax = 200;
 /// BYTES (no tokenizer in this seam). The historical hardcoded 2 under-counts
 /// real text — 80 English tokens is ~320+ chars, CJK is 3 bytes/char in UTF-8 —
 /// so legitimate contexts were rejected as injection and the contextualized
-/// vector silently dropped (deep-QA finding 2026-07-10). Default stays 2
-/// (byte-identical); deployments should raise it (4-6) after measuring their
-/// kPromptInjection reject rate.
+/// vector silently dropped (deep-QA finding 2026-07-10; D12 live 5k evidence
+/// 2026-07-11: DeepSeek's natural ~400-byte outputs hit a 41% false-reject
+/// rate at 2, and 4 would still under-count (4x80=320 < 400)). Default raised
+/// to 6 (6x80=480 bytes, field-validated: 99.55% backfill repair rate);
+/// deployments can still tighten or widen via the config key.
 inline constexpr const char* kContextualGuardCharsPerTokenKey =
     "contextual_retrieval.guard_chars_per_token";
-inline constexpr int kContextualGuardCharsPerTokenDefault = 2;
+inline constexpr int kContextualGuardCharsPerTokenDefault = 6;
 inline constexpr int kContextualGuardCharsPerTokenMin = 1;
 inline constexpr int kContextualGuardCharsPerTokenMax = 20;
 

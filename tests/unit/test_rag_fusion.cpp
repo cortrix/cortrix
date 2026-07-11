@@ -207,6 +207,40 @@ public:
     }
 };
 
+// D11: every chunk carries explain attribution (metadata["rrf_paths"]) the way
+// the per-NS executor attaches it under ?explain; the stage must not shed it.
+class StageMetadataExecutor : public IScatterExecutor {
+public:
+    retrieval::NamespaceQueryResult ExecuteForNamespace(
+        const QueryContext& ctx,
+        const std::string& namespace_id,
+        float /*oversample*/) override {
+        retrieval::NamespaceQueryResult out;
+        out.namespace_id = namespace_id;
+        auto mk = [](const std::string& id, const std::string& text, float s,
+                     const std::string& paths) {
+            retrieval::RankedChunk rc;
+            rc.child_id = id;
+            rc.chunk_text = text;
+            rc.score = s;
+            rc.rerank_score = s;
+            rc.metadata["rrf_paths"] = paths;
+            return rc;
+        };
+        if (ctx.query == "company financial status") {
+            out.chunks = {mk("orig_a", "original answer text", 0.9f, "dense,fts5"),
+                          mk("shared_b", "shared candidate text", 0.5f, "dense")};
+        } else {
+            out.chunks = {mk("variant_c", "variant-only candidate", 0.8f, "hype_question"),
+                          mk("shared_b", "shared candidate text", 0.7f, "dense")};
+        }
+        if (static_cast<int>(out.chunks.size()) > ctx.top_k) {
+            out.chunks.resize(static_cast<std::size_t>(ctx.top_k));
+        }
+        return out;
+    }
+};
+
 // Reset the process-wide metrics before each metric-sensitive test.
 class RagFusionTest : public ::testing::Test {
 protected:
@@ -929,6 +963,53 @@ TEST_F(RagFusionTest, RagFusionStage_ExpandedCandidatePoolThenFinalRerank) {
     EXPECT_TRUE(std::all_of(std::next(executor.seen_rerank.begin()),
                             executor.seen_rerank.end(),
                             [](bool rerank) { return !rerank; }));
+}
+
+// D11 regression: explain attribution (metadata["rrf_paths"]) attached by the
+// per-NS executor must survive the fusion union + global-RRF reorder end to
+// end — including a variant-only candidate whose rich item comes from a
+// variant sub-query (5k C-arm evidence 2026-07-09: 36/41 fused queries
+// returned empty attribution).
+TEST_F(RagFusionTest, RagFusionStage_PreservesRrfPathsMetadataThroughFusion) {
+    auto mock_llm = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock_llm, Chat(_, _)).WillOnce(Return(OkResponse(ThreeVariantJson())));
+    auto svc = MakeService(mock_llm);
+
+    StageMetadataExecutor executor;
+    ExecutorEngine engine(/*workers=*/1, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    QueryRequest req;
+    req.query = "company financial status";
+    req.namespaces = {"bench"};
+    req.top_k = 3;
+    req.rerank = false;
+
+    QueryContext qctx;
+    qctx.query = req.query;
+    qctx.top_k = req.top_k;
+    qctx.rerank = false;
+    qctx.routing_path = "complex";
+    qctx.explain = true;
+
+    AuthContext auth;
+    auth.user_id = "user";
+
+    RagFusionConfig cfg = EnabledConfig();
+    cfg.locale = "en";
+
+    CrossNsResponse resp = stage.Run(req, auth, qctx, cfg);
+
+    ASSERT_GE(resp.results.size(), 2u);
+    for (const auto& item : resp.results) {
+        auto it = item.metadata.find("rrf_paths");
+        ASSERT_NE(it, item.metadata.end())
+            << "child " << item.child_id << " lost rrf_paths through fusion";
+        EXPECT_FALSE(it->second.empty());
+    }
 }
 
 TEST_F(RagFusionTest, RagFusionStage_SelectiveActivationSkipsLlmOnConfidentOriginal) {

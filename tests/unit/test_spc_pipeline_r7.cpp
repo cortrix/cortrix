@@ -684,6 +684,38 @@ TEST_F(SPCPipelineR7Test, EnrichState_OkChainWritesOkRowPerChild) {
     pipeline_->SetEnricherChain(nullptr);
 }
 
+// [D10a] Persist failure AFTER a successful enrich stage must be re-owed in
+// enrich_state, not just WARN-logged: sabotage the entities table so
+// WriteEnrichment fails while the chain member itself succeeded. The row must
+// land pending_retry owing f03 with a persist-flavored last_error, so the
+// sweeper regenerates and re-persists it.
+TEST_F(SPCPipelineR7Test, EnrichState_PersistFailureAfterSuccessfulEnrichIsOwed) {
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    pipeline_->SetEnricherChain(&chain);
+
+    ASSERT_EQ(sqlite3_exec(facade_->store().db_handle(), "DROP TABLE entities",
+                           nullptr, nullptr, nullptr),
+              SQLITE_OK);
+
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+
+    const int rows = CountSql("SELECT COUNT(*) FROM enrich_state");
+    ASSERT_GT(rows, 0);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"), rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members LIKE '%f03%'"),
+              rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE last_error LIKE "
+                       "'CX_ERR_SPC_PERSIST_FAILED%'"),
+              rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE next_retry_at IS NOT NULL"),
+              rows);
+    pipeline_->SetEnricherChain(nullptr);
+}
+
 // F03 slot fails (step status != 0) → pending_retry rows owing exactly f03, with
 // the retry stamp and the error detail.
 TEST_F(SPCPipelineR7Test, EnrichState_F03FailureOwedAsPendingRetry) {
