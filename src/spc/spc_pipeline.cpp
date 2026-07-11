@@ -950,12 +950,21 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             // F03 §3.1: enriched_score + entities, keyed by child_id (META / memory carry none).
             if (!b.child_id.empty()) {
                 auto eit = enrich_by_child.find(b.child_id);
+                // [D10a] A persist failure AFTER a successful enrich stage must be
+                // re-owed in enrich_state below — a WARN alone loses the member
+                // silently, because the retry sweeper only repairs what the ledger
+                // owes (the backfill side already accounts this way).
+                bool f03_persist_owed = false;
+                bool f35_persist_owed = false;
+                std::string persist_err;
                 if (eit != enrich_by_child.end() && eit->second.ok()) {
                     Status we = cortrix::spc::WriteEnrichment(store_db, b.block_id, eit->second);
                     if (!we.ok()) {
                         CORTRIX_LOG_WARN("spc",
                             "F03 enrichment persist skipped for block_id={} (doc_id={}): {}",
                             b.block_id, task.doc_id, we.message());
+                        f03_persist_owed = true;
+                        persist_err = "CX_ERR_SPC_PERSIST_FAILED[f03]: " + we.message();
                     }
                 }
                 // [I2 · F35 §4.1] contextualized_* columns (child rows only). Gated on the
@@ -969,6 +978,16 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                         CORTRIX_LOG_WARN("spc",
                             "F35 contextualized persist skipped for block_id={} (doc_id={}): {}",
                             b.block_id, task.doc_id, wc.message());
+                        // Owe f35 only when F35 actually produced an outcome to
+                        // persist (engaged chains; no-F35 chains no-op inside).
+                        if (eit->second.contextualized_status != 0 ||
+                            eit->second.contextualized_text.has_value()) {
+                            f35_persist_owed = true;
+                            if (persist_err.empty()) {
+                                persist_err =
+                                    "CX_ERR_SPC_PERSIST_FAILED[f35]: " + wc.message();
+                            }
+                        }
                     }
                 }
                 // [Q4 · F40 §6.1] Persist the child's SPLADE sparse vector to
@@ -1010,15 +1029,28 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                     es.doc_id = task.doc_id;
                     es.child_id = b.child_id;
                     auto fit = enrich_failed_by_child.find(b.child_id);
-                    const bool owed =
-                        fit != enrich_failed_by_child.end() && !fit->second.empty();
+                    std::string owed_members = fit != enrich_failed_by_child.end()
+                                                   ? fit->second
+                                                   : std::string();
+                    // [D10a] union in members whose enrich succeeded but persist
+                    // failed, so the sweeper regenerates AND re-persists them.
+                    auto add_owed = [&owed_members](const char* m) {
+                        if (owed_members.find(m) != std::string::npos) return;
+                        if (!owed_members.empty()) owed_members += ",";
+                        owed_members += m;
+                    };
+                    if (f03_persist_owed) add_owed("f03");
+                    if (f35_persist_owed) add_owed("f35");
+                    const bool owed = !owed_members.empty();
                     es.status = owed ? cortrix::spc::kEnrichStatusPendingRetry
                                      : cortrix::spc::kEnrichStatusOk;
                     if (owed) {
-                        es.failed_members = fit->second;
+                        es.failed_members = owed_members;
                         auto eit2 = enrich_error_by_child.find(b.child_id);
                         if (eit2 != enrich_error_by_child.end()) {
                             es.last_error = eit2->second.substr(0, 200);
+                        } else if (!persist_err.empty()) {
+                            es.last_error = persist_err.substr(0, 200);
                         }
                         es.next_retry_at =
                             enrich_now_unix + cortrix::spc::kEnrichRetryFirstDelaySec;
