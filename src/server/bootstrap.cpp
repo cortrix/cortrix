@@ -533,7 +533,11 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
             enricher_cfg.batch_size = std::min(config.enricher_llm.batch_size, 32);
         }
         if (config.enricher_llm.max_tokens > 0) {
-            enricher_cfg.max_tokens = config.enricher_llm.max_tokens;
+            // Clamp here too so the startup line below logs the EFFECTIVE value
+            // (mirrors batch_size above); the enricher slot re-clamps as the
+            // defense-in-depth backstop (QA F-7).
+            enricher_cfg.max_tokens = std::min(
+                config.enricher_llm.max_tokens, cortrix::spc::kEnricherMaxTokensCap);
         }
         CORTRIX_LOG_INFO("main",
                          "F03 enricher enabled (model={} timeout_ms={} batch_size={} max_tokens={})",

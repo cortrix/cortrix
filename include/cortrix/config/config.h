@@ -55,7 +55,9 @@ struct LlmConfig {
                                  ///< generation past provider gateway idle windows.
     int max_tokens = 0;          ///< enricher role only: response token budget for the
                                  ///< F03 batch call (0 = built-in default 4096; oversize
-                                 ///< values clamp to kEnricherMaxTokensCap — QA F-7).
+                                 ///< values are clamped downstream — bootstrap mapping
+                                 ///< and enricher slot — to kEnricherMaxTokensCap, QA
+                                 ///< F-7; this raw field itself stays as parsed).
                                  ///< Size it with batch_size — 4096 across a 32-chunk
                                  ///< batch is ~128 tokens/chunk and truncates the batch
                                  ///< JSON (D5b evidence); the budget/batch policy itself
