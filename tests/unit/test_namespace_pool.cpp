@@ -561,7 +561,10 @@ TEST(PoolErrorTest, MakePoolErrorBodyAndRequiredKeys) {
 
 TEST_F(NamespacePoolTest, StartupLoadEightWorkersConcurrency) {
     config_.startup_load_workers = 8;
-    config_.load_timeout_ms_per_ns = 5000;  // well above the 100ms mock load
+    // Generous timeout: this is a CORRECTNESS test (all 64 NS land through 8
+    // workers), not a latency bound — under a parallel full-suite ctest the
+    // laptop starved 5s once (QA 2026-07-12 F-9).
+    config_.load_timeout_ms_per_ns = 30000;
     std::vector<std::string> ids;
     for (int i = 0; i < 64; ++i) {
         std::string ns = "ns-" + std::to_string(i);
