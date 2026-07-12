@@ -88,6 +88,17 @@ std::vector<EnrichResult> ParseEnrichBatchResponse(const std::string& body,
     const std::string normalized_body = common::UnwrapCompleteJsonFence(body);
     json root = json::parse(normalized_body, /*cb=*/nullptr, /*allow_exceptions=*/false);
     if (root.is_discarded() || !root.is_object()) {
+        // Second chance (QA 2026-07-12 F-10): the F41 contract already repairs
+        // invalid provider backslash escapes; without the same repair here one
+        // bad chunk string poisons the WHOLE batch (L3 is all-or-nothing) and
+        // retries fail deterministically on the same text.
+        const std::string repaired =
+            common::EscapeInvalidJsonStringBackslashes(normalized_body);
+        if (repaired != normalized_body) {
+            root = json::parse(repaired, /*cb=*/nullptr, /*allow_exceptions=*/false);
+        }
+    }
+    if (root.is_discarded() || !root.is_object()) {
         for (auto& r : results) FillParseError(r, "L3", batch_size, model);
         return results;
     }

@@ -101,4 +101,64 @@ inline std::string UnwrapCompleteJsonFence(const std::string& input) {
     return std::string(inner);
 }
 
+// JSON string-escape repair (QA 2026-07-12 F-10; first shipped F41-only after
+// the 2026-07-11 DeepSeek field failure): providers sometimes emit an invalid
+// backslash escape inside a string value (`C:\Users`, LaTeX `\_`, kaomoji) —
+// strict parsing rightly refuses, and it refuses DETERMINISTICALLY for the
+// same input text, so retries cannot help. Doubling the offending backslash
+// preserves the author-visible text and lets the object parse; valid escapes
+// pass through untouched, so repairing an already-valid document is a no-op.
+// Same discipline as the balanced-object layer above: strict parse first,
+// repair only after it fails, keep the event observable.
+inline bool IsValidJsonEscape(char c) {
+    switch (c) {
+        case '"':
+        case '\\':
+        case '/':
+        case 'b':
+        case 'f':
+        case 'n':
+        case 'r':
+        case 't':
+        case 'u':
+            return true;
+        default:
+            return false;
+    }
+}
+
+inline std::string EscapeInvalidJsonStringBackslashes(const std::string& value) {
+    std::string out;
+    out.reserve(value.size());
+
+    bool in_string = false;
+    bool after_backslash = false;
+    for (char c : value) {
+        if (!in_string) {
+            if (c == '"') in_string = true;
+            out.push_back(c);
+            continue;
+        }
+
+        if (after_backslash) {
+            if (!IsValidJsonEscape(c)) out.push_back('\\');
+            out.push_back(c);
+            after_backslash = false;
+            continue;
+        }
+
+        if (c == '\\') {
+            out.push_back(c);
+            after_backslash = true;
+            continue;
+        }
+
+        if (c == '"') in_string = false;
+        out.push_back(c);
+    }
+
+    if (after_backslash) out.push_back('\\');
+    return out;
+}
+
 }  // namespace cortrix::common
