@@ -79,4 +79,53 @@ Status ValidateExecutionProviderForBuild(ExecutionProvider provider) {
                                "' is not compiled into this Cortrix build");
 }
 
+ExecutionProviderRuntimeState EvaluateExecutionProviderRuntimeState(
+    const std::string& configured_ep,
+    const std::string& active_ep,
+    bool model_configured,
+    ExecutionProvider preferred_auto) {
+    ExecutionProviderRuntimeState state;
+    state.configured_ep = configured_ep;
+    state.active_ep = active_ep;
+    state.preferred_ep = ExecutionProviderName(preferred_auto);
+
+    ExecutionProvider configured_provider = ExecutionProvider::kAuto;
+    if (!ParseExecutionProvider(configured_ep, &configured_provider).ok()) {
+        state.policy_mismatch = true;
+        return state;
+    }
+    state.configured_ep = ExecutionProviderName(configured_provider);
+
+    if (!model_configured) {
+        state.ready = active_ep == "stub";
+        state.policy_mismatch = !state.ready;
+        return state;
+    }
+
+    ExecutionProvider active_provider = ExecutionProvider::kAuto;
+    if (!ParseExecutionProvider(active_ep, &active_provider).ok() ||
+        active_provider == ExecutionProvider::kAuto) {
+        state.policy_mismatch = true;
+        return state;
+    }
+    state.active_ep = ExecutionProviderName(active_provider);
+
+    if (configured_provider != ExecutionProvider::kAuto) {
+        state.ready = active_provider == configured_provider;
+        state.policy_mismatch = !state.ready;
+        return state;
+    }
+
+    if (preferred_auto == ExecutionProvider::kAuto) {
+        state.policy_mismatch = true;
+        return state;
+    }
+
+    state.fallback = preferred_auto != ExecutionProvider::kCpu &&
+                     active_provider == ExecutionProvider::kCpu;
+    state.ready = active_provider == preferred_auto || state.fallback;
+    state.policy_mismatch = !state.ready;
+    return state;
+}
+
 }  // namespace cortrix::ml

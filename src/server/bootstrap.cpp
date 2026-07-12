@@ -123,6 +123,7 @@
 #include "cortrix/resource/namespace_facade.h"   // [gap⑤] resume re-hydrates tasks from the doc row
 #include "cortrix/deploy/health_routes.h"
 #include "cortrix/health/readiness.h"  // F20 readiness contract — components registered at wiring
+#include "cortrix/ml/execution_provider.h"
 #include "cortrix/security/env_secret_provider.h"      // F20-6 CreateSecretProvider() for /ready
 #include "cortrix/security/secret_provider_readiness.h" // F20-6 secret_provider readiness adapter
 #include "cortrix/deploy/metrics_server.h"
@@ -1244,6 +1245,45 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         }
         return r;
     });
+
+    auto build_ep_readiness = [](const cortrix::ml::ExecutionProviderRuntimeState& state,
+                                 bool model_configured) {
+        cortrix::health::ComponentReadiness r;
+        r.ready = state.ready;
+        r.detail["configured_ep"] = state.configured_ep;
+        r.detail["active_ep"] = state.active_ep;
+        r.detail["preferred_ep"] = state.preferred_ep;
+        r.detail["model_configured"] = model_configured;
+        r.detail["fallback"] = state.fallback;
+        r.detail["policy_mismatch"] = state.policy_mismatch;
+        if (!r.ready) {
+            r.detail["reason"] = "execution_provider_policy_mismatch";
+        }
+        return r;
+    };
+
+    const bool embedding_model_configured = !config.embedding.model_path.empty();
+    readiness.Register(
+        "embedding_execution_provider",
+        [&embedder, embedding_model_configured, build_ep_readiness]() {
+            return build_ep_readiness(
+                cortrix::ml::EvaluateExecutionProviderRuntimeState(
+                    embedder.configured_ep(), embedder.active_ep(),
+                    embedding_model_configured),
+                embedding_model_configured);
+        });
+
+    const bool reranker_model_configured = !config.reranker.model_dir.empty();
+    readiness.Register(
+        "reranker_execution_provider",
+        [reranker_model_configured, build_ep_readiness]() {
+            auto& metrics = cortrix::reranker::RerankerMetrics::Instance();
+            return build_ep_readiness(
+                cortrix::ml::EvaluateExecutionProviderRuntimeState(
+                    metrics.ConfiguredEp(), metrics.ActiveEp(),
+                    reranker_model_configured),
+                reranker_model_configured);
+        });
 
     // vector_index (F01) + memory_store (MEM): honest deferred. Both are PER-NAMESPACE in
     // V1.0 — the P-HNSW index (model load + WAL replay) and memory.db are created lazily

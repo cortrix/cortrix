@@ -25,9 +25,24 @@ This is an operational deployment guide, not a performance benchmark.
   Toolkit checks that constraint against the host driver before starting the
   container. Do not bypass that check.
 
+Cortrix uses the following Linux driver policy for this image:
+
+| Host NVIDIA driver | Cortrix policy |
+| --- | --- |
+| `>= 520.61.05` | Required baseline for the first formal Cortrix CUDA 11.8 validation and recommended for deployment. This is the Linux driver version paired with the CUDA 11.8 GA toolkit. |
+| `>= 450.80.02` and `< 520.61.05` | NVIDIA documents CUDA 11.x minor-version compatibility in this range, with feature and PTX limitations. Cortrix does not claim this range as validated until it passes a separate GPU qualification. |
+| `< 450.80.02` | Below NVIDIA's CUDA 11.8 minor-version compatibility floor; do not use it for this image. |
+
+Newer driver branches remain subject to NVIDIA's backward-compatibility rules.
+The real-GPU smoke report must record the exact host driver and use
+`>= 520.61.05` unless a separate compatibility qualification explicitly
+approves another version.
+
 References:
 
 - [ONNX Runtime CUDA Execution Provider requirements](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html)
+- [CUDA 11.8 release notes: driver compatibility](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-toolkit-release-notes/index.html#cuda-driver)
+- [NVIDIA CUDA minor-version compatibility](https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html)
 - [NVIDIA Container Toolkit installation](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 - [NVIDIA GPU enumeration and driver capabilities](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/docker-specialized.html)
 
@@ -36,11 +51,15 @@ Confirm the host before building:
 ```bash
 uname -m
 nvidia-smi
+nvidia-smi --query-gpu=name,uuid,driver_version --format=csv,noheader
 docker version
 docker compose version
 ```
 
 `uname -m` must report `x86_64`, and `nvidia-smi` must list the intended GPU.
+Every selected GPU must report a host driver at or above the Cortrix baseline
+unless the run is explicitly qualifying NVIDIA's lower minor-compatibility
+range. Record the command output in the smoke report.
 Install and configure NVIDIA Container Toolkit by following NVIDIA's guide if
 Docker cannot request a GPU.
 
@@ -222,7 +241,27 @@ curl --fail --silent --show-error \
   http://localhost:${CORTRIX_HTTP_PORT:-8420}/api/v1/health
 ```
 
-### 4. Build flavor, active providers, and fallback counters
+### 4. Execution-provider readiness
+
+The readiness response exposes embedding and reranker policy separately:
+
+```bash
+curl --fail --silent --show-error \
+  http://localhost:${CORTRIX_HTTP_PORT:-8420}/api/v1/system/health/ready
+```
+
+Inspect `components.embedding_execution_provider` and
+`components.reranker_execution_provider`. Each component reports
+`configured_ep`, `active_ep`, `preferred_ep`, `model_configured`, `fallback`,
+and `policy_mismatch`.
+
+An allowed `auto` fallback remains ready but reports `fallback: true`, with
+`active_ep: "cpu"` and a CUDA build's `preferred_ep: "cuda"`. An explicit
+provider mismatch is not ready and reports `policy_mismatch: true`; normal
+startup prevents that state by failing closed. Explicit stub mode reports
+`model_configured: false`, `active_ep: "stub"`, and `fallback: false`.
+
+### 5. Build flavor, active providers, and fallback counters
 
 The OpenMetrics listener is internal on port 9091, so query it through the
 container:
@@ -309,7 +348,8 @@ context.
 
 ### `auto` starts on CPU
 
-Read the startup warning and inspect the component's fallback counter. An
+Read the startup warning, inspect the execution-provider readiness component,
+and inspect the component's fallback counter. An
 `ep_init_failed` reason points to provider attachment or dynamic dependencies;
 `session_init_failed` points to CUDA session/model initialization. Fix the
 cause and recreate the service. `auto` fallback uses a fresh CPU-only session;

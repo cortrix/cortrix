@@ -71,5 +71,68 @@ TEST(ExecutionProviderTest, PreferredAutoExecutionProviderDependsOnBuildCapabili
 #endif
 }
 
+TEST(ExecutionProviderTest, RuntimeStateTreatsExplicitStubAsReadyWithoutModel) {
+    const auto state = EvaluateExecutionProviderRuntimeState(
+        "cuda", "stub", false, ExecutionProvider::kCuda);
+
+    EXPECT_TRUE(state.ready);
+    EXPECT_FALSE(state.fallback);
+    EXPECT_FALSE(state.policy_mismatch);
+    EXPECT_EQ(state.configured_ep, "cuda");
+    EXPECT_EQ(state.active_ep, "stub");
+    EXPECT_EQ(state.preferred_ep, "cuda");
+}
+
+TEST(ExecutionProviderTest, RuntimeStateExposesAllowedAutoCpuFallback) {
+    const auto state = EvaluateExecutionProviderRuntimeState(
+        "auto", "cpu", true, ExecutionProvider::kCuda);
+
+    EXPECT_TRUE(state.ready);
+    EXPECT_TRUE(state.fallback);
+    EXPECT_FALSE(state.policy_mismatch);
+    EXPECT_EQ(state.preferred_ep, "cuda");
+}
+
+TEST(ExecutionProviderTest, RuntimeStateAcceptsAutoPreferredProvider) {
+    const auto state = EvaluateExecutionProviderRuntimeState(
+        "AUTO", "CUDA", true, ExecutionProvider::kCuda);
+
+    EXPECT_TRUE(state.ready);
+    EXPECT_FALSE(state.fallback);
+    EXPECT_FALSE(state.policy_mismatch);
+    EXPECT_EQ(state.configured_ep, "auto");
+    EXPECT_EQ(state.active_ep, "cuda");
+}
+
+TEST(ExecutionProviderTest, RuntimeStateRejectsExplicitProviderMismatch) {
+    const auto state = EvaluateExecutionProviderRuntimeState(
+        "cuda", "cpu", true, ExecutionProvider::kCuda);
+
+    EXPECT_FALSE(state.ready);
+    EXPECT_FALSE(state.fallback);
+    EXPECT_TRUE(state.policy_mismatch);
+}
+
+TEST(ExecutionProviderTest, RuntimeStateRejectsUnexpectedAutoProvider) {
+    const auto state = EvaluateExecutionProviderRuntimeState(
+        "auto", "coreml", true, ExecutionProvider::kCuda);
+
+    EXPECT_FALSE(state.ready);
+    EXPECT_FALSE(state.fallback);
+    EXPECT_TRUE(state.policy_mismatch);
+}
+
+TEST(ExecutionProviderTest, RuntimeStateRejectsInvalidOrStubActiveModelState) {
+    EXPECT_TRUE(EvaluateExecutionProviderRuntimeState(
+                    "metal", "cpu", true, ExecutionProvider::kCuda)
+                    .policy_mismatch);
+    EXPECT_TRUE(EvaluateExecutionProviderRuntimeState(
+                    "auto", "stub", true, ExecutionProvider::kCuda)
+                    .policy_mismatch);
+    EXPECT_TRUE(EvaluateExecutionProviderRuntimeState(
+                    "auto", "cpu", true, ExecutionProvider::kAuto)
+                    .policy_mismatch);
+}
+
 }  // namespace
 }  // namespace cortrix::ml
