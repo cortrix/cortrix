@@ -64,13 +64,19 @@ namespace:
 #   model.onnx_data  (~2.1GB)
 #   tokenizer.json   (~16MB)
 #
-# When unconfigured, runs in Stub mode (random vectors); BM25 full-text search still works
+# An empty model_path is the only explicit stub mode. A non-empty missing or
+# invalid model, or a tokenizer load failure, aborts server startup.
 # -----------------------------------------------------------------------------
 embedding:
   model_path: "./models/bge-m3/model.onnx"
+  tokenizer_path: "./models/bge-m3/tokenizer.json"
   dimension: 1024            # bge-m3 fixed at 1024 dimensions, not modifiable
   max_seq_length: 512        # Max tokens per encode
-  gpu_provider: "auto"       # auto=automatic / cpu=CPU-only / coreml=Apple CoreML
+  execution_provider: "auto" # auto / cpu / coreml / cuda
+
+# Deprecated embedding alias: gpu_provider (YAML) or
+# CORTRIX_EMBEDDING_DEVICE (environment). Do not set an alias together with a
+# different canonical execution_provider value; conflicting values fail startup.
 
 # -----------------------------------------------------------------------------
 # reranker — F02 cross-encoder reranker (bge-reranker-v2-m3 ONNX)
@@ -78,12 +84,17 @@ embedding:
 # Download model files from BAAI/bge-reranker-v2-m3 on HuggingFace:
 #   models/bge-reranker-v2-m3/model.onnx + tokenizer.json
 #
-# When model_dir is empty or files are absent, reranker runs in stub mode
-# (no cross-encoder; results still returned but not semantically reranked).
+# An empty model_dir explicitly selects stub mode. A non-empty missing or invalid
+# model, or a tokenizer load failure, aborts server startup.
 # Override via env CORTRIX_RERANKER_MODEL_DIR (env wins over yaml).
 # -----------------------------------------------------------------------------
 reranker:
   model_dir: "./models/bge-reranker-v2-m3"
+  execution_provider: "auto" # auto / cpu / coreml / cuda
+
+# Deprecated reranker alias: use_coreml: true (YAML) or
+# CORTRIX_RERANKER_USE_COREML=true (environment). Do not combine it with a
+# different canonical execution_provider value.
 
 # -----------------------------------------------------------------------------
 # query_complexity — F39 query complexity classifier (DistilBERT-tiny ONNX)

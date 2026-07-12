@@ -30,6 +30,7 @@ Cortrix is in active pre-release development. Some API surfaces are present in t
 | Tenant isolation deny matrix | `Blocked` | Denial behavior cannot be proven in the current auth-disabled local runtime. |
 | MEM02 memory extraction | `Blocked` | The latest verification found an LLM transport timeout path for memory extraction. |
 | OCR / parser paths | `RD review required` | Parser and OCR behavior depends on optional configuration and should be verified per deployment. |
+| Linux NVIDIA CUDA execution provider | `RD review required` | A separate Linux x86_64 image and runbook exist; require a platform capability smoke before treating CUDA as verified in a target deployment. |
 | Log redaction / LogSanitizer defaults | `Blocked` | Runtime hardening is still under review; do not claim sanitized startup logs by default. |
 | Benchmark results | `RD review required` | Do not publish benchmark claims until measured artifacts and methodology are accepted. |
 | Production readiness | `RD review required` | Treat deployment, auth, tenant isolation, limits, and security controls as review-required. |

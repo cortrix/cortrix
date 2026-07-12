@@ -77,7 +77,7 @@ protected:
             auth_, &harness_->pool(), "test-tenant",
             std::vector<std::string>{"default", "qns", "missing-ns"});
 
-        embedder_ = std::make_unique<OnnxEmbedder>("fake.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
         LlmConfig llm_config;
         classifier_ = std::make_unique<IntentClassifier>(llm_config);

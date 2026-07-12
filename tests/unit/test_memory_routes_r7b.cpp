@@ -67,7 +67,7 @@ protected:
 
         port_ = 19180 + (getpid() % 1000);
 
-        embedder_ = std::make_unique<OnnxEmbedder>("stub_model.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
         LlmConfig llm_cfg;
         classifier_ = std::make_unique<IntentClassifier>(llm_cfg);

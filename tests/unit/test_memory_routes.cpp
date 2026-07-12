@@ -102,7 +102,7 @@ protected:
 
         // Create real instances for embedder, classifier, fusion
         // After Phase 2 fix, the search handler uses these for semantic search
-        embedder_ = std::make_unique<OnnxEmbedder>("stub_model.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();  // Sets session_ to non-null sentinel
         LlmConfig llm_cfg;  // Empty provider -> keyword fallback mode
         classifier_ = std::make_unique<IntentClassifier>(llm_cfg);

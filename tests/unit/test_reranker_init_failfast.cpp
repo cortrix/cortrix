@@ -139,11 +139,11 @@ TEST(OnnxRerankerInitTest, FactoryReturnsNullOnInitFailure) {
     EXPECT_EQ(r, nullptr);  // caller aborts startup on null
 }
 
-TEST(OnnxRerankerInitTest, ActiveEpReportsCpuInStubMode) {
+TEST(OnnxRerankerInitTest, ActiveEpReportsStubInStubMode) {
     RerankerConfig c;
     OnnxReranker r(c, nullptr);
     ASSERT_TRUE(r.Init().ok());
-    EXPECT_STREQ(r.active_ep(), "cpu");  // CoreML detection lands in S1.4
+    EXPECT_STREQ(r.active_ep(), "stub");
 }
 
 // --- RerankerErrorCode registry: exhaustive per-code branch coverage ---

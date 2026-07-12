@@ -45,7 +45,7 @@ protected:
         config_.tokenizer_path = dir + "/tokenizer.json";
         // CPU EP: deterministic across machines; CoreML auto is covered by unit
         // tests and would only change the EP, not the contract under test.
-        config_.use_coreml = RerankerConfig::UseCoreML::kForceFalse;
+        config_.execution_provider = "cpu";
     }
 
     RerankerConfig config_;

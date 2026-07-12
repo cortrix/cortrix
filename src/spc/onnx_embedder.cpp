@@ -8,9 +8,11 @@
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <memory>
 #include <thread>
 #include <vector>
 #include <spdlog/spdlog.h>
+#include "cortrix/ml/execution_provider.h"
 
 #ifdef CORTRIX_HAS_ONNXRUNTIME
 #include <onnxruntime_cxx_api.h>
@@ -22,6 +24,50 @@
 namespace fs = std::filesystem;
 
 namespace cortrix {
+
+namespace {
+
+#ifdef CORTRIX_HAS_ONNXRUNTIME
+Status AppendExecutionProvider(Ort::SessionOptions* options,
+                               ml::ExecutionProvider provider) {
+    OrtStatus* status = nullptr;
+    switch (provider) {
+        case ml::ExecutionProvider::kCpu:
+            return Status::Ok();
+        case ml::ExecutionProvider::kCoreMl:
+#ifdef CORTRIX_HAS_COREML
+            status = OrtSessionOptionsAppendExecutionProvider_CoreML(
+                *options, COREML_FLAG_ENABLE_ON_SUBGRAPH);
+            break;
+#else
+            return Status::Unavailable("CoreML execution provider is not compiled in");
+#endif
+        case ml::ExecutionProvider::kCuda:
+#ifdef CORTRIX_HAS_CUDA
+            {
+                OrtCUDAProviderOptions cuda_options{};
+                cuda_options.device_id = 0;
+                status = Ort::GetApi().SessionOptionsAppendExecutionProvider_CUDA(
+                    *options, &cuda_options);
+            }
+            break;
+#else
+            return Status::Unavailable("CUDA execution provider is not compiled in");
+#endif
+        case ml::ExecutionProvider::kAuto:
+            return Status::InvalidArgument("auto must be resolved before session creation");
+    }
+
+    if (status == nullptr) return Status::Ok();
+    const char* message = Ort::GetApi().GetErrorMessage(status);
+    const std::string detail = message == nullptr ? "unknown ONNX Runtime error" : message;
+    Ort::GetApi().ReleaseStatus(status);
+    return Status::Unavailable(std::string(ml::ExecutionProviderName(provider)) +
+                               " execution provider initialization failed: " + detail);
+}
+#endif
+
+}  // namespace
 
 OnnxEmbedder::OnnxEmbedder(const std::string& model_path, int dim,
                            int intra_threads, int inter_threads)
@@ -42,98 +88,138 @@ OnnxEmbedder::~OnnxEmbedder() {
 }
 
 Status OnnxEmbedder::Init() {
-#ifdef CORTRIX_HAS_ONNXRUNTIME
-    // Try real ONNX Runtime initialization if model file exists
-    if (!model_path_.empty() && fs::exists(model_path_)) {
-        try {
-            // Determine tokenizer path
-            std::string tok_path = tokenizer_path_;
-            if (tok_path.empty()) {
-                tok_path = (fs::path(model_path_).parent_path() / "tokenizer.json").string();
-            }
+    ml::ExecutionProvider configured_provider;
+    Status provider_status =
+        ml::ParseExecutionProvider(execution_provider_, &configured_provider);
+    if (!provider_status.ok()) return provider_status;
+    provider_status = ml::ValidateExecutionProviderForBuild(configured_provider);
+    if (!provider_status.ok()) return provider_status;
 
-            // Load tokenizer
-            auto* tokenizer = new HfTokenizer();
-            auto tok_status = tokenizer->Load(tok_path);
-            if (!tok_status.ok()) {
-                spdlog::warn("Failed to load tokenizer from {}: {}, falling back to stub embeddings",
-                             tok_path, tok_status.message());
-                delete tokenizer;
-                // Fall through to stub mode
-            } else {
-                // Create ONNX Runtime environment
-                auto* env = new Ort::Env(ORT_LOGGING_LEVEL_WARNING, "cortrix_embedder");
+    execution_provider_ = ml::ExecutionProviderName(configured_provider);
+    active_ep_ = "stub";
+    onnx::OnnxMetrics::Instance().SetEmbeddingConfiguredEp(execution_provider_);
+    onnx::OnnxMetrics::Instance().SetEmbeddingActiveEp(active_ep_);
 
-                Ort::SessionOptions opts;
-                opts.SetInterOpNumThreads(inter_threads_);
-                opts.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-
-                // Try CoreML first, before setting intra_threads, so we can auto-tune
-#ifdef CORTRIX_HAS_COREML
-                if (gpu_provider_ == "coreml" || gpu_provider_ == "auto") {
-                    uint32_t coreml_flags = COREML_FLAG_ENABLE_ON_SUBGRAPH;
-                    auto coreml_status = OrtSessionOptionsAppendExecutionProvider_CoreML(opts, coreml_flags);
-                    if (coreml_status != nullptr) {
-                        spdlog::warn("CoreML EP initialization failed, falling back to CPU");
-                    } else {
-                        spdlog::info("CoreML execution provider enabled");
-                        coreml_active_ = true;
-                    }
-                }
-#endif
-
-                // Auto-detect intra_threads when set to 0:
-                //   CoreML active → 2 (GPU handles heavy ops; fewer CPU threads reduce contention)
-                //   CPU only      → min(4, hardware_concurrency) (saturate available cores)
-                int effective_threads = intra_threads_;
-                if (effective_threads == 0) {
-                    effective_threads = coreml_active_
-                        ? 2
-                        : static_cast<int>(std::min(4u, std::thread::hardware_concurrency()));
-                    spdlog::info("onnx_intra_threads auto={} (coreml_active={})",
-                                 effective_threads, coreml_active_);
-                }
-                opts.SetIntraOpNumThreads(effective_threads);
-
-                // Create session
-                auto* session = new Ort::Session(*env, model_path_.c_str(), opts);
-
-                // Verify model has expected inputs
-                size_t num_inputs = session->GetInputCount();
-                if (num_inputs < 2) {
-                    spdlog::warn("ONNX model has {} inputs (expected >=2), falling back to stub",
-                                 num_inputs);
-                    delete session;
-                    delete env;
-                    delete tokenizer;
-                } else {
-                    // Success: store handles
-                    env_ = env;
-                    session_ = session;
-                    tokenizer_ = tokenizer;
-                    stub_mode_ = false;
-
-                    spdlog::info("ONNX embedder initialized: model={}, dim={}", model_path_, dim_);
-                    return Status::Ok();
-                }
-            }
-        } catch (const Ort::Exception& e) {
-            spdlog::warn("ONNX Runtime initialization failed: {}, falling back to stub embeddings",
-                         e.what());
-        } catch (const std::exception& e) {
-            spdlog::warn("Unexpected error loading ONNX model: {}, falling back to stub embeddings",
-                         e.what());
-        }
-    } else if (!model_path_.empty()) {
-        spdlog::info("ONNX model not found at {}, using stub embeddings", model_path_);
+    if (model_path_.empty()) {
+        stub_mode_ = true;
+        session_ = reinterpret_cast<void*>(1);
+        spdlog::info("ONNX embedder initialized in stub mode (no model configured)");
+        return Status::Ok();
     }
-#endif
 
-    // Stub mode: no real model, use deterministic fake embeddings
-    stub_mode_ = true;
-    session_ = reinterpret_cast<void*>(1);  // Non-null sentinel for compatibility
-    spdlog::info("ONNX embedder initialized in stub mode (no real model)");
-    return Status::Ok();
+#ifdef CORTRIX_HAS_ONNXRUNTIME
+    if (!fs::exists(model_path_)) {
+        return Status::NotFound("ONNX embedding model not found: " + model_path_);
+    }
+
+    std::string tok_path = tokenizer_path_;
+    if (tok_path.empty()) {
+        tok_path = (fs::path(model_path_).parent_path() / "tokenizer.json").string();
+    }
+    auto tokenizer = std::make_unique<HfTokenizer>();
+    Status tok_status = tokenizer->Load(tok_path);
+    if (!tok_status.ok()) {
+        return Status::Unavailable("failed to load embedding tokenizer from " + tok_path +
+                                   ": " + tok_status.message());
+    }
+
+    try {
+        auto env = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING,
+                                              "cortrix_embedder");
+        auto create_session = [&](ml::ExecutionProvider provider,
+                                  std::unique_ptr<Ort::Session>* session,
+                                  onnx::OnnxMetrics::ProviderFallbackReason* reason) {
+            Ort::SessionOptions options;
+            options.SetInterOpNumThreads(inter_threads_);
+            options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+
+            Status append_status = AppendExecutionProvider(&options, provider);
+            if (!append_status.ok()) {
+                *reason = onnx::OnnxMetrics::ProviderFallbackReason::kEpInitFailed;
+                return append_status;
+            }
+
+            int effective_threads = intra_threads_;
+            if (effective_threads == 0) {
+                const unsigned hardware_threads =
+                    std::max(1u, std::thread::hardware_concurrency());
+                effective_threads = provider == ml::ExecutionProvider::kCpu
+                    ? static_cast<int>(std::min(4u, hardware_threads))
+                    : 2;
+            }
+            options.SetIntraOpNumThreads(effective_threads);
+
+            try {
+                *session = std::make_unique<Ort::Session>(
+                    *env, model_path_.c_str(), options);
+                return Status::Ok();
+            } catch (const Ort::Exception& e) {
+                *reason = onnx::OnnxMetrics::ProviderFallbackReason::kSessionInitFailed;
+                return Status::Unavailable(std::string("ONNX embedding session creation failed: ") +
+                                           e.what());
+            }
+        };
+
+        const bool allow_cpu_fallback =
+            configured_provider == ml::ExecutionProvider::kAuto;
+        const ml::ExecutionProvider preferred_provider = allow_cpu_fallback
+            ? ml::PreferredAutoExecutionProvider()
+            : configured_provider;
+        ml::ExecutionProvider active_provider = preferred_provider;
+        std::unique_ptr<Ort::Session> session;
+        onnx::OnnxMetrics::ProviderFallbackReason fallback_reason =
+            onnx::OnnxMetrics::ProviderFallbackReason::kSessionInitFailed;
+        Status session_status =
+            create_session(preferred_provider, &session, &fallback_reason);
+
+        if (!session_status.ok()) {
+            onnx::OnnxMetrics::Instance().RecordEmbeddingProviderInitFailure(
+                ml::ExecutionProviderName(preferred_provider), fallback_reason);
+        }
+
+        if (!session_status.ok() && allow_cpu_fallback &&
+            preferred_provider != ml::ExecutionProvider::kCpu) {
+            const std::string from = ml::ExecutionProviderName(preferred_provider);
+            onnx::OnnxMetrics::Instance().RecordEmbeddingProviderFallback(
+                from, fallback_reason);
+            spdlog::warn("Embedding {} EP unavailable ({}); auto falling back to CPU",
+                         from, session_status.message());
+            active_provider = ml::ExecutionProvider::kCpu;
+            session_status = create_session(active_provider, &session, &fallback_reason);
+            if (!session_status.ok()) {
+                onnx::OnnxMetrics::Instance().RecordEmbeddingProviderInitFailure(
+                    ml::ExecutionProviderName(active_provider), fallback_reason);
+            }
+        }
+        if (!session_status.ok()) return session_status;
+
+        const size_t num_inputs = session->GetInputCount();
+        if (num_inputs < 2) {
+            return Status::InvalidArgument(
+                "ONNX embedding model must expose at least two inputs; got " +
+                std::to_string(num_inputs));
+        }
+
+        env_ = env.release();
+        session_ = session.release();
+        tokenizer_ = tokenizer.release();
+        stub_mode_ = false;
+        active_ep_ = ml::ExecutionProviderName(active_provider);
+        onnx::OnnxMetrics::Instance().SetEmbeddingActiveEp(active_ep_);
+        spdlog::info("ONNX embedder initialized: model={}, dim={}, configured_ep={}, active_ep={}",
+                     model_path_, dim_, execution_provider_, active_ep_);
+        return Status::Ok();
+    } catch (const Ort::Exception& e) {
+        return Status::Unavailable(std::string("ONNX Runtime initialization failed: ") +
+                                   e.what());
+    } catch (const std::exception& e) {
+        return Status::Unavailable(std::string("embedding initialization failed: ") +
+                                   e.what());
+    }
+#else
+    return Status::Unavailable(
+        "embedding model configured but Cortrix was built without ONNX Runtime");
+#endif
 }
 
 Status OnnxEmbedder::Embed(const std::string& text, EmbeddingResult* result) {

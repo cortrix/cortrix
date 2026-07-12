@@ -11,7 +11,9 @@ struct RerankerConfig {
     std::string model_path;       ///< bge-reranker-v2-m3/model.onnx
     std::string tokenizer_path;   ///< bge-reranker-v2-m3/tokenizer.json
 
-    // --- EP selection (F02 §2.3) ---
+    // --- EP selection ---
+    // Keep this legacy field in its original aggregate position. New callers
+    // should use execution_provider; conflicting values fail initialization.
     enum class UseCoreML { kAuto, kForceTrue, kForceFalse };
     UseCoreML use_coreml = UseCoreML::kAuto;
     int intra_threads = 0;        ///< 0 = ONNX auto
@@ -32,6 +34,10 @@ struct RerankerConfig {
     // --- top_N (E2 ruling D7) ---
     int candidate_multiplier = 3; ///< top_N = min(top_k × N, max_candidates)
     int max_candidates = 50;
+
+    // Canonical EP selection (auto, cpu, coreml, cuda). Appended to preserve
+    // source compatibility for existing aggregate initialization.
+    std::string execution_provider = "auto";
 };
 
 }  // namespace cortrix::reranker

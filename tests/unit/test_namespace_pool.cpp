@@ -1,7 +1,9 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <set>
@@ -9,6 +11,10 @@
 #include <thread>
 #include <utility>
 #include <vector>
+
+#if !defined(_WIN32)
+#include <sys/resource.h>
+#endif
 
 #include <nlohmann/json.hpp>
 
@@ -49,6 +55,56 @@ using cortrix::store::IndexConfig;
 using cortrix::store::IndexStats;
 using cortrix::store::WriteCoordinator;
 using cortrix::store::WriteCoordinatorConfig;
+
+class ScopedNoFileLimit {
+public:
+    explicit ScopedNoFileLimit(uint64_t minimum) {
+#if !defined(_WIN32)
+        if (getrlimit(RLIMIT_NOFILE, &original_) != 0) return;
+        current_ = original_.rlim_cur;
+        if (current_ >= minimum) {
+            sufficient_ = true;
+            return;
+        }
+        struct rlimit updated = original_;
+        const rlim_t requested = static_cast<rlim_t>(minimum);
+        updated.rlim_cur = original_.rlim_max == RLIM_INFINITY
+            ? requested
+            : std::min(requested, original_.rlim_max);
+        if (setrlimit(RLIMIT_NOFILE, &updated) == 0) {
+            raised_ = true;
+            current_ = updated.rlim_cur;
+            sufficient_ = current_ >= minimum;
+        }
+#else
+        (void)minimum;
+        sufficient_ = true;
+#endif
+    }
+
+    ~ScopedNoFileLimit() { (void)Restore(); }
+
+    bool Restore() {
+#if !defined(_WIN32)
+        if (!raised_) return true;
+        if (setrlimit(RLIMIT_NOFILE, &original_) != 0) return false;
+        raised_ = false;
+        current_ = original_.rlim_cur;
+#endif
+        return true;
+    }
+
+    bool sufficient() const { return sufficient_; }
+    uint64_t current() const { return static_cast<uint64_t>(current_); }
+
+private:
+#if !defined(_WIN32)
+    struct rlimit original_ {};
+#endif
+    uint64_t current_ = 0;
+    bool raised_ = false;
+    bool sufficient_ = false;
+};
 
 // ── test doubles ─────────────────────────────────────────────────────────────
 
@@ -560,6 +616,13 @@ TEST(PoolErrorTest, MakePoolErrorBodyAndRequiredKeys) {
 // ── UT9 — 8 workers load 64 NS concurrently (mock 100ms/NS → total < 1s) ─────
 
 TEST_F(NamespacePoolTest, StartupLoadEightWorkersConcurrency) {
+    // A full 64-namespace bundle keeps several SQLite/WAL handles per namespace.
+    // macOS shells default to soft nofile=256, which makes the capacity fixture
+    // fail with EMFILE before it can test concurrency. Raise only this test's
+    // process limit and restore it after the pool releases its bundles.
+    ScopedNoFileLimit nofile_limit(1024);
+    ASSERT_TRUE(nofile_limit.sufficient())
+        << "requires soft nofile >= 1024; current=" << nofile_limit.current();
     config_.startup_load_workers = 8;
     config_.load_timeout_ms_per_ns = 5000;  // well above the 100ms mock load
     std::vector<std::string> ids;
@@ -569,25 +632,28 @@ TEST_F(NamespacePoolTest, StartupLoadEightWorkersConcurrency) {
         MakeUnitDir(ns + "-u");
     }
     StubListNamespaces(ids);
-    auto pool = MakePoolWithLoad(std::chrono::milliseconds(100));
+    {
+        auto pool = MakePoolWithLoad(std::chrono::milliseconds(100));
 
-    const auto t0 = std::chrono::steady_clock::now();
-    auto rep = pool->StartupLoadAll();
-    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                             std::chrono::steady_clock::now() - t0)
-                             .count();
+        const auto t0 = std::chrono::steady_clock::now();
+        auto rep = pool->StartupLoadAll();
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                 std::chrono::steady_clock::now() - t0)
+                                 .count();
 
-    ASSERT_TRUE(rep.ok());
-    EXPECT_EQ(rep.value().total_namespaces, 64u);
-    EXPECT_EQ(rep.value().loaded_successfully, 64u);
-    EXPECT_EQ(rep.value().failed, 0u);
-    EXPECT_EQ(pool->GetPoolStats().pool_size_current, 64u);
-    // 64 NS / 8 workers = 8 serial batches * 100ms ≈ 800ms ideal; SEQUENTIAL is
-    // ~6.4s regardless of machine load (the mock sleeps wall-time). The bound
-    // only needs to separate concurrent from serial: 4500ms rides out full-suite
-    // ctest scheduling noise (2649ms observed at -j4, QA 2026-07-12 F-9) while
-    // staying 30% under the serial floor.
-    EXPECT_LT(elapsed, 4500) << "elapsed=" << elapsed << "ms (expected concurrent)";
+        ASSERT_TRUE(rep.ok());
+        EXPECT_EQ(rep.value().total_namespaces, 64u);
+        EXPECT_EQ(rep.value().loaded_successfully, 64u);
+        EXPECT_EQ(rep.value().failed, 0u);
+        EXPECT_EQ(pool->GetPoolStats().pool_size_current, 64u);
+        // 64 NS / 8 workers = 8 serial batches * 100ms ≈ 800ms ideal; SEQUENTIAL is
+        // ~6.4s regardless of machine load (the mock sleeps wall-time). The bound
+        // only needs to separate concurrent from serial: 4500ms rides out full-suite
+        // ctest scheduling noise (2649ms observed at -j4, QA 2026-07-12 F-9) while
+        // staying 30% under the serial floor.
+        EXPECT_LT(elapsed, 4500) << "elapsed=" << elapsed << "ms (expected concurrent)";
+    }
+    EXPECT_TRUE(nofile_limit.Restore());
 }
 
 // ── UT10 — a single NS whose load exceeds the timeout is counted as failure ──

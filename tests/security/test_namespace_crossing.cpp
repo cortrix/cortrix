@@ -203,7 +203,7 @@ protected:
         kc.permissions = kPermRead | kPermWrite | kPermAdmin;
         auth_->LoadKeys({kc});
 
-        embedder_ = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
         LlmConfig llm_cfg;
         classifier_ = std::make_unique<IntentClassifier>(llm_cfg);

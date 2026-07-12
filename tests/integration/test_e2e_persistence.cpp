@@ -73,7 +73,7 @@ TEST_F(PersistenceTest, StoreDataSurvivesRestart) {
         cfg.max_elements = 10000;
         auto vec = std::make_unique<PHnsw>(vec_path_, cfg);  // ctor runs Recover()
 
-        auto embedder = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
+        auto embedder = std::make_unique<OnnxEmbedder>("", 128);
         ASSERT_TRUE(embedder->Init().ok());
 
         // Create documents with blocks

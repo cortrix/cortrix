@@ -10,6 +10,7 @@
 #include <spdlog/spdlog.h>
 
 #include "cortrix/ml/ort_env_singleton.h"
+#include "cortrix/ml/execution_provider.h"
 #include "cortrix/ml/tokenizer_registry.h"
 #include "cortrix/reranker/input_preprocessor.h"
 #include "cortrix/reranker/reranker_error.h"
@@ -32,6 +33,44 @@ namespace {
 constexpr const char* kTokenizerKey = "bge-m3";  // shared with F40/F03 (§2.4-bis)
 
 #ifdef CORTRIX_HAS_ONNXRUNTIME
+Status AppendExecutionProvider(Ort::SessionOptions* options,
+                               ml::ExecutionProvider provider) {
+    OrtStatus* status = nullptr;
+    switch (provider) {
+        case ml::ExecutionProvider::kCpu:
+            return Status::Ok();
+        case ml::ExecutionProvider::kCoreMl:
+#ifdef CORTRIX_HAS_COREML
+            status = OrtSessionOptionsAppendExecutionProvider_CoreML(
+                *options, COREML_FLAG_ENABLE_ON_SUBGRAPH);
+            break;
+#else
+            return Status::Unavailable("CoreML execution provider is not compiled in");
+#endif
+        case ml::ExecutionProvider::kCuda:
+#ifdef CORTRIX_HAS_CUDA
+            {
+                OrtCUDAProviderOptions cuda_options{};
+                cuda_options.device_id = 0;
+                status = Ort::GetApi().SessionOptionsAppendExecutionProvider_CUDA(
+                    *options, &cuda_options);
+            }
+            break;
+#else
+            return Status::Unavailable("CUDA execution provider is not compiled in");
+#endif
+        case ml::ExecutionProvider::kAuto:
+            return Status::InvalidArgument("auto must be resolved before session creation");
+    }
+
+    if (status == nullptr) return Status::Ok();
+    const char* message = Ort::GetApi().GetErrorMessage(status);
+    const std::string detail = message == nullptr ? "unknown ONNX Runtime error" : message;
+    Ort::GetApi().ReleaseStatus(status);
+    return Status::Unavailable(std::string(ml::ExecutionProviderName(provider)) +
+                               " execution provider initialization failed: " + detail);
+}
+
 /// Cross-encoder pair encoding (F02 §2.2, bge-reranker-v2-m3 / XLM-R):
 ///   <s> query </s> </s> passage </s>
 /// Built by splicing two single-text Encode() results (each comes back
@@ -128,6 +167,41 @@ void OnnxReranker::Shutdown() {
 }
 
 Status OnnxReranker::Init() {
+    ml::ExecutionProvider configured_provider;
+    Status provider_status =
+        ml::ParseExecutionProvider(config_.execution_provider, &configured_provider);
+    if (!provider_status.ok()) {
+        return RerankerStatus(RerankerErrorCode::kRerankerInitFailed,
+                              provider_status.message());
+    }
+
+    if (config_.use_coreml != RerankerConfig::UseCoreML::kAuto) {
+        const ml::ExecutionProvider legacy_provider =
+            config_.use_coreml == RerankerConfig::UseCoreML::kForceTrue
+                ? ml::ExecutionProvider::kCoreMl
+                : ml::ExecutionProvider::kCpu;
+        if (configured_provider != ml::ExecutionProvider::kAuto &&
+            configured_provider != legacy_provider) {
+            return RerankerStatus(
+                RerankerErrorCode::kRerankerInitFailed,
+                "execution_provider conflicts with deprecated use_coreml");
+        }
+        if (configured_provider == ml::ExecutionProvider::kAuto) {
+            configured_provider = legacy_provider;
+        }
+    }
+
+    provider_status = ml::ValidateExecutionProviderForBuild(configured_provider);
+    if (!provider_status.ok()) {
+        return RerankerStatus(RerankerErrorCode::kRerankerInitFailed,
+                              provider_status.message());
+    }
+    config_.execution_provider = ml::ExecutionProviderName(configured_provider);
+    active_ep_ = "stub";
+    ready_ = false;
+    RerankerMetrics::Instance().SetConfiguredEp(config_.execution_provider);
+    RerankerMetrics::Instance().SetActiveEp(active_ep_);
+
     // Build the resident thread pool (S2.1) + circuit breaker (S2.4) regardless of
     // model vs stub mode — ScoreBatch routes work through them in both. The
     // breaker drives the status/metric/log via the S2.5 reporter on each
@@ -152,8 +226,7 @@ Status OnnxReranker::Init() {
     if (config_.model_path.empty()) {
         stub_mode_ = true;
         ready_ = true;
-        coreml_active_ = false;
-        RerankerMetrics::Instance().SetActiveEp(active_ep());  // "cpu"
+        RerankerMetrics::Instance().SetActiveEp(active_ep_);
         spdlog::info("Reranker: no model configured, initialized in stub mode");
         return Status::Ok();
     }
@@ -190,58 +263,79 @@ Status OnnxReranker::Init() {
     auto* env = static_cast<Ort::Env*>(env_);
 
     try {
-        Ort::SessionOptions opts;
-        opts.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-        if (config_.intra_threads > 0) {
-            opts.SetIntraOpNumThreads(config_.intra_threads);
+        auto create_session = [&](ml::ExecutionProvider provider,
+                                  std::unique_ptr<Ort::Session>* session,
+                                  RerankerMetrics::ProviderFallbackReason* reason) {
+            Ort::SessionOptions options;
+            options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+            if (config_.intra_threads > 0) {
+                options.SetIntraOpNumThreads(config_.intra_threads);
+            }
+
+            Status append_status = AppendExecutionProvider(&options, provider);
+            if (!append_status.ok()) {
+                *reason = RerankerMetrics::ProviderFallbackReason::kEpInitFailed;
+                return append_status;
+            }
+
+            try {
+                *session = std::make_unique<Ort::Session>(
+                    *env, config_.model_path.c_str(), options);
+                return Status::Ok();
+            } catch (const Ort::Exception& e) {
+                *reason = RerankerMetrics::ProviderFallbackReason::kSessionInitFailed;
+                return Status::Unavailable(std::string("ONNX session creation failed: ") +
+                                           e.what());
+            }
+        };
+
+        const bool allow_cpu_fallback =
+            configured_provider == ml::ExecutionProvider::kAuto;
+        const ml::ExecutionProvider preferred_provider = allow_cpu_fallback
+            ? ml::PreferredAutoExecutionProvider()
+            : configured_provider;
+        ml::ExecutionProvider active_provider = preferred_provider;
+        std::unique_ptr<Ort::Session> session;
+        RerankerMetrics::ProviderFallbackReason fallback_reason =
+            RerankerMetrics::ProviderFallbackReason::kSessionInitFailed;
+        Status session_status =
+            create_session(preferred_provider, &session, &fallback_reason);
+
+        if (!session_status.ok()) {
+            RerankerMetrics::Instance().RecordProviderInitFailure(
+                ml::ExecutionProviderName(preferred_provider), fallback_reason);
         }
 
-        // --- CoreML EP selection (F02 §3.2 / §4.4, S1.4) ---
-        // use_coreml: kForceFalse → CPU; kAuto/kForceTrue → try CoreML. On Apple a
-        // failure is WARN + coreml_fallback_total + CPU fallback (kAuto), or
-        // fail-fast (kForceTrue). On non-Apple, kAuto → CPU silently; kForceTrue →
-        // fail-fast (operator asked for an EP this build can't provide).
-        const bool want_coreml =
-            config_.use_coreml != RerankerConfig::UseCoreML::kForceFalse;
-        if (want_coreml) {
-#ifdef CORTRIX_HAS_COREML
-            uint32_t coreml_flags = COREML_FLAG_ENABLE_ON_SUBGRAPH;
-            OrtStatus* cm = OrtSessionOptionsAppendExecutionProvider_CoreML(opts, coreml_flags);
-            if (cm != nullptr) {
-                Ort::GetApi().ReleaseStatus(cm);
-                if (config_.use_coreml == RerankerConfig::UseCoreML::kForceTrue) {
-                    spdlog::error("Reranker: CoreML EP forced but init failed");
-                    return RerankerStatus(RerankerErrorCode::kRerankerInitFailed,
-                                          "CoreML EP forced (reranker.use_coreml=true) but unavailable");
-                }
-                spdlog::warn("Reranker: CoreML EP init failed, falling back to CPU EP");
+        if (!session_status.ok() && allow_cpu_fallback &&
+            preferred_provider != ml::ExecutionProvider::kCpu) {
+            const std::string from = ml::ExecutionProviderName(preferred_provider);
+            RerankerMetrics::Instance().RecordProviderFallback(from, fallback_reason);
+            if (preferred_provider == ml::ExecutionProvider::kCoreMl &&
+                fallback_reason == RerankerMetrics::ProviderFallbackReason::kEpInitFailed) {
                 RerankerMetrics::Instance().RecordCoremlFallback(
                     RerankerMetrics::CoremlFallbackReason::kEpInitFailed);
-                coreml_active_ = false;
-            } else {
-                spdlog::info("Reranker: CoreML EP enabled (NPU acceleration)");
-                coreml_active_ = true;
             }
-#else
-            // CoreML not compiled in (non-Apple / disabled).
-            if (config_.use_coreml == RerankerConfig::UseCoreML::kForceTrue) {
-                spdlog::error("Reranker: CoreML forced but not available on this platform/build");
-                return RerankerStatus(RerankerErrorCode::kRerankerInitFailed,
-                                      "CoreML forced (reranker.use_coreml=true) but not compiled in");
+            spdlog::warn("Reranker: {} EP unavailable ({}); auto falling back to CPU",
+                         from, session_status.message());
+            active_provider = ml::ExecutionProvider::kCpu;
+            session_status = create_session(active_provider, &session, &fallback_reason);
+            if (!session_status.ok()) {
+                RerankerMetrics::Instance().RecordProviderInitFailure(
+                    ml::ExecutionProviderName(active_provider), fallback_reason);
             }
-            // kAuto on a non-CoreML build → CPU silently (§3.2 Linux/x86 + auto).
-            coreml_active_ = false;
-#endif
         }
-        RerankerMetrics::Instance().SetActiveEp(active_ep());
+        if (!session_status.ok()) {
+            return RerankerStatus(RerankerErrorCode::kRerankerInitFailed,
+                                  session_status.message());
+        }
 
-        // --- Independent Ort::Session (owned, not shared — §2.4-bis) ---
-        auto* session = new Ort::Session(*env, config_.model_path.c_str(), opts);
-        session_ = session;
+        session_ = session.release();
         stub_mode_ = false;
+        active_ep_ = ml::ExecutionProviderName(active_provider);
         ready_ = true;
+        RerankerMetrics::Instance().SetActiveEp(active_ep_);
         spdlog::info("Reranker: ONNX session created (model={}, ep={})",
-                     config_.model_path, active_ep());
+                     config_.model_path, active_ep_);
         return Status::Ok();
     } catch (const Ort::Exception& e) {
         spdlog::error("Reranker: ONNX session creation failed: {}", e.what());

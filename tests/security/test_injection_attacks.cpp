@@ -242,7 +242,7 @@ protected:
             *auth_, &harness_->ipool(), "sec-tenant",
             std::vector<std::string>{"default"});
 
-        embedder_ = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
         LlmConfig llm_cfg;
         classifier_ = std::make_unique<IntentClassifier>(llm_cfg);

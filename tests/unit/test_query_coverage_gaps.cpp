@@ -409,7 +409,7 @@ public:
 };
 
 TEST(QueryCovGapVectorSearcherTest, TimeoutAfterEmbedding_ReturnsTimeoutNoIndexQuery) {
-    OnnxEmbedder embedder("fake_model.onnx", 128);
+    OnnxEmbedder embedder("", 128);
     ASSERT_TRUE(embedder.Init().ok());
 
     QueryCovGapMockIIndex index;

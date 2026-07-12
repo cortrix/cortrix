@@ -69,11 +69,15 @@ public:
                        std::string reranker_model_dir = "",
                        std::string query_complexity_model_dir = "models/query-complexity",
                        int candidate_multiplier = 3,
-                       int max_candidates = 50);
+                       int max_candidates = 50,
+                       std::string reranker_execution_provider = "auto");
     ~CrossNsQueryWiring();
 
     CrossNsQueryWiring(const CrossNsQueryWiring&) = delete;
     CrossNsQueryWiring& operator=(const CrossNsQueryWiring&) = delete;
+
+    /// False when a configured reranker model/provider failed to initialize.
+    bool IsReady() const;
 
     /// Mount POST /api/v1/query on `svr`, gated by `auth` (kPermRead). The handler
     /// runs the F04 CrossNsQueryHandler and serializes its §2.5 / §2.6 body.

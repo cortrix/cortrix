@@ -133,7 +133,7 @@ protected:
         ASSERT_TRUE(harness_->Admit("default").ok());
 
         // OnnxEmbedder in stub mode (matches test_memory_routes.cpp pattern).
-        embedder_ = std::make_unique<OnnxEmbedder>("stub_model.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
     }
 

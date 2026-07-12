@@ -14,6 +14,7 @@ namespace cortrix::reranker {
 namespace {
 
 using Reason = RerankerMetrics::CoremlFallbackReason;
+using ProviderReason = RerankerMetrics::ProviderFallbackReason;
 
 TEST(RerankerMetricsTest, CoremlFallbackCountsPerReason) {
     auto& m = RerankerMetrics::Instance();
@@ -90,28 +91,108 @@ TEST(RerankerMetricsTest, ScoreDurationHistogramBuckets) {
     EXPECT_NE(text.find("cortrix_reranker_score_duration_seconds_count 3"), std::string::npos);
 }
 
-// --- config plumbing: use_coreml defaults to Auto + active_ep reflects it ---
+// --- config plumbing: execution_provider defaults to Auto + active_ep reflects it ---
 
-TEST(RerankerCoremlTest, UseCoremlDefaultsToAuto) {
+TEST(RerankerCoremlTest, ExecutionProviderDefaultsToAuto) {
     RerankerConfig c;
-    EXPECT_EQ(c.use_coreml, RerankerConfig::UseCoreML::kAuto);
+    EXPECT_EQ(c.execution_provider, "auto");
 }
 
-TEST(RerankerCoremlTest, StubModeReportsCpuEpAndSetsGauge) {
-    RerankerMetrics::Instance().ResetForTest();
-    RerankerConfig c;  // empty model → stub mode, CPU
+TEST(RerankerCoremlTest, LegacyAggregateFieldOrderStillCompiles) {
+    RerankerConfig c{"model.onnx", "tokenizer.json",
+                     RerankerConfig::UseCoreML::kForceFalse};
+    EXPECT_EQ(c.use_coreml, RerankerConfig::UseCoreML::kForceFalse);
+    EXPECT_EQ(c.execution_provider, "auto");
+}
+
+TEST(RerankerCoremlTest, DeprecatedForceFalseMapsToCpu) {
+    RerankerConfig c;
+    c.use_coreml = RerankerConfig::UseCoreML::kForceFalse;
     OnnxReranker r(c, nullptr);
     ASSERT_TRUE(r.Init().ok());
-    EXPECT_STREQ(r.active_ep(), "cpu");
+    EXPECT_STREQ(r.configured_ep(), "cpu");
+    EXPECT_STREQ(r.active_ep(), "stub");
+}
+
+TEST(RerankerCoremlTest, DeprecatedAliasConflictsWithCanonicalProvider) {
+    RerankerConfig c;
+    c.execution_provider = "cuda";
+    c.use_coreml = RerankerConfig::UseCoreML::kForceFalse;
+    OnnxReranker r(c, nullptr);
+    Status status = r.Init();
+    EXPECT_FALSE(status.ok());
+    EXPECT_NE(status.message().find("conflicts with deprecated use_coreml"),
+              std::string::npos);
+}
+
+TEST(RerankerCoremlTest, StubModeReportsStubEpAndSetsGauge) {
+    RerankerMetrics::Instance().ResetForTest();
+    RerankerConfig c;  // empty model -> explicit development stub mode
+    OnnxReranker r(c, nullptr);
+    ASSERT_TRUE(r.Init().ok());
+    EXPECT_STREQ(r.active_ep(), "stub");
     EXPECT_FALSE(r.is_coreml_active());
-    EXPECT_EQ(RerankerMetrics::Instance().ActiveEp(), "cpu");
+    EXPECT_EQ(RerankerMetrics::Instance().ActiveEp(), "stub");
 }
 
 // The real CoreML auto/fail-fast/fallback branch needs a loaded ONNX model.
 TEST(RerankerCoremlTest, LiveEpSelectionRequiresRealModel_SkipOffline) {
     GTEST_SKIP() << "CoreML EP auto-detect / fallback runs only with a real "
-                    "bge-reranker-v2-m3 model (absent offline). Exercised at D3.5 "
-                    "/ W1 Google Benchmark with the model fixture.";
+                    "bge-reranker-v2-m3 model (absent offline). Exercise this in "
+                    "the platform capability smoke with the model fixture.";
+}
+
+TEST(RerankerCoremlTest, ConfiguredAndActiveEpRoundTripsForFallbackStates) {
+    auto& m = RerankerMetrics::Instance();
+    m.ResetForTest();
+    m.SetConfiguredEp("cuda");
+    m.SetActiveEp("cpu");
+    EXPECT_EQ(m.ConfiguredEp(), "cuda");
+    EXPECT_EQ(m.ActiveEp(), "cpu");
+    m.SetConfiguredEp("auto");
+    m.SetActiveEp("stub");
+    EXPECT_EQ(m.ConfiguredEp(), "auto");
+    EXPECT_EQ(m.ActiveEp(), "stub");
+}
+
+TEST(RerankerCoremlTest, ProviderFallbackMetricsDistinguishSourceAndReason) {
+    auto& m = RerankerMetrics::Instance();
+    m.ResetForTest();
+    m.RecordProviderFallback("coreml",
+                             ProviderReason::kSessionInitFailed);
+    m.RecordProviderFallback("coreml",
+                             ProviderReason::kSessionInitFailed);
+    m.RecordProviderFallback("cuda",
+                             ProviderReason::kEpInitFailed);
+    EXPECT_EQ(m.ProviderFallbackCount("coreml", ProviderReason::kSessionInitFailed), 2u);
+    EXPECT_EQ(m.ProviderFallbackCount("cuda", ProviderReason::kEpInitFailed), 1u);
+}
+
+TEST(RerankerCoremlTest, ProviderInitFailureMetricsCoverCpuCoremlAndCuda) {
+    auto& m = RerankerMetrics::Instance();
+    m.ResetForTest();
+    m.RecordProviderInitFailure("cpu", ProviderReason::kSessionInitFailed);
+    m.RecordProviderInitFailure("coreml", ProviderReason::kEpInitFailed);
+    m.RecordProviderInitFailure("cuda", ProviderReason::kSessionInitFailed);
+    EXPECT_EQ(m.ProviderInitFailureCount("cpu", ProviderReason::kSessionInitFailed), 1u);
+    EXPECT_EQ(m.ProviderInitFailureCount("coreml", ProviderReason::kEpInitFailed), 1u);
+    EXPECT_EQ(m.ProviderInitFailureCount("cuda", ProviderReason::kSessionInitFailed), 1u);
+}
+
+TEST(RerankerCoremlTest, OpenMetricsRenderIncludesConfiguredActiveAndFallback) {
+    auto& m = RerankerMetrics::Instance();
+    m.ResetForTest();
+    m.RecordProviderFallback("coreml", ProviderReason::kEpInitFailed);
+    m.RecordProviderInitFailure("cuda", ProviderReason::kSessionInitFailed);
+    m.SetConfiguredEp("cuda");
+    m.SetActiveEp("stub");
+    std::string text = m.RenderOpenMetrics();
+    EXPECT_NE(text.find("cortrix_reranker_configured_ep{ep=\"cuda\"} 1"), std::string::npos);
+    EXPECT_NE(text.find("cortrix_reranker_active_ep{ep=\"stub\"} 1"), std::string::npos);
+    EXPECT_NE(text.find("cortrix_reranker_ep_fallback_total{from=\"coreml\",to=\"cpu\","
+                        "reason=\"ep_init_failed\"} 1"), std::string::npos);
+    EXPECT_NE(text.find("cortrix_reranker_ep_init_failure_total{provider=\"cuda\","
+                        "reason=\"session_init_failed\"} 1"), std::string::npos);
 }
 
 }  // namespace

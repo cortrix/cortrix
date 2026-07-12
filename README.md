@@ -34,6 +34,8 @@ Start here:
 - [MCP README](cortrix-mcp/README.md): MCP server setup and tool reference.
 - [Python SDK README](sdk/python/README.md): Python client setup and resource model.
 - [Built-in Agent README](cortrix-agent/README.md): FastAPI Agent service and chat endpoints.
+- [Linux NVIDIA CUDA operations](docs/operations/cuda-execution-provider.md):
+  separate image, provider policy, deployment, verification, and rollback.
 - [Security policy](SECURITY.md): security reporting path.
 - [Contributing](CONTRIBUTING.md): development workflow and contribution checklist.
 

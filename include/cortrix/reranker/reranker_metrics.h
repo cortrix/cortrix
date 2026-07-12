@@ -26,6 +26,11 @@ public:
         kUnsupportedPlatform,  ///< non-Apple / no CoreML compiled in
     };
 
+    enum class ProviderFallbackReason {
+        kEpInitFailed = 0,
+        kSessionInitFailed,
+    };
+
     /// reason label for cortrix_reranker_failed_tasks_total (S3.4 / S2.5).
     enum class FailedTaskReason {
         kOnnxException = 0,
@@ -40,7 +45,19 @@ public:
     void RecordCoremlFallback(CoremlFallbackReason reason);
     uint64_t CoremlFallbackCount(CoremlFallbackReason reason) const;
 
-    // --- cortrix_reranker_active_ep (Gauge, label: ep="coreml"|"cpu") — S1.4 ---
+    // --- Generic execution-provider state ---
+    void SetConfiguredEp(const std::string& ep);
+    std::string ConfiguredEp() const;
+    void RecordProviderFallback(const std::string& from,
+                                ProviderFallbackReason reason);
+    uint64_t ProviderFallbackCount(const std::string& from,
+                                   ProviderFallbackReason reason) const;
+    void RecordProviderInitFailure(const std::string& provider,
+                                   ProviderFallbackReason reason);
+    uint64_t ProviderInitFailureCount(const std::string& provider,
+                                      ProviderFallbackReason reason) const;
+
+    // --- cortrix_reranker_active_ep (Gauge, label: ep) — S1.4 ---
     void SetActiveEp(const std::string& ep);
     std::string ActiveEp() const;
 
@@ -91,18 +108,24 @@ private:
 
     static constexpr int kCoremlReasonCount = 2;
     static constexpr int kFailedReasonCount = 3;
+    static constexpr int kProviderFallbackCount = 4;
+    static constexpr int kProviderInitFailureCount = 6;
     // score_duration_seconds histogram bucket count (upper bounds in the .cpp
     // kScoreBounds[]; the +1 slot is the implicit +Inf bucket).
     static constexpr int kScoreBucketCount = 8;
 
     std::array<std::atomic<uint64_t>, kCoremlReasonCount> coreml_fallback_{};
+    std::array<std::atomic<uint64_t>, kProviderFallbackCount> provider_fallback_{};
+    std::array<std::atomic<uint64_t>, kProviderInitFailureCount>
+        provider_init_failure_{};
     std::array<std::atomic<uint64_t>, kFailedReasonCount> failed_tasks_{};
     std::atomic<int> cb_state_{0};               // 0=closed (default)
     std::atomic<uint64_t> cb_trips_{0};
     std::atomic<uint64_t> truncated_{0};         // S3.3
     std::atomic<uint64_t> extremely_long_{0};    // S3.3
-    // active_ep gauge: encoded as 0=cpu / 1=coreml (string rendered in Render()).
-    std::atomic<int> active_ep_coreml_{0};
+    // EP codes: 0=auto, 1=cpu, 2=coreml, 3=cuda, 4=stub.
+    std::atomic<int> configured_ep_{0};
+    std::atomic<int> active_ep_{1};
     // queue_depth_current gauge (D35-MET-04): last sampled ThreadPool depth.
     std::atomic<int> queue_depth_{0};
     // score_duration_seconds histogram (D35-MET-04): per-bucket counters (NOT
@@ -113,6 +136,7 @@ private:
 };
 
 const char* ToString(RerankerMetrics::CoremlFallbackReason reason);
+const char* ToString(RerankerMetrics::ProviderFallbackReason reason);
 const char* ToString(RerankerMetrics::FailedTaskReason reason);
 
 }  // namespace cortrix::reranker

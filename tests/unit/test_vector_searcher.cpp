@@ -50,7 +50,7 @@ class VectorSearcherRealTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // The Phase-1 stub OnnxEmbedder returns deterministic fake vectors.
-        embedder_ = std::make_unique<OnnxEmbedder>("fake_model.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
     }
 

@@ -30,16 +30,18 @@ namespace:
 embedding:
   # bge-m3 ONNX assets are NOT baked into the image (too large). On first run
   # entrypoint.sh provisions them into the data volume at the paths below
-  # (PROFILE=full); when absent the server starts in deterministic
-  # stub-embedding mode (WARN at startup, still serves).
+  # (PROFILE=full). A configured path is mandatory: missing or invalid assets
+  # fail startup. PROFILE=lite explicitly clears these paths before startup.
   model_path: /data/models/bge-m3/model.onnx
   tokenizer_path: /data/models/bge-m3/tokenizer.json
+  execution_provider: auto
 
-# F02 reranker — provisioned to the data volume on first run when
-# CORTRIX_RERANKER_MODEL_URL is set; absent = deterministic stub. (Also
-# overridable via CORTRIX_RERANKER_MODEL_DIR, which entrypoint.sh sets.)
+# F02 reranker — optional by default. entrypoint.sh sets the model directory
+# when a complete operator-provided model is present. A non-empty but missing or
+# invalid model fails startup; an empty model_dir is the explicit stub mode.
 reranker:
-  model_dir: /data/models/bge-reranker-v2-m3
+  model_dir: ""
+  execution_provider: auto
 
 # F39/F37 query-complexity classifier — provisioned when
 # CORTRIX_QUERY_COMPLEXITY_MODEL_URL is set; absent = heuristic fallback.

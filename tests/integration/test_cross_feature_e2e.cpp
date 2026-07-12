@@ -111,7 +111,7 @@ protected:
         cfg.max_elements = 10000;
         vec_ = std::make_unique<PHnsw>(vec_path_, cfg);  // ctor runs Recover()
 
-        embedder_ = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         ASSERT_TRUE(embedder_->Init().ok());
 
         // Create test document file
@@ -322,7 +322,7 @@ protected:
             *auth_, &harness_->pool(), "e2e-tenant",
             std::vector<std::string>{"default"});
 
-        embedder_ = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
         LlmConfig llm_cfg;
         classifier_ = std::make_unique<IntentClassifier>(llm_cfg);
@@ -629,7 +629,7 @@ protected:
             *auth_, &harness_->pool(), "full-e2e",
             std::vector<std::string>{"default"});
 
-        embedder_ = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
         LlmConfig llm_cfg;
         classifier_ = std::make_unique<IntentClassifier>(llm_cfg);
@@ -868,7 +868,7 @@ protected:
             std::vector<std::string>{"project_alpha", "project_beta",
                                      "ns_x", "ns_y"});
 
-        embedder_ = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
         LlmConfig llm_cfg;
         classifier_ = std::make_unique<IntentClassifier>(llm_cfg);

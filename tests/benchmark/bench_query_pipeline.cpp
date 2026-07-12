@@ -58,7 +58,7 @@ struct PipelineEnv {
         vec_index->Init();
 
         // Embedder (stub mode: dim=128, non-existent model returns random vecs)
-        embedder = std::make_unique<cortrix::OnnxEmbedder>("stub.onnx", kDim);
+        embedder = std::make_unique<cortrix::OnnxEmbedder>("", kDim);
         // Note: Init() would fail for stub, but VectorSearcher.Search calls
         // embedder.Embed which will fail. For benchmarks we pre-populate
         // the vector index so VectorSearcher still exercises the search path.
