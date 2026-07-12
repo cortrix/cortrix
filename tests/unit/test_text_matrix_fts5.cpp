@@ -5,7 +5,8 @@
 //   - tokenizes on ASCII whitespace (space/tab/\n/\r).
 //   - drops tokens with no "content" char (content = isalnum OR byte>127).
 //   - keeps content tokens, escaping embedded '"' by doubling, then wraps each
-//     surviving token in double quotes; tokens joined by single spaces.
+//     surviving token in double quotes; tokens joined with " OR " (D6 2026-07-12:
+//     bag-of-words BM25 — a bare space is implicit AND and starved recall).
 //
 // We assert structural INVARIANTS (the exact output is impl-defined for some
 // classes), so the matrix is robust to incidental formatting:
@@ -13,7 +14,8 @@
 //   * any output is "balanced": even number of unescaped-context quotes, and
 //     output starts+ends with '"' when non-empty.
 //   * idempotence-ish: a sanitized non-empty result re-sanitized stays non-empty.
-//   * no bare FTS5 operator survives outside quotes (no unquoted * ^ : etc).
+//   * the only bare token outside quotes is the deliberate " OR " joiner; no
+//     user-supplied operator survives unquoted (* ^ : etc stay inside quotes).
 //   * UTF-8 / CJK / 4-byte / mixed content survives (output non-empty).
 //
 // ASCII-only source; CJK test DATA via \x UTF-8 escapes.
