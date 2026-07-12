@@ -16,6 +16,7 @@
 #include "parser_stub.h"  // cortrix::spc::test::StubParser / MakeOnePageDoc
 #include "cortrix/spc/spc_task.h"
 #include "mock_spc_manager.h"
+#include "test_name_util.h"
 
 // S2 coverage: DocumentProcessor — F06 integration via on_page_progress (per-page
 // persistence + Issue 3.1 cancel checkpoint + Issue 5 error mapping). The injected
@@ -58,7 +59,7 @@ class DocumentProcessorTest : public ::testing::Test {
         // Unique per test: parallel ctest processes must not share the stub
         // (a sibling's TearDown/remove yanks it mid-parse; F-1 race family).
         filepath_ = std::string(::testing::TempDir()) + "f42_proc_test_" +
-                    ::testing::UnitTest::GetInstance()->current_test_info()->name() +
+                    cortrix::test::SanitizedTestName() +
                     ".pdf";
         std::ofstream(filepath_) << "%PDF-1.4 stub";
     }

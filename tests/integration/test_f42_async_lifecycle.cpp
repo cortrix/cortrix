@@ -16,6 +16,7 @@
 #include "cortrix/spc/parser.h"
 #include "cortrix/spc/parser_factory.h"
 #include "parser_stub.h"
+#include "test_name_util.h"
 
 // F42 standalone integration (within-feature E2E): the full async document
 // lifecycle wired end to end — HTTP handler → TaskScheduler → WorkerPool →
@@ -66,7 +67,7 @@ class F42LifecycleTest : public ::testing::Test {
         // shared stub mid-parse (observed live: CX_ERR_PARSE_FAILED file-not-
         // found on this very suite, QA 2026-07-12 F-13).
         filepath_ = std::string(::testing::TempDir()) + "f42_lifecycle_" +
-                    ::testing::UnitTest::GetInstance()->current_test_info()->name() +
+                    cortrix::test::SanitizedTestName() +
                     ".pdf";
         std::ofstream(filepath_) << "%PDF-1.4 stub";
     }

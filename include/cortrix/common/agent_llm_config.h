@@ -19,4 +19,10 @@ struct AgentLlmConfig {
     // V1.5 reserved: tenant_id (per-tenant config).
 };
 
+/// Ceiling for `max_tokens` accepted through the PUT route (QA 2026-07-12
+/// FYI-4). Mirrors the enricher-side cap: 32k is the realistic upper budget of
+/// the supported providers; anything above is a runaway request, clamped so
+/// the persisted config (and its echoed read shape) stays sane.
+inline constexpr int kAgentLlmMaxTokensCap = 32768;
+
 }  // namespace cortrix

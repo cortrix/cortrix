@@ -64,10 +64,11 @@ TEST_F(F41DocFts5IndexTest, MultiTokenQueryMatchesPartialTerms) {
     ASSERT_TRUE(idx_.Upsert(Row("d1", "Q3 Financial Report", "revenue")).ok());
     ASSERT_TRUE(idx_.Upsert(Row("d2", "Distributed Systems Guide", "consensus")).ok());
 
-    auto r = idx_.Search("financial report about distributed consensus", 10);
+    auto r = idx_.Search("financial consensus", 10);
     ASSERT_TRUE(r.ok()) << r.status().message();
-    // OR semantics: each doc matches on its own tokens; AND would demand every
-    // token inside one row and return nothing.
+    // Minimal repro (QA 2026-07-12 FYI-2): two tokens, each matching a
+    // DIFFERENT doc. OR semantics returns both; AND would demand
+    // co-occurrence inside one row and return none.
     ASSERT_EQ(r.value().size(), 2u);
 }
 

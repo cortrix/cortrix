@@ -204,5 +204,35 @@ TEST_F(SystemConfigRoute, PutFullValidUpdate) {
               std::string::npos);
 }
 
+// --- PUT max_tokens <= 0 rejected with a field-level error (FYI-4) --------------
+TEST_F(SystemConfigRoute, PutNonPositiveMaxTokensRejected400) {
+    httplib::Client cli("127.0.0.1", port_);
+    for (int bad : {0, -128}) {
+        json b = {{"max_tokens", bad}};
+        auto res = cli.Put("/api/v1/system/agent_llm_config", Admin(), b.dump(),
+                           "application/json");
+        ASSERT_TRUE(res);
+        EXPECT_EQ(res->status, 400) << res->body;
+        EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_INVALID_REQUEST");
+    }
+    // Both rejected writes left the stored value untouched.
+    auto body = json::parse(cli.Get("/api/v1/system/agent_llm_config", Admin())->body);
+    EXPECT_EQ(body["max_tokens"], 1024);
+}
+
+// --- PUT oversize max_tokens clamped to the cap; echo = effective value (FYI-4) -
+TEST_F(SystemConfigRoute, PutOversizeMaxTokensClampedToCap) {
+    httplib::Client cli("127.0.0.1", port_);
+    json b = {{"max_tokens", 1000000000}};
+    auto res = cli.Put("/api/v1/system/agent_llm_config", Admin(), b.dump(),
+                       "application/json");
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 200) << res->body;
+    EXPECT_EQ(json::parse(res->body)["max_tokens"], kAgentLlmMaxTokensCap);
+    // Persisted, not just echoed.
+    auto reread = json::parse(cli.Get("/api/v1/system/agent_llm_config", Admin())->body);
+    EXPECT_EQ(reread["max_tokens"], kAgentLlmMaxTokensCap);
+}
+
 }  // namespace
 }  // namespace cortrix

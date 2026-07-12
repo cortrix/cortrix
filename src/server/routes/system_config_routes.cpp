@@ -1,5 +1,6 @@
 #include "cortrix/server/routes/system_config_routes.h"
 
+#include <algorithm>
 #include <set>
 #include <string>
 
@@ -117,8 +118,20 @@ void RegisterSystemConfigRoutes(httplib::Server& server, IGlobalConfig& config,
                     cfg.model = body["model"].get<std::string>();
                 if (body.contains("base_url") && body["base_url"].is_string())
                     cfg.base_url = body["base_url"].get<std::string>();
-                if (body.contains("max_tokens") && body["max_tokens"].is_number_integer())
-                    cfg.max_tokens = body["max_tokens"].get<int>();
+                if (body.contains("max_tokens") && body["max_tokens"].is_number_integer()) {
+                    const int mt = body["max_tokens"].get<int>();
+                    if (mt <= 0) {
+                        WriteAuthError(res, AuthErrorCode::kInvalidRequest,
+                                       "max_tokens must be a positive integer",
+                                       rctx.request_id,
+                                       {{"field", "max_tokens"}, {"value", mt}});
+                        return;
+                    }
+                    // Cap the persisted budget (QA 2026-07-12 FYI-4, mirrors the
+                    // enricher-side clamp); the echoed read shape below is the
+                    // effective value an Agent must trust.
+                    cfg.max_tokens = std::min(mt, kAgentLlmMaxTokensCap);
+                }
                 if (body.contains("temperature") && body["temperature"].is_number())
                     cfg.temperature = body["temperature"].get<double>();
 

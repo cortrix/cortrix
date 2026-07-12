@@ -95,6 +95,50 @@ TEST(EnricherResponseParserTest, L3RepairsInvalidEscapeInsideJsonFence) {
     EXPECT_EQ(r[0].summary, "path C:\\Users again");
 }
 
+TEST(EnricherResponseParserTest, L3RepairsConsecutiveInvalidEscapes) {
+    // Two invalid escapes back to back: the repair must reset after each
+    // emitted escape and double BOTH independently.
+    const char* body =
+        "{\"0\":{\"summary\":\"dirs \\D\\W here\",\"score\":0.5}}";
+    auto r = ParseEnrichBatchResponse(body, 1, "m", "default-zh");
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_TRUE(r[0].ok());
+    EXPECT_EQ(r[0].summary, "dirs \\D\\W here");
+}
+
+TEST(EnricherResponseParserTest, L3RepairsInvalidEscapeInObjectKey) {
+    // The bad escape sits in a sibling KEY, not a value — the repair walks
+    // every JSON string including keys, so one poisoned key must not sink the
+    // batch (L3 is all-or-nothing).
+    const char* body =
+        "{\"0\":{\"summary\":\"ok\",\"score\":0.5},\"we\\Uird\":1}";
+    auto r = ParseEnrichBatchResponse(body, 1, "m", "default-zh");
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_TRUE(r[0].ok());
+    EXPECT_EQ(r[0].summary, "ok");
+}
+
+TEST(EnricherResponseParserTest, L3RepairPreservesValidUnicodeEscape) {
+    // \u0041 is a VALID escape sharing a string with an invalid \U — repair
+    // must double only the invalid one (over-escaping would corrupt \u0041
+    // into literal text instead of "A").
+    const char* body =
+        "{\"0\":{\"summary\":\"A=\\u0041 path C:\\Users\",\"score\":0.5}}";
+    auto r = ParseEnrichBatchResponse(body, 1, "m", "default-zh");
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_TRUE(r[0].ok());
+    EXPECT_EQ(r[0].summary, "A=A path C:\\Users");
+}
+
+TEST(EnricherResponseParserTest, L3DanglingTrailingBackslashIsNotFakeRescued) {
+    // A value ending in a lone backslash swallows its closing quote; intent is
+    // unrecoverable and the repair must NOT fake a rescue — straight L3.
+    const char* body = "{\"0\":{\"summary\":\"trail\\\",\"score\":0.5}}";
+    auto r = ParseEnrichBatchResponse(body, 1, "m", "default-zh");
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_EQ(r[0].status, static_cast<int>(EnricherErrorCode::kParse));
+}
+
 TEST(EnricherResponseParserTest, L3OnJsonArrayNotObject) {
     // A JSON array parses but is not the expected object → L3.
     auto r = ParseEnrichBatchResponse("[1,2,3]", 1, "m", "default-zh");
