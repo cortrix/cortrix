@@ -149,6 +149,26 @@ TEST(LlmEnricherTest, ConfiguredMaxTokensFlowsToCall) {
     EXPECT_EQ(captured.max_tokens, 8192);
 }
 
+// QA 2026-07-12 F-7: an absurd configured value must not ride into the provider
+// request (it would 400 every batch) — the slot clamps to kEnricherMaxTokensCap.
+TEST(LlmEnricherTest, OversizeMaxTokensClampedAtSlot) {
+    auto mock = std::make_shared<llm::MockLlmClient>();
+    llm::LlmCallConfig captured;
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(DoAll(SaveArg<1>(&captured),
+                        Return(OkChat(R"({"0":{"summary":"ok","score":0.9}})"))));
+
+    DocumentMetadata meta;
+    auto cfg = LlmCfg();
+    cfg.max_tokens = 1000000000;  // nonsensical yaml value
+    LlmEnricher enr(cfg, mock);
+    auto results = enr.EnrichBatch(Batch(meta, 1));
+
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_TRUE(results[0].ok());
+    EXPECT_EQ(captured.max_tokens, kEnricherMaxTokensCap);
+}
+
 TEST(LlmEnricherTest, BatchSplitByBatchSize) {
     auto mock = std::make_shared<llm::MockLlmClient>();
     auto cfg = LlmCfg();
