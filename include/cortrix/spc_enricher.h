@@ -141,13 +141,13 @@ enum class EnricherType {
 EnricherType ParseEnricherType(const std::string& s);
 const char* EnricherTypeString(EnricherType t);
 
-/// Enricher configuration (design §2.6). A-class fields are global-only (GUC);
 /// Upper sanity clamp for the F03 batch-call max_tokens knob (QA 2026-07-12
 /// F-7): the yaml side has only a ">0 use it" gate, so a nonsensical value
 /// would otherwise ride straight into every provider request and 400 each
 /// batch. Generous versus any real provider output budget.
 inline constexpr int kEnricherMaxTokensCap = 32768;
 
+/// Enricher configuration (design §2.6). A-class fields are global-only (GUC);
 /// B-class fields (enabled / model / score_threshold / prompt_template_id) are
 /// NS-overridable (topic 2.2). Defaults match the §2.7 GUC table.
 struct EnricherConfig {

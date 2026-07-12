@@ -55,7 +55,11 @@ class DocumentProcessorTest : public ::testing::Test {
         factory_ = std::make_unique<spc::DocumentParserFactory>(cfg_factory_);
         // The F06 factory stat()s the file in its pre-check (kFileNotFound
         // otherwise), so seed a real temp .pdf the injected stub will "parse".
-        filepath_ = std::string(::testing::TempDir()) + "f42_proc_test.pdf";
+        // Unique per test: parallel ctest processes must not share the stub
+        // (a sibling's TearDown/remove yanks it mid-parse; F-1 race family).
+        filepath_ = std::string(::testing::TempDir()) + "f42_proc_test_" +
+                    ::testing::UnitTest::GetInstance()->current_test_info()->name() +
+                    ".pdf";
         std::ofstream(filepath_) << "%PDF-1.4 stub";
     }
     void TearDown() override { std::remove(filepath_.c_str()); }

@@ -61,7 +61,13 @@ class F42LifecycleTest : public ::testing::Test {
         pool_->RegisterHandler(kTaskDocParse, proc_.get());
         handler_ = std::make_unique<DocumentTaskHandler>(sched_.get(), &mgr_,
                                                         pool_.get(), &cfg_);
-        filepath_ = std::string(::testing::TempDir()) + "f42_lifecycle.pdf";
+        // Unique per test (F-1 race family): parallel ctest runs suite tests as
+        // concurrent processes — a sibling's TearDown/remove would yank a
+        // shared stub mid-parse (observed live: CX_ERR_PARSE_FAILED file-not-
+        // found on this very suite, QA 2026-07-12 F-13).
+        filepath_ = std::string(::testing::TempDir()) + "f42_lifecycle_" +
+                    ::testing::UnitTest::GetInstance()->current_test_info()->name() +
+                    ".pdf";
         std::ofstream(filepath_) << "%PDF-1.4 stub";
     }
     void TearDown() override {
