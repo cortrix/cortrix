@@ -10,6 +10,7 @@
 #include <fstream>
 #include <memory>
 #include <string>
+#include "test_name_util.h"
 
 using ::testing::_;
 using ::testing::Return;
@@ -45,7 +46,7 @@ protected:
         // races one test's SetUp/remove_all against a sibling's live scan.
         test_dir_ = fs::temp_directory_path() /
                     (std::string("cortrix_test_dir_import_") +
-                     ::testing::UnitTest::GetInstance()->current_test_info()->name());
+                     cortrix::test::SanitizedTestName());
         fs::remove_all(test_dir_);
         fs::create_directories(test_dir_);
 
@@ -53,7 +54,7 @@ protected:
         // made unique by appending the running test's name.
         harness_root_ = fs::temp_directory_path() /
                         (std::string("cortrix_dirimp_pool_") +
-                         ::testing::UnitTest::GetInstance()->current_test_info()->name());
+                         cortrix::test::SanitizedTestName());
         fs::remove_all(harness_root_);
 
         // Create test files

@@ -56,6 +56,7 @@
 
 #include "ns_pool_test_helper.h"               // test::NsPoolHarness (F05 pool + FakeIndex)
 #include "parser_stub.h"                        // spc::test::StubParser / MakeOnePageDoc
+#include "test_name_util.h"
 
 namespace cortrix {
 namespace {
@@ -156,7 +157,7 @@ protected:
         filepath_ =
             (std::filesystem::temp_directory_path() /
              (std::string("b3_doc_parse_") +
-              ::testing::UnitTest::GetInstance()->current_test_info()->name() +
+              cortrix::test::SanitizedTestName() +
               ".pdf"))
                 .string();
         std::ofstream(filepath_) << "%PDF-1.4 stub";

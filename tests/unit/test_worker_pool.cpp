@@ -14,6 +14,7 @@
 #include "cortrix/spc/parser.h"
 #include "cortrix/spc/parser_factory.h"
 #include "parser_stub.h"
+#include "test_name_util.h"
 
 // S2 coverage: WorkerPool — Issue 1.1 pool sizing from config, Issue 1.2 startup
 // enforce (pool_size <= parser_max_concurrent), and the end-to-end Dequeue →
@@ -45,7 +46,7 @@ class WorkerPoolTest : public ::testing::Test {
         // Unique per test: parallel ctest processes must not share the stub
         // (a sibling's TearDown/remove yanks it mid-parse; F-1 race family).
         filepath_ = std::string(::testing::TempDir()) + "f42_worker_test_" +
-                    ::testing::UnitTest::GetInstance()->current_test_info()->name() +
+                    cortrix::test::SanitizedTestName() +
                     ".pdf";
         std::ofstream(filepath_) << "%PDF-1.4 stub";
     }

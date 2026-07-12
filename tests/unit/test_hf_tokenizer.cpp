@@ -3,6 +3,7 @@
 #include <fstream>
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#include "test_name_util.h"
 
 namespace cortrix {
 namespace {
@@ -71,7 +72,7 @@ protected:
         // (a sibling's TearDown/remove_all would yank files mid-test).
         test_dir_ = fs::temp_directory_path() /
                     (std::string("cortrix_tokenizer_test_") +
-                     ::testing::UnitTest::GetInstance()->current_test_info()->name());
+                     cortrix::test::SanitizedTestName());
         fs::create_directories(test_dir_);
     }
     void TearDown() override {
