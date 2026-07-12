@@ -404,6 +404,14 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
                 CORTRIX_LOG_WARN("spc", "backfill F03 persist failed, keep owed block_id={}: {}",
                                  rep.block->block_id, we.message());
                 rep.still_owed.push_back("f03");
+                // QA 2026-07-12 F-5: without this, the unconditional flip below
+                // rewrites the row's last_error from an empty rep.last_error and
+                // blanks the diagnosis ingest already recorded (the exact blank-
+                // last_error shape D12 closed on the ingest side).
+                if (rep.last_error.empty()) {
+                    rep.last_error =
+                        "CX_ERR_SPC_PERSIST_FAILED[f03]: " + we.message();
+                }
             } else {
                 UpdateBlockMetadataSummary(db, rep.block->block_id, rep.merged.summary);
             }
@@ -414,6 +422,10 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
                 CORTRIX_LOG_WARN("spc", "backfill F35 persist failed, keep owed block_id={}: {}",
                                  rep.block->block_id, wc.message());
                 rep.still_owed.push_back("f35");
+                if (rep.last_error.empty()) {
+                    rep.last_error =
+                        "CX_ERR_SPC_PERSIST_FAILED[f35]: " + wc.message();
+                }
             }
         }
     }
