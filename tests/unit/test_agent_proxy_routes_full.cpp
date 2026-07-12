@@ -46,12 +46,6 @@ namespace {
 
 using json = nlohmann::json;
 
-// Process-unique-ish port allocator shared by the upstream + proxy servers.
-int NextPort() {
-    static std::atomic<unsigned> ctr{0};
-    return 20100 + ((::getpid() + ctr.fetch_add(1)) % 600);
-}
-
 // Bring an in-process httplib server up on 127.0.0.1:<port> and block until it
 // accepts a TCP probe (or give up after ~3s). Returns true if ready.
 bool WaitReady(int port) {
@@ -68,9 +62,6 @@ bool WaitReady(int port) {
 class AgentProxyRoutesFull : public ::testing::Test {
 protected:
     void SetUp() override {
-        upstream_port_ = NextPort();
-        proxy_port_ = NextPort();
-
         // ---- Fake agent upstream ---------------------------------------------
         upstream_ = std::make_unique<httplib::Server>();
 
@@ -106,7 +97,7 @@ protected:
 
         // Buffered echo endpoints. Echo back method, path (incl. query) and the
         // forwarded headers so tests can assert UpstreamPath + ForwardableHeaders.
-        auto echo = [this](const httplib::Request& req, httplib::Response& res) {
+        auto echo = [](const httplib::Request& req, httplib::Response& res) {
             json out;
             out["method"] = req.method;
             out["path"] = req.path;
@@ -125,16 +116,18 @@ protected:
         upstream_->Put(R"(/.*)", echo);
         upstream_->Delete(R"(/.*)", echo);
 
-        upstream_thread_ =
-            std::thread([this] { upstream_->listen("127.0.0.1", upstream_port_); });
+        upstream_port_ = upstream_->bind_to_any_port("127.0.0.1");
+        ASSERT_GT(upstream_port_, 0) << "failed to bind fake upstream";
+        upstream_thread_ = std::thread([this] { upstream_->listen_after_bind(); });
         ASSERT_TRUE(WaitReady(upstream_port_)) << "fake upstream never came up";
 
         // ---- Proxy server pointed at the (now-ready) upstream ----------------
         base_url_ = "http://127.0.0.1:" + std::to_string(upstream_port_);
         proxy_ = std::make_unique<httplib::Server>();
         RegisterAgentProxyRoutes(*proxy_, base_url_);
-        proxy_thread_ =
-            std::thread([this] { proxy_->listen("127.0.0.1", proxy_port_); });
+        proxy_port_ = proxy_->bind_to_any_port("127.0.0.1");
+        ASSERT_GT(proxy_port_, 0) << "failed to bind proxy";
+        proxy_thread_ = std::thread([this] { proxy_->listen_after_bind(); });
         ASSERT_TRUE(WaitReady(proxy_port_)) << "proxy never came up";
     }
 
@@ -230,9 +223,10 @@ TEST_F(AgentProxyRoutesFull, ChatStreamUpstreamUnreachableGives502) {
     // A proxy pointed at a dead upstream: client.send() fails -> upstream_failed,
     // pending empty -> the held-response 502 arm.
     auto dead_proxy = std::make_unique<httplib::Server>();
-    int dport = NextPort();
     RegisterAgentProxyRoutes(*dead_proxy, "http://127.0.0.1:" + std::to_string(DeadPort()));
-    std::thread th([&] { dead_proxy->listen("127.0.0.1", dport); });
+    int dport = dead_proxy->bind_to_any_port("127.0.0.1");
+    ASSERT_GT(dport, 0);
+    std::thread th([&] { dead_proxy->listen_after_bind(); });
     ASSERT_TRUE(WaitReady(dport));
 
     httplib::Client cli("127.0.0.1", dport);
@@ -341,9 +335,10 @@ TEST_F(AgentProxyRoutesFull, BufferedUnsupportedMethod405) {
 // =========================================================================
 TEST_F(AgentProxyRoutesFull, BufferedUpstreamUnreachableGives502) {
     auto dead_proxy = std::make_unique<httplib::Server>();
-    int dport = NextPort();
     RegisterAgentProxyRoutes(*dead_proxy, "http://127.0.0.1:" + std::to_string(DeadPort()));
-    std::thread th([&] { dead_proxy->listen("127.0.0.1", dport); });
+    int dport = dead_proxy->bind_to_any_port("127.0.0.1");
+    ASSERT_GT(dport, 0);
+    std::thread th([&] { dead_proxy->listen_after_bind(); });
     ASSERT_TRUE(WaitReady(dport));
 
     httplib::Client cli("127.0.0.1", dport);
@@ -397,9 +392,10 @@ TEST_F(AgentProxyRoutesFull, CfgPrefixBufferedStripsAgent) {
 // =========================================================================
 TEST_F(AgentProxyRoutesFull, EmptyBaseUrlRegistersNothing) {
     auto bare = std::make_unique<httplib::Server>();
-    int bport = NextPort();
     RegisterAgentProxyRoutes(*bare, "");  // early return -> no routes
-    std::thread th([&] { bare->listen("127.0.0.1", bport); });
+    int bport = bare->bind_to_any_port("127.0.0.1");
+    ASSERT_GT(bport, 0);
+    std::thread th([&] { bare->listen_after_bind(); });
     ASSERT_TRUE(WaitReady(bport));
 
     httplib::Client cli("127.0.0.1", bport);
