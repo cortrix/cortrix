@@ -582,10 +582,12 @@ TEST_F(NamespacePoolTest, StartupLoadEightWorkersConcurrency) {
     EXPECT_EQ(rep.value().loaded_successfully, 64u);
     EXPECT_EQ(rep.value().failed, 0u);
     EXPECT_EQ(pool->GetPoolStats().pool_size_current, 64u);
-    // 64 NS / 8 workers = 8 serial batches * 100ms ≈ 800ms. Sequential would be
-    // ~6.4s. Generous ceiling (2s) keeps it non-flaky on a loaded CI box while
-    // still proving the load ran concurrently, not serially.
-    EXPECT_LT(elapsed, 2000) << "elapsed=" << elapsed << "ms (expected concurrent)";
+    // 64 NS / 8 workers = 8 serial batches * 100ms ≈ 800ms ideal; SEQUENTIAL is
+    // ~6.4s regardless of machine load (the mock sleeps wall-time). The bound
+    // only needs to separate concurrent from serial: 4500ms rides out full-suite
+    // ctest scheduling noise (2649ms observed at -j4, QA 2026-07-12 F-9) while
+    // staying 30% under the serial floor.
+    EXPECT_LT(elapsed, 4500) << "elapsed=" << elapsed << "ms (expected concurrent)";
 }
 
 // ── UT10 — a single NS whose load exceeds the timeout is counted as failure ──

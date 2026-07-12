@@ -251,7 +251,9 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
         slot->prompt = prompt;
         slot->model = model;
         slot->task_timeout_ms = config_.task_timeout_ms;
-        slot->max_tokens = config_.max_tokens > 0 ? config_.max_tokens : 4096;
+        slot->max_tokens = config_.max_tokens > 0
+                               ? std::min(config_.max_tokens, kEnricherMaxTokensCap)
+                               : 4096;
         const int64_t t0 = NowMs();
         // Task captures ONLY the slot (shared_ptr) + t0 by value.
         auto task = [slot, t0]() -> float {

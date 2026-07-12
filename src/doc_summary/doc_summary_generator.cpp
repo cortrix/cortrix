@@ -61,62 +61,13 @@ std::vector<std::string> ToStringArray(const json& node, const std::string& key)
     return out;
 }
 
-bool IsValidJsonEscape(char c) {
-    switch (c) {
-        case '"':
-        case '\\':
-        case '/':
-        case 'b':
-        case 'f':
-        case 'n':
-        case 'r':
-        case 't':
-        case 'u':
-            return true;
-        default:
-            return false;
-    }
-}
-
-std::string EscapeInvalidJsonStringBackslashes(const std::string& value) {
-    std::string out;
-    out.reserve(value.size());
-
-    bool in_string = false;
-    bool after_backslash = false;
-    for (char c : value) {
-        if (!in_string) {
-            if (c == '"') in_string = true;
-            out.push_back(c);
-            continue;
-        }
-
-        if (after_backslash) {
-            if (!IsValidJsonEscape(c)) out.push_back('\\');
-            out.push_back(c);
-            after_backslash = false;
-            continue;
-        }
-
-        if (c == '\\') {
-            out.push_back(c);
-            after_backslash = true;
-            continue;
-        }
-
-        if (c == '"') in_string = false;
-        out.push_back(c);
-    }
-
-    if (after_backslash) out.push_back('\\');
-    return out;
-}
-
+// Escape machinery lives in common/json_contract.h since QA 2026-07-12 (F-10)
+// so the F03 batch parser shares the exact repair this file pioneered.
 json ParseJsonObjectWithLlmStringEscapeRepair(const std::string& value) {
     json root = json::parse(value, /*cb=*/nullptr, /*allow_exceptions=*/false);
     if (!root.is_discarded() && root.is_object()) return root;
 
-    const std::string repaired = EscapeInvalidJsonStringBackslashes(value);
+    const std::string repaired = common::EscapeInvalidJsonStringBackslashes(value);
     if (repaired == value) return root;
     return json::parse(repaired, /*cb=*/nullptr, /*allow_exceptions=*/false);
 }

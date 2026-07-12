@@ -63,6 +63,23 @@ TEST(EnricherResponseParserTest, L3WholeBatchParseFail) {
     }
 }
 
+TEST(EnricherResponseParserTest, L3RepairsInvalidBackslashEscape) {
+    // A provider echoing a Windows path emits the invalid \U escape; strict
+    // parsing refuses the WHOLE batch (L3 all-or-nothing), so pre-repair one
+    // bad chunk poisoned every neighbor and retries failed deterministically
+    // on the same text (QA 2026-07-12 F-10). The shared escape repair must
+    // rescue the batch and preserve the author-visible text.
+    const char* body =
+        "{\"0\":{\"summary\":\"path C:\\Users broke it\",\"score\":0.5},"
+        "\"1\":{\"summary\":\"innocent neighbor\",\"score\":0.4}}";
+    auto r = ParseEnrichBatchResponse(body, 2, "m", "default-zh");
+    ASSERT_EQ(r.size(), 2u);
+    EXPECT_TRUE(r[0].ok());
+    EXPECT_EQ(r[0].summary, "path C:\\Users broke it");
+    EXPECT_TRUE(r[1].ok());
+    EXPECT_EQ(r[1].summary, "innocent neighbor");
+}
+
 TEST(EnricherResponseParserTest, L3OnJsonArrayNotObject) {
     // A JSON array parses but is not the expected object → L3.
     auto r = ParseEnrichBatchResponse("[1,2,3]", 1, "m", "default-zh");

@@ -708,6 +708,10 @@ TEST_F(SPCPipelineR7Test, EnrichState_PersistFailureAfterSuccessfulEnrichIsOwed)
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"), rows);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members LIKE '%f03%'"),
               rows);
+    // QA 2026-07-12 F-6: the merge must owe EXACTLY f03 here — an over-owe
+    // ("f03,f35") would sail through the LIKE above unnoticed.
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members='f03'"),
+              rows);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE last_error LIKE "
                        "'CX_ERR_SPC_PERSIST_FAILED%'"),
               rows);
@@ -911,6 +915,51 @@ TEST_F(SPCPipelineR7Test, EnrichBackfill_RepairsPendingRowsEndToEnd) {
     ASSERT_TRUE(worker.ProcessTask(t).ok());
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM entities"), entities_before);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM blocks WHERE block_type=16"), hype_before);
+}
+
+// QA 2026-07-12 F-5: a backfill whose enrich SUCCEEDS but whose persist fails
+// must leave a non-empty last_error on the row — the unconditional flip used
+// to rewrite it from an empty rep.last_error, blanking the diagnosis ingest
+// had recorded (the exact blank-last_error shape D12 closed on ingest).
+TEST_F(SPCPipelineR7Test, EnrichBackfill_PersistFailureKeepsNonEmptyLastError) {
+    cortrix::spc::EnricherChain broken;
+    broken.Append(std::make_shared<FailingSummaryEnricher>());
+    pipeline_->SetEnricherChain(&broken);
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+    pipeline_->SetEnricherChain(nullptr);
+    const int rows = CountSql("SELECT COUNT(*) FROM enrich_state");
+    ASSERT_GT(rows, 0);
+
+    // Sabotage persist only: WriteEnrichment commits score+entities atomically,
+    // so a missing entities table fails the write after a successful re-enrich.
+    ASSERT_EQ(sqlite3_exec(facade_->store().db_handle(), "DROP TABLE entities",
+                           nullptr, nullptr, nullptr),
+              SQLITE_OK);
+
+    cortrix::spc::EnricherChain working;
+    working.Append(std::make_shared<FakeSummaryEnricher>());
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks.db").string()).ok());
+    cortrix::spc::EnrichBackfillWorker worker(*pool_, &working, *embedder_, &mgr);
+    async::TaskInfo t;
+    t.task_id = 1;
+    t.namespace_id = "test-ns";
+    t.doc_id = doc_id;
+    ASSERT_TRUE(worker.ProcessTask(t).ok());
+
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"),
+              rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members LIKE '%f03%'"),
+              rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE last_error LIKE "
+                       "'CX_ERR_SPC_PERSIST_FAILED[f03]%'"),
+              rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE last_error IS NULL "
+                       "OR last_error=''"),
+              0);
 }
 
 // Partial repair: the working chain still fails one member (hype LLM down) →

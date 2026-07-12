@@ -54,11 +54,12 @@ struct LlmConfig {
                                  ///< default). Large batches push the non-streaming
                                  ///< generation past provider gateway idle windows.
     int max_tokens = 0;          ///< enricher role only: response token budget for the
-                                 ///< F03 batch call (0 = built-in default 4096). Size it
-                                 ///< with batch_size — 4096 across a 32-chunk batch is
-                                 ///< ~128 tokens/chunk and truncates the batch JSON (D5b
-                                 ///< evidence); the budget/batch policy itself stays a
-                                 ///< deployment decision until the D5b design round.
+                                 ///< F03 batch call (0 = built-in default 4096; oversize
+                                 ///< values clamp to kEnricherMaxTokensCap — QA F-7).
+                                 ///< Size it with batch_size — 4096 across a 32-chunk
+                                 ///< batch is ~128 tokens/chunk and truncates the batch
+                                 ///< JSON (D5b evidence); the budget/batch policy itself
+                                 ///< stays a deployment decision until the D5b round.
     int hype_questions_per_chunk = 0;  ///< enricher role only: F38 §4.3 hypothetical
                                        ///< questions per chunk (0 = built-in default 3;
                                        ///< clamped to the design range [1, 10]). The

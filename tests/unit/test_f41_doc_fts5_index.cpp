@@ -56,6 +56,21 @@ TEST_F(F41DocFts5IndexTest, SearchMatchesTopics) {
     EXPECT_EQ(r.value()[0].doc_id, "d2");
 }
 
+// QA 2026-07-12 F-2: SearchDocFts5 shares the block-path sanitizer, so the D6
+// OR-join applies to doc discovery too. A natural-language query whose tokens
+// do NOT all co-occur in one row must still surface the partial matches —
+// the old implicit-AND semantics starved this to zero rows.
+TEST_F(F41DocFts5IndexTest, MultiTokenQueryMatchesPartialTerms) {
+    ASSERT_TRUE(idx_.Upsert(Row("d1", "Q3 Financial Report", "revenue")).ok());
+    ASSERT_TRUE(idx_.Upsert(Row("d2", "Distributed Systems Guide", "consensus")).ok());
+
+    auto r = idx_.Search("financial report about distributed consensus", 10);
+    ASSERT_TRUE(r.ok()) << r.status().message();
+    // OR semantics: each doc matches on its own tokens; AND would demand every
+    // token inside one row and return nothing.
+    ASSERT_EQ(r.value().size(), 2u);
+}
+
 TEST_F(F41DocFts5IndexTest, UpsertIsIdempotentOnDocId) {
     ASSERT_TRUE(idx_.Upsert(Row("d1", "Old Title", "old")).ok());
     ASSERT_TRUE(idx_.Upsert(Row("d1", "New Title", "new")).ok());  // replace
