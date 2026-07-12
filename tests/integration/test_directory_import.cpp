@@ -40,7 +40,12 @@ class DirectoryImportTest : public ::testing::Test {
 protected:
     void SetUp() override {
         namespace fs = std::filesystem;
-        test_dir_ = fs::temp_directory_path() / "cortrix_test_dir_import";
+        // Unique per test (same idiom as harness_root_ below): parallel ctest
+        // runs suite tests as concurrent processes, and a shared scanned dir
+        // races one test's SetUp/remove_all against a sibling's live scan.
+        test_dir_ = fs::temp_directory_path() /
+                    (std::string("cortrix_test_dir_import_") +
+                     ::testing::UnitTest::GetInstance()->current_test_info()->name());
         fs::remove_all(test_dir_);
         fs::create_directories(test_dir_);
 

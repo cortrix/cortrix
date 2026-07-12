@@ -35,7 +35,11 @@ std::string WriteMinimalTokenizerJson(const fs::path& dir) {
 class TokenizerRegistryBranchTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        dir_ = fs::temp_directory_path() / "cortrix_tok_registry_test";
+        // Unique per test: parallel ctest processes must not share this dir
+        // (a sibling's TearDown/remove_all would yank files mid-test).
+        dir_ = fs::temp_directory_path() /
+               (std::string("cortrix_tok_registry_test_") +
+                ::testing::UnitTest::GetInstance()->current_test_info()->name());
         fs::create_directories(dir_);
         TokenizerRegistry::ResetForTest();
     }
