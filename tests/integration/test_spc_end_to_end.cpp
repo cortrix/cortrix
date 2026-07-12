@@ -32,8 +32,12 @@ static std::string ReadFile(const std::string& path) {
 class SPCEndToEndTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        txt_path_ = "/tmp/cortrix_e2e_test.txt";
-        md_path_ = "/tmp/cortrix_e2e_test.md";
+        // Unique per test: parallel ctest processes must not share these files
+        // (a sibling's TearDown/remove would yank them mid-parse).
+        const std::string uniq =
+            ::testing::UnitTest::GetInstance()->current_test_info()->name();
+        txt_path_ = "/tmp/cortrix_e2e_test_" + uniq + ".txt";
+        md_path_ = "/tmp/cortrix_e2e_test_" + uniq + ".md";
 
         {
             std::ofstream f(txt_path_);

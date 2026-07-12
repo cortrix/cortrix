@@ -67,7 +67,11 @@ std::string CreateMinimalTokenizerJson(const std::string& dir) {
 class HfTokenizerTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        test_dir_ = fs::temp_directory_path() / "cortrix_tokenizer_test";
+        // Unique per test: parallel ctest processes must not share this dir
+        // (a sibling's TearDown/remove_all would yank files mid-test).
+        test_dir_ = fs::temp_directory_path() /
+                    (std::string("cortrix_tokenizer_test_") +
+                     ::testing::UnitTest::GetInstance()->current_test_info()->name());
         fs::create_directories(test_dir_);
     }
     void TearDown() override {
