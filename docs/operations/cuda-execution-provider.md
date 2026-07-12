@@ -132,6 +132,12 @@ at a non-empty path never silently degrade to a stub.
 
 Run all commands from the repository root.
 
+`deploy/Dockerfile.cuda` pins each Linux x86_64 base image by digest, installs
+CMake 4.4.0 from a SHA-256-locked wheel, and uses Redocly CLI 1.34.17. Treat
+changes to any of those identities as a supply-chain update: verify the new
+registry or package digest, rebuild the image from a clean cache, and rerun the
+CPU-isolation and GPU capability smoke tests before publishing it.
+
 Create the local environment file and review it before starting:
 
 ```bash
