@@ -42,7 +42,11 @@ class WorkerPoolTest : public ::testing::Test {
         factory_->SetPrimaryParser(MakeOkStub());
         proc_ = std::make_unique<DocumentProcessor>(&mgr_, factory_.get(), &cfg_);
         // F06 factory pre-check stat()s the file → seed a real temp .pdf.
-        filepath_ = std::string(::testing::TempDir()) + "f42_worker_test.pdf";
+        // Unique per test: parallel ctest processes must not share the stub
+        // (a sibling's TearDown/remove yanks it mid-parse; F-1 race family).
+        filepath_ = std::string(::testing::TempDir()) + "f42_worker_test_" +
+                    ::testing::UnitTest::GetInstance()->current_test_info()->name() +
+                    ".pdf";
         std::ofstream(filepath_) << "%PDF-1.4 stub";
     }
     void TearDown() override { std::remove(filepath_.c_str()); }

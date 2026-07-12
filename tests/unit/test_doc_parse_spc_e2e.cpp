@@ -151,7 +151,14 @@ protected:
 
         // A real on-disk .pdf so the F06 factory pre-check stat() passes (the stub does
         // not read it — it returns the seeded ParsedDoc).
-        filepath_ = (std::filesystem::temp_directory_path() / "b3_doc_parse.pdf").string();
+        // Unique per test: parallel ctest processes must not share the stub
+        // (a sibling's TearDown/remove yanks it mid-parse; F-1 race family).
+        filepath_ =
+            (std::filesystem::temp_directory_path() /
+             (std::string("b3_doc_parse_") +
+              ::testing::UnitTest::GetInstance()->current_test_info()->name() +
+              ".pdf"))
+                .string();
         std::ofstream(filepath_) << "%PDF-1.4 stub";
     }
 
