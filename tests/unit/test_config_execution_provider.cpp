@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "cortrix/config/config.h"
+#include "cortrix/server/bootstrap.h"
 
 namespace cortrix {
 namespace {
@@ -122,6 +123,32 @@ embedding:
     auto errors = ValidateConfig(config);
     EXPECT_TRUE(ContainsError(errors, "embedding canonical execution_provider conflicts with deprecated "
                                        "alias"));
+}
+
+TEST_F(ConfigExecutionProviderTest, ServerStartupRejectsRerankerAliasConflict) {
+    WriteYaml(R"(
+reranker:
+  execution_provider: "cpu"
+  use_coreml: true
+)");
+    std::string program = "cortrix-server";
+    std::string flag = "--config";
+    char* argv[] = {program.data(), flag.data(), yaml_path_.data()};
+
+    EXPECT_EQ(server::RunServer(3, argv), 1);
+}
+
+TEST_F(ConfigExecutionProviderTest, ServerStartupRejectsEmbeddingAliasConflict) {
+    WriteYaml(R"(
+embedding:
+  execution_provider: "cpu"
+  gpu_provider: "cuda"
+)");
+    std::string program = "cortrix-server";
+    std::string flag = "--config";
+    char* argv[] = {program.data(), flag.data(), yaml_path_.data()};
+
+    EXPECT_EQ(server::RunServer(3, argv), 1);
 }
 
 TEST_F(ConfigExecutionProviderTest, EmbeddingCanonicalEnvClearsYamlConflict) {

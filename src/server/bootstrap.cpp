@@ -221,6 +221,14 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
 
     // 1. Load config
     auto config = cortrix::LoadConfig(config_path);
+    const auto config_errors = cortrix::ValidateConfig(config);
+    if (!config_errors.empty()) {
+        std::cerr << "[config] ERROR: Invalid configuration:\n";
+        for (const auto& error : config_errors) {
+            std::cerr << "  - " << error << '\n';
+        }
+        return 1;
+    }
 
     // 2. Initialize logging
     cortrix::InitLogging(config.log);
