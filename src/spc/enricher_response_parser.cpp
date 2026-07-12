@@ -7,6 +7,7 @@
 #include <nlohmann/json.hpp>
 
 #include "cortrix/common/json_contract.h"
+#include "cortrix/logging/logging.h"
 #include "cortrix/spc_enricher/enricher_error.h"
 
 namespace cortrix::spc {
@@ -96,6 +97,15 @@ std::vector<EnrichResult> ParseEnrichBatchResponse(const std::string& body,
             common::EscapeInvalidJsonStringBackslashes(normalized_body);
         if (repaired != normalized_body) {
             root = json::parse(repaired, /*cb=*/nullptr, /*allow_exceptions=*/false);
+            if (!root.is_discarded() && root.is_object()) {
+                // Observable-by-design (json_contract.h contract, QA F-14): a
+                // repair marks a provider-contract deviation — surface it, never
+                // let it become the silent normal path.
+                CORTRIX_LOG_WARN("spc",
+                    "F03 batch response accepted via escape repair (invalid "
+                    "backslash escape from provider; batch_size={} model={})",
+                    batch_size, model);
+            }
         }
     }
     if (root.is_discarded() || !root.is_object()) {

@@ -69,15 +69,30 @@ TEST(EnricherResponseParserTest, L3RepairsInvalidBackslashEscape) {
     // bad chunk poisoned every neighbor and retries failed deterministically
     // on the same text (QA 2026-07-12 F-10). The shared escape repair must
     // rescue the batch and preserve the author-visible text.
+    // The neighbor carries a LEGAL escape (\n): the repair must leave valid
+    // escapes untouched — an over-escaping regression would corrupt it.
     const char* body =
         "{\"0\":{\"summary\":\"path C:\\Users broke it\",\"score\":0.5},"
-        "\"1\":{\"summary\":\"innocent neighbor\",\"score\":0.4}}";
+        "\"1\":{\"summary\":\"innocent\\nneighbor\",\"score\":0.4}}";
     auto r = ParseEnrichBatchResponse(body, 2, "m", "default-zh");
     ASSERT_EQ(r.size(), 2u);
     EXPECT_TRUE(r[0].ok());
     EXPECT_EQ(r[0].summary, "path C:\\Users broke it");
     EXPECT_TRUE(r[1].ok());
-    EXPECT_EQ(r[1].summary, "innocent neighbor");
+    EXPECT_EQ(r[1].summary, "innocent\nneighbor");
+}
+
+TEST(EnricherResponseParserTest, L3RepairsInvalidEscapeInsideJsonFence) {
+    // Fence unwrap runs BEFORE the escape repair; the combination (fenced body
+    // whose payload carries a bad escape) must still be rescued.
+    const char* body =
+        "```json\n"
+        "{\"0\":{\"summary\":\"path C:\\Users again\",\"score\":0.5}}\n"
+        "```";
+    auto r = ParseEnrichBatchResponse(body, 1, "m", "default-zh");
+    ASSERT_EQ(r.size(), 1u);
+    EXPECT_TRUE(r[0].ok());
+    EXPECT_EQ(r[0].summary, "path C:\\Users again");
 }
 
 TEST(EnricherResponseParserTest, L3OnJsonArrayNotObject) {
