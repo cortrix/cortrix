@@ -1,8 +1,8 @@
 # ONNX Runtime Upgrade & Rollback SOP
 
 > Operational runbook for upgrading the ONNX Runtime that `cortrix-server`
-> links. Covers the common same-major `.so` swap, rollback, the rare
-> cross-major rebuild, and multi-instance rolling upgrades.
+> links. Covers the CPU flavor's common same-major `.so` swap, rollback, the
+> rare cross-major rebuild, CUDA provider bundles, and rolling upgrades.
 >
 > Source of truth for the mechanism: `design/features/F22-onnx-runtime-upgrade.md`.
 
@@ -12,9 +12,13 @@
 `libonnxruntime.<version>.dylib` on macOS). Cortrix locks the **ABI major
 version** at build time via the CMake flag `ONNXRT_MAJOR_VERSION` (default `1`).
 
-- **Same-major upgrade (e.g. 1.17 -> 1.19) — the common case.** ONNX Runtime is
-  ABI-compatible within a major version, so you replace the library file and
-  restart the process. **No rebuild.**
+- **Same-major CPU-flavor upgrade (e.g. 1.17 -> 1.19).** ONNX Runtime is
+  ABI-compatible within a major version, so a CPU deployment can replace the
+  core library file and restart the process. **No rebuild.**
+- **CUDA-flavor upgrade.** Treat the core runtime and execution-provider shared
+  objects as one versioned bundle. Rebuild the CUDA image from a pinned ORT
+  archive and compatible CUDA/cuDNN base; never replace only
+  `libonnxruntime.so` while retaining provider libraries from another release.
 - **Cross-major upgrade (e.g. 1.x -> 2.x) — every few years.** ABI breaks across
   majors, so you rebuild `cortrix-server` with `ONNXRT_MAJOR_VERSION` bumped,
   then deploy the new binary.
@@ -41,9 +45,18 @@ cortrix-server --check-onnx
 It validates the loaded runtime + registered models and exits 0 (safe) or 1
 (do not restart — see the printed `CX_ERR_*` code).
 
+`--check-onnx` does not prove CUDA driver visibility or CUDA provider dynamic
+dependencies. CUDA deployments must also follow the `ldd`, active-provider,
+and capability-smoke checks in the
+[CUDA operations runbook](cuda-execution-provider.md).
+
 ---
 
-## Scenario A — same-major upgrade (common, no rebuild)
+## Scenario A — same-major CPU-flavor upgrade (no rebuild)
+
+Do not use this single-library procedure for the CUDA flavor. For CUDA, update
+the pinned ORT version, URL/hash, and compatible CUDA/cuDNN image together,
+rebuild `deploy/Dockerfile.cuda`, then run the CUDA capability smoke.
 
 ```bash
 # 1. Back up the current library (tag it with the version you are replacing).
@@ -164,7 +177,7 @@ K8s / custom LB), not to `cortrix-server`.
 
 ## Observability — what to watch after an upgrade
 
-`cortrix-server` exposes four ONNX metrics (OpenMetrics, prefix
+`cortrix-server` exposes ONNX runtime, inference, and execution-provider metrics (OpenMetrics, prefix
 `cortrix_onnx_*`). After an upgrade, an operator or ops Agent can confirm health
 by querying:
 

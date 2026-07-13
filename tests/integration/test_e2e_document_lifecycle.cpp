@@ -55,7 +55,7 @@ protected:
         cfg.max_elements = 10000;
         vec_ = std::make_unique<PHnsw>(vec_path_, cfg);  // ctor runs Recover()
 
-        embedder_ = std::make_unique<OnnxEmbedder>("stub.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         ASSERT_TRUE(embedder_->Init().ok());
     }
 

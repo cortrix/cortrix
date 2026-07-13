@@ -280,14 +280,14 @@ class FullStackE2E {
   /// caller wanting the F03/F35/F38 fakes installs them on enricher_chain()
   /// before Start(). Workers are started by Start().
   /// @param embedding_dim  vector dimension (stub default 128; real bge-m3 = 1024).
-  /// @param embedder_model_path  ONNX model path. "stub.onnx" (default, or any
-  ///        non-existent path) → the deterministic stub embedder (no real model
-  ///        needed); a real model.onnx path → real inference (E2E-4 semantic recall).
+  /// @param embedder_model_path  ONNX model path. An empty path (default) selects
+  ///        the deterministic stub embedder; a real model.onnx path selects real
+  ///        inference (E2E-4 semantic recall). A missing non-empty path fails.
   ///        NOTE: the F05 pool opens each Unit's P-HNSW at the snapshot/default
   ///        dim (1024); for a REAL semantic-recall test use embedding_dim=1024 so the
   ///        embedder and index dimensions agree.
   void BuildIngest(int embedding_dim = 128,
-                   const std::string& embedder_model_path = "stub.onnx") {
+                   const std::string& embedder_model_path = "") {
     BuildCore(embedding_dim);
 
     // Real SPC components (mirrors bootstrap §7).

@@ -23,7 +23,6 @@ export CORTRIX_LLM_BASE_URL="${CORTRIX_LLM_BASE_URL:-https://api.openai.com/v1}"
 export CORTRIX_LLM_API_KEY="${CORTRIX_LLM_API_KEY:-}"
 
 export CORTRIX_EMBEDDING_MODEL="${CORTRIX_EMBEDDING_MODEL:-bge-m3-onnx}"
-export CORTRIX_EMBEDDING_DEVICE="${CORTRIX_EMBEDDING_DEVICE:-cpu}"
 export CORTRIX_SPC_WORKERS="${CORTRIX_SPC_WORKERS:-2}"
 export CORTRIX_SPC_QUEUE_SIZE="${CORTRIX_SPC_QUEUE_SIZE:-100}"
 
@@ -59,17 +58,160 @@ export PADDLE_PDX_CACHE_HOME="${PADDLE_PDX_CACHE_HOME:-$CORTRIX_DATA_DIR/cache/p
 export DOCLING_CACHE_DIR="${DOCLING_CACHE_DIR:-$CORTRIX_DATA_DIR/cache/docling}"
 mkdir -p "$CORTRIX_MODELS_DIR" "$HF_HOME" "$PADDLE_PDX_CACHE_HOME" "$DOCLING_CACHE_DIR" 2>/dev/null || true
 
+PROFILE_CONFIG=/app/config/cortrix.yaml
+PROFILE_CONFIG_BACKUP=/app/config/cortrix.yaml.pre-lite
+
+# CUDA images carry this marker. The NVIDIA CUDA base image also carries a
+# NVIDIA_REQUIRE_CUDA constraint, which the NVIDIA Container Toolkit evaluates
+# against the host driver before this entrypoint runs.
+if [ "${CORTRIX_ONNX_RUNTIME_FLAVOR:-cpu}" = "cuda" ]; then
+    CUDA_PREFLIGHT_FAILED=0
+    CUDA_EP_LIBRARY=/usr/local/lib/libonnxruntime_providers_cuda.so
+
+    yaml_config_value() {
+        python3 - "$PROFILE_CONFIG" "$1" "$2" <<'PY'
+import sys
+import yaml
+
+path, section_name, key = sys.argv[1:]
+with open(path, encoding="utf-8") as stream:
+    document = yaml.safe_load(stream) or {}
+section = document.get(section_name) or {}
+value = section.get(key)
+if isinstance(value, bool):
+    print("true" if value else "false")
+elif value is not None:
+    print(value)
+PY
+    }
+
+    EMBEDDING_EP="${CORTRIX_EMBEDDING_EXECUTION_PROVIDER:-}"
+    if [ -z "$EMBEDDING_EP" ]; then
+        EMBEDDING_EP="${CORTRIX_EMBEDDING_DEVICE:-}"
+    fi
+    if [ -z "$EMBEDDING_EP" ]; then
+        EMBEDDING_EP="$(yaml_config_value embedding execution_provider)"
+    fi
+    if [ -z "$EMBEDDING_EP" ]; then
+        EMBEDDING_EP="$(yaml_config_value embedding gpu_provider)"
+    fi
+    EMBEDDING_EP="${EMBEDDING_EP:-auto}"
+
+    RERANKER_EP="${CORTRIX_RERANKER_EXECUTION_PROVIDER:-}"
+    if [ -z "$RERANKER_EP" ]; then
+        RERANKER_LEGACY="${CORTRIX_RERANKER_USE_COREML:-}"
+        case "$(printf '%s' "$RERANKER_LEGACY" | tr '[:upper:]' '[:lower:]')" in
+            1|true|yes|on) RERANKER_EP=coreml ;;
+        esac
+    fi
+    if [ -z "$RERANKER_EP" ]; then
+        RERANKER_EP="$(yaml_config_value reranker execution_provider)"
+    fi
+    if [ -z "$RERANKER_EP" ]; then
+        RERANKER_LEGACY="$(yaml_config_value reranker use_coreml)"
+        case "$(printf '%s' "$RERANKER_LEGACY" | tr '[:upper:]' '[:lower:]')" in
+            1|true|yes|on) RERANKER_EP=coreml ;;
+        esac
+    fi
+    RERANKER_EP="${RERANKER_EP:-auto}"
+    EMBEDDING_EP="$(printf '%s' "$EMBEDDING_EP" | tr '[:upper:]' '[:lower:]')"
+    RERANKER_EP="$(printf '%s' "$RERANKER_EP" | tr '[:upper:]' '[:lower:]')"
+
+    CUDA_PREFLIGHT_REQUIRED=0
+    case "$EMBEDDING_EP" in
+        auto|cuda) CUDA_PREFLIGHT_REQUIRED=1 ;;
+    esac
+    case "$RERANKER_EP" in
+        auto|cuda) CUDA_PREFLIGHT_REQUIRED=1 ;;
+    esac
+
+    if [ "$CUDA_PREFLIGHT_REQUIRED" -eq 0 ]; then
+        echo "[cuda] GPU pre-flight skipped; no component requests auto or cuda"
+    else
+
+        cuda_preflight_error() {
+            echo "ERROR: CUDA pre-flight: $1"
+            CUDA_PREFLIGHT_FAILED=1
+        }
+
+        [ "$(uname -m)" = "x86_64" ] || \
+            cuda_preflight_error "the CUDA image supports Linux x86_64 only"
+        if ! command -v nvidia-smi >/dev/null 2>&1; then
+            cuda_preflight_error "nvidia-smi is not visible; install and configure NVIDIA Container Toolkit"
+        elif ! nvidia-smi -L >/dev/null 2>&1; then
+            cuda_preflight_error "no NVIDIA GPU is visible inside the container (NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-unset})"
+        else
+            echo "[cuda] visible devices:"
+            nvidia-smi -L
+            echo "[cuda] container CUDA ${CUDA_VERSION:-unknown}; host driver $(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -n 1)"
+        fi
+
+        if [ ! -r "$CUDA_EP_LIBRARY" ]; then
+            cuda_preflight_error "$CUDA_EP_LIBRARY is missing from the image"
+        else
+            CUDA_LDD_OUTPUT="$(ldd "$CUDA_EP_LIBRARY" 2>&1)" || \
+                cuda_preflight_error "cannot inspect CUDA provider dependencies"
+            if printf '%s\n' "${CUDA_LDD_OUTPUT:-}" | grep -q 'not found'; then
+                printf '%s\n' "$CUDA_LDD_OUTPUT"
+                cuda_preflight_error "CUDA provider dependencies are unresolved; check driver injection and CUDA/cuDNN compatibility"
+            fi
+        fi
+
+        if [ "$CUDA_PREFLIGHT_FAILED" -ne 0 ]; then
+            if [ "$EMBEDDING_EP" = "cuda" ] || [ "$RERANKER_EP" = "cuda" ]; then
+                echo "ERROR: explicit cuda execution_provider is fail-closed"
+                exit 1
+            fi
+            echo "WARN: CUDA pre-flight failed; auto execution_provider will attempt a fresh CPU session"
+        else
+            echo "[cuda] device and runtime pre-flight passed"
+        fi
+    fi
+fi
+
 if [ "$CORTRIX_PROFILE" = "lite" ]; then
-    echo "PROFILE=lite — skipping model/parser provisioning"
-    echo "  (txt/md + BM25 available; embedding=stub; PDF/image parsing off)"
+    # A non-empty model path is fail-closed. Clear both embedding paths in the
+    # runtime copy of the bundled config so lite mode remains an explicit stub.
+    if [ ! -w "$PROFILE_CONFIG" ]; then
+        echo "ERROR: PROFILE=lite must update $PROFILE_CONFIG, but it is not writable"
+        exit 1
+    fi
+    if [ ! -f "$PROFILE_CONFIG_BACKUP" ]; then
+        cp "$PROFILE_CONFIG" "$PROFILE_CONFIG_BACKUP"
+    fi
+    sed -i \
+        -e 's|^  model_path:.*|  model_path: ""|' \
+        -e 's|^  tokenizer_path:.*|  tokenizer_path: ""|' \
+        "$PROFILE_CONFIG"
+    if ! grep -q '^  model_path: ""$' "$PROFILE_CONFIG" || \
+       ! grep -q '^  tokenizer_path: ""$' "$PROFILE_CONFIG"; then
+        echo "ERROR: PROFILE=lite could not clear embedding model_path and tokenizer_path"
+        exit 1
+    fi
+    echo "PROFILE=lite — embedding model paths cleared; skipping model/parser provisioning"
+    echo "  (txt/md + BM25 available; embedding=explicit stub; PDF/image parsing off)"
 else
+    # A container restarted after lite mode retains its writable layer. Restore
+    # the pre-lite config before enforcing the full-profile model contract.
+    if [ -f "$PROFILE_CONFIG_BACKUP" ]; then
+        cp "$PROFILE_CONFIG_BACKUP" "$PROFILE_CONFIG"
+        rm -f "$PROFILE_CONFIG_BACKUP"
+    fi
     # (1) ONNX models → data volume. bge-m3 always; reranker/query-complexity
     #     only when their *_MODEL_URL env is set (see download-models.sh).
-    if [ ! -f "$CORTRIX_MODELS_DIR/bge-m3/model.onnx" ]; then
+    if [ ! -s "$CORTRIX_MODELS_DIR/bge-m3/model.onnx" ] || \
+       [ ! -s "$CORTRIX_MODELS_DIR/bge-m3/model.onnx_data" ] || \
+       [ ! -s "$CORTRIX_MODELS_DIR/bge-m3/tokenizer.json" ]; then
         echo "[provision] fetching ONNX models into $CORTRIX_MODELS_DIR"
         echo "            (first run only; bge-m3 ~2GB, may take 10-20 min)…"
-        bash /app/scripts/download-models.sh "$CORTRIX_MODELS_DIR" \
-            || echo "WARN: model fetch incomplete — affected features degrade (embedding/reranker stub, heuristic complexity)"
+        bash /app/scripts/download-models.sh "$CORTRIX_MODELS_DIR"
+    fi
+    if [ ! -s "$CORTRIX_MODELS_DIR/bge-m3/model.onnx" ] || \
+       [ ! -s "$CORTRIX_MODELS_DIR/bge-m3/model.onnx_data" ] || \
+       [ ! -s "$CORTRIX_MODELS_DIR/bge-m3/tokenizer.json" ]; then
+        echo "ERROR: PROFILE=full requires complete bge-m3 model.onnx, model.onnx_data, and tokenizer.json assets"
+        echo "       Fix model provisioning in $CORTRIX_MODELS_DIR/bge-m3 and restart"
+        exit 1
     fi
     # (2) docling/paddleocr parser stack → venv on the data volume.
     # Self-healing gate: re-provision whenever docling is not importable. The old
@@ -229,7 +371,9 @@ echo "  Data Dir ......  $CORTRIX_DATA_DIR"
 echo "  HTTP Port .....  $CORTRIX_HTTP_PORT"
 echo "  Log Level .....  $CORTRIX_LOG_LEVEL"
 echo "  LLM Provider ..  $CORTRIX_LLM_PROVIDER ($CORTRIX_LLM_MODEL)"
-echo "  Embedding .....  $CORTRIX_EMBEDDING_MODEL ($CORTRIX_EMBEDDING_DEVICE)"
+echo "  Embedding .....  $CORTRIX_EMBEDDING_MODEL (${CORTRIX_EMBEDDING_EXECUTION_PROVIDER:-${CORTRIX_EMBEDDING_DEVICE:-auto}})"
+echo "  Reranker EP ...  ${CORTRIX_RERANKER_EXECUTION_PROVIDER:-auto}"
+echo "  ONNX Flavor ...  ${CORTRIX_ONNX_RUNTIME_FLAVOR:-cpu}"
 echo "  SPC Workers ...  $CORTRIX_SPC_WORKERS"
 echo "  Web UI ........  $CORTRIX_WEB_UI_ENABLED"
 echo "  Agent .........  $CORTRIX_AGENT_ENABLED (port $CORTRIX_AGENT_PORT)"

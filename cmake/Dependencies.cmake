@@ -82,6 +82,14 @@ endif()
 
 # --- ONNX Runtime (pre-built binary for real embeddings) ---
 option(CORTRIX_USE_ONNX "Enable ONNX Runtime for real embedding inference" ON)
+set(CORTRIX_ONNX_RUNTIME_FLAVOR "cpu" CACHE STRING
+    "ONNX Runtime distribution flavor (cpu or cuda; cuda is Linux x86_64 only)")
+set_property(CACHE CORTRIX_ONNX_RUNTIME_FLAVOR PROPERTY STRINGS cpu cuda)
+string(TOLOWER "${CORTRIX_ONNX_RUNTIME_FLAVOR}" CORTRIX_ONNX_RUNTIME_FLAVOR)
+if(NOT CORTRIX_ONNX_RUNTIME_FLAVOR MATCHES "^(cpu|cuda)$")
+    message(FATAL_ERROR
+        "CORTRIX_ONNX_RUNTIME_FLAVOR must be 'cpu' or 'cuda', got '${CORTRIX_ONNX_RUNTIME_FLAVOR}'")
+endif()
 
 # F22: lock the ONNX Runtime ABI *major* version this binary is built against.
 # Within one major (1.x), ONNX Runtime keeps ABI compatibility, so a same-major
@@ -95,15 +103,37 @@ add_compile_definitions(CORTRIX_ONNXRT_EXPECTED_MAJOR=${ONNXRT_MAJOR_VERSION})
 
 if(CORTRIX_USE_ONNX)
     set(ONNXRUNTIME_VERSION "1.17.1")
-
-    if(APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+    if(CORTRIX_ONNX_RUNTIME_FLAVOR STREQUAL "cuda")
+        if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" OR
+           NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+            message(FATAL_ERROR
+                "CORTRIX_ONNX_RUNTIME_FLAVOR=cuda requires Linux x86_64")
+        endif()
+        set(ORT_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-x64-gpu-${ONNXRUNTIME_VERSION}.tgz")
+        # Official v1.17.1 asset: 170787228 bytes. GitHub's legacy release metadata
+        # does not publish a digest; this SHA-256 was independently reproduced from
+        # three retained copies whose name and byte size match the official asset.
+        set(ORT_URL_HASH
+            "SHA256=613c53745ea4960ed368f6b3ab673558bb8561c84a8fa781b4ea7fb4a4340be4")
+        add_compile_definitions(CORTRIX_HAS_CUDA)
+        message(STATUS "ONNX Runtime CUDA flavor enabled (Linux x86_64)")
+    elseif(APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
         set(ORT_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-osx-arm64-${ONNXRUNTIME_VERSION}.tgz")
+        set(ORT_URL_HASH
+            "SHA256=89566f424624a7ad9a7d9d5e413c44b9639a994d7171cf409901d125b16e2bb3")
     elseif(APPLE)
         set(ORT_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-osx-x86_64-${ONNXRUNTIME_VERSION}.tgz")
-    elseif(UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+        set(ORT_URL_HASH
+            "SHA256=86c6b6896434084ff5086eebc4e9ea90be1ed4d46743f92864f46ee43e7b5059")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+           CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
         set(ORT_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-aarch64-${ONNXRUNTIME_VERSION}.tgz")
-    elseif(UNIX)
+        set(ORT_URL_HASH
+            "SHA256=70b6f536bb7ab5961d128e9dbd192368ac1513bffb74fe92f97aac342fbd0ac1")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set(ORT_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}.tgz")
+        set(ORT_URL_HASH
+            "SHA256=89b153af88746665909c758a06797175ae366280cbf25502c41eb5955f9a555e")
     else()
         message(WARNING "ONNX Runtime: unsupported platform, disabling")
         set(CORTRIX_USE_ONNX OFF)
@@ -113,6 +143,7 @@ if(CORTRIX_USE_ONNX)
         FetchContent_Declare(
             onnxruntime
             URL ${ORT_URL}
+            URL_HASH ${ORT_URL_HASH}
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         )
         FetchContent_MakeAvailable(onnxruntime)

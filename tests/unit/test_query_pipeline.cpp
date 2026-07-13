@@ -246,7 +246,7 @@ class QueryPipelineExecuteTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // Initialize stub embedder
-        embedder_ = std::make_unique<OnnxEmbedder>("fake_model.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
 
         // Setup fake vector results

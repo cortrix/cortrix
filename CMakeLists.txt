@@ -257,6 +257,7 @@ add_library(cortrix_core STATIC
     src/resource/namespace_pool.cpp
     src/resource/namespace_facade.cpp
     src/resource/ns_pool_metrics.cpp
+    src/ml/execution_provider.cpp
     src/ml/ort_env_singleton.cpp
     src/ml/tokenizer_registry.cpp
     src/reranker/reranker_error.cpp

@@ -41,7 +41,11 @@ struct EmbeddingConfig {
     std::string tokenizer_path;       // Path to tokenizer.json (derived from model_path dir if empty)
     int dimension = 1024;
     int max_seq_length = 512;         // Maximum input token length
-    std::string gpu_provider = "auto";  // "cpu", "coreml", "auto"
+    // Deprecated C++ compatibility field. Config loading normalizes it into
+    // execution_provider; new callers should use the canonical field.
+    std::string gpu_provider = "auto";
+    std::string execution_provider = "auto";  // auto, cpu, coreml, cuda
+    std::string execution_provider_error;     // canonical/legacy conflict, if any
 };
 
 struct LlmConfig {
@@ -81,7 +85,7 @@ struct LlmConfig {
 };
 
 struct SPCConfig {
-    // 0 = auto: 1 if CoreML active (GPU), 2 if CPU-only; set after embedder.Init()
+    // 0 = auto: resolved after embedder.Init(); current default is 2 for every EP.
     int worker_count = 0;
     // Parser-subprocess concurrency cap (memory protection; the F42 pool-size
     // startup gate compares against it). Default 4 unchanged — raise EXPLICITLY
@@ -96,7 +100,7 @@ struct SPCConfig {
     int chunk_size = 512;
     int chunk_overlap = 50;
     int embedding_batch_size = 4;  // 4 = good default for both GPU and CPU batching
-    // 0 = auto: 2 if CoreML active (GPU handles heavy ops), min(4, cores) if CPU-only
+    // 0 = auto: 2 for an accelerator EP, min(4, cores) for CPU.
     int onnx_intra_threads = 0;
     int onnx_inter_threads = 1;
     std::string ocr_script;
@@ -154,6 +158,8 @@ struct MemoryConfig {
 
 struct RerankerTopConfig {
     std::string model_dir;  ///< dir with model.onnx + tokenizer.json; empty = stub mode
+    std::string execution_provider = "auto";  ///< auto, cpu, coreml, cuda
+    std::string execution_provider_error;     ///< canonical/legacy conflict, if any
 };
 
 struct QueryComplexityTopConfig {

@@ -62,11 +62,11 @@ protected:
         }
     }
 
-    RerankerConfig MakeConfig(RerankerConfig::UseCoreML ep) {
+    RerankerConfig MakeConfig(const std::string& ep) {
         RerankerConfig c;
         c.model_path = dir_ + "/model.onnx";
         c.tokenizer_path = dir_ + "/tokenizer.json";
-        c.use_coreml = ep;
+        c.execution_provider = ep;
         return c;
     }
 
@@ -76,7 +76,7 @@ protected:
 // Real Init (CPU EP forced for deterministic numbers): HfTokenizer load + real
 // Ort::Session create. is_real_model()/is_ready() flip true; active_ep()=="cpu".
 TEST_F(RerankerRealTest, InitLoadsRealModelCpu) {
-    OnnxReranker r(MakeConfig(RerankerConfig::UseCoreML::kForceFalse), /*chunk_store=*/nullptr);
+    OnnxReranker r(MakeConfig("cpu"), /*chunk_store=*/nullptr);
     Status s = r.Init();
     ASSERT_TRUE(s.ok()) << s.message();
     EXPECT_TRUE(r.is_real_model());
@@ -90,20 +90,27 @@ TEST_F(RerankerRealTest, InitLoadsRealModelCpu) {
 // Asserts only that Init succeeds + the model is real (the active EP is
 // platform-dependent, so no fixed assertion on it).
 TEST_F(RerankerRealTest, InitLoadsRealModelAutoEp) {
-    OnnxReranker r(MakeConfig(RerankerConfig::UseCoreML::kAuto), nullptr);
+    OnnxReranker r(MakeConfig("auto"), nullptr);
     Status s = r.Init();
     ASSERT_TRUE(s.ok()) << s.message();
     EXPECT_TRUE(r.is_real_model());
     EXPECT_TRUE(r.is_ready());
-    // active_ep() is "coreml" or "cpu" depending on the box — just confirm callable.
+    // The accelerator result is build-specific; auto may fall back to CPU when
+    // the compiled accelerator is unavailable at runtime.
     const char* ep = r.active_ep();
+#ifdef CORTRIX_HAS_CUDA
+    EXPECT_TRUE(std::string(ep) == "cuda" || std::string(ep) == "cpu");
+#elif defined(CORTRIX_HAS_COREML)
     EXPECT_TRUE(std::string(ep) == "coreml" || std::string(ep) == "cpu");
+#else
+    EXPECT_STREQ(ep, "cpu");
+#endif
 }
 
 // Real Score (RunCrossEncoder): tokenize query+passage → session->Run → sigmoid in
 // [0,1]. The on-topic passage must score clearly above the off-topic one.
 TEST_F(RerankerRealTest, ScoreRealRanksRelevantHigher) {
-    OnnxReranker r(MakeConfig(RerankerConfig::UseCoreML::kForceFalse), nullptr);
+    OnnxReranker r(MakeConfig("cpu"), nullptr);
     ASSERT_TRUE(r.Init().ok());
 
     const char* query = "What is the capital of France?";
@@ -123,7 +130,7 @@ TEST_F(RerankerRealTest, ScoreRealRanksRelevantHigher) {
 // Real ScoreBatch (the thread-pool per-passage path): each pair through the pool
 // must agree with the direct Score() (same encoding + session, CPU deterministic).
 TEST_F(RerankerRealTest, ScoreBatchRealMatchesSingle) {
-    OnnxReranker r(MakeConfig(RerankerConfig::UseCoreML::kForceFalse), nullptr);
+    OnnxReranker r(MakeConfig("cpu"), nullptr);
     ASSERT_TRUE(r.Init().ok());
 
     const char* query = "machine learning frameworks";
@@ -145,7 +152,7 @@ TEST_F(RerankerRealTest, ScoreBatchRealMatchesSingle) {
 // Real ScoreBatch with a single passage (degenerate batch — still goes through the
 // pool path) and an empty passage list (boundary: empty result, no inference).
 TEST_F(RerankerRealTest, ScoreBatchRealBoundaries) {
-    OnnxReranker r(MakeConfig(RerankerConfig::UseCoreML::kForceFalse), nullptr);
+    OnnxReranker r(MakeConfig("cpu"), nullptr);
     ASSERT_TRUE(r.Init().ok());
 
     std::vector<const char*> one = {"Paris is the capital of France."};

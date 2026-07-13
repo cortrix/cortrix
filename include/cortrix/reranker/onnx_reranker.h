@@ -73,12 +73,13 @@ public:
 
     // --- Introspection (test / health) ---
     bool is_real_model() const { return !stub_mode_; }
-    bool is_coreml_active() const { return coreml_active_; }
+    bool is_coreml_active() const { return active_ep_ == "coreml"; }
+    bool is_cuda_active() const { return active_ep_ == "cuda"; }
     /// /health contract (S1.3): false until Init() succeeds (endpoint 503), true
     /// after (endpoint 200). A failed Init() (fail-fast) leaves this false.
     bool is_ready() const { return ready_; }
-    /// Active execution provider for status/metric ("coreml" or "cpu").
-    const char* active_ep() const { return coreml_active_ ? "coreml" : "cpu"; }
+    const char* configured_ep() const { return config_.execution_provider.c_str(); }
+    const char* active_ep() const { return active_ep_.c_str(); }
     const RerankerConfig& config() const { return config_; }
 
     // --- Health / introspection for the circuit breaker + pool (S3.4) ---
@@ -107,7 +108,7 @@ private:
     std::unique_ptr<RerankerThreadPool<RerankTaskResult>> thread_pool_;  // S2.1 (built in Init)
     std::unique_ptr<CircuitBreaker> circuit_breaker_;     // S2.4 (built in Init)
     bool stub_mode_ = true;
-    bool coreml_active_ = false;
+    std::string active_ep_ = "stub";
     bool ready_ = false;
 
     // Opaque ONNX handles (concrete types only in the .cpp via conditional

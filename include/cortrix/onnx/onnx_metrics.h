@@ -28,6 +28,11 @@ class OnnxMetrics {
         kInferenceCheckFailed,
     };
 
+    enum class ProviderFallbackReason {
+        kEpInitFailed = 0,
+        kSessionInitFailed,
+    };
+
     /// Process-wide instance (metrics are global counters/gauges, like a
     /// Prometheus default registry).
     static OnnxMetrics& Instance();
@@ -58,8 +63,21 @@ class OnnxMetrics {
     // at startup from Runtime::GetRuntimeVersion().
     void SetRuntimeVersionInfo(int major, int minor, int patch);
 
-    /// Render all 4 metrics as OpenMetrics/Prometheus text exposition (what the
-    /// F24 `/metrics` endpoint will serve verbatim at D3.5).
+    // --- Embedding execution-provider state ---
+    void SetEmbeddingConfiguredEp(const std::string& ep);
+    std::string EmbeddingConfiguredEp() const;
+    void SetEmbeddingActiveEp(const std::string& ep);
+    std::string EmbeddingActiveEp() const;
+    void RecordEmbeddingProviderFallback(const std::string& from,
+                                         ProviderFallbackReason reason);
+    uint64_t EmbeddingProviderFallbackCount(const std::string& from,
+                                            ProviderFallbackReason reason) const;
+    void RecordEmbeddingProviderInitFailure(const std::string& provider,
+                                            ProviderFallbackReason reason);
+    uint64_t EmbeddingProviderInitFailureCount(
+        const std::string& provider, ProviderFallbackReason reason) const;
+
+    /// Render ONNX Runtime and embedding EP metrics as OpenMetrics text.
     std::string RenderOpenMetrics() const;
 
     /// Reset all counters/gauges (test-only — production metrics are monotonic).
@@ -72,6 +90,8 @@ class OnnxMetrics {
     // inference_duration_seconds histogram bucket count (upper bounds in the .cpp
     // kInfBounds[]; the +1 slot is the implicit +Inf bucket).
     static constexpr int kInfBucketCount = 8;
+    static constexpr int kProviderFallbackCount = 4;
+    static constexpr int kProviderInitFailureCount = 6;
 
     std::array<std::atomic<uint64_t>, kStartupResultCount> startup_validation_{};
     std::atomic<uint64_t> inference_failed_{0};
@@ -86,10 +106,20 @@ class OnnxMetrics {
     std::atomic<int> rt_minor_{0};
     std::atomic<int> rt_patch_{0};
     std::atomic<bool> rt_version_set_{false};
+    // EP codes: 0=auto, 1=cpu, 2=coreml, 3=cuda, 4=stub.
+    std::atomic<int> embedding_configured_ep_{0};
+    std::atomic<int> embedding_active_ep_{4};
+    // coreml/cuda x ep_init_failed/session_init_failed.
+    std::array<std::atomic<uint64_t>, kProviderFallbackCount>
+        embedding_provider_fallback_{};
+    // cpu/coreml/cuda x ep_init_failed/session_init_failed.
+    std::array<std::atomic<uint64_t>, kProviderInitFailureCount>
+        embedding_provider_init_failure_{};
 };
 
 /// String form of a StartupResult label value (e.g. kVersionMismatch ->
 /// "version_mismatch").
 const char* ToString(OnnxMetrics::StartupResult result);
+const char* ToString(OnnxMetrics::ProviderFallbackReason reason);
 
 }  // namespace cortrix::onnx

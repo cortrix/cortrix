@@ -75,7 +75,7 @@ protected:
                                      "rt-ns", "gr-ns", "ex-ns", "ex1-ns", "exf-ns"});
 
         // Initialize embedder and classifier
-        embedder_ = std::make_unique<OnnxEmbedder>("fake.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
 
         LlmConfig llm_config;

@@ -220,6 +220,8 @@ add_executable(cortrix_unit_tests
     unit/test_document_routes.cpp
     unit/test_document_routes_extra.cpp
     unit/test_connector_routes.cpp
+    unit/test_execution_provider.cpp
+    unit/test_config_execution_provider.cpp
     unit/test_directory_importer.cpp
     unit/test_http_transport_unit.cpp
     unit/test_flat_document_routes.cpp

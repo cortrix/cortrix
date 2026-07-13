@@ -123,12 +123,14 @@ private:
 // Build the F02 reranker config from the supplied model dir (resolved from
 // config.reranker.model_dir before this call). Empty dir = stub mode (no
 // cross-encoder; OnnxReranker falls back to deterministic stub scoring).
-reranker::RerankerConfig MakeRerankerConfig(const std::string& model_dir) {
+reranker::RerankerConfig MakeRerankerConfig(const std::string& model_dir,
+                                            const std::string& execution_provider) {
     reranker::RerankerConfig cfg;
     if (!model_dir.empty()) {
         cfg.model_path = model_dir + "/model.onnx";
         cfg.tokenizer_path = model_dir + "/tokenizer.json";
     }
+    cfg.execution_provider = execution_provider;
     return cfg;
 }
 
@@ -164,14 +166,17 @@ struct CrossNsQueryWiring::Impl {
          const std::string& reranker_model_dir,
          const std::string& query_complexity_model_dir,
          int candidate_multiplier,
-         int max_candidates)
+         int max_candidates,
+         const std::string& reranker_execution_provider)
         : pool(pool),
           engine_instr(std::move(engine_instr)),
           perm_adapter(perm_svc, pool),
           // The shared fan-out pool (F04 §2.7 executor.workers / queue_size defaults).
           engine(8, 500),
           // Shared F02 reranker. model_dir from config.reranker.model_dir; empty = stub.
-          reranker(reranker::CreateReranker(MakeRerankerConfig(reranker_model_dir),
+          reranker(reranker::CreateReranker(MakeRerankerConfig(
+                                                reranker_model_dir,
+                                                reranker_execution_provider),
                                             /*chunk_store=*/nullptr)),
           // F40 per-NS SPLADE index owner (Q4 read path). The SAME registry instance
           // the SPC ingest write path indexes into (bootstrap owns it), so the read
@@ -240,17 +245,23 @@ CrossNsQueryWiring::CrossNsQueryWiring(cortrix::resource::INamespacePool& pool,
                                        std::string reranker_model_dir,
                                        std::string query_complexity_model_dir,
                                        int candidate_multiplier,
-                                       int max_candidates)
+                                       int max_candidates,
+                                       std::string reranker_execution_provider)
     : impl_(std::make_unique<Impl>(pool, embedder, fusion, perm_svc,
                                    sparse_registry, std::move(llm),
                                    std::move(engine_instr),
                                    reranker_model_dir,
                                    query_complexity_model_dir,
                                    candidate_multiplier,
-                                   max_candidates)) {}
+                                   max_candidates,
+                                   reranker_execution_provider)) {}
 
 CrossNsQueryWiring::~CrossNsQueryWiring() {
     if (impl_ && impl_->reranker) delete impl_->reranker;
+}
+
+bool CrossNsQueryWiring::IsReady() const {
+    return impl_ != nullptr && impl_->reranker != nullptr;
 }
 
 namespace {

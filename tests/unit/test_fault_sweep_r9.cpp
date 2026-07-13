@@ -463,7 +463,7 @@ public:
                 std::to_string(rand()));
         fs::create_directories(dir_);
         db_path_ = (dir_ / "block.db").string();
-        embedder_ = std::make_unique<OnnxEmbedder>("stub_model.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
         store::PhnswConfig cfg;
         cfg.dim = 128;

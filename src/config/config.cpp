@@ -7,6 +7,7 @@
 
 #include "yaml-cpp/yaml.h"
 #include "cortrix/logging/logging.h"
+#include "cortrix/ml/execution_provider.h"
 
 namespace cortrix {
 
@@ -31,6 +32,32 @@ int GetEnvInt(const char* name, int default_val) {
     } catch (...) {
         return default_val;
     }
+}
+
+bool ProvidersEqual(const std::string& lhs, const std::string& rhs) {
+    ml::ExecutionProvider lhs_provider;
+    ml::ExecutionProvider rhs_provider;
+    return ml::ParseExecutionProvider(lhs, &lhs_provider).ok() &&
+           ml::ParseExecutionProvider(rhs, &rhs_provider).ok() &&
+           lhs_provider == rhs_provider;
+}
+
+void ApplyCanonicalAndLegacyProvider(const std::string& canonical,
+                                     const std::string& legacy,
+                                     const std::string& context,
+                                     std::string* effective,
+                                     std::string* error) {
+    if (effective == nullptr || error == nullptr) return;
+    if (canonical.empty() && legacy.empty()) return;
+    error->clear();
+    if (!canonical.empty()) {
+        *effective = canonical;
+        if (!legacy.empty() && !ProvidersEqual(canonical, legacy)) {
+            *error = context + " canonical execution_provider conflicts with deprecated alias";
+        }
+        return;
+    }
+    if (!legacy.empty()) *effective = legacy;
 }
 
 void LoadFromYaml(const std::string& path, CortrixConfig& config) {
@@ -96,7 +123,14 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (e["tokenizer_path"]) config.embedding.tokenizer_path = e["tokenizer_path"].as<std::string>();
         if (e["dimension"]) config.embedding.dimension = e["dimension"].as<int>();
         if (e["max_seq_length"]) config.embedding.max_seq_length = e["max_seq_length"].as<int>();
-        if (e["gpu_provider"]) config.embedding.gpu_provider = e["gpu_provider"].as<std::string>();
+        const std::string canonical = e["execution_provider"]
+            ? e["execution_provider"].as<std::string>() : "";
+        const std::string legacy = e["gpu_provider"]
+            ? e["gpu_provider"].as<std::string>() : "";
+        if (!legacy.empty()) config.embedding.gpu_provider = legacy;
+        ApplyCanonicalAndLegacyProvider(canonical, legacy, "embedding",
+                                        &config.embedding.execution_provider,
+                                        &config.embedding.execution_provider_error);
     }
 
     // Helper lambda: parse a LlmConfig node
@@ -243,6 +277,13 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
     if (root["reranker"]) {
         auto r = root["reranker"];
         if (r["model_dir"]) config.reranker.model_dir = r["model_dir"].as<std::string>();
+        const std::string canonical = r["execution_provider"]
+            ? r["execution_provider"].as<std::string>() : "";
+        std::string legacy;
+        if (r["use_coreml"] && r["use_coreml"].as<bool>()) legacy = "coreml";
+        ApplyCanonicalAndLegacyProvider(canonical, legacy, "reranker",
+                                        &config.reranker.execution_provider,
+                                        &config.reranker.execution_provider_error);
     }
 
     // F39 query complexity classifier model dir
@@ -304,8 +345,25 @@ void ApplyEnvOverrides(CortrixConfig& config) {
     val = GetEnv("CORTRIX_AUTH_ENABLED");
     if (!val.empty()) config.auth.enabled = GetEnvBool("CORTRIX_AUTH_ENABLED", config.auth.enabled);
 
+    const std::string embedding_canonical =
+        GetEnv("CORTRIX_EMBEDDING_EXECUTION_PROVIDER");
+    const std::string embedding_legacy = GetEnv("CORTRIX_EMBEDDING_DEVICE");
+    if (!embedding_legacy.empty()) config.embedding.gpu_provider = embedding_legacy;
+    ApplyCanonicalAndLegacyProvider(
+        embedding_canonical, embedding_legacy, "embedding environment",
+        &config.embedding.execution_provider, &config.embedding.execution_provider_error);
+
     val = GetEnv("CORTRIX_RERANKER_MODEL_DIR");
     if (!val.empty()) config.reranker.model_dir = val;
+    std::string reranker_legacy;
+    val = GetEnv("CORTRIX_RERANKER_USE_COREML");
+    if (!val.empty() && GetEnvBool("CORTRIX_RERANKER_USE_COREML", false)) {
+        reranker_legacy = "coreml";
+    }
+    ApplyCanonicalAndLegacyProvider(
+        GetEnv("CORTRIX_RERANKER_EXECUTION_PROVIDER"), reranker_legacy,
+        "reranker environment", &config.reranker.execution_provider,
+        &config.reranker.execution_provider_error);
     val = GetEnv("CORTRIX_QUERY_COMPLEXITY_MODEL_DIR");
     if (!val.empty()) config.query_complexity.model_dir = val;
 
@@ -375,6 +433,36 @@ std::vector<std::string> ValidateConfig(const CortrixConfig& config) {
     if (config.embedding.dimension < 1) {
         errors.push_back("embedding.dimension must be >= 1, got " +
                          std::to_string(config.embedding.dimension));
+    }
+    if (!config.embedding.execution_provider_error.empty()) {
+        errors.push_back(config.embedding.execution_provider_error);
+    }
+    ml::ExecutionProvider embedding_provider;
+    Status embedding_provider_status =
+        ml::ParseExecutionProvider(config.embedding.execution_provider, &embedding_provider);
+    if (!embedding_provider_status.ok()) {
+        errors.push_back("embedding.execution_provider: " +
+                         embedding_provider_status.message());
+    } else {
+        Status build_status = ml::ValidateExecutionProviderForBuild(embedding_provider);
+        if (!build_status.ok()) {
+            errors.push_back("embedding.execution_provider: " + build_status.message());
+        }
+    }
+
+    if (!config.reranker.execution_provider_error.empty()) {
+        errors.push_back(config.reranker.execution_provider_error);
+    }
+    ml::ExecutionProvider reranker_provider;
+    Status reranker_provider_status =
+        ml::ParseExecutionProvider(config.reranker.execution_provider, &reranker_provider);
+    if (!reranker_provider_status.ok()) {
+        errors.push_back("reranker.execution_provider: " + reranker_provider_status.message());
+    } else {
+        Status build_status = ml::ValidateExecutionProviderForBuild(reranker_provider);
+        if (!build_status.ok()) {
+            errors.push_back("reranker.execution_provider: " + build_status.message());
+        }
     }
 
     // SPC validation (0 = auto-detect after embedder init)

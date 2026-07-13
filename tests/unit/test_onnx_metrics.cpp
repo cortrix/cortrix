@@ -142,5 +142,71 @@ TEST_F(OnnxMetricsTest, TypeAndHelpLinesPresent) {
               std::string::npos);
 }
 
+TEST_F(OnnxMetricsTest, EmbeddingConfiguredAndActiveEpRoundTrips) {
+    m().SetEmbeddingConfiguredEp("coreml");
+    m().SetEmbeddingActiveEp("cpu");
+    EXPECT_EQ(m().EmbeddingConfiguredEp(), "coreml");
+    EXPECT_EQ(m().EmbeddingActiveEp(), "cpu");
+    m().SetEmbeddingConfiguredEp("cuda");
+    m().SetEmbeddingActiveEp("stub");
+    EXPECT_EQ(m().EmbeddingConfiguredEp(), "cuda");
+    EXPECT_EQ(m().EmbeddingActiveEp(), "stub");
+}
+
+TEST_F(OnnxMetricsTest, EmbeddingProviderFallbackCountTracksCoremlAndCudaReasons) {
+    EXPECT_EQ(m().EmbeddingProviderFallbackCount("coreml",
+        OnnxMetrics::ProviderFallbackReason::kSessionInitFailed), 0u);
+    EXPECT_EQ(m().EmbeddingProviderFallbackCount("cuda",
+        OnnxMetrics::ProviderFallbackReason::kEpInitFailed), 0u);
+
+    m().RecordEmbeddingProviderFallback("coreml",
+                                        OnnxMetrics::ProviderFallbackReason::kSessionInitFailed);
+    m().RecordEmbeddingProviderFallback("coreml",
+                                        OnnxMetrics::ProviderFallbackReason::kSessionInitFailed);
+    m().RecordEmbeddingProviderFallback("cuda",
+                                        OnnxMetrics::ProviderFallbackReason::kEpInitFailed);
+
+    EXPECT_EQ(m().EmbeddingProviderFallbackCount("coreml",
+        OnnxMetrics::ProviderFallbackReason::kSessionInitFailed), 2u);
+    EXPECT_EQ(m().EmbeddingProviderFallbackCount("cuda",
+        OnnxMetrics::ProviderFallbackReason::kEpInitFailed), 1u);
+}
+
+TEST_F(OnnxMetricsTest, EmbeddingProviderInitFailureTracksEveryProvider) {
+    using Reason = OnnxMetrics::ProviderFallbackReason;
+    m().RecordEmbeddingProviderInitFailure("cpu", Reason::kSessionInitFailed);
+    m().RecordEmbeddingProviderInitFailure("coreml", Reason::kEpInitFailed);
+    m().RecordEmbeddingProviderInitFailure("cuda", Reason::kSessionInitFailed);
+    EXPECT_EQ(m().EmbeddingProviderInitFailureCount("cpu", Reason::kSessionInitFailed), 1u);
+    EXPECT_EQ(m().EmbeddingProviderInitFailureCount("coreml", Reason::kEpInitFailed), 1u);
+    EXPECT_EQ(m().EmbeddingProviderInitFailureCount("cuda", Reason::kSessionInitFailed), 1u);
+}
+
+TEST_F(OnnxMetricsTest, RenderContainsEmbeddingEpStateAndFallbackLines) {
+    m().SetEmbeddingConfiguredEp("cuda");
+    m().SetEmbeddingActiveEp("stub");
+    m().RecordEmbeddingProviderFallback("coreml",
+                                        OnnxMetrics::ProviderFallbackReason::kEpInitFailed);
+    m().RecordEmbeddingProviderFallback("cuda",
+                                        OnnxMetrics::ProviderFallbackReason::kSessionInitFailed);
+    m().RecordEmbeddingProviderInitFailure(
+        "cuda", OnnxMetrics::ProviderFallbackReason::kSessionInitFailed);
+
+    std::string text = m().RenderOpenMetrics();
+    EXPECT_NE(text.find("cortrix_onnx_embedding_configured_ep{ep=\"cuda\"} 1"),
+              std::string::npos);
+    EXPECT_NE(text.find("cortrix_onnx_embedding_active_ep{ep=\"stub\"} 1"),
+              std::string::npos);
+    EXPECT_NE(text.find("cortrix_onnx_embedding_ep_fallback_total{from=\"coreml\",to=\"cpu\","
+                        "reason=\"ep_init_failed\"} 1"),
+              std::string::npos);
+    EXPECT_NE(text.find("cortrix_onnx_embedding_ep_fallback_total{from=\"cuda\",to=\"cpu\","
+                        "reason=\"session_init_failed\"} 1"),
+              std::string::npos);
+    EXPECT_NE(text.find("cortrix_onnx_embedding_ep_init_failure_total{provider=\"cuda\","
+                        "reason=\"session_init_failed\"} 1"),
+              std::string::npos);
+}
+
 }  // namespace
 }  // namespace cortrix::onnx

@@ -135,7 +135,7 @@ public:
 class QueryPipelineArmsDocId : public ::testing::Test {
 protected:
     void SetUp() override {
-        embedder_ = std::make_unique<OnnxEmbedder>("fake_model.onnx", 128);
+        embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
 
         // Two ordered chunks for the target doc.

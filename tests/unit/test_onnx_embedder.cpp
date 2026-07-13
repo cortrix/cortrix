@@ -247,10 +247,11 @@ TEST(OnnxEmbedderTest, StubMode_NoModel) {
 }
 
 TEST(OnnxEmbedderTest, StubMode_NonexistentModel) {
-    // With non-existent model path, should fallback to stub mode
+    // With non-existent model path, should fail fast
     OnnxEmbedder embedder("/nonexistent/path/model.onnx", 128);
-    ASSERT_TRUE(embedder.Init().ok());
-    EXPECT_FALSE(embedder.is_real_model());
+    Status s = embedder.Init();
+    EXPECT_FALSE(s.ok());
+    EXPECT_EQ(s.code(), StatusCode::kNotFound);
 }
 
 TEST(OnnxEmbedderTest, SetTokenizerPath) {
@@ -270,7 +271,7 @@ TEST(OnnxEmbedderTest, SetMaxSeqLength) {
 
 TEST(OnnxEmbedderTest, StubEmbed_StillWorks) {
     // Verify stub mode still produces valid embeddings
-    OnnxEmbedder embedder("/no/such/model.onnx", 64);
+    OnnxEmbedder embedder("", 64);
     ASSERT_TRUE(embedder.Init().ok());
     EXPECT_FALSE(embedder.is_real_model());
 

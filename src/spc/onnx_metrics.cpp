@@ -16,6 +16,16 @@ const char* ToString(OnnxMetrics::StartupResult result) {
     return "ok";  // unreachable for a valid enum
 }
 
+const char* ToString(OnnxMetrics::ProviderFallbackReason reason) {
+    switch (reason) {
+        case OnnxMetrics::ProviderFallbackReason::kEpInitFailed:
+            return "ep_init_failed";
+        case OnnxMetrics::ProviderFallbackReason::kSessionInitFailed:
+            return "session_init_failed";
+    }
+    return "unknown";
+}
+
 namespace {
 
 // cortrix_onnx_inference_duration_seconds bucket upper bounds (seconds), aligned
@@ -37,6 +47,41 @@ uint64_t DoubleToBits(double d) {
     uint64_t bits;
     std::memcpy(&bits, &d, sizeof(bits));
     return bits;
+}
+
+int EpCode(const std::string& ep) {
+    if (ep == "cpu") return 1;
+    if (ep == "coreml") return 2;
+    if (ep == "cuda") return 3;
+    if (ep == "stub") return 4;
+    return 0;
+}
+
+const char* EpName(int code) {
+    switch (code) {
+        case 1: return "cpu";
+        case 2: return "coreml";
+        case 3: return "cuda";
+        case 4: return "stub";
+        default: return "auto";
+    }
+}
+
+int ProviderFallbackIndex(const std::string& from,
+                          OnnxMetrics::ProviderFallbackReason reason) {
+    const int provider = from == "cuda" ? 1 : 0;
+    return provider * 2 + static_cast<int>(reason);
+}
+
+int ProviderInitFailureIndex(const std::string& provider,
+                             OnnxMetrics::ProviderFallbackReason reason) {
+    int provider_index = -1;
+    if (provider == "cpu") provider_index = 0;
+    if (provider == "coreml") provider_index = 1;
+    if (provider == "cuda") provider_index = 2;
+    return provider_index < 0
+        ? -1
+        : provider_index * 2 + static_cast<int>(reason);
 }
 
 }  // namespace
@@ -95,6 +140,50 @@ void OnnxMetrics::SetRuntimeVersionInfo(int major, int minor, int patch) {
     rt_version_set_.store(true, std::memory_order_relaxed);
 }
 
+void OnnxMetrics::SetEmbeddingConfiguredEp(const std::string& ep) {
+    embedding_configured_ep_.store(EpCode(ep), std::memory_order_relaxed);
+}
+
+std::string OnnxMetrics::EmbeddingConfiguredEp() const {
+    return EpName(embedding_configured_ep_.load(std::memory_order_relaxed));
+}
+
+void OnnxMetrics::SetEmbeddingActiveEp(const std::string& ep) {
+    embedding_active_ep_.store(EpCode(ep), std::memory_order_relaxed);
+}
+
+std::string OnnxMetrics::EmbeddingActiveEp() const {
+    return EpName(embedding_active_ep_.load(std::memory_order_relaxed));
+}
+
+void OnnxMetrics::RecordEmbeddingProviderFallback(
+    const std::string& from, ProviderFallbackReason reason) {
+    if (from != "coreml" && from != "cuda") return;
+    embedding_provider_fallback_[ProviderFallbackIndex(from, reason)].fetch_add(
+        1, std::memory_order_relaxed);
+}
+
+uint64_t OnnxMetrics::EmbeddingProviderFallbackCount(
+    const std::string& from, ProviderFallbackReason reason) const {
+    if (from != "coreml" && from != "cuda") return 0;
+    return embedding_provider_fallback_[ProviderFallbackIndex(from, reason)].load(
+        std::memory_order_relaxed);
+}
+
+void OnnxMetrics::RecordEmbeddingProviderInitFailure(
+    const std::string& provider, ProviderFallbackReason reason) {
+    const int index = ProviderInitFailureIndex(provider, reason);
+    if (index < 0) return;
+    embedding_provider_init_failure_[index].fetch_add(1, std::memory_order_relaxed);
+}
+
+uint64_t OnnxMetrics::EmbeddingProviderInitFailureCount(
+    const std::string& provider, ProviderFallbackReason reason) const {
+    const int index = ProviderInitFailureIndex(provider, reason);
+    if (index < 0) return 0;
+    return embedding_provider_init_failure_[index].load(std::memory_order_relaxed);
+}
+
 std::string OnnxMetrics::RenderOpenMetrics() const {
     std::ostringstream os;
 
@@ -141,6 +230,38 @@ std::string OnnxMetrics::RenderOpenMetrics() const {
            << rt_patch_.load(std::memory_order_relaxed) << "\"} 1\n";
     }
 
+    os << "# HELP cortrix_onnx_build_info ONNX Runtime build flavor.\n";
+    os << "# TYPE cortrix_onnx_build_info gauge\n";
+#ifdef CORTRIX_HAS_CUDA
+    os << "cortrix_onnx_build_info{runtime_flavor=\"cuda\"} 1\n";
+#else
+    os << "cortrix_onnx_build_info{runtime_flavor=\"cpu\"} 1\n";
+#endif
+    os << "# TYPE cortrix_onnx_embedding_configured_ep gauge\n";
+    os << "cortrix_onnx_embedding_configured_ep{ep=\""
+       << EmbeddingConfiguredEp() << "\"} 1\n";
+    os << "# TYPE cortrix_onnx_embedding_active_ep gauge\n";
+    os << "cortrix_onnx_embedding_active_ep{ep=\""
+       << EmbeddingActiveEp() << "\"} 1\n";
+    os << "# TYPE cortrix_onnx_embedding_ep_fallback_total counter\n";
+    for (const char* from : {"coreml", "cuda"}) {
+        for (int i = 0; i < 2; ++i) {
+            const auto reason = static_cast<ProviderFallbackReason>(i);
+            os << "cortrix_onnx_embedding_ep_fallback_total{from=\"" << from
+               << "\",to=\"cpu\",reason=\"" << ToString(reason) << "\"} "
+               << EmbeddingProviderFallbackCount(from, reason) << "\n";
+        }
+    }
+    os << "# TYPE cortrix_onnx_embedding_ep_init_failure_total counter\n";
+    for (const char* provider : {"cpu", "coreml", "cuda"}) {
+        for (int i = 0; i < 2; ++i) {
+            const auto reason = static_cast<ProviderFallbackReason>(i);
+            os << "cortrix_onnx_embedding_ep_init_failure_total{provider=\""
+               << provider << "\",reason=\"" << ToString(reason) << "\"} "
+               << EmbeddingProviderInitFailureCount(provider, reason) << "\n";
+        }
+    }
+
     return os.str();
 }
 
@@ -154,6 +275,14 @@ void OnnxMetrics::ResetForTest() {
     rt_minor_.store(0, std::memory_order_relaxed);
     rt_patch_.store(0, std::memory_order_relaxed);
     rt_version_set_.store(false, std::memory_order_relaxed);
+    embedding_configured_ep_.store(0, std::memory_order_relaxed);
+    embedding_active_ep_.store(4, std::memory_order_relaxed);
+    for (auto& c : embedding_provider_fallback_) {
+        c.store(0, std::memory_order_relaxed);
+    }
+    for (auto& c : embedding_provider_init_failure_) {
+        c.store(0, std::memory_order_relaxed);
+    }
 }
 
 }  // namespace cortrix::onnx

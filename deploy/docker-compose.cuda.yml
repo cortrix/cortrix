@@ -1,0 +1,17 @@
+# CUDA override for deploy/docker-compose.yml.
+# Run both files together; the default compose file remains CPU-only.
+
+services:
+  cortrix:
+    image: cortrix:cuda
+    platform: linux/amd64
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

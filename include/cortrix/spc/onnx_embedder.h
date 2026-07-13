@@ -75,9 +75,10 @@ public:
     /// True if using real ONNX model inference, false if stub mode
     bool is_real_model() const { return !stub_mode_; }
 
-    /// True if CoreML execution provider is active (Apple GPU/Neural Engine)
-    /// Valid only after Init() is called. Always false on non-Apple platforms.
-    bool is_coreml_active() const { return coreml_active_; }
+    bool is_coreml_active() const { return active_ep_ == "coreml"; }
+    bool is_cuda_active() const { return active_ep_ == "cuda"; }
+    const std::string& configured_ep() const { return execution_provider_; }
+    const std::string& active_ep() const { return active_ep_; }
 
     /// Set the tokenizer JSON path (defaults to model_path dir + tokenizer.json)
     void set_tokenizer_path(const std::string& path) { tokenizer_path_ = path; }
@@ -85,19 +86,25 @@ public:
     /// Set maximum sequence length for tokenization
     void set_max_seq_length(int len) { max_seq_length_ = len; }
 
-    /// Set GPU execution provider ("cpu", "coreml", "auto")
-    void set_gpu_provider(const std::string& provider) { gpu_provider_ = provider; }
+    /// Set execution provider (auto, cpu, coreml, cuda).
+    void set_execution_provider(const std::string& provider) {
+        execution_provider_ = provider;
+    }
+    /// Deprecated compatibility alias.
+    void set_gpu_provider(const std::string& provider) {
+        set_execution_provider(provider);
+    }
 
 private:
     std::string model_path_;
     std::string tokenizer_path_;
-    std::string gpu_provider_ = "auto";
+    std::string execution_provider_ = "auto";
+    std::string active_ep_ = "stub";
     int dim_;
     int intra_threads_;
     int inter_threads_;
     int max_seq_length_ = 512;
     bool stub_mode_ = true;
-    bool coreml_active_ = false;  // Set in Init() when CoreML EP succeeds
 
     // Opaque handles (actual types in .cpp via conditional compilation)
     void* env_ = nullptr;       // Ort::Env*

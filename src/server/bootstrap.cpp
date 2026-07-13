@@ -123,6 +123,7 @@
 #include "cortrix/resource/namespace_facade.h"   // [gap⑤] resume re-hydrates tasks from the doc row
 #include "cortrix/deploy/health_routes.h"
 #include "cortrix/health/readiness.h"  // F20 readiness contract — components registered at wiring
+#include "cortrix/ml/execution_provider.h"
 #include "cortrix/security/env_secret_provider.h"      // F20-6 CreateSecretProvider() for /ready
 #include "cortrix/security/secret_provider_readiness.h" // F20-6 secret_provider readiness adapter
 #include "cortrix/deploy/metrics_server.h"
@@ -220,6 +221,14 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
 
     // 1. Load config
     auto config = cortrix::LoadConfig(config_path);
+    const auto config_errors = cortrix::ValidateConfig(config);
+    if (!config_errors.empty()) {
+        std::cerr << "[config] ERROR: Invalid configuration:\n";
+        for (const auto& error : config_errors) {
+            std::cerr << "  - " << error << '\n';
+        }
+        return 1;
+    }
 
     // 2. Initialize logging
     cortrix::InitLogging(config.log);
@@ -394,14 +403,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         embedder.set_tokenizer_path(config.embedding.tokenizer_path);
     }
     embedder.set_max_seq_length(config.embedding.max_seq_length);
-    embedder.set_gpu_provider(config.embedding.gpu_provider);
+    embedder.set_execution_provider(config.embedding.execution_provider);
     // [F22 D3.5 · A3] Fail-fast ONNX startup validation BEFORE the embedder initializes:
     // an ABI-mismatched runtime, or an out-of-range opset on a PRESENT model, aborts the
     // process here (in the operator's startup window) rather than at the first inference.
-    // skip_missing_models=true preserves the OnnxEmbedder stub-fallback contract (a dev
-    // box without the model files still starts); only a present+incompatible model (or a
-    // runtime ABI mismatch) is the hard stop. F02 reranker / F40 sparse models
-    // self-register in CollectRegisteredOnnxModels only once their files exist.
+    // Validation skips missing paths so Init() can emit the component-specific error.
+    // An intentionally empty model path is the only supported stub-mode contract;
+    // a configured non-empty path that is absent or invalid fails startup below.
     {
         auto onnx_val = cortrix::onnx::StartupValidator::CollectRegisteredOnnxModels(config);
         onnx_val.skip_missing_models = true;
@@ -414,10 +422,12 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     }
     s = embedder.Init();
     if (!s.ok()) {
-        CORTRIX_LOG_WARN("main", "OnnxEmbedder init failed (stub mode): {}", s.message());
-    } else {
-        CORTRIX_LOG_INFO("main", "OnnxEmbedder initialized (real_model={})", embedder.is_real_model());
+        CORTRIX_LOG_ERROR("main", "OnnxEmbedder init failed: {}", s.message());
+        return 1;
     }
+    CORTRIX_LOG_INFO("main",
+                     "OnnxEmbedder initialized (real_model={}, configured_ep={}, active_ep={})",
+                     embedder.is_real_model(), embedder.configured_ep(), embedder.active_ep());
 
     // Auto-resolve worker_count=0: 2 workers in both GPU and CPU-only environments.
     // HfTokenizer::Encode() is const (read-only, thread-safe); Ort::Session::Run()
@@ -425,9 +435,9 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // internally. For file pipelines, parse/OCR (not embedding) is usually the bottleneck,
     // so 2 workers provide real parallelism on IO/parse/chunk stages.
     if (config.spc.worker_count == 0) {
-        config.spc.worker_count = embedder.is_coreml_active() ? 2 : 2;
-        CORTRIX_LOG_INFO("main", "worker_count auto={} (coreml_active={})",
-                        config.spc.worker_count, embedder.is_coreml_active());
+        config.spc.worker_count = 2;
+        CORTRIX_LOG_INFO("main", "worker_count auto={} (embedding_active_ep={})",
+                         config.spc.worker_count, embedder.active_ep());
     }
 
     // 6b. [F24 · moved up for gap②] Disk monitor: periodic statvfs over the data
@@ -1034,7 +1044,14 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::query::CrossNsQueryWiring cross_ns_query_wiring(
         ns_pool, embedder, fusion, perm_svc, &sparse_index_registry, query_llm, engine_instr,
         config.reranker.model_dir, config.query_complexity.model_dir,
-        config.retrieval.candidate_multiplier, config.retrieval.max_candidates);
+        config.retrieval.candidate_multiplier, config.retrieval.max_candidates,
+        config.reranker.execution_provider);
+    if (!cross_ns_query_wiring.IsReady()) {
+        CORTRIX_LOG_ERROR(
+            "main", "Reranker initialization failed (configured_ep={}, model_dir={})",
+            config.reranker.execution_provider, config.reranker.model_dir);
+        return 1;
+    }
     cross_ns_query_wiring.Register(server.server(), auth);
 
     // [M1] MEM02 extraction service: a MemoryQueue draining interactions through
@@ -1236,6 +1253,45 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         }
         return r;
     });
+
+    auto build_ep_readiness = [](const cortrix::ml::ExecutionProviderRuntimeState& state,
+                                 bool model_configured) {
+        cortrix::health::ComponentReadiness r;
+        r.ready = state.ready;
+        r.detail["configured_ep"] = state.configured_ep;
+        r.detail["active_ep"] = state.active_ep;
+        r.detail["preferred_ep"] = state.preferred_ep;
+        r.detail["model_configured"] = model_configured;
+        r.detail["fallback"] = state.fallback;
+        r.detail["policy_mismatch"] = state.policy_mismatch;
+        if (!r.ready) {
+            r.detail["reason"] = "execution_provider_policy_mismatch";
+        }
+        return r;
+    };
+
+    const bool embedding_model_configured = !config.embedding.model_path.empty();
+    readiness.Register(
+        "embedding_execution_provider",
+        [&embedder, embedding_model_configured, build_ep_readiness]() {
+            return build_ep_readiness(
+                cortrix::ml::EvaluateExecutionProviderRuntimeState(
+                    embedder.configured_ep(), embedder.active_ep(),
+                    embedding_model_configured),
+                embedding_model_configured);
+        });
+
+    const bool reranker_model_configured = !config.reranker.model_dir.empty();
+    readiness.Register(
+        "reranker_execution_provider",
+        [reranker_model_configured, build_ep_readiness]() {
+            auto& metrics = cortrix::reranker::RerankerMetrics::Instance();
+            return build_ep_readiness(
+                cortrix::ml::EvaluateExecutionProviderRuntimeState(
+                    metrics.ConfiguredEp(), metrics.ActiveEp(),
+                    reranker_model_configured),
+                reranker_model_configured);
+        });
 
     // vector_index (F01) + memory_store (MEM): honest deferred. Both are PER-NAMESPACE in
     // V1.0 — the P-HNSW index (model load + WAL replay) and memory.db are created lazily

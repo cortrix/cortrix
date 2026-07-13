@@ -29,6 +29,41 @@ uint64_t DoubleToBits(double d) {
     return bits;
 }
 
+int EpCode(const std::string& ep) {
+    if (ep == "cpu") return 1;
+    if (ep == "coreml") return 2;
+    if (ep == "cuda") return 3;
+    if (ep == "stub") return 4;
+    return 0;
+}
+
+const char* EpName(int code) {
+    switch (code) {
+        case 1: return "cpu";
+        case 2: return "coreml";
+        case 3: return "cuda";
+        case 4: return "stub";
+        default: return "auto";
+    }
+}
+
+int ProviderFallbackIndex(const std::string& from,
+                          RerankerMetrics::ProviderFallbackReason reason) {
+    const int provider = from == "cuda" ? 1 : 0;
+    return provider * 2 + static_cast<int>(reason);
+}
+
+int ProviderInitFailureIndex(const std::string& provider,
+                             RerankerMetrics::ProviderFallbackReason reason) {
+    int provider_index = -1;
+    if (provider == "cpu") provider_index = 0;
+    if (provider == "coreml") provider_index = 1;
+    if (provider == "cuda") provider_index = 2;
+    return provider_index < 0
+        ? -1
+        : provider_index * 2 + static_cast<int>(reason);
+}
+
 }  // namespace
 
 RerankerMetrics& RerankerMetrics::Instance() {
@@ -46,14 +81,50 @@ uint64_t RerankerMetrics::CoremlFallbackCount(CoremlFallbackReason reason) const
     return coreml_fallback_[static_cast<int>(reason)].load(std::memory_order_relaxed);
 }
 
+void RerankerMetrics::SetConfiguredEp(const std::string& ep) {
+    configured_ep_.store(EpCode(ep), std::memory_order_relaxed);
+}
+
+std::string RerankerMetrics::ConfiguredEp() const {
+    return EpName(configured_ep_.load(std::memory_order_relaxed));
+}
+
+void RerankerMetrics::RecordProviderFallback(
+    const std::string& from, ProviderFallbackReason reason) {
+    if (from != "coreml" && from != "cuda") return;
+    provider_fallback_[ProviderFallbackIndex(from, reason)].fetch_add(
+        1, std::memory_order_relaxed);
+}
+
+uint64_t RerankerMetrics::ProviderFallbackCount(
+    const std::string& from, ProviderFallbackReason reason) const {
+    if (from != "coreml" && from != "cuda") return 0;
+    return provider_fallback_[ProviderFallbackIndex(from, reason)].load(
+        std::memory_order_relaxed);
+}
+
+void RerankerMetrics::RecordProviderInitFailure(
+    const std::string& provider, ProviderFallbackReason reason) {
+    const int index = ProviderInitFailureIndex(provider, reason);
+    if (index < 0) return;
+    provider_init_failure_[index].fetch_add(1, std::memory_order_relaxed);
+}
+
+uint64_t RerankerMetrics::ProviderInitFailureCount(
+    const std::string& provider, ProviderFallbackReason reason) const {
+    const int index = ProviderInitFailureIndex(provider, reason);
+    if (index < 0) return 0;
+    return provider_init_failure_[index].load(std::memory_order_relaxed);
+}
+
 // --- active_ep (S1.4) ---
 
 void RerankerMetrics::SetActiveEp(const std::string& ep) {
-    active_ep_coreml_.store(ep == "coreml" ? 1 : 0, std::memory_order_relaxed);
+    active_ep_.store(EpCode(ep), std::memory_order_relaxed);
 }
 
 std::string RerankerMetrics::ActiveEp() const {
-    return active_ep_coreml_.load(std::memory_order_relaxed) == 1 ? "coreml" : "cpu";
+    return EpName(active_ep_.load(std::memory_order_relaxed));
 }
 
 // --- circuit_breaker_state / trips (S2.5) ---
@@ -149,6 +220,26 @@ std::string RerankerMetrics::RenderOpenMetrics() const {
     }
     os << "# TYPE cortrix_reranker_active_ep gauge\n";
     os << "cortrix_reranker_active_ep{ep=\"" << ActiveEp() << "\"} 1\n";
+    os << "# TYPE cortrix_reranker_configured_ep gauge\n";
+    os << "cortrix_reranker_configured_ep{ep=\"" << ConfiguredEp() << "\"} 1\n";
+    os << "# TYPE cortrix_reranker_ep_fallback_total counter\n";
+    for (const char* from : {"coreml", "cuda"}) {
+        for (int i = 0; i < 2; ++i) {
+            const auto reason = static_cast<ProviderFallbackReason>(i);
+            os << "cortrix_reranker_ep_fallback_total{from=\"" << from
+               << "\",to=\"cpu\",reason=\"" << ToString(reason) << "\"} "
+               << ProviderFallbackCount(from, reason) << "\n";
+        }
+    }
+    os << "# TYPE cortrix_reranker_ep_init_failure_total counter\n";
+    for (const char* provider : {"cpu", "coreml", "cuda"}) {
+        for (int i = 0; i < 2; ++i) {
+            const auto reason = static_cast<ProviderFallbackReason>(i);
+            os << "cortrix_reranker_ep_init_failure_total{provider=\""
+               << provider << "\",reason=\"" << ToString(reason) << "\"} "
+               << ProviderInitFailureCount(provider, reason) << "\n";
+        }
+    }
     os << "# TYPE cortrix_reranker_circuit_breaker_state gauge\n";
     os << "cortrix_reranker_circuit_breaker_state "
        << cb_state_.load(std::memory_order_relaxed) << "\n";
@@ -191,12 +282,15 @@ std::string RerankerMetrics::RenderOpenMetrics() const {
 
 void RerankerMetrics::ResetForTest() {
     for (auto& c : coreml_fallback_) c.store(0, std::memory_order_relaxed);
+    for (auto& c : provider_fallback_) c.store(0, std::memory_order_relaxed);
+    for (auto& c : provider_init_failure_) c.store(0, std::memory_order_relaxed);
     for (auto& c : failed_tasks_) c.store(0, std::memory_order_relaxed);
     cb_state_.store(0, std::memory_order_relaxed);
     cb_trips_.store(0, std::memory_order_relaxed);
     truncated_.store(0, std::memory_order_relaxed);
     extremely_long_.store(0, std::memory_order_relaxed);
-    active_ep_coreml_.store(0, std::memory_order_relaxed);
+    configured_ep_.store(0, std::memory_order_relaxed);
+    active_ep_.store(1, std::memory_order_relaxed);
     queue_depth_.store(0, std::memory_order_relaxed);
     for (auto& b : score_dur_bkt_) b.store(0, std::memory_order_relaxed);
     score_dur_sum_bits_.store(0, std::memory_order_relaxed);
@@ -207,6 +301,16 @@ const char* ToString(RerankerMetrics::CoremlFallbackReason reason) {
     switch (reason) {
         case RerankerMetrics::CoremlFallbackReason::kEpInitFailed:       return "ep_init_failed";
         case RerankerMetrics::CoremlFallbackReason::kUnsupportedPlatform: return "unsupported_platform";
+    }
+    return "unknown";
+}
+
+const char* ToString(RerankerMetrics::ProviderFallbackReason reason) {
+    switch (reason) {
+        case RerankerMetrics::ProviderFallbackReason::kEpInitFailed:
+            return "ep_init_failed";
+        case RerankerMetrics::ProviderFallbackReason::kSessionInitFailed:
+            return "session_init_failed";
     }
     return "unknown";
 }
