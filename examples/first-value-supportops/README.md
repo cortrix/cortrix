@@ -9,7 +9,8 @@ The default profile uses real local ONNX embedding and reranker models with `rer
 - A clean Cortrix source checkout.
 - CMake and a C++17 toolchain supported by the main project build.
 - Python 3.12, `curl`, and at least 15 GB of working disk space for pinned model sources, converted files, build output, and caches.
-- An unused loopback API port and local metrics port `9091`.
+- An unused loopback API port and local metrics port. The runner defaults to `9091`;
+  pass `--metrics-port <port>` when that port is already reserved.
 
 The fixture is submitted as direct Markdown content through the JSON API. This path does not install or validate PDF, DOCX, image, OCR, or other external parsers.
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import secrets
 import signal
 import socket
@@ -448,11 +449,14 @@ def run_contract(args: argparse.Namespace) -> tuple[dict[str, Any], Path]:
         ensure_port_available("127.0.0.1", args.metrics_port)
         server_log_path = evidence_dir / "server.log"
         server_log_handle = server_log_path.open("wb")
+        server_environment = os.environ.copy()
+        server_environment["CORTRIX_METRICS_PORT"] = str(args.metrics_port)
         server_process = subprocess.Popen(
             [build["binary_path"], "--config", str(runtime_config)],
             stdout=server_log_handle,
             stderr=subprocess.STDOUT,
             cwd=str(core_repo),
+            env=server_environment,
             start_new_session=True,
         )
         summary["runtime"]["server_pid"] = server_process.pid
