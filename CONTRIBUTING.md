@@ -2,16 +2,36 @@
 
 Thanks for your interest in Cortrix — an Agent-Native Semantic Storage Engine. This guide covers how to set up a dev environment, the project layout, and the workflow for landing a change.
 
-By contributing you agree that your contributions are licensed under the project's [AGPL-3.0](LICENSE) license.
+Cortrix does not require a Contributor License Agreement. Contributions to Cortrix-authored material are accepted under [AGPL-3.0-only](LICENSE), the same license under which that material is made available, and must be certified under the [Developer Certificate of Origin 1.1](DCO). Third-party material remains under the license identified in its file or directory and must not be relicensed by a contribution.
 
 ---
 
 ## Ways to Contribute
 
 - **Report bugs** — open a [GitHub Issue](https://github.com/cortrix/cortrix/issues) with steps to reproduce, expected vs. actual behaviour, and your environment (OS, compiler, Cortrix version).
-- **Propose features** — start a thread in [GitHub Discussions](https://github.com/cortrix/cortrix/discussions) before opening a large PR, so the design can be agreed first.
+- **Propose features or integrations** — open a [GitHub Issue](https://github.com/cortrix/cortrix/issues) before opening a large PR so maintainers can confirm scope and evidence requirements.
 - **Improve docs** — fixes to the README, API docs, or tutorials are always welcome.
 - **Send code** — see the workflow below.
+
+---
+
+## Contribution Certification
+
+Every new commit must include a `Signed-off-by` trailer certifying the [Developer Certificate of Origin 1.1](DCO). Create it with:
+
+```bash
+git commit -s
+```
+
+For an existing local commit, add the trailer and update the branch before review:
+
+```bash
+git commit --amend --signoff --no-edit
+```
+
+For a multi-commit contribution, every commit must be signed off. Existing repository history before the policy effective date of 2026-07-20 is not retroactively re-signed. Maintainers verify sign-offs before merge; no GitHub App, required check, or branch-protection enforcement is claimed by this repository policy.
+
+Contributors retain copyright in their contributions. No separate CLA grant is required. A different license for a contribution requires separate permission from the applicable copyright holder or holders.
 
 ---
 
@@ -126,13 +146,14 @@ pytest --cov=cortrix
 
 ## Pull Request Workflow
 
-1. **Discuss first** for anything non-trivial (open an issue or a Discussion).
+1. **Open an issue first** for anything non-trivial.
 2. **Branch** from `main`: `feat/<short-name>` or `fix/<short-name>`.
 3. **Keep it focused** — one logical change per PR.
 4. **Add tests** for new behaviour and keep existing tests green.
 5. **Update docs** — if you change the API, update both `api/openapi.yaml` and the affected docs.
-6. **Run the full test suite locally** before pushing.
-7. **Open the PR** against `main` with a clear description: what changed, why, and how it was tested.
+6. **Sign off every commit** under DCO 1.1.
+7. **Run the full test suite locally** before pushing.
+8. **Open the PR** against `main` with a clear description: what changed, why, and how it was tested.
 
 ### PR Checklist
 
@@ -142,15 +163,20 @@ pytest --cov=cortrix
 - [ ] API changes are reflected in `api/openapi.yaml` and the Python SDK.
 - [ ] Source is English-only and follows the surrounding style.
 - [ ] Commit messages are clear and imperative ("Add cross-namespace filter", not "added stuff").
+- [ ] Every new commit contains a valid `Signed-off-by` trailer.
 
 ---
 
 ## Reporting Security Issues
 
-Please do **not** open public issues for security vulnerabilities. Email [security@cortrix.ai](mailto:security@cortrix.ai) with details, and we will respond promptly.
+Please do **not** open public issues for security vulnerabilities. Follow [SECURITY.md](SECURITY.md) and email [security@cortrix.ai](mailto:security@cortrix.ai). The acknowledgement target is within 5 business days; it is not a remediation deadline.
+
+## Conduct
+
+Participation is governed by the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). Send conduct reports privately to [devrel@cortrix.ai](mailto:devrel@cortrix.ai), not through a public issue. Ownership and recusal rules are documented in [MAINTAINERS.md](MAINTAINERS.md).
 
 ---
 
 ## License
 
-Cortrix is licensed under **AGPL-3.0**. By submitting a contribution, you agree it is licensed under AGPL-3.0. Questions about licensing or a commercial agreement? Contact [hello@cortrix.ai](mailto:hello@cortrix.ai).
+Cortrix-authored material is licensed under [AGPL-3.0-only](LICENSE). Contributions use the applicable license, are certified under [DCO 1.1](DCO), and do not require a CLA. Third-party material retains its own license. See [NOTICE.md](NOTICE.md) for copyright and exception boundaries.

@@ -7,7 +7,7 @@ name = "cortrix-skills"
 version = "1.0.0"
 description = "Cortrix Skill SDK — framework adapters (LangChain / Claude Tools / OpenAI Function Calling) over the Cortrix Python SDK"
 readme = "README.md"
-license = { text = "AGPL-3.0" }
+license = { text = "AGPL-3.0-only" }
 requires-python = ">=3.9"
 authors = [{ name = "Cortrix" }]
 keywords = [

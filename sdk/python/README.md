@@ -167,4 +167,4 @@ python scripts/generate_types.py   # regenerate types from the OpenAPI spec
 
 ## License
 
-AGPL-3.0
+AGPL-3.0-only

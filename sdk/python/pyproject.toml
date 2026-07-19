@@ -7,7 +7,7 @@ name = "cortrix"
 version = "1.0.0"
 description = "Official Python SDK for Cortrix — semantic storage for AI agents"
 readme = "README.md"
-license = {text = "AGPL-3.0"}
+license = {text = "AGPL-3.0-only"}
 requires-python = ">=3.9"
 authors = [
     {name = "Cortrix"}

@@ -5,7 +5,7 @@
 
   Agent-native semantic storage for retrieval, memory, and API-driven AI applications.
 
-  [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+  [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](LICENSE)
   [![Version](https://img.shields.io/badge/version-0.1.0--rc.1-orange.svg)](https://github.com/cortrix/cortrix/releases)
   [![C++17](https://img.shields.io/badge/C%2B%2B-17-blueviolet.svg)](https://en.cppreference.com/w/cpp/17)
 
@@ -38,6 +38,8 @@ Start here:
   separate image, provider policy, deployment, verification, and rollback.
 - [Security policy](SECURITY.md): security reporting path.
 - [Contributing](CONTRIBUTING.md): development workflow and contribution checklist.
+- [Maintainers](MAINTAINERS.md): ownership, acknowledgement targets, and recusal rules.
+- [Code of Conduct](CODE_OF_CONDUCT.md): community standards and private reporting.
 
 ## Current Status
 
@@ -163,10 +165,11 @@ Roadmap items are not current capabilities.
 ## Community And Contribution
 
 - [GitHub Issues](https://github.com/cortrix/cortrix/issues): bugs and feature requests.
-- [GitHub Discussions](https://github.com/cortrix/cortrix/discussions): questions if discussions are enabled.
 - [Security policy](SECURITY.md): security reports.
 - [Contributing](CONTRIBUTING.md): local development and pull requests.
+- [Code of Conduct](CODE_OF_CONDUCT.md): community standards and private conduct reports.
+- [Maintainers](MAINTAINERS.md): ownership and acknowledgement targets.
 
 ## License
 
-Cortrix is licensed under [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0).
+Cortrix-authored material is licensed under [AGPL-3.0-only](LICENSE); third-party material retains its own license. See [NOTICE.md](NOTICE.md) for copyright and exception boundaries and [CONTRIBUTING.md](CONTRIBUTING.md) for the no-CLA, DCO 1.1 contribution policy.

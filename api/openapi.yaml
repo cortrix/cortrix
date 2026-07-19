@@ -29,8 +29,8 @@ info:
     name: Cortrix
     url: https://cortrix.io
   license:
-    name: AGPL-3.0
-    url: https://www.gnu.org/licenses/agpl-3.0.html
+    name: AGPL-3.0-only
+    url: https://spdx.org/licenses/AGPL-3.0-only.html
 
 servers:
   - url: https://api.cortrix.io/api/v1
