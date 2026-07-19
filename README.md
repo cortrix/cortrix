@@ -65,7 +65,7 @@ High-signal current status:
 | Tenant/member/ACL/quota | `Blocked` | Runtime behavior and documented contract are still being reconciled. |
 | MEM02 memory extraction | `Blocked` | Latest verification observed an LLM transport timeout path. |
 | RBAC and tenant isolation denial matrix | `Blocked` | Cannot be proven in the current auth-disabled local runtime. |
-| Benchmark claims | `RD review required` | Treat performance and benchmark numbers as unpublished until measured artifacts are accepted. |
+| Full-corpus BEIR retrieval quality | `Verified` | Accepted SciFact, FiQA, and NFCorpus measurements, method, and provenance are published in the [pinned benchmark bundle](https://github.com/cortrix/cortrix-benchmarks/tree/7bc29aa840c20db3935dfcf80eb048e553ebe2b0/results/published/beir-three-full-corpus-2026-07-v1). This does not establish answer quality or production performance. |
 
 See [Compatibility and known status](docs/compatibility.md) before making production, security, benchmark, or integration claims.
 
@@ -163,7 +163,7 @@ Cortrix is pre-release. Before using it outside local development, review:
 - `config.yaml.example` for auth and API key configuration.
 - `deploy/` for deployment templates.
 
-Do not assume production readiness for auth, tenant isolation, RBAC, quota enforcement, memory extraction, or benchmark performance until those areas are marked `Verified`.
+Do not assume production readiness for auth, tenant isolation, RBAC, quota enforcement, or memory extraction. Do not generalize the published retrieval-quality measurements to answer quality, latency, cost, security, or production performance.
 
 ## Roadmap
 
@@ -172,7 +172,7 @@ Roadmap items are not current capabilities.
 - Advanced autonomous Agent executors such as tool-use and plan-execute modes.
 - Additional integration adapters beyond the currently documented surfaces.
 - Production-readiness hardening for auth, tenant isolation, RBAC, quota, logging redaction, and deployment operations.
-- Public benchmark artifacts after methodology and measurements are accepted.
+- Additional datasets and production-representative latency or cost measurements after separate methods and artifacts are accepted.
 
 ## Community And Contribution
 

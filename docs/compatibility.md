@@ -32,7 +32,7 @@ Cortrix is in active pre-release development. Some API surfaces are present in t
 | OCR / parser paths | `RD review required` | Parser and OCR behavior depends on optional configuration and should be verified per deployment. |
 | Linux NVIDIA CUDA execution provider | `RD review required` | A separate Linux x86_64 image and runbook exist; require a platform capability smoke before treating CUDA as verified in a target deployment. |
 | Log redaction / LogSanitizer defaults | `Blocked` | Runtime hardening is still under review; do not claim sanitized startup logs by default. |
-| Benchmark results | `RD review required` | Do not publish benchmark claims until measured artifacts and methodology are accepted. |
+| Full-corpus BEIR retrieval quality | `Verified` | Accepted SciFact, FiQA, and NFCorpus results are bound to a [pinned measured bundle](https://github.com/cortrix/cortrix-benchmarks/tree/7bc29aa840c20db3935dfcf80eb048e553ebe2b0/results/published/beir-three-full-corpus-2026-07-v1). The bundle does not establish answer quality or production performance. |
 | Production readiness | `RD review required` | Treat deployment, auth, tenant isolation, limits, and security controls as review-required. |
 
 ## Auth And Security Boundaries
@@ -70,9 +70,9 @@ The built-in Agent's advanced autonomous executors are roadmap items.
 
 ## Benchmark Boundary
 
-Do not publish benchmark numbers from README, slides, or external materials unless they link to accepted measured artifacts and methodology.
+Published benchmark numbers must link to accepted measured artifacts and methodology. The current accepted scope is full-corpus SciFact, FiQA, and NFCorpus retrieval quality in the pinned Cortrix-Benchmarks bundle.
 
-Until that review is complete, benchmark content should be described as `RD review required`.
+Keep other datasets, answer quality, latency, cost, security, and production-performance claims as `RD review required` until separately accepted evidence exists.
 
 ## Production Boundary
 
