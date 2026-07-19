@@ -1,5 +1,5 @@
 # =============================================================
-# F23 Stage 1: PR CI  (design: dev-cortrix-hub F23-tests.md §6.2)
+# Stage 1: PR CI
 # Target < 10 min design budget; real-world C++ build needs ccache
 # warm cache to approach it, so job timeout is set wider.
 #

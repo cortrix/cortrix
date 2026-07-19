@@ -4,9 +4,8 @@ Call Cortrix semantic retrieval, document upload and memory query directly from
 SQL — no HTTP client needed in your app. Under the hood `pgcortrix` is a
 `plpython3u` wrapper over the Cortrix Server HTTP REST API.
 
-> **SoT**: [`design/features/F14-pgcortrix.md`](../../../dev-cortrix-hub/design/features/F14-pgcortrix.md)
-> (v1.0.3). This directory is the F14 V1 implementation. Built **independently**
-> with PGXS — it is *not* part of the main `cortrix/` CMake build.
+This directory contains the current V1 implementation. It is built **independently**
+with PGXS — it is *not* part of the main `cortrix/` CMake build.
 
 ## Why plpython3u (and not a C extension)
 

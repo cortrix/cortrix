@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================
-# F23 coverage toolchain + quality gate
-# (design: dev-cortrix-hub F23-tests.md §4.1 / §4.2 / §4.3)
+# Coverage toolchain + quality gate
 #
 # Usage:
 #   scripts/ci/coverage.sh --report-only   # build+test+HTML, no gate

@@ -2,9 +2,9 @@
 
 Status: `ready for R&D review`
 
-Related Hub feedback package:
+## Source Review Context
 
-`dev-cortrix-hub/market/rd-feedback/20260621-cortrix-runtime-blackbox-r4-rd-refresh-feedback/`
+The repair was reviewed against maintainer-held runtime evidence. Private coordination artifacts are not part of this repository.
 
 ## Purpose
 
@@ -97,19 +97,7 @@ Review notes:
 
 ## Fourth-round Evidence
 
-Canonical evidence root:
-
-`CortrixGTM/project-ops/cortrix-runtime-validation/20260620-agent-black-box-rd-refresh-repair/`
-
-Primary files:
-
-- `human-review.md`
-- `repair/round-01/repair-log.md`
-- `repair/round-01/test-results-matrix.md`
-- `repair/round-01/afterfix/ui-v5/report.md`
-- `repair/round-01/afterfix/api-v2/api-smoke-report.md`
-- `repair/round-01/afterfix/mcp-sdk-v2/mcp-real-httpx-rerun/report.md`
-- `repair/round-01/afterfix/static-web-smoke.md`
+The raw runtime evidence archive is retained by the maintainers outside this repository. The recorded result summary follows.
 
 Latest direct afterfix3 result:
 
@@ -123,17 +111,16 @@ Latest direct afterfix3 result:
 
 ## Verification Already Run
 
-Recorded in the evidence root:
+Recorded validation commands that are portable from the repository root:
 
 ```text
 npm run build
 cmake --build build --target cortrix-server
-node project-ops/cortrix-runtime-validation/20260620-agent-black-box-rd-refresh-repair/repair/round-01/afterfix/ui-v5/ui-round01-probe.mjs
-node project-ops/cortrix-runtime-validation/20260620-agent-black-box-rd-refresh-repair/repair/round-01/afterfix/api-v2/api-smoke.mjs
-/Users/scott/Projects/Codex/cortrix/cortrix-agent/venv/bin/python project-ops/cortrix-runtime-validation/20260620-agent-black-box-rd-refresh-repair/repair/round-01/afterfix/mcp-sdk-v2/mcp-real-httpx-probe.py
 curl -sS -I http://localhost:18080/
-curl -sS -D - http://localhost:18080/namespaces -o /private/tmp/cortrix-static-namespaces-body.html
+curl -sS -D - http://localhost:18080/namespaces -o "$TMPDIR/cortrix-static-namespaces-body.html"
 ```
+
+The UI, API, MCP, and SDK probes used for the recorded review are maintainer-held validation tools and are not published as repository commands.
 
 After rebasing this branch onto `origin/main` at `8eb5b6a`, the PR submission step also ran:
 
@@ -145,16 +132,7 @@ cmake --build build --target cortrix-server
 ./build/tests/cortrix_unit_tests '--gtest_filter=OpenAiLlmClientTest.*'
 ```
 
-Follow-up Python target retest after installing dependencies into an isolated Python 3.12 venv:
-
-```text
-/opt/homebrew/bin/python3.12 -m venv /private/tmp/cortrix-r4-python-target-venv
-/private/tmp/cortrix-r4-python-target-venv/bin/python -m pip install -e '/Users/scott/Projects/Codex/cortrix/cortrix-mcp[test]' -e '/Users/scott/Projects/Codex/cortrix/sdk/python[dev]'
-cd /Users/scott/Projects/Codex/cortrix/cortrix-mcp
-/private/tmp/cortrix-r4-python-target-venv/bin/python -m pytest -p no:cacheprovider tests/test_core.py tests/test_admin.py
-cd /Users/scott/Projects/Codex/cortrix/sdk/python
-/private/tmp/cortrix-r4-python-target-venv/bin/python -m pytest -p no:cacheprovider tests/test_memory.py tests/test_async.py
-```
+Follow-up Python target tests were run in an isolated Python 3.12 virtual environment; machine-specific environment commands are intentionally omitted.
 
 Results:
 
@@ -190,8 +168,8 @@ This PR submission did not rerun the full black-box suite; it packages the alrea
 
 ## Files Intentionally Not Included
 
-The local working tree also contains untracked `benchmarks/` files. They are not part of this PR and should not be reviewed as part of the Round-4 repair patch.
+Historical benchmark artifacts are not part of this runtime repair guide.
 
 ## Boundary
 
-Raw evidence is intentionally preserved 1:1 in the private CortrixGTM evidence root. This source PR summarizes and links that evidence; it does not sanitize or replace it.
+Raw runtime evidence is retained by the maintainers outside this repository. This guide publishes the review summary without exposing workstation-specific paths or private coordination records.

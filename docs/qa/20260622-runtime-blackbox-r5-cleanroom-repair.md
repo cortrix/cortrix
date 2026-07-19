@@ -2,9 +2,9 @@
 
 Status: `ready for R&D review`
 
-Related Hub feedback package:
+## Source Review Context
 
-`dev-cortrix-hub/market/rd-feedback/20260622-cortrix-runtime-blackbox-r5-feedback/`
+The repair was reviewed against maintainer-held runtime evidence. Private coordination artifacts are not part of this repository.
 
 ## Purpose
 
@@ -27,7 +27,7 @@ The patch intentionally stays on API/UI/static HTTP surface compatibility. It do
 7. `web/src/pages/admin/UsersPage.tsx`
 8. `web/src/types/api.ts`
 9. `web/src/api/mock.ts`
-10. Fifth-round evidence matrix in `CortrixGTM/project-ops/cortrix-runtime-validation/20260622-agent-black-box-round5/repair/round-01/test-results-matrix.md`
+10. The recorded result summary in this guide.
 
 ## Changed Areas
 
@@ -81,24 +81,7 @@ Review notes:
 
 ## Fifth-round Evidence
 
-Canonical evidence root:
-
-```text
-CortrixGTM/project-ops/cortrix-runtime-validation/20260622-agent-black-box-round5/
-```
-
-Primary reading order:
-
-1. `README.md`
-2. `repair/round-01/test-results-matrix.md`
-3. `repair/round-01/run-log.md`
-4. `repair/round-01/ui/report.md`
-5. `repair/round-01/ui/screenshot-quality-check.md`
-6. `repair/round-01/api/report.md`
-7. `repair/round-01/api/tenant-acl-quota-report.md`
-8. `repair/round-01/mcp-sdk/summary.md`
-9. `repair/round-01/security/security-runtime-report.md`
-10. `repair/round-01/runtime/runtime-summary.md`
+The raw runtime evidence archive is retained by the maintainers outside this repository. The recorded result summary follows.
 
 Latest direct result:
 
@@ -113,18 +96,17 @@ Latest direct result:
 
 ## Verification Already Run
 
-Recorded in the evidence root:
+Recorded validation commands that are portable from the repository root:
 
 ```text
 cmake --build build --target cortrix-server
 npm run build
 ctest -R "HealthEndpointTest|NamespaceApiTest|FullHttpE2ETest.ErrorFormatConsistency" --output-on-failure
-node project-ops/cortrix-runtime-validation/20260622-agent-black-box-round5/repair/round-01/ui/ui-round5-probe.mjs
-node project-ops/cortrix-runtime-validation/20260622-agent-black-box-round5/repair/round-01/api/tenant-acl-quota-probe.mjs
-node project-ops/cortrix-runtime-validation/20260622-agent-black-box-round5/repair/round-01/security/security-runtime-probe.mjs
 python -m pytest cortrix-mcp/tests
 python -m pytest sdk/python/tests
 ```
+
+The UI, API, and security probes used for the recorded review are maintainer-held validation tools and are not published as repository commands.
 
 Results:
 
@@ -165,10 +147,8 @@ Results:
 
 ## Files Intentionally Not Included
 
-The local working tree also contains an untracked `benchmarks/` directory with files dated 2026-06-14. It has no Git history under this repo and is not part of the Round-5 repair patch.
+Historical benchmark artifacts are not part of this runtime repair guide.
 
-## Hub Boundary
+## Boundary
 
-The paired Hub package remains `needs_rd_review`. This source PR should not be interpreted as a public release-readiness claim, benchmark result, or Hub design SoT promotion.
-
-Raw evidence is preserved 1:1 in the private CortrixGTM evidence root. This source PR summarizes and links that evidence; it does not sanitize or replace it.
+This source PR should not be interpreted as a public release-readiness claim or benchmark result. Raw runtime evidence is retained by the maintainers outside this repository. This guide publishes the review summary without exposing workstation-specific paths or private coordination records.

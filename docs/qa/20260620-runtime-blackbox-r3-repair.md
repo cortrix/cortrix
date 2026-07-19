@@ -2,13 +2,9 @@
 
 Status: `ready for R&D review`
 
-Related Hub feedback package:
+## Source Review Context
 
-`dev-cortrix-hub/market/rd-feedback/20260620-cortrix-runtime-blackbox-r3-repair-feedback/`
-
-Related Hub PR:
-
-`https://github.com/cortrix/dev-cortrix-hub/pull/5`
+The repair was reviewed against maintainer-held runtime evidence. Private coordination artifacts are not part of this repository.
 
 ## Purpose
 
@@ -108,13 +104,7 @@ Review notes:
 
 ## Final Local Validation Result
 
-Official evidence root:
-
-`CortrixGTM/project-ops/cortrix-runtime-validation/20260619-agent-black-box-round3-repair/`
-
-Official round:
-
-`round-03-0539168-api-first-repair`
+The raw runtime evidence archive is retained by the maintainers outside this repository. The recorded result summary follows.
 
 | Area | Result |
 |---|---:|

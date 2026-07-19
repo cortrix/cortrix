@@ -1,5 +1,5 @@
 # =============================================================
-# F23 Stage 2: Nightly CI  (design: dev-cortrix-hub F23-tests.md §6.3)
+# Stage 2: Nightly CI
 # Cron 02:00 UTC+8 = 18:00 UTC. Target < 60 min.
 #
 # Hard gates (topic 2 rev B):

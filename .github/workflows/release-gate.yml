@@ -1,5 +1,5 @@
 # =============================================================
-# F23 Stage 3: Release Gate  (design: dev-cortrix-hub F23-tests.md §6.4)
+# Stage 3: Release Gate
 # Manual workflow_dispatch before a release. Target < 4 hr.
 #
 # Hard gates: all Stage-2 gates + cross-platform E2E 100% +

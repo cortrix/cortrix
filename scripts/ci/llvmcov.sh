@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================
-# F23 llvm-cov region-coverage cross-check ("calibration")
-# (design: dev-cortrix-hub F23-tests.md §4.1.bis — measurement
-#  calibration for the gcov/lcov branch metric)
+# llvm-cov region-coverage cross-check ("calibration")
+# for the gcov/lcov branch metric
 #
 # Why: gcov emits hidden branch arms for compiler-generated
 # constructs (temporary construction in string concatenation,
