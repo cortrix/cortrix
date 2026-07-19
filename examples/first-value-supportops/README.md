@@ -4,19 +4,24 @@ This synthetic demo starts an attested local Cortrix binary, loads three small S
 
 ## Prerequisites
 
-- A clean Cortrix source checkout and a CMake build directory configured from that checkout with `CORTRIX_USE_ONNX=OFF`.
+- A clean Cortrix source checkout.
+- CMake and a C++17 toolchain supported by the main project build.
 - Python 3.9 or newer.
 - No running backend is accepted: the runner requires an unused loopback port and starts the exact `cortrix-server` binary itself.
 - No LLM credential is required. The runner owns the config, requires `llm_enabled=false`, and sends `rerank=false`; this makes the demo a deterministic contract check, not a representative retrieval-quality benchmark.
 
-## Run
+## Build and run
 
-From the repository root:
+From a clean checkout at the repository root, configure the deterministic ONNX-off profile, build the server, and run the contract:
 
 ```bash
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCORTRIX_USE_ONNX=OFF
+cmake --build build --target cortrix-server -j
 python3 examples/first-value-supportops/run_demo.py \
   --core-repo . \
-  --build-dir build-r4
+  --build-dir build
 ```
 
 The command verifies the clean Core commit/tree, Release CMake source directory, `CORTRIX_USE_ONNX=OFF`, CMake cache hash, server binary hash, runner-owned PID/config and Core working directory, and `llm_enabled=false`. It fails closed on identity/config mismatch, an occupied port, health or HTTP errors, incomplete ingest tasks, empty results, either missing evidence group, missing same-result source/snippet/provenance, missing trace identity, forbidden claims, timeout, cleanup failure, a namespace that remains active or retains documents/blocks, or server shutdown failure. A Core tombstone with `status=deleted`, `doc_count=0`, and `block_count=0` is recorded as `tombstoned-empty` rather than treated as a live residual namespace.

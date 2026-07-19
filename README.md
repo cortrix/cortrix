@@ -76,9 +76,9 @@ Use the source-first quickstart:
 ```bash
 git clone https://github.com/cortrix/cortrix.git
 cd cortrix
-cp config.yaml.example build/config.yaml
-cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
+cp config.yaml.example build/config.yaml
 ./dev.sh
 ```
 
@@ -91,12 +91,16 @@ curl http://localhost:8420/api/v1/system/health/ready
 
 For the full path, expected responses, LLM configuration notes, and troubleshooting, see [Quickstart](docs/QUICKSTART.md).
 
-After configuring an ONNX-off build directory, exercise the fail-closed first-value contract. The runner starts and stops its own loopback server so it cannot silently test an unrelated backend:
+For a deterministic first-value contract that does not require model downloads or an LLM credential, configure the local server without ONNX, build it from the same clean checkout, and run the synthetic SupportOps demo. The runner starts and stops its own loopback server so it cannot silently test an unrelated backend:
 
 ```bash
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCORTRIX_USE_ONNX=OFF
+cmake --build build --target cortrix-server -j
 python3 examples/first-value-supportops/run_demo.py \
   --core-repo . \
-  --build-dir build-r4
+  --build-dir build
 ```
 
 The demo uses synthetic data and an attested ONNX-off, no-LLM, `rerank=false` validation profile. It verifies source/build/runtime identity plus API and evidence behavior; it is not a retrieval-quality benchmark.
