@@ -1,0 +1,44 @@
+name: Documentation report
+description: Report incorrect, missing, ambiguous, or broken documentation.
+title: "[Docs]: "
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Documentation location
+      description: Provide a repository path, heading, or URL.
+    validations:
+      required: true
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: Problem type
+      options:
+        - incorrect behavior or command
+        - missing prerequisite or limitation
+        - broken link
+        - ambiguous explanation
+        - accessibility or readability
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior or wording
+    validations:
+      required: true
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed correction
+      description: Include exact source evidence when the correction changes a capability claim.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Submission checks
+      options:
+        - label: This report contains no secrets, private paths, or customer data.
+          required: true

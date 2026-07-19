@@ -1,0 +1,19 @@
+{
+  "demo_id": "first-value-supportops",
+  "version": "1.0.0",
+  "runner_contract_version": "1.1.0",
+  "data_classification": "synthetic-public-safe",
+  "query": "queries/q01-setup-retry.json",
+  "expected": "expected/q01-setup-retry.expected.json",
+  "documents": [
+    "docs/agent-setup-guide.md",
+    "docs/support-playbook.md",
+    "docs/release-policy.md"
+  ],
+  "claim_boundary": [
+    "This is a synthetic local first-value demo.",
+    "It is not a production workload benchmark.",
+    "It does not use customer data.",
+    "It does not establish production, security, tenant-isolation, or PostgreSQL readiness."
+  ]
+}

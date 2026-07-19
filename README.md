@@ -28,6 +28,8 @@ The repository includes:
 Start here:
 
 - [Quickstart](docs/QUICKSTART.md): build, configure, start, and run the first health/API checks.
+- [First-value SupportOps demo](examples/first-value-supportops/README.md): run one source-backed query with versioned expected assertions, trace verification, and zero-residual cleanup.
+- [Stack fit and adoption boundaries](docs/adoption/stack-fit.md): review evidence-backed keep/add/replace/unknown decision cards.
 - [Agent access](docs/agent-access.md): choose between HTTP/OpenAPI, MCP, Python SDK, and the built-in Agent.
 - [Compatibility and known status](docs/compatibility.md): current public status for API, MCP, SDK, Agent, auth, tenant/RBAC, memory extraction, benchmarks, and security hardening.
 - [OpenAPI spec](api/openapi.yaml): endpoint paths, schemas, security schemes, and response contracts.
@@ -88,6 +90,16 @@ curl http://localhost:8420/api/v1/system/health/ready
 ```
 
 For the full path, expected responses, LLM configuration notes, and troubleshooting, see [Quickstart](docs/QUICKSTART.md).
+
+After configuring an ONNX-off build directory, exercise the fail-closed first-value contract. The runner starts and stops its own loopback server so it cannot silently test an unrelated backend:
+
+```bash
+python3 examples/first-value-supportops/run_demo.py \
+  --core-repo . \
+  --build-dir build-r4
+```
+
+The demo uses synthetic data and an attested ONNX-off, no-LLM, `rerank=false` validation profile. It verifies source/build/runtime identity plus API and evidence behavior; it is not a retrieval-quality benchmark.
 
 ## API Reference
 
@@ -165,6 +177,7 @@ Roadmap items are not current capabilities.
 ## Community And Contribution
 
 - [GitHub Issues](https://github.com/cortrix/cortrix/issues): bugs and feature requests.
+- [Issue templates](https://github.com/cortrix/cortrix/issues/new/choose): bugs, feature or integration proposals, and documentation reports.
 - [Security policy](SECURITY.md): security reports.
 - [Contributing](CONTRIBUTING.md): local development and pull requests.
 - [Code of Conduct](CODE_OF_CONDUCT.md): community standards and private conduct reports.

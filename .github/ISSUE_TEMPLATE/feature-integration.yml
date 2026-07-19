@@ -1,0 +1,65 @@
+name: Feature or integration proposal
+description: Describe a user problem, stack fit, evidence, and an honest exit path.
+title: "[Proposal]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Describe the workflow problem without prescribing an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: existing_stack
+    attributes:
+      label: Existing stack
+      description: Name versions, data owners, current query path, and operational constraints.
+    validations:
+      required: true
+  - type: dropdown
+    id: fit
+    attributes:
+      label: Expected fit
+      options:
+        - keep existing component and add Cortrix
+        - replace a component
+        - unknown and needs an experiment
+        - current path appears unsupported
+    validations:
+      required: true
+  - type: textarea
+    id: data_flow
+    attributes:
+      label: Data movement and sync owner
+      description: What moves, who keeps it synchronized, and which system remains authoritative?
+    validations:
+      required: true
+  - type: textarea
+    id: query_failure_security
+    attributes:
+      label: Query path, failure domains, and security responsibility
+    validations:
+      required: true
+  - type: textarea
+    id: tested_identity
+    attributes:
+      label: Tested identity and evidence
+      description: Link exact commits, tests, fixtures, commands, artifacts, and checksums. Use unknown when evidence does not exist.
+    validations:
+      required: true
+  - type: textarea
+    id: exit
+    attributes:
+      label: Exit or rollback path
+      description: Explain how a team can stop the experiment without losing its source of truth.
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundary
+    attributes:
+      label: Claim boundary
+      options:
+        - label: I have marked untested compatibility and replacement claims as unknown.
+          required: true
+        - label: I removed credentials, private infrastructure details, and customer data.
+          required: true

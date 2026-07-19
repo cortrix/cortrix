@@ -8,9 +8,9 @@ Cortrix does not require a Contributor License Agreement. Contributions to Cortr
 
 ## Ways to Contribute
 
-- **Report bugs** — open a [GitHub Issue](https://github.com/cortrix/cortrix/issues) with steps to reproduce, expected vs. actual behaviour, and your environment (OS, compiler, Cortrix version).
-- **Propose features or integrations** — open a [GitHub Issue](https://github.com/cortrix/cortrix/issues) before opening a large PR so maintainers can confirm scope and evidence requirements.
-- **Improve docs** — fixes to the README, API docs, or tutorials are always welcome.
+- **Report bugs** — use the [Bug report form](https://github.com/cortrix/cortrix/issues/new?template=bug.yml) with steps to reproduce, expected vs. actual behaviour, and your environment.
+- **Propose features or integrations** — use the [Feature or integration form](https://github.com/cortrix/cortrix/issues/new?template=feature-integration.yml) before opening a large PR so maintainers can confirm scope and evidence requirements.
+- **Improve docs** — use the [Documentation form](https://github.com/cortrix/cortrix/issues/new?template=documentation.yml), or send a focused documentation PR.
 - **Send code** — see the workflow below.
 
 ---
