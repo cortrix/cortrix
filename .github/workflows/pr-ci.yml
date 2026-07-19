@@ -105,7 +105,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     # SOFT gate: legacy code predates .clang-format; hardening mode
-    # (full reformat vs diff-only) is a pending Derek decision.
+    # (full reformat vs diff-only) remains a project-level decision.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4

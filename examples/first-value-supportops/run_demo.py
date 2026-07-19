@@ -21,7 +21,9 @@ from pathlib import Path
 from typing import Any
 
 
-RUNNER_VERSION = "1.1.0"
+RUNNER_VERSION = "2.0.0"
+PRIMARY_PROFILE = "real-onnx-embedding-reranker-no-llm"
+SECONDARY_PROFILE = "onnx-off-contract"
 TERMINAL_SUCCESS = {"completed", "ready"}
 TERMINAL_FAILURE = {"failed", "cancelled"}
 
@@ -67,7 +69,7 @@ def core_identity(repo: Path) -> dict[str, str]:
     return {"commit": commit, "tree": tree, "dirty": "false"}
 
 
-def cmake_cache(build_dir: Path, core_repo: Path) -> dict[str, str]:
+def cmake_cache(build_dir: Path, core_repo: Path, profile: str) -> dict[str, str]:
     cache_path = build_dir / "CMakeCache.txt"
     if not cache_path.is_file():
         raise DemoFailure(f"CMake cache does not exist: {cache_path}")
@@ -81,8 +83,11 @@ def cmake_cache(build_dir: Path, core_repo: Path) -> dict[str, str]:
     source = values.get("CMAKE_HOME_DIRECTORY")
     if not source or Path(source).expanduser().resolve() != core_repo:
         raise DemoFailure("CMake build directory is not configured from the declared Core repo")
-    if values.get("CORTRIX_USE_ONNX") != "OFF":
-        raise DemoFailure("CMake build must set CORTRIX_USE_ONNX=OFF for this contract")
+    expected_onnx = "ON" if profile == PRIMARY_PROFILE else "OFF"
+    if values.get("CORTRIX_USE_ONNX") != expected_onnx:
+        raise DemoFailure(
+            f"CMake build must set CORTRIX_USE_ONNX={expected_onnx} for profile {profile}"
+        )
     if values.get("CMAKE_BUILD_TYPE") != "Release":
         raise DemoFailure("CMake build must set CMAKE_BUILD_TYPE=Release for this contract")
     return {
@@ -94,9 +99,9 @@ def cmake_cache(build_dir: Path, core_repo: Path) -> dict[str, str]:
     }
 
 
-def server_attestation(core_repo: Path, build_dir: Path) -> dict[str, str]:
+def server_attestation(core_repo: Path, build_dir: Path, profile: str) -> dict[str, str]:
     build_dir = build_dir.expanduser().resolve()
-    cache = cmake_cache(build_dir, core_repo)
+    cache = cmake_cache(build_dir, core_repo, profile)
     binary = build_dir / "cortrix-server"
     if not binary.is_file():
         raise DemoFailure(f"Cortrix server binary does not exist: {binary}")
@@ -117,7 +122,62 @@ def ensure_port_available(host: str, port: int) -> None:
             raise DemoFailure(f"TCP port is already in use: {host}:{port}")
 
 
-def write_runtime_config(path: Path, data_dir: Path, host: str, port: int) -> None:
+def attest_models(package: Path, model_root: Path) -> dict[str, Any]:
+    lock_path = package / "model-lock.json"
+    lock = load_json(lock_path)
+    required = {
+        "embedding_model": model_root / "bge-m3" / "model.onnx",
+        "embedding_data": model_root / "bge-m3" / "model.onnx_data",
+        "embedding_tokenizer": model_root / "bge-m3" / "tokenizer.json",
+        "reranker_model": model_root / "bge-reranker-v2-m3" / "model.onnx",
+        "reranker_data": model_root / "bge-reranker-v2-m3" / "model.onnx_data",
+        "reranker_tokenizer": model_root / "bge-reranker-v2-m3" / "tokenizer.json",
+    }
+    locked_files = lock.get("files")
+    if not isinstance(locked_files, dict):
+        raise DemoFailure("Model lock has no files object")
+    receipt: dict[str, Any] = {
+        "lock_path": str(lock_path),
+        "lock_sha256": sha256_file(lock_path),
+        "model_root": str(model_root),
+        "files": {},
+    }
+    for key, path in required.items():
+        expected = locked_files.get(key)
+        if not isinstance(expected, dict):
+            raise DemoFailure(f"Model lock is missing {key}")
+        if not path.is_file():
+            raise DemoFailure(f"Required model file is missing: {path}")
+        actual_size = path.stat().st_size
+        actual_hash = sha256_file(path)
+        if actual_size != expected.get("bytes") or actual_hash != expected.get("sha256"):
+            raise DemoFailure(f"Model identity mismatch for {path}")
+        receipt["files"][key] = {
+            "path": str(path),
+            "bytes": actual_size,
+            "sha256": actual_hash,
+        }
+    return receipt
+
+
+def write_runtime_config(
+    path: Path,
+    data_dir: Path,
+    host: str,
+    port: int,
+    profile: str,
+    model_root: Path | None,
+) -> None:
+    if profile == PRIMARY_PROFILE:
+        if model_root is None:
+            raise DemoFailure("The primary profile requires --models-dir")
+        embedding_model = str(model_root / "bge-m3" / "model.onnx")
+        embedding_tokenizer = str(model_root / "bge-m3" / "tokenizer.json")
+        reranker_dir = str(model_root / "bge-reranker-v2-m3")
+    else:
+        embedding_model = ""
+        embedding_tokenizer = ""
+        reranker_dir = ""
     value = f'''server:
   host: "{host}"
   port: {port}
@@ -137,14 +197,14 @@ namespace:
   idle_timeout_s: 300
 
 embedding:
-  model_path: ""
-  tokenizer_path: ""
+  model_path: {json.dumps(embedding_model)}
+  tokenizer_path: {json.dumps(embedding_tokenizer)}
   dimension: 1024
   max_seq_length: 512
   execution_provider: "cpu"
 
 reranker:
-  model_dir: ""
+  model_dir: {json.dumps(reranker_dir)}
   execution_provider: "cpu"
 
 query_complexity:
@@ -193,6 +253,49 @@ def wait_for_server(process: subprocess.Popen[bytes], base_url: str, timeout: fl
         except (urllib.error.URLError, TimeoutError, OSError):
             time.sleep(0.25)
     raise DemoFailure(f"Cortrix server did not become healthy within {timeout}s")
+
+
+def fetch_text(url: str, timeout: float) -> str:
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            if response.status != 200:
+                raise DemoFailure(f"GET {url} returned HTTP {response.status}")
+            return response.read().decode("utf-8")
+    except (urllib.error.URLError, UnicodeDecodeError, TimeoutError, OSError) as exc:
+        raise DemoFailure(f"GET {url} failed: {exc}") from exc
+
+
+def metric_value(body: str, name: str) -> float:
+    for line in body.splitlines():
+        if line.startswith(name + " "):
+            try:
+                return float(line.split(None, 1)[1])
+            except (IndexError, ValueError) as exc:
+                raise DemoFailure(f"Metric {name} has an invalid value") from exc
+    raise DemoFailure(f"Metric {name} is missing")
+
+
+def assert_primary_readiness(readiness: Any) -> dict[str, Any]:
+    if not isinstance(readiness, dict) or readiness.get("status") != "ready":
+        raise DemoFailure("Readiness response is not ready")
+    components = readiness.get("components")
+    if not isinstance(components, dict):
+        raise DemoFailure("Readiness response has no components object")
+    evidence: dict[str, Any] = {}
+    for name in ("embedding_execution_provider", "reranker_execution_provider"):
+        component = components.get(name)
+        if not isinstance(component, dict):
+            raise DemoFailure(f"Readiness response is missing {name}")
+        if (
+            component.get("status") != "ok"
+            or component.get("model_configured") is not True
+            or component.get("active_ep") != "cpu"
+            or component.get("fallback") is not False
+            or component.get("policy_mismatch") is not False
+        ):
+            raise DemoFailure(f"{name} does not attest an active, non-fallback CPU model")
+        evidence[name] = component
+    return evidence
 
 
 class Client:
@@ -289,12 +392,22 @@ def run_contract(args: argparse.Namespace) -> tuple[dict[str, Any], Path]:
             f"Core commit mismatch: {identity['commit']} != {args.expected_core_commit}"
         )
 
-    build = server_attestation(core_repo, Path(args.build_dir))
+    model_root: Path | None = None
+    model_receipt: dict[str, Any] | None = None
+    if args.profile == PRIMARY_PROFILE:
+        if not args.models_dir:
+            raise DemoFailure("The primary profile requires --models-dir")
+        model_root = Path(args.models_dir).expanduser().resolve()
+        model_receipt = attest_models(package, model_root)
+
+    build = server_attestation(core_repo, Path(args.build_dir), args.profile)
     base_url = f"http://{args.host}:{args.port}"
     runtime_config = evidence_dir / "runtime-config.yaml"
     runtime_data = evidence_dir / "runtime-data"
     runtime_data.mkdir()
-    write_runtime_config(runtime_config, runtime_data, args.host, args.port)
+    write_runtime_config(
+        runtime_config, runtime_data, args.host, args.port, args.profile, model_root
+    )
     file_hashes = {
         str(path.relative_to(package)): sha256_file(path)
         for path in [manifest_path, query_path, expected_path, *documents]
@@ -311,12 +424,13 @@ def run_contract(args: argparse.Namespace) -> tuple[dict[str, Any], Path]:
             **build,
             "config_path": str(runtime_config),
             "config_sha256": sha256_file(runtime_config),
-            "profile_id": "runner-owned-onnx-off-no-llm-rerank-false",
+            "profile_id": args.profile,
             "server_working_directory": str(core_repo),
             "server_pid": None,
             "server_stopped": False,
         },
         "fixture_version": manifest.get("version"),
+        "model_attestation": model_receipt,
         "file_hashes": file_hashes,
         "expected_file_loaded": True,
         "expected_assertions": {},
@@ -327,13 +441,17 @@ def run_contract(args: argparse.Namespace) -> tuple[dict[str, Any], Path]:
     }
     created = False
     server_process: subprocess.Popen[bytes] | None = None
+    server_log_handle: Any | None = None
 
     try:
         ensure_port_available(args.host, args.port)
+        ensure_port_available("127.0.0.1", args.metrics_port)
+        server_log_path = evidence_dir / "server.log"
+        server_log_handle = server_log_path.open("wb")
         server_process = subprocess.Popen(
             [build["binary_path"], "--config", str(runtime_config)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=server_log_handle,
+            stderr=subprocess.STDOUT,
             cwd=str(core_repo),
             start_new_session=True,
         )
@@ -347,6 +465,28 @@ def run_contract(args: argparse.Namespace) -> tuple[dict[str, Any], Path]:
         if health.get("llm_enabled") is not False:
             raise DemoFailure("Health response does not attest llm_enabled=false")
         summary["health"] = health
+
+        if args.profile == PRIMARY_PROFILE:
+            _, readiness = client.request(
+                "GET",
+                "/system/health/ready",
+                expected_status={200},
+                label="readiness",
+            )
+            summary["activation_readiness"] = assert_primary_readiness(readiness)
+            metrics_url = f"http://127.0.0.1:{args.metrics_port}/metrics"
+            metrics_before = fetch_text(metrics_url, args.http_timeout)
+            (evidence_dir / "metrics-before.txt").write_text(metrics_before, encoding="utf-8")
+            if 'cortrix_onnx_embedding_active_ep{ep="cpu"} 1' not in metrics_before:
+                raise DemoFailure("Embedding metrics do not attest active_ep=cpu")
+            if 'cortrix_reranker_active_ep{ep="cpu"} 1' not in metrics_before:
+                raise DemoFailure("Reranker metrics do not attest active_ep=cpu")
+            reranker_count_before = metric_value(
+                metrics_before, "cortrix_reranker_score_duration_seconds_count"
+            )
+            embedding_count_before = metric_value(
+                metrics_before, "cortrix_onnx_inference_duration_seconds_count"
+            )
 
         client.request(
             "GET",
@@ -419,7 +559,7 @@ def run_contract(args: argparse.Namespace) -> tuple[dict[str, Any], Path]:
         request_body = dict(query_spec.get("request") or {})
         request_body["namespaces"] = [namespace]
         request_body["top_k"] = 5
-        request_body["rerank"] = False
+        request_body["rerank"] = args.profile == PRIMARY_PROFILE
         request_body["include_sources"] = True
         trace_id = "fv-trace-" + run_id
         session_id = "fv-session-" + run_id
@@ -440,6 +580,31 @@ def run_contract(args: argparse.Namespace) -> tuple[dict[str, Any], Path]:
         results = [item for item in query["results"] if isinstance(item, dict)]
         if not results:
             raise DemoFailure("Query returned no results")
+        if args.profile == PRIMARY_PROFILE:
+            if "CX_WARN_RERANK_DISABLED" in json.dumps(query, sort_keys=True):
+                raise DemoFailure("The primary query reported reranking disabled")
+            if not all(isinstance(item.get("rerank_score"), (int, float)) for item in results):
+                raise DemoFailure("The primary query did not return numeric rerank_score values")
+            metrics_after = fetch_text(metrics_url, args.http_timeout)
+            (evidence_dir / "metrics-after.txt").write_text(metrics_after, encoding="utf-8")
+            reranker_count_after = metric_value(
+                metrics_after, "cortrix_reranker_score_duration_seconds_count"
+            )
+            embedding_count_after = metric_value(
+                metrics_after, "cortrix_onnx_inference_duration_seconds_count"
+            )
+            if reranker_count_after <= reranker_count_before:
+                raise DemoFailure("Reranker inference counter did not increase for the query")
+            if embedding_count_after <= embedding_count_before:
+                raise DemoFailure("Embedding inference counter did not increase during ingest/query")
+            summary["activation_metrics"] = {
+                "embedding_active_ep": "cpu",
+                "reranker_active_ep": "cpu",
+                "embedding_inference_count_before": embedding_count_before,
+                "embedding_inference_count_after": embedding_count_after,
+                "reranker_score_count_before": reranker_count_before,
+                "reranker_score_count_after": reranker_count_after,
+            }
 
         normalized_results: list[dict[str, Any]] = []
         for position, item in enumerate(results):
@@ -574,6 +739,10 @@ def run_contract(args: argparse.Namespace) -> tuple[dict[str, Any], Path]:
                 server_process.kill()
                 server_process.wait(timeout=5)
                 cleanup_errors.append(f"Server shutdown required kill: {exc}")
+        if server_log_handle is not None:
+            server_log_handle.close()
+            summary["runtime"]["server_log_path"] = str(evidence_dir / "server.log")
+            summary["runtime"]["server_log_sha256"] = sha256_file(evidence_dir / "server.log")
         if cleanup_errors:
             summary["errors"].extend(cleanup_errors)
             summary["contract"] = "FAIL"
@@ -587,9 +756,20 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--core-repo", default=".")
     parser.add_argument("--build-dir", required=True)
+    parser.add_argument(
+        "--profile",
+        choices=(PRIMARY_PROFILE, SECONDARY_PROFILE),
+        default=PRIMARY_PROFILE,
+        help="The default primary profile requires real local ONNX embedding and reranker models.",
+    )
+    parser.add_argument(
+        "--models-dir",
+        help="Directory containing bge-m3/ and bge-reranker-v2-m3/ model assets.",
+    )
     parser.add_argument("--expected-core-commit")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=18420)
+    parser.add_argument("--metrics-port", type=int, default=9091)
     parser.add_argument("--output-root", default=str(default_output))
     parser.add_argument("--http-timeout", type=float, default=20.0)
     parser.add_argument("--task-timeout", type=float, default=120.0)

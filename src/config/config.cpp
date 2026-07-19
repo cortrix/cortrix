@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include "cortrix/config/config.h"
 
@@ -40,6 +42,41 @@ bool ProvidersEqual(const std::string& lhs, const std::string& rhs) {
     return ml::ParseExecutionProvider(lhs, &lhs_provider).ok() &&
            ml::ParseExecutionProvider(rhs, &rhs_provider).ok() &&
            lhs_provider == rhs_provider;
+}
+
+bool IsIpv4Loopback(const std::string& host) {
+    int octets[4] = {0, 0, 0, 0};
+    size_t start = 0;
+    for (int index = 0; index < 4; ++index) {
+        const size_t end = host.find('.', start);
+        if ((index < 3 && end == std::string::npos) ||
+            (index == 3 && end != std::string::npos)) {
+            return false;
+        }
+        const size_t length = (end == std::string::npos ? host.size() : end) - start;
+        if (length == 0 || length > 3) return false;
+        const std::string part = host.substr(start, length);
+        if (!std::all_of(part.begin(), part.end(),
+                         [](unsigned char ch) { return std::isdigit(ch) != 0; })) {
+            return false;
+        }
+        try {
+            octets[index] = std::stoi(part);
+        } catch (...) {
+            return false;
+        }
+        if (octets[index] < 0 || octets[index] > 255) return false;
+        start = end == std::string::npos ? host.size() : end + 1;
+    }
+    return octets[0] == 127;
+}
+
+bool IsLoopbackHost(const std::string& host) {
+    std::string normalized = host;
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    return normalized == "localhost" || normalized == "::1" || normalized == "[::1]" ||
+           IsIpv4Loopback(normalized);
 }
 
 void ApplyCanonicalAndLegacyProvider(const std::string& canonical,
@@ -414,6 +451,12 @@ std::vector<std::string> ValidateConfig(const CortrixConfig& config) {
     if (config.server.max_payload_bytes <= 0) {
         errors.push_back("server.max_payload_bytes must be > 0, got " +
                          std::to_string(config.server.max_payload_bytes));
+    }
+    if (!config.auth.enabled && !IsLoopbackHost(config.server.host)) {
+        errors.push_back(
+            "server.host must be loopback when auth.enabled=false; use 127.0.0.1, "
+            "localhost, or ::1, or enable authentication before binding to a "
+            "non-loopback interface (got '" + config.server.host + "')");
     }
 
     // Namespace validation

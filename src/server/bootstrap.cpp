@@ -1097,7 +1097,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::RegisterBatchRoutes(server.server(), batch_service, auth);
     // [D3.5 r2 · Wave S routes] Flat design-surface /documents family. Mounts the
     // openapi/SDK/MCP shape (POST/GET/GET{id}/DELETE{id} + tasks progress/cancel) on
-    // top of the live per-NS handlers (Derek approach A; nested routes stay). POST reuses
+    // top of the live per-NS handlers while keeping nested routes. POST reuses
     // batch_service as a batch-of-1; the F42 task progress/cancel bodies come from a
     // DocumentTaskHandler over the already-wired scheduler/task_mgr/worker_pool (must
     // outlive `server`, so declared here at end-of-scope).
@@ -1199,7 +1199,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // [F24] Deployment wiring (Wave D-R1, additive). The DiskMonitor itself is
     // constructed earlier (6b) so the SPC admission gate + upload route hold it.
     // Dual health endpoint (F24 main impl): /api/v1/system/health/{live,ready}.
-    // [D3.5 wire · Derek approach A] /ready aggregates the F20 ReadinessRegistry (unified
+    // /ready aggregates the F20 ReadinessRegistry (unified
     // abstraction — replaced F24's standalone HealthProviders). Register the readiness
     // components here (design F20 §8.3/§8.4). Every probe below reflects REAL runtime state
     // — none is a constant-200 stub (a false-ready probe is worse than an honest deferral,

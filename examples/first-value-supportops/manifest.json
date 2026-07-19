@@ -1,7 +1,7 @@
 {
   "demo_id": "first-value-supportops",
   "version": "1.0.0",
-  "runner_contract_version": "1.1.0",
+  "runner_contract_version": "2.0.0",
   "data_classification": "synthetic-public-safe",
   "query": "queries/q01-setup-retry.json",
   "expected": "expected/q01-setup-retry.expected.json",

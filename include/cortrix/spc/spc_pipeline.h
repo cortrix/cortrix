@@ -78,7 +78,7 @@ public:
     /// successfully written full document fires OnDocumentWritten → enqueue a
     /// kTaskDocSummary task. Unset / nullptr = feature off (no doc-summary task;
     /// doc-discovery degrades to the FTS5 fallback). The real F42 wiring in main is
-    /// a separate step (Derek 2026-06-08: F42 productization deferred to its own step).
+    /// a separate step because F42 productization is handled independently.
     void SetDocSummaryEnqueue(std::function<void(const async::SubmitRequest&)> fn);
 
     /// [I1 · GS-2] Install the ISpcEnricher chain (F03 → F35 → F38, fail-soft

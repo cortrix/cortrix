@@ -252,12 +252,11 @@ TEST_F(QueryPipelineArmsDocId, Execute_DocIdFastPath_UnknownDocReturnsEmpty) {
 namespace cortrix::query {
 namespace {
 
-const char* kModelDir =
-    "/Users/derek/Documents/macbookair_files/AI_path/projects/cortrix/cortrix/"
-    "models/query-complexity";
+const std::string kModelDir =
+    std::string(CORTRIX_CE_SOURCE_DIR) + "/models/query-complexity";
 
-std::string ModelPath() { return std::string(kModelDir) + "/model.onnx"; }
-std::string VocabPath() { return std::string(kModelDir) + "/vocab.txt"; }
+std::string ModelPath() { return kModelDir + "/model.onnx"; }
+std::string VocabPath() { return kModelDir + "/vocab.txt"; }
 
 bool ModelPresent() { return fs::exists(ModelPath()); }
 

@@ -1,7 +1,6 @@
 """Memory resource. ``/memory`` domain (ARCH § 4.1.5 + MEM01-05).
 
-Per Derek's ruling (briefing § 9): SDK shape = P03 § 2.12; wire = real
-architecture. Method -> endpoint:
+This resource follows the implemented HTTP architecture. Method -> endpoint:
   - ``search``   -> POST   /memory/search   ({results,total_results,...})
   - ``log``      -> POST   /memory/sessions/{id}/interactions  (live wire)
   - ``extract``  -> POST   /memory/extract  (real-arch, MEM02; PartialSuccessById)

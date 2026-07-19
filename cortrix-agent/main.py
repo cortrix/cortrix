@@ -14,7 +14,7 @@ standalone development cortrix-server is not running, so the section-4 health pi
 stubbed (``HEALTHCHECK_MODE=stub``, the default here) rather than failing fast with
 ``CX_ERR_F48_CORTRIX_SERVER_UNREACHABLE``.
 
-Naming rule (Derek 2026-06-03): this is the Cortrix Agent service — never a "chatbot".
+Naming rule: this is the Cortrix Agent service — never a "chatbot".
 """
 
 from __future__ import annotations

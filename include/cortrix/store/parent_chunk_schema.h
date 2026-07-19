@@ -2,14 +2,13 @@
 
 // F34 parents schema DDL (detailed design § 3.1).
 //
-// [A unified-blocks reconcile, Derek 2026-06-07] Child chunks no longer live in a
+// [A unified-blocks reconcile] Child chunks no longer live in a
 // standalone `children` table — they are rows of the unified per-Unit `blocks`
 // table (child rows = blocks with child_id IS NOT NULL; block_type = source
 // modality), with F34/F35/F40 columns ALTER'd onto `blocks` by their per-Unit
 // SchemaProviders (F34SchemaProvider owns child_id/parent_id/token_count/
 // parent_offset + the 3 indexes; metadata in blocks.metadata_json). See
-// dev-cortrix-hub design/features/F34-parent-child-chunking.md § 3.1 +
-// ARCHITECTURE.md § 1.3.bis.3.
+// ARCHITECTURE.md § 1.3.bis.3 documents the durable in-repository model.
 //
 //   - kParentsSchemaSql  — the `parents` table (parent_text store, § D6: SQLite
 //       over Blob for < 10MB/parent + sub-ms single-point lookup, + D8 hotness

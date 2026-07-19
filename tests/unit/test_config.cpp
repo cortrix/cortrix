@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <fstream>
 #include <cstdlib>
 #include "cortrix/config/config.h"
@@ -48,7 +49,7 @@ protected:
 
 TEST_F(ConfigTest, DefaultValues) {
     auto config = LoadConfig("");
-    EXPECT_EQ(config.server.host, "0.0.0.0");
+    EXPECT_EQ(config.server.host, "127.0.0.1");
     EXPECT_EQ(config.server.port, 8420);
     EXPECT_EQ(config.server.thread_count, 8);
     EXPECT_TRUE(config.auth.enabled);
@@ -265,7 +266,7 @@ server:
 
     auto config = LoadConfig(yaml_path_);
     EXPECT_EQ(config.server.port, 3000);
-    EXPECT_EQ(config.server.host, "0.0.0.0");  // default
+    EXPECT_EQ(config.server.host, "127.0.0.1");  // safe local default
     EXPECT_EQ(config.log.level, "info");  // default
     EXPECT_EQ(config.ns.data_dir, "./data");  // default
 }
@@ -303,6 +304,46 @@ TEST_F(ConfigTest, ValidateDefaultConfigPasses) {
     auto config = LoadConfig("");
     auto errors = ValidateConfig(config);
     EXPECT_TRUE(errors.empty()) << "Default config should pass validation";
+}
+
+TEST_F(ConfigTest, ValidateUnauthenticatedLoopbackHostsPass) {
+    for (const auto* host : {"127.0.0.1", "127.23.45.67", "localhost", "LOCALHOST",
+                             "::1", "[::1]"}) {
+        CortrixConfig config;
+        config.auth.enabled = false;
+        config.server.host = host;
+        const auto errors = ValidateConfig(config);
+        const bool found = std::any_of(errors.begin(), errors.end(), [](const std::string& error) {
+            return error.find("server.host must be loopback") != std::string::npos;
+        });
+        EXPECT_FALSE(found) << "loopback host should pass: " << host;
+    }
+}
+
+TEST_F(ConfigTest, ValidateUnauthenticatedNonLoopbackHostsFailClosed) {
+    for (const auto* host : {"0.0.0.0", "192.168.50.75", "8.8.8.8", "::", "2001:db8::1",
+                             "example.test", "127.0.0.999"}) {
+        CortrixConfig config;
+        config.auth.enabled = false;
+        config.server.host = host;
+        const auto errors = ValidateConfig(config);
+        const auto found = std::find_if(errors.begin(), errors.end(), [](const std::string& error) {
+            return error.find("server.host must be loopback") != std::string::npos;
+        });
+        ASSERT_NE(found, errors.end()) << "non-loopback host should fail: " << host;
+        EXPECT_NE(found->find(host), std::string::npos);
+    }
+}
+
+TEST_F(ConfigTest, ValidateAuthenticatedExternalBindPasses) {
+    CortrixConfig config;
+    config.auth.enabled = true;
+    config.server.host = "0.0.0.0";
+    const auto errors = ValidateConfig(config);
+    const bool found = std::any_of(errors.begin(), errors.end(), [](const std::string& error) {
+        return error.find("server.host must be loopback") != std::string::npos;
+    });
+    EXPECT_FALSE(found);
 }
 
 TEST_F(ConfigTest, ValidatePortZero) {
@@ -958,7 +999,7 @@ TEST_F(ConfigTest, ValidateMaxQueueSizeZeroValid) {
 TEST_F(ConfigTest, LoadConfigNonexistentPathReturnsDefaults) {
     auto config = LoadConfig("/this/path/does/not/exist.yaml");
     // Should not crash, returns defaults
-    EXPECT_EQ(config.server.host, "0.0.0.0");
+    EXPECT_EQ(config.server.host, "127.0.0.1");
     EXPECT_EQ(config.server.port, 8420);
     EXPECT_EQ(config.ns.data_dir, "./data");
     EXPECT_EQ(config.log.level, "info");

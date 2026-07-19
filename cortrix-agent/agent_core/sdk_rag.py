@@ -123,7 +123,7 @@ def normalize_query_result(result: Any) -> RagResult:
 def describe_origin(name: str, source_type: str, source_ref: str, namespace: str) -> str:
     """Human/agent-readable locator for a document's source file.
 
-    The goal (Derek 2026-06-20): no matter where a source file originally lived, the chat
+    No matter where a source file originally lived, the chat
     must be able to say how to find it. We surface the most specific locator available:
 
     * ``source_ref`` set        -> the external origin captured at ingest (e.g. an S3 URI

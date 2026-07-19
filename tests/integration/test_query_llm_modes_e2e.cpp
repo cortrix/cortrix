@@ -2,7 +2,7 @@
 /// @brief R7 full-stack E2E for the query path WITH and WITHOUT an LLM, over the
 ///        production cross-NS query assembly (CrossNsQueryWiring), driven via HTTP.
 ///
-/// Derek's R7 requirement: cover the LLM-configured query (F36 rag-fusion: LLM query-
+/// Covers the LLM-configured query (F36 rag-fusion: LLM query-
 /// variant expansion → vector + BM25 + RRF fusion) AND the no-LLM path (graceful
 /// degradation to vector + BM25 without F36). The rag-fusion LLM is wired through
 /// CrossNsQueryWiring (bootstrap §822) — NOT the per-NS RegisterQueryRoutes used by

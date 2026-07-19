@@ -24,8 +24,8 @@ namespace fs = std::filesystem;
 // vocab.txt lives next to model.onnx. Tests that need it skip when the model
 // archive is absent (CI / offline), exactly like the ONNX model tests.
 std::string VocabPath() {
-    return "/Users/derek/Documents/macbookair_files/AI_path/projects/cortrix/cortrix/"
-           "models/query-complexity/vocab.txt";
+    return std::string(CORTRIX_CE_SOURCE_DIR) +
+           "/models/query-complexity/vocab.txt";
 }
 
 WordPieceTokenizer LoadOrSkip() {

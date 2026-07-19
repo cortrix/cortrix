@@ -36,7 +36,7 @@ curl -X POST http://localhost:8420/api/v1/query \
   -H "Content-Type: application/json" \
   -d '{
     "query": "What is Cortrix?",
-    "namespace": "default",
+    "namespaces": ["default"],
     "top_k": 5
   }'
 ```

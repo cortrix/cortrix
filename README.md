@@ -71,39 +71,31 @@ See [Compatibility and known status](docs/compatibility.md) before making produc
 
 ## Quickstart
 
-Use the source-first quickstart:
+Use the source-first, real-model Quick Start:
 
 ```bash
 git clone https://github.com/cortrix/cortrix.git
 cd cortrix
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
-cp config.yaml.example build/config.yaml
-./dev.sh
-```
-
-Then check the backend:
-
-```bash
-curl http://localhost:8420/api/v1/health
-curl http://localhost:8420/api/v1/system/health/ready
-```
-
-For the full path, expected responses, LLM configuration notes, and troubleshooting, see [Quickstart](docs/QUICKSTART.md).
-
-For a deterministic first-value contract that does not require model downloads or an LLM credential, configure the local server without ONNX, build it from the same clean checkout, and run the synthetic SupportOps demo. The runner starts and stops its own loopback server so it cannot silently test an unrelated backend:
-
-```bash
-cmake -S . -B build \
+export CORTRIX_WORK_ROOT="${CORTRIX_WORK_ROOT:-$HOME/.cache/cortrix/first-value}"
+export CORTRIX_MODEL_DIR="$CORTRIX_WORK_ROOT/models"
+export CORTRIX_MODEL_TOOLS_VENV="$CORTRIX_WORK_ROOT/model-tools-venv"
+export XDG_CACHE_HOME="$CORTRIX_WORK_ROOT/cache/xdg"
+export PIP_CACHE_DIR="$CORTRIX_WORK_ROOT/cache/pip"
+export TMPDIR="$CORTRIX_WORK_ROOT/tmp"
+mkdir -p "$XDG_CACHE_HOME" "$PIP_CACHE_DIR" "$TMPDIR"
+./scripts/setup_quickstart_models.sh
+cmake -S . -B "$CORTRIX_WORK_ROOT/build" \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCORTRIX_USE_ONNX=OFF
-cmake --build build --target cortrix-server -j
+  -DCORTRIX_USE_ONNX=ON
+cmake --build "$CORTRIX_WORK_ROOT/build" --target cortrix-server -j
 python3 examples/first-value-supportops/run_demo.py \
   --core-repo . \
-  --build-dir build
+  --build-dir "$CORTRIX_WORK_ROOT/build" \
+  --models-dir "$CORTRIX_MODEL_DIR" \
+  --output-root "$CORTRIX_WORK_ROOT/evidence"
 ```
 
-The demo uses synthetic data and an attested ONNX-off, no-LLM, `rerank=false` validation profile. It verifies source/build/runtime identity plus API and evidence behavior; it is not a retrieval-quality benchmark.
+The primary demo uses pinned local ONNX embedding and reranker models, sends `rerank=true`, keeps external LLM roles disabled, starts only loopback listeners, and stops its own server after cleanup. For exact prerequisites, model revisions, checksums, licenses, expected evidence, parser boundaries, and the optional secondary ONNX-off contract, see [Quick Start](docs/QUICKSTART.md).
 
 ## API Reference
 
@@ -150,7 +142,7 @@ cp config.yaml.example build/config.yaml
 
 LLM-backed features are configured by role:
 
-- `semantic_llm`: intent classification and reranking.
+- `semantic_llm`: optional LLM-backed semantic processing. It is separate from the local ONNX embedding and cross-encoder reranker used by the primary Quick Start.
 - `vision_llm`: OCR image enhancement.
 - `agent_llm`: built-in Agent chat.
 - `doc_summary_llm`: ingest-side summaries.

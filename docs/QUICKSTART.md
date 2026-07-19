@@ -1,297 +1,165 @@
-# Cortrix Quickstart
+# Cortrix Quick Start
 
-This guide starts Cortrix from source, checks the backend, and gives you the first API calls to verify the local runtime.
+This guide builds Cortrix from source and runs a source-backed local query with real ONNX embedding and reranking. External LLM roles stay disabled, so the run needs no provider key.
 
-Cortrix is in active pre-release development. For current feature status, read [Compatibility and known status](compatibility.md).
+Cortrix is in active pre-release development. Read [Compatibility and known status](compatibility.md) before treating any surface as production-ready.
+
+## What this path verifies
+
+The primary Quick Start:
+
+- builds `cortrix-server` in Release mode with `CORTRIX_USE_ONNX=ON`;
+- binds the unauthenticated API and anonymous metrics endpoint to loopback only;
+- loads pinned BAAI/bge-m3 embedding and BAAI/bge-reranker-v2-m3 reranker models on CPU;
+- keeps every external LLM role disabled;
+- ingests three synthetic Markdown documents as direct JSON content;
+- sends a plural `namespaces` query with `rerank=true`;
+- checks source, snippet, provenance, trace, model readiness, and inference counters;
+- deletes its unique namespace and stops its own server.
+
+It does not install or validate PDF, DOCX, image, OCR, or other external parsers. It is a first-value contract, not a retrieval-quality benchmark or production-readiness test.
 
 ## Prerequisites
 
-Minimum local tools:
-
-- CMake
-- A C++17 compiler
+- Git, CMake, and a C++17 compiler
 - OpenSSL development headers
-- Node.js 20 or newer for the Web UI
-- Python 3.9 or newer for document parsing, the Python SDK, and the built-in Agent
-- Docker, only if you use the deployment templates
+- Python 3.12
+- `curl`
+- at least 15 GB of working disk space for model sources, converted files, dependencies, build output, and runtime evidence
 
 macOS:
 
 ```bash
 xcode-select --install
-brew install cmake openssl node
+brew install cmake openssl python@3.12
 ```
 
-Ubuntu / Debian:
+Ubuntu or Debian:
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential cmake libssl-dev git curl
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
+sudo apt install -y build-essential cmake libssl-dev git curl python3.12 python3.12-venv
 ```
 
-## 1. Clone And Configure
+## 1. Clone and choose a work directory
 
 ```bash
 git clone https://github.com/cortrix/cortrix.git
 cd cortrix
-mkdir -p build
-cp config.yaml.example build/config.yaml
+export CORTRIX_WORK_ROOT="${CORTRIX_WORK_ROOT:-$HOME/.cache/cortrix/first-value}"
+export CORTRIX_MODEL_DIR="$CORTRIX_WORK_ROOT/models"
+export CORTRIX_MODEL_TOOLS_VENV="$CORTRIX_WORK_ROOT/model-tools-venv"
+export CMAKE_BUILD_DIR="$CORTRIX_WORK_ROOT/build"
+export CORTRIX_DEMO_EVIDENCE_DIR="$CORTRIX_WORK_ROOT/evidence"
+export XDG_CACHE_HOME="$CORTRIX_WORK_ROOT/cache/xdg"
+export PIP_CACHE_DIR="$CORTRIX_WORK_ROOT/cache/pip"
+export TMPDIR="$CORTRIX_WORK_ROOT/tmp"
+mkdir -p "$XDG_CACHE_HOME" "$PIP_CACHE_DIR" "$TMPDIR" "$CORTRIX_DEMO_EVIDENCE_DIR"
 ```
 
-`build/config.yaml` is ignored by Git. Put real provider keys only in that local file or in local environment variables.
+The work directory keeps large generated data outside the Git checkout. Do not put provider keys in source-controlled files.
 
-For a first backend smoke test, you can leave LLM roles disabled. LLM-backed features such as reranking, OCR enhancement, memory extraction, and built-in Agent chat require provider configuration.
-
-## 2. Build
+## 2. Provision pinned local models
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+./scripts/setup_quickstart_models.sh
 ```
 
-The backend binary is created at:
+The script downloads exact revisions, verifies source hashes, and converts the reranker locally with pinned Python packages. Identities, licenses, expected file sizes, and SHA-256 values are recorded in [the model lock](../examples/first-value-supportops/model-lock.json).
+
+Expected final line:
 
 ```text
-build/cortrix-server
+QUICKSTART_MODELS=READY
 ```
 
-If you want a lighter build without ONNX semantic embeddings, use:
+Provisioning is intentionally fail closed. A download, checksum, converter, or converted-output mismatch must be resolved rather than bypassed.
+
+## 3. Build the real ONNX profile
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DCORTRIX_USE_ONNX=OFF
-cmake --build build -j
+cmake -S . -B "$CMAKE_BUILD_DIR" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCORTRIX_USE_ONNX=ON
+cmake --build "$CMAKE_BUILD_DIR" --target cortrix-server -j
 ```
 
-BM25 full-text search can still work in this mode, but semantic search quality should not be treated as representative.
+The binary is created at `$CMAKE_BUILD_DIR/cortrix-server`.
 
-## 3. Start Cortrix
-
-Recommended local path:
+## 4. Run the first-value demo
 
 ```bash
-./dev.sh
+python3 examples/first-value-supportops/run_demo.py \
+  --core-repo . \
+  --build-dir "$CMAKE_BUILD_DIR" \
+  --models-dir "$CORTRIX_MODEL_DIR" \
+  --output-root "$CORTRIX_DEMO_EVIDENCE_DIR"
 ```
 
-`dev.sh` starts the backend, the built-in Agent service, and the Web UI when their dependencies are available.
-
-Expected service URLs:
+A passing run prints:
 
 ```text
-Backend:  http://localhost:8420
-Agent:    http://localhost:8001
-Web UI:   http://localhost:5173
+FIRST_VALUE_DEMO_CONTRACT=PASS
+expected_file_loaded=true
+trace_assertion=PASS
+remaining_matching_namespaces=0
 ```
 
-Manual backend-only startup:
+The runner refuses a dirty source tree, a build from another source directory, a non-Release build, `CORTRIX_USE_ONNX=OFF`, model identity drift, an occupied port, a non-loopback host, model fallback, `rerank=false`, failed evidence assertions, residual namespace data, or an unclean server shutdown.
 
-```bash
-./build/cortrix-server --config build/config.yaml
-```
+## 5. Inspect the evidence
 
-Manual Agent startup:
+Open `machine-summary.json` in the printed evidence directory. A primary pass includes:
 
-```bash
-cd cortrix-agent
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001
-```
+- exact Core commit, tree, CMake cache hash, and server binary hash;
+- model-lock hash and each model file identity;
+- `llm_enabled=false`;
+- `embedding_execution_provider` and `reranker_execution_provider` with `model_configured=true`, `active_ep=cpu`, `fallback=false`, and `policy_mismatch=false`;
+- increasing embedding inference and reranker scoring counters;
+- a query response with numeric `rerank_score` values;
+- source, snippet, provenance, trace, cleanup, and server-stop assertions.
 
-Manual Web UI startup:
-
-```bash
-npm install --prefix web
-npm run dev --prefix web
-```
-
-## 4. Verify Health
-
-Backend health:
-
-```bash
-curl http://localhost:8420/api/v1/health
-```
-
-Expected response shape:
-
-```json
-{
-  "status": "healthy",
-  "version": "0.1.0",
-  "llm_enabled": false
-}
-```
-
-Readiness:
-
-```bash
-curl http://localhost:8420/api/v1/system/health/ready
-```
-
-Expected response shape:
-
-```json
-{
-  "status": "ok"
-}
-```
-
-Agent health, if the Agent service is running:
-
-```bash
-curl http://localhost:8001/health
-```
-
-Expected response shape:
-
-```json
-{
-  "status": "ok"
-}
-```
-
-`llm_enabled: false` means the backend did not load a configured LLM role. That is acceptable for a basic backend smoke test. Configure the relevant LLM roles before testing LLM-backed features.
-
-## 5. First API Calls
-
-Create a namespace:
-
-```bash
-curl -X POST http://localhost:8420/api/v1/namespaces \
-  -H "Content-Type: application/json" \
-  -d '{"name": "quickstart"}'
-```
-
-List namespaces:
-
-```bash
-curl http://localhost:8420/api/v1/namespaces
-```
-
-Query:
-
-```bash
-curl -X POST http://localhost:8420/api/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "What is Cortrix?",
-    "namespace": "quickstart",
-    "top_k": 5
-  }'
-```
-
-Expected response shape:
-
-```json
-{
-  "results": [],
-  "meta": {
-    "...": "..."
-  }
-}
-```
-
-An empty result set is acceptable before you upload documents. If the server returns a structured error, compare it with [Compatibility and known status](compatibility.md) and the [OpenAPI spec](../api/openapi.yaml).
-
-## 6. Upload A Document
-
-Create a small local file:
-
-```bash
-printf "Cortrix stores documents for agent-native retrieval.\\n" > quickstart.txt
-```
-
-Upload it:
-
-```bash
-curl -X POST http://localhost:8420/api/v1/namespaces/quickstart/documents \
-  -F "file=@quickstart.txt"
-```
-
-Check document processing status using the returned document or task identifier. The exact response shape is part of the current API contract and should be verified against [OpenAPI](../api/openapi.yaml).
-
-Query again after processing completes:
-
-```bash
-curl -X POST http://localhost:8420/api/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "What does Cortrix store?",
-    "namespace": "quickstart",
-    "top_k": 5
-  }'
-```
-
-## 7. Configure LLM Roles
-
-LLM roles live in `build/config.yaml`.
-
-Each role uses:
+The runtime config uses:
 
 ```yaml
-semantic_llm:
-  provider: "openai"
-  api_key: "your-api-key"
-  model: "gpt-4o-mini"
-  base_url: "https://api.openai.com/v1"
+server:
+  host: "127.0.0.1"
+auth:
+  enabled: false
 ```
 
-Supported role names:
+Cortrix rejects `auth.enabled=false` with a non-loopback `server.host` before creating the API listener. The built-in Agent launcher and anonymous metrics endpoint also default to loopback. To bind the API to another interface, explicitly enable and configure the existing authentication controls first.
 
-- `semantic_llm`
-- `vision_llm`
-- `agent_llm`
-- `doc_summary_llm`
-- `enricher_llm`
+## Local neural models versus LLM roles
 
-Changes take effect after restarting the relevant service.
+`LLM_ENABLED=false` does not mean embeddings or reranking are disabled. This Quick Start uses two local neural ONNX models but makes no request to an external LLM provider.
 
-Provider notes:
+LLM roles such as `semantic_llm`, `vision_llm`, `agent_llm`, `doc_summary_llm`, and `enricher_llm` are separate optional surfaces. Configure them only when testing the features that consume those roles.
 
-- OpenAI-compatible providers can be used by the C++ backend roles.
-- The built-in Agent uses its Python provider adapters for `agent_llm`.
-- If a provider uses a native protocol that is not OpenAI-compatible, use it only where the implementation supports that provider or route it through a compatible gateway.
+## Query contract
 
-## 8. Choose An Agent Access Path
+The current query request uses a plural array:
 
-Use [Agent access](agent-access.md) to choose the integration path:
-
-- HTTP API / OpenAPI for custom clients.
-- MCP for IDE Agents and MCP-compatible clients.
-- Python SDK for Python applications.
-- Built-in Agent for local fixed-flow chat.
-
-## Troubleshooting
-
-### The backend starts with `llm_enabled: false`
-
-Check that the relevant role in `build/config.yaml` has `provider`, `api_key`, and `model` set. Some roles also need `base_url`.
-
-### The Agent health check fails
-
-Start the Agent service:
-
-```bash
-cd cortrix-agent
-.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001
+```json
+{
+  "query": "How should an agent recover from an expired setup token?",
+  "namespaces": ["your_namespace"],
+  "top_k": 5,
+  "rerank": true,
+  "include_sources": true
+}
 ```
 
-### A port is already in use
+The deprecated singular `namespace` query field is rejected. Other endpoints may still use a singular namespace field where their OpenAPI schema requires it.
 
-Find the process:
+## Secondary ONNX-off check
 
-```bash
-lsof -i :8420
-```
+An explicit `onnx-off-contract` profile remains available for low-cost API and fixture testing. It uses stub embedding and `rerank=false`, so it is not the Quick Start quality path and cannot establish semantic or reranker behavior. See the [demo README](../examples/first-value-supportops/README.md) for its commands and boundary.
 
-Then stop that process or change the configured port.
+## Next steps
 
-### Semantic quality is poor
-
-The ONNX embedding model may be missing or disabled. Verify your embedding model path in `build/config.yaml`.
-
-### Auth, tenant, ACL, RBAC, quota, or memory extraction behaves differently from the docs
-
-Check [Compatibility and known status](compatibility.md). Several advanced areas are documented in the API surface but remain blocked or under RD review in the current verification baseline.
+- [Agent access](agent-access.md)
+- [OpenAPI spec](../api/openapi.yaml)
+- [Compatibility and known status](compatibility.md)
+- [Linux NVIDIA CUDA operations](operations/cuda-execution-provider.md)
+- [Full model and parser setup](../deploy/MODELS.md)

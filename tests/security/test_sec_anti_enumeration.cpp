@@ -26,7 +26,7 @@
 /// hitting its OWN existing namespace — must SUCCEED, proving the gate actually
 /// discriminates on authorization rather than always-denying.
 ///
-/// ── DESIGN MODEL (resolved 2026-06-21, Derek) ──────────────────────────────
+/// ── DESIGN MODEL ───────────────────────────────────────────────────────────
 /// Two principals, two correct behaviors:
 ///   * A SCOPED key (explicit allow-list, e.g. {tenant_a_ns}) is NOT authorized
 ///     for any namespace outside its list. For every such namespace — whether it

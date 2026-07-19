@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0.0",
+  "embedding": {
+    "repo": "BAAI/bge-m3",
+    "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+    "license": "MIT"
+  },
+  "reranker": {
+    "repo": "BAAI/bge-reranker-v2-m3",
+    "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+    "license": "Apache-2.0",
+    "conversion": {
+      "python": "3.12",
+      "torch": "2.7.1",
+      "transformers": "4.53.2",
+      "onnx": "1.18.0",
+      "script": "../../scripts/convert_reranker_to_onnx.py",
+      "script_sha256": "01c6b0fdd56fc75af2bfd307731faeae9589c5df4fe7eff460f43332e69550b6"
+    }
+  },
+  "files": {
+    "embedding_model": {
+      "bytes": 724923,
+      "sha256": "f84251230831afb359ab26d9fd37d5936d4d9bb5d1d5410e66442f630f24435b"
+    },
+    "embedding_data": {
+      "bytes": 2266820608,
+      "sha256": "1eebfb28493f67bba03ce0ef64bfdc7fc5a3bd9d7493f818bb1d78cd798416b4"
+    },
+    "embedding_tokenizer": {
+      "bytes": 17098108,
+      "sha256": "21106b6d7dab2952c1d496fb21d5dc9db75c28ed361a05f5020bbba27810dd08"
+    },
+    "reranker_source_model": {
+      "bytes": 2271071852,
+      "sha256": "d9e3e081faff1eefb84019509b2f5558fd74c1a05a2c7db22f74174fcedb5286"
+    },
+    "reranker_model": {
+      "bytes": 655732,
+      "sha256": "6b31a3947fe79e6422641fb54ee01036026871e67eeefbce1ec4f9f0f4f7f271"
+    },
+    "reranker_data": {
+      "bytes": 2271023104,
+      "sha256": "2f17f314b7947fb5003d04127d5f2d421fe8f2af5fc330b5ccb36882e73165bd"
+    },
+    "reranker_tokenizer": {
+      "bytes": 17098273,
+      "sha256": "69564b696052886ed0ac63fa393e928384e0f8caada38c1f4864a9bfbf379c15"
+    }
+  }
+}

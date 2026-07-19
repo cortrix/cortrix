@@ -35,7 +35,7 @@ namespace cortrix::query {
 /// adapter, the handler) so they outlive the registered httplib closure. Construct
 /// once at bootstrap, keep it alive for the server's lifetime, and call Register().
 ///
-/// R1 (Derek 2026-06-12): in CE no-auth mode the AuthMiddleware leaves
+/// In CE no-auth mode the AuthMiddleware leaves
 /// AuthContext.user_id empty; Register()'s closure injects a single-tenant
 /// AuthContext{user_id="default"} so F04's AuthorizeNamespaces Step 1 passes
 /// (F04 §4.2 v1.0.4 — the 401 only fires when auth is enabled and unauthenticated).

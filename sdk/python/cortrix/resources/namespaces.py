@@ -1,7 +1,6 @@
 """Namespaces resource. ``/namespaces`` domain (ARCH § 4.1.1).
 
-Per Derek's ruling (briefing § 9): SDK shape = P03 § 2.12; wire = real
-architecture. ``set_permission()`` uses the real-arch ACL domain
+This resource follows the implemented HTTP architecture. ``set_permission()`` uses the ACL domain
 (``POST /namespaces/{ns}/acl`` grant) — § 2.12's ``PUT
 /namespaces/:ns/permissions/:uid`` is the obsoleted D1 draft.
 """
