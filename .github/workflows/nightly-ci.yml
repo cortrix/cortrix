@@ -2,7 +2,7 @@
 # Stage 2: Nightly CI
 # Cron 02:00 UTC+8 = 18:00 UTC. Target < 60 min.
 #
-# Hard gates (topic 2 rev B):
+# Hard gates:
 #   - Coverage overall ≥ 80%, core-17 ≥ 90% line / ≥ 80% branch
 #   - P0 100% PASS / P1 ≥ 98% PASS
 #   - No High/Critical security findings
@@ -11,7 +11,7 @@
 # Repo-reality adaptations vs the design sketch:
 #   - server listens on 8420 (not 9090) → ZAP target fixed
 #   - snyk: no account/token yet → step disabled, Trivy covers
-#     image CVEs at Stage 3 (noted in PROGRESS as pending)
+#     image CVEs at the release gate
 #   - E2E via npm playwright (web/e2e), 4 browsers
 # =============================================================
 name: Nightly CI
@@ -20,6 +20,7 @@ on:
   schedule:
     - cron: "0 18 * * *"
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   cpp_full:
@@ -49,7 +50,7 @@ jobs:
       - name: Build
         run: cmake --build build --parallel
 
-      # one process per test via ctest; single-process full-suite runs SIGSEGV
+      # Run one process per test via ctest.
       - name: Unit Tests
         run: ctest --test-dir build -L unit --output-on-failure
       - name: Integration Tests
@@ -104,17 +105,16 @@ jobs:
   perf_load:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
-    # Soft gate: P95 vs baseline ±10% — alert, don't block (§6.3)
+    # Soft gate: P95 vs baseline ±10% — alert, don't block.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Build server image
-        run: docker build -t cortrix:nightly -f cortrix/deploy/Dockerfile ..
-        working-directory: .
+        run: docker build -t cortrix:nightly -f deploy/Dockerfile .
       - name: Boot stack
         run: |
-          docker run -d --name cortrix -p 8420:8420 -v /tmp/cortrix-data:/data cortrix:nightly
-          timeout 90 bash -c 'until curl -sf http://localhost:8420/api/v1/health; do sleep 3; done'
+          docker run -d --name cortrix -p 127.0.0.1:8420:8420 -v /tmp/cortrix-data:/data cortrix:nightly
+          timeout 1800 bash -c 'until curl -sf http://localhost:8420/api/v1/system/health/ready; do sleep 5; done'
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
@@ -137,12 +137,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build + boot server
         run: |
-          docker build -t cortrix:nightly -f cortrix/deploy/Dockerfile ..
-          docker run -d --name cortrix --network host -v /tmp/cortrix-data:/data cortrix:nightly
-          timeout 90 bash -c 'until curl -sf http://localhost:8420/api/v1/health; do sleep 3; done'
+          docker build -t cortrix:nightly -f deploy/Dockerfile .
+          docker network create cortrix-zap
+          docker run -d --name cortrix --network cortrix-zap -v /tmp/cortrix-data:/data cortrix:nightly
+          timeout 1800 bash -c 'until docker exec cortrix curl -sf http://127.0.0.1:8420/api/v1/system/health/ready; do sleep 5; done'
       - name: OWASP ZAP baseline (hard gate on High/Critical)
         run: |
-          docker run --rm --network host -v $(pwd):/zap/wrk ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://localhost:8420 -c tests/security/zap-baseline.conf
+          docker run --rm --network cortrix-zap -v $(pwd):/zap/wrk ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://cortrix:8420 -c tests/security/zap-baseline.conf
       # snyk disabled: no org token provisioned yet (design lists it;
-      # tracked in PROGRESS — Trivy image scan runs at Release Gate)
+      # Trivy image scanning runs at the release gate.
