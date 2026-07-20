@@ -545,7 +545,7 @@ TEST_F(HfTokenizerTest, Encode_MissingModelSection) {
 }
 
 // ============================================================
-// Round-2: BPE merge priority + truncation / max_length arms
+// BPE merge priority and truncation / max_length branches
 // ============================================================
 
 // BPE merge priority: when two adjacent pairs can both merge, the lower-rank

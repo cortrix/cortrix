@@ -1696,7 +1696,7 @@ TEST_F(SPCPipelineTest, Stage5_MultiFaultStillRollsBack) {
 }
 
 // ============================================================
-// Round-3 residue: memory-path AddPoints failure (vec index, not the store seam)
+// Additional coverage: memory-path AddPoints failure (vec index, not the store seam)
 // and the valid-but-non-object custom-metadata arm.
 // ============================================================
 

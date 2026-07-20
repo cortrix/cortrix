@@ -349,7 +349,7 @@ TEST_F(NsPoolBranchTest, EvictForDeleteThenIdempotentSecondEvict) {
 
 // ReloadNamespace's startup-failed-list scrub iterates the whole list, taking BOTH
 // the erase arm (the reloaded NS) AND the keep/advance arm (a DIFFERENT still-failed
-// NS). Round-2's reload test had a single-element list → only the erase arm.
+// NS). The single-failure case exercises only the erase arm.
 TEST_F(NsPoolBranchTest, ReloadScrubVisitsMatchingAndNonMatchingFailures) {
     config_.load_timeout_ms_per_ns = 5000;
     MakeUnitDir("good-u");
