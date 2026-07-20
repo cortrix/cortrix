@@ -129,7 +129,7 @@ add_library(cortrix_core STATIC
     src/memory/memory_extractor.cpp
     src/memory/contradiction_detector.cpp
     src/memory/memory_queue.cpp
-    # --- MEM02/03 real store adapters + user_facts query (D3.5 round-2 Wave M) ---
+    # --- MEM02/03 store adapters and user_facts query ---
     src/memory/memory_block_adapter.cpp
     src/memory/memory_extraction_service.cpp
     # --- MEM03 Memory Transparency (Wave C-R1) ---

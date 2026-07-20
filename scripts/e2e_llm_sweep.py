@@ -12,7 +12,7 @@
 #       missing-NS + error envelope
 #   P5  memory: session / interactions / search / inject
 #
-# NOTE: since D3.5 round 2 the live wire IS the design face: F04 /query
+# The live wire is the design surface: F04 /query
 # (namespaces[] + 8-field meta), MEM02/03/04 + F13 surfaces, P08-CE
 # bootstrap/api-keys, F16a import, batch, GC lifecycle, flat /documents
 # + /watch. This sweep covers the design-face shapes.

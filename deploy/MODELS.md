@@ -14,6 +14,12 @@ The canonical machine-readable identity is
 tokenizer file's repository, revision, source path, expected byte size, SHA-256,
 upstream repository, upstream revision, and upstream license.
 
+The pinned `onnx-community` repositories are format-conversion sources linked
+to the attributed BAAI upstream revisions above; Cortrix does not claim
+authorship of those model assets. If the conversion source, upstream identity,
+or license metadata conflicts with the manifest, provisioning must remain
+fail-closed until maintainers resolve the mismatch.
+
 ---
 
 ## Docker Quick Start provisioning

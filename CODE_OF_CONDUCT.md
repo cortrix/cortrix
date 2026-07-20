@@ -87,6 +87,6 @@ For answers to common questions about this code of conduct, see the FAQ at [http
 
 - Conduct reports must be sent privately to [devrel@cortrix.ai](mailto:devrel@cortrix.ai), not filed as public issues.
 - The Cortrix Community Moderation Team will acknowledge receipt within 10 business days. Acknowledgement confirms private intake only and is not a promise of a particular outcome or completion date.
-- A maintainer named in a report must recuse from access, investigation, decision, and closure. `admin@cortrix.ai` will appoint a different, conflict-free Cortrix maintainer.
-- If no conflict-free maintainer is available, the report will be acknowledged and preserved with limited access, but no substantive decision will be made until one is appointed.
+- A maintainer named in a report must recuse from access, investigation, decision, and closure. `devrel@cortrix.ai` will route the report to an available, conflict-free member of the `community-maintainers` role.
+- Independent escalation is not currently available. If no conflict-free maintainer is available, the report will be acknowledged, preserved with limited access, and paused without a substantive decision until one is appointed.
 - Duplicate or off-topic public threads may be redirected or closed with a brief reason. Abusive threads may be locked.

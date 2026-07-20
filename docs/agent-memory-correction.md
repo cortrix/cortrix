@@ -93,9 +93,9 @@ data) with these `CX_ERR_MEM02_*` codes:
 | `CX_ERR_MEM02_CONTRADICTION_AMBIGUOUS` | transient | yes | retry; the judge was unsure |
 | `CX_ERR_MEM02_LLM_DISABLED` | permanent | no | extraction is off (NullEnricher); only `interaction_log` is kept |
 
-## Deferred wiring (D3.5)
+## Implementation status
 
-This guide describes the contract. The live endpoints, the real Query-pipeline
-contradiction path, the Python-middleware async worker, and the MEM04 opt-out
-interplay are wired during D3.5 integration — see the feature's D3.5 deferred list
-in `design/features/MEM02-llm-extraction.md`.
+This guide describes a design contract. The live endpoints, Query-pipeline contradiction
+path, Python-middleware async worker, and MEM04 opt-out integration are not currently
+implemented as one supported workflow. Do not treat the examples above as an executable
+Quick Start. Implementation notes remain in `design/features/MEM02-llm-extraction.md`.

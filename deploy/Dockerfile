@@ -72,7 +72,7 @@ ARG PIP_INDEX_URL=https://pypi.org/simple
 ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
     PIP_TIMEOUT=120 \
     PIP_RETRIES=5
-# No existence guard: requirements.txt is always expected, and a silent skip
+# No existence guard: requirements.lock is always expected, and a silent skip
 # here ships an image whose cortrix-agent crash-loops (missing uvicorn).
 # Python sources are COPYed after the C++ build on purpose: they take no part
 # in the cmake step, and copying them earlier invalidated the (expensive)
@@ -82,8 +82,8 @@ ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
 COPY cortrix-agent  cortrix/cortrix-agent/
 COPY sdk/python     cortrix/sdk/python/
 RUN mkdir -p /wheels && \
-    pip3 wheel --no-cache-dir --wheel-dir /wheels \
-        -r cortrix/cortrix-agent/requirements.txt
+    pip3 wheel --no-cache-dir --require-hashes --wheel-dir /wheels \
+        -r cortrix/cortrix-agent/requirements.lock
 
 # ========== Stage 2: Web UI Builder ==========
 # node 20: react-router-dom@7 requires >=20. NPM_REGISTRY overridable per
