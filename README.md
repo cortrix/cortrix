@@ -27,8 +27,8 @@ The repository includes:
 
 Start here:
 
-- [Quickstart](docs/QUICKSTART.md): build, configure, start, and run the first health/API checks.
-- [First-value SupportOps demo](examples/first-value-supportops/README.md): run one source-backed query with versioned expected assertions, trace verification, and zero-residual cleanup.
+- [Quickstart](docs/QUICKSTART.md): start Cortrix with Docker, check readiness, and run a source-backed reranked query.
+- [First-value SupportOps demo](examples/first-value-supportops/README.md): run the deeper source-build verification path with versioned assertions, trace evidence, and zero-residual cleanup.
 - [Stack fit and adoption boundaries](docs/adoption/stack-fit.md): review evidence-backed keep/add/replace/unknown decision cards.
 - [Agent access](docs/agent-access.md): choose between HTTP/OpenAPI, MCP, Python SDK, and the built-in Agent.
 - [Compatibility and known status](docs/compatibility.md): current public status for API, MCP, SDK, Agent, auth, tenant/RBAC, memory extraction, benchmarks, and security hardening.
@@ -71,31 +71,23 @@ See [Compatibility and known status](docs/compatibility.md) before making produc
 
 ## Quickstart
 
-Use the source-first, real-model Quick Start:
+Run the local Docker Quick Start with real embedding and reranking:
 
 ```bash
 git clone https://github.com/cortrix/cortrix.git
 cd cortrix
-export CORTRIX_WORK_ROOT="${CORTRIX_WORK_ROOT:-$HOME/.cache/cortrix/first-value}"
-export CORTRIX_MODEL_DIR="$CORTRIX_WORK_ROOT/models"
-export CORTRIX_MODEL_TOOLS_VENV="$CORTRIX_WORK_ROOT/model-tools-venv"
-export XDG_CACHE_HOME="$CORTRIX_WORK_ROOT/cache/xdg"
-export PIP_CACHE_DIR="$CORTRIX_WORK_ROOT/cache/pip"
-export TMPDIR="$CORTRIX_WORK_ROOT/tmp"
-mkdir -p "$XDG_CACHE_HOME" "$PIP_CACHE_DIR" "$TMPDIR"
-./scripts/setup_quickstart_models.sh
-cmake -S . -B "$CORTRIX_WORK_ROOT/build" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCORTRIX_USE_ONNX=ON
-cmake --build "$CORTRIX_WORK_ROOT/build" --target cortrix-server -j
-python3 examples/first-value-supportops/run_demo.py \
-  --core-repo . \
-  --build-dir "$CORTRIX_WORK_ROOT/build" \
-  --models-dir "$CORTRIX_MODEL_DIR" \
-  --output-root "$CORTRIX_WORK_ROOT/evidence"
+CORTRIX_SOURCE_REVISION="$(git rev-parse HEAD)" docker compose -f deploy/docker-compose.yml up --build --wait
+
+curl -fsS http://127.0.0.1:8420/api/v1/system/health/ready
+
+curl -fsS -H 'Content-Type: application/json' \
+  -d '{"namespaces":["demo"],"query":"What does semantic storage keep close to the agents that need it?","top_k":5,"rerank":true}' \
+  http://127.0.0.1:8420/api/v1/query
 ```
 
-The primary demo uses pinned local ONNX embedding and reranker models, sends `rerank=true`, keeps external LLM roles disabled, starts only loopback listeners, and stops its own server after cleanup. For exact prerequisites, model revisions, checksums, licenses, expected evidence, parser boundaries, and the optional secondary ONNX-off contract, see [Quick Start](docs/QUICKSTART.md).
+You need Git, Docker, and Docker Compose. No `.env` file, LLM provider key, host-side model tooling, manual model download, model conversion, or separate bootstrap command is required. The first start downloads about 1.17 GB of pinned model assets and can take several minutes; later starts reuse the cached volume.
+
+The Quick Start publishes only the loopback API at `127.0.0.1:8420`. It uses BGE-M3 embedding and bge-reranker-v2-m3 reranking on CPU, while external LLM roles and the built-in Agent remain disabled. For model provenance, checks, expected output, cleanup, and scope boundaries, see [Quick Start](docs/QUICKSTART.md). For the deeper source-build evidence workflow, see the [First-value SupportOps demo](examples/first-value-supportops/README.md).
 
 ## API Reference
 

@@ -1,6 +1,6 @@
 # Cortrix Quick Start
 
-This guide builds Cortrix from source and runs a source-backed local query with real ONNX embedding and reranking. External LLM roles stay disabled, so the run needs no provider key.
+This guide starts Cortrix with Docker and runs a source-backed local query with real ONNX embedding and reranking. External LLM roles stay disabled, so the run needs no provider key.
 
 Cortrix is in active pre-release development. Read [Compatibility and known status](compatibility.md) before treating any surface as production-ready.
 
@@ -8,127 +8,75 @@ Cortrix is in active pre-release development. Read [Compatibility and known stat
 
 The primary Quick Start:
 
-- builds `cortrix-server` in Release mode with `CORTRIX_USE_ONNX=ON`;
-- binds the unauthenticated API and anonymous metrics endpoint to loopback only;
-- loads pinned BAAI/bge-m3 embedding and BAAI/bge-reranker-v2-m3 reranker models on CPU;
-- keeps every external LLM role disabled;
-- ingests three synthetic Markdown documents as direct JSON content;
+- builds the local Docker image from the checked-out source;
+- downloads pinned BGE-M3 embedding and bge-reranker-v2-m3 reranker assets;
+- waits until the server, models, and source-backed demo fixture are ready;
+- publishes only the API at `127.0.0.1:8420`;
+- keeps every external LLM role and the built-in Agent disabled;
 - sends a plural `namespaces` query with `rerank=true`;
-- checks source, snippet, provenance, trace, model readiness, and inference counters;
-- deletes its unique namespace and stops its own server.
+- returns source-backed demo content with numeric reranking scores.
 
-It does not install or validate PDF, DOCX, image, OCR, or other external parsers. It is a first-value contract, not a retrieval-quality benchmark or production-readiness test.
+It does not establish PDF, DOCX, image, OCR, authentication, internet-facing deployment, retrieval-quality benchmark, or production-readiness coverage.
 
 ## Prerequisites
 
-- Git, CMake, and a C++17 compiler
-- OpenSSL development headers
-- Python 3.12
+- Git
+- Docker with Docker Compose
 - `curl`
-- at least 15 GB of working disk space for model sources, converted files, dependencies, build output, and runtime evidence
+- enough local space for the image, build cache, and about 1.17 GB of pinned model assets
 
-macOS:
-
-```bash
-xcode-select --install
-brew install cmake openssl python@3.12
-```
-
-Ubuntu or Debian:
-
-```bash
-sudo apt update
-sudo apt install -y build-essential cmake libssl-dev git curl python3.12 python3.12-venv
-```
-
-## 1. Clone and choose a work directory
+## 1. Clone and start
 
 ```bash
 git clone https://github.com/cortrix/cortrix.git
 cd cortrix
-export CORTRIX_WORK_ROOT="${CORTRIX_WORK_ROOT:-$HOME/.cache/cortrix/first-value}"
-export CORTRIX_MODEL_DIR="$CORTRIX_WORK_ROOT/models"
-export CORTRIX_MODEL_TOOLS_VENV="$CORTRIX_WORK_ROOT/model-tools-venv"
-export CMAKE_BUILD_DIR="$CORTRIX_WORK_ROOT/build"
-export CORTRIX_DEMO_EVIDENCE_DIR="$CORTRIX_WORK_ROOT/evidence"
-export XDG_CACHE_HOME="$CORTRIX_WORK_ROOT/cache/xdg"
-export PIP_CACHE_DIR="$CORTRIX_WORK_ROOT/cache/pip"
-export TMPDIR="$CORTRIX_WORK_ROOT/tmp"
-mkdir -p "$XDG_CACHE_HOME" "$PIP_CACHE_DIR" "$TMPDIR" "$CORTRIX_DEMO_EVIDENCE_DIR"
+CORTRIX_SOURCE_REVISION="$(git rev-parse HEAD)" docker compose -f deploy/docker-compose.yml up --build --wait
 ```
 
-The work directory keeps large generated data outside the Git checkout. Do not put provider keys in source-controlled files.
+The first start builds the local image and downloads about 1.17 GB of pinned model assets into the `cortrix-data` volume. It can take several minutes. Later starts reuse that volume.
 
-## 2. Provision pinned local models
+No `.env` file, LLM provider key, host-side model tooling, manual model download, model conversion, or separate bootstrap command is required.
+
+## 2. Check readiness
 
 ```bash
-./scripts/setup_quickstart_models.sh
+curl -fsS http://127.0.0.1:8420/api/v1/system/health/ready
 ```
 
-The script downloads exact revisions, verifies source hashes, and converts the reranker locally with pinned Python packages. Identities, licenses, expected file sizes, and SHA-256 values are recorded in [the model lock](../examples/first-value-supportops/model-lock.json).
+Compose does not report the service healthy until the API, embedding model, reranker model, and source-backed demo fixture are ready. Model downloads fail closed on missing files, size drift, checksum drift, symlinks, or download errors.
 
-Expected final line:
-
-```text
-QUICKSTART_MODELS=READY
-```
-
-Provisioning is intentionally fail closed. A download, checksum, converter, or converted-output mismatch must be resolved rather than bypassed.
-
-## 3. Build the real ONNX profile
+## 3. Run a reranked query
 
 ```bash
-cmake -S . -B "$CMAKE_BUILD_DIR" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCORTRIX_USE_ONNX=ON
-cmake --build "$CMAKE_BUILD_DIR" --target cortrix-server -j
+curl -fsS -H 'Content-Type: application/json' \
+  -d '{"namespaces":["demo"],"query":"What does semantic storage keep close to the agents that need it?","top_k":5,"rerank":true}' \
+  http://127.0.0.1:8420/api/v1/query
 ```
 
-The binary is created at `$CMAKE_BUILD_DIR/cortrix-server`.
+The response should include content from `quickstart-demo.txt` and numeric `rerank_score` values.
 
-## 4. Run the first-value demo
+## 4. Stop or reset
 
 ```bash
-python3 examples/first-value-supportops/run_demo.py \
-  --core-repo . \
-  --build-dir "$CMAKE_BUILD_DIR" \
-  --models-dir "$CORTRIX_MODEL_DIR" \
-  --output-root "$CORTRIX_DEMO_EVIDENCE_DIR"
+docker compose -f deploy/docker-compose.yml down
 ```
 
-A passing run prints:
+To remove the cached data and model assets as well:
 
-```text
-FIRST_VALUE_DEMO_CONTRACT=PASS
-expected_file_loaded=true
-trace_assertion=PASS
-remaining_matching_namespaces=0
+```bash
+docker compose -f deploy/docker-compose.yml down --volumes
 ```
 
-The runner refuses a dirty source tree, a build from another source directory, a non-Release build, `CORTRIX_USE_ONNX=OFF`, model identity drift, an occupied port, a non-loopback host, model fallback, `rerank=false`, failed evidence assertions, residual namespace data, or an unclean server shutdown.
+The Quick Start publishes only `127.0.0.1:8420`. It does not publish the metrics or Agent ports. Treat it as a local first-value path, not an internet-facing deployment recipe.
 
-## 5. Inspect the evidence
+## Model provenance and integrity
 
-Open `machine-summary.json` in the printed evidence directory. A primary pass includes:
+[`deploy/model-manifest.tsv`](../deploy/model-manifest.tsv) pins the repository, revision, source path, expected size, SHA-256, upstream repository, upstream revision, and upstream license for every downloaded asset.
 
-- exact Core commit, tree, CMake cache hash, and server binary hash;
-- model-lock hash and each model file identity;
-- `llm_enabled=false`;
-- `embedding_execution_provider` and `reranker_execution_provider` with `model_configured=true`, `active_ep=cpu`, `fallback=false`, and `policy_mismatch=false`;
-- increasing embedding inference and reranker scoring counters;
-- a query response with numeric `rerank_score` values;
-- source, snippet, provenance, trace, cleanup, and server-stop assertions.
+- Embedding: `onnx-community/bge-m3-ONNX@25b9af8e87a38eb120cfe87125383677b9cd309e`, derived from `BAAI/bge-m3@5617a9f61b028005a4858fdac845db406aefb181`.
+- Reranker: `onnx-community/bge-reranker-v2-m3-ONNX@6f5ff65298512715a1e669753bc754d2bc8f367b`, derived from `BAAI/bge-reranker-v2-m3@953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e`.
 
-The runtime config uses:
-
-```yaml
-server:
-  host: "127.0.0.1"
-auth:
-  enabled: false
-```
-
-Cortrix rejects `auth.enabled=false` with a non-loopback `server.host` before creating the API listener. The built-in Agent launcher and anonymous metrics endpoint also default to loopback. To bind the API to another interface, explicitly enable and configure the existing authentication controls first.
+The bootstrap downloads the exact manifest entries, verifies their size and SHA-256, installs them atomically, and keeps readiness false on any mismatch.
 
 ## Local neural models versus LLM roles
 
@@ -152,9 +100,11 @@ The current query request uses a plural array:
 
 The deprecated singular `namespace` query field is rejected. Other endpoints may still use a singular namespace field where their OpenAPI schema requires it.
 
-## Secondary ONNX-off check
+## Deeper source-build verification
 
-An explicit `onnx-off-contract` profile remains available for low-cost API and fixture testing. It uses stub embedding and `rerank=false`, so it is not the Quick Start quality path and cannot establish semantic or reranker behavior. See the [demo README](../examples/first-value-supportops/README.md) for its commands and boundary.
+The [First-value SupportOps demo](../examples/first-value-supportops/README.md) provides a separate source-build evidence workflow with model identity, execution-provider, inference-counter, trace, cleanup, and server-stop assertions. It is useful for maintainers and release verification, but it is not required for the Docker Quick Start.
+
+That workflow also retains an explicit `onnx-off-contract` profile for low-cost API and fixture testing. It uses stub embedding and `rerank=false`, so it cannot establish semantic embedding or reranker behavior.
 
 ## Next steps
 
@@ -162,4 +112,4 @@ An explicit `onnx-off-contract` profile remains available for low-cost API and f
 - [OpenAPI spec](../api/openapi.yaml)
 - [Compatibility and known status](compatibility.md)
 - [Linux NVIDIA CUDA operations](operations/cuda-execution-provider.md)
-- [Full model and parser setup](../deploy/MODELS.md)
+- [Model provenance and advanced model setup](../deploy/MODELS.md)
