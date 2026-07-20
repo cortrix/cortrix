@@ -1294,6 +1294,34 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                 reranker_model_configured);
         });
 
+    // Docker QuickStart writes this marker only after it has ingested the
+    // bundled fixture and completed a source-backed query with real embedding
+    // and reranker invocation counters. Native and non-QuickStart deployments
+    // do not set the environment variable, so their readiness contract is
+    // unchanged.
+    const char* quickstart_ready_file_env =
+        std::getenv("CORTRIX_QUICKSTART_READY_FILE");
+    if (quickstart_ready_file_env != nullptr && quickstart_ready_file_env[0] != '\0') {
+        const std::filesystem::path quickstart_ready_file(quickstart_ready_file_env);
+        readiness.Register("quickstart_demo", [quickstart_ready_file]() {
+            cortrix::health::ComponentReadiness r;
+            std::error_code ec;
+            const auto marker_status =
+                std::filesystem::symlink_status(quickstart_ready_file, ec);
+            if (ec == std::make_error_code(std::errc::no_such_file_or_directory)) {
+                ec.clear();
+            }
+            r.ready = !ec && std::filesystem::is_regular_file(marker_status);
+            r.detail["proof_file_present"] = r.ready;
+            if (ec) {
+                r.detail["reason"] = "proof_file_check_failed";
+            } else if (!r.ready) {
+                r.detail["reason"] = "source_backed_demo_pending";
+            }
+            return r;
+        });
+    }
+
     // vector_index (F01) + memory_store (MEM): honest deferred. Both are PER-NAMESPACE in
     // V1.0 — the P-HNSW index (model load + WAL replay) and memory.db are created lazily
     // when a namespace is first used, so there is no single global "loaded/initialized"

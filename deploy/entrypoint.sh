@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # ==============================================================
 #  Cortrix Container Entrypoint
@@ -14,13 +14,29 @@ echo "============================================"
 # ---------- 1. Environment defaults ----------
 export CORTRIX_DATA_DIR="${CORTRIX_DATA_DIR:-/data}"
 export CORTRIX_HTTP_PORT="${CORTRIX_HTTP_PORT:-8420}"
+export CORTRIX_SERVER_PORT="${CORTRIX_SERVER_PORT:-$CORTRIX_HTTP_PORT}"
 export CORTRIX_LOG_LEVEL="${CORTRIX_LOG_LEVEL:-info}"
 export CORTRIX_ENABLE_MEMORY="${CORTRIX_ENABLE_MEMORY:-true}"
 
-export CORTRIX_LLM_PROVIDER="${CORTRIX_LLM_PROVIDER:-openai}"
-export CORTRIX_LLM_MODEL="${CORTRIX_LLM_MODEL:-gpt-4o-mini}"
-export CORTRIX_LLM_BASE_URL="${CORTRIX_LLM_BASE_URL:-https://api.openai.com/v1}"
-export CORTRIX_LLM_API_KEY="${CORTRIX_LLM_API_KEY:-}"
+export CORTRIX_LLM_ENABLED="${CORTRIX_LLM_ENABLED:-false}"
+case "$CORTRIX_LLM_ENABLED" in
+    true)
+        export CORTRIX_LLM_PROVIDER="${CORTRIX_LLM_PROVIDER:-openai}"
+        export CORTRIX_LLM_MODEL="${CORTRIX_LLM_MODEL:-gpt-4o-mini}"
+        export CORTRIX_LLM_BASE_URL="${CORTRIX_LLM_BASE_URL:-https://api.openai.com/v1}"
+        export CORTRIX_LLM_API_KEY="${CORTRIX_LLM_API_KEY:-}"
+        ;;
+    false)
+        export CORTRIX_LLM_PROVIDER="disabled"
+        export CORTRIX_LLM_MODEL="disabled"
+        export CORTRIX_LLM_BASE_URL=""
+        export CORTRIX_LLM_API_KEY=""
+        ;;
+    *)
+        echo "ERROR: CORTRIX_LLM_ENABLED must be true or false"
+        exit 1
+        ;;
+esac
 
 export CORTRIX_EMBEDDING_MODEL="${CORTRIX_EMBEDDING_MODEL:-bge-m3-onnx}"
 export CORTRIX_SPC_WORKERS="${CORTRIX_SPC_WORKERS:-2}"
@@ -34,11 +50,18 @@ if [ "$CORTRIX_WEB_UI_ENABLED" = "true" ]; then
 fi
 # ---------- 1b. First-run provisioning (PROFILE != lite) ----------
 # Models and the docling/paddleocr parser stack are NOT baked into the image;
-# on first run (PROFILE=full, the default) they are provisioned into the /data
+# on first run (PROFILE=quickstart, the default) they are provisioned into the /data
 # volume so they persist across restarts (only the first boot pays the cost).
 # PROFILE=lite skips this: txt/md ingestion + BM25 still work, embedding runs in
 # stub mode, and PDF/image parsing is unavailable.
-export CORTRIX_PROFILE="${CORTRIX_PROFILE:-full}"
+export CORTRIX_PROFILE="${CORTRIX_PROFILE:-quickstart}"
+case "$CORTRIX_PROFILE" in
+    quickstart|full|lite) ;;
+    *)
+        echo "ERROR: CORTRIX_PROFILE must be quickstart, full, or lite"
+        exit 1
+        ;;
+esac
 CORTRIX_MODELS_DIR="$CORTRIX_DATA_DIR/models"
 CORTRIX_OCR_VENV="$CORTRIX_DATA_DIR/ocr_venv"
 # Keep parser model caches on the volume so they persist across restarts.
@@ -170,8 +193,8 @@ PY
 fi
 
 if [ "$CORTRIX_PROFILE" = "lite" ]; then
-    # A non-empty model path is fail-closed. Clear both embedding paths in the
-    # runtime copy of the bundled config so lite mode remains an explicit stub.
+    # Non-empty model paths are fail-closed. Clear embedding and reranker paths
+    # in the runtime copy so lite remains the only explicit stub profile.
     if [ ! -w "$PROFILE_CONFIG" ]; then
         echo "ERROR: PROFILE=lite must update $PROFILE_CONFIG, but it is not writable"
         exit 1
@@ -182,10 +205,12 @@ if [ "$CORTRIX_PROFILE" = "lite" ]; then
     sed -i \
         -e 's|^  model_path:.*|  model_path: ""|' \
         -e 's|^  tokenizer_path:.*|  tokenizer_path: ""|' \
+        -e 's|^  model_dir:.*|  model_dir: ""|' \
         "$PROFILE_CONFIG"
     if ! grep -q '^  model_path: ""$' "$PROFILE_CONFIG" || \
-       ! grep -q '^  tokenizer_path: ""$' "$PROFILE_CONFIG"; then
-        echo "ERROR: PROFILE=lite could not clear embedding model_path and tokenizer_path"
+       ! grep -q '^  tokenizer_path: ""$' "$PROFILE_CONFIG" || \
+       ! grep -q '^  model_dir: ""$' "$PROFILE_CONFIG"; then
+        echo "ERROR: PROFILE=lite could not clear embedding and reranker model paths"
         exit 1
     fi
     echo "PROFILE=lite — embedding model paths cleared; skipping model/parser provisioning"
@@ -197,22 +222,25 @@ else
         cp "$PROFILE_CONFIG_BACKUP" "$PROFILE_CONFIG"
         rm -f "$PROFILE_CONFIG_BACKUP"
     fi
-    # (1) ONNX models → data volume. bge-m3 always; reranker/query-complexity
-    #     only when their *_MODEL_URL env is set (see download-models.sh).
-    if [ ! -s "$CORTRIX_MODELS_DIR/bge-m3/model.onnx" ] || \
-       [ ! -s "$CORTRIX_MODELS_DIR/bge-m3/model.onnx_data" ] || \
-       [ ! -s "$CORTRIX_MODELS_DIR/bge-m3/tokenizer.json" ]; then
-        echo "[provision] fetching ONNX models into $CORTRIX_MODELS_DIR"
-        echo "            (first run only; bge-m3 ~2GB, may take 10-20 min)…"
-        bash /app/scripts/download-models.sh "$CORTRIX_MODELS_DIR"
-    fi
-    if [ ! -s "$CORTRIX_MODELS_DIR/bge-m3/model.onnx" ] || \
-       [ ! -s "$CORTRIX_MODELS_DIR/bge-m3/model.onnx_data" ] || \
-       [ ! -s "$CORTRIX_MODELS_DIR/bge-m3/tokenizer.json" ]; then
-        echo "ERROR: PROFILE=full requires complete bge-m3 model.onnx, model.onnx_data, and tokenizer.json assets"
-        echo "       Fix model provisioning in $CORTRIX_MODELS_DIR/bge-m3 and restart"
-        exit 1
-    fi
+    # (1) Pinned, quantized ONNX embedding + reranker assets → data volume.
+    # download-models.sh verifies exact sizes and SHA-256 values on every boot,
+    # reuses valid cached files, and atomically replaces invalid partial files.
+    echo "[provision] verifying pinned embedding and reranker assets"
+    bash /app/scripts/download-models.sh "$CORTRIX_MODELS_DIR"
+    for _asset in \
+        "$CORTRIX_MODELS_DIR/bge-m3/model.onnx" \
+        "$CORTRIX_MODELS_DIR/bge-m3/tokenizer.json" \
+        "$CORTRIX_MODELS_DIR/bge-reranker-v2-m3/model.onnx" \
+        "$CORTRIX_MODELS_DIR/bge-reranker-v2-m3/tokenizer.json"; do
+        if [ ! -s "$_asset" ] || [ -L "$_asset" ]; then
+            echo "ERROR: real embedding/reranker asset is missing or unsafe: $_asset"
+            exit 1
+        fi
+    done
+
+    # QuickStart intentionally keeps only the stdlib text parser path. The full
+    # profile retains the optional docling/paddleocr provisioning below.
+    if [ "$CORTRIX_PROFILE" = "full" ]; then
     # (2) docling/paddleocr parser stack → venv on the data volume.
     # Self-healing gate: re-provision whenever docling is not importable. The old
     # `-x python3` gate skipped repair forever once the venv directory existed, so a
@@ -297,17 +325,18 @@ PYWARM
         sed -i "s|^  python_bin:.*|  python_bin: $CORTRIX_OCR_VENV/bin/python3|" /app/config/cortrix.yaml
         echo "[provision] parser python_bin -> $CORTRIX_OCR_VENV/bin/python3"
     fi
+    fi
 fi
 
 # DEFECT#8 (b): surface the OCR parser provisioning outcome to /health so a server
 # that came up with PDF/image parsing unavailable does not silently report a bare
 # "healthy". The server reads CORTRIX_PARSER_STATUS and adds a components.parser
 # entry, degrading overall status only when "unavailable". States:
-#   disabled    — PROFILE=lite, OCR intentionally off (not an error)
+#   disabled    — PROFILE=lite/quickstart, OCR intentionally off (not an error)
 #   ok          — docling imports, OCR ready
 #   unavailable — full profile but the parser stack failed to provision (the alarm)
 # Left unset on dev/native runs → the server omits the component (prior behaviour).
-if [ "$CORTRIX_PROFILE" = "lite" ]; then
+if [ "$CORTRIX_PROFILE" = "lite" ] || [ "$CORTRIX_PROFILE" = "quickstart" ]; then
     export CORTRIX_PARSER_STATUS="disabled"
 elif "$CORTRIX_OCR_VENV/bin/python3" -c "import docling" >/dev/null 2>&1; then
     export CORTRIX_PARSER_STATUS="ok"
@@ -315,9 +344,17 @@ else
     export CORTRIX_PARSER_STATUS="unavailable"
 fi
 
-# F02 reranker (real model when provisioned/bind-mounted; absent = stub).
-if [ -d "${CORTRIX_RERANKER_MODEL_DIR:-/data/models/bge-reranker-v2-m3}" ]; then
-    export CORTRIX_RERANKER_MODEL_DIR="${CORTRIX_RERANKER_MODEL_DIR:-/data/models/bge-reranker-v2-m3}"
+# F02 reranker. Non-lite profiles require the pinned real model; lite is the
+# only explicit stub profile.
+if [ "$CORTRIX_PROFILE" != "lite" ]; then
+    export CORTRIX_RERANKER_MODEL_DIR="${CORTRIX_RERANKER_MODEL_DIR:-$CORTRIX_MODELS_DIR/bge-reranker-v2-m3}"
+    if [ ! -s "$CORTRIX_RERANKER_MODEL_DIR/model.onnx" ] || \
+       [ ! -s "$CORTRIX_RERANKER_MODEL_DIR/tokenizer.json" ]; then
+        echo "ERROR: $CORTRIX_PROFILE requires a real reranker model"
+        exit 1
+    fi
+else
+    unset CORTRIX_RERANKER_MODEL_DIR
 fi
 
 # F39/F37 query-complexity classifier (D3.5 r2 #26): point the server at the
@@ -326,12 +363,36 @@ if [ -d "${CORTRIX_QUERY_COMPLEXITY_MODEL_DIR:-/data/models/query-complexity}" ]
     export CORTRIX_QUERY_COMPLEXITY_MODEL_DIR="${CORTRIX_QUERY_COMPLEXITY_MODEL_DIR:-/data/models/query-complexity}"
 fi
 
-export CORTRIX_AGENT_ENABLED="${CORTRIX_AGENT_ENABLED:-true}"
+if [ "$CORTRIX_PROFILE" = "quickstart" ]; then
+    export CORTRIX_AGENT_ENABLED="${CORTRIX_AGENT_ENABLED:-false}"
+    export CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED="${CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED:-true}"
+else
+    export CORTRIX_AGENT_ENABLED="${CORTRIX_AGENT_ENABLED:-true}"
+    export CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED="${CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED:-false}"
+fi
+case "$CORTRIX_AGENT_ENABLED" in true|false) ;; *)
+    echo "ERROR: CORTRIX_AGENT_ENABLED must be true or false"
+    exit 1
+esac
+case "$CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED" in true|false) ;; *)
+    echo "ERROR: CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED must be true or false"
+    exit 1
+esac
 export CORTRIX_AGENT_PORT="${CORTRIX_AGENT_PORT:-8000}"
 # Same-origin agent surface (F48 P-3): the C++ server reverse-proxies
 # /api/v1/agent/* and /agent/* to the cortrix-agent service.
 if [ "$CORTRIX_AGENT_ENABLED" = "true" ]; then
     export CORTRIX_AGENT_BASE_URL="${CORTRIX_AGENT_BASE_URL:-http://127.0.0.1:${CORTRIX_AGENT_PORT}}"
+else
+    unset CORTRIX_AGENT_BASE_URL
+fi
+
+if [ "$CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED" = "true" ]; then
+    export CORTRIX_QUICKSTART_READY_FILE="${CORTRIX_QUICKSTART_READY_FILE:-$CORTRIX_DATA_DIR/quickstart/ready.json}"
+    mkdir -p "$(dirname "$CORTRIX_QUICKSTART_READY_FILE")"
+    rm -f "$CORTRIX_QUICKSTART_READY_FILE"
+else
+    unset CORTRIX_QUICKSTART_READY_FILE
 fi
 
 
@@ -344,9 +405,11 @@ if [ ! -d "$CORTRIX_DATA_DIR" ] || [ ! -w "$CORTRIX_DATA_DIR" ]; then
     exit 1
 fi
 
-# 2b. LLM key
-if [ -z "$CORTRIX_LLM_API_KEY" ]; then
+# 2b. LLM contract
+if [ "$CORTRIX_LLM_ENABLED" = "true" ] && [ -z "$CORTRIX_LLM_API_KEY" ]; then
     echo "WARN: CORTRIX_LLM_API_KEY is not set — LLM features will be unavailable."
+elif [ "$CORTRIX_LLM_ENABLED" = "false" ]; then
+    echo "[llm] disabled; no provider key or LLM endpoint is configured"
 fi
 
 # 2c. Core binary
@@ -370,13 +433,16 @@ echo "Configuration:"
 echo "  Data Dir ......  $CORTRIX_DATA_DIR"
 echo "  HTTP Port .....  $CORTRIX_HTTP_PORT"
 echo "  Log Level .....  $CORTRIX_LOG_LEVEL"
-echo "  LLM Provider ..  $CORTRIX_LLM_PROVIDER ($CORTRIX_LLM_MODEL)"
+echo "  Profile .......  $CORTRIX_PROFILE"
+echo "  Source Rev ....  ${CORTRIX_SOURCE_REVISION:-local-source}"
+echo "  LLM Enabled ...  $CORTRIX_LLM_ENABLED"
 echo "  Embedding .....  $CORTRIX_EMBEDDING_MODEL (${CORTRIX_EMBEDDING_EXECUTION_PROVIDER:-${CORTRIX_EMBEDDING_DEVICE:-auto}})"
 echo "  Reranker EP ...  ${CORTRIX_RERANKER_EXECUTION_PROVIDER:-auto}"
 echo "  ONNX Flavor ...  ${CORTRIX_ONNX_RUNTIME_FLAVOR:-cpu}"
 echo "  SPC Workers ...  $CORTRIX_SPC_WORKERS"
 echo "  Web UI ........  $CORTRIX_WEB_UI_ENABLED"
 echo "  Agent .........  $CORTRIX_AGENT_ENABLED (port $CORTRIX_AGENT_PORT)"
+echo "  Demo Bootstrap   $CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED"
 echo "  Memory ........  $CORTRIX_ENABLE_MEMORY"
 echo ""
 

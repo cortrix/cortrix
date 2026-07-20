@@ -56,6 +56,10 @@ deploy/
 !deploy/entrypoint.sh
 !deploy/healthcheck.sh
 !deploy/download-models.sh
+!deploy/quickstart-bootstrap.sh
+!deploy/model-manifest.tsv
+!deploy/fixtures/
+!deploy/fixtures/quickstart-demo.txt
 
 # Design docs
 designs/

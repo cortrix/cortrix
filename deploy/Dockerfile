@@ -2,10 +2,11 @@
 # Cortrix — Semantic Storage for the Agentic Era
 # Multi-stage Dockerfile
 #
-# Build:  docker build -t cortrix:latest -f deploy/Dockerfile ..
-# Run:    docker run -d -p 8420:8420 -v ./data:/data \
-#           -e CORTRIX_LLM_API_KEY=sk-xxx cortrix:latest
+# Build:  docker build -t cortrix:quickstart -f deploy/Dockerfile ..
+# Run:    use deploy/docker-compose.yml for the pinned-model QuickStart
 # ==========================================================
+
+ARG CORTRIX_SOURCE_REVISION=local-source
 
 # ========== Stage 1: C++ Builder ==========
 FROM ubuntu:22.04 AS builder
@@ -42,13 +43,27 @@ COPY include     cortrix/include/
 COPY src         cortrix/src/
 COPY tests       cortrix/tests/
 
-# Build cortrix-server
-RUN mkdir -p build && cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_TESTS=OFF \
-          ../cortrix && \
-    make -j$(nproc) cortrix-server && \
-    strip cortrix-server
+# Build cortrix-server. Configure downloads are retried in a fresh build tree
+# because upstream TLS connections can terminate mid-transfer.
+RUN attempt=1; \
+    while true; do \
+        rm -rf build && mkdir -p build; \
+        if cd build && cmake -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF ../cortrix; then \
+            cd /build; \
+            break; \
+        fi; \
+        cd /build; \
+        if [ "$attempt" -ge 3 ]; then \
+            echo "ERROR: CMake configure failed after $attempt attempts"; \
+            exit 1; \
+        fi; \
+        echo "WARN: CMake configure attempt $attempt/3 failed; retrying"; \
+        attempt=$((attempt + 1)); \
+        sleep 3; \
+    done && \
+    cmake --build build --parallel "$(nproc)" --target cortrix-server && \
+    strip build/cortrix-server
 
 # Pre-build Python wheels for runtime (cortrix-agent lives at repo top level).
 # PIP_INDEX_URL is overridable per build (e.g. a regional mirror when the
@@ -122,8 +137,8 @@ LABEL description="Cortrix — Semantic Storage for the Agentic Era"
 LABEL version="1.0.0"
 
 # Runtime dependencies only — no compilers.
-# wget + python3.10-venv are needed by the first-run provisioning in
-# entrypoint.sh (download-models.sh fetches ONNX assets; a venv is created
+# curl + python3.10-venv are needed by the first-run provisioning in
+# entrypoint.sh (download-models.sh fetches ONNX assets; the full profile creates
 # for the docling/paddleocr parser stack). tar is in the base image.
 # libgl1 / libglib2.0-0 / libgomp1: paddleocr imports opencv (libGL.so.1) and
 # paddlepaddle needs OpenMP — without them the provisioned parser venv installs
@@ -144,6 +159,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
+
+ARG CORTRIX_SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/cortrix/cortrix"
+LABEL org.opencontainers.image.revision="${CORTRIX_SOURCE_REVISION}"
+ENV CORTRIX_SOURCE_REVISION="${CORTRIX_SOURCE_REVISION}"
 
 # Non-root user
 RUN useradd -m -u 1000 -s /bin/bash cortrix
@@ -190,11 +210,15 @@ COPY scripts/docling_bridge.py \
      scripts/paddleocr_bridge.py \
      scripts/requirements-parser.txt /app/scripts/
 
-# Model fetcher — invoked by entrypoint.sh on first run (PROFILE=full) to
-# populate the /data volume with the ONNX assets that are too large to bake
-# into the image (bge-m3; reranker/query-complexity when their URLs are set).
+# Model fetcher + immutable manifest. Weights remain outside Git and are
+# downloaded from exact revisions, verified, then atomically installed.
 COPY deploy/download-models.sh /app/scripts/download-models.sh
-RUN chmod +x /app/scripts/download-models.sh
+COPY deploy/model-manifest.tsv /app/config/model-manifest.tsv
+
+# Source-backed QuickStart bootstrap and its project-authored fixture.
+COPY deploy/quickstart-bootstrap.sh /app/scripts/quickstart-bootstrap.sh
+COPY deploy/fixtures/quickstart-demo.txt /app/fixtures/quickstart-demo.txt
+RUN chmod +x /app/scripts/download-models.sh /app/scripts/quickstart-bootstrap.sh
 
 # Install Python deps from wheels (fast, no compilation)
 # Fail the build loudly if the cortrix-agent deps cannot install — a silent
@@ -214,7 +238,7 @@ USER cortrix
 EXPOSE 8420
 VOLUME ["/data"]
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=5s --timeout=5s --start-period=30m --retries=3 \
     CMD /app/healthcheck.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]

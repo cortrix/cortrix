@@ -1,113 +1,166 @@
 #!/bin/bash
-# Model download script for Cortrix Docker build
-# Called during Dockerfile build stage
+set -euo pipefail
 
-set -e
+MANIFEST="/app/config/model-manifest.tsv"
+MODELS_DIR="${1:-/data/models}"
+PARTIAL_FILE=""
 
-MODELS_DIR="${1:-/models}"
-mkdir -p "$MODELS_DIR/paddleocr"
+cleanup_partial() {
+    if [ -n "$PARTIAL_FILE" ]; then
+        rm -f "$PARTIAL_FILE"
+    fi
+}
+trap cleanup_partial EXIT INT TERM HUP
 
-echo "=== Downloading Cortrix ML Models ==="
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | awk '{print $1}'
+    else
+        echo "ERROR: neither sha256sum nor shasum is available" >&2
+        return 1
+    fi
+}
 
-# bge-m3 ONNX model graph (~700KB) + external weights (~1.1GB)
-echo "[1/4] Downloading bge-m3 ONNX model..."
-mkdir -p "$MODELS_DIR/bge-m3"
-if [ ! -f "$MODELS_DIR/bge-m3/model.onnx" ]; then
-    wget -q --show-progress -O "$MODELS_DIR/bge-m3/model.onnx" \
-        "https://hf-mirror.com/BAAI/bge-m3/resolve/main/onnx/model.onnx" || {
-        echo "WARN: Failed to download from hf-mirror, trying HuggingFace..."
-        wget -q --show-progress -O "$MODELS_DIR/bge-m3/model.onnx" \
-            "https://huggingface.co/BAAI/bge-m3/resolve/main/onnx/model.onnx" || {
-            echo "ERROR: bge-m3 model download failed"
-        }
-    }
+file_size() {
+    if stat -c '%s' "$1" >/dev/null 2>&1; then
+        stat -c '%s' "$1"
+    else
+        stat -f '%z' "$1"
+    fi
+}
+
+verify_file() {
+    local path="$1"
+    local expected_size="$2"
+    local expected_sha="$3"
+    local actual_size actual_sha
+
+    [ -f "$path" ] && [ ! -L "$path" ] || return 1
+    actual_size="$(file_size "$path")" || return 1
+    [ "$actual_size" = "$expected_size" ] || return 1
+    actual_sha="$(sha256_file "$path")" || return 1
+    [ "$actual_sha" = "$expected_sha" ]
+}
+
+validate_destination() {
+    case "$1" in
+        bge-m3/model.onnx|bge-m3/tokenizer.json|\
+        bge-reranker-v2-m3/model.onnx|bge-reranker-v2-m3/tokenizer.json)
+            return 0
+            ;;
+        *)
+            echo "ERROR: model manifest contains an unexpected destination: $1" >&2
+            return 1
+            ;;
+    esac
+}
+
+download_verified() {
+    local component="$1"
+    local destination="$2"
+    local repository="$3"
+    local revision="$4"
+    local source_path="$5"
+    local expected_size="$6"
+    local expected_sha="$7"
+    local target target_dir url
+
+    validate_destination "$destination"
+    target="$MODELS_DIR/$destination"
+    target_dir="$(dirname "$target")"
+    url="https://huggingface.co/${repository}/resolve/${revision}/${source_path}?download=true"
+
+    if [ -L "$target" ] || [ -L "$target_dir" ]; then
+        echo "ERROR: refusing symlink model target or directory: $destination" >&2
+        return 1
+    fi
+    if verify_file "$target" "$expected_size" "$expected_sha"; then
+        echo "[models] verified cached $component"
+        return 0
+    fi
+
+    mkdir -p "$target_dir"
+    PARTIAL_FILE="$(mktemp "${target}.partial.XXXXXX")"
+    echo "[models] downloading $component from pinned revision $revision"
+    curl --proto '=https' --proto-redir '=https' --tlsv1.2 \
+        --fail --location --show-error --progress-bar \
+        --retry 5 --retry-delay 2 --retry-all-errors \
+        --connect-timeout 20 --max-time 1800 \
+        --output "$PARTIAL_FILE" "$url"
+
+    if ! verify_file "$PARTIAL_FILE" "$expected_size" "$expected_sha"; then
+        local actual_size actual_sha
+        actual_size="$(file_size "$PARTIAL_FILE" 2>/dev/null || printf unknown)"
+        actual_sha="$(sha256_file "$PARTIAL_FILE" 2>/dev/null || printf unknown)"
+        echo "ERROR: checksum verification failed for $component" >&2
+        echo "       expected size=$expected_size sha256=$expected_sha" >&2
+        echo "       actual   size=$actual_size sha256=$actual_sha" >&2
+        return 1
+    fi
+
+    chmod 0644 "$PARTIAL_FILE"
+    mv -f "$PARTIAL_FILE" "$target"
+    PARTIAL_FILE=""
+    echo "[models] installed $component ($expected_size bytes)"
+}
+
+self_test() (
+    local test_dir good_sha
+    test_dir="$(mktemp -d)"
+    trap 'rm -rf "$test_dir"' EXIT
+    printf 'cortrix-model-verification\n' > "$test_dir/model.bin"
+    good_sha="$(sha256_file "$test_dir/model.bin")"
+    verify_file "$test_dir/model.bin" 27 "$good_sha" \
+        || { echo "ERROR: valid file did not pass verification" >&2; return 1; }
+    if verify_file "$test_dir/model.bin" 26 "$good_sha"; then
+        echo "ERROR: incorrect size unexpectedly passed verification" >&2
+        return 1
+    fi
+    if verify_file "$test_dir/model.bin" 27 \
+        0000000000000000000000000000000000000000000000000000000000000000; then
+        echo "ERROR: incorrect checksum unexpectedly passed verification" >&2
+        return 1
+    fi
+    ln -s "$test_dir/model.bin" "$test_dir/model-link.bin"
+    if verify_file "$test_dir/model-link.bin" 27 "$good_sha"; then
+        echo "ERROR: symlink unexpectedly passed verification" >&2
+        return 1
+    fi
+    echo "Model verification self-test passed"
+)
+
+if [ "${1:-}" = "--self-test" ]; then
+    self_test
+    exit 0
+fi
+
+[ -f "$MANIFEST" ] || { echo "ERROR: model manifest is missing: $MANIFEST" >&2; exit 1; }
+[ ! -L "$MODELS_DIR" ] || { echo "ERROR: models directory must not be a symlink" >&2; exit 1; }
+mkdir -p "$MODELS_DIR"
+
+COUNT=0
+while IFS=$'\t' read -r component destination repository revision source_path \
+    expected_size expected_sha _upstream_repository _upstream_revision _license; do
+    [ "$component" != "component" ] || continue
+    [ -n "$component" ] || continue
+    download_verified "$component" "$destination" "$repository" "$revision" \
+        "$source_path" "$expected_size" "$expected_sha"
+    COUNT=$((COUNT + 1))
+done < "$MANIFEST"
+
+[ "$COUNT" -eq 4 ] || {
+    echo "ERROR: expected 4 pinned model assets, found $COUNT" >&2
+    exit 1
+}
+
+if [ -w "$MODELS_DIR" ]; then
+    MANIFEST_TMP="$(mktemp "$MODELS_DIR/.manifest.XXXXXX")"
+    cp "$MANIFEST" "$MANIFEST_TMP"
+    chmod 0644 "$MANIFEST_TMP"
+    mv -f "$MANIFEST_TMP" "$MODELS_DIR/MANIFEST.tsv"
 else
-    echo "  Already exists, skipping"
+    echo "[models] model directory is read-only; manifest snapshot not written"
 fi
-# External weights file (required, contains actual model parameters)
-if [ ! -f "$MODELS_DIR/bge-m3/model.onnx_data" ]; then
-    wget -q --show-progress -O "$MODELS_DIR/bge-m3/model.onnx_data" \
-        "https://hf-mirror.com/BAAI/bge-m3/resolve/main/onnx/model.onnx_data" || {
-        echo "WARN: Failed to download from hf-mirror, trying HuggingFace..."
-        wget -q --show-progress -O "$MODELS_DIR/bge-m3/model.onnx_data" \
-            "https://huggingface.co/BAAI/bge-m3/resolve/main/onnx/model.onnx_data" || {
-            echo "ERROR: bge-m3 external weights download failed"
-        }
-    }
-else
-    echo "  Already exists, skipping"
-fi
-
-# bge-m3 tokenizer (~17MB)
-echo "[2/4] Downloading bge-m3 tokenizer..."
-if [ ! -f "$MODELS_DIR/bge-m3/tokenizer.json" ]; then
-    wget -q --show-progress -O "$MODELS_DIR/bge-m3/tokenizer.json" \
-        "https://hf-mirror.com/BAAI/bge-m3/resolve/main/tokenizer.json" || {
-        echo "WARN: Failed to download from hf-mirror, trying HuggingFace..."
-        wget -q --show-progress -O "$MODELS_DIR/bge-m3/tokenizer.json" \
-            "https://huggingface.co/BAAI/bge-m3/resolve/main/tokenizer.json" || {
-            echo "ERROR: bge-m3 tokenizer download failed"
-        }
-    }
-else
-    echo "  Already exists, skipping"
-fi
-
-# bge-m3 config
-echo "[3/4] Downloading bge-m3 config..."
-wget -q -O "$MODELS_DIR/bge-m3-config.json" \
-    "https://hf-mirror.com/BAAI/bge-m3/resolve/main/config.json" 2>/dev/null || \
-    echo '{"model_type": "bge-m3", "status": "placeholder"}' > "$MODELS_DIR/bge-m3-config.json"
-
-# bge-reranker-v2-m3 ONNX (F02 reranker). No canonical public ONNX export —
-# it is converted from BAAI/bge-reranker-v2-m3 safetensors via
-# scripts/convert_reranker_to_onnx.py. Provide a tarball URL of the converted
-# dir (model.onnx + model.onnx_data + tokenizer.json) via env to auto-fetch;
-# when unset the server falls back to a deterministic reranker stub.
-echo "[*] Reranker (bge-reranker-v2-m3)..."
-if [ -f "$MODELS_DIR/bge-reranker-v2-m3/model.onnx" ]; then
-    echo "  Already exists, skipping"
-elif [ -n "${CORTRIX_RERANKER_MODEL_URL:-}" ]; then
-    mkdir -p "$MODELS_DIR/bge-reranker-v2-m3"
-    wget -q --show-progress -O /tmp/reranker.tar.gz "$CORTRIX_RERANKER_MODEL_URL" && \
-        tar -xf /tmp/reranker.tar.gz -C "$MODELS_DIR/bge-reranker-v2-m3" --strip-components=1 && \
-        rm -f /tmp/reranker.tar.gz || \
-        echo "WARN: reranker download/extract failed — reranker stub fallback in effect"
-else
-    echo "  CORTRIX_RERANKER_MODEL_URL not set — skipping (reranker stub fallback)"
-fi
-
-# query-complexity (F39/F37 DistilBERT classifier). Cortrix-trained artifact,
-# no public source — must be hosted by the operator. Provide a tarball URL via
-# env to auto-fetch; when unset F39 falls back to the heuristic backend.
-echo "[*] Query-complexity classifier..."
-if [ -f "$MODELS_DIR/query-complexity/model.onnx" ]; then
-    echo "  Already exists, skipping"
-elif [ -n "${CORTRIX_QUERY_COMPLEXITY_MODEL_URL:-}" ]; then
-    mkdir -p "$MODELS_DIR/query-complexity"
-    wget -q --show-progress -O /tmp/qc.tar.gz "$CORTRIX_QUERY_COMPLEXITY_MODEL_URL" && \
-        tar -xf /tmp/qc.tar.gz -C "$MODELS_DIR/query-complexity" --strip-components=1 && \
-        rm -f /tmp/qc.tar.gz || \
-        echo "WARN: query-complexity download/extract failed — heuristic fallback in effect"
-else
-    echo "  CORTRIX_QUERY_COMPLEXITY_MODEL_URL not set — skipping (heuristic fallback)"
-fi
-
-# PaddleOCR models (~150MB)
-echo "[4/4] Downloading PaddleOCR models..."
-cd "$MODELS_DIR/paddleocr"
-if [ ! -d "ch_PP-OCRv3_det_infer" ]; then
-    wget -q https://paddleocr.bj.bcebos.com/PP-OCRv3/chinese/ch_PP-OCRv3_det_infer.tar && \
-        tar -xf ch_PP-OCRv3_det_infer.tar && rm -f ch_PP-OCRv3_det_infer.tar || \
-        echo "WARN: PaddleOCR det model download failed"
-fi
-if [ ! -d "ch_PP-OCRv3_rec_infer" ]; then
-    wget -q https://paddleocr.bj.bcebos.com/PP-OCRv3/chinese/ch_PP-OCRv3_rec_infer.tar && \
-        tar -xf ch_PP-OCRv3_rec_infer.tar && rm -f ch_PP-OCRv3_rec_infer.tar || \
-        echo "WARN: PaddleOCR rec model download failed"
-fi
-
-echo ""
-echo "=== Model Download Complete ==="
-echo "Models directory: $MODELS_DIR"
-ls -lh "$MODELS_DIR"
+echo "[models] all pinned embedding and reranker assets verified"

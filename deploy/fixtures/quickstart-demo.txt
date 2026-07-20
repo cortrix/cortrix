@@ -1,0 +1,6 @@
+Cortrix QuickStart demo
+
+Cortrix provides semantic storage for agentic applications. In this demo,
+semantic storage keeps durable context close to the agents that need it.
+The local embedding model finds relevant passages, and the local reranker
+orders those passages without sending the document or query to an LLM service.

@@ -28,19 +28,17 @@ namespace:
   data_dir: /data
 
 embedding:
-  # bge-m3 ONNX assets are NOT baked into the image (too large). On first run
-  # entrypoint.sh provisions them into the data volume at the paths below
-  # (PROFILE=full). A configured path is mandatory: missing or invalid assets
-  # fail startup. PROFILE=lite explicitly clears these paths before startup.
+  # The image keeps model weights out of Git. The default quickstart profile
+  # downloads pinned, checksum-verified quantized bge-m3 assets into /data.
+  # A configured path is fail-closed; only PROFILE=lite explicitly uses a stub.
   model_path: /data/models/bge-m3/model.onnx
   tokenizer_path: /data/models/bge-m3/tokenizer.json
   execution_provider: auto
 
-# F02 reranker — optional by default. entrypoint.sh sets the model directory
-# when a complete operator-provided model is present. A non-empty but missing or
-# invalid model fails startup; an empty model_dir is the explicit stub mode.
+# F02 reranker. Docker quickstart provisions the pinned real model and exports
+# this path. An absent or invalid configured model fails startup.
 reranker:
-  model_dir: ""
+  model_dir: /data/models/bge-reranker-v2-m3
   execution_provider: auto
 
 # F39/F37 query-complexity classifier — provisioned when
