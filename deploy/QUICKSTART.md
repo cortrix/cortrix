@@ -13,7 +13,8 @@ space for the image, build cache, and about 1.17 GB of pinned model assets.
 ```bash
 git clone https://github.com/cortrix/cortrix.git
 cd cortrix
-CORTRIX_SOURCE_REVISION="$(git rev-parse HEAD)" docker compose -f deploy/docker-compose.yml up --build --wait
+CORTRIX_SOURCE_REVISION="$(git rev-parse HEAD)" \
+  docker compose -f deploy/docker-compose.yml up --build --wait
 ```
 
 The first start downloads about 1.17 GB of pinned model assets and can take
@@ -35,7 +36,12 @@ download failures keep the service unready.
 
 ```bash
 curl -fsS -H 'Content-Type: application/json' \
-  -d '{"namespaces":["demo"],"query":"What does semantic storage keep close to the agents that need it?","top_k":5,"rerank":true}' \
+  -d '{
+    "namespaces": ["demo"],
+    "query": "What does semantic storage keep close to the agents that need it?",
+    "top_k": 5,
+    "rerank": true
+  }' \
   http://127.0.0.1:8420/api/v1/query
 ```
 

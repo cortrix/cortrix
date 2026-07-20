@@ -21,7 +21,8 @@ upstream repository, upstream revision, and upstream license.
 The Quick Start provisions the manifest into `/data/models` on the first start:
 
 ```bash
-CORTRIX_SOURCE_REVISION="$(git rev-parse HEAD)" docker compose -f deploy/docker-compose.yml up --build --wait
+CORTRIX_SOURCE_REVISION="$(git rev-parse HEAD)" \
+  docker compose -f deploy/docker-compose.yml up --build --wait
 ```
 
 No model URL overrides are required for this profile. The downloader resolves

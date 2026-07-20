@@ -76,12 +76,18 @@ Run the local Docker Quick Start with real embedding and reranking:
 ```bash
 git clone https://github.com/cortrix/cortrix.git
 cd cortrix
-CORTRIX_SOURCE_REVISION="$(git rev-parse HEAD)" docker compose -f deploy/docker-compose.yml up --build --wait
+CORTRIX_SOURCE_REVISION="$(git rev-parse HEAD)" \
+  docker compose -f deploy/docker-compose.yml up --build --wait
 
 curl -fsS http://127.0.0.1:8420/api/v1/system/health/ready
 
 curl -fsS -H 'Content-Type: application/json' \
-  -d '{"namespaces":["demo"],"query":"What does semantic storage keep close to the agents that need it?","top_k":5,"rerank":true}' \
+  -d '{
+    "namespaces": ["demo"],
+    "query": "What does semantic storage keep close to the agents that need it?",
+    "top_k": 5,
+    "rerank": true
+  }' \
   http://127.0.0.1:8420/api/v1/query
 ```
 
