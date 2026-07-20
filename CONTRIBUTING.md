@@ -58,14 +58,16 @@ cortrix/
 
 ## Development Setup
 
+For the shortest first-value path, use the [Docker Quick Start](docs/QUICKSTART.md). The manual source build below is intended for contributors working on Cortrix itself.
+
 ### Prerequisites
 
 - **OS**: macOS (arm64/x86_64) or Linux (x86_64)
 - **Compiler**: C++17 (Clang 14+ or GCC 10+)
-- **CMake**: 3.20+
+- **CMake**: 3.27+
 - **OpenSSL**: via your system package manager
 - **Python**: 3.9+ (for the SDK and MCP server)
-- **Disk**: ~3 GB for the bge-m3 model files (optional — a stub embedder is available without the model)
+- **Disk**: allow space for the build tree and model assets; the Docker Quick Start downloads about 1.17 GB of pinned embedding and reranker assets
 
 All C++ dependencies (cpp-httplib, yaml-cpp, nlohmann/json, spdlog, hnswlib, SQLite+FTS5, ONNX Runtime, GoogleTest, Google Benchmark) are fetched automatically via CMake `FetchContent`.
 
@@ -77,10 +79,10 @@ cd cortrix
 
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j$(nproc)
+cmake --build . --parallel
 
 # Run it (defaults to http://localhost:8420)
-./cortrix-server --config ../deploy/config.yaml
+./cortrix-server --config ../deploy/cortrix.yaml
 ```
 
 To build without ONNX (uses a stub embedder with random vectors — handy for fast iteration):
