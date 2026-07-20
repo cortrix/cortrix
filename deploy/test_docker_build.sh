@@ -68,6 +68,7 @@ echo "Test 3: Compose zero-config and exposure contract"
 COMPOSE="$DEPLOY_DIR/docker-compose.yml"
 for contract in 'CORTRIX_PROFILE: quickstart' 'CORTRIX_LLM_ENABLED: "false"' \
     'CORTRIX_AGENT_ENABLED: "false"' 'CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED: "true"' \
+    'CORTRIX_SERVER_ALLOW_UNAUTHENTICATED_CONTAINER_BIND: "true"' \
     "127.0.0.1:\${CORTRIX_HTTP_PORT:-8420}:8420" 'CORTRIX_SOURCE_REVISION:'; do
     if contains "$COMPOSE" "$contract"; then
         pass "Compose contains $contract"

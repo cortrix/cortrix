@@ -10,6 +10,9 @@
 # =============================================================
 
 server:
+  # The all-in-one container must listen on its internal network interface.
+  # docker-compose.yml pairs this with an explicit Core opt-in and publishes
+  # port 8420 only to host loopback (127.0.0.1).
   host: 0.0.0.0
   port: 8420
 

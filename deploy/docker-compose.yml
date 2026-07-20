@@ -13,6 +13,10 @@ services:
     environment:
       CORTRIX_DATA_DIR: /data
       CORTRIX_HTTP_PORT: "8420"
+      # The API listens on the container interface, while Compose publishes it
+      # exclusively to host loopback above. Core rejects this exception unless
+      # it is explicitly enabled.
+      CORTRIX_SERVER_ALLOW_UNAUTHENTICATED_CONTAINER_BIND: "true"
       CORTRIX_PROFILE: quickstart
       CORTRIX_LLM_ENABLED: "false"
       CORTRIX_AGENT_ENABLED: "false"

@@ -11,6 +11,10 @@ struct ServerConfig {
     int port = 8420;
     int thread_count = 8;
     int64_t max_payload_bytes = 100 * 1024 * 1024;  // 100MB
+    // Explicit opt-in for a container-internal wildcard listener. This remains
+    // false by default and is only safe when the container runtime publishes
+    // the host port to loopback, such as 127.0.0.1.
+    bool allow_unauthenticated_container_bind = false;
 };
 
 struct AuthConfig {

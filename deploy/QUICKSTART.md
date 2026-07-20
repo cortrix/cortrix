@@ -60,7 +60,10 @@ Add `--volumes` to remove the cached data and model assets as well.
 
 The Quick Start uses real BGE-M3 embedding and bge-reranker-v2-m3 reranking on
 CPU. External LLM roles and the built-in Agent remain disabled. Only the API at
-`127.0.0.1:8420` is published; the metrics and Agent ports are not exposed.
+`127.0.0.1:8420` is the only published host socket; the metrics and Agent ports
+are not exposed. Core's unauthenticated non-loopback guard remains fail closed
+by default; this Compose file explicitly permits only the container-internal
+wildcard listener needed for that loopback publication.
 
 This path is for local first value. It does not establish parser coverage,
 authentication, internet-facing deployment, benchmark quality, or production
