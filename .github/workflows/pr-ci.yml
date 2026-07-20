@@ -106,10 +106,10 @@ jobs:
     timeout-minutes: 10
     # SOFT gate: legacy code predates .clang-format; hardening mode
     # (full reformat vs diff-only) remains a project-level decision.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: clang-format (changed files only)
+        continue-on-error: true
         run: |
           sudo apt-get install -y clang-format
           git fetch origin ${{ github.base_ref || 'main' }} --depth=1 || true
@@ -120,9 +120,10 @@ jobs:
             echo "no C++ changes"
           fi
       - name: ruff (python)
+        continue-on-error: true
         run: |
           pip install -q ruff
-          ruff check cortrix-agent cortrix-mcp sdk/python || true
+          ruff check cortrix-agent cortrix-mcp sdk/python
 
   # Coverage diff is record-only at Stage 1 (soft, per §6.2)
   coverage_soft:
