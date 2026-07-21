@@ -194,7 +194,7 @@ jobs:
       - name: OWASP ZAP baseline (hard gate on High/Critical)
         run: |
           docker run --rm --network cortrix-zap -v $(pwd):/zap/wrk ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://cortrix:8420 -c tests/security/zap-baseline.conf
+            zap-baseline.py -I -t http://cortrix:8420 -c tests/security/zap-baseline.conf
       - name: Cleanup security runtime
         if: always()
         run: |
