@@ -36,6 +36,7 @@ WORKDIR /build
 # Copy CMake infrastructure first for better layer caching
 COPY cmake          cortrix/cmake/
 COPY CMakeLists.txt cortrix/CMakeLists.txt
+COPY VERSION        cortrix/VERSION
 
 # Copy cortrix OSS source (tests/ required: root CMakeLists add_subdirectory
 # is unconditional; BUILD_TESTS=OFF only skips the targets)

@@ -44,6 +44,7 @@ WORKDIR /build
 
 COPY cmake          cortrix/cmake/
 COPY CMakeLists.txt cortrix/CMakeLists.txt
+COPY VERSION        cortrix/VERSION
 COPY include        cortrix/include/
 COPY src            cortrix/src/
 COPY tests          cortrix/tests/
