@@ -106,7 +106,8 @@ jobs:
 
   perf_load:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    # Allow the 30-minute fail-closed cold-start window plus image build and load test.
+    timeout-minutes: 60
     # Soft gate: P95 vs baseline ±10% — alert, don't block.
     continue-on-error: true
     steps:
@@ -134,7 +135,8 @@ jobs:
 
   security_zap:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    # Allow the 30-minute fail-closed cold-start window plus image build and ZAP scan.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Build + boot server
