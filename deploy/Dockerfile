@@ -134,7 +134,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 LABEL maintainer="Cortrix Team <team@cortrix.ai>"
 LABEL description="Cortrix — Semantic Storage for the Agentic Era"
-LABEL version="1.0.0"
+LABEL version="1.0.0-rc.1"
 
 # Runtime dependencies only — no compilers.
 # curl + python3.10-venv are needed by the first-run provisioning in

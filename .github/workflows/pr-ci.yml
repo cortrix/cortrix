@@ -108,6 +108,8 @@ jobs:
     # (full reformat vs diff-only) remains a project-level decision.
     steps:
       - uses: actions/checkout@v4
+      - name: Release version consistency
+        run: python3 scripts/sync_version.py --check
       - name: clang-format (changed files only)
         continue-on-error: true
         run: |

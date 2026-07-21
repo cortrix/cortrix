@@ -40,7 +40,7 @@ This installs the `cortrix-mcp` console command (the MCP stdio server entry poin
 docker run -i --rm \
   -e CORTRIX_URL=http://host.docker.internal:8420 \
   -e CORTRIX_API_KEY=your-cortrix-api-key \
-  cortrix/mcp:v1.0.0
+  cortrix/mcp:v1.0.0-rc.1
 ```
 
 ## Configuration
@@ -90,7 +90,7 @@ Docker variant:
         "run", "-i", "--rm",
         "-e", "CORTRIX_URL=http://host.docker.internal:8420",
         "-e", "CORTRIX_API_KEY=your-cortrix-api-key",
-        "cortrix/mcp:v1.0.0"
+        "cortrix/mcp:v1.0.0-rc.1"
       ]
     }
   }

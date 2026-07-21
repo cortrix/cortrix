@@ -60,7 +60,7 @@ def test_close_and_context_manager(fake_client):
 
 def test_health_uses_sdk(kit, fake_client):
     out = kit.cortrix_health()
-    assert out == {"status": "ok", "version": "1.0.0"}
+    assert out == {"status": "ok", "version": "1.0.0-rc.1"}
     assert fake_client.names_called() == ["system.health"]
 
 

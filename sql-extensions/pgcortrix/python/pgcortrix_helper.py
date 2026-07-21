@@ -607,7 +607,7 @@ class PgcortrixClient:
         blob with http_connected=false (diagnostics must always answer)."""
         cfg = self._get_config()
         result = {
-            "version": "1.0.0",
+            "version": "1.0.0-rc.1",
             "endpoint": cfg["endpoint"],
             "timeout_ms": cfg["timeout_ms"],
             "retry_max": cfg["retry_max"],

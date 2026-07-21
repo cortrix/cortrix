@@ -1,7 +1,7 @@
 # Cortrix Web UI - E2E Test Cases
 
 **Project**: Cortrix Semantic Storage Engine - Web UI
-**Version**: v0.1.0-mvp
+**Historical Test Plan Version**: v0.1.0-mvp
 **Test Type**: End-to-End Browser Automation
 **Test Date**: 2026-02-18
 **Tester**: QA Test Expert (Automated Playwright)

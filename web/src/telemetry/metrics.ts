@@ -32,7 +32,7 @@ let sessionStart = 0;
 function serviceVersion(): string {
   // Vite replaces import.meta.env at build; fall back to package version.
   const env = (import.meta as unknown as { env?: Record<string, string> }).env;
-  return env?.VITE_APP_VERSION ?? '1.0.0';
+  return env?.VITE_APP_VERSION ?? '1.0.0-rc.1';
 }
 
 function deploymentEnv(): string {

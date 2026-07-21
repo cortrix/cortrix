@@ -496,7 +496,7 @@ class TestStatus(unittest.TestCase):
         client, _, cap = make_client(payloads=[{"status": "ok"}])
         s = client.status()
         self.assertTrue(s["http_connected"])
-        self.assertEqual(s["version"], "1.0.0")
+        self.assertEqual(s["version"], "1.0.0-rc.1")
         self.assertEqual(s["endpoint"], "http://localhost:8420")
         self.assertIn("latency_ms", s)
         self.assertTrue(cap.last.full_url.endswith("/api/v1/health"))

@@ -144,6 +144,17 @@ pytest --cov=cortrix
 - **Agent-friendly by design**: new endpoints must return the 4-field error schema (`code` / `retryable` / `category` / `retry_after_ms`) and carry the relevant `x-cortrix-*` OpenAPI hints. The OpenAPI spec ([`api/openapi.yaml`](api/openapi.yaml)) is the source of truth for the wire contract — keep it and the SDK in sync.
 - **Errors** use the project's `CX_ERR_*` code convention (see [`api/openapi.yaml`](api/openapi.yaml)).
 
+## Release Version
+
+The root [`VERSION`](VERSION) file is the only manually edited source for the Cortrix release version. After changing it, synchronize the derived C++, Docker, OpenAPI, Web, and Python package surfaces:
+
+```bash
+python3 scripts/sync_version.py
+python3 scripts/sync_version.py --check
+```
+
+Do not edit a derived version field by itself. CI runs the check command and rejects version drift. Human-facing releases use the `v` prefix, SemVer and API fields omit it, and Python package metadata uses the equivalent PEP 440 spelling.
+
 ---
 
 ## Pull Request Workflow

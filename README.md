@@ -6,7 +6,7 @@
   Agent-native semantic storage for retrieval, memory, and API-driven AI applications.
 
   [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](LICENSE)
-  [![Version](https://img.shields.io/badge/version-0.1.0--rc.1-orange.svg)](https://github.com/cortrix/cortrix/releases)
+  [![Version](https://img.shields.io/badge/version-v1.0.0--rc.1-orange.svg)](https://github.com/cortrix/cortrix/releases)
   [![C++17](https://img.shields.io/badge/C%2B%2B-17-blueviolet.svg)](https://en.cppreference.com/w/cpp/17)
 
   [Quickstart](docs/QUICKSTART.md) · [Agent access](docs/agent-access.md) · [Compatibility](docs/compatibility.md) · [OpenAPI](api/openapi.yaml)

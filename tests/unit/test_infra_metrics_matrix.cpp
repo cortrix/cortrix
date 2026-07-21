@@ -561,7 +561,7 @@ TEST_F(DeployFx, ShutdownStatusGauge) {
 TEST_F(DeployFx, RenderEmitsOwnedGaugesAndBuildInfo) {
     m().SetDiskUsageRatio(0.5);
     m().SetShutdownStatus(1);
-    m().SetBuildInfo("1.0.0", "abc123", "2026-06-21");
+    m().SetBuildInfo("1.0.0-rc.1", "abc123", "2026-06-21");
     m().MarkStart();
     std::string out = m().Render();
     EXPECT_NE(out.find("# TYPE cortrix_disk_usage_ratio gauge"),
@@ -569,7 +569,7 @@ TEST_F(DeployFx, RenderEmitsOwnedGaugesAndBuildInfo) {
     EXPECT_NE(out.find("# TYPE cortrix_shutdown_status gauge"),
               std::string::npos);
     EXPECT_NE(out.find("cortrix_build_info"), std::string::npos);
-    EXPECT_NE(out.find("version=\"1.0.0\""), std::string::npos);
+    EXPECT_NE(out.find("version=\"1.0.0-rc.1\""), std::string::npos);
     EXPECT_NE(out.find("# TYPE cortrix_uptime_seconds gauge"),
               std::string::npos);
     // bloom filter gauges are NOT part of DeployMetrics::Render().

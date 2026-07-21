@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cortrix-mcp"
-version = "1.0.0"
+version = "1.0.0rc1"
 description = "Cortrix MCP Server — expose the Cortrix HTTP API as MCP tools for IDE agents (Claude Code / Cline / Cursor)."
 readme = "README.md"
 requires-python = ">=3.10"

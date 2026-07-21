@@ -2,12 +2,12 @@
 #
 # Build context = this directory (cortrix-mcp/). Installs the package from the local
 # source so the image is buildable before the package is published to PyPI. Once
-# cortrix-mcp is on PyPI, this can switch to `pip install cortrix-mcp==1.0.0` (feature
+# cortrix-mcp is on PyPI, this can switch to `pip install cortrix-mcp==1.0.0rc1` (feature
 # design section 8.2).
 #
-#   docker build -t cortrix/mcp:v1.0.0 .
+#   docker build -t cortrix/mcp:v1.0.0-rc.1 .
 #   docker run -i --rm -e CORTRIX_URL=http://host.docker.internal:8080 \
-#       -e CORTRIX_API_KEY=sk-cortrix-... cortrix/mcp:v1.0.0
+#       -e CORTRIX_API_KEY=sk-cortrix-... cortrix/mcp:v1.0.0-rc.1
 #
 # It speaks MCP over stdio, so run with -i (interactive stdin) and pipe the IDE client in.
 

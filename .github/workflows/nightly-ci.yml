@@ -28,6 +28,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - name: Release version consistency
+        run: python3 scripts/sync_version.py --check
       - name: Install deps
         run: |
           sudo apt-get update
