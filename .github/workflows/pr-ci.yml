@@ -130,7 +130,10 @@ jobs:
   # Coverage diff is record-only at Stage 1 (soft, per §6.2)
   coverage_soft:
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    # Instrumented compilation plus the serial 11k+ unit matrix exceeds the
+    # previous 90-minute envelope on a cold hosted runner. Keep this record-only
+    # job intact and allow its measured workload to finish.
+    timeout-minutes: 150
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4

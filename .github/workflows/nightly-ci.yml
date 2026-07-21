@@ -25,7 +25,10 @@ on:
 jobs:
   cpp_full:
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    # The hard coverage phase performs a second instrumented build and then
+    # runs the 11k+ unit cases serially. Preserve that gate and give it the
+    # measured end-to-end window it needs on a cold hosted runner.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
       - name: Release version consistency
@@ -69,7 +72,9 @@ jobs:
 
   asan:
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    # ASAN runs the complete 11k+ unit matrix serially; the measured hosted
+    # runner duration is just over 90 minutes, so retain the suite unchanged.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - name: Install deps
