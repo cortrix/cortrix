@@ -116,8 +116,28 @@ jobs:
         run: docker build -t cortrix:nightly -f deploy/Dockerfile .
       - name: Boot stack
         run: |
-          docker run -d --name cortrix -p 127.0.0.1:8420:8420 -v /tmp/cortrix-data:/data cortrix:nightly
-          timeout 1800 bash -c 'until curl -sf http://localhost:8420/api/v1/system/health/ready; do sleep 5; done'
+          docker volume create cortrix-nightly-data
+          docker run -d --name cortrix \
+            -p 127.0.0.1:8420:8420 \
+            -v cortrix-nightly-data:/data \
+            -e CORTRIX_SERVER_ALLOW_UNAUTHENTICATED_CONTAINER_BIND=true \
+            cortrix:nightly
+          READY=false
+          for _ in $(seq 1 360); do
+            if [ "$(docker inspect cortrix --format '{{.State.Running}}')" != "true" ]; then
+              docker logs cortrix
+              exit 1
+            fi
+            if curl -fsS http://localhost:8420/api/v1/system/health/ready >/dev/null 2>&1; then
+              READY=true
+              break
+            fi
+            sleep 5
+          done
+          if [ "$READY" != "true" ]; then
+            docker logs cortrix
+            exit 1
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
@@ -132,6 +152,11 @@ jobs:
           name: load-results
           path: build-load/
           if-no-files-found: ignore
+      - name: Cleanup runtime
+        if: always()
+        run: |
+          docker rm -f cortrix 2>/dev/null || true
+          docker volume rm cortrix-nightly-data 2>/dev/null || true
 
   security_zap:
     runs-on: ubuntu-22.04
@@ -143,11 +168,38 @@ jobs:
         run: |
           docker build -t cortrix:nightly -f deploy/Dockerfile .
           docker network create cortrix-zap
-          docker run -d --name cortrix --network cortrix-zap -v /tmp/cortrix-data:/data cortrix:nightly
-          timeout 1800 bash -c 'until docker exec cortrix curl -sf http://127.0.0.1:8420/api/v1/system/health/ready; do sleep 5; done'
+          docker volume create cortrix-zap-data
+          docker run -d --name cortrix \
+            --network cortrix-zap \
+            -v cortrix-zap-data:/data \
+            -e CORTRIX_SERVER_ALLOW_UNAUTHENTICATED_CONTAINER_BIND=true \
+            cortrix:nightly
+          READY=false
+          for _ in $(seq 1 360); do
+            if [ "$(docker inspect cortrix --format '{{.State.Running}}')" != "true" ]; then
+              docker logs cortrix
+              exit 1
+            fi
+            if docker exec cortrix curl -fsS \
+              http://127.0.0.1:8420/api/v1/system/health/ready >/dev/null 2>&1; then
+              READY=true
+              break
+            fi
+            sleep 5
+          done
+          if [ "$READY" != "true" ]; then
+            docker logs cortrix
+            exit 1
+          fi
       - name: OWASP ZAP baseline (hard gate on High/Critical)
         run: |
           docker run --rm --network cortrix-zap -v $(pwd):/zap/wrk ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py -t http://cortrix:8420 -c tests/security/zap-baseline.conf
+      - name: Cleanup security runtime
+        if: always()
+        run: |
+          docker rm -f cortrix 2>/dev/null || true
+          docker network rm cortrix-zap 2>/dev/null || true
+          docker volume rm cortrix-zap-data 2>/dev/null || true
       # snyk disabled: no org token provisioned yet (design lists it;
       # Trivy image scanning runs at the release gate.
