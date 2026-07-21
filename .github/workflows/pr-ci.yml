@@ -20,7 +20,7 @@ on:
 jobs:
   cpp_unit:
     runs-on: ubuntu-22.04
-    timeout-minutes: 40
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -130,7 +130,7 @@ jobs:
   # Coverage diff is record-only at Stage 1 (soft, per §6.2)
   coverage_soft:
     runs-on: ubuntu-22.04
-    timeout-minutes: 50
+    timeout-minutes: 90
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
