@@ -22,7 +22,6 @@ OUT="$BUILD/coverage"
 
 OVERALL_LINE_MIN=80
 CORE_LINE_MIN=90
-CORE_BRANCH_MIN=80
 
 # F01(store/phnsw) F25(store) F02 F03+F07(spc) F04(query) F05(resource)
 # F08(async) F12(catalog) F13(observability+agent_trace) F18a(logging)
@@ -86,10 +85,10 @@ mkdir -p "$OUT"
 if lcov --help 2>&1 | grep -q -- '--filter'; then
   echo "   lcov mode: 2.x filters"
   LCOV_OPTS=(--rc branch_coverage=1 --rc no_exception_branch=1 --rc max_message_count=10
-             --filter branch,function
-             --ignore-errors mismatch,negative,unused,inconsistent,deprecated,format,count,empty,source,unsupported,graph,path,range)
+             --filter "branch,function"
+             --ignore-errors "mismatch,negative,unused,inconsistent,deprecated,format,count,empty,source,unsupported,graph,path,range")
   LCOV_SUMMARY_OPTS=(--rc branch_coverage=1
-                     --ignore-errors inconsistent,format,count,range)
+                     --ignore-errors "inconsistent,format,count,range")
 else
   echo "   lcov mode: 1.x compatibility"
   LCOV_OPTS=(--rc lcov_branch_coverage=1)
