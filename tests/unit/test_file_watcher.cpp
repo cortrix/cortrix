@@ -453,11 +453,13 @@ TEST_F(FileWatcherTest, StopThenRestart) {
     CreateFile("restart_test.txt");
     WaitForEvents(1, 3000);
 
-    std::lock_guard<std::mutex> lock(mu_);
     bool found = false;
-    for (const auto& e : events_) {
-        if (e.path.find("restart_test.txt") != std::string::npos) {
-            found = true;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        for (const auto& e : events_) {
+            if (e.path.find("restart_test.txt") != std::string::npos) {
+                found = true;
+            }
         }
     }
     EXPECT_TRUE(found);

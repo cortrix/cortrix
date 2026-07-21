@@ -77,12 +77,24 @@ mkdir -p "$OUT"
 # Branch gate metric = no-exception-branch (F23 §4.1.bis): gcov's raw mode
 # counts 2 branches per potentially-throwing call site (C++ exception edges),
 # diluting the denominator ~58% with mostly-untriggerable arms.
-# inconsistent/format/count/deprecated etc.: lcov 2.x added strict checks that
-# libc++ system headers and gmock's compiler-generated functions trip
-# constantly; ignore them all (1.x behavior).
-LCOV_OPTS=(--rc branch_coverage=1 --rc no_exception_branch=1 --rc max_message_count=10
-           --filter branch,function
-           --ignore-errors mismatch,negative,unused,inconsistent,deprecated,format,count,empty,source,unsupported,graph,path,range)
+#
+# Ubuntu 22.04 ships lcov 1.15, while newer runners may provide lcov 2.x.
+# Options such as --filter and the extended --ignore-errors taxonomy only exist
+# in 2.x. Keep the same source extraction, exclusions, and line thresholds on
+# both versions; the lcov branch value is informational and the hard branch gate
+# remains owned by llvmcov.sh.
+if lcov --help 2>&1 | grep -q -- '--filter'; then
+  echo "   lcov mode: 2.x filters"
+  LCOV_OPTS=(--rc branch_coverage=1 --rc no_exception_branch=1 --rc max_message_count=10
+             --filter branch,function
+             --ignore-errors mismatch,negative,unused,inconsistent,deprecated,format,count,empty,source,unsupported,graph,path,range)
+  LCOV_SUMMARY_OPTS=(--rc branch_coverage=1
+                     --ignore-errors inconsistent,format,count,range)
+else
+  echo "   lcov mode: 1.x compatibility"
+  LCOV_OPTS=(--rc lcov_branch_coverage=1)
+  LCOV_SUMMARY_OPTS=(--rc lcov_branch_coverage=1)
+fi
 lcov "${LCOV_OPTS[@]}" --capture --directory "$BUILD" --output-file "$OUT/raw.info" >/dev/null
 # project code only: drop system headers, fetched deps, tests themselves.
 # Also drop vendored third-party sources living inside src/ (hnswlib ships its
@@ -103,7 +115,7 @@ genhtml --branch-coverage "$OUT/all.info" --output-directory "$OUT/html" >/dev/n
 pct() { # pct <info-file> <lines|branches>
   # lcov 2.x summary line: "  lines.......: 91.5% (27133 of 29654 lines)".
   # Match field 1 = "<key>...:" (dots vary) and take the % off field 2.
-  lcov --rc branch_coverage=1 --ignore-errors inconsistent,format,count,range --summary "$1" 2>&1 \
+  lcov "${LCOV_SUMMARY_OPTS[@]}" --summary "$1" 2>&1 \
     | awk -v k="$2" '$1 ~ "^"k"\\.*:" {gsub(/%/,"",$2); print $2; exit}'
 }
 
