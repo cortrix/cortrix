@@ -2,7 +2,7 @@
 /// @brief R7 full-stack E2E for F13 Agent Observability + F18a Operation Log over the
 ///        PRODUCTION live wiring (cross-DB owner resolution).
 ///
-/// Why this exists (Derek's R7 mandate — full-stack integration, not component-level):
+/// Why this exists (full-stack integration, not component-level):
 /// the existing F13 coverage (tests/unit/test_observability_routes.cpp) registers the
 /// *co-located* RegisterObservabilityRoutes — agent_trace and interaction_log share one
 /// DB. Production does NOT: bootstrap wires RegisterTracesRoutesGlobal (agent_trace in
@@ -51,7 +51,7 @@ using cortrix::agent_trace::AgentTraceEntry;
 using cortrix::agent_trace::AgentTraceWriterImpl;
 
 // The two namespaces this suite admits. "sales" is alice's (the owner under test);
-// "eng" exists so cross-NS / wrong-NS behaviour is meaningful.
+// "eng" exists so cross-NS / wrong-NS behavior is meaningful.
 constexpr const char* kNsSales = "sales";
 constexpr const char* kNsEng = "eng";
 

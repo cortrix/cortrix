@@ -7,7 +7,7 @@ namespace httplib { class Server; }
 namespace cortrix {
 
 namespace resource { class INamespacePool; }
-namespace observability { class IOperationLogger; }  // D3.5 wire⑤c: memory routes acquire per-request façades from the pool
+namespace observability { class IOperationLogger; }  // Memory routes acquire per-request façades from the pool.
 
 class ApiKeyAuth;
 class SPCManager;
@@ -20,7 +20,7 @@ namespace memory {
 class MemoryExtractionService;          // M1/M2 — /memory/extract* + interaction enqueue
 }  // namespace memory
 
-/// M-wave (D3.5 round-2) memory service bundle. Threads the MEM02 runtime service into
+/// Memory service bundle. Threads the MEM02 runtime service into
 /// RegisterMemoryRoutes without a long parameter list. The pointer is owned by bootstrap
 /// and outlives the server; null = extraction disabled (the extract endpoints then
 /// return a clean disabled error). MEM03 transparency + MEM04 opt-out are NS-scoped, so

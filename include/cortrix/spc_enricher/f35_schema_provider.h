@@ -6,7 +6,7 @@
 namespace cortrix::spc {
 
 /// F35's per-Unit schema contribution (Contextual Retrieval, design § 4.1, A
-/// unified-blocks reconcile — Derek 2026-06-07). Registered through the F12
+/// unified-blocks reconcile). Registered through the F12
 /// SchemaMigrator framework (ARCH § 1.3.bis.3 provider #6, after F03).
 ///
 /// Under A unified-blocks, F35's columns live on child rows of the F09-owned

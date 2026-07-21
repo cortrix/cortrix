@@ -30,7 +30,7 @@ from __future__ import annotations
 from .descriptor import ToolDescriptor, describe_method, json_schema_from_method
 from .toolkit import TOOL_METHOD_NAMES, CortrixToolKit
 
-__version__ = "1.0.0"
+__version__ = "1.0.0rc1"
 
 __all__ = [
     "CortrixToolKit",

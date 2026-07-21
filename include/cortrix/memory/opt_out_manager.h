@@ -109,7 +109,7 @@ struct RevokeResult {
 ///
 /// `mem04.enabled` (cortrix.yaml §4.3) gates opt_out/opt_out_revoke: when disabled the
 /// mutating calls fail OPT_OUT_DISABLED (503). is_session_opted_out is NOT gated — the
-/// MEM02 worker must still honour existing opt-out stamps even if new opt-outs are off.
+/// MEM02 worker must still honor existing opt-out stamps even if new opt-outs are off.
 ///
 /// Standalone-D3: every collaborator is an injected seam, so all three operations run
 /// fully in unit tests against a mock store (+ an optional mock logger).
@@ -145,7 +145,7 @@ public:
                                       const observability::TraceContext* ctx = nullptr);
 
     /// MEM02 worker check (D3 — skip extraction). True iff `session_id` is currently
-    /// opted-out. NOT gated by mem04.enabled (existing stamps are always honoured).
+    /// opted-out. NOT gated by mem04.enabled (existing stamps are always honored).
     /// A non-existent session is treated as not-opted-out (false) — the worker has an
     /// interaction for it, so absence is a benign race, not an error. On store failure
     /// returns the error Status (the worker fails open per its own policy).

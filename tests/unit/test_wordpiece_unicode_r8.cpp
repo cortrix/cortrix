@@ -270,7 +270,7 @@ INSTANTIATE_TEST_SUITE_P(UnicodePunct, PunctTest, ::testing::Values(
 struct ControlCase { char32_t cp; };
 class ControlStripTest : public ::testing::TestWithParam<ControlCase> {};
 
-TEST_P(ControlStripTest, StrippedLeavingNeighbours) {
+TEST_P(ControlStripTest, StrippedLeavingNeighbors) {
     WordPieceTokenizer t;
     // "a<ctrl>b": the control char is removed by CleanText; a/b stay adjacent → "ab".
     auto words = t.BasicTokenize("a" + U8(GetParam().cp) + "b");

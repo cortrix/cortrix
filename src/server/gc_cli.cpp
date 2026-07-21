@@ -15,7 +15,7 @@ namespace cortrix::server {
 
 namespace {
 
-// Parse `--config <path>` out of argv (same flag the server honours) so the CLI
+// Parse `--config <path>` out of argv (same flag the server honors) so the CLI
 // resolves the data dir + gc windows from the same config the server would use.
 std::string ParseConfigPath(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i) {

@@ -8,7 +8,7 @@ frameworks (feature design section 5, issue 2: pydantic BaseModel + auto JSON
 Schema).
 
 The toolkit methods carry plain Python type hints + defaults; we reflect over
-the signature and synthesise a ``pydantic.BaseModel`` whose fields mirror the
+the signature and synthesize a ``pydantic.BaseModel`` whose fields mirror the
 parameters. Pydantic v2 then renders a JSON Schema via ``model_json_schema()``.
 """
 
@@ -29,7 +29,7 @@ __all__ = [
     "first_line",
 ]
 
-# Pydantic appends "Input" to synthesised arg-schema model names for readability
+# Pydantic appends "Input" to synthesized arg-schema model names for readability
 # (e.g. CortrixQueryInput).
 _MODEL_SUFFIX = "Input"
 
@@ -98,7 +98,7 @@ def json_schema_from_method(method: Callable[..., Any]) -> dict[str, Any]:
     """
     model = pydantic_model_from_method(method)
     schema = model.model_json_schema()
-    # Synthesised model titles ("CortrixQueryInput") leak the internal name; drop
+    # Synthesized model titles ("CortrixQueryInput") leak the internal name; drop
     # it so the schema reads as a plain parameter object.
     schema.pop("title", None)
     return schema

@@ -1,8 +1,7 @@
 """GcOps — GC ops endpoints. ``/gc/*`` (ops:admin scope).
 
-Per Derek's ruling (briefing § 9): SDK shape = P03 § 2.12; wire = real
-architecture (= OPEN-2 GC, captured by the spec). So the GC wire follows the
-real-arch shapes (§ 2.13's ``dry_run``/``scope``/``Gc*Result``/``blob_id`` are
+This resource follows the implemented HTTP architecture (= OPEN-2 GC, captured by the spec).
+The GC wire follows the implemented shapes; ``dry_run``/``scope``/``Gc*Result``/``blob_id`` are
 the obsoleted D1 draft):
   - ``run()``     -> POST /gc/run  (parameterless + ``X-Ops-Confirm: true``) -> GcStatus
   - ``restore()`` -> POST /gc/restore  (body ``{document_ids: [...]}``) -> PartialSuccessById

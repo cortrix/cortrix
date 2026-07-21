@@ -156,7 +156,8 @@ OnnxReranker::~OnnxReranker() {
     // deleted out from under an in-flight inference (TSAN-caught UAF).
     Shutdown();
 #ifdef CORTRIX_HAS_ONNXRUNTIME
-    // session_ is owned; env_ is borrowed from OrtEnvSingleton (never deleted).
+    // session_ is owned; env_ is borrowed from OrtEnvSingleton and is not
+    // released by this consumer.
     delete static_cast<Ort::Session*>(session_);
     session_ = nullptr;
 #endif

@@ -11,7 +11,7 @@ the sync (:class:`cortrix._client.Cortrix`) and async
   - ``should_retry`` — retry decision with the issue-4 priority order (§ 5).
 
 The actual HTTP send loops live on the sync/async subclasses (they own the
-``httpx`` client); they call back into these helpers so behaviour is identical
+``httpx`` client); they call back into these helpers so behavior is identical
 across both.
 """
 

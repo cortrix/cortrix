@@ -5,7 +5,6 @@
 # `redocly bundle` into build/openapi.bundled.yaml (= the full API SSoT, consumed by
 # Swagger UI / P03 SDK codegen / contract tests).
 #
-# Detailed design: dev-cortrix-hub/design/features/P04-api-docs.md
 # bundle:  scripts/bundle_openapi.sh  →  build/openapi.bundled.yaml
 #
 # ⚠️ S1 = skeleton (well-structured + bundleable + loadable by Swagger UI).
@@ -14,11 +13,11 @@ openapi: 3.0.3
 
 info:
   title: Cortrix API
-  version: 1.0.0
+  version: 1.0.0-rc.1
   description: |
     Cortrix Agent-first Data Infrastructure API.
 
-    All endpoints follow the GEN-Agent first principle (dev-cortrix-hub/design/AGENT_FRIENDLY.md):
+    All endpoints follow the agent-first API contract:
     - Error responses are machine-readable, including `retryable` / `category` / `retry_after_ms` / `structured_data` fields
     - Endpoint-level `x-cortrix-*` extensions provide Agent-parseable machine-readable metadata
       (workflow / retryable / retry-strategy / auth-scope / latency / rate-limit / side-effects)
@@ -27,10 +26,10 @@ info:
     Primary consumers = Agents (Claude / GPT / LangChain / LlamaIndex, etc.), including ops scenarios.
   contact:
     name: Cortrix
-    url: https://cortrix.io
+    url: https://cortrix.ai
   license:
-    name: AGPL-3.0
-    url: https://www.gnu.org/licenses/agpl-3.0.html
+    name: AGPL-3.0-only
+    url: https://spdx.org/licenses/AGPL-3.0-only.html
 
 servers:
   - url: https://api.cortrix.io/api/v1

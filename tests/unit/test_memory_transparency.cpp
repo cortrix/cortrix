@@ -714,7 +714,7 @@ TEST_F(MemoryTransparencyTest, TriggeredByToString) {
 }
 
 // ---------- MakeOpLogEntry ns_id true-arm (line 116) ----------
-// Round-1 blocks had empty ns_id, so the audit's `if (!ns_id.empty())` true arm
+// Existing fixtures had empty ns_id, so the audit's `if (!ns_id.empty())` true arm
 // (sets namespace_id) was never hit. Seed a block WITH ns_id and delete/edit it.
 
 TEST_F(MemoryTransparencyTest, DeleteAuditSetsNamespaceIdWhenNsPresent) {

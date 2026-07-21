@@ -5,7 +5,7 @@ storage. Synchronous (`Cortrix`) and asynchronous (`AsyncCortrix`) clients with
 a Resource-style API, full type hints (`py.typed`), and structured error
 handling.
 
-> Status: `RD review required`. The SDK surface is documented and test-covered,
+> Status: `Verification required`. The SDK surface is documented and test-covered,
 > but public-readiness labeling still depends on live API compatibility. See
 > [Agent access](../../docs/agent-access.md) and
 > [Compatibility](../../docs/compatibility.md).
@@ -80,7 +80,7 @@ The async client mirrors the sync API exactly — every resource method has an
 | `client.ops.gc` | `status` / `run` / `restore` / `purge` |
 | `client.import_database(...)` | manual database import |
 
-Some resources map to API areas that are currently blocked or under RD review.
+Some resources map to API areas that are currently blocked or awaiting verification.
 Do not treat resource presence as a production-readiness claim.
 
 ## Ops namespace
@@ -110,7 +110,7 @@ try:
 except AuthInvalidCredentialsError:
     relogin()                                  # precise L2 subclass
 except RateLimitError as e:
-    sleep((e.retry_after_ms or 1000) / 1000)   # honour server hint
+    sleep((e.retry_after_ms or 1000) / 1000)   # honor server hint
 except CortrixError as e:
     if e.category == "transient" and e.retryable:
         retry()
@@ -167,4 +167,4 @@ python scripts/generate_types.py   # regenerate types from the OpenAPI spec
 
 ## License
 
-AGPL-3.0
+AGPL-3.0-only

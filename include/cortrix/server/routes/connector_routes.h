@@ -24,7 +24,7 @@ namespace catalog  { class INSRouter; }
 /// F21 (TD-WATCHER-001): the MVP `vector<WatcherEntry>` (one OS FileWatcher per
 /// (dir, namespace) pair) is replaced by a single DirWatcherRegistry that keeps
 /// exactly one OS watcher per directory and fans its events out to every
-/// subscribed namespace. The registry is internally synchronised (its own mu_),
+/// subscribed namespace. The registry is internally synchronized (its own mu_),
 /// so this struct no longer carries a mutex or a watcher vector.
 ///
 /// `registry` is created lazily by RegisterConnectorRoutes (the only place that

@@ -275,7 +275,7 @@ TEST(OnnxStartupValidatorTest, MissingModelSkippedWhenConfigured) {
 // Pin both dirs to nonexistent paths via config (NOT env — the collector now
 // resolves them from config only) so these exact-set assertions hold
 // regardless of where the suite runs (repo root has the real models;
-// worktrees do not).
+// separate source checkouts do not).
 class OnnxCollectModelsTest : public ::testing::Test {
  protected:
     CortrixConfig BaseConfig() {

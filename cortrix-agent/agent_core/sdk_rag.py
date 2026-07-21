@@ -3,7 +3,7 @@
 F48 RAG data source is cortrix-server, accessed through the P03 ``AsyncCortrix`` SDK
 exactly like any external Agent (no privileged channel — design section 5.2). This
 module is the single RAG seam: it calls ``client.search(namespace, query, top_k)`` and
-normalises the wire-faithful ``QueryResult`` into the flat chunk shape the prompt
+normalizes the wire-faithful ``QueryResult`` into the flat chunk shape the prompt
 builder and explain meta consume.
 
 Standalone discipline (D3 rule): during standalone development cortrix-server is not
@@ -27,7 +27,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class RagChunk:
-    """A single retrieved chunk, normalised from a P03 ``QueryResultItem``."""
+    """A single retrieved chunk, normalized from a P03 ``QueryResultItem``."""
 
     chunk_id: str
     source_path: str
@@ -78,7 +78,7 @@ def _content(item: Any) -> str:
 
 
 def normalize_query_result(result: Any) -> RagResult:
-    """Normalise a P03 ``QueryResult`` (or dict) into a :class:`RagResult`.
+    """Normalize a P03 ``QueryResult`` (or dict) into a :class:`RagResult`.
 
     Accepts both the dataclass (``result.results`` / ``result.meta``) and a plain dict
     (``result["results"]`` / ``result["meta"]``) so tests can stub either shape.
@@ -123,7 +123,7 @@ def normalize_query_result(result: Any) -> RagResult:
 def describe_origin(name: str, source_type: str, source_ref: str, namespace: str) -> str:
     """Human/agent-readable locator for a document's source file.
 
-    The goal (Derek 2026-06-20): no matter where a source file originally lived, the chat
+    No matter where a source file originally lived, the chat
     must be able to say how to find it. We surface the most specific locator available:
 
     * ``source_ref`` set        -> the external origin captured at ingest (e.g. an S3 URI
@@ -159,7 +159,7 @@ class SdkRagProvider:
         self.top_k = top_k
 
     async def retrieve(self, query: str, *, namespace: Optional[str] = None) -> RagResult:
-        """Run a semantic search via the SDK and normalise the result.
+        """Run a semantic search via the SDK and normalize the result.
 
         Raises whatever the SDK raises on failure (the executor maps it to the L1/L2/L3
         degradation policy in design section 9.2). ``namespace`` overrides the default

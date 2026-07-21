@@ -152,7 +152,7 @@ TEST_F(PHnswRecoveryTest, Recovery_DeleteThenSnapshotThenReopen) {
     // and recovery's replay never re-sees it. RecoverInternal used to hardcode
     // deleted_count_ = 0, so after reopen it undercounted deletions:
     // SearchLocked's live = total - deleted_count_ over-estimated and could ask
-    // hnswlib for more neighbours than exist live. The fix seeds deleted_count_
+    // hnswlib for more neighbors than exist live. The fix seeds deleted_count_
     // from index_->getDeletedCount() after the snapshot load.
     constexpr int kN = 12;
     constexpr int kDeleted = 4;

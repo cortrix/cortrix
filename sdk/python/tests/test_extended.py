@@ -85,7 +85,7 @@ def test_auth_register_and_me(api_base: str, client: Cortrix) -> None:
 @respx.mock
 def test_system_health(api_base: str, client: Cortrix) -> None:
     respx.get(api_base + "/system/health/live").mock(
-        return_value=httpx.Response(200, json={"status": "alive", "version": "1.0.0"})
+        return_value=httpx.Response(200, json={"status": "alive", "version": "1.0.0-rc.1"})
     )
     h = client.system.health()
     assert h["status"] == "alive"  # raw dict (no dedicated model in spec)

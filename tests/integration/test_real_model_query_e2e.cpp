@@ -6,7 +6,7 @@
 /// STUB embedder, so its query assertion was decision-A-weakened ("path runs +
 /// well-formed results", not "the right chunk ranks first"): stub vectors carry no
 /// semantic signal. This test fills that gap with the REAL bge-m3 model (1024-dim) so
-/// the vector path produces genuine semantic neighbours, and asserts real semantic
+/// the vector path produces genuine semantic neighbors, and asserts real semantic
 /// DISCRIMINATION end-to-end through the server: upload two documents on clearly
 /// different topics, query for one topic's concept, and require the top result to come
 /// from the matching document — something only a real embedder can satisfy.

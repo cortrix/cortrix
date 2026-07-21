@@ -66,7 +66,7 @@ protected:
 TEST_F(PHnswE2ETest, WriteSearchCrashRecoverAutoSnapshot) {
     std::mt19937 rng(42);
     // Keep the first vector to use as a deterministic query whose nearest
-    // neighbour is its own id.
+    // neighbor is its own id.
     std::vector<float> first;
 
     // --- Phase 1: bulk write, then a simulated crash (no Shutdown). ---

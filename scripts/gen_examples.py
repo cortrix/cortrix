@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""gen_examples.py — generate three-language example skeletons (curl / Python SDK / JS fetch) from the bundled spec.
+"""Generate API reference examples and explicitly unsupported SDK placeholders.
 
 Background
 ----------
-P04 § 8.1: each endpoint needs 3 languages × 3 scenarios = 9 examples. ~71 endpoints =
-~639 files, which is unmaintainable to hand-write (P04 R6 reserved an "example
-auto-generation tool"). This script reads build/openapi.bundled.yaml and, per operation,
-generates example skeletons from its method / path / x-cortrix metadata / requestBody schema:
+Each endpoint needs reference files across the supported languages and success/error
+scenarios. With dozens of endpoints, those files are not practical to maintain by hand.
+This script reads build/openapi.bundled.yaml and, per operation, generates reference files
+from its method / path / x-cortrix metadata / requestBody schema:
 
-  examples/<domain>/<opid>/success/{curl.sh,python.py,javascript.js}
+  examples/<domain>/<opid>/success/{curl.sh,javascript.js}
+  examples/<domain>/<opid>/unsupported/python.py
   examples/<domain>/<opid>/error_category_<cat>/{curl.sh,python.py,javascript.js,response.json}
 
 Error scenarios are derived by mapping the 4xx/5xx in each operation's responses → category
 (auth/quota/transient/permanent/timeout), guaranteeing ≥1 success + ≥2 errors per endpoint
-(including 1 retryable=true + 1 false) to satisfy the § 8.4 CI gate.
+(including 1 retryable=true + 1 false) for the examples validation gate.
 
 The hand-refined canonical directories (query/ documents/ memory/) are not overwritten by
 default (only with --force).
@@ -21,8 +22,9 @@ default (only with --force).
 Usage:
     python3 scripts/gen_examples.py [--spec build/openapi.bundled.yaml] [--out api/examples] [--force] [--dry-run]
 
-Note: this generates **skeletons** (placeholder payloads); owners refine the payloads before D5.
-The 3 canonical domains are the refinement reference.
+Generated Python SDK files are placeholders and therefore live under ``unsupported``.
+Owners may move a Python file into ``success`` only after replacing the placeholder with
+a runnable, tested SDK call. The 3 canonical domains are the refinement reference.
 """
 from __future__ import annotations
 
@@ -57,7 +59,7 @@ METHODS = ("get", "post", "put", "delete", "patch")
 
 def domain_of(path: str) -> str:
     # /api/v1 already stripped in spec paths (servers carry the prefix); take the first segment.
-    # Special cases (aligned with the P04 § 2.1 examples/ directory naming):
+    # Special cases aligned with the examples/ directory naming:
     #   /namespaces/{ns}/acl*  → acl
     #   /gc/* + /maintenance/* → ops (P03 GC + maintenance both belong to the ops domain)
     if "/acl" in path:
@@ -84,15 +86,17 @@ def curl_for(method: str, path: str, has_body: bool, ok: bool, status: str = "")
 
 
 def python_for(method: str, path: str, ok: bool, code: str = "") -> str:
-    body = [
-        f'"""{method.upper()} /api/v1{path} — ' + ("success" if ok else f"error {code}") + ' (Python SDK skeleton)."""',
-        "from cortrix import Client",
-    ]
+    description = (
+        "unsupported Python SDK placeholder; not a runnable success example"
+        if ok
+        else f"error {code} (Python SDK skeleton)"
+    )
+    body = [f'"""{method.upper()} /api/v1{path} — {description}."""', "from cortrix import Client"]
     if not ok:
         body.append("from cortrix.exceptions import CortrixError")
     body += ["", 'client = Client(api_key="cx_live_xxx")', ""]
     if ok:
-        body.append("# TODO: call the matching client.<resource>.<verb>(...), see P04 § 8.3 + canonical reference (query/documents/memory)")
+        body.append("# TODO: Replace this placeholder with a tested SDK call before moving it to success/.")
     else:
         body += [
             "try:",
@@ -192,7 +196,7 @@ def main() -> int:
 
             # success
             write(os.path.join(base, "success", "curl.sh"), curl_for(method, path, has_body, True), args.force, args.dry_run, created, skipped)
-            write(os.path.join(base, "success", "python.py"), python_for(method, path, True), args.force, args.dry_run, created, skipped)
+            write(os.path.join(base, "unsupported", "python.py"), python_for(method, path, True), args.force, args.dry_run, created, skipped)
             write(os.path.join(base, "success", "javascript.js"), js_for(method, path, has_body, True), args.force, args.dry_run, created, skipped)
 
             # errors: derive category from the 4xx/5xx in responses, de-duplicating categories

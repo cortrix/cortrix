@@ -43,7 +43,7 @@ def build_response_meta(
     rag_call_failed_detail: Optional[dict[str, Any]] = None,
     llm_call_failed_detail: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
-    """Assemble the chat ``meta`` object honouring the A/B/C tiers (design section 1.7).
+    """Assemble the chat ``meta`` object honoring the A/B/C tiers (design section 1.7).
 
     A-class fields are always present. B-class fields appear only when ``explain`` is
     True. C-class ``*_call_failed_detail`` fields appear only when ``debug`` is True and

@@ -14,8 +14,8 @@ import { metrics, type Counter, type Histogram } from '@opentelemetry/api';
 //   cortrix_webui_api_latency_seconds    Histogram (endpoint, status, method)
 //
 // Standalone discipline (D3): exporting is best-effort. With no collector the
-// OTLP POSTs simply fail and are dropped — initialisation never throws and the
-// app runs unaffected. The instruments are created lazily and memoised so the
+// OTLP POSTs simply fail and are dropped — initialization never throws and the
+// app runs unaffected. The instruments are created lazily and memoized so the
 // recording helpers are cheap no-ops before init / in tests.
 
 const METRIC_PATH = '/v1/metrics';
@@ -32,7 +32,7 @@ let sessionStart = 0;
 function serviceVersion(): string {
   // Vite replaces import.meta.env at build; fall back to package version.
   const env = (import.meta as unknown as { env?: Record<string, string> }).env;
-  return env?.VITE_APP_VERSION ?? '1.0.0';
+  return env?.VITE_APP_VERSION ?? '1.0.0-rc.1';
 }
 
 function deploymentEnv(): string {
@@ -43,7 +43,7 @@ function deploymentEnv(): string {
 }
 
 /**
- * Initialise the Web UI MeterProvider + OTLP exporter and create the 4
+ * Initialize the Web UI MeterProvider + OTLP exporter and create the 4
  * instruments. Idempotent and safe to call once at app start. No-op in
  * non-browser (test/SSR) environments.
  *

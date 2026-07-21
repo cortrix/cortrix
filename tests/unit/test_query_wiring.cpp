@@ -1,11 +1,11 @@
 // query_wiring.cpp — behavioral coverage of the F39/F36 wiring contracts.
 //
-// Honest scope note: the wiring helpers DecisionOf / ReadRouteOverride /
-// ResolveRagFusionConfig / RecordQueryTrace live in an *anonymous namespace* inside
-// query_wiring.cpp and the public CrossNsQueryWiring ctor needs a live F05 pool +
-// bge-m3 embedder + tenant PermissionService, so neither the closure nor those
-// statics is directly unit-addressable without standing up the live server. We
-// therefore pin the SAME contracts at the real components the closure delegates to:
+// Scope note: DecisionOf / ReadRouteOverride / ResolveRagFusionConfig /
+// RecordQueryTrace live in an anonymous namespace inside query_wiring.cpp. The
+// focused tests below pin the contracts at the real components the closure delegates
+// to. The final fixture also assembles CrossNsQueryWiring itself behind an ephemeral
+// loopback HTTP server, using a temporary store, stub embedder, deterministic index,
+// and scripted LLM double; it requires no external service, model, or network access.
 //
 //   * ReadRouteOverride -> CX_ERR_F39_FORCE_ROUTE_INVALID : the override flows into
 //     QueryComplexityClassifier::RouteAndUpdateContext(ctx, route); a bad token
@@ -19,22 +19,47 @@
 //     enabled=false (topic 3) and only the per-request opt-in flips it on — the
 //     exact gate the closure's use_rag_fusion computes.
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <chrono>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
+#include <thread>
+#include <vector>
 
+#include <nlohmann/json.hpp>
+
+#include "httplib.h"
+
+#include "cortrix/auth/api_key_auth.h"
+#include "cortrix/llm/i_llm_client.h"
+#include "cortrix/memory/memory_block_adapter.h"
 #include "cortrix/query/complexity_config.h"
 #include "cortrix/query/heuristic_complexity_backend.h"
 #include "cortrix/query/query_complexity_classifier.h"
 #include "cortrix/query/query_context.h"
 #include "cortrix/query/query_router_metrics.h"
+#include "cortrix/query/query_wiring.h"
 #include "cortrix/query/rag_fusion_types.h"
+#include "cortrix/query/rrf_fusion.h"
 #include "cortrix/query/router_error.h"
+#include "cortrix/resource/namespace_facade.h"
+#include "cortrix/spc/onnx_embedder.h"
+#include "cortrix/tenant/permission_service.h"
+
+#include "fake_doc_discovery_deps.h"
+#include "mock_llm_client.h"
 
 namespace cortrix::query {
 namespace {
+
+using json = nlohmann::json;
+using ::testing::_;
+using ::testing::Invoke;
+using ::testing::NiceMock;
 
 QueryComplexityClassifier MakeClassifier(const ComplexityConfig& cfg = {}) {
     return QueryComplexityClassifier(
@@ -66,9 +91,9 @@ TEST_F(QueryWiringTest, InvalidRouteOverrideYieldsF39Error) {
     EXPECT_TRUE(ctx.routing_decision_source.empty());
 }
 
-// Each valid override token is honoured verbatim with source = "force_route"
+// Each valid override token is honored verbatim with source = "force_route"
 // (the §6.1 step 1 path the closure relies on).
-TEST_F(QueryWiringTest, ValidRouteOverridesHonoured) {
+TEST_F(QueryWiringTest, ValidRouteOverridesHonored) {
     for (const char* route : {"simple", "complex", "chat"}) {
         auto classifier = MakeClassifier();
         QueryContext ctx;
@@ -275,6 +300,374 @@ TEST_F(QueryWiringTest, RagFusionConfigValidationFusionPolicyBounds) {
     edges.fusion_variant_weight = 0.0f;
     edges.fusion_anchor_max = 0;
     EXPECT_TRUE(ValidateRagFusionConfig(edges));
+}
+
+// Exercise the public production assembly rather than mirroring its anonymous
+// helpers. The fixture is fully offline: it uses a stub embedder, a real temporary
+// namespace store, deterministic in-memory index hits, and a scripted LLM double.
+class QueryWiringHttpCoverage : public ::testing::Test {
+protected:
+    static constexpr const char* kNamespace = "query-wiring-unit";
+    static constexpr const char* kNoAuthUser = "anonymous";
+
+    void SetUp() override {
+        const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+        harness_ = std::make_unique<cortrix::doc_summary::test::DiscoveryPoolHarness>(
+            std::filesystem::temp_directory_path() /
+            ("query_wiring_http_" + std::to_string(stamp)));
+        ASSERT_TRUE(harness_->Admit(kNamespace).ok());
+
+        embedder_ = std::make_unique<cortrix::OnnxEmbedder>("", 128);
+        ASSERT_TRUE(embedder_->Init().ok());
+        fusion_ = std::make_unique<RRFFusion>(60);
+        permission_ = std::make_unique<cortrix::tenant::PermissionService>(nullptr);
+
+        ASSERT_NO_FATAL_FAILURE(SeedDocuments());
+        ASSERT_NO_FATAL_FAILURE(SeedUserFacts());
+
+        llm_ = std::make_shared<NiceMock<cortrix::llm::MockLlmClient>>();
+        ON_CALL(*llm_, Chat(_, _))
+            .WillByDefault(Invoke([](const std::string& prompt,
+                                     const cortrix::llm::LlmCallConfig& config) {
+                cortrix::llm::ChatCompletionResponse response;
+                response.status = Status::Ok();
+                response.model = config.model;
+                response.finish_reason = "stop";
+                if (prompt.find("degrade path") != std::string::npos) {
+                    response.content = "{invalid-json";
+                } else if (config.model == "unit-variant-model") {
+                    response.content =
+                        R"({"variants":[{"strategy":"paraphrase","query":"semantic memory"},{"strategy":"subquery","query":"agent context"}]})";
+                } else {
+                    response.content = R"({"ranking":[2,1]})";
+                }
+                response.content_length = static_cast<int>(response.content.size());
+                return response;
+            }));
+
+        auth_.set_enabled(false);
+        server_ = std::make_unique<httplib::Server>();
+        wiring_ = std::make_unique<CrossNsQueryWiring>(
+            harness_->ipool(), *embedder_, *fusion_, *permission_,
+            /*sparse_registry=*/nullptr, llm_, /*engine_instr=*/nullptr,
+            /*reranker_model_dir=*/"",
+            /*query_complexity_model_dir=*/"/definitely/missing/query-complexity",
+            /*candidate_multiplier=*/3, /*max_candidates=*/50,
+            /*reranker_execution_provider=*/"cpu");
+        ASSERT_TRUE(wiring_->IsReady());
+        wiring_->Register(*server_, auth_);
+
+        port_ = server_->bind_to_any_port("127.0.0.1");
+        ASSERT_GT(port_, 0);
+        server_thread_ = std::thread([this] { server_->listen_after_bind(); });
+
+        httplib::Client client("127.0.0.1", port_);
+        bool connected = false;
+        for (int i = 0; i < 50; ++i) {
+            if (client.Get("/__query_wiring_ready_probe")) {
+                connected = true;
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        ASSERT_TRUE(connected);
+    }
+
+    void TearDown() override {
+        if (server_) server_->stop();
+        if (server_thread_.joinable()) server_thread_.join();
+    }
+
+    void SeedDocuments() {
+        const std::string metadata =
+            json{{"status", "generated"},
+                 {"keywords", json::array({"semantic", "memory"})},
+                 {"topics", json::array({"agent context"})},
+                 {"one_liner", "A deterministic query wiring fixture"}}
+                .dump();
+        const uint64_t first = harness_->SeedDocSummaryBlock(
+            kNamespace, "doc-query-wiring-1", "Semantic memory stays near agents.",
+            metadata);
+        const uint64_t second = harness_->SeedDocSummaryBlock(
+            kNamespace, "doc-query-wiring-2", "Agent context supports retrieval.",
+            metadata);
+        ASSERT_NE(harness_->fake_index(), nullptr);
+        harness_->fake_index()->set_search_result({{first, 0.1f}, {second, 0.2f}});
+    }
+
+    void SeedUserFacts() {
+        cortrix::resource::NamespaceFacade facade(harness_->ipool(), kNamespace);
+        ASSERT_TRUE(facade.Acquire().ok());
+        cortrix::memory::MemoryBlockAdapter adapter(facade.store(), nullptr, nullptr);
+        for (int i = 1; i <= 3; ++i) {
+            cortrix::memory::MemoryBlockRecord record;
+            record.block_id = "01QUERYFACT" + std::to_string(i);
+            record.user_id = kNoAuthUser;
+            record.content = "query wiring fact " + std::to_string(i);
+            record.metadata_json = {
+                {"memory_type", i == 2 ? "preference" : "fact"},
+                {"status", "active"},
+                {"user_id", kNoAuthUser},
+                {"created_at", "2026-07-21T00:00:0" + std::to_string(i) + "Z"},
+                {"confidence", 0.8 + 0.01 * i},
+            };
+            ASSERT_TRUE(adapter.InsertMemoryBlock(record).ok());
+        }
+    }
+
+    json BaseBody() const {
+        return json{{"query", "semantic memory for agents"},
+                    {"namespaces", json::array({kNamespace})},
+                    {"top_k", 2}};
+    }
+
+    httplib::Result PostJson(const std::string& path, const json& body) const {
+        httplib::Client client("127.0.0.1", port_);
+        return client.Post(path, body.dump(), "application/json");
+    }
+
+    std::unique_ptr<cortrix::doc_summary::test::DiscoveryPoolHarness> harness_;
+    std::unique_ptr<cortrix::OnnxEmbedder> embedder_;
+    std::unique_ptr<RRFFusion> fusion_;
+    std::unique_ptr<cortrix::tenant::PermissionService> permission_;
+    std::shared_ptr<NiceMock<cortrix::llm::MockLlmClient>> llm_;
+    ApiKeyAuth auth_;
+    std::unique_ptr<httplib::Server> server_;
+    std::unique_ptr<CrossNsQueryWiring> wiring_;
+    std::thread server_thread_;
+    int port_ = -1;
+};
+
+TEST_F(QueryWiringHttpCoverage, RequestMatrixExercisesProductionClosure) {
+    auto expect_status = [this](const std::string& path, const json& body, int status,
+                                const char* expected_code = nullptr) {
+        auto response = PostJson(path, body);
+        ASSERT_TRUE(response) << path;
+        EXPECT_EQ(response->status, status) << path << "\n" << response->body;
+        if (status >= 400) {
+            const json error_body = json::parse(
+                response->body, /*callback=*/nullptr, /*allow_exceptions=*/false);
+            ASSERT_FALSE(error_body.is_discarded()) << path << "\n" << response->body;
+            ASSERT_TRUE(error_body.contains("error")) << path << "\n" << response->body;
+            ASSERT_TRUE(error_body["error"].contains("code"))
+                << path << "\n" << response->body;
+            ASSERT_TRUE(error_body["error"]["code"].is_string())
+                << path << "\n" << response->body;
+            const std::string actual_code =
+                error_body["error"]["code"].get<std::string>();
+            if (expected_code != nullptr) {
+                EXPECT_EQ(actual_code, expected_code) << path << "\n" << response->body;
+            } else {
+                EXPECT_FALSE(actual_code.empty());
+            }
+        }
+    };
+
+    {
+        httplib::Client client("127.0.0.1", port_);
+        auto response = client.Post("/api/v1/query", "{not-json", "application/json");
+        ASSERT_TRUE(response);
+        EXPECT_EQ(response->status, 400) << response->body;
+        const json error_body = json::parse(response->body);
+        ASSERT_TRUE(error_body["error"].contains("code"));
+        ASSERT_TRUE(error_body["error"]["code"].is_string());
+        EXPECT_EQ(error_body["error"]["code"], "INVALID_ARGUMENT");
+    }
+
+    json invalid_granularity = BaseBody();
+    invalid_granularity["granularity"] = "invalid";
+    expect_status("/api/v1/query", invalid_granularity, 400, "INVALID_ARGUMENT");
+    expect_status("/api/v1/query?granularity=invalid", BaseBody(), 400,
+                  "INVALID_ARGUMENT");
+
+    json invalid_crag = BaseBody();
+    invalid_crag["crag"] = "yes";
+    expect_status("/api/v1/query", invalid_crag, 400, "INVALID_ARGUMENT");
+    expect_status("/api/v1/query?crag=maybe", BaseBody(), 400,
+                  "INVALID_ARGUMENT");
+
+    json invalid_route = BaseBody();
+    invalid_route["route"] = "invalid";
+    expect_status("/api/v1/query", invalid_route, 400,
+                  "CX_ERR_F39_FORCE_ROUTE_INVALID");
+    expect_status("/api/v1/query?route=invalid", BaseBody(), 400,
+                  "CX_ERR_F39_FORCE_ROUTE_INVALID");
+
+    json chat = BaseBody();
+    chat["query"] = "hi";
+    chat["route"] = "chat";
+    chat["namespaces"] = json::array({kNamespace, "missing-query-wiring-ns"});
+    auto chat_response = PostJson("/api/v1/query", chat);
+    ASSERT_TRUE(chat_response);
+    ASSERT_EQ(chat_response->status, 200) << chat_response->body;
+    const json chat_json = json::parse(chat_response->body);
+    ASSERT_EQ(chat_json["results"].size(), 2u);
+    EXPECT_EQ(chat_json["meta"]["via_path"], "chat_memory_only");
+    EXPECT_EQ(chat_json["results"][0]["content"], "query wiring fact 3");
+
+    json rich = BaseBody();
+    rich["query"] = "compare semantic memory and agent context in detail";
+    rich["route"] = "complex";
+    rich["granularity"] = "both";
+    rich["rerank"] = true;
+    rich["crag"] = true;
+    rich["explain"] = true;
+    rich["locale"] = "en";
+    rich["search_config"] = {{"enable_vector", true},
+                              {"enable_bm25", true},
+                              {"enable_sparse", true}};
+    rich["filter"] = {{"source", "unit"}, {"ignored_non_string", 7}};
+    rich["rag_fusion"] = true;
+    rich["rag_fusion_config"] = {
+        {"enabled", true},
+        {"variant_count", 2},
+        {"rrf_k", 60},
+        {"timeout_ms", 5000},
+        {"locale", "en"},
+        {"model", "unit-variant-model"},
+        {"candidate_multiplier", 2},
+        {"max_candidates", 20},
+        {"final_rerank", false},
+        {"activation_policy", "always"},
+        {"activation_score_margin", 0.1},
+        {"activation_min_results", 2},
+        {"fusion_original_weight", 1.7},
+        {"fusion_variant_weight", 0.5},
+        {"fusion_anchor_max", 2},
+    };
+    rich["llm_rerank"] = true;
+    rich["llm_rerank_config"] = {
+        {"enabled", true},
+        {"top_n", 2},
+        {"max_doc_chars", 200},
+        {"timeout_ms", 5000},
+        {"model", "unit-rerank-model"},
+        {"locale", "en"},
+        {"consensus_runs", 1},
+    };
+
+    const std::string rich_params =
+        "/api/v1/query?route=complex&granularity=both&explain=1&crag=true"
+        "&rag_fusion=1&locale=zh&rag_fusion_candidate_multiplier=2"
+        "&rag_fusion_max_candidates=20&rag_fusion_final_rerank=false"
+        "&rag_fusion_activation_policy=always&rag_fusion_activation_score_margin=0.1"
+        "&rag_fusion_activation_min_results=2&llm_rerank=1&llm_rerank_top_n=2"
+        "&llm_rerank_model=unit-param-model&llm_rerank_timeout_ms=5000"
+        "&llm_rerank_consensus_runs=1";
+    auto rich_response = PostJson(rich_params, rich);
+    ASSERT_TRUE(rich_response);
+    ASSERT_EQ(rich_response->status, 200) << rich_response->body;
+    const json rich_json = json::parse(rich_response->body);
+    ASSERT_TRUE(rich_json.contains("results"));
+    ASSERT_FALSE(rich_json["results"].empty()) << rich_response->body;
+    EXPECT_LE(rich_json["results"].size(), 2u) << rich_response->body;
+    ASSERT_TRUE(rich_json.contains("explain"));
+    EXPECT_EQ(rich_json["explain"]["granularity"], "both");
+    const auto& rich_features = rich_json["explain"]["llm_dependent_features"];
+    const auto& rich_rag_fusion = rich_features["rag_fusion"];
+    const auto& rich_llm_rerank = rich_features["llm_rerank"];
+    EXPECT_TRUE(rich_rag_fusion["active"].get<bool>());
+    EXPECT_FALSE(rich_rag_fusion["degraded"].get<bool>());
+    EXPECT_EQ(rich_rag_fusion["variant_count"], 3);
+    EXPECT_TRUE(rich_llm_rerank["active"].get<bool>());
+    EXPECT_FALSE(rich_llm_rerank["degraded"].get<bool>());
+    EXPECT_EQ(rich_llm_rerank["votes_ok"], 1);
+
+    json degraded = rich;
+    degraded["query"] = "degrade path";
+    auto degraded_response = PostJson(rich_params, degraded);
+    ASSERT_TRUE(degraded_response);
+    ASSERT_EQ(degraded_response->status, 200) << degraded_response->body;
+    const json degraded_json = json::parse(degraded_response->body);
+    ASSERT_TRUE(degraded_json.contains("explain"));
+    const auto& degraded_features =
+        degraded_json["explain"]["llm_dependent_features"];
+    const auto& degraded_rag_fusion = degraded_features["rag_fusion"];
+    const auto& degraded_llm_rerank = degraded_features["llm_rerank"];
+    EXPECT_TRUE(degraded_rag_fusion["active"].get<bool>());
+    EXPECT_TRUE(degraded_rag_fusion["degraded"].get<bool>());
+    ASSERT_TRUE(degraded_rag_fusion.contains("degrade_reason"));
+    EXPECT_FALSE(degraded_rag_fusion["degrade_reason"].get<std::string>().empty());
+    EXPECT_TRUE(degraded_llm_rerank["active"].get<bool>());
+    EXPECT_TRUE(degraded_llm_rerank["degraded"].get<bool>());
+    ASSERT_TRUE(degraded_llm_rerank.contains("degrade_reason"));
+    EXPECT_FALSE(degraded_llm_rerank["degrade_reason"].get<std::string>().empty());
+
+    json invalid_rag = BaseBody();
+    invalid_rag["route"] = "complex";
+    invalid_rag["rag_fusion_config"] = {{"variant_count", 99}};
+    expect_status("/api/v1/query", invalid_rag, 400,
+                  "CX_ERR_RAG_FUSION_CONFIG_INVALID");
+
+    json invalid_llm = BaseBody();
+    invalid_llm["route"] = "complex";
+    invalid_llm["llm_rerank_config"] = {{"top_n", 1}};
+    expect_status("/api/v1/query", invalid_llm, 400,
+                  "CX_ERR_LLM_RERANK_CONFIG_INVALID");
+
+    const std::string bad_numeric_params =
+        "/api/v1/query?route=complex&granularity=both&crag=true&explain=1"
+        "&rag_fusion=1&llm_rerank=1"
+        "&rag_fusion_candidate_multiplier=bad&rag_fusion_max_candidates=bad"
+        "&rag_fusion_activation_score_margin=bad"
+        "&rag_fusion_activation_min_results=bad&llm_rerank_top_n=bad"
+        "&llm_rerank_timeout_ms=bad&llm_rerank_consensus_runs=bad";
+    auto bad_numeric_response = PostJson(bad_numeric_params, rich);
+    ASSERT_TRUE(bad_numeric_response);
+    ASSERT_EQ(bad_numeric_response->status, 200) << bad_numeric_response->body;
+    const json bad_numeric_json = json::parse(bad_numeric_response->body);
+    ASSERT_TRUE(bad_numeric_json.contains("explain"));
+    const auto& bad_numeric_features =
+        bad_numeric_json["explain"]["llm_dependent_features"];
+    const auto& bad_numeric_rag = bad_numeric_features["rag_fusion"];
+    const auto& bad_numeric_llm = bad_numeric_features["llm_rerank"];
+    EXPECT_TRUE(bad_numeric_rag["active"].get<bool>());
+    EXPECT_FALSE(bad_numeric_rag["degraded"].get<bool>());
+    EXPECT_EQ(bad_numeric_rag["variant_count"], 3);
+    EXPECT_TRUE(bad_numeric_llm["active"].get<bool>());
+    EXPECT_FALSE(bad_numeric_llm["degraded"].get<bool>());
+    EXPECT_EQ(bad_numeric_llm["model"], "unit-rerank-model");
+    EXPECT_EQ(bad_numeric_llm["votes_ok"], 1);
+
+    json body_precedence = BaseBody();
+    body_precedence["route"] = "invalid";
+    body_precedence["granularity"] = "invalid";
+    body_precedence["crag"] = true;
+    auto precedence_response = PostJson(
+        "/api/v1/query?route=complex&granularity=doc&crag=0&explain=1",
+        body_precedence);
+    ASSERT_TRUE(precedence_response);
+    ASSERT_EQ(precedence_response->status, 200) << precedence_response->body;
+    const json precedence_json = json::parse(precedence_response->body);
+    ASSERT_TRUE(precedence_json.contains("explain"));
+    EXPECT_EQ(precedence_json["explain"]["routing_path"], "complex");
+    EXPECT_EQ(precedence_json["explain"]["granularity"], "doc");
+    EXPECT_EQ(precedence_json["explain"]["crag_verdict"], "");
+    EXPECT_FALSE(precedence_json["meta"].contains("crag_verdict"));
+
+    json deprecated = BaseBody();
+    deprecated["namespace"] = kNamespace;
+    expect_status("/api/v1/query", deprecated, 400, "CX_ERR_DEPRECATED_FIELD");
+
+    json too_many = BaseBody();
+    too_many["route"] = "complex";
+    too_many["namespaces"] = json::array();
+    for (int i = 0; i < 101; ++i) {
+        too_many["namespaces"].push_back("query-wiring-ns-" + std::to_string(i));
+    }
+    auto too_many_response = PostJson("/api/v1/query", too_many);
+    ASSERT_TRUE(too_many_response);
+    ASSERT_EQ(too_many_response->status, 400) << too_many_response->body;
+    const json too_many_json = json::parse(too_many_response->body);
+    EXPECT_EQ(too_many_json["error"]["code"], "CX_ERR_TOO_MANY_NAMESPACES");
+
+    json wildcard = BaseBody();
+    wildcard["route"] = "simple";
+    wildcard["namespaces"] = json::array({"*"});
+    expect_status("/api/v1/query", wildcard, 200);
+
+    json missing_query = {{"namespaces", json::array({kNamespace})}};
+    expect_status("/api/v1/query", missing_query, 400, "CX_ERR_BAD_REQUEST");
 }
 
 }  // namespace

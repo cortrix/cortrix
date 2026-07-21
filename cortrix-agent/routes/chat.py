@@ -12,7 +12,7 @@ section 9.2); the route's only jobs are:
   4. Persist the completed turn back to the SessionStore (from ``meta["_assistant_text"]``).
   5. Map any :class:`AgentError` to the GEN-Agent 4-field error SSE event (section 9.3).
 
-Naming rule (Derek 2026-06-03): this is the Cortrix Agent chat endpoint — never a
+Naming rule: this is the Cortrix Agent chat endpoint — never a
 "chatbot" endpoint; the executor class is ``ChatExecutor``.
 
 MEM co-processing (interaction_log write / MEM02 extract trigger / MEM05 user_id

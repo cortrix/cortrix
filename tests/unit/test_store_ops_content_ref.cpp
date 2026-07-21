@@ -193,7 +193,7 @@ INSTANTIATE_TEST_SUITE_P(
     [](const ::testing::TestParamInfo<BelowZeroCase>& i) { return i.param.name; });
 
 // =============================================================================
-// MATRIX 5 — unknown-triple / unknown-file behaviours.
+// MATRIX 5 — unknown-triple / unknown-file behaviors.
 // =============================================================================
 
 // GetRefCount on a never-seen file_hash is a clean 0.

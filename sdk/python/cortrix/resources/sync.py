@@ -1,7 +1,7 @@
 """Sync resource. ``/sync/*`` (ARCH § 4.1.8 Batch Sync).
 
-Per Derek's ruling (briefing § 9): SDK shape = P03 § 2.12; wire = real
-architecture (``start`` / ``status`` / ``stop``):
+This resource follows the implemented HTTP architecture
+(``start`` / ``status`` / ``stop``):
   - ``configure`` -> POST /sync/start  ({namespace, interval_seconds})
   - ``status``    -> GET  /sync/status (?namespace=)
   - ``stop``      -> POST /sync/stop   ({namespace})

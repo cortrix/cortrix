@@ -16,7 +16,7 @@ namespace memory::immunity { class OptOutManager; }
 
 namespace cortrix::memory {
 
-// M1 (D3.5 round-2) — the runtime assembly of MEM02: a MemoryQueue draining
+// Runtime assembly of MEM02: a MemoryQueue draining
 // interactions through per-namespace MemoryExtractors. The interaction-write route
 // enqueues each interaction; the worker pool drains them. Per item the worker
 // acquires the interaction's namespace façade and builds the NS-scoped MemoryExtractor

@@ -380,7 +380,7 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
                                      req.get_param_value("include_invalidated") == "true";
         // MEM03 §4.3.1 pagination. The web client sends limit/offset; the backend
         // filter is page-based (start = page * page_size). Accept limit/offset
-        // (primary) and page/page_size (aliases); normalise offset to a page index.
+        // (primary) and page/page_size (aliases); normalize offset to a page index.
         // Unparseable/negative values fall back to the filter defaults so the route
         // never throws on a bad query string (List clamps page_size to kMaxPageSize).
         auto param_int = [&req](const char* key, int fallback) -> int {

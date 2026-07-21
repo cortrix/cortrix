@@ -18,8 +18,12 @@
 #include <rapidcheck.h>
 #include <rapidcheck/gtest.h>
 
+#include <cstdio>
+#include <cstdlib>
 #include <cstdint>
+#include <stdexcept>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
 #include "cortrix/query/wordpiece_tokenizer.h"
@@ -179,16 +183,43 @@ RC_GTEST_PROP(WordPiecePropR9, AsciiLowerAlnumPreserved,
 struct TempVocab {
     std::string path;
     TempVocab() {
-        path = std::string(::testing::TempDir()) + "/wp_prop_vocab.txt";
-        FILE* f = std::fopen(path.c_str(), "w");
+        std::string pattern =
+            std::string(::testing::TempDir()) + "/wp_prop_vocab_XXXXXX";
+        std::vector<char> path_buffer(pattern.begin(), pattern.end());
+        path_buffer.push_back('\0');
+        const int fd = ::mkstemp(path_buffer.data());
+        if (fd < 0) {
+            throw std::runtime_error("failed to create temporary WordPiece vocabulary");
+        }
+        path = path_buffer.data();
+        FILE* f = ::fdopen(fd, "w");
+        if (f == nullptr) {
+            ::close(fd);
+            std::remove(path.c_str());
+            throw std::runtime_error("failed to open temporary WordPiece vocabulary");
+        }
+
+        bool write_ok = true;
         // ids by line: keep [PAD] at 0 (matches the real DistilBERT layout).
-        std::fputs("[PAD]\n[UNK]\n[CLS]\n[SEP]\n", f);
-        for (char c = 'a'; c <= 'z'; ++c) { std::fputc(c, f); std::fputc('\n', f); }
-        for (char c = '0'; c <= '9'; ++c) { std::fputc(c, f); std::fputc('\n', f); }
+        write_ok = std::fputs("[PAD]\n[UNK]\n[CLS]\n[SEP]\n", f) != EOF;
+        for (char c = 'a'; c <= 'z'; ++c) {
+            write_ok = write_ok && std::fputc(c, f) != EOF;
+            write_ok = write_ok && std::fputc('\n', f) != EOF;
+        }
+        for (char c = '0'; c <= '9'; ++c) {
+            write_ok = write_ok && std::fputc(c, f) != EOF;
+            write_ok = write_ok && std::fputc('\n', f) != EOF;
+        }
         // a couple of ## continuation pieces so multi-char words can chain.
-        std::fputs("##a\n##b\n##c\n", f);
-        std::fclose(f);
+        write_ok = write_ok && std::fputs("##a\n##b\n##c\n", f) != EOF;
+        const int close_result = std::fclose(f);
+        if (!write_ok || close_result != 0) {
+            std::remove(path.c_str());
+            throw std::runtime_error("failed to write temporary WordPiece vocabulary");
+        }
     }
+
+    ~TempVocab() { std::remove(path.c_str()); }
 };
 
 const TempVocab& Vocab() {

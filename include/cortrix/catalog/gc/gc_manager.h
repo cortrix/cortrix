@@ -74,7 +74,7 @@ public:
     Result<RestoreOutcome> Restore(const std::vector<std::string>& doc_ids);
 
     /// Immediate purge (ops /gc/purge): bypass the time windows and run Stage 2 +
-    /// Stage 3 on every currently soft-deleted item. Honours dry_run + the per-run
+    /// Stage 3 on every currently soft-deleted item. Honors dry_run + the per-run
     /// caps. Distinct from the GDPR immediate-purge API (Cloud V1).
     Result<GcRunReport> Purge();
 

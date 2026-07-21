@@ -1,7 +1,7 @@
 """CortrixToolKit tests — all 29 methods, routing, transcoding, error passthrough.
 
 Each method has at least one test. We assert (a) the method returns a plain dict
-(``_to_dict`` normalised the P03 dataclass), (b) it took the expected path (P03
+(``_to_dict`` normalized the P03 dataclass), (b) it took the expected path (P03
 SDK resource verb vs HTTP fallback ``_request``), and (c) the wire contract
 (path / body / params) matches the P12 mirror tool.
 """
@@ -60,7 +60,7 @@ def test_close_and_context_manager(fake_client):
 
 def test_health_uses_sdk(kit, fake_client):
     out = kit.cortrix_health()
-    assert out == {"status": "ok", "version": "1.0.0"}
+    assert out == {"status": "ok", "version": "1.0.0-rc.1"}
     assert fake_client.names_called() == ["system.health"]
 
 

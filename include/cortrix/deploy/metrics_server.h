@@ -14,8 +14,8 @@ namespace cortrix::deploy {
 
 /// OpenMetrics endpoint server (F24 §5, F24-3 decision B — a single, separate
 /// metrics port + anonymous access). Runs an independent httplib::Server on
-/// :9091 serving `GET /metrics` in OpenMetrics text exposition. Separate from the
-/// main :8420 API server so the metrics port can be kept inside the network
+/// loopback:9091 serving `GET /metrics` in OpenMetrics text exposition. Separate
+/// from the main :8420 API server so the metrics port can be explicitly proxied
 /// (K8s ServiceMonitor / Prometheus scrape) while the API is public.
 ///
 ///   GET /metrics
@@ -35,8 +35,8 @@ public:
     using MetricSource = std::function<std::string()>;
 
     /// @param port  listen port (default 9091, F24-3 / OBS_SPEC §5.1)
-    /// @param bind  bind address (default 0.0.0.0 — port-level isolation, §5.2)
-    explicit MetricsServer(int port = 9091, std::string bind = "0.0.0.0");
+    /// @param bind  bind address (default 127.0.0.1 for local-only access)
+    explicit MetricsServer(int port = 9091, std::string bind = "127.0.0.1");
     ~MetricsServer();
 
     MetricsServer(const MetricsServer&) = delete;

@@ -305,7 +305,7 @@ TEST_F(DefaultNSRouterTest, GetActiveUnitServesUnitFromCache) {
     EXPECT_EQ(u.value().unit_id, "unit-ns-uc");
 }
 
-// ListNamespaces honours limit + offset (the two opts-string-building branches).
+// ListNamespaces honors limit + offset (the two opts-string-building branches).
 TEST_F(DefaultNSRouterTest, ListNamespacesLimitAndOffset) {
     for (char c : {'a', 'b', 'c', 'd'}) {
         ASSERT_TRUE(router_->CreateNamespace(MakeNs(std::string(1, c))).ok());

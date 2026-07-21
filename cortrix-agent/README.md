@@ -4,7 +4,7 @@ Cortrix Agent is the built-in FastAPI service for fixed-flow chat over Cortrix
 semantic storage. It uses the public Python SDK path to query cortrix-server and
 does not use a privileged backend channel.
 
-> Status: `RD review required`. Fixed-flow chat mode is documented, but
+> Status: `Verification required`. Fixed-flow chat mode is documented, but
 > deployment, LLM provider behavior, and API compatibility should be verified
 > against your target runtime. See [Agent access](../docs/agent-access.md) and
 > [Compatibility](../docs/compatibility.md).

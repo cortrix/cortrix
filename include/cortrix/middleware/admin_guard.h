@@ -28,7 +28,7 @@ nlohmann::json BuildAdminDeniedBody(const std::string& client_ip);
 
 /// Resolved admin-access policy. In Phase 1 the whitelist is a two-value switch
 /// (design sec 5.1, G3 M4): "127.0.0.1" = loopback-only (default), "0.0.0.0" =
-/// all client IPs (requires explicit acknowledgement). CIDR / multi-IP support
+/// all client IPs (requires explicit acknowledgment). CIDR / multi-IP support
 /// is deferred to Phase 1.5 (PHASE2_BACKLOG TD-F20-IP-ALLOWLIST).
 struct AdminGuardConfig {
     std::string admin_bind_whitelist = "127.0.0.1";  ///< CORTRIX_ADMIN_BIND

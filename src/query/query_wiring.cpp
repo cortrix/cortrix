@@ -64,7 +64,7 @@ public:
                             cortrix::resource::INamespacePool& pool)
         : svc_(svc), pool_(pool) {}
 
-    /// R1 (Derek 2026-06-12, F04 v1.0.4): with auth disabled the deployment is
+    /// With auth disabled the deployment is
     /// CE single-tenant - the injected "default" principal owns every namespace,
     /// so the ns_acl lookup (which has no rows without P09 tenancy) must not
     /// unauthorize it. Set from CrossNsQueryWiring::Register(auth.enabled()).
@@ -745,7 +745,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                 return;
             }
 
-            // R1 (Derek 2026-06-12): CE no-auth leaves user_id empty; inject the
+            // CE no-auth leaves user_id empty; inject the
             // single-tenant default principal so F04 AuthorizeNamespaces Step 1
             // passes (F04 §4.2 v1.0.4). When auth is enabled the middleware has
             // already populated a real user_id and this is a no-op.

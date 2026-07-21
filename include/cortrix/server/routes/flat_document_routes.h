@@ -20,7 +20,7 @@ struct ConnectorState;
 /// (resources/documents.py + watchers.py) and cortrix-mcp (tools/core.py) all wire
 /// to. Live storage is per-namespace (the nested /namespaces/:name/documents +
 /// /connector/* routes); these flat routes mount the design surface ON TOP of the
-/// existing live handlers (Derek approach A) without removing the nested/compat routes.
+/// existing live handlers without removing the nested/compat routes.
 ///
 /// Endpoints (all under /api/v1):
 ///   POST   /documents                         -- async upload (JSON body) -> 202 DocumentTask

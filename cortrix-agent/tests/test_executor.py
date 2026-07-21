@@ -29,7 +29,7 @@ def _no_backoff(monkeypatch):
 
 
 class StubRag:
-    """A stand-in for SdkRagProvider.retrieve with scriptable behaviour."""
+    """A stand-in for SdkRagProvider.retrieve with scriptable behavior."""
 
     def __init__(self, *, result=None, fail_times=0, error=RuntimeError("rag down")):
         self._result = result

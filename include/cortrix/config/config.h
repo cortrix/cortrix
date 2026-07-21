@@ -7,10 +7,14 @@
 namespace cortrix {
 
 struct ServerConfig {
-    std::string host = "0.0.0.0";
+    std::string host = "127.0.0.1";
     int port = 8420;
     int thread_count = 8;
     int64_t max_payload_bytes = 100 * 1024 * 1024;  // 100MB
+    // Explicit opt-in for a container-internal wildcard listener. This remains
+    // false by default and is only safe when the container runtime publishes
+    // the host port to loopback, such as 127.0.0.1.
+    bool allow_unauthenticated_container_bind = false;
 };
 
 struct AuthConfig {
@@ -219,11 +223,11 @@ struct CortrixConfig {
     LlmConfig agent_llm;     // Conversational RAG & chat generation
                               // Can be configured here or in cortrix-agent/.env (env wins)
     LlmConfig doc_summary_llm;  // [F41] Document-level LLM summary (ingest-side, async via F42).
-                                // Independent role (Derek 2026-06-08); the doc_summary feature is
+                                // Independent role; the doc_summary feature is
                                 // OFF unless IsConfigured() (api_key present) — main then builds an
                                 // OpenAiLlmClient for the F41AsyncWorker.
     LlmConfig enricher_llm;     // [F03 · gap①] SPC ingest enricher (NER + summary). Independent
-                                // role (Derek 2026-06-10, plan B — symmetric with doc_summary_llm;
+                                // role (symmetric with doc_summary_llm;
                                 // F03 §2.7.bis). OFF (NullEnricher) unless IsConfigured(); main
                                 // maps it into EnricherConfig{type=kLlm, endpoint, api_key, model},
                                 // remaining tuning fields keep the F03 §2.7 defaults.

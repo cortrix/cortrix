@@ -88,7 +88,7 @@ public:
     /// topic 2.2 — most recent task for `doc_id` AND `task_type` whose created_at is
     /// within the last `window_seconds`, for the Watcher debounce check. nullopt if
     /// none. Scoping by task_type keeps different async kinds for the same doc_id
-    /// (doc-parse vs F41 doc-summary) from debouncing each other (Derek 2026-06-08).
+    /// (doc-parse vs F41 doc-summary) from debouncing each other.
     Result<std::optional<TaskInfo>> FindRecentTaskByDocId(const std::string& doc_id,
                                                           int task_type,
                                                           int window_seconds);

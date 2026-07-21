@@ -13,16 +13,16 @@
 #include "cortrix/resource/namespace_pool.h"
 #include "cortrix/resource/namespace_resource_bundle.h"
 
-// Round-3 branch coverage for DefaultINSRouter targeting the regions the round-1/2
+// Additional branch coverage for DefaultINSRouter targeting regions that earlier
 // tests left untouched (confirmed via gcov line-by-line):
 //   - the F05 admission hook (f05_pool_ != nullptr): both the admit-success arm AND
 //     the admit-failure compensation arm (RemoveNamespaceCatalogRows, lines 256-260
-//     + 375-393) — round-1/2 always ran with a NULL pool so this whole region was
+//     + 375-393) — earlier tests used a NULL pool so this whole region was
 //     dead.
 //   - NULL vs non-NULL optional columns (ColText/ColTextOpt/ColIntOpt both arms).
 //   - bind ternaries in InsertNamespaceCatalog (empty vs non-empty fields).
 //   - ListNamespaces option matrix with EVERY option OFF (the default-arm side of
-//     each `if (opts.* )`), complementing round-1's all-ON test.
+//     each `if (opts.* )`), complementing the all-ON test.
 namespace cortrix::catalog {
 namespace {
 
@@ -109,7 +109,7 @@ protected:
 
 // With an injected pool whose AdmitCreate succeeds, CreateNamespace runs the
 // catalog INSERT THEN calls pool.AdmitCreate (the f05_pool_ != nullptr true arm +
-// admit.ok() arm) and returns Ok. Round-1/2 never wired a pool, so this arm was
+// admit.ok() arm) and returns Ok. Existing tests did not wire a pool, so this arm was
 // dead.
 TEST_F(NsRouterBranch2Test, CreateWithPoolAdmitSuccess) {
     DefaultINSRouter router(catalog_.db(), &pool_);

@@ -1,5 +1,5 @@
 # =============================================================
-# F23 Stage 1: PR CI  (design: dev-cortrix-hub F23-tests.md §6.2)
+# Stage 1: PR CI
 # Target < 10 min design budget; real-world C++ build needs ccache
 # warm cache to approach it, so job timeout is set wider.
 #
@@ -20,7 +20,7 @@ on:
 jobs:
   cpp_unit:
     runs-on: ubuntu-22.04
-    timeout-minutes: 40
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -105,11 +105,13 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     # SOFT gate: legacy code predates .clang-format; hardening mode
-    # (full reformat vs diff-only) is a pending Derek decision.
-    continue-on-error: true
+    # (full reformat vs diff-only) remains a project-level decision.
     steps:
       - uses: actions/checkout@v4
+      - name: Release version consistency
+        run: python3 scripts/sync_version.py --check
       - name: clang-format (changed files only)
+        continue-on-error: true
         run: |
           sudo apt-get install -y clang-format
           git fetch origin ${{ github.base_ref || 'main' }} --depth=1 || true
@@ -120,14 +122,18 @@ jobs:
             echo "no C++ changes"
           fi
       - name: ruff (python)
+        continue-on-error: true
         run: |
           pip install -q ruff
-          ruff check cortrix-agent cortrix-mcp sdk/python || true
+          ruff check cortrix-agent cortrix-mcp sdk/python
 
   # Coverage diff is record-only at Stage 1 (soft, per §6.2)
   coverage_soft:
     runs-on: ubuntu-22.04
-    timeout-minutes: 50
+    # Instrumented compilation plus the serial 11k+ unit matrix exceeds the
+    # previous 90-minute envelope on a cold hosted runner. Keep this record-only
+    # job intact and allow its measured workload to finish.
+    timeout-minutes: 150
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4

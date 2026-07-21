@@ -8,7 +8,7 @@
 
 #include "cortrix/catalog/schema_provider.h"
 
-// F35 § 4.1 (A unified-blocks, Derek 2026-06-07): F35SchemaProvider extends the
+// F35 § 4.1 (A unified-blocks): F35SchemaProvider extends the
 // per-Unit blocks table with the 4 contextual-retrieval columns (embedding,
 // contextualized_text, contextualized_embedding, contextualized_status),
 // registered via the F12 SchemaMigrator.

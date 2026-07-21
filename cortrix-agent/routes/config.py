@@ -43,7 +43,7 @@ _PROVIDERS: list[dict[str, Any]] = [
 
 
 def _mask_api_key(api_key: Optional[str]) -> Optional[str]:
-    """Mask a secret for display (design section 9.1 — GET /config desensitises api_key)."""
+    """Mask a secret for display (design section 9.1 — GET /config desensitizes api_key)."""
     if not api_key:
         return None
     if len(api_key) <= 8:

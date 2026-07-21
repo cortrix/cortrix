@@ -6,7 +6,7 @@ import type { AgentError } from '../../types/api';
 // ErrorDisplay GEN-Agent tests (P02a design § 16.1). Covers code/message,
 // category badge, structured_data collapsible, and the retryable + retry button
 // contract. The error-metric side effect (§ 23-bis) is a no-op in tests (metrics
-// uninitialised) so it does not interfere.
+// uninitialized) so it does not interfere.
 
 function makeError(over: Partial<AgentError> = {}): AgentError {
   return {

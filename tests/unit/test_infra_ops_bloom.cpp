@@ -11,7 +11,7 @@
 
 // BREADTH op-matrix coverage for BloomFilter (F12  sec 7). Complements
 // test_bloom_filter.cpp with: ctor edge inputs (capacity 0, target_fp_rate out of
-// (0,1) -> default 0.01, k-clamp extremes observed via behaviour), add/contains
+// (0,1) -> default 0.01, k-clamp extremes observed via behavior), add/contains
 // no-false-negative + disjoint FP-stat matrices across many key-set sizes, runtime
 // FP-stat accumulation, and LoadFromCatalog prepare-failure / null-db arms.
 //
@@ -80,7 +80,7 @@ INSTANTIATE_TEST_SUITE_P(
         FpCase{0.01}, FpCase{0.001}, FpCase{0.0001}, FpCase{1e-6}, FpCase{1e-9},
         FpCase{1e-12}, FpCase{1e-15}, FpCase{1e-300}));
 
-// -- k-clamp extremes via behaviour: tighter p -> not more false positives ----
+// -- k-clamp extremes via behavior: tighter p -> not more false positives ----
 // p so small that k saturates at 30 must still behave (no crash, no FN), and a
 // near-1 p (k clamps to 1) yields more-or-equal false positives than tight p.
 TEST(BloomOpsMatrixKClamp, ExtremeLowRateClampsKHigh) {

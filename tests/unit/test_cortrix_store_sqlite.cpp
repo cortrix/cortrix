@@ -1955,3 +1955,27 @@ TEST(StoreSqliteOptionsTest, ExternalConnNullHandleRejected) {
     CortrixStoreSqlite store(static_cast<sqlite3*>(nullptr));
     EXPECT_EQ(store.Open(), -1);
 }
+
+// sqlite3_open_v2 can return a partially initialized handle together with an
+// error. Open() must release that handle, clear its state, and remain reusable.
+// LeakSanitizer verifies the failed attempt does not retain SQLite allocations.
+TEST(StoreSqliteOptionsTest, FailedOpenReleasesHandleAndCanRetry) {
+    const auto root = fs::temp_directory_path() /
+                      ("cortrix_store_failed_open_" + std::to_string(::getpid()) +
+                       "_" + std::to_string(rand()));
+    const auto parent = root / "missing";
+    const std::string path = (parent / "store.db").string();
+    std::error_code ec;
+    fs::remove_all(root, ec);
+
+    CortrixStoreSqlite store(path);
+    EXPECT_EQ(store.Open(), -1);
+    EXPECT_EQ(store.db_handle(), nullptr);
+
+    fs::create_directories(parent);
+    EXPECT_EQ(store.Open(), 0);
+    EXPECT_NE(store.db_handle(), nullptr);
+    EXPECT_EQ(store.Close(), 0);
+
+    fs::remove_all(root, ec);
+}

@@ -357,7 +357,7 @@ TEST(ParserFactoryTest, Factory_PaddleOcrDisabledInConfig_NoFallback) {
 }
 
 // ============================================================
-// Round-3 decision-branch residue: each operand of the IsImageExt / MimeType
+// Additional decision-branch coverage: each operand of the IsImageExt / MimeType
 // short-circuit chains, RegisterParser's dup arm, ListParsers' null arms, and the
 // max_file_size_mb<=0 (unlimited) arm. These target the second/third operands of
 // `||` chains and the FALSE side of guards that the existing happy-path tests

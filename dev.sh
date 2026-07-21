@@ -18,7 +18,8 @@ WEB_DIR="$SCRIPT_DIR/web"
 AGENT_DIR="$SCRIPT_DIR/cortrix-agent"
 AGENT_PYTHON="$AGENT_DIR/venv/bin/python"
 AGENT_PORT="${CORTRIX_AGENT_PORT:-8001}"
-AGENT_BASE_URL="${CORTRIX_AGENT_BASE_URL:-http://127.0.0.1:${AGENT_PORT}}"
+AGENT_HOST="${CORTRIX_AGENT_HOST:-127.0.0.1}"
+AGENT_BASE_URL="${CORTRIX_AGENT_BASE_URL:-http://${AGENT_HOST}:${AGENT_PORT}}"
 DEFAULT_CONFIG="$SCRIPT_DIR/build/config.yaml"
 EDITION="CE"
 
@@ -164,7 +165,7 @@ done
 # ── Start Cortrix Agent ────────────────────────────────────
 if [[ -x "$AGENT_PYTHON" ]]; then
     info "Starting Cortrix Agent ($AGENT_BASE_URL)..."
-    (cd "$AGENT_DIR" && "$AGENT_PYTHON" -m uvicorn main:app --host 0.0.0.0 --port "$AGENT_PORT" --log-level warning) &
+    (cd "$AGENT_DIR" && "$AGENT_PYTHON" -m uvicorn main:app --host "$AGENT_HOST" --port "$AGENT_PORT" --log-level warning) &
     AGENT_PID=$!
     # Wait for the Agent to be ready (up to 8 seconds)
     for i in {1..26}; do

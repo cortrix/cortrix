@@ -3,7 +3,7 @@
 This session's APFS/editable-install instability occasionally drops the
 editable ``.pth`` import hook for the P03 SDK (``cortrix``), so we mount both the
 package ``src/`` and the P03 SDK source directory directly. This keeps the test
-run independent of whether ``pip install -e`` is currently honoured. (If the
+run independent of whether ``pip install -e`` is currently honored. (If the
 package is properly installed, these inserts are harmless duplicates.)
 """
 
@@ -14,8 +14,7 @@ import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _SRC = os.path.join(_HERE, "src")
-# P03 SDK source (sibling worktree layout: cortrix-skills/ and sdk/python/ share
-# the wt-P14 parent).
+# P03 SDK source from the repository layout adjacent to cortrix-skills/.
 _P03_SDK = os.path.abspath(os.path.join(_HERE, "..", "sdk", "python"))
 
 for path in (_SRC, _P03_SDK):

@@ -4,6 +4,7 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <stdexcept>
 #include <system_error>
 #include <vector>
 
@@ -1097,7 +1098,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::RegisterBatchRoutes(server.server(), batch_service, auth);
     // [D3.5 r2 · Wave S routes] Flat design-surface /documents family. Mounts the
     // openapi/SDK/MCP shape (POST/GET/GET{id}/DELETE{id} + tasks progress/cancel) on
-    // top of the live per-NS handlers (Derek approach A; nested routes stay). POST reuses
+    // top of the live per-NS handlers while keeping nested routes. POST reuses
     // batch_service as a batch-of-1; the F42 task progress/cancel bodies come from a
     // DocumentTaskHandler over the already-wired scheduler/task_mgr/worker_pool (must
     // outlive `server`, so declared here at end-of-scope).
@@ -1199,7 +1200,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // [F24] Deployment wiring (Wave D-R1, additive). The DiskMonitor itself is
     // constructed earlier (6b) so the SPC admission gate + upload route hold it.
     // Dual health endpoint (F24 main impl): /api/v1/system/health/{live,ready}.
-    // [D3.5 wire · Derek approach A] /ready aggregates the F20 ReadinessRegistry (unified
+    // /ready aggregates the F20 ReadinessRegistry (unified
     // abstraction — replaced F24's standalone HealthProviders). Register the readiness
     // components here (design F20 §8.3/§8.4). Every probe below reflects REAL runtime state
     // — none is a constant-200 stub (a false-ready probe is worse than an honest deferral,
@@ -1293,6 +1294,34 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                 reranker_model_configured);
         });
 
+    // Docker QuickStart writes this marker only after it has ingested the
+    // bundled fixture and completed a source-backed query with real embedding
+    // and reranker invocation counters. Native and non-QuickStart deployments
+    // do not set the environment variable, so their readiness contract is
+    // unchanged.
+    const char* quickstart_ready_file_env =
+        std::getenv("CORTRIX_QUICKSTART_READY_FILE");
+    if (quickstart_ready_file_env != nullptr && quickstart_ready_file_env[0] != '\0') {
+        const std::filesystem::path quickstart_ready_file(quickstart_ready_file_env);
+        readiness.Register("quickstart_demo", [quickstart_ready_file]() {
+            cortrix::health::ComponentReadiness r;
+            std::error_code ec;
+            const auto marker_status =
+                std::filesystem::symlink_status(quickstart_ready_file, ec);
+            if (ec == std::make_error_code(std::errc::no_such_file_or_directory)) {
+                ec.clear();
+            }
+            r.ready = !ec && std::filesystem::is_regular_file(marker_status);
+            r.detail["proof_file_present"] = r.ready;
+            if (ec) {
+                r.detail["reason"] = "proof_file_check_failed";
+            } else if (!r.ready) {
+                r.detail["reason"] = "source_backed_demo_pending";
+            }
+            return r;
+        });
+    }
+
     // vector_index (F01) + memory_store (MEM): honest deferred. Both are PER-NAMESPACE in
     // V1.0 — the P-HNSW index (model load + WAL replay) and memory.db are created lazily
     // when a namespace is first used, so there is no single global "loaded/initialized"
@@ -1304,12 +1333,27 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         server.server(), readiness,
         []() { return g_shutting_down.load(); },
         cortrix::kCortrixVersion);
-    // OpenMetrics endpoint on :9091 (anonymous, separate port). The MetricsServer
+    // OpenMetrics endpoint on a loopback-only, separate port. The MetricsServer
     // always renders the DeployMetrics gauges (disk/shutdown/uptime/build_info); the
     // §5.3 subsystem recorders are AddSource()'d below.
     cortrix::deploy::DeployMetrics::Instance().SetBuildInfo(cortrix::kCortrixVersion, "", "");
     cortrix::deploy::DeployMetrics::Instance().MarkStart();
-    auto f24_metrics_server = cortrix::deploy::RegisterMetricsServer(9091);
+    int metrics_port = 9091;
+    if (const char* value = std::getenv("CORTRIX_METRICS_PORT"); value && *value) {
+        try {
+            std::size_t parsed = 0;
+            const int candidate = std::stoi(value, &parsed);
+            if (parsed != std::string(value).size() || candidate <= 0 || candidate > 65535) {
+                throw std::out_of_range("metrics port");
+            }
+            metrics_port = candidate;
+        } catch (const std::exception&) {
+            CORTRIX_LOG_ERROR(
+                "metrics", "CORTRIX_METRICS_PORT must be an integer from 1 to 65535");
+            return 1;
+        }
+    }
+    auto f24_metrics_server = cortrix::deploy::RegisterMetricsServer(metrics_port);
     if (f24_metrics_server) {
         // [D3.5 wire · gap④] Aggregate the §5.3 subsystem metric recorders into the
         // /metrics body. Each is a process-wide singleton (MET round standalone recorders);
@@ -1339,9 +1383,11 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         ms.AddSource([] { return cortrix::memory::Mem05Metrics::Instance().RenderOpenMetrics(); });
         ms.AddSource([] { return cortrix::agent_trace::AgentTraceMetrics::Instance().RenderOpenMetrics(); });
         ms.AddSource([] { return cortrix::observability::OplogMetrics::Instance().RenderOpenMetrics(); });
-        CORTRIX_LOG_INFO("metrics", "OpenMetrics endpoint on :9091/metrics (22 subsystem recorders)");
+        CORTRIX_LOG_INFO("metrics", "OpenMetrics endpoint on :{}/metrics (22 subsystem recorders)",
+                         metrics_port);
     } else {
-        CORTRIX_LOG_WARN("metrics", "OpenMetrics endpoint failed to bind :9091 (port in use?)");
+        CORTRIX_LOG_WARN("metrics", "OpenMetrics endpoint failed to bind :{} (port in use?)",
+                         metrics_port);
     }
     // [D3.5 wire · gap⑤ · plan B, F24 §7.2.bis] Graceful-shutdown coordinator.
     // The signal stays with the existing SignalHandler (g_shutting_down +

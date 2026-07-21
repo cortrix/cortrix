@@ -1,7 +1,14 @@
 cmake_minimum_required(VERSION 3.20)
 cmake_policy(SET CMP0077 NEW)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
-project(cortrix VERSION 1.0.0 LANGUAGES C CXX)
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" CORTRIX_RELEASE_VERSION LIMIT_COUNT 1)
+string(STRIP "${CORTRIX_RELEASE_VERSION}" CORTRIX_RELEASE_VERSION)
+if(NOT CORTRIX_RELEASE_VERSION MATCHES
+   "^([0-9]+)\\.([0-9]+)\\.([0-9]+)(-[0-9A-Za-z]+(\\.[0-9A-Za-z]+)*)?$")
+    message(FATAL_ERROR "VERSION must contain one SemVer value without a leading 'v'")
+endif()
+set(CORTRIX_VERSION_BASE "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+project(cortrix VERSION "${CORTRIX_VERSION_BASE}" LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -129,7 +136,7 @@ add_library(cortrix_core STATIC
     src/memory/memory_extractor.cpp
     src/memory/contradiction_detector.cpp
     src/memory/memory_queue.cpp
-    # --- MEM02/03 real store adapters + user_facts query (D3.5 round-2 Wave M) ---
+    # --- MEM02/03 store adapters and user_facts query ---
     src/memory/memory_block_adapter.cpp
     src/memory/memory_extraction_service.cpp
     # --- MEM03 Memory Transparency (Wave C-R1) ---

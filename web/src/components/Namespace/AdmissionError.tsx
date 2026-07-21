@@ -22,7 +22,7 @@ interface AdmissionErrorProps {
 
 export function AdmissionError({ error, onRetry }: AdmissionErrorProps) {
   const hint = REMEDIATION[error.code];
-  // Augment the message with the remediation hint when we recognise the code.
+  // Augment the message with the remediation hint when we recognize the code.
   const display: AgentError = hint
     ? { ...error, message: `${error.message} — ${hint}` }
     : error;

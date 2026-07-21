@@ -264,18 +264,30 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             size_t size = getListCount((linklistsizeint*)data);
             tableint *datal = (tableint *) (data + 1);
 #ifdef USE_SSE
-            _mm_prefetch((char *) (visited_array + *(data + 1)), _MM_HINT_T0);
-            _mm_prefetch((char *) (visited_array + *(data + 1) + 64), _MM_HINT_T0);
-            _mm_prefetch(getDataByInternalId(*datal), _MM_HINT_T0);
-            _mm_prefetch(getDataByInternalId(*(datal + 1)), _MM_HINT_T0);
+            // CORTRIX-PATCH: Upstream v0.8.0 dereferences the first two
+            // neighbors even when this adjacency list has fewer entries.
+            if (size > 0) {
+                const tableint first_candidate = datal[0];
+                _mm_prefetch((char *) (visited_array + first_candidate), _MM_HINT_T0);
+                if (static_cast<size_t>(first_candidate) + 64 < max_elements_) {
+                    _mm_prefetch((char *) (visited_array + first_candidate + 64), _MM_HINT_T0);
+                }
+                _mm_prefetch(getDataByInternalId(first_candidate), _MM_HINT_T0);
+            }
+            if (size > 1) {
+                _mm_prefetch(getDataByInternalId(datal[1]), _MM_HINT_T0);
+            }
 #endif
 
             for (size_t j = 0; j < size; j++) {
                 tableint candidate_id = *(datal + j);
 //                    if (candidate_id == 0) continue;
 #ifdef USE_SSE
-                _mm_prefetch((char *) (visited_array + *(datal + j + 1)), _MM_HINT_T0);
-                _mm_prefetch(getDataByInternalId(*(datal + j + 1)), _MM_HINT_T0);
+                if (j + 1 < size) {
+                    const tableint next_candidate = datal[j + 1];
+                    _mm_prefetch((char *) (visited_array + next_candidate), _MM_HINT_T0);
+                    _mm_prefetch(getDataByInternalId(next_candidate), _MM_HINT_T0);
+                }
 #endif
                 if (visited_array[candidate_id] == visited_array_tag) continue;
                 visited_array[candidate_id] = visited_array_tag;
@@ -368,19 +380,32 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             }
 
 #ifdef USE_SSE
-            _mm_prefetch((char *) (visited_array + *(data + 1)), _MM_HINT_T0);
-            _mm_prefetch((char *) (visited_array + *(data + 1) + 64), _MM_HINT_T0);
-            _mm_prefetch(data_level0_memory_ + (*(data + 1)) * size_data_per_element_ + offsetData_, _MM_HINT_T0);
-            _mm_prefetch((char *) (data + 2), _MM_HINT_T0);
+            // CORTRIX-PATCH: Do not dereference an empty adjacency list or
+            // prefetch one element past the final neighbor.
+            if (size > 0) {
+                const tableint first_candidate = *(data + 1);
+                _mm_prefetch((char *) (visited_array + first_candidate), _MM_HINT_T0);
+                if (static_cast<size_t>(first_candidate) + 64 < max_elements_) {
+                    _mm_prefetch((char *) (visited_array + first_candidate + 64), _MM_HINT_T0);
+                }
+                _mm_prefetch(data_level0_memory_ + first_candidate * size_data_per_element_ + offsetData_,
+                             _MM_HINT_T0);
+            }
+            if (size > 1) {
+                _mm_prefetch((char *) (data + 2), _MM_HINT_T0);
+            }
 #endif
 
             for (size_t j = 1; j <= size; j++) {
                 int candidate_id = *(data + j);
 //                    if (candidate_id == 0) continue;
 #ifdef USE_SSE
-                _mm_prefetch((char *) (visited_array + *(data + j + 1)), _MM_HINT_T0);
-                _mm_prefetch(data_level0_memory_ + (*(data + j + 1)) * size_data_per_element_ + offsetData_,
-                                _MM_HINT_T0);  ////////////
+                if (j < size) {
+                    const tableint next_candidate = *(data + j + 1);
+                    _mm_prefetch((char *) (visited_array + next_candidate), _MM_HINT_T0);
+                    _mm_prefetch(data_level0_memory_ + next_candidate * size_data_per_element_ + offsetData_,
+                                 _MM_HINT_T0);  ////////////
+                }
 #endif
                 if (!(visited_array[candidate_id] == visited_array_tag)) {
                     visited_array[candidate_id] = visited_array_tag;
@@ -1090,11 +1115,17 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                     int size = getListCount(data);
                     tableint *datal = (tableint *) (data + 1);
 #ifdef USE_SSE
-                    _mm_prefetch(getDataByInternalId(*datal), _MM_HINT_T0);
+                    // CORTRIX-PATCH: Empty and one-entry lists have no safe
+                    // unconditional look-ahead target.
+                    if (size > 0) {
+                        _mm_prefetch(getDataByInternalId(datal[0]), _MM_HINT_T0);
+                    }
 #endif
                     for (int i = 0; i < size; i++) {
 #ifdef USE_SSE
-                        _mm_prefetch(getDataByInternalId(*(datal + i + 1)), _MM_HINT_T0);
+                        if (i + 1 < size) {
+                            _mm_prefetch(getDataByInternalId(datal[i + 1]), _MM_HINT_T0);
+                        }
 #endif
                         tableint cand = datal[i];
                         dist_t d = fstdistfunc_(dataPoint, getDataByInternalId(cand), dist_func_param_);

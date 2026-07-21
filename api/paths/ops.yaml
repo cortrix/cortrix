@@ -2,7 +2,7 @@
 # SoT: P03 v1.0.1 § 2.13 GC + ARCH ops + components/schemas.yaml (GcStatus)
 # All tag=ops (only exposed in development/self-hosted, see § 5.2 environment tiers); destructive run/purge require X-Ops-Confirm.
 #
-# OPEN-2 three-stage soft-delete lifecycle (Derek 2026-06-12): DELETE /documents/{id} marks the doc
+# OPEN-2 three-stage soft-delete lifecycle: DELETE /documents/{id} marks the doc
 # soft-deleted (status=deleted, deleted_at=now) and recoverable for gc.soft_delete_retention_days
 # (default 30; 0 = immediate, collapsing the window). Inside the window, POST /gc/restore brings docs
 # back; POST /gc/run sweeps expired docs to stage 2 (blob unlink), and POST /gc/purge bypasses the

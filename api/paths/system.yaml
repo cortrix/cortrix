@@ -25,7 +25,7 @@ paths:
                 required: [status, version]
                 properties:
                   status: { type: string, example: healthy }
-                  version: { type: string, example: "1.0.0" }
+                  version: { type: string, example: "1.0.0-rc.1" }
                   uptime_seconds: { type: integer }
                   components:
                     type: object
@@ -155,7 +155,7 @@ paths:
                 type: object
                 required: [version]
                 properties:
-                  version: { type: string, example: "1.0.0" }
+                  version: { type: string, example: "1.0.0-rc.1" }
                   build: { type: string }
                   commit: { type: string }
 

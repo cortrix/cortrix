@@ -185,7 +185,7 @@ Result<RevokeResult> OptOutManager::OptOutRevoke(const std::string& session_id,
 
 Result<bool> OptOutManager::is_session_opted_out(const std::string& session_id,
                                                  const TraceContext* /*ctx*/) {
-    // NOT gated by enabled_ — existing stamps must be honoured even if new opt-outs
+    // NOT gated by enabled_ — existing stamps must be honored even if new opt-outs
     // are disabled. An absent session is benign (false), not an error.
     Result<SessionOptOutState> state = store_->GetOptOutState(session_id);
     if (!state.ok()) return state.status();

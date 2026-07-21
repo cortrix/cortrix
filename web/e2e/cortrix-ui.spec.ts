@@ -1,14 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 
-// Cortrix Web UI — E2E suite (P02a design § 17.1 — 7-8 key scenarios, ~10% of
-// the test pyramid). Rewritten in R5/S11 for the react-router app (the prior
-// spec targeted the pre-router MVP UI: Connector/CDC/`activePage`, all gone).
+// Cortrix Web UI end-to-end coverage for primary user routes and controls.
 //
-// Standalone (D3): runs against `vite dev` with no backend (playwright.config
+// Standalone mode runs against `vite dev` with no backend (playwright.config
 // webServer). Every api module falls back to its in-memory mock, and the mock
 // auth session is authenticated-as-admin by default, so guarded routes + the
 // admin group render without a sign-in step. Selectors use the stable
-// data-testid attributes shipped across R1-R4 (§ 15.2) — not brittle copy.
+// data-testid attributes instead of brittle display copy.
 
 // All app pages live under the guarded Layout; navigate by URL then assert the
 // page's testid is present. A short helper keeps each scenario focused.
@@ -21,7 +19,7 @@ test('1. Namespaces page is the landing route and renders its controls', async (
   await goto(page, '/');
   // App shell (header + sidebar) is present once the auth probe resolves.
   await expect(page.locator('header')).toContainText('Cortrix');
-  // Index route is the Namespaces page (P02a § 8.1). The create entry point
+  // The index route is the Namespaces page. The create entry point
   // always renders (the table body is data-gated, so we assert on the controls
   // that are present regardless of backend availability in standalone).
   await expect(page.getByTestId('namespace-new-btn')).toBeVisible();
@@ -37,8 +35,8 @@ test('2. Search page renders the query box and runs a search', async ({ page }) 
   await input.fill('architecture');
   await page.getByTestId('search-submit-btn').click();
   // Search executed: in standalone the request resolves either to mock results
-  // (markdown-rendered via the sanitized SafeMarkdown, § 4.7 → .prose) or to an
-  // inline GEN-Agent error display (§ 16.4) when the dead-backend proxy returns
+  // (markdown rendered through SafeMarkdown) or to an inline error display
+  // when the unavailable backend proxy returns
   // an error envelope. Either outcome proves the query path ran end-to-end.
   await expect(page.locator('.prose, [data-testid="error-display"]').first()).toBeVisible({
     timeout: 12_000,
@@ -54,13 +52,16 @@ test('3. Chat page renders input + send control', async ({ page }) => {
 });
 
 // ── 4. Memory CRUD entry ────────────────────────────────────────────────────
-test('4. Memory page renders the list and the create entry point', async ({ page }) => {
+test('4. Memory page renders the filters and create entry point', async ({ page }) => {
   await goto(page, '/memory');
-  await expect(page.getByTestId('memory-list')).toBeVisible();
+  // The in-memory dataset may legitimately be empty, so assert on controls
+  // that are stable for both empty and populated states.
+  await expect(page.getByTestId('memory-user-filter')).toBeVisible();
   await expect(page.getByTestId('memory-new-btn')).toBeVisible();
+  await expect(page.getByTestId('app-error-boundary')).toHaveCount(0);
 });
 
-// ── 5. Health dashboard (F20-7 /live + /ready) ──────────────────────────────
+// ── 5. Health dashboard (/live + /ready) ───────────────────────────────────
 test('5. Health dashboard renders live + ready cards', async ({ page }) => {
   await goto(page, '/health');
   await expect(page.getByTestId('health-page')).toBeVisible();
@@ -68,20 +69,20 @@ test('5. Health dashboard renders live + ready cards', async ({ page }) => {
   await expect(page.getByTestId('health-ready-card')).toBeVisible();
 });
 
-// ── 7. Bulk submit panel (TD-F42-BULK-SUBMIT) ───────────────────────────────
+// ── 7. Bulk submit panel ────────────────────────────────────────────────────
 test('7. Upload page exposes the bulk-submit panel that expands', async ({ page }) => {
   await goto(page, '/upload');
   await expect(page.getByTestId('upload-dropzone')).toBeVisible();
   const panel = page.getByTestId('bulk-submit-panel');
   await expect(panel).toBeVisible();
-  // Toggle expands the JSON batch input (§ partial-success schema UI).
+  // The toggle expands the JSON batch input.
   await page.getByTestId('bulk-submit-toggle').click();
   await expect(page.getByTestId('bulk-json-input')).toBeVisible();
 });
 
 // ── 6. Namespace detail drawer survives a backend that omits `configs` ───────
-// Regression for the View Details P0 crash (Scott R9 black-box): the real F12
-// BuildNamespaceJson can return a namespace detail with no `configs` object (or
+// Regression coverage for a View Details crash: the backend can return a
+// namespace detail with no `configs` object (or
 // missing doc_count/block_count). The drawer mapped CONFIG_META over
 // `ns.configs[key]`, so undefined[key] threw a TypeError into the ErrorBoundary.
 // Here we intercept the list + detail endpoints to serve exactly that degraded

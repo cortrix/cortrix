@@ -116,7 +116,7 @@ Status F34SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
             "index parent_id"); !s.ok()) {
         return s;
     }
-    // F08 "1 doc = 1 META" uniqueness (B2, Derek 2026-06-07: built by F34SP, semantics
+    // F08 "1 doc = 1 META" uniqueness (built by F34SP; semantics
     // belong to F08). block_type = 8 = kBlockMeta (F09 CortrixBlockType enum).
     if (Status s = Exec(db,
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_blocks_meta_doc "

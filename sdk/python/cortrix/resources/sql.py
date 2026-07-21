@@ -1,7 +1,7 @@
 """SQL (Text-to-SQL) resource. ``/sql`` (ARCH § 4.1.6, F14).
 
-Per Derek's ruling (briefing § 9): SDK shape = P03 § 2.12; wire = real
-architecture. ``query()`` -> real-arch ``POST /sql`` (``SqlResult``). The
+This resource follows the implemented HTTP architecture. ``query()`` ->
+``POST /sql`` (``SqlResult``). The
 per-namespace schema CRUD (``register_schema`` / ``get_schema`` /
 ``delete_schema``) is **§2.12-only** -> § 2.12 wire ``/namespaces/{ns}/sql/schema``
 (P04 spec to be added -> D3.5). ``query()`` accepts an optional ``namespace``

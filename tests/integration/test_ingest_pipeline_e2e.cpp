@@ -3,7 +3,7 @@
 ///        (real PhnswIndexFactory pool + real SPCManager + real SPCPipeline), driven
 ///        through the HTTP upload/status/query routes.
 ///
-/// Why this exists (Derek's R7 mandate — full-stack, catch D3.5 live-only assembly
+/// Why this exists (full-stack, catching live-only assembly
 /// seams): the existing full-stack server tests (test_e2e_full_server /
 /// test_cross_feature_e2e) back the server with a no-op TestSPCManager + a
 /// non-searchable FakeIndex, so an uploaded document never actually flows through the

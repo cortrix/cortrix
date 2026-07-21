@@ -196,7 +196,11 @@ int CortrixStoreSqlite::Open() {
                                  SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX,
                                  nullptr);
         if (rc != SQLITE_OK) {
-            CORTRIX_LOG_ERROR("store", "Failed to open SQLite: {} ({})", db_path_, sqlite3_errmsg(db_));
+            const std::string error = db_ ? sqlite3_errmsg(db_) : "unknown SQLite error";
+            CORTRIX_LOG_ERROR("store", "Failed to open SQLite: {} ({})", db_path_, error);
+            // sqlite3_open_v2 may return a non-null handle on failure. It still
+            // owns allocations and must be closed before the pointer is cleared.
+            if (db_) sqlite3_close(db_);
             db_ = nullptr;
             return -1;
         }

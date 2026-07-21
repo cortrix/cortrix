@@ -600,7 +600,8 @@ include(GoogleTest)
 # exceed the POST_BUILD discovery timeout, and on timeout make DELETES the just-
 # built binary — turning a slow-listing into a hard build failure. PRE_TEST
 # enumerates lazily at test time, so the build never runs (or deletes) the binary.
-gtest_discover_tests(cortrix_unit_tests PROPERTIES LABELS unit
+gtest_discover_tests(cortrix_unit_tests NO_PRETTY_TYPES NO_PRETTY_VALUES
+    PROPERTIES LABELS unit
     DISCOVERY_MODE PRE_TEST DISCOVERY_TIMEOUT 300)
 
 # --- Integration tests ---

@@ -1,16 +1,15 @@
 # =============================================================
-# F23 Stage 3: Release Gate  (design: dev-cortrix-hub F23-tests.md §6.4)
+# Stage 3: Release Gate
 # Manual workflow_dispatch before a release. Target < 4 hr.
 #
 # Hard gates: all Stage-2 gates + cross-platform E2E 100% +
 # CE/Ent isolation 0 leaks + Lighthouse Perf≥80/A11y≥90 +
-# Trivy no HIGH/CRITICAL + SBOM artifacts (V4 decision 4) + HF integrity.
+# Trivy no HIGH/CRITICAL + SBOM artifacts + HF integrity.
 # Soft: bundle size vs baseline +5%.
 #
 # Repo-reality adaptations:
-#   - image tag = cortrix:<release_tag> built from cortrix/deploy/Dockerfile
-#   - F44 trigger guarded: f44-benchmark.yml lands with F44 (D-R3 #481);
-#     until then the step records SKIP instead of failing the gate
+#   - image tag = cortrix:<release_tag> built from deploy/Dockerfile
+#   - the immutable source revision is supplied separately from the image tag
 # =============================================================
 name: Release Gate
 
@@ -20,20 +19,64 @@ on:
       release_tag:
         required: true
         type: string
+      source_revision:
+        description: Full 40-character source commit to validate
+        required: true
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
+  identity:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    env:
+      SOURCE_REVISION: ${{ inputs.source_revision }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      EVENT_SOURCE_REVISION: ${{ github.sha }}
+      WORKFLOW_SOURCE_REVISION: ${{ github.workflow_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_revision }}
+          persist-credentials: false
+      - name: Validate release source, workflow, and version identity
+        shell: bash
+        run: |
+          if ! [[ "$SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "source_revision must be a full lowercase commit SHA"
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+          test "$EVENT_SOURCE_REVISION" = "$SOURCE_REVISION"
+          test "$WORKFLOW_SOURCE_REVISION" = "$SOURCE_REVISION"
+
+          EXPECTED_TAG="v$(tr -d '\r\n' < VERSION)"
+          if [ "$RELEASE_TAG" != "$EXPECTED_TAG" ]; then
+            echo "release_tag must match VERSION: expected $EXPECTED_TAG"
+            exit 1
+          fi
+          python3 scripts/sync_version.py --check
+
   stage2_full:
+    needs: identity
     uses: ./.github/workflows/nightly-ci.yml
+    with:
+      source_revision: ${{ inputs.source_revision }}
 
   cross_platform_e2e:
     needs: stage2_full
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-13, windows-2022]
+        os: [ubuntu-22.04, macos-15, windows-2022]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_revision }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -48,10 +91,33 @@ jobs:
 
   isolation_and_image:
     needs: stage2_full
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
+    env:
+      SOURCE_REVISION: ${{ inputs.source_revision }}
+      IMAGE_TAG: cortrix:${{ inputs.release_tag }}
+      COMPOSE_PROJECT_NAME: cortrix_release_gate
+      CORTRIX_SOURCE_REVISION: ${{ inputs.source_revision }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_revision }}
+          persist-credentials: false
+
+      - name: Validate immutable release identity
+        run: |
+          if ! [[ "$SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "source_revision must be a full lowercase commit SHA"
+            exit 1
+          fi
+          if ! [[ "${IMAGE_TAG#cortrix:}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+            echo "release_tag contains unsupported characters"
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+
+      - name: Validate release version consistency
+        run: python3 scripts/sync_version.py --check
 
       - name: CE/Ent isolation scan (0 leaks, MUST)
         run: |
@@ -65,26 +131,176 @@ jobs:
           fi
           echo "isolation OK"
 
-      - name: Build release image
-        run: docker build -t cortrix:${{ inputs.release_tag }} -f cortrix/deploy/Dockerfile ..
-
-      - name: Trivy image scan (hard gate)
-        uses: aquasecurity/trivy-action@master
+      - uses: actions/setup-node@v4
         with:
-          image-ref: cortrix:${{ inputs.release_tag }}
-          severity: HIGH,CRITICAL
-          exit-code: "1"
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
-      - name: SBOM generation (Syft → SPDX + CycloneDX, V4 decision 4)
+      - name: Production web audit and build
+        working-directory: web
+        run: |
+          npm ci --ignore-scripts
+          npm audit --omit=dev --audit-level=high
+          npm run build
+
+      - name: Health and Docker contracts
+        run: |
+          bash deploy/test_healthcheck.sh
+          CORTRIX_TEST_DOCKER_BUILD=1 bash deploy/test_docker_build.sh
+
+      - name: Build release image
+        id: build
+        run: |
+          docker build \
+            --build-arg "CORTRIX_SOURCE_REVISION=$SOURCE_REVISION" \
+            -t "$IMAGE_TAG" \
+            -f deploy/Dockerfile .
+          test "$(docker image inspect "$IMAGE_TAG" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$SOURCE_REVISION"
+
+      - name: Generate SPDX and CycloneDX SBOMs
+        if: ${{ always() && steps.build.outcome == 'success' }}
         run: |
           mkdir -p artifacts
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-          syft cortrix:${{ inputs.release_tag }} -o spdx-json=artifacts/sbom.spdx.json
-          syft cortrix:${{ inputs.release_tag }} -o cyclonedx-json=artifacts/sbom.cdx.json
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/artifacts:/artifacts" \
+            anchore/syft:v1.48.0 "$IMAGE_TAG" \
+            -o spdx-json=/artifacts/sbom.spdx.json \
+            -o cyclonedx-json=/artifacts/sbom.cdx.json
+
+      - name: Runtime QuickStart and network-none proof
+        if: ${{ always() && steps.build.outcome == 'success' }}
+        run: |
+          docker tag "$IMAGE_TAG" cortrix:quickstart
+          docker compose -f deploy/docker-compose.yml up --no-build --wait
+
+          test "$(docker compose -f deploy/docker-compose.yml port cortrix 8420)" = "127.0.0.1:8420"
+          curl -fsS http://127.0.0.1:8420/api/v1/system/health/ready > /tmp/ready.json
+          curl -fsS -H 'Content-Type: application/json' \
+            -d '{"namespaces":["demo"],"query":"What does semantic storage keep close to the agents that need it?","top_k":5,"rerank":true}' \
+            http://127.0.0.1:8420/api/v1/query > /tmp/query.json
+
+          python3 - <<'PY'
+          import json
+
+          with open("/tmp/query.json", encoding="utf-8") as handle:
+              payload = json.load(handle)
+
+          def collect_scores(value):
+              if isinstance(value, dict):
+                  for key, child in value.items():
+                      if key == "rerank_score" and isinstance(child, (int, float)):
+                          yield child
+                      yield from collect_scores(child)
+              elif isinstance(value, list):
+                  for child in value:
+                      yield from collect_scores(child)
+
+          assert list(collect_scores(payload)), "query response has no numeric rerank_score"
+          assert "quickstart-demo.txt" in json.dumps(payload), "query response is not source-backed"
+          PY
+
+          docker compose -f deploy/docker-compose.yml down
+          VOLUME="$(docker volume ls --format '{{.Name}}' | grep '^cortrix_release_gate_cortrix-data$')"
+          test -n "$VOLUME"
+
+          docker run -d --name cortrix-network-none \
+            --network none \
+            --mount "source=$VOLUME,target=/data" \
+            -e CORTRIX_PROFILE=quickstart \
+            -e CORTRIX_LLM_ENABLED=false \
+            -e CORTRIX_AGENT_ENABLED=false \
+            -e CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED=true \
+            -e CORTRIX_QUICKSTART_READY_FILE=/data/quickstart/ready.json \
+            -e CORTRIX_EMBEDDING_EXECUTION_PROVIDER=cpu \
+            -e CORTRIX_RERANKER_EXECUTION_PROVIDER=cpu \
+            -e CORTRIX_SERVER_ALLOW_UNAUTHENTICATED_CONTAINER_BIND=true \
+            -e "CORTRIX_SOURCE_REVISION=$SOURCE_REVISION" \
+            "$IMAGE_TAG"
+
+          for _ in $(seq 1 120); do
+            STATUS="$(docker inspect cortrix-network-none --format '{{.State.Health.Status}}')"
+            if [ "$STATUS" = "healthy" ]; then break; fi
+            if [ "$STATUS" = "unhealthy" ]; then docker logs cortrix-network-none; exit 1; fi
+            sleep 5
+          done
+          test "$(docker inspect cortrix-network-none --format '{{.State.Health.Status}}')" = "healthy"
+          test "$(docker inspect cortrix-network-none --format '{{json .HostConfig.PortBindings}}')" = "null"
+          docker exec cortrix-network-none curl -fsS http://127.0.0.1:8420/api/v1/system/health/ready
+          docker exec cortrix-network-none curl -fsS -H 'Content-Type: application/json' \
+            -d '{"namespaces":["demo"],"query":"What does semantic storage keep close to the agents that need it?","top_k":5,"rerank":true}' \
+            http://127.0.0.1:8420/api/v1/query > /tmp/network-none-query.json
+          python3 - <<'PY'
+          import json
+
+          with open("/tmp/network-none-query.json", encoding="utf-8") as handle:
+              payload = json.load(handle)
+          assert "rerank_score" in json.dumps(payload), "network-none query was not reranked"
+          assert "quickstart-demo.txt" in json.dumps(payload), "network-none query is not source-backed"
+          PY
+          docker stop cortrix-network-none
+
+      - name: External-address negative controls
+        if: ${{ always() && steps.build.outcome == 'success' }}
+        run: |
+          VOLUME="$(docker volume ls --format '{{.Name}}' | grep '^cortrix_release_gate_cortrix-data$')"
+          for index in 1 2; do
+            if [ "$index" = 1 ]; then HOST=0.0.0.0; else HOST=192.0.2.10; fi
+            NAME="cortrix-negative-$index"
+            docker run -d --name "$NAME" \
+              --network none \
+              --mount "source=$VOLUME,target=/data" \
+              -e CORTRIX_PROFILE=quickstart \
+              -e CORTRIX_LLM_ENABLED=false \
+              -e CORTRIX_AGENT_ENABLED=false \
+              -e CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED=false \
+              -e "CORTRIX_SERVER_HOST=$HOST" \
+              -e CORTRIX_SERVER_ALLOW_UNAUTHENTICATED_CONTAINER_BIND=false \
+              "$IMAGE_TAG"
+            for _ in $(seq 1 24); do
+              if [ "$(docker inspect "$NAME" --format '{{.State.Running}}')" = "false" ]; then break; fi
+              sleep 5
+            done
+            test "$(docker inspect "$NAME" --format '{{.State.Running}}')" = "false"
+            test "$(docker inspect "$NAME" --format '{{.State.ExitCode}}')" -ne 0
+            docker logs "$NAME"
+          done
+
+      - name: Trivy image scan (hard gate)
+        if: ${{ always() && steps.build.outcome == 'success' }}
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/artifacts:/artifacts" \
+            aquasec/trivy:0.72.0 image \
+            --severity HIGH,CRITICAL \
+            --exit-code 0 \
+            --format json \
+            --output /artifacts/trivy.json \
+            "$IMAGE_TAG"
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.72.0 image \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            "$IMAGE_TAG"
+
+      - name: Cleanup release-gate runtime
+        if: always()
+        run: |
+          docker compose -f deploy/docker-compose.yml down --remove-orphans || true
+          docker rm -f cortrix-network-none cortrix-negative-1 cortrix-negative-2 2>/dev/null || true
+          docker volume rm cortrix_release_gate_cortrix-data 2>/dev/null || true
+
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: sbom-${{ inputs.release_tag }}
-          path: artifacts/sbom.*.json
+          path: |
+            artifacts/sbom.*.json
+            artifacts/trivy.json
+          if-no-files-found: error
 
   lighthouse:
     needs: stage2_full
@@ -92,6 +308,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_revision }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -108,28 +327,106 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: HF model integrity (sha256 manifest)
+        with:
+          ref: ${{ inputs.source_revision }}
+          persist-credentials: false
+      - name: Pinned model manifest contract
         run: |
-          # bge-m3 ONNX + tokenizer assets pinned by checksum manifest
-          if [ -f models/MANIFEST.sha256 ]; then
-            (cd models && sha256sum -c MANIFEST.sha256)
-          else
-            echo "MANIFEST.sha256 not present yet (models distributed out-of-band) — recording SKIP"
-          fi
+          python3 - <<'PY'
+          import csv
+          import re
+          from pathlib import Path, PurePosixPath
 
-  f44_benchmark_trigger:
-    needs: [cross_platform_e2e, isolation_and_image, lighthouse]
-    runs-on: ubuntu-22.04
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4
-      - name: F23 D4 PASS marker → trigger F44 (topic 5 coordination)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "F23 D4 PASS for ${{ inputs.release_tag }}"
-          if gh workflow list | grep -q f44-benchmark; then
-            gh workflow run f44-benchmark.yml --ref ${{ inputs.release_tag }}
-          else
-            echo "f44-benchmark.yml not landed yet (D-R3 #481) — SKIP trigger"
-          fi
+          manifest = Path("deploy/model-manifest.tsv")
+          required_fields = [
+              "component", "destination", "repository", "revision", "source_path",
+              "size_bytes", "sha256", "upstream_repository", "upstream_revision",
+              "license",
+          ]
+          required_components = {
+              "embedding_model", "embedding_tokenizer",
+              "reranker_model", "reranker_tokenizer",
+          }
+          approved_identity = {
+              "embedding_model": (
+                  "bge-m3/model.onnx", "onnx-community/bge-m3-ONNX",
+                  "25b9af8e87a38eb120cfe87125383677b9cd309e",
+                  "onnx/model_quantized.onnx", "568479395",
+                  "2237f770aad5c71bbc1fc2d361a57f9a37400574cc9eff32626f0cdb49234730",
+                  "BAAI/bge-m3", "5617a9f61b028005a4858fdac845db406aefb181",
+                  "MIT",
+              ),
+              "embedding_tokenizer": (
+                  "bge-m3/tokenizer.json", "onnx-community/bge-m3-ONNX",
+                  "25b9af8e87a38eb120cfe87125383677b9cd309e",
+                  "tokenizer.json", "17082799",
+                  "249df0778f236f6ece390de0de746838ef25b9d6954b68c2ee71249e0a9d8fd4",
+                  "BAAI/bge-m3", "5617a9f61b028005a4858fdac845db406aefb181",
+                  "MIT",
+              ),
+              "reranker_model": (
+                  "bge-reranker-v2-m3/model.onnx",
+                  "onnx-community/bge-reranker-v2-m3-ONNX",
+                  "6f5ff65298512715a1e669753bc754d2bc8f367b",
+                  "onnx/model_quantized.onnx", "570727094",
+                  "912fc1215c2dbff6499700534bd8d31253af01573861abbfc43afd1fab6cce5d",
+                  "BAAI/bge-reranker-v2-m3",
+                  "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+                  "Apache-2.0",
+              ),
+              "reranker_tokenizer": (
+                  "bge-reranker-v2-m3/tokenizer.json",
+                  "onnx-community/bge-reranker-v2-m3-ONNX",
+                  "6f5ff65298512715a1e669753bc754d2bc8f367b",
+                  "tokenizer.json", "17082900",
+                  "8bf8afbfd11306bd872018c53bfdf2e160a56f8edbcf49933324404791c148d3",
+                  "BAAI/bge-reranker-v2-m3",
+                  "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+                  "Apache-2.0",
+              ),
+          }
+
+          def require(condition, message):
+              if not condition:
+                  raise SystemExit(message)
+
+          with manifest.open(encoding="utf-8", newline="") as handle:
+              reader = csv.DictReader(handle, delimiter="\t")
+              require(reader.fieldnames == required_fields,
+                      f"unexpected manifest fields: {reader.fieldnames}")
+              rows = list(reader)
+
+          require(all(None not in row for row in rows),
+                  "manifest row has more columns than the header")
+          require(len(rows) == len(required_components),
+                  f"expected {len(required_components)} model assets, found {len(rows)}")
+          require({row["component"] for row in rows} == required_components,
+                  "manifest component set is incomplete or duplicated")
+          require(len({row["component"] for row in rows}) == len(rows),
+                  "manifest contains duplicate components")
+          require(len({row["destination"] for row in rows}) == len(rows),
+                  "manifest contains duplicate destinations")
+          for row in rows:
+              destination = PurePosixPath(row["destination"])
+              require(not destination.is_absolute() and ".." not in destination.parts,
+                      f"unsafe destination: {destination}")
+              require(re.fullmatch(r"[^/\s]+/[^/\s]+", row["repository"]),
+                      f"invalid repository: {row['repository']}")
+              require(re.fullmatch(r"[^/\s]+/[^/\s]+", row["upstream_repository"]),
+                      f"invalid upstream repository: {row['upstream_repository']}")
+              require(re.fullmatch(r"[0-9a-f]{40}", row["revision"]),
+                      f"invalid revision for {row['component']}")
+              require(re.fullmatch(r"[0-9a-f]{40}", row["upstream_revision"]),
+                      f"invalid upstream revision for {row['component']}")
+              require(re.fullmatch(r"[0-9a-f]{64}", row["sha256"]),
+                      f"invalid sha256 for {row['component']}")
+              require(row["size_bytes"].isdigit() and int(row["size_bytes"]) > 0,
+                      f"invalid size for {row['component']}")
+              require(bool(row["source_path"] and row["license"]),
+                      f"missing source path or license for {row['component']}")
+              actual_identity = tuple(row[field] for field in required_fields[1:])
+              require(actual_identity == approved_identity[row["component"]],
+                      f"unapproved model identity for {row['component']}")
+
+          print(f"validated {len(rows)} pinned model assets")
+          PY

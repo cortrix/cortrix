@@ -407,7 +407,7 @@ TEST_F(OptOutManagerTest, IsOptedOutNotGatedByDisabled) {
     auto disabled = MakeManager(store_, logger_, /*enabled=*/false);
     auto r = disabled.is_session_opted_out(kValidSession);
     ASSERT_TRUE(r.ok());
-    EXPECT_TRUE(*r) << "existing opt-out must be honoured even when feature disabled";
+    EXPECT_TRUE(*r) << "existing opt-out must be honored even when feature disabled";
 }
 
 TEST_F(OptOutManagerTest, IsOptedOutPropagatesStoreError) {

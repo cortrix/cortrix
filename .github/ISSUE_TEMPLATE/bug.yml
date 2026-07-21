@@ -1,0 +1,58 @@
+name: Bug report
+description: Report a reproducible Cortrix defect without including secrets or private data.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use the security policy for vulnerabilities. Remove tokens, customer data, private URLs, and sensitive logs before submitting.
+  - type: input
+    id: version
+    attributes:
+      label: Cortrix version or commit
+      description: Prefer a 40-character Git commit.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, architecture, compiler, deployment path, model profile, and relevant configuration with secrets removed.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest ordered sequence that reproduces the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include status codes and structured errors where available.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Add minimal logs, traces, or screenshots after removing credentials, private paths, and customer data.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched for an existing issue.
+          required: true
+        - label: This report contains no secrets, customer data, or private infrastructure details.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

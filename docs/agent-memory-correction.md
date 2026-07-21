@@ -36,7 +36,7 @@ The audit trail is the F18a operation_log (CE) — there is **no** separate
    invalidations with the invalidated block, the block that caused it, the
    reason, confidence, timestamp, and `auto_revoke_eligible`.
 3. **Agent explains and asks** — surface the human-readable reason ("on May 15
-   you said you were 'travelling to Beijing', so I retired 'user is in Shanghai'
+   you said you were 'traveling to Beijing', so I retired 'user is in Shanghai'
    — but that reads as a trip, not a move. Restore it?").
 4. **On confirmation, Agent revokes** — `client.memory.revoke_fact(...)`. The old
    block's `status` goes `invalidated → active`; a `memory_revoke` entry is
@@ -93,9 +93,9 @@ data) with these `CX_ERR_MEM02_*` codes:
 | `CX_ERR_MEM02_CONTRADICTION_AMBIGUOUS` | transient | yes | retry; the judge was unsure |
 | `CX_ERR_MEM02_LLM_DISABLED` | permanent | no | extraction is off (NullEnricher); only `interaction_log` is kept |
 
-## Deferred wiring (D3.5)
+## Implementation status
 
-This guide describes the contract. The live endpoints, the real Query-pipeline
-contradiction path, the Python-middleware async worker, and the MEM04 opt-out
-interplay are wired during D3.5 integration — see the feature's D3.5 deferred list
-in `design/features/MEM02-llm-extraction.md`.
+This guide describes a design contract. The live endpoints, Query-pipeline contradiction
+path, Python-middleware async worker, and MEM04 opt-out integration are not currently
+implemented as one supported workflow. Do not treat the examples above as an executable
+Quick Start. Implementation notes remain in `design/features/MEM02-llm-extraction.md`.

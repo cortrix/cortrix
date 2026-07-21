@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <fstream>
 #include <cstdlib>
 #include "cortrix/config/config.h"
@@ -15,6 +16,7 @@ protected:
         unsetenv("CORTRIX_SERVER_HOST");
         unsetenv("CORTRIX_SERVER_PORT");
         unsetenv("CORTRIX_SERVER_THREADS");
+        unsetenv("CORTRIX_SERVER_ALLOW_UNAUTHENTICATED_CONTAINER_BIND");
         unsetenv("CORTRIX_LOG_LEVEL");
         unsetenv("CORTRIX_LOG_FORMAT");
         unsetenv("CORTRIX_LOG_OUTPUT");
@@ -28,6 +30,7 @@ protected:
         unsetenv("CORTRIX_SERVER_HOST");
         unsetenv("CORTRIX_SERVER_PORT");
         unsetenv("CORTRIX_SERVER_THREADS");
+        unsetenv("CORTRIX_SERVER_ALLOW_UNAUTHENTICATED_CONTAINER_BIND");
         unsetenv("CORTRIX_LOG_LEVEL");
         unsetenv("CORTRIX_LOG_FORMAT");
         unsetenv("CORTRIX_LOG_OUTPUT");
@@ -48,9 +51,10 @@ protected:
 
 TEST_F(ConfigTest, DefaultValues) {
     auto config = LoadConfig("");
-    EXPECT_EQ(config.server.host, "0.0.0.0");
+    EXPECT_EQ(config.server.host, "127.0.0.1");
     EXPECT_EQ(config.server.port, 8420);
     EXPECT_EQ(config.server.thread_count, 8);
+    EXPECT_FALSE(config.server.allow_unauthenticated_container_bind);
     EXPECT_TRUE(config.auth.enabled);
     EXPECT_EQ(config.log.level, "info");
     EXPECT_EQ(config.log.format, "json");
@@ -65,6 +69,7 @@ server:
   port: 9090
   thread_count: 4
   max_payload_bytes: 52428800
+  allow_unauthenticated_container_bind: true
 
 auth:
   enabled: false
@@ -90,6 +95,7 @@ namespace:
     EXPECT_EQ(config.server.port, 9090);
     EXPECT_EQ(config.server.thread_count, 4);
     EXPECT_EQ(config.server.max_payload_bytes, 52428800);
+    EXPECT_TRUE(config.server.allow_unauthenticated_container_bind);
     EXPECT_FALSE(config.auth.enabled);
     ASSERT_EQ(config.auth.api_keys.size(), 1u);
     EXPECT_EQ(config.auth.api_keys[0].key_hash, "abc123");
@@ -265,7 +271,7 @@ server:
 
     auto config = LoadConfig(yaml_path_);
     EXPECT_EQ(config.server.port, 3000);
-    EXPECT_EQ(config.server.host, "0.0.0.0");  // default
+    EXPECT_EQ(config.server.host, "127.0.0.1");  // safe local default
     EXPECT_EQ(config.log.level, "info");  // default
     EXPECT_EQ(config.ns.data_dir, "./data");  // default
 }
@@ -282,6 +288,13 @@ TEST_F(ConfigTest, EnvBoolParsingNumeric) {
 
     auto config = LoadConfig("");
     EXPECT_FALSE(config.auth.enabled);
+}
+
+TEST_F(ConfigTest, EnvContainerBindOptInParsing) {
+    setenv("CORTRIX_SERVER_ALLOW_UNAUTHENTICATED_CONTAINER_BIND", "true", 1);
+
+    auto config = LoadConfig("");
+    EXPECT_TRUE(config.server.allow_unauthenticated_container_bind);
 }
 
 TEST_F(ConfigTest, EnvStringOverrides) {
@@ -303,6 +316,72 @@ TEST_F(ConfigTest, ValidateDefaultConfigPasses) {
     auto config = LoadConfig("");
     auto errors = ValidateConfig(config);
     EXPECT_TRUE(errors.empty()) << "Default config should pass validation";
+}
+
+TEST_F(ConfigTest, ValidateUnauthenticatedLoopbackHostsPass) {
+    for (const auto* host : {"127.0.0.1", "127.23.45.67", "localhost", "LOCALHOST",
+                             "::1", "[::1]"}) {
+        CortrixConfig config;
+        config.auth.enabled = false;
+        config.server.host = host;
+        const auto errors = ValidateConfig(config);
+        const bool found = std::any_of(errors.begin(), errors.end(), [](const std::string& error) {
+            return error.find("server.host must be loopback") != std::string::npos;
+        });
+        EXPECT_FALSE(found) << "loopback host should pass: " << host;
+    }
+}
+
+TEST_F(ConfigTest, ValidateUnauthenticatedNonLoopbackHostsFailClosed) {
+    for (const auto* host : {"0.0.0.0", "192.168.50.75", "8.8.8.8", "::", "2001:db8::1",
+                             "example.test", "127.0.0.999"}) {
+        CortrixConfig config;
+        config.auth.enabled = false;
+        config.server.host = host;
+        const auto errors = ValidateConfig(config);
+        const auto found = std::find_if(errors.begin(), errors.end(), [](const std::string& error) {
+            return error.find("server.host must be loopback") != std::string::npos;
+        });
+        ASSERT_NE(found, errors.end()) << "non-loopback host should fail: " << host;
+        EXPECT_NE(found->find(host), std::string::npos);
+    }
+}
+
+TEST_F(ConfigTest, ValidateAuthenticatedExternalBindPasses) {
+    CortrixConfig config;
+    config.auth.enabled = true;
+    config.server.host = "0.0.0.0";
+    const auto errors = ValidateConfig(config);
+    const bool found = std::any_of(errors.begin(), errors.end(), [](const std::string& error) {
+        return error.find("server.host must be loopback") != std::string::npos;
+    });
+    EXPECT_FALSE(found);
+}
+
+TEST_F(ConfigTest, ValidateExplicitUnauthenticatedContainerWildcardBindPasses) {
+    for (const auto* host : {"0.0.0.0", "::", "[::]"}) {
+        CortrixConfig config;
+        config.auth.enabled = false;
+        config.server.host = host;
+        config.server.allow_unauthenticated_container_bind = true;
+        const auto errors = ValidateConfig(config);
+        const bool found = std::any_of(errors.begin(), errors.end(), [](const std::string& error) {
+            return error.find("server.host must be loopback") != std::string::npos;
+        });
+        EXPECT_FALSE(found) << "explicit container wildcard bind should pass: " << host;
+    }
+}
+
+TEST_F(ConfigTest, ValidateContainerBindOptInDoesNotAllowSpecificExternalAddress) {
+    CortrixConfig config;
+    config.auth.enabled = false;
+    config.server.host = "192.168.50.75";
+    config.server.allow_unauthenticated_container_bind = true;
+    const auto errors = ValidateConfig(config);
+    const bool found = std::any_of(errors.begin(), errors.end(), [](const std::string& error) {
+        return error.find("server.host must be loopback") != std::string::npos;
+    });
+    EXPECT_TRUE(found);
 }
 
 TEST_F(ConfigTest, ValidatePortZero) {
@@ -958,7 +1037,7 @@ TEST_F(ConfigTest, ValidateMaxQueueSizeZeroValid) {
 TEST_F(ConfigTest, LoadConfigNonexistentPathReturnsDefaults) {
     auto config = LoadConfig("/this/path/does/not/exist.yaml");
     // Should not crash, returns defaults
-    EXPECT_EQ(config.server.host, "0.0.0.0");
+    EXPECT_EQ(config.server.host, "127.0.0.1");
     EXPECT_EQ(config.server.port, 8420);
     EXPECT_EQ(config.ns.data_dir, "./data");
     EXPECT_EQ(config.log.level, "info");

@@ -1,6 +1,6 @@
 #pragma once
-// Full-stack E2E harness (R7 · Derek's "core flow must run end-to-end in one real
-// process" mandate). The existing "full-stack" integration tests
+// Full-stack E2E harness for running the core flow end-to-end in one real
+// process. The existing "full-stack" integration tests
 // (test_e2e_full_server / test_cross_feature_e2e::FullHttpE2ETest) stand up a real
 // httplib server but back it with NsPoolHarness — whose pool returns a NON-searchable
 // FakeIndex (MockIndexFactory) and whose SPC layer is a no-op TestSPCManager. They

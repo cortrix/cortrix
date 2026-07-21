@@ -3,7 +3,7 @@
 ///        (real DirWatcherRegistry + real SPCManager + real PhnswIndexFactory pool),
 ///        driven through the connector HTTP routes.
 ///
-/// Why this exists (Derek's R7 mandate — full-stack, catch D3.5 live-only seams):
+/// Why this exists (full-stack, catching live-only seams):
 /// the F21 fan-out unit test (tests/unit/test_dir_watcher_registry.cpp) drives the
 /// private FanOutEvents with synthetic events over mock routers. This exercises the
 /// LIVE path: a real file dropped in a watched directory, fanned out by the real

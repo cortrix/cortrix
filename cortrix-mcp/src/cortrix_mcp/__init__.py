@@ -8,4 +8,4 @@ Distribution: pip (`cortrix-mcp`) + Docker (`cortrix/mcp`).
 Transport to backend: httpx direct HTTP (no Python SDK), prefix `{CORTRIX_URL}/api/v1/<path>`.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0.0rc1"

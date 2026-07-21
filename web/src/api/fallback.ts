@@ -1,7 +1,7 @@
 // Mock-fallback policy — the single chokepoint that decides whether a thrown API
-// error surfaces to the caller or is swallowed in favour of the in-memory mock.
+// error surfaces to the caller or is swallowed in favor of the in-memory mock.
 //
-// Root cause this fixes (Scott R9 #3): the in-memory mock (./mock.ts) was wired
+// Root cause: the in-memory mock (./mock.ts) was wired
 // into the *live* runtime path via a per-call `catch { return mockApi.X() }`. In
 // production that masks real backend failures as fabricated successes — most
 // dangerously, a rejected /admin/bootstrap handing the caller a fake

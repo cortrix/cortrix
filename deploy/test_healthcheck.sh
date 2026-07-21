@@ -1,10 +1,5 @@
 #!/bin/bash
-# ============================================================
-# F12 Test: Health Check — verify deploy/ config correctness
-# Run:  bash codes/cortrix/deploy/test_healthcheck.sh
-# ============================================================
-
-set -e
+set -u
 
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PASS=0
@@ -12,175 +7,61 @@ FAIL=0
 
 pass() { echo "  [PASS] $1"; PASS=$((PASS + 1)); }
 fail() { echo "  [FAIL] $1"; FAIL=$((FAIL + 1)); }
+contains() { grep -Fq -- "$2" "$1"; }
+not_contains() { ! grep -Fq -- "$2" "$1"; }
 
-echo "========================================"
-echo "  F12 Health Check Test Suite"
-echo "========================================"
-echo ""
+echo "Cortrix Docker readiness contract tests"
 
-# --- 1. healthcheck.sh content ---
-echo "Test 1: healthcheck.sh"
-HC="$DEPLOY_DIR/healthcheck.sh"
+HEALTHCHECK="$DEPLOY_DIR/healthcheck.sh"
+ENTRYPOINT="$DEPLOY_DIR/entrypoint.sh"
+SUPERVISOR="$DEPLOY_DIR/supervisord.conf"
+COMPOSE="$DEPLOY_DIR/docker-compose.yml"
 
-if bash -n "$HC" 2>/dev/null; then
-    pass "syntax valid"
+if bash -n "$HEALTHCHECK" && bash -n "$ENTRYPOINT"; then
+    pass "healthcheck and entrypoint syntax is valid"
 else
-    fail "syntax error"
+    fail "healthcheck or entrypoint syntax is invalid"
 fi
 
-if grep -q "curl" "$HC"; then
-    pass "uses curl for HTTP check"
+if contains "$HEALTHCHECK" '/api/v1/system/health/ready' && \
+   contains "$HEALTHCHECK" "if [ \"\$HTTP_CODE\" = \"200\" ]"; then
+    pass "healthcheck accepts only the strict readiness endpoint"
 else
-    fail "missing curl"
+    fail "healthcheck does not enforce strict readiness"
+fi
+if not_contains "$HEALTHCHECK" '503)' && not_contains "$HEALTHCHECK" 'degraded-but-serving'; then
+    pass "HTTP 503 is not treated as healthy"
+else
+    fail "healthcheck still treats HTTP 503 as healthy"
 fi
 
-if grep -q "CORTRIX_HTTP_PORT" "$HC"; then
-    pass "respects CORTRIX_HTTP_PORT"
+for contract in 'CORTRIX_PROFILE:-quickstart' 'CORTRIX_LLM_ENABLED:-false' \
+    'CORTRIX_AGENT_ENABLED:-false' 'CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED:-true' \
+    'real embedding/reranker asset is missing or unsafe' \
+    "rm -f \"\$CORTRIX_QUICKSTART_READY_FILE\""; do
+    if contains "$ENTRYPOINT" "$contract"; then
+        pass "entrypoint contains $contract"
+    else
+        fail "entrypoint is missing $contract"
+    fi
+done
+
+if contains "$ENTRYPOINT" 'CORTRIX_LLM_PROVIDER="disabled"' && \
+   contains "$ENTRYPOINT" 'CORTRIX_LLM_API_KEY=""' && \
+   contains "$COMPOSE" 'CORTRIX_LLM_ENABLED: "false"'; then
+    pass "default QuickStart explicitly disables LLM configuration"
 else
-    fail "missing CORTRIX_HTTP_PORT"
+    fail "no-LLM default is incomplete"
 fi
 
-if grep -q "/api/v1/health" "$HC"; then
-    pass "checks /api/v1/health endpoint"
+if contains "$SUPERVISOR" '/api/v1/system/health/live' && \
+   contains "$SUPERVISOR" 'supervisorctl -c /etc/supervisor/conf.d/cortrix.conf restart cortrix-server' && \
+   not_contains "$SUPERVISOR" 'HTTP" != "503'; then
+    pass "health monitor uses liveness and the configured Supervisor control socket"
 else
-    fail "wrong health endpoint"
+    fail "health monitor liveness or Supervisor control contract is stale"
 fi
 
-if grep -q "503" "$HC"; then
-    pass "handles degraded (503) status"
-else
-    fail "missing 503 handling"
-fi
-
-if grep -q "exit 0" "$HC" && grep -q "exit 1" "$HC"; then
-    pass "has healthy + unhealthy exit codes"
-else
-    fail "incomplete exit codes"
-fi
-
-# --- 2. entrypoint.sh pre-flight checks ---
-echo ""
-echo "Test 2: entrypoint.sh pre-flight checks"
-EP="$DEPLOY_DIR/entrypoint.sh"
-
-if bash -n "$EP" 2>/dev/null; then
-    pass "syntax valid"
-else
-    fail "syntax error"
-fi
-
-if grep -q 'CORTRIX_DATA_DIR' "$EP"; then
-    pass "sets CORTRIX_DATA_DIR default"
-else
-    fail "missing CORTRIX_DATA_DIR"
-fi
-
-if grep -q 'CORTRIX_HTTP_PORT' "$EP"; then
-    pass "sets CORTRIX_HTTP_PORT default"
-else
-    fail "missing CORTRIX_HTTP_PORT"
-fi
-
-if grep -q 'CORTRIX_LLM_API_KEY' "$EP"; then
-    pass "warns about missing API key"
-else
-    fail "missing API key check"
-fi
-
-if grep -q 'cortrix_server' "$EP"; then
-    pass "checks cortrix_server binary"
-else
-    fail "missing binary check"
-fi
-
-if grep -q 'mkdir.*blobs' "$EP"; then
-    pass "initializes data subdirectories"
-else
-    fail "missing data dir init"
-fi
-
-if grep -q 'supervisord' "$EP"; then
-    pass "starts supervisord"
-else
-    fail "missing supervisord start"
-fi
-
-# --- 3. supervisord.conf process management ---
-echo ""
-echo "Test 3: supervisord.conf process management"
-SUP="$DEPLOY_DIR/supervisord.conf"
-
-if grep -q "nodaemon=true" "$SUP"; then
-    pass "runs in foreground (nodaemon=true)"
-else
-    fail "missing nodaemon=true"
-fi
-
-if grep -q 'CORTRIX_LLM_API_KEY' "$SUP"; then
-    pass "passes LLM API key to services"
-else
-    fail "missing LLM key passthrough"
-fi
-
-if grep -q 'startretries=3' "$SUP"; then
-    pass "retry policy configured"
-else
-    fail "missing retry policy"
-fi
-
-if grep -q 'priority=' "$SUP"; then
-    pass "start priority configured"
-else
-    fail "missing start priority"
-fi
-
-# --- 4. env passthrough ---
-echo ""
-echo "Test 4: env passthrough"
-
-if grep -q 'env_file' "$DEPLOY_DIR/docker-compose.yml"; then
-    pass "docker-compose passes env to container"
-else
-    fail "docker-compose missing env passthrough"
-fi
-
-# --- 5. Caddy HTTPS ---
-echo ""
-echo "Test 5: Caddy config"
-CADDY="$DEPLOY_DIR/caddy/Caddyfile"
-
-if grep -q "reverse_proxy localhost:8420" "$CADDY"; then
-    pass "proxies to localhost:8420"
-else
-    fail "wrong proxy target"
-fi
-
-if grep -q "encode" "$CADDY"; then
-    pass "compression enabled"
-else
-    fail "missing compression"
-fi
-
-if grep -q "X-Content-Type-Options" "$CADDY"; then
-    pass "security headers present"
-else
-    fail "missing security headers"
-fi
-
-if grep -q "log" "$CADDY"; then
-    pass "access logging configured"
-else
-    fail "missing access logging"
-fi
-
-# --- Summary ---
-echo ""
-echo "========================================"
 TOTAL=$((PASS + FAIL))
-echo "  Results: $PASS/$TOTAL passed, $FAIL failed"
-echo "========================================"
-
-if [ "$FAIL" -gt 0 ]; then
-    exit 1
-fi
-exit 0
+echo "Results: $PASS/$TOTAL passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

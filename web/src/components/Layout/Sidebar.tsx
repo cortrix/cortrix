@@ -34,7 +34,7 @@ interface NavItem {
 // state now derives from the URL. The Admin group (Users / Operation Log,
 // § 9-bis) renders only for admin-role sessions. The Enterprise group renders
 // only on enterprise builds (edition === 'enterprise'); CE hides it entirely
-// (Derek 2026-06-23: the community edition must not advertise enterprise-only
+// (the community edition must not advertise enterprise-only
 // surfaces).
 
 const PRIMARY: NavItem[] = [

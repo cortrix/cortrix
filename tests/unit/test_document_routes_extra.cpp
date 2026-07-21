@@ -306,7 +306,7 @@ TEST_F(DocRoutesExtraTest, DeletedDocumentBecomesInvisibleOnStatusEndpoint) {
     ASSERT_TRUE(del);
     ASSERT_EQ(del->status, 204) << del->body;
 
-    // GET status for a soft-deleted doc → 404 (OPEN-2 behaviour).
+    // GET status for a soft-deleted doc → 404 (OPEN-2 behavior).
     auto status = cli.Get(
         "/api/v1/namespaces/default/documents/" + doc_id + "/status",
         AuthHeaders());

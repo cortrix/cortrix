@@ -77,14 +77,14 @@ bool QueryComplexityClassifier::IsChatQuery(const std::string& query) {
     const std::string n = NormalizeForChat(query);
     if (n.empty()) return false;  // empty content is handled as a fail-safe elsewhere
     // Conservative pleasantry set (§14 risk: Chat skips all retrieval, so only a
-    // tight match of a content-free greeting/acknowledgement routes here).
+    // tight match of a content-free greeting/acknowledgment routes here).
     static const char* chat_exact[] = {
         "hi", "hello", "hey", "yo", "hiya",
         "thanks", "thank you", "thx", "ty", "cheers",
         "ok", "okay", "cool", "great", "nice",
         "bye", "goodbye", "good morning", "good afternoon", "good evening",
         "how are you", "what's up", "whats up", "sup",
-        // CJK greetings/acknowledgements (raw UTF-8 bytes — functional matching data):
+        // CJK greetings/acknowledgments (raw UTF-8 bytes — functional matching data):
         "\xe4\xbd\xa0\xe5\xa5\xbd",                       // hello
         "\xe5\x97\xa8",                                   // hi
         "\xe8\xb0\xa2\xe8\xb0\xa2",                       // thanks
@@ -190,7 +190,7 @@ retrieval::ClassificationResult QueryComplexityClassifier::RunClassifier(
 retrieval::ClassificationResult QueryComplexityClassifier::Classify(
     const retrieval::ClassifierInput& input) {
     // F39 is a pre-retrieval router: only the query text matters; input.chunks is
-    // ignored (we honour the shared post-retrieval IClassifier signature anyway).
+    // ignored (we honor the shared post-retrieval IClassifier signature anyway).
     // L2: no usable backend → degrade to Complex (classifier_unavailable). We keep
     // the dedicated INFERENCE_FAILED code off this path; the unavailable case is
     // surfaced via RouteAndUpdateContext's routing_decision_source instead.

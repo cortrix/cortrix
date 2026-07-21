@@ -44,6 +44,7 @@ WORKDIR /build
 
 COPY cmake          cortrix/cmake/
 COPY CMakeLists.txt cortrix/CMakeLists.txt
+COPY VERSION        cortrix/VERSION
 COPY include        cortrix/include/
 COPY src            cortrix/src/
 COPY tests          cortrix/tests/
@@ -110,7 +111,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 LABEL maintainer="Cortrix Team <team@cortrix.ai>"
 LABEL description="Cortrix CUDA — Semantic Storage for the Agentic Era"
-LABEL version="1.0.0"
+LABEL version="1.0.0-rc.1"
 
 ENV CORTRIX_ONNX_RUNTIME_FLAVOR=cuda \
     NVIDIA_VISIBLE_DEVICES=all \

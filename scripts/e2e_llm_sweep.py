@@ -12,7 +12,7 @@
 #       missing-NS + error envelope
 #   P5  memory: session / interactions / search / inject
 #
-# NOTE: since D3.5 round 2 the live wire IS the design face: F04 /query
+# The live wire is the design surface: F04 /query
 # (namespaces[] + 8-field meta), MEM02/03/04 + F13 surfaces, P08-CE
 # bootstrap/api-keys, F16a import, batch, GC lifecycle, flat /documents
 # + /watch. This sweep covers the design-face shapes.
@@ -360,7 +360,7 @@ def main():
     # ---------- P6 platform surfaces (D3.5 r2 Wave P) ----------
     r = s.get(f"{api}/system/version", timeout=10)
     if check("P6 /system/version 200", r.status_code == 200, r.text[:160]):
-        check("P6 version == 1.0.0", (r.json() or {}).get("version") == "1.0.0", r.text[:160])
+        check("P6 version == 1.0.0-rc.1", (r.json() or {}).get("version") == "1.0.0-rc.1", r.text[:160])
 
     # F18a operation_log read surface (/operations). By now uploads + memory CRUD +
     # namespace creates have logged rows. Exercises: list, namespace_id filter branch,

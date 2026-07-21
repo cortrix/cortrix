@@ -23,8 +23,10 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <thread>
 
@@ -44,6 +46,37 @@ namespace {
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
+
+class ScopedEnvironmentVariable {
+public:
+    ScopedEnvironmentVariable(const char* name, const std::string& value)
+        : name_(name) {
+        const char* previous = std::getenv(name_.c_str());
+        if (previous != nullptr) {
+            had_previous_ = true;
+            previous_ = previous;
+        }
+        if (::setenv(name_.c_str(), value.c_str(), /*overwrite=*/1) != 0) {
+            throw std::runtime_error("failed to set test environment variable: " + name_);
+        }
+    }
+
+    ~ScopedEnvironmentVariable() {
+        if (had_previous_) {
+            ::setenv(name_.c_str(), previous_.c_str(), /*overwrite=*/1);
+        } else {
+            ::unsetenv(name_.c_str());
+        }
+    }
+
+    ScopedEnvironmentVariable(const ScopedEnvironmentVariable&) = delete;
+    ScopedEnvironmentVariable& operator=(const ScopedEnvironmentVariable&) = delete;
+
+private:
+    std::string name_;
+    std::string previous_;
+    bool had_previous_ = false;
+};
 
 // Minimal SPCManager stub (no real processing).
 class StubSPC : public SPCManager {
@@ -514,12 +547,13 @@ TEST_F(ConnectorRoutesTest, ScanAllWithWatcherReturnsStats) {
 // ---------------------------------------------------------------------------
 
 TEST_F(ConnectorRoutesTest, BrowseDefaultPathReturnsEntries) {
+    ScopedEnvironmentVariable home("HOME", temp_dir_.string());
     httplib::Client cli("127.0.0.1", port_);
     auto res = cli.Get("/api/v1/browse");
     ASSERT_TRUE(res);
-    EXPECT_EQ(res->status, 200);
+    ASSERT_EQ(res->status, 200) << res->body;
     auto body = json::parse(res->body);
-    EXPECT_TRUE(body.contains("path"));
+    EXPECT_EQ(body["path"], temp_dir_canon_);
     EXPECT_TRUE(body.contains("entries"));
 }
 

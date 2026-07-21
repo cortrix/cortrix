@@ -15,7 +15,7 @@ namespace cortrix::query {
 ///   force_route                     — "auto" / "simple" / "complex" / "chat" (NS-level override)
 ///   confidence_threshold            — §6.1 step 5: classifier confidence below this → Complex (fail-safe)
 ///   evaluation_method               — "small_classifier" (F39-1 B) / "hybrid" (Phase 2 LLM judge)
-///   fallback_to_complex_on_failure  — §7 L1/L2/L3 default behaviour
+///   fallback_to_complex_on_failure  — §7 L1/L2/L3 default behavior
 ///   multi_turn_warning_enabled      — §6.2 multi_turn_context_warning detection toggle
 ///   max_inference_retries           — §7.3 L3 retry budget (exponential back-off 50/100/200ms)
 struct ComplexityConfig {
