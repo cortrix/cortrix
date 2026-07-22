@@ -36,7 +36,7 @@ jobs:
     # The hard coverage phase performs a second instrumented build and then
     # runs the 11k+ unit cases serially. Preserve that gate and give it the
     # measured end-to-end window it needs on a cold hosted runner.
-    timeout-minutes: 180
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
         with:
