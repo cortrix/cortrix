@@ -65,9 +65,10 @@ are not exposed. Core's unauthenticated non-loopback guard remains fail closed
 by default; this Compose file explicitly permits only the container-internal
 wildcard listener needed for that loopback publication.
 
-This path is for local first value. It does not establish parser coverage,
-authentication, internet-facing deployment, benchmark quality, or production
-readiness. See the canonical [Quick Start](../docs/QUICKSTART.md) for provenance,
-integrity checks, and next steps. Maintainers who need the deeper source-build
+This path is intended to provide a first local result. It does not establish
+parser coverage, authentication, internet-facing deployment, benchmark quality,
+or production readiness. See the canonical
+[Quick Start](../docs/QUICKSTART.md) for provenance, integrity checks, and next
+steps. Maintainers who need the deeper source-build
 evidence workflow can use the
 [First-value SupportOps demo](../examples/first-value-supportops/README.md).

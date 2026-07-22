@@ -11,7 +11,7 @@ import { defineConfig, devices } from '@playwright/test';
 // production build — so the webServer environment sets VITE_USE_MOCK=1 to force it on,
 // letting every api module fall back to its in-memory mock and the mock
 // authenticated-as-admin session render the guarded routes directly.
-// mcp__claude-in-chrome agent acceptance stays out of CI (§ 17.5).
+// Interactive browser acceptance is verified separately from automated CI.
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
