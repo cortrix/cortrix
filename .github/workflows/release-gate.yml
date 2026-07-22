@@ -68,6 +68,7 @@ jobs:
   cross_platform_e2e:
     needs: stage2_full
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-22.04, macos-15, windows-2022]
     runs-on: ${{ matrix.os }}
@@ -121,15 +122,102 @@ jobs:
 
       - name: CE/Ent isolation scan (0 leaks, MUST)
         run: |
-          # Commercial-edition symbols/headers must never leak into this tree.
-          set -e
-          LEAKS=$(grep -rniE "cortrix.enterprise|text_to_sql|cdc_connector" \
-            --include='*.cpp' --include='*.h' src/ include/ \
-            || true)
-          if [ -n "$LEAKS" ]; then
-            echo "CE tree references commercial internals:"; echo "$LEAKS"; exit 1
-          fi
-          echo "isolation OK"
+          # Public feature-contract names are allowed. Executable coupling to the
+          # commercial edition is not.
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          roots = (Path("src"), Path("include"))
+          suffixes = {".cpp", ".cc", ".h", ".hpp"}
+          sources = sorted(
+              path
+              for root in roots
+              for path in root.rglob("*")
+              if path.is_file() and path.suffix in suffixes
+          )
+
+          if len(sources) <= 100:
+              raise SystemExit(
+                  f"open-core scan expected more than 100 source files; found {len(sources)}"
+              )
+
+          rules = (
+              (
+                  "enterprise qualified reference",
+                  re.compile(r"\bcortrix[.:/_-]+enterprise\b", re.IGNORECASE),
+                  "cortrix.enterprise",
+              ),
+              (
+                  "enterprise build macro",
+                  re.compile(
+                      r"\b(CORTRIX_ENTERPRISE|WITH_ENTERPRISE|CORTRIX_ENT|ENABLE_ENTERPRISE)\b"
+                  ),
+                  "CORTRIX_ENTERPRISE",
+              ),
+              (
+                  "enterprise conditional compilation",
+                  re.compile(
+                      r"#\s*if(?:def|ndef)?\b.*\b(ENTERPRISE|ENT_|WITH_ENT)",
+                      re.IGNORECASE,
+                  ),
+                  "#ifdef WITH_ENTERPRISE",
+              ),
+              (
+                  "enterprise namespace",
+                  re.compile(r"namespace\s+enterprise\b"),
+                  "namespace enterprise",
+              ),
+              (
+                  "enterprise class or interface",
+                  re.compile(r"\b(class|struct)\s+(I?Enterprise[A-Za-z0-9_]*)\b"),
+                  "class IEnterpriseConnector",
+              ),
+              (
+                  "enterprise header include",
+                  re.compile(
+                      r"#\s*include\s*[<\"][^>\"]*enterprise[^>\"]*[>\"]",
+                      re.IGNORECASE,
+                  ),
+                  '#include "cortrix/enterprise/connector.h"',
+              ),
+              (
+                  "enterprise extension table",
+                  re.compile(
+                      r"CREATE\s+TABLE[^;]*\b(audit_log_extension|agent_trace_extension|interaction_sources_extension)\b",
+                      re.IGNORECASE,
+                  ),
+                  "CREATE TABLE audit_log_extension (id INTEGER)",
+              ),
+          )
+
+          for label, pattern, sentinel in rules:
+              if pattern.search(sentinel) is None:
+                  raise SystemExit(f"open-core scan rule is ineffective: {label}")
+
+          if not any(
+              "namespace cortrix" in path.read_text(encoding="utf-8", errors="replace")
+              for path in sources
+          ):
+              raise SystemExit("open-core scan did not read the CE source tree")
+
+          violations = []
+          for path in sources:
+              for line_number, line in enumerate(
+                  path.read_text(encoding="utf-8", errors="replace").splitlines(),
+                  start=1,
+              ):
+                  for label, pattern, _ in rules:
+                      if pattern.search(line):
+                          violations.append(f"{path}:{line_number}: [{label}] {line}")
+
+          if violations:
+              print("CE tree references commercial internals:")
+              print("\n".join(violations))
+              raise SystemExit(1)
+
+          print(f"isolation OK: scanned {len(sources)} CE source files")
+          PY
 
       - uses: actions/setup-node@v4
         with:
