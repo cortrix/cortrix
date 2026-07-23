@@ -14,6 +14,12 @@
 
 Cortrix provides a local-first semantic storage server with namespaces, documents, blocks, hybrid search, memory APIs, and Agent-oriented access paths. It is designed for applications and Agents that need a programmable retrieval layer rather than a one-off vector database wrapper.
 
+## Architecture
+
+<p align="center">
+  <img src="https://cortrix.ai/assets/architecture.svg" width="963" alt="Cortrix architecture overview with source-processing, retrieval, record, storage, and integration paths labeled by evidence boundary">
+</p>
+
 The repository includes:
 
 - `cortrix-server`: the C++ backend and HTTP API.
