@@ -23,6 +23,14 @@ on:
         description: Full 40-character source commit to validate
         required: true
         type: string
+      validation_scope:
+        description: Run the full release gate or only the isolation and image job
+        required: false
+        type: choice
+        default: full
+        options:
+          - full
+          - isolation_and_image
 
 permissions:
   contents: read
@@ -61,6 +69,7 @@ jobs:
 
   stage2_full:
     needs: identity
+    if: ${{ inputs.validation_scope == 'full' }}
     uses: ./.github/workflows/nightly-ci.yml
     with:
       source_revision: ${{ inputs.source_revision }}
@@ -91,7 +100,16 @@ jobs:
           npx playwright test
 
   isolation_and_image:
-    needs: stage2_full
+    needs: [identity, stage2_full]
+    if: >-
+      ${{
+        always() &&
+        needs.identity.result == 'success' &&
+        (
+          inputs.validation_scope == 'isolation_and_image' ||
+          (inputs.validation_scope == 'full' && needs.stage2_full.result == 'success')
+        )
+      }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -314,7 +332,12 @@ jobs:
             sleep 5
           done
           test "$(docker inspect cortrix-network-none --format '{{.State.Health.Status}}')" = "healthy"
-          test "$(docker inspect cortrix-network-none --format '{{json .HostConfig.PortBindings}}')" = "null"
+          NETWORK_MODE="$(docker inspect cortrix-network-none --format '{{.HostConfig.NetworkMode}}')"
+          PUBLISHED_PORTS="$(docker port cortrix-network-none 2>/dev/null || true)"
+          printf 'network-none state: mode=%s published_ports=%s\n' \
+            "$NETWORK_MODE" "${PUBLISHED_PORTS:-<none>}"
+          test "$NETWORK_MODE" = "none"
+          test -z "$PUBLISHED_PORTS"
           docker exec cortrix-network-none curl -fsS http://127.0.0.1:8420/api/v1/system/health/ready
           docker exec cortrix-network-none curl -fsS -H 'Content-Type: application/json' \
             -d '{"namespaces":["demo"],"query":"What does semantic storage keep close to the agents that need it?","top_k":5,"rerank":true}' \
@@ -332,27 +355,26 @@ jobs:
       - name: External-address negative controls
         if: ${{ always() && steps.build.outcome == 'success' }}
         run: |
-          VOLUME="$(docker volume ls --format '{{.Name}}' | grep '^cortrix_release_gate_cortrix-data$')"
+          mkdir -p artifacts/negative-controls
           for index in 1 2; do
             if [ "$index" = 1 ]; then HOST=0.0.0.0; else HOST=192.0.2.10; fi
-            NAME="cortrix-negative-$index"
-            docker run -d --name "$NAME" \
+            LOG="artifacts/negative-controls/${index}.log"
+            set +e
+            docker run --rm \
               --network none \
-              --mount "source=$VOLUME,target=/data" \
-              -e CORTRIX_PROFILE=quickstart \
-              -e CORTRIX_LLM_ENABLED=false \
-              -e CORTRIX_AGENT_ENABLED=false \
-              -e CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED=false \
+              -e CORTRIX_AUTH_ENABLED=false \
               -e "CORTRIX_SERVER_HOST=$HOST" \
               -e CORTRIX_SERVER_ALLOW_UNAUTHENTICATED_CONTAINER_BIND=false \
-              "$IMAGE_TAG"
-            for _ in $(seq 1 24); do
-              if [ "$(docker inspect "$NAME" --format '{{.State.Running}}')" = "false" ]; then break; fi
-              sleep 5
-            done
-            test "$(docker inspect "$NAME" --format '{{.State.Running}}')" = "false"
-            test "$(docker inspect "$NAME" --format '{{.State.ExitCode}}')" -ne 0
-            docker logs "$NAME"
+              --entrypoint /app/cortrix_server \
+              "$IMAGE_TAG" --config /app/config/cortrix.yaml >"$LOG" 2>&1
+            STATUS=$?
+            set -e
+            cat "$LOG"
+            if [ "$STATUS" -eq 0 ]; then
+              echo "Core accepted an unauthenticated non-loopback bind for $HOST"
+              exit 1
+            fi
+            grep -F "server.host must be loopback when auth.enabled=false" "$LOG"
           done
 
       - name: Trivy image scan (hard gate)
@@ -388,6 +410,7 @@ jobs:
           path: |
             artifacts/sbom.*.json
             artifacts/trivy.json
+            artifacts/negative-controls/*.log
           if-no-files-found: error
 
   lighthouse:
