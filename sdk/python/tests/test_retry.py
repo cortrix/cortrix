@@ -1,4 +1,4 @@
-"""Retry behaviour: backoff growth, Retry-After respect, max-retries, no-retry."""
+"""Retry behavior: backoff growth, Retry-After respect, max-retries, no-retry."""
 
 from __future__ import annotations
 

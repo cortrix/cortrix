@@ -19,13 +19,14 @@
 # server — HTTP server
 # -----------------------------------------------------------------------------
 server:
-  host: "0.0.0.0"       # Listen address; "127.0.0.1" = local only, "0.0.0.0" = allow external access
+  host: "127.0.0.1"     # Safe local default; non-loopback binding requires auth.enabled: true
   port: 8420             # HTTP port
   thread_count: 4        # Worker thread count, recommended = number of CPU cores
 
 # -----------------------------------------------------------------------------
 # auth — API Key authentication
-# Keep false during development; production must set it to true
+# Unauthenticated mode is accepted only with a loopback server.host.
+# Enable auth before explicitly binding to a LAN or public interface.
 # -----------------------------------------------------------------------------
 auth:
   enabled: false

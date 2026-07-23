@@ -1,0 +1,30 @@
+{
+  "query_id": "q01_setup_retry",
+  "strict_rank": false,
+  "required_evidence_groups": [
+    {
+      "id": "setup",
+      "sources_any": [
+        "docs/agent-setup-guide.md"
+      ],
+      "snippets_any": [
+        "namespaces"
+      ]
+    },
+    {
+      "id": "retry",
+      "sources_any": [
+        "docs/release-policy.md"
+      ],
+      "snippets_any": [
+        "retry failed Cortrix API calls up to 2 times"
+      ]
+    }
+  ],
+  "must_not_claim": [
+    "production workload benchmark",
+    "customer data",
+    "Postgres live import is ready"
+  ],
+  "known_limitations": []
+}

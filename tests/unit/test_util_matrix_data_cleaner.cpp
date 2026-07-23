@@ -2,7 +2,7 @@
 // Block-vector inputs: exact-dup / semantic near-dup / empty / unicode / anomaly
 // reasons, plus ToString(AnomalyReason), Summarize, ValidateConfig, ShouldSkipIndex.
 //
-// Behaviour (src/spc/data_cleaner.cpp):
+// Behavior (src/spc/data_cleaner.cpp):
 //  - Dedup: SHA-256(chunk_text) exact pass keeps first occurrence; then semantic
 //    cosine >= threshold drops later survivors. Disabled => no removals.
 //  - Cosine of empty / mismatched-dim / zero-norm vectors == 0 (never "similar").

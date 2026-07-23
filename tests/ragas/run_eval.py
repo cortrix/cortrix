@@ -7,7 +7,7 @@
 # Skips (exit 0 with a SKIP marker) when:
 #   - the judge API key env is unset (no LLM judge available), or
 #   - the pinned dataset is missing (lands with #483 real-model pass).
-# Gate behaviour follows thresholds.mode: record-only | enforce.
+# Gate behavior follows thresholds.mode: record-only | enforce.
 # =============================================================
 import json
 import os

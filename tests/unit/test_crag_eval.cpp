@@ -16,7 +16,7 @@
 // Correct precision >= 0.80, Incorrect recall >= 0.70, Ambiguous trigger < 30%).
 //
 // NOTE: The REAL public CRAG benchmark dataset is NOT vendored here — per §12.bis
-// 2.3's "dataset-not-ready mechanism": STOP and escalate to Derek for a decision.
+// 2.3's "dataset-not-ready mechanism": STOP until a suitable public dataset is approved.
 // So this proves the SCORING logic + that the heuristic classifier clears the
 // thresholds on a controlled fixture whose score distributions match each class.
 // Running the public dataset (and the F1 >= 0.70 gate against it) is D3.5 /

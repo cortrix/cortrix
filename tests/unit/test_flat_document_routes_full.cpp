@@ -60,7 +60,7 @@ using json = nlohmann::json;
 using server::BatchSubmitService;
 using server::ITaskSubmitter;
 
-// A submitter whose behaviour is switchable: by default every doc submits OK with a
+// A submitter whose behavior is switchable: by default every doc submits OK with a
 // deterministic task id (the happy/202 path); flip fail_=true and every doc submit
 // returns a CX_ERR Status so the POST /documents per-doc failure arm (meta.failed[0]
 // -> 400) is reached.

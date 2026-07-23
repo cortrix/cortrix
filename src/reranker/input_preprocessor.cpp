@@ -22,7 +22,7 @@ size_t Utf8SafeBoundary(const std::string& text, size_t pos) {
 
 int InputPreprocessor::ApproxTokenCount(const std::string& text) {
     // Identical heuristic to SPC recursive_chunker's ApproxTokenCount so the
-    // reranker's length judgement aligns with how chunks were sized upstream:
+    // reranker's length judgment aligns with how chunks were sized upstream:
     // ASCII words ≈ (len+2)/3 tokens (~1.3 tok/word), CJK/3-byte chars ≈ 2 tokens.
     if (text.empty()) return 0;
     int tokens = 0;

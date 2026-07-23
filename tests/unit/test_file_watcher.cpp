@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "cortrix/connector/file_watcher.h"
+#include <algorithm>
 #include <unistd.h>
 #include <filesystem>
 #include <fstream>
@@ -38,6 +39,15 @@ protected:
         std::unique_lock<std::mutex> lock(mu_);
         cv_.wait_for(lock, std::chrono::milliseconds(timeout_ms),
                      [&]{ return static_cast<int>(events_.size()) >= expected_count; });
+    }
+
+    bool WaitForCreatedFiles(int expected_count, int timeout_ms = 3000) {
+        std::unique_lock<std::mutex> lock(mu_);
+        return cv_.wait_for(lock, std::chrono::milliseconds(timeout_ms), [&] {
+            return std::count_if(events_.begin(), events_.end(), [](const FileEvent& event) {
+                       return event.type == FileEventType::kCreated && !event.is_directory;
+                   }) >= expected_count;
+        });
     }
 
     void CreateFile(const std::string& name, const std::string& content = "test") {
@@ -219,7 +229,7 @@ TEST_F(FileWatcherTest, MultipleFilesCreated) {
     CreateFile("file1.txt");
     CreateFile("file2.txt");
     CreateFile("file3.txt");
-    WaitForEvents(3, 5000);
+    ASSERT_TRUE(WaitForCreatedFiles(3, 5000));
 
     std::lock_guard<std::mutex> lock(mu_);
     int create_count = 0;
@@ -453,11 +463,13 @@ TEST_F(FileWatcherTest, StopThenRestart) {
     CreateFile("restart_test.txt");
     WaitForEvents(1, 3000);
 
-    std::lock_guard<std::mutex> lock(mu_);
     bool found = false;
-    for (const auto& e : events_) {
-        if (e.path.find("restart_test.txt") != std::string::npos) {
-            found = true;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        for (const auto& e : events_) {
+            if (e.path.find("restart_test.txt") != std::string::npos) {
+                found = true;
+            }
         }
     }
     EXPECT_TRUE(found);

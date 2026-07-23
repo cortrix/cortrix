@@ -56,7 +56,7 @@ public:
     /// Classify the complexity of `input.query`. Total (never throws): a transient
     /// backend fault is caught and reported via the safe Complex fallback label +
     /// ClassificationResult.error_code = CX_ERR_F39_INFERENCE_FAILED. `input.chunks`
-    /// is ignored — F39 is a *pre-retrieval* router, but it honours the shared
+    /// is ignored — F39 is a *pre-retrieval* router, but it honors the shared
     /// post-retrieval IClassifier signature so the pipeline treats all classifiers
     /// uniformly.
     retrieval::ClassificationResult Classify(const retrieval::ClassifierInput& input) override;
@@ -68,7 +68,7 @@ public:
 
     /// F39-specific (§6.1): route `ctx.query` and write the routing fields back onto
     /// `ctx` (routing_path / complexity_score / routing_decision_source /
-    /// chat_path_triggered / multi_turn_context_warning), honouring an optional
+    /// chat_path_triggered / multi_turn_context_warning), honoring an optional
     /// Agent `?route=` override and the resolved NS ComplexityConfig.
     ///
     /// Returns Status::Ok on every successful route (including all fail-safe
@@ -97,7 +97,7 @@ public:
     // --- Exposed for unit tests / reuse ---
 
     /// Heuristic chat rule guard (§6.1 step 3): true for trivial greetings /
-    /// acknowledgements with no retrievable content ("hi", "thanks", CJK greetings, …).
+    /// acknowledgments with no retrievable content ("hi", "thanks", CJK greetings, …).
     /// Conservative by design (§14 risk): only an exact-ish match of a short
     /// pleasantry routes to Chat, because Chat skips all retrieval.
     static bool IsChatQuery(const std::string& query);

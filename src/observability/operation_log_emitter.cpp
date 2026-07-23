@@ -49,7 +49,7 @@ OperationLogEntry MakeEngineEntry(EmitSite site,
     // C1/C2: read trace_id / session_id / user_id from the thread-local context.
     // The entry point (WithAuth, auth_middleware.cpp) now fills the ObservabilityContext
     // from the F13 identity headers + the authenticated principal before the handler
-    // runs, so this fulfils the previously-deferred D3.5 wiring: trace_id comes from the
+    // runs, so this fulfills the previously-deferred D3.5 wiring: trace_id comes from the
     // W3C TraceContext; session_id (C2) + user_id come from the F13 identity fields.
     const ObservabilityContext& octx = ObservabilityContext::ThreadLocal();
     if (const TraceContext* tc = octx.GetTraceContext(); tc != nullptr) {

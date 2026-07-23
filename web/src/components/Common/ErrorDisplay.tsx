@@ -14,7 +14,7 @@ import { recordUiError } from '../../telemetry/metrics';
 // GEN-Agent 5-field error display (P02a design § 16.1). Renders code / message /
 // category badge / retry countdown (retry_after_ms) / collapsible
 // structured_data. Category → variant + icon mapping per § 16.1. Magma VI
-// tokens only (no hard-coded colours) so it works in both themes.
+// tokens only (no hard-coded colors) so it works in both themes.
 
 const CATEGORY_META: Record<
   AgentErrorCategory,

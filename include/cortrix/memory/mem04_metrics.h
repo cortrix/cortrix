@@ -11,7 +11,7 @@ namespace cortrix::memory::immunity {
 /// mem02_metrics.h template (process-wide singleton, atomic counters, OpenMetrics
 /// renderer).
 ///
-/// 🚨 Subsystem name: the metric prefix is `cortrix_mem04_*` (a "grey" subsystem in
+/// 🚨 Subsystem name: the metric prefix is `cortrix_mem04_*` (a "gray" subsystem in
 /// OBS_SPEC §2.3 / ARCH §1.7.1). The rename to `memory_immunity` is the Phase-2
 /// TD-OBS-SUBSYSTEM-RENAME backlog item — NOT done here.
 ///

@@ -1,0 +1,10 @@
+{
+  "query_id": "q01_setup_retry",
+  "description": "Find setup and retry guidance for an agent using the SupportOps sample.",
+  "request": {
+    "query": "What setup and retry guidance should an agent follow when using this sample context?",
+    "namespaces": ["supportops-v1"]
+  },
+  "covers": ["document_upload", "query", "source_backed_answer"],
+  "expected_result_file": "../expected/q01-setup-retry.expected.json"
+}

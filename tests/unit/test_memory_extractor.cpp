@@ -1042,7 +1042,7 @@ TEST_F(MemoryExtractorTest, ExtractSingleTurnEntry) {
 }
 
 // ---------- Untested conditional arms in the operation_log writers ----------
-// Round-1 tests always wired a logger + non-empty user_id/ns, leaving the false /
+// Existing tests always wired a logger + non-empty user_id/ns, leaving the false /
 // "anonymous" / empty-ns arms uncovered. These target them explicitly.
 
 // Extract with NO op_logger: WriteWithOperationLog's `if (op_logger_)` false arms

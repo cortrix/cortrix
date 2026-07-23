@@ -173,7 +173,7 @@ RC_GTEST_PROP(QueryRequestPropR9, SearchConfigFlagsDefaultUnlessBool, ()) {
 // After Normalize(), the query length never exceeds kMaxQueryLength, and the
 // returned/`was_truncated` flag is true IFF a trim happened — for any starting
 // query length. (kMaxQueryLength is private, so we infer it from the pristine
-// behaviour: build strings around whatever the limit is by probing.)
+// behavior: build strings around whatever the limit is by probing.)
 RC_GTEST_PROP(QueryRequestPropR9, NormalizeBoundsQueryLength,
               (const std::string& seed)) {
     // Construct a query of a random, possibly very large size by repeating the seed.

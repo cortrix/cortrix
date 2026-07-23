@@ -1,7 +1,6 @@
 """Memory resource. ``/memory`` domain (ARCH § 4.1.5 + MEM01-05).
 
-Per Derek's ruling (briefing § 9): SDK shape = P03 § 2.12; wire = real
-architecture. Method -> endpoint:
+This resource follows the implemented HTTP architecture. Method -> endpoint:
   - ``search``   -> POST   /memory/search   ({results,total_results,...})
   - ``log``      -> POST   /memory/sessions/{id}/interactions  (live wire)
   - ``extract``  -> POST   /memory/extract  (real-arch, MEM02; PartialSuccessById)
@@ -241,7 +240,7 @@ class Memory_(SyncResource):
         memory_type: str,
         metadata: Optional[dict[str, Any]] = None,
     ) -> MemoryCreateAck:
-        """Create a memory. ``POST /memory`` -> acknowledgement."""
+        """Create a memory. ``POST /memory`` -> acknowledgment."""
         result = self._client._request(
             "POST",
             PATH_MEMORY,
@@ -275,7 +274,7 @@ class Memory_(SyncResource):
     edit = update
 
     def delete(self, memory_id: str, *, namespace: Optional[str] = None) -> MemoryDeleteAck:
-        """Soft-delete a memory. ``DELETE /memory/{id}`` -> acknowledgement."""
+        """Soft-delete a memory. ``DELETE /memory/{id}`` -> acknowledgment."""
         effective_namespace = namespace or self._memory_namespaces.get(memory_id)
         return self._client._request(
             "DELETE",

@@ -78,7 +78,7 @@ TOOL_METHOD_NAMES: tuple[str, ...] = (
 
 
 def _to_dict(obj: Any) -> Any:
-    """Normalise a P03 SDK return value to a plain JSON-serialisable structure.
+    """Normalize a P03 SDK return value to a plain JSON-serializable structure.
 
     P03 response types are plain ``@dataclass`` objects (not pydantic), so they
     have no ``.model_dump()``. This converts a dataclass (recursively) to a dict;

@@ -124,7 +124,7 @@ TEST_F(AgentTraceMetricsTest, RenderEmitsAllNineMetricsWithCorrectCardinality) {
     EXPECT_NE(out.find("cortrix_long_session_count_total 1\n"), std::string::npos);
     // gauge value present.
     EXPECT_NE(out.find("cortrix_mcp_active_sessions 1\n"), std::string::npos);
-    // labelled series render with the right label keys.
+    // labeled series render with the right label keys.
     EXPECT_NE(out.find("cortrix_agent_trace_writes_total{source=\"http\",status=\"success\"} 1"),
               std::string::npos);
     EXPECT_NE(out.find("cortrix_traces_query_total{by_role=\"user\",endpoint=\"traces\"} 1"),

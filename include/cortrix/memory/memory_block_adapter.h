@@ -16,7 +16,7 @@ namespace store { class IIndex; }
 
 namespace cortrix::memory {
 
-// M1 (D3.5 round-2) — the real MemoryStore-backed adapters the MEM02 MemoryExtractor
+// Store-backed adapters used by the MEM02 MemoryExtractor
 // + MEM03 MemoryTransparency depend on through their seams (IMemoryBlockStore /
 // IMemoryBlockLister). Memory facts are rows of the per-Unit `blocks` table
 // (block_type = kBlockMemory) whose metadata_json carries the MEM02 §4.1/§4.2 fields

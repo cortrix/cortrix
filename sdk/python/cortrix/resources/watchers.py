@@ -1,7 +1,6 @@
 """Watchers resource. ``/watch`` domain (ARCH § 4.1.4 + F21/F42).
 
-Per Derek's ruling (briefing § 9): SDK shape = P03 § 2.12; wire = real
-architecture. ``add()`` follows the real-arch fan-out shape (``path`` +
+This resource follows the implemented HTTP architecture. ``add()`` follows the fan-out shape (``path`` +
 ``target_namespaces`` array + ``recursive``); the design's per-watcher
 ``patterns`` / ``auto_delete`` are reconciled in D3.5.
 """

@@ -37,7 +37,7 @@ except ValueError:
 
 API_PREFIX = "/api/v1"
 
-# Single shared client — bypass system proxy for local connections (MVP behaviour).
+# Single shared client — bypass system proxy for local connections (MVP behavior).
 _transport = httpx.HTTPTransport(proxy=None)
 _client = httpx.Client(transport=_transport, timeout=CORTRIX_MCP_TIMEOUT)
 

@@ -5,7 +5,7 @@
 "chat mode"). ``ToolUseExecutor`` (V1.5) and PlanExecuteExecutor (V2) are reserved and
 raise NotImplementedError, mirroring the F37 IClassifier / F39 IRetrievalFallback style.
 
-Naming rule (Derek 2026-06-03): the product is the "Cortrix Agent"; the executor class
+Naming rule: the product is the "Cortrix Agent"; the executor class
 is ``ChatExecutor`` (never "ChatbotExecutor"), preserving the mode distinction with the
 future ToolUseExecutor / PlanExecuteExecutor.
 

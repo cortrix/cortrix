@@ -5,8 +5,8 @@
 
   Agent-native semantic storage for retrieval, memory, and API-driven AI applications.
 
-  [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-  [![Version](https://img.shields.io/badge/version-0.1.0--rc.1-orange.svg)](https://github.com/cortrix/cortrix/releases)
+  [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](LICENSE)
+  [![Version](https://img.shields.io/badge/version-v1.0.0--rc.1-orange.svg)](https://github.com/cortrix/cortrix/releases)
   [![C++17](https://img.shields.io/badge/C%2B%2B-17-blueviolet.svg)](https://en.cppreference.com/w/cpp/17)
 
   [Quickstart](docs/QUICKSTART.md) · [Agent access](docs/agent-access.md) · [Compatibility](docs/compatibility.md) · [OpenAPI](api/openapi.yaml)
@@ -27,7 +27,9 @@ The repository includes:
 
 Start here:
 
-- [Quickstart](docs/QUICKSTART.md): build, configure, start, and run the first health/API checks.
+- [Quickstart](docs/QUICKSTART.md): start Cortrix with Docker, check readiness, and run a source-backed reranked query.
+- [First-value SupportOps demo](examples/first-value-supportops/README.md): run the deeper source-build verification path with versioned assertions, trace evidence, and zero-residual cleanup.
+- [Stack fit and adoption boundaries](docs/adoption/stack-fit.md): review evidence-backed keep/add/replace/unknown decision cards.
 - [Agent access](docs/agent-access.md): choose between HTTP/OpenAPI, MCP, Python SDK, and the built-in Agent.
 - [Compatibility and known status](docs/compatibility.md): current public status for API, MCP, SDK, Agent, auth, tenant/RBAC, memory extraction, benchmarks, and security hardening.
 - [OpenAPI spec](api/openapi.yaml): endpoint paths, schemas, security schemes, and response contracts.
@@ -38,13 +40,15 @@ Start here:
   separate image, provider policy, deployment, verification, and rollback.
 - [Security policy](SECURITY.md): security reporting path.
 - [Contributing](CONTRIBUTING.md): development workflow and contribution checklist.
+- [Maintainers](MAINTAINERS.md): ownership, acknowledgment targets, and recusal rules.
+- [Code of Conduct](CODE_OF_CONDUCT.md): community standards and private reporting.
 
 ## Current Status
 
 Cortrix is in active pre-release development. The public documentation uses these status labels:
 
 - `Verified`: directly supported by current code/spec evidence and exercised in the latest validation scope.
-- `RD review required`: present in code, spec, or docs, but not yet confirmed enough for a public-readiness claim.
+- `Verification required`: present in code, spec, or docs, but not yet confirmed enough for a public-readiness claim.
 - `Blocked`: known broken, blocked, or not provable in the current runtime.
 - `Roadmap`: planned or reserved for a later version.
 
@@ -53,39 +57,43 @@ High-signal current status:
 | Area | Status | Notes |
 |---|---|---|
 | OpenAPI file | `Verified` | `api/openapi.yaml` is present and declares the public API surface. |
-| Local server, health endpoints, namespaces, documents, query | `RD review required` | Core surfaces exist, but public-readiness labeling still depends on end-to-end verification. |
-| MCP server | `RD review required` | MCP tooling exists and has test coverage, with release-readiness still under review. |
-| Python SDK | `RD review required` | SDK resources and tests exist, with compatibility still tied to the live API contract. |
-| Built-in Agent chat | `RD review required` | Fixed-flow chat mode exists; advanced autonomous executors are roadmap items. |
+| Local server, health endpoints, namespaces, documents, query | `Verification required` | Core surfaces exist, but public-readiness labeling still depends on end-to-end verification. |
+| MCP server | `Verification required` | MCP tooling exists and has test coverage, with release-readiness still under review. |
+| Python SDK | `Verification required` | SDK resources and tests exist, with compatibility still tied to the live API contract. |
+| Built-in Agent chat | `Verification required` | Fixed-flow chat mode exists; advanced autonomous executors are roadmap items. |
 | Auth login | `Blocked` | The public spec defines login, but the latest runtime verification found contract drift. |
 | Tenant/member/ACL/quota | `Blocked` | Runtime behavior and documented contract are still being reconciled. |
 | MEM02 memory extraction | `Blocked` | Latest verification observed an LLM transport timeout path. |
 | RBAC and tenant isolation denial matrix | `Blocked` | Cannot be proven in the current auth-disabled local runtime. |
-| Benchmark claims | `RD review required` | Treat performance and benchmark numbers as unpublished until measured artifacts are accepted. |
+| Full-corpus BEIR retrieval quality | `Verified` | Accepted SciFact, FiQA, and NFCorpus measurements, method, and provenance are published in the [pinned benchmark bundle](https://github.com/cortrix/cortrix-benchmarks/tree/7bc29aa840c20db3935dfcf80eb048e553ebe2b0/results/published/beir-three-full-corpus-2026-07-v1). This does not establish answer quality or production performance. |
 
 See [Compatibility and known status](docs/compatibility.md) before making production, security, benchmark, or integration claims.
 
 ## Quickstart
 
-Use the source-first quickstart:
+Run the local Docker Quick Start with real embedding and reranking:
 
 ```bash
 git clone https://github.com/cortrix/cortrix.git
 cd cortrix
-cp config.yaml.example build/config.yaml
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
-./dev.sh
+CORTRIX_SOURCE_REVISION="$(git rev-parse HEAD)" \
+  docker compose -f deploy/docker-compose.yml up --build --wait
+
+curl -fsS http://127.0.0.1:8420/api/v1/system/health/ready
+
+curl -fsS -H 'Content-Type: application/json' \
+  -d '{
+    "namespaces": ["demo"],
+    "query": "What does semantic storage keep close to the agents that need it?",
+    "top_k": 5,
+    "rerank": true
+  }' \
+  http://127.0.0.1:8420/api/v1/query
 ```
 
-Then check the backend:
+You need Git, Docker, and Docker Compose. No `.env` file, LLM provider key, host-side model tooling, manual model download, model conversion, or separate bootstrap command is required. The first start downloads about 1.17 GB of pinned model assets and can take several minutes; later starts reuse the cached volume.
 
-```bash
-curl http://localhost:8420/api/v1/health
-curl http://localhost:8420/api/v1/system/health/ready
-```
-
-For the full path, expected responses, LLM configuration notes, and troubleshooting, see [Quickstart](docs/QUICKSTART.md).
+The Quick Start publishes only the loopback API at `127.0.0.1:8420`. It uses BGE-M3 embedding and bge-reranker-v2-m3 reranking on CPU, while external LLM roles and the built-in Agent remain disabled. For model provenance, checks, expected output, cleanup, and scope boundaries, see [Quick Start](docs/QUICKSTART.md). For the deeper source-build evidence workflow, see the [First-value SupportOps demo](examples/first-value-supportops/README.md).
 
 ## API Reference
 
@@ -98,7 +106,7 @@ The spec includes:
 - namespaces, documents, query, memory, watch, import, auth, admin, tenant, Agent, system, GC, and maintenance paths;
 - request/response schemas and error schemas.
 
-OpenAPI presence is not the same as runtime verification. If an endpoint is listed as `RD review required` or `Blocked` in [Compatibility](docs/compatibility.md), use that status as the public claim boundary.
+OpenAPI presence is not the same as runtime verification. If an endpoint is listed as `Verification required` or `Blocked` in [Compatibility](docs/compatibility.md), use that status as the public claim boundary.
 
 ## Agent Access
 
@@ -132,7 +140,7 @@ cp config.yaml.example build/config.yaml
 
 LLM-backed features are configured by role:
 
-- `semantic_llm`: intent classification and reranking.
+- `semantic_llm`: optional LLM-backed semantic processing. It is separate from the local ONNX embedding and cross-encoder reranker used by the primary Quick Start.
 - `vision_llm`: OCR image enhancement.
 - `agent_llm`: built-in Agent chat.
 - `doc_summary_llm`: ingest-side summaries.
@@ -149,7 +157,7 @@ Cortrix is pre-release. Before using it outside local development, review:
 - `config.yaml.example` for auth and API key configuration.
 - `deploy/` for deployment templates.
 
-Do not assume production readiness for auth, tenant isolation, RBAC, quota enforcement, memory extraction, or benchmark performance until those areas are marked `Verified`.
+Do not assume production readiness for auth, tenant isolation, RBAC, quota enforcement, or memory extraction. Do not generalize the published retrieval-quality measurements to answer quality, latency, cost, security, or production performance.
 
 ## Roadmap
 
@@ -158,15 +166,17 @@ Roadmap items are not current capabilities.
 - Advanced autonomous Agent executors such as tool-use and plan-execute modes.
 - Additional integration adapters beyond the currently documented surfaces.
 - Production-readiness hardening for auth, tenant isolation, RBAC, quota, logging redaction, and deployment operations.
-- Public benchmark artifacts after methodology and measurements are accepted.
+- Additional datasets and production-representative latency or cost measurements after separate methods and artifacts are accepted.
 
 ## Community And Contribution
 
 - [GitHub Issues](https://github.com/cortrix/cortrix/issues): bugs and feature requests.
-- [GitHub Discussions](https://github.com/cortrix/cortrix/discussions): questions if discussions are enabled.
+- [Issue templates](https://github.com/cortrix/cortrix/issues/new/choose): bugs, feature or integration proposals, and documentation reports.
 - [Security policy](SECURITY.md): security reports.
 - [Contributing](CONTRIBUTING.md): local development and pull requests.
+- [Code of Conduct](CODE_OF_CONDUCT.md): community standards and private conduct reports.
+- [Maintainers](MAINTAINERS.md): ownership and acknowledgment targets.
 
 ## License
 
-Cortrix is licensed under [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0).
+Cortrix-authored material is licensed under [AGPL-3.0-only](LICENSE); third-party material retains its own license. See [NOTICE.md](NOTICE.md) for copyright and exception boundaries and [CONTRIBUTING.md](CONTRIBUTING.md) for the no-CLA, DCO 1.1 contribution policy.

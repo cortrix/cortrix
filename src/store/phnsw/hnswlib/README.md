@@ -33,4 +33,9 @@ in `src/store/phnsw/`. Any persistence hook that genuinely requires touching
 upstream code must be recorded here with a `// CORTRIX-PATCH:` comment and a note
 in this README, so re-syncing with upstream stays mechanical.
 
-As of F01 S1 there are **no local modifications** — this is a clean copy of v0.8.0.
+## Local patches
+
+- 2026-07-21: Guard SSE neighbor look-ahead prefetches in `hnswalg.h` so empty,
+  one-entry, and final-entry adjacency-list traversal never dereferences beyond
+  the recorded neighbor count. Each changed block is marked `CORTRIX-PATCH`.
+  The graph algorithm and search ordering are unchanged.

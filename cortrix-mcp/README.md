@@ -5,7 +5,7 @@ over the Model Context Protocol (stdio), so IDE agents like **Claude Code**, **C
 and **Cursor** can index documents, run hybrid semantic search, manage conversation
 memory, and trigger admin database imports.
 
-> Status: `RD review required`. The MCP package and tool groups are documented and
+> Status: `Verification required`. The MCP package and tool groups are documented and
 > test-covered, but public-readiness labeling still depends on the target
 > cortrix-server runtime and API compatibility. See
 > [Agent access](../docs/agent-access.md) and
@@ -40,7 +40,7 @@ This installs the `cortrix-mcp` console command (the MCP stdio server entry poin
 docker run -i --rm \
   -e CORTRIX_URL=http://host.docker.internal:8420 \
   -e CORTRIX_API_KEY=your-cortrix-api-key \
-  cortrix/mcp:v1.0.0
+  cortrix/mcp:v1.0.0-rc.1
 ```
 
 ## Configuration
@@ -90,7 +90,7 @@ Docker variant:
         "run", "-i", "--rm",
         "-e", "CORTRIX_URL=http://host.docker.internal:8420",
         "-e", "CORTRIX_API_KEY=your-cortrix-api-key",
-        "cortrix/mcp:v1.0.0"
+        "cortrix/mcp:v1.0.0-rc.1"
       ]
     }
   }

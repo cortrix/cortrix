@@ -1,6 +1,6 @@
 // Exhaustive deterministic matrices for connector/file_utils.h pure path helpers
 // (GetBasename / GetExtension / DetectMimeType) plus temp-file backed size/hash/
-// type probes. Asserts only against the documented behaviour of std::filesystem
+// type probes. Asserts only against the documented behavior of std::filesystem
 // based helpers (extension is the last dot segment; dotfiles like ".bashrc" have
 // no extension; multi-dot files take the final segment; matching is lowercased).
 //
@@ -46,7 +46,7 @@ INSTANTIATE_TEST_SUITE_P(
         ExtCase{"file.md", "md"},
         ExtCase{"file.json", "json"},
         ExtCase{"archive.tar", "tar"},
-        // Case normalisation.
+        // Case normalization.
         ExtCase{"FILE.TXT", "txt"},
         ExtCase{"File.PdF", "pdf"},
         ExtCase{"DATA.JSON", "json"},

@@ -74,7 +74,7 @@ CREATE TYPE pgcortrix_interaction_info AS (
 -- (superuser-only) per V3-E-02 (2026-05-23): a USERSET endpoint is an SSRF
 -- vector (SET pgcortrix.endpoint='http://169.254.169.254/...' → cloud metadata).
 -- The helper additionally validates the endpoint against an allowlist + private
--- IP blocklist on every call (§2.2.bis), so this is defence-in-depth.
+-- IP blocklist on every call (§2.2.bis), so this is defense-in-depth.
 --
 -- NOTE: a packaged build registers these as real custom GUCs in a small C shim
 -- (or via `ALTER SYSTEM` + custom_variable_classes). V1 uses set_config so the

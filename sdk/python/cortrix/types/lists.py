@@ -111,7 +111,7 @@ class MemorySearchResponse:
 
 @dataclass
 class MemoryCreateAck:
-    """``POST /memory`` acknowledgement."""
+    """``POST /memory`` acknowledgment."""
 
     memory_id: Optional[str] = None
     status: Optional[str] = None
@@ -122,7 +122,7 @@ class MemoryCreateAck:
 
 @dataclass
 class MemoryEditAck:
-    """``PATCH /memory/{id}`` acknowledgement."""
+    """``PATCH /memory/{id}`` acknowledgment."""
 
     new_memory_id: Optional[str] = None
     invalidated_memory_id: Optional[str] = None
@@ -135,7 +135,7 @@ class MemoryEditAck:
 
 @dataclass
 class MemoryDeleteAck:
-    """``DELETE /memory/{id}`` soft-delete acknowledgement."""
+    """``DELETE /memory/{id}`` soft-delete acknowledgment."""
 
     block_id: Optional[str] = None
     memory_id: Optional[str] = None

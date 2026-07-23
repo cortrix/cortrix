@@ -112,7 +112,7 @@ private:
     bool ready_ = false;
 
     // Opaque ONNX handles (concrete types only in the .cpp via conditional
-    // compilation). env_ is borrowed from OrtEnvSingleton (not deleted);
+    // compilation). env_ is borrowed from OrtEnvSingleton (not released here);
     // session_ is owned (deleted in dtor).
     void* env_ = nullptr;       // Ort::Env*  (borrowed)
     void* session_ = nullptr;   // Ort::Session* (owned)

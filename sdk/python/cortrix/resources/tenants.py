@@ -1,7 +1,6 @@
 """Tenants resource. ``/tenants/*`` (user-level, P09) + ``/admin/tenants``.
 
-Per Derek's ruling (briefing § 9): SDK shape = P03 § 2.12; wire = real
-architecture. Mapping:
+This resource follows the implemented HTTP architecture. Mapping:
   - ``list``         -> GET    /tenants                    (listMyTenants)
   - ``get``          -> GET    /tenants/{id}
   - ``list_members`` -> GET    /tenants/{id}/members

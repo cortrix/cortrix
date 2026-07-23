@@ -1,8 +1,7 @@
 """Documents resource. ``/documents`` domain (ARCH § 4.1.2 + F42).
 
-Per Derek's ruling (briefing § 9): SDK shape = P03 § 2.12; wire = real
-architecture. ``upload()`` is **async** (aligns with the F42 Document Async
-Processing being built this round — § 2.12's old sync upload is obsoleted by
+This resource follows the implemented HTTP architecture. ``upload()`` is
+**async** (aligns with the F42 Document Async Processing path; the old sync upload is superseded by
 F42): ``POST /documents`` -> 202 ``DocumentTask``, with
 ``GET /documents/tasks/{task_id}/progress`` + ``DELETE /documents/tasks/{task_id}``.
 ``upload_and_wait()`` is sync sugar (upload then poll to a terminal state).
@@ -23,7 +22,7 @@ from ..types import Document, DocumentTask
 from ..types.lists import DocumentList
 from ._base import AsyncResource, SyncResource
 
-# --- paths (real-arch wire; centralised) ---
+# --- paths (real-arch wire; centralized) ---
 PATH_DOCUMENTS = "/documents"
 PATH_DOCUMENT = "/documents/{id}"
 PATH_TASK_PROGRESS = "/documents/tasks/{task_id}/progress"

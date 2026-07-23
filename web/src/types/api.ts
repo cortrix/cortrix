@@ -258,7 +258,7 @@ export interface LLMConfigRequest {
 }
 
 // --- GEN-Agent structured error (CLAUDE.md § 5 + AGENT_FRIENDLY.md) ---
-// Standardised 5-field machine-readable error envelope returned by the backend
+// Standardized 5-field machine-readable error envelope returned by the backend
 // for 4xx/5xx responses: { error: { code, message, retryable, category,
 // retry_after_ms, structured_data } }. The ErrorDisplay component consumes this
 // shape; non-conforming responses fall back to a plain message.

@@ -158,7 +158,7 @@ def validate_filter(filter_jsonb):
 
 
 # ===========================================================================
-# §2.2.bis — endpoint SSRF defence (V3-E-02)
+# §2.2.bis — endpoint SSRF defense (V3-E-02)
 # ===========================================================================
 
 ALLOWED_HOSTS = frozenset(["localhost", "127.0.0.1", "cortrix-server"])
@@ -178,7 +178,7 @@ _BLOCKED_NETWORKS = [
 
 
 def validate_endpoint(endpoint):
-    """SSRF defence (V3-E-02): allowlist host + port, block private / metadata
+    """SSRF defense (V3-E-02): allowlist host + port, block private / metadata
     IPs. Raises CX_ERR_F14_ENDPOINT_BLOCKED on violation. Returns the parsed
     (host, port) on success."""
     parsed = urlparse(endpoint)
@@ -607,7 +607,7 @@ class PgcortrixClient:
         blob with http_connected=false (diagnostics must always answer)."""
         cfg = self._get_config()
         result = {
-            "version": "1.0.0",
+            "version": "1.0.0-rc.1",
             "endpoint": cfg["endpoint"],
             "timeout_ms": cfg["timeout_ms"],
             "retry_max": cfg["retry_max"],

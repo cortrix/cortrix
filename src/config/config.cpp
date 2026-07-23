@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include "cortrix/config/config.h"
 
@@ -42,6 +44,45 @@ bool ProvidersEqual(const std::string& lhs, const std::string& rhs) {
            lhs_provider == rhs_provider;
 }
 
+bool IsIpv4Loopback(const std::string& host) {
+    int octets[4] = {0, 0, 0, 0};
+    size_t start = 0;
+    for (int index = 0; index < 4; ++index) {
+        const size_t end = host.find('.', start);
+        if ((index < 3 && end == std::string::npos) ||
+            (index == 3 && end != std::string::npos)) {
+            return false;
+        }
+        const size_t length = (end == std::string::npos ? host.size() : end) - start;
+        if (length == 0 || length > 3) return false;
+        const std::string part = host.substr(start, length);
+        if (!std::all_of(part.begin(), part.end(),
+                         [](unsigned char ch) { return std::isdigit(ch) != 0; })) {
+            return false;
+        }
+        try {
+            octets[index] = std::stoi(part);
+        } catch (...) {
+            return false;
+        }
+        if (octets[index] < 0 || octets[index] > 255) return false;
+        start = end == std::string::npos ? host.size() : end + 1;
+    }
+    return octets[0] == 127;
+}
+
+bool IsLoopbackHost(const std::string& host) {
+    std::string normalized = host;
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    return normalized == "localhost" || normalized == "::1" || normalized == "[::1]" ||
+           IsIpv4Loopback(normalized);
+}
+
+bool IsWildcardHost(const std::string& host) {
+    return host == "0.0.0.0" || host == "::" || host == "[::]";
+}
+
 void ApplyCanonicalAndLegacyProvider(const std::string& canonical,
                                      const std::string& legacy,
                                      const std::string& context,
@@ -77,6 +118,9 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (s["port"]) config.server.port = s["port"].as<int>();
         if (s["thread_count"]) config.server.thread_count = s["thread_count"].as<int>();
         if (s["max_payload_bytes"]) config.server.max_payload_bytes = s["max_payload_bytes"].as<int64_t>();
+        if (s["allow_unauthenticated_container_bind"])
+            config.server.allow_unauthenticated_container_bind =
+                s["allow_unauthenticated_container_bind"].as<bool>();
     }
 
     // auth
@@ -327,6 +371,13 @@ void ApplyEnvOverrides(CortrixConfig& config) {
     val = GetEnv("CORTRIX_SERVER_HOST");
     if (!val.empty()) config.server.host = val;
 
+    val = GetEnv("CORTRIX_SERVER_ALLOW_UNAUTHENTICATED_CONTAINER_BIND");
+    if (!val.empty()) {
+        config.server.allow_unauthenticated_container_bind = GetEnvBool(
+            "CORTRIX_SERVER_ALLOW_UNAUTHENTICATED_CONTAINER_BIND",
+            config.server.allow_unauthenticated_container_bind);
+    }
+
     config.server.port = GetEnvInt("CORTRIX_SERVER_PORT", config.server.port);
     config.server.thread_count = GetEnvInt("CORTRIX_SERVER_THREADS", config.server.thread_count);
 
@@ -414,6 +465,18 @@ std::vector<std::string> ValidateConfig(const CortrixConfig& config) {
     if (config.server.max_payload_bytes <= 0) {
         errors.push_back("server.max_payload_bytes must be > 0, got " +
                          std::to_string(config.server.max_payload_bytes));
+    }
+    const bool explicit_container_bind =
+        config.server.allow_unauthenticated_container_bind &&
+        IsWildcardHost(config.server.host);
+    if (!config.auth.enabled && !IsLoopbackHost(config.server.host) &&
+        !explicit_container_bind) {
+        errors.push_back(
+            "server.host must be loopback when auth.enabled=false; use 127.0.0.1, "
+            "localhost, or ::1; enable authentication before binding to a "
+            "non-loopback interface, or explicitly opt into a container-internal "
+            "wildcard bind whose host port is published only to loopback (got '" +
+            config.server.host + "')");
     }
 
     // Namespace validation

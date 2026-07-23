@@ -3,7 +3,7 @@
 After each Cortrix Agent chat turn the conversation is fed back into Cortrix's memory
 system: the turn is logged (F13 interaction_log) and that same SDK call triggers MEM02
 LLM extraction server-side. It runs fire-and-forget so a logging/extraction failure never
-blocks the user's chat response (design F48-rev-9). MEM05 user isolation is honoured by
+blocks the user's chat response (design F48-rev-9). MEM05 user isolation is honored by
 always passing a user_id (design F48-rev-11).
 
 Standalone discipline (D3): the P03 SDK ``client.memory.log`` call is exercised against a

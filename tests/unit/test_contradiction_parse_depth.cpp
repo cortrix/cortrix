@@ -12,7 +12,7 @@
 // reachable arm of the parser directly: the bool/numeric verdict accept, the
 // confidence clamp (both directions + boundaries), reason optionality/typing,
 // the array-instead-of-object reject, and the (DIVERGENCE-from-hypothesis)
-// behaviour for code-fenced + {"result":{...}}-wrapped inputs — which this
+// behavior for code-fenced + {"result":{...}}-wrapped inputs — which this
 // parser does NOT unwrap (no fence-strip / no result-unwrap in the impl), so
 // they are rejected. Suite name is globally unique (ContradictionParseDepth).
 namespace cortrix::memory {
@@ -194,7 +194,7 @@ TEST(ContradictionParseDepthTest, IntegerConfidenceCoercedToDouble) {
 }
 
 // ---------- DIVERGENCE notes: the impl does NOT unwrap fences / {"result":...} ----------
-// The DEPTH brief hypothesised the parser handles a ```json fenced single-object
+// The DEPTH brief hypothesized the parser handles a ```json fenced single-object
 // and an object-wrapped {"result":{...}}. The frozen impl does NEITHER — it feeds
 // the raw string straight to nlohmann::parse. These tests pin the ACTUAL contract
 // (both rejected) so a future fence/unwrap addition is a deliberate, test-visible

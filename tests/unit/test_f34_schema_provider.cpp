@@ -10,7 +10,7 @@
 
 #include "cortrix/catalog/schema_provider.h"
 
-// F34 § 3.1 (A unified-blocks, Derek 2026-06-07): F34SchemaProvider extends the
+// F34 § 3.1 (A unified-blocks): F34SchemaProvider extends the
 // per-Unit blocks table (+4 child cols) + 3 indexes (incl idx_blocks_meta_doc, B2)
 // + creates the parents table, registered via the F12 SchemaMigrator.
 namespace cortrix::store {

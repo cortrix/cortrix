@@ -17,15 +17,14 @@ namespace {
 
 namespace fs = std::filesystem;
 
-const char* kModelDir =
-    "/Users/derek/Documents/macbookair_files/AI_path/projects/cortrix/cortrix/"
-    "models/query-complexity";
+const std::string kModelDir =
+    std::string(CORTRIX_CE_SOURCE_DIR) + "/models/query-complexity";
 
-std::string ModelPath() { return std::string(kModelDir) + "/model.onnx"; }
+std::string ModelPath() { return kModelDir + "/model.onnx"; }
 
 bool ModelPresent() { return fs::exists(ModelPath()); }
 
-// --- Offline behaviour: no model file → backend constructible + unavailable. ---
+// --- Offline behavior: no model file → backend constructible + unavailable. ---
 
 TEST(OnnxComplexityBackendTest, Identity) {
     OnnxComplexityBackend b("/nonexistent/model.onnx");

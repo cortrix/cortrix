@@ -8,11 +8,11 @@ namespace cortrix::auth {
 
 /// Production password hasher for Phase 1 V1 — OpenSSL PBKDF2-HMAC-SHA256.
 ///
-/// 🚧 TECH_DEBT-P08-PBKDF2-PLACEHOLDER (Derek ruling 2026-05-31, → D3.5):
+/// 🚧 TECH_DEBT-P08-PBKDF2-PLACEHOLDER:
 /// P08 §4.2 specifies **bcrypt cost=12** with a `$2b$...` hash. bcrypt is NOT
 /// available offline on this build (no system lib / no vendored source / OpenSSL
 /// has no native bcrypt), and the env's FetchContent network fetch is unreliable.
-/// Per Derek's decision we ship a PBKDF2-HMAC-SHA256 placeholder that meets the
+/// This implementation uses a PBKDF2-HMAC-SHA256 placeholder that meets the
 /// security *substance* (salted, slow, tunable work factor, one-way) but emits a
 /// `pbkdf2$...` hash, NOT `$2b$`. SWITCH TO REAL bcrypt once network is available
 /// (D3.5): the IPasswordHasher seam means swapping = replacing this class +

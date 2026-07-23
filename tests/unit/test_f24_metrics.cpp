@@ -45,7 +45,7 @@ TEST_F(DeployMetricsTest, ShutdownStatusGaugeClampsToZeroOneTwo) {
 TEST_F(DeployMetricsTest, RenderEmitsAllFourGaugesWithHelpType) {
     M().SetDiskUsageRatio(0.55);
     M().SetShutdownStatus(1);
-    M().SetBuildInfo("1.0.0", "abc1234", "2026-06-02");
+    M().SetBuildInfo("1.0.0-rc.1", "abc1234", "2026-06-02");
     M().MarkStart();
     std::string out = M().Render();
 
@@ -60,7 +60,7 @@ TEST_F(DeployMetricsTest, RenderEmitsAllFourGaugesWithHelpType) {
     EXPECT_TRUE(Contains(out, "cortrix_uptime_seconds "));
     // build_info — info gauge value 1 with the three labels
     EXPECT_TRUE(Contains(out, "# TYPE cortrix_build_info gauge"));
-    EXPECT_TRUE(Contains(out, "version=\"1.0.0\""));
+    EXPECT_TRUE(Contains(out, "version=\"1.0.0-rc.1\""));
     EXPECT_TRUE(Contains(out, "git_commit=\"abc1234\""));
     EXPECT_TRUE(Contains(out, "build_date=\"2026-06-02\""));
     EXPECT_TRUE(Contains(out, "} 1\n"));  // value is always 1

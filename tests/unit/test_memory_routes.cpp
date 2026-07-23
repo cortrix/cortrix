@@ -1886,7 +1886,7 @@ TEST_F(MemoryRoutesTest, SoftDeleteMemorySuccessReturnsInvalidated) {
 // Our fixture key has permissions=7 which includes kPermAdmin, so is_admin() is true
 // and the guard never fires for the test key. To test the MASK path we need a separate
 // non-admin key. The test validates that with our ADMIN key the mask does NOT fire
-// (returns 200) while documenting the expected behaviour for non-admin callers.
+// (returns 200) while documenting the expected behavior for non-admin callers.
 // ---------------------------------------------------------------------------
 
 // Verify that the 404-mask branch is reachable: when a non-admin key tries to

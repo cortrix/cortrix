@@ -46,7 +46,7 @@ struct McpSession {
 /// thread has its own instance via ThreadLocal(); consumers (F01/F02/F04/F25/
 /// F36/F37 + the whole trace chain) read/set the context and log through it.
 ///
-/// F13 §5.1 v1.0.1 (Derek "extend in place, A"): this is the single identity-context source
+/// F13 §5.1 v1.0.1: this is the single identity-context source
 /// shared by the F13 ops-view track (agent_trace) and the F18a user-view track
 /// (operation_log). The trace members + the original 6 methods are FROZEN for
 /// the F05 namespace_pool / F18a operation_log_emitter consumers (zero break);

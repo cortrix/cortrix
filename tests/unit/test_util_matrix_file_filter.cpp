@@ -80,7 +80,7 @@ INSTANTIATE_TEST_SUITE_P(
         ImportCase{"/x/old.bak", false},
         ImportCase{"#emacs#", false},
         ImportCase{"#autosave#", false},
-        // Non-matching glob neighbours -> import.
+        // Non-matching glob neighbors -> import.
         ImportCase{"/x/file.tmpx", true},   // .tmp != .tmpx
         ImportCase{"/x/file.swpa", true},
         ImportCase{"/x/backup", true},      // not *.bak
@@ -181,7 +181,7 @@ INSTANTIATE_TEST_SUITE_P(
         TraverseCase{"buildX", false},
         TraverseCase{"build", true},     // no char to match '?'
         TraverseCase{"buildXY", true},   // two extra chars, '?' = exactly one
-        // Non-matching neighbours.
+        // Non-matching neighbors.
         TraverseCase{"cache", true},
         TraverseCase{"node_module", true}));
 

@@ -81,7 +81,7 @@ TEST(IRerankerTest, ConcreteSubclassUsableThroughInterfacePointer) {
 
 // --- MockReranker (F02 §7.2) is instantiable and its expectations fire. ---
 
-TEST(MockRerankerTest, GmockDoubleHonoursExpectations) {
+TEST(MockRerankerTest, GmockDoubleHonorsExpectations) {
     MockReranker mock;
     EXPECT_CALL(mock, Name()).WillRepeatedly(Return("MockReranker"));
     EXPECT_CALL(mock, Score(_, _)).WillOnce(Return(0.77f));

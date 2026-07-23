@@ -216,7 +216,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument(
         "--repo-root",
         default=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")),
-        help="wt-P14 repo root (default: two levels up from this script).",
+        help="repository root (default: two levels up from this script).",
     )
     parser.add_argument("--json", action="store_true", help="emit a JSON report.")
     args = parser.parse_args(argv)

@@ -67,12 +67,12 @@ TEST_F(Mem04MetricsTest, RenderOpenMetricsHasAllSeries) {
     EXPECT_NE(out.find("# TYPE cortrix_mem04_opt_out_revoke_total counter"), std::string::npos);
     EXPECT_NE(out.find("# TYPE cortrix_mem04_extract_skipped_total counter"), std::string::npos);
 
-    // Labelled opt_out series (one line per triggered_by enum value).
+    // Labeled opt_out series (one line per triggered_by enum value).
     EXPECT_NE(out.find("cortrix_mem04_opt_out_total{triggered_by=\"user\"} 1"), std::string::npos);
     EXPECT_NE(out.find("cortrix_mem04_opt_out_total{triggered_by=\"agent\"} 1"), std::string::npos);
     EXPECT_NE(out.find("cortrix_mem04_opt_out_total{triggered_by=\"system\"} 0"), std::string::npos);
 
-    // Unlabelled counters.
+    // Unlabeled counters.
     EXPECT_NE(out.find("cortrix_mem04_opt_out_revoke_total 1"), std::string::npos);
     EXPECT_NE(out.find("cortrix_mem04_extract_skipped_total 1"), std::string::npos);
 }

@@ -53,7 +53,7 @@ public:
 
 private:
     // A query with at least this many whitespace-separated tokens is treated as
-    // multi-step (Complex). Kept small + documented so the standalone behaviour is
+    // multi-step (Complex). Kept small + documented so the standalone behavior is
     // predictable for tests; the real classifier replaces this in D3.5.
     static constexpr int kComplexWordThreshold = 12;
 

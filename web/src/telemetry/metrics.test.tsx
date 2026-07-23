@@ -36,7 +36,7 @@ describe('telemetry metrics (§ 23-bis)', () => {
     }).not.toThrow();
   });
 
-  it('pageLabel normalises pathnames to low-cardinality labels', () => {
+  it('pageLabel normalizes pathnames to low-cardinality labels', () => {
     expect(pageLabel('/')).toBe('home');
     expect(pageLabel('')).toBe('home');
     expect(pageLabel('/namespaces')).toBe('ns');

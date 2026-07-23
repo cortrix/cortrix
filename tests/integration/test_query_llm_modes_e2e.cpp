@@ -2,7 +2,7 @@
 /// @brief R7 full-stack E2E for the query path WITH and WITHOUT an LLM, over the
 ///        production cross-NS query assembly (CrossNsQueryWiring), driven via HTTP.
 ///
-/// Derek's R7 requirement: cover the LLM-configured query (F36 rag-fusion: LLM query-
+/// Covers the LLM-configured query (F36 rag-fusion: LLM query-
 /// variant expansion → vector + BM25 + RRF fusion) AND the no-LLM path (graceful
 /// degradation to vector + BM25 without F36). The rag-fusion LLM is wired through
 /// CrossNsQueryWiring (bootstrap §822) — NOT the per-NS RegisterQueryRoutes used by
@@ -266,7 +266,7 @@ TEST_F(QueryWithoutLlm, NoLlmDegradesGracefully) {
 
 // ── F44 / PR #7 regression: metadata-only F08 authors enter F41 doc_fts5 and the
 // production cross-NS query doc/both path can retrieve them. This is the benchmark
-// failure mode Scott's PR exposed: the LLM/product-side document evidence existed in
+// failure mode exposed during regression review: the LLM/product-side document evidence existed in
 // design, but doc-level candidates were not guaranteed to enter the query candidate
 // path. The probe deliberately keeps "Lovelace" OUT of the document text/filename and
 // puts it only in upload metadata.authors, so a hit proves F08 -> F41 doc_fts5 -> query.

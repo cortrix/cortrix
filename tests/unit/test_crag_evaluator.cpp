@@ -254,7 +254,7 @@ TEST(CragEvaluatorTest, BackendScoreClampedToUnitRange) {
 }
 
 TEST(CragEvaluatorTest, BoundaryScoresAtThresholds) {
-    // Exact-threshold behaviour (§6.2): >= threshold_correct → correct; the lower
+    // Exact-threshold behavior (§6.2): >= threshold_correct → correct; the lower
     // boundary uses strict < threshold_incorrect for incorrect.
     CragConfig cfg;  // 0.7 / 0.3 defaults
     // score exactly 0.7 → correct (>=). Build signals so heuristic score == 0.7:

@@ -11,7 +11,7 @@ namespace cortrix::deploy {
 /// Register the dual health endpoints (F24 §4.2, F20-7-rev-2 — F24 owns the
 /// endpoints; F20 owns the readiness *contract*).
 ///
-/// [D3.5 wire · Derek approach A] Unified onto the F20 ReadinessRegistry: /ready now
+/// Unified onto the F20 ReadinessRegistry: /ready now
 /// calls `health::ReadinessRegistry::BuildReport()` (replacing F24's standalone
 /// HealthProviders struct, which was a D3 standalone placeholder). The 5 readiness
 /// components (catalog / vector_index / secret_provider / spc_pipeline /

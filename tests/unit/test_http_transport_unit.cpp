@@ -3,7 +3,7 @@
 // connection that cannot exist in unit tests, so those paths are skipped.
 //
 // What CAN be tested without a network:
-//   - SplitBaseAndPath (static helper inside the .cpp) via the public behaviour
+//   - SplitBaseAndPath (static helper inside the .cpp) via the public behavior
 //     of HttpResponse and the header() utility:
 //       - header() case-insensitive lookup
 //       - header() returns "" when key is absent
@@ -163,7 +163,7 @@ TEST(MakeDefaultHttpTransportTest, IsInstanceOfIHttpTransport) {
 }
 
 // ---------------------------------------------------------------------------
-// FakeHttpTransport — test double behaviour
+// FakeHttpTransport — test double behavior
 // ---------------------------------------------------------------------------
 
 TEST(FakeHttpTransportTest, RecordsLastRequest) {
@@ -304,7 +304,7 @@ TEST(HttplibTransportTest, MalformedUrlNoSchemeReturnsNetworkFail) {
 
 TEST(HttplibTransportTest, UrlWithSchemeButNoPathGetsSlashPath) {
     // When there is no '/' after the host, SplitBaseAndPath sets path="/".
-    // This is an internal behaviour; we verify it does not crash and that
+    // This is an internal behavior; we verify it does not crash and that
     // the transport at least attempts to connect (network_ok may be false
     // due to the unreachable host — that's acceptable).
     auto transport = MakeDefaultHttpTransport();

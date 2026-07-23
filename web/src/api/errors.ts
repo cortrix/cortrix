@@ -4,7 +4,7 @@ import type { AgentError, AgentErrorCategory } from '../types/api';
 // GEN-Agent error parsing (CLAUDE.md § 5 — machine-readable errors). The HTTP
 // client throws `ApiError(status, body)` where `body` is the raw response text.
 // Backends return `{ error: { code, message, retryable, category,
-// retry_after_ms, structured_data } }`. This helper normalises any thrown value
+// retry_after_ms, structured_data } }`. This helper normalizes any thrown value
 // into an `AgentError` so the UI can render a consistent, structured display
 // (and, for transient/quota errors, a retry countdown).
 
@@ -28,7 +28,7 @@ function coerceCategory(value: unknown, status?: number): AgentErrorCategory {
   return 'permanent';
 }
 
-/** Normalise any caught error into the GEN-Agent 5-field shape. */
+/** Normalize any caught error into the GEN-Agent 5-field shape. */
 export function parseAgentError(err: unknown): AgentError {
   if (err instanceof ApiError) {
     let parsed: unknown = null;

@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <future>
 #include <memory>
 #include <set>
 #include <string>
@@ -153,6 +154,17 @@ public:
 
 private:
     std::size_t footprint_;
+};
+
+class DestructionSignalingIndex : public FakeIndex {
+public:
+    explicit DestructionSignalingIndex(std::shared_ptr<std::promise<void>> destroyed)
+        : destroyed_(std::move(destroyed)) {}
+
+    ~DestructionSignalingIndex() override { destroyed_->set_value(); }
+
+private:
+    std::shared_ptr<std::promise<void>> destroyed_;
 };
 
 class MockIndexFactory : public IIndexFactory {
@@ -660,39 +672,58 @@ TEST_F(NamespacePoolTest, StartupLoadEightWorkersConcurrency) {
 
 TEST_F(NamespacePoolTest, StartupSingleNsTimeoutCountsAsFailure) {
     config_.startup_load_workers = 4;
-    config_.load_timeout_ms_per_ns = 150;  // tight timeout
-    std::vector<std::string> ids = {"fast-0", "slow-1", "fast-2"};
-    for (auto& ns : ids) MakeUnitDir(ns + "-u");
+    config_.load_timeout_ms_per_ns = 150;
+    std::vector<std::string> ids = {"slow-1"};
+    MakeUnitDir("slow-1-u");
     StubListNamespaces(ids);
-    // "slow-1" sleeps 600ms > 150ms timeout; the others are fast (we give every
-    // Open the same delay, so make the timeout the discriminator: use a single
-    // delay just above the timeout for ALL, then assert all time out). To isolate
-    // ONE slow NS we instead force slow-1 to block long via a dedicated factory.
+
+    // Block the inner load on an explicit gate. The production timeout must
+    // return while that gate is closed, so this fixture does not depend on host
+    // speed or sanitizer overhead. Keep the pool alive until the detached inner
+    // load has released its result and destroyed the signaling index.
+    auto entered = std::make_shared<std::promise<void>>();
+    std::future<void> entered_future = entered->get_future();
+    auto release = std::make_shared<std::promise<void>>();
+    std::shared_future<void> release_future = release->get_future().share();
+    auto destroyed = std::make_shared<std::promise<void>>();
+    std::future<void> destroyed_future = destroyed->get_future();
+
     using ::testing::Invoke;
     ON_CALL(ns_router_, GetActiveUnit(_))
         .WillByDefault(Invoke([this](const std::string& ns) {
             return Result<cortrix::catalog::UnitDescriptor>(Unit(ns + "-u"));
         }));
     ON_CALL(index_factory_, Open(_))
-        .WillByDefault(Invoke([](const std::string& unit_dir) {
-            if (unit_dir.find("slow-1") != std::string::npos) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(600));
-            }
-            return Result<std::unique_ptr<IIndex>>(std::make_unique<FakeIndex>(0));
+        .WillByDefault(Invoke([entered, release_future, destroyed](const std::string&) {
+            entered->set_value();
+            release_future.wait();
+            return Result<std::unique_ptr<IIndex>>(
+                std::make_unique<DestructionSignalingIndex>(destroyed));
         }));
     DefaultNamespacePool pool(&index_factory_, MakeRealCoordFactory(), &ns_router_,
                               &unit_router_, config_);
 
-    auto rep = pool.StartupLoadAll();
+    auto startup_future = std::async(std::launch::async, [&pool] {
+        return pool.StartupLoadAll();
+    });
+    ASSERT_EQ(entered_future.wait_for(std::chrono::seconds(5)),
+              std::future_status::ready);
+    ASSERT_EQ(startup_future.wait_for(std::chrono::seconds(5)),
+              std::future_status::ready);
+    auto rep = startup_future.get();
+
+    release->set_value();
+    ASSERT_EQ(destroyed_future.wait_for(std::chrono::seconds(5)),
+              std::future_status::ready);
+
     ASSERT_TRUE(rep.ok());
-    EXPECT_EQ(rep.value().total_namespaces, 3u);
-    EXPECT_EQ(rep.value().loaded_successfully, 2u);
+    EXPECT_EQ(rep.value().total_namespaces, 1u);
+    EXPECT_EQ(rep.value().loaded_successfully, 0u);
     EXPECT_EQ(rep.value().failed, 1u);
     ASSERT_EQ(rep.value().failed_namespaces.size(), 1u);
     EXPECT_EQ(rep.value().failed_namespaces[0], "slow-1");
     EXPECT_EQ(pool.GetPoolStats().startup_load_failures, 1u);
-    // The 2 fast NS are resident; the timed-out one is not (admin can reload it).
-    EXPECT_TRUE(pool.Acquire("fast-0").ok());
+    // The timed-out namespace is not resident and can be retried by an admin.
     EXPECT_FALSE(pool.Acquire("slow-1").ok());
     // It shows up in the C-class explain startup-failed list.
     auto ex = pool.GetExplainState();

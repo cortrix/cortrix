@@ -13,8 +13,7 @@ namespace cortrix::spc {
 // =============================================================================
 // I1 — ISpcEnricher chain framework (GS-2: F03 → F35 → F38, fail-soft serial).
 //
-// D3.5 wiring (D35_ROUND2_WIRING_PLAN Wave I / F35 §7 / F38 §5.2): the SPC pipeline
-// runs an ORDERED chain of ISpcEnrichers per chunk. Each enricher contributes
+// The SPC pipeline runs an ordered chain of ISpcEnrichers per chunk. Each enricher contributes
 // independently (F03 entities/summary; F35 contextualized_*; F38 hype questions
 // via its own channel) and runs fail-soft — a failing enricher is skipped, its
 // per-enricher status/error is recorded, and the chain continues. The chain order
@@ -70,7 +69,7 @@ struct ChunkChainResult {
 /// F35/F38). The SPC pipeline holds one of these (installed via a seam, like the
 /// F41 doc-summary enqueue) and calls EnrichChunks() once per document.
 ///
-/// 🔌 Construction: the production factory (bootstrap, D3.5) builds the chain from
+/// Construction: the production bootstrap builds the chain from
 /// the resolved token list + the shared LLM client / embedder / parent store; an
 /// empty chain (or all enrichers unavailable) makes EnrichChunks() a transparent
 /// pass-through (the §7.1 L1 default).

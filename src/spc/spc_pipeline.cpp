@@ -1124,7 +1124,7 @@ void SPCPipeline::OnDocumentWritten(const std::string& doc_id,
     // keyed on doc_id alone (TaskManager::FindRecentTaskByDocId ignores task_type +
     // terminal status), so a doc-summary enqueue can collide with the doc's own
     // (possibly completed) doc-parse task — resolving that (debounce per task_type)
-    // belongs to the F42 main-wiring step (Derek 2026-06-08 chose B: F42 productization).
+    // belongs to the F42 main-wiring step.
     req.content_hash = doc_id;
     req.task_type = async::kTaskDocSummary;
     doc_summary_enqueue_(req);

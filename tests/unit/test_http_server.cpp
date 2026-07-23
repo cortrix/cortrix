@@ -236,7 +236,7 @@ TEST_F(HttpServerTest, HealthEndpointReturnsHealthy) {
 
     auto body = json::parse(res->body);
     EXPECT_EQ(body["status"], "healthy");
-    EXPECT_EQ(body["version"], cortrix::kCortrixVersion);  // [P5] version SoT (1.0.0)
+    EXPECT_EQ(body["version"], cortrix::kCortrixVersion);  // [P5] version SoT (1.0.0-rc.1)
     EXPECT_TRUE(body.contains("uptime_seconds"));
     EXPECT_TRUE(body.contains("components"));
 }
@@ -447,7 +447,7 @@ TEST_F(HttpServerTest, GetNonexistentNamespace) {
 
 // A catalog-backed (ns_router_) detail response must serialize the FULL NSMetadata
 // (F12 §4.1) — not just name/created/updated/dc/bc. Regression for the F12 Major
-// under-serialization (Scott P0 root cause: View Details dropped tenant / isolation
+// under-serialization (regression root cause: View Details dropped tenant / isolation
 // / visibility / status / clone lineage). Optionals are stable keys (null on absent).
 namespace {
 class DetailFakeNSRouter : public cortrix::catalog::INSRouter {

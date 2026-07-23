@@ -1,5 +1,5 @@
 // test_store_ops_fault.cpp — BREADTH matrices for CortrixStoreSqlite operation
-// behaviour: the SetFailNextOps / TryConsumeOpFault testing seam exercised across
+// behavior: the SetFailNextOps / TryConsumeOpFault testing seam exercised across
 // EVERY public CRUD op's failure arm, plus boundary matrices for
 // block_delete_by_doc / doc_delete_by_source_prefix / doc_list_by_status /
 // doc_list_deleted_before.
@@ -106,7 +106,7 @@ protected:
 // Contract (cortrix_store_sqlite.h §4.5): SetFailNextOps(n) forces the next n
 // public CRUD calls to return -1 WITHOUT touching the db. We arm exactly 1, run
 // one op, assert it returns -1, then assert the third (un-armed) call resumes
-// real behaviour AND the store state is untouched by the faulted op.
+// real behavior AND the store state is untouched by the faulted op.
 //
 // Each op is an "invoker" closure run against a fresh fixture so arming windows
 // never overlap. Parameterized so adding/removing an op is one row.
@@ -208,7 +208,7 @@ TEST_P(StoreFaultOpsMatrix, ArmedOpReturnsMinusOne) {
     EXPECT_EQ(GetParam().invoke(*this), -1) << GetParam().name;
 }
 
-// After the single armed fault is consumed, real behaviour resumes (count works).
+// After the single armed fault is consumed, real behavior resumes (count works).
 TEST_P(StoreFaultOpsMatrix, SeamDisarmsAfterOneFault) {
     store_->SetFailNextOps(1);
     (void)GetParam().invoke(*this);  // consumes the one armed fault
@@ -252,7 +252,7 @@ TEST_P(StoreFaultOpsWindow, ExactlyNCallsFault) {
         int64_t c = -1;
         EXPECT_EQ(store_->doc_count(&c), -1) << "call " << i << " of " << n;
     }
-    // (n+1)th call resumes real behaviour.
+    // (n+1)th call resumes real behavior.
     int64_t c = -1;
     EXPECT_EQ(store_->doc_count(&c), 0);
     EXPECT_EQ(c, 0);

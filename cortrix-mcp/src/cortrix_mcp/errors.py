@@ -4,7 +4,7 @@ Two-layer contract (feature design section 6):
   * MCP protocol layer: raise ``McpError`` (isError=True) so the IDE tool bar shows red.
   * Body JSON layer: the 4 GEN-Agent fields (retryable / category / retry_after_ms /
     structured_data) are carried inside ``ErrorData.data`` so programmatic agents can
-    decide retry behaviour.
+    decide retry behavior.
 
 Business errors from cortrix-server (CX_ERR_NS_*, CX_ERR_MEM03_*, CX_ERR_OPLOG_* ...)
 are passed through unchanged — this module never re-invents business codes.

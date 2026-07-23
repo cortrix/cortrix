@@ -8,10 +8,10 @@ import { defineConfig, devices } from '@playwright/test';
 //
 // Standalone (D3): `webServer` boots `vite dev` on :5173 so the spec runs with no
 // backend. The mock fallback is build-time gated (src/api/fallback.ts) — OFF in a
-// production build — so the webServer command sets VITE_USE_MOCK=1 to force it on,
+// production build — so the webServer environment sets VITE_USE_MOCK=1 to force it on,
 // letting every api module fall back to its in-memory mock and the mock
 // authenticated-as-admin session render the guarded routes directly.
-// mcp__claude-in-chrome agent acceptance stays out of CI (§ 17.5).
+// Interactive browser acceptance is verified separately from automated CI.
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
@@ -34,7 +34,8 @@ export default defineConfig({
     { name: 'edge', use: { ...devices['Desktop Edge'], channel: 'msedge' } },
   ],
   webServer: {
-    command: 'VITE_USE_MOCK=1 npm run dev -- --port 5173',
+    command: 'npm run dev -- --port 5173',
+    env: { VITE_USE_MOCK: '1' },
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

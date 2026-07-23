@@ -622,7 +622,7 @@ void CortrixHttpServer::RegisterHealthRoutes() {
                  // whose parser stack failed to install does not silently report a
                  // bare "healthy". The entrypoint sets CORTRIX_PARSER_STATUS after
                  // provisioning (ok / disabled=lite / unavailable=failed). Absent on
-                 // dev/native runs → omit the component and keep prior behaviour;
+                 // dev/native runs → omit the component and keep prior behavior;
                  // only "unavailable" degrades the overall status.
                  if (const char* parser_status = std::getenv("CORTRIX_PARSER_STATUS")) {
                      if (parser_status[0] != '\0') {

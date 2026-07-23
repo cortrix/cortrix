@@ -1,7 +1,6 @@
 """Query resource — backs the top-level ``client.search()`` / ``get_sources()``.
 
-Per Derek's ruling (briefing § 9): SDK shape = P03 § 2.12; wire = real
-architecture. Since D3.5 round 2 (Wave Q) the LIVE ``POST /query`` route IS
+This resource follows the implemented HTTP architecture. The live ``POST /query`` route is
 the F04 cross-NS handler: ``namespaces`` array (single NS = one-element
 list, all = ["*"]), singular ``filter``, and the § 2.12
 ``QueryResult{results, meta}`` response (child_id/content/content_hash

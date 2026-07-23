@@ -143,7 +143,7 @@ ClassificationResult CragEvaluator::RunClassifier(
     // The circuit breaker is a SYSTEMIC gate (shared F02 component): it is checked
     // ONCE at entry so a query does not even start the retry loop against a backend
     // that recent queries proved dead. Inside one query, the full
-    // max_inference_retries budget is honoured (the breaker's per-query failures
+    // max_inference_retries budget is honored (the breaker's per-query failures
     // are recorded but do not abort this query's own retries — that would conflate
     // the N=3 per-query retry policy with the cross-query breaker threshold).
     if (!breaker_.AllowRequest()) {

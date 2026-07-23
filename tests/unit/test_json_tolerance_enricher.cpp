@@ -19,7 +19,7 @@
 // invariant under test is "no crash, correct vector size, documented layer
 // status" -- never a thrown exception.
 //
-// kClean=the 2-chunk happy body, expected status [0,0].  We parameterise the body +
+// kClean=the 2-chunk happy body, expected status [0,0].  We parameterize the body +
 // the expected per-index status vector (length 2 unless noted via batch_size).
 
 #include <gtest/gtest.h>

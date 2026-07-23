@@ -26,7 +26,7 @@ namespace fs = std::filesystem;
 // Deterministic helper (F01 §"test-data strategy" — fixed seed for repeatability).
 std::vector<float> MakeVector(int dim, int index) {
     std::vector<float> v(static_cast<size_t>(dim));
-    // Simple deterministic fill; distinct per index so neighbours are well-ordered.
+    // Simple deterministic fill; distinct per index so neighbors are well-ordered.
     for (int i = 0; i < dim; ++i) {
         v[static_cast<size_t>(i)] = static_cast<float>((index * 31 + i) % 97) * 0.01f;
     }
@@ -84,6 +84,21 @@ TEST_F(PHnswTest, AddPointThenSearchFindsIt) {
     EXPECT_EQ(stats.vector_count, 2u);
 }
 
+TEST_F(PHnswTest, TwoPointSearchStaysWithinNeighborListBounds) {
+    // A two-node graph produces one-entry adjacency lists. Under ASAN this
+    // exercises the SSE look-ahead boundary that previously read neighbor[1]
+    // while traversing a list whose only valid element was neighbor[0].
+    PHnsw index(unit_dir_, config_);
+    auto v0 = MakeVector(kDim, 0);
+    auto v1 = MakeVector(kDim, 50);
+    ASSERT_TRUE(index.AddPoint(v0.data(), 100).ok());
+    ASSERT_TRUE(index.AddPoint(v1.data(), 200).ok());
+
+    auto results = index.Search(v0.data(), /*top_k=*/2);
+    ASSERT_EQ(results.size(), 2u);
+    EXPECT_EQ(results[0].first, 100u);
+}
+
 TEST_F(PHnswTest, AddPointsBatch) {
     PHnsw index(unit_dir_, config_);
     std::vector<std::vector<float>> store;
@@ -133,7 +148,7 @@ TEST_F(PHnswTest, AddPoint_AfterMarkDelete_SameBlockId_Reinserts) {
     PHnsw index(unit_dir_, config_);
 
     // A second, well-separated point so the graph is non-trivial and Search has a
-    // real choice of nearest neighbour.
+    // real choice of nearest neighbor.
     auto other = MakeVector(kDim, 80);
     ASSERT_TRUE(index.AddPoint(other.data(), 200).ok());
 
@@ -253,7 +268,7 @@ TEST_F(PHnswTest, AddPointsRejectsNullInBatch) {
 
 TEST_F(PHnswTest, SearchWithExplicitEfSearch) {
     // ef_search > 0 takes the exclusive-lock branch (per-query ef applied then
-    // restored). Verify it returns the same nearest neighbour as the default path.
+    // restored). Verify it returns the same nearest neighbor as the default path.
     PHnsw index(unit_dir_, config_);
     auto v0 = MakeVector(kDim, 0);
     auto v1 = MakeVector(kDim, 50);

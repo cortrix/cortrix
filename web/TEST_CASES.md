@@ -1,7 +1,7 @@
 # Cortrix Web UI - E2E Test Cases
 
 **Project**: Cortrix Semantic Storage Engine - Web UI
-**Version**: v0.1.0-mvp
+**Historical Test Plan Version**: v0.1.0-mvp
 **Test Type**: End-to-End Browser Automation
 **Test Date**: 2026-02-18
 **Tester**: QA Test Expert (Automated Playwright)
@@ -52,7 +52,7 @@ Test all six features of the Cortrix Web UI running at `http://localhost:5173`, 
 - Cortrix Agent running: `cd cortrix-agent && uvicorn main:app --port 8001`
 - Test files present:
   - `/tmp/test_cortrix_upload.pdf` (1.1 KB test PDF)
-  - `/Users/derek/Documents/test-cortrix-docs/cortrix_intro.md` (2.0 KB Markdown)
+  - `/tmp/cortrix-test-docs/cortrix_intro.md` (2.0 KB Markdown)
 - Python with `playwright` installed: `pip install playwright && playwright install chromium`
 
 ### Test Data Requirements
@@ -193,7 +193,7 @@ The upload feature is the primary data ingestion path. All tests must pass.
 
 **Test Steps**:
 1. Navigate to Upload page
-2. Set file `/Users/derek/Documents/test-cortrix-docs/cortrix_intro.md` on file input
+2. Set file `/tmp/cortrix-test-docs/cortrix_intro.md` on file input
 3. Wait up to 20 seconds for Completed status
 
 **Expected Results**:
@@ -341,7 +341,7 @@ The upload feature is the primary data ingestion path. All tests must pass.
 **Expected Results**:
 - Result cards rendered showing:
   - Block type badge (FILE/DATABASE/MEMORY)
-  - Source path (e.g., `/Users/derek/Documents/test-cortrix-docs/cortrix_intro.md`)
+  - Source path (e.g., `/tmp/cortrix-test-docs/cortrix_intro.md`)
   - Relevance score (e.g., `0.016`)
   - Chunk text content (rendered as Markdown via react-markdown)
   - Block ID, Document ID, related block count in footer
@@ -806,7 +806,7 @@ The upload feature is the primary data ingestion path. All tests must pass.
 
 **Expected Results**:
 - "Directory Path" label visible
-- Text input shows `/Users/derek/Documents/test-docs` (loaded from API)
+- Text input shows `/tmp/cortrix-test-docs` (loaded from API)
 - Value loaded from `GET /api/v1/connector/status` response field `watch_dir`
 
 **Test Result**: PASS
@@ -845,7 +845,7 @@ The upload feature is the primary data ingestion path. All tests must pass.
 **Category**: Functional
 
 **Expected Results**:
-- "Watched Directory" section with current path "/Users/derek/Documents/test-docs"
+- "Watched Directory" section with current path "/tmp/cortrix-test-docs"
 
 **Test Result**: PASS
 
@@ -904,7 +904,7 @@ The upload feature is the primary data ingestion path. All tests must pass.
 {
   "enabled": true,
   "watching": false,
-  "watch_dir": "/Users/derek/Documents/test-docs",
+  "watch_dir": "/tmp/cortrix-test-docs",
   "namespace_name": "local",
   "status": "stopped"
 }

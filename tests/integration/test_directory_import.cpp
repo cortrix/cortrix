@@ -35,7 +35,7 @@ using cortrix::testing::MockSPCManager;
 //   * "new file" assertions just import against the real store (find->-2->create).
 //   * "unchanged"/"update" assertions PRE-SEED a doc into the harness store via a
 //     setup facade (SeedDoc), so the importer's real doc_find_by_source hits it.
-//   * SPC behaviour (Submit / CancelBySourcePath) is still verified with MockSPCManager.
+//   * SPC behavior (Submit / CancelBySourcePath) is still verified with MockSPCManager.
 //   * doc_id is a ULID string now (D-I6), not an int64.
 class DirectoryImportTest : public ::testing::Test {
 protected:
@@ -881,7 +881,7 @@ TEST_F(DirectoryImportTest, HandleFileDeletion_NamespaceNotFound) {
 // branch. The real CortrixStoreSqlite never returns -1 for a healthy query (only 0 /
 // -2), and the facade exposes no per-call failure-injection seam, so that branch is
 // not reproducible with NsPoolHarness. This test now verifies the adjacent, real
-// behaviour: deleting an unknown file is a safe no-op (idempotent), which is what the
+// behavior: deleting an unknown file is a safe no-op (idempotent), which is what the
 // healthy store returns (-2). The specific "-1 => Internal" branch is no longer
 // exercised here.
 TEST_F(DirectoryImportTest, HandleFileDeletion_DocFindError_ReturnsInternal) {

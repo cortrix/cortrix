@@ -1,7 +1,7 @@
 """Auth resource. ``/auth/*`` (ARCH § 4.1.9 + P08).
 
-Per Derek's ruling (briefing § 9): SDK shape = P03 § 2.12; wire = real
-architecture. Covers § 2.12's register/login/password_reset plus real-arch
+This resource follows the implemented HTTP architecture. It covers
+register/login/password_reset plus
 logout/refresh/me (commonly needed). Email-verification / api-key CRUD endpoints
 exist in the real-arch surface and can be added if § 2.12 scope expands (D3.5).
 """
