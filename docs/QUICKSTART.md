@@ -4,6 +4,11 @@ This guide starts Cortrix with Docker and runs a source-backed local query with 
 
 Cortrix is in active pre-release development. Read [Compatibility and known status](compatibility.md) before treating any surface as production-ready.
 
+Using a terminal-capable AI Agent? Give it the
+[Agent-assisted setup contract](AGENT_QUICKSTART.md). That contract pins the
+release and commit, preserves this loopback-only path, and requires a structured
+verification report.
+
 ## What this path verifies
 
 The primary Quick Start:
@@ -114,6 +119,7 @@ That workflow also retains an explicit `onnx-off-contract` profile for low-cost 
 
 ## Next steps
 
+- [Install with an AI Agent](AGENT_QUICKSTART.md)
 - [Agent access](agent-access.md)
 - [OpenAPI spec](../api/openapi.yaml)
 - [Compatibility and known status](compatibility.md)
