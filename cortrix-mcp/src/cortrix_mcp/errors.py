@@ -136,14 +136,26 @@ _HTTP_TO_JSONRPC = {
 }
 
 
-def passthrough_business_error(status_code: int, error_body: dict[str, Any]) -> McpError:
+def passthrough_business_error(
+    status_code: int,
+    error_body: dict[str, Any],
+    identity: Optional[dict[str, Any]] = None,
+) -> McpError:
     """Pass through a cortrix-server business error (CX_ERR_*) unchanged.
 
     The backend already emits the GEN-Agent 4 fields (AGENT_FRIENDLY principle 1); this
     function only re-wraps them into ``McpError`` for the MCP protocol layer. Business
     codes are never re-invented (feature design section 7.2).
+
+    ``identity`` (issue #25): the transport's caller identity (trace_id / session_id)
+    is merged into structured_data so a failed call stays correlatable with its
+    server-side trace — but backend-supplied keys always win, so the backend payload
+    itself is never altered (e.g. CX_ERR_F13_SESSION_NOT_FOUND's own session_id field
+    keeps meaning the *queried* session, not the caller).
     """
     body = error_body or {}
+    structured: dict[str, Any] = dict(identity or {})
+    structured.update(body.get("structured_data") or {})
     return McpError(
         ErrorData(
             code=_HTTP_TO_JSONRPC.get(status_code, INTERNAL_ERROR),
@@ -153,7 +165,7 @@ def passthrough_business_error(status_code: int, error_body: dict[str, Any]) -> 
                 "retryable": body.get("retryable", False),
                 "category": body.get("category", "permanent"),
                 "retry_after_ms": body.get("retry_after_ms"),
-                "structured_data": body.get("structured_data", {}),
+                "structured_data": structured,
             },
         )
     )

@@ -54,8 +54,18 @@ All configuration is via environment variables:
 | `CORTRIX_API_KEY` | Bearer token or API key for the target server | *(empty)* |
 | `CORTRIX_MCP_ADMIN` | Enables admin-only tools when the server accepts the caller as admin | `false` |
 | `CORTRIX_MCP_TIMEOUT` | HTTP timeout in seconds | `30` |
+| `CORTRIX_AGENT_ID` | Agent identity sent as `X-Agent-Id` on every backend request (charset `[A-Za-z0-9_.:/-]`, max 128 chars; invalid values fall back to the default) | `cortrix-mcp` |
 
 > The server connects to cortrix-server on port **8420** by default.
+
+### Observability
+
+Every backend request carries `X-Session-Id` (stable per MCP process), a fresh
+`X-Trace-Id`, and `X-Agent-Id`. cortrix-server adopts these ids for its
+server-side traces, so the `session_id` / `trace_id` returned in each tool's
+`meta.structured_data` can be looked up directly via
+`GET /api/v1/traces/{session_id}` for cross-agent debugging and provenance
+inspection.
 
 Use placeholder values in examples. Do not commit real API keys.
 

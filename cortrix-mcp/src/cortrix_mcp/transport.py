@@ -6,6 +6,9 @@ through ``request()`` here, which:
   * prefixes the path with ``{CORTRIX_URL}/api/v1`` (MCP talks HTTP directly, not via
     the Python SDK, so it carries its own ``/api/v1`` — brief section 3),
   * injects the Bearer token when ``CORTRIX_API_KEY`` is set,
+  * propagates the observability identity headers (X-Session-Id / X-Trace-Id /
+    X-Agent-Id) on every backend request so server-side agent_trace records carry
+    the same identity the envelope reports (issue #25),
   * maps timeout / connection-refused to the CX_ERR_MCP_* transient codes,
   * passes business 4xx/5xx errors through unchanged (errors.passthrough_business_error),
   * builds the GEN-Agent success envelope with structured_data (trace_id, session_id, ...).
@@ -14,6 +17,7 @@ through ``request()`` here, which:
 from __future__ import annotations
 
 import os
+import re
 import uuid
 from typing import Any, Optional
 
@@ -37,26 +41,61 @@ except ValueError:
 
 API_PREFIX = "/api/v1"
 
+# Server-side identity whitelist (observability_context.cpp ValidateSessionId/
+# ValidateTraceId/ValidateAgentId): [a-zA-Z0-9_.:/-], non-empty, <=128 chars.
+# Values that fail it are silently dropped by the middleware (warning header only),
+# which is exactly the identity loss issue #25 is about — so validate client-side.
+_IDENTITY_RE = re.compile(r"[A-Za-z0-9_.:/-]{1,128}")
+_DEFAULT_AGENT_ID = "cortrix-mcp"
+
+
+def _resolve_agent_id(raw: str) -> str:
+    """Return ``raw`` if it passes the server identity whitelist, else the default.
+
+    An invalid CORTRIX_AGENT_ID would be dropped server-side, leaving traces with no
+    agent identity; falling back keeps X-Agent-Id stable and valid.
+    """
+    return raw if _IDENTITY_RE.fullmatch(raw) else _DEFAULT_AGENT_ID
+
+
+# Stable per-process agent identity, sent as X-Agent-Id on every backend request.
+CORTRIX_AGENT_ID = _resolve_agent_id(os.environ.get("CORTRIX_AGENT_ID", _DEFAULT_AGENT_ID))
+
 # Single shared client — bypass system proxy for local connections (MVP behavior).
 _transport = httpx.HTTPTransport(proxy=None)
 _client = httpx.Client(transport=_transport, timeout=CORTRIX_MCP_TIMEOUT)
 
-# Process-scoped MCP session id. D3.5 deferred: real per-session capture wires to
-# ARCH section 2.12 agent_trace once the live cortrix-server connection exists.
+# Process-scoped MCP session id, sent as X-Session-Id on every backend request
+# (ARCH section 2.12 auto-capture). The server validates it and adopts it verbatim
+# (http_observability_middleware), so server-side traces are queryable by this id.
 _SESSION_ID = "mcp-session-" + uuid.uuid4().hex[:12]
 
 
 def mcp_session_id() -> str:
-    """Return the current MCP session id (ARCH section 2.12 auto-capture).
+    """Return the stable MCP session id (ARCH section 2.12 auto-capture).
 
-    D3.5 deferred: standalone uses a process-scoped id; live session binding to the
-    cortrix-server agent_trace happens during integration.
+    One id per MCP server process; every backend request carries it as X-Session-Id,
+    so ``GET /api/v1/traces/{session_id}`` on cortrix-server returns this process's
+    tool calls (issue #25).
     """
     return _SESSION_ID
 
 
-def _headers(extra: Optional[dict[str, str]] = None) -> dict[str, str]:
-    h = {"Content-Type": "application/json"}
+def _new_trace_id() -> str:
+    """Fresh per-request trace id (RFC 4122 v4, same format the server generates)."""
+    return str(uuid.uuid4())
+
+
+def _headers(trace_id: str, extra: Optional[dict[str, str]] = None) -> dict[str, str]:
+    h = {
+        "Content-Type": "application/json",
+        # Identity propagation (issue #25): the server validates these and adopts
+        # them verbatim, so the envelope can report the exact identity recorded in
+        # the server-side agent_trace.
+        "X-Session-Id": _SESSION_ID,
+        "X-Trace-Id": trace_id,
+        "X-Agent-Id": CORTRIX_AGENT_ID,
+    }
     if CORTRIX_API_KEY:
         h["Authorization"] = f"Bearer {CORTRIX_API_KEY}"
     if extra:
@@ -64,10 +103,17 @@ def _headers(extra: Optional[dict[str, str]] = None) -> dict[str, str]:
     return h
 
 
-def _structured_data(resp: httpx.Response, business_meta: dict[str, Any]) -> dict[str, Any]:
-    """Assemble structured_data for a success envelope (feature design section 6.1)."""
+def _structured_data(
+    resp: httpx.Response, business_meta: dict[str, Any], sent_trace_id: str
+) -> dict[str, Any]:
+    """Assemble structured_data for a success envelope (feature design section 6.1).
+
+    trace_id: the server does not currently echo X-Trace-Id on responses; since it
+    adopts a valid client-sent id verbatim, the id we sent IS the server-side trace
+    id. Prefer a response echo if a future server version adds one.
+    """
     sd: dict[str, Any] = {
-        "trace_id": resp.headers.get("X-Trace-Id"),
+        "trace_id": resp.headers.get("X-Trace-Id") or sent_trace_id,
         "session_id": mcp_session_id(),
     }
     # Surface Class-A data-integrity fields when the backend reports them.
@@ -94,7 +140,8 @@ def request(
         path: API path WITHOUT the /api/v1 prefix (e.g. "/query").
         json_body: JSON request body.
         params: query-string parameters.
-        headers: extra headers (merged on top of Content-Type + Bearer).
+        headers: extra headers (merged on top of Content-Type + Bearer + the
+            X-Session-Id / X-Trace-Id / X-Agent-Id identity headers).
         timeout: per-call timeout override (seconds).
         data_key: if given, the envelope ``data`` is ``resp_json[data_key]``; otherwise
             the whole decoded JSON body is used as ``data``.
@@ -104,13 +151,17 @@ def request(
             pass through the backend business error unchanged.
     """
     url = f"{CORTRIX_URL}{API_PREFIX}{path}"
+    # One trace id per backend request (issue #25); error envelopes carry the same
+    # identity so a failed call is still correlatable with its server-side trace.
+    trace_id = _new_trace_id()
+    identity = {"trace_id": trace_id, "session_id": _SESSION_ID}
     try:
         resp = _client.request(
             method,
             url,
             json=json_body,
             params=params,
-            headers=_headers(headers),
+            headers=_headers(trace_id, headers),
             timeout=timeout if timeout is not None else CORTRIX_MCP_TIMEOUT,
         )
         resp.raise_for_status()
@@ -121,28 +172,31 @@ def request(
                 "original_url": url,
                 "timeout_seconds": timeout if timeout is not None else CORTRIX_MCP_TIMEOUT,
                 "detail": str(exc),
+                **identity,
             },
         ) from exc
     except httpx.ConnectError as exc:
         raise mcp_error(
             "CX_ERR_MCP_BACKEND_UNAVAILABLE",
-            structured_data={"original_url": url, "detail": str(exc)},
+            structured_data={"original_url": url, "detail": str(exc), **identity},
         ) from exc
     except httpx.HTTPStatusError as exc:
         try:
             error_body = exc.response.json().get("error", {})
         except Exception:  # noqa: BLE001 - non-JSON error body
             error_body = {"message": exc.response.text}
-        raise passthrough_business_error(exc.response.status_code, error_body) from exc
+        raise passthrough_business_error(
+            exc.response.status_code, error_body, identity=identity
+        ) from exc
 
     # 204 No Content (e.g. delete watcher) — no JSON body.
     if resp.status_code == 204 or not resp.content:
-        return success_envelope({}, _structured_data(resp, {}))
+        return success_envelope({}, _structured_data(resp, {}, trace_id))
 
     payload = resp.json()
     business_meta = payload.get("meta", {}) if isinstance(payload, dict) else {}
     data = payload.get(data_key) if (data_key and isinstance(payload, dict)) else payload
-    return success_envelope(data, _structured_data(resp, business_meta))
+    return success_envelope(data, _structured_data(resp, business_meta, trace_id))
 
 
 def require_admin() -> None:
