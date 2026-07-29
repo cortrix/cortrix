@@ -15,16 +15,21 @@ from mcp import McpError
 
 def test_headers_without_api_key(monkeypatch):
     monkeypatch.setattr(transport, "CORTRIX_API_KEY", "")
-    h = transport._headers()
+    h = transport._headers("trace-1")
     assert "Authorization" not in h
     assert h["Content-Type"] == "application/json"
+    # Identity headers are always present (issue #25).
+    assert h["X-Trace-Id"] == "trace-1"
+    assert h["X-Session-Id"] == transport.mcp_session_id()
+    assert h["X-Agent-Id"] == transport.CORTRIX_AGENT_ID
 
 
 def test_headers_with_api_key_and_extra(monkeypatch):
     monkeypatch.setattr(transport, "CORTRIX_API_KEY", "sk-test")
-    h = transport._headers({"X-Custom": "1"})
+    h = transport._headers("trace-2", {"X-Custom": "1"})
     assert h["Authorization"] == "Bearer sk-test"
     assert h["X-Custom"] == "1"
+    assert h["X-Trace-Id"] == "trace-2"
 
 
 def test_non_json_error_body_falls_back_to_text(mock_request):
