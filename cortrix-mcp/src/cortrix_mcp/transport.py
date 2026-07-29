@@ -23,7 +23,7 @@ from typing import Any, Optional
 
 import httpx
 
-from .errors import mcp_error, passthrough_business_error, success_envelope
+from .errors import passthrough_business_error, success_envelope, tool_error
 
 # ---------------------------------------------------------------------------
 # Configuration (feature design section 5.3).
@@ -65,20 +65,20 @@ CORTRIX_AGENT_ID = _resolve_agent_id(os.environ.get("CORTRIX_AGENT_ID", _DEFAULT
 _transport = httpx.HTTPTransport(proxy=None)
 _client = httpx.Client(transport=_transport, timeout=CORTRIX_MCP_TIMEOUT)
 
-# Process-scoped MCP session id, sent as X-Session-Id on every backend request
-# (ARCH section 2.12 auto-capture). The server validates it and adopts it verbatim
-# (http_observability_middleware), so server-side traces are queryable by this id.
-_SESSION_ID = "mcp-session-" + uuid.uuid4().hex[:12]
+# Process-scoped correlation id. The public X-Session-Id header and
+# ``structured_data.session_id`` names remain unchanged for compatibility with
+# PR #26 and the backend trace API; this value is not an MCP protocol session.
+_PROCESS_CORRELATION_ID = "mcp-session-" + uuid.uuid4().hex[:12]
 
 
 def mcp_session_id() -> str:
-    """Return the stable MCP session id (ARCH section 2.12 auto-capture).
+    """Return the stable process correlation id under its public compatibility name.
 
-    One id per MCP server process; every backend request carries it as X-Session-Id,
-    so ``GET /api/v1/traces/{session_id}`` on cortrix-server returns this process's
-    tool calls (issue #25).
+    One id is created per MCP server process. Every backend request carries it
+    as ``X-Session-Id`` so ``GET /api/v1/traces/{session_id}`` returns this
+    process's tool calls. It is independent of modern MCP request negotiation.
     """
-    return _SESSION_ID
+    return _PROCESS_CORRELATION_ID
 
 
 def _new_trace_id() -> str:
@@ -92,7 +92,7 @@ def _headers(trace_id: str, extra: Optional[dict[str, str]] = None) -> dict[str,
         # Identity propagation (issue #25): the server validates these and adopts
         # them verbatim, so the envelope can report the exact identity recorded in
         # the server-side agent_trace.
-        "X-Session-Id": _SESSION_ID,
+        "X-Session-Id": _PROCESS_CORRELATION_ID,
         "X-Trace-Id": trace_id,
         "X-Agent-Id": CORTRIX_AGENT_ID,
     }
@@ -147,14 +147,14 @@ def request(
             the whole decoded JSON body is used as ``data``.
 
     Raises:
-        McpError: timeout/unavailable map to CX_ERR_MCP_* transient codes; HTTP 4xx/5xx
-            pass through the backend business error unchanged.
+        CortrixToolError: timeout/unavailable map to CX_ERR_MCP_* transient
+            tool results; HTTP 4xx/5xx pass through the backend business error.
     """
     url = f"{CORTRIX_URL}{API_PREFIX}{path}"
     # One trace id per backend request (issue #25); error envelopes carry the same
     # identity so a failed call is still correlatable with its server-side trace.
     trace_id = _new_trace_id()
-    identity = {"trace_id": trace_id, "session_id": _SESSION_ID}
+    identity = {"trace_id": trace_id, "session_id": _PROCESS_CORRELATION_ID}
     try:
         resp = _client.request(
             method,
@@ -166,7 +166,7 @@ def request(
         )
         resp.raise_for_status()
     except httpx.TimeoutException as exc:
-        raise mcp_error(
+        raise tool_error(
             "CX_ERR_MCP_BACKEND_TIMEOUT",
             structured_data={
                 "original_url": url,
@@ -176,7 +176,7 @@ def request(
             },
         ) from exc
     except httpx.ConnectError as exc:
-        raise mcp_error(
+        raise tool_error(
             "CX_ERR_MCP_BACKEND_UNAVAILABLE",
             structured_data={"original_url": url, "detail": str(exc), **identity},
         ) from exc
@@ -207,7 +207,7 @@ def require_admin() -> None:
     claim parsing wires to P08 once the real auth path is available.
     """
     if not CORTRIX_MCP_ADMIN:
-        raise mcp_error(
+        raise tool_error(
             "CX_ERR_MCP_ADMIN_REQUIRED",
             structured_data={"hint": "set CORTRIX_MCP_ADMIN=true or use a role=admin Bearer token"},
         )

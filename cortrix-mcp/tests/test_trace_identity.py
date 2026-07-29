@@ -15,11 +15,9 @@ import re
 from unittest.mock import MagicMock
 
 import httpx
-import pytest
-from conftest import get_tool_fn, make_response
+from conftest import call_tool_result, get_tool_fn, make_response
 
 from cortrix_mcp import transport
-from mcp import McpError
 
 # Mirror of the server-side whitelist (observability_context.cpp IsValidFormat).
 SERVER_IDENTITY_RE = re.compile(r"[A-Za-z0-9_.:/-]{1,128}")
@@ -70,9 +68,9 @@ def test_envelope_prefers_server_echoed_trace_id(mock_request):
 def test_transient_error_envelope_carries_identity(mock_request):
     """Timeout/unavailable envelopes keep session + trace identity (criterion 5)."""
     mock_request.set_side_effect(httpx.TimeoutException("slow"))
-    with pytest.raises(McpError) as ei:
-        get_tool_fn("cortrix_health")()
-    sd = ei.value.error.data["structured_data"]
+    result = call_tool_result("cortrix_health")
+    assert result.is_error is True
+    sd = result.structured_content["structured_data"]
     assert sd["session_id"] == transport.mcp_session_id()
     assert SERVER_IDENTITY_RE.fullmatch(sd["trace_id"])
 
@@ -87,9 +85,9 @@ def test_business_error_identity_merged_backend_keys_win(mock_request):
     )
     exc = httpx.HTTPStatusError("404", request=MagicMock(), response=err_resp)
     mock_request.set_side_effect(exc)
-    with pytest.raises(McpError) as ei:
-        get_tool_fn("cortrix_health")()
-    data = ei.value.error.data
+    result = call_tool_result("cortrix_health")
+    assert result.is_error is True
+    data = result.structured_content
     assert data["code"] == "CX_ERR_F13_SESSION_NOT_FOUND"  # passthrough unchanged
     sd = data["structured_data"]
     # Backend's own session_id field (the *queried* session) wins over caller identity.
@@ -110,9 +108,9 @@ def test_no_secret_in_success_or_error_envelopes(mock_request, monkeypatch):
     assert _sent_headers(mock_request)["Authorization"] == f"Bearer {secret}"
 
     mock_request.set_side_effect(httpx.TimeoutException("slow"))
-    with pytest.raises(McpError) as ei:
-        get_tool_fn("cortrix_health")()
-    assert secret not in json.dumps(ei.value.error.data)
+    result = call_tool_result("cortrix_health")
+    assert result.is_error is True
+    assert secret not in json.dumps(result.model_dump(by_alias=True))
 
 
 def test_resolve_agent_id_accepts_valid_and_falls_back_on_invalid():

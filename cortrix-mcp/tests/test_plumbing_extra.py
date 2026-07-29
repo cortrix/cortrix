@@ -6,11 +6,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import httpx
-import pytest
-from conftest import get_tool_fn, make_response
+from conftest import call_tool_result, get_tool_fn, make_response
 
 from cortrix_mcp import transport
-from mcp import McpError
 
 
 def test_headers_without_api_key(monkeypatch):
@@ -38,11 +36,11 @@ def test_non_json_error_body_falls_back_to_text(mock_request):
     resp.text = "upstream boom"
     exc = httpx.HTTPStatusError("500", request=MagicMock(), response=resp)
     mock_request.set_side_effect(exc)
-    with pytest.raises(McpError) as ei:
-        get_tool_fn("cortrix_health")()
+    result = call_tool_result("cortrix_health")
+    assert result.is_error is True
     # Falls back to CX_ERR_INTERNAL_ERROR with the text surfaced as message.
-    assert ei.value.error.data["code"] == "CX_ERR_INTERNAL_ERROR"
-    assert ei.value.error.message == "upstream boom"
+    assert result.structured_content["code"] == "CX_ERR_INTERNAL_ERROR"
+    assert result.content[0].text.startswith("upstream boom\n")
 
 
 def test_upload_includes_metadata_branch(mock_request):

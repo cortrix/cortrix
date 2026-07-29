@@ -177,6 +177,9 @@ Roadmap items are not current capabilities.
 
 - Advanced autonomous Agent executors such as tool-use and plan-execute modes.
 - Additional integration adapters beyond the currently documented surfaces.
+- A remote MCP access path using stateless Streamable HTTP, with production-grade
+  authentication, authorization, and deployment hardening. The current MCP
+  capability is local stdio only.
 - Production-readiness hardening for auth, tenant isolation, RBAC, quota, logging redaction, and deployment operations.
 - Additional datasets and production-representative latency or cost measurements after separate methods and artifacts are accepted.
 

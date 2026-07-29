@@ -8,10 +8,10 @@ gate without re-importing.
 from __future__ import annotations
 
 import pytest
-from conftest import get_tool_fn
+from conftest import call_tool_result, get_tool_fn
 
 from cortrix_mcp import transport
-from mcp import McpError
+from cortrix_mcp.errors import CortrixToolError
 
 ADMIN_TOOLS = ["cortrix_admin_db_credential_register", "cortrix_admin_db_import_run"]
 
@@ -33,9 +33,9 @@ def test_admin_tool_denied_without_role(name, admin_off, mock_request):
         if name == "cortrix_admin_db_credential_register"
         else {"connection_ref": "pg1", "namespace": "ns", "table": "t"}
     )
-    with pytest.raises(McpError) as ei:
-        get_tool_fn(name)(**kwargs)
-    data = ei.value.error.data
+    result = call_tool_result(name, **kwargs)
+    assert result.is_error is True
+    data = result.structured_content
     assert data["code"] == "CX_ERR_MCP_ADMIN_REQUIRED"
     assert data["category"] == "auth"
     assert data["retryable"] is False
@@ -91,9 +91,9 @@ def test_require_admin_passes_when_flag_true(admin_on):
 
 
 def test_require_admin_raises_when_flag_false(admin_off):
-    with pytest.raises(McpError) as ei:
+    with pytest.raises(CortrixToolError) as ei:
         transport.require_admin()
-    assert ei.value.error.data["code"] == "CX_ERR_MCP_ADMIN_REQUIRED"
+    assert ei.value.data["code"] == "CX_ERR_MCP_ADMIN_REQUIRED"
 
 
 def args_endswith(mock_request, suffix):

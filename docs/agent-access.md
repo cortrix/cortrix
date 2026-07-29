@@ -54,6 +54,10 @@ Use MCP when your Agent client supports Model Context Protocol over stdio.
 
 Setup starts in [cortrix-mcp/README.md](../cortrix-mcp/README.md).
 
+The local stdio server supports modern MCP `2026-07-28` through
+`server/discover` and the legacy `2025-11-25` initialize path. Cortrix does not
+currently expose MCP over remote or loopback Streamable HTTP.
+
 Minimal environment:
 
 ```bash

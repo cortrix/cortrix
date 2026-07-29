@@ -11,8 +11,12 @@ memory, and trigger admin database imports.
 > [Agent access](../docs/agent-access.md) and
 > [Compatibility](../docs/compatibility.md).
 
-Built on [FastMCP](https://github.com/modelcontextprotocol) + [httpx](https://www.python-httpx.org/).
+Built on the official MCP Python SDK v2 `MCPServer` + [httpx](https://www.python-httpx.org/).
 It talks HTTP directly to a running `cortrix-server` (no Python SDK in the path).
+
+The current MCP transport is local stdio only. The same server supports modern
+MCP `2026-07-28` through `server/discover` and the legacy `2025-11-25`
+initialize handshake.
 
 ## Why MCP
 
@@ -60,12 +64,13 @@ All configuration is via environment variables:
 
 ### Observability
 
-Every backend request carries `X-Session-Id` (stable per MCP process), a fresh
+Every backend request carries `X-Session-Id` (a stable process-scoped
+correlation id retained under its compatibility header name), a fresh
 `X-Trace-Id`, and `X-Agent-Id`. cortrix-server adopts these ids for its
 server-side traces, so the `session_id` / `trace_id` returned in each tool's
 `meta.structured_data` can be looked up directly via
 `GET /api/v1/traces/{session_id}` for cross-agent debugging and provenance
-inspection.
+inspection. This correlation id is independent of MCP protocol negotiation.
 
 Use placeholder values in examples. Do not commit real API keys.
 
@@ -189,8 +194,13 @@ Every tool returns a structured two-layer envelope:
 }
 ```
 
-On error the tool raises an `McpError` (MCP `isError=true`) whose `data` carries the same
-4 fields. There are 6 MCP protocol error codes:
+Tool, backend, auth, timeout, and validation failures return a model-visible
+`CallToolResult` with `isError=true`. Both its text content and
+`structuredContent` retain `code`, `retryable`, `category`, `retry_after_ms`,
+and `structured_data`. `MCPError` is reserved for JSON-RPC and protocol
+failures handled by the MCP host.
+
+The adapter defines 6 stable tool error codes:
 
 | Code | retryable | category | retry_after_ms |
 |---|:--:|---|:--:|
@@ -206,6 +216,11 @@ unchanged.
 
 ## Compatibility Notes
 
+- Python dependency: `mcp>=2.0.0,<3.0.0`.
+- Modern protocol: `2026-07-28` via `server/discover`.
+- Legacy protocol: `2025-11-25` via the initialize handshake.
+- Transport: local stdio. Cortrix does not currently expose a remote or
+  loopback Streamable HTTP MCP endpoint.
 - MEM02 memory extraction is currently `Blocked` in the latest public status
   baseline because the runtime verification found an LLM transport timeout path.
 - Auth, tenant/member/ACL/quota, RBAC, and tenant isolation behavior must be
