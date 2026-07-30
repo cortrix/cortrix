@@ -20,11 +20,13 @@ Environment variables (feature design section 5.3):
 
 from __future__ import annotations
 
+from . import __version__
 from .mcp_server import CortrixMCPServer
 from .tools import register_all
 
 mcp = CortrixMCPServer(
     "cortrix",
+    version=__version__,
     instructions=(
         "Cortrix semantic storage — document indexing, hybrid semantic search "
         "(vector + BM25), conversation memory (MEM02/03/04/05), async ingestion, "

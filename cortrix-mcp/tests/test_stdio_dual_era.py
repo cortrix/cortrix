@@ -12,6 +12,7 @@ import mcp.types as types
 import pytest
 from mcp import Client, MCPError, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from cortrix_mcp import __version__
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 HARNESS = Path(__file__).with_name("stdio_test_server.py")
@@ -63,6 +64,9 @@ def test_real_stdio_dual_era_surface_and_admin_denial(mode, expected_protocol):
                 {"connection_ref": "test", "namespace": "test", "table": "items"},
             )
             assert client.protocol_version == expected_protocol
+            assert client.server_info is not None
+            assert client.server_info.name == "cortrix"
+            assert client.server_info.version == __version__
             assert len(listed.tools) == 31
             assert _manifest_hash(listed.tools) == BASELINE_MANIFEST_SHA256
             assert denied.is_error is True
