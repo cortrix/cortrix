@@ -11,10 +11,9 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
-from conftest import get_tool_fn, make_response
+from conftest import call_tool_result, get_tool_fn, make_response
 
 from cortrix_mcp import errors, transport
-from mcp import McpError
 
 
 # ---------------------------------------------------------------------------
@@ -231,9 +230,9 @@ def test_memory_crud_endpoints(mock_request):
 # ---------------------------------------------------------------------------
 def test_backend_timeout_maps_to_mcp_timeout(mock_request):
     mock_request.set_side_effect(httpx.TimeoutException("slow"))
-    with pytest.raises(McpError) as ei:
-        get_tool_fn("cortrix_health")()
-    data = ei.value.error.data
+    result = call_tool_result("cortrix_health")
+    assert result.is_error is True
+    data = result.structured_content
     assert data["code"] == "CX_ERR_MCP_BACKEND_TIMEOUT"
     assert data["retryable"] is True
     assert data["category"] == "transient"
@@ -243,9 +242,9 @@ def test_backend_timeout_maps_to_mcp_timeout(mock_request):
 
 def test_backend_connect_error_maps_to_unavailable(mock_request):
     mock_request.set_side_effect(httpx.ConnectError("refused"))
-    with pytest.raises(McpError) as ei:
-        get_tool_fn("cortrix_query")(query="x")
-    data = ei.value.error.data
+    result = call_tool_result("cortrix_query", query="x")
+    assert result.is_error is True
+    data = result.structured_content
     assert data["code"] == "CX_ERR_MCP_BACKEND_UNAVAILABLE"
     assert data["retry_after_ms"] == 5000
 
@@ -258,9 +257,9 @@ def test_business_4xx_passes_through(mock_request):
     )
     exc = httpx.HTTPStatusError("403", request=MagicMock(), response=err_resp)
     mock_request.set_side_effect(exc)
-    with pytest.raises(McpError) as ei:
-        get_tool_fn("cortrix_query")(query="x")
-    data = ei.value.error.data
+    result = call_tool_result("cortrix_query", query="x")
+    assert result.is_error is True
+    data = result.structured_content
     assert data["code"] == "CX_ERR_NS_UNAUTHORIZED"  # business code not re-invented
     assert data["category"] == "auth"
     assert data["structured_data"]["ns"] == "secret"
@@ -274,32 +273,32 @@ def test_business_5xx_passes_through(mock_request):
     )
     exc = httpx.HTTPStatusError("500", request=MagicMock(), response=err_resp)
     mock_request.set_side_effect(exc)
-    with pytest.raises(McpError) as ei:
-        get_tool_fn("cortrix_list_namespaces")()
-    assert ei.value.error.data["code"] == "CX_ERR_INTERNAL_ERROR"
-    assert ei.value.error.data["retryable"] is True
+    result = call_tool_result("cortrix_list_namespaces")
+    assert result.is_error is True
+    assert result.structured_content["code"] == "CX_ERR_INTERNAL_ERROR"
+    assert result.structured_content["retryable"] is True
 
 
 def test_add_watcher_missing_dir_is_schema_validation_fail(mock_request):
-    with pytest.raises(McpError) as ei:
-        get_tool_fn("cortrix_add_watcher")(data_dir="/no/such/dir")
-    assert ei.value.error.data["code"] == "CX_ERR_MCP_SCHEMA_VALIDATION_FAIL"
-    assert ei.value.error.data["category"] == "permanent"
+    result = call_tool_result("cortrix_add_watcher", data_dir="/no/such/dir")
+    assert result.is_error is True
+    assert result.structured_content["code"] == "CX_ERR_MCP_SCHEMA_VALIDATION_FAIL"
+    assert result.structured_content["category"] == "permanent"
 
 
 # ---------------------------------------------------------------------------
 # errors.py / transport.py unit coverage.
 # ---------------------------------------------------------------------------
 def test_all_six_mcp_error_codes_constructible():
-    for code in errors.MCP_ERROR_TABLE:
-        err = errors.mcp_error(code)
-        assert err.error.data["code"] == code
-        assert err.error.data["category"] in errors.CATEGORY_ENUM
+    for code in errors.TOOL_ERROR_TABLE:
+        err = errors.tool_error(code)
+        assert err.data["code"] == code
+        assert err.data["category"] in errors.CATEGORY_ENUM
 
 
 def test_unknown_mcp_code_raises_keyerror():
     with pytest.raises(KeyError):
-        errors.mcp_error("CX_ERR_MCP_DOES_NOT_EXIST")
+        errors.tool_error("CX_ERR_MCP_DOES_NOT_EXIST")
 
 
 def test_success_envelope_shape():
@@ -311,8 +310,8 @@ def test_success_envelope_shape():
 
 def test_passthrough_defaults_when_body_empty():
     err = errors.passthrough_business_error(500, {})
-    assert err.error.data["code"] == "CX_ERR_INTERNAL_ERROR"
-    assert err.error.data["category"] == "permanent"
+    assert err.data["code"] == "CX_ERR_INTERNAL_ERROR"
+    assert err.data["category"] == "permanent"
 
 
 def test_session_id_stable_within_process():

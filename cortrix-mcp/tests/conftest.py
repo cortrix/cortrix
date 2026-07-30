@@ -7,6 +7,7 @@ this workstation's filesystem.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
@@ -23,9 +24,22 @@ import cortrix_mcp.transport as transport  # noqa: E402
 from cortrix_mcp.server import mcp  # noqa: E402
 
 
+def call_tool_result(tool_name: str, **arguments):
+    """Invoke a registered tool through the public MCPServer API."""
+    return asyncio.run(mcp.call_tool(tool_name, arguments))
+
+
 def get_tool_fn(name: str):
-    """Return the raw callable backing a registered FastMCP tool."""
-    return mcp._tool_manager.get_tool(name).fn
+    """Return a compatibility caller backed by the public MCPServer API."""
+
+    def invoke(**arguments):
+        result = call_tool_result(name, **arguments)
+        if result.is_error:
+            raise AssertionError(f"{name} unexpectedly returned an error result: {result}")
+        assert result.content and result.content[0].type == "text"
+        return json.loads(result.content[0].text)
+
+    return invoke
 
 
 def make_response(

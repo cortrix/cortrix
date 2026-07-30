@@ -20,7 +20,7 @@ Cortrix is in active pre-release development. Some API surfaces are present in t
 | OpenAPI spec file | `Verified` | `api/openapi.yaml` is the canonical public contract file. |
 | Local health endpoints | `Verification required` | Use them for local checks; do not infer full production readiness from health alone. |
 | Namespaces, documents, and query | `Verification required` | Core surfaces exist and are documented; verify against your runtime before production use. |
-| MCP server | `Verification required` | MCP tools are documented and test-covered, but public readiness still depends on server/API compatibility. |
+| MCP server | `Verification required` | The local stdio adapter supports modern `2026-07-28` (`server/discover`) and legacy `2025-11-25` (initialize); public readiness still depends on target server/API compatibility. |
 | Python SDK | `Verification required` | SDK resources are documented and test-covered, but compatibility follows the live API contract. |
 | Built-in Agent fixed-flow chat | `Verification required` | Chat mode is documented; deployment and LLM provider behavior should be verified in your runtime. |
 | Built-in Agent tool-use and plan-execute modes | `Roadmap` | These executor modes are not current production capabilities. |
@@ -62,7 +62,9 @@ When writing client code:
 
 MCP, Python SDK, and the built-in Agent are all documented access paths. They are not interchangeable:
 
-- MCP exposes Cortrix operations as MCP tools over stdio.
+- MCP exposes Cortrix operations as MCP tools over local stdio. It supports
+  modern `2026-07-28` discovery and the legacy `2025-11-25` initialize path;
+  no remote Streamable HTTP MCP endpoint is a current capability.
 - The Python SDK exposes Cortrix resources to Python applications.
 - The built-in Agent exposes a fixed-flow chat service over FastAPI.
 

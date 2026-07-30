@@ -6,14 +6,14 @@
   memory    — MEM02 +2 / MEM04 +1 / MEM03 +4 + batch_submit + list_operations
   admin     — F16a admin scope 2 tools
 
-``register_all(mcp)`` wires every tool onto the FastMCP instance.
+``register_all(mcp)`` wires every tool onto the SDK v2 MCPServer instance.
 """
 
 from . import admin, core, extended, memory, new
 
 
 def register_all(mcp) -> None:
-    """Register all 29 tools + 2 admin tools onto the FastMCP server."""
+    """Register all 29 tools + 2 admin tools onto the MCPServer."""
     core.register(mcp)
     extended.register(mcp)
     new.register(mcp)

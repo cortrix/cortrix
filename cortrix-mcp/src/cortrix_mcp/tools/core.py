@@ -224,9 +224,9 @@ def register(mcp) -> None:
         ns = namespace or CORTRIX_NAMESPACE
         if not os.path.isdir(data_dir):
             # Local pre-check mirrors MVP; reported as a schema-validation failure.
-            from ..errors import mcp_error
+            from ..errors import tool_error
 
-            raise mcp_error(
+            raise tool_error(
                 "CX_ERR_MCP_SCHEMA_VALIDATION_FAIL",
                 message=f"Directory not found: {data_dir}",
                 structured_data={"field": "data_dir", "value": data_dir},

@@ -1,8 +1,9 @@
-"""Cortrix MCP Server — FastMCP entry point.
+"""Cortrix MCP Server — SDK v2 dual-era stdio entry point.
 
 Registers all 29 tools + 2 admin tools and runs in stdio mode for IDE agents
-(Claude Code / Cline / Cursor). Migrated and expanded from the MVP single-file
-mcp-server/cortrix_mcp_server.py.
+(Claude Code / Cline / Cursor). The official ``MCPServer`` negotiates modern
+``2026-07-28`` through ``server/discover`` and retains the legacy
+``2025-11-25`` initialize path on the same server process.
 
 Usage:
     cortrix-mcp                          # stdio mode (installed entry point)
@@ -19,18 +20,18 @@ Environment variables (feature design section 5.3):
 
 from __future__ import annotations
 
-from mcp.server.fastmcp import FastMCP
-
+from .mcp_server import CortrixMCPServer
 from .tools import register_all
 
-mcp = FastMCP(
+mcp = CortrixMCPServer(
     "cortrix",
     instructions=(
         "Cortrix semantic storage — document indexing, hybrid semantic search "
         "(vector + BM25), conversation memory (MEM02/03/04/05), async ingestion, "
         "directory watchers, operation audit, and admin DB import. Every tool returns "
         "a GEN-Agent envelope: {data, meta:{retryable, category, retry_after_ms, "
-        "structured_data}}; errors raise McpError carrying the same 4 fields."
+        "structured_data}}; tool failures return a model-visible structured error "
+        "result with the same retry and correlation fields."
     ),
 )
 
@@ -40,7 +41,7 @@ register_all(mcp)
 
 def main() -> None:
     """Console-script entry point (pyproject [project.scripts] cortrix-mcp)."""
-    mcp.run()
+    mcp.run(transport="stdio")
 
 
 if __name__ == "__main__":

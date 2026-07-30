@@ -59,11 +59,11 @@ def test_main_tool_count_is_29(listed_tools):
 
 
 def test_every_tool_has_input_schema(listed_tools):
-    """FastMCP must emit a JSON Schema for each tool (topic 3 — schema from type hints)."""
+    """MCPServer must emit a JSON Schema for each tool."""
     for t in listed_tools:
-        assert t.inputSchema is not None
-        assert t.inputSchema.get("type") == "object"
-        assert "properties" in t.inputSchema
+        assert t.input_schema is not None
+        assert t.input_schema.get("type") == "object"
+        assert "properties" in t.input_schema
 
 
 def test_every_tool_has_description(listed_tools):
@@ -81,7 +81,7 @@ def test_required_params_present_in_schema(listed_tools):
     """Spot-check that a required positional (no default) shows up as required."""
     by_name = {t.name: t for t in listed_tools}
     # cortrix_query.query has no default -> required.
-    assert "query" in by_name["cortrix_query"].inputSchema.get("required", [])
+    assert "query" in by_name["cortrix_query"].input_schema.get("required", [])
     # cortrix_memory_create requires namespace + content + memory_type.
-    create_req = set(by_name["cortrix_memory_create"].inputSchema.get("required", []))
+    create_req = set(by_name["cortrix_memory_create"].input_schema.get("required", []))
     assert {"namespace", "content", "memory_type"} <= create_req
