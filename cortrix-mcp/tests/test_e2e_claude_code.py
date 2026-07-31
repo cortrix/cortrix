@@ -11,6 +11,7 @@ import asyncio
 
 import pytest
 from conftest import mcp
+from cortrix_mcp import __version__
 
 # Expected 29 main tools (feature design section 4) + 2 admin tools (section 4.6).
 MAIN_TOOLS = {
@@ -42,6 +43,7 @@ def listed_tools():
 
 def test_server_identity():
     assert mcp.name == "cortrix"
+    assert mcp.version == __version__
 
 
 def test_total_tool_count_is_31(listed_tools):
