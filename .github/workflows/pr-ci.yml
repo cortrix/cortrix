@@ -14,7 +14,11 @@ name: PR CI
 
 on:
   push:
-    branches: [main, "feat/**"]
+    # feat/** removed: those branches are already covered by their pull_request
+    # run, and the duplicate push run doubled CI cost for zero extra signal.
+    # (concurrency groups are intentionally NOT added here — they are designed
+    # together with the post-merge main lane, see RC-PERIODIC-CI-CADENCE.)
+    branches: [main]
   pull_request:
 
 jobs:
@@ -30,12 +34,26 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             cmake ninja-build build-essential libssl-dev libsqlite3-dev libpq-dev ccache
 
+      # CCACHE_DIR is pinned explicitly: ccache 3.x defaulted to ~/.ccache but
+      # ccache 4.x (shipped on ubuntu-22.04) defaults to ~/.cache/ccache, so the
+      # previous `path: ~/.ccache` cached a directory that never existed —
+      # every restore missed and every save failed with a Path Validation Error,
+      # making all builds cold. Keep path and CCACHE_DIR in sync.
       - name: ccache
         uses: actions/cache@v4
         with:
-          path: ~/.ccache
-          key: ccache-${{ runner.os }}-${{ github.sha }}
-          restore-keys: ccache-${{ runner.os }}-
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-pr-${{ runner.os }}-${{ github.base_ref || 'main' }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-pr-${{ runner.os }}-${{ github.base_ref || 'main' }}-
+            ccache-pr-${{ runner.os }}-
+
+      - name: Configure ccache
+        run: |
+          echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=2G" >> "$GITHUB_ENV"
+          mkdir -p "${{ github.workspace }}/.ccache"
+          ccache --version
 
       - name: Configure (Debug)
         run: |
@@ -46,10 +64,18 @@ jobs:
       - name: Build
         run: cmake --build build --parallel 2 --target cortrix_unit_tests
 
+      # Hit rate is recorded on every run so "is the cache actually working?"
+      # is verifiable evidence rather than an assumption.
+      - name: ccache stats
+        if: always()
+        run: ccache -s | tee -a "$GITHUB_STEP_SUMMARY"
+
       # Suites run as separate processes via ctest (one proc per test);
       # never run the whole suite in a single process (known SIGSEGV mode).
+      # -j 2 matches the 2-core standard runner; each test is still its own
+      # process, so this does not change the isolation property above.
       - name: Unit Tests (C++)
-        run: ctest --test-dir build -L unit --output-on-failure
+        run: ctest --test-dir build -L unit -j 2 --output-on-failure
 
   frontend_unit:
     runs-on: ubuntu-22.04
@@ -127,25 +153,15 @@ jobs:
           pip install -q ruff
           ruff check cortrix-agent cortrix-mcp sdk/python
 
-  # Coverage diff is record-only at Stage 1 (soft, per §6.2)
-  coverage_soft:
-    runs-on: ubuntu-22.04
-    # Instrumented compilation plus the serial 11k+ unit matrix exceeds the
-    # previous 90-minute envelope on a cold hosted runner. Keep this record-only
-    # job intact and allow its measured workload to finish.
-    timeout-minutes: 150
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            cmake build-essential libssl-dev libsqlite3-dev libpq-dev lcov ccache
-      - name: Coverage build + report (record only)
-        run: ./scripts/ci/coverage.sh --report-only
-      - uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: build-cov/coverage/
-          if-no-files-found: ignore
+  # coverage_soft was removed from the PR lane.
+  #
+  # It was record-only (continue-on-error: true) yet took ~125 min — the single
+  # largest cost in this workflow — and it never blocked a merge, so it spent
+  # that time protecting nothing. It also duplicated work: coverage.sh --check
+  # in the Nightly cpp_full job is a strict superset of --report-only (same
+  # instrumented build and report, plus threshold enforcement), so the same SHA
+  # had its gcov line coverage computed twice. Dropping it here removes the
+  # duplicate and keeps the stricter of the two.
+  #
+  # Covered by: Nightly cpp_full -> scripts/ci/coverage.sh --check
+  # Ref: RC1-CANONICAL-EVIDENCE-DEDUP (hub PR #17 triage, accepted).
