@@ -9,6 +9,17 @@
 #   - ctest selects suites via -L labels (added in tests/CMakeLists.txt)
 #   - lint is SOFT until the legacy-formatting decision is made
 # Hard gates: unit tests 100% PASS, build OK.
+#
+# Measured baseline (paired, same 11475 unit cases, 0 failures):
+#   before (run 30351675068)  wall 125 min  |  cpp_unit 42 min
+#                             build 22 min  |  ctest 1205 s
+#                             coverage_soft 125 min (record-only, blocked nothing)
+#   after  (run 30595445654)  wall  33 min  |  cpp_unit 33 min
+#                             build 21 min  |  ctest  609 s   (-j 2, ~50% faster)
+#                             coverage_soft removed
+# The 'after' build is still cold: it is the first run on the fixed cache path,
+# so it necessarily missed. Cache saved 0.54 GB; warm-build numbers follow on
+# the next run and decide the sharding question (see the design doc).
 # =============================================================
 name: PR CI
 
