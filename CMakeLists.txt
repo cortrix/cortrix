@@ -302,6 +302,7 @@ add_library(cortrix_core STATIC
     src/async/task_cleanup_cron.cpp
     src/async/task_scheduler.cpp
     src/async/task_finalizer.cpp
+    src/async/managed_input.cpp
     src/async/document_processor.cpp
     src/async/worker_pool.cpp
     src/async/document_task_handler.cpp

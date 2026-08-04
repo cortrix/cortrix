@@ -56,8 +56,15 @@ public:
     /// @param pool      borrowed; Notify() after a successful enqueue (nullptr ok
     ///                  in tests that don't run workers)
     /// @param config    borrowed; f42.async_threshold_pages / f42.ent_max_pages
+    /// @param managed_input_dir where server-materialized task inputs live. A
+    ///                  queued task cancels terminally inside CancelTask without
+    ///                  ever reaching a worker, so TaskFinalizer never sees it and
+    ///                  this is the only place that path can release its input.
+    ///                  "" (default) disables the release, for wiring with no such
+    ///                  directory.
     DocumentTaskHandler(TaskScheduler* scheduler, TaskManager* mgr,
-                        WorkerPool* pool, const IGlobalConfig* config);
+                        WorkerPool* pool, const IGlobalConfig* config,
+                        std::string managed_input_dir = "");
 
     /// POST /api/v1/documents — async submission decision + enqueue.
     /// 202 + {status:"processing", task_id, ...} when an async task is minted;
@@ -87,6 +94,7 @@ private:
     int AsyncThresholdPages() const;
     int AsyncMaxPages() const;
 
+    std::string managed_input_dir_;
     TaskScheduler* scheduler_;
     TaskManager* mgr_;
     WorkerPool* pool_;

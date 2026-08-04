@@ -1,5 +1,9 @@
 #include "cortrix/async/document_task_handler.h"
 
+#include <utility>
+
+#include "cortrix/async/managed_input.h"
+
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/async/f42_error.h"
 #include "cortrix/async/f42_metrics.h"
@@ -24,8 +28,10 @@ HttpResult ErrorResult(F42ErrorCode code, nlohmann::json structured_data,
 }  // namespace
 
 DocumentTaskHandler::DocumentTaskHandler(TaskScheduler* scheduler, TaskManager* mgr,
-                                         WorkerPool* pool, const IGlobalConfig* config)
-    : scheduler_(scheduler), mgr_(mgr), pool_(pool), config_(config) {}
+                                         WorkerPool* pool, const IGlobalConfig* config,
+                                         std::string managed_input_dir)
+    : managed_input_dir_(std::move(managed_input_dir)),
+      scheduler_(scheduler), mgr_(mgr), pool_(pool), config_(config) {}
 
 int DocumentTaskHandler::AsyncThresholdPages() const {
     if (config_) {
@@ -204,6 +210,13 @@ HttpResult DocumentTaskHandler::CancelTask(const std::string& task_id) {
             out.status == task_status::kCancelled
                 ? F42Metrics::CancelPhase::kPreDequeue
                 : F42Metrics::CancelPhase::kMidProcessing);
+        // A queued task cancels terminally right here (pre_dequeue) — no worker ever
+        // dispatches it, so TaskFinalizer never runs and this is the only place its
+        // materialized input can be released. A processing task instead reaches
+        // `cancelling` and is released by the finalizer at its checkpoint.
+        if (out.status == task_status::kCancelled) {
+            ReleaseManagedInput(managed_input_dir_, out, mgr_);
+        }
         // §4.3 — 200 + GEN-Agent cancel-accepted body.
         HttpResult r;
         r.status = 200;

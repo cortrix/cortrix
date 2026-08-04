@@ -280,6 +280,12 @@ BatchHttpResult BatchSubmitService::Submit(const BatchRequest& req) {
         sreq.task_type = async::kTaskDocParse;
 
         Result<async::TaskInfo> r = submitter_->Submit(sreq);
+        if (!r.ok() && !sreq.filepath.empty() && input_releaser_) {
+            // The submission produced no task, so the file just written has no owner
+            // and nothing will ever read it. Hand it back now rather than leave it
+            // for a sweep — a rejected batch can otherwise deposit one file per doc.
+            input_releaser_(sreq.filepath);
+        }
         if (r.ok()) {
             results.push_back(MakeResultItem(d.doc_id, r.value().task_id, "submitted"));
             succeeded.push_back(d.doc_id);

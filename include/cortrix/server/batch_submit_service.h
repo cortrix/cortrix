@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -78,6 +79,15 @@ public:
     /// (TaskFinalizer release + startup orphan sweep) agree on one location.
     void SetMaterializeDir(std::string dir) { materialize_dir_ = std::move(dir); }
 
+    /// Release seam for an input this service materialized that never acquired an
+    /// owner — i.e. the per-doc submit failed, so no task will ever read the file.
+    /// (The debounce merge/refresh cases are decided inside the scheduler and are
+    /// reported through TaskScheduler::SetUnadoptedInputReleaser instead.) Unset
+    /// leaves the file for the orphan sweep, which is the standalone/test default.
+    void SetInputReleaser(std::function<void(const std::string&)> fn) {
+        input_releaser_ = std::move(fn);
+    }
+
     /// Process a parsed batch. Returns the §2.3 partial-success reply (200) when
     /// the envelope is accepted, or a single GEN-Agent CX_ERR_BATCH_* error reply
     /// (400/413) when the envelope is rejected. Never throws.
@@ -122,6 +132,7 @@ private:
     ITaskSubmitter* submitter_;
     BatchLimits limits_;
     std::string materialize_dir_;  ///< "" = disabled (mock/standalone)
+    std::function<void(const std::string&)> input_releaser_;
 };
 
 }  // namespace cortrix::server
