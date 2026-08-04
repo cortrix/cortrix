@@ -128,6 +128,12 @@ public:
     /// worker_id cleared. Returns the row count re-queued.
     Result<int> RequeueStaleProcessing(int64_t now_unix, int zombie_hours);
 
+    /// Every non-empty `filepath` still owned by a task that has NOT reached a
+    /// terminal state (queued / processing). This is the live set a reaper must
+    /// preserve: any file outside it has no task that will ever read it again.
+    /// Used by server::SweepOrphanedBatchInputs.
+    Result<std::vector<std::string>> ActiveFilepaths();
+
     /// Total row count (test aid).
     Result<int> CountAll();
 

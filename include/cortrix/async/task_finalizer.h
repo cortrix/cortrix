@@ -28,7 +28,21 @@ namespace cortrix::async {
 /// t_start; the finalizer records it (cortrix_tasks_duration_seconds, End-to-end §6.bis).
 class TaskFinalizer {
 public:
-    explicit TaskFinalizer(TaskManager* mgr);
+    /// @param mgr borrowed TaskManager (terminal row write)
+    /// @param managed_input_dir when non-empty, a task's `filepath` is deleted at
+    ///        every terminal exit IF it sits directly in this directory. That is
+    ///        the server-materialized batch input (server::BatchTempDir): the
+    ///        server wrote it purely to feed the parser, so the task reaching a
+    ///        terminal state is exactly when it stops being needed. Files anywhere
+    ///        else are caller-owned (watcher sources, connector paths) and are
+    ///        never touched, and handlers whose tasks carry no file are unaffected.
+    ///        Empty (the default) disables the release entirely.
+    /// @note  Deliberately best-effort: the terminal outcome is never failed
+    ///        because an unlink failed. Bulk terminal transitions that bypass
+    ///        handlers (SweepZombies / SweepTimedOut) never reach here at all, so
+    ///        server::SweepOrphanedBatchInputs at startup is the required backstop,
+    ///        not an optimization.
+    explicit TaskFinalizer(TaskManager* mgr, std::string managed_input_dir = "");
 
     /// Success terminal: MarkCompleted(doc_id) + completed_total{kSuccess} + duration.
     /// Returns Ok (business success; a tasks-row persist failure is non-fatal — mirrors
@@ -51,7 +65,12 @@ public:
                   std::chrono::steady_clock::time_point t_start);
 
 private:
+    /// Delete the task's materialized input, if this task owns one. Called from
+    /// every terminal exit (Complete / Fail / Cancel) after the row is written.
+    void ReleaseManagedInput(const TaskInfo& task) const;
+
     TaskManager* mgr_;
+    std::string managed_input_dir_;
 };
 
 }  // namespace cortrix::async

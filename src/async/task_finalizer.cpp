@@ -1,7 +1,9 @@
 #include "cortrix/async/task_finalizer.h"
 
 #include <chrono>
+#include <filesystem>
 #include <sstream>
+#include <utility>
 
 #include "cortrix/async/f42_error.h"
 #include "cortrix/async/f42_metrics.h"
@@ -30,7 +32,24 @@ std::string StructuredDataKeys(const nlohmann::json& structured_data) {
 
 }  // namespace
 
-TaskFinalizer::TaskFinalizer(TaskManager* mgr) : mgr_(mgr) {}
+TaskFinalizer::TaskFinalizer(TaskManager* mgr, std::string managed_input_dir)
+    : mgr_(mgr), managed_input_dir_(std::move(managed_input_dir)) {}
+
+void TaskFinalizer::ReleaseManagedInput(const TaskInfo& task) const {
+    if (managed_input_dir_.empty() || task.filepath.empty()) return;
+    std::error_code ec;
+    // Resolve both sides before comparing so ".." and symlinks cannot make a
+    // caller-owned path look like it lives in the managed dir (or vice versa).
+    const std::filesystem::path dir =
+        std::filesystem::weakly_canonical(managed_input_dir_, ec);
+    if (ec) return;
+    const std::filesystem::path path = std::filesystem::weakly_canonical(task.filepath, ec);
+    if (ec) return;
+    // Materialized inputs are flat in the dir; anything nested or elsewhere is
+    // not ours to delete.
+    if (path.parent_path() != dir) return;
+    std::filesystem::remove(path, ec);  // best-effort — startup sweep is the backstop
+}
 
 Status TaskFinalizer::Complete(const TaskInfo& task, const std::string& doc_id,
                                std::chrono::steady_clock::time_point t_start) {
@@ -41,6 +60,7 @@ Status TaskFinalizer::Complete(const TaskInfo& task, const std::string& doc_id,
     const auto tt = static_cast<TaskType>(task.task_type);
     F42Metrics::Instance().RecordCompleted(tt, F42Metrics::CompletionStatus::kSuccess);
     F42Metrics::Instance().ObserveDuration(tt, ElapsedSeconds(t_start));
+    ReleaseManagedInput(task);
     return Status::Ok();
 }
 
@@ -59,6 +79,7 @@ Status TaskFinalizer::Fail(const TaskInfo& task, const std::string& error_code,
     const auto tt = static_cast<TaskType>(task.task_type);
     F42Metrics::Instance().RecordCompleted(tt, F42Metrics::CompletionStatus::kFailed);
     F42Metrics::Instance().ObserveDuration(tt, ElapsedSeconds(t_start));
+    ReleaseManagedInput(task);
     return Status(StatusCode::kInternal, error_code + ": " + error_msg);
 }
 
@@ -68,6 +89,7 @@ Status TaskFinalizer::Cancel(const TaskInfo& task,
     const auto tt = static_cast<TaskType>(task.task_type);
     F42Metrics::Instance().RecordCompleted(tt, F42Metrics::CompletionStatus::kCancelled);
     F42Metrics::Instance().ObserveDuration(tt, ElapsedSeconds(t_start));
+    ReleaseManagedInput(task);
     return F42Status(F42ErrorCode::kTaskCancelling, task.task_id);
 }
 

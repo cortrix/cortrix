@@ -88,6 +88,7 @@
 // [D3.5 r2 · Wave P · P3] TD-F42-BULK batch submit route + its production submitter.
 #include "cortrix/server/routes/batch_routes.h"
 #include "cortrix/server/batch_submit_service.h"
+#include "cortrix/server/batch_temp_store.h"
 #include "cortrix/server/f42_task_submitter_adapter.h"
 // [D3.5 r2 · Wave P · P4] F48 §6.3 agent_llm_config admin API.
 #include "cortrix/server/routes/system_config_routes.h"
@@ -731,8 +732,11 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     spc_mgr.SetWriteRejectProbe(
         [&f24_disk_monitor] { return f24_disk_monitor.ShouldRejectWrites(); });
 
+    // The last argument releases each batch-materialized input file once its task
+    // is terminal (SEC/lifecycle: those files exist only to feed the parser).
     cortrix::async::DocumentProcessor doc_processor(
-        &task_mgr, &f06_factory, f42_config.get(), nullptr, &spc_mgr);
+        &task_mgr, &f06_factory, f42_config.get(), nullptr, &spc_mgr,
+        cortrix::server::BatchTempDir(config.ns.data_dir));
 
     // F41 doc-summary worker — built only when an LLM is configured; otherwise the
     // feature is OFF (no kTaskDocSummary handler, and the ⑤c seam stays unset). It is
@@ -1094,7 +1098,17 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // [P3b] Materialize each batch doc's inline content under the data dir so the
     // F42 doc-parse worker (DocumentProcessor → ParseDocument(filepath)) reads real
     // files — batch submissions now truly enter the pipeline + land as blocks.
-    batch_service.SetMaterializeDir(config.ns.data_dir + "/batch_tmp");
+    batch_service.SetMaterializeDir(cortrix::server::BatchTempDir(config.ns.data_dir));
+    // Reclaim materialized inputs no live task still needs, BEFORE the route is
+    // mounted (nothing is in flight yet, so the live-set read cannot race a new
+    // submission). This is the required backstop for the terminal release above:
+    // SweepZombies/SweepTimedOut end tasks with a bulk UPDATE that never reaches a
+    // handler, and a crash can leave a file whose task never terminated at all.
+    if (auto swept = cortrix::server::SweepOrphanedBatchInputs(
+            cortrix::server::BatchTempDir(config.ns.data_dir), &task_mgr);
+        !swept.ok()) {
+        spdlog::warn("batch temp sweep skipped: {}", swept.status().message());
+    }
     cortrix::RegisterBatchRoutes(server.server(), batch_service, auth);
     // [D3.5 r2 · Wave S routes] Flat design-surface /documents family. Mounts the
     // openapi/SDK/MCP shape (POST/GET/GET{id}/DELETE{id} + tasks progress/cancel) on

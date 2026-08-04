@@ -712,6 +712,28 @@ Result<int> TaskManager::RequeueStaleProcessing(int64_t now_unix, int zombie_hou
     return changes;
 }
 
+Result<std::vector<std::string>> TaskManager::ActiveFilepaths() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    // Terminal statuses (completed/failed/cancelled) are excluded rather than
+    // listing queued/processing explicitly: a future non-terminal status is then
+    // preserved by default, so a reaper can never start deleting live inputs
+    // because a new state was added.
+    const char* sql =
+        "SELECT filepath FROM tasks "
+        "WHERE status NOT IN ('completed','failed','cancelled') "
+        "AND filepath IS NOT NULL AND filepath <> ''";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        return F42Status(F42ErrorCode::kStorageFailed, "ActiveFilepaths prepare");
+    }
+    std::vector<std::string> out;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        out.push_back(SafeColText(stmt, 0));
+    }
+    sqlite3_finalize(stmt);
+    return out;
+}
+
 Result<int> TaskManager::CountAll() {
     std::lock_guard<std::mutex> lock(mutex_);
     sqlite3_stmt* stmt = nullptr;

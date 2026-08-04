@@ -60,10 +60,16 @@ public:
     /// @param spc_mgr  optional SPC entry (Plan B · F42 §4.1.2): when set, a successful
     ///                 parse is handed to SPCManager::ProcessParsedDoc (Chunk→…→write);
     ///                 nullptr = parse-only standalone (D3, SPC deferred).
+    /// @param managed_input_dir forwarded to TaskFinalizer: server-materialized batch
+    ///                 inputs living in this directory are released when the task
+    ///                 reaches any terminal state. Pass server::BatchTempDir(data_dir)
+    ///                 in production; "" (default) keeps the old retain-forever
+    ///                 behavior for standalone/test wiring that has no such dir.
     DocumentProcessor(TaskManager* mgr, spc::DocumentParserFactory* factory,
                       const IGlobalConfig* config,
                       CancelChecker cancel_checker = nullptr,
-                      cortrix::SPCManager* spc_mgr = nullptr);
+                      cortrix::SPCManager* spc_mgr = nullptr,
+                      std::string managed_input_dir = "");
 
     /// Process `task` (already marked processing): parse via F06 with progress +
     /// cancel checkpoint, then finalize. On success → MarkCompleted(doc_id). On

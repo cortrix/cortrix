@@ -359,6 +359,7 @@ add_library(cortrix_core STATIC
     # --- TD-F42 Bulk Submit (Wave D-R1) ---
     src/server/batch_error.cpp
     src/server/batch_submit_service.cpp
+    src/server/batch_temp_store.cpp
     src/server/routes/batch_routes.cpp
     # --- F20 Security Hardening (Wave D-R1) ---
     src/security/env_secret_provider.cpp
