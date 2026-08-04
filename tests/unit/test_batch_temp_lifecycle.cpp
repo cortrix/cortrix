@@ -150,6 +150,33 @@ TEST_F(BatchTempLifecycleTest, SweepSparesFilesInsideTheGraceWindow) {
     EXPECT_TRUE(fs::exists(fresh));
 }
 
+// The grace window defers a reclaim, it does not cancel one. A file that was too
+// fresh on one pass must be reclaimed by a later scheduled pass, without needing
+// a restart — which is the whole point of running the sweep on the daily
+// schedule as well as at startup.
+TEST_F(BatchTempLifecycleTest, SweepReclaimsAFreshOrphanOnceItAgesOut) {
+    const fs::path fresh = fs::path(dir_) / "aging.txt";
+    std::ofstream(fresh) << "x";  // current mtime, no task row
+
+    auto first = server::SweepOrphanedBatchInputs(dir_, &mgr_);
+    ASSERT_TRUE(first.ok());
+    EXPECT_EQ(first.value(), 0);
+    ASSERT_TRUE(fs::exists(fresh)) << "a file inside the grace window was reclaimed";
+
+    // Let it age past the window (the scheduled sweep runs again on its own).
+    std::error_code ec;
+    fs::last_write_time(fresh,
+                        fs::file_time_type::clock::now() -
+                            std::chrono::seconds(server::kOrphanGraceSeconds * 2),
+                        ec);
+    ASSERT_FALSE(ec);
+
+    auto second = server::SweepOrphanedBatchInputs(dir_, &mgr_);
+    ASSERT_TRUE(second.ok());
+    EXPECT_EQ(second.value(), 1) << "an aged-out orphan still needed a restart to reclaim";
+    EXPECT_FALSE(fs::exists(fresh));
+}
+
 // A missing directory is success, not an error (fresh deployment, batch unused).
 TEST_F(BatchTempLifecycleTest, SweepOnMissingDirIsSuccess) {
     auto swept = server::SweepOrphanedBatchInputs((root_ / "nope").string(), &mgr_);

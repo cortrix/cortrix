@@ -108,19 +108,20 @@ TEST_F(BatchIngestFx, SameDocIdInTwoNamespacesCreatesTwoTasks) {
 // namespace.
 TEST_F(BatchIngestFx, RefreshNeverRepointsAnotherNamespacesTask) {
     ASSERT_EQ(SubmitOne("tenant-c", "id2", "CONTENT_C").status, 200);
-    auto before = mgr_.ActiveFilepaths();
+    auto before = mgr_.LiveTaskInputs();
     ASSERT_TRUE(before.ok());
     ASSERT_EQ(before.value().size(), 1u);
-    const std::string c_input = before.value()[0];
+    const std::string c_input = before.value()[0].second;
 
     ASSERT_EQ(SubmitOne("tenant-d", "id2", "CONTENT_D").status, 200);
 
     EXPECT_EQ(mgr_.CountAll().value(), 2);
     // tenant-c's task still points at tenant-c's own content.
-    auto live = mgr_.ActiveFilepaths();
+    auto live = mgr_.LiveTaskInputs();
     ASSERT_TRUE(live.ok());
     bool c_intact = false;
-    for (const std::string& fp : live.value()) {
+    for (const auto& [tid, fp] : live.value()) {
+        (void)tid;
         if (fp != c_input) continue;
         std::ifstream in(fp, std::ios::binary);
         const std::string body((std::istreambuf_iterator<char>(in)),
@@ -171,9 +172,9 @@ TEST_F(BatchIngestFx, DebounceRefreshReleasesTheSupersededInput) {
     EXPECT_EQ(mgr_.CountAll().value(), 1);
     ASSERT_EQ(FilesInDir(), 1u) << "the superseded input was left behind";
     // The surviving file is the new one.
-    auto live = mgr_.ActiveFilepaths();
+    auto live = mgr_.LiveTaskInputs();
     ASSERT_TRUE(live.ok() && live.value().size() == 1u);
-    std::ifstream in(live.value()[0], std::ios::binary);
+    std::ifstream in(live.value()[0].second, std::ios::binary);
     const std::string body((std::istreambuf_iterator<char>(in)),
                            std::istreambuf_iterator<char>());
     EXPECT_EQ(body, "V2");
@@ -229,9 +230,9 @@ TEST_F(BatchIngestFx, InputSurvivesWhenTheTerminalWriteIsRejected) {
 // worker, so TaskFinalizer never sees it — that path has to release too.
 TEST_F(BatchIngestFx, QueuedCancelReleasesItsInput) {
     ASSERT_EQ(SubmitOne("ns", "doc", "payload").status, 200);
-    auto live = mgr_.ActiveFilepaths();
+    auto live = mgr_.LiveTaskInputs();
     ASSERT_TRUE(live.ok() && live.value().size() == 1u);
-    const std::string input = live.value()[0];
+    const std::string input = live.value()[0].second;
     ASSERT_TRUE(fs::exists(input));
 
     async::DocumentTaskHandler handler(sched_.get(), &mgr_, nullptr, nullptr, dir_);
@@ -246,29 +247,140 @@ TEST_F(BatchIngestFx, QueuedCancelReleasesItsInput) {
     EXPECT_FALSE(fs::exists(input)) << "a cancelled queued task retained its input";
 }
 
-// The live-reference guard is what makes the reaper safe; pin its semantics
-// directly, including that a terminal task does not count as a reference.
-TEST_F(BatchIngestFx, LiveReferenceCountIgnoresTerminalTasks) {
+// The live set is what makes the reaper safe; pin its semantics directly,
+// including that a terminal task stops counting as a reference.
+TEST_F(BatchIngestFx, LiveTaskInputsIgnoresTerminalTasks) {
     const std::string path = (fs::path(dir_) / "counted.txt").string();
     async::TaskInfo t;
     t.namespace_id = "ns"; t.doc_id = "d"; t.filename = "f"; t.filepath = path;
     t.task_type = async::kTaskDocParse; t.status = async::task_status::kQueued;
     const auto created = mgr_.CreateTask(std::move(t)).value();
 
-    auto n = mgr_.CountOtherLiveTasksWithFilepath(path, "someone-else");
-    ASSERT_TRUE(n.ok());
-    EXPECT_EQ(n.value(), 1);
+    auto live = mgr_.LiveTaskInputs();
+    ASSERT_TRUE(live.ok());
+    ASSERT_EQ(live.value().size(), 1u);
+    EXPECT_EQ(live.value()[0].first, created.task_id);
+    EXPECT_EQ(live.value()[0].second, path);
 
-    // Excluding the only referencing task leaves nobody.
-    auto self = mgr_.CountOtherLiveTasksWithFilepath(path, created.task_id);
-    ASSERT_TRUE(self.ok());
-    EXPECT_EQ(self.value(), 0);
-
-    // A terminal task is not a reference.
     ASSERT_TRUE(mgr_.MarkCancelled(created.task_id).ok());
-    auto done = mgr_.CountOtherLiveTasksWithFilepath(path, "someone-else");
-    ASSERT_TRUE(done.ok());
-    EXPECT_EQ(done.value(), 0);
+    auto after = mgr_.LiveTaskInputs();
+    ASSERT_TRUE(after.ok());
+    EXPECT_TRUE(after.value().empty());
+}
+
+// --- transitions that must not destroy in-flight work -----------------------
+
+// A refresh rewrites the matched row in place. If that row is already being
+// processed, the worker holds the old TaskInfo: releasing its input strands the
+// parse, and the worker's later MarkCompleted lands on a row that now represents
+// the NEW submission — reporting content as processed that was never read. An
+// in-flight task must keep both its row and its input.
+TEST_F(BatchIngestFx, ResubmitDoesNotRewriteARowAWorkerIsUsing) {
+    ASSERT_EQ(SubmitOne("ns", "doc", "V1").status, 200);
+    auto claimed = sched_->Dequeue(1);
+    ASSERT_TRUE(claimed.ok() && claimed.value().has_value());
+    const async::TaskInfo running = *claimed.value();
+    ASSERT_EQ(running.status, async::task_status::kProcessing);
+    ASSERT_TRUE(fs::exists(running.filepath));
+
+    // New content for the same doc while the first one is mid-flight.
+    ASSERT_EQ(SubmitOne("ns", "doc", "V2").status, 200);
+
+    // The running task is untouched: same row, still processing, input still there.
+    auto row = mgr_.GetTask(running.task_id);
+    ASSERT_TRUE(row.ok());
+    EXPECT_EQ(row.value().status, async::task_status::kProcessing);
+    EXPECT_EQ(row.value().filepath, running.filepath);
+    EXPECT_TRUE(fs::exists(running.filepath))
+        << "the input of a task a worker is processing was released";
+    // The resubmission became its own task rather than hijacking that row.
+    EXPECT_EQ(mgr_.CountAll().value(), 2);
+
+    // And the worker finishing does not mark the new submission complete.
+    async::TaskFinalizer fin(&mgr_, dir_);
+    fin.Complete(running, "doc-v1", std::chrono::steady_clock::now());
+    auto tasks = mgr_.ListByNamespace("ns", 10, 0);
+    ASSERT_TRUE(tasks.ok());
+    int still_queued = 0;
+    for (const auto& t : tasks.value()) {
+        if (t.status == async::task_status::kQueued) ++still_queued;
+    }
+    EXPECT_EQ(still_queued, 1) << "the new submission was reported complete unprocessed";
+}
+
+// Dequeue selects a queued row and only then marks it processing. A cancel can
+// land in that gap, moving the row to cancelled and releasing its input; an
+// unconditional mark would resurrect it and dispatch a worker with no input.
+//
+// Reproduced at the two steps Dequeue performs, in order, with the cancel
+// interleaved between them — driving Dequeue() itself cannot express the gap
+// because it holds its lock across both.
+TEST_F(BatchIngestFx, CancelInsideTheDequeueGapCannotResurrectTheRow) {
+    ASSERT_EQ(SubmitOne("ns", "doc", "payload").status, 200);
+
+    // Step 1 of Dequeue: pick a row that is still queued.
+    auto picked = mgr_.SelectOldestQueuedTaskExcluding({});
+    ASSERT_TRUE(picked.ok() && picked.value().has_value());
+    const async::TaskInfo selected = *picked.value();
+    ASSERT_EQ(selected.status, async::task_status::kQueued);
+    ASSERT_TRUE(fs::exists(selected.filepath));
+
+    // The gap: a cancel lands, taking the row terminal and releasing its input.
+    async::DocumentTaskHandler handler(sched_.get(), &mgr_, nullptr, nullptr, dir_);
+    ASSERT_EQ(handler.CancelTask(selected.task_id).status, 200);
+    ASSERT_FALSE(fs::exists(selected.filepath));
+
+    // Step 2 of Dequeue must now refuse: the row is no longer queued.
+    const Status marked = mgr_.MarkProcessing(selected.task_id, /*worker_id=*/1);
+    EXPECT_FALSE(marked.ok())
+        << "a cancelled row was marked processing, dispatching a worker with no input";
+
+    auto row = mgr_.GetTask(selected.task_id);
+    ASSERT_TRUE(row.ok());
+    EXPECT_EQ(row.value().status, async::task_status::kCancelled)
+        << "a cancelled row was resurrected to processing";
+}
+
+// The scheduler surfaces that conflict as "nothing to dispatch" rather than an
+// error, so the worker loop simply tries again.
+TEST_F(BatchIngestFx, DequeueReportsNoWorkWhenTheRowStoppedBeingQueued) {
+    ASSERT_EQ(SubmitOne("ns", "doc", "payload").status, 200);
+    auto tasks = mgr_.ListByNamespace("ns", 10, 0);
+    ASSERT_TRUE(tasks.ok() && tasks.value().size() == 1u);
+
+    async::DocumentTaskHandler handler(sched_.get(), &mgr_, nullptr, nullptr, dir_);
+    ASSERT_EQ(handler.CancelTask(tasks.value()[0].task_id).status, 200);
+
+    auto picked = sched_->Dequeue(1);
+    ASSERT_TRUE(picked.ok()) << "a lost race must not surface as a scheduler error";
+    EXPECT_FALSE(picked.value().has_value());
+}
+
+// Task rows store whatever string was handed to F42, so the same file can be
+// spelled differently by two tasks. The reference check has to compare
+// filesystem identity, not the stored strings, or finishing one task deletes a
+// file the other still needs.
+TEST_F(BatchIngestFx, ReferenceCheckMatchesOnFilesystemIdentityNotStringForm) {
+    const fs::path real = fs::path(dir_) / "shared.txt";
+    std::ofstream(real) << "payload";
+    // Two live tasks naming the SAME file, spelled differently.
+    const std::string plain = real.string();
+    const std::string dotted = (fs::path(dir_) / "." / "shared.txt").string();
+    ASSERT_NE(plain, dotted);
+
+    auto make = [&](const std::string& doc, const std::string& fp) {
+        async::TaskInfo t;
+        t.namespace_id = "ns"; t.doc_id = doc; t.filename = "f"; t.filepath = fp;
+        t.task_type = async::kTaskDocParse; t.status = async::task_status::kQueued;
+        return mgr_.CreateTask(std::move(t)).value();
+    };
+    const async::TaskInfo t1 = make("d1", plain);
+    make("d2", dotted);
+
+    async::TaskFinalizer fin(&mgr_, dir_);
+    fin.Complete(t1, "doc-1", std::chrono::steady_clock::now());
+    EXPECT_TRUE(fs::exists(real))
+        << "a live task's input was deleted because its row spelled the path differently";
 }
 
 }  // namespace

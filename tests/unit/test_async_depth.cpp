@@ -360,18 +360,25 @@ TEST_F(AsyncDepthTaskFx, RequeueStaleProcessingResetsFreshProcessingToQueued) {
 
 // ---- MarkProcessing has no source-state guard: it is a raw UPDATE by id ----
 
-TEST_F(AsyncDepthTaskFx, MarkProcessingOnCompletedRowStillUpdatesById) {
+TEST_F(AsyncDepthTaskFx, MarkProcessingRefusesARowThatIsNoLongerQueued) {
+    // This previously asserted the opposite ("no state-machine guard ... changes>0
+    // -> Ok"), which is the defect: Dequeue selects a queued row and only then
+    // marks it, so an unconditional update resurrects a row that was cancelled or
+    // claimed in between and dispatches a worker for it.
     auto created = mgr_.CreateTask(AsyncDepthMakeTask("ns", "raw"));
     ASSERT_TRUE(created.ok());
     const std::string id = created.value().task_id;
     ASSERT_TRUE(mgr_.MarkProcessing(id, 1).ok());
     ASSERT_TRUE(mgr_.MarkCompleted(id, "d").ok());
-    // No state-machine guard in MarkProcessing -- the row exists so changes>0 -> Ok.
-    EXPECT_TRUE(mgr_.MarkProcessing(id, 2).ok());
+
+    auto st = mgr_.MarkProcessing(id, 2);
+    EXPECT_FALSE(st.ok()) << "a terminal row was marked processing again";
+    // A live-but-not-queued row is a transient conflict, not "no such task".
+    EXPECT_TRUE(CarriesCode(st, "CX_ERR_DOC_PROCESSING_IN_PROGRESS"));
     auto got = mgr_.GetTask(id);
     ASSERT_TRUE(got.ok());
-    EXPECT_EQ(got.value().status, task_status::kProcessing);
-    EXPECT_EQ(got.value().worker_id, 2);
+    EXPECT_EQ(got.value().status, task_status::kCompleted);
+    EXPECT_EQ(got.value().worker_id, 1);
 }
 
 // ---- CreateTask: empty id is auto-generated; explicit id is honored ----
