@@ -20,6 +20,7 @@ add_executable(cortrix_unit_tests
     # --- D3.5 r2 · Wave P wiring logic (ApiKeyAuth DB fallback + agent_llm codec) ---
     unit/test_wavep_wiring.cpp
     unit/test_batch_temp_lifecycle.cpp
+    unit/test_batch_ingest_identity_and_ownership.cpp
     unit/test_jwt_secret_rotate.cpp
     # --- FA1 R11: P08 admin/users (§2.13-bis) + JWT rotation route (§2.11) ---
     unit/test_admin_users_routes.cpp
