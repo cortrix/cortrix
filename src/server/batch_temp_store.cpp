@@ -25,14 +25,20 @@ Result<int> SweepOrphanedBatchInputs(const std::string& dir, async::TaskManager*
     // before touching the filesystem, so a row that terminates mid-sweep can
     // only ever cause us to keep a file (reclaimed next start), never delete a
     // live one.
-    auto live = mgr->ActiveFilepaths();
+    auto live = mgr->LiveTaskInputs();
     if (!live.ok()) return live.status();
     std::unordered_set<std::string> keep;
-    for (const std::string& fp : live.value()) {
+    for (const auto& [task_id, fp] : live.value()) {
+        (void)task_id;
         if (fp.empty()) continue;
+        // Resolve before keying so a live input is recognised however its row
+        // happens to spell it — the same identity the release path uses.
         const fs::path canon = fs::weakly_canonical(fp, ec);
-        keep.insert(ec ? fp : canon.string());
-        ec.clear();
+        if (ec) {
+            ec.clear();
+            continue;  // unresolvable → cannot key it; the entry below fails closed
+        }
+        keep.insert(canon.string());
     }
 
     // C++17: the filesystem clock is reachable only through file_time_type.

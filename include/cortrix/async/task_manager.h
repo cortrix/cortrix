@@ -140,23 +140,19 @@ public:
     /// worker_id cleared. Returns the row count re-queued.
     Result<int> RequeueStaleProcessing(int64_t now_unix, int zombie_hours);
 
-    /// Every non-empty `filepath` still owned by a task that has NOT reached a
-    /// terminal state (queued / processing). This is the live set a reaper must
-    /// preserve: any file outside it has no task that will ever read it again.
-    /// Used by server::SweepOrphanedBatchInputs.
+    /// (task_id, filepath) for every task that has NOT reached a terminal state
+    /// and names an input. This is the live set a reaper must preserve: a file
+    /// outside it has no task that will ever read it again.
     ///
-    /// Fails closed: an interrupted scan is an error, never a shorter list. A
-    /// partial live set treated as complete would make the reaper delete inputs
-    /// that live tasks still need.
-    Result<std::vector<std::string>> ActiveFilepaths();
-
-    /// How many tasks OTHER than `exclude_task_id` are still non-terminal and
-    /// point at `filepath`. Answers "is anyone else still going to read this?"
-    /// before a materialized input is released — inputs named before the server
-    /// minted its own filenames can be shared by more than one task. Fails closed
-    /// (an unanswerable check must not read as zero).
-    Result<int> CountOtherLiveTasksWithFilepath(const std::string& filepath,
-                                                const std::string& exclude_task_id);
+    /// Deliberately returns raw rows rather than answering "is this path still
+    /// referenced?" in SQL. The stored strings are whatever was handed to F42, so
+    /// two rows can name the same file differently ("d/x.txt" vs "d/./x.txt"); a
+    /// string comparison would miss the match and let a live input be deleted.
+    /// Callers resolve both sides to one filesystem identity before comparing —
+    /// the same identity used to remove the file.
+    ///
+    /// Fails closed: an interrupted scan is an error, never a shorter list.
+    Result<std::vector<std::pair<std::string, std::string>>> LiveTaskInputs();
 
     /// Total row count (test aid).
     Result<int> CountAll();

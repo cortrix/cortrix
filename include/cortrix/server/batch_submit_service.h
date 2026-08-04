@@ -120,11 +120,14 @@ private:
     /// filepath, which the pipeline surfaces as a parse failure for that doc).
     ///
     /// [SEC-BATCH-001] No caller-controlled string may reach the path. The basename
-    /// is a server-minted ULID, and `<ext>` is accepted from `filename` only when it
-    /// maps to a real parser MIME (ExtensionToMimeType), falling back to ".txt" —
-    /// the extension has to survive because ParseDocument selects the parser from
-    /// the filepath extension. The doc_id deliberately is NOT a parameter: it used
-    /// to form the basename, which let a caller write outside this directory.
+    /// is a server-minted ULID. `<ext>` is taken from `filename` and kept verbatim
+    /// whenever its SHAPE is valid (lowercase alphanumerics, length-capped),
+    /// falling back to ".txt" otherwise: the extension has to survive because
+    /// ParseDocument selects the parser from the filepath extension, and filtering
+    /// it down to the parser-backed set would silently turn an unsupported-format
+    /// failure into a successful plain-text ingest. The doc_id deliberately is NOT
+    /// a parameter: it used to form the basename, which let a caller write outside
+    /// this directory.
     /// No-op returning "" when materialization is disabled.
     std::string MaterializeContent(const std::string& content,
                                    const std::string& filename) const;

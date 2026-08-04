@@ -374,9 +374,13 @@ Result<std::vector<TaskInfo>> TaskManager::ListByNamespace(
 
 Status TaskManager::MarkProcessing(const std::string& task_id, int worker_id) {
     std::lock_guard<std::mutex> lock(mutex_);
+    // Conditional on the row still being queued. Dequeue selects a row and only
+    // then marks it, so a cancel (queued -> cancelled, which also releases the
+    // input) can land in between. An unconditional update would resurrect that row
+    // to processing and dispatch a worker whose input no longer exists.
     const char* sql =
         "UPDATE tasks SET status='processing', worker_id=?, started_at=?, "
-        "updated_at=? WHERE task_id=?";
+        "updated_at=? WHERE task_id=? AND status='queued'";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         return F42Status(F42ErrorCode::kStorageFailed, "MarkProcessing prepare");
@@ -390,7 +394,22 @@ Status TaskManager::MarkProcessing(const std::string& task_id, int worker_id) {
     int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
     if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "MarkProcessing step");
-    if (changes == 0) return F42Status(F42ErrorCode::kTaskNotFound, task_id);
+    if (changes == 0) {
+        // 0 rows = the row is gone, OR it left `queued` under us (cancelled, or
+        // claimed by another worker). Distinguish them: a missing row keeps the
+        // established CX_ERR_TASK_NOT_FOUND contract, while a live row that simply
+        // moved on is a transient conflict the caller retries on its next tick.
+        sqlite3_stmt* probe = nullptr;
+        bool exists = false;
+        if (sqlite3_prepare_v2(db_, "SELECT 1 FROM tasks WHERE task_id=?", -1, &probe,
+                               nullptr) == SQLITE_OK) {
+            BindText(probe, 1, task_id);
+            exists = (sqlite3_step(probe) == SQLITE_ROW);
+            sqlite3_finalize(probe);
+        }
+        return exists ? F42Status(F42ErrorCode::kDocProcessingInProgress, task_id)
+                      : F42Status(F42ErrorCode::kTaskNotFound, task_id);
+    }
     return Status::Ok();
 }
 
@@ -718,61 +737,33 @@ Result<int> TaskManager::RequeueStaleProcessing(int64_t now_unix, int zombie_hou
     return changes;
 }
 
-Result<std::vector<std::string>> TaskManager::ActiveFilepaths() {
+Result<std::vector<std::pair<std::string, std::string>>> TaskManager::LiveTaskInputs() {
     std::lock_guard<std::mutex> lock(mutex_);
     // Terminal statuses (completed/failed/cancelled) are excluded rather than
     // listing queued/processing explicitly: a future non-terminal status is then
     // preserved by default, so a reaper can never start deleting live inputs
     // because a new state was added.
     const char* sql =
-        "SELECT filepath FROM tasks "
+        "SELECT task_id, filepath FROM tasks "
         "WHERE status NOT IN ('completed','failed','cancelled') "
         "AND filepath IS NOT NULL AND filepath <> ''";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "ActiveFilepaths prepare");
+        return F42Status(F42ErrorCode::kStorageFailed, "LiveTaskInputs prepare");
     }
-    std::vector<std::string> out;
+    std::vector<std::pair<std::string, std::string>> out;
     int rc = SQLITE_OK;
     while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-        out.push_back(SafeColText(stmt, 0));
+        out.emplace_back(SafeColText(stmt, 0), SafeColText(stmt, 1));
     }
     sqlite3_finalize(stmt);
     // Fail closed. A partial live set read as if it were complete would make the
     // reaper delete inputs that live tasks still need, so an interrupted scan is
     // an error rather than a shorter list.
     if (rc != SQLITE_DONE) {
-        return F42Status(F42ErrorCode::kStorageFailed, "ActiveFilepaths step");
+        return F42Status(F42ErrorCode::kStorageFailed, "LiveTaskInputs step");
     }
     return out;
-}
-
-Result<int> TaskManager::CountOtherLiveTasksWithFilepath(const std::string& filepath,
-                                                        const std::string& exclude_task_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (filepath.empty()) return 0;
-    // Same terminal-status exclusion as ActiveFilepaths: anything not terminal is
-    // still entitled to read this input, including a queued row that will only be
-    // picked up after a restart.
-    const char* sql =
-        "SELECT COUNT(*) FROM tasks "
-        "WHERE filepath = ? AND task_id <> ? "
-        "AND status NOT IN ('completed','failed','cancelled')";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "CountOtherLiveTasksWithFilepath prepare");
-    }
-    BindText(stmt, 1, filepath);
-    BindText(stmt, 2, exclude_task_id);
-    int n = 0;
-    const int rc = sqlite3_step(stmt);
-    if (rc == SQLITE_ROW) n = sqlite3_column_int(stmt, 0);
-    sqlite3_finalize(stmt);
-    // Fail closed for the same reason: an unanswered check must not read as zero.
-    if (rc != SQLITE_ROW) {
-        return F42Status(F42ErrorCode::kStorageFailed, "CountOtherLiveTasksWithFilepath step");
-    }
-    return n;
 }
 
 Result<int> TaskManager::CountAll() {

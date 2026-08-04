@@ -42,20 +42,28 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
                 }
                 return r;
             }
-            // same doc + different content_hash within window → refresh + reset.
-            // A reset-to-queued is a fresh submission for metric purposes (§6.bis).
-            const std::string superseded = r.filepath;
-            auto refreshed = mgr_->UpdateTaskForDebounce(r.task_id, req);
-            if (refreshed.ok()) {
-                F42Metrics::Instance().RecordSubmitted(
-                    static_cast<TaskType>(req.task_type));
-                // The row now points at the new input; the previous one is orphaned
-                // the moment that write lands.
-                if (!superseded.empty() && superseded != req.filepath) {
-                    ReleaseUnadoptedInput(superseded, r.task_id);
+            // same doc + different content_hash within window → refresh + reset,
+            // but ONLY while the existing task is still queued. A refresh rewrites
+            // that row in place: a worker already holding the old TaskInfo would
+            // lose its input (released below) and could later MarkCompleted the
+            // row, reporting the NEW submission as processed without ever having
+            // read it. An in-flight task therefore keeps both its row and its
+            // input, and the resubmission falls through to its own queued task.
+            if (r.status == task_status::kQueued) {
+                // A reset-to-queued is a fresh submission for metrics (§6.bis).
+                const std::string superseded = r.filepath;
+                auto refreshed = mgr_->UpdateTaskForDebounce(r.task_id, req);
+                if (refreshed.ok()) {
+                    F42Metrics::Instance().RecordSubmitted(
+                        static_cast<TaskType>(req.task_type));
+                    // The row now points at the new input; the previous one is
+                    // orphaned the moment that write lands.
+                    if (!superseded.empty() && superseded != req.filepath) {
+                        ReleaseUnadoptedInput(superseded, r.task_id);
+                    }
                 }
+                return refreshed;
             }
-            return refreshed;
         }
     }
 
@@ -97,6 +105,14 @@ Result<std::optional<TaskInfo>> TaskScheduler::Dequeue(int worker_id) {
     Status s = mgr_->MarkProcessing(task.task_id, worker_id);
     if (!s.ok()) {
         if (!task.doc_id.empty()) active_docs_.erase({task.namespace_id, task.doc_id});
+        // The row stopped being queued between the select and the mark — cancelled
+        // (which also released its input) or claimed by another worker. Report "no
+        // task available" rather than an error: dispatching it would hand a worker a
+        // task whose input may already be gone, and the caller simply tries again.
+        const char* conflict = F42ErrorCodeString(F42ErrorCode::kDocProcessingInProgress);
+        if (s.message().rfind(conflict, 0) == 0) {
+            return std::optional<TaskInfo>{};
+        }
         return s;
     }
     task.status = task_status::kProcessing;
