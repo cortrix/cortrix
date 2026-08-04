@@ -70,10 +70,12 @@ public:
                                 BatchLimits limits = {});
 
     /// [D3.5 r2 · P3b] Enable real inline-content materialization: each accepted
-    /// doc's content is written to `<dir>/<doc_id>` and that path becomes the
-    /// SubmitRequest.filepath the F42 doc-parse worker reads. The dir is created if
-    /// absent. When unset (the default), filepath stays "" — the standalone/mock
-    /// seam (no real pipeline) keeps working. Call once at wiring time.
+    /// doc's content is written to a server-named file under `dir` and that path
+    /// becomes the SubmitRequest.filepath the F42 doc-parse worker reads. The dir
+    /// is created if absent. When unset (the default), filepath stays "" — the
+    /// standalone/mock seam (no real pipeline) keeps working. Call once at wiring
+    /// time, passing server::BatchTempDir(data_dir) so the writer and the reapers
+    /// (TaskFinalizer release + startup orphan sweep) agree on one location.
     void SetMaterializeDir(std::string dir) { materialize_dir_ = std::move(dir); }
 
     /// Process a parsed batch. Returns the §2.3 partial-success reply (200) when
@@ -103,17 +105,18 @@ private:
     static nlohmann::json MakeFailureItem(const std::string& doc_id,
                                           const Status& status);
 
-    /// Write `content` to `<materialize_dir_>/<doc_id><ext>` and return the path, or
-    /// "" on a write failure (the caller then submits with an empty filepath, which
-    /// the pipeline surfaces as a parse failure for that doc). `<ext>` is taken from
-    /// `filename`'s extension so the F42 doc-parse worker
-    /// (DocumentParserFactory::ParseDocument selects a parser by the filepath
-    /// extension); it falls back to ".txt" (plain text) when `filename` carries no
-    /// usable extension. The on-disk name keys on doc_id (unique within the batch) so
-    /// duplicate client filenames cannot collide. No-op returning "" when
-    /// materialization is disabled.
-    std::string MaterializeContent(const std::string& doc_id,
-                                   const std::string& content,
+    /// Write `content` to `<materialize_dir_>/<server-minted ULID><ext>` and return
+    /// the path, or "" on a write failure (the caller then submits with an empty
+    /// filepath, which the pipeline surfaces as a parse failure for that doc).
+    ///
+    /// [SEC-BATCH-001] No caller-controlled string may reach the path. The basename
+    /// is a server-minted ULID, and `<ext>` is accepted from `filename` only when it
+    /// maps to a real parser MIME (ExtensionToMimeType), falling back to ".txt" —
+    /// the extension has to survive because ParseDocument selects the parser from
+    /// the filepath extension. The doc_id deliberately is NOT a parameter: it used
+    /// to form the basename, which let a caller write outside this directory.
+    /// No-op returning "" when materialization is disabled.
+    std::string MaterializeContent(const std::string& content,
                                    const std::string& filename) const;
 
     ITaskSubmitter* submitter_;

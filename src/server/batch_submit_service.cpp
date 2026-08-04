@@ -1,6 +1,7 @@
 #include <cstdint>
 #include "cortrix/server/batch_submit_service.h"
 
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <set>
@@ -8,13 +9,53 @@
 
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/async/task_info.h"
+#include "cortrix/id/ulid.h"
 #include "cortrix/query/content_hash.h"
+#include "cortrix/spc/parser_factory.h"
 
 namespace cortrix::server {
 
 using agent_friendly::ErrorCategory;
 
 namespace {
+
+// --- materialization path safety (SEC-BATCH-001) ---------------------------
+
+/// The client filename selects the parser through the materialized filepath's
+/// extension (ParseDocument → ExtractExtension → ExtensionToMimeType), so the
+/// extension has to survive verbatim — this is deliberately NOT filtered down to
+/// the parser-backed set. Doing that would silently turn every submission with an
+/// unsupported extension (".json", ".csv") from a CX_ERR_UNSUPPORTED_FORMAT
+/// failure into a successful plain-text ingest: a behavior change that does not
+/// belong in a security fix and has to be decided on its own merits.
+///
+/// What IS enforced is the character shape, so nothing structural can ride in on
+/// the extension: lowercase alphanumerics only, length-capped. Everything else —
+/// including no extension at all — falls back to ".txt", matching the previous
+/// behavior for a filename with no extension.
+std::string SafeExtension(const std::string& filename) {
+    const std::string ext = spc::DocumentParserFactory::ExtractExtension(filename);
+    constexpr std::size_t kMaxExtChars = 16;
+    if (ext.empty() || ext.size() > kMaxExtChars) return ".txt";
+    for (const unsigned char c : ext) {
+        if (!std::isalnum(c)) return ".txt";  // ExtractExtension already lowercased
+    }
+    return "." + ext;
+}
+
+/// True when `path` resolves strictly inside `base`. Both sides are resolved
+/// with weakly_canonical so ".." segments and symlinks are collapsed before the
+/// comparison rather than compared textually.
+bool IsWithin(const std::filesystem::path& path, const std::filesystem::path& base) {
+    std::error_code ec;
+    const std::filesystem::path canon_base = std::filesystem::weakly_canonical(base, ec);
+    if (ec) return false;
+    const std::filesystem::path canon_path = std::filesystem::weakly_canonical(path, ec);
+    if (ec) return false;
+    const std::filesystem::path rel = std::filesystem::relative(canon_path, canon_base, ec);
+    if (ec || rel.empty()) return false;
+    return *rel.begin() != "..";
+}
 
 // --- per-doc failure classification (TD-F42-BULK §2.4.2) -------------------
 //
@@ -167,23 +208,30 @@ nlohmann::json BatchSubmitService::MakeFailureItem(const std::string& doc_id,
     return item;
 }
 
-std::string BatchSubmitService::MaterializeContent(const std::string& doc_id,
-                                                   const std::string& content,
+std::string BatchSubmitService::MaterializeContent(const std::string& content,
                                                    const std::string& filename) const {
     if (materialize_dir_.empty()) return "";  // disabled (mock/standalone seam)
     std::error_code ec;
     std::filesystem::create_directories(materialize_dir_, ec);
     if (ec) return "";  // dir unavailable → "" filepath → per-doc parse failure
-    // The F42 doc-parse worker picks a parser by the filepath EXTENSION
-    // (DocumentParserFactory::ParseDocument → ExtractExtension → ExtensionToMimeType);
-    // a bare doc_id with no extension is CX_ERR_UNSUPPORTED_FORMAT. Honor the client
-    // filename's extension so the correct parser is chosen, falling back to ".txt"
-    // (plain text) when none is given. The on-disk basename stays keyed on doc_id
-    // (unique within the batch) so duplicate client filenames never collide.
-    std::string ext = std::filesystem::path(filename).extension().string();
-    if (ext.empty()) ext = ".txt";
+
+    // [SEC-BATCH-001] The on-disk name is minted server-side and is NEVER derived
+    // from caller input. It used to be the client's doc_id, which made this a
+    // caller-directed file write: a relative doc_id ("../../x") walked out of the
+    // materialize dir, and an absolute one ("/etc/x") made operator/ discard the
+    // directory entirely, so the content landed wherever the caller pointed —
+    // overwriting any existing file the process could write. doc_id carries its
+    // identity role through SubmitRequest.doc_id and the tasks/documents rows;
+    // nothing needs it to appear in a filename. The parameter is gone rather than
+    // merely unused so the property cannot regress without changing the signature.
+    const std::string stem = id::GenerateUlid();
     const std::filesystem::path path =
-        std::filesystem::path(materialize_dir_) / (doc_id + ext);
+        std::filesystem::path(materialize_dir_) / (stem + SafeExtension(filename));
+
+    // Defense in depth: even if the name construction above ever regresses, a
+    // path that resolves outside the materialize dir is refused, not written.
+    if (!IsWithin(path, materialize_dir_)) return "";
+
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
     if (!out) return "";
     out.write(content.data(), static_cast<std::streamsize>(content.size()));
@@ -226,7 +274,7 @@ BatchHttpResult BatchSubmitService::Submit(const BatchRequest& req) {
         // doc-parse worker reads (DocumentProcessor → factory.ParseDocument(filepath)).
         // Disabled (materialize_dir_ == "") → "" filepath, the standalone/mock seam.
         // The client filename's extension drives parser selection (".txt" fallback).
-        sreq.filepath = MaterializeContent(d.doc_id, d.content, d.filename);
+        sreq.filepath = MaterializeContent(d.content, d.filename);
         sreq.filename = d.filename.empty() ? (d.doc_id + ".txt") : d.filename;
         sreq.metadata_json = d.metadata_json;  // carry caller doc metadata through the F42 task
         sreq.task_type = async::kTaskDocParse;

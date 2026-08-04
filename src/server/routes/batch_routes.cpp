@@ -1,5 +1,6 @@
 #include "cortrix/server/routes/batch_routes.h"
 
+#include <algorithm>
 #include <string>
 
 #include <nlohmann/json.hpp>
@@ -13,6 +14,11 @@
 namespace cortrix {
 
 namespace {
+
+/// Upper bound on a caller-supplied doc_id. Generous enough for any real external
+/// corpus identifier (ULIDs are 26 chars, the longest BEIR-style ids far less)
+/// while keeping an unbounded string out of the task row, logs and error bodies.
+constexpr std::size_t kMaxDocIdBytes = 512;
 
 // Parse the JSON body into a server::BatchRequest. On a malformed request (bad
 // JSON / wrong types / V1-unsupported options) writes the standard error envelope
@@ -72,6 +78,28 @@ bool ParseBatchRequest(const httplib::Request& req, httplib::Response& res,
         }
         server::BatchDocument doc;
         doc.doc_id = item["doc_id"].get<std::string>();
+        // doc_id is caller-controlled and lands in the tasks/documents rows, the
+        // operation log and every error envelope. It no longer forms any filesystem
+        // path (SEC-BATCH-001 — BatchSubmitService mints the on-disk name itself), so
+        // separators stay legal: external corpus ids routinely contain them and
+        // rejecting them would break existing callers for no security gain. What is
+        // rejected is what has no legitimate use and corrupts downstream consumers:
+        // NUL / control bytes (log and C-string truncation) and unbounded length.
+        if (doc.doc_id.size() > kMaxDocIdBytes) {
+            WriteJsonError(res,
+                Status::InvalidArgument("'doc_id' exceeds " +
+                                        std::to_string(kMaxDocIdBytes) + " bytes"),
+                request_id);
+            return false;
+        }
+        if (doc.doc_id.find_first_of(std::string("\0", 1) + "\r\n\t") != std::string::npos ||
+            std::any_of(doc.doc_id.begin(), doc.doc_id.end(),
+                        [](unsigned char c) { return c < 0x20 || c == 0x7f; })) {
+            WriteJsonError(res,
+                Status::InvalidArgument("'doc_id' must not contain control characters"),
+                request_id);
+            return false;
+        }
         doc.content = item["content"].get<std::string>();
         // Optional client filename — its extension drives server-side parser
         // selection (TD-F42-BULK §2.2 documents[] item; ".txt" fallback applied
