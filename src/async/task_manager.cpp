@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstdio>
 #include <ctime>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
@@ -220,6 +221,9 @@ Status TaskManager::CreateTasksTable() {
         CREATE INDEX IF NOT EXISTS idx_tasks_namespace  ON tasks(namespace_id);
         CREATE INDEX IF NOT EXISTS idx_tasks_status     ON tasks(status);
         CREATE INDEX IF NOT EXISTS idx_tasks_doc_id     ON tasks(doc_id);
+        -- Debounce identity is (namespace_id, doc_id, task_type); keep it indexed
+        -- so the per-submit lookup stays a point query as the table grows.
+        CREATE INDEX IF NOT EXISTS idx_tasks_ns_doc_type ON tasks(namespace_id, doc_id, task_type, created_at);
         CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
     )";
     if (ExecSQL(db_, sql) != SQLITE_OK) {
@@ -532,7 +536,8 @@ Status TaskManager::MarkCancelled(const std::string& task_id) {
 // ---------------------------------------------------------------------------
 
 Result<std::optional<TaskInfo>> TaskManager::FindRecentTaskByDocId(
-    const std::string& doc_id, int task_type, int window_seconds) {
+    const std::string& namespace_id, const std::string& doc_id, int task_type,
+    int window_seconds) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (doc_id.empty()) return std::optional<TaskInfo>{};
 
@@ -542,15 +547,17 @@ Result<std::optional<TaskInfo>> TaskManager::FindRecentTaskByDocId(
     const std::string cutoff = UnixToIso8601(now_secs - window_seconds);
 
     std::string sql = std::string("SELECT ") + kSelectColumns +
-                      " FROM tasks WHERE doc_id = ? AND task_type = ? AND created_at >= ? "
+                      " FROM tasks WHERE namespace_id = ? AND doc_id = ? "
+                      "AND task_type = ? AND created_at >= ? "
                       "ORDER BY created_at DESC LIMIT 1";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
         return F42Status(F42ErrorCode::kStorageFailed, "FindRecentTaskByDocId prepare");
     }
-    BindText(stmt, 1, doc_id);
-    sqlite3_bind_int(stmt, 2, task_type);
-    BindText(stmt, 3, cutoff);
+    BindText(stmt, 1, namespace_id);
+    BindText(stmt, 2, doc_id);
+    sqlite3_bind_int(stmt, 3, task_type);
+    BindText(stmt, 4, cutoff);
     std::optional<TaskInfo> out;
     if (sqlite3_step(stmt) == SQLITE_ROW) out = ReadRow(stmt);
     sqlite3_finalize(stmt);
@@ -587,19 +594,17 @@ Result<TaskInfo> TaskManager::UpdateTaskForDebounce(const std::string& task_id,
 }
 
 Result<std::optional<TaskInfo>> TaskManager::SelectOldestQueuedTaskExcluding(
-    const std::vector<std::string>& active_doc_ids) {
+    const std::vector<std::pair<std::string, std::string>>& active_docs) {
     std::lock_guard<std::mutex> lock(mutex_);
-    // Build "doc_id IS NULL OR doc_id NOT IN (?,?,...)" so queued rows whose
-    // doc_id is currently being processed are skipped (topic 2.3 per-doc_id mutex).
-    // A NULL doc_id (Phase 1 corner) is never "active", so it stays eligible.
+    // Skip queued rows whose (namespace_id, doc_id) is currently being processed
+    // (topic 2.3, per-doc mutex). Excluding on the PAIR, not the bare doc_id, so
+    // one namespace's in-flight document cannot block another namespace's document
+    // that merely shares a caller-chosen id. A NULL doc_id (Phase 1 corner) is
+    // never "active", so it stays eligible.
     std::string sql = std::string("SELECT ") + kSelectColumns +
                       " FROM tasks WHERE status='queued'";
-    if (!active_doc_ids.empty()) {
-        sql += " AND (doc_id IS NULL OR doc_id NOT IN (";
-        for (size_t i = 0; i < active_doc_ids.size(); ++i) {
-            sql += (i == 0) ? "?" : ",?";
-        }
-        sql += "))";
+    for (size_t i = 0; i < active_docs.size(); ++i) {
+        sql += " AND (doc_id IS NULL OR NOT (namespace_id = ? AND doc_id = ?))";
     }
     sql += " ORDER BY created_at ASC LIMIT 1";
 
@@ -608,8 +613,9 @@ Result<std::optional<TaskInfo>> TaskManager::SelectOldestQueuedTaskExcluding(
         return F42Status(F42ErrorCode::kStorageFailed,
                          "SelectOldestQueuedTaskExcluding prepare");
     }
-    for (size_t i = 0; i < active_doc_ids.size(); ++i) {
-        BindText(stmt, static_cast<int>(i) + 1, active_doc_ids[i]);
+    for (size_t i = 0; i < active_docs.size(); ++i) {
+        BindText(stmt, static_cast<int>(i) * 2 + 1, active_docs[i].first);
+        BindText(stmt, static_cast<int>(i) * 2 + 2, active_docs[i].second);
     }
     std::optional<TaskInfo> out;
     if (sqlite3_step(stmt) == SQLITE_ROW) out = ReadRow(stmt);
@@ -727,11 +733,46 @@ Result<std::vector<std::string>> TaskManager::ActiveFilepaths() {
         return F42Status(F42ErrorCode::kStorageFailed, "ActiveFilepaths prepare");
     }
     std::vector<std::string> out;
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    int rc = SQLITE_OK;
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         out.push_back(SafeColText(stmt, 0));
     }
     sqlite3_finalize(stmt);
+    // Fail closed. A partial live set read as if it were complete would make the
+    // reaper delete inputs that live tasks still need, so an interrupted scan is
+    // an error rather than a shorter list.
+    if (rc != SQLITE_DONE) {
+        return F42Status(F42ErrorCode::kStorageFailed, "ActiveFilepaths step");
+    }
     return out;
+}
+
+Result<int> TaskManager::CountOtherLiveTasksWithFilepath(const std::string& filepath,
+                                                        const std::string& exclude_task_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (filepath.empty()) return 0;
+    // Same terminal-status exclusion as ActiveFilepaths: anything not terminal is
+    // still entitled to read this input, including a queued row that will only be
+    // picked up after a restart.
+    const char* sql =
+        "SELECT COUNT(*) FROM tasks "
+        "WHERE filepath = ? AND task_id <> ? "
+        "AND status NOT IN ('completed','failed','cancelled')";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        return F42Status(F42ErrorCode::kStorageFailed, "CountOtherLiveTasksWithFilepath prepare");
+    }
+    BindText(stmt, 1, filepath);
+    BindText(stmt, 2, exclude_task_id);
+    int n = 0;
+    const int rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW) n = sqlite3_column_int(stmt, 0);
+    sqlite3_finalize(stmt);
+    // Fail closed for the same reason: an unanswered check must not read as zero.
+    if (rc != SQLITE_ROW) {
+        return F42Status(F42ErrorCode::kStorageFailed, "CountOtherLiveTasksWithFilepath step");
+    }
+    return n;
 }
 
 Result<int> TaskManager::CountAll() {

@@ -3,6 +3,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "cortrix/async/task_info.h"
@@ -85,11 +86,19 @@ public:
 
     // ----- Scheduler-support queries (topic 2; consumed by TaskScheduler in S2) -----
 
-    /// topic 2.2 — most recent task for `doc_id` AND `task_type` whose created_at is
-    /// within the last `window_seconds`, for the Watcher debounce check. nullopt if
-    /// none. Scoping by task_type keeps different async kinds for the same doc_id
-    /// (doc-parse vs F41 doc-summary) from debouncing each other.
-    Result<std::optional<TaskInfo>> FindRecentTaskByDocId(const std::string& doc_id,
+    /// topic 2.2 — most recent task for `namespace_id` + `doc_id` + `task_type`
+    /// whose created_at is within the last `window_seconds`, for the Watcher
+    /// debounce check. nullopt if none. Scoping by task_type keeps different async
+    /// kinds for the same doc_id (doc-parse vs F41 doc-summary) from debouncing
+    /// each other.
+    ///
+    /// `namespace_id` is part of the identity, not a filter added for convenience:
+    /// doc_id is chosen by the caller, so without it two namespaces submitting the
+    /// same id debounce against each other — one namespace's document is silently
+    /// merged into the other's task, and a refresh repoints that task at the other
+    /// namespace's content while its namespace_id stays put.
+    Result<std::optional<TaskInfo>> FindRecentTaskByDocId(const std::string& namespace_id,
+                                                          const std::string& doc_id,
                                                           int task_type,
                                                           int window_seconds);
 
@@ -98,11 +107,14 @@ public:
     Result<TaskInfo> UpdateTaskForDebounce(const std::string& task_id,
                                            const SubmitRequest& req);
 
-    /// topic 2.1 / 2.3 — the oldest status=queued task whose doc_id is NOT in
-    /// `active_doc_ids` (per-doc_id mutex). nullopt if the queue is empty or all
-    /// queued docs are already active.
+    /// topic 2.1 / 2.3 — the oldest status=queued task whose (namespace_id, doc_id)
+    /// is NOT in `active_docs` (the per-doc mutex). nullopt if the queue is empty or
+    /// all queued docs are already active. The pair is the unit of exclusion for the
+    /// same reason it is the unit of debounce identity: a doc_id is only unique
+    /// within its namespace, so excluding on the bare id makes one namespace's
+    /// in-flight document block another's.
     Result<std::optional<TaskInfo>> SelectOldestQueuedTaskExcluding(
-        const std::vector<std::string>& active_doc_ids);
+        const std::vector<std::pair<std::string, std::string>>& active_docs);
 
     // ----- Cleanup (topic 4; driven by the cron in task_cleanup_cron.*) -----
 
@@ -132,7 +144,19 @@ public:
     /// terminal state (queued / processing). This is the live set a reaper must
     /// preserve: any file outside it has no task that will ever read it again.
     /// Used by server::SweepOrphanedBatchInputs.
+    ///
+    /// Fails closed: an interrupted scan is an error, never a shorter list. A
+    /// partial live set treated as complete would make the reaper delete inputs
+    /// that live tasks still need.
     Result<std::vector<std::string>> ActiveFilepaths();
+
+    /// How many tasks OTHER than `exclude_task_id` are still non-terminal and
+    /// point at `filepath`. Answers "is anyone else still going to read this?"
+    /// before a materialized input is released — inputs named before the server
+    /// minted its own filenames can be shared by more than one task. Fails closed
+    /// (an unanswerable check must not read as zero).
+    Result<int> CountOtherLiveTasksWithFilepath(const std::string& filepath,
+                                                const std::string& exclude_task_id);
 
     /// Total row count (test aid).
     Result<int> CountAll();

@@ -25,20 +25,35 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
     // window (window <= 0 disables debounce → every submit is a fresh task).
     const int window = DebounceSeconds();
     if (!req.doc_id.empty() && window > 0) {
-        auto recent = mgr_->FindRecentTaskByDocId(req.doc_id, req.task_type, window);
+        // Identity is (namespace_id, doc_id, task_type). doc_id alone is chosen by
+        // the caller and therefore only unique within a namespace.
+        auto recent = mgr_->FindRecentTaskByDocId(req.namespace_id, req.doc_id,
+                                                  req.task_type, window);
         if (!recent.ok()) return recent.status();
         if (recent.value().has_value()) {
             const TaskInfo& r = *recent.value();
             if (r.content_hash == req.content_hash) {
-                // same doc_id + same content_hash within window → merge (no new row).
+                // same doc + same content_hash within window → merge (no new row).
+                // The existing task keeps its own filepath, so an input the caller
+                // materialized for THIS submission is now owned by nobody — hand it
+                // back or it leaks until a sweep finds it.
+                if (!req.filepath.empty() && req.filepath != r.filepath) {
+                    ReleaseUnadoptedInput(req.filepath, r.task_id);
+                }
                 return r;
             }
-            // same doc_id + different content_hash within window → refresh + reset.
+            // same doc + different content_hash within window → refresh + reset.
             // A reset-to-queued is a fresh submission for metric purposes (§6.bis).
+            const std::string superseded = r.filepath;
             auto refreshed = mgr_->UpdateTaskForDebounce(r.task_id, req);
             if (refreshed.ok()) {
                 F42Metrics::Instance().RecordSubmitted(
                     static_cast<TaskType>(req.task_type));
+                // The row now points at the new input; the previous one is orphaned
+                // the moment that write lands.
+                if (!superseded.empty() && superseded != req.filepath) {
+                    ReleaseUnadoptedInput(superseded, r.task_id);
+                }
             }
             return refreshed;
         }
@@ -67,8 +82,9 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
 Result<std::optional<TaskInfo>> TaskScheduler::Dequeue(int worker_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    // topic 2.3 B — exclude doc_ids already being processed (in-memory set).
-    std::vector<std::string> active(active_doc_ids_.begin(), active_doc_ids_.end());
+    // topic 2.3 B — exclude (namespace, doc) pairs already being processed.
+    std::vector<std::pair<std::string, std::string>> active(active_docs_.begin(),
+                                                            active_docs_.end());
     auto picked = mgr_->SelectOldestQueuedTaskExcluding(active);
     if (!picked.ok()) return picked.status();
     if (!picked.value().has_value()) return std::optional<TaskInfo>{};
@@ -76,11 +92,11 @@ Result<std::optional<TaskInfo>> TaskScheduler::Dequeue(int worker_id) {
     TaskInfo task = *picked.value();
     // Reserve the doc_id before marking processing, so a concurrent Dequeue on
     // another worker can't also pick a task for the same doc_id.
-    if (!task.doc_id.empty()) active_doc_ids_.insert(task.doc_id);
+    if (!task.doc_id.empty()) active_docs_.insert({task.namespace_id, task.doc_id});
 
     Status s = mgr_->MarkProcessing(task.task_id, worker_id);
     if (!s.ok()) {
-        if (!task.doc_id.empty()) active_doc_ids_.erase(task.doc_id);
+        if (!task.doc_id.empty()) active_docs_.erase({task.namespace_id, task.doc_id});
         return s;
     }
     task.status = task_status::kProcessing;
@@ -89,26 +105,35 @@ Result<std::optional<TaskInfo>> TaskScheduler::Dequeue(int worker_id) {
     // is this scheduler's authoritative processing count within the process.
     F42Metrics::Instance().SetQueueDepth(
         F42Metrics::QueueState::kProcessing,
-        static_cast<int64_t>(active_doc_ids_.size()));
+        static_cast<int64_t>(active_docs_.size()));
     return std::optional<TaskInfo>{task};
 }
 
-void TaskScheduler::OnTaskCompleted(const std::string& doc_id) {
+void TaskScheduler::OnTaskCompleted(const std::string& namespace_id,
+                                    const std::string& doc_id) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!doc_id.empty()) active_doc_ids_.erase(doc_id);
+    if (!doc_id.empty()) active_docs_.erase({namespace_id, doc_id});
     F42Metrics::Instance().SetQueueDepth(
         F42Metrics::QueueState::kProcessing,
-        static_cast<int64_t>(active_doc_ids_.size()));
+        static_cast<int64_t>(active_docs_.size()));
 }
 
 size_t TaskScheduler::ActiveDocCount() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return active_doc_ids_.size();
+    return active_docs_.size();
 }
 
-bool TaskScheduler::IsDocActive(const std::string& doc_id) const {
+bool TaskScheduler::IsDocActive(const std::string& namespace_id,
+                                const std::string& doc_id) const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return active_doc_ids_.count(doc_id) > 0;
+    return active_docs_.count({namespace_id, doc_id}) > 0;
+}
+
+void TaskScheduler::ReleaseUnadoptedInput(const std::string& filepath,
+                                          const std::string& owner_task_id) const {
+    // Wired at bootstrap to the batch temp store. Unset (standalone/test) means the
+    // caller owns its own cleanup; never guess a directory here.
+    if (unadopted_input_releaser_) unadopted_input_releaser_(filepath, owner_task_id);
 }
 
 }  // namespace cortrix::async

@@ -213,17 +213,17 @@ TEST_F(AsyncDepthTaskFx, FindRecentTaskScopesByTaskTypeAndWindow) {
     ASSERT_TRUE(mgr_.CreateTask(parse).ok());
 
     // Same doc, a recent parse task is found within a wide window.
-    auto found = mgr_.FindRecentTaskByDocId("shared", kTaskDocParse, /*window_seconds=*/3600);
+    auto found = mgr_.FindRecentTaskByDocId("ns", "shared", kTaskDocParse, /*window_seconds=*/3600);
     ASSERT_TRUE(found.ok());
     EXPECT_TRUE(found.value().has_value());
 
     // A different task_type for the same doc should not match the parse row.
-    auto other = mgr_.FindRecentTaskByDocId("shared", kTaskDocParse + 99, 3600);
+    auto other = mgr_.FindRecentTaskByDocId("ns", "shared", kTaskDocParse + 99, 3600);
     ASSERT_TRUE(other.ok());
     EXPECT_FALSE(other.value().has_value());
 
     // Unknown doc -> none.
-    auto miss = mgr_.FindRecentTaskByDocId("nope", kTaskDocParse, 3600);
+    auto miss = mgr_.FindRecentTaskByDocId("ns", "nope", kTaskDocParse, 3600);
     ASSERT_TRUE(miss.ok());
     EXPECT_FALSE(miss.value().has_value());
 }
@@ -240,7 +240,7 @@ TEST_F(AsyncDepthTaskFx, SelectOldestQueuedExcludesActiveDocIds) {
     ASSERT_TRUE(pick.value().has_value());
 
     // Exclude both queued docs -> nothing selectable.
-    auto none = mgr_.SelectOldestQueuedTaskExcluding({"docX", "docY"});
+    auto none = mgr_.SelectOldestQueuedTaskExcluding({{"ns", "docX"}, {"ns", "docY"}});
     ASSERT_TRUE(none.ok());
     EXPECT_FALSE(none.value().has_value());
 }

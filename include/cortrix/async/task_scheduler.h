@@ -1,7 +1,9 @@
 #pragma once
 #include <mutex>
+#include <functional>
 #include <optional>
 #include <string>
+#include <utility>
 #include <unordered_set>
 
 #include "cortrix/async/task_info.h"
@@ -43,33 +45,63 @@ public:
     ///     processing is allowed; the per-doc_id mutex defers it at Dequeue).
     Result<TaskInfo> Enqueue(const SubmitRequest& req);
 
-    /// topic 2.3 B — pop the oldest queued task whose doc_id is not in
-    /// active_doc_ids_, mark it processing for `worker_id`, and reserve the
-    /// doc_id. nullopt if the queue is empty or all queued docs are active.
+    /// topic 2.3 B — pop the oldest queued task whose (namespace, doc) pair is not
+    /// reserved, mark it processing for `worker_id`, and reserve the pair. nullopt
+    /// if the queue is empty or all queued docs are active.
     Result<std::optional<TaskInfo>> Dequeue(int worker_id);
 
-    /// Release a doc_id when its task reaches a terminal state (completed/failed/
-    /// cancelled). Idempotent. Call this from the worker after MarkCompleted /
-    /// MarkFailed / MarkCancelled.
-    void OnTaskCompleted(const std::string& doc_id);
+    /// Release a (namespace, doc) reservation when its task reaches a terminal
+    /// state (completed/failed/cancelled). Idempotent. Call from the worker after
+    /// MarkCompleted / MarkFailed / MarkCancelled.
+    void OnTaskCompleted(const std::string& namespace_id, const std::string& doc_id);
 
-    /// Count of doc_ids currently reserved as processing (test aid / observability).
+    /// Count of docs currently reserved as processing (test aid / observability).
     size_t ActiveDocCount() const;
 
-    /// True iff `doc_id` is currently reserved (test aid).
-    bool IsDocActive(const std::string& doc_id) const;
+    /// True iff (namespace_id, doc_id) is currently reserved (test aid).
+    bool IsDocActive(const std::string& namespace_id, const std::string& doc_id) const;
+
+    /// Hand back an input file this scheduler decided not to adopt.
+    ///
+    /// Enqueue can conclude that a caller-materialized `SubmitRequest.filepath`
+    /// will never be read: a debounce merge keeps the existing task's own input, and
+    /// a debounce refresh replaces the previous one. In both cases exactly one file
+    /// stops having an owner at a point only the scheduler can see. Rather than let
+    /// the scheduler know about any particular staging directory, it reports the
+    /// path here; bootstrap wires this to the batch temp store, and leaving it unset
+    /// (standalone/tests) means the caller owns its own cleanup.
+    ///
+    /// Arguments are (superseded_filepath, task_id_that_now_owns_the_identity).
+    using UnadoptedInputReleaser =
+        std::function<void(const std::string&, const std::string&)>;
+    void SetUnadoptedInputReleaser(UnadoptedInputReleaser fn) {
+        unadopted_input_releaser_ = std::move(fn);
+    }
 
     /// f42.watcher_debounce_seconds default (§4.0, topic 2.2 C) when config absent.
     static constexpr int kDefaultDebounceSeconds = 5;
 
 private:
     int DebounceSeconds() const;
+    void ReleaseUnadoptedInput(const std::string& filepath,
+                               const std::string& owner_task_id) const;
+
+    /// Hash for the (namespace_id, doc_id) reservation key.
+    struct NsDocHash {
+        size_t operator()(const std::pair<std::string, std::string>& p) const {
+            return std::hash<std::string>{}(p.first) ^
+                   (std::hash<std::string>{}(p.second) << 1);
+        }
+    };
 
     TaskManager* mgr_;
     const IGlobalConfig* config_;
+    UnadoptedInputReleaser unadopted_input_releaser_;
 
     mutable std::mutex mutex_;
-    std::unordered_set<std::string> active_doc_ids_;  // topic 2.3 — processing-in-flight doc_ids
+    // topic 2.3 — in-flight (namespace, doc) reservations. Keyed on the pair because
+    // a doc_id is only unique within its namespace.
+    std::unordered_set<std::pair<std::string, std::string>, NsDocHash> active_docs_;
 };
 
 }  // namespace cortrix::async
