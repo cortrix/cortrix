@@ -102,6 +102,23 @@ public:
                                                           int task_type,
                                                           int window_seconds);
 
+    /// topic 2.2 — claim `task_id` as the target of a same-content debounce merge.
+    ///
+    /// The merge decision cannot rest on a status the caller read earlier:
+    /// RequestCancel does not share the scheduler mutex, so a candidate that was
+    /// queued or processing at lookup time can be cancelled before the caller acts
+    /// on it. Merging into it then swallows the resubmission — the caller is handed
+    /// a task that will never carry the content, and the input materialized for it
+    /// is released.
+    ///
+    /// This is the authoritative revalidation: it re-checks and claims under the
+    /// same lock RequestCancel takes, so the two are linearizable. On success the
+    /// current row is returned and the merge has won the ordering (a cancel arriving
+    /// afterwards legitimately applies to the merged task). If the terminal
+    /// transition won, returns CX_ERR_DOC_PROCESSING_IN_PROGRESS and the caller must
+    /// leave that row alone and give the resubmission its own task.
+    Result<TaskInfo> TryClaimDebounceMerge(const std::string& task_id);
+
     /// topic 2.2 — a debounced re-submit with a *different* content_hash: refresh
     /// content_hash + filepath and reset progress to a fresh queued state.
     Result<TaskInfo> UpdateTaskForDebounce(const std::string& task_id,

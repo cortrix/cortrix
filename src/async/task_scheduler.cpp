@@ -32,25 +32,32 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
         if (!recent.ok()) return recent.status();
         if (recent.value().has_value()) {
             const TaskInfo& r = *recent.value();
+            // `r` is a snapshot: RequestCancel does not share this mutex, so the
+            // candidate can go terminal between the lookup and the decision below.
+            // Neither branch may act on that snapshot — each has an authoritative
+            // operation that re-checks under the task manager's own lock, and
+            // losing that ordering means falling through to a task of our own.
             if (r.content_hash == req.content_hash) {
                 // same doc + same content_hash within window → merge (no new row).
-                // The existing task keeps its own filepath, so an input the caller
-                // materialized for THIS submission is now owned by nobody — hand it
-                // back or it leaks until a sweep finds it.
-                if (!req.filepath.empty() && req.filepath != r.filepath) {
-                    ReleaseUnadoptedInput(req.filepath, r.task_id);
+                // Merging on a stale snapshot would swallow the resubmission: the
+                // caller gets a task that will never carry the content, and the
+                // input materialized for it is released.
+                auto claimed = mgr_->TryClaimDebounceMerge(r.task_id);
+                if (claimed.ok()) {
+                    // The merge won the ordering; a cancel arriving now applies to
+                    // the merged task, which is coherent. That task keeps its own
+                    // filepath, so the input materialized for THIS submission is
+                    // owned by nobody — hand it back rather than leak it.
+                    if (!req.filepath.empty() &&
+                        req.filepath != claimed.value().filepath) {
+                        ReleaseUnadoptedInput(req.filepath, claimed.value().task_id);
+                    }
+                    return claimed;
                 }
-                return r;
-            }
-            // same doc + different content_hash within window → refresh + reset.
-            //
-            // The UPDATE is conditional on the row still being queued and is the
-            // authority here — `r.status` was read a moment ago and CancelTask does
-            // not share this mutex, so a cancel can land in between. The cheap check
-            // just avoids a pointless write for a row we already know is in flight;
-            // if the write loses the race we fall through and give the new
-            // submission its own task rather than resurrecting a terminal row.
-            if (r.status == task_status::kQueued) {
+            } else if (r.status == task_status::kQueued) {
+                // same doc + different content_hash within window → refresh + reset.
+                // The conditional UPDATE is the authority; the snapshot check only
+                // skips a write we already know is pointless for an in-flight row.
                 // A reset-to-queued is a fresh submission for metrics (§6.bis).
                 const std::string superseded = r.filepath;
                 auto refreshed = mgr_->UpdateTaskForDebounce(r.task_id, req);
@@ -64,7 +71,6 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
                     }
                     return refreshed;
                 }
-                // Lost the race (or the row vanished) → fall through to a new task.
             }
         }
     }

@@ -590,6 +590,56 @@ Result<std::optional<TaskInfo>> TaskManager::FindRecentTaskByDocId(
     return out;
 }
 
+Result<TaskInfo> TaskManager::TryClaimDebounceMerge(const std::string& task_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    // Claim with a write so the merge is a real linearization point rather than a
+    // read whose value may already be stale by the time the caller acts on it. The
+    // touch and the read-back happen under the one lock RequestCancel also takes.
+    const char* claim =
+        "UPDATE tasks SET updated_at=? WHERE task_id=? "
+        "AND status NOT IN ('cancelled','cancelling','failed')";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, claim, -1, &stmt, nullptr) != SQLITE_OK) {
+        return F42Status(F42ErrorCode::kStorageFailed, "TryClaimDebounceMerge prepare");
+    }
+    BindText(stmt, 1, NowIso8601());
+    BindText(stmt, 2, task_id);
+    const int rc = sqlite3_step(stmt);
+    const int changes = sqlite3_changes(db_);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        return F42Status(F42ErrorCode::kStorageFailed, "TryClaimDebounceMerge step");
+    }
+    if (changes == 0) {
+        // Either the row went terminal under us, or it is gone. Both mean the same
+        // thing to the caller: do not merge into it.
+        sqlite3_stmt* probe = nullptr;
+        bool exists = false;
+        if (sqlite3_prepare_v2(db_, "SELECT 1 FROM tasks WHERE task_id=?", -1, &probe,
+                               nullptr) == SQLITE_OK) {
+            BindText(probe, 1, task_id);
+            exists = (sqlite3_step(probe) == SQLITE_ROW);
+            sqlite3_finalize(probe);
+        }
+        return exists ? F42Status(F42ErrorCode::kDocProcessingInProgress, task_id)
+                      : F42Status(F42ErrorCode::kTaskNotFound, task_id);
+    }
+    // Read back under the same lock so the returned row reflects the claimed state.
+    std::string sel = std::string("SELECT ") + kSelectColumns + " FROM tasks WHERE task_id = ?";
+    sqlite3_stmt* rd = nullptr;
+    if (sqlite3_prepare_v2(db_, sel.c_str(), -1, &rd, nullptr) != SQLITE_OK) {
+        return F42Status(F42ErrorCode::kStorageFailed, "TryClaimDebounceMerge select");
+    }
+    BindText(rd, 1, task_id);
+    if (sqlite3_step(rd) != SQLITE_ROW) {
+        sqlite3_finalize(rd);
+        return F42Status(F42ErrorCode::kTaskNotFound, task_id);
+    }
+    TaskInfo out = ReadRow(rd);
+    sqlite3_finalize(rd);
+    return out;
+}
+
 Result<TaskInfo> TaskManager::UpdateTaskForDebounce(const std::string& task_id,
                                                     const SubmitRequest& req) {
     {
