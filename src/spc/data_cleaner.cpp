@@ -16,7 +16,7 @@ namespace {
 
 /// SHA-256(text) → 64-char lowercase hex (D2 exact dedup, §4.1 Step 1). Uses the
 /// OpenSSL EVP the project already links (connector/file_utils.cpp uses it for
-/// file hashing); F10 needs the in-memory string form.
+/// file hashing); cleaning needs the in-memory string form.
 std::string Sha256Hex(const std::string& text) {
     unsigned char digest[EVP_MAX_MD_SIZE];
     unsigned int len = 0;
@@ -158,7 +158,7 @@ AnomalyResult DataCleaner::DetectAnomaly(std::vector<Block>& blocks,
         if (static_cast<int>(b.chunk_text.size()) > config_.max_chunk_chars) {
             reasons.push_back(AnomalyReason::OVERSIZED_CHUNK);
         }
-        // PARSE_FAILED: upstream F08 passes through meta.parse_status / meta.parse_failed_page
+        // PARSE_FAILED: the upstream META block passes through meta.parse_status / meta.parse_failed_page
         // (F10-rev-8). Tolerate either signal.
         if (b.metadata_json.is_object()) {
             const auto& m = b.metadata_json;
@@ -178,7 +178,7 @@ AnomalyResult DataCleaner::DetectAnomaly(std::vector<Block>& blocks,
         }
 
         if (!reasons.empty()) {
-            b.flags_ext |= kFlagExtIsAnomalous;  // F09 bit2 (SoT common/block_types.h)
+            b.flags_ext |= kFlagExtIsAnomalous;  // block-header bit2 (SoT common/block_types.h)
             std::string joined;
             for (size_t i = 0; i < reasons.size(); ++i) {
                 if (i) joined.push_back(',');
@@ -210,7 +210,7 @@ void DataCleaner::RegisterPlugin(std::function<void(std::vector<Block>&)> plugin
 
 void DataCleaner::ApplyPlugins(std::vector<Block>& blocks,
                                const observability::TraceContext* /*ctx*/) {
-    // F10 stub: run each registered plugin in order. F11 implements timeout
+    // Stub: run each registered plugin in order. The plugin API implements timeout
     // enforcement (CX_ERR_F10_PLUGIN_TIMEOUT) + exception capture
     // (CX_ERR_F10_PLUGIN_EXCEPTION) + the full ICleaningPlugin ecosystem.
     for (auto& plugin : plugins_) {

@@ -66,12 +66,12 @@ Status F34SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
         return s;
     }
 
-    // blocks is the F09-owned per-Unit table, created before F34's provider runs.
+    // blocks is the block-header-owned per-Unit table, created before this provider runs.
     // If absent (isolated unit test not building the per-Unit framework), no-op the
     // blocks ALTERs so the migrator batch isn't blocked (parents is already created).
     if (!TableExists(db, "blocks")) return Status::Ok();
 
-    // --- blocks +4 F34 child columns (A unified-blocks § 3.1) — idempotent ---
+    // --- blocks +4 child columns (unified-blocks) — idempotent ---
     // child_id is the business ULID AND the child-identity key (block_id =
     // HashChildIdToBlockId(child_id)); a child row is one with child_id IS NOT NULL,
     // its block_type being the source modality (no kBlockChild enum, candidate B).
@@ -100,9 +100,9 @@ Status F34SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
         return s;
     }
 
-    // --- F34 indexes (partial; CREATE IF NOT EXISTS) ---
+    // --- parent/child indexes (partial; CREATE IF NOT EXISTS) ---
     // child identity: UNIQUE over child_id (the partial unique that carries "is a
-    // child" — F40 sparse inverted index references child_id logically against this).
+    // child" — the sparse inverted index references child_id logically against this).
     if (Status s = Exec(db,
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_blocks_child_id "
             "ON blocks(child_id) WHERE child_id IS NOT NULL",
@@ -116,8 +116,8 @@ Status F34SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
             "index parent_id"); !s.ok()) {
         return s;
     }
-    // F08 "1 doc = 1 META" uniqueness (built by F34SP; semantics
-    // belong to F08). block_type = 8 = kBlockMeta (F09 CortrixBlockType enum).
+    // "1 doc = 1 META" uniqueness (built here; semantics
+    // belong to the metadata block). block_type = 8 = kBlockMeta (CortrixBlockType enum).
     if (Status s = Exec(db,
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_blocks_meta_doc "
             "ON blocks(doc_id) WHERE block_type = 8",

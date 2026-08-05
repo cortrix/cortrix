@@ -12,7 +12,7 @@
 #include <nlohmann/json.hpp>
 
 #include "cortrix/catalog/catalog_types.h"   // NSMetadata
-#include "cortrix/catalog/i_ns_router.h"      // F13 INSRouter (create + F05 admit)
+#include "cortrix/catalog/i_ns_router.h"      // INSRouter (create + pool admit)
 #include "cortrix/connector/file_filter.h"
 #include "cortrix/logging/logging.h"
 
@@ -48,7 +48,7 @@ WatchDirConfig MakeImporterConfig(const std::string& canonical_dir,
     WatchDirConfig cfg;
     cfg.data_dir = canonical_dir;
     cfg.namespace_name = ns;
-    cfg.watch_enabled = false;  // F21: OS watcher owned by the registry
+    cfg.watch_enabled = false;  // OS watcher owned by the registry
     cfg.ignore_patterns = kIgnorePatterns;
     return cfg;
 }
@@ -238,7 +238,7 @@ Status DirWatcherRegistry::Subscribe(
                                  ns) != slot->target_namespaces.end();
         if (already) continue;  // idempotent per namespace
 
-        // Auto-create the namespace through the F13 catalog router: this does the
+        // Auto-create the namespace through the catalog router: this does the
         // catalog INSERT *and* the AdmitCreate (idempotent — AlreadyExists is
         // OK). Admission is required for the importer's facade.Acquire() to resolve
         // below; a bare metadata create does NOT admit into the pool, so the
@@ -441,7 +441,7 @@ Status DirWatcherRegistry::TriggerScan(const std::string& directory) {
     if (!slot) return Status::NotFound("directory not watched: " + directory);
 
     for (auto& imp : slot->importers) {
-        Status s = imp->Start();  // Start() == initial (re)scan in F21
+        Status s = imp->Start();  // Start() == initial (re)scan
         if (!s.ok()) {
             CORTRIX_LOG_WARN(kModule, "TriggerScan importer failed dir={}: {}",
                              canonical_dir, s.message());

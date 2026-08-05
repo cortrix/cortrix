@@ -18,12 +18,12 @@ namespace {
 
 // The OpenAiLlmClient is feature-neutral (shared by 7 consumers), so it does NOT
 // know about CX_ERR_ENRICHER_* codes — that classification belongs to the
-// F03 LlmEnricher layer. The client reports failures as a plain cortrix::Status:
+// LlmEnricher layer. The client reports failures as a plain cortrix::Status:
 //   - kUnavailable  → transport failure / HTTP 5xx / HTTP 429 (transient, retryable)
 //   - kInternal     → 4xx (non-429) / malformed success body (caller/permanent)
 // The message carries a neutral llm_tokens::* token + the http_status so the
 // enricher can map it to the right enricher error code + EnricherErrorMeta
-// (F03 §4.2 / §5.1).
+// (per the enricher contract).
 Status MakeStatus(StatusCode code, const char* token, const std::string& detail) {
     return Status(code, std::string(token) + ": " + detail);
 }
@@ -104,7 +104,7 @@ ChatCompletionResponse OpenAiLlmClient::Chat(const std::string& prompt,
 
     // --- Bounded transport retry ---
     // HTTP-level retry/backoff remains feature-owned. At the shared client layer,
-    // retry only no-status transport failures because consumers such as F41 do not
+    // retry only no-status transport failures because consumers such as doc-summary do not
     // have an outer retry shell.
     HttpResponse http;
     const int attempts = std::max(1, config_.max_retries + 1);
@@ -176,7 +176,7 @@ ChatCompletionResponse OpenAiLlmClient::Chat(const std::string& prompt,
     }
     // model echoed by server (fallback to requested)
     resp.model = j.value("model", model);
-    // usage.{prompt,completion}_tokens (budget input, F03 §3.5)
+    // usage.{prompt,completion}_tokens (budget input)
     if (j.contains("usage") && j["usage"].is_object()) {
         resp.prompt_tokens = ReadIntField(j["usage"], "prompt_tokens");
         resp.completion_tokens = ReadIntField(j["usage"], "completion_tokens");

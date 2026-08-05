@@ -9,7 +9,7 @@
 
 #include "cortrix/catalog/catalog_error.h"
 #include "cortrix/logging/logging.h"           // CORTRIX_LOG_WARN (§3.1.bis evict-fail log)
-#include "cortrix/resource/namespace_pool.h"  // F13: complete INamespacePool for AdmitCreate/EvictForDelete
+#include "cortrix/resource/namespace_pool.h"  // Complete INamespacePool for AdmitCreate/EvictForDelete
 
 namespace cortrix::catalog {
 
@@ -241,7 +241,7 @@ Status DefaultINSRouter::CreateNamespace(const NSMetadata& metadata) {
     if (metadata.namespace_id.empty()) {
         return CatalogStatus(CatalogErrorCode::kInvalidConfigJson, "ns_id is empty");
     }
-    // [F05 §5.1.bis · D-R3 #479] Catalog INSERT first, then pool admission.
+    // Catalog INSERT first, then pool admission.
     // The original §5.1 order (admit → insert) was a dependency knot: AdmitCreate's
     // load calls GetActiveUnit, which reads the very ns_units row this INSERT
     // creates — fresh creates always failed NS_NOT_FOUND (masked by mock routers /
@@ -266,7 +266,7 @@ Status DefaultINSRouter::CreateNamespace(const NSMetadata& metadata) {
 }
 
 // §12.2②: INSERT the namespace row + its sole Unit + the 1:1 ns_units mapping in
-// one txn. Extracted from CreateNamespace so the F05 admission/rollback wraps it.
+// one txn. Extracted from CreateNamespace so the pool admission/rollback wraps it.
 Status DefaultINSRouter::InsertNamespaceCatalog(const NSMetadata& metadata) {
     std::lock_guard<std::mutex> lock(mu_);
 
@@ -420,14 +420,14 @@ Status DefaultINSRouter::DeleteNamespace(const std::string& namespace_id) {
     // Invalidate caches so a stale active row isn't served post-delete.
     ns_cache_.Invalidate(namespace_id);
 
-    // F05 eviction hook (F12 §3.1.bis / §13.1 F05-1): after the catalog soft-delete,
+    // Pool eviction hook: after the catalog soft-delete,
     // release the NS's pool resources (index / WriteCoordinator / store.db). When
     // f05_pool_ is null (Phase 1 standalone / F12-standalone) this is skipped. Per
     // §3.1.bis the catalog delete is authoritative: an EvictForDelete failure is
     // logged but NOT rolled back (any pool residue is reclaimable via the admin API,
     // and self-heals on restart since StartupLoadAll skips deleted NS). EvictForDelete
     // itself is UAF-safe — if a request still holds the NS it defers the actual erase
-    // to the last Release (F05 §3.2 refcount gate).
+    // to the last Release (pool refcount gate).
     if (f05_pool_ != nullptr) {
         const Status evict = f05_pool_->EvictForDelete(namespace_id);
         if (!evict.ok()) {

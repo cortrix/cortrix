@@ -47,7 +47,7 @@ std::string NormalizeForChat(const std::string& query) {
     return out;
 }
 
-// Clamp the effective confidence threshold to the §4.2 F39-8 hard limit [0.3, 0.8].
+// Clamp the effective confidence threshold to the hard limit [0.3, 0.8].
 float EffectiveThreshold(const ComplexityConfig& config) {
     float t = config.confidence_threshold;
     if (t < 0.3f) t = 0.3f;
@@ -144,7 +144,7 @@ bool QueryComplexityClassifier::HasMultiTurnSignal(const std::string& query) {
 }
 
 bool QueryComplexityClassifier::ShouldSkipF36(const QueryContext& ctx) {
-    // Simple / Chat skip F36 (keep the single original query, no LLM expansion).
+    // Simple / Chat skip rag-fusion (keep the single original query, no LLM expansion).
     // Empty routing_path (not yet routed) → do NOT skip (fail-safe to Complex).
     if (ctx.chat_path_triggered) return true;
     return ctx.routing_path == "simple" || ctx.routing_path == "chat";
@@ -158,7 +158,7 @@ bool QueryComplexityClassifier::ShouldSkipF37(const QueryContext& ctx) {
 
 retrieval::ClassificationResult QueryComplexityClassifier::DegradedResult() {
     retrieval::ClassificationResult r;
-    r.label = "complex";       // F39-7 fail-safe: default to the full pipeline
+    r.label = "complex";       // Fail-safe: default to the full pipeline
     r.score = 0.5f;
     r.confidence = 0.5f;
     r.error_code = RouterErrorCodeString(RouterErrorCode::kInferenceFailed);
@@ -189,7 +189,7 @@ retrieval::ClassificationResult QueryComplexityClassifier::RunClassifier(
 
 retrieval::ClassificationResult QueryComplexityClassifier::Classify(
     const retrieval::ClassifierInput& input) {
-    // F39 is a pre-retrieval router: only the query text matters; input.chunks is
+    // This is a pre-retrieval router: only the query text matters; input.chunks is
     // ignored (we honor the shared post-retrieval IClassifier signature anyway).
     // L2: no usable backend → degrade to Complex (classifier_unavailable). We keep
     // the dedicated INFERENCE_FAILED code off this path; the unavailable case is
@@ -251,7 +251,7 @@ Status QueryComplexityClassifier::RouteAndUpdateContext(
 
     // --- 2. NS-config force_route override (§6.1 step 2) ---
     // Standalone: config_ is the resolved ComplexityConfig (defaults / NS-override;
-    // the F12 NS-config resolution path is D3.5). An out-of-set NS force_route is a
+    // the NS-config resolution path is not wired yet). An out-of-set NS force_route is a
     // config error surfaced the same way as the Agent override.
     if (!config_.IsForceRouteValid()) {
         return RouterStatus(RouterErrorCode::kForceRouteInvalid, config_.force_route);
@@ -290,7 +290,7 @@ Status QueryComplexityClassifier::RouteAndUpdateContext(
         return Status::Ok();
     }
 
-    // --- 5. confidence-threshold fail-safe (§6.1 step 5 / F39-8) → `fallback` ---
+    // --- 5. confidence-threshold fail-safe (step 5) → `fallback` ---
     const float threshold = EffectiveThreshold(config_);
     if (result.confidence < threshold) {
         commit_as("complex", result.confidence, "low_confidence_fallback",

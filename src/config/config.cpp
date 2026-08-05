@@ -203,14 +203,14 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
     // agent_llm — conversational model for RAG/chat (also read by cortrix-agent)
     if (root["agent_llm"])    parseLlm(root["agent_llm"],    config.agent_llm);
 
-    // doc_summary_llm — ingest-side document summary (async via F42). This
-    // parse was missing when the role landed (F42-1 added the field + the main.cpp
+    // doc_summary_llm — ingest-side document summary (async task). This
+    // parse was missing when the role landed (a later change added the field + the main.cpp
     // consumer only) — without it a configured doc_summary_llm: block never reached
     // IsConfigured() and the feature stayed OFF.
     if (root["doc_summary_llm"]) parseLlm(root["doc_summary_llm"], config.doc_summary_llm);
 
-    // enricher_llm — [F03 · gap①] SPC ingest enricher (NER + summary), plan B
-    //: connection triple here, tuning fields keep the F03 defaults.
+    // enricher_llm — SPC ingest enricher (NER + summary), plan B
+    //: connection triple here, tuning fields keep the enricher defaults.
     if (root["enricher_llm"])    parseLlm(root["enricher_llm"],    config.enricher_llm);
 
     // Backward compatibility: old "llm:" key maps to semantic_llm
@@ -317,7 +317,7 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (sec["allow_public_admin"]) config.security.allow_public_admin = sec["allow_public_admin"].as<bool>();
     }
 
-    // F02 reranker model dir
+    // reranker model dir
     if (root["reranker"]) {
         auto r = root["reranker"];
         if (r["model_dir"]) config.reranker.model_dir = r["model_dir"].as<std::string>();
@@ -330,13 +330,13 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
                                         &config.reranker.execution_provider_error);
     }
 
-    // F39 query complexity classifier model dir
+    // query complexity classifier model dir
     if (root["query_complexity"]) {
         auto qc = root["query_complexity"];
         if (qc["model_dir"]) config.query_complexity.model_dir = qc["model_dir"].as<std::string>();
     }
 
-    // Retrieval candidate-pool sizing (F02 over-fetch cap)
+    // Retrieval candidate-pool sizing (reranker over-fetch cap)
     if (root["retrieval"]) {
         auto rt = root["retrieval"];
         if (rt["candidate_multiplier"])

@@ -9,8 +9,8 @@
 
 #include "cortrix/logging/logging.h"
 #include "cortrix/llm/llm_error_tokens.h"
-#include "cortrix/reranker/circuit_breaker.h"        // F02 frozen — reused (B-R1 §2)
-#include "cortrix/reranker/reranker_thread_pool.h"   // F02 frozen — reused (B-R1 §2)
+#include "cortrix/reranker/circuit_breaker.h"        // reranker infrastructure, reused
+#include "cortrix/reranker/reranker_thread_pool.h"   // reranker infrastructure, reused
 #include "cortrix/spc_enricher.h"
 #include "cortrix/spc_enricher/budget_tracker.h"     // W4 budget cap (§3.5)
 #include "cortrix/spc_enricher/enricher_error.h"
@@ -124,13 +124,13 @@ LlmEnricher::LlmEnricher(const EnricherConfig& config,
     enabled_ = config_.enabled && llm_client_ != nullptr;
 
     // S3.1: bounded-concurrency pool (4 workers / queue 100 / task_timeout 30s,
-    // topic 1.3) — F02 RerankerThreadPool reused (B-R1 §2). One pool task = one
+    // The RerankerThreadPool is reused. One pool task = one
     // Chat call (the §5.1 retry schedule runs on the caller thread), so the pool
     // timeout keeps its single-call meaning.
     thread_pool_ = std::make_unique<reranker::RerankerThreadPool<float>>(
         config_.workers, config_.queue_size, config_.task_timeout_ms);
 
-    // S3.2: independent breaker (threshold 10 / cooldown 60s, topic 3.4) — F02
+    // Independent breaker (threshold 10 / cooldown 60s) — the reranker
     // CircuitBreaker reused. Drives the state gauge + trips counter (S3.4).
     if (config_.circuit_breaker_enabled) {
         circuit_breaker_ = std::make_unique<reranker::CircuitBreaker>(
@@ -264,7 +264,7 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
             call.response_format = "json_object";
             call.allow_reasoning_content_fallback = false;
             if (ModelSupportsThinkingControl(call.model)) {
-                // F03 requires the batch JSON in message.content. DeepSeek
+                // The enricher requires the batch JSON in message.content. DeepSeek
                 // thinking mode can spend the response budget in reasoning_content
                 // and leave incomplete or non-final structured output.
                 call.thinking_type = "disabled";

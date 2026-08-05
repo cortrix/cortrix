@@ -53,7 +53,7 @@ std::string JoinCsv(const std::vector<std::string>& toks) {
     return out;
 }
 
-// Fold the repaired F03 summary into blocks.metadata_json (the ingest path bakes
+// Fold the repaired enricher summary into blocks.metadata_json (the ingest path bakes
 // it in at assembly; backfill patches the queryable column in place).
 void UpdateBlockMetadataSummary(sqlite3* db, uint64_t block_id,
                                 const std::string& summary) {
@@ -101,7 +101,7 @@ bool BlockHasEnrichedScore(sqlite3* db, uint64_t block_id) {
 }
 
 // child_ids that already have hype blocks (block_type=16 metadata source_child_id)
-// — the crash-window / re-run duplicate guard for F38 writes.
+// — the crash-window / re-run duplicate guard for HyPE writes.
 std::unordered_set<std::string> HypeSourceChildIds(sqlite3* db) {
     std::unordered_set<std::string> out;
     sqlite3_stmt* st = nullptr;
@@ -266,7 +266,7 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
             for (const auto& st : res[i].steps) {
                 if (st.skipped) continue;
                 if (st.status == 0) {
-                    // F35 fail-soft: status==0 with a populated error_code (see
+                    // Contextual fail-soft: status==0 with a populated error_code (see
                     // enricher_chain). Harvest it — this was the writer that left
                     // 4,139 f35 debt rows with a blank last_error on the 2026-07-11
                     // live 5k ingest (D12).
@@ -311,7 +311,7 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
     std::vector<BlockId> new_block_ids;
 
     for (auto& rep : repairs) {
-        // F35: contextual dual-vector point + label (skip when already indexed —
+        // Contextual dual-vector point + label (skip when already indexed —
         // the crash-window guard; the columns update below is idempotent anyway).
         if (owes(rep, "f35") && rep.merged.contextualized_embedding.has_value() &&
             !rep.merged.contextualized_embedding->empty()) {
@@ -322,7 +322,7 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
                 label_rows.push_back({label, rep.block->block_id, rep.block->child_id});
             }
         }
-        // F38: hype blocks (skip children that already have them).
+        // HyPE blocks (skip children that already have them).
         if (owes(rep, "f38") && !rep.hype.empty() &&
             existing_hype.find(rep.block->child_id) == existing_hype.end()) {
             std::vector<std::string> q_texts;
@@ -363,7 +363,7 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
         }
     }
 
-    // ---- Persist (one F25 txn when blocks/vectors are added) ------------------
+    // ---- Persist (one txn when blocks/vectors are added) ----------------------
     const bool needs_txn = !new_blocks.empty() || !vec_points.empty();
     store::TxnHandle txn;
     if (needs_txn) {

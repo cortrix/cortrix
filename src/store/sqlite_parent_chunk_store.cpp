@@ -19,9 +19,9 @@ using cortrix::chunker::ChildChunk;
 using cortrix::chunker::DocumentMetadata;
 using cortrix::chunker::ParentChunk;
 
-// Serialize DocumentMetadata to the JSON shape F06 ParseDocMeta() reads back
-// (parser.cpp § ParseDocMeta), so parents.metadata_json round-trips with the F06
-// SoT field names. F03/F08 enrich this same blob per-parent (NER/Summary, § 3.2).
+// Serialize DocumentMetadata to the JSON shape ParseDocMeta() reads back
+// (parser.cpp § ParseDocMeta), so parents.metadata_json round-trips with the parser
+// SoT field names. The enricher and META stages enrich this same blob per-parent (NER/Summary).
 std::string MetaToJson(const DocumentMetadata& m) {
     nlohmann::json j;
     j["filename"] = m.filename;
@@ -233,7 +233,7 @@ Result<ParentChunk> SqliteParentChunkStore::GetParent(const std::string& parent_
     std::lock_guard<std::mutex> lock(mu_);
     if (!db_) return StoreStatus(StatusCode::kInternal, store_errors::kDbError, "store not open");
 
-    // F34 §2.5: emit lookup_total{result=hit|miss} + lookup_latency_seconds. The
+    // Emit lookup_total{result=hit|miss} + lookup_latency_seconds. The
     // latency covers the prepare+step work of one reverse-lookup; a DB-error exit
     // (neither a hit nor a miss) records latency only.
     const auto t0 = std::chrono::steady_clock::now();
@@ -287,7 +287,7 @@ Result<std::vector<ParentChunk>> SqliteParentChunkStore::BulkGetParents(
     }
     out.reserve(parent_ids.size());
     for (const auto& id : parent_ids) {
-        // F34 §2.5: each requested id is one lookup → hit/miss + per-id latency.
+        // Each requested id is one lookup → hit/miss + per-id latency.
         const auto t0 = std::chrono::steady_clock::now();
         sqlite3_bind_text(st, 1, id.c_str(), -1, SQLITE_TRANSIENT);
         int rc = sqlite3_step(st);

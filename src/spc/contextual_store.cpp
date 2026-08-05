@@ -20,8 +20,8 @@ Status SqlErr(sqlite3* db, const char* what) {
 Status WriteContextualized(sqlite3* db, uint64_t block_id, const EnrichResult& result) {
     if (!db) return Status::InvalidArgument("WriteContextualized: null db");
 
-    // No F35 output → leave the columns at their DEFAULT (a non-F35 chain / L1
-    // default / pre-LLM state). contextualized_status != 0 means F35 ran (1
+    // No contextual output → leave the columns at their DEFAULT (a chain without it / L1
+    // default / pre-LLM state). contextualized_status != 0 means the stage ran (1
     // generated / 2 failed / 3 skipped_no_llm); an engaged contextualized_text /
     // embedding optional also signals real output even at status 0 transiently.
     const bool f35_ran = result.contextualized_status != 0 ||
@@ -29,9 +29,9 @@ Status WriteContextualized(sqlite3* db, uint64_t block_id, const EnrichResult& r
                          result.contextualized_embedding.has_value();
     if (!f35_ran) return Status::Ok();
 
-    // Pack the contextualized embedding (and the original dense embedding, F35-9
+    // Pack the contextualized embedding (and the original dense embedding, dual-vector
     // double-vector coexistence) as contiguous float32 BLOBs. The original dense
-    // `embedding` column is the F35-9 second vector; F35 itself does not own the
+    // `embedding` column is the second vector; the contextual stage itself does not own the
     // child's primary embedding (that lives in P-HNSW), so we only write the
     // contextualized_embedding here — the `embedding` column stays NULL unless a
     // later Feature populates it (read path tolerates NULL → dense fallback).

@@ -20,8 +20,8 @@ std::string ToLower(std::string s) {
     return s;
 }
 
-// The zh / en listwise-rerank prompt templates (F36-LR §2.2). {N}, {suffix},
-// {query}, {passages} are substituted by BuildPrompt. Same LLM01 defense as F36
+// The zh / en listwise-rerank prompt templates. {N}, {suffix},
+// {query}, {passages} are substituted by BuildPrompt. Same LLM01 defense as rag-fusion
 // §4.2: random-suffix delimiter + ignore-instructions rule + strict JSON schema.
 // kListwisePromptZh is functional engine data (multilingual support) — its
 // Chinese body is intentional; the English form is kListwisePromptEn.
@@ -86,7 +86,7 @@ std::string RandomSuffix() {
     return s;
 }
 
-// Map a failed Chat() Status onto the F36 degrade-reason token vocabulary
+// Map a failed Chat() Status onto the rag-fusion degrade-reason token vocabulary
 // (rag_fusion.cpp DegradeReasonToken) so benchmark explain output is uniform
 // across both LLM-dependent features.
 std::string DegradeReasonToken(const Status& status) {
@@ -113,8 +113,8 @@ std::string SafeDegradeDetail(const Status& status) {
     return "";
 }
 
-// CX_WARN_LLM_RERANK_DEGRADED warning object for meta.warnings (F36-LR §2.4) —
-// same shape as the F36 CX_WARN_RAG_FUSION_DEGRADED (Agent-friendly principles
+// CX_WARN_LLM_RERANK_DEGRADED warning object for meta.warnings —
+// same shape as CX_WARN_RAG_FUSION_DEGRADED (Agent-friendly principles
 // 1/4/6: machine-readable code, enum category, machine-readable retry hint).
 nlohmann::json DegradedWarning() {
     nlohmann::json w;
@@ -206,7 +206,7 @@ std::string LlmRerankStage::BuildPrompt(const CrossNsResponse& resp,
     std::string tmpl = (cfg.locale == "zh") ? kListwisePromptZh : kListwisePromptEn;
     ReplaceAll(tmpl, "{N}", std::to_string(shown));
     // {suffix} before user-controlled content so a query/passage containing the
-    // literal "{suffix}" cannot influence the delimiter tag name (F36 pattern).
+    // literal "{suffix}" cannot influence the delimiter tag name (same pattern as rag-fusion).
     ReplaceAll(tmpl, "{suffix}", suffix);
     ReplaceAll(tmpl, "{passages}", passages);
     ReplaceAll(tmpl, "{query}", original_query);
@@ -464,7 +464,7 @@ LlmRerankStage::ExplainState LlmRerankStage::Apply(CrossNsResponse* resp,
     for (std::size_t idx : position) head.push_back(std::move(resp->results[idx]));
 
     // Rewrite head scores to a strictly decreasing rank score above the tail's
-    // max, so "sorted by score desc" holds across head + tail. The F02
+    // max, so "sorted by score desc" holds across head + tail. The
     // cross-encoder score stays in rerank_score untouched (§2.3 traceability).
     float tail_max = 0.0f;
     for (std::size_t i = n; i < resp->results.size(); ++i) {

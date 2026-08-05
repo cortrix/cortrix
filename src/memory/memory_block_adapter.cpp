@@ -20,7 +20,7 @@ namespace cortrix::memory {
 
 namespace {
 
-// A memory fact is a blocks row (block_type=kBlockMemory). The MEM02 ULID is the
+// A memory fact is a blocks row (block_type=kBlockMemory). The extraction ULID is the
 // business id; the uint64 storage key is HashChildIdToBlockId(ulid) (same scheme the
 // child blocks use). The ULID is preserved in metadata_json.block_id so reads can
 // echo it back.
@@ -81,7 +81,7 @@ MemoryBlockAdapter::MemoryBlockAdapter(CortrixStore& store, OnnxEmbedder* embedd
     : store_(store), embedder_(embedder), vec_index_(vec_index) {}
 
 Result<std::string> MemoryBlockAdapter::InsertMemoryBlock(const MemoryBlockRecord& block) {
-    // The MEM02 metadata already carries block_id/user_id; ensure block_id is present
+    // The extracted metadata already carries block_id/user_id; ensure block_id is present
     // so reads can echo the ULID. content_text = the fact text (semantically searched).
     nlohmann::json meta = block.metadata_json.is_object() ? block.metadata_json
                                                           : nlohmann::json::object();
@@ -90,7 +90,7 @@ Result<std::string> MemoryBlockAdapter::InsertMemoryBlock(const MemoryBlockRecor
 
     const uint64_t bid = MemBlockId(block.block_id);
 
-    // Embed the content so the fact is searchable (MEM02 memories share the P-HNSW
+    // Embed the content so the fact is searchable (memories share the P-HNSW
     // index). Degrade gracefully when no embedder/index is wired (the row is still
     // stored, just not vector-indexed).
     EmbeddingResult emb;
@@ -277,7 +277,7 @@ std::optional<CandidateBlock> MemoryContradictionAdapter::FindMatchingPreference
 }
 
 // ---------------------------------------------------------------------------
-// QueryUserFacts (#22 — F39 chat path stable interface)
+// QueryUserFacts (chat-path stable interface)
 // ---------------------------------------------------------------------------
 
 Result<std::vector<UserFact>> QueryUserFacts(CortrixStore& store,

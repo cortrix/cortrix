@@ -62,7 +62,7 @@ std::vector<std::string> ToStringArray(const json& node, const std::string& key)
 }
 
 // Escape machinery lives in common/json_contract.h since QA 2026-07-12 (F-10)
-// so the F03 batch parser shares the exact repair this file pioneered.
+// so the enricher batch parser shares the exact repair this file pioneered.
 json ParseJsonObjectWithLlmStringEscapeRepair(const std::string& value) {
     json root = json::parse(value, /*cb=*/nullptr, /*allow_exceptions=*/false);
     if (!root.is_discarded() && root.is_object()) return root;
@@ -326,7 +326,7 @@ Result<DocSummaryStructured> DocSummaryGenerator::CallLlmStructured(
     call.max_tokens = 4096;
     call.allow_reasoning_content_fallback = false;
     // GLM-5.2's OpenAI-compatible JSON response_format can inject a conflicting
-    // provider-side instruction to end with a markdown fence. F41 owns a strict
+    // provider-side instruction to end with a markdown fence. Doc-summary owns a strict
     // JSON-only prompt and parser, so avoid provider-specific wrapper prompts there.
     // DeepSeek's reasoning models need the JSON object contract to put the final
     // answer in message.content instead of running until length in reasoning_content.
@@ -336,7 +336,7 @@ Result<DocSummaryStructured> DocSummaryGenerator::CallLlmStructured(
         call.response_format.clear();
     }
     if (ModelSupportsThinkingControl(call.model)) {
-        // F41 requires the final structured object in message.content. DeepSeek
+        // Doc-summary requires the final structured object in message.content. DeepSeek
         // thinking mode can spend the full token budget in reasoning_content and
         // leave message.content empty on real documents.
         call.thinking_type = "disabled";
@@ -421,7 +421,7 @@ Result<DocSummaryStructured> DocSummaryGenerator::GenerateSummary(
 
 GenerationResult DocSummaryGenerator::Generate(const std::string& doc_id,
                                                const std::string& ns_id) {
-    (void)ns_id;  // ns scoping is applied by the F42 worker / store at D3.5.
+    (void)ns_id;  // ns scoping is applied by the async worker / store.
     GenerationResult result;
     if (chunk_store_ == nullptr) {
         result.error = MakeDocSummaryError(

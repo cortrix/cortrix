@@ -71,9 +71,9 @@ std::vector<ParentChildChunker::Unit> ParentChildChunker::CollectUnits(
         ++stats->total_pages;
         const uint32_t page_num = page.page_num >= 0 ? static_cast<uint32_t>(page.page_num) : 0;
 
-        // A page with no usable text (e.g. F06 reported it failed → empty
+        // A page with no usable text (e.g. the parser reported it failed → empty
         // page_text + no paragraphs) is counted as a failed page and skipped
-        // (§ 4.5, per-page tolerance inherited from F06).
+        // (per-page tolerance inherited from the parser).
         bool page_had_content = false;
 
         auto emit = [&](const std::string& raw) {
@@ -96,7 +96,7 @@ std::vector<ParentChildChunker::Unit> ParentChildChunker::CollectUnits(
             case UnitLevel::kSentence: {
                 // Sentence granularity: split the page text on sentence
                 // separators via RecursiveChunker at child_size, then each piece
-                // is a unit. (Phase 2 F47 auto-detects unit_level; here it is a
+                // is a unit. (A later doc-type classifier auto-detects unit_level; here it is a
                 // GUC-selected granularity.)
                 RecursiveChunker rc(ChunkConfig{config_.child_size, 0});
                 for (const auto& cr : rc.Chunk(page.page_text)) emit(cr.text);
@@ -125,7 +125,7 @@ std::vector<ParentChildChunker::ChildSpan> ParentChildChunker::SplitIntoChildren
     const std::string& parent_text) const {
     // Reuse the project's RecursiveChunker (spc) for token-aware, UTF-8-safe child
     // splitting with overlap — it already implements the separator cascade
-    // (paragraph → sentence → word → char) + token-based overlap F34 needs.
+    // (paragraph → sentence → word → char) + token-based overlap this chunker needs.
     ChunkConfig cfg;
     cfg.chunk_size = config_.child_size;
     cfg.chunk_overlap = config_.child_overlap;

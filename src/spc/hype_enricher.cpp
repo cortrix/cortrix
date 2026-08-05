@@ -33,7 +33,7 @@ HyPEEnricher::HyPEEnricher(const HyPEConfig& config,
 HyPEEnricher::~HyPEEnricher() = default;
 
 bool HyPEEnricher::IsAvailable() const {
-    // F38-8: a missing LLM client degrades the whole HyPE stage (like F03's
+    // A missing LLM client degrades the whole HyPE stage (like the enricher's
     // null-client path). K must be in range to be meaningful.
     return llm_client_ != nullptr && config_.questions_per_chunk >= kHypeQuestionsMin;
 }
@@ -92,13 +92,13 @@ Result<std::string> HyPEEnricher::ResolveParentText(const std::string& parent_id
     }
     Result<cortrix::chunker::ParentChunk> r = parent_store_->GetParent(parent_id);
     if (!r.ok()) {
-        // Surface the store failure as the F38 parent-not-found identity. The
+        // Surface the store failure as the HyPE parent-not-found identity. The
         // caller decides fatal-vs-degrade.
         return HypeStatus(HypeErrorCode::kParentNotFound,
                           "parent_id=" + parent_id + " (" + r.status().message() +
                               ")");
     }
-    return r.value().parent_text;  // F34 field name parent_text
+    return r.value().parent_text;  // parent_text field name
 }
 
 Result<std::vector<HypeQuestion>> HyPEEnricher::GenerateHypeQuestions(
@@ -119,7 +119,7 @@ Result<std::vector<HypeQuestion>> HyPEEnricher::GenerateHypeQuestions(
         llm_client_->Chat(BuildPrompt(chunk_text, parent_text, doc_meta, k), call);
     if (!resp.ok()) {
         // LLM transport/timeout failure → CX_ERR_F38_LLM_TIMEOUT (transparent
-        // degrade upstream, F38-8).
+        // degrade upstream).
         return HypeStatus(HypeErrorCode::kLlmTimeout, resp.status.message());
     }
 
@@ -161,7 +161,7 @@ EnrichResult HyPEEnricher::Enrich(const std::string& chunk_text,
         chunk_text, /*parent_text=*/"", doc_meta, /*source_child_id=*/"",
         /*source_parent_id=*/"");
     if (!q.ok()) {
-        // F38-8 transparent degrade: HyPE skipped, chunk Block still written
+        // Transparent degrade: HyPE skipped, chunk Block still written
         // upstream. error_meta carries the Agent-friendly detail (S5 fills the
         // canonical category/retryable from the registry).
         result.status = 1;  // non-zero = failed (S5 maps to the EnricherErrorCode/§7)

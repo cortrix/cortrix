@@ -81,13 +81,13 @@ MemoryExtractionResult MemoryExtractionService::ExtractOne(
         op_logger_->Log(e, ctx);
     };
 
-    // MEM04 opt-out manager over this NS's session store (NS-scoped).
+    // Opt-out manager over this NS's session store (NS-scoped).
     immunity::MemoryStoreOptOutAdapter opt_store(facade.memory());
     immunity::OptOutManager opt_out(
         std::shared_ptr<immunity::ISessionOptOutStore>(&opt_store, [](auto*) {}),
         op_logger_, /*enabled=*/true);
 
-    // MEM04 double-check 2 (D2): interaction.remember==false → skip + session opt-out.
+    // Opt-out double-check 2: interaction.remember==false → skip + session opt-out.
     if (!interaction.remember) {
         opt_out.OptOut(interaction.session_id, immunity::OptOutActor::kSystemAuto,
                        "interaction_field_remember_false", ctx);
@@ -95,7 +95,7 @@ MemoryExtractionResult MemoryExtractionService::ExtractOne(
         return result;  // skip
     }
 
-    // MEM04 double-check 1 (D3): session opted out → skip + record memory_extract_skipped.
+    // Opt-out double-check 1: session opted out → skip + record memory_extract_skipped.
     if (auto opted = opt_out.is_session_opted_out(interaction.session_id, ctx);
         opted.ok() && opted.value()) {
         skip_oplog("session opted out");
@@ -108,7 +108,7 @@ MemoryExtractionResult MemoryExtractionService::ExtractOne(
 
     MemoryExtractor extractor(llm_, block_store, contradiction, op_logger_, config_);
     // Single-turn window (the current interaction). The multi-turn window fetch from
-    // the session store is a Phase-1.x refinement (MEM02 §3.2 get_window); a single
+    // the session store is a Phase-1.x refinement (get_window); a single
     // turn is the minimal correct extraction unit.
     result = extractor.Extract(interaction, ctx);
     if (!result.ok()) {

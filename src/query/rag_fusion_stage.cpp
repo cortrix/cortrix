@@ -15,7 +15,7 @@ namespace {
 using retrieval::ResultItem;
 using retrieval::ScoredResult;
 
-// CrossNsResponse.results → F36 ScoredResult[] (child_id + score). F36 fuses on the
+// CrossNsResponse.results → ScoredResult[] (child_id + score). Fusion runs on the
 // child_id keyspace (RETRIEVAL_TYPES_SPEC §1); we use the per-item final score as
 // the rank carrier (the list is already sorted best-first by the scatter).
 std::vector<ScoredResult> ToScoredResults(const CrossNsResponse& resp) {
@@ -24,7 +24,7 @@ std::vector<ScoredResult> ToScoredResults(const CrossNsResponse& resp) {
     for (const auto& it : resp.results) {
         ScoredResult sr;
         sr.child_id = it.child_id;
-        // Carry the post-F02/F07 final score into the second-pass RRF. Older
+        // Carry the post-rerank final score into the second-pass RRF. Older
         // responses may only have rerank_score populated, so keep it as fallback.
         sr.score = it.score != 0.0f ? it.score : it.rerank_score;
         out.push_back(std::move(sr));
@@ -74,7 +74,7 @@ retrieval::RankedChunk ToRankedChunkForFinalRerank(const ResultItem& item) {
 }
 
 float EffectiveScore(const ResultItem& item) {
-    // `score` is the downstream ordering contract: F02 writes rerank+RRF fused
+    // `score` is the downstream ordering contract: the reranker writes rerank+RRF fused
     // scores back to RankedChunk::score, and ScatterGather sorts ResultItem by
     // score. Use rerank_score only as a compatibility fallback for legacy/fake
     // responses that did not populate the final score.
@@ -195,7 +195,7 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
     // In final-rerank mode, keep the original query's normal reranked baseline
     // signal, but treat LLM variants as candidate generation only. Running the
     // reranker inside every LLM variant would multiply latency and prematurely
-    // truncate variant candidates before the global F36 union. The final pass then
+    // truncate variant candidates before the global union. The final pass then
     // reranks the union against the original query.
     const bool defer_inner_rerank = cfg.final_rerank && qctx.rerank && reranker_ != nullptr;
     for (std::size_t i = 0; i < all_queries.size(); ++i) {

@@ -27,7 +27,7 @@ DirectoryImporter::DirectoryImporter(const WatchDirConfig& config,
                                      cortrix::resource::INamespacePool& pool,
                                      SPCManager& spc_mgr)
     : config_(config), pool_(pool), spc_mgr_(spc_mgr) {
-    // F21: build the file filter at construction. The filter depends only on
+    // Build the file filter at construction. The filter depends only on
     // config_ (fixed for this importer's lifetime), so it must be ready even
     // before Start() — DirWatcherRegistry may fan events into HandleFileEvents()
     // before an initial scan (e.g. when subscribed with autostart=false).
@@ -73,7 +73,7 @@ Status DirectoryImporter::Start() {
         return scan_status;
     }
 
-    // F21: OS watcher creation removed — DirWatcherRegistry owns a single
+    // OS watcher creation removed — DirWatcherRegistry owns a single
     // FileWatcher per directory and fans events out to every subscribed
     // namespace's importer via HandleFileEvents(). The importer is "active"
     // once its initial scan has completed and is ready to process events.
@@ -85,7 +85,7 @@ Status DirectoryImporter::Start() {
 }
 
 void DirectoryImporter::Stop() {
-    // F21: no OS watcher to stop here (owned by DirWatcherRegistry). Idempotent.
+    // No OS watcher to stop here (owned by DirWatcherRegistry). Idempotent.
     running_ = false;
 }
 
@@ -461,7 +461,7 @@ Status DirectoryImporter::HandleFileDeletion(const std::string& file_path) {
         // Continue with best-effort cascade despite status update failure
     }
 
-    // Cascade delete: blocks (vector index entries) + document. F05/P-HNSW key
+    // Cascade delete: blocks (vector index entries) + document. The pool / P-HNSW key
     // is block_id; MarkDelete is idempotent (a missing id returns Ok), so we
     // delete every block unconditionally — no hnsw_node_id guard needed.
     std::vector<CortrixBlock> blocks;

@@ -272,7 +272,7 @@ Status OnnxEmbedder::Embed(const std::string& text, EmbeddingResult* result) {
         input_tensors.push_back(std::move(input_ids_tensor));
         input_tensors.push_back(std::move(attention_mask_tensor));
 
-        // F22 §10 / §8.3 (D35-MET-11): run-time inference is guarded with exactly
+        // Run-time inference is guarded with exactly
         // one retry (transient errors are often momentary — alloc pressure, kernel
         // hiccup). On a 2nd failure surface CX_ERR_ONNX_INFERENCE_FAILED
         // (transient/retryable, retry_after_ms=200) + bump
@@ -298,7 +298,7 @@ Status OnnxEmbedder::Embed(const std::string& text, EmbeddingResult* result) {
         }
         if (!inference_ok) {
             // Both the initial run and its single retry failed → transient infra
-            // error. last_input_shape = the [1, seq_len] we fed (F22 §8.3
+            // error. last_input_shape = the [1, seq_len] we fed (the
             // structured_data). The Agent-friendly body (op_kernel/last_input_shape)
             // is re-inflated at the API/SDK boundary via MakeOnnxError().
             onnx::OnnxMetrics::Instance().RecordInferenceFailed();
@@ -370,7 +370,7 @@ Status OnnxEmbedder::EmbedBatch(const std::vector<std::string>& texts,
     return Status::Ok();
 }
 
-// --- F40 S1: dense + sparse single-pass embedding ---
+// --- dense + sparse single-pass embedding ---
 
 Status OnnxEmbedder::EmbedWithSparse(const std::string& text,
                                      EmbedWithSparseResult* result, int top_k) {
@@ -380,7 +380,7 @@ Status OnnxEmbedder::EmbedWithSparse(const std::string& text,
     auto start = std::chrono::steady_clock::now();
 
     // Dense half reuses the frozen real/stub embedding path. On failure we
-    // propagate the dense error verbatim — per F40 §7.1 L1, a dense+sparse total
+    // propagate the dense error verbatim — per the L1 rule, a dense+sparse total
     // failure is the chunk-write failure (CX_ERR_F40_INFERENCE_FAILED is raised
     // by the caller around this), so we surface the dense Status unchanged.
     EmbeddingResult dense;
@@ -422,7 +422,7 @@ Status OnnxEmbedder::EmbedBatchWithSparse(
 std::map<uint32_t, float> OnnxEmbedder::StubSparse(const std::string& text,
                                                    int top_k) const {
     // Whitespace-tokenize; each distinct token hashes to a vocab id (kept inside
-    // the uint16 window so the F40 §4.2 uint16 serializer round-trips — the real
+    // the uint16 window so the uint16 serializer round-trips — the real
     // 18-bit vocab encoding is a Phase-2 widening, see header note). Weight is a
     // stable [0,1) value per token; duplicate tokens accumulate weight (SPLADE
     // term-frequency intuition). Empty / whitespace-only → empty map (§6.5
@@ -453,7 +453,7 @@ std::map<uint32_t, float> OnnxEmbedder::StubSparse(const std::string& text,
     }
     flush();
 
-    // top-K truncation by weight DESC (F40-6). top_k<=0 → keep all.
+    // top-K truncation by weight DESC. top_k<=0 → keep all.
     if (top_k > 0 && static_cast<int>(sparse.size()) > top_k) {
         std::vector<std::pair<uint32_t, float>> items(sparse.begin(), sparse.end());
         std::partial_sort(

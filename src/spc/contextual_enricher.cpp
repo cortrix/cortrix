@@ -36,7 +36,7 @@ void ReplaceAll(std::string& s, const std::string& token, const std::string& val
 }  // namespace
 
 // -----------------------------------------------------------------------------
-// Config resolution (F35 §6.2 three-layer override)
+// Config resolution (three-layer override)
 // -----------------------------------------------------------------------------
 
 ContextualRetrievalConfig ResolveContextualConfig(const IGlobalConfig* global) {
@@ -116,9 +116,9 @@ ContextualRetrievalEnricher::ContextualRetrievalEnricher(
 ContextualRetrievalEnricher::~ContextualRetrievalEnricher() = default;
 
 bool ContextualRetrievalEnricher::IsAvailable() const {
-    // §7.2 L2: a missing LLM client OR a disabled config degrades the whole F35
+    // L2: a missing LLM client OR a disabled config degrades the whole contextual
     // stage (the chunk falls back to its original embedding — L1/L2 equivalent at
-    // the stage level). Mirrors F03's null-client / F38's IsAvailable() shape.
+    // the stage level). Mirrors the enricher's null-client / HyPE's IsAvailable() shape.
     return llm_client_ != nullptr && config_.enabled;
 }
 
@@ -217,7 +217,7 @@ EnrichResult ContextualRetrievalEnricher::Enrich(const std::string& chunk_text,
     // 1) LLM contextualized prefix (§6).
     Result<std::string> text = GenerateContextualizedText(chunk_text, doc_meta, ctx);
     if (!text.ok()) {
-        // §7.3 transparent degrade: F35 skipped, original embedding kept. The
+        // Transparent degrade: contextualization skipped, original embedding kept. The
         // contextualized_status records the failure; error_meta carries the
         // Agent-friendly detail (which CX_ERR_F35_* identity).
         result.contextualized_status = 2;  // failed
@@ -228,7 +228,7 @@ EnrichResult ContextualRetrievalEnricher::Enrich(const std::string& chunk_text,
         return result;
     }
 
-    // The contextualized_text = prefix + original chunk (F35 §1.1: the prefix is
+    // The contextualized_text = prefix + original chunk (the prefix is
     // prepended to the chunk and the whole is re-embedded).
     std::string contextualized = text.value() + "\n" + chunk_text;
     result.contextualized_text = contextualized;

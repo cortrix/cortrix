@@ -17,13 +17,13 @@ namespace cortrix::import {
 namespace {
 
 // Build a one-page ParsedDoc from a textualized DB row. The row text becomes the
-// single page's text + one TEXT paragraph (the F34 chunker's input material); the
+// single page's text + one TEXT paragraph (the chunker's input material); the
 // §4.3 source metadata rides on the SPCTask.metadata_json (set by the caller), not
 // here. status=kOk so ProcessParsedDoc treats it as a normal post-parse doc.
 spc::ParsedDoc MakeParsedDoc(const TextChunk& chunk) {
     spc::ParsedDoc doc;
     doc.status = spc::ParserErrorCode::kOk;
-    doc.parser_name = "db_import";  // F16a textualized source (no F06 parse)
+    doc.parser_name = "db_import";  // textualized DB source (no parser run)
 
     spc::ParsedChunk para;
     para.text = chunk.text;
@@ -55,7 +55,7 @@ Result<int> SpcManagerFeeder::Feed(const std::vector<TextChunk>& chunks, const N
         task.doc_id = id::GenerateUlid();
         task.namespace_name = ns;
         task.source_path = chunk.source;            // postgres://.../table/<row_id>
-        task.source_type = "db_import";             // F16a provenance (vs "file"/"http_upload")
+        task.source_type = "db_import";             // DB-import provenance (vs "file"/"http_upload")
         task.content_hash = query::ContentHashOfContent(chunk.text);
         task.mime_type = "text/plain";
         task.processing_level = 3;                  // L3 full processing (embed + store)
@@ -65,7 +65,7 @@ Result<int> SpcManagerFeeder::Feed(const std::vector<TextChunk>& chunks, const N
 
         int rc = spc_mgr_->ProcessParsedDoc(parsed, task);
         if (rc != 0) {
-            // Surface the failure with the F16a connection-failed token (the safest
+            // Surface the failure with the DB-import connection-failed token (the safest
             // transient default for an internal ingest fault), carrying the pipeline
             // detail for the operator.
             return F16aStatus(F16aErrorCode::kConnectionFailed,

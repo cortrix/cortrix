@@ -14,7 +14,7 @@ namespace cortrix::query {
 
 namespace {
 
-// F36 v1.0.7 anchored conservative outer-fusion policy.
+// Anchored conservative outer-fusion policy (v1.0.7).
 //
 // `per_variant_results[0]` is the original query and should remain the primary
 // ranking signal. Its top head is anchored as a strong-hit guardrail. LLM
@@ -128,8 +128,8 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
     explain_.variants_used.push_back(query);
     explain_.variant_count = 1;
 
-    // 🔵 D3.5 deferred (§4.8.2): F39 routing-skip is interface-reserved — the frozen
-    // QueryContext has no `routing_path` field (F39 adds it, same Wave). Once F39
+    // Deferred: routing-skip is interface-reserved — the frozen
+    // QueryContext has no `routing_path` field (the router adds it). Once it
     // lands, this becomes:
     //   if (qctx && QueryComplexityClassifier::ShouldSkipF36(*qctx)) {
     //       explain_.reason = "skipped_by_F39_routing"; ... return {query};
@@ -238,7 +238,7 @@ Result<std::vector<retrieval::ScoredResult>> RagFusion::FuseResults(
     // contribution(query_index, rank) = role_weight / (k + rank)
     //
     // Sum per ChildId (dedup keep-sum); keep the max raw score seen for
-    // tie-context / downstream display. This is the outer F36 fusion over
+    // tie-context / downstream display. This is the outer fusion over
     // retrieval::ScoredResult, distinct from the inner per-NS RRFFusion.
     struct Acc {
         double rrf = 0.0;
