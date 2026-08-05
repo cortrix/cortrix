@@ -303,7 +303,7 @@ protected:
         config_.memory.max_sessions_per_namespace = 100;
         config_.memory.max_interactions_per_session = 500;
 
-        // Namespace pool NS resource pool replaces the MVP NamespaceManager +
+        // NS resource pool replaces the MVP NamespaceManager +
         // CortrixNamespaceManager (RegisterMemoryRoutes now takes INamespacePool&).
         harness_ = std::make_unique<test::NsPoolHarness>(tmp_dir_);
 
@@ -610,7 +610,7 @@ protected:
         config_.memory.max_sessions_per_namespace = 100;
         config_.memory.max_interactions_per_session = 500;
 
-        // Namespace pool NS resource pool replaces the MVP NamespaceManager +
+        // NS resource pool replaces the MVP NamespaceManager +
         // CortrixNamespaceManager (all Register*Routes take INamespacePool&).
         harness_ = std::make_unique<test::NsPoolHarness>(tmp_dir_);
 
@@ -848,7 +848,7 @@ protected:
         config_.memory.max_sessions_per_namespace = 100;
         config_.memory.max_interactions_per_session = 500;
 
-        // Namespace pool NS resource pool replaces the MVP NamespaceManager +
+        // NS resource pool replaces the MVP NamespaceManager +
         // CortrixNamespaceManager (RegisterMemoryRoutes now takes INamespacePool&).
         harness_ = std::make_unique<test::NsPoolHarness>(tmp_dir_);
 

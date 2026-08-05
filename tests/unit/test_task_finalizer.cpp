@@ -1,5 +1,5 @@
 // TaskFinalizer (async task, finalize ownership = handler · decision A): the shared
-// terminal-write + async task task-metric collapse used by DocumentProcessor / F41AsyncWorker.
+// terminal-write + task-metric collapse used by DocumentProcessor / F41AsyncWorker.
 // These verify each terminal path drives the tasks table to the right status AND bumps
 // cortrix_tasks_completed_total{status}, over a real in-memory TaskManager.
 #include "cortrix/async/task_finalizer.h"

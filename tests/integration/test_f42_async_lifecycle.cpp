@@ -20,7 +20,7 @@
 
 // Async task standalone integration (within-feature E2E): the full async document
 // lifecycle wired end to end — HTTP handler → TaskScheduler → WorkerPool →
-// DocumentProcessor → parser (stub) parser → progress/cancel/cleanup — over a real
+// DocumentProcessor → parser (stub) → progress/cancel/cleanup — over a real
 // in-memory stack. The CROSS-feature E2E (real Docling subprocess, real SPC
 // Enricher/Chunk/Index, real write + RollbackCallback, real server routes)
 // is D3.5 deferred wiring; here the only mock is the injected stub IDocumentParser.
