@@ -9,7 +9,7 @@ namespace cortrix::store {
 /// reconcile). Registered through the SchemaMigrator
 /// framework (provider #4, after the block-header framework / before the enricher).
 ///
-/// Under the A unified-blocks model, child chunks are rows of the F09-owned
+/// Under the A unified-blocks model, child chunks are rows of the block-header-owned
 /// per-Unit `blocks` table (child rows = `child_id IS NOT NULL`; block_type =
 /// source modality, no kBlockChild enum). ParentChildSchemaProvider owns:
 ///   - blocks +4 child columns: child_id (TEXT, business ULID + child-identity key)

@@ -2,7 +2,7 @@
 // error/boundary arms the existing tests don't hit:
 //   - contextual_schema_provider.cpp  : the null-db guard (line 58);
 //   - contextual_store.cpp     : null-db (19), the embedding-present + status=failed
-//                                combo (44-67), and the no-F35-output early-Ok (28);
+//                                combo (44-67), and the no-contextual-output early-Ok (28);
 //   - wordpiece_tokenizer.cpp  : the UTF-8 decode error arms (invalid lead byte /
 //                                truncated / bad continuation — reached via the
 //                                PUBLIC BasicTokenize, since CleanText/NextCodePoint
@@ -42,7 +42,7 @@ namespace {
 // ============================================================
 
 // Migrate(nullptr, 0, 1): the init pair passes the version check, then the !db
-// guard (line 58) fires → InvalidArgument "F35 migrate: null db". The existing
+// guard (line 58) fires → InvalidArgument "contextual migrate: null db". The existing
 // f35 test never passes a null db.
 TEST(ContextualSchemaProviderBranchR7b, NullDbInvalidArgument) {
     spc::ContextualSchemaProvider p;

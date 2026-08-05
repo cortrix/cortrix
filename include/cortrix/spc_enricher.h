@@ -26,7 +26,7 @@ class BudgetTracker;    // spc_enricher/budget_tracker.h (Wave 4)
 // NER + Summary Enricher — ISpcEnricher framework
 //
 // V1: ISpcEnricher pluggable framework (NullEnricher default + LlmEnricher V1
-// sole implementation). See design/features/F03-ner-summary.md.
+// sole implementation). See design/features/enricher-ner-summary.md.
 //
 // 🔒 ISpcEnricher base SoT lock (v1.0.5/v1.0.6, design §2.1): Enrich = 3-param
 // (chunk_text:const std::string& / doc_meta:const DocumentMetadata& / ctx:const

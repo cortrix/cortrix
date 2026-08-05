@@ -19,7 +19,7 @@ namespace cortrix::spc {
 ///   - enriched_score / enriched_at → blocks columns (A-class, query-returned)
 ///   - enricher_metadata (prompt_version / model_used / enricher_name JSON) →
 ///     blocks.enricher_metadata (B-class audit; query default hides it, §3.1)
-///   - summary → caller writes into Block.payload.metadata JSONB (F09-owned; not
+///   - summary → caller writes into Block.payload.metadata JSONB (block-header-owned; not
 ///     here — this module owns only the enricher columns + entities table)
 ///   - entities[] → entities table + entities_fts FTS5 index
 

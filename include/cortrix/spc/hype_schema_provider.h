@@ -7,7 +7,7 @@ namespace cortrix::spc {
 
 /// The HyPE index schema-migration contribution. HyPE introduces the
 /// kBlockHypeQuestion=16 block sub-type (common/block_types.h) but owns NO new
-/// table and NO new column: the per-Unit `blocks` table (F09-owned) already
+/// table and NO new column: the per-Unit `blocks` table (block-header-owned) already
 /// stores an arbitrary block_type INTEGER, so a hype_question Block is just a row
 /// with block_type=16. Its Phase-1 Migrate(0→1) is therefore a no-op — it
 /// registers with the SchemaMigrator purely so any future hype_question

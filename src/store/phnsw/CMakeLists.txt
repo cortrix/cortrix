@@ -1,4 +1,4 @@
-# src/store/phnsw — P-HNSW vendored hnswlib (F01 S1)
+# src/store/phnsw — P-HNSW vendored hnswlib
 #
 # hnswlib is header-only, so the vendored fork is exposed as an INTERFACE target
 # rather than a compiled static library. Targets that need the HNSW graph types

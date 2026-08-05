@@ -102,7 +102,7 @@ TEST(CatalogProvidersTest, MultiProviderStartupMigration) {
 }
 
 // S1.2: catalog must migrate before a downstream provider whose table FK-references
-// units. If ordering were wrong this DDL would fail; success proves F12-first.
+// units. If ordering were wrong this DDL would fail; success proves catalog-first.
 TEST(CatalogProvidersTest, CatalogRunsBeforeDownstreamFkProvider) {
     std::vector<std::string> order;
     FakeFeatureProvider needs_units("write_coordinator", &order, /*fk_to_units=*/true);
@@ -157,7 +157,7 @@ TEST(CatalogProvidersTest, FailedBatchLeavesNoPartialSchemaOnDisk) {
     std::remove(path.c_str());
 }
 
-// The S1.1 single-arg Open is unchanged: F12-only, no extra providers.
+// The S1.1 single-arg Open is unchanged: catalog-only, no extra providers.
 TEST(CatalogProvidersTest, SingleArgOpenIsCatalogOnly) {
     CatalogDb catalog;
     ASSERT_TRUE(catalog.Open(":memory:").ok());

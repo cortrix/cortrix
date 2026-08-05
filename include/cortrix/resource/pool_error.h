@@ -28,7 +28,7 @@ namespace cortrix::resource {
 /// they are the same wire identities seen from the pool side.
 ///
 /// Note POOL_INTERNAL is deliberately absent: the PoolError enum is the 4
-/// values below; `CX_ERR_NS_POOL_INTERNAL` is an F12-side mapping fall-through
+/// values below; `CX_ERR_NS_POOL_INTERNAL` is an catalog-side mapping fall-through
 /// code, not an identity the pool itself returns.
 enum class PoolErrorCode {
     kNsQuotaExceeded,           ///< NS count > max_namespaces_per_instance

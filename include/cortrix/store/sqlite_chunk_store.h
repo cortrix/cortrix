@@ -13,7 +13,7 @@ namespace cortrix::store {
 /// Phase 1 ChunkStore implementation over the unified `blocks` table (A unified
 /// blocks). Child chunks are `blocks` rows with
 /// child_id IS NOT NULL; their content_text holds the chunk text and the
-/// parent_id / chunk_index are F34-owned columns (ParentChildSchemaProvider ALTERs). It is
+/// parent_id / chunk_index are parent-child-owned columns (ParentChildSchemaProvider ALTERs). It is
 /// a read-only reverse-lookup:
 ///   Get / GetBatch    — by child_id (the P-HNSW label's business ULID)
 ///   GetChunksByDocId  — all child chunks of a doc, ascending chunk_index

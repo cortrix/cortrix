@@ -275,7 +275,7 @@ int SPCPipeline::Process(SPCTask& task, resource::NamespaceFacade& facade) {
     }
     task.stage = SPCStage::kParsing;
 
-    // ParserOptions defaults are the F12-resolved CE values (max_pages / file-size
+    // ParserOptions defaults are the catalog-resolved CE values (max_pages / file-size
     // limits / OCR fallback on); a per-task / NS override merge is a separate D3.5
     // item, so use defaults here.
     cortrix::spc::ParserOptions opts;

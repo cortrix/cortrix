@@ -2,7 +2,7 @@
 //   Block header (BlockFrameworkSchemaProvider, per-Unit framework: documents/blocks/blocks_fts + idx + triggers)
 //   META block (MetadataSchemaProvider, metadata_blocks table, version 1)
 //   DB import (ImportSchemaProvider, db_connections + import_tasks, version 1; FK -> tenants/namespaces)
-//   Doc summary (DocSummarySchemaProvider, doc_fts5_index FTS5 vtable, version 1; F41-scoped error token)
+//   Doc summary (DocSummarySchemaProvider, doc_fts5_index FTS5 vtable, version 1; doc-summary-scoped error token)
 //
 // Fresh in-memory sqlite3 per case. Globally unique suite/fixture names
 // (BlockFrameworkTblMatrix / MetadataTblMatrix / ImportTblMatrix / DocSummaryTblMatrix) that do NOT reuse the

@@ -3,8 +3,8 @@
   core      — MVP 12 tools (migrated + GEN-Agent 4-field adaptation)
   extended  — 4 extended tools (cross-NS query / async upload / memory filter / extract trigger)
   new       — 4 new tools (memory_extract / task_status / cancel_task / query_explain)
-  memory    — MEM02 +2 / MEM04 +1 / MEM03 +4 + batch_submit + list_operations
-  admin     — F16a admin scope 2 tools
+  memory    — memory extraction +2 / memory opt-out +1 / memory transparency +4 + batch_submit + list_operations
+  admin     — DB import admin scope 2 tools
 
 ``register_all(mcp)`` wires every tool onto the SDK v2 MCPServer instance.
 """

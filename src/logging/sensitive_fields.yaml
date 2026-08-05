@@ -1,4 +1,4 @@
-# F20 Security Hardening — log sanitization field rules (design topic 4 / sec 6.1).
+# Security hardening — log sanitization field rules (design topic 4 / sec 6.1).
 #
 # Single source of truth for which log/structured_data fields LogSanitizer
 # redacts, masks, truncates, or hashes before anything is written to a log sink
@@ -37,8 +37,8 @@ P1_redact_pii:
 P1_truncate_content:
   - query_text       # first 50 chars + full hash
   - document_content # hash only
-  - memory_text      # MEM02 user_facts
-  - prompt           # F03 LLM prompt
+  - memory_text      # extracted user_facts
+  - prompt           # enricher LLM prompt
 
 # P2 correlation-key hash (2 fields)
 P2_hash_only:

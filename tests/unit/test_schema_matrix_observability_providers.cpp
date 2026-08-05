@@ -1,6 +1,6 @@
 // Schema-provider matrices for the observability / agent-trace / auth providers:
 //   Operation log  (OperationLogSchemaProvider, operation_log table, version 1)
-//   Agent trace   (AgentTraceSchemaProvider, agent_trace table, version 1; F13-scoped token)
+//   Agent trace   (AgentTraceSchemaProvider, agent_trace table, version 1; trace-scoped token)
 //   Agent trace   (InteractionSourcesSchemaProvider, interaction_sources, version 1; FK -> interaction_log)
 //   Auth   (AuthSchemaProvider, platform.db auth: 7 tables, version 1; version-agnostic Migrate)
 //

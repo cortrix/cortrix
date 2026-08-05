@@ -31,7 +31,7 @@ build-fuzz/fuzz_flatten_metadata -max_total_time=60 -max_len=8192 \
 |---|---|---|
 | `fuzz_wordpiece_basic_tokenize` | `WordPieceTokenizer::BasicTokenize` (BERT normalizer + UTF-8 decode) | real `src/query/wordpiece_tokenizer.cpp` |
 | `fuzz_query_request_fromjson` | `json::parse` + `QueryRequest::FromJson` + `Normalize` + `Validate` (mirrors `query_routes.cpp`) | real `src/query/query_request.cpp` |
-| `fuzz_cross_ns_parse_request` | cross-NS `ParseRequest` (F04 Sec.2.4) | verbatim copy (real TU pulls scatter-gather); drift-guard in header |
+| `fuzz_cross_ns_parse_request` | cross-NS `ParseRequest` (cross-NS query Sec.2.4) | verbatim copy (real TU pulls scatter-gather); drift-guard in header |
 | `fuzz_flatten_metadata` | `FlattenMetadataIntoMap` (`json::parse` + `.dump()` of nested values) | verbatim copy; drift-guard in header |
 
 The two "verbatim copy" harnesses carry the function body copied byte-for-byte from

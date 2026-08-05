@@ -38,7 +38,7 @@ std::vector<ChunkContext> MakeContexts(const std::vector<std::string>& texts,
     return ctxs;
 }
 
-// A fake F03-style enricher: stamps summary + a name onto each result.
+// A fake enricher-style enricher: stamps summary + a name onto each result.
 class FakeSummaryEnricher : public ISpcEnricher {
 public:
     explicit FakeSummaryEnricher(std::string summary) : summary_(std::move(summary)) {}
@@ -63,7 +63,7 @@ private:
     std::string summary_;
 };
 
-// A fake F35-style enricher: stamps contextualized_* onto each result.
+// A fake contextual-style enricher: stamps contextualized_* onto each result.
 class FakeContextualEnricher : public ISpcEnricher {
 public:
     EnrichResult Enrich(const std::string& text, const DocumentMetadata&,
@@ -84,7 +84,7 @@ public:
     std::string Name() const override { return "f35_contextual_retrieval"; }
 };
 
-// A fake F35-style enricher whose member FAILS while the step stays OK
+// A fake contextual-style enricher whose member FAILS while the step stays OK
 // (status 0, contextualized_status 2, error_msg set) — the real contextual retrieval degrade
 // shape (§7.3 transparent degrade / §8 injection-guard reject).
 class FailSoftContextualEnricher : public ISpcEnricher {

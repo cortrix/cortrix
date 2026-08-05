@@ -8,12 +8,12 @@ namespace cortrix::spc {
 /// The enricher's schema-migration contribution (registered
 /// through the SchemaMigrator framework, aligning with the catalog
 /// layered shared governance). Unlike the reranker and parser (which own no per-Unit schema), it owns a REAL
-/// per-Unit migration: it extends the F09-owned per-Unit `blocks` table with 3
+/// per-Unit migration: it extends the block-header-owned per-Unit `blocks` table with 3
 /// enrichment columns and adds its own `entities` table + FTS5 index.
 ///
 /// Per-Unit migration (topic 2.6 ruling A 3-layer):
 ///   - blocks +3 cols: enriched_score (REAL, indexed) / enriched_at (INTEGER) /
-///     enricher_metadata (TEXT JSONB)   — F03-owned extension columns on the
+///     enricher_metadata (TEXT JSONB)   — enricher-owned extension columns on the
 ///     block-header framework table (the SoT stays there; the enricher owns these columns).
 ///   - entities table (entity_id PK, block_id FK, text, type, offsets) + indexes.
 ///   - entities_fts FTS5 (text, type; content='entities', content_rowid=entity_id).

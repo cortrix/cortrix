@@ -13,7 +13,7 @@
 
 // I2 — WriteContextualized persists contextualized_* columns onto the blocks
 // row ContextualSchemaProvider created. Tests the write, the BLOB round-trip, and the
-// no-op-when-no-F35-output path.
+// no-op-when-no-contextual-output path.
 namespace cortrix::spc {
 namespace {
 

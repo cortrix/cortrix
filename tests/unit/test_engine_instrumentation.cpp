@@ -10,7 +10,7 @@
 #include "cortrix/observability/observability_context.h"
 
 // S6 coverage: Engine-layer instrumentation (§11, topic 8 C4) — identity read from
-// the thread-local ObservabilityContext, F13-first / F18a-second-on-success
+// the thread-local ObservabilityContext, trace-first / operation-log-second-on-success
 // ordering, and C4 exception isolation (a throwing writer never propagates; the
 // write_failed metric is bumped instead).
 namespace cortrix::agent_trace {

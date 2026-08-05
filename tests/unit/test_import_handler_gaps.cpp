@@ -15,7 +15,7 @@
 //     token (HttpFor / ErrorBody route through CodeFromStatus).
 //
 // Deterministic: no socket, no network, no LLM. The handler methods are called
-// directly; a fake IConnectionManager supplies the error / non-F16a-token arms.
+// directly; a fake IConnectionManager supplies the error / non-import-token arms.
 #include <gtest/gtest.h>
 
 #include <memory>

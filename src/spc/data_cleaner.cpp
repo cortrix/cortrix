@@ -159,7 +159,7 @@ AnomalyResult DataCleaner::DetectAnomaly(std::vector<Block>& blocks,
             reasons.push_back(AnomalyReason::OVERSIZED_CHUNK);
         }
         // PARSE_FAILED: the upstream META block passes through meta.parse_status / meta.parse_failed_page
-        // (F10-rev-8). Tolerate either signal.
+        // (cleaning-rev-8). Tolerate either signal.
         if (b.metadata_json.is_object()) {
             const auto& m = b.metadata_json;
             const bool parse_failed =

@@ -1,11 +1,11 @@
-"""CortrixToolKit — 29 methods, 1:1 mirror of the P12 MCP 29 main tools.
+"""CortrixToolKit — 29 methods, 1:1 mirror of the MCP 29 main tools.
 
 Naming SoT (feature design issue 1 / V6 D-15): ``kit.cortrix_<action>`` matches
-the P12 MCP ``cortrix_<action>`` tool names (number + business semantics, not
-forced literal). Each method calls the **P03 Python SDK** (``self._client.xxx``)
+the MCP ``cortrix_<action>`` tool names (number + business semantics, not
+forced literal). Each method calls the **Python SDK** (``self._client.xxx``)
 when the SDK exposes a matching Resource.verb; otherwise it falls back to a
 **pass-through HTTP call** via ``self._client._request(...)`` against the same
-wire contract the P12 tool uses (feature design section 4 note †). The HTTP
+wire contract the MCP server tool uses (feature design section 4 note †). The HTTP
 fallback runs through the SDK's own request loop, so the GEN-Agent 4 fields on
 ``CortrixError`` are preserved either way.
 
@@ -15,13 +15,13 @@ catch ``CortrixError`` — it propagates unchanged (it already carries
 framework adapters (LangChain / Claude / OpenAI) wrap it into each framework's
 error model.
 
-Error codes are passed through from P03 (feature design section 7): the Skill
+Error codes are passed through from Python SDK (feature design section 7): the Skill
 SDK adds **no** ``CX_ERR_*`` prefix of its own.
 
 D3.5 deferred (standalone scope): real LLM round-trips, the spec_lint three-way
 check run, and notebook execution are out of scope here — methods are exercised
 with mocked SDK / HTTP responses. The ``cortrix_skills_*`` metrics are exported
-by cortrix-server (F24), not by this package (feature design section 1.3 /
+by cortrix-server (deployment), not by this package (feature design section 1.3 /
 section 10.bis).
 """
 
@@ -78,9 +78,9 @@ TOOL_METHOD_NAMES: tuple[str, ...] = (
 
 
 def _to_dict(obj: Any) -> Any:
-    """Normalize a P03 SDK return value to a plain JSON-serializable structure.
+    """Normalize a Python SDK return value to a plain JSON-serializable structure.
 
-    P03 response types are plain ``@dataclass`` objects (not pydantic), so they
+    Python SDK response types are plain ``@dataclass`` objects (not pydantic), so they
     have no ``.model_dump()``. This converts a dataclass (recursively) to a dict;
     ``dict`` / ``None`` / primitives pass through unchanged. Lists are mapped
     element-wise. (Verified against cortrix SDK ``types/_generated.py``.)
@@ -97,7 +97,7 @@ def _to_dict(obj: Any) -> Any:
 class CortrixToolKit:
     """Cortrix tool surface for framework Agents (29 methods).
 
-    Wraps a P03 ``cortrix.Cortrix`` client. Construction is lazy — no network
+    Wraps a Python SDK ``cortrix.Cortrix`` client. Construction is lazy — no network
     call is made until the first method runs (feature design section 12.x:
     invalid ``base_url`` / ``api_key`` surface on first call, not on init).
 
@@ -157,10 +157,10 @@ class CortrixToolKit:
         params: Optional[dict] = None,
         timeout: Optional[float] = None,
     ) -> Any:
-        """Pass-through HTTP call via the SDK request loop (P03 SDK gap fallback).
+        """Pass-through HTTP call via the SDK request loop (Python SDK gap fallback).
 
-        Used for the methods whose P03 Resource.verb does not exist yet, or whose
-        signature diverges from the P12 wire contract (feature design section 4
+        Used for the methods whose Python SDK Resource.verb does not exist yet, or whose
+        signature diverges from the MCP server wire contract (feature design section 4
         note †). Routing through ``self._client._request`` keeps the GEN-Agent
         4-field ``CortrixError`` mapping identical to the SDK path (no
         re-wrapping, no new error prefix).
@@ -258,7 +258,7 @@ class CortrixToolKit:
     ) -> dict:
         """Semantic search over conversation memory (POST /memory/search).
 
-        user_id ownership is enforced server-side (MEM05 isolation).
+        user_id ownership is enforced server-side (memory isolation).
         Pass-through GEN-Agent 4-field error response.
         """
         body = {"namespace": self._ns(namespace), "query": query, "top_k": top_k}
@@ -352,7 +352,7 @@ class CortrixToolKit:
         top_k: int = 10,
         rerank: bool = True,
     ) -> dict:
-        """Query across multiple namespaces (F04; POST /query with a namespaces array).
+        """Query across multiple namespaces (cross-NS query; POST /query with a namespaces array).
 
         Args:
             query: search query text.
@@ -372,7 +372,7 @@ class CortrixToolKit:
         filename: str = "",
         metadata: Optional[dict] = None,
     ) -> dict:
-        """Asynchronously upload a large document (F42; POST /documents -> task_id).
+        """Asynchronously upload a large document (async task; POST /documents -> task_id).
 
         Always async: returns a DocumentTask with task_id; poll cortrix_task_status.
         Pass-through GEN-Agent 4-field error response.
@@ -391,7 +391,7 @@ class CortrixToolKit:
         namespace: str = "",
         top_k: int = 5,
     ) -> dict:
-        """Memory search filtered by memory type (MEM01/MEM05; POST /memory/search).
+        """Memory search filtered by memory type (memory decay/memory isolation; POST /memory/search).
 
         Args:
             query: search query text.
@@ -414,7 +414,7 @@ class CortrixToolKit:
         namespace: str = "",
         session_id: str = "",
     ) -> dict:
-        """Manually trigger MEM02 memory extraction for a session (POST /memory/extract).
+        """Manually trigger memory extraction for a session (POST /memory/extract).
 
         Args:
             namespace: target namespace (uses default if empty).
@@ -437,7 +437,7 @@ class CortrixToolKit:
         messages: List[dict],
         namespace: str = "",
     ) -> dict:
-        """Extract memories from a conversation in one shot (MEM02; POST /memory/extract).
+        """Extract memories from a conversation in one shot (memory extraction; POST /memory/extract).
 
         Args:
             messages: conversation turns, each {role, content}.
@@ -450,14 +450,14 @@ class CortrixToolKit:
         return _to_dict(self._http("POST", "/memory/extract", json=body, timeout=60.0))
 
     def cortrix_task_status(self, task_id: str) -> dict:
-        """Query async upload task progress (F42; GET /documents/tasks/{task_id}/progress).
+        """Query async upload task progress (async task; GET /documents/tasks/{task_id}/progress).
 
         Pass-through GEN-Agent 4-field error response.
         """
         return _to_dict(self._client.documents.task_progress(task_id))
 
     def cortrix_cancel_task(self, task_id: str) -> dict:
-        """Cancel an async upload task (F42; DELETE /documents/tasks/{task_id}).
+        """Cancel an async upload task (async task; DELETE /documents/tasks/{task_id}).
 
         Returns 409 (passed through) if the task already finished and cannot be cancelled.
         Pass-through GEN-Agent 4-field error response.
@@ -494,7 +494,7 @@ class CortrixToolKit:
         namespace: str = "",
         limit: int = 50,
     ) -> dict:
-        """Query the memory audit log (MEM02; reuses the F18a operation log).
+        """Query the memory audit log (memory extraction; reuses the operation log).
 
         Args:
             memory_id: filter to a single memory's audit trail (optional).
@@ -513,7 +513,7 @@ class CortrixToolKit:
         memory_id: str,
         namespace: str = "",
     ) -> dict:
-        """Self-service revoke of an auto-extracted fact (MEM02 D6).
+        """Self-service revoke of an auto-extracted fact (memory extraction D6).
 
         Marks the fact auto_revoke_eligible; the physical row is retained
         (full-retention model). Pass-through GEN-Agent 4-field error response.
@@ -533,7 +533,7 @@ class CortrixToolKit:
         opt_out: bool = True,
         namespace: str = "",
     ) -> dict:
-        """Per-session memory opt-out (and opt-out revoke), MEM04 D2 + D5 combined.
+        """Per-session memory opt-out (and opt-out revoke), memory opt-out D2 + D5 combined.
 
         Args:
             session_id: session to opt out of memory extraction.
@@ -556,7 +556,7 @@ class CortrixToolKit:
         async_: bool = True,
         on_duplicate: str = "skip",
     ) -> dict:
-        """Submit up to 100 documents to a namespace in one batch (TD-F42-BULK).
+        """Submit up to 100 documents to a namespace in one batch.
 
         Args:
             namespace: target namespace.
@@ -590,12 +590,12 @@ class CortrixToolKit:
         limit: int = 50,
         cursor: Optional[str] = None,
     ) -> dict:
-        """Query the operation log (F18a; CE 30-day retention + 100K cap).
+        """Query the operation log (operation log; CE 30-day retention + 100K cap).
 
         Args:
             user_id: defaults to the current agent user_id when omitted.
             namespace: filter by namespace.
-            action: one of the F18a action enum values.
+            action: one of the operation log action enum values.
             start_time / end_time: ISO 8601 time range.
             limit: max rows (default 50, max 200).
             cursor: opaque pagination token.
@@ -628,7 +628,7 @@ class CortrixToolKit:
         limit: int = 50,
         offset: int = 0,
     ) -> dict:
-        """List the current user_id's memories (MEM03 endpoint 1; GET /memory).
+        """List the current user_id's memories (memory transparency endpoint 1; GET /memory).
 
         Args:
             namespace: defaults to the current user_id's namespace when omitted.
@@ -657,9 +657,9 @@ class CortrixToolKit:
         memory_type: str,
         metadata: Optional[dict] = None,
     ) -> dict:
-        """Create a memory (MEM03 endpoint 2; POST /memory).
+        """Create a memory (memory transparency endpoint 2; POST /memory).
 
-        The POST path does not pass through LLM quality filtering (MEM03 issue 4);
+        The POST path does not pass through LLM quality filtering (memory transparency issue 4);
         extraction_method is set to 'user_create' server-side.
         Pass-through GEN-Agent 4-field error response.
         """
@@ -675,7 +675,7 @@ class CortrixToolKit:
         content: Optional[str] = None,
         metadata: Optional[dict] = None,
     ) -> dict:
-        """Edit an existing memory's content / metadata (MEM03 endpoint 3; PATCH /memory/{id}).
+        """Edit an existing memory's content / metadata (memory transparency endpoint 3; PATCH /memory/{id}).
 
         metadata merge semantics (not replace); extraction_method is overwritten
         to 'user_edit' server-side. Semantically a new user_edit memory +
@@ -692,11 +692,11 @@ class CortrixToolKit:
         namespace: Optional[str] = None,
         reason: Optional[str] = None,
     ) -> dict:
-        """Soft-delete a memory (MEM03 endpoint 4; DELETE /memory/{id}).
+        """Soft-delete a memory (memory transparency endpoint 4; DELETE /memory/{id}).
 
         Sets status=invalidated + revoked_at + deleted_by_user_id; the physical row
-        is retained (never hard-deleted) per the MEM02 D9 full-retention model and
-        the MEM03 transparency vision. ``reason`` is written to
+        is retained (never hard-deleted) per the memory extraction D9 full-retention model and
+        the memory transparency vision. ``reason`` is written to
         metadata_json.invalidation_reason.
 
         Errors pass through: CX_ERR_MEMORY_NOT_FOUND / CX_ERR_MEMORY_USER_MISMATCH /

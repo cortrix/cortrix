@@ -37,7 +37,7 @@ class DefaultINSRouter : public INSRouter {
 public:
     /// Construct over an already-opened catalog.db handle (from CatalogDb::db()).
     /// `f05_pool` is the optional Layer-1 admission hook (nullptr in Phase 1 /
-    /// F12-standalone → admission is skipped). Cache sizes/TTL default to §6.3.
+    /// catalog-standalone → admission is skipped). Cache sizes/TTL default to §6.3.
     explicit DefaultINSRouter(sqlite3* db, resource::INamespacePool* f05_pool = nullptr);
 
     /// Late-bind the admission hook after construction. Breaks the

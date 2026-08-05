@@ -28,7 +28,7 @@ public:
     /// Input : RRF-fused ScoredResult[] (child_id + RRF score) + query.
     /// Output: vector<RankedChunk> (field SoT = RETRIEVAL_TYPES_SPEC §1).
     /// Internal steps (§4.2-bis): ChunkStore.GetBatch(child_id) → ScoreBatch →
-    /// RerankerScoreFusion::ComputeRerankRrfScore (F02-owned RRF fusion, sort-only)
+    /// RerankerScoreFusion::ComputeRerankRrfScore (reranker-owned RRF fusion, sort-only)
     /// → sort by fused score → return.
     /// Callers: ScatterGather, the CRAG Evaluator.
     virtual std::vector<retrieval::RankedChunk> Rerank(

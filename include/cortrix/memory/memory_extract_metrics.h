@@ -20,7 +20,7 @@ namespace cortrix::memory {
 /// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
 /// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
-/// **deferred to D3.5** (MEM02-rev-7). Until then it is fully usable + testable
+/// **deferred to D3.5** (memory-extraction-rev-7). Until then it is fully usable + testable
 /// in-process and RenderOpenMetrics() produces what the server will serve.
 ///
 /// §5.4.1 metric schema (6 rows):

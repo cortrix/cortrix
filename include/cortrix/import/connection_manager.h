@@ -150,7 +150,7 @@ public:
 /// §6.1) bind to these methods.
 class ConnectionManager : public IConnectionManager {
 public:
-    /// `op_logger` (optional, may be null) receives the F16a-rev-6 operation_log
+    /// `op_logger` (optional, may be null) receives the import-rev-6 operation_log
     /// entries `db_connection_register` / `db_connection_revoke` (S6). Null = no
     /// audit (observability is strictly additive to the business path).
     ConnectionManager(std::shared_ptr<ISecretStore> secret_store,

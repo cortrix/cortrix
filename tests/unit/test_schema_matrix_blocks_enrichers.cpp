@@ -24,7 +24,7 @@
 namespace cortrix::test_schema_matrix_blocks {
 namespace {
 
-// Minimal F09-owned per-Unit `blocks` stand-in: enough shape to ALTER + index.
+// Minimal block-header-owned per-Unit `blocks` stand-in: enough shape to ALTER + index.
 constexpr const char* kBlocksSql = R"SQL(
 CREATE TABLE blocks (
     block_id         INTEGER PRIMARY KEY,
@@ -336,7 +336,7 @@ TEST_P(ContextualBlkVersionMatrix, Gate) {
     }
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
 }
-// V2 gate contract (forward-only up to CurrentVersion()==2, F03-style): any
+// V2 gate contract (forward-only up to CurrentVersion()==2, enricher-style): any
 // 0 ≤ from ≤ to ≤ 2 passes the version gate (then trips the null-db arm here);
 // backward steps and beyond-current versions (incl. same-version pairs > 2,
 // formerly tolerated) are CX_ERR_SCHEMA_VERSION_MISMATCH.

@@ -12,7 +12,7 @@ namespace cortrix::metadata {
 /// Standalone scope: this recorder covers the generator's own metadata_block
 /// lifecycle — block_generated_total / metadata_size_bytes / field_missing_total /
 /// generate_duration / block_count. The PWL-coupled (block_flush_duration) and
-/// F41-coupled (doc_fts5_sync_total) metrics in §5.bis are emitted at the real
+/// doc-summary-coupled (doc_fts5_sync_total) metrics in §5.bis are emitted at the real
 /// single-transaction / hybrid-fallback wiring sites → D3.5; their counters live here
 /// so the call sites are a one-line add when that wiring lands, but are not driven
 /// standalone.

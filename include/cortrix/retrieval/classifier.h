@@ -18,7 +18,7 @@ namespace cortrix::retrieval {
 /// round and reuses this interface later (the router "reuses this
 /// IClassifier"); nothing here depends on the router.
 
-/// Input to a classifier: the query plus the F02-reranked candidates it is judging.
+/// Input to a classifier: the query plus the reranker-reranked candidates it is judging.
 struct ClassifierInput {
     std::string query;
     std::vector<RankedChunk> chunks;     ///< Reranker output (chunks + scores)

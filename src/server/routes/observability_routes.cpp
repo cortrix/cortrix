@@ -133,7 +133,7 @@ void WriteAgentTraceError(httplib::Response& res, const Status& status,
                    const std::string& request_id, const std::string& id_value) {
     const std::string cx = ExtractCxCode(status.message());
     if (cx.empty()) {
-        // Not an F13-tagged error (shouldn't happen from these handlers) — fall back
+        // Not an trace-tagged error (shouldn't happen from these handlers) — fall back
         // to the standard envelope so the response is still well-formed.
         WriteJsonError(res, status, request_id);
         return;

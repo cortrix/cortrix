@@ -162,7 +162,7 @@ TEST(ContextualStoreErrPathTest, PrepareFailureWhenColumnsMissing_SurfacesCxCode
     sqlite3_close(db);
 }
 
-// Control: the no-op guard means a no-F35-output result never reaches the failing
+// Control: the no-op guard means a no-contextual-output result never reaches the failing
 // UPDATE — it returns Ok even on the column-less table (proves the trigger above
 // is the genuine prepare-failure path, not just any missing-column access).
 TEST(ContextualStoreErrPathTest, NoContextualOutputIsOkEvenWithoutColumns) {

@@ -6,9 +6,9 @@ feature design section 5.4). Because Claude tool definitions are plain JSON, the
 schema builder needs **no** ``anthropic`` SDK at all.
 
 For the agent loop, :func:`dispatch_claude_tool_use` runs one ``tool_use`` block
-and returns the matching ``tool_result`` block; a P03 ``CortrixError`` becomes
+and returns the matching ``tool_result`` block; a Python SDK ``CortrixError`` becomes
 ``is_error=True`` + the GEN-Agent 4-field JSON content (feature design section
-6.3). Error codes / 4 fields are passed through from P03 unchanged.
+6.3). Error codes / 4 fields are passed through from Python SDK unchanged.
 
 ``require_anthropic()`` is provided for callers that want to fail fast when the
 optional ``anthropic`` SDK (needed only for the real Messages round-trip, which

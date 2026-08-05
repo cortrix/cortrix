@@ -29,7 +29,7 @@ namespace doc_summary {
 ///       → block_insert → Commit), mirroring the SPCPipeline memory/L1 write path.
 ///
 /// On any failure it returns the error Status WITHOUT writing a block — the scheduler owns the
-/// retry / DLQ (3 attempts), and doc-discovery degrades to the F08-field FTS5 fallback
+/// retry / DLQ (3 attempts), and doc-discovery degrades to the metadata-field FTS5 fallback
 /// for that doc (a failed doc simply has no doc_summary block). The doc-level
 /// FTS5 index (rule-extracted fields, not the LLM summary) is a separate path; wiring it to
 /// the per-Unit store is its own D3.5 item, NOT this worker.

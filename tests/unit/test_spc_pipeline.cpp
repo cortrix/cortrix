@@ -587,7 +587,7 @@ TEST_F(SPCPipelineTest, CLEANING_ResponseMetaCarriesCleaningSummary) {
 }
 
 // [cleaning PARSE_FAILED · M2] A doc parsed with a failed page (d.failed_pages
-// non-empty) must propagate the F08-format meta.parse_status / meta.parse_failed_page
+// non-empty) must propagate the metadata-format meta.parse_status / meta.parse_failed_page
 // keys onto the child Blocks so cleaning DetectAnomaly can fire PARSE_FAILED. The child's
 // parent span covers page 1, which is the failed page → the child is marked anomalous
 // (kept, but flagged skip-index). Regression for the dead-code gap where MetaToJson
@@ -1280,7 +1280,7 @@ TEST_F(SPCPipelineTest, RollbackCallbackDeletesDocFts5IndexRowInProcess) {
 }
 
 // ============================================================
-// metadata_json flow — child blocks carry the F34-inherited DocumentMetadata
+// metadata_json flow — child blocks carry the parent-child-inherited DocumentMetadata
 // (NOT task.metadata_json; that path is the parser/parent-child chunking doc-meta inheritance). The
 // memory path (above) is the one that carries task.metadata_json.
 // ============================================================

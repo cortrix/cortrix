@@ -37,7 +37,7 @@ public:
     ///     enricher_level:  LlmEnricher=4, ContextualRetrieval=3, HyPE=3, NullEnricher/unknown=0
     ///     image_level:     has_image_caption=4, else 0
     /// (v1.0.1 M1 fix) Meta Block special case: input.block_type == kBlockMeta (8) → force returning
-    ///   Level 0 (=0.2); aligned with ARCH §5.2.1 F08-locked semantic_score=0.2, consistent with D7.
+    ///   Level 0 (=0.2); aligned with ARCH §5.2.1 metadata-locked semantic_score=0.2, consistent with D7.
     /// Always returns a value in [0, 4] (never out of range — defensive by construction).
     static uint8_t ComputeLevel(const ScoringInput& input);
 

@@ -82,13 +82,13 @@ struct MetadataBlock {
 };
 
 /// Generator input. doc_metadata is the consumed parser type; file_info /
-/// stats / custom_metadata are F08-owned request/pipeline inputs.
+/// stats / custom_metadata are metadata-owned request/pipeline inputs.
 struct GeneratorInput {
     std::string doc_id;
     std::string namespace_id;
     cortrix::spc::DocumentMetadata doc_metadata;  ///< parser output (parser.h:75, real fields)
-    FileInfo file_info;                           ///< F08-owned DTO (source/tags/upload time)
-    ProcessingStats stats;                        ///< F08-owned DTO (provenance/counts)
+    FileInfo file_info;                           ///< metadata-owned DTO (source/tags/upload time)
+    ProcessingStats stats;                        ///< metadata-owned DTO (provenance/counts)
 
     /// D9 B' lock: custom key-value set once by the business side at upload time (arbitrary JSON object). Empty object by default.
     nlohmann::json custom_metadata = nlohmann::json::object();

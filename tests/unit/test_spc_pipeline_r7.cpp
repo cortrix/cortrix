@@ -174,7 +174,7 @@ public:
     MOCK_METHOD((Result<bool>), ShouldSeal, (const std::string&), (const, override));
 };
 
-// Fake F03-style enricher (entities + summary). Mirrors test_enricher_chain.cpp.
+// Fake enricher (entities + summary). Mirrors test_enricher_chain.cpp.
 class FakeSummaryEnricher : public cortrix::spc::ISpcEnricher {
 public:
     cortrix::spc::EnrichResult Enrich(const std::string&,
@@ -201,7 +201,7 @@ public:
     std::string Name() const override { return "LlmEnricher"; }
 };
 
-// Fake F35-style enricher: stamps a contextualized embedding (drives the
+// Fake contextual-style enricher: stamps a contextualized embedding (drives the
 // kFlagExtHasContextualized bit + WriteContextualized branch in the pipeline).
 class FakeContextualEnricher : public cortrix::spc::ISpcEnricher {
 public:
@@ -614,7 +614,7 @@ TEST_F(SPCPipelineR7Test, EnricherChain_L2_EnrichesButSkipsHypeBlocks) {
 // chain member succeeded, 'pending_retry' + failed_members csv otherwise.
 // ============================================================
 
-// F03-slot fake that always degrades (step status != 0, the enricher/HyPE failure shape).
+// enricher-slot fake that always degrades (step status != 0, the enricher/HyPE failure shape).
 class FailingSummaryEnricher : public cortrix::spc::ISpcEnricher {
 public:
     cortrix::spc::EnrichResult Enrich(const std::string&,
@@ -636,7 +636,7 @@ public:
     std::string Name() const override { return "LlmEnricher"; }
 };
 
-// F35-style fake failing the contextual retrieval way: the step status stays 0 (fail-soft) and the
+// contextual-style fake failing the contextual retrieval way: the step status stays 0 (fail-soft) and the
 // outcome is only visible in contextualized_status == 2 — exactly the shape the
 // member-aware debt detection must catch.
 class FailingContextualEnricher : public cortrix::spc::ISpcEnricher {

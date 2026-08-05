@@ -25,7 +25,7 @@ namespace cortrix::memory::immunity {
 ///
 /// SoT note: the canonical attributes (http / category / retryable / retry_after_ms /
 /// structured_data keys) follow the server error registry (the authority), which this layer
-/// §5.4 explicitly defers to (MEM04-rev-1 registers them in ARCH §4.1.11). Where the
+/// §5.4 explicitly defers to (memory-opt-out-rev-1 registers them in ARCH §4.1.11). Where the
 /// detail design §5.4 table and ARCH §4.1.11 differ on a structured_data key (ALREADY_OPTED_OUT →
 /// `opted_out_at`; REVOKE_DENIED → `required_role`; OPT_OUT_DISABLED → `config_source`),
 /// ARCH wins.

@@ -101,7 +101,7 @@ inline std::string UnwrapCompleteJsonFence(const std::string& input) {
     return std::string(inner);
 }
 
-// JSON string-escape repair (QA 2026-07-12 F-10; first shipped F41-only after
+// JSON string-escape repair (QA 2026-07-12 F-10; first shipped doc-summary-only after
 // the 2026-07-11 DeepSeek field failure): providers sometimes emit an invalid
 // backslash escape inside a string value (`C:\Users`, LaTeX `\_`, kaomoji) —
 // strict parsing rightly refuses, and it refuses DETERMINISTICALLY for the

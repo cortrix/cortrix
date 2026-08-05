@@ -2,7 +2,7 @@
 //   Parser (ParserSchemaProvider, namespaces.parser_config TEXT column, version 1)
 //   Reranker (RerankerSchemaProvider, reranker no-op provider, version 1)
 //   Watcher (WatcherSchemaProvider, watcher no-op provider, version 1)
-//   HyPE (HypeSchemaProvider, hype no-op provider, version 1, F38-specific error token)
+//   HyPE (HypeSchemaProvider, hype no-op provider, version 1, HyPE-specific error token)
 //   Sparse retrieval (SparseSchemaProvider, sparse_inverted_index table + blocks.sparse_vec, version 1)
 //
 // Fresh in-memory sqlite3 per case. Globally unique suite/fixture names

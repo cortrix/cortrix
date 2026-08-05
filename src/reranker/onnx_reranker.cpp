@@ -555,7 +555,7 @@ std::vector<retrieval::RankedChunk> OnnxReranker::Rerank(
         result[i].rerank_score = rerank_scores[i];
     }
 
-    // 4. F02-owned RRF fusion (§4.2-ter): base ordering score =
+    // 4. reranker-owned RRF fusion (§4.2-ter): base ordering score =
     //    rerank_score*0.7 + rrf_score*0.3 (rrf_score = the candidate's RRF score,
     //    carried as RankedChunk.score), then the optional semantic multiplier.
     //    Write the final score back so downstream query surfaces use one score

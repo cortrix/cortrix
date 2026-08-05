@@ -17,7 +17,7 @@ struct QueryContext;  // fwd-decl (defined in query/query_context.h); EvaluateAn
 namespace cortrix::retrieval {
 
 /// CragEvaluator — the CRAG retrieval-quality evaluator.
-/// Implements the shared IClassifier contract and the F37-specific
+/// Implements the shared IClassifier contract and the CRAG-specific
 /// EvaluateAndUpdateContext that writes the verdict back onto QueryContext.
 ///
 /// Pipeline (§6.2): ComputeMultiSignals → heuristic guard (degenerate input) →
@@ -45,7 +45,7 @@ public:
     }
     bool IsAvailable() const override;
 
-    /// F37-specific (§6.3): classify `chunks` for `ctx.query` and write the verdict
+    /// CRAG-specific (§6.3): classify `chunks` for `ctx.query` and write the verdict
     /// fields back onto `ctx` (crag_verdict / crag_score / f37_signals /
     /// ambiguous_action_taken / web_fallback_triggered). Path handling per §6.3
     /// (correct: no-op return; ambiguous: mark action; incorrect: OBS counter +

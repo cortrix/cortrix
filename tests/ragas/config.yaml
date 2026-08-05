@@ -1,6 +1,6 @@
 # =============================================================
-# F23 W1: RAGAS evaluation config (design: F23-tests.md §3.2)
-# Evaluates F03 enrich + retrieval quality: Context Precision /
+# Test suite W1: RAGAS evaluation config (design: test-suite-tests.md §3.2)
+# Evaluates enrich + retrieval quality: Context Precision /
 # Context Recall over a pinned Q-A-context dataset.
 # Runner: tests/ragas/run_eval.py (Nightly + Release; needs an
 # LLM judge key — skipped when CORTRIX_LLM_API_KEY is unset).
@@ -31,7 +31,7 @@ judge:
   base_url_env: CORTRIX_LLM_BASE_URL
 
 thresholds:
-  # Phase 1 V1.0 baselines — recorded first, hardened after F44
+  # Phase 1 V1.0 baselines — recorded first, hardened after benchmark
   # benchmark calibration (topic 5 coordination).
   context_precision: 0.70
   context_recall: 0.70

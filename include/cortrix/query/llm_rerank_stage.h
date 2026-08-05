@@ -10,7 +10,7 @@
 namespace cortrix::query {
 
 /// LlmRerankStage — LLM listwise second-pass reranker (design: hub
-/// design/features/F36-llm-listwise-rerank-addendum.md).
+/// design/features/RAG-Fusion-llm-listwise-rerank-addendum.md).
 ///
 /// Position in the pipeline: retrieval (+RAG-Fusion variants) → cross-encoder
 /// rerank → THIS stage listwise-reranks the head top_n of the response → caller

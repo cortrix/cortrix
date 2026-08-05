@@ -19,7 +19,7 @@
 // HyPE S7 — standalone integration: the full HyPE pipeline wired together
 // against the mock LLM + mock ParentChunkStore + stub embedder. Covers the
 // generate -> embed -> Block(type=16) -> fuse -> explain chain + the L2
-// degrade (IT-F38-recall-4). Real BEIR Recall@10 +3pp / hit-rate 30% / LLM
+// degrade (IT-HyPE-recall-4). Real BEIR Recall@10 +3pp / hit-rate 30% / LLM
 // failure rate <5% (§13.bis) = D3.5 (real model + dataset not present).
 namespace cortrix::spc {
 namespace {
@@ -117,7 +117,7 @@ TEST(HypeIntegrationTest, IT5_FusionExplainViaHype) {
     EXPECT_FLOAT_EQ(c2->hype_match_score, 0.95f);
 }
 
-// IT-F38-recall-4 — L2 degrade: LLM mock failure → Enrich reports failed, the
+// IT-HyPE-recall-4 — L2 degrade: LLM mock failure → Enrich reports failed, the
 // chunk is NOT blocked (HyPE skipped). Standalone proxy for "Recall@10 not
 // below dense-only -1pp" (the real recall measurement = D3.5).
 TEST(HypeIntegrationTest, IT_recall4_LlmFailureDegrades) {

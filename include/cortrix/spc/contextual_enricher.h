@@ -19,7 +19,7 @@ namespace cortrix::spc {
 /// `std::shared_ptr<BgeM3Embedder>` member, but the frozen embedder
 /// (cortrix::OnnxEmbedder) is a concrete, non-virtual class with no shared base
 /// interface — so it cannot be a mockable injection point directly. We introduce
-/// this F35-local virtual seam (same role ILlmClient plays for OpenAiLlmClient):
+/// this contextual-local virtual seam (same role ILlmClient plays for OpenAiLlmClient):
 /// production injects an adapter wrapping OnnxEmbedder (ContextualOnnxEmbedder,
 /// below); tests inject a fake. Wiring the real OnnxEmbedder through the SPC
 /// pipeline is cross-Feature integration → D3.5. A null embedder means "no
@@ -126,7 +126,7 @@ public:
     /// Enricher name (EnrichResult.enricher_name, §5.1).
     std::string Name() const override { return "f35_contextual_retrieval"; }
 
-    // --- F35-specific API ---
+    // --- contextual-specific API ---
 
     /// Generate the contextualized prefix for `chunk_text`. On success
     /// returns the LLM prefix text. On LLM transport/timeout failure returns a

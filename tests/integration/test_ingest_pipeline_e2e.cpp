@@ -63,7 +63,7 @@ constexpr const char* kNsDedupOff = "eng";    // NS override: dedup off
 
 // ── fake enrichers (mirror tests/unit/test_spc_pipeline_r7.cpp) ──────────────────
 
-// F03-style: stamps a summary + one entity + a positive enriched_score so the
+// enricher-style: stamps a summary + one entity + a positive enriched_score so the
 // WriteEnrichment branch + entities table write run.
 class FakeSummaryEnricher : public cortrix::spc::ISpcEnricher {
  public:
@@ -90,7 +90,7 @@ class FakeSummaryEnricher : public cortrix::spc::ISpcEnricher {
   std::string Name() const override { return "LlmEnricher"; }
 };
 
-// F35-style: stamps a contextualized embedding so the kFlagExtHasContextualized bit +
+// contextual-style: stamps a contextualized embedding so the kFlagExtHasContextualized bit +
 // WriteContextualized branch run.
 class FakeContextualEnricher : public cortrix::spc::ISpcEnricher {
  public:

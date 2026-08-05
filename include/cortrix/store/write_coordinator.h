@@ -14,7 +14,7 @@
 #include "cortrix/store/i_vector_store.h"   // IVectorStore (canonical Exists)
 #include "cortrix/store/pending_entry.h"
 #include "cortrix/store/pending_log_writer.h"
-#include "cortrix/store/recover_stores.h"   // IMetadataStore / IBlobStore (F25-consumer DIP)
+#include "cortrix/store/recover_stores.h"   // IMetadataStore / IBlobStore (write-coordinator-consumer DIP)
 
 namespace cortrix::store {
 

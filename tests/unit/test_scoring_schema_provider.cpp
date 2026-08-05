@@ -12,7 +12,7 @@
 namespace cortrix::scoring {
 namespace {
 
-// Minimal stand-in for the F09-owned per-Unit blocks table (the real per-Unit framework
+// Minimal stand-in for the block-header-owned per-Unit blocks table (the real per-Unit framework
 // creates the full table; we only need enough shape to ALTER + index).
 constexpr const char* kBlocksSql = R"SQL(
 CREATE TABLE blocks (

@@ -50,7 +50,7 @@ private:
 
     /// Collect the splitting units (paragraphs for unit_level=paragraph; whole
     /// pages for page; sentence-level otherwise) from the input pages, skipping
-    /// F06-failed / empty paragraphs and updating stats (succeeded/failed pages).
+    /// parser-failed / empty paragraphs and updating stats (succeeded/failed pages).
     std::vector<Unit> CollectUnits(const ChunkerInput& input, ChunkerStats* stats) const;
 
     /// Parent-child path: accumulate units into parents, split each parent into

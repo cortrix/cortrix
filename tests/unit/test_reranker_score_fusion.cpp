@@ -1,4 +1,4 @@
-// Reranker — RerankerScoreFusion (F02-owned RRF fusion) + Rerank ordering.
+// Reranker — RerankerScoreFusion (reranker-owned RRF fusion) + Rerank ordering.
 //
 // Covers (Agent-D reranker wrap-up increment Task A):
 //   (1) Fusion math: weighted_sum(rerank*0.7 + rrf*0.3) + named-constant weights.

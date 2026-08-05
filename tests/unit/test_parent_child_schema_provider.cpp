@@ -184,7 +184,7 @@ TEST(ParentChildSchemaProviderTest, UnexpectedVersionStepIsError) {
 // --- branch-coverage supplements (error / failure paths) ------------------
 
 TEST(ParentChildSchemaProviderTest, NullDbRejected) {
-    // db == nullptr → kInvalidArgument ("F34 migrate: null db") AFTER the
+    // db == nullptr → kInvalidArgument ("parent_child migrate: null db") AFTER the
     // init/version gate but BEFORE any Exec.
     ParentChildSchemaProvider p;
     Status st = p.Migrate(nullptr, 0, 1);

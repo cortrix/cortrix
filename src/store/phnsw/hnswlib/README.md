@@ -1,7 +1,7 @@
 # Vendored hnswlib (P-HNSW shallow fork)
 
 This directory is a **vendored copy** of [hnswlib](https://github.com/nmslib/hnswlib),
-the header-only HNSW graph index used by Cortrix's P-HNSW vector index (F01).
+the header-only HNSW graph index used by Cortrix's P-HNSW vector index.
 
 | | |
 |---|---|
@@ -9,11 +9,11 @@ the header-only HNSW graph index used by Cortrix's P-HNSW vector index (F01).
 | Version | v0.8.0 |
 | Commit | `3f3429661187e4c24a490a0f148fc6bc89042b3d` |
 | License | Apache-2.0 (see `LICENSE`) |
-| Vendored | 2026-05-30 (F01 S1) |
+| Vendored | 2026-05-30 |
 
 ## Why vendored instead of FetchContent
 
-F01 (Persistent HNSW) is a **shallow fork**: we keep hnswlib's graph algorithm
+P-HNSW is a **shallow fork**: we keep hnswlib's graph algorithm
 untouched and add persistence (WAL + snapshot) *around* it in `../`. Vendoring the
 source in-tree (rather than pulling it via CMake `FetchContent` at configure time)
 gives us:

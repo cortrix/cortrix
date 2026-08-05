@@ -22,7 +22,7 @@ struct ChunkRecord {
 /// CRAG. The Phase 1 concrete implementation is SqliteChunkStore over the
 /// unified `blocks` table: child
 /// chunks are blocks rows with child_id IS NOT NULL; content_text holds the chunk
-/// text and parent_id/chunk_index are F34-owned columns — a single-table read, no
+/// text and parent_id/chunk_index are parent-child-owned columns — a single-table read, no
 /// META + blob assembly (the pre-unified-blocks approach). Tests use MockChunkStore.
 /// ParentChunkStore is a *parallel* parent-level lookup (separate class, not
 /// derived from ChunkStore).

@@ -10,7 +10,7 @@ struct sqlite3;  // opaque, same fwd-decl style as cortrix_store_sqlite.h
 
 namespace cortrix::doc_summary {
 
-/// One F08-field row fed into the doc-level FTS5 index. These are the
+/// One metadata-field row fed into the doc-level FTS5 index. These are the
 /// rule-extracted metadata fields — they always exist (no LLM dependency), so
 /// the FTS5 path is the hybrid fallback when the LLM summary is missing/failed.
 struct DocFtsRow {

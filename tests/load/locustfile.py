@@ -1,10 +1,10 @@
 # =============================================================
-# F23 W3: Locust load profile (design: F23-tests.md §3.2 / §6.3)
+# Test suite W3: Locust load profile (design: test-suite-tests.md §3.2 / §6.3)
 # Nightly: locust -f tests/load/locustfile.py --headless -u 100 -r 10
 #          --run-time 5m --host http://localhost:8420
 #
 # Exercises the agent-facing hot paths: health, doc upload, query,
-# memory read. P95 is compared against the F08 baseline out-of-band
+# memory read. P95 is compared against the META block baseline out-of-band
 # (soft gate ±10% — alert, don't block).
 # =============================================================
 import random
@@ -50,7 +50,7 @@ class CortrixAgentUser(HttpUser):
 
     @task(3)
     def query(self):
-        # Global query endpoint; namespace rides in the body (F04 contract)
+        # Global query endpoint; namespace rides in the body (cross-NS query contract)
         self.client.post(
             "/api/v1/query",
             json={"query": _rand_text(6), "namespace": NS, "top_k": 5},
@@ -59,5 +59,5 @@ class CortrixAgentUser(HttpUser):
 
     @task(1)
     def readiness(self):
-        # F24 readiness endpoint (F20 ReadinessRegistry aggregate)
+        # Deployment readiness endpoint (ReadinessRegistry aggregate)
         self.client.get("/api/v1/system/health/ready", name="GET /system/health/ready")

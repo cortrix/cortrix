@@ -17,7 +17,7 @@ struct QueryContext;  // fwd-decl (defined in query/query_context.h); RouteAndUp
 /// QueryComplexityClassifier — the Adaptive-RAG query-complexity router
 /// It implements the shared IClassifier contract (ruling of the
 /// G3+G1.2 joint D1 — declared in cortrix::retrieval, reused here) and the
-/// F39-specific RouteAndUpdateContext that writes the routing decision onto
+/// router-specific RouteAndUpdateContext that writes the routing decision onto
 /// QueryContext (S3 ruling).
 ///
 /// It lives in cortrix::query (not cortrix::retrieval) because it is a *query-path*
@@ -66,7 +66,7 @@ public:
     }
     bool IsAvailable() const override;
 
-    /// F39-specific (§6.1): route `ctx.query` and write the routing fields back onto
+    /// router-specific (§6.1): route `ctx.query` and write the routing fields back onto
     /// `ctx` (routing_path / complexity_score / routing_decision_source /
     /// chat_path_triggered / multi_turn_context_warning), honoring an optional
     /// Agent `?route=` override and the resolved NS ComplexityConfig.
@@ -91,7 +91,7 @@ public:
 
     /// CRAG runs only on the Complex / (default) path; it is skipped on Simple
     /// and Chat. Same fail-safe as ShouldSkipF36. Kept in
-    /// exact lockstep with the F37-side mock (retrieval/routing_mock.h).
+    /// exact lockstep with the CRAG-side mock (retrieval/routing_mock.h).
     static bool ShouldSkipF37(const QueryContext& ctx);
 
     // --- Exposed for unit tests / reuse ---

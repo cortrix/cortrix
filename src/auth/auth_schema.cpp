@@ -6,7 +6,7 @@
 
 namespace cortrix::auth {
 
-// platform.db Auth schema — transcribed from P08-auth-system.md §3.1–§3.7.
+// platform.db Auth schema — transcribed from auth-auth-system.md §3.1–§3.7.
 // One DDL batch so the migrator applies it atomically. 7 tables (v0 4 + v1.0 3).
 // IF NOT EXISTS on every object (see auth_schema.h for the platform.db vs
 // catalog.db separation + idempotency notes).

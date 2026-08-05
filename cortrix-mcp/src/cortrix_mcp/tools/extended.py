@@ -1,9 +1,9 @@
 """Extended 4 tools (feature design section 4.2): #13-#16.
 
-  #13 cortrix_cross_ns_query        -> POST /query  (namespaces array, F04)
-  #14 cortrix_async_upload          -> POST /documents (F42, async only)
-  #15 cortrix_memory_search_filter  -> POST /memory/search (memory_type filter, MEM01/MEM05)
-  #16 cortrix_memory_extract_trigger-> POST /memory/extract (manual MEM02 trigger)
+  #13 cortrix_cross_ns_query        -> POST /query  (namespaces array, cross-NS query)
+  #14 cortrix_async_upload          -> POST /documents (async task, async only)
+  #15 cortrix_memory_search_filter  -> POST /memory/search (memory_type filter, memory decay/memory isolation)
+  #16 cortrix_memory_extract_trigger-> POST /memory/extract (manual memory extraction trigger)
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ def register(mcp) -> None:
         top_k: int = 10,
         rerank: bool = True,
     ) -> dict:
-        """Query across multiple namespaces (F04; POST /query with a namespaces array).
+        """Query across multiple namespaces (cross-NS query; POST /query with a namespaces array).
 
         Args:
             query: search query text.
@@ -41,7 +41,7 @@ def register(mcp) -> None:
         filename: str = "",
         metadata: Optional[dict] = None,
     ) -> dict:
-        """Asynchronously upload a large document (F42; POST /documents -> task_id).
+        """Asynchronously upload a large document (async task; POST /documents -> task_id).
 
         Always async: returns a DocumentTask with task_id; poll cortrix_task_status.
         """
@@ -60,11 +60,11 @@ def register(mcp) -> None:
         namespace: str = "",
         top_k: int = 5,
     ) -> dict:
-        """Memory search filtered by memory type (MEM01/MEM05; POST /memory/search).
+        """Memory search filtered by memory type (memory decay/memory isolation; POST /memory/search).
 
         Args:
             query: search query text.
-            memory_type: one of fact / preference / event (P04 memory enum).
+            memory_type: one of fact / preference / event (API spec memory enum).
             namespace: target namespace (uses default if empty).
             top_k: number of results (default 5).
         """
@@ -77,7 +77,7 @@ def register(mcp) -> None:
         namespace: str = "",
         session_id: str = "",
     ) -> dict:
-        """Manually trigger MEM02 memory extraction for a session (POST /memory/extract).
+        """Manually trigger memory extraction for a session (POST /memory/extract).
 
         Args:
             namespace: target namespace (uses default if empty).

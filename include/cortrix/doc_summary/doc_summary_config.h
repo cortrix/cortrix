@@ -8,7 +8,7 @@ namespace cortrix::doc_summary {
 //
 // Read through the generic IGlobalConfig accessors (GetInt/GetFloat/GetBool/
 // GetString) under the keys below — this layer does NOT add typed getters to the frozen
-// IGlobalConfig scaffolding header (an F41-typed getter would be a D3.5 reverse
+// IGlobalConfig scaffolding header (an doc-summary-typed getter would be a D3.5 reverse
 // hook, the same approach HyPE took for hype.* and sparse retrieval for retrieval.sparse_top_k).
 // The DocSummaryConfig struct + the resolver consume these.
 // -----------------------------------------------------------------------------

@@ -92,7 +92,7 @@ public:
     /// Enricher name (EnrichResult.enricher_name / enricher_name="hype").
     std::string Name() const override { return "hype"; }
 
-    // --- F38-specific API (reconcile 1: the real HyPE product) ---
+    // --- HyPE-specific API (reconcile 1: the real HyPE product) ---
 
     /// Generate K hypothetical questions for `chunk_text`. `parent_text`
     /// is OPTIONAL context (reconcile 2): empty == no parent context available.

@@ -14,7 +14,7 @@ constexpr int kAuthSchemaVersion = 1;
 /// tables (total tables = 7):
 ///   v0 4 tables: users / refresh_tokens / verification_codes / token_blacklist
 ///   v1.0 adds 3 tables: auth_secrets (topic 1.1C) / auth_config (topic 8) / api_keys (topic 7D)
-/// faithfully transcribed from P08-auth-system.md §3.1–§3.7.
+/// faithfully transcribed from auth-auth-system.md §3.1–§3.7.
 ///
 /// 🔒 DB SEPARATION (important — do NOT confuse with the catalog `users` table):
 /// these tables live in **platform.db**, a *different*

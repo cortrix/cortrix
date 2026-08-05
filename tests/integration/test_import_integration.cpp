@@ -149,7 +149,7 @@ TEST(ImportIntegration, RegisterThenImportEndToEndViaHandler) {
     // D5: the 3 rows were fed to the SPC pipeline.
     EXPECT_EQ(s.feeder->total_chunks(), 3);
 
-    // S6 (F16a-rev-6): all 3 operation_log actions recorded.
+    // S6 (import-rev-6): all 3 operation_log actions recorded.
     auto acts = s.oplog->actions();
     EXPECT_NE(std::find(acts.begin(), acts.end(), "db_connection_register"), acts.end());
     EXPECT_NE(std::find(acts.begin(), acts.end(), "database_import"), acts.end());

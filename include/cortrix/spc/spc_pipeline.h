@@ -53,7 +53,7 @@ public:
     /// Post-parse entry: runs Stage 3+ (Chunk → META → 
     /// enrich → embed → assemble → write → OnDocumentWritten) over an already-parsed
     /// doc. Process() delegates here right after Stage 2; the async task path
-    /// (DocumentProcessor, which already F06-parsed with per-page progress/cancel) calls
+    /// (DocumentProcessor, which already parser-parsed with per-page progress/cancel) calls
     /// it directly to avoid re-parsing. `d` is non-const: d.pages is moved into the chunker.
     /// @return 0 = success, -1 = error (task.error_message filled)
     int ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,

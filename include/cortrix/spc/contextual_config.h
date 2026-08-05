@@ -9,7 +9,7 @@ namespace cortrix::spc {
 //
 // Read through the generic IGlobalConfig accessors (GetString/GetInt/GetBool)
 // under the keys below — this stage does NOT add typed getters to the frozen
-// IGlobalConfig scaffolding header (an F35-typed getter would be a D3.5 reverse
+// IGlobalConfig scaffolding header (an contextual-typed getter would be a D3.5 reverse
 // hook, same approach HyPE took for hype.* and sparse retrieval for retrieval.sparse_top_k).
 // The ContextualRetrievalConfig struct + the NS-config three-layer resolver
 // (§6.2) consume these.

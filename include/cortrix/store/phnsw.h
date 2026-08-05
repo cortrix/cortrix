@@ -26,7 +26,7 @@ class L2Space;
 
 namespace cortrix::store {
 
-// F01-internal components (defined in src/store/phnsw/). Forward-declared here
+// index-internal components (defined in src/store/phnsw/). Forward-declared here
 // and held by unique_ptr; their headers are included by phnsw.cpp (where the
 // out-of-line destructor instantiates them as complete types). WalWriter (S2)
 // owns hnsw.wal and is the IWalSink; GroupCommitWriter (shared scaffolding)

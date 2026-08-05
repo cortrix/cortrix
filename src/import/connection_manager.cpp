@@ -280,7 +280,7 @@ Result<ConnectionRefId> ConnectionManager::Register(const std::string& name,
         return ins;
     }
 
-    // S6 (F16a-rev-6): audit the register. resource_id = ref_id (NEVER the DSN, R2).
+    // S6 (import-rev-6): audit the register. resource_id = ref_id (NEVER the DSN, R2).
     if (op_logger_) {
         auto entry = observability::MakeEngineEntry(
             observability::EmitSite::kSpcPipeline, "db_connection_register",
@@ -354,7 +354,7 @@ Status ConnectionManager::Revoke(const ConnectionRefId& ref_id,
     if (!s.ok()) return s;
     secret_store_->Erase(rec->secret_key_id);  // drop the secret on revoke
 
-    // S6 (F16a-rev-6): audit the revoke.
+    // S6 (import-rev-6): audit the revoke.
     if (op_logger_) {
         auto entry = observability::MakeEngineEntry(
             observability::EmitSite::kSpcPipeline, "db_connection_revoke",

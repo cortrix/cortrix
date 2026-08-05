@@ -56,7 +56,7 @@ std::vector<ChunkContext> MakeContexts(const std::vector<std::string>& texts,
     return ctxs;
 }
 
-// F03-style enricher that stamps the full set of merge-source fields (entities +
+// enricher-style enricher that stamps the full set of merge-source fields (entities +
 // summary + score + enricher_name + token_count + duration_ms + model_used +
 // prompt_version). Drives the "first write" side of every merge conditional.
 class FullFieldsEnricher : public ISpcEnricher {
@@ -84,7 +84,7 @@ public:
     std::string Name() const override { return "LlmEnricher"; }
 };
 
-// A SECOND F03-style enricher that ALSO stamps every field — when chained after
+// A SECOND enricher-style enricher that ALSO stamps every field — when chained after
 // FullFieldsEnricher it exercises the "already populated, do not overwrite" FALSE
 // arms (enricher_name kept; entities/summary replaced only because non-empty; the
 // accumulation arms for token_count/duration_ms).

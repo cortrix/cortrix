@@ -422,7 +422,7 @@ Status DefaultINSRouter::DeleteNamespace(const std::string& namespace_id) {
 
     // Pool eviction hook: after the catalog soft-delete,
     // release the NS's pool resources (index / WriteCoordinator / store.db). When
-    // f05_pool_ is null (Phase 1 standalone / F12-standalone) this is skipped. Per
+    // f05_pool_ is null (Phase 1 standalone / catalog-standalone) this is skipped. Per
     // §3.1.bis the catalog delete is authoritative: an EvictForDelete failure is
     // logged but NOT rolled back (any pool residue is reclaimable via the admin API,
     // and self-heals on restart since StartupLoadAll skips deleted NS). EvictForDelete
