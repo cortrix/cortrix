@@ -11,7 +11,7 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/catalog/schema_provider.h"
 
-// P08 S1 coverage: the 7-table platform.db schema + idempotency (P08 §3 / §S1
+// Auth S1 coverage: the 7-table platform.db schema + idempotency (auth / §S1
 // `Schema_Create7Tables`, `Schema_Idempotent`).
 namespace cortrix::auth {
 namespace {
@@ -63,7 +63,7 @@ TEST(AuthSchemaTest, Create7Tables) {
     for (const char* t : kAll7Tables) {
         EXPECT_TRUE(TableExists(db, t)) << "missing table: " << t;
     }
-    // schema_version records P08 at v1.
+    // schema_version records auth at v1.
     EXPECT_EQ(catalog::SchemaMigrator().CurrentVersion(db, "P08"), kP08AuthSchemaVersion);
 }
 
@@ -135,7 +135,7 @@ TEST(AuthSchemaTest, AuthSecretsCheckConstraints) {
               SQLITE_OK);
 }
 
-// DB-separation guard (auth_schema.h): a freshly-opened platform.db has the P08
+// DB-separation guard (auth_schema.h): a freshly-opened platform.db has the auth
 // `users` columns (password_hash / status / login_attempts), NOT the thin
 // catalog `users` (user_id / email / created_at only). This is what keeps the
 // same-name-different-file tables from being confused.
@@ -156,15 +156,15 @@ TEST(AuthSchemaTest, PlatformUsersHasAuthColumns) {
     auto has = [&](const std::string& c) {
         return std::find(cols.begin(), cols.end(), c) != cols.end();
     };
-    EXPECT_TRUE(has("password_hash"));   // P08 users, not catalog users
+    EXPECT_TRUE(has("password_hash"));   // Auth users, not catalog users
     EXPECT_TRUE(has("login_attempts"));
     EXPECT_TRUE(has("display_name"));
-    // catalog `users` PK column is `user_id`; P08 `users` PK is `id`.
+    // catalog `users` PK column is `user_id`; auth `users` PK is `id`.
     EXPECT_TRUE(has("id"));
     EXPECT_FALSE(has("user_id"));
 }
 
-// Extra-provider registration: P08 runs first, an extra provider (FK→users)
+// Extra-provider registration: auth runs first, an extra provider (FK→users)
 // migrates after it in one atomic batch. Mirrors the catalog multi-provider
 // path; proves platform.db reuses the frozen SchemaMigrator scaffold correctly.
 class FakeProvider : public catalog::ISchemaProvider {
@@ -172,7 +172,7 @@ public:
     std::string FeatureName() const override { return "FAKE"; }
     int CurrentVersion() const override { return 1; }
     Status Migrate(sqlite3* db, int, int) override {
-        // FK→users(id) only succeeds if P08 already created `users`.
+        // FK→users(id) only succeeds if auth already created `users`.
         const char* ddl =
             "CREATE TABLE feat_fake (id INTEGER PRIMARY KEY, "
             "uid TEXT REFERENCES users(id))";
@@ -191,7 +191,7 @@ TEST(AuthSchemaTest, ExtraProviderRunsAfterP08) {
     PlatformDb pdb;
     Status st = pdb.Open(":memory:", {&fake});
     ASSERT_TRUE(st.ok()) << st.message();
-    EXPECT_TRUE(TableExists(pdb.db(), "users"));      // P08 base
+    EXPECT_TRUE(TableExists(pdb.db(), "users"));      // Auth base
     EXPECT_TRUE(TableExists(pdb.db(), "feat_fake"));  // extra (FK→users)
 }
 

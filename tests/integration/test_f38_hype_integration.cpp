@@ -16,9 +16,9 @@
 #include "mock_llm_client.h"
 #include "mock_parent_chunk_store.h"
 
-// F38 S7 — standalone integration: the full F38 HyPE pipeline wired together
+// HyPE S7 — standalone integration: the full HyPE pipeline wired together
 // against the mock LLM + mock ParentChunkStore + stub embedder. Covers the
-// generate -> embed -> Block(type=16) -> fuse -> explain chain + the F38-8 L2
+// generate -> embed -> Block(type=16) -> fuse -> explain chain + the L2
 // degrade (IT-F38-recall-4). Real BEIR Recall@10 +3pp / hit-rate 30% / LLM
 // failure rate <5% (§13.bis) = D3.5 (real model + dataset not present).
 namespace cortrix::spc {
@@ -40,7 +40,7 @@ DocumentMetadata DocMeta() {
     return m;
 }
 
-// IT-F38-1 — generate -> embed -> hype_question Block (block_type=16) end-to-end.
+// Case 1 — generate -> embed -> hype_question Block (block_type=16) end-to-end.
 TEST(F38HypeIntegrationTest, IT1_GenerateEmbedBuildBlock) {
     auto llm = std::make_shared<llm::MockLlmClient>();
     EXPECT_CALL(*llm, Chat(_, _))
@@ -91,7 +91,7 @@ TEST(F38HypeIntegrationTest, IT_ParentTextResolvedAndUsed) {
     EXPECT_NE(captured.find("FULL PARENT SECTION TEXT"), std::string::npos);
 }
 
-// IT-F38-5 — mixed-pool fusion: a chunk recalled via hype gets via_hype + explain.
+// Case 5 — mixed-pool fusion: a chunk recalled via hype gets via_hype + explain.
 TEST(F38HypeIntegrationTest, IT5_FusionExplainViaHype) {
     std::vector<HypeCandidate> pool;
     // chunk path: c1 (rank0), c2 (rank1)
@@ -118,7 +118,7 @@ TEST(F38HypeIntegrationTest, IT5_FusionExplainViaHype) {
 }
 
 // IT-F38-recall-4 — L2 degrade: LLM mock failure → Enrich reports failed, the
-// chunk is NOT blocked (HyPE skipped, F38-8). Standalone proxy for "Recall@10 not
+// chunk is NOT blocked (HyPE skipped). Standalone proxy for "Recall@10 not
 // below dense-only -1pp" (the real recall measurement = D3.5).
 TEST(F38HypeIntegrationTest, IT_recall4_LlmFailureDegrades) {
     auto llm = std::make_shared<llm::MockLlmClient>();

@@ -1137,7 +1137,7 @@ TEST_F(UploadHandlerTest, HandleUpload_UpdateSubmitFail_UpdatingStatus) {
 }
 
 // ============================================================
-// F18a §9.1 — SpcPipeline upload site writes operation_log on success
+// Operation log — SpcPipeline upload site writes operation_log on success
 // ============================================================
 
 // Capturing mock operation logger (mirrors test_engine_instrumentation.cpp).

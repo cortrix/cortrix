@@ -6,7 +6,7 @@
 #include "cortrix/retrieval/retrieval_fallback.h"
 #include "cortrix/retrieval/types.h"
 
-// F37 S5 coverage (interface reservation): IRetrievalFallback / NullRetrievalFallback
+// CRAG S5 coverage (interface reservation): IRetrievalFallback / NullRetrievalFallback
 // (§5.3). Phase 1 the Null impl returns the original chunks unchanged; Phase 2 will
 // add WebSearchFallback behind the same interface.
 namespace cortrix::retrieval {
@@ -36,7 +36,7 @@ TEST(RetrievalFallbackTest, NullFallbackEmptyInput) {
     EXPECT_TRUE(out.empty());
 }
 
-// Polymorphic use through the interface pointer (F37 holds an IRetrievalFallback*).
+// Polymorphic use through the interface pointer (CRAG holds an IRetrievalFallback*).
 TEST(RetrievalFallbackTest, UsableThroughInterfacePointer) {
     NullRetrievalFallback impl;
     IRetrievalFallback* fb = &impl;

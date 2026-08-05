@@ -7,7 +7,7 @@
 #include "cortrix/spc/hype_config.h"
 #include "cortrix/spc/hype_ns_config.h"
 
-// Exhaustive parameterized sweep over the F38 HyPE K config resolver
+// Exhaustive parameterized sweep over the HyPE K config resolver
 // (NsHyPEConfig::Parse / ResolveHypeK / ClampHypeK). Real bounds (1/3/10) +
 // the IGlobalConfig key come from hype_config.h. Suite tokens globally unique:
 // HypeCfgParse* / HypeCfgClamp* / HypeCfgResolve*.

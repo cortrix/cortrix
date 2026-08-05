@@ -33,7 +33,7 @@
 ///     does not exist, belongs to another tenant, or is malformed — the gate
 ///     returns the SINGLE canonical identity CX_ERR_NS_UNAUTHORIZED (403), with
 ///     NO namespace name echoed. Existence is never leaked. This is the
-///     anti-enumeration invariant (F04 issue 2.6), now enforced uniformly by
+///     anti-enumeration invariant (cross-NS query issue 2.6), now enforced uniformly by
 ///     ApiKeyAuth::Authorize + WithAuth (api_key_auth.cpp, auth_middleware.cpp).
 ///   * An ALL-ACCESS key requests it EXPLICITLY via the "*" wildcard
 ///     (allowed_namespaces = {"*"}). It is an authorized principal, so it

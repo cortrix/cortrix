@@ -5,7 +5,7 @@
 
 #include "cortrix/memory/mem02_error.h"
 
-// S6 coverage: the MEM02 error model (template A) — all 5 CX_ERR_MEM02_* identities,
+// S6 coverage: the memory extraction error model (template A) — all 5 CX_ERR_MEM02_* identities,
 // their §5.3 attributes (http/category/retryable/retry_after_ms/structured_data
 // keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::memory {

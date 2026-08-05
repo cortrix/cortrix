@@ -85,7 +85,7 @@ TEST_F(OnnxMetricsTest, InferenceDurationHistogramBuckets) {
 }
 
 // ============================================================
-// OpenMetrics text exposition (what F24 will serve at D3.5)
+// OpenMetrics text exposition (what deployment will serve at D3.5)
 // ============================================================
 
 TEST_F(OnnxMetricsTest, RenderContainsAllFourMetrics) {

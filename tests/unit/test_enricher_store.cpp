@@ -14,7 +14,7 @@
 namespace cortrix::spc {
 namespace {
 
-// Build a per-Unit DB with a blocks table + the F03 schema applied, and insert
+// Build a per-Unit DB with a blocks table + the enricher schema applied, and insert
 // one block row to attach enrichment to.
 class EnricherStoreTest : public ::testing::Test {
 protected:
@@ -178,7 +178,7 @@ TEST_F(EnricherStoreTest, NullEnricherEmptyNameWritesNothing) {
 // → SqlErr (the prepare-insert-entities !=SQLITE_OK branch).
 TEST(EnricherStoreNoSchemaTest, WriteEntitiesPrepareFails) {
     sqlite3* db = nullptr;
-    ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);  // no F03 schema applied
+    ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);  // no enricher schema applied
     Status s = WriteEntities(db, 1, {{"X", "ORG", 0, 1}});
     EXPECT_FALSE(s.ok());
     EXPECT_NE(s.message().find("CX_ERR_ENRICHER_STORE"), std::string::npos);
@@ -200,7 +200,7 @@ TEST(EnricherStoreNoSchemaTest, ReadEntitiesPrepareFailsReturnsEmpty) {
 TEST(EnricherStoreNoSchemaTest, WriteEnrichmentRollsBackOnEntityFailure) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
-    // A blocks table with the F03 columns but NO entities table → block write
+    // A blocks table with the enricher columns but NO entities table → block write
     // succeeds, entity write fails → whole txn rolls back.
     ASSERT_EQ(sqlite3_exec(db,
         "CREATE TABLE blocks (block_id INTEGER PRIMARY KEY, enriched_score REAL, "

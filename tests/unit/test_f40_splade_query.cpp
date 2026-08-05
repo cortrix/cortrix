@@ -6,7 +6,7 @@
 
 #include "cortrix/retrieval/splade_sparse_retriever.h"
 
-// F40 S6 — SpladeSparseRetriever query (§6.3): score accumulator (Σ q·c over
+// Sparse retrieval S6 — SpladeSparseRetriever query (§6.3): score accumulator (Σ q·c over
 // shared terms), top-K truncation, per-term posting-list cap, and the posting-
 // list LRU cache (hit-rate / invalidation). In-memory DB; algorithm-level.
 namespace cortrix::retrieval {

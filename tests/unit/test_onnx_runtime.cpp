@@ -10,7 +10,7 @@ namespace {
 // ============================================================
 
 TEST(OnnxRuntimeTest, CompiledMajorVersionIsString) {
-    // F22 §8.3: expected_major_version is a STRING ("1"), matching the CMake
+    // ONNX runtime: expected_major_version is a STRING ("1"), matching the CMake
     // flag ONNXRT_MAJOR_VERSION. Default build locks major 1.
     EXPECT_EQ(Runtime::GetCompiledMajorVersion(), "1");
 }

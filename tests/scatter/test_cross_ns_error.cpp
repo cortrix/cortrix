@@ -12,7 +12,7 @@
 
 // S2.2 coverage: the 6 cross-NS error codes — CX_ERR_ identity,
 // category mapping, retryability, structured_data contract, and the GEN-Agent
-// 4-field boundary factory. F04's error responses are the project-level
+// 4-field boundary factory. cross-NS query's error responses are the project-level
 // Agent-friendly reference, so all 7 principles are asserted here.
 namespace cortrix::query {
 namespace {
@@ -38,7 +38,7 @@ TEST(CrossNsErrorTest, SixCodesTotal) {
     EXPECT_EQ(kCrossNsErrorCodeCount, 6);
 }
 
-// Every code's CX_ERR_* string is unique and matches the P04 ErrorResponseV1
+// Every code's CX_ERR_* string is unique and matches the API spec ErrorResponseV1
 // pattern ^CX_ERR_[A-Z][A-Z_]*$ (GEN-Agent #1 + #7 stable identity).
 TEST(CrossNsErrorTest, EveryCodeHasUniqueWellFormedCxString) {
     static const std::regex kPattern("^CX_ERR_[A-Z][A-Z_]*$");

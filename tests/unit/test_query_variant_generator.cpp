@@ -1,4 +1,4 @@
-// F36 QueryVariantGenerator — standalone unit tests for the static, dependency-free
+// RAG-Fusion QueryVariantGenerator — standalone unit tests for the static, dependency-free
 // surface (no LLM needed): the zh/en prompt templates + injection-hardening
 // delimiter, RandomSuffix determinism/uniqueness, ParseVariantsJson dedup + schema
 // + cap branches, and the ContainsInjectionKeyword keyword set.
@@ -231,7 +231,7 @@ TEST(QueryVariantGeneratorTest, PromptVersionIsStableToken) {
     EXPECT_STREQ(Gen::kPromptVersion, "default-v1");
 }
 
-// has_llm() reflects the injected client: null → false (the F36 gate skips
+// has_llm() reflects the injected client: null → false (the RAG-Fusion gate skips
 // rag-fusion), non-null → true. (No LLM call is made; pure accessor.)
 TEST(QueryVariantGeneratorTest, HasLlmReflectsInjectedClient) {
     QueryVariantGenerator none(/*llm=*/nullptr);

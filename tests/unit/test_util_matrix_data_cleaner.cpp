@@ -1,4 +1,4 @@
-// Exhaustive deterministic matrices for spc/data_cleaner.h (F10 DataCleaner) over
+// Exhaustive deterministic matrices for spc/data_cleaner.h (cleaning DataCleaner) over
 // Block-vector inputs: exact-dup / semantic near-dup / empty / unicode / anomaly
 // reasons, plus ToString(AnomalyReason), Summarize, ValidateConfig, ShouldSkipIndex.
 //

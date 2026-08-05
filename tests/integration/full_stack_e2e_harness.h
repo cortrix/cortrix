@@ -8,15 +8,15 @@
 // PhnswIndexFactory pool + a real SPCManager driving a real SPCPipeline through real
 // PHnsw. That production wiring — the D3.5 live-only assembly seams — has never been
 // E2E-covered. This harness fills that gap and is the shared foundation for the R7
-// full-stack E2E suite (F13 observability / ingest pipeline / multi-NS fan-out).
+// full-stack E2E suite (agent trace observability / ingest pipeline / multi-NS fan-out).
 //
 // It mirrors the production bootstrap assembly (src/server/bootstrap.cpp §7-§8):
 //   CatalogDb (global cortrix_global.db, agent_trace + operation_log migrated)
 //     → DefaultINSRouter + DefaultUnitRouter (real catalog routers)
 //     → PhnswIndexFactory + real WriteCoordinator factory
 //     → DefaultNamespacePool (the REAL pool; ns_router.SetPool late-bind)
-//     → [optional] real SPCManager(real SPCPipeline + F03/F35/F38 chain seam +
-//        F40 sparse registry seam + F10 cleaning-config resolver seam)
+//     → [optional] real SPCManager(real SPCPipeline + enricher/contextual retrieval/HyPE chain seam +
+//        Sparse registry seam + cleaning-config resolver seam)
 //
 // Two construction tiers (a test pays only for what it needs):
 //   * BuildCore()      — catalog + routers + real pool + auth. Enough for an
@@ -87,14 +87,14 @@
 #include <iterator>
 #include "cortrix/spc/parser.h"                        // IDocumentParser / ParsedDoc (StubTxtParser)
 #include "cortrix/spc/parser_factory.h"
-#include "cortrix/chunker/parent_child_chunker.h"     // F34 ParentChildChunker / ChunkerConfig
+#include "cortrix/chunker/parent_child_chunker.h"     // ParentChildChunker / ChunkerConfig
 #include "cortrix/spc/block_assembler.h"
-#include "cortrix/spc_enricher.h"                      // F03 CreateEnricher / EnricherConfig / ISpcEnricher
+#include "cortrix/spc_enricher.h"                      // CreateEnricher / EnricherConfig / ISpcEnricher
 #include "cortrix/spc/enricher_chain.h"                // I1 EnricherChain
 #include "cortrix/spc/spc_pipeline.h"
 #include "cortrix/spc/spc_manager.h"
 #include "cortrix/spc/onnx_embedder.h"
-#include "cortrix/retrieval/sparse_index_registry.h"   // F40 SPLADE per-NS index registry
+#include "cortrix/retrieval/sparse_index_registry.h"   // Sparse retrieval SPLADE per-NS index registry
 
 // HTTP-facing components for the ingest + query routes (BuildIngest tier).
 #include "cortrix/upload/upload_handler.h"             // UploadHandler / UploadConfig
@@ -111,8 +111,8 @@ namespace fs = std::filesystem;
 /// must not depend on that, so we inject this as the factory's primary parser. It
 /// reads the uploaded file and splits it into paragraphs on blank lines — preserving
 /// the test document's paragraph structure (so a verbatim-duplicated paragraph yields
-/// identical F34 children, which is what the dedup probes assert on). One page only
-/// (plain text is page-less); paragraphs[] is the F34 chunker input.
+/// identical parent-child chunking children, which is what the dedup probes assert on). One page only
+/// (plain text is page-less); paragraphs[] is the parent-child chunker input.
 class StubTxtParser : public cortrix::spc::IDocumentParser {
  public:
   cortrix::spc::ParsedDoc Parse(
@@ -207,7 +207,7 @@ class FullStackE2E {
   void BuildCore(int embedding_dim = 128) {
     dim_ = embedding_dim;
 
-    // Global cortrix_global.db with the F18a operation_log + F13 agent_trace
+    // Global cortrix_global.db with the operation_log + agent_trace
     // schemas (same providers bootstrap registers). catalog_db_->db() is the
     // global handle the observability writers + RegisterOperationsRoutes /
     // RegisterTracesRoutesGlobal use.
@@ -222,13 +222,13 @@ class FullStackE2E {
     global_config_ = std::make_shared<cortrix::InMemoryGlobalConfig>();
 
     // Real catalog routers over the global db (CreateNamespace does the catalog
-    // INSERT + — once SetPool is wired below — the F05 AdmitCreate).
+    // INSERT + — once SetPool is wired below — the namespace pool AdmitCreate).
     ns_router_ = std::make_unique<cortrix::catalog::DefaultINSRouter>(
         catalog_db_->db(), /*f05_pool=*/nullptr);
     unit_router_ =
         std::make_unique<cortrix::catalog::DefaultUnitRouter>(catalog_db_->db());
 
-    // Real F05 pool with the production PhnswIndexFactory (a real, searchable
+    // Real namespace pool with the production PhnswIndexFactory (a real, searchable
     // P-HNSW per Unit) + a real WriteCoordinator factory.
     f05_config_.data_root = (root_ / "units").string();
     pool_ = std::make_unique<cortrix::resource::DefaultNamespacePool>(
@@ -274,16 +274,16 @@ class FullStackE2E {
     server_ = std::make_unique<httplib::Server>();
   }
 
-  /// BuildCore() + a real SPCManager (real SPCPipeline + F03/F35/F38 enricher
-  /// chain seam + F40 sparse registry seam + F10 cleaning resolver seam). The
+  /// BuildCore() + a real SPCManager (real SPCPipeline + the enricher
+  /// chain seam + sparse registry seam + cleaning resolver seam). The
   /// enricher chain defaults to the NullEnricher path (no LLM configured) — a
-  /// caller wanting the F03/F35/F38 fakes installs them on enricher_chain()
+  /// caller wanting the enricher/contextual retrieval/HyPE fakes installs them on enricher_chain()
   /// before Start(). Workers are started by Start().
   /// @param embedding_dim  vector dimension (stub default 128; real bge-m3 = 1024).
   /// @param embedder_model_path  ONNX model path. An empty path (default) selects
   ///        the deterministic stub embedder; a real model.onnx path selects real
   ///        inference (E2E-4 semantic recall). A missing non-empty path fails.
-  ///        NOTE: the F05 pool opens each Unit's P-HNSW at the snapshot/default
+  ///        NOTE: the namespace pool opens each Unit's P-HNSW at the snapshot/default
   ///        dim (1024); for a REAL semantic-recall test use embedding_dim=1024 so the
   ///        embedder and index dimensions agree.
   void BuildIngest(int embedding_dim = 128,
@@ -304,7 +304,7 @@ class FullStackE2E {
     embedder_ = std::make_unique<OnnxEmbedder>(embedder_model_path, dim_);
     ASSERT_TRUE(embedder_->Init().ok());
 
-    // Single F03 enricher (NullEnricher when no LLM is configured) — the chain
+    // Single enricher (NullEnricher when no LLM is configured) — the chain
     // head aliases it, exactly as bootstrap does.
     cortrix::spc::EnricherConfig enricher_cfg;
     enricher_ = cortrix::spc::CreateEnricher(enricher_cfg);
@@ -314,11 +314,11 @@ class FullStackE2E {
     spc_mgr_ = std::make_unique<cortrix::SPCManager>(spc_config_, *pool_,
                                                      std::move(pipeline));
 
-    // The F03/F35/F38 chain seam (Set* proxies forward onto the managed pipeline;
+    // The enricher/contextual retrieval/HyPE chain seam (Set* proxies forward onto the managed pipeline;
     // they MUST be installed after the pipeline moved into the manager — this is
     // the assembly-order seam the E2E is here to exercise).
     spc_mgr_->SetEnricherChain(&enricher_chain_);
-    // F40 SPLADE inverted-index registry seam (one instance: write side indexes,
+    // Sparse retrieval SPLADE inverted-index registry seam (one instance: write side indexes,
     // read side searches — same instance so the query serves what was written).
     sparse_index_registry_ =
         std::make_unique<cortrix::retrieval::SparseIndexRegistry>(
@@ -341,7 +341,7 @@ class FullStackE2E {
   // ── namespace admission ────────────────────────────────────────────────────
 
   /// Create + admit a namespace through the REAL catalog router (catalog INSERT +
-  /// F05 AdmitCreate), exactly as a connector/bootstrap path would. After this the
+  /// Namespace pool AdmitCreate), exactly as a connector/bootstrap path would. After this the
   /// NS resolves via the pool and its per-NS memory.db / store.db / index exist.
   Status CreateNamespace(const std::string& ns) {
     cortrix::catalog::NSMetadata meta;
@@ -356,7 +356,7 @@ class FullStackE2E {
 
   /// Create + admit a namespace OWNED BY `owner_tenant`. The cross-NS query
   /// permission check passes immediately when namespaces.tenant_id == the caller's
-  /// AuthContext.tenant_id (P09 §4.6 owner hot path; CE keys set tenant_id ==
+  /// AuthContext.tenant_id (tenancy owner hot path; CE keys set tenant_id ==
   /// user_id). So a query-permission E2E creates the namespace owned by the SAME
   /// tenant as the API key it queries with. Ensures the tenant row exists first
   /// (units.tenant_id FK -> tenants), then delegates to the real router.
@@ -382,7 +382,7 @@ class FullStackE2E {
 
   /// Acquire a per-request facade for `ns` (RAII): gives the per-NS memory.db
   /// (interaction_log / memory_sessions), store, and index. The caller checks
-  /// Acquire().ok(). Used to SEED owner data (interaction_log) for the F13
+  /// Acquire().ok(). Used to SEED owner data (interaction_log) for the agent trace
   /// cross-DB owner resolver, and to READ BACK blocks after an ingest.
   std::unique_ptr<cortrix::resource::NamespaceFacade> Facade(
       const std::string& ns) {

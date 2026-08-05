@@ -7,9 +7,9 @@
 #include "cortrix/async/f42_error.h"
 #include "cortrix/server/batch_submit_service.h"
 
-// TD-F42-BULK coverage: BatchSubmitService — the §2.2/§2.3/§2.4.1 batch submit
+// Batch-submit coverage: BatchSubmitService — the §2.2/§2.3/§2.4.1 batch submit
 // orchestration, exercised standalone against a programmable ITaskSubmitter stub
-// (no F42 worker pool / SQLite). Covers the 4 CX_ERR_BATCH_* envelope faults, the
+// (no async task worker pool / SQLite). Covers the 4 CX_ERR_BATCH_* envelope faults, the
 // 100-doc + 100MB boundaries, partial-success assembly (results[] + meta with the
 // 5-field GEN-Agent failed[] + coverage_ratio), and per-doc code re-inflation.
 namespace cortrix::server {
@@ -19,7 +19,7 @@ using async::SubmitRequest;
 using async::TaskInfo;
 
 // A programmable submit seam: by default every doc succeeds with a synthetic
-// task_id; specific doc_ids can be told to fail with a given F42 Status (the
+// task_id; specific doc_ids can be told to fail with a given async task Status (the
 // "CX_ERR_X: detail" message the production seam carries).
 class StubTaskSubmitter : public ITaskSubmitter {
 public:
@@ -272,7 +272,7 @@ TEST(BatchSubmitServiceTest, AllFailZeroCoverage) {
     EXPECT_EQ(r.body["results"].size(), 0u);
     EXPECT_EQ(r.body["meta"]["failed"].size(), 2u);
     EXPECT_DOUBLE_EQ(r.body["meta"]["coverage_ratio"].get<double>(), 0.0);
-    // DISK_FULL is permanent / non-retryable (§2.4.2 / F24-4).
+    // DISK_FULL is permanent / non-retryable (§2.4.2).
     EXPECT_EQ(r.body["meta"]["failed"][0]["category"], "permanent");
     EXPECT_EQ(r.body["meta"]["failed"][0]["retryable"], false);
 }

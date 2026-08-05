@@ -8,7 +8,7 @@
 #include "cortrix/retrieval/sparse_rrf.h"
 #include "cortrix/retrieval/splade_sparse_retriever.h"
 
-// F40 S11 benchmarks (detailed-design §13.bis 2.1/2.2). Synthetic-data micro-
+// Sparse retrieval S11 benchmarks (detailed-design §13.bis 2.1/2.2). Synthetic-data micro-
 // benchmarks for the inverted-index write/query + sparse_vec codec. These
 // validate the *algorithm* cost shape standalone; the full §13.bis perf gates
 // (N=1M write <2h, query N=1M P50<100ms) + the §2.3 BEIR Recall@10 hybrid vs

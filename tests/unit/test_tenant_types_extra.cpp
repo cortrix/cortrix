@@ -6,7 +6,7 @@
 #include "cortrix/tenant/tenant_types.h"
 
 // Exhaustive enum<->schema-token round-trips + unknown-token + cross-set
-// disjointness for the P09 tenant_types mapping. Basic round-trips live in
+// disjointness for the tenant_types mapping. Basic round-trips live in
 // test_tenant_types.cpp; this is the EXHAUSTIVE matrix incl. the disjointness
 // invariant (TenantRole vs NsAclRole share tokens but are distinct enums) in
 // NEW unique suites (TenantRoleParseMatrix / NsAclRoleParseMatrix /

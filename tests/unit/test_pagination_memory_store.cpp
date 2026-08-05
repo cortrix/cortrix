@@ -1,4 +1,4 @@
-// Pagination + filter matrices for MemoryStore list/search APIs (F23 breadth).
+// Pagination + filter matrices for MemoryStore list/search APIs (test suite breadth).
 //
 // Real APIs (include/cortrix/memory/memory_store.h):
 //   SessionList(ns, limit, offset, &out, user_id="")  - raw bind of limit/offset.
@@ -150,7 +150,7 @@ TEST_F(MemStorePageSessionFilter, NamespaceIsolation) {
     EXPECT_EQ(b.size(), 2u);
 }
 
-// ---- SessionList: user_id filter (MEM05 isolation) ------------------------
+// ---- SessionList: user_id filter (memory isolation) -----------------------
 
 struct MemStorePageUserCase {
     std::string filter_user;   // "" = no filter

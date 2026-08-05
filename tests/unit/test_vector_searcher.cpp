@@ -43,7 +43,7 @@ using Hits = std::vector<std::pair<uint64_t, float>>;
 
 // ============================================================
 // Real VectorSearcher tests using stub OnnxEmbedder + mock IIndex.
-// These exercise VectorSearcher::Search() over the F01 IIndex API.
+// These exercise VectorSearcher::Search() over the IIndex API.
 // ============================================================
 
 class VectorSearcherRealTest : public ::testing::Test {
@@ -91,7 +91,7 @@ TEST_F(VectorSearcherRealTest, Search_EmptyResults) {
     EXPECT_TRUE(result.items.empty());
 }
 
-// NOTE: the old Search_IndexError_ReturnsError case is removed — F01
+// NOTE: the old Search_IndexError_ReturnsError case is removed — index
 // IIndex::Search has no rc/error return (empty = no hits), so the vector route
 // can no longer fail at the index layer. The only remaining error source is
 // embedding (below).

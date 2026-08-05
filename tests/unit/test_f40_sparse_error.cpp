@@ -6,7 +6,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/retrieval/sparse_error.h"
 
-// F40 error model (§8, ARCH §4.1.11) — template A registry. Pins the 5 codes,
+// Sparse retrieval error model (§8, ARCH §4.1.11) — template A registry. Pins the 5 codes,
 // their categories/retryability/retry_after_ms, structured_data contracts, and
 // the Status bridge.
 namespace cortrix::retrieval {

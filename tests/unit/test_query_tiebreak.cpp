@@ -1,4 +1,4 @@
-// Deterministic tie-break behavior across the two RRF fusers (F36 RagFusion over
+// Deterministic tie-break behavior across the two RRF fusers (RAG-Fusion RagFusion over
 // the ChildId keyspace, and the frozen cortrix::RRFFusion over the int64 block_id
 // keyspace).
 //
@@ -8,7 +8,7 @@
 // explicit `first_seen` (insertion-order) secondary key in its comparator; these
 // tests lock that determinism so a refactor that drops the tiebreak is caught.
 //
-// F36 v1.0.7 makes outer RRF anchored + role-weighted: list 0 is the original
+// RAG-Fusion makes outer RRF anchored + role-weighted: list 0 is the original
 // query, while lists 1..N are LLM variants. Equal-score tests therefore construct
 // ties within the same role class (variant-only lists) instead of assuming every
 // list is equal, and keep the original list empty where anchoring is irrelevant.

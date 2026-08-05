@@ -29,7 +29,7 @@
 // Wave S routes coverage: the flat design-surface /documents family
 // (POST/GET/GET{id}/DELETE{id} + tasks progress/cancel). The POST path fans through
 // a real BatchSubmitService over a stub submitter; the {id}/list paths run over a
-// real F05 NsPoolHarness; the task paths run over a real DocumentTaskHandler. Mirrors
+// real namespace pool NsPoolHarness; the task paths run over a real DocumentTaskHandler. Mirrors
 // the test_document_routes / test_batch_routes real-httplib-server pattern.
 #include "ns_pool_test_helper.h"
 
@@ -117,7 +117,7 @@ protected:
         server_ = std::make_unique<httplib::Server>();
         RegisterFlatDocumentRoutes(*server_, harness_->ipool(), *handler_,
                                    *batch_service_, *task_handler_, *auth_);
-        // F21: /watch aliases build the DirWatcherRegistry from the pool + catalog
+        // Watcher: /watch aliases build the DirWatcherRegistry from the pool + catalog
         // router (ns_router_) + SPC; namespace create/admit goes through the router.
         RegisterWatchAliasRoutes(*server_, connector_state_, harness_->ipool(),
                                  ns_router_, *spc_, *auth_);

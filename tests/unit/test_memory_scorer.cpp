@@ -1,4 +1,4 @@
-// MEM01 unit tests — MemoryScorer (classified decay scoring).
+// Memory decay unit tests — MemoryScorer (classified decay scoring).
 // Covers design § 6 unit-test matrix (~24 cases) plus extra boundary coverage
 // to meet line >= 95% / branch >= 80% targets. Pure-compute, no I/O / mocks.
 #include <gtest/gtest.h>

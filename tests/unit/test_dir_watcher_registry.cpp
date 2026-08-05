@@ -1,4 +1,4 @@
-// F21 Watcher Fan-out (TD-WATCHER-001) — DirWatcherRegistry unit tests (S1).
+// Watcher Fan-out (TD-WATCHER-001) — DirWatcherRegistry unit tests (S1).
 //
 // Verifies the fan-out refactor: one OS FileWatcher per directory whose events
 // are dispatched to every subscribed namespace's DirectoryImporter. Covers the
@@ -30,7 +30,7 @@
 #include "cortrix/connector/dir_watcher_registry.h"
 #include "cortrix/spc/spc_pipeline.h"  // complete type for MockSPCManager dtor
 #include "mock_spc_manager.h"
-#include "ns_pool_test_helper.h"  // D3.5 wire⑤c: NsPoolHarness (F05 INamespacePool)
+#include "ns_pool_test_helper.h"  // D3.5 wire⑤c: NsPoolHarness (namespace pool INamespacePool)
 
 using ::testing::_;
 using ::testing::Invoke;
@@ -83,11 +83,11 @@ using cortrix::testing::MockSPCManager;
 
 // ---- Fixture ----
 //
-// wire⑤c: DirWatcherRegistry takes an F05 resource::INamespacePool (the importers
+// wire⑤c: DirWatcherRegistry takes an namespace pool resource::INamespacePool (the importers
 // it builds acquire a per-request NamespaceFacade from it) plus a catalog INSRouter
-// it creates subscribed namespaces through (catalog INSERT + F05 AdmitCreate). The
+// it creates subscribed namespaces through (catalog INSERT + namespace pool AdmitCreate). The
 // pool is stood up by the shared NsPoolHarness (real DefaultNamespacePool + mocked
-// F12 routers + capturing FakeIndex); the router here is a standalone MockNSRouter
+// Catalog routers + capturing FakeIndex); the router here is a standalone MockNSRouter
 // whose CreateNamespace is wired to harness_->Admit() so the registry's create path
 // genuinely admits into the pool (matching production — this is what makes a fresh
 // subscriber's facade.Acquire() resolve).
@@ -110,14 +110,14 @@ protected:
         CreateFile("b.md", "# beta");
         canonical_dir_ = fs::canonical(test_dir_).string();
 
-        // F05 pool lives OUTSIDE the watched test_dir_ (sibling temp dir) so its
+        // Namespace pool lives OUTSIDE the watched test_dir_ (sibling temp dir) so its
         // store.db / catalog files are never seen by the importers' recursive scans.
         harness_ = std::make_unique<cortrix::test::NsPoolHarness>(
             fs::temp_directory_path() /
             ("cortrix_f21_pool_" + std::to_string(::getpid())));
 
         // The registry now creates namespaces through an INSRouter (catalog INSERT
-        // + F05 AdmitCreate). Wire the mock router's CreateNamespace to actually
+        // + namespace pool AdmitCreate). Wire the mock router's CreateNamespace to actually
         // admit into the harness pool — mirroring production, where CreateNamespace
         // is what makes a freshly-subscribed NS resolvable by facade.Acquire(). This
         // also means tests no longer need to AdmitNs() by hand (kept idempotent).
@@ -146,7 +146,7 @@ protected:
     void AdmitNs(const std::string& ns) {
         ASSERT_TRUE(harness_->Admit(ns).ok());
     }
-    // The F05 pool the registry consumes.
+    // The namespace pool the registry consumes.
     cortrix::resource::INamespacePool& pool() { return harness_->ipool(); }
     // The catalog router the registry creates namespaces through.
     cortrix::catalog::INSRouter& router() { return ns_router_; }
@@ -348,7 +348,7 @@ TEST_F(DirWatcherRegistryTest, FanOut_FiltersIgnoredFiles) {
 
 TEST_F(DirWatcherRegistryTest, FanOut_OneImporterFailDoesNotBlockOthers) {
     // team_fail's SPC submit fails; team_ok's must still succeed (per-NS
-    // isolation, F21 § 5.2.3 part. success semantics).
+    // isolation, watcher part. success semantics).
     std::map<std::string, int> ok_submits;
     EXPECT_CALL(spc_, Submit(_))
         .WillRepeatedly(Invoke([&](std::shared_ptr<SPCTask> t) -> Status {

@@ -1,8 +1,8 @@
 // Schema-provider matrices for the table-creating providers:
-//   F09 (F09SchemaProvider, per-Unit framework: documents/blocks/blocks_fts + idx + triggers)
-//   F08 (MetadataSchemaProvider, metadata_blocks table, version 1)
-//   F16a (F16aSchemaProvider, db_connections + import_tasks, version 1; FK -> tenants/namespaces)
-//   F41 (F41SchemaProvider, doc_fts5_index FTS5 vtable, version 1; F41-scoped error token)
+//   Block header (F09SchemaProvider, per-Unit framework: documents/blocks/blocks_fts + idx + triggers)
+//   META block (MetadataSchemaProvider, metadata_blocks table, version 1)
+//   DB import (F16aSchemaProvider, db_connections + import_tasks, version 1; FK -> tenants/namespaces)
+//   Doc summary (F41SchemaProvider, doc_fts5_index FTS5 vtable, version 1; F41-scoped error token)
 //
 // Fresh in-memory sqlite3 per case. Globally unique suite/fixture names
 // (F09TblMatrix / F08TblMatrix / F16aTblMatrix / F41TblMatrix) that do NOT reuse the
@@ -22,7 +22,7 @@
 namespace cortrix::test_schema_matrix_table {
 namespace {
 
-// FK targets for F16a (catalog.db TEXT PKs). Created before F16a's Migrate runs.
+// FK targets for DB import (catalog.db TEXT PKs). Created before DB import's Migrate runs.
 constexpr const char* kCatalogFkSql = R"SQL(
 CREATE TABLE tenants    (tenant_id TEXT PRIMARY KEY, name TEXT);
 CREATE TABLE namespaces (ns_id TEXT PRIMARY KEY, name TEXT);
@@ -64,7 +64,7 @@ struct InitStep {
     bool ok;
 };
 
-// ============================ F09 per-Unit framework (version 1) ============================
+// ============================ block header per-Unit framework (version 1) ===================
 
 class F09TblMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -144,7 +144,7 @@ INSTANTIATE_TEST_SUITE_P(
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{5, 5, true},
                       InitStep{3, 3, true}, InitStep{4, 4, true}, InitStep{10, 10, true}, InitStep{0, 3, false}, InitStep{0, 4, false}, InitStep{2, 5, false}, InitStep{3, 2, false}, InitStep{5, 1, false}));
 
-// ============================ F08 metadata_blocks (version 1) ============================
+// ============================ META block metadata_blocks (version 1) =====================
 
 class F08TblMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -222,7 +222,7 @@ INSTANTIATE_TEST_SUITE_P(
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{8, 8, true},
                       InitStep{3, 3, true}, InitStep{4, 4, true}, InitStep{10, 10, true}, InitStep{0, 3, false}, InitStep{0, 4, false}, InitStep{2, 5, false}, InitStep{3, 2, false}, InitStep{5, 1, false}));
 
-// ============================ F16a db_connections + import_tasks (version 1) ============================
+// ============================ db_connections + import_tasks (version 1) =================================
 
 class F16aTblMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -328,7 +328,7 @@ INSTANTIATE_TEST_SUITE_P(
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{6, 6, true},
                       InitStep{3, 3, true}, InitStep{4, 4, true}, InitStep{10, 10, true}, InitStep{0, 3, false}, InitStep{0, 4, false}, InitStep{2, 5, false}, InitStep{3, 2, false}, InitStep{5, 1, false}));
 
-// ============================ F41 doc_fts5_index (version 1, F41 token) ============================
+// ============================ doc_fts5_index (version 1, doc summary token) ========================
 
 class F41TblMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:

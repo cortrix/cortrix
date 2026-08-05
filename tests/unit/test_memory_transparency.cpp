@@ -10,7 +10,7 @@
 #include "cortrix/memory/memory_transparency.h"
 
 // S1-S5 coverage: the MemoryTransparency service against injected seams (a list-by-user
-// seam, the MEM02 IMemoryBlockStore, and the F18a operation logger). Covers MEM03 §11.1
+// seam, the memory extraction IMemoryBlockStore, and the operation logger). Covers memory transparency
 // — user-isolation List, include_invalidated, issue-2 B edit (new+invalidate old),
 // optimistic lock, cross-user 404 mask, soft delete + idempotence, create validation,
 // no-LLM create, the phased-rollout A/B projection, and the operation_log hooks.
@@ -619,7 +619,7 @@ TEST_F(MemoryTransparencyTest, ProjectListItemMapsMetadata) {
 }
 
 TEST_F(MemoryTransparencyTest, ProjectListItemParsesIsoTimestamp) {
-    // MEM02 stamps created_at as an ISO-8601 string; projection must coerce to epoch ms.
+    // Memory extraction stamps created_at as an ISO-8601 string; projection must coerce to epoch ms.
     MemoryBlockRecord rec;
     rec.block_id = "m1";
     rec.user_id = kUser;

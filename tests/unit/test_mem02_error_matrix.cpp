@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/memory/mem02_error.h"
 
-// Exhaustive parameterized error-registry sweep for MEM02 (§5.3). Distinct suite
+// Exhaustive parameterized error-registry sweep for memory extraction (§5.3). Distinct suite
 // name (Mem02ErrorMatrix) from the basic test_mem02_error.cpp (Mem02ErrorTest) so
 // the two coexist. Walks EVERY Mem02ErrorCode asserting the registry invariants:
 // code-string format/uniqueness, category set membership, retryable<=>retry_after,

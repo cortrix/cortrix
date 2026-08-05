@@ -4,7 +4,7 @@
 
 #include "cortrix/retrieval/crag_metrics.h"
 
-// F37 S6 coverage: the `crag` subsystem metrics (§10) — 4 metrics
+// CRAG S6 coverage: the `crag` subsystem metrics (§10) — 4 metrics
 // (evaluation_total counter / classifier_latency histogram / fallback_ratio gauge
 // / incorrect_ratio gauge), the decision enum label, and the OpenMetrics renderer.
 // Cardinality: NO ns_id label (D1 V3 decision 10 / OBS_SPEC §3.2).

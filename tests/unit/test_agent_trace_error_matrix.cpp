@@ -12,7 +12,7 @@
 #include "cortrix/agent_trace/agent_trace_error.h"
 #include "cortrix/common/status.h"
 
-// Exhaustive error-registry matrix for F13 agent_trace (src/agent_trace/agent_trace_error.*).
+// Exhaustive error-registry matrix for agent_trace (src/agent_trace/agent_trace_error.*).
 // One TEST_P case per F13ErrorCode. Unique suite name (F13ErrorMatrix).
 //
 // NOTE (registry quirk, intentionally not over-asserted): F13_INTERNAL is
@@ -67,7 +67,7 @@ TEST_P(F13ErrorMatrix, CategoryInValidSet) {
         << "code " << info.cx_code;
 }
 
-// Universal invariant only: a present backoff implies the code is retryable. F13
+// Universal invariant only: a present backoff implies the code is retryable. agent trace
 // deliberately does NOT carry the reverse (INTERNAL is retryable with null backoff).
 TEST_P(F13ErrorMatrix, RetryAfterImpliesRetryable) {
     const F13ErrorInfo& info = GetF13ErrorInfo(GetParam());

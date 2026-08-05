@@ -12,7 +12,7 @@
 #include "cortrix/chunker/chunker_agent_error.h"
 #include "cortrix/common/status.h"
 
-// Exhaustive error-registry matrix for F34 chunker (src/chunker/chunker_agent_error.*).
+// Exhaustive error-registry matrix for parent-child chunker (src/chunker/chunker_agent_error.*).
 // One TEST_P case per hard ChunkerErrorCode. Unique suite name (ChunkerErrorMatrix).
 // The 2 non-blocking warnings (CX_WARN_CHUNK_*) are covered by a separate guard test.
 namespace cortrix::chunker {

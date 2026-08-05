@@ -372,7 +372,7 @@ class RrfValMatrixFuseResultsK
 TEST_P(RrfValMatrixFuseResultsK, RankOneBasedContribution) {
     const auto& tc = GetParam();
     cortrix::query::RagFusion rf = MakeRagFusion();
-    // One list means the original query role. F36 v1.0.7 anchored weighted RRF
+    // One list means the original query role. RAG-Fusion anchored weighted RRF
     // makes its rank-1 contribution 1.7/(k+1); anchoring changes order, not score.
     std::vector<std::vector<cortrix::retrieval::ScoredResult>> per_variant = {
         {SR("ID1", 0.9f)}};

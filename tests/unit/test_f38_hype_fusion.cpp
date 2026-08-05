@@ -7,7 +7,7 @@
 #include "cortrix/common/block_types.h"
 #include "cortrix/spc/hype_fusion.h"
 
-// F38 S4 — chunk-level RRF + by-parent dedup over a mixed P-HNSW candidate pool
+// HyPE S4 — chunk-level RRF + by-parent dedup over a mixed P-HNSW candidate pool
 // (§8.1) + the 3 B-class explain fields (§8.2). Real P-HNSW split / QueryPipeline
 // = D3.5.
 namespace cortrix::spc {

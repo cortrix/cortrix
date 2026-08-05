@@ -12,7 +12,7 @@
 #include "cortrix/catalog/catalog_error.h"
 #include "cortrix/common/status.h"
 
-// Exhaustive error-registry matrix for F12 catalog (src/catalog/catalog_error.*).
+// Exhaustive error-registry matrix for catalog (src/catalog/catalog_error.*).
 // One TEST_P case per CatalogErrorCode (ValuesIn over the full enum), so appending a
 // code auto-extends coverage. Unique suite name (CatalogErrorMatrix) — no clash with
 // the existing CatalogErrorTest in test_catalog_error.cpp.

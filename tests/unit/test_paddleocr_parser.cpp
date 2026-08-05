@@ -6,7 +6,7 @@
 #include "cortrix/spc/parser.h"
 #include "parser_script_fixture.h"
 
-// F06 S3 coverage: PaddleOCRParser subprocess wrapper. Standalone — exercised
+// Parser S3 coverage: PaddleOCRParser subprocess wrapper. Standalone — exercised
 // against a mock bridge (paddleocr need not be installed). Real OCR is D3.5.
 namespace cortrix::spc {
 namespace {

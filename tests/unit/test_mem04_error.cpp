@@ -5,7 +5,7 @@
 
 #include "cortrix/memory/mem04_error.h"
 
-// S5 coverage: the MEM04 error model (template A) — all 7 CX_ERR_MEM04_* identities,
+// S5 coverage: the memory opt-out error model (template A) — all 7 CX_ERR_MEM04_* identities,
 // their ARCH §4.1.11 attributes (http/category/retryable/retry_after_ms/structured_data
 // keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::memory::immunity {
@@ -40,7 +40,7 @@ TEST(Mem04ErrorTest, AllCodesHaveUniqueCxStrings) {
     EXPECT_EQ(seen.size(), 7u);
 }
 
-// ARCH §4.1.11 MEM04 table, row by row.
+// ARCH §4.1.11 memory opt-out table, row by row.
 TEST(Mem04ErrorTest, RegistryMatchesArchTable) {
     auto chk = [](Mem04ErrorCode c, const char* code, int http, ErrorCategory cat,
                   bool retry, std::optional<int> retry_ms) {
@@ -68,7 +68,7 @@ TEST(Mem04ErrorTest, RegistryMatchesArchTable) {
 }
 
 TEST(Mem04ErrorTest, AllCodesNonRetryableWithoutHint) {
-    // GEN-Agent #6: all 7 MEM04 faults are permanent/auth client errors → none is
+    // GEN-Agent #6: all 7 memory opt-out faults are permanent/auth client errors → none is
     // retryable and none carries a retry hint.
     for (Mem04ErrorCode c : kAll) {
         const Mem04ErrorInfo& i = GetMem04ErrorInfo(c);

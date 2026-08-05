@@ -8,8 +8,8 @@
 
 namespace cortrix::store {
 
-/// Shared gmock double for ChunkStore (scaffolding D2-pre-8) so F02 / F04 / F37
-/// can unit-test their reverse-lookup logic without F08/F09.
+/// Shared gmock double for ChunkStore (scaffolding D2-pre-8) so reranker / cross-NS query / CRAG
+/// can unit-test their reverse-lookup logic without META block/block header.
 class MockChunkStore : public ChunkStore {
 public:
     MOCK_METHOD(Result<ChunkRecord>, Get, (const std::string& child_id), (override));

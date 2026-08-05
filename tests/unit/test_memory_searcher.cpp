@@ -32,7 +32,7 @@ TEST_F(MemorySearchRequestTest, ValidRequest) {
     MemorySearchRequest req;
     req.query = "test query";
     req.namespace_name = "default";
-    req.scope = MemoryScope::kUser;  // MEM05: default scope, user_id required
+    req.scope = MemoryScope::kUser;  // Memory isolation: default scope, user_id required
     req.user_id = "user_001";
     req.top_k = 10;
 
@@ -68,7 +68,7 @@ TEST_F(MemorySearchRequestTest, SessionScopeRequiresSessionId) {
     MemorySearchRequest req;
     req.query = "test";
     req.namespace_name = "default";
-    req.user_id = "user_001";  // MEM05: user_id always required
+    req.user_id = "user_001";  // Memory isolation: user_id always required
     req.scope = MemoryScope::kSession;
     req.session_id = "";  // missing
 
@@ -82,7 +82,7 @@ TEST_F(MemorySearchRequestTest, SessionScopeWithIdSucceeds) {
     MemorySearchRequest req;
     req.query = "test";
     req.namespace_name = "default";
-    req.user_id = "user_001";  // MEM05: user_id always required
+    req.user_id = "user_001";  // Memory isolation: user_id always required
     req.scope = MemoryScope::kSession;
     req.session_id = "abc-123";
 
@@ -90,7 +90,7 @@ TEST_F(MemorySearchRequestTest, SessionScopeWithIdSucceeds) {
     EXPECT_TRUE(s.ok()) << s.message();
 }
 
-// MEM05: user_id is unconditionally required (no longer scope-dependent).
+// Memory isolation: user_id is unconditionally required (no longer scope-dependent).
 TEST_F(MemorySearchRequestTest, UserIdRequiredEvenForUserScope) {
     MemorySearchRequest req;
     req.query = "test";
@@ -104,7 +104,7 @@ TEST_F(MemorySearchRequestTest, UserIdRequiredEvenForUserScope) {
     EXPECT_NE(s.message().find("user_id"), std::string::npos);
 }
 
-// MEM05: user_id required even for session scope.
+// Memory isolation: user_id required even for session scope.
 TEST_F(MemorySearchRequestTest, UserIdRequiredForSessionScope) {
     MemorySearchRequest req;
     req.query = "test";
@@ -190,7 +190,7 @@ TEST_F(MemorySearchRequestTest, TopKBoundary100Succeeds) {
     EXPECT_TRUE(s.ok()) << s.message();
 }
 
-// MEM05: user_id format rule — oversize (>128 chars) is rejected by Validate()
+// Memory isolation: user_id format rule — oversize (>128 chars) is rejected by Validate()
 // (IsValidUserIdFormat length guard, line 29).
 TEST_F(MemorySearchRequestTest, UserIdOver128CharsRejected) {
     MemorySearchRequest req;
@@ -204,7 +204,7 @@ TEST_F(MemorySearchRequestTest, UserIdOver128CharsRejected) {
     EXPECT_NE(s.message().find("invalid user_id format"), std::string::npos);
 }
 
-// MEM05: user_id exactly 128 chars is the boundary and is accepted.
+// Memory isolation: user_id exactly 128 chars is the boundary and is accepted.
 TEST_F(MemorySearchRequestTest, UserId128CharsBoundaryAccepted) {
     MemorySearchRequest req;
     req.query = "test";
@@ -215,7 +215,7 @@ TEST_F(MemorySearchRequestTest, UserId128CharsBoundaryAccepted) {
     EXPECT_TRUE(s.ok()) << s.message();
 }
 
-// MEM05: a control char (< 0x20) in user_id fails the ASCII-printable charset check
+// Memory isolation: a control char (< 0x20) in user_id fails the ASCII-printable charset check
 // (IsValidUserIdFormat loop, line 31).
 TEST_F(MemorySearchRequestTest, UserIdWithControlCharRejected) {
     MemorySearchRequest req;
@@ -229,7 +229,7 @@ TEST_F(MemorySearchRequestTest, UserIdWithControlCharRejected) {
     EXPECT_NE(s.message().find("invalid user_id format"), std::string::npos);
 }
 
-// MEM05: a byte above 0x7E (e.g. 0x80) in user_id also fails the format check.
+// Memory isolation: a byte above 0x7E (e.g. 0x80) in user_id also fails the format check.
 TEST_F(MemorySearchRequestTest, UserIdWithHighByteRejected) {
     MemorySearchRequest req;
     req.query = "test";
@@ -241,7 +241,7 @@ TEST_F(MemorySearchRequestTest, UserIdWithHighByteRejected) {
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
 }
 
-// MEM05: default scope (kUser) succeeds with a user_id and no session_id.
+// Memory isolation: default scope (kUser) succeeds with a user_id and no session_id.
 TEST_F(MemorySearchRequestTest, DefaultUserScopeWithUserIdSucceeds) {
     MemorySearchRequest req;
     req.query = "test";
@@ -268,9 +268,9 @@ TEST_F(MemorySearchRequestTest, DefaultUserScopeWithUserIdSucceeds) {
 TEST_F(MemorySearchRequestTest, DefaultValuesAreReasonable) {
     MemorySearchRequest req;
     EXPECT_EQ(req.top_k, 10);
-    EXPECT_EQ(req.scope, MemoryScope::kUser);  // MEM05: default changed kAll -> kUser
+    EXPECT_EQ(req.scope, MemoryScope::kUser);  // Memory isolation: default changed kAll -> kUser
     EXPECT_FALSE(req.include_expired);
-    EXPECT_FALSE(req.include_invalidated);     // MEM01 D4 default
+    EXPECT_FALSE(req.include_invalidated);     // Memory decay D4 default
     EXPECT_EQ(req.timeout_ms, 5000);
 }
 
@@ -313,7 +313,7 @@ TEST(MemorySearchResponseTest, DefaultValues) {
 TEST(MemoryScopeTest, EnumValues) {
     EXPECT_EQ(static_cast<int>(MemoryScope::kSession), 0);
     EXPECT_EQ(static_cast<int>(MemoryScope::kUser), 1);
-    // MEM05: kAll removed. Only kSession / kUser remain.
+    // Memory isolation: kAll removed. Only kSession / kUser remain.
 }
 
 // ---------------------------------------------------------------------------
@@ -352,7 +352,7 @@ TEST_F(MemorySearchRequestTest, ValidSessionScopeWithAllFields) {
     req.namespace_name = "finance_ns";
     req.scope = MemoryScope::kSession;
     req.session_id = "session-abc-123";
-    req.user_id = "user_001";  // MEM05: user_id always required
+    req.user_id = "user_001";  // Memory isolation: user_id always required
     req.top_k = 20;
     req.include_expired = true;
     req.timeout_ms = 10000;
@@ -406,7 +406,7 @@ public:
     int search_metadata(const std::string&, int, std::vector<SearchResult>&) override { return -1; }
 };
 
-// Vector index fake: the shared cortrix::test::FakeIndex implements the F01
+// Vector index fake: the shared cortrix::test::FakeIndex implements the index
 // IIndex contract VectorSearcher now takes. Search() returns the scripted hits
 // directly (no rc), set via set_search_result({{block_id, distance}, ...}).
 using cortrix::test::FakeIndex;
@@ -493,12 +493,12 @@ TEST_F(MemorySearcherSearchTest, SearchAllScope_ReturnsResults) {
     MemorySearchRequest req;
     req.query = "AI";
     req.namespace_name = "default";
-    req.scope = MemoryScope::kUser;  // MEM05: kAll removed
+    req.scope = MemoryScope::kUser;  // Memory isolation: kAll removed
     req.user_id = "user-1";
     req.top_k = 10;
 
     MemorySearchResponse resp = searcher.Search(req);
-    // MEM05: only user-1's memories are returned; others are excluded.
+    // Memory isolation: only user-1's memories are returned; others are excluded.
     EXPECT_GE(resp.total_results, 0);
     EXPECT_GE(resp.latency_ms, 0);
 }
@@ -528,11 +528,11 @@ TEST_F(MemorySearcherSearchTest, SearchSessionScope_FiltersCorrectly) {
     req.namespace_name = "default";
     req.scope = MemoryScope::kSession;
     req.session_id = "sess-abc";
-    req.user_id = "user-1";  // MEM05: user_id always required
+    req.user_id = "user-1";  // Memory isolation: user_id always required
     req.top_k = 10;
 
     MemorySearchResponse resp = searcher.Search(req);
-    // MEM05: must match BOTH user-1 and sess-abc.
+    // Memory isolation: must match BOTH user-1 and sess-abc.
     for (const auto& item : resp.results) {
         EXPECT_EQ(item.session_id, "sess-abc");
     }
@@ -621,7 +621,7 @@ TEST_F(MemorySearcherSearchTest, SearchExcludeExpired_FiltersExpiredResults) {
     MemorySearchRequest req;
     req.query = "old";
     req.namespace_name = "default";
-    req.scope = MemoryScope::kUser;  // MEM05: kAll removed
+    req.scope = MemoryScope::kUser;  // Memory isolation: kAll removed
     req.user_id = "user-1";
     req.top_k = 10;
     req.include_expired = false;  // should filter out expired
@@ -656,7 +656,7 @@ TEST_F(MemorySearcherSearchTest, SearchIncludeExpired_ReturnsExpiredMarked) {
     MemorySearchRequest req;
     req.query = "data";
     req.namespace_name = "default";
-    req.scope = MemoryScope::kUser;  // MEM05: kAll removed
+    req.scope = MemoryScope::kUser;  // Memory isolation: kAll removed
     req.user_id = "user-1";
     req.top_k = 10;
     req.include_expired = true;  // include expired
@@ -688,7 +688,7 @@ TEST_F(MemorySearcherSearchTest, SearchTopK1_LimitsResults) {
     MemorySearchRequest req;
     req.query = "test";
     req.namespace_name = "default";
-    req.scope = MemoryScope::kUser;  // MEM05: kAll removed
+    req.scope = MemoryScope::kUser;  // Memory isolation: kAll removed
     req.user_id = "user-1";
     req.top_k = 1;
 
@@ -885,7 +885,7 @@ TEST_F(MemorySearcherPrivateTest, IsExpired_TtlNotNumber_ReturnsFalse) {
 // MatchScope direct tests (lines 171-190)
 // ---------------------------------------------------------------------------
 
-// MEM05: kAll removed. A memory with no user_id in metadata is always excluded.
+// Memory isolation: kAll removed. A memory with no user_id in metadata is always excluded.
 TEST_F(MemorySearcherPrivateTest, MatchScope_NoUserIdInMeta_Excluded) {
     MemoryConfig config;
     MemorySearcher searcher(*pipeline_, *mem_store_, config);
@@ -895,7 +895,7 @@ TEST_F(MemorySearcherPrivateTest, MatchScope_NoUserIdInMeta_Excluded) {
     req.user_id = "user-1";
 
     json meta;
-    meta["session_id"] = "any";  // no user_id -> excluded under MEM05
+    meta["session_id"] = "any";  // no user_id -> excluded under memory isolation
     EXPECT_FALSE(CallMatchScope(searcher, meta, req));
 }
 
@@ -906,7 +906,7 @@ TEST_F(MemorySearcherPrivateTest, MatchScope_kSession_MatchesCorrectSession) {
     MemorySearchRequest req;
     req.scope = MemoryScope::kSession;
     req.session_id = "sess-abc";
-    req.user_id = "user-1";  // MEM05: user_id checked first
+    req.user_id = "user-1";  // Memory isolation: user_id checked first
 
     json meta;
     meta["user_id"] = "user-1";
@@ -929,7 +929,7 @@ TEST_F(MemorySearcherPrivateTest, MatchScope_kSession_RejectsWrongSession) {
     EXPECT_FALSE(CallMatchScope(searcher, meta, req));
 }
 
-// MEM05: session scope with right session but WRONG user is still excluded.
+// Memory isolation: session scope with right session but WRONG user is still excluded.
 TEST_F(MemorySearcherPrivateTest, MatchScope_kSession_RightSessionWrongUser_Excluded) {
     MemoryConfig config;
     MemorySearcher searcher(*pipeline_, *mem_store_, config);
@@ -1181,12 +1181,12 @@ TEST_F(MemorySearcherPrivateTest, ToMemoryResult_EmptyInteractionId) {
 }
 
 // ---------------------------------------------------------------------------
-// Search integration: MEM05 excludes null-metadata items (no user_id) via
+// Search integration: memory isolation excludes null-metadata items (no user_id) via
 // MatchScope before they reach the result list.
 // ---------------------------------------------------------------------------
 
 TEST_F(MemorySearcherPrivateTest, Search_NullMetadataItems_ExcludedByUserIdFilter) {
-    // Under MEM05, a block with null metadata has no user_id, so MatchScope
+    // Under memory isolation, a block with null metadata has no user_id, so MatchScope
     // excludes it on every path. Confirm the search completes and returns none.
 
     vec_index_.set_search_result({{200, 0.1f}});
@@ -1198,7 +1198,7 @@ TEST_F(MemorySearcherPrivateTest, Search_NullMetadataItems_ExcludedByUserIdFilte
     MemorySearchRequest req;
     req.query = "test";
     req.namespace_name = "default";
-    req.scope = MemoryScope::kUser;  // MEM05: kAll removed
+    req.scope = MemoryScope::kUser;  // Memory isolation: kAll removed
     req.user_id = "user-1";
     req.top_k = 10;
 

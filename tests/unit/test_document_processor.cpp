@@ -18,9 +18,9 @@
 #include "mock_spc_manager.h"
 #include "test_name_util.h"
 
-// S2 coverage: DocumentProcessor — F06 integration via on_page_progress (per-page
+// S2 coverage: DocumentProcessor — parser integration via on_page_progress (per-page
 // persistence + Issue 3.1 cancel checkpoint + Issue 5 error mapping). The injected
-// StubParser drives on_page_progress to simulate F06's per-page streaming, so the
+// StubParser drives on_page_progress to simulate parser's per-page streaming, so the
 // processor's callback path is exercised standalone (no Python).
 namespace cortrix::async {
 namespace {
@@ -33,7 +33,7 @@ using spc::test::StubParser;
 
 // A StubParser that, when ParseDocument runs, fires opts.on_page_progress for
 // pages 1..total_pages (success unless the page is in fail_pages), then returns
-// `result`. This mimics the real F06 per-page streaming the factory would do.
+// `result`. This mimics the real parser per-page streaming the factory would do.
 std::unique_ptr<StubParser> MakeDrivingStub(int total_pages, ParsedDoc result,
                                             std::vector<int> fail_pages = {}) {
     auto stub = std::make_unique<StubParser>("docling", std::vector<std::string>{"pdf"});
@@ -54,7 +54,7 @@ class DocumentProcessorTest : public ::testing::Test {
     void SetUp() override {
         ASSERT_TRUE(mgr_.Init(":memory:").ok());
         factory_ = std::make_unique<spc::DocumentParserFactory>(cfg_factory_);
-        // The F06 factory stat()s the file in its pre-check (kFileNotFound
+        // The parser factory stat()s the file in its pre-check (kFileNotFound
         // otherwise), so seed a real temp .pdf the injected stub will "parse".
         // Unique per test: parallel ctest processes must not share the stub
         // (a sibling's TearDown/remove yanks it mid-parse; F-1 race family).
@@ -239,7 +239,7 @@ TEST_F(DocumentProcessorTest, DefaultEntMaxPagesWhenConfigAbsent) {
     EXPECT_EQ(seen_max, DocumentProcessor::kDefaultAsyncMaxPages);  // 2000
 }
 
-// [Plan B · F42 §4.1.2] Wired to SPC: a successful parse hands the ParsedDoc to
+// Wired to SPC: a successful parse hands the ParsedDoc to
 // SPCManager::ProcessParsedDoc, and rc=0 finalizes the task completed.
 TEST_F(DocumentProcessorTest, WiredToSpcHandsParsedDocToProcessParsedDoc) {
     factory_->SetPrimaryParser(MakeDrivingStub(3, MakeOnePageDoc("docling", 0.9f)));

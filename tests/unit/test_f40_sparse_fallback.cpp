@@ -6,7 +6,7 @@
 
 #include "cortrix/retrieval/sparse_fallback.h"
 
-// F40 S9 — L1 (write-time) + L2 (query-time) fallback (§7). L1: serialize with
+// Sparse retrieval S9 — L1 (write-time) + L2 (query-time) fallback (§7). L1: serialize with
 // N=3 retry then degrade to NULL (no chunk-write failure). L2: drop the sparse
 // path, transparent degrade to dense+FTS5(+hype), via_path explain.
 namespace cortrix::retrieval {

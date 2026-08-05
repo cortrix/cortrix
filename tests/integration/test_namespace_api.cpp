@@ -45,7 +45,7 @@ protected:
 
         // [V6] The per-key static allow-list was removed; namespace visibility is now
         // a runtime seam. This MVP server stores namespaces in NamespaceManager (the
-        // F12 catalog the real PermissionService reads is not wired on this path), so
+        // Catalog the real PermissionService reads is not wired on this path), so
         // the per-namespace gate stays ungated (admin tenant in single-tenant CE) and
         // the authorized-set lister — consumed by GET /namespaces (filter=true) —
         // resolves to the manager's namespaces, mirroring ListAuthorizedNamespaces.

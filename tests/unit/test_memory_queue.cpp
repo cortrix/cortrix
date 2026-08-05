@@ -9,9 +9,9 @@
 
 #include "cortrix/memory/memory_queue.h"
 
-// S2 coverage: the MEM02 async queue infrastructure (D2) — push/backpressure,
+// S2 coverage: the memory extraction async queue infrastructure (D2) — push/backpressure,
 // worker-pool drain through the handler, retry → dead-letter, trace propagation,
-// and the periodic-scan fallback. Self-contained C++ queue (no F42 dependency).
+// and the periodic-scan fallback. Self-contained C++ queue (no async task dependency).
 namespace cortrix::memory {
 namespace {
 

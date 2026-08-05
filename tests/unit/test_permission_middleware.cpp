@@ -1,4 +1,4 @@
-// P09 sec 11.1 -- PermissionMiddleware behavior (UT41-42).
+// Tenancy -- PermissionMiddleware behavior (UT41-42).
 //
 // The sec 4.6 PermissionMiddleware is realized in tenant_routes.cpp as the per-route
 // CanX gating over PermissionService (one code path, data-state controlled -- topic 3).
@@ -29,7 +29,7 @@ using catalog::CatalogDb;
 TEST(PermissionMiddlewareTest, DefaultTenant_Pass) {
     CatalogDb catalog;
     ASSERT_TRUE(catalog.Open(":memory:").ok());
-    // OR IGNORE: the P09 §10.1 bootstrap seed (schema-embedded) already inserts
+    // OR IGNORE: the tenancy bootstrap seed (schema-embedded) already inserts
     // default_tenant on Open(); this just guarantees the row for the test.
     ASSERT_EQ(sqlite3_exec(catalog.db(),
                            "INSERT OR IGNORE INTO tenants(tenant_id, type, name, created_at) "

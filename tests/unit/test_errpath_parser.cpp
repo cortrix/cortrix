@@ -13,7 +13,7 @@
 #include "cortrix/spc/parser_factory.h"
 #include "parser_stub.h"
 
-// Error-path coverage for the F06 parser CX_ERR_* identities that had ZERO test
+// Error-path coverage for the parser CX_ERR_* identities that had ZERO test
 // genuinely triggering them and asserting the surfaced CX_ERR_ envelope code:
 //   CX_ERR_UNSUPPORTED_FORMAT  — factory pre-check rejects an unknown extension
 //   CX_ERR_ALL_PARSERS_FAILED  — no parser for the route / primary+OCR both fail

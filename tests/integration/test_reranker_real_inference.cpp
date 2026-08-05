@@ -8,7 +8,7 @@ namespace {
 
 namespace fs = std::filesystem;
 
-// F02 reranker real cross-encoder inference (bge-reranker-v2-m3 ONNX).
+// Reranker real cross-encoder inference (bge-reranker-v2-m3 ONNX).
 // SKIPPED if model files are not present on disk. To run: convert the model
 // with scripts/convert_reranker_to_onnx.py into models/bge-reranker-v2-m3/.
 

@@ -1,5 +1,5 @@
-// F41 S0 — F41SchemaProvider creates the net-new doc_fts5_index FTS5 virtual
-// table inside the F12 SchemaMigrator framework. Pins identity/version,
+// Doc summary S0 — F41SchemaProvider creates the net-new doc_fts5_index FTS5 virtual
+// table inside the catalog SchemaMigrator framework. Pins identity/version,
 // the virtual-table existence + columns after migration, idempotency, the
 // bad-version-step guard, and SchemaMigrator registration. Mirrors
 // test_f40_schema_provider.cpp.
@@ -97,7 +97,7 @@ TEST(F41SchemaProviderTest, NullDbRejected) {
 }
 
 TEST(F41SchemaProviderTest, RegistersWithSchemaMigrator) {
-    // F41 provider runs inside the F12 SchemaMigrator transaction (the D3.5
+    // Doc summary provider runs inside the catalog SchemaMigrator transaction (the D3.5
     // integrated path). Pin the closure: after MigrateUnit the table exists.
     F41SchemaProvider p;
     cortrix::catalog::SchemaMigrator migrator;

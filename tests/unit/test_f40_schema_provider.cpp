@@ -1,5 +1,5 @@
-// F40 S5 — F40SchemaProvider creates the net-new sparse_inverted_index table
-// inside the F12 SchemaMigrator framework. Unlike F02 (no-op), F40's
+// Sparse retrieval S5 — F40SchemaProvider creates the net-new sparse_inverted_index table
+// inside the catalog SchemaMigrator framework. Unlike reranker (no-op), sparse retrieval's
 // Migrate(0→1) emits real DDL — these tests pin identity/version, the table +
 // index existence after migration, idempotency, and the bad-version-step guard.
 // Mirrors test_reranker_schema_provider.cpp.
@@ -86,7 +86,7 @@ TEST(F40SchemaProviderTest, MigrateCreatesTableAndIndexes) {
 }
 
 TEST(F40SchemaProviderTest, MigrateAddsSparseVecToBlocks) {
-    // [A unified-blocks] when the F09 framework `blocks` table is present, F40 also
+    // unified-blocks: when the block header framework `blocks` table is present, sparse retrieval also
     // ALTERs it to add the sparse_vec BLOB column (child rows' SPLADE vector).
     F40SchemaProvider p;
     sqlite3* db = nullptr;
@@ -135,7 +135,7 @@ TEST(F40SchemaProviderTest, NullDbRejected) {
 }
 
 TEST(F40SchemaProviderTest, RegistersWithSchemaMigrator) {
-    // F40 provider runs inside the F12 SchemaMigrator transaction (the D3.5
+    // Sparse retrieval provider runs inside the catalog SchemaMigrator transaction (the D3.5
     // integrated path). Pin the closure: after MigrateUnit the table exists.
     F40SchemaProvider p;
     cortrix::catalog::SchemaMigrator migrator;

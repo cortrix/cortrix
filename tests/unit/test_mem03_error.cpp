@@ -5,7 +5,7 @@
 
 #include "cortrix/memory/mem03_error.h"
 
-// S5 coverage: the MEM03 error model (template A) — all 5 CX_ERR_MEM03_* identities,
+// S5 coverage: the memory transparency error model (template A) — all 5 CX_ERR_MEM03_* identities,
 // their §4.3.4.bis attributes (http/category/retryable/retry_after_ms/structured_data
 // keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::memory::transparency {

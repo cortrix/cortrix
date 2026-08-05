@@ -17,7 +17,7 @@
 //                                     unknown -> kParagraph (D2 lock).
 //   EnricherType (cortrix::spc): EnricherTypeString <-> ParseEnricherType.
 //                                unknown -> kNull (fail-soft).
-//   AnomalyReason (cortrix::spc): ToString only (F10, 5 values starting at 1).
+//   AnomalyReason (cortrix::spc): ToString only (cleaning, 5 values starting at 1).
 // Suite names unique with RtPipe* prefix.
 
 namespace cortrix::spc {
@@ -116,7 +116,7 @@ INSTANTIATE_TEST_SUITE_P(Unknowns, RtEnricherTypeUnknownMatrix,
                                            "ner", "gpt", "local-ner"));
 
 // ----------------------------------------------------------------------------
-// AnomalyReason: ToString only (F10, 5 values, underlying values start at 1).
+// AnomalyReason: ToString only (cleaning, 5 values, underlying values start at 1).
 // ----------------------------------------------------------------------------
 const std::vector<AnomalyReason>& AllAnomalyReasons() {
     static const std::vector<AnomalyReason> v = {

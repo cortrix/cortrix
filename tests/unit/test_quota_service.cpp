@@ -1,4 +1,4 @@
-// P09 sec 11.1 -- QuotaService unit tests (UT36-40).
+// Tenancy -- QuotaService unit tests (UT36-40).
 #include <gtest/gtest.h>
 
 #include <memory>

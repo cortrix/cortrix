@@ -10,7 +10,7 @@
 #include "cortrix/spc_enricher/enricher_response_parser.h"
 #include "cortrix/spc_enricher/prompt_template.h"
 
-// F03 single-component Google Benchmark (Issue 6.5 — GB single-component layer). Pure-CPU, no network:
+// Enricher single-component Google Benchmark (Issue 6.5 — GB single-component layer). Pure-CPU, no network:
 // batch prompt assembly + JSON response parse + NS config JSONB parse. The
 // end-to-end pgbench SLA (remote OpenAI / local vLLM) is D4/D3.5 (needs a live
 // endpoint) — see design §7.4.

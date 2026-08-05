@@ -28,7 +28,7 @@ TEST(ChunkStoreTest, GetReturnsRecordThroughInterface) {
         return Result<ChunkRecord>(MakeChunk("01J0CHILD", "doc_1", "hello world", 3));
     });
 
-    ChunkStore* store = &mock;  // F02 holds only the interface
+    ChunkStore* store = &mock;  // Reranker holds only the interface
     auto r = store->Get("01J0CHILD");
     ASSERT_TRUE(r.ok());
     EXPECT_EQ(r.value().parent_id, "doc_1");

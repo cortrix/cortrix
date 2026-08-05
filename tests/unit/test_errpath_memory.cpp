@@ -151,7 +151,7 @@ TEST_F(MemoryRevokeNotFoundTest, RevokeUnknownBlockReturnsBlockNotFound) {
 //     Status whose code() != kNotFound (i.e. a store UPDATE failure AFTER a successful
 //     block fetch). MemoryExtractionService is a concrete, copy-deleted, NON-virtual
 //     class with no interface seam, so a fake returning Status::Internal cannot be
-//     substituted at the route layer; and the live revoke runs through the F05 pool
+//     substituted at the route layer; and the live revoke runs through the namespace pool
 //     façade store, whose SetFailNextOps op-fault seam is not reachable from the route
 //     fixture. A direct-adapter test could exercise the underlying
 //     CX_ERR_MEM02_STORE UPDATE path, but that is a DIFFERENT code than the route's

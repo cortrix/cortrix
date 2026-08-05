@@ -8,7 +8,7 @@
 #include "cortrix/memory/memory_transparency.h"
 #include "cortrix/memory/opt_out_manager.h"
 
-// Exhaustive matrices for the MEM02/MEM03 memory enums.
+// Exhaustive matrices for the memory extraction/memory enums.
 //   MemoryType:   ToString <-> ParseMemoryType (round-trip, case-insensitive on
 //                 the 3 known values). Unknown -> kUnknown (caller coerces to
 //                 kEvent per D4). src/memory/memory_extractor.cpp.

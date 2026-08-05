@@ -14,7 +14,7 @@
 //     zero-block doc,
 //   * the "multiple files received" warn arm (req.files.count("file") > 1).
 //
-// Harness mirrors test_document_routes.cpp (real F05 NsPoolHarness + real
+// Harness mirrors test_document_routes.cpp (real namespace pool NsPoolHarness + real
 // UploadHandler + real PermissionService authz seam + in-process httplib server).
 // Suite/fixture names are module-prefixed (DocRoutesFull) for global gtest
 // uniqueness. Deterministic: 127.0.0.1 only, no LLM/network/model.

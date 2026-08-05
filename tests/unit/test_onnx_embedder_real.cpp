@@ -7,7 +7,7 @@
 // embedder's real path is at 0% in the unit coverage metric (the file sits at 47.9%,
 // the rest being the stub path). This is a unit-label MIRROR that runs the SAME real
 // path against the on-disk models/bge-m3 model, so the real Init+Embed+EmbedBatch
-// (and the F40 EmbedWithSparse dense half) land in the unit coverage gate.
+// (and the sparse retrieval EmbedWithSparse dense half) land in the unit coverage gate.
 //
 // Self-skips (GTEST_SKIP) when the model is absent, so a model-less CI box / box
 // without the 2.27 GB bge-m3 weights stays green. Standalone NEW file; does not
@@ -168,7 +168,7 @@ TEST_F(OnnxEmbedderRealTest, EmbedBatchRealAllDims) {
     }
 }
 
-// F40 EmbedWithSparse over the REAL model: the dense half runs the real inference
+// Sparse retrieval EmbedWithSparse over the REAL model: the dense half runs the real inference
 // path (1024-dim unit vector), the sparse half is the standalone stub (D3) keyed off
 // the same text. Exercises the EmbedWithSparse dense=real branch + sparse stub on a
 // real session (the dense path is the part that was uncovered in the unit metric).
@@ -186,7 +186,7 @@ TEST_F(OnnxEmbedderRealTest, EmbedWithSparseRealDenseHalf) {
     EXPECT_LE(static_cast<int>(r.sparse.size()), 50);
 }
 
-// F40 EmbedBatchWithSparse over the real model — the batch form of the above
+// Sparse retrieval EmbedBatchWithSparse over the real model — the batch form of the above
 // (sequential per-item real dense + stub sparse).
 TEST_F(OnnxEmbedderRealTest, EmbedBatchWithSparseReal) {
     auto e = MakeRealEmbedder();

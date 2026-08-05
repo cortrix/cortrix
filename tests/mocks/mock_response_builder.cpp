@@ -11,7 +11,7 @@ namespace cortrix::llm {
 namespace {
 using json = nlohmann::json;
 
-// One chunk's enrichment object (the F03 prompt's expected per-index shape).
+// One chunk's enrichment object (the enricher prompt's expected per-index shape).
 json ChunkObj(int i) {
     return {
         {"entities", json::array({{{"text", "Entity" + std::to_string(i)},

@@ -93,7 +93,7 @@ private:
 // ---------------------------------------------------------------------------
 
 // Build a minimal InteractionLog suitable for extraction tests.
-// By default remember=true so it passes the MEM04 double-check.
+// By default remember=true so it passes the memory opt-out double-check.
 InteractionLog MakeInteraction(const std::string& ns,
                                const std::string& session_id,
                                const std::string& id = "ilog-001",
@@ -274,7 +274,7 @@ TEST_F(MemoryExtractionServiceTest, ExtractOne_Branch3_RememberFalseSkipsOk) {
     auto svc = MakeService(llm);
     ASSERT_TRUE(svc->enabled());
 
-    // remember=false triggers MEM04 D2 opt-out and immediate skip.
+    // remember=false triggers memory opt-out D2 opt-out and immediate skip.
     auto log = MakeInteraction("default", "session-b3",
                                /*id=*/"ilog-b3", /*remember=*/false);
     MemoryExtractionResult result = svc->ExtractOne(log);

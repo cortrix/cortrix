@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/retrieval/sparse_error.h"
 
-// Exhaustive parameterized error-registry sweep for F40 sparse (§8, 5 codes).
+// Exhaustive parameterized error-registry sweep for sparse (§8, 5 codes).
 // Distinct suite name (SparseErrorMatrix) from test_f40_sparse_error.cpp.
 namespace cortrix::retrieval {
 namespace {

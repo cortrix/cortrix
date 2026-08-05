@@ -5,7 +5,7 @@
 
 #include "cortrix/catalog/catalog_types.h"
 
-// Exhaustive round-trip matrices for the F12 catalog state/type enums
+// Exhaustive round-trip matrices for the catalog state/type enums
 // (src/catalog/catalog_types.cpp). UnitState + IndexType both expose
 // ToString + a *FromString reverse, and BOTH document "unknown -> default":
 //   UnitStateFromString: unknown -> kActive  (Phase 1 conservative)

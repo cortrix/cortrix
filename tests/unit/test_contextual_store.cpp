@@ -11,7 +11,7 @@
 #include "cortrix/spc_enricher.h"
 #include "cortrix/spc_enricher/f35_schema_provider.h"
 
-// I2 — WriteContextualized persists F35's contextualized_* columns onto the blocks
+// I2 — WriteContextualized persists contextualized_* columns onto the blocks
 // row F35SchemaProvider created. Tests the write, the BLOB round-trip, and the
 // no-op-when-no-F35-output path.
 namespace cortrix::spc {
@@ -21,7 +21,7 @@ class ContextualStoreTest : public ::testing::Test {
 protected:
     void SetUp() override {
         ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK);
-        // Minimal blocks table; the F35 provider ALTERs in the contextualized_* cols.
+        // Minimal blocks table; the contextual retrieval provider ALTERs in the contextualized_* cols.
         ASSERT_EQ(sqlite3_exec(db_,
             "CREATE TABLE blocks (block_id INTEGER PRIMARY KEY, doc_id TEXT, "
             "content_text TEXT)",
@@ -96,7 +96,7 @@ TEST_F(ContextualStoreTest, WritesTextEmbeddingAndStatus) {
 }
 
 TEST_F(ContextualStoreTest, NoOpWhenNoF35Output) {
-    EnrichResult r;  // status 0, no contextualized fields → F35 never ran
+    EnrichResult r;  // status 0, no contextualized fields → contextual retrieval never ran
     ASSERT_TRUE(WriteContextualized(db_, 7, r).ok());
     EXPECT_EQ(StatusCol(7), 0);          // DEFAULT untouched
     EXPECT_EQ(TextCol(7), "");           // NULL
@@ -112,7 +112,7 @@ TEST_F(ContextualStoreTest, WritesStatusOnFailedDegrade) {
     EXPECT_TRUE(EmbCol(7).empty());
 }
 
-// --- contextual_vec_labels helpers (addendum §3.8 W2, F35-9 B dual-vector) ----
+// --- contextual_vec_labels helpers (dual-vector) --------------------------------
 
 TEST_F(ContextualStoreTest, VecLabelUpsertGetRoundTrip) {
     ContextualVecLabelRow row;

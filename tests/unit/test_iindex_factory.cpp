@@ -48,14 +48,14 @@ public:
     MOCK_METHOD((Result<std::unique_ptr<IIndex>>), Open, (const std::string&), (override));
 };
 
-// Mirrors F12 OpenUnitIndex: hold an IIndexFactory*, Open(unit_path), use IIndex.
+// Mirrors catalog OpenUnitIndex: hold an IIndexFactory*, Open(unit_path), use IIndex.
 TEST(IIndexFactoryTest, F12StyleOpenUnitIndexThroughMock) {
     MockIndexFactory factory;
     EXPECT_CALL(factory, Open("/data/units/unit_legal_0")).WillOnce([](const std::string&) {
         return Result<std::unique_ptr<IIndex>>(std::make_unique<FakeIndex>());
     });
 
-    IIndexFactory* f = &factory;  // F12 holds only the interface pointer
+    IIndexFactory* f = &factory;  // Catalog holds only the interface pointer
     auto opened = f->Open("/data/units/unit_legal_0");
     ASSERT_TRUE(opened.ok());
     ASSERT_NE(opened.value(), nullptr);
@@ -86,7 +86,7 @@ TEST(IIndexFactoryTest, CreateUsesIndexConfigDefaults) {
     EXPECT_TRUE(created.ok());
 }
 
-// F01 Wave A (S1) replaced the skeleton: the real PhnswIndexFactory builds a
+// Index Wave A (S1) replaced the skeleton: the real PhnswIndexFactory builds a
 // working PHnsw IIndex. (Before S1 this test asserted kUnavailable.)
 TEST(IIndexFactoryTest, PhnswFactoryCreatesWorkingIndex) {
     namespace fs = std::filesystem;

@@ -3,7 +3,7 @@
 ///
 /// Tests the following cross-Feature data flows:
 ///   1. Upload → SPC → Store → Query
-///   2. Memory persistence across HTTP requests (F09+F10 critical fix verification)
+///   2. Memory persistence across HTTP requests (block header+cleaning critical fix verification)
 ///   3. Memory → Query → Inject full user journey
 ///   4. Document Upload → Store → Query via HTTP
 ///   5. Namespace isolation across all subsystems
@@ -61,7 +61,7 @@
 #include "cortrix/config/config.h"
 #include "cortrix/server/http_server.h"
 
-// [wire⑤c] F05 NsPoolHarness replaces the MVP NamespaceManager +
+// Namespace pool NsPoolHarness replaces the MVP NamespaceManager +
 // CortrixNamespaceManager (Register*Routes now take resource::INamespacePool&).
 #include "ns_pool_test_helper.h"
 #include "unit/namespace_authz_test_helper.h"  // [V6] runtime NS-authz seam over a real PermissionService
@@ -71,12 +71,12 @@ namespace {
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
-using cortrix::store::PHnsw;        // F01 PHnsw replaces MVP CortrixVectorHnswlib
+using cortrix::store::PHnsw;        // Index PHnsw replaces MVP CortrixVectorHnswlib
 using cortrix::store::PhnswConfig;
 
 // Read a UTF-8 text file into a string. Test inputs are plain .txt files; this
 // is the in-process equivalent of the (removed in R6b) MVP TxtParser used purely
-// to obtain text for the chunker. The F06 parser path (DoclingParser /
+// to obtain text for the chunker. The parser path (DoclingParser /
 // PaddleOCRParser) runs via a Python subprocess bridge and is not used here —
 // this test exercises the SPC -> store -> query chain, not document parsing.
 static std::string ReadFile(const std::string& path) {
@@ -88,7 +88,7 @@ static std::string ReadFile(const std::string& path) {
 
 // ==================================================================
 // Test 1: SPC → Store → Query Pipeline (no HTTP, direct API)
-// Verifies: F03 (SPC) → F01 (Store) → F02 (Block) → F07 (Query)
+// Verifies: enricher (SPC) → index (Store) → reranker (Block) → semantic score (Query)
 // ==================================================================
 
 class SpcStoreQueryTest : public ::testing::Test {
@@ -283,7 +283,7 @@ TEST_F(SpcStoreQueryTest, FullPipelineUploadToQuery) {
 // ==================================================================
 // Test 2: Memory Persistence Across HTTP Requests
 // Verifies CRITICAL Phase 2 fix: MemoryStore uses persistent SQLite
-// Tests: F09 (Memory) + F10 (HTTP Routes) cross-request persistence
+// Tests: block header (Memory) + cleaning (HTTP Routes) cross-request persistence
 // ==================================================================
 
 class MemoryPersistenceHttpTest : public ::testing::Test {
@@ -303,7 +303,7 @@ protected:
         config_.memory.max_sessions_per_namespace = 100;
         config_.memory.max_interactions_per_session = 500;
 
-        // [wire⑤c] F05 NS resource pool replaces the MVP NamespaceManager +
+        // Namespace pool NS resource pool replaces the MVP NamespaceManager +
         // CortrixNamespaceManager (RegisterMemoryRoutes now takes INamespacePool&).
         harness_ = std::make_unique<test::NsPoolHarness>(tmp_dir_);
 
@@ -425,7 +425,7 @@ TEST_F(MemoryPersistenceHttpTest, SessionPersistsAcrossRequests) {
 
     // REQUEST 3: Get session detail (third separate HTTP request)
     // If MemoryStore is ephemeral, this would return 404.
-    // MEM05: pass owner user_id for the ownership check.
+    // Memory isolation: pass owner user_id for the ownership check.
     auto res3 = cli.Get(
         "/api/v1/memory/sessions/" + session_id + "?namespace=default&user_id=e2e_user",
         AuthHeaders());
@@ -444,7 +444,7 @@ TEST_F(MemoryPersistenceHttpTest, SessionPersistsAcrossRequests) {
         << "Should have at least 2 interactions (user + assistant)";
 
     // REQUEST 4: List sessions (fourth separate HTTP request)
-    // MEM05: list is user-isolated; pass the owner user_id.
+    // Memory isolation: list is user-isolated; pass the owner user_id.
     auto res4 = cli.Get("/api/v1/memory/sessions?namespace=default&user_id=e2e_user",
                          AuthHeaders());
     ASSERT_TRUE(res4);
@@ -507,7 +507,7 @@ TEST_F(MemoryPersistenceHttpTest, MultipleSessionsIsolation) {
                                      "Tokyo is the capital of Japan");
     ASSERT_TRUE(r2 && r2->status == 201);
 
-    // Verify session 1 only has its own interactions (MEM05: owner = user_0).
+    // Verify session 1 only has its own interactions (memory isolation: owner = user_0).
     auto g1 = cli.Get("/api/v1/memory/sessions/" + sid1 + "?namespace=default&user_id=user_0",
                        AuthHeaders());
     ASSERT_TRUE(g1 && g1->status == 200);
@@ -521,7 +521,7 @@ TEST_F(MemoryPersistenceHttpTest, MultipleSessionsIsolation) {
     EXPECT_TRUE(has_paris) << "Session1 should contain Paris content";
     EXPECT_FALSE(has_tokyo) << "Session1 should NOT contain Tokyo content";
 
-    // Verify session 2 only has its own interactions (MEM05: owner = user_1).
+    // Verify session 2 only has its own interactions (memory isolation: owner = user_1).
     auto g2 = cli.Get("/api/v1/memory/sessions/" + sid2 + "?namespace=default&user_id=user_1",
                        AuthHeaders());
     ASSERT_TRUE(g2 && g2->status == 200);
@@ -589,7 +589,7 @@ TEST_F(MemoryPersistenceHttpTest, InjectReturnsRecentContext) {
 
 // ==================================================================
 // Test 3: Full HTTP E2E — Upload → Store → Query → Memory
-// Verifies: F04 + F01 + F07 + F09 + F10 full user journey
+// Verifies: cross-NS query + index + semantic score + block header + cleaning full user journey
 // ==================================================================
 
 class FullHttpE2ETest : public ::testing::Test {
@@ -610,7 +610,7 @@ protected:
         config_.memory.max_sessions_per_namespace = 100;
         config_.memory.max_interactions_per_session = 500;
 
-        // [wire⑤c] F05 NS resource pool replaces the MVP NamespaceManager +
+        // Namespace pool NS resource pool replaces the MVP NamespaceManager +
         // CortrixNamespaceManager (all Register*Routes take INamespacePool&).
         harness_ = std::make_unique<test::NsPoolHarness>(tmp_dir_);
 
@@ -767,7 +767,7 @@ TEST_F(FullHttpE2ETest, UploadQueryMemoryJourney) {
         AuthHeaders(), interact_body.dump(), "application/json");
     ASSERT_TRUE(interact_res && interact_res->status == 201);
 
-    // Step 6: Verify the full journey is recorded (MEM05: owner = agent_001).
+    // Step 6: Verify the full journey is recorded (memory isolation: owner = agent_001).
     auto detail_res = cli.Get(
         "/api/v1/memory/sessions/" + sid + "?namespace=default&user_id=agent_001",
         AuthHeaders());
@@ -848,7 +848,7 @@ protected:
         config_.memory.max_sessions_per_namespace = 100;
         config_.memory.max_interactions_per_session = 500;
 
-        // [wire⑤c] F05 NS resource pool replaces the MVP NamespaceManager +
+        // Namespace pool NS resource pool replaces the MVP NamespaceManager +
         // CortrixNamespaceManager (RegisterMemoryRoutes now takes INamespacePool&).
         harness_ = std::make_unique<test::NsPoolHarness>(tmp_dir_);
 
@@ -965,7 +965,7 @@ TEST_F(NamespaceIsolationE2ETest, MemorySessionNamespaceIsolation) {
     ASSERT_TRUE(r_beta && r_beta->status == 201);
 
     // List sessions in project_beta — should NOT see alpha's session
-    // (MEM05: bob lists his own beta sessions).
+    // (memory isolation: bob lists his own beta sessions).
     auto list_beta = cli.Get("/api/v1/memory/sessions?namespace=project_beta&user_id=bob",
                               AuthHeaders());
     ASSERT_TRUE(list_beta && list_beta->status == 200);
@@ -977,7 +977,7 @@ TEST_F(NamespaceIsolationE2ETest, MemorySessionNamespaceIsolation) {
     }
 
     // List sessions in project_alpha — should see alpha's session
-    // (MEM05: alice lists her own alpha sessions).
+    // (memory isolation: alice lists her own alpha sessions).
     auto list_alpha = cli.Get("/api/v1/memory/sessions?namespace=project_alpha&user_id=alice",
                                AuthHeaders());
     ASSERT_TRUE(list_alpha && list_alpha->status == 200);
@@ -1002,7 +1002,7 @@ TEST_F(NamespaceIsolationE2ETest, DeleteDoesNotCrossNamespace) {
     auto createSession = [&](const std::string& ns) -> std::string {
         json body;
         body["namespace"] = ns;
-        body["user_id"] = "alice";  // MEM05: sessions are user-scoped, user_id required
+        body["user_id"] = "alice";  // Memory isolation: sessions are user-scoped, user_id required
         auto r = cli.Post("/api/v1/memory/sessions", AuthHeaders(),
                            body.dump(), "application/json");
         return json::parse(r->body)["session_id"].get<std::string>();

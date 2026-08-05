@@ -4,7 +4,7 @@
 
 #include "cortrix/deploy/deploy_metrics.h"
 
-// F24-S5/S6 coverage: the deployment/system gauges (disk_usage_ratio /
+// Deployment coverage: the deployment/system gauges (disk_usage_ratio /
 // shutdown_status / uptime / build_info, §5.3 + §7.4) and the read-through Bloom
 // Filter gauges (§10) — recording + the OpenMetrics text renderer (stable names,
 // HELP/TYPE lines, subsystem="catalog" label, epoch-second conversion).

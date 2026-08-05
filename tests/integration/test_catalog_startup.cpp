@@ -11,7 +11,7 @@
 #include "cortrix/catalog/default_ns_router.h"
 #include "cortrix/catalog/default_unit_router.h"
 
-// S6.1 integration (F12 §9.1 startup sequence + test #10): wire the whole catalog
+// S6.1 integration (catalog startup sequence + test #10): wire the whole catalog
 // module over one catalog.db and exercise the components together — the order a
 // real Server startup follows: open+migrate → routers → ref store → BloomFilter
 // rebuild → ready. Then a small cross-component dedup smoke.

@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/spc_enricher/enricher_error.h"
 
-// Exhaustive parameterized error-registry sweep for F03 enricher (§5.1, 6 codes).
+// Exhaustive parameterized error-registry sweep for enricher (§5.1, 6 codes).
 // Distinct suite name (EnricherErrorMatrix) from test_enricher_error.cpp.
 namespace cortrix::spc {
 namespace {

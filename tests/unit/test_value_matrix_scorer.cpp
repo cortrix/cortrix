@@ -8,7 +8,7 @@
 
 #include "cortrix/memory_scorer.h"
 
-// Value-matrix breadth coverage for MEM01 MemoryScorer decay + ScoreAndRank.
+// Value-matrix breadth coverage for MemoryScorer decay + ScoreAndRank.
 //
 // Real behavior (memory_scorer.h / src/memory/memory_scorer.cpp, verified):
 //   - Defaults: MemoryDecayConfig.lambda=0.01, min_score=0.0.

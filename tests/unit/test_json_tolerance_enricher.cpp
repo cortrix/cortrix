@@ -1,4 +1,4 @@
-// JSON parse-tolerance matrix for cortrix::spc::ParseEnrichBatchResponse (SPC F03,
+// JSON parse-tolerance matrix for cortrix::spc::ParseEnrichBatchResponse (SPC enricher,
 // topic 3.3 three-layer fault tolerance).
 //
 // Real parser (src/spc/enricher_response_parser.cpp): NEVER throws and NEVER returns

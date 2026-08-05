@@ -97,9 +97,9 @@ TEST(BlockAssemblerTest, MintsNonZeroUniqueBlockId) {
     EXPECT_NE(b1.block_id, b2.block_id) << "distinct child_ids → distinct block_ids";
 }
 
-// [A unified-blocks] AssembleChild: a child block carries the real child_id (so
+// unified-blocks: AssembleChild: a child block carries the real child_id (so
 // block_id = HashChildIdToBlockId(child_id)), block_type = source modality (candidate
-// B, not kBlockChild), and the F34 child columns.
+// B, not kBlockChild), and the child columns.
 TEST(BlockAssemblerTest, AssembleChildCarriesAColumns) {
     id::SetDeploymentHashKeyForTesting({0x0123456789abcdefULL, 0xfedcba9876543210ULL});
     BlockAssembler assembler;

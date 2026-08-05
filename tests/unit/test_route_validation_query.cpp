@@ -1,11 +1,11 @@
-// Route request-validation matrices for the F39 unified query route
-// (POST /api/v1/query) and the F21 connector routes. BREADTH coverage of
+// Route request-validation matrices for the query routing unified query route
+// (POST /api/v1/query) and the watcher connector routes. BREADTH coverage of
 // malformed JSON, missing/empty required fields, out-of-range top_k/timeout_ms,
 // bad ?route / ?granularity enums, missing auth -> 401, namespace authz ->
 // 403 / 404, and method-not-allowed / unknown route -> generic 404.
 //
 // Same in-process harness as test_query_routes.cpp (real httplib server +
-// F05 NsPoolHarness + real PermissionService authz + fake embedder/classifier/
+// Namespace pool NsPoolHarness + real PermissionService authz + fake embedder/classifier/
 // fusion) and test_connector_routes.cpp. No live network / LLM.
 //
 // Suite/fixture names area-prefixed (QueryRouteValMatrix / ConnRouteValMatrix)
@@ -343,7 +343,7 @@ INSTANTIATE_TEST_SUITE_P(
                       TimeoutCase{100, false}, TimeoutCase{5000, false},
                       TimeoutCase{30000, false}));
 
-// ---- bad ?route enum matrix (TEST_P) -> F39 body --------------------------
+// ---- bad ?route enum matrix (TEST_P) -> query routing body ----------------
 
 class QueryRouteValBadRoute
     : public QueryRouteValMatrix,

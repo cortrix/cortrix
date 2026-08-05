@@ -11,8 +11,8 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/config/auth_config.h"
 
-// P08 S1 coverage: JwtSecretService::LoadOrInit + AuthConfigService::
-// LoadOrInitDefaults (P08 §S1 steps 3-5 / §2.11 / §2.12 / §3.6).
+// Auth S1 coverage: JwtSecretService::LoadOrInit + AuthConfigService::
+// LoadOrInitDefaults (auth §S1 steps 3-5 / §2.11 / §2.12 / §3.6).
 namespace cortrix::auth {
 namespace {
 

@@ -7,7 +7,7 @@
 #include "cortrix/common/in_memory_global_config.h"
 #include "cortrix/retrieval/sparse_ns_config.h"
 
-// Exhaustive parameterized sweep over the F40 sparse top-K config resolver
+// Exhaustive parameterized sweep over the sparse top-K config resolver
 // (NsSparseConfig::Parse / ResolveSparseTopK / ClampSparseTopK). Real bounds
 // (50/100/200) and the IGlobalConfig key come from sparse_ns_config.h.
 // Suite tokens are globally unique: SparseCfgParse* / SparseCfgClamp* /

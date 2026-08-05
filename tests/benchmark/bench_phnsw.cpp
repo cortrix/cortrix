@@ -1,4 +1,4 @@
-// F01 S6 — P-HNSW benchmarks (design § 6 S6 / § 8 perf targets).
+// Index S6 — P-HNSW benchmarks (design § 6 S6 / § 8 perf targets).
 //
 // Measures PHnsw directly (not the MVP CortrixVectorHnswlib): search latency
 // (report P50/P99 via --benchmark_repetitions), single-write latency, batch

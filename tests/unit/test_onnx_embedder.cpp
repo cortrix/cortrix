@@ -236,7 +236,7 @@ TEST(OnnxEmbedderTest, Dimension_1024) {
 }
 
 // ============================================================
-// Stub mode tests (new in F03-ONNX)
+// Stub mode tests (stub embedder path)
 // ============================================================
 
 TEST(OnnxEmbedderTest, StubMode_NoModel) {

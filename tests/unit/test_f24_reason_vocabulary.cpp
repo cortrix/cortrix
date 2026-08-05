@@ -5,9 +5,9 @@
 
 #include "cortrix/deploy/reason_vocabulary.h"
 
-// F24-S7/S8 coverage: the OpenMetrics `reason` controlled vocabulary (§8, F24-6),
-// the reason<->error_code naming alignment (§9.3, F24-7), and the label vs
-// structured_data field-ownership table (§9.2, F24-7).
+// Deployment coverage: the OpenMetrics `reason` controlled vocabulary (§8),
+// the reason<->error_code naming alignment (§9.3), and the label vs
+// structured_data field-ownership table (§9.2).
 namespace cortrix::deploy {
 namespace {
 
@@ -64,7 +64,7 @@ TEST(ReasonVocabularyTest, ErrorCodeToReasonIsInverseOnFirstToken) {
 }
 
 TEST(CategoryAlignmentTest, FiveCategoryStringsMatchAgentFriendly) {
-    // F24-7: the metric category label uses the same serialization as the error body.
+    // The metric category label uses the same serialization as the error body.
     EXPECT_STREQ(CategoryString(ErrorCategory::kAuth), "auth");
     EXPECT_STREQ(CategoryString(ErrorCategory::kQuota), "quota");
     EXPECT_STREQ(CategoryString(ErrorCategory::kTransient), "transient");

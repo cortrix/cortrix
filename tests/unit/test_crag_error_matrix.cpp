@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/retrieval/crag_error.h"
 
-// Exhaustive parameterized error-registry sweep for F37 CRAG (§4.3, 4 codes).
+// Exhaustive parameterized error-registry sweep for CRAG (§4.3, 4 codes).
 // Distinct suite name (CragErrorMatrix) from test_crag_error.cpp.
 namespace cortrix::retrieval {
 namespace {

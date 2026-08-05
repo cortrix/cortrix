@@ -8,16 +8,16 @@
 #include "cortrix/deploy/disk_monitor.h"
 #include "cortrix/deploy/f24_error.h"
 
-// F24-S3 coverage: the disk-space management model — the 4 CX_ERR_* identities
+// Deployment coverage: the disk-space management model — the 4 CX_ERR_* identities
 // (§12 registry table + structured_data keys + AgentFriendlyError builder), the
-// DiskMonitor NORMAL/WARN/CRIT FSM + write-rejection flag (§6.1, F24-4 decision A),
+// DiskMonitor NORMAL/WARN/CRIT FSM + write-rejection flag (§6.1),
 // the IGlobalConfig threshold loader (§6.4), and the disk_usage_ratio gauge feed.
 namespace cortrix::deploy {
 namespace {
 
 using agent_friendly::ErrorCategory;
 
-// ------------------------- F24 error registry (§12) -------------------------
+// ------------------------- deployment error registry (§12) ------------------
 
 constexpr F24ErrorCode kAll[] = {
     F24ErrorCode::kDiskFull,

@@ -66,7 +66,7 @@ TEST(F35SchemaProviderBranchR7b, NullDbSameVersionNonInit) {
 // contextual_store.cpp — WriteContextualized reachable arms.
 // ============================================================
 
-// A `blocks` table shaped like the F35 migration leaves it (the columns
+// A `blocks` table shaped like the contextual retrieval migration leaves it (the columns
 // WriteContextualized updates). One seed row so the UPDATE matches.
 void CreateBlocksForContextual(sqlite3* db) {
     ASSERT_EQ(sqlite3_exec(db,
@@ -87,7 +87,7 @@ TEST(ContextualStoreBranchR7b, NullDbInvalidArgument) {
     EXPECT_NE(st.message().find("null db"), std::string::npos);
 }
 
-// No F35 output (status 0, no optionals) → the !f35_ran early-Ok (line 28); the
+// No contextual retrieval output (status 0, no optionals) → the !f35_ran early-Ok (line 28); the
 // row is left untouched (status stays its DEFAULT 0).
 TEST(ContextualStoreBranchR7b, NoF35OutputEarlyOk) {
     sqlite3* db = nullptr;

@@ -109,10 +109,10 @@ TEST(ChunkerFallbackTest, FlatChildrenChunkIndexSequential) {
 // --- S3.4 perf-style (L1: chunking throughput, § 7.4) --------------------------
 
 TEST(ChunkerPerfTest, LargeDocChunksQuickly) {
-    // PERF-F34-1-style: a large document chunks well under the L1 budget. Build a
+    // Perf case: a large document chunks well under the L1 budget. Build a
     // ~200-page doc with substantial text and assert it completes fast + produces a
     // coherent parent/child tree. (Wall-clock is generous to avoid CI flakiness;
-    // the real D-perf recall gate vs F44 dataset is D4/D5, § 7.4.)
+    // the real D-perf recall gate vs benchmark dataset is D4/D5, § 7.4.)
     std::vector<ParsedPage> pages;
     for (int p = 1; p <= 200; ++p) pages.push_back(MakePageWithParas(p, 8, 120));
 

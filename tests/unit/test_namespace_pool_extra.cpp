@@ -9,9 +9,9 @@
 #include "cortrix/resource/pool_error.h"
 #include "ns_pool_test_helper.h"
 
-// Extra deterministic acquire/release/evict/idempotency edges for the F05
+// Extra deterministic acquire/release/evict/idempotency edges for the namespace pool
 // DefaultNamespacePool, built on the shared NsPoolHarness (real WriteCoordinator
-// over a temp dir + mocked F12 routers). The basic admission/budget/startup paths
+// over a temp dir + mocked catalog routers). The basic admission/budget/startup paths
 // live in test_namespace_pool*.cpp; this adds the resident-lifecycle edges in a
 // NEW unique fixture (NsPoolExtra) so there is no suite-name clash.
 

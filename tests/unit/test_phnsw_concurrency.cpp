@@ -1,4 +1,4 @@
-// F01 S5 — shared_mutex read/write concurrency tests (design § 6 S5).
+// Index S5 — shared_mutex read/write concurrency tests (design § 6 S5).
 //
 // Validates PHnsw under concurrent access: many parallel searches, reads during
 // writes, parallel writes, alternating read/write, and snapshot during live

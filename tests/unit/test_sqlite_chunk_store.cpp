@@ -14,9 +14,9 @@ namespace cortrix::store {
 namespace {
 
 // Standalone fixture: the real per-Unit framework schema (documents/blocks/
-// blocks_fts) + the F34 child-column ALTERs (child_id/parent_id/chunk_index live
+// blocks_fts) + the parent-child chunking child-column ALTERs (child_id/parent_id/chunk_index live
 // on blocks under A unified blocks). Rows are inserted with raw SQL so the test
-// needs no F25 PWL / BlockAssembler wiring (mirrors test_scoring_store fixture).
+// needs no write coordinator PWL / BlockAssembler wiring (mirrors test_scoring_store fixture).
 class SqliteChunkStoreTest : public ::testing::Test {
 protected:
     void SetUp() override {
@@ -47,7 +47,7 @@ protected:
              ",1,3,X'00','" + text + "','" + child + "'," + p + ")");
     }
 
-    // A non-child row (F08 META, block_type=8, child_id NULL) — must be excluded
+    // A non-child row (META, block_type=8, child_id NULL) — must be excluded
     // by GetChunksByDocId (child_id IS NOT NULL filter).
     void InsertMeta(int64_t bid, const std::string& doc) {
         Exec("INSERT INTO blocks(block_id,doc_id,chunk_index,block_type,"

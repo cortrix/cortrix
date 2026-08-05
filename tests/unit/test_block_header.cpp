@@ -24,12 +24,12 @@ TEST(BlockHeaderTest, InitFields) {
     EXPECT_EQ(hdr.flags, 0);
     EXPECT_EQ(hdr.content_offset, 0u);
     EXPECT_EQ(hdr.crc32, 0u);
-    // Reserved should be zeroed (F09 shrank reserved 44B → 41B; use sizeof so
+    // Reserved should be zeroed (block header shrank reserved 44B → 41B; use sizeof so
     // this stays correct across layout changes).
     for (size_t i = 0; i < sizeof(hdr.reserved); ++i) {
         EXPECT_EQ(hdr.reserved[i], 0) << "reserved[" << i << "] not zero";
     }
-    // F09 fields are also zeroed by Init.
+    // Block header fields are also zeroed by Init.
     EXPECT_EQ(hdr.flags_ext, 0);
     EXPECT_EQ(hdr.enrichment_source, 0);
     EXPECT_EQ(hdr.compression_algo, 0);
@@ -334,7 +334,7 @@ TEST(BlockHeaderTest, PayloadOffsetsCorrect) {
 }
 
 // ============================================================
-// Design Alignment Tests (Review F01+F02)
+// Design Alignment Tests (Review index+reranker)
 // ============================================================
 
 // Test 19: Relative offsets are zero-based from header end
@@ -410,7 +410,7 @@ TEST(BlockHeaderTest, BlockTypeValues) {
 }
 
 // ============================================================
-// Design Alignment Tests (F01+F02 Final Review)
+// Design Alignment Tests (index+reranker Final Review)
 // ============================================================
 
 // Test 25: kFlagHasFts is set for L2 blocks with content (design D2)
@@ -579,7 +579,7 @@ TEST(BlockHeaderTest, DifferentContentDifferentHash) {
 }
 
 // ============================================================================
-// F09 Phase 1 — new fields (flags_ext / enrichment_source / compression_algo),
+// Block header Phase 1 — new fields (flags_ext / enrichment_source / compression_algo),
 // extended enums (META=8, L4), CRC range 84-127, magic CRTX, ToString.
 // (Design §6 tests #33-48.)
 // ============================================================================
@@ -738,7 +738,7 @@ TEST(BlockHeaderTest, F09_UnsupportedVersionRejected) {
         << "header_version=2 must be rejected even with a valid CRC";
 }
 
-// MVP callers (no F09 params) still build/parse cleanly — defaults all zero.
+// MVP callers (no block header params) still build/parse cleanly — defaults all zero.
 TEST(BlockHeaderTest, F09_MvpCallerDefaultsZero) {
     auto blob = BlockBuild(kBlockFile, kLevelL2, "legacy", "{}", "");
     const cortrix_block_header_t* hdr = nullptr;

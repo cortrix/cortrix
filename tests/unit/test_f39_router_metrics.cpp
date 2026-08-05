@@ -4,7 +4,7 @@
 
 #include "cortrix/query/query_router_metrics.h"
 
-// F39 coverage: the `query_router` subsystem metrics (§10) — 4 metrics
+// Query routing coverage: the `query_router` subsystem metrics (§10) — 4 metrics
 // (router_total counter{decision} / classifier_latency histogram /
 // fallback_ratio gauge / compute_saved_seconds counter{path}), the enum labels,
 // and the OpenMetrics renderer. Cardinality: NO ns_id label (D1 V3 decision 10 /

@@ -2,9 +2,9 @@
 /// @brief R7 full-stack E2E for the query path WITH and WITHOUT an LLM, over the
 ///        production cross-NS query assembly (CrossNsQueryWiring), driven via HTTP.
 ///
-/// Covers the LLM-configured query (F36 rag-fusion: LLM query-
+/// Covers the LLM-configured query (rag-fusion: LLM query-
 /// variant expansion → vector + BM25 + RRF fusion) AND the no-LLM path (graceful
-/// degradation to vector + BM25 without F36). The rag-fusion LLM is wired through
+/// degradation to vector + BM25 without RAG-Fusion). The rag-fusion LLM is wired through
 /// CrossNsQueryWiring (bootstrap §822) — NOT the per-NS RegisterQueryRoutes used by
 /// the ingest E2E — so this test stands that production assembly up directly.
 ///
@@ -15,7 +15,7 @@
 /// genuinely entered — asserted by EXPECT_CALL(Chat).Times(AtLeast(1)) (the core
 /// "LLM is really in the chain" probe, per the lead; results-non-empty alone would
 /// false-pass on the stub embedder). The no-LLM test sets the same request flags but
-/// passes llm=nullptr, so F36 cannot expand and the query must still return 200 with a
+/// passes llm=nullptr, so RAG-Fusion cannot expand and the query must still return 200 with a
 /// well-formed result set (DegradationManager keeps it usable) without crashing.
 
 #include <gtest/gtest.h>
@@ -56,9 +56,9 @@ constexpr const char* kNs = "sales";
 bool HasResultDocId(const json& body, const std::string& doc_id);
 int ResultDocPosition(const json& body, const std::string& doc_id);
 
-// Two small documents let the E2E prove F36 variants affect final order, not just
+// Two small documents let the E2E prove RAG-Fusion variants affect final order, not just
 // that Chat() was called. We drive `granularity=doc`, so matching is deterministic
-// through F08 metadata -> F41 doc_fts5 rather than dependent on stub dense vectors:
+// through META block metadata -> doc_fts5 rather than dependent on stub dense vectors:
 // the original query matches the baseline doc metadata, while only the JSON LLM
 // variants match the variant-only doc metadata.
 std::string OriginalOnlyDoc() {
@@ -79,7 +79,7 @@ std::string VariantLlmJson() {
   ]})";
 }
 
-// LLM that returns strict JSON query variants for any prompt (F36 rag-fusion
+// LLM that returns strict JSON query variants for any prompt (rag-fusion
 // ExpandQueries success path).
 std::shared_ptr<llm::MockLlmClient> MakeVariantLlm() {
   auto mock = std::make_shared<llm::MockLlmClient>();
@@ -169,9 +169,9 @@ class QueryLlmModesBase : public ::testing::Test {
     json body = {{"query", "baselinequarter"},
                  {"namespaces", json::array({kNs})},
                  {"route", "complex"},     // force routing_path == "complex"
-                 {"rag_fusion", true},     // opt into F36
+                 {"rag_fusion", true},     // opt into RAG-Fusion
                  {"locale", "en"},         // BEIR-style English query expansion
-                 {"granularity", "doc"},   // deterministic F08/F41 metadata path
+                 {"granularity", "doc"},   // deterministic META block/doc summary metadata path
                  {"top_k", 2},
                  {"explain", true}};
     return c.Post("/api/v1/query?granularity=doc&explain=true",
@@ -204,7 +204,7 @@ class QueryWithLlm : public QueryLlmModesBase {
 
 // The LLM-configured query runs rag-fusion: the MockLlmClient's Chat MUST be invoked
 // (variant expansion entered the query chain) — the core "LLM full-chain" probe — and
-// the fused query returns a 200 with a well-formed result envelope. F36 v1.0.7 uses
+// the fused query returns a 200 with a well-formed result envelope. RAG-Fusion uses
 // anchored conservative weighted RRF, so the original strong hit should stay first
 // while the variant-only doc still enters the final order as additive evidence.
 TEST_F(QueryWithLlm, RagFusionInvokesLlmAndReturnsResults) {
@@ -230,7 +230,7 @@ TEST_F(QueryWithLlm, RagFusionInvokesLlmAndReturnsResults) {
   // The hard proof is the EXPECT_CALL(Chat) on llm_, verified at fixture teardown.
 }
 
-// ── no LLM: query degrades gracefully (no F36, still usable) ──────────────────────
+// ── no LLM: query degrades gracefully (no RAG-Fusion, still usable) ───────────────
 class QueryWithoutLlm : public QueryLlmModesBase {
  protected:
   void SetUp() override {
@@ -246,7 +246,7 @@ class QueryWithoutLlm : public QueryLlmModesBase {
 };
 
 // Even though the request opts into rag-fusion + the complex route, with no LLM wired
-// F36 cannot expand — the query must NOT crash and must still return a well-formed 200
+// RAG-Fusion cannot expand — the query must NOT crash and must still return a well-formed 200
 // result set (vector + BM25 + RRF via the degradation path).
 TEST_F(QueryWithoutLlm, NoLlmDegradesGracefully) {
   auto res = Query();
@@ -264,12 +264,12 @@ TEST_F(QueryWithoutLlm, NoLlmDegradesGracefully) {
   EXPECT_TRUE(j["meta"].contains("coverage_ratio"));
 }
 
-// ── F44 / PR #7 regression: metadata-only F08 authors enter F41 doc_fts5 and the
+// ── benchmark / PR #7 regression: metadata-only META block authors enter doc_fts5 and the
 // production cross-NS query doc/both path can retrieve them. This is the benchmark
 // failure mode exposed during regression review: the LLM/product-side document evidence existed in
 // design, but doc-level candidates were not guaranteed to enter the query candidate
 // path. The probe deliberately keeps "Lovelace" OUT of the document text/filename and
-// puts it only in upload metadata.authors, so a hit proves F08 -> F41 doc_fts5 -> query.
+// puts it only in upload metadata.authors, so a hit proves META block -> doc_fts5 -> query.
 constexpr const char* kF44Ns = "f44_doc_fallback";
 
 std::string F44MetadataOnlyProbeDoc() {
@@ -344,7 +344,7 @@ class F44DocFtsFallbackE2E : public ::testing::Test {
     cortrix::RegisterDocumentRoutes(h_->server(), h_->upload_handler(), h_->pool(),
                                     h_->auth());
 
-    // Mount the same F41 discover route bootstrap mounts, but over the harness parser
+    // Mount the same doc summary discover route bootstrap mounts, but over the harness parser
     // setup. The config leaves fts5_fallback_enabled=true (default).
     cortrix::doc_summary::DocSummaryConfig discover_cfg;
     h_->server().Get(

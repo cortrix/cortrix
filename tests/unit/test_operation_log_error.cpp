@@ -39,7 +39,7 @@ TEST(OplogErrorTest, SixCodesTotal) {
 }
 
 // Every code's CX_ERR_OPLOG_* string is unique, well-formed, and carries the
-// OPLOG namespace prefix (P04 ErrorResponseV1 pattern ^CX_ERR_[A-Z][A-Z_]*$).
+// OPLOG namespace prefix (API spec ErrorResponseV1 pattern ^CX_ERR_[A-Z][A-Z_]*$).
 TEST(OplogErrorTest, EveryCodeHasUniqueWellFormedCxString) {
     static const std::regex kPattern("^CX_ERR_OPLOG_[A-Z][A-Z_]*$");
     std::set<std::string> seen;

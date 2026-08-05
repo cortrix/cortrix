@@ -2,10 +2,10 @@
 #include <gmock/gmock.h>
 #include "cortrix/connector/directory_importer.h"
 #include "cortrix/connector/file_utils.h"
-#include "cortrix/resource/namespace_facade.h"  // [wire5c] per-op facade for seed/read-back
+#include "cortrix/resource/namespace_facade.h"  // per-op facade for seed/read-back
 #include "cortrix/spc/spc_pipeline.h"  // needed for complete type in MockSPCManager dtor
 #include "mock_spc_manager.h"
-#include "ns_pool_test_helper.h"  // [wire5c] F05 NsPoolHarness replaces MVP CortrixNamespaceManager
+#include "ns_pool_test_helper.h"  // Namespace pool NsPoolHarness replaces MVP CortrixNamespaceManager
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -25,8 +25,8 @@ using cortrix::testing::MockSPCManager;
 
 // ---- Test Fixture ----
 //
-// [wire5c] DirectoryImporter migrated off the MVP CortrixNamespaceManager onto the
-// F05 resource::INamespacePool. Its store/vector/blob windows are now reached per-op
+// DirectoryImporter migrated off the MVP CortrixNamespaceManager onto the
+// Namespace pool resource::INamespacePool. Its store/vector/blob windows are now reached per-op
 // through a NamespaceFacade (NOT injected mocks): the importer calls
 // facade.store().doc_create(...) / facade.vec_index().MarkDelete(...) against the
 // REAL CortrixStoreSqlite + capturing FakeIndex that NsPoolHarness stands up.
@@ -372,10 +372,10 @@ TEST_F(DirectoryImportTest, GetStatsReturnsZeroBeforeStart) {
     EXPECT_DOUBLE_EQ(0.0, stats.elapsed_s);
 }
 
-// F21 sec 2.3: IsWatching() no longer reflects an OS watcher owned by the importer
+// Watcher: IsWatching() no longer reflects an OS watcher owned by the importer
 // (DirWatcherRegistry owns the single per-directory FileWatcher now). It reflects
 // whether the importer is active -- false before Start(), true after a successful
-// Start(), false again after Stop(). (Pre-F21 this asserted false when
+// Start(), false again after Stop(). (before the watcher registry this asserted false when
 // watch_enabled=false; that flag is now a no-op for the importer.)
 TEST_F(DirectoryImportTest, IsWatchingReflectsImporterActive) {
     auto harness = MakeHarness();
@@ -385,7 +385,7 @@ TEST_F(DirectoryImportTest, IsWatchingReflectsImporterActive) {
     WatchDirConfig config;
     config.data_dir = test_dir_.string();
     config.namespace_name = "default";
-    config.watch_enabled = false;  // F21: no-op for the importer
+    config.watch_enabled = false;  // Watcher: no-op for the importer
     config.ignore_patterns = {".*", "*~", "*.tmp", "*.swp", "#*#"};
 
     DirectoryImporter importer(config, harness->ipool(), mock_spc);
@@ -481,7 +481,7 @@ TEST_F(DirectoryImportTest, SubdirectoryFilesImported) {
 }
 
 // NOTE [wire5c blocked]: the pre-migration test forced doc_create -> -1 via a gmock
-// store to assert that a metadata-write failure is counted as skipped_error. The F05
+// store to assert that a metadata-write failure is counted as skipped_error. The namespace pool
 // facade exposes a REAL CortrixStoreSqlite over a healthy temp DB, which has no
 // per-call failure-injection seam (doc_create only fails on a SQLite prepare/step
 // error, unreachable from the harness). The closest real-store failure in the same
@@ -704,7 +704,7 @@ TEST_F(DirectoryImportTest, HandleFileEvents_CreatedThenDeleted_Ignored) {
     WatchDirConfig config;
     config.data_dir = test_dir_.string();
     config.namespace_name = "default";
-    config.watch_enabled = false;  // F21: watcher owned by registry; events are injected
+    config.watch_enabled = false;  // Watcher: watcher owned by registry; events are injected
     config.ignore_patterns = {".*", "*~", "*.tmp", "*.swp", "#*#"};
 
     DirectoryImporter importer(config, harness->ipool(), mock_spc);
@@ -771,7 +771,7 @@ TEST_F(DirectoryImportTest, HandleFileEvents_DirectoryEventsIgnored) {
 
 TEST_F(DirectoryImportTest, HandleFileDeletion_FullCascadeWithBlocks) {
     // Verify the full cascade: kDeleting -> vector MarkDelete -> doc_delete -> blob_del.
-    // Driven deterministically via HandleFileEvents() (F21 made it public) against the
+    // Driven deterministically via HandleFileEvents() (watcher made it public) against the
     // real store + capturing FakeIndex (no OS watcher / sleeps).
     auto harness = MakeHarness();
     MockSPCManager mock_spc;

@@ -2,7 +2,7 @@
 
 #include "cortrix/retrieval/crag_config.h"
 
-// Value-matrix breadth coverage for the F37 CRAG threshold configuration
+// Value-matrix breadth coverage for the CRAG threshold configuration
 // invariant (CragConfig::IsValid) and the three-tier boundary semantics.
 //
 // Real behavior (crag_config.h, verified):

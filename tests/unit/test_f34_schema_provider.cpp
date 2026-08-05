@@ -10,13 +10,13 @@
 
 #include "cortrix/catalog/schema_provider.h"
 
-// F34 § 3.1 (A unified-blocks): F34SchemaProvider extends the
+// Parent-child chunking (A unified-blocks): F34SchemaProvider extends the
 // per-Unit blocks table (+4 child cols) + 3 indexes (incl idx_blocks_meta_doc, B2)
-// + creates the parents table, registered via the F12 SchemaMigrator.
+// + creates the parents table, registered via the catalog SchemaMigrator.
 namespace cortrix::store {
 namespace {
 
-// Minimal stand-in for F09's per-Unit `blocks` table (only the shape F34's
+// Minimal stand-in for block header's per-Unit `blocks` table (only the shape parent-child chunking's
 // migration touches: block_id / doc_id / block_type — standalone, no full framework).
 void CreateBlocksTable(sqlite3* db) {
     ASSERT_EQ(sqlite3_exec(db,
@@ -261,7 +261,7 @@ TEST(F34SchemaProviderTest, IndexNameCollisionFailsExec) {
 }
 
 TEST(F34SchemaProviderTest, PreexistingChildColumnsTakeSkipArm) {
-    // When blocks already carries all 4 F34 child columns, each
+    // When blocks already carries all 4 child columns, each
     // AddBlocksColumnIfAbsent hits the ColumnExists==true skip arm (no ALTER) and
     // Migrate still succeeds + builds the indexes.
     sqlite3* db = nullptr;
@@ -315,7 +315,7 @@ TEST(F34SchemaProviderTest, MetaDocIndexNameCollisionFailsExec) {
     sqlite3_close(db);
 }
 
-// Runs through the real SchemaMigrator per-Unit path (the F12 integration point).
+// Runs through the real SchemaMigrator per-Unit path (the catalog integration point).
 TEST(F34SchemaProviderTest, RegistersAndMigratesViaMigratorUnit) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);

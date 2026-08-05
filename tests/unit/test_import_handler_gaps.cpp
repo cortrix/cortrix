@@ -172,7 +172,7 @@ TEST(ImportHandlerGaps, RegisterWithExpireDaysAndBackendError) {
                            {"expire_days", 30}};
     int http = 0;
     auto out = handler.HandleRegisterConnection(body, AdminCtx(), http);
-    // FailingConnMgr::Register returns a non-F16a Status -> CodeFromStatus falls back
+    // FailingConnMgr::Register returns a non-import Status -> CodeFromStatus falls back
     // to kConnectionFailed (line 29) -> HttpFor maps to its http_status (503).
     EXPECT_GE(http, 400) << out.dump();
     ASSERT_TRUE(out.contains("error"));
@@ -197,11 +197,11 @@ TEST(ImportHandlerGaps, RegisterWithExpireDaysSucceeds) {
 
 // ---------------------------------------------------------------------------
 // HandleRevokeConnection: the no-"reason" ternary false branch (245-247) + the
-// non-F16a Revoke error -> CodeFromStatus fallback (29).
+// non-import Revoke error -> CodeFromStatus fallback (29).
 // ---------------------------------------------------------------------------
 
 // Revoke called with NO "reason" field -> reason defaults to "" (line 247 false arm),
-// and the failing conn manager returns a non-F16a Status -> fallback code path.
+// and the failing conn manager returns a non-import Status -> fallback code path.
 TEST(ImportHandlerGaps, RevokeWithoutReasonAndBackendError) {
     auto conn_mgr = std::make_shared<FailingConnMgr>();
     auto handler = ImportHandler(MakeMgr(conn_mgr), conn_mgr);

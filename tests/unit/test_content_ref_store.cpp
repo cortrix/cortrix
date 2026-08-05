@@ -18,7 +18,7 @@ bool HasCxCode(const Status& st, const std::string& cx) {
 }
 
 // Seed a file_locations row so the ref_count aggregate is tracked (this row is
-// normally created by the write path, F25).
+// normally created by the write path, write coordinator).
 void SeedFileLocation(sqlite3* db, const std::string& file_hash,
                       const std::string& status = "active",
                       std::optional<int64_t> deleted_at = std::nullopt) {

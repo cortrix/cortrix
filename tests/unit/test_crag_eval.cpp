@@ -11,7 +11,7 @@
 #include "cortrix/retrieval/heuristic_guard_backend.h"
 #include "cortrix/retrieval/types.h"
 
-// F37 S8 (standalone): the evaluation-scoring harness for the F37 §12.bis 2.3
+// CRAG S8 (standalone): the evaluation-scoring harness for the CRAG 2.3
 // end-to-end classification thresholds (macro-F1 >= 0.65, per-class F1 >= 0.70,
 // Correct precision >= 0.80, Incorrect recall >= 0.70, Ambiguous trigger < 30%).
 //
@@ -37,7 +37,7 @@ struct Example {
 // A small controlled fixture: distributions chosen so the heuristic classifier
 // (score = 0.7*top1 + 0.3*high_score_ratio) lands in the intended band. The class
 // MIX mirrors a realistic query distribution (correct-majority), so the
-// "Ambiguous trigger rate < 30%" threshold (F37 §12.bis 2.3, which guards against
+// "Ambiguous trigger rate < 30%" threshold (CRAG 2.3, which guards against
 // over-broad ambiguous marking on REAL traffic) is meaningful — not a balanced
 // eval set where 1/3 ambiguous would be expected by construction.
 std::vector<Example> Fixture() {
@@ -105,7 +105,7 @@ TEST(CragEvalTest, HeuristicClearsSection12bisThresholds) {
     auto ev = CragEvaluator(std::make_shared<HeuristicGuardBackend>(), CragConfig{});
     Scores s = ScoreClassifier(ev, Fixture());
 
-    // F37 §12.bis 2.3 hard thresholds (on this controlled separable fixture).
+    // CRAG 2.3 hard thresholds (on this controlled separable fixture).
     EXPECT_GE(s.f1["correct"], 0.70) << "per-class F1 (correct)";
     EXPECT_GE(s.f1["ambiguous"], 0.70) << "per-class F1 (ambiguous)";
     EXPECT_GE(s.f1["incorrect"], 0.70) << "per-class F1 (incorrect)";

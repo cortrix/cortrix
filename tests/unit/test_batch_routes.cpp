@@ -16,7 +16,7 @@
 #include "cortrix/server/i_task_submitter.h"
 #include "cortrix/server/routes/batch_routes.h"
 
-// TD-F42-BULK coverage: the POST /api/v1/documents/batch route — auth (Write+),
+// Batch-submit coverage: the POST /api/v1/documents/batch route — auth (Write+),
 // JSON body parsing + request-level validation (malformed JSON / missing fields /
 // bad options), and the end-to-end partial-success + batch-level error wiring
 // through a real BatchSubmitService over a stub submitter. Mirrors the

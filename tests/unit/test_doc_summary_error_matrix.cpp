@@ -12,7 +12,7 @@
 #include "cortrix/common/status.h"
 #include "cortrix/doc_summary/doc_summary_error.h"
 
-// Exhaustive error-registry matrix for F41 doc_summary (src/doc_summary/doc_summary_error.*).
+// Exhaustive error-registry matrix for doc_summary (src/doc_summary/doc_summary_error.*).
 // One TEST_P case per DocSummaryErrorCode. Unique suite name (DocSummaryErrorMatrix).
 namespace cortrix::doc_summary {
 namespace {
@@ -64,7 +64,7 @@ TEST_P(DocSummaryErrorMatrix, CategoryInValidSet) {
 }
 
 // retry_after_ms present implies retryable (universal). Here the reverse also holds
-// (every retryable F41 code carries a backoff, incl. the quota-category budget code).
+// (every retryable doc summary code carries a backoff, incl. the quota-category budget code).
 TEST_P(DocSummaryErrorMatrix, RetryAfterImpliesRetryable) {
     const DocSummaryErrorInfo& info = GetDocSummaryErrorInfo(GetParam());
     if (info.retry_after_ms.has_value()) {

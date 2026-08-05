@@ -9,7 +9,7 @@
 #include "cortrix/deploy/deploy_metrics.h"
 #include "cortrix/deploy/graceful_shutdown.h"
 
-// F24-S4 coverage: graceful shutdown (§7, F24-5 decision C) — pending-task
+// Deployment coverage: graceful shutdown (§7) — pending-task
 // serialization round-trip, the ordered Run() phases with injected hooks, the
 // drain-timeout → forced + persist path, the shutdown_status gauge feed, and the
 // startup resume path (parse + resubmit + delete .pending_tasks.json).

@@ -225,7 +225,7 @@ TEST_F(CatalogSchemaTest, ForeignKeysEnforced) {
     EXPECT_NE(rc, SQLITE_OK);  // FK violation → constraint error
 }
 
-// schema_version records F12 at the current version after Open().
+// schema_version records at the current version after Open().
 TEST_F(CatalogSchemaTest, SchemaVersionRecordsF12) {
     EXPECT_EQ(QueryInt(db_,
         "SELECT version FROM schema_version WHERE feature='F12'"),
@@ -319,7 +319,7 @@ TEST(CatalogDbOpenTest, FailingExtraProviderAbortsOpen) {
 }
 
 // A nullptr extra provider is skipped (the migrator tolerates null entries) — the
-// Open still succeeds with just the F12 base schema.
+// Open still succeeds with just the catalog base schema.
 TEST(CatalogDbOpenTest, NullExtraProviderIsSkipped) {
     CatalogDb c;
     Status s = c.Open(":memory:", {nullptr});
@@ -329,7 +329,7 @@ TEST(CatalogDbOpenTest, NullExtraProviderIsSkipped) {
 
 // ── F12SchemaProvider::Migrate failure branch ────────────────────────────────
 
-// Running the F12 provider against a query-only db makes the CREATE TABLE exec
+// Running the catalog provider against a query-only db makes the CREATE TABLE exec
 // fail ("readonly database") → the migration-failed Status branch (catalog_schema).
 TEST(F12SchemaProviderMigrateTest, ExecFailureReturnsInternal) {
     sqlite3* db = nullptr;

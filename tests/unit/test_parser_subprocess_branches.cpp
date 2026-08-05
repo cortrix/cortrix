@@ -6,7 +6,7 @@
 
 #include "cortrix/spc/parser_subprocess.h"
 
-// F06 branch coverage for parser_subprocess.cpp (RunParserSubprocess fork/exec/
+// Parser branch coverage for parser_subprocess.cpp (RunParserSubprocess fork/exec/
 // poll primitive). The success / launch-failure / timeout arms are covered in
 // test_docling_parser.cpp; this file targets the remaining branches:
 //   - empty argv (launched=false short-circuit)

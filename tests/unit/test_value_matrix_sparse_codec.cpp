@@ -9,7 +9,7 @@
 #include "cortrix/common/status.h"
 #include "cortrix/retrieval/sparse_codec.h"
 
-// Value-matrix breadth coverage for the F40 sparse_vec on-disk codec
+// Value-matrix breadth coverage for the sparse_vec on-disk codec
 // (SerializeSparseVec / DeserializeSparseVec / SerializedSparseVecSize).
 //
 // Real wire format (sparse_codec.h / sparse_codec.cpp, verified):

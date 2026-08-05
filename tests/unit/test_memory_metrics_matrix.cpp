@@ -1,4 +1,4 @@
-// Memory metrics family — exhaustive matrix coverage for MEM02/03/04/05
+// Memory metrics family — exhaustive matrix coverage for the memory features
 // (enum ToString, label-combo counters, gauges, histograms, render, reset).
 // Separate suite namespaces from the existing test_mem0*_metrics.cpp files.
 #include <gtest/gtest.h>
@@ -12,7 +12,7 @@
 #include "cortrix/memory/mem04_metrics.h"
 #include "cortrix/memory/mem05_metrics.h"
 
-// ============================== MEM02 ========================================
+// ============================== memory extraction ============================
 namespace cortrix::memory {
 namespace mem02_matrix {
 
@@ -138,7 +138,7 @@ TEST_F(Mem02Fx, Reset) {
 
 }  // namespace mem02_matrix
 
-// ============================== MEM04 ========================================
+// ============================== memory opt-out ===============================
 namespace immunity {
 namespace mem04_matrix {
 
@@ -200,7 +200,7 @@ TEST_F(Mem04Fx, Reset) {
 }  // namespace mem04_matrix
 }  // namespace immunity
 
-// ============================== MEM05 ========================================
+// ============================== memory isolation =============================
 namespace mem05_matrix {
 
 using CR = Mem05Metrics::CheckResult;
@@ -322,7 +322,7 @@ TEST_F(Mem05Fx, Reset) {
 }  // namespace mem05_matrix
 }  // namespace cortrix::memory
 
-// ============================== MEM03 ========================================
+// ============================== memory transparency ==========================
 namespace cortrix::memory::transparency {
 namespace mem03_matrix {
 

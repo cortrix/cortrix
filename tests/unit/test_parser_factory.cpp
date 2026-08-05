@@ -11,7 +11,7 @@
 #include "cortrix/spc/parser_factory.h"
 #include "parser_stub.h"
 
-// F06 S1 coverage: DocumentParserFactory pre-check / extension→MIME routing /
+// Parser S1 coverage: DocumentParserFactory pre-check / extension→MIME routing /
 // fallback orchestration / custom parser registration. Standalone — the primary
 // + fallback parsers are StubParsers (no Python / Docling / OCR).
 namespace cortrix::spc {

@@ -18,7 +18,7 @@
 
 #include "ns_pool_test_helper.h"
 
-// [F13 TC4] InteractionLogSweeper: the per-NS interaction_log 180d cleanup. It
+// [agent trace TC4] InteractionLogSweeper: the per-NS interaction_log 180d cleanup. It
 // iterates namespaces (via INSRouter), acquires each memory.db façade, and deletes
 // interaction_log rows older than the retention window from EACH namespace (the
 // global agent_trace cleanup is the single-db F13CleanupRegistrar path; interaction_log

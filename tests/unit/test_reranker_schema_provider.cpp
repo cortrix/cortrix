@@ -1,8 +1,8 @@
-// S4.1 — F02SchemaProvider registers with the F12 SchemaMigrator for
-// namespaces.reranker_config version coordination (F02 §2.5 / Issue 2.3).
+// S4.1 — F02SchemaProvider registers with the catalog SchemaMigrator for
+// namespaces.reranker_config version coordination (reranker / Issue 2.3).
 // reranker_config is one of the 11 standardized *_config JSONB columns supplied
-// by the F12 base schema, so F02's Phase-1 Migrate is a no-op. These tests pin
-// that contract + the F02 <-> F12 closure (the column really exists after a
+// by the catalog base schema, so reranker's Phase-1 Migrate is a no-op. These tests pin
+// that contract + the reranker <-> catalog closure (the column really exists after a
 // combined migration). Mirrors test_watcher_schema_provider.cpp.
 #include <gtest/gtest.h>
 
@@ -69,8 +69,8 @@ TEST(F02SchemaProviderTest, RegistersAndMigratesViaMigrator) {
     sqlite3_close(db);
 }
 
-// F02 <-> F12 closure: the reranker_config column F02 relies on is provided by
-// the frozen F12 base schema. Register F12 first (topological order), then F02,
+// Reranker <-> catalog closure: the reranker_config column reranker relies on is provided by
+// the frozen catalog base schema. Register catalog first (topological order), then reranker,
 // run a single atomic migration, and assert the column exists with both versions.
 TEST(F02SchemaProviderTest, RerankerConfigColumnSuppliedByF12BaseSchema) {
     sqlite3* db = nullptr;
@@ -79,7 +79,7 @@ TEST(F02SchemaProviderTest, RerankerConfigColumnSuppliedByF12BaseSchema) {
     cortrix::catalog::F12SchemaProvider f12;
     F02SchemaProvider f02;
     cortrix::catalog::SchemaMigrator m;
-    m.Register(&f12);  // F12 first (ARCH §1.3.bis.3 topological order)
+    m.Register(&f12);  // Catalog first (ARCH §1.3.bis.3 topological order)
     m.Register(&f02);
 
     Status st = m.MigrateCatalog(db);

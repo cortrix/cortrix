@@ -9,7 +9,7 @@
 namespace cortrix::spc {
 namespace test {
 
-/// Test-only stub IDocumentParser (F06 S1 "StubParser"): returns a caller-supplied
+/// Test-only stub IDocumentParser (parser S1 "StubParser"): returns a caller-supplied
 /// ParsedDoc and records how many times Parse was called. Lets the factory's
 /// pre-check / routing / fallback orchestration be exercised standalone — no
 /// Python / Docling / OCR dependency.
@@ -46,7 +46,7 @@ private:
     std::vector<std::string> formats_;
     ParsedDoc result_;
     std::function<void(const std::string&, const ParserOptions&)> on_parse_;
-    // atomic: F42 WorkerPool tests drive Parse from pool workers while the
+    // atomic: async task WorkerPool tests drive Parse from pool workers while the
     // test thread polls call_count() for completion.
     std::atomic<int> call_count_{0};
     std::string last_filepath_;

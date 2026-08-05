@@ -10,7 +10,7 @@
 #include "cortrix/resource/f05_config.h"
 #include "cortrix/resource/sqlite_conn.h"
 
-// Branch coverage for SqliteConn (F05 §3.1 store.db RAII owner). The happy
+// Branch coverage for SqliteConn (namespace pool store.db RAII owner). The happy
 // ApplyPragmas/ReadPragma round-trip is exercised by NamespacePoolTest
 // (UT17); this file drives the error + lifecycle branches: open failure,
 // move semantics, no-op-when-closed guards, PRAGMA exec failure, and

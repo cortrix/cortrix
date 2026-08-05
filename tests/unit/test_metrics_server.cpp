@@ -1,4 +1,4 @@
-// F24 §5 — MetricsServer unit tests (previously ZERO coverage).
+// Deployment — MetricsServer unit tests (previously ZERO coverage).
 // RenderAll multi-source aggregation, AddSource / AddBloomFilterSource (incl.
 // null-source ignore), GET /metrics body + content-type, Start/Stop idempotency,
 // and the RegisterMetricsServer factory. The DeployMetrics gauges are

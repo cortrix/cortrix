@@ -315,7 +315,7 @@ TEST_F(HttpServerTest, CreateNamespaceNoAuth) {
     EXPECT_TRUE(body.contains("created_at"));
 }
 
-// [F18a §9.1 NamespaceManager site] A capturing operation logger. The route runs on
+// [operation log NamespaceManager site] A capturing operation logger. The route runs on
 // a server worker thread, so Log can be called concurrently — guard the vector.
 class CapturingNsOpLogger : public observability::IOperationLogger {
 public:
@@ -446,7 +446,7 @@ TEST_F(HttpServerTest, GetNonexistentNamespace) {
 }
 
 // A catalog-backed (ns_router_) detail response must serialize the FULL NSMetadata
-// — not just name/created/updated/dc/bc. Regression for the F12 Major
+// — not just name/created/updated/dc/bc. Regression for the catalog Major
 // under-serialization (regression root cause: View Details dropped tenant / isolation
 // / visibility / status / clone lineage). Optionals are stable keys (null on absent).
 namespace {
@@ -511,7 +511,7 @@ TEST_F(HttpServerTest, GetNamespaceDetailSerializesFullNSMetadata) {
     EXPECT_EQ(body["owner_user_id"], "user_42");
     EXPECT_EQ(body["status"], "active");
     EXPECT_EQ(body["created_at"], 1700000000000LL);
-    // No updated_at column in F12 §4.1 → mirrors created_at.
+    // No updated_at column in catalog → mirrors created_at.
     EXPECT_EQ(body["updated_at"], body["created_at"]);
     // Stable-shape optionals: present-but-null when the NS was never cloned.
     ASSERT_TRUE(body.contains("cloned_from_ns_id"));

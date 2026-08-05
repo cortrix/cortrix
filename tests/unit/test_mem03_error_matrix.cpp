@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/memory/mem03_error.h"
 
-// Exhaustive parameterized error-registry sweep for MEM03 (§4.3.4.bis). Distinct
+// Exhaustive parameterized error-registry sweep for memory transparency (§4.3.4.bis). Distinct
 // suite name (Mem03ErrorMatrix) from the basic test_mem03_error.cpp.
 namespace cortrix::memory::transparency {
 namespace {

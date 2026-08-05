@@ -1,4 +1,4 @@
-// F36 RAG-Fusion unit tests (detail design sec 11.1: 22 UT + sec 11.3: 3 Perf).
+// RAG-Fusion unit tests (detail design sec 11.1: 22 UT + sec 11.3: 3 Perf).
 //
 // Standalone (B_R1_BRIEFING sec 7): the LLM dependency is the FROZEN
 // `cortrix::llm::ILlmClient` seam, exercised via the frozen
@@ -334,7 +334,7 @@ TEST_F(RagFusionTest, QueryVariantGenerator_InvalidLlmResponse) {
 }
 
 // UT 6 [R7]: no LLM client (null) -> Generate degrades instead of dereferencing a
-// null llm_ (defense-in-depth for the guard in query_variant_generator.cpp; the F36
+// null llm_ (defense-in-depth for the guard in query_variant_generator.cpp; the RAG-Fusion
 // gate in query_wiring normally skips rag-fusion when no LLM is available, but a
 // direct caller must also be safe). Returns CX_WARN_RAG_FUSION_DEGRADED, records one
 // "other" degrade, and must not crash. (Regression for the R7 no-LLM SIGSEGV bug.)
@@ -730,7 +730,7 @@ TEST_F(RagFusionTest, RagFusion_FuseResults_AnchorsOriginalTopThreeBeforeBoosted
 // The anchor is defined over the original query's first three unique child_ids,
 // not merely the first three positions. This keeps the guardrail robust if an
 // upstream retrieval path accidentally emits a duplicate child in the original
-// list before F36's final dedup.
+// list before RAG-Fusion's final dedup.
 TEST_F(RagFusionTest, RagFusion_FuseResults_AnchorsTopThreeUniqueOriginalChildren) {
     auto svc = MakeService(std::make_shared<MockLlmClient>());
     std::vector<std::vector<ScoredResult>> per_variant = {

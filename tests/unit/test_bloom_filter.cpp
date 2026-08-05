@@ -8,7 +8,7 @@
 #include "cortrix/catalog/bloom_filter.h"
 #include "cortrix/catalog/catalog_db.h"
 
-// S4.1 coverage: BloomFilter (F12 §7 dedup accelerator).
+// S4.1 coverage: BloomFilter (catalog dedup accelerator).
 namespace cortrix::catalog {
 namespace {
 

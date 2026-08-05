@@ -4,7 +4,7 @@
 
 #include "cortrix/spc/hype_metrics.h"
 
-// F38 S7 — the 4 hype_index subsystem metrics (§11). Recorder + OpenMetrics
+// HyPE S7 — the 4 hype_index subsystem metrics (§11). Recorder + OpenMetrics
 // render + no-high-cardinality-label compliance.
 namespace cortrix::spc {
 namespace {

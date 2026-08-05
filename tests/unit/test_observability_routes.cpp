@@ -22,7 +22,7 @@
 #include "cortrix/common/i_global_config.h"
 #include "cortrix/server/routes/observability_routes.h"
 
-// F13 §8 HTTP route layer (observability_routes): the 3 GET endpoints over a real
+// Agent trace HTTP route layer (observability_routes): the 3 GET endpoints over a real
 // httplib server (mirrors test_batch_routes' real-server pattern) — auth + happy
 // path + permission (admin vs non-admin cross-user) + header-validation warning +
 // route-side INVALID_FILTER — plus the InstallCors origin logic (loopback allowed,
@@ -392,7 +392,7 @@ TEST_F(ObservabilityRoutesTest, CorsPreflightOptionsAllowedOrigin) {
     EXPECT_EQ(res->get_header_value("Access-Control-Allow-Origin"), "https://app.example.com");
     EXPECT_NE(res->get_header_value("Access-Control-Allow-Methods").find("OPTIONS"),
               std::string::npos);
-    // The F13 identity headers are in the allow-list.
+    // The agent trace identity headers are in the allow-list.
     const std::string allow_headers = res->get_header_value("Access-Control-Allow-Headers");
     EXPECT_NE(allow_headers.find("X-Session-Id"), std::string::npos);
     EXPECT_NE(allow_headers.find("X-Trace-Id"), std::string::npos);

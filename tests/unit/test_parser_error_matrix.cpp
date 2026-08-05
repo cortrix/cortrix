@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/spc/parser_errors.h"
 
-// Exhaustive parameterized error-registry sweep for F06 document-parser (§5.2, 16
+// Exhaustive parameterized error-registry sweep for document-parser (§5.2, 16
 // codes incl. the two non-error outcomes kOk / kEmptyDocument). Distinct suite
 // name (ParserErrorMatrix) from the existing parser tests. Parser uses its own
 // helper names: IsParserOk / RequiredParserStructuredDataKeys /

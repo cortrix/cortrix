@@ -12,7 +12,7 @@
 //      guard branch + non-object / invalid / collision branches not pinned by the
 //      existing tests/scatter/test_live_metadata_flatten.cpp.
 //
-// The executor is constructed against a real (offline) F05 pool via NsPoolHarness
+// The executor is constructed against a real (offline) namespace pool via NsPoolHarness
 // and an un-Init()ed OnnxEmbedder: CandidateK touches neither the pool nor the
 // embedder, so no model load or NS acquisition occurs.
 
@@ -29,7 +29,7 @@
 #include "cortrix/query/rrf_fusion.h"
 #include "cortrix/spc/onnx_embedder.h"
 
-#include "ns_pool_test_helper.h"  // cortrix::test::NsPoolHarness (real offline F05 pool)
+#include "ns_pool_test_helper.h"  // cortrix::test::NsPoolHarness (real offline namespace pool)
 
 namespace cortrix::query {
 namespace {

@@ -115,7 +115,7 @@ TEST(RagFusionTypesBranchR7b, ValidateTimeoutNonPositive) {
     EXPECT_EQ(range, "[1, ]");
 }
 
-// locale outside zh|en → the locale fail() arm. This matters for F44/BEIR, where
+// locale outside zh|en → the locale fail() arm. This matters for benchmark/BEIR, where
 // English benchmark queries must request the English prompt instead of zh.
 TEST(RagFusionTypesBranchR7b, ValidateLocaleInvalid) {
     RagFusionConfig cfg;

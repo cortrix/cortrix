@@ -319,7 +319,7 @@ TEST_F(HttpServerLifecycle, StartBindFailureReturnsInternal) {
 // BuildNamespaceListJson / BuildNamespaceJson (lines 656-661 / 745-751).
 // ---------------------------------------------------------------------------
 
-// Wire a real F05 pool (via the shared NsPoolHarness) into the server, admit a NS in
+// Wire a real namespace pool (via the shared NsPoolHarness) into the server, admit a NS in
 // BOTH the pool and the metadata manager, then list/get it so the per-request
 // NamespaceFacade Acquire() succeeds and the live doc/block-count arm runs.
 TEST_F(HttpServerLifecycle, SetNamespacePoolLiveCounts) {

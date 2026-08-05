@@ -1,5 +1,5 @@
 // S3.1 — reranker.max_seq_length GUC (default 512 / range 128-8192) + the
-// spc.chunk_size GUC registration backfilled (F02 §2.4 V5-B2-05). Range-violation policy
+// spc.chunk_size GUC registration backfilled (reranker V5-B2-05). Range-violation policy
 // = REJECT (Status error), not clamp. Live PostgreSQL GUC registration = D3.5;
 // these exercise the standalone reranker_guc.h SoT + IGlobalConfig load path.
 #include <gtest/gtest.h>

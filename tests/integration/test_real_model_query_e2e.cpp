@@ -90,7 +90,7 @@ class RealModelQueryE2E : public ::testing::Test {
         << "expected the real bge-m3 model to load, got the stub";
 
     perm_svc_ = std::make_unique<cortrix::tenant::PermissionService>(h_->global_db());
-    // Owned by "alice" so the F04 cross-NS query (queried with user_key) authorizes.
+    // Owned by "alice" so the cross-NS query (queried with user_key) authorizes.
     ASSERT_TRUE(h_->CreateNamespaceOwnedBy(kNs, "alice").ok());
 
     // Document upload + cross-NS query (no LLM — plain dense + BM25 + RRF; the
@@ -173,7 +173,7 @@ TEST_F(RealModelQueryE2E, SemanticRecallRanksRelevantDocFirst) {
   }
   ASSERT_GT(j["results"].size(), 0u) << "real-model query returned no results: " << j.dump();
 
-  // The F04 cross-NS result item is keyed by child_id/parent_id + carries the chunk
+  // The cross-NS result item is keyed by child_id/parent_id + carries the chunk
   // `content` (NOT doc_id — that schema is the per-NS query's). Both docs live in one
   // namespace here, so the per-result discriminator is the chunk text: classify each
   // result as ML vs cooking by distinctive vocabulary.

@@ -7,7 +7,7 @@
 #include "cortrix/spc/parser.h"
 #include "parser_script_fixture.h"
 
-// F06 page-level progress + per-page tolerance (Q1, design S5). Standalone: the
+// Parser page-level progress + per-page tolerance (Q1, design S5). Standalone: the
 // callback is driven by replaying the parsed ParsedDoc (real per-page streaming
 // from the bridge is D3.5). DrivePageProgress is also tested directly.
 namespace cortrix::spc {

@@ -1,5 +1,5 @@
 #pragma once
-// Reusable deterministic fakes for the F41 doc-discovery surface
+// Reusable deterministic fakes for the doc-discovery surface
 // (src/doc_summary/discover_handler.cpp). Two layers:
 //
 //   1. Standalone fakes for the pure RecallDocSummaryHnsw(IIndex&, CortrixStore&,
@@ -334,7 +334,7 @@ private:
             config_);
     }
 
-    // ----- mocked F12 routers (only GetActiveUnit / Open are exercised) -----
+    // ----- mocked catalog routers (only GetActiveUnit / Open are exercised) -----
     class MockNSRouter : public cortrix::catalog::INSRouter {
     public:
         MOCK_METHOD((cortrix::Result<std::vector<cortrix::catalog::UnitDescriptor>>),

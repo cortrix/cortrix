@@ -507,7 +507,7 @@ TEST_F(BatchIngestFx, MergeWinningTheOrderingLeavesALaterCancelApplicable) {
     EXPECT_EQ(row.value().status, async::task_status::kCancelled);
 }
 
-// Task rows store whatever string was handed to F42, so the same file can be
+// Task rows store whatever string was handed to async task, so the same file can be
 // spelled differently by two tasks. The reference check has to compare
 // filesystem identity, not the stored strings, or finishing one task deletes a
 // file the other still needs.

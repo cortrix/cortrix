@@ -8,11 +8,11 @@
 #include "cortrix/agent_trace/agent_trace_schema.h"
 #include "cortrix/catalog/schema_provider.h"  // ISchemaProvider + SchemaMigrator
 
-// S1 coverage: agent_trace schema (F13 §4.1, topic 3) — provider identity, the
+// S1 coverage: agent_trace schema (agent trace, topic 3) — provider identity, the
 // table + 3 indices created via the real SchemaMigrator, the full 12-column set,
 // NULL-allowed session/trace/agent/namespace, default status, and idempotent
 // re-migration. agent_trace lives in the global DB and references no catalog
-// table (no FK), so the F13 provider migrates standalone.
+// table (no FK), so the agent trace provider migrates standalone.
 namespace cortrix::agent_trace {
 namespace {
 
@@ -60,7 +60,7 @@ bool Contains(const std::set<std::string>& s, const std::string& k) {
     return s.find(k) != s.end();
 }
 
-// Fixture: in-memory global db, F13 provider migrated once via the real migrator.
+// Fixture: in-memory global db, agent trace provider migrated once via the real migrator.
 class AgentTraceSchemaTest : public ::testing::Test {
 protected:
     void SetUp() override {

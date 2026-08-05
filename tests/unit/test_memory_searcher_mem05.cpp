@@ -1,9 +1,9 @@
-// MEM05 cross-user isolation supplement tests for MemorySearcher.
+// Memory isolation cross-user isolation supplement tests for MemorySearcher.
 //
 // Covers the "body/request user_id != auth principal → non-admin cross-user
 // escalation blocked" path (design § 8.bis) that the existing test suite does
 // not exercise end-to-end through Search(). Also covers the
-// ParseCreatedAtToEpoch and ExtractStatus paths exercised via the MEM01 scorer
+// ParseCreatedAtToEpoch and ExtractStatus paths exercised via the memory decay scorer
 // integration branch.
 //
 // All tests use the same real pipeline stub setup as test_memory_searcher.cpp
@@ -142,7 +142,7 @@ protected:
 };
 
 // ---------------------------------------------------------------------------
-// Core MEM05 cross-user escalation scenarios via Search().
+// Core memory isolation cross-user escalation scenarios via Search().
 //
 // Each test seeds blocks in the pipeline (via vec_index_ + store_.blocks) and
 // calls Search() with a specific user_id in the request. MatchScope inside
@@ -194,7 +194,7 @@ TEST_F(Mem05CrossUserTest, Search_UserBRequest_GetsNothingWhenOnlyUserAPresent) 
 
 // A block with an empty-string user_id is never accessible to any valid user.
 TEST_F(Mem05CrossUserTest, Search_BlockWithEmptyUserId_NeverAccessible) {
-    // Seed a block that has user_id="" in its metadata (malformed / pre-MEM05 data).
+    // Seed a block that has user_id="" in its metadata (malformed / pre-isolation data).
     json meta;
     meta["user_id"] = "";
     meta["interaction_id"] = "int-empty";
@@ -221,7 +221,7 @@ TEST_F(Mem05CrossUserTest, Search_BlockWithEmptyUserId_NeverAccessible) {
         << "block with empty user_id must not be accessible";
 }
 
-// A block with no user_id key in metadata is excluded (pre-MEM05 / orphaned data).
+// A block with no user_id key in metadata is excluded (pre-isolation / orphaned data).
 TEST_F(Mem05CrossUserTest, Search_BlockWithMissingUserId_Excluded) {
     json meta;
     meta["interaction_id"] = "int-missing-uid";

@@ -5,7 +5,7 @@
 
 #include "cortrix/async/f42_error.h"
 
-// S1 coverage: the F42 error model (template A) — all 11 CX_ERR_* identities, their
+// S1 coverage: the async task error model (template A) — all 11 CX_ERR_* identities, their
 // §6.2 attributes (http/category/retryable/retry_after_ms/structured_data keys),
 // the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::async {

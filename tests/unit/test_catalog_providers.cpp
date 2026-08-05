@@ -10,14 +10,14 @@
 #include "cortrix/catalog/catalog_schema.h"
 #include "cortrix/catalog/schema_provider.h"
 
-// S1.2 + S1.3 coverage: catalog provider registration order (F12 first) and
+// S1.2 + S1.3 coverage: catalog provider registration order (catalog first) and
 // multi-provider startup migration through CatalogDb::Open(path, providers).
 namespace cortrix::catalog {
 namespace {
 
 // A downstream-Feature stand-in. Records the order in which its Migrate() runs
 // (shared log), creates one table, and optionally:
-//  - references F12's units table via FK (proves F12 must migrate first), or
+//  - references catalog's units table via FK (proves catalog must migrate first), or
 //  - fails (proves the whole batch rolls back atomically).
 class FakeFeatureProvider : public ISchemaProvider {
 public:
@@ -34,7 +34,7 @@ public:
         if (fail_) return Status::Internal(name_ + " intentional failure");
 
         // Table name derived from the feature id; optionally FK→units(unit_id)
-        // so creation only succeeds once F12 has already created `units`.
+        // so creation only succeeds once catalog has already created `units`.
         std::string ddl = "CREATE TABLE feat_" + name_ + " (id INTEGER PRIMARY KEY";
         if (fk_to_units_) {
             ddl += ", unit_id TEXT REFERENCES units(unit_id)";
@@ -70,11 +70,11 @@ bool TableExists(sqlite3* db, const std::string& table) {
     return found;
 }
 
-// S1.3: Open(path, providers) registers F12 first, then the extra providers in
-// the given order; all tables end up present and F12 ran before them.
+// S1.3: Open(path, providers) registers catalog first, then the extra providers in
+// the given order; all tables end up present and catalog ran before them.
 TEST(CatalogProvidersTest, MultiProviderStartupMigration) {
     std::vector<std::string> order;
-    // Two downstream stand-ins, the first FK-referencing units (needs F12 first).
+    // Two downstream stand-ins, the first FK-referencing units (needs catalog first).
     FakeFeatureProvider f09("F09", &order, /*fk_to_units=*/true);
     FakeFeatureProvider f03("F03", &order);
 
@@ -83,13 +83,13 @@ TEST(CatalogProvidersTest, MultiProviderStartupMigration) {
     ASSERT_TRUE(st.ok()) << st.message();
 
     sqlite3* db = catalog.db();
-    // F12 base tables + both downstream tables exist.
-    EXPECT_TRUE(TableExists(db, "units"));        // F12 base
-    EXPECT_TRUE(TableExists(db, "namespaces"));   // F12 base
+    // Catalog base tables + both downstream tables exist.
+    EXPECT_TRUE(TableExists(db, "units"));        // Catalog base
+    EXPECT_TRUE(TableExists(db, "namespaces"));   // Catalog base
     EXPECT_TRUE(TableExists(db, "feat_F09"));     // downstream (FK→units)
     EXPECT_TRUE(TableExists(db, "feat_F03"));     // downstream
 
-    // Registration/execution order: extras run in given order (F12 is not in the
+    // Registration/execution order: extras run in given order (catalog is not in the
     // log — it is the C++ F12SchemaProvider, not a FakeFeatureProvider).
     ASSERT_EQ(order.size(), 2u);
     EXPECT_EQ(order[0], "F09");
@@ -101,7 +101,7 @@ TEST(CatalogProvidersTest, MultiProviderStartupMigration) {
     EXPECT_EQ(SchemaMigrator().CurrentVersion(db, "F03"), 1);
 }
 
-// S1.2: F12 must migrate before a downstream provider whose table FK-references
+// S1.2: catalog must migrate before a downstream provider whose table FK-references
 // units. If ordering were wrong this DDL would fail; success proves F12-first.
 TEST(CatalogProvidersTest, F12RunsBeforeDownstreamFkProvider) {
     std::vector<std::string> order;
@@ -114,7 +114,7 @@ TEST(CatalogProvidersTest, F12RunsBeforeDownstreamFkProvider) {
 }
 
 // S1.3 atomicity: a failing downstream provider rolls back the WHOLE batch,
-// including F12's base tables — the migrator runs all providers in one tx.
+// including catalog's base tables — the migrator runs all providers in one tx.
 TEST(CatalogProvidersTest, DownstreamFailureRollsBackEntireBatch) {
     std::vector<std::string> order;
     FakeFeatureProvider ok("F09", &order);
@@ -140,14 +140,14 @@ TEST(CatalogProvidersTest, FailedBatchLeavesNoPartialSchemaOnDisk) {
         Status st = c1.Open(path, {&boom});
         ASSERT_FALSE(st.ok());
     }
-    // Inspect the file directly: F12's units table must not be present.
+    // Inspect the file directly: catalog's units table must not be present.
     sqlite3* probe = nullptr;
     ASSERT_EQ(sqlite3_open(path.c_str(), &probe), SQLITE_OK);
     EXPECT_FALSE(TableExists(probe, "units"))
         << "rollback left F12 base tables behind — batch was not atomic";
     sqlite3_close(probe);
 
-    // A subsequent clean Open (no failing provider) succeeds and builds F12.
+    // A subsequent clean Open (no failing provider) succeeds and builds catalog.
     {
         CatalogDb c2;
         Status st = c2.Open(path);

@@ -51,7 +51,7 @@ nlohmann::json QueryBody(const std::vector<std::string>& ns, int top_k = 10,
                           {"rerank", rerank}};
 }
 
-// === IT-F04-1: single NS goes through F04 direct path ===
+// === Case 1: single NS goes through cross-NS query direct path ===
 TEST(ScatterIntegrationTest, IT1_SingleNsDirectPath) {
     Stack s({"ns_a"});
     EXPECT_CALL(s.executor, ExecuteForNamespace(_, "ns_a", _))
@@ -65,7 +65,7 @@ TEST(ScatterIntegrationTest, IT1_SingleNsDirectPath) {
     EXPECT_FLOAT_EQ(r.body["meta"]["coverage_ratio"].get<float>(), 1.0f);
 }
 
-// === IT-F04-2: 3 NS Cross-NS query (merged + sorted by final score across NS) ===
+// === Case 2: 3 NS Cross-NS query (merged + sorted by final score across NS) ===
 TEST(ScatterIntegrationTest, IT2_ThreeNsCrossQuery) {
     Stack s({"ns_a", "ns_b", "ns_c"});
     EXPECT_CALL(s.executor, ExecuteForNamespace(_, "ns_a", _))
@@ -85,7 +85,7 @@ TEST(ScatterIntegrationTest, IT2_ThreeNsCrossQuery) {
     EXPECT_EQ(r.body["meta"]["namespaces_succeeded"].size(), 3u);
 }
 
-// === IT-F04-3: 10 NS Cross-NS (SLA tier — bucketed metric) ===
+// === Case 3: 10 NS Cross-NS (SLA tier — bucketed metric) ===
 TEST(ScatterIntegrationTest, IT3_TenNsCrossQuery) {
     ScatterMetrics::Instance().ResetForTest();
     std::vector<std::string> ns;
@@ -106,7 +106,7 @@ TEST(ScatterIntegrationTest, IT3_TenNsCrossQuery) {
     ScatterMetrics::Instance().ResetForTest();
 }
 
-// === IT-F04-4: namespaces:["*"] wildcard (expands via the permission service) ===
+// === Case 4: namespaces:["*"] wildcard (expands via the permission service) ===
 TEST(ScatterIntegrationTest, IT4_WildcardExpansion) {
     Stack s({"ns_x", "ns_y"});
     EXPECT_CALL(s.executor, ExecuteForNamespace(_, "ns_x", _))
@@ -121,7 +121,7 @@ TEST(ScatterIntegrationTest, IT4_WildcardExpansion) {
               (nlohmann::json{"ns_x", "ns_y"}));
 }
 
-// === IT-F04-5: partial NS failure (meta.namespaces_failed with Agent friendly fields) ===
+// === Case 5: partial NS failure (meta.namespaces_failed with Agent friendly fields) ===
 TEST(ScatterIntegrationTest, IT5_PartialFailure) {
     Stack s({"ns_ok", "ns_bad"});
     EXPECT_CALL(s.executor, ExecuteForNamespace(_, "ns_ok", _))
@@ -141,7 +141,7 @@ TEST(ScatterIntegrationTest, IT5_PartialFailure) {
     EXPECT_FLOAT_EQ(r.body["meta"]["coverage_ratio"].get<float>(), 0.5f);
 }
 
-// === IT-F04-6: cross-NS same content_hash dedup (B-simplified) ===
+// === Case 6: cross-NS same content_hash dedup (B-simplified) ===
 TEST(ScatterIntegrationTest, IT6_CrossNsContentHashDedup) {
     Stack s({"ns_a", "ns_b"});
     // Both NS return a chunk with the SAME text → same content_hash → collapse.
@@ -166,7 +166,7 @@ TEST(ScatterIntegrationTest, IT6_CrossNsContentHashDedup) {
     EXPECT_EQ(d["namespaces"].size(), 2u);
 }
 
-// === IT-F04-7: rerank=false RRF fallback (meta.warnings with "rerank_disabled") ===
+// === Case 7: rerank=false RRF fallback (meta.warnings with "rerank_disabled") ===
 TEST(ScatterIntegrationTest, IT7_RerankDisabledFallback) {
     Stack s({"ns_a"});
     EXPECT_CALL(s.executor, ExecuteForNamespace(_, "ns_a", _))

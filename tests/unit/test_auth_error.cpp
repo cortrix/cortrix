@@ -11,7 +11,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/auth/auth_error.h"
 
-// P08 S1 coverage: the P08 auth error codes (§5.2) — CX_ERR_ identity, category
+// Auth S1 coverage: the auth error codes (§5.2) — CX_ERR_ identity, category
 // mapping, retryability, structured_data keys, and the MakeAuthError boundary
 // factory (incl. the live retry_after override for ACCOUNT_LOCKED / RATE_LIMITED).
 namespace cortrix::auth {
@@ -57,7 +57,7 @@ TEST(AuthErrorTest, CodeCountMatchesAnchor) {
 }
 
 // Every code's CX_ERR_* string is unique and matches the ErrorResponseV1 pattern
-// ^CX_ERR_[A-Z][A-Z_]*$ (ARCH §4.1.11; P08 v1.0.2 V3-resolution-14 added AUTH prefix).
+// ^CX_ERR_[A-Z][A-Z_]*$ (ARCH §4.1.11; auth V3-resolution-14 added AUTH prefix).
 TEST(AuthErrorTest, EveryCodeHasUniqueWellFormedCxString) {
     static const std::regex kPattern("^CX_ERR_[A-Z][A-Z_]*$");
     std::set<std::string> seen;
@@ -111,7 +111,7 @@ TEST(AuthErrorTest, EveryCategoryIsOneOfFive) {
 }
 
 // Spot-check the exact §5.2 rows downstream consumers depend on. NOTE: unlike the
-// catalog table, P08's ACCOUNT_LOCKED / RATE_LIMITED are retryable+quota with a
+// catalog table, auth's ACCOUNT_LOCKED / RATE_LIMITED are retryable+quota with a
 // *live* retry_after (static default = nullopt, injected per-call) — asserted below.
 TEST(AuthErrorTest, SpecificRowsMatchSpec) {
     auto check = [](AuthErrorCode c, const char* cx, ErrorCategory cat, bool retry,
@@ -158,7 +158,7 @@ TEST(AuthErrorTest, MakeAuthErrorBuildsAgentFriendlyBody) {
 }
 
 // CX_ERR_ACCOUNT_LOCKED carries the *live* remaining-lock ms via the per-call
-// override (P08 §5.2 retry_after_ms = remaining lockout ms). Without an override it stays
+// override (auth retry_after_ms = remaining lockout ms). Without an override it stays
 // null (the static row default).
 TEST(AuthErrorTest, AccountLockedCarriesLiveRetryAfter) {
     nlohmann::json sd = {{"locked_until", "2026-05-14T10:35:00Z"},

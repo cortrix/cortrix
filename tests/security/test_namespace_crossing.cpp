@@ -12,8 +12,8 @@
 #include "httplib.h"
 #include <nlohmann/json.hpp>
 
-// [wire⑤c follow-up] MVP CortrixNamespace(Manager) + hnswlib headers removed;
-// store-level isolation walks per-NS stores through the F05 pool façade and
+// MVP CortrixNamespace(Manager) + hnswlib headers removed;
+// store-level isolation walks per-NS stores through the namespace pool façade and
 // the HTTP fixture stands on the shared NsPoolHarness.
 #include "cortrix/store/cortrix_store_sqlite.h"
 #include "cortrix/common/block_header.h"

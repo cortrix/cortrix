@@ -5,7 +5,7 @@
 
 #include "cortrix/server/batch_error.h"
 
-// TD-F42-BULK coverage: the batch error model (template A, mirrors f42_error) —
+// Batch-submit coverage: the batch error model (template A, mirrors f42_error) —
 // all 4 CX_ERR_BATCH_* identities, their §2.4.1 attributes
 // (http/category/retryable/retry_after_ms/structured_data keys), and the
 // AgentFriendlyError builder.

@@ -8,10 +8,10 @@
 
 namespace cortrix::reranker {
 
-/// Shared gmock double for IReranker. Lets the query pipeline / F04 /
-/// F37 unit-test their reranker integration without the real ONNX model.
+/// Shared gmock double for IReranker. Lets the query pipeline / cross-NS query /
+/// CRAG unit-test their reranker integration without the real ONNX model.
 ///
-/// NOTE: F02 §7.2 lists Score/ScoreBatch/Name; the interface also has a pure
+/// NOTE: reranker lists Score/ScoreBatch/Name; the interface also has a pure
 /// virtual Rerank (added v1.0.3, V5 decision #4A), which MUST be mocked too for the
 /// double to be instantiable.
 class MockReranker : public IReranker {

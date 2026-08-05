@@ -18,7 +18,7 @@
 
 // D3.5 wire⑤c: document routes now take a resource::INamespacePool& (was the MVP
 // CortrixNamespaceManager&). The shared harness stands up a real DefaultNamespacePool
-// (mocked F12 routers + FakeIndex + real WriteCoordinator over a temp dir).
+// (mocked catalog routers + FakeIndex + real WriteCoordinator over a temp dir).
 #include "ns_pool_test_helper.h"
 // [V6] Runtime namespace authorization seam over a real PermissionService
 // (the static per-key allow-list / can_access_namespace was removed).
@@ -51,7 +51,7 @@ protected:
         config_.upload.max_file_size = 100 * 1024 * 1024;
         config_.upload.large_file_threshold = 100 * 1024 * 1024;
 
-        // Real F05 pool over a temp dir; admit the "default" namespace the route
+        // Real namespace pool over a temp dir; admit the "default" namespace the route
         // tests target so per-request facade.Acquire() succeeds.
         harness_ = std::make_unique<cortrix::test::NsPoolHarness>(temp_dir_ / "pool");
         ASSERT_TRUE(harness_->Admit("default").ok());
@@ -78,7 +78,7 @@ protected:
 
         // [V6] Real PermissionService over an in-memory catalog. Seed every
         // namespace the tests reach so the admin key (tenant "test-tenant") is an
-        // authorized principal. Only "default" is admitted into the F05 pool; the
+        // authorized principal. Only "default" is admitted into the namespace pool; the
         // others ("nonexistent", "nonexistent-ns", "ghost-ns") are authorized but
         // absent from the pool, so the facade miss yields the expected 404
         // NOT_FOUND (a 404 for an authorized caller, not an anti-enumeration 403).

@@ -1,5 +1,5 @@
-// Pagination + filter matrices for the F13 agent_trace Query API and the MEM03
-// MemoryTransparency List API (F23 breadth).
+// Pagination + filter matrices for the agent_trace Query API and the memory transparency
+// MemoryTransparency List API (test suite breadth).
 //
 // agent_trace (include/cortrix/agent_trace/agent_trace_writer_impl.h):
 //   AgentTraceWriterImpl(sqlite3*, shared_ptr<IGlobalConfig>)
@@ -238,7 +238,7 @@ TEST_F(AgentTracePageFilter, OrderingAscByCreatedAtAcrossPages) {
 }  // namespace cortrix
 
 // ===========================================================================
-// MEM03 MemoryTransparency List - page/page_size clamp + filter matrix.
+// MemoryTransparency List - page/page_size clamp + filter matrix.
 // ===========================================================================
 namespace cortrix {
 namespace memory {

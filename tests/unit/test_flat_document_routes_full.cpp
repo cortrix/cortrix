@@ -16,7 +16,7 @@
 //   * POST /namespaces/{id}/reload happy path (admin recovery).
 //
 // Harness: an in-process loopback httplib::Server + RegisterFlatDocumentRoutes /
-// RegisterWatchAliasRoutes over a real F05 NsPoolHarness, a real UploadHandler, a
+// RegisterWatchAliasRoutes over a real namespace pool NsPoolHarness, a real UploadHandler, a
 // real BatchSubmitService (over a selectable stub submitter), and a real
 // DocumentTaskHandler. Suite/fixture names are module-prefixed (FlatDocRoutesFull)
 // for global gtest uniqueness. Deterministic: 127.0.0.1 only, no LLM/network/model.

@@ -1,4 +1,4 @@
-// F13 AgentTraceMetrics — exhaustive matrix coverage (enum ToString, (source x
+// AgentTraceMetrics — exhaustive matrix coverage (enum ToString, (source x
 // status) / (role x endpoint) / module / header label combos, latency histogram,
 // gauge, RenderOpenMetrics series + no high-cardinality labels, ResetForTest).
 // Separate suite namespace from test_agent_trace_metrics.cpp.

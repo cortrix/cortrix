@@ -168,10 +168,10 @@ TEST(GroupCommitWriterTest, StatsReflectActivity) {
 }
 
 // Note: the kill -9 / crash-recovery DoD item is a property of the IWalSink
-// implementation (F25 PWL / F01 WAL), which owns persistence. GroupCommitWriter's
+// implementation (write coordinator PWL / index WAL), which owns persistence. GroupCommitWriter's
 // unit-level durability contract — "an Ok future implies Sync() already
 // succeeded for that batch" — is covered by SingleSubmitFlushesAndSyncs +
-// WriteFailurePropagatesAndSkipsSync. Crash-recovery integration lives in F25.
+// WriteFailurePropagatesAndSkipsSync. Crash-recovery integration lives in write coordinator.
 
 }  // namespace
 }  // namespace cortrix::store

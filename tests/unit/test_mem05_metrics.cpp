@@ -107,7 +107,7 @@ TEST_F(Mem05MetricsTest, RenderOpenMetricsHasAllSevenMetricsAndTypes) {
 }
 
 TEST_F(Mem05MetricsTest, RenderHasNoHighCardinalityLabels) {
-    // MEM05 §8.bis / OBS_SPEC §3.2: user_id is on the absolute deny list. Labels
+    // Memory isolation / OBS_SPEC §3.2: user_id is on the absolute deny list. Labels
     // are enum-only; per-user data goes through the audit log, never a label.
     M().RecordIsolationCheck(CheckResult::kPass, Action::kSearch);
     M().RecordDefaultUserUsed();

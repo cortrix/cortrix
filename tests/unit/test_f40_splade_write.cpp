@@ -10,10 +10,10 @@
 
 #include "cortrix/retrieval/splade_sparse_retriever.h"
 
-// F40 S5 — SpladeSparseRetriever write/delete (§6.1, §6.2): inverted-index DDL
+// Sparse retrieval S5 — SpladeSparseRetriever write/delete (§6.1, §6.2): inverted-index DDL
 // (Open), incremental Add (replace semantics), Remove (idempotent). Verified by
 // querying the underlying table directly + via the retriever's own read where
-// useful. Runs against an in-memory SQLite DB (standalone — F25 PWL / F34
+// useful. Runs against an in-memory SQLite DB (standalone — write coordinator PWL / parent-child chunking
 // children FK = D3.5).
 namespace cortrix::retrieval {
 namespace {

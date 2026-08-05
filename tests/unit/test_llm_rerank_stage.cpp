@@ -1,5 +1,5 @@
-// F36-LR LlmRerankStage unit tests (hub design/features/
-// F36-llm-listwise-rerank-addendum.md §4): prompt construction (suffix /
+// LlmRerankStage unit tests (the listwise-rerank addendum
+// §4): prompt construction (suffix /
 // truncation / locale), ranking JSON parsing (valid / tolerant / hostile),
 // permutation application (order / score monotonicity / tail preservation),
 // degrade paths, and config validation. LLM doubled via MockLlmClient.

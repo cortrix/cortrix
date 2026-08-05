@@ -9,7 +9,7 @@
 #include "cortrix/catalog/bloom_filter.h"
 #include "cortrix/catalog/catalog_db.h"
 
-// BREADTH op-matrix coverage for BloomFilter (F12  sec 7). Complements
+// BREADTH op-matrix coverage for BloomFilter (catalog). Complements
 // test_bloom_filter.cpp with: ctor edge inputs (capacity 0, target_fp_rate out of
 // (0,1) -> default 0.01, k-clamp extremes observed via behavior), add/contains
 // no-false-negative + disjoint FP-stat matrices across many key-set sizes, runtime

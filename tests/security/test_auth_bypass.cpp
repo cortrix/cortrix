@@ -82,7 +82,7 @@ protected:
         // REAL PermissionService. Seed ONLY "allowed-ns" owned by the restricted
         // key's tenant ("ns-tenant"), preserving the original intent that this key
         // is scoped to "allowed-ns" and DENIED any other namespace. This fixture
-        // drives the real CortrixHttpServer/NamespaceManager (no F05 pool), so the
+        // drives the real CortrixHttpServer/NamespaceManager (no namespace pool), so the
         // list seam is left unwired (nullptr pool); the per-namespace gate is what
         // the ownership seeding governs.
         authz_ = std::make_unique<cortrix::test::NamespaceAuthzHarness>(

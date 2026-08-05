@@ -1,5 +1,5 @@
 /// @file fuzz_cross_ns_parse_request.cpp
-/// @brief libFuzzer harness for the cross-NS query body parse (F04 Sec.2.4).
+/// @brief libFuzzer harness for the cross-NS query body parse (cross-NS query Sec.2.4).
 ///
 /// Mirrors the cross-NS route: raw body -> json::parse (guarded) -> the cross-NS
 /// ParseRequest logic (B' deprecation check + required `namespaces` array walk +

@@ -1,13 +1,13 @@
 /// @file test_multi_ns_fanout_e2e.cpp
-/// @brief R7 full-stack E2E for F21 watcher fan-out over the PRODUCTION assembly
+/// @brief R7 full-stack E2E for watcher fan-out over the PRODUCTION assembly
 ///        (real DirWatcherRegistry + real SPCManager + real PhnswIndexFactory pool),
 ///        driven through the connector HTTP routes.
 ///
 /// Why this exists (full-stack, catching live-only seams):
-/// the F21 fan-out unit test (tests/unit/test_dir_watcher_registry.cpp) drives the
+/// the watcher fan-out unit test (tests/unit/test_dir_watcher_registry.cpp) drives the
 /// private FanOutEvents with synthetic events over mock routers. This exercises the
 /// LIVE path: a real file dropped in a watched directory, fanned out by the real
-/// DirWatcherRegistry (lazily built by RegisterConnectorRoutes over the real F05 pool
+/// DirWatcherRegistry (lazily built by RegisterConnectorRoutes over the real namespace pool
 /// + real catalog INSRouter + real SPCManager) to MULTIPLE namespaces, each landing
 /// the document in its own per-NS store — all via the /connector HTTP routes.
 ///
@@ -120,7 +120,7 @@ class MultiNsFanoutE2E : public ::testing::Test {
 };
 
 // One directory → two namespaces: after a scan, BOTH namespaces hold the directory's
-// documents. This is the F21 fan-out core over the live registry + real pool.
+// documents. This is the watcher fan-out core over the live registry + real pool.
 TEST_F(MultiNsFanoutE2E, FanOutToMultipleNamespaces) {
   // Pre-create both namespaces OWNED BY the query principal (user_key == "alice")
   // so the per-NS query below passes V6 runtime authorization; this isolates the

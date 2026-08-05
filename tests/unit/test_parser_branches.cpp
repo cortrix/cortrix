@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/spc/parser.h"
 
-// F06 branch coverage for parser.cpp: the JSON-field default branches in
+// Parser branch coverage for parser.cpp: the JSON-field default branches in
 // ParseChunk / ParsePageMeta / ParseDocMeta (taken when a field is ABSENT vs
 // present), StatusToCode out-of-range mapping, MakeErrorDoc structured_data
 // edge cases, and MakeAgentFriendlyError with a non-object structured_data.

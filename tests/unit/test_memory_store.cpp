@@ -144,7 +144,7 @@ TEST_F(MemoryStoreTest, SessionListFilterByNamespace) {
 }
 
 // R10 GAP-E1 regression: the per-user filter must be applied IN SQL so that
-// SessionList rows and SessionCount agree under MEM05 isolation. The pre-fix bug
+// SessionList rows and SessionCount agree under memory isolation. The pre-fix bug
 // post-filtered an NS-wide page in the app layer while total_count stayed NS-wide,
 // yielding total_count > returned rows (has_more=true with 0 items → infinite paging).
 TEST_F(MemoryStoreTest, SessionListAndCountScopedByUserId) {
@@ -924,7 +924,7 @@ TEST_F(MemoryStoreTest, InteractionPairInsertRollsBackWhenSessionMissing) {
     EXPECT_EQ(count, 0);
 }
 
-// --- Injected store-failure seam (F23 §4.5, SetFailNextOps) ---
+// --- Injected store-failure seam (test suite, SetFailNextOps) ---
 // Each public op consumes one armed fault and returns Status::Internal before any
 // SQL — this exercises the per-op fault-check branch the gate counts as missed.
 

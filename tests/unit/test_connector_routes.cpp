@@ -1,4 +1,4 @@
-// Tests for connector_routes.cpp (connector + browse endpoints) after the F21
+// Tests for connector_routes.cpp (connector + browse endpoints) after the watcher
 // fan-out refactor (TD-WATCHER-001). The routes now drive a DirWatcherRegistry
 // (one OS watcher per directory, fan-out to N namespaces) instead of the MVP
 // vector<WatcherEntry>. Uses the real in-process httplib server + NsPoolHarness,
@@ -11,7 +11,7 @@
 //                                                            dir-not-found, single-NS (compat),
 //                                                            fan-out target_namespaces[]
 //   DELETE /api/v1/connector/watchers/:id                 — not-found, success (+deleted_docs)
-//   DELETE /api/v1/connector/watchers/:id/namespaces/:ns  — F21 single-NS unsubscribe,
+//   DELETE /api/v1/connector/watchers/:id/namespaces/:ns  — watcher single-NS unsubscribe,
 //                                                            last-NS destroys watcher, not-found
 //   POST   /api/v1/connector/watchers/:id/scan            — not-found, success
 //   GET    /api/v1/connector/status                       — empty, populated
@@ -116,7 +116,7 @@ protected:
         connector_state_.data_dir = (temp_dir_ / "state").string();
         fs::create_directories(connector_state_.data_dir);
 
-        // F05 pool.
+        // Namespace pool.
         harness_ = std::make_unique<cortrix::test::NsPoolHarness>(temp_dir_ / "pool");
         ASSERT_TRUE(harness_->Admit("default").ok());
 
@@ -137,7 +137,7 @@ protected:
 
         port_ = 18700 + (getpid() % 400);
         server_ = std::make_unique<httplib::Server>();
-        // F21: RegisterConnectorRoutes builds the DirWatcherRegistry from the F05
+        // Watcher: RegisterConnectorRoutes builds the DirWatcherRegistry from the namespace pool
         // pool + the catalog router (ns_router_) + SPC; no NamespaceManager needed.
         RegisterConnectorRoutes(*server_, connector_state_,
                                 harness_->ipool(), ns_router_,
@@ -245,7 +245,7 @@ TEST_F(ConnectorRoutesTest, AddWatcherSingleNsCompatReturnsId) {
     EXPECT_TRUE(body.contains("message"));
 }
 
-// F21: POST with target_namespaces[] creates ONE fan-out watcher.
+// Watcher: POST with target_namespaces[] creates ONE fan-out watcher.
 TEST_F(ConnectorRoutesTest, AddWatcherFanoutMultiNs) {
     httplib::Client cli("127.0.0.1", port_);
     json req = {{"path", watch_dir_.string()},
@@ -325,7 +325,7 @@ TEST_F(ConnectorRoutesTest, DeleteWatcherSuccess) {
 }
 
 // ---------------------------------------------------------------------------
-// DELETE /api/v1/connector/watchers/:id/namespaces/:ns  (F21 single-NS)
+// DELETE /api/v1/connector/watchers/:id/namespaces/:ns  (watcher single-NS)
 // ---------------------------------------------------------------------------
 
 TEST_F(ConnectorRoutesTest, UnsubscribeSingleNsKeepsWatcher) {

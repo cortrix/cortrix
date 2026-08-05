@@ -1,6 +1,6 @@
-// F23 §4.6 — syscall fault-injection sweeps for the durability layers.
+// Test suite — syscall fault-injection sweeps for the durability layers.
 //
-// The F25 pending log (PendingLogWriter) and the F01 P-HNSW WAL (WalWriter) +
+// The write coordinator pending log (PendingLogWriter) and the index P-HNSW WAL (WalWriter) +
 // snapshots (SnapshotManager) implement graceful handling for every I/O syscall
 // failure (write/pwrite/pread/fsync/F_FULLFSYNC/ftruncate/rename returning -1).
 // Against a healthy filesystem those error arms are physically unreachable from
@@ -77,7 +77,7 @@ protected:
     std::string dir_tag_;  // unique basename, safe path-filter substring
 };
 
-// ---- PendingLogWriter (F25 PWL) -----------------------------------
+// ---- PendingLogWriter (write coordinator PWL) ---------------------
 
 // Sweep write/sync faults across [Open + a few Appends]. Every failed syscall
 // must surface as a non-ok Status somewhere in the sequence, never a crash.
@@ -192,7 +192,7 @@ TEST_F(SyscallFaultTest, PwlCompactRenameFault) {
     w.Shutdown();
 }
 
-// ---- WalWriter (F01 P-HNSW WAL) -----------------------------------
+// ---- WalWriter (index P-HNSW WAL) ---------------------------------
 
 TEST_F(SyscallFaultTest, HnswWalWriteSyncFaultSweep) {
     const std::string path = dir_ + "/hnsw.wal";
@@ -272,7 +272,7 @@ TEST_F(SyscallFaultTest, HnswWalReadFaultSweep) {
     EXPECT_GT(hits, 0);
 }
 
-// ---- SnapshotManager (F01 snapshots) ------------------------------
+// ---- SnapshotManager (index snapshots) ----------------------------
 // Save does write+fsync+rename of sibling .index/.meta files. We drive it via a
 // real hnswlib index — but constructing one here pulls heavy headers; instead we
 // exercise the read/list error paths that do not need a live index: Load and

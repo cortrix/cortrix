@@ -5,10 +5,10 @@
 
 namespace cortrix::llm {
 
-/// Shared factory for canned ChatCompletionResponse objects (F03 Issue 5.2, 8
+/// Shared factory for canned ChatCompletionResponse objects (enricher Issue 5.2, 8
 /// methods). Used with MockLlmClient (tests/mocks/mock_llm_client.h) to drive the
 /// 7 LLM-consumer features' tests without a live endpoint. Success responses
-/// carry the F03 enricher's index-keyed JSON shape ({"0":{entities,summary,score},
+/// carry the enricher's index-keyed JSON shape ({"0":{entities,summary,score},
 /// ...}) so they exercise the real Issue 3.3 L1/L2/L3 parse path.
 ///
 /// Lives in tests/mocks/ alongside MockLlmClient (the MVP scaffolding home for
@@ -33,7 +33,7 @@ public:
     static ChatCompletionResponse PartialBatch(int returned, int expected,
                                                const std::string& model = "gpt-4o-mini");
 
-    /// Timeout signal (#5): status carries the neutral transport token (the F03
+    /// Timeout signal (#5): status carries the neutral transport token (the enricher
     /// pool models the *hard* timeout itself; this is the in-band variant the
     /// MockLlmClient returns when a test wants Chat() to report a timeout-like
     /// transport failure).

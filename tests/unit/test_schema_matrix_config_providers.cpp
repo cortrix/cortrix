@@ -1,9 +1,9 @@
-// Schema-provider matrices for the catalog-config / no-op providers and F40:
-//   F06 (F06SchemaProvider, namespaces.parser_config TEXT column, version 1)
-//   F02 (F02SchemaProvider, reranker no-op provider, version 1)
-//   F21 (F21SchemaProvider, watcher no-op provider, version 1)
-//   F38 (F38SchemaProvider, hype no-op provider, version 1, F38-specific error token)
-//   F40 (F40SchemaProvider, sparse_inverted_index table + blocks.sparse_vec, version 1)
+// Schema-provider matrices for the catalog-config / no-op providers and sparse retrieval:
+//   Parser (F06SchemaProvider, namespaces.parser_config TEXT column, version 1)
+//   Reranker (F02SchemaProvider, reranker no-op provider, version 1)
+//   Watcher (F21SchemaProvider, watcher no-op provider, version 1)
+//   HyPE (F38SchemaProvider, hype no-op provider, version 1, F38-specific error token)
+//   Sparse retrieval (F40SchemaProvider, sparse_inverted_index table + blocks.sparse_vec, version 1)
 //
 // Fresh in-memory sqlite3 per case. Globally unique suite/fixture names
 // (F06CfgMatrix / F02CfgMatrix / F21CfgMatrix / F38CfgMatrix / F40CfgMatrix) that do
@@ -77,7 +77,7 @@ struct InitStep {
     bool ok;
 };
 
-// ============================ F06 parser_config (version 1) ============================
+// ============================ parser_config (version 1) ================================
 
 class F06CfgMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -145,7 +145,7 @@ INSTANTIATE_TEST_SUITE_P(
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{7, 7, true},
                       InitStep{3, 3, true}, InitStep{4, 4, true}, InitStep{10, 10, true}, InitStep{0, 3, false}, InitStep{0, 4, false}, InitStep{2, 5, false}, InitStep{3, 2, false}, InitStep{5, 1, false}));
 
-// ============================ F02 reranker no-op (version 1) ============================
+// ============================ reranker no-op (version 1) ================================
 
 class F02CfgMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -195,7 +195,7 @@ INSTANTIATE_TEST_SUITE_P(
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{9, 9, true},
                       InitStep{3, 3, true}, InitStep{4, 4, true}, InitStep{10, 10, true}, InitStep{0, 3, false}, InitStep{0, 4, false}, InitStep{2, 5, false}, InitStep{3, 2, false}, InitStep{5, 1, false}));
 
-// ============================ F21 watcher no-op (version 1) ============================
+// ============================ watcher no-op (version 1) ================================
 
 class F21CfgMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -244,7 +244,7 @@ INSTANTIATE_TEST_SUITE_P(
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{3, 3, true},
                       InitStep{3, 3, true}, InitStep{4, 4, true}, InitStep{10, 10, true}, InitStep{0, 3, false}, InitStep{0, 4, false}, InitStep{2, 5, false}, InitStep{3, 2, false}, InitStep{5, 1, false}));
 
-// ============================ F38 hype no-op (version 1, F38 token) ============================
+// ============================ hype no-op (version 1, HyPE token) ===============================
 
 class F38CfgMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -268,7 +268,7 @@ TEST_F(F38CfgMatrix, UnsupportedStepRejectedWithF38Token) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
-    // F38 uses the feature-scoped token CX_ERR_F38_SCHEMA_VERSION_MISMATCH.
+    // HyPE uses the feature-scoped token CX_ERR_F38_SCHEMA_VERSION_MISMATCH.
     EXPECT_NE(s.message().find("CX_ERR_F38_SCHEMA_VERSION_MISMATCH"), std::string::npos);
 }
 
@@ -293,7 +293,7 @@ INSTANTIATE_TEST_SUITE_P(
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{6, 6, true},
                       InitStep{3, 3, true}, InitStep{4, 4, true}, InitStep{10, 10, true}, InitStep{0, 3, false}, InitStep{0, 4, false}, InitStep{2, 5, false}, InitStep{3, 2, false}, InitStep{5, 1, false}));
 
-// ============================ F40 sparse inverted index (version 1) ============================
+// ============================ sparse inverted index (version 1) ================================
 
 class F40CfgMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -340,7 +340,7 @@ TEST_F(F40CfgMatrix, IdempotentReRun) {
 }
 
 TEST_F(F40CfgMatrix, NullDbRejectedWithMismatchToken) {
-    // F40 returns the SCHEMA_VERSION_MISMATCH token for a null db on the 0->1 path.
+    // Sparse retrieval returns the SCHEMA_VERSION_MISMATCH token for a null db on the 0->1 path.
     Status s = p_.Migrate(nullptr, 0, 1);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);

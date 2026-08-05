@@ -60,7 +60,7 @@ public:
     int search_metadata(const std::string&, int, std::vector<SearchResult>&) override { return -1; }
 };
 
-// VectorSearcher now takes a store::IIndex& (F05 wire⑤c). The old
+// VectorSearcher now takes a store::IIndex& (namespace pool wire⑤c). The old
 // FakeVectorIndex (CortrixVectorIndex with an rc-returning search()) is replaced
 // by the shared cortrix::test::FakeIndex, whose Search() returns hits directly
 // (no rc); scripted via set_search_result({{block_id, distance}, ...}).
@@ -405,7 +405,7 @@ TEST_F(QueryPipelineExecuteTest, Execute_AllRoutesDisabled_L3) {
 }
 
 // --- One search route fails, the other succeeds -> degraded L2 ---
-// REPURPOSED (F05 wire⑤c): the old version made the VECTOR route fail via
+// REPURPOSED (namespace pool wire⑤c): the old version made the VECTOR route fail via
 // FakeVectorIndex.search_rc=-1. IIndex::Search no longer has an rc (empty hits =
 // kSuccess, not failure), so a vector-index failure is unreachable. The L2
 // degradation intent is preserved by failing BM25 instead (fulltext_rc=-1) while
@@ -440,7 +440,7 @@ TEST_F(QueryPipelineExecuteTest, Execute_OneRouteFails_DegradedL2) {
 }
 
 // --- All enabled routes fail -> L3 error response ---
-// REPURPOSED (F05 wire⑤c): the old version drove L3 by failing BOTH vector
+// REPURPOSED (namespace pool wire⑤c): the old version drove L3 by failing BOTH vector
 // (search_rc=-1) and BM25 with SQL disabled. A vector-index failure is no longer
 // reachable (IIndex::Search has no rc), so to leave NO healthy search route we
 // disable vector + SQL, keeping only BM25 enabled and failing it (fulltext_rc=-1)
@@ -581,7 +581,7 @@ TEST_F(QueryPipelineExecuteTest, Execute_LowTimeout_UsesMinFloor) {
     EXPECT_GE(response.meta.latency_ms, 0);
 }
 
-// --- SQL intent does not trigger SQL route in F07 ---
+// --- SQL intent does not trigger SQL route in semantic score ---
 
 TEST_F(QueryPipelineExecuteTest, Execute_SqlIntent_NoSqlRoute) {
     LlmConfig llm_config;
@@ -600,7 +600,7 @@ TEST_F(QueryPipelineExecuteTest, Execute_SqlIntent_NoSqlRoute) {
     auto req = MakeRequest("SELECT * FROM users WHERE active = 1");
     QueryResponse response = pipeline.Execute(req);
 
-    // F07: SQL route is always skipped
+    // Semantic score: SQL route is always skipped
     EXPECT_FALSE(response.sql_result.has_result);
 }
 

@@ -160,7 +160,7 @@ class EnrichAuditTest : public EnrichStateStoreTest {
 protected:
     void SetUp() override {
         EnrichStateStoreTest::SetUp();
-        // Minimal blocks shape the audit reads (framework + F03/F35 columns).
+        // Minimal blocks shape the audit reads (framework + enricher/contextual retrieval columns).
         ASSERT_EQ(sqlite3_exec(db_,
             "CREATE TABLE blocks (block_id INTEGER PRIMARY KEY, doc_id TEXT,"
             " child_id TEXT, block_type INTEGER DEFAULT 1, enriched_score REAL,"

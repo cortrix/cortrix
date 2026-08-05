@@ -12,7 +12,7 @@
 #include "cortrix/common/status.h"
 #include "cortrix/metadata/metadata_error.h"
 
-// Exhaustive error-registry matrix for F08 metadata (src/metadata/metadata_error.*).
+// Exhaustive error-registry matrix for META block metadata (src/metadata/metadata_error.*).
 // One TEST_P case per MetadataErrorCode. Unique suite name (MetadataErrorMatrix).
 namespace cortrix::metadata {
 namespace {

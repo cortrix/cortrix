@@ -7,7 +7,7 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/config/auth_config.h"
 
-// P08 S2 (final): Pbkdf2PasswordHasher — the OpenSSL PBKDF2-HMAC-SHA256 production
+// Auth S2 (final): Pbkdf2PasswordHasher — the OpenSSL PBKDF2-HMAC-SHA256 production
 // hasher (TECH_DEBT-AUTH-PBKDF2-PLACEHOLDER; a future compatibility update can add real
 // bcrypt). Maps the §S2 hash test cases onto the placeholder (the `$2b$` format
 // case becomes a `pbkdf2$` format assertion, documenting the deviation).
@@ -51,7 +51,7 @@ TEST(Pbkdf2HasherTest, PlaceholderFormatNotBcrypt) {
         << "placeholder must NOT emit a bcrypt $2b$ hash";
     // iterations embedded in the string.
     EXPECT_NE(s.find("$" + std::to_string(kTestIters) + "$"), std::string::npos);
-    // cost() still reports the bcrypt-equivalent factor 12 (P08 §4.2 intent).
+    // cost() still reports the bcrypt-equivalent factor 12 (auth intent).
     EXPECT_EQ(h.cost(), 12);
 }
 

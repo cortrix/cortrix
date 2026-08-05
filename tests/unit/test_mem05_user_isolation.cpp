@@ -1,4 +1,4 @@
-// MEM05 unit tests — Per-user memory isolation.
+// Memory isolation unit tests — Per-user memory isolation.
 // Covers design § 8.1 matrix (14 cases) + user_id format + a few extras:
 //   - MemorySearchRequest::Validate() : user_id unconditionally required,
 //     format enforced (<=128 chars, ASCII printable).
@@ -53,7 +53,7 @@ protected:
         int search_fulltext(const std::string&, int, std::vector<SearchResult>&) override { return 0; }
         int search_metadata(const std::string&, int, std::vector<SearchResult>&) override { return -1; }
     };
-    // VectorSearcher now takes a store::IIndex& (F05 wire⑤c); the shared
+    // VectorSearcher now takes a store::IIndex& (namespace pool wire⑤c); the shared
     // cortrix::test::FakeIndex stands in for the old CortrixVectorIndex fake.
     // These tests only need the pipeline to construct (they exercise
     // MatchScope/Validate), so the default empty Search result is fine.

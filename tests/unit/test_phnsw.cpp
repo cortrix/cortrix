@@ -1,4 +1,4 @@
-// F01 S1 — PHnsw class-framework tests.
+// Index S1 — PHnsw class-framework tests.
 //
 // S1's DoD is "PHnsw class framework instantiable" on top of the vendored
 // hnswlib fork. These tests exercise the live S1 surface (construct, add,
@@ -23,7 +23,7 @@ namespace {
 
 namespace fs = std::filesystem;
 
-// Deterministic helper (F01 §"test-data strategy" — fixed seed for repeatability).
+// Deterministic helper (index §"test-data strategy" — fixed seed for repeatability).
 std::vector<float> MakeVector(int dim, int index) {
     std::vector<float> v(static_cast<size_t>(dim));
     // Simple deterministic fill; distinct per index so neighbors are well-ordered.
@@ -132,13 +132,13 @@ TEST_F(PHnswTest, MarkDeleteIsIdempotent) {
     EXPECT_TRUE(index.MarkDelete(5).ok());
     EXPECT_FALSE(index.Exists(5));
 
-    // Delete missing id — idempotent Ok (F25 Q6 + V5 #9).
+    // Delete missing id — idempotent Ok (write coordinator Q6 + V5 #9).
     EXPECT_TRUE(index.MarkDelete(5).ok());
     EXPECT_TRUE(index.MarkDelete(99999).ok());
 }
 
 TEST_F(PHnswTest, AddPoint_AfterMarkDelete_SameBlockId_Reinserts) {
-    // Regression for the store-C1 silent data-loss bug. F01 design § 5 sanctions a
+    // Regression for the store-C1 silent data-loss bug. index design § 5 sanctions a
     // re-write as "MarkDelete(id) then AddPoint(id)" with the SAME block_id. The
     // index is built with allow_replace_deleted_=true, under which hnswlib's 2-arg
     // addPoint THROWS on a marked-deleted label; that throw was swallowed by
@@ -225,7 +225,7 @@ TEST_F(PHnswTest, LifecycleOpsSucceedOnEmptyIndex) {
 }
 
 // PHnsw must satisfy both contracts it inherits: the rich IIndex SoT and the
-// narrow IVectorStore subset that F25 WriteCoordinator holds.
+// narrow IVectorStore subset that WriteCoordinator holds.
 TEST_F(PHnswTest, UsableThroughIIndexPointer) {
     PHnsw index(unit_dir_, config_);
     IIndex* as_index = &index;
@@ -237,7 +237,7 @@ TEST_F(PHnswTest, UsableThroughIIndexPointer) {
 
 TEST_F(PHnswTest, UsableThroughIVectorStorePointer) {
     PHnsw index(unit_dir_, config_);
-    IVectorStore* as_store = &index;  // F25 holds this narrow surface
+    IVectorStore* as_store = &index;  // Write coordinator holds this narrow surface
     auto v = MakeVector(kDim, 4);
     ASSERT_TRUE(as_store->AddPoint(v.data(), 77).ok());
     EXPECT_TRUE(as_store->Exists(77));                 // TraceContext-arity overload

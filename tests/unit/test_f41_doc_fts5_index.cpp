@@ -1,4 +1,4 @@
-// F41 S4.6 — doc-level FTS5 hybrid fallback index (§4.3 / §8.2). Self-contained
+// Doc summary S4.6 — doc-level FTS5 hybrid fallback index (§4.3 / §8.2). Self-contained
 // (:memory: SQLite), BM25 column weights, FTS5 injection guard, and the two-path
 // doc-discovery RRF fusion (FuseDocDiscovery).
 #include <gtest/gtest.h>

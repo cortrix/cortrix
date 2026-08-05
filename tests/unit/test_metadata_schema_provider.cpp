@@ -6,7 +6,7 @@
 
 #include "cortrix/metadata/metadata_schema_provider.h"
 
-// F08 S1.3 coverage: MetadataSchemaProvider creates metadata_blocks + idx_metablocks_ns
+// META block S1.3 coverage: MetadataSchemaProvider creates metadata_blocks + idx_metablocks_ns
 // (detailed design §3.3, D5 locked separate table) idempotently, inside the frozen ISchemaProvider contract.
 // Mirrors tests/unit/test_f16a_schema_provider.cpp.
 namespace cortrix::metadata {

@@ -2,7 +2,7 @@
 // the OnnxReranker::Rerank integration paths (missing-chunk tolerance,
 // open-breaker RRF fallback, extremely-long candidate, field assembly), the
 // factory success path, the circuit-breaker-disabled ScoreBatch branch, and the
-// remaining MockReranker scenarios from F02 §7.2 (ONNX-exception / score=0 /
+// remaining MockReranker scenarios from reranker (ONNX-exception / score=0 /
 // varied score distribution).
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -126,7 +126,7 @@ TEST(RerankerCoverageTest, RerankOpenBreakerYieldsZeroRerankScores) {
     for (const auto& rc : ranked) EXPECT_FLOAT_EQ(rc.rerank_score, 0.0f);
 }
 
-// Field assembly: chunk_text from the store, rerank_score set, and the NEW F02
+// Field assembly: chunk_text from the store, rerank_score set, and the NEW reranker
 // contract (§4.2-ter) — RankedChunk.score is the FUSED ordering score written
 // back (rerank_score*0.7 + rrf_score*0.3), with the output sorted by that fused
 // score descending (no score_signals here, so the multiplier is identity).

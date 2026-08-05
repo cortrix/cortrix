@@ -1,5 +1,5 @@
 // Route request-validation matrices for the admin-area routes:
-//   - P08 admin/users (POST/GET/PATCH /api/v1/admin/users ...)
+//   - auth admin/users (POST/GET/PATCH /api/v1/admin/users ...)
 //   - OPEN-2 GC + maintenance ops (/api/v1/gc/*, /api/v1/maintenance/*)
 //
 // BREADTH coverage of: missing auth -> 401, insufficient perm (non-admin) ->

@@ -1,12 +1,12 @@
 // doc_summary end-to-end dispatch (candidate ① D3.5 within-feature E2E): proves
 // the data path wired by ⑤a (SqliteChunkStore) + ⑤b (F41AsyncWorker) + T4 (WorkerPool
-// task_type dispatch) + F42-3 (main wiring) actually runs THROUGH the real F42 scheduler:
+// task_type dispatch) + the main wiring actually runs THROUGH the real async task scheduler:
 //
 //   TaskScheduler::Enqueue(kTaskDocSummary)
 //     → WorkerPool worker thread Dequeue
 //       → dispatch by task_type to the registered F41AsyncWorker
 //         → SqliteChunkStore + DocSummaryGenerator (MockLlmClient) + OnnxEmbedder stub
-//           → doc_summary Block (block_type=17) + P-HNSW point via the F25 PWL.
+//           → doc_summary Block (block_type=17) + P-HNSW point via the write coordinator PWL.
 //
 // Unlike test_f41_async_worker.cpp (⑤b) which calls worker.ProcessTask() directly, this
 // drives the worker through real WorkerPool threads; unlike test_worker_pool_dispatch.cpp
@@ -20,9 +20,9 @@
 // worker thread writes it (that contends on the WAL lock; a harness artifact, not a
 // product issue).
 //
-// finalize ownership = handler (F42 §4.1.1 · decision A, 2026-06-09): F41AsyncWorker
+// finalize ownership = handler (async task · decision A, 2026-06-09): F41AsyncWorker
 // finalizes its own task.status via TaskFinalizer (success → completed, failure → failed);
-// retry/DLQ is the Phase-2 framework layer above finalize (TD-F42-RETRY-POLICY). So this
+// retry/DLQ is the Phase-2 framework layer above finalize (a separate retry/DLQ item). So this
 // test now asserts BOTH the block landing AND the terminal task.status=completed.
 #include "cortrix/doc_summary/f41_async_worker.h"
 
@@ -263,7 +263,7 @@ TEST_F(DocSummaryAsyncDispatchTest, DocSummaryTaskDispatchedThroughPoolWritesBlo
     pool.Stop();  // join workers before reading the store/FakeIndex (no read/write race)
 
     EXPECT_TRUE(signaling.last_status().ok()) << signaling.last_status().message();
-    // finalize ownership = handler (F42 §4.1.1 · decision A): the worker finalizes its
+    // finalize ownership = handler (async task · decision A): the worker finalizes its
     // own task.status via TaskFinalizer → completed (was the KNOWN GAP).
     auto ft = mgr_.GetTask(task_id);
     ASSERT_TRUE(ft.ok());
@@ -279,7 +279,7 @@ TEST_F(DocSummaryAsyncDispatchTest, DocSummaryTaskDispatchedThroughPoolWritesBlo
     EXPECT_EQ(meta["keywords"].size(), 3u);
     EXPECT_EQ(meta.value("one_liner", ""), "Q3 2026 financials");
 
-    // The summary embedding reached the P-HNSW index via the F25 PWL on the pool thread.
+    // The summary embedding reached the P-HNSW index via the write coordinator PWL on the pool thread.
     EXPECT_FALSE(harness_->fake_index()->added_ids().empty());
     EXPECT_EQ(DocSummaryMetrics::Instance().SummariesGeneratedCount(), 1u);
 }
@@ -317,7 +317,7 @@ TEST_F(DocSummaryAsyncDispatchTest, CoexistingHandlersRouteByTaskType) {
 
 // E2E (Fail path, symmetric to Test1): a doc_summary task whose generation fails (invalid
 // LLM output) routes through the pool to the worker, which finalizes the task as FAILED
-// with no block written (handler-owned finalize · F42 §4.1.1). Proves the failure half of
+// with no block written (handler-owned finalize · async task). Proves the failure half of
 // the closed finalize loop — the task reaches a terminal state, not stuck "processing".
 TEST_F(DocSummaryAsyncDispatchTest, GenerationFailureFinalizesTaskFailed) {
     const std::string doc_id = SeedDoc(2);
@@ -336,7 +336,7 @@ TEST_F(DocSummaryAsyncDispatchTest, GenerationFailureFinalizesTaskFailed) {
 
     // Worker returned a failure Status; the task was finalized as failed (terminal, not
     // stuck), carrying a CX_ERR_F41_* code, and no doc_summary block landed (doc-discovery
-    // degrades to the FTS5 fallback for this doc, F41 §7.1).
+    // degrades to the FTS5 fallback for this doc, doc summary).
     EXPECT_FALSE(signaling.last_status().ok());
     auto ft = mgr_.GetTask(task_id);
     ASSERT_TRUE(ft.ok());

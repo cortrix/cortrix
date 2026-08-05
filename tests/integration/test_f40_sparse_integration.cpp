@@ -12,8 +12,8 @@
 #include "cortrix/retrieval/splade_sparse_retriever.h"
 #include "cortrix/spc/onnx_embedder.h"
 
-// F40 S11 — standalone integration: the full F40 sparse pipeline wired together
-// against the stub embedder + in-memory inverted index. Covers IT-F40-1/2/3/4/5/
+// Sparse retrieval S11 — standalone integration: the full sparse pipeline wired together
+// against the stub embedder + in-memory inverted index. Covers cases 1/2/3/4/5/
 // 7/8 (the ones that don't need a real model/BEIR dataset — those are D3.5):
 //   embed (dense+sparse) -> serialize round-trip -> index Add -> Search ->
 //   5-path RRF fuse -> L2 fallback degrade.
@@ -33,7 +33,7 @@ SparseVector EmbedToSparse(cortrix::OnnxEmbedder& emb, const std::string& text,
     return v;
 }
 
-// IT-F40-1 — single inference dual output + sparse_vec round-trip.
+// Case 1 — single inference dual output + sparse_vec round-trip.
 TEST(F40SparseIntegrationTest, IT1_EmbedSerializeRoundTrip) {
     cortrix::OnnxEmbedder emb("", 128);
     ASSERT_TRUE(emb.Init().ok());
@@ -53,7 +53,7 @@ TEST(F40SparseIntegrationTest, IT1_EmbedSerializeRoundTrip) {
     EXPECT_EQ(back.value().terms, v.terms);  // round-trip exact
 }
 
-// IT-F40-2/4 — index N chunks then query returns scored candidates.
+// Cases 2/4 — index N chunks then query returns scored candidates.
 TEST(F40SparseIntegrationTest, IT2_IndexAndQuery) {
     cortrix::OnnxEmbedder emb("", 128);
     ASSERT_TRUE(emb.Init().ok());
@@ -75,7 +75,7 @@ TEST(F40SparseIntegrationTest, IT2_IndexAndQuery) {
     EXPECT_EQ(hits.front().child_id, "c7");
 }
 
-// IT-F40-3 — delete removes from results.
+// Case 3 — delete removes from results.
 TEST(F40SparseIntegrationTest, IT3_DeleteRemovesFromResults) {
     cortrix::OnnxEmbedder emb("", 64);
     ASSERT_TRUE(emb.Init().ok());
@@ -89,7 +89,7 @@ TEST(F40SparseIntegrationTest, IT3_DeleteRemovesFromResults) {
     EXPECT_TRUE(idx.Search(v, "ns", 10).empty());
 }
 
-// IT-F40-5 — 5-path RRF over a real sparse list + (mock) other paths.
+// Case 5 — 5-path RRF over a real sparse list + (mock) other paths.
 TEST(F40SparseIntegrationTest, IT5_FivePathRrfWithRealSparse) {
     cortrix::OnnxEmbedder emb("", 64);
     ASSERT_TRUE(emb.Init().ok());
@@ -107,13 +107,13 @@ TEST(F40SparseIntegrationTest, IT5_FivePathRrfWithRealSparse) {
     in.sparse = sparse_hits;
     in.dense = {{"c3", 0.9f}, {"c1", 0.4f}};  // mock dense path
     in.fts5 = {{"c3", 0.8f}};                 // mock fts5 path
-    // contextualized + hype empty (F35/F38 mock this round).
+    // contextualized + hype empty (contextual retrieval/HyPE mock this round).
     auto fused = FuseFivePathRrf(in, /*top_n=*/10);
     ASSERT_FALSE(fused.empty());
     EXPECT_EQ(fused.front().child_id, "c3");  // strong across sparse+dense+fts5
 }
 
-// IT-F40-7 — L2 fallback: sparse unavailable → degrade to dense+fts5(+hype).
+// Case 7 — L2 fallback: sparse unavailable → degrade to dense+fts5(+hype).
 TEST(F40SparseIntegrationTest, IT7_L2FallbackDegrades) {
     // Retriever NOT opened → IsAvailable() false → fallback.
     SpladeSparseRetriever idx(SpladeConfig{}, ":memory:");
@@ -134,7 +134,7 @@ TEST(F40SparseIntegrationTest, IT7_L2FallbackDegrades) {
     EXPECT_FALSE(sparse_only_present);  // dropped with the sparse path
 }
 
-// IT-F40-8 — posting-list cache hit-rate under repeated query load (≥70%).
+// Case 8 — posting-list cache hit-rate under repeated query load (≥70%).
 TEST(F40SparseIntegrationTest, IT8_CacheHitRateUnderLoad) {
     cortrix::OnnxEmbedder emb("", 64);
     ASSERT_TRUE(emb.Init().ok());

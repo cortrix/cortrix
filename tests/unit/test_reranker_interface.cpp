@@ -17,7 +17,7 @@ using ::testing::Return;
 using retrieval::RankedChunk;
 using retrieval::ScoredResult;
 
-// --- retrieval/types.h (the header F02 introduces) ---
+// --- retrieval/types.h (the header reranker introduces) ---
 
 TEST(RetrievalTypesTest, ScoredResultHoldsChildIdAndScore) {
     ScoredResult r{"01J0CHILDAAAAAAAAAAAAAAAAA", 0.42f};

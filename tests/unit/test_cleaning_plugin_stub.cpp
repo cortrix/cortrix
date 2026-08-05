@@ -2,8 +2,8 @@
 
 #include "cortrix/spc/data_cleaner.h"
 
-// F10 S8: cleaning-plugin seam. F10 gives the RegisterPlugin / ApplyPlugins /
-// ICleaningPlugin signatures (D8 — F11 implements the full ecosystem); the
+// Cleaning S8: cleaning-plugin seam. cleaning gives the RegisterPlugin / ApplyPlugins /
+// ICleaningPlugin signatures (D8 — cleaning plugin implements the full ecosystem); the
 // seam is always compiled, these tests pin its stub behavior.
 namespace cortrix::spc {
 namespace {
@@ -16,8 +16,8 @@ Block MakeBlock(const std::string& id, const std::string& text) {
     return b;
 }
 
-// A registered lambda plugin runs over the batch (stub behavior — F10 just
-// invokes; F11 adds timeout/exception handling).
+// A registered lambda plugin runs over the batch (stub behavior — cleaning just
+// invokes; cleaning plugin adds timeout/exception handling).
 TEST(CleaningPluginStubTest, RegisteredPluginRuns) {
     DataCleaner c(CleaningConfig{});
     int invoked = 0;
@@ -44,7 +44,7 @@ TEST(CleaningPluginStubTest, PluginsRunInOrder) {
 }
 
 // A concrete ICleaningPlugin subclass satisfies the stub interface (the shape
-// F11 will build on).
+// Cleaning plugin will build on).
 class TouchPlugin : public ICleaningPlugin {
 public:
     const char* Name() const override { return "touch"; }

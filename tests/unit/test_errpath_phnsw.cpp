@@ -1,5 +1,5 @@
-// Error-path coverage for the F01 P-HNSW durability codes (WAL / snapshot) and the
-// F07 scoring-store code. Each CX_ERR_* below had ZERO referencing test. We assert
+// Error-path coverage for the index P-HNSW durability codes (WAL / snapshot) and the
+// Semantic score scoring-store code. Each CX_ERR_* below had ZERO referencing test. We assert
 // the *code string* surfaces on the returned cortrix::Status (the project carries the
 // stable identity as a "<CX_ERR_*>: detail" message prefix per CODING_CONVENTIONS §3
 // — there is no separate code field at the store layer), not merely that the call
@@ -145,7 +145,7 @@ TEST(ScoringStoreErrPathTest, MissingBlocksTableReturnsScoringStore) {
 //     iindex_factory.h. The corrupt-snapshot load path returns
 //     CX_ERR_PHNSW_SNAPSHOT_CORRUPTED (snapshot_manager.cpp), not RECOVERY_FAILED.
 //     (The similarly named CX_ERR_PWL_RECOVERY_FAILED in write_coordinator.cpp is a
-//     DIFFERENT code — the F25 PWL layer — out of this assignment's scope.) Reported
+//     DIFFERENT code — the write coordinator PWL layer — out of this assignment's scope.) Reported
 //     as a dead-constant bug.
 // ===========================================================================
 

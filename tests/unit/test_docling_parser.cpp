@@ -11,7 +11,7 @@
 #include "cortrix/spc/parser.h"
 #include "cortrix/spc/parser_subprocess.h"
 
-// F06 S2 coverage: DoclingParser subprocess wrapper + ParseBridgeJson (§3.1).
+// Parser S2 coverage: DoclingParser subprocess wrapper + ParseBridgeJson (§3.1).
 //
 // Standalone strategy (briefing): the dev machine has python3 but not
 // necessarily docling, so the wrapper logic is exercised against *mock* bridge

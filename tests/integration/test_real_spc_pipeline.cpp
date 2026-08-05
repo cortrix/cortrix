@@ -65,7 +65,7 @@ static std::string FindModelDir() {
 // Read a UTF-8 text file into a string. The test inputs are plain .txt files
 // written by the fixtures below, so this is the in-process equivalent of the
 // (removed in R6b) MVP TxtParser used purely to obtain text for the chunker.
-// The F06 parser path (DoclingParser / PaddleOCRParser) runs via a Python
+// The parser path (DoclingParser / PaddleOCRParser) runs via a Python
 // subprocess bridge and is not appropriate here — these tests exercise the
 // chunk -> embed -> store -> query chain, not document parsing.
 static std::string ReadFile(const std::string& path) {

@@ -8,9 +8,9 @@
 #include "cortrix/spc/cleaning_config_resolver.h"
 #include "cortrix/spc/cleaning_types.h"
 
-// Exhaustive parameterized sweep over the F10 cleaning config resolution
+// Exhaustive parameterized sweep over the cleaning config resolution
 // (LoadGlobalCleaningConfig from IGlobalConfig + ResolveCleaningConfig NS merge)
-// and the generic F12 catalog::ConfigResolver<CleaningConfig> it builds on.
+// and the generic catalog::ConfigResolver<CleaningConfig> it builds on.
 // Suite tokens globally unique: CleanCfgGlobal* / CleanCfgResolve* /
 // CleanCfgGeneric*.
 namespace cortrix::spc {
@@ -170,9 +170,9 @@ INSTANTIATE_TEST_SUITE_P(
         CleanCfgResolveCase{"{bad", false, true, 0.95, true}));
 
 // ===========================================================================
-// Generic catalog::ConfigResolver<CleaningConfig> matrix (the F12 template the
-// F10 resolver builds on). Covers the three-layer merge with a request layer +
-// the strict request whitelist, which the F10 wrapper does not exercise.
+// Generic catalog::ConfigResolver<CleaningConfig> matrix (the catalog template the
+// Cleaning resolver builds on). Covers the three-layer merge with a request layer +
+// the strict request whitelist, which the cleaning wrapper does not exercise.
 // ===========================================================================
 
 struct CleanCfgGenericCase {

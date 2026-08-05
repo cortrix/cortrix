@@ -11,7 +11,7 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/config/auth_config.h"
 
-// P08 S5: password reset + email verification (§2.6-2.8 / §4.5 / §4.6). Uses the
+// Auth S5: password reset + email verification (§2.6-2.8 / §4.5 / §4.6). Uses the
 // fake hasher + a capturing NullEmailSender so the verification code is readable
 // without real delivery (bcrypt-independent; SMTP delivery is D3.5).
 namespace cortrix::auth {

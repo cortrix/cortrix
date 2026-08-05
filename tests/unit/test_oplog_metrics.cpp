@@ -4,7 +4,7 @@
 
 #include "cortrix/observability/oplog_metrics.h"
 
-// F18a §11 OBS_SPEC metrics recorder — the 6 cortrix_oplog_* series. Standalone
+// Operation log OBS_SPEC metrics recorder — the 6 cortrix_oplog_* series. Standalone
 // recorder coverage: registration (all 6 names render), record/aggregate, the
 // {action,resource_type} free-string keys, the filter_dimensions + reason labels,
 // and the two histograms.

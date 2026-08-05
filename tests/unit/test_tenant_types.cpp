@@ -1,4 +1,4 @@
-// P09 sec 4.1 -- enum <-> physical-schema string mapping round-trips (S1).
+// Tenancy -- enum <-> physical-schema string mapping round-trips (S1).
 #include <gtest/gtest.h>
 
 #include <string>

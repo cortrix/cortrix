@@ -10,7 +10,7 @@
 #include "cortrix/scoring/scoring_metrics.h"
 #include "cortrix/scoring/semantic_scorer.h"
 
-// F07 S3 + S4 / §7.1 coverage: SemanticScorer.AssignInitialScore (D7 writes to both places + D6
+// Semantic score S3 + S4 / §7.1 coverage: SemanticScorer.AssignInitialScore (D7 writes to both places + D6
 // sentinel) + ComputeFinalScore (D5 multiplier formula). Standalone = pure algorithm over constructed
 // cortrix_block_header_t fixtures (B_R3_BRIEFING §2/§7).
 namespace cortrix::scoring {
@@ -26,7 +26,7 @@ ScoringInput Input(const std::string& parser, const std::string& enricher,
     return in;
 }
 
-// A zeroed, initialized header fixture (the F09 init path).
+// A zeroed, initialized header fixture (the block header init path).
 cortrix::cortrix_block_header_t Header() {
     cortrix::cortrix_block_header_t h;
     cortrix::BlockHeaderInit(&h);
@@ -97,7 +97,7 @@ TEST(SemanticScorerAssignTest, ReassignOverwrites) {
     EXPECT_EQ(h.processing_level, 1);
 }
 
-// QA F07-F1 regression: AssignInitialScore must feed the §6 assign_duration histogram
+// QA regression: AssignInitialScore must feed the §6 assign_duration histogram
 // (it was defined/rendered but never observed). Lock the wiring: each call increments
 // cortrix_f07_assign_duration_seconds_count by 1.
 TEST(SemanticScorerAssignTest, AssignFeedsDurationHistogram) {

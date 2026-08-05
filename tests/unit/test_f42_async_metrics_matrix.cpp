@@ -1,4 +1,4 @@
-// F42 F42Metrics — exhaustive matrix coverage (TaskType + CompletionStatus +
+// Async task F42Metrics — exhaustive matrix coverage (TaskType + CompletionStatus +
 // QueueState + CancelPhase ToString, (task_type x status) combos, duration
 // histogram boundaries, queue_depth gauge, RenderOpenMetrics, ResetForTest).
 // Separate suite namespace from test_f42_metrics.cpp.

@@ -19,8 +19,8 @@
 #include "cortrix/retrieval/heuristic_guard_backend.h"
 #include "cortrix/retrieval/types.h"
 
-// F37 S4/S5/S7 coverage: EvaluateAndUpdateContext writes the 6 F37 QueryContext
-// fields + path handling (§6.3), the explain-endpoint dump (§5.1), and the F39
+// CRAG S4/S5/S7 coverage: EvaluateAndUpdateContext writes the 6 CRAG QueryContext
+// fields + path handling (§6.3), the explain-endpoint dump (§5.1), and the query routing
 // ShouldSkipF37 mock (§2 / §4.1). Standalone — heuristic backend, no ONNX.
 namespace cortrix::retrieval {
 namespace {
@@ -120,7 +120,7 @@ TEST_F(CragContextTest, DegradeVerdictCountsAsFallbackAndTakesCorrectPath) {
 }
 
 TEST_F(CragContextTest, DoesNotTouchF39Fields) {
-    // §6.2 write-failure isolation: F37 only writes its own fields, never F39's.
+    // §6.2 write-failure isolation: CRAG only writes its own fields, never query routing's.
     CragEvaluator ev(std::make_shared<HeuristicGuardBackend>(), CragConfig{});
     query::QueryContext ctx;
     ctx.query = "a real query";
@@ -129,11 +129,11 @@ TEST_F(CragContextTest, DoesNotTouchF39Fields) {
     ctx.routing_decision_source = "llm";
     ev.EvaluateAndUpdateContext(ctx, {Chunk("a", 0.95f)});
 
-    // F39 fields untouched.
+    // Query routing fields untouched.
     EXPECT_EQ(ctx.routing_path, "complex");
     EXPECT_FLOAT_EQ(ctx.complexity_score, 0.83f);
     EXPECT_EQ(ctx.routing_decision_source, "llm");
-    // F04 execution fields also untouched (pure-ADD unification).
+    // Cross-NS query execution fields also untouched (pure-ADD unification).
     EXPECT_EQ(ctx.top_k, 10);
     EXPECT_TRUE(ctx.rerank);
 }
@@ -143,7 +143,7 @@ TEST_F(CragContextTest, DoesNotTouchF39Fields) {
 TEST_F(CragContextTest, ShouldSkipF37MockByRoutingPath) {
     query::QueryContext complex;
     complex.routing_path = "complex";
-    EXPECT_FALSE(ShouldSkipF37(complex));  // complex → run F37
+    EXPECT_FALSE(ShouldSkipF37(complex));  // complex → run CRAG
 
     query::QueryContext simple;
     simple.routing_path = "simple";

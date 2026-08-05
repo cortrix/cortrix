@@ -8,7 +8,7 @@
 #include "cortrix/agent_trace/interaction_sources_schema.h"
 #include "cortrix/catalog/schema_provider.h"  // ISchemaProvider + SchemaMigrator
 
-// Branch coverage for the interaction_sources schema provider (F13 §4.3, topic 6).
+// Branch coverage for the interaction_sources schema provider (agent trace, topic 6).
 // Covers the three Migrate branches (already-current no-op, 0->1 success, exec
 // failure) plus the unsupported-step error, the created table + 2 indices, the
 // NOT NULL identity columns, and idempotent re-migration. interaction_sources has

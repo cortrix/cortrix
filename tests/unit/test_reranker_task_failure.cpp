@@ -1,6 +1,6 @@
 // S3.4 — single-task exception handling (ONNX exception / OOM / timeout) →
 // score=0 + cortrix_reranker_failed_tasks_total{reason} + circuit-breaker
-// linkage (F02 §4.2 / §5.1 / Issue 1.3 / 3.4). Failures are injected via a test
+// linkage (reranker / §5.1 / Issue 1.3 / 3.4). Failures are injected via a test
 // subclass overriding the protected ScoreForTask hook.
 #include <gtest/gtest.h>
 

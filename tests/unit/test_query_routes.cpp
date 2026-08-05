@@ -13,7 +13,7 @@
 #include "cortrix/query/intent_classifier.h"
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/logging/logging.h"
-#include "ns_pool_test_helper.h"  // [wire⑤c] F05 NsPoolHarness replaces MVP NamespaceManager
+#include "ns_pool_test_helper.h"  // Namespace pool NsPoolHarness replaces MVP NamespaceManager
 // [V6] Runtime namespace authorization seam over a real PermissionService
 // (the static per-key allow-list / can_access_namespace was removed).
 #include "unit/namespace_authz_test_helper.h"
@@ -59,7 +59,7 @@ protected:
 
         auth_.LoadKeys(config_.auth.api_keys);
 
-        // [wire⑤c] F05 NS resource pool replaces the MVP NamespaceManager +
+        // Namespace pool NS resource pool replaces the MVP NamespaceManager +
         // CortrixNamespaceManager (RegisterQueryRoutes now takes INamespacePool&).
         harness_ = std::make_unique<test::NsPoolHarness>(tmp_dir_);
 
@@ -186,7 +186,7 @@ TEST_F(QueryRoutesIntegrationTest, NamespaceAccessDenied_Returns403) {
     EXPECT_EQ(res->status, 403);
 
     auto body = json::parse(res->body);
-    // Anti-enumeration (F04 issue 2.6): denied/not-found share the canonical
+    // Anti-enumeration (cross-NS query issue 2.6): denied/not-found share the canonical
     // CX_ERR_NS_UNAUTHORIZED identity, and the namespace name is never echoed.
     EXPECT_EQ(body["error"]["code"], "CX_ERR_NS_UNAUTHORIZED");
     EXPECT_EQ(body["error"]["message"], "CX_ERR_NS_UNAUTHORIZED");
@@ -229,7 +229,7 @@ TEST_F(QueryRoutesIntegrationTest, NoAuth_Returns401) {
 // This test creates a namespace first, then queries it.
 
 TEST_F(QueryRoutesIntegrationTest, ValidQuery_ExistingNamespace_Returns200) {
-    // First create a namespace so it exists (admit into the F05 pool)
+    // First create a namespace so it exists (admit into the namespace pool)
     harness_->Admit("testns");
 
     httplib::Client cli("127.0.0.1", port_);
@@ -255,9 +255,9 @@ TEST_F(QueryRoutesIntegrationTest, ValidQuery_ExistingNamespace_Returns200) {
     }
 }
 
-// ── F39 ?route enum validation (Agent-friendly error) ────────────────────────
+// ── query routing ?route enum validation (Agent-friendly error) ──────────────
 
-// An invalid ?route query-string token is rejected with 400 + the F39
+// An invalid ?route query-string token is rejected with 400 + the query routing
 // CX_ERR_F39_FORCE_ROUTE_INVALID body before any namespace acquisition.
 TEST_F(QueryRoutesIntegrationTest, InvalidRouteParam_Returns400F39) {
     httplib::Client cli("127.0.0.1", port_);
@@ -324,9 +324,9 @@ TEST_F(QueryRoutesIntegrationTest, ValidRouteTokensPassValidation) {
     }
 }
 
-// ── F41 ?granularity enum validation ─────────────────────────────────────────
+// ── doc summary ?granularity enum validation ─────────────────────────────────
 
-// An invalid granularity is a generic InvalidArgument 400 (no F41 request-param
+// An invalid granularity is a generic InvalidArgument 400 (no doc summary request-param
 // error identity), checked before namespace acquisition.
 TEST_F(QueryRoutesIntegrationTest, InvalidGranularityParam_Returns400) {
     httplib::Client cli("127.0.0.1", port_);

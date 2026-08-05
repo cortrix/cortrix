@@ -7,9 +7,9 @@
 #include "cortrix/common/block_types.h"
 #include "cortrix/spc/data_cleaner.h"
 
-// F10 DataCleaner: Dedup (exact hash + semantic cosine, D2/D3), DetectAnomaly
-// (5 reasons, D4), config validation (D9), NS config merge (D1, reuse F12
-// ConfigResolver), and the skip-index helper (D5). Standalone over the F10
+// Cleaning DataCleaner: Dedup (exact hash + semantic cosine, D2/D3), DetectAnomaly
+// (5 reasons, D4), config validation (D9), NS config merge (D1, reuse catalog
+// ConfigResolver), and the skip-index helper (D5). Standalone over the cleaning
 // `Block` contract view.
 namespace cortrix::spc {
 namespace {
@@ -344,7 +344,7 @@ TEST(DataCleanerSummarizeTest, FourFlatFields) {
     EXPECT_FALSE(meta.contains("cleaning_applied"));
 }
 
-// ---------- NS config merge (D1, reuse F12 ConfigResolver) ----------
+// ---------- NS config merge (D1, reuse catalog ConfigResolver) ------
 
 TEST(DataCleanerConfigMergeTest, NsOverridesGlobal) {
     cortrix::catalog::ConfigResolver<CleaningConfig> resolver;

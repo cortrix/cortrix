@@ -44,7 +44,7 @@ static void WriteTextFile(const fs::path& path, const std::string& content) {
 }
 
 // Read a text file into a string. In-process equivalent of the (removed in R6b)
-// MVP TxtParser used purely to obtain text for the chunker; the F06 parser path
+// MVP TxtParser used purely to obtain text for the chunker; the parser path
 // runs via a Python subprocess bridge and is not appropriate for a benchmark.
 static std::string ReadTextFile(const fs::path& path) {
     std::ifstream f(path, std::ios::binary);
@@ -78,7 +78,7 @@ BENCHMARK(BM_RecursiveChunker)->Arg(10)->Arg(50)->Arg(200);
 
 // NOTE: BM_TxtParser / BM_MarkdownParser were removed in R6b. They benchmarked
 // the deleted MVP parser path (cortrix::TxtParser / cortrix::MarkdownParser),
-// which has no F06 equivalent for plain text/markdown (F06 DoclingParser /
+// which has no parser equivalent for plain text/markdown (DoclingParser /
 // PaddleOCRParser run via a Python subprocess bridge, not in-process). The
 // chunker / pipeline benchmarks below remain the meaningful SPC throughput tests.
 

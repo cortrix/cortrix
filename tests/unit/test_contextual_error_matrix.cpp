@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/spc/contextual_error.h"
 
-// Exhaustive parameterized error-registry sweep for F35 contextual retrieval (§8,
+// Exhaustive parameterized error-registry sweep for contextual retrieval (§8,
 // 5 codes). Distinct suite (ContextualErrorMatrix) from test_f35_contextual_error.cpp.
 namespace cortrix::spc {
 namespace {

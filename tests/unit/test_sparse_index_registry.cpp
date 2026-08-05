@@ -1,4 +1,4 @@
-// F40 SparseIndexRegistry unit tests — covers the 0% line-coverage gap.
+// SparseIndexRegistry unit tests — covers the 0% line-coverage gap.
 //
 // Tests the registry's lazy-open lifecycle, path computation, in-memory fallback,
 // cache/idempotency behavior, and namespace isolation. Real SpladeSparseRetriever

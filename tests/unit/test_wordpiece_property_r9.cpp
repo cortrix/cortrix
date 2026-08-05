@@ -250,7 +250,7 @@ RC_GTEST_PROP(WordPiecePropR9, EncodeShapeInvariants,
 }
 
 // Truncation budget: the number of CONTENT tokens (everything between [CLS]/[SEP])
-// never exceeds max_length-2, for any input and any max_length. This is the F37/F39
+// never exceeds max_length-2, for any input and any max_length. This is the CRAG/query routing
 // truncation_side=right contract; an off-by-one in the budget check would break it.
 RC_GTEST_PROP(WordPiecePropR9, EncodeRespectsTruncationBudget,
               (const std::string& raw)) {

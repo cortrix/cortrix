@@ -354,7 +354,7 @@ TEST_F(TaskManagerTest, FindRecentTaskByDocIdWithinWindow) {
 
 TEST_F(TaskManagerTest, FindRecentTaskByDocIdScopesByTaskType) {
     // Same doc_id, two task kinds: the debounce lookup must NOT cross task_type
-    // (doc-parse vs F41 doc-summary) so each finds only its own.
+    // (doc-parse vs doc-summary) so each finds only its own.
     auto parse = mgr_.CreateTask(MakeTask("ns1", "docZ", "hashZ"));  // default kTaskDocParse
     ASSERT_TRUE(parse.ok());
     TaskInfo summary_task = MakeTask("ns1", "docZ", "hashZ");

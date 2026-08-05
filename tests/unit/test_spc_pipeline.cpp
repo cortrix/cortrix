@@ -15,20 +15,20 @@
 #include "cortrix/spc/paddleocr_parser.h"
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/spc/block_assembler.h"
-#include "cortrix/spc_enricher.h"  // F03 NullEnricher (injected, IsAvailable()==false)
+#include "cortrix/spc_enricher.h"  // NullEnricher (injected, IsAvailable()==false)
 #include "cortrix/spc/spc_router.h"
 #include "cortrix/spc/spc_task.h"
 #include "cortrix/chunker/parent_child_chunker.h"
 
-// [A unified-blocks Inc 4-3] The pipeline now runs the F06 structured parser
-// (DocumentParserFactory::ParseDocument → ParsedDoc) → F34 ParentChildChunker →
+// unified-blocks: The pipeline now runs the structured parser
+// (DocumentParserFactory::ParseDocument → ParsedDoc) → ParentChildChunker →
 // unified write (parents into `parents`, children into `blocks`). The fixture
 // injects a *mock* Docling bridge (a python script that prints a fixed §3.1
 // page-level JSON envelope — identical plumbing to test_parser_fallback.cpp) so
 // the orchestration is exercised standalone (the machine has python3 but not
 // docling). Writes are verified against real SQLite (block_get_by_doc / parent_get
 // / doc status) and the captured FakeIndex (added_ids), exactly as production
-// wires it via the F05 NamespaceFacade.
+// wires it via the NamespaceFacade.
 #include "cortrix/catalog/batch_result.h"
 #include "cortrix/catalog/catalog_types.h"
 #include "cortrix/catalog/i_ns_router.h"
@@ -42,7 +42,7 @@
 #include "cortrix/resource/namespace_pool.h"
 #include "cortrix/resource/namespace_resource_bundle.h"
 #include "cortrix/store/cortrix_store.h"
-#include "cortrix/store/cortrix_store_sqlite.h"  // SetFailNextOps seam (F23 section 4.5)
+#include "cortrix/store/cortrix_store_sqlite.h"  // SetFailNextOps seam (test suite section 4.5)
 #include "cortrix/store/i_vector_store.h"
 #include "cortrix/store/iindex.h"
 #include "cortrix/store/iindex_factory.h"
@@ -57,7 +57,7 @@
 
 #include <nlohmann/json.hpp>
 #include <sqlite3.h>
-#include "mock_llm_client.h"  // F03 ③b: drive an available LlmEnricher without a live endpoint
+#include "mock_llm_client.h"  // Enricher ③b: drive an available LlmEnricher without a live endpoint
 
 namespace cortrix {
 namespace {
@@ -67,7 +67,7 @@ using ::testing::Invoke;
 using ::testing::NiceMock;
 
 // ============================================================
-// Test doubles (mirror tests/unit/test_namespace_pool.cpp — the F05 pool template)
+// Test doubles (mirror tests/unit/test_namespace_pool.cpp — the namespace pool template)
 // ============================================================
 
 // IIndex + IVectorStore stand-in. CAPTURES the ids handed to AddPoint/AddPoints
@@ -204,7 +204,7 @@ protected:
         facade_ = std::make_unique<resource::NamespaceFacade>(*pool_, "test-ns");
         ASSERT_TRUE(facade_->Acquire().ok());
 
-        // F06 factory with a *mock* Docling bridge that emits the multi-paragraph
+        // Parser factory with a *mock* Docling bridge that emits the multi-paragraph
         // payload (default). RebuildFactory() lets a test swap the payload.
         embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
@@ -213,7 +213,7 @@ protected:
             cortrix::chunker::ChunkerConfig{});
         RebuildFactory(kDoclingMultiPara);
 
-        // Create temp test files (real on-disk so the F06 factory pre-check stats them).
+        // Create temp test files (real on-disk so the parser factory pre-check stats them).
         txt_path_ = WriteTmp(".txt", "real text on disk\n");
         md_path_ = WriteTmp(".md", "# Title\n\ncontent\n");
     }
@@ -240,7 +240,7 @@ protected:
         return path;
     }
 
-    // Build a mock python bridge that prints `json_literal`, and rebuild the F06
+    // Build a mock python bridge that prints `json_literal`, and rebuild the parser
     // factory + pipeline around it (primary = real DoclingParser over the mock).
     void RebuildFactory(const std::string& docling_json) {
         std::string script = WriteTmp(".py",
@@ -327,7 +327,7 @@ protected:
     }
 
     // The concrete SQLite store behind the facade, for the SetFailNextOps testing
-    // seam (F23 section 4.5): arming it makes the next N public CRUD ops return -1, which
+    // seam (test suite section 4.5): arming it makes the next N public CRUD ops return -1, which
     // is the only way to reach the pipeline's store-write failure / rollback
     // branches against an otherwise-real store.
     cortrix::CortrixStoreSqlite* ConcreteStore() {
@@ -356,7 +356,7 @@ protected:
         return t;
     }
 
-    // ── F05 pool plumbing ──
+    // ── namespace pool plumbing ──
     std::filesystem::path tmp_root_;
     resource::F05Config config_;
     NiceMock<MockIndexFactory> index_factory_;
@@ -366,12 +366,12 @@ protected:
     std::unique_ptr<resource::DefaultNamespacePool> pool_;
     std::unique_ptr<resource::NamespaceFacade> facade_;
 
-    // ── real pipeline (F06 parser + F34 chunker) ──
+    // ── real pipeline (parser + parent-child chunker) ──
     std::unique_ptr<cortrix::spc::DocumentParserFactory> factory_;
     std::unique_ptr<cortrix::chunker::ParentChildChunker> chunker_;
     std::unique_ptr<OnnxEmbedder> embedder_;
     std::unique_ptr<BlockAssembler> assembler_;
-    cortrix::spc::NullEnricher enricher_;  // F03 short-circuit (lifetime ≥ pipeline_)
+    cortrix::spc::NullEnricher enricher_;  // Enricher short-circuit (lifetime ≥ pipeline_)
     std::unique_ptr<SPCPipeline> pipeline_;
 
     std::vector<std::string> tmp_files_;
@@ -400,7 +400,7 @@ TEST_F(SPCPipelineTest, ProcessTxtFile_FullPipeline) {
     EXPECT_EQ(blocks.size(), fake_index_->added_ids().size());
 }
 
-// [A unified-blocks] children land as `blocks` rows with a non-empty child_id +
+// unified-blocks: children land as `blocks` rows with a non-empty child_id +
 // parent_id; the parents land in the `parents` table (verified via parent_get).
 TEST_F(SPCPipelineTest, UnifiedWrite_ParentsAndChildrenPersisted) {
     std::string doc_id = CreateDoc();
@@ -416,7 +416,7 @@ TEST_F(SPCPipelineTest, UnifiedWrite_ParentsAndChildrenPersisted) {
 
     // Under A unified-blocks the `blocks` table is heterogeneous: child rows
     // (block_type = source modality kBlockFile, child-ness carried by child_id) plus
-    // one doc-level F08 META row (block_type = kBlockMeta, no child_id). Separate them.
+    // one doc-level META row (block_type = kBlockMeta, no child_id). Separate them.
     std::vector<std::string> parent_ids;
     int meta_count = 0;
     for (const auto& b : blocks) {
@@ -446,7 +446,7 @@ TEST_F(SPCPipelineTest, UnifiedWrite_ParentsAndChildrenPersisted) {
     }
 }
 
-// [A unified-blocks F08] After chunking (D6 lock F06→F34→F08) one doc-level Metadata
+// [A unified-blocks META block] After chunking (D6 lock parser→parent-child chunking→META block) one doc-level Metadata
 // Block (block_type = kBlockMeta = 8) is written into the same `blocks` table. It
 // carries no child_id/parent_id but has a natural-language block_text (content_text)
 // + the 26-field metadata_json; exactly one per doc (idx_blocks_meta_doc).
@@ -472,7 +472,7 @@ TEST_F(SPCPipelineTest, F08MetadataBlock_Persisted) {
     EXPECT_EQ(meta_count, 1) << "exactly one F08 META block per doc (idx_blocks_meta_doc)";
 }
 
-// [F44/F41 path validation] F08 metadata must also populate the per-Unit
+// [benchmark/doc summary path validation] META block metadata must also populate the per-Unit
 // doc_fts5_index row that query/discover uses as the doc-level fallback candidate
 // path. This is a product-level test: real NamespaceFacade + real Unit SQLite,
 // not the standalone DocFts5Index :memory: wrapper.
@@ -508,7 +508,7 @@ TEST_F(SPCPipelineTest, F41DocFts5Index_RowWrittenFromF08Metadata) {
     EXPECT_EQ(core.hits[0].via_path, "fts5_fallback");
 }
 
-// [A unified-blocks F10] The SPC pipeline runs F10 dedup (exact + semantic) over the
+// [A unified-blocks cleaning] The SPC pipeline runs cleaning dedup (exact + semantic) over the
 // children before the write. Two byte-identical large paragraphs (each > parent_size
 // so each forms its own parent → byte-identical child chunks) must collapse: no two
 // written child rows share identical text.
@@ -586,9 +586,9 @@ TEST_F(SPCPipelineTest, F10_ResponseMetaCarriesCleaningSummary) {
     EXPECT_EQ(input, indexed + skipped);
 }
 
-// [F10 §3.2 PARSE_FAILED · M2] A doc parsed with a failed page (d.failed_pages
+// [cleaning PARSE_FAILED · M2] A doc parsed with a failed page (d.failed_pages
 // non-empty) must propagate the F08-format meta.parse_status / meta.parse_failed_page
-// keys onto the child Blocks so F10 DetectAnomaly can fire PARSE_FAILED. The child's
+// keys onto the child Blocks so cleaning DetectAnomaly can fire PARSE_FAILED. The child's
 // parent span covers page 1, which is the failed page → the child is marked anomalous
 // (kept, but flagged skip-index). Regression for the dead-code gap where MetaToJson
 // dropped parse_status so PARSE_FAILED never triggered in the live pipeline.
@@ -614,12 +614,12 @@ TEST_F(SPCPipelineTest, F10_ParseFailedPropagatesToChild) {
 
     int child_count = 0;
     for (const auto& b : BlocksOf(doc_id)) {
-        if (b.block_type != static_cast<int>(kBlockFile)) continue;  // skip F08 META
+        if (b.block_type != static_cast<int>(kBlockFile)) continue;  // skip META
         ++child_count;
         nlohmann::json m =
             nlohmann::json::parse(b.metadata_json, nullptr, /*allow_exceptions=*/false);
         ASSERT_FALSE(m.is_discarded()) << "child metadata_json must be valid JSON";
-        // M2 passthrough (F08 SoT key format).
+        // M2 passthrough (META block SoT key format).
         ASSERT_TRUE(m.contains("meta.parse_status"));
         EXPECT_EQ(m["meta.parse_status"], "partial");
         ASSERT_TRUE(m.contains("meta.parse_failed_page"));
@@ -633,7 +633,7 @@ TEST_F(SPCPipelineTest, F10_ParseFailedPropagatesToChild) {
     EXPECT_GT(child_count, 0) << "expected at least one child block";
 }
 
-// [F10 §3.4 · M1] When a per-NS CleaningConfig resolver seam is installed, the
+// [cleaning · M1] When a per-NS CleaningConfig resolver seam is installed, the
 // pipeline applies it to the DataCleaner before cleaning. Here the NS turns dedup
 // OFF (dedup_enabled=false), so two byte-identical child chunks that WOULD collapse
 // under the default config (see F10_DedupRemovesDuplicateChildren) both survive —
@@ -661,7 +661,7 @@ TEST_F(SPCPipelineTest, ProcessMarkdownFile_Parses) {
 }
 
 TEST_F(SPCPipelineTest, ParseError_FileNotFound) {
-    // F06 factory pre-check: a non-existent file → FILE_NOT_FOUND (parse error).
+    // Parser factory pre-check: a non-existent file → FILE_NOT_FOUND (parse error).
     auto task_uptr_ = MakeTask("/nonexistent/file.txt", "text/plain",
                                "01JTESTDOC0000000000000042");
     SPCTask& task = *task_uptr_;
@@ -701,7 +701,7 @@ TEST_F(SPCPipelineTest, VectorIndexAddFailure_Error) {
     // Rollback before any block_insert / parent_insert → nothing persisted.
     EXPECT_EQ(BlocksOf(doc_id).size(), 0u);
 
-    // F44/F41: doc_fts5_index is now written immediately after BeginWrite so it
+    // Benchmark/doc summary: doc_fts5_index is now written immediately after BeginWrite so it
     // must be compensated by the same rollback when a later vector write fails.
     auto hits = cortrix::doc_summary::SearchDocFts5(
         facade_->store().db_handle(), "VectorRollbackSentinel", /*top_k=*/10);
@@ -760,7 +760,7 @@ TEST_F(SPCPipelineTest, BlockType_InferredFromMime) {
     EXPECT_EQ(rc, 0);
 
     for (const auto& block : BlocksOf(doc_id)) {
-        // Child rows carry the inferred source modality; the F08 META row is kBlockMeta.
+        // Child rows carry the inferred source modality; the META row is kBlockMeta.
         if (block.child_id.empty()) {
             EXPECT_EQ(block.block_type, static_cast<int>(kBlockMeta));
         } else {
@@ -777,7 +777,7 @@ TEST_F(SPCPipelineTest, ChunkIndicesAreSequential) {
     int rc = pipeline_->Process(task, *facade_);
     EXPECT_EQ(rc, 0);
 
-    // Child blocks carry sequential 0-based chunk indices; the F08 META row
+    // Child blocks carry sequential 0-based chunk indices; the META row
     // (block_type kBlockMeta) is doc-level and not part of the child sequence.
     auto blocks = BlocksOf(doc_id);
     int seq = 0;
@@ -840,7 +840,7 @@ TEST_F(SPCPipelineTest, L2_ChunksButNoEmbedding) {
     EXPECT_EQ(StatusOf(doc_id), DocStatus::kReady);
 }
 
-// [A unified-blocks] parents are written regardless of level (L2 has no embedding
+// unified-blocks: parents are written regardless of level (L2 has no embedding
 // but still emits parent rows).
 TEST_F(SPCPipelineTest, L2_ParentsStillPersisted) {
     std::string doc_id = CreateDoc();
@@ -853,7 +853,7 @@ TEST_F(SPCPipelineTest, L2_ParentsStillPersisted) {
 
     auto blocks = BlocksOf(doc_id);
     ASSERT_GT(blocks.size(), 0u);
-    // Pick a child block (the F08 META row has no parent_id) and resolve its parent.
+    // Pick a child block (the META row has no parent_id) and resolve its parent.
     std::string a_parent_id;
     for (const auto& b : blocks) {
         if (!b.parent_id.empty()) { a_parent_id = b.parent_id; break; }
@@ -1138,7 +1138,7 @@ TEST_F(SPCPipelineTest, L2_AssemblyStage_VerifiedByBlockInsert) {
     EXPECT_EQ(rc, 0);
     EXPECT_EQ(task.stage, SPCStage::kDone);
 
-    // Child blocks carry sequential 0-based chunk indices; the F08 META row
+    // Child blocks carry sequential 0-based chunk indices; the META row
     // (block_type kBlockMeta) is doc-level and not part of the child sequence.
     auto blocks = BlocksOf(doc_id);
     int seq = 0;
@@ -1208,7 +1208,7 @@ TEST_F(SPCPipelineTest, RollbackCallbackDeletesInsertedBlocksInProcess) {
         << "rollback callback must delete the inserted blocks in-process";
 }
 
-// [A unified-blocks Inc 4-3] The rollback callback also drops the doc's parents.
+// unified-blocks: The rollback callback also drops the doc's parents.
 TEST_F(SPCPipelineTest, RollbackCallbackDeletesInsertedParentsInProcess) {
     std::string doc_id = CreateDoc();
 
@@ -1245,7 +1245,7 @@ TEST_F(SPCPipelineTest, RollbackCallbackDeletesInsertedParentsInProcess) {
     EXPECT_EQ(BlocksOf(doc_id).size(), 0u);
 }
 
-// [F44/F41 path validation] The rollback callback must also delete the doc-level
+// [benchmark/doc summary path validation] The rollback callback must also delete the doc-level
 // FTS5 fallback row. Otherwise a failed ingest leaves a searchable orphan doc
 // candidate even though blocks/parents/vectors were compensated.
 TEST_F(SPCPipelineTest, RollbackCallbackDeletesDocFts5IndexRowInProcess) {
@@ -1281,7 +1281,7 @@ TEST_F(SPCPipelineTest, RollbackCallbackDeletesDocFts5IndexRowInProcess) {
 
 // ============================================================
 // metadata_json flow — child blocks carry the F34-inherited DocumentMetadata
-// (NOT task.metadata_json; that path is the F06/F34 doc-meta inheritance). The
+// (NOT task.metadata_json; that path is the parser/parent-child chunking doc-meta inheritance). The
 // memory path (above) is the one that carries task.metadata_json.
 // ============================================================
 
@@ -1297,7 +1297,7 @@ TEST_F(SPCPipelineTest, ChildBlocks_CarryInheritedDocMetadata) {
     auto blocks = BlocksOf(doc_id);
     ASSERT_GT(blocks.size(), 0u);
     for (const auto& block : blocks) {
-        // The F08 META row carries the 26-field F08 schema (lang/parser/counts…),
+        // The META row carries the 26-field META block schema (lang/parser/counts…),
         // not the child-inherited DocumentMetadata (doc_language). This test is about
         // child blocks, so skip the doc-level META row.
         if (block.block_type == static_cast<int>(kBlockMeta)) continue;
@@ -1307,13 +1307,13 @@ TEST_F(SPCPipelineTest, ChildBlocks_CarryInheritedDocMetadata) {
         const cortrix_block_header_t* hdr = nullptr;
         ASSERT_TRUE(BlockParse(block.data.data(), block.data.size(), &hdr));
         EXPECT_GT(hdr->metadata_length, 0u);
-        // doc-level fields inherited from F06 metadata (filename/doc_language).
+        // doc-level fields inherited from parser metadata (filename/doc_language).
         EXPECT_NE(block.metadata_json.find("doc_language"), std::string::npos);
     }
 }
 
 // ============================================================
-// F03 enrich integration (③b): an available LlmEnricher feeds Stage 3.6
+// Enrich integration (③b): an available LlmEnricher feeds Stage 3.6
 // (EnrichBatch) and the write phase persists enriched_score + entities and folds
 // the summary into block metadata_json, all on the real store handle.
 // ============================================================
@@ -1321,7 +1321,7 @@ TEST_F(SPCPipelineTest, ChildBlocks_CarryInheritedDocMetadata) {
 TEST_F(SPCPipelineTest, LlmEnricherPersistsEnrichmentAndSummary) {
     using ::testing::Return;
 
-    // MockLlmClient answers every batch with the F03 index-keyed JSON shape
+    // MockLlmClient answers every batch with the enricher index-keyed JSON shape
     // ({"0":{entities,summary,score}, ...}) for indices 0..7, so each child in a
     // (≤ batch_size=8) batch gets a real enrichment. WillRepeatedly → any batch count.
     auto mock = std::make_shared<llm::MockLlmClient>();
@@ -1385,7 +1385,7 @@ TEST_F(SPCPipelineTest, LlmEnricherPersistsEnrichmentAndSummary) {
     EXPECT_GT(CountOf("SELECT COUNT(*) FROM entities"), 0);
     EXPECT_GT(CountOf("SELECT COUNT(*) FROM entities_fts WHERE entities_fts MATCH 'Cortrix'"), 0);
 
-    // ④ F07 (option A — Matrix level owns block-level processing_level + semantic_score).
+    // ④ semantic score (option A — Matrix level owns block-level processing_level + semantic_score).
     // docling parser (level 2) + LlmEnricher (level 4) → child Matrix level 4 / score 1.0;
     // the META block is locked to level 0 / score 0.2 (ARCH §5.2.1). ABS tolerance because a
     // 0.2f/0.6f REAL widens to double imprecisely (1.0f is exact, but ABS is harmless).
@@ -1426,7 +1426,7 @@ TEST_F(SPCPipelineTest, NullEnricherWritesNoEnrichment) {
     sqlite3_finalize(st);
     EXPECT_EQ(enriched, 0);
 
-    // ④ F07 still runs without enrichment (it is independent of F03): docling parser
+    // ④ semantic score still runs without enrichment (it is independent of enricher): docling parser
     // (level 2) + NullEnricher (level 0) → child Matrix level 2 / semantic_score 0.6.
     sqlite3_stmt* st2 = nullptr;
     ASSERT_EQ(sqlite3_prepare_v2(
@@ -1496,9 +1496,9 @@ TEST_F(SPCPipelineTest, MemorySession_PreCancelled) {
     EXPECT_EQ(TotalBlocks(), 0);
 }
 
-// ProcessParsed is the F42 async entry point (parse already done by F06). Driving
+// ProcessParsed is the async entry point (parse already done by parser). Driving
 // it directly with a hand-built multi-paragraph ParsedDoc exercises the same
-// post-parse stages (chunk → F08 → embed → assemble → write) without the parser
+// post-parse stages (chunk → META block → embed → assemble → write) without the parser
 // subprocess — the dedicated Plan-B seam.
 TEST_F(SPCPipelineTest, ProcessParsed_DirectEntry_WritesBlocks) {
     std::string doc_id = CreateDoc();
@@ -1536,7 +1536,7 @@ TEST_F(SPCPipelineTest, ProcessParsed_DirectEntry_WritesBlocks) {
 }
 
 // ProcessParsed pre-cancelled → the cancel check before chunking returns
-// -1 / kCancelled (the F42 path's own cancel guard).
+// -1 / kCancelled (the async task path's own cancel guard).
 TEST_F(SPCPipelineTest, ProcessParsed_PreCancelled) {
     auto task_uptr = MakeTask(txt_path_, "text/plain", "01JTESTDOC0000000000000077");
     task_uptr->cancelled.store(true);
@@ -1555,7 +1555,7 @@ TEST_F(SPCPipelineTest, ProcessParsed_PreCancelled) {
     EXPECT_EQ(task_uptr->stage, SPCStage::kCancelled);
 }
 
-// A parse result carrying failed_pages → the F08 generator records
+// A parse result carrying failed_pages → the META block generator records
 // parse_status="partial" (the `d.failed_pages.empty() ? "ok" : "partial"` false
 // branch). Verified end-to-end: the doc still writes successfully.
 TEST_F(SPCPipelineTest, PartialParse_StatusReflectedInMeta) {
@@ -1575,7 +1575,7 @@ TEST_F(SPCPipelineTest, PartialParse_StatusReflectedInMeta) {
     int rc = pipeline_->Process(*task_uptr, *facade_);
     ASSERT_EQ(rc, 0) << task_uptr->error_message;
 
-    // The F08 META block carries the parse stats; the doc wrote successfully with
+    // The META block carries the parse stats; the doc wrote successfully with
     // a non-empty failed_pages set driving the "partial" status branch.
     int meta_count = 0;
     for (const auto& b : BlocksOf(doc_id)) {
@@ -1599,7 +1599,7 @@ TEST_F(SPCPipelineTest, MalformedCustomMetadata_IgnoredNotFatal) {
 }
 
 // ============================================================
-// Store-write failure branches (SetFailNextOps seam, F23 section 4.5). Each path's first
+// Store-write failure branches (SetFailNextOps seam, test suite section 4.5). Each path's first
 // store CRUD op after BeginWrite is forced to return -1; the pipeline must roll
 // the txn back, set kError with the path-specific message, and persist nothing.
 // The fault is armed AFTER CreateDoc() (which itself calls doc_create) so the

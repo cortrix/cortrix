@@ -9,7 +9,7 @@
 namespace cortrix::scoring {
 namespace {
 
-// Per-Unit DB with a blocks table + the F07 schema (semantic_score column) applied,
+// Per-Unit DB with a blocks table + the semantic score schema (semantic_score column) applied,
 // plus one block row to attach a score to. Mirrors test_enricher_store's fixture.
 class ScoringStoreTest : public ::testing::Test {
 protected:

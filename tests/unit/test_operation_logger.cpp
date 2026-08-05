@@ -21,7 +21,7 @@
 namespace cortrix::observability {
 namespace {
 
-// Fixture: in-memory global db migrated with the F18a provider, an
+// Fixture: in-memory global db migrated with the operation log provider, an
 // InMemoryGlobalConfig, and an OperationLogger over the handle.
 class OperationLoggerTest : public ::testing::Test {
 protected:

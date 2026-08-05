@@ -8,7 +8,7 @@
 #include "cortrix/retrieval/sparse_ns_config.h"
 #include "cortrix/retrieval/splade_sparse_retriever.h"
 
-// F40 S7 — top-K NS-config (F40-6: default 100, NS-configurable 50-200) + the
+// Sparse retrieval S7 — top-K NS-config (default 100, NS-configurable 50-200) + the
 // IGlobalConfig default key. Parse() / ResolveSparseTopK() / ClampSparseTopK()
 // + an end-to-end check that the resolved value drives Search.
 namespace cortrix::retrieval {

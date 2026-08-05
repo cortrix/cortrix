@@ -1,6 +1,6 @@
-// F02 §4.2-ter — RerankerScoreFusion (F02-owned RRF fusion) + Rerank ordering.
+// Reranker — RerankerScoreFusion (F02-owned RRF fusion) + Rerank ordering.
 //
-// Covers (Agent-D F02 wrap-up increment Task A):
+// Covers (Agent-D reranker wrap-up increment Task A):
 //   (1) Fusion math: weighted_sum(rerank*0.7 + rrf*0.3) + named-constant weights.
 //   (2) Rerank sorts by the FUSED score (not raw rerank_score): a candidate with
 //       high rerank / low RRF can be re-ordered past / behind one with low rerank /
@@ -96,7 +96,7 @@ TEST(RerankerScoreFusionTest, WeightsAreV1Contract) {
 
 TEST(RerankerScoreFusionTest, ComputeRerankRrfScoreIsWeightedSum) {
     RerankerScoreFusion fusion;
-    RankedChunk chunk;  // no F03/F07 signals
+    RankedChunk chunk;  // no enricher/semantic score signals
     // 0.8*0.7 + 0.4*0.3 = 0.56 + 0.12 = 0.68
     EXPECT_FLOAT_EQ(fusion.ComputeRerankRrfScore(0.8f, 0.4f, chunk, "q"), 0.68f);
     // boundary: both 1 → 1; both 0 → 0.
@@ -125,7 +125,7 @@ TEST(RerankerScoreFusionTest, AnomalySentinelOverridesEnrichedScore) {
     RerankerScoreFusion fusion;
     RankedChunk chunk;
     chunk.score_signals.enriched_score = 0.8f;
-    chunk.score_signals.semantic_score = 0.0f;  // F07 persisted anomaly sentinel
+    chunk.score_signals.semantic_score = 0.0f;  // Semantic score persisted anomaly sentinel
 
     // base = 0.8*0.7 + 0.4*0.3 = 0.68. Anomaly priority forces effective=0.0
     // and multiplier=0.9; enriched=0.8 must not re-boost the block to 1.06x.

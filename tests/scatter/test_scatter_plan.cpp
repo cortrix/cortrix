@@ -2,7 +2,7 @@
 
 #include "cortrix/query/scatter_plan.h"
 
-// S4.3 coverage: Cloud P01-3 plan coordination — effective cap = min(global GUC, plan cap).
+// Coverage: cloud plan coordination — effective cap = min(global GUC, plan cap).
 namespace cortrix::query {
 namespace {
 
@@ -28,7 +28,7 @@ TEST(ScatterPlanTest, FlooredAtOne) {
 }
 
 // 🚩 D3.5: the frozen CE AuthContext has no plan field, so PlanMaxNamespacesOf is
-// nullopt today → the AuthContext overload == the global cap. (Once P01-3 injects
+// nullopt today → the AuthContext overload == the global cap. (Once the cloud path injects
 // the field, the WithPlan logic above activates unchanged.)
 TEST(ScatterPlanTest, AuthContextHasNoPlanCapYet) {
     AuthContext auth;

@@ -1,4 +1,4 @@
-// P09 sec 7 -- tenant error registry contract tests (S1).
+// Tenancy -- tenant error registry contract tests (S1).
 // Mirrors test_auth_error.cpp / the catalog-error contract: the enum, its
 // CX_ERR_* strings, categories, retryability, and structured_data key sets are a
 // stable Agent-friendly contract (GEN-Agent #1/#4/#5/#7) that must not drift.
@@ -82,7 +82,7 @@ TEST(TenantErrorTest, EveryCategoryIsOneOfFive) {
 }
 
 TEST(TenantErrorTest, OnlyTransactionFailedIsRetryable) {
-    // Per sec 7, the sole retryable P09 error is CX_ERR_TENANT_TRANSACTION_FAILED
+    // Per sec 7, the sole retryable tenancy error is CX_ERR_TENANT_TRANSACTION_FAILED
     // (transient, retry_after_ms=100). Everything else is non-retryable.
     for (auto code : AllCodes()) {
         const TenantErrorInfo& info = GetTenantErrorInfo(code);
@@ -120,7 +120,7 @@ TEST(TenantErrorTest, RequiredStructuredDataKeysMatchSpec) {
     EXPECT_EQ(RequiredStructuredDataKeys(TenantErrorCode::kCallerRoleInsufficient),
               (V{"tenant_id", "caller_role", "required_min_role", "action"}));
     // Every code must declare at least one required structured_data key (sec 7 has no
-    // empty rows for P09).
+    // empty rows for tenancy).
     for (auto code : AllCodes()) {
         EXPECT_FALSE(RequiredStructuredDataKeys(code).empty()) << TenantErrorCodeString(code);
     }

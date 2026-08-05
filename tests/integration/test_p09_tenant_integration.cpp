@@ -1,13 +1,13 @@
-// P09 sec 11.2 -- standalone integration tests over a real in-memory catalog.db.
+// Tenancy -- standalone integration tests over a real in-memory catalog.db.
 //
-// The cross-feature IT cases that require P08 / F04 / F16a / MEM05 *live* wiring
-// (IT47 F04 call-site switch, IT48 F16a, IT49 MEM05) are D3.5-deferred per the
-// D-R1 standalone rule; here we exercise the P09 contracts those features rely on
-// against the frozen F12 schema:
-//   IT45/46 -- the P08 registration cross-service transaction (P08 holds the tx,
-//             P09 CreatePersonal runs on the SAME conn; COMMIT persists all,
+// The cross-feature IT cases that require auth / cross-NS query / DB import / memory isolation *live* wiring
+// (IT47 cross-NS query call-site switch, IT48 DB import, IT49 memory isolation) are D3.5-deferred per the
+// D-R1 standalone rule; here we exercise the tenancy contracts those features rely on
+// against the frozen catalog schema:
+//   IT45/46 -- the auth registration cross-service transaction (auth holds the tx,
+//             Tenancy CreatePersonal runs on the SAME conn; COMMIT persists all,
 //             ROLLBACK drops all -- users + tenants + user_tenants atomic).
-//   IT47    -- F04 BatchCheck call pattern end-to-end.
+//   IT47    -- cross-NS query BatchCheck call pattern end-to-end.
 //   IT50/51 -- admin HTTP quota / tenant-create service paths.
 //   IT53    -- switch-tenant is unregistered (404 contract) -- asserted at the
 //             route layer (documented; the route is intentionally absent).
@@ -58,7 +58,7 @@ protected:
         perm_svc_ = std::make_unique<PermissionService>(catalog_.db());
         quota_svc_ = std::make_unique<QuotaService>(std::make_shared<UnlimitedPlanProvider>(),
                                                     catalog_.db());
-        // The P09 §10.1 bootstrap seed (schema-embedded) pre-populates users /
+        // The tenancy bootstrap seed (schema-embedded) pre-populates users /
         // tenants / user_tenants on Open(); register-flow assertions are relative
         // to this baseline, not to zero.
         users_base_ = CountRows(catalog_.db(), "users");
@@ -77,10 +77,10 @@ protected:
 // --- IT45: registration flow commits users + tenants + user_tenants together ---
 TEST_F(P09IntegrationTest, Register_Flow_CommitsAllThreeTables) {
     sqlite3* db = catalog_.db();
-    // P08 holds the outermost transaction.
+    // Auth holds the outermost transaction.
     ASSERT_EQ(sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr), SQLITE_OK);
-    SeedUser(db, "u1", "new@x.com");  // P08 step 3: INSERT users (on this conn)
-    auto r = tenant_svc_->CreatePersonal("u1", "new@x.com", /*conn=*/db);  // P08 step 4
+    SeedUser(db, "u1", "new@x.com");  // Auth step 3: INSERT users (on this conn)
+    auto r = tenant_svc_->CreatePersonal("u1", "new@x.com", /*conn=*/db);  // Auth step 4
     ASSERT_TRUE(r.ok()) << r.status().message();
     ASSERT_EQ(sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr), SQLITE_OK);
 
@@ -96,7 +96,7 @@ TEST_F(P09IntegrationTest, Register_Flow_Failure_RollbackAll) {
     SeedUser(db, "u1", "new@x.com");
     auto r = tenant_svc_->CreatePersonal("u1", "new@x.com", db);
     ASSERT_TRUE(r.ok());
-    // P08 hits a later failure (e.g. JWT issue) and rolls the whole tx back.
+    // Auth hits a later failure (e.g. JWT issue) and rolls the whole tx back.
     ASSERT_EQ(sqlite3_exec(db, "ROLLBACK", nullptr, nullptr, nullptr), SQLITE_OK);
 
     EXPECT_EQ(CountRows(db, "users"), users_base_);
@@ -104,7 +104,7 @@ TEST_F(P09IntegrationTest, Register_Flow_Failure_RollbackAll) {
     EXPECT_EQ(CountRows(db, "user_tenants"), memberships_base_);
 }
 
-// --- IT47: F04 BatchCheck over a mix of owned / granted / denied namespaces ---
+// --- IT47: cross-NS query BatchCheck over a mix of owned / granted / denied namespaces ---
 TEST_F(P09IntegrationTest, F04_CrossNSQuery_BatchCheck) {
     sqlite3* db = catalog_.db();
     ASSERT_EQ(sqlite3_exec(db,
@@ -130,7 +130,7 @@ TEST_F(P09IntegrationTest, F04_CrossNSQuery_BatchCheck) {
 // --- IT50: admin HTTP quota check path -> UnlimitedPlanProvider returns unlimited ---
 TEST_F(P09IntegrationTest, Admin_HttpQuotaCheck_V1OSS) {
     sqlite3* db = catalog_.db();
-    // OR IGNORE: the P09 §10.1 bootstrap seed already inserts default_tenant.
+    // OR IGNORE: the tenancy bootstrap seed already inserts default_tenant.
     ASSERT_EQ(sqlite3_exec(db,
                            "INSERT OR IGNORE INTO tenants(tenant_id,type,name,created_at) VALUES('default_tenant','personal','Default',0)",
                            nullptr, nullptr, nullptr), SQLITE_OK);

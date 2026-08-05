@@ -47,7 +47,7 @@ protected:
 
         gc_ = std::make_unique<catalog::gc::GcManager>(catalog_.db(), &sink_, cfg_);
 
-        // Document layer: a real F05 pool + a router whose ListNamespaces yields kNs.
+        // Document layer: a real namespace pool + a router whose ListNamespaces yields kNs.
         harness_ = std::make_unique<cortrix::test::NsPoolHarness>(
             std::filesystem::temp_directory_path() /
             ("gcroutes_" + std::to_string(reinterpret_cast<uintptr_t>(this))));

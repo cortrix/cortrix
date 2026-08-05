@@ -5,8 +5,8 @@
 #include "cortrix/common/in_memory_global_config.h"
 #include "cortrix/spc/hype_ns_config.h"
 
-// F38 S6 — K NS-config (F38-1: default 3, NS-configurable 1-10) + IGlobalConfig
-// default key. Parse / ResolveHypeK / ClampHypeK. Mirrors F40 NsSparseConfig.
+// HyPE S6 — K NS-config (default 3, NS-configurable 1-10) + IGlobalConfig
+// default key. Parse / ResolveHypeK / ClampHypeK. Mirrors sparse retrieval NsSparseConfig.
 namespace cortrix::spc {
 namespace {
 

@@ -1,4 +1,4 @@
-// P09 sec 11.1 -- PermissionService unit tests (UT19-35).
+// Tenancy -- PermissionService unit tests (UT19-35).
 #include <gtest/gtest.h>
 
 #include <string>
@@ -187,7 +187,7 @@ TEST_F(PermissionServiceTest, GrantThenRevokeThenList) {
     EXPECT_EQ(list2->size(), 0u);
 }
 
-// --- UT35: BatchCheck mixed allow/deny (F04 call pattern) ---
+// --- UT35: BatchCheck mixed allow/deny (cross-NS query call pattern) ---
 TEST_F(PermissionServiceTest, BatchCheck_Multiple) {
     Exec("INSERT INTO ns_acl(ns_id, grantee_tenant_id, grantee_user_id, role, granted_at) "
          "VALUES('ns1','t-other',NULL,'viewer',0)");

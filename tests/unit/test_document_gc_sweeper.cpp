@@ -18,7 +18,7 @@
 #include "ns_pool_test_helper.h"
 
 // OPEN-2 document GC (B① per-Unit layer): Stage 2 hard-delete of expired soft-
-// deleted docs over a real F05 pool — asserts the real .raw blob is unlinked, the
+// deleted docs over a real namespace pool — asserts the real .raw blob is unlinked, the
 // block vectors are MarkDelete'd, and the doc/block rows are removed. Plus
 // restore + retention-window + dry_run.
 namespace cortrix::catalog::gc {

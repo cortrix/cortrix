@@ -10,10 +10,10 @@
 #include "cortrix/spc/contextual_metrics.h"
 #include "mock_llm_client.h"
 
-// F35 — ContextualRetrievalEnricher: ISpcEnricher impl (Enrich + EnrichBatch +
+// Contextual retrieval — ContextualRetrievalEnricher: ISpcEnricher impl (Enrich + EnrichBatch +
 // IsAvailable + Name), GenerateContextualizedText (LLM mock), BuildPrompt
 // (default Anthropic + NS-override template), the three-layer config resolver,
-// and the §7 L1/L2/L3 fallback paths. Enrich() populates the 3 F35 EnrichResult
+// and the §7 L1/L2/L3 fallback paths. Enrich() populates the 3 contextual retrieval EnrichResult
 // fields (contextualized_text / contextualized_embedding / contextualized_status).
 namespace cortrix::spc {
 namespace {
@@ -244,7 +244,7 @@ TEST(F35ContextualEnricherTest, EnrichSuccessPopulatesAllThreeFields) {
     EXPECT_EQ(res.contextualized_embedding->size(), 8u);
     // The embedder embedded the contextualized text (not the raw chunk).
     EXPECT_EQ(emb->last_text, "PREFIX CONTEXT\nchunk body");
-    EXPECT_TRUE(res.entities.empty());                  // F35 does no NER
+    EXPECT_TRUE(res.entities.empty());                  // Contextual retrieval does no NER
     EXPECT_TRUE(res.summary.empty());
 }
 

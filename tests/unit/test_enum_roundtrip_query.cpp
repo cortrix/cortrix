@@ -14,7 +14,7 @@
 //   VariantStrategy (cortrix::query): VariantStrategyString <-> ParseVariantStrategy
 //                                     (round-trip) + nlohmann to_json/from_json
 //                                     (unknown JSON string -> kParaphrase).
-//   RrfPath (cortrix::retrieval):     ToString only (5 paths, F40 GS-1 labels).
+//   RrfPath (cortrix::retrieval):     ToString only (5 paths, sparse retrieval GS-1 labels).
 //   BlockType (cortrix):              BlockTypeToString <-> BlockTypeFromString
 //                                     (int codes 1..7). unknown int -> "UNKNOWN";
 //                                     unknown string -> -1.

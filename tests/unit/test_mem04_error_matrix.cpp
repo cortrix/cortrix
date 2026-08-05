@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/memory/mem04_error.h"
 
-// Exhaustive parameterized error-registry sweep for MEM04 (ARCH §4.1.11, 7 codes).
+// Exhaustive parameterized error-registry sweep for memory opt-out (ARCH §4.1.11, 7 codes).
 // Distinct suite name (Mem04ErrorMatrix) from the basic test_mem04_error.cpp.
 namespace cortrix::memory::immunity {
 namespace {
@@ -46,7 +46,7 @@ TEST_P(Mem04ErrorMatrix, CategoryAndRetryInvariant) {
     const Mem04ErrorCode code = GetParam();
     const Mem04ErrorInfo& info = GetMem04ErrorInfo(code);
     EXPECT_TRUE(IsValidCategory(info.category));
-    // All 7 MEM04 codes are non-retryable per ARCH §4.1.11.
+    // All 7 memory opt-out codes are non-retryable per ARCH §4.1.11.
     EXPECT_FALSE(info.retryable) << info.cx_code;
     EXPECT_FALSE(info.retry_after_ms.has_value()) << info.cx_code;
     EXPECT_GT(Mem04ErrorHttpStatus(code), 0);

@@ -6,7 +6,7 @@
 
 #include "cortrix/query/i_namespace_pipeline.h"
 #include "cortrix/query/single_unit_executor.h"
-#include "mock_reranker.h"  // tests/mocks (F02 shared)
+#include "mock_reranker.h"  // tests/mocks (reranker shared)
 
 // S1.2 coverage: SingleUnitExecutor — candidate over-fetch sizing, rerank path,
 // RRF fallback (rerank=false), per-NS index-corrupt in-band error.
@@ -85,7 +85,7 @@ TEST(SingleUnitExecutorTest, RerankPathReturnsRerankedChunks) {
 }
 
 // rerank=false: RRF fallback — no reranker call; ordering by RRF score; chunks
-// carry child_id + score (chunk_text empty until F08/F09 wiring).
+// carry child_id + score (chunk_text empty until META block/block header wiring).
 TEST(SingleUnitExecutorTest, RrfFallbackSkipsReranker) {
     FakePipeline pipe;
     pipe.to_return = {{"c0", 0.3f}, {"c1", 0.9f}, {"c2", 0.5f}};

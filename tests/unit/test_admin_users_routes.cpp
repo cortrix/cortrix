@@ -17,8 +17,8 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/server/routes/auth_routes.h"
 
-// FA1 R11 coverage: the P08 §2.13-bis admin/users 5 endpoints over a real httplib
-// server backed by an in-memory platform.db (migrated with the P08 schema) and a
+// FA1 R11 coverage: the auth admin/users 5 endpoints over a real httplib
+// server backed by an in-memory platform.db (migrated with the auth schema) and a
 // real ApiKeyAuth (admin key + a read-only non-admin key). Exercises list / create
 // / update / disable / enable + the admin permission gate + 404 / 409 / 422 errors.
 namespace cortrix {

@@ -8,7 +8,7 @@
 
 #include "cortrix/middleware/rate_limiter.h"
 
-// BREADTH op-matrix coverage for RateLimiter (F20 token-bucket). Complements
+// BREADTH op-matrix coverage for RateLimiter (readiness token-bucket). Complements
 // test_rate_limiter.cpp with matrices over rate x burst x time using the
 // injectable clock (no real sleeps): burst-draining, refill timing, lock
 // duration, multi-stratum interaction, and BuildErrorBody schema across strata.

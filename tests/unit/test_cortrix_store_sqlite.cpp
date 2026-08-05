@@ -193,7 +193,7 @@ TEST_F(StoreSqliteTest, DocDeleteCascade) {
     EXPECT_TRUE(blocks.empty());
 }
 
-// [F16a D3 · P2c] DeleteBySourcePrefix — full-overwrite import cleanup.
+// [DB import D3 · P2c] DeleteBySourcePrefix — full-overwrite import cleanup.
 TEST_F(StoreSqliteTest, DeleteBySourcePrefix) {
     auto add_doc = [&](const std::string& source_path, int n_blocks) {
         CortrixDoc doc;
@@ -243,7 +243,7 @@ TEST_F(StoreSqliteTest, DeleteBySourcePrefix) {
     EXPECT_EQ(after, 2);
 }
 
-// [F16a D3 · P2c] DeleteBySourcePrefix is a no-op on an empty prefix (never wipes
+// [DB import D3 · P2c] DeleteBySourcePrefix is a no-op on an empty prefix (never wipes
 // the whole namespace) and on a prefix that matches nothing.
 TEST_F(StoreSqliteTest, DeleteBySourcePrefixGuards) {
     CortrixDoc doc;
@@ -401,7 +401,7 @@ TEST_F(StoreSqliteTest, BlockGetReadsOptionalScoreSignalsWhenColumnsExist) {
     EXPECT_FLOAT_EQ(*by_doc[1].score_signals.semantic_score, 0.6f);
 }
 
-// [A unified-blocks] block_insert/block_get round-trip the F34 child columns
+// unified-blocks: block_insert/block_get round-trip the child columns
 // (child_id/parent_id/token_count/parent_offset) + the shared metadata_json.
 TEST_F(StoreSqliteTest, BlockRoundTripsAColumns) {
     CortrixDoc doc;
@@ -846,7 +846,7 @@ TEST_F(StoreSqliteTest, FTS5EmptyQuery) {
 }
 
 // ============================================================
-// Additional Edge Case Tests for F01
+// Additional Edge Case Tests for index
 // ============================================================
 
 // Test 28: DocGetNotFound - getting non-existent doc returns -2
@@ -1038,7 +1038,7 @@ TEST_F(StoreSqliteTest, BlockSpecialCharContent) {
 }
 
 // ============================================================
-// Design Alignment Tests (Review F01+F02)
+// Design Alignment Tests (Review index+reranker)
 // ============================================================
 
 // Test 41: CDC fields are stored and retrieved
@@ -1606,7 +1606,7 @@ TEST_F(StoreSqliteTest, FTS5MultipleResults) {
 }
 
 // ============================================================
-// Design Alignment Tests (F01+F02 Final Review)
+// Design Alignment Tests (index+reranker Final Review)
 // ============================================================
 
 // Test: doc_find_by_hash returns 0 and populates doc for existing hash
@@ -1727,10 +1727,10 @@ TEST_F(StoreSqliteTest, ExplicitBlockIdRoundTripIncludingNegativeRowid) {
     EXPECT_TRUE(found) << "FTS5 must return the block by its negative-rowid block_id";
 }
 
-// [A unified-blocks] parent_insert/parent_get round-trip the `parents` table on the
+// unified-blocks: parent_insert/parent_get round-trip the `parents` table on the
 // unified store (the table is created standalone by F34SchemaProvider in
 // CreateTables()). The SPC write path uses this so parents + child-blocks commit in
-// one F25 transaction (ARCH §3.2). CortrixParent is the storage twin of
+// one write coordinator transaction (ARCH §3.2). CortrixParent is the storage twin of
 // chunker::ParentChunk; the store treats metadata_json as opaque text.
 TEST_F(StoreSqliteTest, ParentInsertGetRoundTripAndDuplicate) {
     CortrixParent p;

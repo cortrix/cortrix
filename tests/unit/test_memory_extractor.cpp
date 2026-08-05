@@ -14,7 +14,7 @@
 #include "cortrix/memory/mem02_metrics.h"
 #include "cortrix/memory/memory_extractor.h"
 
-// S3/S4/S5/S7 coverage: the MEM02 LLM extraction pipeline against injected seams +
+// S3/S4/S5/S7 coverage: the memory extraction LLM extraction pipeline against injected seams +
 // a scriptable LLM client. Includes the §12.3 eight LLM-mock scenarios (fact /
 // preference / event classification, new-fact contradiction, non-contradiction,
 // unknown→event fallback, invalid JSON, timeout), the D6 invalidation + operation_log

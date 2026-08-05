@@ -388,7 +388,7 @@ TEST(ImportDepthQueueTest, FailedWorkWithCxPrefixRecoversPreciseCode) {
 }
 
 // --------------------------------------------------------------------------
-// import_error: registry-driven error-body completeness (F16a section 5.4)
+// import_error: registry-driven error-body completeness (DB import section 5.4)
 // --------------------------------------------------------------------------
 
 TEST(ImportDepthErrorTest, MakeErrorFillsCategoryRetryableFromRegistry) {

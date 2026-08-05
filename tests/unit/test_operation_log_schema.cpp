@@ -12,7 +12,7 @@
 // S1 coverage: operation_log schema — provider identity, the table +
 // 5 indices created via the real SchemaMigrator, the full column set, NULL-allowed
 // trace/session, and idempotent re-migration. operation_log lives in the global
-// DB and references no catalog table (no FK), so the F18a provider migrates
+// DB and references no catalog table (no FK), so the operation log provider migrates
 // standalone.
 namespace cortrix::observability {
 namespace {
@@ -50,7 +50,7 @@ bool Contains(const std::set<std::string>& s, const std::string& k) {
     return s.find(k) != s.end();
 }
 
-// Fixture: in-memory global db, F18a provider migrated once via the real migrator.
+// Fixture: in-memory global db, operation log provider migrated once via the real migrator.
 class OperationLogSchemaTest : public ::testing::Test {
 protected:
     void SetUp() override {

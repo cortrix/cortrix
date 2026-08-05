@@ -225,7 +225,7 @@ INSTANTIATE_TEST_SUITE_P(
         BlobCase{BigBlob(), "large70k"}));
 
 // ============================================================================
-// (E) F34 child-column NULL-sentinel matrix: child_id/parent_id (empty=NULL),
+// (E) parent-child chunking child-column NULL-sentinel matrix: child_id/parent_id (empty=NULL),
 //     token_count/parent_offset (-1=NULL), metadata_json (empty=NULL). Each case
 //     drives the four sentinels independently and asserts the read-back.
 // ============================================================================
@@ -703,7 +703,7 @@ TEST_F(BlockRoundtripFixture, ParentNotFoundAndDuplicate) {
 // ============================================================================
 // (N) Full-block combination matrix: each case sets a realistic combination of
 //     all CortrixBlock fields at once (type/level/hnsw/content_hash/content_text
-//     + the four F34 child sentinels + metadata_json) and asserts every field
+//     + the four child sentinels + metadata_json) and asserts every field
 //     survives both block_get and block_get_by_doc. Complements the single-field
 //     matrices above by proving the columns coexist across many combinations.
 // ============================================================================

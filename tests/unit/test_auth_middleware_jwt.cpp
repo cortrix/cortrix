@@ -10,7 +10,7 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/config/auth_config.h"
 
-// P08 S4: JWT auth-middleware decision logic + /me response builder (§2.16 /
+// Auth S4: JWT auth-middleware decision logic + /me response builder (§2.16 /
 // §4.3 / §2.9). The httplib route mounting + CE/Cloud edition switch + protecting
 // existing routes is cross-Feature server wiring → D3.5; this exercises the pure
 // logic those will call.
@@ -153,7 +153,7 @@ TEST(MeResponseTest, BuildMeResponseEmptyTenants) {
     const std::string body = BuildMeResponseJson(u);
     nlohmann::json j = nlohmann::json::parse(body);
     EXPECT_TRUE(j["tenants"].is_array());
-    EXPECT_EQ(j["tenants"].size(), 0u);  // empty until P09 wiring (D3.5)
+    EXPECT_EQ(j["tenants"].size(), 0u);  // empty until tenancy wiring (D3.5)
 }
 
 }  // namespace

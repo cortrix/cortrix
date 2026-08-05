@@ -320,7 +320,7 @@ TEST_F(QueryCovGapRagFusionTest, ExpandQueries_DegradeReason_InvalidResponse) {
 }
 
 // Nested generic LLM transport token should not be masked as llm_timeout by the
-// F36 wrapper. This is critical for benchmark explainability: "network/TLS" and
+// RAG-Fusion wrapper. This is critical for benchmark explainability: "network/TLS" and
 // "deadline exceeded" require different follow-up actions.
 TEST_F(QueryCovGapRagFusionTest, ExpandQueries_DegradeReason_LlmTransport) {
     auto mock = std::make_shared<MockLlmClient>();

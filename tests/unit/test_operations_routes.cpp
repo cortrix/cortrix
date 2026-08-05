@@ -19,10 +19,10 @@
 #include "cortrix/observability/operation_logger_impl.h"
 #include "cortrix/server/routes/operations_routes.h"
 
-// F18a S3 coverage: GET /api/v1/operations route (§6.1). Exercises the 8 query
+// Operation log S3 coverage: GET /api/v1/operations route (§6.1). Exercises the 8 query
 // params, the admin cross-user permission gate (§6.1 permission grading), pagination +
 // sort, and the 6 CX_ERR_OPLOG_* Agent-friendly error bodies (§7.2) over a real
-// httplib server backed by an in-memory operation_log (migrated with the F18a
+// httplib server backed by an in-memory operation_log (migrated with the operation log
 // provider) and a real ApiKeyAuth (MVP: user_id == tenant_id).
 namespace cortrix {
 namespace {
@@ -33,7 +33,7 @@ using observability::OperationLogEntry;
 class OperationsRoutesTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // In-memory global db + F18a schema (operation_log + indices).
+        // In-memory global db + operation log schema (operation_log + indices).
         ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK);
         sqlite3_exec(db_, "PRAGMA journal_mode=WAL;", nullptr, nullptr, nullptr);
         cortrix::catalog::SchemaMigrator m;

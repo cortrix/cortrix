@@ -1,4 +1,4 @@
-// TokenizerRegistry (F02 secsec 2.4-bis) branch coverage: successful load +
+// TokenizerRegistry (reranker secsec 2.4-bis) branch coverage: successful load +
 // register, the idempotent already-registered short-circuit, the load-failure
 // pass-through, Get hit vs miss, and ResetForTest. The skeleton test already
 // covers the missing-key + load-failure cases; this fills the success / idempotent

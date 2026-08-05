@@ -12,7 +12,7 @@
 #include "cortrix/common/status.h"
 #include "cortrix/import/import_error.h"
 
-// Exhaustive error-registry matrix for F16a DB-import (src/import/import_error.*).
+// Exhaustive error-registry matrix for DB-import (src/import/import_error.*).
 // One TEST_P case per F16aErrorCode. Unique suite name (F16aErrorMatrix).
 namespace cortrix::import {
 namespace {
@@ -62,7 +62,7 @@ TEST_P(F16aErrorMatrix, CategoryInValidSet) {
         << "code " << info.cx_code;
 }
 
-// retry_after_ms present implies retryable; here every retryable F16a code also
+// retry_after_ms present implies retryable; here every retryable DB import code also
 // carries a positive backoff (module-uniform).
 TEST_P(F16aErrorMatrix, RetryAfterImpliesRetryable) {
     const F16aErrorInfo& info = GetF16aErrorInfo(GetParam());

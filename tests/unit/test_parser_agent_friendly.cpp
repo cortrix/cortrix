@@ -9,7 +9,7 @@
 #include "cortrix/spc/parser.h"
 #include "cortrix/spc/parser_errors.h"
 
-// F06 §5.2 (Major-2, design S6): every ParserError maps to a ParsedDoc /
+// Parser (Major-2, design S6): every ParserError maps to a ParsedDoc /
 // AgentFriendlyError carrying the GEN-Agent 4 fields (retryable / category /
 // retry_after_ms / structured_data) with the right values, and the error body
 // serializes to the AGENT_FRIENDLY §3.1 shape.

@@ -10,7 +10,7 @@
 #include "mock_llm_client.h"
 #include "mock_parent_chunk_store.h"
 
-// F38 S1 — HyPEEnricher skeleton: ISpcEnricher impl (Enrich + EnrichBatch +
+// HyPE S1 — HyPEEnricher skeleton: ISpcEnricher impl (Enrich + EnrichBatch +
 // IsAvailable + Name), GenerateHypeQuestions (LLM mock), ResolveParentText
 // (ParentChunkStore mock, optional-context two paths). Enrich() returns a STANDARD
 // EnrichResult (reconcile 1); parent_text is optional (reconcile 2).

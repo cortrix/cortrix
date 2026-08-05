@@ -113,7 +113,7 @@ TEST(MockResponseBuilderDrivesEnricher, NormalAllSucceed) {
 
 TEST(MockResponseBuilderDrivesEnricher, PartialBatchTriggersL2) {
     auto mock = std::make_shared<MockLlmClient>();
-    // F03 now retries each parse-failed chunk individually (RunOneBatch, n==1) when
+    // Enricher now retries each parse-failed chunk individually (RunOneBatch, n==1) when
     // the batch response is partial — so Chat() is called once for the batch plus
     // once per failed chunk. The single-item retries return malformed output, so the
     // missing chunks stay parse failures and the final result set is unchanged.

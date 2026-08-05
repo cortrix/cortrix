@@ -24,7 +24,7 @@
 #include "cortrix/query/rrf_fusion.h"
 #include "cortrix/query/intent_classifier.h"
 #include "cortrix/spc/onnx_embedder.h"
-#include "ns_pool_test_helper.h"  // cortrix::test::NsPoolHarness (real F05 pool)
+#include "ns_pool_test_helper.h"  // cortrix::test::NsPoolHarness (real namespace pool)
 #include "mock_spc_manager.h"
 
 namespace cortrix {
@@ -35,9 +35,9 @@ using ::testing::Return;
 using ::testing::_;
 
 // D3.5 wire⑤c: the routes were migrated off the MVP CortrixNamespaceManager onto
-// the F05 resource::INamespacePool + per-request resource::NamespaceFacade. These
+// the namespace pool resource::INamespacePool + per-request resource::NamespaceFacade. These
 // tests therefore stand up a real DefaultNamespacePool via the shared NsPoolHarness
-// (mocked F12 routers + a real WriteCoordinator over a temp dir) and admit the
+// (mocked catalog routers + a real WriteCoordinator over a temp dir) and admit the
 // "default" namespace, so each route's per-request facade.Acquire() hits and
 // facade.memory()/store() open the NS's real (temp) memory.db / store.db. The MVP
 // stub stores are gone — the harness supplies real, persistent per-NS stores.
@@ -45,7 +45,7 @@ using ::testing::_;
 class MemoryRoutesTest : public ::testing::Test {
 protected:
     // Second, non-admin principal (see SetUp): authenticates as user_id=kNonAdminUserId
-    // with read+write but no admin bit, for route-level MEM05 IDOR tests.
+    // with read+write but no admin bit, for route-level memory isolation IDOR tests.
     static constexpr const char* kNonAdminKey = "non-admin-key-b-67890";
     static constexpr const char* kNonAdminUserId = "user_b_principal";
 
@@ -78,7 +78,7 @@ protected:
         key_config.permissions = 7;  // read + write + admin
         config_.auth.api_keys.push_back(key_config);
 
-        // MEM05 IDOR coverage: a SECOND, non-admin principal on the same server.
+        // Memory isolation IDOR coverage: a SECOND, non-admin principal on the same server.
         // ApiKeyAuth sets rc.auth.user_id = tenant_id (api_key_auth.cpp:65), so this
         // key authenticates as user_id="user_b_principal" with NO admin bit. It lets
         // route-level IDOR tests prove that authenticating as B cannot act on A's
@@ -92,7 +92,7 @@ protected:
 
         auth_.LoadKeys(config_.auth.api_keys);
 
-        // F05 namespace pool (real DefaultNamespacePool over a temp dir via the
+        // Namespace pool (real DefaultNamespacePool over a temp dir via the
         // shared harness) + admit the "default" namespace the route tests use.
         harness_ = std::make_unique<cortrix::test::NsPoolHarness>(tmp_dir_ + "/pool");
         ASSERT_TRUE(harness_->Admit("default").ok());
@@ -143,7 +143,7 @@ protected:
     }
 
     // Helper: non-admin principal headers (user_id=kNonAdminUserId, no admin bit).
-    // Used by the MEM05 route-level IDOR tests where the admin key would bypass the guard.
+    // Used by the memory isolation route-level IDOR tests where the admin key would bypass the guard.
     httplib::Headers NonAdminAuthHeaders() {
         return {{"Authorization", std::string("Bearer ") + kNonAdminKey}};
     }
@@ -302,7 +302,7 @@ TEST_F(MemoryRoutesTest, CreateSessionMinimalFields) {
 
     auto resp = json::parse(res->body);
     EXPECT_FALSE(resp["session_id"].get<std::string>().empty());
-    // MEM05 CE no-auth fallback: create stores the same effective user_id the
+    // Memory isolation CE no-auth fallback: create stores the same effective user_id the
     // list/detail isolation checks resolve to.
     EXPECT_EQ(resp["user_id"], "default");
     EXPECT_EQ(resp["title"], "");
@@ -502,7 +502,7 @@ TEST_F(MemoryRoutesTest, GetSessionDetailNamespaceNotFound) {
     EXPECT_EQ(res->status, 404);
 }
 
-// MEM05 IDOR: GET detail for a session owned by ANOTHER principal must 404-mask.
+// Memory isolation IDOR: GET detail for a session owned by ANOTHER principal must 404-mask.
 // The session is created by the ADMIN principal (owner user_id="test-tenant"); a
 // DIFFERENT authenticated principal (the non-admin key, user_id="user_b_principal")
 // then tries to read it AND spoofs ?user_id=test-tenant to self-assert ownership.
@@ -524,7 +524,7 @@ TEST_F(MemoryRoutesTest, GetSessionDetailCrossUserReturns404Mask) {
     EXPECT_EQ(res->status, 404);  // anti-enumeration: not 403, and the spoof is ignored
 }
 
-// MEM05: GET detail for an owned session returns 200 with the full session body
+// Memory isolation: GET detail for an owned session returns 200 with the full session body
 // (the owned=true success path, including the interactions array).
 TEST_F(MemoryRoutesTest, GetSessionDetailOwnedReturnsBody) {
     std::string sid = CreateSession("default", "owner_u", "My Session");
@@ -609,7 +609,7 @@ TEST_F(MemoryRoutesTest, AppendInteractionDeepMetadataRejected422) {
     EXPECT_EQ(resp["error"]["code"], "CX_ERR_METADATA_TOO_DEEP");
 }
 
-// MEM05: list isolation drops sessions owned by other users (the post-filter
+// Memory isolation: list isolation drops sessions owned by other users (the post-filter
 // excludes a non-matching user_id, line 184).
 TEST_F(MemoryRoutesTest, ListSessionsExcludesOtherUsersSessions) {
     ASSERT_FALSE(CreateSession("default", "list_user_a", "A1").empty());
@@ -629,7 +629,7 @@ TEST_F(MemoryRoutesTest, ListSessionsExcludesOtherUsersSessions) {
 
 // ===== DELETE /api/v1/memory/sessions/:session_id (Delete Session, lines 249-287) =====
 
-// MEM05 IDOR: DELETE of a session owned by ANOTHER principal 404-masks. The
+// Memory isolation IDOR: DELETE of a session owned by ANOTHER principal 404-masks. The
 // session is owned by "del_owner"; the attacker is the non-admin principal
 // "user_b_principal" and even spoofs ?user_id=del_owner. The authenticated
 // principal is authoritative, so the delete is refused (404, anti-enumeration).
@@ -655,7 +655,7 @@ TEST_F(MemoryRoutesTest, DeleteSessionCrossUserReturns404Mask) {
     EXPECT_EQ(check->status, 200);
 }
 
-// MEM05: DELETE of an owned session succeeds (200) with the deletion summary.
+// Memory isolation: DELETE of an owned session succeeds (200) with the deletion summary.
 TEST_F(MemoryRoutesTest, DeleteSessionOwnedSucceeds) {
     std::string sid = CreateSession("default", "del_me");
     ASSERT_FALSE(sid.empty());
@@ -988,7 +988,7 @@ TEST_F(MemoryRoutesTest, SearchWithScopeUser) {
     EXPECT_EQ(res->status, 200);
 }
 
-// MEM05: legacy scope="all" is no longer a distinct mode; it falls through to
+// Memory isolation: legacy scope="all" is no longer a distinct mode; it falls through to
 // kUser (kAll removed). Still 200 because user_id defaults to "default".
 TEST_F(MemoryRoutesTest, SearchWithLegacyScopeAllFallsBackToUser) {
     httplib::Client cli("127.0.0.1", port_);
@@ -1068,10 +1068,10 @@ TEST_F(MemoryRoutesTest, SearchSessionScopeMissingSessionId) {
     EXPECT_EQ(res->status, 400);
 }
 
-// MEM05: at the HTTP route level a missing user_id is NOT a 400 — CE no-auth
+// Memory isolation: at the HTTP route level a missing user_id is NOT a 400 — CE no-auth
 // mode injects user_id="default" before validation (design § CE single-user compatibility).
 // The 400-on-empty-user_id contract is enforced by MemorySearchRequest::Validate()
-// directly (see test_memory_searcher MEM05 unit tests).
+// directly (see test_memory_searcher memory isolation unit tests).
 TEST_F(MemoryRoutesTest, SearchUserScopeMissingUserIdDefaultsToDefaultUser) {
     httplib::Client cli("127.0.0.1", port_);
     json body;
@@ -1112,7 +1112,7 @@ TEST_F(MemoryRoutesTest, SearchTopKOver100) {
     EXPECT_EQ(res->status, 400);
 }
 
-// MEM05: any scope other than "session" defaults to kUser (kAll removed).
+// Memory isolation: any scope other than "session" defaults to kUser (kAll removed).
 // user_id defaults to "default" (CE no-auth), so this succeeds with 200.
 TEST_F(MemoryRoutesTest, SearchUnknownScopeDefaultsToUser) {
     httplib::Client cli("127.0.0.1", port_);
@@ -1124,7 +1124,7 @@ TEST_F(MemoryRoutesTest, SearchUnknownScopeDefaultsToUser) {
     auto res = cli.Post("/api/v1/memory/search", AuthHeaders(),
                         body.dump(), "application/json");
     ASSERT_TRUE(res);
-    EXPECT_EQ(res->status, 200);  // MEM05: defaults to kUser + default user
+    EXPECT_EQ(res->status, 200);  // Memory isolation: defaults to kUser + default user
 }
 
 // ===== Delete session namespace not found (lines 260-264) =====
@@ -1242,7 +1242,7 @@ TEST_F(MemoryRoutesTest, CrossRequestRoundtrip) {
     EXPECT_FALSE(sid.empty());
 
     // 2. List sessions - should now include the created session.
-    //    MEM05: list is user-isolated, so pass the owner's user_id.
+    //    Memory isolation: list is user-isolated, so pass the owner's user_id.
     auto list_res = cli.Get("/api/v1/memory/sessions?namespace=default&user_id=roundtrip_user",
                             AuthHeaders());
     ASSERT_TRUE(list_res);
@@ -1260,7 +1260,7 @@ TEST_F(MemoryRoutesTest, CrossRequestRoundtrip) {
     }
     EXPECT_TRUE(found) << "Created session not found in list";
 
-    // 3. Get session detail (MEM05: owner user_id required for the ownership check).
+    // 3. Get session detail (memory isolation: owner user_id required for the ownership check).
     auto get_res = cli.Get(
         ("/api/v1/memory/sessions/" + sid + "?namespace=default&user_id=roundtrip_user").c_str(),
         AuthHeaders());
@@ -1271,7 +1271,7 @@ TEST_F(MemoryRoutesTest, CrossRequestRoundtrip) {
     EXPECT_EQ(get_resp["session"]["session_id"], sid);
     EXPECT_EQ(get_resp["session"]["title"], "Roundtrip Session");
 
-    // 4. Delete session (MEM05: owner user_id required).
+    // 4. Delete session (memory isolation: owner user_id required).
     auto del_res = cli.Delete(
         ("/api/v1/memory/sessions/" + sid + "?namespace=default&user_id=roundtrip_user").c_str(),
         AuthHeaders());
@@ -1498,7 +1498,7 @@ TEST_F(MemoryRoutesTest, AdminRevokeWiredRestoresActive) {
 }
 
 // ===========================================================================
-// MEM03 Transparency CRUD surface — GET/POST/PATCH/DELETE /api/v1/memory
+// Memory Transparency CRUD surface — GET/POST/PATCH/DELETE /api/v1/memory
 // GET /api/v1/memory/invalidations
 // ===========================================================================
 // All tests use the shared MemoryRoutesTest fixture (real in-process server,
@@ -1535,7 +1535,7 @@ TEST_F(MemoryRoutesTest, GetInvalidationsNoAuthReturns401) {
 }
 
 // ---------------------------------------------------------------------------
-// GET /api/v1/memory  (MEM03 transparency list)
+// GET /api/v1/memory  (memory transparency list)
 // ---------------------------------------------------------------------------
 
 // Happy path: list with a valid namespace returns 200 with memories array and total.
@@ -1550,7 +1550,7 @@ TEST_F(MemoryRoutesTest, ListMemoriesSuccessEmptyNamespace) {
     EXPECT_TRUE(body.contains("total"));
 }
 
-// MEM05: non-admin requesting another user's memories must receive an empty
+// Memory isolation: non-admin requesting another user's memories must receive an empty
 // list (200 with zero items) not a 403/404 — the 404-mask prevents enumeration
 // (memory_routes.cpp line 283-288: the guard fires before any store access).
 // The test key has permissions=7 (admin) so we need to verify the condition
@@ -1571,7 +1571,7 @@ TEST_F(MemoryRoutesTest, ListMemoriesAdminCanQueryAnyUserId) {
     EXPECT_TRUE(body.contains("total"));
 }
 
-// MEM05: GET /api/v1/memory — ns query param is required; missing → 400 wrapped error.
+// Memory isolation: GET /api/v1/memory — ns query param is required; missing → 400 wrapped error.
 TEST_F(MemoryRoutesTest, ListMemoriesMissingNsReturns400) {
     httplib::Client cli("127.0.0.1", port_);
     // No ns / namespace param at all.
@@ -1591,7 +1591,7 @@ TEST_F(MemoryRoutesTest, ListMemoriesUnknownNamespaceReturns404) {
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/v1/memory  (MEM03 transparency create)
+// POST /api/v1/memory  (memory transparency create)
 // ---------------------------------------------------------------------------
 
 // Happy path: create a memory in an existing namespace returns 201 with memory_id.
@@ -1694,7 +1694,7 @@ TEST_F(MemoryRoutesTest, CreateMemoryNoAuthReturns401) {
 }
 
 // ---------------------------------------------------------------------------
-// PATCH /api/v1/memory/{id}  (MEM03 transparency edit)
+// PATCH /api/v1/memory/{id}  (memory transparency edit)
 // ---------------------------------------------------------------------------
 
 // PATCH with a memory_id that does not exist in the store → not-found error
@@ -1812,7 +1812,7 @@ TEST_F(MemoryRoutesTest, EditMemorySuccessReturnsNewAndOldId) {
 }
 
 // ---------------------------------------------------------------------------
-// DELETE /api/v1/memory/{id}  (MEM03 transparency soft-delete)
+// DELETE /api/v1/memory/{id}  (memory transparency soft-delete)
 // ---------------------------------------------------------------------------
 
 // Soft-delete a memory_id that is not in the store → not-found (404) from
@@ -1880,7 +1880,7 @@ TEST_F(MemoryRoutesTest, SoftDeleteMemorySuccessReturnsInvalidated) {
 }
 
 // ---------------------------------------------------------------------------
-// MEM05 §8 isolation: GET /api/v1/memory cross-user 404-mask
+// Memory isolation: GET /api/v1/memory cross-user 404-mask
 // The route at memory_routes.cpp line 283 checks:
 //   !rc.auth.is_admin() && !rc.auth.user_id.empty() && user_id != rc.auth.user_id
 // Our fixture key has permissions=7 which includes kPermAdmin, so is_admin() is true
@@ -1901,7 +1901,7 @@ TEST_F(MemoryRoutesTest, ListMemoriesMEM05NonAdminCrossUserMaskReturnsEmpty) {
     ApiKeyConfig na_kc;
     na_kc.key_hash = ApiKeyAuth::HashKey("non-admin-key-xyz");
     // ApiKeyAuth::Authenticate sets rc.auth.user_id = kc.tenant_id (api_key_auth.cpp:65).
-    // Use a non-empty tenant_id so the MEM05 guard's `!rc.auth.user_id.empty()` condition
+    // Use a non-empty tenant_id so the memory isolation guard's `!rc.auth.user_id.empty()` condition
     // is true. The guard then fires when user_id query param != rc.auth.user_id.
     na_kc.tenant_id = "na-tenant";
     // kPermRead=1 | kPermWrite=2 — deliberately omit kPermAdmin(4).
@@ -1931,7 +1931,7 @@ TEST_F(MemoryRoutesTest, ListMemoriesMEM05NonAdminCrossUserMaskReturnsEmpty) {
     httplib::Client na_cli("127.0.0.1", na_port);
 
     // Non-admin key is authenticated as "na-tenant" (ApiKeyAuth sets user_id=tenant_id).
-    // Requesting user_id="other_user" triggers the MEM05 guard (memory_routes.cpp line 283):
+    // Requesting user_id="other_user" triggers the memory isolation guard (memory_routes.cpp line 283):
     //   !is_admin() && !user_id.empty() && "other_user" != "na-tenant"
     // → returns 200 with empty memories array (404-mask, anti-enumeration).
     auto res = na_cli.Get("/api/v1/memory?ns=default&user_id=other_user", na_headers);
@@ -1945,13 +1945,13 @@ TEST_F(MemoryRoutesTest, ListMemoriesMEM05NonAdminCrossUserMaskReturnsEmpty) {
     EXPECT_TRUE(body.contains("memories"));
     EXPECT_TRUE(body["memories"].is_array());
     // Must return empty array — not the other user's data, and not a 403/404 that would
-    // reveal whether the user_id exists (anti-enumeration, MEM05 §8.bis).
+    // reveal whether the user_id exists (anti-enumeration, memory isolation).
     EXPECT_EQ(body["memories"].size(), 0u);
     EXPECT_EQ(body["total"], 0);
 }
 
 // ---------------------------------------------------------------------------
-// MEM03 Create→List roundtrip: create a memory and then list it back.
+// Memory transparency Create→List roundtrip: create a memory and then list it back.
 // Exercises the integration between the POST route (MemoryBlockAdapter::Write)
 // and the GET route (MemoryBlockAdapter::ListByUser).
 // ---------------------------------------------------------------------------
@@ -1989,9 +1989,9 @@ TEST_F(MemoryRoutesTest, CreateThenListMemoryRoundtrip) {
 }
 
 // ---------------------------------------------------------------------------
-// Task 2: Minimal E2E smoke — MEM03 transparent path not already covered by
+// Task 2: Minimal E2E smoke — memory transparent path not already covered by
 // test_e2e_full_server.cpp (which covers sessions/search/inject but NOT the
-// MEM03 /api/v1/memory CRUD surface). This single test strings together:
+// Memory transparency /api/v1/memory CRUD surface). This single test strings together:
 //   1. Server up (health implied by fixture)
 //   2. Namespace ready (harness "default")
 //   3. POST /api/v1/memory       → create
@@ -2066,7 +2066,7 @@ TEST_F(MemoryRoutesTest, E2E_Mem03TransparencyCrudSmoke) {
 }
 
 // ===========================================================================
-// MEM05 route-level IDOR — authenticate as a NON-ADMIN principal and prove a
+// Memory isolation route-level IDOR — authenticate as a NON-ADMIN principal and prove a
 // spoofed body/param user_id cannot reach another user's data.
 //
 // These tests use NonAdminAuthHeaders() (principal user_id="user_b_principal",

@@ -40,7 +40,7 @@ protected:
             );)");
         // A minimal blocks table for the deleted-source probe.
         Exec(db_, "CREATE TABLE blocks (block_id TEXT PRIMARY KEY);");
-        // interaction_sources via the real F13 provider.
+        // interaction_sources via the real agent trace provider.
         cortrix::catalog::SchemaMigrator m;
         m.Register(&provider_);
         ASSERT_TRUE(m.MigrateCatalog(db_).ok());

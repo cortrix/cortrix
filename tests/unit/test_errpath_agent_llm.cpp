@@ -39,7 +39,7 @@ nlohmann::json ResolveEnvelope(StatusCode sc, const std::string& token,
 }
 
 // ---------------------------------------------------------------------------
-// F48 retrieval-chain LLM identities (sec.3.5). The map deliberately restores
+// Agent retrieval-chain LLM identities (sec.3.5). The map deliberately restores
 // quota/timeout/transient category for codes the StatusCode would mislabel.
 // ---------------------------------------------------------------------------
 
@@ -88,7 +88,7 @@ TEST(ErrPathF48Test, MapOverridesStatusCodeFallback) {
 }
 
 // ---------------------------------------------------------------------------
-// F14 pgcortrix invalid-filter identity (sec.3.4): permanent / non-retryable.
+// Pgcortrix invalid-filter identity (sec.3.4): permanent / non-retryable.
 // ---------------------------------------------------------------------------
 
 TEST(ErrPathF14Test, InvalidFilterResolvesPermanentNonRetryable) {
@@ -99,7 +99,7 @@ TEST(ErrPathF14Test, InvalidFilterResolvesPermanentNonRetryable) {
     EXPECT_EQ(body["error"]["retryable"], false);
 }
 
-// Even with a transient-looking StatusCode the map pins F14 to permanent/false
+// Even with a transient-looking StatusCode the map pins pgcortrix to permanent/false
 // (a malformed filter is a client fault — blind retry cannot help).
 TEST(ErrPathF14Test, InvalidFilterPinnedPermanentEvenOnInternalStatus) {
     auto body = ResolveEnvelope(StatusCode::kInternal, "CX_ERR_F14_INVALID_FILTER", "x");

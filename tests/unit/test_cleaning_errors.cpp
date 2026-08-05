@@ -10,7 +10,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/spc/cleaning_errors.h"
 
-// F10 §5.1 (D9): the 7 CX_ERR_F10_* identities + category/retryability registry
+// Cleaning (D9): the 7 CX_ERR_F10_* identities + category/retryability registry
 // + MakeCleaningError boundary factory. Mirrors the catalog/parser error tests.
 namespace cortrix::spc {
 namespace {
@@ -36,7 +36,7 @@ TEST(CleaningErrorTest, SevenCodesTotal) {
 }
 
 TEST(CleaningErrorTest, EveryCodeHasUniqueWellFormedCxString) {
-    // All F10 codes carry the CX_ERR_F10_ prefix (the family marker).
+    // All cleaning codes carry the CX_ERR_F10_ prefix (the family marker).
     static const std::regex kPattern("^CX_ERR_F10_[A-Z][A-Z_]*$");
     std::set<std::string> seen;
     for (CleaningErrorCode code : AllCodes()) {

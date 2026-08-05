@@ -15,8 +15,8 @@
 #include "cortrix/common/i_global_config.h"
 #include "cortrix/observability/cleanup_scheduler.h"
 
-// S10 + S11(cleanup) coverage: F13 registers agent_trace (90d) + interaction_log
-// (180d) on the shared F18a CleanupScheduler; RunCleanupNow() prunes both;
+// S10 + S11(cleanup) coverage: agent trace registers agent_trace (90d) + interaction_log
+// (180d) on the shared operation log CleanupScheduler; RunCleanupNow() prunes both;
 // interaction_sources cascades via FK; the ISO-8601 cutoff matches the real
 // interaction_log.created_at TEXT column.
 namespace cortrix::agent_trace {

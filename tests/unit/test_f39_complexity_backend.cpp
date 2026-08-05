@@ -3,7 +3,7 @@
 #include "cortrix/query/complexity_config.h"
 #include "cortrix/query/heuristic_complexity_backend.h"
 
-// F39 coverage: the standalone HeuristicComplexityBackend (no-ONNX stub) + the
+// Query routing coverage: the standalone HeuristicComplexityBackend (no-ONNX stub) + the
 // ComplexityConfig validation helpers (§4.2).
 namespace cortrix::query {
 namespace {

@@ -4,7 +4,7 @@
 
 #include "cortrix/memory/prompt_templates.h"
 
-// S1 coverage: the MEM02 prompt template constants + the render/CJK helpers (D10).
+// S1 coverage: the memory extraction prompt template constants + the render/CJK helpers (D10).
 namespace cortrix::memory {
 namespace {
 

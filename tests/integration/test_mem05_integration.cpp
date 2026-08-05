@@ -1,4 +1,4 @@
-// MEM05 integration tests — per-user isolation across the read path and the
+// Memory isolation integration tests — per-user isolation across the read path and the
 // session-ownership CRUD path. Maps design § 8.2 (6 scenarios) onto the
 // capabilities present in the standalone build:
 //   1. cross-user search isolation       -> MemorySearcher + stub pipeline

@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/tenant/tenant_error.h"
 
-// Exhaustive parameterized error-registry sweep for P09 tenant (sec 7, 24 codes).
+// Exhaustive parameterized error-registry sweep for tenant (sec 7, 24 codes).
 // Distinct suite name (TenantErrorMatrix) from test_tenant_error.cpp.
 namespace cortrix::tenant {
 namespace {

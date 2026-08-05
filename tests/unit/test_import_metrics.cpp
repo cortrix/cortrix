@@ -4,7 +4,7 @@
 
 #include "cortrix/import/import_metrics.h"
 
-// S6 coverage: F16a observability metrics (§5.5) — counters/gauges + OpenMetrics
+// S6 coverage: DB import observability metrics (§5.5) — counters/gauges + OpenMetrics
 // render + the v1.0.2 high-cardinality-label removal (no namespace / tenant_id
 // labels). Process-global singleton, so each test resets first.
 namespace cortrix::import {

@@ -8,7 +8,7 @@
 // the service must be enabled. Key seam (R7 stub brief): MemoryExtractionService
 // is a concrete class (can't subclass), but enabled() == (llm_ != nullptr) and
 // ILlmClient is a PURE interface — so a tiny StubLlmClient whose Chat() returns a
-// fixed MEM02 extraction JSON array makes enabled()=true and drives the real
+// fixed memory extraction JSON array makes enabled()=true and drives the real
 // ExtractOne end to end against a fresh in-memory namespace.
 //
 // Harness mirrors test_memory_routes.cpp (real httplib server + NsPoolHarness +
@@ -47,7 +47,7 @@ namespace {
 
 using json = nlohmann::json;
 
-// Stub LLM: Chat() returns a fixed MEM02 extraction JSON array (the schema
+// Stub LLM: Chat() returns a fixed memory extraction JSON array (the schema
 // MemoryExtractor::ParseExtractionJson expects — an array of objects each with a
 // string "content" + optional numeric "confidence"). status=ok so the extractor
 // proceeds to parse + persist. Prompt is ignored (deterministic output).
@@ -96,7 +96,7 @@ protected:
         classifier_ = std::make_unique<IntentClassifier>(llm_cfg);
         fusion_ = std::make_unique<RRFFusion>();
 
-        // The enabled MEM02 service: a non-null StubLlmClient → enabled()==true.
+        // The enabled memory extraction service: a non-null StubLlmClient → enabled()==true.
         extraction_ = std::make_unique<memory::MemoryExtractionService>(
             harness_->ipool(), std::make_shared<StubLlmClient>(), *embedder_,
             /*op_logger=*/nullptr, memory::MemoryExtractorConfig{},

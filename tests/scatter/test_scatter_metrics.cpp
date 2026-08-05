@@ -82,7 +82,7 @@ TEST_F(ScatterMetricsTest, RenderOpenMetricsHasAllSixMetrics) {
                              "cortrix_scatter_duration_seconds"}) {
         EXPECT_NE(text.find(name), std::string::npos) << "missing metric: " << name;
     }
-    // reason+category labels present (GEN-Agent F24-7).
+    // reason+category labels present (GEN-Agent).
     EXPECT_NE(text.find("reason=\"single\""), std::string::npos);
     EXPECT_NE(text.find("category=\"permanent\""), std::string::npos);
 }

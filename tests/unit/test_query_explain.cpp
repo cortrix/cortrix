@@ -1,11 +1,11 @@
-// Unit tests for the read-side decision-signal params (F37 ?explain / F39 ?route /
-// F41 ?granularity) on the query path:
+// Unit tests for the read-side decision-signal params (CRAG ?explain / query routing ?route /
+// Doc summary ?granularity) on the query path:
 //   - QueryRequest body parsing of explain / route / granularity (+ defaults).
 //   - BuildExplainNode A/B/C phased-rollout gating (QUERY_CONTEXT_SPEC §3).
 //   - The end-to-end marshalling the POST /api/v1/query handler performs: build a
-//     QueryContext, run the FROZEN F39 QueryComplexityClassifier::RouteAndUpdateContext
+//     QueryContext, run the FROZEN QueryComplexityClassifier::RouteAndUpdateContext
 //     (Wave C-R2) honoring a ?route override, then dump the explain node + granularity.
-//   - The F39 ?route invalid-token contract the handler pre-validates against.
+//   - The query routing ?route invalid-token contract the handler pre-validates against.
 //
 // The query-string-wins precedence and the HTTP error bodies live in the route
 // handler (anonymous-namespace helpers + httplib) and are exercised by
@@ -131,7 +131,7 @@ TEST(QueryExplainNodeTest, OmitsCClassUnlessDebug) {
 }
 
 TEST(QueryExplainNodeTest, DefaultCragFieldsEmittedNotOmitted) {
-    // On the MVP query path no CRAG runs, so F37 fields stay at SPEC defaults; they
+    // On the MVP query path no CRAG runs, so CRAG fields stay at SPEC defaults; they
     // must still appear (SPEC §6.3: default value reads as "not triggered").
     query::QueryContext ctx;
     ctx.query = "q";
@@ -146,7 +146,7 @@ TEST(QueryExplainNodeTest, DefaultCragFieldsEmittedNotOmitted) {
 // ---------------- End-to-end marshalling (mirrors the handler) ----------------
 
 // Build the explain object exactly as RegisterQueryRoutes does: init the context,
-// run the frozen F39 router with the resolved ?route, dump, then echo granularity.
+// run the frozen query routing router with the resolved ?route, dump, then echo granularity.
 nlohmann::json MarshalExplain(const std::string& query,
                               const std::string& ns_id,
                               const std::string& route,
@@ -195,12 +195,12 @@ TEST(QueryExplainMarshalTest, GranularityIsEchoedVerbatim) {
     }
 }
 
-// ---------------- F39 ?route validation contract ------------------------------
+// ---------------- query routing ?route validation contract --------------------
 
 TEST(QueryExplainRouteValidationTest, RouterRejectsInvalidRouteToken) {
     // The handler pre-validates ?route and returns CX_ERR_F39_FORCE_ROUTE_INVALID for
     // an out-of-set token; the frozen router enforces the same contract (ctx left
-    // untouched, non-ok Status carrying the F39 identity).
+    // untouched, non-ok Status carrying the query routing identity).
     query::QueryContext ctx;
     ctx.query = "q";
     query::QueryComplexityClassifier router(

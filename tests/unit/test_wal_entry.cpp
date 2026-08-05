@@ -1,4 +1,4 @@
-// F01 S2 — WalEntry codec tests (design § 6 S2 test matrix).
+// Index S2 — WalEntry codec tests (design § 6 S2 test matrix).
 //
 // Covers INSERT/DELETE serialize<->deserialize round-trips, CRC validity and
 // tamper detection, exact frame sizes (4121 B INSERT @dim=1024, 25 B DELETE),

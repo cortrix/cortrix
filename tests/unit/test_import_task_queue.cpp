@@ -10,7 +10,7 @@
 
 // S4 coverage: the self-built D6 ImportTaskQueue — submit / progress /
 // cancel state machine + import_tasks persistence + worker pool. Built ON the shared
-// cortrix::ExecutorEngine, with ZERO F42 dependency (§0 red line). Work is a per-task
+// cortrix::ExecutorEngine, with ZERO async task dependency (§0 red line). Work is a per-task
 // closure (the ImportManager captures its auth/trace ctx). Runs against the in-memory
 // task store (standalone; SQLite-backed store → D3.5).
 namespace cortrix::import {

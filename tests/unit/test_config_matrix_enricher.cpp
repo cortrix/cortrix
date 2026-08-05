@@ -6,7 +6,7 @@
 #include "cortrix/spc_enricher.h"  // EnricherConfig
 #include "cortrix/spc_enricher/enricher_config_resolver.h"
 
-// Exhaustive parameterized sweep over the F03 enricher config resolution:
+// Exhaustive parameterized sweep over the enricher config resolution:
 // EnricherNsConfig::Parse + the three-layer EnricherConfigResolver (request >
 // NS > global for `enabled`; NS > global for model/threshold/template). Suite
 // tokens globally unique: EnrichCfgParse* / EnrichCfgResolve* / EnrichCfgJson*.

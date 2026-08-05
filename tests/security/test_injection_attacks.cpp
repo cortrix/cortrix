@@ -13,8 +13,8 @@
 #include "httplib.h"
 #include <nlohmann/json.hpp>
 
-// [wire⑤c follow-up] MVP CortrixNamespace(Manager) + hnswlib headers removed;
-// the HTTP fixtures stand on the F05 pool via the shared NsPoolHarness.
+// MVP CortrixNamespace(Manager) + hnswlib headers removed;
+// the HTTP fixtures stand on the namespace pool via the shared NsPoolHarness.
 #include "cortrix/store/cortrix_store_sqlite.h"
 #include "cortrix/common/block_header.h"
 #include "cortrix/common/block_types.h"

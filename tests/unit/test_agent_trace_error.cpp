@@ -5,7 +5,7 @@
 
 #include "cortrix/agent_trace/agent_trace_error.h"
 
-// S7 coverage: the F13 error model (template A) — all 7 CX_ERR_F13_* identities,
+// S7 coverage: the agent trace error model (template A) — all 7 CX_ERR_F13_* identities,
 // their §9.2 attributes (category/retryable/retry_after_ms/structured_data keys),
 // the AgentFriendlyError builder, the JSON body, and the Status bridge.
 namespace cortrix::agent_trace {
@@ -46,7 +46,7 @@ TEST(F13ErrorTest, RegistryMatchesSpecTable) {
         EXPECT_STREQ(i.cx_code, code);
         EXPECT_EQ(i.category, cat) << code;
         EXPECT_EQ(i.retryable, retry) << code;
-        // §9.2 retry_after_ms column is "-" for every F13 code.
+        // §9.2 retry_after_ms column is "-" for every agent trace code.
         EXPECT_FALSE(i.retry_after_ms.has_value()) << code;
     };
     chk(F13ErrorCode::kSessionNotFound, "CX_ERR_F13_SESSION_NOT_FOUND",

@@ -1,10 +1,10 @@
 #pragma once
-// D3.5 wire⑤c test helper — shared F05 NamespacePool test doubles + harness.
+// D3.5 wire⑤c test helper — shared NamespacePool test doubles + harness.
 //
 // The wire⑤c migration moved every consumer off the MVP CortrixNamespaceManager
-// onto the F05 resource::INamespacePool + per-request resource::NamespaceFacade.
-// Their unit tests therefore need a real DefaultNamespacePool (mocked F12 routers
-// + a capturing FakeIndex + a real F25 WriteCoordinator over a temp dir), exactly
+// onto the namespace pool resource::INamespacePool + per-request resource::NamespaceFacade.
+// Their unit tests therefore need a real DefaultNamespacePool (mocked catalog routers
+// + a capturing FakeIndex + a real WriteCoordinator over a temp dir), exactly
 // as the spc pilot's fixture stands one up (tests/unit/test_spc_pipeline.cpp).
 //
 // This header extracts that proven setup so the route/consumer tests share ONE
@@ -141,7 +141,7 @@ public:
     MOCK_METHOD((cortrix::Result<bool>), ShouldSeal, (const std::string&), (const, override));
 };
 
-// Bundles the mocked F12 routers + a real-WriteCoordinator DefaultNamespacePool
+// Bundles the mocked catalog routers + a real-WriteCoordinator DefaultNamespacePool
 // rooted at a temp dir. Admit(ns) creates the per-Unit dir and admits the NS so
 // Acquire/façade hit. Use by composition. The most recently Open()ed FakeIndex is
 // captured in fake_index() for vector-write assertions.

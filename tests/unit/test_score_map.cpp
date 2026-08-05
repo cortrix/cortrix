@@ -5,7 +5,7 @@
 #include "cortrix/scoring/score_map.h"
 #include "cortrix/scoring/scoring_error.h"
 
-// F07 S1 + S2 / §7.1 coverage: ScoreMap.ComputeLevel (D2 Matrix multi-dimensional decision, 8 cases) +
+// Semantic score S1 + S2 / §7.1 coverage: ScoreMap.ComputeLevel (D2 Matrix multi-dimensional decision, 8 cases) +
 // LevelToScore (5 discrete levels + out-of-range exception). The core scoring algorithm.
 namespace cortrix::scoring {
 namespace {

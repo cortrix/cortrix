@@ -9,7 +9,7 @@
 #include "cortrix/spc/parser_factory.h"
 #include "parser_script_fixture.h"
 
-// F06 S3 coverage: the Docling→PaddleOCR fallback chain, wired end-to-end with
+// Parser S3 coverage: the Docling→PaddleOCR fallback chain, wired end-to-end with
 // the *real* DoclingParser + PaddleOCRParser (each pointed at a mock bridge) in
 // the factory. Exercises §4.1 step 4-5 orchestration as actually composed —
 // not stubs of IDocumentParser, but the real wrapper classes over mock scripts.

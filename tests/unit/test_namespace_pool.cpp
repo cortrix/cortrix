@@ -36,13 +36,13 @@
 #include "cortrix/store/recover_stores.h"
 #include "cortrix/store/write_coordinator.h"
 
-// F05 S1 coverage: NamespaceResourceBundle / UnitResourceBundle (UT1, UT2),
+// Namespace pool S1 coverage: NamespaceResourceBundle / UnitResourceBundle (UT1, UT2),
 // F05Config defaults (UT3), AdmitCreate admission control + rejection log
 // (UT4-UT8), Acquire (UT13, UT14), PoolStats / ExplainState surfaces (UT18), and
 // the PoolError registry (the §8.1 4-code identity set).
 //
-// Standalone (D3): the pool is exercised against mocked F12 routers + a real
-// F01 PhnswIndexFactory-style FakeIndex + a real F25 WriteCoordinator over temp
+// Standalone (D3): the pool is exercised against mocked catalog routers + a real
+// PhnswIndexFactory-style FakeIndex + a real WriteCoordinator over temp
 // dirs. No cross-Feature wiring (no real INSRouter / IGlobalConfig hook) — those
 // are D3.5.
 namespace cortrix::resource {
@@ -380,7 +380,7 @@ TEST(NamespaceResourceBundleTest, PrimaryReturnsFirstUnit) {
 TEST(NamespaceResourceBundleTest, DestructorReleasesResources) {
     // A bundle with all three real resources; leaving scope must not leak / crash
     // (run under ASan in CI). We also assert the memory estimate aggregates the
-    // F05-2 (index footprint) + F05-3 (pwl size) hooks.
+    // Index-footprint + pwl-size hooks.
     auto tmp = std::filesystem::temp_directory_path() / "f05_bundle_dtor";
     std::filesystem::create_directories(tmp);
     FakeVectorStore vs;
@@ -484,7 +484,7 @@ TEST_F(NamespacePoolTest, MemoryBudgetZeroDisablesMemoryGate) {
     EXPECT_EQ(pool->GetPoolStats().memory_budget_limit_bytes, 0u);
 }
 
-// ── UT7 — F12 rollback: EvictForDelete undoes a pool add (consistency) ───────
+// ── UT7 — catalog rollback: EvictForDelete undoes a pool add (consistency) ───
 
 TEST_F(NamespacePoolTest, EvictForDeleteUndoesPoolAdd) {
     MakeUnitDir("ns-r-u");
@@ -492,7 +492,7 @@ TEST_F(NamespacePoolTest, EvictForDeleteUndoesPoolAdd) {
     ASSERT_TRUE(pool->AdmitCreate("ns-r", 100).ok());
     EXPECT_EQ(pool->GetPoolStats().pool_size_current, 1u);
 
-    // Simulates F12 catalog INSERT failure → reverse-undo (§5.2).
+    // Simulates catalog INSERT failure → reverse-undo (§5.2).
     ASSERT_TRUE(pool->EvictForDelete("ns-r").ok());
     EXPECT_EQ(pool->GetPoolStats().pool_size_current, 0u);
     EXPECT_FALSE(pool->Acquire("ns-r").ok());
@@ -732,7 +732,7 @@ TEST_F(NamespacePoolTest, StartupSingleNsTimeoutCountsAsFailure) {
 }
 
 // ── UT10b — ReloadNamespace recovers a startup-timed-out NS WITHOUT the timeout ──
-// Regression for the F05 large-NS bug (2026-06-20): a large-but-healthy NS whose load
+// Regression for the namespace pool large-NS bug (2026-06-20): a large-but-healthy NS whose load
 // exceeds the per-NS startup timeout was left permanently un-admitted because
 // ReloadNamespace reused the SAME timeout. ReloadNamespace now loads without the
 // timeout, so a slow load that exceeds the (tight) startup timeout still recovers.

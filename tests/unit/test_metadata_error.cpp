@@ -10,7 +10,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/metadata/metadata_error.h"
 
-// F08 S1.2 / §5.1 coverage: the 3 metadata error identities — CX_ERR_*/CX_WARN_*
+// META block S1.2 / §5.1 coverage: the 3 metadata error identities — CX_ERR_*/CX_WARN_*
 // identity, category mapping, retryability, the GEN-Agent 4-field boundary factory,
 // the §5.1.1 structured_data contract, and the Status bridge. Mirrors the project
 // reference test tests/unit/test_import_error.cpp (template A).
@@ -35,7 +35,7 @@ TEST(MetadataErrorTest, ThreeCodesTotal) {
     EXPECT_EQ(kMetadataErrorCodeCount, 3);
 }
 
-// Every code's stable string is unique and matches the P04 pattern (GEN-Agent #1 +
+// Every code's stable string is unique and matches the API spec pattern (GEN-Agent #1 +
 // #7 stable identity). Errors are CX_ERR_*, the warning is CX_WARN_*.
 TEST(MetadataErrorTest, EveryCodeHasUniqueWellFormedCxString) {
     static const std::regex kPattern("^CX_(ERR|WARN)_METADATA_[A-Z][A-Z_]*$");

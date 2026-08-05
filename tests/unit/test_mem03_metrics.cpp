@@ -131,7 +131,7 @@ TEST_F(Mem03MetricsTest, OpLatencyHistogramBucketsAreCumulativeAndComplete) {
 }
 
 TEST_F(Mem03MetricsTest, RenderHasNoHighCardinalityLabels) {
-    // OBS_SPEC §3.2 / MEM03 §8: labels are enum-only. No tenant_id / ns_id / user_id.
+    // OBS_SPEC §3.2 / memory transparency: labels are enum-only. No tenant_id / ns_id / user_id.
     M().RecordOp(Op::kList, OpStatus::kSuccess);
     M().ObserveOpLatency(Op::kList, 10);
     M().RecordInvalidInput(ErrorCodeLabel::kUserMismatch);

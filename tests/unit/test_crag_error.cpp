@@ -5,7 +5,7 @@
 
 #include "cortrix/retrieval/crag_error.h"
 
-// F37 S1 coverage: the CRAG error model (template A) — all 4 CX_ERR_F37_*
+// CRAG S1 coverage: the CRAG error model (template A) — all 4 CX_ERR_F37_*
 // identities, their §4.3 attributes (category / retryable / retry_after_ms /
 // structured_data keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::retrieval {
@@ -94,7 +94,7 @@ TEST(CragErrorTest, HasRequiredStructuredDataValidatesKeys) {
 }
 
 TEST(CragErrorTest, EveryCodeRequiresAtLeastOneStructuredKey) {
-    // All 4 F37 codes have a non-empty structured_data contract (§4.3).
+    // All 4 CRAG codes have a non-empty structured_data contract (§4.3).
     for (CragErrorCode c : kAll) {
         EXPECT_FALSE(RequiredStructuredDataKeys(c).empty()) << CragErrorCodeString(c);
     }

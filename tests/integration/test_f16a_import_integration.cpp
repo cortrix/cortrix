@@ -16,7 +16,7 @@
 #include "cortrix/observability/operation_logger.h"
 #include "cortrix/server/import_handler.h"
 
-// F16a standalone integration: drives the 9-issue decision matrix (F16a §2 D1-D9)
+// DB import standalone integration: drives the 9-issue decision matrix (DB import D1-D9)
 // end-to-end through the composed stack (ConnectionManager + QueryExecutor +
 // TextSerializer + SPC feed + BlockCleaner + ImportTaskQueue + ImportManager + the
 // HTTP handler), with operation_log + metrics observed. Real PG / SPCPipeline /

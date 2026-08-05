@@ -12,11 +12,11 @@
 #include "cortrix/observability/operation_logger.h"
 #include "cortrix/store/cortrix_store.h"
 
-// S2-S6 coverage: OptOutManager (the MEM04 main service class) over a mock
+// S2-S6 coverage: OptOutManager (the memory opt-out main service class) over a mock
 // ISessionOptOutStore + a capturing IOperationLogger, plus an end-to-end pass through
 // the real MemoryStoreOptOutAdapter (proves the §4.1/§4.2 migration + the three store
 // ops + the adapter all work against real SQLite). Standalone-D3: no cross-process
-// MEM02 wiring (that is D3.5).
+// Memory extraction wiring (that is D3.5).
 namespace cortrix::memory::immunity {
 namespace {
 

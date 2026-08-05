@@ -396,7 +396,7 @@ TEST_P(ScoringLevelMatrix, Increments) {
 INSTANTIATE_TEST_SUITE_P(All, ScoringLevelMatrix,
                          ::testing::Values<uint8_t>(0, 1, 2, 3, 4));
 
-// error_total{code} — both F07 error codes.
+// error_total{code} — both semantic score error codes.
 class ScoringErrorMatrix : public ScoringFx,
                     public ::testing::WithParamInterface<F07ErrorCode> {};
 TEST_P(ScoringErrorMatrix, Increments) {

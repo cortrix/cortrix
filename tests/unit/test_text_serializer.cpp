@@ -6,7 +6,7 @@
 #include "cortrix/import/spc_feed.h"
 #include "cortrix/import/text_serializer.h"
 
-// S3 coverage: TextSerializer D4 strategies (PER_ROW / MERGE — no template, F16a
+// S3 coverage: TextSerializer D4 strategies (PER_ROW / MERGE — no template, DB import
 // §3.5 v1.0.2 resolution 13), the §4.3 Block source URI + metadata, the D5 SPC-feed seam,
 // and the D3 full-overwrite prefix matching (incl. the "users/ ≠ users2/" boundary).
 namespace cortrix::import {

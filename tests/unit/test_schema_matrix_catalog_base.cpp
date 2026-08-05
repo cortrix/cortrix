@@ -1,5 +1,5 @@
-// Schema-provider matrix for the F12 catalog base-schema provider:
-//   F12 (F12SchemaProvider, catalog.db framework: tenants/namespaces/units/users/...,
+// Schema-provider matrix for the catalog base-schema provider:
+//   Catalog (F12SchemaProvider, catalog.db framework: tenants/namespaces/units/users/...,
 //        CurrentVersion 2, version-agnostic Migrate that creates from scratch).
 //
 // Fresh in-memory sqlite3 per case. Globally unique suite/fixture names
@@ -104,7 +104,7 @@ TEST_F(F12CatMatrix, BlobGcQueueHasBlobUriShape) {
     EXPECT_TRUE(ColumnExists("blob_gc_queue", "blob_uri"));
 }
 
-// F12's Migrate is version-agnostic: it creates the full catalog from scratch for any
+// Catalog's Migrate is version-agnostic: it creates the full catalog from scratch for any
 // (from,to). Matrix confirms every step succeeds and seeds the catalog tables.
 struct CatStep {
     int from;

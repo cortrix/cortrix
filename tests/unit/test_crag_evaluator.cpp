@@ -12,7 +12,7 @@
 #include "cortrix/retrieval/heuristic_guard_backend.h"
 #include "cortrix/retrieval/types.h"
 
-// F37 S2/S3 coverage: CragEvaluator multi-signal feature engineering (§6.1),
+// CRAG S2/S3 coverage: CragEvaluator multi-signal feature engineering (§6.1),
 // three-tier threshold classification (§6.2), heuristic guard (§7.3), and the L3
 // retry-then-transparent-degrade path (§7.3). Standalone — backend is a stub /
 // throwing mock, no ONNX.
@@ -275,7 +275,7 @@ TEST(CragEvaluatorTest, BoundaryScoresAtThresholds) {
 TEST(CragEvaluatorTest, CircuitBreakerOpensThenGatesSubsequentQuery) {
     // Breaker threshold = 3 (ctor). Query 1 fails 1+3=4 times → trips the breaker
     // open. Query 2 then sees the breaker open at entry → backend NOT called,
-    // straight to the transparent degrade (systemic gate, §7.3 / F02 breaker).
+    // straight to the transparent degrade (systemic gate, §7.3 / reranker breaker).
     CragConfig cfg;
     cfg.max_inference_retries = 3;
     auto backend = std::make_shared<ThrowingBackend>();

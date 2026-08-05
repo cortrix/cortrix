@@ -6,7 +6,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/spc/contextual_error.h"
 
-// F35 S7 — Contextual Retrieval error model (§8, ARCH §4.1.11) — template A
+// Contextual retrieval S7 — Contextual Retrieval error model (§8, ARCH §4.1.11) — template A
 // registry. Pins the 5 codes, categories/retryability/retry_after_ms,
 // structured_data contracts, and the Status bridge.
 namespace cortrix::spc {

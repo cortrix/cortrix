@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/auth/auth_error.h"
 
-// Exhaustive parameterized error-registry sweep for P08 auth (§5.2, 24 codes).
+// Exhaustive parameterized error-registry sweep for auth (§5.2, 24 codes).
 // Distinct suite name (AuthErrorMatrix) from test_auth_error.cpp.
 namespace cortrix::auth {
 namespace {

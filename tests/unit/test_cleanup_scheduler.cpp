@@ -163,7 +163,7 @@ TEST(OperationLogEmitterTest, MakeEngineEntryReadsThreadLocalTrace) {
     EXPECT_EQ(e.resource_type, "memory");
     EXPECT_EQ(e.namespace_id, std::optional<std::string>("sales"));
     EXPECT_EQ(e.trace_id, std::optional<std::string>("tl-trace"));
-    EXPECT_EQ(e.user_id, "anonymous");  // §9.2 default until P08
+    EXPECT_EQ(e.user_id, "anonymous");  // §9.2 default until auth
     EXPECT_EQ(e.timestamp, 0);          // logger fills now()
 
     octx.ClearTraceContext();  // don't leak into other tests on this thread

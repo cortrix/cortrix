@@ -18,13 +18,13 @@
 #include "cortrix/server/routes/observability_routes.h"
 #include "ns_pool_test_helper.h"
 
-// [F13 TC4] The F13 read routes after the agent_trace global split:
+// [agent trace TC4] The agent trace read routes after the agent_trace global split:
 //   - GET /traces/:session_id is GLOBAL (RegisterTracesRoutesGlobal) — NO ?namespace=,
 //     reads the global agent_trace; ownership resolved cross-NS via the trace's
 //     namespace_id. An empty global agent_trace → admin sees SESSION_NOT_FOUND.
 //   - GET /interactions[/:id/sources] stays PER-NS (RegisterInteractionsRoutesPerNs) —
 //     ?namespace= required on /sources; /interactions uses its namespace_id filter.
-// A cross-cutting harness test (real F05 pool + a real global agent_trace db).
+// A cross-cutting harness test (real namespace pool + a real global agent_trace db).
 namespace cortrix {
 namespace {
 
@@ -49,7 +49,7 @@ protected:
 
         global_config_ = std::make_shared<InMemoryGlobalConfig>();
 
-        // Global agent_trace db (TC4): a real on-disk sqlite migrated with the F13
+        // Global agent_trace db (TC4): a real on-disk sqlite migrated with the agent trace
         // AgentTraceSchemaProvider, the same way bootstrap migrates it into the global
         // catalog db. Empty to start (no traces written).
         ASSERT_EQ(sqlite3_open((tmp_dir_ + "/global.db").c_str(), &global_db_), SQLITE_OK);

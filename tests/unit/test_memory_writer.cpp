@@ -1,7 +1,7 @@
 // Unit tests for memory_writer.cpp (136 lines, 0% -> target 85%+)
 //
 // Strategy: drive MemoryWriter::Write() and its helpers end-to-end over a real
-// F05 NamespaceFacade. D3.5 wire⑤c moved MemoryWriter off CortrixNamespace onto a
+// NamespaceFacade. D3.5 wire⑤c moved MemoryWriter off CortrixNamespace onto a
 // CortrixStore& (it only ever used ns.store()), so the fixture stands up the shared
 // NsPoolHarness (real DefaultNamespacePool + WriteCoordinator over a temp dir),
 // Acquires one long-lived facade, and constructs the writer with facade.memory()
@@ -30,7 +30,7 @@ class MemoryWriterTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // D3.5 wire⑤c: MemoryWriter takes a CortrixStore& directly (it only ever used
-        // ns.store()). Stand up the shared F05 harness, admit a namespace, and hold a
+        // ns.store()). Stand up the shared namespace pool harness, admit a namespace, and hold a
         // long-lived facade — facade.memory()/facade.store() back the writer.
         harness_ = std::make_unique<cortrix::test::NsPoolHarness>(
             std::filesystem::temp_directory_path() /

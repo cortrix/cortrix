@@ -55,8 +55,8 @@ TEST(CatalogErrorTest, TwentyFourCodesTotal) {
     EXPECT_EQ(kCatalogErrorCodeCount, 24);
 }
 
-// Every code's CX_ERR_* string is unique and matches P04 ErrorResponseV1 pattern
-// ^CX_ERR_[A-Z][A-Z_]*$ (F12 §8.1 v1.0.6 fixed the missing-prefix codes).
+// Every code's CX_ERR_* string is unique and matches API spec ErrorResponseV1 pattern
+// ^CX_ERR_[A-Z][A-Z_]*$ (catalog fixed the missing-prefix codes).
 TEST(CatalogErrorTest, EveryCodeHasUniqueWellFormedCxString) {
     static const std::regex kPattern("^CX_ERR_[A-Z][A-Z_]*$");
     std::set<std::string> seen;

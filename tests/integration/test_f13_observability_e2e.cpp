@@ -1,9 +1,9 @@
 /// @file test_f13_observability_e2e.cpp
-/// @brief R7 full-stack E2E for F13 Agent Observability + F18a Operation Log over the
+/// @brief R7 full-stack E2E for Agent Observability + Operation Log over the
 ///        PRODUCTION live wiring (cross-DB owner resolution).
 ///
 /// Why this exists (full-stack integration, not component-level):
-/// the existing F13 coverage (tests/unit/test_observability_routes.cpp) registers the
+/// the existing agent trace coverage (tests/unit/test_observability_routes.cpp) registers the
 /// *co-located* RegisterObservabilityRoutes — agent_trace and interaction_log share one
 /// DB. Production does NOT: bootstrap wires RegisterTracesRoutesGlobal (agent_trace in
 /// the GLOBAL cortrix_global.db) + RegisterInteractionsRoutesPerNs (interaction_log in
@@ -19,7 +19,7 @@
 /// groups, and drives them over a real httplib server:
 ///   - GET /api/v1/traces/{session_id}        (global trace read; cross-DB owner check)
 ///   - GET /api/v1/interactions               (per-NS list)
-///   - GET /api/v1/operations                 (F18a operation_log over the global db)
+///   - GET /api/v1/operations                 (operation_log over the global db)
 
 #include <gtest/gtest.h>
 
@@ -61,7 +61,7 @@ class F13ObservabilityE2E : public ::testing::Test {
     h_ = std::make_unique<cortrix::test::FullStackE2E>();
     h_->BuildCore();
 
-    // Admit both namespaces through the REAL catalog router (catalog INSERT + F05
+    // Admit both namespaces through the REAL catalog router (catalog INSERT + namespace pool
     // AdmitCreate) so each gets a real per-NS memory.db + store + index.
     ASSERT_TRUE(h_->CreateNamespace(kNsSales).ok());
     ASSERT_TRUE(h_->CreateNamespace(kNsEng).ok());
@@ -272,9 +272,9 @@ TEST_F(F13ObservabilityE2E, ListInteractionsRequiresNamespace) {
   EXPECT_EQ(body["error"]["code"], "CX_ERR_F13_INVALID_FILTER");
 }
 
-// ── GET /api/v1/operations — F18a operation_log over the global db ─────────────────
+// ── GET /api/v1/operations — operation_log over the global db ──────────────────────
 // (Smoke that the three observability route groups coexist on one live server and the
-//  F18a query path works against the same global db the trace writer used.)
+//  Operation log query path works against the same global db the trace writer used.)
 
 // alice sees only her own operation rows by default (self-scope).
 TEST_F(F13ObservabilityE2E, OperationsSelfScope) {
@@ -291,7 +291,7 @@ TEST_F(F13ObservabilityE2E, OperationsSelfScope) {
 }
 
 // A non-admin naming another user_id in the operations filter is unauthorized
-// (F18a §6.1 cross-user gate).
+// (operation log cross-user gate).
 TEST_F(F13ObservabilityE2E, OperationsCrossUserDenied) {
   auto c = h_->Client();
   auto res = c.Get("/api/v1/operations?user_id=bob", h_->Bearer(h_->user_key()));

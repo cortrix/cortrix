@@ -1,8 +1,8 @@
 // Schema-provider matrices for the observability / agent-trace / auth providers:
-//   F18a  (OperationLogSchemaProvider, operation_log table, version 1)
-//   F13   (AgentTraceSchemaProvider, agent_trace table, version 1; F13-scoped token)
-//   F13   (InteractionSourcesSchemaProvider, interaction_sources, version 1; FK -> interaction_log)
-//   P08   (P08AuthSchemaProvider, platform.db auth: 7 tables, version 1; version-agnostic Migrate)
+//   Operation log  (OperationLogSchemaProvider, operation_log table, version 1)
+//   Agent trace   (AgentTraceSchemaProvider, agent_trace table, version 1; F13-scoped token)
+//   Agent trace   (InteractionSourcesSchemaProvider, interaction_sources, version 1; FK -> interaction_log)
+//   Auth   (P08AuthSchemaProvider, platform.db auth: 7 tables, version 1; version-agnostic Migrate)
 //
 // Fresh in-memory sqlite3 per case. Globally unique suite/fixture names
 // (F18aObsMatrix / F13TraceMatrix / F13SrcMatrix / P08AuthMatrix) that do NOT reuse
@@ -62,7 +62,7 @@ struct InitStep {
     bool ok;
 };
 
-// ============================ F18a operation_log (version 1) ============================
+// ============================ operation_log (version 1) =================================
 
 class F18aObsMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -135,7 +135,7 @@ INSTANTIATE_TEST_SUITE_P(
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{7, 7, true},
                       InitStep{3, 3, true}, InitStep{4, 4, true}, InitStep{10, 10, true}, InitStep{0, 3, false}, InitStep{0, 4, false}, InitStep{2, 5, false}, InitStep{3, 2, false}, InitStep{5, 1, false}));
 
-// ============================ F13 agent_trace (version 1, F13 token) ============================
+// ============================ agent_trace (version 1, agent trace token) ========================
 
 class F13TraceMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -207,7 +207,7 @@ INSTANTIATE_TEST_SUITE_P(
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{5, 5, true},
                       InitStep{3, 3, true}, InitStep{4, 4, true}, InitStep{10, 10, true}, InitStep{0, 3, false}, InitStep{0, 4, false}, InitStep{2, 5, false}, InitStep{3, 2, false}, InitStep{5, 1, false}));
 
-// ============================ F13 interaction_sources (version 1) ============================
+// ============================ agent trace interaction_sources (version 1) ====================
 
 class F13SrcMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -282,7 +282,7 @@ INSTANTIATE_TEST_SUITE_P(
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{9, 9, true},
                       InitStep{3, 3, true}, InitStep{4, 4, true}, InitStep{10, 10, true}, InitStep{0, 3, false}, InitStep{0, 4, false}, InitStep{2, 5, false}, InitStep{3, 2, false}, InitStep{5, 1, false}));
 
-// ============================ P08 auth (platform.db, version 1) ============================
+// ============================ auth (platform.db, version 1) ================================
 
 class P08AuthMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -340,7 +340,7 @@ TEST_F(P08AuthMatrix, IdempotentReRun) {
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
 }
 
-// P08's Migrate is version-agnostic (creates from scratch regardless of from/to);
+// Auth's Migrate is version-agnostic (creates from scratch regardless of from/to);
 // every (from,to) succeeds against a fresh db. Matrix confirms no spurious rejection.
 class P08AuthVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:

@@ -387,7 +387,7 @@ TEST_F(GcRoutesArmsSweeperFail, RestoreSweeperFailureSurfacesError) {
 // ===========================================================================
 
 // TC4 split: GLOBAL /traces (RegisterTracesRoutesGlobal over a real global agent_trace
-// db) + PER-NS interactions (RegisterInteractionsRoutesPerNs over the F05 pool). We seed
+// db) + PER-NS interactions (RegisterInteractionsRoutesPerNs over the namespace pool). We seed
 // a global agent_trace row (session touching NS "default") AND a per-NS interaction_log
 // row mapping that session to its owner, so the owner-resolver success path runs.
 class ObsRoutesArms : public ::testing::Test {
@@ -412,7 +412,7 @@ protected:
 
         global_config_ = std::make_shared<InMemoryGlobalConfig>();
 
-        // Global agent_trace db (TC4) migrated with the F13 provider, then seeded with
+        // Global agent_trace db (TC4) migrated with the agent trace provider, then seeded with
         // a row for "alice-sess" stamped namespace_id = kNs.
         ASSERT_EQ(sqlite3_open((tmp_dir_ + "/global.db").c_str(), &global_db_), SQLITE_OK);
         {

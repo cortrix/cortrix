@@ -1,7 +1,7 @@
 // R7-1d — branch-coverage supplements for memory_routes.cpp (63.87% branch).
 //
 // The existing test_memory_routes.cpp (2219 lines) exhaustively covers the
-// sessions / search / inject / auth surfaces, but never POSTs to the MEM02
+// sessions / search / inject / auth surfaces, but never POSTs to the memory extraction
 // extract routes or the invalidation-audit routes. Those are registered by
 // RegisterMemoryRoutes with MemoryServices{} defaulted (extraction == nullptr),
 // so the extract handlers' "service disabled" guard arms + the invalidations
@@ -13,7 +13,7 @@
 // stub + seeded façade state and are deferred — see the note reported to lead.)
 //
 // Strategy mirrors test_memory_routes.cpp: a real httplib::Server with the routes
-// registered over a real F05 pool (NsPoolHarness) + a MockSPCManager, driven via
+// registered over a real namespace pool (NsPoolHarness) + a MockSPCManager, driven via
 // httplib::Client. Harness setup is duplicated here (no shared fixture header),
 // following the test_gc_manager_extra.cpp precedent.
 #include <gtest/gtest.h>
@@ -43,7 +43,7 @@ using json = nlohmann::json;
 
 // Lean fixture: register the memory routes with the DEFAULT MemoryServices{}
 // (extraction == nullptr), which is exactly the "extraction disabled" config the
-// uncovered guard arms gate on. A real F05 pool admits the "default" namespace so
+// uncovered guard arms gate on. A real namespace pool admits the "default" namespace so
 // the per-request façade Acquire() succeeds for routes that reach it.
 class MemoryRoutesR7bTest : public ::testing::Test {
 protected:

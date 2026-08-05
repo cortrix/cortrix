@@ -1,4 +1,4 @@
-// F23 §4.6 syscall fault-injection seam — macOS dyld interpose impl.
+// Test suite syscall fault-injection seam — macOS dyld interpose impl.
 // See fault_inject.h for the contract and safety interlocks.
 #include "fault_inject.h"
 

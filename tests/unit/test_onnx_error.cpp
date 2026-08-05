@@ -75,7 +75,7 @@ TEST(OnnxErrorTest, InferenceFailedIsTransientRetryable200ms) {
 }
 
 // ============================================================
-// Required structured_data keys (F22 §8.3 — Agent-friendly #5)
+// Required structured_data keys (ONNX runtime — Agent-friendly #5)
 // ============================================================
 
 TEST(OnnxErrorTest, RequiredKeysPerCode) {
@@ -113,7 +113,7 @@ TEST(OnnxErrorTest, HasRequiredStructuredData_NonObjectFails) {
 }
 
 // ============================================================
-// MakeOnnxError → AgentFriendlyError (F22 §8.3 / §9.1)
+// MakeOnnxError → AgentFriendlyError (ONNX runtime / §9.1)
 // ============================================================
 
 TEST(OnnxErrorTest, MakeOnnxError_FillsRegistryFields) {
@@ -146,7 +146,7 @@ TEST(OnnxErrorTest, MakeOnnxError_CustomMessageAndRetryAfter) {
 }
 
 // TC-14: structured_data is a JSON OBJECT, not a serialized string — Agent
-// consumes it directly with no JSON.parse (F22 Anti-pattern 4).
+// consumes it directly with no JSON.parse (ONNX runtime Anti-pattern 4).
 TEST(OnnxErrorTest, StructuredDataIsObjectNotString) {
     auto err = MakeOnnxError(OnnxErrorCode::kRuntimeVersionMismatch,
                              {{"current_version", "2.0.1"},

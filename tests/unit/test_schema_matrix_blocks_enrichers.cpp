@@ -1,8 +1,8 @@
 // Schema-provider matrices for the per-Unit `blocks`-altering enrichment providers:
-//   F03 (F03SchemaProvider, enriched_score + entities + FTS5, version 2, forward-only)
-//   F07 (ScoringSchemaProvider, semantic_score, version 1)
-//   F35 (F35SchemaProvider, +4 contextual-retrieval columns, version 1)
-//   F34 (F34SchemaProvider, parents table + 4 child columns + 3 indexes, version 1)
+//   Enricher (F03SchemaProvider, enriched_score + entities + FTS5, version 2, forward-only)
+//   Semantic score (ScoringSchemaProvider, semantic_score, version 1)
+//   Contextual retrieval (F35SchemaProvider, +4 contextual-retrieval columns, version 1)
+//   Parent-child chunking (F34SchemaProvider, parents table + 4 child columns + 3 indexes, version 1)
 //
 // Each provider: feature identity, Migrate(0->1) shape, idempotent re-run, unsupported
 // version step rejected with the real CX_ERR token, null-db handling, and the
@@ -79,7 +79,7 @@ struct SqliteHelpers {
     }
 };
 
-// ============================ F03 (version 2, forward-only) ============================
+// ============================ enricher (version 2, forward-only) =======================
 
 class F03BlkMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -193,7 +193,7 @@ INSTANTIATE_TEST_SUITE_P(
         F03Step{2, 1, false}, F03Step{2, 0, false}, F03Step{1, 0, false},
         F03Step{-1, 1, false}, F03Step{0, 5, false}, F03Step{3, 4, false}));
 
-// ============================ F07 scoring (version 1) ============================
+// ============================ semantic score scoring (version 1) =================
 
 class F07BlkMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -272,7 +272,7 @@ INSTANTIATE_TEST_SUITE_P(
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{3, 5, false}));
 
-// ============================ F35 (version 1, +4 columns) ============================
+// ============================ contextual retrieval (version 1, +4 columns) ===========
 
 class F35BlkMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
@@ -349,7 +349,7 @@ INSTANTIATE_TEST_SUITE_P(
                       InitStep{0, 4, false}, InitStep{2, 5, false}, InitStep{3, 2, false},
                       InitStep{5, 1, false}));
 
-// ============================ F34 (version 1, parents + child cols) ============================
+// ============================ parent-child chunking (version 1, parents + child cols) ==========
 
 class F34BlkMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:

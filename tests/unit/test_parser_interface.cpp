@@ -12,7 +12,7 @@
 #include "cortrix/spc/parser_errors.h"
 #include "parser_stub.h"
 
-// F06 S1 coverage: IDocumentParser interface contract (StubParser) + the
+// Parser S1 coverage: IDocumentParser interface contract (StubParser) + the
 // ParserErrorCode registry (§2.7 / §5.2 Agent-friendly mapping). Mirrors the
 // catalog_error test for the registry half.
 namespace cortrix::spc {
@@ -95,7 +95,7 @@ TEST(ParserErrorTest, SixteenCodesTotal) {
     EXPECT_EQ(kParserErrorCodeCount, 16);
 }
 
-// Enum integer values match the F06 §2.7 wire numbers (also ParsedDoc.status /
+// Enum integer values match the parser wire numbers (also ParsedDoc.status /
 // bridge JSON status). A drift here breaks the C++↔Python contract.
 TEST(ParserErrorTest, EnumValuesMatchWireProtocol) {
     EXPECT_EQ(static_cast<int>(ParserErrorCode::kOk), 0);
@@ -118,7 +118,7 @@ TEST(ParserErrorTest, OnlyOkAndEmptyAreNonError) {
     }
 }
 
-// Every code's CX_ERR_* string is unique and matches the P04 ErrorResponseV1
+// Every code's CX_ERR_* string is unique and matches the API spec ErrorResponseV1
 // pattern ^CX_ERR_[A-Z][A-Z_]*$.
 TEST(ParserErrorTest, EveryCodeHasUniqueWellFormedCxString) {
     static const std::regex kPattern("^CX_ERR_[A-Z][A-Z_]*$");
@@ -147,7 +147,7 @@ TEST(ParserErrorTest, RetryableIffRetryAfterPresent) {
     }
 }
 
-// Spot-check the exact §5.2 rows downstream consumers (HTTP API / F42 progress)
+// Spot-check the exact §5.2 rows downstream consumers (HTTP API / async task progress)
 // depend on.
 TEST(ParserErrorTest, SpecificRowsMatchSpec) {
     auto check = [](ParserErrorCode c, const char* cx, ErrorCategory cat,

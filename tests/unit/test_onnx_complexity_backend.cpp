@@ -34,7 +34,7 @@ TEST(OnnxComplexityBackendTest, Identity) {
 TEST(OnnxComplexityBackendTest, MissingModelIsUnavailableNotError) {
     OnnxComplexityBackend b("/nonexistent/model.onnx");
     // Init() succeeds (offline-friendly) but the backend stays unavailable so
-    // QueryComplexityClassifier takes the F39 L2 default-Complex path.
+    // QueryComplexityClassifier takes the query routing L2 default-Complex path.
     EXPECT_TRUE(b.Init().ok());
     EXPECT_FALSE(b.IsAvailable());
 }

@@ -10,9 +10,9 @@
 #include "cortrix/spc/hype_enricher.h"
 #include "mock_llm_client.h"
 
-// I1 — ISpcEnricher chain framework (F03 → F35 → F38 fail-soft serial). Tests the
+// I1 — ISpcEnricher chain framework (enricher → contextual retrieval → HyPE fail-soft serial). Tests the
 // chain-spec parsing, the NS/GUC resolution, the per-chunk merge across enrichers,
-// the fail-soft skip on throw, and the F38 hype side channel.
+// the fail-soft skip on throw, and the hype side channel.
 namespace cortrix::spc {
 namespace {
 
@@ -85,7 +85,7 @@ public:
 };
 
 // A fake F35-style enricher whose member FAILS while the step stays OK
-// (status 0, contextualized_status 2, error_msg set) — the real F35 degrade
+// (status 0, contextualized_status 2, error_msg set) — the real contextual retrieval degrade
 // shape (§7.3 transparent degrade / §8 injection-guard reject).
 class FailSoftContextualEnricher : public ISpcEnricher {
 public:
@@ -134,7 +134,7 @@ TEST(EnricherChainSpec, FullChainOrdered) {
 }
 
 TEST(EnricherChainSpec, F03AlwaysLeads) {
-    // f35 alone implies f03 first (GS-2: F03 leads).
+    // f35 alone implies f03 first (GS-2: enricher leads).
     EXPECT_EQ(ParseEnricherChainSpec("f35"), (std::vector<std::string>{"f03", "f35"}));
     // f03 mentioned out of order is moved to the front.
     EXPECT_EQ(ParseEnricherChainSpec("f38,f03"),
@@ -193,7 +193,7 @@ TEST(EnricherChainRun, MergesF03AndF35PerChunk) {
     }
 }
 
-// D12 (2026-07-11): the F35 fail-soft outcome (step OK, contextualized_status 2)
+// D12 (2026-07-11): the contextual retrieval fail-soft outcome (step OK, contextualized_status 2)
 // must carry its error_msg into the step record — otherwise the debt row is
 // written with a blank last_error and the real cause (live 5k ingest: the §8
 // injection-guard byte limit, 4,139 blank rows) is unobservable.
@@ -217,7 +217,7 @@ TEST(EnricherChainRun, F35FailSoftCarriesErrorCodeInStepRecord) {
     EXPECT_FALSE(f35->skipped);
     // ...but the cause is preserved for the debt-row writers (the fix).
     EXPECT_EQ(f35->error_code, "output length 300 exceeds 2x max_output_tokens 80");
-    // F03 output unaffected by the F35 member failure.
+    // Enricher output unaffected by the contextual retrieval member failure.
     EXPECT_EQ(res[0].merged.summary, "kept");
 }
 
@@ -231,7 +231,7 @@ TEST(EnricherChainRun, FailSoftSkipsThrowingEnricher) {
     auto ctxs = MakeContexts({"c1"}, &dm);
     auto res = chain.EnrichChunks(ctxs, {}, {}, {});
     ASSERT_EQ(res.size(), 1u);
-    // F03 summary kept AND F35 contextualized still applied despite the throw between.
+    // Enricher summary kept AND contextualized still applied despite the throw between.
     EXPECT_EQ(res[0].merged.summary, "kept");
     EXPECT_TRUE(res[0].merged.contextualized_text.has_value());
     // the thrower's step is recorded as a non-zero status.

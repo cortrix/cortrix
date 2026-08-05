@@ -10,7 +10,7 @@
 #include "cortrix/store/cortrix_store_sqlite.h"
 
 // M1 — the real MemoryBlockAdapter + MemoryContradictionAdapter + QueryUserFacts over
-// an in-memory CortrixStoreSqlite (owns-db path creates the blocks table + the F35/F40
+// an in-memory CortrixStoreSqlite (owns-db path creates the blocks table + the contextual retrieval/sparse retrieval
 // columns via the providers). No embedder/index → rows are stored without vectors,
 // which is exactly the adapter's degrade path; the SQL metadata queries are what these
 // tests exercise.

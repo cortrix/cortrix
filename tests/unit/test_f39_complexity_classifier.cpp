@@ -12,10 +12,10 @@
 #include "cortrix/query/query_router_metrics.h"
 #include "cortrix/query/router_error.h"
 
-// F39 coverage: QueryComplexityClassifier — the routing algorithm (§6.1, all 7
+// Query routing coverage: QueryComplexityClassifier — the routing algorithm (§6.1, all 7
 // routing_decision_source values), L1/L2/L3 fallbacks (§7), confidence threshold
-// (§6.1 step 5 / F39-8), the chat rule guard + multi-turn detection (§6.2), the
-// IClassifier contract (S1), and the F36/F37 skip helpers (§6.3). Standalone: the
+// (§6.1 step 5), the chat rule guard + multi-turn detection (§6.2), the
+// IClassifier contract (S1), and the RAG-Fusion/CRAG skip helpers (§6.3). Standalone: the
 // backend is a stub (HeuristicComplexityBackend or the programmable mock below).
 namespace cortrix::query {
 namespace {
@@ -25,7 +25,7 @@ using retrieval::ClassifierInput;
 
 // A programmable backend: returns a fixed label/confidence, or throws
 // RouterInferenceError a configurable number of times before succeeding (to drive
-// the §7.3 L3 retry/degrade path). Mirrors the F37 mock-backend test pattern.
+// the §7.3 L3 retry/degrade path). Mirrors the CRAG mock-backend test pattern.
 class MockComplexityBackend : public IComplexityClassifierBackend {
 public:
     std::string label = "simple";
@@ -298,7 +298,7 @@ TEST_F(F39ClassifierTest, ClassifierChatVerdictIsDemotedToComplex) {
     EXPECT_EQ(ctx.routing_decision_source, "chat_demoted_guard");
 }
 
-// --- §6.1 step 5: confidence threshold fail-safe (F39-8) ----------------------
+// --- §6.1 step 5: confidence threshold fail-safe ------------------------------
 
 TEST_F(F39ClassifierTest, LowConfidenceFallsBackToComplex) {
     auto backend = std::make_shared<MockComplexityBackend>();
@@ -433,7 +433,7 @@ TEST_F(F39ClassifierTest, HasMultiTurnSignalDetectsCuesAndAvoidsFalsePositives) 
     EXPECT_FALSE(QueryComplexityClassifier::HasMultiTurnSignal("find the revenue report"));
 }
 
-// --- §6.3: F36 / F37 skip helpers (lockstep with f39_routing_mock.h) ----------
+// --- §6.3: RAG-Fusion / CRAG skip helpers (lockstep with f39_routing_mock.h) ----------
 
 TEST_F(F39ClassifierTest, ShouldSkipF36AndF37PerPath) {
     QueryContext simple;

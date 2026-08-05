@@ -12,7 +12,7 @@
 #include "cortrix/import/import_response.h"
 #include "cortrix/import/import_types.h"
 
-// S5 coverage: the 6 F16a error codes — CX_ERR_F16A_ identity, category
+// S5 coverage: the 6 DB import error codes — CX_ERR_F16A_ identity, category
 // mapping, retryability, structured_data contract, the GEN-Agent 4-field boundary
 // factory, and the §5.1/§5.2/§5.3 Agent-friendly response bodies. Mirrors the
 // project reference test scatter/test_cross_ns_error.cpp.
@@ -42,7 +42,7 @@ TEST(F16aErrorTest, SevenCodesTotal) {
     EXPECT_EQ(kF16aErrorCodeCount, 7);
 }
 
-// Every code's CX_ERR_F16A_* string is unique and matches the P04 ErrorResponseV1
+// Every code's CX_ERR_F16A_* string is unique and matches the API spec ErrorResponseV1
 // pattern (GEN-Agent #1 + #7 stable identity).
 TEST(F16aErrorTest, EveryCodeHasUniqueWellFormedCxString) {
     static const std::regex kPattern("^CX_ERR_F16A_[A-Z][A-Z_]*$");

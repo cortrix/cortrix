@@ -217,7 +217,7 @@ TEST_F(OnnxValidateOpsetTest, BelowFloorFails) {
     EXPECT_FALSE(StartupValidator::Validate(cfg).ok());
 }
 
-// TC-3: two in-range models (F02 + OnnxEmbedder shape) both validate.
+// TC-3: two in-range models (reranker + OnnxEmbedder shape) both validate.
 TEST_F(OnnxValidateOpsetTest, TwoModelsBothInRangePass) {
     int mid = (min_opset_ + max_opset_) / 2;
     StartupValidator::ValidationConfig cfg;
@@ -269,8 +269,8 @@ TEST(OnnxStartupValidatorTest, MissingModelSkippedWhenConfigured) {
 // CollectRegisteredOnnxModels — config → ValidationConfig (standalone scope)
 // ============================================================
 
-// CollectRegisteredOnnxModels also conditionally registers the F39
-// query-complexity model (config.query_complexity.model_dir) and the F02
+// CollectRegisteredOnnxModels also conditionally registers the query routing
+// query-complexity model (config.query_complexity.model_dir) and the reranker
 // reranker model (config.reranker.model_dir) when their model.onnx exists.
 // Pin both dirs to nonexistent paths via config (NOT env — the collector now
 // resolves them from config only) so these exact-set assertions hold
@@ -303,18 +303,18 @@ TEST_F(OnnxCollectModelsTest, EmptyModelPathRegistersNothing) {
 }
 
 // ============================================================
-// F40 S2 — F22-2 ONNX Runtime reuse closure (F40-7 decision A)
+// Sparse retrieval S2 — ONNX Runtime reuse closure
 // ============================================================
 // BGE-M3 produces dense + sparse from a SINGLE model in one forward pass, so
-// F40's sparse path reuses the very BGE-M3 model the OnnxEmbedder already loads
-// (config.embedding.model_path) — there is NO separate F40 sparse model to
+// Sparse path reuses the very BGE-M3 model the OnnxEmbedder already loads
+// (config.embedding.model_path) — there is NO separate sparse model to
 // register. These tests pin that closure: the single registration validated for
-// the dense path also certifies the model F40's sparse path runs on. Appending
+// the dense path also certifies the model sparse path runs on. Appending
 // any *distinct* future model to the collector stays D3.5 (collector comment).
 
 TEST_F(OnnxCollectModelsTest, F40SparseReusesBgeM3SingleRegistration) {
     // The bge-m3 registration is shared: registering it once covers both the
-    // dense embedder and the F40 sparse activation (single model, single path).
+    // dense embedder and the sparse activation (single model, single path).
     CortrixConfig config = BaseConfig();
     config.embedding.model_path = "/models/bge-m3/model.onnx";
     auto cfg = StartupValidator::CollectRegisteredOnnxModels(config);
@@ -324,7 +324,7 @@ TEST_F(OnnxCollectModelsTest, F40SparseReusesBgeM3SingleRegistration) {
 }
 
 TEST_F(OnnxCollectModelsTest, F40SparseStubOnlyRegistersNothing) {
-    // Stub-only (no model) deployment: F40 sparse runs on the deterministic stub
+    // Stub-only (no model) deployment: sparse runs on the deterministic stub
     // too, so — like the dense path — there is nothing to validate at startup.
     CortrixConfig config = BaseConfig();  // empty embedding.model_path
     auto cfg = StartupValidator::CollectRegisteredOnnxModels(config);

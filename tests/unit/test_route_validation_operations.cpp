@@ -1,4 +1,4 @@
-// Route request-validation matrices for the F18a operation-log query route
+// Route request-validation matrices for the operation-log query route
 // (GET /api/v1/operations). BREADTH coverage of bad query params (non-integer
 // limit/offset/timestamp, out-of-range limit, inverted ranges, bad enums),
 // the admin cross-user permission gate, missing auth, and method-not-allowed,

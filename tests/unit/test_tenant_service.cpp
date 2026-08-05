@@ -1,5 +1,5 @@
-// P09 sec 11.1 -- TenantService unit tests (UT1-18 + cross-service tx rollback).
-// Runs against a real in-memory catalog.db (F12 schema) per the project's
+// Tenancy -- TenantService unit tests (UT1-18 + cross-service tx rollback).
+// Runs against a real in-memory catalog.db (catalog schema) per the project's
 // router-test pattern (see test_default_ns_router.cpp).
 #include <gtest/gtest.h>
 
@@ -83,10 +83,10 @@ TEST_F(TenantServiceTest, CreatePersonal_Success) {
 
 // --- UT3 (cross-service tx): INSERT user_tenants fails -> caller can ROLLBACK ---
 TEST_F(TenantServiceTest, CreatePersonal_TransactionRollback) {
-    // Simulate the P08 outer transaction: BEGIN on the same connection, pass it in.
+    // Simulate the auth outer transaction: BEGIN on the same connection, pass it in.
     SeedUser("u1", "dup@x.com");
     sqlite3* conn = catalog_.db();
-    // Baseline BEFORE the tx: the P09 §10.1 bootstrap seed (schema-embedded)
+    // Baseline BEFORE the tx: the tenancy bootstrap seed (schema-embedded)
     // already populates tenants (default_tenant + __system__), so "rolled back"
     // means count returns to this baseline, not to zero.
     int baseline = -1;
@@ -99,7 +99,7 @@ TEST_F(TenantServiceTest, CreatePersonal_TransactionRollback) {
         sqlite3_finalize(b);
     }
     ASSERT_EQ(sqlite3_exec(conn, "BEGIN", nullptr, nullptr, nullptr), SQLITE_OK);
-    // Pre-insert a clashing user_tenants PK so P09's membership INSERT fails.
+    // Pre-insert a clashing user_tenants PK so tenancy's membership INSERT fails.
     auto r1 = svc_->CreatePersonal("u1", "dup@x.com", conn);
     ASSERT_TRUE(r1.ok());
     // Force a duplicate membership row on the SAME tenant by reusing its id is not
@@ -112,7 +112,7 @@ TEST_F(TenantServiceTest, CreatePersonal_TransactionRollback) {
     sqlite3_exec(conn, "ROLLBACK", nullptr, nullptr, nullptr);
 
     // After ROLLBACK the created tenant must be gone (atomic with the outer tx):
-    // count returns to the pre-tx baseline (= the P09 seed rows).
+    // count returns to the pre-tx baseline (= the tenancy seed rows).
     sqlite3_stmt* s = nullptr;
     sqlite3_prepare_v2(conn, "SELECT COUNT(*) FROM tenants", -1, &s, nullptr);
     ASSERT_EQ(sqlite3_step(s), SQLITE_ROW);

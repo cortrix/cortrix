@@ -1,6 +1,6 @@
 // S1.3 -- ONNX model load fail-fast + CX_ERR_RERANKER_INIT_FAILED + startup
 // config-compat validation (CX_ERR_CONFIG_MISMATCH) + /health readiness contract
-// + the RerankerErrorCode registry (F02 sec 5.2).
+// + the RerankerErrorCode registry (reranker).
 #include <gtest/gtest.h>
 
 #include <set>
@@ -21,7 +21,7 @@ namespace {
 
 using agent_friendly::ErrorCategory;
 
-// --- RerankerErrorCode registry (F02 sec 5.2, mirrors the F12 CatalogErrorCode test) ---
+// --- RerankerErrorCode registry (reranker, mirrors the CatalogErrorCode test) ----------
 
 TEST(RerankerErrorTest, AllFiveCodesHaveCanonicalCxStrings) {
     EXPECT_STREQ(RerankerErrorCodeString(RerankerErrorCode::kRerankerInitFailed),

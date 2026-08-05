@@ -19,7 +19,7 @@ namespace {
 
 // Read a text file into a string. In-process equivalent of the (removed in R6b)
 // MVP TxtParser/MarkdownParser used purely to obtain text for the chunker; the
-// F06 parser path (DoclingParser/PaddleOCRParser) runs via a Python subprocess
+// Parser path (DoclingParser/PaddleOCRParser) runs via a Python subprocess
 // bridge. These tests exercise the chunk -> embed -> assemble chain, not parsing.
 static std::string ReadFile(const std::string& path) {
     std::ifstream f(path, std::ios::binary);

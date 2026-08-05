@@ -8,14 +8,14 @@
 #include "cortrix/spc/paddleocr_parser.h"
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/spc/block_assembler.h"
-#include "cortrix/spc_enricher.h"  // F03 NullEnricher (injected, IsAvailable()==false)
+#include "cortrix/spc_enricher.h"  // NullEnricher (injected, IsAvailable()==false)
 #include "cortrix/chunker/parent_child_chunker.h"
 #include "cortrix/config/config.h"
 
-// D3.5 wire⑤: SPCManager now acquires per-task NamespaceFacades from a real F05
+// D3.5 wire⑤: SPCManager now acquires per-task NamespaceFacades from a real namespace pool
 // INamespacePool (not the MVP CortrixNamespaceManager). The real-manager fixture
-// therefore stands up a DefaultNamespacePool (mocked F12 routers + FakeIndex + a
-// real F25 WriteCoordinator) and admits namespaces through it.
+// therefore stands up a DefaultNamespacePool (mocked catalog routers + FakeIndex + a
+// real WriteCoordinator) and admits namespaces through it.
 #include "cortrix/catalog/batch_result.h"
 #include "cortrix/catalog/catalog_types.h"
 #include "cortrix/catalog/i_ns_router.h"
@@ -49,7 +49,7 @@ using ::testing::Invoke;
 using ::testing::NiceMock;
 
 // ============================================================
-// F05 pool test doubles (mirror tests/unit/test_namespace_pool.cpp)
+// Namespace pool test doubles (mirror tests/unit/test_namespace_pool.cpp)
 // ============================================================
 
 class FakeIndex : public cortrix::store::IIndex, public cortrix::store::IVectorStore {
@@ -203,7 +203,7 @@ protected:
         fs::create_directories(test_dir_);
         config_.data_root = test_dir_.string();
 
-        // Real F05 pool (no namespaces admitted yet — tests admit what they need).
+        // Real namespace pool (no namespaces admitted yet — tests admit what they need).
         pool_ = MakePool();
 
         // Build real pipeline components
@@ -212,7 +212,7 @@ protected:
         spc_config_.python_bin = "python3";
         spc_config_.parser_timeout_s = 5;
 
-        // F06 structured-parser factory with a stub Docling parser (no Python
+        // Structured-parser factory with a stub Docling parser (no Python
         // dependency — these SPCManager lifecycle tests never feed a real doc
         // through Process; they exercise Start/Stop/Submit/QueueSize). A bare
         // factory with stub parsers is enough to construct the pipeline.
@@ -299,7 +299,7 @@ protected:
     std::unique_ptr<cortrix::chunker::ParentChildChunker> chunker_;
     std::unique_ptr<OnnxEmbedder> embedder_;
     std::unique_ptr<BlockAssembler> assembler_;
-    cortrix::spc::NullEnricher enricher_;  // F03 short-circuit (lifetime ≥ mgr_/pipeline)
+    cortrix::spc::NullEnricher enricher_;  // Enricher short-circuit (lifetime ≥ mgr_/pipeline)
 
     std::unique_ptr<SPCManager> mgr_;
 };
@@ -364,7 +364,7 @@ TEST_F(SPCManagerRealTest, SubmitAndCancelBySourcePath) {
     mgr_->Stop();
 }
 
-// [D3.5 gap⑤ · F24 §7.2.bis] Graceful-shutdown drain: Stop() + DrainRemaining()
+// [D3.5 gap⑤ · deployment] Graceful-shutdown drain: Stop() + DrainRemaining()
 // moves out every not-yet-started task (cancelled ones skipped), leaving the
 // queue empty — these become .pending_tasks.json for next-start resume.
 TEST(SPCManagerTest, QueueDrainRemaining) {
@@ -400,7 +400,7 @@ TEST_F(SPCManagerRealTest, DrainRemainingTasksEmptyAndIdempotent) {
     EXPECT_TRUE(mgr_->DrainRemainingTasks().empty());  // idempotent
 }
 
-// [D3.5 gap②] F24 §6 disk gate: a true write-reject probe refuses NEW task
+// Deployment disk gate: a true write-reject probe refuses NEW task
 // admission with CX_ERR_DISK_FULL; clearing the pressure re-admits.
 TEST_F(SPCManagerRealTest, SubmitRejectedWhenDiskCritical) {
     mgr_->Start();
@@ -565,7 +565,7 @@ TEST_F(SPCManagerRealTest, DestructorCallsStop) {
 }
 
 // ============================================================
-// ProcessParsedDoc (F42 async entry point) — the manager acquires a
+// ProcessParsedDoc (async entry point) — the manager acquires a
 // per-task facade and delegates to pipeline_->ProcessParsed. This is
 // distinct from the WorkerLoop path (no blob extraction here).
 // ============================================================
@@ -598,7 +598,7 @@ TEST_F(SPCManagerRealTest, ProcessParsedDoc_NonexistentNamespace_Error) {
 TEST_F(SPCManagerRealTest, ProcessParsedDoc_RealNamespaceL0_Done) {
     AdmitNs("pp_ns");
 
-    // The F42 path must create the doc row before calling ProcessParsedDoc because
+    // The async task path must create the doc row before calling ProcessParsedDoc because
     // the manager creates it internally when doc_get fails (no existing row).
     cortrix::spc::ParsedDoc d;
     d.status = cortrix::spc::ParserErrorCode::kOk;

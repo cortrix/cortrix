@@ -9,11 +9,11 @@
 #include "cortrix/catalog/schema_provider.h"
 
 // design §3.1 (v1.0.2 Major-2): F03SchemaProvider extends the per-Unit blocks
-// table (+3 cols) + adds entities + FTS5, registered via the F12 SchemaMigrator.
+// table (+3 cols) + adds entities + FTS5, registered via the catalog SchemaMigrator.
 namespace cortrix::spc {
 namespace {
 
-// Minimal stand-in for F09's per-Unit `blocks` table (only the shape F03's
+// Minimal stand-in for block header's per-Unit `blocks` table (only the shape enricher's
 // migration touches — standalone, no full per-Unit framework).
 void CreateBlocksTable(sqlite3* db) {
     ASSERT_EQ(sqlite3_exec(db,
@@ -159,7 +159,7 @@ TEST(F03SchemaProviderTest, ColumnsAlreadyPresentShortCircuits) {
     sqlite3_close(db);
 }
 
-// Runs through the real SchemaMigrator per-Unit path (the F12 integration point).
+// Runs through the real SchemaMigrator per-Unit path (the catalog integration point).
 TEST(F03SchemaProviderTest, RegistersAndMigratesViaMigratorUnit) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);

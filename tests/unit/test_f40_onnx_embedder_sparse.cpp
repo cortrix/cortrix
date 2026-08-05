@@ -2,7 +2,7 @@
 #include "cortrix/spc/onnx_embedder.h"
 #include <cmath>
 
-// F40 S1 — OnnxEmbedder.EmbedWithSparse / EmbedBatchWithSparse.
+// Sparse retrieval S1 — OnnxEmbedder.EmbedWithSparse / EmbedBatchWithSparse.
 // Standalone D3: dense reuses the frozen embed path; sparse is the deterministic
 // stub (real BGE-M3 sparse-head extraction = D3.5). These tests pin the API
 // contract + the stub's reproducibility / top-K behavior so the downstream
@@ -121,7 +121,7 @@ TEST(F40EmbedWithSparseTest, WhitespaceOnlyEmptySparse) {
     EXPECT_TRUE(r.sparse.empty());
 }
 
-// ---------- top-K truncation (F40-6) ----------
+// ---------- top-K truncation ------------------
 
 TEST(F40EmbedWithSparseTest, TopKTruncates) {
     OnnxEmbedder e("", 64);

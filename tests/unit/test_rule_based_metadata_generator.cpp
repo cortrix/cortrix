@@ -11,14 +11,14 @@
 #include "cortrix/metadata/metadata_types.h"
 #include "cortrix/metadata/rule_based_metadata_generator.h"
 
-// F08 S1.2 / S2.4 / §7.2 coverage: RuleBasedMetadataGenerator — the core block_text
-// assembly + 26-field metadata_json serialization (≥95% target), the UT-F08-1/2/3
-// cases (full input / missing page_count / F06 total failure), and the §9.quater.2
+// META block S1.2 / S2.4 / §7.2 coverage: RuleBasedMetadataGenerator — the core block_text
+// assembly + 26-field metadata_json serialization (≥95% target), the three metadata
+// cases (full input / missing page_count / parser total failure), and the §9.quater.2
 // doc_fts5 derived mapping.
 namespace cortrix::metadata {
 namespace {
 
-// A fully-populated, "happy path" input (UT-F08-1). 2026-04-02T10:30:00Z = 1775125800000 ms.
+// A fully-populated, "happy path" input (case 1). 2026-04-02T10:30:00Z = 1775125800000 ms.
 GeneratorInput FullInput() {
     GeneratorInput in;
     in.doc_id = "01HXXDOC";
@@ -105,7 +105,7 @@ TEST(MetadataGeneratorTest, FullInputFieldValuesMatchInput) {
     EXPECT_EQ(j["chunker"], "parent-child");
     EXPECT_EQ(j["processing_time_ms"], 3200);
     EXPECT_EQ(j["source_uri"], "file:///uploads/quarterly_report.pdf");
-    EXPECT_EQ(j["lang"], "zh");  // ← F06 doc_language (consumed-field name difference)
+    EXPECT_EQ(j["lang"], "zh");  // ← parser doc_language (consumed-field name difference)
     EXPECT_EQ(j["tags"], (nlohmann::json{"financial", "Q1-2026"}));
     EXPECT_EQ(j["ingestion_status"], "completed");
     EXPECT_EQ(j["meta.parse_status"], "ok");
@@ -113,10 +113,10 @@ TEST(MetadataGeneratorTest, FullInputFieldValuesMatchInput) {
     EXPECT_EQ(j["custom_metadata"]["owner"], "finance-team");
 }
 
-// UT-F08-2: page_count unknown → null + recorded in missing_fields (§5.2 row 2 / §5.3).
+// Case 2: page_count unknown → null + recorded in missing_fields (§5.2 row 2 / §5.3).
 TEST(MetadataGeneratorTest, MissingPageCountNullsAndWarns) {
     GeneratorInput in = FullInput();
-    in.doc_metadata.page_count = -1;  // F06 couldn't determine page count
+    in.doc_metadata.page_count = -1;  // Parser couldn't determine page count
 
     std::vector<std::string> missing;
     nlohmann::json j = RuleBasedMetadataGenerator::BuildMetadataJson(in, &missing);
@@ -128,7 +128,7 @@ TEST(MetadataGeneratorTest, MissingPageCountNullsAndWarns) {
     EXPECT_EQ(j.size(), static_cast<size_t>(kMetadataFieldCount));
 }
 
-// Unknown counts from F34 (standalone: not yet supplied) → null, schema still complete.
+// Unknown counts from parent-child chunking (standalone: not yet supplied) → null, schema still complete.
 TEST(MetadataGeneratorTest, UnknownCountsBecomeNull) {
     GeneratorInput in = FullInput();
     in.stats.chunk_count = -1;
@@ -142,7 +142,7 @@ TEST(MetadataGeneratorTest, UnknownCountsBecomeNull) {
     EXPECT_TRUE(j["child_count"].is_null());
 }
 
-// F10 coordination (V2 rework M-03): parse_status=partial + a failed page → meta.parse_failed_page
+// Cleaning coordination (V2 rework M-03): parse_status=partial + a failed page → meta.parse_failed_page
 // non-null; ingestion_status follows the status (failed → "failed").
 TEST(MetadataGeneratorTest, ParseStatusF10Signals) {
     GeneratorInput in = FullInput();
@@ -261,7 +261,7 @@ TEST(MetadataGeneratorTest, GeneratePartialSurfacesMissingFields) {
     EXPECT_EQ(res.value().missing_fields[0], "page_count");
 }
 
-// UT-F08-3: F06 total failure (no filename, no source_uri, parse_status=failed) → GEN_FAILED.
+// Case 3: parser total failure (no filename, no source_uri, parse_status=failed) → GEN_FAILED.
 TEST(MetadataGeneratorTest, GenerateFailsWhenF06ParseCompletelyFailed) {
     GeneratorInput in;
     in.doc_id = "01HXXDOC";
@@ -289,7 +289,7 @@ TEST(MetadataGeneratorTest, FailedParseWithFilenameStillGenerates) {
 
 // §5.bis cortrix_f08_block_generate_duration_seconds feed point: each produced-block
 // Generate() must observe the histogram (the recorder method existed but Generate()
-// never fed it). Mirrors the F07 AssignFeedsDurationHistogram regression — lock that
+// never fed it). Mirrors the semantic score AssignFeedsDurationHistogram regression — lock that
 // each generating call increments _count by 1.
 TEST(MetadataGeneratorTest, GenerateFeedsDurationHistogram) {
     MetadataMetrics::Instance().ResetForTest();

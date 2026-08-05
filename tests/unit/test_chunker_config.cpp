@@ -125,7 +125,7 @@ TEST(ChunkerGucTest, LoadFromConfigNullOutRejected) {
     EXPECT_FALSE(ChunkerGuc::LoadFromConfig(cfg, nullptr).ok());
 }
 
-// --- ChunkerStartupValidator (F34-1: child_size <= reranker.max_seq_length) ----
+// --- ChunkerStartupValidator (child_size <= reranker.max_seq_length) ---------
 
 TEST(ChunkerStartupValidatorTest, ValidWhenChildSizeWithinMaxSeqLength) {
     EXPECT_TRUE(ChunkerStartupValidator::ValidateChildSizeCompat(200, 512).ok());
@@ -133,7 +133,7 @@ TEST(ChunkerStartupValidatorTest, ValidWhenChildSizeWithinMaxSeqLength) {
 }
 
 TEST(ChunkerStartupValidatorTest, FailsWhenChildSizeExceedsMaxSeqLength) {
-    // UT-F34-2: child_size=600 / max_seq_length=512 -> startup fails.
+    // Case 2: child_size=600 / max_seq_length=512 -> startup fails.
     Status s = ChunkerStartupValidator::ValidateChildSizeCompat(600, 512);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);

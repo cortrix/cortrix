@@ -7,8 +7,8 @@
 
 #include "cortrix/server/routes/document_routes.h"
 #include "cortrix/upload/upload_handler.h"
-#include "cortrix/deploy/disk_monitor.h"  // [gap②] F24 disk gate on the upload route
-#include "ns_pool_test_helper.h"  // [wire⑤c] F05 NsPoolHarness replaces MVP NamespaceManager
+#include "cortrix/deploy/disk_monitor.h"  // Deployment disk gate on the upload route
+#include "ns_pool_test_helper.h"  // Namespace pool NsPoolHarness replaces MVP NamespaceManager
 #include "unit/namespace_authz_test_helper.h"  // [V6] runtime NS-authz seam over a real PermissionService
 #include "cortrix/auth/api_key_auth.h"
 #include "cortrix/auth/auth_middleware.h"
@@ -56,7 +56,7 @@ protected:
         config_.upload.large_file_threshold = 100 * 1024 * 1024;
         config_.embedding.dimension = 128;
 
-        // [wire⑤c] F05 NS resource pool replaces the MVP NamespaceManager +
+        // Namespace pool NS resource pool replaces the MVP NamespaceManager +
         // CortrixNamespaceManager (RegisterDocumentRoutes now takes INamespacePool&).
         // Admit "default" so uploads to it succeed (was implicit in the MVP manager).
         harness_ = std::make_unique<test::NsPoolHarness>(temp_dir_);
@@ -93,7 +93,7 @@ protected:
         spc_ = std::make_unique<TestSPCManager>();
         handler_ = std::make_unique<UploadHandler>(config_.upload, *spc_);
 
-        // [gap②] F24 disk gate on the upload route. Not Start()ed — tests drive the
+        // Deployment disk gate on the upload route. Not Start()ed — tests drive the
         // NORMAL/WARN/CRIT FSM deterministically via CheckWithSample(); the default
         // state is NORMAL so the existing upload tests are unaffected.
         deploy::DiskMonitorConfig dm_cfg;
@@ -171,7 +171,7 @@ protected:
     std::unique_ptr<cortrix::test::NamespaceAuthzHarness> authz_;
     std::unique_ptr<TestSPCManager> spc_;
     std::unique_ptr<UploadHandler> handler_;
-    std::unique_ptr<deploy::DiskMonitor> disk_monitor_;  // [gap②] upload-route disk gate
+    std::unique_ptr<deploy::DiskMonitor> disk_monitor_;  // upload-route disk gate
     std::unique_ptr<httplib::Server> server_;
     std::thread server_thread_;
     int port_ = 18080;  // Use a non-standard port for testing
@@ -322,7 +322,7 @@ TEST_F(DocumentUploadApiTest, Status_DocNotFound) {
     EXPECT_EQ(res->status, 404);
 }
 
-// [D3.5 gap②] F24 §6 / F24-4 decision A: at CRIT the upload endpoint rejects
+// Deployment: at CRIT the upload endpoint rejects
 // BEFORE any byte is written — 507 + the full CX_ERR_DISK_FULL Agent-friendly
 // body; when pressure clears (NORMAL) uploads succeed again.
 TEST_F(DocumentUploadApiTest, Upload_DiskFull_Rejected507) {

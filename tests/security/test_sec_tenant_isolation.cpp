@@ -4,14 +4,14 @@
 /// Asserts that one tenant can never read, query, list, or dedup-bleed into
 /// another tenant's data. Three layers are exercised with REAL objects:
 ///
-///   1. Store layer (per-NS physical separation via the F05 pool / NamespaceFacade):
+///   1. Store layer (per-NS physical separation via the namespace pool / NamespaceFacade):
 ///        - Tenant A writes a namespace; tenant B's per-NS store sees nothing
 ///          (doc_get / doc_find_by_source / doc_find_by_hash / count).
 ///        - Content-addressed dedup does NOT bleed across tenants: byte-identical
 ///          content in A and B stays logically separate (each NS store is its own
 ///          db; find_by_hash in B never returns A's doc).
 ///
-///   2. Authorization layer (F04 AuthorizeNamespaces, anti-enumeration):
+///   2. Authorization layer (cross-NS query AuthorizeNamespaces, anti-enumeration):
 ///        - Tenant B requesting tenant A's NS → CX_ERR_NS_UNAUTHORIZED, and a
 ///          NON-EXISTENT NS yields the SAME error (existence never leaked).
 ///        - A scatter/cross-NS request only ever queries the principal's own
@@ -203,7 +203,7 @@ TEST_F(TenantStoreIsolationTest, TenantBSearchNeverSurfacesTenantAContent) {
 }
 
 // ============================================================
-// 2. Authorization-layer isolation (F04 AuthorizeNamespaces)
+// 2. Authorization-layer isolation (cross-NS query AuthorizeNamespaces)
 // ============================================================
 
 namespace q = cortrix::query;

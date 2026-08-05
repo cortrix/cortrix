@@ -1,4 +1,4 @@
-// system_config_routes.cpp coverage — the F48 §6.3 agent_llm config API:
+// system_config_routes.cpp coverage — the agent_llm config API:
 //   GET /api/v1/system/agent_llm_config  (read, api_key masked)
 //   PUT /api/v1/system/agent_llm_config  (admin only, field-merge semantics)
 //

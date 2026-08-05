@@ -8,13 +8,13 @@
 #include "cortrix/import/f16a_schema_provider.h"
 
 // S1 coverage: F16aSchemaProvider creates db_connections + import_tasks + their
-// indices (F16a §4.1 / §4.2) in the catalog DB, idempotently, inside the frozen
+// indices (DB import / §4.2) in the catalog DB, idempotently, inside the frozen
 // ISchemaProvider contract.
 namespace cortrix::import {
 namespace {
 
-// Minimal stand-ins for the catalog FK targets (F12 tenants / namespaces). The real
-// catalog migration creates the full tables; we only need the PKs the F16a FKs
+// Minimal stand-ins for the catalog FK targets (catalog tenants / namespaces). The real
+// catalog migration creates the full tables; we only need the PKs the DB import FKs
 // reference so foreign_keys=ON is satisfiable.
 constexpr const char* kPrereqSql = R"SQL(
 PRAGMA foreign_keys = ON;

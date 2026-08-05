@@ -8,7 +8,7 @@
 #include "cortrix/common/block_header.h"
 #include "cortrix/common/block_types.h"
 
-// Value-matrix breadth coverage for the F09 128-byte block header codec
+// Value-matrix breadth coverage for the block header 128-byte block header codec
 // (BlockBuild / BlockParse / BlockComputeCrc32 / BlockHeaderToString).
 //
 // Real behavior (block_header.h / src/store/block_header.cpp, verified):

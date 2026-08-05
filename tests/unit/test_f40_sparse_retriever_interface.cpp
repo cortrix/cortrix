@@ -6,7 +6,7 @@
 
 #include "cortrix/retrieval/sparse_retriever.h"
 
-// F40 S4 — ISparseRetriever interface contract. A header-only abstraction; this
+// Sparse retrieval S4 — ISparseRetriever interface contract. A header-only abstraction; this
 // test pins the signatures + polymorphic contract by implementing a minimal
 // in-memory retriever against it (the real SPLADE impl lands in S5/S6). It also
 // doubles as the reusable mock other stories / D3.5 wiring can lean on.

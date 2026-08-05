@@ -9,7 +9,7 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/config/auth_config.h"
 
-// P08 S7: SMTP admin API (§2.12 / §4.6, Issue 8) — SetSmtp persists + hot-reloads;
+// Auth S7: SMTP admin API (§2.12 / §4.6, Issue 8) — SetSmtp persists + hot-reloads;
 // GetSmtpRedacted masks the password.
 namespace cortrix::auth {
 namespace {

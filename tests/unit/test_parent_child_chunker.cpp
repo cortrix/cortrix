@@ -175,7 +175,7 @@ TEST(ParentChildChunkerTest, ParentTokenCountWithinBudget) {
     }
 }
 
-// --- metadata inheritance (UT-F34-5) -------------------------------------------
+// --- metadata inheritance ------------------------------------------------------
 
 TEST(ParentChildChunkerTest, MetadataInheritedThreeLayers) {
     ChunkerInput in = MakeInput({MakePage(1, {Words(300)})});
@@ -202,7 +202,7 @@ TEST(ParentChildChunkerTest, MetadataInheritedThreeLayers) {
     }
 }
 
-// --- page provenance + per-page tolerance (UT-F34-4) ---------------------------
+// --- page provenance + per-page tolerance -------------------------------------
 
 TEST(ParentChildChunkerTest, PageRangeTracked) {
     ChunkerConfig cfg;
@@ -218,10 +218,10 @@ TEST(ParentChildChunkerTest, PageRangeTracked) {
 }
 
 TEST(ParentChildChunkerTest, FailedPageSkippedAndCounted) {
-    // UT-F34-4: a page F06 could not parse arrives empty (no paragraphs, empty
+    // A page the parser could not parse arrives empty (no paragraphs, empty
     // page_text); it is skipped and counted in stats.failed_pages.
     ParsedPage good = MakePage(1, {"usable content on page one"});
-    ParsedPage bad;  // page 2: empty (simulated F06 failure)
+    ParsedPage bad;  // page 2: empty (simulated parser failure)
     bad.page_num = 2;
     ParsedPage good2 = MakePage(3, {"usable content on page three"});
 

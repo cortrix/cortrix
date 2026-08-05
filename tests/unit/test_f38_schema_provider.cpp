@@ -1,8 +1,8 @@
-// F38 S0 — kBlockHypeQuestion=16 block sub-type + F38SchemaProvider. Unlike F03
-// (real per-Unit columns), F38 owns no table/column: a hype_question Block is a
-// row in the F09 blocks table with block_type=16, so Migrate(0->1) is a no-op.
+// HyPE S0 — kBlockHypeQuestion=16 block sub-type + F38SchemaProvider. Unlike enricher
+// (real per-Unit columns), HyPE owns no table/column: a hype_question Block is a
+// row in the blocks table with block_type=16, so Migrate(0->1) is a no-op.
 // These tests pin the enum value, the no-op semantics, and the SchemaMigrator
-// registration closure. Mirrors test_reranker_schema_provider / F03.
+// registration closure. Mirrors test_reranker_schema_provider / enricher.
 #include <gtest/gtest.h>
 
 #include <sqlite3.h>
@@ -35,17 +35,17 @@ std::set<std::string> TableNames(sqlite3* db) {
 // ---------- block_type enum ----------
 
 TEST(F38BlockTypeTest, HypeQuestionIs16) {
-    // F38 owns block sub-type 16 (F09 §4.4 authorized). Pin the value so a later
+    // HyPE owns block sub-type 16 (block header authorized). Pin the value so a later
     // edit to the shared enum that moved it would fail here.
     EXPECT_EQ(static_cast<uint16_t>(cortrix::kBlockHypeQuestion), 16);
 }
 
 TEST(F38BlockTypeTest, DoesNotCollideWithExistingTypes) {
-    // 16 must differ from every pre-existing sub-type (1-8) and from F08's meta.
+    // 16 must differ from every pre-existing sub-type (1-8) and from meta.
     EXPECT_NE(cortrix::kBlockHypeQuestion, cortrix::kBlockMeta);     // 8
     EXPECT_NE(cortrix::kBlockHypeQuestion, cortrix::kBlockFile);     // 1
     EXPECT_NE(cortrix::kBlockHypeQuestion, cortrix::kBlockMemory);   // 7
-    // F41 owns 17 — F38 must not have taken it.
+    // Doc summary owns 17 — HyPE must not have taken it.
     EXPECT_NE(static_cast<uint16_t>(cortrix::kBlockHypeQuestion), 17);
 }
 
@@ -65,7 +65,7 @@ TEST(F38SchemaProviderTest, MigrateIsNoOpNoNewTable) {
     EXPECT_TRUE(p.Migrate(db, 0, 1).ok());  // init no-op
     EXPECT_TRUE(p.Migrate(db, 1, 1).ok());  // already current
     auto after = TableNames(db);
-    EXPECT_EQ(before, after);  // F38 creates no table (contrast F03)
+    EXPECT_EQ(before, after);  // HyPE creates no table (contrast enricher)
     sqlite3_close(db);
 }
 
@@ -81,9 +81,9 @@ TEST(F38SchemaProviderTest, UnexpectedVersionStepIsError) {
 }
 
 TEST(F38SchemaProviderTest, RegistersWithSchemaMigrator) {
-    // F38 provider runs inside the F12 SchemaMigrator (the D3.5 integrated path).
-    // Pin the closure: MigrateUnit succeeds and records F38 at version 1 without
-    // creating any F38 table.
+    // HyPE provider runs inside the catalog SchemaMigrator (the D3.5 integrated path).
+    // Pin the closure: MigrateUnit succeeds and records HyPE at version 1 without
+    // creating any HyPE table.
     F38SchemaProvider p;
     cortrix::catalog::SchemaMigrator migrator;
     migrator.Register(&p);
@@ -92,7 +92,7 @@ TEST(F38SchemaProviderTest, RegistersWithSchemaMigrator) {
     auto before = TableNames(db);
     ASSERT_TRUE(migrator.MigrateUnit(db, "unit_test").ok());
     EXPECT_EQ(migrator.CurrentVersion(db, "F38"), 1);
-    // Only the migrator's own bookkeeping table may appear; no F38 table.
+    // Only the migrator's own bookkeeping table may appear; no HyPE table.
     auto after = TableNames(db);
     EXPECT_EQ(after.count("hype_questions"), 0u);
     EXPECT_EQ(after.count("hype"), 0u);

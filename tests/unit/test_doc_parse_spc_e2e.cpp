@@ -1,19 +1,19 @@
-// doc-parse → SPC end-to-end (B3 · Plan B · F42 §4.1.2): proves the async large-doc
+// doc-parse → SPC end-to-end (B3 · Plan B · async task): proves the async large-doc
 // path wired by B1 (SPCPipeline::ProcessParsed split) + B2a (SPCManager::ProcessParsedDoc
 // proxy) + B2b-1 (DocumentProcessor hands its parsed doc to SPC) actually runs THROUGH
 // the REAL SPC pipeline and lands blocks — not just the call contract a mock verifies:
 //
 //   DocumentProcessor::ProcessTask
-//     → F06 parse (StubParser drives per-page progress, returns a ParsedDoc)
+//     → parse (StubParser drives per-page progress, returns a ParsedDoc)
 //       → SPCManager::ProcessParsedDoc(parsed, spc_task)   [real, not MockSPCManager]
-//         → NamespaceFacade::Acquire (real F05 pool)
-//           → SPCPipeline::ProcessParsed (Chunk → F08 META → F03 enrich → embed →
-//             assemble → F25 write) → real SQLite `blocks` + P-HNSW point
+//         → NamespaceFacade::Acquire (real namespace pool)
+//           → SPCPipeline::ProcessParsed (Chunk → META → enrich → embed →
+//             assemble → write) → real SQLite `blocks` + P-HNSW point
 //     → TaskFinalizer::Complete → task.status = completed
 //
 // Unlike test_document_processor.cpp's WiredToSpc tests (which inject a MockSPCManager
 // returning 0/-1 to verify the *call + finalize* contract), this wires the REAL
-// SPCManager + SPCPipeline over an NsPoolHarness (the same proven F05 pool the spc
+// SPCManager + SPCPipeline over an NsPoolHarness (the same proven namespace pool the spc
 // pilot stands up) and asserts blocks actually persist. It closes the B3 gap: "real
 // ProcessParsed writes blocks", which the mock path could never exercise.
 //
@@ -36,7 +36,7 @@
 #include "cortrix/async/task_handler.h"         // ITaskHandler (SignalingHandler base)
 #include "cortrix/async/task_info.h"
 #include "cortrix/async/task_manager.h"
-#include "cortrix/async/task_scheduler.h"       // real F42 scheduler (async dispatch)
+#include "cortrix/async/task_scheduler.h"       // real async task scheduler (async dispatch)
 #include "cortrix/async/task_type.h"            // kTaskDocParse
 #include "cortrix/async/worker_pool.h"          // real WorkerPool (task_type dispatch)
 #include "cortrix/chunker/parent_child_chunker.h"
@@ -51,10 +51,10 @@
 #include "cortrix/spc/parser_factory.h"
 #include "cortrix/spc/spc_manager.h"
 #include "cortrix/spc/spc_pipeline.h"
-#include "cortrix/spc_enricher.h"               // F03 NullEnricher (IsAvailable()==false)
+#include "cortrix/spc_enricher.h"               // NullEnricher (IsAvailable()==false)
 #include "cortrix/store/cortrix_store.h"
 
-#include "ns_pool_test_helper.h"               // test::NsPoolHarness (F05 pool + FakeIndex)
+#include "ns_pool_test_helper.h"               // test::NsPoolHarness (namespace pool + FakeIndex)
 #include "parser_stub.h"                        // spc::test::StubParser / MakeOnePageDoc
 #include "test_name_util.h"
 
@@ -67,14 +67,14 @@ using spc::test::MakeOnePageDoc;
 using spc::test::StubParser;
 
 // A multi-paragraph body long enough to chunk into several children under the default
-// ChunkerConfig (child_size=200), so the write produces real child blocks (+ one F08 META).
+// ChunkerConfig (child_size=200), so the write produces real child blocks (+ one META).
 std::string LongBody() {
     std::string s;
     for (int i = 0; i < 12; ++i) s += "Cortrix async ingest writes real blocks end to end. ";
     return s;  // ~600 chars
 }
 
-// A StubParser that drives opts.on_page_progress for pages 1..total (mirroring F06's
+// A StubParser that drives opts.on_page_progress for pages 1..total (mirroring parser's
 // per-page streaming) then returns `result` — same shape as test_document_processor.cpp.
 std::unique_ptr<StubParser> MakeDrivingStub(int total_pages, ParsedDoc result) {
     auto stub = std::make_unique<StubParser>("docling", std::vector<std::string>{"pdf"});
@@ -140,7 +140,7 @@ protected:
         chunker_ = std::make_unique<chunker::ParentChildChunker>(chunker::ChunkerConfig{});
         assembler_ = std::make_unique<BlockAssembler>();
 
-        // F06 factory with the driving stub (its ParsedDoc is what SPC processes).
+        // Parser factory with the driving stub (its ParsedDoc is what SPC processes).
         factory_ = std::make_unique<spc::DocumentParserFactory>(factory_cfg_);
         factory_->SetPrimaryParser(MakeDrivingStub(2, MakeOnePageDoc("docling", 0.95f, LongBody())));
 
@@ -150,7 +150,7 @@ protected:
             *factory_, *chunker_, *embedder_, *assembler_, enricher_);
         spc_mgr_ = std::make_unique<SPCManager>(spc_config_, harness_->ipool(), std::move(pipeline));
 
-        // A real on-disk .pdf so the F06 factory pre-check stat() passes (the stub does
+        // A real on-disk .pdf so the parser factory pre-check stat() passes (the stub does
         // not read it — it returns the seeded ParsedDoc).
         // Unique per test: parallel ctest processes must not share the stub
         // (a sibling's TearDown/remove yanks it mid-parse; F-1 race family).
@@ -218,7 +218,7 @@ protected:
 };
 
 // E2E success: a parsed doc handed to the REAL SPCManager::ProcessParsedDoc runs the full
-// post-parse pipeline and lands blocks (children + one F08 META) + a P-HNSW point; the task
+// post-parse pipeline and lands blocks (children + one META) + a P-HNSW point; the task
 // finalizes completed. This is what the MockSPCManager path can never prove.
 TEST_F(DocParseSpcE2ETest, ParsedDocReachesSpcPipelineAndWritesBlocks) {
     const std::string doc_id = SeedDoc();
@@ -232,7 +232,7 @@ TEST_F(DocParseSpcE2ETest, ParsedDocReachesSpcPipelineAndWritesBlocks) {
     EXPECT_EQ(mgr_.GetTask(task.task_id).value().status, async::task_status::kCompleted);
 
     // Blocks really persisted in the test-ns store: ≥1 child (kBlockFile) + exactly one
-    // doc-level F08 META (kBlockMeta), all carrying the doc_id.
+    // doc-level META (kBlockMeta), all carrying the doc_id.
     auto blocks = BlocksOf(doc_id);
     ASSERT_GT(blocks.size(), 0u);
     int meta = 0, children = 0;

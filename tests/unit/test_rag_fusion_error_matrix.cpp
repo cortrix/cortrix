@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/query/rag_fusion_error.h"
 
-// Exhaustive parameterized error-registry sweep for F36 RAG-Fusion (§7, 6 codes =
+// Exhaustive parameterized error-registry sweep for RAG-Fusion (§7, 6 codes =
 // 5 err + 1 warn). kDegraded uses the CX_WARN_ prefix, so the code-string regex
 // accepts CX_ERR_ or CX_WARN_.
 namespace cortrix::query {

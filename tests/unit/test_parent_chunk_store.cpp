@@ -75,7 +75,7 @@ TEST_F(ParentChunkStoreTest, PutAndGetRoundTrips) {
     EXPECT_EQ(got.page_end, 2u);
     EXPECT_EQ(got.byte_offset_start, 100u);
     EXPECT_EQ(got.byte_offset_end, 200u);
-    // metadata_json round-trips with F06 ParseDocMeta field names.
+    // metadata_json round-trips with ParseDocMeta field names.
     EXPECT_EQ(got.metadata.doc_title, "Title");
     EXPECT_EQ(got.metadata.doc_language, "zh");
     EXPECT_EQ(got.metadata.mime_type, "application/pdf");
@@ -139,7 +139,7 @@ TEST_F(ParentChunkStoreTest, UnopenedStoreReturnsDbError) {
     EXPECT_NE(r.status().message().find(store_errors::kDbError), std::string::npos);
 }
 
-// --- F34 §2.5 lookup metrics (cortrix_parent_chunk_store_lookup_*) -------------
+// --- parent-child chunking lookup metrics (cortrix_parent_chunk_store_lookup_*) -------------
 
 // Uses an injected, isolated ParentChunkStoreMetrics so assertions don't depend
 // on the process-wide Instance() (other tests may also feed the singleton).

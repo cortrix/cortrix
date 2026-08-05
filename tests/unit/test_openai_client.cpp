@@ -249,7 +249,7 @@ TEST(OpenAiLlmClientTest, FallsBackToDefaultModelWhenCallModelEmpty) {
 }
 
 // A downstream feature consuming through the ILlmClient interface with a mock —
-// no live endpoint. (Mirrors F03 LlmEnricher's seam.)
+// no live endpoint. (Mirrors LlmEnricher's seam.)
 TEST(MockLlmClientTest, DownstreamConsumesInterface) {
     MockLlmClient mock;
     ChatCompletionResponse canned;

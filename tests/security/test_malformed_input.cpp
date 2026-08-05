@@ -15,7 +15,7 @@
 #include "cortrix/config/config.h"
 #include "cortrix/auth/api_key_auth.h"
 #include "cortrix/auth/auth_context.h"
-// [wire⑤c follow-up] MVP managers removed; fixture stands on the F05 pool.
+// MVP managers removed; fixture stands on the namespace pool.
 #include "unit/namespace_authz_test_helper.h"
 #include "unit/ns_pool_test_helper.h"
 #include "cortrix/memory/memory_routes.h"

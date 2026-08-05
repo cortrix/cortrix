@@ -6,7 +6,7 @@
 
 #include "cortrix/retrieval/sparse_rrf.h"
 
-// F40 S8 — chunk-level 5-path RRF fusion (§9.1). dense + sparse + fts5 carry real
+// Sparse retrieval S8 — chunk-level 5-path RRF fusion (§9.1). dense + sparse + fts5 carry real
 // structure; contextualized + hype are MOCK (empty lists) this round.
 namespace cortrix::retrieval {
 namespace {
@@ -91,7 +91,7 @@ TEST(F40SparseRrfTest, ContributingPathsRecorded) {
     EXPECT_TRUE(HasPath(*b, RrfPath::kFts5));
 }
 
-// ---------- F35/F38 mock paths (empty this round) ----------
+// ---------- contextual retrieval/HyPE mock paths (empty this round) ----------
 
 TEST(F40SparseRrfTest, MockContextualizedAndHypeEmptyAreNoOps) {
     FivePathInput in;
@@ -108,7 +108,7 @@ TEST(F40SparseRrfTest, MockContextualizedAndHypeEmptyAreNoOps) {
 }
 
 TEST(F40SparseRrfTest, MockPathsCanContributeWhenPopulated) {
-    // The fusion is path-agnostic: when F35/F38 land (D3.5) they just supply
+    // The fusion is path-agnostic: when contextual retrieval/HyPE land (D3.5) they just supply
     // their lists. Verify the mechanism by populating them here.
     FivePathInput in;
     in.contextualized = L({"a"});

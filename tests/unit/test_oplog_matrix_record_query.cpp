@@ -2,12 +2,12 @@
 //
 // Surfaces (all deterministic: in-memory SQLite, fixed timestamps, no clock/IO):
 //   A. OperationLogger record (Log/BatchLog) x query (filter-dimension x
-//      pagination x sort) matrices - the user-view track (F18a sec 5.2).
-//   B. observability operation_log SCHEMA / version / migrate projections (F18a sec 5.1).
+//      pagination x sort) matrices - the user-view track (operation log).
+//   B. observability operation_log SCHEMA / version / migrate projections (operation log).
 //   C. ObservabilityContext / ObservabilityValidator identity-header + MCP
-//      capability projections, FormatStructured trace correlation (F13 sec 5.1/sec 6.1).
+//      capability projections, FormatStructured trace correlation (agent trace/sec 6.1).
 //   D. AgentTraceWriterImpl record/query EDGES not covered by the metrics matrix
-//      (the ops-view track, F13 sec 5.2).
+//      (the ops-view track, agent trace).
 //
 // Does NOT duplicate the OperationLoggerTest cleanup/metric-emit sweeps or the
 // agent_trace metrics_matrix label sweeps - this is the record/query + schema +
@@ -368,7 +368,7 @@ TEST_F(OpLogMatrixSchemaFx, MigrateViaSharedMigratorSucceeds) {
     EXPECT_TRUE(HasTable("operation_log"));
 }
 
-// agent_trace schema parallel projection (F13 sec 4.1 = 3 indices).
+// agent_trace schema parallel projection (agent trace = 3 indices).
 TEST_F(OpLogMatrixSchemaFx, AgentTraceSchemaVersionAndProvider) {
     EXPECT_EQ(agent_trace::kAgentTraceSchemaVersion, 1);
     agent_trace::AgentTraceSchemaProvider p;
@@ -385,7 +385,7 @@ TEST_F(OpLogMatrixSchemaFx, AgentTraceSchemaVersionAndProvider) {
 
 using observability::ObservabilityValidator;
 
-// Identity-format whitelist matrix (F13 sec 6.1 [a-zA-Z0-9_.:/-], <=128).
+// Identity-format whitelist matrix (agent trace [a-zA-Z0-9_.:/-], <=128).
 struct IdRow { const char* value; bool valid; };
 class OpLogMatrixIdFormat : public ::testing::TestWithParam<IdRow> {};
 TEST_P(OpLogMatrixIdFormat, IsValidFormatMatrix) {

@@ -16,10 +16,10 @@
 // test genuinely triggering them:
 //   CX_ERR_DOC_ALREADY_EXISTS — per-doc submit failure re-inflated in meta.failed[]
 //   CX_ERR_INVALID_CONTENT    — per-doc submit failure re-inflated in meta.failed[]
-//   CX_ERR_METADATA_SCHEMA    — F08 migration SQL fails (CREATE INDEX on a
+//   CX_ERR_METADATA_SCHEMA    — META block migration SQL fails (CREATE INDEX on a
 //                               pre-existing, incompatible metadata_blocks table)
 //   CX_ERR_CONTEXTUAL_STORE   — WriteContextualized prepare fails (target columns
-//                               absent) when F35 produced output
+//                               absent) when contextual retrieval produced output
 
 namespace cortrix::server {
 namespace {
@@ -28,7 +28,7 @@ using async::SubmitRequest;
 using async::TaskInfo;
 
 // Programmable submit seam (mirrors test_batch_submit_service.cpp's stub): a
-// per-doc_id Status carrying the "CX_ERR_X: detail" token the production F42 seam
+// per-doc_id Status carrying the "CX_ERR_X: detail" token the production async task seam
 // hands back, which BatchSubmitService re-inflates into the meta.failed[] item.
 class StubTaskSubmitter : public ITaskSubmitter {
 public:
@@ -46,7 +46,7 @@ private:
     std::unordered_map<std::string, Status> fail_;
 };
 
-// CX_ERR_DOC_ALREADY_EXISTS: the submit seam reports a duplicate doc (F42 dedup);
+// CX_ERR_DOC_ALREADY_EXISTS: the submit seam reports a duplicate doc (async task dedup);
 // BatchSubmitService::ClassifyPerDocCode reuses the originating code (§2.4.2) and
 // surfaces it as the failed[] error_code with the permanent/non-retryable contract.
 TEST(IngestErrPathTest, DocAlreadyExists_SurfacesInFailedItem) {
@@ -105,7 +105,7 @@ TEST(IngestErrPathTest, InvalidContent_SurfacesInFailedItem) {
 namespace cortrix::metadata {
 namespace {
 
-// CX_ERR_METADATA_SCHEMA: the F08 0→1 migration runs CREATE INDEX ... ON
+// CX_ERR_METADATA_SCHEMA: the META block 0→1 migration runs CREATE INDEX ... ON
 // metadata_blocks(namespace_id, created_at). Pre-create a metadata_blocks table
 // that lacks namespace_id so CREATE TABLE IF NOT EXISTS is a no-op but the index
 // creation fails → sqlite3_exec returns non-OK → the Internal CX_ERR_METADATA_SCHEMA
@@ -137,7 +137,7 @@ namespace {
 // CX_ERR_CONTEXTUAL_STORE: WriteContextualized UPDATEs blocks.contextualized_* .
 // On a blocks table WITHOUT those columns (F35SchemaProvider migration not run),
 // the prepare step fails and SqlErr() surfaces the CX_ERR_CONTEXTUAL_STORE token —
-// but ONLY when F35 actually produced output (status != 0), so the no-op guard is
+// but ONLY when contextual retrieval actually produced output (status != 0), so the no-op guard is
 // passed first.
 TEST(ContextualStoreErrPathTest, PrepareFailureWhenColumnsMissing_SurfacesCxCode) {
     sqlite3* db = nullptr;
@@ -151,7 +151,7 @@ TEST(ContextualStoreErrPathTest, PrepareFailureWhenColumnsMissing_SurfacesCxCode
         nullptr, nullptr, nullptr), SQLITE_OK);
 
     EnrichResult r;
-    r.contextualized_text = "context: txt";  // F35 ran → past the no-op guard
+    r.contextualized_text = "context: txt";  // Contextual retrieval ran → past the no-op guard
     r.contextualized_status = 1;             // generated
     Status s = WriteContextualized(db, 7, r);
 
@@ -172,7 +172,7 @@ TEST(ContextualStoreErrPathTest, NoF35OutputIsOkEvenWithoutColumns) {
         "CREATE TABLE blocks (block_id INTEGER PRIMARY KEY, doc_id TEXT)",
         nullptr, nullptr, nullptr), SQLITE_OK);
 
-    EnrichResult r;  // status 0, no text/embedding → F35 never ran
+    EnrichResult r;  // status 0, no text/embedding → contextual retrieval never ran
     EXPECT_TRUE(WriteContextualized(db, 7, r).ok());
     sqlite3_close(db);
 }

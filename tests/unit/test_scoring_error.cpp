@@ -10,7 +10,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/scoring/scoring_error.h"
 
-// F07 S8 / §4.4 coverage: the 2 F07 error identities — CX_ERR_F07_* identity, category
+// Semantic score S8 / §4.4 coverage: the 2 semantic score error identities — CX_ERR_F07_* identity, category
 // mapping, retryability, the GEN-Agent 4-field boundary factory, the structured_data
 // contract, and the Status bridge. Mirrors tests/unit/test_import_error.cpp (template A).
 namespace cortrix::scoring {

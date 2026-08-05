@@ -1,4 +1,4 @@
-// F01 S6 — P-HNSW end-to-end integration (F01-internal, design § 6 S6).
+// Index S6 — P-HNSW end-to-end integration (F01-internal, design § 6 S6).
 //
 // A cohesive durable-lifecycle scenario exercised purely at the PHnsw level (the
 // cross-Feature SPC/Query-path E2E lives in D3.5 once the consumer migration

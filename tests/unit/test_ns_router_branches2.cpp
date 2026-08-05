@@ -15,7 +15,7 @@
 
 // Additional branch coverage for DefaultINSRouter targeting regions that earlier
 // tests left untouched (confirmed via gcov line-by-line):
-//   - the F05 admission hook (f05_pool_ != nullptr): both the admit-success arm AND
+//   - the namespace pool admission hook (f05_pool_ != nullptr): both the admit-success arm AND
 //     the admit-failure compensation arm (RemoveNamespaceCatalogRows, lines 256-260
 //     + 375-393) — earlier tests used a NULL pool so this whole region was
 //     dead.
@@ -105,7 +105,7 @@ protected:
     FakePool pool_;
 };
 
-// ── F05 admission hook: success arm ──────────────────────────────────────────
+// ── namespace pool admission hook: success arm ───────────────────────────────
 
 // With an injected pool whose AdmitCreate succeeds, CreateNamespace runs the
 // catalog INSERT THEN calls pool.AdmitCreate (the f05_pool_ != nullptr true arm +
@@ -121,7 +121,7 @@ TEST_F(NsRouterBranch2Test, CreateWithPoolAdmitSuccess) {
     EXPECT_EQ(CountWhere("namespaces", "ns_id='ns-ok'"), 1);
 }
 
-// ── F05 admission hook: failure arm → compensation ───────────────────────────
+// ── namespace pool admission hook: failure arm → compensation ────────────────
 
 // A failing AdmitCreate triggers the §5.1.bis compensation path: the admit Status
 // is returned to the caller and RemoveNamespaceCatalogRows runs (lines 256-260 +
@@ -163,7 +163,7 @@ TEST_F(NsRouterBranch2Test, CompensationRemovesRowsWithFkOff) {
     EXPECT_TRUE(router.CreateNamespace(MakeNs("ns-evict")).ok());
 }
 
-// SetPool late-binds the hook after construction (F13 ctor-cycle break); a create
+// SetPool late-binds the hook after construction (agent trace ctor-cycle break); a create
 // after SetPool exercises the same admit arm via the late-bound pointer.
 TEST_F(NsRouterBranch2Test, SetPoolLateBindsAdmissionHook) {
     DefaultINSRouter router(catalog_.db());  // built with NULL pool

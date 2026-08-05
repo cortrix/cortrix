@@ -15,7 +15,7 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/server/routes/auth_routes.h"
 
-// FA1 R11 coverage: the P08 §2.11 POST /api/v1/admin/auth/rotate-jwt-secret route.
+// FA1 R11 coverage: the auth POST /api/v1/admin/auth/rotate-jwt-secret route.
 // The rotation mechanics are unit-tested in test_jwt_secret_rotate.cpp; here we
 // cover the HTTP boundary — admin gate + the Agent-friendly RotationResult body.
 namespace cortrix {

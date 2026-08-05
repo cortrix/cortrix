@@ -1,4 +1,4 @@
-// F41 doc-discovery HTTP handler + orchestration core
+// Doc-discovery HTTP handler + orchestration core
 // (src/doc_summary/discover_handler.cpp). Deterministic GoogleTest cases for:
 //   - HandleDocumentsDiscover param validation (query / ns|namespace / top_k / explain)
 //   - ExecuteDocDiscovery degrade paths (Acquire fail / HNSW throw / fts5 gate / fts5
@@ -346,7 +346,7 @@ TEST_F(ExecuteTest, ExplainNoFallbackTriggeredWhenFallbackEmpty) {
 }
 
 TEST_F(ExecuteTest, Fts5EmptyIndexIsSilentNoOpAndMainResultSurvives) {
-    // The per-Unit store auto-creates doc_fts5_index via the F41 schema provider, so a
+    // The per-Unit store auto-creates doc_fts5_index via the doc summary schema provider, so a
     // query that simply matches no rows is a SILENT no-op (not a prepare-fault): the
     // fallback-failed metric stays put, no fallback_triggered is emitted, and the main
     // HNSW result still surfaces. (A genuine SQLite fault would need fault injection;

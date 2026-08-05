@@ -10,7 +10,7 @@ namespace {
 
 namespace fs = std::filesystem;
 
-// F06 real-parser inference (D3.5): drives the actual docling / paddleocr
+// Real-parser inference (D3.5): drives the actual docling / paddleocr
 // libraries through the production bridges against committed fixtures.
 // SKIPPED unless CORTRIX_PARSER_PYTHON points at a python with the
 // requirements-parser.txt deps installed (docling needs its layout models

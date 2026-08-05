@@ -13,7 +13,7 @@
 // DEPTH — two anti-regression gaps the coverage mapping flagged:
 //
 // (1) CragBreakerDepth: the circuit-breaker COOLDOWN → half-open → re-close
-//     recovery cycle (the breaker re-closes after cooldown). The F37
+//     recovery cycle (the breaker re-closes after cooldown). The CRAG
 //     CragEvaluator owns a reranker::CircuitBreaker but exposes neither the
 //     breaker nor a clock seam, and CragConfig has no cooldown field — so the
 //     breaker recovery is NOT deterministically reachable THROUGH CragEvaluator

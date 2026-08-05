@@ -1,4 +1,4 @@
-// F01 S2 — WalWriter file-layer tests (design § 6 S2 test matrix).
+// Index S2 — WalWriter file-layer tests (design § 6 S2 test matrix).
 //
 // Append single/batch, mixed INSERT/DELETE, ReadAll round-trip, Truncate, header
 // entry_count/committed_lsn updates, empty WAL, large file, corrupted trailing

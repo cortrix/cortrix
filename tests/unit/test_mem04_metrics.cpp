@@ -4,7 +4,7 @@
 
 #include "cortrix/memory/mem04_metrics.h"
 
-// S6 coverage: the MEM04 `mem04` subsystem metrics (§5.5 / OBSERVABILITY_SPEC §2.3) —
+// S6 coverage: the memory opt-out `mem04` subsystem metrics (§5.5 / OBSERVABILITY_SPEC §2.3) —
 // the 3 counters (opt_out_total{triggered_by} / opt_out_revoke_total /
 // extract_skipped_total), their increments, and the OpenMetrics text rendering.
 namespace cortrix::memory::immunity {

@@ -3,7 +3,7 @@
 #include "cortrix/common/block_types.h"
 #include "cortrix/retrieval/sparse_codec.h"
 
-// F40 S3 — sparse_vec BLOB serialize/deserialize round-trip + F09 flags_ext
+// Sparse retrieval S3 — sparse_vec BLOB serialize/deserialize round-trip + block header flags_ext
 // has_sparse_vec semantics. Wire format (§4.2): [u16 num_terms]([u16 id][f32 w])*.
 namespace cortrix::retrieval {
 namespace {
@@ -121,10 +121,10 @@ TEST(F40SparseCodecTest, TermIdOutOfUint16RangeRejected) {
     EXPECT_TRUE(blob.empty());
 }
 
-// ---------- F09 flags_ext has_sparse_vec semantics ----------
+// ---------- block header flags_ext has_sparse_vec semantics ----------
 
 TEST(F40SparseCodecTest, FlagBitValueIsBit4) {
-    // F40 owns flags_ext bit4 = 0x10 (block_types.h:49); pin it so a later edit
+    // Sparse retrieval owns flags_ext bit4 = 0x10 (block_types.h:49); pin it so a later edit
     // to the shared enum that moved the bit would fail here.
     EXPECT_EQ(static_cast<uint8_t>(kFlagExtHasSparseVec), 0x10);
 }
@@ -145,7 +145,7 @@ TEST(F40SparseCodecTest, NonEmptySparseSetsFlagEmptyClears) {
 }
 
 TEST(F40SparseCodecTest, SparseFlagDoesNotDisturbOtherExtBits) {
-    // Setting/clearing has_sparse_vec must leave F35 contextualized (bit3) etc.
+    // Setting/clearing has_sparse_vec must leave contextualized (bit3) etc.
     uint8_t flags_ext = kFlagExtHasContextualized | kFlagExtHasEntities;  // 0x08|0x01
     flags_ext |= kFlagExtHasSparseVec;                                    // +0x10
     EXPECT_TRUE(flags_ext & kFlagExtHasContextualized);

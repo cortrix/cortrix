@@ -1,6 +1,6 @@
 #pragma once
 // =============================================================
-// F23 §4.6 syscall fault-injection framework (TEST-ONLY).
+// Test suite syscall fault-injection framework (TEST-ONLY).
 //
 // Built as a separate shared library (cortrix_fault_inject) that the
 // unit-test binary links; it uses macOS dyld interposing
@@ -9,7 +9,7 @@
 // ftruncate/close) process-wide. Production binaries never link this
 // library, so production carries zero overhead and zero risk.
 //
-// Why: the durability layers (F25 pending log, F01 P-HNSW WAL +
+// Why: the durability layers (write coordinator pending log, index P-HNSW WAL +
 // snapshots) implement graceful handling for every syscall failure
 // (EIO, ENOSPC, short writes...). Those error branches are physically
 // unreachable from user-space tests against a healthy filesystem;

@@ -7,12 +7,12 @@
 #include "cortrix/catalog/schema_provider.h"
 #include "cortrix/spc/parser_schema_provider.h"
 
-// F06 §2.5 (Major-3): F06SchemaProvider adds namespaces.parser_config JSONB and
-// registers with the F12 SchemaMigrator. Idempotent.
+// Parser (Major-3): F06SchemaProvider adds namespaces.parser_config JSONB and
+// registers with the catalog SchemaMigrator. Idempotent.
 namespace cortrix::spc {
 namespace {
 
-// Minimal stand-in for F12's `namespaces` table (only the shape the migration
+// Minimal stand-in for catalog's `namespaces` table (only the shape the migration
 // touches matters here — standalone, no full catalog schema).
 void CreateNamespacesTable(sqlite3* db) {
     ASSERT_EQ(sqlite3_exec(db,
@@ -94,7 +94,7 @@ TEST(F06SchemaProviderTest, UnexpectedVersionStepIsError) {
     sqlite3_close(db);
 }
 
-// Runs through the real SchemaMigrator (the F12 integration point).
+// Runs through the real SchemaMigrator (the catalog integration point).
 TEST(F06SchemaProviderTest, RegistersAndMigratesViaMigrator) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);

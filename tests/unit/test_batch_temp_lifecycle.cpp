@@ -1,6 +1,6 @@
 // Lifecycle of server-materialized batch inputs (server::BatchTempDir).
 //
-// Those files exist only to give the F42 doc-parse worker something to open.
+// Those files exist only to give the async task doc-parse worker something to open.
 // Nothing used to delete them: the sole reference is tasks.filepath, and the
 // retention cron deletes task rows with plain SQL, so after the retention window
 // the files became unreferenced orphans that no sweep could even identify. The
@@ -8,7 +8,7 @@
 //   1. TaskFinalizer releases the input at every terminal exit;
 //   2. SweepOrphanedBatchInputs reclaims what (1) can never see — tasks ended by
 //      the bulk zombie/timeout UPDATEs, crash leftovers, and files superseded by
-//      the F42 debounce refresh.
+//      the async task debounce refresh.
 // The negative cases matter as much as the positive ones: a queued task's input
 // must survive (it is re-read after a restart), and caller-owned paths outside
 // the managed dir must never be touched.

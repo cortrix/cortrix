@@ -8,11 +8,11 @@
 #include "cortrix/memory/mem03_metrics.h"
 #include "cortrix/memory/memory_transparency.h"
 
-// MEM03 §11.2 / §11.3 standalone integration: the full CRUD lifecycle over a single
+// Memory transparency / §11.3 standalone integration: the full CRUD lifecycle over a single
 // shared in-memory store + operation logger (the D3.5 real MemoryStore adapter / server
-// routing / MEM02-MEM05 wiring are deferred). Covers End2End (list→create→edit→delete→
-// list), the phased rollout, the F18a operation_log integration across endpoints, the
-// MEM05 multi-user isolation + 404 mask, the admin-revoke visibility (revoked_at), and
+// routing / memory-feature wiring are deferred). Covers End2End (list→create→edit→delete→
+// list), the phased rollout, the operation_log integration across endpoints, the
+// Memory isolation multi-user isolation + 404 mask, the admin-revoke visibility (revoked_at), and
 // the Agent self-management E2E.
 namespace cortrix::memory::transparency {
 namespace {
@@ -261,13 +261,13 @@ TEST_F(MemoryTransparencyIntegrationTest, MEM05Isolation) {
     EXPECT_EQ(store_->blocks[id_a].content, "a's secret");
 }
 
-// §11.2 MemoryTransparency_AdminRevokeVisible: after a (simulated MEM02 admin) revoke
+// §11.2 MemoryTransparency_AdminRevokeVisible: after a (simulated memory extraction admin) revoke
 // stamps revoked_at + restores status=active, the user's list surfaces revoked_at
-// (the A-class transparency field). The admin revoke path itself is MEM02's; here we
-// simulate its metadata_json effect on the shared store and assert MEM03 surfaces it.
+// (the A-class transparency field). The admin revoke path itself is memory extraction's; here we
+// simulate its metadata_json effect on the shared store and assert memory transparency surfaces it.
 TEST_F(MemoryTransparencyIntegrationTest, AdminRevokeVisible) {
     // Seed an LLM-invalidated block, then simulate admin revoke (status→active +
-    // revoked_at set), exactly as MEM02 AdminRevokeInvalidate writes to metadata_json.
+    // revoked_at set), exactly as memory extraction AdminRevokeInvalidate writes to metadata_json.
     MemoryBlockRecord rec;
     rec.block_id = "mem_001";
     rec.user_id = kUser;
@@ -295,7 +295,7 @@ TEST_F(MemoryTransparencyIntegrationTest, AdminRevokeVisible) {
 }
 
 // §11.3 MemoryTransparency_AgentSelfManagement: Agent self-service list → create →
-// edit → delete closed loop (P14 SDK is mocked at the service boundary).
+// edit → delete closed loop (Skill SDK is mocked at the service boundary).
 TEST_F(MemoryTransparencyIntegrationTest, AgentSelfManagement) {
     // Agent creates three memories.
     for (int i = 0; i < 3; ++i) {

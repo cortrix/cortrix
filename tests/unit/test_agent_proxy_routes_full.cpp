@@ -1,4 +1,4 @@
-// Full-surface coverage for src/server/routes/agent_proxy_routes.cpp (the F48
+// Full-surface coverage for src/server/routes/agent_proxy_routes.cpp (the agent
 // sec4.3 reverse proxy: SSE-streamed /chat + buffered pass-through for everything
 // else on the /api/v1/agent and /agent prefixes).
 //
@@ -374,7 +374,7 @@ TEST_F(AgentProxyRoutesFull, ForwardsAuthAcceptAndCortrixHeaders) {
 }
 
 // =========================================================================
-// /agent/<path> (P02a settings prefix) -- buffered_cfg lambda
+// /agent/<path> (web UI settings prefix) -- buffered_cfg lambda
 // =========================================================================
 TEST_F(AgentProxyRoutesFull, CfgPrefixBufferedStripsAgent) {
     auto cli = ProxyClient();

@@ -1,4 +1,4 @@
-// S4.2 — NS-level reranker_config JSONB parse (F02 §2.5 / Issue 2.2): the 3
+// S4.2 — NS-level reranker_config JSONB parse (reranker / Issue 2.2): the 3
 // B-class fields (enabled / candidate_multiplier / max_candidates), every field
 // optional, unknown keys ignored, malformed individual values degrade to unset
 // (never crash the query path), non-object / invalid JSON → CX_ERR.

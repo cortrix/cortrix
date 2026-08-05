@@ -8,7 +8,7 @@
 
 #include "cortrix/onnx/startup_validator.h"
 
-// F22 branch coverage for startup_validator.cpp's protobuf WireReader path. The
+// ONNX runtime branch coverage for startup_validator.cpp's protobuf WireReader path. The
 // happy-path opset reads + range checks live in test_onnx_startup_validator.cpp;
 // this file targets the malformed / edge wire-format branches that a real .onnx
 // header could exercise but the well-formed fixtures don't:

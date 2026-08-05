@@ -11,7 +11,7 @@
 #include "cortrix/util/siphash.h"
 
 // S2 (ID system): LoadOrBootstrapHashKey over platform.db auth_secrets
-// (secret_type='siphash_id_key'), mirroring P08 JwtSecretService::LoadOrInit, plus
+// (secret_type='siphash_id_key'), mirroring auth JwtSecretService::LoadOrInit, plus
 // the HashChildIdToBlockId contract. Test layout follows test_auth_config_init.cpp.
 namespace cortrix::id {
 namespace {

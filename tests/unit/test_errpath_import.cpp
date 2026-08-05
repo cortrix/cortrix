@@ -1,7 +1,7 @@
-// Error-path coverage for the F41 doc-summary worker codes, the F16a import
+// Error-path coverage for the doc-summary worker codes, the DB import
 // schema/handler codes. Each CX_ERR_* below had ZERO referencing test.
 //
-// F41 codes ride on the Status message prefix ("<CODE>: <detail>", via
+// Doc summary codes ride on the Status message prefix ("<CODE>: <detail>", via
 // TaskFinalizer::Fail) — assert with message().find(code). F16A_SCHEMA likewise
 // rides on a Status message. F16A_INTERNAL surfaces as a real envelope error.code
 // (the explicit catch(std::exception&) in ImportHandler::HandleStartImport, NOT the
@@ -20,7 +20,7 @@
 
 #include <nlohmann/json.hpp>
 
-// --- F41 worker deps (mirror test_f41_async_worker.cpp) ---
+// --- doc summary worker deps (mirror test_f41_async_worker.cpp) ---
 #include "cortrix/async/task_info.h"
 #include "cortrix/async/task_manager.h"
 #include "cortrix/async/task_type.h"
@@ -34,7 +34,7 @@
 #include "cortrix/spc/block_assembler.h"
 #include "cortrix/spc/onnx_embedder.h"
 
-// --- F16a import deps (mirror test_import_manager.cpp / test_f16a_schema_provider.cpp) ---
+// --- DB import deps (mirror test_import_manager.cpp / test_f16a_schema_provider.cpp) -----
 #include "cortrix/import/connection_manager.h"
 #include "cortrix/import/f16a_schema_provider.h"
 #include "cortrix/import/import_manager.h"
@@ -48,7 +48,7 @@
 #include "ns_pool_test_helper.h"
 
 // ===========================================================================
-// F41 async-worker error paths.
+// Doc summary async-worker error paths.
 // ===========================================================================
 namespace cortrix::doc_summary {
 namespace {
@@ -177,7 +177,7 @@ TEST_F(F41ErrPathTest, VectorAddFailureReturnsWriteFailed) {
 }  // namespace cortrix::doc_summary
 
 // ===========================================================================
-// F16a schema + handler error paths.
+// DB import schema + handler error paths.
 // ===========================================================================
 namespace cortrix::import {
 namespace {
@@ -205,7 +205,7 @@ TEST(F16aSchemaErrPathTest, IndexNameCollisionReturnsSchemaError) {
     sqlite3_close(db);
 }
 
-// An IQueryExecutor whose EstimateRowCount throws a non-F16a std::exception. This is
+// An IQueryExecutor whose EstimateRowCount throws a non-import std::exception. This is
 // invoked inside ImportManager::StartImport (after the admin check + DSN resolve),
 // so the throw propagates out of StartImport and is caught by the handler's
 // catch(std::exception&) -> CX_ERR_F16A_INTERNAL.

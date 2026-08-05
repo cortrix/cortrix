@@ -1,8 +1,8 @@
-// F21 § 2.6: F21SchemaProvider registers with the F12 SchemaMigrator for
+// Watcher: F21SchemaProvider registers with the catalog SchemaMigrator for
 // namespaces.watcher_config version coordination. watcher_config is supplied by
-// the F12 base schema (one of the 11 standardized *_config JSONB columns), so
-// F21's Phase-1 Migrate is a no-op — these tests pin that contract and verify
-// the F21 <-> F12 closure (the column really exists after a combined migration).
+// the catalog base schema (one of the 11 standardized *_config JSONB columns), so
+// Watcher's Phase-1 Migrate is a no-op — these tests pin that contract and verify
+// the watcher <-> catalog closure (the column really exists after a combined migration).
 #include <gtest/gtest.h>
 
 #include <sqlite3.h>
@@ -59,7 +59,7 @@ TEST(F21SchemaProviderTest, UnexpectedVersionStepIsError) {
     sqlite3_close(db);
 }
 
-// Runs through the real SchemaMigrator (the integration point F21 registers at).
+// Runs through the real SchemaMigrator (the integration point watcher registers at).
 TEST(F21SchemaProviderTest, RegistersAndMigratesViaMigrator) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
@@ -72,8 +72,8 @@ TEST(F21SchemaProviderTest, RegistersAndMigratesViaMigrator) {
     sqlite3_close(db);
 }
 
-// F21 <-> F12 closure: the watcher_config column F21 relies on is provided by the
-// frozen F12 base schema. Register F12 first (topological order), then F21, run a
+// Watcher <-> catalog closure: the watcher_config column watcher relies on is provided by the
+// frozen catalog base schema. Register catalog first (topological order), then watcher, run a
 // single atomic migration, and assert the column exists with both versions set.
 TEST(F21SchemaProviderTest, WatcherConfigColumnSuppliedByF12BaseSchema) {
     sqlite3* db = nullptr;
@@ -82,7 +82,7 @@ TEST(F21SchemaProviderTest, WatcherConfigColumnSuppliedByF12BaseSchema) {
     cortrix::catalog::F12SchemaProvider f12;
     F21SchemaProvider f21;
     cortrix::catalog::SchemaMigrator m;
-    m.Register(&f12);  // F12 first (ARCH §1.3.bis.3 topological order)
+    m.Register(&f12);  // Catalog first (ARCH §1.3.bis.3 topological order)
     m.Register(&f21);
 
     Status st = m.MigrateCatalog(db);

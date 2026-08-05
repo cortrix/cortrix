@@ -1,6 +1,6 @@
-// [D3.5 r2 · Wave P] Unit coverage for the new wiring logic introduced when
-// mounting the P08-CE auth surface (P1), F16a import (P2), batch (P3), and the
-// F48 agent_llm config (P4). The route handlers + services are exercised by their
+// Unit coverage for the new wiring logic introduced when
+// mounting the CE auth surface (P1), DB import (P2), batch (P3), and the
+// agent_llm config (P4). The route handlers + services are exercised by their
 // own suites (test_api_keys / test_import_manager / test_batch_routes); here we
 // cover the two NEW pieces of logic this wave added:
 //   * ApiKeyAuth::SetApiKeyService DB-key fallback (P1)
@@ -154,7 +154,7 @@ TEST(AgentLlmCodecTest, EmptyApiKeyStoresEmptyBlob) {
     EXPECT_TRUE(cfg.GetAgentLlmConfig().api_key.empty());
 }
 
-// ---- P2b: F16a real SPCManager feeder --------------------------------------
+// ---- P2b: DB import real SPCManager feeder ---------------------------------
 
 using ::testing::_;
 using ::testing::Invoke;

@@ -7,7 +7,7 @@
 #include "cortrix/reranker/reranker_config_resolver.h"
 #include "cortrix/reranker/reranker_ns_config.h"
 
-// Exhaustive parameterized sweep over the F02 reranker config resolution:
+// Exhaustive parameterized sweep over the reranker config resolution:
 // NsRerankerConfig::Parse + the three-layer RerankerConfigResolver (request >
 // NS > global) + EffectiveRerankerConfig::ComputeTopN. Suite tokens globally
 // unique: RerankCfgParse* / RerankCfgResolve* / RerankCfgTopN*.

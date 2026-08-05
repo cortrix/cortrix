@@ -82,7 +82,7 @@ TEST(ObservabilityContextTest, LogStructuredEmitsToStderr) {
     EXPECT_EQ(j["msg"], "hello");
 }
 
-// ===== F13 §5.1 identity extension =====
+// ===== agent trace identity extension =====
 
 // Defaults: a fresh context has every identity field unset and created_at 0.
 TEST(ObservabilityContextTest, IdentityFieldsDefaultUnset) {

@@ -1,18 +1,18 @@
-// R8 memory_routes — MEM03 transparency + MEM04 opt-out SUCCESS-body coverage.
+// R8 memory_routes — memory transparency + opt-out SUCCESS-body coverage.
 //
-// Companion to test_memory_routes_success_r8.cpp (which covers the MEM02 extract
+// Companion to test_memory_routes_success_r8.cpp (which covers the memory extract
 // surface). This file drives the *transparency* CRUD (GET/POST/PATCH/DELETE
 // /api/v1/memory + GET /api/v1/memory/invalidations) and the *opt-out* surface
 // (POST /api/v1/memory/session/{id}/opt-out[/revoke]) through their 200/201 SUCCESS
 // bodies — the arms test_memory_routes.cpp leaves uncovered (it only exercised
 // auth/validation/disabled guards). No extraction service is wired (transparency +
-// opt-out don't need it); the fixture is the same real-server + real F05 pool harness,
-// minus the MEM02 service.
+// opt-out don't need it); the fixture is the same real-server + real namespace pool harness,
+// minus the memory extraction service.
 //
 // Strategy: self-contained CRUD over the real endpoints — POST creates a memory block
 // in the per-NS façade, then GET/PATCH/DELETE operate on the returned id. No reaching
 // into the store: the create endpoint is the seed. Auth uses an admin key (read+write
-// +admin) so the MEM05 own-user / session-owner guards pass for the happy path.
+// +admin) so the memory isolation own-user / session-owner guards pass for the happy path.
 
 #include <gtest/gtest.h>
 
@@ -40,7 +40,7 @@ namespace {
 
 using json = nlohmann::json;
 
-// Real httplib server + real F05 pool (NsPoolHarness), NO extraction service: the
+// Real httplib server + real namespace pool (NsPoolHarness), NO extraction service: the
 // transparency + opt-out routes are registered by RegisterMemoryRoutes regardless of
 // MemoryServices.extraction, and neither surface needs it.
 class MemoryRoutesTransparencyTest : public ::testing::Test {
@@ -136,7 +136,7 @@ class MemoryRoutesTransparencyTest : public ::testing::Test {
   int port_ = 0;
 };
 
-// ── MEM03 transparency CRUD success bodies ───────────────────────────────────────
+// ── memory transparency CRUD success bodies ──────────────────────────────────────
 
 // POST /api/v1/memory → 201 {memory_id, status:"active"} (the create success body).
 TEST_F(MemoryRoutesTransparencyTest, CreateMemoryReturns201) {
@@ -169,7 +169,7 @@ TEST_F(MemoryRoutesTransparencyTest, ListMemoriesReturnsCreated) {
   EXPECT_TRUE(found) << "created memory not in list: " << j.dump();
 }
 
-// GET /api/v1/memory?explain=true → list with the MEM03 provenance fields surfaced
+// GET /api/v1/memory?explain=true → list with the memory transparency provenance fields surfaced
 // (the explain branch of the list handler).
 TEST_F(MemoryRoutesTransparencyTest, ListMemoriesExplainMode) {
   ASSERT_FALSE(CreateMemory("user speaks German").empty());
@@ -236,7 +236,7 @@ TEST_F(MemoryRoutesTransparencyTest, InvalidationsAuditListReturns200) {
   EXPECT_EQ(res->status, 200) << res->body;
 }
 
-// ── MEM04 opt-out success bodies ─────────────────────────────────────────────────
+// ── opt-out success bodies ───────────────────────────────────────────────────────
 
 // POST /api/v1/memory/session/{id}/opt-out → 200 {session_id, opt_out_at,
 // opted_out_by} (the opt-out state-transition success body).

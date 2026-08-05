@@ -1,4 +1,4 @@
-// R7 cov-store — targeted branch-coverage supplements for the F25/F01
+// R7 cov-store — targeted branch-coverage supplements for the write coordinator/index
 // persistence layer. These exercise specific error/edge arms the existing
 // suites leave uncovered:
 //
@@ -25,7 +25,7 @@
 //       — if no read is intercepted it asserts nothing failed and is documented
 //       as physically-unreachable-from-this-seam in the QA list (no hacks).
 //
-// Physically-unreachable arms (NOT force-tested — F23 §4.1.bis #4) are listed in
+// Physically-unreachable arms (NOT force-tested — test suite #4) are listed in
 // the task's QA unreachable-branch report, not here.
 #include <gtest/gtest.h>
 

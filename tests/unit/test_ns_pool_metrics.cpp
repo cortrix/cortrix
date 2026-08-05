@@ -106,7 +106,7 @@ TEST_F(NsPoolMetricsTest, NsLoadDurationHistogramBucketsAreCumulativeAndComplete
 }
 
 TEST_F(NsPoolMetricsTest, RenderHasNoHighCardinalityLabels) {
-    // OBS_SPEC §3.2 / F05 §10.1: no namespace / unit_id / tenant_id labels.
+    // OBS_SPEC §3.2 / namespace pool: no namespace / unit_id / tenant_id labels.
     M().SetSize(1);
     M().RecordRejectedCreate(RejectReason::kNsCountExceeded);
     std::string out = M().RenderOpenMetrics();

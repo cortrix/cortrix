@@ -7,7 +7,7 @@
 #include "cortrix/async/f42_metrics.h"
 #include "cortrix/async/task_type.h"
 
-// Exhaustive ToString matrices for the F42 async-task enums (cortrix::async,
+// Exhaustive ToString matrices for the async-task enums (cortrix::async,
 // src/async/f42_metrics.cpp). Both are one-way (ToString only):
 //   TaskType (unscoped enum, stable values 1/2/3) -> "kTask*" debug labels.
 //   F42Metrics::CompletionStatus (4 values) -> success/failed/cancelled/timeout.
@@ -35,7 +35,7 @@ INSTANTIATE_TEST_SUITE_P(AllValues, RtAsyncTaskTypeMatrix,
                          ::testing::ValuesIn(AllTaskTypes()));
 
 TEST(RtAsyncTaskTypeTokens, ExactStringsValuesAndUniqueness) {
-    // Stable underlying values (F42 §3.2 backward-compat contract).
+    // Stable underlying values (async task backward-compat contract).
     EXPECT_EQ(static_cast<int>(kTaskDocParse), 1);
     EXPECT_EQ(static_cast<int>(kTaskWatcherFanout), 2);
     EXPECT_EQ(static_cast<int>(kTaskDocSummary), 3);

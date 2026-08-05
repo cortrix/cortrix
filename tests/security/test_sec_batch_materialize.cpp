@@ -1,6 +1,6 @@
 // SEC-BATCH — POST /documents/batch inline-content materialization.
 //
-// The batch surface writes each accepted doc to a server-side file so the F42
+// The batch surface writes each accepted doc to a server-side file so the async task
 // doc-parse worker has something to parse. That write is the only place in the
 // ingest path where a request field can become a filesystem path, so it gets the
 // same treatment as the upload surface in SEC-INJX-004 (which is safe only

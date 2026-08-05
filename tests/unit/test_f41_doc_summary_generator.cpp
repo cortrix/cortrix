@@ -1,4 +1,4 @@
-// F41 S1/S2 — DocSummaryGenerator: structured-output prompt, JSON parse (with
+// Doc summary S1/S2 — DocSummaryGenerator: structured-output prompt, JSON parse (with
 // max_chars truncation), short-doc single-call + long-doc map-reduce (§9.2),
 // Generate end-to-end (success / no-chunks / LLM failure / null store), and the
 // config resolver + doc_summary_status state machine.

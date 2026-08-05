@@ -4,7 +4,7 @@
 // aggregation across multiple sources, and the last_error()/last_cleanup_deleted()
 // accessors -- edges not already pinned by test_agent_trace_writer.cpp.
 //
-// Deterministic: in-memory cortrix_global.db migrated via the F13 SchemaProvider,
+// Deterministic: in-memory cortrix_global.db migrated via the agent trace SchemaProvider,
 // explicit created_at timestamps (no sleeps). Suite/fixture names are globally unique
 // (AgentTraceDepth* prefix) per gtest's global-string suite-name rule.
 

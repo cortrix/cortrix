@@ -10,9 +10,9 @@
 #include "cortrix/spc/hype_block.h"
 #include "mock_embedder.h"
 
-// F38 S3 — hype_question Block generation (block_type=16 + metadata_json
+// HyPE S3 — hype_question Block generation (block_type=16 + metadata_json
 // source_child_id/source_parent_id + hype{} + embedding via OnnxEmbedder mock).
-// The atomic F25 PWL write (chunk + hype_question same txn) = D3.5.
+// The atomic write coordinator PWL write (chunk + hype_question same txn) = D3.5.
 namespace cortrix::spc {
 namespace {
 
@@ -88,7 +88,7 @@ TEST(F38HypeBlockTest, BlockEnrichmentSourceIsLlm) {
 TEST(F38HypeBlockTest, BlockCrcDetectsTamper) {
     HypeQuestion q = MakeQ("q", 0, "c", "p");
     auto blob = BuildHypeQuestionBlock(q, "v1", "gpt-4o-mini", 0.0, "t");
-    // Corrupt a payload byte → CRC parse must fail (well-formed F09 Block).
+    // Corrupt a payload byte → CRC parse must fail (well-formed Block).
     blob[blob.size() - 1] ^= 0xFF;
     const cortrix_block_header_t* hdr = nullptr;
     EXPECT_FALSE(BlockParse(blob.data(), blob.size(), &hdr));

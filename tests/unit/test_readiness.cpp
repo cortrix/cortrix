@@ -78,7 +78,7 @@ TEST(ReadinessRegistryTest, NullComponentIgnored) {
     EXPECT_EQ(reg.size(), 0u);
 }
 
-// ---- SecretProviderReadiness adapter (F20-6) ----
+// ---- SecretProviderReadiness adapter ----------
 
 namespace {
 class FakeProvider : public security::ISecretProvider {
@@ -125,7 +125,7 @@ TEST(SecretProviderReadinessTest, IntegratesIntoRegistry) {
     EXPECT_EQ(report["components"]["secret_provider"]["provider_type"], "env");
 }
 
-// ---- Real-probe semantics (bootstrap /ready components, F20 §8.4) ----
+// ---- Real-probe semantics (bootstrap /ready components, readiness) ---
 //
 // These mirror the exact lambda logic registered in bootstrap.cpp for the catalog
 // and spc_pipeline components, guarding the contract that each probe reflects REAL
@@ -173,7 +173,7 @@ TEST(BootstrapProbeTest, SpcPipelineNotReadyBeforeWorkersStart) {
 }
 
 // Registry-level: a not-yet-started component (e.g. spc_pipeline pre-Start) drives the
-// whole /ready to not_ready → F24 maps it to 503, exactly the warming-up contract.
+// whole /ready to not_ready → deployment maps it to 503, exactly the warming-up contract.
 TEST(BootstrapProbeTest, NotStartedComponentDrives503) {
     ReadinessRegistry reg;
     reg.Register("disk", [] { return ComponentReadiness{true, {}}; });

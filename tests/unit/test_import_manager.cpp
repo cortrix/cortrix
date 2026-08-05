@@ -17,7 +17,7 @@
 #include "cortrix/server/import_handler.h"
 
 // S3 + S4 + S6 coverage: ImportManager end-to-end orchestration (D1 ref resolve →
-// D2 fetch → D4 textualize → D3 cleanup → D5 feed → D6 async), the F18a
+// D2 fetch → D4 textualize → D3 cleanup → D5 feed → D6 async), the operation log
 // operation_loginstrumentation, the metrics, and the HTTP handler parse/response. Real PG /
 // SPCPipeline / server routing are mocked → D3.5.
 namespace cortrix::import {

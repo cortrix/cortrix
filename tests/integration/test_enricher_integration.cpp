@@ -16,7 +16,7 @@
 #include "mock_llm_client.h"
 #include "mock_response_builder.h"
 
-// F03 standalone integration (Issue 6.5 E2E within-feature): resolve NS config →
+// Enricher standalone integration (Issue 6.5 E2E within-feature): resolve NS config →
 // enrich a batch through the (mocked) LLM → persist to the per-Unit store →
 // read back + FTS5 search. The CROSS-feature E2E (real SPC pipeline Parse→Chunk→
 // Enricher→Embed→Store, real LLM) is D3.5 deferred wiring.

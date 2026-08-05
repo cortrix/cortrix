@@ -7,7 +7,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/spc/cleaning_errors.h"
 
-// Exhaustive parameterized error-registry sweep for F10 data-cleaning (§5.1, 7
+// Exhaustive parameterized error-registry sweep for data-cleaning (§5.1, 7
 // codes). Distinct suite name (CleaningErrorMatrix) from test_cleaning_errors.cpp.
 //
 // NOTE: cleaning_errors.h does NOT expose RequiredStructuredDataKeys /

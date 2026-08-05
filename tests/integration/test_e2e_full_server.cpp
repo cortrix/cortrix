@@ -44,7 +44,7 @@
 #include "cortrix/spc/spc_manager.h"
 #include "cortrix/query/intent_classifier.h"
 #include "cortrix/query/rrf_fusion.h"
-#include "ns_pool_test_helper.h"  // [wire⑤c] F05 NsPoolHarness replaces MVP NamespaceManager
+#include "ns_pool_test_helper.h"  // Namespace pool NsPoolHarness replaces MVP NamespaceManager
 #include "unit/namespace_authz_test_helper.h"  // [V6] runtime NS-authz seam over a real PermissionService
 
 namespace cortrix {
@@ -100,7 +100,7 @@ protected:
         auth_ = std::make_unique<ApiKeyAuth>();
         auth_->LoadKeys({admin_kc, rw_kc, ro_kc});
 
-        // [wire⑤c] F05 NS resource pool replaces the MVP NamespaceManager +
+        // Namespace pool NS resource pool replaces the MVP NamespaceManager +
         // CortrixNamespaceManager. All route groups now take INamespacePool&;
         // tests admit each namespace via harness_->Admit(ns) instead of Create.
         harness_ = std::make_unique<test::NsPoolHarness>(tmp_dir_);
@@ -527,7 +527,7 @@ TEST_F(FullServerE2ETest, QueryParameterValidation) {
     EXPECT_EQ(r2->status, 400);
 
     // Nonexistent namespace → 403 CX_ERR_NS_UNAUTHORIZED (ARCHITECTURE V6
-    // anti-enumeration, F04 issue 2.6). The empty-query / missing-namespace probes
+    // anti-enumeration, cross-NS query issue 2.6). The empty-query / missing-namespace probes
     // above still return 400 because request validation runs BEFORE the authz check;
     // but once the request shape is valid, the query route runs the runtime
     // PermissionService authz check before acquiring the namespace. "no_such_ns" is
@@ -558,7 +558,7 @@ TEST_F(FullServerE2ETest, MemorySessionListing) {
     httplib::Client cli("127.0.0.1", port_);
     ASSERT_TRUE(harness_->Admit("list_test").ok());
 
-    // Create 4 sessions, all owned by the same user (MEM05: list is
+    // Create 4 sessions, all owned by the same user (memory isolation: list is
     // user-isolated, so cross-user listing in one call is not possible).
     for (int i = 0; i < 4; ++i) {
         json body;
@@ -570,7 +570,7 @@ TEST_F(FullServerE2ETest, MemorySessionListing) {
         ASSERT_TRUE(r && r->status == 201);
     }
 
-    // List all (MEM05: filtered to list_user's sessions).
+    // List all (memory isolation: filtered to list_user's sessions).
     auto all = cli.Get("/api/v1/memory/sessions?namespace=list_test&user_id=list_user", Admin());
     ASSERT_TRUE(all && all->status == 200);
     auto body = json::parse(all->body);
@@ -837,7 +837,7 @@ TEST_F(FullServerE2ETest, MemoryInteractionMetadata) {
                        Admin(), inter.dump(), "application/json");
     ASSERT_TRUE(wr && wr->status == 201);
 
-    // Verify session detail (MEM05: owner = meta_user).
+    // Verify session detail (memory isolation: owner = meta_user).
     auto detail = cli.Get("/api/v1/memory/sessions/" + sid +
                           "?namespace=meta_test&user_id=meta_user", Admin());
     ASSERT_TRUE(detail && detail->status == 200);
@@ -897,7 +897,7 @@ TEST_F(FullServerE2ETest, NamespaceNotFoundAllRoutes) {
     httplib::Client cli("127.0.0.1", port_);
 
     // Upload to a nonexistent namespace → 403 CX_ERR_NS_UNAUTHORIZED (ARCHITECTURE
-    // V6 anti-enumeration, F04 issue 2.6). WithAuth extracts the :name path param and
+    // V6 anti-enumeration, cross-NS query issue 2.6). WithAuth extracts the :name path param and
     // runs the runtime PermissionService authz check (auth.Authorize) BEFORE the
     // handler ever acquires the namespace. "ghost_ns" is not seeded as owned by
     // tenant "e2e", so the ownership check denies — an UNAUTHORIZED and a
@@ -913,7 +913,7 @@ TEST_F(FullServerE2ETest, NamespaceNotFoundAllRoutes) {
     EXPECT_EQ(r1body["error"]["code"].get<std::string>(), "CX_ERR_NS_UNAUTHORIZED");
 
     // Query a nonexistent namespace → 403 CX_ERR_NS_UNAUTHORIZED (ARCHITECTURE V6
-    // anti-enumeration, F04 issue 2.6). The query route runs the runtime
+    // anti-enumeration, cross-NS query issue 2.6). The query route runs the runtime
     // PermissionService authz check (auth.Authorize) BEFORE acquiring the namespace:
     // an UNAUTHORIZED and a NON-EXISTENT namespace are INDISTINGUISHABLE to the
     // caller — both 403 with the same code, and the namespace name is never echoed

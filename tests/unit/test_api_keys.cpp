@@ -9,7 +9,7 @@
 #include "cortrix/auth/bootstrap_handler.h"
 #include "cortrix/auth/platform_db.h"
 
-// P08 S6: API Key Resource + Bootstrap URL (§2.13 / §3.7, Issue 7 D).
+// Auth S6: API Key Resource + Bootstrap URL (§2.13 / §3.7, Issue 7 D).
 namespace cortrix::auth {
 namespace {
 

@@ -1,5 +1,5 @@
 // Pagination + filter matrices for catalog ns_router ListNamespaces and the
-// async TaskManager ListByNamespace (F23 breadth).
+// async TaskManager ListByNamespace (test suite breadth).
 //
 // DefaultINSRouter (include/cortrix/catalog/default_ns_router.h):
 //   explicit DefaultINSRouter(sqlite3* db, resource::INamespacePool* = nullptr)

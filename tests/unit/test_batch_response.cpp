@@ -9,7 +9,7 @@
 #include "cortrix/catalog/batch_result.h"
 #include "cortrix/catalog/catalog_error.h"
 
-// S5.1 coverage (F12 Issue 5 / §8.1 / §8.2): structured_data required-keys per
+// S5.1 coverage (catalog Issue 5 / §8.1 / §8.2): structured_data required-keys per
 // error code + the BatchResult/BatchMeta builder (5 meta fields + coverage_ratio).
 namespace cortrix::catalog {
 namespace {

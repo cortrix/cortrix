@@ -1,19 +1,19 @@
 // R7 branch-coverage supplement for src/spc/enricher_chain.cpp (branch 53.3%).
 //
 // The existing test_enricher_chain.cpp covers the happy merge, the
-// fail-soft throw catch, the unavailable soft-skip, and the F38 hype happy path.
+// fail-soft throw catch, the unavailable soft-skip, and the hype happy path.
 // The remaining dead branches in EnrichChunks() are the per-field merge-policy
 // conditionals (each `if` is two branches; the existing tests only take the
 // "populated"/"first-write" side) plus the degraded (non-throwing) error-merge arm
-// and the F38 question-parse-failure (qres NOT ok) arm:
+// and the HyPE question-parse-failure (qres NOT ok) arm:
 //   - merged.enricher_name already set → later step does NOT overwrite (line ~186);
 //   - token_count / duration_ms accumulation present vs absent (~188-189);
 //   - model_used / prompt_version empty vs present (~190-191);
-//   - F35 contextualized_* has_value() FALSE arm (an enricher that returns none);
+//   - contextualized_* has_value() FALSE arm (an enricher that returns none);
 //   - the step.ok()==false (degraded, not thrown) error-merge: err_code from
 //     structured_data vs error_msg, merged.status first-capture vs "later error
 //     does not clear" (~201-213);
-//   - the F38 hype GenerateHypeQuestions FAILURE arm (wrong question count →
+//   - the hype GenerateHypeQuestions FAILURE arm (wrong question count →
 //     ParseQuestions fails → qres NOT ok → degraded step recorded, ~145-153);
 //   - the provenance index-bounds false arms (empty parent_texts/src ids, ~129-134).
 //
@@ -219,7 +219,7 @@ TEST(EnricherChainR7, EmptyResultEnricherMergesNothing) {
     EXPECT_EQ(m.token_count, 10);               // no accumulation
     EXPECT_EQ(m.duration_ms, 5);
     EXPECT_EQ(m.model_used, "model-a");
-    EXPECT_FALSE(m.contextualized_text.has_value());        // F35 has_value() false arm
+    EXPECT_FALSE(m.contextualized_text.has_value());        // Contextual retrieval has_value() false arm
     EXPECT_FALSE(m.contextualized_embedding.has_value());
     EXPECT_EQ(m.contextualized_status, 0);
     EXPECT_EQ(res[0].steps.size(), 2u);
@@ -263,7 +263,7 @@ TEST(EnricherChainR7, SecondDegradedDoesNotClobberStatus_StructuredErrCode) {
     EXPECT_EQ(res[0].steps[1].error_code, R"({"k":"v"})");  // from structured_data branch
 }
 
-// ---------- F38 hype: GenerateHypeQuestions FAILURE (qres NOT ok) ----------
+// ---------- hype: GenerateHypeQuestions FAILURE (qres NOT ok) --------------
 
 // A HyPEEnricher whose MockLlmClient returns the WRONG number of questions (1, not
 // the default K=3) → ParseQuestions fails → GenerateHypeQuestions returns non-OK →
@@ -295,7 +295,7 @@ TEST(EnricherChainR7, HypeParseFailureRecordsDegradedStep) {
     EXPECT_TRUE(degraded);
 }
 
-// F38 hype with EMPTY provenance vectors (parent_texts / source_child_ids /
+// Hype with EMPTY provenance vectors (parent_texts / source_child_ids /
 // source_parent_ids all empty) → the index-bounds guards (i < X.size()) take their
 // FALSE arms, so parent_text / child_id / parent_id default to "" — questions still
 // generated, provenance blank. Covers the alternate side of those three guards.

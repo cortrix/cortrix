@@ -1,4 +1,4 @@
-// Breadth matrix for cortrix::chunker::EstimateTokens (F34 standalone char-based
+// Breadth matrix for cortrix::chunker::EstimateTokens (parent-child chunking standalone char-based
 // heuristic). Real impl (src/chunker/parent_child_chunker.cpp):
 //   - whitespace ' ' '\n' '\t' '\r' '\f' are skipped (token separators, 0 tokens).
 //   - an ASCII non-ws run of length L contributes max(1, (L+3)/4) tokens.

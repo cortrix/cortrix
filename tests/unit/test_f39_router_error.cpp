@@ -5,7 +5,7 @@
 
 #include "cortrix/query/router_error.h"
 
-// F39 coverage: the query-router error model (template A) — all 4 CX_ERR_F39_*
+// Query routing coverage: the query-router error model (template A) — all 4 CX_ERR_F39_*
 // identities, their §4.3 attributes (category / retryable / retry_after_ms /
 // structured_data keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::query {

@@ -12,7 +12,7 @@
 //     doc-create (doc_get != 0) arm.
 //
 // Standalone NEW file; does not touch the existing test_spc_manager.cpp. Mirrors its
-// SPCManagerRealTest fixture (real F05 pool + mocked routers + FakeIndex + real F25
+// SPCManagerRealTest fixture (real namespace pool + mocked routers + FakeIndex + real write coordinator
 // WriteCoordinator).
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -63,7 +63,7 @@ using ::testing::_;
 using ::testing::Invoke;
 using ::testing::NiceMock;
 
-// ── F05 pool doubles (same shapes as test_spc_manager.cpp) ──
+// ── namespace pool doubles (same shapes as test_spc_manager.cpp) ──
 class FakeIndex : public cortrix::store::IIndex, public cortrix::store::IVectorStore {
 public:
     explicit FakeIndex(std::size_t footprint = 0) : footprint_(footprint) {}

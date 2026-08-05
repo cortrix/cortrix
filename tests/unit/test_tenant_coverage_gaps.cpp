@@ -1,7 +1,7 @@
 // Coverage-gap unit tests for src/tenant/ (tenant_service / permission_service /
 // quota_service). Targets the AUTHORIZATION GUARDS + no-db guards + success/ACL
 // paths not already exercised by test_tenant_service.cpp /
-// test_tenant_permission_seam.cpp. Runs against a real in-memory catalog.db (F12
+// test_tenant_permission_seam.cpp. Runs against a real in-memory catalog.db (catalog
 // schema) per the project router-test pattern. Deterministic; no network/LLM.
 //
 // SQLITE_CONSTRAINT / transaction-failed arms require fault injection and are NOT

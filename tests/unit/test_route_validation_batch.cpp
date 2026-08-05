@@ -1,4 +1,4 @@
-// Route request-validation matrices for the F42 bulk batch-submit route
+// Route request-validation matrices for the async task bulk batch-submit route
 // (POST /api/v1/documents/batch). BREADTH coverage of malformed / boundary
 // requests asserting the correct 4xx status + CX_ERR_* / standard-envelope body.
 //

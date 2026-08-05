@@ -160,7 +160,7 @@ TEST_F(ApiKeyAuthTest, AuthorizeNamespaceDeniedViaSeam) {
     Status s = auth_.Authorize(ctx, "ns3", kPermRead);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kPermissionDenied);
-    // Anti-enumeration (F04 issue 2.6): denial returns the canonical identity
+    // Anti-enumeration (cross-NS query issue 2.6): denial returns the canonical identity
     // and never echoes the namespace name back to the caller.
     EXPECT_EQ(s.message(), "CX_ERR_NS_UNAUTHORIZED");
 }
@@ -410,7 +410,7 @@ TEST_F(ApiKeyAuthTest, EmptyKeyErrorCode) {
 }
 
 TEST_F(ApiKeyAuthTest, NamespaceDeniedErrorCode) {
-    // Anti-enumeration (F04 issue 2.6): namespace denial now carries the single
+    // Anti-enumeration (cross-NS query issue 2.6): namespace denial now carries the single
     // canonical CX_ERR_NS_UNAUTHORIZED identity in the message (extracted into the
     // envelope code by ResolveError), and never echoes the namespace name -- so a
     // scoped caller cannot probe which namespaces exist.

@@ -9,9 +9,9 @@
 #include "cortrix/catalog/schema_provider.h"
 #include "cortrix/store/f09_schema_provider.h"
 
-// [D3.5-B] F09SchemaProvider now OWNS the per-Unit framework schema (documents /
+// F09SchemaProvider now OWNS the per-Unit framework schema (documents /
 // blocks / blocks_fts + indices + triggers) from kPerUnitFrameworkDdl, run via
-// SchemaMigrator::MigrateUnit at F05 load. These tests are the exact-preservation
+// SchemaMigrator::MigrateUnit at namespace pool load. These tests are the exact-preservation
 // guard for the schema moved out of CortrixStoreSqlite::CreateTables (QA M3 five-piece set:
 // object presence + FTS5 roundtrip + 3 triggers + block_id rowid-alias). PRAGMAs
 // are applied by the conn (SqliteConn/ExecutePragma), not this DDL, so unchanged.
@@ -158,7 +158,7 @@ TEST(F09SchemaProviderTest, FromZeroToUnsupportedTargetIsError) {
     sqlite3_close(db);
 }
 
-// Production integration point: via SchemaMigrator::MigrateUnit (F05 load path).
+// Production integration point: via SchemaMigrator::MigrateUnit (namespace pool load path).
 TEST(F09SchemaProviderTest, MigratesViaMigrateUnit) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);

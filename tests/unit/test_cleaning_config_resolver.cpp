@@ -6,7 +6,7 @@
 #include "cortrix/spc/cleaning_config_resolver.h"
 #include "cortrix/spc/cleaning_types.h"
 
-// F10 §3.4 NS-level cleaning_config three-layer resolve (S5): global ← NS override
+// Cleaning NS-level cleaning_config three-layer resolve (S5): global ← NS override
 // (V1.0 has no request layer). The 3 B-class fields (dedup_enabled /
 // dedup_similarity_threshold / anomaly_detection_enabled) are NS-overridable; the 2
 // resource-level fields (max_chunk_chars / plugin_timeout_ms) are global-only.
@@ -105,7 +105,7 @@ TEST(CleaningConfigResolveTest, NonObjectBlob_MergeFailed) {
         << r.status().message();
 }
 
-// (7) Invalid JSON → merge failed (the SPC path surfaces the F10 error, never a
+// (7) Invalid JSON → merge failed (the SPC path surfaces the cleaning error, never a
 // silently-wrong config).
 TEST(CleaningConfigResolveTest, InvalidJsonBlob_MergeFailed) {
     const CleaningConfig g = GlobalCfg();

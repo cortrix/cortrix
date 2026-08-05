@@ -4,23 +4,23 @@
 // path, store/WAL fault injection, the NullEnricher path) but never installs the
 // optional D3.5 seams, so their branches in Process()/ProcessParsed() are dead in
 // the coverage build:
-//   - the EnricherChain path (use_chain): I1 F03→F35→F38 fail-soft serial, the
+//   - the EnricherChain path (use_chain): I1 enricher→contextual retrieval→HyPE fail-soft serial, the
 //     contextualized_embedding flag (kFlagExtHasContextualized), WriteEnrichment +
-//     WriteContextualized, and the F38 hype-question Block assembly + embed loop;
-//   - the SparseIndexRegistry path (Q4 F40): EmbedBatchWithSparse + per-child
+//     WriteContextualized, and the hype-question Block assembly + embed loop;
+//   - the SparseIndexRegistry path (Q4 sparse retrieval): EmbedBatchWithSparse + per-child
 //     sparse_vec persist + inverted-index Add;
 //   - the cleaning-config resolver field branches (anomaly off, threshold).
 //
-// This file installs real seams (a real EnricherChain with fake F03/F35 + a real
+// This file installs real seams (a real EnricherChain with fake enricher/contextual retrieval + a real
 // HyPEEnricher driven by MockLlmClient; a real in-memory SparseIndexRegistry) over
 // the SAME pool/façade plumbing test_spc_pipeline.cpp uses, and asserts the
 // observable effects (sparse_vec rows, hype_question blocks, contextualized columns,
 // dedup survivors). It is a standalone NEW file (does not touch the existing one).
 //
-// It also carries the corrected F10 dedup-disabled regression: the original
+// It also carries the corrected cleaning dedup-disabled regression: the original
 // SPCPipelineTest.F10_NsConfigResolver_DisablesDedup asserted that a 4400-'x'
 // paragraph survives dedup-disabled as a child whose content_text == the full 4400
-// string. That is impossible: para(4400,'x') has no separators, so the F34 child
+// string. That is impossible: para(4400,'x') has no separators, so the child
 // splitter (RecursiveChunker child_size=200) hard-cuts it into ~8 ~600-char slices
 // per parent — no child ever equals the 4400-char paragraph, so the count is always
 // 0 (release AND coverage). The intent (dedup-off keeps duplicates) is preserved
@@ -54,10 +54,10 @@
 #include "cortrix/async/task_scheduler.h"
 #include "cortrix/async/task_info.h"
 #include "cortrix/common/in_memory_global_config.h"
-#include "cortrix/spc/hype_enricher.h"       // F38 HyPEEnricher (real, drives the hype side channel)
+#include "cortrix/spc/hype_enricher.h"       // HyPEEnricher (real, drives the hype side channel)
 #include "cortrix/spc/spc_task.h"
 #include "cortrix/chunker/parent_child_chunker.h"
-#include "cortrix/retrieval/sparse_index_registry.h"  // Q4 F40
+#include "cortrix/retrieval/sparse_index_registry.h"  // Q4 sparse retrieval
 
 #include "cortrix/catalog/batch_result.h"
 #include "cortrix/catalog/catalog_types.h"
@@ -182,7 +182,7 @@ public:
                                       const cortrix::spc::ChunkContext&) override {
         cortrix::spc::EnrichResult r;
         r.summary = "r7 fake summary";
-        r.enricher_name = "LlmEnricher";  // maps to F07 enricher token "llm"
+        r.enricher_name = "LlmEnricher";  // maps to semantic score enricher token "llm"
         r.enriched_score = 0.5f;
         cortrix::spc::Entity e;
         e.text = "Cortrix";
@@ -417,12 +417,12 @@ std::shared_ptr<llm::MockLlmClient> MakeHypeLlm() {
 }
 
 // ============================================================
-// F10 corrected dedup-disabled regression (replaces the broken
+// Cleaning corrected dedup-disabled regression (replaces the broken
 // SPCPipelineTest.F10_NsConfigResolver_DisablesDedup assertion).
 // ============================================================
 
 // Two byte-identical large paragraphs, dedup DISABLED via the NS resolver. Each
-// paragraph (4400 'x', no separators) is split by the F34 child splitter into
+// paragraph (4400 'x', no separators) is split by the child splitter into
 // several ~600-char children; the two paragraphs yield IDENTICAL child sequences.
 // With dedup off, every child survives, so the surviving child count strictly
 // exceeds the number of DISTINCT child texts (duplicates were kept). The mirror
@@ -522,21 +522,21 @@ TEST_F(SPCPipelineR7Test, F10_NsResolverDisablesAnomaly_NoAnomalyKeys) {
 }
 
 // ============================================================
-// EnricherChain (use_chain) path — F03 + F35 + F38 installed.
+// EnricherChain (use_chain) path — enricher + contextual retrieval + HyPE installed.
 // ============================================================
 
-// A full F03→F35→F38 chain over the L3 path. Exercises:
+// A full enricher→contextual retrieval→HyPE chain over the L3 path. Exercises:
 //   - the use_chain branch (enricher_chain_ && AnyAvailable());
 //   - EnrichChunks + the parent_text_by_id / src_*_ids provenance build;
 //   - the contextualized_embedding flag (kFlagExtHasContextualized) + WriteContextualized;
 //   - WriteEnrichment (enriched_score + entities);
-//   - the F38 hype-question Block assembly + embed loop (block_type=16 rows persisted).
+//   - the hype-question Block assembly + embed loop (block_type=16 rows persisted).
 TEST_F(SPCPipelineR7Test, EnricherChain_F03F35F38_PersistsEnrichmentAndHypeBlocks) {
     cortrix::spc::EnricherChain chain;
-    chain.Append(std::make_shared<FakeSummaryEnricher>());     // F03
-    chain.Append(std::make_shared<FakeContextualEnricher>());  // F35
+    chain.Append(std::make_shared<FakeSummaryEnricher>());     // Enricher
+    chain.Append(std::make_shared<FakeContextualEnricher>());  // Contextual retrieval
     chain.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
-        cortrix::spc::HyPEConfig{}, MakeHypeLlm(), /*parent_store=*/nullptr));  // F38
+        cortrix::spc::HyPEConfig{}, MakeHypeLlm(), /*parent_store=*/nullptr));  // HyPE
     ASSERT_TRUE(chain.AnyAvailable());
     pipeline_->SetEnricherChain(&chain);
 
@@ -547,16 +547,16 @@ TEST_F(SPCPipelineR7Test, EnricherChain_F03F35F38_PersistsEnrichmentAndHypeBlock
     ASSERT_EQ(rc, 0) << task->error_message;
     EXPECT_EQ(task->stage, SPCStage::kDone);
 
-    // F03: enriched_score + entities persisted (WriteEnrichment branch).
+    // Enricher: enriched_score + entities persisted (WriteEnrichment branch).
     EXPECT_GT(CountSql("SELECT COUNT(*) FROM blocks WHERE enriched_score > 0"), 0);
     EXPECT_GT(CountSql("SELECT COUNT(*) FROM entities"), 0);
 
-    // F38: hype_question blocks (block_type=16 = kBlockHypeQuestion) written, one
+    // HyPE: hype_question blocks (block_type=16 = kBlockHypeQuestion) written, one
     // set per source child (K=3 each). Their presence proves the hype assembly +
     // embed loop ran (level>=3 && !hype_by_child.empty()).
     EXPECT_GT(CountSql("SELECT COUNT(*) FROM blocks WHERE block_type = 16"), 0);
 
-    // Each F08 META + child + hype block landed; child blocks present.
+    // Each META + child + hype block landed; child blocks present.
     EXPECT_GT(CountSql("SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL AND child_id != ''"), 0);
 
     // The chain reset to nullptr is a valid no-op afterward.
@@ -588,7 +588,7 @@ TEST_F(SPCPipelineR7Test, EnricherChain_NoneAvailable_ShortCircuits) {
 }
 
 // Chain on the L2 path (no embedding): the enrich stage still runs (it precedes
-// embed and only needs text), so F03 entities persist, but the F38 hype blocks are
+// embed and only needs text), so enricher entities persist, but the hype blocks are
 // skipped (the hype assembly is gated on level>=3). Covers the "chain ran but hype
 // blocks skipped" arm — the `level >= 3 && !hype_by_child.empty()` false branch.
 TEST_F(SPCPipelineR7Test, EnricherChain_L2_EnrichesButSkipsHypeBlocks) {
@@ -604,7 +604,7 @@ TEST_F(SPCPipelineR7Test, EnricherChain_L2_EnrichesButSkipsHypeBlocks) {
     int rc = pipeline_->Process(*task, *facade_);
     ASSERT_EQ(rc, 0) << task->error_message;
 
-    EXPECT_GT(CountSql("SELECT COUNT(*) FROM entities"), 0);     // F03 ran on L2
+    EXPECT_GT(CountSql("SELECT COUNT(*) FROM entities"), 0);     // Enricher ran on L2
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM blocks WHERE block_type = 16"), 0);  // no hype on L2
 }
 
@@ -614,7 +614,7 @@ TEST_F(SPCPipelineR7Test, EnricherChain_L2_EnrichesButSkipsHypeBlocks) {
 // chain member succeeded, 'pending_retry' + failed_members csv otherwise.
 // ============================================================
 
-// F03-slot fake that always degrades (step status != 0, the F03/F38 failure shape).
+// F03-slot fake that always degrades (step status != 0, the enricher/HyPE failure shape).
 class FailingSummaryEnricher : public cortrix::spc::ISpcEnricher {
 public:
     cortrix::spc::EnrichResult Enrich(const std::string&,
@@ -636,7 +636,7 @@ public:
     std::string Name() const override { return "LlmEnricher"; }
 };
 
-// F35-style fake failing the F35 way: the step status stays 0 (fail-soft) and the
+// F35-style fake failing the contextual retrieval way: the step status stays 0 (fail-soft) and the
 // outcome is only visible in contextualized_status == 2 — exactly the shape the
 // member-aware debt detection must catch.
 class FailingContextualEnricher : public cortrix::spc::ISpcEnricher {
@@ -645,7 +645,7 @@ public:
                                       const cortrix::spc::DocumentMetadata&,
                                       const cortrix::spc::ChunkContext&) override {
         cortrix::spc::EnrichResult r;
-        r.contextualized_status = 2;  // failed (LLM error inside F35)
+        r.contextualized_status = 2;  // failed (LLM error inside contextual retrieval)
         r.error_msg = "CX_ERR_F35_LLM_FAILED: synthetic";
         return r;
     }
@@ -720,7 +720,7 @@ TEST_F(SPCPipelineR7Test, EnrichState_PersistFailureAfterSuccessfulEnrichIsOwed)
     pipeline_->SetEnricherChain(nullptr);
 }
 
-// F03 slot fails (step status != 0) → pending_retry rows owing exactly f03, with
+// Enricher slot fails (step status != 0) → pending_retry rows owing exactly f03, with
 // the retry stamp and the error detail.
 TEST_F(SPCPipelineR7Test, EnrichState_F03FailureOwedAsPendingRetry) {
     cortrix::spc::EnricherChain chain;
@@ -741,11 +741,11 @@ TEST_F(SPCPipelineR7Test, EnrichState_F03FailureOwedAsPendingRetry) {
     pipeline_->SetEnricherChain(nullptr);
 }
 
-// F35 fail-soft (step status 0, contextualized_status 2) → the member-aware
-// detection still owes f35; the ok F03 head is NOT owed.
+// Contextual retrieval fail-soft (step status 0, contextualized_status 2) → the member-aware
+// detection still owes f35; the ok enricher head is NOT owed.
 TEST_F(SPCPipelineR7Test, EnrichState_F35SoftFailureDetectedViaContextualizedStatus) {
     cortrix::spc::EnricherChain chain;
-    chain.Append(std::make_shared<FakeSummaryEnricher>());        // ok F03
+    chain.Append(std::make_shared<FakeSummaryEnricher>());        // ok enricher
     chain.Append(std::make_shared<FailingContextualEnricher>());  // f35 soft-fail
     pipeline_->SetEnricherChain(&chain);
 
@@ -761,8 +761,8 @@ TEST_F(SPCPipelineR7Test, EnrichState_F35SoftFailureDetectedViaContextualizedSta
     pipeline_->SetEnricherChain(nullptr);
 }
 
-// F38 hype degrade (LLM fails inside GenerateHypeQuestions → step status != 0)
-// → rows owe exactly f38 while the ok F03 head stays un-owed.
+// Hype degrade (LLM fails inside GenerateHypeQuestions → step status != 0)
+// → rows owe exactly f38 while the ok enricher head stays un-owed.
 TEST_F(SPCPipelineR7Test, EnrichState_HypeFailureOwedAsF38) {
     auto failing_llm = std::make_shared<llm::MockLlmClient>();
     llm::ChatCompletionResponse fail;
@@ -787,7 +787,7 @@ TEST_F(SPCPipelineR7Test, EnrichState_HypeFailureOwedAsF38) {
     pipeline_->SetEnricherChain(nullptr);
 }
 
-// §3.8 W2 dual-vector (F35-9 B): a chain producing contextualized embeddings
+// Dual-vector: a chain producing contextualized embeddings
 // writes one contextual_vec_labels row per child, the label is the deterministic
 // derivation, and the label POINT actually entered the vector index alongside
 // the child's own point.
@@ -1032,7 +1032,7 @@ TEST_F(SPCPipelineR7Test, EnrichSweeper_EnqueuesDueDocsAndLeases) {
 }
 
 // ============================================================
-// SparseIndexRegistry (Q4 F40) path.
+// SparseIndexRegistry (Q4 sparse retrieval) path.
 // ============================================================
 
 // With the sparse registry wired, the L3 embed switches to EmbedBatchWithSparse and
@@ -1051,7 +1051,7 @@ TEST_F(SPCPipelineR7Test, SparseRegistry_PersistsSparseVecForChildren) {
     ASSERT_EQ(rc, 0) << task->error_message;
     EXPECT_EQ(task->stage, SPCStage::kDone);
 
-    // sparse_vec persisted on at least one child row (the F40 write branch ran).
+    // sparse_vec persisted on at least one child row (the sparse retrieval write branch ran).
     EXPECT_GT(CountSql("SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL "
                        "AND child_id != '' AND sparse_vec IS NOT NULL"), 0);
 
@@ -1099,10 +1099,10 @@ TEST_F(SPCPipelineR7Test, ChainAndSparse_Combined_L3_AllPersisted) {
 }
 
 // ============================================================
-// F38 hype embed-failure degrade (F38-8): when the embedder is asked to embed the
+// Hype embed-failure degrade: when the embedder is asked to embed the
 // hype question texts and fails, the hype blocks are dropped (non-fatal) but the doc
 // still writes. We can't make the stub embedder fail directly, so instead we verify
-// the symmetric guard: a chain whose F38 produces questions but the doc is L3 with a
+// the symmetric guard: a chain whose HyPE produces questions but the doc is L3 with a
 // vector-add failure rolls everything back (the hype vec_points are part of the same
 // AddPoints set). This exercises the AddPoints-failure rollback WITH hype blocks in
 // the write set.

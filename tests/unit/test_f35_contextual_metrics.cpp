@@ -4,9 +4,9 @@
 
 #include "cortrix/spc/contextual_metrics.h"
 
-// F35 S7 — Contextual Retrieval metrics (§10, subsystem `contextual_retrieval`).
-// Self-contained recorder + OpenMetrics renderer (same pattern as F38 HypeMetrics
-// / F40 SparseMetrics). NO high-cardinality labels (§10 V3 ruling 10 dropped ns_id).
+// Contextual retrieval S7 — Contextual Retrieval metrics (§10, subsystem `contextual_retrieval`).
+// Self-contained recorder + OpenMetrics renderer (same pattern as HypeMetrics
+// / SparseMetrics). NO high-cardinality labels (§10 V3 ruling 10 dropped ns_id).
 namespace cortrix::spc {
 namespace {
 

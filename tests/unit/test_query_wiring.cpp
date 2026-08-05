@@ -1,4 +1,4 @@
-// query_wiring.cpp — behavioral coverage of the F39/F36 wiring contracts.
+// query_wiring.cpp — behavioral coverage of the query routing/RAG-Fusion wiring contracts.
 //
 // Scope note: DecisionOf / ReadRouteOverride / ResolveRagFusionConfig /
 // RecordQueryTrace live in an anonymous namespace inside query_wiring.cpp. The
@@ -9,7 +9,7 @@
 //
 //   * ReadRouteOverride -> CX_ERR_F39_FORCE_ROUTE_INVALID : the override flows into
 //     QueryComplexityClassifier::RouteAndUpdateContext(ctx, route); a bad token
-//     returns the F39 permanent error and leaves ctx untouched (exactly what the
+//     returns the query routing permanent error and leaves ctx untouched (exactly what the
 //     closure surfaces as a 400).
 //   * DecisionOf(routing_path, source) : RouteAndUpdateContext writes the
 //     routing_path + routing_decision_source the closure maps to a
@@ -76,7 +76,7 @@ protected:
 // ReadRouteOverride -> CX_ERR_F39_FORCE_ROUTE_INVALID
 // ===========================================================================
 
-// A bad ?route= override is the F39 permanent error; ctx is left untouched so the
+// A bad ?route= override is the query routing permanent error; ctx is left untouched so the
 // closure can surface the Agent-friendly 400 without a half-written routing_path.
 TEST_F(QueryWiringTest, InvalidRouteOverrideYieldsF39Error) {
     auto classifier = MakeClassifier();
@@ -129,7 +129,7 @@ TEST_F(QueryWiringTest, NoOverrideUsesClassifier) {
     EXPECT_EQ(ctx.routing_decision_source, "rule");
 }
 
-// The F39 error carries the structured-data key the closure's 400 body needs.
+// The query routing error carries the structured-data key the closure's 400 body needs.
 TEST_F(QueryWiringTest, ForceRouteInvalidErrorHasStructuredKey) {
     const auto& keys = RequiredStructuredDataKeys(RouterErrorCode::kForceRouteInvalid);
     ASSERT_EQ(keys.size(), 1u);
@@ -243,7 +243,7 @@ TEST_F(QueryWiringTest, RagFusionGateOnWhenEnabledComplexAndLlm) {
     EXPECT_TRUE(std::string("complex") == "complex" && cfg.enabled && /*llm=*/true);
     // No LLM -> off even when enabled (the [R7] null-LLM degrade).
     EXPECT_FALSE(std::string("complex") == "complex" && cfg.enabled && /*llm=*/false);
-    // Simple route -> off even when enabled (F36 only on Complex).
+    // Simple route -> off even when enabled (RAG-Fusion only on Complex).
     EXPECT_FALSE(std::string("simple") == "complex" && cfg.enabled && /*llm=*/true);
 }
 

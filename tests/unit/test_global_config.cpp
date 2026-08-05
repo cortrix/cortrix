@@ -63,7 +63,7 @@ TEST(InMemoryGlobalConfigTest, OnChangeFiresOnSet) {
     EXPECT_EQ(changed_key, "enricher.endpoint");
 }
 
-// Downstream feature (e.g. F18a) consuming config through the interface + mock.
+// Downstream feature (e.g. operation log) consuming config through the interface + mock.
 TEST(MockGlobalConfigTest, DownstreamReadsThroughInterface) {
     MockGlobalConfig mock;
     EXPECT_CALL(mock, GetInt("operation_log.retention_days"))

@@ -7,8 +7,8 @@
 /// seams): the existing full-stack server tests (test_e2e_full_server /
 /// test_cross_feature_e2e) back the server with a no-op TestSPCManager + a
 /// non-searchable FakeIndex, so an uploaded document never actually flows through the
-/// real SPC pipeline. The pipeline's optional seams — the F03/F35/F38 EnricherChain,
-/// the F40 SparseIndexRegistry, the F10 CleaningConfig resolver — are all installed
+/// real SPC pipeline. The pipeline's optional seams — the enricher/contextual retrieval/HyPE EnricherChain,
+/// the SparseIndexRegistry, the CleaningConfig resolver — are all installed
 /// via Set* PROXIES *after* the pipeline has moved into the SPCManager. That
 /// assembly-order wiring is exercised here for the first time end-to-end: a real file
 /// is POSTed, the real SPCManager worker processes it, and the per-NS store is then
@@ -40,7 +40,7 @@
 
 #include "cortrix/llm/i_llm_client.h"                  // ILlmClient / ChatCompletionResponse
 #include "cortrix/spc/enricher_chain.h"
-#include "cortrix/spc/hype_enricher.h"                 // F38 HyPEEnricher / HyPEConfig
+#include "cortrix/spc/hype_enricher.h"                 // HyPEEnricher / HyPEConfig
 #include "cortrix/spc_enricher.h"                      // EnrichResult / Entity / ISpcEnricher
 #include "cortrix/spc/parser.h"                        // ChunkContext / DocumentMetadata
 #include "cortrix/spc/cleaning_types.h"                // CleaningConfig
@@ -127,7 +127,7 @@ std::shared_ptr<llm::MockLlmClient> MakeHypeLlm() {
 }
 
 // ── document text: a long paragraph, verbatim-repeated ───────────────────────────
-// The F34 chunker accumulates paragraphs into parents (parent_size=1024 tok) then
+// The parent-child chunker accumulates paragraphs into parents (parent_size=1024 tok) then
 // splits each parent into children of child_size=200 tok. To make duplication
 // observable AT THE CHILD LEVEL, one paragraph must exceed child_size (so it splits
 // into ≥2 children) and be repeated verbatim (so those children recur). dedup-on then
@@ -165,7 +165,7 @@ class IngestPipelineE2E : public ::testing::Test {
     h_ = std::make_unique<cortrix::test::FullStackE2E>();
     h_->BuildIngest(/*embedding_dim=*/128);
 
-    // Install the F03/F35/F38 chain on the shared chain object the harness already
+    // Install the enricher/contextual retrieval/HyPE chain on the shared chain object the harness already
     // handed to the manager (SetEnricherChain(&enricher_chain_) ran in BuildIngest;
     // it holds the POINTER, so appending here — before Start() / before any upload —
     // is the assembly-order seam under test).
@@ -175,7 +175,7 @@ class IngestPipelineE2E : public ::testing::Test {
         cortrix::spc::HyPEConfig{}, MakeHypeLlm(), /*parent_store=*/nullptr));
     ASSERT_TRUE(h_->enricher_chain().AnyAvailable());
 
-    // F10: per-NS cleaning override via the manager proxy. "sales" keeps the default
+    // Cleaning: per-NS cleaning override via the manager proxy. "sales" keeps the default
     // (dedup on); "eng" disables dedup. Resolver keys off the namespace id.
     h_->spc_mgr().SetCleaningConfigResolver(
         [](const std::string& ns) -> cortrix::spc::CleaningConfig {
@@ -272,35 +272,35 @@ class IngestPipelineE2E : public ::testing::Test {
 };
 
 // ── the full ingest chain end-to-end (sales NS, dedup on) ────────────────────────
-// Upload → real SPCManager worker (parse → F34 chunk → F03/F35/F38 chain → F10 clean
-// → F40 sparse → store/index) → poll ready → inspect per-NS store. Each assertion is
+// Upload → real SPCManager worker (parse → parent-child chunk → enricher/contextual retrieval/HyPE chain → clean
+// → sparse → store/index) → poll ready → inspect per-NS store. Each assertion is
 // a probe on one seam's product having actually landed through the manager proxy.
 TEST_F(IngestPipelineE2E, FullChainProducesAllArtifacts) {
   const std::string doc_id = UploadDoc(kNsDedupOn, "doc.txt", RepeatedParagraphDoc());
   ASSERT_FALSE(doc_id.empty());
   ASSERT_EQ(WaitForStatus(kNsDedupOn, doc_id), "ready");
 
-  // F07/F08 + F34: child blocks were written.
+  // Semantic score/META block + parent-child chunking: child blocks were written.
   EXPECT_GT(CountSql(kNsDedupOn,
                      "SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL "
                      "AND child_id != ''"),
             0)
       << "no child blocks — chunk/store chain did not run";
 
-  // (E) F03 enrichment landed: enriched_score + entities (WriteEnrichment branch).
+  // (E) enrichment landed: enriched_score + entities (WriteEnrichment branch).
   EXPECT_GT(CountSql(kNsDedupOn, "SELECT COUNT(*) FROM blocks WHERE enriched_score > 0"), 0)
       << "F03 enrichment missing — the EnricherChain seam did not take effect "
          "through the SPCManager proxy (live-only assembly gap — report, do not weaken)";
   EXPECT_GT(CountSql(kNsDedupOn, "SELECT COUNT(*) FROM entities"), 0)
       << "F03 entities missing — chain seam not wired through the manager";
 
-  // (D) F38 hype blocks landed (block_type=16=kBlockHypeQuestion). Their presence
+  // (D) hype blocks landed (block_type=16=kBlockHypeQuestion). Their presence
   // proves the hype assembly + embed loop ran via the chain seam.
   EXPECT_GT(CountSql(kNsDedupOn, "SELECT COUNT(*) FROM blocks WHERE block_type = 16"), 0)
       << "F38 hype blocks missing — chain seam (HyPEEnricher) did not run through "
          "the SPCManager proxy (live-only assembly gap — report, do not weaken)";
 
-  // (C) F40 sparse_vec persisted on at least one child (the SparseIndexRegistry seam).
+  // (C) sparse_vec persisted on at least one child (the SparseIndexRegistry seam).
   EXPECT_GT(CountSql(kNsDedupOn,
                      "SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL "
                      "AND child_id != '' AND sparse_vec IS NOT NULL"),
@@ -311,7 +311,7 @@ TEST_F(IngestPipelineE2E, FullChainProducesAllArtifacts) {
 
 // (B/F) per-NS cleaning override: the SAME repeated-paragraph doc collapses its
 // duplicate children in the dedup-on NS but keeps them in the dedup-off NS. This both
-// proves dedup truly removes data AND that the F10 resolver routed a different config
+// proves dedup truly removes data AND that the cleaning resolver routed a different config
 // per namespace through the manager proxy.
 TEST_F(IngestPipelineE2E, PerNamespaceCleaningOverrideTakesEffect) {
   const std::string on_doc = UploadDoc(kNsDedupOn, "dup.txt", RepeatedParagraphDoc());

@@ -8,7 +8,7 @@
 // gc_cli.cpp:80-82). These need a catalog.db that OPENS cleanly (so the open-error
 // arm is bypassed) but whose GC query then fails. We get that deterministically by:
 //   1. running gc-status once on a fresh dir so CatalogDb::Open migrates the full
-//      F12 schema AND records the schema_version,
+//      Catalog schema AND records the schema_version,
 //   2. dropping the `file_locations` table directly via sqlite3.
 // On the next MaybeRunGcCli call, Open is version-gated (schema_version is already
 // current) so it SKIPS re-creating the table; GetStatus / RunOnce then fail their

@@ -109,8 +109,8 @@ namespace:
     EXPECT_EQ(config.ns.idle_timeout_s, 600);
 }
 
-// [D3.5 gap①] The two ingest-side LLM roles parse from yaml: enricher_llm (F03
-// plan B, §2.7.bis) and doc_summary_llm (F41 — its parse was MISSING when F42-1
+// The two ingest-side LLM roles parse from yaml: enricher_llm (enricher
+// plan B, §2.7.bis) and doc_summary_llm (doc summary — its parse was MISSING when the scheduler
 // landed the field, so a configured block silently never reached IsConfigured()).
 TEST_F(ConfigTest, IngestLlmRolesParsed) {
     WriteYaml(R"(
@@ -141,8 +141,8 @@ TEST_F(ConfigTest, IngestLlmRolesDefaultUnconfigured) {
     EXPECT_FALSE(config.enricher_llm.IsConfigured());
 }
 
-// Deep-QA 2026-07-10 config seams: F35 ctx knobs on enricher_llm, parser
-// hard-fail gate, F42 sweeper pacing. Absent = 0/false (built-ins unchanged).
+// Deep-QA 2026-07-10 config seams: contextual retrieval ctx knobs on enricher_llm, parser
+// hard-fail gate, async task sweeper pacing. Absent = 0/false (built-ins unchanged).
 TEST_F(ConfigTest, DeepQaConfigSeamsParsed) {
     WriteYaml(R"(
 enricher_llm:
@@ -175,7 +175,7 @@ spc:
     EXPECT_EQ(absent.spc.enrich_sweep_batch, 0);
 }
 
-// F38 §4.3 as-built (2026-07-10): enricher_llm.hype_questions_per_chunk reaches
+// HyPE as-built (2026-07-10): enricher_llm.hype_questions_per_chunk reaches
 // the parsed config; absent = 0 (consumer keeps the built-in default 3).
 TEST_F(ConfigTest, EnricherHypeQuestionsPerChunkParsed) {
     WriteYaml(R"(

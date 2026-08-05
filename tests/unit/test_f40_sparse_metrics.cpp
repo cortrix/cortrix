@@ -4,7 +4,7 @@
 
 #include "cortrix/retrieval/sparse_metrics.h"
 
-// F40 S10 (metrics) — the 4 bge_m3_sparse subsystem metrics. Recorder
+// Sparse retrieval S10 (metrics) — the 4 bge_m3_sparse subsystem metrics. Recorder
 // correctness + OpenMetrics rendering + label naming (no ns_id, D1 V3 ruling 10).
 namespace cortrix::retrieval {
 namespace {

@@ -6,8 +6,8 @@
 
 #include "cortrix/scoring/scoring_schema_provider.h"
 
-// F07 S8 coverage: ScoringSchemaProvider adds the per-Unit blocks.semantic_score column
-// (ARCH §5.1.2) idempotently, inside the frozen ISchemaProvider contract. Mirrors the F03
+// Semantic score S8 coverage: ScoringSchemaProvider adds the per-Unit blocks.semantic_score column
+// (ARCH §5.1.2) idempotently, inside the frozen ISchemaProvider contract. Mirrors the enricher
 // provider's ADD-COLUMN-if-absent pattern (test_f03_schema_provider.cpp).
 namespace cortrix::scoring {
 namespace {
@@ -100,15 +100,15 @@ TEST_F(ScoringSchemaTest, UnsupportedVersionStepRejected) {
     EXPECT_NE(s.message().find("CX_ERR_SCHEMA_VERSION_MISMATCH"), std::string::npos);
 }
 
-// F07 + F03 co-existence: both ALTER blocks for their own column without clobbering.
+// Semantic score + enricher co-existence: both ALTER blocks for their own column without clobbering.
 TEST_F(ScoringSchemaTest, CoexistsWithEnrichedScoreColumn) {
     CreateBlocks();
-    // Simulate F03 having already added enriched_score.
+    // Simulate enricher having already added enriched_score.
     ASSERT_EQ(Exec("ALTER TABLE blocks ADD COLUMN enriched_score REAL DEFAULT NULL;"), SQLITE_OK);
     ScoringSchemaProvider p;
     ASSERT_TRUE(p.Migrate(db_, 0, 1).ok());
-    EXPECT_TRUE(ColumnExists("enriched_score"));   // F03's column untouched
-    EXPECT_TRUE(ColumnExists("semantic_score"));   // F07's column added
+    EXPECT_TRUE(ColumnExists("enriched_score"));   // Enricher's column untouched
+    EXPECT_TRUE(ColumnExists("semantic_score"));   // Semantic score's column added
 }
 
 }  // namespace
