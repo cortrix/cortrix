@@ -165,7 +165,7 @@ bool ParseBatchRequest(const httplib::Request& req, httplib::Response& res,
 void RegisterBatchRoutes(httplib::Server& server,
                          server::BatchSubmitService& service,
                          ApiKeyAuth& auth) {
-    // POST /api/v1/documents/batch — batch submit Agent-first batch submit.
+    // POST /api/v1/documents/batch — Agent-first batch submit.
     server.Post("/api/v1/documents/batch",
         WithAuth(auth, kPermWrite,
             [&service](const httplib::Request& req, httplib::Response& res,

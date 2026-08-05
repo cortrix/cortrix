@@ -85,7 +85,7 @@
 #include "cortrix/server/routes/flat_document_routes.h"
 #include "cortrix/server/routes/connector_routes.h"
 #include "cortrix/async/document_task_handler.h"
-// batch submit batch submit route + its production submitter.
+// Batch submit route + its production submitter.
 #include "cortrix/server/routes/batch_routes.h"
 #include "cortrix/server/batch_submit_service.h"
 #include "cortrix/async/managed_input.h"
