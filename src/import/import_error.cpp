@@ -10,7 +10,7 @@ using agent_friendly::ErrorCategory;
 namespace {
 
 // One canonical row per code. Defined as function-local statics so each
-// returns a stable reference. The switch in GetF16aErrorInfo is intentionally
+// returns a stable reference. The switch in GetImportErrorInfo is intentionally
 // exhaustive: building with -Wall -Wextra (-Wswitch) turns "added a code without a
 // row" into a warning (treated as a build failure), so the registry can't silently
 // drift from the enum.
@@ -19,46 +19,46 @@ namespace {
 // retryable. CONNECTION_FAILED gets a short 5s backoff (network blip); TIMEOUT gets
 // 30s (the §5.3 example body) — a re-run of a slow query benefits from a longer
 // pause. The 4 non-retryable codes carry null.
-constexpr F16aErrorInfo kConnectionFailed
+constexpr ImportErrorInfo kConnectionFailed
     {"CX_ERR_IMPORT_CONNECTION_FAILED",   ErrorCategory::kTransient, true,  5000,         503};
-constexpr F16aErrorInfo kAuthDenied
+constexpr ImportErrorInfo kAuthDenied
     {"CX_ERR_IMPORT_AUTH_DENIED",         ErrorCategory::kAuth,      false, std::nullopt, 403};
-constexpr F16aErrorInfo kInvalidSql
+constexpr ImportErrorInfo kInvalidSql
     {"CX_ERR_IMPORT_INVALID_SQL",         ErrorCategory::kPermanent, false, std::nullopt, 400};
-constexpr F16aErrorInfo kTimeout
+constexpr ImportErrorInfo kTimeout
     {"CX_ERR_IMPORT_TIMEOUT",             ErrorCategory::kTimeout,   true,  30000,        504};
-constexpr F16aErrorInfo kRowsLimitExceeded
+constexpr ImportErrorInfo kRowsLimitExceeded
     {"CX_ERR_IMPORT_ROWS_LIMIT_EXCEEDED", ErrorCategory::kQuota,     false, std::nullopt, 413};
-constexpr F16aErrorInfo kCrossTenantRef
+constexpr ImportErrorInfo kCrossTenantRef
     {"CX_ERR_IMPORT_CROSS_TENANT_REF",    ErrorCategory::kAuth,      false, std::nullopt, 403};
 // [R2-M5] Catch-all for an unexpected import throw (DB driver / allocation). Transient +
 // retryable with a short backoff — a transient cause may clear on a re-run, and the
 // retryable<->retry_after_ms invariant (GEN-Agent #6, test_import_error) requires a value.
-constexpr F16aErrorInfo kInternal
+constexpr ImportErrorInfo kInternal
     {"CX_ERR_IMPORT_INTERNAL",            ErrorCategory::kTransient, true,  1000,         500};
 
 }  // namespace
 
-const F16aErrorInfo& GetF16aErrorInfo(F16aErrorCode code) {
+const ImportErrorInfo& GetImportErrorInfo(ImportErrorCode code) {
     switch (code) {
-        case F16aErrorCode::kConnectionFailed:  return kConnectionFailed;
-        case F16aErrorCode::kAuthDenied:        return kAuthDenied;
-        case F16aErrorCode::kInvalidSql:        return kInvalidSql;
-        case F16aErrorCode::kTimeout:           return kTimeout;
-        case F16aErrorCode::kRowsLimitExceeded: return kRowsLimitExceeded;
-        case F16aErrorCode::kCrossTenantRef:    return kCrossTenantRef;
-        case F16aErrorCode::kInternal:          return kInternal;
+        case ImportErrorCode::kConnectionFailed:  return kConnectionFailed;
+        case ImportErrorCode::kAuthDenied:        return kAuthDenied;
+        case ImportErrorCode::kInvalidSql:        return kInvalidSql;
+        case ImportErrorCode::kTimeout:           return kTimeout;
+        case ImportErrorCode::kRowsLimitExceeded: return kRowsLimitExceeded;
+        case ImportErrorCode::kCrossTenantRef:    return kCrossTenantRef;
+        case ImportErrorCode::kInternal:          return kInternal;
     }
     // Unreachable for a valid enum value; defensive fallback keeps the function
     // total (and avoids a -Wreturn-type warning).
     return kInvalidSql;
 }
 
-const char* F16aErrorCodeString(F16aErrorCode code) {
-    return GetF16aErrorInfo(code).cx_code;
+const char* ImportErrorCodeString(ImportErrorCode code) {
+    return GetImportErrorInfo(code).cx_code;
 }
 
-const std::vector<std::string>& RequiredStructuredDataKeys(F16aErrorCode code) {
+const std::vector<std::string>& RequiredStructuredDataKeys(ImportErrorCode code) {
     // §5.3 / §5.4 structured_data keys the Agent needs to act. Function-local
     // statics → stable refs.
     static const std::vector<std::string> kEmpty{};
@@ -75,22 +75,22 @@ const std::vector<std::string>& RequiredStructuredDataKeys(F16aErrorCode code) {
 
     switch (code) {
         // 503 transient: body is contextual (host/db live in the message).
-        case F16aErrorCode::kConnectionFailed:  return kEmpty;
+        case ImportErrorCode::kConnectionFailed:  return kEmpty;
         // 403 auth: contextual (namespace named in the message).
-        case F16aErrorCode::kAuthDenied:        return kEmpty;
+        case ImportErrorCode::kAuthDenied:        return kEmpty;
         // 400 permanent: contextual (the offending keyword / DSL operator is in the
         // message; we deliberately do NOT echo the raw SQL back — R2 credential /
         // payload hygiene).
-        case F16aErrorCode::kInvalidSql:        return kEmpty;
-        case F16aErrorCode::kTimeout:           return kTimeoutKeys;
-        case F16aErrorCode::kRowsLimitExceeded: return kRowsKeys;
-        case F16aErrorCode::kCrossTenantRef:    return kCrossTenantKeys;
-        case F16aErrorCode::kInternal:          return kEmpty;  // contextual (detail in message)
+        case ImportErrorCode::kInvalidSql:        return kEmpty;
+        case ImportErrorCode::kTimeout:           return kTimeoutKeys;
+        case ImportErrorCode::kRowsLimitExceeded: return kRowsKeys;
+        case ImportErrorCode::kCrossTenantRef:    return kCrossTenantKeys;
+        case ImportErrorCode::kInternal:          return kEmpty;  // contextual (detail in message)
     }
     return kEmpty;  // unreachable for a valid enum
 }
 
-bool HasRequiredStructuredData(F16aErrorCode code,
+bool HasRequiredStructuredData(ImportErrorCode code,
                                const nlohmann::json& structured_data) {
     const std::vector<std::string>& keys = RequiredStructuredDataKeys(code);
     if (!structured_data.is_object()) {
@@ -102,10 +102,10 @@ bool HasRequiredStructuredData(F16aErrorCode code,
     return true;
 }
 
-AgentFriendlyError MakeF16aError(F16aErrorCode code,
+AgentFriendlyError MakeImportError(ImportErrorCode code,
                                  nlohmann::json structured_data,
                                  const std::string& message) {
-    const F16aErrorInfo& info = GetF16aErrorInfo(code);
+    const ImportErrorInfo& info = GetImportErrorInfo(code);
     AgentFriendlyError err;
     err.code = info.cx_code;
     err.message = message.empty() ? info.cx_code : message;
@@ -116,31 +116,31 @@ AgentFriendlyError MakeF16aError(F16aErrorCode code,
     return err;
 }
 
-StatusCode F16aErrorToStatusCode(F16aErrorCode code) {
+StatusCode ImportErrorToStatusCode(ImportErrorCode code) {
     switch (code) {
         // network blip → kUnavailable.
-        case F16aErrorCode::kConnectionFailed:  return StatusCode::kUnavailable;
+        case ImportErrorCode::kConnectionFailed:  return StatusCode::kUnavailable;
         // auth / cross-tenant → kPermissionDenied.
-        case F16aErrorCode::kAuthDenied:
-        case F16aErrorCode::kCrossTenantRef:    return StatusCode::kPermissionDenied;
+        case ImportErrorCode::kAuthDenied:
+        case ImportErrorCode::kCrossTenantRef:    return StatusCode::kPermissionDenied;
         // bad SQL / DSL → kInvalidArgument.
-        case F16aErrorCode::kInvalidSql:        return StatusCode::kInvalidArgument;
+        case ImportErrorCode::kInvalidSql:        return StatusCode::kInvalidArgument;
         // timeout → kUnavailable (closest coarse code; rich category=timeout
-        // preserved via the CX_ERR_ token + boundary MakeF16aError).
-        case F16aErrorCode::kTimeout:           return StatusCode::kUnavailable;
+        // preserved via the CX_ERR_ token + boundary MakeImportError).
+        case ImportErrorCode::kTimeout:           return StatusCode::kUnavailable;
         // quota → kInvalidArgument (closest coarse code; rich category=quota
         // preserved via the token).
-        case F16aErrorCode::kRowsLimitExceeded: return StatusCode::kInvalidArgument;
-        case F16aErrorCode::kInternal:          return StatusCode::kInternal;
+        case ImportErrorCode::kRowsLimitExceeded: return StatusCode::kInvalidArgument;
+        case ImportErrorCode::kInternal:          return StatusCode::kInternal;
     }
     return StatusCode::kInternal;  // unreachable for a valid enum
 }
 
-Status F16aStatus(F16aErrorCode code, const std::string& detail) {
-    const char* cx = F16aErrorCodeString(code);
+Status ImportStatus(ImportErrorCode code, const std::string& detail) {
+    const char* cx = ImportErrorCodeString(code);
     std::string msg = detail.empty() ? std::string(cx)
                                      : std::string(cx) + ": " + detail;
-    return Status(F16aErrorToStatusCode(code), std::move(msg));
+    return Status(ImportErrorToStatusCode(code), std::move(msg));
 }
 
 }  // namespace cortrix::import

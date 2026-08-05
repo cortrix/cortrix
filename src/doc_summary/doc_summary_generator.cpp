@@ -365,7 +365,7 @@ Result<DocSummaryStructured> DocSummaryGenerator::CallLlmStructured(
         // Observable-by-design: a repair is a provider-contract deviation worth
         // tracking per model, never a silent normal path.
         CORTRIX_LOG_WARN("doc_summary",
-                         "F41 structured output accepted via parse repair '{}' "
+                         "structured output accepted via parse repair '{}' "
                          "(model={} content_length={})",
                          parse_repair, resp.model, resp.content_length);
     }

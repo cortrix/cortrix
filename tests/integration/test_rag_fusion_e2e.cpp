@@ -156,7 +156,7 @@ TEST_F(RagFusionE2ETest, E2E_RagFusion_DisabledNs_DirectSingleQuery) {
 }
 
 // IT 26: Issue 2 B — ONE LLM call yields the global variants reused for N×M retrieval.
-TEST_F(RagFusionE2ETest, E2E_RagFusion_F04_ScatterGather_GlobalVariants) {
+TEST_F(RagFusionE2ETest, E2E_RagFusion_CrossNs_ScatterGather_GlobalVariants) {
     auto mock = std::make_shared<MockLlmClient>();
     // Exactly ONE LLM call regardless of NS count (Issue 2 B: variants are global).
     EXPECT_CALL(*mock, Chat(_, _)).Times(1).WillOnce(Return(OkJson(FinanceVariants())));

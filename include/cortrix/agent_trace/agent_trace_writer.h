@@ -77,7 +77,7 @@ struct TraceSession {
 ///
 /// Per CODING_CONVENTIONS §3 / F-FREEZE-1, Query returns Result<T> (no Result<T,E>);
 /// a domain error is carried as a Status whose message is prefixed with the
-/// CX_ERR_TRACE_* token (see agent_trace_error.h F13Status), re-inflated to the full
+/// CX_ERR_TRACE_* token (see agent_trace_error.h AgentTraceStatus), re-inflated to the full
 /// Agent-friendly body at the API boundary.
 class IAgentTraceWriter {
 public:

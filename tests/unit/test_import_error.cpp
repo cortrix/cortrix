@@ -23,32 +23,32 @@ using agent_friendly::ErrorCategory;
 
 // All 6 codes, in enum order. Explicit (not a loop over ints) so the test itself
 // documents the locked set and fails to compile if an enumerator is gone.
-const std::vector<F16aErrorCode>& AllCodes() {
-    static const std::vector<F16aErrorCode> codes = {
-        F16aErrorCode::kConnectionFailed,
-        F16aErrorCode::kAuthDenied,
-        F16aErrorCode::kInvalidSql,
-        F16aErrorCode::kTimeout,
-        F16aErrorCode::kRowsLimitExceeded,
-        F16aErrorCode::kCrossTenantRef,
-        F16aErrorCode::kInternal,  // [R2-M5] appended
+const std::vector<ImportErrorCode>& AllCodes() {
+    static const std::vector<ImportErrorCode> codes = {
+        ImportErrorCode::kConnectionFailed,
+        ImportErrorCode::kAuthDenied,
+        ImportErrorCode::kInvalidSql,
+        ImportErrorCode::kTimeout,
+        ImportErrorCode::kRowsLimitExceeded,
+        ImportErrorCode::kCrossTenantRef,
+        ImportErrorCode::kInternal,  // [R2-M5] appended
     };
     return codes;
 }
 
-TEST(F16aErrorTest, SevenCodesTotal) {
+TEST(ImportErrorTest, SevenCodesTotal) {
     // [R2-M5] 6 -> 7: kInternal appended (GEN-Agent #7 allows new codes; none removed).
     EXPECT_EQ(AllCodes().size(), 7u);
-    EXPECT_EQ(kF16aErrorCodeCount, 7);
+    EXPECT_EQ(kImportErrorCodeCount, 7);
 }
 
 // Every code's CX_ERR_IMPORT_* string is unique and matches the API spec ErrorResponseV1
 // pattern (GEN-Agent #1 + #7 stable identity).
-TEST(F16aErrorTest, EveryCodeHasUniqueWellFormedCxString) {
+TEST(ImportErrorTest, EveryCodeHasUniqueWellFormedCxString) {
     static const std::regex kPattern("^CX_ERR_IMPORT_[A-Z][A-Z_]*$");
     std::set<std::string> seen;
-    for (F16aErrorCode code : AllCodes()) {
-        std::string cx = F16aErrorCodeString(code);
+    for (ImportErrorCode code : AllCodes()) {
+        std::string cx = ImportErrorCodeString(code);
         EXPECT_TRUE(std::regex_match(cx, kPattern)) << cx;
         EXPECT_TRUE(seen.insert(cx).second) << "duplicate " << cx;
     }
@@ -56,52 +56,52 @@ TEST(F16aErrorTest, EveryCodeHasUniqueWellFormedCxString) {
 }
 
 // §5.4 column values pinned exactly (HTTP / category / retryable).
-TEST(F16aErrorTest, RegistryMatchesSpecTable) {
-    auto info = [](F16aErrorCode c) { return GetF16aErrorInfo(c); };
+TEST(ImportErrorTest, RegistryMatchesSpecTable) {
+    auto info = [](ImportErrorCode c) { return GetImportErrorInfo(c); };
 
-    EXPECT_EQ(info(F16aErrorCode::kConnectionFailed).http_status, 503);
-    EXPECT_EQ(info(F16aErrorCode::kConnectionFailed).category, ErrorCategory::kTransient);
-    EXPECT_TRUE(info(F16aErrorCode::kConnectionFailed).retryable);
+    EXPECT_EQ(info(ImportErrorCode::kConnectionFailed).http_status, 503);
+    EXPECT_EQ(info(ImportErrorCode::kConnectionFailed).category, ErrorCategory::kTransient);
+    EXPECT_TRUE(info(ImportErrorCode::kConnectionFailed).retryable);
 
-    EXPECT_EQ(info(F16aErrorCode::kAuthDenied).http_status, 403);
-    EXPECT_EQ(info(F16aErrorCode::kAuthDenied).category, ErrorCategory::kAuth);
-    EXPECT_FALSE(info(F16aErrorCode::kAuthDenied).retryable);
+    EXPECT_EQ(info(ImportErrorCode::kAuthDenied).http_status, 403);
+    EXPECT_EQ(info(ImportErrorCode::kAuthDenied).category, ErrorCategory::kAuth);
+    EXPECT_FALSE(info(ImportErrorCode::kAuthDenied).retryable);
 
-    EXPECT_EQ(info(F16aErrorCode::kInvalidSql).http_status, 400);
-    EXPECT_EQ(info(F16aErrorCode::kInvalidSql).category, ErrorCategory::kPermanent);
-    EXPECT_FALSE(info(F16aErrorCode::kInvalidSql).retryable);
+    EXPECT_EQ(info(ImportErrorCode::kInvalidSql).http_status, 400);
+    EXPECT_EQ(info(ImportErrorCode::kInvalidSql).category, ErrorCategory::kPermanent);
+    EXPECT_FALSE(info(ImportErrorCode::kInvalidSql).retryable);
 
-    EXPECT_EQ(info(F16aErrorCode::kTimeout).http_status, 504);
-    EXPECT_EQ(info(F16aErrorCode::kTimeout).category, ErrorCategory::kTimeout);
-    EXPECT_TRUE(info(F16aErrorCode::kTimeout).retryable);
+    EXPECT_EQ(info(ImportErrorCode::kTimeout).http_status, 504);
+    EXPECT_EQ(info(ImportErrorCode::kTimeout).category, ErrorCategory::kTimeout);
+    EXPECT_TRUE(info(ImportErrorCode::kTimeout).retryable);
 
-    EXPECT_EQ(info(F16aErrorCode::kRowsLimitExceeded).http_status, 413);
-    EXPECT_EQ(info(F16aErrorCode::kRowsLimitExceeded).category, ErrorCategory::kQuota);
-    EXPECT_FALSE(info(F16aErrorCode::kRowsLimitExceeded).retryable);
+    EXPECT_EQ(info(ImportErrorCode::kRowsLimitExceeded).http_status, 413);
+    EXPECT_EQ(info(ImportErrorCode::kRowsLimitExceeded).category, ErrorCategory::kQuota);
+    EXPECT_FALSE(info(ImportErrorCode::kRowsLimitExceeded).retryable);
 
-    EXPECT_EQ(info(F16aErrorCode::kCrossTenantRef).http_status, 403);
-    EXPECT_EQ(info(F16aErrorCode::kCrossTenantRef).category, ErrorCategory::kAuth);
-    EXPECT_FALSE(info(F16aErrorCode::kCrossTenantRef).retryable);
+    EXPECT_EQ(info(ImportErrorCode::kCrossTenantRef).http_status, 403);
+    EXPECT_EQ(info(ImportErrorCode::kCrossTenantRef).category, ErrorCategory::kAuth);
+    EXPECT_FALSE(info(ImportErrorCode::kCrossTenantRef).retryable);
 
     // [R2-M5] kInternal: 500 transient, retryable with a short backoff.
-    EXPECT_EQ(info(F16aErrorCode::kInternal).http_status, 500);
-    EXPECT_EQ(info(F16aErrorCode::kInternal).category, ErrorCategory::kTransient);
-    EXPECT_TRUE(info(F16aErrorCode::kInternal).retryable);
+    EXPECT_EQ(info(ImportErrorCode::kInternal).http_status, 500);
+    EXPECT_EQ(info(ImportErrorCode::kInternal).category, ErrorCategory::kTransient);
+    EXPECT_TRUE(info(ImportErrorCode::kInternal).retryable);
 }
 
 // retry_after_ms is present iff retryable (GEN-Agent #6 — machine-readable retry).
-TEST(F16aErrorTest, RetryAfterMsConsistentWithRetryable) {
-    for (F16aErrorCode code : AllCodes()) {
-        const F16aErrorInfo& info = GetF16aErrorInfo(code);
+TEST(ImportErrorTest, RetryAfterMsConsistentWithRetryable) {
+    for (ImportErrorCode code : AllCodes()) {
+        const ImportErrorInfo& info = GetImportErrorInfo(code);
         EXPECT_EQ(info.retryable, info.retry_after_ms.has_value())
-            << F16aErrorCodeString(code);
+            << ImportErrorCodeString(code);
     }
 }
 
-// MakeF16aError fills the 4 GEN-Agent fields from the registry (call sites never
+// MakeImportError fills the 4 GEN-Agent fields from the registry (call sites never
 // restate category/retryable/retry_after_ms).
-TEST(F16aErrorTest, MakeErrorPopulatesAgentFriendlyFields) {
-    auto err = MakeF16aError(F16aErrorCode::kTimeout,
+TEST(ImportErrorTest, MakeErrorPopulatesAgentFriendlyFields) {
+    auto err = MakeImportError(ImportErrorCode::kTimeout,
                              {{"task_id", "import_x"},
                               {"timeout_seconds", 300},
                               {"rows_imported_before_timeout", 4500}},
@@ -116,51 +116,51 @@ TEST(F16aErrorTest, MakeErrorPopulatesAgentFriendlyFields) {
 }
 
 // Empty message falls back to the CX_ERR_ token (never an empty string).
-TEST(F16aErrorTest, EmptyMessageFallsBackToCode) {
-    auto err = MakeF16aError(F16aErrorCode::kAuthDenied);
+TEST(ImportErrorTest, EmptyMessageFallsBackToCode) {
+    auto err = MakeImportError(ImportErrorCode::kAuthDenied);
     EXPECT_EQ(err.message, "CX_ERR_IMPORT_AUTH_DENIED");
 }
 
 // Required structured_data keys (GEN-Agent #5) for the codes that declare them.
-TEST(F16aErrorTest, RequiredStructuredDataContract) {
-    EXPECT_TRUE(RequiredStructuredDataKeys(F16aErrorCode::kConnectionFailed).empty());
-    EXPECT_TRUE(RequiredStructuredDataKeys(F16aErrorCode::kAuthDenied).empty());
-    EXPECT_TRUE(RequiredStructuredDataKeys(F16aErrorCode::kInvalidSql).empty());
+TEST(ImportErrorTest, RequiredStructuredDataContract) {
+    EXPECT_TRUE(RequiredStructuredDataKeys(ImportErrorCode::kConnectionFailed).empty());
+    EXPECT_TRUE(RequiredStructuredDataKeys(ImportErrorCode::kAuthDenied).empty());
+    EXPECT_TRUE(RequiredStructuredDataKeys(ImportErrorCode::kInvalidSql).empty());
 
     nlohmann::json full = {{"task_id", "t"}, {"timeout_seconds", 300},
                            {"rows_imported_before_timeout", 1}};
-    EXPECT_TRUE(HasRequiredStructuredData(F16aErrorCode::kTimeout, full));
+    EXPECT_TRUE(HasRequiredStructuredData(ImportErrorCode::kTimeout, full));
     nlohmann::json partial = {{"task_id", "t"}};
-    EXPECT_FALSE(HasRequiredStructuredData(F16aErrorCode::kTimeout, partial));
+    EXPECT_FALSE(HasRequiredStructuredData(ImportErrorCode::kTimeout, partial));
 
     nlohmann::json rows = {{"max_rows", 10000000}, {"estimated_rows", 12345678}};
-    EXPECT_TRUE(HasRequiredStructuredData(F16aErrorCode::kRowsLimitExceeded, rows));
+    EXPECT_TRUE(HasRequiredStructuredData(ImportErrorCode::kRowsLimitExceeded, rows));
 
     nlohmann::json xt = {{"connection_ref", "db_conn_a"}, {"tenant_id", "t1"}};
-    EXPECT_TRUE(HasRequiredStructuredData(F16aErrorCode::kCrossTenantRef, xt));
+    EXPECT_TRUE(HasRequiredStructuredData(ImportErrorCode::kCrossTenantRef, xt));
 }
 
-// F16aStatus bridges to a coarse Status whose message recovers the exact identity
+// ImportStatus bridges to a coarse Status whose message recovers the exact identity
 // (F-FREEZE-1: no Result<T,E>; identity travels in the CX_ERR_ prefix).
-TEST(F16aErrorTest, StatusBridgePreservesIdentityInMessage) {
-    Status s = F16aStatus(F16aErrorCode::kCrossTenantRef, "ref db_conn_a not in tenant t1");
+TEST(ImportErrorTest, StatusBridgePreservesIdentityInMessage) {
+    Status s = ImportStatus(ImportErrorCode::kCrossTenantRef, "ref db_conn_a not in tenant t1");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kPermissionDenied);
     EXPECT_NE(s.message().find("CX_ERR_IMPORT_CROSS_TENANT_REF"), std::string::npos);
 
-    EXPECT_EQ(F16aStatus(F16aErrorCode::kInvalidSql).code(), StatusCode::kInvalidArgument);
-    EXPECT_EQ(F16aStatus(F16aErrorCode::kConnectionFailed).code(), StatusCode::kUnavailable);
-    EXPECT_EQ(F16aStatus(F16aErrorCode::kTimeout).code(), StatusCode::kUnavailable);
-    EXPECT_EQ(F16aStatus(F16aErrorCode::kRowsLimitExceeded).code(), StatusCode::kInvalidArgument);
+    EXPECT_EQ(ImportStatus(ImportErrorCode::kInvalidSql).code(), StatusCode::kInvalidArgument);
+    EXPECT_EQ(ImportStatus(ImportErrorCode::kConnectionFailed).code(), StatusCode::kUnavailable);
+    EXPECT_EQ(ImportStatus(ImportErrorCode::kTimeout).code(), StatusCode::kUnavailable);
+    EXPECT_EQ(ImportStatus(ImportErrorCode::kRowsLimitExceeded).code(), StatusCode::kInvalidArgument);
 }
 
-// F16aException carries the full Agent-friendly error for the throw-to-handler path.
-TEST(F16aErrorTest, ExceptionCarriesFullError) {
+// ImportException carries the full Agent-friendly error for the throw-to-handler path.
+TEST(ImportErrorTest, ExceptionCarriesFullError) {
     try {
-        throw F16aException(F16aErrorCode::kInvalidSql, nlohmann::json::object(),
+        throw ImportException(ImportErrorCode::kInvalidSql, nlohmann::json::object(),
                             "denied keyword UNION");
-    } catch (const F16aException& e) {
-        EXPECT_EQ(e.code(), F16aErrorCode::kInvalidSql);
+    } catch (const ImportException& e) {
+        EXPECT_EQ(e.code(), ImportErrorCode::kInvalidSql);
         EXPECT_EQ(e.GetError().code, "CX_ERR_IMPORT_INVALID_SQL");
         EXPECT_EQ(e.GetError().message, "denied keyword UNION");
     }
@@ -168,7 +168,7 @@ TEST(F16aErrorTest, ExceptionCarriesFullError) {
 
 // --- §5.1 / §5.2 / §5.3 Agent-friendly response bodies ---
 
-TEST(F16aResponseTest, ImportStartedBodyMatchesSpec) {
+TEST(ImportResponseTest, ImportStartedBodyMatchesSpec) {
     ImportTaskProgress task;
     task.task_id = "import_xyz";
     task.status = ImportTaskStatus::kQueued;
@@ -189,7 +189,7 @@ TEST(F16aResponseTest, ImportStartedBodyMatchesSpec) {
                                  std::regex("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$")));
 }
 
-TEST(F16aResponseTest, ProgressBodyRunningHasNullError) {
+TEST(ImportResponseTest, ProgressBodyRunningHasNullError) {
     ImportTaskProgress task;
     task.task_id = "import_xyz";
     task.status = ImportTaskStatus::kRunning;
@@ -207,11 +207,11 @@ TEST(F16aResponseTest, ProgressBodyRunningHasNullError) {
     EXPECT_TRUE(body["started_at"].is_string());
 }
 
-TEST(F16aResponseTest, ProgressBodyFailedEmbedsErrorBody) {
+TEST(ImportResponseTest, ProgressBodyFailedEmbedsErrorBody) {
     ImportTaskProgress task;
     task.task_id = "import_xyz";
     task.status = ImportTaskStatus::kFailed;
-    task.error = MakeF16aError(F16aErrorCode::kTimeout,
+    task.error = MakeImportError(ImportErrorCode::kTimeout,
                                {{"task_id", "import_xyz"},
                                 {"timeout_seconds", 300},
                                 {"rows_imported_before_timeout", 4500}},
@@ -227,7 +227,7 @@ TEST(F16aResponseTest, ProgressBodyFailedEmbedsErrorBody) {
 }
 
 // Cancelled is a clean terminal state, NOT an error (§5.4 note).
-TEST(F16aResponseTest, CancelledHasNoErrorBody) {
+TEST(ImportResponseTest, CancelledHasNoErrorBody) {
     ImportTaskProgress task;
     task.task_id = "import_xyz";
     task.status = ImportTaskStatus::kCancelled;
@@ -237,7 +237,7 @@ TEST(F16aResponseTest, CancelledHasNoErrorBody) {
 }
 
 // text_strategy wire parsing: per_row/merge accepted, template rejected (V1.0).
-TEST(F16aTypesTest, ParseTextStrategyRejectsTemplate) {
+TEST(ImportTypesTest, ParseTextStrategyRejectsTemplate) {
     EXPECT_EQ(ParseTextStrategy("per_row"), TextStrategy::kPerRow);
     EXPECT_EQ(ParseTextStrategy("merge"), TextStrategy::kMerge);
     EXPECT_FALSE(ParseTextStrategy("template").has_value());

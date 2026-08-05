@@ -76,7 +76,7 @@
 #include "cortrix/config/config.h"
 #include "cortrix/observability/operation_log_schema.h"
 #include "cortrix/agent_trace/agent_trace_schema.h"
-#include "cortrix/resource/f05_config.h"
+#include "cortrix/resource/namespace_pool_config.h"
 #include "cortrix/resource/namespace_pool.h"
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/store/iindex_factory.h"
@@ -492,7 +492,7 @@ class FullStackE2E {
   std::unique_ptr<cortrix::catalog::DefaultINSRouter> ns_router_;
   std::unique_ptr<cortrix::catalog::DefaultUnitRouter> unit_router_;
   cortrix::store::PhnswIndexFactory index_factory_;
-  cortrix::resource::F05Config f05_config_;
+  cortrix::resource::NamespacePoolConfig f05_config_;
   std::unique_ptr<cortrix::resource::DefaultNamespacePool> pool_;
   std::unique_ptr<ApiKeyAuth> auth_;
   // [V6] Runtime NS-authz service over catalog_db_ (borrowed handle); the seams

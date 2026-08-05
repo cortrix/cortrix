@@ -4,13 +4,13 @@
 #include <string>
 #include <vector>
 
-#include "cortrix/async/f42_metrics.h"
+#include "cortrix/async/task_metrics.h"
 #include "cortrix/async/task_type.h"
 
 // Exhaustive ToString matrices for the async-task enums (cortrix::async,
-// src/async/f42_metrics.cpp). Both are one-way (ToString only):
+// src/async/task_metrics.cpp). Both are one-way (ToString only):
 //   TaskType (unscoped enum, stable values 1/2/3) -> "kTask*" debug labels.
-//   F42Metrics::CompletionStatus (4 values) -> success/failed/cancelled/timeout.
+//   TaskMetrics::CompletionStatus (4 values) -> success/failed/cancelled/timeout.
 // Suite names unique with RtAsync* prefix.
 namespace cortrix::async {
 namespace {
@@ -51,9 +51,9 @@ TEST(RtAsyncTaskTypeTokens, ExactStringsValuesAndUniqueness) {
 }
 
 // ----------------------------------------------------------------------------
-// F42Metrics::CompletionStatus: 4 values.
+// TaskMetrics::CompletionStatus: 4 values.
 // ----------------------------------------------------------------------------
-using CompletionStatus = F42Metrics::CompletionStatus;
+using CompletionStatus = TaskMetrics::CompletionStatus;
 
 const std::vector<CompletionStatus>& AllCompletionStatuses() {
     static const std::vector<CompletionStatus> v = {

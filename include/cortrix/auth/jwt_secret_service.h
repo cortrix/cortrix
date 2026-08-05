@@ -27,7 +27,7 @@ namespace cortrix::auth {
 class JwtSecretService {
 public:
     /// `db` is an open platform.db handle whose `auth_secrets` table already
-    /// exists (P08AuthSchemaProvider migrated it). The service does not own `db`.
+    /// exists (AuthSchemaProvider migrated it). The service does not own `db`.
     explicit JwtSecretService(sqlite3* db) : db_(db) {}
 
     /// Idempotent startup init:

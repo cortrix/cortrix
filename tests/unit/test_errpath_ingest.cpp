@@ -135,7 +135,7 @@ namespace cortrix::spc {
 namespace {
 
 // CX_ERR_CONTEXTUAL_STORE: WriteContextualized UPDATEs blocks.contextualized_* .
-// On a blocks table WITHOUT those columns (F35SchemaProvider migration not run),
+// On a blocks table WITHOUT those columns (ContextualSchemaProvider migration not run),
 // the prepare step fails and SqlErr() surfaces the CX_ERR_CONTEXTUAL_STORE token —
 // but ONLY when contextual retrieval actually produced output (status != 0), so the no-op guard is
 // passed first.
@@ -165,7 +165,7 @@ TEST(ContextualStoreErrPathTest, PrepareFailureWhenColumnsMissing_SurfacesCxCode
 // Control: the no-op guard means a no-F35-output result never reaches the failing
 // UPDATE — it returns Ok even on the column-less table (proves the trigger above
 // is the genuine prepare-failure path, not just any missing-column access).
-TEST(ContextualStoreErrPathTest, NoF35OutputIsOkEvenWithoutColumns) {
+TEST(ContextualStoreErrPathTest, NoContextualOutputIsOkEvenWithoutColumns) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     ASSERT_EQ(sqlite3_exec(db,

@@ -145,12 +145,12 @@ std::shared_ptr<IComplexityClassifierBackend> MakeComplexityBackend(
         model_dir + "/model.onnx", model_dir + "/vocab.txt", /*max_seq_length=*/64);
     onnx->Init();  // Ok + unavailable when the model is absent (offline-friendly)
     if (onnx->IsAvailable()) {
-        CORTRIX_LOG_INFO("main", "F39 complexity router: OnnxComplexityBackend (model={})",
+        CORTRIX_LOG_INFO("main", "complexity router: OnnxComplexityBackend (model={})",
                          model_dir);
         return onnx;
     }
     CORTRIX_LOG_INFO("main",
-                     "F39 complexity router: model unavailable ({}), using heuristic backend",
+                     "complexity router: model unavailable ({}), using heuristic backend",
                      model_dir);
     return std::make_shared<HeuristicComplexityBackend>();
 }
@@ -1029,7 +1029,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
         }
     ));
     CORTRIX_LOG_INFO("main",
-                     "F04 cross-NS query + F39 routing mounted on POST /api/v1/query");
+                     "cross-NS query + F39 routing mounted on POST /api/v1/query");
 }
 
 }  // namespace cortrix::query

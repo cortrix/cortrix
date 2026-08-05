@@ -151,7 +151,7 @@ bool QueryComplexityClassifier::ShouldSkipF36(const QueryContext& ctx) {
 }
 
 bool QueryComplexityClassifier::ShouldSkipF37(const QueryContext& ctx) {
-    // Kept in exact lockstep with retrieval/f39_routing_mock.h::ShouldSkipF37.
+    // Kept in exact lockstep with retrieval/routing_mock.h::ShouldSkipF37.
     if (ctx.chat_path_triggered) return true;
     return ctx.routing_path == "simple" || ctx.routing_path == "chat";
 }

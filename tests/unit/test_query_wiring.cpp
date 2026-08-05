@@ -78,7 +78,7 @@ protected:
 
 // A bad ?route= override is the query routing permanent error; ctx is left untouched so the
 // closure can surface the Agent-friendly 400 without a half-written routing_path.
-TEST_F(QueryWiringTest, InvalidRouteOverrideYieldsF39Error) {
+TEST_F(QueryWiringTest, InvalidRouteOverrideYieldsRouterError) {
     auto classifier = MakeClassifier();
     QueryContext ctx;
     ctx.query = "anything";

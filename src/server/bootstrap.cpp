@@ -58,7 +58,7 @@
 #include "cortrix/async/document_processor.h"
 #include "cortrix/async/worker_pool.h"
 #include "cortrix/async/task_type.h"
-#include "cortrix/doc_summary/f41_async_worker.h"
+#include "cortrix/doc_summary/doc_summary_async_worker.h"
 #include "cortrix/doc_summary/doc_summary_generator.h"
 #include "cortrix/llm/openai_client.h"
 #include "cortrix/upload/upload_handler.h"
@@ -78,7 +78,7 @@
 #include "cortrix/agent_trace/agent_trace_schema.h"       // TC4 agent_trace in global catalog.db
 #include "cortrix/agent_trace/agent_trace_writer_impl.h"  // TC4/A4/F shared agent_trace writer
 #include "cortrix/agent_trace/engine_instrumentation.h"   // F query agent_trace write side
-#include "cortrix/agent_trace/f13_cleanup_registrar.h"    // A4 agent_trace 90d cleanup
+#include "cortrix/agent_trace/agent_trace_cleanup_registrar.h"    // A4 agent_trace 90d cleanup
 #include "cortrix/agent_trace/interaction_log_sweeper.h"  // A4 interaction_log 180d per-NS sweep
 #include "cortrix/server/routes/agent_proxy_routes.h"
 #include "cortrix/server/routes/document_routes.h"
@@ -90,7 +90,7 @@
 #include "cortrix/server/batch_submit_service.h"
 #include "cortrix/async/managed_input.h"
 #include "cortrix/server/batch_temp_store.h"
-#include "cortrix/server/f42_task_submitter_adapter.h"
+#include "cortrix/server/task_submitter_adapter.h"
 // agent_llm_config admin API.
 #include "cortrix/server/routes/system_config_routes.h"
 // DB-import: ImportManager DI + 6 endpoints.
@@ -134,7 +134,7 @@
 #include "cortrix/deploy/disk_monitor.h"
 // [D3.5 wire · gap④] §5.3 subsystem metric recorders (process-wide singletons,
 // MET round standalone-implemented) aggregated into the :9091 /metrics endpoint.
-#include "cortrix/async/f42_metrics.h"
+#include "cortrix/async/task_metrics.h"
 #include "cortrix/query/scatter_metrics.h"
 #include "cortrix/query/rag_fusion_metrics.h"
 #include "cortrix/query/query_router_metrics.h"
@@ -150,10 +150,10 @@
 #include "cortrix/metadata/metadata_metrics.h"
 #include "cortrix/doc_summary/doc_summary_metrics.h"
 #include "cortrix/import/import_metrics.h"
-#include "cortrix/memory/mem02_metrics.h"
-#include "cortrix/memory/mem03_metrics.h"
-#include "cortrix/memory/mem04_metrics.h"
-#include "cortrix/memory/mem05_metrics.h"
+#include "cortrix/memory/memory_extract_metrics.h"
+#include "cortrix/memory/memory_metrics.h"
+#include "cortrix/memory/memory_opt_out_metrics.h"
+#include "cortrix/memory/memory_isolation_metrics.h"
 #include "cortrix/agent_trace/agent_trace_metrics.h"
 #include "cortrix/observability/oplog_metrics.h"
 
@@ -367,7 +367,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         return cortrix::Result<std::unique_ptr<cortrix::store::WriteCoordinator>>(
             std::move(coord));
     };
-    cortrix::resource::F05Config f05_config;
+    cortrix::resource::NamespacePoolConfig f05_config;
     f05_config.data_root = config.ns.data_dir + "/units";  // per-Unit layout root
     f05_config.load_timeout_ms_per_ns = config.ns.load_timeout_ms_per_ns;  // configurable startup-load guard
     cortrix::resource::DefaultNamespacePool ns_pool(
@@ -377,10 +377,10 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         if (startup.ok()) {
             const auto& rep = startup.value();
             CORTRIX_LOG_INFO("main",
-                             "F05 pool StartupLoadAll: {} loaded / {} failed / {} total",
+                             "pool StartupLoadAll: {} loaded / {} failed / {} total",
                              rep.loaded_successfully, rep.failed, rep.total_namespaces);
         } else {
-            CORTRIX_LOG_WARN("main", "F05 pool StartupLoadAll failed: {}",
+            CORTRIX_LOG_WARN("main", "pool StartupLoadAll failed: {}",
                              startup.status().message());
         }
     }
@@ -553,11 +553,11 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                 config.enricher_llm.max_tokens, cortrix::spc::kEnricherMaxTokensCap);
         }
         CORTRIX_LOG_INFO("main",
-                         "F03 enricher enabled (model={} timeout_ms={} batch_size={} max_tokens={})",
+                         "enricher enabled (model={} timeout_ms={} batch_size={} max_tokens={})",
                          config.enricher_llm.model, enricher_cfg.task_timeout_ms,
                          enricher_cfg.batch_size, enricher_cfg.max_tokens);
     } else {
-        CORTRIX_LOG_INFO("main", "F03 enricher disabled (enricher_llm not configured)");
+        CORTRIX_LOG_INFO("main", "enricher disabled (enricher_llm not configured)");
     }
     auto enricher = cortrix::spc::CreateEnricher(enricher_cfg);
 
@@ -651,7 +651,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                 if (config.enricher_llm.hype_questions_per_chunk > 0) {
                     hype_cfg.questions_per_chunk =
                         cortrix::spc::ClampHypeK(config.enricher_llm.hype_questions_per_chunk);
-                    CORTRIX_LOG_INFO("main", "F38 hype questions_per_chunk={} (yaml override)",
+                    CORTRIX_LOG_INFO("main", "hype questions_per_chunk={} (yaml override)",
                                      hype_cfg.questions_per_chunk);
                 }
                 // Same enricher_llm.timeout_ms wiring the enricher and contextual stages already honor —
@@ -680,7 +680,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     //     ⑤c doc-summary enqueue seam can be installed on the pipeline before it
     //     moves into SPCManager. TaskManager (tasks.db) → TaskScheduler → WorkerPool
     //     dispatch (kTaskDocParse → DocumentProcessor; kTaskDocSummary →
-    //     F41AsyncWorker, only when doc_summary_llm is configured).
+    //     DocSummaryAsyncWorker, only when doc_summary_llm is configured).
     auto f42_config = std::make_shared<cortrix::InMemoryGlobalConfig>();
     f42_config->Set("f42.worker_pool_size",
                     std::to_string(config.spc.worker_count > 0 ? config.spc.worker_count : 2));
@@ -705,7 +705,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
 
     cortrix::async::TaskManager task_mgr;
     if (cortrix::Status ti = task_mgr.Init(config.ns.data_dir + "/tasks.db"); !ti.ok()) {
-        CORTRIX_LOG_ERROR("main", "F42 TaskManager init failed: {}", ti.message());
+        CORTRIX_LOG_ERROR("main", "TaskManager init failed: {}", ti.message());
         cortrix::ShutdownLogging();
         return 1;
     }
@@ -744,7 +744,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // constructed BEFORE the WorkerPool so RAII tears the pool down first (Stop + join
     // the worker threads) while the handlers they dispatch to are still alive.
     std::shared_ptr<cortrix::llm::ILlmClient> doc_summary_llm;
-    std::unique_ptr<cortrix::doc_summary::F41AsyncWorker> doc_summary_worker;
+    std::unique_ptr<cortrix::doc_summary::DocSummaryAsyncWorker> doc_summary_worker;
     if (config.doc_summary_llm.IsConfigured()) {
         cortrix::llm::LlmClientConfig llm_cfg;
         llm_cfg.endpoint = config.doc_summary_llm.base_url.empty()
@@ -764,7 +764,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         if (!config.doc_summary_llm.model.empty()) {
             ds_cfg.llm_model = config.doc_summary_llm.model;
         }
-        doc_summary_worker = std::make_unique<cortrix::doc_summary::F41AsyncWorker>(
+        doc_summary_worker = std::make_unique<cortrix::doc_summary::DocSummaryAsyncWorker>(
             ns_pool, doc_summary_llm, ds_cfg, embedder, assembler, &task_mgr);
     }
 
@@ -785,10 +785,10 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     worker_pool.RegisterHandler(cortrix::async::kTaskDocParse, &doc_processor);
     if (doc_summary_worker) {
         worker_pool.RegisterHandler(cortrix::async::kTaskDocSummary, doc_summary_worker.get());
-        CORTRIX_LOG_INFO("main", "F41 doc-summary worker enabled (model={})",
+        CORTRIX_LOG_INFO("main", "doc-summary worker enabled (model={})",
                          config.doc_summary_llm.model);
     } else {
-        CORTRIX_LOG_INFO("main", "F41 doc-summary disabled (doc_summary_llm not configured)");
+        CORTRIX_LOG_INFO("main", "doc-summary disabled (doc_summary_llm not configured)");
     }
     if (enrich_backfill_worker) {
         worker_pool.RegisterHandler(cortrix::async::kTaskEnrichBackfill,
@@ -933,7 +933,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         // The registrar is transient: RegisterAgentTrace's callback captures at_writer
         // (shared_ptr), not the registrar. db=nullptr — interaction_log is per-NS (swept
         // below), not reachable through one catalog.db handle.
-        cortrix::agent_trace::F13CleanupRegistrar f13_cleanup(at_writer, /*db=*/nullptr,
+        cortrix::agent_trace::AgentTraceCleanupRegistrar f13_cleanup(at_writer, /*db=*/nullptr,
                                                               global_config);
         f13_cleanup.RegisterAgentTrace(obs_module.scheduler());
     }
@@ -1104,10 +1104,10 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
 
     // POST /api/v1/documents/batch — mount the batch submit
     // batch submit route. The service fans each doc out through the frozen task
-    // scheduler (F42TaskSubmitterAdapter::Submit → TaskScheduler::Enqueue + a worker
+    // scheduler (TaskSubmitterAdapter::Submit → TaskScheduler::Enqueue + a worker
     // Notify). Default BatchLimits (100 docs / 100MB / 10MB-per-doc). Both the
     // adapter + the service outlive `server` (RAII order: server destructs first).
-    cortrix::server::F42TaskSubmitterAdapter batch_submitter(&task_scheduler, &worker_pool);
+    cortrix::server::TaskSubmitterAdapter batch_submitter(&task_scheduler, &worker_pool);
     cortrix::server::BatchSubmitService batch_service(&batch_submitter);
     // Materialize each batch doc's inline content under the data dir so the
     // doc-parse worker (DocumentProcessor → ParseDocument(filepath)) reads real
@@ -1152,7 +1152,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // over doc_summary blocks + FTS5 fallback). MUST be mounted BEFORE RegisterFlatDocumentRoutes
     // below, whose GET /documents/{id} catch-all would otherwise swallow the literal
     // "discover" path segment. The DocSummaryConfig is resolved once from f42_config — the
-    // same source the F41AsyncWorker write side uses (~line 560), so read and write agree.
+    // same source the DocSummaryAsyncWorker write side uses (~line 560), so read and write agree.
     {
         auto ds_cfg = cortrix::doc_summary::ResolveDocSummaryConfig(f42_config.get());
         server.server().Get(
@@ -1405,7 +1405,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         // The catalog IBloomFilter source needs a BF accessor → deferred alongside the
         // health catalog component.
         auto& ms = *f24_metrics_server;
-        ms.AddSource([] { return cortrix::async::F42Metrics::Instance().RenderOpenMetrics(); });
+        ms.AddSource([] { return cortrix::async::TaskMetrics::Instance().RenderOpenMetrics(); });
         ms.AddSource([] { return cortrix::query::ScatterMetrics::Instance().RenderOpenMetrics(); });
         ms.AddSource([] { return cortrix::query::RagFusionMetrics::Instance().RenderOpenMetrics(); });
         ms.AddSource([] { return cortrix::query::QueryRouterMetrics::Instance().RenderOpenMetrics(); });
@@ -1421,10 +1421,10 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         ms.AddSource([] { return cortrix::metadata::MetadataMetrics::Instance().Render(); });
         ms.AddSource([] { return cortrix::doc_summary::DocSummaryMetrics::Instance().RenderOpenMetrics(); });
         ms.AddSource([] { return cortrix::import::ImportMetrics::Instance().Render(); });
-        ms.AddSource([] { return cortrix::memory::Mem02Metrics::Instance().RenderOpenMetrics(); });
-        ms.AddSource([] { return cortrix::memory::transparency::Mem03Metrics::Instance().RenderOpenMetrics(); });
-        ms.AddSource([] { return cortrix::memory::immunity::Mem04Metrics::Instance().RenderOpenMetrics(); });
-        ms.AddSource([] { return cortrix::memory::Mem05Metrics::Instance().RenderOpenMetrics(); });
+        ms.AddSource([] { return cortrix::memory::MemoryExtractMetrics::Instance().RenderOpenMetrics(); });
+        ms.AddSource([] { return cortrix::memory::transparency::MemoryMetrics::Instance().RenderOpenMetrics(); });
+        ms.AddSource([] { return cortrix::memory::immunity::MemoryOptOutMetrics::Instance().RenderOpenMetrics(); });
+        ms.AddSource([] { return cortrix::memory::MemoryIsolationMetrics::Instance().RenderOpenMetrics(); });
         ms.AddSource([] { return cortrix::agent_trace::AgentTraceMetrics::Instance().RenderOpenMetrics(); });
         ms.AddSource([] { return cortrix::observability::OplogMetrics::Instance().RenderOpenMetrics(); });
         CORTRIX_LOG_INFO("metrics", "OpenMetrics endpoint on :{}/metrics (22 subsystem recorders)",
@@ -1489,7 +1489,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // 13. Start SPC workers, the async worker pool, and the HTTP server.
     spc_mgr.Start();
     if (cortrix::Status ws = worker_pool.Start(); !ws.ok()) {
-        CORTRIX_LOG_ERROR("main", "F42 WorkerPool start failed: {}", ws.message());
+        CORTRIX_LOG_ERROR("main", "WorkerPool start failed: {}", ws.message());
         spc_mgr.Stop();
         cortrix::ShutdownLogging();
         return 1;

@@ -1,4 +1,4 @@
-// S4.1 — F02SchemaProvider registers with the catalog SchemaMigrator for
+// S4.1 — RerankerSchemaProvider registers with the catalog SchemaMigrator for
 // namespaces.reranker_config version coordination (reranker / Issue 2.3).
 // reranker_config is one of the 11 standardized *_config JSONB columns supplied
 // by the catalog base schema, so reranker's Phase-1 Migrate is a no-op. These tests pin
@@ -32,14 +32,14 @@ std::set<std::string> ColumnNames(sqlite3* db, const std::string& table) {
     return out;
 }
 
-TEST(F02SchemaProviderTest, IdentityAndVersion) {
-    F02SchemaProvider p;
+TEST(RerankerSchemaProviderTest, IdentityAndVersion) {
+    RerankerSchemaProvider p;
     EXPECT_EQ(p.FeatureName(), "reranker");
     EXPECT_EQ(p.CurrentVersion(), 1);
 }
 
-TEST(F02SchemaProviderTest, Phase1MigrateIsNoOp) {
-    F02SchemaProvider p;
+TEST(RerankerSchemaProviderTest, Phase1MigrateIsNoOp) {
+    RerankerSchemaProvider p;
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     EXPECT_TRUE(p.Migrate(db, 0, 1).ok());  // init no-op
@@ -47,8 +47,8 @@ TEST(F02SchemaProviderTest, Phase1MigrateIsNoOp) {
     sqlite3_close(db);
 }
 
-TEST(F02SchemaProviderTest, UnexpectedVersionStepIsError) {
-    F02SchemaProvider p;
+TEST(RerankerSchemaProviderTest, UnexpectedVersionStepIsError) {
+    RerankerSchemaProvider p;
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     Status st = p.Migrate(db, 1, 2);  // Phase 2 not implemented yet
@@ -57,10 +57,10 @@ TEST(F02SchemaProviderTest, UnexpectedVersionStepIsError) {
     sqlite3_close(db);
 }
 
-TEST(F02SchemaProviderTest, RegistersAndMigratesViaMigrator) {
+TEST(RerankerSchemaProviderTest, RegistersAndMigratesViaMigrator) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
-    F02SchemaProvider p;
+    RerankerSchemaProvider p;
     cortrix::catalog::SchemaMigrator m;
     m.Register(&p);
     Status st = m.MigrateCatalog(db);
@@ -72,12 +72,12 @@ TEST(F02SchemaProviderTest, RegistersAndMigratesViaMigrator) {
 // Reranker <-> catalog closure: the reranker_config column reranker relies on is provided by
 // the frozen catalog base schema. Register catalog first (topological order), then reranker,
 // run a single atomic migration, and assert the column exists with both versions.
-TEST(F02SchemaProviderTest, RerankerConfigColumnSuppliedByF12BaseSchema) {
+TEST(RerankerSchemaProviderTest, RerankerConfigColumnSuppliedByCatalogBaseSchema) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
 
-    cortrix::catalog::F12SchemaProvider f12;
-    F02SchemaProvider f02;
+    cortrix::catalog::CatalogSchemaProvider f12;
+    RerankerSchemaProvider f02;
     cortrix::catalog::SchemaMigrator m;
     m.Register(&f12);  // Catalog first (ARCH §1.3.bis.3 topological order)
     m.Register(&f02);
@@ -89,7 +89,7 @@ TEST(F02SchemaProviderTest, RerankerConfigColumnSuppliedByF12BaseSchema) {
     EXPECT_NE(cols.find("reranker_config"), cols.end())
         << "namespaces.reranker_config must be present (F12 base schema)";
 
-    EXPECT_EQ(m.CurrentVersion(db, "catalog"), cortrix::catalog::kF12SchemaVersion);
+    EXPECT_EQ(m.CurrentVersion(db, "catalog"), cortrix::catalog::kCatalogSchemaVersion);
     EXPECT_EQ(m.CurrentVersion(db, "reranker"), 1);
     sqlite3_close(db);
 }

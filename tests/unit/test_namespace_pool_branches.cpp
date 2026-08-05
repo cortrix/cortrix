@@ -13,7 +13,7 @@
 #include "cortrix/catalog/i_unit_router.h"
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
-#include "cortrix/resource/f05_config.h"
+#include "cortrix/resource/namespace_pool_config.h"
 #include "cortrix/resource/namespace_pool.h"
 #include "cortrix/resource/namespace_resource_bundle.h"
 #include "cortrix/resource/pool_error.h"
@@ -185,7 +185,7 @@ protected:
     }
 
     std::filesystem::path tmp_root_;
-    F05Config config_;
+    NamespacePoolConfig config_;
     ::testing::NiceMock<MockIndexFactory> index_factory_;
     ::testing::NiceMock<MockNSRouter> ns_router_;
     ::testing::NiceMock<MockUnitRouter> unit_router_;

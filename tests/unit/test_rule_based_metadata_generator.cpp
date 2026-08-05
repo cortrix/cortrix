@@ -144,7 +144,7 @@ TEST(MetadataGeneratorTest, UnknownCountsBecomeNull) {
 
 // Cleaning coordination (V2 rework M-03): parse_status=partial + a failed page → meta.parse_failed_page
 // non-null; ingestion_status follows the status (failed → "failed").
-TEST(MetadataGeneratorTest, ParseStatusF10Signals) {
+TEST(MetadataGeneratorTest, ParseStatusCleaningSignals) {
     GeneratorInput in = FullInput();
     in.stats.parse_status = "partial";
     in.stats.parse_failed_page = 7;
@@ -262,7 +262,7 @@ TEST(MetadataGeneratorTest, GeneratePartialSurfacesMissingFields) {
 }
 
 // Case 3: parser total failure (no filename, no source_uri, parse_status=failed) → GEN_FAILED.
-TEST(MetadataGeneratorTest, GenerateFailsWhenF06ParseCompletelyFailed) {
+TEST(MetadataGeneratorTest, GenerateFailsWhenParserParseCompletelyFailed) {
     GeneratorInput in;
     in.doc_id = "01HXXDOC";
     in.namespace_id = "default";

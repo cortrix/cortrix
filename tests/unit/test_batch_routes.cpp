@@ -9,7 +9,7 @@
 #include "httplib.h"
 #include <nlohmann/json.hpp>
 
-#include "cortrix/async/f42_error.h"
+#include "cortrix/async/task_error.h"
 #include "cortrix/auth/api_key_auth.h"
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/server/batch_submit_service.h"
@@ -263,7 +263,7 @@ TEST_F(BatchRoutesTest, AllSucceedReturns200PartialSchema) {
 
 TEST_F(BatchRoutesTest, PartialSuccessReturns200WithFailedSchema) {
     submitter_->FailDoc("doc_1",
-        async::F42Status(async::F42ErrorCode::kServiceUnavailable, "tasks_db"));
+        async::TaskStatus(async::TaskErrorCode::kServiceUnavailable, "tasks_db"));
     httplib::Client cli("127.0.0.1", port_);
     auto res = cli.Post("/api/v1/documents/batch", WriteHeaders(), BodyWith(3),
                         "application/json");

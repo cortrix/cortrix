@@ -3,7 +3,7 @@
 // (documents / blocks / blocks_fts + indices + triggers).
 //
 // Used by BOTH paths so they build byte-identical schema:
-//   - production: F09SchemaProvider::Migrate, run via SchemaMigrator::MigrateUnit
+//   - production: BlockFrameworkSchemaProvider::Migrate, run via SchemaMigrator::MigrateUnit
 //     at LoadOneNamespace (unified schema governance);
 //   - standalone/test: CortrixStoreSqlite::Open in owns-db mode (no migrator).
 //

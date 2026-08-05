@@ -8,7 +8,7 @@
 #include <thread>
 
 #include "cortrix/common/i_global_config.h"
-#include "cortrix/deploy/f24_error.h"
+#include "cortrix/deploy/deploy_error.h"
 
 namespace cortrix::deploy {
 

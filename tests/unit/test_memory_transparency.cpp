@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "cortrix/memory/mem03_error.h"
-#include "cortrix/memory/mem03_metrics.h"
+#include "cortrix/memory/memory_error.h"
+#include "cortrix/memory/memory_metrics.h"
 #include "cortrix/memory/memory_transparency.h"
 
 // S1-S5 coverage: the MemoryTransparency service against injected seams (a list-by-user
@@ -149,14 +149,14 @@ MemoryBlockRecord MakeMemory(const std::string& id, const std::string& user,
 class MemoryTransparencyTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        Mem03Metrics::Instance().ResetForTest();
+        MemoryMetrics::Instance().ResetForTest();
         store_ = std::make_shared<SharedStore>();
         lister_ = std::make_shared<FakeBlockLister>(store_);
         block_store_ = std::make_shared<FakeBlockStore>(store_);
         oplog_ = std::make_shared<CountingOpLogger>();
         mt_ = std::make_unique<MemoryTransparency>(lister_, block_store_, oplog_);
     }
-    void TearDown() override { Mem03Metrics::Instance().ResetForTest(); }
+    void TearDown() override { MemoryMetrics::Instance().ResetForTest(); }
 
     std::shared_ptr<SharedStore> store_;
     std::shared_ptr<FakeBlockLister> lister_;
@@ -176,8 +176,8 @@ TEST_F(MemoryTransparencyTest, ListUserIdMustMatchSession) {
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kPermissionDenied);
     EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_USER_MISMATCH"), std::string::npos);
-    EXPECT_EQ(Mem03Metrics::Instance().OpCount(Mem03Metrics::Op::kList,
-                                               Mem03Metrics::OpStatus::kError), 1u);
+    EXPECT_EQ(MemoryMetrics::Instance().OpCount(MemoryMetrics::Op::kList,
+                                               MemoryMetrics::OpStatus::kError), 1u);
 }
 
 TEST_F(MemoryTransparencyTest, ListIncludeInvalidatedFalseHidesInvalidated) {
@@ -410,7 +410,7 @@ TEST_F(MemoryTransparencyTest, EditOptimisticLockConflict) {
     auto r = mt_->Edit(req, kUser);
     ASSERT_FALSE(r.ok());
     EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_EDIT_CONCURRENT"), std::string::npos);
-    EXPECT_EQ(Mem03Metrics::Instance().EditConflictCount(), 1u);
+    EXPECT_EQ(MemoryMetrics::Instance().EditConflictCount(), 1u);
     // Old block untouched (still active, no new block inserted beyond none).
     EXPECT_EQ(store_->Get("m_old")->metadata_json["status"], "active");
 }
@@ -434,7 +434,7 @@ TEST_F(MemoryTransparencyTest, EditCrossUserReturns404Mask) {
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kNotFound);
     EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_NOT_FOUND"), std::string::npos);
-    EXPECT_EQ(Mem03Metrics::Instance().CrossUserBlockedCount(), 1u);
+    EXPECT_EQ(MemoryMetrics::Instance().CrossUserBlockedCount(), 1u);
     // Original block untouched.
     EXPECT_EQ(store_->Get("m_old")->metadata_json["status"], "active");
 }
@@ -447,7 +447,7 @@ TEST_F(MemoryTransparencyTest, EditAbsentReturns404) {
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kNotFound);
     // Absent (not cross-user) — masked as NOT_FOUND but NOT counted as cross-user block.
-    EXPECT_EQ(Mem03Metrics::Instance().CrossUserBlockedCount(), 0u);
+    EXPECT_EQ(MemoryMetrics::Instance().CrossUserBlockedCount(), 0u);
 }
 
 TEST_F(MemoryTransparencyTest, EditInvalidNewType) {
@@ -536,8 +536,8 @@ TEST_F(MemoryTransparencyTest, EditOldBlockUpdateFailureReturnsInvalidateFailed)
     auto r = mt_->Edit(req, kUser);
     ASSERT_FALSE(r.ok());
     EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_INVALIDATE_FAILED"), std::string::npos);
-    EXPECT_EQ(Mem03Metrics::Instance().OpCount(Mem03Metrics::Op::kEdit,
-                                               Mem03Metrics::OpStatus::kError), 1u);
+    EXPECT_EQ(MemoryMetrics::Instance().OpCount(MemoryMetrics::Op::kEdit,
+                                               MemoryMetrics::OpStatus::kError), 1u);
 }
 
 // ---------- Delete (soft) ----------
@@ -576,7 +576,7 @@ TEST_F(MemoryTransparencyTest, DeleteCrossUserReturns404Mask) {
     ASSERT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kNotFound);
     EXPECT_NE(s.message().find("CX_ERR_MEMORY_NOT_FOUND"), std::string::npos);
-    EXPECT_EQ(Mem03Metrics::Instance().CrossUserBlockedCount(), 1u);
+    EXPECT_EQ(MemoryMetrics::Instance().CrossUserBlockedCount(), 1u);
     EXPECT_EQ(store_->Get("m1")->metadata_json["status"], "active");  // untouched
 }
 

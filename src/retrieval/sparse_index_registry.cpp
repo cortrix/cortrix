@@ -30,7 +30,7 @@ ISparseRetriever* SparseIndexRegistry::GetOrOpen(const std::string& ns_id) {
             std::filesystem::path(path).parent_path(), ec);
         if (ec) {
             CORTRIX_LOG_WARN("main",
-                             "F40 sparse index dir create failed for ns '{}': {}",
+                             "sparse index dir create failed for ns '{}': {}",
                              ns_id, ec.message());
             return nullptr;
         }
@@ -39,7 +39,7 @@ ISparseRetriever* SparseIndexRegistry::GetOrOpen(const std::string& ns_id) {
     auto retriever = std::make_unique<SpladeSparseRetriever>(config_, path);
     Status s = retriever->Open();
     if (!s.ok()) {
-        CORTRIX_LOG_WARN("main", "F40 sparse index open failed for ns '{}': {}",
+        CORTRIX_LOG_WARN("main", "sparse index open failed for ns '{}': {}",
                          ns_id, s.message());
         return nullptr;  // caller falls back to the non-sparse paths (§7.2)
     }

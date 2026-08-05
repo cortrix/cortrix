@@ -7,7 +7,7 @@
 //                               extraction service to http 404 + this code
 //                               (memory_routes.cpp:322-324). Wired-server test.
 //
-// MEM02_REVOKE_FAILED is DEFERRED — see the note at the end of this file.
+// MEMORYEXTRACT_REVOKE_FAILED is DEFERRED — see the note at the end of this file.
 
 #include <gtest/gtest.h>
 
@@ -45,7 +45,7 @@ using ::testing::_;
 // store with run_schema_ddl=false so the `blocks` table is absent and the SELECT
 // prepare fails ("no such table: blocks").
 // ---------------------------------------------------------------------------
-TEST(MemoryBlockAdapterErrPathTest, ListByUserMissingSchemaReturnsMem03Store) {
+TEST(MemoryBlockAdapterErrPathTest, ListByUserMissingSchemaReturnsMemoryStore) {
     CortrixStoreSqlite::OpenOptions opts;
     opts.run_schema_ddl = false;     // open the handle but DO NOT create `blocks`
     opts.run_crash_recovery = false;

@@ -19,9 +19,9 @@ namespace cortrix::async {
 /// releases the per-doc_id reservation; the returned Status is for the handler to
 /// hand back for log/observe.
 ///
-/// Why a string error_code (not F42ErrorCode) on Fail: handlers carry domain-specific
-/// codes — DocumentProcessor uses the async enum (CX_ERR_PARSE_FAILED), F41AsyncWorker
-/// uses CX_ERR_DOCSUMMARY_* which is NOT in F42ErrorCode. A plain "CX_ERR_*" string keeps the
+/// Why a string error_code (not TaskErrorCode) on Fail: handlers carry domain-specific
+/// codes — DocumentProcessor uses the async enum (CX_ERR_PARSE_FAILED), DocSummaryAsyncWorker
+/// uses CX_ERR_DOCSUMMARY_* which is NOT in TaskErrorCode. A plain "CX_ERR_*" string keeps the
 /// finalizer agnostic to any one handler's error namespace.
 ///
 /// Duration: the handler times its own execution (it knows the boundary) and passes
@@ -59,7 +59,7 @@ public:
                 std::chrono::steady_clock::time_point t_start);
 
     /// Cancel terminal: MarkCancelled + completed_total{kCancelled} + duration.
-    /// Returns F42Status(kTaskCancelling, task_id) (mirrors DocumentProcessor's cancel
+    /// Returns TaskStatus(kTaskCancelling, task_id) (mirrors DocumentProcessor's cancel
     /// return — CX_ERR_TASK_CANCELLING / kAlreadyExists).
     Status Cancel(const TaskInfo& task,
                   std::chrono::steady_clock::time_point t_start);

@@ -10,7 +10,7 @@ namespace cortrix::auth {
 // One DDL batch so the migrator applies it atomically. 7 tables (v0 4 + v1.0 3).
 // IF NOT EXISTS on every object (see auth_schema.h for the platform.db vs
 // catalog.db separation + idempotency notes).
-const char* const kP08AuthSchemaSql = R"SQL(
+const char* const kAuthSchemaSql = R"SQL(
 -- ===== v0 base tables (4) =====
 
 -- 1. users (§3.1). platform.db users — richer than catalog.db's relationship
@@ -114,14 +114,14 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_user_status ON api_keys(user_id, status)
 CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash);
 )SQL";
 
-Status P08AuthSchemaProvider::Migrate(sqlite3* db, int /*from_ver*/, int /*to_ver*/) {
+Status AuthSchemaProvider::Migrate(sqlite3* db, int /*from_ver*/, int /*to_ver*/) {
     // Phase 1: single-step creation from scratch (v0 → v1). Phase 2 internal
     // evolution will branch on (from_ver, to_ver) here.
     char* err = nullptr;
-    if (sqlite3_exec(db, kP08AuthSchemaSql, nullptr, nullptr, &err) != SQLITE_OK) {
+    if (sqlite3_exec(db, kAuthSchemaSql, nullptr, nullptr, &err) != SQLITE_OK) {
         std::string msg = err ? err : "sqlite error";
         sqlite3_free(err);
-        return Status::Internal(std::string("P08 auth schema migration failed: ") + msg);
+        return Status::Internal(std::string("auth schema migration failed: ") + msg);
     }
     return Status::Ok();
 }

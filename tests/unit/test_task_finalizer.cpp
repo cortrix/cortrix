@@ -1,5 +1,5 @@
 // TaskFinalizer (async task, finalize ownership = handler · decision A): the shared
-// terminal-write + task-metric collapse used by DocumentProcessor / F41AsyncWorker.
+// terminal-write + task-metric collapse used by DocumentProcessor / DocSummaryAsyncWorker.
 // These verify each terminal path drives the tasks table to the right status AND bumps
 // cortrix_tasks_completed_total{status}, over a real in-memory TaskManager.
 #include "cortrix/async/task_finalizer.h"
@@ -11,7 +11,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "cortrix/async/f42_metrics.h"
+#include "cortrix/async/task_metrics.h"
 #include "cortrix/async/task_info.h"
 #include "cortrix/async/task_manager.h"
 #include "cortrix/async/task_type.h"
@@ -19,13 +19,13 @@
 namespace cortrix::async {
 namespace {
 
-using Comp = F42Metrics::CompletionStatus;
+using Comp = TaskMetrics::CompletionStatus;
 
 class TaskFinalizerTest : public ::testing::Test {
 protected:
     void SetUp() override {
         ASSERT_TRUE(mgr_.Init(":memory:").ok());
-        F42Metrics::Instance().ResetForTest();
+        TaskMetrics::Instance().ResetForTest();
     }
 
     // Create a task and drive it to `processing` (the state a Worker finalizes from).
@@ -56,13 +56,13 @@ TEST_F(TaskFinalizerTest, CompleteMarksCompletedAndRecordsSuccess) {
     ASSERT_TRUE(got.ok());
     EXPECT_EQ(got.value().status, task_status::kCompleted);
     EXPECT_EQ(got.value().doc_id, "doc-final");
-    EXPECT_EQ(F42Metrics::Instance().CompletedCount(TaskType::kTaskDocSummary, Comp::kSuccess), 1u);
+    EXPECT_EQ(TaskMetrics::Instance().CompletedCount(TaskType::kTaskDocSummary, Comp::kSuccess), 1u);
 }
 
 TEST_F(TaskFinalizerTest, FailMarksFailedWithDomainCodeAndRecordsFailed) {
     TaskInfo t = MakeProcessingTask(kTaskDocSummary);
     nlohmann::json sd = {{"doc_id", t.doc_id}};
-    // A handler-domain code NOT in F42ErrorCode — finalizer must still carry it through.
+    // A handler-domain code NOT in TaskErrorCode — finalizer must still carry it through.
     Status s = finalizer_.Fail(t, "CX_ERR_DOCSUMMARY_GENERATION_FAILED", "llm timeout", sd,
                                std::chrono::steady_clock::now());
     EXPECT_FALSE(s.ok());
@@ -72,7 +72,7 @@ TEST_F(TaskFinalizerTest, FailMarksFailedWithDomainCodeAndRecordsFailed) {
     ASSERT_TRUE(got.ok());
     EXPECT_EQ(got.value().status, task_status::kFailed);
     EXPECT_EQ(got.value().error_code, "CX_ERR_DOCSUMMARY_GENERATION_FAILED");
-    EXPECT_EQ(F42Metrics::Instance().CompletedCount(TaskType::kTaskDocSummary, Comp::kFailed), 1u);
+    EXPECT_EQ(TaskMetrics::Instance().CompletedCount(TaskType::kTaskDocSummary, Comp::kFailed), 1u);
 }
 
 TEST_F(TaskFinalizerTest, CancelMarksCancelledAndRecordsCancelled) {
@@ -84,7 +84,7 @@ TEST_F(TaskFinalizerTest, CancelMarksCancelledAndRecordsCancelled) {
     auto got = mgr_.GetTask(t.task_id);
     ASSERT_TRUE(got.ok());
     EXPECT_EQ(got.value().status, task_status::kCancelled);
-    EXPECT_EQ(F42Metrics::Instance().CompletedCount(TaskType::kTaskDocParse, Comp::kCancelled), 1u);
+    EXPECT_EQ(TaskMetrics::Instance().CompletedCount(TaskType::kTaskDocParse, Comp::kCancelled), 1u);
 }
 
 // task_type scopes the metric: a doc-parse completion must not bump the doc-summary slot.
@@ -93,8 +93,8 @@ TEST_F(TaskFinalizerTest, MetricScopedByTaskType) {
     TaskInfo b = MakeProcessingTask(kTaskDocSummary);
     finalizer_.Complete(a, "da", std::chrono::steady_clock::now());
     finalizer_.Complete(b, "db", std::chrono::steady_clock::now());
-    EXPECT_EQ(F42Metrics::Instance().CompletedCount(TaskType::kTaskDocParse, Comp::kSuccess), 1u);
-    EXPECT_EQ(F42Metrics::Instance().CompletedCount(TaskType::kTaskDocSummary, Comp::kSuccess), 1u);
+    EXPECT_EQ(TaskMetrics::Instance().CompletedCount(TaskType::kTaskDocParse, Comp::kSuccess), 1u);
+    EXPECT_EQ(TaskMetrics::Instance().CompletedCount(TaskType::kTaskDocSummary, Comp::kSuccess), 1u);
 }
 
 // Finalize persist failure is non-fatal: a vanished task row (concurrent delete) still
@@ -105,7 +105,7 @@ TEST_F(TaskFinalizerTest, CompleteToleratesMissingTaskRowReturnsOk) {
     phantom.task_type = kTaskDocSummary;
     Status s = finalizer_.Complete(phantom, "doc", std::chrono::steady_clock::now());
     EXPECT_TRUE(s.ok()) << s.message();
-    EXPECT_EQ(F42Metrics::Instance().CompletedCount(TaskType::kTaskDocSummary, Comp::kSuccess), 1u);
+    EXPECT_EQ(TaskMetrics::Instance().CompletedCount(TaskType::kTaskDocSummary, Comp::kSuccess), 1u);
 }
 
 }  // namespace

@@ -2,7 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "cortrix/memory/mem02_error.h"
+#include "cortrix/memory/memory_extract_error.h"
 #include "cortrix/memory/prompt_templates.h"
 
 namespace cortrix::memory {
@@ -18,7 +18,7 @@ Result<Judgment> ContradictionDetector::ParseJudgmentJson(const std::string& llm
     nlohmann::json j = nlohmann::json::parse(llm_output, /*cb=*/nullptr,
                                              /*allow_exceptions=*/false);
     if (j.is_discarded() || !j.is_object()) {
-        return Mem02Status(Mem02ErrorCode::kExtractInvalidOutput,
+        return MemoryExtractStatus(MemoryExtractErrorCode::kExtractInvalidOutput,
                            "contradiction judge output is not a JSON object");
     }
     Judgment out;
@@ -30,11 +30,11 @@ Result<Judgment> ContradictionDetector::ParseJudgmentJson(const std::string& llm
         } else if (v.is_number()) {
             out.is_contradiction = v.get<double>() != 0.0;
         } else {
-            return Mem02Status(Mem02ErrorCode::kExtractInvalidOutput,
+            return MemoryExtractStatus(MemoryExtractErrorCode::kExtractInvalidOutput,
                                "is_contradiction is not a boolean");
         }
     } else {
-        return Mem02Status(Mem02ErrorCode::kExtractInvalidOutput,
+        return MemoryExtractStatus(MemoryExtractErrorCode::kExtractInvalidOutput,
                            "missing is_contradiction");
     }
     if (j.contains("reason") && j["reason"].is_string()) {
@@ -54,7 +54,7 @@ Result<Judgment> ContradictionDetector::Judge(const std::string& new_content,
     (void)ctx;  // W3C trace propagation to the LLM transport is integration wiring
 
     if (!llm_) {
-        return Mem02Status(Mem02ErrorCode::kLlmDisabled, "no LLM client for judge");
+        return MemoryExtractStatus(MemoryExtractErrorCode::kLlmDisabled, "no LLM client for judge");
     }
 
     // Build the D5 judgment prompt (language auto-picked from the new fact text).
@@ -73,10 +73,10 @@ Result<Judgment> ContradictionDetector::Judge(const std::string& new_content,
         // (kUnavailable from the client) → LLM_TIMEOUT; otherwise treat as ambiguous
         // (the judge could not produce a usable verdict).
         if (resp.status.code() == StatusCode::kUnavailable) {
-            return Mem02Status(Mem02ErrorCode::kExtractLlmTimeout,
+            return MemoryExtractStatus(MemoryExtractErrorCode::kExtractLlmTimeout,
                                "contradiction judge LLM call failed/timed out");
         }
-        return Mem02Status(Mem02ErrorCode::kContradictionAmbiguous,
+        return MemoryExtractStatus(MemoryExtractErrorCode::kContradictionAmbiguous,
                            "contradiction judge LLM error: " + resp.status.message());
     }
 

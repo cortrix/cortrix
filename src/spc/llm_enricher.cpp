@@ -105,7 +105,7 @@ void LogParseFailureSample(const EnrichResult& r,
     const auto layer = ParseFailureLayer(r).value_or("unknown");
     CORTRIX_LOG_WARN(
         "spc",
-        "F03 LlmEnricher parse failure {}: layer={} batch_size={} "
+        "LlmEnricher parse failure {}: layer={} batch_size={} "
         "result_index={} chunk_index={} model={} content_source={} "
         "finish_reason={} content_length={} reasoning_content_length={} "
         "prompt_version={} error={}",
@@ -373,7 +373,7 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
     if (!parse_fail_indices.empty() && n > 1) {
         CORTRIX_LOG_WARN(
             "spc",
-            "F03 LlmEnricher retrying parse failures individually: "
+            "LlmEnricher retrying parse failures individually: "
             "parse_failures={} batch_size={} model={} content_source={} "
             "finish_reason={} content_length={} reasoning_content_length={} "
             "prompt_version={}",
@@ -413,7 +413,7 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
     if (final_parse_fail_count > 0) {
         CORTRIX_LOG_WARN(
             "spc",
-            "F03 LlmEnricher parse failure batch: parse_failures={} batch_size={} "
+            "LlmEnricher parse failure batch: parse_failures={} batch_size={} "
             "uncounted_parse_failures={} model={} content_source={} "
             "finish_reason={} content_length={} reasoning_content_length={} "
             "prompt_version={}",

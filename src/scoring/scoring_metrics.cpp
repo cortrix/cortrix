@@ -42,7 +42,7 @@ struct State {
     std::atomic<uint64_t> anomalous{0};
     std::atomic<uint64_t> final_score{0};
     Hist assign_dur{};
-    std::array<std::atomic<uint64_t>, kF07ErrorCodeCount> error_by_code{};  // §4.4 (2 codes)
+    std::array<std::atomic<uint64_t>, kScoringErrorCodeCount> error_by_code{};  // §4.4 (2 codes)
 };
 
 State& S() {
@@ -97,13 +97,13 @@ void ScoringMetrics::ObserveAssignDuration(double seconds) {
     S().assign_dur.Observe(seconds);
 }
 
-void ScoringMetrics::RecordError(F07ErrorCode code) {
+void ScoringMetrics::RecordError(ScoringErrorCode code) {
     const auto idx = static_cast<size_t>(code);
     if (idx >= S().error_by_code.size()) return;  // (Minor) bounds guard vs an out-of-range cast
     S().error_by_code[idx].fetch_add(1, std::memory_order_relaxed);
 }
 
-uint64_t ScoringMetrics::ErrorCount(F07ErrorCode code) const {
+uint64_t ScoringMetrics::ErrorCount(ScoringErrorCode code) const {
     const auto idx = static_cast<size_t>(code);
     if (idx >= S().error_by_code.size()) return 0;  // (Minor) bounds guard
     return S().error_by_code[idx].load(std::memory_order_relaxed);
@@ -133,9 +133,9 @@ std::string ScoringMetrics::Render() const {
 
     os << "# HELP cortrix_f07_error_total F07 errors by CX_ERR_SCORING_* code (§4.4).\n";
     os << "# TYPE cortrix_f07_error_total counter\n";
-    for (int i = 0; i < kF07ErrorCodeCount; ++i) {
-        const auto code = static_cast<F07ErrorCode>(i);
-        os << "cortrix_f07_error_total{code=\"" << F07ErrorCodeString(code) << "\"} "
+    for (int i = 0; i < kScoringErrorCodeCount; ++i) {
+        const auto code = static_cast<ScoringErrorCode>(i);
+        os << "cortrix_f07_error_total{code=\"" << ScoringErrorCodeString(code) << "\"} "
            << ErrorCount(code) << "\n";
     }
 

@@ -6,7 +6,7 @@ namespace cortrix::server {
 
 /// Minimal submission seam the batch service depends on.
 /// Standalone (D3): the batch service is developed + unit-tested against this
-/// contract with a mock; the production adapter (F42TaskSubmitterAdapter) forwards
+/// contract with a mock; the production adapter (TaskSubmitterAdapter) forwards
 /// to the frozen cortrix::async::TaskScheduler::Enqueue. Keeping the dependency an
 /// interface (rather than the concrete TaskScheduler, which has no virtuals) is
 /// what lets the per-doc submit fan-out be tested without the worker pool /

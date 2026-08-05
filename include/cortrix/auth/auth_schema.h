@@ -8,7 +8,7 @@ namespace cortrix::auth {
 
 /// Current Auth schema version. Bumped only for Phase 1 internal
 /// schema evolution; this build creates the v1 set from scratch.
-constexpr int kP08AuthSchemaVersion = 1;
+constexpr int kAuthSchemaVersion = 1;
 
 /// The platform.db DDL emitted by the Auth SchemaProvider: the 7 Auth
 /// tables (total tables = 7):
@@ -30,16 +30,16 @@ constexpr int kP08AuthSchemaVersion = 1;
 /// holds the raw 64-byte HS256 secret. IF NOT EXISTS on every object so a re-run
 /// on an already-migrated db is a no-op (defensive; the migrator's schema_version
 /// gate is the primary idempotency mechanism).
-extern const char* const kP08AuthSchemaSql;
+extern const char* const kAuthSchemaSql;
 
 /// The Auth ISchemaProvider: owns the 7 Auth tables in platform.db. Registered
 /// with a SchemaMigrator that targets platform.db (NOT the catalog migrator
 /// chain — different database). Reuses the frozen L0 ISchemaProvider/SchemaMigrator
 /// scaffolding (catalog/schema_provider.h) verbatim — no new migration engine.
-class P08AuthSchemaProvider : public catalog::ISchemaProvider {
+class AuthSchemaProvider : public catalog::ISchemaProvider {
 public:
     std::string FeatureName() const override { return "auth"; }
-    int CurrentVersion() const override { return kP08AuthSchemaVersion; }
+    int CurrentVersion() const override { return kAuthSchemaVersion; }
     Status Migrate(sqlite3* db, int from_ver, int to_ver) override;
 };
 

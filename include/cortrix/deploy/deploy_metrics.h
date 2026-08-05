@@ -8,7 +8,7 @@ namespace cortrix::deploy {
 
 /// The deployment/system metrics (observability
 /// §2.3 subsystems `disk` / system). Self-contained dependency-free recorder
-/// (same pattern as ScoringMetrics / F42Metrics): a process-wide singleton of
+/// (same pattern as ScoringMetrics / TaskMetrics): a process-wide singleton of
 /// atomic gauges + an OpenMetrics text renderer that the :9091 endpoint serves.
 ///
 /// 🚨 Cardinality control (OBS_SPEC §3.2): the gauges here are global (no
@@ -23,7 +23,7 @@ namespace cortrix::deploy {
 /// plus the 4 Bloom Filter gauges, which are *rendered from* an
 /// IBloomFilter the metrics server is given (read-through, not stored here).
 /// The remaining ~21 subsystem metrics in §5.3 are owned by their own Feature
-/// recorders (ScoringMetrics, F42Metrics, ...); aggregating all of them into one
+/// recorders (ScoringMetrics, TaskMetrics, ...); aggregating all of them into one
 /// /metrics body is cross-Feature wiring → D3.5 (see metrics_server.h).
 class DeployMetrics {
 public:

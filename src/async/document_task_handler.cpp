@@ -5,23 +5,23 @@
 #include "cortrix/async/managed_input.h"
 
 #include "cortrix/agent_friendly/error.h"
-#include "cortrix/async/f42_error.h"
-#include "cortrix/async/f42_metrics.h"
+#include "cortrix/async/task_error.h"
+#include "cortrix/async/task_metrics.h"
 
 namespace cortrix::async {
 
 namespace {
 
 /// Build the GEN-Agent error HttpResult (topic 5): http status from the §6.2
-/// registry, body = {"error": agent_friendly::ToJson(MakeF42Error(...))}. The
+/// registry, body = {"error": agent_friendly::ToJson(MakeTaskError(...))}. The
 /// single error exit for every handler so the wrapped envelope (R2-M8: fields
 /// under the "error" key, matching WriteJsonError + the 16 other ToJson call
 /// sites) is emitted uniformly.
-HttpResult ErrorResult(F42ErrorCode code, nlohmann::json structured_data,
+HttpResult ErrorResult(TaskErrorCode code, nlohmann::json structured_data,
                        const std::string& message = "") {
     HttpResult r;
-    r.status = F42ErrorHttpStatus(code);
-    r.body["error"] = agent_friendly::ToJson(MakeF42Error(code, std::move(structured_data), message));
+    r.status = TaskErrorHttpStatus(code);
+    r.body["error"] = agent_friendly::ToJson(MakeTaskError(code, std::move(structured_data), message));
     return r;
 }
 
@@ -117,7 +117,7 @@ HttpResult DocumentTaskHandler::SubmitAsync(const SubmitParams& params) {
     if (params.namespace_id.empty() || params.filepath.empty() ||
         params.filename.empty()) {
         return ErrorResult(
-            F42ErrorCode::kInvalidRequest,
+            TaskErrorCode::kInvalidRequest,
             {{"rules_violated",
               {"namespace_id, filename and filepath are required"}}},
             "missing required submission fields");
@@ -128,7 +128,7 @@ HttpResult DocumentTaskHandler::SubmitAsync(const SubmitParams& params) {
 
     // §2.2 / scenario table — over the async hard cap → reject for everyone.
     if (params.page_count > hard_cap) {
-        return ErrorResult(F42ErrorCode::kMaxPagesExceeded,
+        return ErrorResult(TaskErrorCode::kMaxPagesExceeded,
                            {{"max_pages", hard_cap},
                             {"actual_pages", params.page_count},
                             {"async_overflow", params.async_overflow}},
@@ -149,7 +149,7 @@ HttpResult DocumentTaskHandler::SubmitAsync(const SubmitParams& params) {
     // Over threshold but within the hard cap (topic 1.3 A): sync-only
     // deployments reject; async-overflow deployments enqueue.
     if (!params.async_overflow) {
-        return ErrorResult(F42ErrorCode::kMaxPagesExceeded,
+        return ErrorResult(TaskErrorCode::kMaxPagesExceeded,
                            {{"max_pages", threshold},
                             {"actual_pages", params.page_count},
                             {"async_overflow", params.async_overflow}},
@@ -170,7 +170,7 @@ HttpResult DocumentTaskHandler::SubmitAsync(const SubmitParams& params) {
     auto enq = scheduler_->Enqueue(sreq);
     if (!enq.ok()) {
         // Surface a transient service error (tasks_db) — retryable per §6.2.
-        return ErrorResult(F42ErrorCode::kServiceUnavailable,
+        return ErrorResult(TaskErrorCode::kServiceUnavailable,
                            {{"component", "tasks_db"}}, enq.status().message());
     }
     if (pool_) pool_->Notify();  // wake a worker to pick it up
@@ -188,7 +188,7 @@ HttpResult DocumentTaskHandler::SubmitAsync(const SubmitParams& params) {
 HttpResult DocumentTaskHandler::GetProgress(const std::string& task_id) {
     auto got = mgr_->GetTask(task_id);
     if (!got.ok()) {
-        return ErrorResult(F42ErrorCode::kTaskNotFound, nlohmann::json::object(),
+        return ErrorResult(TaskErrorCode::kTaskNotFound, nlohmann::json::object(),
                            "no such task: " + task_id);
     }
     HttpResult r;
@@ -206,10 +206,10 @@ HttpResult DocumentTaskHandler::CancelTask(const std::string& task_id) {
         // a processing task is signalled to its checkpoint (mid_processing). The
         // post_chunk_idx phase (cancel after a chunk-index write) is only reachable
         // once the write-coordinator BeginWrite integration lands.
-        F42Metrics::Instance().RecordCancel(
+        TaskMetrics::Instance().RecordCancel(
             out.status == task_status::kCancelled
-                ? F42Metrics::CancelPhase::kPreDequeue
-                : F42Metrics::CancelPhase::kMidProcessing);
+                ? TaskMetrics::CancelPhase::kPreDequeue
+                : TaskMetrics::CancelPhase::kMidProcessing);
         // A queued task cancels terminally right here (pre_dequeue) — no worker ever
         // dispatches it, so TaskFinalizer never runs and this is the only place its
         // materialized input can be released. A processing task instead reaches
@@ -233,14 +233,14 @@ HttpResult DocumentTaskHandler::CancelTask(const std::string& task_id) {
     // RequestCancel maps NotFound → CX_ERR_TASK_NOT_FOUND, AlreadyExists →
     // CX_ERR_TASK_CANCELLING (repeat cancel of cancelling/terminal, §6.2 423).
     if (s.code() == StatusCode::kNotFound) {
-        return ErrorResult(F42ErrorCode::kTaskNotFound, nlohmann::json::object(),
+        return ErrorResult(TaskErrorCode::kTaskNotFound, nlohmann::json::object(),
                            "no such task: " + task_id);
     }
     // current_status for the 423 structured_data — best-effort re-read.
     std::string cur;
     auto got = mgr_->GetTask(task_id);
     if (got.ok()) cur = got.value().status;
-    return ErrorResult(F42ErrorCode::kTaskCancelling,
+    return ErrorResult(TaskErrorCode::kTaskCancelling,
                        {{"task_id", task_id}, {"current_status", cur}},
                        "task is already cancelling or terminal");
 }

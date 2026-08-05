@@ -7,7 +7,7 @@
 #include "cortrix/catalog/schema_provider.h"
 #include "cortrix/spc/parser_schema_provider.h"
 
-// Parser (Major-3): F06SchemaProvider adds namespaces.parser_config JSONB and
+// Parser (Major-3): ParserSchemaProvider adds namespaces.parser_config JSONB and
 // registers with the catalog SchemaMigrator. Idempotent.
 namespace cortrix::spc {
 namespace {
@@ -32,19 +32,19 @@ bool HasColumn(sqlite3* db, const char* table, const char* column) {
     return found;
 }
 
-TEST(F06SchemaProviderTest, IdentityAndVersion) {
-    F06SchemaProvider p;
+TEST(ParserSchemaProviderTest, IdentityAndVersion) {
+    ParserSchemaProvider p;
     EXPECT_EQ(p.FeatureName(), "parser");
     EXPECT_EQ(p.CurrentVersion(), 1);
 }
 
-TEST(F06SchemaProviderTest, Catalog_AddsParserConfigColumn) {
+TEST(ParserSchemaProviderTest, Catalog_AddsParserConfigColumn) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     CreateNamespacesTable(db);
     EXPECT_FALSE(HasColumn(db, "namespaces", "parser_config"));
 
-    F06SchemaProvider p;
+    ParserSchemaProvider p;
     ASSERT_TRUE(p.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(HasColumn(db, "namespaces", "parser_config"));
 
@@ -61,11 +61,11 @@ TEST(F06SchemaProviderTest, Catalog_AddsParserConfigColumn) {
     sqlite3_close(db);
 }
 
-TEST(F06SchemaProviderTest, Migration_Idempotent) {
+TEST(ParserSchemaProviderTest, Migration_Idempotent) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     CreateNamespacesTable(db);
-    F06SchemaProvider p;
+    ParserSchemaProvider p;
     ASSERT_TRUE(p.Migrate(db, 0, 1).ok());
     // Re-running (and the already-current call) must not error or duplicate.
     EXPECT_TRUE(p.Migrate(db, 0, 1).ok());
@@ -74,20 +74,20 @@ TEST(F06SchemaProviderTest, Migration_Idempotent) {
     sqlite3_close(db);
 }
 
-TEST(F06SchemaProviderTest, NoNamespacesTable_NoOp) {
+TEST(ParserSchemaProviderTest, NoNamespacesTable_NoOp) {
     // If the catalog table isn't built yet (isolated test), migrate is a no-op,
     // not a failure — so the migrator batch isn't blocked.
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
-    F06SchemaProvider p;
+    ParserSchemaProvider p;
     EXPECT_TRUE(p.Migrate(db, 0, 1).ok());
     sqlite3_close(db);
 }
 
-TEST(F06SchemaProviderTest, UnexpectedVersionStepIsError) {
+TEST(ParserSchemaProviderTest, UnexpectedVersionStepIsError) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
-    F06SchemaProvider p;
+    ParserSchemaProvider p;
     Status st = p.Migrate(db, 1, 2);  // no Phase 2 bump yet
     EXPECT_FALSE(st.ok());
     EXPECT_NE(st.message().find("CX_ERR_SCHEMA_VERSION_MISMATCH"), std::string::npos);
@@ -95,11 +95,11 @@ TEST(F06SchemaProviderTest, UnexpectedVersionStepIsError) {
 }
 
 // Runs through the real SchemaMigrator (the catalog integration point).
-TEST(F06SchemaProviderTest, RegistersAndMigratesViaMigrator) {
+TEST(ParserSchemaProviderTest, RegistersAndMigratesViaMigrator) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     CreateNamespacesTable(db);
-    F06SchemaProvider p;
+    ParserSchemaProvider p;
     cortrix::catalog::SchemaMigrator m;
     m.Register(&p);
     Status st = m.MigrateCatalog(db);

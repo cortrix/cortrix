@@ -9,7 +9,7 @@ namespace cortrix::catalog {
 /// internal schema evolution (>= 100 → 110 → ...); MVP → Phase 1 cross-version
 /// migration is out of scope and goes through MVP_MIGRATION_POLICY.md clean break
 /// migrations.
-constexpr int kF12SchemaVersion = 2;  // +1: OPEN-2 GC blob_gc_queue SoT reshape (D3.5 r2)
+constexpr int kCatalogSchemaVersion = 2;  // +1: OPEN-2 GC blob_gc_queue SoT reshape (D3.5 r2)
 
 /// The catalog.db DDL emitted by the catalog SchemaProvider: 6 main tables
 /// (file_locations / ns_units / units / nodes / tenants / namespaces) + 6
@@ -30,10 +30,10 @@ extern const char* const kCatalogSchemaSql;
 /// + the 9 reserved `units` fields). Registered first with the SchemaMigrator
 /// (ARCH §1.3.bis.3 topological order). Other Features register their own
 /// providers for extension tables/columns.
-class F12SchemaProvider : public ISchemaProvider {
+class CatalogSchemaProvider : public ISchemaProvider {
 public:
     std::string FeatureName() const override { return "catalog"; }
-    int CurrentVersion() const override { return kF12SchemaVersion; }
+    int CurrentVersion() const override { return kCatalogSchemaVersion; }
     Status Migrate(sqlite3* db, int from_ver, int to_ver) override;
 };
 

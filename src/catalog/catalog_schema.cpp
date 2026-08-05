@@ -198,7 +198,7 @@ INSERT OR IGNORE INTO tenants (tenant_id, type, name, created_at)
     VALUES ('__system__', 'system', 'Platform System Tenant', CAST(strftime('%s','now') AS INTEGER) * 1000);
 )SQL";
 
-Status F12SchemaProvider::Migrate(sqlite3* db, int /*from_ver*/, int /*to_ver*/) {
+Status CatalogSchemaProvider::Migrate(sqlite3* db, int /*from_ver*/, int /*to_ver*/) {
     // Phase 1: single-step creation from scratch (v0 → v1). Phase 2 internal
     // evolution will branch on (from_ver, to_ver) here.
     //
@@ -232,7 +232,7 @@ Status F12SchemaProvider::Migrate(sqlite3* db, int /*from_ver*/, int /*to_ver*/)
     if (sqlite3_exec(db, kCatalogSchemaSql, nullptr, nullptr, &err) != SQLITE_OK) {
         std::string msg = err ? err : "sqlite error";
         sqlite3_free(err);
-        return Status::Internal(std::string("F12 catalog schema migration failed: ") + msg);
+        return Status::Internal(std::string("catalog schema migration failed: ") + msg);
     }
     return Status::Ok();
 }

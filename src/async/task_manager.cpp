@@ -11,7 +11,7 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
-#include "cortrix/async/f42_error.h"
+#include "cortrix/async/task_error.h"
 #include "cortrix/id/ulid.h"
 
 namespace cortrix::async {
@@ -179,7 +179,7 @@ Status TaskManager::Init(const std::string& db_path) {
         std::string msg = sqlite3_errmsg(db_);
         sqlite3_close(db_);
         db_ = nullptr;
-        return F42Status(F42ErrorCode::kStorageFailed, "open tasks db: " + msg);
+        return TaskStatus(TaskErrorCode::kStorageFailed, "open tasks db: " + msg);
     }
     owns_db_ = true;
     ExecSQL(db_, "PRAGMA journal_mode=WAL;");
@@ -227,7 +227,7 @@ Status TaskManager::CreateTasksTable() {
         CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
     )";
     if (ExecSQL(db_, sql) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "create tasks table");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "create tasks table");
     }
     // Idempotent migration for tasks.db created before metadata_json existed.
     // Gate on pragma_table_info: fresh DBs already have the column from CREATE
@@ -261,7 +261,7 @@ Result<TaskInfo> TaskManager::CreateTask(TaskInfo task) {
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed,
+        return TaskStatus(TaskErrorCode::kStorageFailed,
                          "CreateTask prepare: " + std::string(sqlite3_errmsg(db_)));
     }
     BindText(stmt, 1, task.task_id);
@@ -294,7 +294,7 @@ Result<TaskInfo> TaskManager::CreateTask(TaskInfo task) {
     int rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
     if (rc != SQLITE_DONE) {
-        return F42Status(F42ErrorCode::kStorageFailed,
+        return TaskStatus(TaskErrorCode::kStorageFailed,
                          "CreateTask step: " + std::string(sqlite3_errmsg(db_)));
     }
     return task;
@@ -306,7 +306,7 @@ Result<TaskInfo> TaskManager::GetTask(const std::string& task_id) {
                       " FROM tasks WHERE task_id = ?";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "GetTask prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "GetTask prepare");
     }
     BindText(stmt, 1, task_id);
     int rc = sqlite3_step(stmt);
@@ -316,7 +316,7 @@ Result<TaskInfo> TaskManager::GetTask(const std::string& task_id) {
         return t;
     }
     sqlite3_finalize(stmt);
-    return F42Status(F42ErrorCode::kTaskNotFound, task_id);
+    return TaskStatus(TaskErrorCode::kTaskNotFound, task_id);
 }
 
 Status TaskManager::UpdateProgress(const TaskInfo& task) {
@@ -327,7 +327,7 @@ Status TaskManager::UpdateProgress(const TaskInfo& task) {
         "updated_at=? WHERE task_id=?";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "UpdateProgress prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "UpdateProgress prepare");
     }
     sqlite3_bind_int(stmt, 1, task.processed_pages);
     sqlite3_bind_int(stmt, 2, task.total_pages);
@@ -343,9 +343,9 @@ Status TaskManager::UpdateProgress(const TaskInfo& task) {
     int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
     if (rc != SQLITE_DONE) {
-        return F42Status(F42ErrorCode::kStorageFailed, "UpdateProgress step");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "UpdateProgress step");
     }
-    if (changes == 0) return F42Status(F42ErrorCode::kTaskNotFound, task.task_id);
+    if (changes == 0) return TaskStatus(TaskErrorCode::kTaskNotFound, task.task_id);
     return Status::Ok();
 }
 
@@ -357,7 +357,7 @@ Result<std::vector<TaskInfo>> TaskManager::ListByNamespace(
                       "ORDER BY created_at DESC LIMIT ? OFFSET ?";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "ListByNamespace prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "ListByNamespace prepare");
     }
     BindText(stmt, 1, namespace_id);
     sqlite3_bind_int(stmt, 2, limit);
@@ -383,7 +383,7 @@ Status TaskManager::MarkProcessing(const std::string& task_id, int worker_id) {
         "updated_at=? WHERE task_id=? AND status='queued'";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "MarkProcessing prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "MarkProcessing prepare");
     }
     const std::string now = NowIso8601();
     sqlite3_bind_int(stmt, 1, worker_id);
@@ -393,7 +393,7 @@ Status TaskManager::MarkProcessing(const std::string& task_id, int worker_id) {
     int rc = sqlite3_step(stmt);
     int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
-    if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "MarkProcessing step");
+    if (rc != SQLITE_DONE) return TaskStatus(TaskErrorCode::kStorageFailed, "MarkProcessing step");
     if (changes == 0) {
         // 0 rows = the row is gone, OR it left `queued` under us (cancelled, or
         // claimed by another worker). Distinguish them: a missing row keeps the
@@ -407,8 +407,8 @@ Status TaskManager::MarkProcessing(const std::string& task_id, int worker_id) {
             exists = (sqlite3_step(probe) == SQLITE_ROW);
             sqlite3_finalize(probe);
         }
-        return exists ? F42Status(F42ErrorCode::kDocProcessingInProgress, task_id)
-                      : F42Status(F42ErrorCode::kTaskNotFound, task_id);
+        return exists ? TaskStatus(TaskErrorCode::kDocProcessingInProgress, task_id)
+                      : TaskStatus(TaskErrorCode::kTaskNotFound, task_id);
     }
     return Status::Ok();
 }
@@ -421,7 +421,7 @@ Status TaskManager::MarkCompleted(const std::string& task_id,
         "completed_at=?, updated_at=? WHERE task_id=?";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "MarkCompleted prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "MarkCompleted prepare");
     }
     const std::string now = NowIso8601();
     BindNullableText(stmt, 1, doc_id);
@@ -431,8 +431,8 @@ Status TaskManager::MarkCompleted(const std::string& task_id,
     int rc = sqlite3_step(stmt);
     int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
-    if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "MarkCompleted step");
-    if (changes == 0) return F42Status(F42ErrorCode::kTaskNotFound, task_id);
+    if (rc != SQLITE_DONE) return TaskStatus(TaskErrorCode::kStorageFailed, "MarkCompleted step");
+    if (changes == 0) return TaskStatus(TaskErrorCode::kTaskNotFound, task_id);
     return Status::Ok();
 }
 
@@ -446,7 +446,7 @@ Status TaskManager::MarkFailed(const std::string& task_id,
         "structured_data=?, completed_at=?, updated_at=? WHERE task_id=?";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "MarkFailed prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "MarkFailed prepare");
     }
     const std::string now = NowIso8601();
     BindNullableText(stmt, 1, error_code);
@@ -458,8 +458,8 @@ Status TaskManager::MarkFailed(const std::string& task_id,
     int rc = sqlite3_step(stmt);
     int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
-    if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "MarkFailed step");
-    if (changes == 0) return F42Status(F42ErrorCode::kTaskNotFound, task_id);
+    if (rc != SQLITE_DONE) return TaskStatus(TaskErrorCode::kStorageFailed, "MarkFailed step");
+    if (changes == 0) return TaskStatus(TaskErrorCode::kTaskNotFound, task_id);
     return Status::Ok();
 }
 
@@ -473,12 +473,12 @@ Status TaskManager::RequestCancel(const std::string& task_id, TaskInfo* out) {
                       " FROM tasks WHERE task_id = ?";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sel.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "RequestCancel select prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "RequestCancel select prepare");
     }
     BindText(stmt, 1, task_id);
     if (sqlite3_step(stmt) != SQLITE_ROW) {
         sqlite3_finalize(stmt);
-        return F42Status(F42ErrorCode::kTaskNotFound, task_id);
+        return TaskStatus(TaskErrorCode::kTaskNotFound, task_id);
     }
     TaskInfo t = ReadRow(stmt);
     sqlite3_finalize(stmt);
@@ -490,7 +490,7 @@ Status TaskManager::RequestCancel(const std::string& task_id, TaskInfo* out) {
         new_status = task_status::kCancelling;  // signal the worker checkpoint
     } else {
         // cancelling / completed / failed / cancelled → repeat-cancel is a 423.
-        return F42Status(F42ErrorCode::kTaskCancelling,
+        return TaskStatus(TaskErrorCode::kTaskCancelling,
                          "task " + task_id + " status=" + t.status);
     }
 
@@ -504,7 +504,7 @@ Status TaskManager::RequestCancel(const std::string& task_id, TaskInfo* out) {
               "WHERE task_id=?";
     sqlite3_stmt* us = nullptr;
     if (sqlite3_prepare_v2(db_, upd, -1, &us, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "RequestCancel update prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "RequestCancel update prepare");
     }
     BindText(us, 1, new_status);
     if (terminal) {
@@ -517,7 +517,7 @@ Status TaskManager::RequestCancel(const std::string& task_id, TaskInfo* out) {
     }
     int rc = sqlite3_step(us);
     sqlite3_finalize(us);
-    if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "RequestCancel step");
+    if (rc != SQLITE_DONE) return TaskStatus(TaskErrorCode::kStorageFailed, "RequestCancel step");
 
     if (out) {
         t.cancel_requested = true;
@@ -536,7 +536,7 @@ Status TaskManager::MarkCancelled(const std::string& task_id) {
         "WHERE task_id=?";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "MarkCancelled prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "MarkCancelled prepare");
     }
     const std::string now = NowIso8601();
     BindText(stmt, 1, now);
@@ -545,8 +545,8 @@ Status TaskManager::MarkCancelled(const std::string& task_id) {
     int rc = sqlite3_step(stmt);
     int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
-    if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "MarkCancelled step");
-    if (changes == 0) return F42Status(F42ErrorCode::kTaskNotFound, task_id);
+    if (rc != SQLITE_DONE) return TaskStatus(TaskErrorCode::kStorageFailed, "MarkCancelled step");
+    if (changes == 0) return TaskStatus(TaskErrorCode::kTaskNotFound, task_id);
     return Status::Ok();
 }
 
@@ -578,7 +578,7 @@ Result<std::optional<TaskInfo>> TaskManager::FindRecentTaskByDocId(
                       "ORDER BY created_at DESC LIMIT 1";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "FindRecentTaskByDocId prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "FindRecentTaskByDocId prepare");
     }
     BindText(stmt, 1, namespace_id);
     BindText(stmt, 2, doc_id);
@@ -600,7 +600,7 @@ Result<TaskInfo> TaskManager::TryClaimDebounceMerge(const std::string& task_id) 
         "AND status NOT IN ('cancelled','cancelling','failed')";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, claim, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "TryClaimDebounceMerge prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "TryClaimDebounceMerge prepare");
     }
     BindText(stmt, 1, NowIso8601());
     BindText(stmt, 2, task_id);
@@ -608,7 +608,7 @@ Result<TaskInfo> TaskManager::TryClaimDebounceMerge(const std::string& task_id) 
     const int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
     if (rc != SQLITE_DONE) {
-        return F42Status(F42ErrorCode::kStorageFailed, "TryClaimDebounceMerge step");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "TryClaimDebounceMerge step");
     }
     if (changes == 0) {
         // Either the row went terminal under us, or it is gone. Both mean the same
@@ -621,19 +621,19 @@ Result<TaskInfo> TaskManager::TryClaimDebounceMerge(const std::string& task_id) 
             exists = (sqlite3_step(probe) == SQLITE_ROW);
             sqlite3_finalize(probe);
         }
-        return exists ? F42Status(F42ErrorCode::kDocProcessingInProgress, task_id)
-                      : F42Status(F42ErrorCode::kTaskNotFound, task_id);
+        return exists ? TaskStatus(TaskErrorCode::kDocProcessingInProgress, task_id)
+                      : TaskStatus(TaskErrorCode::kTaskNotFound, task_id);
     }
     // Read back under the same lock so the returned row reflects the claimed state.
     std::string sel = std::string("SELECT ") + kSelectColumns + " FROM tasks WHERE task_id = ?";
     sqlite3_stmt* rd = nullptr;
     if (sqlite3_prepare_v2(db_, sel.c_str(), -1, &rd, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "TryClaimDebounceMerge select");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "TryClaimDebounceMerge select");
     }
     BindText(rd, 1, task_id);
     if (sqlite3_step(rd) != SQLITE_ROW) {
         sqlite3_finalize(rd);
-        return F42Status(F42ErrorCode::kTaskNotFound, task_id);
+        return TaskStatus(TaskErrorCode::kTaskNotFound, task_id);
     }
     TaskInfo out = ReadRow(rd);
     sqlite3_finalize(rd);
@@ -660,7 +660,7 @@ Result<TaskInfo> TaskManager::UpdateTaskForDebounce(const std::string& task_id,
             "cancel_requested=0, updated_at=? WHERE task_id=? AND status='queued'";
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-            return F42Status(F42ErrorCode::kStorageFailed, "UpdateTaskForDebounce prepare");
+            return TaskStatus(TaskErrorCode::kStorageFailed, "UpdateTaskForDebounce prepare");
         }
         BindNullableText(stmt, 1, req.content_hash);
         BindText(stmt, 2, req.filepath);
@@ -670,7 +670,7 @@ Result<TaskInfo> TaskManager::UpdateTaskForDebounce(const std::string& task_id,
         int rc = sqlite3_step(stmt);
         int changes = sqlite3_changes(db_);
         sqlite3_finalize(stmt);
-        if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "UpdateTaskForDebounce step");
+        if (rc != SQLITE_DONE) return TaskStatus(TaskErrorCode::kStorageFailed, "UpdateTaskForDebounce step");
         if (changes == 0) {
             // Distinguish "row is gone" from "row left queued under us"; the caller
             // turns the latter into a separate task for the new submission.
@@ -682,8 +682,8 @@ Result<TaskInfo> TaskManager::UpdateTaskForDebounce(const std::string& task_id,
                 exists = (sqlite3_step(probe) == SQLITE_ROW);
                 sqlite3_finalize(probe);
             }
-            return exists ? F42Status(F42ErrorCode::kDocProcessingInProgress, task_id)
-                          : F42Status(F42ErrorCode::kTaskNotFound, task_id);
+            return exists ? TaskStatus(TaskErrorCode::kDocProcessingInProgress, task_id)
+                          : TaskStatus(TaskErrorCode::kTaskNotFound, task_id);
         }
     }
     return GetTask(task_id);
@@ -706,7 +706,7 @@ Result<std::optional<TaskInfo>> TaskManager::SelectOldestQueuedTaskExcluding(
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed,
+        return TaskStatus(TaskErrorCode::kStorageFailed,
                          "SelectOldestQueuedTaskExcluding prepare");
     }
     for (size_t i = 0; i < active_docs.size(); ++i) {
@@ -732,13 +732,13 @@ Result<int> TaskManager::DeleteExpired(int64_t now_unix, int retention_days) {
         "AND updated_at < ?";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "DeleteExpired prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "DeleteExpired prepare");
     }
     BindText(stmt, 1, cutoff);
     int rc = sqlite3_step(stmt);
     int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
-    if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "DeleteExpired step");
+    if (rc != SQLITE_DONE) return TaskStatus(TaskErrorCode::kStorageFailed, "DeleteExpired step");
     return changes;
 }
 
@@ -752,7 +752,7 @@ Result<int> TaskManager::SweepZombies(int64_t now_unix, int zombie_hours) {
         "WHERE status='processing' AND updated_at < ?";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "SweepZombies prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "SweepZombies prepare");
     }
     const std::string now = NowIso8601();
     BindText(stmt, 1, now);
@@ -761,7 +761,7 @@ Result<int> TaskManager::SweepZombies(int64_t now_unix, int zombie_hours) {
     int rc = sqlite3_step(stmt);
     int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
-    if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "SweepZombies step");
+    if (rc != SQLITE_DONE) return TaskStatus(TaskErrorCode::kStorageFailed, "SweepZombies step");
     return changes;
 }
 
@@ -778,7 +778,7 @@ Result<int> TaskManager::SweepTimedOut(int64_t now_unix, int timeout_seconds) {
         "WHERE status='processing' AND started_at IS NOT NULL AND started_at < ?";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "SweepTimedOut prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "SweepTimedOut prepare");
     }
     const std::string now = NowIso8601();
     BindText(stmt, 1, now);
@@ -787,7 +787,7 @@ Result<int> TaskManager::SweepTimedOut(int64_t now_unix, int timeout_seconds) {
     int rc = sqlite3_step(stmt);
     int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
-    if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "SweepTimedOut step");
+    if (rc != SQLITE_DONE) return TaskStatus(TaskErrorCode::kStorageFailed, "SweepTimedOut step");
     return changes;
 }
 
@@ -803,14 +803,14 @@ Result<int> TaskManager::RequeueStaleProcessing(int64_t now_unix, int zombie_hou
         "updated_at=? WHERE status='processing' AND updated_at >= ?";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "RequeueStaleProcessing prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "RequeueStaleProcessing prepare");
     }
     BindText(stmt, 1, NowIso8601());
     BindText(stmt, 2, cutoff);
     int rc = sqlite3_step(stmt);
     int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
-    if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "RequeueStaleProcessing step");
+    if (rc != SQLITE_DONE) return TaskStatus(TaskErrorCode::kStorageFailed, "RequeueStaleProcessing step");
     return changes;
 }
 
@@ -826,7 +826,7 @@ Result<std::vector<std::pair<std::string, std::string>>> TaskManager::LiveTaskIn
         "AND filepath IS NOT NULL AND filepath <> ''";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "LiveTaskInputs prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "LiveTaskInputs prepare");
     }
     std::vector<std::pair<std::string, std::string>> out;
     int rc = SQLITE_OK;
@@ -838,7 +838,7 @@ Result<std::vector<std::pair<std::string, std::string>>> TaskManager::LiveTaskIn
     // reaper delete inputs that live tasks still need, so an interrupted scan is
     // an error rather than a shorter list.
     if (rc != SQLITE_DONE) {
-        return F42Status(F42ErrorCode::kStorageFailed, "LiveTaskInputs step");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "LiveTaskInputs step");
     }
     return out;
 }
@@ -847,7 +847,7 @@ Result<int> TaskManager::CountAll() {
     std::lock_guard<std::mutex> lock(mutex_);
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, "SELECT COUNT(*) FROM tasks", -1, &stmt, nullptr) != SQLITE_OK) {
-        return F42Status(F42ErrorCode::kStorageFailed, "CountAll prepare");
+        return TaskStatus(TaskErrorCode::kStorageFailed, "CountAll prepare");
     }
     int n = 0;
     if (sqlite3_step(stmt) == SQLITE_ROW) n = sqlite3_column_int(stmt, 0);

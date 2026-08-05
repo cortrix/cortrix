@@ -8,7 +8,7 @@
 
 #include "cortrix/id/ulid.h"
 #include "cortrix/memory/contradiction_detector.h"
-#include "cortrix/memory/mem02_metrics.h"
+#include "cortrix/memory/memory_extract_metrics.h"
 #include "cortrix/memory/prompt_templates.h"
 
 namespace cortrix::memory {
@@ -132,7 +132,7 @@ MemoryExtractor::ParseExtractionJson(const std::string& llm_output) const {
         }
     }
     if (j.is_discarded() || !j.is_array()) {
-        return Mem02Status(Mem02ErrorCode::kExtractInvalidOutput,
+        return MemoryExtractStatus(MemoryExtractErrorCode::kExtractInvalidOutput,
                            "extraction output is not a JSON array");
     }
     std::vector<ExtractedMemory> out;
@@ -142,7 +142,7 @@ MemoryExtractor::ParseExtractionJson(const std::string& llm_output) const {
             !item["content"].is_string()) {
             // Skip malformed entries rather than failing the whole batch — but an
             // entry with no usable content is a contract violation worth flagging.
-            return Mem02Status(Mem02ErrorCode::kExtractInvalidOutput,
+            return MemoryExtractStatus(MemoryExtractErrorCode::kExtractInvalidOutput,
                                "extraction entry missing string 'content'");
         }
         ExtractedMemory mem;
@@ -173,7 +173,7 @@ MemoryExtractionResult MemoryExtractor::DisabledResult(const std::string& intera
     MemoryExtractionResult r;
     nlohmann::json sd = {{"reason", "mem02.enabled=false (NullEnricher mode)"}};
     if (!interaction_id.empty()) sd["interaction_id"] = interaction_id;
-    r.error = MakeMem02Error(Mem02ErrorCode::kLlmDisabled, sd,
+    r.error = MakeMemoryExtractError(MemoryExtractErrorCode::kLlmDisabled, sd,
                              "LLM memory extraction is disabled for this namespace");
     return r;
 }
@@ -195,15 +195,15 @@ MemoryExtractionResult MemoryExtractor::ExtractFromWindow(
     const std::string user_id = window.empty() ? std::string() : window.back().user_id;
     const std::string session_id = window.empty() ? std::string() : window.back().session_id;
 
-    auto& metrics = Mem02Metrics::Instance();
+    auto& metrics = MemoryExtractMetrics::Instance();
 
     if (!config_.enabled || !llm_) {
-        metrics.RecordExtract(Mem02Metrics::ExtractStatus::kFailed);
+        metrics.RecordExtract(MemoryExtractMetrics::ExtractStatus::kFailed);
         return DisabledResult(interaction_id);
     }
     if (window.empty()) {
-        metrics.RecordExtract(Mem02Metrics::ExtractStatus::kFailed);
-        result.error = MakeMem02Error(Mem02ErrorCode::kExtractInvalidOutput,
+        metrics.RecordExtract(MemoryExtractMetrics::ExtractStatus::kFailed);
+        result.error = MakeMemoryExtractError(MemoryExtractErrorCode::kExtractInvalidOutput,
                                       {{"interaction_id", ""}, {"llm_model", config_.llm_model}},
                                       "empty interaction window");
         return result;
@@ -227,30 +227,30 @@ MemoryExtractionResult MemoryExtractor::ExtractFromWindow(
 
     const std::string used_model = resp.model.empty() ? config_.llm_model : resp.model;
     metrics.ObserveExtractDuration(used_model, latency_ms);
-    metrics.RecordTokens(used_model, Mem02Metrics::TokenDirection::kInput,
+    metrics.RecordTokens(used_model, MemoryExtractMetrics::TokenDirection::kInput,
                          static_cast<uint64_t>(std::max(0, resp.prompt_tokens)));
-    metrics.RecordTokens(used_model, Mem02Metrics::TokenDirection::kOutput,
+    metrics.RecordTokens(used_model, MemoryExtractMetrics::TokenDirection::kOutput,
                          static_cast<uint64_t>(std::max(0, resp.completion_tokens)));
 
     if (!resp.ok()) {
-        metrics.RecordExtract(Mem02Metrics::ExtractStatus::kFailed);
+        metrics.RecordExtract(MemoryExtractMetrics::ExtractStatus::kFailed);
         // A client-reported kUnavailable is the timeout/circuit family. Other
         // failures surface as INVALID_OUTPUT (the model produced nothing usable).
         if (resp.status.code() == StatusCode::kUnavailable) {
-            result.error = MakeMem02Error(
-                Mem02ErrorCode::kExtractLlmTimeout,
+            result.error = MakeMemoryExtractError(
+                MemoryExtractErrorCode::kExtractLlmTimeout,
                 {{"interaction_id", interaction_id},
                  {"llm_model", config_.llm_model},
                  {"timeout_ms", config_.llm_timeout_ms}},
                 "LLM extraction timed out for interaction " + interaction_id);
         } else if (resp.status.code() == StatusCode::kPermissionDenied) {
-            result.error = MakeMem02Error(
-                Mem02ErrorCode::kExtractBudgetExceeded,
+            result.error = MakeMemoryExtractError(
+                MemoryExtractErrorCode::kExtractBudgetExceeded,
                 {{"budget_cap_usd", 0}, {"current_usage_usd", 0}},
                 "LLM budget exceeded: " + resp.status.message());
         } else {
-            result.error = MakeMem02Error(
-                Mem02ErrorCode::kExtractInvalidOutput,
+            result.error = MakeMemoryExtractError(
+                MemoryExtractErrorCode::kExtractInvalidOutput,
                 {{"interaction_id", interaction_id}, {"llm_model", config_.llm_model}},
                 "LLM extraction failed: " + resp.status.message());
         }
@@ -260,9 +260,9 @@ MemoryExtractionResult MemoryExtractor::ExtractFromWindow(
     // 2. Parse extraction JSON (D4 fallback applied inside).
     Result<std::vector<ExtractedMemory>> parsed = ParseExtractionJson(resp.content);
     if (!parsed.ok()) {
-        metrics.RecordExtract(Mem02Metrics::ExtractStatus::kFailed);
-        result.error = MakeMem02Error(
-            Mem02ErrorCode::kExtractInvalidOutput,
+        metrics.RecordExtract(MemoryExtractMetrics::ExtractStatus::kFailed);
+        result.error = MakeMemoryExtractError(
+            MemoryExtractErrorCode::kExtractInvalidOutput,
             {{"interaction_id", interaction_id}, {"llm_model", config_.llm_model}},
             parsed.status().message());
         return result;
@@ -282,9 +282,9 @@ MemoryExtractionResult MemoryExtractor::ExtractFromWindow(
     // 4. Persist + stamp invalidation + operation_log (D6 / §4.2.3).
     Status wstatus = WriteWithOperationLog(ns, user_id, memories, contradictions, ctx);
     if (!wstatus.ok()) {
-        metrics.RecordExtract(Mem02Metrics::ExtractStatus::kFailed);
-        result.error = MakeMem02Error(
-            Mem02ErrorCode::kExtractInvalidOutput,
+        metrics.RecordExtract(MemoryExtractMetrics::ExtractStatus::kFailed);
+        result.error = MakeMemoryExtractError(
+            MemoryExtractErrorCode::kExtractInvalidOutput,
             {{"interaction_id", interaction_id}, {"llm_model", config_.llm_model}},
             "persist failed: " + wstatus.message());
         return result;
@@ -306,7 +306,7 @@ MemoryExtractionResult MemoryExtractor::ExtractFromWindow(
 
     result.extracted_memories = std::move(memories);
     result.extract_meta = std::move(meta);
-    metrics.RecordExtract(Mem02Metrics::ExtractStatus::kSuccess);
+    metrics.RecordExtract(MemoryExtractMetrics::ExtractStatus::kSuccess);
     return result;
 }
 
@@ -329,7 +329,7 @@ std::vector<ContradictionPair> MemoryExtractor::FindContradictions(
     if (!contradiction_query_ || !llm_) return pairs;
 
     ContradictionDetector judge(llm_, config_.llm_model, config_.llm_timeout_ms);
-    auto& metrics = Mem02Metrics::Instance();
+    auto& metrics = MemoryExtractMetrics::Instance();
 
     for (const auto& nm : new_memories) {
         // Only facts participate in contradiction (D5: "judge whether the new fact contradicts the old fact" —
@@ -360,7 +360,7 @@ std::vector<ContradictionPair> MemoryExtractor::FindContradictions(
                 p.confidence = jm.confidence;
                 pairs.push_back(std::move(p));
                 metrics.RecordContradiction(
-                    Mem02Metrics::BucketForConfidence(jm.confidence));
+                    MemoryExtractMetrics::BucketForConfidence(jm.confidence));
             }
         }
     }
@@ -437,7 +437,7 @@ Status MemoryExtractor::WriteWithOperationLog(
     if (!block_store_) {
         return Status::Internal("CX_ERR_MEMEXTRACT_INVALID_OUTPUT: no block store");
     }
-    auto& metrics = Mem02Metrics::Instance();
+    auto& metrics = MemoryExtractMetrics::Instance();
     const std::string now = NowIso8601();
 
     // 1. Insert each new memory block with the §4.1 metadata_json fields; mint a ULID.
@@ -510,7 +510,7 @@ Status MemoryExtractor::WriteWithOperationLog(
         if (!us.ok()) {
             return us;
         }
-        metrics.RecordInvalidation(Mem02Metrics::TriggeredBy::kLlmAuto);
+        metrics.RecordInvalidation(MemoryExtractMetrics::TriggeredBy::kLlmAuto);
 
         // operation_log: memory_invalidate (§4.2.2 — action {resource}_{verb}).
         if (op_logger_) {
@@ -578,9 +578,9 @@ Result<MemoryBlockRecord> MemoryExtractor::RevokeInvalidation(
     if (!us.ok()) {
         return us;
     }
-    Mem02Metrics::Instance().RecordInvalidation(
-        revoked_by == "agent_self" ? Mem02Metrics::TriggeredBy::kAgentSelf
-                                   : Mem02Metrics::TriggeredBy::kManual);
+    MemoryExtractMetrics::Instance().RecordInvalidation(
+        revoked_by == "agent_self" ? MemoryExtractMetrics::TriggeredBy::kAgentSelf
+                                   : MemoryExtractMetrics::TriggeredBy::kManual);
 
     if (op_logger_) {
         observability::OperationLogEntry e;
@@ -622,7 +622,7 @@ Status MemoryExtractor::InvalidateMemory(const std::string& block_id,
     if (!us.ok()) {
         return us;
     }
-    Mem02Metrics::Instance().RecordInvalidation(Mem02Metrics::TriggeredBy::kManual);
+    MemoryExtractMetrics::Instance().RecordInvalidation(MemoryExtractMetrics::TriggeredBy::kManual);
 
     if (op_logger_) {
         observability::OperationLogEntry e;

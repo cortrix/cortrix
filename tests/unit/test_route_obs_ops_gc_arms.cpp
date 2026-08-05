@@ -533,7 +533,7 @@ TEST_F(ObsRoutesArms, GlobalTraceNonOwnerDenied) {
 }
 
 // PER-NS /interactions/:id/sources with a namespace that does not exist → the with_ns
-// Acquire() fails → WriteF13Error SESSION_NOT_FOUND (the per-NS not-found arm).
+// Acquire() fails → WriteAgentTraceError SESSION_NOT_FOUND (the per-NS not-found arm).
 TEST_F(ObsRoutesArms, SourcesUnknownNamespaceIsNotFound) {
     httplib::Client cli("127.0.0.1", port_);
     auto res = cli.Get("/api/v1/interactions/int-1/sources?namespace=ghost-ns", Owner());

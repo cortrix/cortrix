@@ -62,7 +62,7 @@ bool IsWithin(const std::filesystem::path& path, const std::filesystem::path& ba
 // per-doc failures REUSE the originating Feature's existing CX_ERR_* code (no new
 // BATCH-per-doc codes — §2.4.2 "avoid error-code explosion"). The submit seam
 // (ITaskSubmitter, prod = TaskScheduler::Enqueue) hands back a coarse Status
-// whose message carries the "CX_ERR_X: detail" token (the F42Status / catalog
+// whose message carries the "CX_ERR_X: detail" token (the TaskStatus / catalog
 // /pool error-bridge convention). To re-inflate the GEN-Agent 5-field meta.failed[]
 // item we map that token → {category, retryable, retry_after_ms}.
 //

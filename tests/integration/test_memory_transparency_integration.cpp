@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "cortrix/memory/mem03_metrics.h"
+#include "cortrix/memory/memory_metrics.h"
 #include "cortrix/memory/memory_transparency.h"
 
 // Memory transparency / §11.3 standalone integration: the full CRUD lifecycle over a single
@@ -99,14 +99,14 @@ public:
 class MemoryTransparencyIntegrationTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        Mem03Metrics::Instance().ResetForTest();
+        MemoryMetrics::Instance().ResetForTest();
         store_ = std::make_shared<IntegStore>();
         oplog_ = std::make_shared<RecordingOpLogger>();
         mt_ = std::make_unique<MemoryTransparency>(
             std::make_shared<StoreLister>(store_),
             std::make_shared<StoreBlock>(store_), oplog_);
     }
-    void TearDown() override { Mem03Metrics::Instance().ResetForTest(); }
+    void TearDown() override { MemoryMetrics::Instance().ResetForTest(); }
 
     MemoryListFilter Filter(const std::string& user, bool include_invalidated = false) {
         MemoryListFilter f;
@@ -193,8 +193,8 @@ TEST_F(MemoryTransparencyIntegrationTest, PhasedRollout) {
     EXPECT_EQ(*ex.value().memories[0].extraction_method, "explicit");  // create path
 }
 
-// §11.2 MemoryTransparency_F18aOpLogIntegration: create/edit/delete all emit audit.
-TEST_F(MemoryTransparencyIntegrationTest, F18aOpLogIntegration) {
+// §11.2 MemoryTransparency_OperationLogOpLogIntegration: create/edit/delete all emit audit.
+TEST_F(MemoryTransparencyIntegrationTest, OperationLogOpLogIntegration) {
     MemoryCreateRequest cr;
     cr.user_id = kUser;
     cr.content = "c";
@@ -221,8 +221,8 @@ TEST_F(MemoryTransparencyIntegrationTest, F18aOpLogIntegration) {
     }
 }
 
-// §11.2 MemoryTransparency_MEM05Isolation: multi-user isolation + 404 mask.
-TEST_F(MemoryTransparencyIntegrationTest, MEM05Isolation) {
+// §11.2 MemoryTransparency_MemoryIsolation: multi-user isolation + 404 mask.
+TEST_F(MemoryTransparencyIntegrationTest, MemoryIsolation) {
     // user_a and user_b each create a memory.
     MemoryCreateRequest ca;
     ca.user_id = "user_a";
@@ -255,7 +255,7 @@ TEST_F(MemoryTransparencyIntegrationTest, MEM05Isolation) {
     EXPECT_EQ(d.code(), StatusCode::kNotFound);
 
     // The cross-user attempts were counted (2: one edit + one delete).
-    EXPECT_EQ(Mem03Metrics::Instance().CrossUserBlockedCount(), 2u);
+    EXPECT_EQ(MemoryMetrics::Instance().CrossUserBlockedCount(), 2u);
     // user_a's block is intact + active.
     EXPECT_EQ(store_->blocks[id_a].metadata_json["status"], "active");
     EXPECT_EQ(store_->blocks[id_a].content, "a's secret");
@@ -324,12 +324,12 @@ TEST_F(MemoryTransparencyIntegrationTest, AgentSelfManagement) {
     EXPECT_EQ(l2.value().total, 2);
 
     // The op metrics reflect the full self-service loop.
-    auto& metrics = Mem03Metrics::Instance();
-    EXPECT_EQ(metrics.OpCount(Mem03Metrics::Op::kCreate, Mem03Metrics::OpStatus::kSuccess), 3u);
-    EXPECT_EQ(metrics.OpCount(Mem03Metrics::Op::kEdit, Mem03Metrics::OpStatus::kSuccess), 1u);
-    EXPECT_EQ(metrics.OpCount(Mem03Metrics::Op::kInvalidate, Mem03Metrics::OpStatus::kSuccess), 1u);
+    auto& metrics = MemoryMetrics::Instance();
+    EXPECT_EQ(metrics.OpCount(MemoryMetrics::Op::kCreate, MemoryMetrics::OpStatus::kSuccess), 3u);
+    EXPECT_EQ(metrics.OpCount(MemoryMetrics::Op::kEdit, MemoryMetrics::OpStatus::kSuccess), 1u);
+    EXPECT_EQ(metrics.OpCount(MemoryMetrics::Op::kInvalidate, MemoryMetrics::OpStatus::kSuccess), 1u);
     // List is called twice in this loop (after the creates, then at the end).
-    EXPECT_EQ(metrics.OpCount(Mem03Metrics::Op::kList, Mem03Metrics::OpStatus::kSuccess), 2u);
+    EXPECT_EQ(metrics.OpCount(MemoryMetrics::Op::kList, MemoryMetrics::OpStatus::kSuccess), 2u);
 }
 
 }  // namespace

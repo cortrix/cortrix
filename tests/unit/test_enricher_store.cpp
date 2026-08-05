@@ -9,7 +9,7 @@
 #include <sqlite3.h>
 
 #include "cortrix/spc_enricher.h"
-#include "cortrix/spc_enricher/f03_schema_provider.h"
+#include "cortrix/spc_enricher/enricher_schema_provider.h"
 
 namespace cortrix::spc {
 namespace {
@@ -24,7 +24,7 @@ protected:
             "CREATE TABLE blocks (block_id INTEGER PRIMARY KEY AUTOINCREMENT, "
             "doc_id TEXT, chunk_index INTEGER, content_text TEXT)",
             nullptr, nullptr, nullptr), SQLITE_OK);
-        F03SchemaProvider p;
+        EnricherSchemaProvider p;
         ASSERT_TRUE(p.Migrate(db_, 0, 1).ok());
         ASSERT_EQ(sqlite3_exec(db_,
             "INSERT INTO blocks(block_id, doc_id, chunk_index, content_text) "

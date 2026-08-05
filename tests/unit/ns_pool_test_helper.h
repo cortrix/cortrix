@@ -38,7 +38,7 @@
 #include "cortrix/catalog/i_unit_router.h"
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
-#include "cortrix/resource/f05_config.h"
+#include "cortrix/resource/namespace_pool_config.h"
 #include "cortrix/resource/namespace_pool.h"
 #include "cortrix/resource/namespace_resource_bundle.h"
 #include "cortrix/store/i_vector_store.h"
@@ -216,7 +216,7 @@ private:
     ::testing::NiceMock<MockUnitRouter> unit_router_;
     ::testing::NiceMock<MockIndexFactory> index_factory_;
     FakeIndex* fake_index_ = nullptr;
-    cortrix::resource::F05Config config_;
+    cortrix::resource::NamespacePoolConfig config_;
     std::unique_ptr<cortrix::resource::DefaultNamespacePool> pool_;
 };
 

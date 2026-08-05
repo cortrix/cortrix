@@ -57,7 +57,7 @@ TEST(ImportTaskQueueTest, FailedWorkPropagatesCxErrCode) {
     auto store = std::make_shared<InMemoryImportTaskStore>();
     ImportTaskQueue q(store);
     ASSERT_TRUE(q.Submit("import_fail", "ns", [&](ImportTaskHandle&) {
-                     return F16aStatus(F16aErrorCode::kTimeout,
+                     return ImportStatus(ImportErrorCode::kTimeout,
                                        "Query exceeded 300s timeout on table users");
                  }).ok());
     q.DrainForTest();

@@ -28,7 +28,7 @@ enum class DocSummaryErrorCode {
     kLlmInvalidOutput,      ///< structured JSON output unparseable
     kLlmBudgetExceeded,     ///< LLM budget cap hit
     kDocTooLarge,           ///< document too large to summarize (permanent)
-    kSchemaVersionMismatch, ///< F41SchemaProvider unexpected version step
+    kSchemaVersionMismatch, ///< DocSummarySchemaProvider unexpected version step
     kFallbackFailed,        ///< in-doc chunk-recall fallback failed
     kFts5FallbackFailed,    ///< hybrid FTS5 index build / query failed
 };

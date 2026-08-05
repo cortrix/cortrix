@@ -27,7 +27,7 @@ std::string ColText(sqlite3_stmt* stmt, int col) {
 
 // Format Unix ms as the ISO-8601 UTC string the interaction_log.created_at column
 // uses, so a time-range filter compares lexically against it (ISO-8601 UTC sorts
-// lexicographically). Mirrors F13CleanupRegistrar::FormatIso8601Utc; kept local to
+// lexicographically). Mirrors AgentTraceCleanupRegistrar::FormatIso8601Utc; kept local to
 // avoid coupling the handler to the cleanup module.
 std::string ToIso8601Utc(int64_t unix_ms) {
     const std::time_t secs = static_cast<std::time_t>(unix_ms / 1000);
@@ -85,7 +85,7 @@ Result<InteractionSourcesView> InteractionsHandler::GetSources(
         if (sqlite3_prepare_v2(db_,
                 "SELECT user_id FROM interaction_log WHERE id = ? LIMIT 1",
                 -1, &stmt, nullptr) != SQLITE_OK) {
-            return F13Status(F13ErrorCode::kInternal, sqlite3_errmsg(db_));
+            return AgentTraceStatus(AgentTraceErrorCode::kInternal, sqlite3_errmsg(db_));
         }
         sqlite3_bind_text(stmt, 1, interaction_id.c_str(), -1, SQLITE_TRANSIENT);
         if (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -96,13 +96,13 @@ Result<InteractionSourcesView> InteractionsHandler::GetSources(
     }
 
     if (!found) {
-        return F13Status(F13ErrorCode::kInteractionNotFound,
+        return AgentTraceStatus(AgentTraceErrorCode::kInteractionNotFound,
                          "no interaction with id " + interaction_id);
     }
 
     // 2. Permission (§8.2/§8.3 anti-leak): non-admin may only read their own.
     if (!ctx.is_admin && owner_user_id.value_or("") != ctx.requester_user_id) {
-        return F13Status(F13ErrorCode::kUnauthorized,
+        return AgentTraceStatus(AgentTraceErrorCode::kUnauthorized,
                          "cross-user interaction access requires admin");
     }
     if (ctx.is_admin && owner_user_id.has_value() &&
@@ -122,7 +122,7 @@ Result<InteractionSourcesView> InteractionsHandler::GetSources(
                 "FROM interaction_sources WHERE interaction_id = ? "
                 "ORDER BY relevance_score DESC, id ASC",
                 -1, &stmt, nullptr) != SQLITE_OK) {
-            return F13Status(F13ErrorCode::kInternal, sqlite3_errmsg(db_));
+            return AgentTraceStatus(AgentTraceErrorCode::kInternal, sqlite3_errmsg(db_));
         }
         sqlite3_bind_text(stmt, 1, interaction_id.c_str(), -1, SQLITE_TRANSIENT);
         while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -154,20 +154,20 @@ Result<InteractionListView> InteractionsHandler::ListInteractions(
     const InteractionListFilter& filter, const RequesterContext& ctx) {
     // ---- validate (§8.3 -> CX_ERR_TRACE_INVALID_FILTER) ----
     if (filter.limit < 1 || filter.limit > 200) {
-        return F13Status(F13ErrorCode::kInvalidFilter,
+        return AgentTraceStatus(AgentTraceErrorCode::kInvalidFilter,
                          "limit must be in [1,200], got " + std::to_string(filter.limit));
     }
     if (filter.offset < 0) {
-        return F13Status(F13ErrorCode::kInvalidFilter,
+        return AgentTraceStatus(AgentTraceErrorCode::kInvalidFilter,
                          "offset must be >= 0, got " + std::to_string(filter.offset));
     }
     if (filter.sort_order != "ASC" && filter.sort_order != "DESC") {
-        return F13Status(F13ErrorCode::kInvalidFilter,
+        return AgentTraceStatus(AgentTraceErrorCode::kInvalidFilter,
                          "sort_order must be ASC|DESC, got " + filter.sort_order);
     }
     if (filter.from_timestamp.has_value() && filter.to_timestamp.has_value() &&
         *filter.from_timestamp > *filter.to_timestamp) {
-        return F13Status(F13ErrorCode::kInvalidFilter, "from_timestamp > to_timestamp");
+        return AgentTraceStatus(AgentTraceErrorCode::kInvalidFilter, "from_timestamp > to_timestamp");
     }
 
     // ---- resolve the effective user scope (§8.3 permission) ----
@@ -177,7 +177,7 @@ Result<InteractionListView> InteractionsHandler::ListInteractions(
     std::optional<std::string> scope_user_id;
     if (!ctx.is_admin) {
         if (filter.user_id.has_value() && *filter.user_id != ctx.requester_user_id) {
-            return F13Status(F13ErrorCode::kUnauthorized,
+            return AgentTraceStatus(AgentTraceErrorCode::kUnauthorized,
                              "cross-user interaction listing requires admin");
         }
         scope_user_id = ctx.requester_user_id;  // force own rows
@@ -219,14 +219,14 @@ Result<InteractionListView> InteractionsHandler::ListInteractions(
         const std::string sql = "SELECT COUNT(*) FROM interaction_log" + where;
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-            return F13Status(F13ErrorCode::kInternal, sqlite3_errmsg(db_));
+            return AgentTraceStatus(AgentTraceErrorCode::kInternal, sqlite3_errmsg(db_));
         }
         bind_all(stmt);
         if (sqlite3_step(stmt) == SQLITE_ROW) out.total_count = sqlite3_column_int64(stmt, 0);
         sqlite3_finalize(stmt);
     }
     if (filter.offset > 0 && filter.offset >= out.total_count) {
-        return F13Status(F13ErrorCode::kInvalidFilter,
+        return AgentTraceStatus(AgentTraceErrorCode::kInvalidFilter,
                          "offset " + std::to_string(filter.offset) +
                              " >= total_count " + std::to_string(out.total_count));
     }
@@ -240,7 +240,7 @@ Result<InteractionListView> InteractionsHandler::ListInteractions(
             " LIMIT ? OFFSET ?";
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-            return F13Status(F13ErrorCode::kInternal, sqlite3_errmsg(db_));
+            return AgentTraceStatus(AgentTraceErrorCode::kInternal, sqlite3_errmsg(db_));
         }
         int idx = bind_all(stmt);
         sqlite3_bind_int(stmt, idx++, filter.limit);

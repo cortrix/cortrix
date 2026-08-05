@@ -10,7 +10,7 @@ namespace cortrix::async {
 /// for task.task_type, so new async task types are added by registering another
 /// handler — the pool stays open/closed. The two Phase-1 handlers:
 ///   kTaskDocParse   (1) → async::DocumentProcessor  (parse + finalize)
-///   kTaskDocSummary (3) → doc_summary::F41AsyncWorker (summary write)
+///   kTaskDocSummary (3) → doc_summary::DocSummaryAsyncWorker (summary write)
 ///
 /// ProcessTask runs one task (already marked processing) to its terminal outcome
 /// and returns the terminal Status (Ok on success; the CX_ERR_* Status otherwise)

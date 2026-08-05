@@ -28,7 +28,7 @@ enum class HypeErrorCode {
     kLlmInvalidOutput,      ///< LLM returned empty / unparseable output
     kLlmBudgetExceeded,     ///< per-Feature / global LLM budget cap hit
     kQuestionParseFailed,   ///< parsed question count != expected K (§6.2)
-    kSchemaVersionMismatch, ///< F38SchemaProvider unexpected version step
+    kSchemaVersionMismatch, ///< HypeSchemaProvider unexpected version step
     kParentNotFound,        ///< ParentChunkStore.GetParent miss / DB error (§6.3)
 };
 

@@ -46,10 +46,10 @@ Status ScoringSchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
     const bool init = (from_ver == 0 && to_ver == 1);
     if (!init && from_ver != to_ver) {
         return Status::InvalidArgument(
-            "CX_ERR_SCHEMA_VERSION_MISMATCH: F07 unsupported migration " +
+            "CX_ERR_SCHEMA_VERSION_MISMATCH: scoring unsupported migration " +
             std::to_string(from_ver) + " -> " + std::to_string(to_ver));
     }
-    if (!db) return Status::InvalidArgument("F07 migrate: null db");
+    if (!db) return Status::InvalidArgument("scoring migrate: null db");
 
     // blocks is the block-header-owned per-Unit table, created before this provider runs. If
     // absent (isolated unit test not building the per-Unit framework), no-op so the

@@ -16,7 +16,7 @@ namespace cortrix::spc {
 /// methods). Registered with the SchemaMigrator at Engine::Init() in the
 /// topological order (catalog → parser → ...). The ADD COLUMN is idempotent (guarded
 /// by a table_info check) so a re-run / already-current DB is a no-op.
-class F06SchemaProvider : public cortrix::catalog::ISchemaProvider {
+class ParserSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     std::string FeatureName() const override { return "parser"; }
     int CurrentVersion() const override { return 1; }

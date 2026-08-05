@@ -7,7 +7,7 @@
 #include <utility>
 
 #include "cortrix/common/status.h"
-#include "cortrix/resource/f05_config.h"
+#include "cortrix/resource/namespace_pool_config.h"
 #include "cortrix/resource/sqlite_conn.h"
 
 // Branch coverage for SqliteConn (namespace pool store.db RAII owner). The happy

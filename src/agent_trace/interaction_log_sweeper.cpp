@@ -5,7 +5,7 @@
 #include <chrono>
 #include <string>
 
-#include "cortrix/agent_trace/f13_cleanup_registrar.h"  // FormatIso8601Utc (shared cutoff format)
+#include "cortrix/agent_trace/agent_trace_cleanup_registrar.h"  // FormatIso8601Utc (shared cutoff format)
 #include "cortrix/catalog/i_ns_router.h"
 #include "cortrix/resource/namespace_facade.h"
 
@@ -22,7 +22,7 @@ int64_t NowMs() {
 // Delete interaction_log rows older than `cutoff_iso` from one namespace's memory.db.
 // The real interaction_log.created_at is ISO-8601 TEXT; ISO-8601 UTC sorts
 // lexicographically, so a string `<` comparison is a correct age filter (mirrors
-// F13CleanupRegistrar::CleanupInteractionLog). interaction_sources cascades via the
+// AgentTraceCleanupRegistrar::CleanupInteractionLog). interaction_sources cascades via the
 // FK. Returns rows deleted (0 on a prepare/step error — best-effort per NS).
 int64_t DeleteExpiredInteractionLog(sqlite3* mem_db, const std::string& cutoff_iso) {
     if (mem_db == nullptr) return 0;
@@ -52,7 +52,7 @@ Result<InteractionLogSweeper::SweepReport> InteractionLogSweeper::RunOnce() {
 
     const int retention_days = config_ ? config_->interaction_log_retention_days : 180;
     const int64_t cutoff_ms = NowMs() - static_cast<int64_t>(retention_days) * 86400000LL;
-    const std::string cutoff_iso = F13CleanupRegistrar::FormatIso8601Utc(cutoff_ms);
+    const std::string cutoff_iso = AgentTraceCleanupRegistrar::FormatIso8601Utc(cutoff_ms);
 
     auto ns_list = ns_router_->ListNamespaces();
     if (!ns_list.ok()) return ns_list.status();  // can't enumerate -> propagate

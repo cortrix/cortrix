@@ -1,7 +1,7 @@
 #include <cstdint>
 #include "cortrix/store/cortrix_store_sqlite.h"
 #include "cortrix/store/per_unit_schema_ddl.h"  // [D3.5-B] kPerUnitFrameworkDdl (single DDL SoT)
-#include "cortrix/store/f34_schema_provider.h"  // [A unified-blocks] standalone child cols + parents
+#include "cortrix/store/parent_child_schema_provider.h"  // [A unified-blocks] standalone child cols + parents
 #include "cortrix/logging/logging.h"
 #include <sqlite3.h>
 #include <algorithm>
@@ -219,7 +219,7 @@ int CortrixStoreSqlite::Open() {
     }
 
     // Per-Unit schema: production units are migrated ONCE at pool load
-    // time (F09SchemaProvider via SchemaMigrator::MigrateUnit), so the per-facade
+    // time (BlockFrameworkSchemaProvider via SchemaMigrator::MigrateUnit), so the per-facade
     // production connection passes run_schema_ddl=false (D-I1.bis). The standalone
     // owns-db path has no migrator and still builds the framework schema here
     // (same kPerUnitFrameworkDdl source → byte-identical schema).
@@ -330,7 +330,7 @@ int CortrixStoreSqlite::ExecutePragma() {
 }
 
 int CortrixStoreSqlite::CreateTables() {
-    // [D3.5-B] Single DDL SoT shared with F09SchemaProvider (production MigrateUnit
+    // [D3.5-B] Single DDL SoT shared with BlockFrameworkSchemaProvider (production MigrateUnit
     // path). This method now serves only the standalone owns-db path (see Open()).
     const char* ddl = store::kPerUnitFrameworkDdl;
 
@@ -343,15 +343,15 @@ int CortrixStoreSqlite::CreateTables() {
     }
     // [A unified-blocks] Standalone fidelity: production builds the blocks child
     // columns (child_id/parent_id/token_count/parent_offset) + parents table via
-    // F34SchemaProvider in MigrateUnit; the owns-db path has no migrator, so apply
+    // ParentChildSchemaProvider in MigrateUnit; the owns-db path has no migrator, so apply
     // the same store-layer provider here so block_insert/block_get (which carry the
     // A columns) match production. The contextual/sparse columns (contextualized/sparse_vec) are
     // not carried by CortrixBlock/block_insert, so they are intentionally not applied
     // here (added in production MigrateUnit; would be a store→spc/retrieval layering
     // violation to apply from the store).
-    store::F34SchemaProvider f34;
+    store::ParentChildSchemaProvider f34;
     if (Status s = f34.Migrate(db_, 0, 1); !s.ok()) {
-        CORTRIX_LOG_ERROR("store", "F34 schema (standalone): {}", s.message());
+        CORTRIX_LOG_ERROR("store", "schema (standalone): {}", s.message());
         return -1;
     }
     return 0;
@@ -1131,8 +1131,8 @@ int CortrixStoreSqlite::parent_insert(CortrixParent& parent) {
     if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
-    // The `parents` table is created standalone by F34SchemaProvider in CreateTables()
-    // and in production by F34SchemaProvider@MigrateUnit, so its 11 written columns
+    // The `parents` table is created standalone by ParentChildSchemaProvider in CreateTables()
+    // and in production by ParentChildSchemaProvider@MigrateUnit, so its 11 written columns
     // exist on both paths. The 3 D8 hotness columns are left to their DDL DEFAULTs
     // (V1.0 does not write them). No BEGIN/COMMIT here: a single INSERT autocommits
     // standalone, and the write coordinator's PWL wraps it in the SPC write transaction.

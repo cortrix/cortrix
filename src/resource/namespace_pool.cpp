@@ -22,15 +22,15 @@
 #include "cortrix/store/cortrix_store_sqlite.h"  // step 8b doc crash recovery view (D-I1.bis)
 #include "cortrix/observability/observability_context.h"
 #include "cortrix/resource/ns_pool_metrics.h"
-#include "cortrix/store/f09_schema_provider.h"   // [D3.5-B] per-Unit framework provider
-#include "cortrix/store/f34_schema_provider.h"   // [A unified-blocks] child cols + parents + indexes
-#include "cortrix/spc_enricher/f03_schema_provider.h"  // unified-blocks: enriched_score +3 + entities + FTS5
+#include "cortrix/store/block_framework_schema_provider.h"   // [D3.5-B] per-Unit framework provider
+#include "cortrix/store/parent_child_schema_provider.h"   // [A unified-blocks] child cols + parents + indexes
+#include "cortrix/spc_enricher/enricher_schema_provider.h"  // unified-blocks: enriched_score +3 + entities + FTS5
 #include "cortrix/scoring/scoring_schema_provider.h"   // unified-blocks: semantic_score col (gap-fill 2026-06-08)
-#include "cortrix/doc_summary/f41_schema_provider.h"   // unified-blocks: doc-level doc_fts5_index
+#include "cortrix/doc_summary/doc_summary_schema_provider.h"   // unified-blocks: doc-level doc_fts5_index
 #include "cortrix/doc_summary/doc_fts5_index.h"        // doc-summary rollback cleanup for doc_fts5_index rows
-#include "cortrix/spc_enricher/f35_schema_provider.h"  // [A unified-blocks] contextualized/embedding cols
+#include "cortrix/spc_enricher/contextual_schema_provider.h"  // [A unified-blocks] contextualized/embedding cols
 #include "cortrix/spc_enricher/enrich_state_schema_provider.h"  // enrich_state sidecar (coverage SoT)
-#include "cortrix/retrieval/f40_schema_provider.h"     // [A unified-blocks] sparse_vec col + inverted index
+#include "cortrix/retrieval/sparse_schema_provider.h"     // [A unified-blocks] sparse_vec col + inverted index
 
 namespace cortrix::resource {
 
@@ -142,7 +142,7 @@ DefaultNamespacePool::DefaultNamespacePool(
     WriteCoordinatorFactory write_coord_factory,
     cortrix::catalog::INSRouter* ns_router,
     cortrix::catalog::IUnitRouter* unit_router,
-    F05Config config)
+    NamespacePoolConfig config)
     : index_factory_(index_factory),
       write_coord_factory_(std::move(write_coord_factory)),
       ns_router_(ns_router),
@@ -194,8 +194,8 @@ void DefaultNamespacePool::RecordRejection(const std::string& namespace_id,
             recent_rejections_.pop_front();
         }
     }
-    // §10.2 F05_POOL_REJECTION (WARN). Structured fields mirror the RejectionEvent.
-    LogEvent(obs::LogLevel::kWarn, "F05_POOL_REJECTION",
+    // §10.2 NAMESPACEPOOL_POOL_REJECTION (WARN). Structured fields mirror the RejectionEvent.
+    LogEvent(obs::LogLevel::kWarn, "NAMESPACEPOOL_POOL_REJECTION",
              {{"namespace_id", ev.namespace_id},
               {"reason", ev.reason},
               {"budget_used", ev.budget_used},
@@ -258,17 +258,17 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
     // 3b. [D3.5-B] Per-Unit schema migration (ARCH §1.3.bis.3 unified governance) —
     //     run ONCE here, BEFORE the recover adapters (step 4) and the WC Recover
     //     (step 8), so documents/blocks exist before any read/write or the rollback
-    //     DELETE FROM blocks. F09SchemaProvider owns the framework schema; this
+    //     DELETE FROM blocks. BlockFrameworkSchemaProvider owns the framework schema; this
     //     replaces the MVP per-Acquire CortrixStoreSqlite::CreateTables on the
     //     production (external-conn) path.
     {
-        cortrix::store::F09SchemaProvider f09_provider;
-        cortrix::store::F34SchemaProvider f34_provider;  // unified-blocks: after the block header (needs blocks)
-        cortrix::spc::F03SchemaProvider f03_provider;    // [A unified-blocks] enriched_score +3 cols + entities + FTS5
+        cortrix::store::BlockFrameworkSchemaProvider f09_provider;
+        cortrix::store::ParentChildSchemaProvider f34_provider;  // unified-blocks: after the block header (needs blocks)
+        cortrix::spc::EnricherSchemaProvider f03_provider;    // [A unified-blocks] enriched_score +3 cols + entities + FTS5
         cortrix::scoring::ScoringSchemaProvider f07_provider;  // [A unified-blocks] semantic_score col (§1.3.bis.3 #6, gap-fill 2026-06-08)
-        cortrix::spc::F35SchemaProvider f35_provider;    // [A unified-blocks] contextualized/embedding cols
-        cortrix::doc_summary::F41SchemaProvider f41_provider;  // [A unified-blocks] doc-level doc_fts5_index (block_type=17 reuses blocks)
-        cortrix::retrieval::F40SchemaProvider f40_provider;  // [A unified-blocks] sparse_vec + inverted index
+        cortrix::spc::ContextualSchemaProvider f35_provider;    // [A unified-blocks] contextualized/embedding cols
+        cortrix::doc_summary::DocSummarySchemaProvider f41_provider;  // [A unified-blocks] doc-level doc_fts5_index (block_type=17 reuses blocks)
+        cortrix::retrieval::SparseSchemaProvider f40_provider;  // [A unified-blocks] sparse_vec + inverted index
         cortrix::spc::EnrichStateSchemaProvider enrich_state_provider;  // enrich_state sidecar (coverage SoT)
         cortrix::catalog::SchemaMigrator unit_migrator;
         unit_migrator.Register(&f09_provider);   // #3 framework: documents/blocks/blocks_fts
@@ -529,7 +529,7 @@ Status DefaultNamespacePool::AdmitCreate(const std::string& namespace_id,
     NsPoolMetrics::Instance().SetSize(static_cast<int64_t>(bundles_.size()));
     NsPoolMetrics::Instance().SetMemoryBudgetUsedBytes(
         static_cast<int64_t>(CurrentMemoryUsedLocked()));
-    LogEvent(obs::LogLevel::kDebug, "F05_POOL_ADMIT_SUCCESS",
+    LogEvent(obs::LogLevel::kDebug, "NAMESPACEPOOL_POOL_ADMIT_SUCCESS",
              {{"namespace_id", namespace_id},
               {"pool_size_after", bundles_.size()}});
     return Status::Ok();
@@ -596,7 +596,7 @@ void DefaultNamespacePool::Release(const std::string& namespace_id) {
         NsPoolMetrics::Instance().SetSize(static_cast<int64_t>(bundles_.size()));
         NsPoolMetrics::Instance().SetMemoryBudgetUsedBytes(
             static_cast<int64_t>(CurrentMemoryUsedLocked()));
-        LogEvent(obs::LogLevel::kDebug, "F05_POOL_EVICT_REAPED",
+        LogEvent(obs::LogLevel::kDebug, "NAMESPACEPOOL_POOL_EVICT_REAPED",
                  {{"namespace_id", namespace_id},
                   {"pool_size_after", bundles_.size()}});
     }
@@ -620,7 +620,7 @@ Status DefaultNamespacePool::EvictForDelete(const std::string& namespace_id) {
     // &slot.bundle would dangle its pointer for the rest of the request.
     if (slot.refcount.load(std::memory_order_acquire) > 0) {
         slot.pending_delete.store(true, std::memory_order_release);
-        LogEvent(obs::LogLevel::kDebug, "F05_POOL_EVICT_DEFERRED",
+        LogEvent(obs::LogLevel::kDebug, "NAMESPACEPOOL_POOL_EVICT_DEFERRED",
                  {{"namespace_id", namespace_id},
                   {"refcount", slot.refcount.load(std::memory_order_acquire)}});
         return Status::Ok();
@@ -650,7 +650,7 @@ Result<StartupReport> DefaultNamespacePool::StartupLoadAll() {
 
     // Startup admission backstop (§6.2): never load past the NS-count ceiling.
     if (ns_list.size() > config_.max_namespaces_per_instance) {
-        LogEvent(obs::LogLevel::kError, "F05_POOL_STARTUP_TRUNCATED",
+        LogEvent(obs::LogLevel::kError, "NAMESPACEPOOL_POOL_STARTUP_TRUNCATED",
                  {{"catalog_ns_count", ns_list.size()},
                   {"max_namespaces", config_.max_namespaces_per_instance}});
         ns_list.resize(config_.max_namespaces_per_instance);
@@ -694,7 +694,7 @@ Result<StartupReport> DefaultNamespacePool::StartupLoadAll() {
                 std::unique_lock<std::shared_mutex> lock(pool_mutex_);
                 startup_failed_namespaces_.push_back(ns_list[i]);
             }
-            LogEvent(obs::LogLevel::kError, "F05_POOL_NS_LOAD_FAILED",
+            LogEvent(obs::LogLevel::kError, "NAMESPACEPOOL_POOL_NS_LOAD_FAILED",
                      {{"namespace_id", ns_list[i]},
                       {"error_detail", loaded.status().message()}});
         }
@@ -709,7 +709,7 @@ Result<StartupReport> DefaultNamespacePool::StartupLoadAll() {
     NsPoolMetrics::Instance().ObserveStartupLoadDuration(
         static_cast<double>(report.total_duration_ms) / 1000.0);
     RefreshPoolGauges();
-    LogEvent(obs::LogLevel::kInfo, "F05_POOL_STARTUP_COMPLETE",
+    LogEvent(obs::LogLevel::kInfo, "NAMESPACEPOOL_POOL_STARTUP_COMPLETE",
              {{"total_namespaces", report.total_namespaces},
               {"loaded_successfully", report.loaded_successfully},
               {"failed", report.failed},
@@ -726,7 +726,7 @@ Status DefaultNamespacePool::ReloadNamespace(const std::string& namespace_id) {
     // so blocking until the load completes is correct.
     auto loaded = LoadOneNamespaceInner(namespace_id);
     if (!loaded.ok()) {
-        LogEvent(obs::LogLevel::kError, "F05_POOL_NS_LOAD_FAILED",
+        LogEvent(obs::LogLevel::kError, "NAMESPACEPOOL_POOL_NS_LOAD_FAILED",
                  {{"namespace_id", namespace_id},
                   {"error_detail", loaded.status().message()}});
         return loaded.status();

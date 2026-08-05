@@ -13,25 +13,25 @@ namespace {
 
 using agent_friendly::ErrorCategory;
 
-constexpr F13ErrorCode kAll[] = {
-    F13ErrorCode::kSessionNotFound,
-    F13ErrorCode::kInvalidFilter,
-    F13ErrorCode::kInteractionNotFound,
-    F13ErrorCode::kUnauthorized,
-    F13ErrorCode::kMcpSessionInvalid,
-    F13ErrorCode::kSessionExpired,
-    F13ErrorCode::kInternal,
+constexpr AgentTraceErrorCode kAll[] = {
+    AgentTraceErrorCode::kSessionNotFound,
+    AgentTraceErrorCode::kInvalidFilter,
+    AgentTraceErrorCode::kInteractionNotFound,
+    AgentTraceErrorCode::kUnauthorized,
+    AgentTraceErrorCode::kMcpSessionInvalid,
+    AgentTraceErrorCode::kSessionExpired,
+    AgentTraceErrorCode::kInternal,
 };
 
-TEST(F13ErrorTest, CountMatchesEnumeration) {
-    EXPECT_EQ(kF13ErrorCodeCount, 7);
-    EXPECT_EQ(std::size(kAll), static_cast<size_t>(kF13ErrorCodeCount));
+TEST(AgentTraceErrorTest, CountMatchesEnumeration) {
+    EXPECT_EQ(kAgentTraceErrorCodeCount, 7);
+    EXPECT_EQ(std::size(kAll), static_cast<size_t>(kAgentTraceErrorCodeCount));
 }
 
-TEST(F13ErrorTest, AllCodesHaveUniqueCxStrings) {
+TEST(AgentTraceErrorTest, AllCodesHaveUniqueCxStrings) {
     std::set<std::string> seen;
-    for (F13ErrorCode c : kAll) {
-        std::string s = F13ErrorCodeString(c);
+    for (AgentTraceErrorCode c : kAll) {
+        std::string s = AgentTraceErrorCodeString(c);
         EXPECT_FALSE(s.empty());
         EXPECT_EQ(s.rfind("CX_ERR_TRACE_", 0), 0u) << s << " must start with CX_ERR_TRACE_";
         EXPECT_TRUE(seen.insert(s).second) << "duplicate code string: " << s;
@@ -40,66 +40,66 @@ TEST(F13ErrorTest, AllCodesHaveUniqueCxStrings) {
 }
 
 // §9.2 table, row by row.
-TEST(F13ErrorTest, RegistryMatchesSpecTable) {
-    auto chk = [](F13ErrorCode c, const char* code, ErrorCategory cat, bool retry) {
-        const F13ErrorInfo& i = GetF13ErrorInfo(c);
+TEST(AgentTraceErrorTest, RegistryMatchesSpecTable) {
+    auto chk = [](AgentTraceErrorCode c, const char* code, ErrorCategory cat, bool retry) {
+        const AgentTraceErrorInfo& i = GetAgentTraceErrorInfo(c);
         EXPECT_STREQ(i.cx_code, code);
         EXPECT_EQ(i.category, cat) << code;
         EXPECT_EQ(i.retryable, retry) << code;
         // §9.2 retry_after_ms column is "-" for every agent trace code.
         EXPECT_FALSE(i.retry_after_ms.has_value()) << code;
     };
-    chk(F13ErrorCode::kSessionNotFound, "CX_ERR_TRACE_SESSION_NOT_FOUND",
+    chk(AgentTraceErrorCode::kSessionNotFound, "CX_ERR_TRACE_SESSION_NOT_FOUND",
         ErrorCategory::kPermanent, false);
-    chk(F13ErrorCode::kInvalidFilter, "CX_ERR_TRACE_INVALID_FILTER",
+    chk(AgentTraceErrorCode::kInvalidFilter, "CX_ERR_TRACE_INVALID_FILTER",
         ErrorCategory::kPermanent, false);
-    chk(F13ErrorCode::kInteractionNotFound, "CX_ERR_TRACE_INTERACTION_NOT_FOUND",
+    chk(AgentTraceErrorCode::kInteractionNotFound, "CX_ERR_TRACE_INTERACTION_NOT_FOUND",
         ErrorCategory::kPermanent, false);
-    chk(F13ErrorCode::kUnauthorized, "CX_ERR_TRACE_UNAUTHORIZED",
+    chk(AgentTraceErrorCode::kUnauthorized, "CX_ERR_TRACE_UNAUTHORIZED",
         ErrorCategory::kAuth, false);
-    chk(F13ErrorCode::kMcpSessionInvalid, "CX_ERR_TRACE_MCP_SESSION_INVALID",
+    chk(AgentTraceErrorCode::kMcpSessionInvalid, "CX_ERR_TRACE_MCP_SESSION_INVALID",
         ErrorCategory::kPermanent, false);
-    chk(F13ErrorCode::kSessionExpired, "CX_ERR_TRACE_SESSION_EXPIRED",
+    chk(AgentTraceErrorCode::kSessionExpired, "CX_ERR_TRACE_SESSION_EXPIRED",
         ErrorCategory::kPermanent, false);
-    chk(F13ErrorCode::kInternal, "CX_ERR_TRACE_INTERNAL",
+    chk(AgentTraceErrorCode::kInternal, "CX_ERR_TRACE_INTERNAL",
         ErrorCategory::kTransient, true);
 }
 
-TEST(F13ErrorTest, RequiredStructuredDataKeysPerSpec) {
-    EXPECT_EQ(RequiredStructuredDataKeys(F13ErrorCode::kSessionNotFound),
+TEST(AgentTraceErrorTest, RequiredStructuredDataKeysPerSpec) {
+    EXPECT_EQ(RequiredStructuredDataKeys(AgentTraceErrorCode::kSessionNotFound),
               (std::vector<std::string>{"session_id"}));
-    EXPECT_EQ(RequiredStructuredDataKeys(F13ErrorCode::kInvalidFilter),
+    EXPECT_EQ(RequiredStructuredDataKeys(AgentTraceErrorCode::kInvalidFilter),
               (std::vector<std::string>{"invalid_field", "reason"}));  // value_preview optional
-    EXPECT_EQ(RequiredStructuredDataKeys(F13ErrorCode::kInteractionNotFound),
+    EXPECT_EQ(RequiredStructuredDataKeys(AgentTraceErrorCode::kInteractionNotFound),
               (std::vector<std::string>{"interaction_id"}));
-    EXPECT_EQ(RequiredStructuredDataKeys(F13ErrorCode::kUnauthorized),
+    EXPECT_EQ(RequiredStructuredDataKeys(AgentTraceErrorCode::kUnauthorized),
               (std::vector<std::string>{"required_role"}));
-    EXPECT_EQ(RequiredStructuredDataKeys(F13ErrorCode::kMcpSessionInvalid),
+    EXPECT_EQ(RequiredStructuredDataKeys(AgentTraceErrorCode::kMcpSessionInvalid),
               (std::vector<std::string>{"session_id", "reason"}));
-    EXPECT_EQ(RequiredStructuredDataKeys(F13ErrorCode::kSessionExpired),
+    EXPECT_EQ(RequiredStructuredDataKeys(AgentTraceErrorCode::kSessionExpired),
               (std::vector<std::string>{"session_id", "retention_days"}));
-    EXPECT_EQ(RequiredStructuredDataKeys(F13ErrorCode::kInternal),
+    EXPECT_EQ(RequiredStructuredDataKeys(AgentTraceErrorCode::kInternal),
               (std::vector<std::string>{"error_id"}));
 }
 
-TEST(F13ErrorTest, HasRequiredStructuredDataValidatesKeys) {
+TEST(AgentTraceErrorTest, HasRequiredStructuredDataValidatesKeys) {
     nlohmann::json full = {{"invalid_field", "X-Session-Id"}, {"reason", "too long"}};
-    EXPECT_TRUE(HasRequiredStructuredData(F13ErrorCode::kInvalidFilter, full));
+    EXPECT_TRUE(HasRequiredStructuredData(AgentTraceErrorCode::kInvalidFilter, full));
     // value_preview present but not required — still valid.
     full["value_preview"] = "abc";
-    EXPECT_TRUE(HasRequiredStructuredData(F13ErrorCode::kInvalidFilter, full));
+    EXPECT_TRUE(HasRequiredStructuredData(AgentTraceErrorCode::kInvalidFilter, full));
 
     nlohmann::json missing = {{"invalid_field", "X-Session-Id"}};
-    EXPECT_FALSE(HasRequiredStructuredData(F13ErrorCode::kInvalidFilter, missing));
+    EXPECT_FALSE(HasRequiredStructuredData(AgentTraceErrorCode::kInvalidFilter, missing));
 
     // Non-object payload never satisfies a code that requires keys.
-    EXPECT_FALSE(HasRequiredStructuredData(F13ErrorCode::kInternal,
+    EXPECT_FALSE(HasRequiredStructuredData(AgentTraceErrorCode::kInternal,
                                            nlohmann::json("not-an-object")));
 }
 
-TEST(F13ErrorTest, MakeF13ErrorFillsFromRegistry) {
+TEST(AgentTraceErrorTest, MakeAgentTraceErrorFillsFromRegistry) {
     nlohmann::json sd = {{"session_id", "sess-1"}, {"retention_days", 90}};
-    auto err = MakeF13Error(F13ErrorCode::kSessionExpired, sd, "session is past retention");
+    auto err = MakeAgentTraceError(AgentTraceErrorCode::kSessionExpired, sd, "session is past retention");
     EXPECT_EQ(err.code, "CX_ERR_TRACE_SESSION_EXPIRED");
     EXPECT_EQ(err.message, "session is past retention");
     EXPECT_FALSE(err.retryable);
@@ -109,14 +109,14 @@ TEST(F13ErrorTest, MakeF13ErrorFillsFromRegistry) {
     EXPECT_EQ((*err.structured_data)["session_id"], "sess-1");
 }
 
-TEST(F13ErrorTest, MakeF13ErrorDefaultsMessageToCode) {
-    auto err = MakeF13Error(F13ErrorCode::kInternal);
+TEST(AgentTraceErrorTest, MakeAgentTraceErrorDefaultsMessageToCode) {
+    auto err = MakeAgentTraceError(AgentTraceErrorCode::kInternal);
     EXPECT_EQ(err.message, "CX_ERR_TRACE_INTERNAL");
     EXPECT_TRUE(err.retryable);
 }
 
-TEST(F13ErrorTest, ToJsonSerializesAgentFriendlyBody) {
-    auto err = MakeF13Error(F13ErrorCode::kUnauthorized, {{"required_role", "admin"}});
+TEST(AgentTraceErrorTest, ToJsonSerializesAgentFriendlyBody) {
+    auto err = MakeAgentTraceError(AgentTraceErrorCode::kUnauthorized, {{"required_role", "admin"}});
     nlohmann::json j = agent_friendly::ToJson(err);
     EXPECT_EQ(j["code"], "CX_ERR_TRACE_UNAUTHORIZED");
     EXPECT_EQ(j["retryable"], false);
@@ -125,25 +125,25 @@ TEST(F13ErrorTest, ToJsonSerializesAgentFriendlyBody) {
     EXPECT_EQ(j["structured_data"]["required_role"], "admin");
 }
 
-TEST(F13ErrorTest, StatusBridgeCarriesCodeToken) {
-    Status s = F13Status(F13ErrorCode::kSessionNotFound, "no such session");
+TEST(AgentTraceErrorTest, StatusBridgeCarriesCodeToken) {
+    Status s = AgentTraceStatus(AgentTraceErrorCode::kSessionNotFound, "no such session");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kNotFound);
     EXPECT_NE(s.message().find("CX_ERR_TRACE_SESSION_NOT_FOUND"), std::string::npos);
     EXPECT_NE(s.message().find("no such session"), std::string::npos);
 }
 
-TEST(F13ErrorTest, StatusCodeMappingIsTotalAndSane) {
-    for (F13ErrorCode c : kAll) {
-        EXPECT_NE(F13ErrorToStatusCode(c), StatusCode::kOk) << F13ErrorCodeString(c);
+TEST(AgentTraceErrorTest, StatusCodeMappingIsTotalAndSane) {
+    for (AgentTraceErrorCode c : kAll) {
+        EXPECT_NE(AgentTraceErrorToStatusCode(c), StatusCode::kOk) << AgentTraceErrorCodeString(c);
     }
-    EXPECT_EQ(F13ErrorToStatusCode(F13ErrorCode::kSessionNotFound), StatusCode::kNotFound);
-    EXPECT_EQ(F13ErrorToStatusCode(F13ErrorCode::kInteractionNotFound), StatusCode::kNotFound);
-    EXPECT_EQ(F13ErrorToStatusCode(F13ErrorCode::kInvalidFilter), StatusCode::kInvalidArgument);
-    EXPECT_EQ(F13ErrorToStatusCode(F13ErrorCode::kMcpSessionInvalid), StatusCode::kInvalidArgument);
-    EXPECT_EQ(F13ErrorToStatusCode(F13ErrorCode::kSessionExpired), StatusCode::kInvalidArgument);
-    EXPECT_EQ(F13ErrorToStatusCode(F13ErrorCode::kUnauthorized), StatusCode::kPermissionDenied);
-    EXPECT_EQ(F13ErrorToStatusCode(F13ErrorCode::kInternal), StatusCode::kInternal);
+    EXPECT_EQ(AgentTraceErrorToStatusCode(AgentTraceErrorCode::kSessionNotFound), StatusCode::kNotFound);
+    EXPECT_EQ(AgentTraceErrorToStatusCode(AgentTraceErrorCode::kInteractionNotFound), StatusCode::kNotFound);
+    EXPECT_EQ(AgentTraceErrorToStatusCode(AgentTraceErrorCode::kInvalidFilter), StatusCode::kInvalidArgument);
+    EXPECT_EQ(AgentTraceErrorToStatusCode(AgentTraceErrorCode::kMcpSessionInvalid), StatusCode::kInvalidArgument);
+    EXPECT_EQ(AgentTraceErrorToStatusCode(AgentTraceErrorCode::kSessionExpired), StatusCode::kInvalidArgument);
+    EXPECT_EQ(AgentTraceErrorToStatusCode(AgentTraceErrorCode::kUnauthorized), StatusCode::kPermissionDenied);
+    EXPECT_EQ(AgentTraceErrorToStatusCode(AgentTraceErrorCode::kInternal), StatusCode::kInternal);
 }
 
 }  // namespace

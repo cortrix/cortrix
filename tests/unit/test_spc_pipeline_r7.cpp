@@ -18,7 +18,7 @@
 // dedup survivors). It is a standalone NEW file (does not touch the existing one).
 //
 // It also carries the corrected cleaning dedup-disabled regression: the original
-// SPCPipelineTest.F10_NsConfigResolver_DisablesDedup asserted that a 4400-'x'
+// SPCPipelineTest.CLEANING_NsConfigResolver_DisablesDedup asserted that a 4400-'x'
 // paragraph survives dedup-disabled as a child whose content_text == the full 4400
 // string. That is impossible: para(4400,'x') has no separators, so the child
 // splitter (RecursiveChunker child_size=200) hard-cuts it into ~8 ~600-char slices
@@ -65,7 +65,7 @@
 #include "cortrix/catalog/i_unit_router.h"
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
-#include "cortrix/resource/f05_config.h"
+#include "cortrix/resource/namespace_pool_config.h"
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/resource/namespace_pool.h"
 #include "cortrix/store/cortrix_store.h"
@@ -383,7 +383,7 @@ protected:
 
     // ── pool plumbing ──
     std::filesystem::path tmp_root_;
-    resource::F05Config config_;
+    resource::NamespacePoolConfig config_;
     NiceMock<MockIndexFactory> index_factory_;
     NiceMock<MockNSRouter> ns_router_;
     NiceMock<MockUnitRouter> unit_router_;
@@ -418,7 +418,7 @@ std::shared_ptr<llm::MockLlmClient> MakeHypeLlm() {
 
 // ============================================================
 // Cleaning corrected dedup-disabled regression (replaces the broken
-// SPCPipelineTest.F10_NsConfigResolver_DisablesDedup assertion).
+// SPCPipelineTest.CLEANING_NsConfigResolver_DisablesDedup assertion).
 // ============================================================
 
 // Two byte-identical large paragraphs, dedup DISABLED via the NS resolver. Each
@@ -429,7 +429,7 @@ std::shared_ptr<llm::MockLlmClient> MakeHypeLlm() {
 // (dedup on) collapses to exactly the distinct count. This proves the resolved NS
 // config (dedup_enabled=false) took effect — without the impossible
 // "content_text == full 4400-char paragraph" assumption of the original test.
-TEST_F(SPCPipelineR7Test, F10_NsResolverDisablesDedup_KeepsDuplicateChildren) {
+TEST_F(SPCPipelineR7Test, CLEANING_NsResolverDisablesDedup_KeepsDuplicateChildren) {
     const std::string para(4400, 'x');
     const std::string json =
         std::string(R"JSON({"status":0,"parser":"docling",)JSON") +
@@ -468,7 +468,7 @@ TEST_F(SPCPipelineR7Test, F10_NsResolverDisablesDedup_KeepsDuplicateChildren) {
 // Mirror: with the resolver left default (dedup ENABLED) the identical children
 // collapse — surviving child texts are all distinct. Confirms the resolver's false
 // in the test above is what kept the duplicates (not some other effect).
-TEST_F(SPCPipelineR7Test, F10_DefaultResolverEnablesDedup_CollapsesDuplicates) {
+TEST_F(SPCPipelineR7Test, CLEANING_DefaultResolverEnablesDedup_CollapsesDuplicates) {
     const std::string para(4400, 'x');
     const std::string json =
         std::string(R"JSON({"status":0,"parser":"docling",)JSON") +
@@ -501,7 +501,7 @@ TEST_F(SPCPipelineR7Test, F10_DefaultResolverEnablesDedup_CollapsesDuplicates) {
 // Resolver that turns anomaly detection OFF (the other §3.4 boolean field). Exercises
 // the resolver SetConfig branch with anomaly_detection_enabled=false (DetectAnomaly
 // early-returns). The doc still writes; no child carries a cleaning.* anomaly key.
-TEST_F(SPCPipelineR7Test, F10_NsResolverDisablesAnomaly_NoAnomalyKeys) {
+TEST_F(SPCPipelineR7Test, CLEANING_NsResolverDisablesAnomaly_NoAnomalyKeys) {
     pipeline_->SetCleaningConfigResolver([](const std::string&) {
         cortrix::spc::CleaningConfig c;
         c.anomaly_detection_enabled = false;
@@ -531,7 +531,7 @@ TEST_F(SPCPipelineR7Test, F10_NsResolverDisablesAnomaly_NoAnomalyKeys) {
 //   - the contextualized_embedding flag (kFlagExtHasContextualized) + WriteContextualized;
 //   - WriteEnrichment (enriched_score + entities);
 //   - the hype-question Block assembly + embed loop (block_type=16 rows persisted).
-TEST_F(SPCPipelineR7Test, EnricherChain_F03F35F38_PersistsEnrichmentAndHypeBlocks) {
+TEST_F(SPCPipelineR7Test, EnricherChain_EnricherF35F38_PersistsEnrichmentAndHypeBlocks) {
     cortrix::spc::EnricherChain chain;
     chain.Append(std::make_shared<FakeSummaryEnricher>());     // Enricher
     chain.Append(std::make_shared<FakeContextualEnricher>());  // Contextual retrieval
@@ -722,7 +722,7 @@ TEST_F(SPCPipelineR7Test, EnrichState_PersistFailureAfterSuccessfulEnrichIsOwed)
 
 // Enricher slot fails (step status != 0) → pending_retry rows owing exactly f03, with
 // the retry stamp and the error detail.
-TEST_F(SPCPipelineR7Test, EnrichState_F03FailureOwedAsPendingRetry) {
+TEST_F(SPCPipelineR7Test, EnrichState_EnricherFailureOwedAsPendingRetry) {
     cortrix::spc::EnricherChain chain;
     chain.Append(std::make_shared<FailingSummaryEnricher>());
     pipeline_->SetEnricherChain(&chain);
@@ -743,7 +743,7 @@ TEST_F(SPCPipelineR7Test, EnrichState_F03FailureOwedAsPendingRetry) {
 
 // Contextual retrieval fail-soft (step status 0, contextualized_status 2) → the member-aware
 // detection still owes f35; the ok enricher head is NOT owed.
-TEST_F(SPCPipelineR7Test, EnrichState_F35SoftFailureDetectedViaContextualizedStatus) {
+TEST_F(SPCPipelineR7Test, EnrichState_ContextualSoftFailureDetectedViaContextualizedStatus) {
     cortrix::spc::EnricherChain chain;
     chain.Append(std::make_shared<FakeSummaryEnricher>());        // ok enricher
     chain.Append(std::make_shared<FailingContextualEnricher>());  // f35 soft-fail

@@ -120,7 +120,7 @@ Status MemoryStore::Init(const std::string& db_path) {
     // on pragma_table_info), so it runs on both fresh and pre-existing DBs — fresh
     // DBs get the columns here since the base CREATE TABLE above does not list them
     // (keeps the MVP table definition frozen).
-    s = MigrateMem04OptOutColumns();
+    s = MigrateMemoryOptOutColumns();
     if (!s.ok()) return s;
 
     // interaction_sources lives in this memory.db (its FK references the
@@ -129,7 +129,7 @@ Status MemoryStore::Init(const std::string& db_path) {
     // can read a session whose calls span namespaces. Idempotent; failure here is
     // non-fatal to the memory path — source attribution degrades but
     // sessions/interactions keep working.
-    if (Status f13 = CreateF13ObservabilityTables(); !f13.ok()) {
+    if (Status f13 = CreateAgentTraceObservabilityTables(); !f13.ok()) {
         // log-and-continue: do not block memory.db init on the observability tables.
     }
 
@@ -140,8 +140,8 @@ Status MemoryStore::Init(const std::string& db_path) {
 // DDL
 // ---------------------------------------------------------------------------
 
-Status MemoryStore::CreateF13ObservabilityTables() {
-    if (!db_) return Status::InvalidArgument("CreateF13ObservabilityTables: null db");
+Status MemoryStore::CreateAgentTraceObservabilityTables() {
+    if (!db_) return Status::InvalidArgument("CreateAgentTraceObservabilityTables: null db");
     // Only interaction_sources is per-NS here: its FK references this db's
     // interaction_log.id (frozen), so the two must co-locate. agent_trace is
     // global (created against cortrix_global.db at startup) — it is NOT
@@ -208,7 +208,7 @@ Status MemoryStore::CreateMemorySessionsTable() {
     return Status::Ok();
 }
 
-Status MemoryStore::MigrateMem04OptOutColumns() {
+Status MemoryStore::MigrateMemoryOptOutColumns() {
     // ColumnExists + ADD COLUMN is check-then-act: two connections first-initing
     // the same db can both see "missing" and both ALTER — the loser gets
     // "duplicate column name", which means the WINNER already reached the target

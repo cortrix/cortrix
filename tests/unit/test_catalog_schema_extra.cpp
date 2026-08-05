@@ -4,8 +4,8 @@
 //   - kCatalogSchemaSql idempotency (CREATE TABLE IF NOT EXISTS re-runs)
 //   - Bootstrap rows (default_tenant, default_user, __system__ tenant)
 //   - blob_gc_queue authoritative column set (blob_uri PK, 6 columns)
-//   - F12SchemaProvider Migrate on db with stale blob_gc_queue shape
-//   - F12SchemaProvider FeatureName / CurrentVersion accessors
+//   - CatalogSchemaProvider Migrate on db with stale blob_gc_queue shape
+//   - CatalogSchemaProvider FeatureName / CurrentVersion accessors
 //   - catalog_schema SQL applied directly (without CatalogDb wrapper)
 #include <gtest/gtest.h>
 
@@ -68,14 +68,14 @@ bool TableExists(sqlite3* db, const std::string& table) {
 }
 
 // ---------------------------------------------------------------------------
-// F12SchemaProvider::Migrate — clean-break of stale blob_gc_queue.
+// CatalogSchemaProvider::Migrate — clean-break of stale blob_gc_queue.
 // The Migrate() code detects whether blob_gc_queue lacks the `blob_uri` column;
 // if it does, the stale table is dropped and the authoritative DDL recreates it.
 // ---------------------------------------------------------------------------
 
 // When blob_gc_queue has a stale schema (missing blob_uri), Migrate drops and
 // recreates it with the correct 6-column shape.
-TEST(F12SchemaMigrateCleanBreakTest, StaleBlobGcQueueIsDroppedAndRecreated) {
+TEST(CatalogSchemaMigrateCleanBreakTest, StaleBlobGcQueueIsDroppedAndRecreated) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
 
@@ -89,7 +89,7 @@ TEST(F12SchemaMigrateCleanBreakTest, StaleBlobGcQueueIsDroppedAndRecreated) {
     auto stale_cols = ColSet(db, "blob_gc_queue");
     EXPECT_EQ(stale_cols.count("blob_uri"), 0u) << "pre-condition: stale shape has no blob_uri";
 
-    F12SchemaProvider provider;
+    CatalogSchemaProvider provider;
     Status s = provider.Migrate(db, 0, provider.CurrentVersion());
     ASSERT_TRUE(s.ok()) << s.message();
 
@@ -106,12 +106,12 @@ TEST(F12SchemaMigrateCleanBreakTest, StaleBlobGcQueueIsDroppedAndRecreated) {
 
 // When blob_gc_queue already has blob_uri (correct schema), Migrate is a no-op
 // (CREATE TABLE IF NOT EXISTS skips it).
-TEST(F12SchemaMigrateCleanBreakTest, ExistingBlobUriSchemaIsPreserved) {
+TEST(CatalogSchemaMigrateCleanBreakTest, ExistingBlobUriSchemaIsPreserved) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
 
     // Simulate an already-migrated DB: Migrate once to get the right shape.
-    F12SchemaProvider provider;
+    CatalogSchemaProvider provider;
     ASSERT_TRUE(provider.Migrate(db, 0, provider.CurrentVersion()).ok());
     // Insert a sentinel row into blob_gc_queue.
     ASSERT_EQ(sqlite3_exec(db,
@@ -133,11 +133,11 @@ TEST(F12SchemaMigrateCleanBreakTest, ExistingBlobUriSchemaIsPreserved) {
 
 // blob_gc_queue absent entirely (no table at all): no-table probe path — table_exists=false
 // means the drop branch is skipped and the table is simply created fresh.
-TEST(F12SchemaMigrateCleanBreakTest, MissingBlobGcQueueCreatedFresh) {
+TEST(CatalogSchemaMigrateCleanBreakTest, MissingBlobGcQueueCreatedFresh) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     // No blob_gc_queue table created at all; just run Migrate.
-    F12SchemaProvider provider;
+    CatalogSchemaProvider provider;
     Status s = provider.Migrate(db, 0, provider.CurrentVersion());
     ASSERT_TRUE(s.ok()) << s.message();
     EXPECT_TRUE(TableExists(db, "blob_gc_queue"));
@@ -147,22 +147,22 @@ TEST(F12SchemaMigrateCleanBreakTest, MissingBlobGcQueueCreatedFresh) {
 }
 
 // ---------------------------------------------------------------------------
-// F12SchemaProvider metadata accessors.
+// CatalogSchemaProvider metadata accessors.
 // ---------------------------------------------------------------------------
 
-TEST(F12SchemaProviderTest, FeatureNameIsF12) {
-    F12SchemaProvider p;
+TEST(CatalogSchemaProviderTest, FeatureNameIsF12) {
+    CatalogSchemaProvider p;
     EXPECT_EQ(p.FeatureName(), "catalog");
 }
 
-TEST(F12SchemaProviderTest, CurrentVersionMatchesConstant) {
-    F12SchemaProvider p;
-    EXPECT_EQ(p.CurrentVersion(), kF12SchemaVersion);
+TEST(CatalogSchemaProviderTest, CurrentVersionMatchesConstant) {
+    CatalogSchemaProvider p;
+    EXPECT_EQ(p.CurrentVersion(), kCatalogSchemaVersion);
 }
 
-// kF12SchemaVersion must be at least 2 (bumped from 1 in OPEN-2 GC reshape).
-TEST(F12SchemaProviderTest, SchemaVersionAtLeastTwo) {
-    EXPECT_GE(kF12SchemaVersion, 2);
+// kCatalogSchemaVersion must be at least 2 (bumped from 1 in OPEN-2 GC reshape).
+TEST(CatalogSchemaProviderTest, SchemaVersionAtLeastTwo) {
+    EXPECT_GE(kCatalogSchemaVersion, 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +239,7 @@ TEST_F(BootstrapRowsTest, DefaultUserTenantOwnerRelationship) {
 // INSERT OR IGNORE: a second Open() (re-migration) must not produce duplicate bootstrap rows.
 TEST_F(BootstrapRowsTest, BootstrapRowsIdempotent) {
     // Run Migrate again directly.
-    F12SchemaProvider p;
+    CatalogSchemaProvider p;
     ASSERT_TRUE(p.Migrate(db_, 0, p.CurrentVersion()).ok());
     EXPECT_EQ(QInt(db_, "SELECT COUNT(*) FROM tenants WHERE tenant_id='default_tenant'"), 1);
     EXPECT_EQ(QInt(db_, "SELECT COUNT(*) FROM users WHERE user_id='default_user'"), 1);

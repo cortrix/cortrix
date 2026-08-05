@@ -5,7 +5,7 @@
 
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
-#include "cortrix/memory/mem04_error.h"
+#include "cortrix/memory/memory_opt_out_error.h"
 #include "cortrix/observability/operation_logger.h"
 #include "cortrix/observability/trace_context.h"
 
@@ -35,7 +35,7 @@ class MemoryStore;  // forward decl — MemoryStoreOptOutAdapter holds a referen
 //     check path are DEFERRED → D3.5.
 //   - F-FREEZE-1: the design's `Result<T, ...>` (double-template) is forbidden. We use
 //     `Result<T>` (StatusOr) + `Status`; the domain identity is carried via the
-//     CX_ERR_MEMOPTOUT_* token (mem04_error.h Mem04Status) and re-inflated to the
+//     CX_ERR_MEMOPTOUT_* token (memory_opt_out_error.h MemoryOptOutStatus) and re-inflated to the
 //     Agent-friendly body at the API boundary.
 namespace cortrix::memory::immunity {
 

@@ -17,13 +17,13 @@ namespace cortrix::agent_trace {
 /// Per CODING_CONVENTIONS §3 / F-FREEZE-1, Cortrix uses Result<T> + Status only
 /// (no Result<T,E>); a domain error is carried as the Agent-friendly boundary
 /// type cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_*
-/// code. So F13ErrorCode is the *enum of identities*, and MakeF13Error() turns
+/// code. So AgentTraceErrorCode is the *enum of identities*, and MakeAgentTraceError() turns
 /// one (plus optional structured_data) into that boundary error. This mirrors the
 /// reranker::RerankerErrorCode template exactly.
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may only be appended.
-enum class F13ErrorCode {
+enum class AgentTraceErrorCode {
     kSessionNotFound,     ///< admin cross-user session does not exist (§8.1)
     kInvalidFilter,       ///< invalid header / filter value (topic 9 — renamed from INVALID_SESSION_ID)
     kInteractionNotFound, ///< GET /interactions/{id}/sources — interaction missing (§8.2)
@@ -35,10 +35,10 @@ enum class F13ErrorCode {
 
 /// Total number of observability error codes (= 7). Compile-time anchor for the
 /// API-compatibility regression test (the set must not shrink).
-constexpr int kF13ErrorCodeCount = 7;
+constexpr int kAgentTraceErrorCodeCount = 7;
 
 /// Canonical, immutable attributes of one error code.
-struct F13ErrorInfo {
+struct AgentTraceErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_TRACE_*" string
     agent_friendly::ErrorCategory category;   ///< auth / permanent / transient
     bool retryable;
@@ -47,27 +47,27 @@ struct F13ErrorInfo {
 
 /// Look up the canonical attributes for `code`. Total over the enum (never
 /// throws / never returns a partial). Single source of truth for the 7 rows.
-const F13ErrorInfo& GetF13ErrorInfo(F13ErrorCode code);
+const AgentTraceErrorInfo& GetAgentTraceErrorInfo(AgentTraceErrorCode code);
 
-/// The "CX_ERR_TRACE_*" string for `code` (convenience over GetF13ErrorInfo).
-const char* F13ErrorCodeString(F13ErrorCode code);
+/// The "CX_ERR_TRACE_*" string for `code` (convenience over GetAgentTraceErrorInfo).
+const char* AgentTraceErrorCodeString(AgentTraceErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry
 /// (structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5);
 /// lets call sites + tests verify the body is complete. value_preview on
 /// INVALID_FILTER is optional (PII guard) so it is NOT in the required set.
-const std::vector<std::string>& RequiredStructuredDataKeys(F13ErrorCode code);
+const std::vector<std::string>& RequiredStructuredDataKeys(AgentTraceErrorCode code);
 
 /// True iff `structured_data` contains every required key for `code`.
-bool HasRequiredStructuredData(F13ErrorCode code,
+bool HasRequiredStructuredData(AgentTraceErrorCode code,
                                const nlohmann::json& structured_data);
 
 /// Build the Agent-friendly boundary error for `code`, attaching `structured_data`
 /// (the §9.2 required keys are the caller's responsibility at each call site) and
 /// an optional human-readable `message`. category / retryable / retry_after_ms are
 /// filled from the canonical registry — call sites never restate them.
-agent_friendly::AgentFriendlyError MakeF13Error(
-    F13ErrorCode code,
+agent_friendly::AgentFriendlyError MakeAgentTraceError(
+    AgentTraceErrorCode code,
     nlohmann::json structured_data = nlohmann::json::object(),
     const std::string& message = "");
 
@@ -75,12 +75,12 @@ agent_friendly::AgentFriendlyError MakeF13Error(
 /// (F-FREEZE-1). The StatusCode is the coarse mapping of `code`; the message is
 /// prefixed with the CX_ERR_TRACE_* token ("CX_ERR_TRACE_X: detail") so the exact
 /// identity is recoverable at the API/SDK boundary (which re-inflates the full
-/// Agent-friendly body via MakeF13Error). We deliberately do NOT widen
+/// Agent-friendly body via MakeAgentTraceError). We deliberately do NOT widen
 /// cortrix::Status itself.
-Status F13Status(F13ErrorCode code, const std::string& detail = "");
+Status AgentTraceStatus(AgentTraceErrorCode code, const std::string& detail = "");
 
-/// Coarse F13ErrorCode → StatusCode mapping used by F13Status (exposed for tests
+/// Coarse AgentTraceErrorCode → StatusCode mapping used by AgentTraceStatus (exposed for tests
 /// / boundary code that needs the mapping without a message).
-StatusCode F13ErrorToStatusCode(F13ErrorCode code);
+StatusCode AgentTraceErrorToStatusCode(AgentTraceErrorCode code);
 
 }  // namespace cortrix::agent_trace

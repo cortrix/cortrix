@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "cortrix/async/f42_error.h"
+#include "cortrix/async/task_error.h"
 #include "cortrix/server/batch_submit_service.h"
 
 // Batch-submit coverage: BatchSubmitService — the §2.2/§2.3/§2.4.1 batch submit
@@ -199,7 +199,7 @@ TEST(BatchSubmitServiceTest, AllSucceedFullCoverage) {
 TEST(BatchSubmitServiceTest, PartialSuccessCoverageRatioAndFailedSchema) {
     StubTaskSubmitter stub;
     // doc_1 fails with a quota error, doc_3 with an LLM rate-limit (transient).
-    stub.FailDoc("doc_1", async::F42Status(async::F42ErrorCode::kServiceUnavailable, "tasks_db"));
+    stub.FailDoc("doc_1", async::TaskStatus(async::TaskErrorCode::kServiceUnavailable, "tasks_db"));
     BatchSubmitService svc(&stub);
 
     BatchRequest req;

@@ -1,6 +1,6 @@
 // Async task WorkerPool task_type dispatch (T4): the pool routes each dequeued TaskInfo to
 // the ITaskHandler registered for its task_type (kTaskDocParse → DocumentProcessor,
-// kTaskDocSummary → F41AsyncWorker in production). Here the handlers are recording
+// kTaskDocSummary → DocSummaryAsyncWorker in production). Here the handlers are recording
 // doubles so the test asserts the routing itself over the real TaskScheduler /
 // TaskManager / worker threads, without the parser or doc summary generator.
 #include "cortrix/async/worker_pool.h"

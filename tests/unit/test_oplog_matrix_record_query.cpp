@@ -664,9 +664,9 @@ TEST_P(OpLogMatrixTraceBadFilter, RejectedWithToken) {
 }
 INSTANTIATE_TEST_SUITE_P(
     Guards, OpLogMatrixTraceBadFilter,
-    ::testing::Values(TBadRow{0, 0, "CX_ERR_F13"},
-                      TBadRow{201, 0, "CX_ERR_F13"},
-                      TBadRow{50, -1, "CX_ERR_F13"}));
+    ::testing::Values(TBadRow{0, 0, "CX_ERR_TRACE"},
+                      TBadRow{201, 0, "CX_ERR_TRACE"},
+                      TBadRow{50, -1, "CX_ERR_TRACE"}));
 
 // Query on an unknown session is a valid empty result (not an error).
 TEST_F(OpLogMatrixTraceFx, UnknownSessionIsEmptyResult) {

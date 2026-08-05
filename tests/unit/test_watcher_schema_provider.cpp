@@ -1,4 +1,4 @@
-// Watcher: F21SchemaProvider registers with the catalog SchemaMigrator for
+// Watcher: WatcherSchemaProvider registers with the catalog SchemaMigrator for
 // namespaces.watcher_config version coordination. watcher_config is supplied by
 // the catalog base schema (one of the 11 standardized *_config JSONB columns), so
 // Watcher's Phase-1 Migrate is a no-op — these tests pin that contract and verify
@@ -33,14 +33,14 @@ std::set<std::string> ColumnNames(sqlite3* db, const std::string& table) {
     return out;
 }
 
-TEST(F21SchemaProviderTest, IdentityAndVersion) {
-    F21SchemaProvider p;
+TEST(WatcherSchemaProviderTest, IdentityAndVersion) {
+    WatcherSchemaProvider p;
     EXPECT_EQ(p.FeatureName(), "watcher");
     EXPECT_EQ(p.CurrentVersion(), 1);
 }
 
-TEST(F21SchemaProviderTest, Phase1MigrateIsNoOp) {
-    F21SchemaProvider p;
+TEST(WatcherSchemaProviderTest, Phase1MigrateIsNoOp) {
+    WatcherSchemaProvider p;
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     EXPECT_TRUE(p.Migrate(db, 0, 1).ok());  // init no-op
@@ -48,8 +48,8 @@ TEST(F21SchemaProviderTest, Phase1MigrateIsNoOp) {
     sqlite3_close(db);
 }
 
-TEST(F21SchemaProviderTest, UnexpectedVersionStepIsError) {
-    F21SchemaProvider p;
+TEST(WatcherSchemaProviderTest, UnexpectedVersionStepIsError) {
+    WatcherSchemaProvider p;
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     Status st = p.Migrate(db, 1, 2);  // Phase 2 not implemented yet
@@ -60,10 +60,10 @@ TEST(F21SchemaProviderTest, UnexpectedVersionStepIsError) {
 }
 
 // Runs through the real SchemaMigrator (the integration point watcher registers at).
-TEST(F21SchemaProviderTest, RegistersAndMigratesViaMigrator) {
+TEST(WatcherSchemaProviderTest, RegistersAndMigratesViaMigrator) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
-    F21SchemaProvider p;
+    WatcherSchemaProvider p;
     cortrix::catalog::SchemaMigrator m;
     m.Register(&p);
     Status st = m.MigrateCatalog(db);
@@ -75,12 +75,12 @@ TEST(F21SchemaProviderTest, RegistersAndMigratesViaMigrator) {
 // Watcher <-> catalog closure: the watcher_config column watcher relies on is provided by the
 // frozen catalog base schema. Register catalog first (topological order), then watcher, run a
 // single atomic migration, and assert the column exists with both versions set.
-TEST(F21SchemaProviderTest, WatcherConfigColumnSuppliedByF12BaseSchema) {
+TEST(WatcherSchemaProviderTest, WatcherConfigColumnSuppliedByCatalogBaseSchema) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
 
-    cortrix::catalog::F12SchemaProvider f12;
-    F21SchemaProvider f21;
+    cortrix::catalog::CatalogSchemaProvider f12;
+    WatcherSchemaProvider f21;
     cortrix::catalog::SchemaMigrator m;
     m.Register(&f12);  // Catalog first (ARCH §1.3.bis.3 topological order)
     m.Register(&f21);
@@ -92,7 +92,7 @@ TEST(F21SchemaProviderTest, WatcherConfigColumnSuppliedByF12BaseSchema) {
     EXPECT_NE(cols.find("watcher_config"), cols.end())
         << "namespaces.watcher_config must be present (F12 base schema)";
 
-    EXPECT_EQ(m.CurrentVersion(db, "catalog"), cortrix::catalog::kF12SchemaVersion);
+    EXPECT_EQ(m.CurrentVersion(db, "catalog"), cortrix::catalog::kCatalogSchemaVersion);
     EXPECT_EQ(m.CurrentVersion(db, "watcher"), 1);
     sqlite3_close(db);
 }

@@ -49,7 +49,7 @@ public:
 };
 
 // Mirrors catalog OpenUnitIndex: hold an IIndexFactory*, Open(unit_path), use IIndex.
-TEST(IIndexFactoryTest, F12StyleOpenUnitIndexThroughMock) {
+TEST(IIndexFactoryTest, CatalogStyleOpenUnitIndexThroughMock) {
     MockIndexFactory factory;
     EXPECT_CALL(factory, Open("/data/units/unit_legal_0")).WillOnce([](const std::string&) {
         return Result<std::unique_ptr<IIndex>>(std::make_unique<FakeIndex>());

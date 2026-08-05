@@ -86,7 +86,7 @@ public:
     struct ExplainState {
         bool active = false;
         std::string reason;             ///< "no_llm_configured" / "ns_disabled" /
-                                        ///< "skipped_by_F39_routing" / "active"
+                                        ///< "skipped_by_Router_routing" / "active"
         int variant_count = 0;          ///< actual variant count executed (degraded → 1)
         std::vector<std::string> variants_used;  ///< returned only on explain
         bool degraded = false;

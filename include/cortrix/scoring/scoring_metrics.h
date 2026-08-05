@@ -37,8 +37,8 @@ public:
     // cortrix_f07_error_total{code="CX_ERR_SCORING_*"} (Counter — error-code
     // distribution; the 5th locked `scoring` metric). Fed at the two throw sites
     // (ScoreMap::LevelToScore kLevelInvalid / SemanticScorer::ComputeFinalScore kConfigInvalid).
-    void RecordError(F07ErrorCode code);
-    uint64_t ErrorCount(F07ErrorCode code) const;
+    void RecordError(ScoringErrorCode code);
+    uint64_t ErrorCount(ScoringErrorCode code) const;
 
     /// Render the current values as OpenMetrics text (what the endpoint will serve).
     /// Stable metric names + HELP/TYPE lines.

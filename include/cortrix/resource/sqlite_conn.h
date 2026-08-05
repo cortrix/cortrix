@@ -3,7 +3,7 @@
 
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
-#include "cortrix/resource/f05_config.h"  // SqlitePragmas
+#include "cortrix/resource/namespace_pool_config.h"  // SqlitePragmas
 
 struct sqlite3;  // opaque, same fwd-decl style as cortrix_store_sqlite.h
 

@@ -44,7 +44,7 @@ std::string UniqueDbPath(const char* tag) {
 
 // Pre-create a TABLE whose name collides with one of the schema's indexes
 // (idx_users_email). CREATE INDEX IF NOT EXISTS then fails ("there is already a
-// table named idx_users_email"), driving P08AuthSchemaProvider::Migrate's error
+// table named idx_users_email"), driving AuthSchemaProvider::Migrate's error
 // branch (the std::string error-message build).
 TEST(AuthSchemaGapTest, MigrateFailsOnNameCollision) {
     sqlite3* db = nullptr;
@@ -53,10 +53,10 @@ TEST(AuthSchemaGapTest, MigrateFailsOnNameCollision) {
                            nullptr),
               SQLITE_OK);
 
-    P08AuthSchemaProvider provider;
-    Status st = provider.Migrate(db, 0, kP08AuthSchemaVersion);
+    AuthSchemaProvider provider;
+    Status st = provider.Migrate(db, 0, kAuthSchemaVersion);
     EXPECT_FALSE(st.ok());
-    EXPECT_NE(st.message().find("P08 auth schema migration failed"), std::string::npos)
+    EXPECT_NE(st.message().find("auth schema migration failed"), std::string::npos)
         << st.message();
     sqlite3_close(db);
 }

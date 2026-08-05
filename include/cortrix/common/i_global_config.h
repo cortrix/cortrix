@@ -15,9 +15,9 @@ namespace cortrix {
 ///
 /// Sprint 0 baseline = generic key/value accessors + OnChange + POD reserved
 /// fields with no external type dependency. Type-specific getters whose return
-/// types come from later Waves (F05Config, AgentLlmConfig) are appended to this
+/// types come from later Waves (NamespacePoolConfig, AgentLlmConfig) are appended to this
 /// canonical via each Feature's D3 reverse hook (V14 J3), e.g.:
-///   - virtual const F05Config& GetF05Config() const = 0;
+///   - virtual const NamespacePoolConfig& GetNamespacePoolConfig() const = 0;
 ///   - virtual AgentLlmConfig GetAgentLlmConfig() const = 0;
 ///                  virtual void SetAgentLlmConfig(const AgentLlmConfig&) = 0;
 class IGlobalConfig {

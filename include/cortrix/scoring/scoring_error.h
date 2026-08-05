@@ -19,13 +19,13 @@ namespace cortrix::scoring {
 /// Per CODING_CONVENTIONS §3 / F-FREEZE-1, Cortrix uses Result<T>+Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code. So
-/// F07ErrorCode is the *enum of identities*, and MakeScoringError() turns one (plus
+/// ScoringErrorCode is the *enum of identities*, and MakeScoringError() turns one (plus
 /// optional structured_data) into that boundary error — mirroring the import / fusion /
 /// metadata template.
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may be appended (api_version stays "v1").
-enum class F07ErrorCode {
+enum class ScoringErrorCode {
     kLevelInvalid,   ///< CX_ERR_SCORING_LEVEL_INVALID — ComputeLevel output > 4 or < 0
                      ///< (exceptional-path bottom-out). permanent, not retryable. structured_data:
                      ///< {level_received, max_allowed, scoring_input}.
@@ -36,10 +36,10 @@ enum class F07ErrorCode {
 
 /// Total number of scoring error codes (= 2). Compile-time anchor for the
 /// API-compatibility regression test (the set must not shrink).
-constexpr int kF07ErrorCodeCount = 2;
+constexpr int kScoringErrorCodeCount = 2;
 
 /// Canonical, immutable attributes of one error code.
-struct F07ErrorInfo {
+struct ScoringErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_SCORING_*" string
     agent_friendly::ErrorCategory category;   ///< permanent (both)
     bool retryable;
@@ -48,36 +48,36 @@ struct F07ErrorInfo {
 
 /// Look up the canonical attributes for `code`. Total over the enum (never throws /
 /// never returns a partial). Single source of truth for the 2 rows.
-const F07ErrorInfo& GetF07ErrorInfo(F07ErrorCode code);
+const ScoringErrorInfo& GetScoringErrorInfo(ScoringErrorCode code);
 
 /// The "CX_ERR_SCORING_*" string for `code`.
-const char* F07ErrorCodeString(F07ErrorCode code);
+const char* ScoringErrorCodeString(ScoringErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5, §4.4
 /// structured_data column). SoT for the Agent-friendly contract; lets call sites +
 /// tests verify the body is complete.
-const std::vector<std::string>& RequiredStructuredDataKeys(F07ErrorCode code);
+const std::vector<std::string>& RequiredStructuredDataKeys(ScoringErrorCode code);
 
 /// True iff `structured_data` contains every required key for `code`.
-bool HasRequiredStructuredData(F07ErrorCode code,
+bool HasRequiredStructuredData(ScoringErrorCode code,
                                const nlohmann::json& structured_data);
 
 /// Build the Agent-friendly boundary error for `code`, attaching `structured_data`
 /// and an optional human-readable `message`. category / retryable / retry_after_ms
 /// are filled from the canonical registry — call sites never restate them.
 agent_friendly::AgentFriendlyError MakeScoringError(
-    F07ErrorCode code,
+    ScoringErrorCode code,
     nlohmann::json structured_data = nlohmann::json::object(),
     const std::string& message = "");
 
-/// F07ErrorCode → StatusCode coarse mapping (for the Result<T>/Status surface,
+/// ScoringErrorCode → StatusCode coarse mapping (for the Result<T>/Status surface,
 /// F-FREEZE-1). Rich category/retryable are preserved via the CX_ERR_* token +
 /// MakeScoringError() re-inflation at the API boundary.
-StatusCode F07ErrorToStatusCode(F07ErrorCode code);
+StatusCode ScoringErrorToStatusCode(ScoringErrorCode code);
 
 /// Bridge to a plain Status; message prefixed "CX_ERR_SCORING_X: detail" so the exact
-/// identity is recoverable at the API/SDK boundary (same pattern as F16aStatus).
+/// identity is recoverable at the API/SDK boundary (same pattern as ImportStatus).
 /// This is what `Result<T>` failure paths carry.
-Status ScoringStatus(F07ErrorCode code, const std::string& detail = "");
+Status ScoringStatus(ScoringErrorCode code, const std::string& detail = "");
 
 }  // namespace cortrix::scoring

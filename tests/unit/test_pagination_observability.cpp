@@ -37,7 +37,7 @@
 #include "cortrix/agent_trace/agent_trace_writer_impl.h"
 #include "cortrix/catalog/schema_provider.h"
 #include "cortrix/common/i_global_config.h"
-#include "cortrix/memory/mem03_error.h"
+#include "cortrix/memory/memory_error.h"
 #include "cortrix/memory/memory_transparency.h"
 
 // ===========================================================================

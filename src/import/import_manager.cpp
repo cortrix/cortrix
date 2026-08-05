@@ -71,12 +71,12 @@ Result<ImportTaskId> ImportManager::StartImport(const ImportRequest& req,
     // D7 permission: per-NS admin only (§4.4 require_per_ns_admin). A non-admin caller
     // is rejected synchronously.
     if (!auth_ctx.is_admin()) {
-        return F16aStatus(F16aErrorCode::kAuthDenied,
+        return ImportStatus(ImportErrorCode::kAuthDenied,
                           "per-NS admin is required to start a database import");
     }
 
     // D1 + D7: resolve the connection_ref under the tenant guard (this is the
-    // synchronous security gate — a cross-tenant ref throws F16aException; an expired
+    // synchronous security gate — a cross-tenant ref throws ImportException; an expired
     // / revoked / missing ref returns AUTH_DENIED). We resolve once here to fail fast
     // (and to learn the tenant for the worker); the DSN itself is re-resolved in the
     // worker so it is never held across the queue boundary.
@@ -95,7 +95,7 @@ Result<ImportTaskId> ImportManager::StartImport(const ImportRequest& req,
     Result<int64_t> est = query_exec_->EstimateRowCount(*dsn, req.query, config_.query_constraints);
     if (est.ok()) {
         if (est.value() > config_.query_constraints.max_rows) {
-            return F16aStatus(F16aErrorCode::kRowsLimitExceeded,
+            return ImportStatus(ImportErrorCode::kRowsLimitExceeded,
                               "estimated rows exceed the 10M cap");
         }
         rows_total = static_cast<int>(est.value());

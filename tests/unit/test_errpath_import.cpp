@@ -2,8 +2,8 @@
 // schema/handler codes. Each CX_ERR_* below had ZERO referencing test.
 //
 // Doc summary codes ride on the Status message prefix ("<CODE>: <detail>", via
-// TaskFinalizer::Fail) — assert with message().find(code). F16A_SCHEMA likewise
-// rides on a Status message. F16A_INTERNAL surfaces as a real envelope error.code
+// TaskFinalizer::Fail) — assert with message().find(code). IMPORT_SCHEMA likewise
+// rides on a Status message. IMPORT_INTERNAL surfaces as a real envelope error.code
 // (the explicit catch(std::exception&) in ImportHandler::HandleStartImport, NOT the
 // generic global exception handler) — assert the JSON field.
 
@@ -20,7 +20,7 @@
 
 #include <nlohmann/json.hpp>
 
-// --- doc summary worker deps (mirror test_f41_async_worker.cpp) ---
+// --- doc summary worker deps (mirror test_doc_summary_async_worker.cpp) ---
 #include "cortrix/async/task_info.h"
 #include "cortrix/async/task_manager.h"
 #include "cortrix/async/task_type.h"
@@ -28,15 +28,15 @@
 #include "cortrix/common/block_types.h"
 #include "cortrix/common/data_types.h"
 #include "cortrix/doc_summary/doc_summary_metrics.h"
-#include "cortrix/doc_summary/f41_async_worker.h"
+#include "cortrix/doc_summary/doc_summary_async_worker.h"
 #include "cortrix/id/hash.h"
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/spc/block_assembler.h"
 #include "cortrix/spc/onnx_embedder.h"
 
-// --- DB import deps (mirror test_import_manager.cpp / test_f16a_schema_provider.cpp) -----
+// --- DB import deps (mirror test_import_manager.cpp / test_import_schema_provider.cpp) -----
 #include "cortrix/import/connection_manager.h"
-#include "cortrix/import/f16a_schema_provider.h"
+#include "cortrix/import/import_schema_provider.h"
 #include "cortrix/import/import_manager.h"
 #include "cortrix/import/query_executor.h"
 #include "cortrix/import/spc_feed.h"
@@ -72,7 +72,7 @@ const char* kSummaryJson = R"({
   "one_liner": "Q3 2026 financials"
 })";
 
-class F41ErrPathTest : public ::testing::Test {
+class DocSummaryErrPathTest : public ::testing::Test {
 protected:
     void SetUp() override {
         id::SetDeploymentHashKeyForTesting({0x0123456789abcdefULL, 0xfedcba9876543210ULL});
@@ -134,9 +134,9 @@ protected:
 };
 
 // CX_ERR_DOCSUMMARY_NS_ACQUIRE_FAILED — acquiring a never-admitted namespace fails before
-// generation/embed/write (f41_async_worker.cpp:58).
-TEST_F(F41ErrPathTest, UnknownNamespaceReturnsNsAcquireFailed) {
-    F41AsyncWorker worker(harness_->ipool(), MakeLlm(kSummaryJson), DocSummaryConfig{},
+// generation/embed/write (doc_summary_async_worker.cpp:58).
+TEST_F(DocSummaryErrPathTest, UnknownNamespaceReturnsNsAcquireFailed) {
+    DocSummaryAsyncWorker worker(harness_->ipool(), MakeLlm(kSummaryJson), DocSummaryConfig{},
                           *embedder_, assembler_, &mgr_);
     Status s = worker.ProcessTask(SummaryTask("some-doc", "no-such-ns"));
     ASSERT_FALSE(s.ok());
@@ -144,13 +144,13 @@ TEST_F(F41ErrPathTest, UnknownNamespaceReturnsNsAcquireFailed) {
         << "message: " << s.message();
 }
 
-// CX_ERR_DOCSUMMARY_EMBED_FAILED — embedding the summary fails (f41_async_worker.cpp:80).
+// CX_ERR_DOCSUMMARY_EMBED_FAILED — embedding the summary fails (doc_summary_async_worker.cpp:80).
 // An OnnxEmbedder that was never Init()'d returns Internal("embedder not
 // initialized") from Embed(), AFTER generation succeeds.
-TEST_F(F41ErrPathTest, UninitializedEmbedderReturnsEmbedFailed) {
+TEST_F(DocSummaryErrPathTest, UninitializedEmbedderReturnsEmbedFailed) {
     const std::string doc_id = SeedDoc(2);
     OnnxEmbedder uninit("", 128);  // deliberately NOT Init()'d -> Embed fails
-    F41AsyncWorker worker(harness_->ipool(), MakeLlm(kSummaryJson), DocSummaryConfig{},
+    DocSummaryAsyncWorker worker(harness_->ipool(), MakeLlm(kSummaryJson), DocSummaryConfig{},
                           uninit, assembler_, &mgr_);
     Status s = worker.ProcessTask(SummaryTask(doc_id));
     ASSERT_FALSE(s.ok());
@@ -159,13 +159,13 @@ TEST_F(F41ErrPathTest, UninitializedEmbedderReturnsEmbedFailed) {
 }
 
 // CX_ERR_DOCSUMMARY_WRITE_FAILED — the vector AddPoints into the P-HNSW index fails
-// (f41_async_worker.cpp:113). FakeIndex::set_add_should_fail makes AddPoints return
+// (doc_summary_async_worker.cpp:113). FakeIndex::set_add_should_fail makes AddPoints return
 // kUnavailable; generation+embed must succeed first (Init'd embedder + chunks) so
 // AddPoints is actually reached.
-TEST_F(F41ErrPathTest, VectorAddFailureReturnsWriteFailed) {
+TEST_F(DocSummaryErrPathTest, VectorAddFailureReturnsWriteFailed) {
     const std::string doc_id = SeedDoc(2);
     harness_->fake_index()->set_add_should_fail(true);
-    F41AsyncWorker worker(harness_->ipool(), MakeLlm(kSummaryJson), DocSummaryConfig{},
+    DocSummaryAsyncWorker worker(harness_->ipool(), MakeLlm(kSummaryJson), DocSummaryConfig{},
                           *embedder_, assembler_, &mgr_);
     Status s = worker.ProcessTask(SummaryTask(doc_id));
     ASSERT_FALSE(s.ok());
@@ -182,12 +182,12 @@ TEST_F(F41ErrPathTest, VectorAddFailureReturnsWriteFailed) {
 namespace cortrix::import {
 namespace {
 
-// CX_ERR_IMPORT_SCHEMA — F16aSchemaProvider::Migrate fails when one of its
+// CX_ERR_IMPORT_SCHEMA — ImportSchemaProvider::Migrate fails when one of its
 // "CREATE ... IF NOT EXISTS" statements collides on object TYPE: pre-creating a
 // TABLE named like one of the provider's indices makes the CREATE INDEX error
 // ("there is already a table named idx_import_tasks_running"), which IF NOT EXISTS
 // does not suppress on a type mismatch.
-TEST(F16aSchemaErrPathTest, IndexNameCollisionReturnsSchemaError) {
+TEST(ImportSchemaErrPathTest, IndexNameCollisionReturnsSchemaError) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     char* err = nullptr;
@@ -197,7 +197,7 @@ TEST(F16aSchemaErrPathTest, IndexNameCollisionReturnsSchemaError) {
         nullptr, nullptr, &err), SQLITE_OK) << (err ? err : "");
     sqlite3_free(err);
 
-    F16aSchemaProvider p;
+    ImportSchemaProvider p;
     Status s = p.Migrate(db, 0, 1);
     EXPECT_FALSE(s.ok());
     EXPECT_NE(s.message().find("CX_ERR_IMPORT_SCHEMA"), std::string::npos)
@@ -231,7 +231,7 @@ AuthContext AdminCtx() {
 
 // CX_ERR_IMPORT_INTERNAL — explicit catch in ImportHandler::HandleStartImport
 // (import_handler.cpp:134-145), http 500, error.code in the envelope.
-TEST(F16aHandlerErrPathTest, ThrowingImportStackReturnsF16aInternal) {
+TEST(ImportHandlerErrPathTest, ThrowingImportStackReturnsImportInternal) {
     auto secret = std::make_shared<InMemorySecretStore>();
     auto conn_store = std::make_shared<InMemoryConnectionStore>();
     auto conn_mgr = std::make_shared<ConnectionManager>(secret, conn_store);

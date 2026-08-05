@@ -6,39 +6,39 @@
 
 namespace cortrix::server {
 
-using cortrix::import::F16aErrorCode;
-using cortrix::import::GetF16aErrorInfo;
+using cortrix::import::ImportErrorCode;
+using cortrix::import::GetImportErrorInfo;
 using cortrix::import::ImportRequest;
-using cortrix::import::MakeF16aError;
+using cortrix::import::MakeImportError;
 using cortrix::import::ParseTextStrategy;
 using cortrix::import::TextStrategy;
 
 namespace {
 
-// Recover the F16aErrorCode whose CX_ERR_IMPORT_* token a Status message is prefixed
-// with (F16aStatus / F16aException stamp "CX_ERR_IMPORT_X: detail"). Falls back to
+// Recover the ImportErrorCode whose CX_ERR_IMPORT_* token a Status message is prefixed
+// with (ImportStatus / ImportException stamp "CX_ERR_IMPORT_X: detail"). Falls back to
 // kConnectionFailed for an unrecognized prefix (a transient 503 is the safest
 // default for an internal failure the Agent may retry).
-F16aErrorCode CodeFromStatus(const cortrix::Status& s) {
+ImportErrorCode CodeFromStatus(const cortrix::Status& s) {
     const std::string& m = s.message();
-    for (F16aErrorCode c : {F16aErrorCode::kConnectionFailed, F16aErrorCode::kAuthDenied,
-                            F16aErrorCode::kInvalidSql, F16aErrorCode::kTimeout,
-                            F16aErrorCode::kRowsLimitExceeded, F16aErrorCode::kCrossTenantRef}) {
-        if (m.rfind(GetF16aErrorInfo(c).cx_code, 0) == 0) return c;
+    for (ImportErrorCode c : {ImportErrorCode::kConnectionFailed, ImportErrorCode::kAuthDenied,
+                            ImportErrorCode::kInvalidSql, ImportErrorCode::kTimeout,
+                            ImportErrorCode::kRowsLimitExceeded, ImportErrorCode::kCrossTenantRef}) {
+        if (m.rfind(GetImportErrorInfo(c).cx_code, 0) == 0) return c;
     }
-    return F16aErrorCode::kConnectionFailed;
+    return ImportErrorCode::kConnectionFailed;
 }
 
 // Build the §5.3 Agent-friendly error envelope { "error": {...} } from a Status.
 nlohmann::json ErrorBody(const cortrix::Status& s) {
-    F16aErrorCode code = CodeFromStatus(s);
-    auto err = MakeF16aError(code, nlohmann::json::object(), s.message());
+    ImportErrorCode code = CodeFromStatus(s);
+    auto err = MakeImportError(code, nlohmann::json::object(), s.message());
     nlohmann::json body;
     body["error"] = cortrix::agent_friendly::ToJson(err);
     return body;
 }
 
-int HttpFor(const cortrix::Status& s) { return GetF16aErrorInfo(CodeFromStatus(s)).http_status; }
+int HttpFor(const cortrix::Status& s) { return GetImportErrorInfo(CodeFromStatus(s)).http_status; }
 
 }  // namespace
 
@@ -47,28 +47,28 @@ ImportHandler::ImportHandler(std::shared_ptr<cortrix::import::ImportManager> imp
     : import_mgr_(std::move(import_mgr)), conn_mgr_(std::move(conn_mgr)) {}
 
 cortrix::Result<ImportRequest> ImportHandler::ParseImportRequest(const nlohmann::json& body) {
-    using cortrix::import::F16aStatus;
+    using cortrix::import::ImportStatus;
     if (!body.is_object()) {
-        return F16aStatus(F16aErrorCode::kInvalidSql, "request body must be a JSON object");
+        return ImportStatus(ImportErrorCode::kInvalidSql, "request body must be a JSON object");
     }
     ImportRequest req;
     if (!body.contains("namespace") || !body["namespace"].is_string()) {
-        return F16aStatus(F16aErrorCode::kInvalidSql, "namespace is required");
+        return ImportStatus(ImportErrorCode::kInvalidSql, "namespace is required");
     }
     req.namespace_id = body["namespace"].get<std::string>();
     if (!body.contains("connection_ref") || !body["connection_ref"].is_string()) {
-        return F16aStatus(F16aErrorCode::kInvalidSql, "connection_ref is required");
+        return ImportStatus(ImportErrorCode::kInvalidSql, "connection_ref is required");
     }
     req.connection_ref = body["connection_ref"].get<std::string>();
 
     // text_strategy (default per_row; "template" rejected — v1.0.2 resolution 13).
     if (body.contains("text_strategy")) {
         if (!body["text_strategy"].is_string()) {
-            return F16aStatus(F16aErrorCode::kInvalidSql, "text_strategy must be a string");
+            return ImportStatus(ImportErrorCode::kInvalidSql, "text_strategy must be a string");
         }
         auto ts = ParseTextStrategy(body["text_strategy"].get<std::string>());
         if (!ts) {
-            return F16aStatus(F16aErrorCode::kInvalidSql,
+            return ImportStatus(ImportErrorCode::kInvalidSql,
                               "unsupported text_strategy (per_row|merge only)");
         }
         req.text_strategy = *ts;
@@ -81,7 +81,7 @@ cortrix::Result<ImportRequest> ImportHandler::ParseImportRequest(const nlohmann:
     const bool has_table = body.contains("table") && body["table"].is_string();
     const bool has_sql = body.contains("sql") && body["sql"].is_string();
     if (has_table == has_sql) {
-        return F16aStatus(F16aErrorCode::kInvalidSql,
+        return ImportStatus(ImportErrorCode::kInvalidSql,
                           "exactly one of {table, sql} must be provided");
     }
     if (has_table) {
@@ -125,9 +125,9 @@ nlohmann::json ImportHandler::HandleStartImport(const nlohmann::json& body,
         p.namespace_id = parsed.value().namespace_id;
         p.queued_at = std::chrono::system_clock::now();
         return cortrix::import::BuildImportStartedResponse(p, parsed.value().connection_ref, 0);
-    } catch (const cortrix::import::F16aException& e) {
+    } catch (const cortrix::import::ImportException& e) {
         // a cross-tenant ref throws (anti-enumeration path).
-        out_http_status = GetF16aErrorInfo(e.code()).http_status;
+        out_http_status = GetImportErrorInfo(e.code()).http_status;
         nlohmann::json out;
         out["error"] = cortrix::agent_friendly::ToJson(e.GetError());
         return out;
@@ -136,10 +136,10 @@ nlohmann::json ImportHandler::HandleStartImport(const nlohmann::json& body,
         // returns a structured Agent-friendly 500 here, instead of escaping to the
         // generic global exception handler. CX_ERR_IMPORT_INTERNAL = transient/retryable.
         out_http_status =
-            GetF16aErrorInfo(cortrix::import::F16aErrorCode::kInternal).http_status;
+            GetImportErrorInfo(cortrix::import::ImportErrorCode::kInternal).http_status;
         nlohmann::json out;
-        out["error"] = cortrix::agent_friendly::ToJson(cortrix::import::MakeF16aError(
-            cortrix::import::F16aErrorCode::kInternal, nlohmann::json::object(),
+        out["error"] = cortrix::agent_friendly::ToJson(cortrix::import::MakeImportError(
+            cortrix::import::ImportErrorCode::kInternal, nlohmann::json::object(),
             std::string("import failed: ") + e.what()));
         return out;
     }
@@ -186,14 +186,14 @@ nlohmann::json ImportHandler::HandleCancel(const std::string& task_id, int& out_
 nlohmann::json ImportHandler::HandleRegisterConnection(const nlohmann::json& body,
                                                        const AuthContext& auth_ctx,
                                                        int& out_http_status) {
-    using cortrix::import::F16aStatus;
+    using cortrix::import::ImportStatus;
     if (!auth_ctx.is_admin()) {
-        auto s = F16aStatus(F16aErrorCode::kAuthDenied, "admin required to register a connection");
+        auto s = ImportStatus(ImportErrorCode::kAuthDenied, "admin required to register a connection");
         out_http_status = HttpFor(s);
         return ErrorBody(s);
     }
     if (!body.is_object() || !body.contains("name") || !body.contains("dsn")) {
-        auto s = F16aStatus(F16aErrorCode::kInvalidSql, "name and dsn are required");
+        auto s = ImportStatus(ImportErrorCode::kInvalidSql, "name and dsn are required");
         out_http_status = HttpFor(s);
         return ErrorBody(s);
     }
@@ -217,9 +217,9 @@ nlohmann::json ImportHandler::HandleRegisterConnection(const nlohmann::json& bod
 
 nlohmann::json ImportHandler::HandleListConnections(const AuthContext& auth_ctx,
                                                     int& out_http_status) {
-    using cortrix::import::F16aStatus;
+    using cortrix::import::ImportStatus;
     if (!auth_ctx.is_admin()) {
-        auto s = F16aStatus(F16aErrorCode::kAuthDenied, "admin required to list connections");
+        auto s = ImportStatus(ImportErrorCode::kAuthDenied, "admin required to list connections");
         out_http_status = HttpFor(s);
         return ErrorBody(s);
     }

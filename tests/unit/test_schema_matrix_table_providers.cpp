@@ -1,12 +1,12 @@
 // Schema-provider matrices for the table-creating providers:
-//   Block header (F09SchemaProvider, per-Unit framework: documents/blocks/blocks_fts + idx + triggers)
+//   Block header (BlockFrameworkSchemaProvider, per-Unit framework: documents/blocks/blocks_fts + idx + triggers)
 //   META block (MetadataSchemaProvider, metadata_blocks table, version 1)
-//   DB import (F16aSchemaProvider, db_connections + import_tasks, version 1; FK -> tenants/namespaces)
-//   Doc summary (F41SchemaProvider, doc_fts5_index FTS5 vtable, version 1; F41-scoped error token)
+//   DB import (ImportSchemaProvider, db_connections + import_tasks, version 1; FK -> tenants/namespaces)
+//   Doc summary (DocSummarySchemaProvider, doc_fts5_index FTS5 vtable, version 1; F41-scoped error token)
 //
 // Fresh in-memory sqlite3 per case. Globally unique suite/fixture names
-// (F09TblMatrix / F08TblMatrix / F16aTblMatrix / F41TblMatrix) that do NOT reuse the
-// names in test_f16a_schema_provider.cpp / test_metadata_schema_provider.cpp etc.
+// (BlockFrameworkTblMatrix / MetadataTblMatrix / ImportTblMatrix / DocSummaryTblMatrix) that do NOT reuse the
+// names in test_import_schema_provider.cpp / test_metadata_schema_provider.cpp etc.
 
 #include <gtest/gtest.h>
 
@@ -14,10 +14,10 @@
 
 #include <string>
 
-#include "cortrix/doc_summary/f41_schema_provider.h"
-#include "cortrix/import/f16a_schema_provider.h"
+#include "cortrix/doc_summary/doc_summary_schema_provider.h"
+#include "cortrix/import/import_schema_provider.h"
 #include "cortrix/metadata/metadata_schema_provider.h"
-#include "cortrix/store/f09_schema_provider.h"
+#include "cortrix/store/block_framework_schema_provider.h"
 
 namespace cortrix::test_schema_matrix_table {
 namespace {
@@ -66,26 +66,26 @@ struct InitStep {
 
 // ============================ block header per-Unit framework (version 1) ===================
 
-class F09TblMatrix : public ::testing::Test, protected SqliteHelpers {
+class BlockFrameworkTblMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
-    cortrix::store::F09SchemaProvider p_;
+    cortrix::store::BlockFrameworkSchemaProvider p_;
 };
 
-TEST_F(F09TblMatrix, FeatureIdentity) {
+TEST_F(BlockFrameworkTblMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "block_framework");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
-TEST_F(F09TblMatrix, MigrateCreatesCoreTables) {
+TEST_F(BlockFrameworkTblMatrix, MigrateCreatesCoreTables) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("documents"));
     EXPECT_TRUE(TableExists("blocks"));
     EXPECT_TRUE(TableExists("blocks_fts"));
 }
 
-TEST_F(F09TblMatrix, MigrateCreatesIndexesAndTriggers) {
+TEST_F(BlockFrameworkTblMatrix, MigrateCreatesIndexesAndTriggers) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(IndexExists("idx_doc_source"));
     EXPECT_TRUE(IndexExists("idx_doc_status"));
@@ -96,7 +96,7 @@ TEST_F(F09TblMatrix, MigrateCreatesIndexesAndTriggers) {
     EXPECT_TRUE(TriggerExists("blocks_au"));
 }
 
-TEST_F(F09TblMatrix, DocumentsAndBlocksShape) {
+TEST_F(BlockFrameworkTblMatrix, DocumentsAndBlocksShape) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("documents", "doc_id"));
     EXPECT_TRUE(ColumnExists("documents", "source_type"));
@@ -106,13 +106,13 @@ TEST_F(F09TblMatrix, DocumentsAndBlocksShape) {
     EXPECT_TRUE(ColumnExists("blocks", "content_text"));
 }
 
-TEST_F(F09TblMatrix, IdempotentReRun) {
+TEST_F(BlockFrameworkTblMatrix, IdempotentReRun) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
 }
 
-TEST_F(F09TblMatrix, UnsupportedStepRejected) {
+TEST_F(BlockFrameworkTblMatrix, UnsupportedStepRejected) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
@@ -120,14 +120,14 @@ TEST_F(F09TblMatrix, UnsupportedStepRejected) {
     EXPECT_NE(s.message().find("block_framework"), std::string::npos);
 }
 
-class F09TblVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class BlockFrameworkTblVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
     void SetUp() override { ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK); }
     void TearDown() override { sqlite3_close(db_); }
     sqlite3* db_ = nullptr;
-    cortrix::store::F09SchemaProvider p_;
+    cortrix::store::BlockFrameworkSchemaProvider p_;
 };
-TEST_P(F09TblVersionMatrix, Gate) {
+TEST_P(BlockFrameworkTblVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(db_, step.from, step.to);
     if (step.ok) {
@@ -138,7 +138,7 @@ TEST_P(F09TblVersionMatrix, Gate) {
     }
 }
 INSTANTIATE_TEST_SUITE_P(
-    F09TblSteps, F09TblVersionMatrix,
+    BlockFrameworkTblSteps, BlockFrameworkTblVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{5, 5, true},
@@ -146,26 +146,26 @@ INSTANTIATE_TEST_SUITE_P(
 
 // ============================ META block metadata_blocks (version 1) =====================
 
-class F08TblMatrix : public ::testing::Test, protected SqliteHelpers {
+class MetadataTblMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
     cortrix::metadata::MetadataSchemaProvider p_;
 };
 
-TEST_F(F08TblMatrix, FeatureIdentity) {
+TEST_F(MetadataTblMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "metadata_block");
     EXPECT_EQ(p_.CurrentVersion(), 1);
     EXPECT_EQ(cortrix::metadata::kMetadataSchemaVersion, 1);
 }
 
-TEST_F(F08TblMatrix, MigrateCreatesTableAndIndex) {
+TEST_F(MetadataTblMatrix, MigrateCreatesTableAndIndex) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("metadata_blocks"));
     EXPECT_TRUE(IndexExists("idx_metablocks_ns"));
 }
 
-TEST_F(F08TblMatrix, TableShape) {
+TEST_F(MetadataTblMatrix, TableShape) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("metadata_blocks", "block_id"));
     EXPECT_TRUE(ColumnExists("metadata_blocks", "doc_id"));
@@ -175,7 +175,7 @@ TEST_F(F08TblMatrix, TableShape) {
     EXPECT_TRUE(ColumnExists("metadata_blocks", "created_at"));
 }
 
-TEST_F(F08TblMatrix, DocIdUniqueConstraint) {
+TEST_F(MetadataTblMatrix, DocIdUniqueConstraint) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_EQ(Exec("INSERT INTO metadata_blocks(block_id, doc_id, namespace_id, block_text, "
                    "metadata_json) VALUES ('b1','d1','ns1','t','{}');"), SQLITE_OK);
@@ -184,13 +184,13 @@ TEST_F(F08TblMatrix, DocIdUniqueConstraint) {
                    "metadata_json) VALUES ('b2','d1','ns1','t','{}');"), SQLITE_OK);
 }
 
-TEST_F(F08TblMatrix, IdempotentReRun) {
+TEST_F(MetadataTblMatrix, IdempotentReRun) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
 }
 
-TEST_F(F08TblMatrix, UnsupportedStepRejected) {
+TEST_F(MetadataTblMatrix, UnsupportedStepRejected) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
@@ -198,14 +198,14 @@ TEST_F(F08TblMatrix, UnsupportedStepRejected) {
     EXPECT_NE(s.message().find("metadata_block"), std::string::npos);
 }
 
-class F08TblVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class MetadataTblVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
     void SetUp() override { ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK); }
     void TearDown() override { sqlite3_close(db_); }
     sqlite3* db_ = nullptr;
     cortrix::metadata::MetadataSchemaProvider p_;
 };
-TEST_P(F08TblVersionMatrix, Gate) {
+TEST_P(MetadataTblVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(db_, step.from, step.to);
     if (step.ok) {
@@ -216,7 +216,7 @@ TEST_P(F08TblVersionMatrix, Gate) {
     }
 }
 INSTANTIATE_TEST_SUITE_P(
-    F08TblSteps, F08TblVersionMatrix,
+    MetadataTblSteps, MetadataTblVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{8, 8, true},
@@ -224,29 +224,29 @@ INSTANTIATE_TEST_SUITE_P(
 
 // ============================ db_connections + import_tasks (version 1) =================================
 
-class F16aTblMatrix : public ::testing::Test, protected SqliteHelpers {
+class ImportTblMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override {
         Open();
         ASSERT_EQ(Exec(kCatalogFkSql), SQLITE_OK);  // tenants/namespaces FK targets
     }
     void TearDown() override { Close(); }
-    cortrix::import::F16aSchemaProvider p_;
+    cortrix::import::ImportSchemaProvider p_;
 };
 
-TEST_F(F16aTblMatrix, FeatureIdentity) {
+TEST_F(ImportTblMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "db_import");
     EXPECT_EQ(p_.CurrentVersion(), 1);
-    EXPECT_EQ(cortrix::import::kF16aSchemaVersion, 1);
+    EXPECT_EQ(cortrix::import::kImportSchemaVersion, 1);
 }
 
-TEST_F(F16aTblMatrix, MigrateCreatesBothTables) {
+TEST_F(ImportTblMatrix, MigrateCreatesBothTables) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("db_connections"));
     EXPECT_TRUE(TableExists("import_tasks"));
 }
 
-TEST_F(F16aTblMatrix, MigrateCreatesIndexes) {
+TEST_F(ImportTblMatrix, MigrateCreatesIndexes) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(IndexExists("idx_db_connections_tenant"));
     EXPECT_TRUE(IndexExists("idx_db_connections_active"));
@@ -254,7 +254,7 @@ TEST_F(F16aTblMatrix, MigrateCreatesIndexes) {
     EXPECT_TRUE(IndexExists("idx_import_tasks_running"));
 }
 
-TEST_F(F16aTblMatrix, DbConnectionsShape) {
+TEST_F(ImportTblMatrix, DbConnectionsShape) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("db_connections", "ref_id"));
     EXPECT_TRUE(ColumnExists("db_connections", "tenant_id"));
@@ -263,7 +263,7 @@ TEST_F(F16aTblMatrix, DbConnectionsShape) {
     EXPECT_TRUE(ColumnExists("db_connections", "revoked_at"));
 }
 
-TEST_F(F16aTblMatrix, ImportTasksShape) {
+TEST_F(ImportTblMatrix, ImportTasksShape) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("import_tasks", "task_id"));
     EXPECT_TRUE(ColumnExists("import_tasks", "ns_id"));
@@ -272,7 +272,7 @@ TEST_F(F16aTblMatrix, ImportTasksShape) {
     EXPECT_TRUE(ColumnExists("import_tasks", "error_code"));
 }
 
-TEST_F(F16aTblMatrix, ImportTasksDefaultProgressFloat) {
+TEST_F(ImportTblMatrix, ImportTasksDefaultProgressFloat) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     ASSERT_EQ(Exec("INSERT INTO tenants(tenant_id, name) VALUES ('t1','t');"), SQLITE_OK);
     ASSERT_EQ(Exec("INSERT INTO namespaces(ns_id, name) VALUES ('ns1','n');"), SQLITE_OK);
@@ -287,13 +287,13 @@ TEST_F(F16aTblMatrix, ImportTasksDefaultProgressFloat) {
     sqlite3_finalize(stmt);
 }
 
-TEST_F(F16aTblMatrix, IdempotentReRun) {
+TEST_F(ImportTblMatrix, IdempotentReRun) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
 }
 
-TEST_F(F16aTblMatrix, UnsupportedStepRejected) {
+TEST_F(ImportTblMatrix, UnsupportedStepRejected) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
@@ -301,7 +301,7 @@ TEST_F(F16aTblMatrix, UnsupportedStepRejected) {
     EXPECT_NE(s.message().find("db_import"), std::string::npos);
 }
 
-class F16aTblVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class ImportTblVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
     void SetUp() override {
         ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK);
@@ -309,9 +309,9 @@ protected:
     }
     void TearDown() override { sqlite3_close(db_); }
     sqlite3* db_ = nullptr;
-    cortrix::import::F16aSchemaProvider p_;
+    cortrix::import::ImportSchemaProvider p_;
 };
-TEST_P(F16aTblVersionMatrix, Gate) {
+TEST_P(ImportTblVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(db_, step.from, step.to);
     if (step.ok) {
@@ -322,7 +322,7 @@ TEST_P(F16aTblVersionMatrix, Gate) {
     }
 }
 INSTANTIATE_TEST_SUITE_P(
-    F16aTblSteps, F16aTblVersionMatrix,
+    ImportTblSteps, ImportTblVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{6, 6, true},
@@ -330,19 +330,19 @@ INSTANTIATE_TEST_SUITE_P(
 
 // ============================ doc_fts5_index (version 1, doc summary token) ========================
 
-class F41TblMatrix : public ::testing::Test, protected SqliteHelpers {
+class DocSummaryTblMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
-    cortrix::doc_summary::F41SchemaProvider p_;
+    cortrix::doc_summary::DocSummarySchemaProvider p_;
 };
 
-TEST_F(F41TblMatrix, FeatureIdentity) {
+TEST_F(DocSummaryTblMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "doc_summary");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
-TEST_F(F41TblMatrix, MigrateCreatesFtsVTable) {
+TEST_F(DocSummaryTblMatrix, MigrateCreatesFtsVTable) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("doc_fts5_index"));
     EXPECT_TRUE(ColumnExists("doc_fts5_index", "filename"));
@@ -350,34 +350,34 @@ TEST_F(F41TblMatrix, MigrateCreatesFtsVTable) {
     EXPECT_TRUE(ColumnExists("doc_fts5_index", "authors"));
 }
 
-TEST_F(F41TblMatrix, IdempotentReRun) {
+TEST_F(DocSummaryTblMatrix, IdempotentReRun) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
 }
 
-TEST_F(F41TblMatrix, NullDbRejectedWithF41Token) {
+TEST_F(DocSummaryTblMatrix, NullDbRejectedWithDocSummaryToken) {
     Status s = p_.Migrate(nullptr, 0, 1);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     EXPECT_NE(s.message().find("CX_ERR_DOCSUMMARY_SCHEMA_VERSION_MISMATCH"), std::string::npos);
 }
 
-TEST_F(F41TblMatrix, UnsupportedStepRejectedWithF41Token) {
+TEST_F(DocSummaryTblMatrix, UnsupportedStepRejectedWithDocSummaryToken) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     EXPECT_NE(s.message().find("CX_ERR_DOCSUMMARY_SCHEMA_VERSION_MISMATCH"), std::string::npos);
 }
 
-class F41TblVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class DocSummaryTblVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
     void SetUp() override { ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK); }
     void TearDown() override { sqlite3_close(db_); }
     sqlite3* db_ = nullptr;
-    cortrix::doc_summary::F41SchemaProvider p_;
+    cortrix::doc_summary::DocSummarySchemaProvider p_;
 };
-TEST_P(F41TblVersionMatrix, Gate) {
+TEST_P(DocSummaryTblVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(db_, step.from, step.to);
     if (step.ok) {
@@ -389,7 +389,7 @@ TEST_P(F41TblVersionMatrix, Gate) {
     }
 }
 INSTANTIATE_TEST_SUITE_P(
-    F41TblSteps, F41TblVersionMatrix,
+    DocSummaryTblSteps, DocSummaryTblVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{4, 4, true},

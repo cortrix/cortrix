@@ -1,6 +1,6 @@
 // R7-1d branch-coverage supplement for three spc-side files whose reachable
 // error/boundary arms the existing tests don't hit:
-//   - f35_schema_provider.cpp  : the null-db guard (line 58);
+//   - contextual_schema_provider.cpp  : the null-db guard (line 58);
 //   - contextual_store.cpp     : null-db (19), the embedding-present + status=failed
 //                                combo (44-67), and the no-F35-output early-Ok (28);
 //   - wordpiece_tokenizer.cpp  : the UTF-8 decode error arms (invalid lead byte /
@@ -29,7 +29,7 @@
 
 #include <sqlite3.h>
 
-#include "cortrix/spc_enricher/f35_schema_provider.h"
+#include "cortrix/spc_enricher/contextual_schema_provider.h"
 #include "cortrix/spc/contextual_store.h"
 #include "cortrix/spc_enricher.h"  // EnrichResult
 #include "cortrix/query/wordpiece_tokenizer.h"
@@ -38,14 +38,14 @@ namespace cortrix {
 namespace {
 
 // ============================================================
-// f35_schema_provider.cpp — null-db guard.
+// contextual_schema_provider.cpp — null-db guard.
 // ============================================================
 
 // Migrate(nullptr, 0, 1): the init pair passes the version check, then the !db
 // guard (line 58) fires → InvalidArgument "F35 migrate: null db". The existing
 // f35 test never passes a null db.
-TEST(F35SchemaProviderBranchR7b, NullDbInvalidArgument) {
-    spc::F35SchemaProvider p;
+TEST(ContextualSchemaProviderBranchR7b, NullDbInvalidArgument) {
+    spc::ContextualSchemaProvider p;
     Status st = p.Migrate(nullptr, 0, 1);
     EXPECT_FALSE(st.ok());
     EXPECT_NE(st.message().find("null db"), std::string::npos);
@@ -55,8 +55,8 @@ TEST(F35SchemaProviderBranchR7b, NullDbInvalidArgument) {
 // null-db arm: the forward-only guard tolerates from==to==CurrentVersion, so
 // execution proceeds to the !db check. (Beyond-current pairs like (3,3) are now
 // rejected by the version guard first — covered by the mismatch tests.)
-TEST(F35SchemaProviderBranchR7b, NullDbSameVersionNonInit) {
-    spc::F35SchemaProvider p;
+TEST(ContextualSchemaProviderBranchR7b, NullDbSameVersionNonInit) {
+    spc::ContextualSchemaProvider p;
     Status st = p.Migrate(nullptr, 2, 2);
     EXPECT_FALSE(st.ok());
     EXPECT_NE(st.message().find("null db"), std::string::npos);
@@ -89,7 +89,7 @@ TEST(ContextualStoreBranchR7b, NullDbInvalidArgument) {
 
 // No contextual retrieval output (status 0, no optionals) → the !f35_ran early-Ok (line 28); the
 // row is left untouched (status stays its DEFAULT 0).
-TEST(ContextualStoreBranchR7b, NoF35OutputEarlyOk) {
+TEST(ContextualStoreBranchR7b, NoContextualOutputEarlyOk) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     CreateBlocksForContextual(db);
@@ -154,7 +154,7 @@ TEST(ContextualStoreBranchR7b, TextPresentEmbeddingAbsent) {
 // f35_ran driven by the contextualized_text optional alone (status 0, no embedding):
 // the `result.contextualized_text.has_value()` disjunct of the f35_ran test (line
 // 26) — distinct from the status!=0 trigger above.
-TEST(ContextualStoreBranchR7b, F35RanViaTextOptionalOnly) {
+TEST(ContextualStoreBranchR7b, ContextualRanViaTextOptionalOnly) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     CreateBlocksForContextual(db);

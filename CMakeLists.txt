@@ -56,8 +56,8 @@ add_library(cortrix_core STATIC
     src/server/routes/health_routes.cpp
     src/server/routes/namespace_routes.cpp
     src/store/block_header.cpp
-    src/store/f09_schema_provider.cpp
-    src/store/f34_schema_provider.cpp
+    src/store/block_framework_schema_provider.cpp
+    src/store/parent_child_schema_provider.cpp
     src/store/group_commit_writer.cpp
     src/store/pending_entry.cpp
     src/store/pending_log_writer.cpp
@@ -94,8 +94,8 @@ add_library(cortrix_core STATIC
     src/spc/budget_tracker.cpp
     src/spc/enricher_startup.cpp
     src/spc/enricher_config_resolver.cpp
-    src/spc/f03_schema_provider.cpp
-    src/spc/f35_schema_provider.cpp
+    src/spc/enricher_schema_provider.cpp
+    src/spc/contextual_schema_provider.cpp
     src/spc/enrich_state_schema_provider.cpp
     src/spc/enrich_state_store.cpp
     src/spc/enrich_backfill_worker.cpp
@@ -111,7 +111,7 @@ add_library(cortrix_core STATIC
     src/spc/enricher_chain.cpp
     src/spc/spc_manager.cpp
     # --- HyPE Index ----------------
-    src/spc/f38_schema_provider.cpp
+    src/spc/hype_schema_provider.cpp
     src/spc/hype_error.cpp
     src/spc/hype_enricher.cpp
     src/spc/hype_block.cpp
@@ -130,8 +130,8 @@ add_library(cortrix_core STATIC
     src/memory/memory_injector.cpp
     src/memory/memory_routes.cpp
     # --- LLM Memory Extraction ---------------------
-    src/memory/mem02_error.cpp
-    src/memory/mem02_metrics.cpp
+    src/memory/memory_extract_error.cpp
+    src/memory/memory_extract_metrics.cpp
     src/memory/prompt_templates.cpp
     src/memory/memory_extractor.cpp
     src/memory/contradiction_detector.cpp
@@ -140,15 +140,15 @@ add_library(cortrix_core STATIC
     src/memory/memory_block_adapter.cpp
     src/memory/memory_extraction_service.cpp
     # --- Memory Transparency ---------------------
-    src/memory/mem03_error.cpp
-    src/memory/mem03_metrics.cpp
+    src/memory/memory_error.cpp
+    src/memory/memory_metrics.cpp
     src/memory/memory_transparency.cpp
     # --- Memory Immunity ---------------------
-    src/memory/mem04_error.cpp
-    src/memory/mem04_metrics.cpp
+    src/memory/memory_opt_out_error.cpp
+    src/memory/memory_opt_out_metrics.cpp
     src/memory/opt_out_manager.cpp
     # --- Per-user Isolation metrics ----------------------
-    src/memory/mem05_metrics.cpp
+    src/memory/memory_isolation_metrics.cpp
     src/query/rrf_fusion.cpp
     src/query/vector_searcher.cpp
     src/query/bm25_searcher.cpp
@@ -188,7 +188,7 @@ add_library(cortrix_core STATIC
     # --- BGE-M3 Sparse ----------------
     src/retrieval/sparse_error.cpp
     src/retrieval/sparse_codec.cpp
-    src/retrieval/f40_schema_provider.cpp
+    src/retrieval/sparse_schema_provider.cpp
     src/retrieval/splade_sparse_retriever.cpp
     src/retrieval/sparse_ns_config.cpp
     src/retrieval/sparse_metrics.cpp
@@ -200,10 +200,10 @@ add_library(cortrix_core STATIC
     src/doc_summary/doc_summary_error.cpp
     src/doc_summary/doc_summary_metrics.cpp
     src/doc_summary/doc_summary_types.cpp
-    src/doc_summary/f41_schema_provider.cpp
+    src/doc_summary/doc_summary_schema_provider.cpp
     src/doc_summary/doc_fts5_index.cpp
     src/doc_summary/doc_summary_generator.cpp
-    src/doc_summary/f41_async_worker.cpp
+    src/doc_summary/doc_summary_async_worker.cpp
     src/doc_summary/discover_handler.cpp
     src/connector/file_filter.cpp
     src/connector/file_utils.cpp
@@ -241,7 +241,7 @@ add_library(cortrix_core STATIC
     src/agent_trace/traces_handler.cpp
     src/server/routes/observability_routes.cpp
     src/agent_trace/engine_instrumentation.cpp
-    src/agent_trace/f13_cleanup_registrar.cpp
+    src/agent_trace/agent_trace_cleanup_registrar.cpp
     src/agent_trace/interaction_log_sweeper.cpp
     src/agent_trace/observability_audit_log.cpp
     src/catalog/schema_migrator.cpp
@@ -296,8 +296,8 @@ add_library(cortrix_core STATIC
     src/store/parent_chunk_store_metrics.cpp
     src/store/sqlite_chunk_store.cpp
     # --- Document Async Processing -------------------
-    src/async/f42_error.cpp
-    src/async/f42_metrics.cpp
+    src/async/task_error.cpp
+    src/async/task_metrics.cpp
     src/async/task_manager.cpp
     src/async/task_cleanup_cron.cpp
     src/async/task_scheduler.cpp
@@ -310,7 +310,7 @@ add_library(cortrix_core STATIC
     src/import/import_types.cpp
     src/import/import_error.cpp
     src/import/import_response.cpp
-    src/import/f16a_schema_provider.cpp
+    src/import/import_schema_provider.cpp
     src/import/connection_manager.cpp
     src/import/query_executor.cpp
     src/import/text_serializer.cpp
@@ -369,7 +369,7 @@ add_library(cortrix_core STATIC
     src/middleware/rate_limiter.cpp
     src/health/readiness.cpp
     # --- docker-compose Deployment -------------------
-    src/deploy/f24_error.cpp
+    src/deploy/deploy_error.cpp
     src/deploy/deploy_metrics.cpp
     src/deploy/disk_monitor.cpp
     src/deploy/reason_vocabulary.cpp

@@ -64,9 +64,9 @@ Status PlatformDb::Open(const std::string& db_path,
     // Run the platform.db schema through the shared (frozen L0) migrator in one
     // atomic batch. Auth is registered FIRST so its `users` table (the FK target
     // refresh_tokens / api_keys reference) exists before any extra provider.
-    // NOTE: F12SchemaProvider is intentionally NOT registered here — catalog
+    // NOTE: CatalogSchemaProvider is intentionally NOT registered here — catalog
     // tables live in catalog.db, a different file (D3.5 reconciles the two).
-    P08AuthSchemaProvider p08_provider;
+    AuthSchemaProvider p08_provider;
     catalog::SchemaMigrator migrator;
     migrator.Register(&p08_provider);
     for (catalog::ISchemaProvider* p : extra_providers) {

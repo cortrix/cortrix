@@ -163,7 +163,7 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
                         results[i].steps.push_back(
                             {name, 1, qres.status().message(), false});
                         CORTRIX_LOG_DEBUG(
-                            "spc", "F38 hype degraded for chunk {}: {}", i,
+                            "spc", "hype degraded for chunk {}: {}", i,
                             qres.status().message());
                     }
                 }

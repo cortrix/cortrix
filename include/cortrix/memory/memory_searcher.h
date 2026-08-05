@@ -101,7 +101,7 @@ private:
 
     // Test-only friends for direct private method coverage
     friend class MemorySearcherPrivateTest;
-    friend class Mem05IsolationTest;  // user-isolation unit tests
+    friend class MemoryIsolationTest;  // user-isolation unit tests
 };
 
 }  // namespace cortrix

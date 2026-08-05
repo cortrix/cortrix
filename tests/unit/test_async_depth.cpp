@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "cortrix/async/f42_error.h"
+#include "cortrix/async/task_error.h"
 #include "cortrix/async/task_info.h"
 #include "cortrix/async/task_manager.h"
 #include "cortrix/async/task_type.h"
@@ -35,7 +35,7 @@ TaskInfo AsyncDepthMakeTask(const std::string& ns, const std::string& doc_id,
     return t;
 }
 
-// True iff `s` carries the given CX_ERR_* token (F42Status prefixes "CX_ERR_X" / "...: detail").
+// True iff `s` carries the given CX_ERR_* token (TaskStatus prefixes "CX_ERR_X" / "...: detail").
 bool CarriesCode(const cortrix::Status& s, const char* token) {
     return s.message().rfind(token, 0) == 0;
 }

@@ -3,7 +3,7 @@
 #include <string>
 
 #include "cortrix/memory/contradiction_detector.h"
-#include "cortrix/memory/mem02_error.h"
+#include "cortrix/memory/memory_extract_error.h"
 
 // DEPTH — a dedicated suite for ContradictionDetector::ParseJudgmentJson (the
 // static single-object JSON parse contract used by the memory extraction D5 judge). The

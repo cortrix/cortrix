@@ -9,7 +9,7 @@
 
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
-#include "cortrix/memory/mem03_error.h"
+#include "cortrix/memory/memory_error.h"
 #include "cortrix/memory/memory_extractor.h"
 #include "cortrix/observability/operation_logger.h"
 #include "cortrix/observability/trace_context.h"
@@ -39,7 +39,7 @@
 //     new value "user_edit" needs NO extractor enum change.
 //   - F-FREEZE-1: the design's `Result<T, MemoryTransparencyError>` (double-template)
 //     is forbidden. We use `Result<T>` (StatusOr) + `Status`; the domain identity is
-//     carried via the CX_ERR_MEMORY_* token (mem03_error.h Mem03Status) and re-inflated
+//     carried via the CX_ERR_MEMORY_* token (memory_error.h MemoryStatus) and re-inflated
 //     to the Agent-friendly body at the API boundary.
 namespace cortrix::memory::transparency {
 

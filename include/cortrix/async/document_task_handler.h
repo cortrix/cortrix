@@ -14,7 +14,7 @@ namespace cortrix::async {
 
 /// A fully-formed HTTP reply: status code + JSON body. The body for an async
 /// success follows §2.1 / §6.2; the body for an error is the GEN-Agent 4-field
-/// envelope (topic 5) produced by agent_friendly::ToJson(MakeF42Error(...)).
+/// envelope (topic 5) produced by agent_friendly::ToJson(MakeTaskError(...)).
 struct HttpResult {
     int status = 200;
     nlohmann::json body;

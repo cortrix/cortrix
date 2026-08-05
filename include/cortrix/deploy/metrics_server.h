@@ -26,7 +26,7 @@ namespace cortrix::deploy {
 /// Sources: the DeployMetrics gauges (disk_usage_ratio / shutdown_status /
 /// uptime / build_info) + the read-through Bloom Filter gauges (§10) + any extra
 /// renderers added via AddSource(). The remaining §5.3 subsystem recorders
-/// (F42Metrics, ScoringMetrics, ...) are aggregated by AddSource() at D3.5 wiring
+/// (TaskMetrics, ScoringMetrics, ...) are aggregated by AddSource() at D3.5 wiring
 /// time — the server is the §5 piece; collecting all 25 metrics into one body is
 /// the cross-Feature wiring step.
 class MetricsServer {

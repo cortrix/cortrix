@@ -9,10 +9,10 @@
 #include <sqlite3.h>
 
 #include "cortrix/spc_enricher.h"
-#include "cortrix/spc_enricher/f35_schema_provider.h"
+#include "cortrix/spc_enricher/contextual_schema_provider.h"
 
 // I2 — WriteContextualized persists contextualized_* columns onto the blocks
-// row F35SchemaProvider created. Tests the write, the BLOB round-trip, and the
+// row ContextualSchemaProvider created. Tests the write, the BLOB round-trip, and the
 // no-op-when-no-F35-output path.
 namespace cortrix::spc {
 namespace {
@@ -26,7 +26,7 @@ protected:
             "CREATE TABLE blocks (block_id INTEGER PRIMARY KEY, doc_id TEXT, "
             "content_text TEXT)",
             nullptr, nullptr, nullptr), SQLITE_OK);
-        F35SchemaProvider p;
+        ContextualSchemaProvider p;
         ASSERT_TRUE(p.Migrate(db_, 0, 1).ok());
         ASSERT_EQ(sqlite3_exec(db_,
             "INSERT INTO blocks(block_id, doc_id, content_text) VALUES(7,'d1','txt')",
@@ -95,7 +95,7 @@ TEST_F(ContextualStoreTest, WritesTextEmbeddingAndStatus) {
     EXPECT_FLOAT_EQ(emb[3], 4.0f);
 }
 
-TEST_F(ContextualStoreTest, NoOpWhenNoF35Output) {
+TEST_F(ContextualStoreTest, NoOpWhenNoContextualOutput) {
     EnrichResult r;  // status 0, no contextualized fields → contextual retrieval never ran
     ASSERT_TRUE(WriteContextualized(db_, 7, r).ok());
     EXPECT_EQ(StatusCol(7), 0);          // DEFAULT untouched

@@ -6,7 +6,7 @@
 
 #include <spdlog/spdlog.h>
 
-#include "cortrix/async/f42_metrics.h"
+#include "cortrix/async/task_metrics.h"
 
 namespace cortrix::async {
 
@@ -69,7 +69,7 @@ void TaskCleanupCron::RunCleanupNow(int* deleted, int* zombies, int* timed_out) 
     int zn = z.ok() ? z.value() : 0;
     // §6.bis cortrix_tasks_zombie_cleaned_total — count the rows this sweep moved
     // processing→failed (bulk SQL sweep carries no per-row task_type, hence no label).
-    if (zn > 0) F42Metrics::Instance().AddZombieCleaned(static_cast<uint64_t>(zn));
+    if (zn > 0) TaskMetrics::Instance().AddZombieCleaned(static_cast<uint64_t>(zn));
     // Then timeout sweep (§6.1 / §7 v0): remaining processing rows that started
     // more than task_timeout_seconds ago exceeded the budget → failed + TASK_TIMEOUT.
     auto t = mgr_->SweepTimedOut(now_secs, TimeoutSeconds());
@@ -77,7 +77,7 @@ void TaskCleanupCron::RunCleanupNow(int* deleted, int* zombies, int* timed_out) 
     auto d = mgr_->DeleteExpired(now_secs, RetentionDays());
     int dn = d.ok() ? d.value() : 0;
     if (zn > 0 || tn > 0 || dn > 0) {
-        spdlog::info("F42 tasks cleanup: {} zombies→failed, {} timed-out→failed, "
+        spdlog::info("tasks cleanup: {} zombies→failed, {} timed-out→failed, "
                      "{} expired deleted", zn, tn, dn);
     }
     if (deleted) *deleted = dn;
@@ -124,10 +124,10 @@ void TaskCleanupCron::RunLoop() {
         try {
             RunCleanupNow();
         } catch (const std::exception& e) {
-            spdlog::error("F42 tasks cleanup sweep threw: {} — skipped this run, "
+            spdlog::error("tasks cleanup sweep threw: {} — skipped this run, "
                           "will retry next tick", e.what());
         } catch (...) {
-            spdlog::error("F42 tasks cleanup sweep threw a non-std exception — "
+            spdlog::error("tasks cleanup sweep threw a non-std exception — "
                           "skipped this run, will retry next tick");
         }
         lock.lock();

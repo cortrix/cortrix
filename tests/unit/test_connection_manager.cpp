@@ -78,9 +78,9 @@ TEST_F(ConnectionManagerTest, CrossTenantResolveThrowsCrossTenantRef) {
     // tenant t2 trying to resolve a t1-owned ref → CX_ERR_IMPORT_CROSS_TENANT_REF.
     try {
         (void)mgr_->ResolveDsn(r.value(), AdminCtx("t2"));
-        FAIL() << "expected F16aException";
-    } catch (const F16aException& e) {
-        EXPECT_EQ(e.code(), F16aErrorCode::kCrossTenantRef);
+        FAIL() << "expected ImportException";
+    } catch (const ImportException& e) {
+        EXPECT_EQ(e.code(), ImportErrorCode::kCrossTenantRef);
         ASSERT_TRUE(e.GetError().structured_data.has_value());
         EXPECT_EQ((*e.GetError().structured_data)["connection_ref"], r.value());
     }

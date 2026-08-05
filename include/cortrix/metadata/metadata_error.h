@@ -75,7 +75,7 @@ agent_friendly::AgentFriendlyError MakeMetadataError(
 StatusCode MetadataErrorToStatusCode(MetadataErrorCode code);
 
 /// Bridge to a plain Status; message prefixed "CX_ERR_X: detail" so the exact
-/// identity is recoverable at the API/SDK boundary (same pattern as F16aStatus /
+/// identity is recoverable at the API/SDK boundary (same pattern as ImportStatus /
 /// RagFusionStatus). This is what `Result<T>` failure paths carry.
 Status MetadataStatus(MetadataErrorCode code, const std::string& detail = "");
 

@@ -176,12 +176,12 @@ RULES = (
         "semver",
     ),
     Rule(
-        "tests/unit/test_f24_metrics.cpp",
+        "tests/unit/test_deploy_metrics.cpp",
         rf'SetBuildInfo\("(?P<value>{SEMVER_TOKEN})"',
         "semver",
     ),
     Rule(
-        "tests/unit/test_f24_metrics.cpp",
+        "tests/unit/test_deploy_metrics.cpp",
         rf'version=\\"(?P<value>{SEMVER_TOKEN})\\"',
         "semver",
     ),

@@ -36,16 +36,16 @@ bool ColumnExists(sqlite3* db, const char* table, const char* column) {
 
 }  // namespace
 
-Status F06SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
+Status ParserSchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
     // Only the Phase-1 init step (0 → 1) and the already-current (n → n) call are
     // supported; any other step is a version mismatch until a future bump.
     const bool init = (from_ver == 0 && to_ver == 1);
     if (!init && from_ver != to_ver) {
         return Status::InvalidArgument(
-            "CX_ERR_SCHEMA_VERSION_MISMATCH: F06 unsupported migration " +
+            "CX_ERR_SCHEMA_VERSION_MISMATCH: parser unsupported migration " +
             std::to_string(from_ver) + " -> " + std::to_string(to_ver));
     }
-    if (!db) return Status::InvalidArgument("F06 migrate: null db");
+    if (!db) return Status::InvalidArgument("parser migrate: null db");
 
     // The catalog's `namespaces` table is created by the catalog schema before this
     // provider runs (registration order: catalog → parser). If it isn't present yet
@@ -64,7 +64,7 @@ Status F06SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
         std::string detail = err ? err : "unknown";
         sqlite3_free(err);
         return Status::Internal(
-            "CX_ERR_SCHEMA_MIGRATION_FAILED: F06 add parser_config: " + detail);
+            "CX_ERR_SCHEMA_MIGRATION_FAILED: parser add parser_config: " + detail);
     }
     return Status::Ok();
 }

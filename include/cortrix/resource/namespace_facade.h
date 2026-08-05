@@ -10,7 +10,7 @@
 
 namespace cortrix::resource {
 
-/// D3.5 wire④ — the thin façade over one acquired Namespace (F05_NS_INTEGRATION
+/// D3.5 wire④ — the thin façade over one acquired Namespace (NAMESPACEPOOL_NS_INTEGRATION
 /// §4). Phase-1 access model (§3 = authoritative): a consumer constructs a
 /// NamespaceFacade per request, calls Acquire() (= Pool.Acquire), uses the
 /// five windows, and lets the destructor Release() (D-I5(a) per-request).

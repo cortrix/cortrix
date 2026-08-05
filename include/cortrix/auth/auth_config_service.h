@@ -26,7 +26,7 @@ namespace cortrix::auth {
 class AuthConfigService {
 public:
     /// `db` is an open platform.db handle whose `auth_config` table already
-    /// exists (P08AuthSchemaProvider migrated it). The service does not own `db`.
+    /// exists (AuthSchemaProvider migrated it). The service does not own `db`.
     explicit AuthConfigService(sqlite3* db) : db_(db) {}
 
     /// Idempotent startup init:

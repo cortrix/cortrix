@@ -6,7 +6,7 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
-#include "cortrix/async/f42_error.h"
+#include "cortrix/async/task_error.h"
 #include "cortrix/spc/parser.h"
 #include "cortrix/spc/parser_errors.h"
 #include "cortrix/spc/spc_manager.h"
@@ -90,7 +90,7 @@ Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
         prog.eta_seconds = -1;
         Status s = mgr_->UpdateProgress(prog);
         if (!s.ok()) {
-            spdlog::warn("F42 progress persist failed for {}: {}", prog.task_id,
+            spdlog::warn("progress persist failed for {}: {}", prog.task_id,
                          s.message());
         }
     };
@@ -115,7 +115,7 @@ Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
             {"page_number", result.failed_pages.empty() ? -1 : result.failed_pages.front()},
             {"parser_error", result.error_msg},
         };
-        return finalizer_.Fail(task, F42ErrorCodeString(F42ErrorCode::kParseFailed),
+        return finalizer_.Fail(task, TaskErrorCodeString(TaskErrorCode::kParseFailed),
                                result.error_msg, sd, t_start);
     }
 

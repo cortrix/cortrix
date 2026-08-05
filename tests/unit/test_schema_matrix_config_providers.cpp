@@ -1,12 +1,12 @@
 // Schema-provider matrices for the catalog-config / no-op providers and sparse retrieval:
-//   Parser (F06SchemaProvider, namespaces.parser_config TEXT column, version 1)
-//   Reranker (F02SchemaProvider, reranker no-op provider, version 1)
-//   Watcher (F21SchemaProvider, watcher no-op provider, version 1)
-//   HyPE (F38SchemaProvider, hype no-op provider, version 1, F38-specific error token)
-//   Sparse retrieval (F40SchemaProvider, sparse_inverted_index table + blocks.sparse_vec, version 1)
+//   Parser (ParserSchemaProvider, namespaces.parser_config TEXT column, version 1)
+//   Reranker (RerankerSchemaProvider, reranker no-op provider, version 1)
+//   Watcher (WatcherSchemaProvider, watcher no-op provider, version 1)
+//   HyPE (HypeSchemaProvider, hype no-op provider, version 1, F38-specific error token)
+//   Sparse retrieval (SparseSchemaProvider, sparse_inverted_index table + blocks.sparse_vec, version 1)
 //
 // Fresh in-memory sqlite3 per case. Globally unique suite/fixture names
-// (F06CfgMatrix / F02CfgMatrix / F21CfgMatrix / F38CfgMatrix / F40CfgMatrix) that do
+// (ParserCfgMatrix / RerankerCfgMatrix / WatcherCfgMatrix / HypeCfgMatrix / SparseCfgMatrix) that do
 // NOT reuse names from existing tests.
 
 #include <gtest/gtest.h>
@@ -17,8 +17,8 @@
 
 #include "cortrix/connector/watcher_schema_provider.h"
 #include "cortrix/reranker/reranker_schema_provider.h"
-#include "cortrix/retrieval/f40_schema_provider.h"
-#include "cortrix/spc/f38_schema_provider.h"
+#include "cortrix/retrieval/sparse_schema_provider.h"
+#include "cortrix/spc/hype_schema_provider.h"
 #include "cortrix/spc/parser_schema_provider.h"
 
 namespace cortrix::test_schema_matrix_config {
@@ -79,20 +79,20 @@ struct InitStep {
 
 // ============================ parser_config (version 1) ================================
 
-class F06CfgMatrix : public ::testing::Test, protected SqliteHelpers {
+class ParserCfgMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
     void CreateNs() { ASSERT_EQ(Exec(kNamespacesSql), SQLITE_OK); }
-    cortrix::spc::F06SchemaProvider p_;
+    cortrix::spc::ParserSchemaProvider p_;
 };
 
-TEST_F(F06CfgMatrix, FeatureIdentity) {
+TEST_F(ParserCfgMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "parser");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
-TEST_F(F06CfgMatrix, MigrateAddsParserConfigColumn) {
+TEST_F(ParserCfgMatrix, MigrateAddsParserConfigColumn) {
     CreateNs();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("namespaces", "parser_config"));
@@ -105,30 +105,30 @@ TEST_F(F06CfgMatrix, MigrateAddsParserConfigColumn) {
     sqlite3_finalize(stmt);
 }
 
-TEST_F(F06CfgMatrix, IdempotentReRun) {
+TEST_F(ParserCfgMatrix, IdempotentReRun) {
     CreateNs();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
 }
 
-TEST_F(F06CfgMatrix, NoNamespacesTableIsNoOp) {
+TEST_F(ParserCfgMatrix, NoNamespacesTableIsNoOp) {
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_FALSE(ColumnExists("namespaces", "parser_config"));
 }
 
-TEST_F(F06CfgMatrix, NullDbAfterValidGate) {
+TEST_F(ParserCfgMatrix, NullDbAfterValidGate) {
     Status s = p_.Migrate(nullptr, 0, 1);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     EXPECT_NE(s.message().find("null db"), std::string::npos);
 }
 
-class F06CfgVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class ParserCfgVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
-    cortrix::spc::F06SchemaProvider p_;
+    cortrix::spc::ParserSchemaProvider p_;
 };
-TEST_P(F06CfgVersionMatrix, Gate) {
+TEST_P(ParserCfgVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(nullptr, step.from, step.to);
     if (step.ok) {
@@ -139,7 +139,7 @@ TEST_P(F06CfgVersionMatrix, Gate) {
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
 }
 INSTANTIATE_TEST_SUITE_P(
-    F06CfgSteps, F06CfgVersionMatrix,
+    ParserCfgSteps, ParserCfgVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{7, 7, true},
@@ -147,26 +147,26 @@ INSTANTIATE_TEST_SUITE_P(
 
 // ============================ reranker no-op (version 1) ================================
 
-class F02CfgMatrix : public ::testing::Test, protected SqliteHelpers {
+class RerankerCfgMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
-    cortrix::reranker::F02SchemaProvider p_;
+    cortrix::reranker::RerankerSchemaProvider p_;
 };
 
-TEST_F(F02CfgMatrix, FeatureIdentity) {
+TEST_F(RerankerCfgMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "reranker");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
-TEST_F(F02CfgMatrix, InitAndNoOpWithRealAndNullDb) {
+TEST_F(RerankerCfgMatrix, InitAndNoOpWithRealAndNullDb) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());     // init no-op
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());      // already-current
     EXPECT_TRUE(p_.Migrate(nullptr, 0, 1).ok()); // ignores db entirely
     EXPECT_TRUE(p_.Migrate(nullptr, 5, 5).ok()); // any n->n
 }
 
-TEST_F(F02CfgMatrix, UnsupportedStepRejected) {
+TEST_F(RerankerCfgMatrix, UnsupportedStepRejected) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
@@ -174,11 +174,11 @@ TEST_F(F02CfgMatrix, UnsupportedStepRejected) {
     EXPECT_NE(s.message().find("reranker"), std::string::npos);
 }
 
-class F02CfgVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class RerankerCfgVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
-    cortrix::reranker::F02SchemaProvider p_;
+    cortrix::reranker::RerankerSchemaProvider p_;
 };
-TEST_P(F02CfgVersionMatrix, Gate) {
+TEST_P(RerankerCfgVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(nullptr, step.from, step.to);
     if (step.ok) {
@@ -189,7 +189,7 @@ TEST_P(F02CfgVersionMatrix, Gate) {
     }
 }
 INSTANTIATE_TEST_SUITE_P(
-    F02CfgSteps, F02CfgVersionMatrix,
+    RerankerCfgSteps, RerankerCfgVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{9, 9, true},
@@ -197,25 +197,25 @@ INSTANTIATE_TEST_SUITE_P(
 
 // ============================ watcher no-op (version 1) ================================
 
-class F21CfgMatrix : public ::testing::Test, protected SqliteHelpers {
+class WatcherCfgMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
-    cortrix::connector::F21SchemaProvider p_;
+    cortrix::connector::WatcherSchemaProvider p_;
 };
 
-TEST_F(F21CfgMatrix, FeatureIdentity) {
+TEST_F(WatcherCfgMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "watcher");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
-TEST_F(F21CfgMatrix, InitAndNoOp) {
+TEST_F(WatcherCfgMatrix, InitAndNoOp) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
     EXPECT_TRUE(p_.Migrate(nullptr, 0, 1).ok());
 }
 
-TEST_F(F21CfgMatrix, UnsupportedStepRejected) {
+TEST_F(WatcherCfgMatrix, UnsupportedStepRejected) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
@@ -223,11 +223,11 @@ TEST_F(F21CfgMatrix, UnsupportedStepRejected) {
     EXPECT_NE(s.message().find("watcher"), std::string::npos);
 }
 
-class F21CfgVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class WatcherCfgVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
-    cortrix::connector::F21SchemaProvider p_;
+    cortrix::connector::WatcherSchemaProvider p_;
 };
-TEST_P(F21CfgVersionMatrix, Gate) {
+TEST_P(WatcherCfgVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(nullptr, step.from, step.to);
     if (step.ok) {
@@ -238,7 +238,7 @@ TEST_P(F21CfgVersionMatrix, Gate) {
     }
 }
 INSTANTIATE_TEST_SUITE_P(
-    F21CfgSteps, F21CfgVersionMatrix,
+    WatcherCfgSteps, WatcherCfgVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{3, 3, true},
@@ -246,25 +246,25 @@ INSTANTIATE_TEST_SUITE_P(
 
 // ============================ hype no-op (version 1, HyPE token) ===============================
 
-class F38CfgMatrix : public ::testing::Test, protected SqliteHelpers {
+class HypeCfgMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
-    cortrix::spc::F38SchemaProvider p_;
+    cortrix::spc::HypeSchemaProvider p_;
 };
 
-TEST_F(F38CfgMatrix, FeatureIdentity) {
+TEST_F(HypeCfgMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "hype");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
-TEST_F(F38CfgMatrix, InitAndNoOp) {
+TEST_F(HypeCfgMatrix, InitAndNoOp) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
     EXPECT_TRUE(p_.Migrate(nullptr, 0, 1).ok());
 }
 
-TEST_F(F38CfgMatrix, UnsupportedStepRejectedWithF38Token) {
+TEST_F(HypeCfgMatrix, UnsupportedStepRejectedWithHypeToken) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
@@ -272,11 +272,11 @@ TEST_F(F38CfgMatrix, UnsupportedStepRejectedWithF38Token) {
     EXPECT_NE(s.message().find("CX_ERR_HYPE_SCHEMA_VERSION_MISMATCH"), std::string::npos);
 }
 
-class F38CfgVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class HypeCfgVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
-    cortrix::spc::F38SchemaProvider p_;
+    cortrix::spc::HypeSchemaProvider p_;
 };
-TEST_P(F38CfgVersionMatrix, Gate) {
+TEST_P(HypeCfgVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(nullptr, step.from, step.to);
     if (step.ok) {
@@ -287,7 +287,7 @@ TEST_P(F38CfgVersionMatrix, Gate) {
     }
 }
 INSTANTIATE_TEST_SUITE_P(
-    F38CfgSteps, F38CfgVersionMatrix,
+    HypeCfgSteps, HypeCfgVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{6, 6, true},
@@ -295,20 +295,20 @@ INSTANTIATE_TEST_SUITE_P(
 
 // ============================ sparse inverted index (version 1) ================================
 
-class F40CfgMatrix : public ::testing::Test, protected SqliteHelpers {
+class SparseCfgMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
     void CreateBlocks() { ASSERT_EQ(Exec(kBlocksSql), SQLITE_OK); }
-    cortrix::retrieval::F40SchemaProvider p_;
+    cortrix::retrieval::SparseSchemaProvider p_;
 };
 
-TEST_F(F40CfgMatrix, FeatureIdentity) {
+TEST_F(SparseCfgMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "sparse_index");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
-TEST_F(F40CfgMatrix, MigrateCreatesInvertedIndexTableAndIndexes) {
+TEST_F(SparseCfgMatrix, MigrateCreatesInvertedIndexTableAndIndexes) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("sparse_inverted_index"));
     EXPECT_TRUE(IndexExists("idx_term_lookup"));
@@ -317,7 +317,7 @@ TEST_F(F40CfgMatrix, MigrateCreatesInvertedIndexTableAndIndexes) {
     EXPECT_FALSE(ColumnExists("blocks", "sparse_vec"));
 }
 
-TEST_F(F40CfgMatrix, InvertedIndexShape) {
+TEST_F(SparseCfgMatrix, InvertedIndexShape) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("sparse_inverted_index", "ns_id"));
     EXPECT_TRUE(ColumnExists("sparse_inverted_index", "term_id"));
@@ -325,21 +325,21 @@ TEST_F(F40CfgMatrix, InvertedIndexShape) {
     EXPECT_TRUE(ColumnExists("sparse_inverted_index", "weight"));
 }
 
-TEST_F(F40CfgMatrix, AddsBlocksSparseVecWhenBlocksPresent) {
+TEST_F(SparseCfgMatrix, AddsBlocksSparseVecWhenBlocksPresent) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("blocks", "sparse_vec"));
     EXPECT_TRUE(TableExists("sparse_inverted_index"));
 }
 
-TEST_F(F40CfgMatrix, IdempotentReRun) {
+TEST_F(SparseCfgMatrix, IdempotentReRun) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
 }
 
-TEST_F(F40CfgMatrix, NullDbRejectedWithMismatchToken) {
+TEST_F(SparseCfgMatrix, NullDbRejectedWithMismatchToken) {
     // Sparse retrieval returns the SCHEMA_VERSION_MISMATCH token for a null db on the 0->1 path.
     Status s = p_.Migrate(nullptr, 0, 1);
     EXPECT_FALSE(s.ok());
@@ -347,7 +347,7 @@ TEST_F(F40CfgMatrix, NullDbRejectedWithMismatchToken) {
     EXPECT_NE(s.message().find("CX_ERR_SCHEMA_VERSION_MISMATCH"), std::string::npos);
 }
 
-TEST_F(F40CfgMatrix, FloatWeightRoundTrip) {
+TEST_F(SparseCfgMatrix, FloatWeightRoundTrip) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_EQ(Exec("INSERT INTO sparse_inverted_index(ns_id, term_id, child_id, weight) "
                    "VALUES ('ns1', 7, 'c1', 0.25);"), SQLITE_OK);
@@ -359,14 +359,14 @@ TEST_F(F40CfgMatrix, FloatWeightRoundTrip) {
     sqlite3_finalize(stmt);
 }
 
-class F40CfgVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class SparseCfgVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
     void SetUp() override { ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK); }
     void TearDown() override { sqlite3_close(db_); }
     sqlite3* db_ = nullptr;
-    cortrix::retrieval::F40SchemaProvider p_;
+    cortrix::retrieval::SparseSchemaProvider p_;
 };
-TEST_P(F40CfgVersionMatrix, Gate) {
+TEST_P(SparseCfgVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(db_, step.from, step.to);
     if (step.ok) {
@@ -378,7 +378,7 @@ TEST_P(F40CfgVersionMatrix, Gate) {
     }
 }
 INSTANTIATE_TEST_SUITE_P(
-    F40CfgSteps, F40CfgVersionMatrix,
+    SparseCfgSteps, SparseCfgVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{4, 4, true},

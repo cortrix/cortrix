@@ -93,7 +93,7 @@ Result<ImportTaskId> ImportTaskQueue::Submit(const ImportTaskId& task_id,
         std::lock_guard<std::mutex> lock(cancel_mu_);
         if (static_cast<int>(cancel_flags_.size()) >= config_.queue_max_size) {
             // Queue full — surface as a transient (the Agent can retry after backoff).
-            return F16aStatus(F16aErrorCode::kConnectionFailed,
+            return ImportStatus(ImportErrorCode::kConnectionFailed,
                               "import task queue is full (max " +
                                   std::to_string(config_.queue_max_size) + ")");
         }
@@ -167,10 +167,10 @@ void ImportTaskQueue::RunTask(ImportTaskId task_id, ImportTaskWork work) {
         if (terminal == ImportTaskStatus::kFailed && err) {
             // Re-inflate the CX_ERR_IMPORT_* identity carried in the Status message
             // into the Agent-friendly error body (§5.3).
-            t->error = MakeF16aError(F16aErrorCode::kConnectionFailed, nlohmann::json::object(),
+            t->error = MakeImportError(ImportErrorCode::kConnectionFailed, nlohmann::json::object(),
                                      err->message());
             // Prefer the precise code if the work returned one in the message prefix.
-            // (The work uses F16aStatus(...) which prefixes "CX_ERR_IMPORT_X: detail".)
+            // (The work uses ImportStatus(...) which prefixes "CX_ERR_IMPORT_X: detail".)
             t->error->code = [&]() -> std::string {
                 const std::string& m = err->message();
                 auto colon = m.find(':');

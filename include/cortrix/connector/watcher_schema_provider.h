@@ -23,10 +23,10 @@ namespace cortrix::connector {
 /// Implements the frozen cortrix::catalog::ISchemaProvider (D2-pre-5). Migrate
 /// returns Status, not Result<void> (F-FREEZE-1 / CODING_CONVENTIONS § 3) — the
 /// § 2.6 sketch's `Result<void>` is reconciled to the frozen interface signature.
-class F21SchemaProvider : public cortrix::catalog::ISchemaProvider {
+class WatcherSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     /// Registration key (aligns with the startup registration order + the
-    /// F06SchemaProvider naming pattern).
+    /// ParserSchemaProvider naming pattern).
     std::string FeatureName() const override { return "watcher"; }
 
     /// Schema version (bumped +1 on evolution; the SchemaMigrator does the

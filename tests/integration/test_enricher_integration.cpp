@@ -11,7 +11,7 @@
 #include "cortrix/spc_enricher.h"
 #include "cortrix/spc_enricher/enricher_config_resolver.h"
 #include "cortrix/spc_enricher/enricher_store.h"
-#include "cortrix/spc_enricher/f03_schema_provider.h"
+#include "cortrix/spc_enricher/enricher_schema_provider.h"
 #include "cortrix/spc/parser.h"
 #include "mock_llm_client.h"
 #include "mock_response_builder.h"
@@ -34,7 +34,7 @@ protected:
             "CREATE TABLE blocks (block_id INTEGER PRIMARY KEY AUTOINCREMENT, "
             "doc_id TEXT, chunk_index INTEGER, content_text TEXT)",
             nullptr, nullptr, nullptr), SQLITE_OK);
-        F03SchemaProvider p;
+        EnricherSchemaProvider p;
         ASSERT_TRUE(p.Migrate(db_, 0, 1).ok());
     }
     void TearDown() override { sqlite3_close(db_); }

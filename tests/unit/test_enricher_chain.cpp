@@ -133,7 +133,7 @@ TEST(EnricherChainSpec, FullChainOrdered) {
               (std::vector<std::string>{"f03", "f35", "f38"}));
 }
 
-TEST(EnricherChainSpec, F03AlwaysLeads) {
+TEST(EnricherChainSpec, EnricherAlwaysLeads) {
     // f35 alone implies f03 first (GS-2: enricher leads).
     EXPECT_EQ(ParseEnricherChainSpec("f35"), (std::vector<std::string>{"f03", "f35"}));
     // f03 mentioned out of order is moved to the front.
@@ -173,7 +173,7 @@ TEST(EnricherChainResolve, DefaultWhenNothingSet) {
 
 // ---------- EnrichChunks (merge + fail-soft) ----------
 
-TEST(EnricherChainRun, MergesF03AndF35PerChunk) {
+TEST(EnricherChainRun, MergesEnricherAndF35PerChunk) {
     auto dm = DocMeta();
     EnricherChain chain;
     chain.Append(std::make_shared<FakeSummaryEnricher>("a summary"));
@@ -197,7 +197,7 @@ TEST(EnricherChainRun, MergesF03AndF35PerChunk) {
 // must carry its error_msg into the step record — otherwise the debt row is
 // written with a blank last_error and the real cause (live 5k ingest: the §8
 // injection-guard byte limit, 4,139 blank rows) is unobservable.
-TEST(EnricherChainRun, F35FailSoftCarriesErrorCodeInStepRecord) {
+TEST(EnricherChainRun, ContextualFailSoftCarriesErrorCodeInStepRecord) {
     auto dm = DocMeta();
     EnricherChain chain;
     chain.Append(std::make_shared<FakeSummaryEnricher>("kept"));

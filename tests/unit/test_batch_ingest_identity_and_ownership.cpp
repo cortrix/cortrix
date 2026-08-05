@@ -1,5 +1,5 @@
 // Batch ingest identity and input ownership, exercised through the REAL
-// production path: BatchSubmitService → F42TaskSubmitterAdapter → TaskScheduler
+// production path: BatchSubmitService → TaskSubmitterAdapter → TaskScheduler
 // → TaskManager.
 //
 // A capturing mock cannot see any of this. The scheduler is where debounce
@@ -28,7 +28,7 @@
 #include "cortrix/async/task_scheduler.h"
 #include "cortrix/server/batch_submit_service.h"
 #include "cortrix/server/batch_temp_store.h"
-#include "cortrix/server/f42_task_submitter_adapter.h"
+#include "cortrix/server/task_submitter_adapter.h"
 
 namespace fs = std::filesystem;
 using namespace cortrix;
@@ -55,7 +55,7 @@ protected:
             [d, tm](const std::string& p, const std::string& owner) {
                 async::ReleaseManagedPath(d, p, owner, tm);
             });
-        adapter_ = std::make_unique<server::F42TaskSubmitterAdapter>(sched_.get(), nullptr);
+        adapter_ = std::make_unique<server::TaskSubmitterAdapter>(sched_.get(), nullptr);
         svc_ = std::make_unique<server::BatchSubmitService>(adapter_.get());
         svc_->SetMaterializeDir(dir_);
         svc_->SetInputReleaser([d, tm](const std::string& p) {
@@ -84,7 +84,7 @@ protected:
     std::string dir_;
     async::TaskManager mgr_;
     std::unique_ptr<async::TaskScheduler> sched_;
-    std::unique_ptr<server::F42TaskSubmitterAdapter> adapter_;
+    std::unique_ptr<server::TaskSubmitterAdapter> adapter_;
     std::unique_ptr<server::BatchSubmitService> svc_;
 };
 

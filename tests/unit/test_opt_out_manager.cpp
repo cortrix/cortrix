@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "cortrix/memory/mem04_error.h"
-#include "cortrix/memory/mem04_metrics.h"
+#include "cortrix/memory/memory_opt_out_error.h"
+#include "cortrix/memory/memory_opt_out_metrics.h"
 #include "cortrix/memory/memory_store.h"
 #include "cortrix/memory/opt_out_manager.h"
 #include "cortrix/observability/operation_logger.h"
@@ -168,9 +168,9 @@ protected:
     void SetUp() override {
         store_ = std::make_shared<FakeOptOutStore>();
         logger_ = std::make_shared<CapturingOpLogger>();
-        Mem04Metrics::Instance().ResetForTest();
+        MemoryOptOutMetrics::Instance().ResetForTest();
     }
-    void TearDown() override { Mem04Metrics::Instance().ResetForTest(); }
+    void TearDown() override { MemoryOptOutMetrics::Instance().ResetForTest(); }
 
     std::shared_ptr<FakeOptOutStore> store_;
     std::shared_ptr<CapturingOpLogger> logger_;
@@ -188,7 +188,7 @@ TEST_F(OptOutManagerTest, OptOutSuccessStampsAndLogsAndMeters) {
     EXPECT_TRUE(store_->IsOptedOut(kValidSession));
 
     // metric
-    EXPECT_EQ(Mem04Metrics::Instance().OptOutCount(Mem04Metrics::TriggeredBy::kUser), 1u);
+    EXPECT_EQ(MemoryOptOutMetrics::Instance().OptOutCount(MemoryOptOutMetrics::TriggeredBy::kUser), 1u);
 
     // operation_log: action memory_opt_out, resource memory/{session}, summary w/ reason
     ASSERT_EQ(logger_->entries.size(), 1u);
@@ -204,14 +204,14 @@ TEST_F(OptOutManagerTest, OptOutAgentActorMapsToAgentMetric) {
     store_->AddSession(kValidSession);
     auto mgr = MakeManager(store_, logger_);
     ASSERT_TRUE(mgr.OptOut(kValidSession, OptOutActor::kAgentAuto).ok());
-    EXPECT_EQ(Mem04Metrics::Instance().OptOutCount(Mem04Metrics::TriggeredBy::kAgent), 1u);
+    EXPECT_EQ(MemoryOptOutMetrics::Instance().OptOutCount(MemoryOptOutMetrics::TriggeredBy::kAgent), 1u);
 }
 
 TEST_F(OptOutManagerTest, OptOutSystemActorMapsToSystemMetric) {
     store_->AddSession(kValidSession);
     auto mgr = MakeManager(store_, logger_);
     ASSERT_TRUE(mgr.OptOut(kValidSession, OptOutActor::kSystemAuto).ok());
-    EXPECT_EQ(Mem04Metrics::Instance().OptOutCount(Mem04Metrics::TriggeredBy::kSystem), 1u);
+    EXPECT_EQ(MemoryOptOutMetrics::Instance().OptOutCount(MemoryOptOutMetrics::TriggeredBy::kSystem), 1u);
 }
 
 TEST_F(OptOutManagerTest, OptOutTestActorMapsToSystemMetricAndStamps) {
@@ -221,7 +221,7 @@ TEST_F(OptOutManagerTest, OptOutTestActorMapsToSystemMetricAndStamps) {
     ASSERT_TRUE(r.ok()) << r.status().message();
     EXPECT_EQ(r->opted_out_by, "test");
     // MetricTrigger(kTest) collapses onto the system label (line 41).
-    EXPECT_EQ(Mem04Metrics::Instance().OptOutCount(Mem04Metrics::TriggeredBy::kSystem), 1u);
+    EXPECT_EQ(MemoryOptOutMetrics::Instance().OptOutCount(MemoryOptOutMetrics::TriggeredBy::kSystem), 1u);
 }
 
 TEST_F(OptOutManagerTest, OptOutInvalidSessionId) {
@@ -249,7 +249,7 @@ TEST_F(OptOutManagerTest, OptOutAlreadyOptedOut) {
     EXPECT_NE(r2.status().message().find("CX_ERR_MEMOPTOUT_ALREADY_OPTED_OUT"), std::string::npos);
     // only the first opt-out logged + metered
     EXPECT_EQ(logger_->entries.size(), 1u);
-    EXPECT_EQ(Mem04Metrics::Instance().OptOutCount(Mem04Metrics::TriggeredBy::kUser), 1u);
+    EXPECT_EQ(MemoryOptOutMetrics::Instance().OptOutCount(MemoryOptOutMetrics::TriggeredBy::kUser), 1u);
 }
 
 TEST_F(OptOutManagerTest, OptOutDisabledReturns503Semantics) {
@@ -281,7 +281,7 @@ TEST_F(OptOutManagerTest, OptOutSetOptOutWriteFailureReturnsError) {
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kInternal);
     EXPECT_TRUE(logger_->entries.empty());
-    EXPECT_EQ(Mem04Metrics::Instance().OptOutCount(Mem04Metrics::TriggeredBy::kUser), 0u);
+    EXPECT_EQ(MemoryOptOutMetrics::Instance().OptOutCount(MemoryOptOutMetrics::TriggeredBy::kUser), 0u);
 }
 
 TEST_F(OptOutManagerTest, OptOutWorksWithoutLogger) {
@@ -306,7 +306,7 @@ TEST_F(OptOutManagerTest, RevokeSuccessClearsAndLogsAndMeters) {
     EXPECT_FALSE(r->revoked_at.empty());
     EXPECT_FALSE(store_->IsOptedOut(kValidSession));
 
-    EXPECT_EQ(Mem04Metrics::Instance().OptOutRevokeCount(), 1u);
+    EXPECT_EQ(MemoryOptOutMetrics::Instance().OptOutRevokeCount(), 1u);
     ASSERT_EQ(logger_->entries.size(), 1u);
     EXPECT_EQ(logger_->entries[0].action, "memory_opt_out_revoke");
     ASSERT_TRUE(logger_->entries[0].summary.has_value());
@@ -365,7 +365,7 @@ TEST_F(OptOutManagerTest, RevokeClearOptOutWriteFailureReturnsError) {
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kInternal);
     EXPECT_TRUE(logger_->entries.empty());  // no revoke audit on failure
-    EXPECT_EQ(Mem04Metrics::Instance().OptOutRevokeCount(), 0u);
+    EXPECT_EQ(MemoryOptOutMetrics::Instance().OptOutRevokeCount(), 0u);
 }
 
 // Revoke propagates a GetOptOutState store failure (line 162) before any write.

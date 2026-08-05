@@ -70,7 +70,7 @@ Result<TracesResponse> TracesHandler::GetSession(const std::string& session_id,
         // someone else's, that is a cross-user attempt -> UNAUTHORIZED (anti-leak;
         // we deliberately do NOT reveal whether the session exists, §8.1).
         if (!owner.found || owner.user_id != ctx.requester_user_id) {
-            return F13Status(F13ErrorCode::kUnauthorized,
+            return AgentTraceStatus(AgentTraceErrorCode::kUnauthorized,
                              "cross-user trace access requires admin");
         }
     } else if (owner.found && owner.user_id != ctx.requester_user_id) {
@@ -91,7 +91,7 @@ Result<TracesResponse> TracesHandler::GetSession(const std::string& session_id,
     // (§8.1: admin cross-user nonexistent session). For a non-admin owner we keep
     // an empty page (the session is theirs; it is simply empty).
     if (ctx.is_admin && ts.total_count == 0 && !owner.found) {
-        return F13Status(F13ErrorCode::kSessionNotFound,
+        return AgentTraceStatus(AgentTraceErrorCode::kSessionNotFound,
                          "no session with id " + session_id);
     }
 

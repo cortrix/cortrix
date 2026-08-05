@@ -1728,7 +1728,7 @@ TEST_F(StoreSqliteTest, ExplicitBlockIdRoundTripIncludingNegativeRowid) {
 }
 
 // unified-blocks: parent_insert/parent_get round-trip the `parents` table on the
-// unified store (the table is created standalone by F34SchemaProvider in
+// unified store (the table is created standalone by ParentChildSchemaProvider in
 // CreateTables()). The SPC write path uses this so parents + child-blocks commit in
 // one write coordinator transaction (ARCH §3.2). CortrixParent is the storage twin of
 // chunker::ParentChunk; the store treats metadata_json as opaque text.

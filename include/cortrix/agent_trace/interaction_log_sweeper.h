@@ -19,7 +19,7 @@ namespace cortrix::agent_trace {
 ///
 /// TC4 keeps interaction_log + interaction_sources PER-NAMESPACE (one table per
 /// namespace memory.db, FK-tied to the interaction_log). The single-db
-/// F13CleanupRegistrar reaches only one db, so the 180-day interaction_log cleanup
+/// AgentTraceCleanupRegistrar reaches only one db, so the 180-day interaction_log cleanup
 /// cannot be a single RegisterTable callback the way the global agent_trace one is.
 ///
 /// This sweeper fills that gap exactly like DocumentGcSweeper does for the document

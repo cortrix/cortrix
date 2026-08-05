@@ -33,7 +33,7 @@ struct DocFtsHit {
 
 /// Borrowed-handle product helpers over the per-Unit `doc_fts5_index` table.
 /// These functions do not own/open/migrate SQLite; the caller supplies the Unit
-/// store handle after F41SchemaProvider has created the virtual table. They are
+/// store handle after DocSummarySchemaProvider has created the virtual table. They are
 /// shared by the product SPC write hook, rollback cleanup, HTTP/query discovery,
 /// and the standalone DocFts5Index wrapper below so benchmark and unit paths
 /// cannot drift.
@@ -45,7 +45,7 @@ Result<std::vector<DocFtsHit>> SearchDocFts5(sqlite3* db, const std::string& que
 /// Self-contained doc-level FTS5 index (hybrid fallback).
 ///
 /// Standalone (D3): owns its own SQLite DB (Open(":memory:") in tests), creating
-/// the `doc_fts5_index` virtual table from the F41SchemaProvider DDL SoT so the
+/// the `doc_fts5_index` virtual table from the DocSummarySchemaProvider DDL SoT so the
 /// two never drift. Product code uses the borrowed-handle helpers above against
 /// the per-Unit store.db. The query path uses BM25 column weights
 /// (doc_title 2.0 / topics 1.5 / filename 1.0) and the shared SanitizeFts5Query
@@ -59,7 +59,7 @@ public:
     DocFts5Index& operator=(const DocFts5Index&) = delete;
 
     /// Open `db_path` (":memory:" for tests) and create the doc_fts5_index virtual
-    /// table from the F41SchemaProvider DDL SoT. Returns a CX_ERR_DOCSUMMARY_* Status on
+    /// table from the DocSummarySchemaProvider DDL SoT. Returns a CX_ERR_DOCSUMMARY_* Status on
     /// failure.
     Status Open(const std::string& db_path);
 

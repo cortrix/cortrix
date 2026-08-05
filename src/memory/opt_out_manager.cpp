@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <ctime>
 
-#include "cortrix/memory/mem04_metrics.h"
+#include "cortrix/memory/memory_opt_out_metrics.h"
 #include "cortrix/memory/memory_store.h"
 
 namespace cortrix::memory::immunity {
@@ -33,14 +33,14 @@ std::string NowISO8601() {
 }
 
 // OptOutActor → the low-cardinality metric label (D4 enum collapsed to actor class).
-Mem04Metrics::TriggeredBy MetricTrigger(OptOutActor actor) {
+MemoryOptOutMetrics::TriggeredBy MetricTrigger(OptOutActor actor) {
     switch (actor) {
-        case OptOutActor::kUserManual: return Mem04Metrics::TriggeredBy::kUser;
-        case OptOutActor::kAgentAuto:  return Mem04Metrics::TriggeredBy::kAgent;
-        case OptOutActor::kSystemAuto: return Mem04Metrics::TriggeredBy::kSystem;
-        case OptOutActor::kTest:       return Mem04Metrics::TriggeredBy::kSystem;
+        case OptOutActor::kUserManual: return MemoryOptOutMetrics::TriggeredBy::kUser;
+        case OptOutActor::kAgentAuto:  return MemoryOptOutMetrics::TriggeredBy::kAgent;
+        case OptOutActor::kSystemAuto: return MemoryOptOutMetrics::TriggeredBy::kSystem;
+        case OptOutActor::kTest:       return MemoryOptOutMetrics::TriggeredBy::kSystem;
     }
-    return Mem04Metrics::TriggeredBy::kSystem;
+    return MemoryOptOutMetrics::TriggeredBy::kSystem;
 }
 
 // Record one operation_log entry for an opt-out action (GEN-OperationLog). No-op
@@ -103,11 +103,11 @@ Result<OptOutResult> OptOutManager::OptOut(const std::string& session_id,
                                            const std::string& reason,
                                            const TraceContext* ctx) {
     if (!IsValidSessionId(session_id)) {
-        return Mem04Status(Mem04ErrorCode::kInvalidSessionId,
+        return MemoryOptOutStatus(MemoryOptOutErrorCode::kInvalidSessionId,
                            "session_id is not a recognizable ULID/UUID");
     }
     if (!enabled_) {
-        return Mem04Status(Mem04ErrorCode::kOptOutDisabled,
+        return MemoryOptOutStatus(MemoryOptOutErrorCode::kOptOutDisabled,
                            "mem04.enabled is false");
     }
 
@@ -115,12 +115,12 @@ Result<OptOutResult> OptOutManager::OptOut(const std::string& session_id,
     if (!state.ok()) return state.status();  // store failure → propagate
 
     if (!state->exists) {
-        return Mem04Status(Mem04ErrorCode::kSessionNotFound, session_id);
+        return MemoryOptOutStatus(MemoryOptOutErrorCode::kSessionNotFound, session_id);
     }
     if (state->opted_out) {
         // ARCH §4.1.11: a repeat opt-out is ALREADY_OPTED_OUT (409). The §11.x
         // idempotent-200 variant is an HTTP-handler concern (D3.5).
-        return Mem04Status(Mem04ErrorCode::kAlreadyOptedOut, session_id);
+        return MemoryOptOutStatus(MemoryOptOutErrorCode::kAlreadyOptedOut, session_id);
     }
 
     const std::string now = NowISO8601();
@@ -129,7 +129,7 @@ Result<OptOutResult> OptOutManager::OptOut(const std::string& session_id,
         return s;
     }
 
-    Mem04Metrics::Instance().RecordOptOut(MetricTrigger(actor));
+    MemoryOptOutMetrics::Instance().RecordOptOut(MetricTrigger(actor));
     std::string summary = std::string("opt-out session ") + session_id;
     if (!reason.empty()) summary += " (" + reason + ")";
     RecordOplog(op_logger_, "memory_opt_out", session_id, summary, ctx);
@@ -145,16 +145,16 @@ Result<RevokeResult> OptOutManager::OptOutRevoke(const std::string& session_id,
                                                  const std::string& reason,
                                                  const TraceContext* ctx) {
     if (!IsValidSessionId(session_id)) {
-        return Mem04Status(Mem04ErrorCode::kInvalidSessionId,
+        return MemoryOptOutStatus(MemoryOptOutErrorCode::kInvalidSessionId,
                            "session_id is not a recognizable ULID/UUID");
     }
     if (!enabled_) {
-        return Mem04Status(Mem04ErrorCode::kOptOutDisabled,
+        return MemoryOptOutStatus(MemoryOptOutErrorCode::kOptOutDisabled,
                            "mem04.enabled is false");
     }
     if (reason.empty()) {
         // §6.2 revoke requestBody: reason is required (recorded in operation_log).
-        return Mem04Status(Mem04ErrorCode::kInvalidSessionId,
+        return MemoryOptOutStatus(MemoryOptOutErrorCode::kInvalidSessionId,
                            "revoke reason is required");
     }
 
@@ -162,17 +162,17 @@ Result<RevokeResult> OptOutManager::OptOutRevoke(const std::string& session_id,
     if (!state.ok()) return state.status();
 
     if (!state->exists) {
-        return Mem04Status(Mem04ErrorCode::kSessionNotFound, session_id);
+        return MemoryOptOutStatus(MemoryOptOutErrorCode::kSessionNotFound, session_id);
     }
     if (!state->opted_out) {
-        return Mem04Status(Mem04ErrorCode::kNotOptedOut, session_id);
+        return MemoryOptOutStatus(MemoryOptOutErrorCode::kNotOptedOut, session_id);
     }
 
     if (Status s = store_->ClearOptOut(session_id); !s.ok()) {
         return s;
     }
 
-    Mem04Metrics::Instance().RecordOptOutRevoke();
+    MemoryOptOutMetrics::Instance().RecordOptOutRevoke();
     RecordOplog(op_logger_, "memory_opt_out_revoke", session_id,
                 std::string("revoke opt-out session ") + session_id + " (" + reason + ")",
                 ctx);

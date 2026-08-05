@@ -398,14 +398,14 @@ INSTANTIATE_TEST_SUITE_P(All, ScoringLevelMatrix,
 
 // error_total{code} — both semantic score error codes.
 class ScoringErrorMatrix : public ScoringFx,
-                    public ::testing::WithParamInterface<F07ErrorCode> {};
+                    public ::testing::WithParamInterface<ScoringErrorCode> {};
 TEST_P(ScoringErrorMatrix, Increments) {
     m().RecordError(GetParam());
     EXPECT_EQ(m().ErrorCount(GetParam()), 1u);
 }
 INSTANTIATE_TEST_SUITE_P(All, ScoringErrorMatrix,
-                         ::testing::Values(F07ErrorCode::kLevelInvalid,
-                                           F07ErrorCode::kConfigInvalid));
+                         ::testing::Values(ScoringErrorCode::kLevelInvalid,
+                                           ScoringErrorCode::kConfigInvalid));
 
 TEST_F(ScoringFx, AnomalousAndFinalScoreCounters) {
     m().RecordAnomalous();
@@ -443,12 +443,12 @@ TEST_F(ScoringFx, Reset) {
     m().RecordScore(2);
     m().RecordAnomalous();
     m().RecordFinalScore();
-    m().RecordError(F07ErrorCode::kLevelInvalid);
+    m().RecordError(ScoringErrorCode::kLevelInvalid);
     m().ResetForTest();
     EXPECT_EQ(m().ScoreCount(2), 0u);
     EXPECT_EQ(m().AnomalousCount(), 0u);
     EXPECT_EQ(m().FinalScoreCount(), 0u);
-    EXPECT_EQ(m().ErrorCount(F07ErrorCode::kLevelInvalid), 0u);
+    EXPECT_EQ(m().ErrorCount(ScoringErrorCode::kLevelInvalid), 0u);
 }
 
 }  // namespace scoring_matrix

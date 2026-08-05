@@ -37,7 +37,7 @@ DocSummaryConfig ResolveDocSummaryConfig(const cortrix::IGlobalConfig* global);
 /// D3.5 (this round produces the parsed structured summary, standalone-testable).
 ///
 /// 🔌 Seams (standalone reconcile): the design §5.1 wrote a concrete
-/// OpenAiLlmClient + ParentChunkStore + F42TaskScheduler + IMetricsRegistry. Here
+/// OpenAiLlmClient + ParentChunkStore + TaskScheduler + IMetricsRegistry. Here
 /// the LLM is the frozen llm::ILlmClient seam (production: OpenAiLlmClient; tests:
 /// MockLlmClient); chunks come from the frozen store::ChunkStore seam
 /// (GetChunksByDocId, tests: MockChunkStore); metrics use the self-contained

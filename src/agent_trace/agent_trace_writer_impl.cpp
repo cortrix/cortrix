@@ -138,16 +138,16 @@ Result<TraceSession> AgentTraceWriterImpl::Query(const std::string& session_id,
     const int64_t t0 = NowMs();
     // ---- validate (§8.1 permanent input faults → CX_ERR_TRACE_INVALID_FILTER) ----
     if (filter.limit < 1 || filter.limit > 200) {
-        return F13Status(F13ErrorCode::kInvalidFilter,
+        return AgentTraceStatus(AgentTraceErrorCode::kInvalidFilter,
                          "limit must be in [1,200], got " + std::to_string(filter.limit));
     }
     if (filter.offset < 0) {
-        return F13Status(F13ErrorCode::kInvalidFilter,
+        return AgentTraceStatus(AgentTraceErrorCode::kInvalidFilter,
                          "offset must be >= 0, got " + std::to_string(filter.offset));
     }
     if (filter.from_timestamp.has_value() && filter.to_timestamp.has_value() &&
         *filter.from_timestamp > *filter.to_timestamp) {
-        return F13Status(F13ErrorCode::kInvalidFilter, "from_timestamp > to_timestamp");
+        return AgentTraceStatus(AgentTraceErrorCode::kInvalidFilter, "from_timestamp > to_timestamp");
     }
 
     std::lock_guard<std::mutex> lock(mu_);
@@ -190,7 +190,7 @@ Result<TraceSession> AgentTraceWriterImpl::Query(const std::string& session_id,
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
             last_error_ = sqlite3_errmsg(db_);
-            return F13Status(F13ErrorCode::kInternal, last_error_);
+            return AgentTraceStatus(AgentTraceErrorCode::kInternal, last_error_);
         }
         bind_predicates(stmt);
         if (sqlite3_step(stmt) == SQLITE_ROW) total_count = sqlite3_column_int64(stmt, 0);
@@ -199,7 +199,7 @@ Result<TraceSession> AgentTraceWriterImpl::Query(const std::string& session_id,
 
     // offset past the end of a non-empty set is out of range (§8.1).
     if (filter.offset > 0 && filter.offset >= total_count) {
-        return F13Status(F13ErrorCode::kInvalidFilter,
+        return AgentTraceStatus(AgentTraceErrorCode::kInvalidFilter,
                          "offset " + std::to_string(filter.offset) +
                              " >= total_count " + std::to_string(total_count));
     }
@@ -234,7 +234,7 @@ Result<TraceSession> AgentTraceWriterImpl::Query(const std::string& session_id,
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
             last_error_ = sqlite3_errmsg(db_);
-            return F13Status(F13ErrorCode::kInternal, last_error_);
+            return AgentTraceStatus(AgentTraceErrorCode::kInternal, last_error_);
         }
         int idx = bind_predicates(stmt);
         sqlite3_bind_int(stmt, idx++, filter.limit);

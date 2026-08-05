@@ -8,7 +8,7 @@
 
 #include "cortrix/doc_summary/doc_summary_config.h"
 #include "cortrix/doc_summary/doc_summary_error.h"
-#include "cortrix/doc_summary/f41_schema_provider.h"  // kDocFts5IndexDdl SoT
+#include "cortrix/doc_summary/doc_summary_schema_provider.h"  // kDocFts5IndexDdl SoT
 #include "cortrix/store/cortrix_store_sqlite.h"        // SanitizeFts5Query (M-SEC-001)
 
 namespace cortrix::doc_summary {
@@ -26,7 +26,7 @@ Status DocFts5Index::Open(const std::string& db_path) {
         return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
                                 "open doc_fts5_index db: " + msg);
     }
-    // Create the virtual table from the F41SchemaProvider DDL SoT (never drift).
+    // Create the virtual table from the DocSummarySchemaProvider DDL SoT (never drift).
     char* err = nullptr;
     rc = sqlite3_exec(db_, kDocFts5IndexDdl, nullptr, nullptr, &err);
     if (rc != SQLITE_OK) {

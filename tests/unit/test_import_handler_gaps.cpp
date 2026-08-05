@@ -1,5 +1,5 @@
 // import_handler.cpp gap coverage. Complements test_import_manager.cpp (which owns
-// the ImportHandlerTest suite) and test_errpath_import.cpp (F16aHandlerErrPathTest).
+// the ImportHandlerTest suite) and test_errpath_import.cpp (ImportHandlerErrPathTest).
 // This file's suite names are module-prefixed (ImportHandlerGaps) for global gtest
 // uniqueness.
 //

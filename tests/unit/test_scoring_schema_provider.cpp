@@ -8,7 +8,7 @@
 
 // Semantic score S8 coverage: ScoringSchemaProvider adds the per-Unit blocks.semantic_score column
 // (ARCH §5.1.2) idempotently, inside the frozen ISchemaProvider contract. Mirrors the enricher
-// provider's ADD-COLUMN-if-absent pattern (test_f03_schema_provider.cpp).
+// provider's ADD-COLUMN-if-absent pattern (test_enricher_schema_provider.cpp).
 namespace cortrix::scoring {
 namespace {
 

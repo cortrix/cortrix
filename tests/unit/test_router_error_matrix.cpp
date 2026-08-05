@@ -9,7 +9,7 @@
 #include "cortrix/query/router_error.h"
 
 // Exhaustive parameterized error-registry sweep for query-router (§4.3, 4
-// codes). Distinct suite name (RouterErrorMatrix) from test_f39_router_error.cpp.
+// codes). Distinct suite name (RouterErrorMatrix) from test_router_error.cpp.
 namespace cortrix::query {
 namespace {
 

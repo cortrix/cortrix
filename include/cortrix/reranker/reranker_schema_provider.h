@@ -15,7 +15,7 @@ namespace cortrix::reranker {
 /// Phase 1 Migrate(0 → 1) is consequently a no-op: it registers with the
 /// SchemaMigrator purely so future reranker_config evolution runs inside the same
 /// versioned, atomic framework as the other Feature providers (mirrors the
-/// F21SchemaProvider / F09SchemaProvider pattern, ARCH §1.3.bis.3 topological
+/// WatcherSchemaProvider / BlockFrameworkSchemaProvider pattern, ARCH §1.3.bis.3 topological
 /// order). Phase 2 (§2.4 NS JSONB extension) activates the `model` /
 /// `score_threshold` keys as per-NS overrides; those are JSON values inside the
 /// existing column (not new SQL columns), so the V1 → V2 step bumps
@@ -27,7 +27,7 @@ namespace cortrix::reranker {
 /// Standalone (D3): registering this with the live CatalogDb::Open(extra_providers)
 /// list at server bootstrap is cross-Feature wiring → D3.5; here it is fully
 /// unit-testable against a SchemaMigrator + the frozen base schema.
-class F02SchemaProvider : public cortrix::catalog::ISchemaProvider {
+class RerankerSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     /// Registration key (aligns with the other SchemaProvider names).
     std::string FeatureName() const override { return "reranker"; }

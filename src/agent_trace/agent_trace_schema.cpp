@@ -55,13 +55,13 @@ Status AgentTraceSchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) 
             std::string msg = err ? err : "sqlite error";
             sqlite3_free(err);
             return Status::Internal(
-                std::string("CX_ERR_TRACE_INTERNAL: F13 agent_trace schema migration failed: ") + msg);
+                std::string("CX_ERR_TRACE_INTERNAL: agent_trace agent_trace schema migration failed: ") + msg);
         }
         return Status::Ok();
     }
     // Unexpected version step (e.g. Phase 2 1 → 2) is not implemented yet.
     return Status::InvalidArgument(
-        "CX_ERR_TRACE_INTERNAL: F13 unsupported migration " +
+        "CX_ERR_TRACE_INTERNAL: agent_trace unsupported migration " +
         std::to_string(from_ver) + " -> " + std::to_string(to_ver));
 }
 

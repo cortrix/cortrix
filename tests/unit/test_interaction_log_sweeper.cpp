@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "cortrix/agent_trace/f13_cleanup_registrar.h"  // FormatIso8601Utc
+#include "cortrix/agent_trace/agent_trace_cleanup_registrar.h"  // FormatIso8601Utc
 #include "cortrix/agent_trace/interaction_log_sweeper.h"
 #include "cortrix/catalog/batch_result.h"
 #include "cortrix/catalog/i_ns_router.h"
@@ -21,7 +21,7 @@
 // [agent trace TC4] InteractionLogSweeper: the per-NS interaction_log 180d cleanup. It
 // iterates namespaces (via INSRouter), acquires each memory.db façade, and deletes
 // interaction_log rows older than the retention window from EACH namespace (the
-// global agent_trace cleanup is the single-db F13CleanupRegistrar path; interaction_log
+// global agent_trace cleanup is the single-db AgentTraceCleanupRegistrar path; interaction_log
 // is per-NS so a single-db registrar cannot reach the N tables).
 namespace cortrix::agent_trace {
 namespace {
@@ -92,7 +92,7 @@ protected:
         cortrix::resource::NamespaceFacade facade(harness_->ipool(), ns);
         ASSERT_TRUE(facade.Acquire().ok());
         sqlite3* db = facade.memory().db_handle();
-        const std::string iso = F13CleanupRegistrar::FormatIso8601Utc(created_ms);
+        const std::string iso = AgentTraceCleanupRegistrar::FormatIso8601Utc(created_ms);
         Exec(db, "INSERT INTO interaction_log"
                  "(id, session_id, namespace_name, user_id, role, content, created_at) "
                  "VALUES('" + id + "','s','" + ns + "','alice','user','q','" + iso + "');");

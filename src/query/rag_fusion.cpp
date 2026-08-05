@@ -132,7 +132,7 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
     // QueryContext has no `routing_path` field (the router adds it). Once it
     // lands, this becomes:
     //   if (qctx && QueryComplexityClassifier::ShouldSkipF36(*qctx)) {
-    //       explain_.reason = "skipped_by_F39_routing"; ... return {query};
+    //       explain_.reason = "skipped_by_Router_routing"; ... return {query};
     //   }
     // Until then qctx is accepted + threaded but does not alter behavior.
     (void)qctx;

@@ -47,9 +47,9 @@ float ScoreMap::LevelToScore(uint8_t level) {
     if (level > 4) {
         // §4.4 defensive bottom-out: ComputeLevel never emits >4, so reaching here means
         // a caller passed a raw bad level. Carry the exact identity + structured_data.
-        ScoringMetrics::Instance().RecordError(F07ErrorCode::kLevelInvalid);  // §6 error_total
+        ScoringMetrics::Instance().RecordError(ScoringErrorCode::kLevelInvalid);  // §6 error_total
         throw agent_friendly::AgentFriendlyException(MakeScoringError(
-            F07ErrorCode::kLevelInvalid,
+            ScoringErrorCode::kLevelInvalid,
             {{"level_received", level}, {"max_allowed", 4}, {"scoring_input", nullptr}},
             "ScoreMap::LevelToScore: level out of range"));
     }

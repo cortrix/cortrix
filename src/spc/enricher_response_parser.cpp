@@ -102,7 +102,7 @@ std::vector<EnrichResult> ParseEnrichBatchResponse(const std::string& body,
                 // repair marks a provider-contract deviation — surface it, never
                 // let it become the silent normal path.
                 CORTRIX_LOG_WARN("spc",
-                    "F03 batch response accepted via escape repair (invalid "
+                    "batch response accepted via escape repair (invalid "
                     "backslash escape from provider; batch_size={} model={})",
                     batch_size, model);
             }

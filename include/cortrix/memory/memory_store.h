@@ -141,12 +141,12 @@ private:
     // Create the agent_trace + interaction_sources tables in this memory.db
     // (they live alongside interaction_log, the table the observability handlers read). Runs the
     // frozen AgentTraceSchemaProvider + InteractionSourcesSchemaProvider (idempotent).
-    Status CreateF13ObservabilityTables();
+    Status CreateAgentTraceObservabilityTables();
     // Idempotently add the opt-out columns + partial index (memory_sessions
     // opt_out_at / opted_out_by; interaction_log remember). SQLite ADD COLUMN is not
     // "if not exists", so guarded on pragma_table_info — same pattern as the SPC
     // schema providers. Pure ADD; the frozen MVP columns are untouched.
-    Status MigrateMem04OptOutColumns();
+    Status MigrateMemoryOptOutColumns();
     static std::string GenerateUUID();
     static std::string NowISO8601();
 

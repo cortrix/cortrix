@@ -61,10 +61,10 @@ std::string QuoteIdent(const std::string& ident) { return "\"" + ident + "\""; }
 
 Status ValidateSqlKeywords(const std::string& sql, const QueryConstraints& constraints) {
     if (sql.empty()) {
-        return F16aStatus(F16aErrorCode::kInvalidSql, "empty SQL");
+        return ImportStatus(ImportErrorCode::kInvalidSql, "empty SQL");
     }
     if (static_cast<int>(sql.size()) > constraints.max_sql_length) {
-        return F16aStatus(F16aErrorCode::kInvalidSql,
+        return ImportStatus(ImportErrorCode::kInvalidSql,
                           "SQL exceeds max length " + std::to_string(constraints.max_sql_length));
     }
     // Reject comment markers + statement separators outright (stacked queries /
@@ -73,7 +73,7 @@ Status ValidateSqlKeywords(const std::string& sql, const QueryConstraints& const
     static const std::vector<std::string> kBannedSubstrings = {"--", "/*", "*/", ";", "#"};
     for (const std::string& bad : kBannedSubstrings) {
         if (sql.find(bad) != std::string::npos) {
-            return F16aStatus(F16aErrorCode::kInvalidSql,
+            return ImportStatus(ImportErrorCode::kInvalidSql,
                               "SQL contains a forbidden sequence");
         }
     }
@@ -82,14 +82,14 @@ Status ValidateSqlKeywords(const std::string& sql, const QueryConstraints& const
     if (tokens.empty() || tokens.front() != "SELECT") {
         // Leading statement must be SELECT (a WITH-CTE / anything else is rejected in
         // V1.0 — keeps the gate simple and conservative).
-        return F16aStatus(F16aErrorCode::kInvalidSql, "only SELECT statements are allowed");
+        return ImportStatus(ImportErrorCode::kInvalidSql, "only SELECT statements are allowed");
     }
 
     std::set<std::string> denied(constraints.denied_keywords.begin(),
                                  constraints.denied_keywords.end());
     for (const std::string& tok : tokens) {
         if (denied.count(tok)) {
-            return F16aStatus(F16aErrorCode::kInvalidSql,
+            return ImportStatus(ImportErrorCode::kInvalidSql,
                               "SQL contains a forbidden keyword: " + tok);
         }
     }
@@ -100,7 +100,7 @@ Status ValidateFilterDsl(const nlohmann::json& filter_dsl,
                          const FilterDslConstraints& constraints) {
     if (filter_dsl.is_null()) return Status::Ok();  // no filter = unconstrained SELECT
     if (!filter_dsl.is_object()) {
-        return F16aStatus(F16aErrorCode::kInvalidSql, "filter must be a JSON object");
+        return ImportStatus(ImportErrorCode::kInvalidSql, "filter must be a JSON object");
     }
 
     std::set<std::string> ops(constraints.allowed_operators.begin(),
@@ -113,50 +113,50 @@ Status ValidateFilterDsl(const nlohmann::json& filter_dsl,
         std::string subkey;
         bool is_meta = IsMetadataField(field, subkey);
         if (!is_meta && !IsBareIdentifier(field)) {
-            return F16aStatus(F16aErrorCode::kInvalidSql,
+            return ImportStatus(ImportErrorCode::kInvalidSql,
                               "filter field is not a valid identifier: " + field);
         }
         // Field allowlist: when allowed_fields is non-empty, a bare field must be in
         // it (metadata.* is always allowed — it maps to a JSONB accessor on the
         // metadata column, whose subkeys are open).
         if (!is_meta && !fields.empty() && !fields.count(field)) {
-            return F16aStatus(F16aErrorCode::kInvalidSql,
+            return ImportStatus(ImportErrorCode::kInvalidSql,
                               "filter field is not in the allowlist: " + field);
         }
 
         const nlohmann::json& cond = it.value();
         if (!cond.is_object() || cond.empty()) {
-            return F16aStatus(F16aErrorCode::kInvalidSql,
+            return ImportStatus(ImportErrorCode::kInvalidSql,
                               "filter condition must be a non-empty {op: value} object");
         }
         for (auto cit = cond.begin(); cit != cond.end(); ++cit) {
             const std::string& op = cit.key();
             if (!ops.count(op)) {
-                return F16aStatus(F16aErrorCode::kInvalidSql,
+                return ImportStatus(ImportErrorCode::kInvalidSql,
                                   "filter operator not allowed: " + op);
             }
             // operator-specific value shape checks.
             const nlohmann::json& val = cit.value();
             if (op == "in") {
                 if (!val.is_array() || val.empty()) {
-                    return F16aStatus(F16aErrorCode::kInvalidSql,
+                    return ImportStatus(ImportErrorCode::kInvalidSql,
                                       "'in' operator requires a non-empty array");
                 }
             } else if (op == "between") {
                 if (!val.is_array() || val.size() != 2) {
-                    return F16aStatus(F16aErrorCode::kInvalidSql,
+                    return ImportStatus(ImportErrorCode::kInvalidSql,
                                       "'between' operator requires a [lo, hi] array");
                 }
             } else if (op == "is_null") {
                 if (!val.is_boolean()) {
-                    return F16aStatus(F16aErrorCode::kInvalidSql,
+                    return ImportStatus(ImportErrorCode::kInvalidSql,
                                       "'is_null' operator requires a boolean");
                 }
             } else {
                 // eq/ne/gt/gte/lt/lte/like: a scalar (string/number/bool). Reject
                 // objects/arrays (no nested expressions — that is how injection hides).
                 if (val.is_object() || val.is_array()) {
-                    return F16aStatus(F16aErrorCode::kInvalidSql,
+                    return ImportStatus(ImportErrorCode::kInvalidSql,
                                       "operator '" + op + "' requires a scalar value");
                 }
             }
@@ -205,7 +205,7 @@ Result<CompiledQuery> BuildQueryFromFilterDsl(const std::string& table,
                                               const std::vector<std::string>& columns,
                                               const FilterDslConstraints& constraints) {
     if (!IsBareIdentifier(table)) {
-        return F16aStatus(F16aErrorCode::kInvalidSql,
+        return ImportStatus(ImportErrorCode::kInvalidSql,
                           "table is not a valid identifier: " + table);
     }
     Status v = ValidateFilterDsl(filter_dsl, constraints);
@@ -217,7 +217,7 @@ Result<CompiledQuery> BuildQueryFromFilterDsl(const std::string& table,
         std::string joined;
         for (const std::string& c : columns) {
             if (!IsBareIdentifier(c)) {
-                return F16aStatus(F16aErrorCode::kInvalidSql,
+                return ImportStatus(ImportErrorCode::kInvalidSql,
                                   "column is not a valid identifier: " + c);
             }
             if (!joined.empty()) joined += ", ";
@@ -275,7 +275,7 @@ Result<CompiledQuery> CompileQueryRequest(const QueryRequest& req,
     const bool has_table = req.table.has_value() && !req.table->empty();
     const bool has_sql = req.sql.has_value() && !req.sql->empty();
     if (has_table == has_sql) {
-        return F16aStatus(F16aErrorCode::kInvalidSql,
+        return ImportStatus(ImportErrorCode::kInvalidSql,
                           "exactly one of {table, sql} must be provided");
     }
     if (has_table) {
@@ -301,7 +301,7 @@ Result<int64_t> QueryExecutor::EstimateRowCount(const std::string& /*dsn*/,
     Result<CompiledQuery> compiled = CompileQueryRequest(req, constraints, dsl_constraints_);
     if (!compiled.ok()) return compiled.status();
     // Real SELECT COUNT(*) over the read-only connection → D3.5.
-    return F16aStatus(F16aErrorCode::kConnectionFailed,
+    return ImportStatus(ImportErrorCode::kConnectionFailed,
                       "live PostgreSQL COUNT(*) is wired in D3.5 (standalone validates only)");
 }
 
@@ -311,7 +311,7 @@ Result<std::vector<DbRow>> QueryExecutor::Execute(const std::string& /*dsn*/,
     Result<CompiledQuery> compiled = CompileQueryRequest(req, constraints, dsl_constraints_);
     if (!compiled.ok()) return compiled.status();
     // Real read-only PQexecParams (timeout + row cap enforced at the connection) → D3.5.
-    return F16aStatus(F16aErrorCode::kConnectionFailed,
+    return ImportStatus(ImportErrorCode::kConnectionFailed,
                       "live PostgreSQL execution is wired in D3.5 (standalone validates only)");
 }
 

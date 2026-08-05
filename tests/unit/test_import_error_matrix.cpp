@@ -13,21 +13,21 @@
 #include "cortrix/import/import_error.h"
 
 // Exhaustive error-registry matrix for DB-import (src/import/import_error.*).
-// One TEST_P case per F16aErrorCode. Unique suite name (F16aErrorMatrix).
+// One TEST_P case per ImportErrorCode. Unique suite name (ImportErrorMatrix).
 namespace cortrix::import {
 namespace {
 
 using agent_friendly::ErrorCategory;
 
-const std::vector<F16aErrorCode>& AllCodes() {
-    static const std::vector<F16aErrorCode> codes = {
-        F16aErrorCode::kConnectionFailed,
-        F16aErrorCode::kAuthDenied,
-        F16aErrorCode::kInvalidSql,
-        F16aErrorCode::kTimeout,
-        F16aErrorCode::kRowsLimitExceeded,
-        F16aErrorCode::kCrossTenantRef,
-        F16aErrorCode::kInternal,
+const std::vector<ImportErrorCode>& AllCodes() {
+    static const std::vector<ImportErrorCode> codes = {
+        ImportErrorCode::kConnectionFailed,
+        ImportErrorCode::kAuthDenied,
+        ImportErrorCode::kInvalidSql,
+        ImportErrorCode::kTimeout,
+        ImportErrorCode::kRowsLimitExceeded,
+        ImportErrorCode::kCrossTenantRef,
+        ImportErrorCode::kInternal,
     };
     return codes;
 }
@@ -47,25 +47,25 @@ const std::set<StatusCode>& ValidStatusCodes() {
     return kCodes;
 }
 
-class F16aErrorMatrix : public ::testing::TestWithParam<F16aErrorCode> {};
+class ImportErrorMatrix : public ::testing::TestWithParam<ImportErrorCode> {};
 
-TEST_P(F16aErrorMatrix, CodeStringWellFormed) {
-    static const std::regex kPattern("^CX_(ERR|WARN)_F16A_[A-Z][A-Z0-9_]*$");
-    const std::string cx = F16aErrorCodeString(GetParam());
+TEST_P(ImportErrorMatrix, CodeStringWellFormed) {
+    static const std::regex kPattern("^CX_(ERR|WARN)_IMPORT_[A-Z][A-Z0-9_]*$");
+    const std::string cx = ImportErrorCodeString(GetParam());
     EXPECT_TRUE(std::regex_match(cx, kPattern)) << "bad code string: " << cx;
-    EXPECT_EQ(cx, std::string(GetF16aErrorInfo(GetParam()).cx_code));
+    EXPECT_EQ(cx, std::string(GetImportErrorInfo(GetParam()).cx_code));
 }
 
-TEST_P(F16aErrorMatrix, CategoryInValidSet) {
-    const F16aErrorInfo& info = GetF16aErrorInfo(GetParam());
+TEST_P(ImportErrorMatrix, CategoryInValidSet) {
+    const ImportErrorInfo& info = GetImportErrorInfo(GetParam());
     EXPECT_EQ(ValidCategoryStrings().count(agent_friendly::ToString(info.category)), 1u)
         << "code " << info.cx_code;
 }
 
 // retry_after_ms present implies retryable; here every retryable DB import code also
 // carries a positive backoff (module-uniform).
-TEST_P(F16aErrorMatrix, RetryAfterImpliesRetryable) {
-    const F16aErrorInfo& info = GetF16aErrorInfo(GetParam());
+TEST_P(ImportErrorMatrix, RetryAfterImpliesRetryable) {
+    const ImportErrorInfo& info = GetImportErrorInfo(GetParam());
     if (info.retry_after_ms.has_value()) {
         EXPECT_TRUE(info.retryable) << info.cx_code;
         EXPECT_GT(*info.retry_after_ms, 0) << info.cx_code;
@@ -73,14 +73,14 @@ TEST_P(F16aErrorMatrix, RetryAfterImpliesRetryable) {
     EXPECT_EQ(info.retryable, info.retry_after_ms.has_value()) << info.cx_code;
 }
 
-TEST_P(F16aErrorMatrix, HttpStatusInValidRange) {
-    const F16aErrorInfo& info = GetF16aErrorInfo(GetParam());
+TEST_P(ImportErrorMatrix, HttpStatusInValidRange) {
+    const ImportErrorInfo& info = GetImportErrorInfo(GetParam());
     EXPECT_GE(info.http_status, 200);
     EXPECT_LT(info.http_status, 600);
 }
 
-TEST_P(F16aErrorMatrix, RequiredStructuredDataContract) {
-    const F16aErrorCode code = GetParam();
+TEST_P(ImportErrorMatrix, RequiredStructuredDataContract) {
+    const ImportErrorCode code = GetParam();
     const std::vector<std::string>& keys = RequiredStructuredDataKeys(code);
 
     nlohmann::json full = nlohmann::json::object();
@@ -97,12 +97,12 @@ TEST_P(F16aErrorMatrix, RequiredStructuredDataContract) {
     EXPECT_EQ(HasRequiredStructuredData(code, nlohmann::json(nullptr)), keys.empty());
 }
 
-TEST_P(F16aErrorMatrix, MakeErrorRoundTrips) {
-    const F16aErrorCode code = GetParam();
-    const F16aErrorInfo& info = GetF16aErrorInfo(code);
+TEST_P(ImportErrorMatrix, MakeErrorRoundTrips) {
+    const ImportErrorCode code = GetParam();
+    const ImportErrorInfo& info = GetImportErrorInfo(code);
     nlohmann::json sd = {{"probe", 1}};
 
-    auto err = MakeF16aError(code, sd, "human detail");
+    auto err = MakeImportError(code, sd, "human detail");
     EXPECT_EQ(err.code, std::string(info.cx_code));
     EXPECT_EQ(err.category, info.category);
     EXPECT_EQ(err.retryable, info.retryable);
@@ -123,35 +123,35 @@ TEST_P(F16aErrorMatrix, MakeErrorRoundTrips) {
     EXPECT_EQ(body["structured_data"]["probe"], 1);
 }
 
-TEST_P(F16aErrorMatrix, EmptyMessageFallsBackToCode) {
-    const F16aErrorCode code = GetParam();
-    auto err = MakeF16aError(code);
-    EXPECT_EQ(err.message, std::string(F16aErrorCodeString(code)));
+TEST_P(ImportErrorMatrix, EmptyMessageFallsBackToCode) {
+    const ImportErrorCode code = GetParam();
+    auto err = MakeImportError(code);
+    EXPECT_EQ(err.message, std::string(ImportErrorCodeString(code)));
 }
 
-TEST_P(F16aErrorMatrix, StatusCodeBucketAndBridge) {
-    const F16aErrorCode code = GetParam();
-    const StatusCode sc = F16aErrorToStatusCode(code);
+TEST_P(ImportErrorMatrix, StatusCodeBucketAndBridge) {
+    const ImportErrorCode code = GetParam();
+    const StatusCode sc = ImportErrorToStatusCode(code);
     EXPECT_EQ(ValidStatusCodes().count(sc), 1u);
     EXPECT_NE(sc, StatusCode::kOk);
 
-    Status s = F16aStatus(code, "detail-z");
+    Status s = ImportStatus(code, "detail-z");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), sc);
-    EXPECT_NE(s.message().find(F16aErrorCodeString(code)), std::string::npos);
+    EXPECT_NE(s.message().find(ImportErrorCodeString(code)), std::string::npos);
     EXPECT_NE(s.message().find("detail-z"), std::string::npos);
 
-    Status bare = F16aStatus(code);
-    EXPECT_EQ(bare.message(), std::string(F16aErrorCodeString(code)));
+    Status bare = ImportStatus(code);
+    EXPECT_EQ(bare.message(), std::string(ImportErrorCodeString(code)));
 }
 
 // The throwing form carries the same Agent-friendly error as the factory.
-TEST_P(F16aErrorMatrix, ExceptionCarriesError) {
-    const F16aErrorCode code = GetParam();
-    const F16aErrorInfo& info = GetF16aErrorInfo(code);
+TEST_P(ImportErrorMatrix, ExceptionCarriesError) {
+    const ImportErrorCode code = GetParam();
+    const ImportErrorInfo& info = GetImportErrorInfo(code);
     try {
-        throw F16aException(code, nlohmann::json::object(), "boom");
-    } catch (const F16aException& ex) {
+        throw ImportException(code, nlohmann::json::object(), "boom");
+    } catch (const ImportException& ex) {
         EXPECT_EQ(ex.code(), code);
         const auto& err = ex.GetError();
         EXPECT_EQ(err.code, std::string(info.cx_code));
@@ -161,17 +161,17 @@ TEST_P(F16aErrorMatrix, ExceptionCarriesError) {
     }
 }
 
-INSTANTIATE_TEST_SUITE_P(AllF16aCodes, F16aErrorMatrix,
+INSTANTIATE_TEST_SUITE_P(AllImportCodes, ImportErrorMatrix,
                          ::testing::ValuesIn(AllCodes()));
 
-TEST(F16aErrorMatrixGuard, CodeStringsAreUniqueAndCountMatches) {
+TEST(ImportErrorMatrixGuard, CodeStringsAreUniqueAndCountMatches) {
     std::set<std::string> seen;
-    for (F16aErrorCode code : AllCodes()) {
-        EXPECT_TRUE(seen.insert(F16aErrorCodeString(code)).second)
-            << "duplicate: " << F16aErrorCodeString(code);
+    for (ImportErrorCode code : AllCodes()) {
+        EXPECT_TRUE(seen.insert(ImportErrorCodeString(code)).second)
+            << "duplicate: " << ImportErrorCodeString(code);
     }
     EXPECT_EQ(seen.size(), AllCodes().size());
-    EXPECT_EQ(static_cast<int>(AllCodes().size()), kF16aErrorCodeCount);
+    EXPECT_EQ(static_cast<int>(AllCodes().size()), kImportErrorCodeCount);
 }
 
 }  // namespace

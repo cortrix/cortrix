@@ -31,7 +31,7 @@ namespace cortrix {
 
 namespace {
 
-using agent_trace::F13ErrorCode;
+using agent_trace::AgentTraceErrorCode;
 using agent_trace::InteractionListFilter;
 using agent_trace::InteractionListView;
 using agent_trace::InteractionSourcesView;
@@ -82,15 +82,15 @@ std::string ExtractCxCode(const std::string& message) {
     return end == std::string::npos ? message : message.substr(0, end);
 }
 
-// Map a recovered "CX_ERR_TRACE_*" token back to its F13ErrorCode. The handlers only
+// Map a recovered "CX_ERR_TRACE_*" token back to its AgentTraceErrorCode. The handlers only
 // ever emit these four on the read path; anything unrecognized is treated as the
 // internal fault (defensive — keeps the body well-formed).
-F13ErrorCode F13CodeFromToken(const std::string& cx) {
-    if (cx == "CX_ERR_TRACE_SESSION_NOT_FOUND")     return F13ErrorCode::kSessionNotFound;
-    if (cx == "CX_ERR_TRACE_INVALID_FILTER")        return F13ErrorCode::kInvalidFilter;
-    if (cx == "CX_ERR_TRACE_INTERACTION_NOT_FOUND") return F13ErrorCode::kInteractionNotFound;
-    if (cx == "CX_ERR_TRACE_UNAUTHORIZED")          return F13ErrorCode::kUnauthorized;
-    return F13ErrorCode::kInternal;
+AgentTraceErrorCode AgentTraceCodeFromToken(const std::string& cx) {
+    if (cx == "CX_ERR_TRACE_SESSION_NOT_FOUND")     return AgentTraceErrorCode::kSessionNotFound;
+    if (cx == "CX_ERR_TRACE_INVALID_FILTER")        return AgentTraceErrorCode::kInvalidFilter;
+    if (cx == "CX_ERR_TRACE_INTERACTION_NOT_FOUND") return AgentTraceErrorCode::kInteractionNotFound;
+    if (cx == "CX_ERR_TRACE_UNAUTHORIZED")          return AgentTraceErrorCode::kUnauthorized;
+    return AgentTraceErrorCode::kInternal;
 }
 
 // Build the §9.2-required structured_data for `code` from the values this route
@@ -98,27 +98,27 @@ F13ErrorCode F13CodeFromToken(const std::string& cx) {
 // agent_trace_error.h); the route is where the concrete ids live (session_id /
 // interaction_id from the path, required_role for the auth denial, error_id for an
 // internal fault). `id_value` carries the session_id or interaction_id as relevant.
-json BuildF13StructuredData(F13ErrorCode code, const std::string& id_value,
+json BuildAgentTraceStructuredData(AgentTraceErrorCode code, const std::string& id_value,
                             const std::string& request_id) {
     json sd = json::object();
     switch (code) {
-        case F13ErrorCode::kSessionNotFound:
+        case AgentTraceErrorCode::kSessionNotFound:
             sd["session_id"] = id_value;
             break;
-        case F13ErrorCode::kInteractionNotFound:
+        case AgentTraceErrorCode::kInteractionNotFound:
             sd["interaction_id"] = id_value;
             break;
-        case F13ErrorCode::kUnauthorized:
+        case AgentTraceErrorCode::kUnauthorized:
             sd["required_role"] = "admin";
             break;
-        case F13ErrorCode::kInvalidFilter:
+        case AgentTraceErrorCode::kInvalidFilter:
             // The handler-originated INVALID_FILTER carries no field breakdown; name
             // the filter generically (route-originated filter errors use the richer
-            // WriteF13InvalidFilter path with the exact offending param).
+            // WriteAgentTraceInvalidFilter path with the exact offending param).
             sd["invalid_field"] = "filter";
             sd["reason"] = "invalid filter value";
             break;
-        case F13ErrorCode::kInternal:
+        case AgentTraceErrorCode::kInternal:
         default:
             sd["error_id"] = request_id;
             break;
@@ -129,7 +129,7 @@ json BuildF13StructuredData(F13ErrorCode code, const std::string& id_value,
 // Render a handler Status (carrying a CX_ERR_TRACE_* token) as the GEN-Agent error
 // body + the mapped HTTP status. `id_value` = the session_id / interaction_id the
 // route was operating on (used to fill structured_data for the NOT_FOUND codes).
-void WriteF13Error(httplib::Response& res, const Status& status,
+void WriteAgentTraceError(httplib::Response& res, const Status& status,
                    const std::string& request_id, const std::string& id_value) {
     const std::string cx = ExtractCxCode(status.message());
     if (cx.empty()) {
@@ -138,17 +138,17 @@ void WriteF13Error(httplib::Response& res, const Status& status,
         WriteJsonError(res, status, request_id);
         return;
     }
-    const F13ErrorCode code = F13CodeFromToken(cx);
-    json sd = BuildF13StructuredData(code, id_value, request_id);
+    const AgentTraceErrorCode code = AgentTraceCodeFromToken(cx);
+    json sd = BuildAgentTraceStructuredData(code, id_value, request_id);
     json body;
     body["error"] = agent_friendly::ToJson(
-        agent_trace::MakeF13Error(code, std::move(sd), status.message()));
+        agent_trace::MakeAgentTraceError(code, std::move(sd), status.message()));
     if (!request_id.empty()) {
         body["error"]["request_id"] = request_id;
         res.set_header("X-Request-Id", request_id);
     }
     res.set_content(body.dump(), "application/json");
-    // The incoming Status already carries the StatusCode F13Status mapped from the
+    // The incoming Status already carries the StatusCode AgentTraceStatus mapped from the
     // code (NotFound/PermissionDenied/InvalidArgument/Internal) -> reuse its
     // http_status() so the HTTP mapping is single-sourced.
     res.status = status.http_status();
@@ -157,7 +157,7 @@ void WriteF13Error(httplib::Response& res, const Status& status,
 // Render a route-originated CX_ERR_TRACE_INVALID_FILTER (a malformed query param) with
 // the exact offending field + reason + a PII-guarded preview (§9.2 — value_preview
 // optional, first 100 chars). HTTP 400.
-void WriteF13InvalidFilter(httplib::Response& res, const std::string& request_id,
+void WriteAgentTraceInvalidFilter(httplib::Response& res, const std::string& request_id,
                            const std::string& field, const std::string& reason,
                            const std::string& value) {
     json sd;
@@ -165,8 +165,8 @@ void WriteF13InvalidFilter(httplib::Response& res, const std::string& request_id
     sd["reason"] = reason;
     sd["value_preview"] = value.substr(0, 100);  // PII guard — first 100 chars only
     json body;
-    body["error"] = agent_friendly::ToJson(agent_trace::MakeF13Error(
-        F13ErrorCode::kInvalidFilter, std::move(sd),
+    body["error"] = agent_friendly::ToJson(agent_trace::MakeAgentTraceError(
+        AgentTraceErrorCode::kInvalidFilter, std::move(sd),
         "CX_ERR_TRACE_INVALID_FILTER: " + field + " " + reason));
     if (!request_id.empty()) {
         body["error"]["request_id"] = request_id;
@@ -321,7 +321,7 @@ void ServeTraces(agent_trace::TracesHandler& traces, const httplib::Request& req
     ParseAndInstallObservabilityHeaders(req, res);
     auto sid_it = req.path_params.find("session_id");
     if (sid_it == req.path_params.end() || sid_it->second.empty()) {
-        WriteF13InvalidFilter(res, rctx.request_id, "session_id",
+        WriteAgentTraceInvalidFilter(res, rctx.request_id, "session_id",
                               "must be provided in the path", "");
         return;
     }
@@ -332,14 +332,14 @@ void ServeTraces(agent_trace::TracesHandler& traces, const httplib::Request& req
         !ParseTimestampParam(req, "to_timestamp", &filter.to_timestamp, &bf, &br, &bv) ||
         !ParseIntParam(req, "limit", &filter.limit, &bf, &br, &bv) ||
         !ParseIntParam(req, "offset", &filter.offset, &bf, &br, &bv)) {
-        WriteF13InvalidFilter(res, rctx.request_id, bf, br, bv);
+        WriteAgentTraceInvalidFilter(res, rctx.request_id, bf, br, bv);
         return;
     }
     if (req.has_param("status")) {
         const std::string st = req.get_param_value("status");
         if (st != "success" && st != "failed" && st != "cancelled" &&
             st != "session_timeout") {
-            WriteF13InvalidFilter(res, rctx.request_id, "status",
+            WriteAgentTraceInvalidFilter(res, rctx.request_id, "status",
                 "must be one of success|failed|cancelled|session_timeout", st);
             return;
         }
@@ -347,7 +347,7 @@ void ServeTraces(agent_trace::TracesHandler& traces, const httplib::Request& req
     }
     auto r = traces.GetSession(session_id, filter, MakeRequesterContext(rctx));
     if (!r.ok()) {
-        WriteF13Error(res, r.status(), rctx.request_id, session_id);
+        WriteAgentTraceError(res, r.status(), rctx.request_id, session_id);
         return;
     }
     WriteJsonResponse(res, 200,
@@ -361,14 +361,14 @@ void ServeSources(agent_trace::InteractionsHandler& inter, const httplib::Reques
     ParseAndInstallObservabilityHeaders(req, res);
     auto id_it = req.path_params.find("id");
     if (id_it == req.path_params.end() || id_it->second.empty()) {
-        WriteF13InvalidFilter(res, rctx.request_id, "interaction_id",
+        WriteAgentTraceInvalidFilter(res, rctx.request_id, "interaction_id",
                               "must be provided in the path", "");
         return;
     }
     const std::string& interaction_id = id_it->second;
     auto r = inter.GetSources(interaction_id, MakeRequesterContext(rctx));
     if (!r.ok()) {
-        WriteF13Error(res, r.status(), rctx.request_id, interaction_id);
+        WriteAgentTraceError(res, r.status(), rctx.request_id, interaction_id);
         return;
     }
     WriteJsonResponse(res, 200, SourcesViewToJson(r.value()), rctx.request_id);
@@ -385,7 +385,7 @@ void ServeListInteractions(agent_trace::InteractionsHandler& inter,
         !ParseTimestampParam(req, "to_timestamp", &filter.to_timestamp, &bf, &br, &bv) ||
         !ParseIntParam(req, "limit", &filter.limit, &bf, &br, &bv) ||
         !ParseIntParam(req, "offset", &filter.offset, &bf, &br, &bv)) {
-        WriteF13InvalidFilter(res, rctx.request_id, bf, br, bv);
+        WriteAgentTraceInvalidFilter(res, rctx.request_id, bf, br, bv);
         return;
     }
     if (req.has_param("user_id"))      filter.user_id = req.get_param_value("user_id");
@@ -396,7 +396,7 @@ void ServeListInteractions(agent_trace::InteractionsHandler& inter,
         std::transform(so.begin(), so.end(), so.begin(),
                        [](unsigned char c) { return std::toupper(c); });
         if (so != "ASC" && so != "DESC") {
-            WriteF13InvalidFilter(res, rctx.request_id, "sort_order",
+            WriteAgentTraceInvalidFilter(res, rctx.request_id, "sort_order",
                                   "must be ASC|DESC", req.get_param_value("sort_order"));
             return;
         }
@@ -404,7 +404,7 @@ void ServeListInteractions(agent_trace::InteractionsHandler& inter,
     }
     auto r = inter.ListInteractions(filter, MakeRequesterContext(rctx));
     if (!r.ok()) {
-        WriteF13Error(res, r.status(), rctx.request_id, /*id_value=*/"");
+        WriteAgentTraceError(res, r.status(), rctx.request_id, /*id_value=*/"");
         return;
     }
     WriteJsonResponse(res, 200, InteractionListToJson(r.value()), rctx.request_id);
@@ -440,7 +440,7 @@ bool RequireNamespaceParam(const httplib::Request& req, httplib::Response& res,
     *ns = req.get_param_value(param_name);
     if (ns->empty() && std::string(param_name) == "namespace") *ns = req.get_param_value("ns");
     if (ns->empty()) {
-        WriteF13InvalidFilter(res, rctx.request_id, param_name,
+        WriteAgentTraceInvalidFilter(res, rctx.request_id, param_name,
                               "query param is required (per-NS observability storage)", "");
         return false;
     }
@@ -591,7 +591,7 @@ void RegisterInteractionsRoutesPerNs(httplib::Server& server,
         if (!RequireNamespaceParam(req, res, rctx, ns_param, &ns)) return;
         resource::NamespaceFacade facade(pool, ns);
         if (Status acq = facade.Acquire(); !acq.ok()) {
-            WriteF13Error(res, Status::NotFound("CX_ERR_TRACE_SESSION_NOT_FOUND: namespace '" +
+            WriteAgentTraceError(res, Status::NotFound("CX_ERR_TRACE_SESSION_NOT_FOUND: namespace '" +
                                                 ns + "' not found"),
                           rctx.request_id, ns);
             return;

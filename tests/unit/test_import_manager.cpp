@@ -186,7 +186,7 @@ TEST(ImportManagerTest, NonAdminRejectedSynchronously) {
 TEST(ImportManagerTest, CrossTenantRefThrows) {
     ManagerFixture f({Row("1", "Ada")});
     // admin of a DIFFERENT tenant tries to use t1's ref.
-    EXPECT_THROW((void)f.mgr->StartImport(f.Req(), AdminCtx("t2", "evil")), F16aException);
+    EXPECT_THROW((void)f.mgr->StartImport(f.Req(), AdminCtx("t2", "evil")), ImportException);
 }
 
 TEST(ImportManagerTest, InvalidQueryRejectedSynchronously) {

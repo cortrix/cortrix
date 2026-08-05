@@ -349,7 +349,7 @@ class QueryRouteValBadRoute
     : public QueryRouteValMatrix,
       public ::testing::WithParamInterface<std::string> {};
 
-TEST_P(QueryRouteValBadRoute, F39RouteInvalid400) {
+TEST_P(QueryRouteValBadRoute, RouterRouteInvalid400) {
     httplib::Client cli("127.0.0.1", port_);
     auto res = cli.Post("/api/v1/query?route=" + GetParam(), Auth(), Body("default"),
                         "application/json");

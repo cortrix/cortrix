@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <ctime>
 
-#include "cortrix/memory/mem05_metrics.h"
+#include "cortrix/memory/memory_isolation_metrics.h"
 
 namespace cortrix {
 
@@ -291,13 +291,13 @@ bool MemorySearcher::MatchScope(const json& metadata,
     // §8.bis: each exclusion is a match_scope_excluded_total{reason} event (the
     // retrieval-path pre-filter, distinct from the API-entry isolation_violation).
     if (!metadata.contains("user_id") || !metadata["user_id"].is_string()) {
-        memory::Mem05Metrics::Instance().RecordMatchScopeExcluded(
-            memory::Mem05Metrics::Reason::kMissingUserId);
+        memory::MemoryIsolationMetrics::Instance().RecordMatchScopeExcluded(
+            memory::MemoryIsolationMetrics::Reason::kMissingUserId);
         return false;  // no user_id in metadata -> exclude
     }
     if (metadata["user_id"].get<std::string>() != request.user_id) {
-        memory::Mem05Metrics::Instance().RecordMatchScopeExcluded(
-            memory::Mem05Metrics::Reason::kMismatch);
+        memory::MemoryIsolationMetrics::Instance().RecordMatchScopeExcluded(
+            memory::MemoryIsolationMetrics::Reason::kMismatch);
         return false;  // wrong user -> exclude
     }
 

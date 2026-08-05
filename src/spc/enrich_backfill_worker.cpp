@@ -333,7 +333,7 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
                 // Hype embed failure keeps f38 owed for the next retry round.
                 rep.still_owed.push_back("f38");
                 if (rep.last_error.empty()) {
-                    rep.last_error = "F38 hype embedding failed: " + qes.message();
+                    rep.last_error = "hype embedding failed: " + qes.message();
                 }
                 continue;
             }

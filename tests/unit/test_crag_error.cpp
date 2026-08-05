@@ -26,7 +26,7 @@ TEST(CragErrorTest, CountMatchesEnumeration) {
     EXPECT_EQ(std::size(kAll), static_cast<size_t>(kCragErrorCodeCount));
 }
 
-TEST(CragErrorTest, AllCodesHaveUniqueF37CxStrings) {
+TEST(CragErrorTest, AllCodesHaveUniqueCragCxStrings) {
     std::set<std::string> seen;
     for (CragErrorCode c : kAll) {
         std::string s = CragErrorCodeString(c);

@@ -9,7 +9,7 @@ namespace cortrix::resource {
 
 /// The `ns_pool` subsystem metrics (observability naming,
 /// naming `cortrix_ns_pool_<metric>_<unit>`). Self-contained dependency-free
-/// recorder (same pattern as ScoringMetrics / Mem02Metrics): a process-wide
+/// recorder (same pattern as ScoringMetrics / MemoryExtractMetrics): a process-wide
 /// singleton of atomic gauges/counters/histograms + an OpenMetrics text renderer.
 ///
 /// 🚨 Cardinality control: labels are

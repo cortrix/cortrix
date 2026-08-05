@@ -5,7 +5,7 @@
 #include <string>
 
 #include "cortrix/async/document_task_handler.h"
-#include "cortrix/async/f42_error.h"
+#include "cortrix/async/task_error.h"
 #include "cortrix/async/task_info.h"
 #include "cortrix/async/task_manager.h"
 #include "cortrix/async/task_scheduler.h"
@@ -368,19 +368,19 @@ TEST_F(DocumentTaskHandlerTest, GetProgressFailedHint) {
 // ---- Issue 5 GEN-Agent 4-field schema across all 11 codes -------------------
 
 TEST(DocumentTaskHandlerSchemaTest, AllElevenCodesEmitFourFieldEnvelope) {
-    // Every CX_ERR_* serialized via ToJson(MakeF42Error(...)) carries the 4
+    // Every CX_ERR_* serialized via ToJson(MakeTaskError(...)) carries the 4
     // GEN-Agent fields with the correct types (§6.2 / AGENT_FRIENDLY §3.1).
-    constexpr F42ErrorCode kAll[] = {
-        F42ErrorCode::kInvalidRequest,          F42ErrorCode::kMaxPagesExceeded,
-        F42ErrorCode::kTaskNotFound,            F42ErrorCode::kTaskTimeout,
-        F42ErrorCode::kDocProcessingInProgress, F42ErrorCode::kTaskCancelling,
-        F42ErrorCode::kParseFailed,             F42ErrorCode::kStorageFailed,
-        F42ErrorCode::kWorkerBusy,              F42ErrorCode::kZombieTaskCleanup,
-        F42ErrorCode::kServiceUnavailable,
+    constexpr TaskErrorCode kAll[] = {
+        TaskErrorCode::kInvalidRequest,          TaskErrorCode::kMaxPagesExceeded,
+        TaskErrorCode::kTaskNotFound,            TaskErrorCode::kTaskTimeout,
+        TaskErrorCode::kDocProcessingInProgress, TaskErrorCode::kTaskCancelling,
+        TaskErrorCode::kParseFailed,             TaskErrorCode::kStorageFailed,
+        TaskErrorCode::kWorkerBusy,              TaskErrorCode::kZombieTaskCleanup,
+        TaskErrorCode::kServiceUnavailable,
     };
     std::set<std::string> codes;
-    for (F42ErrorCode c : kAll) {
-        nlohmann::json j = agent_friendly::ToJson(MakeF42Error(c));
+    for (TaskErrorCode c : kAll) {
+        nlohmann::json j = agent_friendly::ToJson(MakeTaskError(c));
         ASSERT_TRUE(j.contains("code"));
         ASSERT_TRUE(j.contains("retryable"));
         ASSERT_TRUE(j.contains("category"));

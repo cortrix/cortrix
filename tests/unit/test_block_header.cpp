@@ -584,11 +584,11 @@ TEST(BlockHeaderTest, DifferentContentDifferentHash) {
 // (Design §6 tests #33-48.)
 // ============================================================================
 
-TEST(BlockHeaderTest, F09_StructSize128) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_StructSize128) {
     EXPECT_EQ(sizeof(cortrix_block_header_t), 128u);
 }
 
-TEST(BlockHeaderTest, F09_MagicIsCrtx) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_MagicIsCrtx) {
     EXPECT_EQ(kBlockMagic, 0x43525458u);  // "CRTX"
     auto blob = BlockBuild(kBlockFile, kLevelL1, "x", "", "");
     const cortrix_block_header_t* hdr = nullptr;
@@ -596,7 +596,7 @@ TEST(BlockHeaderTest, F09_MagicIsCrtx) {
     EXPECT_EQ(hdr->magic, 0x43525458u);
 }
 
-TEST(BlockHeaderTest, F09_InitSetsVersion1) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_InitSetsVersion1) {
     cortrix_block_header_t hdr;
     BlockHeaderInit(&hdr);
     EXPECT_EQ(hdr.header_version, 1u);
@@ -604,7 +604,7 @@ TEST(BlockHeaderTest, F09_InitSetsVersion1) {
     EXPECT_EQ(hdr.header_size, 128u);
 }
 
-TEST(BlockHeaderTest, F09_BuildParseRoundtripAllFields) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_BuildParseRoundtripAllFields) {
     auto blob = BlockBuild(kBlockMeta, kLevelL4, "content", "{\"k\":1}", "chain",
                            /*vector_dim=*/768, /*embedding_model_id=*/42,
                            /*flags_ext=*/kFlagExtHasEntities | kFlagExtHasSummary,
@@ -621,7 +621,7 @@ TEST(BlockHeaderTest, F09_BuildParseRoundtripAllFields) {
     EXPECT_EQ(hdr->compression_algo, 1u);
 }
 
-TEST(BlockHeaderTest, F09_FlagsExtHasEntities) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_FlagsExtHasEntities) {
     auto blob = BlockBuild(kBlockFile, kLevelL3, "c", "", "", 0, 0,
                            kFlagExtHasEntities);
     const cortrix_block_header_t* hdr = nullptr;
@@ -630,7 +630,7 @@ TEST(BlockHeaderTest, F09_FlagsExtHasEntities) {
     EXPECT_FALSE(hdr->flags_ext & kFlagExtHasSummary);
 }
 
-TEST(BlockHeaderTest, F09_FlagsExtHasSummary) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_FlagsExtHasSummary) {
     auto blob = BlockBuild(kBlockFile, kLevelL3, "c", "", "", 0, 0,
                            kFlagExtHasSummary);
     const cortrix_block_header_t* hdr = nullptr;
@@ -638,7 +638,7 @@ TEST(BlockHeaderTest, F09_FlagsExtHasSummary) {
     EXPECT_TRUE(hdr->flags_ext & kFlagExtHasSummary);
 }
 
-TEST(BlockHeaderTest, F09_FlagsExtCombined) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_FlagsExtCombined) {
     const uint8_t fx = kFlagExtHasEntities | kFlagExtHasSummary |
                        kFlagExtIsAnomalous | kFlagExtHasContextualized |
                        kFlagExtHasSparseVec;
@@ -648,7 +648,7 @@ TEST(BlockHeaderTest, F09_FlagsExtCombined) {
     EXPECT_EQ(hdr->flags_ext, fx);
 }
 
-TEST(BlockHeaderTest, F09_EnrichmentSources) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_EnrichmentSources) {
     for (uint8_t src : {kEnrichNone, kEnrichDocling, kEnrichPaddleOCR,
                         kEnrichLlm, kEnrichVision}) {
         auto blob = BlockBuild(kBlockFile, kLevelL2, "c", "", "", 0, 0, 0, src);
@@ -658,7 +658,7 @@ TEST(BlockHeaderTest, F09_EnrichmentSources) {
     }
 }
 
-TEST(BlockHeaderTest, F09_CompressionAlgoPlaceholder) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_CompressionAlgoPlaceholder) {
     auto blob = BlockBuild(kBlockFile, kLevelL2, "c", "", "", 0, 0, 0, 0,
                            /*compression_algo=*/2);
     const cortrix_block_header_t* hdr = nullptr;
@@ -666,14 +666,14 @@ TEST(BlockHeaderTest, F09_CompressionAlgoPlaceholder) {
     EXPECT_EQ(hdr->compression_algo, 2u);
 }
 
-TEST(BlockHeaderTest, F09_BlockTypeMeta) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_BlockTypeMeta) {
     auto blob = BlockBuild(kBlockMeta, kLevelL1, "m", "", "");
     const cortrix_block_header_t* hdr = nullptr;
     ASSERT_TRUE(BlockParse(blob.data(), blob.size(), &hdr));
     EXPECT_EQ(hdr->block_type, 8u);
 }
 
-TEST(BlockHeaderTest, F09_ProcessingLevelL4) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_ProcessingLevelL4) {
     auto blob = BlockBuild(kBlockFile, kLevelL4, "c", "", "");
     const cortrix_block_header_t* hdr = nullptr;
     ASSERT_TRUE(BlockParse(blob.data(), blob.size(), &hdr));
@@ -681,7 +681,7 @@ TEST(BlockHeaderTest, F09_ProcessingLevelL4) {
 }
 
 // CRC now covers offset 84 (flags_ext) — tampering it must fail parse.
-TEST(BlockHeaderTest, F09_CrcCoversExtFields) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_CrcCoversExtFields) {
     auto blob = BlockBuild(kBlockFile, kLevelL3, "content", "", "", 0, 0,
                            kFlagExtHasEntities);
     const cortrix_block_header_t* hdr = nullptr;
@@ -692,7 +692,7 @@ TEST(BlockHeaderTest, F09_CrcCoversExtFields) {
 }
 
 // CRC now covers reserved (offset 87-127) — tampering it must fail parse.
-TEST(BlockHeaderTest, F09_CrcCoversReserved) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_CrcCoversReserved) {
     auto blob = BlockBuild(kBlockFile, kLevelL3, "content", "", "");
     const cortrix_block_header_t* hdr = nullptr;
     ASSERT_TRUE(BlockParse(blob.data(), blob.size(), &hdr));
@@ -702,7 +702,7 @@ TEST(BlockHeaderTest, F09_CrcCoversReserved) {
 }
 
 // Flipping the crc32 field's own bytes (80-83) is still detected (value changes).
-TEST(BlockHeaderTest, F09_CrcFieldItselfNotInRangeButTamperDetected) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_CrcFieldItselfNotInRangeButTamperDetected) {
     auto blob = BlockBuild(kBlockFile, kLevelL3, "content", "", "");
     const cortrix_block_header_t* hdr = nullptr;
     ASSERT_TRUE(BlockParse(blob.data(), blob.size(), &hdr));
@@ -710,7 +710,7 @@ TEST(BlockHeaderTest, F09_CrcFieldItselfNotInRangeButTamperDetected) {
     EXPECT_FALSE(BlockParse(blob.data(), blob.size(), &hdr));
 }
 
-TEST(BlockHeaderTest, F09_HeaderToString) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_HeaderToString) {
     auto blob = BlockBuild(kBlockFile, kLevelL4, "content", "", "", 0, 0,
                            kFlagExtHasEntities, kEnrichLlm);
     const cortrix_block_header_t* hdr = nullptr;
@@ -722,12 +722,12 @@ TEST(BlockHeaderTest, F09_HeaderToString) {
     EXPECT_NE(s.find("enrich=LLM"), std::string::npos);
 }
 
-TEST(BlockHeaderTest, F09_HeaderToStringNull) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_HeaderToStringNull) {
     EXPECT_EQ(BlockHeaderToString(nullptr), "BlockHeader{null}");
 }
 
 // header_version != 1 is rejected (no V1/V2 compat in Phase 1).
-TEST(BlockHeaderTest, F09_UnsupportedVersionRejected) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_UnsupportedVersionRejected) {
     auto blob = BlockBuild(kBlockFile, kLevelL1, "content", "", "");
     // Bump version to 2 and recompute CRC so only the version gate can reject it.
     auto* hdr = reinterpret_cast<cortrix_block_header_t*>(blob.data());
@@ -739,7 +739,7 @@ TEST(BlockHeaderTest, F09_UnsupportedVersionRejected) {
 }
 
 // MVP callers (no block header params) still build/parse cleanly — defaults all zero.
-TEST(BlockHeaderTest, F09_MvpCallerDefaultsZero) {
+TEST(BlockHeaderTest, BLOCKFRAMEWORK_MvpCallerDefaultsZero) {
     auto blob = BlockBuild(kBlockFile, kLevelL2, "legacy", "{}", "");
     const cortrix_block_header_t* hdr = nullptr;
     ASSERT_TRUE(BlockParse(blob.data(), blob.size(), &hdr));

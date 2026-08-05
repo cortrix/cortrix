@@ -312,7 +312,7 @@ TEST_F(OnnxCollectModelsTest, EmptyModelPathRegistersNothing) {
 // the dense path also certifies the model sparse path runs on. Appending
 // any *distinct* future model to the collector stays D3.5 (collector comment).
 
-TEST_F(OnnxCollectModelsTest, F40SparseReusesBgeM3SingleRegistration) {
+TEST_F(OnnxCollectModelsTest, SparseReusesBgeM3SingleRegistration) {
     // The bge-m3 registration is shared: registering it once covers both the
     // dense embedder and the sparse activation (single model, single path).
     CortrixConfig config = BaseConfig();
@@ -323,7 +323,7 @@ TEST_F(OnnxCollectModelsTest, F40SparseReusesBgeM3SingleRegistration) {
     EXPECT_EQ(cfg.registered_model_paths[0], "/models/bge-m3/model.onnx");
 }
 
-TEST_F(OnnxCollectModelsTest, F40SparseStubOnlyRegistersNothing) {
+TEST_F(OnnxCollectModelsTest, SparseStubOnlyRegistersNothing) {
     // Stub-only (no model) deployment: sparse runs on the deterministic stub
     // too, so — like the dense path — there is nothing to validate at startup.
     CortrixConfig config = BaseConfig();  // empty embedding.model_path

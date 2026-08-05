@@ -2,7 +2,7 @@
 
 namespace cortrix::connector {
 
-Status F21SchemaProvider::Migrate(sqlite3* /*db*/, int from_ver, int to_ver) {
+Status WatcherSchemaProvider::Migrate(sqlite3* /*db*/, int from_ver, int to_ver) {
     // Phase 1: 0 → 1 is an init no-op. namespaces.watcher_config JSONB is created
     // by the catalog base schema (catalog_schema.cpp) and the watcher owns no extra column,
     // so there is no DDL to emit here. Also accept an already-current (1 → 1)
@@ -14,7 +14,7 @@ Status F21SchemaProvider::Migrate(sqlite3* /*db*/, int from_ver, int to_ver) {
     // evolution (TD-WATCHER-OPTIONS activates the 4 per-NS JSONB keys). Until
     // then, an unexpected version step is an error.
     return Status::InvalidArgument(
-        "CX_ERR_SCHEMA_VERSION_MISMATCH: F21 unsupported migration " +
+        "CX_ERR_SCHEMA_VERSION_MISMATCH: watcher unsupported migration " +
         std::to_string(from_ver) + " -> " + std::to_string(to_ver));
 }
 

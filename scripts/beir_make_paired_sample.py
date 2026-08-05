@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build a reproducible paired BEIR sample for Cortrix retrieval diagnostics.
 
-The output format intentionally matches scripts/f36_rerank_loop_diag.py:
+The output format intentionally matches scripts/rag_fusion_rerank_loop_diag.py:
 
   sampled_corpus.jsonl
   sampled_queries.jsonl

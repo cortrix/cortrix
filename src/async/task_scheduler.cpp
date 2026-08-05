@@ -1,8 +1,8 @@
 #include <cstdint>
 #include "cortrix/async/task_scheduler.h"
 
-#include "cortrix/async/f42_error.h"
-#include "cortrix/async/f42_metrics.h"
+#include "cortrix/async/task_error.h"
+#include "cortrix/async/task_metrics.h"
 
 namespace cortrix::async {
 
@@ -62,7 +62,7 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
                 const std::string superseded = r.filepath;
                 auto refreshed = mgr_->UpdateTaskForDebounce(r.task_id, req);
                 if (refreshed.ok()) {
-                    F42Metrics::Instance().RecordSubmitted(
+                    TaskMetrics::Instance().RecordSubmitted(
                         static_cast<TaskType>(req.task_type));
                     // The row now points at the new input; the previous one is
                     // orphaned the moment that write lands.
@@ -90,7 +90,7 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
     task.status = task_status::kQueued;
     auto created = mgr_->CreateTask(std::move(task));
     if (created.ok()) {
-        F42Metrics::Instance().RecordSubmitted(static_cast<TaskType>(req.task_type));
+        TaskMetrics::Instance().RecordSubmitted(static_cast<TaskType>(req.task_type));
     }
     return created;
 }
@@ -117,7 +117,7 @@ Result<std::optional<TaskInfo>> TaskScheduler::Dequeue(int worker_id) {
         // (which also released its input) or claimed by another worker. Report "no
         // task available" rather than an error: dispatching it would hand a worker a
         // task whose input may already be gone, and the caller simply tries again.
-        const char* conflict = F42ErrorCodeString(F42ErrorCode::kDocProcessingInProgress);
+        const char* conflict = TaskErrorCodeString(TaskErrorCode::kDocProcessingInProgress);
         if (s.message().rfind(conflict, 0) == 0) {
             return std::optional<TaskInfo>{};
         }
@@ -127,8 +127,8 @@ Result<std::optional<TaskInfo>> TaskScheduler::Dequeue(int worker_id) {
     task.worker_id = worker_id;
     // §6.bis cortrix_tasks_queue_depth{state="processing"}: the in-flight doc set
     // is this scheduler's authoritative processing count within the process.
-    F42Metrics::Instance().SetQueueDepth(
-        F42Metrics::QueueState::kProcessing,
+    TaskMetrics::Instance().SetQueueDepth(
+        TaskMetrics::QueueState::kProcessing,
         static_cast<int64_t>(active_docs_.size()));
     return std::optional<TaskInfo>{task};
 }
@@ -137,8 +137,8 @@ void TaskScheduler::OnTaskCompleted(const std::string& namespace_id,
                                     const std::string& doc_id) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!doc_id.empty()) active_docs_.erase({namespace_id, doc_id});
-    F42Metrics::Instance().SetQueueDepth(
-        F42Metrics::QueueState::kProcessing,
+    TaskMetrics::Instance().SetQueueDepth(
+        TaskMetrics::QueueState::kProcessing,
         static_cast<int64_t>(active_docs_.size()));
 }
 

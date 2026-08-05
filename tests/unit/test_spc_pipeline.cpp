@@ -37,7 +37,7 @@
 #include "cortrix/common/status.h"
 #include "cortrix/doc_summary/doc_fts5_index.h"
 #include "cortrix/doc_summary/discover_handler.h"
-#include "cortrix/resource/f05_config.h"
+#include "cortrix/resource/namespace_pool_config.h"
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/resource/namespace_pool.h"
 #include "cortrix/resource/namespace_resource_bundle.h"
@@ -358,7 +358,7 @@ protected:
 
     // ── namespace pool plumbing ──
     std::filesystem::path tmp_root_;
-    resource::F05Config config_;
+    resource::NamespacePoolConfig config_;
     NiceMock<MockIndexFactory> index_factory_;
     NiceMock<MockNSRouter> ns_router_;
     NiceMock<MockUnitRouter> unit_router_;
@@ -450,7 +450,7 @@ TEST_F(SPCPipelineTest, UnifiedWrite_ParentsAndChildrenPersisted) {
 // Block (block_type = kBlockMeta = 8) is written into the same `blocks` table. It
 // carries no child_id/parent_id but has a natural-language block_text (content_text)
 // + the 26-field metadata_json; exactly one per doc (idx_blocks_meta_doc).
-TEST_F(SPCPipelineTest, F08MetadataBlock_Persisted) {
+TEST_F(SPCPipelineTest, MetadataBlockPersisted) {
     std::string doc_id = CreateDoc();
     auto task_uptr_ = MakeTask(txt_path_, "text/plain", doc_id);
     SPCTask& task = *task_uptr_;
@@ -476,7 +476,7 @@ TEST_F(SPCPipelineTest, F08MetadataBlock_Persisted) {
 // doc_fts5_index row that query/discover uses as the doc-level fallback candidate
 // path. This is a product-level test: real NamespaceFacade + real Unit SQLite,
 // not the standalone DocFts5Index :memory: wrapper.
-TEST_F(SPCPipelineTest, F41DocFts5Index_RowWrittenFromF08Metadata) {
+TEST_F(SPCPipelineTest, DocSummaryFts5IndexRowWrittenFromMetadata) {
     std::string doc_id = CreateDoc();
     auto task_uptr = MakeTask(txt_path_, "text/plain", doc_id);
     task_uptr->metadata_json = R"({"authors":["Ada","Lovelace"]})";
@@ -512,7 +512,7 @@ TEST_F(SPCPipelineTest, F41DocFts5Index_RowWrittenFromF08Metadata) {
 // children before the write. Two byte-identical large paragraphs (each > parent_size
 // so each forms its own parent → byte-identical child chunks) must collapse: no two
 // written child rows share identical text.
-TEST_F(SPCPipelineTest, F10_DedupRemovesDuplicateChildren) {
+TEST_F(SPCPipelineTest, CLEANING_DedupRemovesDuplicateChildren) {
     const std::string para(4400, 'x');  // ~1100 tokens (> parent_size 1024) → own parent
     const std::string json =
         std::string(R"JSON({"status":0,"parser":"docling",)JSON") +
@@ -547,7 +547,7 @@ TEST_F(SPCPipelineTest, F10_DedupRemovesDuplicateChildren) {
 // into cleaning; exact-hash dedup drops one → chunks_input=2, chunks_skipped_dedup=1,
 // chunks_indexed=1. The pipeline records the summary onto the SPCTask, surfaced via
 // ResponseMetaJson() (= what the HTTP/MCP doc response folds into meta).
-TEST_F(SPCPipelineTest, F10_ResponseMetaCarriesCleaningSummary) {
+TEST_F(SPCPipelineTest, CLEANING_ResponseMetaCarriesCleaningSummary) {
     const std::string para(4400, 'y');  // > parent_size → its own parent, duplicated below
     const std::string json =
         std::string(R"JSON({"status":0,"parser":"docling",)JSON") +
@@ -592,7 +592,7 @@ TEST_F(SPCPipelineTest, F10_ResponseMetaCarriesCleaningSummary) {
 // parent span covers page 1, which is the failed page → the child is marked anomalous
 // (kept, but flagged skip-index). Regression for the dead-code gap where MetaToJson
 // dropped parse_status so PARSE_FAILED never triggered in the live pipeline.
-TEST_F(SPCPipelineTest, F10_ParseFailedPropagatesToChild) {
+TEST_F(SPCPipelineTest, CLEANING_ParseFailedPropagatesToChild) {
     // One distinct paragraph on page 1, sized like the default fixture paragraphs so
     // the chunker reliably emits a child (small enough to stay one parent on page 1).
     std::string para;
@@ -636,15 +636,15 @@ TEST_F(SPCPipelineTest, F10_ParseFailedPropagatesToChild) {
 // [cleaning · M1] When a per-NS CleaningConfig resolver seam is installed, the
 // pipeline applies it to the DataCleaner before cleaning. Here the NS turns dedup
 // OFF (dedup_enabled=false), so two byte-identical child chunks that WOULD collapse
-// under the default config (see F10_DedupRemovesDuplicateChildren) both survive —
+// under the default config (see CLEANING_DedupRemovesDuplicateChildren) both survive —
 // proving the resolved NS config took effect on the owned DataCleaner.
-// [R7] SPCPipelineTest.F10_NsConfigResolver_DisablesDedup was removed here — it had
+// [R7] SPCPipelineTest.CLEANING_NsConfigResolver_DisablesDedup was removed here — it had
 // an assertion bug (failed in BOTH release and coverage builds, identical==0):
 // para(4400,'x') has no separators, so child chunking splits it into ~16 fragments,
 // none of which equals the full 4400-char string, making the `content_text == para`
 // count always 0 regardless of whether dedup ran. The source (DataCleaner::Dedup
 // early-returning when dedup_enabled==false) is correct. Replaced by
-// test_spc_pipeline_r7.cpp::F10_NsResolverDisablesDedup_KeepsDuplicateChildren,
+// test_spc_pipeline_r7.cpp::CLEANING_NsResolverDisablesDedup_KeepsDuplicateChildren,
 // which asserts survivor-count > distinct-text-count (no dependence on the broken
 // "one child == full paragraph" assumption).
 

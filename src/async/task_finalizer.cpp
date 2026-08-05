@@ -5,9 +5,9 @@
 #include <sstream>
 #include <utility>
 
-#include "cortrix/async/f42_error.h"
+#include "cortrix/async/task_error.h"
 #include "cortrix/async/managed_input.h"
-#include "cortrix/async/f42_metrics.h"
+#include "cortrix/async/task_metrics.h"
 
 #include <spdlog/spdlog.h>
 
@@ -48,8 +48,8 @@ Status TaskFinalizer::Complete(const TaskInfo& task, const std::string& doc_id,
     // DocumentProcessor contract — parse OK stays OK even if MarkCompleted NotFounds.
     const Status persisted = mgr_->MarkCompleted(task.task_id, doc_id);
     const auto tt = static_cast<TaskType>(task.task_type);
-    F42Metrics::Instance().RecordCompleted(tt, F42Metrics::CompletionStatus::kSuccess);
-    F42Metrics::Instance().ObserveDuration(tt, ElapsedSeconds(t_start));
+    TaskMetrics::Instance().RecordCompleted(tt, TaskMetrics::CompletionStatus::kSuccess);
+    TaskMetrics::Instance().ObserveDuration(tt, ElapsedSeconds(t_start));
     // Only give up the input once the terminal state is durable. If the row write
     // was rejected the task is still live and will be retried or re-queued, and it
     // needs its input to exist when that happens.
@@ -66,13 +66,13 @@ Status TaskFinalizer::Fail(const TaskInfo& task, const std::string& error_code,
     const Status persisted =
         mgr_->MarkFailed(task.task_id, error_code, error_msg, structured_data.dump());
     spdlog::warn(
-        "F42 TaskFinalizer: task failed task_id={} task_type={} namespace_id={} doc_id={} "
+        "TaskFinalizer: task failed task_id={} task_type={} namespace_id={} doc_id={} "
         "error_code={} error_msg={} structured_data_keys={}",
         task.task_id, task.task_type, task.namespace_id, task.doc_id, error_code,
         error_msg, StructuredDataKeys(structured_data));
     const auto tt = static_cast<TaskType>(task.task_type);
-    F42Metrics::Instance().RecordCompleted(tt, F42Metrics::CompletionStatus::kFailed);
-    F42Metrics::Instance().ObserveDuration(tt, ElapsedSeconds(t_start));
+    TaskMetrics::Instance().RecordCompleted(tt, TaskMetrics::CompletionStatus::kFailed);
+    TaskMetrics::Instance().ObserveDuration(tt, ElapsedSeconds(t_start));
     if (persisted.ok()) ReleaseManagedInput(task);
     return Status(StatusCode::kInternal, error_code + ": " + error_msg);
 }
@@ -81,10 +81,10 @@ Status TaskFinalizer::Cancel(const TaskInfo& task,
                              std::chrono::steady_clock::time_point t_start) {
     const Status persisted = mgr_->MarkCancelled(task.task_id);
     const auto tt = static_cast<TaskType>(task.task_type);
-    F42Metrics::Instance().RecordCompleted(tt, F42Metrics::CompletionStatus::kCancelled);
-    F42Metrics::Instance().ObserveDuration(tt, ElapsedSeconds(t_start));
+    TaskMetrics::Instance().RecordCompleted(tt, TaskMetrics::CompletionStatus::kCancelled);
+    TaskMetrics::Instance().ObserveDuration(tt, ElapsedSeconds(t_start));
     if (persisted.ok()) ReleaseManagedInput(task);
-    return F42Status(F42ErrorCode::kTaskCancelling, task.task_id);
+    return TaskStatus(TaskErrorCode::kTaskCancelling, task.task_id);
 }
 
 }  // namespace cortrix::async

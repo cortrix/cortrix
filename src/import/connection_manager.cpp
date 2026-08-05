@@ -248,19 +248,19 @@ Result<ConnectionRefId> ConnectionManager::Register(const std::string& name,
                                                     const std::string& registered_by,
                                                     std::optional<int> expire_days) {
     if (name.empty() || dsn.empty() || tenant_id.empty()) {
-        return F16aStatus(F16aErrorCode::kInvalidSql,
+        return ImportStatus(ImportErrorCode::kInvalidSql,
                           "name, dsn and tenant_id are required to register a connection");
     }
     int days = expire_days.value_or(config_.expire_default_days);
     if (days <= 0 || days > config_.expire_max_days) {
-        return F16aStatus(F16aErrorCode::kInvalidSql,
+        return ImportStatus(ImportErrorCode::kInvalidSql,
                           "expire_days out of range (1.." +
                               std::to_string(config_.expire_max_days) + ")");
     }
 
     std::string secret_key_id = secret_store_->Put(dsn);
     if (secret_key_id.empty()) {
-        return F16aStatus(F16aErrorCode::kConnectionFailed,
+        return ImportStatus(ImportErrorCode::kConnectionFailed,
                           "secret store failed to encrypt the connection credential");
     }
 
@@ -296,28 +296,28 @@ Result<std::string> ConnectionManager::ResolveDsn(const ConnectionRefId& ref_id,
                                                   const AuthContext& auth_ctx) {
     auto rec = conn_store_->Find(ref_id);
     if (!rec) {
-        return F16aStatus(F16aErrorCode::kAuthDenied,
+        return ImportStatus(ImportErrorCode::kAuthDenied,
                           "connection ref not found: " + ref_id);
     }
     // D7 tenant boundary: a ref may only be resolved by its owning tenant. We do NOT
     // distinguish "not found" from "wrong tenant" in the public message (anti-enumeration), but
     // a cross-tenant attempt is its own code so the Agent can re-pick a valid ref.
     if (rec->tenant_id != auth_ctx.tenant_id) {
-        throw F16aException(F16aErrorCode::kCrossTenantRef,
+        throw ImportException(ImportErrorCode::kCrossTenantRef,
                             {{"connection_ref", ref_id}, {"tenant_id", auth_ctx.tenant_id}},
                             "connection ref belongs to another tenant");
     }
     if (rec->revoked_at_ms.has_value()) {
-        return F16aStatus(F16aErrorCode::kAuthDenied, "connection ref has been revoked: " + ref_id);
+        return ImportStatus(ImportErrorCode::kAuthDenied, "connection ref has been revoked: " + ref_id);
     }
     if (rec->expires_at_ms <= NowMs()) {
-        return F16aStatus(F16aErrorCode::kAuthDenied,
+        return ImportStatus(ImportErrorCode::kAuthDenied,
                           "connection ref expired; re-register: " + ref_id);
     }
 
     auto dsn = secret_store_->Get(rec->secret_key_id);
     if (!dsn) {
-        return F16aStatus(F16aErrorCode::kConnectionFailed,
+        return ImportStatus(ImportErrorCode::kConnectionFailed,
                           "secret store could not resolve the credential");
     }
     return *dsn;
@@ -345,9 +345,9 @@ Status ConnectionManager::Revoke(const ConnectionRefId& ref_id,
                                  const AuthContext& auth_ctx,
                                  const std::string& reason) {
     auto rec = conn_store_->Find(ref_id);
-    if (!rec) return F16aStatus(F16aErrorCode::kAuthDenied, "connection ref not found: " + ref_id);
+    if (!rec) return ImportStatus(ImportErrorCode::kAuthDenied, "connection ref not found: " + ref_id);
     if (rec->tenant_id != auth_ctx.tenant_id) {
-        return F16aStatus(F16aErrorCode::kCrossTenantRef,
+        return ImportStatus(ImportErrorCode::kCrossTenantRef,
                           "connection ref belongs to another tenant: " + ref_id);
     }
     Status s = conn_store_->MarkRevoked(ref_id, NowMs(), auth_ctx.user_id, reason);

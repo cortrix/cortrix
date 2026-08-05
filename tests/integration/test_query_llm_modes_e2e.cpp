@@ -270,9 +270,9 @@ TEST_F(QueryWithoutLlm, NoLlmDegradesGracefully) {
 // design, but doc-level candidates were not guaranteed to enter the query candidate
 // path. The probe deliberately keeps "Lovelace" OUT of the document text/filename and
 // puts it only in upload metadata.authors, so a hit proves META block -> doc_fts5 -> query.
-constexpr const char* kF44Ns = "f44_doc_fallback";
+constexpr const char* kBenchmarkNs = "f44_doc_fallback";
 
-std::string F44MetadataOnlyProbeDoc() {
+std::string BenchmarkMetadataOnlyProbeDoc() {
   return "F44 benchmark path validation note. The document discusses an analytical "
          "engine, early computing machinery, and retrieval candidate ordering.\n\n"
          "The author name used by this regression is intentionally stored only in "
@@ -333,13 +333,13 @@ bool HasMetadataKey(const json& body, const std::string& key) {
   return false;
 }
 
-class F44DocFtsFallbackE2E : public ::testing::Test {
+class BenchmarkDocFtsFallbackE2E : public ::testing::Test {
  protected:
   void SetUp() override {
     h_ = std::make_unique<cortrix::test::FullStackE2E>();
     h_->BuildIngest(/*embedding_dim=*/128);
     perm_svc_ = std::make_unique<cortrix::tenant::PermissionService>(h_->global_db());
-    ASSERT_TRUE(h_->CreateNamespaceOwnedBy(kF44Ns, "alice").ok());
+    ASSERT_TRUE(h_->CreateNamespaceOwnedBy(kBenchmarkNs, "alice").ok());
 
     cortrix::RegisterDocumentRoutes(h_->server(), h_->upload_handler(), h_->pool(),
                                     h_->auth());
@@ -368,18 +368,18 @@ class F44DocFtsFallbackE2E : public ::testing::Test {
   std::string IngestProbeDoc() {
     auto c = h_->Client();
     httplib::MultipartFormDataItems items = {
-        {"file", F44MetadataOnlyProbeDoc(), "f44_metadata_probe.txt", "text/plain"},
+        {"file", BenchmarkMetadataOnlyProbeDoc(), "f44_metadata_probe.txt", "text/plain"},
         {"metadata", R"({"authors":["Ada","Lovelace"],"tags":["f44","metadata-only"]})",
          "metadata.json", "application/json"},
     };
-    auto up = c.Post(std::string("/api/v1/namespaces/") + kF44Ns + "/documents",
+    auto up = c.Post(std::string("/api/v1/namespaces/") + kBenchmarkNs + "/documents",
                      h_->Bearer(h_->user_key()), items);
     EXPECT_TRUE(up);
     EXPECT_EQ(up ? up->status : 0, 201) << (up ? up->body : "no response");
     if (!up || up->status != 201) return "";
     const std::string doc_id = json::parse(up->body)["doc_id"].get<std::string>();
     for (int i = 0; i < 100; ++i) {
-      auto st = c.Get(std::string("/api/v1/namespaces/") + kF44Ns + "/documents/" +
+      auto st = c.Get(std::string("/api/v1/namespaces/") + kBenchmarkNs + "/documents/" +
                           doc_id + "/status",
                       h_->Bearer(h_->user_key()));
       if (st && st->status == 200) {
@@ -401,7 +401,7 @@ class F44DocFtsFallbackE2E : public ::testing::Test {
                         const std::string& query = "Lovelace") {
     auto c = h_->Client();
     json body = {{"query", query},
-                 {"namespaces", json::array({kF44Ns})},
+                 {"namespaces", json::array({kBenchmarkNs})},
                  {"route", "complex"},
                  {"granularity", granularity},
                  {"top_k", 5},
@@ -415,11 +415,11 @@ class F44DocFtsFallbackE2E : public ::testing::Test {
   std::unique_ptr<cortrix::query::CrossNsQueryWiring> query_wiring_;
 };
 
-TEST_F(F44DocFtsFallbackE2E,
+TEST_F(BenchmarkDocFtsFallbackE2E,
        InvalidCragQueryParamReturns400BeforeRetrieval) {
   auto c = h_->Client();
   json body = {{"query", "Lovelace"},
-               {"namespaces", json::array({kF44Ns})},
+               {"namespaces", json::array({kBenchmarkNs})},
                {"route", "complex"},
                {"granularity", "chunk"},
                {"top_k", 5}};
@@ -430,13 +430,13 @@ TEST_F(F44DocFtsFallbackE2E,
   EXPECT_THAT(res->body, HasSubstr("crag must be one of"));
 }
 
-TEST_F(F44DocFtsFallbackE2E,
+TEST_F(BenchmarkDocFtsFallbackE2E,
        MetadataAuthorsReachDiscoverAndQueryDocAndBothGranularity) {
   const std::string doc_id = IngestProbeDoc();
   ASSERT_FALSE(doc_id.empty());
 
   auto c = h_->Client();
-  auto discover = c.Get(std::string("/api/v1/documents/discover?namespace=") + kF44Ns +
+  auto discover = c.Get(std::string("/api/v1/documents/discover?namespace=") + kBenchmarkNs +
                             "&query=Lovelace&top_k=5&explain=true",
                         h_->Bearer(h_->user_key()));
   ASSERT_TRUE(discover);
@@ -457,7 +457,7 @@ TEST_F(F44DocFtsFallbackE2E,
   EXPECT_TRUE(HasMetadataKey(qdoc, "doc_fts5_match_score")) << qdoc_res->body;
   ASSERT_TRUE(qdoc.contains("meta"));
   EXPECT_THAT(qdoc["meta"]["namespaces_succeeded"].get<std::vector<std::string>>(),
-              ::testing::Contains(kF44Ns));
+              ::testing::Contains(kBenchmarkNs));
   ASSERT_TRUE(qdoc.contains("explain"));
   EXPECT_EQ(qdoc["explain"].value("granularity", ""), "doc");
 

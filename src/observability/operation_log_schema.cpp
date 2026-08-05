@@ -56,13 +56,13 @@ Status OperationLogSchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver
             std::string msg = err ? err : "sqlite error";
             sqlite3_free(err);
             return Status::Internal(
-                std::string("CX_ERR_OPLOG_INTERNAL: F18a operation_log schema migration failed: ") + msg);
+                std::string("CX_ERR_OPLOG_INTERNAL: operation_log operation_log schema migration failed: ") + msg);
         }
         return Status::Ok();
     }
     // Unexpected version step (e.g. Phase 2 1 → 2) is not implemented yet.
     return Status::InvalidArgument(
-        "CX_ERR_SCHEMA_VERSION_MISMATCH: F18a unsupported migration " +
+        "CX_ERR_SCHEMA_VERSION_MISMATCH: operation_log unsupported migration " +
         std::to_string(from_ver) + " -> " + std::to_string(to_ver));
 }
 

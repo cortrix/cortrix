@@ -1,14 +1,14 @@
 // Schema-provider matrices for the per-Unit `blocks`-altering enrichment providers:
-//   Enricher (F03SchemaProvider, enriched_score + entities + FTS5, version 2, forward-only)
+//   Enricher (EnricherSchemaProvider, enriched_score + entities + FTS5, version 2, forward-only)
 //   Semantic score (ScoringSchemaProvider, semantic_score, version 1)
-//   Contextual retrieval (F35SchemaProvider, +4 contextual-retrieval columns, version 1)
-//   Parent-child chunking (F34SchemaProvider, parents table + 4 child columns + 3 indexes, version 1)
+//   Contextual retrieval (ContextualSchemaProvider, +4 contextual-retrieval columns, version 1)
+//   Parent-child chunking (ParentChildSchemaProvider, parents table + 4 child columns + 3 indexes, version 1)
 //
 // Each provider: feature identity, Migrate(0->1) shape, idempotent re-run, unsupported
 // version step rejected with the real CX_ERR token, null-db handling, and the
 // no-blocks-table no-op guard. Fresh in-memory sqlite3 per case. Suite/fixture names are
-// globally unique (F03BlkMatrix / F07BlkMatrix / F35BlkMatrix / F34BlkMatrix) and do NOT
-// reuse the names in test_f03_schema_provider.cpp / test_scoring_schema_provider.cpp.
+// globally unique (EnricherBlkMatrix / ScoringBlkMatrix / ContextualBlkMatrix / ParentChildBlkMatrix) and do NOT
+// reuse the names in test_enricher_schema_provider.cpp / test_scoring_schema_provider.cpp.
 
 #include <gtest/gtest.h>
 
@@ -17,9 +17,9 @@
 #include <string>
 
 #include "cortrix/scoring/scoring_schema_provider.h"
-#include "cortrix/spc_enricher/f03_schema_provider.h"
-#include "cortrix/spc_enricher/f35_schema_provider.h"
-#include "cortrix/store/f34_schema_provider.h"
+#include "cortrix/spc_enricher/enricher_schema_provider.h"
+#include "cortrix/spc_enricher/contextual_schema_provider.h"
+#include "cortrix/store/parent_child_schema_provider.h"
 
 namespace cortrix::test_schema_matrix_blocks {
 namespace {
@@ -81,19 +81,19 @@ struct SqliteHelpers {
 
 // ============================ enricher (version 2, forward-only) =======================
 
-class F03BlkMatrix : public ::testing::Test, protected SqliteHelpers {
+class EnricherBlkMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
-    cortrix::spc::F03SchemaProvider p_;
+    cortrix::spc::EnricherSchemaProvider p_;
 };
 
-TEST_F(F03BlkMatrix, FeatureIdentity) {
+TEST_F(EnricherBlkMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "enricher");
     EXPECT_EQ(p_.CurrentVersion(), 2);
 }
 
-TEST_F(F03BlkMatrix, MigrateAddsEnrichmentColumns) {
+TEST_F(EnricherBlkMatrix, MigrateAddsEnrichmentColumns) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("blocks", "enriched_score"));
@@ -101,7 +101,7 @@ TEST_F(F03BlkMatrix, MigrateAddsEnrichmentColumns) {
     EXPECT_TRUE(ColumnExists("blocks", "enricher_metadata"));
 }
 
-TEST_F(F03BlkMatrix, MigrateCreatesEntitiesTableAndIndexes) {
+TEST_F(EnricherBlkMatrix, MigrateCreatesEntitiesTableAndIndexes) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("entities"));
@@ -110,13 +110,13 @@ TEST_F(F03BlkMatrix, MigrateCreatesEntitiesTableAndIndexes) {
     EXPECT_TRUE(IndexExists("idx_blocks_enriched_score"));
 }
 
-TEST_F(F03BlkMatrix, MigrateCreatesEntitiesFts) {
+TEST_F(EnricherBlkMatrix, MigrateCreatesEntitiesFts) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("entities_fts"));
 }
 
-TEST_F(F03BlkMatrix, EntitiesShapeAndFloatRoundTrip) {
+TEST_F(EnricherBlkMatrix, EntitiesShapeAndFloatRoundTrip) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     // entities has 6 columns (entity_id, block_id, text, type, start_offset, end_offset).
@@ -131,7 +131,7 @@ TEST_F(F03BlkMatrix, EntitiesShapeAndFloatRoundTrip) {
     sqlite3_finalize(stmt);
 }
 
-TEST_F(F03BlkMatrix, IdempotentReRun) {
+TEST_F(EnricherBlkMatrix, IdempotentReRun) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());  // re-run 0->1 no-op
@@ -139,7 +139,7 @@ TEST_F(F03BlkMatrix, IdempotentReRun) {
     EXPECT_TRUE(p_.Migrate(db, 2, 2).ok());  // current no-op
 }
 
-TEST_F(F03BlkMatrix, ForwardOneToTwoBackfill) {
+TEST_F(EnricherBlkMatrix, ForwardOneToTwoBackfill) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     // 1->2 is a valid forward backfill (entities FK cascade rebuild path).
@@ -147,13 +147,13 @@ TEST_F(F03BlkMatrix, ForwardOneToTwoBackfill) {
     EXPECT_TRUE(p_.Migrate(db, 0, 2).ok());
 }
 
-TEST_F(F03BlkMatrix, NoBlocksTableIsNoOp) {
+TEST_F(EnricherBlkMatrix, NoBlocksTableIsNoOp) {
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_FALSE(ColumnExists("blocks", "enriched_score"));
     EXPECT_FALSE(TableExists("entities"));
 }
 
-TEST_F(F03BlkMatrix, NullDbAfterValidGate) {
+TEST_F(EnricherBlkMatrix, NullDbAfterValidGate) {
     Status s = p_.Migrate(nullptr, 0, 1);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
@@ -161,17 +161,17 @@ TEST_F(F03BlkMatrix, NullDbAfterValidGate) {
 }
 
 // Forward-only version gate matrix: only steps with 0<=from<=to<=2 are accepted.
-struct F03Step {
+struct EnricherStep {
     int from;
     int to;
     bool ok;
 };
-class F03BlkVersionMatrix : public ::testing::TestWithParam<F03Step> {
+class EnricherBlkVersionMatrix : public ::testing::TestWithParam<EnricherStep> {
 protected:
-    cortrix::spc::F03SchemaProvider p_;
+    cortrix::spc::EnricherSchemaProvider p_;
 };
-TEST_P(F03BlkVersionMatrix, GateOnlyForwardWithinCurrent) {
-    const F03Step step = GetParam();
+TEST_P(EnricherBlkVersionMatrix, GateOnlyForwardWithinCurrent) {
+    const EnricherStep step = GetParam();
     // Null db so we exercise ONLY the version gate (gate runs before the null check
     // for valid steps; for invalid steps the gate rejects regardless of db).
     Status s = p_.Migrate(nullptr, step.from, step.to);
@@ -185,56 +185,56 @@ TEST_P(F03BlkVersionMatrix, GateOnlyForwardWithinCurrent) {
     }
 }
 INSTANTIATE_TEST_SUITE_P(
-    F03BlkSteps, F03BlkVersionMatrix,
+    EnricherBlkSteps, EnricherBlkVersionMatrix,
     ::testing::Values(
-        F03Step{0, 1, true}, F03Step{0, 2, true}, F03Step{1, 2, true},
-        F03Step{2, 2, true}, F03Step{1, 1, true}, F03Step{0, 0, true},
-        F03Step{2, 3, false}, F03Step{0, 3, false}, F03Step{1, 3, false},
-        F03Step{2, 1, false}, F03Step{2, 0, false}, F03Step{1, 0, false},
-        F03Step{-1, 1, false}, F03Step{0, 5, false}, F03Step{3, 4, false}));
+        EnricherStep{0, 1, true}, EnricherStep{0, 2, true}, EnricherStep{1, 2, true},
+        EnricherStep{2, 2, true}, EnricherStep{1, 1, true}, EnricherStep{0, 0, true},
+        EnricherStep{2, 3, false}, EnricherStep{0, 3, false}, EnricherStep{1, 3, false},
+        EnricherStep{2, 1, false}, EnricherStep{2, 0, false}, EnricherStep{1, 0, false},
+        EnricherStep{-1, 1, false}, EnricherStep{0, 5, false}, EnricherStep{3, 4, false}));
 
 // ============================ semantic score scoring (version 1) =================
 
-class F07BlkMatrix : public ::testing::Test, protected SqliteHelpers {
+class ScoringBlkMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
     cortrix::scoring::ScoringSchemaProvider p_;
 };
 
-TEST_F(F07BlkMatrix, FeatureIdentity) {
+TEST_F(ScoringBlkMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "scoring");
     EXPECT_EQ(p_.CurrentVersion(), 1);
     EXPECT_EQ(cortrix::scoring::kScoringSchemaVersion, 1);
 }
 
-TEST_F(F07BlkMatrix, MigrateAddsColumnAndPartialIndex) {
+TEST_F(ScoringBlkMatrix, MigrateAddsColumnAndPartialIndex) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("blocks", "semantic_score"));
     EXPECT_TRUE(IndexExists("idx_blocks_semantic_score"));
 }
 
-TEST_F(F07BlkMatrix, IdempotentReRun) {
+TEST_F(ScoringBlkMatrix, IdempotentReRun) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
 }
 
-TEST_F(F07BlkMatrix, NoBlocksTableIsNoOp) {
+TEST_F(ScoringBlkMatrix, NoBlocksTableIsNoOp) {
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_FALSE(ColumnExists("blocks", "semantic_score"));
 }
 
-TEST_F(F07BlkMatrix, NullDbAfterValidGate) {
+TEST_F(ScoringBlkMatrix, NullDbAfterValidGate) {
     Status s = p_.Migrate(nullptr, 0, 1);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     EXPECT_NE(s.message().find("null db"), std::string::npos);
 }
 
-TEST_F(F07BlkMatrix, FloatRoundTrip) {
+TEST_F(ScoringBlkMatrix, FloatRoundTrip) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_EQ(Exec("INSERT INTO blocks(block_id, doc_id, chunk_index, block_type, "
@@ -252,11 +252,11 @@ struct InitStep {
     int to;
     bool ok;  // true = pass gate (0->1 or n->n)
 };
-class F07BlkVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class ScoringBlkVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
     cortrix::scoring::ScoringSchemaProvider p_;
 };
-TEST_P(F07BlkVersionMatrix, Gate) {
+TEST_P(ScoringBlkVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(nullptr, step.from, step.to);
     if (step.ok) {
@@ -267,26 +267,26 @@ TEST_P(F07BlkVersionMatrix, Gate) {
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
 }
 INSTANTIATE_TEST_SUITE_P(
-    F07BlkSteps, F07BlkVersionMatrix,
+    ScoringBlkSteps, ScoringBlkVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{3, 5, false}));
 
 // ============================ contextual retrieval (version 1, +4 columns) ===========
 
-class F35BlkMatrix : public ::testing::Test, protected SqliteHelpers {
+class ContextualBlkMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
-    cortrix::spc::F35SchemaProvider p_;
+    cortrix::spc::ContextualSchemaProvider p_;
 };
 
-TEST_F(F35BlkMatrix, FeatureIdentity) {
+TEST_F(ContextualBlkMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "contextual");
     EXPECT_EQ(p_.CurrentVersion(), 2);  // V2 = + contextual_vec_labels (§3.8 W2)
 }
 
-TEST_F(F35BlkMatrix, MigrateAddsFourColumns) {
+TEST_F(ContextualBlkMatrix, MigrateAddsFourColumns) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("blocks", "embedding"));
@@ -295,26 +295,26 @@ TEST_F(F35BlkMatrix, MigrateAddsFourColumns) {
     EXPECT_TRUE(ColumnExists("blocks", "contextualized_status"));
 }
 
-TEST_F(F35BlkMatrix, IdempotentReRun) {
+TEST_F(ContextualBlkMatrix, IdempotentReRun) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
 }
 
-TEST_F(F35BlkMatrix, NoBlocksTableIsNoOp) {
+TEST_F(ContextualBlkMatrix, NoBlocksTableIsNoOp) {
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_FALSE(ColumnExists("blocks", "embedding"));
 }
 
-TEST_F(F35BlkMatrix, NullDbAfterValidGate) {
+TEST_F(ContextualBlkMatrix, NullDbAfterValidGate) {
     Status s = p_.Migrate(nullptr, 0, 1);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     EXPECT_NE(s.message().find("null db"), std::string::npos);
 }
 
-TEST_F(F35BlkMatrix, CoexistsWithF03Columns) {
+TEST_F(ContextualBlkMatrix, CoexistsWithEnricherColumns) {
     CreateBlocks();
     ASSERT_EQ(Exec("ALTER TABLE blocks ADD COLUMN enriched_score REAL DEFAULT NULL;"), SQLITE_OK);
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
@@ -322,11 +322,11 @@ TEST_F(F35BlkMatrix, CoexistsWithF03Columns) {
     EXPECT_TRUE(ColumnExists("blocks", "embedding"));
 }
 
-class F35BlkVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class ContextualBlkVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
-    cortrix::spc::F35SchemaProvider p_;
+    cortrix::spc::ContextualSchemaProvider p_;
 };
-TEST_P(F35BlkVersionMatrix, Gate) {
+TEST_P(ContextualBlkVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(nullptr, step.from, step.to);
     if (step.ok) {
@@ -341,7 +341,7 @@ TEST_P(F35BlkVersionMatrix, Gate) {
 // backward steps and beyond-current versions (incl. same-version pairs > 2,
 // formerly tolerated) are CX_ERR_SCHEMA_VERSION_MISMATCH.
 INSTANTIATE_TEST_SUITE_P(
-    F35BlkSteps, F35BlkVersionMatrix,
+    ContextualBlkSteps, ContextualBlkVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, true}, InitStep{0, 2, true},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{4, 4, false},
@@ -351,19 +351,19 @@ INSTANTIATE_TEST_SUITE_P(
 
 // ============================ parent-child chunking (version 1, parents + child cols) ==========
 
-class F34BlkMatrix : public ::testing::Test, protected SqliteHelpers {
+class ParentChildBlkMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
-    cortrix::store::F34SchemaProvider p_;
+    cortrix::store::ParentChildSchemaProvider p_;
 };
 
-TEST_F(F34BlkMatrix, FeatureIdentity) {
+TEST_F(ParentChildBlkMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "parent_child");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
-TEST_F(F34BlkMatrix, CreatesParentsTableEvenWithoutBlocks) {
+TEST_F(ParentChildBlkMatrix, CreatesParentsTableEvenWithoutBlocks) {
     // parents is created unconditionally (independent of blocks).
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("parents"));
@@ -373,7 +373,7 @@ TEST_F(F34BlkMatrix, CreatesParentsTableEvenWithoutBlocks) {
     EXPECT_FALSE(ColumnExists("blocks", "child_id"));
 }
 
-TEST_F(F34BlkMatrix, MigrateAddsChildColumnsAndIndexes) {
+TEST_F(ParentChildBlkMatrix, MigrateAddsChildColumnsAndIndexes) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("blocks", "child_id"));
@@ -385,32 +385,32 @@ TEST_F(F34BlkMatrix, MigrateAddsChildColumnsAndIndexes) {
     EXPECT_TRUE(IndexExists("idx_blocks_meta_doc"));
 }
 
-TEST_F(F34BlkMatrix, ParentsShape) {
+TEST_F(ParentChildBlkMatrix, ParentsShape) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("parents", "parent_id"));
     EXPECT_TRUE(ColumnExists("parents", "parent_text"));
     EXPECT_TRUE(ColumnExists("parents", "hotness_score"));
 }
 
-TEST_F(F34BlkMatrix, IdempotentReRun) {
+TEST_F(ParentChildBlkMatrix, IdempotentReRun) {
     CreateBlocks();
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
 }
 
-TEST_F(F34BlkMatrix, NullDbAfterValidGate) {
+TEST_F(ParentChildBlkMatrix, NullDbAfterValidGate) {
     Status s = p_.Migrate(nullptr, 0, 1);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     EXPECT_NE(s.message().find("null db"), std::string::npos);
 }
 
-class F34BlkVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class ParentChildBlkVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
-    cortrix::store::F34SchemaProvider p_;
+    cortrix::store::ParentChildSchemaProvider p_;
 };
-TEST_P(F34BlkVersionMatrix, Gate) {
+TEST_P(ParentChildBlkVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(nullptr, step.from, step.to);
     if (step.ok) {
@@ -421,7 +421,7 @@ TEST_P(F34BlkVersionMatrix, Gate) {
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
 }
 INSTANTIATE_TEST_SUITE_P(
-    F34BlkSteps, F34BlkVersionMatrix,
+    ParentChildBlkSteps, ParentChildBlkVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{5, 5, true},

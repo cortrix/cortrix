@@ -1,16 +1,16 @@
 // doc_summary end-to-end dispatch (candidate ① D3.5 within-feature E2E): proves
-// the data path wired by ⑤a (SqliteChunkStore) + ⑤b (F41AsyncWorker) + T4 (WorkerPool
+// the data path wired by ⑤a (SqliteChunkStore) + ⑤b (DocSummaryAsyncWorker) + T4 (WorkerPool
 // task_type dispatch) + the main wiring actually runs THROUGH the real async task scheduler:
 //
 //   TaskScheduler::Enqueue(kTaskDocSummary)
 //     → WorkerPool worker thread Dequeue
-//       → dispatch by task_type to the registered F41AsyncWorker
+//       → dispatch by task_type to the registered DocSummaryAsyncWorker
 //         → SqliteChunkStore + DocSummaryGenerator (MockLlmClient) + OnnxEmbedder stub
 //           → doc_summary Block (block_type=17) + P-HNSW point via the write coordinator PWL.
 //
-// Unlike test_f41_async_worker.cpp (⑤b) which calls worker.ProcessTask() directly, this
+// Unlike test_doc_summary_async_worker.cpp (⑤b) which calls worker.ProcessTask() directly, this
 // drives the worker through real WorkerPool threads; unlike test_worker_pool_dispatch.cpp
-// (T4) which routes to recording doubles, this routes to the REAL F41AsyncWorker and
+// (T4) which routes to recording doubles, this routes to the REAL DocSummaryAsyncWorker and
 // asserts the block actually lands. It mirrors main.cpp's "7b" topology (one WorkerPool,
 // kTaskDocParse + kTaskDocSummary handlers coexisting).
 //
@@ -20,11 +20,11 @@
 // worker thread writes it (that contends on the WAL lock; a harness artifact, not a
 // product issue).
 //
-// finalize ownership = handler (async task · decision A, 2026-06-09): F41AsyncWorker
+// finalize ownership = handler (async task · decision A, 2026-06-09): DocSummaryAsyncWorker
 // finalizes its own task.status via TaskFinalizer (success → completed, failure → failed);
 // retry/DLQ is the Phase-2 framework layer above finalize (a separate retry/DLQ item). So this
 // test now asserts BOTH the block landing AND the terminal task.status=completed.
-#include "cortrix/doc_summary/f41_async_worker.h"
+#include "cortrix/doc_summary/doc_summary_async_worker.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -110,13 +110,13 @@ private:
     std::vector<int> seen_;
 };
 
-// Wraps the real F41AsyncWorker so the test can await its completion on a pool thread
+// Wraps the real DocSummaryAsyncWorker so the test can await its completion on a pool thread
 // without polling the per-Unit store concurrently. ProcessTask delegates to the inner
 // worker (which Acquires + Releases its own façade), then notifies — so when WaitFor
 // returns, the worker's write txn is committed and its façade Released.
 class SignalingWorker : public async::ITaskHandler {
 public:
-    explicit SignalingWorker(F41AsyncWorker* inner) : inner_(inner) {}
+    explicit SignalingWorker(DocSummaryAsyncWorker* inner) : inner_(inner) {}
     Status ProcessTask(const async::TaskInfo& task) override {
         Status s = inner_->ProcessTask(task);
         {
@@ -137,7 +137,7 @@ public:
     }
 
 private:
-    F41AsyncWorker* inner_;
+    DocSummaryAsyncWorker* inner_;
     std::mutex mu_;
     std::condition_variable cv_;
     int done_ = 0;
@@ -168,7 +168,7 @@ protected:
     void TearDown() override { harness_.reset(); }
 
     // Seed a doc + `n_chunks` child chunks on the per-Unit store via a scoped façade
-    // (Acquired then Released here) — identical to test_f41_async_worker.cpp. Returns
+    // (Acquired then Released here) — identical to test_doc_summary_async_worker.cpp. Returns
     // the doc's ULID. The worker later self-Acquires the same namespace.
     std::string SeedDoc(int n_chunks) {
         resource::NamespaceFacade f(harness_->ipool(), "test-ns");
@@ -217,8 +217,8 @@ protected:
         return m;
     }
 
-    F41AsyncWorker MakeWorker(std::shared_ptr<llm::ILlmClient> llm) {
-        return F41AsyncWorker(harness_->ipool(), std::move(llm), DocSummaryConfig{},
+    DocSummaryAsyncWorker MakeWorker(std::shared_ptr<llm::ILlmClient> llm) {
+        return DocSummaryAsyncWorker(harness_->ipool(), std::move(llm), DocSummaryConfig{},
                               *embedder_, assembler_, &mgr_);
     }
 
@@ -246,10 +246,10 @@ protected:
 };
 
 // E2E: a kTaskDocSummary submitted to the scheduler is dispatched by a real WorkerPool
-// thread to the real F41AsyncWorker, which lands the doc_summary block + P-HNSW point.
+// thread to the real DocSummaryAsyncWorker, which lands the doc_summary block + P-HNSW point.
 TEST_F(DocSummaryAsyncDispatchTest, DocSummaryTaskDispatchedThroughPoolWritesBlock) {
     const std::string doc_id = SeedDoc(3);
-    F41AsyncWorker worker = MakeWorker(MakeLlm(kSummaryJson));
+    DocSummaryAsyncWorker worker = MakeWorker(MakeLlm(kSummaryJson));
     SignalingWorker signaling(&worker);
 
     async::WorkerPool pool(sched_.get(), &cfg_);
@@ -289,7 +289,7 @@ TEST_F(DocSummaryAsyncDispatchTest, DocSummaryTaskDispatchedThroughPoolWritesBlo
 // worker, and the summary task lands its block.
 TEST_F(DocSummaryAsyncDispatchTest, CoexistingHandlersRouteByTaskType) {
     const std::string sum_doc = SeedDoc(2);
-    F41AsyncWorker worker = MakeWorker(MakeLlm(kSummaryJson));
+    DocSummaryAsyncWorker worker = MakeWorker(MakeLlm(kSummaryJson));
     SignalingWorker signaling(&worker);
     RecordingHandler parse_h;
 
@@ -321,7 +321,7 @@ TEST_F(DocSummaryAsyncDispatchTest, CoexistingHandlersRouteByTaskType) {
 // the closed finalize loop — the task reaches a terminal state, not stuck "processing".
 TEST_F(DocSummaryAsyncDispatchTest, GenerationFailureFinalizesTaskFailed) {
     const std::string doc_id = SeedDoc(2);
-    F41AsyncWorker worker = MakeWorker(MakeLlm("not valid json"));  // generation fails
+    DocSummaryAsyncWorker worker = MakeWorker(MakeLlm("not valid json"));  // generation fails
     SignalingWorker signaling(&worker);
 
     async::WorkerPool pool(sched_.get(), &cfg_);

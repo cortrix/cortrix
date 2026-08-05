@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "cortrix/store/f34_schema_provider.h"
+#include "cortrix/store/parent_child_schema_provider.h"
 #include "cortrix/store/per_unit_schema_ddl.h"
 
 namespace cortrix::store {
@@ -23,7 +23,7 @@ protected:
         ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK);
         ASSERT_EQ(sqlite3_exec(db_, kPerUnitFrameworkDdl, nullptr, nullptr, nullptr),
                   SQLITE_OK);
-        F34SchemaProvider f34;
+        ParentChildSchemaProvider f34;
         ASSERT_TRUE(f34.Migrate(db_, 0, 1).ok());
     }
     void TearDown() override { sqlite3_close(db_); }

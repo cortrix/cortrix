@@ -78,7 +78,7 @@ private:
 /// this PER Submit (so each task carries its own captured auth / trace context):
 /// fetch → textualize → cleanup → feed-to-SPC, reporting progress + honoring
 /// handle.CancelRequested(). Returns Ok on success; an error Status (a CX_ERR_IMPORT_*
-/// Status, e.g. from F16aStatus) drives the task to FAILED with that code/message.
+/// Status, e.g. from ImportStatus) drives the task to FAILED with that code/message.
 using ImportTaskWork = std::function<Status(ImportTaskHandle&)>;
 
 struct ImportTaskQueueConfig {

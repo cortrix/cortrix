@@ -43,9 +43,9 @@ float SemanticScorer::ComputeFinalScore(float rerank_score,
                                         const observability::TraceContext* /*ctx*/) {
     if (alpha < 0.0f || alpha > 1.0f) {
         // §4.4 CX_ERR_SCORING_CONFIG_INVALID — α must be in [0, 1].
-        ScoringMetrics::Instance().RecordError(F07ErrorCode::kConfigInvalid);  // §6 error_total
+        ScoringMetrics::Instance().RecordError(ScoringErrorCode::kConfigInvalid);  // §6 error_total
         throw agent_friendly::AgentFriendlyException(MakeScoringError(
-            F07ErrorCode::kConfigInvalid,
+            ScoringErrorCode::kConfigInvalid,
             {{"alpha_received", alpha},
              {"valid_range", {0.0, 1.0}},
              {"config_source", "config.yaml:scoring.alpha"}},

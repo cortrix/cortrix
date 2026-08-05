@@ -109,7 +109,7 @@ CortrixParent ToCortrixParent(const cortrix::chunker::ParentChunk& p) {
 // ScoreMap::EnricherLevel's short token ("llm"/"contextual"/"hype"). V1's only
 // real SPC-chain enricher is LlmEnricher; Null/unknown → "" (enricher_level 0). Contextual
 // and hype stages map here when they join the chain.
-std::string F07EnricherToken(const std::string& enricher_name) {
+std::string ScoringEnricherToken(const std::string& enricher_name) {
     if (enricher_name == "LlmEnricher") return "llm";
     if (enricher_name == "ContextualRetrievalEnricher") return "contextual";
     if (enricher_name == "HyPEEnricher") return "hype";
@@ -345,7 +345,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     // row from the exact metadata fields so benchmark/query doc fallback observes the
     // same document identity. META gen is non-fatal (a truly empty doc logs + skips;
     // parents/children stay valid). One META per doc is enforced by idx_blocks_meta_doc
-    // (F34SchemaProvider).
+    // (ParentChildSchemaProvider).
     std::optional<cortrix::metadata::MetadataBlock> meta_mb;
     std::optional<cortrix::doc_summary::DocFtsRow> doc_fts5_row;
     {
@@ -370,7 +370,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         }
         auto gres = meta_generator_.Generate(gin);
         if (!gres.ok()) {
-            CORTRIX_LOG_WARN("spc", "F08 metadata gen skipped for doc_id={}: {}",
+            CORTRIX_LOG_WARN("spc", "metadata gen skipped for doc_id={}: {}",
                              task.doc_id, gres.status().message());
         } else {
             meta_mb = std::move(gres.value().block);
@@ -687,7 +687,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         {
             auto eit = enrich_by_child.find(b.id);
             if (eit != enrich_by_child.end() && eit->second.ok())
-                enr_token = F07EnricherToken(eit->second.enricher_name);
+                enr_token = ScoringEnricherToken(eit->second.enricher_name);
         }
         cortrix_block_header_t f07_hdr{};
         float semantic_score = 0.0f;
@@ -764,7 +764,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                 // Non-fatal (transparent degrade): the chunk Blocks are the primary
                 // deliverable; a hype embed failure drops the hype Blocks, not the doc.
                 CORTRIX_LOG_WARN("spc",
-                    "F38 hype embedding failed for doc_id={}, dropping hype blocks: {}",
+                    "hype embedding failed for doc_id={}, dropping hype blocks: {}",
                     task.doc_id, qes.message());
                 q_embs.clear();
                 // [addendum §3.7] The dropped hype blocks are silent coverage debt:
@@ -776,7 +776,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                         owed += owed.empty() ? "f38" : ",f38";
                     }
                     std::string& err = enrich_error_by_child[kv.first];
-                    if (err.empty()) err = "F38 hype embedding failed: " + qes.message();
+                    if (err.empty()) err = "hype embedding failed: " + qes.message();
                 }
             }
         }
@@ -961,7 +961,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                     Status we = cortrix::spc::WriteEnrichment(store_db, b.block_id, eit->second);
                     if (!we.ok()) {
                         CORTRIX_LOG_WARN("spc",
-                            "F03 enrichment persist skipped for block_id={} (doc_id={}): {}",
+                            "enrichment persist skipped for block_id={} (doc_id={}): {}",
                             b.block_id, task.doc_id, we.message());
                         f03_persist_owed = true;
                         persist_err = "CX_ERR_SPC_PERSIST_FAILED[f03]: " + we.message();
@@ -976,7 +976,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                     Status wc = cortrix::spc::WriteContextualized(store_db, b.block_id, eit->second);
                     if (!wc.ok()) {
                         CORTRIX_LOG_WARN("spc",
-                            "F35 contextualized persist skipped for block_id={} (doc_id={}): {}",
+                            "contextualized persist skipped for block_id={} (doc_id={}): {}",
                             b.block_id, task.doc_id, wc.message());
                         // Owe f35 only when the stage actually produced an outcome to
                         // persist (engaged chains; chains without it no-op inside).
@@ -1004,7 +1004,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                     Status wsv = cortrix::retrieval::WriteSparseVec(store_db, b.block_id, sv);
                     if (!wsv.ok()) {
                         CORTRIX_LOG_WARN("spc",
-                            "F40 sparse_vec persist skipped for block_id={} (doc_id={}): {}",
+                            "sparse_vec persist skipped for block_id={} (doc_id={}): {}",
                             b.block_id, task.doc_id, wsv.message());
                     }
                     if (!sv.empty()) {
@@ -1013,7 +1013,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                             Status add = sparse->Add(facade.namespace_id(), b.child_id, sv);
                             if (!add.ok()) {
                                 CORTRIX_LOG_WARN("spc",
-                                    "F40 sparse index Add skipped for child_id={} (ns={}): {}",
+                                    "sparse index Add skipped for child_id={} (ns={}): {}",
                                     b.child_id, facade.namespace_id(), add.message());
                             }
                         }
@@ -1071,7 +1071,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                 Status ws = cortrix::scoring::WriteScore(store_db, b.block_id, sit->second);
                 if (!ws.ok()) {
                     CORTRIX_LOG_WARN("spc",
-                        "F07 semantic_score persist skipped for block_id={} (doc_id={}): {}",
+                        "semantic_score persist skipped for block_id={} (doc_id={}): {}",
                         b.block_id, task.doc_id, ws.message());
                 }
             }

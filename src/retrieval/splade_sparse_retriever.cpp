@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <unordered_map>
 
-#include "cortrix/retrieval/f40_schema_provider.h"  // kSparseInvertedIndexDdl (shared SoT)
+#include "cortrix/retrieval/sparse_schema_provider.h"  // kSparseInvertedIndexDdl (shared SoT)
 #include "cortrix/retrieval/sparse_error.h"
 
 namespace cortrix::retrieval {

@@ -3,7 +3,7 @@
 
 #include <chrono>
 
-#include "cortrix/memory/mem02_metrics.h"
+#include "cortrix/memory/memory_extract_metrics.h"
 
 namespace cortrix::memory {
 
@@ -43,7 +43,7 @@ size_t MemoryQueue::Depth() const {
 }
 
 void MemoryQueue::PublishDepthLocked() {
-    Mem02Metrics::Instance().SetQueueDepth(static_cast<int64_t>(queue_.size()));
+    MemoryExtractMetrics::Instance().SetQueueDepth(static_cast<int64_t>(queue_.size()));
 }
 
 void MemoryQueue::StartWorkers(MemoryQueueHandler handler,

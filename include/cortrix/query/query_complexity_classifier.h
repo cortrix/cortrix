@@ -22,7 +22,7 @@ struct QueryContext;  // fwd-decl (defined in query/query_context.h); RouteAndUp
 ///
 /// It lives in cortrix::query (not cortrix::retrieval) because it is a *query-path*
 /// component: the standalone routing mock left by the CRAG stage
-/// (retrieval/f39_routing_mock.h) names the real owner as
+/// (retrieval/routing_mock.h) names the real owner as
 /// `cortrix::query::QueryComplexityClassifier::ShouldSkipF37`, and the QueryPipeline
 /// drives it before RAG-Fusion, rerank and CRAG. Implementing retrieval::IClassifier across the
 /// namespace boundary is intentional and matches that documented contract.
@@ -91,7 +91,7 @@ public:
 
     /// CRAG runs only on the Complex / (default) path; it is skipped on Simple
     /// and Chat. Same fail-safe as ShouldSkipF36. Kept in
-    /// exact lockstep with the F37-side mock (retrieval/f39_routing_mock.h).
+    /// exact lockstep with the F37-side mock (retrieval/routing_mock.h).
     static bool ShouldSkipF37(const QueryContext& ctx);
 
     // --- Exposed for unit tests / reuse ---

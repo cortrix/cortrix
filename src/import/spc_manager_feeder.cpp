@@ -68,7 +68,7 @@ Result<int> SpcManagerFeeder::Feed(const std::vector<TextChunk>& chunks, const N
             // Surface the failure with the DB-import connection-failed token (the safest
             // transient default for an internal ingest fault), carrying the pipeline
             // detail for the operator.
-            return F16aStatus(F16aErrorCode::kConnectionFailed,
+            return ImportStatus(ImportErrorCode::kConnectionFailed,
                               "SPC pipeline ingest failed for row '" + chunk.source +
                                   "': " + task.error_message);
         }
@@ -91,7 +91,7 @@ Result<int> RealBlockCleaner::CleanupSourceBlocks(const NsId& ns,
     int64_t removed = 0;
     int rc = facade.store().doc_delete_by_source_prefix(source_prefix, &removed);
     if (rc != 0) {
-        return F16aStatus(F16aErrorCode::kConnectionFailed,
+        return ImportStatus(ImportErrorCode::kConnectionFailed,
                           "failed to clear prior import blocks for prefix '" +
                               source_prefix + "'");
     }

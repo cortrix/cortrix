@@ -9,7 +9,7 @@
 namespace cortrix::retrieval {
 
 // Persist a child chunk's SPLADE sparse vector into the
-// per-Unit blocks.sparse_vec BLOB column (added by F40SchemaProvider). A free
+// per-Unit blocks.sparse_vec BLOB column (added by SparseSchemaProvider). A free
 // function over a sqlite3* (same shape as WriteContextualized /
 // WriteEnrichment) so it unit-tests against an in-memory DB with the sparse migration
 // applied. The live wiring (which block_id, the transaction boundary with the

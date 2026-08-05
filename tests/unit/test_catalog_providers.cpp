@@ -86,31 +86,31 @@ TEST(CatalogProvidersTest, MultiProviderStartupMigration) {
     // Catalog base tables + both downstream tables exist.
     EXPECT_TRUE(TableExists(db, "units"));        // Catalog base
     EXPECT_TRUE(TableExists(db, "namespaces"));   // Catalog base
-    EXPECT_TRUE(TableExists(db, "feat_F09"));     // downstream (FK→units)
-    EXPECT_TRUE(TableExists(db, "feat_F03"));     // downstream
+    EXPECT_TRUE(TableExists(db, "feat_block_framework"));     // downstream (FK→units)
+    EXPECT_TRUE(TableExists(db, "feat_enricher"));     // downstream
 
     // Registration/execution order: extras run in given order (catalog is not in the
-    // log — it is the C++ F12SchemaProvider, not a FakeFeatureProvider).
+    // log — it is the C++ CatalogSchemaProvider, not a FakeFeatureProvider).
     ASSERT_EQ(order.size(), 2u);
     EXPECT_EQ(order[0], "block_framework");
     EXPECT_EQ(order[1], "enricher");
 
     // schema_version records each migrated feature at v1.
-    EXPECT_EQ(SchemaMigrator().CurrentVersion(db, "catalog"), kF12SchemaVersion);
+    EXPECT_EQ(SchemaMigrator().CurrentVersion(db, "catalog"), kCatalogSchemaVersion);
     EXPECT_EQ(SchemaMigrator().CurrentVersion(db, "block_framework"), 1);
     EXPECT_EQ(SchemaMigrator().CurrentVersion(db, "enricher"), 1);
 }
 
 // S1.2: catalog must migrate before a downstream provider whose table FK-references
 // units. If ordering were wrong this DDL would fail; success proves F12-first.
-TEST(CatalogProvidersTest, F12RunsBeforeDownstreamFkProvider) {
+TEST(CatalogProvidersTest, CatalogRunsBeforeDownstreamFkProvider) {
     std::vector<std::string> order;
-    FakeFeatureProvider needs_units("F25", &order, /*fk_to_units=*/true);
+    FakeFeatureProvider needs_units("write_coordinator", &order, /*fk_to_units=*/true);
 
     CatalogDb catalog;
     Status st = catalog.Open(":memory:", {&needs_units});
     ASSERT_TRUE(st.ok()) << st.message();
-    EXPECT_TRUE(TableExists(catalog.db(), "feat_F25"));
+    EXPECT_TRUE(TableExists(catalog.db(), "feat_write_coordinator"));
 }
 
 // S1.3 atomicity: a failing downstream provider rolls back the WHOLE batch,
@@ -158,11 +158,11 @@ TEST(CatalogProvidersTest, FailedBatchLeavesNoPartialSchemaOnDisk) {
 }
 
 // The S1.1 single-arg Open is unchanged: F12-only, no extra providers.
-TEST(CatalogProvidersTest, SingleArgOpenIsF12Only) {
+TEST(CatalogProvidersTest, SingleArgOpenIsCatalogOnly) {
     CatalogDb catalog;
     ASSERT_TRUE(catalog.Open(":memory:").ok());
     EXPECT_TRUE(TableExists(catalog.db(), "units"));
-    EXPECT_EQ(SchemaMigrator().CurrentVersion(catalog.db(), "catalog"), kF12SchemaVersion);
+    EXPECT_EQ(SchemaMigrator().CurrentVersion(catalog.db(), "catalog"), kCatalogSchemaVersion);
 }
 
 // nullptr providers in the list are ignored (defensive: matches
@@ -173,7 +173,7 @@ TEST(CatalogProvidersTest, NullProvidersIgnored) {
     CatalogDb catalog;
     Status st = catalog.Open(":memory:", {nullptr, &f09, nullptr});
     ASSERT_TRUE(st.ok()) << st.message();
-    EXPECT_TRUE(TableExists(catalog.db(), "feat_F09"));
+    EXPECT_TRUE(TableExists(catalog.db(), "feat_block_framework"));
     ASSERT_EQ(order.size(), 1u);
     EXPECT_EQ(order[0], "block_framework");
 }

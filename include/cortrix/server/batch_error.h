@@ -13,7 +13,7 @@ namespace cortrix::server {
 /// The 4 batch-level error identities. Each maps to a stable
 /// `CX_ERR_BATCH_*` string + a GEN-Agent category + retryability + retry_after_ms
 /// + the structured_data keys its body MUST carry, via the canonical registry
-/// below. Mirrors the task registry pattern (async/f42_error.h): the enum is the
+/// below. Mirrors the task registry pattern (async/task_error.h): the enum is the
 /// set of identities and MakeBatchError() turns one into the Agent-friendly
 /// boundary type cortrix::agent_friendly::AgentFriendlyError.
 ///

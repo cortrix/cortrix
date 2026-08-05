@@ -22,7 +22,7 @@
 #include "cortrix/catalog/i_unit_router.h"
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
-#include "cortrix/resource/f05_config.h"
+#include "cortrix/resource/namespace_pool_config.h"
 #include "cortrix/resource/namespace_pool.h"
 #include "cortrix/store/i_vector_store.h"
 #include "cortrix/store/iindex.h"
@@ -288,7 +288,7 @@ protected:
     }
 
     fs::path test_dir_;
-    resource::F05Config config_;
+    resource::NamespacePoolConfig config_;
     SPCConfig spc_config_;
     NiceMock<MockIndexFactory> index_factory_;
     NiceMock<MockNSRouter> ns_router_;

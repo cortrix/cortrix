@@ -1,16 +1,16 @@
-// Coverage-gap unit tests for src/deploy: f24_error.cpp (66%) and
+// Coverage-gap unit tests for src/deploy: deploy_error.cpp (66%) and
 // disk_monitor.cpp (66%).
 //
-// The existing test_f24_disk.cpp covers the DiskFull registry row + DiskFull
+// The existing test_deploy_disk.cpp covers the DiskFull registry row + DiskFull
 // structured-data keys + the FSM via CheckWithSample. This file fills the
 // remaining branches:
 //
-//   f24_error.cpp:
+//   deploy_error.cpp:
 //     - RequiredStructuredDataKeys for the 3 non-DiskFull codes (shutdown/health/bf)
 //     - HasRequiredStructuredData: non-object input + per-code completeness
-//     - F24ErrorHttpStatus for every code (table-driven)
-//     - F24ErrorToStatusCode for every code (all 4 -> kUnavailable)
-//     - F24Status with empty detail (the "no detail" message arm)
+//     - DeployErrorHttpStatus for every code (table-driven)
+//     - DeployErrorToStatusCode for every code (all 4 -> kUnavailable)
+//     - DeployStatus with empty detail (the "no detail" message arm)
 //
 //   disk_monitor.cpp:
 //     - ToString(DiskStage) for all three stages
@@ -29,83 +29,83 @@
 
 #include "cortrix/deploy/deploy_metrics.h"
 #include "cortrix/deploy/disk_monitor.h"
-#include "cortrix/deploy/f24_error.h"
+#include "cortrix/deploy/deploy_error.h"
 
 namespace cortrix::deploy {
 namespace {
 
 using agent_friendly::ErrorCategory;
 
-constexpr F24ErrorCode kAllCodes[] = {
-    F24ErrorCode::kDiskFull,
-    F24ErrorCode::kShutdownInProgress,
-    F24ErrorCode::kHealthCheckFailed,
-    F24ErrorCode::kBfNotReady,
+constexpr DeployErrorCode kAllCodes[] = {
+    DeployErrorCode::kDiskFull,
+    DeployErrorCode::kShutdownInProgress,
+    DeployErrorCode::kHealthCheckFailed,
+    DeployErrorCode::kBfNotReady,
 };
 
-// --------------------- f24_error.cpp: structured-data keys ---------------------
+// --------------------- deploy_error.cpp: structured-data keys ---------------------
 
-TEST(F24ErrorGapTest, RequiredKeysForNonDiskFullCodes) {
+TEST(DeployErrorGapTest, RequiredKeysForNonDiskFullCodes) {
     // ShutdownInProgress -> ["shutdown_status"]
-    const auto& sd = RequiredStructuredDataKeys(F24ErrorCode::kShutdownInProgress);
+    const auto& sd = RequiredStructuredDataKeys(DeployErrorCode::kShutdownInProgress);
     ASSERT_EQ(sd.size(), 1u);
     EXPECT_EQ(sd[0], "shutdown_status");
 
     // HealthCheckFailed -> ["component", "error_id"]
-    const auto& he = RequiredStructuredDataKeys(F24ErrorCode::kHealthCheckFailed);
+    const auto& he = RequiredStructuredDataKeys(DeployErrorCode::kHealthCheckFailed);
     ASSERT_EQ(he.size(), 2u);
     EXPECT_EQ(he[0], "component");
     EXPECT_EQ(he[1], "error_id");
 
     // BfNotReady -> ["rebuild_progress"]
-    const auto& bf = RequiredStructuredDataKeys(F24ErrorCode::kBfNotReady);
+    const auto& bf = RequiredStructuredDataKeys(DeployErrorCode::kBfNotReady);
     ASSERT_EQ(bf.size(), 1u);
     EXPECT_EQ(bf[0], "rebuild_progress");
 }
 
-TEST(F24ErrorGapTest, HasRequiredStructuredDataNonObjectIsFalseWhenKeysRequired) {
+TEST(DeployErrorGapTest, HasRequiredStructuredDataNonObjectIsFalseWhenKeysRequired) {
     // A non-object payload cannot satisfy a code that requires keys.
     nlohmann::json not_object = nlohmann::json::array({1, 2, 3});
-    EXPECT_FALSE(HasRequiredStructuredData(F24ErrorCode::kBfNotReady, not_object));
+    EXPECT_FALSE(HasRequiredStructuredData(DeployErrorCode::kBfNotReady, not_object));
     // Per-code completeness: present -> true, missing -> false.
     nlohmann::json ok = {{"rebuild_progress", 0.5}};
-    EXPECT_TRUE(HasRequiredStructuredData(F24ErrorCode::kBfNotReady, ok));
+    EXPECT_TRUE(HasRequiredStructuredData(DeployErrorCode::kBfNotReady, ok));
     nlohmann::json wrong = {{"unrelated", 1}};
-    EXPECT_FALSE(HasRequiredStructuredData(F24ErrorCode::kBfNotReady, wrong));
+    EXPECT_FALSE(HasRequiredStructuredData(DeployErrorCode::kBfNotReady, wrong));
 
     // Health requires two keys: one present is still incomplete.
     nlohmann::json partial = {{"component", "bm25"}};
-    EXPECT_FALSE(HasRequiredStructuredData(F24ErrorCode::kHealthCheckFailed, partial));
+    EXPECT_FALSE(HasRequiredStructuredData(DeployErrorCode::kHealthCheckFailed, partial));
     nlohmann::json full = {{"component", "bm25"}, {"error_id", "e1"}};
-    EXPECT_TRUE(HasRequiredStructuredData(F24ErrorCode::kHealthCheckFailed, full));
+    EXPECT_TRUE(HasRequiredStructuredData(DeployErrorCode::kHealthCheckFailed, full));
 }
 
-// --------------------- f24_error.cpp: code -> http / status ---------------------
+// --------------------- deploy_error.cpp: code -> http / status ---------------------
 
-TEST(F24ErrorGapTest, HttpStatusTableDrivenOverAllCodes) {
-    EXPECT_EQ(F24ErrorHttpStatus(F24ErrorCode::kDiskFull), 507);
-    EXPECT_EQ(F24ErrorHttpStatus(F24ErrorCode::kShutdownInProgress), 503);
-    EXPECT_EQ(F24ErrorHttpStatus(F24ErrorCode::kHealthCheckFailed), 503);
-    EXPECT_EQ(F24ErrorHttpStatus(F24ErrorCode::kBfNotReady), 503);
+TEST(DeployErrorGapTest, HttpStatusTableDrivenOverAllCodes) {
+    EXPECT_EQ(DeployErrorHttpStatus(DeployErrorCode::kDiskFull), 507);
+    EXPECT_EQ(DeployErrorHttpStatus(DeployErrorCode::kShutdownInProgress), 503);
+    EXPECT_EQ(DeployErrorHttpStatus(DeployErrorCode::kHealthCheckFailed), 503);
+    EXPECT_EQ(DeployErrorHttpStatus(DeployErrorCode::kBfNotReady), 503);
 }
 
-TEST(F24ErrorGapTest, ToStatusCodeAllCodesMapToUnavailable) {
-    for (F24ErrorCode c : kAllCodes) {
-        EXPECT_EQ(F24ErrorToStatusCode(c), StatusCode::kUnavailable);
+TEST(DeployErrorGapTest, ToStatusCodeAllCodesMapToUnavailable) {
+    for (DeployErrorCode c : kAllCodes) {
+        EXPECT_EQ(DeployErrorToStatusCode(c), StatusCode::kUnavailable);
     }
 }
 
-TEST(F24ErrorGapTest, F24StatusEmptyDetailUsesCodeAsMessage) {
+TEST(DeployErrorGapTest, DeployStatusEmptyDetailUsesCodeAsMessage) {
     // Empty detail -> message is exactly the CX_ERR_* token (no ": detail" suffix).
-    Status s = F24Status(F24ErrorCode::kBfNotReady);
+    Status s = DeployStatus(DeployErrorCode::kBfNotReady);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kUnavailable);
     EXPECT_EQ(s.message(), std::string("CX_ERR_BF_NOT_READY"));
 }
 
-TEST(F24ErrorGapTest, MakeErrorEmptyMessageFallsBackToCode) {
+TEST(DeployErrorGapTest, MakeErrorEmptyMessageFallsBackToCode) {
     // message="" -> err.message defaults to the code token.
-    auto err = MakeF24Error(F24ErrorCode::kHealthCheckFailed);
+    auto err = MakeDeployError(DeployErrorCode::kHealthCheckFailed);
     EXPECT_EQ(err.code, "CX_ERR_HEALTH_CHECK_FAILED");
     EXPECT_EQ(err.message, "CX_ERR_HEALTH_CHECK_FAILED");
     EXPECT_TRUE(err.retryable);

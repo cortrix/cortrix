@@ -6,11 +6,11 @@
 
 #include <sqlite3.h>
 
-#include "cortrix/retrieval/f40_schema_provider.h"
+#include "cortrix/retrieval/sparse_schema_provider.h"
 #include "cortrix/retrieval/sparse_codec.h"
 
 // Q4 — WriteSparseVec persists a child's SPLADE sparse vector into the
-// blocks.sparse_vec BLOB column F40SchemaProvider adds. Tests the write, the BLOB
+// blocks.sparse_vec BLOB column SparseSchemaProvider adds. Tests the write, the BLOB
 // round-trip through the §4.2 codec, and the empty-vector → SQL NULL (dead chunk,
 // §6.5) path.
 namespace cortrix::retrieval {
@@ -23,7 +23,7 @@ protected:
         ASSERT_EQ(sqlite3_exec(db_,
             "CREATE TABLE blocks (block_id INTEGER PRIMARY KEY, child_id TEXT)",
             nullptr, nullptr, nullptr), SQLITE_OK);
-        F40SchemaProvider p;
+        SparseSchemaProvider p;
         ASSERT_TRUE(p.Migrate(db_, 0, 1).ok());  // adds blocks.sparse_vec + inverted index
         ASSERT_EQ(sqlite3_exec(db_,
             "INSERT INTO blocks(block_id, child_id) VALUES(7,'c1')",

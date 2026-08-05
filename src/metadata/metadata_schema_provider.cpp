@@ -48,7 +48,7 @@ Status MetadataSchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
     }
     // Unexpected version step (e.g. Phase 2 1 → 2) is not implemented yet.
     return Status::InvalidArgument(
-        "CX_ERR_SCHEMA_VERSION_MISMATCH: F08 unsupported migration " +
+        "CX_ERR_SCHEMA_VERSION_MISMATCH: metadata_block unsupported migration " +
         std::to_string(from_ver) + " -> " + std::to_string(to_ver));
 }
 

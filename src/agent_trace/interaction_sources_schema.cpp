@@ -36,12 +36,12 @@ Status InteractionSourcesSchemaProvider::Migrate(sqlite3* db, int from_ver, int 
             std::string msg = err ? err : "sqlite error";
             sqlite3_free(err);
             return Status::Internal(
-                std::string("CX_ERR_TRACE_INTERNAL: F13 interaction_sources schema migration failed: ") + msg);
+                std::string("CX_ERR_TRACE_INTERNAL: agent_trace interaction_sources schema migration failed: ") + msg);
         }
         return Status::Ok();
     }
     return Status::InvalidArgument(
-        "CX_ERR_TRACE_INTERNAL: F13 interaction_sources unsupported migration " +
+        "CX_ERR_TRACE_INTERNAL: agent_trace interaction_sources unsupported migration " +
         std::to_string(from_ver) + " -> " + std::to_string(to_ver));
 }
 

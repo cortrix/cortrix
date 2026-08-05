@@ -449,7 +449,7 @@ TEST_F(MemoryStoreFaultSweepTest, SessionDeleteCascadePwriteFaultSweep) {
 }
 
 // ---------------------------------------------------------------------------
-// memory::MemoryBlockAdapter — store-error mapping arms (CX_ERR_MEMEXTRACT_STORE / MEM03_STORE)
+// memory::MemoryBlockAdapter — store-error mapping arms (CX_ERR_MEMEXTRACT_STORE / MEMORY_STORE)
 // ---------------------------------------------------------------------------
 // The adapter wraps the per-NS CortrixStore; its own error arms fire when the store
 // write fails. InsertMemoryBlock → store_.block_insert (block.db pwrite); the direct

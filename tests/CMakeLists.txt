@@ -47,7 +47,7 @@ add_executable(cortrix_unit_tests
     unit/test_spc_task_queue.cpp
     unit/test_spc_manager.cpp
     unit/test_block_header.cpp
-    unit/test_f09_schema_provider.cpp
+    unit/test_block_framework_schema_provider.cpp
     unit/test_group_commit_writer.cpp
     unit/test_pending_entry.cpp
     unit/test_pending_log_writer.cpp
@@ -74,21 +74,21 @@ add_executable(cortrix_unit_tests
     unit/test_budget_tracker.cpp
     unit/test_enricher_startup.cpp
     unit/test_enricher_config_resolver.cpp
-    unit/test_f03_schema_provider.cpp
-    unit/test_f34_schema_provider.cpp
-    unit/test_f35_schema_provider.cpp
+    unit/test_enricher_schema_provider.cpp
+    unit/test_parent_child_schema_provider.cpp
+    unit/test_contextual_schema_provider.cpp
     unit/test_enrich_state_store.cpp
-    unit/test_f38_schema_provider.cpp
-    unit/test_f38_hype_enricher.cpp
-    unit/test_f38_hype_block.cpp
-    unit/test_f38_hype_fusion.cpp
-    unit/test_f38_hype_error.cpp
-    unit/test_f38_hype_ns_config.cpp
-    unit/test_f38_hype_metrics.cpp
+    unit/test_hype_schema_provider.cpp
+    unit/test_hype_enricher.cpp
+    unit/test_hype_block.cpp
+    unit/test_hype_fusion.cpp
+    unit/test_hype_error.cpp
+    unit/test_hype_ns_config.cpp
+    unit/test_hype_metrics.cpp
     # --- F35 Contextual Retrieval (Wave C-R2) ---
-    unit/test_f35_contextual_error.cpp
-    unit/test_f35_contextual_metrics.cpp
-    unit/test_f35_contextual_enricher.cpp
+    unit/test_contextual_error.cpp
+    unit/test_contextual_metrics.cpp
+    unit/test_contextual_enricher.cpp
     unit/test_enricher_store.cpp
     # --- I1/I2 enricher chain + contextualized persist (D3.5 round-2 Wave I) ---
     unit/test_enricher_chain.cpp
@@ -112,7 +112,7 @@ add_executable(cortrix_unit_tests
     unit/test_traces_handler.cpp
     unit/test_observability_routes.cpp
     unit/test_engine_instrumentation.cpp
-    unit/test_f13_cleanup_registrar.cpp
+    unit/test_agent_trace_cleanup_registrar.cpp
     unit/test_interaction_log_sweeper.cpp
     unit/test_observability_audit_log.cpp
     unit/test_operation_log_error.cpp
@@ -150,7 +150,7 @@ add_executable(cortrix_unit_tests
     unit/test_cortrix_blob_local.cpp
     unit/test_memory_store.cpp
     unit/test_memory_scorer.cpp
-    unit/test_mem05_user_isolation.cpp
+    unit/test_memory_isolation_user_isolation.cpp
     unit/test_memory_writer.cpp
     unit/test_memory_injector.cpp
     unit/test_memory_searcher.cpp
@@ -189,26 +189,26 @@ add_executable(cortrix_unit_tests
     unit/test_query_request_r8.cpp
     unit/test_memory_routes_success_r8.cpp
     unit/test_memory_routes_transparency_r8.cpp
-    unit/test_f40_onnx_embedder_sparse.cpp
-    unit/test_f40_sparse_error.cpp
-    unit/test_f40_sparse_codec.cpp
-    unit/test_f40_sparse_retriever_interface.cpp
-    unit/test_f40_schema_provider.cpp
-    unit/test_f40_splade_write.cpp
+    unit/test_sparse_onnx_embedder_sparse.cpp
+    unit/test_sparse_error.cpp
+    unit/test_sparse_codec.cpp
+    unit/test_sparse_retriever_interface.cpp
+    unit/test_sparse_schema_provider.cpp
+    unit/test_sparse_splade_write.cpp
     unit/test_sparse_vec_store.cpp
-    unit/test_f40_splade_query.cpp
-    unit/test_f40_sparse_ns_config.cpp
-    unit/test_f40_sparse_metrics.cpp
-    unit/test_f40_sparse_rrf.cpp
-    unit/test_f40_sparse_fallback.cpp
+    unit/test_sparse_splade_query.cpp
+    unit/test_sparse_ns_config.cpp
+    unit/test_sparse_metrics.cpp
+    unit/test_sparse_rrf.cpp
+    unit/test_sparse_fallback.cpp
     unit/test_sparse_index_registry.cpp
     # --- F41 Document Summary Index (Wave C-R2) ---
-    unit/test_f41_doc_summary_error.cpp
-    unit/test_f41_doc_summary_metrics.cpp
-    unit/test_f41_schema_provider.cpp
-    unit/test_f41_doc_fts5_index.cpp
-    unit/test_f41_doc_summary_generator.cpp
-    unit/test_f41_async_worker.cpp
+    unit/test_doc_summary_error.cpp
+    unit/test_doc_summary_metrics.cpp
+    unit/test_doc_summary_schema_provider.cpp
+    unit/test_doc_summary_fts5_index.cpp
+    unit/test_doc_summary_generator.cpp
+    unit/test_doc_summary_async_worker.cpp
     unit/test_onnx_runtime.cpp
     unit/test_onnx_error.cpp
     unit/test_onnx_startup_validator.cpp
@@ -287,14 +287,14 @@ add_executable(cortrix_unit_tests
     unit/test_crag_context.cpp
     unit/test_crag_eval.cpp
     # --- F39 Query Complexity Router (Wave C-R2) ---
-    unit/test_f39_router_error.cpp
-    unit/test_f39_router_metrics.cpp
-    unit/test_f39_complexity_backend.cpp
-    unit/test_f39_complexity_classifier.cpp
+    unit/test_router_error.cpp
+    unit/test_router_metrics.cpp
+    unit/test_router_complexity_backend.cpp
+    unit/test_router_complexity_classifier.cpp
     unit/test_wordpiece_tokenizer.cpp
     unit/test_onnx_complexity_backend.cpp
     # --- F42 Document Async Processing (Wave B-R2) ---
-    unit/test_f42_error.cpp
+    unit/test_task_error.cpp
     unit/test_task_manager.cpp
     unit/test_task_cleanup_cron.cpp
     unit/test_task_scheduler.cpp
@@ -305,10 +305,10 @@ add_executable(cortrix_unit_tests
     unit/test_doc_summary_async_dispatch.cpp
     unit/test_doc_parse_spc_e2e.cpp
     unit/test_document_task_handler.cpp
-    unit/test_f42_metrics.cpp
+    unit/test_task_metrics.cpp
     # --- F16a DB Manual Import (Wave B-R2) ---
     unit/test_import_error.cpp
-    unit/test_f16a_schema_provider.cpp
+    unit/test_import_schema_provider.cpp
     unit/test_connection_manager.cpp
     unit/test_query_executor.cpp
     unit/test_query_executor_injection.cpp
@@ -329,18 +329,18 @@ add_executable(cortrix_unit_tests
     unit/test_scoring_metrics.cpp
     unit/test_scoring_store.cpp
     # --- MEM02 LLM Memory Extraction (Wave B-R3) ---
-    unit/test_mem02_error.cpp
-    unit/test_mem02_metrics.cpp
+    unit/test_memory_extract_error.cpp
+    unit/test_memory_extract_metrics.cpp
     # --- MEM03 Memory Transparency (Wave C-R1) ---
-    unit/test_mem03_error.cpp
-    unit/test_mem03_metrics.cpp
+    unit/test_memory_error.cpp
+    unit/test_memory_metrics.cpp
     unit/test_memory_transparency.cpp
     # --- MEM04 Memory Immunity (Wave C-R2) ---
-    unit/test_mem04_error.cpp
-    unit/test_mem04_metrics.cpp
+    unit/test_memory_opt_out_error.cpp
+    unit/test_memory_opt_out_metrics.cpp
     unit/test_opt_out_manager.cpp
     # --- MEM05 Per-user Isolation metrics (D35-MET-09) ---
-    unit/test_mem05_metrics.cpp
+    unit/test_memory_isolation_metrics.cpp
     unit/test_prompt_templates.cpp
     unit/test_memory_queue.cpp
     unit/test_memory_extractor.cpp
@@ -364,10 +364,10 @@ add_executable(cortrix_unit_tests
     unit/test_rate_limiter.cpp
     unit/test_readiness.cpp
     # --- F24 docker-compose Deployment (Wave D-R1) ---
-    unit/test_f24_disk.cpp
-    unit/test_f24_metrics.cpp
-    unit/test_f24_reason_vocabulary.cpp
-    unit/test_f24_graceful_shutdown.cpp
+    unit/test_deploy_disk.cpp
+    unit/test_deploy_metrics.cpp
+    unit/test_deploy_reason_vocabulary.cpp
+    unit/test_deploy_graceful_shutdown.cpp
     # --- ID System Infrastructure (D3.5 Batch 0 prerequisite) ---
     unit/test_siphash.cpp
     unit/test_id_hash.cpp
@@ -416,9 +416,9 @@ add_executable(cortrix_unit_tests
     unit/test_agent_trace_error_matrix.cpp
     unit/test_chunker_error_matrix.cpp
     unit/test_import_error_matrix.cpp
-    unit/test_mem02_error_matrix.cpp
-    unit/test_mem03_error_matrix.cpp
-    unit/test_mem04_error_matrix.cpp
+    unit/test_memory_extract_error_matrix.cpp
+    unit/test_memory_error_matrix.cpp
+    unit/test_memory_opt_out_error_matrix.cpp
     unit/test_auth_error_matrix.cpp
     unit/test_tenant_error_matrix.cpp
     unit/test_cross_ns_error_matrix.cpp
@@ -434,7 +434,7 @@ add_executable(cortrix_unit_tests
     unit/test_sparse_error_matrix.cpp
     unit/test_crag_error_matrix.cpp
     unit/test_agent_trace_metrics_matrix.cpp
-    unit/test_f42_async_metrics_matrix.cpp
+    unit/test_task_async_metrics_matrix.cpp
     unit/test_memory_metrics_matrix.cpp
     unit/test_query_retrieval_metrics_matrix.cpp
     unit/test_spc_scoring_metrics_matrix.cpp
@@ -473,7 +473,7 @@ add_executable(cortrix_unit_tests
     unit/test_tenant_types_extra.cpp
     unit/test_contradiction_parse_depth.cpp
     unit/test_memory_store_unicode_depth.cpp
-    unit/test_mem03_quota_depth.cpp
+    unit/test_memory_quota_depth.cpp
     unit/test_crag_breaker_depth.cpp
     unit/test_splade_depth.cpp
     unit/test_catalog_txn_depth.cpp
@@ -609,7 +609,7 @@ gtest_discover_tests(cortrix_unit_tests NO_PRETTY_TYPES NO_PRETTY_VALUES
 # --- Integration tests ---
 add_executable(cortrix_integration_tests
     integration/test_health_endpoint.cpp
-    integration/test_f13_observability_e2e.cpp
+    integration/test_agent_trace_observability_e2e.cpp
     integration/test_ingest_pipeline_e2e.cpp
     integration/test_multi_ns_fanout_e2e.cpp
     integration/test_query_llm_modes_e2e.cpp
@@ -620,7 +620,7 @@ add_executable(cortrix_integration_tests
     integration/test_spc_end_to_end.cpp
     integration/test_directory_import.cpp
     integration/test_memory_api.cpp
-    integration/test_mem05_integration.cpp
+    integration/test_memory_isolation_integration.cpp
     integration/test_document_upload_api.cpp
     integration/test_cross_feature_e2e.cpp
     integration/test_e2e_error_recovery.cpp
@@ -641,17 +641,17 @@ add_executable(cortrix_integration_tests
     # --- F03 NER + Summary Enricher (Wave B, standalone integration) ---
     integration/test_enricher_integration.cpp
     # --- F42 Document Async Processing (Wave B-R2, standalone integration) ---
-    integration/test_f42_async_lifecycle.cpp
+    integration/test_task_async_lifecycle.cpp
     # --- F16a DB Manual Import (Wave B-R2, standalone integration — 9-issue matrix) ---
-    integration/test_f16a_import_integration.cpp
+    integration/test_import_integration.cpp
     # --- F40 BGE-M3 Sparse (Wave C, standalone integration) ---
-    integration/test_f40_sparse_integration.cpp
+    integration/test_sparse_integration.cpp
     # --- F38 HyPE Index (Wave C, standalone integration) ---
-    integration/test_f38_hype_integration.cpp
+    integration/test_hype_integration.cpp
     # --- MEM03 Memory Transparency (Wave C-R1, standalone integration) ---
     integration/test_memory_transparency_integration.cpp
     # --- P09 Tenant Management (Wave D-R1, standalone integration) ---
-    integration/test_p09_tenant_integration.cpp
+    integration/test_tenant_integration.cpp
     mocks/mock_response_builder.cpp
 )
 

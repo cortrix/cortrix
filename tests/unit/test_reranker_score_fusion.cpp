@@ -107,7 +107,7 @@ TEST(RerankerScoreFusionTest, ComputeRerankRrfScoreIsWeightedSum) {
     EXPECT_FLOAT_EQ(fusion.ComputeRerankRrfScore(0.0f, 1.0f, chunk, "q"), 0.3f);
 }
 
-TEST(RerankerScoreFusionTest, ScoreSignalsApplyF07MultiplierAfterBaseFusion) {
+TEST(RerankerScoreFusionTest, ScoreSignalsApplyScoringMultiplierAfterBaseFusion) {
     RerankerScoreFusion fusion;
     RankedChunk chunk;
     chunk.score_signals.semantic_score = 1.0f;

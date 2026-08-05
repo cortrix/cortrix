@@ -2,7 +2,7 @@
 //
 // Real parser (src/memory/contradiction_detector.cpp ParseJudgmentJson, static):
 //   1. json::parse(allow_exceptions=false). If discarded OR not an object ->
-//      error Result (Mem02Status kExtractInvalidOutput, message carries
+//      error Result (MemoryExtractStatus kExtractInvalidOutput, message carries
 //      "CX_ERR_MEMEXTRACT_INVALID_OUTPUT").  *** NO fence / wrapper / span
 //      recovery here *** (unlike ParseExtractionJson). A fenced or prose-wrapped
 //      body is NOT a JSON object -> rejected.

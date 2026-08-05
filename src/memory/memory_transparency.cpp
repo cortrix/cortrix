@@ -7,7 +7,7 @@
 #include <ctime>
 
 #include "cortrix/id/ulid.h"
-#include "cortrix/memory/mem03_metrics.h"
+#include "cortrix/memory/memory_metrics.h"
 
 namespace cortrix::memory::transparency {
 
@@ -79,16 +79,16 @@ bool IsValidMemoryType(const std::string& t) {
     return t == "fact" || t == "preference" || t == "event";
 }
 
-/// Map a Mem03ErrorCode to its metric ErrorCodeLabel (1:1, same order).
-Mem03Metrics::ErrorCodeLabel MetricLabel(Mem03ErrorCode code) {
+/// Map a MemoryErrorCode to its metric ErrorCodeLabel (1:1, same order).
+MemoryMetrics::ErrorCodeLabel MetricLabel(MemoryErrorCode code) {
     switch (code) {
-        case Mem03ErrorCode::kMemoryNotFound:     return Mem03Metrics::ErrorCodeLabel::kMemoryNotFound;
-        case Mem03ErrorCode::kUserMismatch:       return Mem03Metrics::ErrorCodeLabel::kUserMismatch;
-        case Mem03ErrorCode::kAlreadyInvalidated: return Mem03Metrics::ErrorCodeLabel::kAlreadyInvalidated;
-        case Mem03ErrorCode::kInvalidateFailed:   return Mem03Metrics::ErrorCodeLabel::kInvalidateFailed;
-        case Mem03ErrorCode::kQuota:              return Mem03Metrics::ErrorCodeLabel::kQuota;
+        case MemoryErrorCode::kMemoryNotFound:     return MemoryMetrics::ErrorCodeLabel::kMemoryNotFound;
+        case MemoryErrorCode::kUserMismatch:       return MemoryMetrics::ErrorCodeLabel::kUserMismatch;
+        case MemoryErrorCode::kAlreadyInvalidated: return MemoryMetrics::ErrorCodeLabel::kAlreadyInvalidated;
+        case MemoryErrorCode::kInvalidateFailed:   return MemoryMetrics::ErrorCodeLabel::kInvalidateFailed;
+        case MemoryErrorCode::kQuota:              return MemoryMetrics::ErrorCodeLabel::kQuota;
     }
-    return Mem03Metrics::ErrorCodeLabel::kInvalidateFailed;
+    return MemoryMetrics::ErrorCodeLabel::kInvalidateFailed;
 }
 
 /// Mask the second half of a user_id for the USER_MISMATCH structured_data (the
@@ -184,19 +184,19 @@ Result<MemoryBlockRecord> MemoryTransparency::FetchOwnedMemory(
     if (!r.ok()) {
         // Absent (or store NotFound) → 404 mask. An attacker cannot tell "absent" from
         // "not yours".
-        Mem03Metrics::Instance().RecordInvalidInput(
-            MetricLabel(Mem03ErrorCode::kMemoryNotFound));
-        return Mem03Status(Mem03ErrorCode::kMemoryNotFound, memory_id);
+        MemoryMetrics::Instance().RecordInvalidInput(
+            MetricLabel(MemoryErrorCode::kMemoryNotFound));
+        return MemoryStatus(MemoryErrorCode::kMemoryNotFound, memory_id);
     }
     MemoryBlockRecord rec = r.value();
     const std::string owner =
         !rec.user_id.empty() ? rec.user_id : ReadString(rec.metadata_json, "user_id");
     if (owner != session_user_id) {
         // Cross-user hit: count the block + return the SAME 404 (L1.bis anti-enumeration mask).
-        Mem03Metrics::Instance().RecordCrossUserBlocked();
-        Mem03Metrics::Instance().RecordInvalidInput(
-            MetricLabel(Mem03ErrorCode::kMemoryNotFound));
-        return Mem03Status(Mem03ErrorCode::kMemoryNotFound, memory_id);
+        MemoryMetrics::Instance().RecordCrossUserBlocked();
+        MemoryMetrics::Instance().RecordInvalidInput(
+            MetricLabel(MemoryErrorCode::kMemoryNotFound));
+        return MemoryStatus(MemoryErrorCode::kMemoryNotFound, memory_id);
     }
     return rec;
 }
@@ -207,19 +207,19 @@ Result<MemoryListResponse> MemoryTransparency::List(const MemoryListFilter& filt
                                                     const observability::TraceContext* ctx) {
     (void)ctx;  // trace propagation is a D3.5 wiring concern (seam takes no ctx)
     const auto t0 = std::chrono::steady_clock::now();
-    auto& metrics = Mem03Metrics::Instance();
+    auto& metrics = MemoryMetrics::Instance();
 
     // L1: filter.user_id MUST equal the session user (no cross-user list).
     if (filter.user_id != session_user_id) {
-        metrics.RecordOp(Mem03Metrics::Op::kList, Mem03Metrics::OpStatus::kError);
-        metrics.RecordInvalidInput(MetricLabel(Mem03ErrorCode::kUserMismatch));
-        return Mem03Status(Mem03ErrorCode::kUserMismatch,
+        metrics.RecordOp(MemoryMetrics::Op::kList, MemoryMetrics::OpStatus::kError);
+        metrics.RecordInvalidInput(MetricLabel(MemoryErrorCode::kUserMismatch));
+        return MemoryStatus(MemoryErrorCode::kUserMismatch,
                            "list user_id must match session user");
     }
 
     Result<std::vector<MemoryBlockRecord>> listed = lister_->ListByUser(filter.user_id);
     if (!listed.ok()) {
-        metrics.RecordOp(Mem03Metrics::Op::kList, Mem03Metrics::OpStatus::kError);
+        metrics.RecordOp(MemoryMetrics::Op::kList, MemoryMetrics::OpStatus::kError);
         return listed.status();
     }
 
@@ -255,8 +255,8 @@ Result<MemoryListResponse> MemoryTransparency::List(const MemoryListFilter& filt
     const auto t1 = std::chrono::steady_clock::now();
     resp.latency_ms = static_cast<int>(
         std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
-    metrics.RecordOp(Mem03Metrics::Op::kList, Mem03Metrics::OpStatus::kSuccess);
-    metrics.ObserveOpLatency(Mem03Metrics::Op::kList, resp.latency_ms);
+    metrics.RecordOp(MemoryMetrics::Op::kList, MemoryMetrics::OpStatus::kSuccess);
+    metrics.ObserveOpLatency(MemoryMetrics::Op::kList, resp.latency_ms);
     return resp;
 }
 
@@ -264,28 +264,28 @@ Result<std::string> MemoryTransparency::Create(const MemoryCreateRequest& req,
                                                const std::string& session_user_id,
                                                const observability::TraceContext* ctx) {
     (void)ctx;
-    auto& metrics = Mem03Metrics::Instance();
+    auto& metrics = MemoryMetrics::Instance();
 
     // L1: the create must be for the session user.
     if (req.user_id != session_user_id) {
-        metrics.RecordOp(Mem03Metrics::Op::kCreate, Mem03Metrics::OpStatus::kError);
-        metrics.RecordInvalidInput(MetricLabel(Mem03ErrorCode::kUserMismatch));
-        return Mem03Status(Mem03ErrorCode::kUserMismatch,
+        metrics.RecordOp(MemoryMetrics::Op::kCreate, MemoryMetrics::OpStatus::kError);
+        metrics.RecordInvalidInput(MetricLabel(MemoryErrorCode::kUserMismatch));
+        return MemoryStatus(MemoryErrorCode::kUserMismatch,
                            "create user_id must match session user");
     }
     // issue-8 error 3: memory_type ∈ {fact,preference,event}.
     if (!IsValidMemoryType(req.memory_type)) {
-        metrics.RecordOp(Mem03Metrics::Op::kCreate, Mem03Metrics::OpStatus::kError);
+        metrics.RecordOp(MemoryMetrics::Op::kCreate, MemoryMetrics::OpStatus::kError);
         // CRUD INVALID_TYPE folds onto the boundary as InvalidArgument; the metric
         // tracks it under the closest registered code's "invalid input" family.
-        metrics.RecordInvalidInput(MetricLabel(Mem03ErrorCode::kInvalidateFailed));
+        metrics.RecordInvalidInput(MetricLabel(MemoryErrorCode::kInvalidateFailed));
         return Status::InvalidArgument(
             "CX_ERR_MEMORY_INVALID_TYPE: memory_type must be fact|preference|event");
     }
     // issue-8 error 4: content length ≤ 2000.
     if (static_cast<int>(req.content.size()) > kMaxContentLength) {
-        metrics.RecordOp(Mem03Metrics::Op::kCreate, Mem03Metrics::OpStatus::kError);
-        metrics.RecordInvalidInput(MetricLabel(Mem03ErrorCode::kInvalidateFailed));
+        metrics.RecordOp(MemoryMetrics::Op::kCreate, MemoryMetrics::OpStatus::kError);
+        metrics.RecordInvalidInput(MetricLabel(MemoryErrorCode::kInvalidateFailed));
         return Status::InvalidArgument(
             "CX_ERR_MEMORY_CONTENT_TOO_LONG: content exceeds 2000 chars");
     }
@@ -307,7 +307,7 @@ Result<std::string> MemoryTransparency::Create(const MemoryCreateRequest& req,
 
     Result<std::string> ins = block_store_->InsertMemoryBlock(rec);
     if (!ins.ok()) {
-        metrics.RecordOp(Mem03Metrics::Op::kCreate, Mem03Metrics::OpStatus::kError);
+        metrics.RecordOp(MemoryMetrics::Op::kCreate, MemoryMetrics::OpStatus::kError);
         return ins.status();
     }
 
@@ -317,7 +317,7 @@ Result<std::string> MemoryTransparency::Create(const MemoryCreateRequest& req,
                                    TriggeredBy::kUserManual,
                                    "extraction_method=explicit"));
 
-    metrics.RecordOp(Mem03Metrics::Op::kCreate, Mem03Metrics::OpStatus::kSuccess);
+    metrics.RecordOp(MemoryMetrics::Op::kCreate, MemoryMetrics::OpStatus::kSuccess);
     return rec.block_id;
 }
 
@@ -325,12 +325,12 @@ Result<MemoryEditResult> MemoryTransparency::Edit(const MemoryEditRequest& req,
                                                   const std::string& session_user_id,
                                                   const observability::TraceContext* ctx) {
     (void)ctx;
-    auto& metrics = Mem03Metrics::Instance();
+    auto& metrics = MemoryMetrics::Instance();
 
     // 1. Fetch + ownership (L1.bis 404 mask).
     Result<MemoryBlockRecord> owned = FetchOwnedMemory(req.memory_id, session_user_id);
     if (!owned.ok()) {
-        metrics.RecordOp(Mem03Metrics::Op::kEdit, Mem03Metrics::OpStatus::kError);
+        metrics.RecordOp(MemoryMetrics::Op::kEdit, MemoryMetrics::OpStatus::kError);
         return owned.status();
     }
     MemoryBlockRecord old_block = owned.value();
@@ -343,16 +343,16 @@ Result<MemoryEditResult> MemoryTransparency::Edit(const MemoryEditRequest& req,
         req.new_memory_type.has_value() ? *req.new_memory_type
                                         : ReadString(old_block.metadata_json, "memory_type");
     if (req.new_memory_type.has_value() && !IsValidMemoryType(new_type)) {
-        metrics.RecordOp(Mem03Metrics::Op::kEdit, Mem03Metrics::OpStatus::kError);
-        metrics.RecordInvalidInput(MetricLabel(Mem03ErrorCode::kInvalidateFailed));
+        metrics.RecordOp(MemoryMetrics::Op::kEdit, MemoryMetrics::OpStatus::kError);
+        metrics.RecordInvalidInput(MetricLabel(MemoryErrorCode::kInvalidateFailed));
         return Status::InvalidArgument(
             "CX_ERR_MEMORY_INVALID_TYPE: memory_type must be fact|preference|event");
     }
     const std::string new_content =
         req.new_content.has_value() ? *req.new_content : old_block.content;
     if (static_cast<int>(new_content.size()) > kMaxContentLength) {
-        metrics.RecordOp(Mem03Metrics::Op::kEdit, Mem03Metrics::OpStatus::kError);
-        metrics.RecordInvalidInput(MetricLabel(Mem03ErrorCode::kInvalidateFailed));
+        metrics.RecordOp(MemoryMetrics::Op::kEdit, MemoryMetrics::OpStatus::kError);
+        metrics.RecordInvalidInput(MetricLabel(MemoryErrorCode::kInvalidateFailed));
         return Status::InvalidArgument(
             "CX_ERR_MEMORY_CONTENT_TOO_LONG: content exceeds 2000 chars");
     }
@@ -362,7 +362,7 @@ Result<MemoryEditResult> MemoryTransparency::Edit(const MemoryEditRequest& req,
         const std::optional<int64_t> cur =
             ReadTimestampMs(old_block.metadata_json, "last_modified_at");
         if (!cur.has_value() || *cur != *req.expected_modified_at) {
-            metrics.RecordOp(Mem03Metrics::Op::kEdit, Mem03Metrics::OpStatus::kError);
+            metrics.RecordOp(MemoryMetrics::Op::kEdit, MemoryMetrics::OpStatus::kError);
             metrics.RecordEditConflict();
             return Status(
                 StatusCode::kUnavailable,
@@ -396,9 +396,9 @@ Result<MemoryEditResult> MemoryTransparency::Edit(const MemoryEditRequest& req,
 
     Result<std::string> ins = block_store_->InsertMemoryBlock(new_block);
     if (!ins.ok()) {
-        metrics.RecordOp(Mem03Metrics::Op::kEdit, Mem03Metrics::OpStatus::kError);
-        metrics.RecordInvalidInput(MetricLabel(Mem03ErrorCode::kInvalidateFailed));
-        return Mem03Status(Mem03ErrorCode::kInvalidateFailed,
+        metrics.RecordOp(MemoryMetrics::Op::kEdit, MemoryMetrics::OpStatus::kError);
+        metrics.RecordInvalidInput(MetricLabel(MemoryErrorCode::kInvalidateFailed));
+        return MemoryStatus(MemoryErrorCode::kInvalidateFailed,
                            "insert new edited block failed");
     }
 
@@ -410,9 +410,9 @@ Result<MemoryEditResult> MemoryTransparency::Edit(const MemoryEditRequest& req,
     old_block.metadata_json["invalidation_triggered_by"] = ToString(TriggeredBy::kUserEdit);
     Status us = block_store_->UpdateMemoryBlock(old_block);
     if (!us.ok()) {
-        metrics.RecordOp(Mem03Metrics::Op::kEdit, Mem03Metrics::OpStatus::kError);
-        metrics.RecordInvalidInput(MetricLabel(Mem03ErrorCode::kInvalidateFailed));
-        return Mem03Status(Mem03ErrorCode::kInvalidateFailed,
+        metrics.RecordOp(MemoryMetrics::Op::kEdit, MemoryMetrics::OpStatus::kError);
+        metrics.RecordInvalidInput(MetricLabel(MemoryErrorCode::kInvalidateFailed));
+        return MemoryStatus(MemoryErrorCode::kInvalidateFailed,
                            "invalidate old block failed");
     }
 
@@ -425,7 +425,7 @@ Result<MemoryEditResult> MemoryTransparency::Edit(const MemoryEditRequest& req,
                                    old_block.ns_id, old_block.block_id,
                                    TriggeredBy::kUserEdit, "cascaded_from=memory_edit"));
 
-    metrics.RecordOp(Mem03Metrics::Op::kEdit, Mem03Metrics::OpStatus::kSuccess);
+    metrics.RecordOp(MemoryMetrics::Op::kEdit, MemoryMetrics::OpStatus::kSuccess);
     MemoryEditResult result;
     result.new_memory_id = new_block.block_id;
     result.old_memory_id = old_block.block_id;
@@ -436,12 +436,12 @@ Status MemoryTransparency::Delete(const std::string& memory_id,
                                   const std::string& session_user_id,
                                   const observability::TraceContext* ctx) {
     (void)ctx;
-    auto& metrics = Mem03Metrics::Instance();
+    auto& metrics = MemoryMetrics::Instance();
 
     // 1. Fetch + ownership (404 mask).
     Result<MemoryBlockRecord> owned = FetchOwnedMemory(memory_id, session_user_id);
     if (!owned.ok()) {
-        metrics.RecordOp(Mem03Metrics::Op::kInvalidate, Mem03Metrics::OpStatus::kError);
+        metrics.RecordOp(MemoryMetrics::Op::kInvalidate, MemoryMetrics::OpStatus::kError);
         return owned.status();
     }
     MemoryBlockRecord rec = owned.value();
@@ -451,7 +451,7 @@ Status MemoryTransparency::Delete(const std::string& memory_id,
 
     // 2. Idempotent: already invalidated → return Ok (no error, §4.2 step 2).
     if (ReadString(rec.metadata_json, "status") == ToString(MemoryStatus::kInvalidated)) {
-        metrics.RecordOp(Mem03Metrics::Op::kInvalidate, Mem03Metrics::OpStatus::kSuccess);
+        metrics.RecordOp(MemoryMetrics::Op::kInvalidate, MemoryMetrics::OpStatus::kSuccess);
         return Status::Ok();
     }
 
@@ -465,16 +465,16 @@ Status MemoryTransparency::Delete(const std::string& memory_id,
     rec.metadata_json["invalidation_triggered_by"] = ToString(TriggeredBy::kUserManual);
     Status us = block_store_->UpdateMemoryBlock(rec);
     if (!us.ok()) {
-        metrics.RecordOp(Mem03Metrics::Op::kInvalidate, Mem03Metrics::OpStatus::kError);
-        metrics.RecordInvalidInput(MetricLabel(Mem03ErrorCode::kInvalidateFailed));
-        return Mem03Status(Mem03ErrorCode::kInvalidateFailed, "soft-delete update failed");
+        metrics.RecordOp(MemoryMetrics::Op::kInvalidate, MemoryMetrics::OpStatus::kError);
+        metrics.RecordInvalidInput(MetricLabel(MemoryErrorCode::kInvalidateFailed));
+        return MemoryStatus(MemoryErrorCode::kInvalidateFailed, "soft-delete update failed");
     }
 
     // 4. audit: memory_invalidate, triggered_by=user_manual (§4.2 step 4).
     if (op_logger_) op_logger_->Log(MakeOpLogEntry("memory_invalidate", session_user_id, rec.ns_id,
                                    memory_id, TriggeredBy::kUserManual));
 
-    metrics.RecordOp(Mem03Metrics::Op::kInvalidate, Mem03Metrics::OpStatus::kSuccess);
+    metrics.RecordOp(MemoryMetrics::Op::kInvalidate, MemoryMetrics::OpStatus::kSuccess);
     return Status::Ok();
 }
 

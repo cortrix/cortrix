@@ -38,7 +38,7 @@
 #include "cortrix/common/data_types.h"
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
-#include "cortrix/resource/f05_config.h"
+#include "cortrix/resource/namespace_pool_config.h"
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/resource/namespace_pool.h"
 #include "cortrix/store/cortrix_store.h"
@@ -262,7 +262,7 @@ public:
     }
 
     // Create the per-Unit doc_fts5_index virtual table + insert one row, mirroring
-    // the F41SchemaProvider column order (filename, doc_title, topics, authors).
+    // the DocSummarySchemaProvider column order (filename, doc_title, topics, authors).
     void CreateFts5Table(const std::string& ns, const std::string& doc_id,
                          const std::string& filename, const std::string& doc_title,
                          const std::string& topics, const std::string& authors) {
@@ -378,7 +378,7 @@ private:
     ::testing::NiceMock<MockUnitRouter> unit_router_;
     ::testing::NiceMock<MockIndexFactory> index_factory_;
     FakeDiscoveryIndex* fake_index_ = nullptr;
-    cortrix::resource::F05Config config_;
+    cortrix::resource::NamespacePoolConfig config_;
     std::unique_ptr<cortrix::resource::DefaultNamespacePool> pool_;
     uint64_t next_block_id_ = 1000;
 };

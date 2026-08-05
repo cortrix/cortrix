@@ -13,9 +13,9 @@
 #include "cortrix/common/status.h"
 
 // Exhaustive error-registry matrix for agent_trace (src/agent_trace/agent_trace_error.*).
-// One TEST_P case per F13ErrorCode. Unique suite name (F13ErrorMatrix).
+// One TEST_P case per AgentTraceErrorCode. Unique suite name (AgentTraceErrorMatrix).
 //
-// NOTE (registry quirk, intentionally not over-asserted): F13_INTERNAL is
+// NOTE (registry quirk, intentionally not over-asserted): AGENTTRACE_INTERNAL is
 // retryable=true with retry_after_ms=null (the Agent may retry but no fixed backoff
 // is promised). So only the universal direction "retry_after_ms present => retryable"
 // is asserted here; the reverse does NOT hold for this module.
@@ -24,15 +24,15 @@ namespace {
 
 using agent_friendly::ErrorCategory;
 
-const std::vector<F13ErrorCode>& AllCodes() {
-    static const std::vector<F13ErrorCode> codes = {
-        F13ErrorCode::kSessionNotFound,
-        F13ErrorCode::kInvalidFilter,
-        F13ErrorCode::kInteractionNotFound,
-        F13ErrorCode::kUnauthorized,
-        F13ErrorCode::kMcpSessionInvalid,
-        F13ErrorCode::kSessionExpired,
-        F13ErrorCode::kInternal,
+const std::vector<AgentTraceErrorCode>& AllCodes() {
+    static const std::vector<AgentTraceErrorCode> codes = {
+        AgentTraceErrorCode::kSessionNotFound,
+        AgentTraceErrorCode::kInvalidFilter,
+        AgentTraceErrorCode::kInteractionNotFound,
+        AgentTraceErrorCode::kUnauthorized,
+        AgentTraceErrorCode::kMcpSessionInvalid,
+        AgentTraceErrorCode::kSessionExpired,
+        AgentTraceErrorCode::kInternal,
     };
     return codes;
 }
@@ -52,33 +52,33 @@ const std::set<StatusCode>& ValidStatusCodes() {
     return kCodes;
 }
 
-class F13ErrorMatrix : public ::testing::TestWithParam<F13ErrorCode> {};
+class AgentTraceErrorMatrix : public ::testing::TestWithParam<AgentTraceErrorCode> {};
 
-TEST_P(F13ErrorMatrix, CodeStringWellFormed) {
-    static const std::regex kPattern("^CX_(ERR|WARN)_F13_[A-Z][A-Z0-9_]*$");
-    const std::string cx = F13ErrorCodeString(GetParam());
+TEST_P(AgentTraceErrorMatrix, CodeStringWellFormed) {
+    static const std::regex kPattern("^CX_(ERR|WARN)_TRACE_[A-Z][A-Z0-9_]*$");
+    const std::string cx = AgentTraceErrorCodeString(GetParam());
     EXPECT_TRUE(std::regex_match(cx, kPattern)) << "bad code string: " << cx;
-    EXPECT_EQ(cx, std::string(GetF13ErrorInfo(GetParam()).cx_code));
+    EXPECT_EQ(cx, std::string(GetAgentTraceErrorInfo(GetParam()).cx_code));
 }
 
-TEST_P(F13ErrorMatrix, CategoryInValidSet) {
-    const F13ErrorInfo& info = GetF13ErrorInfo(GetParam());
+TEST_P(AgentTraceErrorMatrix, CategoryInValidSet) {
+    const AgentTraceErrorInfo& info = GetAgentTraceErrorInfo(GetParam());
     EXPECT_EQ(ValidCategoryStrings().count(agent_friendly::ToString(info.category)), 1u)
         << "code " << info.cx_code;
 }
 
 // Universal invariant only: a present backoff implies the code is retryable. agent trace
 // deliberately does NOT carry the reverse (INTERNAL is retryable with null backoff).
-TEST_P(F13ErrorMatrix, RetryAfterImpliesRetryable) {
-    const F13ErrorInfo& info = GetF13ErrorInfo(GetParam());
+TEST_P(AgentTraceErrorMatrix, RetryAfterImpliesRetryable) {
+    const AgentTraceErrorInfo& info = GetAgentTraceErrorInfo(GetParam());
     if (info.retry_after_ms.has_value()) {
         EXPECT_TRUE(info.retryable) << info.cx_code;
         EXPECT_GT(*info.retry_after_ms, 0) << info.cx_code;
     }
 }
 
-TEST_P(F13ErrorMatrix, RequiredStructuredDataContract) {
-    const F13ErrorCode code = GetParam();
+TEST_P(AgentTraceErrorMatrix, RequiredStructuredDataContract) {
+    const AgentTraceErrorCode code = GetParam();
     const std::vector<std::string>& keys = RequiredStructuredDataKeys(code);
 
     nlohmann::json full = nlohmann::json::object();
@@ -95,12 +95,12 @@ TEST_P(F13ErrorMatrix, RequiredStructuredDataContract) {
     EXPECT_EQ(HasRequiredStructuredData(code, nlohmann::json(nullptr)), keys.empty());
 }
 
-TEST_P(F13ErrorMatrix, MakeErrorRoundTrips) {
-    const F13ErrorCode code = GetParam();
-    const F13ErrorInfo& info = GetF13ErrorInfo(code);
+TEST_P(AgentTraceErrorMatrix, MakeErrorRoundTrips) {
+    const AgentTraceErrorCode code = GetParam();
+    const AgentTraceErrorInfo& info = GetAgentTraceErrorInfo(code);
     nlohmann::json sd = {{"probe", 1}};
 
-    auto err = MakeF13Error(code, sd, "human detail");
+    auto err = MakeAgentTraceError(code, sd, "human detail");
     EXPECT_EQ(err.code, std::string(info.cx_code));
     EXPECT_EQ(err.category, info.category);
     EXPECT_EQ(err.retryable, info.retryable);
@@ -121,39 +121,39 @@ TEST_P(F13ErrorMatrix, MakeErrorRoundTrips) {
     EXPECT_EQ(body["structured_data"]["probe"], 1);
 }
 
-TEST_P(F13ErrorMatrix, EmptyMessageFallsBackToCode) {
-    const F13ErrorCode code = GetParam();
-    auto err = MakeF13Error(code);
-    EXPECT_EQ(err.message, std::string(F13ErrorCodeString(code)));
+TEST_P(AgentTraceErrorMatrix, EmptyMessageFallsBackToCode) {
+    const AgentTraceErrorCode code = GetParam();
+    auto err = MakeAgentTraceError(code);
+    EXPECT_EQ(err.message, std::string(AgentTraceErrorCodeString(code)));
 }
 
-TEST_P(F13ErrorMatrix, StatusCodeBucketAndBridge) {
-    const F13ErrorCode code = GetParam();
-    const StatusCode sc = F13ErrorToStatusCode(code);
+TEST_P(AgentTraceErrorMatrix, StatusCodeBucketAndBridge) {
+    const AgentTraceErrorCode code = GetParam();
+    const StatusCode sc = AgentTraceErrorToStatusCode(code);
     EXPECT_EQ(ValidStatusCodes().count(sc), 1u);
     EXPECT_NE(sc, StatusCode::kOk);
 
-    Status s = F13Status(code, "detail-z");
+    Status s = AgentTraceStatus(code, "detail-z");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), sc);
-    EXPECT_NE(s.message().find(F13ErrorCodeString(code)), std::string::npos);
+    EXPECT_NE(s.message().find(AgentTraceErrorCodeString(code)), std::string::npos);
     EXPECT_NE(s.message().find("detail-z"), std::string::npos);
 
-    Status bare = F13Status(code);
-    EXPECT_EQ(bare.message(), std::string(F13ErrorCodeString(code)));
+    Status bare = AgentTraceStatus(code);
+    EXPECT_EQ(bare.message(), std::string(AgentTraceErrorCodeString(code)));
 }
 
-INSTANTIATE_TEST_SUITE_P(AllF13Codes, F13ErrorMatrix,
+INSTANTIATE_TEST_SUITE_P(AllAgentTraceCodes, AgentTraceErrorMatrix,
                          ::testing::ValuesIn(AllCodes()));
 
-TEST(F13ErrorMatrixGuard, CodeStringsAreUniqueAndCountMatches) {
+TEST(AgentTraceErrorMatrixGuard, CodeStringsAreUniqueAndCountMatches) {
     std::set<std::string> seen;
-    for (F13ErrorCode code : AllCodes()) {
-        EXPECT_TRUE(seen.insert(F13ErrorCodeString(code)).second)
-            << "duplicate: " << F13ErrorCodeString(code);
+    for (AgentTraceErrorCode code : AllCodes()) {
+        EXPECT_TRUE(seen.insert(AgentTraceErrorCodeString(code)).second)
+            << "duplicate: " << AgentTraceErrorCodeString(code);
     }
     EXPECT_EQ(seen.size(), AllCodes().size());
-    EXPECT_EQ(static_cast<int>(AllCodes().size()), kF13ErrorCodeCount);
+    EXPECT_EQ(static_cast<int>(AllCodes().size()), kAgentTraceErrorCodeCount);
 }
 
 }  // namespace

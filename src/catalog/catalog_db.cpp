@@ -67,7 +67,7 @@ Status CatalogDb::Open(const std::string& db_path,
     // downstream Feature provider extends them. The caller supplies the
     // downstream providers already in ARCH §1.3.bis.3 topological order;
     // SchemaMigrator preserves registration order and skips nullptr entries.
-    F12SchemaProvider f12_provider;
+    CatalogSchemaProvider f12_provider;
     SchemaMigrator migrator;
     migrator.Register(&f12_provider);
     for (ISchemaProvider* p : extra_providers) {

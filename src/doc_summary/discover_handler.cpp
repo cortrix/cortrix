@@ -55,7 +55,7 @@ std::vector<DocDiscoveryHit> RecallDocSummaryHnsw(store::IIndex& index,
     if (!embedder.Embed(query, &emb).ok() || emb.vector.empty()) return out;
 
     // One ANN search over the SAME mixed P-HNSW pool the chunk path uses. doc_summary
-    // blocks were AddPoints'd by F41AsyncWorker; we over-fetch (×4) because the pool is
+    // blocks were AddPoints'd by DocSummaryAsyncWorker; we over-fetch (×4) because the pool is
     // shared with chunk/hype blocks and we filter to block_type==17 below.
     const int search_k = top_k * 4;
     auto raw = index.Search(emb.vector.data(), search_k);

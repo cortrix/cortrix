@@ -51,7 +51,7 @@ class DocSummaryErrorMatrix : public ::testing::TestWithParam<DocSummaryErrorCod
 
 // CX_ERR_DOCSUMMARY_* token shape.
 TEST_P(DocSummaryErrorMatrix, CodeStringWellFormed) {
-    static const std::regex kPattern("^CX_(ERR|WARN)_F41_[A-Z][A-Z0-9_]*$");
+    static const std::regex kPattern("^CX_(ERR|WARN)_DOCSUMMARY_[A-Z][A-Z0-9_]*$");
     const std::string cx = DocSummaryErrorCodeString(GetParam());
     EXPECT_TRUE(std::regex_match(cx, kPattern)) << "bad code string: " << cx;
     EXPECT_EQ(cx, std::string(GetDocSummaryErrorInfo(GetParam()).cx_code));

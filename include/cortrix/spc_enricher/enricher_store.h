@@ -10,7 +10,7 @@
 
 namespace cortrix::spc {
 
-/// Persists an EnrichResult into the per-Unit DB schema F03SchemaProvider creates
+/// Persists an EnrichResult into the per-Unit DB schema EnricherSchemaProvider creates
 /// (design §3.1, S5.4). Free functions over a sqlite3* so they are unit-testable
 /// against an in-memory DB with the enricher migration applied; the live wiring (which
 /// block_id, transaction boundaries with block writes) is wired separately.

@@ -15,7 +15,7 @@
 #include "cortrix/retrieval/crag_error.h"  // CragInferenceError (Throwing mock)
 #include "cortrix/retrieval/crag_evaluator.h"
 #include "cortrix/retrieval/crag_metrics.h"
-#include "cortrix/retrieval/f39_routing_mock.h"
+#include "cortrix/retrieval/routing_mock.h"
 #include "cortrix/retrieval/heuristic_guard_backend.h"
 #include "cortrix/retrieval/types.h"
 
@@ -119,7 +119,7 @@ TEST_F(CragContextTest, DegradeVerdictCountsAsFallbackAndTakesCorrectPath) {
     EXPECT_EQ(ctx.ambiguous_action_taken, "");
 }
 
-TEST_F(CragContextTest, DoesNotTouchF39Fields) {
+TEST_F(CragContextTest, DoesNotTouchRouterFields) {
     // §6.2 write-failure isolation: CRAG only writes its own fields, never query routing's.
     CragEvaluator ev(std::make_shared<HeuristicGuardBackend>(), CragConfig{});
     query::QueryContext ctx;
@@ -140,7 +140,7 @@ TEST_F(CragContextTest, DoesNotTouchF39Fields) {
 
 // ---------------- §2 / §4.1 ShouldSkipF37 mock --------------------------------
 
-TEST_F(CragContextTest, ShouldSkipF37MockByRoutingPath) {
+TEST_F(CragContextTest, ShouldSkipCragMockByRoutingPath) {
     query::QueryContext complex;
     complex.routing_path = "complex";
     EXPECT_FALSE(ShouldSkipF37(complex));  // complex → run CRAG

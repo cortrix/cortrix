@@ -9,7 +9,7 @@
 #include "cortrix/spc/hype_error.h"
 
 // Exhaustive parameterized error-registry sweep for HyPE (§7, 6 codes).
-// Distinct suite name (HypeErrorMatrix) from test_f38_hype_error.cpp.
+// Distinct suite name (HypeErrorMatrix) from test_hype_error.cpp.
 namespace cortrix::spc {
 namespace {
 

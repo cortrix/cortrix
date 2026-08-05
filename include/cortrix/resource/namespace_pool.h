@@ -15,7 +15,7 @@
 #include "cortrix/catalog/i_unit_router.h"
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
-#include "cortrix/resource/f05_config.h"
+#include "cortrix/resource/namespace_pool_config.h"
 #include "cortrix/resource/namespace_resource_bundle.h"
 #include "cortrix/resource/pool_error.h"
 #include "cortrix/store/iindex_factory.h"
@@ -208,7 +208,7 @@ public:
                          WriteCoordinatorFactory write_coord_factory,
                          cortrix::catalog::INSRouter* ns_router,
                          cortrix::catalog::IUnitRouter* unit_router,
-                         F05Config config);
+                         NamespacePoolConfig config);
 
     Status AdmitCreate(const std::string& namespace_id,
                        size_t estimated_size_bytes) override;
@@ -260,7 +260,7 @@ private:
     // IUnitRouter::GetUnit call is unnecessary here); this stays wired for the
     // Catalog hook + Phase-2 multi-Unit lookups.
     [[maybe_unused]] cortrix::catalog::IUnitRouter* unit_router_;
-    F05Config config_;
+    NamespacePoolConfig config_;
 
     // Lock-free counters (A-class stats).
     std::atomic<size_t> rejected_ns_count_{0};

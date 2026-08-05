@@ -2,10 +2,10 @@
 //   Operation log  (OperationLogSchemaProvider, operation_log table, version 1)
 //   Agent trace   (AgentTraceSchemaProvider, agent_trace table, version 1; F13-scoped token)
 //   Agent trace   (InteractionSourcesSchemaProvider, interaction_sources, version 1; FK -> interaction_log)
-//   Auth   (P08AuthSchemaProvider, platform.db auth: 7 tables, version 1; version-agnostic Migrate)
+//   Auth   (AuthSchemaProvider, platform.db auth: 7 tables, version 1; version-agnostic Migrate)
 //
 // Fresh in-memory sqlite3 per case. Globally unique suite/fixture names
-// (F18aObsMatrix / F13TraceMatrix / F13SrcMatrix / P08AuthMatrix) that do NOT reuse
+// (OperationLogObsMatrix / AgentTraceMatrix / AgentTraceSrcMatrix / AuthMatrix) that do NOT reuse
 // names from existing tests (OperationLogSchemaTest / AgentTraceSchemaTest / ...).
 
 #include <gtest/gtest.h>
@@ -64,20 +64,20 @@ struct InitStep {
 
 // ============================ operation_log (version 1) =================================
 
-class F18aObsMatrix : public ::testing::Test, protected SqliteHelpers {
+class OperationLogObsMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
     cortrix::observability::OperationLogSchemaProvider p_;
 };
 
-TEST_F(F18aObsMatrix, FeatureIdentity) {
+TEST_F(OperationLogObsMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "operation_log");
     EXPECT_EQ(p_.CurrentVersion(), 1);
     EXPECT_EQ(cortrix::observability::kOplogSchemaVersion, 1);
 }
 
-TEST_F(F18aObsMatrix, MigrateCreatesTableAndIndexes) {
+TEST_F(OperationLogObsMatrix, MigrateCreatesTableAndIndexes) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("operation_log"));
     EXPECT_TRUE(IndexExists("idx_oplog_timestamp"));
@@ -87,7 +87,7 @@ TEST_F(F18aObsMatrix, MigrateCreatesTableAndIndexes) {
     EXPECT_TRUE(IndexExists("idx_oplog_user_resource"));
 }
 
-TEST_F(F18aObsMatrix, TableShape) {
+TEST_F(OperationLogObsMatrix, TableShape) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("operation_log", "timestamp"));
     EXPECT_TRUE(ColumnExists("operation_log", "user_id"));
@@ -97,13 +97,13 @@ TEST_F(F18aObsMatrix, TableShape) {
     EXPECT_TRUE(ColumnExists("operation_log", "session_id"));
 }
 
-TEST_F(F18aObsMatrix, IdempotentReRun) {
+TEST_F(OperationLogObsMatrix, IdempotentReRun) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
 }
 
-TEST_F(F18aObsMatrix, UnsupportedStepRejected) {
+TEST_F(OperationLogObsMatrix, UnsupportedStepRejected) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
@@ -111,14 +111,14 @@ TEST_F(F18aObsMatrix, UnsupportedStepRejected) {
     EXPECT_NE(s.message().find("operation_log"), std::string::npos);
 }
 
-class F18aObsVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class OperationLogObsVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
     void SetUp() override { ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK); }
     void TearDown() override { sqlite3_close(db_); }
     sqlite3* db_ = nullptr;
     cortrix::observability::OperationLogSchemaProvider p_;
 };
-TEST_P(F18aObsVersionMatrix, Gate) {
+TEST_P(OperationLogObsVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(db_, step.from, step.to);
     if (step.ok) {
@@ -129,7 +129,7 @@ TEST_P(F18aObsVersionMatrix, Gate) {
     }
 }
 INSTANTIATE_TEST_SUITE_P(
-    F18aObsSteps, F18aObsVersionMatrix,
+    OperationLogObsSteps, OperationLogObsVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{7, 7, true},
@@ -137,20 +137,20 @@ INSTANTIATE_TEST_SUITE_P(
 
 // ============================ agent_trace (version 1, agent trace token) ========================
 
-class F13TraceMatrix : public ::testing::Test, protected SqliteHelpers {
+class AgentTraceMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
     cortrix::agent_trace::AgentTraceSchemaProvider p_;
 };
 
-TEST_F(F13TraceMatrix, FeatureIdentity) {
+TEST_F(AgentTraceMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "agent_trace");
     EXPECT_EQ(p_.CurrentVersion(), 1);
     EXPECT_EQ(cortrix::agent_trace::kAgentTraceSchemaVersion, 1);
 }
 
-TEST_F(F13TraceMatrix, MigrateCreatesTableAndIndexes) {
+TEST_F(AgentTraceMatrix, MigrateCreatesTableAndIndexes) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("agent_trace"));
     EXPECT_TRUE(IndexExists("idx_agent_trace_session"));
@@ -158,7 +158,7 @@ TEST_F(F13TraceMatrix, MigrateCreatesTableAndIndexes) {
     EXPECT_TRUE(IndexExists("idx_agent_trace_trace_id"));
 }
 
-TEST_F(F13TraceMatrix, TableShape) {
+TEST_F(AgentTraceMatrix, TableShape) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("agent_trace", "session_id"));
     EXPECT_TRUE(ColumnExists("agent_trace", "trace_id"));
@@ -168,13 +168,13 @@ TEST_F(F13TraceMatrix, TableShape) {
     EXPECT_TRUE(ColumnExists("agent_trace", "created_at"));
 }
 
-TEST_F(F13TraceMatrix, IdempotentReRun) {
+TEST_F(AgentTraceMatrix, IdempotentReRun) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
 }
 
-TEST_F(F13TraceMatrix, UnsupportedStepRejectedWithF13Token) {
+TEST_F(AgentTraceMatrix, UnsupportedStepRejectedWithAgentTraceToken) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
@@ -182,14 +182,14 @@ TEST_F(F13TraceMatrix, UnsupportedStepRejectedWithF13Token) {
     EXPECT_NE(s.message().find("CX_ERR_TRACE_INTERNAL"), std::string::npos);
 }
 
-class F13TraceVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class AgentTraceVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
     void SetUp() override { ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK); }
     void TearDown() override { sqlite3_close(db_); }
     sqlite3* db_ = nullptr;
     cortrix::agent_trace::AgentTraceSchemaProvider p_;
 };
-TEST_P(F13TraceVersionMatrix, Gate) {
+TEST_P(AgentTraceVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(db_, step.from, step.to);
     if (step.ok) {
@@ -201,7 +201,7 @@ TEST_P(F13TraceVersionMatrix, Gate) {
     }
 }
 INSTANTIATE_TEST_SUITE_P(
-    F13TraceSteps, F13TraceVersionMatrix,
+    AgentTraceSteps, AgentTraceVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{5, 5, true},
@@ -209,7 +209,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 // ============================ agent trace interaction_sources (version 1) ====================
 
-class F13SrcMatrix : public ::testing::Test, protected SqliteHelpers {
+class AgentTraceSrcMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override {
         Open();
@@ -219,20 +219,20 @@ protected:
     cortrix::agent_trace::InteractionSourcesSchemaProvider p_;
 };
 
-TEST_F(F13SrcMatrix, FeatureIdentity) {
+TEST_F(AgentTraceSrcMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "interaction_sources");
     EXPECT_EQ(p_.CurrentVersion(), 1);
     EXPECT_EQ(cortrix::agent_trace::kInteractionSourcesSchemaVersion, 1);
 }
 
-TEST_F(F13SrcMatrix, MigrateCreatesTableAndIndexes) {
+TEST_F(AgentTraceSrcMatrix, MigrateCreatesTableAndIndexes) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("interaction_sources"));
     EXPECT_TRUE(IndexExists("idx_sources_interaction"));
     EXPECT_TRUE(IndexExists("idx_sources_block"));
 }
 
-TEST_F(F13SrcMatrix, TableShape) {
+TEST_F(AgentTraceSrcMatrix, TableShape) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("interaction_sources", "interaction_id"));
     EXPECT_TRUE(ColumnExists("interaction_sources", "source_block_id"));
@@ -241,13 +241,13 @@ TEST_F(F13SrcMatrix, TableShape) {
     EXPECT_TRUE(ColumnExists("interaction_sources", "snippet"));
 }
 
-TEST_F(F13SrcMatrix, IdempotentReRun) {
+TEST_F(AgentTraceSrcMatrix, IdempotentReRun) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
 }
 
-TEST_F(F13SrcMatrix, UnsupportedStepRejectedWithF13Token) {
+TEST_F(AgentTraceSrcMatrix, UnsupportedStepRejectedWithAgentTraceToken) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
@@ -255,7 +255,7 @@ TEST_F(F13SrcMatrix, UnsupportedStepRejectedWithF13Token) {
     EXPECT_NE(s.message().find("interaction_sources"), std::string::npos);
 }
 
-class F13SrcVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class AgentTraceSrcVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
     void SetUp() override {
         ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK);
@@ -265,7 +265,7 @@ protected:
     sqlite3* db_ = nullptr;
     cortrix::agent_trace::InteractionSourcesSchemaProvider p_;
 };
-TEST_P(F13SrcVersionMatrix, Gate) {
+TEST_P(AgentTraceSrcVersionMatrix, Gate) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(db_, step.from, step.to);
     if (step.ok) {
@@ -276,7 +276,7 @@ TEST_P(F13SrcVersionMatrix, Gate) {
     }
 }
 INSTANTIATE_TEST_SUITE_P(
-    F13SrcSteps, F13SrcVersionMatrix,
+    AgentTraceSrcSteps, AgentTraceSrcVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{2, 2, true},
                       InitStep{0, 0, true}, InitStep{1, 2, false}, InitStep{0, 2, false},
                       InitStep{2, 1, false}, InitStep{1, 0, false}, InitStep{9, 9, true},
@@ -284,20 +284,20 @@ INSTANTIATE_TEST_SUITE_P(
 
 // ============================ auth (platform.db, version 1) ================================
 
-class P08AuthMatrix : public ::testing::Test, protected SqliteHelpers {
+class AuthMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
-    cortrix::auth::P08AuthSchemaProvider p_;
+    cortrix::auth::AuthSchemaProvider p_;
 };
 
-TEST_F(P08AuthMatrix, FeatureIdentity) {
+TEST_F(AuthMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "auth");
     EXPECT_EQ(p_.CurrentVersion(), 1);
-    EXPECT_EQ(cortrix::auth::kP08AuthSchemaVersion, 1);
+    EXPECT_EQ(cortrix::auth::kAuthSchemaVersion, 1);
 }
 
-TEST_F(P08AuthMatrix, MigrateCreatesAllSevenTables) {
+TEST_F(AuthMatrix, MigrateCreatesAllSevenTables) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("users"));
     EXPECT_TRUE(TableExists("refresh_tokens"));
@@ -307,7 +307,7 @@ TEST_F(P08AuthMatrix, MigrateCreatesAllSevenTables) {
     EXPECT_TRUE(TableExists("auth_config"));
 }
 
-TEST_F(P08AuthMatrix, UsersShapeAndIndexes) {
+TEST_F(AuthMatrix, UsersShapeAndIndexes) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("users", "email"));
     EXPECT_TRUE(ColumnExists("users", "password_hash"));
@@ -317,7 +317,7 @@ TEST_F(P08AuthMatrix, UsersShapeAndIndexes) {
     EXPECT_TRUE(IndexExists("idx_refresh_tokens_user"));
 }
 
-TEST_F(P08AuthMatrix, EmailUniqueConstraint) {
+TEST_F(AuthMatrix, EmailUniqueConstraint) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_EQ(Exec("INSERT INTO users(id,email,password_hash,display_name,created_at,updated_at) "
                    "VALUES ('usr_1','a@b.c','h','n',0,0);"), SQLITE_OK);
@@ -325,7 +325,7 @@ TEST_F(P08AuthMatrix, EmailUniqueConstraint) {
                    "VALUES ('usr_2','a@b.c','h','n',0,0);"), SQLITE_OK);
 }
 
-TEST_F(P08AuthMatrix, AuthSecretsCheckConstraint) {
+TEST_F(AuthMatrix, AuthSecretsCheckConstraint) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     // status CHECK rejects an out-of-set value.
     EXPECT_NE(Exec("INSERT INTO auth_secrets(id,secret_type,value,status,created_at) "
@@ -334,7 +334,7 @@ TEST_F(P08AuthMatrix, AuthSecretsCheckConstraint) {
                    "VALUES ('s2','jwt_secret',x'00','current',0);"), SQLITE_OK);
 }
 
-TEST_F(P08AuthMatrix, IdempotentReRun) {
+TEST_F(AuthMatrix, IdempotentReRun) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 1).ok());
@@ -342,14 +342,14 @@ TEST_F(P08AuthMatrix, IdempotentReRun) {
 
 // Auth's Migrate is version-agnostic (creates from scratch regardless of from/to);
 // every (from,to) succeeds against a fresh db. Matrix confirms no spurious rejection.
-class P08AuthVersionMatrix : public ::testing::TestWithParam<InitStep> {
+class AuthVersionMatrix : public ::testing::TestWithParam<InitStep> {
 protected:
     void SetUp() override { ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK); }
     void TearDown() override { sqlite3_close(db_); }
     sqlite3* db_ = nullptr;
-    cortrix::auth::P08AuthSchemaProvider p_;
+    cortrix::auth::AuthSchemaProvider p_;
 };
-TEST_P(P08AuthVersionMatrix, AlwaysCreatesRegardlessOfStep) {
+TEST_P(AuthVersionMatrix, AlwaysCreatesRegardlessOfStep) {
     const InitStep step = GetParam();
     Status s = p_.Migrate(db_, step.from, step.to);
     EXPECT_TRUE(s.ok());
@@ -360,7 +360,7 @@ TEST_P(P08AuthVersionMatrix, AlwaysCreatesRegardlessOfStep) {
     sqlite3_finalize(stmt);
 }
 INSTANTIATE_TEST_SUITE_P(
-    P08AuthSteps, P08AuthVersionMatrix,
+    AuthSteps, AuthVersionMatrix,
     ::testing::Values(InitStep{0, 1, true}, InitStep{1, 1, true}, InitStep{0, 2, true},
                       InitStep{1, 2, true}, InitStep{2, 2, true}, InitStep{0, 0, true}));
 

@@ -13,7 +13,7 @@ constexpr int kScoringSchemaVersion = 1;
 /// The scoring ISchemaProvider (frozen cortrix::catalog::ISchemaProvider): owns the
 /// per-Unit `blocks.semantic_score` column (ARCH §5.1.2 — a separate per-Unit SQLite `blocks` column,
 /// NOT in BlockHeader). Mirrors the enricher provider's idempotent ADD-COLUMN-if-absent
-/// pattern (src/spc/f03_schema_provider.cpp added enriched_score the same way). Registered
+/// pattern (src/spc/enricher_schema_provider.cpp added enriched_score the same way). Registered
 /// with the per-Unit SchemaMigrator. Migrate returns Status (F-FREEZE-1: no Result<void>).
 ///
 /// Co-existence with the enricher: it adds `enriched_score` (the LLM enrichment score it writes itselfng),

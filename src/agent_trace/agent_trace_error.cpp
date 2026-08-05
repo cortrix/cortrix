@@ -18,41 +18,41 @@ namespace {
 // retry_after_ms: every trace code is "-" (no machine retry delay). Only
 // INTERNAL is retryable (transient) — the Agent may retry but no fixed backoff is
 // promised; the rest are permanent/auth (caller must fix the request).
-constexpr F13ErrorInfo kSessionNotFound{
+constexpr AgentTraceErrorInfo kSessionNotFound{
     "CX_ERR_TRACE_SESSION_NOT_FOUND", ErrorCategory::kPermanent, false, std::nullopt};
-constexpr F13ErrorInfo kInvalidFilter{
+constexpr AgentTraceErrorInfo kInvalidFilter{
     "CX_ERR_TRACE_INVALID_FILTER", ErrorCategory::kPermanent, false, std::nullopt};
-constexpr F13ErrorInfo kInteractionNotFound{
+constexpr AgentTraceErrorInfo kInteractionNotFound{
     "CX_ERR_TRACE_INTERACTION_NOT_FOUND", ErrorCategory::kPermanent, false, std::nullopt};
-constexpr F13ErrorInfo kUnauthorized{
+constexpr AgentTraceErrorInfo kUnauthorized{
     "CX_ERR_TRACE_UNAUTHORIZED", ErrorCategory::kAuth, false, std::nullopt};
-constexpr F13ErrorInfo kMcpSessionInvalid{
+constexpr AgentTraceErrorInfo kMcpSessionInvalid{
     "CX_ERR_TRACE_MCP_SESSION_INVALID", ErrorCategory::kPermanent, false, std::nullopt};
-constexpr F13ErrorInfo kSessionExpired{
+constexpr AgentTraceErrorInfo kSessionExpired{
     "CX_ERR_TRACE_SESSION_EXPIRED", ErrorCategory::kPermanent, false, std::nullopt};
-constexpr F13ErrorInfo kInternal{
+constexpr AgentTraceErrorInfo kInternal{
     "CX_ERR_TRACE_INTERNAL", ErrorCategory::kTransient, true, std::nullopt};
 
 }  // namespace
 
-const F13ErrorInfo& GetF13ErrorInfo(F13ErrorCode code) {
+const AgentTraceErrorInfo& GetAgentTraceErrorInfo(AgentTraceErrorCode code) {
     switch (code) {
-        case F13ErrorCode::kSessionNotFound:     return kSessionNotFound;
-        case F13ErrorCode::kInvalidFilter:       return kInvalidFilter;
-        case F13ErrorCode::kInteractionNotFound: return kInteractionNotFound;
-        case F13ErrorCode::kUnauthorized:        return kUnauthorized;
-        case F13ErrorCode::kMcpSessionInvalid:   return kMcpSessionInvalid;
-        case F13ErrorCode::kSessionExpired:      return kSessionExpired;
-        case F13ErrorCode::kInternal:            return kInternal;
+        case AgentTraceErrorCode::kSessionNotFound:     return kSessionNotFound;
+        case AgentTraceErrorCode::kInvalidFilter:       return kInvalidFilter;
+        case AgentTraceErrorCode::kInteractionNotFound: return kInteractionNotFound;
+        case AgentTraceErrorCode::kUnauthorized:        return kUnauthorized;
+        case AgentTraceErrorCode::kMcpSessionInvalid:   return kMcpSessionInvalid;
+        case AgentTraceErrorCode::kSessionExpired:      return kSessionExpired;
+        case AgentTraceErrorCode::kInternal:            return kInternal;
     }
     return kInternal;  // unreachable for a valid enum value
 }
 
-const char* F13ErrorCodeString(F13ErrorCode code) {
-    return GetF13ErrorInfo(code).cx_code;
+const char* AgentTraceErrorCodeString(AgentTraceErrorCode code) {
+    return GetAgentTraceErrorInfo(code).cx_code;
 }
 
-const std::vector<std::string>& RequiredStructuredDataKeys(F13ErrorCode code) {
+const std::vector<std::string>& RequiredStructuredDataKeys(AgentTraceErrorCode code) {
     // §9.2 structured_data column, 1:1. Function-local statics → stable references.
     // INVALID_FILTER's value_preview is optional (PII guard) → not required.
     static const std::vector<std::string> kSession{"session_id"};
@@ -64,18 +64,18 @@ const std::vector<std::string>& RequiredStructuredDataKeys(F13ErrorCode code) {
     static const std::vector<std::string> kErrId{"error_id"};
 
     switch (code) {
-        case F13ErrorCode::kSessionNotFound:     return kSession;
-        case F13ErrorCode::kInvalidFilter:       return kFilter;
-        case F13ErrorCode::kInteractionNotFound: return kInteraction;
-        case F13ErrorCode::kUnauthorized:        return kRole;
-        case F13ErrorCode::kMcpSessionInvalid:   return kMcp;
-        case F13ErrorCode::kSessionExpired:      return kExpired;
-        case F13ErrorCode::kInternal:            return kErrId;
+        case AgentTraceErrorCode::kSessionNotFound:     return kSession;
+        case AgentTraceErrorCode::kInvalidFilter:       return kFilter;
+        case AgentTraceErrorCode::kInteractionNotFound: return kInteraction;
+        case AgentTraceErrorCode::kUnauthorized:        return kRole;
+        case AgentTraceErrorCode::kMcpSessionInvalid:   return kMcp;
+        case AgentTraceErrorCode::kSessionExpired:      return kExpired;
+        case AgentTraceErrorCode::kInternal:            return kErrId;
     }
     return kErrId;  // unreachable for a valid enum
 }
 
-bool HasRequiredStructuredData(F13ErrorCode code,
+bool HasRequiredStructuredData(AgentTraceErrorCode code,
                                const nlohmann::json& structured_data) {
     if (!structured_data.is_object()) {
         return RequiredStructuredDataKeys(code).empty();
@@ -86,10 +86,10 @@ bool HasRequiredStructuredData(F13ErrorCode code,
     return true;
 }
 
-AgentFriendlyError MakeF13Error(F13ErrorCode code,
+AgentFriendlyError MakeAgentTraceError(AgentTraceErrorCode code,
                                 nlohmann::json structured_data,
                                 const std::string& message) {
-    const F13ErrorInfo& info = GetF13ErrorInfo(code);
+    const AgentTraceErrorInfo& info = GetAgentTraceErrorInfo(code);
     AgentFriendlyError err;
     err.code = info.cx_code;
     err.message = message.empty() ? info.cx_code : message;
@@ -100,34 +100,34 @@ AgentFriendlyError MakeF13Error(F13ErrorCode code,
     return err;
 }
 
-StatusCode F13ErrorToStatusCode(F13ErrorCode code) {
+StatusCode AgentTraceErrorToStatusCode(AgentTraceErrorCode code) {
     switch (code) {
         // Missing session / interaction → kNotFound.
-        case F13ErrorCode::kSessionNotFound:
-        case F13ErrorCode::kInteractionNotFound:
+        case AgentTraceErrorCode::kSessionNotFound:
+        case AgentTraceErrorCode::kInteractionNotFound:
             return StatusCode::kNotFound;
         // Bad filter / invalid MCP session id / expired session → caller-side bad
         // input → kInvalidArgument. The rich CX_ERR_TRACE_* identity + category
-        // survive via the token + boundary MakeF13Error().
-        case F13ErrorCode::kInvalidFilter:
-        case F13ErrorCode::kMcpSessionInvalid:
-        case F13ErrorCode::kSessionExpired:
+        // survive via the token + boundary MakeAgentTraceError().
+        case AgentTraceErrorCode::kInvalidFilter:
+        case AgentTraceErrorCode::kMcpSessionInvalid:
+        case AgentTraceErrorCode::kSessionExpired:
             return StatusCode::kInvalidArgument;
         // Cross-user denial → kPermissionDenied (auth category).
-        case F13ErrorCode::kUnauthorized:
+        case AgentTraceErrorCode::kUnauthorized:
             return StatusCode::kPermissionDenied;
         // Unexpected server fault → kInternal (transient/retryable).
-        case F13ErrorCode::kInternal:
+        case AgentTraceErrorCode::kInternal:
             return StatusCode::kInternal;
     }
     return StatusCode::kInternal;  // unreachable for a valid enum
 }
 
-Status F13Status(F13ErrorCode code, const std::string& detail) {
-    const char* cx = F13ErrorCodeString(code);
+Status AgentTraceStatus(AgentTraceErrorCode code, const std::string& detail) {
+    const char* cx = AgentTraceErrorCodeString(code);
     std::string msg = detail.empty() ? std::string(cx)
                                      : std::string(cx) + ": " + detail;
-    return Status(F13ErrorToStatusCode(code), std::move(msg));
+    return Status(AgentTraceErrorToStatusCode(code), std::move(msg));
 }
 
 }  // namespace cortrix::agent_trace

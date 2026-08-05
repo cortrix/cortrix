@@ -7,7 +7,7 @@
 namespace cortrix::agent_trace {
 
 /// The agent-observability metrics (9 metrics, observability naming
-/// `cortrix_<metric>_<unit>`). Mirrors the Mem02Metrics / RagFusionMetrics
+/// `cortrix_<metric>_<unit>`). Mirrors the MemoryExtractMetrics / RagFusionMetrics
 /// template (process-wide singleton, atomic counters/gauge/histogram, OpenMetrics
 /// renderer).
 ///

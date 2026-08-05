@@ -5,8 +5,8 @@
 
 #include <spdlog/spdlog.h>
 
-#include "cortrix/async/f42_error.h"
-#include "cortrix/async/f42_metrics.h"
+#include "cortrix/async/task_error.h"
+#include "cortrix/async/task_metrics.h"
 
 namespace cortrix::async {
 
@@ -50,13 +50,13 @@ Status WorkerPool::Start() {
             {"worker_pool_size", pool_size},
             {"parser_max_concurrent", parser_max},
         };
-        return F42Status(F42ErrorCode::kInvalidRequest,
+        return TaskStatus(TaskErrorCode::kInvalidRequest,
                          "f42.worker_pool_size (" + std::to_string(pool_size) +
                              ") > f06.parser_max_concurrent (" +
                              std::to_string(parser_max) + ")");
     }
     if (pool_size < 1) {
-        return F42Status(F42ErrorCode::kInvalidRequest,
+        return TaskStatus(TaskErrorCode::kInvalidRequest,
                          "f42.worker_pool_size must be >= 1");
     }
 
@@ -66,7 +66,7 @@ Status WorkerPool::Start() {
         workers_.emplace_back([this, i] { WorkerLoop(i + 1); });  // worker_id 1-based
     }
     started_ = true;
-    spdlog::info("F42 WorkerPool started with {} workers (parser_max={})",
+    spdlog::info("WorkerPool started with {} workers (parser_max={})",
                  pool_size, parser_max);
     return Status::Ok();
 }
@@ -108,30 +108,30 @@ void WorkerPool::WorkerLoop(int worker_id) {
                     Status handler_status = it->second->ProcessTask(task);
                     if (!handler_status.ok()) {
                         spdlog::warn(
-                            "F42 WorkerPool: handler returned failure for task {} "
+                            "WorkerPool: handler returned failure for task {} "
                             "(task_type {}, namespace_id {}, doc_id {}): {}",
                             task.task_id, task.task_type, task.namespace_id, task.doc_id,
                             handler_status.message());
                     }
                 } catch (const std::exception& e) {
                     spdlog::error(
-                        "F42 WorkerPool: handler threw for task {} (task_type {}): "
+                        "WorkerPool: handler threw for task {} (task_type {}): "
                         "{} — task failed, worker continues",
                         task.task_id, task.task_type, e.what());
-                    F42Metrics::Instance().RecordCompleted(
+                    TaskMetrics::Instance().RecordCompleted(
                         static_cast<TaskType>(task.task_type),
-                        F42Metrics::CompletionStatus::kFailed);
+                        TaskMetrics::CompletionStatus::kFailed);
                 } catch (...) {
                     spdlog::error(
-                        "F42 WorkerPool: handler threw a non-std exception for task "
+                        "WorkerPool: handler threw a non-std exception for task "
                         "{} (task_type {}) — task failed, worker continues",
                         task.task_id, task.task_type);
-                    F42Metrics::Instance().RecordCompleted(
+                    TaskMetrics::Instance().RecordCompleted(
                         static_cast<TaskType>(task.task_type),
-                        F42Metrics::CompletionStatus::kFailed);
+                        TaskMetrics::CompletionStatus::kFailed);
                 }
             } else {
-                spdlog::error("F42 WorkerPool: no handler for task_type {} (task {})",
+                spdlog::error("WorkerPool: no handler for task_type {} (task {})",
                               task.task_type, task.task_id);
             }
             // Release the per-doc_id reservation regardless of terminal outcome

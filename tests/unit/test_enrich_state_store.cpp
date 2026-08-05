@@ -254,7 +254,7 @@ TEST_F(EnrichAuditTest, DoesNotResurrectFailedPermanent) {
 // When contextual_vec_labels is absent entirely (isolated pre-V2 store) the audit
 // keeps the legacy ctx_status-only semantics (covered by the other tests above,
 // whose fixture has no label table).
-TEST_F(EnrichAuditTest, OwesF35WhenLabelMissingDespiteColumns) {
+TEST_F(EnrichAuditTest, OwesContextualWhenLabelMissingDespiteColumns) {
     ASSERT_EQ(sqlite3_exec(db_,
         "CREATE TABLE contextual_vec_labels (label INTEGER PRIMARY KEY,"
         " block_id INTEGER NOT NULL, child_id TEXT NOT NULL)",

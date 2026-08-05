@@ -13,13 +13,13 @@ namespace cortrix::store {
 /// Phase 1 ChunkStore implementation over the unified `blocks` table (A unified
 /// blocks). Child chunks are `blocks` rows with
 /// child_id IS NOT NULL; their content_text holds the chunk text and the
-/// parent_id / chunk_index are F34-owned columns (F34SchemaProvider ALTERs). It is
+/// parent_id / chunk_index are F34-owned columns (ParentChildSchemaProvider ALTERs). It is
 /// a read-only reverse-lookup:
 ///   Get / GetBatch    — by child_id (the P-HNSW label's business ULID)
 ///   GetChunksByDocId  — all child chunks of a doc, ascending chunk_index
 ///
 /// BORROWS a sqlite3* handle (the per-Unit DB, e.g. CortrixStore::db_handle()); it
-/// does NOT open / own / close the DB — the block-header framework + F34SchemaProvider own
+/// does NOT open / own / close the DB — the block-header framework + ParentChildSchemaProvider own
 /// the blocks schema, and the handle must outlive this store. Thread-safe via an
 /// internal mutex (defense-in-depth alongside SQLite FULLMUTEX), mirroring
 /// SqliteParentChunkStore. The store-layer unified error model (store_errors.h)

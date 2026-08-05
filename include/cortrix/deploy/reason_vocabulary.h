@@ -55,8 +55,8 @@ enum class MetricReason {
     kNsRoutingInvalidNs,
     kNsRoutingQuotaExceeded,
     // f42_async.*
-    kF42AsyncTaskCancelled,
-    kF42AsyncSchedulerBusy,
+    kTaskAsyncTaskCancelled,
+    kTaskAsyncSchedulerBusy,
 };
 
 /// Total entries in the controlled vocabulary. Compile-time anchor for

@@ -25,7 +25,7 @@
 #include "cortrix/catalog/i_unit_router.h"
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
-#include "cortrix/resource/f05_config.h"
+#include "cortrix/resource/namespace_pool_config.h"
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/resource/namespace_pool.h"
 #include "cortrix/resource/namespace_resource_bundle.h"
@@ -37,7 +37,7 @@
 #include "cortrix/store/write_coordinator.h"
 
 // Namespace pool S1 coverage: NamespaceResourceBundle / UnitResourceBundle (UT1, UT2),
-// F05Config defaults (UT3), AdmitCreate admission control + rejection log
+// NamespacePoolConfig defaults (UT3), AdmitCreate admission control + rejection log
 // (UT4-UT8), Acquire (UT13, UT14), PoolStats / ExplainState surfaces (UT18), and
 // the PoolError registry (the §8.1 4-code identity set).
 //
@@ -337,7 +337,7 @@ protected:
     }
 
     std::filesystem::path tmp_root_;
-    F05Config config_;
+    NamespacePoolConfig config_;
     ::testing::NiceMock<MockIndexFactory> index_factory_;
     ::testing::NiceMock<MockNSRouter> ns_router_;
     ::testing::NiceMock<MockUnitRouter> unit_router_;
@@ -346,10 +346,10 @@ protected:
     FakeBlobStore blob_store_;
 };
 
-// ── UT3 — F05Config defaults ─────────────────────────────────────────────────
+// ── UT3 — NamespacePoolConfig defaults ─────────────────────────────────────────────────
 
-TEST(F05ConfigTest, Defaults) {
-    F05Config c;
+TEST(NamespacePoolConfigTest, Defaults) {
+    NamespacePoolConfig c;
     EXPECT_EQ(c.max_namespaces_per_instance, 64u);
     EXPECT_EQ(c.memory_budget_bytes, 0u);  // disabled by default
     EXPECT_EQ(c.startup_load_workers, 8);

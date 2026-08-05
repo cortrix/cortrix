@@ -41,7 +41,7 @@ using json = nlohmann::json;
 // in test_memory_searcher.cpp; kept local to avoid link-order dependencies).
 // ---------------------------------------------------------------------------
 
-class FakeMem05Store : public CortrixStore {
+class FakeMemoryIsolationStore : public CortrixStore {
 public:
     std::vector<SearchResult> fulltext_results;
     int fulltext_rc = 0;
@@ -84,7 +84,7 @@ public:
 // Test fixture — builds a real (stub) pipeline so MemorySearcher can run.
 // ---------------------------------------------------------------------------
 
-class Mem05CrossUserTest : public ::testing::Test {
+class MemoryIsolationCrossUserTest : public ::testing::Test {
 protected:
     void SetUp() override {
         embedder_ = std::make_unique<OnnxEmbedder>("", 128);
@@ -125,7 +125,7 @@ protected:
         vec_index_.set_search_result(seeded_hits_);
     }
 
-    FakeMem05Store store_;
+    FakeMemoryIsolationStore store_;
     cortrix::test::FakeIndex vec_index_;
     std::vector<std::pair<uint64_t, float>> seeded_hits_;
 
@@ -151,7 +151,7 @@ protected:
 
 // Request user_A sees only user_A's block, not user_B's — even though both are
 // returned by the underlying query pipeline.
-TEST_F(Mem05CrossUserTest, Search_CrossUserRequest_SeesOnlyOwnBlocks) {
+TEST_F(MemoryIsolationCrossUserTest, Search_CrossUserRequest_SeesOnlyOwnBlocks) {
     SeedUserBlock(101, "user_A", "int-A1", "Q_A\n---\nR_A", 0.1f);
     SeedUserBlock(102, "user_B", "int-B1", "Q_B\n---\nR_B", 0.2f);
 
@@ -174,7 +174,7 @@ TEST_F(Mem05CrossUserTest, Search_CrossUserRequest_SeesOnlyOwnBlocks) {
 }
 
 // Request user_B sees no results when only user_A's blocks are in the index.
-TEST_F(Mem05CrossUserTest, Search_UserBRequest_GetsNothingWhenOnlyUserAPresent) {
+TEST_F(MemoryIsolationCrossUserTest, Search_UserBRequest_GetsNothingWhenOnlyUserAPresent) {
     SeedUserBlock(201, "user_A", "int-A2");
 
     MemoryConfig config;
@@ -193,7 +193,7 @@ TEST_F(Mem05CrossUserTest, Search_UserBRequest_GetsNothingWhenOnlyUserAPresent) 
 }
 
 // A block with an empty-string user_id is never accessible to any valid user.
-TEST_F(Mem05CrossUserTest, Search_BlockWithEmptyUserId_NeverAccessible) {
+TEST_F(MemoryIsolationCrossUserTest, Search_BlockWithEmptyUserId_NeverAccessible) {
     // Seed a block that has user_id="" in its metadata (malformed / pre-isolation data).
     json meta;
     meta["user_id"] = "";
@@ -222,7 +222,7 @@ TEST_F(Mem05CrossUserTest, Search_BlockWithEmptyUserId_NeverAccessible) {
 }
 
 // A block with no user_id key in metadata is excluded (pre-isolation / orphaned data).
-TEST_F(Mem05CrossUserTest, Search_BlockWithMissingUserId_Excluded) {
+TEST_F(MemoryIsolationCrossUserTest, Search_BlockWithMissingUserId_Excluded) {
     json meta;
     meta["interaction_id"] = "int-missing-uid";
     // no "user_id" key at all
@@ -250,7 +250,7 @@ TEST_F(Mem05CrossUserTest, Search_BlockWithMissingUserId_Excluded) {
 
 // Session-scope: request (user_A, sess_S1) must not see a block that belongs to
 // (user_A, sess_S2) — session isolation inside the same user.
-TEST_F(Mem05CrossUserTest, Search_SessionScope_WrongSession_Excluded) {
+TEST_F(MemoryIsolationCrossUserTest, Search_SessionScope_WrongSession_Excluded) {
     json meta;
     meta["user_id"] = "user_A";
     meta["session_id"] = "sess_S2";
@@ -277,7 +277,7 @@ TEST_F(Mem05CrossUserTest, Search_SessionScope_WrongSession_Excluded) {
 }
 
 // Session-scope: the correct (user, session) combination is returned.
-TEST_F(Mem05CrossUserTest, Search_SessionScope_RightUserAndSession_Included) {
+TEST_F(MemoryIsolationCrossUserTest, Search_SessionScope_RightUserAndSession_Included) {
     json meta;
     meta["user_id"] = "user_A";
     meta["session_id"] = "sess_right";
@@ -307,7 +307,7 @@ TEST_F(Mem05CrossUserTest, Search_SessionScope_RightUserAndSession_Included) {
 }
 
 // Session-scope: a different user's block in the right session is still excluded.
-TEST_F(Mem05CrossUserTest, Search_SessionScope_RightSessionWrongUser_Excluded) {
+TEST_F(MemoryIsolationCrossUserTest, Search_SessionScope_RightSessionWrongUser_Excluded) {
     json meta;
     meta["user_id"] = "user_B";          // wrong user
     meta["session_id"] = "sess_right";   // but right session
@@ -334,7 +334,7 @@ TEST_F(Mem05CrossUserTest, Search_SessionScope_RightSessionWrongUser_Excluded) {
 }
 
 // Multiple users coexist: each only sees their own blocks.
-TEST_F(Mem05CrossUserTest, Search_MultiUser_IsolationPreservedAcrossAll) {
+TEST_F(MemoryIsolationCrossUserTest, Search_MultiUser_IsolationPreservedAcrossAll) {
     SeedUserBlock(801, "alice", "int-alice", "Alice Q\n---\nAlice A", 0.1f);
     SeedUserBlock(802, "bob",   "int-bob",   "Bob Q\n---\nBob A",     0.2f);
     SeedUserBlock(803, "carol", "int-carol", "Carol Q\n---\nCarol A", 0.3f);
@@ -378,7 +378,7 @@ TEST_F(Mem05CrossUserTest, Search_MultiUser_IsolationPreservedAcrossAll) {
 // ---------------------------------------------------------------------------
 
 // user_id composed entirely of printable ASCII boundary characters (0x20 + 0x7E).
-TEST(Mem05ValidateExtraTest, UserIdBoundaryAsciiAccepted) {
+TEST(MemoryIsolationValidateExtraTest, UserIdBoundaryAsciiAccepted) {
     MemorySearchRequest req;
     req.query = "q";
     req.namespace_name = "ns";
@@ -387,7 +387,7 @@ TEST(Mem05ValidateExtraTest, UserIdBoundaryAsciiAccepted) {
 }
 
 // user_id with DEL (0x7F) is above 0x7E and must be rejected.
-TEST(Mem05ValidateExtraTest, UserIdWithDelCharRejected) {
+TEST(MemoryIsolationValidateExtraTest, UserIdWithDelCharRejected) {
     MemorySearchRequest req;
     req.query = "q";
     req.namespace_name = "ns";
@@ -398,7 +398,7 @@ TEST(Mem05ValidateExtraTest, UserIdWithDelCharRejected) {
 }
 
 // user_id that is exactly one printable ASCII char is valid.
-TEST(Mem05ValidateExtraTest, UserIdSingleCharAccepted) {
+TEST(MemoryIsolationValidateExtraTest, UserIdSingleCharAccepted) {
     MemorySearchRequest req;
     req.query = "q";
     req.namespace_name = "ns";
@@ -407,7 +407,7 @@ TEST(Mem05ValidateExtraTest, UserIdSingleCharAccepted) {
 }
 
 // top_k exactly at the boundaries: 1 and 100 are both valid.
-TEST(Mem05ValidateExtraTest, TopKBoundariesValid) {
+TEST(MemoryIsolationValidateExtraTest, TopKBoundariesValid) {
     {
         MemorySearchRequest req;
         req.query = "q";
@@ -428,7 +428,7 @@ TEST(Mem05ValidateExtraTest, TopKBoundariesValid) {
 
 // Validation is checked in order: query → namespace → user_id → format → scope.
 // An empty query fails before the namespace or user_id checks.
-TEST(Mem05ValidateExtraTest, ValidationOrder_EmptyQueryFirst) {
+TEST(MemoryIsolationValidateExtraTest, ValidationOrder_EmptyQueryFirst) {
     MemorySearchRequest req;
     req.query = "";
     req.namespace_name = "";
@@ -439,7 +439,7 @@ TEST(Mem05ValidateExtraTest, ValidationOrder_EmptyQueryFirst) {
 }
 
 // namespace failure comes before user_id failure.
-TEST(Mem05ValidateExtraTest, ValidationOrder_NamespaceBeforeUserId) {
+TEST(MemoryIsolationValidateExtraTest, ValidationOrder_NamespaceBeforeUserId) {
     MemorySearchRequest req;
     req.query = "q";
     req.namespace_name = "";

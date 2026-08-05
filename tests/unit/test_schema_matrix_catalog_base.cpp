@@ -1,9 +1,9 @@
 // Schema-provider matrix for the catalog base-schema provider:
-//   Catalog (F12SchemaProvider, catalog.db framework: tenants/namespaces/units/users/...,
+//   Catalog (CatalogSchemaProvider, catalog.db framework: tenants/namespaces/units/users/...,
 //        CurrentVersion 2, version-agnostic Migrate that creates from scratch).
 //
 // Fresh in-memory sqlite3 per case. Globally unique suite/fixture names
-// (F12CatMatrix / F12CatVersionMatrix) that do NOT reuse CatalogSchemaTest /
+// (CatalogCatMatrix / CatalogCatVersionMatrix) that do NOT reuse CatalogSchemaTest /
 // BootstrapRowsTest from test_catalog_schema.cpp.
 
 #include <gtest/gtest.h>
@@ -40,20 +40,20 @@ struct SqliteHelpers {
     }
 };
 
-class F12CatMatrix : public ::testing::Test, protected SqliteHelpers {
+class CatalogCatMatrix : public ::testing::Test, protected SqliteHelpers {
 protected:
     void SetUp() override { Open(); }
     void TearDown() override { Close(); }
-    cortrix::catalog::F12SchemaProvider p_;
+    cortrix::catalog::CatalogSchemaProvider p_;
 };
 
-TEST_F(F12CatMatrix, FeatureIdentity) {
+TEST_F(CatalogCatMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "catalog");
     EXPECT_EQ(p_.CurrentVersion(), 2);
-    EXPECT_EQ(cortrix::catalog::kF12SchemaVersion, 2);
+    EXPECT_EQ(cortrix::catalog::kCatalogSchemaVersion, 2);
 }
 
-TEST_F(F12CatMatrix, MigrateCreatesCoreCatalogTables) {
+TEST_F(CatalogCatMatrix, MigrateCreatesCoreCatalogTables) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("tenants"));
     EXPECT_TRUE(TableExists("namespaces"));
@@ -61,7 +61,7 @@ TEST_F(F12CatMatrix, MigrateCreatesCoreCatalogTables) {
     EXPECT_TRUE(TableExists("ns_units"));
 }
 
-TEST_F(F12CatMatrix, MigrateCreatesAuthAndAclTables) {
+TEST_F(CatalogCatMatrix, MigrateCreatesAuthAndAclTables) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("users"));
     EXPECT_TRUE(TableExists("user_tenants"));
@@ -69,7 +69,7 @@ TEST_F(F12CatMatrix, MigrateCreatesAuthAndAclTables) {
     EXPECT_TRUE(TableExists("cross_tenant_whitelist"));
 }
 
-TEST_F(F12CatMatrix, MigrateCreatesContentAndGcTables) {
+TEST_F(CatalogCatMatrix, MigrateCreatesContentAndGcTables) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(TableExists("content_refs"));
     EXPECT_TRUE(TableExists("blob_gc_queue"));
@@ -77,13 +77,13 @@ TEST_F(F12CatMatrix, MigrateCreatesContentAndGcTables) {
     EXPECT_TRUE(TableExists("nodes"));
 }
 
-TEST_F(F12CatMatrix, TenantsAndNamespacesShape) {
+TEST_F(CatalogCatMatrix, TenantsAndNamespacesShape) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("tenants", "tenant_id"));
     EXPECT_TRUE(ColumnExists("namespaces", "ns_id"));
 }
 
-TEST_F(F12CatMatrix, BootstrapRowsSeeded) {
+TEST_F(CatalogCatMatrix, BootstrapRowsSeeded) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     // The DDL seeds a system tenant via INSERT OR IGNORE.
     sqlite3_stmt* stmt = nullptr;
@@ -92,14 +92,14 @@ TEST_F(F12CatMatrix, BootstrapRowsSeeded) {
     sqlite3_finalize(stmt);
 }
 
-TEST_F(F12CatMatrix, IdempotentReRun) {
+TEST_F(CatalogCatMatrix, IdempotentReRun) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(p_.Migrate(db, 1, 2).ok());
     EXPECT_TRUE(p_.Migrate(db, 2, 2).ok());
 }
 
-TEST_F(F12CatMatrix, BlobGcQueueHasBlobUriShape) {
+TEST_F(CatalogCatMatrix, BlobGcQueueHasBlobUriShape) {
     ASSERT_TRUE(p_.Migrate(db, 0, 1).ok());
     EXPECT_TRUE(ColumnExists("blob_gc_queue", "blob_uri"));
 }
@@ -110,14 +110,14 @@ struct CatStep {
     int from;
     int to;
 };
-class F12CatVersionMatrix : public ::testing::TestWithParam<CatStep> {
+class CatalogCatVersionMatrix : public ::testing::TestWithParam<CatStep> {
 protected:
     void SetUp() override { ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK); }
     void TearDown() override { sqlite3_close(db_); }
     sqlite3* db_ = nullptr;
-    cortrix::catalog::F12SchemaProvider p_;
+    cortrix::catalog::CatalogSchemaProvider p_;
 };
-TEST_P(F12CatVersionMatrix, AlwaysCreatesCatalog) {
+TEST_P(CatalogCatVersionMatrix, AlwaysCreatesCatalog) {
     const CatStep step = GetParam();
     Status s = p_.Migrate(db_, step.from, step.to);
     EXPECT_TRUE(s.ok());
@@ -128,7 +128,7 @@ TEST_P(F12CatVersionMatrix, AlwaysCreatesCatalog) {
     sqlite3_finalize(stmt);
 }
 INSTANTIATE_TEST_SUITE_P(
-    F12CatSteps, F12CatVersionMatrix,
+    CatalogCatSteps, CatalogCatVersionMatrix,
     ::testing::Values(CatStep{0, 1}, CatStep{0, 2}, CatStep{1, 1}, CatStep{1, 2},
                       CatStep{2, 2}, CatStep{0, 0}, CatStep{3, 3}, CatStep{0, 3},
                       CatStep{2, 1}));

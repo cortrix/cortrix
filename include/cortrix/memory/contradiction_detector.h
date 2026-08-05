@@ -30,7 +30,7 @@ public:
     /// Judge whether `new_content` contradicts `old_content` (D5 prompt). Returns the
     /// parsed judgment, or an error Status (CX_ERR_MEMEXTRACT_INVALID_OUTPUT on bad
     /// JSON, CX_ERR_MEMEXTRACT_LLM_TIMEOUT / _CONTRADICTION_AMBIGUOUS on the LLM
-    /// fault paths) carried via Mem02Status.
+    /// fault paths) carried via MemoryExtractStatus.
     Result<MemoryExtractor::Judgment> Judge(const std::string& new_content,
                                             const std::string& old_content,
                                             const observability::TraceContext* ctx = nullptr);

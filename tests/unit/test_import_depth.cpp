@@ -145,12 +145,12 @@ TEST(ImportDepthResponseTest, ProgressBodyFailedEmbedsErrorBody) {
     ImportTaskProgress task;
     task.task_id = "import_fail";
     task.status = ImportTaskStatus::kFailed;
-    task.error = MakeF16aError(F16aErrorCode::kConnectionFailed, nlohmann::json::object(),
+    task.error = MakeImportError(ImportErrorCode::kConnectionFailed, nlohmann::json::object(),
                                "pg down");
     auto body = BuildProgressResponse(task);
     EXPECT_EQ(body["status"], "failed");
     ASSERT_TRUE(body["error"].is_object());
-    EXPECT_EQ(body["error"]["code"], F16aErrorCodeString(F16aErrorCode::kConnectionFailed));
+    EXPECT_EQ(body["error"]["code"], ImportErrorCodeString(ImportErrorCode::kConnectionFailed));
 }
 
 TEST(ImportDepthResponseTest, ProgressBodyCancelledHasNullErrorPerSpecNote) {
@@ -365,15 +365,15 @@ TEST(ImportDepthQueueTest, FailedWorkWithoutCxPrefixKeepsDefaultConnectionFailed
     auto p = queue.GetProgress("ferr");
     ASSERT_TRUE(p.has_value());
     ASSERT_TRUE(p->error.has_value());
-    EXPECT_EQ(p->error->code, F16aErrorCodeString(F16aErrorCode::kConnectionFailed));
+    EXPECT_EQ(p->error->code, ImportErrorCodeString(ImportErrorCode::kConnectionFailed));
 }
 
 TEST(ImportDepthQueueTest, FailedWorkWithCxPrefixRecoversPreciseCode) {
     auto store = std::make_shared<InMemoryImportTaskStore>();
     ImportTaskQueue queue(store);
-    // Work returns an F16aStatus whose message is "CX_ERR_IMPORT_TIMEOUT: ...".
+    // Work returns an ImportStatus whose message is "CX_ERR_IMPORT_TIMEOUT: ...".
     auto work = [](ImportTaskHandle&) -> Status {
-        return F16aStatus(F16aErrorCode::kTimeout, "exceeded 5 min");
+        return ImportStatus(ImportErrorCode::kTimeout, "exceeded 5 min");
     };
     auto r = queue.Submit("ferr2", "ns", work);
     ASSERT_TRUE(r.ok());
@@ -384,7 +384,7 @@ TEST(ImportDepthQueueTest, FailedWorkWithCxPrefixRecoversPreciseCode) {
     auto p = queue.GetProgress("ferr2");
     ASSERT_TRUE(p.has_value());
     ASSERT_TRUE(p->error.has_value());
-    EXPECT_EQ(p->error->code, F16aErrorCodeString(F16aErrorCode::kTimeout));
+    EXPECT_EQ(p->error->code, ImportErrorCodeString(ImportErrorCode::kTimeout));
 }
 
 // --------------------------------------------------------------------------
@@ -392,34 +392,34 @@ TEST(ImportDepthQueueTest, FailedWorkWithCxPrefixRecoversPreciseCode) {
 // --------------------------------------------------------------------------
 
 TEST(ImportDepthErrorTest, MakeErrorFillsCategoryRetryableFromRegistry) {
-    auto err = MakeF16aError(F16aErrorCode::kConnectionFailed);
-    const auto& info = GetF16aErrorInfo(F16aErrorCode::kConnectionFailed);
+    auto err = MakeImportError(ImportErrorCode::kConnectionFailed);
+    const auto& info = GetImportErrorInfo(ImportErrorCode::kConnectionFailed);
     EXPECT_EQ(err.code, info.cx_code);
     EXPECT_EQ(err.retryable, info.retryable);
     EXPECT_EQ(err.category, info.category);
 }
 
 TEST(ImportDepthErrorTest, MakeErrorDefaultMessageFallsBackToCode) {
-    auto err = MakeF16aError(F16aErrorCode::kInvalidSql);  // no explicit message
+    auto err = MakeImportError(ImportErrorCode::kInvalidSql);  // no explicit message
     EXPECT_FALSE(err.message.empty());
 }
 
 TEST(ImportDepthErrorTest, AllErrorCodeStringsAreUniqueAndCountMatches) {
-    const F16aErrorCode all[] = {
-        F16aErrorCode::kConnectionFailed, F16aErrorCode::kAuthDenied,
-        F16aErrorCode::kInvalidSql,       F16aErrorCode::kTimeout,
-        F16aErrorCode::kRowsLimitExceeded, F16aErrorCode::kCrossTenantRef,
-        F16aErrorCode::kInternal,
+    const ImportErrorCode all[] = {
+        ImportErrorCode::kConnectionFailed, ImportErrorCode::kAuthDenied,
+        ImportErrorCode::kInvalidSql,       ImportErrorCode::kTimeout,
+        ImportErrorCode::kRowsLimitExceeded, ImportErrorCode::kCrossTenantRef,
+        ImportErrorCode::kInternal,
     };
-    EXPECT_EQ(static_cast<int>(std::size(all)), kF16aErrorCodeCount);
+    EXPECT_EQ(static_cast<int>(std::size(all)), kImportErrorCodeCount);
     std::vector<std::string> codes;
-    for (auto c : all) codes.emplace_back(F16aErrorCodeString(c));
+    for (auto c : all) codes.emplace_back(ImportErrorCodeString(c));
     std::sort(codes.begin(), codes.end());
     EXPECT_EQ(std::adjacent_find(codes.begin(), codes.end()), codes.end());
 }
 
 TEST(ImportDepthErrorTest, StatusBridgeCarriesCxToken) {
-    auto st = F16aStatus(F16aErrorCode::kTimeout, "5 min cap");
+    auto st = ImportStatus(ImportErrorCode::kTimeout, "5 min cap");
     EXPECT_EQ(st.message().rfind("CX_ERR_IMPORT_", 0), 0u);
     EXPECT_NE(st.message().find("5 min cap"), std::string::npos);
 }
@@ -427,8 +427,8 @@ TEST(ImportDepthErrorTest, StatusBridgeCarriesCxToken) {
 TEST(ImportDepthErrorTest, ToStatusCodeMapsTimeoutAndAuthDistinctly) {
     // Timeout is transient (kUnavailable family) while auth is permission-denied -- the
     // coarse mapping must not collapse them to the same code.
-    auto timeout = F16aErrorToStatusCode(F16aErrorCode::kTimeout);
-    auto auth = F16aErrorToStatusCode(F16aErrorCode::kAuthDenied);
+    auto timeout = ImportErrorToStatusCode(ImportErrorCode::kTimeout);
+    auto auth = ImportErrorToStatusCode(ImportErrorCode::kAuthDenied);
     EXPECT_NE(timeout, auth);
     EXPECT_EQ(auth, StatusCode::kPermissionDenied);
 }

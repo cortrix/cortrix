@@ -170,7 +170,7 @@ agent_friendly::AgentFriendlyError DiskMonitor::MakeDiskFullError() const {
         {"warn_threshold", config_.warn_threshold},
         {"crit_threshold", config_.crit_threshold},
     };
-    return MakeF24Error(F24ErrorCode::kDiskFull, std::move(sd),
+    return MakeDeployError(DeployErrorCode::kDiskFull, std::move(sd),
                         "Disk usage critical (>= crit threshold). Operations rejected.");
 }
 

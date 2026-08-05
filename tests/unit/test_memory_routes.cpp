@@ -1893,7 +1893,7 @@ TEST_F(MemoryRoutesTest, SoftDeleteMemorySuccessReturnsInvalidated) {
 // query a different user_id, the route returns 200 with an empty memories array
 // rather than 403/404. We register a second non-admin key on a new server to
 // exercise this branch cleanly.
-TEST_F(MemoryRoutesTest, ListMemoriesMEM05NonAdminCrossUserMaskReturnsEmpty) {
+TEST_F(MemoryRoutesTest, ListMemoriesMemoryIsolationNonAdminCrossUserMaskReturnsEmpty) {
     // Stand up a second in-process server with a non-admin key (permissions = read|write
     // but NO admin bit) to exercise the !is_admin() branch.
     const int na_port = port_ + 100;
@@ -2001,7 +2001,7 @@ TEST_F(MemoryRoutesTest, CreateThenListMemoryRoundtrip) {
 //   7. GET  /api/v1/memory       → list after delete (soft-deleted block gone from
 //                                   default active view, include_invalidated=false)
 // ---------------------------------------------------------------------------
-TEST_F(MemoryRoutesTest, E2E_Mem03TransparencyCrudSmoke) {
+TEST_F(MemoryRoutesTest, E2E_MemoryTransparencyCrudSmoke) {
     httplib::Client cli("127.0.0.1", port_);
     const std::string user_id = "smoke_user";
 

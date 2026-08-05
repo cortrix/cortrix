@@ -34,8 +34,8 @@ const char* ReasonStringImpl(MetricReason r) {
         case MetricReason::kNsRoutingUnauthorized:       return "ns_routing.unauthorized";
         case MetricReason::kNsRoutingInvalidNs:          return "ns_routing.invalid_ns";
         case MetricReason::kNsRoutingQuotaExceeded:      return "ns_routing.quota_exceeded";
-        case MetricReason::kF42AsyncTaskCancelled:       return "f42_async.task_cancelled";
-        case MetricReason::kF42AsyncSchedulerBusy:       return "f42_async.scheduler_busy";
+        case MetricReason::kTaskAsyncTaskCancelled:       return "f42_async.task_cancelled";
+        case MetricReason::kTaskAsyncSchedulerBusy:       return "f42_async.scheduler_busy";
     }
     return "";  // unreachable for a valid enum
 }
@@ -69,8 +69,8 @@ const char* ReasonSubsystem(MetricReason reason) {
         case MetricReason::kNsRoutingUnauthorized:
         case MetricReason::kNsRoutingInvalidNs:
         case MetricReason::kNsRoutingQuotaExceeded:      return "ns_routing";
-        case MetricReason::kF42AsyncTaskCancelled:
-        case MetricReason::kF42AsyncSchedulerBusy:       return "f42_async";
+        case MetricReason::kTaskAsyncTaskCancelled:
+        case MetricReason::kTaskAsyncSchedulerBusy:       return "f42_async";
     }
     return "";  // unreachable
 }
@@ -87,8 +87,8 @@ const std::vector<MetricReason>& AllReasons() {
         MetricReason::kVectorIndexSearchTimeout,    MetricReason::kVectorIndexShardUnavailable,
         MetricReason::kCatalogLookupFailed,         MetricReason::kCatalogBfNotReady,
         MetricReason::kNsRoutingUnauthorized,       MetricReason::kNsRoutingInvalidNs,
-        MetricReason::kNsRoutingQuotaExceeded,      MetricReason::kF42AsyncTaskCancelled,
-        MetricReason::kF42AsyncSchedulerBusy,
+        MetricReason::kNsRoutingQuotaExceeded,      MetricReason::kTaskAsyncTaskCancelled,
+        MetricReason::kTaskAsyncSchedulerBusy,
     };
     return kAll;
 }

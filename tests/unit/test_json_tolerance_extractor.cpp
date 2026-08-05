@@ -3,7 +3,7 @@
 // Real parser (src/memory/memory_extractor.cpp ParseExtractionJson):
 //   1. json::parse(allow_exceptions=false). If discarded OR not an array, narrow
 //      to the outermost [ ... ] span (find('[') .. rfind(']')) and re-parse.
-//   2. If still discarded / not array  -> Result error (Mem02Status,
+//   2. If still discarded / not array  -> Result error (MemoryExtractStatus,
 //      kExtractInvalidOutput, message carries "CX_ERR_MEMEXTRACT_INVALID_OUTPUT").
 //   3. Each element must be an object with a string "content", else error.
 //      type missing/unknown -> kEvent (D4 fallback). confidence clamped [0,1].

@@ -6,13 +6,13 @@
 // standalone `children` table — they are rows of the unified per-Unit `blocks`
 // table (child rows = blocks with child_id IS NOT NULL; block_type = source
 // modality), with chunker, contextual and sparse columns ALTER'd onto `blocks` by their per-Unit
-// SchemaProviders (F34SchemaProvider owns child_id/parent_id/token_count/
+// SchemaProviders (ParentChildSchemaProvider owns child_id/parent_id/token_count/
 // parent_offset + the 3 indexes; metadata in blocks.metadata_json). See
 // ARCHITECTURE.md § 1.3.bis.3 documents the durable in-repository model.
 //
 //   - kParentsSchemaSql  — the `parents` table (parent_text store, § D6: SQLite
 //       over Blob for < 10MB/parent + sub-ms single-point lookup, + D8 hotness
-//       fields reserved). F34SchemaProvider creates this in the production
+//       fields reserved). ParentChildSchemaProvider creates this in the production
 //       MigrateUnit path; SqliteParentChunkStore (standalone) also creates it.
 //   - kChildrenSchemaSql — LEGACY. The pre-A standalone `children` table, kept ONLY
 //       for SqliteParentChunkStore's standalone unit tests until the SPC write path

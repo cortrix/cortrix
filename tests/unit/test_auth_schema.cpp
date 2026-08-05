@@ -64,7 +64,7 @@ TEST(AuthSchemaTest, Create7Tables) {
         EXPECT_TRUE(TableExists(db, t)) << "missing table: " << t;
     }
     // schema_version records auth at v1.
-    EXPECT_EQ(catalog::SchemaMigrator().CurrentVersion(db, "auth"), kP08AuthSchemaVersion);
+    EXPECT_EQ(catalog::SchemaMigrator().CurrentVersion(db, "auth"), kAuthSchemaVersion);
 }
 
 TEST(AuthSchemaTest, AllIndexesCreated) {
@@ -99,7 +99,7 @@ TEST(AuthSchemaTest, Idempotent) {
         ASSERT_TRUE(st.ok()) << st.message();
         for (const char* t : kAll7Tables) EXPECT_TRUE(TableExists(p2.db(), t));
         EXPECT_EQ(catalog::SchemaMigrator().CurrentVersion(p2.db(), "auth"),
-                  kP08AuthSchemaVersion);
+                  kAuthSchemaVersion);
     }
     std::remove(path.c_str());
 }

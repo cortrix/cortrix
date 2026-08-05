@@ -30,7 +30,7 @@ struct DocSummaryConfig;
 
 /// doc-summary HNSW recall (main path). Embeds `query`, runs
 /// a single ANN search over the per-NS P-HNSW index (the SAME mixed pool the chunk
-/// path uses — doc_summary blocks were AddPoints'd by F41AsyncWorker), then resolves
+/// path uses — doc_summary blocks were AddPoints'd by DocSummaryAsyncWorker), then resolves
 /// each hit from `store` and keeps ONLY block_type==kBlockDocSummary(17) rows whose
 /// metadata_json.status == "generated" (a failed/pending doc has no such block, so it
 /// is naturally absent → the §7.1 FTS5 fallback covers it). The 4 structured fields

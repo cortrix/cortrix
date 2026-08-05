@@ -228,8 +228,8 @@ TEST_F(CatalogSchemaTest, ForeignKeysEnforced) {
 // schema_version records at the current version after Open().
 TEST_F(CatalogSchemaTest, SchemaVersionRecordsF12) {
     EXPECT_EQ(QueryInt(db_,
-        "SELECT version FROM schema_version WHERE feature='F12'"),
-        kF12SchemaVersion);
+        "SELECT version FROM schema_version WHERE feature='catalog'"),
+        kCatalogSchemaVersion);
 }
 
 // Re-opening an already-migrated on-disk db is a no-op and preserves data.
@@ -327,19 +327,19 @@ TEST(CatalogDbOpenTest, NullExtraProviderIsSkipped) {
     EXPECT_NE(c.db(), nullptr);
 }
 
-// ── F12SchemaProvider::Migrate failure branch ────────────────────────────────
+// ── CatalogSchemaProvider::Migrate failure branch ────────────────────────────────
 
 // Running the catalog provider against a query-only db makes the CREATE TABLE exec
 // fail ("readonly database") → the migration-failed Status branch (catalog_schema).
-TEST(F12SchemaProviderMigrateTest, ExecFailureReturnsInternal) {
+TEST(CatalogSchemaProviderMigrateTest, ExecFailureReturnsInternal) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     ASSERT_EQ(sqlite3_exec(db, "PRAGMA query_only=ON", nullptr, nullptr, nullptr),
               SQLITE_OK);
-    F12SchemaProvider provider;
+    CatalogSchemaProvider provider;
     Status s = provider.Migrate(db, 0, provider.CurrentVersion());
     EXPECT_FALSE(s.ok());
-    EXPECT_NE(s.message().find("F12 catalog schema migration failed"), std::string::npos);
+    EXPECT_NE(s.message().find("catalog schema migration failed"), std::string::npos);
     sqlite3_close(db);
 }
 

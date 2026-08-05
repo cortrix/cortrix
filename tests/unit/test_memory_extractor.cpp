@@ -10,8 +10,8 @@
 #include <ctime>
 
 #include "cortrix/memory/contradiction_detector.h"
-#include "cortrix/memory/mem02_error.h"
-#include "cortrix/memory/mem02_metrics.h"
+#include "cortrix/memory/memory_extract_error.h"
+#include "cortrix/memory/memory_extract_metrics.h"
 #include "cortrix/memory/memory_extractor.h"
 
 // S3/S4/S5/S7 coverage: the memory extraction LLM extraction pipeline against injected seams +
@@ -203,13 +203,13 @@ InteractionLog MakeTurnNoUserNoNs(const std::string& id, const std::string& role
 class MemoryExtractorTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        Mem02Metrics::Instance().ResetForTest();
+        MemoryExtractMetrics::Instance().ResetForTest();
         llm_ = std::make_shared<ScriptedLlmClient>();
         store_ = std::make_shared<FakeBlockStore>();
         cq_ = std::make_shared<FakeContradictionQuery>();
         oplog_ = std::make_shared<CountingOpLogger>();
     }
-    void TearDown() override { Mem02Metrics::Instance().ResetForTest(); }
+    void TearDown() override { MemoryExtractMetrics::Instance().ResetForTest(); }
 
     std::unique_ptr<MemoryExtractor> Make(MemoryExtractorConfig cfg = {}) {
         return std::make_unique<MemoryExtractor>(llm_, store_, cq_, oplog_, cfg);
@@ -464,8 +464,8 @@ TEST_F(MemoryExtractorTest, S4_NewFactContradictsOldFact_InvalidatesOld) {
     // operation_log: one memory_invalidate + one memory_extract.
     EXPECT_EQ(oplog_->CountAction("memory_invalidate"), 1);
     EXPECT_EQ(oplog_->CountAction("memory_extract"), 1);
-    EXPECT_EQ(Mem02Metrics::Instance().InvalidationCount(
-                  Mem02Metrics::TriggeredBy::kLlmAuto), 1u);
+    EXPECT_EQ(MemoryExtractMetrics::Instance().InvalidationCount(
+                  MemoryExtractMetrics::TriggeredBy::kLlmAuto), 1u);
 }
 
 // Scenario 4b: low-confidence contradiction marks auto_revoke_eligible=true.
@@ -540,8 +540,8 @@ TEST_F(MemoryExtractorTest, S7_InvalidJsonReturnsInvalidOutput) {
     ASSERT_FALSE(r.ok());
     ASSERT_TRUE(r.error.has_value());
     EXPECT_EQ(r.error->code, "CX_ERR_MEMEXTRACT_INVALID_OUTPUT");
-    EXPECT_EQ(Mem02Metrics::Instance().ExtractCount(
-                  Mem02Metrics::ExtractStatus::kFailed), 1u);
+    EXPECT_EQ(MemoryExtractMetrics::Instance().ExtractCount(
+                  MemoryExtractMetrics::ExtractStatus::kFailed), 1u);
 }
 
 // Scenario 8: LLM timeout → CX_ERR_MEMEXTRACT_LLM_TIMEOUT + retryable.
@@ -659,8 +659,8 @@ TEST_F(MemoryExtractorTest, RevokeInvalidationRestoresActiveAndLogs) {
     ASSERT_NE(updated, nullptr);
     EXPECT_EQ(updated->metadata_json["status"], "active");
     EXPECT_EQ(oplog_->CountAction("memory_revoke"), 1);
-    EXPECT_EQ(Mem02Metrics::Instance().InvalidationCount(
-                  Mem02Metrics::TriggeredBy::kAgentSelf), 1u);
+    EXPECT_EQ(MemoryExtractMetrics::Instance().InvalidationCount(
+                  MemoryExtractMetrics::TriggeredBy::kAgentSelf), 1u);
 }
 
 TEST_F(MemoryExtractorTest, RevokeMissingBlockReturnsNotFound) {
@@ -1109,8 +1109,8 @@ TEST_F(MemoryExtractorTest, RevokeEmptyRevokerAnonymousAuditManualMetric) {
     ASSERT_NE(e, nullptr);
     EXPECT_EQ(e->user_id, "anonymous");
     EXPECT_FALSE(e->namespace_id.has_value());
-    EXPECT_EQ(Mem02Metrics::Instance().InvalidationCount(
-                  Mem02Metrics::TriggeredBy::kManual), 1u);
+    EXPECT_EQ(MemoryExtractMetrics::Instance().InvalidationCount(
+                  MemoryExtractMetrics::TriggeredBy::kManual), 1u);
 }
 
 // RevokeInvalidation with NO op_logger: the `if (op_logger_)` false arm (571).

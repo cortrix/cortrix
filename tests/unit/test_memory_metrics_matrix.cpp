@@ -7,28 +7,28 @@
 #include <string>
 #include <tuple>
 
-#include "cortrix/memory/mem02_metrics.h"
-#include "cortrix/memory/mem03_metrics.h"
-#include "cortrix/memory/mem04_metrics.h"
-#include "cortrix/memory/mem05_metrics.h"
+#include "cortrix/memory/memory_extract_metrics.h"
+#include "cortrix/memory/memory_metrics.h"
+#include "cortrix/memory/memory_opt_out_metrics.h"
+#include "cortrix/memory/memory_isolation_metrics.h"
 
 // ============================== memory extraction ============================
 namespace cortrix::memory {
 namespace mem02_matrix {
 
-using ES = Mem02Metrics::ExtractStatus;
-using TD = Mem02Metrics::TokenDirection;
-using CB = Mem02Metrics::ConfidenceBucket;
-using TB = Mem02Metrics::TriggeredBy;
+using ES = MemoryExtractMetrics::ExtractStatus;
+using TD = MemoryExtractMetrics::TokenDirection;
+using CB = MemoryExtractMetrics::ConfidenceBucket;
+using TB = MemoryExtractMetrics::TriggeredBy;
 
-class Mem02Fx : public ::testing::Test {
+class MemoryExtractFx : public ::testing::Test {
 protected:
-    void SetUp() override { Mem02Metrics::Instance().ResetForTest(); }
-    void TearDown() override { Mem02Metrics::Instance().ResetForTest(); }
-    Mem02Metrics& m() { return Mem02Metrics::Instance(); }
+    void SetUp() override { MemoryExtractMetrics::Instance().ResetForTest(); }
+    void TearDown() override { MemoryExtractMetrics::Instance().ResetForTest(); }
+    MemoryExtractMetrics& m() { return MemoryExtractMetrics::Instance(); }
 };
 
-TEST_F(Mem02Fx, ToStringAll) {
+TEST_F(MemoryExtractFx, ToStringAll) {
     EXPECT_STREQ(ToString(ES::kSuccess), "success");
     EXPECT_STREQ(ToString(ES::kFailed), "failed");
     EXPECT_STREQ(ToString(TD::kInput), "input");
@@ -41,42 +41,42 @@ TEST_F(Mem02Fx, ToStringAll) {
     EXPECT_STREQ(ToString(TB::kAgentSelf), "agent_self");
 }
 
-TEST_F(Mem02Fx, BucketForConfidenceBoundaries) {
-    EXPECT_EQ(Mem02Metrics::BucketForConfidence(1.0), CB::kHigh);
-    EXPECT_EQ(Mem02Metrics::BucketForConfidence(0.8), CB::kHigh);   // [0.8,1.0]
-    EXPECT_EQ(Mem02Metrics::BucketForConfidence(0.79), CB::kMedium);
-    EXPECT_EQ(Mem02Metrics::BucketForConfidence(0.5), CB::kMedium);  // [0.5,0.8)
-    EXPECT_EQ(Mem02Metrics::BucketForConfidence(0.49), CB::kLow);
-    EXPECT_EQ(Mem02Metrics::BucketForConfidence(0.0), CB::kLow);     // [0,0.5)
+TEST_F(MemoryExtractFx, BucketForConfidenceBoundaries) {
+    EXPECT_EQ(MemoryExtractMetrics::BucketForConfidence(1.0), CB::kHigh);
+    EXPECT_EQ(MemoryExtractMetrics::BucketForConfidence(0.8), CB::kHigh);   // [0.8,1.0]
+    EXPECT_EQ(MemoryExtractMetrics::BucketForConfidence(0.79), CB::kMedium);
+    EXPECT_EQ(MemoryExtractMetrics::BucketForConfidence(0.5), CB::kMedium);  // [0.5,0.8)
+    EXPECT_EQ(MemoryExtractMetrics::BucketForConfidence(0.49), CB::kLow);
+    EXPECT_EQ(MemoryExtractMetrics::BucketForConfidence(0.0), CB::kLow);     // [0,0.5)
 }
 
-class Mem02ExtractMatrix : public Mem02Fx, public ::testing::WithParamInterface<ES> {};
-TEST_P(Mem02ExtractMatrix, Increments) {
+class MemoryExtractMatrix : public MemoryExtractFx, public ::testing::WithParamInterface<ES> {};
+TEST_P(MemoryExtractMatrix, Increments) {
     m().RecordExtract(GetParam());
     EXPECT_EQ(m().ExtractCount(GetParam()), 1u);
 }
-INSTANTIATE_TEST_SUITE_P(All, Mem02ExtractMatrix,
+INSTANTIATE_TEST_SUITE_P(All, MemoryExtractMatrix,
                          ::testing::Values(ES::kSuccess, ES::kFailed));
 
-class Mem02ConfMatrix : public Mem02Fx, public ::testing::WithParamInterface<CB> {};
-TEST_P(Mem02ConfMatrix, Increments) {
+class MemoryExtractConfMatrix : public MemoryExtractFx, public ::testing::WithParamInterface<CB> {};
+TEST_P(MemoryExtractConfMatrix, Increments) {
     m().RecordContradiction(GetParam());
     m().RecordContradiction(GetParam());
     EXPECT_EQ(m().ContradictionCount(GetParam()), 2u);
 }
-INSTANTIATE_TEST_SUITE_P(All, Mem02ConfMatrix,
+INSTANTIATE_TEST_SUITE_P(All, MemoryExtractConfMatrix,
                          ::testing::Values(CB::kHigh, CB::kMedium, CB::kLow));
 
-class Mem02TrigMatrix : public Mem02Fx, public ::testing::WithParamInterface<TB> {};
-TEST_P(Mem02TrigMatrix, Increments) {
+class MemoryExtractTrigMatrix : public MemoryExtractFx, public ::testing::WithParamInterface<TB> {};
+TEST_P(MemoryExtractTrigMatrix, Increments) {
     m().RecordInvalidation(GetParam());
     EXPECT_EQ(m().InvalidationCount(GetParam()), 1u);
 }
-INSTANTIATE_TEST_SUITE_P(All, Mem02TrigMatrix,
+INSTANTIATE_TEST_SUITE_P(All, MemoryExtractTrigMatrix,
                          ::testing::Values(TB::kLlmAuto, TB::kManual,
                                            TB::kAgentSelf));
 
-TEST_F(Mem02Fx, TokensSummedOverModelsByDirection) {
+TEST_F(MemoryExtractFx, TokensSummedOverModelsByDirection) {
     m().RecordTokens("gpt", TD::kInput, 10);
     m().RecordTokens("claude", TD::kInput, 5);
     m().RecordTokens("gpt", TD::kOutput, 7);
@@ -84,7 +84,7 @@ TEST_F(Mem02Fx, TokensSummedOverModelsByDirection) {
     EXPECT_EQ(m().TokenCount(TD::kOutput), 7u);
 }
 
-TEST_F(Mem02Fx, QueueGaugeLastWriteWins) {
+TEST_F(MemoryExtractFx, QueueGaugeLastWriteWins) {
     m().SetQueueDepth(9);
     EXPECT_EQ(m().QueueDepth(), 9);
     m().SetQueueDepth(2);
@@ -92,7 +92,7 @@ TEST_F(Mem02Fx, QueueGaugeLastWriteWins) {
 }
 
 // extract_duration histogram bounds {0.1,0.25,0.5,1,2,5,10,30}s.
-TEST_F(Mem02Fx, ExtractDurationHistogramRender) {
+TEST_F(MemoryExtractFx, ExtractDurationHistogramRender) {
     m().ObserveExtractDuration("gpt", 100);    // 0.1s exactly first bound
     m().ObserveExtractDuration("gpt", 50);     // under
     m().ObserveExtractDuration("gpt", 999000);  // above largest -> +Inf
@@ -102,13 +102,13 @@ TEST_F(Mem02Fx, ExtractDurationHistogramRender) {
     EXPECT_NE(out.find("model=\"gpt\""), std::string::npos);
 }
 
-TEST_F(Mem02Fx, ExtractDurationNegativeClamps) {
+TEST_F(MemoryExtractFx, ExtractDurationNegativeClamps) {
     m().ObserveExtractDuration("m", -5);
     std::string out = m().RenderOpenMetrics();
     EXPECT_NE(out.find("_count{model=\"m\"} 1"), std::string::npos);
 }
 
-TEST_F(Mem02Fx, RenderHelpTypeAndNoHighCardinality) {
+TEST_F(MemoryExtractFx, RenderHelpTypeAndNoHighCardinality) {
     m().RecordExtract(ES::kSuccess);
     m().RecordTokens("gpt", TD::kInput, 3);
     std::string out = m().RenderOpenMetrics();
@@ -121,7 +121,7 @@ TEST_F(Mem02Fx, RenderHelpTypeAndNoHighCardinality) {
     EXPECT_EQ(out.find("user_id="), std::string::npos);
 }
 
-TEST_F(Mem02Fx, Reset) {
+TEST_F(MemoryExtractFx, Reset) {
     m().RecordExtract(ES::kSuccess);
     m().RecordContradiction(CB::kHigh);
     m().RecordInvalidation(TB::kManual);
@@ -142,33 +142,33 @@ TEST_F(Mem02Fx, Reset) {
 namespace immunity {
 namespace mem04_matrix {
 
-using TB = Mem04Metrics::TriggeredBy;
+using TB = MemoryOptOutMetrics::TriggeredBy;
 
-class Mem04Fx : public ::testing::Test {
+class MemoryOptOutFx : public ::testing::Test {
 protected:
-    void SetUp() override { Mem04Metrics::Instance().ResetForTest(); }
-    void TearDown() override { Mem04Metrics::Instance().ResetForTest(); }
-    Mem04Metrics& m() { return Mem04Metrics::Instance(); }
+    void SetUp() override { MemoryOptOutMetrics::Instance().ResetForTest(); }
+    void TearDown() override { MemoryOptOutMetrics::Instance().ResetForTest(); }
+    MemoryOptOutMetrics& m() { return MemoryOptOutMetrics::Instance(); }
 };
 
-TEST_F(Mem04Fx, ToStringAll) {
+TEST_F(MemoryOptOutFx, ToStringAll) {
     EXPECT_STREQ(ToString(TB::kUser), "user");
     EXPECT_STREQ(ToString(TB::kAgent), "agent");
     EXPECT_STREQ(ToString(TB::kSystem), "system");
 }
 
-class Mem04OptOutMatrix : public Mem04Fx, public ::testing::WithParamInterface<TB> {};
-TEST_P(Mem04OptOutMatrix, Increments) {
+class MemoryOptOutMatrix : public MemoryOptOutFx, public ::testing::WithParamInterface<TB> {};
+TEST_P(MemoryOptOutMatrix, Increments) {
     m().RecordOptOut(GetParam());
     m().RecordOptOut(GetParam());
     EXPECT_EQ(m().OptOutCount(GetParam()), 2u);
     for (TB t : {TB::kUser, TB::kAgent, TB::kSystem})
         if (t != GetParam()) EXPECT_EQ(m().OptOutCount(t), 0u);
 }
-INSTANTIATE_TEST_SUITE_P(All, Mem04OptOutMatrix,
+INSTANTIATE_TEST_SUITE_P(All, MemoryOptOutMatrix,
                          ::testing::Values(TB::kUser, TB::kAgent, TB::kSystem));
 
-TEST_F(Mem04Fx, NoLabelCounters) {
+TEST_F(MemoryOptOutFx, NoLabelCounters) {
     m().RecordOptOutRevoke();
     m().RecordExtractSkipped();
     m().RecordExtractSkipped();
@@ -176,7 +176,7 @@ TEST_F(Mem04Fx, NoLabelCounters) {
     EXPECT_EQ(m().ExtractSkippedCount(), 2u);
 }
 
-TEST_F(Mem04Fx, RenderHelpTypeNoHighCardinality) {
+TEST_F(MemoryOptOutFx, RenderHelpTypeNoHighCardinality) {
     m().RecordOptOut(TB::kUser);
     std::string out = m().RenderOpenMetrics();
     EXPECT_NE(out.find("# TYPE cortrix_mem04_opt_out_total counter"),
@@ -187,7 +187,7 @@ TEST_F(Mem04Fx, RenderHelpTypeNoHighCardinality) {
     EXPECT_EQ(out.find("user_id="), std::string::npos);
 }
 
-TEST_F(Mem04Fx, Reset) {
+TEST_F(MemoryOptOutFx, Reset) {
     m().RecordOptOut(TB::kUser);
     m().RecordOptOutRevoke();
     m().RecordExtractSkipped();
@@ -203,10 +203,10 @@ TEST_F(Mem04Fx, Reset) {
 // ============================== memory isolation =============================
 namespace mem05_matrix {
 
-using CR = Mem05Metrics::CheckResult;
-using AC = Mem05Metrics::Action;
-using RE = Mem05Metrics::Reason;
-using QT = Mem05Metrics::QuotaType;
+using CR = MemoryIsolationMetrics::CheckResult;
+using AC = MemoryIsolationMetrics::Action;
+using RE = MemoryIsolationMetrics::Reason;
+using QT = MemoryIsolationMetrics::QuotaType;
 
 constexpr std::array<CR, 2> kResults{CR::kPass, CR::kViolation};
 constexpr std::array<AC, 6> kActions{AC::kSearch, AC::kList,    AC::kEdit,
@@ -216,14 +216,14 @@ constexpr std::array<RE, 3> kReasons{RE::kMissingUserId, RE::kEmptyUserId,
 constexpr std::array<QT, 3> kQuotas{QT::kItemsCount, QT::kSessionCount,
                                     QT::kMemoryBytes};
 
-class Mem05Fx : public ::testing::Test {
+class MemoryIsolationFx : public ::testing::Test {
 protected:
-    void SetUp() override { Mem05Metrics::Instance().ResetForTest(); }
-    void TearDown() override { Mem05Metrics::Instance().ResetForTest(); }
-    Mem05Metrics& m() { return Mem05Metrics::Instance(); }
+    void SetUp() override { MemoryIsolationMetrics::Instance().ResetForTest(); }
+    void TearDown() override { MemoryIsolationMetrics::Instance().ResetForTest(); }
+    MemoryIsolationMetrics& m() { return MemoryIsolationMetrics::Instance(); }
 };
 
-TEST_F(Mem05Fx, ToStringAll) {
+TEST_F(MemoryIsolationFx, ToStringAll) {
     EXPECT_STREQ(ToString(CR::kPass), "pass");
     EXPECT_STREQ(ToString(CR::kViolation), "violation");
     EXPECT_STREQ(ToString(AC::kSearch), "search");
@@ -241,8 +241,8 @@ TEST_F(Mem05Fx, ToStringAll) {
 }
 
 using CheckParam = std::tuple<CR, AC>;
-class Mem05CheckMatrix : public Mem05Fx, public ::testing::WithParamInterface<CheckParam> {};
-TEST_P(Mem05CheckMatrix, IncrementsOnlyTargetCell) {
+class MemoryIsolationCheckMatrix : public MemoryIsolationFx, public ::testing::WithParamInterface<CheckParam> {};
+TEST_P(MemoryIsolationCheckMatrix, IncrementsOnlyTargetCell) {
     auto [r, a] = GetParam();
     m().RecordIsolationCheck(r, a);
     EXPECT_EQ(m().IsolationCheckCount(r, a), 1u);
@@ -251,38 +251,38 @@ TEST_P(Mem05CheckMatrix, IncrementsOnlyTargetCell) {
             if (!(rr == r && aa == a))
                 EXPECT_EQ(m().IsolationCheckCount(rr, aa), 0u);
 }
-INSTANTIATE_TEST_SUITE_P(AllCells, Mem05CheckMatrix,
+INSTANTIATE_TEST_SUITE_P(AllCells, MemoryIsolationCheckMatrix,
                          ::testing::Combine(::testing::ValuesIn(kResults),
                                             ::testing::ValuesIn(kActions)));
 
 using ViolParam = std::tuple<AC, RE>;
-class Mem05ViolMatrix : public Mem05Fx, public ::testing::WithParamInterface<ViolParam> {};
-TEST_P(Mem05ViolMatrix, Increments) {
+class MemoryIsolationViolMatrix : public MemoryIsolationFx, public ::testing::WithParamInterface<ViolParam> {};
+TEST_P(MemoryIsolationViolMatrix, Increments) {
     auto [a, r] = GetParam();
     m().RecordIsolationViolation(a, r);
     EXPECT_EQ(m().IsolationViolationCount(a, r), 1u);
 }
-INSTANTIATE_TEST_SUITE_P(AllCells, Mem05ViolMatrix,
+INSTANTIATE_TEST_SUITE_P(AllCells, MemoryIsolationViolMatrix,
                          ::testing::Combine(::testing::ValuesIn(kActions),
                                             ::testing::ValuesIn(kReasons)));
 
-class Mem05QuotaMatrix : public Mem05Fx, public ::testing::WithParamInterface<QT> {};
-TEST_P(Mem05QuotaMatrix, CounterAndGauge) {
+class MemoryIsolationQuotaMatrix : public MemoryIsolationFx, public ::testing::WithParamInterface<QT> {};
+TEST_P(MemoryIsolationQuotaMatrix, CounterAndGauge) {
     m().RecordQuotaExceeded(GetParam());
     EXPECT_EQ(m().QuotaExceededCount(GetParam()), 1u);
     m().SetQuotaUsageRatio(GetParam(), 0.75);
     EXPECT_NEAR(m().QuotaUsageRatio(GetParam()), 0.75, 1e-6);
 }
-INSTANTIATE_TEST_SUITE_P(All, Mem05QuotaMatrix, ::testing::ValuesIn(kQuotas));
+INSTANTIATE_TEST_SUITE_P(All, MemoryIsolationQuotaMatrix, ::testing::ValuesIn(kQuotas));
 
-class Mem05ScopeMatrix : public Mem05Fx, public ::testing::WithParamInterface<RE> {};
-TEST_P(Mem05ScopeMatrix, Increments) {
+class MemoryIsolationScopeMatrix : public MemoryIsolationFx, public ::testing::WithParamInterface<RE> {};
+TEST_P(MemoryIsolationScopeMatrix, Increments) {
     m().RecordMatchScopeExcluded(GetParam());
     EXPECT_EQ(m().MatchScopeExcludedCount(GetParam()), 1u);
 }
-INSTANTIATE_TEST_SUITE_P(All, Mem05ScopeMatrix, ::testing::ValuesIn(kReasons));
+INSTANTIATE_TEST_SUITE_P(All, MemoryIsolationScopeMatrix, ::testing::ValuesIn(kReasons));
 
-TEST_F(Mem05Fx, NoLabelGaugeAndCounter) {
+TEST_F(MemoryIsolationFx, NoLabelGaugeAndCounter) {
     m().SetUserSessionCount(12);
     EXPECT_EQ(m().UserSessionCount(), 12);
     m().RecordDefaultUserUsed();
@@ -290,7 +290,7 @@ TEST_F(Mem05Fx, NoLabelGaugeAndCounter) {
     EXPECT_EQ(m().DefaultUserUsedCount(), 2u);
 }
 
-TEST_F(Mem05Fx, RenderHelpTypeNoHighCardinality) {
+TEST_F(MemoryIsolationFx, RenderHelpTypeNoHighCardinality) {
     m().RecordIsolationCheck(CR::kPass, AC::kSearch);
     m().SetQuotaUsageRatio(QT::kItemsCount, 0.5);
     std::string out = m().RenderOpenMetrics();
@@ -301,7 +301,7 @@ TEST_F(Mem05Fx, RenderHelpTypeNoHighCardinality) {
     EXPECT_EQ(out.find("user_id="), std::string::npos);
 }
 
-TEST_F(Mem05Fx, Reset) {
+TEST_F(MemoryIsolationFx, Reset) {
     m().RecordIsolationCheck(CR::kPass, AC::kSearch);
     m().RecordIsolationViolation(AC::kSession, RE::kMismatch);
     m().RecordQuotaExceeded(QT::kItemsCount);
@@ -326,9 +326,9 @@ TEST_F(Mem05Fx, Reset) {
 namespace cortrix::memory::transparency {
 namespace mem03_matrix {
 
-using Op = Mem03Metrics::Op;
-using OS = Mem03Metrics::OpStatus;
-using EC = Mem03Metrics::ErrorCodeLabel;
+using Op = MemoryMetrics::Op;
+using OS = MemoryMetrics::OpStatus;
+using EC = MemoryMetrics::ErrorCodeLabel;
 
 constexpr std::array<Op, 4> kOps{Op::kList, Op::kCreate, Op::kEdit,
                                  Op::kInvalidate};
@@ -337,14 +337,14 @@ constexpr std::array<EC, 5> kErrs{EC::kMemoryNotFound, EC::kUserMismatch,
                                   EC::kAlreadyInvalidated, EC::kInvalidateFailed,
                                   EC::kQuota};
 
-class Mem03Fx : public ::testing::Test {
+class MemoryFx : public ::testing::Test {
 protected:
-    void SetUp() override { Mem03Metrics::Instance().ResetForTest(); }
-    void TearDown() override { Mem03Metrics::Instance().ResetForTest(); }
-    Mem03Metrics& m() { return Mem03Metrics::Instance(); }
+    void SetUp() override { MemoryMetrics::Instance().ResetForTest(); }
+    void TearDown() override { MemoryMetrics::Instance().ResetForTest(); }
+    MemoryMetrics& m() { return MemoryMetrics::Instance(); }
 };
 
-TEST_F(Mem03Fx, ToStringAll) {
+TEST_F(MemoryFx, ToStringAll) {
     EXPECT_STREQ(ToString(Op::kList), "list");
     EXPECT_STREQ(ToString(Op::kCreate), "create");
     EXPECT_STREQ(ToString(Op::kEdit), "edit");
@@ -359,8 +359,8 @@ TEST_F(Mem03Fx, ToStringAll) {
 }
 
 using OpParam = std::tuple<Op, OS>;
-class Mem03OpMatrix : public Mem03Fx, public ::testing::WithParamInterface<OpParam> {};
-TEST_P(Mem03OpMatrix, IncrementsOnlyTargetCell) {
+class MemoryOpMatrix : public MemoryFx, public ::testing::WithParamInterface<OpParam> {};
+TEST_P(MemoryOpMatrix, IncrementsOnlyTargetCell) {
     auto [op, st] = GetParam();
     m().RecordOp(op, st);
     EXPECT_EQ(m().OpCount(op, st), 1u);
@@ -368,18 +368,18 @@ TEST_P(Mem03OpMatrix, IncrementsOnlyTargetCell) {
         for (OS s : kStatuses)
             if (!(o == op && s == st)) EXPECT_EQ(m().OpCount(o, s), 0u);
 }
-INSTANTIATE_TEST_SUITE_P(AllCells, Mem03OpMatrix,
+INSTANTIATE_TEST_SUITE_P(AllCells, MemoryOpMatrix,
                          ::testing::Combine(::testing::ValuesIn(kOps),
                                             ::testing::ValuesIn(kStatuses)));
 
-class Mem03ErrMatrix : public Mem03Fx, public ::testing::WithParamInterface<EC> {};
-TEST_P(Mem03ErrMatrix, Increments) {
+class MemoryErrMatrix : public MemoryFx, public ::testing::WithParamInterface<EC> {};
+TEST_P(MemoryErrMatrix, Increments) {
     m().RecordInvalidInput(GetParam());
     EXPECT_EQ(m().InvalidInputCount(GetParam()), 1u);
 }
-INSTANTIATE_TEST_SUITE_P(All, Mem03ErrMatrix, ::testing::ValuesIn(kErrs));
+INSTANTIATE_TEST_SUITE_P(All, MemoryErrMatrix, ::testing::ValuesIn(kErrs));
 
-TEST_F(Mem03Fx, NoLabelCounters) {
+TEST_F(MemoryFx, NoLabelCounters) {
     m().RecordCrossUserBlocked();
     m().RecordCrossUserBlocked();
     m().RecordEditConflict();
@@ -388,7 +388,7 @@ TEST_F(Mem03Fx, NoLabelCounters) {
 }
 
 // op_latency histogram per op, bounds {0.005,...,1}s.
-TEST_F(Mem03Fx, OpLatencyHistogramRender) {
+TEST_F(MemoryFx, OpLatencyHistogramRender) {
     m().ObserveOpLatency(Op::kList, 5);    // 0.005s exactly first bound
     m().ObserveOpLatency(Op::kList, 2);    // under
     m().ObserveOpLatency(Op::kList, 99999);  // above largest -> +Inf
@@ -398,13 +398,13 @@ TEST_F(Mem03Fx, OpLatencyHistogramRender) {
     EXPECT_NE(out.find("op=\"list\""), std::string::npos);
 }
 
-TEST_F(Mem03Fx, OpLatencyNegativeClamps) {
+TEST_F(MemoryFx, OpLatencyNegativeClamps) {
     m().ObserveOpLatency(Op::kEdit, -3);
     std::string out = m().RenderOpenMetrics();
     EXPECT_NE(out.find("op=\"edit\""), std::string::npos);
 }
 
-TEST_F(Mem03Fx, RenderHelpTypeNoHighCardinality) {
+TEST_F(MemoryFx, RenderHelpTypeNoHighCardinality) {
     m().RecordOp(Op::kList, OS::kSuccess);
     std::string out = m().RenderOpenMetrics();
     EXPECT_NE(out.find("# TYPE cortrix_memory_transparency_op_total counter"),
@@ -413,7 +413,7 @@ TEST_F(Mem03Fx, RenderHelpTypeNoHighCardinality) {
     EXPECT_EQ(out.find("ns_id="), std::string::npos);
 }
 
-TEST_F(Mem03Fx, Reset) {
+TEST_F(MemoryFx, Reset) {
     m().RecordOp(Op::kList, OS::kSuccess);
     m().RecordInvalidInput(EC::kQuota);
     m().RecordCrossUserBlocked();
