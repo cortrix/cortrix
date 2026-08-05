@@ -26,7 +26,7 @@ public:
     /// Stop the queue (unblock all waiting Pop calls)
     void Stop();
 
-    /// [D3.5 gap⑤ · F24 §7.2.bis] Move out every not-yet-started task (graceful-
+    /// Move out every not-yet-started task (graceful-
     /// shutdown drain). Cancelled tasks are skipped. Call AFTER Stop() + worker
     /// join (the manager guarantees no concurrent Pop); the queue is left empty.
     std::vector<std::shared_ptr<SPCTask>> DrainRemaining();

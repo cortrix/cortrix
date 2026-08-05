@@ -8,14 +8,14 @@
 
 namespace cortrix::spc {
 
-/// The F38 HyPE-index subsystem metrics (F38 §11, OBSERVABILITY_SPEC subsystem
+/// The HyPE-index subsystem metrics (observability subsystem
 /// `hype_index`). Naming cortrix_hype_index_<metric>_<unit>. NO high-cardinality
 /// labels (§11 / OBS_SPEC §3.2 forbids tenant/ns/unit/user/request/chunk id);
 /// chunk_id etc. go to structured logs only (HypeLog, below).
 ///
 /// Standalone (D3): a self-contained, dependency-free recorder + an OpenMetrics
-/// text renderer (same pattern as F03 EnricherMetrics / F40 SparseMetrics / F22
-/// OnnxMetrics). The F24 `/metrics` scrape endpoint does not exist in the frozen
+/// text renderer (same pattern as EnricherMetrics / SparseMetrics /
+/// OnnxMetrics). The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder there is cross-Feature wiring → D3.5.
 class HypeMetrics {
 public:

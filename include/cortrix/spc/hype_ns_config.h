@@ -10,9 +10,9 @@
 
 namespace cortrix::spc {
 
-/// Per-namespace F38 HyPE overrides parsed from a `*_config` JSONB blob (mirrors
-/// the F02 NsRerankerConfig / F40 NsSparseConfig pattern). V1 = the single
-/// NS-overridable B-class field `questions_per_chunk` (F38-1 ruling D: default 3,
+/// Per-namespace HyPE overrides parsed from a `*_config` JSONB blob (mirrors
+/// the NsRerankerConfig / NsSparseConfig pattern). V1 = the single
+/// NS-overridable B-class field `questions_per_chunk` (default 3,
 /// NS-configurable 1-10); every field is OPTIONAL so an absent key inherits the
 /// global default at resolve time. prompt_version is A-class (global) in Phase 1
 /// (NS-switchable prompt = Phase 2, §14), so it is NOT here.
@@ -32,11 +32,11 @@ struct NsHyPEConfig {
 
 /// Resolve the effective K (questions per chunk): NS override (if set) else the
 /// global default (IGlobalConfig key kHypeQuestionsPerChunkKey, else
-/// kHypeQuestionsDefault), clamped to [1, 10] (F38-1). `global` may be null
+/// kHypeQuestionsDefault), clamped to [1, 10]. `global` may be null
 /// (tests / no-config) → falls back to the compile-time default before clamping.
 int ResolveHypeK(const NsHyPEConfig& ns_cfg, const IGlobalConfig* global);
 
-/// Clamp an arbitrary requested K to the F38-1 [1, 10] window. Exposed for tests
+/// Clamp an arbitrary requested K to the [1, 10] window. Exposed for tests
 /// + call sites with a raw value.
 int ClampHypeK(int requested);
 

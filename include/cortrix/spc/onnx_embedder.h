@@ -13,13 +13,13 @@ struct EmbeddingResult {
     float inference_time_ms = 0.0f;
 };
 
-/// Dense + sparse pair from a single BGE-M3 forward pass (F40 §5.1, F40-1 A:
+/// Dense + sparse pair from a single BGE-M3 forward pass (
 /// "write-time single inference outputs dense + sparse"). `dense` is the same
 /// 1024-dim CLS embedding EmbedBatch produces; `sparse` is the SPLADE-style
 /// lexical_weights map (BGE-M3 vocab token_id → activation weight), top-K
-/// truncated by the caller (default K=100, F40-6). An empty `sparse` map is a
+/// truncated by the caller (default K=100). An empty `sparse` map is a
 /// valid result — it means the chunk produced no active sparse terms (a "dead"
-/// chunk, F40 §6.5) and the caller writes sparse_vec=NULL + clears the F09
+/// chunk) and the caller writes sparse_vec=NULL + clears the
 /// flags_ext has_sparse_vec bit.
 struct EmbedWithSparseResult {
     std::vector<float> dense;          ///< 1024-dim dense embedding (unit-normalized)
@@ -48,9 +48,9 @@ public:
     Status EmbedBatch(const std::vector<std::string>& texts,
                       std::vector<EmbeddingResult>* results);
 
-    /// ✨ F40 S1 (F40-1 decision A) — single BGE-M3 forward pass producing both
+    /// ✨ Single BGE-M3 forward pass producing both
     /// the dense embedding and the SPLADE sparse lexical_weights. `top_k` caps
-    /// the sparse map to its top-`top_k` weights (F40-6 K=100 default,
+    /// the sparse map to its top-`top_k` weights (K=100 default,
     /// NS-configurable 50-200); top_k<=0 keeps every active term.
     ///
     /// Real sparse-head extraction from a re-exported BGE-M3 ONNX model that
@@ -114,11 +114,11 @@ private:
     /// Stub embedding: deterministic fake vectors (fallback when model unavailable)
     Status StubEmbed(const std::string& text, EmbeddingResult* result) const;
 
-    /// Deterministic stub sparse lexical_weights for `text` (F40 S1 standalone).
+    /// Deterministic stub sparse lexical_weights for `text` (standalone).
     /// Hashes whitespace-delimited tokens into the BGE-M3 vocab space
     /// (kBgeM3VocabSize), assigns a stable positive weight per term, then keeps
     /// the top-`top_k` by weight. Empty / whitespace-only text → empty map (the
-    /// F40 §6.5 "empty_content" path). Mirrors StubEmbed's determinism so tests
+    /// the "empty_content" path). Mirrors StubEmbed's determinism so tests
     /// are reproducible; replaced by the real model sparse output at D3.5.
     std::map<uint32_t, float> StubSparse(const std::string& text, int top_k) const;
 };
@@ -126,7 +126,7 @@ private:
 /// BGE-M3 token vocabulary size (250K). term_id values returned by the sparse
 /// path are < this; the serializer stores term_id as uint16, so the
 /// stub keeps ids in a 16-bit window — the real vocab needs the Phase-2 wider
-/// term_id encoding tracked in PHASE2_BACKLOG (F40 §4.2 note "18 bits actual").
+/// term_id encoding tracked for Phase 2 ("18 bits actual").
 inline constexpr uint32_t kBgeM3VocabSize = 250000u;
 
 }  // namespace cortrix

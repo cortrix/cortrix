@@ -11,9 +11,9 @@
 
 namespace cortrix::spc {
 
-/// The 7 F10 data-cleaning error identities (F10 §5.1, D9). Each maps to a
+/// The 7 data-cleaning error identities. Each maps to a
 /// stable `CX_ERR_F10_*` string + a GEN-Agent category + retryability via the
-/// canonical registry below — same pattern as catalog::CatalogErrorCode (F12,
+/// canonical registry below — same pattern as catalog::CatalogErrorCode (
 /// the template) and spc::ParserErrorCode.
 ///
 /// Per CODING_CONVENTIONS §3, a domain error is carried as the Agent-friendly
@@ -25,11 +25,11 @@ enum class CleaningErrorCode : uint8_t {
     kAnomalyConfigInvalid = 2,   // max_chunk_chars ≤ 0
     kPluginTimeout = 3,          // cleaning plugin > plugin_timeout_ms
     kPluginException = 4,        // Plugin threw a C++ exception
-    kNsConfigMergeFailed = 5,    // F12-1 ConfigResolver failed
+    kNsConfigMergeFailed = 5,    // ConfigResolver failed
     kInternalError = 6,          // fallback unknown error
 };
 
-/// Total number of F10 error codes (F10 §5.1 = 7). Compile-time anchor for the
+/// Total number of data-cleaning error codes (= 7). Compile-time anchor for the
 /// API-compatibility regression test (the set must not shrink).
 constexpr int kCleaningErrorCodeCount = 7;
 

@@ -11,25 +11,25 @@
 namespace cortrix::spc {
 
 // =============================================================================
-// I1 — ISpcEnricher chain framework (GS-2: F03 → F35 → F38, fail-soft serial).
+// ISpcEnricher chain framework (enrich → contextualize → HyPE, fail-soft serial).
 //
 // The SPC pipeline runs an ordered chain of ISpcEnrichers per chunk. Each enricher contributes
-// independently (F03 entities/summary; F35 contextualized_*; F38 hype questions
+// independently (entities/summary; contextualized_*; hype questions
 // via its own channel) and runs fail-soft — a failing enricher is skipped, its
 // per-enricher status/error is recorded, and the chain continues. The chain order
-// is fixed F03 → F35 → F38 (the F35/F38 stages consume the chunk text, not F03's
-// output, so the only ordering invariant is that F03 leads — design GS-2).
+// is fixed enrich → contextualize → HyPE (the later stages consume the chunk text, not the enricher's
+// output, so the only ordering invariant is that the enricher leads).
 //
 // The chain is resolved from the `enricher.chain` GUC ("f03" default; e.g.
 // "f03,f35,f38") with an optional per-NS metadata override. Membership of an
 // enricher is gated by BOTH the chain list AND the enricher's own IsAvailable()
-// (an LLM-less F35/F38 degrades to a no-op — F35 §7.2 / F38-8).
+// (an LLM-less contextualizer or HyPE stage degrades to a no-op).
 // =============================================================================
 
 /// Parse an `enricher.chain` spec ("f03,f35,f38") into a normalized, de-duplicated
 /// token list. Tokens are lowercased + trimmed; unknown tokens are dropped
 /// (fail-soft). An empty / absent spec yields {"f03"} (the §7.1 default chain).
-/// f03 is always implied first when any token is present (GS-2: F03 leads), so
+/// f03 is always implied first when any token is present (the enricher leads), so
 /// "f35" alone resolves to {"f03","f35"}. Pure + static for unit testing.
 std::vector<std::string> ParseEnricherChainSpec(const std::string& spec);
 
@@ -43,7 +43,7 @@ std::vector<std::string> ResolveEnricherChain(const IGlobalConfig* global,
 /// fail-soft bookkeeping the design requires). `name` = ISpcEnricher::Name();
 /// `status` mirrors EnrichResult.status (0 == ok); `error_code` is the CX_ERR_*
 /// token when the enricher degraded (empty on success / skip). Exception: the
-/// F35 fail-soft shape keeps status==0 (the chunk retains its original
+/// The contextualizer fail-soft shape keeps status==0 (the chunk retains its original
 /// embedding) while contextualized_status==2 — there error_code carries the
 /// member's cause so debt rows record why (D12, 2026-07-11).
 struct EnricherStepOutcome {
@@ -54,9 +54,9 @@ struct EnricherStepOutcome {
 };
 
 /// Per-chunk merged enrichment result across the whole chain. `merged` is the
-/// single EnrichResult the write phase consumes (F03 entities/summary + F35
+/// single EnrichResult the write phase consumes (entities/summary +
 /// contextualized_* folded into one struct — the frozen EnrichResult already
-/// carries both field families). `hype_questions` is the F38 side channel
+/// carries both field families). `hype_questions` is the HyPE side channel
 /// (reconcile 1: the frozen EnrichResult has no slot for them). `steps` records
 /// each enricher's fail-soft outcome for observability / tests.
 struct ChunkChainResult {
@@ -65,9 +65,9 @@ struct ChunkChainResult {
     std::vector<EnricherStepOutcome> steps;
 };
 
-/// Ordered, fail-soft ISpcEnricher chain. Owns its enrichers (F03 head + optional
-/// F35/F38). The SPC pipeline holds one of these (installed via a seam, like the
-/// F41 doc-summary enqueue) and calls EnrichChunks() once per document.
+/// Ordered, fail-soft ISpcEnricher chain. Owns its enrichers (enricher head + optional
+/// contextualizer and HyPE stages). The SPC pipeline holds one of these (installed via a seam, like the
+/// doc-summary enqueue) and calls EnrichChunks() once per document.
 ///
 /// Construction: the production bootstrap builds the chain from
 /// the resolved token list + the shared LLM client / embedder / parent store; an
@@ -92,11 +92,11 @@ public:
     /// Run the chain over a batch of chunk contexts (one ChunkChainResult per
     /// context, index-aligned). For each chunk every available enricher runs in
     /// order; a throwing / failing enricher is caught, recorded in `steps`, and the
-    /// chain continues (fail-soft). F38's hype questions are collected via its
-    /// GenerateHypeQuestions() side channel when an F38 enricher is in the chain;
+    /// chain continues (fail-soft). HyPE questions are collected via its
+    /// GenerateHypeQuestions() side channel when a HyPE enricher is in the chain;
     /// `parent_texts` supplies the optional parent context per chunk (index-aligned;
-    /// "" == no parent context — F38 reconcile 2). `source_child_ids` /
-    /// `source_parent_ids` are the F38-4 provenance stamped on each generated
+    /// "" == no parent context). `source_child_ids` /
+    /// `source_parent_ids` are the provenance stamped on each generated
     /// question (index-aligned; empty vectors → provenance left blank).
     ///
     /// `member_filter` (addendum §3.7 backfill): when non-null, only members whose

@@ -8,7 +8,7 @@
 
 namespace cortrix::spc {
 
-/// The F35 Contextual Retrieval subsystem metrics (F35 §10, OBSERVABILITY_SPEC
+/// The Contextual Retrieval subsystem metrics (observability
 /// subsystem `contextual_retrieval`). Naming
 /// cortrix_contextual_retrieval_<metric>_<unit>. NO high-cardinality labels (§10
 /// V3 ruling 10 dropped the ns_id label; per-NS data is served via the
@@ -16,8 +16,8 @@ namespace cortrix::spc {
 /// tenant/ns/unit/user/request/chunk id); chunk_id etc. go to structured logs only.
 ///
 /// Standalone (D3): a self-contained, dependency-free recorder + an OpenMetrics
-/// text renderer (same pattern as F03 EnricherMetrics / F38 HypeMetrics / F40
-/// SparseMetrics / F22 OnnxMetrics). The F24 `/metrics` scrape endpoint does not
+/// text renderer (same pattern as EnricherMetrics / HypeMetrics /
+/// SparseMetrics / OnnxMetrics). The `/metrics` scrape endpoint does not
 /// exist in the frozen tree — registering this recorder there is cross-Feature
 /// wiring → D3.5.
 class ContextualRetrievalMetrics {

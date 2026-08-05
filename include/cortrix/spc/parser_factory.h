@@ -51,7 +51,7 @@ public:
     /// Select a parser based on file extension and config and run parsing (including fallback orchestration).
     /// File pre-checks: not found→FILE_NOT_FOUND / over limit→FILE_TOO_LARGE / unsupported extension→
     /// UNSUPPORTED_FORMAT. Primary parser low-confidence/empty pages and fallback allowed → OCR.
-    /// @return ParsedDoc — consumed directly by F34 ChunkerInput.pages + F08 GeneratorInput.doc_metadata
+    /// @return ParsedDoc — consumed directly by ChunkerInput.pages + GeneratorInput.doc_metadata
     ParsedDoc ParseDocument(const std::string& filepath,
                             const ParserOptions& opts = ParserOptions{});
 

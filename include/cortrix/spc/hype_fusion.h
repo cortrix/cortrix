@@ -11,10 +11,10 @@ namespace cortrix::spc {
 using cortrix::id::ChildId;
 using cortrix::id::ParentId;
 
-/// Default RRF constant (F38 §8.1: k=60, industry default / NS-config Phase 2).
+/// Default RRF constant (k=60, industry default / NS-config Phase 2).
 inline constexpr int kHypeRrfK = 60;
 
-/// One P-HNSW candidate in the mixed pool (F38 §8.1 ChildCandidate analog). A
+/// One P-HNSW candidate in the mixed pool (ChildCandidate analog). A
 /// chunk candidate (block_type != kBlockHypeQuestion — a content Block) scores
 /// its own child_id; a hype candidate (block_type == kBlockHypeQuestion=16)
 /// scores its source_child_id (the chunk it points to, from the Block metadata
@@ -27,7 +27,7 @@ struct HypeCandidate {
     std::string question_text; ///< hype only: matched hypothetical question (explain)
 };
 
-/// Fused result with the 3 F38-9 B-class explain fields (§8.2).
+/// Fused result with the 3 B-class explain fields.
 struct HypeFusedResult {
     ChildId child_id;
     ParentId parent_id;        ///< for by-parent dedup (empty if unknown)

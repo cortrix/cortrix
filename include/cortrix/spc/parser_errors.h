@@ -20,9 +20,9 @@ namespace cortrix::spc {
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// So ParserErrorCode is the *enum of identities*, and MakeParserError() turns
 /// one (plus optional structured_data) into that boundary error — mirroring
-/// catalog::CatalogErrorCode (F12 §8.1, the canonical template).
+/// catalog::CatalogErrorCode (the canonical template).
 ///
-/// The integer values match F06 §2.7 (ParserError) so they double as the
+/// The integer values match the ParserError enum so they double as the
 /// ParsedDoc.status wire value the Python bridge returns over JSON.
 ///
 /// EMPTY_DOCUMENT (9) is *not* an error: an all-blank document returns
@@ -47,7 +47,7 @@ enum class ParserErrorCode : uint8_t {
     kMaxPagesExceeded = 15,   // Exceeds the max page-count limit
 };
 
-/// Total number of parser error codes (F06 §2.7 = 16). Compile-time anchor for
+/// Total number of parser error codes (= 16). Compile-time anchor for
 /// the API-compatibility regression test (the set must not shrink).
 constexpr int kParserErrorCodeCount = 16;
 
@@ -72,7 +72,7 @@ const ParserErrorInfo& GetParserErrorInfo(ParserErrorCode code);
 /// The "CX_ERR_*" string for `code` (convenience over GetParserErrorInfo).
 const char* ParserErrorCodeString(ParserErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (F06 §5.2
+/// The structured_data keys a `code`'s error body MUST carry (
 /// "structured_data" column). The SoT for the Agent-friendly contract
 /// (GEN-Agent #5); lets call sites + tests verify the body is complete.
 /// kOk / kEmptyDocument return an empty list.

@@ -22,15 +22,15 @@ public:
                          uint8_t processing_level = 3,
                          const std::string& metadata_json = "");
 
-    /// [A unified-blocks] Assemble a child block (F34 ParentChildChunker output) as a
+    /// Assemble a child block (ParentChildChunker output) as a
     /// row of the unified `blocks` table. block_id = HashChildIdToBlockId(child.child_id)
     /// (the real child ULID — the P-HNSW label); block_type = the document's source
     /// `modality` (candidate B — child-ness is carried by child_id, no kBlockChild);
     /// child_id/parent_id/token_count/parent_offset are set on the block; metadata_json
     /// is the inherited per-child metadata (caller-serialized from child.metadata).
-    /// `flags_ext` is the F09 BlockFlagsExt bitmask baked into the header (default 0
+    /// `flags_ext` is the BlockFlagsExt bitmask baked into the header (default 0
     /// = no flags; existing callers unchanged). The SPC pipeline passes
-    /// kFlagExtHasContextualized (bit3, F35 §4.1) when the child carries an F35
+    /// kFlagExtHasContextualized (bit3) when the child carries a contextual
     /// contextualized embedding so the read path can branch on the header without a
     /// column read.
     CortrixBlock AssembleChild(const cortrix::chunker::ChildChunk& child,

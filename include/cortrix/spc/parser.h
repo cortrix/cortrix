@@ -8,7 +8,7 @@
 
 namespace cortrix::spc {
 
-/// Parse options. Config sources: global_config → NS override → request-level override (F12 merge).
+/// Parse options. Config sources: global_config → NS override → request-level override (catalog merge).
 /// NS-overridable: max_pages / max_file_size_mb / enable_ocr_fallback / language_hint /
 /// subprocess_timeout_ms. Not NS-overridable (system resource level): parser_max_concurrent /
 /// parser_default_concurrent (Q11 — actual concurrency control at the Pipeline layer).
@@ -38,8 +38,8 @@ const char* ToString(ChunkType type);
 /// Reverse: §3.1 JSON string → ChunkType (unknown string falls back to TEXT). Used by bridge JSON parsing (S2).
 ChunkType ChunkTypeFromString(const std::string& s);
 
-/// Parsed paragraph-level text chunk (ParsedPage.paragraphs[] sub-structure, F06 §2.1).
-/// A6 §16: content_hash is computed by F34/Chunker after the final chunk is formed, not in F06 output.
+/// Parsed paragraph-level text chunk (ParsedPage.paragraphs[] sub-structure).
+/// content_hash is computed by the chunker after the final chunk is formed, not in parser output.
 struct ParsedChunk {
     std::string text;          ///< Text content (UTF-8)
     int page = -1;             ///< Page number (1-based, -1 means not applicable)
@@ -60,8 +60,8 @@ struct PageMetadata {
     int char_count = 0;            ///< Character count of the whole page
 };
 
-/// Single-page parse output (F06 §2.1, v1.0.1). Maps 1:1 to F34 ChunkerInput.pages;
-/// paragraphs[] is the input material for F34 parent-child splitting.
+/// Single-page parse output. Maps 1:1 to ChunkerInput.pages;
+/// paragraphs[] is the input material for parent-child splitting.
 struct ParsedPage {
     int page_num = 0;                       ///< Page number (1-based)
     std::string page_text;                  ///< Whole-page concatenated text (merged in paragraphs order)
@@ -69,22 +69,22 @@ struct ParsedPage {
     PageMetadata page_metadata;             ///< Page-level metadata
 };
 
-/// Document metadata (F06 §2.1, v1.0.2). DocumentMetadata is the single SoT —— F03/F35 consumers
+/// Document metadata. DocumentMetadata is the single SoT —— enricher consumers
 /// reference this struct, do not create another. doc_language = document-level language (distinct from the
 /// paragraph-level ParsedChunk.language). section_heading is paragraph-level (ParsedChunk.section), not in this struct.
 struct DocumentMetadata {
     std::string filename;          ///< Original file name
-    std::string doc_title;         ///< Document title (empty=no title, falls back to filename) — F35 {{doc_title}}
-    std::string mime_type;         ///< MIME type (the old F03 note "type" refers to this field)
+    std::string doc_title;         ///< Document title (empty=no title, falls back to filename) — {{doc_title}}
+    std::string mime_type;         ///< MIME type (the old enricher note "type" refers to this field)
     int64_t file_size_bytes = 0;   ///< File size
     int page_count = -1;           ///< Total page count (-1=not applicable)
-    std::string doc_language;      ///< Primary document language — F35 {{doc_language}} / consumed by F03
-    int64_t upload_timestamp = 0;  ///< Upload timestamp (Unix epoch ms) — F35 {{upload_timestamp}}
+    std::string doc_language;      ///< Primary document language — {{doc_language}} / consumed by the enricher
+    int64_t upload_timestamp = 0;  ///< Upload timestamp (Unix epoch ms) — {{upload_timestamp}}
     int64_t parse_time_ms = 0;     ///< Parse duration
 };
 
-/// Parse result (F06 §2.1, v1.0.1: ParseResult → ParsedDoc). Consumed directly by downstream F34
-/// ChunkerInput.pages + F08 GeneratorInput.doc_metadata.
+/// Parse result (ParseResult → ParsedDoc). Consumed directly by the downstream
+/// ChunkerInput.pages + GeneratorInput.doc_metadata.
 ///
 /// An error response (status != 0 and not EMPTY_DOCUMENT) carries the 4 fields of the Agent-friendly 7 principles
 /// (retryable / category / retry_after_ms / structured_data_json). Use
@@ -93,7 +93,7 @@ struct DocumentMetadata {
 struct ParsedDoc {
     ParserErrorCode status = ParserErrorCode::kOk;  ///< kOk / kEmptyDocument = success
     std::vector<ParsedPage> pages;          ///< Page-level output (v1.0.1 replaces chunks)
-    DocumentMetadata metadata;              ///< Document metadata (F08 MetadataGenerator is responsible for generating the Block)
+    DocumentMetadata metadata;              ///< Document metadata (MetadataGenerator is responsible for generating the Block)
     std::string parser_name;                ///< "docling" / "paddleocr" / "docling+paddleocr"
     std::vector<int> failed_pages;          ///< Page numbers that failed to parse (Q1 per-page fault tolerance)
 
@@ -145,7 +145,7 @@ public:
     /// Parse a document file.
     /// @param filepath temporary file path (local path after upload)
     /// @param opts parse options
-    /// @return ParsedDoc — consumed directly by downstream F34 ChunkerInput.pages
+    /// @return ParsedDoc — consumed directly by downstream ChunkerInput.pages
     virtual ParsedDoc Parse(const std::string& filepath,
                             const ParserOptions& opts = ParserOptions{}) = 0;
 

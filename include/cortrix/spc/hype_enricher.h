@@ -16,8 +16,8 @@ struct HyPEConfig {
     int questions_per_chunk = kHypeQuestionsDefault;   ///< K, default 3 (NS 1-10)
     std::string prompt_version = kHypePromptVersionDefault;  ///< "v1"
     std::string llm_model = kHypeDefaultLlmModel;      ///< "gpt-4o-mini"
-    /// Per-call LLM deadline in ms; 0 = the shared client's default. F35/F03
-    /// honor enricher_llm.timeout_ms while F38 historically ignored it — at
+    /// Per-call LLM deadline in ms; 0 = the shared client's default. The other enrichers
+    /// honor enricher_llm.timeout_ms while HyPE historically ignored it — at
     /// provider peak (GLM evening, observed 2026-07-08) the 30s client default
     /// is the only protection hype generation gets. Wired from the same yaml key.
     int timeout_ms = 0;
@@ -29,17 +29,17 @@ struct HyPEConfig {
 struct HypeQuestion {
     std::string question_text;
     int question_index = 0;                 ///< 0..K-1
-    std::string source_child_id;            ///< F38-4 primary key (recall expansion)
-    std::string source_parent_id;           ///< F38-4 Phase-1 written, Phase-2 dual-path
+    std::string source_child_id;            ///< Provenance primary key (recall expansion)
+    std::string source_parent_id;           ///< Phase-1 written, Phase-2 dual-path
     std::vector<float> embedding;           ///< 1024-dim BGE-M3 (filled at S3 / pipeline)
 };
 
 /// HyPE enricher — an ISpcEnricher chain subclass (chunk-level, per-child),
-/// peer of F03 LlmEnricher / F35 ContextualRetrieval.
+/// peer of LlmEnricher / ContextualRetrieval.
 ///
-/// ⚠️ Two D3.5 contract reconciles (Lead-ruled 2026-06-01, F38 detailed design
+/// ⚠️ Two contract reconciles (Lead-ruled 2026-06-01, the HyPE design
 /// §7.1 / §6.3 reverse-revised to D3.5):
-///   1. The frozen ISpcEnricher::EnrichResult (shared F03 type) has NO
+///   1. The frozen ISpcEnricher::EnrichResult (shared enricher type) has NO
 ///      hype_questions field and no generic extension slot, so Enrich() returns a
 ///      STANDARD EnrichResult (status only — HyPE does no NER, so entities/summary
 ///      stay empty). The hype questions are produced by the dedicated
@@ -70,11 +70,11 @@ public:
                  std::shared_ptr<store::ParentChunkStore> parent_store);
     ~HyPEEnricher() override;
 
-    // --- ISpcEnricher (🔒 base SoT-locked signatures, shared with F03/F35) ---
+    // --- ISpcEnricher (🔒 base SoT-locked signatures, shared with the other enrichers) ---
 
     /// HyPE enrichment for one chunk. Returns a STANDARD EnrichResult (reconcile 1):
     /// status=SUCCESS(0) on success / FAILED with error_meta on LLM failure
-    /// (transparent degrade, F38-8). entities/summary stay empty (HyPE does no NER).
+    /// (transparent degrade). entities/summary stay empty (HyPE does no NER).
     /// The generated questions are NOT carried here (the frozen EnrichResult has no
     /// slot) — call GenerateHypeQuestions() for them. enricher_name="hype".
     EnrichResult Enrich(const std::string& chunk_text,
@@ -85,18 +85,18 @@ public:
     std::vector<EnrichResult> EnrichBatch(
         const std::vector<ChunkContext>& contexts) override;
 
-    /// Available iff a non-null LLM client was injected (F38-8: a missing client
-    /// degrades the whole HyPE stage, like F03's null-client path).
+    /// Available iff a non-null LLM client was injected (a missing client
+    /// degrades the whole HyPE stage, like the enricher's null-client path).
     bool IsAvailable() const override;
 
-    /// Enricher name (EnrichResult.enricher_name / F07 enricher_name="hype").
+    /// Enricher name (EnrichResult.enricher_name / enricher_name="hype").
     std::string Name() const override { return "hype"; }
 
     // --- F38-specific API (reconcile 1: the real HyPE product) ---
 
     /// Generate K hypothetical questions for `chunk_text`. `parent_text`
     /// is OPTIONAL context (reconcile 2): empty == no parent context available.
-    /// `source_child_id` / `source_parent_id` are the F38-4 provenance written onto
+    /// `source_child_id` / `source_parent_id` are the provenance written onto
     /// each question. On success returns exactly `config.questions_per_chunk`
     /// questions; on LLM failure / parse failure returns a non-OK Status carrying a
     /// CX_ERR_F38_* token (the caller / Enrich() maps it to the degrade path).

@@ -5,16 +5,16 @@
 
 namespace cortrix::spc {
 
-/// F06's schema-migration contribution (F06 §2.5, Major-3). Adds the
+/// The document parser's schema-migration contribution. Adds the
 /// `namespaces.parser_config` JSONB (TEXT in SQLite) column with default
 /// '{}' so a namespace can override parser options (max_pages /
 /// max_file_size_mb / enable_ocr_fallback / language_hint /
-/// subprocess_timeout_ms — §2.5 whitelist). F06 owns no per-Unit schema (parse
-/// output flows straight to F34), so only the catalog migration is meaningful.
+/// subprocess_timeout_ms whitelist). The parser owns no per-Unit schema (parse
+/// output flows straight to the chunker), so only the catalog migration is meaningful.
 ///
-/// Implements the frozen cortrix::catalog::ISchemaProvider (F12 §3.7 — 3
-/// methods). Registered with the F12 SchemaMigrator at Engine::Init() in the
-/// ARCH topological order (F12→F06→...). The ADD COLUMN is idempotent (guarded
+/// Implements the frozen cortrix::catalog::ISchemaProvider (3
+/// methods). Registered with the SchemaMigrator at Engine::Init() in the
+/// topological order (catalog → parser → ...). The ADD COLUMN is idempotent (guarded
 /// by a table_info check) so a re-run / already-current DB is a no-op.
 class F06SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:

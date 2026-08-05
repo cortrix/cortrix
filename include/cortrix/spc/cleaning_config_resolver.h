@@ -9,7 +9,7 @@ namespace cortrix::spc {
 
 /// The IGlobalConfig keys holding the process-wide cleaning defaults.
 /// Read via the generic IGlobalConfig accessors — the canonical config surface has
-/// no F10-typed getter (that would be an F10 reverse hook to IGlobalConfig);
+/// no cleaning-typed getter (that would be a reverse hook into IGlobalConfig);
 /// standalone reads the generic keys. Absent keys fall back to the CleaningConfig
 /// struct defaults (cleaning_types.h §3.1).
 inline constexpr const char* kCleaningDedupEnabledKey =
@@ -30,8 +30,8 @@ inline constexpr const char* kCleaningPluginTimeoutMsKey =
 CleaningConfig LoadGlobalCleaningConfig(const IGlobalConfig* global);
 
 /// Resolve the effective CleaningConfig for one namespace = global ← NS override
-/// (F10 §3.4, three-layer order global → ns.cleaning_config → request; V1.0 has no
-/// request layer). Reuses the F12 ConfigResolver<CleaningConfig> template (§3.4
+/// (three-layer order global → ns.cleaning_config → request; V1.0 has no
+/// request layer). Reuses the ConfigResolver<CleaningConfig> template (
 /// mandate) for the JSON-object shallow merge, then RE-ASSERTS the two
 /// resource-level fields (max_chunk_chars / plugin_timeout_ms) back to `global`:
 /// those are system-resource level and NOT NS-overridable (§3.4 line 176), so a

@@ -24,16 +24,16 @@ std::string BuildHypeQuestionMetadataJson(const HypeQuestion& q,
                                           const std::string& generated_at,
                                           const std::string& llm_provider = "openai");
 
-/// Build a complete hype_question Block BLOB (F09 128B header + payload) for one
+/// Build a complete hype_question Block BLOB (128B header + payload) for one
 /// question, via the frozen BlockBuild() with block_type=kBlockHypeQuestion (16).
 /// content = question_text; metadata_json = BuildHypeQuestionMetadataJson(...);
 /// vector_dim = q.embedding.size(). Proves a hype_question Block is a well-formed
-/// F09 Block that round-trips (block_type=16 is the recall discriminator — HyPE
+/// Block that round-trips (block_type=16 is the recall discriminator — HyPE
 /// owns no flags_ext bit, so flags_ext stays 0).
 ///
 /// Standalone (D3): the actual atomic write (chunk + hype_question Blocks in one
-/// F25 PWL transaction, §5.2/§9.1) is cross-Feature wiring → D3.5; here we build
-/// the BLOB the pipeline will hand to F25.
+/// write-coordinator transaction) is wired separately; here we build
+/// the BLOB the pipeline will hand to the write coordinator.
 std::vector<uint8_t> BuildHypeQuestionBlock(const HypeQuestion& q,
                                             const std::string& prompt_version,
                                             const std::string& llm_model,

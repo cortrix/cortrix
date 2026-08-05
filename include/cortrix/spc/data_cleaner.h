@@ -9,11 +9,11 @@
 #include "cortrix/spc/cleaning_errors.h"
 #include "cortrix/spc/cleaning_types.h"
 
-// Forward declarations — F10 does not hard-depend on these Features' headers.
+// Forward declarations — data cleaning does not hard-depend on those headers.
 //  - TraceContext (GEN-Observability): Phase 1 noop pointer, Phase 2 OTel.
-//  - IOperationLogger (F18a, CE Operation Log): audit sink. NOT in the L0 base
-//    yet (sibling Wave-A Feature) — taken as a *nullable* shared_ptr so F10
-//    builds + tests standalone; the live F18a wiring is D3.5.
+//  - IOperationLogger (CE operation log): audit sink. NOT in the L0 base
+//    yet — taken as a *nullable* shared_ptr so data cleaning
+//    builds + tests standalone; the live operation-log wiring lands later.
 namespace cortrix::observability { struct TraceContext; }
 namespace cortrix::operation_log { class IOperationLogger; }
 
@@ -25,16 +25,16 @@ namespace cortrix::spc {
 /// (D5). chunk-level; orthogonal to file-level dedup (tenants.dedup_scope).
 ///
 /// D3 standalone: Dedup / DetectAnomaly / config validation are fully
-/// implemented + tested against the F10 `Block` contract view. The §4.3
+/// implemented + tested against the `Block` contract view. The
 /// SpcPipeline wiring (ChunkResult/EmbeddingResult ↔ Block, Storage-Write
 /// skip-index) is cross-Feature → D3.5. The op_logger audit sink is
 /// optional/nullable for the same reason.
 class DataCleaner {
 public:
     /// @param config     resolved cleaning config (post ConfigResolver merge)
-    /// @param op_logger  F18a audit sink; may be nullptr (D3.5 wiring). When
+    /// @param op_logger  operation-log audit sink; may be nullptr. When
     ///                   present, B2 path stats are logged there (not in the API
-    ///                   response — §5.2). Default nullptr keeps F10 standalone.
+    ///                   response). Default nullptr keeps data cleaning standalone.
     explicit DataCleaner(
         const CleaningConfig& config,
         std::shared_ptr<operation_log::IOperationLogger> op_logger = nullptr);
@@ -76,8 +76,8 @@ public:
     static CleaningResult Summarize(int input_count, const DedupResult& dedup,
                                     const AnomalyResult& anomaly);
 
-    /// ★ Cleaning-plugin seam (F11 coordination, D8 — F10 ships the stub; the
-    /// full plugin ecosystem lands with F11).
+    /// ★ Cleaning-plugin seam — data cleaning ships the stub; the
+    /// full plugin ecosystem lands with the plugin API.
     void RegisterPlugin(std::function<void(std::vector<Block>&)> plugin);
     void ApplyPlugins(std::vector<Block>& blocks,
                       const observability::TraceContext* ctx = nullptr);
@@ -89,8 +89,8 @@ private:
     std::vector<std::function<void(std::vector<Block>&)>> plugins_;
 };
 
-/// ICleaningPlugin stub abstract base (F10 v1.0.1 Minor-3). F10 D1 gives the
-/// signature; F11 D1 implements the full ecosystem (interface + sample plugins +
+/// ICleaningPlugin stub abstract base. Data cleaning gives the
+/// signature; the plugin API implements the full ecosystem (interface + sample plugins +
 /// loader + docs).
 class ICleaningPlugin {
 public:
@@ -99,8 +99,8 @@ public:
     virtual void Apply(std::vector<Block>& blocks) = 0;  ///< in-place transform
 };
 
-/// F09 anomaly flag (F10 §3.3, D6) — the frozen bit2 of BlockFlagsExt. Mirrors
-/// cortrix::kFlagExtIsAnomalous so F10 code reads self-documenting; the SoT is
+/// Anomaly flag — the frozen bit2 of BlockFlagsExt. Mirrors
+/// cortrix::kFlagExtIsAnomalous so the cleaning code reads self-documenting; the SoT is
 /// common/block_types.h (V14 J1 whole-bitmap lock).
 constexpr uint8_t kBlockFlagExtAnomalous = 0x04;
 
