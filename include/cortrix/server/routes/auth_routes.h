@@ -12,7 +12,7 @@ class JwtSecretService;
 }  // namespace auth
 namespace observability { class IOperationLogger; }
 
-/// [D3.5 r2 · Wave P · P1] Register the P08-CE bootstrap routes (§2.13.2):
+/// Register the CE bootstrap routes:
 ///   GET  /api/v1/admin/bootstrap?token=<t>  -- first-run HTML page (one-time admin key)
 ///   POST /api/v1/admin/bootstrap  body {token}  -- programmatic JSON variant
 ///
@@ -23,7 +23,7 @@ namespace observability { class IOperationLogger; }
 /// only ambient gate. `handler` must outlive `server`.
 void RegisterBootstrapRoutes(httplib::Server& server, auth::BootstrapHandler& handler);
 
-/// [D3.5 r2 · Wave P · P1] Register the P08-CE API Keys resource (§2.13.3):
+/// Register the CE API Keys resource:
 ///   POST   /api/v1/auth/api-keys           -- create a key (plaintext returned once)
 ///   GET    /api/v1/auth/api-keys           -- list the caller's keys (prefix only)
 ///   DELETE /api/v1/auth/api-keys/{key_id}  -- revoke a key (soft delete, revoked_at)
@@ -46,7 +46,7 @@ void RegisterApiKeyRoutes(httplib::Server& server, auth::ApiKeyService& keys,
 /// a V1.5 multi-user item). NOT WithAuth-wrapped — this is the pre-auth probe.
 void RegisterAuthSessionRoute(httplib::Server& server, ApiKeyAuth& auth);
 
-/// [FA1 R11] Register the P08 §2.13-bis admin/users 5 endpoints (admin role only):
+/// Register the admin/users 5 endpoints (admin role only):
 ///   GET    /api/v1/admin/users              -- list (q / status / role / page / limit)
 ///   POST   /api/v1/admin/users              -- create (invite mode, no email verify)
 ///   PATCH  /api/v1/admin/users/:id          -- update (display_name / role / email_verified)
@@ -62,7 +62,7 @@ void RegisterAdminUsersRoutes(httplib::Server& server, auth::AdminUsersService& 
                               ApiKeyAuth& auth,
                               observability::IOperationLogger* logger = nullptr);
 
-/// [FA1 R11] Register the P08 §2.11 JWT secret rotation endpoint (topic 1.1 C):
+/// Register the JWT secret rotation endpoint:
 ///   POST /api/v1/admin/auth/rotate-jwt-secret  -- rotate HS256 secret (dual-key window)
 ///
 /// WithAuth(kPermAdmin) (+ AdminGuard). Returns the Agent-friendly RotationResult

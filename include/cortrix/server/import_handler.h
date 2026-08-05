@@ -12,7 +12,7 @@
 
 namespace cortrix::server {
 
-/// HTTP handler core for the 6 F16a endpoints. This is the request-
+/// HTTP handler core for the 6 database-import endpoints. This is the request-
 /// parse + response-build logic the D3.5 httplib routes call; binding it into the
 /// real `httplib::Server` (+ AdminGuard middleware §6.1 two-layer protection) is D3.5 wiring, so
 /// here it is a plain, fully-unit-testable class over the import/connection managers.
@@ -25,7 +25,7 @@ public:
     ImportHandler(std::shared_ptr<cortrix::import::ImportManager> import_mgr,
                   std::shared_ptr<cortrix::import::IConnectionManager> conn_mgr);
 
-    /// Parse a request body into an ImportRequest (F16a §6.2 oneOf{table, sql} +
+    /// Parse a request body into an ImportRequest (oneOf{table, sql} +
     /// text_strategy). Returns CX_ERR_F16A_INVALID_SQL on a missing required field,
     /// an unknown text_strategy ("template" is rejected — v1.0.2 ruling 13), or a
     /// malformed shape.

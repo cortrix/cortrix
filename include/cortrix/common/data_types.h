@@ -53,17 +53,17 @@ struct CortrixBlock {
     std::string          content_hash;
     std::vector<uint8_t> data;
     std::string          content_text;
-    // [A unified-blocks] child-row + shared columns (F34/F35/F40 SchemaProviders own
+    // Child-row + shared columns (the per-Unit SchemaProviders own
     // the DDL; this struct carries them through block_insert/block_get). Empty string
     // / -1 sentinel → SQL NULL (a non-child block leaves child_id/parent_id empty and
     // token_count/parent_offset = -1). A child row = child_id non-empty; its block_type
     // stays the source modality (candidate B, no kBlockChild).
-    std::string          child_id;        // F34: business ULID + child-identity key (empty = not a child)
-    std::string          parent_id;       // F34: FK → parents.parent_id (empty = NULL)
-    int64_t              token_count = -1;   // F34: child token count (-1 = NULL)
-    int64_t              parent_offset = -1; // F34: offset within parent_text (-1 = NULL)
-    std::string          metadata_json;   // F09-framework shared JSONB (MEM/F34 child/F08 META); empty = NULL
-    ScoreSignals         score_signals;   // F03/F07 optional query-time scoring signals
+    std::string          child_id;        // business ULID + child-identity key (empty = not a child)
+    std::string          parent_id;       // FK → parents.parent_id (empty = NULL)
+    int64_t              token_count = -1;   // child token count (-1 = NULL)
+    int64_t              parent_offset = -1; // offset within parent_text (-1 = NULL)
+    std::string          metadata_json;   // framework-shared JSONB (memory / child / META); empty = NULL
+    ScoreSignals         score_signals;   // optional query-time scoring signals
 };
 
 // [A unified-blocks] Storage DTO for the per-Unit `parents` table.
@@ -86,7 +86,7 @@ struct CortrixParent {
     int64_t     page_end = 0;
     int64_t     byte_offset_start = 0;
     int64_t     byte_offset_end = 0;
-    std::string metadata_json;      // opaque JSON (F06 doc meta + post-F03 per-parent)
+    std::string metadata_json;      // opaque JSON (parsed doc meta + post-enrichment per-parent)
     int64_t     created_at = 0;     // Unix epoch ms
 };
 

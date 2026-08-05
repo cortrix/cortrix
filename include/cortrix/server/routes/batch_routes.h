@@ -8,7 +8,7 @@ namespace server {
 class BatchSubmitService;
 }  // namespace server
 
-/// Register the TD-F42-BULK batch submit route (Wave D-R1):
+/// Register the batch submit route:
 ///   POST /api/v1/documents/batch  -- submit 1-100 documents (async, partial-success)
 ///
 /// Write+ auth. The handler parses the JSON body into a server::BatchRequest and

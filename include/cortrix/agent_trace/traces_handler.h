@@ -12,7 +12,7 @@ struct sqlite3;
 
 namespace cortrix::agent_trace {
 
-/// Soft cap on the serialized response size (F13 §8.1 — 1MB soft limit). When the
+/// Soft cap on the serialized response size (1MB soft limit). When the
 /// returned page's rough byte estimate exceeds this, TraceSession.response_size_warning
 /// is set so the Agent knows to paginate. (Carried on the handler result, below.)
 constexpr int64_t kResponseSizeSoftLimitBytes = 1024 * 1024;
@@ -25,7 +25,7 @@ struct TracesResponse {
     bool response_size_warning = false;   ///< §8.1 — page estimate > 1MB soft limit
 };
 
-/// CE business logic for GET /api/v1/traces/{session_id} (F13 §8.1, S4). Owns the
+/// CE business logic for GET /api/v1/traces/{session_id}. Owns the
 /// permission decision (the writer just filters + paginates):
 ///   - the session's owner is resolved via interaction_log (session_id ->
 ///     user_id) — agent_trace itself carries no user_id, and the §11 closed loop ties
@@ -60,7 +60,7 @@ public:
     ///                the TC4 global wiring (which sets an OwnerResolver instead).
     TracesHandler(std::shared_ptr<IAgentTraceWriter> writer, sqlite3* db);
 
-    /// [F13 TC4] Install an out-of-band owner resolver (global wiring). When set it
+    /// Install an out-of-band owner resolver (global wiring). When set it
     /// supersedes the co-located `db` interaction_log lookup — agent_trace is global
     /// but the session->user mapping is per-NS, so the global GET /traces resolves
     /// ownership through this strategy. Returns *this for call-chaining at the wiring.

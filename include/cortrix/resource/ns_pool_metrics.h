@@ -7,18 +7,18 @@
 
 namespace cortrix::resource {
 
-/// The `ns_pool` subsystem metrics (F05 §10.1, OBSERVABILITY_SPEC §2.3 line 84,
+/// The `ns_pool` subsystem metrics (observability naming,
 /// naming `cortrix_ns_pool_<metric>_<unit>`). Self-contained dependency-free
 /// recorder (same pattern as ScoringMetrics / Mem02Metrics): a process-wide
 /// singleton of atomic gauges/counters/histograms + an OpenMetrics text renderer.
 ///
-/// 🚨 Cardinality control (OBSERVABILITY_SPEC §3.2 — F05 §10.1): labels are
+/// 🚨 Cardinality control: labels are
 /// enum-only (`reason` for rejected_creates_total). NO namespace_id / unit_id /
-/// tenant_id (high cardinality); per-NS data goes through the F05 explain/stats
+/// tenant_id (high cardinality); per-NS data goes through the pool explain/stats
 /// API (the namespace_id inside that JSON is a data field, not a metric label).
 ///
 /// 🚨 D3 standalone: this recorder + RenderOpenMetrics() are fully usable +
-/// testable in-process. The F24 `/metrics` scrape endpoint does not exist in the
+/// testable in-process. The `/metrics` scrape endpoint does not exist in the
 /// frozen tree — registering this recorder into that endpoint is cross-Feature
 /// wiring **deferred to D3.5**. This makes explicit the registration convention that
 /// namespace_pool.cpp:26-32 previously left only as a code comment: the A-class
@@ -36,7 +36,7 @@ class NsPoolMetrics {
 public:
     /// `reason` label for rejected_creates_total (§10.1 — the two admission gates).
     /// Values match the PoolStats.rejected_creates_total struct field names + the
-    /// RejectionEvent.reason strings 1:1 (F05 §3.2 m6/n1).
+    /// RejectionEvent.reason strings 1:1.
     enum class RejectReason {
         kNsCountExceeded = 0,
         kMemoryExceeded,

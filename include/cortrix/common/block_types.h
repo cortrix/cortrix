@@ -4,8 +4,8 @@
 namespace cortrix {
 
 /// Block sub-type enum (matches DDL block_type column).
-/// F09 is the SoT for this enum — downstream Features (F38 kBlockHypeQuestion=16,
-/// F41 doc-summary, ...) extend it here, not via private values.
+/// The block-header layer is the SoT for this enum — downstream code (kBlockHypeQuestion=16,
+/// doc-summary, ...) extends it here, not via private values.
 enum CortrixBlockType : uint16_t {
     kBlockFile     = 1,
     kBlockScan     = 2,   // OCR
@@ -14,9 +14,9 @@ enum CortrixBlockType : uint16_t {
     kBlockVideo    = 5,
     kBlockImage    = 6,
     kBlockMemory   = 7,
-    kBlockMeta     = 8,   // F09/Phase 1: document-metadata block
-    kBlockHypeQuestion = 16,  // F38: HyPE hypothetical-question block (F09 §4.4 authorized)
-    kBlockDocSummary   = 17,  // F41: document-level LLM summary block (F09 §4.4 authorized; F08-4: independent, not via F08)
+    kBlockMeta     = 8,   // Phase 1: document-metadata block
+    kBlockHypeQuestion = 16,  // HyPE hypothetical-question block
+    kBlockDocSummary   = 17,  // document-level LLM summary block (independent of the metadata block)
 };
 
 /// Block processing level (unified INTEGER across pipeline)
@@ -25,10 +25,10 @@ enum ProcessingLevel : uint8_t {
     kLevelL1 = 1,   // Metadata only
     kLevelL2 = 2,   // BM25 + metadata
     kLevelL3 = 3,   // Vector + BM25 + metadata (fully processed)
-    kLevelL4 = 4,   // F09/Phase 1: LLM Enhanced (NER + Summary + Vision)
+    kLevelL4 = 4,   // Phase 1: LLM Enhanced (NER + Summary + Vision)
 };
 
-/// Header flags bitmask (MVP — unchanged by F09)
+/// Header flags bitmask (unchanged from the MVP)
 enum BlockFlags : uint8_t {
     kFlagHasContent  = 0x01,  // bit0
     kFlagHasVector   = 0x02,  // bit1
@@ -39,16 +39,16 @@ enum BlockFlags : uint8_t {
     // bit6-7: reserved
 };
 
-/// Extended flags (flags_ext field, F09/Phase 1). F09 is the SINGLE SoT for the
+/// Extended flags (flags_ext field, Phase 1). This header is the SINGLE SoT for the
 /// flags_ext bit assignment (V14 J1, 2026-05-29): downstream Features
 /// MUST #include this enum and not allocate bits privately
 /// (this whole-bitmap lock fixed the prior bit0/bit1 double-occupation).
 enum BlockFlagsExt : uint8_t {
     kFlagExtHasEntities       = 0x01,  // bit0: payload has NER entities JSON
     kFlagExtHasSummary        = 0x02,  // bit1: payload has summary text
-    kFlagExtIsAnomalous       = 0x04,  // bit2: F10 cleaning marked this block anomalous
-    kFlagExtHasContextualized = 0x08,  // bit3: F35 contextualized embedding
-    kFlagExtHasSparseVec      = 0x10,  // bit4: F40 sparse vector
+    kFlagExtIsAnomalous       = 0x04,  // bit2: cleaning marked this block anomalous
+    kFlagExtHasContextualized = 0x08,  // bit3: contextualized embedding
+    kFlagExtHasSparseVec      = 0x10,  // bit4: sparse vector
     // bit5-7 (0x20/0x40/0x80): reserved (encryption-related, Phase 2)
 };
 

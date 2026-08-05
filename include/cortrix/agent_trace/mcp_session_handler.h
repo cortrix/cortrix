@@ -42,7 +42,7 @@ struct McpClientCapability {
     std::optional<std::string> namespace_id;
 };
 
-/// MCP session auto-capture (F13 §7.1, S3). Manages the per-session lifecycle and
+/// MCP session auto-capture. Manages the per-session lifecycle and
 /// double-writes every tool_call (incl. failures) to agent_trace via the injected
 /// IAgentTraceWriter:
 ///   - OnConnectionEstablished: resolve session_id (server-generated UUID, or a

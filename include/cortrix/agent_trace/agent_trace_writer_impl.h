@@ -18,7 +18,7 @@ namespace cortrix::agent_trace {
 /// cortrix/ has no #ifdef and does not know it exists.
 ///
 /// The handle is BORROWED, already-opened-and-migrated by the DI container (the
-/// F13 AgentTraceSchemaProvider runs at startup via the shared SchemaMigrator — this
+/// AgentTraceSchemaProvider runs at startup via the shared SchemaMigrator — this
 /// class does not migrate). Retention comes from IGlobalConfig
 /// (agent_trace_retention_days), read live in Cleanup() so a config OnChange takes
 /// effect on the next sweep.

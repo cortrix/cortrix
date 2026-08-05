@@ -9,10 +9,10 @@ namespace cortrix::agent_trace {
 /// (v0 → v1). Phase 2 internal evolution branches on (from, to) here.
 constexpr int kAgentTraceSchemaVersion = 1;
 
-/// The agent_trace DDL emitted by the F13 SchemaProvider:
+/// The agent_trace DDL emitted by the observability SchemaProvider:
 /// the agent_trace table + 3 indices. Stored in cortrix_global.db (the global
 /// DB, NOT a per-namespace DB), but applied via the shared SchemaMigrator so it
-/// runs inside the same versioned, atomic framework as the catalog / F18a
+/// runs inside the same versioned, atomic framework as the catalog / operation log
 /// providers.
 ///
 /// Open-Core (topic 7, §4.4): this is the CE-only schema. Ent's
@@ -30,7 +30,7 @@ constexpr int kAgentTraceSchemaVersion = 1;
 /// (topic 3 — same clock as operation_log, for the trace_id correlation chain).
 extern const char* const kAgentTraceSchemaSql;
 
-/// F13's ISchemaProvider (frozen cortrix::catalog::ISchemaProvider, D2-pre-5):
+/// The observability ISchemaProvider (frozen cortrix::catalog::ISchemaProvider):
 /// owns the agent_trace table + 3 indices in cortrix_global.db. Registered with
 /// the SchemaMigrator that targets the global DB. Migrate returns Status
 /// (F-FREEZE-1: no Result<void>).

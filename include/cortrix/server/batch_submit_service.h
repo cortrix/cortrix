@@ -12,7 +12,7 @@
 
 namespace cortrix::server {
 
-/// One document of a parsed batch request (TD-F42-BULK §2.2 documents[] item).
+/// One document of a parsed batch request (documents[] item).
 struct BatchDocument {
     std::string doc_id;            ///< client-provided, unique within the batch
     std::string content;           ///< inline content (url / file_path are Phase 2)
@@ -21,10 +21,10 @@ struct BatchDocument {
                                    ///< parser selection (".txt" fallback when absent)
 };
 
-/// On-duplicate policy (TD-F42-BULK §2.2 topic 2). Parsed from options.on_duplicate.
+/// On-duplicate policy. Parsed from options.on_duplicate.
 enum class OnDuplicate { kSkip, kOverwrite, kError };
 
-/// A parsed batch submission request (TD-F42-BULK §2.2). The HTTP layer
+/// A parsed batch submission request. The HTTP layer
 /// (batch_routes) parses the JSON body into this; the service is transport-free
 /// so it is unit-testable standalone (mirrors DocumentTaskHandler / §5 step 1-2).
 struct BatchRequest {
@@ -42,26 +42,26 @@ struct BatchHttpResult {
     nlohmann::json body;
 };
 
-/// Batch submission limits (TD-F42-BULK §2.2 topic 1). Defaults match the detailed
-/// design; a Phase 2 anchor exposes these via IGlobalConfig (TD-F42-BULK-CONFIG).
+/// Batch submission limits. Defaults match the detailed
+/// design; a Phase 2 anchor exposes these via IGlobalConfig.
 struct BatchLimits {
     int max_documents = 100;                          ///< §2.2 — single batch cap
     int64_t max_payload_bytes = 100LL * 1024 * 1024;  ///< §2.2 — total body 100MB
     int64_t max_doc_bytes = 10LL * 1024 * 1024;       ///< §2.2 — per-doc content 10MB
 };
 
-/// BatchSubmitService — the POST /documents/batch orchestration (TD-F42-BULK
+/// BatchSubmitService — the POST /documents/batch orchestration (
 /// §3), independent of the HTTP transport. Validates the batch envelope (the 4
 /// CX_ERR_BATCH_* faults), then per-doc submits through the ITaskSubmitter seam
-/// (production = the frozen F42 TaskScheduler), assembling the §2.3 partial-success
+/// (production = the frozen TaskScheduler), assembling the partial-success
 /// response with the GEN-Agent 5-field meta.failed[] schema.
 ///
 /// Standalone (D3): real validation + fan-out + response assembly over a mock
 /// ITaskSubmitter, fully unit-tested. DEFERRED → D3.5: (1) the inline
 /// content → server-side temp-file materialization that fills SubmitRequest.filepath
-/// for the real F42/SPC pipeline; (2) real on_duplicate=overwrite cancel-running
-/// (TD-F42-BULK-2 F25/F42 coordination); (3) the batch `metric` subsystem wiring
-/// into the F24 /metrics registry (§4.bis). Those are cross-Feature live wiring, not this
+/// for the real task/SPC pipeline; (2) real on_duplicate=overwrite cancel-running
+/// (write/task coordination); (3) the batch `metric` subsystem wiring
+/// into the /metrics registry. Those are live wiring, not this
 /// round's scope.
 class BatchSubmitService {
 public:
@@ -72,7 +72,7 @@ public:
 
     /// [D3.5 r2 · P3b] Enable real inline-content materialization: each accepted
     /// doc's content is written to a server-named file under `dir` and that path
-    /// becomes the SubmitRequest.filepath the F42 doc-parse worker reads. The dir
+    /// becomes the SubmitRequest.filepath the doc-parse worker reads. The dir
     /// is created if absent. When unset (the default), filepath stays "" — the
     /// standalone/mock seam (no real pipeline) keeps working. Call once at wiring
     /// time, passing server::BatchTempDir(data_dir) so the writer and the reapers

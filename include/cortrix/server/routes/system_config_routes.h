@@ -6,7 +6,7 @@ namespace cortrix {
 class ApiKeyAuth;
 class IGlobalConfig;
 
-/// [D3.5 r2 · Wave P · P4] Register the F48 §6.3 agent LLM config admin API:
+/// Register the agent LLM config admin API:
 ///   GET /api/v1/system/agent_llm_config  -- read current config (api_key masked)
 ///   PUT /api/v1/system/agent_llm_config  -- update config (admin only)
 ///

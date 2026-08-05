@@ -12,10 +12,10 @@ namespace cortrix::resource {
 
 /// D3.5 wire④ — the thin façade over one acquired Namespace (F05_NS_INTEGRATION
 /// §4). Phase-1 access model (§3 = authoritative): a consumer constructs a
-/// NamespaceFacade per request, calls Acquire() (= F05 Pool.Acquire), uses the
+/// NamespaceFacade per request, calls Acquire() (= Pool.Acquire), uses the
 /// five windows, and lets the destructor Release() (D-I5(a) per-request).
 ///
-/// Layering (§4): the F05 Pool owns the "heavy" resources (P-HNSW index +
+/// Layering: the Pool owns the "heavy" resources (P-HNSW index +
 /// WriteCoordinator/pending.wal, which need admission); the façade owns the
 /// "light" resources it builds itself (D-I4) — the blob file dir + the independent
 /// memory.db — plus its own PRIVATE store.db connection (D-I1.bis: per-facade
@@ -45,9 +45,9 @@ public:
 
     // ── Five windows (§4). Precondition: Acquire() returned Ok. ──────────────
 
-    /// Bundle's P-HNSW index (F01 IIndex) — the heavy resource (forwarded).
+    /// Bundle's P-HNSW index (IIndex) — the heavy resource (forwarded).
     cortrix::store::IIndex& vec_index();
-    /// Bundle's per-NS F25 WriteCoordinator (the `pwl` resource) (forwarded).
+    /// Bundle's per-NS WriteCoordinator (the `pwl` resource) (forwarded).
     cortrix::store::WriteCoordinator& write_coordinator();
     /// CortrixStore over this façade's PRIVATE store.db connection (D-I1.bis).
     cortrix::CortrixStore& store();

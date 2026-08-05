@@ -11,8 +11,8 @@
 
 namespace cortrix {
 
-/// Shared bounded-queue thread pool (scaffolding D2-pre-4). Consumed by F02
-/// reranker, F04 ScatterGather, F36, and the Phase 2 multi-Unit router via
+/// Shared bounded-queue thread pool. Consumed by the
+/// reranker, ScatterGather, RAG-Fusion, and the Phase 2 multi-Unit router via
 /// `#include "cortrix/common/executor_engine.h"`.
 ///
 /// Submit<T>() enqueues a callable returning T and returns its future; N worker

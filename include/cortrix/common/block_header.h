@@ -8,13 +8,13 @@
 namespace cortrix {
 
 /// 128-byte packed C struct — zero-copy reads.
-/// F09 evolves the MVP layout: +3 fields (flags_ext / enrichment_source /
+/// This evolves the MVP layout: +3 fields (flags_ext / enrichment_source /
 /// compression_algo) carved from reserved (44B → 41B), magic "CTX\0" → "CRTX",
 /// CRC range extended to cover the new fields + reserved. Size stays 128B.
 #pragma pack(push, 1)
 struct cortrix_block_header_t {
     /* Identification (8B) */
-    uint32_t magic;              // "CRTX" = 0x43525458 (F09 rename, Cortrix brand)
+    uint32_t magic;              // "CRTX" = 0x43525458 (Cortrix brand)
     uint16_t header_version;     // Header format version, Phase 1 = 1
     uint16_t header_size;        // Fixed 128
 
@@ -71,10 +71,10 @@ void BlockHeaderInit(cortrix_block_header_t* hdr);
 /// Build complete block data: header + content_text + metadata_json + processing_chain.
 /// Returns complete BLOB (header 128B + variable-length payload).
 ///
-/// F09 appends 3 optional Phase-1 params (flags_ext / enrichment_source /
+/// Appends 3 optional Phase-1 params (flags_ext / enrichment_source /
 /// compression_algo); all default to 0 so existing MVP callers need zero changes.
 /// (The struct evolves the MVP layout — the std::string/out-ptr signatures are
-/// preserved deliberately; F09 §2.3's vector sketch is reconciled to the MVP
+/// preserved deliberately; the design's vector sketch is reconciled to the MVP
 /// signature this Feature is told to evolve, per S1 DoD "MVP callers unchanged".)
 std::vector<uint8_t> BlockBuild(
     CortrixBlockType block_type,

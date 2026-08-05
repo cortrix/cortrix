@@ -35,8 +35,8 @@ struct InteractionSourcesView {
     std::vector<InteractionSource> sources;
 };
 
-/// The caller's permission context for an interactions read (F13 §8.2/§8.3). The
-/// real values come from the P08 AuthContext at the request boundary (D3.5
+/// The caller's permission context for an interactions read. The
+/// real values come from the AuthContext at the request boundary (
 /// wiring); standalone tests pass them directly. A handler enforces:
 ///   - non-admin may only read interactions whose interaction_log.user_id ==
 ///     requester_user_id (else CX_ERR_F13_UNAUTHORIZED, anti-leak);
@@ -49,7 +49,7 @@ struct RequesterContext {
 
 /// One row in a GET /interactions list response. Projected from the
 /// real frozen interaction_log (MVP role/content model) — NOT the §4.2 draft shape
-/// (query_text/response_summary), which predates the MEM01 rebuild. query_text is
+/// (query_text/response_summary), which predates the memory rebuild. query_text is
 /// returned in full (§8.3 — not truncated); namespace_id is the real
 /// namespace_name column.
 struct InteractionListItem {
@@ -86,7 +86,7 @@ struct InteractionListView {
 };
 
 /// CE business logic for the citation-provenance + interactions-list endpoints
-/// (F13 §8.2 / §8.3, S5 + S11). Reads interaction_log (MVP frozen, role/content
+/// Reads interaction_log (MVP frozen, role/content
 /// model) + interaction_sources (CE, this Feature) + probes `blocks` for deleted
 /// sources. Standalone: pure DB logic over a borrowed handle; the HTTP route
 /// registration (httplib) is D3.5. Thread-safe via a single mutex over the handle.

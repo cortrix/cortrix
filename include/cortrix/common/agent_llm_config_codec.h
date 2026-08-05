@@ -8,7 +8,7 @@ namespace cortrix {
 
 class IGlobalConfig;
 
-/// F48 §6.2 storage codec for AgentLlmConfig over the generic IGlobalConfig
+/// Storage codec for AgentLlmConfig over the generic IGlobalConfig
 /// key/value store. Shared by every IGlobalConfig backend's GetAgentLlmConfig /
 /// SetAgentLlmConfig default so the `agent_llm.*` key layout + the api_key
 /// encryption-at-rest live in ONE place (not copied per backend).
@@ -29,7 +29,7 @@ AgentLlmConfig Load(const IGlobalConfig& cfg);
 void Store(const AgentLlmConfig& in,
            const std::function<void(const std::string&, const std::string&)>& set);
 
-/// Mask an api_key for the read API surface (F48 §6.3 — never return plaintext):
+/// Mask an api_key for the read API surface (never return plaintext):
 /// "" stays "", otherwise the first 4 + "..." (e.g. "sk-1...").
 std::string MaskApiKey(const std::string& api_key);
 

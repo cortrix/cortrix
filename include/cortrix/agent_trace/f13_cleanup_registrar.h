@@ -11,10 +11,10 @@ struct sqlite3;
 
 namespace cortrix::agent_trace {
 
-/// Registers F13's retention-cleanup callbacks onto the shared F18a CleanupScheduler
-/// (F13 §10.1, S10 + S11 — reuses the F18a framework, no separate timer).
+/// Registers the observability retention-cleanup callbacks onto the shared CleanupScheduler
+/// (reuses the operation-log framework, no separate timer).
 ///
-/// TC4 split F13's two retention tables across two DBs, so this registrar covers ONLY
+/// The two retention tables live in different DBs, so this registrar covers ONLY
 /// the single-db tables it can reach through `db_`:
 ///   - agent_trace  : 90 days (IGlobalConfig.agent_trace_retention_days), delegated
 ///                    to writer->Cleanup() (the writer owns the agent_trace DELETE).
@@ -41,9 +41,9 @@ public:
                         std::shared_ptr<IGlobalConfig> config);
 
     /// Register the global agent_trace 90d cleanup on `scheduler` (TC4 — the only
-    /// single-db F13 table; interaction_log is per-NS, see InteractionLogSweeper).
+    /// single-db table; interaction_log is per-NS, see InteractionLogSweeper).
     /// Idempotent registration is the caller's responsibility (call once at startup),
-    /// mirroring F18a.
+    /// mirroring the operation log.
     void RegisterAgentTrace(observability::CleanupScheduler& scheduler);
 
     /// Delete interaction_log rows older than the retention window from `db_` (exposed

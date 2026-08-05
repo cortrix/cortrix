@@ -7,7 +7,7 @@
 
 namespace cortrix::agent_trace {
 
-/// Result of running the F13 HTTP observability middleware over one request's
+/// Result of running the HTTP observability middleware over one request's
 /// headers (§6.1). The `context` is ready to install on the thread-local
 /// (ctx.SetThreadLocal()); `warnings` lists the headers that were present but
 /// invalid (the caller sets `X-Cortrix-Header-Warning: invalid-format` on the
@@ -20,7 +20,7 @@ struct HttpObservabilityResult {
     bool generated_trace_id = false;
 };
 
-/// Stateless parser+validator for the three F13 identity headers (§6.1, S2):
+/// Stateless parser+validator for the three identity headers:
 ///   X-Session-Id / X-Trace-Id / X-Agent-Id
 /// Pure (no server dependency) so it is unit-testable in isolation; the D3.5
 /// wiring adapts httplib::Request headers → observability::HttpHeaders and calls
@@ -42,7 +42,7 @@ public:
     /// invalid one, and return the ready-to-install context + warnings.
     HttpObservabilityResult Process(const observability::HttpHeaders& headers) const;
 
-    /// The CORS `allowed_headers` list F13 contributes (§6.2). Exposed so the
+    /// The CORS `allowed_headers` list this layer contributes. Exposed so the
     /// server's CORS config (config/cors.yaml) and tests share one source.
     static const std::vector<std::string>& CorsAllowedHeaders();
 

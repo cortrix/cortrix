@@ -10,9 +10,9 @@
 
 namespace cortrix::agent_trace {
 
-/// One row written to the agent_trace table (F13 §5.2 / §4.1). The CE ops-view
+/// One row written to the agent_trace table. The CE ops-view
 /// record of "what call did the Agent make, how long, why it failed" — the
-/// protocol-detail half of the three-track split (F18a operation_log is the
+/// protocol-detail half of the three-track split (operation_log is the
 /// user-view track; §2.13 System Observability is the SRE track). status defaults
 /// to "success"; a failure sets status + error_code and (per §3) keeps only the
 /// error in result_summary.
@@ -53,7 +53,7 @@ struct TraceFilter {
     int offset = 0;
 };
 
-/// Paginated session view (F13 §8.1 Response). traces are ordered by created_at
+/// Paginated session view. traces are ordered by created_at
 /// then id; the meta aggregates session_start/end + total_duration_ms.
 struct TraceSession {
     std::string session_id;
@@ -67,7 +67,7 @@ struct TraceSession {
     int next_offset = 0;
 };
 
-/// CE-public agent-trace writer contract (F13 §5.2, topic 7). cortrix/ defines and
+/// CE-public agent-trace writer contract. cortrix/ defines and
 /// owns this interface; a downstream extension writer IS-A
 /// IAgentTraceWriter and double-writes agent_trace + agent_trace_extension — but
 /// this tree has NO conditional compilation and does not know any extension writer

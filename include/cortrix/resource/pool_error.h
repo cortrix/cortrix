@@ -10,9 +10,9 @@
 
 namespace cortrix::resource {
 
-/// The 4 NS-pool error identities (F05 §3.2 PoolError + §8.1). Each maps to a
+/// The 4 NS-pool error identities (PoolError). Each maps to a
 /// stable `CX_ERR_NS_*` string + a GEN-Agent category + retryability via the
-/// canonical registry below — the exact pattern CatalogErrorCode uses (F12 §8.1
+/// canonical registry below — the exact pattern CatalogErrorCode uses (
 /// is the template, per L1_ALPHA_BRIEFING §2).
 ///
 /// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
@@ -22,14 +22,14 @@ namespace cortrix::resource {
 /// and MakePoolError() turns one (plus structured_data) into the boundary error.
 ///
 /// Naming (§8.1 m4): the prefix is `CX_ERR_NS_*`, NOT `CX_ERR_F05_*` — admission
-/// control failures are namespace-domain errors shared with F12 / P09, so an
+/// control failures are namespace-domain errors shared with the catalog and tenant layers, so an
 /// Agent never filters Cortrix errors by F-module number. The 3 admission codes
-/// reuse the same CX_ERR_NS_* strings F12 already registers (catalog_error.h);
-/// they are the same wire identities seen from the F05 side.
+/// reuse the same CX_ERR_NS_* strings the catalog already registers (catalog_error.h);
+/// they are the same wire identities seen from the pool side.
 ///
-/// Note POOL_INTERNAL is deliberately absent: F05's own PoolError enum is the 4
+/// Note POOL_INTERNAL is deliberately absent: the PoolError enum is the 4
 /// values below; `CX_ERR_NS_POOL_INTERNAL` is an F12-side mapping fall-through
-/// code, not an identity F05 itself returns.
+/// code, not an identity the pool itself returns.
 enum class PoolErrorCode {
     kNsQuotaExceeded,           ///< NS count > max_namespaces_per_instance
     kNsResourceBudgetExceeded,  ///< would exceed memory_budget_bytes
@@ -37,7 +37,7 @@ enum class PoolErrorCode {
     kNsNotFound,                ///< NS not in pool (never created / load failed)
 };
 
-/// Count of pool error codes (F05 §3.2 = 4). Compile-time anchor for the
+/// Count of pool error codes (= 4). Compile-time anchor for the
 /// API-compatibility regression test (the set must not shrink / be re-ordered).
 constexpr int kPoolErrorCodeCount = 4;
 
@@ -56,7 +56,7 @@ const PoolErrorInfo& GetPoolErrorInfo(PoolErrorCode code);
 /// The "CX_ERR_NS_*" string for `code`.
 const char* PoolErrorCodeString(PoolErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (F05 §8.1 "required keys").
+/// The structured_data keys a `code`'s error body MUST carry ("required keys").
 /// SoT for the Agent-friendly contract (GEN-Agent #5); lets call sites + tests
 /// verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(PoolErrorCode code);

@@ -10,17 +10,17 @@
 
 namespace cortrix::server {
 
-/// The 4 batch-level error identities (TD-F42-BULK §2.4.1). Each maps to a stable
+/// The 4 batch-level error identities. Each maps to a stable
 /// `CX_ERR_BATCH_*` string + a GEN-Agent category + retryability + retry_after_ms
 /// + the structured_data keys its body MUST carry, via the canonical registry
-/// below. Mirrors the F42 registry pattern (async/f42_error.h): the enum is the
+/// below. Mirrors the task registry pattern (async/f42_error.h): the enum is the
 /// set of identities and MakeBatchError() turns one into the Agent-friendly
 /// boundary type cortrix::agent_friendly::AgentFriendlyError.
 ///
 /// These are batch *request envelope* faults (the whole request is rejected with
 /// a single GEN-Agent error). Per-document failures inside an accepted batch are
 /// NOT in this enum — they reuse the originating Feature's existing CX_ERR_* codes
-/// in meta.failed[] (TD-F42-BULK §2.4.2, "avoid error-code explosion").
+/// in meta.failed[] ("avoid error-code explosion").
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may be appended (api_version stays "v1").
@@ -31,7 +31,7 @@ enum class BatchErrorCode {
     kDuplicateDocId,   ///< 400 CX_ERR_BATCH_DUPLICATE_DOC_ID — duplicate doc_id in one batch (topic 4 Q2)
 };
 
-/// Total number of batch-level error codes (TD-F42-BULK §2.4.1 = 4 rows).
+/// Total number of batch-level error codes (= 4 rows).
 /// Compile-time anchor for the API-compatibility regression test (the set must
 /// not shrink).
 constexpr int kBatchErrorCodeCount = 4;

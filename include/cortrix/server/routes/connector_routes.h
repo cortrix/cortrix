@@ -13,7 +13,7 @@ class NamespaceManager;
 class SPCManager;
 
 // D3.5 wire⑤c: connector routes acquire per-operation NamespaceFacades over the
-// F05 resource pool, and route namespace creation+admission through the F12/F13
+// resource pool, and route namespace creation+admission through the catalog and
 // catalog router (the DirWatcherRegistry holds these two; the MVP NamespaceManager
 // is no longer on the watcher path).
 namespace resource { class INamespacePool; }
@@ -21,24 +21,24 @@ namespace catalog  { class INSRouter; }
 
 /// Shared state for the connector routes.
 ///
-/// F21 (TD-WATCHER-001): the MVP `vector<WatcherEntry>` (one OS FileWatcher per
+/// Watcher fan-out: the MVP `vector<WatcherEntry>` (one OS FileWatcher per
 /// (dir, namespace) pair) is replaced by a single DirWatcherRegistry that keeps
 /// exactly one OS watcher per directory and fans its events out to every
 /// subscribed namespace. The registry is internally synchronized (its own mu_),
 /// so this struct no longer carries a mutex or a watcher vector.
 ///
 /// `registry` is created lazily by RegisterConnectorRoutes (the only place that
-/// has the F05 pool + NamespaceManager + SPCManager it needs). bootstrap.cpp
+/// has the pool + NamespaceManager + SPCManager it needs). bootstrap.cpp
 /// constructs the struct, sets `data_dir`, then calls RegisterConnectorRoutes /
 /// RegisterWatchAliasRoutes which share the SAME ConnectorState, so both the
 /// /connector/* routes and the /watch aliases drive one registry.
 struct ConnectorState {
     std::string data_dir;                          ///< root for watchers.json persistence
-    std::unique_ptr<DirWatcherRegistry> registry;  ///< F21 fan-out registry (lazily built)
+    std::unique_ptr<DirWatcherRegistry> registry;  ///< fan-out registry (lazily built)
 };
 
-/// Lazily create `state.registry` if it is null, wiring it to the F05 pool, the
-/// F13 catalog router and the SPC pipeline, then restore persisted watchers from
+/// Lazily create `state.registry` if it is null, wiring it to the pool, the
+/// catalog router and the SPC pipeline, then restore persisted watchers from
 /// {state.data_dir}/watchers.json (v1 layouts auto-migrate to v2). Idempotent:
 /// a second call with an already-built registry is a no-op. Shared by the
 /// /connector/* routes and the /watch aliases so both mount the SAME registry.
@@ -50,13 +50,13 @@ void ConnectorEnsureRegistry(ConnectorState& state,
                              cortrix::catalog::INSRouter& ins_router,
                              SPCManager& spc_mgr);
 
-/// Register connector HTTP routes (F21 fan-out model).
+/// Register connector HTTP routes (fan-out model).
 ///
 /// Multi-watcher endpoints:
 ///   GET    /api/v1/connector/watchers                     -- list watchers (per-NS stats)
 ///   POST   /api/v1/connector/watchers                     -- subscribe target_namespaces[] to a dir
 ///   DELETE /api/v1/connector/watchers/:id                 -- remove a watcher (all NS) + purge docs
-///   DELETE /api/v1/connector/watchers/:id/namespaces/:ns  -- F21: unsubscribe a single NS
+///   DELETE /api/v1/connector/watchers/:id/namespaces/:ns  -- unsubscribe a single NS
 ///   POST   /api/v1/connector/watchers/:id/scan            -- trigger a fan-out rescan
 ///
 /// Backward-compat single-watcher endpoints:

@@ -4,11 +4,11 @@
 
 namespace cortrix::server {
 
-/// Production ITaskSubmitter — forwards each per-doc submission to the frozen F42
+/// Production ITaskSubmitter — forwards each per-doc submission to the frozen
 /// scheduler (cortrix::async::TaskScheduler::Enqueue), then wakes a worker. This
-/// is the single binding point between the batch service and F42; swapping it is
+/// is the single binding point between the batch service and the scheduler; swapping it is
 /// the only change needed if the per-doc submission seam is ever re-targeted.
-/// 0 change to F42: it only *calls* the already-frozen Enqueue surface.
+/// 0 change to the scheduler: it only *calls* the already-frozen Enqueue surface.
 ///
 /// D3.5: the SubmitRequest handed here must already carry a server-side
 /// `filepath` (the materialized inline content) — that materialization is the
@@ -16,7 +16,7 @@ namespace cortrix::server {
 /// service is exercised against MockTaskSubmitter, not this adapter.
 class F42TaskSubmitterAdapter : public ITaskSubmitter {
 public:
-    /// @param scheduler borrowed frozen F42 scheduler (must outlive this adapter)
+    /// @param scheduler borrowed frozen task scheduler (must outlive this adapter)
     /// @param pool      borrowed worker pool to Notify() after a successful
     ///                  enqueue (nullptr ok — no worker wake, e.g. in tests)
     explicit F42TaskSubmitterAdapter(async::TaskScheduler* scheduler,

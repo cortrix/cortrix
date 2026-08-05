@@ -21,7 +21,7 @@ class ApiKeyAuth;
 /// [D3.5 wire · gap②] `disk_monitor` (optional): when set, the upload endpoint
 /// consults DiskMonitor::ShouldRejectWrites() BEFORE any byte is written
 /// (doc_create / blob.store) and rejects with 507 + the CX_ERR_DISK_FULL
-/// Agent-friendly body (F24 §6, decision F24-4 A — reject all new writes at
+/// Agent-friendly body (reject all new writes at
 /// CRIT). nullptr = no disk gating (tests / minimal deployments).
 void RegisterDocumentRoutes(httplib::Server& server,
                              UploadHandler& handler,

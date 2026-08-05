@@ -8,10 +8,10 @@ namespace cortrix::server {
 
 /// Sole owner of the "batch materialized input" on-disk concept.
 ///
-/// POST /documents/batch carries inline content, but the F42 doc-parse worker
+/// POST /documents/batch carries inline content, but the doc-parse worker
 /// reads a *file* (DocumentParserFactory::ParseDocument(filepath)). The batch
 /// service therefore materializes each accepted doc under this directory and
-/// hands that path to F42 as SubmitRequest.filepath.
+/// hands that path to the scheduler as SubmitRequest.filepath.
 ///
 /// The writer (BatchSubmitService) and both reapers (TaskFinalizer's terminal
 /// release + the startup orphan sweep) resolve the directory through
@@ -30,7 +30,7 @@ std::string BatchTempDir(const std::string& data_dir);
 ///     would otherwise retain their input forever;
 ///   - a crash between materialization and the terminal write leaves a file
 ///     with no live owner;
-///   - the F42 debounce refresh (TaskManager::UpdateTaskForDebounce) repoints
+///   - the debounce refresh (TaskManager::UpdateTaskForDebounce) repoints
 ///     tasks.filepath at a new file, orphaning the superseded one;
 ///   - pre-existing files from before the release hook existed.
 ///

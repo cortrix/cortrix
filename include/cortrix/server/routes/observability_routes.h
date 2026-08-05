@@ -18,10 +18,10 @@ class TracesHandler;
 class InteractionsHandler;
 }  // namespace agent_trace
 
-/// Register the F13 Agent-Observability HTTP routes (F13 §8, S4/S5/S11). These are
+/// Register the Agent-Observability HTTP routes. These are
 /// the read-only query layer over the existing CE handlers — the handlers own the
 /// permission decisions + DB access; this layer only adapts httplib <-> handler:
-/// it parses the F13 identity headers (X-Session-Id/X-Trace-Id/X-Agent-Id) via the
+/// it parses the identity headers (X-Session-Id/X-Trace-Id/X-Agent-Id) via the
 /// shared HttpObservabilityMiddleware (installing the ObservabilityContext on the
 /// thread-local + surfacing the per-header warning), derives the requester context
 /// from the authenticated AuthContext (user_id + admin bit), parses + validates the
@@ -43,13 +43,13 @@ void RegisterObservabilityRoutes(httplib::Server& server,
                                  agent_trace::InteractionsHandler& inter,
                                  ApiKeyAuth& auth);
 
-// [F13 TC4] The old combined RegisterObservabilityRoutesPerNs (all 3 F13 routes over
+// The old combined RegisterObservabilityRoutesPerNs (all 3 routes over
 // the per-NS memory.db, ?namespace= forced on /traces) was REMOVED. TC4 split
 // agent_trace back to the global DB, so the live wiring is now the two functions below:
 // RegisterTracesRoutesGlobal (trace read, global, no ?namespace=) +
 // RegisterInteractionsRoutesPerNs (the two interaction reads, still per-NS).
 
-/// [F13 TC4] Register GET /api/v1/traces/:session_id over the GLOBAL cortrix_global.db
+/// Register GET /api/v1/traces/:session_id over the GLOBAL cortrix_global.db
 /// (where agent_trace lives after TC4). A session's calls can span namespaces, so the
 /// read is global and does NOT take `?namespace=`. Ownership for the §8.1 permission
 /// check is resolved out-of-band: agent_trace carries no user_id and the session->user
@@ -68,7 +68,7 @@ void RegisterTracesRoutesGlobal(httplib::Server& server,
                                 std::shared_ptr<IGlobalConfig> global_config,
                                 ApiKeyAuth& auth);
 
-/// [F13 TC4] Register the two per-NS interaction reads — GET /api/v1/interactions and
+/// Register the two per-NS interaction reads — GET /api/v1/interactions and
 /// GET /api/v1/interactions/:id/sources — built PER-REQUEST over the request's
 /// namespace memory.db (interaction_log + interaction_sources live there, unchanged by
 /// TC4). `?namespace=<ns>` is REQUIRED on /interactions/:id/sources; GET /interactions
@@ -80,7 +80,7 @@ void RegisterInteractionsRoutesPerNs(httplib::Server& server,
                                      resource::INamespacePool& pool,
                                      ApiKeyAuth& auth);
 
-/// Install a CORS layer on `server` (F13 topic 4 — "allowed headers" decision +
+/// Install a CORS layer on `server` ("allowed headers" decision +
 /// Lead cross-cutting decision). Registers an OPTIONS preflight handler and a
 /// post-routing handler that, for every response, echoes the request Origin into
 /// `Access-Control-Allow-Origin` ONLY when that Origin is allowed:

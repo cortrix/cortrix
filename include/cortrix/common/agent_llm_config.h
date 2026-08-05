@@ -3,8 +3,8 @@
 
 namespace cortrix {
 
-/// F48 §6.2 agent LLM configuration. A plain POD (no external deps) so it can live
-/// on the canonical IGlobalConfig getter/setter without pulling F48 into the
+/// Agent LLM configuration. A plain POD (no external deps) so it can live
+/// on the canonical IGlobalConfig getter/setter without pulling the agent into the
 /// scaffolding. `api_key` is stored encrypted at rest (the setter encrypts; the
 /// getter decrypts) and masked on the read API surface. Defaults match
 /// the design (max_tokens=4096 / temperature=0.7); an empty `provider` means

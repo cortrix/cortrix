@@ -6,8 +6,8 @@
 
 namespace cortrix::agent_trace {
 
-/// The F13 OBS_SPEC metrics (F13 §13 = 9 metrics, OBSERVABILITY_SPEC §2 naming
-/// `cortrix_<metric>_<unit>`). Mirrors the MEM02 Mem02Metrics / F36 RagFusionMetrics
+/// The agent-observability metrics (9 metrics, observability naming
+/// `cortrix_<metric>_<unit>`). Mirrors the Mem02Metrics / RagFusionMetrics
 /// template (process-wide singleton, atomic counters/gauge/histogram, OpenMetrics
 /// renderer).
 ///
@@ -17,10 +17,10 @@ namespace cortrix::agent_trace {
 /// the session_id label (it goes to the structured log, topic 5 v1.0.2).
 ///
 /// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
-/// text renderer. The F24 `/metrics` scrape endpoint does not exist in the frozen
+/// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
 /// **deferred to D3.5**. Until then it is fully usable + testable in-process and
-/// RenderOpenMetrics() produces what F24 will serve.
+/// RenderOpenMetrics() produces what the server will serve.
 ///
 /// §13 metric schema (9 rows):
 ///   cortrix_agent_trace_writes_total           counter   {source, status}
@@ -49,7 +49,7 @@ public:
     /// endpoint label for traces_query_total (3 read endpoints).
     enum class Endpoint { kTraces = 0, kInteractions, kInteractionsSources };
 
-    /// module label for observability_write_failed_total (C4 coordination — F13 / F18a).
+    /// module label for observability_write_failed_total (trace / operation log).
     enum class Module { kF13 = 0, kF18a };
 
     /// Process-wide instance (metrics are global counters/gauge/histogram).

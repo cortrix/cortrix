@@ -6,11 +6,11 @@
 
 namespace cortrix::resource {
 
-/// Per-Unit store.db PRAGMA tuning (F05 §4.1 / topic 7). Applied by the pool right
-/// after each store.db Open (F05 §7.3 ApplyPragmas). The numeric SQLite knobs
+/// Per-Unit store.db PRAGMA tuning. Applied by the pool right
+/// after each store.db Open (ApplyPragmas). The numeric SQLite knobs
 /// follow SQLite's own semantics: `cache_size` negative = KiB (not pages).
 struct SqlitePragmas {
-    std::string journal_mode = "WAL";       ///< concurrent read/write, same model as F25 PWL
+    std::string journal_mode = "WAL";       ///< concurrent read/write, same model as the PWL
     std::string synchronous = "NORMAL";     ///< perf vs durability trade-off (FULL is 2-3x slower)
     int cache_size_kb = -2000;              ///< 2MB per Unit (SQLite negative = KiB)
     int64_t mmap_size_bytes = 64 * 1024 * 1024;  ///< 64MB mmap for large-file reads
@@ -18,13 +18,13 @@ struct SqlitePragmas {
     int64_t busy_timeout_ms = 5000;         ///< lock wait, avoids transient test failures
 };
 
-/// Global resource-pool configuration (F05 §4.1, topics 2/3/5/7).
+/// Global resource-pool configuration.
 ///
 /// Scope is **global only**: a namespace cannot decide its own quota
 /// rules, so there is no NS-level f05_config blob. In production this is sourced
 /// from IGlobalConfig::GetF05Config() — that getter is a D3.5 reverse hook into
 /// the shared scaffolding; standalone code (and tests) construct an
-/// F05Config directly and pass it to the pool, so F05 stays decoupled from the
+/// F05Config directly and pass it to the pool, so the pool stays decoupled from the
 /// shared IGlobalConfig contract during D3.
 struct F05Config {
     // topic 2 — NS count ceiling.
@@ -51,12 +51,12 @@ struct F05Config {
 
     // Root dir under which the pool derives a Unit's on-disk layout
     // (<data_root>/<unit_id>/{index, pending.wal, store.db}) when loading. The
-    // *production* per-Unit path scheme is owned by F12 / deployment and resolved
+    // *production* per-Unit path scheme is owned by the catalog / deployment and resolved
     // at D3.5; this knob keeps the standalone load path + tests deterministic.
     std::string data_root;
 
     // Per-NS WriteCoordinator tuning, passed to the WriteCoordinatorFactory when a
-    // bundle's F25 coordinator is constructed (F05 §6.3 step 3).
+    // bundle's write coordinator is constructed.
     cortrix::store::WriteCoordinatorConfig write_coord_config;
 };
 

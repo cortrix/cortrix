@@ -55,7 +55,7 @@ struct RejectionEvent {
     size_t estimated_size = 0;
 };
 
-/// Outcome of StartupLoadAll (F05 §6, S2). total = loaded + failed.
+/// Outcome of StartupLoadAll. total = loaded + failed.
 struct StartupReport {
     size_t total_namespaces = 0;
     size_t loaded_successfully = 0;
@@ -72,7 +72,7 @@ struct ExplainState {
     std::vector<RejectionEvent> recent_rejections;  ///< most recent N=50
 };
 
-/// Factory that constructs a per-NS F25 WriteCoordinator (D3.5 C1 / §9.3). The
+/// Factory that constructs a per-NS WriteCoordinator. The
 /// pool calls it during load with the NS's data_dir + tuning AND the three stores
 /// the coordinator's Recover() needs — the pool resolves these in
 /// LoadOneNamespaceInner (vector = the Unit's index cast to IVectorStore; metadata
@@ -92,7 +92,7 @@ using WriteCoordinatorFactory =
 
 /// NS resource pool contract. Manages per-NS runtime resource bundles
 /// (index / WriteCoordinator / store.db) with NS-count + memory-budget admission
-/// control. Phase 1: all-hot, no eviction (TD-F05-EVICTION is Phase 2).
+/// control. Phase 1: all-hot, no eviction (eviction is Phase 2).
 ///
 /// Error model (CODING_CONVENTIONS §3 / F-FREEZE-1): the spec's
 /// `Result<…, PoolError>` is read as Result<T> (value path) or plain Status
@@ -103,7 +103,7 @@ public:
     virtual ~INamespacePool() = default;
 
     // —— Create path (admission control) ——
-    /// Called by F12.INSRouter.CreateNamespace before the catalog INSERT (F12-N
+    /// Called by INSRouter.CreateNamespace before the catalog INSERT (
     /// reverse hook, §5.1). Checks the NS-count gate, then the memory-budget gate
     /// (if enabled), then loads the new NS into the pool. On success the NS is
     /// resident and Acquire will hit. Errors (as Status w/ CX_ERR_NS_* token):
@@ -128,7 +128,7 @@ public:
     /// AND the NS is marked pending_delete (a DeleteNamespace raced an in-flight
     /// borrow), this call reaps the slot — releasing index / WriteCoordinator /
     /// store.db. (Phase 2 extends this seam with full drain/grace, §14
-    /// TD-F05-EVICTION.) Calling Release for a non-resident NS is a safe no-op.
+    /// eviction lands in Phase 2.) Calling Release for a non-resident NS is a safe no-op.
     virtual void Release(const std::string& namespace_id) = 0;
 
     // —— Startup path ——
@@ -142,8 +142,8 @@ public:
     virtual Status ReloadNamespace(const std::string& namespace_id) = 0;
 
     // —— Unload path ——
-    /// Drop a NS's resources from the pool. Called only by F12.DeleteNamespace
-    /// (NS soft-delete, §13.1) and by the F12 admission rollback (§5.2) to undo a
+    /// Drop a NS's resources from the pool. Called only by DeleteNamespace
+    /// (NS soft-delete) and by the catalog admission rollback to undo a
     /// pool add when the catalog INSERT fails. Idempotent: absent NS returns Ok.
     /// If the NS still has outstanding Acquire references, the erase is DEFERRED:
     /// the slot is marked pending_delete (blocking new Acquires) and the resources
@@ -169,7 +169,7 @@ public:
 /// — otherwise it sets pending_delete and the last Release reaps the slot. Once
 /// pending_delete is set, Acquire refuses the NS (it is being torn down), so the
 /// count can only fall to zero. This is the minimal refcount gate; the full
-/// drain/grace-period machinery is still Phase 2 (§14 TD-F05-EVICTION).
+/// drain/grace-period machinery is still Phase 2.
 ///
 /// Concurrency: refcount/pending_delete are atomics so Acquire/Release can touch
 /// them under the shared lock; the erase decision in EvictForDelete and the
@@ -198,11 +198,11 @@ struct NamespaceSlot {
 /// per-slot refcount above.
 class DefaultNamespacePool : public INamespacePool {
 public:
-    /// @param index_factory        borrowed F01 factory (Open per Unit)
-    /// @param write_coord_factory  per-NS F25 coordinator factory (v1.0.2 §3.3)
-    /// @param ns_router            borrowed F12 NS router (catalog NS list / lookup)
-    /// @param unit_router          borrowed F12 Unit router (active Unit descriptor)
-    /// @param config               global F05 config (§4.1; standalone passes it
+    /// @param index_factory        borrowed index factory (Open per Unit)
+    /// @param write_coord_factory  per-NS write-coordinator factory
+    /// @param ns_router            borrowed NS router (catalog NS list / lookup)
+    /// @param unit_router          borrowed Unit router (active Unit descriptor)
+    /// @param config               global pool config (standalone passes it
     ///                             directly — the IGlobalConfig getter is D3.5)
     DefaultNamespacePool(cortrix::store::IIndexFactory* index_factory,
                          WriteCoordinatorFactory write_coord_factory,
@@ -254,11 +254,11 @@ private:
     cortrix::store::IIndexFactory* index_factory_;
     WriteCoordinatorFactory write_coord_factory_;
     cortrix::catalog::INSRouter* ns_router_;
-    // Held per the F05 §3.3 contract / topic 8 (F12 coordination boundary). The standalone load
+    // Held per the pool contract (catalog coordination boundary). The standalone load
     // path resolves the Unit through INSRouter::GetActiveUnit (the L0 catalog
     // contract returns the full UnitDescriptor directly, so a separate
     // IUnitRouter::GetUnit call is unnecessary here); this stays wired for the
-    // D3.5 F12-N hook + Phase-2 multi-Unit (TD-F05-MULTI-UNIT) lookups.
+    // Catalog hook + Phase-2 multi-Unit lookups.
     [[maybe_unused]] cortrix::catalog::IUnitRouter* unit_router_;
     F05Config config_;
 

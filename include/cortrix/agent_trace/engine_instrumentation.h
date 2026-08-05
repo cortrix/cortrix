@@ -8,7 +8,7 @@
 
 namespace cortrix::agent_trace {
 
-/// The minimal description of one Engine call to be traced (F13 §11, S6). The
+/// The minimal description of one Engine call to be traced. The
 /// instrumentation site fills this from its request + result; the helper reads the
 /// rest (trace_id/session_id/agent_id/user_id) from the thread-local
 /// ObservabilityContext.
@@ -23,20 +23,20 @@ struct EngineCall {
     std::string error_message;                ///< on failure (first 256 chars kept)
     int duration_ms = 0;
 
-    // F18a operation_log fields (only used when an operation_logger is supplied +
+    // operation_log fields (only used when an operation_logger is supplied +
     // is_success). resource_type/resource_id/summary mirror OperationLogEntry.
     std::string resource_type = "query";
     std::optional<std::string> resource_id;
     std::optional<std::string> op_summary;    ///< operation_log summary (≤100)
 };
 
-/// Reusable Engine-layer instrumentation (F13 §11, topic 8 C4). Wraps the
+/// Reusable Engine-layer instrumentation. Wraps the
 /// dual-write both Engine sites (QueryEngine / SpcPipeline) perform after running
 /// the business logic:
-///   1. F13 agent_trace FIRST, for ALL calls (incl. failures), inside a try/catch
+///   1. agent_trace FIRST, for ALL calls (incl. failures), inside a try/catch
 ///      so an observability fault never breaks the business path (C4 exception
 ///      isolation); a thrown write bumps cortrix_observability_write_failed_total{f13}.
-///   2. F18a operation_log SECOND, only on success, in its own try/catch
+///   2. operation_log SECOND, only on success, in its own try/catch
 ///      (write_failed{f18a} on throw). Skipped when no operation_logger is given.
 /// Identity (trace_id/session_id/agent_id/user_id) is read from the thread-local
 /// ObservabilityContext (C1). Pure helper — standalone: the real Engine call sites

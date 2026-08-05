@@ -9,7 +9,7 @@ namespace cortrix::agent_trace {
 /// create (v0 -> v1).
 constexpr int kInteractionSourcesSchemaVersion = 1;
 
-/// The interaction_sources DDL emitted by the F13 SchemaProvider (F13 §4.3, topic
+/// The interaction_sources DDL emitted by the observability SchemaProvider (
 /// 6 + v1.0.5 §9.2 split). The CE citation-provenance table for GET
 /// /interactions/{id}/sources (T-106): which blocks/memories a past interaction's
 /// answer was grounded in.
@@ -21,19 +21,19 @@ constexpr int kInteractionSourcesSchemaVersion = 1;
 /// conditional compilation and does not know that table exists.
 ///
 /// FK note: interaction_id references the MVP interaction_log table, whose real
-/// frozen PK is `id TEXT` (UUID v4; see memory/interaction_log.h + the MEM01
-/// CREATE TABLE in memory_store.cpp) -- NOT the `interaction_id INTEGER` the F13
-/// §4.3 draft assumed (that draft predates the MEM01 role/content rebuild). The
+/// frozen PK is `id TEXT` (UUID v4; see memory/interaction_log.h + the
+/// CREATE TABLE in memory_store.cpp) -- NOT the `interaction_id INTEGER` the
+/// earlier draft assumed (it predates the role/content rebuild). The
 /// column is therefore TEXT to match the real PK; ON DELETE CASCADE keeps the
 /// provenance rows in lock-step with the interaction. (Reported to the lead as the
 /// same root cause as the S11 interaction_log finding; aligning a net-new table's
 /// FK type to the real frozen PK is a stale-naming alignment, not a contract change.)
 extern const char* const kInteractionSourcesSchemaSql;
 
-/// F13's ISchemaProvider for interaction_sources (frozen cortrix::catalog::
+/// The ISchemaProvider for interaction_sources (frozen cortrix::catalog::
 /// ISchemaProvider, D2-pre-5). Lives in the same DB as interaction_log (the
 /// memory/global DB). Registered with the SchemaMigrator. FeatureName is distinct
-/// from the agent_trace provider's "F13" so both can coexist in schema_version.
+/// from the agent_trace provider's key so both can coexist in schema_version.
 class InteractionSourcesSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     std::string FeatureName() const override { return "F13_interaction_sources"; }

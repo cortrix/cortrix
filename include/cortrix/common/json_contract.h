@@ -25,7 +25,7 @@ inline std::string_view TrimAsciiWhitespace(std::string_view s) {
 // (no '{', or the object never closes — e.g. a truncated generation).
 //
 // This is the SECOND-CHANCE repair layer for LLM JSON contracts (deep-QA
-// 2026-07-10, DeepSeek-V4-Flash x F41 field failure): providers occasionally
+// 2026-07-10, DeepSeek-V4-Flash doc-summary field failure): providers occasionally
 // wrap the object in prose ("Here is the JSON: {...}") or an UNCLOSED fence,
 // which the strict path below rightly refuses. Callers must treat a repair as
 // an observable event (log/diagnostics), never as the silent normal path.

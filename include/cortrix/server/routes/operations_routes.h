@@ -8,7 +8,7 @@ class ApiKeyAuth;
 
 namespace observability { class IOperationLogger; }
 
-/// Register the F18a operation-log query route (F18a §6.1, Story S3).
+/// Register the operation-log query route.
 ///
 /// Endpoint:
 ///   GET /api/v1/operations  -- the caller's data-operation history ("what did I

@@ -6,7 +6,7 @@ namespace cortrix {
 class ApiKeyAuth;
 namespace server { class ImportHandler; }
 
-/// [D3.5 r2 · Wave P · P2] Register the 6 F16a DB-import endpoints on
+/// Register the 6 DB-import endpoints on
 /// the raw httplib server, delegating to the (borrowed) ImportHandler:
 ///   POST   /api/v1/import/database               -- start import (async)
 ///   GET    /api/v1/import/tasks/{task_id}/progress -- progress

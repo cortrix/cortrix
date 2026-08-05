@@ -11,7 +11,7 @@
 namespace cortrix {
 
 // D3.5 wire⑤c: live doc/block counts come from a per-request NamespaceFacade over
-// the F05 resource pool; namespace creation is routed through the F12 catalog.
+// the resource pool; namespace creation is routed through the catalog.
 namespace resource {
 class INamespacePool;
 }
@@ -26,7 +26,7 @@ class CortrixHttpServer {
 public:
     CortrixHttpServer(const CortrixConfig& config, ApiKeyAuth& auth, NamespaceManager& ns_mgr);
 
-    /// Register all routes (F01 routes + extension points for later Features)
+    /// Register all routes (index routes + extension points)
     void RegisterRoutes();
 
     /// Blocking start
@@ -36,15 +36,15 @@ public:
     /// Graceful shutdown
     void Stop();
 
-    /// Set the F05 NS resource pool for live doc/block count queries (per-request
+    /// Set the NS resource pool for live doc/block count queries (per-request
     /// NamespaceFacade Acquire/Release). Replaces the MVP CortrixNamespaceManager.
     void SetNamespacePool(cortrix::resource::INamespacePool* pool);
 
-    /// Set the F12 NS router used by the create-namespace route. When unset,
+    /// Set the NS router used by the create-namespace route. When unset,
     /// POST /api/v1/namespaces falls back to the metadata manager (NamespaceManager).
     void SetNamespaceRouter(cortrix::catalog::INSRouter* router);
 
-    /// Set the F18a operation_log writer for the NamespaceManager instrumentation
+    /// Set the operation_log writer for the NamespaceManager instrumentation
     /// site (§9.1: ns_create / ns_delete). Optional — when unset the NS routes run
     /// unchanged (observability strictly additive, C4). Non-owning: the logger
     /// outlives the server (bootstrap owns the ObservabilityModule).
@@ -58,7 +58,7 @@ public:
     /// is in place by the time any request reads it (no concurrent write/read).
     void SetEdition(const std::string& edition);
 
-    /// Serve the P02a web UI (SPA) from `dir` at the server root. Static assets
+    /// Serve the web UI (SPA) from `dir` at the server root. Static assets
     /// are mounted at "/"; unmatched non-/api GET paths fall back to index.html
     /// (BrowserRouter deep links). No-op if dir/index.html is unreadable.
     void EnableWebUi(const std::string& dir);
@@ -72,7 +72,7 @@ private:
     void RegisterSystemRoutes();
     void RegisterNamespaceRoutes();
 
-    // F12 single-SoT accessors: read/delete through the catalog router when
+    // Single-SoT accessors: read/delete through the catalog router when
     // injected (creation already does), legacy NamespaceManager otherwise.
     // `filter`=false lists every namespace (no-auth dev mode). `filter`=true
     // restricts the result to `allowed` (the principal's authorized set from
@@ -82,7 +82,7 @@ private:
     Status BuildNamespaceJson(const std::string& name, nlohmann::json* out);
     Status DeleteNamespaceUnified(const std::string& name);
 
-    // [F18a §9.1 NamespaceManager site] Emit one operation_log row (action
+    // Emit one operation_log row (action
     // ns_create / ns_delete) on a successful NS mutation. No-op when op_logger_ is
     // null. Identity is read from the thread-local ObservabilityContext (the route
     // runs synchronously on the request thread WithAuth populated). Never throws

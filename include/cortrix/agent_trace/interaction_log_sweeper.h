@@ -15,10 +15,10 @@ class INamespacePool;
 
 namespace cortrix::agent_trace {
 
-/// [F13 TC4] Per-NS interaction_log retention sweeper (S11, F13 §10.1).
+/// Per-NS interaction_log retention sweeper.
 ///
 /// TC4 keeps interaction_log + interaction_sources PER-NAMESPACE (one table per
-/// namespace memory.db, FK-tied to the MEM01 interaction_log). The single-db
+/// namespace memory.db, FK-tied to the interaction_log). The single-db
 /// F13CleanupRegistrar reaches only one db, so the 180-day interaction_log cleanup
 /// cannot be a single RegisterTable callback the way the global agent_trace one is.
 ///
@@ -27,7 +27,7 @@ namespace cortrix::agent_trace {
 /// INamespacePool), and runs the interaction_log DELETE over that namespace's
 /// memory.db. interaction_sources rows cascade via the FK (ON DELETE CASCADE).
 ///
-/// Wiring: bootstrap registers RunOnce() on the shared F18a CleanupScheduler under
+/// Wiring: bootstrap registers RunOnce() on the shared CleanupScheduler under
 /// the logical name "interaction_log" (one callback that fans out over all NS), so it
 /// runs on the same daily UTC-02:00 sweep as agent_trace / operation_log. The
 /// retention window is read live from IGlobalConfig (interaction_log_retention_days)

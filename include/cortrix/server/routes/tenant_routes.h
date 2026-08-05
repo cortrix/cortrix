@@ -12,7 +12,7 @@ class PermissionService;
 class QuotaService;
 }  // namespace tenant
 
-/// Register the P09 tenant/permission/quota HTTP routes (P09 sec 4.5 -- 15 endpoints)
+/// Register the tenant/permission/quota HTTP routes (15 endpoints)
 /// plus the sec 4.6 PermissionMiddleware behavior (the namespace ACL endpoints run
 /// the composite CanX checks; the tenant-admin endpoints enforce the sec 4.5 admin-
 /// only column via AuthContext.is_admin()).

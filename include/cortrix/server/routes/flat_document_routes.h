@@ -16,7 +16,7 @@ class NamespaceManager;
 struct ConnectorState;
 
 /// Register the flat (design-surface) /documents family + /watch aliases that the
-/// openapi spec (api/paths/documents.yaml + watch.yaml), the P03 Python SDK
+/// openapi spec (api/paths/documents.yaml + watch.yaml), the Python SDK
 /// (resources/documents.py + watchers.py) and cortrix-mcp (tools/core.py) all wire
 /// to. Live storage is per-namespace (the nested /namespaces/:name/documents +
 /// /connector/* routes); these flat routes mount the design surface ON TOP of the
@@ -27,12 +27,12 @@ struct ConnectorState;
 ///   GET    /documents?namespace=&limit=&offset= -- list (per-NS facade)
 ///   GET    /documents/{id}?namespace=          -- get one (per-NS storage -> ?namespace= required)
 ///   DELETE /documents/{id}?namespace=          -- soft delete (GC lifecycle) -> 204
-///   GET    /documents/tasks/{task_id}/progress -- F42 task progress
-///   DELETE /documents/tasks/{task_id}          -- F42 task cancel
+///   GET    /documents/tasks/{task_id}/progress -- task progress
+///   DELETE /documents/tasks/{task_id}          -- task cancel
 ///
-/// `batch_service` (borrowed) fans a single upload out through the frozen F42
+/// `batch_service` (borrowed) fans a single upload out through the frozen
 /// scheduler as a batch-of-1 (reusing its inline-content materialization), and
-/// `task_handler` (borrowed) owns the F42 progress/cancel bodies. Both must
+/// `task_handler` (borrowed) owns the progress/cancel bodies. Both must
 /// outlive the server. `disk_monitor` may be null (no disk gating).
 void RegisterFlatDocumentRoutes(httplib::Server& server,
                                 resource::INamespacePool& pool,
@@ -42,8 +42,8 @@ void RegisterFlatDocumentRoutes(httplib::Server& server,
                                 ApiKeyAuth& auth);
 
 /// Register the /watch alias family that maps the spec/SDK/MCP fan-out shape
-/// ({path, target_namespaces[], recursive}) onto the F21 DirWatcherRegistry. With
-/// F21 a directory fanning out to N namespaces is ONE registry watcher carrying
+/// ({path, target_namespaces[], recursive}) onto the DirWatcherRegistry. With
+/// fan-out, a directory serving N namespaces is ONE registry watcher carrying
 /// all N target_namespaces (the MVP keyed by (dir, ns) and emitted N watchers).
 /// The nested /connector/* routes are kept and share the SAME registry.
 ///
