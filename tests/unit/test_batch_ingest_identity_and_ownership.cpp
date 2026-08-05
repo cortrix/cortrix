@@ -356,6 +356,89 @@ TEST_F(BatchIngestFx, DequeueReportsNoWorkWhenTheRowStoppedBeingQueued) {
     EXPECT_FALSE(picked.value().has_value());
 }
 
+// The status read before the refresh is stale by the time the write happens:
+// CancelTask does not share the scheduler mutex. Reproduced by cancelling between
+// the lookup and the refresh — the write must lose, not resurrect the row.
+TEST_F(BatchIngestFx, CancelBetweenLookupAndRefreshCannotResurrectTheRow) {
+    ASSERT_EQ(SubmitOne("ns", "doc", "V1").status, 200);
+    auto tasks = mgr_.ListByNamespace("ns", 10, 0);
+    ASSERT_TRUE(tasks.ok() && tasks.value().size() == 1u);
+    const async::TaskInfo original = tasks.value()[0];
+
+    // What Enqueue does first: find the debounce candidate while it is queued.
+    auto found = mgr_.FindRecentTaskByDocId("ns", "doc", async::kTaskDocParse, 3600);
+    ASSERT_TRUE(found.ok() && found.value().has_value());
+    ASSERT_EQ(found.value()->status, async::task_status::kQueued);
+
+    // The gap: a cancel takes that row terminal and releases its input.
+    async::DocumentTaskHandler handler(sched_.get(), &mgr_, nullptr, nullptr, dir_);
+    ASSERT_EQ(handler.CancelTask(original.task_id).status, 200);
+
+    // What Enqueue does next. The write is the authority and must refuse.
+    async::SubmitRequest refresh;
+    refresh.namespace_id = "ns"; refresh.doc_id = "doc";
+    refresh.content_hash = "different"; refresh.filepath = "/tmp/whatever";
+    refresh.task_type = async::kTaskDocParse;
+    EXPECT_FALSE(mgr_.UpdateTaskForDebounce(original.task_id, refresh).ok())
+        << "a cancelled row was reset to queued for a different submission";
+
+    auto row = mgr_.GetTask(original.task_id);
+    ASSERT_TRUE(row.ok());
+    EXPECT_EQ(row.value().status, async::task_status::kCancelled)
+        << "the cancel response reported terminal but the row was resurrected";
+}
+
+// End to end: after a cancel, a resubmission with NEW content must become its own
+// live task rather than reviving the cancelled one.
+TEST_F(BatchIngestFx, ResubmitAfterCancelGetsItsOwnTask) {
+    ASSERT_EQ(SubmitOne("ns", "doc", "V1").status, 200);
+    auto tasks = mgr_.ListByNamespace("ns", 10, 0);
+    ASSERT_TRUE(tasks.ok() && tasks.value().size() == 1u);
+    const std::string cancelled_id = tasks.value()[0].task_id;
+
+    async::DocumentTaskHandler handler(sched_.get(), &mgr_, nullptr, nullptr, dir_);
+    ASSERT_EQ(handler.CancelTask(cancelled_id).status, 200);
+
+    ASSERT_EQ(SubmitOne("ns", "doc", "V2").status, 200);
+
+    EXPECT_EQ(mgr_.CountAll().value(), 2) << "the resubmission revived the cancelled row";
+    auto old_row = mgr_.GetTask(cancelled_id);
+    ASSERT_TRUE(old_row.ok());
+    EXPECT_EQ(old_row.value().status, async::task_status::kCancelled);
+    // The new submission is live and owns its own input.
+    auto live = mgr_.LiveTaskInputs();
+    ASSERT_TRUE(live.ok());
+    ASSERT_EQ(live.value().size(), 1u);
+    EXPECT_NE(live.value()[0].first, cancelled_id);
+    EXPECT_TRUE(fs::exists(live.value()[0].second));
+}
+
+// The same-content branch has the same problem without any race: a cancelled task
+// returned as the debounce result swallows the resubmission — the caller is handed
+// a terminal task_id and the new input is released, so nothing ever processes it.
+TEST_F(BatchIngestFx, SameContentResubmitAfterCancelIsNotSwallowed) {
+    ASSERT_EQ(SubmitOne("ns", "doc", "SAME").status, 200);
+    auto tasks = mgr_.ListByNamespace("ns", 10, 0);
+    ASSERT_TRUE(tasks.ok() && tasks.value().size() == 1u);
+    const std::string cancelled_id = tasks.value()[0].task_id;
+
+    async::DocumentTaskHandler handler(sched_.get(), &mgr_, nullptr, nullptr, dir_);
+    ASSERT_EQ(handler.CancelTask(cancelled_id).status, 200);
+    ASSERT_EQ(FilesInDir(), 0u);  // cancel released its input
+
+    // Identical content again, still inside the debounce window.
+    ASSERT_EQ(SubmitOne("ns", "doc", "SAME").status, 200);
+
+    EXPECT_EQ(mgr_.CountAll().value(), 2)
+        << "the resubmission was merged into a cancelled task and will never be processed";
+    auto live = mgr_.LiveTaskInputs();
+    ASSERT_TRUE(live.ok());
+    ASSERT_EQ(live.value().size(), 1u) << "no live task carries the resubmission";
+    EXPECT_NE(live.value()[0].first, cancelled_id);
+    EXPECT_TRUE(fs::exists(live.value()[0].second))
+        << "the resubmission's input was released with no live task to read it";
+}
+
 // Task rows store whatever string was handed to F42, so the same file can be
 // spelled differently by two tasks. The reference check has to compare
 // filesystem identity, not the stored strings, or finishing one task deletes a

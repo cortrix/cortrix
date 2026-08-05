@@ -22,6 +22,7 @@
 
 #include "cortrix/async/task_finalizer.h"
 #include "cortrix/async/task_manager.h"
+#include "cortrix/observability/cleanup_scheduler.h"
 #include "cortrix/server/batch_temp_store.h"
 
 namespace fs = std::filesystem;
@@ -150,10 +151,47 @@ TEST_F(BatchTempLifecycleTest, SweepSparesFilesInsideTheGraceWindow) {
     EXPECT_TRUE(fs::exists(fresh));
 }
 
-// The grace window defers a reclaim, it does not cancel one. A file that was too
-// fresh on one pass must be reclaimed by a later scheduled pass, without needing
-// a restart — which is the whole point of running the sweep on the daily
-// schedule as well as at startup.
+// The grace window defers a reclaim, it does not cancel one. A file too fresh on
+// one pass must be reclaimed by a LATER SCHEDULED pass without a restart — which
+// is the whole reason the sweep is registered on the cleanup schedule and not run
+// only at startup.
+//
+// Driven through the registered callback rather than by calling the sweep
+// directly: the claim under test is about the wiring, so a test that calls
+// SweepOrphanedBatchInputs() twice would only re-prove that the function handles
+// age, which the test below it already covers.
+TEST_F(BatchTempLifecycleTest, ScheduledCallbackReclaimsAnAgedOrphanWithoutRestart) {
+    const fs::path fresh = fs::path(dir_) / "aging.txt";
+    std::ofstream(fresh) << "x";  // current mtime, no task row
+
+    // Production-equivalent registration (see bootstrap: the sweep is registered on
+    // the shared CleanupScheduler alongside the other retention tables).
+    observability::CleanupScheduler scheduler;
+    const std::string d = dir_;
+    async::TaskManager* tm = &mgr_;
+    scheduler.RegisterTable("batch_tmp_inputs",
+                            [d, tm] { server::SweepOrphanedBatchInputs(d, tm); });
+    ASSERT_EQ(scheduler.registered_count(), 1u);
+
+    // First scheduled execution: still inside the grace window, keep it.
+    scheduler.RunCleanupNow();
+    ASSERT_TRUE(fs::exists(fresh)) << "a file inside the grace window was reclaimed";
+
+    // Time passes; the file ages out.
+    std::error_code ec;
+    fs::last_write_time(fresh,
+                        fs::file_time_type::clock::now() -
+                            std::chrono::seconds(server::kOrphanGraceSeconds * 2),
+                        ec);
+    ASSERT_FALSE(ec);
+
+    // A LATER scheduled execution reclaims it — no restart involved.
+    scheduler.RunCleanupNow();
+    EXPECT_FALSE(fs::exists(fresh))
+        << "the scheduled sweep did not reclaim an aged orphan; it would need a restart";
+}
+
+// The sweep function's own age handling, independent of the wiring above.
 TEST_F(BatchTempLifecycleTest, SweepReclaimsAFreshOrphanOnceItAgesOut) {
     const fs::path fresh = fs::path(dir_) / "aging.txt";
     std::ofstream(fresh) << "x";  // current mtime, no task row

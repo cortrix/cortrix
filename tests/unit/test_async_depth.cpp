@@ -190,7 +190,6 @@ TEST_F(AsyncDepthTaskFx, UpdateTaskForDebounceResetsToQueuedWithNewHash) {
     auto created = mgr_.CreateTask(AsyncDepthMakeTask("ns", "dbg", "oldhash"));
     ASSERT_TRUE(created.ok());
     const std::string id = created.value().task_id;
-    ASSERT_TRUE(mgr_.MarkProcessing(id, 4).ok());
 
     SubmitRequest req;
     req.namespace_id = "ns";
@@ -203,6 +202,33 @@ TEST_F(AsyncDepthTaskFx, UpdateTaskForDebounceResetsToQueuedWithNewHash) {
     EXPECT_EQ(r.value().content_hash, "newhash");
     EXPECT_EQ(r.value().filepath, "/tmp/refreshed.pdf");
     EXPECT_FLOAT_EQ(r.value().progress_pct, 0.0f);
+}
+
+TEST_F(AsyncDepthTaskFx, UpdateTaskForDebounceRefusesARowThatIsNoLongerQueued) {
+    // This case previously asserted the opposite: it marked the row processing and
+    // required the refresh to succeed. That rewrites a row a worker is already
+    // using — the worker loses its input and its later MarkCompleted lands on a row
+    // that now represents a different submission. The write is the authority, so a
+    // row that left `queued` (dequeued, or cancelled between lookup and refresh)
+    // must refuse and let the caller mint a separate task.
+    auto created = mgr_.CreateTask(AsyncDepthMakeTask("ns", "dbg2", "oldhash"));
+    ASSERT_TRUE(created.ok());
+    const std::string id = created.value().task_id;
+    ASSERT_TRUE(mgr_.MarkProcessing(id, 4).ok());
+
+    SubmitRequest req;
+    req.namespace_id = "ns";
+    req.doc_id = "dbg2";
+    req.content_hash = "newhash";
+    req.filepath = "/tmp/refreshed.pdf";
+    auto r = mgr_.UpdateTaskForDebounce(id, req);
+    EXPECT_FALSE(r.ok()) << "a row a worker is using was reset to queued";
+    EXPECT_TRUE(CarriesCode(r.status(), "CX_ERR_DOC_PROCESSING_IN_PROGRESS"));
+
+    auto got = mgr_.GetTask(id);
+    ASSERT_TRUE(got.ok());
+    EXPECT_EQ(got.value().status, task_status::kProcessing);
+    EXPECT_EQ(got.value().content_hash, "oldhash");
 }
 
 // ---- FindRecentTaskByDocId window + task_type scoping ----
