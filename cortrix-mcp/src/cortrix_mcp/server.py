@@ -13,8 +13,8 @@ Usage:
 Environment variables (feature design section 5.3):
     CORTRIX_URL         Cortrix backend URL                 (default http://127.0.0.1:8420)
     CORTRIX_NAMESPACE   default namespace                   (default "default")
-    CORTRIX_API_KEY     Bearer token (auth API key)          (default empty)
-    CORTRIX_MCP_ADMIN   admin override for DB import admin tools (default false)
+    CORTRIX_API_KEY     Bearer token (P08 API key)          (default empty)
+    CORTRIX_MCP_ADMIN   admin override for F16a admin tools (default false)
     CORTRIX_MCP_TIMEOUT HTTP timeout in seconds             (default 30)
 """
 

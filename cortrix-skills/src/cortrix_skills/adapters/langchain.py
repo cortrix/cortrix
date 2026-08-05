@@ -3,9 +3,9 @@
 Converts a :class:`cortrix_skills.CortrixToolKit` into LangChain
 ``StructuredTool`` objects (29 -> 29). Each tool's ``args_schema`` is the pydantic
 model derived from the method signature (feature design section 5.3), and each
-call is wrapped so a Python SDK ``CortrixError`` is re-raised as a LangChain
+call is wrapped so a P03 ``CortrixError`` is re-raised as a LangChain
 ``ToolException`` whose message is the GEN-Agent 4-field JSON payload (feature
-design section 6.2). The error codes / 4 fields are passed through from the Python SDK
+design section 6.2). The error codes / 4 fields are passed through from P03
 unchanged — no re-wrapping of the values, only of the carrier exception.
 
 Soft dependency: ``langchain`` is imported here, not in the package root.

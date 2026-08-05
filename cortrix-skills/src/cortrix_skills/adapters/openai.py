@@ -9,8 +9,8 @@ SDK.
 
 :func:`dispatch_openai_tool_call` runs one OpenAI ``tool_call`` (whose
 ``arguments`` are a JSON-encoded string) and returns a JSON string suitable for
-a ``role: "tool"`` message; a Python SDK ``CortrixError`` is encoded as the GEN-Agent
-4-field JSON payload (error codes / fields passed through from the Python SDK unchanged).
+a ``role: "tool"`` message; a P03 ``CortrixError`` is encoded as the GEN-Agent
+4-field JSON payload (error codes / fields passed through from P03 unchanged).
 
 Real GPT round-trips are D3.5-deferred; standalone tests exercise the conversion
 + dispatch with a mocked toolkit. ``require_openai()`` lets callers fail fast

@@ -1,5 +1,5 @@
 """MVP 12 tools — migrated from mcp-server/cortrix_mcp_server.py and adapted to the
-GEN-Agent two-layer 4-field schema, calling the frozen API spec endpoints.
+GEN-Agent two-layer 4-field schema, calling the frozen P04 endpoints.
 
 Endpoint reconciliation vs the MVP single-file server (verified against the live backend
 route table in src/server, not just api/paths/*.yaml):
@@ -7,7 +7,7 @@ route table in src/server, not just api/paths/*.yaml):
                         exposes /system/health/{live,ready} + a bare /health, but no bare
                         /system/health — the prior "/system/health" call 404'd)
   * query            -> POST /query  body {query, namespaces:[...], top_k, rerank}
-                        (MVP used single `namespace` + search_config — API spec uses a namespaces array)
+                        (MVP used single `namespace` + search_config — P04 uses a namespaces array)
   * upload           -> POST /documents body {namespace, content, filename} async -> task_id
                         (JSON content-upload entry. The multipart POST /namespaces/{ns}/documents
                         is a *second, equally live* entry — file uploads — not stale; both routes
@@ -17,7 +17,7 @@ route table in src/server, not just api/paths/*.yaml):
   * create_namespace -> POST /namespaces
   * memory_search    -> POST /memory/search
   * document_status  -> GET  /documents/{id}?namespace=...
-                        (API spec getDocument; live storage is namespace-scoped)
+                        (P04 getDocument; live storage is namespace-scoped)
   * add_watcher      -> POST /watch  body {path, target_namespaces:[...]}
                         (MVP used /connector/watchers {data_dir, namespace_name} — stale)
   * list_watchers    -> GET  /watch
@@ -119,7 +119,7 @@ def register(mcp) -> None:
     ) -> dict:
         """Semantic search over conversation memory (POST /memory/search).
 
-        user_id ownership is enforced server-side (memory isolation).
+        user_id ownership is enforced server-side (MEM05 isolation).
         """
         ns = namespace or CORTRIX_NAMESPACE
         body = {"namespace": ns, "query": query, "top_k": top_k}
@@ -136,7 +136,7 @@ def register(mcp) -> None:
 
         Backed by POST /memory/sessions/{session_id}/interactions (memory_routes.cpp): the
         session id is carried in the URL path; the body holds namespace + query_text +
-        response_text (all required server-side). Append is gated by memory isolation session ownership.
+        response_text (all required server-side). Append is gated by MEM05 session ownership.
         """
         ns = namespace or CORTRIX_NAMESPACE
         body = {
