@@ -439,6 +439,74 @@ TEST_F(BatchIngestFx, SameContentResubmitAfterCancelIsNotSwallowed) {
         << "the resubmission's input was released with no live task to read it";
 }
 
+// The same-content branch has the same stale-snapshot exposure as the refresh
+// branch: the candidate can be queued or processing at lookup time and cancelled
+// before the merge decision. Merging on that snapshot swallows the resubmission
+// — the caller is handed a task that will never carry the content, and the input
+// materialized for it is released. Reproduced by placing the cancel exactly
+// between the lookup and the merge.
+TEST_F(BatchIngestFx, CancelBetweenLookupAndMergeCannotSwallowTheResubmission) {
+    ASSERT_EQ(SubmitOne("ns", "doc", "SAME").status, 200);
+    auto tasks = mgr_.ListByNamespace("ns", 10, 0);
+    ASSERT_TRUE(tasks.ok() && tasks.value().size() == 1u);
+    const async::TaskInfo original = tasks.value()[0];
+
+    // What Enqueue does first: the candidate is live at lookup time.
+    auto found = mgr_.FindRecentTaskByDocId("ns", "doc", async::kTaskDocParse, 3600);
+    ASSERT_TRUE(found.ok() && found.value().has_value());
+    ASSERT_EQ(found.value()->task_id, original.task_id);
+    ASSERT_EQ(found.value()->status, async::task_status::kQueued);
+
+    // The gap: the candidate is cancelled, releasing its input.
+    async::DocumentTaskHandler handler(sched_.get(), &mgr_, nullptr, nullptr, dir_);
+    ASSERT_EQ(handler.CancelTask(original.task_id).status, 200);
+    ASSERT_FALSE(fs::exists(original.filepath));
+
+    // What Enqueue does next. The claim is the authority and must refuse, so the
+    // caller mints a task of its own instead of merging into a terminal row.
+    auto claimed = mgr_.TryClaimDebounceMerge(original.task_id);
+    EXPECT_FALSE(claimed.ok())
+        << "a cancelled task was claimed as a merge target and would swallow the resubmission";
+
+    // The terminal row is preserved exactly as the cancel left it.
+    auto row = mgr_.GetTask(original.task_id);
+    ASSERT_TRUE(row.ok());
+    EXPECT_EQ(row.value().status, async::task_status::kCancelled);
+
+    // And the resubmission that follows becomes its own live task owning its input.
+    ASSERT_EQ(SubmitOne("ns", "doc", "SAME").status, 200);
+    EXPECT_EQ(mgr_.CountAll().value(), 2);
+    auto live = mgr_.LiveTaskInputs();
+    ASSERT_TRUE(live.ok());
+    ASSERT_EQ(live.value().size(), 1u) << "no live task carries the resubmission";
+    EXPECT_NE(live.value()[0].first, original.task_id);
+    EXPECT_TRUE(fs::exists(live.value()[0].second))
+        << "the resubmission's input was released with no live task to read it";
+}
+
+// The converse ordering Scott called out as acceptable: when the merge wins, the
+// merge is the linearization point and a cancel arriving after it applies to the
+// merged task rather than being lost.
+TEST_F(BatchIngestFx, MergeWinningTheOrderingLeavesALaterCancelApplicable) {
+    ASSERT_EQ(SubmitOne("ns", "doc", "SAME").status, 200);
+    auto tasks = mgr_.ListByNamespace("ns", 10, 0);
+    ASSERT_TRUE(tasks.ok() && tasks.value().size() == 1u);
+    const std::string id = tasks.value()[0].task_id;
+
+    // Merge wins: the claim succeeds while the row is still live.
+    auto claimed = mgr_.TryClaimDebounceMerge(id);
+    ASSERT_TRUE(claimed.ok());
+    EXPECT_EQ(claimed.value().task_id, id);
+
+    // A cancel arriving afterwards applies to that merged task — coherent, because
+    // the caller was handed exactly this task_id.
+    async::DocumentTaskHandler handler(sched_.get(), &mgr_, nullptr, nullptr, dir_);
+    EXPECT_EQ(handler.CancelTask(id).status, 200);
+    auto row = mgr_.GetTask(id);
+    ASSERT_TRUE(row.ok());
+    EXPECT_EQ(row.value().status, async::task_status::kCancelled);
+}
+
 // Task rows store whatever string was handed to F42, so the same file can be
 // spelled differently by two tasks. The reference check has to compare
 // filesystem identity, not the stored strings, or finishing one task deletes a
