@@ -13,7 +13,7 @@ void RegisterHealthRoutes(httplib::Server& server,
     // GET /api/v1/system/health/live — liveness. The process answers, so it is
     // alive; this only fails by virtue of the listener being down (handled by
     // the proxy/orchestrator timing out). Always 200 here. Carries
-    // uptime_seconds + version like /health does (the P02a HealthPage reads
+    // uptime_seconds + version like /health does (the the web UI HealthPage reads
     // both fields from this probe).
     const auto start_time = std::chrono::steady_clock::now();
 

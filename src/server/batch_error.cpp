@@ -9,7 +9,7 @@ using agent_friendly::ErrorCategory;
 
 namespace {
 
-// One canonical row per code (TD-F42-BULK §2.4.1). Defined as function-local
+// One canonical row per code (batch submit §2.4.1). Defined as function-local
 // statics so each returns a stable reference. The switch in GetBatchErrorInfo is
 // intentionally exhaustive: building with -Wall -Wextra (-Wswitch) turns "added
 // a code without a row" into a warning (treated as a build failure), so the

@@ -149,7 +149,7 @@ void RegisterQueryRoutes(
                 return;
             }
 
-            // Step 4: Acquire namespace (per-request façade over the F05 pool;
+            // Step 4: Acquire namespace (per-request façade over the namespace pool;
             // RAII-released when this handler scope exits — D-I5a per-request).
             cortrix::resource::NamespaceFacade facade(pool, query_req.namespace_name);
             Status acq = facade.Acquire();

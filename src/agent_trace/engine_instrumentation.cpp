@@ -20,7 +20,7 @@ void EngineInstrumentation::Record(const EngineCall& call) {
     const ObservabilityContext& octx = ObservabilityContext::ThreadLocal();
     auto& metrics = AgentTraceMetrics::Instance();
 
-    // 1. F13 agent_trace FIRST (all calls, incl. failures), exception-isolated (C4).
+    // 1. agent_trace FIRST (all calls, incl. failures), exception-isolated (C4).
     {
         AgentTraceEntry e;
         e.session_id = octx.session_id;
@@ -50,7 +50,7 @@ void EngineInstrumentation::Record(const EngineCall& call) {
         }
     }
 
-    // 2. F18a operation_log SECOND, only on success, isolated (topic 8). Skipped when
+    // 2. operation_log SECOND, only on success, isolated (topic 8). Skipped when
     //    no logger is supplied.
     if (op_logger_ && call.is_success) {
         observability::OperationLogEntry op;

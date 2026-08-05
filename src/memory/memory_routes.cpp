@@ -22,7 +22,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/common/json_depth.h"  // metadata depth guard (DoS: deep-JSON dump)
 #include "cortrix/memory/mem05_metrics.h"
-// M1/M2/M4/M5 — MEM02 extraction + MEM03 transparency + MEM04 opt-out runtime
+// M1/M2/M4/M5 — memory extraction + MEM03 transparency + MEM04 opt-out runtime
 #include "cortrix/memory/interaction_log.h"
 #include "cortrix/memory/memory_extraction_service.h"
 #include "cortrix/memory/memory_extractor.h"
@@ -282,7 +282,7 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
     // GET /api/v1/memory/invalidations — D6/D9 audit list (over operation_log).
     svr.Get("/api/v1/memory/invalidations", WithAuth(auth, kPermRead,
         [](const httplib::Request& req, httplib::Response& res, const RequestContext&) {
-        // The invalidation audit trail lives in F18a operation_log (memory_invalidate /
+        // The invalidation audit trail lives in operation_log (memory_invalidate /
         // memory_revoke actions). Querying it is the /operations surface's job; here we
         // return the canonical pointer so the SDK can follow it (the dedicated filtered
         // view is a thin wrapper deferred to the operations route owner).
@@ -348,7 +348,7 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
                                              OnnxEmbedder& embedder,
                                              const MemoryConfig& config,
                                              const MemoryServices& services) {
-    // Capture the F18a audit sink by value (shared_ptr) so the handlers never
+    // Capture the audit sink by value (shared_ptr) so the handlers never
     // dangle on the registrar argument; null = audit disabled, never deref'd.
     auto op_logger = services.op_logger;
     (void)config;
@@ -632,7 +632,7 @@ void RegisterMemoryRoutes(
             return;
         }
 
-        // Per-request façade over the F05 pool (D-I5a Acquire/Release): the
+        // Per-request façade over the namespace pool (D-I5a Acquire/Release): the
         // destructor releases the bundle when this handler returns.
         resource::NamespaceFacade facade(pool, ns_name);
         Status acq = facade.Acquire();
@@ -1038,7 +1038,7 @@ void RegisterMemoryRoutes(
         int64_t count = 0;
         mem_store->InteractionCount(session_id, &count);
 
-        // [M1] Enqueue the turn for async MEM02 LLM extraction (the cortrix_log_interaction
+        // Enqueue the turn for async MEM02 LLM extraction (the cortrix_log_interaction
         // trigger). The worker applies the MEM04 double-check (opt-out / remember) and runs
         // the NS-scoped extractor. Disabled (no LLM) => no-op, interaction_log only. The
         // user turn carries `remember`; absent defaults to true (extract).

@@ -12,7 +12,7 @@ namespace cortrix::observability {
 namespace {
 
 // CX_ERR_F13_INVALID_FILTER token. Carried in the Status message so
-// the exact F13 identity survives to the API boundary, which re-inflates the
+// the exact identity survives to the API boundary, which re-inflates the
 // full Agent-friendly body (the §3.1 4-field schema). Kept as a literal here so
 // this widely-included shared TU does not pull in agent_trace_error.h (S7).
 constexpr const char* kInvalidFilterToken = "CX_ERR_F13_INVALID_FILTER";
@@ -71,7 +71,7 @@ void ObservabilityContext::LogStructured(LogLevel level, const std::string& msg)
     std::fprintf(stderr, "%s\n", line.c_str());
 }
 
-// ===== F13 identity extension (§5.1 v1.0.1) =====
+// ===== identity extension (§5.1 v1.0.1) =====
 
 ObservabilityContext ObservabilityContext::FromHttpHeaders(const HttpHeaders& headers) {
     ObservabilityContext ctx;

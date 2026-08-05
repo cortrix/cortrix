@@ -345,7 +345,7 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
             config.retrieval.max_candidates = rt["max_candidates"].as<int>();
     }
 
-    // [OPEN-2] three-stage GC
+    // three-stage GC
     if (root["gc"]) {
         auto g = root["gc"];
         if (g["enabled"]) config.gc.enabled = g["enabled"].as<bool>();
@@ -626,7 +626,7 @@ std::vector<std::string> ValidateConfig(const CortrixConfig& config) {
                          std::to_string(config.memory.max_interactions_per_session));
     }
 
-    // [OPEN-2] GC windows + safety limits
+    // GC windows + safety limits
     if (config.gc.soft_delete_retention_days < 0) {
         errors.push_back("gc.soft_delete_retention_days must be >= 0, got " +
                          std::to_string(config.gc.soft_delete_retention_days));

@@ -57,11 +57,11 @@ bool IsWithin(const std::filesystem::path& path, const std::filesystem::path& ba
     return *rel.begin() != "..";
 }
 
-// --- per-doc failure classification (TD-F42-BULK §2.4.2) -------------------
+// --- per-doc failure classification (batch submit §2.4.2) -------------------
 //
 // per-doc failures REUSE the originating Feature's existing CX_ERR_* code (no new
 // BATCH-per-doc codes — §2.4.2 "avoid error-code explosion"). The submit seam
-// (ITaskSubmitter, prod = F42 TaskScheduler::Enqueue) hands back a coarse Status
+// (ITaskSubmitter, prod = TaskScheduler::Enqueue) hands back a coarse Status
 // whose message carries the "CX_ERR_X: detail" token (the F42Status / catalog
 // /pool error-bridge convention). To re-inflate the GEN-Agent 5-field meta.failed[]
 // item we map that token → {category, retryable, retry_after_ms}.
@@ -84,7 +84,7 @@ const PerDocErrorInfo& ClassifyPerDocCode(const std::string& cx_code) {
     static const PerDocErrorInfo kLlmRate    {ErrorCategory::kTransient, true,  5000};
     static const PerDocErrorInfo kDiskFull   {ErrorCategory::kPermanent, false, std::nullopt};
     static const PerDocErrorInfo kInvalid    {ErrorCategory::kPermanent, false, std::nullopt};
-    // F42 enqueue-path transient (tasks_db down) — surfaced when the seam itself
+    // task enqueue-path transient (tasks_db down) — surfaced when the seam itself
     // fails rather than an upstream per-doc check (retry the doc).
     static const PerDocErrorInfo kServiceDown{ErrorCategory::kTransient, true,  10000};
     static const PerDocErrorInfo kDefault    {ErrorCategory::kPermanent, false, std::nullopt};
@@ -186,7 +186,7 @@ nlohmann::json BatchSubmitService::MakeFailureItem(const std::string& doc_id,
     const std::string detail = ExtractDetail(status.message());
     const PerDocErrorInfo& info = ClassifyPerDocCode(cx_code);
 
-    // TD-F42-BULK §2.3 meta.failed[] item: doc_id + the GEN-Agent 5 fields. NOTE
+    // batch submit §2.3 meta.failed[] item: doc_id + the GEN-Agent 5 fields. NOTE
     // the field is `error_code` (NOT the bare top-level-envelope `code`) — this is
     // a partial-success *failure descriptor*, matching the §2.3 example and the
     // existing cross-NS QueryMeta.namespaces_failed[] convention (error_code /
@@ -250,13 +250,13 @@ BatchHttpResult BatchSubmitService::Submit(const BatchRequest& req) {
         return r;
     }
 
-    // 2) per-doc fan-out through the submit seam (prod = F42 TaskScheduler).
+    // 2) per-doc fan-out through the submit seam (prod = TaskScheduler).
     //
     // on_duplicate (skip/overwrite/error) enforcement is D3.5: the frozen F42
     // SubmitRequest carries no on_duplicate field, and the duplicate decision
-    // needs the real store/F42 dedup (cross-Feature wiring). F42::Enqueue already
+    // needs the real store/task dedup (cross-Feature wiring). F42::Enqueue already
     // applies same-doc_id+same-content_hash debounce/merge; the on_duplicate
-    // overwrite→cancel-running path is TD-F42-BULK-2 (D3.5). Standalone, every
+    // overwrite→cancel-running path is the overwrite/cancel item (D3.5). Standalone, every
     // accepted doc is reported "submitted"; the "skipped" status variant becomes
     // reachable when that wiring lands. req.on_duplicate is parsed + validated
     // upstream so the contract is honored end-to-end at D3.5.
@@ -270,13 +270,13 @@ BatchHttpResult BatchSubmitService::Submit(const BatchRequest& req) {
         sreq.namespace_id = req.namespace_id;
         sreq.doc_id = d.doc_id;
         sreq.content_hash = query::ContentHashOfContent(d.content);
-        // [P3b] Materialize the inline content to a server-side file the F42
+        // Materialize the inline content to a server-side file the F42
         // doc-parse worker reads (DocumentProcessor → factory.ParseDocument(filepath)).
         // Disabled (materialize_dir_ == "") → "" filepath, the standalone/mock seam.
         // The client filename's extension drives parser selection (".txt" fallback).
         sreq.filepath = MaterializeContent(d.content, d.filename);
         sreq.filename = d.filename.empty() ? (d.doc_id + ".txt") : d.filename;
-        sreq.metadata_json = d.metadata_json;  // carry caller doc metadata through the F42 task
+        sreq.metadata_json = d.metadata_json;  // carry caller doc metadata through the async task
         sreq.task_type = async::kTaskDocParse;
 
         Result<async::TaskInfo> r = submitter_->Submit(sreq);

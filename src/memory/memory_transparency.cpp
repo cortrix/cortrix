@@ -311,7 +311,7 @@ Result<std::string> MemoryTransparency::Create(const MemoryCreateRequest& req,
         return ins.status();
     }
 
-    // F18a audit (memory_create). Creation is not an invalidation, so triggered_by is
+    // audit (memory_create). Creation is not an invalidation, so triggered_by is
     // the manual user-create path; encoded in summary (CE track).
     if (op_logger_) op_logger_->Log(MakeOpLogEntry("memory_create", req.user_id, rec.ns_id, rec.block_id,
                                    TriggeredBy::kUserManual,
@@ -416,7 +416,7 @@ Result<MemoryEditResult> MemoryTransparency::Edit(const MemoryEditRequest& req,
                            "invalidate old block failed");
     }
 
-    // 5. F18a audit: memory_edit + the cascaded memory_invalidate of the old block
+    // 5. audit: memory_edit + the cascaded memory_invalidate of the old block
     //    (§4.2 step 5 — two records; triggered_by=user_edit distinguishes the cascade).
     if (op_logger_) op_logger_->Log(MakeOpLogEntry("memory_edit", session_user_id, new_block.ns_id,
                                    new_block.block_id, TriggeredBy::kUserEdit,
@@ -470,7 +470,7 @@ Status MemoryTransparency::Delete(const std::string& memory_id,
         return Mem03Status(Mem03ErrorCode::kInvalidateFailed, "soft-delete update failed");
     }
 
-    // 4. F18a audit: memory_invalidate, triggered_by=user_manual (§4.2 step 4).
+    // 4. audit: memory_invalidate, triggered_by=user_manual (§4.2 step 4).
     if (op_logger_) op_logger_->Log(MakeOpLogEntry("memory_invalidate", session_user_id, rec.ns_id,
                                    memory_id, TriggeredBy::kUserManual));
 

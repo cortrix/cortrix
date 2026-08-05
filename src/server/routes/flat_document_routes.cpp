@@ -2,7 +2,7 @@
 #include "cortrix/server/routes/flat_document_routes.h"
 
 #include "cortrix/server/routes/connector_routes.h"  // ConnectorState (shared registry)
-#include "cortrix/connector/dir_watcher_registry.h"  // F21 fan-out registry (/watch)
+#include "cortrix/connector/dir_watcher_registry.h"  // fan-out registry (/watch)
 #include "cortrix/catalog/i_ns_router.h"             // INSRouter (signature compat)
 #include "cortrix/spc/spc_manager.h"                 // SPCManager (signature compat)
 #include "cortrix/upload/upload_handler.h"
@@ -118,7 +118,7 @@ void RegisterFlatDocumentRoutes(httplib::Server& server,
     // filename?, metadata?}; api/paths/documents.yaml uploadDocument) -> 202
     // DocumentTask. Reuses the BatchSubmitService as a batch-of-1: the service
     // already materializes inline content to a server-side file and fans it through
-    // the frozen F42 scheduler, returning a task_id. The single-doc reply is reshaped
+    // the frozen task scheduler, returning a task_id. The single-doc reply is reshaped
     // from the batch results[0] into the spec DocumentTask shape.
     server.Post("/api/v1/documents",
         WithAuth(auth, kPermWrite,
@@ -150,7 +150,7 @@ void RegisterFlatDocumentRoutes(httplib::Server& server,
                 const std::string namespace_id = body["namespace"].get<std::string>();
 
                 // Fan a single document through the batch service. The doc_id keys
-                // the materialized temp file + F42 dedup; a fresh ULID is unique per
+                // the materialized temp file + task dedup; a fresh ULID is unique per
                 // request (the pipeline derives the real content-hash identity).
                 server::BatchRequest batch;
                 batch.namespace_id = namespace_id;
@@ -195,7 +195,7 @@ void RegisterFlatDocumentRoutes(httplib::Server& server,
                     nlohmann::json task;
                     task["task_id"] = results[0]["task_id"];
                     task["namespace"] = namespace_id;
-                    task["status"] = "queued";  // spec DocumentTask enum (F42 fresh enqueue)
+                    task["status"] = "queued";  // spec DocumentTask enum (fresh enqueue)
                     WriteJsonResponse(res, 202, task, rctx.request_id);
                     return;
                 }
@@ -274,7 +274,7 @@ void RegisterFlatDocumentRoutes(httplib::Server& server,
     // single-segment {id} pattern shadow a tasks path. (The patterns are already
     // disjoint by slash count, but explicit ordering keeps it obvious.)
 
-    // GET /api/v1/documents/tasks/{task_id}/progress — F42 progress
+    // GET /api/v1/documents/tasks/{task_id}/progress — task progress
     // (api/paths/documents.yaml getDocumentTaskProgress). Wraps the existing
     // DocumentTaskHandler::GetProgress (GEN-Agent §6.3 body / 404 CX_ERR_TASK_NOT_FOUND).
     server.Get(R"(/api/v1/documents/tasks/([^/]+)/progress)",
@@ -288,7 +288,7 @@ void RegisterFlatDocumentRoutes(httplib::Server& server,
         )
     );
 
-    // DELETE /api/v1/documents/tasks/{task_id} — F42 cancel
+    // DELETE /api/v1/documents/tasks/{task_id} — task cancel
     // (api/paths/documents.yaml cancelDocumentTask). Wraps
     // DocumentTaskHandler::CancelTask (200 cancel-accepted / 404 / 423).
     server.Delete(R"(/api/v1/documents/tasks/([^/]+))",
@@ -327,7 +327,7 @@ void RegisterFlatDocumentRoutes(httplib::Server& server,
                     WriteJsonError(res, s, rctx.request_id);
                     return;
                 }
-                // [OPEN-2] a soft-deleted doc is not externally live (404 until
+                // a soft-deleted doc is not externally live (404 until
                 // restore / hard-delete), matching the nested route.
                 if (doc.status == DocStatus::kDeleted) {
                     WriteJsonError(res, Status::NotFound("document not found: " + doc_id),
@@ -393,7 +393,7 @@ std::string WatcherStatusToSpec(bool watching) {
     return watching ? "active" : "paused";
 }
 
-// Reshape a F21 fan-out watcher (one directory, N subscribed namespaces) into
+// Reshape a fan-out watcher (one directory, N subscribed namespaces) into
 // the openapi Watcher object {id, path, target_namespaces[], recursive, status}.
 // api/components/schemas.yaml#/Watcher. With F21 a directory fanned out to N
 // namespaces is ONE Watcher carrying all N target_namespaces (the MVP emitted N

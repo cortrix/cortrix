@@ -7,28 +7,28 @@
 #include <utility>
 #include <unordered_map>
 
-#include "cortrix/spc/parser_factory.h"          // F06 cortrix::spc::DocumentParserFactory
+#include "cortrix/spc/parser_factory.h"          // cortrix::spc::DocumentParserFactory
 #include "cortrix/spc/parser.h"                   // ParsedDoc / ParserOptions / DocumentMetadata
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/spc/block_assembler.h"
 #include "cortrix/spc/spc_router.h"
-#include "cortrix/chunker/parent_child_chunker.h" // F34 ParentChildChunker
+#include "cortrix/chunker/parent_child_chunker.h" // ParentChildChunker
 #include "cortrix/chunker/i_chunker.h"            // ChunkerInput / ChunkerOutput
-#include "cortrix/doc_summary/doc_fts5_index.h"   // F41 doc-level FTS5 product write hook
-#include "cortrix/metadata/metadata_types.h"      // F08 GeneratorInput / MetadataBlock
-#include "cortrix/spc/data_cleaner.h"              // F10 DataCleaner / spc::Block / ShouldSkipIndex
-#include "cortrix/spc_enricher.h"                  // F03 ISpcEnricher / CreateEnricher / EnrichResult
-#include "cortrix/spc/enricher_chain.h"            // I1 EnricherChain (F03→F35→F38 fail-soft serial)
+#include "cortrix/doc_summary/doc_fts5_index.h"   // doc-level FTS5 product write hook
+#include "cortrix/metadata/metadata_types.h"      // GeneratorInput / MetadataBlock
+#include "cortrix/spc/data_cleaner.h"              // DataCleaner / spc::Block / ShouldSkipIndex
+#include "cortrix/spc_enricher.h"                  // ISpcEnricher / CreateEnricher / EnrichResult
+#include "cortrix/spc/enricher_chain.h"            // EnricherChain (enrich → contextualize → HyPE, fail-soft serial)
 #include "cortrix/spc/hype_block.h"                // I3 BuildHypeQuestionBlock / FillHypeEmbedding
-#include "cortrix/spc_enricher/enricher_store.h"   // F03 WriteEnrichment (enriched_score + entities persist)
+#include "cortrix/spc_enricher/enricher_store.h"   // WriteEnrichment (enriched_score + entities persist)
 #include "cortrix/spc_enricher/enrich_state_store.h"  // §3.7 enrich_state coverage rows
-#include "cortrix/spc/contextual_store.h"          // I2 WriteContextualized (F35 contextualized_* cols)
-#include "cortrix/retrieval/sparse_codec.h"        // Q4 F40 SparseVector
-#include "cortrix/retrieval/sparse_index_registry.h"  // Q4 F40 per-NS index registry
-#include "cortrix/retrieval/sparse_retriever.h"    // Q4 F40 ISparseRetriever::Add
-#include "cortrix/retrieval/sparse_vec_store.h"    // Q4 F40 WriteSparseVec (blocks.sparse_vec)
-#include "cortrix/scoring/score_map.h"             // F07 ScoringInput (parser/enricher/anomaly signals)
-#include "cortrix/scoring/scoring_store.h"          // F07 WriteScore (semantic_score persist)
+#include "cortrix/spc/contextual_store.h"          // WriteContextualized (contextualized_* cols)
+#include "cortrix/retrieval/sparse_codec.h"        // SparseVector
+#include "cortrix/retrieval/sparse_index_registry.h"  // per-NS index registry
+#include "cortrix/retrieval/sparse_retriever.h"    // ISparseRetriever::Add
+#include "cortrix/retrieval/sparse_vec_store.h"    // WriteSparseVec (blocks.sparse_vec)
+#include "cortrix/scoring/score_map.h"             // ScoringInput (parser/enricher/anomaly signals)
+#include "cortrix/scoring/scoring_store.h"          // WriteScore (semantic_score persist)
 #include "cortrix/resource/namespace_facade.h"    // D3.5 wire⑤: Process over the façade
 #include "cortrix/store/write_coordinator.h"      // C2: BeginWrite/Commit/Rollback
 #include "cortrix/store/iindex.h"                 // M3: AddPoints
@@ -43,9 +43,9 @@ namespace cortrix {
 
 namespace {
 
-// Serialize a F06 DocumentMetadata into the JSON shape the parents/children rows
+// Serialize a DocumentMetadata into the JSON shape the parents/children rows
 // carry (mirrors sqlite_parent_chunk_store.cpp MetaToJson, so the per-parent /
-// per-child metadata_json round-trips with the F06 SoT field names). F03/F08
+// per-child metadata_json round-trips with the parser SoT field names). The enricher and metadata layers
 // enrich this same blob per-parent (NER/Summary).
 std::string MetaToJson(const cortrix::spc::DocumentMetadata& m) {
     nlohmann::json j;
@@ -106,9 +106,9 @@ CortrixParent ToCortrixParent(const cortrix::chunker::ParentChunk& p) {
 }
 
 // Map an ISpcEnricher::Name() / EnrichResult.enricher_name (e.g. "LlmEnricher") to
-// F07 ScoreMap::EnricherLevel's short token ("llm"/"contextual"/"hype"). V1's only
-// real SPC-chain enricher is LlmEnricher; Null/unknown → "" (enricher_level 0). F35
-// (contextual) / F38 (hype) map here when they join the chain (D3.5+).
+// ScoreMap::EnricherLevel's short token ("llm"/"contextual"/"hype"). V1's only
+// real SPC-chain enricher is LlmEnricher; Null/unknown → "" (enricher_level 0). Contextual
+// and hype stages map here when they join the chain.
 std::string F07EnricherToken(const std::string& enricher_name) {
     if (enricher_name == "LlmEnricher") return "llm";
     if (enricher_name == "ContextualRetrievalEnricher") return "contextual";
@@ -149,7 +149,7 @@ int SPCPipeline::Process(SPCTask& task, resource::NamespaceFacade& facade) {
     // --- Memory-session fast path (Inc 4-3 item 6) ---
     // MemoryWriter puts Q+A text in content_hash and metadata in metadata_json.
     // BYPASS parse + chunker: assemble ONE flat block via the assembler's flat
-    // Assemble() (memory has no parent), embed it, write via the unified F25 flow.
+    // Assemble() (memory has no parent), embed it, write via the unified coordinated flow.
     if (is_memory) {
         if (task.cancelled.load()) {
             task.stage = SPCStage::kCancelled;
@@ -267,7 +267,7 @@ int SPCPipeline::Process(SPCTask& task, resource::NamespaceFacade& facade) {
         return 0;
     }
 
-    // Stage 2: Parse (F06 structured parser — owns scan detection / OCR / fallback
+    // Stage 2: Parse (structured parser — owns scan detection / OCR / fallback
     // internally; DECISION X). (Inc 4-3 item 2.)
     if (task.cancelled.load()) {
         task.stage = SPCStage::kCancelled;
@@ -286,20 +286,20 @@ int SPCPipeline::Process(SPCTask& task, resource::NamespaceFacade& facade) {
         return -1;
     }
 
-    // [Plan B · F42 §4.1.2] Hand the parsed doc to the post-parse stages. The F42 async
-    // path reaches the same stages via ProcessParsed() directly (parse done by F06).
+    // Hand the parsed doc to the post-parse stages. The async
+    // path reaches the same stages via ProcessParsed() directly (parse already done).
     return ProcessParsed(d, task, facade);
 }
 
 int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                                resource::NamespaceFacade& facade) {
     // Re-derive the Stage-1 routing locals the post-parse stages read (Process computed
-    // these before Stage 2; ProcessParsed is also reached directly from the F42 async path).
+    // these before Stage 2; ProcessParsed is also reached directly from the async path).
     uint8_t level = task.processing_level;
     CortrixBlockType block_type = static_cast<CortrixBlockType>(
         SPCRouter::InferBlockType(task.mime_type));
 
-    // Stage 3: Chunk (F34 parent-child). (Inc 4-3 item 3.)
+    // Stage 3: Chunk (parent-child).
     if (task.cancelled.load()) {
         task.stage = SPCStage::kCancelled;
         return -1;
@@ -338,11 +338,11 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         return 0;
     }
 
-    // Stage 3.5: F08 document-level Metadata Block GENERATION (D6 lock F06→F34→F08;
-    // ARCH §2.3 SoT — F08 runs after chunk, before enrich/embed). Generate ONLY here;
+    // Stage 3.5: document-level Metadata Block GENERATION (parse → chunk → metadata;
+    // it runs after chunk, before enrich/embed). Generate ONLY here;
     // the META block is embedded in Stage 4 and assembled into the write set after the
-    // child loop. In the same successful F08 branch, derive the F41 doc-level FTS5
-    // row from the exact F08 fields so benchmark/query doc fallback observes the
+    // child loop. In the same successful branch, derive the doc-level FTS5
+    // row from the exact metadata fields so benchmark/query doc fallback observes the
     // same document identity. META gen is non-fatal (a truly empty doc logs + skips;
     // parents/children stay valid). One META per doc is enforced by idx_blocks_meta_doc
     // (F34SchemaProvider).
@@ -379,20 +379,20 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         }
     }
 
-    // Stage 3.6: enrich (ISpcEnricher chain; ARCH §2.3 SoT — after F08, before embed,
-    // so F35 contextual-retrieval can re-embed enriched text). Build a ChunkContext per
-    // child (text + F06 doc_meta + prev/next neighbors), enrich, and stash each result by
-    // child_id. F03 summary → child metadata_json at assembly; enriched_score + entities +
-    // F35 contextualized_* persist in the write phase. Enrich needs no embedding, so it
+    // Stage 3.6: enrich (ISpcEnricher chain; after metadata, before embed,
+    // so contextual retrieval can re-embed enriched text). Build a ChunkContext per
+    // child (text + doc_meta + prev/next neighbors), enrich, and stash each result by
+    // child_id. The enricher summary → child metadata_json at assembly; enriched_score + entities +
+    // contextualized_* persist in the write phase. Enrich needs no embedding, so it
     // precedes Stage 4. Runs for L2/L3 alike (both produce children).
     //
-    // [I1 · GS-2] When the enricher chain is installed (bootstrap, F03→F35→F38 fail-soft
+    // When the enricher chain is installed (bootstrap, enrich → contextualize → HyPE, fail-soft
     // serial) it supersedes the single ctor enricher_: EnrichChunks() returns one merged
-    // EnrichResult per child (F03 entities/summary + F35 contextualized_*) PLUS the F38
+    // EnrichResult per child (entities/summary + contextualized_*) PLUS the hype
     // hype_question side channel. Unset / no chain member available → the single-enricher
     // path (backward compatible). NullEnricher short-circuits → the maps stay empty.
     std::unordered_map<std::string, cortrix::spc::EnrichResult> enrich_by_child;
-    // [I3] F38 hype questions per source child (the write phase builds block_type=16 Blocks).
+    // Hype questions per source child (the write phase builds block_type=16 Blocks).
     std::unordered_map<std::string, std::vector<cortrix::spc::HypeQuestion>> hype_by_child;
     // [addendum §3.7] Per-child enrichment debt for the enrich_state coverage SoT:
     // csv of owed-but-missing chain tokens (canonical f03,f35,f38 order) + the first
@@ -414,7 +414,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             cortrix::spc::ChunkContext c;
             c.chunk_text = out.children[i].child_text;
             c.chunk_index = static_cast<int>(out.children[i].chunk_index);
-            c.doc_metadata = &in.metadata;  // F06 SoT; `in` is function-scope → outlives this call
+            c.doc_metadata = &in.metadata;  // parser SoT; `in` is function-scope → outlives this call
             c.prev_chunk_text = (i == 0) ? "" : out.children[i - 1].child_text;
             c.next_chunk_text =
                 (i + 1 == out.children.size()) ? "" : out.children[i + 1].child_text;
@@ -423,9 +423,9 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
 
         if (use_chain) {
             // [I3] Real chunk→parent binding: resolve each child's parent_text from the
-            // in-memory parents (F38 reconcile 2 — parent_text is optional context). The
+            // in-memory parents (parent_text is optional context). The
             // source_child_id / source_parent_id provenance is stamped on each generated
-            // hype question (F38-4).
+            // hype question.
             std::unordered_map<std::string, const std::string*> parent_text_by_id;
             for (const auto& p : out.parents) parent_text_by_id[p.parent_id] = &p.parent_text;
             std::vector<std::string> parent_texts(out.children.size());
@@ -443,8 +443,8 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             enrich_stage_ran = true;
             for (size_t i = 0; i < chain_res.size() && i < out.children.size(); ++i) {
                 const std::string& cid = out.children[i].child_id;
-                // Member-aware debt detection. F38/F03 report failure through the
-                // step status; F35 fail-softs with status==0 and records its outcome
+                // Member-aware debt detection. The hype and enrich stages report failure through the
+                // step status; contextualization fail-softs with status==0 and records its outcome
                 // in contextualized_status (2 == failed), so the step status alone
                 // would miss it.
                 bool f03_failed = false, f35_failed = false, f38_failed = false;
@@ -452,7 +452,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                 for (const auto& st : chain_res[i].steps) {
                     if (st.skipped) continue;
                     if (st.status == 0) {
-                        // F35 fail-soft carries its cause in error_code with
+                        // The contextual fail-soft carries its cause in error_code with
                         // status==0 (see enricher_chain); harvest it so the debt
                         // row records why instead of a blank last_error (D12).
                         if (first_err.empty() && !st.error_code.empty()) first_err = st.error_code;
@@ -460,7 +460,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                     }
                     if (st.name == "hype") f38_failed = true;
                     else if (st.name == "f35_contextual_retrieval") f35_failed = true;
-                    else f03_failed = true;  // the F03 head slot (LlmEnricher / …)
+                    else f03_failed = true;  // the enricher head slot (LlmEnricher / …)
                     if (first_err.empty() && !st.error_code.empty()) first_err = st.error_code;
                 }
                 if (chain_res[i].merged.contextualized_status == 2) f35_failed = true;
@@ -485,7 +485,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         } else {
             // Single-enricher path (backward compatible). EnrichBatch returns one result per
             // context, aligned by index; re-key by child_id so the write phase attaches each
-            // result to its block regardless of F10 dedup reordering.
+            // result to its block regardless of dedup reordering.
             std::vector<cortrix::spc::EnrichResult> eres = enricher_.EnrichBatch(ctxs);
             enrich_stage_ran = true;
             for (size_t i = 0; i < eres.size() && i < out.children.size(); ++i) {
@@ -500,7 +500,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     }
 
     // Stage 4: Embed children (L3 only; L2 skips embedding). (Inc 4-3 item 4.)
-    // [Q4 · F40] When the sparse registry is wired, use EmbedBatchWithSparse so the
+    // When the sparse registry is wired, use EmbedBatchWithSparse so the
     // single BGE-M3 pass yields BOTH the dense embedding (unchanged downstream) AND
     // the SPLADE sparse vector per child (persisted + indexed in the write phase).
     // sparse_by_child holds the per-child SparseVector, keyed by child_id.
@@ -548,7 +548,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         }
     }
 
-    // Stage 4 (cont.): embed the F08 META block_text (doc-level; its own embedding).
+    // Stage 4 (cont.): embed the META block_text (doc-level; its own embedding).
     // Declared at function scope so it outlives the vec_points pointer into it.
     EmbeddingResult meta_embedding;
     if (meta_mb && level >= 3) {
@@ -569,32 +569,32 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     // carried by child_id, not a kBlockChild enum).
     const CortrixBlockType modality = block_type;
 
-    // Phase 1 — F10 data cleaning + assembly. Build a lightweight Block view of the
-    // children (id + text + the upstream embedding + inherited metadata), run F10
+    // Phase 1 — data cleaning + assembly. Build a lightweight Block view of the
+    // children (id + text + the upstream embedding + inherited metadata), run cleaning
     // dedup (exact SHA-256 + semantic cosine over the embeddings) and anomaly
     // detection, then assemble the survivors. Dedup runs AFTER embed because the
     // semantic pass needs the embeddings; deduped children are dropped from
     // the write (the `parents` table stores no child_ids, so no parent dangles);
     // anomalous children are still written (with "cleaning.*" in metadata_json) but
-    // skipped from P-HNSW (ShouldSkipIndex, F10 D5).
+    // skipped from P-HNSW (ShouldSkipIndex).
     std::vector<CortrixBlock> child_blocks;
     std::vector<std::pair<const float*, uint64_t>> vec_points;
-    // ④ F07: block_id → write-time semantic_score, drained in the write phase (WriteScore).
+    // block_id → write-time semantic_score, drained in the write phase (WriteScore).
     std::unordered_map<uint64_t, float> score_by_block;
-    // [addendum §3.8 W2 · F35-9 B] contextual dual-vector label rows: one per child
+    // Contextual dual-vector label rows: one per child
     // whose contextualized embedding enters P-HNSW as its own point. Written to
     // contextual_vec_labels in the write phase (same PWL lifecycle as the blocks).
     std::vector<cortrix::spc::ContextualVecLabelRow> ctx_label_rows;
     child_blocks.reserve(out.children.size());
 
-    // [F10 §3.2 PARSE_FAILED · M2] F06 reports failed pages doc-level (d.failed_pages,
+    // The parser reports failed pages doc-level (d.failed_pages,
     // page numbers). MetaToJson only carries the 8 DocumentMetadata fields, so the
-    // F10 DetectAnomaly parse_status signals (meta.parse_status / meta.parse_failed_page,
-    // the F08 SoT key format — rule_based_metadata_generator.cpp) never reached the
+    // DetectAnomaly parse_status signals (meta.parse_status / meta.parse_failed_page,
+    // the metadata SoT key format — rule_based_metadata_generator.cpp) never reached the
     // child Blocks → PARSE_FAILED was dead. Stamp them per child here. Per-chunk
     // semantics (metadata_types.h: "the page in failed_pages this chunk sits on"):
     // a child sits on its parent's [page_start, page_end] span (parent page_num from
-    // the F34 chunker, same 1-based numbering as failed_pages), so only children whose
+    // the chunker, same 1-based numbering as failed_pages), so only children whose
     // span intersects a failed page are flagged — NOT every child of a partly-failed
     // doc. parse_status = "ok" when the doc fully parsed, else "partial".
     const bool doc_parse_partial = !d.failed_pages.empty();
@@ -630,7 +630,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         cb.metadata_json = nlohmann::json::parse(
             MetaToJson(child.metadata), nullptr, /*allow_exceptions=*/false);
         if (cb.metadata_json.is_discarded()) cb.metadata_json = nlohmann::json::object();
-        // [M2] parse_status passthrough (F08 SoT key format): "ok" unless the doc
+        // parse_status passthrough (metadata SoT key format): "ok" unless the doc
         // had failed pages; meta.parse_failed_page set only when THIS child's parent
         // span covers a failed page (→ DetectAnomaly marks PARSE_FAILED for it).
         if (doc_parse_partial) {
@@ -643,7 +643,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         clean_blocks.push_back(std::move(cb));
         child_idx_by_id[child.child_id] = i;
     }
-    // [F10 §3.4 · D3.5] Apply the per-NS effective CleaningConfig (global ← NS
+    // Apply the per-NS effective CleaningConfig (global ← NS
     // cleaning_config) before cleaning. The seam resolves from the catalog (which
     // the façade does not expose); unset → data_cleaner_ keeps its default config.
     if (cleaning_config_resolver_) {
@@ -666,7 +666,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         EmbeddingResult emb;
         emb.vector = b.embedding;
         emb.dim = static_cast<int>(b.embedding.size());
-        // F03 §3.1: summary → Block.payload.metadata JSONB. Fold the enriched summary
+        // Summary → Block.payload.metadata JSONB. Fold the enriched summary
         // (when produced) into this child's metadata before assembly so it travels in the
         // block payload; enriched_score + entities persist separately in the write phase.
         {
@@ -676,11 +676,11 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                 b.metadata_json["summary"] = eit->second.summary;
             }
         }
-        // ④ F07 SemanticScorer (ARCH §2.3 step-7, D7 — clean→score→assemble): compute the
+        // SemanticScorer (clean → score → assemble): compute the
         // Matrix processing_level (parser/enricher/anomaly) + write-time semantic_score via
         // the frozen AssignInitialScore. A throwaway header captures the level byte (the scorer
         // only writes processing_level, reads no header field); the level is then baked into
-        // BOTH the block header byte AND blocks.processing_level (option A — F07 is the sole
+        // BOTH the block header byte AND blocks.processing_level (scoring is the sole
         // owner of block-level processing_level; ingest depth L0-L3 lives at the doc level).
         // The score travels to the write phase (WriteScore), keyed by block_id.
         std::string enr_token;
@@ -697,7 +697,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         sin.is_anomalous = cortrix::spc::ShouldSkipIndex(b);
         sin.block_type = static_cast<uint16_t>(modality);
         scorer_.AssignInitialScore(f07_hdr, semantic_score, sin);
-        // [I2 · F35 §4.1] flags_ext bit3 (has_contextualized_embedding): set when F35
+        // flags_ext bit3 (has_contextualized_embedding): set when contextualization
         // produced a contextualized embedding for this child (double-vector coexistence).
         uint8_t child_flags_ext = 0;
         {
@@ -717,7 +717,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             // through the write below).
             vec_points.push_back({b.embedding.data(), child_blocks.back().block_id});
         }
-        // [addendum §3.8 W2 · F35-9 B] Dual-vector coexistence: the contextualized
+        // Dual-vector coexistence: the contextualized
         // embedding becomes its OWN P-HNSW point under the deterministic derived
         // label; the mapping row resolves ANN hits back to this child at query
         // time. The embedding storage lives in enrich_by_child (function scope,
@@ -738,14 +738,14 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         }
     }
 
-    // [I3 · F38 §5.2/§9.1] Assemble hype_question Blocks (block_type=16) from the chain's
-    // F38 side channel and append them to the SAME write set so the same BeginWrite /
-    // block_insert loop persists them in ONE F25 PWL transaction with the chunk + META
-    // Blocks (F25 §5.2 atomic write). Each question's embedding is the BGE-M3 vector of
+    // Assemble hype_question Blocks (block_type=16) from the chain's
+    // hype side channel and append them to the SAME write set so the same BeginWrite /
+    // block_insert loop persists them in ONE PWL transaction with the chunk + META
+    // Blocks (atomic write). Each question's embedding is the BGE-M3 vector of
     // the question text (the §9.1 `hype_q.embedding = OnnxEmbedder.Embed(question_text)`
     // step); block_id = HashChildIdToBlockId(a fresh ULID per question). The questions are
     // keyed by source child_id (provenance in metadata_json.source_child_id) so recall can
-    // expand a hype hit back to its child (F38-4). L3 only (hype Blocks index into P-HNSW);
+    // expand a hype hit back to its child. L3 only (hype Blocks index into P-HNSW);
     // for L2 the questions carry no vector and are skipped (no enrich-only doc has them).
     if (level >= 3 && !hype_by_child.empty()) {
         // Flatten the question texts to embed in one batch (cheap when the chain ran).
@@ -761,7 +761,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         if (!q_texts.empty()) {
             Status qes = embedder_.EmbedBatch(q_texts, &q_embs);
             if (!qes.ok()) {
-                // Non-fatal (F38-8 transparent degrade): the chunk Blocks are the primary
+                // Non-fatal (transparent degrade): the chunk Blocks are the primary
                 // deliverable; a hype embed failure drops the hype Blocks, not the doc.
                 CORTRIX_LOG_WARN("spc",
                     "F38 hype embedding failed for doc_id={}, dropping hype blocks: {}",
@@ -806,12 +806,12 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         }
     }
 
-    // Assemble the F08 META block from the pre-generated mb (Stage 3.5) + its Stage-4
+    // Assemble the META block from the pre-generated mb (Stage 3.5) + its Stage-4
     // embedding, appending it to the write set so the same BeginWrite/block_insert loop
-    // persists it (same blocks table + same F25 txn; L3 → P-HNSW). [③a: gen+embed moved
+    // persists it (same blocks table + same write txn; L3 → P-HNSW). [gen+embed moved
     // earlier; here only construct.]
     if (meta_mb) {
-        // ④ F07 for the META block: ComputeLevel special-cases block_type==kBlockMeta → Matrix
+        // Scoring for the META block: ComputeLevel special-cases block_type==kBlockMeta → Matrix
         // level 0 / score 0.2 (ARCH §5.2.1 lock), regardless of parser/enricher. Same dual-write
         // as children: the level goes into both the header byte and blocks.processing_level (the
         // embed gating above used the TASK level, so a META block can still carry its L3 vector).
@@ -824,9 +824,9 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
 
         CortrixBlock meta_block;
         meta_block.doc_id = task.doc_id;
-        meta_block.chunk_index = 0;  // F08: the doc-level Chunk[0]
+        meta_block.chunk_index = 0;  // the doc-level Chunk[0]
         meta_block.block_type = static_cast<int>(kBlockMeta);
-        meta_block.processing_level = meta_hdr.processing_level;  // F07 Matrix level (0 for META)
+        meta_block.processing_level = meta_hdr.processing_level;  // Matrix level (0 for META)
         meta_block.block_id = id::HashChildIdToBlockId(meta_mb->block_id);
         meta_block.content_text = meta_mb->block_text;
         meta_block.metadata_json = meta_mb->metadata_json.dump();
@@ -858,11 +858,11 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         return -1;
     }
 
-    // F08→F41 product sync: the row is a doc-level candidate source used by
-    // `/documents/discover` and query `granularity=doc|both|auto`. Unlike F03/F07/F40
+    // Metadata → doc-summary product sync: the row is a doc-level candidate source used by
+    // `/documents/discover` and query `granularity=doc|both|auto`. Unlike the enrichment, scoring and sparse writes
     // auxiliary columns below, this is part of the benchmark-visible candidate path.
     //
-    // Write it immediately after BeginWrite, before vector/block stores. F25 PWL is a
+    // Write it immediately after BeginWrite, before vector/block stores. The PWL is a
     // compensating lifecycle, not a SQLite transaction; writing this row first means:
     //   - a later vector/block/store failure rolls it back through the registered callback;
     //   - a crash before blocks are complete is recovered as ROLLBACK and cleans it;
@@ -924,12 +924,12 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         }
     }
 
-    // F03/F07: the borrowed sqlite3* for inline enrichment + semantic_score persistence.
+    // The borrowed sqlite3* for inline enrichment + semantic_score persistence.
     // nullptr for non-SQLite stores (test fakes) → those writes are skipped (the core block
-    // is already inserted). The SPC write is already serialized per-NS by the F25 coordinator;
+    // is already inserted). The SPC write is already serialized per-NS by the write coordinator;
     // WriteEnrichment / WriteScore run their own statements — safe because neither block_insert
-    // nor the F25 coordinator holds an open SQLite txn (F25 is a pure PWL; crash consistency =
-    // compensating rollback). Both persists are NON-FATAL (mirror the F08 META-gen skip above):
+    // nor the coordinator holds an open SQLite txn (it is a pure PWL; crash consistency =
+    // compensating rollback). Both persists are NON-FATAL (mirror the META-gen skip above):
     // the block row + vector are the primary deliverable, enriched_score / semantic_score are
     // auxiliary quality columns that degrade to NULL, so a failure logs and continues rather
     // than discard the whole doc (WriteEnrichment also rolls back its own partial write).
@@ -947,7 +947,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             return -1;
         }
         if (store_db) {
-            // F03 §3.1: enriched_score + entities, keyed by child_id (META / memory carry none).
+            // enriched_score + entities, keyed by child_id (META / memory carry none).
             if (!b.child_id.empty()) {
                 auto eit = enrich_by_child.find(b.child_id);
                 // [D10a] A persist failure AFTER a successful enrich stage must be
@@ -967,19 +967,19 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                         persist_err = "CX_ERR_SPC_PERSIST_FAILED[f03]: " + we.message();
                     }
                 }
-                // [I2 · F35 §4.1] contextualized_* columns (child rows only). Gated on the
-                // F35 output inside the merged result (contextualized_status / engaged
-                // optionals), NOT on merged.ok() — F35 can degrade (status=failed) while F03
-                // succeeded, and the §4.1 columns must still record the F35 outcome. No-op
-                // when the chain had no F35 stage (columns stay NULL/0).
+                // Contextualized_* columns (child rows only). Gated on the
+                // contextual output inside the merged result (contextualized_status / engaged
+                // optionals), NOT on merged.ok() — contextualization can degrade (status=failed) while enrichment
+                // succeeded, and the columns must still record that outcome. No-op
+                // when the chain had no contextual stage (columns stay NULL/0).
                 if (eit != enrich_by_child.end()) {
                     Status wc = cortrix::spc::WriteContextualized(store_db, b.block_id, eit->second);
                     if (!wc.ok()) {
                         CORTRIX_LOG_WARN("spc",
                             "F35 contextualized persist skipped for block_id={} (doc_id={}): {}",
                             b.block_id, task.doc_id, wc.message());
-                        // Owe f35 only when F35 actually produced an outcome to
-                        // persist (engaged chains; no-F35 chains no-op inside).
+                        // Owe f35 only when the stage actually produced an outcome to
+                        // persist (engaged chains; chains without it no-op inside).
                         if (eit->second.contextualized_status != 0 ||
                             eit->second.contextualized_text.has_value()) {
                             f35_persist_owed = true;
@@ -990,7 +990,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                         }
                     }
                 }
-                // [Q4 · F40 §6.1] Persist the child's SPLADE sparse vector to
+                // Persist the child's SPLADE sparse vector to
                 // blocks.sparse_vec (durable copy / index-rebuild source) AND index
                 // it into the per-NS inverted index (live serving). A child with no
                 // active sparse terms (dead chunk, §6.5) writes NULL + indexes
@@ -1064,7 +1064,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                     }
                 }
             }
-            // F07 §5.1.2: write-time semantic_score for every F07-scored block (L2/L3 children
+            // Write-time semantic_score for every scored block (L2/L3 children
             // + META). Keyed by block_id (the fast L0/L1/memory paths never populate the map).
             auto sit = score_by_block.find(b.block_id);
             if (sit != score_by_block.end()) {
@@ -1088,7 +1088,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     // Phase 3 — document status.
     facade.store().doc_update_status(task.doc_id, DocStatus::kReady);
     task.stage = SPCStage::kDone;
-    // [⑤c] F41 doc-summary enqueue seam: a fully written document fires the hook
+    // doc-summary enqueue seam: a fully written document fires the hook
     // (no-op unless production installed the seam via SetDocSummaryEnqueue).
     OnDocumentWritten(task.doc_id, task.namespace_name);
     return 0;
@@ -1115,16 +1115,16 @@ void SPCPipeline::SetCleaningConfigResolver(
 
 void SPCPipeline::OnDocumentWritten(const std::string& doc_id,
                                     const std::string& ns_id) {
-    if (!doc_summary_enqueue_) return;  // feature off (no F42 scheduler wired)
+    if (!doc_summary_enqueue_) return;  // feature off (no task scheduler wired)
     async::SubmitRequest req;
     req.namespace_id = ns_id;
     req.doc_id = doc_id;
     // content_hash = doc_id makes a repeat OnDocumentWritten for the SAME doc within
-    // the debounce window self-merge (no duplicate summary). NOTE: F42's debounce is
+    // the debounce window self-merge (no duplicate summary). NOTE: the scheduler debounce is
     // keyed on doc_id alone (TaskManager::FindRecentTaskByDocId ignores task_type +
     // terminal status), so a doc-summary enqueue can collide with the doc's own
     // (possibly completed) doc-parse task — resolving that (debounce per task_type)
-    // belongs to the F42 main-wiring step.
+    // belongs to the scheduler main-wiring step.
     req.content_hash = doc_id;
     req.task_type = async::kTaskDocSummary;
     doc_summary_enqueue_(req);

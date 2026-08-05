@@ -239,7 +239,7 @@ Status DirWatcherRegistry::Subscribe(
         if (already) continue;  // idempotent per namespace
 
         // Auto-create the namespace through the F13 catalog router: this does the
-        // catalog INSERT *and* the F05 AdmitCreate (idempotent — AlreadyExists is
+        // catalog INSERT *and* the AdmitCreate (idempotent — AlreadyExists is
         // OK). Admission is required for the importer's facade.Acquire() to resolve
         // below; a bare metadata create does NOT admit into the pool, so the
         // importer would silently skip every file (live-only bug). Mirrors the MVP

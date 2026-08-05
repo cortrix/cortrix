@@ -29,7 +29,7 @@ int64_t NowMs() {
 }
 
 // Map the feature-neutral OpenAiLlmClient status token (llm_error_tokens.h) to
-// the F03 enricher error code (§4.2). RATE_LIMIT is distinct; transport / HTTP
+// the enricher error code (§4.2). RATE_LIMIT is distinct; transport / HTTP
 // 5xx / bad-body all surface as LLM_API (transient, retryable per §5.1).
 EnricherErrorCode ClassifyLlmFailure(const std::string& status_msg) {
     if (status_msg.rfind(llm::llm_tokens::kRateLimit, 0) == 0) {

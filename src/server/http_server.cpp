@@ -2,12 +2,12 @@
 #include "cortrix/server/http_server.h"
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/agent_friendly/error.h"       // GEN-Agent error category enum
-#include "cortrix/catalog/i_ns_router.h"        // F12 INSRouter (F13 create path)
+#include "cortrix/catalog/i_ns_router.h"        // INSRouter (F13 create path)
 #include "cortrix/catalog/catalog_types.h"      // NSMetadata
-#include "cortrix/resource/namespace_facade.h"  // per-request façade over F05 pool
+#include "cortrix/resource/namespace_facade.h"  // per-request façade over namespace pool
 #include "cortrix/logging/logging.h"
 #include "cortrix/common/version.h"                       // [P5] version SoT
-#include "cortrix/observability/operation_logger.h"       // F18a ns_* operation_log
+#include "cortrix/observability/operation_logger.h"       // ns_* operation_log
 #include "cortrix/observability/operation_log_emitter.h"  // §9.1 MakeEngineEntry / EmitSite
 
 #include <cstdlib>
@@ -76,7 +76,7 @@ const std::unordered_map<std::string, std::pair<ErrorCategory, bool>>& Sdk3Map()
         // sec.3.3 Store
         {"CX_ERR_STORE_NOT_FOUND", {ErrorCategory::kPermanent, false}},
         {"CX_ERR_STORE_DB_ERROR", {ErrorCategory::kTransient, true}},
-        // sec.3.4 F14 pgcortrix
+        // sec.3.4 pgcortrix
         {"CX_ERR_F14_INVALID_FILTER", {ErrorCategory::kPermanent, false}},
         // sec.3.5 retrieval chain
         {"CX_ERR_RAG_FUSION_LLM_TIMEOUT", {ErrorCategory::kTimeout, true}},
@@ -89,7 +89,7 @@ const std::unordered_map<std::string, std::pair<ErrorCategory, bool>>& Sdk3Map()
         {"CX_ERR_F48_RAG_FAILED", {ErrorCategory::kTransient, true}},
         // sec.3.6 rate limit
         {"CX_ERR_RATE_LIMITED", {ErrorCategory::kQuota, true}},
-        // sec.3.7 MEM02 extraction
+        // sec.3.7 memory extraction
         {"CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT", {ErrorCategory::kTimeout, true}},
         {"CX_ERR_MEM02_EXTRACT_BUDGET_EXCEEDED", {ErrorCategory::kQuota, false}},
         // sec.3.1 Namespace (NotFoundError -> permanent/false)
@@ -817,7 +817,7 @@ Status CortrixHttpServer::BuildNamespaceJson(const std::string& name, nlohmann::
 }
 
 Status CortrixHttpServer::DeleteNamespaceUnified(const std::string& name) {
-    // Catalog soft-delete also triggers F05 pool eviction.
+    // Catalog soft-delete also triggers namespace pool eviction.
     if (ns_router_) return ns_router_->DeleteNamespace(name);
     return ns_mgr_.Delete(name);
 }
@@ -850,7 +850,7 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
 
                          nlohmann::json resp;
                          if (ns_router_) {
-                             // F13: route creation through the F12 catalog (single SoT). The
+                             // F13: route creation through the catalog (single SoT). The
                              // router's Status carries the CX_ERR_NS_* token, so already-exists
                              // → 409 / quota → 403 fall out of WriteJsonError unchanged.
                              cortrix::catalog::NSMetadata meta;
@@ -859,7 +859,7 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                              // P09 §4.6: tenant ownership from the auth context; the V1.0
                              // OSS single-tenant run (auth off / anonymous) falls back to
                              // the bootstrap 'default_tenant' (namespaces.tenant_id is
-                             // NOT NULL + FK, seeded by the F12 schema bootstrap).
+                             // NOT NULL + FK, seeded by the catalog schema bootstrap).
                              meta.tenant_id = rctx.auth.tenant_id.empty() ? "default_tenant"
                                                                           : rctx.auth.tenant_id;
                              Status s = ns_router_->CreateNamespace(meta);
@@ -924,7 +924,7 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
 
                 nlohmann::json resp;
                 if (ns_router_) {
-                    // F13: route creation through the F12 catalog (single SoT). The
+                    // F13: route creation through the catalog (single SoT). The
                     // router's Status carries the CX_ERR_NS_* token, so already-exists
                     // → 409 / quota → 403 fall out of WriteJsonError unchanged.
                     cortrix::catalog::NSMetadata meta;
@@ -933,7 +933,7 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                     // P09 §4.6: tenant ownership from the auth context; the V1.0
                     // OSS single-tenant run (auth off / anonymous) falls back to
                     // the bootstrap 'default_tenant' (namespaces.tenant_id is
-                    // NOT NULL + FK, seeded by the F12 schema bootstrap).
+                    // NOT NULL + FK, seeded by the catalog schema bootstrap).
                     meta.tenant_id =
                         rctx.auth.tenant_id.empty() ? "default_tenant" : rctx.auth.tenant_id;
                     Status s = ns_router_->CreateNamespace(meta);

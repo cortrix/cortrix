@@ -640,7 +640,7 @@ Status ValidateResolvedLlmRerankConfigForRequest(const LlmRerankConfig& cfg) {
 // namespace_id (NULL = global call, §4.1). `params_summary` is a compact JSON
 // (truncated to ≤2KB on write); on failure the error code + message are kept.
 //
-// op_summary (the F18a operation_log summary, §11 — query_text prefix) is filled too,
+// op_summary (the operation_log summary, §11 — query_text prefix) is filled too,
 // but the operation_log write happens ONLY when the bootstrap constructs this
 // EngineInstrumentation WITH an operation_logger. This cell wires agent_trace, so the
 // recommended query instance is trace-only (op_logger null) → Record skips the F18a
@@ -669,7 +669,7 @@ void RecordQueryTrace(agent_trace::EngineInstrumentation* engine_instr,
     engine_instr->Record(call);
 }
 
-// First 100 chars of the query text — the F18a operation_log summary shape (§11).
+// First 100 chars of the query text — the operation_log summary shape (§11).
 std::string QueryTextSummary(const QueryContext& qctx) {
     return qctx.query.size() > 100 ? qctx.query.substr(0, 100) : qctx.query;
 }

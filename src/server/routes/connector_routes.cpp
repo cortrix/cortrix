@@ -3,9 +3,9 @@
 #include "cortrix/connector/directory_importer.h"  // ImportStats
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/server/http_server.h"
-#include "cortrix/catalog/i_ns_router.h"          // F12 INSRouter (F13 create path)
+#include "cortrix/catalog/i_ns_router.h"          // INSRouter (F13 create path)
 #include "cortrix/namespace/namespace_manager.h"
-#include "cortrix/resource/namespace_pool.h"      // F05 INamespacePool
+#include "cortrix/resource/namespace_pool.h"      // INamespacePool
 #include "cortrix/spc/spc_manager.h"
 #include "cortrix/logging/logging.h"
 
@@ -35,7 +35,7 @@ nlohmann::json StatsToJson(const ImportStats& s) {
     return j;
 }
 
-// Serialize one watcher (a directory + its fan-out subscribers) to the F21 GET
+// Serialize one watcher (a directory + its fan-out subscribers) to the GET
 // shape: id / directory / target_namespaces[] / subscriber_count / watching /
 // recursive + nested per-NS stats.
 nlohmann::json WatchToJson(const DirWatcherRegistry& reg, const WatchInfo& w) {
@@ -91,7 +91,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
     DirWatcherRegistry& reg = *state.registry;
 
     // ----------------------------------------------------------------
-    // Multi-watcher endpoints (F21 fan-out)
+    // Multi-watcher endpoints (fan-out)
     // ----------------------------------------------------------------
 
     // GET /api/v1/connector/watchers — list all watchers with per-NS stats.
@@ -122,7 +122,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
                 return;
             }
 
-            // `path` is the F21 field; `data_dir` is the MVP alias.
+            // `path` is the canonical field; `data_dir` is the MVP alias.
             std::string data_dir = body.value("path", body.value("data_dir", std::string{}));
             if (data_dir.empty()) {
                 WriteJsonError(res, Status::InvalidArgument("path (or data_dir) is required"),
@@ -160,7 +160,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
             }
             if (!state.data_dir.empty()) reg.SaveState(state.data_dir);
 
-            // Return the watcher's F21 view (canonical dir + full subscriber list).
+            // Return the watcher's canonical view (canonical dir + full subscriber list).
             // Subscribe succeeded so the dir resolves; canonicalize defensively.
             std::error_code cec;
             std::string canon = std::filesystem::canonical(data_dir, cec).string();

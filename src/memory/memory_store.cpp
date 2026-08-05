@@ -123,7 +123,7 @@ Status MemoryStore::Init(const std::string& db_path) {
     s = MigrateMem04OptOutColumns();
     if (!s.ok()) return s;
 
-    // [F13 TC4] interaction_sources lives in this memory.db (its FK references the
+    // interaction_sources lives in this memory.db (its FK references the
     // per-NS interaction_log.id, so it must share that db). agent_trace does NOT —
     // TC4 moved it back to the global cortrix_global.db, where GET /traces
     // can read a session whose calls span namespaces. Idempotent; failure here is
@@ -142,7 +142,7 @@ Status MemoryStore::Init(const std::string& db_path) {
 
 Status MemoryStore::CreateF13ObservabilityTables() {
     if (!db_) return Status::InvalidArgument("CreateF13ObservabilityTables: null db");
-    // [F13 TC4] Only interaction_sources is per-NS here: its FK references this db's
+    // Only interaction_sources is per-NS here: its FK references this db's
     // interaction_log.id (MEM01 frozen), so the two must co-locate. agent_trace is
     // global (created against cortrix_global.db at startup, F13 §4.1) — it is NOT
     // created here any more. The provider is idempotent (CREATE TABLE IF NOT EXISTS),

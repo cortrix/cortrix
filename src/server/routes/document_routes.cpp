@@ -60,7 +60,7 @@ void RegisterDocumentRoutes(httplib::Server& server,
         WithAuth(auth, kPermWrite,
             [&handler, &pool, disk_monitor](const httplib::Request& req, httplib::Response& res,
                               const RequestContext& rctx) {
-                // [D3.5 wire · gap②] Disk pressure gate (F24 §6, F24-4 decision A):
+                // Disk pressure gate (F24 §6, F24-4 decision A):
                 // at CRIT reject the upload BEFORE any byte is written (doc_create /
                 // blob.store below would only deepen the pressure). 507 + the full
                 // CX_ERR_DISK_FULL Agent-friendly body.
@@ -82,7 +82,7 @@ void RegisterDocumentRoutes(httplib::Server& server,
                 }
                 std::string ns_name = ns_it->second;
 
-                // Acquire namespace (per-request façade over the F05 pool;
+                // Acquire namespace (per-request façade over the namespace pool;
                 // released by the destructor when this handler returns).
                 resource::NamespaceFacade facade(pool, ns_name);
                 Status acq = facade.Acquire();
@@ -196,7 +196,7 @@ void RegisterDocumentRoutes(httplib::Server& server,
                 }
                 std::string ns_name = ns_it->second;
 
-                // Acquire namespace (per-request façade over the F05 pool;
+                // Acquire namespace (per-request façade over the namespace pool;
                 // released by the destructor when this handler returns).
                 resource::NamespaceFacade facade(pool, ns_name);
                 Status acq = facade.Acquire();
@@ -228,7 +228,7 @@ void RegisterDocumentRoutes(httplib::Server& server,
                     WriteJsonError(res, s, rctx.request_id);
                     return;
                 }
-                // [OPEN-2] A soft-deleted doc (Stage 1) is invisible to clients: 404
+                // A soft-deleted doc (Stage 1) is invisible to clients: 404
                 // until it is either restored or hard-deleted. The row still exists
                 // (restorable within the retention window) but is not externally live.
                 if (doc.status == DocStatus::kDeleted) {
@@ -269,7 +269,7 @@ void RegisterDocumentRoutes(httplib::Server& server,
                 }
                 std::string ns_name = ns_it->second;
 
-                // Acquire namespace (per-request façade over the F05 pool;
+                // Acquire namespace (per-request façade over the namespace pool;
                 // released by the destructor when this handler returns).
                 resource::NamespaceFacade facade(pool, ns_name);
                 Status acq = facade.Acquire();
@@ -353,7 +353,7 @@ void RegisterDocumentRoutes(httplib::Server& server,
                 }
                 std::string ns_name = ns_it->second;
 
-                // Acquire namespace (per-request façade over the F05 pool;
+                // Acquire namespace (per-request façade over the namespace pool;
                 // released by the destructor when this handler returns).
                 resource::NamespaceFacade facade(pool, ns_name);
                 Status acq = facade.Acquire();
@@ -390,7 +390,7 @@ void RegisterDocumentRoutes(httplib::Server& server,
                     return;
                 }
 
-                // [OPEN-2] Stage 1 soft delete: mark the doc 'deleted' + stamp
+                // Stage 1 soft delete: mark the doc 'deleted' + stamp
                 // deleted_at. Blocks / vectors / blob stay in place (LIST + retrieval
                 // filter the doc out; restorable within the retention window). The
                 // GC sweeper hard-deletes blocks + blob + the row at Stage 2 once the

@@ -25,7 +25,7 @@ Status SPCManager::Submit(std::shared_ptr<SPCTask> task) {
         return Status::Unavailable("SPCManager not running");
     }
 
-    // [D3.5 wire · gap②] Disk pressure gate (F24 §6, F24-4 decision A): at CRIT
+    // Disk pressure gate (F24 §6, F24-4 decision A): at CRIT
     // refuse NEW task admission. Catch-all for the non-HTTP ingest paths (watcher /
     // CDC submit directly here); the HTTP upload route already rejected earlier with
     // the full Agent-friendly 507 body, before doc/blob were written.
@@ -51,7 +51,7 @@ int SPCManager::CancelBySourcePath(const std::string& source_path) {
 }
 
 int SPCManager::ProcessParsedDoc(spc::ParsedDoc& parsed, SPCTask& task) {
-    // Per-task façade over the F05 pool, mirroring WorkerLoop — but the F42 async path has
+    // Per-task façade over the namespace pool, mirroring WorkerLoop — but the F42 async path has
     // already parsed (F06 in DocumentProcessor), so no blob→temp extraction is needed here.
     resource::NamespaceFacade facade(*pool_, task.namespace_name);
     Status acq = facade.Acquire();
@@ -169,7 +169,7 @@ void SPCManager::WorkerLoop() {
 
         if (task->cancelled.load()) continue;
 
-        // Per-task façade over the F05 pool (D-I5a per-request Acquire/Release):
+        // Per-task façade over the namespace pool (D-I5a per-request Acquire/Release):
         // the destructor releases the bundle when this iteration ends.
         resource::NamespaceFacade facade(*pool_, task->namespace_name);
         Status acq = facade.Acquire();

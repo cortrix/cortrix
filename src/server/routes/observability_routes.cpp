@@ -50,7 +50,7 @@ RequesterContext MakeRequesterContext(const RequestContext& rctx) {
     return RequesterContext{rctx.auth.user_id, rctx.auth.is_admin()};
 }
 
-// ---- F13 identity headers (§6.1) -------------------------------------------
+// ---- identity headers (§6.1) -------------------------------------------
 
 // Parse X-Session-Id/X-Trace-Id/X-Agent-Id via the shared middleware, install the
 // resulting ObservabilityContext on the thread-local (so the downstream read path
@@ -75,7 +75,7 @@ void ParseAndInstallObservabilityHeaders(const httplib::Request& req,
 
 // Recover the "CX_ERR_F13_*" token from a Status message ("CX_ERR_F13_X: detail").
 // "" if the message does not start with the token. Mirrors batch_submit_service's
-// ExtractCxCode (the handlers encode the F13 identity in the message prefix).
+// ExtractCxCode (the handlers encode the identity in the message prefix).
 std::string ExtractCxCode(const std::string& message) {
     if (message.rfind("CX_ERR_F13_", 0) != 0) return "";
     const size_t end = message.find_first_of(": \t", 0);
@@ -449,7 +449,7 @@ bool RequireNamespaceParam(const httplib::Request& req, httplib::Response& res,
 
 }  // namespace
 
-// [F13 TC4] The old combined RegisterObservabilityRoutesPerNs (all 3 routes over the
+// The old combined RegisterObservabilityRoutesPerNs (all 3 routes over the
 // per-NS memory.db) was REMOVED: TC4 moved agent_trace to the global DB, so building
 // the trace writer over a per-NS memory.db (where agent_trace no longer exists) is
 // wrong. The live wiring is now RegisterTracesRoutesGlobal (trace read, global) +
@@ -495,7 +495,7 @@ bool ReadOwnerFromNsTable(sqlite3* mem_db, const char* table,
     return found;
 }
 
-// [F13 TC4] Resolve a session's owner for the GLOBAL /traces permission check.
+// Resolve a session's owner for the GLOBAL /traces permission check.
 // agent_trace is global but carries no user_id; the session->user mapping lives in
 // each namespace's memory.db (interaction_log / memory_sessions). A session belongs
 // to one user, and every agent_trace row stamps the namespace_id of the call, so:

@@ -2,7 +2,7 @@
 #include "cortrix/server/http_server.h"
 #include "cortrix/logging/logging.h"
 // [F13 S2 · D3.5 wiring] Populate the thread-local ObservabilityContext on every
-// agent-facing route from the F13 identity headers + the authenticated user_id, so
+// agent-facing route from the identity headers + the authenticated user_id, so
 // the downstream Engine instrumentation (agent_trace, §11) and the F18a
 // operation_log emitter (operation_log_emitter.cpp:49-62) read a filled context.
 // WithAuth is the single entry seam every route passes through; doing it here is the
@@ -111,7 +111,7 @@ httplib::Server::Handler WithAuth(ApiKeyAuth& auth, int required_permission, Htt
             }
 
             rctx.auth = actx;
-            // Auth succeeded: install the obs context from the F13 identity
+            // Auth succeeded: install the obs context from the identity
             // headers + the authenticated user_id (§5.1 C1/C2). Runs after the auth
             // decision so it cannot influence authn/authz (pure-ADD).
             InstallObservabilityContext(req, res, actx.user_id, actx.agent_id);

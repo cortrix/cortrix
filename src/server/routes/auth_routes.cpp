@@ -253,7 +253,7 @@ void RegisterApiKeyRoutes(httplib::Server& server, ApiKeyService& keys,
 }
 
 void RegisterAuthSessionRoute(httplib::Server& server, ApiKeyAuth& auth) {
-    // GET /api/v1/auth/me — CE Web UI session probe (P02a §9.2 / quick-experience mode).
+    // GET /api/v1/auth/me — CE Web UI session probe (the web UI §9.2 / quick-experience mode).
     //
     // The JWT email/password /auth/me is a cloud-enterprise endpoint, absent in CE (an
     // un-shimmed CE would 404 here). The self-hosted Web UI probes this on startup to

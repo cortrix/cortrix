@@ -13,20 +13,20 @@
 #include "cortrix/logging/logging.h"
 #include "cortrix/common/version.h"  // [P5] single SoT for the version string
 #include "cortrix/auth/api_key_auth.h"
-// [D3.5 r2 · Wave P · P1] P08-CE auth: platform.db + bootstrap + API Keys REST.
+// CE auth: platform.db + bootstrap + API Keys REST.
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/auth/api_key_service.h"
 #include "cortrix/auth/bootstrap_handler.h"
-#include "cortrix/auth/admin_users_service.h"      // [FA1 R11] §2.13-bis admin/users
-#include "cortrix/auth/jwt_secret_service.h"        // [FA1 R11] §2.11 JWT rotation
-#include "cortrix/auth/pbkdf2_password_hasher.h"    // [FA1 R11] invite-mode create hasher
+#include "cortrix/auth/admin_users_service.h"      // §2.13-bis admin/users
+#include "cortrix/auth/jwt_secret_service.h"        // §2.11 JWT rotation
+#include "cortrix/auth/pbkdf2_password_hasher.h"    // invite-mode create hasher
 #include "cortrix/server/routes/auth_routes.h"
 #include "cortrix/namespace/namespace_manager.h"
-// [D3.5 wire ①②] F12 catalog + F05 NamespacePool runtime resource stack
+// catalog + NamespacePool runtime resource stack
 #include "cortrix/catalog/catalog_db.h"
 #include "cortrix/catalog/default_ns_router.h"
 #include "cortrix/catalog/default_unit_router.h"
-// [OPEN-2] three-stage GC manager + background thread + ops routes
+// three-stage GC manager + background thread + ops routes
 #include "cortrix/catalog/gc/blob_gc_sink.h"
 #include "cortrix/catalog/gc/gc_manager.h"
 #include "cortrix/catalog/gc/gc_thread.h"
@@ -35,13 +35,13 @@
 #include "cortrix/resource/namespace_pool.h"
 #include "cortrix/store/iindex_factory.h"
 #include "cortrix/spc/onnx_embedder.h"
-#include "cortrix/spc/parser_factory.h"          // F06 structured parser factory
-#include "cortrix/spc/docling_parser.h"          // F06 primary parser
-#include "cortrix/spc/paddleocr_parser.h"        // F06 OCR fallback parser
-#include "cortrix/chunker/parent_child_chunker.h" // F34 parent-child chunker
+#include "cortrix/spc/parser_factory.h"          // structured parser factory
+#include "cortrix/spc/docling_parser.h"          // primary parser
+#include "cortrix/spc/paddleocr_parser.h"        // OCR fallback parser
+#include "cortrix/chunker/parent_child_chunker.h" // parent-child chunker
 #include "cortrix/spc/block_assembler.h"
-#include "cortrix/spc_enricher.h"                  // F03 CreateEnricher / EnricherConfig
-#include "cortrix/spc/enricher_chain.h"            // I1 EnricherChain (F03→F35→F38)
+#include "cortrix/spc_enricher.h"                  // CreateEnricher / EnricherConfig
+#include "cortrix/spc/enricher_chain.h"            // EnricherChain (enrich → contextualize → HyPE)
 #include "cortrix/spc_enricher/enrich_backfill_worker.h"  // §3.7 kTaskEnrichBackfill handler
 #include "cortrix/spc_enricher/enrich_retry_sweeper.h"    // §3.7 enrich_state due-row sweeper
 #include "cortrix/server/routes/enrich_routes.h"          // §3.7 backfill ops surface
@@ -52,7 +52,7 @@
 #include "cortrix/spc/spc_pipeline.h"
 #include "cortrix/spc/spc_manager.h"
 #include "cortrix/spc/cleaning_config_resolver.h"  // per-NS CleaningConfig resolve
-// [F42 main wiring] async subsystem + F41 doc-summary worker + LLM client
+// async subsystem + doc-summary worker + LLM client
 #include "cortrix/async/task_manager.h"
 #include "cortrix/async/task_scheduler.h"
 #include "cortrix/async/document_processor.h"
@@ -65,14 +65,14 @@
 #include "cortrix/query/intent_classifier.h"
 #include "cortrix/query/rrf_fusion.h"
 #include "cortrix/query/query_routes.h"
-#include "cortrix/query/query_wiring.h"   // [D3.5-R2 Q1/Q2] F04 cross-NS query live mount
-#include "cortrix/retrieval/sparse_index_registry.h"  // [Q4 F40] shared per-NS SPLADE index
+#include "cortrix/query/query_wiring.h"   // cross-NS query live mount
+#include "cortrix/retrieval/sparse_index_registry.h"  // shared per-NS SPLADE index
 #include "cortrix/memory/memory_routes.h"
-#include "cortrix/memory/memory_extraction_service.h"  // M1 MEM02 extraction runtime
-#include "cortrix/server/routes/observability_routes.h" // [F13 TC4] RegisterTracesRoutesGlobal + RegisterInteractionsRoutesPerNs
-// [V1.0 acceptance · Wave2 integration] A3 startup validation / A4+TC4 F13 agent_trace
+#include "cortrix/memory/memory_extraction_service.h"  // M1 memory extraction runtime
+#include "cortrix/server/routes/observability_routes.h" // RegisterTracesRoutesGlobal + RegisterInteractionsRoutesPerNs
+// A3 startup validation / A4+TC4 agent_trace
 // global wiring / A6 doc-summary discover route / F query-trace EngineInstrumentation.
-#include "cortrix/onnx/startup_validator.h"               // A3 F22 fail-fast ONNX validation
+#include "cortrix/onnx/startup_validator.h"               // A3 fail-fast ONNX validation
 #include "cortrix/auth/auth_middleware.h"                 // A6 WithAuth for the discover route
 #include "cortrix/doc_summary/discover_handler.h"         // A6 GET /documents/discover
 #include "cortrix/agent_trace/agent_trace_schema.h"       // TC4 agent_trace in global catalog.db
@@ -85,15 +85,15 @@
 #include "cortrix/server/routes/flat_document_routes.h"
 #include "cortrix/server/routes/connector_routes.h"
 #include "cortrix/async/document_task_handler.h"
-// [D3.5 r2 · Wave P · P3] TD-F42-BULK batch submit route + its production submitter.
+// batch submit batch submit route + its production submitter.
 #include "cortrix/server/routes/batch_routes.h"
 #include "cortrix/server/batch_submit_service.h"
 #include "cortrix/async/managed_input.h"
 #include "cortrix/server/batch_temp_store.h"
 #include "cortrix/server/f42_task_submitter_adapter.h"
-// [D3.5 r2 · Wave P · P4] F48 §6.3 agent_llm_config admin API.
+// F48 §6.3 agent_llm_config admin API.
 #include "cortrix/server/routes/system_config_routes.h"
-// [D3.5 r2 · Wave P · P2] F16a DB-import: ImportManager DI + 6 endpoints.
+// DB-import: ImportManager DI + 6 endpoints.
 #include "cortrix/server/routes/import_routes.h"
 #include "cortrix/server/import_handler.h"
 #include "cortrix/import/import_manager.h"
@@ -103,13 +103,13 @@
 #include "cortrix/import/spc_feed.h"
 #include "cortrix/import/spc_manager_feeder.h"   // [P2b] real SPCManager feed + cleaner
 #include "cortrix/import/import_task_queue.h"
-// [D3.5 batch1] P09 tenant/permission/quota REST surface
+// tenant/permission/quota REST surface
 #include "cortrix/server/routes/tenant_routes.h"
 #include "cortrix/tenant/tenant_service.h"
 #include "cortrix/tenant/permission_service.h"
 #include "cortrix/tenant/quota_service.h"
 #include "cortrix/tenant/i_plan_provider.h"
-// [D3.5 batch1] F18a operation-log query route + DI module + schema provider
+// F18a operation-log query route + DI module + schema provider
 #include "cortrix/server/routes/operations_routes.h"
 #include "cortrix/observability/observability_module.h"
 #include "cortrix/observability/operation_log_schema.h"
@@ -125,10 +125,10 @@
 #include "cortrix/deploy/graceful_shutdown.h"
 #include "cortrix/resource/namespace_facade.h"   // [gap⑤] resume re-hydrates tasks from the doc row
 #include "cortrix/deploy/health_routes.h"
-#include "cortrix/health/readiness.h"  // F20 readiness contract — components registered at wiring
+#include "cortrix/health/readiness.h"  // readiness contract — components registered at wiring
 #include "cortrix/ml/execution_provider.h"
-#include "cortrix/security/env_secret_provider.h"      // F20-6 CreateSecretProvider() for /ready
-#include "cortrix/security/secret_provider_readiness.h" // F20-6 secret_provider readiness adapter
+#include "cortrix/security/env_secret_provider.h"      // CreateSecretProvider() for /ready
+#include "cortrix/security/secret_provider_readiness.h" // secret_provider readiness adapter
 #include "cortrix/deploy/metrics_server.h"
 #include "cortrix/deploy/deploy_metrics.h"
 #include "cortrix/deploy/disk_monitor.h"
@@ -189,7 +189,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // here pins the documented "init before threads" invariant.
     sqlite3_initialize();
 
-    // [OPEN-2] GC admin subcommands (gc-status / gc-run / restore / purge) run
+    // GC admin subcommands (gc-status / gc-run / restore / purge) run
     // against the catalog and exit without starting the server. Returns a value
     // only when argv[1] is a gc subcommand.
     if (auto rc = MaybeRunGcCli(argc, argv); rc.has_value()) {
@@ -211,7 +211,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     //   2. Logging
     //   3. NamespaceManager (metadata SQLite)
     //   4. Auth
-    //   5. F05 NamespacePool (per-NS resource pool; replaces the MVP manager)
+    //   5. NamespacePool (per-NS resource pool; replaces the MVP manager)
     //   6. OnnxEmbedder (ONNX Runtime for embeddings)
     //   7. SPC pipeline components (parser, chunker, OCR, assembler)
     //   8. SPCManager (background document processing workers)
@@ -264,7 +264,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     auth.set_enabled(config.auth.enabled);
     auth.LoadKeys(config.auth.api_keys);
 
-    // 4b. [D3.5 r2 · Wave P · P1] P08-CE auth layer: open platform.db (the Auth SoT,
+    // 4b. CE auth layer: open platform.db (the Auth SoT,
     // P08 §3.1 — a SEPARATE file from catalog.db), build the API Key service +
     // bootstrap handler, and on a first start (empty `users` table) print the 60s
     // single-use admin-bootstrap banner. The ApiKeyService is bound into ApiKeyAuth
@@ -282,7 +282,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     auth.SetApiKeyService(&api_key_service);
     cortrix::auth::BootstrapHandler bootstrap_handler(platform_db.db(), &api_key_service);
 
-    // [FA1 R11] P08 admin/users (§2.13-bis) + JWT rotation (§2.11) backends.
+    // admin/users (§2.13-bis) + JWT rotation (§2.11) backends.
     // The PBKDF2 hasher is the invite-mode create path's password hasher (same
     // TECH_DEBT-AUTH-PBKDF2-PLACEHOLDER seam as the login flow). JwtSecretService
     // LoadOrInit reads/auto-generates the HS256 secret in platform.db auth_secrets
@@ -319,7 +319,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                          token.status().message());
     }
 
-    // 5. [D3.5 wire ①②] F12 catalog + F05 NamespacePool — the Phase-1 runtime
+    // 5. catalog + NamespacePool — the Phase-1 runtime
     // resource stack (replaced the MVP namespace manager, removed in wire ⑥). On a
     // fresh, empty catalog StartupLoadAll is a no-op (0 namespaces), so this stack
     // stays inert until namespaces are created through the F13 path.
@@ -330,7 +330,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         // catalog/global DB at startup so ObservabilityModule attaches to an
         // already-migrated handle (its ctor doc requires the schema to exist).
         cortrix::observability::OperationLogSchemaProvider oplog_schema;
-        // [F13 TC4] agent_trace lives in the global catalog.db now (moved out of the
+        // agent_trace lives in the global catalog.db now (moved out of the
         // per-NS memory.db, where memory_store keeps only interaction_sources). Migrate
         // its schema here so the writer (A4/F) + reader (RegisterTracesRoutesGlobal) both
         // bind an already-built table.
@@ -345,10 +345,10 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::catalog::DefaultINSRouter ns_router(catalog_db.db(), /*f05_pool=*/nullptr);
     cortrix::catalog::DefaultUnitRouter unit_router(catalog_db.db());
 
-    // [OPEN-2] GC layer 1 — catalog.db / blob_gc_queue. The Stage 3 sink resolves
+    // GC layer 1 — catalog.db / blob_gc_queue. The Stage 3 sink resolves
     // the content-addressed blob_uri ({hash[0:2]}/{hash}, F25 layer) under the blob
     // root; a missing blob is an idempotent no-op. Layer 2 (DocumentGcSweeper) is
-    // built below once the F05 NamespacePool exists. The background thread runs both
+    // built below once the NamespacePool exists. The background thread runs both
     // layers each cycle (gc.enabled-gated); Start()ed after the workers come up,
     // Stop()ed in graceful shutdown.
     cortrix::catalog::gc::LocalBlobGcSink gc_blob_sink(config.ns.data_dir + "/blobs");
@@ -384,12 +384,12 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                              startup.status().message());
         }
     }
-    // [D3.5 wire⑤c / F13] Late-bind the pool into the router now that both exist
+    // Late-bind the pool into the router now that both exist
     // (breaks the pool↔router ctor cycle). From here, INSRouter.CreateNamespace
     // admits the new NS into ns_pool before the catalog INSERT.
     ns_router.SetPool(&ns_pool);
 
-    // [OPEN-2] GC layer 2 — per-Unit document GC over the F05 pool (iterates NSs
+    // GC layer 2 — per-Unit document GC over the namespace pool (iterates NSs
     // via the router, acquires each facade, hard-deletes expired soft-deleted docs:
     // MarkDelete vectors + blob().del + block/doc rows). The GcThread drives both
     // layers each cycle.
@@ -407,7 +407,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     }
     embedder.set_max_seq_length(config.embedding.max_seq_length);
     embedder.set_execution_provider(config.embedding.execution_provider);
-    // [F22 D3.5 · A3] Fail-fast ONNX startup validation BEFORE the embedder initializes:
+    // Fail-fast ONNX startup validation BEFORE the embedder initializes:
     // an ABI-mismatched runtime, or an out-of-range opset on a PRESENT model, aborts the
     // process here (in the operator's startup window) rather than at the first inference.
     // Validation skips missing paths so Init() can emit the component-specific error.
@@ -443,7 +443,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                          config.spc.worker_count, embedder.active_ep());
     }
 
-    // 6b. [F24 · moved up for gap②] Disk monitor: periodic statvfs over the data
+    // 6b. Disk monitor: periodic statvfs over the data
     // dir, feeds cortrix_disk_usage_ratio + the write-reject flag. Constructed
     // BEFORE SPCManager / route registration so both can hold it (probe lambda /
     // pointer) — RAII then tears them down first while the monitor is still alive.
@@ -455,8 +455,8 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         });
     f24_disk_monitor.Start();
 
-    // 7. SPC pipeline components — F06 structured parser (owns OCR/VLM internally)
-    //    + F34 parent-child chunker (Inc 4-3: A unified-blocks ingest swap).
+    // 7. SPC pipeline components — structured parser (owns OCR/VLM internally)
+    //    + parent-child chunker (Inc 4-3: A unified-blocks ingest swap).
     // [D3.5 wire · #479] Real bridge-script lookup: the old "" placeholder went
     // straight into argv (python3 "" …) and every parse failed. Resolution order:
     // CORTRIX_SCRIPTS_DIR env → /app/scripts (container layout) → ./scripts
@@ -519,7 +519,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
 
     cortrix::chunker::ParentChildChunker pc_chunker(cortrix::chunker::ChunkerConfig{});
     cortrix::BlockAssembler assembler;
-    // [D3.5 wire · gap①] F03 enricher (plan B, F03 §2.7.bis): the connection triple
+    // enricher (plan B, F03 §2.7.bis): the connection triple
     // comes from the config.yaml `enricher_llm` role (symmetric with doc_summary_llm);
     // the remaining tuning fields keep the F03 §2.7 defaults. Unconfigured → kNull
     // (NullEnricher short-circuit). CreateEnricher then runs the §4.1 startup probe
@@ -561,8 +561,8 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     }
     auto enricher = cortrix::spc::CreateEnricher(enricher_cfg);
 
-    // [I1 · GS-2] Enricher chain (F03 → F35 → F38, fail-soft serial). The chain
-    // supersedes the single F03 enricher above when it has any available member.
+    // Enricher chain (enrich → contextualize → HyPE, fail-soft serial). The chain
+    // supersedes the single enricher above when it has any available member.
     // It is resolved from the `enricher.chain` GUC (default "f03"); when the
     // enricher LLM is configured we seed the GUC to the full chain so F35/F38 join
     // (they share that LLM). The chain + its enrichers live at function scope so
@@ -583,7 +583,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
             std::make_shared<cortrix::llm::OpenAiLlmClient>(std::move(chain_llm_cfg));
     }
     // Non-owning shared_ptr aliasing the stack embedder (it outlives the chain) so
-    // the F35 ContextualOnnxEmbedder adapter (which takes a shared_ptr) can reuse
+    // the ContextualOnnxEmbedder adapter (which takes a shared_ptr) can reuse
     // the same OnnxEmbedder the pipeline embeds with.
     std::shared_ptr<cortrix::OnnxEmbedder> embedder_alias(
         std::shared_ptr<void>{}, &embedder);
@@ -593,7 +593,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
             cortrix::spc::ResolveEnricherChain(enricher_chain_config.get(), "");
         for (const auto& tok : chain_tokens) {
             if (tok == "f03") {
-                // F03 head: reuse the single enricher already created above (shared, so
+                // enricher head: reuse the single enricher already created above (shared, so
                 // the chain and the pipeline ctor arg point at the same object).
                 enricher_chain.Append(
                     std::shared_ptr<cortrix::spc::ISpcEnricher>(enricher.get(), [](auto*) {}));
@@ -676,7 +676,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                          }());
     }
 
-    // 7b. [F42 main wiring] The async subsystem, wired BEFORE the SPCPipeline so the
+    // 7b. The async subsystem, wired BEFORE the SPCPipeline so the
     //     ⑤c doc-summary enqueue seam can be installed on the pipeline before it
     //     moves into SPCManager. TaskManager (tasks.db) → TaskScheduler → WorkerPool
     //     dispatch (kTaskDocParse → DocumentProcessor; kTaskDocSummary →
@@ -691,7 +691,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                     std::to_string(config.spc.parser_max_concurrent > 0
                                        ? config.spc.parser_max_concurrent
                                        : 4));
-    // F42 enrich-retry sweeper pacing (deep-QA 2026-07-10): the sweeper already
+    // enrich-retry sweeper pacing (deep-QA 2026-07-10): the sweeper already
     // reads these keys but nothing ever seeded them, freezing the 60s x 32
     // built-ins (a multi-hour drain at 5000-doc scale). 0/absent = unchanged.
     if (config.spc.enrich_sweep_interval_sec > 0) {
@@ -712,23 +712,23 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::async::TaskScheduler task_scheduler(&task_mgr, f42_config.get());
 
     // 8. SPCPipeline + SPCManager — constructed BEFORE doc_processor (Plan B · F42 §4.1.2):
-    // the F42 doc-parse handler borrows &spc_mgr to hand its parsed doc to ProcessParsedDoc.
+    // the doc-parse handler borrows &spc_mgr to hand its parsed doc to ProcessParsedDoc.
     // The doc-summary seam is installed LATER (after the WorkerPool exists) via the spc_mgr
     // proxy, breaking the doc_processor → spc_mgr → pipeline(seam) → worker_pool cycle.
     auto pipeline = std::make_unique<cortrix::SPCPipeline>(
         f06_factory, pc_chunker, embedder, assembler, *enricher);
     cortrix::SPCManager spc_mgr(config.spc, ns_pool, std::move(pipeline));
-    // [I1 · GS-2] Install the enricher chain on the managed pipeline (no-op when the
+    // Install the enricher chain on the managed pipeline (no-op when the
     // chain has no available member → pipeline keeps the single-enricher path).
     spc_mgr.SetEnricherChain(&enricher_chain);
-    // [Q4 · F40] The single shared per-NS SPLADE inverted-index registry: the SPC
+    // The single shared per-NS SPLADE inverted-index registry: the SPC
     // write path indexes into it at ingest, the cross-NS query read path searches
     // it — one instance so the read serves exactly what was written. Per-NS index
     // files live at <data_dir>/<ns>/sparse_index.db. Must outlive both spc_mgr and
     // the query wiring (declared here, at the same scope).
     cortrix::retrieval::SparseIndexRegistry sparse_index_registry(config.ns.data_dir);
     spc_mgr.SetSparseIndexRegistry(&sparse_index_registry);
-    // [D3.5 wire · gap②] F24 disk gate on task admission (catch-all for watcher /
+    // disk gate on task admission (catch-all for watcher /
     // CDC paths that Submit() directly; the HTTP upload route rejects earlier).
     spc_mgr.SetWriteRejectProbe(
         [&f24_disk_monitor] { return f24_disk_monitor.ShouldRejectWrites(); });
@@ -739,7 +739,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         &task_mgr, &f06_factory, f42_config.get(), nullptr, &spc_mgr,
         cortrix::server::BatchTempDir(config.ns.data_dir));
 
-    // F41 doc-summary worker — built only when an LLM is configured; otherwise the
+    // doc-summary worker — built only when an LLM is configured; otherwise the
     // feature is OFF (no kTaskDocSummary handler, and the ⑤c seam stays unset). It is
     // constructed BEFORE the WorkerPool so RAII tears the pool down first (Stop + join
     // the worker threads) while the handlers they dispatch to are still alive.
@@ -806,10 +806,10 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         CORTRIX_LOG_INFO("main", "enrich backfill disabled (no enricher chain member)");
     }
 
-    // [⑤c] Install the F41 doc-summary enqueue seam NOW — the WorkerPool exists (the seam
+    // Install the doc-summary enqueue seam NOW — the WorkerPool exists (the seam
     // captures &worker_pool) and the pipeline has already moved into spc_mgr, so set it via
     // the spc_mgr proxy (Plan B · §4.1.2: this ordering breaks the doc_processor ↔ spc_mgr ↔
-    // seam ↔ pool construction cycle). Only when the F41 worker is registered (LLM
+    // seam ↔ pool construction cycle). Only when the doc-summary worker is registered (LLM
     // configured); else the seam stays unset and OnDocumentWritten is a no-op (→ FTS5).
     if (doc_summary_worker) {
         cortrix::async::TaskScheduler* sched = &task_scheduler;
@@ -831,7 +831,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // lazily by RegisterConnectorRoutes. The config watch_dir is subscribed AFTER
     // the routes build the registry (see just after RegisterConnectorRoutes below) —
     // a fresh NS is created via INSRouter::CreateNamespace inside Subscribe (catalog
-    // INSERT + F05 AdmitCreate), not the JSON-only NamespaceManager::Create.
+    // INSERT + AdmitCreate), not the JSON-only NamespaceManager::Create.
     cortrix::ConnectorState connector_state;
     connector_state.data_dir = config.ns.data_dir;  // for watchers.json persistence
 
@@ -842,7 +842,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::IntentClassifier classifier(config.semantic_llm);
     cortrix::RRFFusion fusion;
 
-    // 10b. [D3.5 batch1] P09 tenant/permission/quota services over the F12 catalog.
+    // 10b. tenant/permission/quota services over the catalog.
     // All three borrow the already-open catalog.db handle (they do not own it) and
     // must outlive `server` below. Phase-1 OSS uses UnlimitedPlanProvider (no paid
     // plan tiers yet — matches the P09 integration default); paid quota providers
@@ -877,7 +877,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
             return out;
         });
 
-    // 10c. [D3.5 batch1/F18a] Operation-log query surface. ObservabilityModule owns
+    // 10c. Operation-log query surface. ObservabilityModule owns
     // the CE OperationLogger (over catalog.db, schema migrated at startup above) +
     // the daily UTC-02:00 cleanup sweep. Phase-1 OSS uses an in-memory global config
     // (retention/row-cap defaults); a file-based config lands with full F18a ops.
@@ -893,7 +893,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         seed.base_url = config.agent_llm.base_url;
         global_config->SetAgentLlmConfig(seed);
     }
-    // [F10 §3.4 · D3.5] Wire the per-NS CleaningConfig resolver onto the SPC pipeline
+    // Wire the per-NS CleaningConfig resolver onto the SPC pipeline
     // (proxied through spc_mgr). The NS cleaning_config lives in the catalog (not on
     // the per-request façade), so the pipeline reaches it through this seam: resolve
     // global defaults once from global_config, then per task merge global ←
@@ -919,10 +919,10 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         });
     cortrix::observability::ObservabilityModule obs_module(catalog_db.db(), global_config);
     upload_handler.SetOperationLogger(obs_module.logger());  // upload-site operation_log
-    // [F13 TC4 · A4] agent_trace now lives in the global catalog.db. Build ONE writer over
-    // that handle, shared by the F13 90-day retention cleanup here AND the F-path query
-    // EngineInstrumentation write side (below, ~line 710). Register the F13 retention
-    // callbacks on the shared F18a CleanupScheduler BEFORE Initialize() so its startup
+    // agent_trace now lives in the global catalog.db. Build ONE writer over
+    // that handle, shared by the 90-day retention cleanup here AND the F-path query
+    // EngineInstrumentation write side (below, ~line 710). Register the retention
+    // callbacks on the shared CleanupScheduler BEFORE Initialize() so its startup
     // catch-up sweep covers agent_trace + interaction_log too (Initialize() registers
     // operation_log then StartScheduler()s the catch-up). agent_trace is single-db
     // (delegated to writer->Cleanup); interaction_log is per-NS, so it gets a fan-out
@@ -956,16 +956,16 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     }
     obs_module.Initialize();
 
-    // 10d. [D3.5 r2 · Wave P · P2] F16a DB-import assembly. The ConnectionManager
+    // 10d. DB-import assembly. The ConnectionManager
     // (encrypted secret store + ref lifecycle) and ImportManager (validate → fetch
     // → textualize → feed) are built over: the validating QueryExecutor (real PG
     // connect → D3.5, so it returns CONNECTION_FAILED after the §3.4 security gate
     // today), in-memory secret/conn stores + import task store, plus —
     // [P2b] real SPCManager feed (textualized rows → live Pipeline → searchable
-    // blocks, F16a §3.2 step 6) + [P2c] real D3 full-overwrite cleanup
+    // blocks, step 6) + [P2c] real D3 full-overwrite cleanup
     // (RealBlockCleaner deletes the prior import's docs+blocks by source_path prefix
-    // over the F05 pool, so a re-import replaces rather than duplicates) + the real
-    // F18a operation logger (db_connection_register/revoke + database_import audit,
+    // over the namespace pool, so a re-import replaces rather than duplicates) + the real
+    // operation logger (db_connection_register/revoke + database_import audit,
     // S6). ImportHandler holds shared_ptrs; kept alive in this scope.
     auto import_op_logger = obs_module.logger();
     auto import_conn_mgr = std::make_shared<cortrix::import::ConnectionManager>(
@@ -988,7 +988,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::middleware::RateLimiter rate_limiter;
     cortrix::CortrixHttpServer server(config, auth, ns_mgr);
     server.SetNamespacePool(&ns_pool);       // [wire⑤c] live doc/block counts via per-request façade
-    server.SetNamespaceRouter(&ns_router);   // [wire⑤c/F13] namespace-create path
+    server.SetNamespaceRouter(&ns_router);   // namespace-create path
     server.SetOperationLogger(obs_module.logger().get());  // ns_create/ns_delete operation_log
     server.RegisterRoutes();
     // Pre-routing rate-limit gate (per-ip / per-api-key / global token
@@ -1016,7 +1016,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
             return httplib::Server::HandlerResponse::Unhandled;
         });
 
-    // P02a web UI: serve the SPA bundle when a dist dir is provided (container
+    // web UI: serve the SPA bundle when a dist dir is provided (container
     // entrypoint exports CORTRIX_WEB_UI_DIR=/app/web-ui; unset = headless).
     if (const char* web_ui_dir = std::getenv("CORTRIX_WEB_UI_DIR");
         web_ui_dir != nullptr && web_ui_dir[0] != '\0') {
@@ -1035,12 +1035,12 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // [gap②] Document upload consults the disk monitor (507 CX_ERR_DISK_FULL at CRIT).
     cortrix::RegisterDocumentRoutes(server.server(), upload_handler, ns_pool, auth,
                                     &f24_disk_monitor);
-    // [D3.5-R2 Wave Q1/Q2] F04 cross-NS query: POST /api/v1/query is now the
+    // cross-NS query: POST /api/v1/query is now the
     // ScatterGather link (namespaces[] array + 8-field meta + child_id/content_hash
-    // ResultItems), replacing the MVP single-NS route. The wiring owns the F04 stack
+    // ResultItems), replacing the MVP single-NS route. The wiring owns the cross-NS query stack
     // (executor engine / reranker / live executor / scatter / handler) and must
     // outlive `server`, so it is a local that lives to the end of this scope.
-    // F36 query-variant expansion reuses the semantic LLM (F36 deps: "reuse LLM
+    // query-variant expansion reuses the semantic LLM (F36 deps: "reuse LLM
     // client"); when semantic_llm is unconfigured, the null client leaves F36 off.
     std::shared_ptr<cortrix::llm::ILlmClient> query_llm;
     if (config.semantic_llm.IsConfigured()) {
@@ -1052,7 +1052,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         q_cfg.default_model = config.semantic_llm.model;
         query_llm = std::make_shared<cortrix::llm::OpenAiLlmClient>(std::move(q_cfg));
     }
-    // [F13 · F] Query-path agent_trace write side: one EngineInstrumentation over the
+    // Query-path agent_trace write side: one EngineInstrumentation over the
     // shared global at_writer (built at ~line 640). op_logger is now wired
     // (was nullptr) so the query site ALSO writes operation_log on success — the
     // EngineInstrumentation::Record success path emits the F18a entry (action="query").
@@ -1073,8 +1073,8 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     }
     cross_ns_query_wiring.Register(server.server(), auth);
 
-    // [M1] MEM02 extraction service: a MemoryQueue draining interactions through
-    // per-namespace MemoryExtractors. Reuses the enricher-chain LLM (F03 OpenAiLlmClient
+    // memory extraction service: a MemoryQueue draining interactions through
+    // per-namespace MemoryExtractors. Reuses the enricher-chain LLM (OpenAiLlmClient
     // shared, MEM02 D1) + obs_module's operation logger. Disabled (no enricher LLM) =>
     // interaction_log only. Started after registration so the route can enqueue.
     cortrix::memory::MemoryExtractorConfig mem02_cfg;
@@ -1099,18 +1099,18 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         mem02_queue_cfg);
     cortrix::MemoryServices mem_services;
     mem_services.extraction = &mem02_service;
-    mem_services.op_logger = obs_module.logger();  // F18a audit for MEM03 CRUD
+    mem_services.op_logger = obs_module.logger();  // audit for memory-transparency CRUD
     mem02_service.Start();
 
-    // [D3.5 r2 · Wave P · P3] POST /api/v1/documents/batch — mount the TD-F42-BULK
+    // POST /api/v1/documents/batch — mount the batch submit
     // batch submit route. The service fans each doc out through the frozen F42
     // scheduler (F42TaskSubmitterAdapter::Submit → TaskScheduler::Enqueue + a worker
     // Notify). Default BatchLimits (100 docs / 100MB / 10MB-per-doc). Both the
     // adapter + the service outlive `server` (RAII order: server destructs first).
     cortrix::server::F42TaskSubmitterAdapter batch_submitter(&task_scheduler, &worker_pool);
     cortrix::server::BatchSubmitService batch_service(&batch_submitter);
-    // [P3b] Materialize each batch doc's inline content under the data dir so the
-    // F42 doc-parse worker (DocumentProcessor → ParseDocument(filepath)) reads real
+    // Materialize each batch doc's inline content under the data dir so the
+    // doc-parse worker (DocumentProcessor → ParseDocument(filepath)) reads real
     // files — batch submissions now truly enter the pipeline + land as blocks.
     batch_service.SetMaterializeDir(cortrix::server::BatchTempDir(config.ns.data_dir));
     // Reclaim materialized inputs no live task still needs, BEFORE the route is
@@ -1142,13 +1142,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // [D3.5 r2 · Wave S routes] Flat design-surface /documents family. Mounts the
     // openapi/SDK/MCP shape (POST/GET/GET{id}/DELETE{id} + tasks progress/cancel) on
     // top of the live per-NS handlers while keeping nested routes. POST reuses
-    // batch_service as a batch-of-1; the F42 task progress/cancel bodies come from a
+    // batch_service as a batch-of-1; the async task progress/cancel bodies come from a
     // DocumentTaskHandler over the already-wired scheduler/task_mgr/worker_pool (must
     // outlive `server`, so declared here at end-of-scope).
     cortrix::async::DocumentTaskHandler doc_task_handler(
         &task_scheduler, &task_mgr, &worker_pool, f42_config.get(),
         cortrix::server::BatchTempDir(config.ns.data_dir));
-    // [F41 · A6] GET /api/v1/documents/discover — doc-summary granularity recall (HNSW
+    // GET /api/v1/documents/discover — doc-summary granularity recall (HNSW
     // over doc_summary blocks + FTS5 fallback). MUST be mounted BEFORE RegisterFlatDocumentRoutes
     // below, whose GET /documents/{id} catch-all would otherwise swallow the literal
     // "discover" path segment. The DocSummaryConfig is resolved once from f42_config — the
@@ -1169,7 +1169,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                                         batch_service, doc_task_handler, auth);
     cortrix::RegisterMemoryRoutes(server.server(), auth, ns_pool, spc_mgr,
                                   embedder, classifier, fusion, config.memory, mem_services);
-    // [F13 TC4] Agent-observability routes split across two DBs: agent_trace moved back to
+    // Agent-observability routes split across two DBs: agent_trace moved back to
     // the global catalog.db (a session may span namespaces -> trace read is GLOBAL, no
     // ?namespace=), while interaction_log + interaction_sources stay per-NS memory.db.
     // RegisterTracesRoutesGlobal builds its own writer + the section 8.1 cross-NS owner
@@ -1181,7 +1181,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::RegisterConnectorRoutes(server.server(), connector_state, ns_pool, ns_router, spc_mgr, auth);
     // The registry is now built (RegisterConnectorRoutes lazily creates it).
     // Subscribe the config watch_dir as a fan-out watcher over its namespace. Subscribe
-    // creates a fresh NS via INSRouter (catalog INSERT + F05 AdmitCreate) so the importer
+    // creates a fresh NS via INSRouter (catalog INSERT + AdmitCreate) so the importer
     // can Acquire it; autostart is deferred to StartAll() below.
     if (config.watch_dir.watch_enabled && !config.watch_dir.data_dir.empty() &&
         connector_state.registry) {
@@ -1192,11 +1192,11 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // [D3.5 r2 · Wave S routes] /watch aliases (openapi/SDK/MCP fan-out shape) mapped
     // onto the same connector registry (POST = one Subscribe(path, target_namespaces)).
     cortrix::RegisterWatchAliasRoutes(server.server(), connector_state, ns_pool, ns_router, spc_mgr, auth);
-    // [D3.5 batch1] P09 tenant/permission/quota REST (15 endpoints, sec 4.5). In CE
+    // tenant/permission/quota REST (15 endpoints, sec 4.5). In CE
     // no-auth mode WithAuth grants admin so the admin-gated endpoints are reachable
-    // for local integration; full multi-tenant enforcement activates with P08 auth.
+    // for local integration; full multi-tenant enforcement activates with auth.
     cortrix::RegisterTenantRoutes(server.server(), tenant_svc, perm_svc, quota_svc, auth);
-    // [D3.5 batch1/F18a] operation-log query route (GET /api/v1/operations, read-only).
+    // operation-log query route (GET /api/v1/operations, read-only).
     cortrix::RegisterOperationsRoutes(server.server(), *obs_module.logger(), auth);
     // [addendum §3.7 G4] enrichment-backfill ops surface (admin; audit + enqueue).
     {
@@ -1210,7 +1210,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                                       std::move(enrich_chain_tokens),
                                       obs_module.logger().get());
     }
-    // [D3.5 r2 · Wave P · P1] P08-CE auth REST surface. Bootstrap GET+POST are NOT
+    // CE auth REST surface. Bootstrap GET+POST are NOT
     // WithAuth-wrapped (on first run no key exists; the bootstrap token IS the
     // credential) — AdminGuard's loopback IP filter on /api/v1/admin/* is the
     // ambient gate. /auth/api-keys CRUD is WithAuth(admin).
@@ -1220,20 +1220,20 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // the self-hosted UI is usable out-of-the-box; auth-enabled → 401 (login). The
     // JWT /auth/me is cloud-enterprise; this CE shim avoids the no-auth login dead-end.
     cortrix::RegisterAuthSessionRoute(server.server(), auth);
-    // [FA1 R11] P08 §2.13-bis admin/users 5 endpoints (admin-gated; mutations write
+    // P08 §2.13-bis admin/users 5 endpoints (admin-gated; mutations write
     // operation_log) + §2.11 JWT secret rotation endpoint. AdminGuard adds the
     // loopback IP layer on the /api/v1/admin/* prefix.
     cortrix::RegisterAdminUsersRoutes(server.server(), admin_users_service, auth,
                                       obs_module.logger().get());
     cortrix::RegisterJwtRotateRoute(server.server(), jwt_secret_service, auth);
-    // [D3.5 r2 · Wave P · P2] F16a DB-import 6-endpoint surface (admin-gated;
+    // DB-import 6-endpoint surface (admin-gated;
     // /admin/db-connections* under AdminGuard, /import/* Layer-2 only per §6.1).
     cortrix::RegisterImportRoutes(server.server(), import_handler, auth);
-    // [D3.5 r2 · Wave P · P4] F48 §6.3 agent_llm_config GET (read) / PUT (admin).
+    // F48 §6.3 agent_llm_config GET (read) / PUT (admin).
     // Backed by the shared global_config (api_key encrypted at rest). The PUT path
     // is not under AdminGuard, so it enforces admin in-handler.
     cortrix::RegisterSystemConfigRoutes(server.server(), *global_config, auth);
-    // [OPEN-2] GC + maintenance ops routes (/api/v1/gc/*, /api/v1/maintenance/*).
+    // GC + maintenance ops routes (/api/v1/gc/*, /api/v1/maintenance/*).
     cortrix::RegisterGcRoutes(server.server(), gc_manager, gc_doc_sweeper, auth);
 
     // Install AdminGuard pre-routing filter: admin paths are restricted to
@@ -1243,8 +1243,8 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         {config.security.admin_bind, config.security.allow_public_admin});
     // Deployment wiring (additive). The DiskMonitor itself is
     // constructed earlier (6b) so the SPC admission gate + upload route hold it.
-    // Dual health endpoint (F24 main impl): /api/v1/system/health/{live,ready}.
-    // /ready aggregates the F20 ReadinessRegistry (unified
+    // Dual health endpoint (main implementation): /api/v1/system/health/{live,ready}.
+    // /ready aggregates the ReadinessRegistry (unified
     // abstraction — replaced F24's standalone HealthProviders). Register the readiness
     // components here (design F20 §8.3/§8.4). Every probe below reflects REAL runtime state
     // — none is a constant-200 stub (a false-ready probe is worse than an honest deferral,
@@ -1276,8 +1276,8 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         return r;
     });
 
-    // secret_provider (real, F20-6): construct the configured provider (env in V1.0) and
-    // register the F20 adapter, which reports ready iff ISecretProvider::IsHealthy() and
+    // secret_provider (real, the secret provider): construct the configured provider (env in V1.0) and
+    // register the readiness adapter, which reports ready iff ISecretProvider::IsHealthy() and
     // surfaces provider_type.
     auto secret_provider = cortrix::security::CreateSecretProvider();
     readiness.Register(
@@ -1433,12 +1433,12 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         CORTRIX_LOG_WARN("metrics", "OpenMetrics endpoint failed to bind :{} (port in use?)",
                          metrics_port);
     }
-    // [D3.5 wire · gap⑤ · plan B, F24 §7.2.bis] Graceful-shutdown coordinator.
+    // Graceful-shutdown coordinator.
     // The signal stays with the existing SignalHandler (g_shutting_down +
     // server.Stop()); Run() executes on the MAIN thread after server.Start()
     // returns — zero races with the RAII teardown (InstallGracefulShutdown's
     // signal-takeover waiter is deliberately NOT used here). Drain scope = the
-    // in-memory SPC queue only: F42 tasks live in tasks.db (status=queued is
+    // in-memory SPC queue only: async tasks live in tasks.db (status=queued is
     // re-picked by Dequeue on next start); flush_wal / persist_memory stay null —
     // P-HNSW WAL (fdatasync per write) + SQLite WAL are already crash-safe.
     cortrix::deploy::ShutdownConfig gs_cfg;
@@ -1447,7 +1447,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         /*close_http=*/ nullptr,  // server already stopped before Run() (plan B)
         /*drain_tasks=*/ [&worker_pool, &spc_mgr, &enrich_sweeper](std::chrono::steady_clock::time_point) {
             // Order matters (original Plan B teardown): the enrich sweeper stops
-            // first (no new backfill enqueues), then the F42 pool stops so
+            // first (no new backfill enqueues), then the worker pool stops so
             // doc_processor→spc_mgr quiesces, then the SPC drain joins its workers
             // (each finishes at most its in-hand task) and exports the untouched
             // queue remainder for .pending_tasks.json.
@@ -1503,7 +1503,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                          enrich_sweeper.SweepIntervalSec());
     }
 
-    // [OPEN-2] Launch the background GC thread (no-op when gc.enabled=false).
+    // Launch the background GC thread (no-op when gc.enabled=false).
     gc_thread.Start();
     if (gc_thread.started()) {
         CORTRIX_LOG_INFO("main", "GC background thread started ({}h scan interval)",
@@ -1559,7 +1559,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     if (connector_state.registry) {
         connector_state.registry->StopAll();
     }
-    // [OPEN-2] stop the GC thread (also RAII-handled, but explicit so an in-flight
+    // stop the GC thread (also RAII-handled, but explicit so an in-flight
     // sweep finishes + the thread joins before the catalog handle is torn down).
     gc_thread.Stop();
     // stop the deployment background services (also handled by RAII, but
@@ -1570,9 +1570,9 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     if (extensions.on_shutdown) {
         extensions.on_shutdown();
     }
-    // [gap⑤ · plan B] Ordered graceful shutdown on the MAIN thread (F24 §7.2.bis,
+    // Ordered graceful shutdown on the MAIN thread (F24 §7.2.bis,
     // replaces the bare worker_pool.Stop() + spc_mgr.Stop() pair — Run()'s drain
-    // hook performs both, preserving the Plan B order: F42 pool first so
+    // hook performs both, preserving the Plan B order: worker pool first so
     // doc_processor→spc_mgr quiesces, then the SPC drain joins workers and persists
     // the untouched queue remainder to .pending_tasks.json for next-start resume.
     // F42 DB tasks need no persist: status=queued is re-picked by Dequeue.)

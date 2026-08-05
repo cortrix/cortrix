@@ -43,7 +43,7 @@ Mem04Metrics::TriggeredBy MetricTrigger(OptOutActor actor) {
     return Mem04Metrics::TriggeredBy::kSystem;
 }
 
-// Record one F18a operation_log entry for an opt-out action (GEN-OperationLog). No-op
+// Record one operation_log entry for an opt-out action (GEN-OperationLog). No-op
 // when no logger is wired (standalone). action = {resource}_{verb} (≤32, lower, '_').
 void RecordOplog(const std::shared_ptr<IOperationLogger>& logger,
                  const char* action,

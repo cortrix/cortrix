@@ -192,7 +192,7 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
             EnrichResult& merged = results[i].merged;
             const bool step_ok = step.ok();
 
-            // Merge policy: the F03 head establishes the base (entities/summary/
+            // Merge policy: the enricher head establishes the base (entities/summary/
             // enriched_score/provenance). F35 contributes the contextualized_* fields
             // only. We never clobber a non-empty F03 field with an empty later one.
             if (!step.entities.empty()) merged.entities = std::move(step.entities);

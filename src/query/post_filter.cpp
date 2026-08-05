@@ -38,7 +38,7 @@ std::vector<ResultItem> PostFilter::Apply(
             // Doc may have been deleted; skip
             continue;
         }
-        // [OPEN-2] A soft-deleted doc (Stage 1) is invisible to retrieval: its
+        // A soft-deleted doc (Stage 1) is invisible to retrieval: its
         // blocks stay in the index (restore is free) but must not surface in
         // results until it is restored or hard-deleted by Stage 2.
         if (doc.status == DocStatus::kDeleted) {
@@ -153,7 +153,7 @@ std::vector<ResultItem> PostFilter::FetchByDocId(
     store_.doc_get(doc_id, doc);
 
     std::vector<ResultItem> results;
-    // [OPEN-2] A soft-deleted doc is invisible to retrieval — return no rows.
+    // A soft-deleted doc is invisible to retrieval — return no rows.
     if (doc.status == DocStatus::kDeleted) {
         return results;
     }
