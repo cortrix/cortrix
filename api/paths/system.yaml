@@ -1,7 +1,7 @@
-# paths/system.yaml — /api/v1/health + /api/v1/system/* (ARCH § 4.1.11)
+# paths/system.yaml — /api/v1/health + /api/v1/system/*
 # Live surface (reconciled S2): /health (general) + /system/health/live + /system/health/ready
-# + /system/version + /system/features + /system/agent_llm_config GET/PUT (V14 J8 F48 § 6.3).
-# /system/namespaces/{ns}/stats is the F20 per-NS metrics design surface (NsStats).
+# + /system/version + /system/features + /system/agent_llm_config GET/PUT.
+# /system/namespaces/{ns}/stats is the per-namespace metrics surface (NsStats).
 paths:
   /health:
     get:
@@ -65,7 +65,7 @@ paths:
       operationId: getSystemHealthReady
       summary: Readiness probe
       description: |
-        Readiness probe. Aggregates the F20 ReadinessRegistry plus a shutdown gate. 200 when not shutting
+        Readiness probe. Aggregates the ReadinessRegistry plus a shutdown gate. 200 when not shutting
         down AND all components are ready; otherwise 503 listing the failing components. No authentication required.
       x-cortrix-agent-workflow: ops
       x-cortrix-retryable: true
@@ -192,7 +192,7 @@ paths:
       tags: [admin]
       operationId: getAgentLlmConfig
       summary: Get agent LLM config
-      description: F48 § 6.3 redacted read of the agent LLM config (does not return the key in plaintext, only api_key_set).
+      description: Redacted read of the agent LLM config (does not return the key in plaintext, only api_key_set).
       x-cortrix-agent-workflow: admin
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff
@@ -212,7 +212,7 @@ paths:
       tags: [admin]
       operationId: updateAgentLlmConfig
       summary: Update agent LLM config
-      description: F48 § 6.3 update of the agent LLM config (admin only).
+      description: Update of the agent LLM config (admin only).
       x-cortrix-agent-workflow: admin
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry

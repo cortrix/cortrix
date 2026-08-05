@@ -1,7 +1,6 @@
 # components/partial.yaml — PartialSuccessByIdV1 + PartialSuccessByNamespaceV1 (v1.0.1 dual schema)
 #
-# SoT: P04 § 4.2 + AGENT_FRIENDLY § 2 principle 3 + § 3.2
-# Selection rule: unique ID → ById; across NS/domain/shard → ByNamespace; mixed → allOf combination (P04 § 4.2.3).
+# Selection rule: unique ID → ById; across NS/domain/shard → ByNamespace; mixed → allOf combination.
 components:
   schemas:
     # ---- ById: for batch upload / batch delete / memory extract (primary key = id) ----

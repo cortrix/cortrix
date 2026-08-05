@@ -48,7 +48,7 @@ cortrix/
 ├── sql-extensions/       # pgcortrix — PostgreSQL extension (plpython3u + HTTP)
 ├── cortrix-mcp/          # MCP server for IDE agents and MCP-compatible clients
 ├── web/                  # Web UI (static)
-├── cortrix-agent/        # Cortrix built-in Agent (F48, FastAPI + P03 SDK)
+├── cortrix-agent/        # Cortrix built-in Agent (FastAPI + Python SDK)
 ├── deploy/               # docker-compose.yml, Dockerfile, configs
 ├── tests/                # C++ unit / integration / security / stability / benchmark suites
 └── docs/                 # Documentation

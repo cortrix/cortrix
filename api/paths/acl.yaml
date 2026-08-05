@@ -1,5 +1,4 @@
-# paths/acl.yaml — /api/v1/namespaces/{ns_id}/acl/* (P09 v1.0.4 V3-C-04) — 3 endpoint
-# SoT: P09 v1.0 § 4.1.x + components/schemas.yaml (NsAclEntry)
+# paths/acl.yaml — /api/v1/namespaces/{ns_id}/acl/* — 3 endpoints
 paths:
   /namespaces/{ns_id}/acl:
     parameters:

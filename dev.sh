@@ -99,7 +99,7 @@ export CORTRIX_OPENAPI_ROOT="${CORTRIX_OPENAPI_ROOT:-$SCRIPT_DIR}"
 MISSING_MODELS=()
 [[ -f "$SCRIPT_DIR/models/bge-m3/model.onnx" ]]            || MISSING_MODELS+=("bge-m3 (embedding)")
 [[ -f "$SCRIPT_DIR/models/bge-reranker-v2-m3/model.onnx" ]] || MISSING_MODELS+=("bge-reranker-v2-m3 (rerank)")
-[[ -f "$SCRIPT_DIR/models/query-complexity/model.onnx" ]]  || MISSING_MODELS+=("query-complexity (F39 routing)")
+[[ -f "$SCRIPT_DIR/models/query-complexity/model.onnx" ]]  || MISSING_MODELS+=("query-complexity (routing)")
 [[ -x "$SCRIPT_DIR/scripts/ocr_venv/bin/python3" || -x "$SCRIPT_DIR/scripts/ocr_venv/bin/python3.12" ]] \
     || MISSING_MODELS+=("docling/paddleocr parser venv (PDF/image parsing)")
 if [[ ${#MISSING_MODELS[@]} -gt 0 ]]; then

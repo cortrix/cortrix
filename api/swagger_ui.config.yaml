@@ -1,6 +1,5 @@
 # swagger_ui.config.yaml — Swagger UI deployment config + environment-tiered exposure (D4 + D5 resolutions)
 #
-# SoT: P04 § 5.2 (environment-tiered exposure) + § 7.1 (Swagger UI deployment config).
 # This is the swagger_ui config fragment for cortrix-server (merged into config.yaml). Consumed by the C++ SwaggerHandler in S7:
 # on startup it reads expose_tags[env] by current_env → filters the paths of build/openapi.bundled.yaml (by tag) → renders /docs.
 #
@@ -37,13 +36,13 @@ swagger_ui:
   # injected by the deployment script at deploy time (overrides this default)
   current_env: production
 
-# ---- server endpoints (landed in S7, see P04 § 7.2) ----
+# ---- server endpoints ----
 # | Path                    | Purpose                    | Auth |
 # | /docs                   | Swagger UI HTML page       | no   |
 # | /openapi.bundled.yaml   | bundled spec file          | no   |
 # | /openapi.json           | bundled spec JSON (alt)    | no   |
 #
-# ---- evolution anchors (L4 audience + L5 deployment form, P04 § 5.4) ----
+# ---- evolution anchors ----
 # Adding a new tag (internal/partner) only requires extending openapi.yaml tags + this file's expose_tags.
 # Adding a new environment (qa/pre-release) only requires extending expose_tags.
-# Phase 2 adds /redoc (Redoc) / /stoplight (Stoplight Elements) as alternative UIs (P04 § 7.3).
+# Phase 2 adds /redoc (Redoc) / /stoplight (Stoplight Elements) as alternative UIs.

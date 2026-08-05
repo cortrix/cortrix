@@ -1,13 +1,12 @@
-# components/schemas.yaml — core dataclasses (gathered in reverse from ARCH § 4.1.x + P03 v1.0.1 types)
+# components/schemas.yaml — core dataclasses shared by the request and response bodies.
 #
-# SoT: ARCHITECTURE.md § 4.1.1-4.1.11 per-domain request/response examples + each Feature's detailed design + P03 v1.0.1 types.
-# Field names are stable and backward-compatible (AGENT_FRIENDLY principle 7). ULID uses string (ARCH § 1.8 + V5 resolution #6A).
+# Field names are stable and backward-compatible. ULIDs are carried as strings.
 #
-# Relational-model fields (P03-1 collaboration): visibility / ns_acl / dedup_scope / isolation_mode / owner_node_id.
+# Relational-model fields: visibility / ns_acl / dedup_scope / isolation_mode / owner_node_id.
 components:
   schemas:
 
-    # ============ Namespace domain (ARCH § 4.1.1) ============
+    # ============ Namespace domain ============
     ChunkStrategy:
       type: object
       properties:
@@ -38,7 +37,7 @@ components:
           example: "bge-m3"
         chunk_strategy:
           $ref: '#/components/schemas/ChunkStrategy'
-        # relational-model fields (P03-1)
+        # relational-model fields
         visibility:
           type: string
           enum: [private, tenant, public]
@@ -78,10 +77,10 @@ components:
         owner_node_id:
           type: string
           nullable: true
-          description: "ID of the node that owns this NS's data (distributed deployment, P03-1)"
+          description: "ID of the node that owns this NS's data (distributed deployment)"
         ns_acl:
           type: array
-          description: "NS ACL grant list (P09 / P03-1; see NsAclEntry)"
+          description: "NS ACL grant list (see NsAclEntry)"
           items:
             $ref: '#/components/schemas/NsAclEntry'
         created_at:
@@ -89,7 +88,7 @@ components:
           format: date-time
           example: "2026-04-02T10:00:00Z"
 
-    # ============ Document domain (ARCH § 4.1.2 + F42) ============
+    # ============ Document domain ============
     DocumentProgress:
       type: object
       properties:
@@ -160,7 +159,7 @@ components:
 
     DocumentTask:
       type: object
-      description: "F42 asynchronous upload task"
+      description: "Asynchronous upload task"
       required: [task_id, status]
       properties:
         task_id:
@@ -204,7 +203,7 @@ components:
         message:
           type: string
 
-    # ============ Query domain (ARCH § 4.1.3 + F04 v1.0.3) ============
+    # ============ Query domain ============
     QueryFilter:
       type: object
       properties:
@@ -253,11 +252,11 @@ components:
         route:
           type: string
           enum: [auto, simple, complex, chat]
-          description: "F39 query-complexity route override (also accepted as ?route query param; default auto). 'chat' takes the MEM02-only memory path."
+          description: "Query-complexity route override (also accepted as ?route query param; default auto). 'chat' takes the memory-only path."
         rag_fusion:
           type: boolean
           default: false
-          description: "F36 RAG-Fusion opt-in (also accepted as ?rag_fusion=true). Off by default until the NS-config resolver lands (D3.5)."
+          description: "RAG-Fusion opt-in (also accepted as ?rag_fusion=true). Off by default until the per-namespace config resolver lands."
         search_config:
           $ref: '#/components/schemas/SearchConfig'
         timeout_ms:
@@ -266,14 +265,14 @@ components:
           maximum: 30000
           description: >-
             Per-query wall-clock budget in milliseconds, distributed across the parallel
-            vector / BM25 / SQL routes (F08 CalculateRouteTimeout). Must be in [100, 30000];
+            vector / BM25 / SQL routes. Must be in [100, 30000];
             out-of-range → 400 CX_ERR_QUERY_INVALID_ARGUMENT.
           example: 5000
 
     SearchConfig:
       type: object
       description: >-
-        Per-query route toggles (F07/F08). Each route defaults to enabled; set a flag false
+        Per-query route toggles. Each route defaults to enabled; set a flag false
         to skip that route (e.g. {"enable_sql": false} runs vector + BM25 only). Disabling a
         route is reflected in the response meta.routes_used / degradation fields.
       properties:
@@ -288,14 +287,14 @@ components:
         enable_sql:
           type: boolean
           default: true
-          description: "Allow the SQL route to fire when the query intent is SQL/hybrid (F08; otherwise skipped)."
+          description: "Allow the SQL route to fire when the query intent is SQL/hybrid; otherwise skipped."
 
     QueryResultItem:
       type: object
       properties:
         child_id:
           type: string
-          description: "child block ULID (ARCH § 1.8)"
+          description: "child block ULID"
           example: "01HXYZA0BC9876543ZYXWVU321"
         parent_id:
           type: string
@@ -304,16 +303,16 @@ components:
           type: string
         parent_content:
           type: string
-          description: "F34 parent full text"
+          description: "Parent full text"
         score:
           type: number
           format: float
-          description: "final_score (output of the F07 SemanticScorer)"
+          description: "final_score (output of the SemanticScorer)"
           example: 0.892
         rerank_score:
           type: number
           format: float
-          description: "cross-encoder score (F02)"
+          description: "cross-encoder score (reranker)"
           example: 0.945
         namespace:
           type: string
@@ -374,13 +373,13 @@ components:
             type: object
         via_path:
           type: string
-          description: "F39 path marker, present on the chat route (e.g. 'chat_memory_only')."
+          description: "Route path marker, present on the chat route (e.g. 'chat_memory_only')."
         crag_verdict:
           type: string
-          description: "F37 CRAG B-class verdict; present only when F37 ran (Complex route)."
+          description: "CRAG B-class verdict; present only when CRAG evaluation ran (Complex route)."
         crag_action:
           type: string
-          description: "F37 action taken for an ambiguous CRAG verdict; present alongside crag_verdict when set."
+          description: "Action taken for an ambiguous CRAG verdict; present alongside crag_verdict when set."
 
     QueryResult:
       type: object
@@ -393,7 +392,7 @@ components:
         meta:
           $ref: '#/components/schemas/QueryMeta'
 
-    # ============ Memory domain (ARCH § 4.1.5 + MEM01/02/03/05) ============
+    # ============ Memory domain ============
     MemorySearchRequest:
       type: object
       required: [query, namespace, user_id]
@@ -406,7 +405,7 @@ components:
           example: "user_memory"
         user_id:
           type: string
-          description: "Mandatory user_id filter (MEM05 isolation)"
+          description: "Mandatory user_id filter (per-user isolation)"
           example: "user_001"
         top_k:
           type: integer
@@ -414,7 +413,7 @@ components:
 
     MemorySearchResultItem:
       type: object
-      description: "One MEM02 conversation-memory search hit (live MemorySearcher result)."
+      description: "One conversation-memory search hit (live MemorySearcher result)."
       required: [interaction_id, session_id, query_text, response_text, score, expired, created_at]
       properties:
         interaction_id: { type: string }
@@ -431,7 +430,7 @@ components:
 
     MemorySearchResponse:
       type: object
-      description: "POST /memory/search body (live MemorySearchResponse). Semantic search over conversation memory with MEM05 user isolation."
+      description: "POST /memory/search body (live MemorySearchResponse). Semantic search over conversation memory with per-user isolation."
       required: [results, total_results, latency_ms, degraded]
       properties:
         results:
@@ -524,14 +523,14 @@ components:
           format: float
           nullable: true
 
-    # ============ Import domain (F16a Database Import) ============
+    # ============ Import domain ============
     # Shapes mirror the live CE implementation:
     #   src/import/import_types.h (ImportRequest / ImportTaskProgress / ImportTaskStatus)
     #   src/import/import_response.cpp (BuildImportStartedResponse / BuildProgressResponse).
     ImportRequest:
       type: object
       description: |
-        Database import request (POST /import/database, F16a §6.2). Exactly one of {table, sql} must be
+        Database import request (POST /import/database). Exactly one of {table, sql} must be
         provided; table mode additionally accepts a filter JSON DSL (NOT raw SQL) + columns projection.
       required: [namespace, connection_ref]
       properties:
@@ -570,7 +569,7 @@ components:
 
     ImportTaskStarted:
       type: object
-      description: "Acceptance ack for POST /import/database (F16a §5.1). status is always 'queued'; live status comes from GET /import/tasks/{task_id}/progress."
+      description: "Acceptance ack for POST /import/database. status is always 'queued'; live status comes from GET /import/tasks/{task_id}/progress."
       required: [task_id, status, namespace, connection_ref, estimated_rows, queued_at, progress_endpoint, cancel_endpoint, error]
       properties:
         task_id:
@@ -603,7 +602,7 @@ components:
 
     ImportTaskProgress:
       type: object
-      description: "Import task progress snapshot (F16a §5.2). error is set only in the FAILED terminal state; cancel resolves to status=cancelled with no error."
+      description: "Import task progress snapshot. error is set only in the FAILED terminal state; cancel resolves to status=cancelled with no error."
       required: [task_id, status, progress, rows_imported, rows_total, rows_failed, started_at, estimated_completion_at, error]
       properties:
         task_id:
@@ -671,13 +670,13 @@ components:
         revoked:
           type: boolean
 
-    # ============ Observability domain (F13 Agent Observability) ============
+    # ============ Observability domain ============
     # Shapes mirror the live CE serializers in src/server/routes/observability_routes.cpp
     # (TraceEntryToJson / TracesResponseToJson / SourcesViewToJson / InteractionListToJson).
     # Timestamps are raw stored Unix-ms integers (the writer stamps Unix ms).
     TraceEntry:
       type: object
-      description: "One agent_trace row (F13 §8.1). Optional columns are JSON null when unset (GEN-Agent stable schema)."
+      description: "One agent_trace row. Optional columns are JSON null when unset (stable schema)."
       required: [session_id, trace_id, agent_id, method, params, result_summary, duration_ms, source, status, error_code, namespace_id, created_at]
       properties:
         session_id: { type: string, nullable: true }
@@ -713,11 +712,11 @@ components:
           description: "Null when has_next is false."
         response_size_warning:
           type: boolean
-          description: "§8.1 soft-limit flag."
+          description: "Soft-limit flag."
 
     TraceSession:
       type: object
-      description: "GET /traces/{session_id} body (F13 §8.1)."
+      description: "GET /traces/{session_id} body."
       required: [session_id, trace_count, traces, meta]
       properties:
         session_id: { type: string }
@@ -759,7 +758,7 @@ components:
 
     InteractionList:
       type: object
-      description: "GET /interactions body (F13 §8.3)."
+      description: "GET /interactions body."
       required: [interactions, meta]
       properties:
         interactions:
@@ -782,7 +781,7 @@ components:
 
     InteractionSources:
       type: object
-      description: "GET /interactions/{id}/sources body (F13 §8.2). highlight_ranges is Enterprise-only (absent in CE)."
+      description: "GET /interactions/{id}/sources body. highlight_ranges is Enterprise-only (absent in CE)."
       required: [interaction_id, source_count, deleted_sources_count, sources]
       properties:
         interaction_id: { type: string }
@@ -793,10 +792,10 @@ components:
           items:
             $ref: '#/components/schemas/InteractionSource'
 
-    # ============ Operation log domain (F18a §6.1) ============
+    # ============ Operation log domain ============
     OperationLogEntry:
       type: object
-      description: "One operation_log row (F18a §6.1). Optional columns are JSON null when unset."
+      description: "One operation_log row. Optional columns are JSON null when unset."
       required: [id, timestamp, user_id, action, resource_type]
       properties:
         id: { type: string }
@@ -828,7 +827,7 @@ components:
 
     OperationLogPage:
       type: object
-      description: "GET /operations body (F18a §6.1). Pagination is offset-based (no opaque cursor)."
+      description: "GET /operations body. Pagination is offset-based (no opaque cursor)."
       required: [operations, total_count, limit, offset, meta]
       properties:
         operations:
@@ -850,7 +849,7 @@ components:
             has_next: { type: boolean }
             next_offset: { type: integer }
 
-    # ============ Watch domain (ARCH § 4.1.4 + F21) ============
+    # ============ Watch domain ============
     Watcher:
       type: object
       required: [id, path]
@@ -891,7 +890,7 @@ components:
           type: string
           format: date-time
 
-    # ============ Auth domain (ARCH § 4.1.9 + P08) ============
+    # ============ Auth domain ============
     RegisterRequest:
       type: object
       required: [email, password]
@@ -984,7 +983,7 @@ components:
           format: date-time
           nullable: true
 
-    # ============ Tenant / ACL domain (P09) ============
+    # ============ Tenant / ACL domain ============
     Quota:
       type: object
       properties:
@@ -1051,7 +1050,7 @@ components:
           type: string
           format: date-time
 
-    # ============ Agent domain (F48 v1.0.2 / V14 J8) ============
+    # ============ Agent domain ============
     ChatRequest:
       type: object
       required: [message]
@@ -1078,8 +1077,8 @@ components:
           type: string
           nullable: true
           description: >-
-            Class-A field, always returned (AGENT_FRIENDLY § 2). In a CE single-tenant environment the value is null
-            (Class-A null-allowed clause, F48's first instance) — treat as default/unset, not as an error.
+            Class-A field, always returned. In a CE single-tenant environment the value is null
+            (Class-A null-allowed clause) — treat as default/unset, not as an error.
         messages:
           type: array
           items:
@@ -1097,10 +1096,10 @@ components:
           type: string
           format: date-time
 
-    # ============ System domain (ARCH § 4.1.11 + V14 J8) ============
+    # ============ System domain ============
     AgentLlmConfig:
       type: object
-      description: "F48 § 6.3 agent LLM config (GET reads redacted / PUT admin-only update)"
+      description: "Agent LLM config (GET reads redacted / PUT admin-only update)"
       properties:
         provider:
           type: string
@@ -1133,7 +1132,7 @@ components:
           format: date-time
           nullable: true
 
-    # ============ GC / ops domain (P03 v1.0.1 § 2.13) ============
+    # ============ GC / ops domain ============
     GcStatus:
       type: object
       properties:
@@ -1149,12 +1148,12 @@ components:
           type: integer
           format: int64
           nullable: true
-          description: "Unix epoch milliseconds of the last GC run (same convention as latency_ms / F13 timestamps); null if GC has never run."
+          description: "Unix epoch milliseconds of the last GC run (same convention as latency_ms / trace timestamps); null if GC has never run."
 
-    # ============ Batch submit domain (TD-F42-BULK §2.2/§2.3, Wave D-R1) ============
+    # ============ Batch submit domain ============
     BatchSubmitDocument:
       type: object
-      description: "One document in a batch submission (TD-F42-BULK §2.2)."
+      description: "One document in a batch submission."
       required: [doc_id, content]
       properties:
         doc_id:
@@ -1170,12 +1169,12 @@ components:
 
     BatchSubmitOptions:
       type: object
-      description: "Batch submission options (TD-F42-BULK §2.2, topics 2/3)."
+      description: "Batch submission options."
       properties:
         async:
           type: boolean
           default: true
-          description: "Always true in V1 (F42 async processing, topic 3)."
+          description: "Always true in V1 (asynchronous processing)."
         on_duplicate:
           type: string
           enum: [skip, overwrite, error]
@@ -1200,7 +1199,7 @@ components:
 
     BatchSubmitResultItem:
       type: object
-      description: "Accepted per-doc submission result (TD-F42-BULK §2.3 results[])."
+      description: "Accepted per-doc submission result."
       required: [doc_id, task_id, status]
       properties:
         doc_id:
@@ -1208,17 +1207,17 @@ components:
           example: "doc_001"
         task_id:
           type: string
-          description: "F42 task_id for polling GET /documents/tasks/{task_id}/progress."
+          description: "Task id for polling GET /documents/tasks/{task_id}/progress."
           example: "task_xxx_001"
         status:
           type: string
           enum: [submitted, skipped]
-          description: "submitted = queued to F42; skipped = on_duplicate=skip matched."
+          description: "submitted = queued for processing; skipped = on_duplicate=skip matched."
           example: submitted
 
     BatchSubmitFailureItem:
       type: object
-      description: "Per-doc failure with the GEN-Agent 5-field schema (TD-F42-BULK §2.3 / §2.4.2). error_code reuses the originating Feature's existing CX_ERR_* code."
+      description: "Per-doc failure with the 5-field error schema. error_code reuses the originating code path's existing CX_ERR_* code."
       required: [doc_id, error_code, category, retryable]
       properties:
         doc_id:
@@ -1243,7 +1242,7 @@ components:
 
     BatchSubmitMeta:
       type: object
-      description: "Class-A partial-success meta (TD-F42-BULK §2.3); coverage_ratio = succeeded / total_submitted."
+      description: "Class-A partial-success meta; coverage_ratio = succeeded / total_submitted."
       required: [succeeded, failed, coverage_ratio, total_submitted]
       properties:
         succeeded:
@@ -1267,7 +1266,7 @@ components:
 
     BatchSubmitResponse:
       type: object
-      description: "Batch submission partial-success response (TD-F42-BULK §2.3). HTTP 200 even with per-doc failures; batch-level rejection returns a GEN-Agent error envelope (§2.4.1)."
+      description: "Batch submission partial-success response. HTTP 200 even with per-doc failures; batch-level rejection returns an error envelope."
       required: [results, meta]
       properties:
         results:

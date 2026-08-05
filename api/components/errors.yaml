@@ -1,6 +1,5 @@
 # components/errors.yaml — ErrorResponseV1 + error-code enum + x-cortrix-error-codes + request_id
 #
-# SoT: P04 § 4.1 + AGENT_FRIENDLY § 3.1/3.3 + ERROR_CODE_SDK_MAP + ARCH § 4.1.11
 # GEN-Agent first principle: error responses are machine-readable (code/retryable/category/retry_after_ms/structured_data).
 components:
   schemas:
@@ -40,28 +39,28 @@ components:
             category:
               type: string
               enum: [auth, quota, transient, permanent, timeout]
-              description: "Enumerable status value (AGENT_FRIENDLY principle 4)"
+              description: "Enumerable status value"
             retry_after_ms:
               type: integer
               nullable: true
               example: 1000
               description: >-
                 Retry hint in ms. Client priority: retry_after_ms > Retry-After HTTP Header (s) > exponential backoff
-                (consistent with the P03 SDK should_retry decision). Usually non-null when category=transient/timeout/quota(429).
+                (consistent with the SDK should_retry decision). Usually non-null when category=transient/timeout/quota(429).
             structured_data:
               type: object
               additionalProperties: true
               description: "Error-specific structured data for Agent automation (e.g. unauthorized_namespaces[])"
             request_id:
               type: string
-              # v1.0.1 addition: ARCH § 4.1.11 error responses already include request_id (essential for ops).
+              # Error responses always include request_id (essential for ops).
               pattern: "^req_[a-zA-Z0-9]+$"
               example: "req_abc123"
-              description: "Server-generated request ID for cross-log correlation (works together with P03 SDK ErrorContext.trace_id)"
+              description: "Server-generated request ID for cross-log correlation (works together with SDK ErrorContext.trace_id)"
 
     # x-cortrix-error-codes is the global error-code metadata registry (exposed in the spec as a machine-readable reference table).
     # The strict schema is defined in components/x-cortrix.yaml (S3); this is an instantiated sample associated with ErrorResponseV1,
-    # covering high-frequency cross-Feature error codes (the full ~291 are registered in ARCH § 4.1.11.X / ERROR_CODE_SDK_MAP).
+    # covering high-frequency error codes; the full set is registered in the server's error-code registry.
     XCortrixErrorCodeRegistry:
       type: object
       description: |

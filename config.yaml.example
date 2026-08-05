@@ -80,7 +80,7 @@ embedding:
 # different canonical execution_provider value; conflicting values fail startup.
 
 # -----------------------------------------------------------------------------
-# reranker — F02 cross-encoder reranker (bge-reranker-v2-m3 ONNX)
+# reranker — cross-encoder rerank stage (bge-reranker-v2-m3 ONNX)
 #
 # Download model files from BAAI/bge-reranker-v2-m3 on HuggingFace:
 #   models/bge-reranker-v2-m3/model.onnx + tokenizer.json
@@ -98,19 +98,19 @@ reranker:
 # different canonical execution_provider value.
 
 # -----------------------------------------------------------------------------
-# query_complexity — F39 query complexity classifier (DistilBERT-tiny ONNX)
+# query_complexity — query complexity classifier (DistilBERT-tiny ONNX)
 #
 # Download model files into models/query-complexity/:
 #   model.onnx + vocab.txt
 #
-# When absent, F39 falls back to heuristic backend (all queries routed as Complex).
+# When absent, routing falls back to the heuristic backend (all queries routed as Complex).
 # Override via env CORTRIX_QUERY_COMPLEXITY_MODEL_DIR (env wins over yaml).
 # -----------------------------------------------------------------------------
 query_complexity:
   model_dir: "./models/query-complexity"
 
 # -----------------------------------------------------------------------------
-# retrieval — candidate-pool over-fetch sizing (F02 §top_N)
+# retrieval — candidate-pool over-fetch sizing (reranker top_N)
 # candidate_k = min(top_k * candidate_multiplier * oversample, max_candidates).
 # Defaults 3 / 50 match the historical behavior. On large corpora relevant docs
 # spread past rank 50, so raise max_candidates to lift the recall ceiling.
@@ -152,8 +152,8 @@ spc:
 #   semantic_llm     — intent classification & reranking (every query; fast/cheap)
 #   vision_llm       — OCR image refinement (model must support vision input)
 #   agent_llm        — conversational RAG/chat
-#   doc_summary_llm  — F41 ingest-side document summary (async via F42)
-#   enricher_llm     — F03 SPC ingest enricher (NER + summary)
+#   doc_summary_llm  — ingest-side document summary (processed asynchronously)
+#   enricher_llm     — SPC ingest enricher (NER + summary)
 #
 # Each role takes the same four fields; a role with provider/api_key/model all
 # set counts as configured, anything else leaves that feature OFF:
@@ -163,7 +163,7 @@ spc:
 #   base_url: API endpoint (e.g. https://open.bigmodel.cn/api/paas/v4 for GLM)
 #
 # Two consumers, two wire protocols — this matters for the provider you pick:
-#   • agent_llm    — consumed by the Python Agent (cortrix-agent/, F48). It has a
+#   • agent_llm    — consumed by the Python Agent (cortrix-agent/). It has a
 #                    per-provider adapter and talks each vendor's NATIVE protocol
 #                    (e.g. Anthropic /v1/messages for "claude"). The agent_llm
 #                    block here is also picked up by the Python Agent as a default
@@ -269,7 +269,7 @@ memory:
   inject_max_tokens: 2000    # Max token budget for injected context
 
 # -----------------------------------------------------------------------------
-# rag_fusion — F36 RAG-Fusion multi-query fusion (global default / IGlobalConfig §4.7)
+# rag_fusion — RAG-Fusion multi-query fusion (global default)
 # The LLM expands a single query into N variants; each variant is retrieved independently + RRF re-fusion (NDCG +8-15%).
 # Topic 3: V1.0 OSS defaults to disabled — must be explicitly enabled via the namespace-level rag_fusion_config,
 # and only runs when an LLM role is configured (see the LLM configuration block above); on LLM failure it degrades to a single query.

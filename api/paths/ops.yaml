@@ -1,6 +1,5 @@
-# paths/ops.yaml — /api/v1/gc/* + /api/v1/maintenance/* (P03 v1.0.1 § 2.13 + OPEN-2 GC) — 6 endpoint
-# SoT: P03 v1.0.1 § 2.13 GC + ARCH ops + components/schemas.yaml (GcStatus)
-# All tag=ops (only exposed in development/self-hosted, see § 5.2 environment tiers); destructive run/purge require X-Ops-Confirm.
+# paths/ops.yaml — /api/v1/gc/* + /api/v1/maintenance/* — 6 endpoints
+# All tag=ops (only exposed in development/self-hosted); destructive run/purge require X-Ops-Confirm.
 #
 # OPEN-2 three-stage soft-delete lifecycle: DELETE /documents/{id} marks the doc
 # soft-deleted (status=deleted, deleted_at=now) and recoverable for gc.soft_delete_retention_days

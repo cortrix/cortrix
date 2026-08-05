@@ -38,18 +38,18 @@ embedding:
   tokenizer_path: /data/models/bge-m3/tokenizer.json
   execution_provider: auto
 
-# F02 reranker. Docker quickstart provisions the pinned real model and exports
+# Reranker. Docker quickstart provisions the pinned real model and exports
 # this path. An absent or invalid configured model fails startup.
 reranker:
   model_dir: /data/models/bge-reranker-v2-m3
   execution_provider: auto
 
-# F39/F37 query-complexity classifier — provisioned when
+# Query-complexity classifier — provisioned when
 # CORTRIX_QUERY_COMPLEXITY_MODEL_URL is set; absent = heuristic fallback.
 query_complexity:
   model_dir: /data/models/query-complexity
 
-# F06 document parser — the docling/paddleocr bridge scripts are auto-located
+# Document parser — the docling/paddleocr bridge scripts are auto-located
 # at /app/scripts. python_bin defaults to the system python3 so the txt/md
 # plain-text fast path (stdlib only) works out of the box, including PROFILE=lite.
 # In PROFILE=full, entrypoint.sh repoints this at the provisioned parser venv
@@ -63,8 +63,8 @@ spc:
 # semantic_llm:      # intent classification & reranking
 # vision_llm:        # image/PDF visual parsing
 # agent_llm:         # agent demo chat
-# doc_summary_llm:   # F41 document summary index
-# enricher_llm:      # F03 LLM enricher (NER + summary)
+# doc_summary_llm:   # document summary index
+# enricher_llm:      # LLM enricher (NER + summary)
 #   provider: openai
 #   api_key: sk-...
 #   model: gpt-4o-mini

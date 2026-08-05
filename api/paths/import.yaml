@@ -1,5 +1,4 @@
-# paths/import.yaml — /api/v1/import/* + /api/v1/admin/db-connections/* (F16a Database Import) — 6 endpoints
-# SoT: F16a detailed design + live CE implementation
+# paths/import.yaml — /api/v1/import/* + /api/v1/admin/db-connections/* — 6 endpoints
 #   src/server/routes/import_routes.cpp + src/server/import_handler.cpp + src/import/import_response.cpp.
 # /import/* is admin-scoped (WithAuth kPermAdmin) but not under the AdminGuard loopback prefix;
 # /admin/db-connections/* is under the AdminGuard prefix (Layer 1) + handler.is_admin() (Layer 2).
@@ -10,7 +9,7 @@ paths:
       operationId: startDatabaseImport
       summary: Start database import (async)
       description: |
-        Start an asynchronous database import into a namespace (F16a, Admin+). Rows are fetched via a
+        Start an asynchronous database import into a namespace (Admin+). Rows are fetched via a
         registered connection_ref, textualized (per_row | merge), and fed to the SPC pipeline. Returns a
         task_id whose status is deterministically "queued"; poll progress via
         GET /import/tasks/{task_id}/progress. Exactly one of {table, sql} must be provided.
@@ -49,7 +48,7 @@ paths:
       tags: [admin]
       operationId: getImportTaskProgress
       summary: Get import task progress
-      description: Query asynchronous import task progress (F16a §5.2, Admin+).
+      description: Query asynchronous import task progress (Admin+).
       x-cortrix-agent-workflow: admin
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff
@@ -76,7 +75,7 @@ paths:
       tags: [admin]
       operationId: cancelImportTask
       summary: Cancel import task
-      description: Cancel an asynchronous import task (F16a §5.4, Admin+). Cancel is not an error; the task resolves to status=cancelling then cancelled.
+      description: Cancel an asynchronous import task (Admin+). Cancel is not an error; the task resolves to status=cancelling then cancelled.
       x-cortrix-agent-workflow: admin
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -105,7 +104,7 @@ paths:
       operationId: adminRegisterDbConnection
       summary: Register a database connection
       description: |
-        Register a database connection for import (F16a, Admin+). The DSN is stored server-side and never
+        Register a database connection for import (Admin+). The DSN is stored server-side and never
         returned (R2). Returns only the generated ref_id + name.
       x-cortrix-agent-workflow: admin
       x-cortrix-retryable: false
@@ -147,7 +146,7 @@ paths:
       tags: [admin]
       operationId: adminListDbConnections
       summary: List database connections
-      description: List registered database connections (F16a, Admin+). The DSN is never included (R2).
+      description: List registered database connections (Admin+). The DSN is never included.
       x-cortrix-agent-workflow: admin
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff
@@ -180,7 +179,7 @@ paths:
       tags: [admin]
       operationId: adminRevokeDbConnection
       summary: Revoke a database connection
-      description: Revoke a registered database connection (F16a, Admin+). Accepts an optional reason.
+      description: Revoke a registered database connection (Admin+). Accepts an optional reason.
       x-cortrix-agent-workflow: admin
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry

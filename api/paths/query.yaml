@@ -1,5 +1,4 @@
-# paths/query.yaml — /api/v1/query (ARCH § 4.1.3 + F04 cross-NS) — 1 endpoint
-# SoT: ARCH § 4.1.3 + F04 v1.0.3 § 2.4/2.5 + AGENT_FRIENDLY § 2 (Class-A meta + degraded partial 200)
+# paths/query.yaml — /api/v1/query (cross-namespace) — 1 endpoint
 paths:
   /query:
     post:
@@ -9,9 +8,9 @@ paths:
       description: |
         Unified semantic query (including cross-NS). namespaces array: single NS / multiple NS / ["*"] all NS (hard cap 100).
         Partial failures return 200 + meta.namespaces_failed[] (degraded path, PartialSuccessByNamespace semantics).
-        ?explain=true additionally exposes Class-B LLM-path fields (AGENT_FRIENDLY § 2 phased rollout).
+        ?explain=true additionally exposes Class-B LLM-path fields (phased rollout).
         Routing/fusion knobs (route, rag_fusion) may be passed in the body or as query params (query param wins).
-        meta carries path markers when applicable: via_path (chat route), crag_verdict + crag_action (F37, Complex route).
+        meta carries path markers when applicable: via_path (chat route), crag_verdict + crag_action (Complex route).
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff
@@ -32,12 +31,12 @@ paths:
           in: query
           required: false
           schema: { type: string, enum: [auto, simple, complex, chat] }
-          description: "F39 route override (query param wins over the body field)."
+          description: "Route override (query param wins over the body field)."
         - name: rag_fusion
           in: query
           required: false
           schema: { type: boolean }
-          description: "F36 RAG-Fusion opt-in (query param wins over the body field)."
+          description: "RAG-Fusion opt-in (query param wins over the body field)."
       requestBody:
         required: true
         content:

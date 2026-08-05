@@ -1,12 +1,11 @@
-# paths/memory.yaml — /api/v1/memory/* (ARCH § 4.1.5 + MEM01/02/03/05) — 6 endpoint
-# SoT: ARCH § 4.1.5 + MEM03 v1.0 §3.A + components/schemas.yaml (Memory / MemorySearchRequest)
+# paths/memory.yaml — /api/v1/memory/* — 6 endpoints
 paths:
   /memory:
     post:
       tags: [public]
       operationId: createMemory
       summary: Create memory
-      description: Create a user-explicit memory (no LLM validation, MEM03 §3.A, Write+).
+      description: Create a user-explicit memory (no LLM validation, Write+).
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -33,7 +32,7 @@ paths:
       tags: [public]
       operationId: listMemory
       summary: List memory
-      description: List all of a user's memories (paginated/filter; ?include_invalidated=true includes deprecated history, MEM03, Read+). Enforces user_id ownership check.
+      description: List all of a user's memories (paginated/filter; ?include_invalidated=true includes deprecated history, Read+). Enforces user_id ownership check.
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff
@@ -82,7 +81,7 @@ paths:
       tags: [public]
       operationId: searchMemory
       summary: Memory semantic search
-      description: Semantic memory search (enforced user_id filter, MEM05 isolation, Read+).
+      description: Semantic memory search (enforced user_id filter, per-user isolation, Read+).
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff
@@ -115,7 +114,7 @@ paths:
       operationId: extractMemory
       summary: Extract memory (LLM)
       description: |
-        LLM memory extraction from a single interaction (MEM02, Write+). Requires ns + the turn (content,
+        LLM memory extraction from a single interaction (Write+). Requires ns + the turn (content,
         or a query_text/response_text pair) in the body. Returns the extracted memories + extract_meta.
         For batch extraction over a list of interactions use POST /memory/extract/batch.
       x-cortrix-agent-workflow: public
@@ -160,7 +159,7 @@ paths:
       operationId: extractMemoryBatch
       summary: Extract memory batch (LLM, partial-success)
       description: |
-        LLM memory extraction over a list of interactions (MEM02, Write+). Returns HTTP 200 with
+        LLM memory extraction over a list of interactions (Write+). Returns HTTP 200 with
         per-item partial-success status (results[] each carry id/ok and either extracted_count or error).
         Requires ns + interactions[] in the body.
       x-cortrix-agent-workflow: public
@@ -219,7 +218,7 @@ paths:
       operationId: extractMemoryForNamespace
       summary: Run namespace-level extraction backfill
       description: |
-        Trigger an NS-level extraction backfill (MEM02, Write+). Enumerates unextracted interactions and
+        Trigger an NS-level extraction backfill (Write+). Enumerates unextracted interactions and
         enqueues them through the async extraction queue; returns immediately with status=scheduled.
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
@@ -257,7 +256,7 @@ paths:
       operationId: listMemoryInvalidations
       summary: List memory invalidations (audit)
       description: |
-        List the memory invalidation/revoke audit trail (MEM03 D6/D9, Read+). The trail lives in the F18a
+        List the memory invalidation/revoke audit trail (Read+). The trail lives in the
         operation_log; this endpoint returns the canonical /operations pointer the SDK can follow.
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
@@ -295,7 +294,7 @@ paths:
       tags: [admin]
       operationId: revokeMemoryInvalidation
       summary: Revoke a memory invalidation (admin)
-      description: Revoke a memory invalidation (MEM03 D9, Admin+). Requires ns in the body; optional reason.
+      description: Revoke a memory invalidation (Admin+). Requires ns in the body; optional reason.
       x-cortrix-agent-workflow: admin
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -343,7 +342,7 @@ paths:
       tags: [public]
       operationId: editMemory
       summary: Edit memory
-      description: Edit a memory (MEM03 topic 2 B — create a new user_edit + invalidate the old one; semantically not a wholesale replace, hence PATCH not PUT, Write+).
+      description: Edit a memory (create a new user_edit + invalidate the old one; semantically not a wholesale replace, hence PATCH not PUT, Write+).
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -374,7 +373,7 @@ paths:
       tags: [public]
       operationId: deleteMemory
       summary: Delete memory (soft)
-      description: Soft-delete a memory (marks status='invalidated'; always retained, never hard-deleted, MEM03 §3.A, Write+).
+      description: Soft-delete a memory (marks status='invalidated'; always retained, never hard-deleted, Write+).
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -392,7 +391,7 @@ paths:
         '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
         '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
 
-  # --- MEM04 Memory Immunity (session opt-out) ---
+  # --- Memory opt-out (session level) ---
   /memory/session/{session_id}/opt-out:
     parameters:
       - name: session_id
@@ -403,7 +402,7 @@ paths:
       tags: [public]
       operationId: optOutSession
       summary: Opt a session out of memory
-      description: Opt a session out of memory extraction (MEM04, Write+). NS-scoped, so ns is required in the body.
+      description: Opt a session out of memory extraction (Write+). NS-scoped, so ns is required in the body.
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -447,7 +446,7 @@ paths:
       tags: [admin]
       operationId: revokeSessionOptOut
       summary: Revoke a session opt-out (admin)
-      description: Revoke a session's memory opt-out (MEM04, Admin+). Requires ns + reason in the body.
+      description: Revoke a session's memory opt-out (Admin+). Requires ns + reason in the body.
       x-cortrix-agent-workflow: admin
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -488,7 +487,7 @@ paths:
       summary: Create memory session
       description: |
         Create a conversation memory session (Write+). namespace is required; an optional client-provided
-        session_id that already exists returns 409. MEM05 isolation: user_id defaults to "default" in CE
+        session_id that already exists returns 409. Per-user isolation: user_id defaults to "default" in CE
         no-auth mode.
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
@@ -530,7 +529,7 @@ paths:
       tags: [public]
       operationId: listMemorySessions
       summary: List memory sessions
-      description: List conversation memory sessions in a namespace (Read+). MEM05 isolation post-filters to the requester's own sessions.
+      description: List conversation memory sessions in a namespace (Read+). Per-user isolation post-filters to the requester's own sessions.
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff
@@ -588,7 +587,7 @@ paths:
       operationId: getMemorySession
       summary: Get memory session detail
       description: |
-        Get a session + its interactions (Read+). namespace is required. MEM05 ownership: another user's
+        Get a session + its interactions (Read+). namespace is required. Per-user ownership: another user's
         session returns 404 (anti-enumeration, not 403).
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
@@ -641,7 +640,7 @@ paths:
       operationId: deleteMemorySession
       summary: Delete memory session
       description: |
-        Delete a session and its interactions (Write+). namespace is required. MEM05 ownership: another
+        Delete a session and its interactions (Write+). namespace is required. Per-user ownership: another
         user's (or missing) session returns 404 (anti-enumeration).
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
@@ -682,7 +681,7 @@ paths:
       summary: Write a session interaction
       description: |
         Append a query/response interaction to a session (Write+). namespace + query_text + response_text
-        are required. The turn is enqueued for async MEM02 LLM extraction (subject to MEM04 opt-out/remember).
+        are required. The turn is enqueued for async LLM extraction (subject to the session opt-out).
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry

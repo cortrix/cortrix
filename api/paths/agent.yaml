@@ -1,5 +1,4 @@
-# paths/agent.yaml — /api/v1/agent/* (F48 v1.0.2 / V14 J8, reverse-proxied through cortrix-server :8420) — 3 endpoints
-# SoT: F48 v1.0.2 § 9 + components/schemas.yaml (ChatRequest / AgentSession)
+# paths/agent.yaml — /api/v1/agent/* (reverse-proxied through cortrix-server :8420) — 3 endpoints
 # Key: chat = SSE streaming (x-cortrix-stream: SSE; Schemathesis skips JSON schema validation).
 paths:
   /agent/chat:
@@ -10,7 +9,7 @@ paths:
       description: |
         SSE streaming chat (text/event-stream). Streaming chunks + the terminal meta JSON frame do not go through standard OpenAPI
         response schema validation (annotated x-cortrix-stream: SSE; Schemathesis response_schema_conformance skips it).
-        The terminal meta frame includes tenant_id (null in CE environments — Class-A null-allowed clause, F48's instance).
+        The terminal meta frame includes tenant_id (null in CE environments — Class-A null-allowed clause).
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -69,7 +68,7 @@ paths:
       tags: [public]
       operationId: getAgentHealth
       summary: Agent health check
-      description: F48 agent health check. No authentication required.
+      description: Agent health check. No authentication required.
       x-cortrix-agent-workflow: ops
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff

@@ -1,5 +1,4 @@
 # redocly.yaml — redocly CLI configuration (bundle + lint)
-# SoT: P04 § 2.3 / § 6.3
 #
 # Usage:
 #   redocly bundle cortrix-api -o ../build/openapi.bundled.yaml --ext yaml
@@ -21,7 +20,7 @@ rules:
   spec-strict-refs: off
   # Skeleton phase allows operations to temporarily lack 4xx (recommended takes over once S2/S4 fill error responses).
   operation-4xx-response: off
-  # The localhost:8420 dev server is a design requirement (P04 § 2.2 Local development); kept by-design.
+  # The localhost:8420 dev server is a local-development requirement; kept by design.
   no-server-example.com: off
   # Skeleton phase defines components before they are referenced (path operations consume them only in S4-S6) → disable the unused warning.
   # Re-enable when S7 tightens to recommended (by then all endpoints are filled, so unreferenced = a real anomaly).

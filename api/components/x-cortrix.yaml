@@ -1,6 +1,5 @@
 # components/x-cortrix.yaml — strict schema definition for x-cortrix-* extension fields (D7 resolution)
 #
-# SoT: P04 § 3.1
 # CI-enforced (S7 validate_x_cortrix_extensions.py): every x-cortrix-* field used in any paths/*.yaml
 # must be defined here; out-of-range enum values / undefined fields → lint fail.
 #
@@ -45,7 +44,7 @@ x-cortrix-extensions:
         type: integer
         minimum: 0
     required: [p50_ms, p99_ms]
-    description: "P50 + P99 latency estimates (P50/P99 double-value, not single point — D7 supplement)"
+    description: "P50 + P99 latency estimates (double value, not a single point)"
 
   x-cortrix-rate-limit:
     type: string
@@ -62,7 +61,7 @@ x-cortrix-extensions:
     enum: [SSE]
     description: |
       Marks an endpoint as a server-sent-events (text/event-stream) streaming endpoint
-      (V14 J8 — F48 agent/chat). Schemathesis / response_schema_conformance skips JSON schema
+      (agent/chat). Schemathesis / response_schema_conformance skips JSON schema
       validation on streaming endpoints (chat streaming chunks + the terminal meta JSON frame do not go through standard OpenAPI response validation).
 
   x-cortrix-edition:
@@ -72,7 +71,7 @@ x-cortrix-extensions:
       Which edition(s) expose this endpoint. The spec is the full all-edition blueprint;
       this field tells Agents which build actually serves the endpoint:
       - ce: served by the Community Edition (CE-native surface, e.g. API-Key auth, bootstrap, tenant/quota admin)
-      - cloud-enterprise: only Cloud / Enterprise builds; CE returns 404 (P08 acceptance item, e.g. JWT account family, user/audit management, SMTP)
+      - cloud-enterprise: only Cloud / Enterprise builds; CE returns 404 (e.g. JWT account family, user/audit management, SMTP)
       - cloud: only the managed Cloud build (e.g. GDPR export/delete)
       Endpoints without this field are served by every edition.
 

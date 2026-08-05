@@ -1,6 +1,5 @@
-# paths/auth.yaml — /api/v1/auth/* (ARCH § 4.1.9 + P08 v1.0.2) — 11 endpoints
-# SoT: P08 v1.0.2 § 2 + ERROR_CODE_SDK_MAP § 3.2 (CX_ERR_AUTH_* 11) + components/schemas.yaml
-# Agent self-service first: API Key (create once, use forever) is preferred over email+password (AGENT_FRIENDLY § 8).
+# paths/auth.yaml — /api/v1/auth/* — 11 endpoints
+# Agent self-service first: API Key (create once, use forever) is preferred over email+password.
 paths:
   /auth/register:
     post:
@@ -8,7 +7,7 @@ paths:
       operationId: register
       summary: Register account
       description: Register an account (email + password). After registration, verify-email is required to activate.
-      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404; only Cloud/Enterprise expose it
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -37,7 +36,7 @@ paths:
       operationId: login
       summary: Login
       description: Log in; returns a JWT access_token + refresh_token.
-      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404; only Cloud/Enterprise expose it
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -70,7 +69,7 @@ paths:
       operationId: logout
       summary: Logout
       description: Log out (revokes the refresh_token).
-      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404; only Cloud/Enterprise expose it
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -87,7 +86,7 @@ paths:
       operationId: refreshToken
       summary: Refresh access token
       description: Exchange a refresh_token for a new access_token.
-      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404; only Cloud/Enterprise expose it
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: immediate
@@ -118,7 +117,7 @@ paths:
       operationId: requestPasswordReset
       summary: Request password reset
       description: Request a password reset (sends a verification email + 6-digit code).
-      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404; only Cloud/Enterprise expose it
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -146,7 +145,7 @@ paths:
       operationId: confirmPasswordReset
       summary: Confirm password reset
       description: Complete the password reset using the email + 6-digit code.
-      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404; only Cloud/Enterprise expose it
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -175,7 +174,7 @@ paths:
       operationId: verifyEmail
       summary: Verify email
       description: Email verification (activates the account after registration).
-      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404; only Cloud/Enterprise expose it
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -202,7 +201,7 @@ paths:
       operationId: getCurrentUser
       summary: Get current user
       description: Get the currently logged-in user's info (user + tenants + role).
-      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404 (P08); only Cloud/Enterprise expose it
+      x-cortrix-edition: cloud-enterprise   # JWT account family: CE returns 404; only Cloud/Enterprise expose it
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff

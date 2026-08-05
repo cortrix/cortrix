@@ -1,5 +1,4 @@
-# paths/tenants.yaml — /api/v1/tenants/* (P09 v1.0.4 V3-C-04, user-level) — 8 endpoint
-# SoT: P09 v1.0 § 4.1.x + components/schemas.yaml (Tenant / TenantMember / Quota)
+# paths/tenants.yaml — /api/v1/tenants/* (user level) — 8 endpoints
 # user-level (distinct from the 4 admin tenant ops in admin.yaml).
 paths:
   /tenants:

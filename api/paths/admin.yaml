@@ -1,6 +1,5 @@
-# paths/admin.yaml — /api/v1/admin/* (ARCH § 4.1.9 + P08 v1.0.2 + P09) — 15 endpoints
-# SoT: P08 v1.0.2 § 2.13/2.13-bis + P09 + components/schemas.yaml (User / Tenant)
-# Note: admin/* binds 127.0.0.1 by default (loopback only, AdminGuard, ARCH § 4.1.10).
+# paths/admin.yaml — /api/v1/admin/* — 15 endpoints
+# Note: admin/* binds 127.0.0.1 by default (loopback only, AdminGuard).
 paths:
   /admin/users:
     get:
@@ -170,7 +169,7 @@ paths:
       tags: [admin]
       operationId: adminRotateJwtSecret
       summary: Rotate JWT secret
-      description: Rotate the JWT secret (P08 topic 1.1 C). All existing tokens are invalidated.
+      description: Rotate the JWT secret. All existing tokens are invalidated.
       x-cortrix-edition: cloud-enterprise   # JWT secret management: CE returns 404; only Cloud/Enterprise expose it
       x-cortrix-agent-workflow: admin
       x-cortrix-retryable: false
@@ -189,7 +188,7 @@ paths:
       tags: [admin]
       operationId: adminConfigSmtp
       summary: Configure SMTP
-      description: Configure SMTP (P08 topic 8 D).
+      description: Configure SMTP.
       x-cortrix-edition: cloud-enterprise   # SMTP (email delivery for JWT flows): CE returns 404; only Cloud/Enterprise expose it
       x-cortrix-agent-workflow: admin
       x-cortrix-retryable: false

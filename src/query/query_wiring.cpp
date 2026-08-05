@@ -974,7 +974,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                                 std::move(rf);
                         }
                         if (use_llm_rerank) {
-                            // F36-LR explain (addendum §2.5) — B-class, explain-only.
+                            // Listwise rerank explain — B-class, explain-only.
                             json lr = {
                                 {"active", lr_es.active},
                                 {"feature_id", "F36-LR"},

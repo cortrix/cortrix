@@ -70,7 +70,7 @@ High-signal current status:
 | Built-in Agent chat | `Verification required` | Fixed-flow chat mode exists; advanced autonomous executors are roadmap items. |
 | Auth login | `Blocked` | The public spec defines login, but the latest runtime verification found contract drift. |
 | Tenant/member/ACL/quota | `Blocked` | Runtime behavior and documented contract are still being reconciled. |
-| MEM02 memory extraction | `Blocked` | Latest verification observed an LLM transport timeout path. |
+| Conversation-memory extraction | `Blocked` | Latest verification observed an LLM transport timeout path. |
 | RBAC and tenant isolation denial matrix | `Blocked` | Cannot be proven in the current auth-disabled local runtime. |
 | Full-corpus BEIR retrieval quality | `Verified` | Accepted SciFact, FiQA, and NFCorpus measurements, method, and provenance are published in the [pinned benchmark bundle](https://github.com/cortrix/cortrix-benchmarks/tree/7bc29aa840c20db3935dfcf80eb048e553ebe2b0/results/published/beir-three-full-corpus-2026-07-v1). This does not establish answer quality or production performance. |
 

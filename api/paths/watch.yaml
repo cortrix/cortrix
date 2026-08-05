@@ -1,6 +1,5 @@
-# paths/watch.yaml — /api/v1/watch/* (ARCH § 4.1.4/4.1.7 + F21/F42) — 4 endpoint
-# SoT: ARCH § 4.1.4 + F21 detailed design + components/schemas.yaml (Watcher / WatchEvent)
-# Live: the F21 watcher surface is served under /api/v1/connector/watchers (+ /connector/watchers/{id}/scan);
+# paths/watch.yaml — /api/v1/watch/* — 4 endpoints
+# Live: the watcher surface is served under /api/v1/connector/watchers (+ /connector/watchers/{id}/scan);
 # the /watch alias (POST /watch, GET /watch, DELETE /watch/{id}) is the Agent-friendly canonical name.
 # /watch/{id}/events has no live backing yet (see x-cortrix-status: not-implemented below).
 paths:

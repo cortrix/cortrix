@@ -3,7 +3,7 @@
 # Main file: only holds info + servers + tags + security + $ref (no inline definitions).
 # Actual definitions live in the components/ and paths/ sub-files; CI merges them via
 # `redocly bundle` into build/openapi.bundled.yaml (= the full API SSoT, consumed by
-# Swagger UI / P03 SDK codegen / contract tests).
+# Swagger UI / SDK codegen / contract tests).
 #
 # bundle:  scripts/bundle_openapi.sh  →  build/openapi.bundled.yaml
 #
@@ -38,7 +38,7 @@ servers:
     description: Local development (cortrix-server default port)
 
 # Security schemes: API Key (Agent self-service first, create once use forever) or Bearer JWT.
-# See ARCH § 4.1 + P08 auth. Endpoints are annotated with x-cortrix-auth-required / x-cortrix-auth-scope.
+# Endpoints are annotated with x-cortrix-auth-required / x-cortrix-auth-scope.
 security:
   - ApiKeyAuth: []
   - BearerAuth: []
@@ -56,7 +56,7 @@ tags:
     x-cortrix-extra-headers:
       X-Ops-Confirm: "true"   # ops APIs require an extra confirm header (guards against accidental calls)
 
-# paths pulls in 15 resource-domain sub-files via $ref (aligned with ARCH § 4.1 resource domains).
+# paths pulls in 15 resource-domain sub-files via $ref.
 # redocly bundle inlines all $ref into build/openapi.bundled.yaml.
 # S1: sub-files are skeletons (with 1 placeholder health probe to keep bundle/lint passing); S4-S6 fill in the full endpoints.
 paths:
@@ -69,7 +69,7 @@ paths:
   # ---- Document domain ----
   /documents:
     $ref: './paths/documents.yaml#/paths/~1documents'
-  /documents/batch:  # [TD-F42-BULK] Wave D-R1
+  /documents/batch:
     $ref: './paths/documents.yaml#/paths/~1documents~1batch'
   /documents/{id}:
     $ref: './paths/documents.yaml#/paths/~1documents~1{id}'
@@ -118,7 +118,7 @@ paths:
     $ref: './paths/watch.yaml#/paths/~1watch~1{id}'
   /watch/{id}/events:
     $ref: './paths/watch.yaml#/paths/~1watch~1{id}~1events'
-  # ---- Import domain (F16a — database import + db-connections) ----
+  # ---- Import domain (database import + db-connections) ----
   /import/database:
     $ref: './paths/import.yaml#/paths/~1import~1database'
   /import/tasks/{task_id}/progress:
@@ -129,7 +129,7 @@ paths:
     $ref: './paths/import.yaml#/paths/~1admin~1db-connections'
   /admin/db-connections/{ref_id}:
     $ref: './paths/import.yaml#/paths/~1admin~1db-connections~1{ref_id}'
-  # ---- Observability domain (F13 — traces + interactions; F18a — operation_log) ----
+  # ---- Observability domain (traces + interactions + operation_log) ----
   /traces/{session_id}:
     $ref: './paths/observability.yaml#/paths/~1traces~1{session_id}'
   /interactions:
@@ -172,7 +172,7 @@ paths:
   # ---- ACL domain (3) ----
   /namespaces/{ns_id}/acl: { $ref: './paths/acl.yaml#/paths/~1namespaces~1{ns_id}~1acl' }
   /namespaces/{ns_id}/acl/{grantee_tenant_id}: { $ref: './paths/acl.yaml#/paths/~1namespaces~1{ns_id}~1acl~1{grantee_tenant_id}' }
-  # ---- Agent domain (3, F48 — chat SSE) ----
+  # ---- Agent domain (chat SSE) ----
   /agent/chat: { $ref: './paths/agent.yaml#/paths/~1agent~1chat' }
   /agent/sessions/{session_id}: { $ref: './paths/agent.yaml#/paths/~1agent~1sessions~1{session_id}' }
   /agent/health: { $ref: './paths/agent.yaml#/paths/~1agent~1health' }
@@ -207,7 +207,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: "JWT Bearer token (issued by P08 auth/login, with refresh)."
+      description: "JWT Bearer token (issued by auth/login, with refresh)."
 
   # Global schemas/responses/headers are gathered from each components/*.yaml (S2 fills errors/partial/headers, S3 fills schemas/x-cortrix).
   # This way the bundle validates all component definitions inline; each paths/*.yaml references them via internal '#/components/...' $ref.

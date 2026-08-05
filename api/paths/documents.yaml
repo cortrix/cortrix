@@ -1,6 +1,5 @@
-# paths/documents.yaml — /api/v1/documents/* (ARCH § 4.1.2 + F42 + TD-F42-BULK)
+# paths/documents.yaml — /api/v1/documents/*
 #                         + POST /api/v1/namespaces/{ns}/documents (multipart file upload) — 8 endpoints
-# SoT: ARCH § 4.1.2 + F42 detailed design + TD-F42-BULK detailed design + components/schemas.yaml (Document / DocumentTask / BatchSubmit*)
 #
 # Two legitimate upload entries (double-track, by design — both routes are live in the backend):
 #   1. POST /documents                   — JSON body {namespace, content, ...}, async, returns a task_id.
@@ -14,7 +13,7 @@ paths:
       operationId: uploadDocument
       summary: Upload document (async, JSON content)
       description: |
-        Unified asynchronous upload endpoint (namespace in body, F42, Write+). Accepts inline document
+        Unified asynchronous upload endpoint (namespace in body, Write+). Accepts inline document
         content as JSON and returns a task_id; query progress via GET /documents/tasks/{task_id}/progress.
         Partial failures in batch upload use PartialSuccessById semantics.
 
@@ -90,16 +89,16 @@ paths:
         '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
         '429': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
 
-  # --- TD-F42-BULK Agent-first batch submit (Wave D-R1) ---
-  # was batch-submit in spec era; aligned to P12 tool wire memory.py:109 (D3.5: P04 spec reconcile)
+  # --- Agent-first batch submit ---
+  # was batch-submit in the spec era; aligned to the MCP tool wire format
   /documents/batch:
     post:
       tags: [public]
       operationId: batchSubmitDocuments
       summary: Batch submit documents (async, partial-success)
       description: |
-        Submit 1-100 documents to a namespace in one request (TD-F42-BULK, Write+). Each accepted document
-        is queued as an F42 async task (poll GET /documents/tasks/{task_id}/progress). Returns HTTP 200 with
+        Submit 1-100 documents to a namespace in one request (Write+). Each accepted document
+        is queued as an async task (poll GET /documents/tasks/{task_id}/progress). Returns HTTP 200 with
         partial-success semantics: results[] holds the accepted docs (task_id + status) and meta.failed[] holds
         per-doc failures with the GEN-Agent 5-field schema. A batch-level rejection (size/payload/empty/duplicate
         doc_id) returns a single GEN-Agent error envelope (CX_ERR_BATCH_*).
@@ -193,7 +192,7 @@ paths:
       tags: [public]
       operationId: getDocumentTaskProgress
       summary: Get async task progress
-      description: Query asynchronous upload task progress (F42, Read+).
+      description: Query asynchronous upload task progress (Read+).
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff
@@ -220,7 +219,7 @@ paths:
       tags: [public]
       operationId: cancelDocumentTask
       summary: Cancel async task
-      description: Cancel an asynchronous upload task (F42, Write+).
+      description: Cancel an asynchronous upload task (Write+).
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -249,7 +248,7 @@ paths:
         the two legitimate upload tracks: use it to upload a file/binary, as opposed to the JSON inline
         content of POST /documents. Returns the doc_id synchronously (201 created / 200 unchanged
         duplicate / 201 updating). At disk CRIT pressure the upload is rejected with 507 CX_ERR_DISK_FULL
-        before any byte is written (F24 §6).
+        before any byte is written.
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff

@@ -1,6 +1,5 @@
 # components/headers.yaml — Retry-After + traceparent (W3C) + x-cortrix-trace-id
 #
-# SoT: P04 § 4.1 + OBSERVABILITY_SPEC § 5.3/5.4 + P03 topic 3 (P04-rev-6 collaboration)
 components:
   headers:
     RetryAfter:
@@ -14,8 +13,7 @@ components:
 
     Traceparent:
       description: >-
-        W3C Trace Context traceparent header (distributed tracing). Works together with the P03 SDK trace_id_provider
-        (P04-rev-6 / OBSERVABILITY § 5.3).
+        W3C Trace Context traceparent header (distributed tracing). Works together with the SDK trace_id_provider
       schema:
         type: string
         # W3C: version-traceid(32hex)-spanid(16hex)-flags(2hex)
@@ -24,8 +22,7 @@ components:
 
     XCortrixTraceId:
       description: >-
-        Cortrix internal trace id (cross-log/metric correlation). Aligned with the P03 SDK ErrorContext.trace_id
-        (OBSERVABILITY § 5.4).
+        Cortrix internal trace id (cross-log/metric correlation). Aligned with the SDK ErrorContext.trace_id.
       schema:
         type: string
         example: "trace_abc123def456"

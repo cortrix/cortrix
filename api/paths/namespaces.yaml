@@ -1,5 +1,4 @@
-# paths/namespaces.yaml — /api/v1/namespaces/* (ARCH § 4.1.1) — 5 endpoint
-# SoT: ARCH § 4.1.1 + components/schemas.yaml (Namespace / NamespaceCreateRequest)
+# paths/namespaces.yaml — /api/v1/namespaces/* — 5 endpoints
 paths:
   /namespaces:
     post:
