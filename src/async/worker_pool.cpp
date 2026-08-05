@@ -136,7 +136,7 @@ void WorkerPool::WorkerLoop(int worker_id) {
             }
             // Release the per-doc_id reservation regardless of terminal outcome
             // (success, failure, or a caught handler exception above).
-            scheduler_->OnTaskCompleted(task.doc_id);
+            scheduler_->OnTaskCompleted(task.namespace_id, task.doc_id);
             continue;  // immediately try for the next queued task
         }
         // Empty queue (or all docs active) → wait for a Notify()/Stop(), with a

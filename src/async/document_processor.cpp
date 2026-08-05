@@ -34,12 +34,13 @@ DocumentProcessor::DocumentProcessor(TaskManager* mgr,
                                      spc::DocumentParserFactory* factory,
                                      const IGlobalConfig* config,
                                      CancelChecker cancel_checker,
-                                     cortrix::SPCManager* spc_mgr)
+                                     cortrix::SPCManager* spc_mgr,
+                                     std::string managed_input_dir)
     : mgr_(mgr),
       factory_(factory),
       config_(config),
       cancel_checker_(std::move(cancel_checker)),
-      finalizer_(mgr),
+      finalizer_(mgr, std::move(managed_input_dir)),
       spc_mgr_(spc_mgr) {
     if (!cancel_checker_) {
         // Default: poll the persisted cancel_requested flag via the manager.

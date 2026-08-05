@@ -95,7 +95,7 @@ TEST_F(TaskSchedulerTest, DequeueMarksProcessingAndReservesDoc) {
     ASSERT_TRUE(dq.value().has_value());
     EXPECT_EQ(dq.value()->status, std::string(task_status::kProcessing));
     EXPECT_EQ(dq.value()->worker_id, 1);
-    EXPECT_TRUE(sched_->IsDocActive("docA"));
+    EXPECT_TRUE(sched_->IsDocActive("ns1", "docA"));
     EXPECT_EQ(sched_->ActiveDocCount(), 1u);
 }
 
@@ -115,8 +115,8 @@ TEST_F(TaskSchedulerTest, PerDocIdMutexDefersSameDoc) {
     EXPECT_FALSE(second.value().has_value());
 
     // Release docA → the deferred task becomes dequeuable.
-    sched_->OnTaskCompleted("docA");
-    EXPECT_FALSE(sched_->IsDocActive("docA"));
+    sched_->OnTaskCompleted("ns1", "docA");
+    EXPECT_FALSE(sched_->IsDocActive("ns1", "docA"));
     auto third = sched_->Dequeue(2);
     ASSERT_TRUE(third.value().has_value());
     EXPECT_EQ(third.value()->doc_id, "docA");
@@ -142,8 +142,8 @@ TEST_F(TaskSchedulerTest, DequeueEmptyQueueReturnsNullopt) {
 TEST_F(TaskSchedulerTest, OnTaskCompletedIsIdempotent) {
     sched_->Enqueue(MakeReq("docA", "h1"));
     sched_->Dequeue(1);
-    sched_->OnTaskCompleted("docA");
-    sched_->OnTaskCompleted("docA");  // no-op second release
+    sched_->OnTaskCompleted("ns1", "docA");
+    sched_->OnTaskCompleted("ns1", "docA");  // no-op second release
     EXPECT_EQ(sched_->ActiveDocCount(), 0u);
 }
 
@@ -183,22 +183,22 @@ TEST_F(TaskSchedulerTest, EnqueueEmptyDocIdAlwaysCreatesNewRow) {
     EXPECT_EQ(mgr_.CountAll().value(), 2);
 }
 
-// OnTaskCompleted("") with an empty doc_id is a no-op on the active set (the
+// OnTaskCompleted("ns1", "") with an empty doc_id is a no-op on the active set (the
 // !doc_id.empty() guard is false) but still refreshes the queue-depth gauge.
 TEST_F(TaskSchedulerTest, OnTaskCompletedEmptyDocIdIsNoOp) {
     sched_->Enqueue(MakeReq("docA", "h1"));
     sched_->Dequeue(1);
     ASSERT_EQ(sched_->ActiveDocCount(), 1u);
-    sched_->OnTaskCompleted("");  // empty → does not erase docA
+    sched_->OnTaskCompleted("ns1", "");  // empty → does not erase docA
     EXPECT_EQ(sched_->ActiveDocCount(), 1u);
 }
 
 // IsDocActive returns false for a doc that was never dequeued (the count()==0
 // branch), complementing the active-doc assertions above.
 TEST_F(TaskSchedulerTest, IsDocActiveFalseForUnknownDoc) {
-    EXPECT_FALSE(sched_->IsDocActive("never-seen"));
+    EXPECT_FALSE(sched_->IsDocActive("ns1", "never-seen"));
     sched_->Enqueue(MakeReq("docA", "h1"));
-    EXPECT_FALSE(sched_->IsDocActive("docA"));  // enqueued but not yet dequeued
+    EXPECT_FALSE(sched_->IsDocActive("ns1", "docA"));  // enqueued but not yet dequeued
 }
 
 // Dequeue reserves the doc_id, then MarkProcessing fails → the rollback arm erases
@@ -231,7 +231,7 @@ TEST(TaskSchedulerDequeueFaultTest, MarkProcessingFailureRollsBackReservation) {
 
     auto dq = sched.Dequeue(1);  // picks docA, reserves it, MarkProcessing aborts
     EXPECT_FALSE(dq.ok());
-    EXPECT_FALSE(sched.IsDocActive("docA"));  // reservation rolled back
+    EXPECT_FALSE(sched.IsDocActive("ns1", "docA"));  // reservation rolled back
     EXPECT_EQ(sched.ActiveDocCount(), 0u);
 
     sqlite3_close(probe);

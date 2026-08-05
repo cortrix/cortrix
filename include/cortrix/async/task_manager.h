@@ -3,6 +3,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "cortrix/async/task_info.h"
@@ -85,24 +86,52 @@ public:
 
     // ----- Scheduler-support queries (topic 2; consumed by TaskScheduler in S2) -----
 
-    /// topic 2.2 — most recent task for `doc_id` AND `task_type` whose created_at is
-    /// within the last `window_seconds`, for the Watcher debounce check. nullopt if
-    /// none. Scoping by task_type keeps different async kinds for the same doc_id
-    /// (doc-parse vs F41 doc-summary) from debouncing each other.
-    Result<std::optional<TaskInfo>> FindRecentTaskByDocId(const std::string& doc_id,
+    /// topic 2.2 — most recent task for `namespace_id` + `doc_id` + `task_type`
+    /// whose created_at is within the last `window_seconds`, for the Watcher
+    /// debounce check. nullopt if none. Scoping by task_type keeps different async
+    /// kinds for the same doc_id (doc-parse vs F41 doc-summary) from debouncing
+    /// each other.
+    ///
+    /// `namespace_id` is part of the identity, not a filter added for convenience:
+    /// doc_id is chosen by the caller, so without it two namespaces submitting the
+    /// same id debounce against each other — one namespace's document is silently
+    /// merged into the other's task, and a refresh repoints that task at the other
+    /// namespace's content while its namespace_id stays put.
+    Result<std::optional<TaskInfo>> FindRecentTaskByDocId(const std::string& namespace_id,
+                                                          const std::string& doc_id,
                                                           int task_type,
                                                           int window_seconds);
+
+    /// topic 2.2 — claim `task_id` as the target of a same-content debounce merge.
+    ///
+    /// The merge decision cannot rest on a status the caller read earlier:
+    /// RequestCancel does not share the scheduler mutex, so a candidate that was
+    /// queued or processing at lookup time can be cancelled before the caller acts
+    /// on it. Merging into it then swallows the resubmission — the caller is handed
+    /// a task that will never carry the content, and the input materialized for it
+    /// is released.
+    ///
+    /// This is the authoritative revalidation: it re-checks and claims under the
+    /// same lock RequestCancel takes, so the two are linearizable. On success the
+    /// current row is returned and the merge has won the ordering (a cancel arriving
+    /// afterwards legitimately applies to the merged task). If the terminal
+    /// transition won, returns CX_ERR_DOC_PROCESSING_IN_PROGRESS and the caller must
+    /// leave that row alone and give the resubmission its own task.
+    Result<TaskInfo> TryClaimDebounceMerge(const std::string& task_id);
 
     /// topic 2.2 — a debounced re-submit with a *different* content_hash: refresh
     /// content_hash + filepath and reset progress to a fresh queued state.
     Result<TaskInfo> UpdateTaskForDebounce(const std::string& task_id,
                                            const SubmitRequest& req);
 
-    /// topic 2.1 / 2.3 — the oldest status=queued task whose doc_id is NOT in
-    /// `active_doc_ids` (per-doc_id mutex). nullopt if the queue is empty or all
-    /// queued docs are already active.
+    /// topic 2.1 / 2.3 — the oldest status=queued task whose (namespace_id, doc_id)
+    /// is NOT in `active_docs` (the per-doc mutex). nullopt if the queue is empty or
+    /// all queued docs are already active. The pair is the unit of exclusion for the
+    /// same reason it is the unit of debounce identity: a doc_id is only unique
+    /// within its namespace, so excluding on the bare id makes one namespace's
+    /// in-flight document block another's.
     Result<std::optional<TaskInfo>> SelectOldestQueuedTaskExcluding(
-        const std::vector<std::string>& active_doc_ids);
+        const std::vector<std::pair<std::string, std::string>>& active_docs);
 
     // ----- Cleanup (topic 4; driven by the cron in task_cleanup_cron.*) -----
 
@@ -127,6 +156,20 @@ public:
     /// threshold are re-queued on restart (§6.1 / §7 crash recovery): status → queued,
     /// worker_id cleared. Returns the row count re-queued.
     Result<int> RequeueStaleProcessing(int64_t now_unix, int zombie_hours);
+
+    /// (task_id, filepath) for every task that has NOT reached a terminal state
+    /// and names an input. This is the live set a reaper must preserve: a file
+    /// outside it has no task that will ever read it again.
+    ///
+    /// Deliberately returns raw rows rather than answering "is this path still
+    /// referenced?" in SQL. The stored strings are whatever was handed to F42, so
+    /// two rows can name the same file differently ("d/x.txt" vs "d/./x.txt"); a
+    /// string comparison would miss the match and let a live input be deleted.
+    /// Callers resolve both sides to one filesystem identity before comparing —
+    /// the same identity used to remove the file.
+    ///
+    /// Fails closed: an interrupted scan is an error, never a shorter list.
+    Result<std::vector<std::pair<std::string, std::string>>> LiveTaskInputs();
 
     /// Total row count (test aid).
     Result<int> CountAll();

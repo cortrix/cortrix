@@ -337,17 +337,17 @@ TEST_F(TaskManagerTest, UpdateProgressWithUnassignedWorkerBindsNull) {
 TEST_F(TaskManagerTest, FindRecentTaskByDocIdWithinWindow) {
     auto c = mgr_.CreateTask(MakeTask("ns1", "docX", "hashX"));
     ASSERT_TRUE(c.ok());
-    auto recent = mgr_.FindRecentTaskByDocId("docX", kTaskDocParse, 5);
+    auto recent = mgr_.FindRecentTaskByDocId("ns1", "docX", kTaskDocParse, 5);
     ASSERT_TRUE(recent.ok());
     ASSERT_TRUE(recent.value().has_value());
     EXPECT_EQ(recent.value()->task_id, c.value().task_id);
     EXPECT_EQ(recent.value()->content_hash, "hashX");
     // unknown doc → none
-    auto none = mgr_.FindRecentTaskByDocId("docY", kTaskDocParse, 5);
+    auto none = mgr_.FindRecentTaskByDocId("ns1", "docY", kTaskDocParse, 5);
     ASSERT_TRUE(none.ok());
     EXPECT_FALSE(none.value().has_value());
     // empty doc_id → none (defensive)
-    auto empty = mgr_.FindRecentTaskByDocId("", kTaskDocParse, 5);
+    auto empty = mgr_.FindRecentTaskByDocId("ns1", "", kTaskDocParse, 5);
     ASSERT_TRUE(empty.ok());
     EXPECT_FALSE(empty.value().has_value());
 }
@@ -362,16 +362,16 @@ TEST_F(TaskManagerTest, FindRecentTaskByDocIdScopesByTaskType) {
     auto summary = mgr_.CreateTask(std::move(summary_task));
     ASSERT_TRUE(summary.ok());
 
-    auto by_parse = mgr_.FindRecentTaskByDocId("docZ", kTaskDocParse, 5);
+    auto by_parse = mgr_.FindRecentTaskByDocId("ns1", "docZ", kTaskDocParse, 5);
     ASSERT_TRUE(by_parse.ok() && by_parse.value().has_value());
     EXPECT_EQ(by_parse.value()->task_id, parse.value().task_id);
 
-    auto by_summary = mgr_.FindRecentTaskByDocId("docZ", kTaskDocSummary, 5);
+    auto by_summary = mgr_.FindRecentTaskByDocId("ns1", "docZ", kTaskDocSummary, 5);
     ASSERT_TRUE(by_summary.ok() && by_summary.value().has_value());
     EXPECT_EQ(by_summary.value()->task_id, summary.value().task_id);
 
     // A task_type with no row → none, even though docZ has tasks of other kinds.
-    auto by_other = mgr_.FindRecentTaskByDocId("docZ", kTaskWatcherFanout, 5);
+    auto by_other = mgr_.FindRecentTaskByDocId("ns1", "docZ", kTaskWatcherFanout, 5);
     ASSERT_TRUE(by_other.ok());
     EXPECT_FALSE(by_other.value().has_value());
 }
@@ -413,13 +413,13 @@ TEST_F(TaskManagerTest, SelectOldestQueuedRespectsActiveDocIdMutex) {
     EXPECT_EQ(pick1.value()->doc_id, "docA");
 
     // docA active → docB is next (Issue 2.3 per-doc_id mutex).
-    auto pick2 = mgr_.SelectOldestQueuedTaskExcluding({"docA"});
+    auto pick2 = mgr_.SelectOldestQueuedTaskExcluding({{"ns1", "docA"}});
     ASSERT_TRUE(pick2.ok());
     ASSERT_TRUE(pick2.value().has_value());
     EXPECT_EQ(pick2.value()->doc_id, "docB");
 
     // both active → nothing eligible.
-    auto pick3 = mgr_.SelectOldestQueuedTaskExcluding({"docA", "docB"});
+    auto pick3 = mgr_.SelectOldestQueuedTaskExcluding({{"ns1", "docA"}, {"ns1", "docB"}});
     ASSERT_TRUE(pick3.ok());
     EXPECT_FALSE(pick3.value().has_value());
 }
@@ -452,7 +452,7 @@ TEST(TaskManagerErrorTest, OperationsOnUninitializedManagerFailGracefully) {
     EXPECT_FALSE(m.MarkFailed("x", "c", "m").ok());
     EXPECT_FALSE(m.RequestCancel("x", nullptr).ok());
     EXPECT_FALSE(m.MarkCancelled("x").ok());
-    EXPECT_FALSE(m.FindRecentTaskByDocId("d", kTaskDocParse, 5).ok());
+    EXPECT_FALSE(m.FindRecentTaskByDocId("ns1", "d", kTaskDocParse, 5).ok());
     SubmitRequest req;
     EXPECT_FALSE(m.UpdateTaskForDebounce("x", req).ok());
     EXPECT_FALSE(m.SelectOldestQueuedTaskExcluding({}).ok());
@@ -558,7 +558,7 @@ TEST_F(TaskManagerTest, FindRecentTaskByDocIdOutsideWindowReturnsNone) {
     auto c = mgr_.CreateTask(MakeTask("ns1", "docW", "hashW"));
     ASSERT_TRUE(c.ok());
     // window=-1s pushes the cutoff into the future so the row falls outside it.
-    auto none = mgr_.FindRecentTaskByDocId("docW", kTaskDocParse, -1);
+    auto none = mgr_.FindRecentTaskByDocId("ns1", "docW", kTaskDocParse, -1);
     ASSERT_TRUE(none.ok());
     EXPECT_FALSE(none.value().has_value());
 }

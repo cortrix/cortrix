@@ -302,6 +302,7 @@ add_library(cortrix_core STATIC
     src/async/task_cleanup_cron.cpp
     src/async/task_scheduler.cpp
     src/async/task_finalizer.cpp
+    src/async/managed_input.cpp
     src/async/document_processor.cpp
     src/async/worker_pool.cpp
     src/async/document_task_handler.cpp
@@ -359,6 +360,7 @@ add_library(cortrix_core STATIC
     # --- TD-F42 Bulk Submit (Wave D-R1) ---
     src/server/batch_error.cpp
     src/server/batch_submit_service.cpp
+    src/server/batch_temp_store.cpp
     src/server/routes/batch_routes.cpp
     # --- F20 Security Hardening (Wave D-R1) ---
     src/security/env_secret_provider.cpp

@@ -190,7 +190,6 @@ TEST_F(AsyncDepthTaskFx, UpdateTaskForDebounceResetsToQueuedWithNewHash) {
     auto created = mgr_.CreateTask(AsyncDepthMakeTask("ns", "dbg", "oldhash"));
     ASSERT_TRUE(created.ok());
     const std::string id = created.value().task_id;
-    ASSERT_TRUE(mgr_.MarkProcessing(id, 4).ok());
 
     SubmitRequest req;
     req.namespace_id = "ns";
@@ -205,6 +204,33 @@ TEST_F(AsyncDepthTaskFx, UpdateTaskForDebounceResetsToQueuedWithNewHash) {
     EXPECT_FLOAT_EQ(r.value().progress_pct, 0.0f);
 }
 
+TEST_F(AsyncDepthTaskFx, UpdateTaskForDebounceRefusesARowThatIsNoLongerQueued) {
+    // This case previously asserted the opposite: it marked the row processing and
+    // required the refresh to succeed. That rewrites a row a worker is already
+    // using — the worker loses its input and its later MarkCompleted lands on a row
+    // that now represents a different submission. The write is the authority, so a
+    // row that left `queued` (dequeued, or cancelled between lookup and refresh)
+    // must refuse and let the caller mint a separate task.
+    auto created = mgr_.CreateTask(AsyncDepthMakeTask("ns", "dbg2", "oldhash"));
+    ASSERT_TRUE(created.ok());
+    const std::string id = created.value().task_id;
+    ASSERT_TRUE(mgr_.MarkProcessing(id, 4).ok());
+
+    SubmitRequest req;
+    req.namespace_id = "ns";
+    req.doc_id = "dbg2";
+    req.content_hash = "newhash";
+    req.filepath = "/tmp/refreshed.pdf";
+    auto r = mgr_.UpdateTaskForDebounce(id, req);
+    EXPECT_FALSE(r.ok()) << "a row a worker is using was reset to queued";
+    EXPECT_TRUE(CarriesCode(r.status(), "CX_ERR_DOC_PROCESSING_IN_PROGRESS"));
+
+    auto got = mgr_.GetTask(id);
+    ASSERT_TRUE(got.ok());
+    EXPECT_EQ(got.value().status, task_status::kProcessing);
+    EXPECT_EQ(got.value().content_hash, "oldhash");
+}
+
 // ---- FindRecentTaskByDocId window + task_type scoping ----
 
 TEST_F(AsyncDepthTaskFx, FindRecentTaskScopesByTaskTypeAndWindow) {
@@ -213,17 +239,17 @@ TEST_F(AsyncDepthTaskFx, FindRecentTaskScopesByTaskTypeAndWindow) {
     ASSERT_TRUE(mgr_.CreateTask(parse).ok());
 
     // Same doc, a recent parse task is found within a wide window.
-    auto found = mgr_.FindRecentTaskByDocId("shared", kTaskDocParse, /*window_seconds=*/3600);
+    auto found = mgr_.FindRecentTaskByDocId("ns", "shared", kTaskDocParse, /*window_seconds=*/3600);
     ASSERT_TRUE(found.ok());
     EXPECT_TRUE(found.value().has_value());
 
     // A different task_type for the same doc should not match the parse row.
-    auto other = mgr_.FindRecentTaskByDocId("shared", kTaskDocParse + 99, 3600);
+    auto other = mgr_.FindRecentTaskByDocId("ns", "shared", kTaskDocParse + 99, 3600);
     ASSERT_TRUE(other.ok());
     EXPECT_FALSE(other.value().has_value());
 
     // Unknown doc -> none.
-    auto miss = mgr_.FindRecentTaskByDocId("nope", kTaskDocParse, 3600);
+    auto miss = mgr_.FindRecentTaskByDocId("ns", "nope", kTaskDocParse, 3600);
     ASSERT_TRUE(miss.ok());
     EXPECT_FALSE(miss.value().has_value());
 }
@@ -240,7 +266,7 @@ TEST_F(AsyncDepthTaskFx, SelectOldestQueuedExcludesActiveDocIds) {
     ASSERT_TRUE(pick.value().has_value());
 
     // Exclude both queued docs -> nothing selectable.
-    auto none = mgr_.SelectOldestQueuedTaskExcluding({"docX", "docY"});
+    auto none = mgr_.SelectOldestQueuedTaskExcluding({{"ns", "docX"}, {"ns", "docY"}});
     ASSERT_TRUE(none.ok());
     EXPECT_FALSE(none.value().has_value());
 }
@@ -360,18 +386,25 @@ TEST_F(AsyncDepthTaskFx, RequeueStaleProcessingResetsFreshProcessingToQueued) {
 
 // ---- MarkProcessing has no source-state guard: it is a raw UPDATE by id ----
 
-TEST_F(AsyncDepthTaskFx, MarkProcessingOnCompletedRowStillUpdatesById) {
+TEST_F(AsyncDepthTaskFx, MarkProcessingRefusesARowThatIsNoLongerQueued) {
+    // This previously asserted the opposite ("no state-machine guard ... changes>0
+    // -> Ok"), which is the defect: Dequeue selects a queued row and only then
+    // marks it, so an unconditional update resurrects a row that was cancelled or
+    // claimed in between and dispatches a worker for it.
     auto created = mgr_.CreateTask(AsyncDepthMakeTask("ns", "raw"));
     ASSERT_TRUE(created.ok());
     const std::string id = created.value().task_id;
     ASSERT_TRUE(mgr_.MarkProcessing(id, 1).ok());
     ASSERT_TRUE(mgr_.MarkCompleted(id, "d").ok());
-    // No state-machine guard in MarkProcessing -- the row exists so changes>0 -> Ok.
-    EXPECT_TRUE(mgr_.MarkProcessing(id, 2).ok());
+
+    auto st = mgr_.MarkProcessing(id, 2);
+    EXPECT_FALSE(st.ok()) << "a terminal row was marked processing again";
+    // A live-but-not-queued row is a transient conflict, not "no such task".
+    EXPECT_TRUE(CarriesCode(st, "CX_ERR_DOC_PROCESSING_IN_PROGRESS"));
     auto got = mgr_.GetTask(id);
     ASSERT_TRUE(got.ok());
-    EXPECT_EQ(got.value().status, task_status::kProcessing);
-    EXPECT_EQ(got.value().worker_id, 2);
+    EXPECT_EQ(got.value().status, task_status::kCompleted);
+    EXPECT_EQ(got.value().worker_id, 1);
 }
 
 // ---- CreateTask: empty id is auto-generated; explicit id is honored ----

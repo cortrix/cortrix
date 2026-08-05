@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -70,11 +71,22 @@ public:
                                 BatchLimits limits = {});
 
     /// [D3.5 r2 · P3b] Enable real inline-content materialization: each accepted
-    /// doc's content is written to `<dir>/<doc_id>` and that path becomes the
-    /// SubmitRequest.filepath the F42 doc-parse worker reads. The dir is created if
-    /// absent. When unset (the default), filepath stays "" — the standalone/mock
-    /// seam (no real pipeline) keeps working. Call once at wiring time.
+    /// doc's content is written to a server-named file under `dir` and that path
+    /// becomes the SubmitRequest.filepath the F42 doc-parse worker reads. The dir
+    /// is created if absent. When unset (the default), filepath stays "" — the
+    /// standalone/mock seam (no real pipeline) keeps working. Call once at wiring
+    /// time, passing server::BatchTempDir(data_dir) so the writer and the reapers
+    /// (TaskFinalizer release + startup orphan sweep) agree on one location.
     void SetMaterializeDir(std::string dir) { materialize_dir_ = std::move(dir); }
+
+    /// Release seam for an input this service materialized that never acquired an
+    /// owner — i.e. the per-doc submit failed, so no task will ever read the file.
+    /// (The debounce merge/refresh cases are decided inside the scheduler and are
+    /// reported through TaskScheduler::SetUnadoptedInputReleaser instead.) Unset
+    /// leaves the file for the orphan sweep, which is the standalone/test default.
+    void SetInputReleaser(std::function<void(const std::string&)> fn) {
+        input_releaser_ = std::move(fn);
+    }
 
     /// Process a parsed batch. Returns the §2.3 partial-success reply (200) when
     /// the envelope is accepted, or a single GEN-Agent CX_ERR_BATCH_* error reply
@@ -103,22 +115,27 @@ private:
     static nlohmann::json MakeFailureItem(const std::string& doc_id,
                                           const Status& status);
 
-    /// Write `content` to `<materialize_dir_>/<doc_id><ext>` and return the path, or
-    /// "" on a write failure (the caller then submits with an empty filepath, which
-    /// the pipeline surfaces as a parse failure for that doc). `<ext>` is taken from
-    /// `filename`'s extension so the F42 doc-parse worker
-    /// (DocumentParserFactory::ParseDocument selects a parser by the filepath
-    /// extension); it falls back to ".txt" (plain text) when `filename` carries no
-    /// usable extension. The on-disk name keys on doc_id (unique within the batch) so
-    /// duplicate client filenames cannot collide. No-op returning "" when
-    /// materialization is disabled.
-    std::string MaterializeContent(const std::string& doc_id,
-                                   const std::string& content,
+    /// Write `content` to `<materialize_dir_>/<server-minted ULID><ext>` and return
+    /// the path, or "" on a write failure (the caller then submits with an empty
+    /// filepath, which the pipeline surfaces as a parse failure for that doc).
+    ///
+    /// [SEC-BATCH-001] No caller-controlled string may reach the path. The basename
+    /// is a server-minted ULID. `<ext>` is taken from `filename` and kept verbatim
+    /// whenever its SHAPE is valid (lowercase alphanumerics, length-capped),
+    /// falling back to ".txt" otherwise: the extension has to survive because
+    /// ParseDocument selects the parser from the filepath extension, and filtering
+    /// it down to the parser-backed set would silently turn an unsupported-format
+    /// failure into a successful plain-text ingest. The doc_id deliberately is NOT
+    /// a parameter: it used to form the basename, which let a caller write outside
+    /// this directory.
+    /// No-op returning "" when materialization is disabled.
+    std::string MaterializeContent(const std::string& content,
                                    const std::string& filename) const;
 
     ITaskSubmitter* submitter_;
     BatchLimits limits_;
     std::string materialize_dir_;  ///< "" = disabled (mock/standalone)
+    std::function<void(const std::string&)> input_releaser_;
 };
 
 }  // namespace cortrix::server

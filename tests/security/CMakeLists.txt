@@ -9,6 +9,8 @@ add_executable(cortrix_security_tests
     test_sec_jwt_hardening.cpp
     test_sec_injection_ext.cpp
     test_sec_tenant_isolation.cpp
+    # --- SEC-BATCH: batch inline-content materialization ---
+    test_sec_batch_materialize.cpp
 )
 
 target_link_libraries(cortrix_security_tests PRIVATE

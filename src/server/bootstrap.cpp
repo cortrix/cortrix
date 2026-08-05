@@ -88,6 +88,8 @@
 // [D3.5 r2 · Wave P · P3] TD-F42-BULK batch submit route + its production submitter.
 #include "cortrix/server/routes/batch_routes.h"
 #include "cortrix/server/batch_submit_service.h"
+#include "cortrix/async/managed_input.h"
+#include "cortrix/server/batch_temp_store.h"
 #include "cortrix/server/f42_task_submitter_adapter.h"
 // [D3.5 r2 · Wave P · P4] F48 §6.3 agent_llm_config admin API.
 #include "cortrix/server/routes/system_config_routes.h"
@@ -731,8 +733,11 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     spc_mgr.SetWriteRejectProbe(
         [&f24_disk_monitor] { return f24_disk_monitor.ShouldRejectWrites(); });
 
+    // The last argument releases each batch-materialized input file once its task
+    // is terminal (SEC/lifecycle: those files exist only to feed the parser).
     cortrix::async::DocumentProcessor doc_processor(
-        &task_mgr, &f06_factory, f42_config.get(), nullptr, &spc_mgr);
+        &task_mgr, &f06_factory, f42_config.get(), nullptr, &spc_mgr,
+        cortrix::server::BatchTempDir(config.ns.data_dir));
 
     // F41 doc-summary worker — built only when an LLM is configured; otherwise the
     // feature is OFF (no kTaskDocSummary handler, and the ⑤c seam stays unset). It is
@@ -936,6 +941,19 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         &ns_router, &ns_pool, global_config);
     obs_module.scheduler().RegisterTable("interaction_log",
                                          [il_sweeper] { il_sweeper->RunOnce(); });
+    // Recurring reclaim of orphaned batch inputs. The startup sweep alone is not a
+    // recovery path: it skips files inside its grace window and then does not run
+    // again until the next restart, so a fresh orphan could survive indefinitely.
+    // Riding the daily 02:00 UTC sweep bounds that without adding a thread.
+    // (F42's own TaskCleanupCron is not constructed anywhere in production, so it
+    // is not an option here.)
+    {
+        const std::string batch_tmp = cortrix::server::BatchTempDir(config.ns.data_dir);
+        cortrix::async::TaskManager* tm = &task_mgr;
+        obs_module.scheduler().RegisterTable("batch_tmp_inputs", [batch_tmp, tm] {
+            cortrix::server::SweepOrphanedBatchInputs(batch_tmp, tm);
+        });
+    }
     obs_module.Initialize();
 
     // 10d. [D3.5 r2 · Wave P · P2] F16a DB-import assembly. The ConnectionManager
@@ -1094,7 +1112,32 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // [P3b] Materialize each batch doc's inline content under the data dir so the
     // F42 doc-parse worker (DocumentProcessor → ParseDocument(filepath)) reads real
     // files — batch submissions now truly enter the pipeline + land as blocks.
-    batch_service.SetMaterializeDir(config.ns.data_dir + "/batch_tmp");
+    batch_service.SetMaterializeDir(cortrix::server::BatchTempDir(config.ns.data_dir));
+    // Reclaim materialized inputs no live task still needs, BEFORE the route is
+    // mounted (nothing is in flight yet, so the live-set read cannot race a new
+    // submission). This is the required backstop for the terminal release above:
+    // SweepZombies/SweepTimedOut end tasks with a bulk UPDATE that never reaches a
+    // handler, and a crash can leave a file whose task never terminated at all.
+    if (auto swept = cortrix::server::SweepOrphanedBatchInputs(
+            cortrix::server::BatchTempDir(config.ns.data_dir), &task_mgr);
+        !swept.ok()) {
+        spdlog::warn("batch temp sweep skipped: {}", swept.status().message());
+    }
+    // Ownership hand-back for materialized inputs that end up with no owner:
+    //   - the scheduler reports a debounce merge/refresh (it alone sees those);
+    //   - the batch service reports a per-doc submit that produced no task.
+    // Both funnel into the same containment + live-reference checked release.
+    {
+        const std::string managed_dir = cortrix::server::BatchTempDir(config.ns.data_dir);
+        cortrix::async::TaskManager* tm = &task_mgr;
+        task_scheduler.SetUnadoptedInputReleaser(
+            [managed_dir, tm](const std::string& path, const std::string& owner_task_id) {
+                cortrix::async::ReleaseManagedPath(managed_dir, path, owner_task_id, tm);
+            });
+        batch_service.SetInputReleaser([managed_dir, tm](const std::string& path) {
+            cortrix::async::ReleaseManagedPath(managed_dir, path, /*exclude=*/"", tm);
+        });
+    }
     cortrix::RegisterBatchRoutes(server.server(), batch_service, auth);
     // [D3.5 r2 · Wave S routes] Flat design-surface /documents family. Mounts the
     // openapi/SDK/MCP shape (POST/GET/GET{id}/DELETE{id} + tasks progress/cancel) on
@@ -1103,7 +1146,8 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // DocumentTaskHandler over the already-wired scheduler/task_mgr/worker_pool (must
     // outlive `server`, so declared here at end-of-scope).
     cortrix::async::DocumentTaskHandler doc_task_handler(
-        &task_scheduler, &task_mgr, &worker_pool, f42_config.get());
+        &task_scheduler, &task_mgr, &worker_pool, f42_config.get(),
+        cortrix::server::BatchTempDir(config.ns.data_dir));
     // [F41 · A6] GET /api/v1/documents/discover — doc-summary granularity recall (HNSW
     // over doc_summary blocks + FTS5 fallback). MUST be mounted BEFORE RegisterFlatDocumentRoutes
     // below, whose GET /documents/{id} catch-all would otherwise swallow the literal
