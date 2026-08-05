@@ -12,11 +12,11 @@
 
 namespace cortrix {
 
-namespace resource { class INamespacePool; }  // D3.5 wire⑤c: F05 pool dependency
-namespace catalog  { class INSRouter; }        // F13 catalog: namespace create+admit
+namespace resource { class INamespacePool; }  // namespace-pool dependency
+namespace catalog  { class INSRouter; }        // catalog: namespace create+admit
 class SPCManager;
 
-/// F21 Watcher Fan-out (TD-WATCHER-001).
+/// Watcher fan-out.
 ///
 /// MVP created one OS-level FileWatcher per (directory, namespace) pair: when a
 /// single directory was subscribed by N namespaces it spawned N OS watchers and
@@ -44,9 +44,9 @@ struct WatchInfo {
 
 class DirWatcherRegistry {
 public:
-    /// @param pool       F05 resource pool the importers acquire per-operation.
-    /// @param ins_router F13 catalog router used to create a subscribed namespace
-    ///                   (catalog INSERT + F05 AdmitCreate, idempotent on
+    /// @param pool       resource pool the importers acquire per-operation.
+    /// @param ins_router catalog router used to create a subscribed namespace
+    ///                   (catalog INSERT + AdmitCreate, idempotent on
     ///                   AlreadyExists). This is the ONLY admission path that makes
     ///                   a freshly-subscribed namespace resolvable by the importer's
     ///                   facade.Acquire() — a bare metadata create does NOT admit

@@ -1,5 +1,5 @@
 #pragma once
-// F20 Security Hardening — rate limiting baseline (design topic 8, sec 8.bis).
+// Security hardening — rate limiting baseline.
 //
 // Three independent strata, each a token bucket (the design's recommended
 // algorithm):

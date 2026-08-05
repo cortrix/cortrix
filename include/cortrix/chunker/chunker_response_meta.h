@@ -6,7 +6,7 @@
 #include "cortrix/chunker/child_parent_dedup.h"
 #include "cortrix/chunker/i_chunker.h"
 
-// F34 Agent-friendly response meta builders (detailed design § 3.3 / § 5.3). Turn a
+// Agent-friendly response meta builders. Turn a
 // ChunkerOutput's stats + the retrieval-time dedup groups into the GEN-Agent
 // `meta` JSON the API/SDK/MCP boundary returns:
 //   - index-time:  meta.stats (document-parse completeness, A-class) +
@@ -21,7 +21,7 @@ namespace cortrix::chunker {
 nlohmann::json BuildStatsMeta(const ChunkerStats& stats);
 
 /// Build the index-time `meta.warnings[]` array (§ 5.3). Includes a
-/// CX_WARN_CHUNK_FALLBACK entry when stats.fallback_to_flat; per-page F06 parse
+/// CX_WARN_CHUNK_FALLBACK entry when stats.fallback_to_flat; per-page parse
 /// warnings (§ 5.3 example) are appended by the parser/pipeline layer (their text
 /// is not on ChunkerStats), so this returns just the chunker-owned warnings.
 nlohmann::json BuildWarningsMeta(const ChunkerStats& stats, const std::string& doc_id,

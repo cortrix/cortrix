@@ -5,16 +5,16 @@
 
 namespace cortrix::onnx {
 
-/// Thin wrapper over the ONNX Runtime C API (F22 D4=A — thin, not fat).
+/// Thin wrapper over the ONNX Runtime C API (thin, not fat).
 /// Provides version introspection + a home for the few incremental shims we may
 /// need for known breaking changes across supported runtime versions. There is
 /// deliberately NO general abstraction of the Ort API: consumers (OnnxEmbedder,
-/// F02 reranker) keep calling Ort directly; this class only owns the
+/// the reranker) keep calling Ort directly; this class only owns the
 /// version/opset facts the StartupValidator needs.
 ///
 /// Phase 1: static methods (one runtime instance per Cortrix binary, build-time
 /// locked per D1=A). A future multi-runtime mode would require a breaking change
-/// to an instance-based API; see PHASE2_BACKLOG F22-MULTI-RUNTIME.
+/// to an instance-based API in Phase 2.
 class Runtime {
  public:
     /// The ONNX Runtime version actually loaded into this process, e.g.
@@ -35,9 +35,9 @@ class Runtime {
     static std::pair<int32_t, int32_t> GetSupportedOpsetRange();
 
     /// The ONNX Runtime ABI major version this binary was COMPILED against,
-    /// from the CMake-locked CORTRIX_ONNXRT_EXPECTED_MAJOR (F22 D1=A). Compared
+    /// from the CMake-locked CORTRIX_ONNXRT_EXPECTED_MAJOR. Compared
     /// with GetRuntimeMajorVersion() at startup to detect an ABI mismatch after
-    /// a `.so` swap. Returned as a string to match the F22 §8.3 structured_data
+    /// a `.so` swap. Returned as a string to match the structured_data
     /// "expected_major_version" string-typed contract.
     static std::string GetCompiledMajorVersion();
 

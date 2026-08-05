@@ -2,14 +2,14 @@
 
 namespace cortrix::ml {
 
-/// Process-wide ONNX Runtime environment singleton (F02 §2.4-bis lifecycle SoT).
+/// Process-wide ONNX Runtime environment singleton (the lifecycle SoT).
 ///
-/// Background (V5-B2-07): F02 OnnxReranker, F40 BGE-M3 Sparse and F03 OnnxEmbedder
+/// Background: OnnxReranker, BGE-M3 sparse and OnnxEmbedder
 /// all need an Ort::Env. Creating one per component duplicates the global runtime
 /// state. This singleton owns the single Ort::Env; consumers borrow it.
 ///
 /// Thread-safety: lazily initialized exactly once via std::call_once on first
-/// EnvHandle()/Init() call (F02 §2.4-bis "std::call_once guarantees one-time initialization").
+/// EnvHandle()/Init() call ("std::call_once guarantees one-time initialization").
 ///
 /// Standalone (D3): no real model needed to construct the Env — Ort::Env is just
 /// the logging/threadpool context, so this is fully testable in-process. The

@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-// F34 ChunkerConfig — GUC-backed chunking parameters (detailed design § 2.3).
+// ChunkerConfig — GUC-backed chunking parameters.
 //
 // Plain value carrier (mirrors reranker/reranker_config.h): default values +
 // documented ranges live here; range enforcement is in ChunkerGuc (chunker_guc.h),
@@ -12,7 +12,7 @@ namespace cortrix::chunker {
 /// degraded fallback path (§ 4.5), kSemantic is a Phase 2 enum placeholder.
 enum class ChunkStrategy { kParentChild, kFlat, kSemantic };
 
-/// Granularity of the splitting unit (§ 2.3, D2 lock = paragraph). Phase 2 F47
+/// Granularity of the splitting unit (paragraph). Phase 2
 /// DocumentTypeClassifier auto-detects this per-doc.
 enum class UnitLevel { kPage, kParagraph, kSentence };
 
@@ -23,7 +23,7 @@ const char* ToString(UnitLevel u);
 ChunkStrategy ChunkStrategyFromString(const std::string& s);
 UnitLevel UnitLevelFromString(const std::string& s);
 
-/// F34 chunker configuration. Defaults = D0_SCOPE values + detailed design § 2.3 locks
+/// Chunker configuration. Defaults are the locked values
 /// (D1 overlap=20 / D2 unit_level=paragraph / D3 max_parents=10000 /
 /// D5 children_per_parent_for_rerank=3).
 struct ChunkerConfig {

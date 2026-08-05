@@ -9,7 +9,7 @@
 
 namespace cortrix::config {
 
-/// File-backed IGlobalConfig (F12 §3.8 FileBasedGlobalConfig — the CE default
+/// File-backed IGlobalConfig (the CE default
 /// global-config source, `~/.cortrix/config.json`). Implements the canonical
 /// cortrix::IGlobalConfig (D2-pre-9 scaffolding) — does NOT redefine it.
 ///
@@ -17,10 +17,10 @@ namespace cortrix::config {
 /// strings); typed getters parse on read (InvalidArgument on malformed, NotFound
 /// on missing). Reload() re-reads the file and fires OnChange for changed keys.
 ///
-/// Scope note (S3.1): F12 owns this CE file impl + reuses the dev/test
+/// Scope note: the catalog owns this CE file impl + reuses the dev/test
 /// InMemoryGlobalConfig (common/). The other §3.8 sources — PgcortrixGucConfig
-/// (PostgreSQL GUC) and WebUIConfig — belong to F14 / P02a respectively
-/// and are delivered there on this same canonical interface; F12 (Layer 0) does
+/// (PostgreSQL GUC) and WebUIConfig — belong to pgcortrix / the web UI respectively
+/// and are delivered there on this same canonical interface; the catalog (Layer 0) does
 /// not stub them (they'd pull cross-Feature deps).
 class FileBasedGlobalConfig : public cortrix::IGlobalConfig {
 public:

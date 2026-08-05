@@ -1,12 +1,12 @@
 #pragma once
-// F20 Security Hardening — Secret management (design topic 2 / topic 6).
+// Security hardening — Secret management.
 //
 // ISecretProvider abstracts where runtime secrets come from. Phase 1 ships only
 // EnvSecretProvider (reads process environment variables, the industry default
 // used by Postgres / Redis / Weaviate). Cloud providers (AWS Secrets Manager,
 // GCP Secret Manager, Azure Key Vault, HashiCorp Vault) are deferred to Phase
 // 1.5 / Phase 2 behind this same interface — see PHASE2_BACKLOG
-// TD-F20-SECRET-PROVIDERS. The async-first shape mirrors mainstream SaaS SDKs so
+// The async-first shape mirrors mainstream SaaS SDKs so
 // a network-backed provider drops in without changing call sites.
 
 #include <future>
@@ -18,7 +18,7 @@ namespace cortrix::security {
 /// Failure modes a secret lookup can report. Phase 1's EnvSecretProvider only
 /// ever surfaces kNotFound (env var absent); the remaining values exist so Cloud
 /// providers added later need no interface change. These map 1:1 to the
-/// CX_ERR_SECRET_* codes in the F20 design (only CX_ERR_SECRET_INVALID_CONFIG
+/// CX_ERR_SECRET_* codes in the design (only CX_ERR_SECRET_INVALID_CONFIG
 /// and CX_ERR_SECRET_NOT_FOUND are wired in Phase 1).
 enum class SecretError {
     kNotFound,             ///< secret key does not exist
@@ -80,7 +80,7 @@ public:
         return result.ok() ? result.value() : std::nullopt;
     }
 
-    /// Health probe — feeds the F20 /ready endpoint's secret_provider component
+    /// Health probe — feeds the /ready endpoint's secret_provider component
     /// (design topic 7). EnvSecretProvider is always healthy.
     virtual bool IsHealthy() const = 0;
 

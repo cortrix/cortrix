@@ -1,11 +1,11 @@
 #pragma once
-// F20 Security Hardening — secret_provider readiness component (design sec 8.4).
+// Security hardening — secret_provider readiness component.
 //
-// Bridges the F20-6 ISecretProvider into the F24-owned /ready endpoint: reports
+// Bridges ISecretProvider into the /ready endpoint: reports
 // the secret_provider component as ready iff ISecretProvider::IsHealthy() and
 // includes the active provider_type in the /ready body. Registered with the
 // ReadinessRegistry; the other 4 readiness components are owned by their
-// Features (catalog/F12, vector_index/F01, spc_pipeline/F06, memory_store/MEM).
+// components (catalog, vector_index, spc_pipeline, memory_store).
 
 #include <memory>
 #include <string>

@@ -4,14 +4,14 @@
 
 #include "cortrix/id/types.h"
 
-// F34 child→parent dedup (detailed design § 4.4, D5 lock = C top-3) + the § 3.3 response meta
+// Child→parent dedup + the response meta
 // types it produces.
 //
 // P-HNSW top-K returns child hits, several of which may share one parent. The C
 // top-3 strategy keeps at most `children_per_parent_for_rerank` (default 3,
 // GUC-/NS-tunable 1-10) children per parent to feed the reranker; the rest are
 // recorded in `meta.children_hits_per_parent` (result completeness, not dropped
-// silently). Standalone: the real P-HNSW search + F02 rerank wiring is D3.5; this
+// silently). Standalone: the real P-HNSW search + rerank wiring lands later; this
 // is the pure grouping/selection given hits whose parent_id is already attached.
 namespace cortrix::chunker {
 

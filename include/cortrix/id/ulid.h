@@ -5,7 +5,7 @@
 // ULID generation (ARCH § 1.8.1 — IDs are 26-char Crockford-base32 ULIDs:
 // 48-bit millisecond timestamp + 80-bit randomness, lexicographically sortable so
 // IDs are time-ordered). Scaffolding note: the id/ header previously only carried
-// the type aliases (id/types.h); F34 is the first feature to mint IDs, so it adds
+// the type aliases (id/types.h); the chunker is the first to mint IDs, so it adds
 // the generator here as the shared home for all id minting (parent/child/doc).
 namespace cortrix::id {
 

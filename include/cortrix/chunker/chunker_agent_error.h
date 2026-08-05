@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/common/status.h"
 
-// F34 chunker Agent-friendly error registry (detailed design § 5.1 / § 5.2). Mirrors
+// Chunker Agent-friendly error registry. Mirrors
 // reranker/reranker_error.h (template A): an enum of error identities + a canonical
 // registry (category / retryable / required structured_data keys) + MakeChunkerError
 // turning one into the GEN-Agent boundary body. Per CODING_CONVENTIONS § 3 the

@@ -8,12 +8,12 @@ namespace cortrix::tenant {
 
 // ===== Role enums (two independent sets, never interchangeable) =====
 
-/// In-tenant role -- mirrors the user_tenants.role physical schema (F12, 4 values).
-/// Lark/Feishu-style membership ladder (P09 sec 4.1).
+/// In-tenant role -- mirrors the user_tenants.role physical schema (4 values).
+/// Lark/Feishu-style membership ladder.
 enum class TenantRole { OWNER, ADMIN, MEMBER, VIEWER };
 
 /// Cross-tenant namespace-sharing role -- mirrors the ns_acl.role physical schema
-/// (F12, 3 values, P09 sec 4.1). Disjoint from TenantRole on purpose.
+/// (3 values). Disjoint from TenantRole on purpose.
 enum class NsAclRole { VIEWER, EDITOR, ADMIN };
 
 // ===== Tenant type =====
@@ -36,7 +36,7 @@ struct QuotaLimit {
     bool IsUnlimited() const { return limit < 0; }
 };
 
-/// The full quota picture for a tenant: per-type usage + per-type limit (P09 sec 4.1).
+/// The full quota picture for a tenant: per-type usage + per-type limit.
 struct QuotaInfo {
     std::string tenant_id;
     std::map<QuotaType, int64_t> usage;
@@ -45,7 +45,7 @@ struct QuotaInfo {
 
 // ===== Tenant data structures =====
 
-/// A tenant row (catalog.db `tenants`, P09 sec 6).
+/// A tenant row (catalog.db `tenants`).
 struct Tenant {
     std::string tenant_id;    ///< "tenant-" + uuid_v4()
     std::string name;
@@ -54,7 +54,7 @@ struct Tenant {
     int64_t created_at = 0;
 };
 
-/// A tenant member view (user_tenants JOIN users, P09 sec 4.2 ListMembers).
+/// A tenant member view (user_tenants JOIN users, ListMembers).
 struct Member {
     std::string user_id;
     std::string email;
@@ -62,7 +62,7 @@ struct Member {
     int64_t joined_at = 0;
 };
 
-// ===== Type aliases (consumer-friendly; F16a already uses TenantId) =====
+// ===== Type aliases (consumer-friendly) =====
 using TenantId = std::string;
 using UserId = std::string;
 using NsId = std::string;

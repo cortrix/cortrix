@@ -19,7 +19,7 @@ namespace cortrix::onnx {
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// So OnnxErrorCode is the *enum of identities*, and MakeOnnxError() turns one
 /// (plus optional structured_data) into that boundary error. This mirrors the
-/// F12 catalog::CatalogErrorCode template exactly — the F22 spec's
+/// catalog::CatalogErrorCode template exactly — the spec's
 /// `Result<void, OnnxError>` / standalone `OnnxError` struct (§9.1) is the
 /// pre-convention draft; this is its convention-compliant form.
 ///
@@ -33,11 +33,11 @@ enum class OnnxErrorCode {
     kInferenceFailed,         ///< OrtSession::Run() returned non-OK
 };
 
-/// Total number of ONNX error codes (F22 §8.3 = 3). Compile-time anchor for the
+/// Total number of ONNX error codes (= 3). Compile-time anchor for the
 /// API-compatibility regression test (the set must not shrink).
 constexpr int kOnnxErrorCodeCount = 3;
 
-/// Canonical, immutable attributes of one error code (F22 §8.3 columns).
+/// Canonical, immutable attributes of one error code.
 struct OnnxErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     agent_friendly::ErrorCategory category;   ///< permanent / transient / ...
@@ -52,7 +52,7 @@ const OnnxErrorInfo& GetOnnxErrorInfo(OnnxErrorCode code);
 /// The "CX_ERR_*" string for `code` (convenience over GetOnnxErrorInfo).
 const char* OnnxErrorCodeString(OnnxErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (F22 §8.3
+/// The structured_data keys a `code`'s error body MUST carry (
 /// structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5);
 /// lets call sites + tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(OnnxErrorCode code);
@@ -67,7 +67,7 @@ bool HasRequiredStructuredData(OnnxErrorCode code,
 /// each call site) and an optional human-readable `message`. category /
 /// retryable / retry_after_ms are filled from the canonical registry — call
 /// sites never restate them. The returned structured_data is always a JSON
-/// OBJECT (Agent consumes directly, no JSON.parse — F22 §8.3 / Anti-pattern 4).
+/// OBJECT (Agent consumes directly, no JSON.parse).
 agent_friendly::AgentFriendlyError MakeOnnxError(
     OnnxErrorCode code,
     nlohmann::json structured_data = nlohmann::json::object(),

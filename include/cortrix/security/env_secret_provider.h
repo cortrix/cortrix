@@ -1,5 +1,5 @@
 #pragma once
-// F20 Security Hardening — Phase 1 default secret provider (design topic 2).
+// Security hardening — Phase 1 default secret provider.
 //
 // EnvSecretProvider reads secrets straight from process environment variables.
 // This is the Phase 1 default and matches how Postgres / Redis / Weaviate take

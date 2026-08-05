@@ -12,10 +12,10 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::tenant {
 
-/// Tenant lifecycle + membership service over catalog.db (P09 sec 4.2). Owns the
+/// Tenant lifecycle + membership service over catalog.db. Owns the
 /// CreatePersonal / CreateOrganization flows, member management, and tenant
 /// metadata. Built up Story-by-Story:
-///   - S2 (this): all 10 methods over the F12 `tenants` / `users` / `user_tenants`
+///   - all 10 methods over the catalog `tenants` / `users` / `user_tenants`
 ///     tables.
 ///
 /// The service borrows an open catalog.db handle (it does NOT own it). Errors are
@@ -24,10 +24,10 @@ namespace cortrix::tenant {
 /// sec 4.1 `Result<T,TenantError>` spelling is the pre-convention draft; the project
 /// convention is Result<T> + Status, see tenant_error.h).
 ///
-/// Cross-service transaction contract (P09 sec 5.1 / topic M2): CreatePersonal takes
-/// a `sqlite3* conn` so P08's AuthService::Register can pass its already-open
-/// outermost transaction handle and P09 runs its INSERTs on the SAME connection
-/// without opening a nested transaction. P08 keeps BEGIN/COMMIT/ROLLBACK; a P09
+/// Cross-service transaction contract: CreatePersonal takes
+/// a `sqlite3* conn` so AuthService::Register can pass its already-open
+/// outermost transaction handle and this service runs its INSERTs on the SAME connection
+/// without opening a nested transaction. The caller keeps BEGIN/COMMIT/ROLLBACK; a
 /// failure rolls back users + tenants + user_tenants atomically. (The sec 4.2 draft
 /// names this `IDbConnection*`; the catalog DB layer is a raw sqlite3* throughout
 /// this codebase -- see auth::AuthService -- so we pass the handle directly.)
@@ -42,13 +42,13 @@ public:
 
     // --- Create (topic 6 -- two interfaces) ---
 
-    /// Personal tenant -- called inside P08's registration flow (no AuthContext,
+    /// Personal tenant -- called inside the registration flow (no AuthContext,
     /// the user is not yet logged in). Atomic on `conn`: INSERT tenants(type=
     /// 'personal', name=email, dedup_scope='tenant') + INSERT user_tenants(role=
-    /// 'owner'). tenant_id = "tenant-" + uuid_v4() (P08 topic 3.1 B). Does NOT
+    /// 'owner'). tenant_id = "tenant-" + uuid_v4(). Does NOT
     /// COMMIT -- the caller owns the transaction. `conn` must be a valid open
     /// handle; if null, the service's own handle is used (standalone path). Email
-    /// is assumed already format-validated by P08 (sec 5.1 -- P09 does not re-validate).
+    /// is assumed already format-validated by the caller (this service does not re-validate).
     /// Errors: CX_ERR_TENANT_EMAIL_DUPLICATE / CX_ERR_TENANT_TRANSACTION_FAILED.
     Result<Tenant> CreatePersonal(
         const UserId& user_id,

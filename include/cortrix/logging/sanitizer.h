@@ -1,5 +1,5 @@
 #pragma once
-// F20 Security Hardening — log / structured_data sanitizer (design topic 4).
+// Security hardening — log / structured_data sanitizer.
 //
 // LogSanitizer scrubs sensitive fields out of any nlohmann::json payload before
 // it reaches a log sink or is returned in an error body. Field rules live in
@@ -9,8 +9,8 @@
 // languages sanitize identically (design sec 6.4).
 //
 // Standalone scope (D-R1): this provides the sanitizer + rule loading + a global
-// instance. Wiring it into every existing logger / error call site (F03 / P08 /
-// F16a / MEM02 / P03 SDK) is deferred to D3.5 (hooks F20-4-rev-7, F20-4-rev-8).
+// instance. Wiring it into every existing logger / error call site (enricher, auth,
+// import, memory, SDK) is deferred.
 
 #include <string>
 #include <unordered_set>

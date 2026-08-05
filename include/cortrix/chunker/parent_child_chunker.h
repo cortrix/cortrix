@@ -8,9 +8,9 @@
 #include "cortrix/chunker/types.h"
 #include "cortrix/common/result.h"
 
-// F34 ParentChildChunker — the Phase 1 V1.0 IChunker implementation (detailed design § 4.1).
+// ParentChildChunker — the Phase 1 V1.0 IChunker implementation.
 //
-// Splits a document (F06 ParsedPage[]) into a two-layer chunk tree:
+// Splits a document (ParsedPage[]) into a two-layer chunk tree:
 //   - paragraphs are accumulated until the running token count reaches
 //     parent_size → flushed as one ParentChunk;
 //   - within each parent, the parent_text is recursively split into Children of
@@ -29,7 +29,7 @@ public:
     explicit ParentChildChunker(ChunkerConfig config = {},
                                 TokenCounter token_counter = EstimateTokens);
 
-    /// Chunk one document. Tolerates per-page F06 failures (skips, records in
+    /// Chunk one document. Tolerates per-page parse failures (skips, records in
     /// stats); returns a CX_ERR_CHUNK_* Status only for hard errors:
     ///   - empty document (no usable page)            → CX_ERR_CHUNK_EMPTY_DOCUMENT
     ///   - parent count > cap AND flat fallback failed → CX_ERR_CHUNK_OVERFLOW

@@ -10,7 +10,7 @@
 
 namespace cortrix::tenant {
 
-/// The 24 P09 tenant/permission/quota error identities (P09 sec 7). Each maps to a
+/// The 24 tenant/permission/quota error identities. Each maps to a
 /// stable `CX_ERR_*` string + a GEN-Agent category + retryability via the
 /// canonical registry below.
 ///
@@ -58,11 +58,11 @@ enum class TenantErrorCode {
     kCallerRoleInsufficient,          // CX_ERR_CALLER_ROLE_INSUFFICIENT
 };
 
-/// Total number of P09 error codes (P09 sec 7 = 24). Compile-time anchor for the
+/// Total number of tenant error codes (= 24). Compile-time anchor for the
 /// API-compatibility regression test (the set must not shrink).
 constexpr int kTenantErrorCodeCount = 24;
 
-/// Canonical, immutable attributes of one error code (P09 sec 7 columns).
+/// Canonical, immutable attributes of one error code.
 struct TenantErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
@@ -77,7 +77,7 @@ const TenantErrorInfo& GetTenantErrorInfo(TenantErrorCode code);
 /// The "CX_ERR_*" string for `code` (convenience over GetTenantErrorInfo).
 const char* TenantErrorCodeString(TenantErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (P09 sec 7
+/// The structured_data keys a `code`'s error body MUST carry (
 /// structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5);
 /// lets call sites + tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(TenantErrorCode code);

@@ -1,8 +1,8 @@
 #pragma once
-// MEM01: Memory Scoring & Classified Decay
+// Memory Scoring & Classified Decay
 // Pure-compute scoring component for the Memory Search pipeline.
 //
-// Decay rules (design MEM01 § 3.2):
+// Decay rules:
 //   - fact / preference : immune to time decay -> final = raw_score
 //   - event / "" / unknown : exponential decay -> final = raw_score * exp(-lambda * age_days)
 //   - status == "invalidated" : filtered out by ScoreAndRank (unless include_invalidated)
@@ -70,7 +70,7 @@ public:
     /// Batch score + filter invalidated + rank by final_score (desc) + truncate.
     /// @param include_invalidated  D4 lock: default false strictly filters
     ///                             status=="invalidated"; true keeps them
-    ///                             (audit / debug / P02a memory-history page).
+    ///                             (audit / debug / the memory-history page).
     /// Same final_score keeps the original (raw_score) order via stable_sort.
     std::vector<ScoredMemory> ScoreAndRank(const std::vector<MemoryCandidate>& candidates,
                                            int64_t now,

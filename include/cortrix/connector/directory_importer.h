@@ -12,7 +12,7 @@
 
 namespace cortrix {
 
-// D3.5 wire⑤c: the directory importer acquires its namespace through the F05
+// The directory importer acquires its namespace through the
 // resource pool (per-operation NamespaceFacade), not the MVP manager.
 namespace resource { class INamespacePool; }
 
@@ -32,7 +32,7 @@ struct ImportStats {
 class DirectoryImporter {
 public:
     /// @param config: watch_dir configuration
-    /// @param pool: F05 namespace resource pool (per-op NamespaceFacade acquire)
+    /// @param pool: namespace resource pool (per-op NamespaceFacade acquire)
     /// @param spc_mgr: SPC pipeline manager
     DirectoryImporter(const WatchDirConfig& config,
                       cortrix::resource::INamespacePool& pool,
@@ -44,7 +44,7 @@ public:
     /// 2. Recursive scan of data_dir.
     /// 3. For each file: filter -> hash -> incremental check -> doc_create -> SPC enqueue.
     ///
-    /// F21: OS-level file watching is owned by DirWatcherRegistry (1 watcher per
+    /// OS-level file watching is owned by DirWatcherRegistry (1 watcher per
     /// directory, fan-out to all subscribed namespaces). DirectoryImporter no
     /// longer creates a FileWatcher; it is a pure per-namespace file processor.
     /// Real-time events arrive via HandleFileEvents() called by the registry.
@@ -59,14 +59,14 @@ public:
     /// Get import statistics
     ImportStats GetStats() const;
 
-    /// F21: Handle a batch of file events fanned out by DirWatcherRegistry.
+    /// Handle a batch of file events fanned out by DirWatcherRegistry.
     /// Each importer independently merges events, then processes (hash check +
     /// SPC enqueue) or cascade-deletes. Made public (was private in MVP) so the
     /// registry can dispatch one OS event batch to every subscribed namespace.
     void HandleFileEvents(const std::vector<FileEvent>& events);
 
     /// Whether this importer is active (Start() succeeded and not Stop()'d).
-    /// F21: no longer reflects OS watcher state (that is owned by the registry);
+    /// No longer reflects OS watcher state (that is owned by the registry);
     /// reflects whether the importer is processing events for its namespace.
     bool IsWatching() const;
 
@@ -96,7 +96,7 @@ private:
     cortrix::resource::INamespacePool& pool_;
     SPCManager& spc_mgr_;
 
-    // F21: FileWatcher ownership moved to DirWatcherRegistry (1 per directory,
+    // FileWatcher ownership moved to DirWatcherRegistry (1 per directory,
     // fan-out to N namespaces). DirectoryImporter keeps only the per-namespace
     // file filter + stats and is driven by HandleFileEvents().
     std::unique_ptr<FileFilter> filter_;

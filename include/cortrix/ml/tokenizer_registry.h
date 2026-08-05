@@ -7,14 +7,14 @@
 
 namespace cortrix::ml {
 
-/// Process-wide HfTokenizer registry (F02 §2.4-bis lifecycle SoT).
+/// Process-wide HfTokenizer registry (the lifecycle SoT).
 ///
-/// Background (V5-B2-07): F02 OnnxReranker + F40 + F03 share the bge-m3 tokenizer.
+/// Background: the reranker, sparse retrieval and the embedder share the bge-m3 tokenizer.
 /// Loading it once and sharing the shared_ptr avoids per-component reload cost
-/// (F02 §2.4-bis "eager load (avoids runtime tokenizer loading cost)").
+/// ("eager load (avoids runtime tokenizer loading cost)").
 ///
 /// Thread-safety: registration takes a std::mutex; reads after registration are
-/// lock-free against the returned shared_ptr (F02 §2.4-bis "lock with std::mutex during registration,
+/// lock-free against the returned shared_ptr ("lock with std::mutex during registration,
 /// lock-free read-only at runtime"). The registry holds a strong ref so the tokenizer outlives
 /// every borrower.
 class TokenizerRegistry {

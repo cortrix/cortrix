@@ -11,7 +11,7 @@ typedef struct sqlite3 sqlite3;
 // SipHash-2-4 of its business ULID under a per-deployment 128-bit key:
 //   block_id = HashChildIdToBlockId(child_id) = SipHash24(child_id, k0, k1)
 // The key is loaded once at startup from platform.db (auth_secrets, secret_type=
-// 'siphash_id_key'), mirroring P08's JwtSecretService::LoadOrInit. It must stay
+// 'siphash_id_key'), mirroring JwtSecretService::LoadOrInit. It must stay
 // stable for the life of an index (so the persisted P-HNSW labels keep pointing at
 // the right nodes), hence it is generated once and persisted — per deployment, not
 // per namespace (§1.8.2 V4 ruling 3).
@@ -28,7 +28,7 @@ struct SipHashKey {
 /// (startup is single-threaded, before any worker starts — no locking needed).
 extern SipHashKey kDeploymentHashKey;
 
-/// Startup key load, idempotent (mirrors JwtSecretService::LoadOrInit, P08 §2.11):
+/// Startup key load, idempotent (mirrors JwtSecretService::LoadOrInit):
 ///   1) if env `CORTRIX_SIPHASH_ID_KEY` (32 hex chars = 16 bytes, k0‖k1 LE) is set →
 ///      use it and upsert it as the current siphash_id_key;
 ///   2) else if a status='current' siphash_id_key row exists → load it;
@@ -38,7 +38,7 @@ extern SipHashKey kDeploymentHashKey;
 /// write failure is FATAL at startup (caller refuses to start), same as JWT init.
 ///
 /// NOTE: wiring this into the main.cpp boot sequence (platform.db open → before
-/// feature init) is D3.5 integration work — P08's JwtSecretService::LoadOrInit is
+/// feature init) is integration work — JwtSecretService::LoadOrInit is
 /// likewise not yet wired into main.cpp; both land together. This function +
 /// HashChildIdToBlockId are the standalone, unit-tested deliverable.
 Status LoadOrBootstrapHashKey(sqlite3* platform_db);

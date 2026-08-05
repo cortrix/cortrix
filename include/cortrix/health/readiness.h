@@ -1,16 +1,16 @@
 #pragma once
-// F20 Security Hardening — readiness contract (design topic 7, sec 8.3-8.4).
+// Security hardening — readiness contract.
 //
 // BOUNDARY (D-R1 brief sec 3.2): the /live + /ready HTTP endpoints are owned by
-// F24 (RegisterHealthRoutes). F20 owns only this *contract*: the IReadyComponent
+// the deployment layer (RegisterHealthRoutes). This owns only the *contract*: the IReadyComponent
 // interface each subsystem implements and the ReadinessRegistry that aggregates
-// them into the /ready response body. F24's endpoint calls
+// them into the /ready response body. The endpoint calls
 // ReadinessRegistry::BuildReport() and maps overall readiness to 200 / 503.
 //
-// The 5 readiness components (design sec 8.4) are: catalog (F12 IBloomFilter +
-// catalog.db), vector_index (F01 model load + WAL replay), secret_provider
-// (F20-6 ISecretProvider::IsHealthy), spc_pipeline (F06/F03 workers),
-// memory_store (MEM01-05). F20 ships the secret_provider adapter; the others are
+// The 5 readiness components are: catalog (IBloomFilter +
+// catalog.db), vector_index (model load + WAL replay), secret_provider
+// (ISecretProvider::IsHealthy), spc_pipeline (parser / enricher workers),
+// memory_store. This layer ships the secret_provider adapter; the others are
 // registered by their owning Features in D3.5 (deferred).
 
 #include <functional>
@@ -46,7 +46,7 @@ public:
 };
 
 /// Aggregates registered components into the /ready report. Owned by the server
-/// and populated at startup; F24's health endpoint reads it per request.
+/// and populated at startup; the health endpoint reads it per request.
 class ReadinessRegistry {
 public:
     /// Register a component. Order is preserved in the report. Components keep

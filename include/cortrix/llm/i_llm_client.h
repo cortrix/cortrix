@@ -20,14 +20,14 @@ struct LlmCallConfig {
 };
 
 /// Client-level configuration: endpoint, auth, defaults, resilience. Sourced
-/// from IGlobalConfig GUCs (enricher.endpoint / enricher.api_key, F03 topic 2.1).
+/// from IGlobalConfig GUCs (enricher.endpoint / enricher.api_key).
 struct LlmClientConfig {
     std::string endpoint;                  ///< OpenAI-compatible base URL
     std::string api_key;
     std::string default_model = "gpt-4o-mini";
     int timeout_ms = 30000;
     int max_retries = 2;
-    int circuit_breaker_cooldown_ms = 60000;  ///< F03 topic 3 (cooldown=60s)
+    int circuit_breaker_cooldown_ms = 60000;  ///< cooldown=60s
 };
 
 /// Result of a Chat() call. Chat returns this by value (not Result<T>) so the
@@ -48,8 +48,8 @@ struct ChatCompletionResponse {
 };
 
 /// Shared OpenAI-compatible chat LLM client interface (scaffolding D2-pre-3).
-/// Consumers (roster, F03 §2.3): F03 LlmEnricher + F35 / F38 / F41 / F15 /
-/// MEM02 / F36 — 7 features total. Mock via tests/mocks/mock_llm_client.h.
+/// Consumers: LlmEnricher, contextual retrieval, HyPE, doc summary, text-to-SQL,
+/// memory extraction and RAG-Fusion — 7 in total. Mock via tests/mocks/mock_llm_client.h.
 class ILlmClient {
 public:
     virtual ~ILlmClient() = default;

@@ -12,8 +12,8 @@ struct CortrixConfig;  // fwd-decl; CollectRegisteredOnnxModels is defined in th
 
 namespace cortrix::onnx {
 
-/// Startup-time ONNX validator (F22 D2=A — fail-fast at startup). Run once at
-/// cortrix-server startup, before SPC pipeline init (and before F12 schema
+/// Startup-time ONNX validator (fail-fast at startup). Run once at
+/// cortrix-server startup, before SPC pipeline init (and before catalog schema
 /// migration), so an incompatible ONNX Runtime / model is caught in the window
 /// the operator is watching — not at the first inference request in prod.
 ///
@@ -28,15 +28,15 @@ namespace cortrix::onnx {
 /// non-OK Status (hard-fail, D3=A — no degrade, no fallback).
 ///
 /// Standalone (D3): this class validates a *given* list of model paths. Wiring
-/// it into the live cortrix-server startup and populating the list from F02's
+/// it into the live cortrix-server startup and populating the list from the reranker's
 /// reranker_config + the live OnnxEmbedder config is cross-Feature integration
 /// → deferred to D3.5 (see collect_registered_onnx_models, not built here).
 class StartupValidator {
  public:
     struct ValidationConfig {
         /// Absolute paths of the .onnx models registered for this instance.
-        /// Populated (at D3.5) from F02 reranker_config.model_path (bge-reranker
-        /// -v2-m3) + OnnxEmbedder model_path (bge-m3) + F40 (Wave C, future).
+        /// Populated from reranker_config.model_path (bge-reranker
+        /// -v2-m3) + OnnxEmbedder model_path (bge-m3) + sparse retrieval (future).
         std::vector<std::string> registered_model_paths;
 
         /// When true, a registered path that does not exist on disk is skipped
@@ -71,7 +71,7 @@ class StartupValidator {
     ///
     /// TraceContext is nullable at startup (no trace yet); the parameter is
     /// reserved so Phase-2 startup tracing can inject without breaking the
-    /// signature (matches the F07/F10/F42 `const TraceContext* ctx = nullptr`
+    /// signature (matches the shared `const TraceContext* ctx = nullptr`
     /// convention).
     static Status Validate(
         const ValidationConfig& cfg,
@@ -84,13 +84,13 @@ class StartupValidator {
         const observability::TraceContext* ctx = nullptr);
 
     /// Build a ValidationConfig from a loaded CortrixConfig by collecting the
-    /// registered ONNX model consumers (F22 §9.3 collect_registered_onnx_models).
+    /// registered ONNX model consumers (collect_registered_onnx_models).
     ///
     /// Standalone (D3) scope — registers only the consumers whose model_path
     /// already exists in the FROZEN config: the OnnxEmbedder (bge-m3,
-    /// `config.embedding.model_path`). The F02 reranker (bge-reranker-v2-m3)
-    /// has no model_path field in the current config (F02 has not landed its
-    /// config), so it is NOT collected here — adding it (and the F40 Wave C
+    /// `config.embedding.model_path`). The reranker (bge-reranker-v2-m3)
+    /// has no model_path field in the current config (it has not landed its
+    /// config), so it is NOT collected here — adding it (and the sparse
     /// model) is cross-Feature wiring deferred to D3.5. Empty paths are skipped
     /// (a stub-only deployment registers nothing).
     ///

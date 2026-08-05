@@ -13,9 +13,9 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::tenant {
 
-/// Quota service (P09 sec 4.4, topic 4). Reads limits from the injected IPlanProvider;
+/// Quota service. Reads limits from the injected IPlanProvider;
 /// usage tracking (RecordUsage) is a no-op in V1.0 OSS (quota_usage lives in
-/// platform.db only from Cloud V1 -- P09 sec 3 / sec 6).
+/// platform.db only from Cloud V1).
 ///
 /// The optional catalog.db handle lets GetQuota verify the tenant exists; pass
 /// nullptr in pure provider-only tests.

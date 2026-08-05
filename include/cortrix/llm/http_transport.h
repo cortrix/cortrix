@@ -36,11 +36,11 @@ struct HttpResponse {
     std::string header(const std::string& name) const;
 };
 
-/// Injectable HTTP transport seam (B-R1 F03 briefing: "make OpenAiLlmClient a
+/// Injectable HTTP transport seam ("make OpenAiLlmClient a
 /// mockable interface/seam ... an injectable transport"). OpenAiLlmClient builds the OpenAI
 /// request + parses the response (fully unit-testable); the raw byte round-trip
 /// goes through this interface so:
-///   - downstream features + F03 tests inject a fake;
+///   - downstream consumers + enricher tests inject a fake;
 ///   - runtime wiring uses the default network transport against a live endpoint.
 ///
 /// The project build enables cpp-httplib's OpenSSL support so HTTPS endpoints

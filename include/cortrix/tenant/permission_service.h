@@ -14,7 +14,7 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::tenant {
 
-/// One ns_acl grant row (P09 sec 4.3).
+/// One ns_acl grant row.
 struct AclEntry {
     TenantId grantee_tenant_id;
     UserId grantee_user_id;  ///< empty == tenant-level grant (stored as NULL)
@@ -23,16 +23,16 @@ struct AclEntry {
     UserId granted_by_user_id;
 };
 
-/// Namespace permission service over catalog.db (P09 sec 4.3). Combines the
+/// Namespace permission service over catalog.db. Combines the
 /// structural layer (owner FK + ns_acl grantee lookups) with the business layer
 /// (CanRead/CanWrite/... composite semantics) that the HTTP middleware + feature
-/// call sites use. Implements F04's BatchCheck contract (P09 sec 5.2).
+/// call sites use. Implements the cross-NS BatchCheck contract.
 ///
 /// Borrows an open catalog.db handle (not owned). Errors are carried as
 /// cortrix::Status via tenant::TenantStatus(); structural boolean checks return a
 /// plain bool (no error surface) so they can run on the request hot path.
 ///
-/// V1.0 OSS hot path (P09 sec 4.6): in the single default_tenant deployment the owner
+/// V1.0 OSS hot path: in the single default_tenant deployment the owner
 /// check matches immediately (owner_tenant_id == caller.tenant_id) so CanRead/
 /// CanWrite return true without touching ns_acl. The full ACL/visibility logic is
 /// the same code path (topic 3 -- data state, not code branch, controls behavior).
@@ -42,7 +42,7 @@ public:
 
     // === Structural layer ===
 
-    /// True iff namespaces.owner_tenant_id (F12 column `tenant_id`) == tenant_id.
+    /// True iff namespaces.owner_tenant_id (catalog column `tenant_id`) == tenant_id.
     bool CheckOwnerTenant(const NsId& ns_id, const TenantId& tenant_id);
 
     /// ACL grantee role for (ns, tenant[, user]). A user-level grant wins over a
@@ -83,7 +83,7 @@ public:
     bool CanTransferOwnership(const AuthContext& ctx, const NsId& ns_id);
     bool CanChangeVisibility(const AuthContext& ctx, const NsId& ns_id);
 
-    // === Batch (F04 Cross-NS Query, P09 sec 5.2) ===
+    // === Batch (cross-namespace query) ===
     struct BatchPermissionCheck {
         NsId ns_id;
         bool can_read = false;

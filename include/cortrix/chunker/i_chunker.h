@@ -10,7 +10,7 @@
 #include "cortrix/id/types.h"
 #include "cortrix/spc/parser.h"  // cortrix::spc::ParsedPage / DocumentMetadata
 
-// F34 IChunker — the L1 chunking abstraction (detailed design § 2.1).
+// IChunker — the L1 chunking abstraction.
 //
 // Phase 1 V1.0 has a single implementation (ParentChildChunker); the interface
 // is kept abstract so Phase 2 can add semantic / fixed-size / hybrid chunkers.
@@ -27,11 +27,11 @@ using TokenCounter = std::function<uint32_t(const std::string&)>;
 /// counts as ~1 token (CJK ≈ 1 token/char). Never returns 0 for non-empty text.
 uint32_t EstimateTokens(const std::string& text);
 
-/// Chunker input — one document's F06 parse output + doc-level metadata (§ 2.1).
+/// Chunker input — one document's parse output + doc-level metadata.
 struct ChunkerInput {
     cortrix::id::DocId       doc_id;
     cortrix::id::NamespaceId namespace_id;
-    std::vector<cortrix::spc::ParsedPage> pages;  ///< F06 Docling output
+    std::vector<cortrix::spc::ParsedPage> pages;  ///< Docling parser output
     DocumentMetadata metadata;                    ///< doc-level (inherited to parent/child)
 };
 

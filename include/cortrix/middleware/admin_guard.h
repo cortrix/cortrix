@@ -1,12 +1,12 @@
 #pragma once
-// F20 Security Hardening — AdminGuard middleware (design topic 3, plan A).
+// Security hardening — AdminGuard middleware.
 //
 // Cortrix listens on a single socket (0.0.0.0:port); admin endpoints are not on
 // a separate bind. Instead AdminGuard runs as an httplib pre-routing handler:
 // for any request whose path matches an admin prefix it checks the client IP
 // against the admin whitelist and returns 403 CX_ERR_ADMIN_LOOPBACK_REQUIRED
 // unless the client is allowed (loopback by default). This matches how
-// Prometheus / Grafana / Etcd protect admin surfaces, and keeps F24's
+// Prometheus / Grafana / Etcd protect admin surfaces, and keeps the deployment
 // `ports: <p>:<p>` single mapping unchanged (design sec 5.1 / 5.2.bis).
 //
 // V3-E-06 hard-fail: ValidateConfigOrAbort() validates the env combination at
@@ -29,7 +29,7 @@ nlohmann::json BuildAdminDeniedBody(const std::string& client_ip);
 /// Resolved admin-access policy. In Phase 1 the whitelist is a two-value switch
 /// (design sec 5.1, G3 M4): "127.0.0.1" = loopback-only (default), "0.0.0.0" =
 /// all client IPs (requires explicit acknowledgment). CIDR / multi-IP support
-/// is deferred to Phase 1.5 (PHASE2_BACKLOG TD-F20-IP-ALLOWLIST).
+/// is deferred to Phase 1.5.
 struct AdminGuardConfig {
     std::string admin_bind_whitelist = "127.0.0.1";  ///< CORTRIX_ADMIN_BIND
     bool allow_public = false;                        ///< CORTRIX_ALLOW_PUBLIC_ADMIN

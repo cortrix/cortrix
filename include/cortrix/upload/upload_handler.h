@@ -35,7 +35,7 @@ class UploadHandler {
 public:
     /// @param config: upload configuration
     /// @param spc_mgr: SPC pipeline manager (task enqueue)
-    /// @param op_logger: F18a operation_log writer (SpcPipeline upload site, §9.1).
+    /// @param op_logger: operation_log writer (SpcPipeline upload site).
     ///        Optional — null leaves the upload path unchanged (observability is
     ///        strictly additive, C4); the success path then simply skips the write.
     UploadHandler(const UploadConfig& config, SPCManager& spc_mgr,
@@ -51,7 +51,7 @@ public:
     /// Handle single file upload.
     ///
     /// Takes the narrow per-request windows the handler actually uses (the caller
-    /// — a route handler — obtains them from a per-request F05 NamespaceFacade and
+    /// — a route handler — obtains them from a per-request NamespaceFacade and
     /// passes facade.store()/facade.blob()). The target namespace for blob keying
     /// is carried on req.namespace_name.
     ///
@@ -93,7 +93,7 @@ private:
                               const std::string& filename,
                               CortrixDoc* existing_doc);
 
-    /// [F18a §9.1 SpcPipeline · upload site] Emit one operation_log `upload` row on a
+    /// Emit one operation_log `upload` row on a
     /// successful upload. No-op when op_logger_ is null. Identity (user_id / trace_id /
     /// session_id) is read from the thread-local ObservabilityContext by MakeEngineEntry
     /// (HandleUpload runs synchronously on the request thread WithAuth populated). Never

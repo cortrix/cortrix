@@ -7,9 +7,9 @@
 
 namespace cortrix::llm {
 
-/// OpenAI-compatible chat client (scaffolding D2-pre-3 skeleton → F03 Wave B).
+/// OpenAI-compatible chat client.
 ///
-/// F03 Wave B (S2.1) delivers the real transport: POST {endpoint}/chat/completions
+/// The real transport: POST {endpoint}/chat/completions
 /// with Bearer api_key, JSON body {model, messages:[{role:user, content:prompt}],
 /// temperature, max_tokens, response_format}; parses choices[0].message.content
 /// with an OpenAI-compatible reasoning_content fallback for providers that place
@@ -21,9 +21,9 @@ namespace cortrix::llm {
 /// IHttpTransport (briefing "an injectable transport"). The default ctor uses
 /// MakeDefaultHttpTransport() (cpp-httplib); tests inject a fake. The client uses
 /// LlmClientConfig::max_retries for transport-level failures so shared consumers
-/// without their own retry shell (for example F41) can tolerate transient TLS /
+/// without their own retry shell (for example doc summary) can tolerate transient TLS /
 /// connection failures. Feature-specific retry/backoff/breaker policy remains in
-/// the owning feature layer where applicable (for example F03 LlmEnricher).
+/// the owning layer where applicable (for example LlmEnricher).
 class OpenAiLlmClient : public ILlmClient {
 public:
     /// Production ctor — default cpp-httplib transport.

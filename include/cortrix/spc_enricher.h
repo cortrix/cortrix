@@ -10,7 +10,7 @@
 #include "cortrix/spc/parser.h"          // DocumentMetadata SoT
 #include "cortrix/spc_enricher/enricher_error.h"
 
-namespace cortrix::reranker {            // F02 frozen classes F03 reuses (B-R1 §2)
+namespace cortrix::reranker {            // frozen reranker classes the enricher reuses
 class CircuitBreaker;
 template <typename R> class RerankerThreadPool;  // R=float here (task payload via Slot)
 }  // namespace cortrix::reranker
@@ -23,7 +23,7 @@ class PromptTemplate;   // spc_enricher/prompt_template.h
 class BudgetTracker;    // spc_enricher/budget_tracker.h (Wave 4)
 
 // =============================================================================
-// F03 NER + Summary Enricher — ISpcEnricher framework (detailed design v1.0.7 §2)
+// NER + Summary Enricher — ISpcEnricher framework
 //
 // V1: ISpcEnricher pluggable framework (NullEnricher default + LlmEnricher V1
 // sole implementation). See design/features/F03-ner-summary.md.
@@ -31,7 +31,7 @@ class BudgetTracker;    // spc_enricher/budget_tracker.h (Wave 4)
 // 🔒 ISpcEnricher base SoT lock (v1.0.5/v1.0.6, design §2.1): Enrich = 3-param
 // (chunk_text:const std::string& / doc_meta:const DocumentMetadata& / ctx:const
 // ChunkContext&); IsAvailable() (NOT IsEnabled); Name() returns std::string.
-// F35/F38 subclasses already on this SoT — must not drift.
+// the contextual and HyPE subclasses already sit on this SoT — must not drift.
 // =============================================================================
 
 /// One NER-extracted entity (design §2.5). The design wrote char* for
@@ -64,9 +64,9 @@ struct EnricherErrorMeta {
     static EnricherErrorMeta FromCode(EnricherErrorCode code, std::string data = "");
 };
 
-/// LLM enrichment output for one chunk (design §2.5, 15 fields (+F35 3, design
+/// LLM enrichment output for one chunk (15 fields (+3 contextual,
 /// §5.2) = original 5 from ARCH + 6 added by topic 1.4 + topic 1.6
-/// EnricherErrorMeta + 3 added by F35 ContextualRetrieval). status == 0 = success;
+/// EnricherErrorMeta + 3 added by ContextualRetrieval). status == 0 = success;
 /// otherwise one of the 6 EnricherErrorCode (cast to int) and error_meta filled.
 struct EnrichResult {
     // The original 5 fields from ARCH §4.4.3
@@ -82,16 +82,16 @@ struct EnrichResult {
     int duration_ms = 0;                 ///< Performance diagnostics
     int token_count = 0;                 ///< Input for topic 3.5 cost calculation
     std::string enricher_name;           ///< Multi-Enricher chain provenance
-    int64_t enriched_at = 0;             ///< F43 coordination (Unix epoch ms)
+    int64_t enriched_at = 0;             ///< hotness coordination (Unix epoch ms)
 
     // v1.0.2 Major-1: Agent-friendly error response (populated when status != 0, design §2.5b)
     EnricherErrorMeta error_meta;        ///< topic 1.6 mapping of 6 error codes → 4 fields
 
-    // ✨ F35 ContextualRetrieval (design §5.2, pure ADD). Populated only by
-    // ContextualRetrievalEnricher; F03 Null/Llm + F38 HyPE leave these defaulted
+    // ✨ ContextualRetrieval (pure ADD). Populated only by
+    // ContextualRetrievalEnricher; the Null/Llm and HyPE enrichers leave these defaulted
     // (forward compatible). contextualized_status: 0=pending 1=generated 2=failed
     // 3=skipped_no_llm. The optionals are engaged only when actually produced; the
-    // SPC pipeline writes them into the F34 children contextualized_* columns at D3.5.
+    // SPC pipeline writes them into the child contextualized_* columns.
     std::optional<std::string> contextualized_text;
     std::optional<std::vector<float>> contextualized_embedding;
     int contextualized_status = 0;
@@ -119,10 +119,10 @@ struct ChunkContext {
     // is satisfied by the enricher resolving it; per-request `enrich:bool` is the
     // only request-level knob (topic 2.5).
 
-    // ✨ v1.0.4 G1.1 (F35 ContextualRetrievalEnricher consumes; F03 Null/Llm
+    // ✨ ContextualRetrievalEnricher consumes these; the Null/Llm enrichers
     // default ignore — forward compatible). Empty string == document boundary.
-    std::string prev_chunk_text;                  ///< F35 v1.0 NEW ("" == doc start)
-    std::string next_chunk_text;                  ///< F35 v1.0 NEW ("" == doc end)
+    std::string prev_chunk_text;                  ///< ("" == doc start)
+    std::string next_chunk_text;                  ///< ("" == doc end)
 };
 
 // -----------------------------------------------------------------------------
@@ -141,7 +141,7 @@ enum class EnricherType {
 EnricherType ParseEnricherType(const std::string& s);
 const char* EnricherTypeString(EnricherType t);
 
-/// Upper sanity clamp for the F03 batch-call max_tokens knob (QA 2026-07-12
+/// Upper sanity clamp for the batch-call max_tokens knob (QA 2026-07-12
 /// F-7): the yaml side has only a ">0 use it" gate, so a nonsensical value
 /// would otherwise ride straight into every provider request and 400 each
 /// batch. Generous versus any real provider output budget.
@@ -164,7 +164,7 @@ struct EnricherConfig {
                                                   ///< batch 32 truncates the batch JSON — D5b)
     bool circuit_breaker_enabled = true;          ///< topic 3.4
     int circuit_breaker_threshold = 10;
-    int circuit_breaker_cooldown_sec = 60;        ///< F03 60s (differs from F02's 30s)
+    int circuit_breaker_cooldown_sec = 60;        ///< 60s (differs from the reranker's 30s)
     int budget_cap_usd = 0;                       ///< topic 3.5 (0 = disabled)
     int startup_probe_timeout_ms = 5000;          ///< topic 3.6
     int http_retry_backoff_ms = 5000;             ///< §5.1 transport/5xx retry backoff base
@@ -188,13 +188,13 @@ inline constexpr int kEnricherMaxHttpAttempts = 3;
 // -----------------------------------------------------------------------------
 
 /// Pluggable SPC enrichment stage. 🔒 SoT-locked signatures (v1.0.5/v1.0.6) —
-/// F35/F38 subclasses share these exact signatures; do not drift.
+/// The contextual and HyPE subclasses share these exact signatures; do not drift.
 class ISpcEnricher {
 public:
     virtual ~ISpcEnricher() = default;
 
     /// Single-chunk enrichment (topic 1.2 internal batch_size=1 path).
-    /// 🔒 v1.0.5 3-param signature (incl. ChunkContext&) — shared with F35/F38.
+    /// 🔒 3-param signature (incl. ChunkContext&) — shared with the subclasses.
     virtual EnrichResult Enrich(const std::string& chunk_text,
                                 const DocumentMetadata& doc_meta,
                                 const ChunkContext& ctx) = 0;
@@ -204,12 +204,12 @@ public:
         const std::vector<ChunkContext>& contexts) = 0;
 
     /// Availability (topic 1.1 upper-layer short-circuit + startup LLM probe).
-    /// 🔒 v1.0.5 method name IsAvailable (NOT IsEnabled) — F35/F37 already use it.
+    /// 🔒 Method name IsAvailable (NOT IsEnabled) — the subclasses already use it.
     virtual bool IsAvailable() const = 0;
 
     /// Enricher name (log / debug / EnrichResult.enricher_name).
     /// 🔒 v1.0.6 returns std::string (NOT const char*) — C++ override consistency
-    /// with F35/F38 subclasses.
+    /// with the subclasses.
     virtual std::string Name() const = 0;
 };
 
@@ -250,7 +250,7 @@ public:
 /// LLM-backed enricher: combined NER + Summary over OpenAI-compatible chat
 /// (topic 3). Wave 2 delivers the core path (PromptTemplate → ILlmClient.Chat →
 /// topic 3.3 L1/L2/L3 parse → EnrichResult 12-field fill). Wave 3 adds the
-/// ThreadPool (F02 RerankerThreadPool) + CircuitBreaker + retry; Wave 4
+/// ThreadPool (RerankerThreadPool) + CircuitBreaker + retry;
 /// adds the BudgetTracker + startup probe / fallback.
 ///
 /// 🔌 Network seam: the LLM is reached through an injected ILlmClient — the
@@ -286,7 +286,7 @@ private:
     std::unique_ptr<PromptTemplate> prompt_template_;
     bool enabled_ = false;
 
-    // Wave 3 (forward-declared, wired in W3 — F02 frozen classes reused):
+    // Forward-declared (frozen reranker classes reused):
     std::unique_ptr<reranker::RerankerThreadPool<float>> thread_pool_;
     std::unique_ptr<reranker::CircuitBreaker> circuit_breaker_;
     // Wave 4: global budget cap (topic 3.5). null == cap disabled.

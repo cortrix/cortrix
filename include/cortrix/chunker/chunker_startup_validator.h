@@ -3,13 +3,13 @@
 #include "cortrix/common/i_global_config.h"
 #include "cortrix/common/status.h"
 
-// F34 chunker startup-time config validator (detailed design § 2.3 startup validation / F34-1).
+// Chunker startup-time config validator.
 //
-// Enforces the F34↔Reranker invariant `spc.chunker.child_size ≤
-// reranker.max_seq_length` so a Child can never exceed what the F02 reranker can
+// Enforces the chunker↔reranker invariant `spc.chunker.child_size ≤
+// reranker.max_seq_length` so a Child can never exceed what the reranker can
 // process. On violation it returns CX_ERR_CHUNK_SIZE_INVALID with both values;
 // cortrix-server's startup aborts on a non-OK Status (fail-fast, mirrors
-// reranker_startup_validator / F22 StartupValidator). This is the F34 side of the
+// reranker_startup_validator / the ONNX StartupValidator). This is the chunker side of the
 // same compat gate the reranker enforces for spc.chunk_size.
 namespace cortrix::chunker {
 

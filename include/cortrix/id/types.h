@@ -2,13 +2,13 @@
 #include <cstdint>
 #include <string>
 // SoT: ARCHITECTURE.md § 1.8 global ID system (D1 V3 ruling 3). This header = the code realization of the §1.8.1 ID type definitions
-// (missed by the Sprint 0 scaffolding, backfilled in Batch β F02 as a D2-pre-residual).
+// (missed by the Sprint 0 scaffolding, backfilled later).
 // Note: currently a type alias (=std::string), providing no compile-time mix-up protection; distinct strong types = Phase 2 (see PHASE2_BACKLOG TD-ID-DISTINCT-STRONGTYPE).
 namespace cortrix::id {
 using ChildId     = std::string;   // ULID, 26 chars, time-ordered
 using ParentId    = std::string;   // ULID, 26 chars
 using DocId       = std::string;   // ULID, 26 chars
-using BlockId     = uint64_t;      // 64 bit, F01 P-HNSW internal
+using BlockId     = uint64_t;      // 64 bit, P-HNSW internal
 using NamespaceId = std::string;   // user-defined string
 
 // BlockId (uint64) <-> SQLite INTEGER (signed int64). SQLite has no unsigned 64-bit

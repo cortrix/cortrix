@@ -6,17 +6,17 @@
 
 namespace cortrix::onnx {
 
-/// The 4 F22 ONNX metrics, following the F02 `cortrix_reranker_*`
+/// The 4 ONNX metrics, following the `cortrix_reranker_*`
 /// naming style: `cortrix_onnx_<subsystem>_<metric>_<unit>`. These are the
 /// infrastructure-layer signals an ops Agent queries to answer "why did the
 /// ONNX upgrade fail / what runtime version is loaded / did inference regress".
 ///
 /// Standalone (D3): this is a self-contained, dependency-free recorder + an
-/// OpenMetrics text renderer. The F24 `/metrics` scrape ENDPOINT does not exist
+/// OpenMetrics text renderer. The `/metrics` scrape ENDPOINT does not exist
 /// yet (no metrics registry in the frozen tree) — registering this recorder
 /// into that endpoint is cross-Feature wiring deferred to D3.5. Until then the
 /// recorder is fully usable + testable in-process, and Render() produces the
-/// exact text F24 will serve.
+/// exact text the server will serve.
 class OnnxMetrics {
  public:
     /// Outcome label for cortrix_onnx_startup_validation_total
@@ -52,7 +52,7 @@ class OnnxMetrics {
     // _count). The sum+count accessors below are kept (the avg is still derivable
     // and the existing TC depends on them); ObserveInferenceDuration now also lands
     // the sample in a bucket. Bounds straddle the ONNX single-call latency band
-    // (F02 §3.4: single-pair inference ~10ms CoreML / ~30ms CPU) — see kInfBounds.
+    // (single-pair inference ~10ms CoreML / ~30ms CPU) — see kInfBounds.
     void ObserveInferenceDuration(double seconds);
     uint64_t InferenceDurationCount() const;
     double InferenceDurationSum() const;

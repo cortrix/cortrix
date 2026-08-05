@@ -6,7 +6,7 @@
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
 
-// F34 chunker GUC keys + range validation (detailed design § 2.3 GUC table SoT in code).
+// Chunker GUC keys + range validation (the GUC table SoT in code).
 //
 // Standalone (D3): defines the GUC names + [min,max] ranges, pure validation, and
 // a load-from-IGlobalConfig path. Registering with the live PostgreSQL GUC
@@ -21,7 +21,7 @@ namespace cortrix::chunker {
 namespace guc {
 
 // Keys (detailed design § 2.3). child_size is ALSO bounded at startup by
-// reranker.max_seq_length (F34-1, enforced in chunker_startup_validator).
+// reranker.max_seq_length (enforced in chunker_startup_validator).
 inline constexpr const char* kStrategy                 = "spc.chunker.strategy";
 inline constexpr const char* kParentSize               = "spc.chunker.parent_size";
 inline constexpr const char* kChildSize                = "spc.chunker.child_size";
@@ -33,7 +33,7 @@ inline constexpr const char* kChildrenPerParentRerank  = "spc.chunker.children_p
 
 // Ranges (detailed design § 2.3). Inclusive [min, max].
 inline constexpr int kParentSizeMin = 256,  kParentSizeMax = 8192;
-inline constexpr int kChildSizeMin = 50,    kChildSizeMax = 8192;   ///< upper also ≤ max_seq_length (F34-1, checked separately)
+inline constexpr int kChildSizeMin = 50,    kChildSizeMax = 8192;   ///< upper also ≤ max_seq_length ( checked separately)
 inline constexpr int kChildOverlapMin = 0,  kChildOverlapMax = 100;
 inline constexpr int kMaxParentsMin = 100,  kMaxParentsMax = 100000;
 inline constexpr int kChildrenPerParentMin = 1, kChildrenPerParentMax = 10;
@@ -46,7 +46,7 @@ public:
     /// cross-field invariant child_size ≤ parent_size. Returns OK or the first
     /// offending field's Status (InvalidArgument, message names the field + value
     /// + range). Does NOT check child_size ≤ max_seq_length — that needs the
-    /// reranker config and lives in ChunkerStartupValidator (F34-1).
+    /// reranker config and lives in ChunkerStartupValidator.
     static Status ValidateConfig(const ChunkerConfig& config);
 
     /// Validate a single int value against [min, max]; OK or InvalidArgument

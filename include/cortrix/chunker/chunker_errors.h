@@ -3,7 +3,7 @@
 
 #include "cortrix/common/status.h"
 
-// F34 chunker error codes (detailed design § 5.1). Same one-error-model convention as
+// Chunker error codes. Same one-error-model convention as
 // store/pwl_errors.h (CODING_CONVENTIONS § 3): a fallible op returns Result<T> /
 // Status, domain identity is a stable CX_* code carried as a prefix on the Status
 // message ("<CODE>: <detail>"); the API/SDK/MCP boundary lifts it into the

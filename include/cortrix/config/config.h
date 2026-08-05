@@ -32,7 +32,7 @@ struct NamespaceConfig {
     std::string data_dir = "./data";
     int max_active = 20;
     int idle_timeout_s = 300;
-    // F05 per-NS startup-load timeout guard (§6.3 C1). A large-but-healthy namespace
+    // Per-NS startup-load timeout guard. A large-but-healthy namespace
     // (100MB+ store, big HNSW/sparse indexes) legitimately needs many seconds to load;
     // too small a value mis-classifies it as hung and leaves it un-admitted (invisible)
     // after restart (a 5183-doc NS measured ~42s to load). <=0 means "no timeout, wait
@@ -62,7 +62,7 @@ struct LlmConfig {
                                  ///< default). Large batches push the non-streaming
                                  ///< generation past provider gateway idle windows.
     int max_tokens = 0;          ///< enricher role only: response token budget for the
-                                 ///< F03 batch call (0 = built-in default 4096; oversize
+                                 ///< enricher batch call (0 = built-in default 4096; oversize
                                  ///< values are clamped downstream — bootstrap mapping
                                  ///< and enricher slot — to kEnricherMaxTokensCap, QA
                                  ///< F-7; this raw field itself stays as parsed).
@@ -70,14 +70,14 @@ struct LlmConfig {
                                  ///< batch is ~128 tokens/chunk and truncates the batch
                                  ///< JSON (D5b evidence); the budget/batch policy itself
                                  ///< stays a deployment decision until the D5b round.
-    int hype_questions_per_chunk = 0;  ///< enricher role only: F38 §4.3 hypothetical
+    int hype_questions_per_chunk = 0;  ///< enricher role only: hypothetical
                                        ///< questions per chunk (0 = built-in default 3;
                                        ///< clamped to the design range [1, 10]). The
                                        ///< first-order candidate-pool-coverage lever.
-    int ctx_max_output_tokens = 0;     ///< enricher role only: F35 §6.2 context-prefix
+    int ctx_max_output_tokens = 0;     ///< enricher role only: context-prefix
                                        ///< token budget (0 = built-in default 80;
                                        ///< clamped to [40, 200]).
-    int ctx_guard_chars_per_token = 0; ///< enricher role only: F35 §8 injection-guard
+    int ctx_guard_chars_per_token = 0; ///< enricher role only: injection-guard
                                        ///< bytes-per-token multiplier (0 = built-in
                                        ///< default 6; clamped to [1, 20]). The old
                                        ///< default 2 rejected legitimate >160-byte
@@ -91,7 +91,7 @@ struct LlmConfig {
 struct SPCConfig {
     // 0 = auto: resolved after embedder.Init(); current default is 2 for every EP.
     int worker_count = 0;
-    // Parser-subprocess concurrency cap (memory protection; the F42 pool-size
+    // Parser-subprocess concurrency cap (memory protection; the worker pool-size
     // startup gate compares against it). Default 4 unchanged — raise EXPLICITLY
     // only for workloads that spawn no/few parsers (e.g. enrich backfill).
     int parser_max_concurrent = 4;
@@ -119,7 +119,7 @@ struct SPCConfig {
     // CORTRIX_SCRIPTS_DIR) answers health 200 while 100% of ingests fail
     // CX_ERR_PARSE_FAILED — observed as a full 5000-doc wipeout 2026-07-09.
     bool require_parsers = false;
-    // F42 enrich-retry sweeper pacing. 0 = built-in defaults (60s tick, 32
+    // Enrich-retry sweeper pacing. 0 = built-in defaults (60s tick, 32
     // docs/NS/tick). At 5000-doc scale the defaults mean a multi-hour drain.
     int enrich_sweep_interval_sec = 0;
     int enrich_sweep_batch = 0;
@@ -167,10 +167,10 @@ struct RerankerTopConfig {
 };
 
 struct QueryComplexityTopConfig {
-    std::string model_dir = "models/query-complexity";  ///< F39 DistilBERT ONNX dir
+    std::string model_dir = "models/query-complexity";  ///< DistilBERT ONNX dir
 };
 
-// === Retrieval candidate-pool sizing (F02 §top_N over-fetch) ===
+// === Retrieval candidate-pool sizing (reranker top_N over-fetch) ===
 // candidate_k = min(top_k * candidate_multiplier * oversample, max_candidates).
 // Defaults preserve the historical hardcoded 3 / 50. Raising max_candidates
 // matters on large corpora where relevant docs spread past rank 50 and the pool
@@ -222,21 +222,21 @@ struct CortrixConfig {
                               // Inherits semantic_llm's provider/api_key/base_url if not set
     LlmConfig agent_llm;     // Conversational RAG & chat generation
                               // Can be configured here or in cortrix-agent/.env (env wins)
-    LlmConfig doc_summary_llm;  // Document-level LLM summary (ingest-side, async via F42).
+    LlmConfig doc_summary_llm;  // Document-level LLM summary (ingest-side, processed asynchronously).
                                 // Independent role; the doc_summary feature is
                                 // OFF unless IsConfigured() (api_key present) — main then builds an
                                 // OpenAiLlmClient for the F41AsyncWorker.
-    LlmConfig enricher_llm;     // [F03 · gap①] SPC ingest enricher (NER + summary). Independent
+    LlmConfig enricher_llm;     // SPC ingest enricher (NER + summary). Independent
                                 // role (symmetric with doc_summary_llm;
-                                // F03 §2.7.bis). OFF (NullEnricher) unless IsConfigured(); main
+                                // OFF (NullEnricher) unless IsConfigured(); main
                                 // maps it into EnricherConfig{type=kLlm, endpoint, api_key, model},
-                                // remaining tuning fields keep the F03 §2.7 defaults.
+                                // remaining tuning fields keep the enricher defaults.
     SPCConfig spc;
     UploadConfig upload;
     WatchDirConfig watch_dir;
     MemoryConfig memory;
-    RerankerTopConfig reranker;              // F02 reranker model dir
-    QueryComplexityTopConfig query_complexity;  // F39 complexity classifier model dir
+    RerankerTopConfig reranker;              // reranker model dir
+    QueryComplexityTopConfig query_complexity;  // complexity classifier model dir
     RetrievalConfig retrieval;               // candidate-pool sizing (over-fetch cap)
     SecurityConfig security;  // admin access policy
     GcConfig gc;              // [OPEN-2] three-stage GC + ops endpoints
