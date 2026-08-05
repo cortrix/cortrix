@@ -114,7 +114,7 @@ def test_create_namespace_uses_sdk(kit, fake_client):
 
 
 def test_memory_search_uses_http_fallback_no_user_id(kit, fake_client):
-    # Python SDK memory.search requires user_id (server-enforced in MCP server); keep MCP server wire.
+    # Python SDK memory.search requires user_id (server-enforced in the MCP server); keep the MCP wire.
     fake_client.set_http_return({"memories": []})
     out = kit.cortrix_memory_search(query="prefs", top_k=4)
     assert out == {"memories": []}

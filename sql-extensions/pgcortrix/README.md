@@ -47,7 +47,7 @@ the **V3+ roadmap** (§9 of the SoT), not V1.
 **Helper (2):** `pgcortrix_configure(api_key) → VOID`, `pgcortrix_status() → JSONB`.
 
 `pgcortrix_memory_search` / `pgcortrix_list_interactions` require `user_id`
-(memory isolation per-user isolation — three-way parity with the MCP + HTTP layers).
+(per-user isolation — three-way parity with the MCP + HTTP layers).
 
 ## Configuration (GUC, §2.2)
 

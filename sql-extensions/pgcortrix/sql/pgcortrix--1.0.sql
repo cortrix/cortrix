@@ -158,7 +158,7 @@ AS $$
         )
 $$;
 
--- 3.bis Batch document submit (batch submit, D3 impl layer).
+-- 3.bis Batch document submit (D3 impl layer).
 -- Wraps POST /api/v1/documents/batch — Agent-first bulk upload of up to 100
 -- documents. `documents` is a JSONB array of per-doc objects (client-supplied
 -- doc_id + content; optional filename / metadata). Returns the partial-success
@@ -190,7 +190,7 @@ $$;
 CREATE FUNCTION pgcortrix_memory_search(
     namespace TEXT,
     query     TEXT,
-    user_id   TEXT,              -- memory isolation forced per-user isolation
+    user_id   TEXT,              -- forced per-user isolation
     top_k     INT  DEFAULT 5
 ) RETURNS SETOF pgcortrix_memory_result
 LANGUAGE plpython3u

@@ -1,4 +1,4 @@
-# Parser Document Parser — Python bridge dependencies.
+# Document Parser — Python bridge dependencies.
 # Installed into the parser venv (real docling/paddleocr are D3.5 — not required
 # for D3 standalone, where the C++ wrappers are tested against mock bridges).
 

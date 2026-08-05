@@ -7,7 +7,7 @@ import { mockApi } from '../api/mock';
 import { USE_MOCK } from '../api/fallback';
 import { errorMessage } from '../api/errors';
 
-// Agent Cortrix Agent endpoint (web UI, the agent design): chat is served by
+// Cortrix Agent endpoint (web UI, agent design): chat is served by
 // cortrix-server's reverse proxy at /api/v1/agent/chat (same-origin SSE +
 // multi-tenant header pass-through). The legacy MVP path was the agent-demo
 // `/agent/chat`; R4/S2 moves to the unified endpoint.

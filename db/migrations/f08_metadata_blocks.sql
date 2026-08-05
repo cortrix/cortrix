@@ -1,4 +1,4 @@
--- META block Metadata Block — metadata_blocks table (detailed design §3.3, D5 lock: separate table).
+-- Metadata Block — metadata_blocks table (detailed design §3.3, D5 lock: separate table).
 --
 -- Per-Unit document-level metadata block storage (Chunk[0]): 1 doc = 1 row. Applied
 -- by cortrix::metadata::MetadataSchemaProvider::Migrate at runtime (CREATE TABLE IF

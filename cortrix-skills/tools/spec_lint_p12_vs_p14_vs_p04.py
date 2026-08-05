@@ -4,7 +4,7 @@
 Checks that the three agent-access surfaces stay 1:1:
 
   * **Skill SDK** ``CortrixToolKit`` — 29 methods + their parameter sets (introspected).
-  * **MCP server** Cortrix MCP tools — ``cortrix_*`` ``@mcp.tool()`` functions + params
+  * **MCP server** — Cortrix ``@mcp.tool()`` surface: ``cortrix_*`` ``@mcp.tool()`` functions + params
     (parsed from ``cortrix-mcp/src/cortrix_mcp/tools/*.py`` with the stdlib ``ast``
     module, so FastMCP need not be installed).
   * **API spec** OpenAPI — operation paths/methods (parsed from ``api/openapi.yaml`` +

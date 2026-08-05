@@ -16,7 +16,7 @@ Naming rule: this is the Cortrix Agent chat endpoint — never a
 "chatbot" endpoint; the executor class is ``ChatExecutor``.
 
 MEM co-processing (interaction_log write / memory extract trigger / memory isolation user_id
-filter — design the agent design) is the V1.5 ②-round scope and is intentionally NOT
+filter — agent design) is the V1.5 ②-round scope and is intentionally NOT
 wired here; see the ``TODO(D3.5)`` marker below.
 """
 

@@ -3,7 +3,7 @@
 After each Cortrix Agent chat turn the conversation is fed back into Cortrix's memory
 system: the turn is logged (agent trace interaction_log) and that same SDK call triggers memory extraction
 LLM extraction server-side. It runs fire-and-forget so a logging/extraction failure never
-blocks the user's chat response (design the agent design). memory isolation user isolation is honored by
+blocks the user's chat response (agent design). Per-user isolation is honored by
 always passing a user_id (design the agent design1).
 
 Standalone discipline (D3): the Python SDK ``client.memory.log`` call is exercised against a

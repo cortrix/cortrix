@@ -1,6 +1,6 @@
 """RAG retrieval via the Python SDK (dogfood — design section 5).
 
-Agent RAG data source is cortrix-server, accessed through the Python SDK ``AsyncCortrix`` SDK
+Agent RAG data source is cortrix-server, accessed through the Python SDK ``AsyncCortrix`` client
 exactly like any external Agent (no privileged channel — design section 5.2). This
 module is the single RAG seam: it calls ``client.search(namespace, query, top_k)`` and
 normalizes the wire-faithful ``QueryResult`` into the flat chunk shape the prompt

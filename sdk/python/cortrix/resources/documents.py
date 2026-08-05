@@ -36,7 +36,7 @@ PATH_BATCH = "/documents/batch"
 # on_duplicate policy values (batch submit §2.2 options.on_duplicate).
 _ON_DUPLICATE_VALUES = frozenset({"skip", "overwrite", "error"})
 
-# Terminal async-task states (async task DocumentTask.status enum).
+# Terminal async-task states (DocumentTask.status enum).
 _TERMINAL_TASK_STATES = frozenset({"ready", "failed", "cancelled"})
 _DEFAULT_POLL_INTERVAL = 1.0
 _DEFAULT_WAIT_TIMEOUT = 300.0

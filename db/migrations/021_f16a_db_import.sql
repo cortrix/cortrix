@@ -3,7 +3,7 @@
 --
 -- This file is the human-readable mirror of the DDL the F16aSchemaProvider emits
 -- (src/import/f16a_schema_provider.cpp kF16aSchemaSql). The provider is the
--- runtime SoT (applied atomically via the catalog SchemaMigrator, after catalog so the
+-- runtime SoT (applied atomically via the catalog SchemaMigrator, after the catalog schema so the
 -- tenants/namespaces FK targets exist); this file documents the same schema for
 -- review / ops inspection. Keep the two in lock-step.
 --
