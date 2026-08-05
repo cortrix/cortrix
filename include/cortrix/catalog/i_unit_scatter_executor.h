@@ -3,8 +3,8 @@
 
 namespace cortrix::query {
 // Forward declarations ONLY. These query-layer types are not defined in
-// F12's Layer-0 scope, and this interface has NO Phase-1 implementation (F12
-// §3.5: "declaration only"), so forward declarations are sufficient and keep F12 building
+// the catalog's Layer-0 scope, and this interface has NO Phase-1 implementation
+// ("declaration only"), so forward declarations are sufficient and keep the catalog building
 // standalone. Phase 2's MultiUnitNSExecutor supplies the concrete types +
 // the implementation.
 struct QueryContext;
@@ -13,7 +13,7 @@ struct UnitQueryResult;
 
 namespace cortrix::catalog {
 
-/// Per-Unit scatter execution (F12 §3.5, topic 1.3 B — separate NS / Unit scatter
+/// Per-Unit scatter execution (separate NS / Unit scatter
 /// interfaces). DECLARATION ONLY in Phase 1: 1 NS = 1 Unit, so queries route
 /// directly to the single Unit and no scatter is needed. Phase 2 implements this
 /// inside MultiUnitNSExecutor (the per-Unit fan-out of a 1:N namespace).

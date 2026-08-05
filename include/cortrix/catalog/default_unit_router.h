@@ -11,7 +11,7 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::catalog {
 
-/// catalog.db-backed IUnitRouter (F12 §3.2 impl, Story S2.3). Borrows the sqlite3
+/// catalog.db-backed IUnitRouter. Borrows the sqlite3
 /// handle owned by CatalogDb. Phase 1: states are all `active`, ShouldSeal is
 /// always false (thresholds default to INT_MAX), and UpdateUnitState accepts only
 /// active→active (other transitions → CX_ERR_NOT_IMPLEMENTED until Phase 2).

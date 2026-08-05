@@ -29,7 +29,7 @@ struct CreatedApiKey {
     std::string plaintext;     ///< "cortrix_sk_<64-char>" — show once, never stored
 };
 
-/// Simplified API Key service over platform.db `api_keys` (P08 §2.13.3 / §3.7,
+/// Simplified API Key service over platform.db `api_keys` (
 /// topic 7 D). Keys are `cortrix_sk_<64-char>`; only their SHA-256 hash + a 16-char
 /// prefix are persisted (plaintext returned once at creation). Borrows an open
 /// platform.db handle (does not own it). The REST routes that expose these are
@@ -38,21 +38,21 @@ class ApiKeyService {
 public:
     explicit ApiKeyService(sqlite3* db) : db_(db) {}
 
-    /// Create a key for `user_id` (P08 §2.13.3 POST). `expires_at_ms` = 0 → never
+    /// Create a key for `user_id` (POST). `expires_at_ms` = 0 → never
     /// expires. Returns the plaintext ONCE (caller must surface it immediately).
     Result<CreatedApiKey> CreateApiKey(const std::string& user_id,
                                        const std::string& name,
                                        int64_t expires_at_ms = 0);
 
-    /// Validate a presented plaintext key (middleware path, P08 §2.13.3): hash →
+    /// Validate a presented plaintext key (middleware path): hash →
     /// lookup → check status active + not expired → bump last_used_at → return the
     /// owning user_id. Errors: CX_ERR_AUTH_INVALID_API_KEY (revoked/expired/not_found).
     Result<std::string> ValidateApiKey(const std::string& plaintext);
 
-    /// List a user's keys (P08 §2.13.3 GET) — NEVER returns plaintext.
+    /// List a user's keys (GET) — NEVER returns plaintext.
     Result<std::vector<ApiKeyInfo>> ListApiKeys(const std::string& user_id);
 
-    /// Revoke a key by id (P08 §2.13.3 DELETE): status='revoked' + revoked_at.
+    /// Revoke a key by id (DELETE): status='revoked' + revoked_at.
     /// NotFound → CX_ERR_NOT_FOUND. Idempotent on an already-revoked key.
     Status RevokeApiKey(const std::string& key_id);
 

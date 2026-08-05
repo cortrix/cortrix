@@ -16,18 +16,18 @@ namespace cortrix::auth {
 /// AuthConfig.password_min_length (default 8, topic 2).
 bool ValidatePassword(const std::string& password, int min_length = 8);
 
-/// Basic RFC-5322-ish email format check (P08 §4.1 step 1): exactly one '@',
+/// Basic RFC-5322-ish email format check: exactly one '@',
 /// non-empty local part, a domain with at least one '.', no spaces. Deliberately
 /// permissive (delivery is the real validator) but rejects obvious garbage.
 bool ValidateEmail(const std::string& email);
 
-/// Generate a user id: "usr_" + 8 lowercase hex chars (P08 §2.10 / §4.1 step 3).
+/// Generate a user id: "usr_" + 8 lowercase hex chars.
 /// Uses OpenSSL RAND_bytes (4 random bytes → 8 hex).
 std::string GenerateUserId();
 
 // ======================= Password hashing abstraction =======================
 
-/// Pluggable password hasher (P08 §4.2 — bcrypt cost=12). The interface keeps the
+/// Pluggable password hasher (bcrypt cost=12). The interface keeps the
 /// AuthService / Register flow independent of the concrete bcrypt library choice
 /// (a build/license decision); BcryptPasswordHasher is the production impl, and
 /// tests can substitute a fast fake. All methods are pure (no DB / IO).

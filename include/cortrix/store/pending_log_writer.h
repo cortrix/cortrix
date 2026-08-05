@@ -62,7 +62,7 @@ public:
     /// Testing seam: force the next `n` appended entries (via Append() or
     /// AppendBatch()) to fail with a CX_ERR_PWL_WRITE_FAILED status without
     /// touching the file, to exercise the caller's transient-failure retry path
-    /// (F25 Q1-B). `n == 0` disables it. Not part of the production write path;
+    /// `n == 0` disables it. Not part of the production write path;
     /// thread-safe.
     void SetAppendFailures(int n) { append_failures_.store(n, std::memory_order_relaxed); }
 
@@ -91,7 +91,7 @@ public:
     /// Current on-disk size of pending.wal in bytes (header + all durable
     /// records), as last extended by WriteBatch. O(1) — reads a cached counter
     /// updated under file_mu_, never touches the filesystem. Backs
-    /// WriteCoordinator::GetPwlSizeBytes() for F05 memory-budget tracking
+    /// WriteCoordinator::GetPwlSizeBytes() for memory-budget tracking
     /// (design § 2.1 v1.0.1). Records still buffered in the group-commit queue
     /// are not yet counted (they have no file bytes until their batch writes).
     size_t SizeBytes() const;

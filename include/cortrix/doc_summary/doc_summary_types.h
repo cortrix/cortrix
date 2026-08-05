@@ -8,7 +8,7 @@
 
 namespace cortrix::doc_summary {
 
-/// The 4 structured fields the LLM produces (F41 §5.1 / §4.2 metadata_json).
+/// The 4 structured fields the LLM produces (metadata_json).
 struct DocSummaryStructured {
     std::string summary_text;            ///< 200-500 chars (the §4.2 main embedding field)
     std::vector<std::string> keywords;   ///< 3-8 keywords/phrases (Agent direct-read)
@@ -27,7 +27,7 @@ struct GenerationResult {
     bool no_summary_content = false;     ///< true when the doc exists but has no chunks to summarize
 };
 
-/// F41 async task payload. TaskType SoT = F42 §3.2
+/// Doc-summary async task payload.
 /// (async::TaskType::kTaskDocSummary=3) — reverse-referenced, not redeclared.
 struct DocSummaryTask {
     std::string task_id;
@@ -35,7 +35,7 @@ struct DocSummaryTask {
     std::string doc_id;
     std::string ns_id;
     int attempt_count = 0;
-    // F42 retry policy: 3 retries + exponential backoff; DLQ after 3 (F42 owns it).
+    // Retry policy: 3 retries + exponential backoff; DLQ after 3 (the scheduler owns it).
 };
 
 /// doc_summary_status state machine values. String form is what the
@@ -43,9 +43,9 @@ struct DocSummaryTask {
 enum class DocSummaryStatus { kPending = 0, kGenerated, kFailed };
 const char* ToString(DocSummaryStatus status);
 
-/// One doc-discovery hit (F41 §6.1 response). via_path distinguishes the two
+/// One doc-discovery hit. via_path distinguishes the two
 /// hybrid recall paths. The LLM-summary path carries the 4 structured fields; the
-/// FTS5-fallback path carries the F08 fields instead.
+/// FTS5-fallback path carries the metadata fields instead.
 struct DocDiscoveryHit {
     std::string doc_id;
     std::string via_path;            ///< "llm_summary" | "fts5_fallback"

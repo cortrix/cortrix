@@ -11,18 +11,18 @@
 typedef struct sqlite3 sqlite3;
 
 namespace cortrix::resource {
-// Forward declaration ONLY — F05 (INamespacePool) is Layer 1, built after F12
-// (Layer 0). F12's HEADER MUST compile standalone, so we never #include an F05
-// header here; the dependency direction is strictly F05 → F12. The .cpp DOES
-// include namespace_pool.h to make the F13 admission calls (it is compiled in
-// the full build where F05 exists). The Phase-1 default (f05_pool_ == nullptr)
+// Forward declaration ONLY — INamespacePool is Layer 1, built after the catalog
+// (Layer 0). The catalog HEADER MUST compile standalone, so we never #include a pool
+// header here; the dependency direction is strictly pool → catalog. The .cpp DOES
+// include namespace_pool.h to make the admission calls (it is compiled in
+// the full build where the pool exists). The Phase-1 default (f05_pool_ == nullptr)
 // skips admission.
 class INamespacePool;
 }  // namespace cortrix::resource
 
 namespace cortrix::catalog {
 
-/// catalog.db-backed INSRouter (F12 §3.1 impl, Story S2.2). Borrows the sqlite3
+/// catalog.db-backed INSRouter. Borrows the sqlite3
 /// handle owned by CatalogDb (does not open/close it). Reads/writes the
 /// namespaces / units / ns_units tables and fronts them with the §6.3 caches:
 /// NS metadata (10K / 60s) + Unit descriptor (1K / 60s).
@@ -40,7 +40,7 @@ public:
     /// F12-standalone → admission is skipped). Cache sizes/TTL default to §6.3.
     explicit DefaultINSRouter(sqlite3* db, resource::INamespacePool* f05_pool = nullptr);
 
-    /// F13: late-bind the F05 admission hook after construction. Breaks the
+    /// Late-bind the admission hook after construction. Breaks the
     /// pool↔router ctor cycle (the pool ctor needs the router to load the catalog;
     /// the router needs the pool to AdmitCreate on CreateNamespace). main calls this
     /// once, after the pool is built + StartupLoadAll. nullptr = admission skipped.
@@ -65,7 +65,7 @@ private:
     // The single Unit mapped to ns_id (Phase 1 1:1); caller holds mu_.
     Result<std::string> ActiveUnitIdLocked(const std::string& ns_id) const;
     // The durable catalog write of CreateNamespace (INSERT ns + Unit + ns_units in
-    // one txn). Extracted so the F05 admission/rollback wraps it; takes
+    // one txn). Extracted so the admission/rollback wraps it; takes
     // mu_ itself.
     Status InsertNamespaceCatalog(const NSMetadata& metadata);
     // Compensation for a failed AdmitCreate: physically remove the

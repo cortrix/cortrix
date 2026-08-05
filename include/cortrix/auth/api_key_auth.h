@@ -17,7 +17,7 @@ struct ApiKeyConfig {
     std::string key_hash;
     std::string tenant_id;
     // NOTE: the per-key static `allowed_namespaces` allow-list was removed
-    // (ARCHITECTURE V6 / P08 issue 3.3-4). Namespace authorization is now a
+    // Namespace authorization is now a
     // runtime PermissionService::BatchCheck (ownership + ns_acl), wired into
     // ApiKeyAuth via SetNamespaceAuthorizer() — least-privilege, immediately
     // reflects Admin grant/revoke without re-issuing the key.
@@ -42,7 +42,7 @@ public:
     /// service must outlive this object. nullptr (default) = config keys only.
     void SetApiKeyService(auth::ApiKeyService* svc) { db_keys_ = svc; }
 
-    /// Runtime namespace-authorization seam (ARCHITECTURE V6 / P08 issue 3.3-4).
+    /// Runtime namespace-authorization seam.
     /// Returns true iff the principal may access `ns` (the real wiring calls
     /// PermissionService::BatchCheck — ownership + ns_acl). When unset, Authorize
     /// leaves the namespace ungated (e.g. routes with no namespace, or no-auth

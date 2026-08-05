@@ -12,7 +12,7 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::auth {
 
-/// Loads + holds the runtime AuthConfig over platform.db `auth_config` (P08
+/// Loads + holds the runtime AuthConfig over platform.db `auth_config` (
 /// §2.12 / §3.6, topic 8 — minimal IGlobalConfig). This is the auth-domain owner of
 /// the table; the canonical cortrix::IGlobalConfig stays the repo-wide interface
 /// and S7 bridges this to it (PlatformDbAuthConfig) when the admin API lands.
@@ -29,7 +29,7 @@ public:
     /// exists (P08AuthSchemaProvider migrated it). The service does not own `db`.
     explicit AuthConfigService(sqlite3* db) : db_(db) {}
 
-    /// Idempotent startup init (P08 §S1 step 4):
+    /// Idempotent startup init:
     ///   - if `auth_config` is empty → INSERT the §3.6 defaults (updated_by='system');
     ///   - then SELECT all rows → populate `config_`.
     /// Re-running on a populated table only reloads (no duplicate writes).
@@ -51,7 +51,7 @@ public:
 
     // ------------------------------- S7 ---------------------------------
 
-    /// SMTP settings for the admin API (P08 §2.12 `POST /admin/config/smtp`).
+    /// SMTP settings for the admin API (`POST /admin/config/smtp`).
     struct SmtpSettings {
         std::string host;
         int port = 587;
@@ -61,13 +61,13 @@ public:
         bool enable_email_verification = false;
     };
 
-    /// Persist SMTP credentials + the email_verification flag (P08 §2.12 / §4.6,
+    /// Persist SMTP credentials + the email_verification flag (
     /// topic 8) to platform.db `auth_config`, then hot-reload the affected keys
     /// (fires OnChange so a live SmtpEmailSender re-reads). One tx for all keys.
     Status SetSmtp(const SmtpSettings& s);
 
     /// Current SMTP settings for the GET endpoint, with `pass` REDACTED to "***"
-    /// when set (P08 §3.6 — never return the stored password). Reads the snapshot.
+    /// when set (never return the stored password). Reads the snapshot.
     SmtpSettings GetSmtpRedacted() const;
 
 private:

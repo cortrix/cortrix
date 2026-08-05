@@ -11,11 +11,11 @@
 
 struct sqlite3;
 
-// F34 SqliteParentChunkStore — the default ParentChunkStore (detailed design § 2.5 / § 3.1).
+// SqliteParentChunkStore — the default ParentChunkStore.
 //
 // Persists parents + children to SQLite (§ 3.1 schema) and serves the parent
-// reverse-lookups. Standalone: it owns its own sqlite3 handle so F34 unit-tests
-// run against a real (in-memory or temp-file) DB without the F25 PWL / F08 / F01
+// reverse-lookups. Standalone: it owns its own sqlite3 handle so chunker unit-tests
+// run against a real (in-memory or temp-file) DB without the PWL / metadata / index
 // wiring (that single-transaction integration is D3.5). The LRU cache layer
 // (§ 2.5 Phase-2 anchor TD-PARENT-CHUNK-STORE-CACHE) is not implemented in V1.0.
 namespace cortrix::store {
@@ -23,7 +23,7 @@ namespace cortrix::store {
 class SqliteParentChunkStore : public ParentChunkStore {
 public:
     /// @param db_path  SQLite file path, or ":memory:" for an in-process DB.
-    /// @param metrics  optional F34 §2.5 lookup-metrics recorder. nullptr (the
+    /// @param metrics  optional lookup-metrics recorder. nullptr (the
     ///   default — backward-compatible with the original single-arg ctor) binds
     ///   the process-wide ParentChunkStoreMetrics::Instance(); tests inject a
     ///   private recorder for isolated assertions.
@@ -41,7 +41,7 @@ public:
 
     // --- write path (§ 4.2; standalone — real PWL single-txn wiring = D3.5) -----
 
-    /// Insert one parent + its children in a single SQLite transaction (the F25
+    /// Insert one parent + its children in a single SQLite transaction (the
     /// PWL BeginWrite→Commit boundary wraps this at D3.5; here it is a local txn so
     /// a partial failure rolls back). metadata is JSON-serialized into
     /// metadata_json. OK or CX_ERR_STORE_DB_ERROR.

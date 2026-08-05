@@ -1,11 +1,11 @@
 #pragma once
 
-// F34 parents schema DDL (detailed design § 3.1).
+// Parents schema DDL.
 //
 // [A unified-blocks reconcile] Child chunks no longer live in a
 // standalone `children` table — they are rows of the unified per-Unit `blocks`
 // table (child rows = blocks with child_id IS NOT NULL; block_type = source
-// modality), with F34/F35/F40 columns ALTER'd onto `blocks` by their per-Unit
+// modality), with chunker, contextual and sparse columns ALTER'd onto `blocks` by their per-Unit
 // SchemaProviders (F34SchemaProvider owns child_id/parent_id/token_count/
 // parent_offset + the 3 indexes; metadata in blocks.metadata_json). See
 // ARCHITECTURE.md § 1.3.bis.3 documents the durable in-repository model.

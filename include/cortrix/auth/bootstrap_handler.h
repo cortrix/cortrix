@@ -12,7 +12,7 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::auth {
 
-/// First-time admin bootstrap (P08 §2.13, topic 7 D). On first start (the
+/// First-time admin bootstrap. On first start (the
 /// platform.db `users` table is empty) the server prints a one-time, 60-second,
 /// single-use URL; visiting it mints a `system admin` user + an admin API Key
 /// (shown once), then the token is invalidated. Two endpoints (GET HTML + POST
@@ -42,7 +42,7 @@ public:
         std::string admin_key_id;
     };
 
-    /// Consume `token` (P08 §2.13.2 — shared by GET + POST): validate it is the
+    /// Consume `token` (shared by GET + POST): validate it is the
     /// current, unexpired, unused token → create system admin user (Personal
     /// Tenant placeholder, role=owner) + admin API Key (name='bootstrap-admin') →
     /// invalidate the token. Errors: CX_ERR_AUTH_BOOTSTRAP_TOKEN_INVALID
@@ -55,7 +55,7 @@ public:
     /// Render the §2.13.2.b JSON body for the POST path.
     static std::string RenderJson(const std::string& admin_api_key);
 
-    /// Token validity window (P08 §2.13.1 — 60 seconds).
+    /// Token validity window (60 seconds).
     static constexpr int64_t kTokenTtlMs = 60 * 1000;
 
 private:

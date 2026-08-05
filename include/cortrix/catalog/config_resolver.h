@@ -9,7 +9,7 @@
 
 namespace cortrix::catalog {
 
-/// Three-layer config resolution (F12 §3.8 / §6.1): the effective config for a
+/// Three-layer config resolution: the effective config for a
 /// Feature is global default ← NS override ← request override, where the request
 /// layer may only set whitelisted fields (§3.5/§6.2). Generic over any config
 /// struct `ConfigT` that is nlohmann-JSON serializable (has to_json/from_json) —

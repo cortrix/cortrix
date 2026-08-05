@@ -37,7 +37,7 @@ class SnapshotManager;  // snapshot save/load + recovery (S4)
 struct WalEntry;  // codec record applied to the graph during a flush (S3)
 
 /// WAL-specific stats, exposed by PHnsw but not part of the generic IIndex
-/// surface (F01 §2.1 — `PhnswWalStats GetWalStats()`). Sourced from the WalWriter.
+/// surface (`PhnswWalStats GetWalStats()`). Sourced from the WalWriter.
 struct PhnswWalStats {
     uint64_t entry_count = 0;       ///< entries currently in the WAL
     uint64_t committed_lsn = 0;     ///< last durably synced LSN
@@ -48,7 +48,7 @@ struct PhnswWalStats {
 /// WAL + snapshot persistence layer around the untouched graph algorithm.
 ///
 /// Phase 1 is the only IIndex implementation. PHnsw also implements the narrower
-/// IVectorStore (held by F25 WriteCoordinator) — the two bases share most of the
+/// IVectorStore (held by WriteCoordinator) — the two bases share most of the
 /// surface; where signatures differ (Search ef_search, Exists/Snapshot/Recover
 /// TraceContext arity) each override is declared explicitly below.
 ///
@@ -62,7 +62,7 @@ struct PhnswWalStats {
 /// and the IIndexFactory.
 class PHnsw : public IIndex, public IVectorStore {
 public:
-    /// unit_data_dir: per-Unit data directory (F01 §2.1 / V5 #10), e.g.
+    /// unit_data_dir: per-Unit data directory, e.g.
     /// /data/units/unit_legal_0/ — holds hnsw.wal + snapshots + hnsw.meta.
     PHnsw(const std::string& unit_data_dir, const PhnswConfig& config);
     ~PHnsw() override;
@@ -75,7 +75,7 @@ public:
                     const observability::TraceContext* ctx = nullptr) override;
     Status AddPoints(const std::vector<std::pair<const float*, uint64_t>>& points,
                      const observability::TraceContext* ctx = nullptr) override;
-    /// Idempotent: a missing block_id returns Ok (F25 Q6 + V5 #9).
+    /// Idempotent: a missing block_id returns Ok.
     Status MarkDelete(uint64_t block_id,
                       const observability::TraceContext* ctx = nullptr) override;
 
@@ -92,7 +92,7 @@ public:
     IndexStats GetStats() override;
     std::size_t GetMemoryFootprintBytes() const override;
 
-    // --- IVectorStore subset held by F25 (distinct signatures from IIndex) ---
+    // --- IVectorStore subset held by the write coordinator (distinct signatures from IIndex) ---
     // Search without ef_search: delegates to the IIndex Search with the
     // configured default. Exists/Snapshot/Recover carry a TraceContext per the
     // ARCHITECTURE.md SoT signature.

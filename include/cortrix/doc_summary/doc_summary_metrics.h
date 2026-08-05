@@ -8,24 +8,24 @@
 
 namespace cortrix::doc_summary {
 
-/// The F41 Document Summary metrics. Two OBS subsystems:
+/// The Document Summary metrics. Two observability subsystems:
 ///   - `doc_summary`: llm_calls_total / llm_duration_seconds /
 ///     summaries_generated_total / fallback_triggered_total
-///   - `fts5_fallback`: fts5_fallback_failed_total (F41-8 hybrid fallback)
+///   - `fts5_fallback`: fts5_fallback_failed_total (hybrid fallback)
 /// Naming cortrix_<subsystem>_<metric>_<unit>. NO high-cardinality labels (§12
 /// forbids tenant/ns/unit/user/request/doc id); doc_id etc. go to structured
 /// logs only.
 ///
 /// Standalone (D3): a self-contained, dependency-free recorder + an OpenMetrics
-/// text renderer (same pattern as F03 EnricherMetrics / F38 HypeMetrics / F40
-/// SparseMetrics). The F24 `/metrics` scrape endpoint does not exist in the frozen
+/// text renderer (same pattern as EnricherMetrics / HypeMetrics /
+/// SparseMetrics). The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder there is cross-Feature wiring → D3.5.
 class DocSummaryMetrics {
 public:
     /// status label for cortrix_doc_summary_llm_calls_total (§12 / §10.2).
     enum class LlmCallStatus { kStarted = 0, kSuccess, kFailed };
 
-    /// result label for cortrix_doc_summary_fallback_triggered_total (F41-5 G).
+    /// result label for cortrix_doc_summary_fallback_triggered_total.
     enum class FallbackResult { kHit = 0, kMiss };
 
     /// Process-wide instance (metrics are global counters/gauges).

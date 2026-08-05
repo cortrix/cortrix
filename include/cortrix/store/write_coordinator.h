@@ -11,7 +11,7 @@
 #include "cortrix/common/result.h"
 #include "cortrix/common/status.h"
 #include "cortrix/common/types.h"
-#include "cortrix/store/i_vector_store.h"   // F01 IVectorStore (canonical Exists, Q1-C)
+#include "cortrix/store/i_vector_store.h"   // IVectorStore (canonical Exists)
 #include "cortrix/store/pending_entry.h"
 #include "cortrix/store/pending_log_writer.h"
 #include "cortrix/store/recover_stores.h"   // IMetadataStore / IBlobStore (F25-consumer DIP)
@@ -68,7 +68,7 @@ class WriteCoordinator {
 public:
     /// @param data_dir       per-namespace dir; pending.wal lives here
     /// @param config         tuning (see WriteCoordinatorConfig)
-    /// @param vector_store   borrowed (F01 IVectorStore); Recover's Exists check
+    /// @param vector_store   borrowed (IVectorStore); Recover's Exists check
     /// @param metadata_store borrowed; Recover's BlockExists check
     /// @param blob_store     borrowed; Recover's BlobExists check
     /// Any store may be null when Recover() is not exercised (e.g. write-only
@@ -138,7 +138,7 @@ public:
     /// Live transaction counts from pending.wal (design § 2.1).
     Result<WalStats> GetStats();
 
-    /// Current pending.wal size in bytes — O(1), for F05 memory budgeting
+    /// Current pending.wal size in bytes — O(1), for memory budgeting
     /// (design § 2.1 v1.0.1, GetPwlSizeBytes). Zero before Init().
     size_t GetPwlSizeBytes() const;
 

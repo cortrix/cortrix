@@ -11,7 +11,7 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::auth {
 
-/// JWT signing-secret lifecycle over platform.db `auth_secrets` (P08 §2.11 /
+/// JWT signing-secret lifecycle over platform.db `auth_secrets` (
 /// §3.5, topic 1.1 C — Cortrix auto-generate + admin-API rotate + dual-key window).
 ///
 /// S1 scope (this header): startup LoadOrInit + the current-secret accessor.
@@ -30,7 +30,7 @@ public:
     /// exists (P08AuthSchemaProvider migrated it). The service does not own `db`.
     explicit JwtSecretService(sqlite3* db) : db_(db) {}
 
-    /// Idempotent startup init (P08 §S1 step 3 / §2.11):
+    /// Idempotent startup init:
     ///   1) if env `CORTRIX_JWT_SECRET` set → use it + upsert as current;
     ///   2) else if a status='current' jwt_secret row exists → load it;
     ///   3) else auto-generate 64 random bytes → persist as current → use it.
@@ -51,21 +51,21 @@ public:
 
     // ------------------------------- S7 ---------------------------------
 
-    /// Result of a rotation (P08 §2.11 admin API response).
+    /// Result of a rotation (admin API response).
     struct RotationResult {
         std::string new_key_id;
         std::string prev_key_id;
         int64_t prev_expires_at_ms = 0;  ///< current + 24h
     };
 
-    /// Rotate the JWT secret (P08 §2.11 admin API `rotate-jwt-secret`, topic 1.1 C):
+    /// Rotate the JWT secret (admin API `rotate-jwt-secret`):
     /// demote the existing current → prev (expires_at = now + 24h), generate +
     /// persist a new current, and update the in-memory current_secret_. Verifying
     /// continues to accept the prev key until it expires (GetAcceptSecrets()).
     /// Atomic (single tx). On failure returns CX_ERR_AUTH_JWT_INIT_FAILED.
     Result<RotationResult> RotateJwtSecret();
 
-    /// The secrets to accept on verify (P08 §2.11 dual-key window): the current secret
+    /// The secrets to accept on verify (dual-key window): the current secret
     /// first, then any status='prev' secret whose expires_at is still in the
     /// future. AuthService passes this to JwtCodec::Decode. Re-reads the db so a
     /// rotation by another worker is picked up.

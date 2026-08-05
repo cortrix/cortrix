@@ -284,7 +284,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
 
     // [FA1 R11] P08 admin/users (§2.13-bis) + JWT rotation (§2.11) backends.
     // The PBKDF2 hasher is the invite-mode create path's password hasher (same
-    // TECH_DEBT-P08-PBKDF2-PLACEHOLDER seam as the login flow). JwtSecretService
+    // TECH_DEBT-AUTH-PBKDF2-PLACEHOLDER seam as the login flow). JwtSecretService
     // LoadOrInit reads/auto-generates the HS256 secret in platform.db auth_secrets
     // (§2.11) so the rotation route has a live current secret to rotate.
     cortrix::auth::Pbkdf2PasswordHasher admin_users_hasher;

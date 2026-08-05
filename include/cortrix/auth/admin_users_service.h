@@ -13,7 +13,7 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::auth {
 
-/// One admin/users record (P08 §2.13-bis UserRecord). The richer profile the
+/// One admin/users record (UserRecord). The richer profile the
 /// admin UsersPage shows: the platform.db `users` row projected to the
 /// Agent-friendly response shape. `role` is 'admin' | 'user'; `status` is
 /// 'active' | 'disabled' (the API never surfaces the internal 'locked' state —
@@ -29,7 +29,7 @@ struct AdminUserRecord {
     int64_t created_at = 0;     ///< Unix seconds
 };
 
-/// Filter for the list endpoint (P08 §2.13-bis GET /admin/users query params).
+/// Filter for the list endpoint (GET /admin/users query params).
 struct AdminUserListFilter {
     std::optional<std::string> q;       ///< substring match on email OR display_name
     std::optional<std::string> status;  ///< active | disabled
@@ -38,7 +38,7 @@ struct AdminUserListFilter {
     int limit = 20;                     ///< default 20, cap 200
 };
 
-/// Paginated list result (P08 §2.13-bis `{ users, total, page, limit }`).
+/// Paginated list result (`{ users, total, page, limit }`).
 struct AdminUserListResult {
     std::vector<AdminUserRecord> users;
     int64_t total = 0;
@@ -46,7 +46,7 @@ struct AdminUserListResult {
     int limit = 20;
 };
 
-/// Admin user-management service over platform.db `users` (P08 §2.13-bis, the 5
+/// Admin user-management service over platform.db `users` (the 5
 /// admin/users endpoints). Standalone CRUD-ish logic that the route layer
 /// (auth_routes.cpp RegisterAdminUsersRoutes) wraps with WithAuth(kPermAdmin) +
 /// operation_log writes. Errors are carried as AuthStatus(...) tokens

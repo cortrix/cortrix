@@ -15,7 +15,7 @@ enum class IndexType {
 
 /// Index-agnostic open/create configuration shared by all IIndex backends.
 /// Backend-specific tuning (group-commit batch size, snapshot thresholds, WAL
-/// buffer, ...) lives in that backend's own config (e.g. F01 PhnswConfig sourced
+/// buffer, ...) lives in that backend's own config (e.g. PhnswConfig sourced
 /// from IGlobalConfig), NOT in this shared contract.
 struct IndexConfig {
     IndexType type = IndexType::kPhnsw;
@@ -26,8 +26,8 @@ struct IndexConfig {
     int max_elements = 1000000;
 };
 
-/// Factory for IIndex instances (shared scaffolding D2-pre-2). F01 provides the
-/// concrete PhnswIndexFactory; F12 catalog (OpenUnitIndex) and F05 NamespacePool
+/// Factory for IIndex instances. The index layer provides the
+/// concrete PhnswIndexFactory; the catalog (OpenUnitIndex) and NamespacePool
 /// (Acquire) hold an IIndexFactory* and call Open(unit_data_dir) per Unit.
 class IIndexFactory {
 public:
@@ -43,8 +43,8 @@ public:
 };
 
 /// Phase 1 P-HNSW factory. This skeleton (interface + declarations) is delivered
-/// by scaffolding D2-pre-2 so F12 / F05 can compile and mock against it now; the
-/// concrete P-HNSW implementation is delivered by F01 (Wave A), which replaces
+/// by scaffolding so the catalog and pool can compile and mock against it now; the
+/// concrete P-HNSW implementation is delivered by the index layer, which replaces
 /// the placeholder bodies in iindex_factory.cpp.
 class PhnswIndexFactory : public IIndexFactory {
 public:

@@ -10,8 +10,8 @@
 namespace cortrix::catalog {
 
 /// NS routing + namespace lifecycle. The catalog is the single SoT
-/// for NS / Unit metadata; upstream modules (F04 ScatterGather, F25
-/// WriteCoordinator, F21 Watcher, pgcortrix) go through this interface rather
+/// for NS / Unit metadata; upstream modules (ScatterGather,
+/// WriteCoordinator, Watcher, pgcortrix) go through this interface rather
 /// than touching catalog.db directly (§2 strict dependency inversion).
 ///
 /// Error model (F-FREEZE-1 / CODING_CONVENTIONS §3): value-returning methods use
@@ -49,12 +49,12 @@ public:
 
     /// Create a namespace. Void-fallible → Status (F-FREEZE-1: no Result<void>).
     /// Errors: CX_ERR_NS_ALREADY_EXISTS; CX_ERR_NS_QUOTA_EXCEEDED /
-    /// CX_ERR_NS_RESOURCE_BUDGET_EXCEEDED / CX_ERR_NS_POOL_INTERNAL from the F05
+    /// CX_ERR_NS_RESOURCE_BUDGET_EXCEEDED / CX_ERR_NS_POOL_INTERNAL from the
     /// admission check the implementation performs.
     virtual Status CreateNamespace(const NSMetadata& metadata) = 0;
 
     /// Soft-delete a namespace (status='deleted'). Void-fallible → Status.
-    /// The implementation also triggers F05 pool eviction.
+    /// The implementation also triggers pool eviction.
     /// Error: CX_ERR_NS_NOT_FOUND.
     virtual Status DeleteNamespace(const std::string& namespace_id) = 0;
 };

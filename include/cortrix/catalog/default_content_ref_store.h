@@ -12,11 +12,11 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::catalog {
 
-/// catalog.db-backed IContentRefStore (F12 §3.3 impl, Story S2.3). Borrows the
+/// catalog.db-backed IContentRefStore. Borrows the
 /// sqlite3 handle owned by CatalogDb. Maintains catalog.content_refs rows (the
 /// authoritative per-(file_hash, ns_id, doc_id) records) and keeps the
 /// file_locations.ref_count aggregate in sync when that row exists (it is
-/// created by the write path, F25; ref counting tolerates its absence).
+/// created by the write path; ref counting tolerates its absence).
 class DefaultContentRefStore : public IContentRefStore {
 public:
     explicit DefaultContentRefStore(sqlite3* db);

@@ -7,7 +7,7 @@
 
 namespace cortrix::auth {
 
-/// The authentication decision for a Cloud request (P08 §2.16 / §4.3),
+/// The authentication decision for a Cloud request,
 /// as a pure, httplib-independent unit so it is fully testable standalone. It
 /// turns the request's auth headers into either an AuthContext or an
 /// Agent-friendly error, by delegating JWT validation to AuthService.
@@ -22,7 +22,7 @@ class JwtAuthMiddleware {
 public:
     explicit JwtAuthMiddleware(AuthService* auth) : auth_(auth) {}
 
-    /// Decide auth from the raw header values (P08 §4.3 step 1-3):
+    /// Decide auth from the raw header values (step 1-3):
     ///   - "Authorization: Bearer <jwt>"  → AuthService::ValidateAccessToken;
     ///   - "Authorization: Bearer cortrix_sk_..." OR non-empty `x_api_key`
     ///       → API-Key path → returns CX_ERR_NOT_FOUND here (the API-Key branch

@@ -5,17 +5,17 @@
 
 namespace cortrix::auth {
 
-/// A tenant membership row as surfaced in API responses (P08 §2.3 / §2.9 login +
-/// /me `tenants` array). Populated from P09 in later wiring (D3.5); the struct is
-/// owned here because it is part of P08's response shape.
+/// A tenant membership row as surfaced in API responses (login +
+/// /me `tenants` array). Populated from tenant management in later wiring; the struct is
+/// owned here because it is part of the auth response shape.
 struct TenantRef {
     std::string id;     ///< tenant_id ("tenant-<uuid>")
     std::string name;
     std::string role;   ///< owner | admin | member | viewer
 };
 
-/// User profile returned by Register / GetUserInfo / login (P08 §2.2 / §2.9).
-/// `tenants` is filled from P09 (D3.5); empty until then (Register returns the
+/// User profile returned by Register / GetUserInfo / login.
+/// `tenants` is filled from tenant management later; empty until then (Register returns the
 /// freshly-created user before the Personal-Tenant wiring lands).
 struct UserInfo {
     std::string id;             ///< "usr_" + 8 hex

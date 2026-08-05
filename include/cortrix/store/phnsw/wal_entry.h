@@ -9,11 +9,11 @@ namespace cortrix::store {
 
 /// One mutation record in the P-HNSW write-ahead log (hnsw.wal).
 ///
-/// F01 logs every vector mutation before it touches the in-memory graph: an
+/// The index logs every vector mutation before it touches the in-memory graph: an
 /// INSERT record carries the full vector, a DELETE record carries only the
 /// block_id. Crash recovery (S4) replays these on top of the latest snapshot.
 ///
-/// On-disk frame (little-endian, F01 design § 3.1) — `checksum` covers every
+/// On-disk frame (little-endian) — `checksum` covers every
 /// field from `entry_type` through `vector_data` (i.e. everything except the
 /// leading `entry_size` and the trailing `checksum` itself):
 ///

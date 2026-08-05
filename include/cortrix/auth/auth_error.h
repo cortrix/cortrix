@@ -10,7 +10,7 @@
 
 namespace cortrix::auth {
 
-/// The P08 Auth error identities (P08 §5.1 / §5.2). Each maps to a stable
+/// The Auth error identities. Each maps to a stable
 /// `CX_ERR_*` string + a GEN-Agent category + retryability via the canonical
 /// registry below. This is the exact convention-compliant mirror of
 /// catalog::CatalogErrorCode (CODING_CONVENTIONS §3 / L1-α §2): an *enum of
@@ -18,13 +18,13 @@ namespace cortrix::auth {
 /// cortrix::agent_friendly::AgentFriendlyError by MakeAuthError() — we do NOT
 /// introduce a parallel AuthError struct.
 ///
-/// Module-prefix rule (P08 v1.0.2 V3-ruling-14, ARCH §4.1.11): auth-domain codes
-/// carry the `CX_ERR_AUTH_` second-level prefix. A handful of codes P08 *uses*
+/// Module-prefix rule: auth-domain codes
+/// carry the `CX_ERR_AUTH_` second-level prefix. A handful of codes this layer *uses*
 /// are project-shared and keep their generic `CX_ERR_` spelling (governed by the
 /// master table, V14 J6): kInvalidRequest / kUnauthorized / kNotFound / kRateLimited /
 /// kInternalError / kServiceUnavailable, plus the admin/users codes
 /// kUserNotFound / kUserEmailExists / kUserValidation. They live
-/// in this enum so every error P08 returns flows through one registry, exactly
+/// in this enum so every error the auth layer returns flows through one registry, exactly
 /// as CatalogErrorCode carries kInternalError / kNotImplemented.
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
@@ -54,7 +54,7 @@ enum class AuthErrorCode {
     kUserNotFound,                // 404  CX_ERR_USER_NOT_FOUND
     kUserEmailExists,             // 409  CX_ERR_USER_EMAIL_EXISTS
     kUserValidation,              // 422  CX_ERR_USER_VALIDATION
-    // --- Project-shared codes P08 uses (governed by the master table, generic prefix) ---
+    // --- Project-shared codes this layer uses (governed by the master table, generic prefix) ---
     kInvalidRequest,              // 400  CX_ERR_INVALID_REQUEST
     kUnauthorized,                // 401  CX_ERR_UNAUTHORIZED
     kNotFound,                    // 404  CX_ERR_NOT_FOUND
@@ -63,12 +63,12 @@ enum class AuthErrorCode {
     kServiceUnavailable,          // 503  CX_ERR_SERVICE_UNAVAILABLE
 };
 
-/// Total number of P08 auth error codes (P08 §5.2 — 23 scenarios mapped to
+/// Total number of auth error codes (23 scenarios mapped to
 /// 24 unique identities incl. shared ones). Compile-time anchor for the
 /// API-compatibility regression test (the set must not shrink).
 constexpr int kAuthErrorCodeCount = 24;
 
-/// Canonical, immutable attributes of one error code (P08 §5.2 columns).
+/// Canonical, immutable attributes of one error code.
 struct AuthErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
@@ -83,7 +83,7 @@ const AuthErrorInfo& GetAuthErrorInfo(AuthErrorCode code);
 /// The "CX_ERR_*" string for `code` (convenience over GetAuthErrorInfo).
 const char* AuthErrorCodeString(AuthErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (P08 §5.2
+/// The structured_data keys a `code`'s error body MUST carry (
 /// structured_data column). Empty where the spec lists `{}` (e.g.
 /// kInvalidCredentials — empty to prevent enumeration). SoT for the
 /// Agent-friendly contract (GEN-Agent #5).
@@ -98,7 +98,7 @@ bool HasRequiredStructuredData(AuthErrorCode code,
 /// and an optional human-readable `message`. category / retryable /
 /// retry_after_ms are filled from the canonical registry — call sites never
 /// restate them. For kAccountLocked / kRateLimited the caller passes the live
-/// retry_after_ms via `retry_after_override` (remaining lockout ms — P08 §5.2).
+/// retry_after_ms via `retry_after_override` (remaining lockout ms).
 agent_friendly::AgentFriendlyError MakeAuthError(
     AuthErrorCode code,
     nlohmann::json structured_data = nlohmann::json::object(),

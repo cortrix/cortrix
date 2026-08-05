@@ -12,8 +12,8 @@ typedef struct sqlite3 sqlite3;
 namespace cortrix::catalog {
 
 /// A Feature's schema contribution (scaffolding D2-pre-5, interface SoT =
-/// F12 §3.7). Each Feature (F12 / F06 / F09 / F25 / F03 / F21 / F38 / F41 /
-/// MEM01) implements one and registers it with the SchemaMigrator.
+/// Each subsystem (catalog / parser / block header / write coordinator / enricher /
+/// watcher / HyPE / doc summary / memory) implements one and registers it with the SchemaMigrator.
 class ISchemaProvider {
 public:
     virtual ~ISchemaProvider() = default;
@@ -39,8 +39,8 @@ class SchemaMigrator {
 public:
     SchemaMigrator() = default;
 
-    /// Register a provider. Order is the migration order; F12 registers in the
-    /// ARCH §1.3.bis.3 topological order (F12→F06→F09→F25→F03→F21→F38→F41→MEM01).
+    /// Register a provider. Order is the migration order; the catalog registers in the
+    /// topological order (catalog first, then the per-Unit schema owners).
     void Register(ISchemaProvider* provider);
 
     /// Migrate the catalog database (catalog.db). Atomic across all providers.

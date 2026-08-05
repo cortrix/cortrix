@@ -4,7 +4,7 @@
 //
 // Used by BOTH paths so they build byte-identical schema:
 //   - production: F09SchemaProvider::Migrate, run via SchemaMigrator::MigrateUnit
-//     at F05 LoadOneNamespace (ARCH §1.3.bis.3 unified schema governance);
+//     at LoadOneNamespace (unified schema governance);
 //   - standalone/test: CortrixStoreSqlite::Open in owns-db mode (no migrator).
 //
 // The DDL below was moved verbatim out of CortrixStoreSqlite::CreateTables — keep

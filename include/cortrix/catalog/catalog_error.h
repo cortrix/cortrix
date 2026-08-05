@@ -21,7 +21,7 @@ namespace cortrix::catalog {
 /// introduce a parallel CatalogError struct (the §3.9 `Result<T,CatalogError>`
 /// spelling is the pre-convention draft; this is its convention-compliant form).
 ///
-/// V1.0 versioning promise (F12 §8.3, GEN-Agent #7): this set is not removed /
+/// V1.0 versioning promise: this set is not removed /
 /// renamed / re-categorized; new codes may be appended (api_version stays "v1").
 /// Three codes are Phase-1-reserved (present, but never returned until Phase 2):
 /// kUnitArchived / kUnitOwnerRemote / kTenantQuotaExceeded.
@@ -54,17 +54,17 @@ enum class CatalogErrorCode {
     // --- Generic ---
     kInternalError,
     kNotImplemented,
-    // --- F05 admission (v1.0.5) ---
+    // --- namespace-pool admission ---
     kNsQuotaExceeded,
     kNsResourceBudgetExceeded,
     kNsPoolInternal,
 };
 
-/// Total number of catalog error codes (F12 §8.1 = 24). Compile-time anchor for
+/// Total number of catalog error codes (= 24). Compile-time anchor for
 /// the API-compatibility regression test (the set must not shrink).
 constexpr int kCatalogErrorCodeCount = 24;
 
-/// Canonical, immutable attributes of one error code (F12 §8.1 columns).
+/// Canonical, immutable attributes of one error code.
 struct CatalogErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
@@ -79,7 +79,7 @@ const CatalogErrorInfo& GetCatalogErrorInfo(CatalogErrorCode code);
 /// The "CX_ERR_*" string for `code` (convenience over GetCatalogErrorInfo).
 const char* CatalogErrorCodeString(CatalogErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (F12 §8.1 "required keys"
+/// The structured_data keys a `code`'s error body MUST carry ("required keys"
 /// column). Empty for CX_ERR_INTERNAL_ERROR (§8.1 "case-by-case"). This
 /// is the SoT for the Agent-friendly contract (GEN-Agent #5) and lets call sites
 /// + tests verify the body is complete (S5.1 / topic 5).
@@ -105,7 +105,7 @@ agent_friendly::AgentFriendlyError MakeCatalogError(
 /// catalog identity is recoverable at the API/SDK boundary, which re-inflates the
 /// full Agent-friendly body (category / retryable / structured_data) via
 /// MakeCatalogError(). We deliberately do NOT widen cortrix::Status itself (that
-/// would be a cross-cutting change to the shared primitive — out of F12 scope).
+/// would be a cross-cutting change to the shared primitive — out of catalog scope).
 Status CatalogStatus(CatalogErrorCode code, const std::string& detail = "");
 
 /// Coarse CatalogErrorCode → StatusCode mapping used by CatalogStatus (exposed

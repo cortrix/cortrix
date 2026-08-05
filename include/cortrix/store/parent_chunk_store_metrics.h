@@ -6,8 +6,8 @@
 
 namespace cortrix::store {
 
-/// The F34 parent_chunk_store subsystem metrics (F34 §2.5, OBSERVABILITY_SPEC
-/// subsystem `parent_chunk_store`). Mirrors the F13 AgentTraceMetrics / F40
+/// The parent_chunk_store subsystem metrics (observability
+/// subsystem `parent_chunk_store`). Mirrors the AgentTraceMetrics /
 /// SparseMetrics template (process-wide singleton, atomic counters + histogram,
 /// OpenMetrics renderer).
 ///
@@ -21,10 +21,10 @@ namespace cortrix::store {
 /// those go to structured logs).
 ///
 /// D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
-/// text renderer. The F24 `/metrics` scrape endpoint does not exist in the frozen
+/// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
 /// deferred to D3.5. Until then it is fully usable + testable in-process and
-/// RenderOpenMetrics() produces what F24 will serve.
+/// RenderOpenMetrics() produces what the server will serve.
 class ParentChunkStoreMetrics {
 public:
     /// result label for cortrix_parent_chunk_store_lookup_total (§2.5).

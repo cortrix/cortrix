@@ -20,7 +20,7 @@ struct AuthContext {
     bool can_write() const { return permissions & kPermWrite; }
     bool is_admin() const { return permissions & kPermAdmin; }
     // NOTE: the static per-principal `namespaces` allow-list and
-    // can_access_namespace() were removed (ARCHITECTURE V6 / P08 issue 3.3-4).
+    // can_access_namespace() were removed.
     // Namespace authorization is now a runtime PermissionService::BatchCheck
     // (ownership + ns_acl), reached through ApiKeyAuth::Authorize's seam.
 };

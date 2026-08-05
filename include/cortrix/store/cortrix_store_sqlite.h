@@ -19,8 +19,8 @@ public:
     /// Open()-time startup responsibilities (D-I1.bis). The connection itself is
     /// always opened in owns mode; these gate the two one-shot startup jobs that
     /// must NOT run per-request: the framework DDL (production units are migrated
-    /// once at F05 load time by SchemaMigrator) and doc-level crash recovery
-    /// (runs once at F05 load time; per-request it would mis-reset docs that are
+    /// once at namespace load time by SchemaMigrator) and doc-level crash recovery
+    /// (runs once at namespace load time; per-request it would mis-reset docs that are
     /// legitimately mid-processing on a concurrent request).
     struct OpenOptions {
         bool run_schema_ddl = true;
@@ -35,7 +35,7 @@ public:
     /// Owns-the-connection mode with explicit startup responsibilities. The
     /// production façade passes {false, false}: per-facade PRIVATE connection
     /// (D-I1.bis) — schema already migrated and doc recovery already run once at
-    /// F05 load time, so neither one-shot startup job may run per-request.
+    /// namespace load time, so neither one-shot startup job may run per-request.
     CortrixStoreSqlite(const std::string& db_path, OpenOptions options);
 
     /// External-connection view: borrows an already-open `sqlite3*`. Open() skips
@@ -43,7 +43,7 @@ public:
     /// the owning SqliteConn does. The borrowed handle must outlive this store.
     /// `owns_db_ = false`.
     ///
-    /// ★ D-I1.bis (2026-06-10): SINGLE-THREADED CONTEXTS ONLY (F05 load-time
+    /// ★ SINGLE-THREADED CONTEXTS ONLY (namespace load-time
     /// tooling — e.g. the assembly-time RecoverCrashedDocs pass — and tests).
     /// The former production use (per-request façade views sharing the bundle's
     /// conn across threads) segfaulted under concurrency and is now forbidden:
@@ -61,7 +61,7 @@ public:
                            const std::string& error_message = "") override;
     int doc_delete(const std::string& doc_id) override;
     int doc_delete_by_source_prefix(const std::string& source_path_prefix,
-                                    int64_t* deleted_blocks) override;  // [F16a D3 · P2c]
+                                    int64_t* deleted_blocks) override;  // full-overwrite import cleanup
     int doc_soft_delete(const std::string& doc_id, int64_t now_ms) override;
     int doc_restore(const std::string& doc_id) override;
     int doc_list_deleted_before(int64_t cutoff_ms, std::vector<CortrixDoc>& out) override;
@@ -88,9 +88,9 @@ public:
     int search_metadata(const std::string& filter, int top_k,
                          std::vector<SearchResult>& results) override;
 
-    /// D3.5 F03/F07: expose the owned/borrowed sqlite3* so the SPC write path can
+    /// Expose the owned/borrowed sqlite3* so the SPC write path can
     /// persist per-block enrichment (enriched_score / entities, later semantic_score)
-    /// on the same connection inside the F25 write. Non-null after Open().
+    /// on the same connection inside the coordinated write. Non-null after Open().
     sqlite3* db_handle() override;
 
     /// Crash recovery: processing docs -> delete blocks -> reset to pending

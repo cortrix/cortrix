@@ -8,8 +8,8 @@ namespace cortrix::auth {
 
 /// Production password hasher for Phase 1 V1 — OpenSSL PBKDF2-HMAC-SHA256.
 ///
-/// 🚧 TECH_DEBT-P08-PBKDF2-PLACEHOLDER:
-/// P08 §4.2 specifies **bcrypt cost=12** with a `$2b$...` hash. bcrypt is NOT
+/// 🚧 TECH_DEBT-AUTH-PBKDF2-PLACEHOLDER:
+/// The design specifies **bcrypt cost=12** with a `$2b$...` hash. bcrypt is NOT
 /// available offline on this build (no system lib / no vendored source / OpenSSL
 /// has no native bcrypt), and the env's FetchContent network fetch is unreliable.
 /// This implementation uses a PBKDF2-HMAC-SHA256 placeholder that meets the
@@ -17,7 +17,7 @@ namespace cortrix::auth {
 /// `pbkdf2$...` hash, NOT `$2b$`. SWITCH TO REAL bcrypt once network is available
 /// (D3.5): the IPasswordHasher seam means swapping = replacing this class +
 /// re-hashing. Pre-launch there are no stored passwords, so the migration is
-/// zero-cost. Tracked: requirements/TECH_DEBT.md → TECH_DEBT-P08-PBKDF2-PLACEHOLDER.
+/// zero-cost. Tracked as TECH_DEBT-AUTH-PBKDF2-PLACEHOLDER.
 ///
 /// Hash string format (self-describing so Verify needs no external params):
 ///   `pbkdf2$sha256$<iterations>$<base64(salt)>$<base64(dk)>`
@@ -35,7 +35,7 @@ public:
     Result<bool> Verify(const std::string& password, const std::string& hash) override;
 
     /// IPasswordHasher::cost — reports the bcrypt-equivalent work factor this
-    /// build targets (12, P08 §4.2). The actual KDF here is PBKDF2/iterations;
+    /// build targets (12). The actual KDF here is PBKDF2/iterations;
     /// cost() stays 12 so callers/spec see the intended factor (placeholder note).
     int cost() const override { return 12; }
 

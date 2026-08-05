@@ -8,7 +8,7 @@
 
 namespace cortrix::catalog {
 
-/// Standard environment for batch responses (F12 §8.2 meta) — the catalog state
+/// Standard environment for batch responses (meta) — the catalog state
 /// stamped onto every BatchMeta so callers don't restate it per call.
 struct BatchContext {
     bool    bloom_filter_ready = true;

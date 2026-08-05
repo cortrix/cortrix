@@ -6,7 +6,7 @@
 
 namespace cortrix::catalog {
 
-/// Unit lifecycle state (F12 §4.1 units.state). Phase 1 every Unit is `active`;
+/// Unit lifecycle state (units.state). Phase 1 every Unit is `active`;
 /// the rest are Phase 2 (sealing → sealed → archived) + `migrating` (Phase 2
 /// cross-node transient, prereq constraint 7). Stored as the lowercase string.
 enum class UnitState {
@@ -21,7 +21,7 @@ const char* ToString(UnitState state);
 /// Parse the stored string; unknown → kActive (Phase 1 conservative default).
 UnitState UnitStateFromString(const std::string& s);
 
-/// Physical index backing a Unit (F12 §4.1 units.index_type). Phase 1 = hnsw.
+/// Physical index backing a Unit (units.index_type). Phase 1 = hnsw.
 enum class IndexType {
     kHnsw,
     kBruteForce,
@@ -31,7 +31,7 @@ enum class IndexType {
 const char* ToString(IndexType type);
 IndexType IndexTypeFromString(const std::string& s);
 
-/// A Unit's catalog metadata (F12 §3.2 / §4.1 units row). The 9 reserved Phase 2
+/// A Unit's catalog metadata (units row). The 9 reserved Phase 2
 /// fields are present so the descriptor is stable across phases; Phase 1 writes
 /// them with their defaults and does not act on the seal/owner fields.
 struct UnitDescriptor {
@@ -51,16 +51,16 @@ struct UnitDescriptor {
     int64_t     created_at = 0;
 };
 
-/// Runtime statistics pushed back to the catalog (F12 §3.2 UpdateUnitStats).
+/// Runtime statistics pushed back to the catalog (UpdateUnitStats).
 struct UnitStats {
     int64_t vector_count = 0;
     int64_t size_bytes = 0;
     int64_t last_write_at = 0;
 };
 
-/// A namespace's catalog metadata (F12 §3.1 GetNamespace / §4.1 namespaces row).
+/// A namespace's catalog metadata (GetNamespace / namespaces row).
 /// The 11 *_config columns are carried as raw JSON strings ('{}' = disabled);
-/// ConfigResolver<T> (Wave 3) interprets them per Feature — F12 does not parse.
+/// ConfigResolver<T> interprets them per consumer — the catalog does not parse.
 struct NSMetadata {
     std::string namespace_id;               // namespaces.ns_id
     std::string name;
@@ -74,7 +74,7 @@ struct NSMetadata {
     std::string status = "active";          // 'active' | 'deleted'
     int64_t     created_at = 0;
 
-    /// The 11 standardized *_config JSON blobs (F12 §4.1, v1.0.8). Empty optional
+    /// The 11 standardized *_config JSON blobs. Empty optional
     /// means "column default '{}'" — kept as strings; Feature config types live
     /// with each Feature and are resolved by ConfigResolver<T> (Wave 3).
     std::optional<std::string> reranker_config;

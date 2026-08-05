@@ -14,7 +14,7 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::catalog {
 
-/// Standard Bloom filter (F12 §7 default: 100MB / 1% FP / ~100M file_hash). Bit
+/// Standard Bloom filter (default: 100MB / 1% FP / ~100M file_hash). Bit
 /// array + k hash functions derived from two 64-bit base hashes
 /// (Kirsch-Mitzenmacher double hashing). Optimal m (bits) and k are computed
 /// from capacity + target FP rate.
@@ -42,7 +42,7 @@ public:
     /// Startup recovery (§7.2): full-scan catalog.file_locations and Add() every
     /// file_hash, then mark ready. Borrows the catalog sqlite3 handle.
     ///
-    /// SPEC DEVIATION (flagged): F12 §3.4 spells this LoadFromCatalog(INSRouter*),
+    /// SPEC DEVIATION (flagged): the design spells this LoadFromCatalog(INSRouter*),
     /// but INSRouter (S2.1) is NS-centric and exposes no file_hash enumeration —
     /// the BF's data source is the dedup table file_locations, not NS routing.
     /// Taking the sqlite3 handle (as CatalogDb/Default routers do) is the correct
@@ -68,11 +68,11 @@ private:
     std::atomic<float> load_progress_{0.0f};
     std::atomic<int64_t> last_rebuild_ms_{-1};
 
-    // F24 runtime counters: updated from the const MightContain() (a positive
+    // Runtime counters: updated from the const MightContain() (a positive
     // hit bumps total_checks_), so mutable — they are observability state, not
     // part of the filter's logical value.
-    mutable std::atomic<uint64_t> total_checks_{0};         // §3.4 F24 counter
-    mutable std::atomic<uint64_t> false_positive_count_{0}; // §3.4 F24 counter
+    mutable std::atomic<uint64_t> total_checks_{0};         // metrics counter
+    mutable std::atomic<uint64_t> false_positive_count_{0}; // metrics counter
 
     mutable std::mutex add_mu_;             // serialize Add bit-writes
 };

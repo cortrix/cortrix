@@ -26,13 +26,13 @@ enum class PhnswError {
     WAL_SYNC_FAILED = 9,
 };
 
-/// Stable CX_ERR_* identity codes for the F01 P-HNSW scope (design § 2.4,
+/// Stable CX_ERR_* identity codes for the P-HNSW scope (
 /// registered under ARCH § 4.1 `CX_ERR_PHNSW_*`). Per CODING_CONVENTIONS § 3 the
 /// project uses one error model — `Result<T>` + `Status` — and distinguishes
 /// domain errors by a `CX_ERR_*` code string rather than a typed `Result<T, E>`.
 /// The code is carried as a stable prefix on the Status message
 /// (`"<CODE>: <detail>"`); the API/SDK/MCP boundary lifts it into the
-/// AgentFriendlyError `code` field. Mirrors F25's `pwl_errors` convention.
+/// AgentFriendlyError `code` field. Mirrors the `pwl_errors` convention.
 namespace phnsw_errors {
 
 inline constexpr char kVectorDimMismatch[] = "CX_ERR_PHNSW_VECTOR_DIM_MISMATCH";

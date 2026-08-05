@@ -35,7 +35,7 @@ namespace cortrix::auth {
 /// `users.email` UNIQUE constraint.
 class AuthService {
 public:
-    /// `email_sender` may be null → an internal NullEmailSender is used (P08 §4.6
+    /// `email_sender` may be null → an internal NullEmailSender is used (
     /// default; codes are logged, not delivered). S5 password-reset / email-verify
     /// route verification codes through it.
     AuthService(sqlite3* platform_db, config::AuthConfig config,
@@ -53,7 +53,7 @@ public:
 
     // ----------------------------- S3 -----------------------------
 
-    /// Login (P08 §2.3 / §4.2): look up user → check status/lockout → verify
+    /// Login: look up user → check status/lockout → verify
     /// password (IPasswordHasher) → on failure bump login_attempts (lock at
     /// max_login_attempts for lockout_duration) → on success reset attempts,
     /// issue access+refresh JWT, persist refresh_token hash. Errors:
@@ -61,12 +61,12 @@ public:
     /// CX_ERR_ACCOUNT_LOCKED (with live retry_after_ms) / CX_ERR_AUTH_ACCOUNT_DISABLED.
     Result<AuthTokenPair> Login(const std::string& email, const std::string& password);
 
-    /// Logout (P08 §2.4 / §4.7): blacklist the access token (memory + persist to
+    /// Logout: blacklist the access token (memory + persist to
     /// token_blacklist) and revoke the associated refresh_token(s) for the sid.
     /// A malformed/already-invalid token is a no-op success (idempotent logout).
     Status Logout(const std::string& access_token);
 
-    /// Refresh (P08 §2.5 / §4.4): decode refresh token → verify it is a refresh
+    /// Refresh: decode refresh token → verify it is a refresh
     /// token, present + not revoked + not expired in refresh_tokens, hash matches,
     /// user still active → issue a NEW access token using the user's CURRENT
     /// tenant_id/role from the db. Errors: CX_ERR_AUTH_INVALID_REFRESH_TOKEN /
@@ -80,11 +80,11 @@ public:
     Result<AuthContext> ValidateAccessToken(const std::string& access_token);
 
     /// Load the persisted (non-expired) token_blacklist into memory at startup
-    /// (P08 §3.4 / §3.9). Idempotent; call once after Open.
+    /// Idempotent; call once after Open.
     Status LoadBlacklist();
 
     /// Remove expired rows from token_blacklist + drop expired in-memory entries
-    /// (P08 §3.9 cleanup). Safe to call periodically.
+    /// Safe to call periodically.
     Status CleanupExpired();
 
     /// S7 hook: replace the set of secrets accepted on verify (the dual-key
@@ -94,7 +94,7 @@ public:
 
     // ----------------------------- S5 -----------------------------
 
-    /// Request a password reset (P08 §2.6 / §4.5): if the email exists, store a
+    /// Request a password reset: if the email exists, store a
     /// 6-digit code (type='password_reset', 15-min TTL) and send it. ALWAYS
     /// returns Ok regardless of whether the email exists (anti-enumeration, §2.6) — a
     /// genuine send/DB error is the only failure surfaced.
@@ -142,7 +142,7 @@ private:
     std::unordered_set<std::string> token_blacklist_;  ///< SHA-256(access_token) hex
 
     /// Resolve the active email sender: the injected one, or a process-wide
-    /// NullEmailSender fallback (P08 §4.6 default).
+    /// NullEmailSender fallback (default).
     IEmailSender* EmailSender();
     IEmailSender* email_sender_;          ///< may be null → NullEmailSender fallback
     NullEmailSender null_email_sender_;   ///< fallback when email_sender_ == nullptr

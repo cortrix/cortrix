@@ -5,11 +5,11 @@
 
 namespace cortrix::store {
 
-/// F09's schema-migration contribution. [D3.5-B] F09 owns the per-Unit
+/// The block-header schema-migration contribution. It owns the per-Unit
 /// FRAMEWORK schema (documents / blocks / blocks_fts + indices + triggers): its
 /// 0 → 1 migration creates them from kPerUnitFrameworkDdl (the single DDL SoT,
 /// also reused by CortrixStoreSqlite::Open's standalone owns-db path). Runs via
-/// SchemaMigrator::MigrateUnit at F05 LoadOneNamespace (ARCH §1.3.bis.3 unified
+/// SchemaMigrator::MigrateUnit at LoadOneNamespace (unified
 /// schema governance). The Phase-2 header V1→V2 upgrade (TD-BLOCK-V2-UPGRADE)
 /// will run inside the same versioned framework.
 ///

@@ -8,7 +8,7 @@
 namespace cortrix::catalog {
 
 /// Unit lifecycle + runtime stats. The catalog is the SoT for Unit
-/// metadata; F03 (enrichment), F25 (write) etc. update stats / state through
+/// metadata; enrichment, the write path etc. update stats / state through
 /// this interface rather than touching the units table directly.
 ///
 /// Error model (F-FREEZE-1): value methods return Result<T> (error path = Status

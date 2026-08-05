@@ -8,7 +8,7 @@
 #include "cortrix/config/auth_config.h"
 
 // P08 S2 (final): Pbkdf2PasswordHasher — the OpenSSL PBKDF2-HMAC-SHA256 production
-// hasher (TECH_DEBT-P08-PBKDF2-PLACEHOLDER; a future compatibility update can add real
+// hasher (TECH_DEBT-AUTH-PBKDF2-PLACEHOLDER; a future compatibility update can add real
 // bcrypt). Maps the §S2 hash test cases onto the placeholder (the `$2b$` format
 // case becomes a `pbkdf2$` format assertion, documenting the deviation).
 namespace cortrix::auth {
@@ -40,7 +40,7 @@ TEST(Pbkdf2HasherTest, WrongPassword) {
 
 // Placeholder format (replaces §S2 `Password_BcryptCost12`): the hash is the
 // self-describing `pbkdf2$sha256$<iters>$<salt>$<dk>`, NOT `$2b$`. This test
-// documents the intentional spec deviation (TECH_DEBT-P08-PBKDF2-PLACEHOLDER).
+// documents the intentional spec deviation (TECH_DEBT-AUTH-PBKDF2-PLACEHOLDER).
 TEST(Pbkdf2HasherTest, PlaceholderFormatNotBcrypt) {
     Pbkdf2PasswordHasher h(kTestIters);
     auto hash = h.Hash("Secure123!");

@@ -25,7 +25,7 @@ public:
     virtual int doc_update_status(const std::string& doc_id, DocStatus status,
                                    const std::string& error_message = "") = 0;
     virtual int doc_delete(const std::string& doc_id) = 0;
-    // [F16a D3 · P2c] Full-overwrite import cleanup: delete every document whose
+    // Full-overwrite import cleanup: delete every document whose
     // source_path begins with `source_path_prefix` (LIKE 'prefix%', uses
     // idx_doc_source) together with its blocks (FTS cleaned via the blocks_ad
     // trigger), in one transaction. Writes the count of blocks removed to
@@ -73,9 +73,9 @@ public:
         (void)doc_id; *count = 0; return 0;
     }
 
-    // ---- Parent CRUD (F34 `parents` table; A unified-blocks) ----
+    // ---- Parent CRUD (`parents` table) ----
     // parents is a per-Unit table KEPT under A (child chunks moved to `blocks`). The
-    // SPC write path inserts parents on the SAME store.db handle inside the SAME F25
+    // SPC write path inserts parents on the SAME store.db handle inside the SAME
     // transaction as the doc's child-blocks (ARCH §3.2 atomic write), so the write
     // lives on this unified store rather than a second handle/wrapper. Default impls
     // return -1 (not implemented) so the many lightweight test fakes/stubs need not
@@ -94,10 +94,10 @@ public:
     virtual int search_metadata(const std::string& filter, int top_k,
                                  std::vector<SearchResult>& results) = 0;
 
-    // ---- Raw SQLite handle (D3.5 F03/F07 enrichment persistence) ----
-    // The SPC ingest write persists per-block enrichment — F03 enriched_score +
-    // entities (enricher_store.h), later F07 semantic_score — by calling the free
-    // functions over this underlying handle, inside the same F25 logical write as
+    // ---- Raw SQLite handle (enrichment persistence) ----
+    // The SPC ingest write persists per-block enrichment — enriched_score +
+    // entities (enricher_store.h), later semantic_score — by calling the free
+    // functions over this underlying handle, inside the same logical write as
     // block_insert. Only the SQLite-backed store returns a real handle; every other
     // impl (test fakes, future backends) returns nullptr and the caller skips the
     // enrichment write (the core block row is already persisted via block_insert).

@@ -15,7 +15,7 @@ typedef struct sqlite3 sqlite3;
 namespace cortrix::catalog::gc {
 
 /// Snapshot of GC state for `GET /gc/status` (ARCH GcStatus / schemas.yaml).
-/// Field set is the authoritative GcStatus contract consumed by the P03 SDK
+/// Field set is the authoritative GcStatus contract consumed by the SDK
 /// dataclass (status / soft_deleted_count / reclaimable_bytes / last_gc_at).
 struct GcStatusSnapshot {
     bool running = false;                  ///< true while a sweep is in progress

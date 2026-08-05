@@ -22,13 +22,13 @@ namespace resource { class INamespacePool; }
 
 namespace cortrix::doc_summary {
 
-// Resolved F41 config (defined in doc_summary_generator.h; SoT keys/defaults in
+// Resolved doc-summary config (defined in doc_summary_generator.h; SoT keys/defaults in
 // doc_summary_config.h). The endpoint takes it by const-ref only, so a forward
 // declaration keeps this header light — callers that pass an instance include the
 // generator header; discover_handler.cpp includes it for the member access.
 struct DocSummaryConfig;
 
-/// doc-summary HNSW recall (F41 §6.1 Step 1 / §8.2 main path). Embeds `query`, runs
+/// doc-summary HNSW recall (main path). Embeds `query`, runs
 /// a single ANN search over the per-NS P-HNSW index (the SAME mixed pool the chunk
 /// path uses — doc_summary blocks were AddPoints'd by F41AsyncWorker), then resolves
 /// each hit from `store` and keeps ONLY block_type==kBlockDocSummary(17) rows whose
@@ -48,7 +48,7 @@ std::vector<DocDiscoveryHit> RecallDocSummaryHnsw(store::IIndex& index,
 /// Shared doc-discovery core used by BOTH the HTTP discover endpoint and query
 /// granularity=doc/both. It runs:
 ///   1) doc_summary embedding HNSW recall ("llm_summary");
-///   2) optional doc-level FTS5 fallback over F08 fields ("fts5_fallback");
+///   2) optional doc-level FTS5 fallback over the metadata fields ("fts5_fallback");
 ///   3) FuseDocDiscovery RRF over doc_id.
 /// The core is intentionally below the NamespaceFacade boundary so callers that
 /// already acquired a per-NS facade can reuse the exact same candidate-generation
@@ -75,13 +75,13 @@ DocDiscoveryCoreResult RunDocDiscoveryCore(store::IIndex& index,
                                            const std::string& query,
                                            const DocDiscoveryCoreOptions& options);
 
-/// Pure doc-discovery executor (F41 §6.1 / §8.2 — test-friendly, no httplib). Acquires
+/// Pure doc-discovery executor (test-friendly, no httplib). Acquires
 /// the NS facade from `pool`, runs the two hybrid recall paths and RRF-fuses them:
 ///   Step 1 (main):     RecallDocSummaryHnsw (doc_summary embedding HNSW) → "llm_summary"
-///   Step 2 (fallback): a per-NS doc-level FTS5 index over the F08 fields → "fts5_fallback"
+///   Step 2 (fallback): a per-NS doc-level FTS5 index over the metadata fields → "fts5_fallback"
 ///                      (config.fts5_fallback_enabled gate; a query-time FTS5 failure is a
 ///                      graceful degrade — increments cortrix_fts5_fallback_failed_total and
-///                      returns the main-path results only, never throws, F41-8/§8.2).
+///                      returns the main-path results only, never throws).
 ///   Step 3:            FuseDocDiscovery (RRF, dedup by doc_id) → top_k.
 /// Returns the §6.1 response body { results:[...], meta:{succeeded,failed,coverage_ratio,
 /// warnings} }. `explain` adds the C-class meta.fallback_triggered signal. A NS that

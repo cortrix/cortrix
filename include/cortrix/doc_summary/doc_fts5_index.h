@@ -11,17 +11,17 @@ struct sqlite3;  // opaque, same fwd-decl style as cortrix_store_sqlite.h
 namespace cortrix::doc_summary {
 
 /// One F08-field row fed into the doc-level FTS5 index. These are the
-/// rule-extracted F08 metadata fields — they always exist (no LLM dependency), so
+/// rule-extracted metadata fields — they always exist (no LLM dependency), so
 /// the FTS5 path is the hybrid fallback when the LLM summary is missing/failed.
 struct DocFtsRow {
     std::string doc_id;
     std::string filename;
     std::string doc_title;
-    std::string topics_rule_extracted;   ///< F08 tags joined (space-separated)
+    std::string topics_rule_extracted;   ///< tags joined (space-separated)
     std::string authors;
 };
 
-/// One doc-level FTS5 hit (F41 §8.2 fallback path). `score` is a normalized
+/// One doc-level FTS5 hit (fallback path). `score` is a normalized
 /// match score in (0,1] derived from the FTS5 bm25() rank (lower bm25 = better →
 /// mapped to a higher score) so it can join the RRF fusion uniformly.
 struct DocFtsHit {
@@ -42,12 +42,12 @@ Status DeleteDocFts5Row(sqlite3* db, const std::string& doc_id);
 Result<std::vector<DocFtsHit>> SearchDocFts5(sqlite3* db, const std::string& query,
                                              int top_k);
 
-/// Self-contained doc-level FTS5 index (F41 §4.3 / §8.2 hybrid fallback).
+/// Self-contained doc-level FTS5 index (hybrid fallback).
 ///
 /// Standalone (D3): owns its own SQLite DB (Open(":memory:") in tests), creating
 /// the `doc_fts5_index` virtual table from the F41SchemaProvider DDL SoT so the
 /// two never drift. Product code uses the borrowed-handle helpers above against
-/// the F05 per-Unit store.db. The query path uses BM25 column weights (§8.2:
+/// the per-Unit store.db. The query path uses BM25 column weights (
 /// doc_title 2.0 / topics 1.5 / filename 1.0) and the shared SanitizeFts5Query
 /// guard (M-SEC-001) against FTS5 operator injection.
 class DocFts5Index {
@@ -63,11 +63,11 @@ public:
     /// failure.
     Status Open(const std::string& db_path);
 
-    /// Index (or replace) one document's F08 fields. Idempotent on doc_id
+    /// Index (or replace) one document's metadata fields. Idempotent on doc_id
     /// (delete-then-insert) so re-indexing a doc does not duplicate rows.
     Status Upsert(const DocFtsRow& row);
 
-    /// BM25 search over the F08 fields (§8.2 fallback path). `top_k<=0` → no
+    /// BM25 search over the metadata fields (fallback path). `top_k<=0` → no
     /// results. Returns hits sorted by score DESC. An empty / whitespace-only
     /// (post-sanitize) query returns an empty list (not an error). A query-time
     /// SQLite failure surfaces as CX_ERR_F41_FTS5_FALLBACK_FAILED.
@@ -79,7 +79,7 @@ private:
     sqlite3* db_ = nullptr;
 };
 
-/// RRF-fuse the two doc-discovery recall paths (F41 §8.2, dedup by doc_id). Each
+/// RRF-fuse the two doc-discovery recall paths (dedup by doc_id). Each
 /// input list is already sorted by its own score DESC; only rank position matters.
 /// A doc's contribution from a path is 1/(k+rank) (rank 0-based, top hit = 1/k);
 /// scores sum across paths. Results are sorted by fused score DESC, truncated to

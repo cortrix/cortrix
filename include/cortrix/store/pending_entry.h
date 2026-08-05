@@ -11,12 +11,12 @@ namespace cortrix::store {
 
 /// One transaction record in the Pending Write Log (pending.wal).
 ///
-/// F25 Write Coordinator persists a tiny state machine per document write:
+/// The Write Coordinator persists a tiny state machine per document write:
 /// a PENDING record is appended before the three-way store write begins, then
 /// a COMMITTED or ROLLBACK record finalizes it (keyed by txn_id). Crash recovery
 /// replays these records to decide which transactions to clean up.
 ///
-/// On-disk frame (little-endian, F25 design § 3.1) — `checksum` covers every
+/// On-disk frame (little-endian) — `checksum` covers every
 /// field from `entry_type` through `block_ids` (i.e. everything except the
 /// leading `entry_size` and the trailing `checksum` itself):
 ///

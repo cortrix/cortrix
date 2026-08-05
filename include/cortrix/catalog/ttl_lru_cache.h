@@ -8,7 +8,7 @@
 
 namespace cortrix::catalog {
 
-/// Bounded LRU cache with per-entry TTL (F12 §6.3: NS metadata 10K/60s, Unit
+/// Bounded LRU cache with per-entry TTL (NS metadata 10K/60s, Unit
 /// descriptor 1K/60s). Lookups expire stale entries lazily; inserts evict the
 /// least-recently-used entry once capacity is exceeded.
 ///

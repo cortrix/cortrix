@@ -13,7 +13,7 @@
 
 namespace cortrix::store {
 
-/// Aggregate counters over hnsw.wal (F01 design § 2.5 WalStats — distinct from
+/// Aggregate counters over hnsw.wal (WalStats — distinct from
 /// PHnsw's higher-level WalStats in phnsw.h; this one is the file-level view).
 struct WalWriterStats {
     uint64_t entry_count = 0;       ///< records currently in the WAL
@@ -30,7 +30,7 @@ struct WalWriterStats {
 /// into one fsync per batch; because WalWriter already implements
 /// IWalSink::WriteBatch/Sync, S3 only has to construct the committer with
 /// `sink = this`. A record is crash-recoverable once its Append() returns Ok
-/// (its bytes reached fdatasync) — same durability contract as F25's PWL.
+/// (its bytes reached fdatasync) — same durability contract as the PWL.
 ///
 /// On-disk header (32 bytes, design § 3.2, little-endian):
 ///   magic         "PWAL" (4B)

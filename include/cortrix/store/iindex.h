@@ -25,12 +25,12 @@ struct IndexStats {
     int dim = 0;
 };
 
-/// Vector index contract (evolved from the MVP CortrixVectorIndex to F01's rich
-/// API). Implemented by F01 P-HNSW (and Phase 2 BruteForce / QuantizedHnsw);
-/// consumed via IIndexFactory by F12 catalog and F05 NamespacePool.
+/// Vector index contract (evolved from the MVP CortrixVectorIndex to the rich
+/// API). Implemented by P-HNSW (and Phase 2 BruteForce / QuantizedHnsw);
+/// consumed via IIndexFactory by the catalog and NamespacePool.
 ///
 /// Error model: write/lifecycle ops return Status; Search returns its hits
-/// directly; MarkDelete is idempotent (missing block_id returns Ok, per F25 Q6
+/// directly; MarkDelete is idempotent (missing block_id returns Ok
 /// + V5 #9). Every mutating/search op accepts an optional TraceContext for the
 /// observability span chain (OBS_SPEC §5.3).
 class IIndex {
@@ -51,7 +51,7 @@ public:
         const float* query, int top_k, int ef_search = -1,
         const observability::TraceContext* ctx = nullptr) = 0;
 
-    /// Membership check used by F25 Recover three-way consistency.
+    /// Membership check used by Recover three-way consistency.
     virtual bool Exists(uint64_t block_id) = 0;
 
     // --- Persistence / lifecycle ---
@@ -60,7 +60,7 @@ public:
     virtual Status Shutdown() = 0;
     virtual IndexStats GetStats() = 0;
 
-    /// Resident memory estimate (bytes) for F05 admission control.
+    /// Resident memory estimate (bytes) for admission control.
     virtual std::size_t GetMemoryFootprintBytes() const = 0;
 };
 

@@ -14,10 +14,10 @@ struct FailedItem {
     std::string detail;
 };
 
-/// Batch response metadata (F12 §8.2 BatchMeta). Carries the 5 standard meta
+/// Batch response metadata (BatchMeta). Carries the 5 standard meta
 /// fields (catalog_version / bloom_filter_ready / cache_hit-style flags /
 /// timestamp_ms / node_id) + the partial-success accounting. `dedup_applied` is
-/// a write-side internal flag (F12 §8.2 v1.0.4 note: NOT a query-response field).
+/// a write-side internal flag (NOT a query-response field).
 struct BatchMeta {
     std::vector<std::string> succeeded_ids;
     std::vector<FailedItem>  failed;

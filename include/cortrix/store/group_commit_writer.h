@@ -16,7 +16,7 @@ namespace cortrix::store {
 /// A batch becomes durable only after Sync() returns Ok. GroupCommitWriter
 /// guarantees exactly one WriteBatch()+Sync() pair per coalesced batch, so an
 /// implementation amortizes its fsync cost across all writers in the batch.
-/// Implemented by F25 PWL writer and F01 P-HNSW WAL backend.
+/// Implemented by the PWL writer and the P-HNSW WAL backend.
 class IWalSink {
 public:
     virtual ~IWalSink() = default;
@@ -48,9 +48,9 @@ struct GroupCommitStats {
 /// WriteBatch()+Sync() per batch. Each Submit() future resolves with the
 /// durability Status of its batch: an Ok future therefore implies Sync()
 /// succeeded, i.e. the entry is crash-recoverable (durability handoff for the
-/// WAL recovery path owned by F25 / F01).
+/// WAL recovery path owned by the write coordinator / index).
 ///
-/// Consumed by F01 P-HNSW and F25 PWL. Non-copyable; the sink is borrowed and
+/// Consumed by P-HNSW and the PWL. Non-copyable; the sink is borrowed and
 /// must outlive the writer.
 class GroupCommitWriter {
 public:
@@ -103,7 +103,7 @@ private:
 
 /// CRC32 over `length` bytes of `data`, IEEE 802.3 polynomial (0xEDB88320),
 /// table-driven — identical to zlib's crc32 so frames stay tool-compatible.
-/// Shared utility for WAL record framing (F25 PWL / F01 integrity checks).
+/// Shared utility for WAL record framing (PWL / index integrity checks).
 /// `data` may be null iff `length == 0`.
 std::uint32_t Crc32(const std::uint8_t* data, std::size_t length);
 

@@ -3,7 +3,7 @@
 
 #include "cortrix/common/status.h"
 
-// Store-layer Repository-pattern error codes (F34 § 2.5.1 SoT — D1 V3 ruling 2).
+// Store-layer Repository-pattern error codes.
 //
 // The Store-layer interfaces (ParentChunkStore today; future ChunkStore impls)
 // share one error model. Per CODING_CONVENTIONS § 3 the project uses Result<T> /

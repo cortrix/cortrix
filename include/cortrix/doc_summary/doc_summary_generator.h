@@ -14,7 +14,7 @@
 
 namespace cortrix::doc_summary {
 
-/// Resolved F41 config. Post-resolve result the generator consumes.
+/// Resolved doc-summary config. Post-resolve result the generator consumes.
 struct DocSummaryConfig {
     int max_chars = kMaxCharsDefault;                 ///< default 500 (200-500)
     int chunk_threshold = kChunkThresholdDefault;     ///< > this → map-reduce (default 50)
@@ -29,11 +29,11 @@ struct DocSummaryConfig {
 DocSummaryConfig ResolveDocSummaryConfig(const cortrix::IGlobalConfig* global);
 
 /// Document Summary generator — an INDEPENDENT pipeline step (NOT an
-/// ISpcEnricher subclass, unlike F38/F35). For each document it asks an LLM for a
+/// ISpcEnricher subclass, unlike the chunk-level enrichers). For each document it asks an LLM for a
 /// structured JSON summary (summary_text + keywords + topics + one_liner), with a
-/// map-reduce path for long documents (> chunk_threshold, F41-2/§9.2). The result
+/// map-reduce path for long documents (> chunk_threshold). The result
 /// is written to a doc_summary Block (block_type=17) + indexed in P-HNSW; that
-/// write + the F42 async scheduling + the embedding are cross-Feature wiring →
+/// write + the async scheduling + the embedding are wired
 /// D3.5 (this round produces the parsed structured summary, standalone-testable).
 ///
 /// 🔌 Seams (standalone reconcile): the design §5.1 wrote a concrete
@@ -41,9 +41,9 @@ DocSummaryConfig ResolveDocSummaryConfig(const cortrix::IGlobalConfig* global);
 /// the LLM is the frozen llm::ILlmClient seam (production: OpenAiLlmClient; tests:
 /// MockLlmClient); chunks come from the frozen store::ChunkStore seam
 /// (GetChunksByDocId, tests: MockChunkStore); metrics use the self-contained
-/// DocSummaryMetrics recorder (not IMetricsRegistry — same reconcile F38 made);
-/// and the F42 scheduler is mocked (TaskType SoT = F42 §3.2). Real OnnxEmbedder /
-/// F25 PWL write / F42 enqueue wiring = D3.5.
+/// DocSummaryMetrics recorder (not IMetricsRegistry — same reconcile HyPE made);
+/// and the task scheduler is mocked. Real OnnxEmbedder /
+/// PWL write / enqueue wiring lands separately.
 class DocSummaryGenerator {
 public:
     /// @param config     resolved DocSummaryConfig.
@@ -56,12 +56,12 @@ public:
                         std::shared_ptr<store::ChunkStore> chunk_store);
     ~DocSummaryGenerator();
 
-    /// Main entry (F42 async-task callback target). Loads the doc's chunks via
+    /// Main entry (async-task callback target). Loads the doc's chunks via
     /// ChunkStore, runs the single-call or map-reduce summary, parses the
     /// structured output, and returns it. Empty documents succeed with
-    /// no_summary_content=true so the F42 task can complete as a no-op. On any
+    /// no_summary_content=true so the task can complete as a no-op. On any
     /// failure GenerationResult.success is false and .error carries the
-    /// CX_ERR_F41_* identity (the F42 worker maps it to retry / DLQ +
+    /// CX_ERR_F41_* identity (the worker maps it to retry / DLQ +
     /// doc_summary_status="failed"). `embedding` is left empty (the OnnxEmbedder
     /// re-embed is D3.5 pipeline wiring).
     GenerationResult Generate(const std::string& doc_id, const std::string& ns_id);

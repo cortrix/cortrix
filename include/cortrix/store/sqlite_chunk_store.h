@@ -11,7 +11,7 @@ struct sqlite3;
 namespace cortrix::store {
 
 /// Phase 1 ChunkStore implementation over the unified `blocks` table (A unified
-/// blocks; F02 § 2.1-bis SoT, 2026-06-08). Child chunks are `blocks` rows with
+/// blocks). Child chunks are `blocks` rows with
 /// child_id IS NOT NULL; their content_text holds the chunk text and the
 /// parent_id / chunk_index are F34-owned columns (F34SchemaProvider ALTERs). It is
 /// a read-only reverse-lookup:
@@ -19,7 +19,7 @@ namespace cortrix::store {
 ///   GetChunksByDocId  — all child chunks of a doc, ascending chunk_index
 ///
 /// BORROWS a sqlite3* handle (the per-Unit DB, e.g. CortrixStore::db_handle()); it
-/// does NOT open / own / close the DB — the F09 framework + F34SchemaProvider own
+/// does NOT open / own / close the DB — the block-header framework + F34SchemaProvider own
 /// the blocks schema, and the handle must outlive this store. Thread-safe via an
 /// internal mutex (defense-in-depth alongside SQLite FULLMUTEX), mirroring
 /// SqliteParentChunkStore. The store-layer unified error model (store_errors.h)
@@ -40,7 +40,7 @@ public:
     std::vector<ChunkRecord> GetBatch(const std::vector<std::string>& child_ids,
                                       std::vector<std::string>* missing_ids = nullptr) override;
 
-    /// All child chunks of a document, ascending by chunk_index (F41 doc-summary
+    /// All child chunks of a document, ascending by chunk_index (doc-summary
     /// map-reduce input). Non-child rows (META / doc_summary, child_id IS NULL) and
     /// other docs are excluded. Empty when the doc has no child chunks.
     std::vector<ChunkRecord> GetChunksByDocId(const std::string& doc_id) override;
