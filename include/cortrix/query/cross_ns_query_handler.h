@@ -10,7 +10,7 @@
 
 namespace cortrix::query {
 
-/// CX_ERR_DEPRECATED_FIELD — the B' incompatible-with-MVP error (F04 §2.4 / topic 4.1).
+/// CX_ERR_DEPRECATED_FIELD — the incompatible-with-MVP error.
 /// NOT one of the 6 CrossNsErrorCode identities (those are query-execution errors);
 /// this is a request-validation error, so it is its own stable code. category =
 /// permanent, retryable = false, structured_data = {deprecated_field, use_instead}.
@@ -25,7 +25,7 @@ struct HandlerResult {
     nlohmann::json body;
 };
 
-/// CrossNsQueryHandler — the POST /api/v1/query handler **logic** (F04 §2.4 / §4.1 /
+/// CrossNsQueryHandler — the POST /api/v1/query handler **logic** (
 /// S4.1). Parses the cross-NS QueryRequest, rejects the deprecated MVP `namespace`
 /// single field (CX_ERR_DEPRECATED_FIELD), validates the request, then runs
 /// ScatterGather and serializes the §2.5 response / §2.6 error body.
@@ -43,7 +43,7 @@ public:
     /// Handle one request body + auth. Never throws — every failure path becomes a
     /// HandlerResult with the right status + an Agent-friendly error body.
     ///
-    /// @param routing_ctx  optional pre-built QueryContext carrying the F39 routing
+    /// @param routing_ctx  optional pre-built QueryContext carrying the routing
     ///                    decision (routing_path etc., Q3 wiring). When non-null it is
     ///                    threaded into ScatterGather.Execute so the per-NS executors
     ///                    see the resolved route; when null, ScatterGather builds the

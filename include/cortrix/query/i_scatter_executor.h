@@ -6,12 +6,12 @@
 
 namespace cortrix::query {
 
-/// IScatterExecutor — the NS-level scatter execution abstraction (F04 §2.1 /
+/// IScatterExecutor — the NS-level scatter execution abstraction (
 /// topic 1.1 / OPEN-3 Q4 landing).
 ///
 /// Clarification (Lead ruling): this is the **NS-level** interface and is distinct from
 /// `cortrix::catalog::IUnitScatterExecutor` (Unit-level, Phase-1 declaration-only,
-/// F12 §3.5). They must not be conflated or share a name. Phase 1's only impl is
+/// the catalog executor). They must not be conflated or share a name. Phase 1's only impl is
 /// `SingleUnitExecutor` (1 NS = 1 Unit). Phase 2 adds `MultiUnitExecutor` (intra-NS
 /// multi-Unit scatter, OPEN-3) behind the same interface.
 class IScatterExecutor {

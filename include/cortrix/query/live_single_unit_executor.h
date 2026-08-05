@@ -29,10 +29,10 @@ namespace cortrix::query {
 void FlattenMetadataIntoMap(const std::string& metadata_json,
                             std::map<std::string, std::string>& out);
 
-/// addendum §3.8 W2 (F38 §8.1 split): classify one vector-route ANN hit for the
+/// Classify one vector-route ANN hit for the
 /// five-path RRF. A normal child block votes dense under its own child_id; a
 /// hype_question block (block_type=16) votes hype under its SOURCE child
-/// (metadata_json.source_child_id — the F38-4 expansion; the question text never
+/// (metadata_json.source_child_id — the HyPE expansion; the question text never
 /// impersonates a chunk). kDropped = missing identity (legacy row / bad metadata).
 /// Contextual dual-vector hits are NOT classified here — they have no blocks row
 /// (the caller resolves them through contextual_vec_labels).
@@ -51,17 +51,17 @@ std::vector<retrieval::RankedChunk> FuseHybridChunksByDocId(
     std::vector<retrieval::RankedChunk> doc_chunks,
     int top_k);
 
-/// LiveSingleUnitExecutor — the D3.5 IScatterExecutor that runs F04's per-NS
+/// LiveSingleUnitExecutor — the live IScatterExecutor that runs the per-NS
 /// pipeline against the live MVP retrieval stack (Q2 wiring).
 ///
-/// Why a purpose-built executor rather than the stock SingleUnitExecutor: F02's
+/// Why a purpose-built executor rather than the stock SingleUnitExecutor: the reranker's
 /// reranker reverse-looks-up chunk_text from a ChunkStore that is bound at
 /// construction, but Cortrix has one store PER namespace (the per-request
 /// NamespaceFacade). A single global reranker therefore cannot serve every NS's
 /// store. This executor solves that by keeping the reranker's stateless ONNX
 /// scoring (ScoreBatch — thread-safe, store-independent) shared, while binding the
 /// chunk-text lookup to the current NS's store per call. The fusion ordering
-/// mirrors F02 OnnxReranker::Rerank exactly (RerankerScoreFusion 0.7/0.3), so the
+/// mirrors OnnxReranker::Rerank exactly (RerankerScoreFusion 0.7/0.3), so the
 /// single-NS result matches the frozen reranker contract.
 ///
 /// Per ExecuteForNamespace(ns): Acquire facade → Vector+BM25 → RRF (block_id) →
@@ -71,19 +71,19 @@ std::vector<retrieval::RankedChunk> FuseHybridChunksByDocId(
 /// CX_ERR_INDEX_CORRUPT (topic 2.4 partial success), never thrown.
 class LiveSingleUnitExecutor : public IScatterExecutor {
 public:
-    /// @param pool      the F05 namespace pool (NOT owned).
-    /// @param embedder  shared F03 OnnxEmbedder for the vector route (NOT owned).
+    /// @param pool      the namespace pool (NOT owned).
+    /// @param embedder  shared OnnxEmbedder for the vector route (NOT owned).
     /// @param fusion    shared inner-RRF for vector+bm25 (NOT owned).
-    /// @param reranker  shared F02 reranker; its ScoreBatch is used per NS. May be
+    /// @param reranker  shared reranker; its ScoreBatch is used per NS. May be
     ///                 null only if every query sets rerank=false.
-    /// @param sparse_registry  F40 per-NS SPLADE index owner (NOT owned). When non-
+    /// @param sparse_registry  per-NS SPLADE index owner (NOT owned). When non-
     ///                 null the executor runs chunk-level 5-path RRF (dense + sparse
-    ///                 + FTS5; contextualized/hype fed empty until F35/F38 wire in);
+    ///                 + FTS5; contextualized/hype fed empty until those stages wire in);
     ///                 when null it runs the dense+FTS5 (2-route) RRF only. A NS with
     ///                 no indexed sparse vectors yields an empty sparse list → the
-    ///                 fusion degrades to the other paths (F40 §7.2 L2 fallback).
-    /// @param candidate_multiplier / max_candidates  over-fetch sizing (F02 §top_N).
-    /// @param doc_fts5_fallback_enabled  whether the doc path runs F41 doc-level
+    ///                 fusion degrades to the other paths (L2 fallback).
+    /// @param candidate_multiplier / max_candidates  over-fetch sizing.
+    /// @param doc_fts5_fallback_enabled  whether the doc path runs doc-level
     ///                 FTS5 fallback in addition to doc-summary HNSW.
     LiveSingleUnitExecutor(cortrix::resource::INamespacePool& pool,
                            cortrix::OnnxEmbedder& embedder,
@@ -94,10 +94,10 @@ public:
                            int max_candidates = 50,
                            bool doc_fts5_fallback_enabled = true);
 
-    /// Per-NS entry. Dispatches on ctx.granularity (F41 §6.2 / §8.1):
+    /// Per-NS entry. Dispatches on ctx.granularity:
     ///   "auto" | "both" → ExecuteHybridRetrieval (chunk + doc-summary fallback);
     ///   "chunk" (and any unknown value) → ExecuteChunkRetrieval (explicit baseline);
-    ///   "doc"  → ExecuteDocRetrieval (F41 doc-discovery core: doc_summary HNSW +
+    ///   "doc"  → ExecuteDocRetrieval (doc-discovery core: doc_summary HNSW +
     ///             optional doc-level FTS5 fallback);
     /// The cross-NS gather/dedupe (ScatterGather) is granularity-agnostic and untouched.
     retrieval::NamespaceQueryResult ExecuteForNamespace(
@@ -116,7 +116,7 @@ private:
         const QueryContext& ctx, const std::string& namespace_id, float oversample);
 
     /// granularity=doc (§8.1 doc branch ≅ GET /documents/discover): run the shared
-    /// F41 doc-discovery core (doc_summary HNSW + doc-level FTS5 fallback + doc_id
+    /// Doc-discovery core (doc_summary HNSW + doc-level FTS5 fallback + doc_id
     /// RRF), surfaced as doc-level RankedChunks (child_id = doc_id). No rerank (doc
     /// summaries / doc pseudos are not chunk passages). A NS with no doc candidates
     /// returns an empty success result (not an error).

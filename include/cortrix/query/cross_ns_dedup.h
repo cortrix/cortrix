@@ -6,7 +6,7 @@
 
 namespace cortrix::query {
 
-/// DedupeByContentHash — F04 §3.3 / §4.3 B simplified cross-NS deduplication.
+/// DedupeByContentHash — simplified cross-NS deduplication.
 ///
 /// When the same chunk (identical `content_hash`) is returned by more than one NS,
 /// the copies collapse to a single result whose **primary = the highest final score
@@ -26,8 +26,8 @@ namespace cortrix::query {
 /// must not merge unrelated chunks.
 ///
 /// 🚨 D3 standalone: operates purely on in-memory ResultItems whose content_hash was
-/// set by the gather layer (content-derived standalone; F09 Block-header sourced at
-/// D3.5 — F09-4 hook). No storage / index access.
+/// set by the gather layer (content-derived standalone; Block-header sourced once
+/// that hook is wired). No storage / index access.
 ///
 /// @param items  [in/out] candidate items; rewritten in place to the deduped set.
 /// @param meta   [out] deduplicated_chunks[] + deduplicated_chunks_count populated.

@@ -8,15 +8,15 @@
 
 namespace cortrix::query {
 
-/// The `scatter` subsystem metrics (F04 §3.4, OBSERVABILITY_SPEC subsystem
+/// The `scatter` subsystem metrics (observability subsystem
 /// `scatter`). Naming `cortrix_scatter_<metric>_<unit>` (V2 ruling #3: cortrix_
-/// prefix, no plugin prefix). Mirrors the F02 RerankerMetrics template.
+/// prefix, no plugin prefix). Mirrors the RerankerMetrics template.
 ///
 /// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
-/// text renderer. The F24 `/metrics` scrape endpoint does not exist in the frozen
+/// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
 /// **deferred to D3.5**. Until then it is fully usable + testable in-process and
-/// RenderOpenMetrics() produces what F24 will serve.
+/// RenderOpenMetrics() produces what the server will serve.
 ///
 /// §3.4 metric schema (6 rows):
 ///   cortrix_scatter_requests_total          counter   {reason, category}
@@ -42,7 +42,7 @@ public:
 
     // --- cortrix_scatter_requests_total (Counter, labels: reason, category) ---
     // category here is the *request outcome* class (permanent on success, or the
-    // failure category for a hard-rejected request); GEN-Agent F24-7 reason+category.
+    // failure category for a hard-rejected request); reason+category.
     void RecordRequest(Reason reason, agent_friendly::ErrorCategory category);
     uint64_t RequestCount(Reason reason, agent_friendly::ErrorCategory category) const;
 

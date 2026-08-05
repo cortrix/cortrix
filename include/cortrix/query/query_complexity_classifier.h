@@ -14,17 +14,17 @@ namespace cortrix::query {
 
 struct QueryContext;  // fwd-decl (defined in query/query_context.h); RouteAndUpdateContext only needs the reference
 
-/// QueryComplexityClassifier — the F39 Adaptive-RAG query-complexity router
-/// (F39 §5.1 / §6). It implements the shared IClassifier contract (S1 ruling of the
+/// QueryComplexityClassifier — the Adaptive-RAG query-complexity router
+/// It implements the shared IClassifier contract (ruling of the
 /// G3+G1.2 joint D1 — declared in cortrix::retrieval, reused here) and the
 /// F39-specific RouteAndUpdateContext that writes the routing decision onto
 /// QueryContext (S3 ruling).
 ///
 /// It lives in cortrix::query (not cortrix::retrieval) because it is a *query-path*
-/// component: the standalone routing mock left by F37
+/// component: the standalone routing mock left by the CRAG stage
 /// (retrieval/f39_routing_mock.h) names the real owner as
 /// `cortrix::query::QueryComplexityClassifier::ShouldSkipF37`, and the QueryPipeline
-/// drives it before F36/F02/F37. Implementing retrieval::IClassifier across the
+/// drives it before RAG-Fusion, rerank and CRAG. Implementing retrieval::IClassifier across the
 /// namespace boundary is intentional and matches that documented contract.
 ///
 /// Routing algorithm (§6.1, in order):
@@ -40,8 +40,8 @@ struct QueryContext;  // fwd-decl (defined in query/query_context.h); RouteAndUp
 ///
 /// Standalone (D3): the backend is a HeuristicComplexityBackend stub (no ONNX); the
 /// real DistilBERT-tiny OnnxComplexityBackend + QueryPipeline step-3 wiring are
-/// D3.5. The F36/F37 skip is exposed via the static ShouldSkipF36/ShouldSkipF37
-/// helpers the QueryPipeline calls (this class never reaches into F36/F37).
+/// The skip decisions are exposed via the static ShouldSkipF36/ShouldSkipF37
+/// helpers the QueryPipeline calls (this class never reaches into those stages).
 class QueryComplexityClassifier : public retrieval::IClassifier {
 public:
     /// @param backend  inference backend (HeuristicComplexityBackend standalone /
@@ -56,7 +56,7 @@ public:
     /// Classify the complexity of `input.query`. Total (never throws): a transient
     /// backend fault is caught and reported via the safe Complex fallback label +
     /// ClassificationResult.error_code = CX_ERR_F39_INFERENCE_FAILED. `input.chunks`
-    /// is ignored — F39 is a *pre-retrieval* router, but it honors the shared
+    /// is ignored — this is a *pre-retrieval* router, but it honors the shared
     /// post-retrieval IClassifier signature so the pipeline treats all classifiers
     /// uniformly.
     retrieval::ClassificationResult Classify(const retrieval::ClassifierInput& input) override;
@@ -80,17 +80,17 @@ public:
         QueryContext& ctx,
         const std::optional<std::string>& force_route = std::nullopt);
 
-    // --- F36-9 hook (§5.1): the QueryPipeline calls these *before* F36 / F37 to
+    // --- Skip hooks: the QueryPipeline calls these *before* RAG-Fusion / CRAG to
     // decide the skip. Static + pure (depend only on the already-written ctx) so
     // they are trivially testable and have no instance state. ---
 
-    /// F36 RAG-Fusion is skipped on the Simple and Chat paths (§6.3 / F39-3): both
+    /// RAG-Fusion is skipped on the Simple and Chat paths: both
     /// keep the single original query (no LLM variant expansion). An empty
-    /// routing_path (not yet routed) → do NOT skip (fail-safe to running F36).
+    /// routing_path (not yet routed) → do NOT skip (fail-safe to running it).
     static bool ShouldSkipF36(const QueryContext& ctx);
 
-    /// F37 CRAG runs only on the Complex / (default) path; it is skipped on Simple
-    /// and Chat (§6.3 / F39-3 / F39-5). Same fail-safe as ShouldSkipF36. Kept in
+    /// CRAG runs only on the Complex / (default) path; it is skipped on Simple
+    /// and Chat. Same fail-safe as ShouldSkipF36. Kept in
     /// exact lockstep with the F37-side mock (retrieval/f39_routing_mock.h).
     static bool ShouldSkipF37(const QueryContext& ctx);
 

@@ -19,7 +19,7 @@ struct QueryFilter {
 struct SearchConfig {
     bool enable_vector = true;
     bool enable_bm25   = true;
-    bool enable_sql    = true;              // F07 accepts but does not execute SQL route (F08 implements)
+    bool enable_sql    = true;              // accepted but the SQL route is not executed yet
 };
 
 struct QueryRequest {
@@ -30,16 +30,16 @@ struct QueryRequest {
     QueryFilter filters;                    // optional filter conditions
     SearchConfig search_config;             // optional route switches
 
-    // --- Wave-C decision-signal request controls (F37/F39/F41 read-side params) ---
+    // --- Decision-signal request controls (CRAG / routing / granularity) ---
     // All three are additive with safe defaults so an absent param never changes
     // behavior and existing callers (e.g. memory_searcher::ToQueryRequest) are
     // unaffected. They may arrive as query-string params OR JSON body fields; the
     // route handler applies the query-string-wins precedence and validates the
-    // enums (route -> F39 §4.3, granularity -> F41 §6.2). FromJson only reads the
+    // enums (route, granularity). FromJson only reads the
     // body form; it does not reject (validation is centralized at the boundary).
-    bool explain = false;                   // F37/F39 ?explain — dump QueryContext to meta (default off)
-    std::string route = "auto";             // F39 ?route override: auto|simple|complex|chat
-    std::string granularity = "auto";       // F41 ?granularity: auto|chunk|doc|both
+    bool explain = false;                   // ?explain — dump QueryContext to meta (default off)
+    std::string route = "auto";             // ?route override: auto|simple|complex|chat
+    std::string granularity = "auto";       // ?granularity: auto|chunk|doc|both
 
     /// Parse from JSON body
     /// @return Ok / InvalidArgument

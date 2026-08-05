@@ -18,7 +18,7 @@ namespace resource { class INamespacePool; }
 ///
 /// @param svr: cpp-httplib server instance
 /// @param auth: API Key auth
-/// @param pool: F05 NS resource pool (per-request NamespaceFacade Acquire/Release)
+/// @param pool: NS resource pool (per-request NamespaceFacade Acquire/Release)
 /// @param embedder: global OnnxEmbedder
 /// @param classifier: global IntentClassifier
 /// @param fusion: global RRFFusion

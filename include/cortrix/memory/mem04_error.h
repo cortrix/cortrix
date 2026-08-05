@@ -10,7 +10,7 @@
 
 namespace cortrix::memory::immunity {
 
-/// The 7 MEM04 Memory-Immunity error identities (MEM04 §5.4, registered in
+/// The 7 memory-immunity error identities (registered in
 /// ARCH §4.1.11 — "M-05 +5 + V14 J5 +2 = 7", issue D6). Each maps to a stable
 /// `CX_ERR_*` string + a GEN-Agent category + retryability + retry_after_ms + the
 /// structured_data keys its body MUST carry, via the canonical registry below.
@@ -24,7 +24,7 @@ namespace cortrix::memory::immunity {
 /// optional structured_data) into that boundary error.
 ///
 /// SoT note: the canonical attributes (http / category / retryable / retry_after_ms /
-/// structured_data keys) follow ARCH §4.1.11 (the registered authority), which MEM04
+/// structured_data keys) follow the server error registry (the authority), which this layer
 /// §5.4 explicitly defers to (MEM04-rev-1 registers them in ARCH §4.1.11). Where the
 /// detail design §5.4 table and ARCH §4.1.11 differ on a structured_data key (ALREADY_OPTED_OUT →
 /// `opted_out_at`; REVOKE_DENIED → `required_role`; OPT_OUT_DISABLED → `config_source`),
@@ -42,7 +42,7 @@ enum class Mem04ErrorCode {
     kMetadataTooLarge,   ///< 422 CX_ERR_MEM04_METADATA_TOO_LARGE — permanent, not retryable (metadata JSON > 4KB)
 };
 
-/// Total number of MEM04 error codes (ARCH §4.1.11 = 7). Compile-time anchor for the
+/// Total number of memory-immunity error codes (= 7). Compile-time anchor for the
 /// API-compatibility regression test (the set must not shrink).
 constexpr int kMem04ErrorCodeCount = 7;
 

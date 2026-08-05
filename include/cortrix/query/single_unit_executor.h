@@ -4,15 +4,15 @@
 #include "cortrix/query/i_namespace_pipeline.h"
 #include "cortrix/query/i_scatter_executor.h"
 #include "cortrix/query/query_context.h"
-#include "cortrix/reranker.h"            // cortrix::reranker::IReranker (F02 frozen header)
+#include "cortrix/reranker.h"            // cortrix::reranker::IReranker (frozen header)
 #include "cortrix/retrieval/cross_ns_types.h"  // NamespaceQueryResult
 
 namespace cortrix::query {
 
-/// SingleUnitExecutor — V1's only IScatterExecutor impl (F04 §2.1 / S1.2).
+/// SingleUnitExecutor — V1's only IScatterExecutor impl.
 /// 1 NS = 1 Unit, so it runs the NS's whole pipeline in-line:
 ///   Retrieve (Vector+BM25 → RRF, via INamespacePipeline)  →
-///   IReranker::Rerank (F02 frozen contract; skipped when ctx.rerank == false)  →
+///   IReranker::Rerank (frozen contract; skipped when ctx.rerank == false)  →
 ///   truncate to top_k  →  NamespaceQueryResult.
 ///
 /// 🚨 D3 standalone: it programs against the INamespacePipeline + IReranker
@@ -22,16 +22,16 @@ namespace cortrix::query {
 /// shared MockReranker.
 ///
 /// candidate over-fetch: candidate_k = min(top_k × multiplier, max_candidates)
-/// (F02 §top_N — multiplier/cap mirror RerankerConfig defaults 3 / 50). The
+/// (multiplier/cap mirror RerankerConfig defaults 3 / 50). The
 /// reranker reorders by cross-encoder score (comparable across NS, ARCH §3.3); when
 /// rerank is off, the RRF score carries the ordering (RRF fallback — final gather
 /// fallback lives in ScatterGather, this NS-local path just preserves RRF order).
 class SingleUnitExecutor : public IScatterExecutor {
 public:
     /// @param pipeline  the Retrieve stage (NOT owned).
-    /// @param reranker  F02 reranker (NOT owned); may be null only if every query
+    /// @param reranker  reranker (NOT owned); may be null only if every query
     ///                 sets rerank=false (otherwise the NS reports CX_ERR_INDEX_CORRUPT).
-    /// @param candidate_multiplier / max_candidates  over-fetch sizing (F02 §top_N).
+    /// @param candidate_multiplier / max_candidates  over-fetch sizing.
     SingleUnitExecutor(INamespacePipeline* pipeline,
                        reranker::IReranker* reranker,
                        int candidate_multiplier = 3,

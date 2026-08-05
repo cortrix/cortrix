@@ -6,21 +6,21 @@
 
 namespace cortrix::retrieval {
 
-/// The `crag` subsystem metrics (F37 §10, OBSERVABILITY_SPEC naming
-/// `cortrix_crag_<metric>_<unit>`). Mirrors the F36 RagFusionMetrics template
+/// The `crag` subsystem metrics (observability naming
+/// `cortrix_crag_<metric>_<unit>`). Mirrors the RagFusionMetrics template
 /// (process-wide singleton, atomic counters/histogram/gauges, OpenMetrics
 /// renderer).
 ///
-/// 🚨 Cardinality control (OBSERVABILITY_SPEC §3.2 — F37 §10 / v1.0.3 qa-tier2-g3
+/// 🚨 Cardinality control (observability
 /// M3): labels are enum-only. NO `ns_id` (high-cardinality, forbidden — removed in
 /// D1 V3 decision 10); per-NS data goes through
 /// `GET /api/v1/system/namespaces/<ns_id>/stats` (OBS_SPEC §3.4).
 ///
 /// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
-/// text renderer. The F24 `/metrics` scrape endpoint does not exist in the frozen
+/// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
 /// **deferred to D3.5**. Until then it is fully usable + testable in-process and
-/// RenderOpenMetrics() produces what F24 will serve.
+/// RenderOpenMetrics() produces what the server will serve.
 ///
 /// §10 metric schema (4 rows):
 ///   cortrix_crag_evaluation_total            counter   {decision}
@@ -46,13 +46,13 @@ public:
     uint64_t EvaluationCount(Decision decision) const;
 
     // --- cortrix_crag_classifier_latency_seconds (Histogram, no label) ---
-    // Classifier inference latency distribution (F37 §12.bis 2.1: P50<5ms / P99<20ms).
+    // Classifier inference latency distribution (P50<5ms / P99<20ms).
     void ObserveClassifierLatency(double seconds);
     uint64_t ClassifierLatencyCount() const;
     double ClassifierLatencySum() const;
 
     // --- cortrix_crag_fallback_ratio (Gauge, no label) ---
-    // L3 fallback ratio (F37 §12.bis 2.2 alarm threshold). Gauge → last write wins.
+    // L3 fallback ratio (alarm threshold). Gauge → last write wins.
     void SetFallbackRatio(double ratio);
     double FallbackRatio() const;
 

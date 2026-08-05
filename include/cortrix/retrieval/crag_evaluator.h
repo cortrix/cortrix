@@ -8,7 +8,7 @@
 #include "cortrix/retrieval/crag_classifier_backend.h"  // ICragClassifierBackend
 #include "cortrix/retrieval/crag_config.h"              // CragConfig
 #include "cortrix/retrieval/types.h"                    // RankedChunk
-#include "cortrix/reranker/circuit_breaker.h"           // CircuitBreaker (F02, reusable)
+#include "cortrix/reranker/circuit_breaker.h"           // CircuitBreaker (reusable)
 
 namespace cortrix::query {
 struct QueryContext;  // fwd-decl (defined in query/query_context.h); EvaluateAndUpdateContext only needs the reference
@@ -16,7 +16,7 @@ struct QueryContext;  // fwd-decl (defined in query/query_context.h); EvaluateAn
 
 namespace cortrix::retrieval {
 
-/// CragEvaluator — the F37 CRAG retrieval-quality evaluator (F37 §5.2 / §6).
+/// CragEvaluator — the CRAG retrieval-quality evaluator.
 /// Implements the shared IClassifier contract and the F37-specific
 /// EvaluateAndUpdateContext that writes the verdict back onto QueryContext.
 ///
@@ -50,7 +50,7 @@ public:
     /// ambiguous_action_taken / web_fallback_triggered). Path handling per §6.3
     /// (correct: no-op return; ambiguous: mark action; incorrect: OBS counter +
     /// degrade). Does NOT decide skip — that is the QueryPipeline's job via
-    /// F39 ShouldSkipF37 (§4.1 v1.0.3 M2). Definition lands with S4/S5.
+    /// ShouldSkipF37. The real definition lands with the router.
     void EvaluateAndUpdateContext(query::QueryContext& ctx,
                                   const std::vector<RankedChunk>& chunks);
 

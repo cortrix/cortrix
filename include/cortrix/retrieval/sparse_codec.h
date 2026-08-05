@@ -20,20 +20,20 @@ struct SparseVector {
     size_t size() const { return terms.size(); }
 };
 
-/// F40 §4.2 sparse_vec on-disk serialization (the F34 children.sparse_vec BLOB).
+/// sparse_vec on-disk serialization (the children.sparse_vec BLOB).
 ///
 /// Wire format (little-endian, packed; matches the §4.2 sketch):
 ///   [uint16 num_terms] then num_terms × ([uint16 term_id][float weight])
 /// Size = 2 + num_terms × 6 bytes (K=100 → 602 bytes). An empty vector
 /// serializes to the 2-byte header {num_terms=0}; the caller, however, should
-/// store SQL NULL for a "no sparse signal" chunk and clear the F09
+/// store SQL NULL for a "no sparse signal" chunk and clear the
 /// flags_ext has_sparse_vec bit — an all-zero BLOB is reserved for the rare
 /// "deserialized-but-empty" round-trip, not the dead-chunk sentinel.
 ///
 /// term_id is stored as uint16 per §4.2. The real BGE-M3 vocab is 250K (needs
 /// ~18 bits) — a term_id ≥ 65536 is rejected by Serialize with
 /// CX_ERR_F40_SPARSE_SERIALIZE_FAILED (the standalone stub keeps ids in-range;
-/// the wider real-vocab encoding is Phase 2, see PHASE2_BACKLOG / F40 §4.2 note).
+/// the wider real-vocab encoding is Phase 2).
 std::vector<uint8_t> SerializeSparseVec(const SparseVector& vec, bool* ok = nullptr);
 
 /// Parse a sparse_vec BLOB produced by SerializeSparseVec. Returns the vector on

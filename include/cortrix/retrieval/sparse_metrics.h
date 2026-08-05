@@ -6,17 +6,17 @@
 
 namespace cortrix::retrieval {
 
-/// The F40 BGE-M3-sparse subsystem metrics (F40 §10, OBSERVABILITY_SPEC subsystem
+/// The BGE-M3-sparse subsystem metrics (observability subsystem
 /// `bge_m3_sparse`). Naming `cortrix_bge_m3_sparse_<metric>` (no ns_id label —
 /// D1 V3 ruling 10 removed the high-cardinality label; per-NS data goes through
 /// the namespaces/<ns_id>/stats API).
 ///
 /// Standalone (D3): a self-contained, dependency-free recorder + an OpenMetrics
-/// text renderer (same pattern as F02 RerankerMetrics / F22 OnnxMetrics). The
-/// F24 `/metrics` scrape endpoint does not exist in the frozen tree — registering
+/// text renderer (same pattern as RerankerMetrics / OnnxMetrics). The
+/// `/metrics` scrape endpoint does not exist in the frozen tree — registering
 /// this recorder into that endpoint is cross-Feature wiring → D3.5. Until then it
 /// is fully usable + testable in-process and RenderOpenMetrics() produces what
-/// F24 will serve.
+/// the server will serve.
 class SparseMetrics {
 public:
     /// status label for cortrix_bge_m3_sparse_inference_total (§10).

@@ -7,21 +7,21 @@
 
 namespace cortrix::memory {
 
-/// The `mem02` subsystem metrics (MEM02 §5.4, OBSERVABILITY_SPEC §2 naming
-/// `cortrix_mem02_<metric>_<unit>`). Mirrors the F36 RagFusionMetrics / F04
+/// The `mem02` subsystem metrics (observability naming
+/// `cortrix_mem02_<metric>_<unit>`). Mirrors the RagFusionMetrics /
 /// ScatterMetrics template (process-wide singleton, atomic counters/histograms,
 /// OpenMetrics renderer).
 ///
-/// 🚨 Cardinality control (OBSERVABILITY_SPEC §3.2 — MEM02 §5.4.2): labels are
+/// 🚨 Cardinality control: labels are
 /// enum-only or a low-cardinality config-driven model string. NO `tenant_id` /
 /// `ns_id` / `user_id` (high-cardinality, forbidden); per-NS / per-tenant data
 /// goes through the §3.4 per-tenant API.
 ///
 /// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
-/// text renderer. The F24 `/metrics` scrape endpoint does not exist in the frozen
+/// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
 /// **deferred to D3.5** (MEM02-rev-7). Until then it is fully usable + testable
-/// in-process and RenderOpenMetrics() produces what F24 will serve.
+/// in-process and RenderOpenMetrics() produces what the server will serve.
 ///
 /// §5.4.1 metric schema (6 rows):
 ///   cortrix_mem02_extract_total                counter   {status: success|failed}

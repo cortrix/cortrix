@@ -15,7 +15,7 @@ namespace cortrix {
 
 class MemoryStore {
 public:
-    /// @param store: F02 CortrixStore instance (per-namespace, shared SQLite connection)
+    /// @param store: CortrixStore instance (per-namespace, shared SQLite connection)
     explicit MemoryStore(CortrixStore& store);
     ~MemoryStore();
 
@@ -30,10 +30,10 @@ public:
     void SetFailNextOps(int n) { fail_next_ops_.store(n, std::memory_order_relaxed); }
 
     /// Borrowed handle to this namespace's memory.db (interaction_log /
-    /// memory_sessions / — after Init — the F13 agent_trace + interaction_sources
-    /// tables). [F13 D3.5 wiring] The F13 observability handlers (TracesHandler /
+    /// memory_sessions / — after Init — the agent_trace + interaction_sources
+    /// tables). The observability handlers (TracesHandler /
     /// InteractionsHandler) read interaction_log, which lives in THIS db (not the
-    /// blocks store db); this additive accessor lets the per-request F13 route build
+    /// blocks store db); this additive accessor lets the per-request route build
     /// its handlers over the right connection. Not owned; null before Init().
     sqlite3* db_handle() const { return db_; }
 
@@ -49,7 +49,7 @@ public:
 
     /// List sessions (sorted by updated_at descending). When `user_id` is
     /// non-empty the result is filtered to that owner in SQL — this keeps
-    /// pagination correct under MEM05 per-user isolation (offset/limit apply to
+    /// pagination correct under per-user isolation (offset/limit apply to
     /// the owner's sessions, not the NS-wide set). Empty `user_id` = no filter.
     Status SessionList(const std::string& namespace_name,
                        int limit, int offset,
@@ -95,7 +95,7 @@ public:
     /// Update session's updated_at + interaction_count
     Status SessionTouch(const std::string& session_id);
 
-    // ---- MEM04 Memory Immunity (opt-out) ----
+    // ---- Memory immunity (opt-out) ----
 
     /// Read a session's opt-out columns (opt_out_at / opted_out_by).
     /// @param session_id: session to read
@@ -121,7 +121,7 @@ public:
 
     /// Count sessions in a namespace (for pagination total_count). When
     /// `user_id` is non-empty the count is scoped to that owner so total_count
-    /// matches the filtered SessionList page (MEM05 isolation). Empty = NS-wide.
+    /// matches the filtered SessionList page (per-user isolation). Empty = NS-wide.
     Status SessionCount(const std::string& namespace_name, int64_t* count,
                         const std::string& user_id = "");
 
@@ -139,10 +139,10 @@ private:
     Status CreateInteractionLogTable();
     Status CreateMemorySessionsTable();
     // Create the agent_trace + interaction_sources tables in this memory.db
-    // (they live alongside interaction_log, the table the F13 handlers read). Runs the
+    // (they live alongside interaction_log, the table the observability handlers read). Runs the
     // frozen AgentTraceSchemaProvider + InteractionSourcesSchemaProvider (idempotent).
     Status CreateF13ObservabilityTables();
-    // MEM04: idempotently add the opt-out columns + partial index (memory_sessions
+    // Idempotently add the opt-out columns + partial index (memory_sessions
     // opt_out_at / opted_out_by; interaction_log remember). SQLite ADD COLUMN is not
     // "if not exists", so guarded on pragma_table_info — same pattern as the SPC
     // schema providers. Pure ADD; the frozen MVP columns are untouched.

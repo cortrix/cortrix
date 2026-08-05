@@ -29,7 +29,7 @@ public:
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// So CragErrorCode is the *enum of identities*, and MakeCragError() turns one
-/// (plus optional structured_data) into that boundary error. This mirrors the F02
+/// (plus optional structured_data) into that boundary error. This mirrors the
 /// reranker::RerankerErrorCode template (range-A) exactly.
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
@@ -41,11 +41,11 @@ enum class CragErrorCode {
     kFallbackTriggered,     ///< transparent degrade to all-Correct fired (retries exhausted)
 };
 
-/// Total number of CRAG error codes (F37 §4.3 = 4). Compile-time anchor for the
+/// Total number of CRAG error codes (= 4). Compile-time anchor for the
 /// API-compatibility regression test (the set must not shrink).
 constexpr int kCragErrorCodeCount = 4;
 
-/// Canonical, immutable attributes of one error code (F37 §4.3 columns).
+/// Canonical, immutable attributes of one error code.
 struct CragErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_F37_*" string
     agent_friendly::ErrorCategory category;   ///< permanent / transient
@@ -60,7 +60,7 @@ const CragErrorInfo& GetCragErrorInfo(CragErrorCode code);
 /// The "CX_ERR_F37_*" string for `code` (convenience over GetCragErrorInfo).
 const char* CragErrorCodeString(CragErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (F37 §4.3
+/// The structured_data keys a `code`'s error body MUST carry (
 /// structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5);
 /// lets call sites + tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(CragErrorCode code);

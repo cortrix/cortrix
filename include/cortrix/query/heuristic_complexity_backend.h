@@ -12,9 +12,9 @@ namespace cortrix::query {
 /// tokens + presence of multi-hop / comparison cue words), so
 /// QueryComplexityClassifier is fully exercisable + testable without any model. In
 /// D3.5 this is swapped for OnnxComplexityBackend behind the same
-/// IComplexityClassifierBackend interface. This mirrors F37's HeuristicGuardBackend.
+/// IComplexityClassifierBackend interface. This mirrors HeuristicGuardBackend.
 ///
-/// Heuristic (F39 §6 — Adaptive-RAG label intuition NQ/HotpotQA/SQuAD2.0):
+/// Heuristic (Adaptive-RAG label intuition NQ/HotpotQA/SQuAD2.0):
 ///   - very short / no real content → "chat" (Chat detection is handled earlier by
 ///     the classifier's IsChatQuery rule guard; this backend's chat branch is a
 ///     safety net for degenerate input the rule guard let through).

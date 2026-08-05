@@ -7,7 +7,7 @@
 
 namespace cortrix::query {
 
-/// Variant generation strategy (F36 §4.1 / topic D5 — ARCH locked 3 strategies).
+/// Variant generation strategy (3 locked strategies).
 /// Serializes to the lowercase string the LLM prompt + NS config JSON use.
 enum class VariantStrategy {
     kParaphrase,   ///< "paraphrase" — synonym rewrite
@@ -36,8 +36,8 @@ inline void from_json(const nlohmann::json& j, VariantStrategy& s) {
     s = parsed;
 }
 
-/// NS-level RAG-Fusion config (F36 §4.1 / §4.4). Persisted as the
-/// namespaces.rag_fusion_config JSONB blob (F12 v1.0.4 7th *_config field) and
+/// NS-level RAG-Fusion config. Persisted as the
+/// namespaces.rag_fusion_config JSONB blob (the 7th *_config field) and
 /// resolved global ← NS ← request via ConfigResolver<RagFusionConfig> (§4.4).
 ///
 /// Defaults encode topic 1 (N=3) + topic 3 (V1.0 OSS default disabled).

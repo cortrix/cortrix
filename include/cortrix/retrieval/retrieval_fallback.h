@@ -11,7 +11,7 @@ struct QueryContext;  // fwd-decl — Fallback only takes a const reference
 namespace cortrix::retrieval {
 
 /// IRetrievalFallback — the Phase-1 interface reservation for CRAG "Incorrect"
-/// corrective retrieval (F37 §5.3 / borrowed-5). When F37 evaluates a query as
+/// corrective retrieval. When CRAG evaluates a query as
 /// Incorrect, Phase 1 only records it and returns the degraded reranker results;
 /// Phase 2 plugs a WebSearchFallback (Bing / Brave / Tavily) behind this same
 /// interface to actually fetch corrective context.
@@ -19,7 +19,7 @@ class IRetrievalFallback {
 public:
     virtual ~IRetrievalFallback() = default;
 
-    /// Called when F37's verdict is "incorrect". Phase 1's only implementation
+    /// Called when the CRAG verdict is "incorrect". Phase 1's only implementation
     /// (NullRetrievalFallback) returns the original chunks unchanged. Phase 2
     /// implementations may issue an external search and return new RankedChunk[].
     virtual std::vector<RankedChunk> Fallback(

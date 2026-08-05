@@ -6,20 +6,20 @@
 
 namespace cortrix::query {
 
-/// The `query_router` subsystem metrics (F39 §10, OBSERVABILITY_SPEC naming
-/// `cortrix_query_router_<metric>_<unit>`). Mirrors the F37 CragMetrics template
+/// The `query_router` subsystem metrics (observability naming
+/// `cortrix_query_router_<metric>_<unit>`). Mirrors the CragMetrics template
 /// (process-wide singleton, atomic counters/histogram/gauge, OpenMetrics renderer).
 ///
-/// 🚨 Cardinality control (OBSERVABILITY_SPEC §3.2 — F39 §10 / D1 V3 decision 10):
+/// 🚨 Cardinality control:
 /// labels are enum-only. NO `ns_id` (high-cardinality, forbidden — removed in D1 V3
 /// decision 10); per-NS data goes through
 /// `GET /api/v1/system/namespaces/<ns_id>/stats` (OBS_SPEC §3.4).
 ///
 /// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
-/// text renderer. The F24 `/metrics` scrape endpoint does not exist in the frozen
+/// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
 /// **deferred to D3.5**. Until then it is fully usable + testable in-process and
-/// RenderOpenMetrics() produces what F24 will serve.
+/// RenderOpenMetrics() produces what the server will serve.
 ///
 /// §10 metric schema (4 rows):
 ///   cortrix_query_router_total                     counter   {decision}
@@ -39,7 +39,7 @@ public:
 
     /// path label for cortrix_query_router_compute_saved_seconds (§10) — which
     /// short-path produced the saving vs the full Complex pipeline. `simple` skips
-    /// F36+F37+F38-hype; `chat` skips all retrieval (larger saving).
+    /// RAG-Fusion, CRAG and HyPE; `chat` skips all retrieval (larger saving).
     enum class SavedPath {
         kSimple = 0,
         kChat,
@@ -53,14 +53,14 @@ public:
     uint64_t DecisionCount(Decision decision) const;
 
     // --- cortrix_query_router_classifier_latency_seconds (Histogram, no label) ---
-    // Classifier inference latency distribution (F39 §12.bis 2.1: rule path P50<0.5ms;
+    // Classifier inference latency distribution (rule path P50<0.5ms;
     // LLM path P50<200ms when enabled). Sub-ms..ms buckets straddle the rule SLA.
     void ObserveClassifierLatency(double seconds);
     uint64_t ClassifierLatencyCount() const;
     double ClassifierLatencySum() const;
 
     // --- cortrix_query_router_fallback_ratio (Gauge, no label) ---
-    // L3 fallback ratio (F39 §12.bis 2.2 alarm threshold < 5%). Gauge → last write wins.
+    // L3 fallback ratio (alarm threshold < 5%). Gauge → last write wins.
     void SetFallbackRatio(double ratio);
     double FallbackRatio() const;
 

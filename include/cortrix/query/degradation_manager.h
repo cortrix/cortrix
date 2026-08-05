@@ -27,7 +27,7 @@ public:
     ///
     /// @param vector_result: vector search result
     /// @param bm25_result: BM25 search result
-    /// @param sql_result: SQL search result (F07 always kSkipped)
+    /// @param sql_result: SQL search result (always kSkipped today)
     /// @param search_config: client route switches (disabled routes don't count)
     /// @return DegradationInfo
     DegradationInfo Evaluate(

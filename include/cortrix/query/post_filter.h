@@ -9,7 +9,7 @@ namespace cortrix {
 
 class PostFilter {
 public:
-    /// @param store: F02 CortrixStore instance (for loading block details)
+    /// @param store: CortrixStore instance (for loading block details)
     explicit PostFilter(CortrixStore& store);
 
     /// Apply in-memory filtering on RRF results

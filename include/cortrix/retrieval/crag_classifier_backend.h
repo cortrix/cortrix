@@ -13,12 +13,12 @@ struct CragBackendResult {
 };
 
 /// ICragClassifierBackend — the pluggable inference backend behind CragEvaluator
-/// (F37 §5.2 / §6.2 RunClassifier).
+/// (RunClassifier).
 ///
-/// WHY THIS INTERFACE (standalone / Lead-approved injection point): F37 §5.2's
+/// WHY THIS INTERFACE (standalone / Lead-approved injection point): the design's
 /// CragEvaluator ctor names `std::shared_ptr<OnnxSession>`, but `OnnxSession` is a
 /// stale name — no such type exists in the frozen tree (onnx/ only exposes the
-/// static cortrix::onnx::Runtime version/opset introspector; F02 holds its own raw
+/// static cortrix::onnx::Runtime version/opset introspector; the reranker holds its own raw
 /// Ort::Session). Per the C-R1 briefing the real DistilBERT-tiny inference is
 /// D3.5-deferred and standalone uses a heuristic-guard stub. So CragEvaluator
 /// depends on THIS small interface instead of a non-existent ONNX session:

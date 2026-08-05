@@ -5,7 +5,7 @@
 
 namespace cortrix::retrieval {
 
-/// Canonical F40 §4.3 inverted-index DDL — the single SoT for the
+/// Canonical inverted-index DDL — the single SoT for the
 /// sparse_inverted_index table, shared by F40SchemaProvider::Migrate (the D3.5
 /// integrated path) and SpladeSparseRetriever::Open (the standalone self-contained
 /// path) so the two can never drift.
@@ -32,12 +32,12 @@ CREATE INDEX IF NOT EXISTS idx_child_lookup
     ON sparse_inverted_index (ns_id, child_id);
 )SQL";
 
-/// F40's schema-migration contribution (F40 §4.3 + A unified-blocks). Owns:
+/// The sparse-retrieval schema-migration contribution. Owns:
 ///   - the net-new `sparse_inverted_index` table (per-NS SPLADE postings), and
 ///   - the `blocks.sparse_vec` BLOB column (A unified-blocks: sparse_vec lives on
 ///     child rows of `blocks`, ALTER'd here — replaces the legacy children.sparse_vec
 ///     that was declared in store/parent_chunk_schema.h pre-A).
-/// Unlike F02 (which owns no extra column), F40's Migrate(0→1) emits real DDL.
+/// Unlike the reranker (which owns no extra column), this Migrate(0→1) emits real DDL.
 ///
 /// Implements the frozen cortrix::catalog::ISchemaProvider (D2-pre-5); Migrate
 /// returns Status (F-FREEZE-1 / CODING_CONVENTIONS §3), runs inside the
@@ -46,10 +46,10 @@ CREATE INDEX IF NOT EXISTS idx_child_lookup
 /// Standalone (D3): registering this with the live CatalogDb/Unit migrator at
 /// bootstrap is cross-Feature wiring → D3.5. SpladeSparseRetriever::Open()
 /// creates the same table self-contained for standalone tests; this provider is
-/// the integrated, versioned path that runs against the F05 Unit DB at D3.5.
+/// the integrated, versioned path that runs against the Unit DB once wired.
 class F40SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
-    /// F12 registration key (aligns with F02/F09/F21 SchemaProvider naming).
+    /// Registration key (aligns with the other SchemaProvider names).
     std::string FeatureName() const override { return "F40"; }
 
     /// V1 = the sparse_inverted_index table + blocks.sparse_vec column. Phase 2

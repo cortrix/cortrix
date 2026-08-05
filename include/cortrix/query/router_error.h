@@ -12,11 +12,11 @@
 namespace cortrix::query {
 
 /// Thrown by an IComplexityClassifierBackend when a single inference fails
-/// transiently (F39 §6.1 / §7.3 L3 path). QueryComplexityClassifier catches it,
+/// transiently (the L3 path). QueryComplexityClassifier catches it,
 /// retries `max_inference_retries` times with exponential back-off (50/100/200ms),
 /// then transparently defaults to the Complex path (CX_ERR_F39_INFERENCE_FAILED).
 /// Backends must NOT let any other exception escape across the IClassifier
-/// boundary (IClassifier::Classify is total per F39 §5.1 / retrieval/classifier.h).
+/// boundary (IClassifier::Classify is total; see retrieval/classifier.h).
 class RouterInferenceError : public std::runtime_error {
 public:
     explicit RouterInferenceError(const std::string& what) : std::runtime_error(what) {}
@@ -31,7 +31,7 @@ public:
 /// type cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_*
 /// code. So RouterErrorCode is the *enum of identities*, and MakeRouterError()
 /// turns one (plus optional structured_data) into that boundary error — mirroring
-/// the F37 CragErrorCode / F36 RagFusionErrorCode template exactly.
+/// the CragErrorCode / RagFusionErrorCode template exactly.
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may only be appended.
@@ -42,11 +42,11 @@ enum class RouterErrorCode {
     kFallbackTriggered,     ///< CX_ERR_F39_FALLBACK_TRIGGERED — transparent degrade to Complex fired (transient)
 };
 
-/// Total number of query-router error codes (F39 §4.3 = 4). Compile-time anchor
+/// Total number of query-router error codes (= 4). Compile-time anchor
 /// for the API-compatibility regression test (the set must not shrink).
 constexpr int kRouterErrorCodeCount = 4;
 
-/// Canonical, immutable attributes of one error code (F39 §4.3 columns).
+/// Canonical, immutable attributes of one error code.
 struct RouterErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_F39_*" string
     agent_friendly::ErrorCategory category;   ///< permanent / transient
@@ -61,7 +61,7 @@ const RouterErrorInfo& GetRouterErrorInfo(RouterErrorCode code);
 /// The "CX_ERR_F39_*" string for `code` (convenience over GetRouterErrorInfo).
 const char* RouterErrorCodeString(RouterErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (F39 §4.3
+/// The structured_data keys a `code`'s error body MUST carry (
 /// structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5);
 /// lets call sites + tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(RouterErrorCode code);

@@ -7,7 +7,7 @@
 namespace cortrix::query {
 
 /// OnnxComplexityBackend — the D3.5 real DistilBERT inference backend behind
-/// QueryComplexityClassifier (F39 §5.1 / §6.1 step 4). It replaces the standalone
+/// QueryComplexityClassifier. It replaces the standalone
 /// HeuristicComplexityBackend behind the same IComplexityClassifierBackend
 /// interface, so QueryComplexityClassifier (and its rule-guard / force-route /
 /// confidence-fail-safe logic) is unchanged by the swap.
@@ -25,13 +25,13 @@ namespace cortrix::query {
 /// are kept out of this header (opaque void* env_/session_) so non-ONNX TUs may
 /// include it, and the session is created in Init().
 ///
-/// Availability / failure model (F39 §7.3, mapped from the embedder's pattern):
+/// Availability / failure model (mapped from the embedder's pattern):
 ///   - Model file absent OR ONNX Runtime not linked → Init() returns Ok but leaves
 ///     the backend UNAVAILABLE (IsAvailable()==false). QueryComplexityClassifier
 ///     then takes the L2 "classifier_unavailable" default-Complex path. This keeps
 ///     CI / offline builds green without a 256 MB model.
 ///   - A model present but failing to load (corrupt / opset / tokenizer) → Init()
-///     returns the underlying error AND leaves the backend unavailable. The F22
+///     returns the underlying error AND leaves the backend unavailable. The ONNX
 ///     StartupValidator hard-fails the process on a registered model that does not
 ///     validate; once past that gate a load failure here is the L2 path.
 ///   - A transient *inference* fault at query time → Infer() retries once then

@@ -15,7 +15,7 @@ struct MemorySession {
     std::string doc_id;                // associated Document ID, ULID (source_type=memory_session); empty = none
     std::string created_at;            // ISO 8601
     std::string updated_at;            // ISO 8601
-    // MEM04 Memory Immunity (opt-out). Pure ADD — does not touch the frozen columns
+    // Memory immunity (opt-out). Pure ADD — does not touch the frozen columns
     // above. opt_out_at empty = not opted-out; non-empty (ISO 8601) = opted-out time.
     std::string opt_out_at;            // ISO 8601, empty when active (D4)
     std::string opted_out_by;          // "user_manual" | "agent_auto" | "system_auto" | "test" (D4)

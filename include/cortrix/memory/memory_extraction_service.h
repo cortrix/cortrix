@@ -16,14 +16,14 @@ namespace memory::immunity { class OptOutManager; }
 
 namespace cortrix::memory {
 
-// Runtime assembly of MEM02: a MemoryQueue draining
+// Runtime assembly of memory extraction: a MemoryQueue draining
 // interactions through per-namespace MemoryExtractors. The interaction-write route
 // enqueues each interaction; the worker pool drains them. Per item the worker
 // acquires the interaction's namespace façade and builds the NS-scoped MemoryExtractor
 // (real MemoryBlockAdapter + MemoryContradictionAdapter over that NS's store), so
 // memories land in the right namespace's blocks table.
 //
-// MEM04 double-check (the §3.3.1 worker logic, kernel-side here instead of the design's
+// opt-out double-check (worker logic, kernel-side here instead of the design's
 // Python middleware): before extracting, the worker (1) skips when the session is
 // opted out (records operation_log.memory_extract_skipped) and (2) skips +
 // session-opts-out when interaction.remember==false (D2). When no LLM is configured the
@@ -33,11 +33,11 @@ public:
     /// @param pool       the namespace pool (per-item façade acquisition).
     /// @param llm        shared extraction LLM (null → service disabled, log-only).
     /// @param embedder   embeds memory content for search (shared with the pipeline).
-    /// @param op_logger  F18a operation logger (memory_extract / _skipped audit).
+    /// @param op_logger  operation logger (memory_extract / _skipped audit).
     /// @param config     mem02.* config.
     /// @param queue_cfg  worker pool + reliability config (worker_count etc).
     ///
-    /// The MEM04 opt-out check is built per-item over the interaction's NS façade
+    /// The opt-out check is built per-item over the interaction's NS façade
     /// (sessions are NS-scoped), so no global opt-out manager is held here.
     MemoryExtractionService(resource::INamespacePool& pool,
                             std::shared_ptr<llm::ILlmClient> llm,
@@ -69,7 +69,7 @@ public:
 
     /// Run extraction for one interaction synchronously (the worker handler + the
     /// /memory/extract HTTP path share this). Acquires the NS façade, applies the
-    /// MEM04 double-check, builds the NS-scoped extractor, and runs it. Returns the
+    /// opt-out double-check, builds the NS-scoped extractor, and runs it. Returns the
     /// extractor result (or a non-ok result carrying the failure / skip reason).
     MemoryExtractionResult ExtractOne(const InteractionLog& interaction,
                                       const observability::TraceContext* ctx = nullptr);

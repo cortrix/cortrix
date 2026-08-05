@@ -8,7 +8,7 @@
 #include "cortrix/memory/memory_extractor.h"
 #include "cortrix/observability/trace_context.h"
 
-// MEM02 contradiction-judgment helper (D5). Wraps the contradiction-detect prompt +
+// Contradiction-judgment helper. Wraps the contradiction-detect prompt +
 // the LLM judge call + the single-object JSON parse into one focused unit so the
 // extractor's WriteWithOperationLog path stays readable and the judge logic is
 // independently testable.

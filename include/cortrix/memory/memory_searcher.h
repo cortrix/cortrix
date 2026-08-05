@@ -17,18 +17,18 @@ enum class MemoryScope {
     kSession = 0,    // limited to a specific session (of this user)
     kUser    = 1,    // all sessions of a specific user
     // kAll removed: cross-user memory access is prohibited.
-    // Phase 2 may add kAdmin=2 (ABI-compatible append); see MEM05 design § ABI note.
+    // Phase 2 may add kAdmin=2 (ABI-compatible append); see the isolation ABI note.
 };
 
 struct MemorySearchRequest {
     std::string query;                 // search query text (required)
     std::string namespace_name;        // namespace (required)
-    MemoryScope scope = MemoryScope::kUser;  // MEM05: default changed kAll -> kUser
+    MemoryScope scope = MemoryScope::kUser;  // per-user isolation: default changed kAll -> kUser
     std::string session_id;            // required when scope=kSession
-    std::string user_id;               // MEM05: ALWAYS required (memory isolation)
+    std::string user_id;               // ALWAYS required (memory isolation)
     int top_k = 10;                    // result count (1-100)
     bool include_expired = false;      // include TTL-expired results
-    bool include_invalidated = false;  // MEM01 D4: include status=invalidated memories (default false)
+    bool include_invalidated = false;  // include status=invalidated memories (default false)
     int timeout_ms = 5000;
 
     /// Validate parameters — user_id is unconditionally required.
@@ -41,14 +41,14 @@ struct MemorySearchResultItem {
     std::string query_text;            // original Q (interaction rows)
     std::string response_text;         // original A (interaction rows)
     std::string query_type;
-    // MEM02 fact/preference/event blocks surfaced by the unified read pipeline
+    // fact/preference/event blocks surfaced by the unified read pipeline
     // (§6.5.3): content is the fact statement (no Q/A split), memory_type is
-    // fact|preference|event, block_id is the MEM02 ULID. Empty on interaction rows.
+    // fact|preference|event, block_id is the memory ULID. Empty on interaction rows.
     std::string content;
     std::string memory_type;
     std::string block_id;
     float score = 0.0f;               // RRF fusion score (raw_score before decay)
-    // MEM01 classified-decay scoring (design § 2.1). Populated only when a
+    // Classified-decay scoring. Populated only when a
     // MemoryScorer is injected; on the null-scorer fallback path they stay at
     // their defaults (decay_factor=1.0, final_score==score) so callers see raw
     // RRF behavior unchanged.
@@ -68,12 +68,12 @@ struct MemorySearchResponse {
 
 class MemorySearcher {
 public:
-    /// @param pipeline: F07 QueryPipeline (per-namespace)
+    /// @param pipeline: QueryPipeline (per-namespace)
     /// @param memory_store: MemoryStore (per-namespace)
     /// @param config: MemoryConfig
-    /// @param scorer: MEM01 MemoryScorer (optional). When non-null, search
+    /// @param scorer: MemoryScorer (optional). When non-null, search
     ///                results carry classified-decay scoring; when null the
-    ///                searcher falls back to raw RRF scoring (pre-MEM01 behavior).
+    ///                searcher falls back to raw RRF scoring (pre-scoring behavior).
     ///                The full raw_score -> decay wiring against live blocks
     ///                (memory_type / created_at extraction) is D3.5.
     MemorySearcher(QueryPipeline& pipeline,
@@ -81,10 +81,10 @@ public:
                    const MemoryConfig& config,
                    MemoryScorer* scorer = nullptr);
 
-    /// Execute memory semantic search (reuses F07 QueryPipeline)
+    /// Execute memory semantic search (reuses QueryPipeline)
     MemorySearchResponse Search(const MemorySearchRequest& request);
 
-    /// MEM01: accessor for the injected scorer (may be null). Test/debug.
+    /// Accessor for the injected scorer (may be null). Test/debug.
     MemoryScorer* scorer() const { return scorer_; }
 
 private:
@@ -97,11 +97,11 @@ private:
     QueryPipeline& pipeline_;
     MemoryStore& memory_store_;
     MemoryConfig config_;
-    MemoryScorer* scorer_ = nullptr;  // MEM01: optional classified-decay scorer
+    MemoryScorer* scorer_ = nullptr;  // optional classified-decay scorer
 
     // Test-only friends for direct private method coverage
     friend class MemorySearcherPrivateTest;
-    friend class Mem05IsolationTest;  // MEM05 user-isolation unit tests
+    friend class Mem05IsolationTest;  // user-isolation unit tests
 };
 
 }  // namespace cortrix

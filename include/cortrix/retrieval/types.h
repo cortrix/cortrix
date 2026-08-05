@@ -8,8 +8,8 @@
 
 namespace cortrix::retrieval {
 
-/// Cortrix Retrieval-link type SoT (design/RETRIEVAL_TYPES_SPEC.md §1). F02 is the
-/// first consumer (per F02 §2 it `#include "cortrix/retrieval/types.h"`), so this
+/// Cortrix retrieval-link type SoT. The reranker is the
+/// first consumer (it `#include "cortrix/retrieval/types.h"`), so this
 /// header is introduced here.
 ///
 /// ID types (ARCH §1.8.1): the canonical `cortrix::id` namespace is the single SoT
@@ -21,21 +21,21 @@ using cortrix::id::ChildId;   ///< ULID, 26 chars — SoT cortrix::id (ARCH §1.
 using cortrix::id::ParentId;  ///< doc-level parent block id — SoT cortrix::id
 
 /// Raw retrieval result (minimal) — VectorSearcher / BM25Searcher / RRFFusion
-/// output, F36 RRF feeds these into F02.Rerank as candidates.
+/// output, RAG-Fusion RRF feeds these into Rerank as candidates.
 struct ScoredResult {
     ChildId child_id;
     float   score = 0.0f;
 };
 
-/// Reranker output (carries full chunk content) — F02 output / F37 input.
+/// Reranker output (carries full chunk content) — reranker output / CRAG input.
 /// Field SoT = RETRIEVAL_TYPES_SPEC §1.
 struct RankedChunk {
     ChildId     child_id;
     std::string chunk_text;
-    std::string parent_text;   ///< F34 §2.5 ParentChunkStore reverse-lookup (empty until F34 wires in)
-    float       score = 0.0f;        ///< final ordering score after F02/F07 composition
-    float       rerank_score = 0.0f; ///< F02 cross-encoder score
-    ScoreSignals score_signals;      ///< optional F03/F07 query-time scoring signals
+    std::string parent_text;   ///< ParentChunkStore reverse-lookup (empty until the chunker wires in)
+    float       score = 0.0f;        ///< final ordering score after rerank/scoring composition
+    float       rerank_score = 0.0f; ///< cross-encoder score
+    ScoreSignals score_signals;      ///< optional query-time scoring signals
     std::map<std::string, std::string> metadata;
 };
 

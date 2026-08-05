@@ -10,7 +10,7 @@
 
 namespace cortrix::query {
 
-/// One failed namespace inside meta.namespaces_failed[] (F04 §2.5 / topic 2.4 + 2.7).
+/// One failed namespace inside meta.namespaces_failed[].
 /// Carries the full GEN-Agent error contract so an Agent can decide per-NS whether
 /// to retry (timeout) or notify ops (permanent) — see §3.2 decision matrix.
 struct NamespaceFailure {
@@ -26,21 +26,21 @@ struct NamespaceFailure {
     nlohmann::json structured_data = nlohmann::json::object();
 };
 
-/// One source of a deduplicated chunk (F04 §2.5 deduplicated_chunks[].namespaces[]).
+/// One source of a deduplicated chunk (deduplicated_chunks[].namespaces[]).
 struct DedupSourceNs {
     std::string namespace_id;   ///< serialized as "namespace"
     float score = 0.0f;
     float rerank_score = 0.0f;
 };
 
-/// A chunk that was found in >1 NS and collapsed to one primary (F04 §3.3 B simplified).
+/// A chunk that was found in >1 NS and collapsed to one primary (simplified).
 struct DeduplicatedChunkInfo {
     std::string content_hash;                ///< "sha256:..."
     std::string primary_namespace;           ///< the NS whose copy was kept (highest final score)
     std::vector<DedupSourceNs> namespaces;   ///< brief multi-source array (NS + score), >= 2 entries
 };
 
-/// F04 cross-NS response meta — exactly the **8 A/C-class fields** (F04 §2.5 / topic 3.5
+/// Cross-NS response meta — exactly the **8 A/C-class fields** (
 /// v1.0.2; rerank_enabled + dedup_applied B2 fields were deleted). All present on
 /// every response (GEN-Agent #2 A-class "always included"); warnings is C-class (only populated
 /// under its trigger).
@@ -57,7 +57,7 @@ struct CrossNsMeta {
     nlohmann::json ToJson() const;
 };
 
-/// F04 cross-NS query response. `error` is set ONLY for the overall
+/// Cross-NS query response. `error` is set ONLY for the overall
 /// scatter-timeout partial case (CX_ERR_SCATTER_TIMEOUT, still HTTP 200 with
 /// partial results — topic 2.7 principle 3). Hard failures (auth / too-many / unauthorized)
 /// are thrown as CrossNsException and never reach this struct.

@@ -14,16 +14,16 @@
 
 namespace cortrix::query {
 
-/// RagFusion — the F36 main service (§4.3). Expands one query into [original + N
+/// RagFusion — the RAG-Fusion main service. Expands one query into [original + N
 /// variants] (LLM), then RRF-fuses the per-variant retrieval results into one
 /// globally-ranked list (topic 2 B: a single global second-pass fusion, NOT per-NS).
 ///
 /// 🔑 RRF reuse note (B_R1_BRIEFING §7): the frozen `cortrix::RRFFusion`
 /// (query/rrf_fusion.h) fuses `RouteResult` → `ScoredBlock` keyed by int64
-/// block_id — that is the INNER per-NS fusion of vector/BM25 routes that F04
-/// already performs. F36's FuseResults is the OUTER second-pass fusion across
+/// block_id — that is the INNER per-NS fusion of vector/BM25 routes that the cross-NS layer
+/// already performs. FuseResults is the OUTER second-pass fusion across
 /// variants, over already-fused `cortrix::retrieval::ScoredResult` (keyed by the
-/// string ChildId, RETRIEVAL_TYPES_SPEC §1). F36 v1.0.7 applies an anchored
+/// string ChildId). This applies an anchored
 /// conservative weighted RRF formula over that keyspace: `per_variant_results[0]`
 /// is the original query, receives the primary role weight, and its top-3 head is
 /// emitted first as a strong-hit guardrail; LLM variants receive weaker additive
@@ -42,16 +42,16 @@ public:
     /// Expand `query` → [original query] + N variants (§4.3). topic 4: on LLM
     /// failure returns the CX_ERR_RAG_FUSION_* Status (the caller degrades to the
     /// single query + emits CX_WARN_RAG_FUSION_DEGRADED). When the NS config is
-    /// disabled, or F39 routing says skip, returns just `{query}` (Ok, no LLM call).
+    /// disabled, or routing says skip, returns just `{query}` (Ok, no LLM call).
     ///
     /// v1.0.5 canonical 4-param signature (V2 QA M-05): trace_ctx + qctx both
     /// optional. The result always begins with `query` itself (§4.5 invariant).
     ///
     /// 🔵 D3.5 deferred: the `qctx` routing-skip (ShouldSkipF36 reading
     /// SPEC `routing_path`) is INTERFACE-RESERVED — the FROZEN QueryContext has no
-    /// `routing_path` field yet (F39 adds it, same Wave, not frozen). So a non-null
+    /// `routing_path` field yet (the router adds it, not frozen). So a non-null
     /// `qctx` is accepted and threaded, but the real skip wiring lands at D3.5 when
-    /// F39's field exists; until then `qctx` does not change behavior.
+    /// that field exists; until then `qctx` does not change behavior.
     Result<std::vector<std::string>> ExpandQueries(
         const std::string& query,
         const RagFusionConfig& ns_config,
@@ -81,7 +81,7 @@ public:
         const RagFusionConfig& cfg,
         const observability::TraceContext* ctx);
 
-    /// F36 path state for the explain endpoint (§4.3 / topic 5 revised + topic 6).
+    /// RAG-Fusion path state for the explain endpoint.
     /// Only surfaced via ?explain=true — never in a default query response.
     struct ExplainState {
         bool active = false;

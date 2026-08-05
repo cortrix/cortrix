@@ -14,7 +14,7 @@
 #include "cortrix/observability/operation_logger.h"
 #include "cortrix/observability/trace_context.h"
 
-// MEM02 LLM Memory Extraction (detailed design MEM02-llm-extraction.md). Extends the existing
+// LLM memory extraction. Extends the existing
 // cortrix::memory module (it does NOT replace interaction_log / memory_store /
 // memory_writer). Standalone-D3 scope: the LLM extraction algorithm, the
 // three-class memory model, the contradiction-judgment helper (mock QueryPipeline),
@@ -36,7 +36,7 @@
 //     (NOT the stale two-arg AuthContext form)
 namespace cortrix::memory {
 
-/// Three-class memory model (2026-04-06 redesign, MEM02 §1.2). kUnknown is the
+/// Three-class memory model (2026-04-06 redesign). kUnknown is the
 /// internal sentinel for an LLM `type` that does not parse to one of the three
 /// classes; the code-layer fallback (D4) coerces it to kEvent before persistence.
 enum class MemoryType {
@@ -103,7 +103,7 @@ struct MemoryExtractionBatchResult {
     std::vector<MemoryExtractionResult> results;
 };
 
-/// One contradiction the judge confirmed (MEM02 §3.2 ContradictionPair). Pairs a
+/// One contradiction the judge confirmed (ContradictionPair). Pairs a
 /// newly extracted memory with the existing block it invalidates.
 struct ContradictionPair {
     std::string new_block_id;     ///< the new memory (may be empty pre-persist; matched by content)
@@ -114,21 +114,21 @@ struct ContradictionPair {
     double confidence = 0.0;
 };
 
-/// A memory block as stored (the subset MEM02 reads/writes). `metadata_json` is the
-/// JSONB field MEM02 stamps with memory_type/status/provenance/invalidation state
-/// (MEM02 §4.1/§4.2). This mirrors the shape the real `blocks` row exposes; the
+/// A memory block as stored (the subset extraction reads/writes). `metadata_json` is the
+/// JSONB field extraction stamps with memory_type/status/provenance/invalidation state
+/// This mirrors the shape the real `blocks` row exposes; the
 /// D3.5 adapter maps it onto the concrete store.
 struct MemoryBlockRecord {
     std::string block_id;
     std::string ns_id;
     std::string user_id;
     std::string content;
-    nlohmann::json metadata_json;  ///< object; MEM02 writes the §4.1/§4.2 fields
+    nlohmann::json metadata_json;  ///< object; extraction writes the memory fields
 };
 
 /// Minimal memory-block persistence seam (existing-header interface style, cf.
 /// ILlmClient / IOperationLogger). NOT the forbidden `IBlockStore` — it is scoped to
-/// the metadata-block operations MEM02 needs and is mockable for standalone UT. The
+/// the metadata-block operations extraction needs and is mockable for standalone UT. The
 /// real MemoryStore-backed adapter is wired in D3.5.
 class IMemoryBlockStore {
 public:
@@ -148,7 +148,7 @@ public:
     virtual Result<MemoryBlockRecord> GetMemoryBlock(const std::string& block_id) = 0;
 };
 
-/// Contradiction-retrieval seam over the Query unified read pipeline (D5). MEM02
+/// Contradiction-retrieval seam over the Query unified read pipeline. Extraction
 /// does NOT depend on the concrete QueryPipeline in standalone; it depends on this
 /// seam, whose real adapter calls QueryPipeline::Execute(const QueryRequest&) (the
 /// real single-arg signature) and is wired in D3.5. The mock returns candidate old
@@ -184,7 +184,7 @@ public:
     }
 };
 
-/// MEM02 configuration (cortrix.yaml `mem02.*`, MEM02 §4.3). Defaults match the spec.
+/// Memory-extraction configuration (cortrix.yaml `mem02.*`). Defaults match the spec.
 struct MemoryExtractorConfig {
     bool enabled = true;                       ///< false = NullEnricher mode (LLM disabled)
     std::string llm_model = "gpt-4o-mini";     ///< default extraction model
@@ -200,7 +200,7 @@ struct MemoryExtractorConfig {
     double tokens_cost_per_1k_usd = 0.0;       ///< optional cost model for extract_meta
 };
 
-/// MemoryExtractor — MEM02 main class (D1 decision: directly holds the shared
+/// MemoryExtractor — the extraction main class (directly holds the shared
 /// ILlmClient; prompt templates live in this module's namespace). Extends the
 /// existing cortrix::memory module; adds no dependency the frozen tree lacks.
 ///
@@ -208,13 +208,13 @@ struct MemoryExtractorConfig {
 /// in unit tests against mocks (§12.3 eight LLM-mock scenarios). DEFERRED → D3.5:
 /// the real MemoryStore adapter, the real QueryPipeline contradiction path, the
 /// server memory_handler endpoints, the Python middleware async worker, and the
-/// MEM04 opt-out live wiring.
+/// opt-out live wiring.
 class MemoryExtractor {
 public:
-    /// @param llm        shared LLM client (F03 ILlmClient; OpenAiLlmClient is the V1 impl)
+    /// @param llm        shared LLM client (ILlmClient; OpenAiLlmClient is the V1 impl)
     /// @param block_store memory-block persistence seam (D3.5 real adapter)
     /// @param contradiction_query contradiction-retrieval seam over the read pipeline (D5)
-    /// @param op_logger  F18a operation logger (CE; real cortrix::observability::IOperationLogger)
+    /// @param op_logger  operation logger (CE; real cortrix::observability::IOperationLogger)
     /// @param config     mem02.* config
     MemoryExtractor(std::shared_ptr<llm::ILlmClient> llm,
                     std::shared_ptr<IMemoryBlockStore> block_store,
@@ -226,7 +226,7 @@ public:
 
     /// Extract memories from a single interaction (its window of preceding turns is
     /// supplied by the caller; standalone uses an explicit window — see
-    /// ExtractFromWindow). `ctx` propagates the W3C trace (MEM02 §5.5, nullptr default).
+    /// ExtractFromWindow). `ctx` propagates the W3C trace (nullptr default).
     MemoryExtractionResult Extract(const InteractionLog& current_turn,
                                    const observability::TraceContext* ctx = nullptr);
 

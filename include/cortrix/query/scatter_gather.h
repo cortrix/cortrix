@@ -10,19 +10,19 @@
 #include "cortrix/query/i_scatter_executor.h"
 #include "cortrix/query/permission_service.h"
 #include "cortrix/query/query_context.h"
-#include "cortrix/reranker.h"                      // cortrix::reranker::IReranker (F02 frozen)
+#include "cortrix/reranker.h"                      // cortrix::reranker::IReranker (frozen)
 #include "cortrix/retrieval/cross_ns_types.h"
 
 namespace cortrix::query {
 
-/// TraceContext — minimal placeholder for OBS_SPEC §5.3 end-to-end tracing (F04 §2.2 4th
-/// param). The full type is owned by the observability subsystem; F04 only needs a
+/// TraceContext — minimal placeholder for end-to-end tracing (4th
+/// param). The full type is owned by the observability subsystem; this layer only needs a
 /// trace_id to pass through into QueryContext. Real TraceContext wiring = D3.5.
 struct TraceContext {
     std::string trace_id;
 };
 
-/// Timeout knobs (F04 §2.7 GUC scatter.ns_query_timeout_ms / total_timeout_ms,
+/// Timeout knobs (GUC scatter.ns_query_timeout_ms / total_timeout_ms,
 /// topic 2.5 dual-layer). Defaults match the spec (5s per-NS / 30s overall). The real
 /// values come from the global GUC registry (S4.2, not in W1/W2); ScatterGather
 /// takes them by value so it stays standalone-testable with small timeouts.
@@ -31,30 +31,30 @@ struct ScatterTimeouts {
     int total_timeout_ms = 30000;     ///< overall scatter deadline → CX_ERR_SCATTER_TIMEOUT (partial)
 };
 
-/// ScatterGather — F04's top-level cross-NS query orchestrator (§2.2 / §4.1).
+/// ScatterGather — the top-level cross-NS query orchestrator.
 ///
 /// Pipeline: AuthorizeNamespaces (§4.2, 5 steps) → single/multi-NS split (topic 1.6) →
 /// per-NS execute (single = inline, multi = engine_->Submit) with dual-layer
 /// timeouts (topic 2.5) → Gather (§3, W3) → §2.5 8-field response.
 ///
-/// 🚨 D3 standalone: ScatterGather holds the F02 IReranker* by its **frozen
+/// 🚨 Standalone: ScatterGather holds the IReranker* by its **frozen
 /// contract** (compiled against reranker.h) and the F-Common ExecutorEngine
 /// (#include "cortrix/common/executor_engine.h"). Tests inject a
 /// MockIScatterExecutor + MockReranker + MockPermissionService; a real OnnxReranker
-/// / real P09 / server route are **D3.5**.
+/// / the real permission service / the server route are wired later.
 ///
 /// Scope: Execute() does auth (§4.2) + single/multi split (topic 1.6) + dual-timeout
 /// scatter (topic 2.5) + Gather (§4.1 step 3 — sort by cross-NS rerank_score → B simplified
 /// DedupeByContentHash §3.3 → top_k) + the §2.5 8-field meta (incl. deduplicated_chunks
 /// + warnings) + §3.4 scatter metrics. content_hash is content-derived standalone;
-/// the F09 Block-header source (F09-4 hook) is **D3.5**.
+/// the Block-header source is wired later.
 class ScatterGather {
 public:
     /// @param executor   the NS executor (V1 = SingleUnitExecutor; NOT owned).
     /// @param engine     shared thread pool for the multi-NS fan-out (NOT owned).
-    /// @param reranker   F02 reranker for cross-NS re-rank in Gather (NOT owned; W3
+    /// @param reranker   reranker for cross-NS re-rank in Gather (NOT owned;
     ///                  uses it — held now per §2.2 ctor SoT).
-    /// @param perm       P09 permission service for AuthorizeNamespaces (NOT owned).
+    /// @param perm       permission service for AuthorizeNamespaces (NOT owned).
     ScatterGather(IScatterExecutor* executor,
                   ExecutorEngine* engine,
                   reranker::IReranker* reranker,
@@ -66,7 +66,7 @@ public:
     /// scatter-timeout (§2.7 principle 3 — HTTP 200 + partial).
     ///
     /// @param request   query / namespaces / top_k / rerank / filter.
-    /// @param auth      P09 BatchCheck input.
+    /// @param auth      BatchCheck input.
     /// @param qctx      optional shared QueryContext; when null, built
     ///                 from request + auth.
     /// @param trace_ctx optional end-to-end tracing context (OBS_SPEC §5.3).

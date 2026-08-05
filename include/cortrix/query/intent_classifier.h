@@ -20,7 +20,7 @@ enum class QueryIntent {
 ///
 /// S2 ruling (G3+G1.2 joint D1, decision D / backward-compatible): IntentClassifier
 /// is adapted to be a `cortrix::retrieval::IClassifier` instance so the query
-/// pipeline can treat all classifiers (F37 CRAG, F39 complexity, intent) uniformly.
+/// pipeline can treat all classifiers (CRAG, complexity, intent) uniformly.
 /// This is a *pure addition* — the existing `Classify(query_text, timeout_us)`
 /// signature and all its call sites are unchanged (zero break). The new
 /// IClassifier::Classify(ClassifierInput) overload is a thin adapter over the same

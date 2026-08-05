@@ -18,7 +18,7 @@ namespace cortrix::query {
 /// 🚨 D3 standalone: the real `GET /api/v1/query?...&explain=true` endpoint does
 /// not exist in the frozen tree (ARCH-owned, cross-Feature → D3.5). This is the
 /// dump helper that endpoint will call; it is fully usable + testable in-process.
-/// First needed by F37 (CRAG verdict fields); F39 (C-R2) reuses it for the routing
+/// First needed by the CRAG verdict fields; the router reuses it for the routing
 /// fields.
 nlohmann::json ToExplainJson(const QueryContext& ctx);
 

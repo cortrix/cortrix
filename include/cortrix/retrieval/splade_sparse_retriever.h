@@ -16,27 +16,27 @@ struct sqlite3;
 
 namespace cortrix::retrieval {
 
-/// SpladeSparseRetriever configuration (F40 §5.3 / §6 / §13 S7). Top-K + the
+/// SpladeSparseRetriever configuration. Top-K + the
 /// posting-list caps + LRU cache size. NS-config (sparse_top_k 50-200, S7)
 /// overrides default_top_k at resolve time; the caps are A-class (process
 /// global), not NS-overridable.
 struct SpladeConfig {
-    int default_top_k = 100;          ///< F40-6 K=100 default (NS 50-200, S7)
+    int default_top_k = 100;          ///< K=100 default (NS 50-200)
     int posting_list_cap = 1000;      ///< per-term posting cap, weight DESC (§6.5)
     size_t posting_cache_capacity = 1024;  ///< LRU: max cached posting lists (§6 S6)
 };
 
-/// SPLADE inverted-index sparse retriever (F40 §5.3, §6 — Phase 1 direct impl).
+/// SPLADE inverted-index sparse retriever (Phase 1 direct impl).
 /// Owns a SQLite-backed per-(ns, term) inverted index; Add/Remove maintain it,
 /// Search accumulates SPLADE dot-product scores over the query terms' posting
 /// lists with a per-term LRU cache.
 ///
 /// Standalone (D3): owns its own sqlite3 handle (":memory:" or temp file) so the
-/// algorithm is unit-testable without the F25 PWL / F05 pool / F34 children
+/// algorithm is unit-testable without the write coordinator / namespace pool / children
 /// wiring (that single-DB, FK-to-children, atomic-write integration = D3.5). The
 /// detailed design's `shared_ptr<SQLiteHandle>` ctor param does not exist in the
 /// frozen tree (there is no SQLiteHandle type) — standalone takes a db_path and
-/// owns the connection (mirrors F34 SqliteParentChunkStore); injecting the F05
+/// owns the connection (mirrors SqliteParentChunkStore); injecting the pooled
 /// pool connection is D3.5.
 class SpladeSparseRetriever : public ISparseRetriever {
 public:
@@ -75,7 +75,7 @@ public:
     /// Idempotent. OK or CX_ERR_F40_INVERTED_INDEX_WRITE_FAILED.
     Status Remove(const NamespaceId& ns_id, const ChildId& child_id) override;
 
-    /// True once Open() has succeeded and the DB handle is live (F40-7).
+    /// True once Open() has succeeded and the DB handle is live.
     bool IsAvailable() const override;
 
     // --- observability hooks (S6/S9; metric wiring lands in S10) ---

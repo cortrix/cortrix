@@ -14,24 +14,24 @@ class MemoryStore;  // forward decl — MemoryStoreOptOutAdapter holds a referen
                     // full definition (memory_store.h) is pulled in by the .cpp only.
 }  // namespace cortrix
 
-// MEM04 Memory Immunity (detail design MEM04-memory-immunity.md). Extends the existing
+// Memory immunity. Extends the existing
 // cortrix::memory module with a NEW namespace cortrix::memory::immunity; it does NOT
-// replace the MEM02 extractor / MEM03 transparency / memory_store. It is the opt-out
-// layer — mark a session "do not remember" so the MEM02 worker skips extraction
+// replace the extractor / transparency surface / memory_store. It is the opt-out
+// layer — mark a session "do not remember" so the extraction worker skips it
 // (interaction_log is still written; only blocks-table extraction is skipped, D3).
 //
 // ⚠️ Contract reconciliation vs the D1 detail design (C_R2_BRIEFING §1 — the detail
 // design predates the implemented headers and drifts):
 //   - §3.2 names the session seam `IMemorySessionStore`; there is no such type in the
 //     tree. The concrete session store is cortrix::MemoryStore (memory_store.h). Like
-//     MEM03's IMemoryBlockLister, MEM04 declares a minimal ISessionOptOutStore seam
+//     the transparency IMemoryBlockLister, this layer declares a minimal ISessionOptOutStore seam
 //     (existing-header style) covering exactly the opt-out reads/writes; the real
 //     MemoryStore-backed adapter (MemoryStoreOptOutAdapter, opt_out_manager.cpp) is
 //     wired here, and standalone UT mocks the seam.
 //   - the operation logger is the real cortrix::observability::IOperationLogger
-//     (the F18a CE contract). It is OPTIONAL (nullptr ok): the GEN-OperationLog
+//     (the CE operation-log contract). It is OPTIONAL (nullptr ok): the audit
 //     audit hooks (memory_opt_out / memory_opt_out_revoke) are recorded when present,
-//     but the real server wiring of the logger + the MEM02 Python-middleware HTTP
+//     but the real server wiring of the logger + the Python-middleware HTTP
 //     check path are DEFERRED → D3.5.
 //   - F-FREEZE-1: the design's `Result<T, ...>` (double-template) is forbidden. We use
 //     `Result<T>` (StatusOr) + `Status`; the domain identity is carried via the
@@ -62,7 +62,7 @@ struct SessionOptOutState {
 };
 
 /// Minimal opt-out seam over the session store (existing-header interface style,
-/// cf. MEM03 IMemoryBlockLister). MemoryStore has full session CRUD; MEM04 needs only
+/// cf. IMemoryBlockLister). MemoryStore has full session CRUD; the opt-out layer needs only
 /// these three opt-out operations, so it depends on this thin seam. Standalone UT
 /// mocks it; the real MemoryStore-backed adapter (MemoryStoreOptOutAdapter) pushes
 /// these onto the memory_sessions opt_out_at / opted_out_by columns. All three return
@@ -86,22 +86,22 @@ public:
     virtual Status ClearOptOut(const std::string& session_id) = 0;
 };
 
-/// Result of OptOut (MEM04 §5.1 200 body, minus the interactions_* counts which are a
-/// D3.5 query-time enrichment over the MEM02 queue). Carries the stamped values back.
+/// Result of OptOut (200 body, minus the interactions_* counts which are a
+/// query-time enrichment over the extraction queue). Carries the stamped values back.
 struct OptOutResult {
     std::string session_id;
     std::string opt_out_at;
     std::string opted_out_by;
 };
 
-/// Result of OptOutRevoke (MEM04 §5.2 200 body).
+/// Result of OptOutRevoke (200 body).
 struct RevokeResult {
     std::string session_id;
     std::string revoked_at;
 };
 
-/// OptOutManager — MEM04 main service class. Holds the opt-out seam and
-/// (optionally) the F18a operation logger. The MEM02 worker collaboration (§3.3 — the
+/// OptOutManager — the opt-out main service class. Holds the opt-out seam and
+/// (optionally) the operation logger. The extraction-worker collaboration (the
 /// Python middleware HTTP-calling is_session_opted_out + writing the
 /// memory_extract_skipped oplog) is NOT a hard dependency in standalone: this class
 /// exposes is_session_opted_out() for that path, but the cross-process wiring is
@@ -109,14 +109,14 @@ struct RevokeResult {
 ///
 /// `mem04.enabled` (cortrix.yaml §4.3) gates opt_out/opt_out_revoke: when disabled the
 /// mutating calls fail OPT_OUT_DISABLED (503). is_session_opted_out is NOT gated — the
-/// MEM02 worker must still honor existing opt-out stamps even if new opt-outs are off.
+/// worker must still honor existing opt-out stamps even if new opt-outs are off.
 ///
 /// Standalone-D3: every collaborator is an injected seam, so all three operations run
 /// fully in unit tests against a mock store (+ an optional mock logger).
 class OptOutManager {
 public:
     /// @param store      opt-out seam (D3.5 real MemoryStore adapter; UT mock)
-    /// @param op_logger  F18a operation logger (CE; real observability::IOperationLogger).
+    /// @param op_logger  operation logger (CE; real observability::IOperationLogger).
     ///                   OPTIONAL — nullptr skips the GEN-OperationLog audit hooks.
     /// @param enabled    mem04.enabled (cortrix.yaml §4.3) — false ⇒ mutating calls 503.
     explicit OptOutManager(std::shared_ptr<ISessionOptOutStore> store,
@@ -144,7 +144,7 @@ public:
                                       const std::string& reason,
                                       const observability::TraceContext* ctx = nullptr);
 
-    /// MEM02 worker check (D3 — skip extraction). True iff `session_id` is currently
+    /// Extraction-worker check (skip extraction). True iff `session_id` is currently
     /// opted-out. NOT gated by mem04.enabled (existing stamps are always honored).
     /// A non-existent session is treated as not-opted-out (false) — the worker has an
     /// interaction for it, so absence is a benign race, not an error. On store failure

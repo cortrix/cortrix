@@ -7,7 +7,7 @@
 
 namespace cortrix::query {
 
-/// F04 §2.7 — the 5 global GUCs, as a compile-time SoT (name / default / min / max).
+/// The 5 global GUCs, as a compile-time SoT (name / default / min / max).
 ///
 /// 🚨 D3 standalone (S4.2): this is the **GUC table + range-validated load** from an
 /// IGlobalConfig. The real PostgreSQL `DefineCustomVariable` registration (GUC
@@ -39,7 +39,7 @@ enum ScatterGucIndex {
     kGucTotalTimeoutMs = 4,
 };
 
-/// Resolved F04 runtime config (§2.7). The values ScatterGather + ExecutorEngine
+/// Resolved cross-NS runtime config. The values ScatterGather + ExecutorEngine
 /// actually run with, after load + range clamp.
 struct ScatterConfig {
     int executor_workers = kScatterGucs[kGucExecutorWorkers].default_value;

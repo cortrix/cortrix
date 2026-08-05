@@ -6,7 +6,7 @@
 
 namespace cortrix::memory::immunity {
 
-/// The `mem04` subsystem metrics (MEM04 §5.5, OBSERVABILITY_SPEC §2.3 line 112 SoT,
+/// The `mem04` subsystem metrics (observability naming,
 /// naming `cortrix_mem04_<event>_<unit>`). Mirrors the mem03_metrics.h /
 /// mem02_metrics.h template (process-wide singleton, atomic counters, OpenMetrics
 /// renderer).
@@ -22,10 +22,10 @@ namespace cortrix::memory::immunity {
 /// API, NOT this metric.
 ///
 /// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics text
-/// renderer. The F24 `/metrics` scrape endpoint does not exist in the frozen tree —
+/// renderer. The `/metrics` scrape endpoint does not exist in the frozen tree —
 /// registering this recorder into that endpoint is cross-Feature wiring **deferred to
 /// D3.5**. Until then it is fully usable + testable in-process and RenderOpenMetrics()
-/// produces what F24 will serve.
+/// produces what the server will serve.
 ///
 /// §5.5 metric schema (3 rows, all counters):
 ///   cortrix_mem04_opt_out_total          counter {triggered_by}
@@ -55,7 +55,7 @@ public:
     uint64_t OptOutRevokeCount() const;
 
     // --- cortrix_mem04_extract_skipped_total (Counter) ---
-    // Incremented when the MEM02 worker skips extraction for an opted-out session.
+    // Incremented when the extraction worker skips an opted-out session.
     void RecordExtractSkipped();
     uint64_t ExtractSkippedCount() const;
 

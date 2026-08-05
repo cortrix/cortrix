@@ -11,11 +11,11 @@
 
 namespace cortrix::retrieval {
 
-/// Default write-time serialize retry count (F40 §7.1 L1: "retry N=3").
+/// Default write-time serialize retry count ("retry N=3").
 inline constexpr int kSparseSerializeRetries = 3;
 
 /// Outcome of the L1 write-time serialize path. On success the BLOB is
-/// present and the F09 has_sparse_vec bit should be SET. On a serialize failure
+/// present and the has_sparse_vec bit should be SET. On a serialize failure
 /// (after N retries) the chunk degrades to dense+FTS5 only: blob is empty,
 /// has_sparse_vec must be CLEARED, sparse_vec column written NULL — NOT an error
 /// that fails the chunk write (only a *dense+sparse both* inference failure does
@@ -23,7 +23,7 @@ inline constexpr int kSparseSerializeRetries = 3;
 struct L1SerializeResult {
     bool serialized = false;          ///< true → use `blob`; false → write NULL
     std::vector<uint8_t> blob;        ///< the sparse_vec BLOB when serialized
-    bool set_has_sparse_vec = false;  ///< F09 flags_ext bit decision
+    bool set_has_sparse_vec = false;  ///< flags_ext bit decision
     int attempts = 0;                 ///< how many serialize attempts were made
 };
 

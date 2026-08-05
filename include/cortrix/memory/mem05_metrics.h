@@ -6,24 +6,24 @@
 
 namespace cortrix::memory {
 
-/// The `mem05` subsystem metrics (MEM05 §8.bis, OBSERVABILITY_SPEC §2.3 naming
+/// The `mem05` subsystem metrics (observability naming
 /// `cortrix_mem05_<metric>_<unit>`). Self-contained dependency-free recorder
 /// (same pattern as Mem02Metrics / ScoringMetrics): a process-wide singleton of
 /// atomic counters/gauges + an OpenMetrics text renderer.
 ///
-/// MEM05 metrics focus on *isolation compliance* — per-user isolation checks,
+/// These metrics focus on *isolation compliance* — per-user isolation checks,
 /// cross-user access denials (the safety-critical alert), quota enforcement, the
 /// CE no-auth `default` user, and MatchScope pre-filtering. They deliberately do
 /// NOT re-collect the generic `memory_*` metrics (items_count / decay_ratio,
-/// owned by MEM01 / MEM03), per MEM05 §8.bis.
+/// owned by the memory core / transparency surface).
 ///
-/// 🚨 Cardinality control (OBSERVABILITY_SPEC §3.2 — MEM05 §8.bis): labels are
+/// 🚨 Cardinality control: labels are
 /// enum-only (result / action / reason / quota_type). `user_id` is on the §3.2
 /// absolute deny list (high cardinality); per-user data goes through the audit
 /// log, never a metric label.
 ///
 /// 🚨 D3 standalone: this recorder + RenderOpenMetrics() are fully usable +
-/// testable in-process. The F24 `/metrics` scrape endpoint does not exist in the
+/// testable in-process. The `/metrics` scrape endpoint does not exist in the
 /// frozen tree — registering this recorder into that endpoint is cross-Feature
 /// wiring **deferred to D3.5** (same status as ScoringMetrics / Mem02Metrics).
 ///
@@ -109,7 +109,7 @@ public:
     uint64_t MatchScopeExcludedCount(Reason reason) const;
 
     /// Render all recorded metrics as OpenMetrics/Prometheus text exposition.
-    /// Stable metric names + HELP/TYPE lines (what the F24 endpoint will serve).
+    /// Stable metric names + HELP/TYPE lines (what the endpoint will serve).
     std::string RenderOpenMetrics() const;
 
     /// Reset all counters/gauges (test-only — production metrics are monotonic).

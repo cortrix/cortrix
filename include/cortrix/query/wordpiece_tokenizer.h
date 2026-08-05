@@ -8,7 +8,7 @@
 
 namespace cortrix::query {
 
-/// WordPieceTokenizer — the BERT/DistilBERT WordPiece tokenizer the F39/F37
+/// WordPieceTokenizer — the BERT/DistilBERT WordPiece tokenizer the routing and CRAG
 /// query-complexity classifier (OnnxComplexityBackend) feeds. It reproduces the
 /// HuggingFace `distilbert-base-uncased` pipeline byte-for-byte so the ids match
 /// the model the classifier was trained/exported with:

@@ -1,10 +1,10 @@
 #pragma once
 #include <string>
 
-// MEM02 prompt templates (D10 decision: F03 framework reuse + MEM02 specialization).
+// Memory-extraction prompt templates (enricher framework reuse + extraction specialization).
 // V1 ships a Chinese + English extraction prompt and a Chinese + English
 // contradiction-judgment prompt. Multi-language (JA/KO/ES/FR/DE) is Phase 2
-// (TD-MEM02-MULTI-LANG-PROMPT). The templates are plain text with `{placeholder}`
+// The templates are plain text with `{placeholder}`
 // tokens; RenderPrompt() does the single-pass substitution (no external template
 // engine — keeps the kernel dependency-free).
 namespace cortrix::memory {

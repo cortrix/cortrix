@@ -37,7 +37,7 @@ public:
     /// Execute full query pipeline
     /// 1. Intent classification (parallel, non-blocking)
     /// 2. vector + BM25 parallel execution
-    /// 3. Wait for SQL based on intent (F07 does not execute, reserved for F08)
+    /// 3. Wait for SQL based on intent (not executed yet; reserved)
     /// 4. RRF fusion
     /// 5. Post-filter + load details
     /// 6. Degradation evaluation

@@ -5,12 +5,12 @@
 
 namespace cortrix::query {
 
-/// CragStage — the F37 CRAG retrieval-quality evaluation applied AFTER rerank on
+/// CragStage — the CRAG retrieval-quality evaluation applied AFTER rerank on
 /// the live query path (Q6 wiring).
 ///
-/// Placement (F37 §4.1 / §6.3): F37 evaluates the FINAL reranked result set, so it
+/// Placement: CRAG evaluates the FINAL reranked result set, so it
 /// runs on the post-ScatterGather CrossNsResponse (cross-NS merged + reranked),
-/// gated by F39 ShouldSkipF37 (complex route only; simple/chat skip). The frozen
+/// gated by ShouldSkipF37 (complex route only; simple/chat skip). The frozen
 /// CragEvaluator writes the verdict onto QueryContext but does NOT mutate the result
 /// set — that is the Query-Engine's job (§6.3 "downstream"). This stage is that
 /// downstream: it converts the ResultItems to RankedChunks, runs

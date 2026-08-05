@@ -22,7 +22,7 @@ constexpr int kDefaultMaxNamespaces = 100;
 /// throws CrossNsException(kTooManyNamespaces) with structured_data
 /// {requested_count, max_namespaces} (topic 1.5 / GEN-Agent #5 — Agent slices + parallel
 /// re-queries). `max_namespaces` is the min(global GUC, plan cap) already taken by
-/// the caller (P01-3 plan coordination = S4.3, not done in W2). An empty request list throws
+/// the caller (cloud plan coordination, not done here). An empty request list throws
 /// CX_ERR_TOO_MANY_NAMESPACES is NOT used — an empty list is an invalid request and
 /// is rejected upstream; here an empty (non-wildcard) list simply yields empty.
 std::vector<std::string> ExpandNamespaces(

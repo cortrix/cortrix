@@ -4,24 +4,24 @@
 #include <string>
 #include <vector>
 
-#include "cortrix/retrieval/types.h"  // RankedChunk (F02 output / F37 input)
+#include "cortrix/retrieval/types.h"  // RankedChunk (reranker output / classifier input)
 
 namespace cortrix::retrieval {
 
-/// IClassifier — the shared post-retrieval classifier abstraction (F37 §5.1, S1
-/// ruling of the G3+G1.2 joint D1). F37 CragEvaluator, F39 QueryComplexityClassifier
+/// IClassifier — the shared post-retrieval classifier abstraction (the
+/// shared contract). CragEvaluator, QueryComplexityClassifier
 /// (C-R2), and the existing IntentClassifier all implement this one interface so
 /// the query pipeline can treat "classify a retrieval/query signal" uniformly.
 ///
-/// Standalone note (D3): F37 builds CragEvaluator : IClassifier against this header
-/// + a mock/heuristic backend. F39's QueryComplexityClassifier is NOT frozen this
-/// round and reuses this interface in C-R2 (the briefing's "F39 reuses your
-/// IClassifier"); nothing here depends on F39.
+/// Standalone note: CragEvaluator : IClassifier is built against this header
+/// + a mock/heuristic backend. QueryComplexityClassifier is NOT frozen this
+/// round and reuses this interface later (the router "reuses this
+/// IClassifier"); nothing here depends on the router.
 
 /// Input to a classifier: the query plus the F02-reranked candidates it is judging.
 struct ClassifierInput {
     std::string query;
-    std::vector<RankedChunk> chunks;     ///< F02 Reranker output (chunks + scores)
+    std::vector<RankedChunk> chunks;     ///< Reranker output (chunks + scores)
     std::optional<std::string> ns_id;    ///< target namespace (for NS-config resolution)
 };
 
@@ -41,7 +41,7 @@ public:
 
     /// Classify one input. Implementations must be total (never throw across this
     /// boundary): a backend failure is reported via ClassificationResult.error_code
-    /// + a safe fallback label, per F37 §6.2 / §7.3.
+    /// + a safe fallback label.
     virtual ClassificationResult Classify(const ClassifierInput& input) = 0;
 
     /// Stable classifier name (logging / explain endpoint). e.g. "f37-crag".

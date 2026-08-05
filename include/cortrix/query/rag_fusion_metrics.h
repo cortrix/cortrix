@@ -9,11 +9,11 @@
 
 namespace cortrix::query {
 
-/// The `rag_fusion` subsystem metrics (F36 §8, OBSERVABILITY_SPEC §2 naming
-/// `cortrix_rag_fusion_<metric>_<unit>`). Mirrors the F04 ScatterMetrics template
+/// The `rag_fusion` subsystem metrics (observability naming
+/// `cortrix_rag_fusion_<metric>_<unit>`). Mirrors the ScatterMetrics template
 /// (process-wide singleton, atomic counters/histograms, OpenMetrics renderer).
 ///
-/// 🚨 Cardinality control (OBSERVABILITY_SPEC §3.2 — F36 §8): labels are
+/// 🚨 Cardinality control: labels are
 /// enum-only. NO `tenant_id` / `ns_id` / `user_id` (high-cardinality, forbidden);
 /// per-NS / per-tenant data goes through the §3.4 per-tenant API. The model label
 /// is a low-cardinality enum (< 50, provider × mainstream model — §8 Phase 2
@@ -22,10 +22,10 @@ namespace cortrix::query {
 /// asserts no high-cardinality label string ever appears.
 ///
 /// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
-/// text renderer. The F24 `/metrics` scrape endpoint does not exist in the frozen
+/// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
 /// **deferred to D3.5**. Until then it is fully usable + testable in-process and
-/// RenderOpenMetrics() produces what F24 will serve.
+/// RenderOpenMetrics() produces what the server will serve.
 ///
 /// §8 metric schema (6 rows):
 ///   cortrix_rag_fusion_invocation_total          counter   {result}

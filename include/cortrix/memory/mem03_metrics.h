@@ -6,23 +6,23 @@
 
 namespace cortrix::memory::transparency {
 
-/// The `memory_transparency` subsystem metrics (MEM03 §8, OBSERVABILITY_SPEC §2
+/// The `memory_transparency` subsystem metrics (observability
 /// naming `cortrix_memory_transparency_<metric>_<unit>`, §2.3 line 105 SoT). Mirrors
-/// the mem02_metrics.h / F36 RagFusionMetrics template (process-wide singleton,
+/// the mem02_metrics.h / RagFusionMetrics template (process-wide singleton,
 /// atomic counters/histograms, OpenMetrics renderer).
 ///
-/// 🚨 Cardinality control (OBSERVABILITY_SPEC §3.2 — MEM03 §8): labels are enum-only.
+/// 🚨 Cardinality control: labels are enum-only.
 /// NO `tenant_id` / `ns_id` / `user_id` (high-cardinality, forbidden); per-NS /
 /// per-tenant data goes through the §3.4 per-tenant API. `op` is the 4-value op enum
 /// (list/create/edit/invalidate — V8 G2 M1: op=invalidate is 1:1 with the audit
-/// action name), `status` is success/error, `error_code` is the 5-value MEM03
+/// action name), `status` is success/error, `error_code` is the 5-value transparency
 /// error-code enum (all bounded, low-cardinality).
 ///
 /// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics text
-/// renderer. The F24 `/metrics` scrape endpoint does not exist in the frozen tree —
+/// renderer. The `/metrics` scrape endpoint does not exist in the frozen tree —
 /// registering this recorder into that endpoint is cross-Feature wiring **deferred to
 /// D3.5**. Until then it is fully usable + testable in-process and RenderOpenMetrics()
-/// produces what F24 will serve.
+/// produces what the server will serve.
 ///
 /// §8 metric schema (5 rows):
 ///   cortrix_memory_transparency_op_total                counter   {op, status}
@@ -33,8 +33,8 @@ namespace cortrix::memory::transparency {
 class Mem03Metrics {
 public:
     /// op label for op_total / op_latency_seconds (§8). list/create/edit/invalidate —
-    /// `invalidate` (not `delete`) is 1:1 with the audit action + P12 tool name
-    /// (V8 G2 M1 naming sync, MEM03 §8 / §4.2).
+    /// `invalidate` (not `delete`) is 1:1 with the audit action + MCP tool name
+    /// (naming sync with the audit surface).
     enum class Op {
         kList = 0,
         kCreate,
@@ -48,7 +48,7 @@ public:
         kError,
     };
 
-    /// error_code label for invalid_input_total (§8). The 5 registered MEM03 error
+    /// error_code label for invalid_input_total. The 5 registered transparency error
     /// identities (mem03_error.h Mem03ErrorCode), kept enum-bounded so the metric
     /// label stays low-cardinality. Ordered to match Mem03ErrorCode.
     enum class ErrorCodeLabel {

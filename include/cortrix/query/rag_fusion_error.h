@@ -15,18 +15,18 @@ namespace cortrix::query {
 /// retryability + the structured_data keys its body MUST carry, via the canonical
 /// registry below.
 ///
-/// F36 §3 (B_R1_BRIEFING template A): the D1 detail design wrote `Result<T,
+/// The detail design wrote `Result<T,
 /// RagFusionError>` (double-template), which F-FREEZE-1 forbids — Cortrix uses
 /// `Result<T>` (StatusOr) + `Status` only. A domain error is carried as the
 /// Agent-friendly boundary type cortrix::agent_friendly::AgentFriendlyError,
 /// identified by its CX_ERR_* code. So RagFusionErrorCode is the *enum of
 /// identities*, and MakeRagFusionError() turns one (plus optional structured_data)
-/// into that boundary error — mirroring the F04 CrossNsErrorCode / F12
+/// into that boundary error — mirroring the CrossNsErrorCode /
 /// CatalogErrorCode template (query/cross_ns_error.h).
 ///
 /// topic 6 commercial sensitivity: CX_WARN_RAG_FUSION_DEGRADED is C-class — it ONLY
-/// surfaces when a user has explicitly enabled F36 (ns_config.enabled=true) and an
-/// LLM call then fails; users who never enable F36 never see it (the LLM is never
+/// surfaces when a user has explicitly enabled RAG-Fusion (ns_config.enabled=true) and an
+/// LLM call then fails; users who never enable it never see it (the LLM is never
 /// called). All other codes are B-class (internal, only via ?explain=true).
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
@@ -43,12 +43,12 @@ enum class RagFusionErrorCode {
                          ///< query response), bad rag_fusion_config field
 };
 
-/// Total number of RAG-Fusion error codes (F36 §7 = 6 = 5 err + 1 warn).
+/// Total number of RAG-Fusion error codes (= 6 = 5 err + 1 warn).
 /// Compile-time anchor for the API-compatibility regression test (the set must
 /// not shrink).
 constexpr int kRagFusionErrorCodeCount = 6;
 
-/// Canonical, immutable attributes of one error code (F36 §7 columns).
+/// Canonical, immutable attributes of one error code.
 struct RagFusionErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" / "CX_WARN_*" string
     agent_friendly::ErrorCategory category;   ///< transient/timeout/quota/permanent
@@ -64,7 +64,7 @@ const RagFusionErrorInfo& GetRagFusionErrorInfo(RagFusionErrorCode code);
 const char* RagFusionErrorCodeString(RagFusionErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5,
-/// F36 §7 structured_data column). SoT for the Agent-friendly contract; lets call
+/// structured_data column). SoT for the Agent-friendly contract; lets call
 /// sites + tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(RagFusionErrorCode code);
 

@@ -9,12 +9,12 @@
 
 namespace cortrix::query {
 
-/// LlmRerankStage — F36-LR LLM listwise second-pass reranker (design: hub
+/// LlmRerankStage — LLM listwise second-pass reranker (design: hub
 /// design/features/F36-llm-listwise-rerank-addendum.md).
 ///
-/// Position in the pipeline (§2): retrieval (+F36 variants) → F02 cross-encoder
+/// Position in the pipeline: retrieval (+RAG-Fusion variants) → cross-encoder
 /// rerank → THIS stage listwise-reranks the head top_n of the response → caller
-/// trims back to the requested top_k → F37 CRAG → serialize.
+/// trims back to the requested top_k → CRAG → serialize.
 ///
 /// Contract:
 ///  - Reorders `resp->results` in place; never fails the query. On any LLM /
@@ -22,9 +22,9 @@ namespace cortrix::query {
 ///    meta.warnings[CX_WARN_LLM_RERANK_DEGRADED] (§2.4).
 ///  - Reordered head scores are rewritten to a monotonically decreasing rank
 ///    score strictly above the tail's max score, so the "results sorted by
-///    score desc" downstream contract holds; the F02 cross-encoder score stays
+///    score desc" downstream contract holds; the cross-encoder score stays
 ///    untouched in `rerank_score` for traceability (§2.3).
-///  - Prompt carries the same LLM01 injection defense as F36 §4.2: random
+///  - Prompt carries the same injection defense as the variant generator: random
 ///    suffix delimiter tags + ignore-instructions rule + strict JSON schema.
 class LlmRerankStage {
 public:
@@ -40,11 +40,11 @@ public:
         int votes_ok = 0;            ///< calls whose ranking was usable
         std::string model_used;
         std::string reason;          ///< "active" / "disabled" / "too_few_results" / "llm_unavailable"
-        std::string degrade_reason;  ///< F36 reason-token vocabulary (llm_timeout / ...)
+        std::string degrade_reason;  ///< reason-token vocabulary (llm_timeout / ...)
         std::string degrade_detail;  ///< safe short detail (http_status=... / ...)
     };
 
-    /// @param llm  shared OpenAI-compatible client (F03 roster); null → the
+    /// @param llm  shared OpenAI-compatible client; null → the
     ///             stage degrades every call with reason "llm_unavailable".
     explicit LlmRerankStage(std::shared_ptr<llm::ILlmClient> llm)
         : llm_(std::move(llm)) {}

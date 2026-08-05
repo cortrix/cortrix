@@ -4,12 +4,12 @@
 
 namespace cortrix::query {
 
-/// F36-LR: request-scoped config for the LLM listwise rerank stage (design:
+/// Request-scoped config for the LLM listwise rerank stage (design:
 /// hub design/features/F36-llm-listwise-rerank-addendum.md §2.1).
 ///
-/// Unlike F36 RagFusionConfig (query expansion — candidate generation), this
+/// Unlike RagFusionConfig (query expansion — candidate generation), this
 /// stage lets the LLM participate in ORDERING: it listwise-reranks the top_n
-/// candidates that retrieval + the F02 cross-encoder already ranked. Default
+/// candidates that retrieval + the cross-encoder already ranked. Default
 /// disabled (cost + latency); an Agent opts in per request via `llm_rerank`
 /// (body/param) or `llm_rerank_config` (body object).
 struct LlmRerankConfig {

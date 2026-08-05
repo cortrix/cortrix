@@ -7,18 +7,18 @@
 
 namespace cortrix::retrieval {
 
-/// Default RRF constant (F40 §9.1: k=60, industry default / NS-configurable
+/// Default RRF constant (k=60, industry default / NS-configurable
 /// Phase 2).
 inline constexpr int kRrfKDefault = 60;
 
-/// The 5 chunk-level recall paths (F40 §9.1 / GS-1). via_path / explain uses
+/// The 5 chunk-level recall paths. via_path / explain uses
 /// these names; the index order is the stable label order.
 enum class RrfPath {
     kDense = 0,           ///< original child embedding (BGE-M3 dense)
-    kContextualized,      ///< F35 contextualized_embedding (dual-vector ANN hit, §3.8 W2)
-    kSparse,              ///< F40 sparse_vec → SpladeSparseRetriever.Search
+    kContextualized,      ///< contextualized_embedding (dual-vector ANN hit)
+    kSparse,              ///< sparse_vec → SpladeSparseRetriever.Search
     kFts5,                ///< literal BM25
-    kHypeQuestion,        ///< F38 hype_question hit expanded to its source child (F38-4)
+    kHypeQuestion,        ///< hype_question hit expanded to its source child
 };
 inline constexpr int kRrfPathCount = 5;
 const char* ToString(RrfPath path);
@@ -39,10 +39,10 @@ struct RrfFusedHit {
 /// simple/chat routes stay chunk-only.
 struct FivePathInput {
     std::vector<SparseHit> dense;
-    std::vector<SparseHit> contextualized;  ///< F35-9 B dual-vector votes (§3.8 W2)
+    std::vector<SparseHit> contextualized;  ///< dual-vector votes
     std::vector<SparseHit> sparse;
     std::vector<SparseHit> fts5;
-    std::vector<SparseHit> hype;            ///< F38 hype votes for their source child
+    std::vector<SparseHit> hype;            ///< hype votes for their source child
 };
 
 /// chunk-level 5-path RRF fusion. For each path, a candidate's
@@ -56,7 +56,7 @@ struct FivePathInput {
 std::vector<RrfFusedHit> FuseFivePathRrf(const FivePathInput& input,
                                          int top_n = 0, int k = kRrfKDefault);
 
-/// B-class explain payload for a sparse-path query (F40 §3.1 B-class /
+/// B-class explain payload for a sparse-path query (
 /// AGENT_FRIENDLY #2 — `?explain=true`). via_path is "sparse" on the normal path
 /// and a fallback token on L2; fallback_paths lists what actually ran.
 struct SparseExplain {

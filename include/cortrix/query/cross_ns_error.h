@@ -14,7 +14,7 @@ namespace cortrix::query {
 /// `CX_ERR_*` string + a GEN-Agent category + retryability + the structured_data
 /// keys its body MUST carry, via the canonical registry below.
 ///
-/// 🌟 F04's error responses are the **project-level Agent-friendly reference**
+/// 🌟 The cross-NS error responses are the **project-level Agent-friendly reference**
 /// (topic 2.7 drives GEN-Agent's first principle — AGENT_FRIENDLY.md). All 7 principles must
 /// hold: machine-readable code (#1) + enumerable category (#4) + structured_data
 /// (#5) + machine-readable retry (#6) + stable/versioned set (#7).
@@ -24,7 +24,7 @@ namespace cortrix::query {
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// So CrossNsErrorCode is the *enum of identities*, and MakeCrossNsError() turns
 /// one (plus optional structured_data) into that boundary error — mirroring the
-/// F12 CatalogErrorCode template.
+/// CatalogErrorCode template.
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may be appended (api_version stays "v1").
@@ -41,11 +41,11 @@ enum class CrossNsErrorCode {
     kScatterTimeout,          ///< 200 + meta + partial — overall scatter exceeded total_timeout_ms
 };
 
-/// Total number of Cross-NS error codes (F04 §3.1 = 6). Compile-time anchor for
+/// Total number of Cross-NS error codes (= 6). Compile-time anchor for
 /// the API-compatibility regression test (the set must not shrink).
 constexpr int kCrossNsErrorCodeCount = 6;
 
-/// Canonical, immutable attributes of one error code (F04 §3.1 columns).
+/// Canonical, immutable attributes of one error code.
 struct CrossNsErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout

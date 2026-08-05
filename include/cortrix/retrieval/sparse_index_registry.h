@@ -8,11 +8,11 @@
 
 namespace cortrix::retrieval {
 
-/// SparseIndexRegistry — the D3.5 per-NS lifecycle owner for the F40 SPLADE
+/// SparseIndexRegistry — the per-NS lifecycle owner for the SPLADE
 /// inverted index (Q4 wiring).
 ///
 /// The frozen SpladeSparseRetriever owns one SQLite handle (its inverted index);
-/// F40's design leaves "injecting the per-NS connection" to D3.5. This registry is
+/// The design leaves "injecting the per-NS connection" to the wiring layer. This registry is
 /// that injection: it lazily opens ONE retriever per namespace (keyed by ns_id) and
 /// hands the SAME instance to both the ingest write path (Add at chunk embed) and
 /// the query read path (Search), so writes and reads share one index. Each NS's

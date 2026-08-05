@@ -10,8 +10,8 @@ class OnnxEmbedder;
 
 class VectorSearcher {
 public:
-    /// @param vec_index: per-namespace F01 vector index (façade.vec_index(), = bundle.index)
-    /// @param embedder: F03 OnnxEmbedder instance (global shared)
+    /// @param vec_index: per-namespace vector index (façade.vec_index(), = bundle.index)
+    /// @param embedder: OnnxEmbedder instance (global shared)
     VectorSearcher(cortrix::store::IIndex& vec_index, OnnxEmbedder& embedder);
 
     /// Execute vector search

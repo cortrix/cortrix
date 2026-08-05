@@ -9,19 +9,19 @@
 
 namespace cortrix::retrieval {
 
-/// F40 top-K config bounds (F40-6: K=100 default, NS-configurable 50-200).
+/// Sparse top-K config bounds (K=100 default, NS-configurable 50-200).
 inline constexpr int kSparseTopKDefault = 100;
 inline constexpr int kSparseTopKMin = 50;
 inline constexpr int kSparseTopKMax = 200;
 
 /// The IGlobalConfig key holding the process-wide default sparse top-K. Read via
 /// the generic IGlobalConfig::GetInt accessor (the canonical config surface does
-/// not have an F40-typed getter — that would be an F40 D3 reverse hook to
+/// not have a sparse-typed getter — that would be a reverse hook into
 /// IGlobalConfig at D3.5; standalone reads the generic key).
 inline constexpr const char* kSparseTopKConfigKey = "retrieval.sparse_top_k";
 
-/// Per-namespace F40 sparse overrides parsed from a `*_config` JSONB blob (mirrors
-/// the F02 NsRerankerConfig pattern, topic 2.2/2.4). V1 = the single
+/// Per-namespace sparse overrides parsed from a `*_config` JSONB blob (mirrors
+/// the NsRerankerConfig pattern). V1 = the single
 /// NS-overridable B-class field `sparse_top_k`; every field is OPTIONAL so an
 /// absent key inherits the global default at resolve time. A-class caps
 /// (posting_list_cap / cache size) are process-global, NOT here.
@@ -43,11 +43,11 @@ struct NsSparseConfig {
 
 /// Resolve the effective top-K for a query: NS override (if set) else the global
 /// default (IGlobalConfig key, else kSparseTopKDefault), clamped to [50, 200]
-/// (F40-6). `global` may be null (tests / no-config) → falls back to the
+/// `global` may be null (tests / no-config) → falls back to the
 /// compile-time default before clamping.
 int ResolveSparseTopK(const NsSparseConfig& ns_cfg, const IGlobalConfig* global);
 
-/// Clamp an arbitrary requested top-K to the F40-6 [50, 200] window. Exposed for
+/// Clamp an arbitrary requested top-K to the [50, 200] window. Exposed for
 /// tests + call sites that already have a raw value.
 int ClampSparseTopK(int requested);
 

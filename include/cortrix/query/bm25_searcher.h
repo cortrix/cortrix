@@ -8,7 +8,7 @@ namespace cortrix {
 
 class BM25Searcher {
 public:
-    /// @param store: F02 CortrixStore instance (per-namespace)
+    /// @param store: CortrixStore instance (per-namespace)
     explicit BM25Searcher(CortrixStore& store);
 
     /// Execute BM25 full-text search

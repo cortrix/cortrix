@@ -8,10 +8,10 @@ namespace cortrix::query {
 struct SearchConfig {
     bool enable_vector = true;  ///< dense embedding/HNSW route
     bool enable_bm25 = true;    ///< FTS5/BM25 route
-    bool enable_sparse = true;  ///< F40 sparse/SPLADE route when available
+    bool enable_sparse = true;  ///< sparse/SPLADE route when available
 };
 
-/// F04 cross-NS QueryRequest (F04 §2.4 — B' incompatible-with-MVP schema). The
+/// Cross-NS QueryRequest (incompatible-with-MVP schema). The
 /// ONLY supported request shape uses the `namespaces` **array** (topic 4.1). The MVP
 /// single `namespace` field is deprecated → CX_ERR_DEPRECATED_FIELD at the HTTP
 /// handler (S4.1 / W4, not in this batch).

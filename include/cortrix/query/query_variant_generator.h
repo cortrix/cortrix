@@ -14,14 +14,14 @@ namespace cortrix::query {
 ///
 /// 🔑 Standalone seam (B_R1_BRIEFING §7): the D1 design names the dependency
 /// `f03::OpenAiLlmClient`, but the FROZEN scaffolding seam (D2-pre-3,
-/// `cortrix/llm/i_llm_client.h`) is `cortrix::llm::ILlmClient` — the interface F03's
-/// real `OpenAiLlmClient` implements, and which lists F36 as one of its 7
+/// `cortrix/llm/i_llm_client.h`) is `cortrix::llm::ILlmClient` — the interface the
+/// real `OpenAiLlmClient` implements, and which lists RAG-Fusion as one of its 7
 /// consumers. We depend on the interface (the correct abstraction), and unit-test
 /// against the frozen `cortrix::llm::MockLlmClient`. The REAL `OpenAiLlmClient.Chat()`
-/// HTTP transport is delivered by F03 (same Wave) → wiring a live client is the
-/// **D3.5 deferred** step (β-pattern: F04 mocked F02 IReranker the same way).
+/// HTTP transport is delivered with the enricher → wiring a live client is a
+/// **deferred** step (the cross-NS layer mocked IReranker the same way).
 ///
-/// Prompt-injection hardening (F36 §4.2 / D1 V3 ruling 11 / SECURITY_BASELINE LLM01):
+/// Prompt-injection hardening:
 ///   1. user input wrapped in `<USER_QUERY_{suffix}>...</USER_QUERY_{suffix}>`
 ///   2. {suffix} = a fresh random 8-char hex per call (defeats a user closing the tag)
 ///   3. LLM output strictly JSON-schema-validated (no free text accepted)
@@ -35,7 +35,7 @@ public:
     ///             dereferences a null llm), and callers can pre-check via has_llm().
     explicit QueryVariantGenerator(std::shared_ptr<llm::ILlmClient> llm);
 
-    /// True iff an LLM client is configured (non-null). The F36 rag-fusion gate
+    /// True iff an LLM client is configured (non-null). The rag-fusion gate
     /// (query_wiring) checks this to skip variant expansion entirely when no LLM is
     /// available, degrading the query to plain scatter (dense + BM25) — [R7].
     bool has_llm() const { return llm_ != nullptr; }
@@ -81,10 +81,10 @@ public:
                                    const std::string& suffix,
                                    const std::string& locale);
 
-    /// A fresh random 8-char lowercase-hex suffix (F36 §4.2 #2).
+    /// A fresh random 8-char lowercase-hex suffix.
     static std::string RandomSuffix();
 
-    /// True iff `query` contains a known prompt-injection keyword (F36 §4.2 #4).
+    /// True iff `query` contains a known prompt-injection keyword.
     /// Case-insensitive substring match over a fixed keyword set.
     static bool ContainsInjectionKeyword(const std::string& query);
 
@@ -96,7 +96,7 @@ public:
     static bool ShouldKeepVariant(const std::string& original_query,
                                   const std::string& variant_query);
 
-    /// Parse the LLM's JSON response into variant strings (F36 §4.2 #3 strict
+    /// Parse the LLM's JSON response into variant strings (strict
     /// schema). Expects `{"variants":[{"strategy":"..","query":".."}, ...]}`.
     /// Returns false (and fills `schema_error`) on any schema violation — a missing
     /// `variants` array, a non-object element, a missing/empty `query`, etc. On

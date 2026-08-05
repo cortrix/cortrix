@@ -10,11 +10,11 @@
 
 namespace cortrix::memory {
 
-/// The 5 MEM02 LLM-Memory-Extraction error identities. Each maps to a
+/// The 5 LLM memory-extraction error identities. Each maps to a
 /// stable `CX_ERR_*` string + a GEN-Agent category + retryability + retry_after_ms
 /// + the structured_data keys its body MUST carry, via the canonical registry below.
 ///
-/// MEM02 §3 (B_R3_BRIEFING template A): the D1 detail design wrote `Result<T,
+/// The detail design wrote `Result<T,
 /// XxxError>` (double-template) in places, which F-FREEZE-1 forbids — Cortrix uses
 /// `Result<T>` (StatusOr) + `Status` only. A domain error is carried as the
 /// Agent-friendly boundary type cortrix::agent_friendly::AgentFriendlyError,
@@ -32,11 +32,11 @@ enum class Mem02ErrorCode {
     kLlmDisabled,           ///< 503 CX_ERR_MEM02_LLM_DISABLED — permanent (NullEnricher mode), not retryable
 };
 
-/// Total number of MEM02 error codes (MEM02 §5.3 = 5). Compile-time anchor for the
+/// Total number of memory-extraction error codes (= 5). Compile-time anchor for the
 /// API-compatibility regression test (the set must not shrink).
 constexpr int kMem02ErrorCodeCount = 5;
 
-/// Canonical, immutable attributes of one error code (MEM02 §5.3 columns).
+/// Canonical, immutable attributes of one error code.
 struct Mem02ErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     int http_status;                          ///< §5.3 HTTP column (504/500/429/503)
@@ -56,7 +56,7 @@ const char* Mem02ErrorCodeString(Mem02ErrorCode code);
 int Mem02ErrorHttpStatus(Mem02ErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5,
-/// MEM02 §5.2 structured_data example). SoT for the Agent-friendly contract; lets
+/// structured_data example). SoT for the Agent-friendly contract; lets
 /// call sites + tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(Mem02ErrorCode code);
 

@@ -12,14 +12,14 @@
 #include "cortrix/memory/interaction_log.h"
 #include "cortrix/observability/trace_context.h"
 
-// MEM02 async extraction queue (D2 decision: async queue main line + periodic
+// Async extraction queue (async queue main line + periodic
 // fallback). A self-contained C++ in-process queue + resident worker pool that
 // drains queued interactions through a supplied handler.
 //
 // 🚨 D3 standalone discipline (B_R3_BRIEFING §2 redline 2): this is modeled on the
-// F42 WorkerPool fan-out *pattern* but does NOT #include or consume any F42 code —
-// it is an independent queue scoped to MEM02. The real cross-language async worker
-// (the Python middleware in MEM02 §3.3.1) and the real cortrix_log_interaction
+// WorkerPool fan-out *pattern* but does NOT #include or consume the task-scheduler code —
+// it is an independent queue scoped to extraction. The real cross-language async worker
+// (the Python middleware) and the real cortrix_log_interaction
 // trigger are DEFERRED → D3.5; this kernel-side queue is the in-process basis they
 // build on and is fully testable standalone (push → worker → handler).
 //
@@ -51,7 +51,7 @@ using MemoryUnextractedSource = std::function<std::vector<InteractionLog>()>;
 
 class MemoryQueue {
 public:
-    /// Worker-pool + reliability config (MEM02 §3.3 Config + §4.3 mem02.queue).
+    /// Worker-pool + reliability config (`mem02.queue`).
     struct Config {
         int worker_count = 4;                 ///< resident worker threads (NS-level configurable)
         size_t queue_max_size = 10000;        ///< backpressure cap; push past it is rejected

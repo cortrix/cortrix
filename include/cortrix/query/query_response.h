@@ -34,7 +34,7 @@ struct SqlResult {
     std::vector<std::string> columns;
     std::vector<std::vector<json>> rows;
     bool has_result = false;                 // false = sql_result: null
-    // F08 extensions
+    // metadata-block extensions
     int row_count = 0;
     bool truncated = false;
     std::string error;
@@ -43,7 +43,7 @@ struct SqlResult {
 
 struct QueryResponse {
     std::vector<ResultItem> results;
-    SqlResult sql_result;                    // F07 always null, F08 fills
+    SqlResult sql_result;                    // always null today
     QueryMeta meta;
     bool has_error = false;                  // true when all routes failed (L3)
     std::string error_message;               // user-facing error description
