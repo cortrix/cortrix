@@ -150,7 +150,7 @@ add_executable(cortrix_unit_tests
     unit/test_cortrix_blob_local.cpp
     unit/test_memory_store.cpp
     unit/test_memory_scorer.cpp
-    unit/test_memory_isolation_user_isolation.cpp
+    unit/test_memory_user_isolation.cpp
     unit/test_memory_writer.cpp
     unit/test_memory_injector.cpp
     unit/test_memory_searcher.cpp
@@ -189,7 +189,7 @@ add_executable(cortrix_unit_tests
     unit/test_query_request_r8.cpp
     unit/test_memory_routes_success_r8.cpp
     unit/test_memory_routes_transparency_r8.cpp
-    unit/test_sparse_onnx_embedder_sparse.cpp
+    unit/test_onnx_embedder_sparse.cpp
     unit/test_sparse_error.cpp
     unit/test_sparse_codec.cpp
     unit/test_sparse_retriever_interface.cpp

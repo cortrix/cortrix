@@ -13,7 +13,7 @@ add_executable(cortrix_benchmarks
     bench_spc_pipeline.cpp
     bench_memory_system.cpp
     bench_enricher.cpp
-    bench_sparse_sparse.cpp
+    bench_sparse.cpp
 )
 
 target_link_libraries(cortrix_benchmarks PRIVATE
