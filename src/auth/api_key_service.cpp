@@ -40,7 +40,7 @@ std::string RandomHex(int nbytes) {
 }  // namespace
 
 std::string ApiKeyService::GenerateApiKeyPlaintext() {
-    // "cortrix_sk_" + 64 hex chars (32 random bytes). P08 §2.13.2.a / §3.7.
+    // "cortrix_sk_" + 64 hex chars (32 random bytes).
     return "cortrix_sk_" + RandomHex(32);
 }
 
@@ -58,7 +58,7 @@ Result<CreatedApiKey> ApiKeyService::CreateApiKey(const std::string& user_id,
                                                   int64_t expires_at_ms) {
     if (db_ == nullptr) return AuthStatus(AuthErrorCode::kInternalError, "not initialized");
 
-    // CE no-auth / first-start posture (R1, F04 v1.0.4 family): the api_keys FK
+    // CE no-auth / first-start posture: the api_keys FK
     // targets users(id), but with auth disabled no user row exists until the
     // bootstrap URL is consumed. Ensure the owning principal lazily so key
     // minting works in the single-tenant deployment; a real registered user id

@@ -9,7 +9,7 @@ namespace cortrix::reranker {
 namespace {
 
 // cortrix_reranker_score_duration_seconds bucket upper bounds (seconds), aligned
-// with RerankerMetrics::kScoreBucketCount. Chosen against the F02 §3.4 SLA:
+// with RerankerMetrics::kScoreBucketCount. Chosen against the reranker SLA:
 // component P99=200ms, 30-candidate ScoreBatch ~240ms, end-to-end P50<500ms /
 // P99<1500ms — buckets sit on those thresholds with headroom to 5s.
 constexpr double kScoreBounds[8] = {0.05, 0.1, 0.2, 0.5, 1.0, 1.5, 2.0, 5.0};

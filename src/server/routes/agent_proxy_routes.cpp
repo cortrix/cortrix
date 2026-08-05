@@ -56,7 +56,7 @@ std::string UpstreamPath(const httplib::Request& req, const std::string& strip_p
 
 // Streamed pass-through for the SSE chat endpoint: an upstream reader thread
 // feeds chunks into a handoff buffer the chunked provider drains, so tokens
-// reach the browser as the agent emits them (F48 section 4.3 SSE pass-through).
+// reach the browser as the agent emits them (SSE pass-through).
 struct StreamState {
     std::mutex mu;
     std::condition_variable cv;
@@ -194,7 +194,7 @@ void ProxyBuffered(const std::string& base, const std::string& strip_prefix,
 void RegisterAgentProxyRoutes(httplib::Server& server, const std::string& agent_base_url) {
     if (agent_base_url.empty()) return;
 
-    // SSE chat — streamed (F48 section 4.3).
+    // SSE chat — streamed.
     server.Post("/api/v1/agent/chat",
         [agent_base_url](const httplib::Request& req, httplib::Response& res) {
             ProxyChatStreaming(agent_base_url, req, res);

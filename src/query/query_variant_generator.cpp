@@ -79,7 +79,7 @@ void ReplaceAll(std::string& s, const std::string& from, const std::string& to) 
     }
 }
 
-// Classify a failed Chat() Status into the F36 §7 error identity. F03's real
+// Classify a failed Chat() Status into the rag-fusion error identity. The enricher's real
 // client (D3.5) prefixes its Status message with the CX_ERR token (CrossNsStatus
 // pattern); until then we also match on coarse StatusCode + message hints so the
 // degrade path is exercised standalone.
@@ -287,9 +287,9 @@ Result<QueryVariants> QueryVariantGenerator::Generate(
     const std::string& locale,
     const observability::TraceContext* ctx) {
     // [R7] No LLM configured (CE OSS default) → cannot expand. Degrade to single
-    // query instead of dereferencing a null llm_ (defense-in-depth: the F36 gate in
+    // query instead of dereferencing a null llm_ (defense-in-depth: the rag-fusion gate in
     // query_wiring already skips rag-fusion when no LLM is available, but this guard
-    // keeps the generator safe for any caller). Mirrors the §F36 "LLM unavailable →
+    // keeps the generator safe for any caller). Mirrors the "LLM unavailable →
     // single-query fallback" contract; kDegraded is the C-class warning code.
     if (!llm_) {
         RagFusionMetrics::Instance().RecordDegraded(

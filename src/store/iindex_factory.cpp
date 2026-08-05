@@ -13,8 +13,8 @@ namespace {
 
 // Translate the index-agnostic IndexConfig (HNSW graph knobs) into a PhnswConfig.
 // The persistence-layer knobs (group commit, snapshot thresholds, WAL buffer)
-// are an F01 implementation detail and keep their PhnswConfig defaults here —
-// they are sourced from IGlobalConfig once F01 S3/S4 wire that up, not from the
+// are an index implementation detail and keep their PhnswConfig defaults here —
+// they are sourced from IGlobalConfig once the index wires that up, not from the
 // shared IndexConfig contract.
 PhnswConfig ToPhnswConfig(const IndexConfig& cfg) {
     PhnswConfig pc;

@@ -51,14 +51,14 @@ Status ScoringSchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
     }
     if (!db) return Status::InvalidArgument("F07 migrate: null db");
 
-    // blocks is the F09-owned per-Unit table, created before F07's provider runs. If
+    // blocks is the block-header-owned per-Unit table, created before this provider runs. If
     // absent (isolated unit test not building the per-Unit framework), no-op so the
-    // migrator batch isn't blocked (same guard as F03's provider).
+    // migrator batch isn't blocked (same guard as the enricher's provider).
     if (!TableExists(db, "blocks")) return Status::Ok();
 
-    // ARCH §5.1.2 / F07 §3: semantic_score is a per-Unit blocks column (write-time score, immutable,
+    // semantic_score is a per-Unit blocks column (write-time score, immutable,
     // 5-level discrete float). SQLite ADD COLUMN is not "if not exists" → guard on ColumnExists for
-    // idempotency (mirrors F03 enriched_score).
+    // idempotency (mirrors enriched_score).
     if (ColumnExists(db, "blocks", "semantic_score")) return Status::Ok();
     if (Status s = Exec(db,
             "ALTER TABLE blocks ADD COLUMN semantic_score REAL DEFAULT NULL",

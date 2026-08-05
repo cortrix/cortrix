@@ -1,6 +1,6 @@
 #include "cortrix/spc/cleaning_config_resolver.h"
 
-#include "cortrix/catalog/config_resolver.h"  // F12 ConfigResolver<CleaningConfig> (§3.4 mandate)
+#include "cortrix/catalog/config_resolver.h"  // ConfigResolver<CleaningConfig>
 #include "cortrix/spc/cleaning_errors.h"       // CleaningStatus / kNsConfigMergeFailed
 
 namespace cortrix::spc {
@@ -32,7 +32,7 @@ CleaningConfig LoadGlobalCleaningConfig(const IGlobalConfig* global) {
 
 Result<CleaningConfig> ResolveCleaningConfig(const CleaningConfig& global,
                                              const std::string& ns_blob) {
-    // Layer global ← ns via the F12 template (shallow JSON-object merge). No
+    // Layer global ← ns via the catalog template (shallow JSON-object merge). No
     // request layer in V1.0 (§3.4), so request = nullptr.
     catalog::ConfigResolver<CleaningConfig> resolver;
     Result<CleaningConfig> merged = resolver.Resolve(global, ns_blob);

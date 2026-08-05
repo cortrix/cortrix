@@ -7,7 +7,7 @@ namespace cortrix::query {
 
 namespace {
 
-// classifier_latency_seconds `le` bounds (seconds). F39 §12.bis 2.1: rule path
+// classifier_latency_seconds `le` bounds (seconds). Rule path
 // P50<0.5ms / P99<2ms; LLM path (Phase 2) P50<200ms / P99<800ms → fine sub-ms..ms
 // buckets straddling the rule SLA, plus headroom up to the LLM range.
 constexpr double kLatBounds[] = {0.0005, 0.002, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0};

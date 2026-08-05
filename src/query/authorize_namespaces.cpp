@@ -25,7 +25,7 @@ bool IsWildcard(const std::vector<std::string>& requested) {
 }
 
 // The frozen AuthContext (auth/auth_context.h) carries no `role` field; §4.2's
-// `auth.role` is resolved by the real P09 at D3.5. Standalone we pass "" — the
+// `auth.role` is resolved by the real tenant service once wired. Standalone we pass "" — the
 // MockPermissionService keys off user_id/tenant_id, so role is not load-bearing yet.
 std::string RoleOf(const AuthContext&) { return std::string(); }
 
@@ -71,7 +71,7 @@ std::vector<std::string> AuthorizeNamespaces(const std::vector<std::string>& req
     std::vector<std::string> expanded =
         ExpandNamespaces(requested, auth, perm_service, max_namespaces);
 
-    // Step 3: dynamic batch authorization against ns_acl (P09 at D3.5; mock now).
+    // Step 3: dynamic batch authorization against ns_acl (tenant service pending; mock now).
     BatchCheckResult check = perm_service->BatchCheck(
         auth.user_id, auth.tenant_id, RoleOf(auth), expanded, PermissionAction::kQuery);
 

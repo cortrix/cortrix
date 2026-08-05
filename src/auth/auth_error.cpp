@@ -9,7 +9,7 @@ using agent_friendly::ErrorCategory;
 
 namespace {
 
-// One canonical row per code (P08 §5.2 6-field table). Defined as constexpr
+// One canonical row per code (6-field table). Defined as constexpr
 // statics so each returns a stable reference. The switch in GetAuthErrorInfo is
 // intentionally exhaustive: building with -Wall -Wextra (-Wswitch) turns "added
 // a code without a row" into a warning, which the project treats as a build
@@ -82,7 +82,7 @@ const char* AuthErrorCodeString(AuthErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(AuthErrorCode code) {
-    // P08 §5.2 "structured_data" column, 1:1. Function-local statics → stable
+    // The "structured_data" column, 1:1. Function-local statics → stable
     // references. Empty vector where the spec shows `{}` (intentionally empty,
     // e.g. kInvalidCredentials prevents account enumeration).
     static const std::vector<std::string> kEmpty{};

@@ -84,10 +84,10 @@ Result<BootstrapHandler::BootstrapResult> BootstrapHandler::Consume(
         token_used_ = true;
     }
 
-    // Create the system admin user (P08 §2.13.2 step 3). password_hash is a
+    // Create the system admin user (bootstrap step 3). password_hash is a
     // placeholder sentinel — the admin authenticates via the API Key, not a
     // password (no password login path for the bootstrap admin). tenant/role
-    // (Personal Tenant, owner) are filled by P09 at D3.5.
+    // (Personal Tenant, owner) are filled by the tenant service once wired.
     const std::string user_id = "usr_" + RandomHex(4);
     const int64_t now_sec = NowMs() / 1000;
     sqlite3_stmt* ins = nullptr;
@@ -143,7 +143,7 @@ std::string BootstrapHandler::RenderHtml(const std::string& admin_api_key) {
 }
 
 std::string BootstrapHandler::RenderJson(const std::string& admin_api_key) {
-    // P08 §2.13.2.b — {admin_api_key, expires_at:null, scopes:["admin:*"]}.
+    // Bootstrap response — {admin_api_key, expires_at:null, scopes:["admin:*"]}.
     nlohmann::json j;
     j["admin_api_key"] = admin_api_key;
     j["expires_at"] = nullptr;

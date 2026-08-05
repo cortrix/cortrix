@@ -9,7 +9,7 @@
 namespace cortrix::store {
 
 Status F09SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
-    // [D3.5-B] F09 owns the per-Unit framework schema (documents / blocks /
+    // The block-header framework owns the per-Unit schema (documents / blocks /
     // blocks_fts + indices + triggers). 0 → 1 creates it from the single DDL SoT
     // (idempotent CREATE IF NOT EXISTS). Runs inside the SchemaMigrator txn on the
     // production MigrateUnit path; the same kPerUnitFrameworkDdl is reused by

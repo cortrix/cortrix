@@ -3,7 +3,7 @@
 #include "cortrix/connector/directory_importer.h"  // ImportStats
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/server/http_server.h"
-#include "cortrix/catalog/i_ns_router.h"          // INSRouter (F13 create path)
+#include "cortrix/catalog/i_ns_router.h"          // INSRouter (namespace create path)
 #include "cortrix/namespace/namespace_manager.h"
 #include "cortrix/resource/namespace_pool.h"      // INamespacePool
 #include "cortrix/spc/spc_manager.h"
@@ -108,7 +108,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
     ));
 
     // POST /api/v1/connector/watchers — subscribe namespace(s) to a directory.
-    // F21: accepts `target_namespaces: [...]` (fan-out); the MVP single
+    // Accepts `target_namespaces: [...]` (fan-out); the MVP single
     // `namespace_name` is still honored (mapped to a one-element array).
     server.Post("/api/v1/connector/watchers", WithAuth(auth, kPermAdmin,
         [&reg, &state](const httplib::Request& req, httplib::Response& res,
@@ -209,7 +209,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
         }
     ));
 
-    // DELETE /api/v1/connector/watchers/:id/namespaces/:ns — F21: unsubscribe a
+    // DELETE /api/v1/connector/watchers/:id/namespaces/:ns — unsubscribe a
     // single namespace. The last unsubscribe destroys the watcher (no doc purge
     // on a per-NS unsubscribe — that is the whole-watcher DELETE's job).
     server.Delete("/api/v1/connector/watchers/:id/namespaces/:ns", WithAuth(auth, kPermAdmin,

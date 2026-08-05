@@ -12,7 +12,7 @@ namespace {
 // SELECT column order → ChunkRecord field order (child_id, parent_id, content,
 // chunk_index). content := blocks.content_text — the chunk full text, written by
 // BlockAssembler::AssembleChild as `block.content_text = child.child_text`, so the
-// reverse-lookup needs no F09 blob deserialization (A unified blocks, F02 §2.1-bis).
+// reverse-lookup needs no block-header blob deserialization (unified blocks).
 constexpr const char* kChildCols = "child_id, parent_id, content_text, chunk_index";
 
 bool ColumnExists(sqlite3* db, const char* table, const char* column) {

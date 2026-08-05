@@ -9,13 +9,13 @@ using agent_friendly::ErrorCategory;
 
 namespace {
 
-// One canonical row per code (ARCH §4.1.11 MEM04 table). Defined as function-local
+// One canonical row per code (the opt-out table). Defined as function-local
 // statics so each returns a stable reference. The switch in GetMem04ErrorInfo is
 // intentionally exhaustive: building with -Wall -Wextra (-Wswitch) turns "added a
 // code without a row" into a warning (treated as a build failure), so the registry
 // can't silently drift from the enum.
 //
-// All 7 MEM04 faults are permanent/auth client errors (bad session id, duplicate /
+// All 7 opt-out faults are permanent/auth client errors (bad session id, duplicate /
 // missing opt-out state, missing admin scope, disabled feature, oversize metadata) —
 // none is transient, so all carry retryable=false + retry_after_ms=null.
 constexpr Mem04ErrorInfo kSessionNotFound

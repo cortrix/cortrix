@@ -211,7 +211,7 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
         result->status = is_update ? "updating" : "pending";
         result->is_duplicate = false;
         // [gap②] Pass the disk-full rejection through unchanged — masking it as
-        // "queue full" would mislead the caller (F24 §6 wants CX_ERR_DISK_FULL
+        // "queue full" would mislead the caller (the disk gate wants CX_ERR_DISK_FULL
         // surfaced). The doc + blob are already saved at this point either way.
         if (s.message().find("CX_ERR_DISK_FULL") != std::string::npos) {
             return s;

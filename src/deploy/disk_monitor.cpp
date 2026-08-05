@@ -87,7 +87,7 @@ void DiskMonitor::Apply(const DiskUsage& sample) {
     int prev_stage = stage_.exchange(static_cast<int>(sample.stage), std::memory_order_relaxed);
     total_bytes_.store(sample.total_bytes, std::memory_order_relaxed);
     free_bytes_.store(sample.free_bytes, std::memory_order_relaxed);
-    // CRIT → reject new writes; NORMAL/WARN → allow (F24-4 decision A).
+    // CRIT → reject new writes; NORMAL/WARN → allow.
     reject_new_writes_.store(sample.stage == DiskStage::kCrit, std::memory_order_relaxed);
 
     // Update the gauge on every sample (§6.1 "metric gauge update").

@@ -9,7 +9,7 @@ namespace cortrix::scoring {
 
 namespace {
 
-// Histogram bucket bounds (seconds) for assign_duration (F07 §7.3: 100 chunks < 1ms,
+// Histogram bucket bounds (seconds) for assign_duration (100 chunks < 1ms,
 // 1000 chunks < 10ms — these are per-call, sub-ms; buckets straddle the per-batch SLAs).
 constexpr size_t kNumDurBuckets = 5;
 constexpr double kDurBounds[kNumDurBuckets] = {0.00001, 0.0001, 0.001, 0.01, 0.1};

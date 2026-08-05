@@ -23,7 +23,7 @@ namespace {
 
 // §4.2 doc_summary block metadata_json. status ∈ {pending|generated|failed}; here it
 // is always "generated" — the worker writes a block only on LLM success (a failed doc
-// has no block, F41 §7.1). summary_text itself rides on content_text + the embedding.
+// has no block). summary_text itself rides on content_text + the embedding.
 std::string BuildMetadataJson(const DocSummaryStructured& s, const DocSummaryConfig& cfg) {
     nlohmann::json j;
     j["keywords"] = s.keywords;
@@ -92,7 +92,7 @@ Status F41AsyncWorker::ProcessTask(const async::TaskInfo& task) {
         return finalizer_.Fail(task, "CX_ERR_F41_EMBED_FAILED", es.message(),
                                {{"doc_id", task.doc_id}}, t_start);
 
-    // (4) Assemble the doc_summary block (block_type=17) and write it in one F25 txn
+    // (4) Assemble the doc_summary block (block_type=17) and write it in one write-coordinator txn
     //     (BeginWrite → AddPoints[P-HNSW] → block_insert → Commit).
     const std::string metadata_json = BuildMetadataJson(result.summary, config_);
     ChunkResult chunk;

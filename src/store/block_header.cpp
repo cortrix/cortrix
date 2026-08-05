@@ -150,7 +150,7 @@ bool BlockParse(const void* data, size_t len, const cortrix_block_header_t** hdr
 
 uint32_t BlockComputeCrc32(const void* data, size_t len) {
     // CRC32 covers: header[0..79] + header[84..127] + payload (offset 128+).
-    // Skips only the crc32 field itself (offset 80-83). F09 extends the MVP
+    // Skips only the crc32 field itself (offset 80-83). The header extends the MVP
     // range to include the Phase-1 fields (84-86) + reserved (87-127).
     const auto* bytes = reinterpret_cast<const uint8_t*>(data);
 

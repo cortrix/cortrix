@@ -41,7 +41,7 @@ std::string PathParam(const httplib::Request& req, const char* key) {
 void RegisterImportRoutes(httplib::Server& server, server::ImportHandler& handler,
                           ApiKeyAuth& auth) {
     // POST /api/v1/import/database — start import (async). Layer-2 admin via
-    // WithAuth(kPermAdmin) (the /import/* prefix is not under AdminGuard, F16a §6.1).
+    // WithAuth(kPermAdmin) (the /import/* prefix is not under AdminGuard).
     server.Post("/api/v1/import/database",
         WithAuth(auth, kPermAdmin,
             [&handler](const httplib::Request& req, httplib::Response& res,

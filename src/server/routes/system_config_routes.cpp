@@ -19,7 +19,7 @@ namespace {
 using cortrix::auth::AuthErrorCode;
 using cortrix::auth::MakeAuthError;
 
-// F48 §6.2 / §7 — the 6 allowed providers. An unknown provider is rejected with
+// The 6 allowed providers. An unknown provider is rejected with
 // CX_ERR_INVALID_REQUEST (the field-level validation the Agent-first PUT owes).
 const std::set<std::string>& AllowedProviders() {
     static const std::set<std::string> kProviders = {

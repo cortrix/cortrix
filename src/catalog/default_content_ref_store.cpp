@@ -90,7 +90,7 @@ Status DefaultContentRefStore::IncrementRef(const std::string& file_hash,
     }
 
     // Keep the file_locations aggregate in sync IF that row exists (it is created
-    // by the write path, F25). Only bump on a genuinely new reference.
+    // by the write path). Only bump on a genuinely new reference.
     if (newly_added) {
         const char* sql =
             "UPDATE file_locations SET ref_count = ref_count + 1 WHERE file_hash = ?";

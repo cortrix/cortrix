@@ -40,7 +40,7 @@ Status WorkerPool::Start() {
 
     const int pool_size = ConfiguredPoolSize();
     const int parser_max = ParserMaxConcurrent();
-    // topic 1.2 B — startup enforce: worker pool must not exceed F06's parser
+    // Startup enforce: the worker pool must not exceed the parser's
     // concurrency. The spec LOG_FATAL+exit(1)s; here we fail fast with a code so
     // the host (and tests) can handle it without aborting the process.
     if (pool_size > parser_max) {

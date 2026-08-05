@@ -5,7 +5,7 @@
 namespace cortrix::import {
 
 std::string BuildSourceUri(const SourceContext& src, const std::string& row_id) {
-    // postgres://host:port/db/table/<row_id> (ARCH §5.1 + F16a §4.3 line 1381 convention).
+    // postgres://host:port/db/table/<row_id> (the DB-import convention).
     return "postgres://" + src.host + ":" + std::to_string(src.port) + "/" + src.db_name +
            "/" + src.table + "/" + row_id;
 }
@@ -32,7 +32,7 @@ nlohmann::json TextSerializer::BuildMetadata(const SourceContext& src,
                                              const std::string& row_id,
                                              int row_span,
                                              bool is_merge) {
-    // F16a §4.3 metadata_json block written into blocks. source_type = the F16a
+    // The DB-import metadata_json block written into blocks. source_type = the import
     // discriminator the D3 overwrite + Agent provenance queries key off.
     nlohmann::json m;
     m["source"] = BuildSourceUri(src, row_id);

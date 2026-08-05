@@ -60,7 +60,7 @@ std::string PermissionService::Visibility(const NsId& ns_id) {
 
 bool PermissionService::CheckOwnerTenant(const NsId& ns_id, const TenantId& tenant_id) {
     if (db_ == nullptr) return false;
-    // F12 `namespaces.tenant_id` is the owner-tenant FK (P09 sec 6 "owner FK").
+    // The catalog `namespaces.tenant_id` is the owner-tenant FK.
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, "SELECT tenant_id FROM namespaces WHERE ns_id=? LIMIT 1", -1,
                            &stmt, nullptr) != SQLITE_OK) {

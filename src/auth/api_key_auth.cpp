@@ -81,8 +81,8 @@ Status ApiKeyAuth::Authorize(const AuthContext& ctx,
     }
 
     // Runtime namespace authorization (ARCHITECTURE V6): delegate to the
-    // PermissionService seam (ownership + ns_acl). Anti-enumeration (F04 issue
-    // 2.6): unauthorized and not-found share the single CX_ERR_NS_UNAUTHORIZED
+    // PermissionService seam (ownership + ns_acl). Anti-enumeration (see the query
+    // contract): unauthorized and not-found share the single CX_ERR_NS_UNAUTHORIZED
     // identity, and the namespace name is NEVER echoed back -- otherwise the
     // 403/404 split and the echoed name would let a caller probe which
     // namespaces exist. When no authorizer is installed the namespace is left

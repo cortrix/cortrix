@@ -6,12 +6,12 @@
 
 namespace cortrix::metadata {
 
-// F08 schema — metadata_blocks (detailed design §3.3, D5 lock: separate table). SQLite dialect (same idiom as
+// Metadata schema — metadata_blocks (separate table). SQLite dialect (same idiom as
 // every other provider): created_at as Unix-ms INTEGER, metadata_json as TEXT
 // affinity, IF NOT EXISTS so a re-run on an already-migrated db is a no-op outside the
 // migrator's version gate. doc_id is UNIQUE (1 doc = 1 metadata block). The FK to
 // documents(doc_id) is intentionally omitted standalone — see the header's
-// "FK reconciliation (D3.5 deferred)" note (documents.doc_id is INTEGER vs F08's TEXT
+// "FK reconciliation (D3.5 deferred)" note (documents.doc_id is INTEGER vs the metadata block's TEXT
 // ULID; reconciling the type + wiring the FK is real pipeline work).
 const char* const kMetadataSchemaSql = R"SQL(
 CREATE TABLE IF NOT EXISTS metadata_blocks (

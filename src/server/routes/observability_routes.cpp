@@ -43,7 +43,7 @@ using json = nlohmann::json;
 // ---- requester context -----------------------------------------------------
 
 // The handlers' permission decisions key off (requester_user_id, is_admin). Both
-// come from the authenticated AuthContext that WithAuth filled (the real P08
+// come from the authenticated AuthContext that WithAuth filled (the real auth
 // identity). user_id may be empty when auth is disabled (dev) — the handlers treat
 // that as a normal non-admin/admin requester unchanged.
 RequesterContext MakeRequesterContext(const RequestContext& rctx) {

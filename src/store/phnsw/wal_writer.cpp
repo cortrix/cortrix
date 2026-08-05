@@ -17,7 +17,7 @@ namespace {
 // Flush `fd` to stable storage. The WAL durability contract (group_commit_writer
 // .h IWalSink::Sync) is "survives a power loss", so on macOS we use F_FULLFSYNC
 // — plain fsync there does not flush the drive's write cache — and fdatasync on
-// Linux. Returns 0 on success, -1 with errno set. (Identical policy to F25's PWL
+// Linux. Returns 0 on success, -1 with errno set. (Identical policy to the write coordinator's PWL
 // DurableSync — same project-wide durability guarantee.)
 int DurableSync(int fd) {
 #if defined(__APPLE__)

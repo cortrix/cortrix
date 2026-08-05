@@ -38,7 +38,7 @@ Status PlatformDb::OpenAndConfigure(const std::string& db_path) {
         return Status::Internal(std::string("platform.db open failed: ") + msg);
     }
 
-    // P08 §3.8 pragmas (same family as the NS store.db). A ':memory:' db reports
+    // Auth-db pragmas (same family as the NS store.db). A ':memory:' db reports
     // WAL as 'memory'; that is expected. foreign_keys ON so the FK constraints in
     // the Auth schema (refresh_tokens / api_keys → users) are enforced.
     Status st = ExecPragma(db_, "PRAGMA journal_mode=WAL;");
@@ -62,7 +62,7 @@ Status PlatformDb::Open(const std::string& db_path,
     if (!st.ok()) return st;
 
     // Run the platform.db schema through the shared (frozen L0) migrator in one
-    // atomic batch. P08 is registered FIRST so its `users` table (the FK target
+    // atomic batch. Auth is registered FIRST so its `users` table (the FK target
     // refresh_tokens / api_keys reference) exists before any extra provider.
     // NOTE: F12SchemaProvider is intentionally NOT registered here — catalog
     // tables live in catalog.db, a different file (D3.5 reconciles the two).

@@ -8,7 +8,7 @@ namespace cortrix::deploy {
 
 namespace {
 
-// One canonical dotted string per reason (F24 §8.2 / OBS_SPEC §3.bis). The switch
+// One canonical dotted string per reason (see OBS_SPEC). The switch
 // is exhaustive so -Wswitch turns "added a reason without a row" into a build
 // failure — the vocabulary cannot silently drift from the enum.
 const char* ReasonStringImpl(MetricReason r) {
@@ -144,7 +144,7 @@ FieldChannel ChannelFor(FieldKind kind) {
 
 const char* CategoryString(agent_friendly::ErrorCategory category) {
     // Delegate to the single serialization in agent_friendly so the metric
-    // `category` label and the error `category` field never diverge (F24-7).
+    // `category` label and the error `category` field never diverge.
     return agent_friendly::ToString(category);
 }
 

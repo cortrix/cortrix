@@ -20,7 +20,7 @@ CortrixBlock BlockAssembler::Assemble(const std::string& doc_id,
     block.content_text = chunk.text;
     // block_id = HashChildIdToBlockId(child_id) (ID_SYSTEM_IMPL §6.1 / ARCH §1.8):
     // mint the chunk's business ULID (its child_id) here and derive the uint64
-    // P-HNSW label from its SipHash. F34's parent-child chunker will supply the
+    // P-HNSW label from its SipHash. The parent-child chunker will supply the
     // child_id later; the block_id formula is unchanged, so this is the final form.
     block.block_id = id::HashChildIdToBlockId(id::GenerateUlid());
 

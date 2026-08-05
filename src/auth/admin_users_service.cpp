@@ -13,7 +13,7 @@ namespace cortrix::auth {
 
 namespace {
 
-constexpr int kDisplayNameMax = 64;  // P08 §4.1 (display_name 1..64)
+constexpr int kDisplayNameMax = 64;  // display_name 1..64
 constexpr int kListLimitCap = 200;   // §2.13-bis pagination cap
 
 int64_t NowSec() {

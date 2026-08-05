@@ -9,7 +9,7 @@
 namespace cortrix::auth {
 
 namespace {
-constexpr int kPasswordMaxLength = 128;  // P08 §4.5 — bcrypt DoS guard
+constexpr int kPasswordMaxLength = 128;  // bcrypt DoS guard
 }  // namespace
 
 bool ValidatePassword(const std::string& password, int min_length) {

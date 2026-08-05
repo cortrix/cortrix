@@ -22,7 +22,7 @@ namespace cortrix::doc_summary {
 namespace {
 
 // Serialize one fused DocDiscoveryHit into the §6.1 result object. The llm_summary
-// path carries the 4 structured fields; the fts5_fallback path carries the F08 fields.
+// path carries the 4 structured fields; the fts5_fallback path carries the META fields.
 nlohmann::json HitToJson(const DocDiscoveryHit& h) {
     nlohmann::json j;
     j["doc_id"] = h.doc_id;
@@ -120,8 +120,8 @@ DocDiscoveryCoreResult RunDocDiscoveryCore(store::IIndex& index,
         result.warnings.push_back(std::string("doc_summary_hnsw_failed: ") + e.what());
     }
 
-    // Step 2 (fallback): per-Unit doc-level FTS5 over the F08 fields. Query-time
-    // FTS5 faults are graceful degrade events, counted by the existing F41 metric.
+    // Step 2 (fallback): per-Unit doc-level FTS5 over the META fields. Query-time
+    // FTS5 faults are graceful degrade events, counted by the existing doc-summary metric.
     std::vector<DocFtsHit> fts5_hits;
     if (options.fts5_fallback_enabled) {
         result.fts5_ran = true;

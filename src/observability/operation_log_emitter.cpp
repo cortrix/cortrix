@@ -14,7 +14,7 @@ const char* ResourceTypeFor(EmitSite site, const std::string& action) {
             return "query";
         case EmitSite::kSpcPipeline:
             // §9.1: SpcPipeline emits upload / delete (document) + db_import.
-            // §5.1 resource_type domain also has db_connection for the F16a hooks.
+            // The resource_type domain also has db_connection for the DB-import hooks.
             if (action == "database_import") return "db_import";
             if (action == "db_connection_register" || action == "db_connection_revoke")
                 return "db_connection";

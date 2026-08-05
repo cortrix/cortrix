@@ -47,8 +47,8 @@ Status F06SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
     }
     if (!db) return Status::InvalidArgument("F06 migrate: null db");
 
-    // The catalog's `namespaces` table is created by F12's schema before F06's
-    // provider runs (registration order F12→F06). If it isn't present yet
+    // The catalog's `namespaces` table is created by the catalog schema before this
+    // provider runs (registration order: catalog → parser). If it isn't present yet
     // (e.g. an isolated unit test that didn't build the catalog), there is
     // nothing to alter — succeed as a no-op so the migrator batch isn't blocked.
     if (!TableExists(db, "namespaces")) return Status::Ok();

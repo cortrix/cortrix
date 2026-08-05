@@ -22,7 +22,7 @@ bool TenantExists(sqlite3* db, const TenantId& tenant_id) {
     return exists;
 }
 
-// The five quota types GetQuota reports on (P09 sec 4.1 QuotaType).
+// The five quota types GetQuota reports on (QuotaType).
 const QuotaType kAllQuotaTypes[] = {
     QuotaType::MAX_NAMESPACES, QuotaType::MAX_DOCUMENTS_PER_NS, QuotaType::MAX_STORAGE_BYTES,
     QuotaType::MAX_QPS,        QuotaType::MAX_MEMBERS_PER_TENANT};

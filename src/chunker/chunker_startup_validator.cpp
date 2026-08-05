@@ -41,7 +41,7 @@ Status ChunkerStartupValidator::ValidateStartupFromGlobalConfig(const IGlobalCon
         max_seq_length = r.value();
     }
 
-    // 3) F34-1 compat gate.
+    // 3) Model compat gate.
     return ValidateChildSizeCompat(chunker_cfg.child_size, max_seq_length);
 }
 

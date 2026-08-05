@@ -6,7 +6,7 @@
 
 namespace cortrix::observability {
 
-// operation_log schema — transcribed 1:1 from F18a §5.1. Kept as one DDL batch so
+// operation_log schema — transcribed 1:1 from the design. Kept as one DDL batch so
 // the migrator applies it atomically. IF NOT EXISTS on every object so a re-run on
 // an already-migrated db is a no-op even outside the migrator's version gate
 // (defensive; the migrator's schema_version gate is the primary idempotency

@@ -29,9 +29,9 @@ const char* ToString(OnnxMetrics::ProviderFallbackReason reason) {
 namespace {
 
 // cortrix_onnx_inference_duration_seconds bucket upper bounds (seconds), aligned
-// with OnnxMetrics::kInfBucketCount. No explicit per-call SLA is fixed in F22 /
+// with OnnxMetrics::kInfBucketCount. No explicit per-call SLA is fixed in the ONNX spec /
 // OBS_SPEC for ONNX inference, so these straddle the observed single-call band
-// (F02 §3.4: bge-reranker single-pair ~10ms CoreML / ~30ms CPU; OnnxEmbedder is
+// (bge-reranker single-pair ~10ms CoreML / ~30ms CPU; OnnxEmbedder is
 // the same order) with headroom up to 1s for cold/degraded runs.
 constexpr double kInfBounds[8] = {0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0};
 constexpr const char* kInfBoundStr[8] = {

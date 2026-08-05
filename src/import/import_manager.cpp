@@ -101,7 +101,7 @@ Result<ImportTaskId> ImportManager::StartImport(const ImportRequest& req,
         rows_total = static_cast<int>(est.value());
     }
 
-    // S6: write operation_log `database_import` (GEN-OperationLog, F18a §9.1 via the
+    // S6: write operation_log `database_import` (GEN-OperationLog, via the
     // frozen emitter helper). We set user_id / namespace from the auth context (the
     // instrumentation site supplies these; the thread-local default is "anonymous").
     if (op_logger_) {

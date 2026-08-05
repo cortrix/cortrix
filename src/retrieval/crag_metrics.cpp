@@ -7,7 +7,7 @@ namespace cortrix::retrieval {
 
 namespace {
 
-// classifier_latency_seconds `le` bounds (seconds). F37 §12.bis 2.1 SLA: P50<5ms /
+// classifier_latency_seconds `le` bounds (seconds). SLA: P50<5ms /
 // P99<20ms → fine sub-ms..ms buckets straddling the SLA, plus headroom.
 constexpr double kLatBounds[] = {0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.5};
 constexpr const char* kLatBoundStr[] = {"0.001", "0.002", "0.005", "0.01",

@@ -56,7 +56,7 @@ QueryIntent IntentClassifier::ClassifyByLlm(const std::string& query_text, int64
     // Until then, we fall back to keyword heuristics, which is safe because:
     //   - The caller (Classify) wraps this in a try/catch for robustness
     //   - Keyword classification provides reasonable defaults
-    //   - SQL route is skipped in F07 anyway, so misclassification has no effect in MVP
+    //   - the SQL route is skipped anyway, so misclassification has no effect in MVP
     return ClassifyByKeyword(query_text);
 }
 

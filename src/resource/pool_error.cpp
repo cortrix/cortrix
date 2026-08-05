@@ -15,7 +15,7 @@ namespace {
 //
 // The 3 admission codes reuse the same CX_ERR_NS_* strings + attributes that
 // catalog_error.cpp registers (shared NS semantic domain, §8.1 m4) — they are
-// the same wire identities, seen from the F05 side.
+// the same wire identities, seen from the pool side.
 constexpr PoolErrorInfo kNsQuotaExceeded     {"CX_ERR_NS_QUOTA_EXCEEDED",           ErrorCategory::kQuota,     false, std::nullopt};
 constexpr PoolErrorInfo kNsResourceBudget    {"CX_ERR_NS_RESOURCE_BUDGET_EXCEEDED", ErrorCategory::kQuota,     false, std::nullopt};
 constexpr PoolErrorInfo kNsLoadFailed        {"CX_ERR_NS_LOAD_FAILED",              ErrorCategory::kTransient, true,  1000};
@@ -38,7 +38,7 @@ const char* PoolErrorCodeString(PoolErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(PoolErrorCode code) {
-    // F05 §8.1 "structured_data required keys" column, 1:1.
+    // The "structured_data required keys" column, 1:1.
     static const std::vector<std::string> kQuota{"current_count", "limit", "namespace_id"};
     static const std::vector<std::string> kBudget{"budget_used", "budget_limit",
                                                   "estimated_size", "namespace_id"};

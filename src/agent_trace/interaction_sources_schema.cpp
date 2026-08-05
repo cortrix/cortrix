@@ -6,7 +6,7 @@
 
 namespace cortrix::agent_trace {
 
-// interaction_sources schema -- F13 §4.3 (topic 6, v1.0.5 §9.2 Open-Core split).
+// interaction_sources schema (Open-Core split).
 // CE table, no highlight ranges. One DDL batch applied atomically by the migrator;
 // IF NOT EXISTS on every object for defensive idempotency. interaction_id is TEXT
 // to match the real interaction_log.id (UUID), with ON DELETE CASCADE.

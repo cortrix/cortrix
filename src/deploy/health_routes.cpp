@@ -40,7 +40,7 @@ void RegisterHealthRoutes(httplib::Server& server,
             res.status = 200;
         });
 
-    // GET /api/v1/system/health/ready — readiness. Aggregates the F20
+    // GET /api/v1/system/health/ready — readiness. Aggregates the
     // ReadinessRegistry (every registered component's CheckReady()) via
     // BuildReport(), then applies the shutdown gate: 200 only when NOT shutting
     // down AND all components are ready; otherwise 503 listing the failures (so

@@ -60,9 +60,9 @@ std::vector<ResultItem> PostFilter::Apply(
         item.chunk_text = block.content_text;
         // item.metadata is the retrieval UNIT's metadata. Start from the doc-level
         // metadata, then overlay the BLOCK-level metadata so block-specific fields
-        // win. Critical for MEM02 memory blocks: their identity fields
+        // win. Critical for extracted memory blocks: their identity fields
         // (user_id / memory_type / interaction_id) live in the block metadata, while
-        // the synthetic __cortrix_memory__ doc carries none. The MEM05 scope filter
+        // the synthetic __cortrix_memory__ doc carries none. The isolation scope filter
         // and the unified memory read pipeline both read item.metadata, so without the
         // block metadata every extracted fact is dropped as "no user_id".
         item.metadata = json::object();

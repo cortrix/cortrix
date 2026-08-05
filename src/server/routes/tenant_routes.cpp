@@ -23,7 +23,7 @@ using tenant::NsAclRole;
 using tenant::TenantErrorCode;
 using tenant::TenantRole;
 
-// All P09 error codes, so we can recover the identity from the CX token a
+// All tenant error codes, so we can recover the identity from the CX token a
 // TenantStatus() message carries ("CX_ERR_X: detail" -- see tenant_error.h).
 const std::vector<TenantErrorCode>& AllTenantErrorCodes() {
     static const std::vector<TenantErrorCode> kAll = {
@@ -53,7 +53,7 @@ std::optional<TenantErrorCode> CodeFromStatus(const Status& s) {
     return std::nullopt;
 }
 
-/// HTTP status for a P09 error code (the sec 7 categories map to the standard codes).
+/// HTTP status for a tenant error code (the categories map to the standard codes).
 int HttpForCode(TenantErrorCode code) {
     switch (tenant::TenantErrorToStatusCode(code)) {
         case StatusCode::kNotFound:        return 404;

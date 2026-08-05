@@ -49,7 +49,7 @@ Status AddBlocksColumnIfAbsent(sqlite3* db, const char* column, const char* ddl,
 }  // namespace
 
 Status F35SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
-    // Forward-only, idempotent (mirrors the F03 multi-version pattern): a single
+    // Forward-only, idempotent (mirrors the enricher's multi-version pattern): a single
     // pass covers 0→1, 0→2 and the 1→2 label-table add; reject backward /
     // beyond-current steps as a mismatch.
     if (from_ver < 0 || to_ver > CurrentVersion() || to_ver < from_ver) {
@@ -75,7 +75,7 @@ Status F35SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
         return s;
     }
 
-    // blocks is the F09-owned per-Unit table, created before F35's provider runs.
+    // blocks is the block-header-owned per-Unit table, created before this provider runs.
     // If absent (isolated unit test), no-op so the migrator batch isn't blocked.
     if (!TableExists(db, "blocks")) return Status::Ok();
 

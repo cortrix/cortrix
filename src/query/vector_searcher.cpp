@@ -35,7 +35,7 @@ RouteResult VectorSearcher::Search(const std::string& query_text, int top_k, int
         return result;
     }
 
-    // Step 3: Search vector index (oversample by 3x for post-filter). F01 IIndex
+    // Step 3: Search vector index (oversample by 3x for post-filter). The IIndex
     // returns its hits directly (no rc; empty = no match), per iindex.h.
     int search_k = top_k * 3;
     auto hits = vec_index_.Search(embed_result.vector.data(), search_k);

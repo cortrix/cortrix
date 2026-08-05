@@ -176,7 +176,7 @@ std::string MaskApiKey(const std::string& api_key) {
 
 }  // namespace agent_llm_codec
 
-// ----- IGlobalConfig default impls (F48 §6.2 reverse hook) -------------------
+// ----- IGlobalConfig default impls (reverse hook) ----------------------------
 // The default GetAgentLlmConfig reads via the generic GetString/GetInt/GetFloat
 // (available on the interface). The default SetAgentLlmConfig is a no-op: the
 // interface has no generic setter, so a writable backend (InMemory / FileBased)

@@ -4,7 +4,7 @@ namespace cortrix::connector {
 
 Status F21SchemaProvider::Migrate(sqlite3* /*db*/, int from_ver, int to_ver) {
     // Phase 1: 0 → 1 is an init no-op. namespaces.watcher_config JSONB is created
-    // by the F12 base schema (catalog_schema.cpp) and F21 owns no extra column,
+    // by the catalog base schema (catalog_schema.cpp) and the watcher owns no extra column,
     // so there is no DDL to emit here. Also accept an already-current (1 → 1)
     // call defensively.
     if ((from_ver == 0 && to_ver == 1) || from_ver == to_ver) {

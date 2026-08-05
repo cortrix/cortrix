@@ -96,7 +96,7 @@ bool BloomFilter::MightContain(const std::string& file_hash) const {
             return false;  // definitely absent
         }
     }
-    // A positive hit — counted for the runtime FPR denominator (§3.4 F24).
+    // A positive hit — counted for the runtime FPR denominator.
     total_checks_.fetch_add(1, std::memory_order_relaxed);
     return true;
 }

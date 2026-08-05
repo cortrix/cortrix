@@ -30,14 +30,14 @@ Result<AuthContext> JwtAuthMiddleware::AuthenticateHeaders(
 
     const std::string bearer = ExtractBearer(authorization);
 
-    // API-Key path (P08 §4.3 step 1): a `cortrix_sk_*` bearer or an X-API-Key
+    // API-Key path (step 1): a `cortrix_sk_*` bearer or an X-API-Key
     // header. The API-Key validation itself is S6 — here we report it is not the
     // JWT path so the caller (D3.5 wiring) routes it to ApiKeyService.
     if (IsApiKeyToken(bearer) || !x_api_key.empty()) {
         return AuthStatus(AuthErrorCode::kNotFound, "api-key path handled by S6 ApiKeyService");
     }
 
-    // No credentials at all → 401 (P08 §4.3 step 1 "none → CX_ERR_UNAUTHORIZED").
+    // No credentials at all → 401 ("none → CX_ERR_UNAUTHORIZED").
     if (bearer.empty()) {
         return AuthStatus(AuthErrorCode::kUnauthorized,
                           "missing Authorization bearer token or X-API-Key");
@@ -59,7 +59,7 @@ std::string BuildMeResponseJson(const UserInfo& user) {
     for (const TenantRef& t : user.tenants) {
         tenants.push_back({{"id", t.id}, {"name", t.name}, {"role", t.role}});
     }
-    j["tenants"] = tenants;  // empty until P09 wiring (D3.5)
+    j["tenants"] = tenants;  // empty until the tenant service is wired
     return j.dump();
 }
 

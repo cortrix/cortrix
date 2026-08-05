@@ -215,7 +215,7 @@ void AuthConfigService::NotifyChange(const std::string& key) {
 // ============================ S7: SMTP admin API =============================
 
 namespace {
-// UPSERT one (key, json-value) row with updated_by='admin' (P08 §2.12 setter).
+// UPSERT one (key, json-value) row with updated_by='admin'.
 Status UpsertKey(sqlite3* db, const std::string& key, const std::string& json) {
     sqlite3_stmt* stmt = nullptr;
     const char* sql =

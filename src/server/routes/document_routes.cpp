@@ -60,7 +60,7 @@ void RegisterDocumentRoutes(httplib::Server& server,
         WithAuth(auth, kPermWrite,
             [&handler, &pool, disk_monitor](const httplib::Request& req, httplib::Response& res,
                               const RequestContext& rctx) {
-                // Disk pressure gate (F24 §6, F24-4 decision A):
+                // Disk pressure gate:
                 // at CRIT reject the upload BEFORE any byte is written (doc_create /
                 // blob.store below would only deepen the pressure). 507 + the full
                 // CX_ERR_DISK_FULL Agent-friendly body.

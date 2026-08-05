@@ -69,7 +69,7 @@ Result<Judgment> ContradictionDetector::Judge(const std::string& new_content,
 
     llm::ChatCompletionResponse resp = llm_->Chat(prompt, cfg);
     if (!resp.ok()) {
-        // Map the transport error to the MEM02 judge fault family. A timeout
+        // Map the transport error to the extraction judge fault family. A timeout
         // (kUnavailable from the client) → LLM_TIMEOUT; otherwise treat as ambiguous
         // (the judge could not produce a usable verdict).
         if (resp.status.code() == StatusCode::kUnavailable) {

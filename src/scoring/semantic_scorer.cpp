@@ -14,11 +14,11 @@ void SemanticScorer::AssignInitialScore(cortrix::cortrix_block_header_t& header,
                                         const ScoringInput& input,
                                         const observability::TraceContext* /*ctx*/) {
     // §6 cortrix_f07_assign_duration_seconds — time the scoring work (steady_clock,
-    // immune to wall-clock jumps). QA F07-F1: the histogram was defined but never fed.
+    // immune to wall-clock jumps). QA finding: the histogram was defined but never fed.
     const auto start = std::chrono::steady_clock::now();
 
     const uint8_t level = ScoreMap::ComputeLevel(input);  // always in [0,4]
-    // D7: processing_level is the F09 header byte (immutable, written here as the sole
+    // processing_level is the block header byte (immutable, written here as the sole
     // source of computation). Written even for anomalous blocks (the level reflects the
     // actual processing depth).
     header.processing_level = level;

@@ -6,7 +6,7 @@ namespace cortrix::reranker {
 
 IReranker* CreateReranker(const RerankerConfig& config, store::ChunkStore* chunk_store) {
     // V1: only OnnxReranker. (reranker.type onnx/llamacpp/api is a GUC, but V1
-    // implements onnx only — F02 §2.1 factory note.)
+    // implements onnx only.)
     auto* reranker = new OnnxReranker(config, chunk_store);
     Status s = reranker->Init();
     if (!s.ok()) {

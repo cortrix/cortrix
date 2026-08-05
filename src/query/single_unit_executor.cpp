@@ -68,13 +68,13 @@ NamespaceQueryResult SingleUnitExecutor::ExecuteForNamespace(
 
         std::vector<RankedChunk> ranked;
         if (ctx.rerank) {
-            // F02 frozen contract: Rerank loads chunk_text/parent_text via ChunkStore,
+            // Frozen reranker contract: Rerank loads chunk_text/parent_text via ChunkStore,
             // scores with the cross-encoder, and returns RankedChunks sorted by the
             // fused rerank score (RETRIEVAL_TYPES_SPEC §2 / reranker.h).
             ranked = reranker_->Rerank(candidates, ctx.query);
         } else {
             // RRF fallback (topic 3.2): no cross-encoder. We have child_id + RRF score
-            // only; chunk_text/parent_text/metadata stay empty until F08/F09 wiring
+            // only; chunk_text/parent_text/metadata stay empty until the block wiring
             // (D3.5) — the gather layer flags meta.warnings["rerank_disabled"].
             ranked.reserve(candidates.size());
             for (const auto& c : candidates) {

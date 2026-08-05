@@ -6,7 +6,7 @@
 
 namespace cortrix::agent_trace {
 
-// agent_trace schema — transcribed 1:1 from F13 §4.1 (topic 3). Kept as one DDL
+// agent_trace schema — transcribed 1:1 from the design. Kept as one DDL
 // batch so the migrator applies it atomically. IF NOT EXISTS on every object so a
 // re-run on an already-migrated db is a no-op even outside the migrator's version
 // gate (defensive; the migrator's schema_version gate is the primary idempotency

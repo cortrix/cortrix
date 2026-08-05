@@ -280,13 +280,13 @@ StartupValidator::ValidationConfig StartupValidator::CollectRegisteredOnnxModels
     if (!config.embedding.model_path.empty()) {
         cfg.registered_model_paths.push_back(config.embedding.model_path);
     }
-    // [Q3/#26 · F39-rev-1/F22-2 D3.5 wiring] The F39 query-complexity DistilBERT
+    // The query-complexity DistilBERT
     // model dir comes from config.query_complexity.model_dir — the SAME field the
     // query wiring (MakeComplexityBackend) resolves, so this pre-flight check and
     // the runtime backend always agree. The env var CORTRIX_QUERY_COMPLEXITY_MODEL_DIR
     // is folded into that field upstream by ApplyEnvOverrides (single env-read site).
     // Registered ONLY when the file is present, so an offline / model-less deployment
-    // validates nothing for it and the F39 backend takes its heuristic fallback
+    // validates nothing for it and the classifier backend takes its heuristic fallback
     // (OnnxComplexityBackend Init() leaves it unavailable → QueryComplexityClassifier
     // L2 default-Complex). When the model IS present, this catches an opset/ABI
     // mismatch up front instead of silently degrading to the heuristic.
@@ -311,7 +311,7 @@ StartupValidator::ValidationConfig StartupValidator::CollectRegisteredOnnxModels
         }
     }
     // --- D3.5 wiring (do NOT add here during D3 standalone) ---
-    // The F40 Wave C sparse model reuses bge-m3 (config.embedding.model_path) — no
+    // The sparse model reuses bge-m3 (config.embedding.model_path) — no
     // distinct model to register. Any future *distinct* ONNX model appends here; the
     // collector is the only place that learns about them (D5=A static binding).
     return cfg;

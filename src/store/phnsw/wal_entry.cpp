@@ -11,7 +11,7 @@ namespace cortrix::store {
 
 namespace {
 
-// --- little-endian append helpers (match F25 PendingEntry codec style) ---
+// --- little-endian append helpers (match the PendingEntry codec style) ---
 void PutU8(std::vector<uint8_t>& b, uint8_t v) { b.push_back(v); }
 
 void PutU32(std::vector<uint8_t>& b, uint32_t v) {

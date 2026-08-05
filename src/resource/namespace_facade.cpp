@@ -37,7 +37,7 @@ Status NamespaceFacade::Acquire() {
     // (the former shared bundle-conn view segfaulted under concurrency). WAL
     // gives N readers + 1 writer; writer contention queues on busy_timeout.
     // {false, false}: schema was migrated and doc recovery already ran once at
-    // F05 load time — neither one-shot startup job may run per-request.
+    // pool load time — neither one-shot startup job may run per-request.
     store_ = std::make_unique<cortrix::CortrixStoreSqlite>(
         unit.data_dir + "/store.db",
         cortrix::CortrixStoreSqlite::OpenOptions{false, false});

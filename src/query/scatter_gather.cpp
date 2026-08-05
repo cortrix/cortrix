@@ -57,7 +57,7 @@ CrossNsResponse ScatterGather::Execute(const QueryRequest& request,
                                        const QueryContext* qctx,
                                        const TraceContext* trace_ctx) {
     // 1. Authorization (§4.2 5 steps). The effective per-query cap is min(global GUC
-    //    cap, AuthContext plan cap) — S4.3 Cloud P01-3 plan coordination (topic 1.5). Throws
+    //    cap, AuthContext plan cap) — cloud plan coordination. Throws
     //    CrossNsException on auth / too-many / unauthorized — the handler serializes
     //    GetError() to the §2.6 body.
     const int effective_cap = EffectiveMaxNamespaces(max_namespaces_, auth);
@@ -176,7 +176,7 @@ CrossNsResponse ScatterGather::GatherAndRerank(
         if (r.error_code.empty()) {
             meta.namespaces_succeeded.push_back(r.namespace_id);
             for (auto& rc : r.chunks) {
-                // content_hash (F09-4 hook, R3 closed): the authoritative source is
+                // content_hash (block-header hook): the authoritative source is
                 // the per-Unit blocks.content_hash column (idx_block_hash) — written
                 // by block_header.cpp as SHA-256(content_text) first-16-bytes. This
                 // ContentHashOfContent(chunk_text) is the SAME computation over the
@@ -244,7 +244,7 @@ CrossNsResponse ScatterGather::GatherAndRerank(
 
     // Observability (§3.4): NS-count + latency histograms, and the partial-success
     // counter when any NS failed (a partial-success response always carries a
-    // non-empty meta.namespaces_failed[]). Standalone recorder; F24 /metrics = D3.5.
+    // non-empty meta.namespaces_failed[]). Standalone recorder; the /metrics wiring lands with deployment.
     ScatterMetrics& m = ScatterMetrics::Instance();
     m.ObserveNamespacesPerQuery(queried);
     m.ObserveDuration(queried, total_latency);

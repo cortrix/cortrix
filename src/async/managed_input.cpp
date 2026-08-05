@@ -23,7 +23,7 @@ bool ReleaseManagedPath(const std::string& managed_dir, const std::string& filep
     // an unanswerable check as "still referenced".
     //
     // The comparison resolves BOTH sides. Task rows store whatever string was
-    // handed to F42, so the same file can appear as "d/x.txt" for one task and
+    // handed to the scheduler, so the same file can appear as "d/x.txt" for one task and
     // "d/./x.txt" for another; comparing the stored strings would report "nobody
     // else needs it" and delete a live input. The identity used here is the same
     // one used to remove the file below.

@@ -82,7 +82,7 @@ Status F03SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
     }
     if (!db) return Status::InvalidArgument("F03 migrate: null db");
 
-    // blocks is the F09-owned per-Unit table, created before F03's provider runs.
+    // blocks is the block-header-owned per-Unit table, created before this provider runs.
     // If absent (isolated unit test not building the per-Unit framework), no-op so
     // the migrator batch isn't blocked.
     if (!TableExists(db, "blocks")) return Status::Ok();
@@ -114,7 +114,7 @@ Status F03SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
         return s;
     }
 
-    // --- entities table + indexes + FTS5 (topic 2.6, F03 self-maintained) — idempotent ---
+    // --- entities table + indexes + FTS5 (self-maintained) — idempotent ---
     // R9 Tier C fix: rebuild pre-cascade `entities` tables in place. SQLite cannot
     // ALTER a FK, so when an old (no-CASCADE) table is present we recreate it via the
     // standard table-rebuild and copy the rows. block_id values still reference live

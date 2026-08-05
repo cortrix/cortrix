@@ -14,7 +14,7 @@ namespace cortrix::middleware {
 namespace {
 
 // Admin path prefixes AdminGuard protects (design sec 5.2.bis, exact prefix).
-//   /api/v1/admin/*          -> P08 / P09 / F16a / F18a admin namespace
+//   /api/v1/admin/*          -> auth / tenant / import / operations admin namespace
 //   /api/v1/system/tenants/* -> high-cardinality per-tenant stats (OBS_SPEC)
 //   /api/v1/system/units/*   -> high-cardinality per-unit stats (OBS_SPEC)
 constexpr const char* kAdminPrefixes[] = {

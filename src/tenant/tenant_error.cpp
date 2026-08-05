@@ -9,7 +9,7 @@ using agent_friendly::ErrorCategory;
 
 namespace {
 
-// One canonical row per code (P09 sec 7 table). Defined as function-local statics so
+// One canonical row per code. Defined as function-local statics so
 // each returns a stable reference. The switch is intentionally exhaustive:
 // building with -Wall -Wextra (-Wswitch) turns "added a code without a row" into a
 // warning the project treats as a build failure -- the registry can't silently
@@ -78,7 +78,7 @@ const char* TenantErrorCodeString(TenantErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(TenantErrorCode code) {
-    // P09 sec 7 "structured_data" column, 1:1. Function-local statics -> stable refs.
+    // The "structured_data" column, 1:1. Function-local statics -> stable refs.
     static const std::vector<std::string> kTenantId{"tenant_id"};
     static const std::vector<std::string> kTenantIdName{"tenant_id", "name"};
     static const std::vector<std::string> kEmail{"email"};

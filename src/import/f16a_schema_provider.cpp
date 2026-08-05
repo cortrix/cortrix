@@ -6,11 +6,11 @@
 
 namespace cortrix::import {
 
-// F16a schema — db_connections (§4.1) + import_tasks (§4.2). Kept as one DDL batch
+// DB-import schema — db_connections + import_tasks. Kept as one DDL batch
 // so the migrator applies it atomically. SQLite dialect (see header dialect note):
 // the spec's BIGSERIAL → INTEGER PRIMARY KEY AUTOINCREMENT, TIMESTAMP → INTEGER
 // (Unix ms), now() → strftime('%s','now')*1000, JSONB → TEXT (TEXT affinity). FK
-// targets tenants(tenant_id) / namespaces(ns_id) are catalog.db TEXT PKs (F12
+// targets tenants(tenant_id) / namespaces(ns_id) are catalog.db TEXT PKs (catalog
 // catalog SoT — V6 Stage 3 A32 aligned both to TEXT). IF NOT EXISTS everywhere so a
 // re-run on an already-migrated db is a no-op outside the migrator's version gate.
 const char* const kF16aSchemaSql = R"SQL(

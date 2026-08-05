@@ -113,7 +113,7 @@ Result<ImportTaskId> ImportTaskQueue::Submit(const ImportTaskId& task_id,
         return created;
     }
 
-    // Dispatch to a worker thread (ExecutorEngine — shared pool, NOT F42). The
+    // Dispatch to a worker thread (ExecutorEngine — shared pool, NOT the async scheduler). The
     // per-task work closure (with its captured auth/trace ctx) rides along.
     std::future<void> fut = engine_->Submit<void>(
         [this, task_id, work = std::move(work)]() mutable { RunTask(task_id, std::move(work)); });

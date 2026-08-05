@@ -398,7 +398,7 @@ bool MemoryExtractor::MaybeUpgradePreference(const std::string& ns,
 
     block.metadata_json["mention_count"] = count + 1;
     // D8 immunity: once count+1 >= threshold within the window, the preference is
-    // immune (status stays active — MEM01 reads status=active → weight ×1.0; the
+    // immune (status stays active — the scorer reads status=active → weight ×1.0; the
     // immune flag records that it no longer decays as an event-like preference).
     const bool immune = IsPreferenceImmune(
         count, first_at, now_iso,

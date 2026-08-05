@@ -46,7 +46,7 @@ int ParseMinor(const std::string& v) {
 // thin lookup (D4=A) — when a future minor is loaded that is newer than the
 // table, we extrapolate the upper bound from the last known anchor rather than
 // failing, and clamp anything older to the floor. Cross-major (2.x) is out of
-// the F22 V1.0 scope and returns the conservative {0, 0} "unknown".
+// the V1.0 scope and returns the conservative {0, 0} "unknown".
 constexpr int32_t kOpsetFloorMajor1 = 7;
 
 // Anchors: ORT 1.<minor> max supported opset. From ORT release notes.
@@ -103,7 +103,7 @@ std::pair<int32_t, int32_t> Runtime::GetSupportedOpsetRange() {
     if (major == 1) {
         return DeriveOpsetRangeForMajor1(ParseMinor(v));
     }
-    // Other majors (notably the future 2.x) are out of F22 V1.0 scope.
+    // Other majors (notably the future 2.x) are out of V1.0 scope.
     return {0, 0};
 }
 

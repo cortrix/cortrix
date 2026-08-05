@@ -121,7 +121,7 @@ Status JwtSecretService::LoadOrInit() {
     sqlite3_finalize(stmt);
     if (found) return Status::Ok();
 
-    // (3) none → auto-generate + persist (P08 §2.11 startup behavior step 3; topic 1.1 C).
+    // (3) none → auto-generate + persist (startup behavior step 3).
     Result<std::string> gen = GenerateSecret();
     if (!gen.ok()) return gen.status();
     Status st = InsertCurrentSecret(db_, RandomHexId(), gen.value());

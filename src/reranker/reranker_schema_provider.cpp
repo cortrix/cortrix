@@ -5,8 +5,8 @@
 namespace cortrix::reranker {
 
 Status F02SchemaProvider::Migrate(sqlite3* /*db*/, int from_ver, int to_ver) {
-    // Phase 1: 0 → 1 is an init no-op (reranker_config is supplied by the F12 base
-    // schema; F02 owns no extra column). Also accept an already-current (1 → 1)
+    // Phase 1: 0 → 1 is an init no-op (reranker_config is supplied by the catalog base
+    // schema; the reranker owns no extra column). Also accept an already-current (1 → 1)
     // call defensively.
     if ((from_ver == 0 && to_ver == 1) || from_ver == to_ver) {
         return Status::Ok();

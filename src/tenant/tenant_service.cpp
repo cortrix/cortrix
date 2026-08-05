@@ -40,7 +40,7 @@ std::string UuidV4() {
 }
 
 /// Whether a tenant role meets the "manager" bar (OWNER or ADMIN) required to
-/// mutate membership / metadata (P09 sec 4.2).
+/// mutate membership / metadata.
 bool IsManager(TenantRole role) {
     return role == TenantRole::OWNER || role == TenantRole::ADMIN;
 }
@@ -105,7 +105,7 @@ Result<Tenant> TenantService::CreatePersonal(const UserId& user_id,
                                              const std::string& email,
                                              sqlite3* conn,
                                              const observability::TraceContext* /*ctx*/) {
-    // Reuse the caller's transaction connection when provided (P08 sec 5.1 -- P09 does
+    // Reuse the caller's transaction connection when provided (registration holds the outermost tx -- this service does
     // NOT open a nested transaction); fall back to the owned handle standalone.
     sqlite3* db = conn ? conn : db_;
     if (db == nullptr) {

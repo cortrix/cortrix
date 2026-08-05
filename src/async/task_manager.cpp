@@ -188,7 +188,7 @@ Status TaskManager::Init(const std::string& db_path) {
 }
 
 Status TaskManager::CreateTasksTable() {
-    // F42 §3.1 tasks table (SQLite dialect: BOOLEAN→INTEGER 0/1, JSON→TEXT).
+    // tasks table (SQLite dialect: BOOLEAN→INTEGER 0/1, JSON→TEXT).
     const char* sql = R"(
         CREATE TABLE IF NOT EXISTS tasks (
             task_id          TEXT PRIMARY KEY,

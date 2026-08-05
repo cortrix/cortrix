@@ -27,7 +27,7 @@ uint8_t ScoreMap::EnricherLevel(const std::string& enricher_name) {
 }
 
 uint8_t ScoreMap::ComputeLevel(const ScoringInput& input) {
-    // (v1.0.1 M1) Meta Block special case: F08 Meta Block locks semantic_score=0.2 (ARCH §5.2.1)
+    // Meta Block special case: the Meta Block locks semantic_score=0.2
     // → forced to Level 0, bypassing the Matrix. Checked first so a Meta Block never picks up a
     // parser/enricher/image level.
     if (input.block_type == kBlockMeta) return 0;

@@ -43,7 +43,7 @@ const char* OnnxErrorCodeString(OnnxErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(OnnxErrorCode code) {
-    // F22 §8.3 structured_data column, 1:1. Function-local statics → stable
+    // The structured_data column, 1:1. Function-local statics → stable
     // references. `action` is included for the two startup errors because §8.3
     // carries an `action` field telling the Agent how to decide
     // (replace_so_or_rebuild / downgrade_model_or_upgrade_runtime).

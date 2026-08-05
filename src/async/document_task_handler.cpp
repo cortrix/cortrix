@@ -205,7 +205,7 @@ HttpResult DocumentTaskHandler::CancelTask(const std::string& task_id) {
         // the post-transition status — a queued task cancels terminally (pre_dequeue),
         // a processing task is signalled to its checkpoint (mid_processing). The
         // post_chunk_idx phase (cancel after a chunk-index write) is only reachable
-        // once the F25 BeginWrite integration lands → D3.5.
+        // once the write-coordinator BeginWrite integration lands.
         F42Metrics::Instance().RecordCancel(
             out.status == task_status::kCancelled
                 ? F42Metrics::CancelPhase::kPreDequeue

@@ -56,10 +56,10 @@ Status F40SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
                 "CX_ERR_F40_INVERTED_INDEX_WRITE_FAILED: create "
                 "sparse_inverted_index: " + msg);
         }
-        // [A unified-blocks] blocks.sparse_vec BLOB (F40-2 A) — only child rows write
+        // unified-blocks: blocks.sparse_vec BLOB — only child rows write
         // it; other block_types leave it NULL. If `blocks` is absent (isolated unit
         // test without the per-Unit framework) skip the ALTER (the inverted index is
-        // already created); the column is added once F09 builds blocks.
+        // already created); the column is added once the blocks table is built.
         if (TableExists(db, "blocks") && !ColumnExists(db, "blocks", "sparse_vec")) {
             rc = sqlite3_exec(db, "ALTER TABLE blocks ADD COLUMN sparse_vec BLOB",
                               nullptr, nullptr, &err);

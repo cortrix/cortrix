@@ -22,7 +22,7 @@ void ObservabilityModule::Initialize() {
 
     logger_ = MakeLogger();
 
-    // Register operation_log for the daily UTC-02:00 sweep (§8.1). F13 registers
+    // Register operation_log for the daily UTC-02:00 sweep. The trace module registers
     // agent_trace / interaction_log on the same scheduler at its D3.
     auto logger = logger_;
     scheduler_.RegisterTable("operation_log", [logger] { logger->Cleanup(); });

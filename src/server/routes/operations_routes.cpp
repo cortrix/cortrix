@@ -84,7 +84,7 @@ int CleanupRetryAtMs() {
     return observability::kOplogCleanupRetryBaseMs + jitter(Rng());
 }
 
-// --- CX_ERR_OPLOG_* token recovery (F18a §7.2 boundary re-inflation) ---------
+// --- CX_ERR_OPLOG_* token recovery (boundary re-inflation) -------------------
 // OperationLogger::Query returns a Status whose message is "CX_ERR_OPLOG_X: detail"
 // (OplogStatus). We recover the identity here and rebuild the full Agent-friendly
 // body — the token-only Status deliberately does not carry structured_data, so the

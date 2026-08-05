@@ -131,7 +131,7 @@ HandlerResult CrossNsQueryHandler::Handle(const nlohmann::json& body,
     //    CrossNsException → serialize GetError() with the §3.1 HTTP status. The
     //    overall scatter-timeout partial case does NOT throw — it returns a 200
     //    response whose .error is set (§2.7 principle 3), handled below. The
-    //    optional routing_ctx (Q3 F39) carries the resolved route into the per-NS
+    //    optional routing_ctx carries the resolved route into the per-NS
     //    executors; when null ScatterGather builds the context itself (unchanged).
     try {
         CrossNsResponse resp = scatter_->Execute(request, auth, routing_ctx);

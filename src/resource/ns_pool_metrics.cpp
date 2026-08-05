@@ -8,7 +8,7 @@ namespace cortrix::resource {
 namespace {
 
 // Duration histogram bucket upper bounds (seconds), shared by both ns_pool
-// duration histograms. F05 §11.3 Perf1 assumes ~3s real IO per NS load and
+// duration histograms. The perf target assumes ~3s real IO per NS load and
 // startup loads up to max_namespaces concurrently → bounds straddle a few seconds
 // (per-NS) up to a minute (whole-startup tail).
 constexpr double kDurBounds[NsPoolMetrics::kNumDurBuckets] =

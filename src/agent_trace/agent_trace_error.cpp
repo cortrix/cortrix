@@ -15,7 +15,7 @@ namespace {
 // warning, which the project treats as a build failure — the registry can't
 // silently drift from the enum.
 //
-// retry_after_ms: every F13 code is "-" in §9.2 (no machine retry delay). Only
+// retry_after_ms: every trace code is "-" (no machine retry delay). Only
 // INTERNAL is retryable (transient) — the Agent may retry but no fixed backoff is
 // promised; the rest are permanent/auth (caller must fix the request).
 constexpr F13ErrorInfo kSessionNotFound{

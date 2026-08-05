@@ -68,7 +68,7 @@ nlohmann::json DocToSpecJson(const CortrixDoc& doc, const std::string& namespace
 
 // Resolve the required ?namespace= query param. On absence writes a 400 GEN-Agent
 // envelope (structured_data.missing_param) and returns false. Per-NS storage model
-// inference (F13 precedent): the spec GET/DELETE /documents/{id} carry no namespace,
+// inference (same precedent as the namespace routes): the spec GET/DELETE /documents/{id} carry no namespace,
 // but live storage is per-namespace, so the flat surface requires it explicitly.
 bool RequireNamespaceParam(const httplib::Request& req, httplib::Response& res,
                            const std::string& request_id, std::string* out_ns) {
@@ -395,7 +395,7 @@ std::string WatcherStatusToSpec(bool watching) {
 
 // Reshape a fan-out watcher (one directory, N subscribed namespaces) into
 // the openapi Watcher object {id, path, target_namespaces[], recursive, status}.
-// api/components/schemas.yaml#/Watcher. With F21 a directory fanned out to N
+// api/components/schemas.yaml#/Watcher. A directory fanned out to N
 // namespaces is ONE Watcher carrying all N target_namespaces (the MVP emitted N
 // rows under (dir, ns) keying — the spec's fan-out shape is now native).
 nlohmann::json WatcherToSpecJson(const WatchInfo& w) {
@@ -425,7 +425,7 @@ void RegisterWatchAliasRoutes(httplib::Server& server,
 
     // POST /api/v1/watch — add/append a directory watch (api/paths/watch.yaml
     // addWatcher; body {path, target_namespaces[], recursive?}) -> 201 Watcher.
-    // F21: one Subscribe() call fans `path` out to every target namespace via a
+    // One Subscribe() call fans `path` out to every target namespace via a
     // single OS watcher (the MVP created one watcher per (dir, ns)).
     server.Post("/api/v1/watch",
         WithAuth(auth, kPermAdmin,

@@ -7,7 +7,7 @@ namespace cortrix::async {
 
 namespace {
 
-// duration_seconds histogram bucket upper bounds (seconds). F42 §6.1/§7: small
+// duration_seconds histogram bucket upper bounds (seconds). Small
 // docs return sync ≤ 5 min (300s); large docs async ≤ 30 min; task_timeout_seconds
 // = 1800 (30 min). Bounds straddle the 5-min sync threshold (300) and the 30-min
 // timeout (1800) so the latency distribution + the timeout tail are both visible.

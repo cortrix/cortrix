@@ -96,7 +96,7 @@ Status SchemaMigrator::MigrateCatalog(sqlite3* db) {
 }
 
 Status SchemaMigrator::MigrateUnit(sqlite3* db, const std::string& /*unit_id*/) {
-    // Same engine applied to a per-Unit database. F12 (Wave A) refines which
+    // Same engine applied to a per-Unit database. The catalog refines which
     // providers target catalog vs per-Unit schema when it registers them; the
     // unit_id is reserved for that routing + logging context.
     return RunProviders(db);

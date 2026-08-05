@@ -37,7 +37,7 @@ Status ChunkerGuc::ValidateConfig(const ChunkerConfig& config) {
 
     // Cross-field invariant: a child cannot be larger than its parent (§ 2.3 —
     // child is a sub-span of parent_text). The child_size ≤ max_seq_length gate
-    // (F34-1) needs the reranker config and lives in ChunkerStartupValidator.
+    // needs the reranker config and lives in ChunkerStartupValidator.
     if (config.child_size > config.parent_size) {
         return Status::InvalidArgument(
             std::string(guc::kChildSize) + "=" + std::to_string(config.child_size) +

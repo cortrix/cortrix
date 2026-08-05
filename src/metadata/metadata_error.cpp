@@ -16,10 +16,10 @@ namespace {
 // drift from the enum.
 //
 // §5.1: all 3 codes are non-retryable (retry_after_ms = null). GEN_FAILED is a 5xx
-// permanent error (F06 produced no usable metadata — re-uploading won't help until
+// permanent error (the parser produced no usable metadata — re-uploading won't help until
 // the source is fixed); PARTIAL is a warning rendered into the HTTP 200 success body
 // (meta.warnings[], §5.3); FIELD_IMMUTABLE is the 405 V1.0 returns for PATCH /metadata
-// (D9 B' lock, Phase 2 F08 Block Versioning changes it to 200).
+// (locked for V1; Block Versioning changes it to 200 later).
 constexpr MetadataErrorInfo kGenFailed
     {"CX_ERR_METADATA_GEN_FAILED",       ErrorCategory::kPermanent, false, std::nullopt, 500};
 constexpr MetadataErrorInfo kPartial
@@ -49,7 +49,7 @@ const std::vector<std::string>& RequiredStructuredDataKeys(MetadataErrorCode cod
     // Function-local statics → stable refs.
     static const std::vector<std::string> kEmpty{};
     // GEN_FAILED (§5.1.1 example A): the Agent needs to know which stage failed +
-    // what is missing + the F06 parse status + what downstream was blocked.
+    // what is missing + the parse status + what downstream was blocked.
     static const std::vector<std::string> kGenFailedKeys{
         "doc_id", "namespace_id", "stage", "missing_fields",
         "f06_parse_status", "downstream_blocked"};
@@ -99,7 +99,7 @@ AgentFriendlyError MakeMetadataError(MetadataErrorCode code,
 
 StatusCode MetadataErrorToStatusCode(MetadataErrorCode code) {
     switch (code) {
-        // generation failed (no usable F06 output) → kInternal (5xx).
+        // generation failed (no usable parser output) → kInternal (5xx).
         case MetadataErrorCode::kGenFailed:      return StatusCode::kInternal;
         // partial is a warning, not a hard failure; the coarse Status side maps it to
         // kInvalidArgument only if a caller forces it onto the error surface (the

@@ -62,7 +62,7 @@ Status CatalogDb::Open(const std::string& db_path,
     if (!st.ok()) return st;
 
     // Run the whole catalog schema through the shared migrator in one atomic
-    // batch. F12 is registered FIRST so its base tables (units / tenants /
+    // batch. The catalog is registered FIRST so its base tables (units / tenants /
     // namespaces) — the FK targets the rest reference — exist before any
     // downstream Feature provider extends them. The caller supplies the
     // downstream providers already in ARCH §1.3.bis.3 topological order;
