@@ -16,7 +16,7 @@
 //
 // IDs are ULIDs (time-ordered, 26 chars) carried as cortrix::id::* aliases
 // (= std::string in Phase 1; distinct strong types = Phase 2). embedding lives in
-// P-HNSW (F01), never in these structs.
+// P-HNSW, never in these structs.
 namespace cortrix::chunker {
 
 /// DocumentMetadata is the F06 §2.1 SoT type (cortrix::spc::DocumentMetadata),
@@ -59,7 +59,7 @@ struct ChildChunk {
     uint32_t chunk_index = 0;              ///< order of this child within the doc (0,1,2,...)
     DocumentMetadata metadata;             ///< inherited from parent
     int64_t created_at = 0;
-    // embedding is not in this struct — it lives in P-HNSW (F01).
+    // embedding is not in this struct — it lives in P-HNSW.
 };
 
 /// Chunking statistics surfaced into the Agent-friendly response `meta.stats`

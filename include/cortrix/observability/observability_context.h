@@ -13,7 +13,7 @@ enum class LogLevel { kDebug, kInfo, kWarn, kError };
 
 const char* ToString(LogLevel level);
 
-/// Raw HTTP headers as parsed by the server layer (F13 §6.1). A thin
+/// Raw HTTP headers as parsed by the server layer. A thin
 /// case-sensitive name→value view; F13 reads X-Session-Id / X-Trace-Id /
 /// X-Agent-Id from it. Defined here (not pulled from the http server) so the
 /// shared ObservabilityContext stays dependency-light and unit-testable without
@@ -30,7 +30,7 @@ struct HttpHeaders {
     bool Has(const std::string& name) const { return values.count(name) != 0; }
 };
 
-/// Minimal MCP session view F13 needs to seed an ObservabilityContext (F13 §7.1).
+/// Minimal MCP session view F13 needs to seed an ObservabilityContext.
 /// The full McpSessionHandler lives in mcp_session.h; this is the read-only slice
 /// the context factory consumes (the resolved session_id + optional agent_id),
 /// kept here so the shared context header has no dependency on the MCP handler.
@@ -81,7 +81,7 @@ public:
     std::optional<std::string> namespace_id;
     int64_t created_at = 0;                   ///< Unix ms the context was built (0 = unset)
 
-    /// Build a context from parsed HTTP headers (F13 §6.1): validate
+    /// Build a context from parsed HTTP headers: validate
     /// X-Session-Id / X-Trace-Id / X-Agent-Id via ObservabilityValidator; an
     /// invalid header is dropped (left unset) — the caller emits the warning +
     /// metric. A missing/invalid X-Trace-Id leaves trace unset; the middleware
@@ -89,7 +89,7 @@ public:
     /// is stamped to now().
     static ObservabilityContext FromHttpHeaders(const HttpHeaders& headers);
 
-    /// Build a context from an MCP session (F13 §7.1): the session_id is already
+    /// Build a context from an MCP session: the session_id is already
     /// server-resolved (generated or validated) by McpSessionHandler, so it is
     /// taken as-is; agent_id / namespace_id are copied through. created_at is
     /// stamped to now().

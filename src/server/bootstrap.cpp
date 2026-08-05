@@ -51,7 +51,7 @@
 #include "cortrix/llm/openai_client.h"             // OpenAiLlmClient (shared enricher LLM)
 #include "cortrix/spc/spc_pipeline.h"
 #include "cortrix/spc/spc_manager.h"
-#include "cortrix/spc/cleaning_config_resolver.h"  // [F10 §3.4] per-NS CleaningConfig resolve
+#include "cortrix/spc/cleaning_config_resolver.h"  // per-NS CleaningConfig resolve
 // [F42 main wiring] async subsystem + F41 doc-summary worker + LLM client
 #include "cortrix/async/task_manager.h"
 #include "cortrix/async/task_scheduler.h"
@@ -115,13 +115,13 @@
 #include "cortrix/observability/operation_log_schema.h"
 #include "cortrix/common/in_memory_global_config.h"
 #include "cortrix/connector/directory_importer.h"
-#include "cortrix/connector/dir_watcher_registry.h"       // [F21] ConnectorState holds unique_ptr<DirWatcherRegistry> (complete type for dtor)
+#include "cortrix/connector/dir_watcher_registry.h"       // ConnectorState holds unique_ptr<DirWatcherRegistry> (complete type for dtor)
 #include "cortrix/server/http_server.h"
-// [F20] security hardening
+// security hardening
 #include "cortrix/middleware/admin_guard.h"
-#include "cortrix/middleware/rate_limiter.h"               // [F20 §8.bis] pre-routing rate-limit gate
+#include "cortrix/middleware/rate_limiter.h"               // pre-routing rate-limit gate
 #include "cortrix/logging/sanitizer.h"
-// [F24] deployment: dual health endpoint + OpenMetrics :9091 + disk monitor + graceful shutdown
+// deployment: dual health endpoint + OpenMetrics :9091 + disk monitor + graceful shutdown
 #include "cortrix/deploy/graceful_shutdown.h"
 #include "cortrix/resource/namespace_facade.h"   // [gap⑤] resume re-hydrates tasks from the doc row
 #include "cortrix/deploy/health_routes.h"
@@ -237,7 +237,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::InitLogging(config.log);
     CORTRIX_LOG_INFO("main", "Cortrix server starting...");
 
-    // [F20] Load log sanitization rules + validate admin access config.
+    // Load log sanitization rules + validate admin access config.
     // ValidateConfigOrAbort() is the V3-E-06 hard-fail: CORTRIX_ADMIN_BIND=0.0.0.0
     // without CORTRIX_ALLOW_PUBLIC_ADMIN=true aborts startup here.
     cortrix::logging::LogSanitizer::Initialize("/app/config/sensitive_fields.yaml");
@@ -295,7 +295,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                           js.message());
     }
     if (auto token = bootstrap_handler.GenerateToken(); token.ok() && !token.value().empty()) {
-        // First start: surface the one-time setup URL on stdout (P08 §2.13.1). The
+        // First start: surface the one-time setup URL on stdout. The
         // token lives in memory only; visiting either bootstrap endpoint mints the
         // admin API Key and invalidates it. AdminGuard restricts the path to
         // loopback by default, so this is local-operator-only.
@@ -326,7 +326,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::catalog::CatalogDb catalog_db;
     {
         const std::string catalog_path = config.ns.data_dir + "/catalog.db";
-        // [D3.5 batch1/F18a] migrate the operation_log (F18a) schema into the
+        // [D3.5 batch1/F18a] migrate the operation_log schema into the
         // catalog/global DB at startup so ObservabilityModule attaches to an
         // already-migrated handle (its ctor doc requires the schema to exist).
         cortrix::observability::OperationLogSchemaProvider oplog_schema;
@@ -827,7 +827,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::spc::EnrichRetrySweeper enrich_sweeper(ns_pool, &task_scheduler,
                                                     &worker_pool, f42_config.get());
 
-    // 8b. [F21] ConnectorState holds a single DirWatcherRegistry (fan-out), built
+    // 8b. ConnectorState holds a single DirWatcherRegistry (fan-out), built
     // lazily by RegisterConnectorRoutes. The config watch_dir is subscribed AFTER
     // the routes build the registry (see just after RegisterConnectorRoutes below) —
     // a fresh NS is created via INSRouter::CreateNamespace inside Subscribe (catalog
@@ -918,7 +918,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
             return cleaning_global;  // bad NS blob → safe global defaults
         });
     cortrix::observability::ObservabilityModule obs_module(catalog_db.db(), global_config);
-    upload_handler.SetOperationLogger(obs_module.logger());  // [F18a M3] upload-site operation_log
+    upload_handler.SetOperationLogger(obs_module.logger());  // upload-site operation_log
     // [F13 TC4 · A4] agent_trace now lives in the global catalog.db. Build ONE writer over
     // that handle, shared by the F13 90-day retention cleanup here AND the F-path query
     // EngineInstrumentation write side (below, ~line 710). Register the F13 retention
@@ -983,15 +983,15 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::server::ImportHandler import_handler(import_mgr, import_conn_mgr);
 
     // 11. Create HTTP server and register all routes
-    // [F20 §8.bis] Rate limiter is declared before the server so the pre-routing
+    // Rate limiter is declared before the server so the pre-routing
     // handler's capture outlives every in-flight request the server may dispatch.
     cortrix::middleware::RateLimiter rate_limiter;
     cortrix::CortrixHttpServer server(config, auth, ns_mgr);
     server.SetNamespacePool(&ns_pool);       // [wire⑤c] live doc/block counts via per-request façade
     server.SetNamespaceRouter(&ns_router);   // [wire⑤c/F13] namespace-create path
-    server.SetOperationLogger(obs_module.logger().get());  // [F18a M2] ns_create/ns_delete operation_log
+    server.SetOperationLogger(obs_module.logger().get());  // ns_create/ns_delete operation_log
     server.RegisterRoutes();
-    // [F20 §8.bis] Pre-routing rate-limit gate (per-ip / per-api-key / global token
+    // Pre-routing rate-limit gate (per-ip / per-api-key / global token
     // buckets). A denied request short-circuits with 429 + the GEN-Agent error
     // envelope before any route handler runs — defends unauthenticated DDoS /
     // brute force. api_key is read from the same headers as WithAuth so per-key
@@ -1053,7 +1053,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         query_llm = std::make_shared<cortrix::llm::OpenAiLlmClient>(std::move(q_cfg));
     }
     // [F13 · F] Query-path agent_trace write side: one EngineInstrumentation over the
-    // shared global at_writer (built at ~line 640). [F18a M1] op_logger is now wired
+    // shared global at_writer (built at ~line 640). op_logger is now wired
     // (was nullptr) so the query site ALSO writes operation_log on success — the
     // EngineInstrumentation::Record success path emits the F18a entry (action="query").
     // The closure reads trace/session/agent/user from the thread-local ObservabilityContext
@@ -1079,13 +1079,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // interaction_log only. Started after registration so the route can enqueue.
     cortrix::memory::MemoryExtractorConfig mem02_cfg;
     mem02_cfg.enabled = (enricher_chain_llm != nullptr);
-    // The extractor reuses the enricher LLM client (MEM02 D1), so the model id
+    // The extractor reuses the enricher LLM client, so the model id
     // must follow that provider too - the struct default (gpt-4o-mini) 400s on
     // any non-OpenAI endpoint ("model does not exist").
     if (config.enricher_llm.IsConfigured()) {
         mem02_cfg.llm_model = config.enricher_llm.model;
     }
-    // [MEM02] Plumb the extraction LLM timeout from config — it was hardcoded at the
+    // Plumb the extraction LLM timeout from config — it was hardcoded at the
     // 30s struct default with no override path, too short for slow structured
     // extraction plus the contradiction judge's second call (the failure the R4
     // black-box hit as an extraction timeout). enricher_llm.timeout_ms > 0 overrides
@@ -1179,7 +1179,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                                         global_config, auth);
     cortrix::RegisterInteractionsRoutesPerNs(server.server(), ns_pool, auth);
     cortrix::RegisterConnectorRoutes(server.server(), connector_state, ns_pool, ns_router, spc_mgr, auth);
-    // [F21] The registry is now built (RegisterConnectorRoutes lazily creates it).
+    // The registry is now built (RegisterConnectorRoutes lazily creates it).
     // Subscribe the config watch_dir as a fan-out watcher over its namespace. Subscribe
     // creates a fresh NS via INSRouter (catalog INSERT + F05 AdmitCreate) so the importer
     // can Acquire it; autostart is deferred to StartAll() below.
@@ -1236,12 +1236,12 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // [OPEN-2] GC + maintenance ops routes (/api/v1/gc/*, /api/v1/maintenance/*).
     cortrix::RegisterGcRoutes(server.server(), gc_manager, gc_doc_sweeper, auth);
 
-    // [F20] Install AdminGuard pre-routing filter: admin paths are restricted to
+    // Install AdminGuard pre-routing filter: admin paths are restricted to
     // the configured client-IP whitelist (loopback-only by default). Runs before
     // route dispatch / API-key auth. Config comes from CORTRIX_ADMIN_BIND.
     cortrix::middleware::InstallAdminGuard(server.server(),
         {config.security.admin_bind, config.security.allow_public_admin});
-    // [F24] Deployment wiring (Wave D-R1, additive). The DiskMonitor itself is
+    // Deployment wiring (Wave D-R1, additive). The DiskMonitor itself is
     // constructed earlier (6b) so the SPC admission gate + upload route hold it.
     // Dual health endpoint (F24 main impl): /api/v1/system/health/{live,ready}.
     // /ready aggregates the F20 ReadinessRegistry (unified
@@ -1366,7 +1366,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         });
     }
 
-    // vector_index (F01) + memory_store (MEM): honest deferred. Both are PER-NAMESPACE in
+    // vector_index + memory_store (MEM): honest deferred. Both are PER-NAMESPACE in
     // V1.0 — the P-HNSW index (model load + WAL replay) and memory.db are created lazily
     // when a namespace is first used, so there is no single global "loaded/initialized"
     // signal to probe at the process level. Rather than stub a false 200, we do NOT register
@@ -1536,7 +1536,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         }
     }
 
-    // 13b. [F21] Start all subscribed directory watchers (fan-out registry; one OS
+    // 13b. Start all subscribed directory watchers (fan-out registry; one OS
     // watcher per directory, autostart was deferred to here at Subscribe time).
     if (connector_state.registry) {
         connector_state.registry->StartAll();
@@ -1553,7 +1553,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         return 1;
     }
 
-    // [F21] Graceful shutdown — stop all directory watchers. The registry serializes
+    // Graceful shutdown — stop all directory watchers. The registry serializes
     // its own teardown (its dtor also StopAll()s, but do it explicitly before the
     // catalog/pool handles are torn down).
     if (connector_state.registry) {
@@ -1562,7 +1562,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // [OPEN-2] stop the GC thread (also RAII-handled, but explicit so an in-flight
     // sweep finishes + the thread joins before the catalog handle is torn down).
     gc_thread.Stop();
-    // [F24] stop the deployment background services (also handled by RAII, but
+    // stop the deployment background services (also handled by RAII, but
     // stop explicitly so scrapes/disk checks quiesce before final teardown).
     if (f24_metrics_server) f24_metrics_server->Stop();
     f24_disk_monitor.Stop();

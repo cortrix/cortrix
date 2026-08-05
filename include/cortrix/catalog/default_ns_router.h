@@ -65,10 +65,10 @@ private:
     // The single Unit mapped to ns_id (Phase 1 1:1); caller holds mu_.
     Result<std::string> ActiveUnitIdLocked(const std::string& ns_id) const;
     // The durable catalog write of CreateNamespace (INSERT ns + Unit + ns_units in
-    // one txn). Extracted so the F05 admission/rollback (F13 §12.2) wraps it; takes
+    // one txn). Extracted so the F05 admission/rollback wraps it; takes
     // mu_ itself.
     Status InsertNamespaceCatalog(const NSMetadata& metadata);
-    // [F05 §5.1.bis] Compensation for a failed AdmitCreate: physically remove the
+    // Compensation for a failed AdmitCreate: physically remove the
     // rows InsertNamespaceCatalog just wrote (the NS never became a successful
     // create). NOT the user-facing soft delete — that would block a same-name
     // retry on the PK and ListNamespaces does not filter 'deleted' rows. Takes mu_.

@@ -43,7 +43,7 @@
 //     to the Agent-friendly body at the API boundary.
 namespace cortrix::memory::transparency {
 
-/// MEM03 operation type (MEM03 §4.1). DELETE keeps the REST method name; the audit
+/// MEM03 operation type. DELETE keeps the REST method name; the audit
 /// action / metric op / MCP tool are all named `invalidate` (V8 G2 M1, soft-delete).
 enum class MemoryTransparencyOp {
     kList,
@@ -89,7 +89,7 @@ struct MemoryListItem {
     std::optional<std::string> source_interaction_id;
 };
 
-/// GET /memory response (MEM03 §4.3.1). `meta` carries the GEN-Agent A-class
+/// GET /memory response. `meta` carries the GEN-Agent A-class
 /// data-integrity fields (total / page / coverage_ratio / latency_ms / warnings).
 struct MemoryListResponse {
     std::vector<MemoryListItem> memories;
@@ -140,7 +140,7 @@ enum class TriggeredBy {
 const char* ToString(TriggeredBy triggered_by);
 
 /// Minimal list-query seam over the memory blocks (existing-header interface style,
-/// cf. IMemoryBlockStore / ILlmClient). IMemoryBlockStore (MEM02) only fetches by id;
+/// cf. IMemoryBlockStore / ILlmClient). IMemoryBlockStore only fetches by id;
 /// the GET /memory path needs to enumerate a user's blocks, so MEM03 adds this thin
 /// seam. Standalone UT mocks it; the real MemoryStore-backed adapter (a `SELECT ...
 /// WHERE metadata_json->>'user_id'=? AND metadata_json->>'memory_type' IS NOT NULL`)
@@ -157,7 +157,7 @@ public:
     virtual Result<std::vector<MemoryBlockRecord>> ListByUser(const std::string& user_id) = 0;
 };
 
-/// MemoryTransparency — MEM03 main service class (MEM03 §4.2). Holds the list seam,
+/// MemoryTransparency — MEM03 main service class. Holds the list seam,
 /// the block store (read/write metadata_json), and the operation logger. The MEM02
 /// MemoryExtractor is NOT a hard dependency in standalone (issue-2 B "reuse the MEM02
 /// invalidate flow" is satisfied directly via the block store + metadata_json stamping,

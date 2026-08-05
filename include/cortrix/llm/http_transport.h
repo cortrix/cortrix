@@ -40,7 +40,7 @@ struct HttpResponse {
 /// mockable interface/seam ... an injectable transport"). OpenAiLlmClient builds the OpenAI
 /// request + parses the response (fully unit-testable); the raw byte round-trip
 /// goes through this interface so:
-///   - downstream features (F35/F38/F41/F15/MEM02/F36) + F03 tests inject a fake;
+///   - downstream features + F03 tests inject a fake;
 ///   - runtime wiring uses the default network transport against a live endpoint.
 ///
 /// The project build enables cpp-httplib's OpenSSL support so HTTPS endpoints

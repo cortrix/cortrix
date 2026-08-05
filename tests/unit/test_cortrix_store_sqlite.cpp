@@ -1853,7 +1853,7 @@ TEST_F(StoreSqliteClosedTest, SearchAndRecoverFailPrepare) {
 }
 
 // ============================================================
-// Branch coverage: SetFailNextOps seam (F23 §4.5) fires the fault arm
+// Branch coverage: SetFailNextOps seam fires the fault arm
 // ============================================================
 
 // Every public CRUD/search method begins with `if (TryConsumeOpFault()) return -1`.

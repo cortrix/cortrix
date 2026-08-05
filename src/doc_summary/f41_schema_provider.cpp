@@ -9,7 +9,7 @@
 namespace cortrix::doc_summary {
 
 Status F41SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
-    // Phase 1: 0 → 1 creates the doc_fts5_index virtual table (F41 §4.3). Accept
+    // Phase 1: 0 → 1 creates the doc_fts5_index virtual table. Accept
     // an already-current (1 → 1) call defensively (CREATE ... IF NOT EXISTS is
     // itself idempotent). Runs inside the SchemaMigrator's transaction.
     if (from_ver == to_ver) {

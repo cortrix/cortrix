@@ -233,7 +233,7 @@ void CragEvaluator::EvaluateAndUpdateContext(
     query::QueryContext& ctx, const std::vector<RankedChunk>& chunks) {
     // §6.3: classify and write the F37 verdict fields onto QueryContext. This does
     // NOT decide skip — the QueryPipeline gates on F39 ShouldSkipF37 *before*
-    // calling this (F37 §4.1 v1.0.3 M2). Skipped queries simply never reach here.
+    // calling this. Skipped queries simply never reach here.
     ClassifierInput input{ctx.query, chunks,
                           ctx.ns_id.empty() ? std::optional<std::string>{}
                                             : std::optional<std::string>{ctx.ns_id}};

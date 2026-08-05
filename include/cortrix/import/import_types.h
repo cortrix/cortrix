@@ -15,13 +15,13 @@ namespace cortrix::import {
 
 /// Phase-1 string-alias IDs (ARCH §1.8 — distinct strong types are Phase 2). A
 /// connection ref is "db_conn_<ulid>"; an import task is "import_<ulid>" (F16a
-/// §4.1 / §4.2). NsId / TenantId reuse the catalog's TEXT keys (F12).
+/// §4.1 / §4.2). NsId / TenantId reuse the catalog's TEXT keys.
 using ConnectionRefId = std::string;
 using ImportTaskId    = std::string;
 using NsId            = cortrix::id::NamespaceId;
 using TenantId        = std::string;
 
-/// D4 textualization strategy (F16a §3.5). TEMPLATE was removed in v1.0.2 (D1 V3
+/// D4 textualization strategy. TEMPLATE was removed in v1.0.2 (D1 V3
 /// ruling 13 — Jinja pushed to V1.5); only PER_ROW + MERGE exist in V1.0.
 enum class TextStrategy {
     kPerRow,   ///< default: one Block per row ("col: val\n...")
@@ -33,7 +33,7 @@ const char* ToString(TextStrategy strategy);
 /// (notably "template", deliberately rejected in V1.0).
 std::optional<TextStrategy> ParseTextStrategy(const std::string& s);
 
-/// D6 task lifecycle (F16a §3.6). Terminal states = COMPLETED / FAILED / CANCELLED.
+/// D6 task lifecycle. Terminal states = COMPLETED / FAILED / CANCELLED.
 enum class ImportTaskStatus {
     kQueued,
     kRunning,

@@ -9,7 +9,7 @@
 namespace cortrix::import {
 
 /// Agent-friendly response serialization for F16a (§5.1 / §5.2 / §5.3). These build
-/// the exact wire bodies the SDK (P03) + OpenAPI (P04) contract on, so the schema is
+/// the exact wire bodies the SDK + OpenAPI contract on, so the schema is
 /// the single source of truth even though the real HTTP routing is wired in D3.5.
 
 /// Render a system_clock time point to RFC3339/ISO-8601 UTC ("...Z"). The shared

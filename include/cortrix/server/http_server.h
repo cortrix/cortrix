@@ -40,7 +40,7 @@ public:
     /// NamespaceFacade Acquire/Release). Replaces the MVP CortrixNamespaceManager.
     void SetNamespacePool(cortrix::resource::INamespacePool* pool);
 
-    /// Set the F12 NS router used by the create-namespace route (F13). When unset,
+    /// Set the F12 NS router used by the create-namespace route. When unset,
     /// POST /api/v1/namespaces falls back to the metadata manager (NamespaceManager).
     void SetNamespaceRouter(cortrix::catalog::INSRouter* router);
 

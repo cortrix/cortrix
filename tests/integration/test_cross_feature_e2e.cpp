@@ -2,10 +2,10 @@
 /// @brief D3.5 Phase 5: Cross-Feature integration & E2E smoke tests
 ///
 /// Tests the following cross-Feature data flows:
-///   1. Upload → SPC → Store → Query (F01+F02+F03+F04+F07+F08)
+///   1. Upload → SPC → Store → Query
 ///   2. Memory persistence across HTTP requests (F09+F10 critical fix verification)
-///   3. Memory → Query → Inject full user journey (F07+F09+F10)
-///   4. Document Upload → Store → Query via HTTP (F04+F01+F07+F10)
+///   3. Memory → Query → Inject full user journey
+///   4. Document Upload → Store → Query via HTTP
 ///   5. Namespace isolation across all subsystems
 
 #include <gtest/gtest.h>
@@ -19,20 +19,20 @@
 #include "httplib.h"
 #include <nlohmann/json.hpp>
 
-// Storage layer (F01)
+// Storage layer
 #include "cortrix/store/cortrix_store_sqlite.h"
 #include "cortrix/store/cortrix_blob_local.h"
 #include "cortrix/store/phnsw.h"
 #include "cortrix/common/block_header.h"
 #include "cortrix/common/block_types.h"
 
-// SPC pipeline (F03)
+// SPC pipeline
 #include "cortrix/spc/recursive_chunker.h"
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/spc/block_assembler.h"
 #include "cortrix/spc/spc_manager.h"
 
-// Query engine (F07+F08)
+// Query engine
 #include "cortrix/query/query_pipeline.h"
 #include "cortrix/query/query_request.h"
 #include "cortrix/query/query_response.h"
@@ -44,14 +44,14 @@
 #include "cortrix/query/degradation_manager.h"
 #include "cortrix/query/sql_executor.h"
 
-// Memory system (F09)
+// Memory system
 #include "cortrix/memory/memory_store.h"
 #include "cortrix/memory/memory_writer.h"
 #include "cortrix/memory/memory_searcher.h"
 #include "cortrix/memory/memory_injector.h"
 #include "cortrix/memory/memory_config.h"
 
-// HTTP routes (F10+F12)
+// HTTP routes
 #include "cortrix/memory/memory_routes.h"
 #include "cortrix/query/query_routes.h"
 #include "cortrix/server/routes/document_routes.h"
@@ -153,7 +153,7 @@ protected:
 
 // Core E2E: Upload doc → Parse → Chunk → Embed → Store (SQLite+HNSW) → Query (BM25+Vector)
 TEST_F(SpcStoreQueryTest, FullPipelineUploadToQuery) {
-    // ===== Phase 1: SPC Pipeline (F03) =====
+    // ===== Phase 1: SPC Pipeline =====
     // 1a. Read document text (plain .txt input; see ReadFile note)
     std::string doc_text = ReadFile(doc_path_);
     ASSERT_FALSE(doc_text.empty());
@@ -175,7 +175,7 @@ TEST_F(SpcStoreQueryTest, FullPipelineUploadToQuery) {
     ASSERT_TRUE(s.ok()) << s.message();
     ASSERT_EQ(embeddings.size(), chunks.size());
 
-    // ===== Phase 2: Store (F01+F02) =====
+    // ===== Phase 2: Store =====
     // 2a. Create document record
     CortrixDoc doc;
     doc.source_type = "http_upload";
@@ -207,7 +207,7 @@ TEST_F(SpcStoreQueryTest, FullPipelineUploadToQuery) {
     // 2d. Mark doc as ready
     ASSERT_EQ(store_->doc_update_status(doc.doc_id, DocStatus::kReady), 0);
 
-    // ===== Phase 3: Query (F07+F08) =====
+    // ===== Phase 3: Query =====
     // 3a. FTS query — search for "semantic storage"
     {
         std::vector<SearchResult> fts_results;

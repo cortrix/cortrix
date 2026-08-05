@@ -22,7 +22,7 @@ public:
     explicit RouterInferenceError(const std::string& what) : std::runtime_error(what) {}
 };
 
-/// The 4 query-router error identities (F39 §4.3). Each maps to a stable
+/// The 4 query-router error identities. Each maps to a stable
 /// `CX_ERR_F39_*` string + a GEN-Agent category + retryability via the canonical
 /// registry below.
 ///

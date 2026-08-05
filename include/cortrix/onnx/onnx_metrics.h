@@ -6,7 +6,7 @@
 
 namespace cortrix::onnx {
 
-/// The 4 F22 ONNX metrics (F22 §13.5), following the F02 `cortrix_reranker_*`
+/// The 4 F22 ONNX metrics, following the F02 `cortrix_reranker_*`
 /// naming style: `cortrix_onnx_<subsystem>_<metric>_<unit>`. These are the
 /// infrastructure-layer signals an ops Agent queries to answer "why did the
 /// ONNX upgrade fail / what runtime version is loaded / did inference regress".

@@ -5,7 +5,7 @@
 
 namespace cortrix::spc {
 
-/// F38's schema-migration contribution (F38 §4.4). F38 introduces the
+/// F38's schema-migration contribution. F38 introduces the
 /// kBlockHypeQuestion=16 block sub-type (common/block_types.h) but owns NO new
 /// table and NO new column: the per-Unit `blocks` table (F09-owned) already
 /// stores an arbitrary block_type INTEGER, so a hype_question Block is just a row
@@ -15,7 +15,7 @@ namespace cortrix::spc {
 /// providers (mirrors the F02SchemaProvider no-op pattern, contrast F03 which owns
 /// real per-Unit columns).
 ///
-/// Implements the frozen cortrix::catalog::ISchemaProvider (F12 §3.7). Migrate
+/// Implements the frozen cortrix::catalog::ISchemaProvider. Migrate
 /// returns Status (F-FREEZE-1 / CODING_CONVENTIONS §3 — the F38 detailed design
 /// §4.4 wrote Result<void>, reconciled to the frozen Status signature here).
 ///

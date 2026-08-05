@@ -25,7 +25,7 @@ struct ImportManagerConfig {
     std::string pg_db = "postgres";
 };
 
-/// F16a main orchestrator (F16a §3.2). Wires the D-decisions together: D1 resolve
+/// F16a main orchestrator. Wires the D-decisions together: D1 resolve
 /// connection_ref → DSN, D2 fetch rows under the 5 security constraints, D4
 /// textualize, D3 clear this table's prior Blocks, D5 feed the SPC pipeline, D6 run
 /// it as an async task with progress/cancel, writing the F18a operation_log around

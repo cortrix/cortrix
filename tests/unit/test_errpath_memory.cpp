@@ -1,4 +1,4 @@
-// Error-path coverage for the Memory (MEM02/MEM03) codes that had ZERO referencing
+// Error-path coverage for the Memory codes that had ZERO referencing
 // test.
 //
 //  * CX_ERR_MEM03_STORE       — MemoryBlockAdapter::ListByUser prepare failure

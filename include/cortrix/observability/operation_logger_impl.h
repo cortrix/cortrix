@@ -11,7 +11,7 @@ struct sqlite3;
 
 namespace cortrix::observability {
 
-/// CE implementation of IOperationLogger (F18a §5.2). Writes the operation_log
+/// CE implementation of IOperationLogger. Writes the operation_log
 /// table in cortrix_global.db synchronously (topic 4: Log P95 < 1ms — one prepared
 /// INSERT on a WAL db). Open-Core: this is the CE-only concrete; Ent's
 /// A downstream extended logger is a SEPARATE IOperationLogger that

@@ -11,7 +11,7 @@ struct sqlite3;
 
 namespace cortrix::agent_trace {
 
-/// CE implementation of IAgentTraceWriter (F13 §5.2). Writes the agent_trace table
+/// CE implementation of IAgentTraceWriter. Writes the agent_trace table
 /// in cortrix_global.db synchronously (one prepared INSERT on a WAL db). Open-Core:
 /// this is the stock concrete; a downstream extension writer
 /// is a SEPARATE IAgentTraceWriter that double-writes agent_trace_extension —

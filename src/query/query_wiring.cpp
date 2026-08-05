@@ -747,7 +747,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
 
             // CE no-auth leaves user_id empty; inject the
             // single-tenant default principal so F04 AuthorizeNamespaces Step 1
-            // passes (F04 §4.2 v1.0.4). When auth is enabled the middleware has
+            // passes. When auth is enabled the middleware has
             // already populated a real user_id and this is a no-op.
             AuthContext auth_ctx = ctx.auth;
             if (auth_ctx.user_id.empty()) auth_ctx.user_id = "default";
@@ -793,7 +793,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             QueryRouterMetrics::Instance().RecordDecision(
                 DecisionOf(qctx.routing_path, qctx.routing_decision_source));
 
-            // [F13 §11] Time the actual query execution (chat / scatter) for the
+            // Time the actual query execution (chat / scatter) for the
             // agent_trace duration_ms. Started after routing resolves so it measures
             // the execution, not the pre-execution validation (those 400s are request
             // -shape errors, not Engine calls, and are not traced — matching §11 which
@@ -816,7 +816,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                 QueryRequest chat_req;
                 if (CrossNsQueryHandler::ParseRequest(body, &chat_req).ok()) {
                     json chat_body = BuildChatResponse(*pool, qctx, chat_req.namespaces);
-                    // [F13 §11] Trace the chat-path query (memory-only retrieval).
+                    // Trace the chat-path query (memory-only retrieval).
                     RecordQueryTrace(engine_instr, BuildQueryParamsSummary(qctx),
                                      elapsed_ms(), /*is_success=*/true,
                                      "chat_memory_only", QueryTextSummary(qctx),
@@ -893,7 +893,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                                 static_cast<std::size_t>(requested_top_k));
                         }
                     }
-                    // [F13 §11] Trace the executed retrieval query (success). Summary
+                    // Trace the executed retrieval query (success). Summary
                     // = result count + coverage (the writer truncates to ≤512).
                     RecordQueryTrace(
                         engine_instr, BuildQueryParamsSummary(qctx), elapsed_ms(),
@@ -1007,7 +1007,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                     return;
                 } catch (const CrossNsException& e) {
                     const int http = GetCrossNsErrorInfo(e.code()).http_status;
-                    // [F13 §11] Trace the failed query (status=failed + error code).
+                    // Trace the failed query (status=failed + error code).
                     RecordQueryTrace(engine_instr, BuildQueryParamsSummary(qctx),
                                      elapsed_ms(), /*is_success=*/false, "",
                                      QueryTextSummary(qctx), e.GetError().code,

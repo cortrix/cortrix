@@ -183,7 +183,7 @@ void RegisterQueryRoutes(
 
             if (query_req.explain) {
                 // Populate a QueryContext for the read-side explain dump. The routing
-                // (F39) signals come from the FROZEN QueryComplexityClassifier
+                // signals come from the FROZEN QueryComplexityClassifier
                 // (RouteAndUpdateContext, Wave C-R2) — the route handler is the read
                 // side that surfaces the already-implemented decision logic; it adds
                 // no new routing behavior. Standalone backend is the heuristic guard

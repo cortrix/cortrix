@@ -69,7 +69,7 @@ DirWatcherRegistry::~DirWatcherRegistry() {
 // --- id derivation ---
 
 std::string DirWatcherRegistry::MakeId(const std::string& canonical_dir) {
-    // SHA-256(canonical_dir), first 8 hex chars (F21 § 2.1). Per-directory key
+    // SHA-256(canonical_dir), first 8 hex chars. Per-directory key
     // (no namespace component) since one watcher now serves all subscribers.
     unsigned char digest[EVP_MAX_MD_SIZE];
     unsigned int digest_len = 0;

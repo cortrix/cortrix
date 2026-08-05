@@ -39,12 +39,12 @@ public:
     MemoryBlockAdapter(CortrixStore& store, OnnxEmbedder* embedder,
                        store::IIndex* vec_index);
 
-    // --- IMemoryBlockStore (MEM02) ---
+    // --- IMemoryBlockStore ---
     Result<std::string> InsertMemoryBlock(const MemoryBlockRecord& block) override;
     Status UpdateMemoryBlock(const MemoryBlockRecord& block) override;
     Result<MemoryBlockRecord> GetMemoryBlock(const std::string& block_id) override;
 
-    // --- IMemoryBlockLister (MEM03) ---
+    // --- IMemoryBlockLister ---
     Result<std::vector<MemoryBlockRecord>> ListByUser(const std::string& user_id) override;
 
 private:

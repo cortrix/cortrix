@@ -593,8 +593,8 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             }
         }
 
-        // chunk-level multi-path RRF (F40 §9.1) — all five paths live: dense +
-        // fts5 + sparse + contextualized (F35-9 B) + hype (F38 §8.1), wired by the
+        // chunk-level multi-path RRF — all five paths live: dense +
+        // fts5 + sparse + contextualized (F35-9 B) + hype, wired by the
         // vector-route split above (addendum §3.8 W2).
         std::vector<retrieval::RrfFusedHit> fused =
             retrieval::FuseFivePathRrf(rrf_in, candidate_k);
@@ -664,7 +664,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             for (std::size_t i = 0; i < ranked.size() && i < scores.size(); ++i) {
                 ranked[i].rerank_score = scores[i];
             }
-            // Fused ordering score = rerank*0.7 + rrf*0.3 (F02 §4.2-ter), local
+            // Fused ordering score = rerank*0.7 + rrf*0.3, local
             // sort-use only (not written into RankedChunk).
             const reranker::RerankerScoreFusion fusion;
             std::vector<std::pair<float, std::size_t>> order;

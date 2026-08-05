@@ -44,7 +44,7 @@ struct PhnswWalStats {
     std::size_t file_size_bytes = 0;
 };
 
-/// Persistent HNSW vector index (F01) — a shallow fork of hnswlib that adds a
+/// Persistent HNSW vector index — a shallow fork of hnswlib that adds a
 /// WAL + snapshot persistence layer around the untouched graph algorithm.
 ///
 /// Phase 1 is the only IIndex implementation. PHnsw also implements the narrower
@@ -54,7 +54,7 @@ struct PhnswWalStats {
 ///
 /// Thread safety: writes take a unique_lock on mutex_, reads take a shared_lock
 /// (S5). Lifecycle: the constructor runs Recover() and only accepts traffic once
-/// the index reports READY (F01 §4.4-ter).
+/// the index reports READY.
 ///
 /// S1 scope: this class is declared and instantiable; the WAL / group-commit /
 /// snapshot bodies are filled in by S2–S6. Until then the method bodies are

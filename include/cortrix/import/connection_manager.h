@@ -48,7 +48,7 @@ public:
     virtual void Erase(const std::string& key_id) = 0;
 };
 
-/// In-memory AES-256-GCM secret store (F16a §3.3). Standalone default + the unit
+/// In-memory AES-256-GCM secret store. Standalone default + the unit
 /// test double. Encrypts with a process-ephemeral key so the plaintext never sits
 /// in the map; a persistent KMS/Vault store is the D3.5 / Phase-2 swap. Thread-safe.
 class InMemorySecretStore : public ISecretStore {
@@ -66,7 +66,7 @@ private:
     uint64_t next_id_ = 1;
 };
 
-/// Persistent metadata access for the db_connections table (F16a §4.1). cortrix/
+/// Persistent metadata access for the db_connections table. cortrix/
 /// owns this CE interface; the SQLite-backed impl is SqliteConnectionStore. The
 /// secret itself lives in ISecretStore, NOT here (this row holds only secret_key_id
 /// + non-sensitive metadata). Mockable for standalone unit tests.
@@ -118,7 +118,7 @@ struct ConnectionManagerConfig {
     int expire_max_days = 365;       // §4.4 connection.expire_max_days
 };
 
-/// Pure-virtual interface for the D1 credential-ref lifecycle (F16a §3.3), so the
+/// Pure-virtual interface for the D1 credential-ref lifecycle, so the
 /// ImportManager / QueryExecutor seam can be mocked. resolve_dsn is the only path
 /// that ever materializes a plaintext DSN.
 class IConnectionManager {
@@ -144,7 +144,7 @@ public:
                           const std::string& reason) = 0;
 };
 
-/// D1 connection-ref management (F16a §3.3): encrypted secret store + ref expiry +
+/// D1 connection-ref management: encrypted secret store + ref expiry +
 /// revoke + the D7 cross-tenant guard. Holds only refs + metadata; the DSN is
 /// encrypted in the ISecretStore. The 3 admin endpoints (register/list/revoke,
 /// §6.1) bind to these methods.

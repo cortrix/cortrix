@@ -369,7 +369,7 @@ float OnnxReranker::StubScore(const char* query, const char* passage) const {
 
 float OnnxReranker::Score(const char* query, const char* passage) {
 #ifdef CORTRIX_HAS_ONNXRUNTIME
-    // Real cross-encoder path (F02 §2.2): pair-encode → session Run → sigmoid.
+    // Real cross-encoder path: pair-encode → session Run → sigmoid.
     // MAY throw on ONNX/OOM failure — ScoreBatch's per-task guard owns the
     // catch (ScoreForTask contract); direct callers get fail-loud semantics.
     if (!stub_mode_ && session_ != nullptr && tokenizer_ && tokenizer_->loaded()) {

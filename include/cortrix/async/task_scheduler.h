@@ -26,7 +26,7 @@ namespace cortrix::async {
 ///
 /// Standalone (D3): real and fully tested against an in-memory TaskManager. The
 /// debounce window comes from IGlobalConfig f42.watcher_debounce_seconds (§4.0)
-/// with a documented default; admin-API hot-reload (P08) → next Enqueue picks it up.
+/// with a documented default; admin-API hot-reload → next Enqueue picks it up.
 ///
 /// Thread-safe: Enqueue / Dequeue / OnTaskCompleted serialize on mutex_.
 class TaskScheduler {

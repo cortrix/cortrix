@@ -5,7 +5,7 @@
 
 namespace cortrix::connector {
 
-/// F21's schema-migration contribution (F21 § 2.6). The watcher's per-namespace
+/// F21's schema-migration contribution. The watcher's per-namespace
 /// configuration lives in catalog.db `namespaces.watcher_config JSONB`, which is
 /// one of the 11 standardized *_config columns already created by the F12 base
 /// schema (catalog_schema.cpp). F21 therefore owns NO extension column and adds

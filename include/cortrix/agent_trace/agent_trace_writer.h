@@ -39,7 +39,7 @@ struct AgentTraceEntry {
     int64_t created_at = 0;                     ///< Unix ms (0 → writer fills now())
 };
 
-/// Query filter for GET /api/v1/traces/{session_id} (F13 §8.1). Defaults match
+/// Query filter for GET /api/v1/traces/{session_id}. Defaults match
 /// §8.1: limit 50 / cap 200, offset 0. The session_id is the path param (passed
 /// to Query separately); these are the additional query-string dimensions.
 struct TraceFilter {

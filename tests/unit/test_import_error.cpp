@@ -12,7 +12,7 @@
 #include "cortrix/import/import_response.h"
 #include "cortrix/import/import_types.h"
 
-// S5 coverage: the 6 F16a error codes (F16a §5.4) — CX_ERR_F16A_ identity, category
+// S5 coverage: the 6 F16a error codes — CX_ERR_F16A_ identity, category
 // mapping, retryability, structured_data contract, the GEN-Agent 4-field boundary
 // factory, and the §5.1/§5.2/§5.3 Agent-friendly response bodies. Mirrors the
 // project reference test scatter/test_cross_ns_error.cpp.

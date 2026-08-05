@@ -78,7 +78,7 @@ const std::unordered_map<std::string, std::pair<ErrorCategory, bool>>& Sdk3Map()
         {"CX_ERR_STORE_DB_ERROR", {ErrorCategory::kTransient, true}},
         // sec.3.4 F14 pgcortrix
         {"CX_ERR_F14_INVALID_FILTER", {ErrorCategory::kPermanent, false}},
-        // sec.3.5 retrieval chain (F36 / F38 / F48)
+        // sec.3.5 retrieval chain
         {"CX_ERR_RAG_FUSION_LLM_TIMEOUT", {ErrorCategory::kTimeout, true}},
         {"CX_ERR_RAG_FUSION_LLM_QUOTA", {ErrorCategory::kQuota, true}},
         {"CX_ERR_F38_LLM_TIMEOUT", {ErrorCategory::kTimeout, true}},
@@ -771,7 +771,7 @@ Status CortrixHttpServer::BuildNamespaceJson(const std::string& name, nlohmann::
         if (!got.ok()) return got.status();
         const cortrix::catalog::NSMetadata& md = got.value();
         created = md.created_at;
-        // namespaces (F12 §4.1) has no updated_at column — mirror the create/list
+        // namespaces has no updated_at column — mirror the create/list
         // responses and surface created_at as updated_at (NSMetadata carries no
         // separate mutation timestamp).
         updated = created;
@@ -817,7 +817,7 @@ Status CortrixHttpServer::BuildNamespaceJson(const std::string& name, nlohmann::
 }
 
 Status CortrixHttpServer::DeleteNamespaceUnified(const std::string& name) {
-    // Catalog soft-delete also triggers F05 pool eviction (F12 §3.1.bis).
+    // Catalog soft-delete also triggers F05 pool eviction.
     if (ns_router_) return ns_router_->DeleteNamespace(name);
     return ns_mgr_.Delete(name);
 }
@@ -898,7 +898,7 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                              resp["block_count"] = info.block_count;
                          }
 
-                         EmitNsLog("ns_create", name);  // [F18a §9.1] success-only
+                         EmitNsLog("ns_create", name);  // success-only
                          WriteJsonResponse(res, 201, resp, rctx.request_id);
                      }));
     } else {
@@ -972,7 +972,7 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                     resp["block_count"] = info.block_count;
                 }
 
-                EmitNsLog("ns_create", name);  // [F18a §9.1] success-only
+                EmitNsLog("ns_create", name);  // success-only
                 WriteJsonResponse(res, 201, resp, rctx.request_id);
             }));
     }
@@ -1046,7 +1046,7 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                                      return;
                                  }
 
-                                 EmitNsLog("ns_delete", name);  // [F18a §9.1] success-only
+                                 EmitNsLog("ns_delete", name);  // success-only
                                  res.set_header("X-Request-Id", rctx.request_id);
                                  res.status = 204;
                              }));
@@ -1062,7 +1062,7 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
                             return;
                         }
 
-                        EmitNsLog("ns_delete", name);  // [F18a §9.1] success-only
+                        EmitNsLog("ns_delete", name);  // success-only
                         res.set_header("X-Request-Id", rctx.request_id);
                         res.status = 204;
                     }));

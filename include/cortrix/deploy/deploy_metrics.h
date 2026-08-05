@@ -13,14 +13,14 @@ namespace cortrix::deploy {
 ///
 /// 🚨 Cardinality control (OBS_SPEC §3.2): the gauges here are global (no
 /// per-NS / per-doc labels). The Bloom Filter gauges carry only the fixed
-/// subsystem="catalog" label (F24 §10).
+/// subsystem="catalog" label.
 ///
 /// Scope (D3 standalone): the gauges this recorder owns directly are
 ///   cortrix_disk_usage_ratio          (gauge — fed by DiskMonitor, F24-4)
 ///   cortrix_shutdown_status           (gauge 0/1/2 — fed by GracefulShutdown, F24-5)
 ///   cortrix_uptime_seconds            (gauge — derived from the process start)
 ///   cortrix_build_info{version,...}   (info gauge, value 1)
-/// plus the 4 Bloom Filter gauges (F24 §10), which are *rendered from* an
+/// plus the 4 Bloom Filter gauges, which are *rendered from* an
 /// IBloomFilter the metrics server is given (read-through, not stored here).
 /// The remaining ~21 subsystem metrics in §5.3 are owned by their own Feature
 /// recorders (ScoringMetrics, F42Metrics, ...); aggregating all of them into one
@@ -63,7 +63,7 @@ private:
     DeployMetrics() = default;
 };
 
-/// Read-through renderer for the 4 Bloom Filter gauges (F24 §10), kept separate
+/// Read-through renderer for the 4 Bloom Filter gauges, kept separate
 /// from DeployMetrics because they reflect a live filter rather than stored
 /// state. Given accessors for the four values (so it does not hard-depend on the
 /// catalog headers — the metrics server binds these from the real IBloomFilter,

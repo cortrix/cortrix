@@ -6,7 +6,7 @@
 
 namespace cortrix::auth {
 
-/// Current P08 Auth schema version (P08 §3). Bumped only for Phase 1 internal
+/// Current P08 Auth schema version. Bumped only for Phase 1 internal
 /// schema evolution; this build creates the v1 set from scratch.
 constexpr int kP08AuthSchemaVersion = 1;
 

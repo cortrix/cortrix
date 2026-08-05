@@ -5,7 +5,7 @@
 
 namespace cortrix::spc {
 
-/// Structured outcome of a parser bridge subprocess (F06 §4.2). Richer than the
+/// Structured outcome of a parser bridge subprocess. Richer than the
 /// shared RunSubprocess (which collapses every failure to one Status): the
 /// parser needs to tell PARSE_TIMEOUT / SUBPROCESS_CRASHED / SUBPROCESS_FAILED /
 /// OUTPUT_TOO_LARGE apart and surface exit_code + stderr tail into the

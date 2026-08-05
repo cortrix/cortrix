@@ -9,7 +9,7 @@ namespace cortrix::async {
 /// than declaring their own (V2 QA M-17: F41 §5.2 previously declared it
 /// unilaterally, violating SoT ownership).
 ///
-/// Enum-value stability contract (F42 §3.2):
+/// Enum-value stability contract:
 ///  - The values (1/2/3) are stable across Phases so the tasks.task_type column
 ///    stays backward-compatible.
 ///  - A new TaskType MUST be added by a PR that also updates F42 §3.2 + ARCH

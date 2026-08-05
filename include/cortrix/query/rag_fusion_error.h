@@ -10,7 +10,7 @@
 
 namespace cortrix::query {
 
-/// The 6 RAG-Fusion error identities (F36 §7). 5 errors + 1 warning, each mapping
+/// The 6 RAG-Fusion error identities. 5 errors + 1 warning, each mapping
 /// to a stable `CX_ERR_*` / `CX_WARN_*` string + a GEN-Agent category +
 /// retryability + the structured_data keys its body MUST carry, via the canonical
 /// registry below.
@@ -24,7 +24,7 @@ namespace cortrix::query {
 /// into that boundary error — mirroring the F04 CrossNsErrorCode / F12
 /// CatalogErrorCode template (query/cross_ns_error.h).
 ///
-/// topic 6 commercial sensitivity (F36 §7): CX_WARN_RAG_FUSION_DEGRADED is C-class — it ONLY
+/// topic 6 commercial sensitivity: CX_WARN_RAG_FUSION_DEGRADED is C-class — it ONLY
 /// surfaces when a user has explicitly enabled F36 (ns_config.enabled=true) and an
 /// LLM call then fails; users who never enable F36 never see it (the LLM is never
 /// called). All other codes are B-class (internal, only via ?explain=true).

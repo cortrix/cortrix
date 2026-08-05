@@ -5,7 +5,7 @@
 
 namespace cortrix::auth {
 
-/// Pluggable email transport (P08 §4.6). Phase 1 default is NullEmailSender
+/// Pluggable email transport. Phase 1 default is NullEmailSender
 /// (email_verification off → codes only logged); SmtpEmailSender is the
 /// production transport, configured via the admin API (topic 8).
 class IEmailSender {
@@ -16,7 +16,7 @@ public:
                         const std::string& body) = 0;
 };
 
-/// Default sender (P08 §4.6): does not send; logs the message at INFO so a dev /
+/// Default sender: does not send; logs the message at INFO so a dev /
 /// CI run can read the verification code. Used whenever email_verification is
 /// false (the §3.6 default) or SMTP is unconfigured. Always succeeds.
 class NullEmailSender : public IEmailSender {

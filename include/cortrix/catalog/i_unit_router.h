@@ -7,7 +7,7 @@
 
 namespace cortrix::catalog {
 
-/// Unit lifecycle + runtime stats (F12 §3.2). The catalog is the SoT for Unit
+/// Unit lifecycle + runtime stats. The catalog is the SoT for Unit
 /// metadata; F03 (enrichment), F25 (write) etc. update stats / state through
 /// this interface rather than touching the units table directly.
 ///

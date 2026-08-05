@@ -17,7 +17,7 @@ struct BatchContext {
     std::optional<std::string> node_id;  // 'local' in Phase 1
 };
 
-/// Accumulates a partial-success batch (F12 §8.2) and finalizes a BatchResult<T>
+/// Accumulates a partial-success batch and finalizes a BatchResult<T>
 /// with the 5 standard meta fields + a coverage_ratio computed from the actual
 /// succeeded/failed counts. Keeps the §8.2 contract (api_version "v1", node_id,
 /// catalog_version, bloom_filter_ready, timestamp_ms) in one place.

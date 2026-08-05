@@ -9,7 +9,7 @@ using agent_friendly::ErrorCategory;
 
 namespace {
 
-// One canonical row per code (F07 §4.4). Defined as function-local statics so each
+// One canonical row per code. Defined as function-local statics so each
 // returns a stable reference. The switch in GetF07ErrorInfo is intentionally
 // exhaustive: building with -Wall -Wextra (-Wswitch) turns "added a code without a
 // row" into a warning (treated as a build failure), so the registry can't silently

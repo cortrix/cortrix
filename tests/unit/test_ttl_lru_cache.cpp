@@ -4,7 +4,7 @@
 
 #include "cortrix/catalog/ttl_lru_cache.h"
 
-// S2.2 coverage: the bounded TTL+LRU cache fronting INSRouter (F12 §6.3). Time is
+// S2.2 coverage: the bounded TTL+LRU cache fronting INSRouter. Time is
 // injected so expiry/eviction are deterministic.
 namespace cortrix::catalog {
 namespace {

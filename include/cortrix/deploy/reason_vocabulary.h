@@ -59,7 +59,7 @@ enum class MetricReason {
     kF42AsyncSchedulerBusy,
 };
 
-/// Total entries in the controlled vocabulary (F24 §8.2). Compile-time anchor for
+/// Total entries in the controlled vocabulary. Compile-time anchor for
 /// the regression test (the set must not silently shrink).
 constexpr int kMetricReasonCount = 23;
 

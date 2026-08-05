@@ -4,7 +4,7 @@
 
 #include "cortrix/async/f42_metrics.h"
 
-// MET-10 coverage: the 6 cortrix_tasks_* metrics (F42 §6.bis) — counters/gauge/
+// MET-10 coverage: the 6 cortrix_tasks_* metrics — counters/gauge/
 // histogram recording + the OpenMetrics renderer + label-enum discipline
 // (OBS_SPEC §3.2 no high-cardinality labels). Note metric names are
 // `cortrix_tasks_*`, NOT `cortrix_f42_*` (the locked OBS_SPEC §2.3 names).

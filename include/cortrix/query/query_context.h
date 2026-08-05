@@ -25,7 +25,7 @@ namespace cortrix::query {
 ///
 /// Wave C unification (F37/F39 — QUERY_CONTEXT_SPEC.md SoT): the Wave-C joint
 /// design (G3+G1.2 §S3) made QueryContext the single query-path context object that
-/// also carries the routing (F39) + CRAG (F37) decision signals exposed via the
+/// also carries the routing + CRAG decision signals exposed via the
 /// ARCH `?explain=true` endpoint. QUERY_CONTEXT_SPEC.md §2 is the SoT for those
 /// fields. They are added here as a **pure ADD** (C-R1 briefing red-line 2): the
 /// original F04 execution fields above are unchanged, so F04's existing consumers
@@ -58,7 +58,7 @@ struct QueryContext {
     // candidates can enter the official query candidate set. ScatterGather itself never
     // branches on this — it is a per-NS executor concern (the cross-NS gather/dedupe stays
     // granularity-agnostic).
-    std::string granularity = "auto";  ///< "auto" | "chunk" | "doc" | "both" (F41 §6.2)
+    std::string granularity = "auto";  ///< "auto" | "chunk" | "doc" | "both"
 
     // --- Identity pass-through (topic §11.bis MEM05-4: AuthContext.user_id flows through) ---
     std::string user_id;     ///< passed through for downstream isolation / audit (empty in CE single-tenant)

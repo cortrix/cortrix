@@ -8,7 +8,7 @@
 
 namespace cortrix::doc_summary {
 
-/// The F41 Document Summary metrics (F41 §12). Two OBS subsystems:
+/// The F41 Document Summary metrics. Two OBS subsystems:
 ///   - `doc_summary`: llm_calls_total / llm_duration_seconds /
 ///     summaries_generated_total / fallback_triggered_total
 ///   - `fts5_fallback`: fts5_fallback_failed_total (F41-8 hybrid fallback)

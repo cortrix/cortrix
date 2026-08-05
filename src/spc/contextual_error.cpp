@@ -9,7 +9,7 @@ using agent_friendly::ErrorCategory;
 
 namespace {
 
-// One canonical row per code (F35 §8). Function-local statics → stable refs. The
+// One canonical row per code. Function-local statics → stable refs. The
 // switches below are intentionally exhaustive: -Wswitch turns "added a code
 // without a row" into a build failure, so the registry can't drift from the enum.
 //

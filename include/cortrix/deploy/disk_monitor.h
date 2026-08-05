@@ -25,7 +25,7 @@ enum class DiskStage {
 
 const char* ToString(DiskStage stage);
 
-/// Snapshot of a single statvfs sample (F24 §6.2). usage_ratio = used / total.
+/// Snapshot of a single statvfs sample. usage_ratio = used / total.
 struct DiskUsage {
     uint64_t total_bytes = 0;
     uint64_t free_bytes  = 0;       ///< available to an unprivileged process (f_bavail)
@@ -33,9 +33,9 @@ struct DiskUsage {
     DiskStage stage = DiskStage::kNormal;
 };
 
-/// The IGlobalConfig keys + documented defaults the monitor reads (F24 §6.4).
+/// The IGlobalConfig keys + documented defaults the monitor reads.
 /// Generic KV accessors (IGlobalConfig::GetFloat/GetInt) keep the canonical
-/// config header dependency-free; an admin hot-reload (P08) is picked up on the
+/// config header dependency-free; an admin hot-reload is picked up on the
 /// next check tick. Standalone (D3): real + tested against InMemoryGlobalConfig.
 struct DiskMonitorConfig {
     std::string data_dir = "./data";   ///< path passed to statvfs (CORTRIX_DATA_DIR)

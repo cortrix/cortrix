@@ -40,7 +40,7 @@ Status CatalogDb::OpenAndConfigure(const std::string& db_path) {
         return Status::Internal(std::string("catalog.db open failed: ") + msg);
     }
 
-    // WAL for concurrent readers + crash safety (F12 §9.1). foreign_keys ON so
+    // WAL for concurrent readers + crash safety. foreign_keys ON so
     // the FK constraints in the schema are actually enforced (off by default in
     // SQLite). A ':memory:' db reports WAL as 'memory'; that is expected.
     Status st = ExecPragma(db_, "PRAGMA journal_mode=WAL;");

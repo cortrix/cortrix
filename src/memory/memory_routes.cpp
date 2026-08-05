@@ -1108,7 +1108,7 @@ void RegisterMemoryRoutes(
         search_req.include_expired = body.value("include_expired", false);
         search_req.include_invalidated = body.value("include_invalidated", false);
 
-        // MEM05: user_id is always required. With auth (P08) it comes from the
+        // MEM05: user_id is always required. With auth it comes from the
         // AuthContext (JWT/API Key); in CE no-auth mode it defaults to "default"
         // (design § CE single-user compatibility). Real AuthContext extraction is D3.5.
         // L1 IDOR guard: a non-admin requesting another user's memories via a

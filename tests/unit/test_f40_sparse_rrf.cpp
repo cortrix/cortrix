@@ -7,7 +7,7 @@
 #include "cortrix/retrieval/sparse_rrf.h"
 
 // F40 S8 — chunk-level 5-path RRF fusion (§9.1). dense + sparse + fts5 carry real
-// structure; contextualized (F35) + hype (F38) are MOCK (empty lists) this round.
+// structure; contextualized + hype are MOCK (empty lists) this round.
 namespace cortrix::retrieval {
 namespace {
 
@@ -97,7 +97,7 @@ TEST(F40SparseRrfTest, MockContextualizedAndHypeEmptyAreNoOps) {
     FivePathInput in;
     in.dense = L({"a"});
     in.sparse = L({"a"});
-    // contextualized (F35) + hype (F38) intentionally empty (mock this round).
+    // contextualized + hype intentionally empty (mock this round).
     auto out = FuseFivePathRrf(in);
     ASSERT_EQ(out.size(), 1u);
     const RrfFusedHit* a = Find(out, "a");

@@ -7,7 +7,7 @@
 
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/llm/i_llm_client.h"    // ILlmClient (injectable LLM seam)
-#include "cortrix/spc/parser.h"          // DocumentMetadata SoT (F06 §2.1)
+#include "cortrix/spc/parser.h"          // DocumentMetadata SoT
 #include "cortrix/spc_enricher/enricher_error.h"
 
 namespace cortrix::reranker {            // F02 frozen classes F03 reuses (B-R1 §2)
@@ -111,7 +111,7 @@ struct EnrichResult {
 struct ChunkContext {
     std::string chunk_text;                       ///< Required: the current chunk's text
     int chunk_index = 0;                          ///< Required: ordinal within the doc (0-based)
-    const DocumentMetadata* doc_metadata = nullptr;  ///< Required: DocumentMetadata SoT (F06), non-owning
+    const DocumentMetadata* doc_metadata = nullptr;  ///< Required: DocumentMetadata SoT, non-owning
     // enricher_config: the per-call merged config travels separately to
     // EnrichBatch via the LlmEnricher's resolved EnricherConfig (topic 2.4 three-layer
     // override is applied by the enricher, not carried per-context) — avoids a
@@ -250,7 +250,7 @@ public:
 /// LLM-backed enricher: combined NER + Summary over OpenAI-compatible chat
 /// (topic 3). Wave 2 delivers the core path (PromptTemplate → ILlmClient.Chat →
 /// topic 3.3 L1/L2/L3 parse → EnrichResult 12-field fill). Wave 3 adds the
-/// ThreadPool (F02 RerankerThreadPool) + CircuitBreaker (F02) + retry; Wave 4
+/// ThreadPool (F02 RerankerThreadPool) + CircuitBreaker + retry; Wave 4
 /// adds the BudgetTracker + startup probe / fallback.
 ///
 /// 🔌 Network seam: the LLM is reached through an injected ILlmClient — the

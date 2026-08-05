@@ -8,7 +8,7 @@
 
 namespace cortrix::observability {
 
-/// The 4 Engine instrumentation sites (F18a §9.1). Each Engine module emits operation_log
+/// The 4 Engine instrumentation sites. Each Engine module emits operation_log
 /// entries for a fixed set of actions; this enum names the site so the emitter
 /// helper can fill the correct resource_type and the standalone tests can assert
 /// the §9.1 mapping without touching the real Engine code (D3 standalone — the

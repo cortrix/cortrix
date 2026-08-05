@@ -4,7 +4,7 @@
 
 #include "cortrix/memory/mem03_metrics.h"
 
-// S6 coverage: the 5 cortrix_memory_transparency_* metrics (MEM03 §8) — counters +
+// S6 coverage: the 5 cortrix_memory_transparency_* metrics — counters +
 // per-op latency histogram recording + the OpenMetrics renderer + label-enum
 // discipline (OBS_SPEC §3.2 no high-cardinality labels).
 namespace cortrix::memory::transparency {

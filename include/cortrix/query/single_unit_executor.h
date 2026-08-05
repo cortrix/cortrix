@@ -19,7 +19,7 @@ namespace cortrix::query {
 /// *interfaces* and never touches live MVP instances. Wiring the real per-NS
 /// pipeline (VectorSearcher/BM25Searcher/RRFFusion bound to a live index/store)
 /// and the real OnnxReranker is **D3.5**. Unit tests inject a mock pipeline + the
-/// shared MockReranker (F02 §7.2).
+/// shared MockReranker.
 ///
 /// candidate over-fetch: candidate_k = min(top_k × multiplier, max_candidates)
 /// (F02 §top_N — multiplier/cap mirror RerankerConfig defaults 3 / 50). The

@@ -14,7 +14,7 @@ struct sqlite3;
 namespace cortrix::agent_trace {
 
 /// One citation-provenance row in a GET /interactions/{id}/sources response
-/// (F13 §8.2). snippet is already truncated (<=500, first 400 + last 100). The
+///. snippet is already truncated (<=500, first 400 + last 100). The
 /// CE shape carries NO highlight ranges (Ent writes those to
 /// interaction_sources_extension).
 struct InteractionSource {
@@ -24,7 +24,7 @@ struct InteractionSource {
     std::string snippet;
 };
 
-/// GET /interactions/{id}/sources response (F13 §8.2). deleted_sources_count is the
+/// GET /interactions/{id}/sources response. deleted_sources_count is the
 /// number of provenance rows whose source_block_id no longer resolves in `blocks`
 /// (topic 6 -- historical chunk deleted handling); those rows are omitted from
 /// `sources` but counted here so the Agent knows the answer cited now-gone data.
@@ -47,7 +47,7 @@ struct RequesterContext {
     bool is_admin = false;
 };
 
-/// One row in a GET /interactions list response (F13 §8.3). Projected from the
+/// One row in a GET /interactions list response. Projected from the
 /// real frozen interaction_log (MVP role/content model) — NOT the §4.2 draft shape
 /// (query_text/response_summary), which predates the MEM01 rebuild. query_text is
 /// returned in full (§8.3 — not truncated); namespace_id is the real
@@ -63,7 +63,7 @@ struct InteractionListItem {
     std::string created_at;           ///< ISO-8601 TEXT
 };
 
-/// Filter + pagination for GET /interactions (F13 §8.3). Defaults match §8.3:
+/// Filter + pagination for GET /interactions. Defaults match §8.3:
 /// limit 50 / cap 200, offset 0, DESC. user_id is admin-only cross-user (a
 /// non-admin gets their own rows regardless of this field).
 struct InteractionListFilter {
@@ -77,7 +77,7 @@ struct InteractionListFilter {
     std::string sort_order = "DESC";          ///< "ASC" | "DESC"
 };
 
-/// Paginated GET /interactions response (F13 §8.3).
+/// Paginated GET /interactions response.
 struct InteractionListView {
     std::vector<InteractionListItem> interactions;
     int64_t total_count = 0;

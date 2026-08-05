@@ -66,7 +66,7 @@ struct CortrixBlock {
     ScoreSignals         score_signals;   // F03/F07 optional query-time scoring signals
 };
 
-// [A unified-blocks] Storage DTO for the per-Unit `parents` table (F34 § 3.1).
+// [A unified-blocks] Storage DTO for the per-Unit `parents` table.
 // parents are KEPT under A (child chunks moved into `blocks`; parents did not), and
 // CortrixParent is the persistence twin of the pipeline-side cortrix::chunker::
 // ParentChunk — exactly as CortrixBlock is the storage twin of chunker::ChildChunk.

@@ -10,7 +10,7 @@
 
 namespace cortrix::query {
 
-/// QueryVariantGenerator — LLM-backed query-variant generation (F36 §4.2).
+/// QueryVariantGenerator — LLM-backed query-variant generation.
 ///
 /// 🔑 Standalone seam (B_R1_BRIEFING §7): the D1 design names the dependency
 /// `f03::OpenAiLlmClient`, but the FROZEN scaffolding seam (D2-pre-3,

@@ -11,7 +11,7 @@
 
 namespace cortrix::spc {
 
-/// The 16 document-parser error identities (F06 §2.7). Each maps to a stable
+/// The 16 document-parser error identities. Each maps to a stable
 /// `CX_ERR_*` string + a GEN-Agent category + retryability via the canonical
 /// registry below.
 ///

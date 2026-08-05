@@ -31,7 +31,7 @@ struct RerankTaskResult {
 /// OnnxReranker — V1 sole IReranker implementation (bge-reranker-v2-m3 ONNX
 /// Cross-Encoder, F02 §2.2).
 ///
-/// Sharing (F02 §2.4-bis): borrows the process-wide Ort::Env (OrtEnvSingleton)
+/// Sharing: borrows the process-wide Ort::Env (OrtEnvSingleton)
 /// and the bge-m3 HfTokenizer (TokenizerRegistry); owns an independent
 /// Ort::Session. Ort types are kept out of this header (opaque void* session_),
 /// mirroring the in-tree OnnxEmbedder pattern so non-ONNX TUs can include it.

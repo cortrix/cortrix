@@ -121,7 +121,7 @@ Result<BootstrapHandler::BootstrapResult> BootstrapHandler::Consume(
 }
 
 std::string BootstrapHandler::RenderHtml(const std::string& admin_api_key) {
-    // Minimal inline-styled page (P08 §2.13.2.a). The key is shown once; the URL
+    // Minimal inline-styled page. The key is shown once; the URL
     // is then invalidated. Kept dependency-free (no template engine).
     return
         "<!DOCTYPE html>\n<html>\n<head>\n  <title>Cortrix Admin Setup</title>\n"

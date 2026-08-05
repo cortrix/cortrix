@@ -10,7 +10,7 @@
 
 namespace cortrix::spc {
 
-// I2 (F35 §4.1) — persist the contextualized_* columns F35SchemaProvider added to
+// I2 — persist the contextualized_* columns F35SchemaProvider added to
 // the per-Unit `blocks` table (embedding / contextualized_text /
 // contextualized_embedding / contextualized_status). A free function over a
 // sqlite3* (same shape as F03's WriteEnrichment) so it unit-tests against an
@@ -33,7 +33,7 @@ Status WriteContextualized(sqlite3* db, uint64_t block_id, const EnrichResult& r
 // The contextualized embedding enters P-HNSW as its OWN point under a derived
 // label (not a blocks row). contextual_vec_labels (F35SchemaProvider V2) maps
 // that label back to the owning child so the query side can resolve an ANN hit
-// on a contextual point into a contextualized-path RRF vote (F35 §9.1).
+// on a contextual point into a contextualized-path RRF vote.
 
 struct ContextualVecLabelRow {
     uint64_t label = 0;     ///< derived P-HNSW label of the contextual point

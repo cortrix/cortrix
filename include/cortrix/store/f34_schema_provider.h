@@ -22,7 +22,7 @@ namespace cortrix::store {
 ///     F34SchemaProvider; its semantics belong to F08 — see F08 § 3.3).
 ///   - `parents` table (parent_text reverse-lookup store, § D6) via kParentsSchemaSql.
 ///
-/// Implements the frozen cortrix::catalog::ISchemaProvider (F12 § 3.7). Migrate
+/// Implements the frozen cortrix::catalog::ISchemaProvider. Migrate
 /// returns Status (CODING_CONVENTIONS § 3). All DDL is idempotent (column/table
 /// existence guards + IF NOT EXISTS) so a re-run / already-current Unit DB is a
 /// no-op; if `blocks` is absent (isolated unit test) the blocks ALTERs no-op but

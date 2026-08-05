@@ -90,7 +90,7 @@ public:
     int QueueDepth() const;
 
     // --- cortrix_reranker_score_duration_seconds (Histogram, no label) — D35-MET-04 ---
-    // ScoreBatch end-to-end latency distribution (F02 §3.4). Bucket bounds straddle
+    // ScoreBatch end-to-end latency distribution. Bucket bounds straddle
     // the F02 SLA (component P99=200ms; 30-candidate batch ~240ms; e2e P50<500ms /
     // P99<1500ms) — see kScoreBounds in the .cpp.
     void ObserveScoreDuration(double seconds);

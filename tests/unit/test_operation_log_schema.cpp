@@ -9,7 +9,7 @@
 #include "cortrix/catalog/schema_provider.h"  // ISchemaProvider + SchemaMigrator
 #include "cortrix/observability/operation_log_schema.h"
 
-// S1 coverage: operation_log schema (F18a §5.1) — provider identity, the table +
+// S1 coverage: operation_log schema — provider identity, the table +
 // 5 indices created via the real SchemaMigrator, the full column set, NULL-allowed
 // trace/session, and idempotent re-migration. operation_log lives in the global
 // DB and references no catalog table (no FK), so the F18a provider migrates

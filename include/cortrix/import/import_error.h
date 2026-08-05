@@ -10,7 +10,7 @@
 
 namespace cortrix::import {
 
-/// The 6 F16a DB-import error identities (F16a §5.4). Each maps to a stable
+/// The 6 F16a DB-import error identities. Each maps to a stable
 /// `CX_ERR_F16A_*` string + a GEN-Agent category + retryability + the HTTP status
 /// its body carries, via the canonical registry below.
 ///
@@ -41,7 +41,7 @@ enum class F16aErrorCode {
 
 /// Total number of F16a error codes. Compile-time anchor for the API-compatibility
 /// regression test (the set must not shrink; new codes may be appended — GEN-Agent #7).
-/// Was 6 (F16a §5.4); +kInternal (R2-M5) = 7.
+/// Was 6; +kInternal (R2-M5) = 7.
 constexpr int kF16aErrorCodeCount = 7;
 
 /// Canonical, immutable attributes of one error code (F16a §5.4 columns).

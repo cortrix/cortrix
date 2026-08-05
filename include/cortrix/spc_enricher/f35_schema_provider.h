@@ -28,7 +28,7 @@ namespace cortrix::spc {
 /// resolve an ANN hit on a contextual point back to its child:
 ///   contextual_vec_labels(label PK, block_id, child_id)
 ///
-/// Implements the frozen cortrix::catalog::ISchemaProvider (F12 § 3.7). Migrate
+/// Implements the frozen cortrix::catalog::ISchemaProvider. Migrate
 /// returns Status (CODING_CONVENTIONS § 3). All DDL is idempotent (column
 /// existence guards); if `blocks` is absent (isolated unit test) it no-ops.
 class F35SchemaProvider : public cortrix::catalog::ISchemaProvider {

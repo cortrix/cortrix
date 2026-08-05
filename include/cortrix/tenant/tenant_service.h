@@ -46,7 +46,7 @@ public:
     /// the user is not yet logged in). Atomic on `conn`: INSERT tenants(type=
     /// 'personal', name=email, dedup_scope='tenant') + INSERT user_tenants(role=
     /// 'owner'). tenant_id = "tenant-" + uuid_v4() (P08 topic 3.1 B). Does NOT
-    /// COMMIT -- the caller (P08) owns the transaction. `conn` must be a valid open
+    /// COMMIT -- the caller owns the transaction. `conn` must be a valid open
     /// handle; if null, the service's own handle is used (standalone path). Email
     /// is assumed already format-validated by P08 (sec 5.1 -- P09 does not re-validate).
     /// Errors: CX_ERR_TENANT_EMAIL_DUPLICATE / CX_ERR_TENANT_TRANSACTION_FAILED.

@@ -98,7 +98,7 @@ Result<CompiledQuery> CompileQueryRequest(const QueryRequest& req,
 /// is D3.5; standalone mocks this. Owns nothing the QueryExecutor outlives.
 class IConnectionManager;  // fwd (connection_manager.h)
 
-/// Executes a validated query against an external PostgreSQL (F16a §3.4). The real
+/// Executes a validated query against an external PostgreSQL. The real
 /// libpq PQexecParams path (read-only role, statement_timeout, paramValues) is
 /// D3.5; cortrix/ owns this CE interface so the ImportManager seam is mockable.
 class IQueryExecutor {

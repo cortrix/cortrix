@@ -2,7 +2,7 @@
 //
 // Verifies the fan-out refactor: one OS FileWatcher per directory whose events
 // are dispatched to every subscribed namespace's DirectoryImporter. Covers the
-// S1 DoD test matrix (F21 § 6 S1): Subscribe (single / multi / idempotent /
+// S1 DoD test matrix: Subscribe (single / multi / idempotent /
 // not-found / empty), Unsubscribe (single / last / not-found), RemoveWatch,
 // FanOut (all-NS / one-importer-fail), ListWatches, TriggerScan, and the
 // watchers.json v1->v2 SaveLoad round-trip.

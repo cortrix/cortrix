@@ -6,12 +6,12 @@
 
 #include "cortrix/common/block_types.h"
 
-// F07 Semantic Score — ScoreMap static mapping + ScoringInput (F07 §4.1).
+// F07 Semantic Score — ScoreMap static mapping + ScoringInput.
 //
 // net-new namespace cortrix::scoring (verified dev=8e189e1 has no such ns/dir, so creating it has no conflict).
 namespace cortrix::scoring {
 
-/// Inputs to the Matrix level computation (F07 §4.1). Carries the processing-depth signals
+/// Inputs to the Matrix level computation. Carries the processing-depth signals
 /// (parser / enricher / image) + the F10 anomaly flag + the block_type (for the
 /// F08 Meta-Block special case). All defaults map to Level 0 (a fully-empty input
 /// scores the floor, 0.2).

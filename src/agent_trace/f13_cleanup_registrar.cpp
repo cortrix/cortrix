@@ -47,7 +47,7 @@ int F13CleanupRegistrar::CleanupInteractionLog() {
     const int64_t cutoff_ms = NowMs() - static_cast<int64_t>(retention_days) * 86400000LL;
     const std::string cutoff_iso = FormatIso8601Utc(cutoff_ms);
 
-    // The real interaction_log.created_at is ISO-8601 TEXT (MEM01). ISO-8601 UTC
+    // The real interaction_log.created_at is ISO-8601 TEXT. ISO-8601 UTC
     // sorts lexicographically, so a string `<` comparison is a correct age filter.
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, "DELETE FROM interaction_log WHERE created_at < ?",

@@ -79,7 +79,7 @@ TEST(IRerankerTest, ConcreteSubclassUsableThroughInterfacePointer) {
     EXPECT_FLOAT_EQ(ranked[0].score, 0.5f);  // pre-rerank score carried through
 }
 
-// --- MockReranker (F02 §7.2) is instantiable and its expectations fire. ---
+// --- MockReranker is instantiable and its expectations fire. ---
 
 TEST(MockRerankerTest, GmockDoubleHonorsExpectations) {
     MockReranker mock;

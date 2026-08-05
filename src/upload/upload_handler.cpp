@@ -158,7 +158,7 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
         result->content_hash = content_hash;
         result->status = "skipped";
         result->is_duplicate = true;
-        // [F18a §9.1] The upload operation completed successfully (idempotent no-op);
+        // The upload operation completed successfully (idempotent no-op);
         // record it so the Agent sees the call landed against the existing doc.
         EmitUploadLog(req.namespace_name, existing_doc.doc_id, req.filename, "skipped");
         return Status::Ok();
@@ -226,7 +226,7 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
 
     CORTRIX_LOG_INFO("upload", "Upload success: doc_id={}, filename={}, status={}",
                     doc.doc_id, req.filename, result->status);
-    // [F18a §9.1] Record the accepted upload (doc created + SPC task queued). The
+    // Record the accepted upload (doc created + SPC task queued). The
     // SPC-submit-failed path above returns a non-Ok Status and is deliberately NOT
     // logged (operation_log records successful operations only, §4.1).
     EmitUploadLog(req.namespace_name, doc.doc_id, req.filename, result->status);

@@ -1,4 +1,4 @@
-// JSON parse-tolerance matrix for DocSummaryGenerator::ParseStructuredOutput (F41 §9.1).
+// JSON parse-tolerance matrix for DocSummaryGenerator::ParseStructuredOutput.
 //
 // Real parser (src/doc_summary/doc_summary_generator.cpp ParseStructuredOutput):
 //   1. Complete Markdown JSON fences are unwrapped first. Then json::parse

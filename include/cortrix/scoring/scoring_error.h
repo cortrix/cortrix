@@ -10,7 +10,7 @@
 
 namespace cortrix::scoring {
 
-/// The 2 F07 Semantic Score error identities (F07 §4.4). F07 is an internal module
+/// The 2 F07 Semantic Score error identities. F07 is an internal module
 /// (few error scenarios, §4.4 note), so the set is small: an out-of-range level (defensive
 /// bottom-out) and a bad α config. Each maps to a stable `CX_ERR_F07_*` string + a
 /// GEN-Agent category + retryability + the structured_data keys its body MUST carry,

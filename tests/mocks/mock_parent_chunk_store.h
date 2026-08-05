@@ -9,7 +9,7 @@
 
 namespace cortrix::store {
 
-/// Shared gmock double for ParentChunkStore (F34 § 2.5) so F38 HyPEEnricher /
+/// Shared gmock double for ParentChunkStore so F38 HyPEEnricher /
 /// F41 doc-summary can unit-test their parent reverse-lookup logic without the
 /// SQLite store. Parallel to MockChunkStore (child-level).
 class MockParentChunkStore : public ParentChunkStore {

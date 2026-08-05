@@ -9,7 +9,7 @@ using agent_friendly::ErrorCategory;
 
 namespace {
 
-// One canonical row per code (F10 §5.1). constexpr statics → stable references.
+// One canonical row per code. constexpr statics → stable references.
 // The switch in GetCleaningErrorInfo is intentionally exhaustive: -Wswitch turns
 // "added a code without a row" into a build failure, so the registry can't drift
 // from the enum.

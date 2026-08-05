@@ -30,7 +30,7 @@ struct Block {
     bool marked_for_removal = false; ///< set by Dedup, consumed by the erase step
 };
 
-/// Cleaning config (F10 §3.1). NS-overridable: dedup_enabled /
+/// Cleaning config. NS-overridable: dedup_enabled /
 /// dedup_similarity_threshold / anomaly_detection_enabled. Resource-level
 /// (global only, not NS-overridable): max_chunk_chars / plugin_timeout_ms.
 /// JSON-serializable so F12 ConfigResolver<CleaningConfig> can three-layer merge

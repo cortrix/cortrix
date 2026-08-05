@@ -16,7 +16,7 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::auth {
 
-/// Core authentication service over platform.db (P08 §2.14). Owns the
+/// Core authentication service over platform.db. Owns the
 /// registration / login / token / reset flows. Built up Story-by-Story:
 ///   - S2: Register + GetUserInfo (+ the IPasswordHasher seam).
 ///   - S3 (this): Login / Logout / RefreshAccessToken / ValidateAccessToken (JWT
@@ -32,7 +32,7 @@ namespace cortrix::auth {
 ///
 /// Concurrency: the in-memory token blacklist is mutex-guarded; SQLite handles
 /// row locking. Concurrent registration of the same email is resolved by the
-/// `users.email` UNIQUE constraint (P08 §5.1).
+/// `users.email` UNIQUE constraint.
 class AuthService {
 public:
     /// `email_sender` may be null → an internal NullEmailSender is used (P08 §4.6
@@ -73,7 +73,7 @@ public:
     /// CX_ERR_AUTH_TOKEN_REVOKED / CX_ERR_AUTH_TOKEN_EXPIRED / CX_ERR_AUTH_ACCOUNT_DISABLED.
     Result<std::string> RefreshAccessToken(const std::string& refresh_token);
 
-    /// Validate an access token for the middleware (P08 §4.3): decode + verify
+    /// Validate an access token for the middleware: decode + verify
     /// signature/expiry, reject non-access tokens, reject blacklisted tokens,
     /// then return the AuthContext. Errors: CX_ERR_UNAUTHORIZED (bad/sig/non-access)
     /// / CX_ERR_AUTH_TOKEN_EXPIRED / CX_ERR_AUTH_TOKEN_REVOKED.
@@ -100,7 +100,7 @@ public:
     /// genuine send/DB error is the only failure surfaced.
     Status RequestPasswordReset(const std::string& email);
 
-    /// Confirm a password reset (P08 §2.7): validate the code (exists, type,
+    /// Confirm a password reset: validate the code (exists, type,
     /// unused, unexpired), validate the new password complexity, update the hash,
     /// mark the code used, and revoke ALL of the user's refresh tokens (§2.7
     /// side-effect). Errors: CX_ERR_AUTH_INVALID_RESET_CODE (bad/expired/used) /
@@ -108,7 +108,7 @@ public:
     Status ConfirmPasswordReset(const std::string& email, const std::string& code,
                                 const std::string& new_password);
 
-    /// Verify an email (P08 §2.8): validate the code (type='email_verify') and set
+    /// Verify an email: validate the code (type='email_verify') and set
     /// users.email_verified=1. Idempotent if already verified. Error:
     /// CX_ERR_AUTH_INVALID_RESET_CODE (bad/expired/used code).
     Status VerifyEmail(const std::string& email, const std::string& code);
@@ -118,7 +118,7 @@ public:
     /// the initial verify email when email_verification is on (D3.5 wiring).
     Status IssueVerificationCode(const std::string& email, const std::string& type);
 
-    /// Generate a 6-digit numeric code (P08 §4.6) using a uniform CSPRNG draw.
+    /// Generate a 6-digit numeric code using a uniform CSPRNG draw.
     static std::string GenerateVerificationCode();
 
 private:

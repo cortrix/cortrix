@@ -10,7 +10,7 @@
 
 namespace cortrix::query {
 
-/// The 6 Cross-NS query error identities (F04 §3.1). Each maps to a stable
+/// The 6 Cross-NS query error identities. Each maps to a stable
 /// `CX_ERR_*` string + a GEN-Agent category + retryability + the structured_data
 /// keys its body MUST carry, via the canonical registry below.
 ///

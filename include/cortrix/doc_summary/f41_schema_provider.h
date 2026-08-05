@@ -26,12 +26,12 @@ CREATE VIRTUAL TABLE IF NOT EXISTS doc_fts5_index USING fts5(
 );
 )SQL";
 
-/// F41's schema-migration contribution (F41 §4.5). Owns the net-new doc-level
+/// F41's schema-migration contribution. Owns the net-new doc-level
 /// `doc_fts5_index` FTS5 virtual table (hybrid fallback, F41-8). The doc_summary
 /// Block itself reuses the F09 blocks table (block_type=17), so F41 adds no
 /// regular table — only this per-Unit virtual table.
 ///
-/// Implements the frozen cortrix::catalog::ISchemaProvider (F12 §3.7); the
+/// Implements the frozen cortrix::catalog::ISchemaProvider; the
 /// v1.0.3 reverse revision (V9 F1 ARCH cascade) unified the old MigrateCatalog +
 /// MigrateUnit pair into the single Migrate(sqlite3*, int, int). Migrate returns
 /// Status (F-FREEZE-1 / CODING_CONVENTIONS §3), runs inside the SchemaMigrator's

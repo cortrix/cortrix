@@ -96,7 +96,7 @@ public:
     /// Crash recovery: processing docs -> delete blocks -> reset to pending
     int RecoverCrashedDocs();
 
-    /// Testing seam (F23 §4.5): force the next `n` public CRUD calls (doc_*/
+    /// Testing seam: force the next `n` public CRUD calls (doc_*/
     /// block_*/parent_*/search_*) to fail with -1 without touching the db, to
     /// exercise callers' storage-failure branches. `n == 0` disables it. Not
     /// part of the production path (a single relaxed load when disarmed).

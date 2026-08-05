@@ -38,7 +38,7 @@ struct HypeFusedResult {
     float hype_match_score = 0.0f;     ///< that hype candidate's raw score
 };
 
-/// chunk-level RRF + by-parent dedup over a mixed P-HNSW candidate pool (F38 §8.1).
+/// chunk-level RRF + by-parent dedup over a mixed P-HNSW candidate pool.
 ///   Step 1: split by block_type → chunk path (child_id) + hype path (mapped to
 ///           source_child_id).
 ///   Step 2: RRF fuse the two rank lists (contribution 1/(k+rank) per path).

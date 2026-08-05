@@ -20,7 +20,7 @@ int64_t NowMs() {
 }
 
 // Delete interaction_log rows older than `cutoff_iso` from one namespace's memory.db.
-// The real interaction_log.created_at is ISO-8601 TEXT (MEM01); ISO-8601 UTC sorts
+// The real interaction_log.created_at is ISO-8601 TEXT; ISO-8601 UTC sorts
 // lexicographically, so a string `<` comparison is a correct age filter (mirrors
 // F13CleanupRegistrar::CleanupInteractionLog). interaction_sources cascades via the
 // FK. Returns rows deleted (0 on a prepare/step error — best-effort per NS).

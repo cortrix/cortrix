@@ -53,7 +53,7 @@ public:
     /// (bootstrap) and shared with the query read path; nullptr = sparse off.
     virtual void SetSparseIndexRegistry(cortrix::retrieval::SparseIndexRegistry* registry);
 
-    /// [F10 §3.4] Install the per-NS CleaningConfig resolver on the managed pipeline
+    /// Install the per-NS CleaningConfig resolver on the managed pipeline
     /// (proxy, same reason as SetEnricherChain). Given a ns_id it returns the
     /// effective CleaningConfig (global ← namespaces.cleaning_config); bootstrap binds
     /// it to INSRouter::GetNamespace + ResolveCleaningConfig. nullptr = NS-override off

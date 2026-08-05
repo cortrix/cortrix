@@ -3,7 +3,7 @@
 // These reach the injection-only error arms that a :memory: database can never
 // exercise (SQLITE_IOERR on the data path, WAL write failures).
 //
-// Method (F23 §4.6): a file-backed DB replaces :memory:, then fi::FailOp() arms the
+// Method: a file-backed DB replaces :memory:, then fi::FailOp() arms the
 // dyld-interpose seam to fail a chosen POSIX I/O call on the DB's path so the store's
 // `rc != SQLITE_OK/DONE` arms fire. Every sweep asserts the workload fails GRACEFULLY
 // (non-zero rc, no crash/UB) and the store stays usable after Disarm() (recoverable).

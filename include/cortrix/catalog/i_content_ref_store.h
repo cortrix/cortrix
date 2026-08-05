@@ -8,7 +8,7 @@
 
 namespace cortrix::catalog {
 
-/// dedup reference counting (F12 §3.3). Tracks which (file_hash, ns_id, doc_id)
+/// dedup reference counting. Tracks which (file_hash, ns_id, doc_id)
 /// triples reference a content-addressed file, backing OPEN-2 three-stage GC.
 /// Maintains catalog.content_refs rows + the file_locations.ref_count aggregate.
 ///

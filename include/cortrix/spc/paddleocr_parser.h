@@ -7,7 +7,7 @@
 
 namespace cortrix::spc {
 
-/// PaddleOCRParser config (F06 §2.3). Held by value; defaults match the spec.
+/// PaddleOCRParser config. Held by value; defaults match the spec.
 struct PaddleOCRParserConfig {
     std::string python_path = "python3";
     std::string script_path = "";                     ///< paddleocr_bridge.py path
@@ -17,7 +17,7 @@ struct PaddleOCRParserConfig {
     std::string lang = "ch";                          ///< Chinese by default
 };
 
-/// OCR fallback parser (F06 §2.3): drives PaddleOCR via a Python subprocess
+/// OCR fallback parser: drives PaddleOCR via a Python subprocess
 /// (paddleocr_bridge.py) for scanned PDFs and images. Outputs the same §3.1
 /// page-level envelope as Docling; OCR paragraphs are all TEXT with empty
 /// section (OCR can't distinguish tables/captions). Used by the factory as the

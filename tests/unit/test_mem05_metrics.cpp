@@ -4,7 +4,7 @@
 
 #include "cortrix/memory/mem05_metrics.h"
 
-// MET-09 coverage: the 7 cortrix_mem05_* metrics (MEM05 §8.bis) — counters/gauges
+// MET-09 coverage: the 7 cortrix_mem05_* metrics — counters/gauges
 // recording + the OpenMetrics renderer + label-enum discipline (OBS_SPEC §3.2 no
 // high-cardinality labels, esp. no user_id).
 namespace cortrix::memory {

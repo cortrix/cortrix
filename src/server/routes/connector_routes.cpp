@@ -130,7 +130,7 @@ void RegisterConnectorRoutes(httplib::Server& server,
                 return;
             }
 
-            // target_namespaces[] (F21) OR namespace_name (MVP, default "default").
+            // target_namespaces[] OR namespace_name (MVP, default "default").
             std::vector<std::string> target_namespaces;
             if (body.contains("target_namespaces") &&
                 body["target_namespaces"].is_array()) {

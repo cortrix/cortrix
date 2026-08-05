@@ -18,7 +18,7 @@ namespace cortrix::spc {
 ///   - entities table (entity_id PK, block_id FK, text, type, offsets) + indexes.
 ///   - entities_fts FTS5 (text, type; content='entities', content_rowid=entity_id).
 ///
-/// Implements the frozen cortrix::catalog::ISchemaProvider (F12 §3.7). Migrate
+/// Implements the frozen cortrix::catalog::ISchemaProvider. Migrate
 /// returns Status (F-FREEZE-1 / CODING_CONVENTIONS §3 — not Result<void>). All
 /// DDL is idempotent (table/column existence guards) so a re-run / already-current
 /// Unit DB is a no-op; if `blocks` is absent (isolated unit test) it no-ops too.

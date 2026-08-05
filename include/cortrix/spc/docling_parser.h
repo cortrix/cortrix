@@ -7,7 +7,7 @@
 
 namespace cortrix::spc {
 
-/// DoclingParser config (F06 §2.2). Held by value; defaults match the spec.
+/// DoclingParser config. Held by value; defaults match the spec.
 struct DoclingParserConfig {
     std::string python_path = "python3";              ///< Python interpreter path
     std::string script_path = "";                     ///< docling_bridge.py path (empty=auto-locate)
@@ -15,7 +15,7 @@ struct DoclingParserConfig {
     int64_t max_output_size_bytes = 100 * 1024 * 1024;///< Max output 100MB
 };
 
-/// Default document parser (F06 §2.2): drives the Docling library via a Python
+/// Default document parser: drives the Docling library via a Python
 /// subprocess (docling_bridge.py) and maps its JSON output (§3.1 page-level
 /// protocol) to ParsedDoc.
 ///

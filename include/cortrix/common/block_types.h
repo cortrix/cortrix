@@ -5,7 +5,7 @@ namespace cortrix {
 
 /// Block sub-type enum (matches DDL block_type column).
 /// F09 is the SoT for this enum — downstream Features (F38 kBlockHypeQuestion=16,
-/// F41 doc-summary, ...) extend it here, not via private values (F09 §4.4).
+/// F41 doc-summary, ...) extend it here, not via private values.
 enum CortrixBlockType : uint16_t {
     kBlockFile     = 1,
     kBlockScan     = 2,   // OCR
@@ -14,7 +14,7 @@ enum CortrixBlockType : uint16_t {
     kBlockVideo    = 5,
     kBlockImage    = 6,
     kBlockMemory   = 7,
-    kBlockMeta     = 8,   // F09/Phase 1: document-metadata block (F08)
+    kBlockMeta     = 8,   // F09/Phase 1: document-metadata block
     kBlockHypeQuestion = 16,  // F38: HyPE hypothetical-question block (F09 §4.4 authorized)
     kBlockDocSummary   = 17,  // F41: document-level LLM summary block (F09 §4.4 authorized; F08-4: independent, not via F08)
 };
@@ -25,7 +25,7 @@ enum ProcessingLevel : uint8_t {
     kLevelL1 = 1,   // Metadata only
     kLevelL2 = 2,   // BM25 + metadata
     kLevelL3 = 3,   // Vector + BM25 + metadata (fully processed)
-    kLevelL4 = 4,   // F09/Phase 1: LLM Enhanced (NER + Summary + Vision) (F07)
+    kLevelL4 = 4,   // F09/Phase 1: LLM Enhanced (NER + Summary + Vision)
 };
 
 /// Header flags bitmask (MVP — unchanged by F09)
@@ -41,11 +41,11 @@ enum BlockFlags : uint8_t {
 
 /// Extended flags (flags_ext field, F09/Phase 1). F09 is the SINGLE SoT for the
 /// flags_ext bit assignment (V14 J1, 2026-05-29): downstream Features
-/// (F03/F10/F35/F40) MUST #include this enum and not allocate bits privately
+/// MUST #include this enum and not allocate bits privately
 /// (this whole-bitmap lock fixed the prior bit0/bit1 double-occupation).
 enum BlockFlagsExt : uint8_t {
-    kFlagExtHasEntities       = 0x01,  // bit0: payload has NER entities JSON (F03)
-    kFlagExtHasSummary        = 0x02,  // bit1: payload has summary text (F03)
+    kFlagExtHasEntities       = 0x01,  // bit0: payload has NER entities JSON
+    kFlagExtHasSummary        = 0x02,  // bit1: payload has summary text
     kFlagExtIsAnomalous       = 0x04,  // bit2: F10 cleaning marked this block anomalous
     kFlagExtHasContextualized = 0x08,  // bit3: F35 contextualized embedding
     kFlagExtHasSparseVec      = 0x10,  // bit4: F40 sparse vector

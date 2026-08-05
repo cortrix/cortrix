@@ -131,7 +131,7 @@ private:
     // cleaning_config_resolver_ when that seam is installed. The F18a audit sink is
     // nullable (left null here) — so no ctor ripple.
     cortrix::spc::DataCleaner data_cleaner_{cortrix::spc::CleaningConfig{}};
-    // [F10 §3.4] Optional per-NS CleaningConfig resolver (nullable = feature off →
+    // Optional per-NS CleaningConfig resolver (nullable = feature off →
     // default CleaningConfig{}). Production wires it to INSRouter::GetNamespace +
     // ResolveCleaningConfig (bootstrap); given a ns_id it returns the resolved
     // effective config, applied to data_cleaner_ before each cleaning run.

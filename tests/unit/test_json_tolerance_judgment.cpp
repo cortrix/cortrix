@@ -1,4 +1,4 @@
-// JSON parse-tolerance matrix for ContradictionDetector::ParseJudgmentJson (MEM02 D5).
+// JSON parse-tolerance matrix for ContradictionDetector::ParseJudgmentJson.
 //
 // Real parser (src/memory/contradiction_detector.cpp ParseJudgmentJson, static):
 //   1. json::parse(allow_exceptions=false). If discarded OR not an object ->

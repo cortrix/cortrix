@@ -446,7 +446,7 @@ TEST_F(HttpServerTest, GetNonexistentNamespace) {
 }
 
 // A catalog-backed (ns_router_) detail response must serialize the FULL NSMetadata
-// (F12 §4.1) — not just name/created/updated/dc/bc. Regression for the F12 Major
+// — not just name/created/updated/dc/bc. Regression for the F12 Major
 // under-serialization (regression root cause: View Details dropped tenant / isolation
 // / visibility / status / clone lineage). Optionals are stable keys (null on absent).
 namespace {

@@ -17,7 +17,7 @@
 #include "cortrix/resource/ns_pool_metrics.h"
 #include "cortrix/store/parent_chunk_store_metrics.h"
 
-// ============================ Reranker (F02) =================================
+// ============================ Reranker =================================
 namespace cortrix::reranker {
 namespace rr_matrix {
 
@@ -123,7 +123,7 @@ TEST_F(RerankerFx, Reset) {
 }  // namespace rr_matrix
 }  // namespace cortrix::reranker
 
-// ============================ NsPool (F05) ===================================
+// ============================ NsPool ===================================
 namespace cortrix::resource {
 namespace nspool_matrix {
 
@@ -200,7 +200,7 @@ TEST_F(NsPoolFx, Reset) {
 }  // namespace nspool_matrix
 }  // namespace cortrix::resource
 
-// ====================== ParentChunkStore (F34) ===============================
+// ====================== ParentChunkStore ===============================
 namespace cortrix::store {
 namespace pcs_matrix {
 
@@ -269,7 +269,7 @@ TEST_F(ParentChunkStoreFx, Reset) {
 }  // namespace pcs_matrix
 }  // namespace cortrix::store
 
-// ============================ Import (F16a) ==================================
+// ============================ Import ==================================
 namespace cortrix::import {
 namespace import_matrix {
 
@@ -349,7 +349,7 @@ TEST_F(ImportFx, Reset) {
 }  // namespace import_matrix
 }  // namespace cortrix::import
 
-// ============================ Metadata (F08) =================================
+// ============================ Metadata =================================
 namespace cortrix::metadata {
 namespace metadata_matrix {
 
@@ -435,7 +435,7 @@ TEST_F(MetadataFx, Reset) {
 }  // namespace metadata_matrix
 }  // namespace cortrix::metadata
 
-// ============================ Oplog (F18a) ===================================
+// ============================ Oplog ===================================
 namespace cortrix::observability {
 namespace oplog_matrix {
 
@@ -533,7 +533,7 @@ TEST_F(OplogFx, Reset) {
 }  // namespace oplog_matrix
 }  // namespace cortrix::observability
 
-// ============================ Deploy (F24) ===================================
+// ============================ Deploy ===================================
 namespace cortrix::deploy {
 namespace deploy_matrix {
 

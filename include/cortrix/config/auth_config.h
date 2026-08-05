@@ -32,13 +32,13 @@ struct AuthConfig {
     std::string smtp_pass;               ///< Masked as "***" when returned by the GET admin API
     bool smtp_tls           = true;
 
-    // JWT algorithm is fixed HS256 in Phase 1 (P08 §2.11); the secret itself is
+    // JWT algorithm is fixed HS256 in Phase 1; the secret itself is
     // NOT in this struct — it lives in auth_secrets and is owned by
     // JwtSecretService (topic 1.1 C), not auth_config.
     std::string jwt_algorithm = "HS256";
 };
 
-/// The platform.db `auth_config` table key names (P08 §3.6). Centralized so the
+/// The platform.db `auth_config` table key names. Centralized so the
 /// loader, the admin-API setter (S7) and tests never spell a key as a bare
 /// literal. SMTP keys use the dotted form the spec mandates ("smtp.host" …).
 namespace auth_config_keys {

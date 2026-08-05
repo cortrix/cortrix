@@ -7,7 +7,7 @@
 
 namespace cortrix::spc {
 
-/// The IGlobalConfig keys holding the process-wide cleaning defaults (F10 §3.4).
+/// The IGlobalConfig keys holding the process-wide cleaning defaults.
 /// Read via the generic IGlobalConfig accessors — the canonical config surface has
 /// no F10-typed getter (that would be an F10 reverse hook to IGlobalConfig);
 /// standalone reads the generic keys. Absent keys fall back to the CleaningConfig

@@ -360,7 +360,7 @@ int CortrixStoreSqlite::CreateTables() {
 // --- Document CRUD ---
 
 int CortrixStoreSqlite::doc_create(CortrixDoc& doc) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     // D-I6: mint the doc_id ULID at the app layer (no rowid). The INSERT carries
@@ -446,7 +446,7 @@ int CortrixStoreSqlite::doc_create(CortrixDoc& doc) {
 }
 
 int CortrixStoreSqlite::doc_get(const std::string& doc_id, CortrixDoc& doc) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = R"SQL(
@@ -479,7 +479,7 @@ int CortrixStoreSqlite::doc_get(const std::string& doc_id, CortrixDoc& doc) {
 
 int CortrixStoreSqlite::doc_update_status(const std::string& doc_id, DocStatus status,
                                           const std::string& error_message) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = R"SQL(
@@ -512,7 +512,7 @@ int CortrixStoreSqlite::doc_update_status(const std::string& doc_id, DocStatus s
 }
 
 int CortrixStoreSqlite::doc_delete(const std::string& doc_id) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     char* err = nullptr;
@@ -580,7 +580,7 @@ int CortrixStoreSqlite::doc_delete(const std::string& doc_id) {
 int CortrixStoreSqlite::doc_delete_by_source_prefix(const std::string& source_path_prefix,
                                                     int64_t* deleted_blocks) {
     if (deleted_blocks) *deleted_blocks = 0;
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     if (source_path_prefix.empty()) return 0;  // refuse to clear the whole NS
     std::lock_guard<std::mutex> lock(mu_);
 
@@ -651,7 +651,7 @@ int CortrixStoreSqlite::doc_delete_by_source_prefix(const std::string& source_pa
 int CortrixStoreSqlite::doc_soft_delete(const std::string& doc_id, int64_t now_ms) {
     // OPEN-2 Stage 1: mark the doc 'deleted' + stamp deleted_at. Idempotent on an
     // already-deleted doc (it stays deleted; deleted_at refreshes are harmless).
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = R"SQL(
@@ -679,7 +679,7 @@ int CortrixStoreSqlite::doc_restore(const std::string& doc_id) {
     // OPEN-2 Stage 1 reversal: clear deleted_at + flip 'deleted' back to 'ready'.
     // Guarded on status='deleted' so it only restores a soft-deleted doc (a live
     // doc is untouched → -2 "nothing to restore").
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = R"SQL(
@@ -707,7 +707,7 @@ int CortrixStoreSqlite::doc_list_deleted_before(int64_t cutoff_ms,
     // OPEN-2 Stage 2 candidates: soft-deleted docs whose retention window has
     // elapsed (deleted_at <= cutoff). cutoff = now - soft_delete_retention_days;
     // an immediate-purge sweep passes a future cutoff to catch every deleted doc.
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = R"SQL(
@@ -734,7 +734,7 @@ int CortrixStoreSqlite::doc_list_deleted_before(int64_t cutoff_ms,
 
 int CortrixStoreSqlite::doc_list_by_status(DocStatus status,
                                             std::vector<CortrixDoc>& out) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = R"SQL(
@@ -766,7 +766,7 @@ int CortrixStoreSqlite::doc_list_by_status(DocStatus status,
 int CortrixStoreSqlite::doc_find_by_source(const std::string& source_type,
                                             const std::string& source_path,
                                             CortrixDoc& doc) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = R"SQL(
@@ -798,7 +798,7 @@ int CortrixStoreSqlite::doc_find_by_source(const std::string& source_type,
 
 int CortrixStoreSqlite::doc_find_by_hash(const std::string& content_hash,
                                           CortrixDoc& doc) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     if (content_hash.empty()) return -2;
@@ -830,7 +830,7 @@ int CortrixStoreSqlite::doc_find_by_hash(const std::string& content_hash,
 }
 
 int CortrixStoreSqlite::doc_count(int64_t* count) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = "SELECT COUNT(*) FROM documents";
@@ -849,7 +849,7 @@ int CortrixStoreSqlite::doc_count(int64_t* count) {
 // --- Block CRUD ---
 
 int CortrixStoreSqlite::block_insert(CortrixBlock& block) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     // D3.5 wire⑤: the business layer (BlockAssembler / SPC) provides a real uint64
@@ -950,7 +950,7 @@ int CortrixStoreSqlite::block_insert(CortrixBlock& block) {
 }
 
 int CortrixStoreSqlite::block_get(uint64_t block_id, CortrixBlock& block) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = R"SQL(
@@ -1012,7 +1012,7 @@ int CortrixStoreSqlite::block_get(uint64_t block_id, CortrixBlock& block) {
 
 int CortrixStoreSqlite::block_get_by_doc(const std::string& doc_id,
                                           std::vector<CortrixBlock>& out) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = R"SQL(
@@ -1075,7 +1075,7 @@ int CortrixStoreSqlite::block_get_by_doc(const std::string& doc_id,
 }
 
 int CortrixStoreSqlite::block_delete_by_doc(const std::string& doc_id) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = "DELETE FROM blocks WHERE doc_id = ?";
@@ -1091,7 +1091,7 @@ int CortrixStoreSqlite::block_delete_by_doc(const std::string& doc_id) {
 }
 
 int CortrixStoreSqlite::block_count(int64_t* count) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = "SELECT COUNT(*) FROM blocks";
@@ -1108,7 +1108,7 @@ int CortrixStoreSqlite::block_count(int64_t* count) {
 }
 
 int CortrixStoreSqlite::block_count_by_doc(const std::string& doc_id, int64_t* count) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = "SELECT COUNT(*) FROM blocks WHERE doc_id = ?";
@@ -1128,7 +1128,7 @@ int CortrixStoreSqlite::block_count_by_doc(const std::string& doc_id, int64_t* c
 // --- Parent CRUD (F34 `parents` table; A unified-blocks) ---
 
 int CortrixStoreSqlite::parent_insert(CortrixParent& parent) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     // The `parents` table is created standalone by F34SchemaProvider in CreateTables()
@@ -1177,7 +1177,7 @@ int CortrixStoreSqlite::parent_insert(CortrixParent& parent) {
 }
 
 int CortrixStoreSqlite::parent_get(const std::string& parent_id, CortrixParent& out) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = R"SQL(
@@ -1216,7 +1216,7 @@ int CortrixStoreSqlite::parent_get(const std::string& parent_id, CortrixParent& 
 
 int CortrixStoreSqlite::search_fulltext(const std::string& query, int top_k,
                                          std::vector<SearchResult>& results) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     // Sanitize query to prevent FTS5 operator injection (M-SEC-001)
@@ -1265,7 +1265,7 @@ int CortrixStoreSqlite::search_fulltext(const std::string& query, int top_k,
 
 int CortrixStoreSqlite::search_metadata(const std::string& /*filter*/, int /*top_k*/,
                                          std::vector<SearchResult>& /*results*/) {
-    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return -1;  // testing seam
     return -1;  // MVP: not implemented
 }
 

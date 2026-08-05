@@ -29,7 +29,7 @@ namespace cortrix::resource {
 ///
 /// Note POOL_INTERNAL is deliberately absent: F05's own PoolError enum is the 4
 /// values below; `CX_ERR_NS_POOL_INTERNAL` is an F12-side mapping fall-through
-/// code (F12 §3.1.bis), not an identity F05 itself returns (F05 §8.1 v1.0.2).
+/// code, not an identity F05 itself returns.
 enum class PoolErrorCode {
     kNsQuotaExceeded,           ///< NS count > max_namespaces_per_instance
     kNsResourceBudgetExceeded,  ///< would exceed memory_budget_bytes

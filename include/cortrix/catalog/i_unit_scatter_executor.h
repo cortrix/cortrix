@@ -2,10 +2,10 @@
 #include <string>
 
 namespace cortrix::query {
-// Forward declarations ONLY. These query-layer types (F04) are not defined in
+// Forward declarations ONLY. These query-layer types are not defined in
 // F12's Layer-0 scope, and this interface has NO Phase-1 implementation (F12
 // §3.5: "declaration only"), so forward declarations are sufficient and keep F12 building
-// standalone. Phase 2's MultiUnitNSExecutor (F04) supplies the concrete types +
+// standalone. Phase 2's MultiUnitNSExecutor supplies the concrete types +
 // the implementation.
 struct QueryContext;
 struct UnitQueryResult;

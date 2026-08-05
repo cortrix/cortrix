@@ -10,7 +10,7 @@
 #include "cortrix/catalog/default_ns_router.h"
 #include "cortrix/catalog/default_unit_router.h"
 
-// BREADTH op-matrix coverage for the catalog routers (F12). Complements
+// BREADTH op-matrix coverage for the catalog routers. Complements
 // test_default_ns_router.cpp / test_unit_router.cpp with additional matrices:
 // ListNamespaces (limit x offset x include_deleted x tenant) combinations,
 // UpdateUnitStats round-trip over value matrices, UpdateUnitState transition

@@ -15,7 +15,7 @@ namespace cortrix::auth {
 
 namespace {
 
-constexpr int kSecretBytes = 64;  // 512-bit HS256 secret (P08 §2.11)
+constexpr int kSecretBytes = 64;  // 512-bit HS256 secret
 
 int64_t NowMs() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(

@@ -1,4 +1,4 @@
-// JSON parse-tolerance matrix for MemoryExtractor::ParseExtractionJson (MEM02).
+// JSON parse-tolerance matrix for MemoryExtractor::ParseExtractionJson.
 //
 // Real parser (src/memory/memory_extractor.cpp ParseExtractionJson):
 //   1. json::parse(allow_exceptions=false). If discarded OR not an array, narrow

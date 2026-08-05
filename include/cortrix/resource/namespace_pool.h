@@ -23,7 +23,7 @@
 
 namespace cortrix::resource {
 
-// ── Stats / report value types (F05 §3.2) ───────────────────────────────────
+// ── Stats / report value types ───────────────────────────────────
 
 /// Rejected-create counters, nested to mirror the admin API JSON 1:1
 /// (`rejected_creates_total.{ns_count_exceeded, memory_exceeded}`, §8.2) so the
@@ -88,9 +88,9 @@ using WriteCoordinatorFactory =
         cortrix::store::IMetadataStore* metadata_store,
         cortrix::store::IBlobStore* blob_store)>;
 
-// ── INamespacePool (F05 §3.2) ────────────────────────────────────────────────
+// ── INamespacePool ────────────────────────────────────────────────
 
-/// NS resource pool contract (F05 §2.1). Manages per-NS runtime resource bundles
+/// NS resource pool contract. Manages per-NS runtime resource bundles
 /// (index / WriteCoordinator / store.db) with NS-count + memory-budget admission
 /// control. Phase 1: all-hot, no eviction (TD-F05-EVICTION is Phase 2).
 ///
@@ -158,7 +158,7 @@ public:
     virtual ExplainState GetExplainState() const = 0;
 };
 
-// ── DefaultNamespacePool (F05 §3.3) ──────────────────────────────────────────
+// ── DefaultNamespacePool ──────────────────────────────────────────
 
 /// One resident NS slot: the resource bundle plus the minimal Phase-1 lifecycle
 /// gate that makes the §13.1 DeleteNamespace → EvictForDelete path safe against an

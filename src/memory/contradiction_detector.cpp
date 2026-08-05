@@ -51,7 +51,7 @@ Result<Judgment> ContradictionDetector::ParseJudgmentJson(const std::string& llm
 Result<Judgment> ContradictionDetector::Judge(const std::string& new_content,
                                               const std::string& old_content,
                                               const observability::TraceContext* ctx) {
-    (void)ctx;  // W3C trace propagation to the LLM transport is D3.5 wiring (MEM02 §5.5.2)
+    (void)ctx;  // W3C trace propagation to the LLM transport is D3.5 wiring
 
     if (!llm_) {
         return Mem02Status(Mem02ErrorCode::kLlmDisabled, "no LLM client for judge");

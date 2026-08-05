@@ -10,7 +10,7 @@ namespace cortrix::retrieval {
 using cortrix::id::ChildId;       ///< ULID TEXT — SoT cortrix::id (ARCH §1.8.1)
 using cortrix::id::NamespaceId;   ///< NS string — SoT cortrix::id
 
-/// One sparse-retrieval candidate (F40 §5.2). SoT for the retrieval-link sparse
+/// One sparse-retrieval candidate. SoT for the retrieval-link sparse
 /// hit type is RETRIEVAL_TYPES_SPEC §1; this is the in-tree realization. The
 /// `child_id` aligns with F34 children.child_id (v1.0.2 Minor-11 renamed
 /// block_id→child_id). `score` is the SPLADE dot-product accumulator value.
@@ -54,7 +54,7 @@ public:
         const ChildId& child_id,
         const SparseVector& vec) = 0;
 
-    /// Delete all postings for `child_id` in `ns_id` (F40 §6.2). Removing an
+    /// Delete all postings for `child_id` in `ns_id`. Removing an
     /// absent child_id is a no-op success (idempotent delete).
     virtual Status Remove(
         const NamespaceId& ns_id,

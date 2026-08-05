@@ -10,7 +10,7 @@
 
 namespace cortrix::memory {
 
-/// The 5 MEM02 LLM-Memory-Extraction error identities (MEM02 §5.3). Each maps to a
+/// The 5 MEM02 LLM-Memory-Extraction error identities. Each maps to a
 /// stable `CX_ERR_*` string + a GEN-Agent category + retryability + retry_after_ms
 /// + the structured_data keys its body MUST carry, via the canonical registry below.
 ///

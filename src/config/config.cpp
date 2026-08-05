@@ -203,14 +203,14 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
     // agent_llm — conversational model for RAG/chat (also read by cortrix-agent)
     if (root["agent_llm"])    parseLlm(root["agent_llm"],    config.agent_llm);
 
-    // doc_summary_llm — [F41] ingest-side document summary (async via F42). This
+    // doc_summary_llm — ingest-side document summary (async via F42). This
     // parse was missing when the role landed (F42-1 added the field + the main.cpp
     // consumer only) — without it a configured doc_summary_llm: block never reached
     // IsConfigured() and the feature stayed OFF.
     if (root["doc_summary_llm"]) parseLlm(root["doc_summary_llm"], config.doc_summary_llm);
 
     // enricher_llm — [F03 · gap①] SPC ingest enricher (NER + summary), plan B
-    // (F03 §2.7.bis): connection triple here, tuning fields keep the F03 defaults.
+    //: connection triple here, tuning fields keep the F03 defaults.
     if (root["enricher_llm"])    parseLlm(root["enricher_llm"],    config.enricher_llm);
 
     // Backward compatibility: old "llm:" key maps to semantic_llm
@@ -302,7 +302,7 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (m["max_sessions_per_namespace"]) config.memory.max_sessions_per_namespace = m["max_sessions_per_namespace"].as<int>();
         if (m["max_interactions_per_session"]) config.memory.max_interactions_per_session = m["max_interactions_per_session"].as<int>();
         if (m["chunk_strategy"]) config.memory.chunk_strategy = m["chunk_strategy"].as<std::string>();
-        // [MEM01] memory.decay.* — classified-decay scoring (design § 2.5).
+        // memory.decay.* — classified-decay scoring (design § 2.5).
         if (m["decay"]) {
             auto decay = m["decay"];
             if (decay["lambda"]) config.memory.decay_lambda = decay["lambda"].as<double>();
@@ -310,7 +310,7 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         }
     }
 
-    // [F20] security — admin access policy
+    // security — admin access policy
     if (root["security"]) {
         auto sec = root["security"];
         if (sec["admin_bind"]) config.security.admin_bind = sec["admin_bind"].as<std::string>();
@@ -426,7 +426,7 @@ void ApplyEnvOverrides(CortrixConfig& config) {
     val = GetEnv("CORTRIX_REQUIRE_PARSERS");
     if (!val.empty()) config.spc.require_parsers = GetEnvBool("CORTRIX_REQUIRE_PARSERS", config.spc.require_parsers);
 
-    // [F20] security — admin access policy
+    // security — admin access policy
     val = GetEnv("CORTRIX_ADMIN_BIND");
     if (!val.empty()) config.security.admin_bind = val;
     val = GetEnv("CORTRIX_ALLOW_PUBLIC_ADMIN");

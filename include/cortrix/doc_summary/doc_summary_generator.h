@@ -14,7 +14,7 @@
 
 namespace cortrix::doc_summary {
 
-/// Resolved F41 config (F41 §4.4). Post-resolve result the generator consumes.
+/// Resolved F41 config. Post-resolve result the generator consumes.
 struct DocSummaryConfig {
     int max_chars = kMaxCharsDefault;                 ///< default 500 (200-500)
     int chunk_threshold = kChunkThresholdDefault;     ///< > this → map-reduce (default 50)
@@ -23,12 +23,12 @@ struct DocSummaryConfig {
     bool fts5_fallback_enabled = kFts5FallbackEnabledDefault;
 };
 
-/// Resolve a DocSummaryConfig from `global` (F41 §4.4). Reads the doc_summary.*
+/// Resolve a DocSummaryConfig from `global`. Reads the doc_summary.*
 /// keys via the generic IGlobalConfig accessors; any key absent / unparseable
 /// keeps the built-in default (fail-soft). `global == nullptr` returns defaults.
 DocSummaryConfig ResolveDocSummaryConfig(const cortrix::IGlobalConfig* global);
 
-/// Document Summary generator (F41 §5.1) — an INDEPENDENT pipeline step (NOT an
+/// Document Summary generator — an INDEPENDENT pipeline step (NOT an
 /// ISpcEnricher subclass, unlike F38/F35). For each document it asks an LLM for a
 /// structured JSON summary (summary_text + keywords + topics + one_liner), with a
 /// map-reduce path for long documents (> chunk_threshold, F41-2/§9.2). The result
@@ -74,7 +74,7 @@ public:
         const std::vector<store::ChunkRecord>& chunks, const std::string& doc_title,
         bool* used_map_reduce);
 
-    /// Parse the LLM structured-JSON output (F41 §9.1) into the 4 fields. A
+    /// Parse the LLM structured-JSON output into the 4 fields. A
     /// non-object / missing-summary_text / unparseable body →
     /// CX_ERR_F41_LLM_INVALID_OUTPUT. summary_text is truncated to config.max_chars.
     /// Static so it is unit-testable in isolation.

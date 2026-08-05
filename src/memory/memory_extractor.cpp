@@ -234,7 +234,7 @@ MemoryExtractionResult MemoryExtractor::ExtractFromWindow(
 
     if (!resp.ok()) {
         metrics.RecordExtract(Mem02Metrics::ExtractStatus::kFailed);
-        // A client-reported kUnavailable is the timeout/circuit family (F03). Other
+        // A client-reported kUnavailable is the timeout/circuit family. Other
         // failures surface as INVALID_OUTPUT (the model produced nothing usable).
         if (resp.status.code() == StatusCode::kUnavailable) {
             result.error = MakeMem02Error(

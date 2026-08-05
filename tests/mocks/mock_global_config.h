@@ -9,7 +9,7 @@
 namespace cortrix {
 
 /// Shared gmock double for IGlobalConfig (scaffolding D2-pre-9) so downstream
-/// features (F05 / F48 / F18a / F13) can unit-test config-driven logic.
+/// features can unit-test config-driven logic.
 class MockGlobalConfig : public IGlobalConfig {
 public:
     MOCK_METHOD(Result<std::string>, GetString, (const std::string& key), (const, override));

@@ -1,5 +1,5 @@
 // F41 S0 — F41SchemaProvider creates the net-new doc_fts5_index FTS5 virtual
-// table (F41 §4.3) inside the F12 SchemaMigrator framework. Pins identity/version,
+// table inside the F12 SchemaMigrator framework. Pins identity/version,
 // the virtual-table existence + columns after migration, idempotency, the
 // bad-version-step guard, and SchemaMigrator registration. Mirrors
 // test_f40_schema_provider.cpp.

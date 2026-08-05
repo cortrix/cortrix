@@ -17,7 +17,7 @@
 namespace cortrix::catalog {
 namespace {
 
-// --- value type round-trips / defaults (F12 §4.1) ---------------------------
+// --- value type round-trips / defaults ---------------------------
 
 TEST(CatalogTypesTest, UnitStateRoundTrip) {
     for (UnitState s : {UnitState::kActive, UnitState::kSealing, UnitState::kSealed,

@@ -8,7 +8,7 @@
 
 namespace cortrix::reranker {
 
-/// Shared gmock double for IReranker (F02 §7.2). Lets the query pipeline / F04 /
+/// Shared gmock double for IReranker. Lets the query pipeline / F04 /
 /// F37 unit-test their reranker integration without the real ONNX model.
 ///
 /// NOTE: F02 §7.2 lists Score/ScoreBatch/Name; the interface also has a pure

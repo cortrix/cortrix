@@ -1,6 +1,6 @@
 // R7 branch-coverage supplement for src/spc/enricher_chain.cpp (branch 53.3%).
 //
-// The existing test_enricher_chain.cpp covers the happy merge (F03+F35), the
+// The existing test_enricher_chain.cpp covers the happy merge, the
 // fail-soft throw catch, the unavailable soft-skip, and the F38 hype happy path.
 // The remaining dead branches in EnrichChunks() are the per-field merge-policy
 // conditionals (each `if` is two branches; the existing tests only take the

@@ -74,7 +74,7 @@ private:
     std::shared_ptr<std::atomic<bool>> cancel_flag_;
 };
 
-/// The unit of work a submitted task runs (F16a §3.6). The ImportManager supplies
+/// The unit of work a submitted task runs. The ImportManager supplies
 /// this PER Submit (so each task carries its own captured auth / trace context):
 /// fetch → textualize → cleanup → feed-to-SPC, reporting progress + honoring
 /// handle.CancelRequested(). Returns Ok on success; an error Status (a CX_ERR_F16A_*
@@ -86,7 +86,7 @@ struct ImportTaskQueueConfig {
     int queue_max_size = 100;    // §4.4 task.queue_max_size
 };
 
-/// D6 async import queue (F16a §3.6). **Self-built in cortrix::import, modeled on the
+/// D6 async import queue. **Self-built in cortrix::import, modeled on the
 /// F42 async pattern but with ZERO dependency on F42** (the §0 red line: no
 /// `#include` / link of cortrix::async::TaskScheduler). Worker threads come from the
 /// shared cortrix::ExecutorEngine (common, Wave-A frozen — NOT F42); the lifecycle

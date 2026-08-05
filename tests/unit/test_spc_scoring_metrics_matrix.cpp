@@ -15,7 +15,7 @@
 #include "cortrix/spc_enricher/enricher_error.h"
 #include "cortrix/spc_enricher/enricher_metrics.h"
 
-// ============================ Hype (F38) =====================================
+// ============================ Hype =====================================
 namespace cortrix::spc {
 namespace hype_matrix {
 
@@ -98,7 +98,7 @@ TEST_F(HypeFx, Reset) {
 
 }  // namespace hype_matrix
 
-// ====================== Contextual Retrieval (F35) ===========================
+// ====================== Contextual Retrieval ===========================
 namespace ctx_matrix {
 
 using CSt = ContextualRetrievalMetrics::ChunkStatus;
@@ -181,7 +181,7 @@ TEST_F(CtxFx, Reset) {
 
 }  // namespace ctx_matrix
 
-// ============================ Enricher (F03) =================================
+// ============================ Enricher =================================
 namespace enricher_matrix {
 
 using FR = EnricherMetrics::FallbackReason;
@@ -300,7 +300,7 @@ TEST_F(EnricherFx, Reset) {
 
 }  // namespace cortrix::spc
 
-// ============================ ONNX (F22) =====================================
+// ============================ ONNX =====================================
 namespace cortrix::onnx {
 namespace onnx_matrix {
 
@@ -375,7 +375,7 @@ TEST_F(OnnxFx, Reset) {
 }  // namespace onnx_matrix
 }  // namespace cortrix::onnx
 
-// ============================ Scoring (F07) ==================================
+// ============================ Scoring ==================================
 namespace cortrix::scoring {
 namespace scoring_matrix {
 

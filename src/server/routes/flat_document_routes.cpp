@@ -541,7 +541,7 @@ void RegisterWatchAliasRoutes(httplib::Server& server,
     );
 
     // POST /api/v1/namespaces/{id}/reload — admin recovery for a namespace the bounded
-    // startup load could not admit in time (F05 §6.3 C1). A large NS (100MB+ store,
+    // startup load could not admit in time. A large NS (100MB+ store,
     // big HNSW/sparse indexes) can exceed the per-NS startup timeout and be left
     // un-admitted (its data is on disk but the pool never loaded it). This endpoint
     // calls ReloadNamespace, which loads WITHOUT the startup timeout, so the NS becomes

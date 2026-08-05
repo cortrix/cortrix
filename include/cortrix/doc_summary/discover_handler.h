@@ -94,7 +94,7 @@ nlohmann::json ExecuteDocDiscovery(cortrix::resource::INamespacePool& pool,
                                    const DocSummaryConfig& config);
 
 /// Thin httplib wrapper around ExecuteDocDiscovery for GET /api/v1/documents/discover
-/// (F41 §6.1). Reads ?query (required) / ?top_k (default 10, clamped 1..100) / ?ns or
+///. Reads ?query (required) / ?top_k (default 10, clamped 1..100) / ?ns or
 /// ?namespace (required) / ?explain (truthy "true"/"1"); writes the JSON body (200) or
 /// the Agent-friendly InvalidArgument/NotFound error envelope. Does NOT register itself
 /// on a server — bootstrap mounts it (BEFORE the GET /documents/{id} catch-all so the

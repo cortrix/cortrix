@@ -104,7 +104,7 @@ class QueryLlmModesBase : public ::testing::Test {
     h_ = std::make_unique<cortrix::test::FullStackE2E>();
     h_->BuildIngest(/*embedding_dim=*/128);
     perm_svc_ = std::make_unique<cortrix::tenant::PermissionService>(h_->global_db());
-    // The cross-NS query (F04) authorizes a namespace when its owner tenant ==
+    // The cross-NS query authorizes a namespace when its owner tenant ==
     // the caller's tenant. We query with user_key (tenant "alice"), so own the NS by
     // "alice" — otherwise AuthorizeNamespaces returns CX_ERR_NS_UNAUTHORIZED.
     ASSERT_TRUE(h_->CreateNamespaceOwnedBy(kNs, "alice").ok());

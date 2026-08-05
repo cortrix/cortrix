@@ -88,7 +88,7 @@ public:
     int search_metadata(const std::string&, int, std::vector<SearchResult>&) override { return -1; }
 };
 
-// [F01] The MVP CortrixVectorIndex was replaced by store::IIndex (VectorSearcher
+// The MVP CortrixVectorIndex was replaced by store::IIndex (VectorSearcher
 // now holds an IIndex&). VectorSearcher only calls Search(); the rest are no-op
 // stubs that satisfy the pure-virtual contract. `results` is the canned hit list
 // (block_id, distance) that drives the cross-user isolation scenarios.

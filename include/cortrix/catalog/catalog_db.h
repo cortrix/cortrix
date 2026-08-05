@@ -18,7 +18,7 @@ class ISchemaProvider;  // cortrix/catalog/schema_provider.h
 ///
 /// Provider ordering (S1.2/S1.3): F12 is always registered first so the base
 /// tables its FK targets reference (units / tenants / namespaces) exist before
-/// downstream providers (F06/F09/F25/F03/F21/F38/F41/MEM01) extend them. The
+/// downstream providers extend them. The
 /// caller passes the downstream providers in the ARCH §1.3.bis.3 topological
 /// order; the migrator runs them in that registration order, atomically.
 ///

@@ -67,7 +67,7 @@ public:
     ///
     /// @param request   query / namespaces / top_k / rerank / filter.
     /// @param auth      P09 BatchCheck input.
-    /// @param qctx      optional shared QueryContext (F37/F02); when null, built
+    /// @param qctx      optional shared QueryContext; when null, built
     ///                 from request + auth.
     /// @param trace_ctx optional end-to-end tracing context (OBS_SPEC §5.3).
     CrossNsResponse Execute(const QueryRequest& request,

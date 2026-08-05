@@ -89,7 +89,7 @@ void WorkerPool::WorkerLoop(int worker_id) {
         auto dq = scheduler_->Dequeue(worker_id);
         if (dq.ok() && dq.value().has_value()) {
             const TaskInfo& task = *dq.value();
-            // Dispatch by task_type to the registered handler (F42 §4.1 / F41 §10.2).
+            // Dispatch by task_type to the registered handler.
             // Process outside any lock; ProcessTask drives progress + finalize.
             //
             // R2-C1 — a handler MUST NOT throw (it returns a CX_ERR_* Status on

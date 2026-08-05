@@ -10,7 +10,7 @@
 
 namespace cortrix::deploy {
 
-/// The 4 F24 deployment error identities (F24 §12). Each maps to a stable
+/// The 4 F24 deployment error identities. Each maps to a stable
 /// `CX_ERR_*` string + a GEN-Agent category + retryability + retry_after_ms + the
 /// structured_data keys its body MUST carry, via the canonical registry below.
 ///

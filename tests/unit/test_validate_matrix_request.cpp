@@ -8,7 +8,7 @@
 #include "cortrix/query/query_request.h"
 
 // Exhaustive field-by-field validation sweeps over the two request structs that
-// expose a Validate() surface: MemorySearchRequest (MEM05) and QueryRequest (F07).
+// expose a Validate() surface: MemorySearchRequest and QueryRequest.
 // These are EXHAUSTIVE matrices in NEW suites (globally unique tokens
 // SearcherValidateMatrix* / QueryReqValidateMatrix* / QueryReqNormalizeMatrix*)
 // — the basic happy/sad tests live elsewhere; here we parameterize each field at

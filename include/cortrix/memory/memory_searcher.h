@@ -16,7 +16,7 @@ namespace cortrix {
 enum class MemoryScope {
     kSession = 0,    // limited to a specific session (of this user)
     kUser    = 1,    // all sessions of a specific user
-    // kAll removed (MEM05): cross-user memory access is prohibited.
+    // kAll removed: cross-user memory access is prohibited.
     // Phase 2 may add kAdmin=2 (ABI-compatible append); see MEM05 design § ABI note.
 };
 
@@ -31,7 +31,7 @@ struct MemorySearchRequest {
     bool include_invalidated = false;  // MEM01 D4: include status=invalidated memories (default false)
     int timeout_ms = 5000;
 
-    /// Validate parameters — user_id is unconditionally required (MEM05).
+    /// Validate parameters — user_id is unconditionally required.
     Status Validate() const;
 };
 

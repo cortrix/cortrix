@@ -125,7 +125,7 @@ Status MemoryStore::Init(const std::string& db_path) {
 
     // [F13 TC4] interaction_sources lives in this memory.db (its FK references the
     // per-NS interaction_log.id, so it must share that db). agent_trace does NOT —
-    // TC4 moved it back to the global cortrix_global.db (F13 §4.1), where GET /traces
+    // TC4 moved it back to the global cortrix_global.db, where GET /traces
     // can read a session whose calls span namespaces. Idempotent; failure here is
     // non-fatal to the memory path — F13 source attribution degrades but
     // sessions/interactions keep working.
@@ -322,7 +322,7 @@ bool MemoryStore::TryConsumeOpFault() {
 }
 
 Status MemoryStore::SessionCreate(MemorySession& session) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     // Accept client-provided session_id if non-empty; otherwise generate one
@@ -375,10 +375,10 @@ Status MemoryStore::SessionCreate(MemorySession& session) {
 }
 
 Status MemoryStore::SessionGet(const std::string& session_id, MemorySession& session) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
-    // opt_out_at / opted_out_by appended last (MEM04 §4.1) so the frozen column
+    // opt_out_at / opted_out_by appended last so the frozen column
     // indices above are unchanged; NULL → empty string (active session).
     const char* sql =
         "SELECT session_id, namespace_name, user_id, title, interaction_count, "
@@ -419,7 +419,7 @@ Status MemoryStore::SessionList(const std::string& namespace_name,
                                 int limit, int offset,
                                 std::vector<MemorySession>& sessions,
                                 const std::string& user_id) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     // MEM05: when a user_id is supplied, push the per-user predicate into SQL so
@@ -468,7 +468,7 @@ Status MemoryStore::SessionList(const std::string& namespace_name,
 }
 
 Status MemoryStore::SessionDelete(const std::string& session_id) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     // Check session exists
@@ -614,14 +614,14 @@ Status MemoryStore::TouchSessionLocked(const std::string& session_id) {
 // ---------------------------------------------------------------------------
 
 Status MemoryStore::InteractionInsert(InteractionLog& log) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
     return InsertInteractionLocked(log);
 }
 
 Status MemoryStore::InteractionListBySession(const std::string& session_id,
                                              std::vector<InteractionLog>& interactions) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql =
@@ -649,7 +649,7 @@ Status MemoryStore::InteractionListBySession(const std::string& session_id,
 Status MemoryStore::InteractionGetRecent(const std::string& session_id,
                                          int limit,
                                          std::vector<InteractionLog>& interactions) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql =
@@ -681,7 +681,7 @@ Status MemoryStore::InteractionSearch(const std::string& namespace_name,
                                       const std::string& user_id,
                                       int limit,
                                       std::vector<InteractionLog>& results) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     if (query.empty()) {
@@ -735,7 +735,7 @@ Status MemoryStore::InteractionSearch(const std::string& namespace_name,
 }
 
 Status MemoryStore::InteractionCount(const std::string& session_id, int64_t* count) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql = "SELECT COUNT(*) FROM interaction_log WHERE session_id = ?";
@@ -760,7 +760,7 @@ Status MemoryStore::InteractionCount(const std::string& session_id, int64_t* cou
 
 Status MemoryStore::SessionCount(const std::string& namespace_name, int64_t* count,
                                  const std::string& user_id) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     // MEM05: when a user_id is supplied, scope the count to that owner so the
@@ -791,7 +791,7 @@ Status MemoryStore::SessionCount(const std::string& namespace_name, int64_t* cou
 }
 
 Status MemoryStore::SessionTouch(const std::string& session_id) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
     return TouchSessionLocked(session_id);
 }
@@ -800,7 +800,7 @@ Status MemoryStore::InteractionPairInsertAndSessionTouch(
         InteractionLog& user_log,
         InteractionLog& assistant_log,
         const std::string& session_id) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     // Begin transaction — mu_ is held for the entire duration, so no other
@@ -848,7 +848,7 @@ Status MemoryStore::SessionGetOptOut(const std::string& session_id,
                                      bool* exists,
                                      std::string* opt_out_at,
                                      std::string* opted_out_by) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     *exists = false;
@@ -878,7 +878,7 @@ Status MemoryStore::SessionGetOptOut(const std::string& session_id,
 Status MemoryStore::SessionSetOptOut(const std::string& session_id,
                                      const std::string& opt_out_at,
                                      const std::string& opted_out_by) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql =
@@ -907,7 +907,7 @@ Status MemoryStore::SessionSetOptOut(const std::string& session_id,
 }
 
 Status MemoryStore::SessionClearOptOut(const std::string& session_id) {
-    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
     const char* sql =

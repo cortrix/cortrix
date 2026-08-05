@@ -16,7 +16,7 @@ struct DocSummaryStructured {
     std::string one_liner;               ///< <= 50 chars (UI display)
 };
 
-/// DocSummaryGenerator output (F41 §5.1). On success `summary` + `embedding` are
+/// DocSummaryGenerator output. On success `summary` + `embedding` are
 /// filled; on failure `error` carries the Agent-friendly CX_ERR_F41_* identity.
 struct GenerationResult {
     bool success = false;
@@ -27,7 +27,7 @@ struct GenerationResult {
     bool no_summary_content = false;     ///< true when the doc exists but has no chunks to summarize
 };
 
-/// F41 async task payload (F41 §5.2). TaskType SoT = F42 §3.2
+/// F41 async task payload. TaskType SoT = F42 §3.2
 /// (async::TaskType::kTaskDocSummary=3) — reverse-referenced, not redeclared.
 struct DocSummaryTask {
     std::string task_id;
@@ -38,7 +38,7 @@ struct DocSummaryTask {
     // F42 retry policy: 3 retries + exponential backoff; DLQ after 3 (F42 owns it).
 };
 
-/// doc_summary_status state machine values (F41 §7.1). String form is what the
+/// doc_summary_status state machine values. String form is what the
 /// metadata_json `status` field stores.
 enum class DocSummaryStatus { kPending = 0, kGenerated, kFailed };
 const char* ToString(DocSummaryStatus status);

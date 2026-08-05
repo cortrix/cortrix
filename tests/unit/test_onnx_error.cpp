@@ -20,7 +20,7 @@ constexpr std::array<OnnxErrorCode, kOnnxErrorCodeCount> kAllCodes = {
 };
 
 // ============================================================
-// Registry: stable CX_ERR_* strings (F22 §8.3)
+// Registry: stable CX_ERR_* strings
 // ============================================================
 
 TEST(OnnxErrorTest, CodeStrings) {
@@ -53,7 +53,7 @@ TEST(OnnxErrorTest, AllCodesHaveUniqueStrings) {
 }
 
 // ============================================================
-// Registry: category + retryability (F22 §8.3)
+// Registry: category + retryability
 // ============================================================
 
 TEST(OnnxErrorTest, StartupErrorsArePermanentNonRetryable) {

@@ -23,7 +23,7 @@
 // trigger are DEFERRED → D3.5; this kernel-side queue is the in-process basis they
 // build on and is fully testable standalone (push → worker → handler).
 //
-// The TraceContext (MEM02 §5.5.2) travels with each queued item so the async link
+// The TraceContext travels with each queued item so the async link
 // keeps the W3C trace_id (the worker constructs its span with parent = ctx.span_id).
 namespace cortrix::memory {
 

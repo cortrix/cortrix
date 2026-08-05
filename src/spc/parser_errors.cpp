@@ -9,7 +9,7 @@ using agent_friendly::ErrorCategory;
 
 namespace {
 
-// One canonical row per code (F06 §5.2). Defined as constexpr statics so each
+// One canonical row per code. Defined as constexpr statics so each
 // returns a stable reference. The switch in GetParserErrorInfo is intentionally
 // exhaustive: building with -Wall -Wextra (-Wswitch) turns "added a code without
 // a row" into a warning, which the project treats as a build failure — the

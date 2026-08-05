@@ -19,7 +19,7 @@ namespace cortrix::operation_log { class IOperationLogger; }
 
 namespace cortrix::spc {
 
-/// SPC Pipeline data-cleaning module (F10). Runs *before* Block assembly to
+/// SPC Pipeline data-cleaning module. Runs *before* Block assembly to
 /// drop duplicate chunks (exact hash + semantic cosine, D2/D3) and to mark
 /// anomalous chunks (5 reasons, D4) so Storage Write keeps them out of P-HNSW
 /// (D5). chunk-level; orthogonal to file-level dedup (tenants.dedup_scope).
@@ -27,7 +27,7 @@ namespace cortrix::spc {
 /// D3 standalone: Dedup / DetectAnomaly / config validation are fully
 /// implemented + tested against the F10 `Block` contract view. The §4.3
 /// SpcPipeline wiring (ChunkResult/EmbeddingResult ↔ Block, Storage-Write
-/// skip-index) is cross-Feature → D3.5. The op_logger audit sink (F18a) is
+/// skip-index) is cross-Feature → D3.5. The op_logger audit sink is
 /// optional/nullable for the same reason.
 class DataCleaner {
 public:

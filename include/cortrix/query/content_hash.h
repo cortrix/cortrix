@@ -7,7 +7,7 @@ namespace cortrix::query {
 /// content_hash representation helpers for cross-NS dedup (RETRIEVAL_TYPES_SPEC §6
 /// + F04 §3.3.2). The response/dedup layer uses the string form
 /// `"sha256:<32-hex>"` (the first 16 bytes of SHA-256, hex-encoded) as the dedup
-/// hash-table key; the storage layer (F09) keeps `uint64×2` raw.
+/// hash-table key; the storage layer keeps `uint64×2` raw.
 ///
 /// 🚨 D3 standalone / F09-4 hook: in production ResultItem.content_hash is sourced
 /// from the F09 Block header (uint64×2) via ContentHashToString. F08/F09 wiring is

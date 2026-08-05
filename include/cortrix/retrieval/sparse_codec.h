@@ -8,7 +8,7 @@
 
 namespace cortrix::retrieval {
 
-/// A SPLADE sparse vector: BGE-M3 lexical_weights as term_id → weight (F40 §5.2).
+/// A SPLADE sparse vector: BGE-M3 lexical_weights as term_id → weight.
 /// This is the net-new retrieval-layer type the inverted index + RRF consume;
 /// it is the same shape the OnnxEmbedder produces (EmbedWithSparseResult.sparse)
 /// — kept as a named struct here (not a bare map) so the interface contract is
@@ -26,7 +26,7 @@ struct SparseVector {
 ///   [uint16 num_terms] then num_terms × ([uint16 term_id][float weight])
 /// Size = 2 + num_terms × 6 bytes (K=100 → 602 bytes). An empty vector
 /// serializes to the 2-byte header {num_terms=0}; the caller, however, should
-/// store SQL NULL for a "no sparse signal" chunk (F40 §6.5) and clear the F09
+/// store SQL NULL for a "no sparse signal" chunk and clear the F09
 /// flags_ext has_sparse_vec bit — an all-zero BLOB is reserved for the rare
 /// "deserialized-but-empty" round-trip, not the dead-chunk sentinel.
 ///

@@ -66,7 +66,7 @@ inline constexpr const char* kContextualDefaultLlmModel = "gpt-4o-mini";
 /// LLM call timeout for prefix generation (F35 §6.1 = 10s).
 inline constexpr int kContextualTimeoutMs = 10000;
 
-/// L3 transient-retry policy (F35 §7.3): N=3 attempts, exponential backoff
+/// L3 transient-retry policy: N=3 attempts, exponential backoff
 /// 1s/2s/4s. The backoff base is exposed so tests can assert the schedule without
 /// sleeping (the enricher returns the planned delay; real sleeping is the caller's
 /// resilience layer at D3.5).

@@ -5,7 +5,7 @@
 
 namespace cortrix::reranker {
 
-/// Circuit breaker states (F02 §3.2). Underlying int values double as the
+/// Circuit breaker states. Underlying int values double as the
 /// cortrix_reranker_circuit_breaker_state gauge values (0/1/2).
 enum class CircuitBreakerState : int {
     kClosed = 0,    ///< normal: requests allowed

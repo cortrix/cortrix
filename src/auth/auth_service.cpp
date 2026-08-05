@@ -538,7 +538,7 @@ Status AuthService::LoadBlacklist() {
 Status AuthService::CleanupExpired() {
     if (db_ == nullptr) return AuthStatus(AuthErrorCode::kInternalError, "not initialized");
     const int64_t now = NowSec();
-    // Persisted blacklist + refresh tokens + verification codes (P08 §3.9).
+    // Persisted blacklist + refresh tokens + verification codes.
     sqlite3_exec(db_,
                  ("DELETE FROM token_blacklist WHERE expires_at < " + std::to_string(now))
                      .c_str(),
@@ -563,7 +563,7 @@ IEmailSender* AuthService::EmailSender() {
 }
 
 std::string AuthService::GenerateVerificationCode() {
-    // 6-digit numeric code (P08 §4.6). Draw a uniform uint32 and reject the tail
+    // 6-digit numeric code. Draw a uniform uint32 and reject the tail
     // that would bias the modulo (rejection sampling over [0, floor(2^32/1e6)*1e6)).
     constexpr uint32_t kRange = 1000000;
     constexpr uint32_t kLimit = (0xFFFFFFFFu / kRange) * kRange;
@@ -614,7 +614,7 @@ Status AuthService::IssueVerificationCode(const std::string& email,
 
 Status AuthService::RequestPasswordReset(const std::string& email) {
     if (db_ == nullptr) return AuthStatus(AuthErrorCode::kInternalError, "not initialized");
-    // anti-enumeration (P08 §2.6): only issue a code if the email exists, but ALWAYS return
+    // anti-enumeration: only issue a code if the email exists, but ALWAYS return
     // Ok so the caller's response is identical regardless of existence.
     bool query_ok = false;
     const bool exists = EmailExists(db_, email, &query_ok);

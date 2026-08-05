@@ -64,7 +64,7 @@ CrossNsResponse ScatterGather::Execute(const QueryRequest& request,
     std::vector<std::string> authorized =
         AuthorizeNamespaces(request.namespaces, auth, perm_, effective_cap);
 
-    // Shared per-request context: caller-supplied (F37/F02) or built here.
+    // Shared per-request context: caller-supplied or built here.
     QueryContext built;
     const QueryContext* ctx_ptr = qctx;
     if (ctx_ptr == nullptr) {

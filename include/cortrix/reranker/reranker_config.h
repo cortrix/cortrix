@@ -3,8 +3,8 @@
 
 namespace cortrix::reranker {
 
-/// Full RerankerConfig (F02 §2.3). Default values + ranges mirror the GUC table
-/// (F02 §2.4); range enforcement lives in the GUC-registration path (S2.2 / S3.1),
+/// Full RerankerConfig. Default values + ranges mirror the GUC table
+///; range enforcement lives in the GUC-registration path (S2.2 / S3.1),
 /// the struct itself is a plain value carrier.
 struct RerankerConfig {
     // --- Model paths ---

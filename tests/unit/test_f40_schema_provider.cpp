@@ -1,5 +1,5 @@
 // F40 S5 — F40SchemaProvider creates the net-new sparse_inverted_index table
-// (F40 §4.3) inside the F12 SchemaMigrator framework. Unlike F02 (no-op), F40's
+// inside the F12 SchemaMigrator framework. Unlike F02 (no-op), F40's
 // Migrate(0→1) emits real DDL — these tests pin identity/version, the table +
 // index existence after migration, idempotency, and the bad-version-step guard.
 // Mirrors test_reranker_schema_provider.cpp.

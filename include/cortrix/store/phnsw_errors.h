@@ -5,7 +5,7 @@
 
 namespace cortrix::store {
 
-/// P-HNSW error taxonomy (F01 §2.4). These name the failure conditions internal
+/// P-HNSW error taxonomy. These name the failure conditions internal
 /// to the index; at the public API boundary they are surfaced through
 /// cortrix::Status (CODING_CONVENTIONS §3 — single Status error model, with the
 /// CX_ERR_PHNSW_* string codes documented in ERROR_CODE_SDK_MAP).

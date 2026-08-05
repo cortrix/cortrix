@@ -72,7 +72,7 @@ TEST(IngestErrPathTest, DocAlreadyExists_SurfacesInFailedItem) {
     EXPECT_EQ(f["message"], "doc 'dup' already ingested");  // detail after the token
 }
 
-// CX_ERR_INVALID_CONTENT: the submit seam rejects unparseable content (F06);
+// CX_ERR_INVALID_CONTENT: the submit seam rejects unparseable content;
 // re-inflated as a permanent/non-retryable per-doc failure.
 TEST(IngestErrPathTest, InvalidContent_SurfacesInFailedItem) {
     StubTaskSubmitter stub;

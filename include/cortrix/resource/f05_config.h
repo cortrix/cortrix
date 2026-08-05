@@ -20,10 +20,10 @@ struct SqlitePragmas {
 
 /// Global resource-pool configuration (F05 §4.1, topics 2/3/5/7).
 ///
-/// Scope is **global only** (F05 §4.2): a namespace cannot decide its own quota
+/// Scope is **global only**: a namespace cannot decide its own quota
 /// rules, so there is no NS-level f05_config blob. In production this is sourced
 /// from IGlobalConfig::GetF05Config() — that getter is a D3.5 reverse hook into
-/// the shared scaffolding (F05 §4.2); standalone code (and tests) construct an
+/// the shared scaffolding; standalone code (and tests) construct an
 /// F05Config directly and pass it to the pool, so F05 stays decoupled from the
 /// shared IGlobalConfig contract during D3.
 struct F05Config {

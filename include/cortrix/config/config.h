@@ -153,7 +153,7 @@ struct MemoryConfig {
     int max_sessions_per_namespace = 10000;
     int max_interactions_per_session = 1000;
     std::string chunk_strategy = "per_turn";
-    // [MEM01] Classified-decay scoring for memory search (design § 2.5).
+    // Classified-decay scoring for memory search (design § 2.5).
     // D5 lock: V1.0 is global-GUC only (no per-namespace override). These feed
     // MemoryDecayConfig at the MemorySearcher wiring site (memory_routes.cpp).
     double decay_lambda = 0.01;     // memory.decay.lambda  — decay coefficient (half-life ~70d)
@@ -197,7 +197,7 @@ struct GcConfig {
     bool immediate_purge_enabled = false;    ///< GDPR immediate-purge API switch
 };
 
-// === [F20] security hardening ===
+// === security hardening ===
 // Admin-endpoint access policy (design topic 3, plan A). The server binds a
 // single socket (server.host:server.port); admin paths are gated at the
 // application layer by AdminGuard, not by a separate bind. `admin_bind` is the
@@ -222,7 +222,7 @@ struct CortrixConfig {
                               // Inherits semantic_llm's provider/api_key/base_url if not set
     LlmConfig agent_llm;     // Conversational RAG & chat generation
                               // Can be configured here or in cortrix-agent/.env (env wins)
-    LlmConfig doc_summary_llm;  // [F41] Document-level LLM summary (ingest-side, async via F42).
+    LlmConfig doc_summary_llm;  // Document-level LLM summary (ingest-side, async via F42).
                                 // Independent role; the doc_summary feature is
                                 // OFF unless IsConfigured() (api_key present) — main then builds an
                                 // OpenAiLlmClient for the F41AsyncWorker.
@@ -238,7 +238,7 @@ struct CortrixConfig {
     RerankerTopConfig reranker;              // F02 reranker model dir
     QueryComplexityTopConfig query_complexity;  // F39 complexity classifier model dir
     RetrievalConfig retrieval;               // candidate-pool sizing (over-fetch cap)
-    SecurityConfig security;  // [F20] admin access policy
+    SecurityConfig security;  // admin access policy
     GcConfig gc;              // [OPEN-2] three-stage GC + ops endpoints
 };
 

@@ -5,11 +5,11 @@
 
 namespace cortrix::agent_trace {
 
-/// Current agent_trace schema version (F13 §4.1). Phase 1 single-step create
+/// Current agent_trace schema version. Phase 1 single-step create
 /// (v0 → v1). Phase 2 internal evolution branches on (from, to) here.
 constexpr int kAgentTraceSchemaVersion = 1;
 
-/// The agent_trace DDL emitted by the F13 SchemaProvider (F13 §4.1 topic 3):
+/// The agent_trace DDL emitted by the F13 SchemaProvider:
 /// the agent_trace table + 3 indices. Stored in cortrix_global.db (the global
 /// DB, NOT a per-namespace DB), but applied via the shared SchemaMigrator so it
 /// runs inside the same versioned, atomic framework as the catalog / F18a

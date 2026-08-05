@@ -100,7 +100,7 @@ struct RevokeResult {
     std::string revoked_at;
 };
 
-/// OptOutManager — MEM04 main service class (MEM04 §3.2). Holds the opt-out seam and
+/// OptOutManager — MEM04 main service class. Holds the opt-out seam and
 /// (optionally) the F18a operation logger. The MEM02 worker collaboration (§3.3 — the
 /// Python middleware HTTP-calling is_session_opted_out + writing the
 /// memory_extract_skipped oplog) is NOT a hard dependency in standalone: this class

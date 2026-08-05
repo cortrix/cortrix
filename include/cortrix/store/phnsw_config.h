@@ -3,7 +3,7 @@
 
 namespace cortrix::store {
 
-/// P-HNSW tuning knobs (F01 §2.3). Split into the HNSW graph parameters (shared
+/// P-HNSW tuning knobs. Split into the HNSW graph parameters (shared
 /// with the index-agnostic IndexConfig) and the persistence parameters that are
 /// specific to P-HNSW's WAL / group-commit / snapshot machinery. The latter are
 /// intentionally NOT in the shared IndexConfig (iindex_factory.h) — they are an

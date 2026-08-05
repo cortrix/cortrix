@@ -10,7 +10,7 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::auth {
 
-/// A stored API key row as surfaced by the list endpoint (P08 §2.13.3) — never
+/// A stored API key row as surfaced by the list endpoint — never
 /// includes the plaintext key (only the prefix for identification).
 struct ApiKeyInfo {
     std::string id;            ///< key_id (ULID/UUID)
@@ -23,7 +23,7 @@ struct ApiKeyInfo {
     std::string status;        ///< active | revoked | expired
 };
 
-/// Result of creating a key — the ONLY time the plaintext is returned (P08 §2.13.3).
+/// Result of creating a key — the ONLY time the plaintext is returned.
 struct CreatedApiKey {
     ApiKeyInfo info;
     std::string plaintext;     ///< "cortrix_sk_<64-char>" — show once, never stored

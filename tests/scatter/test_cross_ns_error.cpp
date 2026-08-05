@@ -10,7 +10,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/query/cross_ns_error.h"
 
-// S2.2 coverage: the 6 cross-NS error codes (F04 §3.1) — CX_ERR_ identity,
+// S2.2 coverage: the 6 cross-NS error codes — CX_ERR_ identity,
 // category mapping, retryability, structured_data contract, and the GEN-Agent
 // 4-field boundary factory. F04's error responses are the project-level
 // Agent-friendly reference, so all 7 principles are asserted here.

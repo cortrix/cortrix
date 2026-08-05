@@ -14,7 +14,7 @@ namespace cortrix {
 
 namespace {
 
-// [F13 S2] Parse X-Session-Id/X-Trace-Id/X-Agent-Id via the shared middleware
+// Parse X-Session-Id/X-Trace-Id/X-Agent-Id via the shared middleware
 // (validation + server-generated trace_id fallback, topic 4), overlay the
 // authenticated user_id (§5.1 — the context's identity source for both the F13
 // ops-view and the F18a user-view tracks), and install the result on the
@@ -58,7 +58,7 @@ httplib::Server::Handler WithAuth(ApiKeyAuth& auth, int required_permission, Htt
                 rctx.auth.tenant_id = "default_tenant";
                 rctx.auth.user_id = "anonymous";
                 rctx.auth.permissions = kPermRead | kPermWrite | kPermAdmin;
-                // [F13 S2] Dev/no-auth: still install the obs context from headers (no
+                // Dev/no-auth: still install the obs context from headers (no
                 // real authenticated user_id, so use the CE no-auth identity).
                 InstallObservabilityContext(req, res, /*user_id=*/rctx.auth.user_id,
                                             /*agent_id=*/rctx.auth.agent_id);
@@ -111,7 +111,7 @@ httplib::Server::Handler WithAuth(ApiKeyAuth& auth, int required_permission, Htt
             }
 
             rctx.auth = actx;
-            // [F13 S2] Auth succeeded: install the obs context from the F13 identity
+            // Auth succeeded: install the obs context from the F13 identity
             // headers + the authenticated user_id (§5.1 C1/C2). Runs after the auth
             // decision so it cannot influence authn/authz (pure-ADD).
             InstallObservabilityContext(req, res, actx.user_id, actx.agent_id);

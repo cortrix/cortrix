@@ -8,7 +8,7 @@
 #include "cortrix/import/import_error.h"
 #include "cortrix/import/query_executor.h"
 
-// S2 coverage: the 5 D2 security constraints (F16a §3.4) — SELECT whitelist, dual
+// S2 coverage: the 5 D2 security constraints — SELECT whitelist, dual
 // -mode discrimination, JSON DSL → parameterized SQL, length / row caps. The
 // dedicated injection-fuzzing corpus is in test_query_executor_injection.cpp.
 namespace cortrix::import {

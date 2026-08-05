@@ -5,7 +5,7 @@
 
 namespace cortrix::agent_trace {
 
-/// Current interaction_sources schema version (F13 §4.3). Phase 1 single-step
+/// Current interaction_sources schema version. Phase 1 single-step
 /// create (v0 -> v1).
 constexpr int kInteractionSourcesSchemaVersion = 1;
 

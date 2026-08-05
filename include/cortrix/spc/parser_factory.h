@@ -9,7 +9,7 @@
 
 namespace cortrix::spc {
 
-/// DoclingParser config (F06 §2.2). The actual DoclingParser class is implemented in S2; S1 only needs this POD
+/// DoclingParser config. The actual DoclingParser class is implemented in S2; S1 only needs this POD
 /// to make ParserFactoryConfig complete.
 struct DoclingConfig {
     std::string python_path = "python3";              ///< Python interpreter path
@@ -18,7 +18,7 @@ struct DoclingConfig {
     int64_t max_output_size_bytes = 100 * 1024 * 1024;///< Max output 100MB
 };
 
-/// PaddleOCRParser config (F06 §2.3). The actual class is implemented in S3.
+/// PaddleOCRParser config. The actual class is implemented in S3.
 struct PaddleOCRConfig {
     std::string python_path = "python3";
     std::string script_path = "";                     ///< paddleocr_bridge.py path
@@ -27,7 +27,7 @@ struct PaddleOCRConfig {
     std::string lang = "ch";                          ///< Chinese by default
 };
 
-/// Factory + fallback orchestration config (F06 §2.4).
+/// Factory + fallback orchestration config.
 struct ParserFactoryConfig {
     DoclingConfig docling;
     PaddleOCRConfig paddleocr;
@@ -38,7 +38,7 @@ struct ParserFactoryConfig {
     float fallback_confidence_threshold = 0.3f;
 };
 
-/// Factory + fallback orchestration for the document parsing framework (F06 §2.4).
+/// Factory + fallback orchestration for the document parsing framework.
 ///
 /// S1 scope: the ParseDocument framework (file pre-checks + extension→MIME inference + parser selection +
 /// fallback logic) + RegisterParser/ListParsers + NeedsFallback + MIME mapping.

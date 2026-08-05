@@ -57,7 +57,7 @@ struct CrossNsMeta {
     nlohmann::json ToJson() const;
 };
 
-/// F04 cross-NS query response (F04 §2.5). `error` is set ONLY for the overall
+/// F04 cross-NS query response. `error` is set ONLY for the overall
 /// scatter-timeout partial case (CX_ERR_SCATTER_TIMEOUT, still HTTP 200 with
 /// partial results — topic 2.7 principle 3). Hard failures (auth / too-many / unauthorized)
 /// are thrown as CrossNsException and never reach this struct.

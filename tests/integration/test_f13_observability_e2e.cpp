@@ -107,7 +107,7 @@ class F13ObservabilityE2E : public ::testing::Test {
       }
     }
 
-    // ── Seed operation_log in the GLOBAL db (F18a). alice has rows, bob has one.
+    // ── Seed operation_log in the GLOBAL db. alice has rows, bob has one.
     {
       op_logger_ = std::make_shared<cortrix::observability::OperationLogger>(
           h_->global_db(), h_->global_config());

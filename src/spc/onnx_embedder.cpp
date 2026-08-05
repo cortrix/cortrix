@@ -379,7 +379,7 @@ Status OnnxEmbedder::EmbedWithSparse(const std::string& text,
     }
     auto start = std::chrono::steady_clock::now();
 
-    // Dense half reuses the frozen real/stub embedding path (F22). On failure we
+    // Dense half reuses the frozen real/stub embedding path. On failure we
     // propagate the dense error verbatim — per F40 §7.1 L1, a dense+sparse total
     // failure is the chunk-write failure (CX_ERR_F40_INFERENCE_FAILED is raised
     // by the caller around this), so we surface the dense Status unchanged.

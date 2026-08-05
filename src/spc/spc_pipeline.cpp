@@ -19,7 +19,7 @@
 #include "cortrix/spc/data_cleaner.h"              // F10 DataCleaner / spc::Block / ShouldSkipIndex
 #include "cortrix/spc_enricher.h"                  // F03 ISpcEnricher / CreateEnricher / EnrichResult
 #include "cortrix/spc/enricher_chain.h"            // I1 EnricherChain (F03→F35→F38 fail-soft serial)
-#include "cortrix/spc/hype_block.h"                // I3 BuildHypeQuestionBlock / FillHypeEmbedding (F38)
+#include "cortrix/spc/hype_block.h"                // I3 BuildHypeQuestionBlock / FillHypeEmbedding
 #include "cortrix/spc_enricher/enricher_store.h"   // F03 WriteEnrichment (enriched_score + entities persist)
 #include "cortrix/spc_enricher/enrich_state_store.h"  // §3.7 enrich_state coverage rows
 #include "cortrix/spc/contextual_store.h"          // I2 WriteContextualized (F35 contextualized_* cols)
@@ -573,7 +573,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     // children (id + text + the upstream embedding + inherited metadata), run F10
     // dedup (exact SHA-256 + semantic cosine over the embeddings) and anomaly
     // detection, then assemble the survivors. Dedup runs AFTER embed because the
-    // semantic pass needs the embeddings (F10 D3); deduped children are dropped from
+    // semantic pass needs the embeddings; deduped children are dropped from
     // the write (the `parents` table stores no child_ids, so no parent dangles);
     // anomalous children are still written (with "cleaning.*" in metadata_json) but
     // skipped from P-HNSW (ShouldSkipIndex, F10 D5).
@@ -649,7 +649,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     if (cleaning_config_resolver_) {
         data_cleaner_.SetConfig(cleaning_config_resolver_(facade.namespace_id()));
     }
-    // [F10 §5.2] Capture the dedup + anomaly results (not just their in-place side
+    // Capture the dedup + anomaly results (not just their in-place side
     // effects) to build the A-class cleaning summary the doc-processing response
     // surfaces (chunks_input / chunks_indexed / chunks_skipped_dedup /
     // chunks_marked_anomalous). chunks_input = the child count fed into cleaning.
@@ -843,7 +843,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     }
 
     // Phase 2 — transactional write. SPC never writes a blob, so writes_blob=false
-    // (F25 §10.4). P-HNSW first, then SQLite (parents + child blocks) (design §4.5);
+    //. P-HNSW first, then SQLite (parents + child blocks) (design §4.5);
     // the rollback callback (§9.4) cleans blocks + parents idempotently on failure.
     std::vector<BlockId> child_block_ids;
     child_block_ids.reserve(child_blocks.size());

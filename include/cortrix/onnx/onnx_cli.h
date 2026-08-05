@@ -10,7 +10,7 @@ struct CortrixConfig;
 
 namespace cortrix::onnx {
 
-/// `cortrix-server --check-onnx` dry-run logic (F22 §9.4). Renders the human-
+/// `cortrix-server --check-onnx` dry-run logic. Renders the human-
 /// readable [OK]/[FAIL] report from a StartupValidator::ValidationReport and
 /// returns the process exit code (0 = all checks passed, 1 = a check failed).
 /// On failure the report goes to `err` (stderr) with the CX_ERR_* code +

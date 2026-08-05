@@ -10,7 +10,7 @@
 
 namespace cortrix::observability {
 
-/// One row of the operation_log table (F18a §5.1). The CE user-facing record of
+/// One row of the operation_log table. The CE user-facing record of
 /// "what data operation did the user perform" — the business-semantics half of
 /// the three-track split (F18a is the user-view track; F13 agent_trace is the
 /// ops-view track; §2.13 System Observability is the SRE track).
@@ -56,7 +56,7 @@ struct OperationLogQueryResult {
     int next_offset = 0;
 };
 
-/// Aggregate stats for Agent self-service monitoring (F18a topic 4).
+/// Aggregate stats for Agent self-service monitoring.
 struct OperationLogStats {
     int64_t total_count = 0;
     int64_t oldest_timestamp = 0;
@@ -64,7 +64,7 @@ struct OperationLogStats {
     int64_t size_bytes = 0;
 };
 
-/// Liveness/health snapshot for Agent self-service monitoring (F18a topic 4).
+/// Liveness/health snapshot for Agent self-service monitoring.
 struct HealthStatus {
     bool is_healthy = true;
     std::string last_error;

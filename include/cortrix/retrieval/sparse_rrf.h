@@ -23,7 +23,7 @@ enum class RrfPath {
 inline constexpr int kRrfPathCount = 5;
 const char* ToString(RrfPath path);
 
-/// One fused result (F40 §9.1). `rrf_score` = Σ 1/(k+rank) over the paths that
+/// One fused result. `rrf_score` = Σ 1/(k+rank) over the paths that
 /// ranked this child; `contributing_paths` is the B-class explain detail (which
 /// of the 5 paths contributed, in label order).
 struct RrfFusedHit {
@@ -36,7 +36,7 @@ struct RrfFusedHit {
 /// DESC; only rank position matters to RRF). A path that did not run / produced
 /// nothing is an empty list — e.g. an un-enriched namespace feeds contextualized
 /// and hype empty, an L2 sparse fallback drops the sparse list (§7.2), and
-/// simple/chat routes stay chunk-only (F38 §8).
+/// simple/chat routes stay chunk-only.
 struct FivePathInput {
     std::vector<SparseHit> dense;
     std::vector<SparseHit> contextualized;  ///< F35-9 B dual-vector votes (§3.8 W2)
@@ -45,7 +45,7 @@ struct FivePathInput {
     std::vector<SparseHit> hype;            ///< F38 hype votes for their source child
 };
 
-/// chunk-level 5-path RRF fusion (F40 §9.1). For each path, a candidate's
+/// chunk-level 5-path RRF fusion. For each path, a candidate's
 /// contribution is 1/(k + rank) where rank is its 0-based position in that path's
 /// list (so the §9.1 formula 1/(k+rank); rank starts at 0 here → the top hit
 /// contributes 1/k). Results are deduped by child_id (scores summed across

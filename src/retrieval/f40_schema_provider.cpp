@@ -32,7 +32,7 @@ bool ColumnExists(sqlite3* db, const char* table, const char* column) {
 }  // namespace
 
 Status F40SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
-    // Phase 1: 0 → 1 creates the sparse_inverted_index table (F40 §4.3) AND adds
+    // Phase 1: 0 → 1 creates the sparse_inverted_index table AND adds
     // the blocks.sparse_vec BLOB column (A unified-blocks: sparse_vec lives on child
     // rows of `blocks`, not the legacy children table). Accept an already-current
     // (1 → 1) call defensively (all DDL is idempotent). Runs inside the

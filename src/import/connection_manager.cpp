@@ -336,7 +336,7 @@ std::vector<ConnectionInfo> ConnectionManager::ListConnections(const TenantId& t
         info.registered_at_ms = rec.registered_at_ms;
         info.expires_at_ms = rec.expires_at_ms;
         info.revoked = rec.revoked_at_ms.has_value();
-        out.push_back(info);  // NOTE: never carries the DSN (F16a §3.3)
+        out.push_back(info);  // NOTE: never carries the DSN
     }
     return out;
 }

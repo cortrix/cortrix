@@ -56,7 +56,7 @@ public:
     /// Real sparse-head extraction from a re-exported BGE-M3 ONNX model that
     /// exposes the lexical_weights output is cross-Feature wiring (model export
     /// + a 2nd model output) → D3.5. In standalone D3 the dense half reuses the
-    /// frozen real inference path (F22), and the sparse half is produced by a
+    /// frozen real inference path, and the sparse half is produced by a
     /// deterministic stub derived from the same input (so the serialization,
     /// inverted-index and RRF code is fully exercisable + reproducible). When a
     /// real model IS present, dense uses it; sparse still uses the stub until
@@ -124,7 +124,7 @@ private:
 };
 
 /// BGE-M3 token vocabulary size (250K). term_id values returned by the sparse
-/// path are < this; the serializer (F40 §4.2) stores term_id as uint16, so the
+/// path are < this; the serializer stores term_id as uint16, so the
 /// stub keeps ids in a 16-bit window — the real vocab needs the Phase-2 wider
 /// term_id encoding tracked in PHASE2_BACKLOG (F40 §4.2 note "18 bits actual").
 inline constexpr uint32_t kBgeM3VocabSize = 250000u;

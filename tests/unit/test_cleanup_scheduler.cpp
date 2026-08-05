@@ -15,7 +15,7 @@
 #include "cortrix/observability/operation_log_schema.h"
 #include "cortrix/observability/operation_logger_impl.h"
 
-// S2 coverage: CleanupScheduler (F18a §8.1), the EmitSite helper (§9.1), and the
+// S2 coverage: CleanupScheduler, the EmitSite helper (§9.1), and the
 // ObservabilityModule DI wiring (§5.3 / Issue 10).
 namespace cortrix::observability {
 namespace {

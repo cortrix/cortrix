@@ -7,7 +7,7 @@
 #include "cortrix/import/connection_manager.h"
 #include "cortrix/import/import_error.h"
 
-// S1 coverage: ConnectionManager D1 lifecycle (F16a §3.3) — register / resolve /
+// S1 coverage: ConnectionManager D1 lifecycle — register / resolve /
 // list / revoke + AES secret round-trip + 30d expiry + D7 cross-tenant guard. Runs
 // against the in-memory secret store + connection store (standalone doubles; the
 // SQLite-backed store + real DSN resolution is D3.5).

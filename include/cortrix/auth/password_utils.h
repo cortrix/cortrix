@@ -6,13 +6,13 @@
 
 namespace cortrix::auth {
 
-// ============================ Validation (P08 §4.5) ==========================
+// ============================ Validation ==========================
 // These are bcrypt-independent and fully testable on their own (S2 test cases
 // Validate_* + Validate_Email*).
 
-/// Password complexity (P08 §4.5): length in [min_length, 128] AND contains at
+/// Password complexity: length in [min_length, 128] AND contains at
 /// least one letter and one digit. The regex equivalent is
-/// ^(?=.*[a-zA-Z])(?=.*\d).{min,128}$ (P08 §4.5). `min_length` comes from
+/// ^(?=.*[a-zA-Z])(?=.*\d).{min,128}$. `min_length` comes from
 /// AuthConfig.password_min_length (default 8, topic 2).
 bool ValidatePassword(const std::string& password, int min_length = 8);
 
@@ -36,7 +36,7 @@ public:
     virtual ~IPasswordHasher() = default;
 
     /// Hash `password`, returning the encoded hash string (bcrypt: `$2b$<cost>$...`).
-    /// Error → CX_ERR_AUTH_BCRYPT_TIMEOUT / CX_ERR_INTERNAL_ERROR (P08 §5.1).
+    /// Error → CX_ERR_AUTH_BCRYPT_TIMEOUT / CX_ERR_INTERNAL_ERROR.
     virtual Result<std::string> Hash(const std::string& password) = 0;
 
     /// Constant-time-ish verify of `password` against a stored `hash`. Returns

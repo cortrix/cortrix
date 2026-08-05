@@ -319,7 +319,7 @@ TEST_F(QueryPipelineExecuteTest, Execute_HybridQuery_BothRoutes) {
     EXPECT_FALSE(response.meta.degraded);
     EXPECT_EQ(response.meta.degradation_level, 0);
 
-    // sql_result should be null (F07)
+    // sql_result should be null
     EXPECT_FALSE(response.sql_result.has_result);
 
     // meta should show both routes

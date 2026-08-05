@@ -23,7 +23,7 @@ public:
     /// @param db_path: SQLite database path (":memory:" for testing)
     Status Init(const std::string& db_path = ":memory:");
 
-    /// Testing seam (F23 §4.5): force the next `n` public API calls (Session*/
+    /// Testing seam: force the next `n` public API calls (Session*/
     /// Interaction*) to fail with Status::Internal without touching the db, to
     /// exercise callers' storage-failure branches. `n == 0` disables it. Not
     /// part of the production path (a single relaxed load when disarmed).
@@ -138,7 +138,7 @@ public:
 private:
     Status CreateInteractionLogTable();
     Status CreateMemorySessionsTable();
-    // [F13 D3.5] Create the agent_trace + interaction_sources tables in this memory.db
+    // Create the agent_trace + interaction_sources tables in this memory.db
     // (they live alongside interaction_log, the table the F13 handlers read). Runs the
     // frozen AgentTraceSchemaProvider + InteractionSourcesSchemaProvider (idempotent).
     Status CreateF13ObservabilityTables();

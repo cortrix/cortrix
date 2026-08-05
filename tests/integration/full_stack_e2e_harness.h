@@ -20,7 +20,7 @@
 //
 // Two construction tiers (a test pays only for what it needs):
 //   * BuildCore()      — catalog + routers + real pool + auth. Enough for an
-//                        observability E2E (F13/F18a): agent_trace lives in the
+//                        observability E2E: agent_trace lives in the
 //                        global db, interaction_log in each NS's memory.db (reached
 //                        via NamespaceFacade), the cross-DB owner resolver is real.
 //   * BuildIngest()    — BuildCore() + a real SPCManager (real pipeline + chains).
@@ -354,7 +354,7 @@ class FullStackE2E {
     return ns_router_->CreateNamespace(meta);
   }
 
-  /// Create + admit a namespace OWNED BY `owner_tenant`. The cross-NS query (F04)
+  /// Create + admit a namespace OWNED BY `owner_tenant`. The cross-NS query
   /// permission check passes immediately when namespaces.tenant_id == the caller's
   /// AuthContext.tenant_id (P09 §4.6 owner hot path; CE keys set tenant_id ==
   /// user_id). So a query-permission E2E creates the namespace owned by the SAME

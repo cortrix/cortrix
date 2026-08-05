@@ -8,7 +8,7 @@
 
 namespace cortrix::spc {
 
-/// Parse options (F06 §2.1). Config sources: global_config → NS override → request-level override (F12 merge).
+/// Parse options. Config sources: global_config → NS override → request-level override (F12 merge).
 /// NS-overridable: max_pages / max_file_size_mb / enable_ocr_fallback / language_hint /
 /// subprocess_timeout_ms. Not NS-overridable (system resource level): parser_max_concurrent /
 /// parser_default_concurrent (Q11 — actual concurrency control at the Pipeline layer).
@@ -25,7 +25,7 @@ struct ParserOptions {
     std::function<void(int page, int total, bool success)> on_page_progress = nullptr;
 };
 
-/// Chunk type (F06 §2.1). Serialized as the uppercase string of the §3.1 JSON protocol ("TEXT" etc.).
+/// Chunk type. Serialized as the uppercase string of the §3.1 JSON protocol ("TEXT" etc.).
 enum class ChunkType : uint8_t {
     TEXT = 0,
     TABLE = 1,
@@ -51,7 +51,7 @@ struct ParsedChunk {
     int char_length = -1;      ///< Character length
 };
 
-/// Page-level metadata (F06 §2.1).
+/// Page-level metadata.
 struct PageMetadata {
     int page_num = 0;              ///< Page number (1-based)
     std::string parser_used;       ///< Parser used for this page ("docling" / "paddleocr")
@@ -136,7 +136,7 @@ ParsedDoc ParseBridgeJson(const std::string& json_str,
 /// replay after parsing completes (true per-page streaming driving requires incremental bridge output → D3.5). No callback when doc is an error result.
 void DrivePageProgress(const ParsedDoc& doc, const ParserOptions& opts);
 
-/// Abstract document parser interface (F06 §2.1). Pluggable: DoclingParser (default) / PaddleOCRParser
+/// Abstract document parser interface. Pluggable: DoclingParser (default) / PaddleOCRParser
 /// (OCR fallback) / custom implementations (VLM etc. from S5 on) all implement this interface and register with the Factory.
 class IDocumentParser {
 public:

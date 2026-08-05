@@ -12,7 +12,7 @@
 
 namespace cortrix::deploy {
 
-/// cortrix_shutdown_status gauge values (F24 §7.4). Kept in sync with
+/// cortrix_shutdown_status gauge values. Kept in sync with
 /// DeployMetrics::SetShutdownStatus.
 enum class ShutdownStatus : int {
     kRunning      = 0,
@@ -20,7 +20,7 @@ enum class ShutdownStatus : int {
     kForced       = 2,   ///< grace window elapsed with tasks still pending → persisted
 };
 
-/// One pending async task carried across a restart (F24 §7.2). A minimal subset
+/// One pending async task carried across a restart. A minimal subset
 /// of async::SubmitRequest — exactly what TaskScheduler::Enqueue needs to re-queue
 /// the work after a forced shutdown. Serialized to `.pending_tasks.json`.
 struct PendingTask {
@@ -41,7 +41,7 @@ std::vector<PendingTask> DeserializePending(const nlohmann::json& j);
 PendingTask      FromSubmitRequest(const async::SubmitRequest& req);
 async::SubmitRequest ToSubmitRequest(const PendingTask& t);
 
-/// The grace-period config the coordinator reads (F24 §7.3). One IGlobalConfig
+/// The grace-period config the coordinator reads. One IGlobalConfig
 /// key with a documented default + range.
 struct ShutdownConfig {
     int grace_period_sec = 30;   ///< key "grace_period_sec" (range 5–300)
@@ -51,7 +51,7 @@ struct ShutdownConfig {
     std::string data_dir = "./data";   ///< where .pending_tasks.json lives
 };
 
-/// Path of the pending-tasks file under `data_dir` (F24 §7.2). Hidden dotfile.
+/// Path of the pending-tasks file under `data_dir`. Hidden dotfile.
 std::string PendingTasksPath(const std::string& data_dir);
 
 /// Graceful-shutdown coordinator (F24 §7, F24-5 decision C — ordered + user-
@@ -98,7 +98,7 @@ public:
     /// drained clean). Idempotent: a second call is a no-op returning the prior result.
     ShutdownStatus Run();
 
-    /// Startup resume (F24 §7.2): if .pending_tasks.json exists under data_dir,
+    /// Startup resume: if .pending_tasks.json exists under data_dir,
     /// parse it, hand each task to `resubmit`, then delete the file. Returns the
     /// number of tasks resumed (0 if the file was absent). A parse error logs +
     /// leaves the file in place (so an operator can inspect it) and returns 0.
@@ -129,7 +129,7 @@ bool AtomicWriteFile(const std::string& path, const std::string& contents);
 /// ⚠️ D3.5 wiring: in D3 the GracefulShutdown's drain/wal/memory hooks are bound
 /// to the real SPC pipeline / P-HNSW WAL / Memory Store. Until those hooks are
 /// bound (cross-Feature), main.cpp keeps its existing SignalHandler → server.Stop()
-/// path and does NOT call this — see the `// [F24] D3.5` note in main.cpp. The
+/// path and does NOT call this — see the `// D3.5` note in main.cpp. The
 /// coordinator + this installer are fully implemented and unit-tested standalone.
 void InstallGracefulShutdown(GracefulShutdown* gs);
 

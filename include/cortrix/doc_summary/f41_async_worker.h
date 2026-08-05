@@ -16,7 +16,7 @@ namespace resource { class INamespacePool; }
 
 namespace doc_summary {
 
-/// F41AsyncWorker — the F42 async-task callback for kTaskDocSummary (F41 §10.2).
+/// F41AsyncWorker — the F42 async-task callback for kTaskDocSummary.
 /// For one document it:
 ///   (1) acquires the task's NamespaceFacade from the F05 pool (RAII Release),
 ///       exactly as SPCManager does before SPCPipeline::Process;

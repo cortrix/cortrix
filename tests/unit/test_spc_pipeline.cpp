@@ -542,7 +542,7 @@ TEST_F(SPCPipelineTest, F10_DedupRemovesDuplicateChildren) {
                 << "F10 dedup: no two surviving child rows may share identical text";
 }
 
-// [F10 §5.2] The doc-processing response meta carries the 4 A-class cleaning
+// The doc-processing response meta carries the 4 A-class cleaning
 // fields. The two identical paragraphs above (own-parent each) feed 2 children
 // into cleaning; exact-hash dedup drops one → chunks_input=2, chunks_skipped_dedup=1,
 // chunks_indexed=1. The pipeline records the summary onto the SPCTask, surfaced via
@@ -1315,7 +1315,7 @@ TEST_F(SPCPipelineTest, ChildBlocks_CarryInheritedDocMetadata) {
 // ============================================================
 // F03 enrich integration (③b): an available LlmEnricher feeds Stage 3.6
 // (EnrichBatch) and the write phase persists enriched_score + entities and folds
-// the summary into block metadata_json (F03 §3.1), all on the real store handle.
+// the summary into block metadata_json, all on the real store handle.
 // ============================================================
 
 TEST_F(SPCPipelineTest, LlmEnricherPersistsEnrichmentAndSummary) {
@@ -1395,7 +1395,7 @@ TEST_F(SPCPipelineTest, LlmEnricherPersistsEnrichmentAndSummary) {
     EXPECT_EQ(CountOf("SELECT COUNT(*) FROM blocks WHERE block_type = 8 "
                       "AND processing_level = 0 AND ABS(semantic_score - 0.2) < 0.001"), 1);
 
-    // Summary folded into a child block's metadata_json (F03 §3.1).
+    // Summary folded into a child block's metadata_json.
     bool found_summary = false;
     for (const auto& b : BlocksOf(doc_id)) {
         if (!b.child_id.empty() &&
@@ -1462,7 +1462,7 @@ TEST_F(SPCPipelineTest, OnDocumentWrittenIsNoOpWhenSeamUnset) {
 }
 
 // ============================================================
-// Branch coverage: memory-session edge paths, ProcessParsed (F42) direct entry,
+// Branch coverage: memory-session edge paths, ProcessParsed direct entry,
 // partial parse status, malformed custom metadata.
 // ============================================================
 

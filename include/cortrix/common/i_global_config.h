@@ -17,8 +17,8 @@ namespace cortrix {
 /// fields with no external type dependency. Type-specific getters whose return
 /// types come from later Waves (F05Config, AgentLlmConfig) are appended to this
 /// canonical via each Feature's D3 reverse hook (V14 J3), e.g.:
-///   - Wave B F05 → virtual const F05Config& GetF05Config() const = 0;   (F05 §4.2)
-///   - Wave E F48 → virtual AgentLlmConfig GetAgentLlmConfig() const = 0; (F48 §6.2)
+///   - Wave B F05 → virtual const F05Config& GetF05Config() const = 0;
+///   - Wave E F48 → virtual AgentLlmConfig GetAgentLlmConfig() const = 0;
 ///                  virtual void SetAgentLlmConfig(const AgentLlmConfig&) = 0;
 class IGlobalConfig {
 public:
@@ -45,10 +45,10 @@ public:
     virtual AgentLlmConfig GetAgentLlmConfig() const;
 
     /// Persist the agent LLM config (api_key encrypted at rest). Admin-only at the
-    /// REST layer (F48 §6.3); this storage call itself does no auth.
+    /// REST layer; this storage call itself does no auth.
     virtual void SetAgentLlmConfig(const AgentLlmConfig& cfg);
 
-    // ----- POD reserved fields (F18a §8.2 + F13 §10.2) -----
+    // ----- POD reserved fields -----
     // POD ints, no external dependency, in the Sprint 0 baseline. Consumed
     // directly by the F18a/F13 CleanupScheduler and the MCP idle watcher.
     int operation_log_retention_days   = 30;      ///< F18a topic 5 — CE 30 / Ent 365

@@ -12,7 +12,7 @@
 #include "cortrix/server/http_server.h"
 #include "cortrix/server/routes/agent_proxy_routes.h"
 
-// Error-path coverage for the retrieval-chain (F48) and pgcortrix (F14) error
+// Error-path coverage for the retrieval-chain and pgcortrix error
 // identities that the GEN-Agent error envelope surfaces via the sec.3 SoT map
 // (http_server.cpp Sdk3Map / ResolveError). Each of these CX_ERR_* codes had ZERO
 // referencing test. The codes are NOT thrown by a service object; they are the

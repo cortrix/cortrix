@@ -19,7 +19,7 @@ namespace cortrix::config {
 ///
 /// Scope note (S3.1): F12 owns this CE file impl + reuses the dev/test
 /// InMemoryGlobalConfig (common/). The other §3.8 sources — PgcortrixGucConfig
-/// (PostgreSQL GUC) and WebUIConfig (P02a) — belong to F14 / P02a respectively
+/// (PostgreSQL GUC) and WebUIConfig — belong to F14 / P02a respectively
 /// and are delivered there on this same canonical interface; F12 (Layer 0) does
 /// not stub them (they'd pull cross-Feature deps).
 class FileBasedGlobalConfig : public cortrix::IGlobalConfig {

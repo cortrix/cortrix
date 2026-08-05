@@ -155,7 +155,7 @@ AgentFriendlyError MakeAuthError(AuthErrorCode code,
     err.category = info.category;
     // Live retry_after (remaining lockout / reset ms) wins over the table default; this is
     // how CX_ERR_ACCOUNT_LOCKED / CX_ERR_RATE_LIMITED carry a per-request value
-    // (P08 §5.2). Otherwise fall back to the registry's static value.
+    //. Otherwise fall back to the registry's static value.
     err.retry_after_ms = retry_after_override.has_value() ? retry_after_override
                                                           : info.retry_after_ms;
     err.structured_data = std::move(structured_data);

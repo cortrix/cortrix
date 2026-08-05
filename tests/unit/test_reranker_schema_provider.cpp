@@ -3,7 +3,7 @@
 // reranker_config is one of the 11 standardized *_config JSONB columns supplied
 // by the F12 base schema, so F02's Phase-1 Migrate is a no-op. These tests pin
 // that contract + the F02 <-> F12 closure (the column really exists after a
-// combined migration). Mirrors test_watcher_schema_provider.cpp (F21).
+// combined migration). Mirrors test_watcher_schema_provider.cpp.
 #include <gtest/gtest.h>
 
 #include <sqlite3.h>

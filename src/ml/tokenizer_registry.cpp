@@ -8,7 +8,7 @@ namespace cortrix::ml {
 namespace {
 std::mutex g_mu;
 // Guarded by g_mu for writes; entries, once inserted, are never mutated, so
-// borrowers read the shared_ptr lock-free after registration (F02 §2.4-bis).
+// borrowers read the shared_ptr lock-free after registration.
 std::unordered_map<std::string, std::shared_ptr<HfTokenizer>>& Registry() {
     static std::unordered_map<std::string, std::shared_ptr<HfTokenizer>> reg;
     return reg;

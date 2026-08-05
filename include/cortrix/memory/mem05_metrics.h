@@ -79,7 +79,7 @@ public:
     uint64_t IsolationCheckCount(CheckResult result, Action action) const;
 
     // --- cortrix_mem05_isolation_violation_total (Counter, labels: action, reason) ---
-    // Cross-user access denied — the safety-critical alert metric (MEM05 §8.bis).
+    // Cross-user access denied — the safety-critical alert metric.
     void RecordIsolationViolation(Action action, Reason reason);
     uint64_t IsolationViolationCount(Action action, Reason reason) const;
 

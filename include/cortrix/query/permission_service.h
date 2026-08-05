@@ -10,7 +10,7 @@ enum class PermissionAction {
     kQuery,
 };
 
-/// Result of a batch permission check (F04 §4.2). `unauthorized` is the subset of
+/// Result of a batch permission check. `unauthorized` is the subset of
 /// the requested namespaces the principal may NOT perform the action on.
 ///
 /// Anti-enumeration (topic 2.6): the service does NOT distinguish "NS does not exist" from "NS
@@ -20,7 +20,7 @@ struct BatchCheckResult {
     std::vector<std::string> unauthorized;
 };
 
-/// PermissionService — the minimal F04 consumer-side view of P09 (F04 §4.2).
+/// PermissionService — the minimal F04 consumer-side view of P09.
 ///
 /// 🚨 D3 standalone: the real P09 PermissionService (queries the ns_acl table) is
 /// NOT built (Wave C); wiring it in is **D3.5**. F04 defines this minimal contract

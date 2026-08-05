@@ -156,7 +156,7 @@ Result<Tenant> TenantService::CreatePersonal(const UserId& user_id,
     sqlite3_finalize(ut);
     if (rc != SQLITE_DONE) {
         // Membership insert failed -> surface the transaction-failed identity so the
-        // caller (P08) ROLLBACKs the whole registration (users + tenants + user_tenants).
+        // caller ROLLBACKs the whole registration (users + tenants + user_tenants).
         return TenantStatus(TenantErrorCode::kTenantTransactionFailed,
                             std::string("user_tenants insert: ") + sqlite3_errmsg(db));
     }

@@ -14,7 +14,7 @@ namespace cortrix::retrieval {
 /// Default write-time serialize retry count (F40 §7.1 L1: "retry N=3").
 inline constexpr int kSparseSerializeRetries = 3;
 
-/// Outcome of the L1 write-time serialize path (F40 §7.1). On success the BLOB is
+/// Outcome of the L1 write-time serialize path. On success the BLOB is
 /// present and the F09 has_sparse_vec bit should be SET. On a serialize failure
 /// (after N retries) the chunk degrades to dense+FTS5 only: blob is empty,
 /// has_sparse_vec must be CLEARED, sparse_vec column written NULL — NOT an error
@@ -37,7 +37,7 @@ struct L1SerializeResult {
 L1SerializeResult L1SerializeSparseVec(const SparseVector& vec,
                                        int retries = kSparseSerializeRetries);
 
-/// L2 query-time fallback decision (F40 §7.2). Given whether the sparse path is
+/// L2 query-time fallback decision. Given whether the sparse path is
 /// available (e.g. ISparseRetriever::IsAvailable() / last_search_failed()),
 /// returns the explain payload: on the normal path via_path="sparse"; on
 /// fallback via_path="fallback_dense_fts5_hype" + fallback_used=true. `sparse_top_k`

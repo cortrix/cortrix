@@ -52,7 +52,7 @@ const char* ToString(MemoryType type);
 /// applies the D4 fallback to kEvent). Case-insensitive on the three known values.
 MemoryType ParseMemoryType(const std::string& s);
 
-/// Memory lifecycle status persisted in blocks.metadata_json (MEM02 §4.1).
+/// Memory lifecycle status persisted in blocks.metadata_json.
 enum class MemoryStatus {
     kActive = 0,
     kTentative,
@@ -61,7 +61,7 @@ enum class MemoryStatus {
 
 const char* ToString(MemoryStatus status);
 
-/// One memory the LLM extracted from the interaction window (MEM02 §5.1). Before
+/// One memory the LLM extracted from the interaction window. Before
 /// persistence the extractor mints `block_id` (ULID, id/ulid.h) and stamps the
 /// source/method provenance.
 struct ExtractedMemory {
@@ -75,7 +75,7 @@ struct ExtractedMemory {
     std::vector<std::string> invalidates;  ///< old block_ids this one invalidates (D6)
 };
 
-/// extract_meta block returned alongside the memories (MEM02 §5.1).
+/// extract_meta block returned alongside the memories.
 struct ExtractMeta {
     std::string llm_model;
     int llm_latency_ms = 0;
@@ -86,7 +86,7 @@ struct ExtractMeta {
     std::string extracted_at;         ///< ISO 8601
 };
 
-/// Result of extract() for one interaction (MEM02 §5.1). On the failure paths the
+/// Result of extract() for one interaction. On the failure paths the
 /// error is the Agent-friendly boundary type carrying a CX_ERR_MEM02_* code (see
 /// mem02_error.h); `ok()` mirrors error.has_value() == false.
 struct MemoryExtractionResult {
@@ -97,7 +97,7 @@ struct MemoryExtractionResult {
     bool ok() const { return !error.has_value(); }
 };
 
-/// Batch result for extract_batch (MEM02 §3.2) — one MemoryExtractionResult per
+/// Batch result for extract_batch — one MemoryExtractionResult per
 /// input turn, in order.
 struct MemoryExtractionBatchResult {
     std::vector<MemoryExtractionResult> results;
@@ -236,7 +236,7 @@ public:
     MemoryExtractionResult ExtractFromWindow(const std::vector<InteractionLog>& window,
                                              const observability::TraceContext* ctx = nullptr);
 
-    /// Batch extract (MEM02 §3.2) — one result per turn, in order.
+    /// Batch extract — one result per turn, in order.
     MemoryExtractionBatchResult ExtractBatch(const std::vector<InteractionLog>& turns,
                                              const observability::TraceContext* ctx = nullptr);
 

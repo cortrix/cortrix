@@ -44,7 +44,7 @@ private:
     AuthService* auth_;
 };
 
-/// Build the `GET /api/v1/auth/me` JSON body from a UserInfo (P08 §2.9). Pure
+/// Build the `GET /api/v1/auth/me` JSON body from a UserInfo. Pure
 /// (no IO) so it is unit-testable; the route that calls it is D3.5.
 std::string BuildMeResponseJson(const UserInfo& user);
 

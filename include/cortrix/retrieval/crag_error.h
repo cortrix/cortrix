@@ -21,7 +21,7 @@ public:
     explicit CragInferenceError(const std::string& what) : std::runtime_error(what) {}
 };
 
-/// The 4 CRAG-evaluation error identities (F37 §4.3). Each maps to a stable
+/// The 4 CRAG-evaluation error identities. Each maps to a stable
 /// `CX_ERR_F37_*` string + a GEN-Agent category + retryability via the canonical
 /// registry below.
 ///

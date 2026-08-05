@@ -71,11 +71,11 @@ public:
     /// rotation by another worker is picked up.
     Result<std::vector<std::string>> GetAcceptSecrets();
 
-    /// 24h cron (P08 §3.9): retire status='prev' jwt_secrets whose expires_at has
+    /// 24h cron: retire status='prev' jwt_secrets whose expires_at has
     /// passed (status → 'retired'). Returns the number retired.
     Result<int> CleanupExpiredPrev();
 
-    /// The 24h dual-key window in ms (P08 §2.11).
+    /// The 24h dual-key window in ms.
     static constexpr int64_t kPrevWindowMs = 24LL * 60 * 60 * 1000;
 
 private:

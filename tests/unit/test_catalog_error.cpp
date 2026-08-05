@@ -10,7 +10,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/catalog/catalog_error.h"
 
-// S2.1 coverage: the 24 catalog error codes (F12 §8.1) — CX_ERR_ identity,
+// S2.1 coverage: the 24 catalog error codes — CX_ERR_ identity,
 // category mapping, retryability, and the MakeCatalogError boundary factory.
 namespace cortrix::catalog {
 namespace {

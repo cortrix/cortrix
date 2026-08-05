@@ -90,7 +90,7 @@ struct NSMetadata {
     std::optional<std::string> doc_summary_config;
 };
 
-/// Options for INSRouter::ListNamespaces (F12 §3.1). Phase 1 supports a tenant
+/// Options for INSRouter::ListNamespaces. Phase 1 supports a tenant
 /// filter + simple pagination; fields are additive (api_version stable).
 struct ListNamespacesOptions {
     std::optional<std::string> tenant_id;   // restrict to one Tenant

@@ -12,7 +12,7 @@
 
 namespace cortrix::server {
 
-/// HTTP handler core for the 6 F16a endpoints (F16a §6.1). This is the request-
+/// HTTP handler core for the 6 F16a endpoints. This is the request-
 /// parse + response-build logic the D3.5 httplib routes call; binding it into the
 /// real `httplib::Server` (+ AdminGuard middleware §6.1 two-layer protection) is D3.5 wiring, so
 /// here it is a plain, fully-unit-testable class over the import/connection managers.

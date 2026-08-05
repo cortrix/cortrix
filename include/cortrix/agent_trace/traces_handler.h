@@ -17,7 +17,7 @@ namespace cortrix::agent_trace {
 /// is set so the Agent knows to paginate. (Carried on the handler result, below.)
 constexpr int64_t kResponseSizeSoftLimitBytes = 1024 * 1024;
 
-/// GET /api/v1/traces/{session_id} result (F13 §8.1). Wraps the writer's
+/// GET /api/v1/traces/{session_id} result. Wraps the writer's
 /// TraceSession plus the §8.1 meta extras the handler computes (the soft-limit
 /// warning). The permission decision is made here, not in the writer.
 struct TracesResponse {

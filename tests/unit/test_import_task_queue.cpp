@@ -8,7 +8,7 @@
 #include "cortrix/import/import_error.h"
 #include "cortrix/import/import_task_queue.h"
 
-// S4 coverage: the self-built D6 ImportTaskQueue (F16a §3.6) — submit / progress /
+// S4 coverage: the self-built D6 ImportTaskQueue — submit / progress /
 // cancel state machine + import_tasks persistence + worker pool. Built ON the shared
 // cortrix::ExecutorEngine, with ZERO F42 dependency (§0 red line). Work is a per-task
 // closure (the ImportManager captures its auth/trace ctx). Runs against the in-memory

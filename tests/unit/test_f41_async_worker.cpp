@@ -1,4 +1,4 @@
-// F41AsyncWorker (F41 §10.2) — the F42 doc_summary task callback. These are
+// F41AsyncWorker — the F42 doc_summary task callback. These are
 // integration-flavored unit tests: a real F05 DefaultNamespacePool (via the shared
 // NsPoolHarness) + a real per-Unit store/F25 WriteCoordinator/FakeIndex, a real
 // OnnxEmbedder("",128) stub, a real BlockAssembler, and a MockLlmClient driving the

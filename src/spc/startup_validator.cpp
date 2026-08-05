@@ -297,7 +297,7 @@ StartupValidator::ValidationConfig StartupValidator::CollectRegisteredOnnxModels
             cfg.registered_model_paths.push_back(model);
         }
     }
-    // [F02] The reranker model dir comes from config.reranker.model_dir — same field
+    // The reranker model dir comes from config.reranker.model_dir — same field
     // the query wiring (MakeRerankerConfig) resolves. Registered ONLY when present,
     // so a stub-mode deployment (empty dir / model absent) validates nothing and the
     // reranker runs deterministic stub scoring; when the model IS present this catches

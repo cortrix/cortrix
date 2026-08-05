@@ -9,7 +9,7 @@ using agent_friendly::ErrorCategory;
 
 namespace {
 
-// One canonical row per code (MEM02 §5.3). Defined as function-local statics so each
+// One canonical row per code. Defined as function-local statics so each
 // returns a stable reference. The switch in GetMem02ErrorInfo is intentionally
 // exhaustive: building with -Wall -Wextra (-Wswitch) turns "added a code without a
 // row" into a warning (treated as a build failure), so the registry can't silently

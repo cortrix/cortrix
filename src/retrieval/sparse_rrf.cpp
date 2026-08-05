@@ -18,7 +18,7 @@ const char* ToString(RrfPath path) {
 
 namespace {
 // Accumulate one path's RRF contributions into the score/paths maps. rank is the
-// 0-based position; contribution = 1/(k + rank) (F40 §9.1).
+// 0-based position; contribution = 1/(k + rank).
 void AccumulatePath(const std::vector<SparseHit>& list, RrfPath path, int k,
                     std::unordered_map<ChildId, float>& score,
                     std::unordered_map<ChildId, std::vector<RrfPath>>& paths) {

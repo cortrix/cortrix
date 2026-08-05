@@ -8,7 +8,7 @@
 
 namespace cortrix::import {
 
-/// Everything needed to stamp a row's Block with its provenance (F16a §4.3). The
+/// Everything needed to stamp a row's Block with its provenance. The
 /// serializer fills blocks.metadata_json `source` (postgres://host:port/db/table/
 /// <row_id>) + the source_type / connection_ref / query_signature / import_task_id /
 /// imported_at / imported_by fields the D3 full-overwrite + audit rely on.
@@ -33,7 +33,7 @@ std::string BuildSourceUri(const SourceContext& src, const std::string& row_id);
 /// cleanup_source_blocks / §4.3). A trailing '/' so "users" never matches "users2".
 std::string SourcePrefix(const SourceContext& src);
 
-/// D4 textualization engine (F16a §3.5). Two strategies only — PER_ROW + MERGE; the
+/// D4 textualization engine. Two strategies only — PER_ROW + MERGE; the
 /// TEMPLATE/Jinja path was removed in v1.0.2 (D1 V3 ruling 13 — no SSTI attack surface
 /// in V1.0; Jinja / LLM textualization is re-evaluated at V1.5). No template, no
 /// sandbox.

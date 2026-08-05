@@ -798,14 +798,14 @@ INSTANTIATE_TEST_SUITE_P(
         // memory block, no hash, child id only
         FullBlockCase{kBlockMemory, kLevelL2, -1, 0, "memory note",
                       "01HXC0000000000000000005", "", -1, -1, "", "memory_child_id_only"},
-        // meta block (F08), summary-style
+        // meta block, summary-style
         FullBlockCase{kBlockMeta, kLevelL1, -1, 0, "doc metadata block",
                       "", "", -1, -1, R"({"doc_meta":true})", "meta_block"},
-        // HyPE question block (F38)
+        // HyPE question block
         FullBlockCase{kBlockHypeQuestion, kLevelL3, 33, 16, "What is X?",
                       "01HXC0000000000000000006", "01HXP0000000000000000006",
                       12, 0, R"({"hype":true})", "hype_question"},
-        // doc-summary block (F41)
+        // doc-summary block
         FullBlockCase{kBlockDocSummary, kLevelL4, -1, 32, "Summary of the doc.",
                       "", "", -1, -1, R"({"summary":true})", "doc_summary"},
         // file block with metadata-only enrichment, parent_id present only

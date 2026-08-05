@@ -20,7 +20,7 @@ namespace cortrix::reranker {
 /// set outside its documented range is an operator error surfaced at config load
 /// (topic S2.2 DoD "reject out-of-range").
 namespace guc {
-// Keys (F02 §2.4). Resident-resource GUCs are global (not NS-overridable).
+// Keys. Resident-resource GUCs are global (not NS-overridable).
 inline constexpr const char* kQueueSize       = "reranker.queue_size";
 inline constexpr const char* kTaskTimeoutMs   = "reranker.task_timeout_ms";
 inline constexpr const char* kWorkers         = "reranker.workers";
@@ -35,7 +35,7 @@ inline constexpr const char* kCircuitCooldown = "reranker.circuit_breaker.cooldo
 inline constexpr const char* kSpcChunkSize    = "spc.chunk_size";
 inline constexpr int kSpcChunkSizeDefault = 512;
 
-// Ranges (F02 §2.4). Inclusive [min, max].
+// Ranges. Inclusive [min, max].
 inline constexpr int kQueueSizeMin = 50,      kQueueSizeMax = 2000;
 inline constexpr int kTaskTimeoutMin = 1000,  kTaskTimeoutMax = 30000;
 inline constexpr int kWorkersMin = 1,         kWorkersMax = 16;

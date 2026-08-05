@@ -9,7 +9,7 @@
 
 namespace cortrix::auth {
 
-/// JWT claims for the two Cortrix token kinds (P08 §2.10). Modeled as one struct
+/// JWT claims for the two Cortrix token kinds. Modeled as one struct
 /// covering both; `is_refresh()` distinguishes them. The access token carries 9
 /// fields (topic 3.3 C, benchmarked against InsForge); the refresh token carries sub/sid/type/jti.
 struct JwtPayload {

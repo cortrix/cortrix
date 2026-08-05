@@ -10,7 +10,7 @@
 
 namespace cortrix::onnx {
 
-/// The 3 ONNX-layer error identities (F22 §8.3). Each maps to a stable
+/// The 3 ONNX-layer error identities. Each maps to a stable
 /// `CX_ERR_*` string + a GEN-Agent category + retryability via the canonical
 /// registry below.
 ///

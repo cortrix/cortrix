@@ -41,7 +41,7 @@ public:
     UploadHandler(const UploadConfig& config, SPCManager& spc_mgr,
                   std::shared_ptr<observability::IOperationLogger> op_logger = nullptr);
 
-    /// [F18a] Set the operation_log writer after construction. The bootstrap builds
+    /// Set the operation_log writer after construction. The bootstrap builds
     /// the ObservabilityModule *after* the UploadHandler, so the op_logger is wired
     /// here rather than at construction. No-op-safe: null leaves the path unchanged.
     void SetOperationLogger(std::shared_ptr<observability::IOperationLogger> op_logger) {

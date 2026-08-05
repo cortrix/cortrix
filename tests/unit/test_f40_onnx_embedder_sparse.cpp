@@ -72,7 +72,7 @@ TEST(F40EmbedWithSparseTest, SparseWeightsStrictlyPositive) {
     for (const auto& [term_id, weight] : r.sparse) {
         EXPECT_GT(weight, 0.0f);
         EXPECT_GT(term_id, 0u);          // id 0 reserved as "no term"
-        EXPECT_LE(term_id, 65535u);      // uint16 serialization window (F40 §4.2)
+        EXPECT_LE(term_id, 65535u);      // uint16 serialization window
     }
 }
 
@@ -100,7 +100,7 @@ TEST(F40EmbedWithSparseTest, DifferentInputsDifferentSparse) {
     EXPECT_NE(a.sparse, b.sparse);
 }
 
-// ---------- empty / whitespace content (F40 §6.5) ----------
+// ---------- empty / whitespace content ----------
 
 TEST(F40EmbedWithSparseTest, EmptyTextEmptySparse) {
     OnnxEmbedder e("", 64);

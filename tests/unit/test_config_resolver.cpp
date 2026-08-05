@@ -9,7 +9,7 @@
 #include "cortrix/common/status.h"
 
 // S3.2 coverage: ConfigResolver<T> three-layer override (global ← NS ← request)
-// with a request whitelist (F12 §6). Uses a sample JSON-serializable config.
+// with a request whitelist. Uses a sample JSON-serializable config.
 //
 // SampleConfig + its to_json/from_json (macro) + operator== live in a NAMED
 // namespace (not the anonymous one below) on purpose: the macro emits free

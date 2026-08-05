@@ -10,7 +10,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/observability/operation_log_error.h"
 
-// S1 coverage: the 6 operation-log error codes (F18a §7.2) — CX_ERR_OPLOG_*
+// S1 coverage: the 6 operation-log error codes — CX_ERR_OPLOG_*
 // identity, category mapping, retryability, required structured_data keys, and
 // the MakeOplogError boundary factory.
 namespace cortrix::observability {

@@ -3,7 +3,7 @@
 
 namespace cortrix::auth {
 
-/// Decoded identity of an authenticated principal (P08 §2.15). This is the P08
+/// Decoded identity of an authenticated principal. This is the P08
 /// (Cloud JWT) auth context — distinct from the MVP root-namespace
 /// `cortrix::AuthContext` (API-Key, tenant/permissions bitmask). The two coexist
 /// during D3; unifying them is part of the middleware wiring (D3.5).

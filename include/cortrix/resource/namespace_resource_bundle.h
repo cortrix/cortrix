@@ -5,9 +5,9 @@
 #include <vector>
 
 #include "cortrix/resource/sqlite_conn.h"
-#include "cortrix/store/iindex.h"             // cortrix::store::IIndex (F01)
+#include "cortrix/store/iindex.h"             // cortrix::store::IIndex
 #include "cortrix/store/recover_stores.h"     // IMetadataStore / IBlobStore (F25 recover views)
-#include "cortrix/store/write_coordinator.h"  // cortrix::store::WriteCoordinator (F25)
+#include "cortrix/store/write_coordinator.h"  // cortrix::store::WriteCoordinator
 
 namespace cortrix::resource {
 

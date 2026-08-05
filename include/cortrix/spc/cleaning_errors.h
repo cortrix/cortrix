@@ -14,7 +14,7 @@ namespace cortrix::spc {
 /// The 7 F10 data-cleaning error identities (F10 §5.1, D9). Each maps to a
 /// stable `CX_ERR_F10_*` string + a GEN-Agent category + retryability via the
 /// canonical registry below — same pattern as catalog::CatalogErrorCode (F12,
-/// the template) and spc::ParserErrorCode (F06).
+/// the template) and spc::ParserErrorCode.
 ///
 /// Per CODING_CONVENTIONS §3, a domain error is carried as the Agent-friendly
 /// boundary type cortrix::agent_friendly::AgentFriendlyError, identified by its

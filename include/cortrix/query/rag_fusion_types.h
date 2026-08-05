@@ -101,7 +101,7 @@ bool ValidateRagFusionConfig(const RagFusionConfig& cfg,
                              std::string* field = nullptr,
                              std::string* valid_range = nullptr);
 
-/// Variant generation result (F36 §4.1). `variants` does NOT include the original
+/// Variant generation result. `variants` does NOT include the original
 /// query — the caller merges it (§4.5 `all_queries = {query} + variants`).
 struct QueryVariants {
     std::string original_query;

@@ -11,7 +11,7 @@ namespace cortrix::observability {
 
 namespace {
 
-// CX_ERR_F13_INVALID_FILTER token (F13 §9.2). Carried in the Status message so
+// CX_ERR_F13_INVALID_FILTER token. Carried in the Status message so
 // the exact F13 identity survives to the API boundary, which re-inflates the
 // full Agent-friendly body (the §3.1 4-field schema). Kept as a literal here so
 // this widely-included shared TU does not pull in agent_trace_error.h (S7).
@@ -126,7 +126,7 @@ void ObservabilityContext::SetThreadLocal() const {
 bool ObservabilityValidator::IsValidFormat(const std::string& value, int max_length) {
     if (value.empty()) return false;
     if (static_cast<int>(value.size()) > max_length) return false;
-    // Whitelist [a-zA-Z0-9_.:/-] (F13 §6.1). ASCII-only by construction.
+    // Whitelist [a-zA-Z0-9_.:/-]. ASCII-only by construction.
     for (unsigned char c : value) {
         const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
                         (c >= '0' && c <= '9') || c == '_' || c == '.' ||

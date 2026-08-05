@@ -1203,7 +1203,7 @@ TEST_F(MemorySearcherPrivateTest, Search_NullMetadataItems_ExcludedByUserIdFilte
     req.top_k = 10;
 
     MemorySearchResponse resp = searcher.Search(req);
-    // Null-metadata item has no user_id -> excluded by MatchScope (MEM05).
+    // Null-metadata item has no user_id -> excluded by MatchScope.
     EXPECT_EQ(resp.total_results, 0);
     EXPECT_GE(resp.latency_ms, 0);
 }

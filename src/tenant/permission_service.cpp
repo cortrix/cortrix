@@ -305,7 +305,7 @@ bool PermissionService::CanChangeVisibility(const AuthContext& ctx, const NsId& 
 }
 
 // ---------------------------------------------------------------------------
-// Batch (F04)
+// Batch
 // ---------------------------------------------------------------------------
 
 std::vector<PermissionService::BatchPermissionCheck> PermissionService::BatchCheck(

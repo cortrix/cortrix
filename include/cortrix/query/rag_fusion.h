@@ -47,7 +47,7 @@ public:
     /// v1.0.5 canonical 4-param signature (V2 QA M-05): trace_ctx + qctx both
     /// optional. The result always begins with `query` itself (§4.5 invariant).
     ///
-    /// 🔵 D3.5 deferred (F36 §4.8.2): the `qctx` routing-skip (ShouldSkipF36 reading
+    /// 🔵 D3.5 deferred: the `qctx` routing-skip (ShouldSkipF36 reading
     /// SPEC `routing_path`) is INTERFACE-RESERVED — the FROZEN QueryContext has no
     /// `routing_path` field yet (F39 adds it, same Wave, not frozen). So a non-null
     /// `qctx` is accepted and threaded, but the real skip wiring lands at D3.5 when

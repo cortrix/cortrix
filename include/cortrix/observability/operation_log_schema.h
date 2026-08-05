@@ -5,11 +5,11 @@
 
 namespace cortrix::observability {
 
-/// Current operation_log schema version (F18a §5.1). Phase 1 single-step create
+/// Current operation_log schema version. Phase 1 single-step create
 /// (v0 → v1). Phase 2 internal evolution branches on (from, to) here.
 constexpr int kOplogSchemaVersion = 1;
 
-/// The operation_log DDL emitted by the F18a SchemaProvider (F18a §5.1):
+/// The operation_log DDL emitted by the F18a SchemaProvider:
 /// the operation_log table + 5 indices. Stored in cortrix_global.db (the global
 /// DB, NOT a per-namespace DB), but applied via the shared SchemaMigrator so it
 /// runs inside the same versioned, atomic framework as the catalog providers.

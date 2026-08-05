@@ -10,7 +10,7 @@
 
 namespace cortrix::reranker {
 
-/// The 5 reranker error identities (F02 §5.2). Each maps to a stable `CX_ERR_*`
+/// The 5 reranker error identities. Each maps to a stable `CX_ERR_*`
 /// string + a GEN-Agent category + retryability via the canonical registry below.
 ///
 /// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no

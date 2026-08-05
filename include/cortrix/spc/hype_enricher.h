@@ -10,7 +10,7 @@
 
 namespace cortrix::spc {
 
-/// HyPE generation config (F38 §5.1). K + prompt version + LLM model. NS-config
+/// HyPE generation config. K + prompt version + LLM model. NS-config
 /// (questions_per_chunk 1-10, S6) overrides `questions_per_chunk` at resolve time.
 struct HyPEConfig {
     int questions_per_chunk = kHypeQuestionsDefault;   ///< K, default 3 (NS 1-10)
@@ -23,7 +23,7 @@ struct HyPEConfig {
     int timeout_ms = 0;
 };
 
-/// One generated hypothetical question for a child chunk (F38 §5.1). The embedding
+/// One generated hypothetical question for a child chunk. The embedding
 /// is filled by the SPC pipeline via OnnxEmbedder before the hype_question Block
 /// is written (S3); HyPEEnricher itself produces question_text + provenance.
 struct HypeQuestion {
@@ -34,7 +34,7 @@ struct HypeQuestion {
     std::vector<float> embedding;           ///< 1024-dim BGE-M3 (filled at S3 / pipeline)
 };
 
-/// HyPE enricher (F38) — an ISpcEnricher chain subclass (chunk-level, per-child),
+/// HyPE enricher — an ISpcEnricher chain subclass (chunk-level, per-child),
 /// peer of F03 LlmEnricher / F35 ContextualRetrieval.
 ///
 /// ⚠️ Two D3.5 contract reconciles (Lead-ruled 2026-06-01, F38 detailed design
@@ -94,7 +94,7 @@ public:
 
     // --- F38-specific API (reconcile 1: the real HyPE product) ---
 
-    /// Generate K hypothetical questions for `chunk_text` (F38 §6). `parent_text`
+    /// Generate K hypothetical questions for `chunk_text`. `parent_text`
     /// is OPTIONAL context (reconcile 2): empty == no parent context available.
     /// `source_child_id` / `source_parent_id` are the F38-4 provenance written onto
     /// each question. On success returns exactly `config.questions_per_chunk`
@@ -108,14 +108,14 @@ public:
         const std::string& source_child_id,
         const std::string& source_parent_id);
 
-    /// Resolve parent_text via the injected ParentChunkStore (F38 §6.3). Returns
+    /// Resolve parent_text via the injected ParentChunkStore. Returns
     /// empty string when parent_store is null OR `parent_id` is empty (optional
     /// context, reconcile 2). A store NOT_FOUND / DB error surfaces as a non-OK
     /// Status carrying CX_ERR_F38_PARENT_NOT_FOUND (caller decides whether to treat
     /// a missing parent as fatal or degrade to empty context).
     Result<std::string> ResolveParentText(const std::string& parent_id);
 
-    /// Parse LLM output into exactly `expected_k` questions (F38 §6.2). Splits by
+    /// Parse LLM output into exactly `expected_k` questions. Splits by
     /// newline, trims, drops empty lines. A count != expected_k is a parse failure
     /// → non-OK Status carrying CX_ERR_F38_QUESTION_PARSE_FAILED (transient,
     /// retryable) with the actual/expected counts; an entirely empty output →

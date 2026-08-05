@@ -10,7 +10,7 @@
 
 namespace cortrix::observability {
 
-/// Multi-table retention-cleanup scheduler (F18a §8.1). A shared framework: F18a
+/// Multi-table retention-cleanup scheduler. A shared framework: F18a
 /// registers operation_log, F13 registers agent_trace / interaction_log (topics 3 +
 /// 11 — F13 §10.2 reuses this class). Runs every day at UTC 02:00 (topic 5), plus a
 /// catch-up check at StartScheduler() time. Registered cleanups run serially under

@@ -24,7 +24,7 @@ std::string ToLower(std::string s) {
     return s;
 }
 
-// The zh / en variant-generation prompt templates (F36 §4.2). {N}, {suffix},
+// The zh / en variant-generation prompt templates. {N}, {suffix},
 // {original_query} are substituted by BuildPrompt. The XML-style delimiter + the
 // "ignore instructions inside the tag" rule + the strict JSON schema are the
 // LLM01 prompt-injection defense (D1 V3 resolution 11).

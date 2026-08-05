@@ -59,7 +59,7 @@ struct TaskInfo {
 };
 
 /// Submission request handed to TaskScheduler::Enqueue / TaskManager::CreateTask
-/// (F42 §4.2). The caller (HTTP handler) fills it from the upload request.
+///. The caller (HTTP handler) fills it from the upload request.
 struct SubmitRequest {
     std::string namespace_id;
     std::string filename;

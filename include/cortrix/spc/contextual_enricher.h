@@ -35,7 +35,7 @@ public:
     virtual Result<std::vector<float>> Embed(const std::string& text) = 0;
 };
 
-/// Resolved F35 config (F35 §6.2). The §6.2 three-layer override (built-in
+/// Resolved F35 config. The §6.2 three-layer override (built-in
 /// default → IGlobalConfig global → per-NS metadata) is applied by
 /// ResolveContextualConfig(); this struct is the post-resolve result the enricher
 /// consumes. Mirrors the F38 HyPEConfig shape.
@@ -68,7 +68,7 @@ ContextualRetrievalConfig ResolveContextualConfig(const IGlobalConfig* global);
 ContextualRetrievalConfig MergeNsOverride(const ContextualRetrievalConfig& base,
                                           const std::string& ns_metadata_json);
 
-/// Contextual Retrieval enricher (F35) — an ISpcEnricher chain subclass
+/// Contextual Retrieval enricher — an ISpcEnricher chain subclass
 /// (chunk-level, per-child), peer of F03 LlmEnricher / F38 HyPEEnricher. Chain
 /// order F03 → F35 → F38 (GS-2). Implements the Anthropic 2024 Contextual
 /// Retrieval scheme: at index time an LLM writes a short context prefix for each
@@ -128,7 +128,7 @@ public:
 
     // --- F35-specific API ---
 
-    /// Generate the contextualized prefix for `chunk_text` (F35 §6). On success
+    /// Generate the contextualized prefix for `chunk_text`. On success
     /// returns the LLM prefix text. On LLM transport/timeout failure returns a
     /// non-OK Status carrying CX_ERR_F35_LLM_FAILED; on an over-long output
     /// (length > 2 x max_output_tokens, §8 defense) returns

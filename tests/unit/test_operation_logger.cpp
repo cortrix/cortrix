@@ -15,7 +15,7 @@
 #include "cortrix/observability/operation_logger_impl.h"
 #include "cortrix/observability/oplog_metrics.h"  // §11 emit-integration assertions
 
-// S2 coverage: OperationLogger CE implementation (F18a §5.2) — Log / BatchLog
+// S2 coverage: OperationLogger CE implementation — Log / BatchLog
 // (all-or-nothing) / Query (filters + pagination + validation) / Cleanup
 // (retention + row-cap) / GetStats / Health.
 namespace cortrix::observability {

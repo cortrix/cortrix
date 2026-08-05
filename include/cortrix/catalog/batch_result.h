@@ -6,7 +6,7 @@
 
 namespace cortrix::catalog {
 
-/// One failed item in a partial-success batch (F12 §8.2). `cx_code` is the
+/// One failed item in a partial-success batch. `cx_code` is the
 /// CX_ERR_* string (see catalog_error.h); `detail` is human-readable context.
 struct FailedItem {
     std::string id;       // the input id that failed (e.g. ns_id)
@@ -31,7 +31,7 @@ struct BatchMeta {
     std::string api_version = "v1";  // §8.3 versioning promise
 };
 
-/// Partial-success batch result (F12 §8.2). GEN-Agent #3: a batch returns the
+/// Partial-success batch result. GEN-Agent #3: a batch returns the
 /// data it could produce plus structured meta about what failed, rather than
 /// all-or-nothing. `results` holds the successful payloads; `meta.failed` the
 /// rest.

@@ -6,7 +6,7 @@
 // flow* — RagFusion::ExpandQueries (LLM variant generation via the frozen
 // MockLlmClient) → simulated per-variant retrieval → RagFusion::FuseResults
 // (global RRF) — plus the Issue 5/6 phased-rollout invariants and the Issue 4
-// degrade path. The actual cross-Feature retrieval call (F04) is simulated with
+// degrade path. The actual cross-Feature retrieval call is simulated with
 // crafted ScoredResult lists; wiring the real ScatterGather is the D3.5 step.
 
 #include <gtest/gtest.h>

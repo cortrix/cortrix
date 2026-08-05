@@ -14,11 +14,11 @@ struct sqlite3;
 
 namespace cortrix::async {
 
-/// Owns the `tasks` SQLite table (F42 §3.1) — the async-scheduling SoT. A
+/// Owns the `tasks` SQLite table — the async-scheduling SoT. A
 /// self-contained store (mirrors cortrix::MemoryStore): its own Init(db_path)
 /// runs the DDL (CREATE TABLE IF NOT EXISTS + 4 indexes), and every CRUD method
 /// is a prepared-statement op guarded by an internal mutex. Tasks metadata is
-/// decoupled from the catalog blob_gc_queue (F42 §4.4), so this does NOT register
+/// decoupled from the catalog blob_gc_queue, so this does NOT register
 /// with the catalog SchemaMigrator.
 ///
 /// Standalone (D3): the table + CRUD + cleanup are real and fully tested against

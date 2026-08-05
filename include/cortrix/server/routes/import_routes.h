@@ -6,7 +6,7 @@ namespace cortrix {
 class ApiKeyAuth;
 namespace server { class ImportHandler; }
 
-/// [D3.5 r2 · Wave P · P2] Register the 6 F16a DB-import endpoints (F16a §6.1) on
+/// [D3.5 r2 · Wave P · P2] Register the 6 F16a DB-import endpoints on
 /// the raw httplib server, delegating to the (borrowed) ImportHandler:
 ///   POST   /api/v1/import/database               -- start import (async)
 ///   GET    /api/v1/import/tasks/{task_id}/progress -- progress
@@ -15,7 +15,7 @@ namespace server { class ImportHandler; }
 ///   GET    /api/v1/admin/db-connections          -- list connections
 ///   DELETE /api/v1/admin/db-connections/{ref_id} -- revoke a connection
 ///
-/// Two-layer admin protection (F16a §6.1):
+/// Two-layer admin protection:
 ///   Layer 1 — AdminGuard IP filter. /admin/db-connections* match the
 ///     /api/v1/admin/* prefix directly; the /import/* paths are a business prefix,
 ///     so they rely on Layer 2 only (per design — Phase 1.5 unifies them).

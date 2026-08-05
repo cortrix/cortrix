@@ -23,7 +23,7 @@ namespace cortrix::auth {
 /// are project-shared and keep their generic `CX_ERR_` spelling (governed by the
 /// master table, V14 J6): kInvalidRequest / kUnauthorized / kNotFound / kRateLimited /
 /// kInternalError / kServiceUnavailable, plus the admin/users codes
-/// kUserNotFound / kUserEmailExists / kUserValidation (P08 §2.13-bis). They live
+/// kUserNotFound / kUserEmailExists / kUserValidation. They live
 /// in this enum so every error P08 returns flows through one registry, exactly
 /// as CatalogErrorCode carries kInternalError / kNotImplemented.
 ///

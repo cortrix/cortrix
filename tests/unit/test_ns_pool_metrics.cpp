@@ -4,7 +4,7 @@
 
 #include "cortrix/resource/ns_pool_metrics.h"
 
-// MET-12 coverage: the 6 cortrix_ns_pool_* metrics (F05 §10.1) — gauges/counters/
+// MET-12 coverage: the 6 cortrix_ns_pool_* metrics — gauges/counters/
 // histograms recording + the OpenMetrics renderer + label-enum discipline
 // (OBS_SPEC §3.2 no high-cardinality labels; the namespace_id lives only in the
 // explain/stats API JSON, never a metric label).
