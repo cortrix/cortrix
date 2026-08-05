@@ -568,6 +568,13 @@ Result<std::optional<TaskInfo>> TaskManager::FindRecentTaskByDocId(
     std::string sql = std::string("SELECT ") + kSelectColumns +
                       " FROM tasks WHERE namespace_id = ? AND doc_id = ? "
                       "AND task_type = ? AND created_at >= ? "
+                      // Only a task that will actually carry the submission is a
+                      // debounce candidate. Merging into a cancelled, cancelling or
+                      // failed task swallows the resubmission: the caller is handed
+                      // that task_id and its input is released, but nothing will ever
+                      // process the content. (`completed` stays eligible — identical
+                      // content already ingested is exactly what dedup should report.)
+                      "AND status NOT IN ('cancelled','cancelling','failed') "
                       "ORDER BY created_at DESC LIMIT 1";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
@@ -587,13 +594,20 @@ Result<TaskInfo> TaskManager::UpdateTaskForDebounce(const std::string& task_id,
                                                     const SubmitRequest& req) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
+        // Conditional on the row still being queued: this is the authority for the
+        // debounce decision, not the status the caller read a moment earlier. A
+        // cancel (queued -> cancelled, which also releases the input) does not share
+        // the scheduler mutex, so it can land between that read and this write. An
+        // unconditional update would resurrect the cancelled row under the same
+        // task_id for a different submission, after its cancel response already told
+        // the caller the task was terminal.
         const char* sql =
             "UPDATE tasks SET content_hash=?, filepath=?, total_pages=?, "
             "status='queued', processed_pages=0, failed_pages='[]', "
             "progress_pct=0.0, eta_seconds=-1, current_phase=NULL, "
             "worker_id=NULL, error_code=NULL, error_msg=NULL, "
             "structured_data=NULL, started_at=NULL, completed_at=NULL, "
-            "cancel_requested=0, updated_at=? WHERE task_id=?";
+            "cancel_requested=0, updated_at=? WHERE task_id=? AND status='queued'";
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
             return F42Status(F42ErrorCode::kStorageFailed, "UpdateTaskForDebounce prepare");
@@ -607,7 +621,20 @@ Result<TaskInfo> TaskManager::UpdateTaskForDebounce(const std::string& task_id,
         int changes = sqlite3_changes(db_);
         sqlite3_finalize(stmt);
         if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "UpdateTaskForDebounce step");
-        if (changes == 0) return F42Status(F42ErrorCode::kTaskNotFound, task_id);
+        if (changes == 0) {
+            // Distinguish "row is gone" from "row left queued under us"; the caller
+            // turns the latter into a separate task for the new submission.
+            sqlite3_stmt* probe = nullptr;
+            bool exists = false;
+            if (sqlite3_prepare_v2(db_, "SELECT 1 FROM tasks WHERE task_id=?", -1,
+                                   &probe, nullptr) == SQLITE_OK) {
+                BindText(probe, 1, task_id);
+                exists = (sqlite3_step(probe) == SQLITE_ROW);
+                sqlite3_finalize(probe);
+            }
+            return exists ? F42Status(F42ErrorCode::kDocProcessingInProgress, task_id)
+                          : F42Status(F42ErrorCode::kTaskNotFound, task_id);
+        }
     }
     return GetTask(task_id);
 }

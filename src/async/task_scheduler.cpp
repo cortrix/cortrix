@@ -42,13 +42,14 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
                 }
                 return r;
             }
-            // same doc + different content_hash within window → refresh + reset,
-            // but ONLY while the existing task is still queued. A refresh rewrites
-            // that row in place: a worker already holding the old TaskInfo would
-            // lose its input (released below) and could later MarkCompleted the
-            // row, reporting the NEW submission as processed without ever having
-            // read it. An in-flight task therefore keeps both its row and its
-            // input, and the resubmission falls through to its own queued task.
+            // same doc + different content_hash within window → refresh + reset.
+            //
+            // The UPDATE is conditional on the row still being queued and is the
+            // authority here — `r.status` was read a moment ago and CancelTask does
+            // not share this mutex, so a cancel can land in between. The cheap check
+            // just avoids a pointless write for a row we already know is in flight;
+            // if the write loses the race we fall through and give the new
+            // submission its own task rather than resurrecting a terminal row.
             if (r.status == task_status::kQueued) {
                 // A reset-to-queued is a fresh submission for metrics (§6.bis).
                 const std::string superseded = r.filepath;
@@ -61,8 +62,9 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
                     if (!superseded.empty() && superseded != req.filepath) {
                         ReleaseUnadoptedInput(superseded, r.task_id);
                     }
+                    return refreshed;
                 }
-                return refreshed;
+                // Lost the race (or the row vanished) → fall through to a new task.
             }
         }
     }
