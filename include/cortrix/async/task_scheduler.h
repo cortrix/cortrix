@@ -14,11 +14,11 @@
 namespace cortrix::async {
 
 /// TaskScheduler — per-doc_id mutual exclusion + Watcher debounce over the tasks
-/// queue (F42 §4.2, topic 2). Sits on top of TaskManager: Enqueue applies the 5s
+/// queue. Sits on top of TaskManager: Enqueue applies the 5s
 /// Watcher debounce (topic 2.2 C) and FIFO same-doc_id queueing (topic 2.1 A);
 /// Dequeue hands a worker the oldest queued task whose doc_id is NOT already
 /// being processed (topic 2.3 B — in-memory active_doc_ids_ set, same model as
-/// F25 Q2 active_docs_); OnTaskCompleted releases the doc_id.
+/// active_docs_); OnTaskCompleted releases the doc_id.
 ///
 /// The active_doc_ids_ set is process-local (authoritative only within a process
 /// lifetime); crash recovery rebuilds queued/processing state from the tasks

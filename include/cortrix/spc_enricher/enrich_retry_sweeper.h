@@ -24,7 +24,7 @@ namespace spc {
 /// the loaded namespaces, finds documents with due 'pending_retry' rows
 /// (next_retry_at <= now), LEASES them forward (so the next tick cannot
 /// re-enqueue a doc whose task is still queued/running) and enqueues one
-/// backfill task per doc through the F42 TaskScheduler (+ WorkerPool::Notify).
+/// backfill task per doc through the TaskScheduler (+ WorkerPool::Notify).
 ///
 /// enrich_state itself is the persistent queue SoT — the sweeper holds no state,
 /// so crashes lose nothing (the lease simply expires and the doc is re-swept).
@@ -32,9 +32,9 @@ namespace spc {
 /// sweep body is exposed as RunSweepNow for tests and for the backfill ops API).
 class EnrichRetrySweeper {
 public:
-    /// @param pool      borrowed F05 pool (namespace enumeration + per-NS acquire).
-    /// @param scheduler borrowed F42 scheduler (Enqueue; debounces by doc_id).
-    /// @param workers   borrowed F42 worker pool (Notify after enqueues); may be
+    /// @param pool      borrowed namespace pool (enumeration + per-NS acquire).
+    /// @param scheduler borrowed task scheduler (Enqueue; debounces by doc_id).
+    /// @param workers   borrowed worker pool (Notify after enqueues); may be
     ///                  nullptr in tests (enqueue still happens, no wake).
     /// @param config    borrowed IGlobalConfig for f42.enrich_sweep_interval_sec
     ///                  (nullptr → default).

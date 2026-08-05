@@ -10,7 +10,7 @@
 
 namespace cortrix::scoring {
 
-/// The 2 F07 Semantic Score error identities. F07 is an internal module
+/// The 2 Semantic Score error identities. Scoring is an internal module
 /// (few error scenarios, §4.4 note), so the set is small: an out-of-range level (defensive
 /// bottom-out) and a bad α config. Each maps to a stable `CX_ERR_F07_*` string + a
 /// GEN-Agent category + retryability + the structured_data keys its body MUST carry,
@@ -20,8 +20,8 @@ namespace cortrix::scoring {
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code. So
 /// F07ErrorCode is the *enum of identities*, and MakeScoringError() turns one (plus
-/// optional structured_data) into that boundary error — mirroring the F16a / F36 /
-/// F08 template A.
+/// optional structured_data) into that boundary error — mirroring the import / fusion /
+/// metadata template.
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may be appended (api_version stays "v1").
@@ -34,11 +34,11 @@ enum class F07ErrorCode {
                      ///< {alpha_received, valid_range, config_source}.
 };
 
-/// Total number of F07 error codes (F07 §4.4 = 2). Compile-time anchor for the
+/// Total number of scoring error codes (= 2). Compile-time anchor for the
 /// API-compatibility regression test (the set must not shrink).
 constexpr int kF07ErrorCodeCount = 2;
 
-/// Canonical, immutable attributes of one error code (F07 §4.4 columns).
+/// Canonical, immutable attributes of one error code.
 struct F07ErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_F07_*" string
     agent_friendly::ErrorCategory category;   ///< permanent (both)

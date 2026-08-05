@@ -10,15 +10,15 @@
 
 namespace cortrix::observability {
 
-/// Multi-table retention-cleanup scheduler. A shared framework: F18a
-/// registers operation_log, F13 registers agent_trace / interaction_log (topics 3 +
-/// 11 — F13 §10.2 reuses this class). Runs every day at UTC 02:00 (topic 5), plus a
+/// Multi-table retention-cleanup scheduler. A shared framework: the operation log
+/// registers its table, observability registers agent_trace / interaction_log (
+/// both reuse this class). Runs every day at UTC 02:00, plus a
 /// catch-up check at StartScheduler() time. Registered cleanups run serially under
 /// an in-process advisory lock; a failing table is retried with exponential
 /// backoff (max 3 attempts: 1 / 5 / 15 min).
 ///
 /// Standalone (D3): the daily wall-clock loop is real, but cross-Feature wiring
-/// (registering F13's tables, the OBS_SPEC metric emission) is deferred. Tests
+/// (registering the observability tables, the metric emission) is deferred. Tests
 /// drive RunCleanupNow() / the pure NextRunDelayMs() directly.
 class CleanupScheduler {
 public:
@@ -30,7 +30,7 @@ public:
 
     /// Register a table's cleanup callback. Idempotent per name is NOT enforced;
     /// the caller registers each table once at startup. `cleanup_fn` must not
-    /// throw (it is invoked under the scheduler lock); F18a passes
+    /// throw (it is invoked under the scheduler lock); the operation log passes
     /// [logger]{ logger->Cleanup(); }.
     void RegisterTable(const std::string& table_name,
                        std::function<void()> cleanup_fn);

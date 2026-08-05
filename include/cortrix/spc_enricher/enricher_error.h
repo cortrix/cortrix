@@ -10,7 +10,7 @@
 
 namespace cortrix::spc {
 
-/// The 6 enricher error identities (F03 §1.6 / §5.1). Each maps to a stable
+/// The 6 enricher error identities. Each maps to a stable
 /// `CX_ERR_ENRICHER_*` string + a GEN-Agent category + retryability via the
 /// canonical registry below.
 ///
@@ -37,11 +37,11 @@ enum class EnricherErrorCode {
     kRateLimit,    ///< LLM 429 rate limit (Retry-After backoff)
 };
 
-/// Total number of enricher error codes (F03 §1.6 = 6). Compile-time anchor for
+/// Total number of enricher error codes (= 6). Compile-time anchor for
 /// the API-compatibility regression test (the set must not shrink).
 constexpr int kEnricherErrorCodeCount = 6;
 
-/// Canonical, immutable attributes of one error code (F03 §5.1 columns).
+/// Canonical, immutable attributes of one error code.
 struct EnricherErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_ENRICHER_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
@@ -56,7 +56,7 @@ const EnricherErrorInfo& GetEnricherErrorInfo(EnricherErrorCode code);
 /// The "CX_ERR_ENRICHER_*" string for `code` (convenience over GetEnricherErrorInfo).
 const char* EnricherErrorCodeString(EnricherErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (F03 §5.1
+/// The structured_data keys a `code`'s error body MUST carry (
 /// structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5);
 /// lets call sites + tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(EnricherErrorCode code);

@@ -4,14 +4,14 @@
 
 namespace cortrix::metadata {
 
-/// F08 observability metrics (detailed design §5.bis, OBSERVABILITY_SPEC subsystem `f08`).
+/// Metadata-block observability metrics (subsystem `f08`).
 /// Naming `cortrix_f08_<metric>_<unit>`. Self-contained dependency-free recorder
 /// (same pattern as ImportMetrics / RerankerMetrics / OnnxMetrics); registering into
-/// the F24 `/metrics` scrape endpoint is cross-Feature wiring → D3.5.
+/// the `/metrics` scrape endpoint is wired separately.
 ///
-/// Standalone scope (B_R3_BRIEFING §2): this recorder covers F08's own metadata_block
+/// Standalone scope: this recorder covers the generator's own metadata_block
 /// lifecycle — block_generated_total / metadata_size_bytes / field_missing_total /
-/// generate_duration / block_count. The F25-PWL-coupled (block_flush_duration) and
+/// generate_duration / block_count. The PWL-coupled (block_flush_duration) and
 /// F41-coupled (doc_fts5_sync_total) metrics in §5.bis are emitted at the real
 /// single-transaction / hybrid-fallback wiring sites → D3.5; their counters live here
 /// so the call sites are a one-line add when that wiring lands, but are not driven
@@ -51,7 +51,7 @@ public:
     // JSON serialization [+ SQLite insert in D3.5]; §5.bis SLA P95 ≤ 50ms).
     void ObserveGenerateDuration(double seconds);
 
-    /// Render the current values as OpenMetrics text (what the F24 endpoint will
+    /// Render the current values as OpenMetrics text (what the endpoint will
     /// serve). Stable metric names + HELP/TYPE lines.
     std::string Render() const;
 

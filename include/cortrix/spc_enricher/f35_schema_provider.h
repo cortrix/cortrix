@@ -5,23 +5,23 @@
 
 namespace cortrix::spc {
 
-/// F35's per-Unit schema contribution (Contextual Retrieval, design § 4.1, A
-/// unified-blocks reconcile). Registered through the F12
-/// SchemaMigrator framework (ARCH § 1.3.bis.3 provider #6, after F03).
+/// The contextual-retrieval per-Unit schema contribution (
+/// unified-blocks reconcile). Registered through the
+/// SchemaMigrator framework (provider #6, after the enricher).
 ///
-/// Under A unified-blocks, F35's columns live on child rows of the F09-owned
+/// Under unified blocks, these columns live on child rows of the framework-owned
 /// per-Unit `blocks` table (child rows = child_id IS NOT NULL), ALTER'd here
 /// (was the children-table merge pre-A). F35SchemaProvider owns 4 blocks columns:
 ///   - embedding (BLOB)                — original child dense embedding (BGE-M3
-///     1024-dim; F35-9 B dual-vector coexistence).
-///   - contextualized_text (TEXT)      — LLM contextual prefix + chunk (F35-5 B).
+///     1024-dim; dual-vector coexistence).
+///   - contextualized_text (TEXT)      — LLM contextual prefix + chunk.
 ///   - contextualized_embedding (BLOB) — BGE-M3 embedding of contextualized_text.
 ///   - contextualized_status (SMALLINT DEFAULT 0) — 0=pending 1=generated 2=failed
 ///     3=skipped_no_llm.
-/// (chunk_index is NOT owned by F35 — it is an F09 framework blocks column.
+/// (chunk_index is NOT owned here — it is a framework blocks column.
 /// metadata is in blocks.metadata_json, the shared framework JSONB column.)
 ///
-/// V2 adds `contextual_vec_labels` (addendum §3.8 W2 wiring): the F35-9 B
+/// V2 adds `contextual_vec_labels`: the
 /// dual-vector decision puts the contextualized embedding into P-HNSW as its OWN
 /// point, under a derived label (HashChildIdToBlockId(child_id + ":ctx")). The
 /// label is not a blocks row, so this mapping table is what lets the query side
@@ -33,7 +33,7 @@ namespace cortrix::spc {
 /// existence guards); if `blocks` is absent (isolated unit test) it no-ops.
 class F35SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
-    /// F12 registration key.
+    /// Registration key.
     std::string FeatureName() const override { return "F35"; }
 
     /// Schema version. V1 = blocks +4 contextual-retrieval columns.

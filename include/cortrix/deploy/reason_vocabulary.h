@@ -6,20 +6,20 @@
 
 namespace cortrix::deploy {
 
-/// OpenMetrics `reason` controlled vocabulary (F24 §8, F24-6 decision A;
+/// OpenMetrics `reason` controlled vocabulary (
 /// OBSERVABILITY_SPEC §3.bis is the maintained SoT). Every `reason` metric label
 /// must be one of these enum values, in the `<subsystem>.<action_outcome>`
 /// pattern (lowercase + dot) — this prevents label cardinality explosion and
 /// keeps cross-subsystem queries friendly.
 ///
-/// 🚨 F24-7 (§9): the `category` enum (auth/quota/transient/permanent/timeout) is
+/// 🚨 The `category` enum (auth/quota/transient/permanent/timeout) is
 /// shared verbatim with the Agent-friendly error body (cortrix::agent_friendly::
 /// ErrorCategory) — the same 5 values are enforced across the metric and error
 /// channels so an Agent can pivot from a monitoring signal to an error
 /// investigation. We therefore re-use ErrorCategory here rather than defining a
 /// second enum.
 ///
-/// F24-7 (§9.3) naming alignment: the dotted `reason` label maps 1:1 to an
+/// Naming alignment: the dotted `reason` label maps 1:1 to an
 /// UPPER_SNAKE `CX_ERR_*` error code, so an Agent can convert between the two
 /// channels by a simple transform (ReasonToErrorCode / ErrorCodeToReason below).
 ///   llm.budget_exceeded     <-> CX_ERR_LLM_BUDGET_EXCEEDED
@@ -70,28 +70,28 @@ const char* ReasonString(MetricReason reason);
 /// The subsystem prefix of `reason` (e.g. "llm", "disk", "catalog"). Total.
 const char* ReasonSubsystem(MetricReason reason);
 
-/// Every vocabulary entry, for iteration (tests / a CI lint, F24 TD-F24-REASON-
+/// Every vocabulary entry, for iteration (tests / a CI lint, TD-REASON-
 /// VOCABULARY-CI-LINT in Phase 2). Stable order = enum order.
 const std::vector<MetricReason>& AllReasons();
 
 /// True iff `s` is a member of the controlled vocabulary (guards a label before
-/// it is emitted — an unknown reason is a design defect, F24-6).
+/// it is emitted — an unknown reason is a design defect).
 bool IsValidReason(const std::string& s);
 
-/// F24-7 §9.3 transform: dotted reason → UPPER_SNAKE `CX_ERR_*` code. Pure string
+/// Transform: dotted reason → UPPER_SNAKE `CX_ERR_*` code. Pure string
 /// transform ("llm.budget_exceeded" → "CX_ERR_LLM_BUDGET_EXCEEDED"); does not
 /// assert the code exists in any registry (the alignment rule is syntactic).
 std::string ReasonToErrorCode(const std::string& reason);
 
-/// F24-7 §9.3 inverse transform: `CX_ERR_*` code → dotted reason. Strips the
+/// Inverse transform: `CX_ERR_*` code → dotted reason. Strips the
 /// CX_ERR_ prefix and lowercases ("CX_ERR_SPC_QUEUE_FULL" → "spc.queue_full"),
 /// treating the first token after the prefix as the subsystem.
 std::string ErrorCodeToReason(const std::string& error_code);
 
-// --------------------------- label vs structured_data (F24-7 §9.2) ---------------------------
+// --------------------------- label vs structured_data ---------------------------
 
 /// Whether a field of a given semantic kind belongs on a metric label, in the
-/// error structured_data, or both (F24 §9.2 field-ownership table). Used to audit
+/// error structured_data, or both (the field-ownership table). Used to audit
 /// that high-cardinality fields never become labels (OBS_SPEC §3.2).
 enum class FieldChannel {
     kLabelOnly,         ///< low-cardinality enum: metric label only
@@ -113,7 +113,7 @@ enum class FieldKind {
 FieldChannel ChannelFor(FieldKind kind);
 
 /// The 5 category enum values, as the lowercase strings shared across the metric
-/// `category` label and the error body `category` field (F24-7, GEN-Agent #4).
+/// `category` label and the error body `category` field.
 /// Re-exposes agent_friendly::ErrorCategory's serialization so a metric emitter
 /// and an error emitter cannot drift.
 const char* CategoryString(agent_friendly::ErrorCategory category);

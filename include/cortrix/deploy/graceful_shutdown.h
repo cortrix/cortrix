@@ -54,7 +54,7 @@ struct ShutdownConfig {
 /// Path of the pending-tasks file under `data_dir`. Hidden dotfile.
 std::string PendingTasksPath(const std::string& data_dir);
 
-/// Graceful-shutdown coordinator (F24 §7, F24-5 decision C — ordered + user-
+/// Graceful-shutdown coordinator (ordered + user-
 /// configurable + persistence-guaranteed + resume). Owns the SIGTERM ordering:
 ///
 ///   1. cortrix_shutdown_status = 1; close the HTTP server (stop new requests)
@@ -120,7 +120,7 @@ private:
 /// Hooks.persist_file is null. Exposed for reuse + tests.
 bool AtomicWriteFile(const std::string& path, const std::string& contents);
 
-/// Install `gs` as the process SIGTERM/SIGINT handler (F24 §7, the briefing's
+/// Install `gs` as the process SIGTERM/SIGINT handler (the design's
 /// main.cpp entry point). The OS signal handler only sets an atomic flag and
 /// notifies; a dedicated waiter thread then runs gs->Run() off the signal
 /// context (calling the ordered shutdown — file I/O, joins — from a signal

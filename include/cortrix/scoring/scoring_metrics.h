@@ -6,9 +6,9 @@
 
 namespace cortrix::scoring {
 
-/// F07 observability metrics (F07 §6, OBSERVABILITY_SPEC subsystem `scoring`). Naming
+/// Scoring observability metrics (subsystem `scoring`). Naming
 /// `cortrix_f07_<metric>_<unit>`. Self-contained dependency-free recorder (same pattern
-/// as ImportMetrics / RerankerMetrics); registering into the F24 `/metrics` scrape
+/// as ImportMetrics / RerankerMetrics); registering into the `/metrics` scrape
 /// endpoint is cross-Feature wiring → D3.5.
 ///
 /// v1.0.2: no ns_id label (on the OBS_SPEC §3.2 absolute deny list for high-cardinality labels) —
@@ -27,20 +27,20 @@ public:
     void RecordAnomalous();
     uint64_t AnomalousCount() const;
 
-    // cortrix_f07_final_score_total (Counter — ComputeFinalScore calls, F02 side reuses the F07 tool).
+    // cortrix_f07_final_score_total (Counter — ComputeFinalScore calls; the reranker reuses this tool).
     void RecordFinalScore();
     uint64_t FinalScoreCount() const;
 
     // cortrix_f07_assign_duration_seconds (Histogram — AssignInitialScore call latency).
     void ObserveAssignDuration(double seconds);
 
-    // cortrix_f07_error_total{code="CX_ERR_F07_*"} (Counter — F07 §6 / §4.4 error-code
-    // distribution; the 5th locked `scoring` metric). Fed at the two F07 throw sites
+    // cortrix_f07_error_total{code="CX_ERR_F07_*"} (Counter — error-code
+    // distribution; the 5th locked `scoring` metric). Fed at the two throw sites
     // (ScoreMap::LevelToScore kLevelInvalid / SemanticScorer::ComputeFinalScore kConfigInvalid).
     void RecordError(F07ErrorCode code);
     uint64_t ErrorCount(F07ErrorCode code) const;
 
-    /// Render the current values as OpenMetrics text (what the F24 endpoint will serve).
+    /// Render the current values as OpenMetrics text (what the endpoint will serve).
     /// Stable metric names + HELP/TYPE lines.
     std::string Render() const;
 

@@ -5,16 +5,16 @@
 
 namespace cortrix::spc {
 
-/// F03's schema-migration contribution (design §3.1, v1.0.2 Major-2 — registered
-/// through the F12 SchemaMigrator framework, aligning with F12 D1 topic 2.6 C
-/// layered shared governance). Unlike F02/F06 (which own no per-Unit schema), F03 owns a REAL
+/// The enricher's schema-migration contribution (registered
+/// through the SchemaMigrator framework, aligning with the catalog
+/// layered shared governance). Unlike the reranker and parser (which own no per-Unit schema), it owns a REAL
 /// per-Unit migration: it extends the F09-owned per-Unit `blocks` table with 3
 /// enrichment columns and adds its own `entities` table + FTS5 index.
 ///
 /// Per-Unit migration (topic 2.6 ruling A 3-layer):
 ///   - blocks +3 cols: enriched_score (REAL, indexed) / enriched_at (INTEGER) /
 ///     enricher_metadata (TEXT JSONB)   — F03-owned extension columns on the
-///     F09 framework table (SoT stays F09; F03 owns these columns).
+///     block-header framework table (the SoT stays there; the enricher owns these columns).
 ///   - entities table (entity_id PK, block_id FK, text, type, offsets) + indexes.
 ///   - entities_fts FTS5 (text, type; content='entities', content_rowid=entity_id).
 ///
@@ -24,11 +24,11 @@ namespace cortrix::spc {
 /// Unit DB is a no-op; if `blocks` is absent (isolated unit test) it no-ops too.
 ///
 /// Standalone (D3): registering this with the SchemaMigrator at server bootstrap
-/// (the F12 MigrateUnit path) is cross-Feature wiring → D3.5; here it is fully
+/// (the MigrateUnit path) is wired separately; here it is fully
 /// unit-testable against a SchemaMigrator + an in-memory blocks table.
 class F03SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
-    /// F12 registration key (aligns with F02/F06/F09 SchemaProvider naming).
+    /// Registration key (aligns with the other SchemaProvider names).
     std::string FeatureName() const override { return "F03"; }
 
     /// Schema version. V1 = blocks +3 cols + entities + FTS5. V2 (R9 Tier C) =

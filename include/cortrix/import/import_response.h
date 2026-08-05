@@ -8,7 +8,7 @@
 
 namespace cortrix::import {
 
-/// Agent-friendly response serialization for F16a (§5.1 / §5.2 / §5.3). These build
+/// Agent-friendly response serialization for database import. These build
 /// the exact wire bodies the SDK + OpenAPI contract on, so the schema is
 /// the single source of truth even though the real HTTP routing is wired in D3.5.
 

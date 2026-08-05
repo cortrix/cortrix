@@ -2,22 +2,22 @@
 
 namespace cortrix::async {
 
-/// TaskType — Phase 1 async-task-type enum (F42 §3.2, **SoT**).
+/// TaskType — Phase 1 async-task-type enum (**SoT**).
 ///
-/// F42 is the Phase 1 async-task-scheduling owner Feature, so the TaskType enum
-/// is declared here once; F06/F08/F21/F41 reverse-reference this header rather
-/// than declaring their own (V2 QA M-17: F41 §5.2 previously declared it
+/// The async scheduler owns task scheduling in Phase 1, so the TaskType enum
+/// is declared here once; its consumers reverse-reference this header rather
+/// than declaring their own (the doc-summary design previously declared it
 /// unilaterally, violating SoT ownership).
 ///
 /// Enum-value stability contract:
 ///  - The values (1/2/3) are stable across Phases so the tasks.task_type column
 ///    stays backward-compatible.
-///  - A new TaskType MUST be added by a PR that also updates F42 §3.2 + ARCH
+///  - A new TaskType MUST be added by a PR that also updates the design
 ///    §2.10 (no Feature may declare one unilaterally).
 enum TaskType {
-    kTaskDocParse        = 1,   ///< F06/F08 established (PDF/Office parse task)
-    kTaskWatcherFanout   = 2,   ///< F21 established (Watcher cross-NS broadcast task)
-    kTaskDocSummary      = 3,   ///< F41 added (document-level summary index generation task)
+    kTaskDocParse        = 1,   ///< PDF/Office parse task
+    kTaskWatcherFanout   = 2,   ///< Watcher cross-NS broadcast task
+    kTaskDocSummary      = 3,   ///< document-level summary index generation task
     kTaskEnrichBackfill  = 4,   ///< addendum §3.7 added (per-doc chunk-enrichment backfill;
                                 ///< payload = namespace_id + doc_id, owed members re-read
                                 ///< from enrich_state — idempotent)

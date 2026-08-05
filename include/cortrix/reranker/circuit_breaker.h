@@ -13,7 +13,7 @@ enum class CircuitBreakerState : int {
     kHalfOpen = 2,  ///< probing: one trial request allowed
 };
 
-/// CircuitBreaker — reranker systemic-failure breaker (F02 §3.2 / §4.3 / topic
+/// CircuitBreaker — reranker systemic-failure breaker (
 /// 1.3 / 3.4). State machine:
 ///   closed --(threshold consecutive failures)--> open
 ///   open   --(cooldown_sec elapsed, next AllowRequest)--> half_open

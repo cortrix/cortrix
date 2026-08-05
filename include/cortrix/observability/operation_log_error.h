@@ -10,11 +10,11 @@
 
 namespace cortrix::observability {
 
-/// The 6 operation-log error identities (F18a topic 3 / §7.2). Each maps to a stable
+/// The 6 operation-log error identities. Each maps to a stable
 /// `CX_ERR_OPLOG_*` string + a GEN-Agent category + retryability via the canonical
 /// registry below.
 ///
-/// Mirrors the F12 CatalogErrorCode pattern (enum-of-identities + table-driven
+/// Mirrors the CatalogErrorCode pattern (enum-of-identities + table-driven
 /// registry + MakeOplogError → AgentFriendlyError) per CODING_CONVENTIONS §3:
 /// Cortrix uses Result<T> + Status only (no Result<T,E>); a domain error is
 /// carried as the Agent-friendly boundary type cortrix::agent_friendly::
@@ -35,7 +35,7 @@ enum class OplogErrorCode {
     kInternal,                // CX_ERR_OPLOG_INTERNAL
 };
 
-/// Total number of operation-log error codes (F18a §7.2 = 6). Compile-time anchor
+/// Total number of operation-log error codes (= 6). Compile-time anchor
 /// for the API-compatibility regression test (the set must not shrink).
 constexpr int kOplogErrorCodeCount = 6;
 
@@ -44,7 +44,7 @@ constexpr int kOplogErrorCodeCount = 6;
 /// `retry_at_ms` so retries from many clients don't thunder at the same instant.
 constexpr int kOplogCleanupRetryBaseMs = 5000;
 
-/// Canonical, immutable attributes of one error code (F18a §7.2 columns).
+/// Canonical, immutable attributes of one error code.
 struct OplogErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_OPLOG_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
@@ -59,7 +59,7 @@ const OplogErrorInfo& GetOplogErrorInfo(OplogErrorCode code);
 /// The "CX_ERR_OPLOG_*" string for `code` (convenience over GetOplogErrorInfo).
 const char* OplogErrorCodeString(OplogErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (F18a §7.2
+/// The structured_data keys a `code`'s error body MUST carry (
 /// "structured_data required" column). This is the SoT for the Agent-friendly
 /// contract (GEN-Agent #5) and lets call sites + tests verify the body is
 /// complete before it is returned.
@@ -84,7 +84,7 @@ agent_friendly::AgentFriendlyError MakeOplogError(
 /// message is prefixed with the CX_ERR_OPLOG_* token ("CX_ERR_OPLOG_X: detail")
 /// so the exact oplog identity is recoverable at the API/SDK boundary, which
 /// re-inflates the full Agent-friendly body (category / retryable /
-/// structured_data) via MakeOplogError(). Follows F12 CatalogStatus precedent —
+/// structured_data) via MakeOplogError(). Follows the CatalogStatus precedent —
 /// we deliberately do NOT widen cortrix::Status itself.
 Status OplogStatus(OplogErrorCode code, const std::string& detail = "");
 

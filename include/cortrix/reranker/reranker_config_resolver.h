@@ -8,7 +8,7 @@
 
 namespace cortrix::reranker {
 
-/// The reranker request-level parameter set (F02 §2.5 / topic 2.5). V1 exposes
+/// The reranker request-level parameter set. V1 exposes
 /// exactly ONE request-level control: `rerank` boolean. candidate_multiplier /
 /// max_candidates are NS-level business params, never per-request (topic 2.5), so
 /// they are intentionally absent here. Unset (`std::nullopt`) = the request does
@@ -18,7 +18,7 @@ struct RerankerRequestParams {
     std::optional<bool> rerank;  ///< pgcortrix_search(..., rerank BOOLEAN DEFAULT TRUE)
 };
 
-/// The fully-resolved reranker decision for one query (F02 §2.6 output).
+/// The fully-resolved reranker decision for one query.
 struct EffectiveRerankerConfig {
     bool enabled;               ///< whether to run the reranker at all
     int  candidate_multiplier;  ///< effective top_N multiplier
@@ -49,7 +49,7 @@ struct EffectiveRerankerConfig {
 ///   - the request `rerank` arg from the SQL function is the Phase-1 per-request
 ///     override (§2.6 example); wiring it in is D3.5 cross-Feature work.
 ///   - reading the NS blob from the INSRouter cache (namespaces.reranker_config) is
-///     PHASE-2 (F02 §extension: per-NS model / score_threshold land "after the
+///     PHASE-2 (per-NS model / score_threshold land "after the
 ///     LlamaCppReranker is introduced"). The resolver is the Phase-2-ready pre-build
 ///     — NOT a D3.5 wiring gap.
 class RerankerConfigResolver {

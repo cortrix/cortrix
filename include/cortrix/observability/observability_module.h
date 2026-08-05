@@ -12,7 +12,7 @@ struct sqlite3;
 
 namespace cortrix::observability {
 
-/// CE dependency-injection module for F18a (§5.3, topic 10). Owns the CE
+/// CE dependency-injection module for the operation log. Owns the CE
 /// OperationLogger + the shared CleanupScheduler, registers operation_log for the
 /// daily UTC-02:00 sweep, and injects the IOperationLogger into the 4 Engine instrumentation
 /// sites + the API handler.
@@ -26,7 +26,7 @@ namespace cortrix::observability {
 /// Standalone (D3): the instrumentation sites are injected through the IOperationLoggerAware
 /// seam; the REAL QueryEngine / SpcPipeline / MemoryStore / NamespaceManager
 /// instances are attached at D3.5. `db` is the already-migrated cortrix_global.db
-/// handle (the F18a OperationLogSchemaProvider ran at startup).
+/// handle (the OperationLogSchemaProvider ran at startup).
 class ObservabilityModule {
 public:
     ObservabilityModule(sqlite3* global_db, std::shared_ptr<IGlobalConfig> config);
@@ -49,7 +49,7 @@ public:
     /// The injected logger (null before Initialize()).
     std::shared_ptr<IOperationLogger> logger() const { return logger_; }
 
-    /// The shared cleanup scheduler (F13 registers its tables here too).
+    /// The shared cleanup scheduler (the trace tables register here too).
     CleanupScheduler& scheduler() { return scheduler_; }
 
     /// Stop the scheduler (also done by the destructor).

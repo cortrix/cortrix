@@ -6,20 +6,20 @@
 
 namespace cortrix::metadata {
 
-/// Current F08 schema version (detailed design §3.3). Phase 1 single-step create (v0 → v1);
-/// Phase 2 (F08 Block Versioning + Update API) adds block_version / updated_at and
+/// Current metadata schema version. Phase 1 single-step create (v0 → v1);
+/// Phase 2 (Block Versioning + Update API) adds block_version / updated_at and
 /// will branch on (from, to).
 constexpr int kMetadataSchemaVersion = 1;
 
-/// The F08 DDL emitted by the schema provider (detailed design §3.3 — metadata_blocks table +
+/// The DDL emitted by the schema provider (metadata_blocks table +
 /// idx_metablocks_ns). Lives in the per-Unit DB alongside the documents / blocks
-/// tables (D5 lock: a separate metadata_blocks table — does not pollute F34 parents/children), applied via
-/// the shared F12 SchemaMigrator so it runs inside the same versioned, atomic framework.
+/// tables (a separate metadata_blocks table — does not pollute parents/children), applied via
+/// the shared SchemaMigrator so it runs inside the same versioned, atomic framework.
 ///
 /// FK reconciliation (D3.5 deferred — surfaced, not silently hacked): detailed design §3.3
 /// declares `FOREIGN KEY (doc_id) REFERENCES documents(doc_id)`, but the per-Unit
 /// `documents.doc_id` is currently `INTEGER PRIMARY KEY AUTOINCREMENT`
-/// (src/store/cortrix_store_sqlite.cpp) while F08's doc_id is the TEXT ULID
+/// (src/store/cortrix_store_sqlite.cpp) while this doc_id is the TEXT ULID
 /// (id/types.h DocId = std::string). That TEXT-vs-INTEGER mismatch is a genuine
 /// cross-feature schema-authority question (no MVP_MIGRATION_POLICY entry resolves
 /// it) → it belongs to real pipeline wiring, NOT a standalone unilateral fix. So the
@@ -28,7 +28,7 @@ constexpr int kMetadataSchemaVersion = 1;
 /// documents.doc_id type is reconciled is a D3.5 deferred item.
 extern const char* const kMetadataSchemaSql;
 
-/// F08's ISchemaProvider (frozen cortrix::catalog::ISchemaProvider, D2-pre-5): owns
+/// The metadata ISchemaProvider (frozen cortrix::catalog::ISchemaProvider): owns
 /// metadata_blocks + its index in the per-Unit DB. Registered with the per-Unit
 /// SchemaMigrator. Migrate returns Status (F-FREEZE-1: no Result<void>).
 class MetadataSchemaProvider : public cortrix::catalog::ISchemaProvider {

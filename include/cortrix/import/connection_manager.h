@@ -14,7 +14,7 @@
 
 namespace cortrix::import {
 
-/// Non-sensitive view of a registered connection (F16a §3.3 list_connections —
+/// Non-sensitive view of a registered connection (list_connections —
 /// never carries the DSN). Returned by ConnectionManager::ListConnections.
 struct ConnectionInfo {
     ConnectionRefId ref_id;
@@ -28,7 +28,7 @@ struct ConnectionInfo {
     bool revoked = false;
 };
 
-/// Encrypted credential store (F16a §3.3 — AES-256 secret store). The raw DSN is
+/// Encrypted credential store (AES-256 secret store). The raw DSN is
 /// handed in once at register time, stored encrypted, and only ever returned to the
 /// ImportManager via the ConnectionManager. cortrix/ owns this CE interface; a Vault
 /// / AWS-SM backed impl is a Phase-2 swap (L1 evolution). For standalone the in-memory
@@ -114,7 +114,7 @@ private:
 };
 
 struct ConnectionManagerConfig {
-    int expire_default_days = 30;    // F16a §4.4 connection.expire_default_days
+    int expire_default_days = 30;    // connection.expire_default_days
     int expire_max_days = 365;       // §4.4 connection.expire_max_days
 };
 
@@ -152,7 +152,7 @@ class ConnectionManager : public IConnectionManager {
 public:
     /// `op_logger` (optional, may be null) receives the F16a-rev-6 operation_log
     /// entries `db_connection_register` / `db_connection_revoke` (S6). Null = no
-    /// audit (observability is strictly additive to the business path, F18a C4).
+    /// audit (observability is strictly additive to the business path).
     ConnectionManager(std::shared_ptr<ISecretStore> secret_store,
                       std::shared_ptr<IConnectionStore> conn_store,
                       std::shared_ptr<observability::IOperationLogger> op_logger = nullptr,

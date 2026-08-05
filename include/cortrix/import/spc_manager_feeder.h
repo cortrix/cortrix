@@ -14,13 +14,13 @@ namespace resource { class INamespacePool; }
 namespace cortrix::import {
 
 /// [D3.5 r2 · Wave P · P2b] Real ISpcFeeder over the live SPCManager — replaces
-/// InMemorySpcFeeder (F16a §3.2 feed_to_spc_pipeline, design step 6 "feed the
+/// InMemorySpcFeeder (feed_to_spc_pipeline, step 6 "feed the
 /// textualized rows into the Pipeline"). Each TextChunk (one textualized DB row,
 /// or a MERGE batch) becomes a single document: a one-page ParsedDoc carrying the
 /// chunk text + the §4.3 source metadata, handed to SPCManager::ProcessParsedDoc
 /// (the same post-parse seam DocumentProcessor uses — Chunk→META→enrich→embed→
-/// assemble→F25 write). doc_id is a fresh ULID; content_hash is the chunk text
-/// hash (F42 dedup identity). The resulting blocks are real + searchable.
+/// assemble→coordinated write). doc_id is a fresh ULID; content_hash is the chunk text
+/// hash (the dedup identity). The resulting blocks are real + searchable.
 ///
 /// Borrows the SPCManager (must outlive this feeder). 0 change to SPCManager /
 /// SPCPipeline — this only *calls* the frozen ProcessParsedDoc surface.
@@ -38,12 +38,12 @@ private:
 };
 
 /// [D3.5 r2 · Wave P · P2c] Real IBlockCleaner for the D3 full-overwrite step
-/// (F16a §3.2 cleanup_source_blocks). Acquires the target namespace's F05 façade
+/// (cleanup_source_blocks). Acquires the target namespace's façade
 /// (the same per-Unit store the SpcManagerFeeder writes into) and deletes every
 /// document whose source_path begins with `source_prefix` together with its blocks,
 /// via CortrixStore::doc_delete_by_source_prefix (one txn; FTS cleaned by trigger).
 /// Returns the count of blocks removed. A re-import thus clears the prior table's
-/// rows before the new ones land (no duplicate rows). Borrows the F05 pool (must
+/// rows before the new ones land (no duplicate rows). Borrows the namespace pool (must
 /// outlive this cleaner).
 class RealBlockCleaner : public IBlockCleaner {
 public:

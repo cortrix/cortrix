@@ -11,8 +11,8 @@
 
 namespace cortrix::import {
 
-/// The 5 D2 security constraints (F16a §3.4 / topic D2). Read-only connection +
-/// SELECT whitelist + 5-min timeout + 10M row cap + F18a audit. Field defaults are
+/// The 5 security constraints. Read-only connection +
+/// SELECT whitelist + 5-min timeout + 10M row cap + operation-log audit. Field defaults are
 /// the §4.4 config defaults.
 struct QueryConstraints {
     int timeout_seconds = 300;          ///< 5-minute query timeout
@@ -65,18 +65,18 @@ struct CompiledQuery {
 };
 
 /// Validate a raw SELECT body against the keyword allow/deny lists + length cap
-/// (F16a §3.4, constraint "SELECT whitelist"). Returns CX_ERR_F16A_INVALID_SQL on
+/// (constraint "SELECT whitelist"). Returns CX_ERR_F16A_INVALID_SQL on
 /// any write verb / set op / metadata probe / non-SELECT leading token. Comment
 /// markers and statement separators (`;` stacked queries) are rejected too.
 Status ValidateSqlKeywords(const std::string& sql, const QueryConstraints& constraints);
 
-/// Validate a JSON DSL filter against the operator + field allowlists (F16a §3.4,
+/// Validate a JSON DSL filter against the operator + field allowlists (
 /// v1.0.2 ruling 8). Returns CX_ERR_F16A_INVALID_SQL on an unknown operator, a field
 /// not in the allowlist, or a malformed shape.
 Status ValidateFilterDsl(const nlohmann::json& filter_dsl,
                          const FilterDslConstraints& constraints);
 
-/// Compile a table + JSON DSL filter into a parameterized SELECT (F16a §3.4
+/// Compile a table + JSON DSL filter into a parameterized SELECT (
 /// build_query_from_filter_dsl). Validates first (ValidateFilterDsl); on success the
 /// returned SQL uses only $N placeholders and `columns` are emitted as a quoted
 /// identifier list (validated against the allowlist). `table` must be a bare
@@ -86,7 +86,7 @@ Result<CompiledQuery> BuildQueryFromFilterDsl(const std::string& table,
                                               const std::vector<std::string>& columns,
                                               const FilterDslConstraints& constraints);
 
-/// Validate the whole dual-mode QueryRequest (F16a §6.2 oneOf): exactly one of
+/// Validate the whole dual-mode QueryRequest (oneOf): exactly one of
 /// {table, sql}; table mode runs ValidateFilterDsl + identifier checks; sql mode
 /// runs ValidateSqlKeywords. Returns the compiled, parameterized query for table
 /// mode; for custom-SQL mode the (validated) SQL is returned verbatim with no binds.
@@ -94,7 +94,7 @@ Result<CompiledQuery> CompileQueryRequest(const QueryRequest& req,
                                           const QueryConstraints& constraints,
                                           const FilterDslConstraints& dsl_constraints);
 
-/// Connection seam (F16a §3.4 connect_readonly). The real libpq read-only connection
+/// Connection seam (connect_readonly). The real libpq read-only connection
 /// is D3.5; standalone mocks this. Owns nothing the QueryExecutor outlives.
 class IConnectionManager;  // fwd (connection_manager.h)
 

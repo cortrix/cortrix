@@ -6,25 +6,25 @@
 
 #include "cortrix/common/block_types.h"
 
-// F07 Semantic Score — ScoreMap static mapping + ScoringInput.
+// Semantic Score — ScoreMap static mapping + ScoringInput.
 //
 // net-new namespace cortrix::scoring (verified dev=8e189e1 has no such ns/dir, so creating it has no conflict).
 namespace cortrix::scoring {
 
 /// Inputs to the Matrix level computation. Carries the processing-depth signals
-/// (parser / enricher / image) + the F10 anomaly flag + the block_type (for the
-/// F08 Meta-Block special case). All defaults map to Level 0 (a fully-empty input
+/// (parser / enricher / image) + the anomaly flag + the block_type (for the
+/// Meta-Block special case). All defaults map to Level 0 (a fully-empty input
 /// scores the floor, 0.2).
 struct ScoringInput {
     std::string parser_name;          ///< "docling" / "paddleocr" / "docling+paddleocr"
     std::string enricher_name;        ///< "null" / "llm" / "contextual" / "hype"
     bool has_image_caption = false;   ///< Vision caption present → image_level 4
-    bool is_anomalous = false;        ///< F10 anomalous Block → triggers D6 (score=0.0 in the scorer)
-    uint16_t block_type = 0;          ///< F09 CortrixBlockType (1=FILE … 8=META). META(8)
-                                      ///< → ComputeLevel special case returns Level 0 (=0.2), F07 v1.0.1 M1.
+    bool is_anomalous = false;        ///< anomalous Block → score=0.0 in the scorer
+    uint16_t block_type = 0;          ///< CortrixBlockType (1=FILE … 8=META). META(8)
+                                      ///< → ComputeLevel special case returns Level 0 (=0.2).
 };
 
-/// Static mapping tool (F07 §4.1, D7 ruling — F07 is the sole computation source; D8 ruling — F03 reuses this
+/// Static mapping tool (the sole computation source; the enricher reuses this
 /// utility class via LevelToScore). Pure functions, no state.
 class ScoreMap {
 public:
@@ -47,7 +47,7 @@ public:
     /// level, so a throw here means a caller passed a raw bad level).
     static float LevelToScore(uint8_t level);
 
-    // --- Matrix sub-level helpers (exposed for targeted UT, F07 §7.1 ScoreMap family) ---
+    // --- Matrix sub-level helpers (exposed for targeted UT) ---
 
     /// parser_name → parser_level (Docling=2, PaddleOCR=1, Docling+PaddleOCR=2, else 0).
     static uint8_t ParserLevel(const std::string& parser_name);

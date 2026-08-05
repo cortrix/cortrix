@@ -24,7 +24,7 @@ struct SourceContext {
     std::string imported_at_iso;       ///< RFC3339 UTC
 };
 
-/// The postgres:// source URI for a row (F16a §4.3 / ARCH §5.1). The D3 full-
+/// The postgres:// source URI for a row. The full-
 /// overwrite matches the prefix up to ".../table/" (see SourcePrefix).
 std::string BuildSourceUri(const SourceContext& src, const std::string& row_id);
 

@@ -10,7 +10,7 @@
 
 namespace cortrix::metadata {
 
-/// The 3 F08 Metadata Block error identities (detailed design §5.1). 2 errors + 1 warning, each
+/// The 3 Metadata Block error identities. 2 errors + 1 warning, each
 /// mapping to a stable `CX_ERR_*` / `CX_WARN_*` string + a GEN-Agent category +
 /// retryability + the HTTP status its body carries, via the canonical registry below.
 ///
@@ -18,21 +18,21 @@ namespace cortrix::metadata {
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code. So
 /// MetadataErrorCode is the *enum of identities*, and MakeMetadataError() turns one
-/// (plus optional structured_data) into that boundary error — mirroring the F04
-/// CrossNsErrorCode / F36 RagFusionErrorCode / F16a F16aErrorCode template A.
+/// (plus optional structured_data) into that boundary error — mirroring the
+/// CrossNsErrorCode / RagFusionErrorCode / import error template.
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may be appended (api_version stays "v1").
 enum class MetadataErrorCode {
     kGenFailed,       ///< CX_ERR_METADATA_GEN_FAILED — block_text generation failed (doc_metadata
-                      ///< entirely empty / F06 parse fully failed). permanent, 5xx, not retryable.
+                      ///< entirely empty / parse fully failed). permanent, 5xx, not retryable.
     kPartial,         ///< CX_WARN_METADATA_PARTIAL — some fields missing (e.g. page_count unknown)
                       ///< but the Block is still generated (HTTP 200 + meta.warnings[]). warning, not error.
     kFieldImmutable,  ///< CX_ERR_METADATA_FIELD_IMMUTABLE — V1.0 PATCH /metadata attempts
                       ///< to change a field (D9 B' lock, HTTP 405). permanent, not retryable.
 };
 
-/// Total number of F08 error codes (detailed design §5.1 = 3 = 2 err + 1 warn). Compile-time
+/// Total number of metadata error codes (= 3 = 2 err + 1 warn). Compile-time
 /// anchor for the API-compatibility regression test (the set must not shrink).
 constexpr int kMetadataErrorCodeCount = 3;
 

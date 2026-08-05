@@ -9,7 +9,7 @@
 namespace cortrix::reranker {
 
 /// Per-namespace reranker overrides parsed from `namespaces.reranker_config`
-/// JSONB (F02 §2.5 / topic 2.2). V1 = the 3 B-class fields; every field is
+/// JSONB. V1 = the 3 B-class fields; every field is
 /// OPTIONAL so an absent key falls back to the global default at resolve time
 /// (topic 2.4 "a missing key falls back to the global default"). Unknown keys are ignored (forward-compatible
 /// with the Phase-2 `model` / `score_threshold` keys, topic 2.4).

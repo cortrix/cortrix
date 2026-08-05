@@ -10,7 +10,7 @@ namespace cortrix::async {
 ///
 /// Some ingest surfaces (today: POST /documents/batch) carry inline content but
 /// the doc-parse worker reads a file, so the server writes the content to a file
-/// under a directory it owns and hands that path to F42 as SubmitRequest.filepath.
+/// under a directory it owns and hands that path to the scheduler as SubmitRequest.filepath.
 /// The server therefore owns that file's lifetime — unlike a watcher or connector
 /// path, which belongs to the caller and must survive forever.
 ///

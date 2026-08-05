@@ -8,7 +8,7 @@
 
 namespace cortrix::reranker {
 
-/// Reranker health/status reporting (F02 §3.4 / §3.5, S2.5).
+/// Reranker health/status reporting.
 ///
 /// Bundles the three concerns the breaker's state change drives:
 ///   1. metric: cortrix_reranker_circuit_breaker_state gauge (0/1/2) +
@@ -17,7 +17,7 @@ namespace cortrix::reranker {
 ///   3. log: WARN on open, INFO on close (§3.4 server-log spec).
 ///
 /// Standalone (D3): builds the JSONB + records to the in-process RerankerMetrics
-/// + logs. Exposing it through the live pgcortrix_status() SQL function + the F24
+/// + logs. Exposing it through the live pgcortrix_status() SQL function + the
 /// /metrics endpoint is cross-Feature wiring → D3.5.
 class RerankerStatusReporter {
 public:
@@ -43,8 +43,8 @@ public:
     /// per §3.4 ("fallback RRF for 30s").
     static void OnCircuitStateChange(CircuitBreakerState new_state, int cooldown_sec);
 
-    // --- Alert rules (F02 §3.4 / OBSERVABILITY, ops-side Prometheus) ---
-    // SoT for the two reranker alert rule expressions; surfaced so the F24 alert
+    // --- Alert rules (ops-side Prometheus) ---
+    // SoT for the two reranker alert rule expressions; surfaced so the ops alert
     // bundle (D3.5) can emit them verbatim.
     static std::string AlertRuleCircuitOpen5m();   ///< state==1 for >= 5m
     static std::string AlertRuleFrequentTrips1h();  ///< trips increase >= 3 in 1h

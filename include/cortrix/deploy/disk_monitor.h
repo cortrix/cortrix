@@ -12,7 +12,7 @@
 
 namespace cortrix::deploy {
 
-/// Disk pressure stage (F24 §6.1, F24-4 decision A — active degradation + write
+/// Disk pressure stage (active degradation + write
 /// rejection). The three thresholds map ratio → stage:
 ///   NORMAL  ratio < warn   : normal operation
 ///   WARN    ratio >= warn   : log_warn + metric gauge update (writes still allowed)
@@ -54,14 +54,14 @@ struct DiskMonitorConfig {
                                               const std::string& data_dir);
 };
 
-/// Periodic disk-space watchdog (F24 §6, F24-4 decision A). Owns a background
+/// Periodic disk-space watchdog. Owns a background
 /// thread that statvfs(data_dir) every check_interval_sec, computes the usage
 /// ratio, transitions NORMAL/WARN/CRIT, and flips an atomic `reject_new_writes`
 /// flag the SPC write path consults before admitting a new write.
 ///
 /// Standalone (D3): the monitor + CheckOnce() are fully usable and tested
 /// in-process (CheckOnce drives the FSM deterministically; the thread is just a
-/// scheduler around it). Wiring the gauge into the F24 /metrics endpoint and the
+/// scheduler around it). Wiring the gauge into the /metrics endpoint and the
 /// flag into the real SPC pipeline is in this Feature; cross-Feature E2E is D3.5.
 ///
 /// Thread-safe: ShouldRejectWrites() / Usage() are lock-free (atomics); Start /

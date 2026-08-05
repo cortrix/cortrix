@@ -13,7 +13,7 @@
 
 namespace cortrix::async {
 
-/// WorkerPool — N resident worker threads draining the async task queue (F42 §4.1
+/// WorkerPool — N resident worker threads draining the async task queue (
 /// / topic 1). Each worker loops: TaskScheduler::Dequeue → DocumentProcessor::
 /// ProcessTask → TaskScheduler::OnTaskCompleted(doc_id). When the queue is empty
 /// a worker blocks on a condition variable until Notify() (a new Enqueue) or Stop().
@@ -22,8 +22,8 @@ namespace cortrix::async {
 /// and Start() ENFORCES worker_pool_size ≤ f06.parser_max_concurrent — exceeding
 /// it is a fatal misconfiguration (Start returns CX_ERR_INVALID_REQUEST rather
 /// than the spec's LOG_FATAL/exit, so the server/tests fail fast without aborting
-/// the process under test). Hot-reload of the pool size via the P08 admin API is
-/// DEFERRED → D3.5 (TD-F42-WORKER-POOL-DYNAMIC); Phase 1 size is fixed at Start().
+/// the process under test). Hot-reload of the pool size via the admin API is
+/// DEFERRED; Phase 1 size is fixed at Start().
 ///
 /// Standalone (D3): real threads + real Dequeue/ProcessTask loop, tested against
 /// an in-memory TaskManager + injected stub parser. DEFERRED → D3.5: real server

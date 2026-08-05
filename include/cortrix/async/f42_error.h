@@ -10,11 +10,11 @@
 
 namespace cortrix::async {
 
-/// The 11 F42 Document-Async error identities. Each maps to a stable
+/// The 11 Document-Async error identities. Each maps to a stable
 /// `CX_ERR_*` string + a GEN-Agent category + retryability + retry_after_ms + the
 /// structured_data keys its body MUST carry, via the canonical registry below.
 ///
-/// F42 §3 (B_R2_BRIEFING template A): the D1 detail design wrote `Result<T,
+/// The detail design wrote `Result<T,
 /// XxxError>` (double-template) in places, which F-FREEZE-1 forbids — Cortrix
 /// uses `Result<T>` (StatusOr) + `Status` only. A domain error is carried as the
 /// Agent-friendly boundary type cortrix::agent_friendly::AgentFriendlyError,
@@ -38,12 +38,12 @@ enum class F42ErrorCode {
     kServiceUnavailable,         ///< 503 CX_ERR_SERVICE_UNAVAILABLE — transient
 };
 
-/// Total number of F42 error codes (F42 §6.2 = 11 HTTP error rows; the 202
+/// Total number of async-task error codes (11 HTTP error rows; the 202
 /// TASK_SUBMITTED success row is not an error code). Compile-time anchor for the
 /// API-compatibility regression test (the set must not shrink).
 constexpr int kF42ErrorCodeCount = 11;
 
-/// Canonical, immutable attributes of one error code (F42 §6.2 columns).
+/// Canonical, immutable attributes of one error code.
 struct F42ErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     int http_status;                          ///< §6.2 HTTP column (400/403/404/408/409/423/500/503)
@@ -63,7 +63,7 @@ const char* F42ErrorCodeString(F42ErrorCode code);
 int F42ErrorHttpStatus(F42ErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5,
-/// F42 §6.2 structured_data column). SoT for the Agent-friendly contract; lets
+/// structured_data column). SoT for the Agent-friendly contract; lets
 /// call sites + tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(F42ErrorCode code);
 

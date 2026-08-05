@@ -14,11 +14,11 @@
 
 namespace cortrix::reranker {
 
-/// RerankerThreadPool — F02's OWN bounded-queue thread pool (F02 §3.1 / topic 3.3).
+/// RerankerThreadPool — the reranker's OWN bounded-queue thread pool.
 ///
-/// D3 standalone (F02-3 → D3.5): F02 deliberately keeps its own pool this phase;
+/// Standalone: the reranker deliberately keeps its own pool this phase;
 /// sharing the global cortrix::ExecutorEngine ("ThreadPool→ExecutorEngine sharing",
-/// F02-3 hook) is cross-Feature integration deferred to D3.5. The interface here
+/// the shared-pool hook) is integration deferred to the wiring phase. The interface here
 /// mirrors the spec (`std::future<R> Submit(std::function<R()>)`) so the later swap
 /// to ExecutorEngine keeps `reranker.workers` GUC semantics.
 ///

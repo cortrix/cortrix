@@ -6,15 +6,15 @@
 
 namespace cortrix::reranker {
 
-/// The reranker subsystem metrics (F02 §3.4, OBSERVABILITY_SPEC subsystem
+/// The reranker subsystem metrics (observability subsystem
 /// `reranker`). Naming `cortrix_reranker_<metric>_<unit>` (V2 ruling #3: cortrix_
 /// prefix, no plugin prefix).
 ///
 /// Standalone (D3): a self-contained, dependency-free recorder + an OpenMetrics
-/// text renderer (same pattern as F22 OnnxMetrics). The F24 `/metrics` scrape
+/// text renderer (same pattern as OnnxMetrics). The `/metrics` scrape
 /// endpoint does not exist in the frozen tree — registering this recorder into
 /// that endpoint is cross-Feature wiring deferred to D3.5. Until then it is fully
-/// usable + testable in-process and Render() produces what F24 will serve.
+/// usable + testable in-process and Render() produces what the server will serve.
 ///
 /// This class is introduced in S1.4 (EP metrics) and extended in S2.5 (circuit-
 /// breaker metrics); later Waves fill the input-preprocessing counters.
@@ -91,7 +91,7 @@ public:
 
     // --- cortrix_reranker_score_duration_seconds (Histogram, no label) — D35-MET-04 ---
     // ScoreBatch end-to-end latency distribution. Bucket bounds straddle
-    // the F02 SLA (component P99=200ms; 30-candidate batch ~240ms; e2e P50<500ms /
+    // the reranker SLA (component P99=200ms; 30-candidate batch ~240ms; e2e P50<500ms /
     // P99<1500ms) — see kScoreBounds in the .cpp.
     void ObserveScoreDuration(double seconds);
     uint64_t ScoreDurationCount() const;

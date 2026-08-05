@@ -3,7 +3,7 @@
 
 namespace cortrix::reranker {
 
-/// Input length category (F02 §3.3 / §3.5.4). Thresholds are expressed in tokens
+/// Input length category. Thresholds are expressed in tokens
 /// relative to max_seq_length (default 512); the EXTREMELY_LONG cutoff is
 /// 4×max_seq_length (default 2048). These are tokenizer-agnostic — the caller
 /// supplies token counts (real HfTokenizer counts in production, an approximate
@@ -18,7 +18,7 @@ enum class InputCategory {
 /// (§3.3 "max_seq_length - query - 3 tokens".)
 inline constexpr int kReservedSpecialTokens = 3;
 
-/// Categorize one query-passage pair by length (F02 §3.3, the §4.2 inner loop's
+/// Categorize one query-passage pair by length (the inner loop's
 /// first step). Pure function of token counts (no tokenizer dependency).
 ///
 /// NORMAL when passage_tokens ≤ max_seq_length - query_tokens - 3. If the query
@@ -32,7 +32,7 @@ InputCategory CategorizeInput(int query_tokens, int passage_tokens, int max_seq_
 /// (max_seq_length - query_tokens - 3, floored at 0).
 int PassageTokenBudget(int query_tokens, int max_seq_length);
 
-/// Result of preparing one passage for scoring (F02 §4.2 / §5.1).
+/// Result of preparing one passage for scoring.
 struct PreprocessedPassage {
     InputCategory category;
     std::string   text;          ///< NORMAL: original; TRUNCATED: front-truncated; EXTREMELY_LONG: ""

@@ -10,7 +10,7 @@
 
 namespace cortrix::async {
 
-/// Independent tasks-table cleanup cron (F42 §4.4, topic 4.2 B — decoupled from
+/// Independent tasks-table cleanup cron (decoupled from
 /// the OPEN-2 catalog GC). Runs once per day at UTC 02:00 (topic 4.1/4.3):
 ///   - DeleteExpired: drop completed/failed/cancelled tasks older than
 ///     task_retention_days (default 30, topic 4.1 B);
@@ -23,7 +23,7 @@ namespace cortrix::async {
 /// key is missing/malformed the documented default is used.
 ///
 /// Mirrors the observability::CleanupScheduler 02:00 design (same NextRunDelayMs
-/// math) but is a single-purpose F42 loop (topic 4.2 — its own cron, not the F18a
+/// math) but is a single-purpose loop (its own cron, not the operation-log
 /// multi-table scheduler). The wall-clock loop is real and standalone; tests
 /// drive RunCleanupNow() and the pure NextRunDelayMs() directly without waiting.
 class TaskCleanupCron {

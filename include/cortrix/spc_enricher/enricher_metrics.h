@@ -10,16 +10,16 @@
 
 namespace cortrix::spc {
 
-/// The enricher subsystem metrics (F03 §3.6, OBSERVABILITY_SPEC subsystem
+/// The enricher subsystem metrics (observability subsystem
 /// `enricher`). Naming `cortrix_enricher_<metric>_<unit>` (V2 ruling #3: cortrix_
 /// prefix, no plugin prefix; V12 P0 CRIT-2 dropped the high-cardinality ns_id
 /// label from tokens_total / cost_usd_total).
 ///
 /// Standalone (D3): a self-contained, dependency-free recorder + OpenMetrics text
-/// renderer (same pattern as RerankerMetrics / OnnxMetrics). The F24 `/metrics`
+/// renderer (same pattern as RerankerMetrics / OnnxMetrics). The `/metrics`
 /// scrape endpoint does not exist in the frozen tree — registering this recorder
 /// into that endpoint is cross-Feature wiring deferred to D3.5. Until then it is
-/// fully usable + testable in-process and Render() produces what F24 will serve.
+/// fully usable + testable in-process and Render() produces what the server will serve.
 class EnricherMetrics {
 public:
     /// Reason label for cortrix_enricher_fallback_to_null_total (§4.4 scenarios).

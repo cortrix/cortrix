@@ -29,7 +29,7 @@ struct RerankTaskResult {
 };
 
 /// OnnxReranker — V1 sole IReranker implementation (bge-reranker-v2-m3 ONNX
-/// Cross-Encoder, F02 §2.2).
+/// Cross-Encoder).
 ///
 /// Sharing: borrows the process-wide Ort::Env (OrtEnvSingleton)
 /// and the bge-m3 HfTokenizer (TokenizerRegistry); owns an independent

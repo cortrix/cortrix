@@ -6,7 +6,7 @@
 
 namespace cortrix::async {
 
-/// Task status string constants (F42 §3.1 status state machine). The tasks table
+/// Task status string constants (the status state machine). The tasks table
 /// CHECK constraint enforces exactly this set.
 ///   queued → processing → completed
 ///                      ↘ failed
@@ -20,14 +20,14 @@ inline constexpr const char* kFailed     = "failed";
 inline constexpr const char* kCancelled  = "cancelled";
 }  // namespace task_status
 
-/// current_phase string constants (F42 §3.1 / topic 5 Progress meta).
+/// current_phase string constants (Progress meta).
 namespace task_phase {
 inline constexpr const char* kParsing   = "parsing";
 inline constexpr const char* kEnriching = "enriching";
 inline constexpr const char* kIndexing  = "indexing";
 }  // namespace task_phase
 
-/// A row of the tasks table (F42 §3.1 + §3.3). The persisted unit of async
+/// A row of the tasks table. The persisted unit of async
 /// document processing. `failed_pages` is stored as a JSON int array in the DB
 /// and materialized here as a vector<int>.
 struct TaskInfo {

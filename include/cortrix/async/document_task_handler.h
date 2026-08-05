@@ -36,7 +36,7 @@ struct SubmitParams {
 };
 
 /// DocumentTaskHandler — the POST(async submit) / GET(progress) / DELETE(cancel)
-/// contract for F42 (§2.1 / §4.1 / §4.3 / §6.2/6.3), independent of the HTTP
+/// contract for async document tasks, independent of the HTTP
 /// transport. Each method returns an HttpResult (status + GEN-Agent-shaped body).
 ///
 /// Sync/async decision (§2.2): page_count <= async_threshold_pages → the handler

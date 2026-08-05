@@ -10,7 +10,7 @@
 
 namespace cortrix::import {
 
-/// The 6 F16a DB-import error identities. Each maps to a stable
+/// The 6 DB-import error identities. Each maps to a stable
 /// `CX_ERR_F16A_*` string + a GEN-Agent category + retryability + the HTTP status
 /// its body carries, via the canonical registry below.
 ///
@@ -18,13 +18,13 @@ namespace cortrix::import {
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// So F16aErrorCode is the *enum of identities*, and MakeF16aError() turns one
-/// (plus optional structured_data) into that boundary error — mirroring the F04
-/// CrossNsErrorCode / F12 CatalogErrorCode template A.
+/// (plus optional structured_data) into that boundary error — mirroring the
+/// CrossNsErrorCode / CatalogErrorCode template.
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may be appended (api_version stays "v1").
 ///
-/// Note: task_cancelled is NOT an error code (F16a §5.4 note) — cancel is a legal
+/// Note: task_cancelled is NOT an error code — cancel is a legal
 /// operation that resolves to status="cancelled", carrying no error body.
 enum class F16aErrorCode {
     kConnectionFailed,    ///< 503 transient — PostgreSQL connection failed (network / DNS / SSL)
@@ -39,12 +39,12 @@ enum class F16aErrorCode {
     kInternal,            ///< 500 transient — unexpected internal import failure
 };
 
-/// Total number of F16a error codes. Compile-time anchor for the API-compatibility
+/// Total number of DB-import error codes. Compile-time anchor for the API-compatibility
 /// regression test (the set must not shrink; new codes may be appended — GEN-Agent #7).
 /// Was 6; +kInternal (R2-M5) = 7.
 constexpr int kF16aErrorCodeCount = 7;
 
-/// Canonical, immutable attributes of one error code (F16a §5.4 columns).
+/// Canonical, immutable attributes of one error code.
 struct F16aErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_F16A_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout

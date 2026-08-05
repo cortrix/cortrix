@@ -49,7 +49,7 @@ public:
     Result<TaskInfo> GetTask(const std::string& task_id);
 
     /// Update the mutable progress columns of an in-flight task (driven by the
-    /// F06 on_page_progress callback, S2): processed_pages / total_pages /
+    /// on_page_progress callback): processed_pages / total_pages /
     /// failed_pages / progress_pct / eta_seconds / current_phase / worker_id.
     /// Stamps updated_at. NotFound if the task is gone.
     Status UpdateProgress(const TaskInfo& task);
@@ -89,7 +89,7 @@ public:
     /// topic 2.2 — most recent task for `namespace_id` + `doc_id` + `task_type`
     /// whose created_at is within the last `window_seconds`, for the Watcher
     /// debounce check. nullopt if none. Scoping by task_type keeps different async
-    /// kinds for the same doc_id (doc-parse vs F41 doc-summary) from debouncing
+    /// kinds for the same doc_id (doc-parse vs doc-summary) from debouncing
     /// each other.
     ///
     /// `namespace_id` is part of the identity, not a filter added for convenience:
@@ -162,7 +162,7 @@ public:
     /// outside it has no task that will ever read it again.
     ///
     /// Deliberately returns raw rows rather than answering "is this path still
-    /// referenced?" in SQL. The stored strings are whatever was handed to F42, so
+    /// referenced?" in SQL. The stored strings are whatever was handed to the scheduler, so
     /// two rows can name the same file differently ("d/x.txt" vs "d/./x.txt"); a
     /// string comparison would miss the match and let a live input be deleted.
     /// Callers resolve both sides to one filesystem identity before comparing —

@@ -7,7 +7,7 @@
 
 namespace cortrix::spc {
 
-/// PromptTemplate (F03 §3.4 / topic 3.2). Builds the combined NER + Summary prompt
+/// PromptTemplate. Builds the combined NER + Summary prompt
 /// for a batch of chunks. V1 ships two templates: "default-zh" / "default-en".
 ///
 /// The rendered prompt instructs the LLM to return a single JSON object keyed by

@@ -10,13 +10,13 @@
 
 namespace cortrix::import {
 
-/// D5 SPC-pipeline seam (F16a §3.2 feed_to_spc_pipeline). A TextChunk → one Block
+/// SPC-pipeline seam (feed_to_spc_pipeline). A TextChunk → one Block
 /// through the SPC pipeline (Parse→Chunk→Embed→Assemble→Store).
 ///
 /// ⚠️ Real-contract note: the frozen pipeline class is `cortrix::SPCPipeline` (spc/
 /// spc_pipeline.h — all-caps, NO `I` prefix, NO abstract base), with concrete ctor
 /// deps + `int Process(SPCTask&, CortrixNamespace&)`. It is heavyweight and not
-/// directly mockable, so F16a consumes it behind THIS thin `ISpcFeeder` seam:
+/// directly mockable, so the importer consumes it behind THIS thin `ISpcFeeder` seam:
 /// standalone uses InMemorySpcFeeder; the real adapter (TextChunk → SPCTask →
 /// SPCPipeline::Process against a live CortrixNamespace) is wired in D3.5.
 class ISpcFeeder {
@@ -50,7 +50,7 @@ private:
     std::vector<FedBatch> batches_;
 };
 
-/// D3 full-overwrite seam (F16a §3.2 cleanup_source_blocks / §4.3). Clears only the
+/// Full-overwrite seam (cleanup_source_blocks). Clears only the
 /// Blocks in `ns` whose metadata_json `source` begins with `source_prefix` — i.e.
 /// the prior import of this exact table (ARCH §3.6 lock: only clears Blocks sourced from this table).
 ///

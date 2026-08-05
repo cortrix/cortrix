@@ -14,7 +14,7 @@ enum class LogLevel { kDebug, kInfo, kWarn, kError };
 const char* ToString(LogLevel level);
 
 /// Raw HTTP headers as parsed by the server layer. A thin
-/// case-sensitive name→value view; F13 reads X-Session-Id / X-Trace-Id /
+/// case-sensitive name→value view; this layer reads X-Session-Id / X-Trace-Id /
 /// X-Agent-Id from it. Defined here (not pulled from the http server) so the
 /// shared ObservabilityContext stays dependency-light and unit-testable without
 /// the server. The real middleware adapts the server's header type to this in
@@ -30,7 +30,7 @@ struct HttpHeaders {
     bool Has(const std::string& name) const { return values.count(name) != 0; }
 };
 
-/// Minimal MCP session view F13 needs to seed an ObservabilityContext.
+/// Minimal MCP session view needed to seed an ObservabilityContext.
 /// The full McpSessionHandler lives in mcp_session.h; this is the read-only slice
 /// the context factory consumes (the resolved session_id + optional agent_id),
 /// kept here so the shared context header has no dependency on the MCP handler.
@@ -40,26 +40,26 @@ struct McpSession {
     std::optional<std::string> namespace_id;
 };
 
-/// Thread-local observability scope (scaffolding D2-pre-6; F13 §5.1 identity
-/// extension). Carries the current TraceContext + the F13 identity fields and
+/// Thread-local observability scope (identity
+/// extension). Carries the current TraceContext + the identity fields and
 /// emits OBSERVABILITY_SPEC §6 structured logs with trace correlation. Each
-/// thread has its own instance via ThreadLocal(); consumers (F01/F02/F04/F25/
-/// F36/F37 + the whole trace chain) read/set the context and log through it.
+/// thread has its own instance via ThreadLocal(); consumers (index, reranker, query, write,
+/// fusion, CRAG + the whole trace chain) read/set the context and log through it.
 ///
-/// F13 §5.1 v1.0.1: this is the single identity-context source
-/// shared by the F13 ops-view track (agent_trace) and the F18a user-view track
+/// This is the single identity-context source
+/// shared by the ops-view track (agent_trace) and the user-view track
 /// (operation_log). The trace members + the original 6 methods are FROZEN for
-/// the F05 namespace_pool / F18a operation_log_emitter consumers (zero break);
-/// F13 only ADDs the identity fields + From* factories below — fulfilling C1/C2
+/// the namespace_pool / operation_log_emitter consumers (zero break);
+/// this only ADDs the identity fields + From* factories below — fulfilling
 /// (operation_log_emitter.cpp:49-62 + operation_logger.h:31-32 plan the context
 /// to carry trace_id/session_id/user_id; the emitter notes it "does not yet"
 /// carry user_id ⇒ planned). Real entry injection (middleware fills user_id from
-/// the P08 AuthContext) + the emitter reading these = D3.5 wiring.
+/// the AuthContext) + the emitter reading these are wired later.
 class ObservabilityContext {
 public:
     static ObservabilityContext& ThreadLocal();
 
-    // ===== Existing trace part (F05/F18a + trace-chain consumers; signatures frozen) =====
+    // ===== Existing trace part (pool / operation log + trace-chain consumers; signatures frozen) =====
     const TraceContext* GetTraceContext() const;
     void SetTraceContext(TraceContext ctx);
     void ClearTraceContext();
@@ -74,10 +74,10 @@ public:
     /// observability feature.
     void LogStructured(LogLevel level, const std::string& msg);
 
-    // ===== F13 ADD: identity context (C1/C2; filled after HTTP/MCP entry parse) =====
-    std::optional<std::string> session_id;   ///< C2 — VARCHAR(128); F18a reads it for session correlation
+    // ===== Identity context (filled after HTTP/MCP entry parse) =====
+    std::optional<std::string> session_id;   ///< VARCHAR(128); the operation log reads it for session correlation
     std::optional<std::string> agent_id;     ///< VARCHAR(128)
-    std::optional<std::string> user_id;      ///< entry injects from P08 AuthContext (real inject = D3.5)
+    std::optional<std::string> user_id;      ///< entry injects from the AuthContext (real inject wired later)
     std::optional<std::string> namespace_id;
     int64_t created_at = 0;                   ///< Unix ms the context was built (0 = unset)
 
@@ -104,7 +104,7 @@ private:
     std::optional<TraceContext> trace_;      ///< existing
 };
 
-/// Shared validator for the F13 identity headers / MCP capability (topic 4): a
+/// Shared validator for the identity headers / MCP capability: a
 /// single length + character-whitelist rule reused by both entry points. Per
 /// CODING_CONVENTIONS §3 / F-FREEZE-1 it returns Result<T> + Status (NO
 /// Result<T,E> double-param); an invalid value yields an InvalidArgument Status
@@ -112,7 +112,7 @@ private:
 /// Agent-friendly body at the API boundary.
 class ObservabilityValidator {
 public:
-    /// Max accepted length for an identity field (F13 §6.1 "≤128").
+    /// Max accepted length for an identity field ("≤128").
     static constexpr int kMaxIdentityLength = 128;
 
     static Result<std::string> ValidateSessionId(const std::string& value);
@@ -120,7 +120,7 @@ public:
     static Result<std::string> ValidateAgentId(const std::string& value);
 
     /// True iff `value` is non-empty, ≤ `max_length`, and every char is in the
-    /// F13 §6.1 whitelist `[a-zA-Z0-9_.:/-]`. Exposed for tests.
+    /// Whitelist `[a-zA-Z0-9_.:/-]`. Exposed for tests.
     static bool IsValidFormat(const std::string& value, int max_length);
 };
 

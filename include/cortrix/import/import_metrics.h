@@ -4,9 +4,9 @@
 
 namespace cortrix::import {
 
-/// F16a observability metrics (F16a §5.5, OBSERVABILITY_SPEC subsystem `f16a`).
+/// Database-import observability metrics (subsystem `f16a`).
 /// Naming `cortrix_f16a_<metric>_<unit>`. Self-contained dependency-free recorder
-/// (same pattern as RerankerMetrics / OnnxMetrics); registering into the F24
+/// (same pattern as RerankerMetrics / OnnxMetrics); registering into the
 /// `/metrics` scrape endpoint is cross-Feature wiring → D3.5.
 ///
 /// v1.0.2 reverse-fix (§5.5 note): the high-cardinality labels `namespace` (on
@@ -47,7 +47,7 @@ public:
     // cortrix_f16a_query_duration_seconds (Histogram, label: query_type).
     void ObserveQueryDuration(QueryType query_type, double seconds);
 
-    /// Render the current values as OpenMetrics text (what the F24 endpoint will
+    /// Render the current values as OpenMetrics text (what the endpoint will
     /// serve). Stable metric names + HELP/TYPE lines.
     std::string Render() const;
 

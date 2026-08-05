@@ -6,18 +6,18 @@
 
 namespace cortrix::deploy {
 
-/// The F24 deployment/system metrics (F24 §5.3 + §7.4 + §10, OBSERVABILITY_SPEC
+/// The deployment/system metrics (observability
 /// §2.3 subsystems `disk` / system). Self-contained dependency-free recorder
 /// (same pattern as ScoringMetrics / F42Metrics): a process-wide singleton of
-/// atomic gauges + an OpenMetrics text renderer that the F24 :9091 endpoint serves.
+/// atomic gauges + an OpenMetrics text renderer that the :9091 endpoint serves.
 ///
 /// 🚨 Cardinality control (OBS_SPEC §3.2): the gauges here are global (no
 /// per-NS / per-doc labels). The Bloom Filter gauges carry only the fixed
 /// subsystem="catalog" label.
 ///
 /// Scope (D3 standalone): the gauges this recorder owns directly are
-///   cortrix_disk_usage_ratio          (gauge — fed by DiskMonitor, F24-4)
-///   cortrix_shutdown_status           (gauge 0/1/2 — fed by GracefulShutdown, F24-5)
+///   cortrix_disk_usage_ratio          (gauge — fed by DiskMonitor)
+///   cortrix_shutdown_status           (gauge 0/1/2 — fed by GracefulShutdown)
 ///   cortrix_uptime_seconds            (gauge — derived from the process start)
 ///   cortrix_build_info{version,...}   (info gauge, value 1)
 /// plus the 4 Bloom Filter gauges, which are *rendered from* an
@@ -30,12 +30,12 @@ public:
     /// Process-wide instance (metrics are global gauges).
     static DeployMetrics& Instance();
 
-    // --- cortrix_disk_usage_ratio (gauge, F24-4 §6 / OBS_SPEC §2.3 disk) ---
+    // --- cortrix_disk_usage_ratio (gauge) ---
     // (total - free) / total of the data volume, in [0,1]. Set by DiskMonitor.
     void SetDiskUsageRatio(double ratio);
     double DiskUsageRatio() const;
 
-    // --- cortrix_shutdown_status (gauge 0/1/2, F24-5 §7.4) ---
+    // --- cortrix_shutdown_status (gauge 0/1/2) ---
     // 0 = running, 1 = shutting_down, 2 = forced (timed out with persisted tasks).
     void SetShutdownStatus(int status);
     int ShutdownStatus() const;

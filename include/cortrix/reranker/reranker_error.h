@@ -18,7 +18,7 @@ namespace cortrix::reranker {
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// So RerankerErrorCode is the *enum of identities*, and MakeRerankerError() turns
 /// one (plus optional structured_data) into that boundary error. This mirrors the
-/// F12 catalog::CatalogErrorCode template exactly.
+/// catalog::CatalogErrorCode template exactly.
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may only be appended.
@@ -34,11 +34,11 @@ enum class RerankerErrorCode {
     kRerankerCircuitOpen,  ///< circuit breaker open → reranker skipped (RRF fallback)
 };
 
-/// Total number of reranker error codes (F02 §5.2 = 5). Compile-time anchor for
+/// Total number of reranker error codes (= 5). Compile-time anchor for
 /// the API-compatibility regression test (the set must not shrink).
 constexpr int kRerankerErrorCodeCount = 5;
 
-/// Canonical, immutable attributes of one error code (F02 §5.2 columns).
+/// Canonical, immutable attributes of one error code.
 struct RerankerErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     agent_friendly::ErrorCategory category;   ///< permanent / timeout / transient
@@ -53,7 +53,7 @@ const RerankerErrorInfo& GetRerankerErrorInfo(RerankerErrorCode code);
 /// The "CX_ERR_*" string for `code` (convenience over GetRerankerErrorInfo).
 const char* RerankerErrorCodeString(RerankerErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (F02 §5.2
+/// The structured_data keys a `code`'s error body MUST carry (
 /// structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5);
 /// lets call sites + tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(RerankerErrorCode code);

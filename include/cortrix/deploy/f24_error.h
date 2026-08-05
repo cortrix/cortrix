@@ -10,7 +10,7 @@
 
 namespace cortrix::deploy {
 
-/// The 4 F24 deployment error identities. Each maps to a stable
+/// The 4 deployment error identities. Each maps to a stable
 /// `CX_ERR_*` string + a GEN-Agent category + retryability + retry_after_ms + the
 /// structured_data keys its body MUST carry, via the canonical registry below.
 ///
@@ -30,11 +30,11 @@ enum class F24ErrorCode {
     kBfNotReady,                ///< 503 CX_ERR_BF_NOT_READY — transient (retry after Bloom Filter rebuild)
 };
 
-/// Total number of F24 error codes (F24 §12 = 4). Compile-time anchor for the
+/// Total number of deployment error codes (= 4). Compile-time anchor for the
 /// API-compatibility regression test (the set must not shrink).
 constexpr int kF24ErrorCodeCount = 4;
 
-/// Canonical, immutable attributes of one error code (F24 §12 columns).
+/// Canonical, immutable attributes of one error code.
 struct F24ErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     int http_status;                          ///< HTTP status (507/503)
@@ -54,7 +54,7 @@ const char* F24ErrorCodeString(F24ErrorCode code);
 int F24ErrorHttpStatus(F24ErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5,
-/// F24 §6.3 / §12 structured_data column). SoT for the Agent-friendly contract;
+/// structured_data column). SoT for the Agent-friendly contract;
 /// lets call sites + tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(F24ErrorCode code);
 

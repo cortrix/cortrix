@@ -60,7 +60,7 @@ struct EnricherRequestParams {
 ///   - the request `enrich` arg from the SQL/HTTP layer is the Phase-1 per-request
 ///     override (§2.9 three-layer priority); wiring it in is D3.5 cross-Feature work.
 ///   - reading the NS blob from the NS-router cache (namespaces.enricher_config) is
-///     PHASE-2 (F03 §2.7.bis Plan B: Phase-1 enricher connection is global via the
+///     PHASE-2 (Phase-1 enricher connection is global via the
 ///     config.yaml enricher_llm role; per-NS api_key/model/budget is Phase 2). The
 ///     resolver is the Phase-2-ready pre-build — NOT a D3.5 wiring gap.
 class EnricherConfigResolver {

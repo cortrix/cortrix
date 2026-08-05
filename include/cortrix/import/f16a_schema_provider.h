@@ -6,16 +6,16 @@
 
 namespace cortrix::import {
 
-/// Current F16a schema version (F16a §4.1 / §4.2). Phase 1 single-step create
+/// Current database-import schema version. Phase 1 single-step create
 /// (v0 → v1); Phase 2 internal evolution branches on (from, to).
 constexpr int kF16aSchemaVersion = 1;
 
-/// The F16a DDL emitted by the schema provider (F16a §4.1 db_connections +
+/// The DDL emitted by the schema provider (db_connections +
 /// §4.2 import_tasks). Lives in the catalog DB (catalog.db) alongside the
-/// tenants / namespaces tables its FKs reference, applied via the shared F12
+/// tenants / namespaces tables its FKs reference, applied via the shared
 /// SchemaMigrator so it runs inside the same versioned, atomic framework.
 ///
-/// Dialect note: the F16a §4.x spec is written in Postgres syntax (BIGSERIAL /
+/// Dialect note: the spec is written in Postgres syntax (BIGSERIAL /
 /// TIMESTAMP / now()); the catalog DB is SQLite, so this is transcribed to the
 /// SQLite idiom every other provider uses (operation_log_schema.cpp /
 /// catalog_schema.cpp): INTEGER PRIMARY KEY AUTOINCREMENT, Unix-ms INTEGER
@@ -23,9 +23,9 @@ constexpr int kF16aSchemaVersion = 1;
 /// (columns / FKs / indices / 30d expiry) are 1:1 with the spec.
 extern const char* const kF16aSchemaSql;
 
-/// F16a's ISchemaProvider (frozen cortrix::catalog::ISchemaProvider, D2-pre-5):
+/// The database-import ISchemaProvider (frozen cortrix::catalog::ISchemaProvider):
 /// owns db_connections + import_tasks + their indices in the catalog DB. Registered
-/// with the catalog SchemaMigrator (after F12, so the tenants/namespaces FK targets
+/// with the catalog SchemaMigrator (after the catalog, so the tenants/namespaces FK targets
 /// exist). Migrate returns Status (F-FREEZE-1: no Result<void>).
 class F16aSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:

@@ -19,7 +19,7 @@ namespace cortrix::observability {
 /// exists.
 ///
 /// The handle is BORROWED, already-opened-and-migrated by the DI container (the
-/// F18a OperationLogSchemaProvider runs at startup via the shared SchemaMigrator —
+/// OperationLogSchemaProvider runs at startup via the shared SchemaMigrator —
 /// this class does not migrate). Retention/row-cap come from IGlobalConfig
 /// (operation_log_retention_days / operation_log_max_rows), read live in Cleanup()
 /// so a config OnChange takes effect on the next sweep.

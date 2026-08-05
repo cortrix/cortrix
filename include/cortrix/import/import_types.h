@@ -14,7 +14,7 @@
 namespace cortrix::import {
 
 /// Phase-1 string-alias IDs (ARCH §1.8 — distinct strong types are Phase 2). A
-/// connection ref is "db_conn_<ulid>"; an import task is "import_<ulid>" (F16a
+/// connection ref is "db_conn_<ulid>"; an import task is "import_<ulid>" (
 /// §4.1 / §4.2). NsId / TenantId reuse the catalog's TEXT keys.
 using ConnectionRefId = std::string;
 using ImportTaskId    = std::string;
@@ -54,13 +54,13 @@ struct DbValue {
 };
 
 /// One fetched row: ordered columns + the source row identifier used to build the
-/// Block `source` URI (F16a §4.3 — postgres://host/db/table/<row_id>).
+/// Block `source` URI (postgres://host/db/table/<row_id>).
 struct DbRow {
     std::vector<std::pair<std::string, DbValue>> columns;  ///< preserves SELECT order
     std::string row_id;                                    ///< PK / ctid rendering for the source URI
 };
 
-/// A textualized chunk ready to feed the SPC pipeline (F16a §3.5 → §3.2). `source`
+/// A textualized chunk ready to feed the SPC pipeline. `source`
 /// is the full postgres:// URI written into blocks.metadata_json (§4.3).
 struct TextChunk {
     std::string text;
@@ -80,7 +80,7 @@ struct QueryRequest {
     std::optional<std::string> sql;
 };
 
-/// The full import request body (POST /api/v1/import/database, F16a §6.2).
+/// The full import request body (POST /api/v1/import/database).
 struct ImportRequest {
     NsId namespace_id;
     ConnectionRefId connection_ref;
@@ -89,7 +89,7 @@ struct ImportRequest {
     QueryRequest query;
 };
 
-/// D6 progress snapshot (F16a §3.6 / §5.2). `error` is set only in the FAILED
+/// Progress snapshot. `error` is set only in the FAILED
 /// terminal state (cancel resolves to status=cancelled, no error — §5.4 note).
 struct ImportTaskProgress {
     ImportTaskId task_id;

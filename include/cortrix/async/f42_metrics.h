@@ -8,9 +8,9 @@
 
 namespace cortrix::async {
 
-/// The `f42_async` subsystem metrics (F42 §6.bis, OBSERVABILITY_SPEC §2.3). Note
+/// The `f42_async` subsystem metrics (observability naming). Note
 /// the metric names are `cortrix_tasks_<metric>_<unit>` (NOT `cortrix_f42_*`) —
-/// the locked names from OBS_SPEC §2.3 line 90 / F42 §6.bis (V10 P0-2). Self-contained
+/// the locked observability names. Self-contained
 /// dependency-free recorder (same pattern as ScoringMetrics / Mem02Metrics): a
 /// process-wide singleton of atomic counters/gauges/histograms + an OpenMetrics
 /// text renderer.
@@ -21,7 +21,7 @@ namespace cortrix::async {
 /// the tasks table + progress API, never a metric label.
 ///
 /// 🚨 D3 standalone: this recorder + RenderOpenMetrics() are fully usable +
-/// testable in-process. The F24 `/metrics` scrape endpoint does not exist in the
+/// testable in-process. The `/metrics` scrape endpoint does not exist in the
 /// frozen tree — registering this recorder into that endpoint is cross-Feature
 /// wiring **deferred to D3.5** (B-R2-FREEZE-REVIEW §66 lists "OBSERVABILITY
 /// f42_async metrics" as deferred wiring; the recorder itself is the D3 piece).

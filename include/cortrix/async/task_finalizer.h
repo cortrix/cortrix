@@ -10,8 +10,8 @@
 
 namespace cortrix::async {
 
-/// TaskFinalizer — collapses the generic "terminal write + F42 task-level metric"
-/// boilerplate that every ITaskHandler repeats at its terminal exits (F42 §4.1.1,
+/// TaskFinalizer — collapses the generic "terminal write + task-level metric"
+/// boilerplate that every ITaskHandler repeats at its terminal exits (
 /// finalize ownership = handler, decision A 2026-06-09). Each handler still OWNS the
 /// terminal *decision + content* (which outcome, which CX_ERR_* code, which
 /// structured_data); this only unifies the mechanics: Mark* + RecordCompleted +
@@ -20,7 +20,7 @@ namespace cortrix::async {
 /// hand back for log/observe.
 ///
 /// Why a string error_code (not F42ErrorCode) on Fail: handlers carry domain-specific
-/// codes — DocumentProcessor uses the F42 enum (CX_ERR_PARSE_FAILED), F41AsyncWorker
+/// codes — DocumentProcessor uses the async enum (CX_ERR_PARSE_FAILED), F41AsyncWorker
 /// uses CX_ERR_F41_* which is NOT in F42ErrorCode. A plain "CX_ERR_*" string keeps the
 /// finalizer agnostic to any one handler's error namespace.
 ///

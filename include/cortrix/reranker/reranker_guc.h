@@ -8,7 +8,7 @@
 
 namespace cortrix::reranker {
 
-/// Reranker GUC keys + range validation (F02 §2.4 GUC table SoT in code).
+/// Reranker GUC keys + range validation (the GUC table SoT in code).
 ///
 /// Standalone (D3): defines the GUC names + [min,max] ranges and provides pure
 /// validation + a load-from-IGlobalConfig path. Registering these with the live
@@ -28,7 +28,7 @@ inline constexpr const char* kMaxSeqLength    = "reranker.max_seq_length";
 inline constexpr const char* kCircuitThreshold = "reranker.circuit_breaker.threshold";
 inline constexpr const char* kCircuitCooldown = "reranker.circuit_breaker.cooldown_sec";
 
-// spc.chunk_size (F02 §2.4 "V5-B2-05 GUC registration backfill") — owned by SPC but read here
+// spc.chunk_size — owned by SPC but read here
 // for the §3.5.1 startup compat check (spc.chunk_size ≤ reranker.max_seq_length).
 // Its [min,max] mirror reranker.max_seq_length (both bound by the model's token
 // limit); the default 512 matches recursive_chunker's chunk_size default.
@@ -61,7 +61,7 @@ public:
     /// IGlobalConfig path.)
     static Status LoadFromGlobalConfig(const IGlobalConfig& cfg, RerankerConfig* out);
 
-    /// Read `spc.chunk_size` from `cfg` (F02 §2.4 V5-B2-05). Returns the configured
+    /// Read `spc.chunk_size` from `cfg`. Returns the configured
     /// value, or kSpcChunkSizeDefault (512) when the key is absent. Validates it
     /// against [kSpcChunkSizeMin, kSpcChunkSizeMax]; an out-of-range value is
     /// InvalidArgument (consistent with the reject-not-clamp policy). Used by the

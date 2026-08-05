@@ -2,21 +2,21 @@
 #include <functional>
 #include <string>
 
-#include "cortrix/health/readiness.h"  // F20 readiness contract (ReadinessRegistry)
+#include "cortrix/health/readiness.h"  // readiness contract (ReadinessRegistry)
 
 namespace httplib { class Server; }
 
 namespace cortrix::deploy {
 
-/// Register the dual health endpoints (F24 §4.2, F20-7-rev-2 — F24 owns the
-/// endpoints; F20 owns the readiness *contract*).
+/// Register the dual health endpoints (the deployment layer owns the
+/// endpoints; the health layer owns the readiness *contract*).
 ///
-/// Unified onto the F20 ReadinessRegistry: /ready now
-/// calls `health::ReadinessRegistry::BuildReport()` (replacing F24's standalone
+/// Unified onto the ReadinessRegistry: /ready now
+/// calls `health::ReadinessRegistry::BuildReport()` (replacing the standalone
 /// HealthProviders struct, which was a D3 standalone placeholder). The 5 readiness
 /// components (catalog / vector_index / secret_provider / spc_pipeline /
 /// memory_store, design sec 8.4) are registered with `registry` at main.cpp wiring
-/// time as each owning Feature exposes its IsReady() probe (F20-S5); this endpoint
+/// time as each owning subsystem exposes its IsReady() probe; this endpoint
 /// only aggregates them and maps overall readiness to 200 / 503.
 ///
 ///   GET /api/v1/system/health/live   — liveness: 200 once the process is up;

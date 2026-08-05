@@ -14,7 +14,7 @@
 
 namespace cortrix::import {
 
-/// Persistence seam for the D6 task lifecycle (F16a §4.2 import_tasks). cortrix/ owns
+/// Persistence seam for the task lifecycle (import_tasks). cortrix/ owns
 /// this CE interface; the SQLite-backed store (real import_tasks rows) is D3.5.
 /// Standalone uses InMemoryImportTaskStore. Mutating ops are CAS-on-status so a
 /// cancel racing a worker resolves deterministically.
@@ -51,7 +51,7 @@ private:
 };
 
 /// Handle a running worker uses to report progress + check for a cancel request
-/// (F16a §3.6 / §5.2). The worker periodically calls CancelRequested(); on true it
+/// The worker periodically calls CancelRequested(); on true it
 /// must stop, leave partial rows, and let the queue mark CANCELLED.
 class ImportTaskHandle {
 public:
@@ -82,14 +82,14 @@ private:
 using ImportTaskWork = std::function<Status(ImportTaskHandle&)>;
 
 struct ImportTaskQueueConfig {
-    int worker_count = 2;        // F16a §4.4 task.worker_count (limit external PG pressure)
+    int worker_count = 2;        // task.worker_count (limit external PG pressure)
     int queue_max_size = 100;    // §4.4 task.queue_max_size
 };
 
 /// D6 async import queue. **Self-built in cortrix::import, modeled on the
-/// F42 async pattern but with ZERO dependency on F42** (the §0 red line: no
+/// the async task pattern but with ZERO dependency on the scheduler** (the red line: no
 /// `#include` / link of cortrix::async::TaskScheduler). Worker threads come from the
-/// shared cortrix::ExecutorEngine (common, Wave-A frozen — NOT F42); the lifecycle
+/// shared cortrix::ExecutorEngine (common, frozen — NOT the scheduler); the lifecycle
 /// state machine + import_tasks persistence are owned here.
 ///
 /// State machine (§3.6): QUEUED → RUNNING → {COMPLETED | FAILED | CANCELLED}, with

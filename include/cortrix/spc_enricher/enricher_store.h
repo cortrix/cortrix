@@ -12,18 +12,18 @@ namespace cortrix::spc {
 
 /// Persists an EnrichResult into the per-Unit DB schema F03SchemaProvider creates
 /// (design §3.1, S5.4). Free functions over a sqlite3* so they are unit-testable
-/// against an in-memory DB with the F03 migration applied; the live wiring (which
-/// block_id, transaction boundaries with F09 block writes) is cross-Feature → D3.5.
+/// against an in-memory DB with the enricher migration applied; the live wiring (which
+/// block_id, transaction boundaries with block writes) is wired separately.
 ///
 /// Field placement (design §3.1 field classification):
 ///   - enriched_score / enriched_at → blocks columns (A-class, query-returned)
 ///   - enricher_metadata (prompt_version / model_used / enricher_name JSON) →
 ///     blocks.enricher_metadata (B-class audit; query default hides it, §3.1)
 ///   - summary → caller writes into Block.payload.metadata JSONB (F09-owned; not
-///     here — this module owns only the F03 columns + entities table)
+///     here — this module owns only the enricher columns + entities table)
 ///   - entities[] → entities table + entities_fts FTS5 index
 
-/// Update the F03 block columns (enriched_score / enriched_at / enricher_metadata)
+/// Update the enricher block columns (enriched_score / enriched_at / enricher_metadata)
 /// for `block_id`. status != 0 results skip the score/metadata (nothing to write).
 Status WriteBlockEnrichment(sqlite3* db, uint64_t block_id, const EnrichResult& result);
 

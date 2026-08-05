@@ -7,26 +7,26 @@
 #include "cortrix/metadata/i_metadata_generator.h"
 #include "cortrix/metadata/metadata_types.h"
 
-// F08 Metadata Block — Phase 1 V1.0 rule-based generator (detailed design §4.1).
+// Metadata Block — Phase 1 V1.0 rule-based generator.
 namespace cortrix::metadata {
 
 /// The sole Phase 1 V1.0 implementation (detailed design §2.1 / D4 lock): pure rule extraction, no LLM. Maps the
-/// consumed F06 DocumentMetadata + the F08-owned FileInfo/ProcessingStats DTOs into
+/// consumed DocumentMetadata + the owned FileInfo/ProcessingStats DTOs into
 /// (a) block_text — a natural-language sentence over the 7-10 core fields (D3 lock, embedding
 /// input), and (b) metadata_json — the full 26-field schema (D2/D9 + V2 rework). block_id
-/// is a fresh ULID (id/ulid.h, produced by F34 B-R1 — reuse, do not recreate).
+/// is a fresh ULID (id/ulid.h, produced by the chunker — reuse, do not recreate).
 ///
 /// Standalone (B_R3_BRIEFING §2): the embedding vector is left empty — embedding(block_text)
 /// + P-HNSW insert is D3.5 pipeline wiring. parent_count / child_count come from the
-/// caller's ProcessingStats (real source = F34, D6 lock F06→F34→F08). The F41
+/// caller's ProcessingStats (real source = the chunker). The doc-summary
 /// doc_fts5_index product sync is wired in SPCPipeline from the derived columns below,
-/// keeping this generator pure and free of SQLite/F41 table dependencies.
+/// keeping this generator pure and free of SQLite / doc-summary table dependencies.
 class RuleBasedMetadataGenerator : public IMetadataGenerator {
 public:
     RuleBasedMetadataGenerator() = default;
 
     /// The detailed design §4.1 main generation flow. Returns CX_ERR_METADATA_GEN_FAILED when there is no usable
-    /// metadata (empty filename AND no source_uri AND failed parse status — i.e. F06
+    /// metadata (empty filename AND no source_uri AND failed parse status — i.e. the parser
     /// produced nothing); otherwise Ok, with output.missing_fields listing any
     /// optional fields that could not be filled (→ CX_WARN_METADATA_PARTIAL upstream).
     Result<GeneratorOutput> Generate(
@@ -48,11 +48,11 @@ public:
     static nlohmann::json BuildMetadataJson(const GeneratorInput& input,
                                             std::vector<std::string>* missing_fields);
 
-    /// §9.quater.2 derivation rule for doc_fts5_index fields ← F08 fields (V1.0).
+    /// Derivation rule for doc_fts5_index fields ← metadata fields (V1.0).
     /// Pure mapping, no table dependency: {doc_id, filename, doc_title(=filename
     /// without extension), topics_rule_extracted(=tags.join(' ')),
     /// authors(=custom_metadata.authors ?? null)}. SPCPipeline uses this as the
-    /// sole product write source for the F41 doc-level FTS5 fallback row.
+    /// sole product write source for the doc-level FTS5 fallback row.
     static nlohmann::json DeriveDocFts5Columns(const GeneratorInput& input);
 };
 
