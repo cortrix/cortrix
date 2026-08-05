@@ -356,7 +356,7 @@ TEST_P(QueryRouteValBadRoute, F39RouteInvalid400) {
     ASSERT_TRUE(res) << GetParam();
     EXPECT_EQ(res->status, 400) << GetParam();
     auto body = json::parse(res->body);
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F39_FORCE_ROUTE_INVALID") << GetParam();
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_ROUTER_FORCE_ROUTE_INVALID") << GetParam();
     EXPECT_EQ(body["error"]["structured_data"]["invalid_route_value"], GetParam());
 }
 

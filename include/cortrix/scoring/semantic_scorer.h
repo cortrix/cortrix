@@ -43,7 +43,7 @@ public:
     ///       (prevents coalesce(enriched, 0.0) from wrongly overriding the sentinel when enrichment precedes the cleaning anomaly detection).
     ///   α = 0.2 (Cortrix internal math parameter, v1.0.1: Phase 1 global only, not exposed to NS / Agent).
     ///     effective=0.5 → ×1.0; =1.0 → ×1.1; =0.2 → ×0.94; =0.0 → ×0.9.
-    /// Error: α ∉ [0, 1] → CX_ERR_F07_CONFIG_INVALID (throws AgentFriendlyException).
+    /// Error: α ∉ [0, 1] → CX_ERR_SCORING_CONFIG_INVALID (throws AgentFriendlyException).
     static float ComputeFinalScore(
         float rerank_score,
         std::optional<float> enriched_score,

@@ -340,7 +340,7 @@ TEST_F(OpLogMatrixSchemaFx, VersionConstantIsOne) {
     EXPECT_EQ(observability::kOplogSchemaVersion, 1);
     observability::OperationLogSchemaProvider p;
     EXPECT_EQ(p.CurrentVersion(), 1);
-    EXPECT_EQ(p.FeatureName(), "F18a");
+    EXPECT_EQ(p.FeatureName(), "operation_log");
 }
 
 TEST_F(OpLogMatrixSchemaFx, MigrateZeroToOneCreatesTableAndIndices) {
@@ -373,7 +373,7 @@ TEST_F(OpLogMatrixSchemaFx, AgentTraceSchemaVersionAndProvider) {
     EXPECT_EQ(agent_trace::kAgentTraceSchemaVersion, 1);
     agent_trace::AgentTraceSchemaProvider p;
     EXPECT_EQ(p.CurrentVersion(), 1);
-    EXPECT_EQ(p.FeatureName(), "F13");
+    EXPECT_EQ(p.FeatureName(), "agent_trace");
     ASSERT_TRUE(p.Migrate(db_, 0, 1).ok());
     EXPECT_TRUE(HasTable("agent_trace"));
     EXPECT_EQ(IndexCount("agent_trace"), 3);
@@ -438,7 +438,7 @@ TEST(OpLogMatrixValidate, InvalidIdsReturnInvalidArgument) {
     auto s = ObservabilityValidator::ValidateSessionId("bad space");
     ASSERT_FALSE(s.ok());
     EXPECT_EQ(s.status().code(), StatusCode::kInvalidArgument);
-    EXPECT_NE(s.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(s.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
 }
 
 // FromHttpHeaders: valid headers populate identity; invalid ones are dropped.
@@ -646,7 +646,7 @@ INSTANTIATE_TEST_SUITE_P(
                       TPageRow{5, 0, 5, false},
                       TPageRow{10, 0, 5, false}));
 
-// Invalid filter rejection -> CX_ERR_F13_* token.
+// Invalid filter rejection -> CX_ERR_TRACE_* token.
 struct TBadRow { int limit; int offset; const char* token; };
 class OpLogMatrixTraceBadFilter
     : public OpLogMatrixTraceFx,

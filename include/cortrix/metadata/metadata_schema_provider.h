@@ -33,7 +33,7 @@ extern const char* const kMetadataSchemaSql;
 /// SchemaMigrator. Migrate returns Status (F-FREEZE-1: no Result<void>).
 class MetadataSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
-    std::string FeatureName() const override { return "F08"; }
+    std::string FeatureName() const override { return "metadata_block"; }
     int CurrentVersion() const override { return kMetadataSchemaVersion; }
 
     /// Phase 1 (from_ver 0 → 1): create metadata_blocks + idx_metablocks_ns. An

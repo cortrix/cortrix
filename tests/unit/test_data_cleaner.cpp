@@ -314,14 +314,14 @@ TEST(DataCleanerConfigTest, ThresholdOutOfRange) {
     CleaningConfig lo = DefaultCfg(); lo.dedup_similarity_threshold = -0.1;
     Status s = DataCleaner(lo).ValidateConfig();
     EXPECT_FALSE(s.ok());
-    EXPECT_NE(s.message().find("CX_ERR_F10_DEDUP_THRESHOLD_RANGE"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_CLEANING_DEDUP_THRESHOLD_RANGE"), std::string::npos);
 }
 
 TEST(DataCleanerConfigTest, MaxChunkCharsNonPositive) {
     CleaningConfig cfg = DefaultCfg(); cfg.max_chunk_chars = 0;
     Status s = DataCleaner(cfg).ValidateConfig();
     EXPECT_FALSE(s.ok());
-    EXPECT_NE(s.message().find("CX_ERR_F10_ANOMALY_CONFIG_INVALID"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_CLEANING_ANOMALY_CONFIG_INVALID"), std::string::npos);
 }
 
 // ---------- Summarize (§5.2 A-class meta) ----------

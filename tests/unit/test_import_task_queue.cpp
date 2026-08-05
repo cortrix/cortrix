@@ -66,8 +66,8 @@ TEST(ImportTaskQueueTest, FailedWorkPropagatesCxErrCode) {
     ASSERT_TRUE(p.has_value());
     EXPECT_EQ(p->status, ImportTaskStatus::kFailed);
     ASSERT_TRUE(p->error.has_value());
-    // the CX_ERR_F16A_* identity is recovered from the Status message prefix.
-    EXPECT_EQ(p->error->code, "CX_ERR_F16A_TIMEOUT");
+    // the CX_ERR_IMPORT_* identity is recovered from the Status message prefix.
+    EXPECT_EQ(p->error->code, "CX_ERR_IMPORT_TIMEOUT");
 }
 
 TEST(ImportTaskQueueTest, CancelWhileQueuedNeverRunsWork) {

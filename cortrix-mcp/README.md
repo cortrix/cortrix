@@ -211,7 +211,7 @@ The adapter defines 6 stable tool error codes:
 | `CX_ERR_MCP_AUTH_MISSING` | false | auth | — |
 | `CX_ERR_MCP_ADMIN_REQUIRED` | false | auth | — |
 
-Business errors from cortrix-server (`CX_ERR_NS_*`, `CX_ERR_MEM03_*`, …) pass through
+Business errors from cortrix-server (`CX_ERR_NS_*`, `CX_ERR_MEMORY_*`, …) pass through
 unchanged.
 
 ## Compatibility Notes

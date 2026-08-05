@@ -79,7 +79,7 @@ def test_business_error_identity_merged_backend_keys_win(mock_request):
     """Passthrough gains caller identity, but backend structured_data is never altered."""
     err_resp = make_response(
         status_code=404,
-        json_body={"error": {"code": "CX_ERR_F13_SESSION_NOT_FOUND", "retryable": False,
+        json_body={"error": {"code": "CX_ERR_TRACE_SESSION_NOT_FOUND", "retryable": False,
                               "category": "permanent",
                               "structured_data": {"session_id": "queried-target-sid"}}},
     )
@@ -88,7 +88,7 @@ def test_business_error_identity_merged_backend_keys_win(mock_request):
     result = call_tool_result("cortrix_health")
     assert result.is_error is True
     data = result.structured_content
-    assert data["code"] == "CX_ERR_F13_SESSION_NOT_FOUND"  # passthrough unchanged
+    assert data["code"] == "CX_ERR_TRACE_SESSION_NOT_FOUND"  # passthrough unchanged
     sd = data["structured_data"]
     # Backend's own session_id field (the *queried* session) wins over caller identity.
     assert sd["session_id"] == "queried-target-sid"

@@ -25,13 +25,13 @@ namespace {
 //                            degrade already happened); there is no caller action,
 //                            so no concrete back-off is advertised.
 constexpr CragErrorInfo kClassifierLoadFailed{
-    "CX_ERR_F37_CLASSIFIER_LOAD_FAILED", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_CRAG_CLASSIFIER_LOAD_FAILED", ErrorCategory::kPermanent, false, std::nullopt};
 constexpr CragErrorInfo kInferenceFailed{
-    "CX_ERR_F37_INFERENCE_FAILED", ErrorCategory::kTransient, true, 200};
+    "CX_ERR_CRAG_INFERENCE_FAILED", ErrorCategory::kTransient, true, 200};
 constexpr CragErrorInfo kThresholdInvalid{
-    "CX_ERR_F37_THRESHOLD_INVALID", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_CRAG_THRESHOLD_INVALID", ErrorCategory::kPermanent, false, std::nullopt};
 constexpr CragErrorInfo kFallbackTriggered{
-    "CX_ERR_F37_FALLBACK_TRIGGERED", ErrorCategory::kTransient, true, std::nullopt};
+    "CX_ERR_CRAG_FALLBACK_TRIGGERED", ErrorCategory::kTransient, true, std::nullopt};
 
 }  // namespace
 

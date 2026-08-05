@@ -308,7 +308,7 @@ TEST(ImportDepthQueueTest, QueueFullSurfacedAsTransientConnectionFailed) {
     // Second submit exceeds queue_max_size while t1 still occupies the slot.
     auto r2 = queue.Submit("t2", "ns", [](ImportTaskHandle&) { return Status::Ok(); });
     ASSERT_FALSE(r2.ok());
-    EXPECT_NE(r2.status().message().find("CX_ERR_F16A_"), std::string::npos);
+    EXPECT_NE(r2.status().message().find("CX_ERR_IMPORT_"), std::string::npos);
 
     gate->store(true);  // release the blocking worker
     queue.DrainForTest();
@@ -351,7 +351,7 @@ TEST(ImportDepthQueueTest, CompletedTaskWithoutTotalBackfillsFromImported) {
 TEST(ImportDepthQueueTest, FailedWorkWithoutCxPrefixKeepsDefaultConnectionFailedCode) {
     auto store = std::make_shared<InMemoryImportTaskStore>();
     ImportTaskQueue queue(store);
-    // Work returns a plain Status whose message lacks the CX_ERR_F16A_ prefix -> the
+    // Work returns a plain Status whose message lacks the CX_ERR_IMPORT_ prefix -> the
     // queue keeps the default kConnectionFailed identity for the error body.
     auto work = [](ImportTaskHandle&) -> Status {
         return Status::Internal("raw driver blew up");
@@ -371,7 +371,7 @@ TEST(ImportDepthQueueTest, FailedWorkWithoutCxPrefixKeepsDefaultConnectionFailed
 TEST(ImportDepthQueueTest, FailedWorkWithCxPrefixRecoversPreciseCode) {
     auto store = std::make_shared<InMemoryImportTaskStore>();
     ImportTaskQueue queue(store);
-    // Work returns an F16aStatus whose message is "CX_ERR_F16A_TIMEOUT: ...".
+    // Work returns an F16aStatus whose message is "CX_ERR_IMPORT_TIMEOUT: ...".
     auto work = [](ImportTaskHandle&) -> Status {
         return F16aStatus(F16aErrorCode::kTimeout, "exceeded 5 min");
     };
@@ -420,7 +420,7 @@ TEST(ImportDepthErrorTest, AllErrorCodeStringsAreUniqueAndCountMatches) {
 
 TEST(ImportDepthErrorTest, StatusBridgeCarriesCxToken) {
     auto st = F16aStatus(F16aErrorCode::kTimeout, "5 min cap");
-    EXPECT_EQ(st.message().rfind("CX_ERR_F16A_", 0), 0u);
+    EXPECT_EQ(st.message().rfind("CX_ERR_IMPORT_", 0), 0u);
     EXPECT_NE(st.message().find("5 min cap"), std::string::npos);
 }
 

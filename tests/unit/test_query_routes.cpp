@@ -258,7 +258,7 @@ TEST_F(QueryRoutesIntegrationTest, ValidQuery_ExistingNamespace_Returns200) {
 // ── query routing ?route enum validation (Agent-friendly error) ──────────────
 
 // An invalid ?route query-string token is rejected with 400 + the query routing
-// CX_ERR_F39_FORCE_ROUTE_INVALID body before any namespace acquisition.
+// CX_ERR_ROUTER_FORCE_ROUTE_INVALID body before any namespace acquisition.
 TEST_F(QueryRoutesIntegrationTest, InvalidRouteParam_Returns400F39) {
     httplib::Client cli("127.0.0.1", port_);
     json req_body;
@@ -269,7 +269,7 @@ TEST_F(QueryRoutesIntegrationTest, InvalidRouteParam_Returns400F39) {
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 400);
     auto body = json::parse(res->body);
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F39_FORCE_ROUTE_INVALID");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_ROUTER_FORCE_ROUTE_INVALID");
     // structured_data echoes the offending value (machine-readable per GEN-Agent).
     EXPECT_EQ(body["error"]["structured_data"]["invalid_route_value"], "bogus");
 }
@@ -287,7 +287,7 @@ TEST_F(QueryRoutesIntegrationTest, InvalidRouteInBody_Returns400F39) {
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 400);
     auto body = json::parse(res->body);
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F39_FORCE_ROUTE_INVALID");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_ROUTER_FORCE_ROUTE_INVALID");
 }
 
 // The query string wins over the body: a valid body route + an invalid
@@ -303,7 +303,7 @@ TEST_F(QueryRoutesIntegrationTest, QueryStringRouteOverridesBody) {
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 400);
     auto body = json::parse(res->body);
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F39_FORCE_ROUTE_INVALID");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_ROUTER_FORCE_ROUTE_INVALID");
     EXPECT_EQ(body["error"]["structured_data"]["invalid_route_value"], "bogus");
 }
 

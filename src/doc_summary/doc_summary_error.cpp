@@ -18,19 +18,19 @@ namespace {
 // transient/retryable with no §7-stated interval → a modest 200ms. DOC_TOO_LARGE
 // + SCHEMA_VERSION_MISMATCH are permanent (data / operator fix) → not retryable.
 constexpr DocSummaryErrorInfo kLlmTimeout{
-    "CX_ERR_F41_LLM_TIMEOUT", ErrorCategory::kTimeout, true, 5000};
+    "CX_ERR_DOCSUMMARY_LLM_TIMEOUT", ErrorCategory::kTimeout, true, 5000};
 constexpr DocSummaryErrorInfo kLlmInvalidOutput{
-    "CX_ERR_F41_LLM_INVALID_OUTPUT", ErrorCategory::kTransient, true, 200};
+    "CX_ERR_DOCSUMMARY_LLM_INVALID_OUTPUT", ErrorCategory::kTransient, true, 200};
 constexpr DocSummaryErrorInfo kLlmBudgetExceeded{
-    "CX_ERR_F41_LLM_BUDGET_EXCEEDED", ErrorCategory::kQuota, true, 60000};
+    "CX_ERR_DOCSUMMARY_LLM_BUDGET_EXCEEDED", ErrorCategory::kQuota, true, 60000};
 constexpr DocSummaryErrorInfo kDocTooLarge{
-    "CX_ERR_F41_DOC_TOO_LARGE", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_DOCSUMMARY_TOO_LARGE", ErrorCategory::kPermanent, false, std::nullopt};
 constexpr DocSummaryErrorInfo kSchemaVersionMismatch{
-    "CX_ERR_F41_SCHEMA_VERSION_MISMATCH", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_DOCSUMMARY_SCHEMA_VERSION_MISMATCH", ErrorCategory::kPermanent, false, std::nullopt};
 constexpr DocSummaryErrorInfo kFallbackFailed{
-    "CX_ERR_F41_FALLBACK_FAILED", ErrorCategory::kTransient, true, 200};
+    "CX_ERR_DOCSUMMARY_FALLBACK_FAILED", ErrorCategory::kTransient, true, 200};
 constexpr DocSummaryErrorInfo kFts5FallbackFailed{
-    "CX_ERR_F41_FTS5_FALLBACK_FAILED", ErrorCategory::kTransient, true, 200};
+    "CX_ERR_DOCSUMMARY_FTS5_FALLBACK_FAILED", ErrorCategory::kTransient, true, 200};
 
 }  // namespace
 

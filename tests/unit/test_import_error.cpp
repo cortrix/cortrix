@@ -12,7 +12,7 @@
 #include "cortrix/import/import_response.h"
 #include "cortrix/import/import_types.h"
 
-// S5 coverage: the 6 DB import error codes — CX_ERR_F16A_ identity, category
+// S5 coverage: the 6 DB import error codes — CX_ERR_IMPORT_ identity, category
 // mapping, retryability, structured_data contract, the GEN-Agent 4-field boundary
 // factory, and the §5.1/§5.2/§5.3 Agent-friendly response bodies. Mirrors the
 // project reference test scatter/test_cross_ns_error.cpp.
@@ -42,10 +42,10 @@ TEST(F16aErrorTest, SevenCodesTotal) {
     EXPECT_EQ(kF16aErrorCodeCount, 7);
 }
 
-// Every code's CX_ERR_F16A_* string is unique and matches the API spec ErrorResponseV1
+// Every code's CX_ERR_IMPORT_* string is unique and matches the API spec ErrorResponseV1
 // pattern (GEN-Agent #1 + #7 stable identity).
 TEST(F16aErrorTest, EveryCodeHasUniqueWellFormedCxString) {
-    static const std::regex kPattern("^CX_ERR_F16A_[A-Z][A-Z_]*$");
+    static const std::regex kPattern("^CX_ERR_IMPORT_[A-Z][A-Z_]*$");
     std::set<std::string> seen;
     for (F16aErrorCode code : AllCodes()) {
         std::string cx = F16aErrorCodeString(code);
@@ -106,7 +106,7 @@ TEST(F16aErrorTest, MakeErrorPopulatesAgentFriendlyFields) {
                               {"timeout_seconds", 300},
                               {"rows_imported_before_timeout", 4500}},
                              "Query exceeded 300s timeout on table users");
-    EXPECT_EQ(err.code, "CX_ERR_F16A_TIMEOUT");
+    EXPECT_EQ(err.code, "CX_ERR_IMPORT_TIMEOUT");
     EXPECT_TRUE(err.retryable);
     EXPECT_EQ(err.category, ErrorCategory::kTimeout);
     ASSERT_TRUE(err.retry_after_ms.has_value());
@@ -118,7 +118,7 @@ TEST(F16aErrorTest, MakeErrorPopulatesAgentFriendlyFields) {
 // Empty message falls back to the CX_ERR_ token (never an empty string).
 TEST(F16aErrorTest, EmptyMessageFallsBackToCode) {
     auto err = MakeF16aError(F16aErrorCode::kAuthDenied);
-    EXPECT_EQ(err.message, "CX_ERR_F16A_AUTH_DENIED");
+    EXPECT_EQ(err.message, "CX_ERR_IMPORT_AUTH_DENIED");
 }
 
 // Required structured_data keys (GEN-Agent #5) for the codes that declare them.
@@ -146,7 +146,7 @@ TEST(F16aErrorTest, StatusBridgePreservesIdentityInMessage) {
     Status s = F16aStatus(F16aErrorCode::kCrossTenantRef, "ref db_conn_a not in tenant t1");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kPermissionDenied);
-    EXPECT_NE(s.message().find("CX_ERR_F16A_CROSS_TENANT_REF"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_IMPORT_CROSS_TENANT_REF"), std::string::npos);
 
     EXPECT_EQ(F16aStatus(F16aErrorCode::kInvalidSql).code(), StatusCode::kInvalidArgument);
     EXPECT_EQ(F16aStatus(F16aErrorCode::kConnectionFailed).code(), StatusCode::kUnavailable);
@@ -161,7 +161,7 @@ TEST(F16aErrorTest, ExceptionCarriesFullError) {
                             "denied keyword UNION");
     } catch (const F16aException& e) {
         EXPECT_EQ(e.code(), F16aErrorCode::kInvalidSql);
-        EXPECT_EQ(e.GetError().code, "CX_ERR_F16A_INVALID_SQL");
+        EXPECT_EQ(e.GetError().code, "CX_ERR_IMPORT_INVALID_SQL");
         EXPECT_EQ(e.GetError().message, "denied keyword UNION");
     }
 }
@@ -220,7 +220,7 @@ TEST(F16aResponseTest, ProgressBodyFailedEmbedsErrorBody) {
     auto body = BuildProgressResponse(task);
     EXPECT_EQ(body["status"], "failed");
     ASSERT_TRUE(body["error"].is_object());
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F16A_TIMEOUT");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_IMPORT_TIMEOUT");
     EXPECT_EQ(body["error"]["retryable"], true);
     EXPECT_EQ(body["error"]["category"], "timeout");
     EXPECT_EQ(body["error"]["retry_after_ms"], 30000);

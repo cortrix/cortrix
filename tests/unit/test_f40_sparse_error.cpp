@@ -29,22 +29,22 @@ TEST(F40SparseErrorTest, CountIsFive) {
 
 TEST(F40SparseErrorTest, CodeStringsMatchArchRegistry) {
     EXPECT_STREQ(SparseErrorCodeString(SparseErrorCode::kInferenceFailed),
-                 "CX_ERR_F40_INFERENCE_FAILED");
+                 "CX_ERR_SPARSE_INFERENCE_FAILED");
     EXPECT_STREQ(SparseErrorCodeString(SparseErrorCode::kSparseSerializeFailed),
-                 "CX_ERR_F40_SPARSE_SERIALIZE_FAILED");
+                 "CX_ERR_SPARSE_SERIALIZE_FAILED");
     EXPECT_STREQ(SparseErrorCodeString(SparseErrorCode::kInvertedIndexWriteFailed),
-                 "CX_ERR_F40_INVERTED_INDEX_WRITE_FAILED");
+                 "CX_ERR_SPARSE_INVERTED_INDEX_WRITE_FAILED");
     EXPECT_STREQ(SparseErrorCodeString(SparseErrorCode::kSparseRetrieverFailed),
-                 "CX_ERR_F40_SPARSE_RETRIEVER_FAILED");
+                 "CX_ERR_SPARSE_RETRIEVER_FAILED");
     EXPECT_STREQ(SparseErrorCodeString(SparseErrorCode::kOnnxRuntimeInitFailed),
-                 "CX_ERR_F40_ONNX_RUNTIME_INIT_FAILED");
+                 "CX_ERR_SPARSE_ONNX_RUNTIME_INIT_FAILED");
 }
 
 TEST(F40SparseErrorTest, AllCodesUniqueAndPrefixed) {
     std::set<std::string> seen;
     for (auto code : kAll) {
         std::string s = SparseErrorCodeString(code);
-        EXPECT_EQ(s.rfind("CX_ERR_F40_", 0), 0u) << s;
+        EXPECT_EQ(s.rfind("CX_ERR_SPARSE_", 0), 0u) << s;
         EXPECT_TRUE(seen.insert(s).second) << "duplicate " << s;
     }
     EXPECT_EQ(seen.size(), 5u);
@@ -106,7 +106,7 @@ TEST(F40SparseErrorTest, HasRequiredStructuredData) {
 TEST(F40SparseErrorTest, MakeSparseErrorFillsFromRegistry) {
     auto err = MakeSparseError(SparseErrorCode::kSparseRetrieverFailed,
                                {{"ns_id", "ns_01"}, {"fallback_used", true}});
-    EXPECT_EQ(err.code, "CX_ERR_F40_SPARSE_RETRIEVER_FAILED");
+    EXPECT_EQ(err.code, "CX_ERR_SPARSE_RETRIEVER_FAILED");
     EXPECT_TRUE(err.retryable);
     EXPECT_EQ(err.category, ErrorCategory::kTransient);
     ASSERT_TRUE(err.retry_after_ms.has_value());
@@ -117,7 +117,7 @@ TEST(F40SparseErrorTest, MakeSparseErrorFillsFromRegistry) {
 
 TEST(F40SparseErrorTest, MakeSparseErrorDefaultMessageIsCode) {
     auto err = MakeSparseError(SparseErrorCode::kInferenceFailed);
-    EXPECT_EQ(err.message, "CX_ERR_F40_INFERENCE_FAILED");
+    EXPECT_EQ(err.message, "CX_ERR_SPARSE_INFERENCE_FAILED");
     auto err2 = MakeSparseError(SparseErrorCode::kInferenceFailed,
                                 nlohmann::json::object(), "custom detail");
     EXPECT_EQ(err2.message, "custom detail");
@@ -127,7 +127,7 @@ TEST(F40SparseErrorTest, MakeSparseErrorSerializesToAgentFriendlyBody) {
     auto err = MakeSparseError(SparseErrorCode::kInvertedIndexWriteFailed,
                                {{"child_id", "c1"}, {"term_count", 7}});
     auto j = agent_friendly::ToJson(err);
-    EXPECT_EQ(j["code"], "CX_ERR_F40_INVERTED_INDEX_WRITE_FAILED");
+    EXPECT_EQ(j["code"], "CX_ERR_SPARSE_INVERTED_INDEX_WRITE_FAILED");
     EXPECT_EQ(j["retryable"], true);
     EXPECT_EQ(j["category"], "transient");
     EXPECT_EQ(j["retry_after_ms"], 1000);
@@ -138,7 +138,7 @@ TEST(F40SparseErrorTest, StatusBridgeCarriesTokenAndCode) {
     Status s = SparseStatus(SparseErrorCode::kOnnxRuntimeInitFailed, "bad path");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);  // permanent/operator-side
-    EXPECT_NE(s.message().find("CX_ERR_F40_ONNX_RUNTIME_INIT_FAILED"),
+    EXPECT_NE(s.message().find("CX_ERR_SPARSE_ONNX_RUNTIME_INIT_FAILED"),
               std::string::npos);
     EXPECT_NE(s.message().find("bad path"), std::string::npos);
 }

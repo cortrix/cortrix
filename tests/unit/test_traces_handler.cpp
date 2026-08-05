@@ -94,7 +94,7 @@ TEST_F(TracesHandlerTest, NonAdminCrossUserIsUnauthorized) {
     auto r = handler_->GetSession("alice-sess", TraceFilter{}, RequesterContext{"mallory", false});
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kPermissionDenied);
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_UNAUTHORIZED"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_UNAUTHORIZED"), std::string::npos);
 }
 
 TEST_F(TracesHandlerTest, NonAdminUnknownSessionIsUnauthorizedNotLeaked) {
@@ -102,7 +102,7 @@ TEST_F(TracesHandlerTest, NonAdminUnknownSessionIsUnauthorizedNotLeaked) {
     // gets UNAUTHORIZED (we do not reveal nonexistence).
     auto r = handler_->GetSession("ghost-sess", TraceFilter{}, RequesterContext{"alice", false});
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_UNAUTHORIZED"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_UNAUTHORIZED"), std::string::npos);
 }
 
 TEST_F(TracesHandlerTest, AdminReadsAnyOwnedSession) {
@@ -137,7 +137,7 @@ TEST_F(TracesHandlerTest, AdminNonexistentSessionIsNotFound) {
     auto r = handler_->GetSession("ghost-sess", TraceFilter{}, RequesterContext{"root", true});
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kNotFound);
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_SESSION_NOT_FOUND"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_SESSION_NOT_FOUND"), std::string::npos);
 }
 
 // A session that exists in agent_trace but has no interaction_log owner: admin can
@@ -160,7 +160,7 @@ TEST_F(TracesHandlerTest, InvalidFilterTokenPropagated) {
     bad.limit = 0;
     auto r = handler_->GetSession("alice-sess", bad, RequesterContext{"alice", false});
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
 }
 
 TEST_F(TracesHandlerTest, ResponseSizeWarningOnLargePage) {

@@ -71,25 +71,25 @@ void ParseAndInstallObservabilityHeaders(const httplib::Request& req,
     }
 }
 
-// ---- error rendering (GEN-Agent CX_ERR_F13_* body, §9.1) -------------------
+// ---- error rendering (GEN-Agent CX_ERR_TRACE_* body, §9.1) -------------------
 
-// Recover the "CX_ERR_F13_*" token from a Status message ("CX_ERR_F13_X: detail").
+// Recover the "CX_ERR_TRACE_*" token from a Status message ("CX_ERR_TRACE_X: detail").
 // "" if the message does not start with the token. Mirrors batch_submit_service's
 // ExtractCxCode (the handlers encode the identity in the message prefix).
 std::string ExtractCxCode(const std::string& message) {
-    if (message.rfind("CX_ERR_F13_", 0) != 0) return "";
+    if (message.rfind("CX_ERR_TRACE_", 0) != 0) return "";
     const size_t end = message.find_first_of(": \t", 0);
     return end == std::string::npos ? message : message.substr(0, end);
 }
 
-// Map a recovered "CX_ERR_F13_*" token back to its F13ErrorCode. The handlers only
+// Map a recovered "CX_ERR_TRACE_*" token back to its F13ErrorCode. The handlers only
 // ever emit these four on the read path; anything unrecognized is treated as the
 // internal fault (defensive — keeps the body well-formed).
 F13ErrorCode F13CodeFromToken(const std::string& cx) {
-    if (cx == "CX_ERR_F13_SESSION_NOT_FOUND")     return F13ErrorCode::kSessionNotFound;
-    if (cx == "CX_ERR_F13_INVALID_FILTER")        return F13ErrorCode::kInvalidFilter;
-    if (cx == "CX_ERR_F13_INTERACTION_NOT_FOUND") return F13ErrorCode::kInteractionNotFound;
-    if (cx == "CX_ERR_F13_UNAUTHORIZED")          return F13ErrorCode::kUnauthorized;
+    if (cx == "CX_ERR_TRACE_SESSION_NOT_FOUND")     return F13ErrorCode::kSessionNotFound;
+    if (cx == "CX_ERR_TRACE_INVALID_FILTER")        return F13ErrorCode::kInvalidFilter;
+    if (cx == "CX_ERR_TRACE_INTERACTION_NOT_FOUND") return F13ErrorCode::kInteractionNotFound;
+    if (cx == "CX_ERR_TRACE_UNAUTHORIZED")          return F13ErrorCode::kUnauthorized;
     return F13ErrorCode::kInternal;
 }
 
@@ -126,7 +126,7 @@ json BuildF13StructuredData(F13ErrorCode code, const std::string& id_value,
     return sd;
 }
 
-// Render a handler Status (carrying a CX_ERR_F13_* token) as the GEN-Agent error
+// Render a handler Status (carrying a CX_ERR_TRACE_* token) as the GEN-Agent error
 // body + the mapped HTTP status. `id_value` = the session_id / interaction_id the
 // route was operating on (used to fill structured_data for the NOT_FOUND codes).
 void WriteF13Error(httplib::Response& res, const Status& status,
@@ -154,7 +154,7 @@ void WriteF13Error(httplib::Response& res, const Status& status,
     res.status = status.http_status();
 }
 
-// Render a route-originated CX_ERR_F13_INVALID_FILTER (a malformed query param) with
+// Render a route-originated CX_ERR_TRACE_INVALID_FILTER (a malformed query param) with
 // the exact offending field + reason + a PII-guarded preview (§9.2 — value_preview
 // optional, first 100 chars). HTTP 400.
 void WriteF13InvalidFilter(httplib::Response& res, const std::string& request_id,
@@ -167,7 +167,7 @@ void WriteF13InvalidFilter(httplib::Response& res, const std::string& request_id
     json body;
     body["error"] = agent_friendly::ToJson(agent_trace::MakeF13Error(
         F13ErrorCode::kInvalidFilter, std::move(sd),
-        "CX_ERR_F13_INVALID_FILTER: " + field + " " + reason));
+        "CX_ERR_TRACE_INVALID_FILTER: " + field + " " + reason));
     if (!request_id.empty()) {
         body["error"]["request_id"] = request_id;
         res.set_header("X-Request-Id", request_id);
@@ -591,7 +591,7 @@ void RegisterInteractionsRoutesPerNs(httplib::Server& server,
         if (!RequireNamespaceParam(req, res, rctx, ns_param, &ns)) return;
         resource::NamespaceFacade facade(pool, ns);
         if (Status acq = facade.Acquire(); !acq.ok()) {
-            WriteF13Error(res, Status::NotFound("CX_ERR_F13_SESSION_NOT_FOUND: namespace '" +
+            WriteF13Error(res, Status::NotFound("CX_ERR_TRACE_SESSION_NOT_FOUND: namespace '" +
                                                 ns + "' not found"),
                           rctx.request_id, ns);
             return;

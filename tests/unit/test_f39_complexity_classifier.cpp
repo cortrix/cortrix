@@ -151,7 +151,7 @@ TEST_F(F39ClassifierTest, ForceRouteInvalidReturnsErrorAndLeavesCtxUntouched) {
     Status s = c.RouteAndUpdateContext(ctx, std::string("banana"));
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
-    EXPECT_NE(s.message().find("CX_ERR_F39_FORCE_ROUTE_INVALID"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_ROUTER_FORCE_ROUTE_INVALID"), std::string::npos);
     EXPECT_NE(s.message().find("banana"), std::string::npos);
     // ctx untouched (routing_path still default empty).
     EXPECT_EQ(ctx.routing_path, "");
@@ -185,7 +185,7 @@ TEST_F(F39ClassifierTest, NsForceRouteInvalidReturnsError) {
     Status s = c.RouteAndUpdateContext(ctx);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
-    EXPECT_NE(s.message().find("CX_ERR_F39_FORCE_ROUTE_INVALID"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_ROUTER_FORCE_ROUTE_INVALID"), std::string::npos);
 }
 
 TEST_F(F39ClassifierTest, AgentOverrideBeatsNsForceRoute) {
@@ -392,7 +392,7 @@ TEST_F(F39ClassifierTest, ClassifyTotalOnPersistentFault) {
     ClassificationResult r = c.Classify(ClassifierInput{"q", {}, std::nullopt});
     EXPECT_EQ(r.label, "complex");
     ASSERT_TRUE(r.error_code.has_value());
-    EXPECT_EQ(*r.error_code, "CX_ERR_F39_INFERENCE_FAILED");
+    EXPECT_EQ(*r.error_code, "CX_ERR_ROUTER_INFERENCE_FAILED");
 }
 
 // --- §6.2: multi-turn signal detection (borrowed 6) ---------------------------

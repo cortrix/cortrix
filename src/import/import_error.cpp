@@ -20,22 +20,22 @@ namespace {
 // 30s (the §5.3 example body) — a re-run of a slow query benefits from a longer
 // pause. The 4 non-retryable codes carry null.
 constexpr F16aErrorInfo kConnectionFailed
-    {"CX_ERR_F16A_CONNECTION_FAILED",   ErrorCategory::kTransient, true,  5000,         503};
+    {"CX_ERR_IMPORT_CONNECTION_FAILED",   ErrorCategory::kTransient, true,  5000,         503};
 constexpr F16aErrorInfo kAuthDenied
-    {"CX_ERR_F16A_AUTH_DENIED",         ErrorCategory::kAuth,      false, std::nullopt, 403};
+    {"CX_ERR_IMPORT_AUTH_DENIED",         ErrorCategory::kAuth,      false, std::nullopt, 403};
 constexpr F16aErrorInfo kInvalidSql
-    {"CX_ERR_F16A_INVALID_SQL",         ErrorCategory::kPermanent, false, std::nullopt, 400};
+    {"CX_ERR_IMPORT_INVALID_SQL",         ErrorCategory::kPermanent, false, std::nullopt, 400};
 constexpr F16aErrorInfo kTimeout
-    {"CX_ERR_F16A_TIMEOUT",             ErrorCategory::kTimeout,   true,  30000,        504};
+    {"CX_ERR_IMPORT_TIMEOUT",             ErrorCategory::kTimeout,   true,  30000,        504};
 constexpr F16aErrorInfo kRowsLimitExceeded
-    {"CX_ERR_F16A_ROWS_LIMIT_EXCEEDED", ErrorCategory::kQuota,     false, std::nullopt, 413};
+    {"CX_ERR_IMPORT_ROWS_LIMIT_EXCEEDED", ErrorCategory::kQuota,     false, std::nullopt, 413};
 constexpr F16aErrorInfo kCrossTenantRef
-    {"CX_ERR_F16A_CROSS_TENANT_REF",    ErrorCategory::kAuth,      false, std::nullopt, 403};
+    {"CX_ERR_IMPORT_CROSS_TENANT_REF",    ErrorCategory::kAuth,      false, std::nullopt, 403};
 // [R2-M5] Catch-all for an unexpected import throw (DB driver / allocation). Transient +
 // retryable with a short backoff — a transient cause may clear on a re-run, and the
 // retryable<->retry_after_ms invariant (GEN-Agent #6, test_import_error) requires a value.
 constexpr F16aErrorInfo kInternal
-    {"CX_ERR_F16A_INTERNAL",            ErrorCategory::kTransient, true,  1000,         500};
+    {"CX_ERR_IMPORT_INTERNAL",            ErrorCategory::kTransient, true,  1000,         500};
 
 }  // namespace
 

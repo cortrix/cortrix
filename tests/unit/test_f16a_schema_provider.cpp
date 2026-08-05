@@ -60,7 +60,7 @@ protected:
 
 TEST_F(F16aSchemaTest, MetadataMatchesFrozenInterface) {
     F16aSchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F16a");
+    EXPECT_EQ(p.FeatureName(), "db_import");
     EXPECT_EQ(p.CurrentVersion(), 1);
     EXPECT_EQ(kF16aSchemaVersion, 1);
 }

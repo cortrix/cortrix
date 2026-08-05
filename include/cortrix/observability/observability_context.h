@@ -108,7 +108,7 @@ private:
 /// single length + character-whitelist rule reused by both entry points. Per
 /// CODING_CONVENTIONS §3 / F-FREEZE-1 it returns Result<T> + Status (NO
 /// Result<T,E> double-param); an invalid value yields an InvalidArgument Status
-/// carrying the CX_ERR_F13_INVALID_FILTER token, re-inflated to the full
+/// carrying the CX_ERR_TRACE_INVALID_FILTER token, re-inflated to the full
 /// Agent-friendly body at the API boundary.
 class ObservabilityValidator {
 public:

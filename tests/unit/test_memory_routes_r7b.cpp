@@ -112,7 +112,7 @@ protected:
 };
 
 // POST /memory/extract with extraction disabled (null service) → 503 + the
-// CX_ERR_MEM02_LLM_DISABLED agent error (the `!extraction || !enabled()` guard).
+// CX_ERR_MEMEXTRACT_LLM_DISABLED agent error (the `!extraction || !enabled()` guard).
 TEST_F(MemoryRoutesR7bTest, ExtractDisabledReturns503) {
     httplib::Client cli("127.0.0.1", port_);
     json body{{"ns", "default"}, {"content", "user: hi\nassistant: hello"}};
@@ -120,7 +120,7 @@ TEST_F(MemoryRoutesR7bTest, ExtractDisabledReturns503) {
                         "application/json");
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 503);
-    EXPECT_NE(res->body.find("CX_ERR_MEM02_LLM_DISABLED"), std::string::npos);
+    EXPECT_NE(res->body.find("CX_ERR_MEMEXTRACT_LLM_DISABLED"), std::string::npos);
 }
 
 // POST /memory/extract/batch disabled → 503 (the batch route's guard arm).
@@ -131,7 +131,7 @@ TEST_F(MemoryRoutesR7bTest, ExtractBatchDisabledReturns503) {
                         "application/json");
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 503);
-    EXPECT_NE(res->body.find("CX_ERR_MEM02_LLM_DISABLED"), std::string::npos);
+    EXPECT_NE(res->body.find("CX_ERR_MEMEXTRACT_LLM_DISABLED"), std::string::npos);
 }
 
 // POST /memory/extract/run_for_ns disabled → 503 (the backfill route's guard arm).
@@ -142,7 +142,7 @@ TEST_F(MemoryRoutesR7bTest, ExtractRunForNsDisabledReturns503) {
                         "application/json");
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 503);
-    EXPECT_NE(res->body.find("CX_ERR_MEM02_LLM_DISABLED"), std::string::npos);
+    EXPECT_NE(res->body.find("CX_ERR_MEMEXTRACT_LLM_DISABLED"), std::string::npos);
 }
 
 // POST /memory/invalidations/{id}/revoke with null extraction → 503 (the
@@ -154,7 +154,7 @@ TEST_F(MemoryRoutesR7bTest, RevokeWithoutExtractionReturns503) {
                         "{}", "application/json");
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 503);
-    EXPECT_NE(res->body.find("CX_ERR_MEM02_LLM_DISABLED"), std::string::npos);
+    EXPECT_NE(res->body.find("CX_ERR_MEMEXTRACT_LLM_DISABLED"), std::string::npos);
 }
 
 // GET /memory/invalidations → 200 with the canonical operation_log pointer (the

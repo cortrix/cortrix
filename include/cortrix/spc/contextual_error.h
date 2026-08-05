@@ -11,7 +11,7 @@
 namespace cortrix::spc {
 
 /// The 5 contextual-retrieval error identities (registered in the
-/// §4.1.11). Each maps to a stable `CX_ERR_F35_*` string + a GEN-Agent category +
+/// §4.1.11). Each maps to a stable `CX_ERR_CONTEXTUAL_*` string + a GEN-Agent category +
 /// retryability via the canonical registry below.
 ///
 /// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
@@ -37,7 +37,7 @@ constexpr int kContextualErrorCodeCount = 5;
 
 /// Canonical, immutable attributes of one error code.
 struct ContextualErrorInfo {
-    const char* cx_code;                      ///< stable "CX_ERR_F35_*" string
+    const char* cx_code;                      ///< stable "CX_ERR_CONTEXTUAL_*" string
     agent_friendly::ErrorCategory category;   ///< transient/quota/permanent
     bool retryable;
     std::optional<int> retry_after_ms;        ///< null unless retryable per §8
@@ -47,7 +47,7 @@ struct ContextualErrorInfo {
 /// throws / never returns a partial). Single source of truth for the 5 rows.
 const ContextualErrorInfo& GetContextualErrorInfo(ContextualErrorCode code);
 
-/// The "CX_ERR_F35_*" string for `code`.
+/// The "CX_ERR_CONTEXTUAL_*" string for `code`.
 const char* ContextualErrorCodeString(ContextualErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry
@@ -71,7 +71,7 @@ agent_friendly::AgentFriendlyError MakeContextualError(
 StatusCode ContextualErrorToStatusCode(ContextualErrorCode code);
 
 /// Bridge a contextual-retrieval error to a plain Status for the Result<T>/Status surface
-/// (F-FREEZE-1). The message is prefixed with the CX_ERR_F35_* token so the exact
+/// (F-FREEZE-1). The message is prefixed with the CX_ERR_CONTEXTUAL_* token so the exact
 /// identity is recoverable at the API/SDK boundary (which re-inflates the full
 /// Agent-friendly body via MakeContextualError). cortrix::Status is not widened.
 Status ContextualStatus(ContextualErrorCode code, const std::string& detail = "");

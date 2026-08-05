@@ -64,7 +64,7 @@ protected:
 
 TEST(InteractionSourcesSchemaProviderTest, IdentityAndVersion) {
     InteractionSourcesSchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F13_interaction_sources");
+    EXPECT_EQ(p.FeatureName(), "interaction_sources");
     EXPECT_EQ(p.CurrentVersion(), 1);
     EXPECT_EQ(kInteractionSourcesSchemaVersion, 1);
 }
@@ -85,7 +85,7 @@ TEST(InteractionSourcesSchemaProviderTest, UnexpectedVersionStepIsError) {
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     Status st = p.Migrate(db, 1, 2);
     EXPECT_FALSE(st.ok());
-    EXPECT_NE(st.message().find("CX_ERR_F13_INTERNAL"), std::string::npos);
+    EXPECT_NE(st.message().find("CX_ERR_TRACE_INTERNAL"), std::string::npos);
     sqlite3_close(db);
 }
 
@@ -102,7 +102,7 @@ TEST(InteractionSourcesSchemaProviderTest, FreshMigrationSucceeds) {
 
 // sqlite3_exec failure branch: a pre-existing index named "interaction_sources"
 // defeats the "CREATE TABLE IF NOT EXISTS interaction_sources" DDL (IF NOT EXISTS
-// only tolerates same-type collisions), so Migrate returns CX_ERR_F13_INTERNAL.
+// only tolerates same-type collisions), so Migrate returns CX_ERR_TRACE_INTERNAL.
 TEST(InteractionSourcesSchemaProviderTest, ExecFailureReportsInternalError) {
     InteractionSourcesSchemaProvider p;
     sqlite3* db = nullptr;
@@ -113,7 +113,7 @@ TEST(InteractionSourcesSchemaProviderTest, ExecFailureReportsInternalError) {
                            nullptr, nullptr, nullptr), SQLITE_OK);
     Status st = p.Migrate(db, 0, kInteractionSourcesSchemaVersion);
     EXPECT_FALSE(st.ok());
-    EXPECT_NE(st.message().find("CX_ERR_F13_INTERNAL"), std::string::npos);
+    EXPECT_NE(st.message().find("CX_ERR_TRACE_INTERNAL"), std::string::npos);
     sqlite3_close(db);
 }
 

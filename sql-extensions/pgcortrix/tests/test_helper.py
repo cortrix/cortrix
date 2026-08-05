@@ -5,7 +5,7 @@ replaced by a fake urlopen (FakeUrlopen / capture). These cover the three things
 the standalone DoD asks for (L1-α briefing §6):
   * HTTP call shape — URL, method, body, headers per endpoint
   * user_id resolution — "pg:<PG_user>:<pid>" synthesis + parse, memory isolation mandatory
-  * error-code mapping — CX_ERR_F14_* + transport → plpy.error()
+  * error-code mapping — CX_ERR_PGCORTRIX_* + transport → plpy.error()
 
 Run: python3 -m unittest discover -s tests  (from the pgcortrix/ dir)
 """
@@ -338,7 +338,7 @@ class TestMem05AndFilter(unittest.TestCase):
         client, _, cap = make_client()
         with self.assertRaises(h.CortrixError) as ctx:
             client.list_interactions("ns", "u", {"evil": 1}, 50, 0)
-        self.assertEqual(ctx.exception.code, "CX_ERR_F14_INVALID_FILTER")
+        self.assertEqual(ctx.exception.code, "CX_ERR_PGCORTRIX_INVALID_FILTER")
         self.assertEqual(ctx.exception.structured_data["invalid_field"],
                          ["evil"])
         self.assertEqual(len(cap.requests), 0)
@@ -354,7 +354,7 @@ class TestMem05AndFilter(unittest.TestCase):
 
     def test_invalid_filter_error_body_is_agent_friendly(self):
         err = h.CortrixError(
-            "CX_ERR_F14_INVALID_FILTER", "bad",
+            "CX_ERR_PGCORTRIX_INVALID_FILTER", "bad",
             {"invalid_field": ["x"]})
         body = err.to_body()
         self.assertEqual(set(body), {"code", "message", "retryable",
@@ -378,7 +378,7 @@ class TestSsrf(unittest.TestCase):
     def test_block_cloud_metadata_ip(self):
         with self.assertRaises(h.CortrixError) as ctx:
             h.validate_endpoint("http://169.254.169.254/latest/meta-data/")
-        self.assertEqual(ctx.exception.code, "CX_ERR_F14_ENDPOINT_BLOCKED")
+        self.assertEqual(ctx.exception.code, "CX_ERR_PGCORTRIX_ENDPOINT_BLOCKED")
 
     def test_block_private_ranges(self):
         for ep in ("http://10.0.0.5:8420", "http://172.16.0.1:8420",
@@ -404,7 +404,7 @@ class TestSsrf(unittest.TestCase):
             gucs={"pgcortrix.endpoint": "http://169.254.169.254"})
         with self.assertRaises(h.CortrixError) as ctx:
             client.search("ns", "q", 1, None, False)
-        self.assertEqual(ctx.exception.code, "CX_ERR_F14_ENDPOINT_BLOCKED")
+        self.assertEqual(ctx.exception.code, "CX_ERR_PGCORTRIX_ENDPOINT_BLOCKED")
         self.assertEqual(len(cap.requests), 0)
 
 

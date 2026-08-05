@@ -44,7 +44,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS doc_fts5_index USING fts5(
 class F41SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     /// Registration key (aligns with the other SchemaProvider names).
-    std::string FeatureName() const override { return "F41"; }
+    std::string FeatureName() const override { return "doc_summary"; }
 
     /// V1 = the doc_fts5_index virtual table. Phase 2 (§15) would bump this.
     int CurrentVersion() const override { return 1; }
@@ -52,7 +52,7 @@ public:
     /// from_ver 0 → 1: CREATE the doc_fts5_index FTS5 virtual table. An
     /// already-current (1 → 1) call is accepted defensively (CREATE ... IF NOT
     /// EXISTS is idempotent). Any other (from, to) is a version mismatch
-    /// (CX_ERR_F41_SCHEMA_VERSION_MISMATCH) until a Phase-2 step is defined.
+    /// (CX_ERR_DOCSUMMARY_SCHEMA_VERSION_MISMATCH) until a Phase-2 step is defined.
     Status Migrate(sqlite3* db, int from_ver, int to_ver) override;
 };
 

@@ -20,15 +20,15 @@ namespace {
 // 5000ms backoff (§5.2 example body). BUDGET_EXCEEDED (quota) + LLM_DISABLED
 // (permanent) carry no retry hint.
 constexpr Mem02ErrorInfo kExtractLlmTimeout
-    {"CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT",      504, ErrorCategory::kTimeout,    true,  5000};
+    {"CX_ERR_MEMEXTRACT_LLM_TIMEOUT",      504, ErrorCategory::kTimeout,    true,  5000};
 constexpr Mem02ErrorInfo kExtractInvalidOutput
-    {"CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT",   500, ErrorCategory::kTransient,  true,  5000};
+    {"CX_ERR_MEMEXTRACT_INVALID_OUTPUT",   500, ErrorCategory::kTransient,  true,  5000};
 constexpr Mem02ErrorInfo kExtractBudgetExceeded
-    {"CX_ERR_MEM02_EXTRACT_BUDGET_EXCEEDED",  429, ErrorCategory::kQuota,      false, std::nullopt};
+    {"CX_ERR_MEMEXTRACT_BUDGET_EXCEEDED",  429, ErrorCategory::kQuota,      false, std::nullopt};
 constexpr Mem02ErrorInfo kContradictionAmbiguous
-    {"CX_ERR_MEM02_CONTRADICTION_AMBIGUOUS",  500, ErrorCategory::kTransient,  true,  5000};
+    {"CX_ERR_MEMEXTRACT_CONTRADICTION_AMBIGUOUS",  500, ErrorCategory::kTransient,  true,  5000};
 constexpr Mem02ErrorInfo kLlmDisabled
-    {"CX_ERR_MEM02_LLM_DISABLED",             503, ErrorCategory::kPermanent,  false, std::nullopt};
+    {"CX_ERR_MEMEXTRACT_LLM_DISABLED",             503, ErrorCategory::kPermanent,  false, std::nullopt};
 
 }  // namespace
 

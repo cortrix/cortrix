@@ -29,7 +29,7 @@ namespace cortrix::spc {
 class F03SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     /// Registration key (aligns with the other SchemaProvider names).
-    std::string FeatureName() const override { return "F03"; }
+    std::string FeatureName() const override { return "enricher"; }
 
     /// Schema version. V1 = blocks +3 cols + entities + FTS5. V2 (R9 Tier C) =
     /// entities.block_id FK gains ON DELETE CASCADE so GC hard-delete / purge can

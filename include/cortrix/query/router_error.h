@@ -14,7 +14,7 @@ namespace cortrix::query {
 /// Thrown by an IComplexityClassifierBackend when a single inference fails
 /// transiently (the L3 path). QueryComplexityClassifier catches it,
 /// retries `max_inference_retries` times with exponential back-off (50/100/200ms),
-/// then transparently defaults to the Complex path (CX_ERR_F39_INFERENCE_FAILED).
+/// then transparently defaults to the Complex path (CX_ERR_ROUTER_INFERENCE_FAILED).
 /// Backends must NOT let any other exception escape across the IClassifier
 /// boundary (IClassifier::Classify is total; see retrieval/classifier.h).
 class RouterInferenceError : public std::runtime_error {
@@ -23,7 +23,7 @@ public:
 };
 
 /// The 4 query-router error identities. Each maps to a stable
-/// `CX_ERR_F39_*` string + a GEN-Agent category + retryability via the canonical
+/// `CX_ERR_ROUTER_*` string + a GEN-Agent category + retryability via the canonical
 /// registry below.
 ///
 /// Per CODING_CONVENTIONS / B_R1+C_R2 template A, Cortrix uses Result<T> + Status
@@ -36,10 +36,10 @@ public:
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may only be appended.
 enum class RouterErrorCode {
-    kClassifierLoadFailed,  ///< CX_ERR_F39_CLASSIFIER_LOAD_FAILED — DistilBERT-tiny ONNX load failed (L2, permanent)
-    kInferenceFailed,       ///< CX_ERR_F39_INFERENCE_FAILED — single-query inference failed → retry then degrade (L3, transient)
-    kForceRouteInvalid,     ///< CX_ERR_F39_FORCE_ROUTE_INVALID — ?route= / NS force_route is not auto/simple/complex/chat (permanent)
-    kFallbackTriggered,     ///< CX_ERR_F39_FALLBACK_TRIGGERED — transparent degrade to Complex fired (transient)
+    kClassifierLoadFailed,  ///< CX_ERR_ROUTER_CLASSIFIER_LOAD_FAILED — DistilBERT-tiny ONNX load failed (L2, permanent)
+    kInferenceFailed,       ///< CX_ERR_ROUTER_INFERENCE_FAILED — single-query inference failed → retry then degrade (L3, transient)
+    kForceRouteInvalid,     ///< CX_ERR_ROUTER_FORCE_ROUTE_INVALID — ?route= / NS force_route is not auto/simple/complex/chat (permanent)
+    kFallbackTriggered,     ///< CX_ERR_ROUTER_FALLBACK_TRIGGERED — transparent degrade to Complex fired (transient)
 };
 
 /// Total number of query-router error codes (= 4). Compile-time anchor
@@ -48,7 +48,7 @@ constexpr int kRouterErrorCodeCount = 4;
 
 /// Canonical, immutable attributes of one error code.
 struct RouterErrorInfo {
-    const char* cx_code;                      ///< stable "CX_ERR_F39_*" string
+    const char* cx_code;                      ///< stable "CX_ERR_ROUTER_*" string
     agent_friendly::ErrorCategory category;   ///< permanent / transient
     bool retryable;
     std::optional<int> retry_after_ms;        ///< per §4.3 (100 for inference; null/none otherwise)
@@ -58,7 +58,7 @@ struct RouterErrorInfo {
 /// throws / never returns a partial). Single source of truth for the 4 rows.
 const RouterErrorInfo& GetRouterErrorInfo(RouterErrorCode code);
 
-/// The "CX_ERR_F39_*" string for `code` (convenience over GetRouterErrorInfo).
+/// The "CX_ERR_ROUTER_*" string for `code` (convenience over GetRouterErrorInfo).
 const char* RouterErrorCodeString(RouterErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry

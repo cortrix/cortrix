@@ -131,7 +131,7 @@ std::string ScoringMetrics::Render() const {
     os << "# TYPE cortrix_f07_assign_duration_seconds histogram\n";
     RenderHist(os, "cortrix_f07_assign_duration_seconds", S().assign_dur);
 
-    os << "# HELP cortrix_f07_error_total F07 errors by CX_ERR_F07_* code (§4.4).\n";
+    os << "# HELP cortrix_f07_error_total F07 errors by CX_ERR_SCORING_* code (§4.4).\n";
     os << "# TYPE cortrix_f07_error_total counter\n";
     for (int i = 0; i < kF07ErrorCodeCount; ++i) {
         const auto code = static_cast<F07ErrorCode>(i);

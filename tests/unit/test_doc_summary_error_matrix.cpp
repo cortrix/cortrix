@@ -49,7 +49,7 @@ const std::set<StatusCode>& ValidStatusCodes() {
 
 class DocSummaryErrorMatrix : public ::testing::TestWithParam<DocSummaryErrorCode> {};
 
-// CX_ERR_F41_* token shape.
+// CX_ERR_DOCSUMMARY_* token shape.
 TEST_P(DocSummaryErrorMatrix, CodeStringWellFormed) {
     static const std::regex kPattern("^CX_(ERR|WARN)_F41_[A-Z][A-Z0-9_]*$");
     const std::string cx = DocSummaryErrorCodeString(GetParam());

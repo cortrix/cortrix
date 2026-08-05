@@ -173,7 +173,7 @@ Result<std::string> ContextualRetrievalEnricher::GenerateContextualizedText(
     llm::ChatCompletionResponse resp =
         llm_client_->Chat(BuildPrompt(chunk_text, doc_meta, ctx), call);
     if (!resp.ok()) {
-        // §7.3 L3: transport / timeout / rate-limit / network → CX_ERR_F35_LLM_FAILED
+        // §7.3 L3: transport / timeout / rate-limit / network → CX_ERR_CONTEXTUAL_LLM_FAILED
         // (transient, retryable; the caller degrades to the original embedding).
         return ContextualStatus(ContextualErrorCode::kLlmFailed, resp.status.message());
     }
@@ -219,7 +219,7 @@ EnrichResult ContextualRetrievalEnricher::Enrich(const std::string& chunk_text,
     if (!text.ok()) {
         // Transparent degrade: contextualization skipped, original embedding kept. The
         // contextualized_status records the failure; error_meta carries the
-        // Agent-friendly detail (which CX_ERR_F35_* identity).
+        // Agent-friendly detail (which CX_ERR_CONTEXTUAL_* identity).
         result.contextualized_status = 2;  // failed
         result.error_msg = text.status().message();
         result.error_meta.structured_data =

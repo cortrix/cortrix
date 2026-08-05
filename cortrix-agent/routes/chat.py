@@ -169,7 +169,7 @@ async def chat_endpoint(
         except Exception as exc:  # noqa: BLE001 - last-resort guard -> generic 4-field error
             logger.error("chat_unhandled_error", error=str(exc), session_id=body.session_id)
             fallback = AgentError(
-                "CX_ERR_F48_RAG_FAILED",
+                "CX_ERR_AGENT_RAG_FAILED",
                 message="Unhandled error during chat generation",
                 structured_data={"detail": str(exc)},
             )

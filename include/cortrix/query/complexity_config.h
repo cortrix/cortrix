@@ -28,7 +28,7 @@ struct ComplexityConfig {
     int max_inference_retries = 3;             ///< §7.3 L3 retry budget
 
     /// Boundary hard-limit: a NS-supplied confidence_threshold is valid
-    /// only inside [0.3, 0.8]. Callers raise CX_ERR_F39_FORCE_ROUTE_INVALID's sibling
+    /// only inside [0.3, 0.8]. Callers raise CX_ERR_ROUTER_FORCE_ROUTE_INVALID's sibling
     /// validation at config-resolution time (D3.5); the router clamps defensively.
     bool IsThresholdValid() const {
         return confidence_threshold >= 0.3f && confidence_threshold <= 0.8f;

@@ -18,7 +18,7 @@ namespace cortrix::spc {
 /// by a table_info check) so a re-run / already-current DB is a no-op.
 class F06SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
-    std::string FeatureName() const override { return "F06"; }
+    std::string FeatureName() const override { return "parser"; }
     int CurrentVersion() const override { return 1; }
 
     /// Phase 1 (from_ver 0 → 1): add namespaces.parser_config if absent.

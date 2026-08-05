@@ -165,7 +165,7 @@ TEST(F16aIntegration, RegisterThenImportEndToEndViaHandler) {
     EXPECT_EQ(ImportMetrics::Instance().RowsImportedTotal(), 3u);
 }
 
-// D2 security: an INSERT/UPDATE custom-SQL is rejected with CX_ERR_F16A_INVALID_SQL.
+// D2 security: an INSERT/UPDATE custom-SQL is rejected with CX_ERR_IMPORT_INVALID_SQL.
 TEST(F16aIntegration, D2WriteSqlRejected) {
     Stack s({Row("1", "Ada")});
     int http = 0;
@@ -175,10 +175,10 @@ TEST(F16aIntegration, D2WriteSqlRejected) {
     auto out = s.handler->HandleStartImport(
         {{"namespace", "ns"}, {"connection_ref", ref}, {"sql", "DELETE FROM users"}}, Admin(), http);
     EXPECT_EQ(http, 400);
-    EXPECT_EQ(out["error"]["code"], "CX_ERR_F16A_INVALID_SQL");
+    EXPECT_EQ(out["error"]["code"], "CX_ERR_IMPORT_INVALID_SQL");
 }
 
-// D7 cross-tenant: tenant t2 cannot use t1's ref (CX_ERR_F16A_CROSS_TENANT_REF, 403).
+// D7 cross-tenant: tenant t2 cannot use t1's ref (CX_ERR_IMPORT_CROSS_TENANT_REF, 403).
 TEST(F16aIntegration, D7CrossTenantRefRejected) {
     Stack s({Row("1", "Ada")});
     int http = 0;
@@ -189,7 +189,7 @@ TEST(F16aIntegration, D7CrossTenantRefRejected) {
         {{"namespace", "ns"}, {"connection_ref", ref}, {"table", "users"}}, Admin("t2", "evil"),
         http);
     EXPECT_EQ(http, 403);
-    EXPECT_EQ(out["error"]["code"], "CX_ERR_F16A_CROSS_TENANT_REF");
+    EXPECT_EQ(out["error"]["code"], "CX_ERR_IMPORT_CROSS_TENANT_REF");
 }
 
 // D3 full-overwrite: a re-import of the same table clears the prior Blocks first.

@@ -12,7 +12,7 @@ Startup follows design section 11.bis: read config -> build the LLM provider ->
 construct the Python SDK client (NOT connected in standalone) -> health-gate -> serve. In
 standalone development cortrix-server is not running, so the section-4 health ping is
 stubbed (``HEALTHCHECK_MODE=stub``, the default here) rather than failing fast with
-``CX_ERR_F48_CORTRIX_SERVER_UNREACHABLE``.
+``CX_ERR_AGENT_CORTRIX_SERVER_UNREACHABLE``.
 
 Naming rule: this is the Cortrix Agent service — never a "chatbot".
 """
@@ -168,7 +168,7 @@ def build_app(
     async def lifespan(_app: FastAPI):
         # Design section 11.bis startup sequence (standalone: health ping stubbed).
         # HEALTHCHECK_MODE=live would attempt the cortrix-server ping with 5 retries
-        # and raise CX_ERR_F48_CORTRIX_SERVER_UNREACHABLE on exhaustion (Step 4); the
+        # and raise CX_ERR_AGENT_CORTRIX_SERVER_UNREACHABLE on exhaustion (Step 4); the
         # live probe wiring is TODO(integration) once cortrix-server runs in deployment compose.
         healthcheck_mode = os.environ.get("HEALTHCHECK_MODE", "stub")
         logger.info(
@@ -228,7 +228,7 @@ def build_app(
             status_code=422,
             content={
                 "error": {
-                    "code": "CX_ERR_F48_VALIDATION_ERROR",
+                    "code": "CX_ERR_AGENT_VALIDATION_ERROR",
                     "message": str(first_msg),
                     "category": "permanent",
                     "retryable": False,

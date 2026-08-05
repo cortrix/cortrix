@@ -99,7 +99,7 @@ public:
     /// `source_child_id` / `source_parent_id` are the provenance written onto
     /// each question. On success returns exactly `config.questions_per_chunk`
     /// questions; on LLM failure / parse failure returns a non-OK Status carrying a
-    /// CX_ERR_F38_* token (the caller / Enrich() maps it to the degrade path).
+    /// CX_ERR_HYPE_* token (the caller / Enrich() maps it to the degrade path).
     /// `embedding` is left empty here (filled by the pipeline via OnnxEmbedder, S3).
     Result<std::vector<HypeQuestion>> GenerateHypeQuestions(
         const std::string& chunk_text,
@@ -111,15 +111,15 @@ public:
     /// Resolve parent_text via the injected ParentChunkStore. Returns
     /// empty string when parent_store is null OR `parent_id` is empty (optional
     /// context, reconcile 2). A store NOT_FOUND / DB error surfaces as a non-OK
-    /// Status carrying CX_ERR_F38_PARENT_NOT_FOUND (caller decides whether to treat
+    /// Status carrying CX_ERR_HYPE_PARENT_NOT_FOUND (caller decides whether to treat
     /// a missing parent as fatal or degrade to empty context).
     Result<std::string> ResolveParentText(const std::string& parent_id);
 
     /// Parse LLM output into exactly `expected_k` questions. Splits by
     /// newline, trims, drops empty lines. A count != expected_k is a parse failure
-    /// → non-OK Status carrying CX_ERR_F38_QUESTION_PARSE_FAILED (transient,
+    /// → non-OK Status carrying CX_ERR_HYPE_QUESTION_PARSE_FAILED (transient,
     /// retryable) with the actual/expected counts; an entirely empty output →
-    /// CX_ERR_F38_LLM_INVALID_OUTPUT. Static so it is unit-testable in isolation.
+    /// CX_ERR_HYPE_LLM_INVALID_OUTPUT. Static so it is unit-testable in isolation.
     static Result<std::vector<std::string>> ParseQuestions(
         const std::string& llm_output, int expected_k);
 

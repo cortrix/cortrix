@@ -14,7 +14,7 @@ namespace cortrix::retrieval {
 ///   threshold_incorrect <= crag_score < threshold_correct → "ambiguous"
 ///   crag_score < threshold_incorrect               → "incorrect"
 /// Invariant: 0.0 <= threshold_incorrect <= threshold_correct <= 1.0
-/// (violations → CX_ERR_F37_THRESHOLD_INVALID, validated by IsValid()).
+/// (violations → CX_ERR_CRAG_THRESHOLD_INVALID, validated by IsValid()).
 struct CragConfig {
     bool enabled = true;                  ///< §7.1 L1: NS-config path switch (default on / zero-config)
     float threshold_correct = 0.7f;       ///< NS-configurable upper boundary
@@ -36,7 +36,7 @@ struct CragConfig {
     int max_inference_retries = 3;
 
     /// True iff the thresholds satisfy the §6.2 invariant (in range + ordered).
-    /// Callers raise CX_ERR_F37_THRESHOLD_INVALID when this is false.
+    /// Callers raise CX_ERR_CRAG_THRESHOLD_INVALID when this is false.
     bool IsValid() const {
         return threshold_incorrect >= 0.0f &&
                threshold_correct <= 1.0f &&

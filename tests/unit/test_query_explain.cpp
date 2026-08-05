@@ -198,7 +198,7 @@ TEST(QueryExplainMarshalTest, GranularityIsEchoedVerbatim) {
 // ---------------- query routing ?route validation contract --------------------
 
 TEST(QueryExplainRouteValidationTest, RouterRejectsInvalidRouteToken) {
-    // The handler pre-validates ?route and returns CX_ERR_F39_FORCE_ROUTE_INVALID for
+    // The handler pre-validates ?route and returns CX_ERR_ROUTER_FORCE_ROUTE_INVALID for
     // an out-of-set token; the frozen router enforces the same contract (ctx left
     // untouched, non-ok Status carrying the query routing identity).
     query::QueryContext ctx;

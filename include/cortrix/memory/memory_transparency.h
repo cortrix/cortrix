@@ -39,7 +39,7 @@
 //     new value "user_edit" needs NO extractor enum change.
 //   - F-FREEZE-1: the design's `Result<T, MemoryTransparencyError>` (double-template)
 //     is forbidden. We use `Result<T>` (StatusOr) + `Status`; the domain identity is
-//     carried via the CX_ERR_MEM03_* token (mem03_error.h Mem03Status) and re-inflated
+//     carried via the CX_ERR_MEMORY_* token (mem03_error.h Mem03Status) and re-inflated
 //     to the Agent-friendly body at the API boundary.
 namespace cortrix::memory::transparency {
 
@@ -219,7 +219,7 @@ public:
 
 private:
     /// issue-5 A + L1.bis: fetch a block by id and verify the session user owns it;
-    /// a cross-user (or absent) block returns CX_ERR_MEM03_MEMORY_NOT_FOUND (404 mask
+    /// a cross-user (or absent) block returns CX_ERR_MEMORY_NOT_FOUND (404 mask
     /// — the response cannot distinguish "absent" from "not yours"). Records the
     /// cross_user_blocked metric when masking a real cross-user hit.
     Result<MemoryBlockRecord> FetchOwnedMemory(const std::string& memory_id,

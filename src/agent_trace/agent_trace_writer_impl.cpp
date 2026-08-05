@@ -136,7 +136,7 @@ Result<TraceSession> AgentTraceWriterImpl::Query(const std::string& session_id,
                                                  const TraceFilter& filter,
                                                  const observability::TraceContext* /*ctx*/) {
     const int64_t t0 = NowMs();
-    // ---- validate (§8.1 permanent input faults → CX_ERR_F13_INVALID_FILTER) ----
+    // ---- validate (§8.1 permanent input faults → CX_ERR_TRACE_INVALID_FILTER) ----
     if (filter.limit < 1 || filter.limit > 200) {
         return F13Status(F13ErrorCode::kInvalidFilter,
                          "limit must be in [1,200], got " + std::to_string(filter.limit));

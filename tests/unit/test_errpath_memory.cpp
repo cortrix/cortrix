@@ -1,9 +1,9 @@
 // Error-path coverage for the Memory codes that had ZERO referencing
 // test.
 //
-//  * CX_ERR_MEM03_STORE       — MemoryBlockAdapter::ListByUser prepare failure
+//  * CX_ERR_MEMORY_STORE       — MemoryBlockAdapter::ListByUser prepare failure
 //                               (memory_block_adapter.cpp:185). Direct adapter test.
-//  * CX_ERR_MEM02_BLOCK_NOT_FOUND — the revoke route maps a NotFound from the
+//  * CX_ERR_MEMEXTRACT_BLOCK_NOT_FOUND — the revoke route maps a NotFound from the
 //                               extraction service to http 404 + this code
 //                               (memory_routes.cpp:322-324). Wired-server test.
 //
@@ -39,7 +39,7 @@ using json = nlohmann::json;
 using ::testing::_;
 
 // ---------------------------------------------------------------------------
-// CX_ERR_MEM03_STORE — ListByUser prepare failure (ordinary input).
+// CX_ERR_MEMORY_STORE — ListByUser prepare failure (ordinary input).
 // ListByUser short-circuits to an empty result when db_handle() is null, so a no-op
 // store does NOT reach the code. We need a REAL open handle with NO schema: open the
 // store with run_schema_ddl=false so the `blocks` table is absent and the SELECT
@@ -56,13 +56,13 @@ TEST(MemoryBlockAdapterErrPathTest, ListByUserMissingSchemaReturnsMem03Store) {
     memory::MemoryBlockAdapter adapter(store, /*embedder=*/nullptr, /*vec_index=*/nullptr);
     auto r = adapter.ListByUser("alice");
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM03_STORE"), std::string::npos)
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_STORE"), std::string::npos)
         << "message: " << r.status().message();
     EXPECT_EQ(r.status().code(), StatusCode::kInternal);
 }
 
 // ---------------------------------------------------------------------------
-// CX_ERR_MEM02_BLOCK_NOT_FOUND — revoke a never-seeded block on a wired server.
+// CX_ERR_MEMEXTRACT_BLOCK_NOT_FOUND — revoke a never-seeded block on a wired server.
 // The real MemoryExtractionService.RevokeInvalidation fetches the block, gets a
 // NotFound (block id was never inserted), and the route maps http==404 to this code.
 // ---------------------------------------------------------------------------
@@ -133,20 +133,20 @@ protected:
 TEST_F(MemoryRevokeNotFoundTest, RevokeUnknownBlockReturnsBlockNotFound) {
     httplib::Client cli("127.0.0.1", port_);
     // ns is required AND the block was never inserted -> GetMemoryBlock NotFound ->
-    // route maps http 404 -> CX_ERR_MEM02_BLOCK_NOT_FOUND.
+    // route maps http 404 -> CX_ERR_MEMEXTRACT_BLOCK_NOT_FOUND.
     auto res = cli.Post("/api/v1/memory/invalidations/blk_never_inserted/revoke",
                         AuthHeaders(), R"({"ns":"default","reason":"x"})",
                         "application/json");
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 404) << res->body;
     auto body = json::parse(res->body);
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_MEM02_BLOCK_NOT_FOUND") << res->body;
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_MEMEXTRACT_BLOCK_NOT_FOUND") << res->body;
 }
 
 // ===========================================================================
 // DEFERRED — no hollow test written:
 //
-//   CX_ERR_MEM02_REVOKE_FAILED  (memory_routes.cpp:324, the else/http!=404 branch)
+//   CX_ERR_MEMEXTRACT_REVOKE_FAILED  (memory_routes.cpp:324, the else/http!=404 branch)
 //     Reached only when MemoryExtractionService::RevokeInvalidation returns a non-ok
 //     Status whose code() != kNotFound (i.e. a store UPDATE failure AFTER a successful
 //     block fetch). MemoryExtractionService is a concrete, copy-deleted, NON-virtual
@@ -154,8 +154,8 @@ TEST_F(MemoryRevokeNotFoundTest, RevokeUnknownBlockReturnsBlockNotFound) {
 //     substituted at the route layer; and the live revoke runs through the namespace pool
 //     façade store, whose SetFailNextOps op-fault seam is not reachable from the route
 //     fixture. A direct-adapter test could exercise the underlying
-//     CX_ERR_MEM02_STORE UPDATE path, but that is a DIFFERENT code than the route's
-//     CX_ERR_MEM02_REVOKE_FAILED mapping, which has no ordinary-input path. Triggering
+//     CX_ERR_MEMEXTRACT_STORE UPDATE path, but that is a DIFFERENT code than the route's
+//     CX_ERR_MEMEXTRACT_REVOKE_FAILED mapping, which has no ordinary-input path. Triggering
 //     it would need either a virtual seam on MemoryExtractionService or a façade store
 //     exposing SetFailNextOps for the revoke connection.
 // ===========================================================================

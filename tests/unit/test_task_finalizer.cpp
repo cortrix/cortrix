@@ -63,15 +63,15 @@ TEST_F(TaskFinalizerTest, FailMarksFailedWithDomainCodeAndRecordsFailed) {
     TaskInfo t = MakeProcessingTask(kTaskDocSummary);
     nlohmann::json sd = {{"doc_id", t.doc_id}};
     // A handler-domain code NOT in F42ErrorCode — finalizer must still carry it through.
-    Status s = finalizer_.Fail(t, "CX_ERR_F41_GENERATION_FAILED", "llm timeout", sd,
+    Status s = finalizer_.Fail(t, "CX_ERR_DOCSUMMARY_GENERATION_FAILED", "llm timeout", sd,
                                std::chrono::steady_clock::now());
     EXPECT_FALSE(s.ok());
-    EXPECT_NE(s.message().find("CX_ERR_F41_GENERATION_FAILED"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_DOCSUMMARY_GENERATION_FAILED"), std::string::npos);
 
     auto got = mgr_.GetTask(t.task_id);
     ASSERT_TRUE(got.ok());
     EXPECT_EQ(got.value().status, task_status::kFailed);
-    EXPECT_EQ(got.value().error_code, "CX_ERR_F41_GENERATION_FAILED");
+    EXPECT_EQ(got.value().error_code, "CX_ERR_DOCSUMMARY_GENERATION_FAILED");
     EXPECT_EQ(F42Metrics::Instance().CompletedCount(TaskType::kTaskDocSummary, Comp::kFailed), 1u);
 }
 

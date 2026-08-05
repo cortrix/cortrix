@@ -69,7 +69,7 @@ protected:
 
 TEST(OperationLogSchemaProviderTest, IdentityAndVersion) {
     OperationLogSchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F18a");
+    EXPECT_EQ(p.FeatureName(), "operation_log");
     EXPECT_EQ(p.CurrentVersion(), 1);
     EXPECT_EQ(kOplogSchemaVersion, 1);
 }
@@ -107,7 +107,7 @@ TEST_F(OperationLogSchemaTest, TableExistsAndVersionRecorded) {
     auto tables = QueryTextSet(db_, "SELECT name FROM sqlite_master WHERE type='table'");
     EXPECT_TRUE(Contains(tables, "operation_log"));
     cortrix::catalog::SchemaMigrator m;
-    EXPECT_EQ(m.CurrentVersion(db_, "F18a"), kOplogSchemaVersion);
+    EXPECT_EQ(m.CurrentVersion(db_, "operation_log"), kOplogSchemaVersion);
 }
 
 // DoD: the full §5.1 column set is present (10 columns).

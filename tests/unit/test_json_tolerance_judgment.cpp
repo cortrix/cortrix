@@ -3,7 +3,7 @@
 // Real parser (src/memory/contradiction_detector.cpp ParseJudgmentJson, static):
 //   1. json::parse(allow_exceptions=false). If discarded OR not an object ->
 //      error Result (Mem02Status kExtractInvalidOutput, message carries
-//      "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT").  *** NO fence / wrapper / span
+//      "CX_ERR_MEMEXTRACT_INVALID_OUTPUT").  *** NO fence / wrapper / span
 //      recovery here *** (unlike ParseExtractionJson). A fenced or prose-wrapped
 //      body is NOT a JSON object -> rejected.
 //   2. "is_contradiction" REQUIRED: bool, or a number (!=0 -> true). Missing or a
@@ -49,7 +49,7 @@ TEST_P(JudgmentJsonMatrix, Tolerance) {
         EXPECT_EQ(r.value().is_contradiction, tc.expect_contra) << tc.name;
     } else {
         ASSERT_FALSE(r.ok()) << tc.name << " unexpectedly parsed";
-        EXPECT_NE(r.status().message().find("CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT"),
+        EXPECT_NE(r.status().message().find("CX_ERR_MEMEXTRACT_INVALID_OUTPUT"),
                   std::string::npos)
             << tc.name << " msg=" << r.status().message();
     }

@@ -102,7 +102,7 @@ INSTANTIATE_TEST_SUITE_P(
 // ===========================================================================
 // ResolveCleaningConfig matrix: global <- NS merge, then resource-level fields
 // (max_chunk_chars / plugin_timeout_ms) RE-ASSERTED to global (not NS-overridable).
-// Errors on non-object NS blob -> CX_ERR_F10_NS_CONFIG_MERGE_FAILED.
+// Errors on non-object NS blob -> CX_ERR_CLEANING_NS_CONFIG_MERGE_FAILED.
 // ===========================================================================
 
 struct CleanCfgResolveCase {
@@ -128,7 +128,7 @@ TEST_P(CleanCfgResolveMatrix, Resolve) {
     Result<CleaningConfig> r = ResolveCleaningConfig(global, c.ns_blob);
     EXPECT_EQ(r.ok(), c.expect_ok) << "blob=" << c.ns_blob;
     if (!c.expect_ok) {
-        EXPECT_NE(r.status().message().find("CX_ERR_F10_NS_CONFIG_MERGE_FAILED"),
+        EXPECT_NE(r.status().message().find("CX_ERR_CLEANING_NS_CONFIG_MERGE_FAILED"),
                   std::string::npos)
             << "blob=" << c.ns_blob;
         return;

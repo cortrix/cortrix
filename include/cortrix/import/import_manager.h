@@ -49,7 +49,7 @@ public:
     /// D6 async entry (§3.2 start_import). Validates the request (D2 security gate +
     /// resolves the ref under the D7 tenant guard), estimates rows (R5 pre-check),
     /// writes operation_log `database_import` (S6), and enqueues the task. Returns the
-    /// task_id (or a CX_ERR_F16A_* Status on a synchronous rejection — bad SQL /
+    /// task_id (or a CX_ERR_IMPORT_* Status on a synchronous rejection — bad SQL /
     /// cross-tenant / auth). The `ctx` is reserved for the TraceContext (D3.5 wiring).
     Result<ImportTaskId> StartImport(const ImportRequest& req,
                                      const AuthContext& auth_ctx,
@@ -64,7 +64,7 @@ public:
 private:
     /// The per-task unit of work handed to the queue (runs on a worker thread):
     /// resolve DSN → fetch → textualize → D3 cleanup → feed SPC, reporting progress
-    /// and honoring cooperative cancel. Returns a CX_ERR_F16A_* Status on failure.
+    /// and honoring cooperative cancel. Returns a CX_ERR_IMPORT_* Status on failure.
     Status RunImport(const ImportRequest& req, const AuthContext& auth_ctx,
                      ImportTaskHandle& handle);
 

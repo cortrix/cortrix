@@ -21,7 +21,7 @@ namespace cortrix::async {
 ///
 /// Why a string error_code (not F42ErrorCode) on Fail: handlers carry domain-specific
 /// codes — DocumentProcessor uses the async enum (CX_ERR_PARSE_FAILED), F41AsyncWorker
-/// uses CX_ERR_F41_* which is NOT in F42ErrorCode. A plain "CX_ERR_*" string keeps the
+/// uses CX_ERR_DOCSUMMARY_* which is NOT in F42ErrorCode. A plain "CX_ERR_*" string keeps the
 /// finalizer agnostic to any one handler's error namespace.
 ///
 /// Duration: the handler times its own execution (it knows the boundary) and passes

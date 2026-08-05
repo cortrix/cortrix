@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS import_tasks (
     completed_at          INTEGER,
     estimated_completion_at INTEGER,
 
-    error_code            TEXT,                                        -- CX_ERR_F16A_*
+    error_code            TEXT,                                        -- CX_ERR_IMPORT_*
     error_message         TEXT,
     error_structured_data TEXT,
 

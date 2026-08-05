@@ -105,7 +105,7 @@ TEST(F38HyPEEnricherTest, GenerateLlmFailureReturnsError) {
 
     auto r = e.GenerateHypeQuestions("chunk", "", DocMeta(), "c", "p");
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F38_LLM_TIMEOUT"),
+    EXPECT_NE(r.status().message().find("CX_ERR_HYPE_LLM_TIMEOUT"),
               std::string::npos);
 }
 
@@ -203,7 +203,7 @@ TEST(F38HyPEEnricherTest, ResolveParentTextNotFoundSurfacesError) {
 
     auto r = e.ResolveParentText("missing");
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F38_PARENT_NOT_FOUND"),
+    EXPECT_NE(r.status().message().find("CX_ERR_HYPE_PARENT_NOT_FOUND"),
               std::string::npos);
 }
 
@@ -253,21 +253,21 @@ TEST(F38HyPEParseTest, TrimsAndDropsBlankLines) {
 TEST(F38HyPEParseTest, TooFewIsParseFailed) {
     auto r = HyPEEnricher::ParseQuestions("q1\nq2", 3);  // 2 != 3
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F38_QUESTION_PARSE_FAILED"),
+    EXPECT_NE(r.status().message().find("CX_ERR_HYPE_QUESTION_PARSE_FAILED"),
               std::string::npos);
 }
 
 TEST(F38HyPEParseTest, TooManyIsParseFailed) {
     auto r = HyPEEnricher::ParseQuestions("q1\nq2\nq3\nq4", 3);  // 4 != 3
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F38_QUESTION_PARSE_FAILED"),
+    EXPECT_NE(r.status().message().find("CX_ERR_HYPE_QUESTION_PARSE_FAILED"),
               std::string::npos);
 }
 
 TEST(F38HyPEParseTest, EmptyOutputIsInvalidOutput) {
     auto r = HyPEEnricher::ParseQuestions("   \n  \n", 3);
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F38_LLM_INVALID_OUTPUT"),
+    EXPECT_NE(r.status().message().find("CX_ERR_HYPE_LLM_INVALID_OUTPUT"),
               std::string::npos);
 }
 
@@ -277,7 +277,7 @@ TEST(F38HyPEEnricherTest, GenerateRejectsCountMismatch) {
     HyPEEnricher e(HyPEConfig{}, llm, nullptr);
     auto r = e.GenerateHypeQuestions("chunk", "", DocMeta(), "c", "p");
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F38_QUESTION_PARSE_FAILED"),
+    EXPECT_NE(r.status().message().find("CX_ERR_HYPE_QUESTION_PARSE_FAILED"),
               std::string::npos);
 }
 

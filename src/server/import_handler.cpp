@@ -15,8 +15,8 @@ using cortrix::import::TextStrategy;
 
 namespace {
 
-// Recover the F16aErrorCode whose CX_ERR_F16A_* token a Status message is prefixed
-// with (F16aStatus / F16aException stamp "CX_ERR_F16A_X: detail"). Falls back to
+// Recover the F16aErrorCode whose CX_ERR_IMPORT_* token a Status message is prefixed
+// with (F16aStatus / F16aException stamp "CX_ERR_IMPORT_X: detail"). Falls back to
 // kConnectionFailed for an unrecognized prefix (a transient 503 is the safest
 // default for an internal failure the Agent may retry).
 F16aErrorCode CodeFromStatus(const cortrix::Status& s) {
@@ -134,7 +134,7 @@ nlohmann::json ImportHandler::HandleStartImport(const nlohmann::json& body,
     } catch (const std::exception& e) {
         // (R2-M5) Any other throw from the import stack (DB driver, std::bad_alloc, ...)
         // returns a structured Agent-friendly 500 here, instead of escaping to the
-        // generic global exception handler. CX_ERR_F16A_INTERNAL = transient/retryable.
+        // generic global exception handler. CX_ERR_IMPORT_INTERNAL = transient/retryable.
         out_http_status =
             GetF16aErrorInfo(cortrix::import::F16aErrorCode::kInternal).http_status;
         nlohmann::json out;
@@ -151,7 +151,7 @@ nlohmann::json ImportHandler::HandleGetProgress(const std::string& task_id,
     if (!p) {
         out_http_status = 404;
         nlohmann::json out;
-        out["error"] = {{"code", "CX_ERR_F16A_TASK_NOT_FOUND"},
+        out["error"] = {{"code", "CX_ERR_IMPORT_TASK_NOT_FOUND"},
                         {"message", "import task not found: " + task_id},
                         {"retryable", false},
                         {"category", "permanent"},
@@ -167,7 +167,7 @@ nlohmann::json ImportHandler::HandleCancel(const std::string& task_id, int& out_
     if (!import_mgr_->Cancel(task_id)) {
         out_http_status = 404;
         nlohmann::json out;
-        out["error"] = {{"code", "CX_ERR_F16A_TASK_NOT_FOUND"},
+        out["error"] = {{"code", "CX_ERR_IMPORT_TASK_NOT_FOUND"},
                         {"message", "import task not found: " + task_id},
                         {"retryable", false},
                         {"category", "permanent"},

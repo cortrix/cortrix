@@ -95,12 +95,12 @@ TEST(CleaningConfigResolveTest, ResourceLevelFields_NotNsOverridable) {
     EXPECT_FALSE(r.value().dedup_enabled);  // a real B-class override still applies
 }
 
-// (6) A blob that is valid JSON but not an object → CX_ERR_F10_NS_CONFIG_MERGE_FAILED.
+// (6) A blob that is valid JSON but not an object → CX_ERR_CLEANING_NS_CONFIG_MERGE_FAILED.
 TEST(CleaningConfigResolveTest, NonObjectBlob_MergeFailed) {
     const CleaningConfig g = GlobalCfg();
     Result<CleaningConfig> r = ResolveCleaningConfig(g, "[1,2,3]");
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F10_NS_CONFIG_MERGE_FAILED"),
+    EXPECT_NE(r.status().message().find("CX_ERR_CLEANING_NS_CONFIG_MERGE_FAILED"),
               std::string::npos)
         << r.status().message();
 }
@@ -111,7 +111,7 @@ TEST(CleaningConfigResolveTest, InvalidJsonBlob_MergeFailed) {
     const CleaningConfig g = GlobalCfg();
     Result<CleaningConfig> r = ResolveCleaningConfig(g, "{not json");
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F10_NS_CONFIG_MERGE_FAILED"),
+    EXPECT_NE(r.status().message().find("CX_ERR_CLEANING_NS_CONFIG_MERGE_FAILED"),
               std::string::npos)
         << r.status().message();
 }

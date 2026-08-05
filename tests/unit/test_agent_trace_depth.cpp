@@ -82,7 +82,7 @@ TEST_F(AgentTraceDepthWriterFx, QueryLimitZeroRejected) {
     f.limit = 0;  // below the [1,200] range
     auto r = writer_->Query("s", f);
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
 }
 
 TEST_F(AgentTraceDepthWriterFx, QueryLimitOver200Rejected) {
@@ -90,7 +90,7 @@ TEST_F(AgentTraceDepthWriterFx, QueryLimitOver200Rejected) {
     f.limit = 201;  // above the cap
     auto r = writer_->Query("s", f);
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
 }
 
 TEST_F(AgentTraceDepthWriterFx, QueryLimitAtCap200IsValid) {
@@ -105,7 +105,7 @@ TEST_F(AgentTraceDepthWriterFx, QueryNegativeOffsetRejected) {
     f.offset = -1;
     auto r = writer_->Query("s", f);
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
 }
 
 TEST_F(AgentTraceDepthWriterFx, QueryFromAfterToRejected) {
@@ -114,7 +114,7 @@ TEST_F(AgentTraceDepthWriterFx, QueryFromAfterToRejected) {
     f.to_timestamp = 1000;  // from > to
     auto r = writer_->Query("s", f);
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
 }
 
 TEST_F(AgentTraceDepthWriterFx, QueryEqualFromToIsValid) {

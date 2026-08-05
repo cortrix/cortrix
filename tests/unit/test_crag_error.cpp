@@ -5,7 +5,7 @@
 
 #include "cortrix/retrieval/crag_error.h"
 
-// CRAG S1 coverage: the CRAG error model (template A) — all 4 CX_ERR_F37_*
+// CRAG S1 coverage: the CRAG error model (template A) — all 4 CX_ERR_CRAG_*
 // identities, their §4.3 attributes (category / retryable / retry_after_ms /
 // structured_data keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::retrieval {
@@ -31,7 +31,7 @@ TEST(CragErrorTest, AllCodesHaveUniqueF37CxStrings) {
     for (CragErrorCode c : kAll) {
         std::string s = CragErrorCodeString(c);
         EXPECT_FALSE(s.empty());
-        EXPECT_EQ(s.rfind("CX_ERR_F37_", 0), 0u) << s << " must start with CX_ERR_F37_";
+        EXPECT_EQ(s.rfind("CX_ERR_CRAG_", 0), 0u) << s << " must start with CX_ERR_CRAG_";
         EXPECT_TRUE(seen.insert(s).second) << "duplicate code string: " << s;
     }
     EXPECT_EQ(seen.size(), 4u);
@@ -47,16 +47,16 @@ TEST(CragErrorTest, RegistryMatchesSpecTable) {
         EXPECT_EQ(i.retryable, retry) << code;
         EXPECT_EQ(i.retry_after_ms, retry_ms) << code;
     };
-    chk(CragErrorCode::kClassifierLoadFailed, "CX_ERR_F37_CLASSIFIER_LOAD_FAILED",
+    chk(CragErrorCode::kClassifierLoadFailed, "CX_ERR_CRAG_CLASSIFIER_LOAD_FAILED",
         ErrorCategory::kPermanent, false, std::nullopt);
-    chk(CragErrorCode::kInferenceFailed, "CX_ERR_F37_INFERENCE_FAILED",
+    chk(CragErrorCode::kInferenceFailed, "CX_ERR_CRAG_INFERENCE_FAILED",
         ErrorCategory::kTransient, true, 200);
-    chk(CragErrorCode::kThresholdInvalid, "CX_ERR_F37_THRESHOLD_INVALID",
+    chk(CragErrorCode::kThresholdInvalid, "CX_ERR_CRAG_THRESHOLD_INVALID",
         ErrorCategory::kPermanent, false, std::nullopt);
     // §4.3 lists FALLBACK_TRIGGERED as transient + retryable with retry_after_ms
     // "-" (unspecified) → null. It is informational (the transparent all-Correct
     // degrade already happened), so no concrete back-off is advertised.
-    chk(CragErrorCode::kFallbackTriggered, "CX_ERR_F37_FALLBACK_TRIGGERED",
+    chk(CragErrorCode::kFallbackTriggered, "CX_ERR_CRAG_FALLBACK_TRIGGERED",
         ErrorCategory::kTransient, true, std::nullopt);
 }
 
@@ -104,7 +104,7 @@ TEST(CragErrorTest, MakeCragErrorFillsFromRegistry) {
     nlohmann::json sd = {{"chunk_id", 7}, {"retry_count", 3}};
     auto err = MakeCragError(CragErrorCode::kInferenceFailed, sd,
                              "CRAG classifier inference failed, falling back to correct");
-    EXPECT_EQ(err.code, "CX_ERR_F37_INFERENCE_FAILED");
+    EXPECT_EQ(err.code, "CX_ERR_CRAG_INFERENCE_FAILED");
     EXPECT_EQ(err.message, "CRAG classifier inference failed, falling back to correct");
     EXPECT_TRUE(err.retryable);
     EXPECT_EQ(err.category, ErrorCategory::kTransient);
@@ -116,7 +116,7 @@ TEST(CragErrorTest, MakeCragErrorFillsFromRegistry) {
 
 TEST(CragErrorTest, MakeCragErrorDefaultsMessageToCode) {
     auto err = MakeCragError(CragErrorCode::kClassifierLoadFailed);
-    EXPECT_EQ(err.message, "CX_ERR_F37_CLASSIFIER_LOAD_FAILED");
+    EXPECT_EQ(err.message, "CX_ERR_CRAG_CLASSIFIER_LOAD_FAILED");
     EXPECT_FALSE(err.retryable);
     EXPECT_FALSE(err.retry_after_ms.has_value());
 }
@@ -125,7 +125,7 @@ TEST(CragErrorTest, ToJsonSerializesAgentFriendlyBody) {
     auto err = MakeCragError(CragErrorCode::kInferenceFailed,
                              {{"chunk_id", 12345}, {"retry_count", 3}});
     nlohmann::json j = agent_friendly::ToJson(err);
-    EXPECT_EQ(j["code"], "CX_ERR_F37_INFERENCE_FAILED");
+    EXPECT_EQ(j["code"], "CX_ERR_CRAG_INFERENCE_FAILED");
     EXPECT_EQ(j["retryable"], true);
     EXPECT_EQ(j["category"], "transient");
     EXPECT_EQ(j["retry_after_ms"], 200);
@@ -136,7 +136,7 @@ TEST(CragErrorTest, StatusBridgeCarriesCodeToken) {
     Status s = CragStatus(CragErrorCode::kThresholdInvalid, "threshold_correct=1.5");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
-    EXPECT_NE(s.message().find("CX_ERR_F37_THRESHOLD_INVALID"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_CRAG_THRESHOLD_INVALID"), std::string::npos);
     EXPECT_NE(s.message().find("threshold_correct=1.5"), std::string::npos);
 }
 

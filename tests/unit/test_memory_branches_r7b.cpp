@@ -215,7 +215,7 @@ TEST_F(MemoryBranchesTest, GetMissingBlockReturnsNotFound) {
     auto got = adapter.GetMemoryBlock("01NOSUCHBLOCK");
     EXPECT_FALSE(got.ok());
     EXPECT_EQ(got.status().code(), StatusCode::kNotFound);
-    EXPECT_NE(got.status().message().find("CX_ERR_MEM02_STORE"), std::string::npos);
+    EXPECT_NE(got.status().message().find("CX_ERR_MEMEXTRACT_STORE"), std::string::npos);
 }
 
 // B6 — limit<=0 / top_k<=0 select the default caps (QueryUserFacts → 20,

@@ -435,7 +435,7 @@ Status MemoryExtractor::WriteWithOperationLog(
     const std::vector<ContradictionPair>& contradictions,
     const observability::TraceContext* ctx) {
     if (!block_store_) {
-        return Status::Internal("CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT: no block store");
+        return Status::Internal("CX_ERR_MEMEXTRACT_INVALID_OUTPUT: no block store");
     }
     auto& metrics = Mem02Metrics::Instance();
     const std::string now = NowIso8601();
@@ -558,7 +558,7 @@ Result<MemoryBlockRecord> MemoryExtractor::RevokeInvalidation(
     const std::string& revoked_by,
     const observability::TraceContext* ctx) {
     if (!block_store_) {
-        return Status::Internal("CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT: no block store");
+        return Status::Internal("CX_ERR_MEMEXTRACT_INVALID_OUTPUT: no block store");
     }
     Result<MemoryBlockRecord> br = block_store_->GetMemoryBlock(invalidated_block_id);
     if (!br.ok()) {
@@ -603,7 +603,7 @@ Status MemoryExtractor::InvalidateMemory(const std::string& block_id,
                                          const std::string& reason,
                                          const observability::TraceContext* ctx) {
     if (!block_store_) {
-        return Status::Internal("CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT: no block store");
+        return Status::Internal("CX_ERR_MEMEXTRACT_INVALID_OUTPUT: no block store");
     }
     Result<MemoryBlockRecord> br = block_store_->GetMemoryBlock(block_id);
     if (!br.ok()) {

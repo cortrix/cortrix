@@ -154,7 +154,7 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
     (void)embedder;
     (void)config;
     auto extract_disabled = [](httplib::Response& res) {
-        WriteAgentError(res, 503, "CX_ERR_MEM02_LLM_DISABLED",
+        WriteAgentError(res, 503, "CX_ERR_MEMEXTRACT_LLM_DISABLED",
                         "memory extraction is disabled (no LLM configured)",
                         false, "permanent");
     };
@@ -166,7 +166,7 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         if (!extraction || !extraction->enabled()) { extract_disabled(res); return; }
         json body;
         try { body = json::parse(req.body); } catch (...) {
-            WriteAgentError(res, 400, "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT",
+            WriteAgentError(res, 400, "CX_ERR_MEMEXTRACT_INVALID_OUTPUT",
                             "invalid JSON body", false, "permanent");
             return;
         }
@@ -220,7 +220,7 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         if (!extraction || !extraction->enabled()) { extract_disabled(res); return; }
         json body;
         try { body = json::parse(req.body); } catch (...) {
-            WriteAgentError(res, 400, "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT",
+            WriteAgentError(res, 400, "CX_ERR_MEMEXTRACT_INVALID_OUTPUT",
                             "invalid JSON body", false, "permanent");
             return;
         }
@@ -263,7 +263,7 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         if (!extraction || !extraction->enabled()) { extract_disabled(res); return; }
         json body;
         try { body = json::parse(req.body); } catch (...) {
-            WriteAgentError(res, 400, "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT",
+            WriteAgentError(res, 400, "CX_ERR_MEMEXTRACT_INVALID_OUTPUT",
                             "invalid JSON body", false, "permanent");
             return;
         }
@@ -302,7 +302,7 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         [extraction](const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         std::string block_id = req.matches[1].str();
         if (!extraction) {
-            WriteAgentError(res, 503, "CX_ERR_MEM02_LLM_DISABLED",
+            WriteAgentError(res, 503, "CX_ERR_MEMEXTRACT_LLM_DISABLED",
                             "memory service unavailable", false, "permanent");
             return;
         }
@@ -320,8 +320,8 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
             const Status& s = r.status();
             const int http = s.code() == StatusCode::kNotFound ? 404 : 500;
             WriteAgentError(res, http,
-                            http == 404 ? "CX_ERR_MEM02_BLOCK_NOT_FOUND"
-                                        : "CX_ERR_MEM02_REVOKE_FAILED",
+                            http == 404 ? "CX_ERR_MEMEXTRACT_BLOCK_NOT_FOUND"
+                                        : "CX_ERR_MEMEXTRACT_REVOKE_FAILED",
                             s.message(), false, "permanent");
             return;
         }

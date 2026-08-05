@@ -31,7 +31,7 @@ struct ClassificationResult {
     float score = 0.0f;                  ///< primary score (CRAG: softmax confidence of the verdict)
     float confidence = 0.0f;             ///< classifier confidence (drives heuristic-guard fallback)
     std::map<std::string, float> raw_signals;  ///< multi-signal feature dump (top1 / median / std / ...)
-    std::optional<std::string> error_code;     ///< CX_ERR_F37_* token when a fallback path was taken
+    std::optional<std::string> error_code;     ///< CX_ERR_CRAG_* token when a fallback path was taken
 };
 
 /// The shared classifier contract.

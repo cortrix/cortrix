@@ -83,15 +83,15 @@ candidates = client.memory.get_audit(auto_revoke_eligible=True,
 ## Error handling the Agent should expect
 
 Memory extraction returns the GEN-Agent error body (4 machine-readable fields + structured
-data) with these `CX_ERR_MEM02_*` codes:
+data) with these `CX_ERR_MEMEXTRACT_*` codes:
 
 | code | category | retryable | what the Agent should do |
 |---|---|:--:|---|
-| `CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT` | timeout | yes | retry after `retry_after_ms` |
-| `CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT` | transient | yes | retry; persistent → report |
-| `CX_ERR_MEM02_EXTRACT_BUDGET_EXCEEDED` | quota | no | back off; raise the day's budget |
-| `CX_ERR_MEM02_CONTRADICTION_AMBIGUOUS` | transient | yes | retry; the judge was unsure |
-| `CX_ERR_MEM02_LLM_DISABLED` | permanent | no | extraction is off (NullEnricher); only `interaction_log` is kept |
+| `CX_ERR_MEMEXTRACT_LLM_TIMEOUT` | timeout | yes | retry after `retry_after_ms` |
+| `CX_ERR_MEMEXTRACT_INVALID_OUTPUT` | transient | yes | retry; persistent → report |
+| `CX_ERR_MEMEXTRACT_BUDGET_EXCEEDED` | quota | no | back off; raise the day's budget |
+| `CX_ERR_MEMEXTRACT_CONTRADICTION_AMBIGUOUS` | transient | yes | retry; the judge was unsure |
+| `CX_ERR_MEMEXTRACT_LLM_DISABLED` | permanent | no | extraction is off (NullEnricher); only `interaction_log` is kept |
 
 ## Implementation status
 

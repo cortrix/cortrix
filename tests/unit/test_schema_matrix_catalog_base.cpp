@@ -48,7 +48,7 @@ protected:
 };
 
 TEST_F(F12CatMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F12");
+    EXPECT_EQ(p_.FeatureName(), "catalog");
     EXPECT_EQ(p_.CurrentVersion(), 2);
     EXPECT_EQ(cortrix::catalog::kF12SchemaVersion, 2);
 }

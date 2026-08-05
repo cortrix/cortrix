@@ -28,26 +28,26 @@ TEST(F41DocSummaryErrorTest, CountIsSeven) {
 
 TEST(F41DocSummaryErrorTest, CodeStringsMatchDesign) {
     EXPECT_STREQ(DocSummaryErrorCodeString(DocSummaryErrorCode::kLlmTimeout),
-                 "CX_ERR_F41_LLM_TIMEOUT");
+                 "CX_ERR_DOCSUMMARY_LLM_TIMEOUT");
     EXPECT_STREQ(DocSummaryErrorCodeString(DocSummaryErrorCode::kLlmInvalidOutput),
-                 "CX_ERR_F41_LLM_INVALID_OUTPUT");
+                 "CX_ERR_DOCSUMMARY_LLM_INVALID_OUTPUT");
     EXPECT_STREQ(DocSummaryErrorCodeString(DocSummaryErrorCode::kLlmBudgetExceeded),
-                 "CX_ERR_F41_LLM_BUDGET_EXCEEDED");
+                 "CX_ERR_DOCSUMMARY_LLM_BUDGET_EXCEEDED");
     EXPECT_STREQ(DocSummaryErrorCodeString(DocSummaryErrorCode::kDocTooLarge),
-                 "CX_ERR_F41_DOC_TOO_LARGE");
+                 "CX_ERR_DOCSUMMARY_TOO_LARGE");
     EXPECT_STREQ(DocSummaryErrorCodeString(DocSummaryErrorCode::kSchemaVersionMismatch),
-                 "CX_ERR_F41_SCHEMA_VERSION_MISMATCH");
+                 "CX_ERR_DOCSUMMARY_SCHEMA_VERSION_MISMATCH");
     EXPECT_STREQ(DocSummaryErrorCodeString(DocSummaryErrorCode::kFallbackFailed),
-                 "CX_ERR_F41_FALLBACK_FAILED");
+                 "CX_ERR_DOCSUMMARY_FALLBACK_FAILED");
     EXPECT_STREQ(DocSummaryErrorCodeString(DocSummaryErrorCode::kFts5FallbackFailed),
-                 "CX_ERR_F41_FTS5_FALLBACK_FAILED");
+                 "CX_ERR_DOCSUMMARY_FTS5_FALLBACK_FAILED");
 }
 
 TEST(F41DocSummaryErrorTest, AllCodesUniqueAndPrefixed) {
     std::set<std::string> seen;
     for (auto code : kAll) {
         std::string s = DocSummaryErrorCodeString(code);
-        EXPECT_EQ(s.rfind("CX_ERR_F41_", 0), 0u) << s;
+        EXPECT_EQ(s.rfind("CX_ERR_DOCSUMMARY_", 0), 0u) << s;
         EXPECT_TRUE(seen.insert(s).second) << "duplicate " << s;
     }
     EXPECT_EQ(seen.size(), 7u);
@@ -111,7 +111,7 @@ TEST(F41DocSummaryErrorTest, MakeErrorFillsFromRegistry) {
     auto err = MakeDocSummaryError(
         DocSummaryErrorCode::kLlmBudgetExceeded,
         {{"doc_id", "d1"}, {"budget_remaining_usd", 0.0}, {"budget_reset_at", "t"}});
-    EXPECT_EQ(err.code, "CX_ERR_F41_LLM_BUDGET_EXCEEDED");
+    EXPECT_EQ(err.code, "CX_ERR_DOCSUMMARY_LLM_BUDGET_EXCEEDED");
     EXPECT_TRUE(err.retryable);
     EXPECT_EQ(err.category, ErrorCategory::kQuota);
     ASSERT_TRUE(err.retry_after_ms.has_value());
@@ -123,7 +123,7 @@ TEST(F41DocSummaryErrorTest, MakeErrorSerializesToAgentFriendlyBody) {
                                    {{"doc_id", "d1"}, {"doc_size_bytes", 99},
                                     {"max_allowed_bytes", 10}});
     auto j = agent_friendly::ToJson(err);
-    EXPECT_EQ(j["code"], "CX_ERR_F41_DOC_TOO_LARGE");
+    EXPECT_EQ(j["code"], "CX_ERR_DOCSUMMARY_TOO_LARGE");
     EXPECT_EQ(j["retryable"], false);
     EXPECT_EQ(j["category"], "permanent");
     EXPECT_TRUE(j["retry_after_ms"].is_null());
@@ -132,14 +132,14 @@ TEST(F41DocSummaryErrorTest, MakeErrorSerializesToAgentFriendlyBody) {
 
 TEST(F41DocSummaryErrorTest, MakeErrorDefaultMessageIsCode) {
     auto err = MakeDocSummaryError(DocSummaryErrorCode::kFallbackFailed);
-    EXPECT_EQ(err.message, "CX_ERR_F41_FALLBACK_FAILED");
+    EXPECT_EQ(err.message, "CX_ERR_DOCSUMMARY_FALLBACK_FAILED");
 }
 
 TEST(F41DocSummaryErrorTest, StatusBridgeCarriesTokenAndCode) {
     Status s = DocSummaryStatus(DocSummaryErrorCode::kLlmTimeout, "slow");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kUnavailable);
-    EXPECT_NE(s.message().find("CX_ERR_F41_LLM_TIMEOUT"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_DOCSUMMARY_LLM_TIMEOUT"), std::string::npos);
     EXPECT_NE(s.message().find("slow"), std::string::npos);
 }
 

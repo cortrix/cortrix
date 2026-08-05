@@ -19,19 +19,19 @@ namespace {
 // missing opt-out state, missing admin scope, disabled feature, oversize metadata) —
 // none is transient, so all carry retryable=false + retry_after_ms=null.
 constexpr Mem04ErrorInfo kSessionNotFound
-    {"CX_ERR_MEM04_SESSION_NOT_FOUND",  404, ErrorCategory::kPermanent, false, std::nullopt};
+    {"CX_ERR_MEMOPTOUT_SESSION_NOT_FOUND",  404, ErrorCategory::kPermanent, false, std::nullopt};
 constexpr Mem04ErrorInfo kAlreadyOptedOut
-    {"CX_ERR_MEM04_ALREADY_OPTED_OUT",  409, ErrorCategory::kPermanent, false, std::nullopt};
+    {"CX_ERR_MEMOPTOUT_ALREADY_OPTED_OUT",  409, ErrorCategory::kPermanent, false, std::nullopt};
 constexpr Mem04ErrorInfo kNotOptedOut
-    {"CX_ERR_MEM04_NOT_OPTED_OUT",      409, ErrorCategory::kPermanent, false, std::nullopt};
+    {"CX_ERR_MEMOPTOUT_NOT_OPTED_OUT",      409, ErrorCategory::kPermanent, false, std::nullopt};
 constexpr Mem04ErrorInfo kRevokeDenied
-    {"CX_ERR_MEM04_REVOKE_DENIED",      403, ErrorCategory::kAuth,      false, std::nullopt};
+    {"CX_ERR_MEMOPTOUT_REVOKE_DENIED",      403, ErrorCategory::kAuth,      false, std::nullopt};
 constexpr Mem04ErrorInfo kOptOutDisabled
-    {"CX_ERR_MEM04_OPT_OUT_DISABLED",   503, ErrorCategory::kPermanent, false, std::nullopt};
+    {"CX_ERR_MEMOPTOUT_DISABLED",   503, ErrorCategory::kPermanent, false, std::nullopt};
 constexpr Mem04ErrorInfo kInvalidSessionId
-    {"CX_ERR_MEM04_INVALID_SESSION_ID", 422, ErrorCategory::kPermanent, false, std::nullopt};
+    {"CX_ERR_MEMOPTOUT_INVALID_SESSION_ID", 422, ErrorCategory::kPermanent, false, std::nullopt};
 constexpr Mem04ErrorInfo kMetadataTooLarge
-    {"CX_ERR_MEM04_METADATA_TOO_LARGE", 422, ErrorCategory::kPermanent, false, std::nullopt};
+    {"CX_ERR_MEMOPTOUT_METADATA_TOO_LARGE", 422, ErrorCategory::kPermanent, false, std::nullopt};
 
 }  // namespace
 

@@ -59,7 +59,7 @@ public:
     DocFts5Index& operator=(const DocFts5Index&) = delete;
 
     /// Open `db_path` (":memory:" for tests) and create the doc_fts5_index virtual
-    /// table from the F41SchemaProvider DDL SoT. Returns a CX_ERR_F41_* Status on
+    /// table from the F41SchemaProvider DDL SoT. Returns a CX_ERR_DOCSUMMARY_* Status on
     /// failure.
     Status Open(const std::string& db_path);
 
@@ -70,7 +70,7 @@ public:
     /// BM25 search over the metadata fields (fallback path). `top_k<=0` → no
     /// results. Returns hits sorted by score DESC. An empty / whitespace-only
     /// (post-sanitize) query returns an empty list (not an error). A query-time
-    /// SQLite failure surfaces as CX_ERR_F41_FTS5_FALLBACK_FAILED.
+    /// SQLite failure surfaces as CX_ERR_DOCSUMMARY_FTS5_FALLBACK_FAILED.
     Result<std::vector<DocFtsHit>> Search(const std::string& query, int top_k) const;
 
     bool is_open() const { return db_ != nullptr; }

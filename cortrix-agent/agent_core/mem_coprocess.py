@@ -48,7 +48,7 @@ class MemoryCoprocessor:
         """Log a completed turn (agent trace) + trigger memory extraction; never raises.
 
         Memory isolation: a user_id is always sent (CE single-tenant falls back to a default
-        subject). On any failure we log a warning carrying CX_ERR_F48_INTERACTION_LOG_FAILED
+        subject). On any failure we log a warning carrying CX_ERR_AGENT_INTERACTION_LOG_FAILED
         and return — the chat turn must not be blocked (design the agent design).
         """
         uid = user_id or _DEFAULT_USER_ID
@@ -64,7 +64,7 @@ class MemoryCoprocessor:
         except Exception as err:  # noqa: BLE001 - logging must never break the chat turn
             logger.warning(
                 "interaction_log_failed",
-                code="CX_ERR_F48_INTERACTION_LOG_FAILED",
+                code="CX_ERR_AGENT_INTERACTION_LOG_FAILED",
                 session_id=session_id,
                 error=str(err),
             )

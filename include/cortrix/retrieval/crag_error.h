@@ -14,7 +14,7 @@ namespace cortrix::retrieval {
 /// Thrown by an ICragClassifierBackend when a single inference fails transiently
 /// (§6.2 / §7.3 L3 path). CragEvaluator catches it, retries N times with
 /// exponential back-off, then transparently degrades to the all-Correct verdict
-/// (CX_ERR_F37_INFERENCE_FAILED). Backends must NOT let any other exception escape
+/// (CX_ERR_CRAG_INFERENCE_FAILED). Backends must NOT let any other exception escape
 /// across the IClassifier boundary.
 class CragInferenceError : public std::runtime_error {
 public:
@@ -22,7 +22,7 @@ public:
 };
 
 /// The 4 CRAG-evaluation error identities. Each maps to a stable
-/// `CX_ERR_F37_*` string + a GEN-Agent category + retryability via the canonical
+/// `CX_ERR_CRAG_*` string + a GEN-Agent category + retryability via the canonical
 /// registry below.
 ///
 /// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
@@ -47,7 +47,7 @@ constexpr int kCragErrorCodeCount = 4;
 
 /// Canonical, immutable attributes of one error code.
 struct CragErrorInfo {
-    const char* cx_code;                      ///< stable "CX_ERR_F37_*" string
+    const char* cx_code;                      ///< stable "CX_ERR_CRAG_*" string
     agent_friendly::ErrorCategory category;   ///< permanent / transient
     bool retryable;
     std::optional<int> retry_after_ms;        ///< null unless retryable per §4.3
@@ -57,7 +57,7 @@ struct CragErrorInfo {
 /// throws / never returns a partial). Single source of truth for the 4 rows.
 const CragErrorInfo& GetCragErrorInfo(CragErrorCode code);
 
-/// The "CX_ERR_F37_*" string for `code` (convenience over GetCragErrorInfo).
+/// The "CX_ERR_CRAG_*" string for `code` (convenience over GetCragErrorInfo).
 const char* CragErrorCodeString(CragErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry

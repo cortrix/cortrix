@@ -24,14 +24,14 @@ namespace cortrix::spc {
 /// below); tests inject a fake. Wiring the real OnnxEmbedder through the SPC
 /// pipeline is cross-Feature integration → D3.5. A null embedder means "no
 /// re-embedding available" — Enrich() then produces contextualized_text only and
-/// reports CX_ERR_F35_EMBEDDING_FAILED for the embedding half.
+/// reports CX_ERR_CONTEXTUAL_EMBEDDING_FAILED for the embedding half.
 class IContextualEmbedder {
 public:
     virtual ~IContextualEmbedder() = default;
 
     /// Embed `text` into a dense vector (BGE-M3 1024-dim). Never throws; a failure
     /// is reported as a non-OK Status (the enricher maps it to
-    /// CX_ERR_F35_EMBEDDING_FAILED + a transparent degrade, §7.3).
+    /// CX_ERR_CONTEXTUAL_EMBEDDING_FAILED + a transparent degrade, §7.3).
     virtual Result<std::vector<float>> Embed(const std::string& text) = 0;
 };
 
@@ -96,7 +96,7 @@ public:
     ///                   MockLlmClient). A null client => IsAvailable()==false (L2 skip).
     /// @param embedder  injected re-embedding seam (production: ContextualOnnxEmbedder;
     ///                   tests: fake). May be null — the embedding half then degrades
-    ///                   to CX_ERR_F35_EMBEDDING_FAILED while contextualized_text is
+    ///                   to CX_ERR_CONTEXTUAL_EMBEDDING_FAILED while contextualized_text is
     ///                   still produced (partial result, §7.3).
     ContextualRetrievalEnricher(const ContextualRetrievalConfig& config,
                                 std::shared_ptr<llm::ILlmClient> llm_client,
@@ -130,9 +130,9 @@ public:
 
     /// Generate the contextualized prefix for `chunk_text`. On success
     /// returns the LLM prefix text. On LLM transport/timeout failure returns a
-    /// non-OK Status carrying CX_ERR_F35_LLM_FAILED; on an over-long output
+    /// non-OK Status carrying CX_ERR_CONTEXTUAL_LLM_FAILED; on an over-long output
     /// (length > 2 x max_output_tokens, §8 defense) returns
-    /// CX_ERR_F35_PROMPT_INJECTION. Null client => CX_ERR_F35_STARTUP_NO_LLM.
+    /// CX_ERR_CONTEXTUAL_PROMPT_INJECTION. Null client => CX_ERR_CONTEXTUAL_STARTUP_NO_LLM.
     Result<std::string> GenerateContextualizedText(const std::string& chunk_text,
                                                    const DocumentMetadata& doc_meta,
                                                    const ChunkContext& ctx);

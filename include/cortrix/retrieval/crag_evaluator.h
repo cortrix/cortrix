@@ -24,7 +24,7 @@ namespace cortrix::retrieval {
 /// backend Infer → low-confidence guard → three-tier threshold mapping. Backend
 /// faults go through an L3 retry/degrade path (§7.3): retry max_inference_retries
 /// times, then transparently return the all-Correct fallback verdict
-/// (label "correct", error_code CX_ERR_F37_INFERENCE_FAILED).
+/// (label "correct", error_code CX_ERR_CRAG_INFERENCE_FAILED).
 ///
 /// Standalone (D3): the backend is a HeuristicGuardBackend stub (no ONNX); the
 /// real DistilBERT-tiny OnnxCragBackend + QueryPipeline step-10 wiring are D3.5.
@@ -75,7 +75,7 @@ private:
         const std::map<std::string, float>& signals);
 
     /// The §7.3 transparent-degrade verdict ("correct_fallback_classifier_failed"
-    /// + CX_ERR_F37_INFERENCE_FAILED), preserving signals for ?explain=true.
+    /// + CX_ERR_CRAG_INFERENCE_FAILED), preserving signals for ?explain=true.
     ClassificationResult DegradedResult(
         const std::map<std::string, float>& signals) const;
 

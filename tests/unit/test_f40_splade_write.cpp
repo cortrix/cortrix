@@ -143,7 +143,7 @@ TEST_F(SpladeWriteTest, AddBeforeOpenFails) {
     SpladeSparseRetriever closed(SpladeConfig{}, ":memory:");  // no Open()
     Status s = closed.Add("ns", "c", V({{1, 0.5f}}));
     EXPECT_FALSE(s.ok());
-    EXPECT_NE(s.message().find("CX_ERR_F40_INVERTED_INDEX_WRITE_FAILED"),
+    EXPECT_NE(s.message().find("CX_ERR_SPARSE_INVERTED_INDEX_WRITE_FAILED"),
               std::string::npos);
 }
 

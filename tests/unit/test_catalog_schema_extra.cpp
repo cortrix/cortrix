@@ -152,7 +152,7 @@ TEST(F12SchemaMigrateCleanBreakTest, MissingBlobGcQueueCreatedFresh) {
 
 TEST(F12SchemaProviderTest, FeatureNameIsF12) {
     F12SchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F12");
+    EXPECT_EQ(p.FeatureName(), "catalog");
 }
 
 TEST(F12SchemaProviderTest, CurrentVersionMatchesConstant) {

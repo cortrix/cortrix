@@ -87,7 +87,7 @@ struct ExtractMeta {
 };
 
 /// Result of extract() for one interaction. On the failure paths the
-/// error is the Agent-friendly boundary type carrying a CX_ERR_MEM02_* code (see
+/// error is the Agent-friendly boundary type carrying a CX_ERR_MEMEXTRACT_* code (see
 /// mem02_error.h); `ok()` mirrors error.has_value() == false.
 struct MemoryExtractionResult {
     std::vector<ExtractedMemory> extracted_memories;
@@ -264,7 +264,7 @@ public:
 
     /// Parse the LLM extraction JSON array → ExtractedMemory list. Applies the D4
     /// fallback (unknown type → event). Returns InvalidArgument (carrying
-    /// CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT identity via Mem02Status) on non-JSON /
+    /// CX_ERR_MEMEXTRACT_INVALID_OUTPUT identity via Mem02Status) on non-JSON /
     /// wrong-shape output.
     Result<std::vector<ExtractedMemory>> ParseExtractionJson(const std::string& llm_output) const;
 

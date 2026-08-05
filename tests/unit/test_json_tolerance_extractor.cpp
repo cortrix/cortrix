@@ -4,7 +4,7 @@
 //   1. json::parse(allow_exceptions=false). If discarded OR not an array, narrow
 //      to the outermost [ ... ] span (find('[') .. rfind(']')) and re-parse.
 //   2. If still discarded / not array  -> Result error (Mem02Status,
-//      kExtractInvalidOutput, message carries "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT").
+//      kExtractInvalidOutput, message carries "CX_ERR_MEMEXTRACT_INVALID_OUTPUT").
 //   3. Each element must be an object with a string "content", else error.
 //      type missing/unknown -> kEvent (D4 fallback). confidence clamped [0,1].
 //
@@ -35,7 +35,7 @@ namespace {
 
 enum class Tol {
     kParsed,    // parses to an array; expected_count is the element count
-    kRejected,  // graceful error Result (CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT)
+    kRejected,  // graceful error Result (CX_ERR_MEMEXTRACT_INVALID_OUTPUT)
 };
 
 struct ExtractorJsonCase {
@@ -64,7 +64,7 @@ TEST_P(ExtractorJsonMatrix, Tolerance) {
         EXPECT_EQ(static_cast<int>(r.value().size()), tc.expected_count) << tc.name;
     } else {
         ASSERT_FALSE(r.ok()) << tc.name << " unexpectedly parsed";
-        EXPECT_NE(r.status().message().find("CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT"),
+        EXPECT_NE(r.status().message().find("CX_ERR_MEMEXTRACT_INVALID_OUTPUT"),
                   std::string::npos)
             << tc.name << " msg=" << r.status().message();
     }

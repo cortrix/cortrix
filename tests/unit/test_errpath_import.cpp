@@ -133,18 +133,18 @@ protected:
     async::TaskManager mgr_;
 };
 
-// CX_ERR_F41_NS_ACQUIRE_FAILED — acquiring a never-admitted namespace fails before
+// CX_ERR_DOCSUMMARY_NS_ACQUIRE_FAILED — acquiring a never-admitted namespace fails before
 // generation/embed/write (f41_async_worker.cpp:58).
 TEST_F(F41ErrPathTest, UnknownNamespaceReturnsNsAcquireFailed) {
     F41AsyncWorker worker(harness_->ipool(), MakeLlm(kSummaryJson), DocSummaryConfig{},
                           *embedder_, assembler_, &mgr_);
     Status s = worker.ProcessTask(SummaryTask("some-doc", "no-such-ns"));
     ASSERT_FALSE(s.ok());
-    EXPECT_NE(s.message().find("CX_ERR_F41_NS_ACQUIRE_FAILED"), std::string::npos)
+    EXPECT_NE(s.message().find("CX_ERR_DOCSUMMARY_NS_ACQUIRE_FAILED"), std::string::npos)
         << "message: " << s.message();
 }
 
-// CX_ERR_F41_EMBED_FAILED — embedding the summary fails (f41_async_worker.cpp:80).
+// CX_ERR_DOCSUMMARY_EMBED_FAILED — embedding the summary fails (f41_async_worker.cpp:80).
 // An OnnxEmbedder that was never Init()'d returns Internal("embedder not
 // initialized") from Embed(), AFTER generation succeeds.
 TEST_F(F41ErrPathTest, UninitializedEmbedderReturnsEmbedFailed) {
@@ -154,11 +154,11 @@ TEST_F(F41ErrPathTest, UninitializedEmbedderReturnsEmbedFailed) {
                           uninit, assembler_, &mgr_);
     Status s = worker.ProcessTask(SummaryTask(doc_id));
     ASSERT_FALSE(s.ok());
-    EXPECT_NE(s.message().find("CX_ERR_F41_EMBED_FAILED"), std::string::npos)
+    EXPECT_NE(s.message().find("CX_ERR_DOCSUMMARY_EMBED_FAILED"), std::string::npos)
         << "message: " << s.message();
 }
 
-// CX_ERR_F41_WRITE_FAILED — the vector AddPoints into the P-HNSW index fails
+// CX_ERR_DOCSUMMARY_WRITE_FAILED — the vector AddPoints into the P-HNSW index fails
 // (f41_async_worker.cpp:113). FakeIndex::set_add_should_fail makes AddPoints return
 // kUnavailable; generation+embed must succeed first (Init'd embedder + chunks) so
 // AddPoints is actually reached.
@@ -169,7 +169,7 @@ TEST_F(F41ErrPathTest, VectorAddFailureReturnsWriteFailed) {
                           *embedder_, assembler_, &mgr_);
     Status s = worker.ProcessTask(SummaryTask(doc_id));
     ASSERT_FALSE(s.ok());
-    EXPECT_NE(s.message().find("CX_ERR_F41_WRITE_FAILED"), std::string::npos)
+    EXPECT_NE(s.message().find("CX_ERR_DOCSUMMARY_WRITE_FAILED"), std::string::npos)
         << "message: " << s.message();
 }
 
@@ -182,7 +182,7 @@ TEST_F(F41ErrPathTest, VectorAddFailureReturnsWriteFailed) {
 namespace cortrix::import {
 namespace {
 
-// CX_ERR_F16A_SCHEMA — F16aSchemaProvider::Migrate fails when one of its
+// CX_ERR_IMPORT_SCHEMA — F16aSchemaProvider::Migrate fails when one of its
 // "CREATE ... IF NOT EXISTS" statements collides on object TYPE: pre-creating a
 // TABLE named like one of the provider's indices makes the CREATE INDEX error
 // ("there is already a table named idx_import_tasks_running"), which IF NOT EXISTS
@@ -200,7 +200,7 @@ TEST(F16aSchemaErrPathTest, IndexNameCollisionReturnsSchemaError) {
     F16aSchemaProvider p;
     Status s = p.Migrate(db, 0, 1);
     EXPECT_FALSE(s.ok());
-    EXPECT_NE(s.message().find("CX_ERR_F16A_SCHEMA"), std::string::npos)
+    EXPECT_NE(s.message().find("CX_ERR_IMPORT_SCHEMA"), std::string::npos)
         << "message: " << s.message();
     sqlite3_close(db);
 }
@@ -208,7 +208,7 @@ TEST(F16aSchemaErrPathTest, IndexNameCollisionReturnsSchemaError) {
 // An IQueryExecutor whose EstimateRowCount throws a non-import std::exception. This is
 // invoked inside ImportManager::StartImport (after the admin check + DSN resolve),
 // so the throw propagates out of StartImport and is caught by the handler's
-// catch(std::exception&) -> CX_ERR_F16A_INTERNAL.
+// catch(std::exception&) -> CX_ERR_IMPORT_INTERNAL.
 class ThrowingQueryExecutor : public IQueryExecutor {
 public:
     Result<int64_t> EstimateRowCount(const std::string&, const QueryRequest&,
@@ -229,7 +229,7 @@ AuthContext AdminCtx() {
     return c;
 }
 
-// CX_ERR_F16A_INTERNAL — explicit catch in ImportHandler::HandleStartImport
+// CX_ERR_IMPORT_INTERNAL — explicit catch in ImportHandler::HandleStartImport
 // (import_handler.cpp:134-145), http 500, error.code in the envelope.
 TEST(F16aHandlerErrPathTest, ThrowingImportStackReturnsF16aInternal) {
     auto secret = std::make_shared<InMemorySecretStore>();
@@ -264,7 +264,7 @@ TEST(F16aHandlerErrPathTest, ThrowingImportStackReturnsF16aInternal) {
 
     EXPECT_EQ(http, 500) << out.dump();
     ASSERT_TRUE(out.contains("error"));
-    EXPECT_EQ(out["error"]["code"], "CX_ERR_F16A_INTERNAL") << out.dump();
+    EXPECT_EQ(out["error"]["code"], "CX_ERR_IMPORT_INTERNAL") << out.dump();
 }
 
 }  // namespace

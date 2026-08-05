@@ -211,8 +211,8 @@ void DataCleaner::RegisterPlugin(std::function<void(std::vector<Block>&)> plugin
 void DataCleaner::ApplyPlugins(std::vector<Block>& blocks,
                                const observability::TraceContext* /*ctx*/) {
     // Stub: run each registered plugin in order. The plugin API implements timeout
-    // enforcement (CX_ERR_F10_PLUGIN_TIMEOUT) + exception capture
-    // (CX_ERR_F10_PLUGIN_EXCEPTION) + the full ICleaningPlugin ecosystem.
+    // enforcement (CX_ERR_CLEANING_PLUGIN_TIMEOUT) + exception capture
+    // (CX_ERR_CLEANING_PLUGIN_EXCEPTION) + the full ICleaningPlugin ecosystem.
     for (auto& plugin : plugins_) {
         if (plugin) plugin(blocks);
     }

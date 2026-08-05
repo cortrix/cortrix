@@ -30,7 +30,7 @@ extern const char* const kOperationLogSchemaSql;
 /// (F-FREEZE-1: no Result<void>).
 class OperationLogSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
-    std::string FeatureName() const override { return "F18a"; }
+    std::string FeatureName() const override { return "operation_log"; }
     int CurrentVersion() const override { return kOplogSchemaVersion; }
 
     /// Phase 1 (from_ver 0 → 1): create operation_log + 5 indices. An

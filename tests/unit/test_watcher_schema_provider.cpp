@@ -35,7 +35,7 @@ std::set<std::string> ColumnNames(sqlite3* db, const std::string& table) {
 
 TEST(F21SchemaProviderTest, IdentityAndVersion) {
     F21SchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F21");
+    EXPECT_EQ(p.FeatureName(), "watcher");
     EXPECT_EQ(p.CurrentVersion(), 1);
 }
 
@@ -68,7 +68,7 @@ TEST(F21SchemaProviderTest, RegistersAndMigratesViaMigrator) {
     m.Register(&p);
     Status st = m.MigrateCatalog(db);
     ASSERT_TRUE(st.ok()) << st.message();
-    EXPECT_EQ(m.CurrentVersion(db, "F21"), 1);  // recorded at v1
+    EXPECT_EQ(m.CurrentVersion(db, "watcher"), 1);  // recorded at v1
     sqlite3_close(db);
 }
 
@@ -92,8 +92,8 @@ TEST(F21SchemaProviderTest, WatcherConfigColumnSuppliedByF12BaseSchema) {
     EXPECT_NE(cols.find("watcher_config"), cols.end())
         << "namespaces.watcher_config must be present (F12 base schema)";
 
-    EXPECT_EQ(m.CurrentVersion(db, "F12"), cortrix::catalog::kF12SchemaVersion);
-    EXPECT_EQ(m.CurrentVersion(db, "F21"), 1);
+    EXPECT_EQ(m.CurrentVersion(db, "catalog"), cortrix::catalog::kF12SchemaVersion);
+    EXPECT_EQ(m.CurrentVersion(db, "watcher"), 1);
     sqlite3_close(db);
 }
 

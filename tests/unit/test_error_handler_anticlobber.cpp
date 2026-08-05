@@ -1,7 +1,7 @@
 // 🔒 http_server error_handler anti-clobber (http_server.cpp l.371). The 404
 // error handler must fill the generic "resource not found" body ONLY when the
 // response body is still EMPTY. A route handler that already wrote a business
-// CX_ERR_* body + status 404 (e.g. CX_ERR_F13_SESSION_NOT_FOUND) must survive
+// CX_ERR_* body + status 404 (e.g. CX_ERR_TRACE_SESSION_NOT_FOUND) must survive
 // untouched — this is the exact mem-documented "generic 404 ≠ route miss" bug
 // class. Driven through a real httplib server with custom routes registered AFTER
 // RegisterRoutes() (so the error handler is already installed).
@@ -46,7 +46,7 @@ protected:
             "/api/v1/business-404",
             [](const httplib::Request&, httplib::Response& res) {
                 json body;
-                body["error"]["code"] = "CX_ERR_F13_SESSION_NOT_FOUND";
+                body["error"]["code"] = "CX_ERR_TRACE_SESSION_NOT_FOUND";
                 body["error"]["message"] = "session sess_abc not found";
                 res.set_content(body.dump(), "application/json");
                 res.status = 404;  // 4xx → error handler is invoked by httplib
@@ -95,7 +95,7 @@ TEST_F(ErrorHandlerAntiClobberTest, BusinessBodyNotClobbered) {
     EXPECT_EQ(res->status, 404);
     auto body = json::parse(res->body);
     // The handler's specific business code must survive — anti-clobber rule.
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F13_SESSION_NOT_FOUND");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_TRACE_SESSION_NOT_FOUND");
     EXPECT_EQ(body["error"]["message"], "session sess_abc not found");
     // It must NOT have been overwritten by the generic NOT_FOUND message.
     EXPECT_NE(body["error"]["message"], "The requested resource was not found");

@@ -163,7 +163,7 @@ TEST(SemanticScorerFinalTest, AlphaOutOfRangeThrowsConfigInvalid) {
         SemanticScorer::ComputeFinalScore(1.0f, std::nullopt, 0.5f, false, /*alpha=*/1.5f);
         FAIL() << "expected AgentFriendlyException";
     } catch (const agent_friendly::AgentFriendlyException& e) {
-        EXPECT_EQ(e.GetError().code, "CX_ERR_F07_CONFIG_INVALID");
+        EXPECT_EQ(e.GetError().code, "CX_ERR_SCORING_CONFIG_INVALID");
         ASSERT_TRUE(e.GetError().structured_data.has_value());
         EXPECT_EQ((*e.GetError().structured_data)["config_source"], "config.yaml:scoring.alpha");
     }

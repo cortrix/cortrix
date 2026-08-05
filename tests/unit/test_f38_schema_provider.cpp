@@ -53,7 +53,7 @@ TEST(F38BlockTypeTest, DoesNotCollideWithExistingTypes) {
 
 TEST(F38SchemaProviderTest, IdentityAndVersion) {
     F38SchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F38");
+    EXPECT_EQ(p.FeatureName(), "hype");
     EXPECT_EQ(p.CurrentVersion(), 1);
 }
 
@@ -75,7 +75,7 @@ TEST(F38SchemaProviderTest, UnexpectedVersionStepIsError) {
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     Status st = p.Migrate(db, 1, 2);  // Phase 2 not implemented
     EXPECT_FALSE(st.ok());
-    EXPECT_NE(st.message().find("CX_ERR_F38_SCHEMA_VERSION_MISMATCH"),
+    EXPECT_NE(st.message().find("CX_ERR_HYPE_SCHEMA_VERSION_MISMATCH"),
               std::string::npos);
     sqlite3_close(db);
 }
@@ -91,7 +91,7 @@ TEST(F38SchemaProviderTest, RegistersWithSchemaMigrator) {
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     auto before = TableNames(db);
     ASSERT_TRUE(migrator.MigrateUnit(db, "unit_test").ok());
-    EXPECT_EQ(migrator.CurrentVersion(db, "F38"), 1);
+    EXPECT_EQ(migrator.CurrentVersion(db, "hype"), 1);
     // Only the migrator's own bookkeeping table may appear; no HyPE table.
     auto after = TableNames(db);
     EXPECT_EQ(after.count("hype_questions"), 0u);

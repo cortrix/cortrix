@@ -30,7 +30,7 @@ namespace cortrix::reranker {
 class F02SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     /// Registration key (aligns with the other SchemaProvider names).
-    std::string FeatureName() const override { return "F02"; }
+    std::string FeatureName() const override { return "reranker"; }
 
     /// Schema version. V1 = base reranker_config already in the catalog schema.
     /// Phase 2 -> V2 (§2.4 NS JSONB extension).

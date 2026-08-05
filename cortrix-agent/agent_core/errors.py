@@ -27,43 +27,43 @@ ErrorCategory = Literal["auth", "quota", "transient", "permanent", "timeout"]
 # --- Section 10.1: 7 V1.0-enabled runtime chat-path error codes ---
 # Each entry: category, retryable, default HTTP status, default message.
 ERROR_TABLE: dict[str, dict[str, Any]] = {
-    "CX_ERR_F48_LLM_TIMEOUT": {
+    "CX_ERR_AGENT_LLM_TIMEOUT": {
         "category": "timeout",
         "retryable": True,
         "http_status": 504,
         "message": "LLM provider request timed out",
     },
-    "CX_ERR_F48_LLM_QUOTA_EXCEEDED": {
+    "CX_ERR_AGENT_LLM_QUOTA_EXCEEDED": {
         "category": "quota",
         "retryable": True,
         "http_status": 429,
         "message": "LLM provider quota exceeded",
     },
-    "CX_ERR_F48_LLM_UNAVAILABLE": {
+    "CX_ERR_AGENT_LLM_UNAVAILABLE": {
         "category": "transient",
         "retryable": True,
         "http_status": 503,
         "message": "LLM provider is unavailable",
     },
-    "CX_ERR_F48_LLM_INVALID_CONFIG": {
+    "CX_ERR_AGENT_LLM_INVALID_CONFIG": {
         "category": "permanent",
         "retryable": False,
         "http_status": 400,
         "message": "LLM provider configuration is invalid",
     },
-    "CX_ERR_F48_SESSION_NOT_FOUND": {
+    "CX_ERR_AGENT_SESSION_NOT_FOUND": {
         "category": "permanent",
         "retryable": False,
         "http_status": 404,
         "message": "Session not found",
     },
-    "CX_ERR_F48_RAG_FAILED": {
+    "CX_ERR_AGENT_RAG_FAILED": {
         "category": "transient",
         "retryable": True,
         "http_status": 503,
         "message": "RAG retrieval against cortrix-server failed",
     },
-    "CX_ERR_F48_INTERACTION_LOG_FAILED": {
+    "CX_ERR_AGENT_INTERACTION_LOG_FAILED": {
         "category": "transient",
         "retryable": True,
         "http_status": 503,
@@ -74,31 +74,31 @@ ERROR_TABLE: dict[str, dict[str, Any]] = {
 
 # --- Section 10.3: startup / init-period error codes (independent group) ---
 STARTUP_ERROR_TABLE: dict[str, dict[str, Any]] = {
-    "CX_ERR_F48_CORTRIX_SERVER_UNREACHABLE": {
+    "CX_ERR_AGENT_CORTRIX_SERVER_UNREACHABLE": {
         "category": "transient",
         "retryable": True,
         "http_status": 503,
         "message": "cortrix-server health check failed (5 attempts)",
     },
-    "CX_ERR_F48_LLM_PROVIDER_INVALID": {
+    "CX_ERR_AGENT_LLM_PROVIDER_INVALID": {
         "category": "permanent",
         "retryable": False,
         "http_status": 500,
         "message": "LLM provider registration failed (bad config)",
     },
-    "CX_ERR_F48_PORT_OCCUPIED": {
+    "CX_ERR_AGENT_PORT_OCCUPIED": {
         "category": "permanent",
         "retryable": False,
         "http_status": 500,
         "message": "Agent port is already in use",
     },
-    "CX_ERR_F48_TENANT_CONFIG_INVALID": {
+    "CX_ERR_AGENT_TENANT_CONFIG_INVALID": {
         "category": "permanent",
         "retryable": False,
         "http_status": 500,
         "message": "IGlobalConfig agent_llm section schema is invalid",
     },
-    "CX_ERR_F48_NO_LLM_AVAILABLE": {
+    "CX_ERR_AGENT_NO_LLM_AVAILABLE": {
         "category": "transient",
         "retryable": True,
         "http_status": 503,

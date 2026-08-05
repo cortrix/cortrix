@@ -74,7 +74,7 @@ protected:
 };
 
 TEST_F(F09TblMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F09");
+    EXPECT_EQ(p_.FeatureName(), "block_framework");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
@@ -117,7 +117,7 @@ TEST_F(F09TblMatrix, UnsupportedStepRejected) {
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     EXPECT_NE(s.message().find("CX_ERR_SCHEMA_VERSION_MISMATCH"), std::string::npos);
-    EXPECT_NE(s.message().find("F09"), std::string::npos);
+    EXPECT_NE(s.message().find("block_framework"), std::string::npos);
 }
 
 class F09TblVersionMatrix : public ::testing::TestWithParam<InitStep> {
@@ -154,7 +154,7 @@ protected:
 };
 
 TEST_F(F08TblMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F08");
+    EXPECT_EQ(p_.FeatureName(), "metadata_block");
     EXPECT_EQ(p_.CurrentVersion(), 1);
     EXPECT_EQ(cortrix::metadata::kMetadataSchemaVersion, 1);
 }
@@ -195,7 +195,7 @@ TEST_F(F08TblMatrix, UnsupportedStepRejected) {
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     EXPECT_NE(s.message().find("CX_ERR_SCHEMA_VERSION_MISMATCH"), std::string::npos);
-    EXPECT_NE(s.message().find("F08"), std::string::npos);
+    EXPECT_NE(s.message().find("metadata_block"), std::string::npos);
 }
 
 class F08TblVersionMatrix : public ::testing::TestWithParam<InitStep> {
@@ -235,7 +235,7 @@ protected:
 };
 
 TEST_F(F16aTblMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F16a");
+    EXPECT_EQ(p_.FeatureName(), "db_import");
     EXPECT_EQ(p_.CurrentVersion(), 1);
     EXPECT_EQ(cortrix::import::kF16aSchemaVersion, 1);
 }
@@ -298,7 +298,7 @@ TEST_F(F16aTblMatrix, UnsupportedStepRejected) {
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     EXPECT_NE(s.message().find("CX_ERR_SCHEMA_VERSION_MISMATCH"), std::string::npos);
-    EXPECT_NE(s.message().find("F16a"), std::string::npos);
+    EXPECT_NE(s.message().find("db_import"), std::string::npos);
 }
 
 class F16aTblVersionMatrix : public ::testing::TestWithParam<InitStep> {
@@ -338,7 +338,7 @@ protected:
 };
 
 TEST_F(F41TblMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F41");
+    EXPECT_EQ(p_.FeatureName(), "doc_summary");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
@@ -360,14 +360,14 @@ TEST_F(F41TblMatrix, NullDbRejectedWithF41Token) {
     Status s = p_.Migrate(nullptr, 0, 1);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
-    EXPECT_NE(s.message().find("CX_ERR_F41_SCHEMA_VERSION_MISMATCH"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_DOCSUMMARY_SCHEMA_VERSION_MISMATCH"), std::string::npos);
 }
 
 TEST_F(F41TblMatrix, UnsupportedStepRejectedWithF41Token) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
-    EXPECT_NE(s.message().find("CX_ERR_F41_SCHEMA_VERSION_MISMATCH"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_DOCSUMMARY_SCHEMA_VERSION_MISMATCH"), std::string::npos);
 }
 
 class F41TblVersionMatrix : public ::testing::TestWithParam<InitStep> {
@@ -384,7 +384,7 @@ TEST_P(F41TblVersionMatrix, Gate) {
         EXPECT_TRUE(s.ok());
     } else {
         EXPECT_FALSE(s.ok());
-        EXPECT_NE(s.message().find("CX_ERR_F41_SCHEMA_VERSION_MISMATCH"), std::string::npos);
+        EXPECT_NE(s.message().find("CX_ERR_DOCSUMMARY_SCHEMA_VERSION_MISMATCH"), std::string::npos);
         EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     }
 }

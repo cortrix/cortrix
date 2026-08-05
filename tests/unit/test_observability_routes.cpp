@@ -192,7 +192,7 @@ TEST_F(ObservabilityRoutesTest, NonAdminCrossUserUnauthorized) {
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 403);
     auto body = json::parse(res->body);
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F13_UNAUTHORIZED");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_TRACE_UNAUTHORIZED");
     EXPECT_EQ(body["error"]["category"], "auth");
     EXPECT_FALSE(body["error"]["retryable"].get<bool>());
     // §9.2 structured_data required key for UNAUTHORIZED.
@@ -213,7 +213,7 @@ TEST_F(ObservabilityRoutesTest, AdminNonexistentSessionNotFound) {
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 404);
     auto body = json::parse(res->body);
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F13_SESSION_NOT_FOUND");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_TRACE_SESSION_NOT_FOUND");
     EXPECT_EQ(body["error"]["structured_data"]["session_id"], "ghost-sess");
 }
 
@@ -223,7 +223,7 @@ TEST_F(ObservabilityRoutesTest, InvalidLimitParamIsInvalidFilter) {
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 400);
     auto body = json::parse(res->body);
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F13_INVALID_FILTER");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_TRACE_INVALID_FILTER");
     EXPECT_EQ(body["error"]["structured_data"]["invalid_field"], "limit");
     // value_preview echoes the offending value (PII-guarded to 100 chars).
     EXPECT_EQ(body["error"]["structured_data"]["value_preview"], "abc");
@@ -238,13 +238,13 @@ TEST_F(ObservabilityRoutesTest, InvalidStatusParamIsInvalidFilter) {
 }
 
 // out-of-range limit is rejected by the writer (handler) and surfaces as the same
-// CX_ERR_F13_INVALID_FILTER token through the route.
+// CX_ERR_TRACE_INVALID_FILTER token through the route.
 TEST_F(ObservabilityRoutesTest, OutOfRangeLimitFromHandlerIsInvalidFilter) {
     httplib::Client cli("127.0.0.1", port_);
     auto res = cli.Get("/api/v1/traces/alice-sess?limit=9999", Bearer(alice_key_));
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 400);
-    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_F13_INVALID_FILTER");
+    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_TRACE_INVALID_FILTER");
 }
 
 // ---- header validation (§6.1, topic 4) ------------------------------------
@@ -294,7 +294,7 @@ TEST_F(ObservabilityRoutesTest, SourcesMissingInteractionNotFound) {
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 404);
     auto body = json::parse(res->body);
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F13_INTERACTION_NOT_FOUND");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_TRACE_INTERACTION_NOT_FOUND");
     EXPECT_EQ(body["error"]["structured_data"]["interaction_id"], "nope");
 }
 
@@ -303,7 +303,7 @@ TEST_F(ObservabilityRoutesTest, SourcesNonAdminCrossUserUnauthorized) {
     auto res = cli.Get("/api/v1/interactions/int-1/sources", Bearer(mallory_key_));
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 403);
-    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_F13_UNAUTHORIZED");
+    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_TRACE_UNAUTHORIZED");
 }
 
 // ---- GET /interactions -----------------------------------------------------
@@ -329,7 +329,7 @@ TEST_F(ObservabilityRoutesTest, ListNonAdminCrossUserUnauthorized) {
     auto res = cli.Get("/api/v1/interactions?user_id=alice", Bearer(mallory_key_));
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 403);
-    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_F13_UNAUTHORIZED");
+    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_TRACE_UNAUTHORIZED");
 }
 
 TEST_F(ObservabilityRoutesTest, ListInvalidSortOrderIsInvalidFilter) {

@@ -11,11 +11,11 @@ namespace cortrix::observability {
 
 namespace {
 
-// CX_ERR_F13_INVALID_FILTER token. Carried in the Status message so
+// CX_ERR_TRACE_INVALID_FILTER token. Carried in the Status message so
 // the exact identity survives to the API boundary, which re-inflates the
 // full Agent-friendly body (the §3.1 4-field schema). Kept as a literal here so
 // this widely-included shared TU does not pull in agent_trace_error.h (S7).
-constexpr const char* kInvalidFilterToken = "CX_ERR_F13_INVALID_FILTER";
+constexpr const char* kInvalidFilterToken = "CX_ERR_TRACE_INVALID_FILTER";
 
 int64_t NowMs() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(

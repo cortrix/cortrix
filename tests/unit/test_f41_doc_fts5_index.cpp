@@ -110,7 +110,7 @@ TEST(F41DocFts5IndexLifecycleTest, SearchOnClosedIndexErrors) {
     DocFts5Index idx;  // not opened
     auto r = idx.Search("x", 5);
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F41_FTS5_FALLBACK_FAILED"),
+    EXPECT_NE(r.status().message().find("CX_ERR_DOCSUMMARY_FTS5_FALLBACK_FAILED"),
               std::string::npos);
 }
 
@@ -122,11 +122,11 @@ TEST(F41DocFts5IndexLifecycleTest, UpsertOnClosedIndexErrors) {
 
 TEST(F41DocFts5IndexLifecycleTest, OpenOnUncreatablePathErrors) {
     // A path under a non-existent directory cannot be created → sqlite3_open
-    // (with the default create flags) fails → CX_ERR_F41_FTS5_FALLBACK_FAILED.
+    // (with the default create flags) fails → CX_ERR_DOCSUMMARY_FTS5_FALLBACK_FAILED.
     DocFts5Index idx;
     Status st = idx.Open("/nonexistent_dir_f41_xyz/sub/doc.sqlite");
     EXPECT_FALSE(st.ok());
-    EXPECT_NE(st.message().find("CX_ERR_F41_FTS5_FALLBACK_FAILED"),
+    EXPECT_NE(st.message().find("CX_ERR_DOCSUMMARY_FTS5_FALLBACK_FAILED"),
               std::string::npos);
     EXPECT_FALSE(idx.is_open());
 }
@@ -157,7 +157,7 @@ TEST(F41DocFts5SharedHandleTest, BorrowedHandleErrorsWithoutMigratedTable) {
 
     Status st = UpsertDocFts5Row(db, Row("d1", "Missing Table"));
     EXPECT_FALSE(st.ok());
-    EXPECT_NE(st.message().find("CX_ERR_F41_FTS5_FALLBACK_FAILED"),
+    EXPECT_NE(st.message().find("CX_ERR_DOCSUMMARY_FTS5_FALLBACK_FAILED"),
               std::string::npos);
 
     sqlite3_close(db);

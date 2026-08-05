@@ -198,8 +198,8 @@ def register(mcp) -> None:
             limit: max rows (default 50, max 200).
             offset: pagination offset.
 
-        Errors pass through: CX_ERR_MEM03_USER_MISMATCH / CX_ERR_MEM03_INVALID_TYPE /
-        CX_ERR_MEM03_QUOTA / CX_ERR_MEM03_LIST_FAILED.
+        Errors pass through: CX_ERR_MEMORY_USER_MISMATCH / CX_ERR_MEMORY_INVALID_TYPE /
+        CX_ERR_MEMORY_QUOTA / CX_ERR_MEMORY_LIST_FAILED.
         """
         ns = namespace or CORTRIX_NAMESPACE
         params: dict = {
@@ -224,8 +224,8 @@ def register(mcp) -> None:
         The POST path does not pass through LLM quality filtering (MEM03 topic 4 lock);
         extraction_method is set to 'user_create' server-side.
 
-        Errors pass through: CX_ERR_MEM03_USER_MISMATCH / CX_ERR_MEM03_INVALID_TYPE /
-        CX_ERR_MEM03_CONTENT_TOO_LONG / CX_ERR_MEM03_QUOTA / CX_ERR_MEM03_CREATE_FAILED.
+        Errors pass through: CX_ERR_MEMORY_USER_MISMATCH / CX_ERR_MEMORY_INVALID_TYPE /
+        CX_ERR_MEMORY_CONTENT_TOO_LONG / CX_ERR_MEMORY_QUOTA / CX_ERR_MEMORY_CREATE_FAILED.
         """
         body: dict = {"namespace": namespace, "content": content, "memory_type": memory_type}
         if metadata:
@@ -245,9 +245,9 @@ def register(mcp) -> None:
         'user_edit' server-side. Semantically a new user_edit memory + invalidation of the
         old one, hence PATCH not PUT.
 
-        Errors pass through: CX_ERR_MEM03_MEMORY_NOT_FOUND / CX_ERR_MEM03_USER_MISMATCH /
-        CX_ERR_MEM03_ALREADY_INVALIDATED / CX_ERR_MEM03_CONTENT_TOO_LONG /
-        CX_ERR_MEM03_EDIT_FAILED / CX_ERR_MEM03_QUOTA.
+        Errors pass through: CX_ERR_MEMORY_NOT_FOUND / CX_ERR_MEMORY_USER_MISMATCH /
+        CX_ERR_MEMORY_ALREADY_INVALIDATED / CX_ERR_MEMORY_CONTENT_TOO_LONG /
+        CX_ERR_MEMORY_EDIT_FAILED / CX_ERR_MEMORY_QUOTA.
         """
         ns = namespace or CORTRIX_NAMESPACE
         body: dict = {"namespace": ns}
@@ -269,8 +269,8 @@ def register(mcp) -> None:
         retained (never hard-deleted) per the MEM02 D9 full-retention model and the MEM03
         transparency vision. ``reason`` is written to metadata_json.invalidation_reason.
 
-        Errors pass through: CX_ERR_MEM03_MEMORY_NOT_FOUND / CX_ERR_MEM03_USER_MISMATCH /
-        CX_ERR_MEM03_ALREADY_INVALIDATED / CX_ERR_MEM03_INVALIDATE_FAILED / CX_ERR_MEM03_QUOTA.
+        Errors pass through: CX_ERR_MEMORY_NOT_FOUND / CX_ERR_MEMORY_USER_MISMATCH /
+        CX_ERR_MEMORY_ALREADY_INVALIDATED / CX_ERR_MEMORY_INVALIDATE_FAILED / CX_ERR_MEMORY_QUOTA.
         """
         params: dict = {}
         if namespace:

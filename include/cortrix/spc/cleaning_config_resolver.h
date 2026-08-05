@@ -38,7 +38,7 @@ CleaningConfig LoadGlobalCleaningConfig(const IGlobalConfig* global);
 /// stray key for them in the NS blob is ignored.
 ///
 /// `ns_blob` is the raw `namespaces.cleaning_config` JSONB ("" / "{}" / SQL NULL =
-/// inherit global entirely). Returns CX_ERR_F10_NS_CONFIG_MERGE_FAILED (§5.1) when
+/// inherit global entirely). Returns CX_ERR_CLEANING_NS_CONFIG_MERGE_FAILED (§5.1) when
 /// the blob is present but not a JSON object, or when the merged result fails to
 /// deserialize — so the SPC path can surface the Agent-friendly merge error rather
 /// than silently using a wrong config.

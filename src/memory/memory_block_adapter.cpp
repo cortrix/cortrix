@@ -117,7 +117,7 @@ Result<std::string> MemoryBlockAdapter::InsertMemoryBlock(const MemoryBlockRecor
 
     if (int rc = store_.block_insert(cb); rc != 0) {
         return Result<std::string>(
-            Status::Internal("CX_ERR_MEM02_STORE: block_insert failed for memory block"));
+            Status::Internal("CX_ERR_MEMEXTRACT_STORE: block_insert failed for memory block"));
     }
     if (have_vec && vec_index_) {
         std::vector<std::pair<const float*, uint64_t>> pts{{emb.vector.data(), bid}};
@@ -146,13 +146,13 @@ Status MemoryBlockAdapter::UpdateMemoryBlock(const MemoryBlockRecord& block) {
     sqlite3_stmt* stmt = nullptr;
     const char* sql = "UPDATE blocks SET metadata_json=?1 WHERE block_id=?2";
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK)
-        return Status::Internal("CX_ERR_MEM02_STORE: prepare update memory block");
+        return Status::Internal("CX_ERR_MEMEXTRACT_STORE: prepare update memory block");
     sqlite3_bind_text(stmt, 1, meta_str.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_int64(stmt, 2, static_cast<sqlite3_int64>(bid));
     int rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
     if (rc != SQLITE_DONE)
-        return Status::Internal("CX_ERR_MEM02_STORE: update memory block failed");
+        return Status::Internal("CX_ERR_MEMEXTRACT_STORE: update memory block failed");
     return Status::Ok();
 }
 
@@ -160,7 +160,7 @@ Result<MemoryBlockRecord> MemoryBlockAdapter::GetMemoryBlock(const std::string& 
     CortrixBlock cb;
     if (store_.block_get(MemBlockId(block_id), cb) != 0) {
         return Result<MemoryBlockRecord>(
-            Status::NotFound("CX_ERR_MEM02_STORE: memory block not found"));
+            Status::NotFound("CX_ERR_MEMEXTRACT_STORE: memory block not found"));
     }
     MemoryBlockRecord rec = ToRecord(cb);
     if (rec.block_id.empty()) rec.block_id = block_id;
@@ -182,7 +182,7 @@ Result<std::vector<MemoryBlockRecord>> MemoryBlockAdapter::ListByUser(
         "ORDER BY json_extract(metadata_json,'$.created_at') DESC";
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         return Result<std::vector<MemoryBlockRecord>>(
-            Status::Internal("CX_ERR_MEM03_STORE: prepare list by user"));
+            Status::Internal("CX_ERR_MEMORY_STORE: prepare list by user"));
     }
     sqlite3_bind_int(stmt, 1, static_cast<int>(kBlockMemory));
     sqlite3_bind_text(stmt, 2, user_id.c_str(), -1, SQLITE_TRANSIENT);
@@ -296,7 +296,7 @@ Result<std::vector<UserFact>> QueryUserFacts(CortrixStore& store,
         "ORDER BY json_extract(metadata_json,'$.created_at') DESC LIMIT ?3";
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         return Result<std::vector<UserFact>>(
-            Status::Internal("CX_ERR_MEM02_STORE: prepare user facts"));
+            Status::Internal("CX_ERR_MEMEXTRACT_STORE: prepare user facts"));
     }
     sqlite3_bind_int(stmt, 1, static_cast<int>(kBlockMemory));
     sqlite3_bind_text(stmt, 2, user_id.c_str(), -1, SQLITE_TRANSIENT);

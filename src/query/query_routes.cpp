@@ -97,7 +97,7 @@ void RegisterQueryRoutes(
             ApplyRouteGranularityParams(req, query_req);
 
             // ?route enum: an invalid token returns the Agent-friendly
-            // CX_ERR_F39_FORCE_ROUTE_INVALID body with structured_data.invalid_route_value
+            // CX_ERR_ROUTER_FORCE_ROUTE_INVALID body with structured_data.invalid_route_value
             // (machine-readable per CLAUDE.md §5 / GEN-Agent #1,#5), not a generic
             // parse error. "auto" means "no override; let the router decide".
             if (!IsValidRoute(query_req.route)) {
@@ -116,7 +116,7 @@ void RegisterQueryRoutes(
             }
 
             // ?granularity enum: auto|chunk|doc|both. The frozen error
-            // set (CX_ERR_F41_*) has no request-param identity, so an invalid value is
+            // set (CX_ERR_DOCSUMMARY_*) has no request-param identity, so an invalid value is
             // a generic InvalidArgument (consistent with the other request-shape
             // validations in QueryRequest::Validate).
             if (!IsValidGranularity(query_req.granularity)) {

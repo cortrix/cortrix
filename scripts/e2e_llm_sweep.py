@@ -305,7 +305,7 @@ def main():
         # /traces is the GLOBAL agent_trace read (agent trace / TC4): ?namespace is NOT
         # required (a session's calls span namespaces, aggregated by session_id). So
         # omitting it is NOT a 400 — it behaves like the ns-param case above (200 if the
-        # session has traces, 404 CX_ERR_F13_SESSION_NOT_FOUND if it has none). The old
+        # session has traces, 404 CX_ERR_TRACE_SESSION_NOT_FOUND if it has none). The old
         # "missing ns → 400" assertion applied the per-NS /interactions contract here.
         r = s.get(f"{api}/traces/{sid}", timeout=15)
         check("P5 F13 /traces no-ns (global, ns not required) responds", r.status_code in (200, 404), f"{r.status_code} {r.text[:160]}")

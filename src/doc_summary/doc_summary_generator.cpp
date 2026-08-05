@@ -271,7 +271,7 @@ Result<DocSummaryStructured> DocSummaryGenerator::ParseStructuredOutput(
         // Second chance (deep-QA 2026-07-10, recorded method change): providers
         // occasionally wrap the object in prose or an UNCLOSED fence — both
         // rightly refused by the strict path, both observed live as
-        // CX_ERR_F41_LLM_INVALID_OUTPUT with DeepSeek-V4-Flash mid-drain. A
+        // CX_ERR_DOCSUMMARY_LLM_INVALID_OUTPUT with DeepSeek-V4-Flash mid-drain. A
         // balanced-brace extraction rescues exactly that WRAPPER NOISE. It runs
         // only when the whole body failed to parse: output that parses to a
         // wrong structure (top-level array/string) is a real contract
@@ -447,13 +447,13 @@ GenerationResult DocSummaryGenerator::Generate(const std::string& doc_id,
     Result<DocSummaryStructured> summary =
         GenerateSummary(chunks, /*doc_title=*/"", &used_map_reduce);
     if (!summary.ok()) {
-        // Re-inflate the Agent-friendly body from the CX_ERR_F41_* token carried in
+        // Re-inflate the Agent-friendly body from the CX_ERR_DOCSUMMARY_* token carried in
         // the Status message (the registry has the canonical category/retryable).
         const std::string& msg = summary.status().message();
         DocSummaryErrorCode code = DocSummaryErrorCode::kLlmInvalidOutput;
-        if (msg.find("CX_ERR_F41_LLM_TIMEOUT") != std::string::npos)
+        if (msg.find("CX_ERR_DOCSUMMARY_LLM_TIMEOUT") != std::string::npos)
             code = DocSummaryErrorCode::kLlmTimeout;
-        else if (msg.find("CX_ERR_F41_LLM_BUDGET_EXCEEDED") != std::string::npos)
+        else if (msg.find("CX_ERR_DOCSUMMARY_LLM_BUDGET_EXCEEDED") != std::string::npos)
             code = DocSummaryErrorCode::kLlmBudgetExceeded;
         result.error = MakeDocSummaryError(
             code,

@@ -61,7 +61,7 @@ public:
     /// structured output, and returns it. Empty documents succeed with
     /// no_summary_content=true so the task can complete as a no-op. On any
     /// failure GenerationResult.success is false and .error carries the
-    /// CX_ERR_F41_* identity (the worker maps it to retry / DLQ +
+    /// CX_ERR_DOCSUMMARY_* identity (the worker maps it to retry / DLQ +
     /// doc_summary_status="failed"). `embedding` is left empty (the OnnxEmbedder
     /// re-embed is D3.5 pipeline wiring).
     GenerationResult Generate(const std::string& doc_id, const std::string& ns_id);
@@ -76,7 +76,7 @@ public:
 
     /// Parse the LLM structured-JSON output into the 4 fields. A
     /// non-object / missing-summary_text / unparseable body →
-    /// CX_ERR_F41_LLM_INVALID_OUTPUT. summary_text is truncated to config.max_chars.
+    /// CX_ERR_DOCSUMMARY_LLM_INVALID_OUTPUT. summary_text is truncated to config.max_chars.
     /// Static so it is unit-testable in isolation.
     ///
     /// Acceptance order (deep-QA 2026-07-10, recorded method change): 1) strict —
@@ -110,7 +110,7 @@ public:
 
 private:
     /// One structured-JSON LLM call (short-doc path + Reduce stage). Returns the
-    /// parsed 4 fields or a CX_ERR_F41_* Status.
+    /// parsed 4 fields or a CX_ERR_DOCSUMMARY_* Status.
     Result<DocSummaryStructured> CallLlmStructured(const std::string& prompt);
 
     DocSummaryConfig config_;

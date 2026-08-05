@@ -25,11 +25,11 @@ namespace cortrix::memory {
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may be appended (api_version stays "v1").
 enum class Mem02ErrorCode {
-    kExtractLlmTimeout,     ///< 504 CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT — transient/timeout, retryable
-    kExtractInvalidOutput,  ///< 500 CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT — transient (LLM bad JSON), retryable
-    kExtractBudgetExceeded, ///< 429 CX_ERR_MEM02_EXTRACT_BUDGET_EXCEEDED — quota, not retryable
-    kContradictionAmbiguous,///< 500 CX_ERR_MEM02_CONTRADICTION_AMBIGUOUS — transient (low-confidence judge), retryable
-    kLlmDisabled,           ///< 503 CX_ERR_MEM02_LLM_DISABLED — permanent (NullEnricher mode), not retryable
+    kExtractLlmTimeout,     ///< 504 CX_ERR_MEMEXTRACT_LLM_TIMEOUT — transient/timeout, retryable
+    kExtractInvalidOutput,  ///< 500 CX_ERR_MEMEXTRACT_INVALID_OUTPUT — transient (LLM bad JSON), retryable
+    kExtractBudgetExceeded, ///< 429 CX_ERR_MEMEXTRACT_BUDGET_EXCEEDED — quota, not retryable
+    kContradictionAmbiguous,///< 500 CX_ERR_MEMEXTRACT_CONTRADICTION_AMBIGUOUS — transient (low-confidence judge), retryable
+    kLlmDisabled,           ///< 503 CX_ERR_MEMEXTRACT_LLM_DISABLED — permanent (NullEnricher mode), not retryable
 };
 
 /// Total number of memory-extraction error codes (= 5). Compile-time anchor for the

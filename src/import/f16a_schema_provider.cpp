@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS import_tasks (
     completed_at          INTEGER,
     estimated_completion_at INTEGER,
 
-    -- error (CX_ERR_F16A_*).
+    -- error (CX_ERR_IMPORT_*).
     error_code            TEXT,
     error_message         TEXT,
     error_structured_data TEXT,
@@ -96,7 +96,7 @@ Status F16aSchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
             std::string msg = err ? err : "sqlite error";
             sqlite3_free(err);
             return Status::Internal(
-                std::string("CX_ERR_F16A_SCHEMA: db_connections/import_tasks migration failed: ") + msg);
+                std::string("CX_ERR_IMPORT_SCHEMA: db_connections/import_tasks migration failed: ") + msg);
         }
         return Status::Ok();
     }

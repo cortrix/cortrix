@@ -30,9 +30,9 @@ struct TracesResponse {
 ///   - the session's owner is resolved via interaction_log (session_id ->
 ///     user_id) — agent_trace itself carries no user_id, and the §11 closed loop ties
 ///     interactions/traces by session_id;
-///   - non-admin reading a session they do not own -> CX_ERR_F13_UNAUTHORIZED
+///   - non-admin reading a session they do not own -> CX_ERR_TRACE_UNAUTHORIZED
 ///     (anti-leak, §8.1);
-///   - admin reading a session with no traces -> CX_ERR_F13_SESSION_NOT_FOUND;
+///   - admin reading a session with no traces -> CX_ERR_TRACE_SESSION_NOT_FOUND;
 ///   - otherwise delegate to writer.Query and tag the soft-limit warning.
 ///
 /// Standalone: pure logic over the writer + a borrowed DB handle (for the
@@ -70,7 +70,7 @@ public:
     }
 
     /// GET /traces/{session_id}. Permission-checks, then returns the filtered +
-    /// paginated session. Errors carried as a Status with the CX_ERR_F13_* token.
+    /// paginated session. Errors carried as a Status with the CX_ERR_TRACE_* token.
     Result<TracesResponse> GetSession(const std::string& session_id,
                                       const TraceFilter& filter,
                                       const RequesterContext& ctx);

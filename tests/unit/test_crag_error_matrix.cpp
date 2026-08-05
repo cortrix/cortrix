@@ -34,8 +34,8 @@ TEST_P(CragErrorMatrix, CodeStringFormat) {
     const CragErrorCode code = GetParam();
     const std::string s = CragErrorCodeString(code);
     EXPECT_FALSE(s.empty());
-    EXPECT_EQ(s.rfind("CX_ERR_F37_", 0), 0u) << s;
-    EXPECT_TRUE(std::regex_match(s, std::regex("^CX_ERR_F37_[A-Z0-9_]+$"))) << s;
+    EXPECT_EQ(s.rfind("CX_ERR_CRAG_", 0), 0u) << s;
+    EXPECT_TRUE(std::regex_match(s, std::regex("^CX_ERR_CRAG_[A-Z0-9_]+$"))) << s;
     EXPECT_STREQ(GetCragErrorInfo(code).cx_code, s.c_str());
 }
 

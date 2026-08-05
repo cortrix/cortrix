@@ -30,7 +30,7 @@ public:
 
     /// Feed each chunk as a document through the pipeline into namespace `ns`.
     /// Returns the count successfully ingested (== chunks.size() on full success);
-    /// a per-chunk pipeline failure aborts with a CX_ERR_F16A_* Status.
+    /// a per-chunk pipeline failure aborts with a CX_ERR_IMPORT_* Status.
     Result<int> Feed(const std::vector<TextChunk>& chunks, const NsId& ns) override;
 
 private:

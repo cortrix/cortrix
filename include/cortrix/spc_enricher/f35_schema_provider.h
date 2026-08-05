@@ -34,7 +34,7 @@ namespace cortrix::spc {
 class F35SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     /// Registration key.
-    std::string FeatureName() const override { return "F35"; }
+    std::string FeatureName() const override { return "contextual"; }
 
     /// Schema version. V1 = blocks +4 contextual-retrieval columns.
     /// V2 = + contextual_vec_labels (dual-vector ANN label → child mapping).

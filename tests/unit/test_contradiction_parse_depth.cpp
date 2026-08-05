@@ -20,11 +20,11 @@ namespace {
 
 using Judgment = MemoryExtractor::Judgment;
 
-// CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT is the only error identity this static
+// CX_ERR_MEMEXTRACT_INVALID_OUTPUT is the only error identity this static
 // parser returns; helper to assert it without restating the token everywhere.
 bool IsInvalidOutput(const Status& st) {
     return !st.ok() &&
-           st.message().find("CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT") != std::string::npos;
+           st.message().find("CX_ERR_MEMEXTRACT_INVALID_OUTPUT") != std::string::npos;
 }
 
 // ---------- happy single-object ----------

@@ -77,21 +77,21 @@ const std::unordered_map<std::string, std::pair<ErrorCategory, bool>>& Sdk3Map()
         {"CX_ERR_STORE_NOT_FOUND", {ErrorCategory::kPermanent, false}},
         {"CX_ERR_STORE_DB_ERROR", {ErrorCategory::kTransient, true}},
         // sec.3.4 pgcortrix
-        {"CX_ERR_F14_INVALID_FILTER", {ErrorCategory::kPermanent, false}},
+        {"CX_ERR_PGCORTRIX_INVALID_FILTER", {ErrorCategory::kPermanent, false}},
         // sec.3.5 retrieval chain
         {"CX_ERR_RAG_FUSION_LLM_TIMEOUT", {ErrorCategory::kTimeout, true}},
         {"CX_ERR_RAG_FUSION_LLM_QUOTA", {ErrorCategory::kQuota, true}},
-        {"CX_ERR_F38_LLM_TIMEOUT", {ErrorCategory::kTimeout, true}},
-        {"CX_ERR_F38_PARENT_NOT_FOUND", {ErrorCategory::kPermanent, false}},
-        {"CX_ERR_F48_LLM_TIMEOUT", {ErrorCategory::kTimeout, true}},
-        {"CX_ERR_F48_LLM_QUOTA_EXCEEDED", {ErrorCategory::kQuota, true}},
-        {"CX_ERR_F48_LLM_UNAVAILABLE", {ErrorCategory::kTransient, true}},
-        {"CX_ERR_F48_RAG_FAILED", {ErrorCategory::kTransient, true}},
+        {"CX_ERR_HYPE_LLM_TIMEOUT", {ErrorCategory::kTimeout, true}},
+        {"CX_ERR_HYPE_PARENT_NOT_FOUND", {ErrorCategory::kPermanent, false}},
+        {"CX_ERR_AGENT_LLM_TIMEOUT", {ErrorCategory::kTimeout, true}},
+        {"CX_ERR_AGENT_LLM_QUOTA_EXCEEDED", {ErrorCategory::kQuota, true}},
+        {"CX_ERR_AGENT_LLM_UNAVAILABLE", {ErrorCategory::kTransient, true}},
+        {"CX_ERR_AGENT_RAG_FAILED", {ErrorCategory::kTransient, true}},
         // sec.3.6 rate limit
         {"CX_ERR_RATE_LIMITED", {ErrorCategory::kQuota, true}},
         // sec.3.7 memory extraction
-        {"CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT", {ErrorCategory::kTimeout, true}},
-        {"CX_ERR_MEM02_EXTRACT_BUDGET_EXCEEDED", {ErrorCategory::kQuota, false}},
+        {"CX_ERR_MEMEXTRACT_LLM_TIMEOUT", {ErrorCategory::kTimeout, true}},
+        {"CX_ERR_MEMEXTRACT_BUDGET_EXCEEDED", {ErrorCategory::kQuota, false}},
         // sec.3.1 Namespace (NotFoundError -> permanent/false)
         {"CX_ERR_NAMESPACE_NOT_FOUND", {ErrorCategory::kPermanent, false}},
     };
@@ -388,7 +388,7 @@ void CortrixHttpServer::RegisterRoutes() {
             }
             // Only synthesize a generic body when NO handler matched (body still empty).
             // httplib invokes the error handler for ANY >=400 status, so a handler that ran
-            // and wrote its own 4xx body (e.g. CX_ERR_F13_SESSION_NOT_FOUND) would otherwise
+            // and wrote its own 4xx body (e.g. CX_ERR_TRACE_SESSION_NOT_FOUND) would otherwise
             // be clobbered into a misleading generic "resource not found".
             if (res.body.empty()) {
                 std::string req_id = GenerateRequestId();

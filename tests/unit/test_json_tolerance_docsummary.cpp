@@ -4,7 +4,7 @@
 //   1. Complete Markdown JSON fences are unwrapped first. Then json::parse
 //      (allow_exceptions=false). discarded OR not object -> error Result
 //      (DocSummaryStatus kLlmInvalidOutput; message carries
-//      "CX_ERR_F41_LLM_INVALID_OUTPUT").  *** NO prose / wrapper / span recovery. ***
+//      "CX_ERR_DOCSUMMARY_LLM_INVALID_OUTPUT").  *** NO prose / wrapper / span recovery. ***
 //   2. "summary_text" REQUIRED + must be a string, else error.
 //   3. summary_text is UTF-8-truncated to max_chars; keywords/topics pulled via
 //      ToStringArray (missing/non-array -> empty; non-string elements skipped);
@@ -33,7 +33,7 @@ namespace {
 
 enum class DTol {
     kParsed,    // object with string summary_text -> parses
-    kRejected,  // graceful error Result (CX_ERR_F41_LLM_INVALID_OUTPUT)
+    kRejected,  // graceful error Result (CX_ERR_DOCSUMMARY_LLM_INVALID_OUTPUT)
 };
 
 struct DocSummaryJsonCase {
@@ -65,7 +65,7 @@ TEST_P(DocSummaryJsonMatrix, Tolerance) {
         }
     } else {
         ASSERT_FALSE(r.ok()) << tc.name << " unexpectedly parsed";
-        EXPECT_NE(r.status().message().find("CX_ERR_F41_LLM_INVALID_OUTPUT"),
+        EXPECT_NE(r.status().message().find("CX_ERR_DOCSUMMARY_LLM_INVALID_OUTPUT"),
                   std::string::npos)
             << tc.name << " msg=" << r.status().message();
     }

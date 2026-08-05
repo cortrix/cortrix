@@ -59,7 +59,7 @@ protected:
 
 TEST_F(ScoringSchemaTest, FeatureIdentity) {
     ScoringSchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F07");
+    EXPECT_EQ(p.FeatureName(), "scoring");
     EXPECT_EQ(p.CurrentVersion(), kScoringSchemaVersion);
     EXPECT_EQ(kScoringSchemaVersion, 1);
 }

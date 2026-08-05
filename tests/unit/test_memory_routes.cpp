@@ -1698,7 +1698,7 @@ TEST_F(MemoryRoutesTest, CreateMemoryNoAuthReturns401) {
 // ---------------------------------------------------------------------------
 
 // PATCH with a memory_id that does not exist in the store → not-found error
-// (MemoryTransparency::Edit calls FetchOwnedMemory which returns CX_ERR_MEM03_MEMORY_NOT_FOUND,
+// (MemoryTransparency::Edit calls FetchOwnedMemory which returns CX_ERR_MEMORY_NOT_FOUND,
 // which WriteJsonError maps to 404).
 TEST_F(MemoryRoutesTest, EditMemoryNotFoundReturns404) {
     httplib::Client cli("127.0.0.1", port_);

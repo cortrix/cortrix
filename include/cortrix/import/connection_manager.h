@@ -132,8 +132,8 @@ public:
                                              std::optional<int> expire_days = std::nullopt) = 0;
 
     /// Resolve a ref → plaintext DSN for the ImportManager. Enforces the D7 tenant
-    /// boundary (cross-tenant ref → CX_ERR_F16A_CROSS_TENANT_REF) and expiry/
-    /// revocation (→ CX_ERR_F16A_AUTH_DENIED). The auth_ctx.tenant_id is the gate.
+    /// boundary (cross-tenant ref → CX_ERR_IMPORT_CROSS_TENANT_REF) and expiry/
+    /// revocation (→ CX_ERR_IMPORT_AUTH_DENIED). The auth_ctx.tenant_id is the gate.
     virtual Result<std::string> ResolveDsn(const ConnectionRefId& ref_id,
                                            const AuthContext& auth_ctx) = 0;
 

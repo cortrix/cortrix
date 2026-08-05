@@ -103,7 +103,7 @@ TEST(ScoreMapLevelToScoreTest, OutOfRangeThrowsLevelInvalid) {
         ScoreMap::LevelToScore(5);
         FAIL() << "expected AgentFriendlyException";
     } catch (const agent_friendly::AgentFriendlyException& e) {
-        EXPECT_EQ(e.GetError().code, "CX_ERR_F07_LEVEL_INVALID");
+        EXPECT_EQ(e.GetError().code, "CX_ERR_SCORING_LEVEL_INVALID");
         ASSERT_TRUE(e.GetError().structured_data.has_value());
         EXPECT_EQ((*e.GetError().structured_data)["max_allowed"], 4);
     }

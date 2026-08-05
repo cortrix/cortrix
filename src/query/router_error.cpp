@@ -19,13 +19,13 @@ namespace {
 // transient but no fixed delay (the degrade is already applied, "-" in the table);
 // CLASSIFIER_LOAD_FAILED / FORCE_ROUTE_INVALID (permanent) → null.
 constexpr RouterErrorInfo kClassifierLoadFailed
-    {"CX_ERR_F39_CLASSIFIER_LOAD_FAILED", ErrorCategory::kPermanent, false, std::nullopt};
+    {"CX_ERR_ROUTER_CLASSIFIER_LOAD_FAILED", ErrorCategory::kPermanent, false, std::nullopt};
 constexpr RouterErrorInfo kInferenceFailed
-    {"CX_ERR_F39_INFERENCE_FAILED",       ErrorCategory::kTransient, true,  100};
+    {"CX_ERR_ROUTER_INFERENCE_FAILED",       ErrorCategory::kTransient, true,  100};
 constexpr RouterErrorInfo kForceRouteInvalid
-    {"CX_ERR_F39_FORCE_ROUTE_INVALID",    ErrorCategory::kPermanent, false, std::nullopt};
+    {"CX_ERR_ROUTER_FORCE_ROUTE_INVALID",    ErrorCategory::kPermanent, false, std::nullopt};
 constexpr RouterErrorInfo kFallbackTriggered
-    {"CX_ERR_F39_FALLBACK_TRIGGERED",     ErrorCategory::kTransient, true,  std::nullopt};
+    {"CX_ERR_ROUTER_FALLBACK_TRIGGERED",     ErrorCategory::kTransient, true,  std::nullopt};
 
 }  // namespace
 

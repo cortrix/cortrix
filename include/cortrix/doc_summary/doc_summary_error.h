@@ -11,7 +11,7 @@
 namespace cortrix::doc_summary {
 
 /// The 7 Document Summary error identities (registered in the
-/// §4.1.11). Each maps to a stable `CX_ERR_F41_*` string + a GEN-Agent category +
+/// §4.1.11). Each maps to a stable `CX_ERR_DOCSUMMARY_*` string + a GEN-Agent category +
 /// retryability via the canonical registry below.
 ///
 /// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
@@ -39,7 +39,7 @@ constexpr int kDocSummaryErrorCodeCount = 7;
 
 /// Canonical, immutable attributes of one error code.
 struct DocSummaryErrorInfo {
-    const char* cx_code;                      ///< stable "CX_ERR_F41_*" string
+    const char* cx_code;                      ///< stable "CX_ERR_DOCSUMMARY_*" string
     agent_friendly::ErrorCategory category;   ///< timeout/transient/quota/permanent
     bool retryable;
     std::optional<int> retry_after_ms;        ///< null unless retryable per §7
@@ -49,7 +49,7 @@ struct DocSummaryErrorInfo {
 /// throws / never returns a partial). Single source of truth for the 7 rows.
 const DocSummaryErrorInfo& GetDocSummaryErrorInfo(DocSummaryErrorCode code);
 
-/// The "CX_ERR_F41_*" string for `code`.
+/// The "CX_ERR_DOCSUMMARY_*" string for `code`.
 const char* DocSummaryErrorCodeString(DocSummaryErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry
@@ -73,7 +73,7 @@ agent_friendly::AgentFriendlyError MakeDocSummaryError(
 StatusCode DocSummaryErrorToStatusCode(DocSummaryErrorCode code);
 
 /// Bridge a doc-summary error to a plain Status for the Result<T>/Status surface
-/// (F-FREEZE-1). The message is prefixed with the CX_ERR_F41_* token so the exact
+/// (F-FREEZE-1). The message is prefixed with the CX_ERR_DOCSUMMARY_* token so the exact
 /// identity is recoverable at the API/SDK boundary (which re-inflates the full
 /// Agent-friendly body via MakeDocSummaryError). cortrix::Status is not widened.
 Status DocSummaryStatus(DocSummaryErrorCode code, const std::string& detail = "");

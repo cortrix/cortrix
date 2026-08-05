@@ -65,13 +65,13 @@ struct CompiledQuery {
 };
 
 /// Validate a raw SELECT body against the keyword allow/deny lists + length cap
-/// (constraint "SELECT whitelist"). Returns CX_ERR_F16A_INVALID_SQL on
+/// (constraint "SELECT whitelist"). Returns CX_ERR_IMPORT_INVALID_SQL on
 /// any write verb / set op / metadata probe / non-SELECT leading token. Comment
 /// markers and statement separators (`;` stacked queries) are rejected too.
 Status ValidateSqlKeywords(const std::string& sql, const QueryConstraints& constraints);
 
 /// Validate a JSON DSL filter against the operator + field allowlists.
-/// Returns CX_ERR_F16A_INVALID_SQL on an unknown operator, a field
+/// Returns CX_ERR_IMPORT_INVALID_SQL on an unknown operator, a field
 /// not in the allowlist, or a malformed shape.
 Status ValidateFilterDsl(const nlohmann::json& filter_dsl,
                          const FilterDslConstraints& constraints);
@@ -106,7 +106,7 @@ public:
     virtual ~IQueryExecutor() = default;
 
     /// Estimate row count (SELECT COUNT(*)) for the R5 pre-check + progress total.
-    /// Returns CX_ERR_F16A_ROWS_LIMIT_EXCEEDED if the estimate exceeds max_rows.
+    /// Returns CX_ERR_IMPORT_ROWS_LIMIT_EXCEEDED if the estimate exceeds max_rows.
     virtual Result<int64_t> EstimateRowCount(const std::string& dsn,
                                              const QueryRequest& req,
                                              const QueryConstraints& constraints) = 0;
@@ -121,7 +121,7 @@ public:
 
 /// Production QueryExecutor — validates every request (the §3.4 5 constraints) then
 /// (D3.5) connects read-only + runs PQexecParams. In standalone the Execute/Estimate
-/// bodies return CX_ERR_F16A_CONNECTION_FAILED ("real PG → D3.5") AFTER validation,
+/// bodies return CX_ERR_IMPORT_CONNECTION_FAILED ("real PG → D3.5") AFTER validation,
 /// so the security gate is fully exercised without a live PG. The validation free
 /// functions above are what the fuzzing suite hammers.
 class QueryExecutor : public IQueryExecutor {

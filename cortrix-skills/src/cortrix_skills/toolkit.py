@@ -296,7 +296,7 @@ class CortrixToolKit:
 
         ``filter`` whitelist (5 fields): session_id / namespace_id / from_ts /
         to_ts / sort_order; out-of-whitelist keys pass through the backend's
-        CX_ERR_F14_INVALID_FILTER. Pass-through GEN-Agent 4-field error response.
+        CX_ERR_PGCORTRIX_INVALID_FILTER. Pass-through GEN-Agent 4-field error response.
         """
         params: dict = {"namespace": namespace, "user_id": user_id, "limit": limit, "offset": offset}
         if filter:
@@ -699,8 +699,8 @@ class CortrixToolKit:
         the MEM03 transparency vision. ``reason`` is written to
         metadata_json.invalidation_reason.
 
-        Errors pass through: CX_ERR_MEM03_MEMORY_NOT_FOUND / CX_ERR_MEM03_USER_MISMATCH /
-        CX_ERR_MEM03_ALREADY_INVALIDATED / CX_ERR_MEM03_INVALIDATE_FAILED / CX_ERR_MEM03_QUOTA.
+        Errors pass through: CX_ERR_MEMORY_NOT_FOUND / CX_ERR_MEMORY_USER_MISMATCH /
+        CX_ERR_MEMORY_ALREADY_INVALIDATED / CX_ERR_MEMORY_INVALIDATE_FAILED / CX_ERR_MEMORY_QUOTA.
         Pass-through GEN-Agent 4-field error response.
         """
         # The Python SDK invalidate(==delete) takes only memory_id; namespace / reason

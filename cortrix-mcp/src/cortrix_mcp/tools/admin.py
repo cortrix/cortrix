@@ -79,7 +79,7 @@ def register(mcp) -> None:
             sql: raw SQL query (SQL mode).
 
         Exactly one of {table, sql} must be provided (the backend rejects neither/both with
-        CX_ERR_F16A_INVALID_SQL). Maps to POST /import/database (import_routes.cpp).
+        CX_ERR_IMPORT_INVALID_SQL). Maps to POST /import/database (import_routes.cpp).
         Raises CX_ERR_MCP_ADMIN_REQUIRED (403) when the caller lacks the admin role.
         """
         require_admin()

@@ -19,9 +19,9 @@ namespace {
 // is a defensive bottom-out (ComputeLevel should never exceed 4); CONFIG_INVALID is a
 // startup-time bad-α rejection (not part of a query response body).
 constexpr F07ErrorInfo kLevelInvalid
-    {"CX_ERR_F07_LEVEL_INVALID",  ErrorCategory::kPermanent, false, std::nullopt};
+    {"CX_ERR_SCORING_LEVEL_INVALID",  ErrorCategory::kPermanent, false, std::nullopt};
 constexpr F07ErrorInfo kConfigInvalid
-    {"CX_ERR_F07_CONFIG_INVALID", ErrorCategory::kPermanent, false, std::nullopt};
+    {"CX_ERR_SCORING_CONFIG_INVALID", ErrorCategory::kPermanent, false, std::nullopt};
 
 }  // namespace
 

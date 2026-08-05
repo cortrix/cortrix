@@ -41,7 +41,7 @@ public:
     /// Always returns a value in [0, 4] (never out of range — defensive by construction).
     static uint8_t ComputeLevel(const ScoringInput& input);
 
-    /// Level → Score (direct table lookup kLevelScore[level]). Error: level > 4 → CX_ERR_F07_LEVEL_INVALID
+    /// Level → Score (direct table lookup kLevelScore[level]). Error: level > 4 → CX_ERR_SCORING_LEVEL_INVALID
     /// (throws cortrix::agent_friendly::AgentFriendlyException carrying that code; this
     /// is the §4.4 defensive bottom-out — ComputeLevel never produces an out-of-range
     /// level, so a throw here means a caller passed a raw bad level).

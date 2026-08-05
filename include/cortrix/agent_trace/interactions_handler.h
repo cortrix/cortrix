@@ -39,9 +39,9 @@ struct InteractionSourcesView {
 /// real values come from the AuthContext at the request boundary;
 /// standalone tests pass them directly. A handler enforces:
 ///   - non-admin may only read interactions whose interaction_log.user_id ==
-///     requester_user_id (else CX_ERR_F13_UNAUTHORIZED, anti-leak);
+///     requester_user_id (else CX_ERR_TRACE_UNAUTHORIZED, anti-leak);
 ///   - admin may read across users; a missing interaction is
-///     CX_ERR_F13_INTERACTION_NOT_FOUND.
+///     CX_ERR_TRACE_INTERACTION_NOT_FOUND.
 struct RequesterContext {
     std::string requester_user_id;
     bool is_admin = false;
@@ -99,7 +99,7 @@ public:
     /// GET /interactions/{id}/sources (§8.2, T-106). Permission-checks against
     /// interaction_log.user_id, then returns the live sources (deleted ones
     /// counted in deleted_sources_count). Errors: INTERACTION_NOT_FOUND /
-    /// UNAUTHORIZED / INTERNAL (carried as a Status with the CX_ERR_F13_* token).
+    /// UNAUTHORIZED / INTERNAL (carried as a Status with the CX_ERR_TRACE_* token).
     Result<InteractionSourcesView> GetSources(const std::string& interaction_id,
                                               const RequesterContext& ctx);
 
@@ -107,9 +107,9 @@ public:
     /// interactions with filter + pagination, projected from the real frozen
     /// interaction_log. Permission (§8.3, mirrors §8.2): a non-admin is always
     /// scoped to their own user_id (any user_id filter naming someone else ->
-    /// CX_ERR_F13_UNAUTHORIZED); an admin may target another user_id (and the
+    /// CX_ERR_TRACE_UNAUTHORIZED); an admin may target another user_id (and the
     /// access is logged via the §12 forensics line). admin cross-user with no rows
-    /// -> empty list (per §8.3, not an error). Invalid filter -> CX_ERR_F13_INVALID_FILTER.
+    /// -> empty list (per §8.3, not an error). Invalid filter -> CX_ERR_TRACE_INVALID_FILTER.
     Result<InteractionListView> ListInteractions(const InteractionListFilter& filter,
                                                  const RequesterContext& ctx);
 

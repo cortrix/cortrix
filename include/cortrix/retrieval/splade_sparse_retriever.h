@@ -50,7 +50,7 @@ public:
 
     /// Open the DB + create the sparse_inverted_index table + index (idempotent).
     /// Must be called before Add/Remove/Search. OK or
-    /// CX_ERR_F40_INVERTED_INDEX_WRITE_FAILED (open/DDL fault).
+    /// CX_ERR_SPARSE_INVERTED_INDEX_WRITE_FAILED (open/DDL fault).
     Status Open();
     void Close();
 
@@ -67,12 +67,12 @@ public:
     /// Incremental write (§6.1): replace `child_id`'s postings with `vec` (delete
     /// then insert, in one txn). Empty `vec` = remove (§6.5). Invalidates the
     /// affected terms' cache entries. OK or
-    /// CX_ERR_F40_INVERTED_INDEX_WRITE_FAILED (retryable).
+    /// CX_ERR_SPARSE_INVERTED_INDEX_WRITE_FAILED (retryable).
     Status Add(const NamespaceId& ns_id, const ChildId& child_id,
                const SparseVector& vec) override;
 
     /// Incremental delete (§6.2): drop all postings for `child_id` in `ns_id`.
-    /// Idempotent. OK or CX_ERR_F40_INVERTED_INDEX_WRITE_FAILED.
+    /// Idempotent. OK or CX_ERR_SPARSE_INVERTED_INDEX_WRITE_FAILED.
     Status Remove(const NamespaceId& ns_id, const ChildId& child_id) override;
 
     /// True once Open() has succeeded and the DB handle is live.

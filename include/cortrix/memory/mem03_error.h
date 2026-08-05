@@ -40,11 +40,11 @@ namespace cortrix::memory::transparency {
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may be appended (api_version stays "v1").
 enum class Mem03ErrorCode {
-    kMemoryNotFound,        ///< 404 CX_ERR_MEM03_MEMORY_NOT_FOUND — permanent, not retryable (incl. cross-user mask)
-    kUserMismatch,          ///< 403 CX_ERR_MEM03_USER_MISMATCH — auth, not retryable (caller ≠ owner)
-    kAlreadyInvalidated,    ///< 410 CX_ERR_MEM03_ALREADY_INVALIDATED — permanent, not retryable (idempotent repeat)
-    kInvalidateFailed,      ///< 500 CX_ERR_MEM03_INVALIDATE_FAILED — transient, retryable (DB / oplog / trace write)
-    kQuota,                 ///< 429 CX_ERR_MEM03_QUOTA — quota, retryable (per-user/per-ns rate limit)
+    kMemoryNotFound,        ///< 404 CX_ERR_MEMORY_NOT_FOUND — permanent, not retryable (incl. cross-user mask)
+    kUserMismatch,          ///< 403 CX_ERR_MEMORY_USER_MISMATCH — auth, not retryable (caller ≠ owner)
+    kAlreadyInvalidated,    ///< 410 CX_ERR_MEMORY_ALREADY_INVALIDATED — permanent, not retryable (idempotent repeat)
+    kInvalidateFailed,      ///< 500 CX_ERR_MEMORY_INVALIDATE_FAILED — transient, retryable (DB / oplog / trace write)
+    kQuota,                 ///< 429 CX_ERR_MEMORY_QUOTA — quota, retryable (per-user/per-ns rate limit)
 };
 
 /// Total number of memory-transparency error codes (= 5). Compile-time anchor

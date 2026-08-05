@@ -5,7 +5,7 @@
 //   AgentTraceWriterImpl(sqlite3*, shared_ptr<IGlobalConfig>)
 //   Result<TraceSession> Query(session_id, const TraceFilter&, ctx=nullptr)
 //   TraceFilter{ ...optional dims..., int limit=50, int offset=0 }
-//   Validation (NOT clamp): limit must be [1,200] else CX_ERR_F13_INVALID_FILTER;
+//   Validation (NOT clamp): limit must be [1,200] else CX_ERR_TRACE_INVALID_FILTER;
 //       offset < 0 => invalid; offset > 0 && offset >= total_count => invalid
 //       (offset==0 always OK; rows ORDER BY created_at ASC, id ASC).
 //

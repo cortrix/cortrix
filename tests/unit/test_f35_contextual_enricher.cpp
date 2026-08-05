@@ -125,7 +125,7 @@ TEST(F35ContextualEnricherTest, GenerateNullClientIsStartupNoLlm) {
     ContextualRetrievalEnricher e(ContextualRetrievalConfig{}, nullptr, MakeEmbedder());
     auto r = e.GenerateContextualizedText("chunk", DocMeta(), MakeCtx("chunk"));
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F35_STARTUP_NO_LLM"),
+    EXPECT_NE(r.status().message().find("CX_ERR_CONTEXTUAL_STARTUP_NO_LLM"),
               std::string::npos);
 }
 
@@ -138,7 +138,7 @@ TEST(F35ContextualEnricherTest, GenerateLlmFailureIsLlmFailed) {
 
     auto r = e.GenerateContextualizedText("chunk", DocMeta(), MakeCtx("chunk"));
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F35_LLM_FAILED"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_CONTEXTUAL_LLM_FAILED"), std::string::npos);
 }
 
 TEST(F35ContextualEnricherTest, GenerateOverlongOutputIsPromptInjection) {
@@ -153,7 +153,7 @@ TEST(F35ContextualEnricherTest, GenerateOverlongOutputIsPromptInjection) {
 
     auto r = e.GenerateContextualizedText("chunk", DocMeta(), MakeCtx("chunk"));
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F35_PROMPT_INJECTION"),
+    EXPECT_NE(r.status().message().find("CX_ERR_CONTEXTUAL_PROMPT_INJECTION"),
               std::string::npos);
 }
 
@@ -282,7 +282,7 @@ TEST(F35ContextualEnricherTest, EnrichLlmFailureDegradesToFailed) {
     EXPECT_EQ(res.contextualized_status, 2);            // failed
     EXPECT_FALSE(res.contextualized_text.has_value());
     EXPECT_FALSE(res.contextualized_embedding.has_value());
-    EXPECT_NE(res.error_msg.find("CX_ERR_F35_LLM_FAILED"), std::string::npos);
+    EXPECT_NE(res.error_msg.find("CX_ERR_CONTEXTUAL_LLM_FAILED"), std::string::npos);
 }
 
 TEST(F35ContextualEnricherTest, EnrichNullEmbedderDegradesButKeepsText) {
@@ -295,7 +295,7 @@ TEST(F35ContextualEnricherTest, EnrichNullEmbedderDegradesButKeepsText) {
     ASSERT_TRUE(res.contextualized_text.has_value());   // text still produced (partial)
     EXPECT_EQ(*res.contextualized_text, "PFX\nchunk");
     EXPECT_FALSE(res.contextualized_embedding.has_value());
-    EXPECT_NE(res.error_msg.find("CX_ERR_F35_EMBEDDING_FAILED"), std::string::npos);
+    EXPECT_NE(res.error_msg.find("CX_ERR_CONTEXTUAL_EMBEDDING_FAILED"), std::string::npos);
 }
 
 TEST(F35ContextualEnricherTest, EnrichEmbedderFailureDegradesToFailed) {
@@ -308,7 +308,7 @@ TEST(F35ContextualEnricherTest, EnrichEmbedderFailureDegradesToFailed) {
     EnrichResult res = e.Enrich("chunk", DocMeta(), MakeCtx("chunk"));
     EXPECT_EQ(res.contextualized_status, 2);            // failed
     EXPECT_FALSE(res.contextualized_embedding.has_value());
-    EXPECT_NE(res.error_msg.find("CX_ERR_F35_EMBEDDING_FAILED"), std::string::npos);
+    EXPECT_NE(res.error_msg.find("CX_ERR_CONTEXTUAL_EMBEDDING_FAILED"), std::string::npos);
 }
 
 // ---------- Enrich: metrics side effects ----------

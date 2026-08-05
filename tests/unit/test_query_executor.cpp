@@ -40,7 +40,7 @@ TEST(QueryExecutorSqlTest, RejectsWriteVerbs) {
          }) {
         Status s = ValidateSqlKeywords(sql, c);
         EXPECT_FALSE(s.ok()) << sql;
-        EXPECT_NE(s.message().find("CX_ERR_F16A_INVALID_SQL"), std::string::npos) << sql;
+        EXPECT_NE(s.message().find("CX_ERR_IMPORT_INVALID_SQL"), std::string::npos) << sql;
     }
 }
 
@@ -188,7 +188,7 @@ TEST(QueryExecutorTest, ExecuteValidatesBeforeDeferringToD35) {
     QueryRequest bad;  // neither table nor sql
     auto r = exec.Execute("dsn", bad, c);
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F16A_INVALID_SQL"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_IMPORT_INVALID_SQL"), std::string::npos);
 
     // a well-formed request passes the gate and hits the D3.5 connection seam.
     QueryRequest good;
@@ -196,7 +196,7 @@ TEST(QueryExecutorTest, ExecuteValidatesBeforeDeferringToD35) {
     good.filter = json{{"status", {{"eq", "active"}}}};
     auto r2 = exec.Execute("dsn", good, c);
     EXPECT_FALSE(r2.ok());  // standalone: no live PG
-    EXPECT_NE(r2.status().message().find("CX_ERR_F16A_CONNECTION_FAILED"), std::string::npos);
+    EXPECT_NE(r2.status().message().find("CX_ERR_IMPORT_CONNECTION_FAILED"), std::string::npos);
     EXPECT_NE(r2.status().message().find("D3.5"), std::string::npos);
 }
 

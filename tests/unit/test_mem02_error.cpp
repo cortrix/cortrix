@@ -5,7 +5,7 @@
 
 #include "cortrix/memory/mem02_error.h"
 
-// S6 coverage: the memory extraction error model (template A) — all 5 CX_ERR_MEM02_* identities,
+// S6 coverage: the memory extraction error model (template A) — all 5 CX_ERR_MEMEXTRACT_* identities,
 // their §5.3 attributes (http/category/retryable/retry_after_ms/structured_data
 // keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::memory {
@@ -32,7 +32,7 @@ TEST(Mem02ErrorTest, AllCodesHaveUniqueCxStrings) {
     for (Mem02ErrorCode c : kAll) {
         std::string s = Mem02ErrorCodeString(c);
         EXPECT_FALSE(s.empty());
-        EXPECT_EQ(s.rfind("CX_ERR_MEM02_", 0), 0u) << s << " must start with CX_ERR_MEM02_";
+        EXPECT_EQ(s.rfind("CX_ERR_MEMEXTRACT_", 0), 0u) << s << " must start with CX_ERR_MEMEXTRACT_";
         EXPECT_TRUE(seen.insert(s).second) << "duplicate code string: " << s;
     }
     EXPECT_EQ(seen.size(), 5u);
@@ -49,15 +49,15 @@ TEST(Mem02ErrorTest, RegistryMatchesSpecTable) {
         EXPECT_EQ(i.retryable, retry) << code;
         EXPECT_EQ(i.retry_after_ms, retry_ms) << code;
     };
-    chk(Mem02ErrorCode::kExtractLlmTimeout, "CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT", 504,
+    chk(Mem02ErrorCode::kExtractLlmTimeout, "CX_ERR_MEMEXTRACT_LLM_TIMEOUT", 504,
         ErrorCategory::kTimeout, true, 5000);
-    chk(Mem02ErrorCode::kExtractInvalidOutput, "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT", 500,
+    chk(Mem02ErrorCode::kExtractInvalidOutput, "CX_ERR_MEMEXTRACT_INVALID_OUTPUT", 500,
         ErrorCategory::kTransient, true, 5000);
-    chk(Mem02ErrorCode::kExtractBudgetExceeded, "CX_ERR_MEM02_EXTRACT_BUDGET_EXCEEDED", 429,
+    chk(Mem02ErrorCode::kExtractBudgetExceeded, "CX_ERR_MEMEXTRACT_BUDGET_EXCEEDED", 429,
         ErrorCategory::kQuota, false, std::nullopt);
-    chk(Mem02ErrorCode::kContradictionAmbiguous, "CX_ERR_MEM02_CONTRADICTION_AMBIGUOUS", 500,
+    chk(Mem02ErrorCode::kContradictionAmbiguous, "CX_ERR_MEMEXTRACT_CONTRADICTION_AMBIGUOUS", 500,
         ErrorCategory::kTransient, true, 5000);
-    chk(Mem02ErrorCode::kLlmDisabled, "CX_ERR_MEM02_LLM_DISABLED", 503,
+    chk(Mem02ErrorCode::kLlmDisabled, "CX_ERR_MEMEXTRACT_LLM_DISABLED", 503,
         ErrorCategory::kPermanent, false, std::nullopt);
 }
 
@@ -112,7 +112,7 @@ TEST(Mem02ErrorTest, MakeMem02ErrorFillsFromRegistry) {
                          {"timeout_ms", 30000}};
     auto err = MakeMem02Error(Mem02ErrorCode::kExtractLlmTimeout, sd,
                               "LLM extraction timed out");
-    EXPECT_EQ(err.code, "CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT");
+    EXPECT_EQ(err.code, "CX_ERR_MEMEXTRACT_LLM_TIMEOUT");
     EXPECT_EQ(err.message, "LLM extraction timed out");
     EXPECT_TRUE(err.retryable);
     EXPECT_EQ(err.category, ErrorCategory::kTimeout);
@@ -124,7 +124,7 @@ TEST(Mem02ErrorTest, MakeMem02ErrorFillsFromRegistry) {
 
 TEST(Mem02ErrorTest, MakeMem02ErrorDefaultsMessageToCode) {
     auto err = MakeMem02Error(Mem02ErrorCode::kLlmDisabled);
-    EXPECT_EQ(err.message, "CX_ERR_MEM02_LLM_DISABLED");
+    EXPECT_EQ(err.message, "CX_ERR_MEMEXTRACT_LLM_DISABLED");
     EXPECT_FALSE(err.retryable);
     EXPECT_FALSE(err.retry_after_ms.has_value());
 }
@@ -133,7 +133,7 @@ TEST(Mem02ErrorTest, ToJsonSerializesAgentFriendlyBody) {
     auto err = MakeMem02Error(Mem02ErrorCode::kExtractBudgetExceeded,
                               {{"budget_cap_usd", 10}, {"current_usage_usd", 12}});
     nlohmann::json j = agent_friendly::ToJson(err);
-    EXPECT_EQ(j["code"], "CX_ERR_MEM02_EXTRACT_BUDGET_EXCEEDED");
+    EXPECT_EQ(j["code"], "CX_ERR_MEMEXTRACT_BUDGET_EXCEEDED");
     EXPECT_EQ(j["retryable"], false);
     EXPECT_EQ(j["category"], "quota");
     EXPECT_TRUE(j["retry_after_ms"].is_null());
@@ -144,7 +144,7 @@ TEST(Mem02ErrorTest, StatusBridgeCarriesCodeToken) {
     Status s = Mem02Status(Mem02ErrorCode::kExtractBudgetExceeded, "daily cap hit");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kPermissionDenied);
-    EXPECT_NE(s.message().find("CX_ERR_MEM02_EXTRACT_BUDGET_EXCEEDED"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_MEMEXTRACT_BUDGET_EXCEEDED"), std::string::npos);
     EXPECT_NE(s.message().find("daily cap hit"), std::string::npos);
 }
 

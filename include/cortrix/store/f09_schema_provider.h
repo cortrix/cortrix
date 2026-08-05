@@ -18,7 +18,7 @@ namespace cortrix::store {
 /// is reconciled to the frozen interface signature.
 class F09SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
-    std::string FeatureName() const override { return "F09"; }
+    std::string FeatureName() const override { return "block_framework"; }
     int CurrentVersion() const override { return 1; }
 
     /// Phase 1 (from_ver 0 → 1): create the per-Unit framework schema from

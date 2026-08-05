@@ -29,7 +29,7 @@ extern const char* const kF16aSchemaSql;
 /// exist). Migrate returns Status (F-FREEZE-1: no Result<void>).
 class F16aSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
-    std::string FeatureName() const override { return "F16a"; }
+    std::string FeatureName() const override { return "db_import"; }
     int CurrentVersion() const override { return kF16aSchemaVersion; }
 
     /// Phase 1 (from_ver 0 → 1): create db_connections + import_tasks + indices. An

@@ -37,8 +37,8 @@ TEST_P(Mem04ErrorMatrix, CodeStringFormat) {
     const Mem04ErrorCode code = GetParam();
     const std::string s = Mem04ErrorCodeString(code);
     EXPECT_FALSE(s.empty());
-    EXPECT_EQ(s.rfind("CX_ERR_MEM04_", 0), 0u) << s;
-    EXPECT_TRUE(std::regex_match(s, std::regex("^CX_ERR_MEM04_[A-Z0-9_]+$"))) << s;
+    EXPECT_EQ(s.rfind("CX_ERR_MEMOPTOUT_", 0), 0u) << s;
+    EXPECT_TRUE(std::regex_match(s, std::regex("^CX_ERR_MEMOPTOUT_[A-Z0-9_]+$"))) << s;
     EXPECT_STREQ(GetMem04ErrorInfo(code).cx_code, s.c_str());
 }
 

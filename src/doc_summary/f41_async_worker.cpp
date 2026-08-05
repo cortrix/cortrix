@@ -55,7 +55,7 @@ Status F41AsyncWorker::ProcessTask(const async::TaskInfo& task) {
     resource::NamespaceFacade facade(pool_, task.namespace_id);
     Status acq = facade.Acquire();
     if (!acq.ok())
-        return finalizer_.Fail(task, "CX_ERR_F41_NS_ACQUIRE_FAILED", acq.message(),
+        return finalizer_.Fail(task, "CX_ERR_DOCSUMMARY_NS_ACQUIRE_FAILED", acq.message(),
                                {{"doc_id", task.doc_id}}, t_start);
 
     // (2) Per-task ChunkStore over THIS Unit's blocks + generator; run the LLM summary.
@@ -67,7 +67,7 @@ Status F41AsyncWorker::ProcessTask(const async::TaskInfo& task) {
         // No block written → doc-discovery degrades to FTS5 (§7.1); finalize failed
         // (Phase 1 terminal-on-failure). The generator already recorded its metrics.
         const std::string code =
-            result.error ? result.error->code : "CX_ERR_F41_GENERATION_FAILED";
+            result.error ? result.error->code : "CX_ERR_DOCSUMMARY_GENERATION_FAILED";
         const std::string msg =
             result.error ? result.error->message : "doc summary generation failed";
         nlohmann::json structured_data = {{"doc_id", task.doc_id}};
@@ -89,7 +89,7 @@ Status F41AsyncWorker::ProcessTask(const async::TaskInfo& task) {
     EmbeddingResult emb;
     Status es = embedder_.Embed(result.summary.summary_text, &emb);
     if (!es.ok())
-        return finalizer_.Fail(task, "CX_ERR_F41_EMBED_FAILED", es.message(),
+        return finalizer_.Fail(task, "CX_ERR_DOCSUMMARY_EMBED_FAILED", es.message(),
                                {{"doc_id", task.doc_id}}, t_start);
 
     // (4) Assemble the doc_summary block (block_type=17) and write it in one write-coordinator txn
@@ -115,26 +115,26 @@ Status F41AsyncWorker::ProcessTask(const async::TaskInfo& task) {
     Status bw = facade.write_coordinator().BeginWrite(task.doc_id, {block.block_id},
                                                       /*writes_blob=*/false, &txn);
     if (!bw.ok())
-        return finalizer_.Fail(task, "CX_ERR_F41_WRITE_FAILED", bw.message(),
+        return finalizer_.Fail(task, "CX_ERR_DOCSUMMARY_WRITE_FAILED", bw.message(),
                                {{"doc_id", task.doc_id}}, t_start);
 
     if (!vec_points.empty()) {
         Status av = facade.vec_index().AddPoints(vec_points);
         if (!av.ok()) {
             facade.write_coordinator().Rollback(txn);
-            return finalizer_.Fail(task, "CX_ERR_F41_WRITE_FAILED", av.message(),
+            return finalizer_.Fail(task, "CX_ERR_DOCSUMMARY_WRITE_FAILED", av.message(),
                                    {{"doc_id", task.doc_id}}, t_start);
         }
     }
     if (facade.store().block_insert(block) != 0) {
         facade.write_coordinator().Rollback(txn);
-        return finalizer_.Fail(task, "CX_ERR_F41_WRITE_FAILED",
+        return finalizer_.Fail(task, "CX_ERR_DOCSUMMARY_WRITE_FAILED",
                                "doc_summary block_insert failed",
                                {{"doc_id", task.doc_id}}, t_start);
     }
     Status cm = facade.write_coordinator().Commit(txn);
     if (!cm.ok())
-        return finalizer_.Fail(task, "CX_ERR_F41_WRITE_FAILED", cm.message(),
+        return finalizer_.Fail(task, "CX_ERR_DOCSUMMARY_WRITE_FAILED", cm.message(),
                                {{"doc_id", task.doc_id}}, t_start);
 
     return finalizer_.Complete(task, task.doc_id, t_start);

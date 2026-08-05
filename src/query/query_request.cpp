@@ -64,7 +64,7 @@ Status QueryRequest::FromJson(const json& j, QueryRequest* req) {
 
     // Optional: route (router override) / granularity. Body form only here; the
     // enum is validated at the route boundary so an invalid value can surface the
-    // Agent-friendly CX_ERR_F39_* body (route) instead of a generic parse error.
+    // Agent-friendly CX_ERR_ROUTER_* body (route) instead of a generic parse error.
     if (j.contains("route") && j["route"].is_string()) {
         req->route = j["route"].get<std::string>();
     }

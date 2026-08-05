@@ -148,7 +148,7 @@ def register(mcp) -> None:
         try:
             return request("POST", path, json_body=body, timeout=10.0)
         except Exception as exc:  # noqa: BLE001 - retry only for the live session precondition.
-            if "Session not found" not in str(exc) and "CX_ERR_MEM04_SESSION_NOT_FOUND" not in str(exc):
+            if "Session not found" not in str(exc) and "CX_ERR_MEMOPTOUT_SESSION_NOT_FOUND" not in str(exc):
                 raise
             request(
                 "POST",

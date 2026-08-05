@@ -21,7 +21,7 @@ constexpr int kScoringSchemaVersion = 1;
 /// blocks table idempotently; running order is insensitive (each guards on ColumnExists).
 class ScoringSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
-    std::string FeatureName() const override { return "F07"; }
+    std::string FeatureName() const override { return "scoring"; }
     int CurrentVersion() const override { return kScoringSchemaVersion; }
 
     /// Phase 1 (from_ver 0 → 1): ADD blocks.semantic_score (REAL, default NULL) iff absent

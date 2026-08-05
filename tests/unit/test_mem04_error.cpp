@@ -5,7 +5,7 @@
 
 #include "cortrix/memory/mem04_error.h"
 
-// S5 coverage: the memory opt-out error model (template A) — all 7 CX_ERR_MEM04_* identities,
+// S5 coverage: the memory opt-out error model (template A) — all 7 CX_ERR_MEMOPTOUT_* identities,
 // their ARCH §4.1.11 attributes (http/category/retryable/retry_after_ms/structured_data
 // keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::memory::immunity {
@@ -34,7 +34,7 @@ TEST(Mem04ErrorTest, AllCodesHaveUniqueCxStrings) {
     for (Mem04ErrorCode c : kAll) {
         std::string s = Mem04ErrorCodeString(c);
         EXPECT_FALSE(s.empty());
-        EXPECT_EQ(s.rfind("CX_ERR_MEM04_", 0), 0u) << s << " must start with CX_ERR_MEM04_";
+        EXPECT_EQ(s.rfind("CX_ERR_MEMOPTOUT_", 0), 0u) << s << " must start with CX_ERR_MEMOPTOUT_";
         EXPECT_TRUE(seen.insert(s).second) << "duplicate code string: " << s;
     }
     EXPECT_EQ(seen.size(), 7u);
@@ -51,19 +51,19 @@ TEST(Mem04ErrorTest, RegistryMatchesArchTable) {
         EXPECT_EQ(i.retryable, retry) << code;
         EXPECT_EQ(i.retry_after_ms, retry_ms) << code;
     };
-    chk(Mem04ErrorCode::kSessionNotFound, "CX_ERR_MEM04_SESSION_NOT_FOUND", 404,
+    chk(Mem04ErrorCode::kSessionNotFound, "CX_ERR_MEMOPTOUT_SESSION_NOT_FOUND", 404,
         ErrorCategory::kPermanent, false, std::nullopt);
-    chk(Mem04ErrorCode::kAlreadyOptedOut, "CX_ERR_MEM04_ALREADY_OPTED_OUT", 409,
+    chk(Mem04ErrorCode::kAlreadyOptedOut, "CX_ERR_MEMOPTOUT_ALREADY_OPTED_OUT", 409,
         ErrorCategory::kPermanent, false, std::nullopt);
-    chk(Mem04ErrorCode::kNotOptedOut, "CX_ERR_MEM04_NOT_OPTED_OUT", 409,
+    chk(Mem04ErrorCode::kNotOptedOut, "CX_ERR_MEMOPTOUT_NOT_OPTED_OUT", 409,
         ErrorCategory::kPermanent, false, std::nullopt);
-    chk(Mem04ErrorCode::kRevokeDenied, "CX_ERR_MEM04_REVOKE_DENIED", 403,
+    chk(Mem04ErrorCode::kRevokeDenied, "CX_ERR_MEMOPTOUT_REVOKE_DENIED", 403,
         ErrorCategory::kAuth, false, std::nullopt);
-    chk(Mem04ErrorCode::kOptOutDisabled, "CX_ERR_MEM04_OPT_OUT_DISABLED", 503,
+    chk(Mem04ErrorCode::kOptOutDisabled, "CX_ERR_MEMOPTOUT_DISABLED", 503,
         ErrorCategory::kPermanent, false, std::nullopt);
-    chk(Mem04ErrorCode::kInvalidSessionId, "CX_ERR_MEM04_INVALID_SESSION_ID", 422,
+    chk(Mem04ErrorCode::kInvalidSessionId, "CX_ERR_MEMOPTOUT_INVALID_SESSION_ID", 422,
         ErrorCategory::kPermanent, false, std::nullopt);
-    chk(Mem04ErrorCode::kMetadataTooLarge, "CX_ERR_MEM04_METADATA_TOO_LARGE", 422,
+    chk(Mem04ErrorCode::kMetadataTooLarge, "CX_ERR_MEMOPTOUT_METADATA_TOO_LARGE", 422,
         ErrorCategory::kPermanent, false, std::nullopt);
 }
 
@@ -120,7 +120,7 @@ TEST(Mem04ErrorTest, MakeMem04ErrorFillsFromRegistry) {
     nlohmann::json sd = {{"session_id", "s_123"}, {"opted_out_at", "2026-05-16T10:30:00Z"}};
     auto err = MakeMem04Error(Mem04ErrorCode::kAlreadyOptedOut, sd,
                               "session already opted out");
-    EXPECT_EQ(err.code, "CX_ERR_MEM04_ALREADY_OPTED_OUT");
+    EXPECT_EQ(err.code, "CX_ERR_MEMOPTOUT_ALREADY_OPTED_OUT");
     EXPECT_EQ(err.message, "session already opted out");
     EXPECT_FALSE(err.retryable);
     EXPECT_EQ(err.category, ErrorCategory::kPermanent);
@@ -131,7 +131,7 @@ TEST(Mem04ErrorTest, MakeMem04ErrorFillsFromRegistry) {
 
 TEST(Mem04ErrorTest, MakeMem04ErrorDefaultsMessageToCode) {
     auto err = MakeMem04Error(Mem04ErrorCode::kSessionNotFound);
-    EXPECT_EQ(err.message, "CX_ERR_MEM04_SESSION_NOT_FOUND");
+    EXPECT_EQ(err.message, "CX_ERR_MEMOPTOUT_SESSION_NOT_FOUND");
     EXPECT_FALSE(err.retryable);
     EXPECT_FALSE(err.retry_after_ms.has_value());
 }
@@ -139,7 +139,7 @@ TEST(Mem04ErrorTest, MakeMem04ErrorDefaultsMessageToCode) {
 TEST(Mem04ErrorTest, RevokeDeniedIsAuthCategory) {
     auto err = MakeMem04Error(Mem04ErrorCode::kRevokeDenied, {{"required_role", "admin"}});
     nlohmann::json j = agent_friendly::ToJson(err);
-    EXPECT_EQ(j["code"], "CX_ERR_MEM04_REVOKE_DENIED");
+    EXPECT_EQ(j["code"], "CX_ERR_MEMOPTOUT_REVOKE_DENIED");
     EXPECT_EQ(j["retryable"], false);
     EXPECT_EQ(j["category"], "auth");
     EXPECT_TRUE(j["retry_after_ms"].is_null());
@@ -149,7 +149,7 @@ TEST(Mem04ErrorTest, RevokeDeniedIsAuthCategory) {
 TEST(Mem04ErrorTest, ToJsonSerializesNotFoundBody) {
     auto err = MakeMem04Error(Mem04ErrorCode::kSessionNotFound, {{"session_id", "s_002"}});
     nlohmann::json j = agent_friendly::ToJson(err);
-    EXPECT_EQ(j["code"], "CX_ERR_MEM04_SESSION_NOT_FOUND");
+    EXPECT_EQ(j["code"], "CX_ERR_MEMOPTOUT_SESSION_NOT_FOUND");
     EXPECT_EQ(j["retryable"], false);
     EXPECT_EQ(j["category"], "permanent");
     EXPECT_TRUE(j["retry_after_ms"].is_null());
@@ -160,7 +160,7 @@ TEST(Mem04ErrorTest, StatusBridgeCarriesCodeToken) {
     Status s = Mem04Status(Mem04ErrorCode::kRevokeDenied, "caller is not admin");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kPermissionDenied);
-    EXPECT_NE(s.message().find("CX_ERR_MEM04_REVOKE_DENIED"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_MEMOPTOUT_REVOKE_DENIED"), std::string::npos);
     EXPECT_NE(s.message().find("caller is not admin"), std::string::npos);
 }
 
@@ -187,7 +187,7 @@ TEST(Mem04ErrorTest, StatusCodeMappingIsTotalAndSane) {
 
 TEST(Mem04ErrorTest, StatusBridgeDefaultsMessageToCodeOnly) {
     Status s = Mem04Status(Mem04ErrorCode::kNotOptedOut);
-    EXPECT_EQ(s.message(), "CX_ERR_MEM04_NOT_OPTED_OUT");
+    EXPECT_EQ(s.message(), "CX_ERR_MEMOPTOUT_NOT_OPTED_OUT");
 }
 
 }  // namespace

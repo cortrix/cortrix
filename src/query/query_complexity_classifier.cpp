@@ -238,7 +238,7 @@ Status QueryComplexityClassifier::RouteAndUpdateContext(
         if (route != "auto" && route != "simple" && route != "complex" &&
             route != "chat") {
             // Invalid token → leave ctx untouched; caller surfaces
-            // CX_ERR_F39_FORCE_ROUTE_INVALID (the §4.3 structured_data carries
+            // CX_ERR_ROUTER_FORCE_ROUTE_INVALID (the §4.3 structured_data carries
             // invalid_route_value at the call site).
             return RouterStatus(RouterErrorCode::kForceRouteInvalid, route);
         }

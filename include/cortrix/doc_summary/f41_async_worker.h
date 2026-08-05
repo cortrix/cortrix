@@ -53,7 +53,7 @@ public:
     /// @param assembler  borrowed BlockAssembler (flat Assemble → doc_summary block).
     /// @param task_mgr   borrowed TaskManager — finalizes the task terminal state via
     ///                    TaskFinalizer (success → MarkCompleted; any failure → MarkFailed
-    ///                    with the CX_ERR_F41_* code + structured_data).
+    ///                    with the CX_ERR_DOCSUMMARY_* code + structured_data).
     F41AsyncWorker(resource::INamespacePool& pool,
                    std::shared_ptr<llm::ILlmClient> llm_client,
                    DocSummaryConfig config,

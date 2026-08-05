@@ -88,7 +88,7 @@ protected:
 };
 
 TEST_F(F06CfgMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F06");
+    EXPECT_EQ(p_.FeatureName(), "parser");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
@@ -155,7 +155,7 @@ protected:
 };
 
 TEST_F(F02CfgMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F02");
+    EXPECT_EQ(p_.FeatureName(), "reranker");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
@@ -171,7 +171,7 @@ TEST_F(F02CfgMatrix, UnsupportedStepRejected) {
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     EXPECT_NE(s.message().find("CX_ERR_SCHEMA_VERSION_MISMATCH"), std::string::npos);
-    EXPECT_NE(s.message().find("F02"), std::string::npos);
+    EXPECT_NE(s.message().find("reranker"), std::string::npos);
 }
 
 class F02CfgVersionMatrix : public ::testing::TestWithParam<InitStep> {
@@ -205,7 +205,7 @@ protected:
 };
 
 TEST_F(F21CfgMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F21");
+    EXPECT_EQ(p_.FeatureName(), "watcher");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
@@ -220,7 +220,7 @@ TEST_F(F21CfgMatrix, UnsupportedStepRejected) {
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     EXPECT_NE(s.message().find("CX_ERR_SCHEMA_VERSION_MISMATCH"), std::string::npos);
-    EXPECT_NE(s.message().find("F21"), std::string::npos);
+    EXPECT_NE(s.message().find("watcher"), std::string::npos);
 }
 
 class F21CfgVersionMatrix : public ::testing::TestWithParam<InitStep> {
@@ -254,7 +254,7 @@ protected:
 };
 
 TEST_F(F38CfgMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F38");
+    EXPECT_EQ(p_.FeatureName(), "hype");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 
@@ -268,8 +268,8 @@ TEST_F(F38CfgMatrix, UnsupportedStepRejectedWithF38Token) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
-    // HyPE uses the feature-scoped token CX_ERR_F38_SCHEMA_VERSION_MISMATCH.
-    EXPECT_NE(s.message().find("CX_ERR_F38_SCHEMA_VERSION_MISMATCH"), std::string::npos);
+    // HyPE uses the feature-scoped token CX_ERR_HYPE_SCHEMA_VERSION_MISMATCH.
+    EXPECT_NE(s.message().find("CX_ERR_HYPE_SCHEMA_VERSION_MISMATCH"), std::string::npos);
 }
 
 class F38CfgVersionMatrix : public ::testing::TestWithParam<InitStep> {
@@ -283,7 +283,7 @@ TEST_P(F38CfgVersionMatrix, Gate) {
         EXPECT_TRUE(s.ok());
     } else {
         EXPECT_FALSE(s.ok());
-        EXPECT_NE(s.message().find("CX_ERR_F38_SCHEMA_VERSION_MISMATCH"), std::string::npos);
+        EXPECT_NE(s.message().find("CX_ERR_HYPE_SCHEMA_VERSION_MISMATCH"), std::string::npos);
     }
 }
 INSTANTIATE_TEST_SUITE_P(
@@ -304,7 +304,7 @@ protected:
 };
 
 TEST_F(F40CfgMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F40");
+    EXPECT_EQ(p_.FeatureName(), "sparse_index");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 

@@ -55,7 +55,7 @@ public:
     // --- IClassifier (S1 shared contract) ---
     /// Classify the complexity of `input.query`. Total (never throws): a transient
     /// backend fault is caught and reported via the safe Complex fallback label +
-    /// ClassificationResult.error_code = CX_ERR_F39_INFERENCE_FAILED. `input.chunks`
+    /// ClassificationResult.error_code = CX_ERR_ROUTER_INFERENCE_FAILED. `input.chunks`
     /// is ignored — this is a *pre-retrieval* router, but it honors the shared
     /// post-retrieval IClassifier signature so the pipeline treats all classifiers
     /// uniformly.
@@ -73,7 +73,7 @@ public:
     ///
     /// Returns Status::Ok on every successful route (including all fail-safe
     /// degradations, which are normal). Returns InvalidArgument carrying
-    /// CX_ERR_F39_FORCE_ROUTE_INVALID when `force_route` (or the NS force_route) is
+    /// CX_ERR_ROUTER_FORCE_ROUTE_INVALID when `force_route` (or the NS force_route) is
     /// not one of auto/simple/complex/chat — ctx is left untouched in that case so
     /// the caller can surface the Agent-friendly error.
     Status RouteAndUpdateContext(
@@ -112,11 +112,11 @@ private:
     /// Run the backend with the §7.3 L3 retry-then-degrade policy. On success
     /// returns the backend result with error_code unset; after `max_inference_retries`
     /// transient faults returns the degraded Complex result (error_code =
-    /// CX_ERR_F39_INFERENCE_FAILED). Never throws.
+    /// CX_ERR_ROUTER_INFERENCE_FAILED). Never throws.
     retrieval::ClassificationResult RunClassifier(const std::string& query);
 
     /// The §7.3 transparent-degrade result: Complex label, confidence 0.5,
-    /// error_code CX_ERR_F39_INFERENCE_FAILED.
+    /// error_code CX_ERR_ROUTER_INFERENCE_FAILED.
     static retrieval::ClassificationResult DegradedResult();
 
     std::shared_ptr<IComplexityClassifierBackend> backend_;

@@ -38,7 +38,7 @@ Result<CleaningConfig> ResolveCleaningConfig(const CleaningConfig& global,
     Result<CleaningConfig> merged = resolver.Resolve(global, ns_blob);
     if (!merged.ok()) {
         // Re-badge the catalog merge failure as the F10-native §5.1 error so the
-        // boundary surfaces CX_ERR_F10_NS_CONFIG_MERGE_FAILED (not a catalog code).
+        // boundary surfaces CX_ERR_CLEANING_NS_CONFIG_MERGE_FAILED (not a catalog code).
         return CleaningStatus(CleaningErrorCode::kNsConfigMergeFailed,
                               merged.status().message());
     }

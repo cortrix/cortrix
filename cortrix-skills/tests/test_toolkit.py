@@ -379,7 +379,7 @@ def test_mem03_error_codes_passthrough(kit, fake_client):
         CortrixError(
             "already invalidated",
             status_code=409,
-            error_code="CX_ERR_MEM03_ALREADY_INVALIDATED",
+            error_code="CX_ERR_MEMORY_ALREADY_INVALIDATED",
             retryable=False,
             category="permanent",
             structured_data={"memory_id": "mem-1"},
@@ -387,7 +387,7 @@ def test_mem03_error_codes_passthrough(kit, fake_client):
     )
     with pytest.raises(CortrixError) as ei:
         kit.cortrix_memory_invalidate(memory_id="mem-1", reason="x")
-    assert ei.value.error_code == "CX_ERR_MEM03_ALREADY_INVALIDATED"
+    assert ei.value.error_code == "CX_ERR_MEMORY_ALREADY_INVALIDATED"
     assert ei.value.retryable is False
 
 

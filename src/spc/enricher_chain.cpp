@@ -158,7 +158,7 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
                                                          qs.begin(), qs.end());
                         results[i].steps.push_back({name, 0, "", false});
                     } else {
-                        // Fail-soft: HyPE degraded — record the CX_ERR_F38_* token,
+                        // Fail-soft: HyPE degraded — record the CX_ERR_HYPE_* token,
                         // skip this chunk's questions, continue.
                         results[i].steps.push_back(
                             {name, 1, qres.status().message(), false});

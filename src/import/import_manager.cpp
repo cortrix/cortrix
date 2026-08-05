@@ -84,7 +84,7 @@ Result<ImportTaskId> ImportManager::StartImport(const ImportRequest& req,
     if (!dsn.ok()) return dsn.status();
 
     // D2 security gate (pre-validate before we ever enqueue) — bad SQL / DSL fails
-    // synchronously with CX_ERR_F16A_INVALID_SQL.
+    // synchronously with CX_ERR_IMPORT_INVALID_SQL.
     Result<CompiledQuery> compiled =
         CompileQueryRequest(req.query, config_.query_constraints, config_.dsl_constraints);
     if (!compiled.ok()) return compiled.status();

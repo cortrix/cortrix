@@ -11,7 +11,7 @@
 namespace cortrix::import {
 
 /// The 6 DB-import error identities. Each maps to a stable
-/// `CX_ERR_F16A_*` string + a GEN-Agent category + retryability + the HTTP status
+/// `CX_ERR_IMPORT_*` string + a GEN-Agent category + retryability + the HTTP status
 /// its body carries, via the canonical registry below.
 ///
 /// Per CODING_CONVENTIONS §3 / F-FREEZE-1, Cortrix uses Result<T>+Status only (no
@@ -46,7 +46,7 @@ constexpr int kF16aErrorCodeCount = 7;
 
 /// Canonical, immutable attributes of one error code.
 struct F16aErrorInfo {
-    const char* cx_code;                      ///< stable "CX_ERR_F16A_*" string
+    const char* cx_code;                      ///< stable "CX_ERR_IMPORT_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
     bool retryable;
     std::optional<int> retry_after_ms;        ///< null unless retryable
@@ -57,7 +57,7 @@ struct F16aErrorInfo {
 /// / never returns a partial). Single source of truth for the 6 rows.
 const F16aErrorInfo& GetF16aErrorInfo(F16aErrorCode code);
 
-/// The "CX_ERR_F16A_*" string for `code` (convenience over GetF16aErrorInfo).
+/// The "CX_ERR_IMPORT_*" string for `code` (convenience over GetF16aErrorInfo).
 const char* F16aErrorCodeString(F16aErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5).
@@ -82,7 +82,7 @@ agent_friendly::AgentFriendlyError MakeF16aError(
 /// MakeF16aError() re-inflation at the API boundary.
 StatusCode F16aErrorToStatusCode(F16aErrorCode code);
 
-/// Bridge to a plain Status; message prefixed "CX_ERR_F16A_X: detail" so the exact
+/// Bridge to a plain Status; message prefixed "CX_ERR_IMPORT_X: detail" so the exact
 /// identity is recoverable at the API/SDK boundary (same pattern as CrossNsStatus).
 Status F16aStatus(F16aErrorCode code, const std::string& detail = "");
 

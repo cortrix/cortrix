@@ -46,7 +46,7 @@ std::set<std::string> ColumnNames(sqlite3* db, const std::string& table) {
 
 TEST(F41SchemaProviderTest, IdentityAndVersion) {
     F41SchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F41");
+    EXPECT_EQ(p.FeatureName(), "doc_summary");
     EXPECT_EQ(p.CurrentVersion(), 1);
 }
 
@@ -83,7 +83,7 @@ TEST(F41SchemaProviderTest, UnexpectedVersionStepIsError) {
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     Status st = p.Migrate(db, 1, 2);  // Phase 2 not implemented
     EXPECT_FALSE(st.ok());
-    EXPECT_NE(st.message().find("CX_ERR_F41_SCHEMA_VERSION_MISMATCH"),
+    EXPECT_NE(st.message().find("CX_ERR_DOCSUMMARY_SCHEMA_VERSION_MISMATCH"),
               std::string::npos);
     sqlite3_close(db);
 }
@@ -92,7 +92,7 @@ TEST(F41SchemaProviderTest, NullDbRejected) {
     F41SchemaProvider p;
     Status st = p.Migrate(nullptr, 0, 1);
     EXPECT_FALSE(st.ok());
-    EXPECT_NE(st.message().find("CX_ERR_F41_SCHEMA_VERSION_MISMATCH"),
+    EXPECT_NE(st.message().find("CX_ERR_DOCSUMMARY_SCHEMA_VERSION_MISMATCH"),
               std::string::npos);
 }
 
@@ -106,7 +106,7 @@ TEST(F41SchemaProviderTest, RegistersWithSchemaMigrator) {
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     ASSERT_TRUE(migrator.MigrateUnit(db, "unit_test").ok());
     EXPECT_TRUE(TableNames(db).count("doc_fts5_index"));
-    EXPECT_EQ(migrator.CurrentVersion(db, "F41"), 1);
+    EXPECT_EQ(migrator.CurrentVersion(db, "doc_summary"), 1);
     sqlite3_close(db);
 }
 

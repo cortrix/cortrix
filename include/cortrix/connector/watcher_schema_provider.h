@@ -27,7 +27,7 @@ class F21SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     /// Registration key (aligns with the startup registration order + the
     /// F06SchemaProvider naming pattern).
-    std::string FeatureName() const override { return "F21"; }
+    std::string FeatureName() const override { return "watcher"; }
 
     /// Schema version (bumped +1 on evolution; the SchemaMigrator does the
     /// idempotent per-version migration). V1 = base watcher_config already in

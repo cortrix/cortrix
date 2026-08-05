@@ -34,7 +34,7 @@ public:
     // cortrix_f07_assign_duration_seconds (Histogram — AssignInitialScore call latency).
     void ObserveAssignDuration(double seconds);
 
-    // cortrix_f07_error_total{code="CX_ERR_F07_*"} (Counter — error-code
+    // cortrix_f07_error_total{code="CX_ERR_SCORING_*"} (Counter — error-code
     // distribution; the 5th locked `scoring` metric). Fed at the two throw sites
     // (ScoreMap::LevelToScore kLevelInvalid / SemanticScorer::ComputeFinalScore kConfigInvalid).
     void RecordError(F07ErrorCode code);

@@ -19,15 +19,15 @@ namespace {
 // fault) advises 5000ms; QUOTA (rate limit) advises 60000ms. The three non-retryable
 // faults (MEMORY_NOT_FOUND / USER_MISMATCH / ALREADY_INVALIDATED) carry no hint.
 constexpr Mem03ErrorInfo kMemoryNotFound
-    {"CX_ERR_MEM03_MEMORY_NOT_FOUND",    404, ErrorCategory::kPermanent,  false, std::nullopt};
+    {"CX_ERR_MEMORY_NOT_FOUND",    404, ErrorCategory::kPermanent,  false, std::nullopt};
 constexpr Mem03ErrorInfo kUserMismatch
-    {"CX_ERR_MEM03_USER_MISMATCH",       403, ErrorCategory::kAuth,       false, std::nullopt};
+    {"CX_ERR_MEMORY_USER_MISMATCH",       403, ErrorCategory::kAuth,       false, std::nullopt};
 constexpr Mem03ErrorInfo kAlreadyInvalidated
-    {"CX_ERR_MEM03_ALREADY_INVALIDATED", 410, ErrorCategory::kPermanent,  false, std::nullopt};
+    {"CX_ERR_MEMORY_ALREADY_INVALIDATED", 410, ErrorCategory::kPermanent,  false, std::nullopt};
 constexpr Mem03ErrorInfo kInvalidateFailed
-    {"CX_ERR_MEM03_INVALIDATE_FAILED",   500, ErrorCategory::kTransient,  true,  5000};
+    {"CX_ERR_MEMORY_INVALIDATE_FAILED",   500, ErrorCategory::kTransient,  true,  5000};
 constexpr Mem03ErrorInfo kQuota
-    {"CX_ERR_MEM03_QUOTA",               429, ErrorCategory::kQuota,      true,  60000};
+    {"CX_ERR_MEMORY_QUOTA",               429, ErrorCategory::kQuota,      true,  60000};
 
 }  // namespace
 

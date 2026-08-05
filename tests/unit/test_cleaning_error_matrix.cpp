@@ -41,8 +41,8 @@ TEST_P(CleaningErrorMatrix, CodeStringFormat) {
     const CleaningErrorCode code = GetParam();
     const std::string s = CleaningErrorCodeString(code);
     EXPECT_FALSE(s.empty());
-    EXPECT_EQ(s.rfind("CX_ERR_F10_", 0), 0u) << s;
-    EXPECT_TRUE(std::regex_match(s, std::regex("^CX_ERR_F10_[A-Z0-9_]+$"))) << s;
+    EXPECT_EQ(s.rfind("CX_ERR_CLEANING_", 0), 0u) << s;
+    EXPECT_TRUE(std::regex_match(s, std::regex("^CX_ERR_CLEANING_[A-Z0-9_]+$"))) << s;
     EXPECT_STREQ(GetCleaningErrorInfo(code).cx_code, s.c_str());
 }
 

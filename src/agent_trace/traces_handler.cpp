@@ -83,7 +83,7 @@ Result<TracesResponse> TracesHandler::GetSession(const std::string& session_id,
     // Delegate the filtered + paginated read to the writer.
     auto qr = writer_->Query(session_id, filter);
     if (!qr.ok()) {
-        return qr.status();  // CX_ERR_F13_INVALID_FILTER / INTERNAL token preserved
+        return qr.status();  // CX_ERR_TRACE_INVALID_FILTER / INTERNAL token preserved
     }
     TraceSession ts = std::move(qr.value());
 

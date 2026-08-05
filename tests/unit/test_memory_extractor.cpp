@@ -532,26 +532,26 @@ TEST_F(MemoryExtractorTest, S6b_MissingTypeFallsBackToEvent) {
     EXPECT_EQ(r.extracted_memories[0].type, MemoryType::kEvent);
 }
 
-// Scenario 7: LLM returns invalid JSON → CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT.
+// Scenario 7: LLM returns invalid JSON → CX_ERR_MEMEXTRACT_INVALID_OUTPUT.
 TEST_F(MemoryExtractorTest, S7_InvalidJsonReturnsInvalidOutput) {
     llm_->PushOk("this is not json at all");
     auto ex = Make();
     auto r = ex->ExtractFromWindow({MakeTurn("i1", "user", "x")});
     ASSERT_FALSE(r.ok());
     ASSERT_TRUE(r.error.has_value());
-    EXPECT_EQ(r.error->code, "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT");
+    EXPECT_EQ(r.error->code, "CX_ERR_MEMEXTRACT_INVALID_OUTPUT");
     EXPECT_EQ(Mem02Metrics::Instance().ExtractCount(
                   Mem02Metrics::ExtractStatus::kFailed), 1u);
 }
 
-// Scenario 8: LLM timeout → CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT + retryable.
+// Scenario 8: LLM timeout → CX_ERR_MEMEXTRACT_LLM_TIMEOUT + retryable.
 TEST_F(MemoryExtractorTest, S8_LlmTimeoutReturnsTimeoutRetryable) {
     llm_->PushError(StatusCode::kUnavailable, "circuit open / timeout");
     auto ex = Make();
     auto r = ex->ExtractFromWindow({MakeTurn("i_123", "user", "x")});
     ASSERT_FALSE(r.ok());
     ASSERT_TRUE(r.error.has_value());
-    EXPECT_EQ(r.error->code, "CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT");
+    EXPECT_EQ(r.error->code, "CX_ERR_MEMEXTRACT_LLM_TIMEOUT");
     EXPECT_TRUE(r.error->retryable);
     ASSERT_TRUE(r.error->structured_data.has_value());
     EXPECT_EQ((*r.error->structured_data)["interaction_id"], "i_123");
@@ -566,7 +566,7 @@ TEST_F(MemoryExtractorTest, DisabledModeReturnsLlmDisabled) {
     auto r = ex->ExtractFromWindow({MakeTurn("i1", "user", "x")});
     ASSERT_FALSE(r.ok());
     ASSERT_TRUE(r.error.has_value());
-    EXPECT_EQ(r.error->code, "CX_ERR_MEM02_LLM_DISABLED");
+    EXPECT_EQ(r.error->code, "CX_ERR_MEMEXTRACT_LLM_DISABLED");
     EXPECT_FALSE(r.error->retryable);
     EXPECT_EQ(llm_->call_count, 0);  // no LLM call in disabled mode
 }
@@ -610,7 +610,7 @@ TEST_F(MemoryExtractorTest, EmptyWindowReturnsInvalidOutput) {
     auto ex = Make();
     auto r = ex->ExtractFromWindow({});
     ASSERT_FALSE(r.ok());
-    EXPECT_EQ(r.error->code, "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT");
+    EXPECT_EQ(r.error->code, "CX_ERR_MEMEXTRACT_INVALID_OUTPUT");
 }
 
 // ---------- Events do not trigger contradiction judging ----------
@@ -732,7 +732,7 @@ TEST_F(MemoryExtractorTest, ContradictionDetectorMapsTimeout) {
     ContradictionDetector det(llm, "gpt-4o-mini", 30000);
     auto r = det.Judge("user is in Beijing", "user is in Shanghai");
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT"),
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMEXTRACT_LLM_TIMEOUT"),
               std::string::npos);
 }
 
@@ -742,7 +742,7 @@ TEST_F(MemoryExtractorTest, ContradictionDetectorMapsGenericErrorToAmbiguous) {
     ContradictionDetector det(llm, "gpt-4o-mini", 30000);
     auto r = det.Judge("a", "b");
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM02_CONTRADICTION_AMBIGUOUS"),
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMEXTRACT_CONTRADICTION_AMBIGUOUS"),
               std::string::npos);
 }
 
@@ -750,7 +750,7 @@ TEST_F(MemoryExtractorTest, ContradictionDetectorNullLlmReturnsDisabled) {
     ContradictionDetector det(nullptr, "gpt-4o-mini", 30000);
     auto r = det.Judge("a", "b");
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM02_LLM_DISABLED"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMEXTRACT_LLM_DISABLED"), std::string::npos);
 }
 
 TEST_F(MemoryExtractorTest, ContradictionDetectorParsesNumericBoolean) {
@@ -768,7 +768,7 @@ TEST_F(MemoryExtractorTest, ContradictionDetectorRejectsNonBoolVerdict) {
     auto r = ContradictionDetector::ParseJudgmentJson(
         R"({"is_contradiction":"maybe"})");
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT"),
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMEXTRACT_INVALID_OUTPUT"),
               std::string::npos);
 }
 
@@ -789,7 +789,7 @@ TEST_F(MemoryExtractorTest, BudgetExceededMapsToBudgetError) {
     auto ex = Make();
     auto r = ex->ExtractFromWindow({MakeTurn("i1", "user", "x")});
     ASSERT_FALSE(r.ok());
-    EXPECT_EQ(r.error->code, "CX_ERR_MEM02_EXTRACT_BUDGET_EXCEEDED");
+    EXPECT_EQ(r.error->code, "CX_ERR_MEMEXTRACT_BUDGET_EXCEEDED");
     EXPECT_FALSE(r.error->retryable);
 }
 
@@ -798,7 +798,7 @@ TEST_F(MemoryExtractorTest, GenericLlmErrorMapsToInvalidOutput) {
     auto ex = Make();
     auto r = ex->ExtractFromWindow({MakeTurn("i1", "user", "x")});
     ASSERT_FALSE(r.ok());
-    EXPECT_EQ(r.error->code, "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT");
+    EXPECT_EQ(r.error->code, "CX_ERR_MEMEXTRACT_INVALID_OUTPUT");
 }
 
 TEST_F(MemoryExtractorTest, ExtractionEntryMissingContentIsInvalidOutput) {
@@ -807,7 +807,7 @@ TEST_F(MemoryExtractorTest, ExtractionEntryMissingContentIsInvalidOutput) {
     auto ex = Make();
     auto r = ex->ExtractFromWindow({MakeTurn("i1", "user", "x")});
     ASSERT_FALSE(r.ok());
-    EXPECT_EQ(r.error->code, "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT");
+    EXPECT_EQ(r.error->code, "CX_ERR_MEMEXTRACT_INVALID_OUTPUT");
 }
 
 // A block store whose insert always fails — exercises the persist-failure path.
@@ -831,7 +831,7 @@ TEST_F(MemoryExtractorTest, PersistFailureSurfacesInvalidOutput) {
     llm_->PushOk(R"([{"type":"fact","content":"user is a doctor","confidence":0.95}])");
     auto r = ex->ExtractFromWindow({MakeTurn("i1", "user", "I am a doctor")});
     ASSERT_FALSE(r.ok());
-    EXPECT_EQ(r.error->code, "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT");
+    EXPECT_EQ(r.error->code, "CX_ERR_MEMEXTRACT_INVALID_OUTPUT");
     EXPECT_NE(r.error->message.find("persist failed"), std::string::npos);
 }
 

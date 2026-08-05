@@ -70,7 +70,7 @@ protected:
 
 TEST_F(InteractionsHandlerTest, SchemaProviderIdentity) {
     InteractionSourcesSchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F13_interaction_sources");
+    EXPECT_EQ(p.FeatureName(), "interaction_sources");
     EXPECT_EQ(p.CurrentVersion(), 1);
 }
 
@@ -115,7 +115,7 @@ TEST_F(InteractionsHandlerTest, NonAdminCrossUserIsUnauthorized) {
     auto r = handler_->GetSources("int-1", mallory);  // owned by alice
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kPermissionDenied);
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_UNAUTHORIZED"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_UNAUTHORIZED"), std::string::npos);
 }
 
 TEST_F(InteractionsHandlerTest, MissingInteractionIsNotFound) {
@@ -123,7 +123,7 @@ TEST_F(InteractionsHandlerTest, MissingInteractionIsNotFound) {
     auto r = handler_->GetSources("does-not-exist", ctx);
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kNotFound);
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INTERACTION_NOT_FOUND"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INTERACTION_NOT_FOUND"), std::string::npos);
 }
 
 TEST_F(InteractionsHandlerTest, AllSourcesDeletedYieldsEmptyListWithCount) {
@@ -202,7 +202,7 @@ TEST_F(InteractionsListTest, NonAdminUserIdFilterForOtherIsUnauthorized) {
     f.user_id = "bob";  // alice asking for bob's
     auto r = handler_->ListInteractions(f, RequesterContext{"alice", false});
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_UNAUTHORIZED"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_UNAUTHORIZED"), std::string::npos);
 }
 
 TEST_F(InteractionsListTest, NonAdminUserIdFilterForSelfIsAllowed) {
@@ -290,7 +290,7 @@ TEST_F(InteractionsListTest, InvalidFilterRejected) {
     bad2.sort_order = "SIDEWAYS";
     auto r = handler_->ListInteractions(bad2, RequesterContext{"alice", false});
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
 }
 
 TEST_F(InteractionsListTest, AdminCrossUserNoRowsIsEmptyNotError) {
@@ -311,7 +311,7 @@ TEST_F(InteractionsListTest, NegativeOffsetRejected) {
     f.offset = -5;
     auto r = handler_->ListInteractions(f, RequesterContext{"alice", false});
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
 }
 
 // limit above the cap is rejected (the limit > 200 half of the OR).
@@ -320,7 +320,7 @@ TEST_F(InteractionsListTest, LimitOverCapRejected) {
     f.limit = 999;
     auto r = handler_->ListInteractions(f, RequesterContext{"alice", false});
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
 }
 
 // from_timestamp > to_timestamp trips the inverted-range branch.
@@ -330,7 +330,7 @@ TEST_F(InteractionsListTest, InvertedTimestampRangeRejected) {
     f.to_timestamp = 1000;
     auto r = handler_->ListInteractions(f, RequesterContext{"alice", false});
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
 }
 
 // An offset at/past the end of a non-empty result set is out-of-range (the
@@ -340,7 +340,7 @@ TEST_F(InteractionsListTest, OffsetPastEndIsInvalidFilter) {
     f.offset = 100;  // alice has 3 rows < 100
     auto r = handler_->ListInteractions(f, RequesterContext{"alice", false});
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
 }
 
 // to_timestamp-only filter exercises the upper-bound predicate (created_at <= ?)
@@ -371,31 +371,31 @@ TEST_F(InteractionsHandlerTest, AdminReadingOwnInteractionNoForensics) {
     EXPECT_EQ(r.value().interaction_id, "int-admin");
 }
 
-// GetSources' owner-lookup prepare failure → CX_ERR_F13_INTERNAL. Dropping
+// GetSources' owner-lookup prepare failure → CX_ERR_TRACE_INTERNAL. Dropping
 // interaction_log makes the first SELECT fail to prepare.
 TEST_F(InteractionsHandlerTest, GetSourcesOwnerLookupPrepareFailureIsInternal) {
     Exec(db_, "DROP TABLE interaction_log;");
     auto r = handler_->GetSources("int-1", RequesterContext{"alice", false});
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INTERNAL"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INTERNAL"), std::string::npos);
 }
 
-// GetSources' sources-query prepare failure → CX_ERR_F13_INTERNAL. The owner
+// GetSources' sources-query prepare failure → CX_ERR_TRACE_INTERNAL. The owner
 // lookup succeeds (interaction_log intact) but interaction_sources is gone.
 TEST_F(InteractionsHandlerTest, GetSourcesSourcesQueryPrepareFailureIsInternal) {
     Exec(db_, "DROP TABLE interaction_sources;");
     auto r = handler_->GetSources("int-1", RequesterContext{"alice", false});
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INTERNAL"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INTERNAL"), std::string::npos);
 }
 
-// ListInteractions' count-query prepare failure → CX_ERR_F13_INTERNAL.
+// ListInteractions' count-query prepare failure → CX_ERR_TRACE_INTERNAL.
 TEST_F(InteractionsHandlerTest, ListCountPrepareFailureIsInternal) {
     Exec(db_, "DROP TABLE interaction_log;");
     auto r = handler_->ListInteractions(InteractionListFilter{},
                                         RequesterContext{"alice", false});
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INTERNAL"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INTERNAL"), std::string::npos);
 }
 
 // When the db has no `blocks` table, BlockExists can't probe deletions, so every

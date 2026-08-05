@@ -118,13 +118,13 @@ Result<std::vector<HypeQuestion>> HyPEEnricher::GenerateHypeQuestions(
     llm::ChatCompletionResponse resp =
         llm_client_->Chat(BuildPrompt(chunk_text, parent_text, doc_meta, k), call);
     if (!resp.ok()) {
-        // LLM transport/timeout failure → CX_ERR_F38_LLM_TIMEOUT (transparent
+        // LLM transport/timeout failure → CX_ERR_HYPE_LLM_TIMEOUT (transparent
         // degrade upstream).
         return HypeStatus(HypeErrorCode::kLlmTimeout, resp.status.message());
     }
 
-    // §6.2 strict parse: exactly K lines, else CX_ERR_F38_QUESTION_PARSE_FAILED /
-    // CX_ERR_F38_LLM_INVALID_OUTPUT (S2).
+    // §6.2 strict parse: exactly K lines, else CX_ERR_HYPE_QUESTION_PARSE_FAILED /
+    // CX_ERR_HYPE_LLM_INVALID_OUTPUT (S2).
     Result<std::vector<std::string>> parsed = ParseQuestions(resp.content, k);
     if (!parsed.ok()) {
         return parsed.status();

@@ -17,7 +17,7 @@ struct DocSummaryStructured {
 };
 
 /// DocSummaryGenerator output. On success `summary` + `embedding` are
-/// filled; on failure `error` carries the Agent-friendly CX_ERR_F41_* identity.
+/// filled; on failure `error` carries the Agent-friendly CX_ERR_DOCSUMMARY_* identity.
 struct GenerationResult {
     bool success = false;
     DocSummaryStructured summary;

@@ -27,24 +27,24 @@ TEST(F38HypeErrorTest, CountIsSix) {
 
 TEST(F38HypeErrorTest, CodeStringsMatchDesign) {
     EXPECT_STREQ(HypeErrorCodeString(HypeErrorCode::kLlmTimeout),
-                 "CX_ERR_F38_LLM_TIMEOUT");
+                 "CX_ERR_HYPE_LLM_TIMEOUT");
     EXPECT_STREQ(HypeErrorCodeString(HypeErrorCode::kLlmInvalidOutput),
-                 "CX_ERR_F38_LLM_INVALID_OUTPUT");
+                 "CX_ERR_HYPE_LLM_INVALID_OUTPUT");
     EXPECT_STREQ(HypeErrorCodeString(HypeErrorCode::kLlmBudgetExceeded),
-                 "CX_ERR_F38_LLM_BUDGET_EXCEEDED");
+                 "CX_ERR_HYPE_LLM_BUDGET_EXCEEDED");
     EXPECT_STREQ(HypeErrorCodeString(HypeErrorCode::kQuestionParseFailed),
-                 "CX_ERR_F38_QUESTION_PARSE_FAILED");
+                 "CX_ERR_HYPE_QUESTION_PARSE_FAILED");
     EXPECT_STREQ(HypeErrorCodeString(HypeErrorCode::kSchemaVersionMismatch),
-                 "CX_ERR_F38_SCHEMA_VERSION_MISMATCH");
+                 "CX_ERR_HYPE_SCHEMA_VERSION_MISMATCH");
     EXPECT_STREQ(HypeErrorCodeString(HypeErrorCode::kParentNotFound),
-                 "CX_ERR_F38_PARENT_NOT_FOUND");
+                 "CX_ERR_HYPE_PARENT_NOT_FOUND");
 }
 
 TEST(F38HypeErrorTest, AllCodesUniqueAndPrefixed) {
     std::set<std::string> seen;
     for (auto code : kAll) {
         std::string s = HypeErrorCodeString(code);
-        EXPECT_EQ(s.rfind("CX_ERR_F38_", 0), 0u) << s;
+        EXPECT_EQ(s.rfind("CX_ERR_HYPE_", 0), 0u) << s;
         EXPECT_TRUE(seen.insert(s).second) << "duplicate " << s;
     }
     EXPECT_EQ(seen.size(), 6u);
@@ -103,7 +103,7 @@ TEST(F38HypeErrorTest, MakeHypeErrorFillsFromRegistry) {
     auto err = MakeHypeError(
         HypeErrorCode::kLlmBudgetExceeded,
         {{"chunk_id", "c1"}, {"budget_remaining_usd", 0.0}, {"budget_reset_at", "t"}});
-    EXPECT_EQ(err.code, "CX_ERR_F38_LLM_BUDGET_EXCEEDED");
+    EXPECT_EQ(err.code, "CX_ERR_HYPE_LLM_BUDGET_EXCEEDED");
     EXPECT_TRUE(err.retryable);
     EXPECT_EQ(err.category, ErrorCategory::kQuota);
     ASSERT_TRUE(err.retry_after_ms.has_value());
@@ -115,7 +115,7 @@ TEST(F38HypeErrorTest, MakeHypeErrorSerializesToAgentFriendlyBody) {
                              {{"chunk_id", "c1"}, {"expected_count", 3},
                               {"actual_count", 2}});
     auto j = agent_friendly::ToJson(err);
-    EXPECT_EQ(j["code"], "CX_ERR_F38_QUESTION_PARSE_FAILED");
+    EXPECT_EQ(j["code"], "CX_ERR_HYPE_QUESTION_PARSE_FAILED");
     EXPECT_EQ(j["retryable"], true);
     EXPECT_EQ(j["category"], "transient");
     EXPECT_EQ(j["retry_after_ms"], 200);
@@ -124,14 +124,14 @@ TEST(F38HypeErrorTest, MakeHypeErrorSerializesToAgentFriendlyBody) {
 
 TEST(F38HypeErrorTest, MakeHypeErrorDefaultMessageIsCode) {
     auto err = MakeHypeError(HypeErrorCode::kLlmTimeout);
-    EXPECT_EQ(err.message, "CX_ERR_F38_LLM_TIMEOUT");
+    EXPECT_EQ(err.message, "CX_ERR_HYPE_LLM_TIMEOUT");
 }
 
 TEST(F38HypeErrorTest, StatusBridgeCarriesTokenAndCode) {
     Status s = HypeStatus(HypeErrorCode::kParentNotFound, "missing p1");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kNotFound);
-    EXPECT_NE(s.message().find("CX_ERR_F38_PARENT_NOT_FOUND"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_HYPE_PARENT_NOT_FOUND"), std::string::npos);
     EXPECT_NE(s.message().find("missing p1"), std::string::npos);
 }
 

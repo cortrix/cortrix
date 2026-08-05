@@ -57,7 +57,7 @@ bool HasIndex(sqlite3* db, const char* index) {
 
 TEST(F03SchemaProviderTest, IdentityAndVersion) {
     F03SchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F03");
+    EXPECT_EQ(p.FeatureName(), "enricher");
     EXPECT_EQ(p.CurrentVersion(), 2);
 }
 
@@ -169,7 +169,7 @@ TEST(F03SchemaProviderTest, RegistersAndMigratesViaMigratorUnit) {
     m.Register(&p);
     Status st = m.MigrateUnit(db, "unit-1");
     ASSERT_TRUE(st.ok()) << st.message();
-    EXPECT_EQ(m.CurrentVersion(db, "F03"), 2);
+    EXPECT_EQ(m.CurrentVersion(db, "enricher"), 2);
     EXPECT_TRUE(HasColumn(db, "blocks", "enriched_score"));
     EXPECT_TRUE(HasTable(db, "entities"));
     sqlite3_close(db);

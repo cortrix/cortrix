@@ -7,7 +7,7 @@
 // loopback HTTP server, using a temporary store, stub embedder, deterministic index,
 // and scripted LLM double; it requires no external service, model, or network access.
 //
-//   * ReadRouteOverride -> CX_ERR_F39_FORCE_ROUTE_INVALID : the override flows into
+//   * ReadRouteOverride -> CX_ERR_ROUTER_FORCE_ROUTE_INVALID : the override flows into
 //     QueryComplexityClassifier::RouteAndUpdateContext(ctx, route); a bad token
 //     returns the query routing permanent error and leaves ctx untouched (exactly what the
 //     closure surfaces as a 400).
@@ -73,7 +73,7 @@ protected:
 };
 
 // ===========================================================================
-// ReadRouteOverride -> CX_ERR_F39_FORCE_ROUTE_INVALID
+// ReadRouteOverride -> CX_ERR_ROUTER_FORCE_ROUTE_INVALID
 // ===========================================================================
 
 // A bad ?route= override is the query routing permanent error; ctx is left untouched so the
@@ -85,7 +85,7 @@ TEST_F(QueryWiringTest, InvalidRouteOverrideYieldsF39Error) {
     Status s = classifier.RouteAndUpdateContext(ctx, std::optional<std::string>("banana"));
     ASSERT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
-    EXPECT_NE(s.message().find("CX_ERR_F39_FORCE_ROUTE_INVALID"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_ROUTER_FORCE_ROUTE_INVALID"), std::string::npos);
     // ctx untouched on the invalid-override path.
     EXPECT_TRUE(ctx.routing_path.empty());
     EXPECT_TRUE(ctx.routing_decision_source.empty());
@@ -135,7 +135,7 @@ TEST_F(QueryWiringTest, ForceRouteInvalidErrorHasStructuredKey) {
     ASSERT_EQ(keys.size(), 1u);
     EXPECT_EQ(keys[0], "invalid_route_value");
     EXPECT_STREQ(RouterErrorCodeString(RouterErrorCode::kForceRouteInvalid),
-                 "CX_ERR_F39_FORCE_ROUTE_INVALID");
+                 "CX_ERR_ROUTER_FORCE_ROUTE_INVALID");
 }
 
 // ===========================================================================
@@ -489,9 +489,9 @@ TEST_F(QueryWiringHttpCoverage, RequestMatrixExercisesProductionClosure) {
     json invalid_route = BaseBody();
     invalid_route["route"] = "invalid";
     expect_status("/api/v1/query", invalid_route, 400,
-                  "CX_ERR_F39_FORCE_ROUTE_INVALID");
+                  "CX_ERR_ROUTER_FORCE_ROUTE_INVALID");
     expect_status("/api/v1/query?route=invalid", BaseBody(), 400,
-                  "CX_ERR_F39_FORCE_ROUTE_INVALID");
+                  "CX_ERR_ROUTER_FORCE_ROUTE_INVALID");
 
     json chat = BaseBody();
     chat["query"] = "hi";

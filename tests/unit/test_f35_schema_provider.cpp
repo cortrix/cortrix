@@ -47,7 +47,7 @@ bool HasTable(sqlite3* db, const char* table) {
 
 TEST(F35SchemaProviderTest, IdentityAndVersion) {
     F35SchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F35");
+    EXPECT_EQ(p.FeatureName(), "contextual");
     EXPECT_EQ(p.CurrentVersion(), 2);  // V2 = + contextual_vec_labels (§3.8 W2)
 }
 
@@ -130,7 +130,7 @@ TEST(F35SchemaProviderTest, RegistersAndMigratesViaMigratorUnit) {
     m.Register(&p);
     Status st = m.MigrateUnit(db, "unit-1");
     ASSERT_TRUE(st.ok()) << st.message();
-    EXPECT_EQ(m.CurrentVersion(db, "F35"), 2);
+    EXPECT_EQ(m.CurrentVersion(db, "contextual"), 2);
     EXPECT_TRUE(HasColumn(db, "blocks", "contextualized_text"));
     EXPECT_TRUE(HasTable(db, "contextual_vec_labels"));
     sqlite3_close(db);

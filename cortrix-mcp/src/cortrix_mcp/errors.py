@@ -5,7 +5,7 @@ outcomes. They must reach the model as ``CallToolResult(is_error=True)`` with
 the GEN-Agent fields intact. ``MCPError`` is intentionally not used here; the
 SDK reserves it for JSON-RPC and protocol failures handled by the MCP host.
 
-Business errors from cortrix-server (CX_ERR_NS_*, CX_ERR_MEM03_*,
+Business errors from cortrix-server (CX_ERR_NS_*, CX_ERR_MEMORY_*,
 CX_ERR_OPLOG_*, and similar codes) pass through unchanged.
 """
 

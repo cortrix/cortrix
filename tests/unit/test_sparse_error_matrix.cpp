@@ -35,8 +35,8 @@ TEST_P(SparseErrorMatrix, CodeStringFormat) {
     const SparseErrorCode code = GetParam();
     const std::string s = SparseErrorCodeString(code);
     EXPECT_FALSE(s.empty());
-    EXPECT_EQ(s.rfind("CX_ERR_F40_", 0), 0u) << s;
-    EXPECT_TRUE(std::regex_match(s, std::regex("^CX_ERR_F40_[A-Z0-9_]+$"))) << s;
+    EXPECT_EQ(s.rfind("CX_ERR_SPARSE_", 0), 0u) << s;
+    EXPECT_TRUE(std::regex_match(s, std::regex("^CX_ERR_SPARSE_[A-Z0-9_]+$"))) << s;
     EXPECT_STREQ(GetSparseErrorInfo(code).cx_code, s.c_str());
 }
 

@@ -11,7 +11,7 @@
 // S2 SQL-injection fuzzing (DB import / §7 / V3-E-01 root-cause). Hammers BOTH query
 // modes with adversarial input and asserts the security gate holds:
 //   1. custom-SQL mode: every classic injection family is rejected by the keyword /
-//      separator / comment gate (CX_ERR_F16A_INVALID_SQL).
+//      separator / comment gate (CX_ERR_IMPORT_INVALID_SQL).
 //   2. table+DSL mode: a value, no matter how malicious its text, can ONLY ever land
 //      as a $N bind param — never interpolated into the SQL string. This is the
 //      structural defense (parameterized query), so even a payload that slips past a
@@ -60,7 +60,7 @@ TEST(QueryInjectionTest, EveryCustomSqlPayloadIsRejected) {
     for (const std::string& payload : InjectionCorpus()) {
         Status s = ValidateSqlKeywords(payload, c);
         EXPECT_FALSE(s.ok()) << "ACCEPTED a malicious payload: " << payload;
-        EXPECT_NE(s.message().find("CX_ERR_F16A_INVALID_SQL"), std::string::npos) << payload;
+        EXPECT_NE(s.message().find("CX_ERR_IMPORT_INVALID_SQL"), std::string::npos) << payload;
     }
 }
 

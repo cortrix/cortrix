@@ -27,22 +27,22 @@ TEST(F35ContextualErrorTest, CountIsFive) {
 
 TEST(F35ContextualErrorTest, CodeStringsMatchDesign) {
     EXPECT_STREQ(ContextualErrorCodeString(ContextualErrorCode::kLlmFailed),
-                 "CX_ERR_F35_LLM_FAILED");
+                 "CX_ERR_CONTEXTUAL_LLM_FAILED");
     EXPECT_STREQ(ContextualErrorCodeString(ContextualErrorCode::kBudgetExceeded),
-                 "CX_ERR_F35_BUDGET_EXCEEDED");
+                 "CX_ERR_CONTEXTUAL_BUDGET_EXCEEDED");
     EXPECT_STREQ(ContextualErrorCodeString(ContextualErrorCode::kPromptInjection),
-                 "CX_ERR_F35_PROMPT_INJECTION");
+                 "CX_ERR_CONTEXTUAL_PROMPT_INJECTION");
     EXPECT_STREQ(ContextualErrorCodeString(ContextualErrorCode::kEmbeddingFailed),
-                 "CX_ERR_F35_EMBEDDING_FAILED");
+                 "CX_ERR_CONTEXTUAL_EMBEDDING_FAILED");
     EXPECT_STREQ(ContextualErrorCodeString(ContextualErrorCode::kStartupNoLlm),
-                 "CX_ERR_F35_STARTUP_NO_LLM");
+                 "CX_ERR_CONTEXTUAL_STARTUP_NO_LLM");
 }
 
 TEST(F35ContextualErrorTest, AllCodesUniqueAndPrefixed) {
     std::set<std::string> seen;
     for (auto code : kAll) {
         std::string s = ContextualErrorCodeString(code);
-        EXPECT_EQ(s.rfind("CX_ERR_F35_", 0), 0u) << s;
+        EXPECT_EQ(s.rfind("CX_ERR_CONTEXTUAL_", 0), 0u) << s;
         EXPECT_TRUE(seen.insert(s).second) << "duplicate " << s;
     }
     EXPECT_EQ(seen.size(), 5u);
@@ -115,7 +115,7 @@ TEST(F35ContextualErrorTest, HasRequiredStructuredDataNonObjectIsFalse) {
 TEST(F35ContextualErrorTest, MakeContextualErrorFillsFromRegistry) {
     auto err = MakeContextualError(ContextualErrorCode::kLlmFailed,
                                    {{"chunk_id", "c1"}, {"retry_count", 3}});
-    EXPECT_EQ(err.code, "CX_ERR_F35_LLM_FAILED");
+    EXPECT_EQ(err.code, "CX_ERR_CONTEXTUAL_LLM_FAILED");
     EXPECT_TRUE(err.retryable);
     EXPECT_EQ(err.category, ErrorCategory::kTransient);
     ASSERT_TRUE(err.retry_after_ms.has_value());
@@ -126,7 +126,7 @@ TEST(F35ContextualErrorTest, MakeContextualErrorSerializesToAgentFriendlyBody) {
     auto err = MakeContextualError(ContextualErrorCode::kPromptInjection,
                                    {{"chunk_id", "c1"}, {"output_length", 999}});
     auto j = agent_friendly::ToJson(err);
-    EXPECT_EQ(j["code"], "CX_ERR_F35_PROMPT_INJECTION");
+    EXPECT_EQ(j["code"], "CX_ERR_CONTEXTUAL_PROMPT_INJECTION");
     EXPECT_EQ(j["retryable"], false);
     EXPECT_EQ(j["category"], "permanent");
     EXPECT_TRUE(j["retry_after_ms"].is_null());
@@ -135,14 +135,14 @@ TEST(F35ContextualErrorTest, MakeContextualErrorSerializesToAgentFriendlyBody) {
 
 TEST(F35ContextualErrorTest, MakeContextualErrorDefaultMessageIsCode) {
     auto err = MakeContextualError(ContextualErrorCode::kEmbeddingFailed);
-    EXPECT_EQ(err.message, "CX_ERR_F35_EMBEDDING_FAILED");
+    EXPECT_EQ(err.message, "CX_ERR_CONTEXTUAL_EMBEDDING_FAILED");
 }
 
 TEST(F35ContextualErrorTest, StatusBridgeCarriesTokenAndCode) {
     Status s = ContextualStatus(ContextualErrorCode::kLlmFailed, "connect refused");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kUnavailable);
-    EXPECT_NE(s.message().find("CX_ERR_F35_LLM_FAILED"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_CONTEXTUAL_LLM_FAILED"), std::string::npos);
     EXPECT_NE(s.message().find("connect refused"), std::string::npos);
 }
 

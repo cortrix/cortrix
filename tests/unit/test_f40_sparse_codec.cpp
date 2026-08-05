@@ -101,7 +101,7 @@ TEST(F40SparseCodecTest, TruncatedHeaderRejected) {
     std::vector<uint8_t> one_byte{0x01};  // < 2 bytes for the num_terms header
     auto out = DeserializeSparseVec(one_byte);
     ASSERT_FALSE(out.ok());
-    EXPECT_NE(out.status().message().find("CX_ERR_F40_SPARSE_SERIALIZE_FAILED"),
+    EXPECT_NE(out.status().message().find("CX_ERR_SPARSE_SERIALIZE_FAILED"),
               std::string::npos);
 }
 

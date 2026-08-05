@@ -77,7 +77,7 @@ struct TraceSession {
 ///
 /// Per CODING_CONVENTIONS §3 / F-FREEZE-1, Query returns Result<T> (no Result<T,E>);
 /// a domain error is carried as a Status whose message is prefixed with the
-/// CX_ERR_F13_* token (see agent_trace_error.h F13Status), re-inflated to the full
+/// CX_ERR_TRACE_* token (see agent_trace_error.h F13Status), re-inflated to the full
 /// Agent-friendly body at the API boundary.
 class IAgentTraceWriter {
 public:
@@ -92,7 +92,7 @@ public:
                        const observability::TraceContext* ctx = nullptr) = 0;
 
     /// Query one session's traces with filter + pagination + permission scope
-    /// (§8.1). Returns an error Status (CX_ERR_F13_* token) on invalid filter /
+    /// (§8.1). Returns an error Status (CX_ERR_TRACE_* token) on invalid filter /
     /// bad range / out-of-range pagination. The caller (handler) is responsible
     /// for the cross-user permission check (admin vs UNAUTHORIZED) before calling.
     virtual Result<TraceSession> Query(

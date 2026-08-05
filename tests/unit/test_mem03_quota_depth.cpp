@@ -7,7 +7,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/memory/mem03_error.h"
 
-// DEPTH — the CX_ERR_MEM03_QUOTA (429) contract surface. The DEPTH brief asked
+// DEPTH — the CX_ERR_MEMORY_QUOTA (429) contract surface. The DEPTH brief asked
 // for the "Create over-quota + memory_routes 429" path; an investigation of the
 // frozen tree shows MemoryTransparency::Create and memory_routes.cpp DO NOT
 // enforce any per-user/per-NS quota (no quota seam exists on the service or the
@@ -68,7 +68,7 @@ TEST(Mem03QuotaDepthTest, QuotaBodyCarriesRetryHintAndCategory) {
         {{"user_id", "u1"}, {"namespace", "ns1"}, {"quota_used", 100},
          {"quota_limit", 100}, {"window_seconds", 60}},
         "per-user memory quota exceeded");
-    EXPECT_EQ(err.code, "CX_ERR_MEM03_QUOTA");
+    EXPECT_EQ(err.code, "CX_ERR_MEMORY_QUOTA");
     EXPECT_EQ(err.message, "per-user memory quota exceeded");
     EXPECT_TRUE(err.retryable);
     EXPECT_EQ(err.category, ErrorCategory::kQuota);
@@ -76,7 +76,7 @@ TEST(Mem03QuotaDepthTest, QuotaBodyCarriesRetryHintAndCategory) {
     EXPECT_EQ(*err.retry_after_ms, 60000);
 
     nlohmann::json j = agent_friendly::ToJson(err);
-    EXPECT_EQ(j["code"], "CX_ERR_MEM03_QUOTA");
+    EXPECT_EQ(j["code"], "CX_ERR_MEMORY_QUOTA");
     EXPECT_EQ(j["category"], "quota");
     EXPECT_EQ(j["retryable"], true);
     EXPECT_EQ(j["retry_after_ms"], 60000);
@@ -99,13 +99,13 @@ TEST(Mem03QuotaDepthTest, QuotaStatusBridgePreservesTokenUnderUnavailable) {
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kUnavailable);
     EXPECT_EQ(Mem03ErrorToStatusCode(Mem03ErrorCode::kQuota), StatusCode::kUnavailable);
-    EXPECT_NE(s.message().find("CX_ERR_MEM03_QUOTA"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_MEMORY_QUOTA"), std::string::npos);
     EXPECT_NE(s.message().find("per-ns rate limit"), std::string::npos);
 }
 
 TEST(Mem03QuotaDepthTest, QuotaStatusBridgeDefaultsMessageToTokenOnly) {
     Status s = Mem03Status(Mem03ErrorCode::kQuota);
-    EXPECT_EQ(s.message(), "CX_ERR_MEM03_QUOTA");
+    EXPECT_EQ(s.message(), "CX_ERR_MEMORY_QUOTA");
 }
 
 }  // namespace

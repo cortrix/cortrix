@@ -50,7 +50,7 @@ std::string McpSessionHandler::TruncateResult(const std::string& summary) {
 std::string McpSessionHandler::FormatError(const std::optional<std::string>& error_code,
                                            const std::string& error_message) {
     // §3: on failure keep only the error_code + first 256 chars of the message.
-    std::string code = error_code.value_or("CX_ERR_F13_INTERNAL");
+    std::string code = error_code.value_or("CX_ERR_TRACE_INTERNAL");
     std::string msg = error_message.size() > kErrorMsgMaxBytes
                           ? error_message.substr(0, kErrorMsgMaxBytes)
                           : error_message;

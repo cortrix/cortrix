@@ -65,7 +65,7 @@ int ExecNoErr(sqlite3* db, const char* sql) {
 
 TEST(F34SchemaProviderTest, IdentityAndVersion) {
     F34SchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F34");
+    EXPECT_EQ(p.FeatureName(), "parent_child");
     EXPECT_EQ(p.CurrentVersion(), 1);
 }
 
@@ -325,7 +325,7 @@ TEST(F34SchemaProviderTest, RegistersAndMigratesViaMigratorUnit) {
     m.Register(&p);
     Status st = m.MigrateUnit(db, "unit-1");
     ASSERT_TRUE(st.ok()) << st.message();
-    EXPECT_EQ(m.CurrentVersion(db, "F34"), 1);
+    EXPECT_EQ(m.CurrentVersion(db, "parent_child"), 1);
     EXPECT_TRUE(HasColumn(db, "blocks", "child_id"));
     EXPECT_TRUE(HasTable(db, "parents"));
     sqlite3_close(db);

@@ -152,7 +152,7 @@ Result<InteractionSourcesView> InteractionsHandler::GetSources(
 
 Result<InteractionListView> InteractionsHandler::ListInteractions(
     const InteractionListFilter& filter, const RequesterContext& ctx) {
-    // ---- validate (§8.3 -> CX_ERR_F13_INVALID_FILTER) ----
+    // ---- validate (§8.3 -> CX_ERR_TRACE_INVALID_FILTER) ----
     if (filter.limit < 1 || filter.limit > 200) {
         return F13Status(F13ErrorCode::kInvalidFilter,
                          "limit must be in [1,200], got " + std::to_string(filter.limit));

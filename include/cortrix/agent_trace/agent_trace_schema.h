@@ -36,7 +36,7 @@ extern const char* const kAgentTraceSchemaSql;
 /// (F-FREEZE-1: no Result<void>).
 class AgentTraceSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
-    std::string FeatureName() const override { return "F13"; }
+    std::string FeatureName() const override { return "agent_trace"; }
     int CurrentVersion() const override { return kAgentTraceSchemaVersion; }
 
     /// Phase 1 (from_ver 0 → 1): create agent_trace + 3 indices. An

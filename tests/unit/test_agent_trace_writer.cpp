@@ -16,7 +16,7 @@
 
 // S3/S4/S10 coverage via the CE writer: Write() persists every call (incl.
 // failures + session_end), Query() returns the filtered + paginated session with
-// whole-session meta aggregates and CX_ERR_F13_INVALID_FILTER on bad input,
+// whole-session meta aggregates and CX_ERR_TRACE_INVALID_FILTER on bad input,
 // CheckAndMarkTimeoutSessions() writes session_timeout backstops, Cleanup()
 // deletes past the retention window.
 namespace cortrix::agent_trace {
@@ -207,7 +207,7 @@ TEST_F(AgentTraceWriterTest, QueryInvalidFilterRejected) {
     bad_limit.limit = 0;
     auto r1 = writer_->Query("s", bad_limit);
     ASSERT_FALSE(r1.ok());
-    EXPECT_NE(r1.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(r1.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
 
     TraceFilter big_limit;
     big_limit.limit = 999;
@@ -231,7 +231,7 @@ TEST_F(AgentTraceWriterTest, QueryOffsetPastEndIsInvalid) {
     f.offset = 10;  // past the single row
     auto r = writer_->Query("s", f);
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
 }
 
 TEST_F(AgentTraceWriterTest, QueryEmptySessionIsValidEmptyPage) {
@@ -390,7 +390,7 @@ TEST_F(AgentTraceWriterTest, CheckAndMarkTimeoutIgnoresHttpSessions) {
 
 // ---- storage-failure arms via a dropped table / abort trigger ------------------
 //
-// Query's count + page `prepare_v2 != SQLITE_OK` arms (CX_ERR_F13_INTERNAL) are
+// Query's count + page `prepare_v2 != SQLITE_OK` arms (CX_ERR_TRACE_INTERNAL) are
 // reached by dropping agent_trace from the shared handle after a clean validate.
 TEST_F(AgentTraceWriterTest, QueryCountPrepareFailureIsInternal) {
     writer_->Write(MakeEntry("s", "a", "mcp", 1000));
@@ -398,7 +398,7 @@ TEST_F(AgentTraceWriterTest, QueryCountPrepareFailureIsInternal) {
               SQLITE_OK);
     auto r = writer_->Query("s", TraceFilter{});
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F13_INTERNAL"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_TRACE_INTERNAL"), std::string::npos);
 }
 
 // Write's InsertLocked step-failure arm: a BEFORE INSERT abort trigger makes the

@@ -50,7 +50,7 @@ CREATE INDEX IF NOT EXISTS idx_child_lookup
 class F40SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     /// Registration key (aligns with the other SchemaProvider names).
-    std::string FeatureName() const override { return "F40"; }
+    std::string FeatureName() const override { return "sparse_index"; }
 
     /// V1 = the sparse_inverted_index table + blocks.sparse_vec column. Phase 2
     /// (IVF-sparse / sharding, §14) would bump this.

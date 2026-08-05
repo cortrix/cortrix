@@ -5,7 +5,7 @@
 
 #include "cortrix/agent_trace/agent_trace_error.h"
 
-// S7 coverage: the agent trace error model (template A) — all 7 CX_ERR_F13_* identities,
+// S7 coverage: the agent trace error model (template A) — all 7 CX_ERR_TRACE_* identities,
 // their §9.2 attributes (category/retryable/retry_after_ms/structured_data keys),
 // the AgentFriendlyError builder, the JSON body, and the Status bridge.
 namespace cortrix::agent_trace {
@@ -33,7 +33,7 @@ TEST(F13ErrorTest, AllCodesHaveUniqueCxStrings) {
     for (F13ErrorCode c : kAll) {
         std::string s = F13ErrorCodeString(c);
         EXPECT_FALSE(s.empty());
-        EXPECT_EQ(s.rfind("CX_ERR_F13_", 0), 0u) << s << " must start with CX_ERR_F13_";
+        EXPECT_EQ(s.rfind("CX_ERR_TRACE_", 0), 0u) << s << " must start with CX_ERR_TRACE_";
         EXPECT_TRUE(seen.insert(s).second) << "duplicate code string: " << s;
     }
     EXPECT_EQ(seen.size(), 7u);
@@ -49,19 +49,19 @@ TEST(F13ErrorTest, RegistryMatchesSpecTable) {
         // §9.2 retry_after_ms column is "-" for every agent trace code.
         EXPECT_FALSE(i.retry_after_ms.has_value()) << code;
     };
-    chk(F13ErrorCode::kSessionNotFound, "CX_ERR_F13_SESSION_NOT_FOUND",
+    chk(F13ErrorCode::kSessionNotFound, "CX_ERR_TRACE_SESSION_NOT_FOUND",
         ErrorCategory::kPermanent, false);
-    chk(F13ErrorCode::kInvalidFilter, "CX_ERR_F13_INVALID_FILTER",
+    chk(F13ErrorCode::kInvalidFilter, "CX_ERR_TRACE_INVALID_FILTER",
         ErrorCategory::kPermanent, false);
-    chk(F13ErrorCode::kInteractionNotFound, "CX_ERR_F13_INTERACTION_NOT_FOUND",
+    chk(F13ErrorCode::kInteractionNotFound, "CX_ERR_TRACE_INTERACTION_NOT_FOUND",
         ErrorCategory::kPermanent, false);
-    chk(F13ErrorCode::kUnauthorized, "CX_ERR_F13_UNAUTHORIZED",
+    chk(F13ErrorCode::kUnauthorized, "CX_ERR_TRACE_UNAUTHORIZED",
         ErrorCategory::kAuth, false);
-    chk(F13ErrorCode::kMcpSessionInvalid, "CX_ERR_F13_MCP_SESSION_INVALID",
+    chk(F13ErrorCode::kMcpSessionInvalid, "CX_ERR_TRACE_MCP_SESSION_INVALID",
         ErrorCategory::kPermanent, false);
-    chk(F13ErrorCode::kSessionExpired, "CX_ERR_F13_SESSION_EXPIRED",
+    chk(F13ErrorCode::kSessionExpired, "CX_ERR_TRACE_SESSION_EXPIRED",
         ErrorCategory::kPermanent, false);
-    chk(F13ErrorCode::kInternal, "CX_ERR_F13_INTERNAL",
+    chk(F13ErrorCode::kInternal, "CX_ERR_TRACE_INTERNAL",
         ErrorCategory::kTransient, true);
 }
 
@@ -100,7 +100,7 @@ TEST(F13ErrorTest, HasRequiredStructuredDataValidatesKeys) {
 TEST(F13ErrorTest, MakeF13ErrorFillsFromRegistry) {
     nlohmann::json sd = {{"session_id", "sess-1"}, {"retention_days", 90}};
     auto err = MakeF13Error(F13ErrorCode::kSessionExpired, sd, "session is past retention");
-    EXPECT_EQ(err.code, "CX_ERR_F13_SESSION_EXPIRED");
+    EXPECT_EQ(err.code, "CX_ERR_TRACE_SESSION_EXPIRED");
     EXPECT_EQ(err.message, "session is past retention");
     EXPECT_FALSE(err.retryable);
     EXPECT_EQ(err.category, ErrorCategory::kPermanent);
@@ -111,14 +111,14 @@ TEST(F13ErrorTest, MakeF13ErrorFillsFromRegistry) {
 
 TEST(F13ErrorTest, MakeF13ErrorDefaultsMessageToCode) {
     auto err = MakeF13Error(F13ErrorCode::kInternal);
-    EXPECT_EQ(err.message, "CX_ERR_F13_INTERNAL");
+    EXPECT_EQ(err.message, "CX_ERR_TRACE_INTERNAL");
     EXPECT_TRUE(err.retryable);
 }
 
 TEST(F13ErrorTest, ToJsonSerializesAgentFriendlyBody) {
     auto err = MakeF13Error(F13ErrorCode::kUnauthorized, {{"required_role", "admin"}});
     nlohmann::json j = agent_friendly::ToJson(err);
-    EXPECT_EQ(j["code"], "CX_ERR_F13_UNAUTHORIZED");
+    EXPECT_EQ(j["code"], "CX_ERR_TRACE_UNAUTHORIZED");
     EXPECT_EQ(j["retryable"], false);
     EXPECT_EQ(j["category"], "auth");
     EXPECT_TRUE(j["retry_after_ms"].is_null());
@@ -129,7 +129,7 @@ TEST(F13ErrorTest, StatusBridgeCarriesCodeToken) {
     Status s = F13Status(F13ErrorCode::kSessionNotFound, "no such session");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kNotFound);
-    EXPECT_NE(s.message().find("CX_ERR_F13_SESSION_NOT_FOUND"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_TRACE_SESSION_NOT_FOUND"), std::string::npos);
     EXPECT_NE(s.message().find("no such session"), std::string::npos);
 }
 

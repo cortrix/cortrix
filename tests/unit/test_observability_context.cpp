@@ -116,12 +116,12 @@ TEST(ObservabilityValidatorTest, ValidateReturnsValueOrInvalidFilterToken) {
     ASSERT_TRUE(ok.ok());
     EXPECT_EQ(ok.value(), "sess-001");
 
-    // All three validators reject and carry the CX_ERR_F13_INVALID_FILTER token
+    // All three validators reject and carry the CX_ERR_TRACE_INVALID_FILTER token
     // + the field name in the Status message.
     auto bad_s = ObservabilityValidator::ValidateSessionId("bad value");
     ASSERT_FALSE(bad_s.ok());
     EXPECT_EQ(bad_s.status().code(), StatusCode::kInvalidArgument);
-    EXPECT_NE(bad_s.status().message().find("CX_ERR_F13_INVALID_FILTER"), std::string::npos);
+    EXPECT_NE(bad_s.status().message().find("CX_ERR_TRACE_INVALID_FILTER"), std::string::npos);
     EXPECT_NE(bad_s.status().message().find("X-Session-Id"), std::string::npos);
 
     auto bad_t = ObservabilityValidator::ValidateTraceId("");

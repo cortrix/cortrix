@@ -14,10 +14,10 @@ Status F38SchemaProvider::Migrate(sqlite3* /*db*/, int from_ver, int to_ver) {
     }
     // Phase 2 (independent P-HNSW / Block versioning, §14) is the only future
     // step; until it is defined an unexpected version jump is a mismatch. The
-    // CX_ERR_F38_SCHEMA_VERSION_MISMATCH identity (registered in the HyPE error
+    // CX_ERR_HYPE_SCHEMA_VERSION_MISMATCH identity (registered in the HyPE error
     // registry) survives via the token prefix on the Status message.
     return Status::InvalidArgument(
-        "CX_ERR_F38_SCHEMA_VERSION_MISMATCH: F38 unsupported migration " +
+        "CX_ERR_HYPE_SCHEMA_VERSION_MISMATCH: F38 unsupported migration " +
         std::to_string(from_ver) + " -> " + std::to_string(to_ver));
 }
 

@@ -5,7 +5,7 @@
 
 #include "cortrix/memory/mem03_error.h"
 
-// S5 coverage: the memory transparency error model (template A) — all 5 CX_ERR_MEM03_* identities,
+// S5 coverage: the memory transparency error model (template A) — all 5 CX_ERR_MEMORY_* identities,
 // their §4.3.4.bis attributes (http/category/retryable/retry_after_ms/structured_data
 // keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::memory::transparency {
@@ -32,7 +32,7 @@ TEST(Mem03ErrorTest, AllCodesHaveUniqueCxStrings) {
     for (Mem03ErrorCode c : kAll) {
         std::string s = Mem03ErrorCodeString(c);
         EXPECT_FALSE(s.empty());
-        EXPECT_EQ(s.rfind("CX_ERR_MEM03_", 0), 0u) << s << " must start with CX_ERR_MEM03_";
+        EXPECT_EQ(s.rfind("CX_ERR_MEMORY_", 0), 0u) << s << " must start with CX_ERR_MEMORY_";
         EXPECT_TRUE(seen.insert(s).second) << "duplicate code string: " << s;
     }
     EXPECT_EQ(seen.size(), 5u);
@@ -49,15 +49,15 @@ TEST(Mem03ErrorTest, RegistryMatchesSpecTable) {
         EXPECT_EQ(i.retryable, retry) << code;
         EXPECT_EQ(i.retry_after_ms, retry_ms) << code;
     };
-    chk(Mem03ErrorCode::kMemoryNotFound, "CX_ERR_MEM03_MEMORY_NOT_FOUND", 404,
+    chk(Mem03ErrorCode::kMemoryNotFound, "CX_ERR_MEMORY_NOT_FOUND", 404,
         ErrorCategory::kPermanent, false, std::nullopt);
-    chk(Mem03ErrorCode::kUserMismatch, "CX_ERR_MEM03_USER_MISMATCH", 403,
+    chk(Mem03ErrorCode::kUserMismatch, "CX_ERR_MEMORY_USER_MISMATCH", 403,
         ErrorCategory::kAuth, false, std::nullopt);
-    chk(Mem03ErrorCode::kAlreadyInvalidated, "CX_ERR_MEM03_ALREADY_INVALIDATED", 410,
+    chk(Mem03ErrorCode::kAlreadyInvalidated, "CX_ERR_MEMORY_ALREADY_INVALIDATED", 410,
         ErrorCategory::kPermanent, false, std::nullopt);
-    chk(Mem03ErrorCode::kInvalidateFailed, "CX_ERR_MEM03_INVALIDATE_FAILED", 500,
+    chk(Mem03ErrorCode::kInvalidateFailed, "CX_ERR_MEMORY_INVALIDATE_FAILED", 500,
         ErrorCategory::kTransient, true, 5000);
-    chk(Mem03ErrorCode::kQuota, "CX_ERR_MEM03_QUOTA", 429,
+    chk(Mem03ErrorCode::kQuota, "CX_ERR_MEMORY_QUOTA", 429,
         ErrorCategory::kQuota, true, 60000);
 }
 
@@ -113,7 +113,7 @@ TEST(Mem03ErrorTest, MakeMem03ErrorFillsFromRegistry) {
     nlohmann::json sd = {{"memory_id", "mem_abc123"}, {"failure_stage", "metadata_update"}};
     auto err = MakeMem03Error(Mem03ErrorCode::kInvalidateFailed, sd,
                               "metadata_json update failed");
-    EXPECT_EQ(err.code, "CX_ERR_MEM03_INVALIDATE_FAILED");
+    EXPECT_EQ(err.code, "CX_ERR_MEMORY_INVALIDATE_FAILED");
     EXPECT_EQ(err.message, "metadata_json update failed");
     EXPECT_TRUE(err.retryable);
     EXPECT_EQ(err.category, ErrorCategory::kTransient);
@@ -125,7 +125,7 @@ TEST(Mem03ErrorTest, MakeMem03ErrorFillsFromRegistry) {
 
 TEST(Mem03ErrorTest, MakeMem03ErrorDefaultsMessageToCode) {
     auto err = MakeMem03Error(Mem03ErrorCode::kMemoryNotFound);
-    EXPECT_EQ(err.message, "CX_ERR_MEM03_MEMORY_NOT_FOUND");
+    EXPECT_EQ(err.message, "CX_ERR_MEMORY_NOT_FOUND");
     EXPECT_FALSE(err.retryable);
     EXPECT_FALSE(err.retry_after_ms.has_value());
 }
@@ -136,7 +136,7 @@ TEST(Mem03ErrorTest, QuotaErrorIsRetryableQuotaCategory) {
                                {"quota_used", 100}, {"quota_limit", 100},
                                {"window_seconds", 60}});
     nlohmann::json j = agent_friendly::ToJson(err);
-    EXPECT_EQ(j["code"], "CX_ERR_MEM03_QUOTA");
+    EXPECT_EQ(j["code"], "CX_ERR_MEMORY_QUOTA");
     EXPECT_EQ(j["retryable"], true);
     EXPECT_EQ(j["category"], "quota");
     EXPECT_EQ(j["retry_after_ms"], 60000);
@@ -146,7 +146,7 @@ TEST(Mem03ErrorTest, QuotaErrorIsRetryableQuotaCategory) {
 TEST(Mem03ErrorTest, ToJsonSerializesNotFoundBody) {
     auto err = MakeMem03Error(Mem03ErrorCode::kMemoryNotFound, {{"memory_id", "mem_002"}});
     nlohmann::json j = agent_friendly::ToJson(err);
-    EXPECT_EQ(j["code"], "CX_ERR_MEM03_MEMORY_NOT_FOUND");
+    EXPECT_EQ(j["code"], "CX_ERR_MEMORY_NOT_FOUND");
     EXPECT_EQ(j["retryable"], false);
     EXPECT_EQ(j["category"], "permanent");
     EXPECT_TRUE(j["retry_after_ms"].is_null());
@@ -157,7 +157,7 @@ TEST(Mem03ErrorTest, StatusBridgeCarriesCodeToken) {
     Status s = Mem03Status(Mem03ErrorCode::kUserMismatch, "caller != owner");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kPermissionDenied);
-    EXPECT_NE(s.message().find("CX_ERR_MEM03_USER_MISMATCH"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_MEMORY_USER_MISMATCH"), std::string::npos);
     EXPECT_NE(s.message().find("caller != owner"), std::string::npos);
 }
 
@@ -180,7 +180,7 @@ TEST(Mem03ErrorTest, StatusCodeMappingIsTotalAndSane) {
 
 TEST(Mem03ErrorTest, StatusBridgeDefaultsMessageToCodeOnly) {
     Status s = Mem03Status(Mem03ErrorCode::kAlreadyInvalidated);
-    EXPECT_EQ(s.message(), "CX_ERR_MEM03_ALREADY_INVALIDATED");
+    EXPECT_EQ(s.message(), "CX_ERR_MEMORY_ALREADY_INVALIDATED");
 }
 
 }  // namespace

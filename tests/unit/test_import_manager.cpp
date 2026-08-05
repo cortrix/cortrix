@@ -180,7 +180,7 @@ TEST(ImportManagerTest, NonAdminRejectedSynchronously) {
     non_admin.permissions = kPermRead | kPermWrite;  // no admin
     auto r = f.mgr->StartImport(f.Req(), non_admin);
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F16A_AUTH_DENIED"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_IMPORT_AUTH_DENIED"), std::string::npos);
 }
 
 TEST(ImportManagerTest, CrossTenantRefThrows) {
@@ -196,7 +196,7 @@ TEST(ImportManagerTest, InvalidQueryRejectedSynchronously) {
     req.query.sql = "DROP TABLE users";  // write verb
     auto r = f.mgr->StartImport(req, AdminCtx());
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F16A_INVALID_SQL"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_IMPORT_INVALID_SQL"), std::string::npos);
 }
 
 TEST(ImportManagerTest, D3FullOverwriteClearsPriorTableBlocks) {
@@ -227,7 +227,7 @@ TEST(ImportManagerTest, RowsLimitExceededRejected) {
                                                f.cleaner, f.task_store, f.oplog, cfg);
     auto r = mgr->StartImport(f.Req(), AdminCtx());
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F16A_ROWS_LIMIT_EXCEEDED"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_IMPORT_ROWS_LIMIT_EXCEEDED"), std::string::npos);
 }
 
 // When EstimateRowCount is unavailable (standalone real executor returns a transient),
@@ -317,7 +317,7 @@ TEST(ImportHandlerTest, StartImportNonAdminGives403) {
     int http = 0;
     auto out = handler.HandleStartImport(body, non_admin, http);
     EXPECT_EQ(http, 403);
-    EXPECT_EQ(out["error"]["code"], "CX_ERR_F16A_AUTH_DENIED");
+    EXPECT_EQ(out["error"]["code"], "CX_ERR_IMPORT_AUTH_DENIED");
 }
 
 TEST(ImportHandlerTest, GetProgressUnknownGives404) {
@@ -326,7 +326,7 @@ TEST(ImportHandlerTest, GetProgressUnknownGives404) {
     int http = 0;
     auto out = handler.HandleGetProgress("nope", http);
     EXPECT_EQ(http, 404);
-    EXPECT_EQ(out["error"]["code"], "CX_ERR_F16A_TASK_NOT_FOUND");
+    EXPECT_EQ(out["error"]["code"], "CX_ERR_IMPORT_TASK_NOT_FOUND");
 }
 
 TEST(ImportHandlerTest, RegisterConnectionReturnsRefNotDsn) {
@@ -351,11 +351,11 @@ TEST(ImportHandlerTest, RegisterConnectionNonAdminAndMissingFields) {
     non_admin.permissions = kPermRead;
     auto a = handler.HandleRegisterConnection({{"name", "x"}, {"dsn", "d"}}, non_admin, http);
     EXPECT_EQ(http, 403);
-    EXPECT_EQ(a["error"]["code"], "CX_ERR_F16A_AUTH_DENIED");
+    EXPECT_EQ(a["error"]["code"], "CX_ERR_IMPORT_AUTH_DENIED");
     // missing dsn → 400.
     auto b = handler.HandleRegisterConnection({{"name", "x"}}, AdminCtx(), http);
     EXPECT_EQ(http, 400);
-    EXPECT_EQ(b["error"]["code"], "CX_ERR_F16A_INVALID_SQL");
+    EXPECT_EQ(b["error"]["code"], "CX_ERR_IMPORT_INVALID_SQL");
 }
 
 TEST(ImportHandlerTest, ListConnectionsAdminAndNonAdmin) {
@@ -374,7 +374,7 @@ TEST(ImportHandlerTest, ListConnectionsAdminAndNonAdmin) {
     non_admin.permissions = kPermRead;
     auto denied = handler.HandleListConnections(non_admin, http);
     EXPECT_EQ(http, 403);
-    EXPECT_EQ(denied["error"]["code"], "CX_ERR_F16A_AUTH_DENIED");
+    EXPECT_EQ(denied["error"]["code"], "CX_ERR_IMPORT_AUTH_DENIED");
 }
 
 TEST(ImportHandlerTest, RevokeConnectionSuccessAndCrossTenant) {
@@ -394,7 +394,7 @@ TEST(ImportHandlerTest, RevokeCrossTenantGives403) {
     int http = 0;
     auto denied = handler.HandleRevokeConnection(f.ref, {{"reason", "x"}}, AdminCtx("t2"), http);
     EXPECT_EQ(http, 403);
-    EXPECT_EQ(denied["error"]["code"], "CX_ERR_F16A_CROSS_TENANT_REF");
+    EXPECT_EQ(denied["error"]["code"], "CX_ERR_IMPORT_CROSS_TENANT_REF");
 }
 
 TEST(ImportHandlerTest, CancelExistingTaskReturns200) {
@@ -418,7 +418,7 @@ TEST(ImportHandlerTest, CancelUnknownTaskGives404) {
     int http = 0;
     auto out = handler.HandleCancel("nope", http);
     EXPECT_EQ(http, 404);
-    EXPECT_EQ(out["error"]["code"], "CX_ERR_F16A_TASK_NOT_FOUND");
+    EXPECT_EQ(out["error"]["code"], "CX_ERR_IMPORT_TASK_NOT_FOUND");
 }
 
 TEST(ImportHandlerTest, ParseRejectsNonObjectAndMissingNamespace) {
@@ -463,7 +463,7 @@ TEST(ImportHandlerTest, ProgressBodyForFailedImportHasErrorEnvelope) {
     EXPECT_EQ(h, 200);
     EXPECT_EQ(p["status"], "failed");
     ASSERT_TRUE(p["error"].is_object());
-    EXPECT_EQ(p["error"]["code"], "CX_ERR_F16A_CONNECTION_FAILED");
+    EXPECT_EQ(p["error"]["code"], "CX_ERR_IMPORT_CONNECTION_FAILED");
 }
 
 }  // namespace

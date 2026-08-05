@@ -245,9 +245,9 @@ TEST_F(McpSessionHandlerTest, TruncateResultAndFormatError) {
     std::string fe = McpSessionHandler::FormatError(std::string("CX_ERR_X"), longmsg);
     EXPECT_EQ(fe.substr(0, 9), "CX_ERR_X:");
     EXPECT_LT(fe.size(), 9 + 500);  // message truncated to 256
-    // null error_code falls back to CX_ERR_F13_INTERNAL.
+    // null error_code falls back to CX_ERR_TRACE_INTERNAL.
     EXPECT_EQ(McpSessionHandler::FormatError(std::nullopt, "boom"),
-              "CX_ERR_F13_INTERNAL: boom");
+              "CX_ERR_TRACE_INTERNAL: boom");
 }
 
 }  // namespace

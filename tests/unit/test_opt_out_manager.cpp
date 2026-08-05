@@ -228,7 +228,7 @@ TEST_F(OptOutManagerTest, OptOutInvalidSessionId) {
     auto mgr = MakeManager(store_, logger_);
     auto r = mgr.OptOut("bad id");
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM04_INVALID_SESSION_ID"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMOPTOUT_INVALID_SESSION_ID"), std::string::npos);
     EXPECT_TRUE(logger_->entries.empty());  // rejected before any side effect
 }
 
@@ -237,7 +237,7 @@ TEST_F(OptOutManagerTest, OptOutSessionNotFound) {
     auto r = mgr.OptOut(kValidSession);  // not registered
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kNotFound);
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM04_SESSION_NOT_FOUND"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMOPTOUT_SESSION_NOT_FOUND"), std::string::npos);
 }
 
 TEST_F(OptOutManagerTest, OptOutAlreadyOptedOut) {
@@ -246,7 +246,7 @@ TEST_F(OptOutManagerTest, OptOutAlreadyOptedOut) {
     ASSERT_TRUE(mgr.OptOut(kValidSession).ok());
     auto r2 = mgr.OptOut(kValidSession);
     ASSERT_FALSE(r2.ok());
-    EXPECT_NE(r2.status().message().find("CX_ERR_MEM04_ALREADY_OPTED_OUT"), std::string::npos);
+    EXPECT_NE(r2.status().message().find("CX_ERR_MEMOPTOUT_ALREADY_OPTED_OUT"), std::string::npos);
     // only the first opt-out logged + metered
     EXPECT_EQ(logger_->entries.size(), 1u);
     EXPECT_EQ(Mem04Metrics::Instance().OptOutCount(Mem04Metrics::TriggeredBy::kUser), 1u);
@@ -258,7 +258,7 @@ TEST_F(OptOutManagerTest, OptOutDisabledReturns503Semantics) {
     auto r = mgr.OptOut(kValidSession);
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kUnavailable);
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM04_OPT_OUT_DISABLED"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMOPTOUT_DISABLED"), std::string::npos);
     EXPECT_FALSE(store_->IsOptedOut(kValidSession));
 }
 
@@ -319,21 +319,21 @@ TEST_F(OptOutManagerTest, RevokeRequiresReason) {
     ASSERT_TRUE(mgr.OptOut(kValidSession).ok());
     auto r = mgr.OptOutRevoke(kValidSession, "");  // missing reason
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM04_INVALID_SESSION_ID"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMOPTOUT_INVALID_SESSION_ID"), std::string::npos);
 }
 
 TEST_F(OptOutManagerTest, RevokeInvalidSessionId) {
     auto mgr = MakeManager(store_, logger_);
     auto r = mgr.OptOutRevoke("bad id", "reason");
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM04_INVALID_SESSION_ID"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMOPTOUT_INVALID_SESSION_ID"), std::string::npos);
 }
 
 TEST_F(OptOutManagerTest, RevokeSessionNotFound) {
     auto mgr = MakeManager(store_, logger_);
     auto r = mgr.OptOutRevoke(kValidSession, "reason");
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM04_SESSION_NOT_FOUND"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMOPTOUT_SESSION_NOT_FOUND"), std::string::npos);
 }
 
 TEST_F(OptOutManagerTest, RevokeNotOptedOut) {
@@ -341,7 +341,7 @@ TEST_F(OptOutManagerTest, RevokeNotOptedOut) {
     auto mgr = MakeManager(store_, logger_);
     auto r = mgr.OptOutRevoke(kValidSession, "reason");
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM04_NOT_OPTED_OUT"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMOPTOUT_NOT_OPTED_OUT"), std::string::npos);
 }
 
 TEST_F(OptOutManagerTest, RevokeDisabledReturns503Semantics) {
@@ -349,7 +349,7 @@ TEST_F(OptOutManagerTest, RevokeDisabledReturns503Semantics) {
     auto mgr = MakeManager(store_, logger_, /*enabled=*/false);
     auto r = mgr.OptOutRevoke(kValidSession, "reason");
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM04_OPT_OUT_DISABLED"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMOPTOUT_DISABLED"), std::string::npos);
 }
 
 // Revoke passes validation + state checks (exists + opted_out) but ClearOptOut

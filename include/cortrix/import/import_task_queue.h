@@ -77,7 +77,7 @@ private:
 /// The unit of work a submitted task runs. The ImportManager supplies
 /// this PER Submit (so each task carries its own captured auth / trace context):
 /// fetch → textualize → cleanup → feed-to-SPC, reporting progress + honoring
-/// handle.CancelRequested(). Returns Ok on success; an error Status (a CX_ERR_F16A_*
+/// handle.CancelRequested(). Returns Ok on success; an error Status (a CX_ERR_IMPORT_*
 /// Status, e.g. from F16aStatus) drives the task to FAILED with that code/message.
 using ImportTaskWork = std::function<Status(ImportTaskHandle&)>;
 

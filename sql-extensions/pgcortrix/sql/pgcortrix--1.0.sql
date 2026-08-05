@@ -216,7 +216,7 @@ $$;
 -- with agent trace HTTP API (function). Three-way parity with MCP
 -- cortrix_list_interactions + HTTP GET /memory/interactions.
 --   filter JSONB whitelist (§2.1.5): session_id / namespace_id / from_ts / to_ts
---   / sort_order. Anything else → CX_ERR_F14_INVALID_FILTER.
+--   / sort_order. Anything else → CX_ERR_PGCORTRIX_INVALID_FILTER.
 CREATE FUNCTION pgcortrix_list_interactions(
     namespace TEXT,
     user_id   TEXT,                  -- memory isolation D4: mandatory positional (no NULL/default)

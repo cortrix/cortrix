@@ -19,7 +19,7 @@ namespace cortrix::retrieval {
 // block_type=child rows). An empty `vec` (a "dead" chunk with no active sparse
 // terms) writes SQL NULL — never an all-zero BLOB — so the read path's
 // has_sparse_vec test and the dead-chunk sentinel agree. Serialization overflow
-// (term_id >= 65536) surfaces as CX_ERR_F40_SPARSE_SERIALIZE_FAILED.
+// (term_id >= 65536) surfaces as CX_ERR_SPARSE_SERIALIZE_FAILED.
 Status WriteSparseVec(sqlite3* db, uint64_t block_id, const SparseVector& vec);
 
 }  // namespace cortrix::retrieval

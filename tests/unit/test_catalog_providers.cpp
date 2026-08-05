@@ -75,8 +75,8 @@ bool TableExists(sqlite3* db, const std::string& table) {
 TEST(CatalogProvidersTest, MultiProviderStartupMigration) {
     std::vector<std::string> order;
     // Two downstream stand-ins, the first FK-referencing units (needs catalog first).
-    FakeFeatureProvider f09("F09", &order, /*fk_to_units=*/true);
-    FakeFeatureProvider f03("F03", &order);
+    FakeFeatureProvider f09("block_framework", &order, /*fk_to_units=*/true);
+    FakeFeatureProvider f03("enricher", &order);
 
     CatalogDb catalog;
     Status st = catalog.Open(":memory:", {&f09, &f03});
@@ -92,13 +92,13 @@ TEST(CatalogProvidersTest, MultiProviderStartupMigration) {
     // Registration/execution order: extras run in given order (catalog is not in the
     // log — it is the C++ F12SchemaProvider, not a FakeFeatureProvider).
     ASSERT_EQ(order.size(), 2u);
-    EXPECT_EQ(order[0], "F09");
-    EXPECT_EQ(order[1], "F03");
+    EXPECT_EQ(order[0], "block_framework");
+    EXPECT_EQ(order[1], "enricher");
 
     // schema_version records each migrated feature at v1.
-    EXPECT_EQ(SchemaMigrator().CurrentVersion(db, "F12"), kF12SchemaVersion);
-    EXPECT_EQ(SchemaMigrator().CurrentVersion(db, "F09"), 1);
-    EXPECT_EQ(SchemaMigrator().CurrentVersion(db, "F03"), 1);
+    EXPECT_EQ(SchemaMigrator().CurrentVersion(db, "catalog"), kF12SchemaVersion);
+    EXPECT_EQ(SchemaMigrator().CurrentVersion(db, "block_framework"), 1);
+    EXPECT_EQ(SchemaMigrator().CurrentVersion(db, "enricher"), 1);
 }
 
 // S1.2: catalog must migrate before a downstream provider whose table FK-references
@@ -117,8 +117,8 @@ TEST(CatalogProvidersTest, F12RunsBeforeDownstreamFkProvider) {
 // including catalog's base tables — the migrator runs all providers in one tx.
 TEST(CatalogProvidersTest, DownstreamFailureRollsBackEntireBatch) {
     std::vector<std::string> order;
-    FakeFeatureProvider ok("F09", &order);
-    FakeFeatureProvider boom("F03", &order, /*fk_to_units=*/false, /*fail=*/true);
+    FakeFeatureProvider ok("block_framework", &order);
+    FakeFeatureProvider boom("enricher", &order, /*fk_to_units=*/false, /*fail=*/true);
 
     CatalogDb catalog;
     Status st = catalog.Open(":memory:", {&ok, &boom});
@@ -134,7 +134,7 @@ TEST(CatalogProvidersTest, FailedBatchLeavesNoPartialSchemaOnDisk) {
     std::remove(path.c_str());
 
     std::vector<std::string> order;
-    FakeFeatureProvider boom("F03", &order, /*fk_to_units=*/false, /*fail=*/true);
+    FakeFeatureProvider boom("enricher", &order, /*fk_to_units=*/false, /*fail=*/true);
     {
         CatalogDb c1;
         Status st = c1.Open(path, {&boom});
@@ -162,20 +162,20 @@ TEST(CatalogProvidersTest, SingleArgOpenIsF12Only) {
     CatalogDb catalog;
     ASSERT_TRUE(catalog.Open(":memory:").ok());
     EXPECT_TRUE(TableExists(catalog.db(), "units"));
-    EXPECT_EQ(SchemaMigrator().CurrentVersion(catalog.db(), "F12"), kF12SchemaVersion);
+    EXPECT_EQ(SchemaMigrator().CurrentVersion(catalog.db(), "catalog"), kF12SchemaVersion);
 }
 
 // nullptr providers in the list are ignored (defensive: matches
 // SchemaMigrator::Register skipping nullptr).
 TEST(CatalogProvidersTest, NullProvidersIgnored) {
     std::vector<std::string> order;
-    FakeFeatureProvider f09("F09", &order);
+    FakeFeatureProvider f09("block_framework", &order);
     CatalogDb catalog;
     Status st = catalog.Open(":memory:", {nullptr, &f09, nullptr});
     ASSERT_TRUE(st.ok()) << st.message();
     EXPECT_TRUE(TableExists(catalog.db(), "feat_F09"));
     ASSERT_EQ(order.size(), 1u);
-    EXPECT_EQ(order[0], "F09");
+    EXPECT_EQ(order[0], "block_framework");
 }
 
 }  // namespace

@@ -79,7 +79,7 @@ protected:
 
 TEST(AgentTraceSchemaProviderTest, IdentityAndVersion) {
     AgentTraceSchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F13");
+    EXPECT_EQ(p.FeatureName(), "agent_trace");
     EXPECT_EQ(p.CurrentVersion(), 1);
     EXPECT_EQ(kAgentTraceSchemaVersion, 1);
 }
@@ -91,7 +91,7 @@ TEST(AgentTraceSchemaProviderTest, UnexpectedVersionStepIsError) {
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     Status st = p.Migrate(db, 1, 2);
     EXPECT_FALSE(st.ok());
-    EXPECT_NE(st.message().find("CX_ERR_F13_INTERNAL"), std::string::npos);
+    EXPECT_NE(st.message().find("CX_ERR_TRACE_INTERNAL"), std::string::npos);
     sqlite3_close(db);
 }
 
@@ -106,7 +106,7 @@ TEST(AgentTraceSchemaProviderTest, AlreadyCurrentIsNoop) {
 
 // sqlite3_exec failure branch: a name collision between the table we create and a
 // pre-existing object of a DIFFERENT kind defeats IF NOT EXISTS, so the DDL fails
-// and Migrate returns the CX_ERR_F13_INTERNAL exec-failure path.
+// and Migrate returns the CX_ERR_TRACE_INTERNAL exec-failure path.
 TEST(AgentTraceSchemaProviderTest, ExecFailureReportsInternalError) {
     AgentTraceSchemaProvider p;
     sqlite3* db = nullptr;
@@ -120,7 +120,7 @@ TEST(AgentTraceSchemaProviderTest, ExecFailureReportsInternalError) {
                            nullptr, nullptr, nullptr), SQLITE_OK);
     Status st = p.Migrate(db, 0, kAgentTraceSchemaVersion);
     EXPECT_FALSE(st.ok());
-    EXPECT_NE(st.message().find("CX_ERR_F13_INTERNAL"), std::string::npos);
+    EXPECT_NE(st.message().find("CX_ERR_TRACE_INTERNAL"), std::string::npos);
     sqlite3_close(db);
 }
 
@@ -129,7 +129,7 @@ TEST_F(AgentTraceSchemaTest, TableExistsAndVersionRecorded) {
     auto tables = QueryTextSet(db_, "SELECT name FROM sqlite_master WHERE type='table'");
     EXPECT_TRUE(Contains(tables, "agent_trace"));
     cortrix::catalog::SchemaMigrator m;
-    EXPECT_EQ(m.CurrentVersion(db_, "F13"), kAgentTraceSchemaVersion);
+    EXPECT_EQ(m.CurrentVersion(db_, "agent_trace"), kAgentTraceSchemaVersion);
 }
 
 // DoD: the full §4.1 column set is present (13 columns).

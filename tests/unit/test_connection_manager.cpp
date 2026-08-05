@@ -75,7 +75,7 @@ TEST_F(ConnectionManagerTest, SecretStoreBlobIsNotPlaintext) {
 TEST_F(ConnectionManagerTest, CrossTenantResolveThrowsCrossTenantRef) {
     auto r = mgr_->Register("crm-db", kDsn, "t1", "admin1");
     ASSERT_TRUE(r.ok());
-    // tenant t2 trying to resolve a t1-owned ref → CX_ERR_F16A_CROSS_TENANT_REF.
+    // tenant t2 trying to resolve a t1-owned ref → CX_ERR_IMPORT_CROSS_TENANT_REF.
     try {
         (void)mgr_->ResolveDsn(r.value(), AdminCtx("t2"));
         FAIL() << "expected F16aException";
@@ -105,7 +105,7 @@ TEST_F(ConnectionManagerTest, CrossTenantRevokeRejected) {
     ASSERT_TRUE(r.ok());
     Status s = mgr_->Revoke(r.value(), AdminCtx("t2"), "evil");
     EXPECT_FALSE(s.ok());
-    EXPECT_NE(s.message().find("CX_ERR_F16A_CROSS_TENANT_REF"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_IMPORT_CROSS_TENANT_REF"), std::string::npos);
 }
 
 TEST_F(ConnectionManagerTest, ExpiredRefDeniesResolve) {

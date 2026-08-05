@@ -63,7 +63,7 @@ class ErrorCategory:
 
 # One canonical row per pgcortrix CX_ERR_* code. Mirrors catalog_error.cpp's
 # table-driven registry. SoT for these identities: ARCHITECTURE.md §4.1.11
-# (CX_ERR_F14_INVALID_FILTER / CX_ERR_F14_ENDPOINT_BLOCKED) + §4.1 user_id
+# (CX_ERR_PGCORTRIX_INVALID_FILTER / CX_ERR_PGCORTRIX_ENDPOINT_BLOCKED) + §4.1 user_id
 # (CX_ERR_USER_ID_MISSING). retry_after_ms is None unless retryable.
 #
 # NOTE (design flag raised to Lead): pgcortrix/§7.bis acceptance prose also names
@@ -73,8 +73,8 @@ class ErrorCategory:
 # structured codes. So we register only the SoT codes here; transport failures
 # go through `plpy.error()` (see PgcortrixClient._post).
 _ERROR_REGISTRY = {
-    "CX_ERR_F14_INVALID_FILTER": (ErrorCategory.PERMANENT, False, None),
-    "CX_ERR_F14_ENDPOINT_BLOCKED": (ErrorCategory.PERMANENT, False, None),
+    "CX_ERR_PGCORTRIX_INVALID_FILTER": (ErrorCategory.PERMANENT, False, None),
+    "CX_ERR_PGCORTRIX_ENDPOINT_BLOCKED": (ErrorCategory.PERMANENT, False, None),
     "CX_ERR_USER_ID_MISSING": (ErrorCategory.AUTH, False, None),
 }
 
@@ -123,7 +123,7 @@ ALLOWED_FILTER_KEYS = frozenset(
 
 def validate_filter(filter_jsonb):
     """Whitelist-validate the list_interactions filter. Rejects any key not in
-    ALLOWED_FILTER_KEYS → CX_ERR_F14_INVALID_FILTER (pgcortrix). Accepts a dict
+    ALLOWED_FILTER_KEYS → CX_ERR_PGCORTRIX_INVALID_FILTER (pgcortrix). Accepts a dict
     (plpython3u hands JSONB in as a dict) or a JSON string; None → {}."""
     if filter_jsonb is None:
         return {}
@@ -134,24 +134,24 @@ def validate_filter(filter_jsonb):
             f = json.loads(filter_jsonb)
         except Exception:
             raise CortrixError(
-                "CX_ERR_F14_INVALID_FILTER",
+                "CX_ERR_PGCORTRIX_INVALID_FILTER",
                 "filter must be valid JSONB object",
                 {"reason": "json_parse_failed"})
         if not isinstance(f, dict):
             raise CortrixError(
-                "CX_ERR_F14_INVALID_FILTER",
+                "CX_ERR_PGCORTRIX_INVALID_FILTER",
                 "filter must be a JSONB object",
                 {"reason": "not_an_object"})
     extra = set(f.keys()) - ALLOWED_FILTER_KEYS
     if extra:
         raise CortrixError(
-            "CX_ERR_F14_INVALID_FILTER",
+            "CX_ERR_PGCORTRIX_INVALID_FILTER",
             "unknown filter field(s): %s" % sorted(extra),
             {"invalid_field": sorted(extra),
              "allowed_fields": sorted(ALLOWED_FILTER_KEYS)})
     if "sort_order" in f and f["sort_order"] not in ("ASC", "DESC"):
         raise CortrixError(
-            "CX_ERR_F14_INVALID_FILTER",
+            "CX_ERR_PGCORTRIX_INVALID_FILTER",
             "sort_order must be 'ASC' or 'DESC'",
             {"invalid_value": f["sort_order"]})
     return f
@@ -179,13 +179,13 @@ _BLOCKED_NETWORKS = [
 
 def validate_endpoint(endpoint):
     """SSRF defense (V3-E-02): allowlist host + port, block private / metadata
-    IPs. Raises CX_ERR_F14_ENDPOINT_BLOCKED on violation. Returns the parsed
+    IPs. Raises CX_ERR_PGCORTRIX_ENDPOINT_BLOCKED on violation. Returns the parsed
     (host, port) on success."""
     parsed = urlparse(endpoint)
     host = parsed.hostname
     if host is None:
         raise CortrixError(
-            "CX_ERR_F14_ENDPOINT_BLOCKED",
+            "CX_ERR_PGCORTRIX_ENDPOINT_BLOCKED",
             "pgcortrix.endpoint has no host: %r" % endpoint,
             {"endpoint": endpoint, "reason": "no_host"})
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
@@ -196,21 +196,21 @@ def validate_endpoint(endpoint):
             ip = ipaddress.ip_address(host)
         except ValueError:
             raise CortrixError(
-                "CX_ERR_F14_ENDPOINT_BLOCKED",
+                "CX_ERR_PGCORTRIX_ENDPOINT_BLOCKED",
                 "pgcortrix.endpoint host %s not in allowlist" % host,
                 {"host": host, "allowed_hosts": sorted(ALLOWED_HOSTS)})
         if not ip.is_loopback:
             for blocked in _BLOCKED_NETWORKS:
                 if ip in blocked:
                     raise CortrixError(
-                        "CX_ERR_F14_ENDPOINT_BLOCKED",
+                        "CX_ERR_PGCORTRIX_ENDPOINT_BLOCKED",
                         "pgcortrix.endpoint host %s in blocked network %s"
                         % (host, blocked),
                         {"host": host, "blocked_network": str(blocked)})
 
     if port not in ALLOWED_PORTS:
         raise CortrixError(
-            "CX_ERR_F14_ENDPOINT_BLOCKED",
+            "CX_ERR_PGCORTRIX_ENDPOINT_BLOCKED",
             "pgcortrix.endpoint port %s not in allowlist" % port,
             {"port": port, "allowed_ports": sorted(ALLOWED_PORTS)})
     return host, port
@@ -586,7 +586,7 @@ class PgcortrixClient:
                 "CX_ERR_USER_ID_MISSING",
                 "pgcortrix_list_interactions requires user_id (MEM05 D4)",
                 {"reason": "user_id_required_for_mem05_isolation"})
-        validated = validate_filter(filter)  # raises CX_ERR_F14_INVALID_FILTER
+        validated = validate_filter(filter)  # raises CX_ERR_PGCORTRIX_INVALID_FILTER
         params = {
             "namespace": namespace,
             "user_id": user_id,            # memory isolation D4: never NULL

@@ -18,15 +18,15 @@ namespace {
 // PROMPT_INJECTION / STARTUP_NO_LLM are permanent (defense / operator fix) → not
 // retryable, no interval.
 constexpr ContextualErrorInfo kLlmFailed{
-    "CX_ERR_F35_LLM_FAILED", ErrorCategory::kTransient, true, 1000};
+    "CX_ERR_CONTEXTUAL_LLM_FAILED", ErrorCategory::kTransient, true, 1000};
 constexpr ContextualErrorInfo kBudgetExceeded{
-    "CX_ERR_F35_BUDGET_EXCEEDED", ErrorCategory::kQuota, false, std::nullopt};
+    "CX_ERR_CONTEXTUAL_BUDGET_EXCEEDED", ErrorCategory::kQuota, false, std::nullopt};
 constexpr ContextualErrorInfo kPromptInjection{
-    "CX_ERR_F35_PROMPT_INJECTION", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_CONTEXTUAL_PROMPT_INJECTION", ErrorCategory::kPermanent, false, std::nullopt};
 constexpr ContextualErrorInfo kEmbeddingFailed{
-    "CX_ERR_F35_EMBEDDING_FAILED", ErrorCategory::kTransient, true, 500};
+    "CX_ERR_CONTEXTUAL_EMBEDDING_FAILED", ErrorCategory::kTransient, true, 500};
 constexpr ContextualErrorInfo kStartupNoLlm{
-    "CX_ERR_F35_STARTUP_NO_LLM", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_CONTEXTUAL_STARTUP_NO_LLM", ErrorCategory::kPermanent, false, std::nullopt};
 
 }  // namespace
 

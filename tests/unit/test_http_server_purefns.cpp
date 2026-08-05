@@ -53,9 +53,9 @@ json ErrBody(const Status& s) {
 
 // --- Rich CX token IN the sec.3 SoT map: code preserved + map's category/retry --
 TEST(HttpServerPureFnResolve, Sec3MapHit_TimeoutRetryable) {
-    // CX_ERR_F48_LLM_TIMEOUT → {kTimeout, retryable=true} per Sdk3Map.
-    auto e = ErrBody(Status::Internal("CX_ERR_F48_LLM_TIMEOUT: model stalled"));
-    EXPECT_EQ(e["code"], "CX_ERR_F48_LLM_TIMEOUT");
+    // CX_ERR_AGENT_LLM_TIMEOUT → {kTimeout, retryable=true} per Sdk3Map.
+    auto e = ErrBody(Status::Internal("CX_ERR_AGENT_LLM_TIMEOUT: model stalled"));
+    EXPECT_EQ(e["code"], "CX_ERR_AGENT_LLM_TIMEOUT");
     EXPECT_EQ(e["category"], "timeout");
     EXPECT_EQ(e["retryable"], true);
 }

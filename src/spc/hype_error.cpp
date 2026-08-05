@@ -18,17 +18,17 @@ namespace {
 // no §7-stated interval → a modest 200ms (re-ask the LLM). SCHEMA_VERSION_MISMATCH
 // + PARENT_NOT_FOUND are permanent (operator/data fix) → not retryable.
 constexpr HypeErrorInfo kLlmTimeout{
-    "CX_ERR_F38_LLM_TIMEOUT", ErrorCategory::kTimeout, true, 5000};
+    "CX_ERR_HYPE_LLM_TIMEOUT", ErrorCategory::kTimeout, true, 5000};
 constexpr HypeErrorInfo kLlmInvalidOutput{
-    "CX_ERR_F38_LLM_INVALID_OUTPUT", ErrorCategory::kTransient, true, 200};
+    "CX_ERR_HYPE_LLM_INVALID_OUTPUT", ErrorCategory::kTransient, true, 200};
 constexpr HypeErrorInfo kLlmBudgetExceeded{
-    "CX_ERR_F38_LLM_BUDGET_EXCEEDED", ErrorCategory::kQuota, true, 60000};
+    "CX_ERR_HYPE_LLM_BUDGET_EXCEEDED", ErrorCategory::kQuota, true, 60000};
 constexpr HypeErrorInfo kQuestionParseFailed{
-    "CX_ERR_F38_QUESTION_PARSE_FAILED", ErrorCategory::kTransient, true, 200};
+    "CX_ERR_HYPE_QUESTION_PARSE_FAILED", ErrorCategory::kTransient, true, 200};
 constexpr HypeErrorInfo kSchemaVersionMismatch{
-    "CX_ERR_F38_SCHEMA_VERSION_MISMATCH", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_HYPE_SCHEMA_VERSION_MISMATCH", ErrorCategory::kPermanent, false, std::nullopt};
 constexpr HypeErrorInfo kParentNotFound{
-    "CX_ERR_F38_PARENT_NOT_FOUND", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_HYPE_PARENT_NOT_FOUND", ErrorCategory::kPermanent, false, std::nullopt};
 
 }  // namespace
 

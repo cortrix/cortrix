@@ -72,7 +72,7 @@ protected:
 };
 
 TEST_F(F18aObsMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F18a");
+    EXPECT_EQ(p_.FeatureName(), "operation_log");
     EXPECT_EQ(p_.CurrentVersion(), 1);
     EXPECT_EQ(cortrix::observability::kOplogSchemaVersion, 1);
 }
@@ -108,7 +108,7 @@ TEST_F(F18aObsMatrix, UnsupportedStepRejected) {
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     EXPECT_NE(s.message().find("CX_ERR_SCHEMA_VERSION_MISMATCH"), std::string::npos);
-    EXPECT_NE(s.message().find("F18a"), std::string::npos);
+    EXPECT_NE(s.message().find("operation_log"), std::string::npos);
 }
 
 class F18aObsVersionMatrix : public ::testing::TestWithParam<InitStep> {
@@ -145,7 +145,7 @@ protected:
 };
 
 TEST_F(F13TraceMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F13");
+    EXPECT_EQ(p_.FeatureName(), "agent_trace");
     EXPECT_EQ(p_.CurrentVersion(), 1);
     EXPECT_EQ(cortrix::agent_trace::kAgentTraceSchemaVersion, 1);
 }
@@ -178,8 +178,8 @@ TEST_F(F13TraceMatrix, UnsupportedStepRejectedWithF13Token) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
-    // agent_trace's mismatch surfaces as CX_ERR_F13_INTERNAL (feature-scoped token).
-    EXPECT_NE(s.message().find("CX_ERR_F13_INTERNAL"), std::string::npos);
+    // agent_trace's mismatch surfaces as CX_ERR_TRACE_INTERNAL (feature-scoped token).
+    EXPECT_NE(s.message().find("CX_ERR_TRACE_INTERNAL"), std::string::npos);
 }
 
 class F13TraceVersionMatrix : public ::testing::TestWithParam<InitStep> {
@@ -196,7 +196,7 @@ TEST_P(F13TraceVersionMatrix, Gate) {
         EXPECT_TRUE(s.ok());
     } else {
         EXPECT_FALSE(s.ok());
-        EXPECT_NE(s.message().find("CX_ERR_F13_INTERNAL"), std::string::npos);
+        EXPECT_NE(s.message().find("CX_ERR_TRACE_INTERNAL"), std::string::npos);
         EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
     }
 }
@@ -220,7 +220,7 @@ protected:
 };
 
 TEST_F(F13SrcMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F13_interaction_sources");
+    EXPECT_EQ(p_.FeatureName(), "interaction_sources");
     EXPECT_EQ(p_.CurrentVersion(), 1);
     EXPECT_EQ(cortrix::agent_trace::kInteractionSourcesSchemaVersion, 1);
 }
@@ -251,7 +251,7 @@ TEST_F(F13SrcMatrix, UnsupportedStepRejectedWithF13Token) {
     Status s = p_.Migrate(db, 1, 2);
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
-    EXPECT_NE(s.message().find("CX_ERR_F13_INTERNAL"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_TRACE_INTERNAL"), std::string::npos);
     EXPECT_NE(s.message().find("interaction_sources"), std::string::npos);
 }
 
@@ -272,7 +272,7 @@ TEST_P(F13SrcVersionMatrix, Gate) {
         EXPECT_TRUE(s.ok());
     } else {
         EXPECT_FALSE(s.ok());
-        EXPECT_NE(s.message().find("CX_ERR_F13_INTERNAL"), std::string::npos);
+        EXPECT_NE(s.message().find("CX_ERR_TRACE_INTERNAL"), std::string::npos);
     }
 }
 INSTANTIATE_TEST_SUITE_P(
@@ -292,7 +292,7 @@ protected:
 };
 
 TEST_F(P08AuthMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "P08");
+    EXPECT_EQ(p_.FeatureName(), "auth");
     EXPECT_EQ(p_.CurrentVersion(), 1);
     EXPECT_EQ(cortrix::auth::kP08AuthSchemaVersion, 1);
 }

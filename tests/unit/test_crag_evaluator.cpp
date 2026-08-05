@@ -206,7 +206,7 @@ TEST(CragEvaluatorTest, InferenceFailureDegradesTransparently) {
     EXPECT_EQ(backend->calls, 4);
     EXPECT_EQ(r.label, "correct_fallback_classifier_failed");
     ASSERT_TRUE(r.error_code.has_value());
-    EXPECT_EQ(*r.error_code, "CX_ERR_F37_INFERENCE_FAILED");
+    EXPECT_EQ(*r.error_code, "CX_ERR_CRAG_INFERENCE_FAILED");
     EXPECT_FLOAT_EQ(r.score, 0.5f);
     // Signals preserved for ?explain=true.
     EXPECT_NE(r.raw_signals.find("top1"), r.raw_signals.end());
@@ -290,7 +290,7 @@ TEST(CragEvaluatorTest, CircuitBreakerOpensThenGatesSubsequentQuery) {
     auto r2 = ev.Classify(in);
     EXPECT_EQ(r2.label, "correct_fallback_classifier_failed");
     ASSERT_TRUE(r2.error_code.has_value());
-    EXPECT_EQ(*r2.error_code, "CX_ERR_F37_INFERENCE_FAILED");
+    EXPECT_EQ(*r2.error_code, "CX_ERR_CRAG_INFERENCE_FAILED");
     // Breaker open → query 2 made no additional backend calls.
     EXPECT_EQ(backend->calls, after_q1);
 }

@@ -5,7 +5,7 @@
 
 #include "cortrix/query/router_error.h"
 
-// Query routing coverage: the query-router error model (template A) — all 4 CX_ERR_F39_*
+// Query routing coverage: the query-router error model (template A) — all 4 CX_ERR_ROUTER_*
 // identities, their §4.3 attributes (category / retryable / retry_after_ms /
 // structured_data keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::query {
@@ -31,7 +31,7 @@ TEST(F39RouterErrorTest, AllCodesHaveUniqueF39CxStrings) {
     for (RouterErrorCode c : kAll) {
         std::string s = RouterErrorCodeString(c);
         EXPECT_FALSE(s.empty());
-        EXPECT_EQ(s.rfind("CX_ERR_F39_", 0), 0u) << s << " must start with CX_ERR_F39_";
+        EXPECT_EQ(s.rfind("CX_ERR_ROUTER_", 0), 0u) << s << " must start with CX_ERR_ROUTER_";
         EXPECT_TRUE(seen.insert(s).second) << "duplicate code string: " << s;
     }
     EXPECT_EQ(seen.size(), 4u);
@@ -47,16 +47,16 @@ TEST(F39RouterErrorTest, RegistryMatchesSpecTable) {
         EXPECT_EQ(i.retryable, retry) << code;
         EXPECT_EQ(i.retry_after_ms, retry_ms) << code;
     };
-    chk(RouterErrorCode::kClassifierLoadFailed, "CX_ERR_F39_CLASSIFIER_LOAD_FAILED",
+    chk(RouterErrorCode::kClassifierLoadFailed, "CX_ERR_ROUTER_CLASSIFIER_LOAD_FAILED",
         ErrorCategory::kPermanent, false, std::nullopt);
-    chk(RouterErrorCode::kInferenceFailed, "CX_ERR_F39_INFERENCE_FAILED",
+    chk(RouterErrorCode::kInferenceFailed, "CX_ERR_ROUTER_INFERENCE_FAILED",
         ErrorCategory::kTransient, true, 100);
-    chk(RouterErrorCode::kForceRouteInvalid, "CX_ERR_F39_FORCE_ROUTE_INVALID",
+    chk(RouterErrorCode::kForceRouteInvalid, "CX_ERR_ROUTER_FORCE_ROUTE_INVALID",
         ErrorCategory::kPermanent, false, std::nullopt);
     // §4.3 lists FALLBACK_TRIGGERED as transient + retryable with retry_after_ms "-"
     // (unspecified) → null. It is informational (the transparent Complex degrade
     // already happened), so no concrete back-off is advertised.
-    chk(RouterErrorCode::kFallbackTriggered, "CX_ERR_F39_FALLBACK_TRIGGERED",
+    chk(RouterErrorCode::kFallbackTriggered, "CX_ERR_ROUTER_FALLBACK_TRIGGERED",
         ErrorCategory::kTransient, true, std::nullopt);
 }
 
@@ -104,7 +104,7 @@ TEST(F39RouterErrorTest, MakeRouterErrorFillsFromRegistry) {
     nlohmann::json sd = {{"query_preview", "compare X vs Y"}, {"retry_count", 3}};
     auto err = MakeRouterError(RouterErrorCode::kInferenceFailed, sd,
                                "Query router classifier inference failed, defaulting to complex");
-    EXPECT_EQ(err.code, "CX_ERR_F39_INFERENCE_FAILED");
+    EXPECT_EQ(err.code, "CX_ERR_ROUTER_INFERENCE_FAILED");
     EXPECT_EQ(err.message,
               "Query router classifier inference failed, defaulting to complex");
     EXPECT_TRUE(err.retryable);
@@ -117,7 +117,7 @@ TEST(F39RouterErrorTest, MakeRouterErrorFillsFromRegistry) {
 
 TEST(F39RouterErrorTest, MakeRouterErrorDefaultsMessageToCode) {
     auto err = MakeRouterError(RouterErrorCode::kClassifierLoadFailed);
-    EXPECT_EQ(err.message, "CX_ERR_F39_CLASSIFIER_LOAD_FAILED");
+    EXPECT_EQ(err.message, "CX_ERR_ROUTER_CLASSIFIER_LOAD_FAILED");
     EXPECT_FALSE(err.retryable);
     EXPECT_FALSE(err.retry_after_ms.has_value());
 }
@@ -126,7 +126,7 @@ TEST(F39RouterErrorTest, ToJsonSerializesAgentFriendlyBody) {
     auto err = MakeRouterError(RouterErrorCode::kInferenceFailed,
                                {{"query_preview", "..."}, {"retry_count", 3}});
     nlohmann::json j = agent_friendly::ToJson(err);
-    EXPECT_EQ(j["code"], "CX_ERR_F39_INFERENCE_FAILED");
+    EXPECT_EQ(j["code"], "CX_ERR_ROUTER_INFERENCE_FAILED");
     EXPECT_EQ(j["retryable"], true);
     EXPECT_EQ(j["category"], "transient");
     EXPECT_EQ(j["retry_after_ms"], 100);
@@ -137,14 +137,14 @@ TEST(F39RouterErrorTest, StatusBridgeCarriesCodeToken) {
     Status s = RouterStatus(RouterErrorCode::kForceRouteInvalid, "banana");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
-    EXPECT_NE(s.message().find("CX_ERR_F39_FORCE_ROUTE_INVALID"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_ROUTER_FORCE_ROUTE_INVALID"), std::string::npos);
     EXPECT_NE(s.message().find("banana"), std::string::npos);
 }
 
 TEST(F39RouterErrorTest, StatusBridgeDefaultsDetailToCode) {
     Status s = RouterStatus(RouterErrorCode::kInferenceFailed);
     EXPECT_FALSE(s.ok());
-    EXPECT_EQ(s.message(), "CX_ERR_F39_INFERENCE_FAILED");
+    EXPECT_EQ(s.message(), "CX_ERR_ROUTER_INFERENCE_FAILED");
 }
 
 TEST(F39RouterErrorTest, StatusCodeMappingIsTotalAndSane) {

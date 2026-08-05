@@ -11,7 +11,7 @@
 namespace cortrix::spc {
 
 /// The 6 HyPE error identities (registered in the server error registry). Each
-/// maps to a stable `CX_ERR_F38_*` string + a GEN-Agent category + retryability
+/// maps to a stable `CX_ERR_HYPE_*` string + a GEN-Agent category + retryability
 /// via the canonical registry below.
 ///
 /// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
@@ -38,7 +38,7 @@ constexpr int kHypeErrorCodeCount = 6;
 
 /// Canonical, immutable attributes of one error code.
 struct HypeErrorInfo {
-    const char* cx_code;                      ///< stable "CX_ERR_F38_*" string
+    const char* cx_code;                      ///< stable "CX_ERR_HYPE_*" string
     agent_friendly::ErrorCategory category;   ///< timeout/transient/quota/permanent
     bool retryable;
     std::optional<int> retry_after_ms;        ///< null unless retryable per §7
@@ -48,7 +48,7 @@ struct HypeErrorInfo {
 /// throws / never returns a partial). Single source of truth for the 6 rows.
 const HypeErrorInfo& GetHypeErrorInfo(HypeErrorCode code);
 
-/// The "CX_ERR_F38_*" string for `code`.
+/// The "CX_ERR_HYPE_*" string for `code`.
 const char* HypeErrorCodeString(HypeErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry
@@ -71,7 +71,7 @@ agent_friendly::AgentFriendlyError MakeHypeError(
 StatusCode HypeErrorToStatusCode(HypeErrorCode code);
 
 /// Bridge a HyPE error to a plain Status for the Result<T>/Status surface
-/// (F-FREEZE-1). The message is prefixed with the CX_ERR_F38_* token so the exact
+/// (F-FREEZE-1). The message is prefixed with the CX_ERR_HYPE_* token so the exact
 /// identity is recoverable at the API/SDK boundary (which re-inflates the full
 /// Agent-friendly body via MakeHypeError). cortrix::Status is not widened.
 Status HypeStatus(HypeErrorCode code, const std::string& detail = "");

@@ -25,7 +25,7 @@ class InteractionsHandler;
 /// shared HttpObservabilityMiddleware (installing the ObservabilityContext on the
 /// thread-local + surfacing the per-header warning), derives the requester context
 /// from the authenticated AuthContext (user_id + admin bit), parses + validates the
-/// query params, and renders the result / the GEN-Agent CX_ERR_F13_* error body.
+/// query params, and renders the result / the GEN-Agent CX_ERR_TRACE_* error body.
 ///
 /// Endpoints (all WithAuth, Read permission):
 ///   GET /api/v1/traces/:session_id            -- session interaction trace list (§8.1)

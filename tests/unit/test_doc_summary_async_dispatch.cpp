@@ -335,7 +335,7 @@ TEST_F(DocSummaryAsyncDispatchTest, GenerationFailureFinalizesTaskFailed) {
     pool.Stop();
 
     // Worker returned a failure Status; the task was finalized as failed (terminal, not
-    // stuck), carrying a CX_ERR_F41_* code, and no doc_summary block landed (doc-discovery
+    // stuck), carrying a CX_ERR_DOCSUMMARY_* code, and no doc_summary block landed (doc-discovery
     // degrades to the FTS5 fallback for this doc, doc summary).
     EXPECT_FALSE(signaling.last_status().ok());
     auto ft = mgr_.GetTask(task_id);

@@ -280,14 +280,14 @@ Result<std::string> MemoryTransparency::Create(const MemoryCreateRequest& req,
         // tracks it under the closest registered code's "invalid input" family.
         metrics.RecordInvalidInput(MetricLabel(Mem03ErrorCode::kInvalidateFailed));
         return Status::InvalidArgument(
-            "CX_ERR_MEM03_INVALID_TYPE: memory_type must be fact|preference|event");
+            "CX_ERR_MEMORY_INVALID_TYPE: memory_type must be fact|preference|event");
     }
     // issue-8 error 4: content length ≤ 2000.
     if (static_cast<int>(req.content.size()) > kMaxContentLength) {
         metrics.RecordOp(Mem03Metrics::Op::kCreate, Mem03Metrics::OpStatus::kError);
         metrics.RecordInvalidInput(MetricLabel(Mem03ErrorCode::kInvalidateFailed));
         return Status::InvalidArgument(
-            "CX_ERR_MEM03_CONTENT_TOO_LONG: content exceeds 2000 chars");
+            "CX_ERR_MEMORY_CONTENT_TOO_LONG: content exceeds 2000 chars");
     }
 
     const int64_t now_ms = NowEpochMs();
@@ -346,7 +346,7 @@ Result<MemoryEditResult> MemoryTransparency::Edit(const MemoryEditRequest& req,
         metrics.RecordOp(Mem03Metrics::Op::kEdit, Mem03Metrics::OpStatus::kError);
         metrics.RecordInvalidInput(MetricLabel(Mem03ErrorCode::kInvalidateFailed));
         return Status::InvalidArgument(
-            "CX_ERR_MEM03_INVALID_TYPE: memory_type must be fact|preference|event");
+            "CX_ERR_MEMORY_INVALID_TYPE: memory_type must be fact|preference|event");
     }
     const std::string new_content =
         req.new_content.has_value() ? *req.new_content : old_block.content;
@@ -354,7 +354,7 @@ Result<MemoryEditResult> MemoryTransparency::Edit(const MemoryEditRequest& req,
         metrics.RecordOp(Mem03Metrics::Op::kEdit, Mem03Metrics::OpStatus::kError);
         metrics.RecordInvalidInput(MetricLabel(Mem03ErrorCode::kInvalidateFailed));
         return Status::InvalidArgument(
-            "CX_ERR_MEM03_CONTENT_TOO_LONG: content exceeds 2000 chars");
+            "CX_ERR_MEMORY_CONTENT_TOO_LONG: content exceeds 2000 chars");
     }
 
     // 2. Optimistic lock: expected_modified_at must match last_modified_at (issue-8 #5).
@@ -366,7 +366,7 @@ Result<MemoryEditResult> MemoryTransparency::Edit(const MemoryEditRequest& req,
             metrics.RecordEditConflict();
             return Status(
                 StatusCode::kUnavailable,
-                "CX_ERR_MEM03_EDIT_CONCURRENT: last_modified_at mismatch (expected " +
+                "CX_ERR_MEMORY_EDIT_CONCURRENT: last_modified_at mismatch (expected " +
                     std::to_string(*req.expected_modified_at) + ", actual " +
                     (cur.has_value() ? std::to_string(*cur) : std::string("none")) + ")");
         }

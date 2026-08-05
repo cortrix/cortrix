@@ -165,16 +165,16 @@ void ImportTaskQueue::RunTask(ImportTaskId task_id, ImportTaskWork work) {
             if (t->rows_total <= 0) t->rows_total = t->rows_imported;
         }
         if (terminal == ImportTaskStatus::kFailed && err) {
-            // Re-inflate the CX_ERR_F16A_* identity carried in the Status message
+            // Re-inflate the CX_ERR_IMPORT_* identity carried in the Status message
             // into the Agent-friendly error body (§5.3).
             t->error = MakeF16aError(F16aErrorCode::kConnectionFailed, nlohmann::json::object(),
                                      err->message());
             // Prefer the precise code if the work returned one in the message prefix.
-            // (The work uses F16aStatus(...) which prefixes "CX_ERR_F16A_X: detail".)
+            // (The work uses F16aStatus(...) which prefixes "CX_ERR_IMPORT_X: detail".)
             t->error->code = [&]() -> std::string {
                 const std::string& m = err->message();
                 auto colon = m.find(':');
-                if (m.rfind("CX_ERR_F16A_", 0) == 0 && colon != std::string::npos) {
+                if (m.rfind("CX_ERR_IMPORT_", 0) == 0 && colon != std::string::npos) {
                     return m.substr(0, colon);
                 }
                 return t->error->code;

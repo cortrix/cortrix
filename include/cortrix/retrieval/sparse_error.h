@@ -11,7 +11,7 @@
 namespace cortrix::retrieval {
 
 /// The 5 BGE-M3-sparse error identities (registered in the server error registry).
-/// Each maps to a stable `CX_ERR_F40_*` string + a GEN-Agent category +
+/// Each maps to a stable `CX_ERR_SPARSE_*` string + a GEN-Agent category +
 /// retryability via the canonical registry below.
 ///
 /// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
@@ -37,7 +37,7 @@ constexpr int kSparseErrorCodeCount = 5;
 
 /// Canonical, immutable attributes of one error code.
 struct SparseErrorInfo {
-    const char* cx_code;                      ///< stable "CX_ERR_F40_*" string
+    const char* cx_code;                      ///< stable "CX_ERR_SPARSE_*" string
     agent_friendly::ErrorCategory category;   ///< transient / permanent
     bool retryable;
     std::optional<int> retry_after_ms;        ///< null unless retryable per §8
@@ -47,7 +47,7 @@ struct SparseErrorInfo {
 /// throws / never returns a partial). Single source of truth for the 5 rows.
 const SparseErrorInfo& GetSparseErrorInfo(SparseErrorCode code);
 
-/// The "CX_ERR_F40_*" string for `code`.
+/// The "CX_ERR_SPARSE_*" string for `code`.
 const char* SparseErrorCodeString(SparseErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry
@@ -71,7 +71,7 @@ agent_friendly::AgentFriendlyError MakeSparseError(
 StatusCode SparseErrorToStatusCode(SparseErrorCode code);
 
 /// Bridge a sparse-retrieval error to a plain Status for the Result<T>/Status surface
-/// (F-FREEZE-1). The message is prefixed with the CX_ERR_F40_* token so the
+/// (F-FREEZE-1). The message is prefixed with the CX_ERR_SPARSE_* token so the
 /// exact identity is recoverable at the API/SDK boundary (which re-inflates the
 /// full Agent-friendly body via MakeSparseError). cortrix::Status itself is not
 /// widened.

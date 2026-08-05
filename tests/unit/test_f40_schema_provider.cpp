@@ -62,7 +62,7 @@ std::set<std::string> ColumnNames(sqlite3* db, const std::string& table) {
 
 TEST(F40SchemaProviderTest, IdentityAndVersion) {
     F40SchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F40");
+    EXPECT_EQ(p.FeatureName(), "sparse_index");
     EXPECT_EQ(p.CurrentVersion(), 1);
 }
 
@@ -144,7 +144,7 @@ TEST(F40SchemaProviderTest, RegistersWithSchemaMigrator) {
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     ASSERT_TRUE(migrator.MigrateUnit(db, "unit_test").ok());
     EXPECT_TRUE(TableNames(db).count("sparse_inverted_index"));
-    EXPECT_EQ(migrator.CurrentVersion(db, "F40"), 1);
+    EXPECT_EQ(migrator.CurrentVersion(db, "sparse_index"), 1);
     sqlite3_close(db);
 }
 

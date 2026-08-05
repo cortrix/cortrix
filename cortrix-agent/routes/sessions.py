@@ -8,7 +8,7 @@ The response shape (design section 9.1)::
 
     {session_id, messages:[{role, content, timestamp}], window_size, created_at, tenant_id}
 
-A missing session returns the GEN-Agent 4-field error ``CX_ERR_F48_SESSION_NOT_FOUND``
+A missing session returns the GEN-Agent 4-field error ``CX_ERR_AGENT_SESSION_NOT_FOUND``
 (design section 9.3 / 10.1), HTTP 404.
 """
 
@@ -46,7 +46,7 @@ async def get_session_detail(
     payload = sessions.get_history(session_id)
     if payload is None:
         err = AgentError(
-            "CX_ERR_F48_SESSION_NOT_FOUND",
+            "CX_ERR_AGENT_SESSION_NOT_FOUND",
             structured_data={"session_id": session_id},
         )
         return JSONResponse(status_code=err.http_status, content=err.to_dict())

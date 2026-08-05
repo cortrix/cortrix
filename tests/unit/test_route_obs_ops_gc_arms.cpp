@@ -529,7 +529,7 @@ TEST_F(ObsRoutesArms, GlobalTraceNonOwnerDenied) {
                        {{"Authorization", "Bearer obs-arms-mallory"}});
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 403) << res->body;
-    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_F13_UNAUTHORIZED");
+    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_TRACE_UNAUTHORIZED");
 }
 
 // PER-NS /interactions/:id/sources with a namespace that does not exist → the with_ns
@@ -539,7 +539,7 @@ TEST_F(ObsRoutesArms, SourcesUnknownNamespaceIsNotFound) {
     auto res = cli.Get("/api/v1/interactions/int-1/sources?namespace=ghost-ns", Owner());
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 404) << res->body;
-    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_F13_SESSION_NOT_FOUND");
+    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_TRACE_SESSION_NOT_FOUND");
 }
 
 // PER-NS /interactions/:id/sources with the real namespace → ServeSources runs over the
@@ -561,7 +561,7 @@ TEST_F(ObsRoutesArms, ListInteractionsBadTimestampIsInvalidFilter) {
                        "&from_timestamp=notanumber", Owner());
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 400) << res->body;
-    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_F13_INVALID_FILTER");
+    EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_TRACE_INVALID_FILTER");
 }
 
 }  // namespace

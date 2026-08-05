@@ -646,7 +646,7 @@ public:
                                       const cortrix::spc::ChunkContext&) override {
         cortrix::spc::EnrichResult r;
         r.contextualized_status = 2;  // failed (LLM error inside contextual retrieval)
-        r.error_msg = "CX_ERR_F35_LLM_FAILED: synthetic";
+        r.error_msg = "CX_ERR_CONTEXTUAL_LLM_FAILED: synthetic";
         return r;
     }
     std::vector<cortrix::spc::EnrichResult> EnrichBatch(

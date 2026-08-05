@@ -19,14 +19,14 @@ namespace cortrix::server {
 ///
 /// Each method returns the JSON body to serialize + sets `out_http_status` to the
 /// §5.4 / §6.2 HTTP code. Errors are the Agent-friendly body (§5.3); the parse layer
-/// maps a malformed request to CX_ERR_F16A_INVALID_SQL (400).
+/// maps a malformed request to CX_ERR_IMPORT_INVALID_SQL (400).
 class ImportHandler {
 public:
     ImportHandler(std::shared_ptr<cortrix::import::ImportManager> import_mgr,
                   std::shared_ptr<cortrix::import::IConnectionManager> conn_mgr);
 
     /// Parse a request body into an ImportRequest (oneOf{table, sql} +
-    /// text_strategy). Returns CX_ERR_F16A_INVALID_SQL on a missing required field,
+    /// text_strategy). Returns CX_ERR_IMPORT_INVALID_SQL on a missing required field,
     /// an unknown text_strategy ("template" is rejected — v1.0.2 ruling 13), or a
     /// malformed shape.
     static cortrix::Result<cortrix::import::ImportRequest> ParseImportRequest(

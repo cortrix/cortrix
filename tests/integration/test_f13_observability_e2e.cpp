@@ -176,7 +176,7 @@ TEST_F(F13ObservabilityE2E, AdminReadsAnySessionTraces) {
 
 // A non-owner non-admin (mallory) is denied by the anti-leak rule. The resolver
 // finds the session belongs to "alice" (cross-DB), mallory != alice + not admin ->
-// CX_ERR_F13_UNAUTHORIZED. This is the core assembly assertion: a co-located-only
+// CX_ERR_TRACE_UNAUTHORIZED. This is the core assembly assertion: a co-located-only
 // resolver would never reach the sales NS memory.db to learn the owner is alice.
 TEST_F(F13ObservabilityE2E, NonOwnerNonAdminDeniedTraces) {
   auto c = h_->Client();
@@ -185,7 +185,7 @@ TEST_F(F13ObservabilityE2E, NonOwnerNonAdminDeniedTraces) {
   EXPECT_NE(res->status, 200);
   auto body = json::parse(res->body);
   ASSERT_TRUE(body.contains("error"));
-  EXPECT_EQ(body["error"]["code"], "CX_ERR_F13_UNAUTHORIZED");
+  EXPECT_EQ(body["error"]["code"], "CX_ERR_TRACE_UNAUTHORIZED");
 }
 
 // No credentials -> 401 at the auth gate (before any handler logic).
@@ -205,7 +205,7 @@ TEST_F(F13ObservabilityE2E, AdminUnknownSessionNotFound) {
   EXPECT_NE(res->status, 200);
   auto body = json::parse(res->body);
   ASSERT_TRUE(body.contains("error"));
-  EXPECT_EQ(body["error"]["code"], "CX_ERR_F13_SESSION_NOT_FOUND");
+  EXPECT_EQ(body["error"]["code"], "CX_ERR_TRACE_SESSION_NOT_FOUND");
 }
 
 // Trace filter (status) reaches the writer query: filtering to a status none of the
@@ -257,7 +257,7 @@ TEST_F(F13ObservabilityE2E, ListInteractionsCrossUserDenied) {
   EXPECT_NE(res->status, 200);
   auto body = json::parse(res->body);
   ASSERT_TRUE(body.contains("error"));
-  EXPECT_EQ(body["error"]["code"], "CX_ERR_F13_UNAUTHORIZED");
+  EXPECT_EQ(body["error"]["code"], "CX_ERR_TRACE_UNAUTHORIZED");
 }
 
 // The per-NS list requires the namespace selector (per-NS storage cannot be picked
@@ -269,7 +269,7 @@ TEST_F(F13ObservabilityE2E, ListInteractionsRequiresNamespace) {
   EXPECT_NE(res->status, 200);
   auto body = json::parse(res->body);
   ASSERT_TRUE(body.contains("error"));
-  EXPECT_EQ(body["error"]["code"], "CX_ERR_F13_INVALID_FILTER");
+  EXPECT_EQ(body["error"]["code"], "CX_ERR_TRACE_INVALID_FILTER");
 }
 
 // ── GET /api/v1/operations — operation_log over the global db ──────────────────────

@@ -30,7 +30,7 @@ namespace cortrix::store {
 class F34SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     /// Registration key.
-    std::string FeatureName() const override { return "F34"; }
+    std::string FeatureName() const override { return "parent_child"; }
 
     /// Schema version. V1 = blocks +4 child cols + 3 indexes + parents table.
     int CurrentVersion() const override { return 1; }

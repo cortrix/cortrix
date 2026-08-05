@@ -34,8 +34,8 @@ TEST_P(RouterErrorMatrix, CodeStringFormat) {
     const RouterErrorCode code = GetParam();
     const std::string s = RouterErrorCodeString(code);
     EXPECT_FALSE(s.empty());
-    EXPECT_EQ(s.rfind("CX_ERR_F39_", 0), 0u) << s;
-    EXPECT_TRUE(std::regex_match(s, std::regex("^CX_ERR_F39_[A-Z0-9_]+$"))) << s;
+    EXPECT_EQ(s.rfind("CX_ERR_ROUTER_", 0), 0u) << s;
+    EXPECT_TRUE(std::regex_match(s, std::regex("^CX_ERR_ROUTER_[A-Z0-9_]+$"))) << s;
     EXPECT_STREQ(GetRouterErrorInfo(code).cx_code, s.c_str());
 }
 

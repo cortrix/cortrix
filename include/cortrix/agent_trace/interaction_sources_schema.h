@@ -36,7 +36,7 @@ extern const char* const kInteractionSourcesSchemaSql;
 /// from the agent_trace provider's key so both can coexist in schema_version.
 class InteractionSourcesSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
-    std::string FeatureName() const override { return "F13_interaction_sources"; }
+    std::string FeatureName() const override { return "interaction_sources"; }
     int CurrentVersion() const override { return kInteractionSourcesSchemaVersion; }
 
     Status Migrate(sqlite3* db, int from_ver, int to_ver) override;

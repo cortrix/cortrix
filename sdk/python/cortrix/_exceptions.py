@@ -174,29 +174,29 @@ class StoreDbError(ServiceUnavailableError):
 
 
 # --- pgcortrix (1 — V3 decision 4) -------
-class F14InvalidFilterError(InvalidRequestError):
-    """400 — CX_ERR_F14_INVALID_FILTER — filter JSONB field not in allowlist."""
+class PgcortrixInvalidFilterError(InvalidRequestError):
+    """400 — CX_ERR_PGCORTRIX_INVALID_FILTER — filter JSONB field not in allowlist."""
 
 
 # --- Retrieval path (8 — RAG-Fusion/CRAG/doc summary/agent/memory extraction + LLM/quota/CSRF) ---
-class F36ExpandQueriesTimeoutError(TimeoutError):
-    """timeout — CX_ERR_F36_EXPAND_TIMEOUT — RAG-Fusion ExpandQueries LLM timeout."""
+class RagFusionExpandTimeoutError(TimeoutError):
+    """timeout — CX_ERR_RAGFUSION_EXPAND_TIMEOUT — RAG-Fusion ExpandQueries LLM timeout."""
 
 
-class F37CragEvaluationFailedError(InternalServerError):
-    """500 — CX_ERR_F37_CRAG_EVAL_FAILED — CRAG LLM evaluation failed (fallback active)."""
+class CragEvaluationFailedError(InternalServerError):
+    """500 — CX_ERR_CRAG_EVAL_FAILED — CRAG LLM evaluation failed (fallback active)."""
 
 
-class F41DocSummaryFailedError(InternalServerError):
-    """500 — CX_ERR_F41_DOC_SUMMARY_FAILED — DocSummary LLM call failed."""
+class DocSummaryFailedError(InternalServerError):
+    """500 — CX_ERR_DOCSUMMARY_FAILED — DocSummary LLM call failed."""
 
 
-class F48AgentToolNotFoundError(NotFoundError):
-    """404 — CX_ERR_F48_TOOL_NOT_FOUND — Cortrix Agent tool not registered."""
+class AgentToolNotFoundError(NotFoundError):
+    """404 — CX_ERR_AGENT_TOOL_NOT_FOUND — Cortrix Agent tool not registered."""
 
 
-class MEM02ExtractionFailedError(InternalServerError):
-    """500 — CX_ERR_MEM02_EXTRACTION_FAILED — memory extraction LLM extraction failed (fallback active)."""
+class MemoryExtractionFailedError(InternalServerError):
+    """500 — CX_ERR_MEMEXTRACT_FAILED — memory extraction LLM extraction failed (fallback active)."""
 
 
 class LlmCircuitOpenError(ServiceUnavailableError):
@@ -235,12 +235,12 @@ CODE_EXCEPTION_MAP: dict[str, type[CortrixError]] = {
     "CX_ERR_STORE_NOT_FOUND": StoreNotFoundError,
     "CX_ERR_STORE_DB_ERROR": StoreDbError,
     # Pgcortrix (1)
-    "CX_ERR_F14_INVALID_FILTER": F14InvalidFilterError,
+    "CX_ERR_PGCORTRIX_INVALID_FILTER": PgcortrixInvalidFilterError,
     # Retrieval path (6)
-    "CX_ERR_F36_EXPAND_TIMEOUT": F36ExpandQueriesTimeoutError,
-    "CX_ERR_F37_CRAG_EVAL_FAILED": F37CragEvaluationFailedError,
-    "CX_ERR_F41_DOC_SUMMARY_FAILED": F41DocSummaryFailedError,
-    "CX_ERR_F48_TOOL_NOT_FOUND": F48AgentToolNotFoundError,
-    "CX_ERR_MEM02_EXTRACTION_FAILED": MEM02ExtractionFailedError,
+    "CX_ERR_RAGFUSION_EXPAND_TIMEOUT": RagFusionExpandTimeoutError,
+    "CX_ERR_CRAG_EVAL_FAILED": CragEvaluationFailedError,
+    "CX_ERR_DOCSUMMARY_FAILED": DocSummaryFailedError,
+    "CX_ERR_AGENT_TOOL_NOT_FOUND": AgentToolNotFoundError,
+    "CX_ERR_MEMEXTRACT_FAILED": MemoryExtractionFailedError,
     "CX_ERR_LLM_CIRCUIT_OPEN": LlmCircuitOpenError,
 }

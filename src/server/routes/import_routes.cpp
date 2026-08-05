@@ -13,7 +13,7 @@ namespace cortrix {
 namespace {
 
 // Parse the request body into JSON; on malformed input returns a null json (the
-// handler's ParseImportRequest maps that to CX_ERR_F16A_INVALID_SQL 400).
+// handler's ParseImportRequest maps that to CX_ERR_IMPORT_INVALID_SQL 400).
 nlohmann::json ParseBodyOrNull(const httplib::Request& req) {
     try {
         return nlohmann::json::parse(req.body);

@@ -131,7 +131,7 @@ async def test_l3_hard_error_when_rag_and_llm_both_fail():
     with pytest.raises(AgentError) as exc_info:
         await _drain(ex, "q", ChatContext(session_id="s1"))
     err = exc_info.value
-    assert err.code == "CX_ERR_F48_RAG_FAILED"
+    assert err.code == "CX_ERR_AGENT_RAG_FAILED"
     assert err.retryable is False
     assert err.structured_data.get("fallback_attempted") is True
     assert "llm_error" in err.structured_data

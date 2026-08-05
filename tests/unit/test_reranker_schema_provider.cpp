@@ -34,7 +34,7 @@ std::set<std::string> ColumnNames(sqlite3* db, const std::string& table) {
 
 TEST(F02SchemaProviderTest, IdentityAndVersion) {
     F02SchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F02");
+    EXPECT_EQ(p.FeatureName(), "reranker");
     EXPECT_EQ(p.CurrentVersion(), 1);
 }
 
@@ -65,7 +65,7 @@ TEST(F02SchemaProviderTest, RegistersAndMigratesViaMigrator) {
     m.Register(&p);
     Status st = m.MigrateCatalog(db);
     ASSERT_TRUE(st.ok()) << st.message();
-    EXPECT_EQ(m.CurrentVersion(db, "F02"), 1);  // recorded at v1
+    EXPECT_EQ(m.CurrentVersion(db, "reranker"), 1);  // recorded at v1
     sqlite3_close(db);
 }
 
@@ -89,8 +89,8 @@ TEST(F02SchemaProviderTest, RerankerConfigColumnSuppliedByF12BaseSchema) {
     EXPECT_NE(cols.find("reranker_config"), cols.end())
         << "namespaces.reranker_config must be present (F12 base schema)";
 
-    EXPECT_EQ(m.CurrentVersion(db, "F12"), cortrix::catalog::kF12SchemaVersion);
-    EXPECT_EQ(m.CurrentVersion(db, "F02"), 1);
+    EXPECT_EQ(m.CurrentVersion(db, "catalog"), cortrix::catalog::kF12SchemaVersion);
+    EXPECT_EQ(m.CurrentVersion(db, "reranker"), 1);
     sqlite3_close(db);
 }
 

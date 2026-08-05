@@ -32,7 +32,7 @@ extern const char* const kCatalogSchemaSql;
 /// providers for extension tables/columns.
 class F12SchemaProvider : public ISchemaProvider {
 public:
-    std::string FeatureName() const override { return "F12"; }
+    std::string FeatureName() const override { return "catalog"; }
     int CurrentVersion() const override { return kF12SchemaVersion; }
     Status Migrate(sqlite3* db, int from_ver, int to_ver) override;
 };

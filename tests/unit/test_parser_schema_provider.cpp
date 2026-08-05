@@ -34,7 +34,7 @@ bool HasColumn(sqlite3* db, const char* table, const char* column) {
 
 TEST(F06SchemaProviderTest, IdentityAndVersion) {
     F06SchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F06");
+    EXPECT_EQ(p.FeatureName(), "parser");
     EXPECT_EQ(p.CurrentVersion(), 1);
 }
 
@@ -104,7 +104,7 @@ TEST(F06SchemaProviderTest, RegistersAndMigratesViaMigrator) {
     m.Register(&p);
     Status st = m.MigrateCatalog(db);
     ASSERT_TRUE(st.ok()) << st.message();
-    EXPECT_EQ(m.CurrentVersion(db, "F06"), 1);
+    EXPECT_EQ(m.CurrentVersion(db, "parser"), 1);
     EXPECT_TRUE(HasColumn(db, "namespaces", "parser_config"));
     sqlite3_close(db);
 }

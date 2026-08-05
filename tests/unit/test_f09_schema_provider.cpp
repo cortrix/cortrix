@@ -44,7 +44,7 @@ bool Exec(sqlite3* db, const std::string& sql) {
 
 TEST(F09SchemaProviderTest, IdentityAndVersion) {
     F09SchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F09");
+    EXPECT_EQ(p.FeatureName(), "block_framework");
     EXPECT_EQ(p.CurrentVersion(), 1);
 }
 
@@ -167,7 +167,7 @@ TEST(F09SchemaProviderTest, MigratesViaMigrateUnit) {
     m.Register(&p);
     Status st = m.MigrateUnit(db, "unit-test");
     ASSERT_TRUE(st.ok()) << st.message();
-    EXPECT_EQ(m.CurrentVersion(db, "F09"), 1);
+    EXPECT_EQ(m.CurrentVersion(db, "block_framework"), 1);
     EXPECT_TRUE(ObjectExists(db, "blocks"));  // framework built through the migrator
     sqlite3_close(db);
 }

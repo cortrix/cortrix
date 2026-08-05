@@ -36,8 +36,8 @@ TEST_P(HypeErrorMatrix, CodeStringFormat) {
     const HypeErrorCode code = GetParam();
     const std::string s = HypeErrorCodeString(code);
     EXPECT_FALSE(s.empty());
-    EXPECT_EQ(s.rfind("CX_ERR_F38_", 0), 0u) << s;
-    EXPECT_TRUE(std::regex_match(s, std::regex("^CX_ERR_F38_[A-Z0-9_]+$"))) << s;
+    EXPECT_EQ(s.rfind("CX_ERR_HYPE_", 0), 0u) << s;
+    EXPECT_TRUE(std::regex_match(s, std::regex("^CX_ERR_HYPE_[A-Z0-9_]+$"))) << s;
     EXPECT_STREQ(GetHypeErrorInfo(code).cx_code, s.c_str());
 }
 

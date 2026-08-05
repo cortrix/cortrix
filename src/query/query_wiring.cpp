@@ -268,7 +268,7 @@ namespace {
 
 // Read the optional Agent ?route override (auto|simple|complex|chat). An invalid
 // token is left as-is so RouteAndUpdateContext returns the Agent-friendly
-// CX_ERR_F39_FORCE_ROUTE_INVALID and the closure can surface a 400.
+// CX_ERR_ROUTER_FORCE_ROUTE_INVALID and the closure can surface a 400.
 std::optional<std::string> ReadRouteOverride(const httplib::Request& req,
                                              const json& body) {
     if (req.has_param("route")) return req.get_param_value("route");  // query-string wins
@@ -281,7 +281,7 @@ std::optional<std::string> ReadRouteOverride(const httplib::Request& req,
 // Read the ?granularity value (query-string wins over the JSON body, default
 // "auto") — same precedence as ?route / ?explain on this path. Validation is the
 // caller's (an invalid value is a generic 400, mirroring the single-NS
-// query_routes.cpp path: the frozen CX_ERR_F41_* set has no request-param identity).
+// query_routes.cpp path: the frozen CX_ERR_DOCSUMMARY_* set has no request-param identity).
 std::string ReadGranularity(const httplib::Request& req, const json& body) {
     if (req.has_param("granularity")) return req.get_param_value("granularity");
     if (body.is_object() && body.contains("granularity") && body["granularity"].is_string()) {
@@ -758,13 +758,13 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             // guard → backend Infer → confidence<threshold fail-safe → Complex), so
             // the chat rule guard correctly precedes the ML backend (team-lead note
             // on short-text domain shift). It is total; an invalid ?route returns
-            // CX_ERR_F39_FORCE_ROUTE_INVALID and ctx is left untouched.
+            // CX_ERR_ROUTER_FORCE_ROUTE_INVALID and ctx is left untouched.
             QueryContext qctx = MakeRoutingContext(body, auth_ctx);
             qctx.ns_id.clear();  // cross-NS: per-NS id is bound inside the executor
 
             // ?granularity (auto|chunk|doc|both, query-string wins over body).
             // Validate before routing so an invalid value is a clean 400 (the frozen
-            // CX_ERR_F41_* set has no request-param identity → generic InvalidArgument,
+            // CX_ERR_DOCSUMMARY_* set has no request-param identity → generic InvalidArgument,
             // matching the single-NS query_routes.cpp path). "chunk" is the explicit
             // baseline; "auto" and "both" engage the hybrid doc-summary fallback inside
             // LiveSingleUnitExecutor. ScatterGather/Gather are untouched (pass-through).

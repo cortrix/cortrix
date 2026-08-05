@@ -38,7 +38,7 @@ extern const char* const kP08AuthSchemaSql;
 /// scaffolding (catalog/schema_provider.h) verbatim — no new migration engine.
 class P08AuthSchemaProvider : public catalog::ISchemaProvider {
 public:
-    std::string FeatureName() const override { return "P08"; }
+    std::string FeatureName() const override { return "auth"; }
     int CurrentVersion() const override { return kP08AuthSchemaVersion; }
     Status Migrate(sqlite3* db, int from_ver, int to_ver) override;
 };

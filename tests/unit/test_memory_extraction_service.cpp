@@ -376,7 +376,7 @@ TEST_F(MemoryExtractionServiceTest, ExtractOne_Branch5a_SuccessfulExtraction) {
 TEST_F(MemoryExtractionServiceTest, ExtractOne_Branch5b_LlmErrorResultNotOk) {
     auto llm = std::make_shared<ScriptedLlmClient>();
     // Push a timeout-style error; MemoryExtractor maps this to
-    // CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT with retryable=true.
+    // CX_ERR_MEMEXTRACT_LLM_TIMEOUT with retryable=true.
     llm->PushError(StatusCode::kUnavailable, "circuit open / timeout");
 
     auto svc = MakeService(llm);
@@ -389,7 +389,7 @@ TEST_F(MemoryExtractionServiceTest, ExtractOne_Branch5b_LlmErrorResultNotOk) {
     EXPECT_FALSE(result.ok());
     ASSERT_TRUE(result.error.has_value());
     // MemoryExtractor maps kUnavailable to the LLM_TIMEOUT error code.
-    EXPECT_EQ(result.error->code, "CX_ERR_MEM02_EXTRACT_LLM_TIMEOUT");
+    EXPECT_EQ(result.error->code, "CX_ERR_MEMEXTRACT_LLM_TIMEOUT");
     EXPECT_GE(llm->call_count, 1);
 }
 

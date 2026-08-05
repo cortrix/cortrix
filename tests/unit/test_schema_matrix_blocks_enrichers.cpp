@@ -89,7 +89,7 @@ protected:
 };
 
 TEST_F(F03BlkMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F03");
+    EXPECT_EQ(p_.FeatureName(), "enricher");
     EXPECT_EQ(p_.CurrentVersion(), 2);
 }
 
@@ -203,7 +203,7 @@ protected:
 };
 
 TEST_F(F07BlkMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F07");
+    EXPECT_EQ(p_.FeatureName(), "scoring");
     EXPECT_EQ(p_.CurrentVersion(), 1);
     EXPECT_EQ(cortrix::scoring::kScoringSchemaVersion, 1);
 }
@@ -282,7 +282,7 @@ protected:
 };
 
 TEST_F(F35BlkMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F35");
+    EXPECT_EQ(p_.FeatureName(), "contextual");
     EXPECT_EQ(p_.CurrentVersion(), 2);  // V2 = + contextual_vec_labels (§3.8 W2)
 }
 
@@ -359,7 +359,7 @@ protected:
 };
 
 TEST_F(F34BlkMatrix, FeatureIdentity) {
-    EXPECT_EQ(p_.FeatureName(), "F34");
+    EXPECT_EQ(p_.FeatureName(), "parent_child");
     EXPECT_EQ(p_.CurrentVersion(), 1);
 }
 

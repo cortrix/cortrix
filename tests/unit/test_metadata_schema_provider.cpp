@@ -46,7 +46,7 @@ protected:
 
 TEST_F(MetadataSchemaTest, FeatureIdentity) {
     MetadataSchemaProvider p;
-    EXPECT_EQ(p.FeatureName(), "F08");
+    EXPECT_EQ(p.FeatureName(), "metadata_block");
     EXPECT_EQ(p.CurrentVersion(), kMetadataSchemaVersion);
     EXPECT_EQ(kMetadataSchemaVersion, 1);
 }

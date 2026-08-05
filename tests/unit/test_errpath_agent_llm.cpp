@@ -44,33 +44,33 @@ nlohmann::json ResolveEnvelope(StatusCode sc, const std::string& token,
 // ---------------------------------------------------------------------------
 
 TEST(ErrPathF48Test, LlmTimeoutResolvesTimeoutRetryable) {
-    auto body = ResolveEnvelope(StatusCode::kInternal, "CX_ERR_F48_LLM_TIMEOUT",
+    auto body = ResolveEnvelope(StatusCode::kInternal, "CX_ERR_AGENT_LLM_TIMEOUT",
                                 "upstream LLM deadline exceeded");
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F48_LLM_TIMEOUT");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_AGENT_LLM_TIMEOUT");
     EXPECT_EQ(body["error"]["category"], "timeout");
     EXPECT_EQ(body["error"]["retryable"], true);
 }
 
 TEST(ErrPathF48Test, LlmQuotaExceededResolvesQuotaRetryable) {
-    auto body = ResolveEnvelope(StatusCode::kInternal, "CX_ERR_F48_LLM_QUOTA_EXCEEDED",
+    auto body = ResolveEnvelope(StatusCode::kInternal, "CX_ERR_AGENT_LLM_QUOTA_EXCEEDED",
                                 "provider token quota exhausted");
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F48_LLM_QUOTA_EXCEEDED");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_AGENT_LLM_QUOTA_EXCEEDED");
     EXPECT_EQ(body["error"]["category"], "quota");
     EXPECT_EQ(body["error"]["retryable"], true);
 }
 
 TEST(ErrPathF48Test, LlmUnavailableResolvesTransientRetryable) {
-    auto body = ResolveEnvelope(StatusCode::kUnavailable, "CX_ERR_F48_LLM_UNAVAILABLE",
+    auto body = ResolveEnvelope(StatusCode::kUnavailable, "CX_ERR_AGENT_LLM_UNAVAILABLE",
                                 "LLM endpoint down");
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F48_LLM_UNAVAILABLE");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_AGENT_LLM_UNAVAILABLE");
     EXPECT_EQ(body["error"]["category"], "transient");
     EXPECT_EQ(body["error"]["retryable"], true);
 }
 
 TEST(ErrPathF48Test, RagFailedResolvesTransientRetryable) {
-    auto body = ResolveEnvelope(StatusCode::kInternal, "CX_ERR_F48_RAG_FAILED",
+    auto body = ResolveEnvelope(StatusCode::kInternal, "CX_ERR_AGENT_RAG_FAILED",
                                 "retrieval-augmented generation step failed");
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F48_RAG_FAILED");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_AGENT_RAG_FAILED");
     EXPECT_EQ(body["error"]["category"], "transient");
     EXPECT_EQ(body["error"]["retryable"], true);
 }
@@ -81,7 +81,7 @@ TEST(ErrPathF48Test, RagFailedResolvesTransientRetryable) {
 // not an accidental match with the StatusCode fallback.
 TEST(ErrPathF48Test, MapOverridesStatusCodeFallback) {
     auto quota = ResolveEnvelope(StatusCode::kInvalidArgument,
-                                 "CX_ERR_F48_LLM_QUOTA_EXCEEDED", "x");
+                                 "CX_ERR_AGENT_LLM_QUOTA_EXCEEDED", "x");
     // StatusCode fallback for kInvalidArgument is permanent/false; the map forces quota/true.
     EXPECT_EQ(quota["error"]["category"], "quota");
     EXPECT_EQ(quota["error"]["retryable"], true);
@@ -92,9 +92,9 @@ TEST(ErrPathF48Test, MapOverridesStatusCodeFallback) {
 // ---------------------------------------------------------------------------
 
 TEST(ErrPathF14Test, InvalidFilterResolvesPermanentNonRetryable) {
-    auto body = ResolveEnvelope(StatusCode::kInvalidArgument, "CX_ERR_F14_INVALID_FILTER",
+    auto body = ResolveEnvelope(StatusCode::kInvalidArgument, "CX_ERR_PGCORTRIX_INVALID_FILTER",
                                 "metadata filter expression failed to parse");
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F14_INVALID_FILTER");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_PGCORTRIX_INVALID_FILTER");
     EXPECT_EQ(body["error"]["category"], "permanent");
     EXPECT_EQ(body["error"]["retryable"], false);
 }
@@ -102,7 +102,7 @@ TEST(ErrPathF14Test, InvalidFilterResolvesPermanentNonRetryable) {
 // Even with a transient-looking StatusCode the map pins pgcortrix to permanent/false
 // (a malformed filter is a client fault — blind retry cannot help).
 TEST(ErrPathF14Test, InvalidFilterPinnedPermanentEvenOnInternalStatus) {
-    auto body = ResolveEnvelope(StatusCode::kInternal, "CX_ERR_F14_INVALID_FILTER", "x");
+    auto body = ResolveEnvelope(StatusCode::kInternal, "CX_ERR_PGCORTRIX_INVALID_FILTER", "x");
     EXPECT_EQ(body["error"]["category"], "permanent");
     EXPECT_EQ(body["error"]["retryable"], false);
 }

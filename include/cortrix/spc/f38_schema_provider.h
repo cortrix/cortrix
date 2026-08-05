@@ -25,7 +25,7 @@ namespace cortrix::spc {
 class F38SchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     /// Registration key (aligns with the other SchemaProvider names).
-    std::string FeatureName() const override { return "F38"; }
+    std::string FeatureName() const override { return "hype"; }
 
     /// Schema version. V1 = the kBlockHypeQuestion=16 block sub-type (code-level
     /// enum; no DB schema object). Phase 2 (independent P-HNSW / versioning, §14)
@@ -35,7 +35,7 @@ public:
     /// Phase 1 (from_ver 0 → 1): no-op (hype_question Blocks reuse the existing blocks
     /// table's existing block_type column; HyPE owns no extra table/column). An
     /// already-current (n → n) call is accepted defensively. Any other step is a
-    /// version mismatch (CX_ERR_F38_SCHEMA_VERSION_MISMATCH) until a Phase-2 step
+    /// version mismatch (CX_ERR_HYPE_SCHEMA_VERSION_MISMATCH) until a Phase-2 step
     /// is defined.
     Status Migrate(sqlite3* db, int from_ver, int to_ver) override;
 };

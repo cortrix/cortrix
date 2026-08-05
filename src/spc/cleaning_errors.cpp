@@ -13,13 +13,13 @@ namespace {
 // The switch in GetCleaningErrorInfo is intentionally exhaustive: -Wswitch turns
 // "added a code without a row" into a build failure, so the registry can't drift
 // from the enum.
-constexpr CleaningErrorInfo kDedupVectorInvalid  {"CX_ERR_F10_DEDUP_VECTOR_INVALID",  ErrorCategory::kPermanent, false, std::nullopt};
-constexpr CleaningErrorInfo kDedupThresholdRange {"CX_ERR_F10_DEDUP_THRESHOLD_RANGE", ErrorCategory::kPermanent, false, std::nullopt};
-constexpr CleaningErrorInfo kAnomalyConfigInvalid{"CX_ERR_F10_ANOMALY_CONFIG_INVALID",ErrorCategory::kPermanent, false, std::nullopt};
-constexpr CleaningErrorInfo kPluginTimeout       {"CX_ERR_F10_PLUGIN_TIMEOUT",        ErrorCategory::kTimeout,   true,  1000};
-constexpr CleaningErrorInfo kPluginException     {"CX_ERR_F10_PLUGIN_EXCEPTION",      ErrorCategory::kPermanent, false, std::nullopt};
-constexpr CleaningErrorInfo kNsConfigMergeFailed {"CX_ERR_F10_NS_CONFIG_MERGE_FAILED",ErrorCategory::kPermanent, false, std::nullopt};
-constexpr CleaningErrorInfo kInternalError       {"CX_ERR_F10_INTERNAL_ERROR",        ErrorCategory::kTransient, true,  2000};
+constexpr CleaningErrorInfo kDedupVectorInvalid  {"CX_ERR_CLEANING_DEDUP_VECTOR_INVALID",  ErrorCategory::kPermanent, false, std::nullopt};
+constexpr CleaningErrorInfo kDedupThresholdRange {"CX_ERR_CLEANING_DEDUP_THRESHOLD_RANGE", ErrorCategory::kPermanent, false, std::nullopt};
+constexpr CleaningErrorInfo kAnomalyConfigInvalid{"CX_ERR_CLEANING_ANOMALY_CONFIG_INVALID",ErrorCategory::kPermanent, false, std::nullopt};
+constexpr CleaningErrorInfo kPluginTimeout       {"CX_ERR_CLEANING_PLUGIN_TIMEOUT",        ErrorCategory::kTimeout,   true,  1000};
+constexpr CleaningErrorInfo kPluginException     {"CX_ERR_CLEANING_PLUGIN_EXCEPTION",      ErrorCategory::kPermanent, false, std::nullopt};
+constexpr CleaningErrorInfo kNsConfigMergeFailed {"CX_ERR_CLEANING_NS_CONFIG_MERGE_FAILED",ErrorCategory::kPermanent, false, std::nullopt};
+constexpr CleaningErrorInfo kInternalError       {"CX_ERR_CLEANING_INTERNAL_ERROR",        ErrorCategory::kTransient, true,  2000};
 
 }  // namespace
 

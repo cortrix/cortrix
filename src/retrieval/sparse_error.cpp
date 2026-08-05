@@ -17,15 +17,15 @@ namespace {
 // 1000 / RETRIEVER 200 (all transient/retryable); ONNX_RUNTIME_INIT is permanent
 // (operator must fix the model/path) → not retryable.
 constexpr SparseErrorInfo kInferenceFailed{
-    "CX_ERR_F40_INFERENCE_FAILED", ErrorCategory::kTransient, true, 500};
+    "CX_ERR_SPARSE_INFERENCE_FAILED", ErrorCategory::kTransient, true, 500};
 constexpr SparseErrorInfo kSparseSerializeFailed{
-    "CX_ERR_F40_SPARSE_SERIALIZE_FAILED", ErrorCategory::kTransient, true, 100};
+    "CX_ERR_SPARSE_SERIALIZE_FAILED", ErrorCategory::kTransient, true, 100};
 constexpr SparseErrorInfo kInvertedIndexWriteFailed{
-    "CX_ERR_F40_INVERTED_INDEX_WRITE_FAILED", ErrorCategory::kTransient, true, 1000};
+    "CX_ERR_SPARSE_INVERTED_INDEX_WRITE_FAILED", ErrorCategory::kTransient, true, 1000};
 constexpr SparseErrorInfo kSparseRetrieverFailed{
-    "CX_ERR_F40_SPARSE_RETRIEVER_FAILED", ErrorCategory::kTransient, true, 200};
+    "CX_ERR_SPARSE_RETRIEVER_FAILED", ErrorCategory::kTransient, true, 200};
 constexpr SparseErrorInfo kOnnxRuntimeInitFailed{
-    "CX_ERR_F40_ONNX_RUNTIME_INIT_FAILED", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_SPARSE_ONNX_RUNTIME_INIT_FAILED", ErrorCategory::kPermanent, false, std::nullopt};
 
 }  // namespace
 

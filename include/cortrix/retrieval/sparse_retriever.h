@@ -26,7 +26,7 @@ struct SparseHit {
 /// future IVF-sparse impl (Phase 2, N>100M) drops in without touching callers.
 ///
 /// Errors are surfaced via cortrix::Status (F-FREEZE-1, no Result<T,E>); the
-/// domain identity is carried by the CX_ERR_F40_* token in the Status message
+/// domain identity is carried by the CX_ERR_SPARSE_* token in the Status message
 /// (re-inflatable to the Agent-friendly body via MakeSparseError). Search
 /// returns a vector directly (an empty result is success, not an error); Add /
 /// Remove return Status.
@@ -47,7 +47,7 @@ public:
     /// Write/update the sparse vector for `child_id` in `ns_id` (incremental
     /// index). Re-adding an existing child_id replaces its postings.
     /// An empty `vec` removes any existing postings (the dead-chunk / §6.5
-    /// path — equivalent to Remove). Returns CX_ERR_F40_INVERTED_INDEX_WRITE_*
+    /// path — equivalent to Remove). Returns CX_ERR_SPARSE_INVERTED_INDEX_WRITE_*
     /// on a write fault (retryable).
     virtual Status Add(
         const NamespaceId& ns_id,

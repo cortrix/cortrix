@@ -15,7 +15,7 @@ ChatExecutor pipeline (one turn):
      rag_status="degraded".
   3. Build the injection-hardened prompt (design section 6.5) and stream the LLM.
   4. If the LLM itself fails after a degraded RAG (or permanent error) -> L3:
-     raise AgentError(CX_ERR_F48_RAG_FAILED) so the route emits the 4-field error.
+     raise AgentError(CX_ERR_AGENT_RAG_FAILED) so the route emits the 4-field error.
 
 The executor yields ``StreamEvent`` objects; the route layer encodes them as SSE
 (``data:{chunk}`` ... ``data:{meta}`` ``data:[DONE]`` — design section 9.1).
@@ -182,7 +182,7 @@ class ChatExecutor(IAgentExecutor):
             if rag_status == RAG_STATUS_DEGRADED:
                 # L3: both RAG and LLM unavailable -> hard error (design section 9.2).
                 raise AgentError(
-                    "CX_ERR_F48_RAG_FAILED",
+                    "CX_ERR_AGENT_RAG_FAILED",
                     retryable=False,
                     structured_data={
                         "cortrix_server_error": rag_failed_detail.get("cortrix_server_error")

@@ -162,7 +162,7 @@ def test_l3_failure_emits_four_field_error_event():
     errors = [p["error"] for p in payloads if "error" in p]
     assert len(errors) == 1
     err = errors[0]
-    assert err["code"] == "CX_ERR_F48_RAG_FAILED"
+    assert err["code"] == "CX_ERR_AGENT_RAG_FAILED"
     assert set(err.keys()) == {
         "code",
         "message",
@@ -183,7 +183,7 @@ def test_chat_rejects_empty_message():
     body = resp.json()
     assert "error" in body, body
     err = body["error"]
-    assert err["code"] == "CX_ERR_F48_VALIDATION_ERROR"
+    assert err["code"] == "CX_ERR_AGENT_VALIDATION_ERROR"
     assert err["retryable"] is False
     assert err["category"] == "permanent"
     assert "validation_errors" in err["structured_data"]
@@ -195,7 +195,7 @@ def test_chat_missing_message_field_is_agent_friendly():
     resp = client.post("/chat", json={"session_id": "s1"})
     assert resp.status_code == 422
     err = resp.json()["error"]
-    assert err["code"] == "CX_ERR_F48_VALIDATION_ERROR"
+    assert err["code"] == "CX_ERR_AGENT_VALIDATION_ERROR"
     assert err["structured_data"]["validation_errors"]
 
 
@@ -215,7 +215,7 @@ def test_get_missing_session_returns_404_four_field_error():
     resp = client.get("/sessions/does-not-exist")
     assert resp.status_code == 404
     err = resp.json()["error"]
-    assert err["code"] == "CX_ERR_F48_SESSION_NOT_FOUND"
+    assert err["code"] == "CX_ERR_AGENT_SESSION_NOT_FOUND"
     assert err["retryable"] is False
     assert err["structured_data"]["session_id"] == "does-not-exist"
 

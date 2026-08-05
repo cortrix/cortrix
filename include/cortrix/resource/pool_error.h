@@ -21,9 +21,9 @@ namespace cortrix::resource {
 /// identified by its CX_ERR_* code. So PoolErrorCode is the *enum of identities*
 /// and MakePoolError() turns one (plus structured_data) into the boundary error.
 ///
-/// Naming (§8.1 m4): the prefix is `CX_ERR_NS_*`, NOT `CX_ERR_F05_*` — admission
-/// control failures are namespace-domain errors shared with the catalog and tenant layers, so an
-/// Agent never filters Cortrix errors by F-module number. The 3 admission codes
+/// Naming: the prefix is `CX_ERR_NS_*` — admission control failures are
+/// namespace-domain errors shared with the catalog and tenant layers, so they are
+/// named for the domain rather than for the component raising them. The 3 admission codes
 /// reuse the same CX_ERR_NS_* strings the catalog already registers (catalog_error.h);
 /// they are the same wire identities seen from the pool side.
 ///

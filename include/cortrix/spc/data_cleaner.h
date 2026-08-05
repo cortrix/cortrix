@@ -40,7 +40,7 @@ public:
         std::shared_ptr<operation_log::IOperationLogger> op_logger = nullptr);
 
     /// Validate the config (threshold ∈ [0,1], max_chunk_chars > 0). Returns the
-    /// matching CX_ERR_F10_* Status on violation. Called by the ctor's consumers
+    /// matching CX_ERR_CLEANING_* Status on violation. Called by the ctor's consumers
     /// before use; exposed for the pipeline to fail fast / surface to the Agent.
     Status ValidateConfig() const;
 

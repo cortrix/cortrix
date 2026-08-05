@@ -12,7 +12,7 @@
 namespace cortrix::spc {
 
 /// The 7 data-cleaning error identities. Each maps to a
-/// stable `CX_ERR_F10_*` string + a GEN-Agent category + retryability via the
+/// stable `CX_ERR_CLEANING_*` string + a GEN-Agent category + retryability via the
 /// canonical registry below — same pattern as catalog::CatalogErrorCode
 /// (the template) and spc::ParserErrorCode.
 ///
@@ -36,7 +36,7 @@ constexpr int kCleaningErrorCodeCount = 7;
 /// Canonical, immutable attributes of one error code (§5.1 columns). Mirrors
 /// catalog::CatalogErrorInfo / spc::ParserErrorInfo so the registries read alike.
 struct CleaningErrorInfo {
-    const char* cx_code;                      ///< stable "CX_ERR_F10_*" string
+    const char* cx_code;                      ///< stable "CX_ERR_CLEANING_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
     bool retryable;
     std::optional<int> retry_after_ms;        ///< null unless retryable per §5.1
@@ -46,7 +46,7 @@ struct CleaningErrorInfo {
 /// throws / never returns a partial). Single source of truth for the §5.1 rows.
 const CleaningErrorInfo& GetCleaningErrorInfo(CleaningErrorCode code);
 
-/// The "CX_ERR_F10_*" string for `code`.
+/// The "CX_ERR_CLEANING_*" string for `code`.
 const char* CleaningErrorCodeString(CleaningErrorCode code);
 
 /// Build the Agent-friendly boundary error for `code`, attaching `structured_data`
@@ -59,7 +59,7 @@ agent_friendly::AgentFriendlyError MakeCleaningError(
     const std::string& message = "");
 
 /// Bridge a cleaning error to a plain Status (F-FREEZE-1). The message is
-/// prefixed with the CX_ERR_F10_* token so the exact identity is recoverable at
+/// prefixed with the CX_ERR_CLEANING_* token so the exact identity is recoverable at
 /// the API/SDK boundary (same pattern as catalog::CatalogStatus). We do NOT
 /// widen cortrix::Status itself.
 Status CleaningStatus(CleaningErrorCode code, const std::string& detail = "");

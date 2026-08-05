@@ -101,7 +101,7 @@ TEST_F(ObservabilityRoutesTc4Test, TracesGlobalNoNamespaceRequired) {
     EXPECT_EQ(res->status, 404);
     auto body = json::parse(res->body);
     ASSERT_TRUE(body.contains("error"));
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F13_SESSION_NOT_FOUND");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_TRACE_SESSION_NOT_FOUND");
 }
 
 TEST_F(ObservabilityRoutesTc4Test, TracesUnknownSessionReturns404) {
@@ -112,7 +112,7 @@ TEST_F(ObservabilityRoutesTc4Test, TracesUnknownSessionReturns404) {
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 404);
     auto body = json::parse(res->body);
-    EXPECT_EQ(body["error"]["code"], "CX_ERR_F13_SESSION_NOT_FOUND");
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_TRACE_SESSION_NOT_FOUND");
 }
 
 TEST_F(ObservabilityRoutesTc4Test, SourcesMissingNamespaceReturns400) {

@@ -19,19 +19,19 @@ namespace {
 // INTERNAL is retryable (transient) — the Agent may retry but no fixed backoff is
 // promised; the rest are permanent/auth (caller must fix the request).
 constexpr F13ErrorInfo kSessionNotFound{
-    "CX_ERR_F13_SESSION_NOT_FOUND", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_TRACE_SESSION_NOT_FOUND", ErrorCategory::kPermanent, false, std::nullopt};
 constexpr F13ErrorInfo kInvalidFilter{
-    "CX_ERR_F13_INVALID_FILTER", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_TRACE_INVALID_FILTER", ErrorCategory::kPermanent, false, std::nullopt};
 constexpr F13ErrorInfo kInteractionNotFound{
-    "CX_ERR_F13_INTERACTION_NOT_FOUND", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_TRACE_INTERACTION_NOT_FOUND", ErrorCategory::kPermanent, false, std::nullopt};
 constexpr F13ErrorInfo kUnauthorized{
-    "CX_ERR_F13_UNAUTHORIZED", ErrorCategory::kAuth, false, std::nullopt};
+    "CX_ERR_TRACE_UNAUTHORIZED", ErrorCategory::kAuth, false, std::nullopt};
 constexpr F13ErrorInfo kMcpSessionInvalid{
-    "CX_ERR_F13_MCP_SESSION_INVALID", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_TRACE_MCP_SESSION_INVALID", ErrorCategory::kPermanent, false, std::nullopt};
 constexpr F13ErrorInfo kSessionExpired{
-    "CX_ERR_F13_SESSION_EXPIRED", ErrorCategory::kPermanent, false, std::nullopt};
+    "CX_ERR_TRACE_SESSION_EXPIRED", ErrorCategory::kPermanent, false, std::nullopt};
 constexpr F13ErrorInfo kInternal{
-    "CX_ERR_F13_INTERNAL", ErrorCategory::kTransient, true, std::nullopt};
+    "CX_ERR_TRACE_INTERNAL", ErrorCategory::kTransient, true, std::nullopt};
 
 }  // namespace
 
@@ -107,7 +107,7 @@ StatusCode F13ErrorToStatusCode(F13ErrorCode code) {
         case F13ErrorCode::kInteractionNotFound:
             return StatusCode::kNotFound;
         // Bad filter / invalid MCP session id / expired session → caller-side bad
-        // input → kInvalidArgument. The rich CX_ERR_F13_* identity + category
+        // input → kInvalidArgument. The rich CX_ERR_TRACE_* identity + category
         // survive via the token + boundary MakeF13Error().
         case F13ErrorCode::kInvalidFilter:
         case F13ErrorCode::kMcpSessionInvalid:

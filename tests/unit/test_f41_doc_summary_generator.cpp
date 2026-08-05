@@ -83,7 +83,7 @@ TEST(F41DocSummaryGeneratorTest, ParseNonObjectIsInvalidOutput) {
                                     std::make_shared<store::MockChunkStore>());
     auto r = g.ParseStructuredOutput("[1,2,3]", 500);
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F41_LLM_INVALID_OUTPUT"),
+    EXPECT_NE(r.status().message().find("CX_ERR_DOCSUMMARY_LLM_INVALID_OUTPUT"),
               std::string::npos);
 }
 
@@ -92,7 +92,7 @@ TEST(F41DocSummaryGeneratorTest, ParseGarbageIsInvalidOutput) {
                                     std::make_shared<store::MockChunkStore>());
     auto r = g.ParseStructuredOutput("not json at all", 500);
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F41_LLM_INVALID_OUTPUT"),
+    EXPECT_NE(r.status().message().find("CX_ERR_DOCSUMMARY_LLM_INVALID_OUTPUT"),
               std::string::npos);
 }
 
@@ -130,7 +130,7 @@ TEST(F41DocSummaryGeneratorTest, ParseMissingSummaryTextIsInvalid) {
 
 // ---------- Parse-repair second chance (deep-QA 2026-07-10, DeepSeek field
 // failure: valid object wrapped in prose or an UNCLOSED fence rejected by the
-// strict path -> CX_ERR_F41_LLM_INVALID_OUTPUT mid-drain) ----------
+// strict path -> CX_ERR_DOCSUMMARY_LLM_INVALID_OUTPUT mid-drain) ----------
 
 TEST(F41DocSummaryGeneratorTest, ParseRepairsProseWrappedJson) {
     DocSummaryGenerator g = MakeGen(std::make_shared<llm::MockLlmClient>(),
@@ -196,7 +196,7 @@ TEST(F41DocSummaryGeneratorTest, ParseTruncatedJsonStillFails) {
         R"({"summary_text": "cut off mid-genera)", 500, &repair);
     EXPECT_FALSE(r.ok());
     EXPECT_TRUE(repair.empty());
-    EXPECT_NE(r.status().message().find("CX_ERR_F41_LLM_INVALID_OUTPUT"),
+    EXPECT_NE(r.status().message().find("CX_ERR_DOCSUMMARY_LLM_INVALID_OUTPUT"),
               std::string::npos);
 }
 
@@ -326,7 +326,7 @@ TEST(F41DocSummaryGeneratorTest, ShortDocLlmFailureIsTimeout) {
     bool mr = false;
     auto r = g.GenerateSummary(NChunks(3), "R", &mr);
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F41_LLM_TIMEOUT"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_DOCSUMMARY_LLM_TIMEOUT"), std::string::npos);
 }
 
 // Regression (DEFECT#3, 2026-06-26): the generator must send the CONFIGURED
@@ -379,7 +379,7 @@ TEST(F41DocSummaryGeneratorTest, MapReduceMapStageFailureSurfaces) {
     bool mr = false;
     auto r = g.GenerateSummary(NChunks(5), "Long", &mr);
     EXPECT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_F41_LLM_TIMEOUT"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_DOCSUMMARY_LLM_TIMEOUT"), std::string::npos);
 }
 
 // ---------- Generate end-to-end ----------
@@ -432,7 +432,7 @@ TEST(F41DocSummaryGeneratorTest, GenerateLlmFailureCarriesTimeoutError) {
     GenerationResult res = g.Generate("doc1", "ns1");
     EXPECT_FALSE(res.success);
     ASSERT_TRUE(res.error.has_value());
-    EXPECT_EQ(res.error->code, "CX_ERR_F41_LLM_TIMEOUT");
+    EXPECT_EQ(res.error->code, "CX_ERR_DOCSUMMARY_LLM_TIMEOUT");
     ASSERT_TRUE(res.error->structured_data.has_value());
     EXPECT_TRUE(HasRequiredStructuredData(DocSummaryErrorCode::kLlmTimeout,
                                           *res.error->structured_data));
@@ -452,7 +452,7 @@ TEST(F41DocSummaryGeneratorTest, GenerateInvalidOutputCarriesInvalidError) {
     GenerationResult res = g.Generate("doc1", "ns1");
     EXPECT_FALSE(res.success);
     ASSERT_TRUE(res.error.has_value());
-    EXPECT_EQ(res.error->code, "CX_ERR_F41_LLM_INVALID_OUTPUT");
+    EXPECT_EQ(res.error->code, "CX_ERR_DOCSUMMARY_LLM_INVALID_OUTPUT");
     ASSERT_TRUE(res.error->structured_data.has_value());
     EXPECT_TRUE(HasRequiredStructuredData(DocSummaryErrorCode::kLlmInvalidOutput,
                                           *res.error->structured_data));
@@ -464,7 +464,7 @@ TEST(F41DocSummaryGeneratorTest, GenerateInvalidOutputCarriesInvalidError) {
     EXPECT_EQ((*res.error->structured_data)["llm_content_length"], 8);
     EXPECT_EQ((*res.error->structured_data)["llm_reasoning_content_length"], 0);
     EXPECT_NE((*res.error->structured_data)["parse_error"].get<std::string>().find(
-                  "CX_ERR_F41_LLM_INVALID_OUTPUT"),
+                  "CX_ERR_DOCSUMMARY_LLM_INVALID_OUTPUT"),
               std::string::npos);
     EXPECT_NE(res.error->message.find("content_source=message.content"),
               std::string::npos);

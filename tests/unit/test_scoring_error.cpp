@@ -10,7 +10,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/scoring/scoring_error.h"
 
-// Semantic score S8 / §4.4 coverage: the 2 semantic score error identities — CX_ERR_F07_* identity, category
+// Semantic score S8 / §4.4 coverage: the 2 semantic score error identities — CX_ERR_SCORING_* identity, category
 // mapping, retryability, the GEN-Agent 4-field boundary factory, the structured_data
 // contract, and the Status bridge. Mirrors tests/unit/test_import_error.cpp (template A).
 namespace cortrix::scoring {
@@ -32,7 +32,7 @@ TEST(F07ErrorTest, TwoCodesTotal) {
 }
 
 TEST(F07ErrorTest, EveryCodeHasUniqueWellFormedCxString) {
-    static const std::regex kPattern("^CX_ERR_F07_[A-Z][A-Z_]*$");
+    static const std::regex kPattern("^CX_ERR_SCORING_[A-Z][A-Z_]*$");
     std::set<std::string> seen;
     for (F07ErrorCode code : AllCodes()) {
         std::string cx = F07ErrorCodeString(code);
@@ -41,9 +41,9 @@ TEST(F07ErrorTest, EveryCodeHasUniqueWellFormedCxString) {
     }
     EXPECT_EQ(seen.size(), 2u);
     EXPECT_EQ(std::string(F07ErrorCodeString(F07ErrorCode::kLevelInvalid)),
-              "CX_ERR_F07_LEVEL_INVALID");
+              "CX_ERR_SCORING_LEVEL_INVALID");
     EXPECT_EQ(std::string(F07ErrorCodeString(F07ErrorCode::kConfigInvalid)),
-              "CX_ERR_F07_CONFIG_INVALID");
+              "CX_ERR_SCORING_CONFIG_INVALID");
 }
 
 // §4.4: both permanent, neither retryable, retry_after_ms null.
@@ -64,7 +64,7 @@ TEST(F07ErrorTest, MakeErrorPopulatesAgentFriendlyFields) {
         {{"alpha_received", 1.5}, {"valid_range", {0.0, 1.0}},
          {"config_source", "config.yaml:scoring.alpha"}},
         "alpha out of [0,1]");
-    EXPECT_EQ(err.code, "CX_ERR_F07_CONFIG_INVALID");
+    EXPECT_EQ(err.code, "CX_ERR_SCORING_CONFIG_INVALID");
     EXPECT_FALSE(err.retryable);
     EXPECT_EQ(err.category, ErrorCategory::kPermanent);
     EXPECT_FALSE(err.retry_after_ms.has_value());
@@ -72,14 +72,14 @@ TEST(F07ErrorTest, MakeErrorPopulatesAgentFriendlyFields) {
     EXPECT_EQ((*err.structured_data)["config_source"], "config.yaml:scoring.alpha");
 
     auto body = agent_friendly::ToJson(err);
-    EXPECT_EQ(body["code"], "CX_ERR_F07_CONFIG_INVALID");
+    EXPECT_EQ(body["code"], "CX_ERR_SCORING_CONFIG_INVALID");
     EXPECT_EQ(body["category"], "permanent");
     EXPECT_TRUE(body["retry_after_ms"].is_null());
 }
 
 TEST(F07ErrorTest, EmptyMessageFallsBackToCode) {
     auto err = MakeScoringError(F07ErrorCode::kLevelInvalid);
-    EXPECT_EQ(err.message, "CX_ERR_F07_LEVEL_INVALID");
+    EXPECT_EQ(err.message, "CX_ERR_SCORING_LEVEL_INVALID");
 }
 
 // §4.4 structured_data contract (GEN-Agent #5).
@@ -101,11 +101,11 @@ TEST(F07ErrorTest, StatusBridgePreservesIdentityInMessage) {
     Status s = ScoringStatus(F07ErrorCode::kLevelInvalid, "level 7");
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kInvalidArgument);
-    EXPECT_NE(s.message().find("CX_ERR_F07_LEVEL_INVALID"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_SCORING_LEVEL_INVALID"), std::string::npos);
     EXPECT_NE(s.message().find("level 7"), std::string::npos);
 
     EXPECT_EQ(ScoringStatus(F07ErrorCode::kConfigInvalid).code(), StatusCode::kInvalidArgument);
-    EXPECT_EQ(ScoringStatus(F07ErrorCode::kLevelInvalid).message(), "CX_ERR_F07_LEVEL_INVALID");
+    EXPECT_EQ(ScoringStatus(F07ErrorCode::kLevelInvalid).message(), "CX_ERR_SCORING_LEVEL_INVALID");
 }
 
 }  // namespace

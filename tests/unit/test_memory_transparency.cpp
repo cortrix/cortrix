@@ -175,7 +175,7 @@ TEST_F(MemoryTransparencyTest, ListUserIdMustMatchSession) {
     auto r = mt_->List(f, kUser);
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kPermissionDenied);
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM03_USER_MISMATCH"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_USER_MISMATCH"), std::string::npos);
     EXPECT_EQ(Mem03Metrics::Instance().OpCount(Mem03Metrics::Op::kList,
                                                Mem03Metrics::OpStatus::kError), 1u);
 }
@@ -335,7 +335,7 @@ TEST_F(MemoryTransparencyTest, CreateInvalidType) {
     auto r = mt_->Create(req, kUser);
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kInvalidArgument);
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM03_INVALID_TYPE"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_INVALID_TYPE"), std::string::npos);
 }
 
 TEST_F(MemoryTransparencyTest, CreateContentTooLong) {
@@ -346,7 +346,7 @@ TEST_F(MemoryTransparencyTest, CreateContentTooLong) {
     auto r = mt_->Create(req, kUser);
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kInvalidArgument);
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM03_CONTENT_TOO_LONG"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_CONTENT_TOO_LONG"), std::string::npos);
 }
 
 TEST_F(MemoryTransparencyTest, CreateContentExactlyMaxAllowed) {
@@ -409,7 +409,7 @@ TEST_F(MemoryTransparencyTest, EditOptimisticLockConflict) {
     req.expected_modified_at = 9999;  // stale — does not match 1234
     auto r = mt_->Edit(req, kUser);
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM03_EDIT_CONCURRENT"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_EDIT_CONCURRENT"), std::string::npos);
     EXPECT_EQ(Mem03Metrics::Instance().EditConflictCount(), 1u);
     // Old block untouched (still active, no new block inserted beyond none).
     EXPECT_EQ(store_->Get("m_old")->metadata_json["status"], "active");
@@ -433,7 +433,7 @@ TEST_F(MemoryTransparencyTest, EditCrossUserReturns404Mask) {
     auto r = mt_->Edit(req, "evil_user");  // attacker session
     ASSERT_FALSE(r.ok());
     EXPECT_EQ(r.status().code(), StatusCode::kNotFound);
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM03_MEMORY_NOT_FOUND"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_NOT_FOUND"), std::string::npos);
     EXPECT_EQ(Mem03Metrics::Instance().CrossUserBlockedCount(), 1u);
     // Original block untouched.
     EXPECT_EQ(store_->Get("m_old")->metadata_json["status"], "active");
@@ -457,7 +457,7 @@ TEST_F(MemoryTransparencyTest, EditInvalidNewType) {
     req.new_memory_type = "bogus";
     auto r = mt_->Edit(req, kUser);
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM03_INVALID_TYPE"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_INVALID_TYPE"), std::string::npos);
 }
 
 TEST_F(MemoryTransparencyTest, EditContentOnlyKeepsType) {
@@ -480,7 +480,7 @@ TEST_F(MemoryTransparencyTest, EditInsertFailureRollsBackToError) {
     req.new_content = "c2";
     auto r = mt_->Edit(req, kUser);
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM03_INVALIDATE_FAILED"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_INVALIDATE_FAILED"), std::string::npos);
     // Old block NOT invalidated since the new insert failed first.
     EXPECT_EQ(store_->Get("m_old")->metadata_json["status"], "active");
 }
@@ -521,7 +521,7 @@ TEST_F(MemoryTransparencyTest, EditOptimisticLockNoStoredModifiedAtConflicts) {
     req.expected_modified_at = 1234;  // nothing to match against
     auto r = mt_->Edit(req, kUser);
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM03_EDIT_CONCURRENT"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_EDIT_CONCURRENT"), std::string::npos);
     EXPECT_NE(r.status().message().find("none"), std::string::npos);  // actual=none
 }
 
@@ -535,7 +535,7 @@ TEST_F(MemoryTransparencyTest, EditOldBlockUpdateFailureReturnsInvalidateFailed)
     req.new_content = "c2";
     auto r = mt_->Edit(req, kUser);
     ASSERT_FALSE(r.ok());
-    EXPECT_NE(r.status().message().find("CX_ERR_MEM03_INVALIDATE_FAILED"), std::string::npos);
+    EXPECT_NE(r.status().message().find("CX_ERR_MEMORY_INVALIDATE_FAILED"), std::string::npos);
     EXPECT_EQ(Mem03Metrics::Instance().OpCount(Mem03Metrics::Op::kEdit,
                                                Mem03Metrics::OpStatus::kError), 1u);
 }
@@ -575,7 +575,7 @@ TEST_F(MemoryTransparencyTest, DeleteCrossUserReturns404Mask) {
     Status s = mt_->Delete("m1", "evil_user");
     ASSERT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kNotFound);
-    EXPECT_NE(s.message().find("CX_ERR_MEM03_MEMORY_NOT_FOUND"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_MEMORY_NOT_FOUND"), std::string::npos);
     EXPECT_EQ(Mem03Metrics::Instance().CrossUserBlockedCount(), 1u);
     EXPECT_EQ(store_->Get("m1")->metadata_json["status"], "active");  // untouched
 }
@@ -591,7 +591,7 @@ TEST_F(MemoryTransparencyTest, DeleteUpdateFailurePropagates) {
     block_store_->SetUpdateFail(true);
     Status s = mt_->Delete("m1", kUser);
     ASSERT_FALSE(s.ok());
-    EXPECT_NE(s.message().find("CX_ERR_MEM03_INVALIDATE_FAILED"), std::string::npos);
+    EXPECT_NE(s.message().find("CX_ERR_MEMORY_INVALIDATE_FAILED"), std::string::npos);
     EXPECT_EQ(oplog_->CountAction("memory_invalidate"), 0);  // no audit on failure
 }
 

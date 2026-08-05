@@ -11,7 +11,7 @@
 namespace cortrix::agent_trace {
 
 /// The 7 agent-observability error identities. Each maps to a
-/// stable `CX_ERR_F13_*` string + a GEN-Agent category + retryability via the
+/// stable `CX_ERR_TRACE_*` string + a GEN-Agent category + retryability via the
 /// canonical registry below.
 ///
 /// Per CODING_CONVENTIONS §3 / F-FREEZE-1, Cortrix uses Result<T> + Status only
@@ -39,7 +39,7 @@ constexpr int kF13ErrorCodeCount = 7;
 
 /// Canonical, immutable attributes of one error code.
 struct F13ErrorInfo {
-    const char* cx_code;                      ///< stable "CX_ERR_F13_*" string
+    const char* cx_code;                      ///< stable "CX_ERR_TRACE_*" string
     agent_friendly::ErrorCategory category;   ///< auth / permanent / transient
     bool retryable;
     std::optional<int> retry_after_ms;        ///< null for every code in this family
@@ -49,7 +49,7 @@ struct F13ErrorInfo {
 /// throws / never returns a partial). Single source of truth for the 7 rows.
 const F13ErrorInfo& GetF13ErrorInfo(F13ErrorCode code);
 
-/// The "CX_ERR_F13_*" string for `code` (convenience over GetF13ErrorInfo).
+/// The "CX_ERR_TRACE_*" string for `code` (convenience over GetF13ErrorInfo).
 const char* F13ErrorCodeString(F13ErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry
@@ -73,7 +73,7 @@ agent_friendly::AgentFriendlyError MakeF13Error(
 
 /// Bridge an observability error to a plain Status for the Result<T>/Status surface
 /// (F-FREEZE-1). The StatusCode is the coarse mapping of `code`; the message is
-/// prefixed with the CX_ERR_F13_* token ("CX_ERR_F13_X: detail") so the exact
+/// prefixed with the CX_ERR_TRACE_* token ("CX_ERR_TRACE_X: detail") so the exact
 /// identity is recoverable at the API/SDK boundary (which re-inflates the full
 /// Agent-friendly body via MakeF13Error). We deliberately do NOT widen
 /// cortrix::Status itself.

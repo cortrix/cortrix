@@ -53,7 +53,7 @@ Status F40SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
             std::string msg = err ? err : "DDL failed";
             sqlite3_free(err);
             return Status::Internal(
-                "CX_ERR_F40_INVERTED_INDEX_WRITE_FAILED: create "
+                "CX_ERR_SPARSE_INVERTED_INDEX_WRITE_FAILED: create "
                 "sparse_inverted_index: " + msg);
         }
         // unified-blocks: blocks.sparse_vec BLOB — only child rows write
@@ -67,7 +67,7 @@ Status F40SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
                 std::string msg = err ? err : "DDL failed";
                 sqlite3_free(err);
                 return Status::Internal(
-                    "CX_ERR_F40_INVERTED_INDEX_WRITE_FAILED: add blocks.sparse_vec: " + msg);
+                    "CX_ERR_SPARSE_INVERTED_INDEX_WRITE_FAILED: add blocks.sparse_vec: " + msg);
             }
         }
         return Status::Ok();

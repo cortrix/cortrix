@@ -11,7 +11,7 @@
 //     Register-returns-error arm (207-208).
 //   * HandleRevokeConnection:   the no-"reason" ternary false branch (247).
 //   * CodeFromStatus:      the unrecognized-prefix -> kConnectionFailed fallback (29),
-//     reached via a connection-manager Status whose message carries no CX_ERR_F16A_*
+//     reached via a connection-manager Status whose message carries no CX_ERR_IMPORT_*
 //     token (HttpFor / ErrorBody route through CodeFromStatus).
 //
 // Deterministic: no socket, no network, no LLM. The handler methods are called
@@ -77,13 +77,13 @@ public:
 };
 
 // A fake IConnectionManager whose Register / Revoke return a Status whose message
-// carries NO CX_ERR_F16A_* token. This drives both the Register/Revoke error arms
+// carries NO CX_ERR_IMPORT_* token. This drives both the Register/Revoke error arms
 // AND CodeFromStatus's unrecognized-prefix fallback (kConnectionFailed).
 class FailingConnMgr : public IConnectionManager {
 public:
     Result<ConnectionRefId> Register(const std::string&, const std::string&, const TenantId&,
                                      const std::string&, std::optional<int>) override {
-        // Plain message, no CX_ERR_F16A_ prefix -> CodeFromStatus falls back.
+        // Plain message, no CX_ERR_IMPORT_ prefix -> CodeFromStatus falls back.
         return Status::Internal("secret store write failed");
     }
     Result<std::string> ResolveDsn(const ConnectionRefId&, const AuthContext&) override {
@@ -113,7 +113,7 @@ std::shared_ptr<ImportManager> MakeMgr(std::shared_ptr<IConnectionManager> conn_
 // ParseImportRequest: text_strategy + merge_size branches.
 // ---------------------------------------------------------------------------
 
-// text_strategy present but not a string -> CX_ERR_F16A_INVALID_SQL (line 67).
+// text_strategy present but not a string -> CX_ERR_IMPORT_INVALID_SQL (line 67).
 TEST(ImportHandlerGaps, TextStrategyNotStringIsInvalid) {
     nlohmann::json body = {{"namespace", "ns"}, {"connection_ref", "r"},
                            {"table", "users"}, {"text_strategy", 123}};
@@ -156,7 +156,7 @@ TEST(ImportHandlerGaps, StartImportParseFailureReturns400) {
     auto out = handler.HandleStartImport(body, AdminCtx(), http);
     EXPECT_EQ(http, 400) << out.dump();
     ASSERT_TRUE(out.contains("error"));
-    EXPECT_EQ(out["error"]["code"], "CX_ERR_F16A_INVALID_SQL") << out.dump();
+    EXPECT_EQ(out["error"]["code"], "CX_ERR_IMPORT_INVALID_SQL") << out.dump();
 }
 
 // ---------------------------------------------------------------------------

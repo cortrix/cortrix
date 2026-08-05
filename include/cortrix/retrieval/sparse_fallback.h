@@ -19,7 +19,7 @@ inline constexpr int kSparseSerializeRetries = 3;
 /// (after N retries) the chunk degrades to dense+FTS5 only: blob is empty,
 /// has_sparse_vec must be CLEARED, sparse_vec column written NULL — NOT an error
 /// that fails the chunk write (only a *dense+sparse both* inference failure does
-/// that, which is handled by the caller raising CX_ERR_F40_INFERENCE_FAILED).
+/// that, which is handled by the caller raising CX_ERR_SPARSE_INFERENCE_FAILED).
 struct L1SerializeResult {
     bool serialized = false;          ///< true → use `blob`; false → write NULL
     std::vector<uint8_t> blob;        ///< the sparse_vec BLOB when serialized
