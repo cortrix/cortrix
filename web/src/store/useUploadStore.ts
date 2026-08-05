@@ -10,7 +10,7 @@ interface UploadState {
   files: UploadFile[];
   documents: DocumentStatus[];
   documentsLoading: boolean;
-  // Bulk submit (TD-F42-BULK-SUBMIT) — partial-success result + BATCH-level error.
+  // Bulk submit (batch submit) — partial-success result + BATCH-level error.
   batchResult: BatchSubmitResponse | null;
   batchError: AgentError | null;
   batchSubmitting: boolean;
@@ -140,7 +140,7 @@ export const useUploadStore = create<UploadState>((set, get) => ({
     }
   },
 
-  // Bulk submit (TD-F42-BULK-SUBMIT). The textarea holds a JSON array of
+  // Bulk submit (batch submit). The textarea holds a JSON array of
   // `{ doc_id, content, metadata? }`. A parse error / BATCH-level failure
   // (empty, >100, duplicate) lands in `batchError`; otherwise the per-doc
   // partial-success envelope lands in `batchResult` (succeeded[] / failed[]).

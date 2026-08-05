@@ -1,9 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
-// Vitest config (P02a design § 17 — test matrix / § 17.3 coverage targets).
+// Vitest config (web UI design § 17 — test matrix / § 17.3 coverage targets).
 // Coverage gate mirrors the design: Lines > 70%, Functions > 80%, Branches > 60%
-// (P02a is one of the 17 core features → Story DoD also expects line ≥ 90% on the
+// (web UI is one of the 17 core features → Story DoD also expects line ≥ 90% on the
 // store/util core, enforced in CI per-path; here we set the feature-wide floor).
 export default defineConfig({
   plugins: [react()],

@@ -44,7 +44,7 @@ client.close()
 Expected success signal: the client can reach the configured server and returns
 resource objects or typed `CortrixError` exceptions. Check the server status in
 [Compatibility](../../docs/compatibility.md) before relying on auth, tenant,
-RBAC, quota, or MEM02 extraction paths.
+RBAC, quota, or memory extraction paths.
 
 ### Async
 
@@ -150,7 +150,7 @@ the minimal SDK path.
 - Auth login is currently `Blocked` in the public status baseline.
 - Tenant/member/ACL/quota behavior is currently `Blocked` pending contract
   reconciliation.
-- MEM02 extraction is currently `Blocked` because the latest runtime verification
+- memory extraction is currently `Blocked` because the latest runtime verification
   found an LLM transport timeout path.
 - Built-in retry/error behavior should be verified against your target
   cortrix-server build.

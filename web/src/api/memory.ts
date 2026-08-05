@@ -12,7 +12,7 @@ import type {
   MemoryInvalidateResponse,
 } from '../types/api';
 
-// MEM03 Memory Transparency client (4 endpoints, P02a design § 7.2):
+// Memory Transparency client (4 endpoints, web UI design § 7.2):
 //   GET    /api/v1/memory?explain={bool}   list
 //   POST   /api/v1/memory                  create
 //   PATCH  /api/v1/memory/{id}             edit (server sets extraction_method=user_edit)

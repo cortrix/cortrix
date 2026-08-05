@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import type { MemoryItem, MemoryType } from '../../types/api';
 import { Modal, Button, Textarea, Select } from '../ui';
 
-// Create / Edit memory dialog (P02a design § 7.1, MEM03 POST + PATCH). One
+// Create / Edit memory dialog (web UI design § 7.1, memory transparency POST + PATCH). One
 // component drives both modes — `memory` present = edit. Edit creates a new
 // memory and invalidates the old one (§ 7.2 — extraction_method=user_edit), so
-// we surface that note. content maxLength 2000 (MEM03 § 4.3.2).
+// we surface that note. content maxLength 2000 (memory transparency).
 
 const MAX_CONTENT = 2000;
 

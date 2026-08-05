@@ -1,9 +1,9 @@
 """CortrixToolKit tests — all 29 methods, routing, transcoding, error passthrough.
 
 Each method has at least one test. We assert (a) the method returns a plain dict
-(``_to_dict`` normalized the P03 dataclass), (b) it took the expected path (P03
+(``_to_dict`` normalized the Python SDK dataclass), (b) it took the expected path (Python SDK
 SDK resource verb vs HTTP fallback ``_request``), and (c) the wire contract
-(path / body / params) matches the P12 mirror tool.
+(path / body / params) matches the MCP server mirror tool.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ def test_all_names_prefixed_cortrix():
 
 
 def test_no_admin_methods():
-    # F16a admin tools are explicitly out of scope for P14 (feature design 1.3).
+    # DB import admin tools are explicitly out of scope for Skill SDK (feature design 1.3).
     assert not any("admin" in n for n in TOOL_METHOD_NAMES)
 
 
@@ -114,7 +114,7 @@ def test_create_namespace_uses_sdk(kit, fake_client):
 
 
 def test_memory_search_uses_http_fallback_no_user_id(kit, fake_client):
-    # P03 memory.search requires user_id (server-enforced in P12); keep P12 wire.
+    # Python SDK memory.search requires user_id (server-enforced in MCP server); keep MCP server wire.
     fake_client.set_http_return({"memories": []})
     out = kit.cortrix_memory_search(query="prefs", top_k=4)
     assert out == {"memories": []}
@@ -233,7 +233,7 @@ def test_query_explain_uses_http_fallback_with_explain_param(kit, fake_client):
     assert params == {"explain": "true"}
 
 
-# === MEM02 reverse +2 =======================================================
+# === memory extraction reverse +2 ===========================================
 
 def test_memory_get_audit_uses_http_fallback(kit, fake_client):
     fake_client.set_http_return({"entries": []})
@@ -251,7 +251,7 @@ def test_memory_revoke_fact_uses_http_fallback(kit, fake_client):
     assert body == {"namespace": "default"}
 
 
-# === MEM04 reverse +1 =======================================================
+# === memory opt-out reverse +1 ==============================================
 
 def test_memory_opt_out_uses_http_fallback(kit, fake_client):
     fake_client.set_http_return({"opted_out": True})
@@ -261,7 +261,7 @@ def test_memory_opt_out_uses_http_fallback(kit, fake_client):
     assert body == {"namespace": "default", "session_id": "s1", "opt_out": False}
 
 
-# === TD-F42-BULK reverse +1 =================================================
+# === Batch submit reverse +1 =================================================
 
 def test_batch_submit_uses_http_fallback(kit, fake_client):
     fake_client.set_http_return({"results": [], "structured_data": {"total": 0}})
@@ -273,7 +273,7 @@ def test_batch_submit_uses_http_fallback(kit, fake_client):
     assert timeout == 120.0
 
 
-# === F18a reverse +1 ========================================================
+# === operation log reverse +1 ===============================================
 
 def test_list_operations_uses_http_fallback_omits_none(kit, fake_client):
     fake_client.set_http_return({"operations": [], "structured_data": {"total": 0}})
@@ -284,7 +284,7 @@ def test_list_operations_uses_http_fallback_omits_none(kit, fake_client):
     assert params == {"limit": 200, "user_id": "u1", "action": "upload"}
 
 
-# === MEM03 reverse +4 =======================================================
+# === memory transparency reverse +4 =========================================
 
 def test_memory_list_uses_sdk(kit, fake_client):
     out = kit.cortrix_memory_list(memory_type="preference", include_invalidated=True, limit=300)

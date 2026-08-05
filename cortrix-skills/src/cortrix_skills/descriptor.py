@@ -109,7 +109,7 @@ class ToolDescriptor:
 
     Attributes:
         name: the method name (``cortrix_<action>``), used verbatim as the
-            framework tool name (the P12 ``cortrix_<action>`` naming SoT).
+            framework tool name (the MCP server ``cortrix_<action>`` naming SoT).
         description: first line of the method docstring.
         input_schema: JSON Schema for the parameters.
         method: the bound callable (so an adapter can invoke it).

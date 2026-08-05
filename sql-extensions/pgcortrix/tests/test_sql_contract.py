@@ -2,7 +2,7 @@
 
 The build machine has no PostgreSQL, so we cannot run pg_regress / a live server
 (that is deferred to D3.5). Instead this test parses the DDL text and asserts the
-SQL *contract* defined by F14-pgcortrix.md §2.1: the 4 composite types with their
+SQL *contract* defined by the pgcortrix design §2.1: the 4 composite types with their
 exact columns, the 5 main + 2 helper function signatures (name, ordered params
 with types + defaults, return type, volatility/parallel markers). It catches the
 kinds of drift a human review misses — a renamed column, a dropped DEFAULT, a
@@ -157,7 +157,7 @@ class TestFunctionSignatures(unittest.TestCase):
         params, tail = self._fn("pgcortrix_memory_search")
         names = self._param_names(params)
         self.assertEqual(names, ["namespace", "query", "user_id", "top_k"])
-        # MEM05: user_id must be positional + mandatory (no DEFAULT on it).
+        # Memory isolation: user_id must be positional + mandatory (no DEFAULT on it).
         self.assertNotRegex(params, r"user_id\s+TEXT\s+DEFAULT")
         self.assertRegex(tail, r"RETURNS\s+SETOF\s+pgcortrix_memory_result")
 
@@ -167,7 +167,7 @@ class TestFunctionSignatures(unittest.TestCase):
         # v1.0.2 5-param shape: namespace, user_id, filter, limit_n, offset_n.
         self.assertEqual(
             names, ["namespace", "user_id", "filter", "limit_n", "offset_n"])
-        # user_id mandatory (MEM05 D4): no DEFAULT on it; filter is optional.
+        # user_id mandatory (memory isolation D4): no DEFAULT on it; filter is optional.
         self.assertNotRegex(params, r"user_id\s+TEXT\s+DEFAULT")
         self.assertRegex(params, r"filter\s+JSONB\s+DEFAULT\s+NULL")
         self.assertIn("DEFAULT 50", params)
@@ -182,7 +182,7 @@ class TestFunctionSignatures(unittest.TestCase):
 
     def test_batch_submit_signature(self):
         params, tail = self._fn("pgcortrix_batch_submit")
-        # TD-F42-BULK-5-rev-3: namespace + documents JSONB + on_duplicate.
+        # Batch submit: namespace + documents JSONB + on_duplicate.
         self.assertEqual(
             self._param_names(params), ["namespace", "documents", "on_duplicate"])
         self.assertRegex(params, r"documents\s+JSONB")

@@ -1,7 +1,7 @@
 import { get } from './client';
 
 // NOTE: The standalone Connector page (S3 pull / directory monitor UI) was
-// removed in P02a-R1-S1 (F17 -> Phase 2). Only the watcher listing used by the
+// removed in web UI (S3 pull -> Phase 2). Only the watcher listing used by the
 // Upload / DocumentList tree view is retained here. The backend route
 // `/api/v1/connector/watchers` stays the source of watch-directory groupings.
 

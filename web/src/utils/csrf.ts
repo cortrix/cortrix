@@ -1,4 +1,4 @@
-// CSRF token helper (P02a design § 4.6 — double-cookie + custom header).
+// CSRF token helper (web UI design § 4.6 — double-cookie + custom header).
 //
 // The backend issues two cookies on login: `cortrix-auth` (HttpOnly — proof of
 // identity, NOT readable by JS) and `cortrix-csrf` (non-HttpOnly — readable by

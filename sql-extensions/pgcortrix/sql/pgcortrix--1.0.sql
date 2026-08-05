@@ -1,21 +1,21 @@
 -- pgcortrix--1.0.sql — Cortrix PostgreSQL extension, V1 (plpython3u + HTTP REST).
 --
--- SoT: design/features/F14-pgcortrix.md v1.0.3 (§2.1 signatures, §2.2 GUC, §3.3
+-- SoT: design/features/the pgcortrix design (§2.1 signatures, §2.2 GUC, §3.3
 -- endpoint map). Loaded by `CREATE EXTENSION pgcortrix`.
 --
--- Shape of V1 (F14 §1, L0' 2026-05-07): every function is a thin plpython3u
+-- Shape of V1 (pgcortrix, L0' 2026-05-07): every function is a thin plpython3u
 -- wrapper that calls the Cortrix Server HTTP API via the pgcortrix_helper Python
 -- module (installed into PG's plpython3u site-packages). No shared memory / C
 -- code — that is the V3+ roadmap (§9). The Python logic is kept in the helper
 -- module (not inlined here) so it is unit-testable off a live PG (mock urllib),
 -- which is how the standalone DoD is met (L1-α briefing §6).
 --
--- Function inventory (F14 §2.1): 6 main + 2 helper.
+-- Function inventory (pgcortrix): 6 main + 2 helper.
 --   main:   pgcortrix_search / pgcortrix_upload / pgcortrix_list_documents /
 --           pgcortrix_batch_submit / pgcortrix_memory_search /
 --           pgcortrix_list_interactions
 --   helper: pgcortrix_configure / pgcortrix_status
--- pgcortrix_batch_submit (TD-F42-BULK-5-rev-3, D3 impl layer) wraps
+-- pgcortrix_batch_submit (batch submit, D3 impl layer) wraps
 -- POST /api/v1/documents/batch and returns the partial-success envelope as JSONB.
 
 \echo Use "CREATE EXTENSION pgcortrix" to load this file. \quit
@@ -24,7 +24,7 @@
 -- §2.1.1  Composite return types (4)
 -- ===========================================================================
 -- Four SETOF-returning functions need a composite row type each. Column sets
--- mirror the HTTP response schemas these functions wrap (F14 §3.3 → ARCH §4.1).
+-- mirror the HTTP response schemas these functions wrap (pgcortrix → ARCH §4.1).
 
 CREATE TYPE pgcortrix_search_result AS (
     chunk_id     TEXT,
@@ -51,10 +51,10 @@ CREATE TYPE pgcortrix_memory_result AS (
     created_at  TIMESTAMPTZ,
     memory_type TEXT,        -- fact | preference | event
     status      TEXT,        -- active | invalidated
-    final_score FLOAT        -- MEM01: raw * decay_factor (ranking key, design § 2.1)
+    final_score FLOAT        -- memory decay: raw * decay_factor (ranking key, design § 2.1)
 );
 
--- v1.0.1: interaction_log list type. MEM05 v1.0 D4 forces per-user isolation,
+-- v1.0.1: interaction_log list type. memory isolation D4 forces per-user isolation,
 -- so pgcortrix_list_interactions always carries user_id (§2.1.2 fn 5).
 CREATE TYPE pgcortrix_interaction_info AS (
     interaction_id TEXT,
@@ -91,7 +91,7 @@ END $$;
 -- §2.1.2  Main functions (6)
 -- ===========================================================================
 -- Each body defers to the cached PgcortrixClient helper (GD-cached so the module
--- is imported once per backend, not per call — F14 §2.3). The helper does the
+-- is imported once per backend, not per call — pgcortrix). The helper does the
 -- GUC read, endpoint validation, HTTP call, retry, cancel handling and error
 -- mapping; the SQL layer only marshals args in and yields rows / values out.
 
@@ -158,7 +158,7 @@ AS $$
         )
 $$;
 
--- 3.bis Batch document submit (TD-F42-BULK-5-rev-3, D3 impl layer).
+-- 3.bis Batch document submit (batch submit, D3 impl layer).
 -- Wraps POST /api/v1/documents/batch — Agent-first bulk upload of up to 100
 -- documents. `documents` is a JSONB array of per-doc objects (client-supplied
 -- doc_id + content; optional filename / metadata). Returns the partial-success
@@ -168,7 +168,7 @@ $$;
 -- on them in SQL), while batch-level faults (size / payload / empty /
 -- duplicate-doc_id) surface as PG ERRORs via the helper's HTTP error mapping.
 -- VOLATILE (write path); options default async=true / on_duplicate=skip
--- (TD-F42-BULK §2.2 — V1 is always async).
+-- (batch submit §2.2 — V1 is always async).
 CREATE FUNCTION pgcortrix_batch_submit(
     namespace    TEXT,
     documents    JSONB,
@@ -186,11 +186,11 @@ AS $$
     return json.dumps(resp)
 $$;
 
--- 4. Memory search (MEM05: user_id is mandatory for per-user isolation).
+-- 4. Memory search (memory isolation: user_id is mandatory for per-user isolation).
 CREATE FUNCTION pgcortrix_memory_search(
     namespace TEXT,
     query     TEXT,
-    user_id   TEXT,              -- MEM05 forced per-user isolation
+    user_id   TEXT,              -- memory isolation forced per-user isolation
     top_k     INT  DEFAULT 5
 ) RETURNS SETOF pgcortrix_memory_result
 LANGUAGE plpython3u
@@ -212,14 +212,14 @@ AS $$
 $$;
 
 -- 5. interaction_log list (v1.0.2 — D1 V3 decision 4 "combined" shape).
--- MEM05 v1.0 D4 three-way parity = user_id mandatory (security) + filter capability aligned
--- with F13 §8.3 HTTP API (function). Three-way parity with MCP
+-- Memory isolation D4 three-way parity = user_id mandatory (security) + filter capability aligned
+-- with agent trace HTTP API (function). Three-way parity with MCP
 -- cortrix_list_interactions + HTTP GET /memory/interactions.
 --   filter JSONB whitelist (§2.1.5): session_id / namespace_id / from_ts / to_ts
 --   / sort_order. Anything else → CX_ERR_F14_INVALID_FILTER.
 CREATE FUNCTION pgcortrix_list_interactions(
     namespace TEXT,
-    user_id   TEXT,                  -- MEM05 D4: mandatory positional (no NULL/default)
+    user_id   TEXT,                  -- memory isolation D4: mandatory positional (no NULL/default)
     filter    JSONB DEFAULT NULL,    -- v1.0.2 optional whitelist filter
     limit_n   INT   DEFAULT 50,
     offset_n  INT   DEFAULT 0

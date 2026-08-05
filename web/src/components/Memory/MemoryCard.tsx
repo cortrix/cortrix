@@ -5,7 +5,7 @@ import { Badge, Button } from '../ui';
 import { formatEpoch } from '../../utils/formatters';
 import { ExtractionMethodBadge } from './ExtractionMethodBadge';
 
-// One memory record card (P02a design § 7.1). Shows A-class fields by default;
+// One memory record card (web UI design § 7.1). Shows A-class fields by default;
 // B-class provenance (§ 7.3 explain mode) is revealed when `explain` is on.
 // `revoked_at` is surfaced as a transparency badge (§ 7.4 — admin revoke
 // history). Invalidate = soft delete (§ 7.2), never a hard delete.

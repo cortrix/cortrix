@@ -1,10 +1,10 @@
-"""SQL (Text-to-SQL) resource. ``/sql`` (ARCH § 4.1.6, F14).
+"""SQL (Text-to-SQL) resource. ``/sql`` (ARCH § 4.1.6, pgcortrix).
 
 This resource follows the implemented HTTP architecture. ``query()`` ->
 ``POST /sql`` (``SqlResult``). The
 per-namespace schema CRUD (``register_schema`` / ``get_schema`` /
 ``delete_schema``) is **§2.12-only** -> § 2.12 wire ``/namespaces/{ns}/sql/schema``
-(P04 spec to be added -> D3.5). ``query()`` accepts an optional ``namespace``
+(API spec to be added -> D3.5). ``query()`` accepts an optional ``namespace``
 sent in the body for forward-compat (real-arch ``SqlRequest`` has no namespace).
 """
 
@@ -16,7 +16,7 @@ from ..types import SqlResult
 from ._base import AsyncResource, SyncResource
 
 PATH_SQL = "/sql"
-# §2.12-only (P04 spec to be added -> D3.5).
+# §2.12-only (API spec to be added -> D3.5).
 PATH_SQL_SCHEMA = "/namespaces/{ns}/sql/schema"
 
 

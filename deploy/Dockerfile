@@ -78,7 +78,7 @@ ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
 # Python sources are COPYed after the C++ build on purpose: they take no part
 # in the cmake step, and copying them earlier invalidated the (expensive)
 # compile layer on every Python-side change.
-# sdk/python is the P03 SDK — cortrix-agent imports it as a sibling package
+# sdk/python is the Python SDK — cortrix-agent imports it as a sibling package
 # (main.py resolves ../sdk/python), so it ships as source, not a wheel.
 COPY cortrix-agent  cortrix/cortrix-agent/
 COPY sdk/python     cortrix/sdk/python/
@@ -183,7 +183,7 @@ COPY --from=builder /build/build/cortrix-server /app/cortrix_server
 COPY --from=builder /build/build/_deps/onnxruntime-src/lib/libonnxruntime.so* /usr/local/lib/
 RUN ldconfig
 
-# Default YAML config + F20 log-sanitizer rules (main.cpp reads the fixed
+# Default YAML config + readiness log-sanitizer rules (main.cpp reads the fixed
 # path /app/config/sensitive_fields.yaml)
 COPY deploy/cortrix.yaml              /app/config/cortrix.yaml
 COPY src/logging/sensitive_fields.yaml /app/config/sensitive_fields.yaml
@@ -196,13 +196,13 @@ COPY --from=web-builder /build/web-ui/dist /app/web-ui
 COPY --from=web-builder /build/openapi.bundled.yaml /app/build/openapi.bundled.yaml
 
 # Python code + pre-built wheels (image layout keeps /app/python/cortrix-agent
-# with the P03 SDK as its sibling at /app/python/sdk/python — main.py resolves
+# with the Python SDK as its sibling at /app/python/sdk/python — main.py resolves
 # parents[1]/sdk/python; supervisord.conf depends on this layout)
 COPY --from=builder /build/cortrix/cortrix-agent /app/python/cortrix-agent
 COPY --from=builder /build/cortrix/sdk/python    /app/python/sdk/python
 COPY --from=builder /wheels /tmp/wheels
 
-# F06 parser bridge scripts (auto-located at /app/scripts by the server).
+# Parser bridge scripts (auto-located at /app/scripts by the server).
 # txt/md parse via the bridge's plain-text fast path with zero extra deps;
 # the heavy docling/paddleocr stacks are installed on first run by
 # entrypoint.sh into a venv on the /data volume (PROFILE=full default),

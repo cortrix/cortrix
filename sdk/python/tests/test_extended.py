@@ -114,7 +114,7 @@ def test_tenants_create_uses_admin_endpoint(api_base: str, client: Cortrix) -> N
     assert route.calls.last.request.url.path == "/api/v1/admin/tenants"
 
 
-# --- import (F16a hand-written, mocked; real spec -> D3.5) ---
+# --- import (DB import hand-written, mocked; real spec -> D3.5) ---
 @respx.mock
 def test_import_database(api_base: str, client: Cortrix) -> None:
     route = respx.post(api_base + "/import/database").mock(

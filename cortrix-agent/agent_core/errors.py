@@ -1,4 +1,4 @@
-"""F48 error codes + GEN-Agent 4-field error response (design section 9.3 / section 10).
+"""agent error codes + GEN-Agent 4-field error response (design section 9.3 / section 10).
 
 GEN-Agent first principle (AGENT_FRIENDLY.md): every error carries machine-readable
 fields so an Agent caller can decide retry / routing autonomously. The wire shape is::
@@ -106,14 +106,14 @@ STARTUP_ERROR_TABLE: dict[str, dict[str, Any]] = {
     },
 }
 
-# Combined lookup used when building a response from any known F48 code.
+# Combined lookup used when building a response from any known agent code.
 _ALL_CODES: dict[str, dict[str, Any]] = {**ERROR_TABLE, **STARTUP_ERROR_TABLE}
 
 
 class AgentError(Exception):
     """A Cortrix Agent error carrying the GEN-Agent 4 fields.
 
-    When ``code`` is a known F48 code, ``category`` / ``retryable`` / ``http_status``
+    When ``code`` is a known agent code, ``category`` / ``retryable`` / ``http_status``
     default from the registry; callers may override any of them and attach a
     ``structured_data`` payload (design section 9.3 — the data the Agent needs to act).
     """

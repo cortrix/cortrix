@@ -1,5 +1,5 @@
 # pgcortrix — PGXS Makefile (independent build, NOT part of the main cortrix/
-# CMake; L1-α briefing §6 / F14 §1).
+# CMake; L1-α briefing §6 / pgcortrix).
 #
 # Standard PostgreSQL extension build via PGXS:
 #   make                       # stages the SQL + control (no compiled module in V1)

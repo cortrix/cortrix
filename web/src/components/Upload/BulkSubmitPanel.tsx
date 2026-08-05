@@ -12,7 +12,7 @@ import { ErrorDisplay } from '../Common/ErrorDisplay';
 import { ProgrammaticBanner } from '../Common/ProgrammaticBanner';
 import type { AgentError, BatchSubmitFailure } from '../../types/api';
 
-// Bulk submit panel (P02a § 4.1, TD-F42-BULK-SUBMIT). Submits a JSON array of
+// Bulk submit panel (web UI, batch submit). Submits a JSON array of
 // documents (1–100) and renders the partial-success schema: a succeeded group
 // (chips) + a failed group (each row an ErrorDisplay built from the per-doc
 // GEN-Agent 5 fields). A BATCH-level error (empty / >100 / duplicate / invalid

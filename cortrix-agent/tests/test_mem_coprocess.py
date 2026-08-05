@@ -1,4 +1,4 @@
-"""Unit tests for MemoryCoprocessor (F48 <-> MEM co-processing, design section 13)."""
+"""Unit tests for MemoryCoprocessor (agent <-> MEM co-processing, design section 13)."""
 
 import pytest
 
@@ -45,7 +45,7 @@ async def test_record_turn_calls_memory_log():
 
 @pytest.mark.asyncio
 async def test_record_turn_user_id_fallback():
-    """MEM05: a missing user_id falls back to a default subject (never sent empty)."""
+    """memory isolation: a missing user_id falls back to a default subject (never sent empty)."""
     client = _Client()
     mem = MemoryCoprocessor(client)
     await mem.record_turn("s2", "q", "a", user_id=None)
@@ -62,7 +62,7 @@ async def test_record_turn_namespace_override():
 
 @pytest.mark.asyncio
 async def test_record_turn_never_raises_on_failure():
-    """F48-rev-9: a logging failure must not propagate (chat must not be blocked)."""
+    """the agent design: a logging failure must not propagate (chat must not be blocked)."""
     client = _Client(fail=True)
     mem = MemoryCoprocessor(client)
     assert await mem.record_turn("s4", "q", "a", user_id="u") is None

@@ -1,4 +1,4 @@
-"""T-P03-TRACE-1~4 — issue-3 client_id / trace_id_provider injection."""
+"""SDK trace cases 1-4 — issue-3 client_id / trace_id_provider injection."""
 
 from __future__ import annotations
 

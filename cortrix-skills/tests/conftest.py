@@ -1,4 +1,4 @@
-"""Shared test fixtures: a fake P03 client recording SDK calls + HTTP fallbacks.
+"""Shared test fixtures: a fake Python SDK client recording SDK calls + HTTP fallbacks.
 
 No real network. ``FakeClient`` mimics the parts of ``cortrix.Cortrix`` that
 ``CortrixToolKit`` touches:

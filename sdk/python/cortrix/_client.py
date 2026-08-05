@@ -1,4 +1,4 @@
-"""Synchronous Cortrix client. See P03 design § 2.2."""
+"""Synchronous Cortrix client. See Python SDK design § 2.2."""
 
 from __future__ import annotations
 
@@ -278,7 +278,7 @@ class Cortrix(BaseClient):
         table: Optional[str] = None,
         mode: str = "per_row",
     ) -> Any:
-        """Manual DB import (F16a). ``POST /import/database`` (import.yaml not yet
+        """Manual database import. ``POST /import/database`` (import.yaml not yet
         built -> D3.5)."""
         if self._imports is None:
             self._imports = Imports(self)

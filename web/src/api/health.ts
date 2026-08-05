@@ -2,7 +2,7 @@ import { API_BASE } from '../utils/constants';
 import { mockApi } from './mock';
 import { fallbackToMock } from './fallback';
 
-// Health endpoints (P02a design § 4.2, F20-7). Two K8s-style probes:
+// Health endpoints (web UI design § 4.2, readiness). Two K8s-style probes:
 //   GET /api/v1/system/health/live   — process liveness (always 200 when up)
 //   GET /api/v1/system/health/ready  — readiness, 200 when all 5 components are
 //                                      ready, 503 (not_ready) while any is down.
@@ -18,7 +18,7 @@ export interface LiveResponse {
 
 export type ComponentStatus = 'ok' | 'not_ready';
 
-// 5 components per F20-7 § 8.4 (catalog / vector_index / secret_provider /
+// 5 components per the readiness design (catalog / vector_index / secret_provider /
 // spc_pipeline / memory_store). Each may carry component-specific extras
 // (bloom_filter_ready, wal_lag_bytes, queue_depth, progress, reason, …) which
 // we surface generically as key/value detail rows.

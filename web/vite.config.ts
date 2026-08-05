@@ -1,10 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Vite build + dev config (P02a design § 11.3 proxy + § 14.2 code-splitting).
+// Vite build + dev config (web UI design § 11.3 proxy + § 14.2 code-splitting).
 //
 // Build output is emitted to static/ (committed, embedded into cortrix-server
-// at container build per § 11.1 / F24). manualChunks splits the vendor graph so
+// at container build per § 11.1 / deployment). manualChunks splits the vendor graph so
 // the initial bundle stays under the 250KB gzip release gate (§ 14.1): the big
 // libraries (react / state / ui / monaco) land in long-cached vendor chunks and
 // Monaco + the lazy route pages (see src/routes.tsx) are only fetched on demand.

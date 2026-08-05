@@ -2,7 +2,7 @@
 
 Session state is the in-process :class:`agent_core.SessionStore` (decision P-2): an
 in-memory dict with an N=10 sliding multi-turn window. There is NO server round-trip
-in V1.0 — MEM02 durable-session integration is the V1.5 ②-round upgrade (TODO(D3.5)).
+in V1.0 — memory extraction durable-session integration is the V1.5 ②-round upgrade (TODO(D3.5)).
 
 The response shape (design section 9.1)::
 

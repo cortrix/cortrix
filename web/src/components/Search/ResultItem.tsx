@@ -5,7 +5,7 @@ interface ResultItemProps {
   result: SearchResult;
 }
 
-// F04 cross-NS ResultItem renderer. The result carries child_id/parent_id (ULIDs),
+// Cross-NS ResultItem renderer. The result carries child_id/parent_id (ULIDs),
 // the matched `content`, the source `namespace` (cross-NS: each hit may come from a
 // different NS), and score + rerank_score. block_type/source_path/hit_routes from the
 // old single-NS schema no longer exist on the wire.

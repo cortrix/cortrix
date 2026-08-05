@@ -1,4 +1,4 @@
-"""Cortrix Agent core (F48 v1.0 chat mode).
+"""Cortrix Agent core (agent chat mode).
 
 UI-agnostic kernel for the Cortrix built-in Agent. Phase 1 V1.0 ships the
 ``ChatExecutor`` (fixed RAG flow, no autonomous tool-use); V1.5 adds

@@ -221,7 +221,7 @@ unchanged.
 - Legacy protocol: `2025-11-25` via the initialize handshake.
 - Transport: local stdio. Cortrix does not currently expose a remote or
   loopback Streamable HTTP MCP endpoint.
-- MEM02 memory extraction is currently `Blocked` in the latest public status
+- memory extraction is currently `Blocked` in the latest public status
   baseline because the runtime verification found an LLM transport timeout path.
 - Auth, tenant/member/ACL/quota, RBAC, and tenant isolation behavior must be
   checked against [Compatibility](../docs/compatibility.md) before making a

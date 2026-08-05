@@ -29,7 +29,7 @@ interface NavItem {
   end?: boolean;
 }
 
-// Primary navigation (P02a design § 10 / § 9-bis). Migrated from the old
+// Primary navigation (web UI design § 10 / § 9-bis). Migrated from the old
 // `activePage` zustand selection to react-router <NavLink> in R3/S5 — the active
 // state now derives from the URL. The Admin group (Users / Operation Log,
 // § 9-bis) renders only for admin-role sessions. The Enterprise group renders
@@ -51,7 +51,7 @@ const ADMIN: NavItem[] = [
   { to: '/admin/operation-log', label: 'admin.operations.navLabel', icon: ClipboardDocumentListIcon },
 ];
 
-// Enterprise group (P02a § 6.3) — rendered only on enterprise builds. On the
+// Enterprise group (web UI) — rendered only on enterprise builds. On the
 // enterprise edition each item carries a "Coming" badge until its feature ships
 // (V1.5); on CE the whole group is hidden (see Sidebar gating below).
 const ENTERPRISE: NavItem[] = [

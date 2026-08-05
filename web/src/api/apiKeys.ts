@@ -3,7 +3,7 @@ import { mockApi } from './mock';
 import { fallbackToMock } from './fallback';
 import type { ApiKeySummary, ApiKeyCreateRequest, ApiKeyCreateResponse } from '../types/api';
 
-// API Keys client (P08 § 2.13.3 — user-level keys for SDK / MCP, P02a § 9.3):
+// API Keys client (auth — user-level keys for SDK / MCP, web UI):
 //   GET    /api/v1/auth/api-keys           list (no plaintext key)
 //   POST   /api/v1/auth/api-keys           create (plaintext `key` returned ONCE)
 //   DELETE /api/v1/auth/api-keys/{id}      revoke

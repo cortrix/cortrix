@@ -3,7 +3,7 @@ import { mockApi } from './mock';
 import { fallbackToMock } from './fallback';
 import type { BatchSubmitRequest, BatchSubmitResponse } from '../types/api';
 
-// Bulk document submit (TD-F42-BULK-SUBMIT):
+// Bulk document submit (batch submit):
 //   POST /api/v1/documents/batch  — 1–100 docs, partial-success schema.
 //
 // BATCH-level failures (empty / size / payload-too-large / duplicate doc_id)

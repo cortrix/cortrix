@@ -1,4 +1,4 @@
-"""Query / search tests (POST /query, F04 wire: ``namespaces`` array)."""
+"""Query / search tests (POST /query, cross-NS query wire: ``namespaces`` array)."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def test_search_single_ns_wraps_in_array(api_base: str, client: Cortrix) -> None
     assert res.results[0].child_id == "c1"
     assert res.meta.coverage_ratio == 1.0
     body = json.loads(route.calls.last.request.content)
-    assert body["namespaces"] == ["ns1"]  # F04 wire: single str -> 1-element array
+    assert body["namespaces"] == ["ns1"]  # cross-NS query wire: single str -> 1-element array
     assert body["query"] == "Party A breach clause"
     assert body["top_k"] == 5
     assert body["rerank"] is True

@@ -3,14 +3,14 @@
 ``IAgentExecutor`` is the V1.5-forward interface; Phase 1 V1.0 ships only
 ``ChatExecutor`` — a fixed RAG flow with NO autonomous tool selection (the design's
 "chat mode"). ``ToolUseExecutor`` (V1.5) and PlanExecuteExecutor (V2) are reserved and
-raise NotImplementedError, mirroring the F37 IClassifier / F39 IRetrievalFallback style.
+raise NotImplementedError, mirroring the CRAG IClassifier / query routing IRetrievalFallback style.
 
 Naming rule: the product is the "Cortrix Agent"; the executor class
 is ``ChatExecutor`` (never "ChatbotExecutor"), preserving the mode distinction with the
 future ToolUseExecutor / PlanExecuteExecutor.
 
 ChatExecutor pipeline (one turn):
-  1. RAG retrieve via the P03 SDK with L1 retry N=3 on transient errors (design section 9.2).
+  1. RAG retrieve via the Python SDK with L1 retry N=3 on transient errors (design section 9.2).
   2. On RAG exhaustion -> L2 fallback: prompt the LLM with no context, mark
      rag_status="degraded".
   3. Build the injection-hardened prompt (design section 6.5) and stream the LLM.

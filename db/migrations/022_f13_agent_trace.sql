@@ -1,13 +1,13 @@
--- F13 Agent Observability — agent_trace (§4.1, topic 3)
+-- Agent Observability — agent_trace (§4.1, topic 3)
 -- Wave C C-R1. Lives in the global DB (cortrix_global.db), NOT a per-namespace DB.
 --
--- This file is the human-readable mirror of the DDL the F13 AgentTraceSchemaProvider
+-- This file is the human-readable mirror of the DDL the AgentTraceSchemaProvider
 -- emits (src/agent_trace/agent_trace_schema.cpp kAgentTraceSchemaSql). The provider
--- is the runtime SoT (applied atomically via the F12 SchemaMigrator against the
--- global DB, alongside the F18a OperationLogSchemaProvider); this file documents the
+-- is the runtime SoT (applied atomically via the catalog SchemaMigrator against the
+-- global DB, alongside the OperationLogSchemaProvider); this file documents the
 -- same schema for review / ops inspection. Keep the two in lock-step.
 --
--- Dialect: SQLite (global DB). The F13 §4.1 spec spells session_id/trace_id/agent_id
+-- Dialect: SQLite (global DB). The agent trace spec spells session_id/trace_id/agent_id
 -- as VARCHAR(128); SQLite accepts VARCHAR(n) as a type name (TEXT affinity, no length
 -- enforcement), kept verbatim for spec fidelity. created_at is Unix-ms INTEGER (same
 -- clock as operation_log so the trace_id correlation chain joins cleanly). IF NOT
@@ -16,14 +16,14 @@
 -- Open-Core: this is the CE-only schema. Ent's agent_trace_extension table
 -- (input_tokens / output_tokens / query_pattern_id) is a SEPARATE migration in
 -- a separate distribution keyed by agent_trace.id — it does NOT alter this
--- table (F13 §4.4 extension-table isolation).
+-- table (agent trace extension-table isolation).
 
 CREATE TABLE IF NOT EXISTS agent_trace (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
 
     -- Session identity (topic 3 — VARCHAR(64) → VARCHAR(128))
     session_id    VARCHAR(128),                  -- Agent session id (C2; == operation_log.session_id length)
-    trace_id      VARCHAR(128),                  -- call-chain id (C1/F18a-6; == operation_log.trace_id length)
+    trace_id      VARCHAR(128),                  -- call-chain id (== operation_log.trace_id length)
     agent_id      VARCHAR(128),                  -- Agent identity (topic 3 — length aligned)
 
     -- call detail

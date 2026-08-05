@@ -19,9 +19,9 @@ import { ProgrammaticBanner } from '../../components/Common/ProgrammaticBanner';
 import { ErrorDisplay } from '../../components/Common/ErrorDisplay';
 import { UserFormModal, type UserFormValues } from './UserFormModal';
 
-// UsersPage (P02a design § 9-bis.1 — Day-2 admin, CE). Integrates the P08
+// UsersPage (web UI design § 9-bis.1 — Day-2 admin, CE). Integrates the auth
 // admin/users 5-endpoint set (list / create / update / disable / enable) via
-// TanStack Query. Note (P02a-9bis-3 / V6 A30): there is NO hard delete — the
+// TanStack Query. Note (web UI): there is NO hard delete — the
 // disable+enable pair is the lifecycle, so disabled users are retained. Access
 // is gated by PrivateRoute requireAdmin; this page also reads the current role
 // to keep self-service safety (an admin can't disable their own account here).

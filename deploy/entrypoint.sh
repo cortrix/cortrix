@@ -317,7 +317,7 @@ PYWARM
         export TRANSFORMERS_OFFLINE=1
         echo "[provision] docling runtime pinned offline (cache warm)"
     fi
-    # Point the F06 parser at the venv (docling/paddleocr live there). The baked
+    # Point the parser at the venv (docling/paddleocr live there). The baked
     # config defaults python_bin to system python3 so the txt/md plain-text path
     # always works (incl. lite); repoint it here only when the venv is present so
     # PDF/image parsing is enabled without breaking text ingestion when it is not.
@@ -344,7 +344,7 @@ else
     export CORTRIX_PARSER_STATUS="unavailable"
 fi
 
-# F02 reranker. Non-lite profiles require the pinned real model; lite is the
+# Reranker. Non-lite profiles require the pinned real model; lite is the
 # only explicit stub profile.
 if [ "$CORTRIX_PROFILE" != "lite" ]; then
     export CORTRIX_RERANKER_MODEL_DIR="${CORTRIX_RERANKER_MODEL_DIR:-$CORTRIX_MODELS_DIR/bge-reranker-v2-m3}"
@@ -357,7 +357,7 @@ else
     unset CORTRIX_RERANKER_MODEL_DIR
 fi
 
-# F39/F37 query-complexity classifier (D3.5 r2 #26): point the server at the
+# Query routing/CRAG query-complexity classifier (D3.5 r2 #26): point the server at the
 # bind-mounted model dir when present; absent = heuristic fallback by design.
 if [ -d "${CORTRIX_QUERY_COMPLEXITY_MODEL_DIR:-/data/models/query-complexity}" ]; then
     export CORTRIX_QUERY_COMPLEXITY_MODEL_DIR="${CORTRIX_QUERY_COMPLEXITY_MODEL_DIR:-/data/models/query-complexity}"
@@ -379,7 +379,7 @@ case "$CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED" in true|false) ;; *)
     exit 1
 esac
 export CORTRIX_AGENT_PORT="${CORTRIX_AGENT_PORT:-8000}"
-# Same-origin agent surface (F48 P-3): the C++ server reverse-proxies
+# Same-origin agent surface (agent P-3): the C++ server reverse-proxies
 # /api/v1/agent/* and /agent/* to the cortrix-agent service.
 if [ "$CORTRIX_AGENT_ENABLED" = "true" ]; then
     export CORTRIX_AGENT_BASE_URL="${CORTRIX_AGENT_BASE_URL:-http://127.0.0.1:${CORTRIX_AGENT_PORT}}"

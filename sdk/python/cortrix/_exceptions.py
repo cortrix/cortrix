@@ -3,7 +3,7 @@
 Layered mapping per ERROR_CODE_SDK_MAP.md:
   - L1 base classes (12): HTTP-status grouping.
   - L2 high-frequency subclasses (23 concrete here; SoT target 26 incl. extension
-    slots — see ERROR_CODE_SDK_MAP § 3 and P03 design § 3.3 v1.0.3 tree note).
+    slots — see ERROR_CODE_SDK_MAP § 3 and Python SDK design § 3.3 v1.0.3 tree note).
   - L3 default (100+): routed via L1 base + ``error_code`` / ``category`` metadata.
 
 Every exception inherits ``CortrixError``, which carries the 4 GEN-Agent fields
@@ -112,14 +112,14 @@ class TimeoutError(CortrixError):
     """Request timed out (504 / client-side timeout)."""
 
 
-# === L2 subclasses (23 concrete — ERROR_CODE_SDK_MAP § 3 / P03 § 3.3 tree) ===
+# === L2 subclasses (23 concrete — ERROR_CODE_SDK_MAP § 3 / Python SDK tree) ===
 
 # --- Namespace (1) ---
 class NamespaceNotFoundError(NotFoundError):
     """404 — CX_ERR_NAMESPACE_NOT_FOUND — namespace does not exist."""
 
 
-# --- Auth (11 — V3 decision 14, P08 CX_ERR_AUTH_*) ---
+# --- Auth (11 — V3 decision 14, CX_ERR_AUTH_*) -------
 class AuthEmailAlreadyExistsError(ConflictError):
     """409 — CX_ERR_AUTH_EMAIL_ALREADY_EXISTS — email already registered."""
 
@@ -173,12 +173,12 @@ class StoreDbError(ServiceUnavailableError):
     """503 — CX_ERR_STORE_DB_ERROR — underlying DB error (retryable)."""
 
 
-# --- F14 pgcortrix (1 — V3 decision 4) ---
+# --- pgcortrix (1 — V3 decision 4) -------
 class F14InvalidFilterError(InvalidRequestError):
     """400 — CX_ERR_F14_INVALID_FILTER — filter JSONB field not in allowlist."""
 
 
-# --- Retrieval path (8 — F36/F37/F41/F48/MEM02 + LLM/quota/CSRF) ---
+# --- Retrieval path (8 — RAG-Fusion/CRAG/doc summary/agent/memory extraction + LLM/quota/CSRF) ---
 class F36ExpandQueriesTimeoutError(TimeoutError):
     """timeout — CX_ERR_F36_EXPAND_TIMEOUT — RAG-Fusion ExpandQueries LLM timeout."""
 
@@ -196,7 +196,7 @@ class F48AgentToolNotFoundError(NotFoundError):
 
 
 class MEM02ExtractionFailedError(InternalServerError):
-    """500 — CX_ERR_MEM02_EXTRACTION_FAILED — MEM02 LLM extraction failed (fallback active)."""
+    """500 — CX_ERR_MEM02_EXTRACTION_FAILED — memory extraction LLM extraction failed (fallback active)."""
 
 
 class LlmCircuitOpenError(ServiceUnavailableError):
@@ -234,7 +234,7 @@ CODE_EXCEPTION_MAP: dict[str, type[CortrixError]] = {
     # Store (2)
     "CX_ERR_STORE_NOT_FOUND": StoreNotFoundError,
     "CX_ERR_STORE_DB_ERROR": StoreDbError,
-    # F14 pgcortrix (1)
+    # Pgcortrix (1)
     "CX_ERR_F14_INVALID_FILTER": F14InvalidFilterError,
     # Retrieval path (6)
     "CX_ERR_F36_EXPAND_TIMEOUT": F36ExpandQueriesTimeoutError,

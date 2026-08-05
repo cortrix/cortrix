@@ -1,4 +1,4 @@
-"""Auth resource. ``/auth/*`` (ARCH § 4.1.9 + P08).
+"""Auth resource. ``/auth/*`` (ARCH § 4.1.9 + auth).
 
 This resource follows the implemented HTTP architecture. It covers
 register/login/password_reset plus

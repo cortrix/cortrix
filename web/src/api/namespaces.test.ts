@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { listNamespaces, createNamespace, deleteNamespace } from './namespaces';
 
-// namespaces api tests (P02a § 8 — F12 NS CRUD client contract). Asserts each
+// namespaces api tests (web UI — catalog NS CRUD client contract). Asserts each
 // helper hits the right endpoint/verb and unwraps the response shape.
 
 const mockFetch = vi.fn();

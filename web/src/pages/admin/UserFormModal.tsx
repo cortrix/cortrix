@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { Modal, Input, Select, Button } from '../../components/ui';
 import type { UserRecord, UserRole } from '../../types/api';
 
-// Create / Edit user modal (P02a § 9-bis.1). In create mode all fields are
+// Create / Edit user modal (web UI). In create mode all fields are
 // editable (email + password + role); in edit mode the password field is
-// hidden (P08 has no admin password-reset in the 5-endpoint set) and only
+// hidden (auth has no admin password-reset in the 5-endpoint set) and only
 // email / display_name / role are patched.
 
 export interface UserFormValues {

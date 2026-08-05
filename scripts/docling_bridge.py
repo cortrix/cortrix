@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Docling document-parser bridge for F06 DoclingParser.
+"""Docling document-parser bridge for DoclingParser.
 
 Invoked as a subprocess by cortrix::spc::DoclingParser:
 
     python3 docling_bridge.py --filepath FILE --timeout SECS \
         --max-pages N --language-hint LANG --output-format json
 
-Emits the F06 §3.1 page-level JSON protocol on stdout:
+Emits the parser page-level JSON protocol on stdout:
 
     {"status": 0, "parser": "docling",
      "metadata": {filename, doc_title, mime_type, file_size_bytes,
@@ -70,7 +70,7 @@ def _error(status, msg, *, retryable=False, category="PERMANENT",
 
 
 def _classify_type(element):
-    """Map a Docling element to an F06 ChunkType string."""
+    """Map a Docling element to a parser ChunkType string."""
     label = (getattr(element, "label", "") or "").lower()
     if "table" in label:
         return "TABLE"

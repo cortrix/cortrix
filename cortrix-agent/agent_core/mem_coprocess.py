@@ -1,13 +1,13 @@
-"""F48 <-> MEM co-processing (design section 13 / F48-rev-9/10/11).
+"""agent <-> MEM co-processing (design section 13 / the agent design).
 
 After each Cortrix Agent chat turn the conversation is fed back into Cortrix's memory
-system: the turn is logged (F13 interaction_log) and that same SDK call triggers MEM02
+system: the turn is logged (agent trace interaction_log) and that same SDK call triggers memory extraction
 LLM extraction server-side. It runs fire-and-forget so a logging/extraction failure never
-blocks the user's chat response (design F48-rev-9). MEM05 user isolation is honored by
-always passing a user_id (design F48-rev-11).
+blocks the user's chat response (design the agent design). memory isolation user isolation is honored by
+always passing a user_id (design the agent design1).
 
-Standalone discipline (D3): the P03 SDK ``client.memory.log`` call is exercised against a
-stubbed SDK here; real cortrix-server interaction-log persistence + the live MEM02 worker
+Standalone discipline (D3): the Python SDK ``client.memory.log`` call is exercised against a
+stubbed SDK here; real cortrix-server interaction-log persistence + the live memory extraction worker
 are TODO(D3.5).
 """
 
@@ -25,11 +25,11 @@ _DEFAULT_USER_ID = "default"
 
 
 class MemoryCoprocessor:
-    """Feeds completed chat turns into Cortrix memory via the P03 SDK (design section 13).
+    """Feeds completed chat turns into Cortrix memory via the Python SDK (design section 13).
 
-    ``client.memory.log`` writes the F13 interaction_log AND triggers MEM02 auto
-    extraction server-side, so a single call covers F48-rev-9 (interaction log) and
-    F48-rev-10 (MEM02 trigger).
+    ``client.memory.log`` writes the agent trace interaction_log AND triggers memory extraction auto
+    extraction server-side, so a single call covers the agent design (interaction log) and
+    the agent design (memory extraction trigger).
     """
 
     def __init__(self, client: Any, namespace: str = "default") -> None:
@@ -45,11 +45,11 @@ class MemoryCoprocessor:
         user_id: Optional[str] = None,
         namespace: Optional[str] = None,
     ) -> None:
-        """Log a completed turn (F13) + trigger MEM02 extraction; never raises.
+        """Log a completed turn (agent trace) + trigger memory extraction; never raises.
 
-        MEM05: a user_id is always sent (CE single-tenant falls back to a default
+        Memory isolation: a user_id is always sent (CE single-tenant falls back to a default
         subject). On any failure we log a warning carrying CX_ERR_F48_INTERACTION_LOG_FAILED
-        and return — the chat turn must not be blocked (design F48-rev-9).
+        and return — the chat turn must not be blocked (design the agent design).
         """
         uid = user_id or _DEFAULT_USER_ID
         ns = namespace or self._namespace

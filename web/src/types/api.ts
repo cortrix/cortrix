@@ -25,7 +25,7 @@ export interface DocumentStatus {
   processed_at?: string;
 }
 
-// --- Bulk document submit (TD-F42-BULK-SUBMIT — partial-success schema) ---
+// --- Bulk document submit (batch submit — partial-success schema) ---
 // POST /api/v1/documents/batch-submit accepts 1–100 documents and returns a
 // partial-success envelope: `results[]` for accepted docs (Elasticsearch _bulk
 // style) + `meta` with succeeded[] / failed[] (each failure carrying the
@@ -55,7 +55,7 @@ export interface BatchSubmitResult {
   status: 'submitted';
 }
 
-/** Per-doc failure — GEN-Agent 5 fields (TD-F42 § 2.3). */
+/** Per-doc failure — GEN-Agent 5 fields (batch submit). */
 export interface BatchSubmitFailure {
   doc_id: string;
   error_code: string;
@@ -82,10 +82,10 @@ export interface QueryRequest {
   namespaces: string[];
   top_k?: number;
   timeout_ms?: number;
-  // F04 §2.4 — the live cross-NS handler reads the singular `filter` key (a
+  // Cross-NS query — the live cross-NS handler reads the singular `filter` key (a
   // JSONB pass-through). The plural `filters` was MVP-era drift that hit a dead
   // parser. Inner block_type[] is forwarded as-is; structured block_type
-  // enforcement is F04 Phase-2 scope (line 60), not wired in the V1 executor.
+  // enforcement is cross-NS query Phase-2 scope (line 60), not wired in the V1 executor.
   filter?: {
     block_type?: string[];
     source_path?: string;
@@ -104,7 +104,7 @@ export interface QueryResponse {
   meta: QueryMeta;
 }
 
-// F04 cross-NS ResultItem (cross_ns_response.cpp ResultItemToJson). child_id/
+// Cross-NS ResultItem (cross_ns_response.cpp ResultItemToJson). child_id/
 // parent_id are ULID strings; content is the matched child chunk, parent_content the
 // enclosing parent block; namespace is which NS this hit came from (cross-NS).
 export interface SearchResult {
@@ -125,7 +125,7 @@ export interface SQLResult {
   rows: unknown[][];
 }
 
-// F04 cross-NS query meta (cross_ns_response.cpp CrossNsMeta::ToJson). A-class data
+// Cross-NS query meta (cross_ns_response.cpp CrossNsMeta::ToJson). A-class data
 // integrity: which NSs were queried/succeeded/failed + coverage.
 export interface QueryNamespaceFailure {
   namespace: string;
@@ -185,7 +185,7 @@ export interface SystemStatus {
 }
 
 // --- Feature flags ---
-// Mirrors the backend GET /api/v1/system/features contract (P02a § 5.1):
+// Mirrors the backend GET /api/v1/system/features contract (web UI):
 // `edition` + a per-feature descriptor ({ enabled, placeholder, available_in }).
 
 export type SystemEdition = string;
@@ -283,8 +283,8 @@ export interface AgentErrorEnvelope {
   error: AgentError;
 }
 
-// --- Memory (MEM03 Memory Transparency) ---
-// extraction_method 5-enum (P02a § 7.5 — Heroicons, no emoji).
+// --- Memory (Memory Transparency) ---------
+// extraction_method 5-enum (web UI — Heroicons, no emoji).
 export type ExtractionMethod =
   | 'llm_extracted'
   | 'user_created'
@@ -294,8 +294,8 @@ export type ExtractionMethod =
 
 export type MemoryType = 'fact' | 'preference' | 'event';
 
-// MEM03 § 4.4 — status enum (active is the valid state; J5 aligns reader with
-// MEM02 writer). invalidated = soft-deleted.
+// Memory transparency — status enum (active is the valid state; J5 aligns reader with
+// Memory extraction writer). invalidated = soft-deleted.
 export type MemoryStatus = 'active' | 'tentative' | 'invalidated';
 
 export interface MemoryItem {
@@ -381,9 +381,9 @@ export interface MemoryInvalidateResponse {
   status: 'invalidated';
 }
 
-// --- Namespace configs (F12 two-layer mapping, v1.0.8 — 11 *_config) ---
+// --- Namespace configs (catalog two-layer mapping, v1.0.8 — 11 *_config) ---
 // Each of the 11 *_config columns is a free-form JSONB blob; per-feature schema
-// is owned by F02/F03/F06/MEM01/F21/F10/F36/F37/F39/F40/F41 respectively. The
+// is owned by reranker/enricher/parser/memory decay/watcher/cleaning/RAG-Fusion/CRAG/query routing/sparse retrieval/doc summary respectively. The
 // UI treats them as opaque JSON objects (Hybrid Form + raw Monaco editor) and
 // never hard-codes field validation beyond the documented examples.
 export type NamespaceConfigKey =
@@ -413,7 +413,7 @@ export interface NamespaceDetail extends NamespaceInfo {
   status: NamespaceStatus;
   owner_user_id?: string | null;
   configs: NamespaceConfigs;
-  // F05 admission state surfaced in the detail drawer (best-effort; optional).
+  // Namespace pool admission state surfaced in the detail drawer (best-effort; optional).
   admission?: {
     estimated_size_bytes?: number;
     budget_limit_bytes?: number;
@@ -437,7 +437,7 @@ export interface UpdateNamespaceRequest {
   configs?: Partial<NamespaceConfigs>;
 }
 
-// --- Auth (P08 — HttpOnly cookie model, P02a § 9.2) ---
+// --- Auth (auth — HttpOnly cookie model, web UI) ------
 // The auth token lives in an HttpOnly cookie managed by the backend; the store
 // only tracks UI state. `currentUser` is populated by GET /api/v1/auth/me.
 
@@ -451,7 +451,7 @@ export interface CurrentUser {
   role: UserRole;
 }
 
-/** GET /api/v1/auth/me — current session probe (P08 § 2.9). */
+/** GET /api/v1/auth/me — current session probe (auth). */
 export interface AuthMeResponse {
   id: string;
   email: string;
@@ -461,20 +461,20 @@ export interface AuthMeResponse {
   edition?: string;
 }
 
-/** POST /api/v1/auth/login — Web UI path (P08 § 2.3): Set-Cookie + user only. */
+/** POST /api/v1/auth/login — Web UI path (auth): Set-Cookie + user only. */
 export interface LoginResponse {
   user: AuthMeResponse;
   expires_in?: number;
 }
 
-/** POST /api/v1/admin/bootstrap — programmatic admin key (P08 § 2.13.2.b). */
+/** POST /api/v1/admin/bootstrap — programmatic admin key (auth). */
 export interface BootstrapResponse {
   admin_api_key: string;
   expires_at: string | null;
   scopes: string[];
 }
 
-// --- API Keys (P08 § 2.13.3 — user-level keys for SDK / MCP) ---
+// --- API Keys (auth — user-level keys for SDK / MCP) -----------
 
 export type ApiKeyStatus = 'active' | 'revoked' | 'expired';
 
@@ -503,7 +503,7 @@ export interface ApiKeyCreateResponse {
   expires_at?: string | null;
 }
 
-// --- Admin: Users (P08 § 2.13-bis — 5 endpoints) ---
+// --- Admin: Users (auth — 5 endpoints) -------------
 
 export interface UserRecord {
   id: string;
@@ -548,10 +548,10 @@ export interface UserMutationResponse {
   user: UserRecord;
 }
 
-// --- Operation Log (F18a CE — GET /api/v1/operations) ---
-// Response shape is the SoT (F18a § 6.1). The §9-bis.2 table maps the display
+// --- Operation Log (operation log CE — GET /api/v1/operations) ---
+// Response shape is the SoT (operation log). The §9-bis.2 table maps the display
 // column `namespace` -> `namespace_id` and `status` -> the schema default
-// ('success'); Ent (F18b) adds source_ip / user_agent / details_json /
+// ('success'); Ent (the Ent audit extension) adds source_ip / user_agent / details_json /
 // failure_reason via the audit_log_extension table (surfaced when the
 // `audit_log_ent` flag is on — DynamicColumns swaps the column set).
 export type OperationStatus = 'success' | 'failed' | 'denied';
@@ -568,7 +568,7 @@ export interface OperationLogEntry {
   status?: OperationStatus;
   trace_id?: string | null;
   session_id?: string | null;
-  // Extended audit columns (F18b — only present on extended deployments).
+  // Extended audit columns (the Ent audit extension — only present on extended deployments).
   source_ip?: string | null;
   user_agent?: string | null;
   details_json?: Record<string, unknown> | null;

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""validate_x_cortrix_extensions.py — validate x-cortrix-* field compliance in paths/*.yaml (P04 § 3.3).
+"""validate_x_cortrix_extensions.py — validate x-cortrix-* field compliance in paths/*.yaml (API spec).
 
-CI-enforced (P04 § 3.3 + D7 addendum): every x-cortrix-* field used in paths/*.yaml must be
+CI-enforced (API spec + D7 addendum): every x-cortrix-* field used in paths/*.yaml must be
 defined in components/x-cortrix.yaml, with enum values inside the allowed set and pattern
 fields matching the format.
 

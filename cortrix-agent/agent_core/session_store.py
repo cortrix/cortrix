@@ -4,7 +4,7 @@ Decision P-2 (design section 9.1): Phase 1 V1.0 keeps session history in an in-p
 dict; each session holds at most ``WINDOW_SIZE`` turns (a turn = one user message plus
 its assistant reply). When the window overflows, the oldest turn is dropped (FIFO).
 
-V1.5 upgrade (MEM02 integration) is intentionally deferred — see TODO(D3.5) markers in
+V1.5 upgrade (memory extraction integration) is intentionally deferred — see TODO(D3.5) markers in
 the executor where memory co-processing wires to the real cortrix-server.
 """
 

@@ -19,7 +19,7 @@ include(cmake/Dependencies.cmake)
 
 find_package(OpenSSL REQUIRED)
 
-# Vendored hnswlib (P-HNSW shallow fork, F01). Provides the
+# Vendored hnswlib (P-HNSW shallow fork, index). Provides the
 # cortrix::hnswlib_vendored INTERFACE target; replaces the old FetchContent
 # hnswlib include path. Source lives in-tree at src/store/phnsw/hnswlib/.
 add_subdirectory(src/store/phnsw)
@@ -29,7 +29,7 @@ add_library(cortrix_core STATIC
     src/common/status.cpp
     src/common/executor_engine.cpp
     src/common/in_memory_global_config.cpp
-    # --- F48 §6.2 agent_llm config codec (D3.5 r2 · Wave P · P4) ---
+    # --- agent_llm config codec ------------------------------------
     src/common/agent_llm_config_codec.cpp
     src/config/config.cpp
     src/logging/logging.cpp
@@ -88,7 +88,7 @@ add_library(cortrix_core STATIC
     src/spc/onnx_cli.cpp
     src/spc/hf_tokenizer.cpp
     src/spc/block_assembler.cpp
-    # --- F03 NER + Summary Enricher (Wave B) ---
+    # --- NER + Summary Enricher ----------------
     src/spc/enricher_error.cpp
     src/spc/enricher_metrics.cpp
     src/spc/budget_tracker.cpp
@@ -110,7 +110,7 @@ add_library(cortrix_core STATIC
     src/spc/spc_pipeline.cpp
     src/spc/enricher_chain.cpp
     src/spc/spc_manager.cpp
-    # --- F38 HyPE Index (Wave C) ---
+    # --- HyPE Index ----------------
     src/spc/f38_schema_provider.cpp
     src/spc/hype_error.cpp
     src/spc/hype_enricher.cpp
@@ -118,7 +118,7 @@ add_library(cortrix_core STATIC
     src/spc/hype_fusion.cpp
     src/spc/hype_ns_config.cpp
     src/spc/hype_metrics.cpp
-    # --- F35 Contextual Retrieval (Wave C-R2) ---
+    # --- Contextual Retrieval -------------------
     src/spc/contextual_error.cpp
     src/spc/contextual_metrics.cpp
     src/spc/contextual_enricher.cpp
@@ -129,25 +129,25 @@ add_library(cortrix_core STATIC
     src/memory/memory_searcher.cpp
     src/memory/memory_injector.cpp
     src/memory/memory_routes.cpp
-    # --- MEM02 LLM Memory Extraction (Wave B-R3) ---
+    # --- LLM Memory Extraction ---------------------
     src/memory/mem02_error.cpp
     src/memory/mem02_metrics.cpp
     src/memory/prompt_templates.cpp
     src/memory/memory_extractor.cpp
     src/memory/contradiction_detector.cpp
     src/memory/memory_queue.cpp
-    # --- MEM02/03 store adapters and user_facts query ---
+    # --- store adapters and user_facts query ------------
     src/memory/memory_block_adapter.cpp
     src/memory/memory_extraction_service.cpp
-    # --- MEM03 Memory Transparency (Wave C-R1) ---
+    # --- Memory Transparency ---------------------
     src/memory/mem03_error.cpp
     src/memory/mem03_metrics.cpp
     src/memory/memory_transparency.cpp
-    # --- MEM04 Memory Immunity (Wave C-R2) ---
+    # --- Memory Immunity ---------------------
     src/memory/mem04_error.cpp
     src/memory/mem04_metrics.cpp
     src/memory/opt_out_manager.cpp
-    # --- MEM05 Per-user Isolation metrics (D35-MET-09) ---
+    # --- Per-user Isolation metrics ----------------------
     src/memory/mem05_metrics.cpp
     src/query/rrf_fusion.cpp
     src/query/vector_searcher.cpp
@@ -159,7 +159,7 @@ add_library(cortrix_core STATIC
     src/query/query_request.cpp
     src/query/query_response.cpp
     src/query/query_routes.cpp
-    # --- F04 Cross-NS Query (Wave 1-5) ---
+    # --- Cross-NS Query ------------------
     src/query/cross_ns_error.cpp
     src/query/content_hash.cpp
     src/query/cross_ns_types.cpp
@@ -172,20 +172,20 @@ add_library(cortrix_core STATIC
     src/query/scatter_guc.cpp
     src/query/scatter_plan.cpp
     src/query/cross_ns_query_handler.cpp
-    # --- F04 cross-NS query live wiring (D3.5-R2 Wave Q1/Q2) ---
+    # --- cross-NS query live wiring ----------------------------
     src/query/live_single_unit_executor.cpp
     src/query/query_wiring.cpp
-    # --- F36 RAG-Fusion (Wave B) ---
+    # --- RAG-Fusion ----------------
     src/query/rag_fusion_error.cpp
     src/query/rag_fusion_types.cpp
     src/query/rag_fusion_metrics.cpp
     src/query/query_variant_generator.cpp
     src/query/rag_fusion.cpp
     src/query/rag_fusion_stage.cpp
-    # --- F36-LR LLM listwise rerank (2026-07-05 addendum) ---
+    # --- listwise rerank LLM listwise rerank (2026-07-05 addendum) ---
     src/query/llm_rerank_stage.cpp
     src/query/crag_stage.cpp
-    # --- F40 BGE-M3 Sparse (Wave C) ---
+    # --- BGE-M3 Sparse ----------------
     src/retrieval/sparse_error.cpp
     src/retrieval/sparse_codec.cpp
     src/retrieval/f40_schema_provider.cpp
@@ -196,7 +196,7 @@ add_library(cortrix_core STATIC
     src/retrieval/sparse_fallback.cpp
     src/retrieval/sparse_index_registry.cpp
     src/retrieval/sparse_vec_store.cpp
-    # --- F41 Document Summary Index (Wave C-R2) ---
+    # --- Document Summary Index -------------------
     src/doc_summary/doc_summary_error.cpp
     src/doc_summary/doc_summary_metrics.cpp
     src/doc_summary/doc_summary_types.cpp
@@ -281,7 +281,7 @@ add_library(cortrix_core STATIC
     src/reranker/onnx_reranker.cpp
     src/reranker/score_fusion.cpp
     src/reranker/reranker_factory.cpp
-    # --- F34 Parent-Child Chunking (Wave 1-3) ---
+    # --- Parent-Child Chunking ------------------
     src/id/ulid.cpp
     # --- ID System Infrastructure (D3.5 Batch 0 prerequisite: SipHash block_id key) ---
     src/id/hash.cc
@@ -295,7 +295,7 @@ add_library(cortrix_core STATIC
     src/store/sqlite_parent_chunk_store.cpp
     src/store/parent_chunk_store_metrics.cpp
     src/store/sqlite_chunk_store.cpp
-    # --- F42 Document Async Processing (Wave B-R2) ---
+    # --- Document Async Processing -------------------
     src/async/f42_error.cpp
     src/async/f42_metrics.cpp
     src/async/task_manager.cpp
@@ -306,7 +306,7 @@ add_library(cortrix_core STATIC
     src/async/document_processor.cpp
     src/async/worker_pool.cpp
     src/async/document_task_handler.cpp
-    # --- F16a DB Manual Import (Wave B-R2) ---
+    # --- DB Manual Import --------------------
     src/import/import_types.cpp
     src/import/import_error.cpp
     src/import/import_response.cpp
@@ -315,60 +315,60 @@ add_library(cortrix_core STATIC
     src/import/query_executor.cpp
     src/import/text_serializer.cpp
     src/import/spc_feed.cpp
-    # --- F16a real SPCManager feed (D3.5 r2 · Wave P · P2b) ---
+    # --- real SPCManager feed ---------------------------------
     src/import/spc_manager_feeder.cpp
     src/import/import_task_queue.cpp
     src/import/import_manager.cpp
     src/import/import_metrics.cpp
     src/server/import_handler.cpp
-    # --- F16a DB-import REST surface (D3.5 r2 · Wave P · P2) ---
+    # --- DB-import REST surface --------------------------------
     src/server/routes/import_routes.cpp
-    # --- F08 Metadata Block (Wave A) ---
+    # --- Metadata Block ----------------
     src/metadata/metadata_error.cpp
     src/metadata/metadata_metrics.cpp
     src/metadata/metadata_schema_provider.cpp
     src/metadata/rule_based_metadata_generator.cpp
-    # --- F07 Semantic Score (Wave B) ---
+    # --- Semantic Score ----------------
     src/scoring/scoring_error.cpp
     src/scoring/score_map.cpp
     src/scoring/semantic_scorer.cpp
     src/scoring/scoring_metrics.cpp
     src/scoring/scoring_schema_provider.cpp
     src/scoring/scoring_store.cpp
-    # --- F37 CRAG Retrieval Evaluation (Wave C-R1) ---
+    # --- CRAG Retrieval Evaluation -------------------
     src/retrieval/crag_error.cpp
     src/retrieval/crag_evaluator.cpp
     src/retrieval/crag_metrics.cpp
     src/query/query_context_explain.cpp
-    # --- F39 Query Complexity Router (Wave C-R2) ---
+    # --- Query Complexity Router -------------------
     src/query/router_error.cpp
     src/query/query_router_metrics.cpp
     src/query/query_complexity_classifier.cpp
     src/query/wordpiece_tokenizer.cpp
     src/query/onnx_complexity_backend.cpp
-    # --- P09 Tenant Management (Wave D-R1) ---
+    # --- Tenant Management -------------------
     src/tenant/tenant_types.cpp
     src/tenant/tenant_error.cpp
     src/tenant/tenant_service.cpp
     src/tenant/permission_service.cpp
     src/tenant/quota_service.cpp
     src/server/routes/tenant_routes.cpp
-    # --- P08 CE auth REST surface (D3.5 r2 · Wave P · P1) ---
+    # --- CE auth REST surface -------------------------------
     src/server/routes/auth_routes.cpp
-    # --- F48 agent_llm_config admin API (D3.5 r2 · Wave P · P4) ---
+    # --- agent_llm_config admin API -------------------------------
     src/server/routes/system_config_routes.cpp
-    # --- TD-F42 Bulk Submit (Wave D-R1) ---
+    # --- Bulk Submit ----------------------
     src/server/batch_error.cpp
     src/server/batch_submit_service.cpp
     src/server/batch_temp_store.cpp
     src/server/routes/batch_routes.cpp
-    # --- F20 Security Hardening (Wave D-R1) ---
+    # --- Security Hardening -------------------
     src/security/env_secret_provider.cpp
     src/logging/sanitizer.cpp
     src/middleware/admin_guard.cpp
     src/middleware/rate_limiter.cpp
     src/health/readiness.cpp
-    # --- F24 docker-compose Deployment (Wave D-R1) ---
+    # --- docker-compose Deployment -------------------
     src/deploy/f24_error.cpp
     src/deploy/deploy_metrics.cpp
     src/deploy/disk_monitor.cpp

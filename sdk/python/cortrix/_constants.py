@@ -1,4 +1,4 @@
-"""SDK-wide constants (version, defaults). See P03 design § 3.1."""
+"""SDK-wide constants (version, defaults). See Python SDK design § 3.1."""
 
 SDK_VERSION = "1.0.0rc1"
 DEFAULT_BASE_URL = "http://localhost:8420"

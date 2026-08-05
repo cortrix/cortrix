@@ -8,11 +8,11 @@ import { initWebMetrics } from './telemetry/metrics';
 import './i18n';
 import './index.css';
 
-// Web UI observability (P02a § 23-bis) — start the OpenTelemetry metrics
+// Web UI observability (web UI) — start the OpenTelemetry metrics
 // pipeline. Best-effort: a no-op when no collector is reachable (standalone).
 initWebMetrics();
 
-// TanStack Query client (P02a design § 3.2). Conservative defaults: no
+// TanStack Query client (web UI design § 3.2). Conservative defaults: no
 // refetch-on-focus churn, one retry for transient failures, 30s stale window.
 const queryClient = new QueryClient({
   defaultOptions: {

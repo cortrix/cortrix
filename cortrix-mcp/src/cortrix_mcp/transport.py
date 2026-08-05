@@ -200,11 +200,11 @@ def request(
 
 
 def require_admin() -> None:
-    """Enforce the admin scope for the 2 F16a admin tools (feature design section 4.6).
+    """Enforce the admin scope for the 2 DB import admin tools (feature design section 4.6).
 
-    V1.0 uses the ``CORTRIX_MCP_ADMIN=true`` env fallback (risk #4); after P08 D3 the
+    V1.0 uses the ``CORTRIX_MCP_ADMIN=true`` env fallback (risk #4); after auth D3 the
     check switches back to the Bearer ``role=admin`` claim. D3.5 deferred: live Bearer
-    claim parsing wires to P08 once the real auth path is available.
+    claim parsing wires to auth once the real auth path is available.
     """
     if not CORTRIX_MCP_ADMIN:
         raise tool_error(

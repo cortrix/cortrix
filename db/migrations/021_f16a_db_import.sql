@@ -1,13 +1,13 @@
--- F16a DB Manual Import — db_connections (§4.1) + import_tasks (§4.2)
+-- DB Manual Import — db_connections (§4.1) + import_tasks (§4.2)
 -- Wave B-R2. Lives in the catalog DB (catalog.db) alongside tenants / namespaces.
 --
 -- This file is the human-readable mirror of the DDL the F16aSchemaProvider emits
 -- (src/import/f16a_schema_provider.cpp kF16aSchemaSql). The provider is the
--- runtime SoT (applied atomically via the F12 SchemaMigrator, after F12 so the
+-- runtime SoT (applied atomically via the catalog SchemaMigrator, after catalog so the
 -- tenants/namespaces FK targets exist); this file documents the same schema for
 -- review / ops inspection. Keep the two in lock-step.
 --
--- Dialect: SQLite (catalog DB). The F16a §4.x spec is written in Postgres syntax
+-- Dialect: SQLite (catalog DB). The DB import spec is written in Postgres syntax
 -- (BIGSERIAL / TIMESTAMP / now()); transcribed here to the SQLite idiom every
 -- other catalog provider uses: INTEGER PRIMARY KEY AUTOINCREMENT, Unix-ms INTEGER
 -- timestamps, JSONB → TEXT affinity, IF NOT EXISTS on every object.
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS db_connections (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     ref_id        TEXT UNIQUE NOT NULL,                          -- "db_conn_<ulid>"
     name          TEXT NOT NULL,                                 -- business-readable name
-    tenant_id     TEXT NOT NULL REFERENCES tenants(tenant_id),   -- F12 catalog SoT (TEXT PK)
+    tenant_id     TEXT NOT NULL REFERENCES tenants(tenant_id),   -- catalog SoT (TEXT PK)
 
     secret_key_id TEXT NOT NULL,                                 -- key id into the secret store, NOT the DSN
 
@@ -38,13 +38,13 @@ CREATE INDEX IF NOT EXISTS idx_db_connections_tenant ON db_connections(tenant_id
 CREATE INDEX IF NOT EXISTS idx_db_connections_active ON db_connections(tenant_id, expires_at)
     WHERE revoked_at IS NULL;
 
--- import_tasks (D6): one row per async import task (mimics the F42 task table shape,
--- but is F16a-owned — no dependency on F42's schema).
+-- import_tasks (D6): one row per async import task (mimics the async task table shape,
+-- but is import-owned — no dependency on async task's schema).
 CREATE TABLE IF NOT EXISTS import_tasks (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     task_id               TEXT UNIQUE NOT NULL,                        -- "import_<ulid>"
-    ns_id                 TEXT NOT NULL REFERENCES namespaces(ns_id),  -- F12 catalog SoT (TEXT PK)
-    tenant_id             TEXT NOT NULL REFERENCES tenants(tenant_id), -- F12 catalog SoT (TEXT PK)
+    ns_id                 TEXT NOT NULL REFERENCES namespaces(ns_id),  -- catalog SoT (TEXT PK)
+    tenant_id             TEXT NOT NULL REFERENCES tenants(tenant_id), -- catalog SoT (TEXT PK)
 
     connection_ref_id     TEXT NOT NULL,                               -- references db_connections.ref_id
     request_json          TEXT NOT NULL,                               -- D2 dual-mode params (JSON)

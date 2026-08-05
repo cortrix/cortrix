@@ -169,7 +169,7 @@ with a load balancer, you can upgrade them one at a time for zero downtime:
 2. Verify instance 1 is healthy, then roll the same steps across instances 2..N.
 3. Use the LB / K8s Service to isolate the instance currently being upgraded.
 
-F22 does not block this pattern, but the orchestration itself (LB draining,
+ONNX runtime does not block this pattern, but the orchestration itself (LB draining,
 readiness probes, rollout ordering) belongs to your deployment layer (systemd /
 K8s / custom LB), not to `cortrix-server`.
 

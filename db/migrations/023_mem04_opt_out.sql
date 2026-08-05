@@ -1,4 +1,4 @@
--- MEM04 Memory Immunity — opt-out columns (§4.1 / §4.2, issue D4/D2)
+-- Memory Immunity — opt-out columns (§4.1 / §4.2, issue D4/D2)
 -- Wave C C-R2. Lives in the per-namespace memory DB (interaction_log / memory_sessions).
 --
 -- This file is the human-readable mirror of the DDL the runtime emits in

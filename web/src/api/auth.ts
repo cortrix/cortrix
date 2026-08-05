@@ -3,7 +3,7 @@ import { mockApi } from './mock';
 import { USE_MOCK, fallbackToMock } from './fallback';
 import type { AuthMeResponse, LoginResponse, BootstrapResponse } from '../types/api';
 
-// Auth client (P08 / P02a § 9.2 — HttpOnly cookie model). All calls send
+// Auth client (auth / web UI — HttpOnly cookie model). All calls send
 // credentials:'include' via the shared client; mutations also carry the
 // X-CSRF-Token header (§ 4.6). The token itself is never read or stored by JS.
 //
@@ -68,7 +68,7 @@ export async function logout(): Promise<void> {
 
 /**
  * POST /api/v1/admin/bootstrap { token } — programmatic one-time exchange of a
- * bootstrap token for the admin API key (P08 § 2.13.2.b). The token is consumed
+ * bootstrap token for the admin API key (auth). The token is consumed
  * on first use by either the GET (browser) or POST (this) endpoint.
  */
 export async function bootstrap(token: string): Promise<BootstrapResponse> {

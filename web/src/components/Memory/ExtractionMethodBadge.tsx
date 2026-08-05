@@ -8,7 +8,7 @@ import {
 import type { ComponentType, SVGProps } from 'react';
 import type { ExtractionMethod } from '../../types/api';
 
-// MEM03 extraction_method 5-enum → Heroicons (P02a design § 7.5). NO emoji
+// Memory transparency extraction_method 5-enum → Heroicons (web UI design § 7.5). NO emoji
 // (VI SPECS § 5.1 — Heroicons only). Each entry is icon-sm (h-4 w-4) per the VI
 // icon token. Magma VI muted/secondary tone so it reads in both themes.
 

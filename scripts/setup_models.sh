@@ -12,7 +12,7 @@
 #   ./scripts/setup_models.sh --parser-only   # parser venv only, skip downloads
 #
 # reranker / query-complexity have no public ONNX download. Set their tarball
-# URLs to auto-fetch; otherwise reranker falls back to a stub and F39 query
+# URLs to auto-fetch; otherwise reranker falls back to a stub and query
 # complexity falls back to the heuristic backend:
 #   CORTRIX_RERANKER_MODEL_URL=...  \
 #   CORTRIX_QUERY_COMPLEXITY_MODEL_URL=...  ./scripts/setup_models.sh

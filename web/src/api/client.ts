@@ -17,9 +17,9 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
   const method = (options?.method ?? 'GET').toUpperCase();
-  // Auth via HttpOnly cookie (P02a § 4.5): always send credentials so the
+  // Auth via HttpOnly cookie (web UI): always send credentials so the
   // browser attaches `cortrix-auth`. Mutating requests echo the readable CSRF
-  // cookie back in the X-CSRF-Token header (P02a § 4.6 double-cookie pattern).
+  // cookie back in the X-CSRF-Token header (web UI double-cookie pattern).
   const csrfHeader: Record<string, string> = SAFE_METHODS.has(method)
     ? {}
     : { [CSRF_HEADER]: getCsrfToken() };

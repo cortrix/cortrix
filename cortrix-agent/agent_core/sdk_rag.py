@@ -1,6 +1,6 @@
-"""RAG retrieval via the P03 Python SDK (dogfood — design P-12 / section 5).
+"""RAG retrieval via the Python SDK (dogfood — design section 5).
 
-F48 RAG data source is cortrix-server, accessed through the P03 ``AsyncCortrix`` SDK
+Agent RAG data source is cortrix-server, accessed through the Python SDK ``AsyncCortrix`` SDK
 exactly like any external Agent (no privileged channel — design section 5.2). This
 module is the single RAG seam: it calls ``client.search(namespace, query, top_k)`` and
 normalizes the wire-faithful ``QueryResult`` into the flat chunk shape the prompt
@@ -27,7 +27,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class RagChunk:
-    """A single retrieved chunk, normalized from a P03 ``QueryResultItem``."""
+    """A single retrieved chunk, normalized from a Python SDK ``QueryResultItem``."""
 
     chunk_id: str
     source_path: str
@@ -78,7 +78,7 @@ def _content(item: Any) -> str:
 
 
 def normalize_query_result(result: Any) -> RagResult:
-    """Normalize a P03 ``QueryResult`` (or dict) into a :class:`RagResult`.
+    """Normalize a Python SDK ``QueryResult`` (or dict) into a :class:`RagResult`.
 
     Accepts both the dataclass (``result.results`` / ``result.meta``) and a plain dict
     (``result["results"]`` / ``result["meta"]``) so tests can stub either shape.
@@ -147,7 +147,7 @@ def describe_origin(name: str, source_type: str, source_ref: str, namespace: str
 
 
 class SdkRagProvider:
-    """RAG provider backed by the P03 ``AsyncCortrix`` SDK (design P-12 dogfood).
+    """RAG provider backed by the Python SDK ``AsyncCortrix`` SDK (design dogfood).
 
     The data source is fixed to cortrix-server (design P-11): there is no setter for an
     alternative backend in V1.0.

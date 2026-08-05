@@ -3,7 +3,7 @@
 V1.0 surface:
   * ``GET /config`` — current agent LLM config with the ``api_key`` masked
     (admin-facing; design section 9.1). Never returns a raw key.
-  * ``GET /config/providers`` — the provider/model catalog the P02a
+  * ``GET /config/providers`` — the provider/model catalog the web UI
     ``LLMSettingsDialog`` reuses (design section 6.4), with a ``configured`` flag.
   * ``PUT /config/agent_llm`` — update the agent LLM config (admin only).
 
@@ -28,7 +28,7 @@ from pydantic import BaseModel
 router = APIRouter()
 
 
-# Provider catalog reused by the P02a LLMSettingsDialog (design section 6.4 / 7.1).
+# Provider catalog reused by the web UI LLMSettingsDialog (design section 6.4 / 7.1).
 # 6 providers = MVP 5 + DeepSeek (issue 5 decision B). DeepSeek adapter itself is the
 # V1.5 ②-round scope (not added in this ①-kernel round) but the catalog lists it so the
 # Settings UI can render the option.
@@ -100,7 +100,7 @@ async def get_config(config: AgentLlmConfigView = Depends(get_agent_llm_config))
 
 @router.get("/config/providers")
 async def get_providers():
-    """Return the provider catalog reused by the P02a LLMSettingsDialog (no secrets)."""
+    """Return the provider catalog reused by the web UI LLMSettingsDialog (no secrets)."""
     return {"providers": _PROVIDERS}
 
 

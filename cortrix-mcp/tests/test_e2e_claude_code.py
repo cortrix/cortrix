@@ -26,10 +26,10 @@ MAIN_TOOLS = {
     # new 4
     "cortrix_memory_extract", "cortrix_task_status", "cortrix_cancel_task",
     "cortrix_query_explain",
-    # MEM02 +2 / MEM04 +1 / BULK +1 / F18a +1
+    # Memory extraction +2 / memory opt-out +1 / BULK +1 / operation log +1
     "cortrix_memory_get_audit", "cortrix_memory_revoke_fact", "cortrix_memory_opt_out",
     "cortrix_batch_submit", "cortrix_list_operations",
-    # MEM03 +4
+    # Memory transparency +4
     "cortrix_memory_list", "cortrix_memory_create", "cortrix_memory_edit",
     "cortrix_memory_invalidate",
 }

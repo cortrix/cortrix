@@ -1,6 +1,6 @@
 import { metrics, type Counter, type Histogram } from '@opentelemetry/api';
 
-// Web UI observability — OpenTelemetry metrics (P02a design § 23-bis).
+// Web UI observability — OpenTelemetry metrics (web UI design § 23-bis).
 //
 // The 4 V1.0 minimal-set metrics (§ 23-bis.1) are emitted client-side and
 // pushed via OTLP/HTTP to cortrix-server's /v1/metrics reverse proxy
@@ -47,7 +47,7 @@ function deploymentEnv(): string {
  * instruments. Idempotent and safe to call once at app start. No-op in
  * non-browser (test/SSR) environments.
  *
- * Perf (P02a § 14): the heavy OTel SDK (MeterProvider / OTLP exporter, ~19KB
+ * Perf (web UI): the heavy OTel SDK (MeterProvider / OTLP exporter, ~19KB
  * gzip) is dynamic-imported here so it lands in its own async chunk and never
  * blocks first paint / inflates the initial bundle — only the tiny
  * @opentelemetry/api no-op surface ships in the entry. The recording helpers

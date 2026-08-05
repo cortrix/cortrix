@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { recordPageView } from './metrics';
 
-// Page-view metric hook (P02a design § 23-bis.1 — cortrix_webui_page_views_total).
+// Page-view metric hook (web UI design § 23-bis.1 — cortrix_webui_page_views_total).
 // Mounted inside the router (Layout) so it fires once per route change with the
 // normalized top-level page label (login/home/memory/ns/admin/...). Best-effort:
 // recordPageView is a no-op before metrics init / when the collector is down.

@@ -46,7 +46,7 @@ FetchContent_Declare(
 )
 set(RC_ENABLE_GTEST ON CACHE BOOL "" FORCE)
 
-# hnswlib (vector index): NOT fetched anymore — vendored in-tree as the F01
+# hnswlib (vector index): NOT fetched anymore — vendored in-tree as the index
 # P-HNSW shallow fork at src/store/phnsw/hnswlib/ (see CMakeLists.txt there).
 
 # SQLite amalgamation
@@ -91,7 +91,7 @@ if(NOT CORTRIX_ONNX_RUNTIME_FLAVOR MATCHES "^(cpu|cuda)$")
         "CORTRIX_ONNX_RUNTIME_FLAVOR must be 'cpu' or 'cuda', got '${CORTRIX_ONNX_RUNTIME_FLAVOR}'")
 endif()
 
-# F22: lock the ONNX Runtime ABI *major* version this binary is built against.
+# ONNX runtime: lock the ONNX Runtime ABI *major* version this binary is built against.
 # Within one major (1.x), ONNX Runtime keeps ABI compatibility, so a same-major
 # upgrade (e.g. 1.17 -> 1.19) is just a `.so`/dylib swap + restart — no rebuild.
 # Crossing a major (1.x -> 2.x, every few years) is the only case that needs a
@@ -177,15 +177,15 @@ if(NOT sqlite3_POPULATED)
         # SQLITE_THREADSAFE=1 (serialized), NOT =2 (multi-thread). The catalog.db
         # handle (owned by CatalogDb) is borrowed and used concurrently by multiple
         # threads — the GC background thread (GcManager) and HTTP request threads
-        # (F12) — with no owner-level mutex. Under multi-thread mode (=2), concurrent
+        # (catalog) — with no owner-level mutex. Under multi-thread mode (=2), concurrent
         # use of a single connection is undefined behavior and crashed intermittently
         # (GcThreadTest.LoopRunsSweep SEGFAULT, ~2/3 in isolation). Serialized mode
         # gives each connection its own recursive mutex: independent connections
-        # (per-Unit store.db in the F05 pool) still run fully in parallel; only
+        # (per-Unit store.db in the namespace pool) still run fully in parallel; only
         # concurrent use of the SAME connection is serialized. The cost is an
         # uncontended lock/unlock per API call on single-threaded connections
         # (negligible) plus real serialization on the shared catalog connection
-        # (low-volume metadata, cached behind F12 bloom filter).
+        # (low-volume metadata, cached behind catalog bloom filter).
         # Phase-2 perf upgrade path (per-connection owner mutex / per-thread WAL
         # connections) is tracked in hub PHASE2_BACKLOG (TD-CATALOG-CONN-CONCURRENCY).
         SQLITE_THREADSAFE=1

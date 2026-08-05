@@ -171,7 +171,7 @@ export const mockApi = {
     };
   },
 
-  // ─── Health probes (F20-7 — /live + /ready) ───────────────────────────────
+  // ─── Health probes (readiness — /live + /ready) ───────────────────────────────
   async getLive(): Promise<LiveResponse> {
     await delay(60);
     return { status: 'alive', uptime_seconds: 4200 + Math.floor(Math.random() * 100), version: '1.0.0-rc.1' };
@@ -179,7 +179,7 @@ export const mockApi = {
 
   async getReady(): Promise<ReadyResponse> {
     await delay(90);
-    // Standalone demo: all 5 components ready (F20-7 § 8.4 component set).
+    // Standalone demo: all 5 components ready (the readiness design component set).
     return {
       status: 'ready',
       uptime_seconds: 4200,
@@ -194,7 +194,7 @@ export const mockApi = {
     };
   },
 
-  // ─── Bulk document submit (TD-F42-BULK-SUBMIT — partial-success schema) ────
+  // ─── Bulk document submit (batch submit — partial-success schema) ────
   async batchSubmit(req: BatchSubmitRequest): Promise<BatchSubmitResponse> {
     await delay(420);
     const docs = req.documents ?? [];
@@ -333,7 +333,7 @@ export const mockApi = {
     };
   },
 
-  // ─── Memory CRUD (MEM03) ──────────────────────────────────────────────────
+  // ─── Memory CRUD (memory transparency) ────────────────────────────────────
   // Mutable in-memory store so create/edit/invalidate reflect in later lists.
   async listMemory(filter: MemoryListFilter): Promise<MemoryListResponse> {
     await delay(220);
@@ -391,7 +391,7 @@ export const mockApi = {
     const old = memoryStore[idx];
     const now = Date.now();
     const newId = `mem_${(nextMemId++).toString(16)}`;
-    // MEM03 § 5.2 — edit = insert new (user_edit) + invalidate old.
+    // Memory transparency — edit = insert new (user_edit) + invalidate old.
     memoryStore[idx] = {
       ...old,
       status: 'invalidated',
@@ -425,7 +425,7 @@ export const mockApi = {
     return { block_id: id, status: 'invalidated' };
   },
 
-  // ─── Namespace CRUD (F12) ─────────────────────────────────────────────────
+  // ─── Namespace CRUD (catalog) ─────────────────────────────────────────────
   async getNamespaceDetail(name: string): Promise<NamespaceDetail> {
     await delay(180);
     const existing = namespaceDetailStore.find((n) => n.name === name);
@@ -481,7 +481,7 @@ export const mockApi = {
     return next;
   },
 
-  // ─── Auth (P08 — HttpOnly cookie model simulated in-memory) ────────────────
+  // ─── Auth (auth — HttpOnly cookie model simulated in-memory) ───────────────
   // A real backend manages the session via cookies; standalone we keep a
   // module-level flag so the bootstrap → login → guarded-pages flow works.
   authMe(): AuthMeResponse | null {
@@ -529,7 +529,7 @@ export const mockApi = {
     };
   },
 
-  // ─── Admin / Users (P08 § 2.13-bis) ───────────────────────────────────────
+  // ─── Admin / Users (auth) ─────────────────────────────────────────────────
   async listUsers(filter: UserListFilter): Promise<UserListResponse> {
     await delay(200);
     let items = [...userStore];
@@ -587,7 +587,7 @@ export const mockApi = {
     return { user: userStore[idx] };
   },
 
-  // ─── Operation Log (F18a CE — GET /operations) ────────────────────────────
+  // ─── Operation Log (operation log CE — GET /operations) ───────────────────
   async listOperations(filter: OperationLogFilter): Promise<OperationLogResponse> {
     await delay(210);
     let items = [...operationStore];
@@ -609,7 +609,7 @@ export const mockApi = {
     };
   },
 
-  // ─── API Keys (P08 § 2.13.3) ──────────────────────────────────────────────
+  // ─── API Keys (auth) ──────────────────────────────────────────────────────
   async listApiKeys(): Promise<ApiKeySummary[]> {
     await delay(160);
     return apiKeyStore.map((k) => ({ ...k }));

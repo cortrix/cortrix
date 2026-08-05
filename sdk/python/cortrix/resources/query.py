@@ -1,15 +1,15 @@
 """Query resource — backs the top-level ``client.search()`` / ``get_sources()``.
 
 This resource follows the implemented HTTP architecture. The live ``POST /query`` route is
-the F04 cross-NS handler: ``namespaces`` array (single NS = one-element
+the cross-NS handler: ``namespaces`` array (single NS = one-element
 list, all = ["*"]), singular ``filter``, and the § 2.12
 ``QueryResult{results, meta}`` response (child_id/content/content_hash
 items + 8-field A-class meta). ``_adapt_wire_result`` is kept as a
 tolerant shim for the pre-mount MVP response shape (chunk_text/block_id) —
-F04-shaped responses pass through untouched.
+cross-NS-shaped responses pass through untouched.
 
 ``get_sources()`` -> ``GET /interactions/{id}/sources`` is **§2.12-only**
-(P04 spec to be added -> D3.5).
+(API spec to be added -> D3.5).
 """
 
 from __future__ import annotations
@@ -54,13 +54,13 @@ def _adapt_wire_result(body: Any, namespace: Union[str, List[str]]) -> Any:
       ``doc_id`` -> ``parent_id``; ``source_path`` / ``block_type`` /
       ``hit_routes`` / ``vector_score`` / ``related_blocks_count`` fold into
       ``metadata``. Route-degradation info surfaces as a ``meta.warnings`` entry.
-    Already-§2.12 payloads (e.g. a future F04 mount, test stubs) pass through.
+    Already-§2.12 payloads (e.g. a future cross-NS query mount, test stubs) pass through.
     """
     if not isinstance(body, dict) or "results" not in body:
         return body
     wire_meta = body.get("meta") or {}
     if "namespaces_queried" in wire_meta:
-        return body  # already the §2.12 / F04 cross-NS shape
+        return body  # already the §2.12 / cross-NS shape
 
     ns = namespace if isinstance(namespace, str) else (list(namespace) or [""])[0]
     results: list[dict[str, Any]] = []

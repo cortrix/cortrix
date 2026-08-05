@@ -1,6 +1,6 @@
 """Database import — backs the top-level ``client.import_database()``.
 
-F16a reverse hook. The frozen ``api/paths/import.yaml`` is **not yet built**
+DB import reverse hook. The frozen ``api/paths/import.yaml`` is **not yet built**
 (B-R2 briefing) so this is hand-written per design § 2.12 (``POST
 /import/database``) and exercised against mocked HTTP responses; the real spec
 regen + server integration -> D3.5.
@@ -35,7 +35,7 @@ def _import_body(
 
 
 class Imports(SyncResource):
-    """Manual DB import (F16a). Hand-written; real spec -> D3.5."""
+    """Manual database import. Hand-written; real spec -> D3.5."""
 
     def database(
         self,

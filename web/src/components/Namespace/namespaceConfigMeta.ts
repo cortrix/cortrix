@@ -1,15 +1,15 @@
 import type { NamespaceConfigKey } from '../../types/api';
 
-// F12 11 *_config registry (F12 v1.0.8 — schema section locks 11 columns). Each
+// Catalog 11 *_config registry (catalog — schema section locks 11 columns). Each
 // entry maps a config column to its owning Feature, a human label, and an
 // example JSON shape (used as a placeholder / "insert example" hint in the
 // structured form). The UI treats every config as an opaque JSON blob — these
 // examples are guidance only, never enforced validation.
 //
-// Tab assignment follows P02a design § 8.2 (5 tabs). The original § 8.2 table
-// predates sparse_config + doc_summary_config (F12 v1.0.4→v1.0.8 added 4 of the
-// 11); we slot them by Feature semantics: sparse_config → Retrieval (F40 sparse
-// retrieval), doc_summary_config → Processing (F41 document summary index).
+// Tab assignment follows web UI design § 8.2 (5 tabs). The original § 8.2 table
+// predates sparse_config + doc_summary_config (catalog→v1.0.8 added 4 of the
+// 11); we slot them by Feature semantics: sparse_config → Retrieval (sparse
+// retrieval), doc_summary_config → Processing (doc summary document summary index).
 
 export type ConfigTab = 'retrieval' | 'processing' | 'memory' | 'advanced';
 

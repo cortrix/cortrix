@@ -11,7 +11,7 @@ import { ErrorMessage } from '../Common/ErrorMessage';
 import { usePageViews } from '../../telemetry/usePageViews';
 import { setMetricsEdition } from '../../telemetry/metrics';
 
-// App shell (P02a design § 10 — react-router). Header + Sidebar frame an
+// App shell (web UI design § 10 — react-router). Header + Sidebar frame an
 // <Outlet/> that renders the active route. Page selection moved from the old
 // `activePage` zustand field to the URL (BrowserRouter) in R3/S5; every R1/R2
 // page (Upload / Search / Chat / Memory / Namespaces / Settings) is now a

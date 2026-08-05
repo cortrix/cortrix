@@ -13,9 +13,9 @@ import { ProgrammaticBanner } from '../components/Common/ProgrammaticBanner';
 import { ErrorDisplay } from '../components/Common/ErrorDisplay';
 import { parseAgentError } from '../api/errors';
 
-// Health dashboard (P02a design § 4.2, F20-7). Surfaces the two K8s probes:
+// Health dashboard (web UI design § 4.2, readiness). Surfaces the two K8s probes:
 //   /live  — process liveness (status + uptime + version)
-//   /ready — readiness with the 5-component breakdown (F20-7 § 8.4)
+//   /ready — readiness with the 5-component breakdown (the readiness design)
 // Agent-friendly: data-testid + data-component on each component row so an
 // Agent can scrape readiness; a ProgrammaticBanner points at the SDK / REST
 // equivalent (a human watches the dashboard, an Agent polls /ready).

@@ -1,17 +1,17 @@
 # Agent Memory Correction — Self-Service Loop
 
 > Best-practice guide for an Agent to find and undo a wrong memory invalidation
-> (MEM02 D6 + D9 self-correction loop). This is the public counterpart of
-> `cortrix.ai/docs/agent-memory-correction` (MEM02-rev-1b).
+> (memory extraction D6 + D9 self-correction loop). This is the public counterpart of
+> `cortrix.ai/docs/agent-memory-correction`.
 >
 > Source of truth for the mechanism: `design/features/MEM02-llm-extraction.md`
 > §6 (HTTP API), §7 (SDK), §8 (the full self-correction scenario).
 
 ## Background — why invalidations are reversible
 
-MEM02 extracts long-term memories (`fact` / `preference` / `event`) from
+memory extracts long-term memories (`fact` / `preference` / `event`) from
 interactions. When a newly extracted fact contradicts an existing one (D5
-judgment), MEM02 marks the **old** block `status = invalidated` and records *why*
+judgment), memory extraction marks the **old** block `status = invalidated` and records *why*
 — it never deletes it (the full-retention policy). Every invalidation is
 therefore reversible.
 
@@ -25,8 +25,8 @@ Two facts make self-correction safe:
   the old block is marked `auto_revoke_eligible = true`, so an Agent can find the
   shaky calls and review them proactively.
 
-The audit trail is the F18a operation_log (CE) — there is **no** separate
-`memory_audit_log` table. MEM02 writes four `memory_*` actions:
+The audit trail is the operation_log (CE) — there is **no** separate
+`memory_audit_log` table. memory extraction writes four `memory_*` actions:
 `memory_extract` / `memory_invalidate` / `memory_revoke` / `memory_blocks_update`.
 
 ## The self-correction loop (Agent-driven)
@@ -44,7 +44,7 @@ The audit trail is the F18a operation_log (CE) — there is **no** separate
 5. **Agent fixes the misclassification if needed** — e.g. re-type the offending
    memory from `fact` to `event` via `client.memory.update(memory_id=..., ...)`.
 
-> SDK / MCP naming (P12 v1.0.4 SoT): the audit + revoke tools are
+> SDK / MCP naming (MCP server SoT): the audit + revoke tools are
 > `cortrix_memory_get_audit` (#21) and `cortrix_memory_revoke_fact` (#22). The
 > older `invalidations.list` / `invalidations.revoke` names are deprecated.
 > SDK keys memories by `memory_id` (the SDK abstraction), not the internal
@@ -82,7 +82,7 @@ candidates = client.memory.get_audit(auto_revoke_eligible=True,
 
 ## Error handling the Agent should expect
 
-MEM02 returns the GEN-Agent error body (4 machine-readable fields + structured
+Memory extraction returns the GEN-Agent error body (4 machine-readable fields + structured
 data) with these `CX_ERR_MEM02_*` codes:
 
 | code | category | retryable | what the Agent should do |
@@ -96,6 +96,6 @@ data) with these `CX_ERR_MEM02_*` codes:
 ## Implementation status
 
 This guide describes a design contract. The live endpoints, Query-pipeline contradiction
-path, Python-middleware async worker, and MEM04 opt-out integration are not currently
+path, Python-middleware async worker, and opt-out integration are not currently
 implemented as one supported workflow. Do not treat the examples above as an executable
 Quick Start. Implementation notes remain in `design/features/MEM02-llm-extraction.md`.

@@ -95,10 +95,10 @@ def test_all_29_main_tools_have_a_success_case():
 
 
 # ---------------------------------------------------------------------------
-# Request shaping: verify P04-correct endpoints + bodies for representative tools.
+# Request shaping: verify spec-correct endpoints + bodies for representative tools.
 # ---------------------------------------------------------------------------
 def test_query_uses_namespaces_array_and_prefix(mock_request):
-    # F04 wire (live since D3.5 r2): POST /query takes a `namespaces` array.
+    # Cross-NS query wire (live since D3.5 r2): POST /query takes a `namespaces` array.
     mock_request.set(json_body={"data": []})
     get_tool_fn("cortrix_query")(query="hi", top_k=7, namespaces=["c1", "c2"], rerank=False)
     args, kwargs = mock_request.last_call

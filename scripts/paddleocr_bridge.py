@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""PaddleOCR fallback bridge for F06 PaddleOCRParser.
+"""PaddleOCR fallback bridge for PaddleOCRParser.
 
 Invoked as a subprocess by cortrix::spc::PaddleOCRParser:
 
     python3 paddleocr_bridge.py --filepath FILE --timeout SECS \
         --max-pages N --lang ch --output-format json [--use-gpu]
 
-Emits the F06 §3.1 page-level JSON protocol on stdout (same envelope as
+Emits the parser page-level JSON protocol on stdout (same envelope as
 docling_bridge.py). OCR specifics: page_metadata.parser_used = "paddleocr",
 every paragraph type = TEXT, section = "" (OCR can't recover structure), and
 paragraph.confidence is the OCR score. PDFs are OCR'd page-by-page; images

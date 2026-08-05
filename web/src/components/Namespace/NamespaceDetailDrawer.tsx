@@ -8,8 +8,8 @@ import { Badge, Button } from '../ui';
 import { formatFileSize } from '../../utils/formatters';
 import { CONFIG_META } from './namespaceConfigMeta';
 
-// NamespaceDetailDrawer (P02a design § 8.5) — right slide-over showing metadata
-// + all 11 *_config as collapsible read-only JSON accordions + F05 admission
+// NamespaceDetailDrawer (web UI design § 8.5) — right slide-over showing metadata
+// + all 11 *_config as collapsible read-only JSON accordions + namespace pool admission
 // state, with Edit / Delete actions at the bottom. Does not disturb the list.
 
 interface NamespaceDetailDrawerProps {
@@ -111,7 +111,7 @@ export function NamespaceDetailDrawer({
             </div>
           </section>
 
-          {/* F05 admission state */}
+          {/* namespace pool admission state */}
           {ns.admission && (
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
@@ -208,7 +208,7 @@ export function NamespaceDetailDrawer({
             </h3>
             <div className="space-y-2">
               {CONFIG_META.map((meta) => {
-                // Defensive: the backend (F12 BuildNamespaceJson) may omit the
+                // Defensive: the backend (catalog BuildNamespaceJson) may omit the
                 // whole `configs` object or individual *_config keys. Optional-
                 // chain through both so a missing field degrades to a "default"
                 // accordion instead of throwing (undefined[key]) into the

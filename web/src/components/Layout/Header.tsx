@@ -71,7 +71,7 @@ export function Header() {
         </button>
       )}
 
-      {/* Current user + logout (P02a § 9 — HttpOnly cookie session) */}
+      {/* Current user + logout (web UI — HttpOnly cookie session) */}
       {currentUser && (
         <div className="ml-4 flex items-center gap-2">
           <span

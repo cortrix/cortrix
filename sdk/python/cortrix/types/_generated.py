@@ -76,7 +76,7 @@ class Document:
 
 @dataclass
 class DocumentTask:
-    """F42 async upload task."""
+    """async upload task."""
     task_id: str
     status: Literal["submitted", "queued", "processing", "ready", "failed", "cancelled"]
     document_id: Optional[str] = None
@@ -331,7 +331,7 @@ class AgentSession:
 
 @dataclass
 class AgentLlmConfig:
-    """F48 § 6.3 agent LLM config (GET redacted read / PUT admin-only update)."""
+    """agent LLM config (GET redacted read / PUT admin-only update)."""
     provider: Optional[Literal["openai", "deepseek", "azure"]] = None
     model: Optional[str] = None
     api_key_set: Optional[bool] = None

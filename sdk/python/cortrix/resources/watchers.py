@@ -1,4 +1,4 @@
-"""Watchers resource. ``/watch`` domain (ARCH § 4.1.4 + F21/F42).
+"""Watchers resource. ``/watch`` domain (ARCH § 4.1.4 + watcher/async task).
 
 This resource follows the implemented HTTP architecture. ``add()`` follows the fan-out shape (``path`` +
 ``target_namespaces`` array + ``recursive``); the design's per-watcher

@@ -1,4 +1,4 @@
-"""Unit tests for the P03 SDK RAG seam (agent_core.sdk_rag)."""
+"""Unit tests for the Python SDK RAG seam (agent_core.sdk_rag)."""
 
 import pytest
 

@@ -3,12 +3,12 @@ import { mockApi } from './mock';
 import { fallbackToMock } from './fallback';
 import type { OperationLogFilter, OperationLogResponse } from '../types/api';
 
-// Operation Log client (F18a CE — GET /api/v1/operations, P02a § 9-bis.2).
+// Operation Log client (operation log CE — GET /api/v1/operations, web UI).
 //
 // Path note (V5-B4 P0-V5-66): the endpoint is the business prefix
 // `/api/v1/operations` — NOT `/api/v1/admin/operations`. Admin cross-user
 // queries (user_id != current) trigger the AdminGuard double-protection on the
-// backend (F18a § 6.1); the UI just passes the optional user_id filter.
+// backend (operation log); the UI just passes the optional user_id filter.
 //
 // Mock fallback is build-time gated (./fallback.ts): production surfaces every
 // error; only a standalone build exercises the log table + filters against the

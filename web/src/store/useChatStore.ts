@@ -7,7 +7,7 @@ import { mockApi } from '../api/mock';
 import { USE_MOCK } from '../api/fallback';
 import { errorMessage } from '../api/errors';
 
-// F48 Cortrix Agent endpoint (P02a § 4.1, F48-rev-1): chat is served by
+// Agent Cortrix Agent endpoint (web UI, the agent design): chat is served by
 // cortrix-server's reverse proxy at /api/v1/agent/chat (same-origin SSE +
 // multi-tenant header pass-through). The legacy MVP path was the agent-demo
 // `/agent/chat`; R4/S2 moves to the unified endpoint.
@@ -88,7 +88,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         cancelStream: null,
       }));
 
-    // F48 multi-tenant header pass-through (§ 8.2): X-Cortrix-Namespace is the
+    // Agent multi-tenant header pass-through (§ 8.2): X-Cortrix-Namespace is the
     // request-level NS override. X-Cortrix-Tenant-Id is a Cloud (V1.5) concern
     // — CE is single-tenant so it is omitted here (cortrix-server ignores an
     // absent header). CSRF header is required on this POST (§ 4.6).
@@ -129,13 +129,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
             if (dataStr === '[DONE]') continue;
             try {
               const data = JSON.parse(dataStr);
-              // F48 SSE: `{ "chunk": "…" }` tokens, then a final
+              // Agent SSE: `{ "chunk": "…" }` tokens, then a final
               // `{ "meta": { chunks_used, chunk_ids, rag_status, … } }` frame.
               if (typeof data.chunk === 'string') {
                 fullContent += data.chunk;
                 applyContent(fullContent);
               }
-              // Legacy/mock path may stream `sources`. F48 carries real per-source
+              // Legacy/mock path may stream `sources`. agent carries real per-source
               // provenance in `meta.citations` (source_path + score + snippet) — map
               // those so each source shows real text + score. Fall back to bare
               // `chunk_ids` only for an older agent that predates citations.

@@ -1,4 +1,4 @@
-# F10: Web UI Build Integration
+# Cleaning: Web UI Build Integration
 # Builds the React SPA and copies output to web/static/ for embedding in cortrix-server
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/web/package.json)

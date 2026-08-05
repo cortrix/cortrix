@@ -1,4 +1,4 @@
-"""T-P03-AGENT-1~5 — GEN-Agent 4-field decisions (design § 8 / issue 4)."""
+"""SDK agent cases 1-5 — GEN-Agent 4-field decisions (design § 8 / issue 4)."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def _u(api_base: str) -> str:
 
 @respx.mock
 def test_agent_1_error_has_4_fields(api_base: str) -> None:
-    """T-P03-AGENT-1: 400 carries retryable/category/retry_after_ms/structured_data."""
+    """SDK agent case 1: 400 carries retryable/category/retry_after_ms/structured_data."""
     respx.get(_u(api_base)).mock(
         return_value=httpx.Response(
             400,
@@ -39,7 +39,7 @@ def test_agent_1_error_has_4_fields(api_base: str) -> None:
 
 @respx.mock
 def test_agent_2_retry_when_server_says_true(api_base: str) -> None:
-    """T-P03-AGENT-2: 503 retryable=true + retry_after_ms, succeeds on 3rd."""
+    """SDK agent case 2: 503 retryable=true + retry_after_ms, succeeds on 3rd."""
     route = respx.get(_u(api_base))
     route.side_effect = [
         httpx.Response(503, json={"error": {"code": "CX_ERR_DB", "message": "x",
@@ -56,7 +56,7 @@ def test_agent_2_retry_when_server_says_true(api_base: str) -> None:
 
 @respx.mock
 def test_agent_3_no_retry_when_server_says_false(api_base: str) -> None:
-    """T-P03-AGENT-3: 429 retryable=false (quota) -> no retry, RateLimitError."""
+    """SDK agent case 3: 429 retryable=false (quota) -> no retry, RateLimitError."""
     route = respx.get(_u(api_base)).mock(
         return_value=httpx.Response(
             429, json={"error": {"code": "CX_ERR_QUOTA", "message": "out",
@@ -73,7 +73,7 @@ def test_agent_3_no_retry_when_server_says_false(api_base: str) -> None:
 
 @respx.mock
 def test_agent_4_fallback_http_status(api_base: str) -> None:
-    """T-P03-AGENT-4: 503 with NO retryable field -> fallback HTTP-status retry."""
+    """SDK agent case 4: 503 with NO retryable field -> fallback HTTP-status retry."""
     route = respx.get(_u(api_base))
     route.side_effect = [
         httpx.Response(503, json={"error": {"code": "CX_ERR_X", "message": "down"}}),
@@ -87,7 +87,7 @@ def test_agent_4_fallback_http_status(api_base: str) -> None:
 
 @respx.mock
 def test_agent_5_retry_after_ms_priority(api_base: str) -> None:
-    """T-P03-AGENT-5: retry_after_ms=120 wins over Retry-After header '5' (s)."""
+    """SDK agent case 5: retry_after_ms=120 wins over Retry-After header '5' (s)."""
     route = respx.get(_u(api_base))
     route.side_effect = [
         httpx.Response(

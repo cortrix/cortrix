@@ -1,4 +1,4 @@
-# F23 lint config — matches the prevailing in-tree style (Google base,
+# Test suite lint config — matches the prevailing in-tree style (Google base,
 # 4-space indent, 100 cols). CI enforcement is diff-only and currently a
 # SOFT gate; full-tree reformat is a pending decision (would churn blame
 # across 45+ frozen features).

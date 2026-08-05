@@ -9,7 +9,7 @@ with PGXS — it is *not* part of the main `cortrix/` CMake build.
 
 ## Why plpython3u (and not a C extension)
 
-F14 V1 (L0' route, 2026-05-07) deliberately chose `plpython3u` + HTTP over a C
+Pgcortrix V1 (L0' route, 2026-05-07) deliberately chose `plpython3u` + HTTP over a C
 extension + shared-memory IPC:
 
 - **PG-version-agnostic** — works on PG 13–17 via the stable `plpython3u` ABI.
@@ -32,7 +32,7 @@ the **V3+ roadmap** (§9 of the SoT), not V1.
 | `Makefile` | PGXS build + Python helper install. |
 | `tests/` | Python unit tests (mock `urllib`, fake `plpy`) — run without a live PG. |
 
-## Functions (F14 §2.1)
+## Functions (pgcortrix)
 
 **Main (5):**
 
@@ -47,7 +47,7 @@ the **V3+ roadmap** (§9 of the SoT), not V1.
 **Helper (2):** `pgcortrix_configure(api_key) → VOID`, `pgcortrix_status() → JSONB`.
 
 `pgcortrix_memory_search` / `pgcortrix_list_interactions` require `user_id`
-(MEM05 per-user isolation — three-way parity with the MCP + HTTP layers).
+(memory isolation per-user isolation — three-way parity with the MCP + HTTP layers).
 
 ## Configuration (GUC, §2.2)
 

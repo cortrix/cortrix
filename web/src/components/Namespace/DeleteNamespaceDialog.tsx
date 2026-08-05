@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import type { NamespaceDetail } from '../../types/api';
 import { Modal, Button, Input } from '../ui';
 
-// Delete confirmation (P02a design § 8.6) — irreversible-from-UI warning + 30-day
-// soft-delete note (F12 status='deleted'), gated behind typing the namespace
+// Delete confirmation (web UI design § 8.6) — irreversible-from-UI warning + 30-day
+// soft-delete note (catalog status='deleted'), gated behind typing the namespace
 // name to confirm.
 
 interface DeleteNamespaceDialogProps {

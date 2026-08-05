@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { CurrentUser } from '../types/api';
 import { login as apiLogin, logout as apiLogout, fetchMe } from '../api/auth';
 
-// useAuthStore (P02a design § 9.2 — V4 CC-02 HttpOnly Cookie refactor).
+// useAuthStore (web UI design § 9.2 — V4 CC-02 HttpOnly Cookie refactor).
 //
 // The auth token is NEVER stored in the frontend (no localStorage / no
 // sessionStorage — that is an XSS one-shot per § 4.5). It lives in an HttpOnly

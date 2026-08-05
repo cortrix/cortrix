@@ -4,7 +4,7 @@
 # The artifact build/openapi.bundled.yaml = the single source of truth for the whole
 # Cortrix API, consumed by:
 #   - Swagger UI  (cortrix-server /docs)
-#   - P03 Python SDK build-time types/_generated.py
+#   - Python SDK build-time types/_generated.py
 #   - Schemathesis contract tests (S7)
 #
 # Usage:
@@ -12,7 +12,7 @@
 #   scripts/bundle_openapi.sh --no-lint
 #
 # Dependency: @redocly/cli (if not preinstalled, `npm i -g @redocly/cli`, or this script falls back to npx)
-# SoT: P04 § 2.3 + § 6.3
+# SoT: API spec + § 6.3
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

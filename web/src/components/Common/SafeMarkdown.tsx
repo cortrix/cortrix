@@ -2,7 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import DOMPurify from 'dompurify';
 
-// SafeMarkdown (P02a design § 4.7 — XSS defense: DOMPurify + rehypeSanitize).
+// SafeMarkdown (web UI design § 4.7 — XSS defense: DOMPurify + rehypeSanitize).
 //
 // Both the Chat assistant stream and the Search result snippets render
 // model-produced / user-supplied content as Markdown. Rendering that through a
@@ -24,7 +24,7 @@ import DOMPurify from 'dompurify';
 // block reverse-tabnabbing (§ 4.7). data:/javascript: protocols are dropped by
 // the protocol allow-list below.
 
-// Allowed inline/markdown tags (P02a § 4.7 ALLOWED_TAGS).
+// Allowed inline/markdown tags (web UI ALLOWED_TAGS).
 const ALLOWED_TAGS = [
   'p',
   'strong',

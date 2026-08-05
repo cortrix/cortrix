@@ -9,7 +9,7 @@ import {
   MAX_FILE_SIZE,
 } from './validators';
 
-// Input validation tests (P02a — Upload + Namespace + Search business rules).
+// Input validation tests (web UI — Upload + Namespace + Search business rules).
 // Pure functions, so exhaustive over the accept/reject boundaries.
 
 function fakeFile(name: string, size: number): File {

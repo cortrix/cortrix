@@ -9,8 +9,8 @@
 # Thresholds (topic 2 rev B, Phase 1 V1.0):
 #   overall line ≥ 80% · core-17 line ≥ 90% · core-17 branch ≥ 80%
 #
-# Core-17 feature → source dir map (§4.2). F14 pgcortrix (PG extension,
-# separate build) and F24 (shell/deploy artifacts) cannot be instrumented
+# Core-17 feature → source dir map (§4.2). pgcortrix (PG extension,
+# separate build) and deployment (shell/deploy artifacts) cannot be instrumented
 # by this C++ run and are validated by their own suites.
 # =============================================================
 set -euo pipefail
@@ -32,9 +32,9 @@ CORE_LINE_MIN=90
 CORE_TARGET_TU_EXPECTED=317
 CORE_TARGET_SOURCE_SHA256_EXPECTED="4e86934e2109eff7f536e4e538e9ae033109bf7fbb167aa0404c59fc7437b978"
 
-# F01(store/phnsw) F25(store) F02 F03+F07(spc) F04(query) F05(resource)
-# F08(async) F12(catalog) F13(observability+agent_trace) F18a(logging)
-# F22(ml) MEM02/03/05(memory)
+# Index(store/phnsw) write coordinator(store) reranker enricher+semantic score(spc) cross-NS query(query) namespace pool(resource)
+# META block(async) catalog(catalog) agent trace(observability+agent_trace) operation log(logging)
+# ONNX runtime(ml) memory features(memory)
 CORE_DIRS=(
   src/store src/reranker src/spc src/query src/resource src/async
   src/catalog src/observability src/agent_trace src/logging src/ml src/memory
@@ -55,7 +55,7 @@ cmake -B "$BUILD" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug \
 
 # Build ONLY the unit-suite binary: the gate runs `ctest -L unit`, so the full
 # `all` target would waste instrumented-build time on integration/benchmark
-# binaries this run never executes (benchmarks are F44 domain, #481 cloud).
+# binaries this run never executes (benchmarks are benchmark domain, #481 cloud).
 echo "── build (cortrix_unit_tests)"
 # Instrumented (-O0 + coverage mapping) compiles take 2-3 GB PER translation unit;
 # the default --parallel (= all 10 cores here) OOMs a 16 GB box (~30 GB peak →
@@ -83,7 +83,7 @@ ctest --test-dir "$BUILD" -L unit -E "$COV_EXCLUDE" --output-on-failure
 
 echo "── capture lcov"
 mkdir -p "$OUT"
-# Branch gate metric = no-exception-branch (F23 §4.1.bis): gcov's raw mode
+# Branch gate metric = no-exception-branch (test suite): gcov's raw mode
 # counts 2 branches per potentially-throwing call site (C++ exception edges),
 # diluting the denominator ~58% with mostly-untriggerable arms.
 #

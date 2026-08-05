@@ -1,6 +1,6 @@
 """Response meta builder: the A/B/C field tiers + ?explain mode (design section 1.7 / P-4).
 
-F48 is the 7th evidence Feature for the project-level observability principle
+Agent is the 7th evidence Feature for the project-level observability principle
 (ARCH section 1.6). Chat response meta is split into three tiers:
 
   * A (data integrity)  — ALWAYS returned. session_id / chunks_used / chunk_ids /

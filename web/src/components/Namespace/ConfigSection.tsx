@@ -1,7 +1,7 @@
 import { JsonEditor } from './JsonEditor';
 import type { ConfigMeta } from './namespaceConfigMeta';
 
-// ConfigSection (P02a design § 8.3) — one card per *_config: title + Feature
+// ConfigSection (web UI design § 8.3) — one card per *_config: title + Feature
 // badge + "Learn more" link + JSON editor for the opaque blob. Per-config
 // schema is owned by the respective Feature, so the UI offers an example shape
 // and validates JSON syntax only. `error` (a parse error message) is surfaced

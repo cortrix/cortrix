@@ -239,7 +239,7 @@ class AsyncCortrix(AsyncBaseClient):
         )
 
     async def get_sources(self, interaction_id: str) -> Any:
-        """Citation sources — §2.12-only endpoint (P04 spec -> D3.5)."""
+        """Citation sources — §2.12-only endpoint (API spec -> D3.5)."""
         return await self.query.get_sources(interaction_id)
 
     async def import_database(
@@ -251,7 +251,7 @@ class AsyncCortrix(AsyncBaseClient):
         table: Optional[str] = None,
         mode: str = "per_row",
     ) -> Any:
-        """Manual DB import (F16a). ``POST /import/database`` (import.yaml not yet
+        """Manual database import. ``POST /import/database`` (import.yaml not yet
         built -> D3.5)."""
         if self._imports is None:
             self._imports = AsyncImports(self)

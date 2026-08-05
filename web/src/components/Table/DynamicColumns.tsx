@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-// DynamicColumns (P02a design § 9-bis.2). A table whose column set is supplied
+// DynamicColumns (web UI design § 9-bis.2). A table whose column set is supplied
 // at render time so the same component renders CE (8 cols) or Ent (12 cols)
 // without a rewrite — OperationLogPage swaps the column list based on the
 // `audit_log_ent` feature flag. Each column declares how to extract + render a

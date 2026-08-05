@@ -1,4 +1,4 @@
-"""Tenants resource. ``/tenants/*`` (user-level, P09) + ``/admin/tenants``.
+"""Tenants resource. ``/tenants/*`` (user-level, tenancy) + ``/admin/tenants``.
 
 This resource follows the implemented HTTP architecture. Mapping:
   - ``list``         -> GET    /tenants                    (listMyTenants)

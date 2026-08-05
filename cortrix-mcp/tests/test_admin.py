@@ -1,4 +1,4 @@
-"""Tests for the 2 F16a admin-scope tools + the admin gating in transport.require_admin.
+"""Tests for the 2 DB import admin-scope tools + the admin gating in transport.require_admin.
 
 Admin tools require role=admin; V1.0 fallback is the CORTRIX_MCP_ADMIN env var (parsed
 into transport.CORTRIX_MCP_ADMIN at import). We monkeypatch that module flag to flip the

@@ -1,7 +1,7 @@
 """pgcortrix_helper — HTTP client behind the pgcortrix plpython3u functions.
 
 Installed into PG's plpython3u site-packages (see Makefile); the SQL function
-bodies do `from pgcortrix_helper import get_client`. SoT: F14-pgcortrix.md
+bodies do `from pgcortrix_helper import get_client`. SoT: the pgcortrix design
 (§2.2.bis SSRF, §2.4 client, §4.2 cancel, §4.3 retry, §5 errors).
 
 Why this shape — the build machine has no PostgreSQL, so the design constraint
@@ -61,12 +61,12 @@ class ErrorCategory:
     TIMEOUT = "timeout"
 
 
-# One canonical row per F14 CX_ERR_* code. Mirrors catalog_error.cpp's
+# One canonical row per pgcortrix CX_ERR_* code. Mirrors catalog_error.cpp's
 # table-driven registry. SoT for these identities: ARCHITECTURE.md §4.1.11
 # (CX_ERR_F14_INVALID_FILTER / CX_ERR_F14_ENDPOINT_BLOCKED) + §4.1 user_id
 # (CX_ERR_USER_ID_MISSING). retry_after_ms is None unless retryable.
 #
-# NOTE (design flag raised to Lead): F14 §5/§7.bis acceptance prose also names
+# NOTE (design flag raised to Lead): pgcortrix/§7.bis acceptance prose also names
 # a CX_ERR_PG_* family (SSRF_BLOCKED / HTTP_TIMEOUT / ...). Those are NOT in the
 # architecture SoT registry, and §5 explicitly says V1 transport errors
 # (timeout/5xx/conn/4xx) are surfaced as plain plpy.error() PG ERRORs, not
@@ -123,7 +123,7 @@ ALLOWED_FILTER_KEYS = frozenset(
 
 def validate_filter(filter_jsonb):
     """Whitelist-validate the list_interactions filter. Rejects any key not in
-    ALLOWED_FILTER_KEYS → CX_ERR_F14_INVALID_FILTER (F14 §2.1.5). Accepts a dict
+    ALLOWED_FILTER_KEYS → CX_ERR_F14_INVALID_FILTER (pgcortrix). Accepts a dict
     (plpython3u hands JSONB in as a dict) or a JSON string; None → {}."""
     if filter_jsonb is None:
         return {}
@@ -217,7 +217,7 @@ def validate_endpoint(endpoint):
 
 
 # ===========================================================================
-# user_id synthesis (F18a §2.3 issue 8 Option D: "pg:<PG_user>:<pid>")
+# user_id synthesis (operation log issue 8 Option D: "pg:<PG_user>:<pid>")
 # ===========================================================================
 
 _SYNTHETIC_USER_PREFIX = "pg:"
@@ -225,7 +225,7 @@ _SYNTHETIC_USER_PREFIX = "pg:"
 
 def synthesize_user_id(pg_user, pid):
     """Caller-identity for audit logging when pgcortrix has no configure()'d API
-    key (F18a Option D). NOT the MEM05 data-isolation user_id (that is an explicit
+    key (operation log Option D). NOT the memory isolation data-isolation user_id (that is an explicit
     function argument). Format: "pg:<PG_user>:<pid>"."""
     return "%s%s:%s" % (_SYNTHETIC_USER_PREFIX, pg_user, pid)
 
@@ -268,7 +268,7 @@ def build_url(endpoint, path, params=None):
 
 def classify_http_error(status_code):
     """Map an HTTP status to (retryable, short_reason) for retry decisions
-    (F14 §4.3): 5xx retryable (transient), 4xx not. The reason string feeds the
+    (pgcortrix): 5xx retryable (transient), 4xx not. The reason string feeds the
     PG error message / metric label."""
     if 500 <= status_code <= 599:
         return True, "http_5xx"
@@ -282,7 +282,7 @@ def classify_http_error(status_code):
 
 
 def backoff_delays_ms(retry_max):
-    """Exponential backoff schedule (F14 §4.3): 100 / 200 / 400 ... for the
+    """Exponential backoff schedule (pgcortrix): 100 / 200 / 400 ... for the
     given number of retries."""
     return [100 * (2 ** i) for i in range(max(0, retry_max))]
 
@@ -320,7 +320,7 @@ class _PlpyAdapter:
 
     def ping_for_interrupt(self):
         """A no-op query whose execution makes PG run CHECK_FOR_INTERRUPTS, so a
-        pg_cancel_backend / statement_timeout is observed (F14 §4.2). Raises
+        pg_cancel_backend / statement_timeout is observed (pgcortrix). Raises
         whatever plpy raises on interrupt; caller treats any raise as cancel."""
         self._plpy.execute("SELECT 1")
 
@@ -339,7 +339,7 @@ class _PlpyAdapter:
 class PgcortrixClient:
     """HTTP client used by all pgcortrix functions. One instance per backend,
     cached in GD (see get_client). Reads GUCs on every call so runtime `SET`s
-    take effect (F14 §2.4)."""
+    take effect (pgcortrix)."""
 
     def __init__(self, plpy, urlopen=None, sleep=None):
         self._pg = _PlpyAdapter(plpy)
@@ -352,7 +352,7 @@ class PgcortrixClient:
         # Per-session API key override set via pgcortrix_configure(); takes
         # precedence over the api_key GUC when non-empty.
         self._session_api_key = None
-        # Synthetic user_id is logged WARN once per backend (F18a Option D).
+        # Synthetic user_id is logged WARN once per backend (operation log Option D).
         self._warned_synthetic_user = False
 
     # ---- config ----------------------------------------------------------
@@ -374,10 +374,10 @@ class PgcortrixClient:
         self._session_api_key = api_key
 
     def caller_user_id(self, configured_api_key):
-        """Resolve the audit caller-identity (F18a Option D). With a configured
+        """Resolve the audit caller-identity (operation log Option D). With a configured
         API key the server derives the real user_id, so we send nothing here
         (return None). Without one, synthesize "pg:<PG_user>:<pid>" and WARN
-        once. This is the audit identity, distinct from the MEM05 data user_id
+        once. This is the audit identity, distinct from the memory isolation data user_id
         passed as a function argument."""
         if configured_api_key:
             return None
@@ -403,7 +403,7 @@ class PgcortrixClient:
             headers["X-API-Key"] = cfg["api_key"]
         caller = self.caller_user_id(cfg["api_key"])
         if caller:
-            # F18a audit attribution when anonymous (no API key).
+            # Operation log audit attribution when anonymous (no API key).
             headers["X-Pgcortrix-Caller"] = caller
         return headers
 
@@ -458,7 +458,7 @@ class PgcortrixClient:
     def _do_with_retry(self, method, path, body=None, params=None):
         """Retry 5xx / connection errors per §4.3 (exponential backoff); 4xx and
         SSRF are not retried. Terminal transport failures are surfaced as PG
-        ERRORs via plpy.error() (F14 §5 — V1 does not map to structured codes)."""
+        ERRORs via plpy.error() (pgcortrix — V1 does not map to structured codes)."""
         cfg = self._get_config()
         delays = backoff_delays_ms(cfg["retry_max"])
         attempt = 0
@@ -493,7 +493,7 @@ class PgcortrixClient:
                     "pgcortrix endpoint unreachable: %s (%s)"
                     % (cfg["endpoint"], getattr(e, "reason", e)))
 
-    # ---- typed endpoints (F14 §2.4 + v1.0.3 endpoint map §3.3) ----------
+    # ---- typed endpoints (pgcortrix + v1.0.3 endpoint map §3.3) ---------
 
     def search(self, namespace, query, top_k, filter, rerank):
         resp = self._post("/api/v1/query", {
@@ -548,7 +548,7 @@ class PgcortrixClient:
 
     def batch_submit(self, namespace, documents, async_=True,
                      on_duplicate="skip"):
-        """TD-F42-BULK: batch-submit up to 100 documents in one call.
+        """batch submit: batch-submit up to 100 documents in one call.
 
         ``documents`` is the already-decoded list of per-doc dicts (each with a
         client-supplied doc_id + content; optional filename / metadata). Returns
@@ -579,7 +579,7 @@ class PgcortrixClient:
         return resp.get("results", [])
 
     def list_interactions(self, namespace, user_id, filter, limit_n, offset_n):
-        """v1.0.2: MEM05 D4 user_id mandatory + whitelist filter (§2.1.5).
+        """v1.0.2: memory isolation D4 user_id mandatory + whitelist filter (§2.1.5).
         Endpoint GET /api/v1/memory/interactions (§3.3 v1.0.3)."""
         if not user_id:
             raise CortrixError(
@@ -589,7 +589,7 @@ class PgcortrixClient:
         validated = validate_filter(filter)  # raises CX_ERR_F14_INVALID_FILTER
         params = {
             "namespace": namespace,
-            "user_id": user_id,            # MEM05 D4: never NULL
+            "user_id": user_id,            # memory isolation D4: never NULL
             "limit": limit_n,
             "offset": offset_n,
         }
@@ -638,7 +638,7 @@ class PgcortrixClient:
 
 
 # ===========================================================================
-# GD-cached factory (F14 §2.3) — import the module + build the client once per
+# GD-cached factory (pgcortrix) — import the module + build the client once per
 # backend, not per call.
 # ===========================================================================
 

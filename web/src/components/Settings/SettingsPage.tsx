@@ -490,13 +490,13 @@ export function SettingsPage() {
         </div>
       </Section>
 
-      {/* ── Section 7: API Keys (P02a § 9.3 — user-level API keys, P08 § 2.13.3) ── */}
+      {/* ── Section 7: API Keys (web UI — user-level API keys, auth) ── */}
       <ApiKeysSection />
     </div>
   );
 }
 
-// ─── API Keys section (P02a § 9.3 — user-level API keys, P08 § 2.13.3) ─────────
+// ─── API Keys section (web UI — user-level API keys, auth) ─────────────────────
 // R1 left a disabled scaffold; R3/S5 fills it in: list / create (plaintext key
 // shown once) / revoke, via TanStack Query. Standalone-backed by the mock.
 

@@ -1,4 +1,4 @@
-"""GC ops tests (/gc/*, real-arch wire). T-P03-OPS-1~5."""
+"""GC ops tests (/gc/*, real-arch wire). SDK ops cases 1-5."""
 
 from __future__ import annotations
 

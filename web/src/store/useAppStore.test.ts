@@ -129,7 +129,7 @@ describe('useAppStore', () => {
   });
 
   // Feature flags moved to their own store in R4/S6 (useFeatureFlagsStore,
-  // P02a § 5.3). On a failed fetch it falls back to the CE default with no
+  // Web UI). On a failed fetch it falls back to the CE default with no
   // enabled features; the Ent placeholder probes return false.
   it('feature flags fall back to CE on error', async () => {
     // mockImplementationOnce (not mockReturnValueOnce(Promise.reject)) so the

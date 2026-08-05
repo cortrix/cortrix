@@ -1,4 +1,4 @@
--- F08 Metadata Block — metadata_blocks table (detailed design §3.3, D5 lock: separate table).
+-- META block Metadata Block — metadata_blocks table (detailed design §3.3, D5 lock: separate table).
 --
 -- Per-Unit document-level metadata block storage (Chunk[0]): 1 doc = 1 row. Applied
 -- by cortrix::metadata::MetadataSchemaProvider::Migrate at runtime (CREATE TABLE IF
@@ -10,7 +10,7 @@
 --
 -- FK reconciliation (D3.5 deferred): detailed design §3.3 declares
 --   FOREIGN KEY (doc_id) REFERENCES documents(doc_id)
--- but the per-Unit documents.doc_id is INTEGER while F08's doc_id is the TEXT ULID
+-- but the per-Unit documents.doc_id is INTEGER while META block's doc_id is the TEXT ULID
 -- (id/types.h). That type mismatch is a cross-feature schema-authority question with
 -- no MVP_MIGRATION_POLICY ruling → wiring the FK belongs to real pipeline integration,
 -- not a standalone unilateral fix. The column stays TEXT UNIQUE; the FK is omitted here.

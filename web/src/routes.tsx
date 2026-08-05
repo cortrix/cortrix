@@ -7,18 +7,18 @@ import { LoginPage } from './pages/LoginPage';
 import { NamespacesPage } from './components/Namespace/NamespacesPage';
 import { LoadingSpinner } from './components/Common/LoadingSpinner';
 
-// Route registry (P02a design § 10 — react-router-dom). Migration note (R3/S5):
+// Route registry (web UI design § 10 — react-router-dom). Migration note (R3/S5):
 // page selection moved off the old `activePage` zustand field onto the URL. The
 // app shell (Layout) is itself guarded by PrivateRoute, so every authenticated
 // page (all R1/R2 pages + admin pages) sits behind the auth cookie probe; the
 // standalone setup/sign-in routes (/bootstrap, /login) stay public.
 //
-// Perf (P02a § 14.2/§ 14.3 — S10 code-split): the landing route (Namespaces)
+// Perf (web UI/§ 14.3 — S10 code-split): the landing route (Namespaces)
 // and the public auth shell (Bootstrap / Login) stay eager so first paint is
 // immediate. Every other page is React.lazy-imported so it ships in its own
 // route chunk fetched on navigation — this pulls Chat (react-markdown),
 // Settings, the admin tables, the Ent placeholders and the Health dashboard out
-// of the initial bundle (P02a-12-rev-2). A <Suspense> with the shared spinner
+// of the initial bundle (web UI). A <Suspense> with the shared spinner
 // covers the in-flight chunk fetch.
 //
 // Path mapping (keeps every R1/R2 page reachable):
@@ -32,7 +32,7 @@ import { LoadingSpinner } from './components/Common/LoadingSpinner';
 // § 10.1) are registered in V1.0 already (R4/S6) so bookmarks survive the V1.5
 // swap; each page is a feature-flag gate (§ 10.2 — EntPages) rendering the
 // marketing PlaceholderPage until the backend reports the feature enabled. The
-// Health dashboard (/health, F20-7 /live + /ready) is also a guarded route
+// Health dashboard (/health, readiness /live + /ready) is also a guarded route
 // (R4/S7).
 //   /ent/text-to-sql  -> TextToSqlPage   /ent/audit-log -> AuditLogPage
 //   /ent/multi-tenant -> MultiTenantPage
@@ -108,13 +108,13 @@ export function AppRoutes() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="health" element={<HealthPage />} />
 
-            {/* Ent placeholders (P02a § 6 / § 10.1) — feature-flag gated pages,
+            {/* Ent placeholders (web UI / § 10.1) — feature-flag gated pages,
                 registered in V1.0 so V1.5 bookmarks survive the swap. */}
             <Route path="ent/text-to-sql" element={<TextToSqlPage />} />
             <Route path="ent/audit-log" element={<AuditLogPage />} />
             <Route path="ent/multi-tenant" element={<MultiTenantPage />} />
 
-            {/* Admin (Day-2) — gated by admin role (P02a § 9-bis) */}
+            {/* Admin (Day-2) — gated by admin role (web UI) */}
             <Route
               path="admin/users"
               element={

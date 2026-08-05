@@ -61,7 +61,7 @@ def domain_of(path: str) -> str:
     # /api/v1 already stripped in spec paths (servers carry the prefix); take the first segment.
     # Special cases aligned with the examples/ directory naming:
     #   /namespaces/{ns}/acl*  → acl
-    #   /gc/* + /maintenance/* → ops (P03 GC + maintenance both belong to the ops domain)
+    #   /gc/* + /maintenance/* → ops (Python SDK GC + maintenance both belong to the ops domain)
     if "/acl" in path:
         return "acl"
     seg = [s for s in path.split("/") if s and not s.startswith("{")]

@@ -1,8 +1,8 @@
-"""Documents resource. ``/documents`` domain (ARCH § 4.1.2 + F42).
+"""Documents resource. ``/documents`` domain (ARCH § 4.1.2 + async task).
 
 This resource follows the implemented HTTP architecture. ``upload()`` is
-**async** (aligns with the F42 Document Async Processing path; the old sync upload is superseded by
-F42): ``POST /documents`` -> 202 ``DocumentTask``, with
+**async** (aligns with the async task Document Async Processing path; the old sync upload is superseded by
+Async task): ``POST /documents`` -> 202 ``DocumentTask``, with
 ``GET /documents/tasks/{task_id}/progress`` + ``DELETE /documents/tasks/{task_id}``.
 ``upload_and_wait()`` is sync sugar (upload then poll to a terminal state).
 ``status()`` aliases ``get()`` (status lives in ``Document.status`` / ``progress``).
@@ -27,16 +27,16 @@ PATH_DOCUMENTS = "/documents"
 PATH_DOCUMENT = "/documents/{id}"
 PATH_TASK_PROGRESS = "/documents/tasks/{task_id}/progress"
 PATH_TASK = "/documents/tasks/{task_id}"
-# TD-F42-BULK Agent-first batch submit. The design (P03 §2.12 / TD-F42-BULK §2.1)
+# Agent-first batch submit. The design (Python SDK / batch submit §2.1)
 # names this ``/documents/batch-submit``; the real-arch wire is ``/documents/batch``
 # (server route POST /api/v1/documents/batch, RegisterBatchRoutes), so per the
-# "SDK shape = P03, wire = real architecture" rule we map to the live route.
+# "SDK shape follows the SDK design, wire follows the real architecture" rule we map to the live route.
 PATH_BATCH = "/documents/batch"
 
-# on_duplicate policy values (TD-F42-BULK §2.2 options.on_duplicate).
+# on_duplicate policy values (batch submit §2.2 options.on_duplicate).
 _ON_DUPLICATE_VALUES = frozenset({"skip", "overwrite", "error"})
 
-# Terminal async-task states (F42 DocumentTask.status enum).
+# Terminal async-task states (async task DocumentTask.status enum).
 _TERMINAL_TASK_STATES = frozenset({"ready", "failed", "cancelled"})
 _DEFAULT_POLL_INTERVAL = 1.0
 _DEFAULT_WAIT_TIMEOUT = 300.0
@@ -92,7 +92,7 @@ def _batch_body(
     async_: bool,
     on_duplicate: str,
 ) -> dict[str, Any]:
-    """Build the batch-submit request body (TD-F42-BULK §2.2).
+    """Build the batch-submit request body (batch submit §2.2).
 
     ``documents`` items are passed through verbatim (each needs a ``doc_id`` +
     ``content``; optional ``filename`` / ``metadata``) so the caller controls the
@@ -123,7 +123,7 @@ class Documents(SyncResource):
         filename: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
     ) -> DocumentTask:
-        """Upload a document (async, F42). ``POST /documents`` -> 202 DocumentTask.
+        """Upload a document (async). ``POST /documents`` -> 202 DocumentTask.
 
         Poll progress via :meth:`task_progress`, or use :meth:`upload_and_wait`.
         """
@@ -171,7 +171,7 @@ class Documents(SyncResource):
         async_: bool = True,
         on_duplicate: str = "skip",
     ) -> dict[str, Any]:
-        """Batch-submit up to 100 documents (TD-F42-BULK). ``POST /documents/batch``.
+        """Batch-submit up to 100 documents (batch submit). ``POST /documents/batch``.
 
         Agent-first bulk upload: one request submits many documents instead of N
         single ``upload()`` calls. Each ``documents`` item is a dict with a
@@ -284,7 +284,7 @@ class AsyncDocuments(AsyncResource):
         async_: bool = True,
         on_duplicate: str = "skip",
     ) -> dict[str, Any]:
-        """Batch-submit up to 100 documents (TD-F42-BULK). ``POST /documents/batch``.
+        """Batch-submit up to 100 documents (batch submit). ``POST /documents/batch``.
 
         Async-symmetric to :meth:`Documents.batch_submit`. Returns the raw
         partial-success envelope (``results`` + ``meta``).

@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
-"""spec_lint — three-way consistency check: P14 ↔ P12 ↔ P04 (feature design 10.4).
+"""spec_lint — three-way consistency check: Skill SDK ↔ MCP server ↔ API spec (feature design 10.4).
 
 Checks that the three agent-access surfaces stay 1:1:
 
-  * **P14** ``CortrixToolKit`` — 29 methods + their parameter sets (introspected).
-  * **P12** Cortrix MCP tools — ``cortrix_*`` ``@mcp.tool()`` functions + params
+  * **Skill SDK** ``CortrixToolKit`` — 29 methods + their parameter sets (introspected).
+  * **MCP server** Cortrix MCP tools — ``cortrix_*`` ``@mcp.tool()`` functions + params
     (parsed from ``cortrix-mcp/src/cortrix_mcp/tools/*.py`` with the stdlib ``ast``
     module, so FastMCP need not be installed).
-  * **P04** OpenAPI — operation paths/methods (parsed from ``api/openapi.yaml`` +
-    ``api/paths/*.yaml``; requires PyYAML, else the P04 leg is skipped with a warning).
+  * **API spec** OpenAPI — operation paths/methods (parsed from ``api/openapi.yaml`` +
+    ``api/paths/*.yaml``; requires PyYAML, else the API spec leg is skipped with a warning).
 
 Three-way rules:
-  1. P14 method names == P12 tool names (set equality, admin tools excluded).
-  2. For each shared name, the P14 method parameter set == the P12 tool parameter
+  1. Skill SDK method names == MCP server tool names (set equality, admin tools excluded).
+  2. For each shared name, the Skill SDK method parameter set == the MCP server tool parameter
      set (modulo the known ``async_``↔``async`` alias and ``self``).
-  3. Each method's underlying wire path is present in P04, **or** is on the
+  3. Each method's underlying wire path is present in API spec, **or** is on the
      ``D3.5_DEFERRED_PATHS`` allowlist (endpoints not yet in the frozen spec —
      feature design section 4 note †).
 
-**Run timing**: wired into the P05 release gate / CI (feature design section 2 /
+**Run timing**: wired into the quick start release gate / CI (feature design section 2 /
 section 10.4) — it is NOT part of the standalone unit suite. Exit code 0 = pass,
 1 = drift, 2 = could not locate inputs.
 
@@ -36,13 +36,13 @@ import os
 import sys
 from typing import Dict, List, Optional, Set, Tuple
 
-# Admin tools are out of P14 scope (feature design 1.3); exclude from the P12 set.
+# Admin tools are out of Skill SDK scope (feature design 1.3); exclude from the MCP server set.
 ADMIN_TOOLS: Set[str] = {
     "cortrix_admin_db_credential_register",
     "cortrix_admin_db_import_run",
 }
 
-# P12 uses ``async`` (reserved-word-safe via schema), P14 uses ``async_``.
+# MCP server uses ``async`` (reserved-word-safe via schema), Skill SDK uses ``async_``.
 PARAM_ALIASES: Dict[str, str] = {"async_": "async"}
 
 # Endpoints the toolkit/MCP target that are not yet in the frozen OpenAPI spec
@@ -60,7 +60,7 @@ D3_5_DEFERRED_PATHS: Set[str] = {
 
 
 # --------------------------------------------------------------------------- #
-# P14: introspect CortrixToolKit
+# Skill SDK: introspect CortrixToolKit
 # --------------------------------------------------------------------------- #
 
 def collect_p14(repo_root: str) -> Dict[str, Set[str]]:
@@ -84,7 +84,7 @@ def collect_p14(repo_root: str) -> Dict[str, Set[str]]:
 
 
 # --------------------------------------------------------------------------- #
-# P12: parse cortrix-mcp tool modules with ast
+# MCP server: parse cortrix-mcp tool modules with ast
 # --------------------------------------------------------------------------- #
 
 def _is_mcp_tool(fn: ast.FunctionDef) -> bool:
@@ -117,7 +117,7 @@ def collect_p12(repo_root: str) -> Dict[str, Set[str]]:
 
 
 # --------------------------------------------------------------------------- #
-# P04: parse OpenAPI paths
+# API spec: parse OpenAPI paths
 # --------------------------------------------------------------------------- #
 
 def collect_p04_paths(repo_root: str) -> Optional[Set[str]]:
@@ -197,7 +197,7 @@ def run_checks(repo_root: str) -> Tuple[List[str], List[str]]:
                 f"param drift in {name}: P14-only={sorted(a - b)} P12-only={sorted(b - a)}"
             )
 
-    # Rule 3 — P04 path coverage (best-effort; needs PyYAML).
+    # Rule 3 — API spec path coverage (best-effort; needs PyYAML).
     p04_paths = collect_p04_paths(repo_root)
     if p04_paths is None:
         warnings.append("P04: PyYAML not installed — skipped OpenAPI path coverage check.")

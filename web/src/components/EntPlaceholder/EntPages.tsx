@@ -7,7 +7,7 @@ import {
 import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { PlaceholderPage, type PlaceholderMarketingLinks } from './PlaceholderPage';
 
-// Ent feature gate pages (P02a design § 6.2 / § 10.2). Each page reads the
+// Ent feature gate pages (web UI design § 6.2 / § 10.2). Each page reads the
 // feature flag store: when the backend reports the feature enabled it renders
 // the real component (V1.5 — not bundled in V1.0), when it is a placeholder it
 // renders the marketing PlaceholderPage. The routes are registered in V1.0

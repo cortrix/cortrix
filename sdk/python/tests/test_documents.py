@@ -145,7 +145,7 @@ def test_upload_and_wait_timeout_raises(api_base: str, client: Cortrix, tmp_path
     assert ei.value.category == "timeout"
 
 
-# --- batch_submit (TD-F42-BULK) ---
+# --- batch_submit (batch submit) ---
 
 
 @respx.mock

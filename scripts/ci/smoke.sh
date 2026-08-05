@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================
-# D-R3 #479: docker full-stack smoke (F23 E2E entry tier)
+# D-R3 #479: docker full-stack smoke (test suite E2E entry tier)
 # Boots deploy/docker-compose.yml and walks the agent-facing
 # golden path against the real all-in-one image:
 #

@@ -4,7 +4,7 @@ No PostgreSQL and no network: `plpy` is a small fake (FakePlpy) and urllib is
 replaced by a fake urlopen (FakeUrlopen / capture). These cover the three things
 the standalone DoD asks for (L1-α briefing §6):
   * HTTP call shape — URL, method, body, headers per endpoint
-  * user_id resolution — "pg:<PG_user>:<pid>" synthesis + parse, MEM05 mandatory
+  * user_id resolution — "pg:<PG_user>:<pid>" synthesis + parse, memory isolation mandatory
   * error-code mapping — CX_ERR_F14_* + transport → plpy.error()
 
 Run: python3 -m unittest discover -s tests  (from the pgcortrix/ dir)
@@ -314,7 +314,7 @@ class TestHttpShape(unittest.TestCase):
 
 
 # ===========================================================================
-# MEM05 user_id enforcement + filter whitelist (error-code mapping)
+# Memory isolation user_id enforcement + filter whitelist (error-code mapping)
 # ===========================================================================
 
 
@@ -409,7 +409,7 @@ class TestSsrf(unittest.TestCase):
 
 
 # ===========================================================================
-# Retry / backoff / transport errors (F14 §4.3, §5)
+# Retry / backoff / transport errors (pgcortrix, §5)
 # ===========================================================================
 
 
@@ -419,7 +419,7 @@ class TestRetryAndErrors(unittest.TestCase):
             "http://localhost:8420/x", code, "err", {}, io.BytesIO(b"body"))
 
     def test_5xx_retries_then_succeeds(self):
-        # First two 503s, third returns OK (F14 §7.2 case 6).
+        # First two 503s, third returns OK (pgcortrix case 6).
         client, _, cap = make_client(payloads=[
             self._http_error(503), self._http_error(503), {"results": [{}]}])
         rows = client.search("ns", "q", 1, None, False)
@@ -463,7 +463,7 @@ class TestRetryAndErrors(unittest.TestCase):
 
 
 # ===========================================================================
-# PG cancel (F14 §4.2)
+# PG cancel (pgcortrix)
 # ===========================================================================
 
 
@@ -527,7 +527,7 @@ class TestStatus(unittest.TestCase):
 
 
 # ===========================================================================
-# GD caching (F14 §2.3)
+# GD caching (pgcortrix)
 # ===========================================================================
 
 

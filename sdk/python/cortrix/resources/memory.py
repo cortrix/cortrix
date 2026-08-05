@@ -1,9 +1,9 @@
-"""Memory resource. ``/memory`` domain (ARCH § 4.1.5 + MEM01-05).
+"""Memory resource. ``/memory`` domain (ARCH § 4.1.5 + the memory features).
 
 This resource follows the implemented HTTP architecture. Method -> endpoint:
   - ``search``   -> POST   /memory/search   ({results,total_results,...})
   - ``log``      -> POST   /memory/sessions/{id}/interactions  (live wire)
-  - ``extract``  -> POST   /memory/extract  (real-arch, MEM02; PartialSuccessById)
+  - ``extract``  -> POST   /memory/extract  (real-arch, memory extraction; PartialSuccessById)
   - ``list``     -> GET    /memory          ({memories,total,...})
   - ``create``   -> POST   /memory          (MemoryCreateAck)
   - ``update``/``edit``       -> PATCH  /memory/{id}  (MemoryEditAck)
@@ -23,7 +23,7 @@ from ._base import AsyncResource, SyncResource
 PATH_MEMORY = "/memory"
 PATH_MEMORY_SEARCH = "/memory/search"
 # log() targets the LIVE interaction-write route (src/memory/memory_routes.cpp);
-# the designed one-shot /memory/log (interaction + MEM02 trigger) is not mounted.
+# the designed one-shot /memory/log (interaction + memory extraction trigger) is not mounted.
 PATH_MEMORY_LOG = "/memory/sessions/{session_id}/interactions"
 PATH_MEMORY_SESSIONS = "/memory/sessions"
 PATH_MEMORY_EXTRACT = "/memory/extract"
@@ -169,8 +169,8 @@ class Memory_(SyncResource):
         context: Optional[dict[str, Any]] = None,
     ) -> Any:
         """Log an interaction. Live wire: ``POST /memory/sessions/{id}/interactions``
-        (writes the F13 interaction row; the designed one-shot /memory/log with the
-        MEM02 auto-extract trigger is not mounted yet -> D3.5)."""
+        (writes the agent trace interaction row; the designed one-shot /memory/log with the
+        Memory extraction auto-extract trigger is not mounted yet -> D3.5)."""
         if not session_id:
             raise ValueError(
                 "session_id is required: the live wire logs interactions under "
@@ -206,7 +206,7 @@ class Memory_(SyncResource):
         context: Optional[dict[str, Any]] = None,
     ) -> Any:
         """Trigger LLM extraction over an interaction. ``POST /memory/extract``
-        (real-arch MEM02; PartialSuccessById)."""
+        (real-arch memory extraction; PartialSuccessById)."""
         result = self._client._request(
             "POST",
             PATH_MEMORY_EXTRACT,
@@ -270,7 +270,7 @@ class Memory_(SyncResource):
         self._remember_memory(result.new_memory_id or result.memory_id, effective_namespace)
         return result
 
-    # design alias: edit == update (MEM03 §7.bis #28)
+    # design alias: edit == update (memory transparency #28)
     edit = update
 
     def delete(self, memory_id: str, *, namespace: Optional[str] = None) -> MemoryDeleteAck:
@@ -283,12 +283,12 @@ class Memory_(SyncResource):
             response_model=MemoryDeleteAck,
         )
 
-    # design alias: invalidate == delete (MEM03 §7.bis #29, soft-delete)
+    # design alias: invalidate == delete (memory transparency #29, soft-delete)
     invalidate = delete
 
     def opt_out(self, session_id: str, *, namespace: Optional[str] = None) -> Any:
         """Session memory opt-out. ``POST /memory/session/{id}/opt-out``
-        (§2.12-only; P04 spec to be added -> D3.5)."""
+        (§2.12-only; API spec to be added -> D3.5)."""
         effective_namespace = namespace or self._session_namespaces.get(session_id)
         return self._client._request(
             "POST",

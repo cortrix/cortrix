@@ -8,7 +8,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(-O2)
 endif()
 
-# Opt-in sanitizers for concurrency / memory verification (F01 S5 DoD: TSAN; also
+# Opt-in sanitizers for concurrency / memory verification (index S5 DoD: TSAN; also
 # usable by any feature's stress tests). Off by default so normal builds are
 # unaffected. Usage:
 #   cmake -B build-tsan -DCORTRIX_SANITIZE=thread   (data races)

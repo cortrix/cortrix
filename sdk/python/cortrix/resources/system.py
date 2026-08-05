@@ -3,7 +3,7 @@
 This resource follows the implemented HTTP architecture. Endpoints include
 ``health/live`` / ``version`` /
 ``namespaces/{ns}/stats`` / ``agent_llm_config``. ``features()``
-(``GET /system/features``) is **§2.12-only** -> § 2.12 wire (P04 spec to be
+(``GET /system/features``) is **§2.12-only** -> § 2.12 wire (API spec to be
 added -> D3.5).
 """
 

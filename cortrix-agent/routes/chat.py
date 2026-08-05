@@ -15,8 +15,8 @@ section 9.2); the route's only jobs are:
 Naming rule: this is the Cortrix Agent chat endpoint — never a
 "chatbot" endpoint; the executor class is ``ChatExecutor``.
 
-MEM co-processing (interaction_log write / MEM02 extract trigger / MEM05 user_id
-filter — design F48-rev-9/10/11) is the V1.5 ②-round scope and is intentionally NOT
+MEM co-processing (interaction_log write / memory extract trigger / memory isolation user_id
+filter — design the agent design) is the V1.5 ②-round scope and is intentionally NOT
 wired here; see the ``TODO(D3.5)`` marker below.
 """
 
@@ -41,8 +41,8 @@ router = APIRouter()
 class ChatRequest(BaseModel):
     """POST /chat request body (design section 9.1).
 
-    ``user_id`` is carried for the V1.5 MEM05 user-isolation filter (design
-    F48-rev-11); in V1.0 it is accepted but only threaded into the context.
+    ``user_id`` is carried for the V1.5 memory isolation user-isolation filter (design
+    the agent design1); in V1.0 it is accepted but only threaded into the context.
     ``demo_flow`` from the MVP agent-demo is intentionally dropped (V1.5 removal,
     section 9.1) — the V1.0 ChatExecutor runs a single fixed RAG flow.
     """
@@ -71,7 +71,7 @@ def get_memory() -> MemoryCoprocessor:
 
 
 # Fire-and-forget memory co-processing tasks, kept referenced so the event loop does not
-# garbage-collect them mid-flight (design F48-rev-9 — never blocks the chat response).
+# garbage-collect them mid-flight (design the agent design — never blocks the chat response).
 _BACKGROUND_TASKS: set = set()
 
 
@@ -104,7 +104,7 @@ async def chat_endpoint(
     # Bearer token is parsed for forward-compat (P-5); V1.0 CE does not validate it
     # and tenant_id comes from the header. In V1.5 Cloud the JWT claim takes priority
     # (design section 8.2 anti-BOLA) — TODO(D3.5) wire JWT claim extraction.
-    _ = authorization  # reserved (design F48-rev-3)
+    _ = authorization  # reserved (agent design)
 
     # A-class tenant_id: None in CE single-tenant; echoes the header when provided
     # (design section 1.7 / 8.2 P-5 forward-compat passthrough).
@@ -146,10 +146,10 @@ async def chat_endpoint(
                 assistant_text,
                 tenant_id=tenant_id,
             )
-            # Feed the turn back into Cortrix memory (F13 interaction_log + MEM02 extract,
+            # Feed the turn back into Cortrix memory (agent trace interaction_log + memory extract,
             # via one SDK memory.log call) fire-and-forget so it never blocks the response
-            # (design F48-rev-9/10/11). TODO(D3.5): real cortrix-server interaction-log
-            # persistence + live MEM02 worker; MEM05 user_id from a real JWT claim.
+            # (design the agent design). TODO(D3.5): real cortrix-server interaction-log
+            # persistence + live memory extraction worker; memory isolation user_id from a real JWT claim.
             task = asyncio.create_task(
                 mem.record_turn(
                     body.session_id,

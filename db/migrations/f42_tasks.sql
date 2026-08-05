@@ -1,4 +1,4 @@
--- F42 Document Async Processing — tasks table (detailed design §3.1).
+-- Async task Document Async Processing — tasks table (detailed design §3.1).
 --
 -- Async-scheduling metadata, decoupled from the catalog blob_gc_queue (§4.4):
 -- platform-level, applied by cortrix::async::TaskManager::Init at runtime

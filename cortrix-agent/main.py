@@ -1,15 +1,15 @@
-"""Cortrix Agent — FastAPI entry point (F48 V1.0 ①-kernel / design section 4 + 11.bis).
+"""Cortrix Agent — FastAPI entry point (agent V1.0 ①-kernel / design section 4 + 11.bis).
 
 Assembles the dependency graph and mounts the chat / sessions / config routers over the
 UI-agnostic :mod:`agent_core` kernel:
 
-    AsyncCortrix (P03 SDK, dogfood)  ->  SdkRagProvider  ->  ChatExecutor
+    AsyncCortrix (Python SDK, dogfood)  ->  SdkRagProvider  ->  ChatExecutor
                                                               ^
                           LLM adapter (by config provider) ---+
     SessionStore (singleton, in-memory N=10)
 
 Startup follows design section 11.bis: read config -> build the LLM provider ->
-construct the P03 SDK client (NOT connected in standalone) -> health-gate -> serve. In
+construct the Python SDK client (NOT connected in standalone) -> health-gate -> serve. In
 standalone development cortrix-server is not running, so the section-4 health ping is
 stubbed (``HEALTHCHECK_MODE=stub``, the default here) rather than failing fast with
 ``CX_ERR_F48_CORTRIX_SERVER_UNREACHABLE``.
@@ -31,9 +31,9 @@ from fastapi import FastAPI
 
 from config import settings
 
-# The P03 Python SDK is a sibling package (cortrix/sdk/python), not pip-installed in the
-# standalone agent venv. Make it importable so F48 dogfoods the SDK exactly like any
-# external Agent (design P-12 / section 5.2).
+# The Python SDK is a sibling package (cortrix/sdk/python), not pip-installed in the
+# standalone agent venv. Make it importable so agent dogfoods the SDK exactly like any
+# external Agent (design section 5.2).
 _SDK_PATH = Path(__file__).resolve().parents[1] / "sdk" / "python"
 if _SDK_PATH.is_dir() and str(_SDK_PATH) not in sys.path:
     sys.path.insert(0, str(_SDK_PATH))
@@ -128,10 +128,10 @@ def build_app(
     model_name: Optional[str] = None,
     memory_coprocessor: Optional[MemoryCoprocessor] = None,
 ) -> FastAPI:
-    """Construct the FastAPI app with the F48 dependency graph wired.
+    """Construct the FastAPI app with the agent dependency graph wired.
 
     Components can be injected (tests pass mocks); otherwise they are built from
-    ``config.settings``. The P03 SDK client is constructed but NOT connected
+    ``config.settings``. The Python SDK client is constructed but NOT connected
     (standalone D3 discipline — design section 5 / sdk_rag TODO(D3.5)).
     """
     store = session_store or SessionStore()
@@ -159,7 +159,7 @@ def build_app(
     if memory_coprocessor is not None:
         mem = memory_coprocessor
     else:
-        # Reuse the RAG provider's P03 client so memory co-processing dogfoods the same
+        # Reuse the RAG provider's Python SDK client so memory co-processing dogfoods the same
         # SDK connection (design P-12). May be a stub client in standalone tests.
         mem_client = getattr(rag, "_client", None)
         mem = MemoryCoprocessor(mem_client, namespace=settings.cortrix_namespace)
@@ -169,7 +169,7 @@ def build_app(
         # Design section 11.bis startup sequence (standalone: health ping stubbed).
         # HEALTHCHECK_MODE=live would attempt the cortrix-server ping with 5 retries
         # and raise CX_ERR_F48_CORTRIX_SERVER_UNREACHABLE on exhaustion (Step 4); the
-        # live probe wiring is TODO(D3.5) once cortrix-server runs in F24 compose.
+        # live probe wiring is TODO(D3.5) once cortrix-server runs in deployment compose.
         healthcheck_mode = os.environ.get("HEALTHCHECK_MODE", "stub")
         logger.info(
             "cortrix_agent_started",
@@ -255,7 +255,7 @@ def build_app(
                 llm_reachable = False
         return {
             "status": "ready",
-            "cortrix_server": "unknown",  # TODO(D3.5): live ping in F24 compose
+            "cortrix_server": "unknown",  # TODO(D3.5): live ping in deployment compose
             "llm_reachable": llm_reachable,
         }
 

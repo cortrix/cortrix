@@ -30,7 +30,7 @@ BUILD="$ROOT/build-llvmcov"
 OUT="$BUILD/coverage"
 PROF="$BUILD/prof"
 
-# F23 §4.1.bis dual-track gate: this script owns the core-17 BRANCH gate on the
+# Test suite dual-track gate: this script owns the core-17 BRANCH gate on the
 # clang region/branch metric (the line gates are owned by coverage.sh on gcov).
 CORE_BRANCH_MIN=80
 CORE_TARGET_TU_EXPECTED=317

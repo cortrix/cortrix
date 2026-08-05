@@ -12,9 +12,9 @@
 #       missing-NS + error envelope
 #   P5  memory: session / interactions / search / inject
 #
-# The live wire is the design surface: F04 /query
-# (namespaces[] + 8-field meta), MEM02/03/04 + F13 surfaces, P08-CE
-# bootstrap/api-keys, F16a import, batch, GC lifecycle, flat /documents
+# The live wire is the design surface: cross-NS query /query
+# (namespaces[] + 8-field meta), memory + agent trace surfaces, CE auth
+# bootstrap/api-keys, DB import, batch, GC lifecycle, flat /documents
 # + /watch. This sweep covers the design-face shapes.
 #
 # Usage:
@@ -155,7 +155,7 @@ def main():
               f"{r.status_code} needle={needle} resp={r.text[:200]}")
 
     q = "Why do plants appear green?"
-    # F04 8-field A-class meta on the array wire.
+    # Cross-NS query 8-field A-class meta on the array wire.
     r = query({"query": q, "namespaces": [args.ns], "top_k": 5, "rerank": True})
     if check("P4 F04 wire 200", r.status_code == 200, r.text[:300]):
         meta = r.json().get("meta", {})
@@ -166,12 +166,12 @@ def main():
               bool(items) and "child_id" in items[0] and "content" in items[0],
               json.dumps(items[0])[:250] if items else "no results")
 
-    # Deprecated MVP singular field is rejected loudly (F04 B' ruling).
+    # Deprecated MVP singular field is rejected loudly (cross-NS query B' ruling).
     r = query({"query": q, "namespace": args.ns, "top_k": 3})
     dep = r.status_code == 400 and "CX_ERR_DEPRECATED_FIELD" in r.text
     check("P4 singular namespace → CX_ERR_DEPRECATED_FIELD", dep, f"{r.status_code} {r.text[:200]}")
 
-    # Multi-NS + wildcard now served in one call (F04 mounted).
+    # Multi-NS + wildcard now served in one call (cross-NS query mounted).
     r = query({"query": q, "namespaces": [args.ns, args.ns], "top_k": 3})
     check("P4 multi-NS 200", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
     r = query({"query": q, "namespaces": ["*"], "top_k": 3})
@@ -190,17 +190,17 @@ def main():
             check("P4 chat via_path", via == "chat_memory_only", f"via_path={via}")
         check(f"P4 route={route} 200", ok, f"{r.status_code} {r.text[:200]}")
 
-    # F37 CRAG runs only on the Complex route; with explain the verdict is surfaced.
+    # CRAG runs only on the Complex route; with explain the verdict is surfaced.
     # Exercises the CRAG explain branch (crag_verdict / crag_score / ambiguous_action_taken).
     r = query({"query": q, "namespaces": [args.ns], "top_k": 5}, "?route=complex&explain=true")
     if check("P4 F37 complex+explain 200", r.status_code == 200, r.text[:250]):
         ex = (r.json() or {}).get("explain", {}) or {}
         flat = json.dumps(ex)
-        # crag_verdict appears somewhere in the explain tree when F37 ran.
+        # crag_verdict appears somewhere in the explain tree when CRAG ran.
         has_crag = "crag_verdict" in flat
         check("P4 F37 CRAG verdict surfaced in explain", has_crag, flat[:300])
         if has_crag:
-            # verdict must be one of the known F37 classes (not an empty/garbage value).
+            # verdict must be one of the known CRAG classes (not an empty/garbage value).
             verdict_ok = any(v in flat for v in ('"correct"', '"ambiguous"', '"incorrect"', '"disabled"'))
             check("P4 F37 CRAG verdict is a known class", verdict_ok, flat[:300])
 
@@ -244,7 +244,7 @@ def main():
         if ok_all:
             check("P5 interactions written", True)
 
-        # MEM02 is wired (D3.5 r2 M1/M2): the queue drains interactions through
+        # Memory extraction is wired (D3.5 r2 M1/M2): the queue drains interactions through
         # the LLM extractor. Poll up to 90s for the extracted fact to surface.
         hit = False
         last_resp = ""
@@ -277,23 +277,23 @@ def main():
         check("P5 memory inject 200", r.status_code == 200, f"{r.status_code} {r.text[:250]}")
         print("    inject:", r.text[:250])
 
-        # MEM05 isolation: list is scoped to the requesting user, so the same
+        # Memory isolation: list is scoped to the requesting user, so the same
         # user_id the session was created under must be passed.
         r = s.get(f"{api}/memory/sessions",
                   params={"namespace": args.ns, "user_id": "alex"}, timeout=15)
         check("P5 sessions listed", r.status_code == 200 and sid in r.text, r.text[:200])
 
-        # F13 observability (M6, per-NS): /interactions is live now.
+        # Agent trace observability (M6, per-NS): /interactions is live now.
         r = s.get(f"{api}/interactions", params={"namespace_id": args.ns, "session_id": sid}, timeout=15)
         check("P5 F13 /interactions 200", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
-        # F13 §8.2 sources view: if any interaction exists, its /sources sub-resource must
+        # Agent trace sources view: if any interaction exists, its /sources sub-resource must
         # respond 200 with a source_count field (exercises the interaction-sources branch).
         if r.status_code == 200:
             inters = (r.json() or {}).get("interactions", [])
             iid = inters[0].get("interaction_id") if inters else None
             if iid:
                 # NB: the sources sub-resource uses the `namespace` param (per-NS storage),
-                # NOT `namespace_id` like the /interactions list above — a documented F13
+                # NOT `namespace_id` like the /interactions list above — a documented agent trace
                 # contract addendum (observability_routes.cpp §TC4), so pass `namespace`.
                 rs = s.get(f"{api}/interactions/{iid}/sources",
                            params={"namespace": args.ns}, timeout=15)
@@ -302,7 +302,7 @@ def main():
                       f"{rs.status_code} {rs.text[:200]}")
         r = s.get(f"{api}/traces/{sid}", params={"namespace": args.ns}, timeout=15)
         check("P5 F13 /traces (ns param) responds", r.status_code in (200, 404), f"{r.status_code} {r.text[:160]}")
-        # /traces is the GLOBAL agent_trace read (F13 §8.1 / TC4): ?namespace is NOT
+        # /traces is the GLOBAL agent_trace read (agent trace / TC4): ?namespace is NOT
         # required (a session's calls span namespaces, aggregated by session_id). So
         # omitting it is NOT a 400 — it behaves like the ns-param case above (200 if the
         # session has traces, 404 CX_ERR_F13_SESSION_NOT_FOUND if it has none). The old
@@ -310,7 +310,7 @@ def main():
         r = s.get(f"{api}/traces/{sid}", timeout=15)
         check("P5 F13 /traces no-ns (global, ns not required) responds", r.status_code in (200, 404), f"{r.status_code} {r.text[:160]}")
 
-        # F13 agent-trace WRITE path (folds in the 2026-06-24 standalone write check so it
+        # Agent-trace WRITE path (folds in the 2026-06-24 standalone write check so it
         # is permanent sweep coverage): a /query carrying X-Session-Id/X-Agent-Id makes the
         # engine instrumentation Record() a row into the GLOBAL agent_trace table; that row
         # must then surface at GET /traces/{that_sid} as 200 with total_count >= 1. This also
@@ -334,7 +334,7 @@ def main():
         check("P5 F13 agent-trace write (X-Session-Id query → /traces trace_count>=1)",
               wrote, f"last={r.status_code} {r.text[:200]}")
 
-        # MEM03 transparency CRUD on /memory.
+        # Memory transparency CRUD on /memory.
         r = s.post(f"{api}/memory",
                    json={"namespace": args.ns, "content": "User Alex speaks fluent French.",
                          "memory_type": "fact", "user_id": "alex"}, timeout=30)
@@ -347,7 +347,7 @@ def main():
             r = s.delete(f"{api}/memory/{mem_id}", params={"namespace": args.ns, "user_id": "alex"}, timeout=30)
             check("P5 MEM03 soft-delete 2xx", r.status_code in (200, 204), f"{r.status_code} {r.text[:200]}")
 
-        # MEM04 immunity: opt-out is idempotent; revoke is admin (no-auth grants admin).
+        # Memory opt-out immunity: opt-out is idempotent; revoke is admin (no-auth grants admin).
         r = s.post(f"{api}/memory/session/{sid}/opt-out", json={"namespace": args.ns}, timeout=30)
         check("P5 MEM04 opt-out 2xx", r.status_code in (200, 201), f"{r.status_code} {r.text[:200]}")
         r = s.post(f"{api}/memory/session/{sid}/opt-out/revoke",
@@ -362,7 +362,7 @@ def main():
     if check("P6 /system/version 200", r.status_code == 200, r.text[:160]):
         check("P6 version == 1.0.0-rc.1", (r.json() or {}).get("version") == "1.0.0-rc.1", r.text[:160])
 
-    # F18a operation_log read surface (/operations). By now uploads + memory CRUD +
+    # Operation_log read surface (/operations). By now uploads + memory CRUD +
     # namespace creates have logged rows. Exercises: list, namespace_id filter branch,
     # resource_type filter branch — and asserts the ns filter actually scopes results.
     r = s.get(f"{api}/operations", timeout=15)
@@ -383,7 +383,7 @@ def main():
         rt = s.get(f"{api}/operations", params={"resource_type": "memory"}, timeout=15)
         check("P6 F18a /operations?resource_type=memory 200", rt.status_code == 200, rt.text[:200])
 
-    # P08-CE api-keys CRUD (no-auth mode grants admin for local integration).
+    # CE auth api-keys CRUD (no-auth mode grants admin for local integration).
     r = s.post(f"{api}/auth/api-keys", json={"name": "e2e-key"}, timeout=15)
     key_id = None
     if check("P6 api-key create 2xx", r.status_code in (200, 201), f"{r.status_code} {r.text[:250]}"):
@@ -398,7 +398,7 @@ def main():
         r = s.delete(f"{api}/auth/api-keys/{key_id}", timeout=15)
         check("P6 api-key revoke 2xx", r.status_code in (200, 204), f"{r.status_code} {r.text[:160]}")
 
-    # F48 section 6.3 agent_llm_config (GET masked / PUT in-handler admin).
+    # Agent section 6.3 agent_llm_config (GET masked / PUT in-handler admin).
     r = s.get(f"{api}/system/agent_llm_config", timeout=15)
     if check("P6 agent_llm_config GET 200", r.status_code == 200, r.text[:250]):
         body = r.json() or {}
@@ -407,7 +407,7 @@ def main():
         masked = key_val == "" or (("..." in key_val or "****" in key_val) and len(key_val) <= 24)
         check("P6 agent_llm api_key masked", masked, raw[:200])
 
-    # F16a admin connections surface responds (empty registry is fine).
+    # DB import admin connections surface responds (empty registry is fine).
     r = s.get(f"{api}/admin/db-connections", timeout=15)
     check("P6 db-connections list responds", r.status_code in (200, 403), f"{r.status_code} {r.text[:200]}")
 

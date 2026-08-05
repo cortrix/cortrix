@@ -75,7 +75,7 @@ class MemoryList:
 
 @dataclass
 class MemorySearchResultItem:
-    """One ``POST /memory/search`` result item from the live MEM03 wire."""
+    """One ``POST /memory/search`` result item from the live memory transparency wire."""
 
     interaction_id: Optional[str] = None
     session_id: Optional[str] = None

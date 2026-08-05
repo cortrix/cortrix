@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import type { MemoryItem } from '../../types/api';
 import { Modal, Button } from '../ui';
 
-// Invalidate (soft-delete) confirmation (P02a design § 7.1 — second confirm).
-// MEM03 § 7.2: this is NOT a hard delete — the memory is marked
+// Invalidate (soft-delete) confirmation (web UI design § 7.1 — second confirm).
+// Memory transparency: this is NOT a hard delete — the memory is marked
 // status=invalidated and stays in the transparency history.
 
 interface InvalidateMemoryDialogProps {

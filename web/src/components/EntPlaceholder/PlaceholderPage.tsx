@@ -7,7 +7,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Badge } from '../ui';
 
-// Unified Enterprise placeholder template (P02a design § 6.1 / § 10.2). A CE
+// Unified Enterprise placeholder template (web UI design § 6.1 / § 10.2). A CE
 // deployment ships every Ent surface as a marketing placeholder until the
 // backend feature flag reports the feature enabled (§ 5 — feature flag store).
 // Content: Title + Enterprise badge + Description + Problem solved + Use cases
@@ -15,9 +15,9 @@ import { Badge } from '../ui';
 // VI SPECS § "no emoji icons").
 
 export interface PlaceholderMarketingLinks {
-  /** cortrix.ai roadmap sub-page (P13 § 1). */
+  /** cortrix.ai roadmap sub-page (the cloud roadmap). */
   roadmap: string;
-  /** Cloud V1.5 sign-up page (P13). */
+  /** Cloud V1.5 sign-up page (the cloud roadmap). */
   cloudBeta?: string;
   /** mailto: enterprise contact. */
   contact: string;

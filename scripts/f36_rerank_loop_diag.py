@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Minimal F36/F02 rerank-loop diagnostic over an existing sampled BEIR slice.
+"""Minimal RAG-Fusion/rerank-loop diagnostic over an existing sampled BEIR slice.
 
-This is intentionally a local diagnostic harness, not the F44 published benchmark
+This is intentionally a local diagnostic harness, not the benchmark published benchmark
 runner. It runs several query profiles against one Cortrix namespace and writes
 machine-readable artifacts so we can see whether LLM expansion + final rerank can
 move Recall@K / NDCG@K toward an 0.80 target on a small controlled sample.
@@ -358,7 +358,7 @@ def profile_matrix(
                 "final_rerank": True,
             },
         },
-        # Attribution control for F36-LR: same widened candidate window as the
+        # Attribution control for listwise rerank: same widened candidate window as the
         # listwise profiles (top_k = llm_rerank top_n) but NO LLM — the metric
         # trim to args.top_k keeps the CE-ordered head. D vs this isolates the
         # LLM's pure ORDERING contribution; this vs dense_rerank isolates the
@@ -369,7 +369,7 @@ def profile_matrix(
             "search_config": dense_search_config,
             "top_k": llm_rerank_top_n,
         },
-        # F36-LR §3 profile D: strict dense candidates + F02 CE + LLM listwise
+        # listwise rerank profile D: strict dense candidates + reranker CE + LLM listwise
         # rerank — isolates the LLM's direct ORDERING contribution vs dense_rerank.
         "dense_rerank_llm_listwise": {
             "rerank": True,
@@ -378,7 +378,7 @@ def profile_matrix(
             "llm_rerank": True,
             "llm_rerank_config": llm_rerank_config,
         },
-        # F36-LR §3 profile E: full LLM path — F36 variants (candidate side) +
+        # listwise rerank profile E: full LLM path — RAG-Fusion variants (candidate side) +
         # CE + LLM listwise (ordering side).
         "dense_llm_full_listwise": {
             "rerank": True,
@@ -407,7 +407,7 @@ def profile_matrix(
             "llm_rerank": True,
             "llm_rerank_config": llm_rerank_config_v2,
         },
-        # §3.5.5 E-v2: F36 variants widen candidates + v2 listwise ordering.
+        # §3.5.5 E-v2: RAG-Fusion variants widen candidates + v2 listwise ordering.
         "dense_llm_full_listwise_v2": {
             "rerank": True,
             "rag_fusion": True,
@@ -429,7 +429,7 @@ def profile_matrix(
             "llm_rerank": True,
             "llm_rerank_config": llm_rerank_config_v2,
         },
-        # §3.5.5 HE-v2: widest LLM path — hybrid candidate routes + F36 variant
+        # §3.5.5 HE-v2: widest LLM path — hybrid candidate routes + RAG-Fusion variant
         # expansion (candidate side) + v2 listwise (ordering side).
         "hybrid_llm_full_listwise_v2": {
             "rerank": True,

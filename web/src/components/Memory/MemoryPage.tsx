@@ -15,7 +15,7 @@ import { MemoryFormDialog } from './MemoryFormDialog';
 import { InvalidateMemoryDialog } from './InvalidateMemoryDialog';
 import { useAppStore } from '../../store/useAppStore';
 
-// Memory CRUD page (P02a design § 7 / MEM03). Toolbar (user_id + type filter +
+// Memory CRUD page (web UI design § 7 / memory transparency). Toolbar (user_id + type filter +
 // explain toggle + show-invalidated toggle + Create) → card list → pagination,
 // plus 3 dialogs (create / edit / invalidate). Data via TanStack Query so
 // mutations invalidate the list cache and refetch automatically.

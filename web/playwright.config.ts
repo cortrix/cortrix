@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Playwright E2E config (P02a design § 17 — test matrix / § 17.2 4-browser CI).
+// Playwright E2E config (web UI design § 17 — test matrix / § 17.2 4-browser CI).
 //
 // The 4-browser strategy (§ 17.2): PR runs Chromium only; merge adds Firefox;
 // nightly + release run all 4 (Chromium / Firefox / WebKit / Edge). CI selects a

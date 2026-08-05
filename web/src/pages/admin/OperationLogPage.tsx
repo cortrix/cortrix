@@ -11,7 +11,7 @@ import { ProgrammaticBanner } from '../../components/Common/ProgrammaticBanner';
 import { ErrorDisplay } from '../../components/Common/ErrorDisplay';
 import { DynamicColumns, type ColumnDef } from '../../components/Table/DynamicColumns';
 
-// OperationLogPage (P02a design § 9-bis.2 — CE simplified). Integrates the F18a
+// OperationLogPage (web UI design § 9-bis.2 — CE simplified). Integrates the operation log
 // CE operation_log via GET /api/v1/operations (business prefix — NOT
 // /admin/operations, per V5-B4 P0-V5-66). Renders 8 CE columns; when the
 // Filters: user_id / action / resource_type / date range.
@@ -22,7 +22,7 @@ import { DynamicColumns, type ColumnDef } from '../../components/Table/DynamicCo
 
 const PAGE_SIZE = 50;
 
-// Distinct resource_type values surfaced as a filter (F18a § 4.1 enum).
+// Distinct resource_type values surfaced as a filter (operation log enum).
 const RESOURCE_TYPES = ['document', 'namespace', 'memory', 'query', 'user', 'db_connection', 'db_import'];
 
 function fmtTimestamp(ms: number): string {
@@ -65,7 +65,7 @@ export function OperationLogPage() {
   const total = data?.meta.total_count ?? 0;
   const hasNext = data?.meta.has_next ?? false;
 
-  // CE 8 columns (P02a § 9-bis.2). `namespace` display maps to namespace_id;
+  // CE 8 columns (web UI). `namespace` display maps to namespace_id;
   // `status` falls back to the schema default 'success'.
   const ceColumns: ColumnDef<OperationLogEntry>[] = useMemo(
     () => [
