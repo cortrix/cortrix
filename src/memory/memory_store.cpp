@@ -5,7 +5,7 @@
 #include <chrono>
 #include <cstring>
 #include <spdlog/spdlog.h>
-#include "cortrix/agent_trace/interaction_sources_schema.h"   // F13 InteractionSourcesSchemaProvider (per-NS; agent_trace is global, TC4)
+#include "cortrix/agent_trace/interaction_sources_schema.h"   // InteractionSourcesSchemaProvider (per-NS; agent_trace is global)
 
 namespace cortrix {
 
@@ -61,7 +61,7 @@ static std::string EscapeLikePattern(const std::string& input) {
 }
 
 /// Whether `table` already has a column named `column` (via pragma_table_info).
-/// SQLite ADD COLUMN is not "if not exists", so the MEM04 migration gates on this —
+/// SQLite ADD COLUMN is not "if not exists", so the opt-out migration gates on this —
 /// same idiom as src/spc/*_schema_provider.cpp.
 static bool ColumnExists(sqlite3* db, const char* table, const char* column) {
     sqlite3_stmt* stmt = nullptr;
@@ -100,7 +100,7 @@ Status MemoryStore::Init(const std::string& db_path) {
     owns_db_ = true;
 
     // busy_timeout FIRST: it only guards statements that run AFTER it. The
-    // per-facade memory db is opened on every F05 Acquire; concurrent first-init
+    // per-facade memory db is opened on every pool Acquire; concurrent first-init
     // of the same namespace's memory.db races on the WAL conversion's exclusive
     // lock (and CREATE TABLE), so the timeout must already be set when
     // journal_mode runs — otherwise the loser fails immediately with
@@ -116,7 +116,7 @@ Status MemoryStore::Init(const std::string& db_path) {
     s = CreateInteractionLogTable();
     if (!s.ok()) return s;
 
-    // MEM04: add the opt-out columns + partial index. Idempotent (ADD COLUMN guarded
+    // Add the opt-out columns + partial index. Idempotent (ADD COLUMN guarded
     // on pragma_table_info), so it runs on both fresh and pre-existing DBs — fresh
     // DBs get the columns here since the base CREATE TABLE above does not list them
     // (keeps the MVP table definition frozen).
@@ -127,7 +127,7 @@ Status MemoryStore::Init(const std::string& db_path) {
     // per-NS interaction_log.id, so it must share that db). agent_trace does NOT —
     // TC4 moved it back to the global cortrix_global.db, where GET /traces
     // can read a session whose calls span namespaces. Idempotent; failure here is
-    // non-fatal to the memory path — F13 source attribution degrades but
+    // non-fatal to the memory path — source attribution degrades but
     // sessions/interactions keep working.
     if (Status f13 = CreateF13ObservabilityTables(); !f13.ok()) {
         // log-and-continue: do not block memory.db init on the observability tables.
@@ -143,8 +143,8 @@ Status MemoryStore::Init(const std::string& db_path) {
 Status MemoryStore::CreateF13ObservabilityTables() {
     if (!db_) return Status::InvalidArgument("CreateF13ObservabilityTables: null db");
     // Only interaction_sources is per-NS here: its FK references this db's
-    // interaction_log.id (MEM01 frozen), so the two must co-locate. agent_trace is
-    // global (created against cortrix_global.db at startup, F13 §4.1) — it is NOT
+    // interaction_log.id (frozen), so the two must co-locate. agent_trace is
+    // global (created against cortrix_global.db at startup) — it is NOT
     // created here any more. The provider is idempotent (CREATE TABLE IF NOT EXISTS),
     // so re-running on an existing db is a no-op.
     agent_trace::InteractionSourcesSchemaProvider sources_provider;
@@ -222,7 +222,7 @@ Status MemoryStore::MigrateMem04OptOutColumns() {
         return ColumnExists(db_, table, column);  // lost a benign race → fine
     };
 
-    // memory_sessions += opt_out_at / opted_out_by (MEM04 §4.1, D4). NULL = active.
+    // memory_sessions += opt_out_at / opted_out_by (opt-out migration). NULL = active.
     if (!add_column_if_missing(
             "memory_sessions", "opt_out_at",
             "ALTER TABLE memory_sessions ADD COLUMN opt_out_at TEXT DEFAULT NULL")) {
@@ -233,7 +233,7 @@ Status MemoryStore::MigrateMem04OptOutColumns() {
             "ALTER TABLE memory_sessions ADD COLUMN opted_out_by TEXT DEFAULT NULL")) {
         return Status::Internal("MEM04: add memory_sessions.opted_out_by failed");
     }
-    // Partial index on opted-out sessions only (MEM04 §4.1 / R6 — keeps the
+    // Partial index on opted-out sessions only (keeps the
     // is_session_opted_out + opted-out enumeration cheap without bloating the index
     // with the common active rows).
     if (ExecSQL(db_,
@@ -243,7 +243,7 @@ Status MemoryStore::MigrateMem04OptOutColumns() {
         return Status::Internal("MEM04: index memory_sessions.opt_out_at failed");
     }
 
-    // interaction_log += remember (MEM04 §4.2, D2/D4). DEFAULT TRUE: existing rows and
+    // interaction_log += remember (opt-out migration). DEFAULT TRUE: existing rows and
     // new interactions are remembered unless explicitly opted out.
     if (!add_column_if_missing(
             "interaction_log", "remember",
@@ -308,7 +308,7 @@ std::string MemoryStore::NowISO8601() {
 // ---------------------------------------------------------------------------
 
 
-// Testing seam (F23 §4.5, SetFailNextOps): consume one pending fault, if any.
+// Testing seam (SetFailNextOps): consume one pending fault, if any.
 // Production leaves fail_next_ops_ at 0, making this a single relaxed load.
 bool MemoryStore::TryConsumeOpFault() {
     int pending = fail_next_ops_.load(std::memory_order_relaxed);
@@ -422,7 +422,7 @@ Status MemoryStore::SessionList(const std::string& namespace_name,
     if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
-    // MEM05: when a user_id is supplied, push the per-user predicate into SQL so
+    // When a user_id is supplied, push the per-user predicate into SQL so
     // LIMIT/OFFSET paginate over the owner's sessions (a post-filter on an
     // NS-wide page breaks pagination — total_count/has_more diverge from the
     // returned rows). The user_id predicate sits before ORDER/LIMIT/OFFSET.
@@ -763,7 +763,7 @@ Status MemoryStore::SessionCount(const std::string& namespace_name, int64_t* cou
     if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
-    // MEM05: when a user_id is supplied, scope the count to that owner so the
+    // When a user_id is supplied, scope the count to that owner so the
     // total_count returned to a per-user list matches the filtered page.
     const std::string sql =
         std::string("SELECT COUNT(*) FROM memory_sessions WHERE namespace_name = ?") +
@@ -841,7 +841,7 @@ Status MemoryStore::InteractionPairInsertAndSessionTouch(
 }
 
 // ---------------------------------------------------------------------------
-// MEM04 Memory Immunity (opt-out) — memory_sessions.opt_out_at / opted_out_by
+// Memory Immunity (opt-out) — memory_sessions.opt_out_at / opted_out_by
 // ---------------------------------------------------------------------------
 
 Status MemoryStore::SessionGetOptOut(const std::string& session_id,

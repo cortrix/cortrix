@@ -2,7 +2,7 @@
 #include "cortrix/server/http_server.h"
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/agent_friendly/error.h"       // GEN-Agent error category enum
-#include "cortrix/catalog/i_ns_router.h"        // INSRouter (F13 create path)
+#include "cortrix/catalog/i_ns_router.h"        // INSRouter (namespace create path)
 #include "cortrix/catalog/catalog_types.h"      // NSMetadata
 #include "cortrix/resource/namespace_facade.h"  // per-request façade over namespace pool
 #include "cortrix/logging/logging.h"
@@ -58,7 +58,7 @@ using agent_friendly::ErrorCategory;
 // StatusCode approximation below.
 const std::unordered_map<std::string, std::pair<ErrorCategory, bool>>& Sdk3Map() {
     static const std::unordered_map<std::string, std::pair<ErrorCategory, bool>> kMap = {
-        // sec.3.2 Auth (P08, 11 codes)
+        // Auth (11 codes)
         {"CX_ERR_AUTH_EMAIL_ALREADY_EXISTS", {ErrorCategory::kPermanent, false}},
         {"CX_ERR_AUTH_INVALID_CREDENTIALS", {ErrorCategory::kAuth, false}},
         {"CX_ERR_AUTH_INVALID_RESET_CODE", {ErrorCategory::kPermanent, false}},
@@ -70,7 +70,7 @@ const std::unordered_map<std::string, std::pair<ErrorCategory, bool>>& Sdk3Map()
         {"CX_ERR_AUTH_EMAIL_SEND_FAILED", {ErrorCategory::kTransient, true}},
         {"CX_ERR_AUTH_BCRYPT_TIMEOUT", {ErrorCategory::kPermanent, false}},
         {"CX_ERR_AUTH_JWT_INIT_FAILED", {ErrorCategory::kPermanent, false}},
-        // Anti-enumeration (F04 issue 2.6): namespace not-found and unauthorized
+        // Anti-enumeration: namespace not-found and unauthorized
         // share this single identity so existence is never leaked.
         {"CX_ERR_NS_UNAUTHORIZED", {ErrorCategory::kAuth, false}},
         // sec.3.3 Store
@@ -646,7 +646,7 @@ void CortrixHttpServer::RegisterSystemRoutes() {
                                  const RequestContext& rctx) {
         const std::string name = req.path_params.at("ns");
         // Runtime namespace authorization (ARCHITECTURE V6) + anti-enumeration
-        // (F04 issue 2.6): unauthorized and not-found share CX_ERR_NS_UNAUTHORIZED
+        // Anti-enumeration: unauthorized and not-found share CX_ERR_NS_UNAUTHORIZED
         // and the namespace name is never echoed back.
         if (!auth_.Authorize(rctx.auth, name, kPermRead).ok()) {
             WriteJsonError(res, Status::PermissionDenied("CX_ERR_NS_UNAUTHORIZED"),
@@ -775,10 +775,10 @@ Status CortrixHttpServer::BuildNamespaceJson(const std::string& name, nlohmann::
         // responses and surface created_at as updated_at (NSMetadata carries no
         // separate mutation timestamp).
         updated = created;
-        // Full catalog identity/relationship fields (F12 §4.1 namespaces row). The
+        // Full catalog identity/relationship fields (the namespaces row). The
         // prior code emitted only name/created/updated/dc/bc and dropped these 8,
         // so View Details could not show tenant / isolation / visibility / clone
-        // lineage / status (F12 Major under-serialization).
+        // lineage / status (previously under-serialized).
         (*out)["namespace_id"] = md.namespace_id;
         (*out)["tenant_id"] = md.tenant_id;
         (*out)["isolation_mode"] = md.isolation_mode;
@@ -850,13 +850,13 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
 
                          nlohmann::json resp;
                          if (ns_router_) {
-                             // F13: route creation through the catalog (single SoT). The
+                             // Route creation through the catalog (single SoT). The
                              // router's Status carries the CX_ERR_NS_* token, so already-exists
                              // → 409 / quota → 403 fall out of WriteJsonError unchanged.
                              cortrix::catalog::NSMetadata meta;
                              meta.namespace_id = name;
                              meta.name = name;
-                             // P09 §4.6: tenant ownership from the auth context; the V1.0
+                             // Tenant ownership from the auth context; the V1.0
                              // OSS single-tenant run (auth off / anonymous) falls back to
                              // the bootstrap 'default_tenant' (namespaces.tenant_id is
                              // NOT NULL + FK, seeded by the catalog schema bootstrap).
@@ -924,13 +924,13 @@ void CortrixHttpServer::RegisterNamespaceRoutes() {
 
                 nlohmann::json resp;
                 if (ns_router_) {
-                    // F13: route creation through the catalog (single SoT). The
+                    // Route creation through the catalog (single SoT). The
                     // router's Status carries the CX_ERR_NS_* token, so already-exists
                     // → 409 / quota → 403 fall out of WriteJsonError unchanged.
                     cortrix::catalog::NSMetadata meta;
                     meta.namespace_id = name;
                     meta.name = name;
-                    // P09 §4.6: tenant ownership from the auth context; the V1.0
+                    // Tenant ownership from the auth context; the V1.0
                     // OSS single-tenant run (auth off / anonymous) falls back to
                     // the bootstrap 'default_tenant' (namespaces.tenant_id is
                     // NOT NULL + FK, seeded by the catalog schema bootstrap).

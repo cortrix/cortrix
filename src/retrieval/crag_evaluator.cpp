@@ -57,7 +57,7 @@ CragEvaluator::CragEvaluator(std::shared_ptr<ICragClassifierBackend> backend,
                              const CragConfig& config)
     : backend_(std::move(backend)),
       config_(config),
-      // Reuse F02's circuit breaker (§5.2): trip after 3 consecutive backend
+      // Reuse the reranker's circuit breaker: trip after 3 consecutive backend
       // failures, 30s cooldown. Mirrors the reranker default profile.
       breaker_(/*threshold=*/3, /*cooldown_sec=*/30) {}
 
@@ -78,8 +78,8 @@ std::map<std::string, float> CragEvaluator::ComputeMultiSignals(
         return signals;
     }
 
-    // §6.1: the score distribution drives the multi-signal features. F37 evaluates
-    // on the F02 reranker output; per RETRIEVAL_TYPES_SPEC the pre-rerank `score`
+    // The score distribution drives the multi-signal features. CRAG evaluates
+    // on the reranker output; per RETRIEVAL_TYPES_SPEC the pre-rerank `score`
     // field is the RRF score and `rerank_score` the cross-encoder score. §6.1's
     // reference code reads chunk.score, so we mirror that exactly.
     std::vector<float> scores;
@@ -140,7 +140,7 @@ ClassificationResult CragEvaluator::RunClassifier(
     const std::string& chunk_text,
     const std::map<std::string, float>& signals) {
     // §7.3 L3: retry the backend on transient failure, then transparently degrade.
-    // The circuit breaker is a SYSTEMIC gate (shared F02 component): it is checked
+    // The circuit breaker is a SYSTEMIC gate (shared reranker component): it is checked
     // ONCE at entry so a query does not even start the retry loop against a backend
     // that recent queries proved dead. Inside one query, the full
     // max_inference_retries budget is honored (the breaker's per-query failures
@@ -159,7 +159,7 @@ ClassificationResult CragEvaluator::RunClassifier(
             ClassificationResult r;
             // Backend may emit a label directly; otherwise derive from score via
             // the configured thresholds. We always re-derive from score so the NS
-            // threshold override governs the final verdict (§4.2 F37-2).
+            // threshold override governs the final verdict.
             r.score = std::clamp(br.score, 0.0f, 1.0f);
             r.label = br.label.empty() ? LabelFromScore(r.score) : br.label;
             r.confidence = br.confidence;
@@ -231,17 +231,17 @@ CragMetrics::Decision DecisionForVerdict(const std::string& verdict) {
 
 void CragEvaluator::EvaluateAndUpdateContext(
     query::QueryContext& ctx, const std::vector<RankedChunk>& chunks) {
-    // §6.3: classify and write the F37 verdict fields onto QueryContext. This does
-    // NOT decide skip — the QueryPipeline gates on F39 ShouldSkipF37 *before*
+    // Classify and write the CRAG verdict fields onto QueryContext. This does
+    // NOT decide skip — the QueryPipeline gates on ShouldSkipF37 *before*
     // calling this. Skipped queries simply never reach here.
     ClassifierInput input{ctx.query, chunks,
                           ctx.ns_id.empty() ? std::optional<std::string>{}
                                             : std::optional<std::string>{ctx.ns_id}};
     ClassificationResult result = Classify(input);
 
-    // Write the F37 fields (S3 / QUERY_CONTEXT_SPEC §2.3). Per §6.2 the §6.1 helper
-    // already wrote QueryContext-independent state; here we only touch F37's own
-    // fields, never F39's (write-failure isolation, SPEC §6.2).
+    // Write the CRAG fields (QUERY_CONTEXT_SPEC). The classification helper
+    // already wrote QueryContext-independent state; here we only touch CRAG's own
+    // fields, never the router's (write-failure isolation).
     ctx.crag_verdict = result.label;
     ctx.crag_score = result.score;
     ctx.f37_signals = result.raw_signals;
@@ -252,21 +252,21 @@ void CragEvaluator::EvaluateAndUpdateContext(
     // --- §6.3 path handling ---
     if (result.label == "correct" ||
         result.label == "correct_fallback_classifier_failed") {
-        // F37-3 A: directly return reranker top-K (no extra processing). The
+        // Directly return reranker top-K (no extra processing). The
         // fallback verdict also takes the correct path (transparent degrade, §7.3).
         return;
     }
 
     if (result.label == "ambiguous") {
-        // F37-4 A+D: fine-grained filtering (top-N/2) is done downstream by the
-        // Query Engine; F37 only records the action taken (D3.5 wires the actual
+        // Fine-grained filtering (top-N/2) is done downstream by the
+        // Query Engine; CRAG only records the action taken (a later change wires the actual
         // filter into QueryPipeline).
         ctx.ambiguous_action_taken = "filtered_top_n_by_2";
         return;
     }
 
     if (result.label == "incorrect") {
-        // F37-5 A: Phase 1 only records (OBS metric above + structured log) and
+        // Phase 1 only records (OBS metric above + structured log) and
         // returns the degraded reranker top-K. Phase 2 triggers IRetrievalFallback
         // (WebSearchFallback). web_fallback_triggered stays false in Phase 1.
         ctx.web_fallback_triggered = false;

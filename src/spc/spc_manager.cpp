@@ -25,7 +25,7 @@ Status SPCManager::Submit(std::shared_ptr<SPCTask> task) {
         return Status::Unavailable("SPCManager not running");
     }
 
-    // Disk pressure gate (F24 §6, F24-4 decision A): at CRIT
+    // Disk pressure gate: at CRIT
     // refuse NEW task admission. Catch-all for the non-HTTP ingest paths (watcher /
     // CDC submit directly here); the HTTP upload route already rejected earlier with
     // the full Agent-friendly 507 body, before doc/blob were written.
@@ -51,8 +51,8 @@ int SPCManager::CancelBySourcePath(const std::string& source_path) {
 }
 
 int SPCManager::ProcessParsedDoc(spc::ParsedDoc& parsed, SPCTask& task) {
-    // Per-task façade over the namespace pool, mirroring WorkerLoop — but the F42 async path has
-    // already parsed (F06 in DocumentProcessor), so no blob→temp extraction is needed here.
+    // Per-task façade over the namespace pool, mirroring WorkerLoop — but the async task path has
+    // already parsed (in DocumentProcessor), so no blob→temp extraction is needed here.
     resource::NamespaceFacade facade(*pool_, task.namespace_name);
     Status acq = facade.Acquire();
     if (!acq.ok()) {
@@ -61,9 +61,9 @@ int SPCManager::ProcessParsedDoc(spc::ParsedDoc& parsed, SPCTask& task) {
             "namespace acquire failed: " + task.namespace_name + ": " + acq.message();
         return -1;
     }
-    // The F42 async path (DocumentProcessor → here) carries a doc_id that has NO
+    // The async task path (DocumentProcessor → here) carries a doc_id that has NO
     // documents row yet — unlike the upload path, where upload_handler creates the doc
-    // before enqueuing. The post-parse stages (F25 write) insert blocks that
+    // before enqueuing. The post-parse stages (the write coordinator) insert blocks that
     // FK→documents(doc_id), so the row must exist first or block_insert fails with
     // CX_ERR_SPC_PROCESS_FAILED. Create it from the task (doc_get guard keeps this
     // idempotent / avoids a duplicate-PK INSERT), mirroring upload_handler.
@@ -78,9 +78,9 @@ int SPCManager::ProcessParsedDoc(spc::ParsedDoc& parsed, SPCTask& task) {
         doc.processing_level = task.processing_level;
         doc.status = DocStatus::kProcessing;
         // Persist caller-supplied document metadata onto the row, mirroring
-        // upload_handler (doc.metadata_json = req.metadata_json). The F42 async batch
+        // upload_handler (doc.metadata_json = req.metadata_json). The async batch
         // path dropped this, so user metadata (e.g. an external corpus id) survived
-        // only inside the F08 META block and never round-tripped to query results
+        // only inside the META block and never round-tripped to query results
         // (post_filter reads documents.metadata_json). System/block metadata still wins
         // on key collision via post_filter's doc→block overlay.
         doc.metadata_json = task.metadata_json;

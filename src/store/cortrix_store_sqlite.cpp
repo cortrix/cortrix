@@ -158,14 +158,14 @@ CortrixStoreSqlite::CortrixStoreSqlite(const std::string& db_path)
 CortrixStoreSqlite::CortrixStoreSqlite(const std::string& db_path, OpenOptions options)
     : db_path_(db_path), owns_db_(true), opts_(options) {}
 
-// D-I1.bis: borrowed-connection view, single-threaded contexts ONLY (F05
+// D-I1.bis: borrowed-connection view, single-threaded contexts ONLY (pool
 // load-time tooling + tests; see header). We do NOT own the conn — Open()
 // skips sqlite3_open, Close()/dtor skip sqlite3_close. db_path_ is a label
 // only (for logs). PRAGMAs were already applied by the conn's owner.
 CortrixStoreSqlite::CortrixStoreSqlite(sqlite3* external_conn)
     : db_path_("<external-conn>"), db_(external_conn), owns_db_(false) {}
 
-// Testing seam (F23 §4.5, SetFailNextOps): consume one pending fault, if any.
+// Testing seam (SetFailNextOps): consume one pending fault, if any.
 // Production leaves fail_next_ops_ at 0, making this a single relaxed load.
 bool CortrixStoreSqlite::TryConsumeOpFault() {
     int pending = fail_next_ops_.load(std::memory_order_relaxed);
@@ -210,7 +210,7 @@ int CortrixStoreSqlite::Open() {
         }
     } else {
         // D-I1 external-conn mode: the handle was injected at construction and is
-        // owned by the F05 SqliteConn (PRAGMAs already applied there, F05 §7.3).
+        // owned by the pooled SqliteConn (PRAGMAs already applied there).
         // A null handle here is a wiring bug.
         if (!db_) {
             CORTRIX_LOG_ERROR("store", "External-conn store Open() with null handle");
@@ -218,7 +218,7 @@ int CortrixStoreSqlite::Open() {
         }
     }
 
-    // [D3.5-B] Per-Unit schema: production units are migrated ONCE at F05 load
+    // Per-Unit schema: production units are migrated ONCE at pool load
     // time (F09SchemaProvider via SchemaMigrator::MigrateUnit), so the per-facade
     // production connection passes run_schema_ddl=false (D-I1.bis). The standalone
     // owns-db path has no migrator and still builds the framework schema here
@@ -233,7 +233,7 @@ int CortrixStoreSqlite::Open() {
     // RecoverCrashedDocs (processing→pending reset + delete partial blocks) is a
     // one-shot *startup* recovery — per-request it would be unsafe (a concurrent
     // request mid-processing a doc would be mis-detected as crashed and rolled
-    // back). Production runs it ONCE at F05 load time (single-threaded, before
+    // back). Production runs it ONCE at pool load time (single-threaded, before
     // any request; namespace_pool assembly step 8b, D-I1.bis), so the per-facade
     // connection passes run_crash_recovery=false. Standalone keeps it in Open().
     if (owns_db_ && opts_.run_crash_recovery) {
@@ -248,15 +248,15 @@ int CortrixStoreSqlite::Close() {
     if (owns_db_ && db_) {
         sqlite3_close(db_);
     }
-    // External mode: just drop the borrowed pointer; the F05 SqliteConn owns the
+    // External mode: just drop the borrowed pointer; the pooled SqliteConn owns the
     // handle and closes it when the bundle is released.
     db_ = nullptr;
     return 0;
 }
 
-// D3.5 F03/F07: hand back the underlying connection (owned or borrowed) for the
+// Hand back the underlying connection (owned or borrowed) for the
 // SPC write path's enrichment persistence. No lock: the caller uses it sequentially
-// inside the per-NS F25 write (same discipline as the §9.4 rollback callback, which
+// inside the per-NS write (same discipline as the rollback callback, which
 // also captures and uses the bare handle); returning the pointer races with nothing.
 sqlite3* CortrixStoreSqlite::db_handle() { return db_; }
 
@@ -345,7 +345,7 @@ int CortrixStoreSqlite::CreateTables() {
     // columns (child_id/parent_id/token_count/parent_offset) + parents table via
     // F34SchemaProvider in MigrateUnit; the owns-db path has no migrator, so apply
     // the same store-layer provider here so block_insert/block_get (which carry the
-    // A columns) match production. F35/F40 columns (contextualized/sparse_vec) are
+    // A columns) match production. The contextual/sparse columns (contextualized/sparse_vec) are
     // not carried by CortrixBlock/block_insert, so they are intentionally not applied
     // here (added in production MigrateUnit; would be a store→spc/retrieval layering
     // violation to apply from the store).
@@ -860,7 +860,7 @@ int CortrixStoreSqlite::block_insert(CortrixBlock& block) {
     const bool explicit_id = (block.block_id != 0);
 
     // [A unified-blocks] +5 columns: child_id/parent_id/token_count/parent_offset
-    // (F34, NULL for non-child rows) + metadata_json (F09-framework shared JSONB).
+    // (NULL for non-child rows) + metadata_json (block-header framework shared JSONB).
     const char* sql = explicit_id ? R"SQL(
         INSERT INTO blocks (block_id, doc_id, chunk_index, block_type, processing_level,
                             hnsw_node_id, content_hash, data, content_text,
@@ -1125,7 +1125,7 @@ int CortrixStoreSqlite::block_count_by_doc(const std::string& doc_id, int64_t* c
     return (rc == SQLITE_ROW) ? 0 : -1;
 }
 
-// --- Parent CRUD (F34 `parents` table; A unified-blocks) ---
+// --- Parent CRUD (`parents` table; unified-blocks) ---
 
 int CortrixStoreSqlite::parent_insert(CortrixParent& parent) {
     if (TryConsumeOpFault()) return -1;  // testing seam
@@ -1135,7 +1135,7 @@ int CortrixStoreSqlite::parent_insert(CortrixParent& parent) {
     // and in production by F34SchemaProvider@MigrateUnit, so its 11 written columns
     // exist on both paths. The 3 D8 hotness columns are left to their DDL DEFAULTs
     // (V1.0 does not write them). No BEGIN/COMMIT here: a single INSERT autocommits
-    // standalone, and the F25 PWL wraps it in the SPC write transaction (ARCH §3.2).
+    // standalone, and the write coordinator's PWL wraps it in the SPC write transaction.
     const char* sql = R"SQL(
         INSERT INTO parents (parent_id, doc_id, namespace_id, parent_text, token_count,
                              page_start, page_end, byte_offset_start, byte_offset_end,

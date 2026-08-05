@@ -43,8 +43,8 @@ std::vector<std::string> ParseEnricherChainSpec(const std::string& spec) {
         if (t.empty() || !IsKnownToken(t)) continue;
         if (seen.insert(t).second) out.push_back(t);
     }
-    // GS-2: F03 always leads. If any token is present but f03 is not, prepend it
-    // (F35/F38 are chain peers AFTER F03). An empty/all-unknown spec defaults to
+    // The `f03` enricher always leads. If any token is present but f03 is not, prepend it
+    // (`f35`/`f38` are chain peers AFTER `f03`). An empty/all-unknown spec defaults to
     // the single-enricher {"f03"} chain (§7.1 L1).
     if (out.empty()) return {"f03"};
     if (std::find(out.begin(), out.end(), "f03") == out.end()) {
@@ -58,7 +58,7 @@ std::vector<std::string> ParseEnricherChainSpec(const std::string& spec) {
 
 std::vector<std::string> ResolveEnricherChain(const IGlobalConfig* global,
                                               const std::string& ns_metadata_json) {
-    // NS metadata override wins (the per-NS "enricher_chain" string, F35 §6.2 NS
+    // NS metadata override wins (the per-NS "enricher_chain" string, the NS
     // layer pattern). Falls back to the global `enricher.chain` GUC, then the
     // built-in default.
     if (!ns_metadata_json.empty()) {
@@ -133,10 +133,10 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
             continue;
         }
 
-        // F38 has a side channel (GenerateHypeQuestions): the frozen EnrichResult
+        // The hype enricher has a side channel (GenerateHypeQuestions): the frozen EnrichResult
         // carries no hype slot (reconcile 1). Detect it by Name() == "hype" and
         // route to its dedicated API; everything else flows through EnrichBatch and
-        // the F03/F35 EnrichResult fields are merged.
+        // the enricher and contextual EnrichResult fields are merged.
         if (name == "hype") {
             auto* hype = dynamic_cast<HyPEEnricher*>(enricher.get());
             if (hype) {
@@ -159,7 +159,7 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
                         results[i].steps.push_back({name, 0, "", false});
                     } else {
                         // Fail-soft: HyPE degraded — record the CX_ERR_F38_* token,
-                        // skip this chunk's questions, continue (F38-8).
+                        // skip this chunk's questions, continue.
                         results[i].steps.push_back(
                             {name, 1, qres.status().message(), false});
                         CORTRIX_LOG_DEBUG(
@@ -171,7 +171,7 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
             continue;
         }
 
-        // F03 / F35: run EnrichBatch + merge each result into the chunk's merged
+        // Enricher / contextual: run EnrichBatch + merge each result into the chunk's merged
         // EnrichResult. Wrapped so a throwing enricher is caught (fail-soft) and the
         // chain continues with the partial result already accumulated.
         std::vector<EnrichResult> batch;
@@ -193,8 +193,8 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
             const bool step_ok = step.ok();
 
             // Merge policy: the enricher head establishes the base (entities/summary/
-            // enriched_score/provenance). F35 contributes the contextualized_* fields
-            // only. We never clobber a non-empty F03 field with an empty later one.
+            // enriched_score/provenance). The contextual stage contributes the contextualized_* fields
+            // only. We never clobber a non-empty enricher field with an empty later one.
             if (!step.entities.empty()) merged.entities = std::move(step.entities);
             if (!step.summary.empty()) merged.summary = std::move(step.summary);
             if (step.enriched_score > 0.0f) merged.enriched_score = step.enriched_score;
@@ -205,7 +205,7 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
             if (!step.model_used.empty()) merged.model_used = step.model_used;
             if (!step.prompt_version.empty()) merged.prompt_version = step.prompt_version;
 
-            // F35 contextualized_* (pure-ADD fields; only F35 populates them).
+            // contextualized_* (pure-ADD fields; only the contextual stage populates them).
             if (step.contextualized_text.has_value())
                 merged.contextualized_text = std::move(step.contextualized_text);
             if (step.contextualized_embedding.has_value())
@@ -226,7 +226,7 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
                     merged.error_msg = step.error_msg;
                 }
             } else if (step.contextualized_status == 2 && !step.error_msg.empty()) {
-                // F35 fail-soft: the step reports OK (the chunk keeps its original
+                // Contextual fail-soft: the step reports OK (the chunk keeps its original
                 // embedding) but the member outcome is a failure recorded only in
                 // contextualized_status. Without this, the f35 debt row is written
                 // with an empty last_error and the real cause (e.g. the §8

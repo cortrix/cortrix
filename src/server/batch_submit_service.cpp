@@ -89,12 +89,12 @@ const PerDocErrorInfo& ClassifyPerDocCode(const std::string& cx_code) {
     static const PerDocErrorInfo kServiceDown{ErrorCategory::kTransient, true,  10000};
     static const PerDocErrorInfo kDefault    {ErrorCategory::kPermanent, false, std::nullopt};
 
-    if (cx_code == "CX_ERR_NS_QUOTA_EXCEEDED")          return kQuota;       // F12 existing (quota)
-    if (cx_code == "CX_ERR_DOC_ALREADY_EXISTS")         return kDupPerm;     // F42 existing (permanent)
-    if (cx_code == "CX_ERR_TRANSIENT_LLM_RATE_LIMIT")   return kLlmRate;     // F03 existing (transient, §2.3 retry_after_ms=5000)
-    if (cx_code == "CX_ERR_DISK_FULL")                  return kDiskFull;    // F24-4 (permanent)
-    if (cx_code == "CX_ERR_INVALID_CONTENT")            return kInvalid;     // F06 existing (permanent)
-    if (cx_code == "CX_ERR_SERVICE_UNAVAILABLE")        return kServiceDown; // F42 §6.2 (transient)
+    if (cx_code == "CX_ERR_NS_QUOTA_EXCEEDED")          return kQuota;       // catalog (quota)
+    if (cx_code == "CX_ERR_DOC_ALREADY_EXISTS")         return kDupPerm;     // scheduler (permanent)
+    if (cx_code == "CX_ERR_TRANSIENT_LLM_RATE_LIMIT")   return kLlmRate;     // enricher (transient, retry_after_ms=5000)
+    if (cx_code == "CX_ERR_DISK_FULL")                  return kDiskFull;    // deployment (permanent)
+    if (cx_code == "CX_ERR_INVALID_CONTENT")            return kInvalid;     // parser (permanent)
+    if (cx_code == "CX_ERR_SERVICE_UNAVAILABLE")        return kServiceDown; // scheduler (transient)
     return kDefault;
 }
 
@@ -252,9 +252,9 @@ BatchHttpResult BatchSubmitService::Submit(const BatchRequest& req) {
 
     // 2) per-doc fan-out through the submit seam (prod = TaskScheduler).
     //
-    // on_duplicate (skip/overwrite/error) enforcement is D3.5: the frozen F42
+    // on_duplicate (skip/overwrite/error) enforcement is not wired yet: the frozen task
     // SubmitRequest carries no on_duplicate field, and the duplicate decision
-    // needs the real store/task dedup (cross-Feature wiring). F42::Enqueue already
+    // needs the real store/task dedup (cross-component wiring). Enqueue already
     // applies same-doc_id+same-content_hash debounce/merge; the on_duplicate
     // overwrite→cancel-running path is the overwrite/cancel item (D3.5). Standalone, every
     // accepted doc is reported "submitted"; the "skipped" status variant becomes
@@ -270,7 +270,7 @@ BatchHttpResult BatchSubmitService::Submit(const BatchRequest& req) {
         sreq.namespace_id = req.namespace_id;
         sreq.doc_id = d.doc_id;
         sreq.content_hash = query::ContentHashOfContent(d.content);
-        // Materialize the inline content to a server-side file the F42
+        // Materialize the inline content to a server-side file the task
         // doc-parse worker reads (DocumentProcessor → factory.ParseDocument(filepath)).
         // Disabled (materialize_dir_ == "") → "" filepath, the standalone/mock seam.
         // The client filename's extension drives parser selection (".txt" fallback).

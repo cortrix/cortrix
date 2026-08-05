@@ -30,7 +30,7 @@ namespace cortrix {
 
 namespace {
 
-// Read-side decision-signal params (F37 ?explain / F39 ?route / F41 ?granularity).
+// Read-side decision-signal params (?explain / ?route / ?granularity).
 // Precedence: a query-string value overrides the JSON body value (briefing red-line
 // "if both, query-string wins"). The body value has already been parsed into
 // `req` by QueryRequest::FromJson before these run.
@@ -96,7 +96,7 @@ void RegisterQueryRoutes(
             ApplyExplainParam(req, query_req);
             ApplyRouteGranularityParams(req, query_req);
 
-            // F39 ?route enum (§4.3): an invalid token returns the Agent-friendly
+            // ?route enum: an invalid token returns the Agent-friendly
             // CX_ERR_F39_FORCE_ROUTE_INVALID body with structured_data.invalid_route_value
             // (machine-readable per CLAUDE.md §5 / GEN-Agent #1,#5), not a generic
             // parse error. "auto" means "no override; let the router decide".
@@ -115,7 +115,7 @@ void RegisterQueryRoutes(
                 return;
             }
 
-            // F41 ?granularity enum (§6.2): auto|chunk|doc|both. The frozen F41 error
+            // ?granularity enum: auto|chunk|doc|both. The frozen error
             // set (CX_ERR_F41_*) has no request-param identity, so an invalid value is
             // a generic InvalidArgument (consistent with the other request-shape
             // validations in QueryRequest::Validate).
@@ -140,7 +140,7 @@ void RegisterQueryRoutes(
             }
 
             // Step 3: Namespace access check via the runtime PermissionService
-            // seam (ARCHITECTURE V6). Anti-enumeration (F04 issue 2.6):
+            // seam (ARCHITECTURE V6). Anti-enumeration:
             // unauthorized and not-found share CX_ERR_NS_UNAUTHORIZED, and the
             // namespace name is never echoed back (no existence oracle).
             if (!auth.Authorize(ctx.auth, query_req.namespace_name, kPermRead).ok()) {
@@ -189,7 +189,7 @@ void RegisterQueryRoutes(
                 // no new routing behavior. Standalone backend is the heuristic guard
                 // (real DistilBERT-tiny ONNX wiring is D3.5); QueryComplexityClassifier
                 // is total (never throws). The granularity is echoed so the Agent sees
-                // the resolved value; F37 CRAG fields stay at their SPEC defaults
+                // the resolved value; CRAG fields stay at their SPEC defaults
                 // (""/0.0/{}) because no CRAG evaluation runs on this MVP path — per
                 // QUERY_CONTEXT_SPEC §6.3 a default value reads as "not triggered".
                 cortrix::query::QueryContext qctx;

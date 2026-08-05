@@ -21,7 +21,7 @@
 namespace cortrix::store {
 
 // ─────────────────────────────────────────────────────────────────────────────
-// F01 S1/S3 — class framework + hnswlib fork + durable group-commit writes.
+// Class framework + hnswlib fork + durable group-commit writes.
 //
 // S1 built a usable PHnsw on the vendored hnswlib graph (read paths + a direct
 // AddPoint). S3 makes writes crash-safe: AddPoint/AddPoints/MarkDelete now frame
@@ -289,7 +289,7 @@ void PHnsw::ApplyEntryLocked(const WalEntry& entry) {
                 ++deleted_count_;
             } catch (const std::exception&) {
                 // block_id absent OR already marked deleted — idempotent no-op
-                // (F25 Q6 + V5 #9). markDelete throws "Label not found" for an
+                // markDelete throws "Label not found" for an
                 // absent id and "already deleted" for a repeated delete; both are
                 // legitimately no-ops here (a re-delete must NOT double-count).
             }
@@ -305,7 +305,7 @@ void PHnsw::ApplyInsertLocked(const WalEntry& entry) {
     // Caller holds the write lock and is inside ApplyEntryLocked's try.
     //
     // An INSERT for a block_id that is currently MARKED DELETED is a re-write.
-    // F01 design § 5 (boundary table) sanctions this: a duplicate-block_id write
+    // The index design (boundary table) sanctions this: a duplicate-block_id write
     // is "MarkDelete then AddPoint" with the same id (caller-guaranteed ordering),
     // because hnswlib disallows two live nodes with the same label.
     // The index is built with allow_replace_deleted_=true (RecoverInternal), and
@@ -404,8 +404,8 @@ Status PHnsw::AddPoints(const std::vector<std::pair<const float*, uint64_t>>& po
 }
 
 Status PHnsw::MarkDelete(uint64_t block_id, const observability::TraceContext* /*ctx*/) {
-    // Idempotent at the graph level (a missing block_id replays to a no-op,
-    // F25 Q6 + V5 #9), but the DELETE is still journaled so recovery is exact.
+    // Idempotent at the graph level (a missing block_id replays to a no-op),
+    // but the DELETE is still journaled so recovery is exact.
     if (!ready_ || !committer_) {
         return PhnswStatus(StatusCode::kUnavailable, phnsw_errors::kNotReady,
                            "PHnsw::MarkDelete: index not ready");
@@ -431,7 +431,7 @@ std::vector<std::pair<uint64_t, float>> PHnsw::Search(
     // shared member setEf(), which mutates ef_; doing that under a shared_lock
     // would be a data race (and would bleed ef into other concurrent searches).
     // So an explicit ef_search takes the exclusive lock for the duration of that
-    // one search. ef_search <= 0 (the default, what F04 ScatterGather uses) keeps
+    // one search. ef_search <= 0 (the default, what ScatterGather uses) keeps
     // full read concurrency.
     if (ef_search > 0) {
         std::unique_lock<std::shared_mutex> lock(mutex_);
@@ -558,7 +558,7 @@ IndexStats PHnsw::GetStats() {
 }
 
 std::size_t PHnsw::GetMemoryFootprintBytes() const {
-    // Public entry: take the read lock so a direct F05 call is race-free against
+    // Public entry: take the read lock so a direct pool call is race-free against
     // concurrent writers (S5). GetStats() uses the *Locked variant instead, since
     // re-acquiring shared_lock on the same thread is UB for std::shared_mutex.
     std::shared_lock<std::shared_mutex> lock(mutex_);
@@ -566,7 +566,7 @@ std::size_t PHnsw::GetMemoryFootprintBytes() const {
 }
 
 std::size_t PHnsw::GetMemoryFootprintBytesLocked() const {
-    // F01 §2.6 coarse upper-bound estimate for F05 admission control. Caller holds
+    // Coarse upper-bound estimate for pool admission control. Caller holds
     // mutex_ (shared or exclusive). O(1) arithmetic.
     if (!index_) {
         return 0;
@@ -598,7 +598,7 @@ bool PHnsw::Exists(uint64_t block_id, const observability::TraceContext* /*ctx*/
 
 std::vector<std::pair<uint64_t, float>> PHnsw::Search(
     const float* query, int top_k, const observability::TraceContext* ctx) {
-    // F25's no-ef_search overload uses the configured default search width.
+    // The write coordinator's no-ef_search overload uses the configured default search width.
     return Search(query, top_k, /*ef_search=*/-1, ctx);
 }
 

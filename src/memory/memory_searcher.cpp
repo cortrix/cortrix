@@ -24,7 +24,7 @@ MemorySearcher::MemorySearcher(QueryPipeline& pipeline,
 // ---------------------------------------------------------------------------
 
 namespace {
-// MEM05: user_id format rule — max 128 chars, ASCII printable (0x20-0x7E).
+// Isolation: user_id format rule — max 128 chars, ASCII printable (0x20-0x7E).
 // Guards against injection / oversized identifiers (design § 5).
 constexpr size_t kMaxUserIdLen = 128;
 bool IsValidUserIdFormat(const std::string& user_id) {
@@ -35,7 +35,7 @@ bool IsValidUserIdFormat(const std::string& user_id) {
     return true;
 }
 
-// MEM01: parse an ISO 8601 "YYYY-MM-DDTHH:MM:SSZ" timestamp to Unix seconds.
+// Parse an ISO 8601 "YYYY-MM-DDTHH:MM:SSZ" timestamp to Unix seconds.
 // Returns 0 on a malformed / empty string — the scorer treats created_at <= 0
 // as "unknown age" (age_days=0, decay_factor=1.0), i.e. no decay rather than a
 // penalty (design § 5 boundary: created_at missing -> no decay).
@@ -59,7 +59,7 @@ int64_t ParseCreatedAtToEpoch(const std::string& iso) {
 #endif
 }
 
-// MEM01: read the memory block status ("active"/"tentative"/"invalidated") from
+// Read the memory block status ("active"/"tentative"/"invalidated") from
 // item metadata. Missing/non-string -> "active" (design § 5: status missing ->
 // treated as a valid/active state). ToMemoryResult does not surface status, so
 // the scoring path reads it directly here.
@@ -79,11 +79,11 @@ Status MemorySearchRequest::Validate() const {
     if (namespace_name.empty()) {
         return Status::InvalidArgument("namespace is required");
     }
-    // MEM05: user_id is always required for memory isolation.
+    // user_id is always required for memory isolation.
     if (user_id.empty()) {
         return Status::InvalidArgument("user_id is required for memory isolation");
     }
-    // MEM05: enforce user_id format (length + ASCII printable).
+    // Enforce user_id format (length + ASCII printable).
     if (!IsValidUserIdFormat(user_id)) {
         return Status::InvalidArgument("invalid user_id format");
     }
@@ -121,7 +121,7 @@ MemorySearchResponse MemorySearcher::Search(const MemorySearchRequest& request) 
     response.degraded = qresp.meta.degraded;
 
     // 4. Post-filter: scope + TTL. Collect all surviving rows first (no early
-    //    top_k cut) — MEM01 re-ranks by final_score below, so truncation must
+    //    top_k cut) — the scorer re-ranks by final_score below, so truncation must
     //    happen after scoring, not in pipeline (raw RRF) order.
     std::vector<MemorySearchResultItem> kept;
     std::vector<MemoryCandidate> candidates;  // parallel to `kept` (scorer path)
@@ -129,7 +129,7 @@ MemorySearchResponse MemorySearcher::Search(const MemorySearchRequest& request) 
     candidates.reserve(qresp.results.size());
 
     for (const auto& item : qresp.results) {
-        // 4a. Scope filter (MEM05: always applied — items without user_id in
+        // 4a. Scope filter (always applied — items without user_id in
         //     metadata, including null metadata, fail the user_id check and are
         //     excluded. MatchScope handles null/missing metadata via contains()).
         if (!MatchScope(item.metadata, request)) {
@@ -150,14 +150,14 @@ MemorySearchResponse MemorySearcher::Search(const MemorySearchRequest& request) 
         // so the field is always meaningful and ordering is unchanged.
         result.final_score = static_cast<double>(result.score);
 
-        // Keep interaction rows (interaction_id) AND MEM02 fact/preference/event
+        // Keep interaction rows (interaction_id) AND extracted fact/preference/event
         // blocks (content). A result with neither is a non-memory row that slipped
         // the MEMORY block_type filter — drop it.
         if (result.interaction_id.empty() && result.content.empty()) {
             continue;
         }
 
-        // 5b. MEM01 (scorer path only): build the scoring candidate parallel to
+        // 5b. Scorer path only: build the scoring candidate parallel to
         //     `kept`. block_id is repurposed as a back-correlation index into
         //     `kept` (real block ids are ULID strings carried on the result item;
         //     the scorer only passes this field through and never matches on it).
@@ -177,7 +177,7 @@ MemorySearchResponse MemorySearcher::Search(const MemorySearchRequest& request) 
     }
 
     if (scorer_ != nullptr) {
-        // MEM01 path: classified-decay scoring + invalidated filter + rank by
+        // Scorer path: classified-decay scoring + invalidated filter + rank by
         // final_score + top_k truncation (all in MemoryScorer::ScoreAndRank,
         // design § 4.1 step 4). Map each ScoredMemory back to its kept row via
         // the index stashed in block_id, writing final_score / decay_factor.
@@ -195,7 +195,7 @@ MemorySearchResponse MemorySearcher::Search(const MemorySearchRequest& request) 
             response.results.push_back(std::move(result));
         }
     } else {
-        // Null-scorer fallback (pre-MEM01 behavior): keep raw RRF order, truncate
+        // Null-scorer fallback (pre-scorer behavior): keep raw RRF order, truncate
         // to top_k by count. final_score already mirrors score (set above).
         for (auto& result : kept) {
             response.results.push_back(std::move(result));
@@ -286,7 +286,7 @@ bool MemorySearcher::IsExpired(const std::string& metadata_json) {
 
 bool MemorySearcher::MatchScope(const json& metadata,
                                 const MemorySearchRequest& request) const {
-    // MEM05: ALWAYS filter by user_id first — this is the core isolation line.
+    // ALWAYS filter by user_id first — this is the core isolation line.
     // A memory with no user_id (or wrong user_id) is excluded on every path.
     // §8.bis: each exclusion is a match_scope_excluded_total{reason} event (the
     // retrieval-path pre-filter, distinct from the API-entry isolation_violation).
@@ -325,7 +325,7 @@ MemorySearchResultItem MemorySearcher::ToMemoryResult(const ResultItem& item) co
     result.created_at = "";
 
     // The unified memory read pipeline surfaces two row kinds from the MEMORY
-    // block_type: interaction rows (interaction_id + Q/A) and MEM02
+    // block_type: interaction rows (interaction_id + Q/A) and extracted
     // fact/preference/event blocks (memory_type + block_id, content_text = the fact
     // statement). Pull whichever metadata fields are present.
     if (!item.metadata.is_null()) {
@@ -355,9 +355,9 @@ MemorySearchResultItem MemorySearcher::ToMemoryResult(const ResultItem& item) co
             result.query_text = item.chunk_text;
         }
     } else {
-        // MEM02 fact/preference/event block — content_text is the fact statement
+        // Fact/preference/event block — content_text is the fact statement
         // itself (no Q/A split). This is what makes extracted memories retrievable
-        // through /memory/search (the unified read pipeline, MEM02 §6.5.3).
+        // through /memory/search (the unified read pipeline).
         result.content = item.chunk_text;
     }
 

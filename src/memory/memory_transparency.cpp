@@ -15,7 +15,7 @@ namespace {
 
 using observability::OperationLogEntry;
 
-/// Current wall clock as Unix epoch milliseconds — MEM03 §6.1 stamps revoked_at /
+/// Current wall clock as Unix epoch milliseconds — transparency stamps revoked_at /
 /// deleted_at / last_modified_at as INTEGER epoch ms.
 int64_t NowEpochMs() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -23,9 +23,9 @@ int64_t NowEpochMs() {
         .count();
 }
 
-/// Read a metadata_json timestamp key as epoch ms. MEM02 writes some timestamps as
+/// Read a metadata_json timestamp key as epoch ms. The extractor writes some timestamps as
 /// ISO 8601 strings ("YYYY-MM-DDTHH:MM:SSZ", e.g. created_at / invalidated_at) while
-/// MEM03 writes its own keys as numeric epoch ms. This tolerant reader returns the
+/// Transparency writes its own keys as numeric epoch ms. This tolerant reader returns the
 /// number directly, or parses the ISO form to epoch ms, or nullopt when the key is
 /// absent / unparseable.
 std::optional<int64_t> ReadTimestampMs(const nlohmann::json& meta, const char* key) {
@@ -36,7 +36,7 @@ std::optional<int64_t> ReadTimestampMs(const nlohmann::json& meta, const char* k
     if (v.is_string()) {
         const std::string s = v.get<std::string>();
         std::tm tm{};
-        // Parse the canonical UTC form MEM02 emits. sscanf avoids strptime portability gaps.
+        // Parse the canonical UTC form the extractor emits. sscanf avoids strptime portability gaps.
         int y = 0, mo = 0, d = 0, h = 0, mi = 0, se = 0;
         if (std::sscanf(s.c_str(), "%d-%d-%dT%d:%d:%dZ", &y, &mo, &d, &h, &mi, &se) == 6) {
             tm.tm_year = y - 1900;
@@ -91,8 +91,8 @@ Mem03Metrics::ErrorCodeLabel MetricLabel(Mem03ErrorCode code) {
     return Mem03Metrics::ErrorCodeLabel::kInvalidateFailed;
 }
 
-/// Mask the second half of a user_id for the USER_MISMATCH structured_data (MEM03
-/// §4.3.4.bis example "user_y****"): keep up to the first 6 chars, then "****".
+/// Mask the second half of a user_id for the USER_MISMATCH structured_data (the
+/// spec example "user_y****"): keep up to the first 6 chars, then "****".
 std::string MaskUserId(const std::string& uid) {
     constexpr size_t kKeep = 6;
     if (uid.size() <= kKeep) return uid + "****";
@@ -143,7 +143,7 @@ MemoryTransparency::MemoryTransparency(
       op_logger_(std::move(op_logger)) {}
 
 bool MemoryTransparency::IsEffectiveStatus(const MemoryBlockRecord& rec) {
-    // J5: a memory's effective (valid) state aligns with MEM02's write side = active;
+    // A memory's effective (valid) state aligns with the extractor's write side = active;
     // tentative is also a non-invalidated state the user still "has". invalidated is
     // the only state hidden by include_invalidated=false.
     const std::string status = ReadString(rec.metadata_json, "status");
@@ -162,7 +162,7 @@ MemoryListItem MemoryTransparency::ProjectListItem(const MemoryBlockRecord& rec,
     item.status = ReadString(m, "status");
     // user_id: prefer the struct field, fall back to the metadata key.
     item.user_id = !rec.user_id.empty() ? rec.user_id : ReadString(m, "user_id");
-    // MEM02 stamps the extraction time under "created_at"; honor MEM03's own
+    // The extractor stamps the extraction time under "created_at"; honor transparency's own
     // "extracted_at" key too if present.
     item.extracted_at = ReadTimestampMs(m, "extracted_at");
     if (!item.extracted_at.has_value()) item.extracted_at = ReadTimestampMs(m, "created_at");
@@ -292,7 +292,7 @@ Result<std::string> MemoryTransparency::Create(const MemoryCreateRequest& req,
 
     const int64_t now_ms = NowEpochMs();
     MemoryBlockRecord rec;
-    rec.block_id = id::GenerateUlid(now_ms);  // reuse F34 ULID (no other id minting)
+    rec.block_id = id::GenerateUlid(now_ms);  // reuse the chunker's ULID minting (no other id minting)
     rec.user_id = req.user_id;
     rec.content = req.content;
     // issue-3 A: POST path writes directly, NO LLM — extraction_method="explicit".

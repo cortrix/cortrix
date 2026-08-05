@@ -15,7 +15,7 @@
 namespace cortrix::async {
 
 namespace {
-// [Plan B · F42 §4.1.2 ①] Async TaskInfo lacks mime_type; derive just enough from the
+// Async TaskInfo lacks mime_type; derive just enough from the
 // filename for SPCRouter::InferBlockType (which only distinguishes image scans from files).
 std::string InferMimeFromFilename(const std::string& fn) {
     auto ends = [&](const char* s) {
@@ -60,7 +60,7 @@ int DocumentProcessor::AsyncMaxPages() const {
 }
 
 Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
-    // F42 §6.bis metrics — record the terminal outcome + end-to-end duration,
+    // Task metrics — record the terminal outcome + end-to-end duration,
     // keyed on the task's task_type. The /metrics endpoint wiring is D3.5; the
     // recorder + these feed points are the D3 piece.
     const auto t_start = std::chrono::steady_clock::now();
@@ -99,16 +99,16 @@ Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
     try {
         result = factory_->ParseDocument(task.filepath, opts);
     } catch (const CancellationException&) {
-        // topic 3.3 A — F06 subprocess is not force-killed; the current page
+        // The parser subprocess is not force-killed; the current page
         // finished naturally and the checkpoint threw. Finalize as cancelled.
-        // DEFERRED → D3.5: if a downstream F25 BeginWrite had already landed
+        // DEFERRED: if a downstream BeginWrite had already landed
         // chunks, invoke RollbackCallback here (nothing is written in D3, so the
         // cancel is clean).
         return finalizer_.Cancel(task, t_start);
     }
 
     if (!result.ok()) {
-        // Map the F06 ParserErrorCode → CX_ERR_PARSE_FAILED + GEN-Agent structured_data
+        // Map the ParserErrorCode → CX_ERR_PARSE_FAILED + GEN-Agent structured_data
         // (topic 5 error persistence); the finalizer persists via MarkFailed + metric.
         nlohmann::json sd = {
             {"task_id", task.task_id},
@@ -125,8 +125,8 @@ Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
         return finalizer_.Cancel(task, t_start);
     }
 
-    // [Plan B · F42 §4.1.2] If wired to SPC, hand the parsed doc to the shared post-parse
-    // stages (Chunk→F08 META→F03 enrich→embed→assemble→F25 write) via SPCManager; else
+    // If wired to SPC, hand the parsed doc to the shared post-parse
+    // stages (chunk → META → enrich → embed → assemble → write) via SPCManager; else
     // (standalone D3) finalize parse-only with the task's content-hash-derived doc_id.
     if (spc_mgr_) {
         SPCTask spc_task;
@@ -146,7 +146,7 @@ Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
         // round-trips to query results (post_filter reads documents.metadata_json).
         spc_task.metadata_json = task.metadata_json;
         // §4.1.2 ② — the sync call leaves SPCTask.cancelled false; post-parse mid-flight
-        // cancel is Phase 2 (cancel's main checkpoint is the F06 per-page parse above).
+        // cancel is Phase 2 (cancel's main checkpoint is the per-page parse above).
         int rc = spc_mgr_->ProcessParsedDoc(result, spc_task);
         if (rc != 0) {
             return finalizer_.Fail(task, "CX_ERR_SPC_PROCESS_FAILED", spc_task.error_message,

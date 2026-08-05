@@ -89,15 +89,15 @@ nlohmann::json RuleBasedMetadataGenerator::BuildMetadataJson(
     j["doc_id"] = input.doc_id;
     j["namespace_id"] = input.namespace_id;
 
-    // --- file facts (from F06 DocumentMetadata + F08 FileInfo) ---
+    // --- file facts (from DocumentMetadata + FileInfo) ---
     j["filename"] = dm.filename;
     j["mime_type"] = dm.mime_type;
     j["file_size_bytes"] = dm.file_size_bytes;
     std::string upload = FormatIso8601Utc(input.file_info.upload_time_ms);
     j["upload_time"] = upload.empty() ? nlohmann::json(nullptr) : nlohmann::json(upload);
 
-    // --- counts (page from F06; chunk/parent/child from F34 via ProcessingStats) ---
-    // page_count unknown (§5.2 row 2: F06 partial success) → null + warning.
+    // --- counts (page from the parser; chunk/parent/child from chunking via ProcessingStats) ---
+    // page_count unknown (parser partial success) → null + warning.
     if (dm.page_count >= 0) {
         j["page_count"] = dm.page_count;
     } else {
@@ -122,10 +122,10 @@ nlohmann::json RuleBasedMetadataGenerator::BuildMetadataJson(
     // --- processing + source + lang ---
     j["processing_time_ms"] = input.stats.processing_time_ms;
     j["source_uri"] = input.file_info.source_uri;
-    // lang (schema key `lang`) ← F06 doc_language (consumed field name differs, briefing §2).
+    // lang (schema key `lang`) ← parser doc_language (the consumed field name differs).
     j["lang"] = dm.doc_language;
 
-    // --- F10 coordination signals (V2 remediation M-03, class A immutable, F06 → F08 passthrough) ---
+    // --- cleaning coordination signals (class A immutable, parser → metadata passthrough) ---
     std::string parse_status = input.stats.parse_status.empty() ? "ok" : input.stats.parse_status;
     j["meta.parse_status"] = parse_status;
     // meta.parse_failed_page: int? — non-null only when failed/partial AND a page is set.
@@ -138,7 +138,7 @@ nlohmann::json RuleBasedMetadataGenerator::BuildMetadataJson(
 
     // --- business fields (class B, V1.0 set once at upload time + immutable, D9 B' lock) ---
     j["tags"] = input.file_info.tags;  // array (possibly empty)
-    // ingestion_status: derived from the F06 parse status (completed unless failed).
+    // ingestion_status: derived from the parse status (completed unless failed).
     j["ingestion_status"] = (parse_status == "failed") ? "failed" : "completed";
     // custom_metadata: business-supplied object (default {}).
     j["custom_metadata"] = input.custom_metadata.is_null() ? nlohmann::json::object()
@@ -148,9 +148,9 @@ nlohmann::json RuleBasedMetadataGenerator::BuildMetadataJson(
 }
 
 nlohmann::json RuleBasedMetadataGenerator::DeriveDocFts5Columns(const GeneratorInput& input) {
-    // §9.quater.2 V1.0 derivation rules. Pure logical mapping — zero F08 schema
-    // change, no SQLite/F41 table dependency. SPCPipeline writes these columns into
-    // the product doc_fts5_index row after the F08 META block is assembled.
+    // V1.0 derivation rules. Pure logical mapping — zero metadata schema
+    // change, no SQLite/doc-summary table dependency. SPCPipeline writes these columns into
+    // the product doc_fts5_index row after the META block is assembled.
     nlohmann::json cols;
     cols["doc_id"] = input.doc_id;
     cols["filename"] = input.doc_metadata.filename;
@@ -169,7 +169,7 @@ Result<GeneratorOutput> RuleBasedMetadataGenerator::Generate(
     const GeneratorInput& input, const observability::TraceContext* /*ctx*/) {
     auto& metrics = MetadataMetrics::Instance();
 
-    // §5.2 row 1: F06 parse fully failed → no DocumentMetadata → cannot fallback → GEN_FAILED.
+    // Parse fully failed → no DocumentMetadata → cannot fallback → GEN_FAILED.
     // "Completely empty" = no filename, no source_uri, and the parse status is failed.
     const auto& dm = input.doc_metadata;
     const bool no_identity = dm.filename.empty() && input.file_info.source_uri.empty();
@@ -191,7 +191,7 @@ Result<GeneratorOutput> RuleBasedMetadataGenerator::Generate(
     }
 
     // §5.bis cortrix_f08_block_generate_duration_seconds — time block_text assembly +
-    // JSON serialization (steady_clock, immune to wall-clock jumps). Mirrors F07
+    // JSON serialization (steady_clock, immune to wall-clock jumps). Mirrors the semantic-score
     // ObserveAssignDuration (commit d634fdb): the histogram was defined/rendered/tested
     // but Generate() never fed it. The GEN_FAILED early return above does no assembly, so
     // it is intentionally outside this timer (SLA P95 ≤ 50ms covers the produced-block path).

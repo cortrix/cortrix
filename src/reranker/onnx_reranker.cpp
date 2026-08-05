@@ -30,7 +30,7 @@ namespace fs = std::filesystem;
 namespace cortrix::reranker {
 
 namespace {
-constexpr const char* kTokenizerKey = "bge-m3";  // shared with F40/F03 (§2.4-bis)
+constexpr const char* kTokenizerKey = "bge-m3";  // shared with the sparse and enricher paths
 
 #ifdef CORTRIX_HAS_ONNXRUNTIME
 Status AppendExecutionProvider(Ort::SessionOptions* options,
@@ -71,7 +71,7 @@ Status AppendExecutionProvider(Ort::SessionOptions* options,
                                " execution provider initialization failed: " + detail);
 }
 
-/// Cross-encoder pair encoding (F02 §2.2, bge-reranker-v2-m3 / XLM-R):
+/// Cross-encoder pair encoding (bge-reranker-v2-m3 / XLM-R):
 ///   <s> query </s> </s> passage </s>
 /// Built by splicing two single-text Encode() results (each comes back
 /// <s>...</s> + padding): strip padding via the attention mask, join with the
@@ -218,7 +218,7 @@ Status OnnxReranker::Init() {
         });
     }
 
-    // Fail-fast contract (F02 §3.1 / §4.1, S1.3): if a model is *configured*
+    // Fail-fast contract: if a model is *configured*
     // (model_path non-empty) it MUST load, else startup fails with
     // CX_ERR_RERANKER_INIT_FAILED. An EMPTY model_path = no reranker model
     // configured → stub mode (offline/dev; mirrors the in-tree OnnxEmbedder so a
@@ -391,7 +391,7 @@ std::vector<float> OnnxReranker::ScoreBatch(const char* query,
     const std::string q = query ? query : "";
     const size_t n = passages.size();
 
-    // D35-MET-04: time the whole ScoreBatch (F02 §3.4 score_duration_seconds) and
+    // Time the whole ScoreBatch (score_duration_seconds) and
     // sample the live pool queue depth (queue_depth_current gauge). The duration is
     // observed at every return path via this scope guard.
     const auto score_start = std::chrono::steady_clock::now();
@@ -509,7 +509,7 @@ std::vector<retrieval::RankedChunk> OnnxReranker::Rerank(
     if (candidates.empty()) return result;
 
     // 1. Reverse-look-up chunk text (ChunkStore.GetBatch). Standalone uses a mock;
-    //    real F08+F09 assembly = D3.5.
+    //    real META + block-header assembly comes from the pipeline.
     std::vector<std::string> child_ids;
     child_ids.reserve(candidates.size());
     for (const auto& c : candidates) child_ids.push_back(c.child_id);
@@ -557,7 +557,7 @@ std::vector<retrieval::RankedChunk> OnnxReranker::Rerank(
 
     // 4. F02-owned RRF fusion (§4.2-ter): base ordering score =
     //    rerank_score*0.7 + rrf_score*0.3 (rrf_score = the candidate's RRF score,
-    //    carried as RankedChunk.score), then optional F03/F07 semantic multiplier.
+    //    carried as RankedChunk.score), then the optional semantic multiplier.
     //    Write the final score back so downstream query surfaces use one score
     //    contract.
     const RerankerScoreFusion fusion;
