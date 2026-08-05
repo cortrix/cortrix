@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "cortrix/agent_friendly/error.h"
-#include "cortrix/agent_trace/engine_instrumentation.h"  // F13 §11 Engine instrumentation (S6)
+#include "cortrix/agent_trace/engine_instrumentation.h"  // Engine instrumentation
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/query/complexity_config.h"
 #include "cortrix/query/cross_ns_error.h"
@@ -51,11 +51,11 @@ namespace cortrix::query {
 
 namespace {
 
-// Adapt the P09 tenant PermissionService (cortrix::tenant) onto F04's minimal
+// Adapt the tenant PermissionService (cortrix::tenant) onto the query stack's minimal
 // cortrix::query::PermissionService contract (§4.2). The tenant service keys its
-// checks off a full AuthContext; F04 hands us (user_id, tenant_id, role) strings,
+// checks off a full AuthContext; the query stack hands us (user_id, tenant_id, role) strings,
 // so we reconstruct a minimal AuthContext from them. In the CE single-tenant OSS
-// hot path (P09 sec 4.6) CanRead returns true once owner_tenant_id == caller
+// hot path CanRead returns true once owner_tenant_id == caller
 // tenant_id, so the reconstructed context (carrying user_id + tenant_id) is
 // sufficient; the full ACL path activates with multi-tenant data.
 class TenantPermissionAdapter : public PermissionService {
@@ -66,7 +66,7 @@ public:
 
     /// With auth disabled the deployment is
     /// CE single-tenant - the injected "default" principal owns every namespace,
-    /// so the ns_acl lookup (which has no rows without P09 tenancy) must not
+    /// so the ns_acl lookup (which has no rows without tenancy) must not
     /// unauthorize it. Set from CrossNsQueryWiring::Register(auth.enabled()).
     void set_auth_enabled(bool enabled) { auth_enabled_ = enabled; }
 
@@ -120,7 +120,7 @@ private:
     cortrix::resource::INamespacePool& pool_;
 };
 
-// Build the F02 reranker config from the supplied model dir (resolved from
+// Build the reranker config from the supplied model dir (resolved from
 // config.reranker.model_dir before this call). Empty dir = stub mode (no
 // cross-encoder; OnnxReranker falls back to deterministic stub scoring).
 reranker::RerankerConfig MakeRerankerConfig(const std::string& model_dir,
@@ -134,7 +134,7 @@ reranker::RerankerConfig MakeRerankerConfig(const std::string& model_dir,
     return cfg;
 }
 
-// Build the F39 complexity-classifier backend from the supplied model dir
+// Build the complexity-classifier backend from the supplied model dir
 // (resolved from config.query_complexity.model_dir before this call).
 // Init() is offline-friendly: returns Ok + unavailable when the model files
 // are absent, falling back to HeuristicComplexityBackend so the routing link
@@ -171,21 +171,21 @@ struct CrossNsQueryWiring::Impl {
         : pool(pool),
           engine_instr(std::move(engine_instr)),
           perm_adapter(perm_svc, pool),
-          // The shared fan-out pool (F04 §2.7 executor.workers / queue_size defaults).
+          // The shared fan-out pool (executor.workers / queue_size defaults).
           engine(8, 500),
-          // Shared F02 reranker. model_dir from config.reranker.model_dir; empty = stub.
+          // Shared reranker. model_dir from config.reranker.model_dir; empty = stub.
           reranker(reranker::CreateReranker(MakeRerankerConfig(
                                                 reranker_model_dir,
                                                 reranker_execution_provider),
                                             /*chunk_store=*/nullptr)),
-          // F40 per-NS SPLADE index owner (Q4 read path). The SAME registry instance
+          // Per-NS SPLADE index owner (sparse read path). The SAME registry instance
           // the SPC ingest write path indexes into (bootstrap owns it), so the read
           // path serves exactly what was indexed; null → sparse off (dense+FTS5).
           executor(pool, embedder, fusion, reranker, sparse_registry,
                    candidate_multiplier, max_candidates),
           scatter(&executor, &engine, reranker, &perm_adapter),
           handler(&scatter),
-          // F39 query-complexity router (Q3). Standalone backend = the heuristic
+          // Query-complexity router. Standalone backend = the heuristic
           // guard; the real DistilBERT OnnxComplexityBackend
           // (models/query-complexity/) is preferred and drops in behind the same
           // interface (R4 — #26), with the heuristic as the offline fallback
@@ -193,29 +193,29 @@ struct CrossNsQueryWiring::Impl {
           // missing/failed backend degrades to Complex (L2 "classifier_unavailable"),
           // so the link is safe with either backend.
           classifier(MakeComplexityBackend(query_complexity_model_dir), ComplexityConfig{}),
-          // F36 RAG-Fusion (Q5). The variant generator needs an LLM; when none is
-          // configured (`llm` null) ExpandQueries can't expand → F36 is effectively
+          // RAG-Fusion. The variant generator needs an LLM; when none is
+          // configured (`llm` null) ExpandQueries can't expand → RAG-Fusion is effectively
           // off (it is also default-disabled per NS config). rag_rrf is a dedicated
-          // RRFFusion for the F36 global second-pass fusion (over the ChildId
+          // RRFFusion for the global second-pass fusion (over the ChildId
           // keyspace), distinct from the inner per-NS RRF.
           variant_generator(std::make_shared<QueryVariantGenerator>(llm)),
           rag_rrf(std::make_shared<RRFFusion>()),
           rag_fusion(variant_generator, rag_rrf),
           rag_stage(&scatter, &rag_fusion, reranker),
-          // F37 CRAG evaluator (Q6). Standalone backend = the heuristic guard; the
+          // CRAG evaluator. Standalone backend = the heuristic guard; the
           // real DistilBERT-tiny OnnxCragBackend drops in behind the same interface
           // (R4). The evaluator is total: a missing/failed backend degrades to the
           // "correct" path, so the result set is never wrongly truncated.
           crag_evaluator(std::make_shared<retrieval::HeuristicGuardBackend>(),
                          retrieval::CragConfig{}),
           crag_stage(&crag_evaluator),
-          // F36-LR LLM listwise rerank (addendum §2). Shares the F03 LLM client
-          // with F36; null llm → the wiring gate skips the stage (llm_rerank=true
-          // then degrades to the pre-stage order, mirroring the F36 [R7] stance).
+          // LLM listwise rerank. Shares the enricher LLM client
+          // with RAG-Fusion; null llm → the wiring gate skips the stage (llm_rerank=true
+          // then degrades to the pre-stage order, mirroring the RAG-Fusion stance).
           llm_rerank_stage(llm) {}
 
     cortrix::resource::INamespacePool& pool;  ///< for the chat path's per-NS user_facts
-    /// F13 Engine instrumentation (§11, S6). null when tracing is off (standalone /
+    /// Engine instrumentation. null when tracing is off (standalone /
     /// tests). Declared right after `pool` so it is initialized early (its init in the
     /// ctor list is order-independent — it depends on nothing else).
     std::shared_ptr<agent_trace::EngineInstrumentation> engine_instr;
@@ -278,7 +278,7 @@ std::optional<std::string> ReadRouteOverride(const httplib::Request& req,
     return std::nullopt;
 }
 
-// Read the F41 ?granularity value (query-string wins over the JSON body, default
+// Read the ?granularity value (query-string wins over the JSON body, default
 // "auto") — same precedence as ?route / ?explain on this path. Validation is the
 // caller's (an invalid value is a generic 400, mirroring the single-NS
 // query_routes.cpp path: the frozen CX_ERR_F41_* set has no request-param identity).
@@ -319,8 +319,8 @@ Status ReadCragEnabled(const httplib::Request& req, const json& body, bool* out)
     return Status::Ok();
 }
 
-// Build the per-request QueryContext that carries both the F04 execution fields
-// (mirrors ScatterGather::MakeContext) and the F39 routing decision, so the
+// Build the per-request QueryContext that carries both the query execution fields
+// (mirrors ScatterGather::MakeContext) and the routing decision, so the
 // per-NS executors run with the resolved route + the request's top_k/rerank/filter.
 QueryContext MakeRoutingContext(const json& body, const AuthContext& auth) {
     QueryContext qctx;
@@ -366,10 +366,10 @@ QueryRouterMetrics::Decision DecisionOf(const std::string& routing_path,
     return QueryRouterMetrics::Decision::kComplex;
 }
 
-// The F39 Chat-path response (§9.1 / F39-5 A): Chat skips ALL retrieval and returns
-// only MEM02 user_facts + meta.via_path = "chat_memory_only". User facts are
+// The Chat-path response: Chat skips ALL retrieval and returns
+// only memory user_facts + meta.via_path = "chat_memory_only". User facts are
 // per-user but stored per-NS, so we acquire each requested NS facade and query its
-// store for the user's active facts (MEM02 QueryUserFacts — pure SQL, no vector
+// store for the user's active facts (QueryUserFacts — pure SQL, no vector
 // search), aggregate across NS, sort created_at DESC, and cap at top_k.
 json BuildChatResponse(cortrix::resource::INamespacePool& pool, const QueryContext& qctx,
                        const std::vector<std::string>& namespaces) {
@@ -418,13 +418,13 @@ json BuildChatResponse(cortrix::resource::INamespacePool& pool, const QueryConte
     meta["deduplicated_chunks"] = json::array();
     meta["deduplicated_chunks_count"] = 0;
     meta["warnings"] = json::array();
-    meta["via_path"] = "chat_memory_only";  // F39 §9.1 Chat-path marker
+    meta["via_path"] = "chat_memory_only";  // Chat-path marker
     out["meta"] = std::move(meta);
     return out;
 }
 
-// Resolve whether F36 RAG-Fusion runs for this request (Q5). NS-config resolution
-// (the rag_fusion_config JSONB) is itself D3.5; until that resolver is wired, F36 is
+// Resolve whether RAG-Fusion runs for this request. NS-config resolution
+// (the rag_fusion_config JSONB) is a separate wiring step; until that resolver lands, RAG-Fusion is
 // off by default (topic 3) and an Agent opts in per-request via `rag_fusion: true`
 // (body) or `?rag_fusion=true`. variant_count / rrf_k keep the design defaults.
 RagFusionConfig ResolveRagFusionConfig(const httplib::Request& req, const json& body) {
@@ -552,7 +552,7 @@ Status ValidateResolvedRagFusionConfigForRequest(const RagFusionConfig& cfg) {
         " must be " + valid_range);
 }
 
-// Resolve the F36-LR LLM listwise rerank config (addendum §2.1). Default off;
+// Resolve the LLM listwise rerank config. Default off;
 // an Agent opts in per request via `llm_rerank: true` (body) or `?llm_rerank=true`,
 // with knobs in the `llm_rerank_config` body object / `llm_rerank_*` params.
 // Mirrors ResolveRagFusionConfig so the two LLM-dependent features stay uniform.
@@ -631,7 +631,7 @@ Status ValidateResolvedLlmRerankConfigForRequest(const LlmRerankConfig& cfg) {
         " must be " + valid_range);
 }
 
-// [F13 §11 / S6] Record one finished query as an agent_trace row via the Engine
+// Record one finished query as an agent_trace row via the Engine
 // instrumentation. No-op when tracing is off (engine_instr null → standalone/tests).
 // The helper itself never throws (EngineInstrumentation::Record isolates both
 // writes, C4), so it is safe to call on the request path. Identity
@@ -643,7 +643,7 @@ Status ValidateResolvedLlmRerankConfigForRequest(const LlmRerankConfig& cfg) {
 // op_summary (the operation_log summary, §11 — query_text prefix) is filled too,
 // but the operation_log write happens ONLY when the bootstrap constructs this
 // EngineInstrumentation WITH an operation_logger. This cell wires agent_trace, so the
-// recommended query instance is trace-only (op_logger null) → Record skips the F18a
+// recommended query instance is trace-only (op_logger null) → Record skips the operation-log
 // block and op_summary is unused; the field is set so enabling op_logger later is
 // correct without touching this code.
 void RecordQueryTrace(agent_trace::EngineInstrumentation* engine_instr,
@@ -688,14 +688,14 @@ std::string BuildQueryParamsSummary(const QueryContext& qctx) {
     return p.dump();
 }
 
-// Serialize a scatter response, applying the F37 CRAG verdict action + surfacing
-// meta.crag_verdict (B-class) when F37 ran (Complex route). CragStage is a no-op on
+// Serialize a scatter response, applying the CRAG verdict action + surfacing
+// meta.crag_verdict (B-class) when CRAG ran (Complex route). CragStage is a no-op on
 // simple/chat (ShouldSkipF37) so this is safe to call on every scatter path.
 json SerializeWithCrag(CrossNsResponse& resp, QueryContext& qctx, CragStage* crag) {
     crag->Apply(resp, qctx);
     json out = resp.ToJson();
     if (!qctx.crag_verdict.empty()) {
-        out["meta"]["crag_verdict"] = qctx.crag_verdict;  // F37 §6.3 B-class
+        out["meta"]["crag_verdict"] = qctx.crag_verdict;  // CRAG B-class
         if (!qctx.ambiguous_action_taken.empty()) {
             out["meta"]["crag_action"] = qctx.ambiguous_action_taken;
         }
@@ -706,7 +706,7 @@ json SerializeWithCrag(CrossNsResponse& resp, QueryContext& qctx, CragStage* cra
 }  // namespace
 
 void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
-    // R1: propagate the deployment auth posture into the F04 permission adapter
+    // Propagate the deployment auth posture into the query permission adapter
     // (CE no-auth single tenant must not be unauthorized by the empty ns_acl).
     impl_->perm_adapter.set_auth_enabled(auth.enabled());
     CrossNsQueryHandler* handler = &impl_->handler;
@@ -716,17 +716,17 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
     ScatterGather* scatter = &impl_->scatter;
     CragStage* crag_stage = &impl_->crag_stage;
     cortrix::resource::INamespacePool* pool = &impl_->pool;
-    // F13 §11 Engine instrumentation (raw ptr; Impl outlives the closure). null →
+    // Engine instrumentation (raw ptr; Impl outlives the closure). null →
     // tracing off; RecordQueryTrace then no-ops, leaving the path unchanged.
     agent_trace::EngineInstrumentation* engine_instr = impl_->engine_instr.get();
-    // [R7] Whether an LLM is configured — F36 rag-fusion needs one to expand query
+    // Whether an LLM is configured — rag-fusion needs one to expand query
     // variants. When absent (CE OSS default) the gate below skips rag-fusion and
     // runs plain scatter, so a `rag_fusion=true` request degrades gracefully instead
-    // of dereferencing a null LLM client (the §F36 LLM-unavailable contract).
+    // of dereferencing a null LLM client (the RAG-Fusion LLM-unavailable contract).
     const bool rag_fusion_llm_available = impl_->variant_generator->has_llm();
-    // F36-LR listwise rerank stage (addendum §2). Same availability stance: no
+    // Listwise rerank stage. Same availability stance: no
     // LLM configured → the gate below skips the stage and the response keeps the
-    // pre-stage (F02 cross-encoder) order.
+    // pre-stage (cross-encoder) order.
     LlmRerankStage* llm_rerank_stage = &impl_->llm_rerank_stage;
     const bool llm_rerank_available = impl_->llm_rerank_stage.has_llm();
     svr.Post("/api/v1/query", WithAuth(auth, kPermRead,
@@ -735,7 +735,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             const httplib::Request& req, httplib::Response& res,
             const RequestContext& ctx) {
             // Parse the JSON body up-front so a malformed body is a clean 400 here
-            // (the F04 handler also validates shape, but it expects a JSON object).
+            // (the query handler also validates shape, but it expects a JSON object).
             json body;
             try {
                 body = json::parse(req.body);
@@ -746,13 +746,13 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             }
 
             // CE no-auth leaves user_id empty; inject the
-            // single-tenant default principal so F04 AuthorizeNamespaces Step 1
+            // single-tenant default principal so AuthorizeNamespaces Step 1
             // passes. When auth is enabled the middleware has
             // already populated a real user_id and this is a no-op.
             AuthContext auth_ctx = ctx.auth;
             if (auth_ctx.user_id.empty()) auth_ctx.user_id = "default";
 
-            // F39 routing (Q3, §6.1): classify the query and write routing_path onto
+            // Complexity routing: classify the query and write routing_path onto
             // the QueryContext BEFORE retrieval. The classifier runs the §6.1 order
             // internally (Agent ?route override → NS force_route → IsChatQuery rule
             // guard → backend Infer → confidence<threshold fail-safe → Complex), so
@@ -762,7 +762,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             QueryContext qctx = MakeRoutingContext(body, auth_ctx);
             qctx.ns_id.clear();  // cross-NS: per-NS id is bound inside the executor
 
-            // F41 §6.2 ?granularity (auto|chunk|doc|both, query-string wins over body).
+            // ?granularity (auto|chunk|doc|both, query-string wins over body).
             // Validate before routing so an invalid value is a clean 400 (the frozen
             // CX_ERR_F41_* set has no request-param identity → generic InvalidArgument,
             // matching the single-NS query_routes.cpp path). "chunk" is the explicit
@@ -797,18 +797,18 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             // agent_trace duration_ms. Started after routing resolves so it measures
             // the execution, not the pre-execution validation (those 400s are request
             // -shape errors, not Engine calls, and are not traced — matching §11 which
-            // instruments DoQuery, and F18a which logs success only).
+            // instruments DoQuery, and the operation log which logs success only).
             const auto exec_start = std::chrono::steady_clock::now();
             auto elapsed_ms = [&exec_start]() -> int {
                 return static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::steady_clock::now() - exec_start).count());
             };
 
-            // Chat path (§9.1 / F39-5 A): skip retrieval + F36/F37/F38 entirely,
-            // return only MEM02 user_facts + meta.via_path. The deprecated-field
+            // Chat path: skip retrieval + RAG-Fusion/CRAG/HyPE entirely,
+            // return only memory user_facts + meta.via_path. The deprecated-field
             // (CX_ERR_DEPRECATED_FIELD) check still must run on the raw body, so a
             // chat-routed request that ALSO carries the MVP `namespace` field is
-            // rejected before the short-circuit (consistency with the F04 handler).
+            // rejected before the short-circuit (consistency with the query handler).
             // The request must still parse (need the namespaces[] to scope the
             // per-NS user_facts query); a parse fault falls through to Handle for
             // the precise error body.
@@ -829,11 +829,11 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                 // else: fall through to Handle below for the bad-request body.
             }
 
-            // Simple / Complex retrieval path. Parse the F04 request once: on a
+            // Simple / Complex retrieval path. Parse the query request once: on a
             // parse fault (deprecated `namespace`, malformed body) fall through to
             // handler->Handle, which produces the precise CX_ERR_DEPRECATED_FIELD /
-            // bad-request body. On success run the scatter (or the F36 RagFusionStage
-            // when Complex + rag_fusion enabled), then apply F37 CRAG (Q6) before
+            // bad-request body. On success run the scatter (or the RagFusionStage
+            // when Complex + rag_fusion enabled), then apply CRAG before
             // serializing. CragStage is a no-op on the Simple route (ShouldSkipF37).
             QueryRequest f04_req;
             Status parsed = CrossNsQueryHandler::ParseRequest(body, &f04_req);
@@ -871,7 +871,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                 // plain scatter rather than crashing on a null LLM client.
                 const bool use_rag_fusion = qctx.routing_path == "complex" &&
                                             rag_cfg.enabled && rag_fusion_llm_available;
-                // F36-LR gate (addendum §2): needs an LLM; the listwise window
+                // Listwise rerank gate: needs an LLM; the listwise window
                 // needs top_n candidates, so widen the retrieval top_k and trim
                 // back to the Agent's requested top_k after the stage.
                 const bool use_llm_rerank = lr_cfg.enabled && llm_rerank_available;
@@ -912,7 +912,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                             qctx.routing_decision_source == "inference_failed_fallback";
                         out["explain"] =
                             cortrix::query::BuildExplainNode(qctx, include_debug);
-                        // F41 §6.2: echo the resolved granularity so the Agent sees the
+                        // Echo the resolved granularity so the Agent sees the
                         // effective value (mirrors the single-NS query_routes.cpp echo).
                         out["explain"]["granularity"] = qctx.granularity;
                         // [addendum §3.8 W2 · P5] Aggregate per-path vote counts over
@@ -920,7 +920,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                         // of the five chunk-level paths helped rank (dense / fts5 /
                         // sparse / contextualized / hype_question); via_path_counts =
                         // doc-route provenance (chunk / hybrid / llm_summary / …). Lets
-                        // a caller split the F41 doc-route vs F35/F38 chunk-path
+                        // a caller split the doc-summary route vs the contextual/HyPE chunk path
                         // contribution without client-side counting.
                         {
                             json path_counts = json::object();
@@ -1021,7 +1021,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                 }
             }
 
-            // Parse fault → the F04 handler produces the precise error body.
+            // Parse fault → the query handler produces the precise error body.
             HandlerResult hr = handler->Handle(body, auth_ctx, &qctx);
             res.status = hr.status;
             res.set_header("X-Request-Id", ctx.request_id);

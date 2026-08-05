@@ -22,7 +22,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/common/json_depth.h"  // metadata depth guard (DoS: deep-JSON dump)
 #include "cortrix/memory/mem05_metrics.h"
-// M1/M2/M4/M5 — memory extraction + MEM03 transparency + MEM04 opt-out runtime
+// Memory extraction + transparency + opt-out runtime
 #include "cortrix/memory/interaction_log.h"
 #include "cortrix/memory/memory_extraction_service.h"
 #include "cortrix/memory/memory_extractor.h"
@@ -37,7 +37,7 @@ namespace cortrix {
 
 using json = nlohmann::json;
 
-// MEM05 §8.bis: resolve the requester's user_id from the `user_id` query param,
+// Isolation: resolve the requester's user_id from the `user_id` query param,
 // applying the CE no-auth `default` fallback. When the fallback fires it is a
 // cortrix_mem05_default_user_used_total event (ops signal: a node running auth-less
 // on default). Returns the effective user_id used for the isolation check.
@@ -50,7 +50,7 @@ static std::string ResolveRequesterUserId(const httplib::Request& req) {
     return req_user_id;
 }
 
-// MEM05 §8.bis: record one isolation decision at an API entry — the
+// Record one isolation decision at an API entry — the
 // isolation_check_total audit baseline plus, on a cross-user denial,
 // isolation_violation_total{reason=mismatch} (the safety-critical alert).
 static void RecordIsolationDecision(memory::Mem05Metrics::Action action, bool owned) {
@@ -63,7 +63,7 @@ static void RecordIsolationDecision(memory::Mem05Metrics::Action action, bool ow
     }
 }
 
-// MEM05 IDOR guard: resolve the effective user_id from a caller-supplied value
+// IDOR guard: resolve the effective user_id from a caller-supplied value
 // (body or query param) and decide whether the authenticated principal may act on
 // it. A non-admin principal may only target its own user_id — supplying someone
 // else's user_id is a body-spoof cross-user attempt and is denied. This is the
@@ -86,14 +86,14 @@ static bool EnforceOwnUserId(const RequestContext& rc, std::string& requested,
     }
     // Admins may target any user_id; a principal with no user_id (e.g. the CE
     // no-auth path where auth.user_id is empty) is not subject to the per-user
-    // mismatch check — P08 per-key isolation still applies upstream.
+    // mismatch check — per-key isolation still applies upstream.
     const bool owned = rc.auth.is_admin() || rc.auth.user_id.empty() ||
                        requested == rc.auth.user_id;
     RecordIsolationDecision(action, owned);
     return owned;
 }
 
-// MEM05 IDOR guard for session-scoped operations (inject / write-interaction /
+// IDOR guard for session-scoped operations (inject / write-interaction /
 // opt-out). The session's owner is the authoritative user_id (the memory_sessions
 // row), so a caller cannot self-assert ownership via the body. A non-admin
 // principal may only act on a session it owns; acting on another principal's
@@ -109,7 +109,7 @@ static bool EnforceSessionOwner(const RequestContext& rc, MemoryStore& store,
                                 const std::string& session_id,
                                 memory::Mem05Metrics::Action action) {
     // Admin and the no-auth empty principal are not subject to the per-user check
-    // (P08 per-key isolation still applies upstream); skip the lookup entirely.
+    // (per-key isolation still applies upstream); skip the lookup entirely.
     if (rc.auth.is_admin() || rc.auth.user_id.empty()) return true;
     MemorySession session;
     if (!store.SessionGet(session_id, session).ok()) {
@@ -139,7 +139,7 @@ static void WriteAgentError(httplib::Response& res, int http_status,
     res.set_content(body.dump(), "application/json");
 }
 
-// ── M2: MEM02 LLM extraction HTTP surface ────────────────────────────────────
+// ── LLM extraction HTTP surface ──────────────────────────────────────────────
 // POST /api/v1/memory/extract            — single interaction (PartialSuccessById)
 // POST /api/v1/memory/extract/batch      — batch
 // POST /api/v1/memory/extract/run_for_ns — NS-level backfill
@@ -338,8 +338,8 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
     }));
 }
 
-// ── M4: MEM03 Memory Transparency HTTP surface ───────────────────────────────
-// GET    /api/v1/memory       — list a user's memories (MEM05 isolation)
+// ── Memory Transparency HTTP surface ─────────────────────────────────────────
+// GET    /api/v1/memory       — list a user's memories (per-user isolation)
 // POST   /api/v1/memory       — create a memory
 // PATCH  /api/v1/memory/{id}  — edit (= new fact + invalidate old)
 // DELETE /api/v1/memory/{id}  — soft-delete (status=invalidated)
@@ -359,7 +359,7 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         std::string ns = req.get_param_value("ns");
         if (ns.empty()) ns = req.get_param_value("namespace");
         if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
-        // MEM05 L1: the requester may only list their own user_id (admin may query any).
+        // Isolation L1: the requester may only list their own user_id (admin may query any).
         std::string user_id = req.get_param_value("user_id");
         if (!EnforceOwnUserId(rc, user_id, memory::Mem05Metrics::Action::kSearch)) {
             // Empty-result mask: do not reveal another user's memories exist.
@@ -378,7 +378,7 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         filter.user_id = user_id;
         filter.include_invalidated = req.get_param_value("status") == "invalidated" ||
                                      req.get_param_value("include_invalidated") == "true";
-        // MEM03 §4.3.1 pagination. The web client sends limit/offset; the backend
+        // Transparency pagination. The web client sends limit/offset; the backend
         // filter is page-based (start = page * page_size). Accept limit/offset
         // (primary) and page/page_size (aliases); normalize offset to a page index.
         // Unparseable/negative values fall back to the filter defaults so the route
@@ -438,7 +438,7 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         if (ns.empty() || content.empty()) {
             WriteJsonError(res, Status::InvalidArgument("ns + content are required")); return;
         }
-        // MEM05 L1: a non-admin may only create memories under its own user_id;
+        // Isolation L1: a non-admin may only create memories under its own user_id;
         // a spoofed body user_id is a cross-user write and is refused. 404 (not 403)
         // keeps the response shape uniform with the other masked routes and does not
         // confirm/deny anything about the target user.
@@ -463,7 +463,7 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         WriteJsonResponse(res, 201, resp);
     }));
 
-    // PATCH /api/v1/memory/{id} — edit = new fact + invalidate old (MEM03-4).
+    // PATCH /api/v1/memory/{id} — edit = new fact + invalidate old.
     svr.Patch(R"(/api/v1/memory/([A-Za-z0-9_\-]+))", WithAuth(auth, kPermWrite,
         [&pool, &embedder, op_logger](const httplib::Request& req, httplib::Response& res,
                            const RequestContext& rc) {
@@ -477,7 +477,7 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         if (ns.empty() || content.empty()) {
             WriteJsonError(res, Status::InvalidArgument("ns + content are required")); return;
         }
-        // MEM05 L1: a non-admin may only edit memories under its own user_id; a
+        // Isolation L1: a non-admin may only edit memories under its own user_id; a
         // spoofed body user_id would let A invalidate+rewrite B's memory → 404-mask.
         std::string user_id = body.value("user_id", "");
         if (!EnforceOwnUserId(rc, user_id, memory::Mem05Metrics::Action::kEdit)) {
@@ -509,7 +509,7 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         std::string ns = req.get_param_value("ns");
         if (ns.empty()) ns = req.get_param_value("namespace");
         if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
-        // MEM05 L1: a non-admin may only soft-delete memories under its own user_id;
+        // Isolation L1: a non-admin may only soft-delete memories under its own user_id;
         // a spoofed user_id would let A invalidate B's memory → 404-mask.
         std::string user_id = req.get_param_value("user_id");
         if (!EnforceOwnUserId(rc, user_id, memory::Mem05Metrics::Action::kDelete)) {
@@ -529,7 +529,7 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
     }));
 }
 
-// ── M5: MEM04 Memory Immunity (opt-out) HTTP surface ─────────────────────────
+// ── Memory Immunity (opt-out) HTTP surface ───────────────────────────────────
 // POST /api/v1/memory/session/{id}/opt-out         — opt a session out
 // POST /api/v1/memory/session/{id}/opt-out/revoke  — admin revoke
 // Sessions are NS-scoped, so the OptOutManager is built per-request over the NS façade
@@ -579,7 +579,7 @@ static void RegisterMemoryOptOutRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         if (Status acq = facade.Acquire(); !acq.ok()) {
             WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found")); return;
         }
-        // MEM05 L2: a non-admin may only opt out a session it owns; opting out
+        // Isolation L2: a non-admin may only opt out a session it owns; opting out
         // another user's session is 404-masked (anti-enumeration). (The revoke
         // sibling is kPermAdmin, so it is already restricted to admins.)
         if (!EnforceSessionOwner(rc, facade.memory(), session_id,
@@ -655,7 +655,7 @@ void RegisterMemoryRoutes(
         MemorySession session;
         session.session_id = body.value("session_id", "");  // Accept client-provided ID
         session.namespace_name = ns_name;
-        // MEM05: a non-admin session owner is pinned to the authenticated principal
+        // Isolation: a non-admin session owner is pinned to the authenticated principal
         // — a spoofed body user_id cannot create a session owned by another user
         // (closes the create-session owner-spoof griefing gap). Admin may set any
         // owner; the CE no-auth path (empty principal) falls back to body then
@@ -744,7 +744,7 @@ void RegisterMemoryRoutes(
 
         MemoryStore* mem_store = &facade.memory();
 
-        // MEM05: list isolation — only return the requester's own sessions.
+        // List isolation — only return the requester's own sessions.
         // Authenticated non-admin: the principal (rc.auth.user_id) is authoritative,
         // so a spoofed ?user_id= cannot list another user's sessions. Admin / CE
         // no-auth fall back to the query-param self-identification ("default").
@@ -820,7 +820,7 @@ void RegisterMemoryRoutes(
             return;
         }
 
-        // MEM05: ownership check — a session belonging to another user must not
+        // Ownership check — a session belonging to another user must not
         // be readable. Return 404 (not 403) to avoid leaking existence (anti-enumeration,
         // design § 2.7 / § 4.5).
         //
@@ -902,7 +902,7 @@ void RegisterMemoryRoutes(
         }
         MemoryStore* mem_store = &facade.memory();
 
-        // MEM05: verify ownership before deleting. Cross-user (or missing)
+        // Verify ownership before deleting. Cross-user (or missing)
         // session -> 404, not leaking existence (anti-enumeration, design § 4.5).
         // Authenticated principal is authoritative (a non-admin cannot delete
         // another user's session by passing its id in ?user_id=); CE no-auth falls
@@ -984,7 +984,7 @@ void RegisterMemoryRoutes(
         }
         MemoryStore* mem_store = &facade.memory();
 
-        // MEM05 L2: only the session's owner (or an admin) may append interactions;
+        // Isolation L2: only the session's owner (or an admin) may append interactions;
         // writing into another user's session is 404-masked (anti-enumeration).
         if (!EnforceSessionOwner(rc, *mem_store, session_id,
                                  memory::Mem05Metrics::Action::kSession)) {
@@ -1038,8 +1038,8 @@ void RegisterMemoryRoutes(
         int64_t count = 0;
         mem_store->InteractionCount(session_id, &count);
 
-        // Enqueue the turn for async MEM02 LLM extraction (the cortrix_log_interaction
-        // trigger). The worker applies the MEM04 double-check (opt-out / remember) and runs
+        // Enqueue the turn for async LLM extraction (the cortrix_log_interaction
+        // trigger). The worker applies the double-check (opt-out / remember) and runs
         // the NS-scoped extractor. Disabled (no LLM) => no-op, interaction_log only. The
         // user turn carries `remember`; absent defaults to true (extract).
         bool mem02_enqueued = false;
@@ -1108,7 +1108,7 @@ void RegisterMemoryRoutes(
         search_req.include_expired = body.value("include_expired", false);
         search_req.include_invalidated = body.value("include_invalidated", false);
 
-        // MEM05: user_id is always required. With auth it comes from the
+        // Isolation: user_id is always required. With auth it comes from the
         // AuthContext (JWT/API Key); in CE no-auth mode it defaults to "default"
         // (design § CE single-user compatibility). Real AuthContext extraction is D3.5.
         // L1 IDOR guard: a non-admin requesting another user's memories via a
@@ -1130,7 +1130,7 @@ void RegisterMemoryRoutes(
         }
         search_req.user_id = user_id;
 
-        // MEM05: scope is session or user only (kAll removed). Default = user.
+        // Scope is session or user only (kAll removed). Default = user.
         std::string scope_str = body.value("scope", "user");
         if (scope_str == "session") {
             search_req.scope = MemoryScope::kSession;
@@ -1157,7 +1157,7 @@ void RegisterMemoryRoutes(
         QueryPipeline pipeline(vec_searcher, bm25_searcher, fusion,
                                classifier, post_filter, deg_mgr, sql_stub);
 
-        // MEM01: inject the classified-decay scorer so /memory/search applies
+        // Inject the classified-decay scorer so /memory/search applies
         // event-decay ranking (fact/preference immune, invalidated filtered).
         // Decay params come from the global GUC (config.decay_*, design § 2.5;
         // D5 lock: V1.0 global-only). llm_available is logging-only and does not
@@ -1181,13 +1181,13 @@ void RegisterMemoryRoutes(
             j["query_text"] = item.query_text;
             j["response_text"] = item.response_text;
             if (!item.query_type.empty()) j["query_type"] = item.query_type;
-            // MEM02 fact/preference/event block fields (unified read pipeline §6.5.3):
+            // Fact/preference/event block fields (unified read pipeline):
             // present only on extracted-memory rows, absent on interaction rows.
             if (!item.content.empty()) j["content"] = item.content;
             if (!item.memory_type.empty()) j["memory_type"] = item.memory_type;
             if (!item.block_id.empty()) j["block_id"] = item.block_id;
             j["score"] = item.score;
-            // MEM01 classified-decay transparency (design § 2.1 / S2 step 3):
+            // Classified-decay transparency:
             // score = raw RRF; final_score = raw * decay_factor (the ranking key).
             j["decay_factor"] = item.decay_factor;
             j["final_score"] = item.final_score;
@@ -1236,7 +1236,7 @@ void RegisterMemoryRoutes(
         }
         MemoryStore* mem_store = &facade.memory();
 
-        // MEM05 L2: injecting a session's recent context returns its conversation
+        // Isolation L2: injecting a session's recent context returns its conversation
         // history — only the owner (or an admin) may read it. Cross-user → 404-mask
         // (anti-enumeration), consistent with GET /sessions/{id}.
         if (!EnforceSessionOwner(rc, *mem_store, session_id,

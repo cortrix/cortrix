@@ -21,7 +21,7 @@
 #include "cortrix/retrieval/sparse_codec.h"
 #include "cortrix/retrieval/sparse_retriever.h"
 #include "cortrix/retrieval/sparse_rrf.h"
-#include "cortrix/spc/contextual_store.h"  // GetContextualVecLabel (F35-9 B dual-vector, §3.8 W2)
+#include "cortrix/spc/contextual_store.h"  // GetContextualVecLabel (contextual dual-vector)
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/store/cortrix_store.h"
 #include "cortrix/store/sqlite_chunk_store.h"
@@ -36,7 +36,7 @@ using retrieval::RankedChunk;
 
 namespace {
 
-// Route-level deadline for the live two-route fan-out (the F04 per-NS timeout is
+// Route-level deadline for the live two-route fan-out (the per-NS query timeout is
 // enforced one level up by the ScatterGather join).
 constexpr int64_t kRouteTimeoutUs = 5'000'000;  // 5s
 constexpr int kHybridRrfK = 60;
@@ -305,7 +305,7 @@ VectorHitPath ClassifyVectorHit(int block_type, const std::string& block_child_i
                                 const std::string& metadata_json,
                                 std::string* out_child_id) {
     if (block_type == static_cast<int>(cortrix::kBlockHypeQuestion)) {
-        // F38-4 expansion: a hype hit is a vote FOR its source chunk. No valid
+        // HyPE expansion: a hype hit is a vote FOR its source chunk. No valid
         // source_child_id (legacy row / corrupt metadata) → dropped, never surfaced
         // as its own result (the question text must not impersonate a chunk).
         json j = json::parse(metadata_json, nullptr, /*allow_exceptions=*/false);
@@ -391,7 +391,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
     }
 
     try {
-        // 1. Acquire the NS façade (F05 Pool.Acquire, RAII-released at scope exit).
+        // 1. Acquire the NS façade (Pool.Acquire, RAII-released at scope exit).
         cortrix::resource::NamespaceFacade facade(pool_, namespace_id);
         Status acq = facade.Acquire();
         if (!acq.ok()) {
@@ -413,14 +413,14 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         CortrixStore& store = facade.store();
 
         // 2. Run the enabled per-NS recall routes. By default vector + BM25 are on
-        //    and F40 sparse joins when a sparse registry is wired; search_config can
+        //    and sparse joins when a sparse registry is wired; search_config can
         //    disable individual routes for diagnostic ablations such as dense-only.
         //    The retrieval-link boundary keys on child_id (ULID), so each route's
         //    block_id hits are mapped to child_id by reading the per-NS store; a
         //    legacy non-child row (empty child_id) is dropped. Blocks are cached here
         //    so the final RankedChunk assembly reuses them (one block_get per
         //    distinct child).
-        // F38 §8 routing contract: simple/chat are chunk-only (no hype / contextual
+        // Routing contract: simple/chat are chunk-only (no hype / contextual
         // votes); complex (default) consumes the mixed ANN pool.
         const bool chunk_only_route =
             ctx.routing_path == "simple" || ctx.routing_path == "chat";
@@ -432,7 +432,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             VectorSearcher vec_searcher(facade.vec_index(), embedder_);
             // §3.8 W2: the ANN pool mixes chunk + hype (≤3) + contextual (≤1)
             // points per fully-enriched chunk, so over-fetch to keep the
-            // distinct-chunk depth (F38 §8.1 top_k*4 spirit; the aux points are
+            // distinct-chunk depth (top_k*4 spirit; the aux points are
             // votes for their chunks, not waste, so 3× is enough headroom).
             const int vec_k = chunk_only_route ? candidate_k : candidate_k * 3;
             vector_result = vec_searcher.Search(ctx.query, vec_k, kRouteTimeoutUs);
@@ -516,7 +516,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         };
 
         retrieval::FivePathInput rrf_in;
-        // [addendum §3.8 W2] Vector-route split (F38 §8.1 / F35-9 B): the ANN pool
+        // Vector-route split (hype + contextual dual-vector): the ANN pool
         // mixes chunk points, hype-question points (block_type=16 → vote for their
         // source child) and contextual dual-vector points (no blocks row → resolved
         // through contextual_vec_labels). Each hit lands in its five-path slot;
@@ -555,7 +555,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
                     }
                     continue;
                 }
-                // No blocks row → possibly a contextual dual-vector label (F35-9 B).
+                // No blocks row → possibly a contextual dual-vector label.
                 if (chunk_only_route) continue;
                 if (sqlite3* label_db = store.db_handle()) {
                     auto lr = cortrix::spc::GetContextualVecLabel(label_db, it.block_id);
@@ -570,10 +570,10 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         }
         rrf_in.fts5 = to_child_hits(bm25_result);
 
-        // F40 sparse path (§6.3): embed the query's sparse vector and search the
+        // Sparse path: embed the query's sparse vector and search the
         // per-NS SPLADE inverted index. A NS with no indexed sparse vectors (or a
         // missing registry / index open failure) yields an empty list → the fusion
-        // degrades to dense+FTS5 (F40 §7.2 L2 fallback), no error.
+        // degrades to dense+FTS5 (L2 fallback), no error.
         if (ctx.enable_sparse && sparse_registry_ != nullptr) {
             retrieval::ISparseRetriever* sparse = sparse_registry_->GetOrOpen(namespace_id);
             if (sparse != nullptr && sparse->IsAvailable()) {
@@ -594,7 +594,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         }
 
         // chunk-level multi-path RRF — all five paths live: dense +
-        // fts5 + sparse + contextualized (F35-9 B) + hype, wired by the
+        // fts5 + sparse + contextualized + hype, wired by the
         // vector-route split above (addendum §3.8 W2).
         std::vector<retrieval::RrfFusedHit> fused =
             retrieval::FuseFivePathRrf(rrf_in, candidate_k);
@@ -615,10 +615,10 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             RankedChunk rc;
             rc.child_id = fh.child_id;
             rc.chunk_text = row.content_text;
-            // parent_text reverse-lookup (F34 ParentChunkStore) is a separate seam;
-            // left empty here per RETRIEVAL_TYPES_SPEC §1 ("empty until F34 wires in").
+            // parent_text reverse-lookup (ParentChunkStore) is a separate seam;
+            // left empty here per RETRIEVAL_TYPES_SPEC ("empty until the parent-chunk store wires in").
             // RankedChunk carries no parent_id field — ToResultItem sets ResultItem.
-            // parent_id to its default until that F34 reverse-lookup lands (D3.5+).
+            // parent_id to its default until that reverse-lookup lands.
             rc.score = fh.rrf_score;        // pre-rerank (multi-path RRF) score
             rc.rerank_score = fh.rrf_score;  // overwritten below when reranking
             rc.score_signals = row.score_signals;
@@ -653,7 +653,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             ranked.push_back(std::move(rc));
         }
 
-        // 4. Rerank (shared ScoreBatch + F02 RerankerScoreFusion ordering) when the
+        // 4. Rerank (shared ScoreBatch + RerankerScoreFusion ordering) when the
         //    request asks for it; otherwise keep the RRF order (RRF fallback path).
         if (ctx.rerank && !ranked.empty()) {
             std::vector<const char*> passages;
@@ -727,7 +727,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteDocRetrieval(
     };
 
     try {
-        // Acquire the NS façade (F05 Pool.Acquire, RAII-released at scope exit) — same
+        // Acquire the NS façade (Pool.Acquire, RAII-released at scope exit) — same
         // contract as the chunk path; a missing NS / store fault folds in-band as
         // CX_ERR_INDEX_CORRUPT (topic 2.4 partial success), never thrown.
         cortrix::resource::NamespaceFacade facade(pool_, namespace_id);

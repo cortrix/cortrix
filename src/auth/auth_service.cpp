@@ -21,7 +21,7 @@ namespace cortrix::auth {
 
 namespace {
 
-constexpr int kDisplayNameMax = 64;  // P08 §4.1 step 1 (display_name 1..64)
+constexpr int kDisplayNameMax = 64;  // Registration step 1 (display_name 1..64)
 
 int64_t NowSec() {
     return std::chrono::duration_cast<std::chrono::seconds>(
@@ -42,7 +42,7 @@ std::string RandomToken(const char* prefix) {
     return out;
 }
 
-// Does a user with this email already exist? (P08 §4.1 step 2.) Sets *ok=false on
+// Does a user with this email already exist? (registration step 2.) Sets *ok=false on
 // a query failure (caller maps to a transient/internal error).
 bool EmailExists(sqlite3* db, const std::string& email, bool* ok) {
     sqlite3_stmt* stmt = nullptr;
@@ -67,7 +67,7 @@ Result<UserInfo> AuthService::Register(const std::string& email,
         return AuthStatus(AuthErrorCode::kInternalError, "AuthService not initialized");
     }
 
-    // 1) Parameter validation (P08 §4.1 step 1). Distinct rules → CX_ERR_INVALID_REQUEST
+    // 1) Parameter validation (registration step 1). Distinct rules → CX_ERR_INVALID_REQUEST
     //    with the violated rule(s) in structured_data (§5.2 { rules_violated }).
     nlohmann::json rules = nlohmann::json::array();
     if (!ValidateEmail(email)) rules.push_back("email_format");
@@ -91,12 +91,12 @@ Result<UserInfo> AuthService::Register(const std::string& email,
     }
 
     // 3) Hash password + INSERT user, inside a transaction. The transaction seam
-    //    is where P09 TenantService::CreatePersonal(user_id, email) joins as
-    //    step 4 (atomic with the users INSERT, P08 §4.1 / §"P09 dependency notes"):
-    //    P08 holds the outermost tx; P09 reuses this same connection. That is
-    //    cross-Feature wiring → 🚩 D3.5 (P09 has no code yet). Standalone S2
+    //    is where TenantService::CreatePersonal(user_id, email) joins as
+    //    step 4 (atomic with the users INSERT, see the tenant dependency notes):
+    //    Registration holds the outermost tx; the tenant service reuses that same connection. That is
+    //    cross-component wiring, pending the tenant service (no code yet). Standalone
     //    commits the users row alone; the BEGIN/COMMIT is already here so wiring
-    //    P09 in later is a localized insert, not a restructure.
+    //    the tenant service in later is a localized insert, not a restructure.
     Result<std::string> hash = hasher_->Hash(password);
     if (!hash.ok()) return hash.status();
 
@@ -128,14 +128,14 @@ Result<UserInfo> AuthService::Register(const std::string& email,
     if (rc != SQLITE_DONE) {
         sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
         // UNIQUE(email) violation under concurrency → the registration race lost
-        // (P08 §5.1 "concurrent registration of the same email" → 409 same as the pre-check).
+        // ("concurrent registration of the same email" → 409 same as the pre-check).
         if (rc == SQLITE_CONSTRAINT) {
             return AuthStatus(AuthErrorCode::kEmailAlreadyExists, email);
         }
         return AuthStatus(AuthErrorCode::kServiceUnavailable, "users insert failed");
     }
 
-    // (4) → D3.5: P09 CreatePersonal here, in this same tx.
+    // (4) → TenantService::CreatePersonal here, in this same tx, once wired.
     // (5) email verification: only when config_.email_verification (default
     //     false). The send path is S5; standalone S2 leaves it off.
 
@@ -150,7 +150,7 @@ Result<UserInfo> AuthService::Register(const std::string& email,
     info.display_name = display_name;
     info.email_verified = false;
     info.created_at = now;
-    // info.tenants stays empty until the P09 wiring (D3.5).
+    // info.tenants stays empty until the tenant service is wired.
     return info;
 }
 
@@ -227,7 +227,7 @@ Result<AuthTokenPair> AuthService::Login(const std::string& email,
         return AuthStatus(AuthErrorCode::kInternalError, "AuthService not initialized");
     }
 
-    // 1) look up user (P08 §4.2 step 1). Nonexistent email → same error as wrong
+    // 1) look up user (login step 1). Nonexistent email → same error as wrong
     //    password (anti-enumeration, §5.1).
     sqlite3_stmt* stmt = nullptr;
     const char* sql =
@@ -258,7 +258,7 @@ Result<AuthTokenPair> AuthService::Login(const std::string& email,
 
     const int64_t now = NowSec();
 
-    // 2) account status / lockout (P08 §4.2 step 2).
+    // 2) account status / lockout (login step 2).
     if (status == "disabled") {
         return AuthStatus(AuthErrorCode::kAccountDisabled, "account disabled");
     }
@@ -281,7 +281,7 @@ Result<AuthTokenPair> AuthService::Login(const std::string& email,
         attempts = 0;
     }
 
-    // 3) verify password (P08 §4.2 step 3).
+    // 3) verify password (login step 3).
     Result<bool> verify = hasher_->Verify(password, password_hash);
     if (!verify.ok()) return verify.status();
     if (!verify.value()) {
@@ -305,18 +305,18 @@ Result<AuthTokenPair> AuthService::Login(const std::string& email,
         return AuthStatus(AuthErrorCode::kInvalidCredentials, "wrong password");
     }
 
-    // 4) success: reset attempts, issue tokens, persist refresh hash (P08 §4.2 step 4).
-    //    tenant_id/role come from P09 at D3.5; standalone S3 issues with the
+    // 4) success: reset attempts, issue tokens, persist refresh hash (login step 4).
+    //    tenant_id/role come from the tenant service once wired; for now it issues with the
     //    Personal-Tenant placeholder ("" tenant, "owner" role) so the JWT is
-    //    well-formed and the flow is testable. 🚩 D3.5: fill from P09.
+    //    well-formed and the flow is testable. TODO: fill from the tenant service.
     sqlite3_exec(db_,
                  ("UPDATE users SET login_attempts=0, locked_until=NULL, updated_at=" +
                   std::to_string(now) + " WHERE id='" + user_id + "'").c_str(),
                  nullptr, nullptr, nullptr);
 
     const std::string sid = RandomToken("sess_");
-    const std::string tenant_id;          // 🚩 D3.5 (P09 active tenant)
-    const std::string role = "owner";     // 🚩 D3.5 (P09 membership role)
+    const std::string tenant_id;          // TODO: active tenant from the tenant service
+    const std::string role = "owner";     // TODO: membership role from the tenant service
 
     Result<std::string> access = IssueAccessToken(user_id, email, tenant_id, role, sid);
     if (!access.ok()) return access.status();
@@ -332,7 +332,7 @@ Result<AuthTokenPair> AuthService::Login(const std::string& email,
     Result<std::string> refresh = JwtCodec::Encode(rp, sign_secret_);
     if (!refresh.ok()) return refresh.status();
 
-    // persist refresh_token hash (P08 §3.2 / §4.2 step 4).
+    // persist refresh_token hash (login step 4).
     sqlite3_stmt* ins = nullptr;
     const char* rsql =
         "INSERT INTO refresh_tokens(jti, user_id, token_hash, expires_at, revoked, created_at) "
@@ -414,7 +414,7 @@ Result<std::string> AuthService::RefreshAccessToken(const std::string& refresh_t
 
     const int64_t now = NowSec();
 
-    // 1) decode + verify signature/expiry (P08 §4.4 step 1). A bad/expired token
+    // 1) decode + verify signature/expiry (refresh step 1). A bad/expired token
     //    maps to the refresh-specific codes.
     Result<JwtPayload> decoded = JwtCodec::Decode(refresh_token, accept_secrets_, now);
     if (!decoded.ok()) {
@@ -428,12 +428,12 @@ Result<std::string> AuthService::RefreshAccessToken(const std::string& refresh_t
     }
     const JwtPayload& p = decoded.value();
 
-    // 2) must be a refresh token (P08 §4.4 step 2).
+    // 2) must be a refresh token (refresh step 2).
     if (!p.is_refresh()) {
         return AuthStatus(AuthErrorCode::kInvalidRefreshToken, "not a refresh token");
     }
 
-    // 3) look up the refresh_tokens row by jti (P08 §4.4 step 3-4).
+    // 3) look up the refresh_tokens row by jti (refresh step 3-4).
     sqlite3_stmt* stmt = nullptr;
     const char* sql =
         "SELECT token_hash, expires_at, revoked FROM refresh_tokens WHERE jti = ?";
@@ -457,12 +457,12 @@ Result<std::string> AuthService::RefreshAccessToken(const std::string& refresh_t
     if (revoked != 0) return AuthStatus(AuthErrorCode::kTokenRevoked, "refresh revoked");
     if (expires_at <= now) return AuthStatus(AuthErrorCode::kTokenExpired, "refresh expired");
 
-    // 4) token hash must match (P08 §4.4 step 4 — defends against a forged jti).
+    // 4) token hash must match (refresh step 4 — defends against a forged jti).
     if (HashToken(refresh_token) != stored_hash) {
         return AuthStatus(AuthErrorCode::kInvalidRefreshToken, "hash mismatch");
     }
 
-    // 5) user still active (P08 §4.4 step 5) + read CURRENT email/tenant/role.
+    // 5) user still active (refresh step 5) + read CURRENT email/tenant/role.
     sqlite3_stmt* us = nullptr;
     if (sqlite3_prepare_v2(db_, "SELECT email, status FROM users WHERE id = ?", -1,
                            &us, nullptr) != SQLITE_OK) {
@@ -481,15 +481,15 @@ Result<std::string> AuthService::RefreshAccessToken(const std::string& refresh_t
         return AuthStatus(AuthErrorCode::kAccountDisabled, "user not active");
     }
 
-    // 6) issue a new access token reusing the same sid (P08 §4.4 step 6). tenant/
-    //    role from P09 at D3.5 (placeholder here, same as Login).
+    // 6) issue a new access token reusing the same sid (refresh step 6). tenant/
+    //    role from the tenant service once wired (placeholder here, same as Login).
     return IssueAccessToken(p.sub, email, /*tenant_id=*/"", /*role=*/"owner", p.sid);
 }
 
 Result<AuthContext> AuthService::ValidateAccessToken(const std::string& access_token) {
     const int64_t now = NowSec();
 
-    // 1-2) decode + verify signature + expiry (P08 §4.3 step 2).
+    // 1-2) decode + verify signature + expiry (step 2).
     Result<JwtPayload> decoded = JwtCodec::Decode(access_token, accept_secrets_, now);
     if (!decoded.ok()) return decoded.status();  // kUnauthorized / kTokenExpired
     const JwtPayload& p = decoded.value();
@@ -581,7 +581,7 @@ Status AuthService::IssueVerificationCode(const std::string& email,
                                           const std::string& type) {
     if (db_ == nullptr) return AuthStatus(AuthErrorCode::kInternalError, "not initialized");
     const int64_t now = NowSec();
-    // 15-min TTL (P08 §3.3 / §2.7). Code stored plaintext (short-lived, single-use).
+    // 15-min TTL. Code stored plaintext (short-lived, single-use).
     const std::string code = GenerateVerificationCode();
     const int64_t expires_at = now + 15 * 60;
 
@@ -678,7 +678,7 @@ Status AuthService::ConfirmPasswordReset(const std::string& email,
     if (db_ == nullptr || hasher_ == nullptr) {
         return AuthStatus(AuthErrorCode::kInternalError, "not initialized");
     }
-    // New password complexity first (P08 §2.7 → CX_ERR_INVALID_REQUEST).
+    // New password complexity first (→ CX_ERR_INVALID_REQUEST).
     if (!ValidatePassword(new_password, config_.password_min_length)) {
         return AuthStatus(AuthErrorCode::kInvalidRequest, "rules_violated=password_complexity");
     }

@@ -24,10 +24,10 @@
 #include "cortrix/resource/ns_pool_metrics.h"
 #include "cortrix/store/f09_schema_provider.h"   // [D3.5-B] per-Unit framework provider
 #include "cortrix/store/f34_schema_provider.h"   // [A unified-blocks] child cols + parents + indexes
-#include "cortrix/spc_enricher/f03_schema_provider.h"  // [A unified-blocks] F03 enriched_score +3 + entities + FTS5 (§1.3.bis.3 #5)
-#include "cortrix/scoring/scoring_schema_provider.h"   // [A unified-blocks] F07 semantic_score col (§1.3.bis.3 #6, gap-fill 2026-06-08)
-#include "cortrix/doc_summary/f41_schema_provider.h"   // [A unified-blocks] F41 doc-level doc_fts5_index (§1.3.bis.3 #10)
-#include "cortrix/doc_summary/doc_fts5_index.h"        // F41 rollback cleanup for doc_fts5_index rows
+#include "cortrix/spc_enricher/f03_schema_provider.h"  // unified-blocks: enriched_score +3 + entities + FTS5
+#include "cortrix/scoring/scoring_schema_provider.h"   // unified-blocks: semantic_score col (gap-fill 2026-06-08)
+#include "cortrix/doc_summary/f41_schema_provider.h"   // unified-blocks: doc-level doc_fts5_index
+#include "cortrix/doc_summary/doc_fts5_index.h"        // doc-summary rollback cleanup for doc_fts5_index rows
 #include "cortrix/spc_enricher/f35_schema_provider.h"  // [A unified-blocks] contextualized/embedding cols
 #include "cortrix/spc_enricher/enrich_state_schema_provider.h"  // enrich_state sidecar (coverage SoT)
 #include "cortrix/retrieval/f40_schema_provider.h"     // [A unified-blocks] sparse_vec col + inverted index
@@ -47,7 +47,7 @@ int64_t NowMs() {
 // Emit one OBS_SPEC §6 structured log line (§10.2). The metric *recorder*
 // (cortrix_ns_pool_* counters/gauges/histograms, §10.1) is now implemented in
 // ns_pool_metrics.{h,cpp} (NsPoolMetrics::Instance(), fed from this file); only
-// registering it into the F24 `/metrics` scrape endpoint is still cross-Feature
+// registering it into the `/metrics` scrape endpoint is still cross-component
 // wiring → D3.5. The A-class values are also exposed via GetPoolStats() and the
 // durations via StartupReport. Standalone we emit both the structured-log half
 // (here) and the metric half (NsPoolMetrics feed points below).
@@ -60,7 +60,7 @@ void LogEvent(obs::LogLevel level, const std::string& event,
 
 // Per-Unit on-disk layout for standalone D3: <data_root>/<unit_id>/ holds the
 // index, pending.wal and store.db for that Unit. The real production scheme is
-// owned by F12 / deployment (how the filesystem is laid out per Unit) and is an
+// owned by the catalog / deployment (how the filesystem is laid out per Unit) and is an
 // integration concern → resolved at D3.5; standalone derives it deterministically
 // so the load path and its tests are reproducible.
 std::string UnitDataDir(const std::string& data_root, const std::string& unit_id) {
@@ -77,7 +77,7 @@ std::string UnitBlobDir(const std::string& unit_data_dir) {
     return unit_data_dir + "/blob";
 }
 
-// ── F25 Recover adapters (D3.5 C1, F05_NS_INTEGRATION §9.2) ──────────────────
+// ── Recover adapters ─────────────────────────────────────────────────────────
 // Two narrow, stateless probes the pool self-constructs per Unit so the
 // WriteCoordinator's three-way Recover consistency check has its metadata + blob
 // "does this exist?" answers WITHOUT requiring the façade layer (D-I4 unbroken).
@@ -227,7 +227,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
         }
     } observe_guard{ns_load_start};
 
-    // 1. Resolve the NS's active Unit via the F12 routers (§6.3 step 1).
+    // 1. Resolve the NS's active Unit via the catalog routers (step 1).
     auto unit_res = ns_router_->GetActiveUnit(ns_id);
     if (!unit_res.ok()) {
         return PoolStatus(PoolErrorCode::kNsLoadFailed,
@@ -236,7 +236,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
     const cortrix::catalog::UnitDescriptor& unit = unit_res.value();
     const std::string unit_dir = UnitDataDir(config_.data_root, unit.unit_id);
 
-    // 2. Open the F01 index handle (loads snapshot + WAL recovery) (§6.3 step 2).
+    // 2. Open the index handle (loads snapshot + WAL recovery) (step 2).
     auto idx_res = index_factory_->Open(unit_dir);
     if (!idx_res.ok()) {
         return PoolStatus(PoolErrorCode::kNsLoadFailed,
@@ -263,7 +263,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
     //     production (external-conn) path.
     {
         cortrix::store::F09SchemaProvider f09_provider;
-        cortrix::store::F34SchemaProvider f34_provider;  // [A unified-blocks] after F09 (needs blocks)
+        cortrix::store::F34SchemaProvider f34_provider;  // unified-blocks: after the block header (needs blocks)
         cortrix::spc::F03SchemaProvider f03_provider;    // [A unified-blocks] enriched_score +3 cols + entities + FTS5
         cortrix::scoring::ScoringSchemaProvider f07_provider;  // [A unified-blocks] semantic_score col (§1.3.bis.3 #6, gap-fill 2026-06-08)
         cortrix::spc::F35SchemaProvider f35_provider;    // [A unified-blocks] contextualized/embedding cols
@@ -274,7 +274,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
         unit_migrator.Register(&f09_provider);   // #3 framework: documents/blocks/blocks_fts
         unit_migrator.Register(&f34_provider);   // #4 child cols + parents + idx (incl idx_blocks_meta_doc)
         unit_migrator.Register(&f03_provider);   // #5 blocks +enriched_score/at/metadata + entities + FTS5
-        unit_migrator.Register(&f07_provider);   // #6 blocks +semantic_score + idx (ColumnExists guard → order-insensitive vs F03)
+        unit_migrator.Register(&f07_provider);   // #6 blocks +semantic_score + idx (ColumnExists guard → order-insensitive vs the enricher migration)
         unit_migrator.Register(&f35_provider);   // #7 blocks +embedding/contextualized_*
         unit_migrator.Register(&f41_provider);   // #10 doc_fts5_index (doc-level FTS5; doc_summary block reuses blocks)
         unit_migrator.Register(&f40_provider);   // #11 blocks +sparse_vec + sparse_inverted_index
@@ -286,7 +286,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
         }
     }
 
-    // 4. Self-construct the two narrow F25 Recover adapters (§9.2): metadata over
+    // 4. Self-construct the two narrow Recover adapters: metadata over
     //    the store.db conn, blob over <unit_dir>/blob. They go in the bundle so
     //    they outlive the coordinator that borrows them via raw pointers.
     auto meta_recover =
@@ -305,7 +305,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
         return PoolStatus(PoolErrorCode::kNsLoadFailed, "index_not_ivector_store");
     }
 
-    // 6. Construct the per-NS F25 WriteCoordinator over the three stores (factory
+    // 6. Construct the per-NS WriteCoordinator over the three stores (factory
     //    news + Init()s it; §6.3 step 3 / §9.3 step 6).
     auto coord_res = write_coord_factory_(unit_dir, config_.write_coord_config,
                                           vstore, meta_recover.get(),
@@ -363,7 +363,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
                         sqlite3_finalize(pstmt);
                     }
                 }
-                // [F44/F41 path validation] SPC now also syncs one F08-derived row
+                // [doc-summary path validation] SPC now also syncs one metadata-derived row
                 // into doc_fts5_index for doc-level fallback retrieval. Rollback must
                 // drop it by doc_id, otherwise failed ingest can leave a benchmark-visible
                 // orphan doc candidate with no committed blocks.
@@ -401,7 +401,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
 
         // 8c. Pre-warm <unit_dir>/memory.db (same D-I1.bis startup/connection
         //     split): ownership stays with the facade at request time (D-I4),
-        //     but the ONE-SHOT first-init — schema DDL + MEM04 column migration +
+        //     but the ONE-SHOT first-init — schema DDL + opt-out column migration +
         //     WAL conversion — runs here in the single-threaded assembly window.
         //     A fresh namespace's first concurrent requests used to race that
         //     init: the WAL conversion's exclusive lock hits SQLite's
@@ -511,7 +511,7 @@ Status DefaultNamespacePool::AdmitCreate(const std::string& namespace_id,
     if (already_resident) return Status::Ok();  // idempotent re-admit
 
     // Load the new NS into the pool (§5.1 "load new NS"). A load failure surfaces as
-    // CX_ERR_NS_LOAD_FAILED (F12 maps the non-quota case to CX_ERR_NS_POOL_INTERNAL).
+    // CX_ERR_NS_LOAD_FAILED (the catalog maps the non-quota case to CX_ERR_NS_POOL_INTERNAL).
     auto loaded = LoadOneNamespaceInner(namespace_id);
     if (!loaded.ok()) {
         return loaded.status();
@@ -607,7 +607,7 @@ void DefaultNamespacePool::Release(const std::string& namespace_id) {
 Status DefaultNamespacePool::EvictForDelete(const std::string& namespace_id) {
     std::unique_lock<std::shared_mutex> lock(pool_mutex_);
     auto it = bundles_.find(namespace_id);
-    // Idempotent: evicting an absent NS is Ok (the F12 rollback path may call this
+    // Idempotent: evicting an absent NS is Ok (the catalog rollback path may call this
     // for an NS that never made it into the pool, §5.2).
     if (it == bundles_.end()) return Status::Ok();
 
