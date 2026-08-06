@@ -28,7 +28,7 @@ nlohmann::json ToExplainJson(const QueryContext& ctx);
 ///   - A class (data integrity) — always present.
 ///   - B class (LLM-dependent decision path) — present (this node is only built when
 ///     the caller already decided `?explain=true`).
-///   - C class (anomaly debug: f37_signals / routing_misclassified) — present only
+///   - C class (anomaly debug: crag_signals / routing_misclassified) — present only
 ///     when `include_debug` is true, i.e. the corresponding capability ran AND
 ///     failed (SPEC §3 C-class rule). Otherwise the C fields are omitted so an Agent
 ///     does not mistake a default-valued signal for a real one.

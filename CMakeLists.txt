@@ -174,6 +174,7 @@ add_library(cortrix_core STATIC
     src/query/cross_ns_query_handler.cpp
     # --- cross-NS query live wiring ----------------------------
     src/query/live_single_unit_executor.cpp
+    src/query/query_explain_json.cpp
     src/query/query_wiring.cpp
     # --- RAG-Fusion ----------------
     src/query/rag_fusion_error.cpp

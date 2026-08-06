@@ -46,7 +46,7 @@ public:
     bool IsAvailable() const override;
 
     /// CRAG-specific (§6.3): classify `chunks` for `ctx.query` and write the verdict
-    /// fields back onto `ctx` (crag_verdict / crag_score / f37_signals /
+    /// fields back onto `ctx` (crag_verdict / crag_score / crag_signals /
     /// ambiguous_action_taken / web_fallback_triggered). Path handling per §6.3
     /// (correct: no-op return; ambiguous: mark action; incorrect: OBS counter +
     /// degrade). Does NOT decide skip — that is the QueryPipeline's job via

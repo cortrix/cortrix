@@ -61,8 +61,8 @@ TEST_F(CragContextTest, CorrectVerdictWritesFieldsNoAction) {
 
     EXPECT_EQ(ctx.crag_verdict, "correct");
     EXPECT_GE(ctx.crag_score, 0.7f);
-    EXPECT_FALSE(ctx.f37_signals.empty());
-    EXPECT_NE(ctx.f37_signals.find("top1"), ctx.f37_signals.end());
+    EXPECT_FALSE(ctx.crag_signals.empty());
+    EXPECT_NE(ctx.crag_signals.find("top1"), ctx.crag_signals.end());
     // Correct path: no ambiguous action, web fallback stays false.
     EXPECT_EQ(ctx.ambiguous_action_taken, "");
     EXPECT_FALSE(ctx.web_fallback_triggered);
@@ -189,7 +189,7 @@ TEST_F(CragContextTest, ExplainJsonContainsAll13FieldsSnakeCase) {
     ctx.routing_decision_source = "llm";
     ctx.crag_verdict = "correct";
     ctx.crag_score = 0.92f;
-    ctx.f37_signals = {{"top1", 0.95f}, {"median", 0.45f}};
+    ctx.crag_signals = {{"top1", 0.95f}, {"median", 0.45f}};
 
     nlohmann::json j = query::ToExplainJson(ctx);
 
@@ -197,14 +197,14 @@ TEST_F(CragContextTest, ExplainJsonContainsAll13FieldsSnakeCase) {
     for (const char* key : {"query", "ns_id", "multi_turn_context_warning",
                             "web_fallback_triggered", "routing_path", "complexity_score",
                             "routing_decision_source", "chat_path_triggered", "crag_verdict",
-                            "crag_score", "ambiguous_action_taken", "f37_signals",
+                            "crag_score", "ambiguous_action_taken", "crag_signals",
                             "routing_misclassified"}) {
         EXPECT_TRUE(j.contains(key)) << "missing key: " << key;
     }
     EXPECT_EQ(j["crag_verdict"], "correct");
     EXPECT_NEAR(j["crag_score"].get<float>(), 0.92f, 1e-4);
     EXPECT_EQ(j["routing_path"], "complex");
-    EXPECT_NEAR(j["f37_signals"]["top1"].get<float>(), 0.95f, 1e-4);
+    EXPECT_NEAR(j["crag_signals"]["top1"].get<float>(), 0.95f, 1e-4);
     // Default-valued fields are emitted, not omitted.
     EXPECT_EQ(j["ambiguous_action_taken"], "");
     EXPECT_EQ(j["web_fallback_triggered"], false);
@@ -220,7 +220,7 @@ TEST_F(CragContextTest, ExplainJsonRoundTripsAfterEvaluation) {
     nlohmann::json j = query::ToExplainJson(ctx);
     EXPECT_EQ(j["crag_verdict"], "ambiguous");
     EXPECT_EQ(j["ambiguous_action_taken"], "filtered_top_n_by_2");
-    EXPECT_TRUE(j["f37_signals"].contains("top1"));
+    EXPECT_TRUE(j["crag_signals"].contains("top1"));
 }
 
 }  // namespace

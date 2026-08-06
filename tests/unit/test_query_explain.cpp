@@ -115,19 +115,19 @@ TEST(QueryExplainNodeTest, AlwaysEmitsAandBClass) {
 TEST(QueryExplainNodeTest, OmitsCClassUnlessDebug) {
     query::QueryContext ctx;
     ctx.query = "q";
-    ctx.f37_signals = {{"top1", 0.9f}};  // a value exists, but must stay hidden
+    ctx.crag_signals = {{"top1", 0.9f}};  // a value exists, but must stay hidden
 
-    // include_debug=false → C class (f37_signals / routing_misclassified) omitted so
+    // include_debug=false → C class (crag_signals / routing_misclassified) omitted so
     // an Agent never mistakes a default/leftover signal for a triggered one (SPEC §3).
     nlohmann::json off = query::BuildExplainNode(ctx, /*include_debug=*/false);
-    EXPECT_FALSE(off.contains("f37_signals"));
+    EXPECT_FALSE(off.contains("crag_signals"));
     EXPECT_FALSE(off.contains("routing_misclassified"));
 
     // include_debug=true → C class present.
     nlohmann::json on = query::BuildExplainNode(ctx, /*include_debug=*/true);
-    EXPECT_TRUE(on.contains("f37_signals"));
+    EXPECT_TRUE(on.contains("crag_signals"));
     EXPECT_TRUE(on.contains("routing_misclassified"));
-    EXPECT_NEAR(on["f37_signals"]["top1"].get<float>(), 0.9f, 1e-4);
+    EXPECT_NEAR(on["crag_signals"]["top1"].get<float>(), 0.9f, 1e-4);
 }
 
 TEST(QueryExplainNodeTest, DefaultCragFieldsEmittedNotOmitted) {

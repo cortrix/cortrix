@@ -244,7 +244,7 @@ void CragEvaluator::EvaluateAndUpdateContext(
     // fields, never the router's (write-failure isolation).
     ctx.crag_verdict = result.label;
     ctx.crag_score = result.score;
-    ctx.f37_signals = result.raw_signals;
+    ctx.crag_signals = result.raw_signals;
 
     // §10 metric: one evaluation_total increment per verdict (enum label only).
     CragMetrics::Instance().RecordEvaluation(DecisionForVerdict(result.label));

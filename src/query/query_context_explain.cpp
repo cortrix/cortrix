@@ -23,7 +23,7 @@ nlohmann::json ToExplainJson(const QueryContext& ctx) {
     j["ambiguous_action_taken"] = ctx.ambiguous_action_taken;
 
     // --- C class (anomaly debug; only when the capability ran + failed / explain) ---
-    j["f37_signals"] = ctx.f37_signals;        // map<string,float> → JSON object
+    j["crag_signals"] = ctx.crag_signals;        // map<string,float> → JSON object
     j["routing_misclassified"] = ctx.routing_misclassified;
 
     return j;
@@ -53,7 +53,7 @@ nlohmann::json BuildExplainNode(const QueryContext& ctx, bool include_debug) {
     // SPEC §3 C-class rule: do not surface these unless explicitly triggered, so a
     // default-valued signal is never mistaken for a real one.
     if (include_debug) {
-        j["f37_signals"] = ctx.f37_signals;        // map<string,float> → JSON object
+        j["crag_signals"] = ctx.crag_signals;        // map<string,float> → JSON object
         j["routing_misclassified"] = ctx.routing_misclassified;
     }
 

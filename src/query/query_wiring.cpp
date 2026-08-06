@@ -21,6 +21,7 @@
 #include "cortrix/query/onnx_complexity_backend.h"
 #include "cortrix/query/permission_service.h"
 #include "cortrix/query/query_complexity_classifier.h"
+#include "cortrix/query/query_explain_json.h"
 #include "cortrix/query/query_context.h"
 #include "cortrix/query/query_context_explain.h"
 #include "cortrix/query/query_router_metrics.h"
@@ -950,55 +951,13 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                             }
                         }
                         if (use_rag_fusion) {
-                            const auto es = rag_fusion->GetExplainState();
-                            json rf = {
-                                {"active", es.active},
-                                {"feature_id", "F36"},
-                                {"reason", es.reason},
-                                {"variant_count", es.variant_count},
-                                {"degraded", es.degraded},
-                            };
-                            if (!es.variants_used.empty()) {
-                                rf["variants_used"] = es.variants_used;
-                            }
-                            if (!es.degrade_reason.empty()) {
-                                rf["degrade_reason"] = es.degrade_reason;
-                            }
-                            if (!es.degrade_detail.empty()) {
-                                rf["degrade_detail"] = es.degrade_detail;
-                            }
-                            if (es.llm_latency_ms.has_value()) {
-                                rf["llm_latency_ms"] = *es.llm_latency_ms;
-                            }
                             out["explain"]["llm_dependent_features"]["rag_fusion"] =
-                                std::move(rf);
+                                BuildRagFusionExplain(rag_fusion->GetExplainState());
                         }
                         if (use_llm_rerank) {
                             // Listwise rerank explain — B-class, explain-only.
-                            json lr = {
-                                {"active", lr_es.active},
-                                {"feature_id", "F36-LR"},
-                                {"reason", lr_es.reason},
-                                {"top_n_effective", lr_es.top_n_effective},
-                                {"order_changed", lr_es.order_changed},
-                                {"degraded", lr_es.degraded},
-                            };
-                            if (!lr_es.model_used.empty()) {
-                                lr["model"] = lr_es.model_used;
-                            }
-                            if (!lr_es.degrade_reason.empty()) {
-                                lr["degrade_reason"] = lr_es.degrade_reason;
-                            }
-                            if (!lr_es.degrade_detail.empty()) {
-                                lr["degrade_detail"] = lr_es.degrade_detail;
-                            }
-                            if (lr_es.active) {
-                                lr["llm_latency_ms"] = lr_es.llm_latency_ms;
-                                lr["llm_calls"] = lr_es.llm_calls;
-                                lr["votes_ok"] = lr_es.votes_ok;
-                            }
                             out["explain"]["llm_dependent_features"]["llm_rerank"] =
-                                std::move(lr);
+                                BuildListwiseRerankExplain(lr_es);
                         }
                     }
                     res.status = 200;

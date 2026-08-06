@@ -84,7 +84,7 @@ struct QueryContext {
     // --- CRAG writes (evaluation) ---
     std::string crag_verdict;            ///< "correct"/"ambiguous"/"incorrect"/"correct_fallback_classifier_failed"
     float crag_score = 0.0f;             ///< softmax confidence
-    std::map<std::string, float> f37_signals;  ///< top1/median/std/high_score_ratio/...
+    std::map<std::string, float> crag_signals;  ///< top1/median/std/high_score_ratio/...
     std::string ambiguous_action_taken;  ///< "filtered_top_n_by_2" / "marked_meta_only"
     bool web_fallback_triggered = false; ///< Phase 1 always false (Phase 2 Web fallback → true)
     bool routing_misclassified = false;  ///< Phase 1 always false (Phase 2 bidirectional feedback → true)
