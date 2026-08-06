@@ -99,7 +99,7 @@ TEST(SemanticScorerAssignTest, ReassignOverwrites) {
 
 // QA regression: AssignInitialScore must feed the §6 assign_duration histogram
 // (it was defined/rendered but never observed). Lock the wiring: each call increments
-// cortrix_f07_assign_duration_seconds_count by 1.
+// cortrix_scoring_assign_duration_seconds_count by 1.
 TEST(SemanticScorerAssignTest, AssignFeedsDurationHistogram) {
     ScoringMetrics::Instance().ResetForTest();
     SemanticScorer scorer;
@@ -109,7 +109,7 @@ TEST(SemanticScorerAssignTest, AssignFeedsDurationHistogram) {
     scorer.AssignInitialScore(h, score, Input("paddleocr", "null"));
 
     const std::string out = ScoringMetrics::Instance().Render();
-    EXPECT_NE(out.find("cortrix_f07_assign_duration_seconds_count 2"), std::string::npos)
+    EXPECT_NE(out.find("cortrix_scoring_assign_duration_seconds_count 2"), std::string::npos)
         << out;
     ScoringMetrics::Instance().ResetForTest();
 }

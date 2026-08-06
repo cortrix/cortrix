@@ -5,7 +5,7 @@
 namespace cortrix::metadata {
 
 /// Metadata-block observability metrics (subsystem `f08`).
-/// Naming `cortrix_f08_<metric>_<unit>`. Self-contained dependency-free recorder
+/// Naming `cortrix_metadata_<metric>_<unit>`. Self-contained dependency-free recorder
 /// (same pattern as ImportMetrics / RerankerMetrics / OnnxMetrics); registering into
 /// the `/metrics` scrape endpoint is wired separately.
 ///
@@ -21,33 +21,33 @@ namespace cortrix::metadata {
 /// per-NS data goes through the OBS_SPEC §3.4 system stats API, not metric labels.
 class MetadataMetrics {
 public:
-    /// status label for cortrix_f08_block_generated_total (detailed design §5.bis).
+    /// status label for cortrix_metadata_block_generated_total (detailed design §5.bis).
     enum class GenStatus { kSuccess = 0, kPartialWarning, kFailed };
-    /// source label for cortrix_f08_block_generated_total.
+    /// source label for cortrix_metadata_block_generated_total.
     enum class GenSource { kApiUpload = 0, kBatchImport, kReUpload };
 
     /// Process-wide instance (metrics are global counters/gauges).
     static MetadataMetrics& Instance();
 
-    // cortrix_f08_block_generated_total (Counter, labels: status, source).
+    // cortrix_metadata_block_generated_total (Counter, labels: status, source).
     void RecordGenerated(GenStatus status, GenSource source);
     uint64_t GeneratedCount(GenStatus status, GenSource source) const;
 
-    // cortrix_f08_block_count_current (Gauge — row count of the metadata_blocks table). Set by the
+    // cortrix_metadata_block_count_current (Gauge — row count of the metadata_blocks table). Set by the
     // store layer; standalone tests drive it directly.
     void SetBlockCount(int64_t count);
     int64_t BlockCount() const;
 
-    // cortrix_f08_field_missing_total (Counter, label: field_name — controlled enum,
+    // cortrix_metadata_field_missing_total (Counter, label: field_name — controlled enum,
     // a subset of v1_immutable_fields). field_name is taken verbatim; the generator only
     // passes schema field names, so cardinality stays bounded.
     void RecordFieldMissing(const std::string& field_name);
     uint64_t FieldMissingCount(const std::string& field_name) const;
 
-    // cortrix_f08_metadata_size_bytes (Histogram — per-entry byte-size distribution of metadata_json).
+    // cortrix_metadata_size_bytes (Histogram — per-entry byte-size distribution of metadata_json).
     void ObserveMetadataSize(double bytes);
 
-    // cortrix_f08_block_generate_duration_seconds (Histogram — total time for block_text assembly +
+    // cortrix_metadata_block_generate_duration_seconds (Histogram — total time for block_text assembly +
     // JSON serialization [+ SQLite insert in D3.5]; §5.bis SLA P95 ≤ 50ms).
     void ObserveGenerateDuration(double seconds);
 

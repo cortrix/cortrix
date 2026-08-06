@@ -46,12 +46,12 @@ TEST_F(ScoringMetricsTest, RenderEmitsStableMetricNames) {
     m.ObserveAssignDuration(0.0005);
 
     std::string out = m.Render();
-    EXPECT_NE(out.find("cortrix_f07_score_total{level=\"2\"} 1"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_f07_score_total{level=\"0\"} 0"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_f07_anomalous_blocks_total 1"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_f07_final_score_total 1"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_f07_assign_duration_seconds_count 1"), std::string::npos);
-    EXPECT_NE(out.find("# TYPE cortrix_f07_score_total counter"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_scoring_score_total{level=\"2\"} 1"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_scoring_score_total{level=\"0\"} 0"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_scoring_anomalous_blocks_total 1"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_scoring_final_score_total 1"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_scoring_assign_duration_seconds_count 1"), std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_scoring_score_total counter"), std::string::npos);
 
     // No high-cardinality ns_id label (OBS_SPEC §3.2 / semantic score C1 removed it).
     EXPECT_EQ(out.find("ns_id=\""), std::string::npos);

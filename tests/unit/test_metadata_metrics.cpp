@@ -60,16 +60,16 @@ TEST_F(MetadataMetricsTest, RenderEmitsStableMetricNames) {
     m.ObserveGenerateDuration(0.012);
 
     std::string out = m.Render();
-    EXPECT_NE(out.find("cortrix_f08_block_count_current 3"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_f08_block_generated_total{status=\"success\",source=\"api_upload\"} 1"),
+    EXPECT_NE(out.find("cortrix_metadata_block_count_current 3"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_metadata_block_generated_total{status=\"success\",source=\"api_upload\"} 1"),
               std::string::npos);
-    EXPECT_NE(out.find("cortrix_f08_field_missing_total{field_name=\"page_count\"} 1"),
+    EXPECT_NE(out.find("cortrix_metadata_field_missing_total{field_name=\"page_count\"} 1"),
               std::string::npos);
-    EXPECT_NE(out.find("cortrix_f08_metadata_size_bytes_bucket{le=\"2048\"}"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_f08_block_generate_duration_seconds_count 1"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_metadata_size_bytes_bucket{le=\"2048\"}"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_metadata_block_generate_duration_seconds_count 1"), std::string::npos);
     // HELP/TYPE lines present (Prometheus scrape contract).
-    EXPECT_NE(out.find("# TYPE cortrix_f08_block_generated_total counter"), std::string::npos);
-    EXPECT_NE(out.find("# TYPE cortrix_f08_block_count_current gauge"), std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_metadata_block_generated_total counter"), std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_metadata_block_count_current gauge"), std::string::npos);
 
     // High-cardinality labels are forbidden (OBS_SPEC §3.2) — no doc_id / ns_id labels.
     EXPECT_EQ(out.find("doc_id=\""), std::string::npos);
@@ -82,8 +82,8 @@ TEST_F(MetadataMetricsTest, HistogramSumAndCountTrack) {
     m.ObserveGenerateDuration(0.006);
     std::string out = m.Render();
     // 2 observations, smallest bucket le=0.005 catches the 0.004 one.
-    EXPECT_NE(out.find("cortrix_f08_block_generate_duration_seconds_count 2"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_f08_block_generate_duration_seconds_bucket{le=\"0.005\"} 1"),
+    EXPECT_NE(out.find("cortrix_metadata_block_generate_duration_seconds_count 2"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_metadata_block_generate_duration_seconds_bucket{le=\"0.005\"} 1"),
               std::string::npos);
 }
 

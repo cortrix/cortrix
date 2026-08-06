@@ -97,65 +97,65 @@ uint64_t MemoryIsolationMetrics::MatchScopeExcludedCount(Reason reason) const {
 std::string MemoryIsolationMetrics::RenderOpenMetrics() const {
     std::ostringstream os;
 
-    // cortrix_mem05_isolation_check_total (counter, labels: result, action)
-    os << "# HELP cortrix_mem05_isolation_check_total Per-user isolation checks by result and action.\n";
-    os << "# TYPE cortrix_mem05_isolation_check_total counter\n";
+    // cortrix_memory_isolation_check_total (counter, labels: result, action)
+    os << "# HELP cortrix_memory_isolation_check_total Per-user isolation checks by result and action.\n";
+    os << "# TYPE cortrix_memory_isolation_check_total counter\n";
     for (int r = 0; r < kCheckResultCount; ++r) {
         for (int a = 0; a < kActionCount; ++a) {
-            os << "cortrix_mem05_isolation_check_total{result=\""
+            os << "cortrix_memory_isolation_check_total{result=\""
                << ToString(static_cast<CheckResult>(r)) << "\",action=\""
                << ToString(static_cast<Action>(a)) << "\"} "
                << isolation_check_[r][a].load(std::memory_order_relaxed) << "\n";
         }
     }
 
-    // cortrix_mem05_isolation_violation_total (counter, labels: action, reason)
-    os << "# HELP cortrix_mem05_isolation_violation_total Cross-user access denials (safety alert).\n";
-    os << "# TYPE cortrix_mem05_isolation_violation_total counter\n";
+    // cortrix_memory_isolation_violation_total (counter, labels: action, reason)
+    os << "# HELP cortrix_memory_isolation_violation_total Cross-user access denials (safety alert).\n";
+    os << "# TYPE cortrix_memory_isolation_violation_total counter\n";
     for (int a = 0; a < kActionCount; ++a) {
         for (int rn = 0; rn < kReasonCount; ++rn) {
-            os << "cortrix_mem05_isolation_violation_total{action=\""
+            os << "cortrix_memory_isolation_violation_total{action=\""
                << ToString(static_cast<Action>(a)) << "\",reason=\""
                << ToString(static_cast<Reason>(rn)) << "\"} "
                << isolation_violation_[a][rn].load(std::memory_order_relaxed) << "\n";
         }
     }
 
-    // cortrix_mem05_quota_exceeded_total (counter, label: quota_type)
-    os << "# HELP cortrix_mem05_quota_exceeded_total User quota-exceeded events by quota_type.\n";
-    os << "# TYPE cortrix_mem05_quota_exceeded_total counter\n";
+    // cortrix_memory_isolation_quota_exceeded_total (counter, label: quota_type)
+    os << "# HELP cortrix_memory_isolation_quota_exceeded_total User quota-exceeded events by quota_type.\n";
+    os << "# TYPE cortrix_memory_isolation_quota_exceeded_total counter\n";
     for (int q = 0; q < kQuotaTypeCount; ++q) {
-        os << "cortrix_mem05_quota_exceeded_total{quota_type=\""
+        os << "cortrix_memory_isolation_quota_exceeded_total{quota_type=\""
            << ToString(static_cast<QuotaType>(q)) << "\"} "
            << quota_exceeded_[q].load(std::memory_order_relaxed) << "\n";
     }
 
-    // cortrix_mem05_quota_usage_ratio (gauge, label: quota_type)
-    os << "# HELP cortrix_mem05_quota_usage_ratio Current quota usage ratio (0-1) by quota_type.\n";
-    os << "# TYPE cortrix_mem05_quota_usage_ratio gauge\n";
+    // cortrix_memory_isolation_quota_usage_ratio (gauge, label: quota_type)
+    os << "# HELP cortrix_memory_isolation_quota_usage_ratio Current quota usage ratio (0-1) by quota_type.\n";
+    os << "# TYPE cortrix_memory_isolation_quota_usage_ratio gauge\n";
     for (int q = 0; q < kQuotaTypeCount; ++q) {
-        os << "cortrix_mem05_quota_usage_ratio{quota_type=\""
+        os << "cortrix_memory_isolation_quota_usage_ratio{quota_type=\""
            << ToString(static_cast<QuotaType>(q)) << "\"} "
            << LoadDouble(quota_usage_ratio_bits_[q]) << "\n";
     }
 
-    // cortrix_mem05_user_session_count (gauge, no label)
-    os << "# HELP cortrix_mem05_user_session_count Active user-session total.\n";
-    os << "# TYPE cortrix_mem05_user_session_count gauge\n";
-    os << "cortrix_mem05_user_session_count "
+    // cortrix_memory_isolation_user_session_count (gauge, no label)
+    os << "# HELP cortrix_memory_isolation_user_session_count Active user-session total.\n";
+    os << "# TYPE cortrix_memory_isolation_user_session_count gauge\n";
+    os << "cortrix_memory_isolation_user_session_count "
        << user_session_count_.load(std::memory_order_relaxed) << "\n";
 
-    // cortrix_mem05_default_user_used_total (counter, no label)
-    os << "# HELP cortrix_mem05_default_user_used_total CE no-auth default user usage count.\n";
-    os << "# TYPE cortrix_mem05_default_user_used_total counter\n";
-    os << "cortrix_mem05_default_user_used_total "
+    // cortrix_memory_isolation_default_user_used_total (counter, no label)
+    os << "# HELP cortrix_memory_isolation_default_user_used_total CE no-auth default user usage count.\n";
+    os << "# TYPE cortrix_memory_isolation_default_user_used_total counter\n";
+    os << "cortrix_memory_isolation_default_user_used_total "
        << default_user_used_.load(std::memory_order_relaxed) << "\n";
 
-    // cortrix_mem05_match_scope_excluded_total (counter, label: reason)
-    os << "# HELP cortrix_mem05_match_scope_excluded_total MatchScope pre-filter exclusions by reason.\n";
-    os << "# TYPE cortrix_mem05_match_scope_excluded_total counter\n";
+    // cortrix_memory_isolation_match_scope_excluded_total (counter, label: reason)
+    os << "# HELP cortrix_memory_isolation_match_scope_excluded_total MatchScope pre-filter exclusions by reason.\n";
+    os << "# TYPE cortrix_memory_isolation_match_scope_excluded_total counter\n";
     for (int rn = 0; rn < kReasonCount; ++rn) {
-        os << "cortrix_mem05_match_scope_excluded_total{reason=\""
+        os << "cortrix_memory_isolation_match_scope_excluded_total{reason=\""
            << ToString(static_cast<Reason>(rn)) << "\"} "
            << match_scope_excluded_[rn].load(std::memory_order_relaxed) << "\n";
     }

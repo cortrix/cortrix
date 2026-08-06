@@ -419,22 +419,22 @@ TEST_F(ScoringFx, AssignDurationHistogramRender) {
     m().ObserveAssignDuration(0.01);
     m().ObserveAssignDuration(99.0);  // above largest -> +Inf
     std::string out = m().Render();
-    EXPECT_NE(out.find("# TYPE cortrix_f07_assign_duration_seconds histogram"),
+    EXPECT_NE(out.find("# TYPE cortrix_scoring_assign_duration_seconds histogram"),
               std::string::npos);
 }
 
 TEST_F(ScoringFx, RenderEmitsAllFiveLevelsAndHelpType) {
     m().RecordScore(2);
     std::string out = m().Render();
-    EXPECT_NE(out.find("# TYPE cortrix_f07_score_total counter"),
+    EXPECT_NE(out.find("# TYPE cortrix_scoring_score_total counter"),
               std::string::npos);
     // all 5 level series emitted even when zero.
     for (int lv = 0; lv <= 4; ++lv) {
-        EXPECT_NE(out.find("cortrix_f07_score_total{level=\"" +
+        EXPECT_NE(out.find("cortrix_scoring_score_total{level=\"" +
                            std::to_string(lv) + "\"}"),
                   std::string::npos);
     }
-    EXPECT_NE(out.find("# TYPE cortrix_f07_error_total counter"),
+    EXPECT_NE(out.find("# TYPE cortrix_scoring_error_total counter"),
               std::string::npos);
     EXPECT_EQ(out.find("ns_id="), std::string::npos);
 }

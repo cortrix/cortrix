@@ -72,7 +72,7 @@ public:
     bool Push(const InteractionLog& interaction,
               const observability::TraceContext* ctx = nullptr);
 
-    /// Current queue depth (also mirrored to cortrix_mem02_queue_depth on push/pop).
+    /// Current queue depth (also mirrored to cortrix_memory_extract_queue_depth on push/pop).
     size_t Depth() const;
 
     /// Start `worker_count` worker threads draining the queue through `handler`.

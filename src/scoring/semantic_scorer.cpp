@@ -13,7 +13,7 @@ void SemanticScorer::AssignInitialScore(cortrix::cortrix_block_header_t& header,
                                         float& semantic_score,
                                         const ScoringInput& input,
                                         const observability::TraceContext* /*ctx*/) {
-    // §6 cortrix_f07_assign_duration_seconds — time the scoring work (steady_clock,
+    // §6 cortrix_scoring_assign_duration_seconds — time the scoring work (steady_clock,
     // immune to wall-clock jumps). QA finding: the histogram was defined but never fed.
     const auto start = std::chrono::steady_clock::now();
 

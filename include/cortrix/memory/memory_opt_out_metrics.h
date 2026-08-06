@@ -7,11 +7,11 @@
 namespace cortrix::memory::immunity {
 
 /// The `mem04` subsystem metrics (observability naming,
-/// naming `cortrix_mem04_<event>_<unit>`). Mirrors the memory_metrics.h /
+/// naming `cortrix_memory_opt_out_<event>_<unit>`). Mirrors the memory_metrics.h /
 /// memory_extract_metrics.h template (process-wide singleton, atomic counters, OpenMetrics
 /// renderer).
 ///
-/// 🚨 Subsystem name: the metric prefix is `cortrix_mem04_*` (a "gray" subsystem in
+/// 🚨 Subsystem name: the metric prefix is `cortrix_memory_opt_out_*` (a "gray" subsystem in
 /// OBS_SPEC §2.3 / ARCH §1.7.1). The rename to `memory_immunity` is the Phase-2
 /// TD-OBS-SUBSYSTEM-RENAME backlog item — NOT done here.
 ///
@@ -28,9 +28,9 @@ namespace cortrix::memory::immunity {
 /// produces what the server will serve.
 ///
 /// §5.5 metric schema (3 rows, all counters):
-///   cortrix_mem04_opt_out_total          counter {triggered_by}
-///   cortrix_mem04_opt_out_revoke_total   counter {}
-///   cortrix_mem04_extract_skipped_total  counter {}  (no label — V3 decision 10)
+///   cortrix_memory_opt_out_total          counter {triggered_by}
+///   cortrix_memory_opt_out_revoke_total   counter {}
+///   cortrix_memory_opt_out_extract_skipped_total  counter {}  (no label — V3 decision 10)
 class MemoryOptOutMetrics {
 public:
     /// triggered_by label for opt_out_total (§5.5). Mirrors the `opted_out_by`
@@ -46,15 +46,15 @@ public:
     /// Process-wide instance (metrics are global counters).
     static MemoryOptOutMetrics& Instance();
 
-    // --- cortrix_mem04_opt_out_total (Counter, label: triggered_by) ---
+    // --- cortrix_memory_opt_out_total (Counter, label: triggered_by) ---
     void RecordOptOut(TriggeredBy triggered_by);
     uint64_t OptOutCount(TriggeredBy triggered_by) const;
 
-    // --- cortrix_mem04_opt_out_revoke_total (Counter) ---
+    // --- cortrix_memory_opt_out_revoke_total (Counter) ---
     void RecordOptOutRevoke();
     uint64_t OptOutRevokeCount() const;
 
-    // --- cortrix_mem04_extract_skipped_total (Counter) ---
+    // --- cortrix_memory_opt_out_extract_skipped_total (Counter) ---
     // Incremented when the extraction worker skips an opted-out session.
     void RecordExtractSkipped();
     uint64_t ExtractSkippedCount() const;

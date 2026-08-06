@@ -4,7 +4,7 @@
 
 #include "cortrix/memory/memory_isolation_metrics.h"
 
-// MET-09 coverage: the 7 cortrix_mem05_* metrics — counters/gauges
+// MET-09 coverage: the 7 cortrix_memory_isolation_* metrics — counters/gauges
 // recording + the OpenMetrics renderer + label-enum discipline (OBS_SPEC §3.2 no
 // high-cardinality labels, esp. no user_id).
 namespace cortrix::memory {
@@ -89,20 +89,20 @@ TEST_F(MemoryIsolationMetricsTest, RenderOpenMetricsHasAllSevenMetricsAndTypes) 
 
     std::string out = M().RenderOpenMetrics();
     // All 7 metric names present.
-    EXPECT_NE(out.find("cortrix_mem05_isolation_check_total"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem05_isolation_violation_total"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem05_quota_exceeded_total"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem05_quota_usage_ratio"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem05_user_session_count"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem05_default_user_used_total"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem05_match_scope_excluded_total"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_isolation_check_total"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_isolation_violation_total"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_isolation_quota_exceeded_total"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_isolation_quota_usage_ratio"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_isolation_user_session_count"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_isolation_default_user_used_total"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_isolation_match_scope_excluded_total"), std::string::npos);
     // TYPE lines (counter / gauge mix).
-    EXPECT_NE(out.find("# TYPE cortrix_mem05_isolation_check_total counter"), std::string::npos);
-    EXPECT_NE(out.find("# TYPE cortrix_mem05_isolation_violation_total counter"), std::string::npos);
-    EXPECT_NE(out.find("# TYPE cortrix_mem05_quota_usage_ratio gauge"), std::string::npos);
-    EXPECT_NE(out.find("# TYPE cortrix_mem05_user_session_count gauge"), std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_memory_isolation_check_total counter"), std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_memory_isolation_violation_total counter"), std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_memory_isolation_quota_usage_ratio gauge"), std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_memory_isolation_user_session_count gauge"), std::string::npos);
     // Safety alert metric exposes its labels.
-    EXPECT_NE(out.find("cortrix_mem05_isolation_violation_total{action=\"delete\",reason=\"mismatch\"}"),
+    EXPECT_NE(out.find("cortrix_memory_isolation_violation_total{action=\"delete\",reason=\"mismatch\"}"),
               std::string::npos);
 }
 

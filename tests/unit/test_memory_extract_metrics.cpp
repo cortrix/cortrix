@@ -4,7 +4,7 @@
 
 #include "cortrix/memory/memory_extract_metrics.h"
 
-// S9 coverage: the 6 cortrix_mem02_* metrics (§5.4.1) — counters/gauge/histogram
+// S9 coverage: the 6 cortrix_memory_extract_* metrics (§5.4.1) — counters/gauge/histogram
 // recording + the OpenMetrics renderer + label-enum discipline (§5.4.2 no
 // high-cardinality labels).
 namespace cortrix::memory {
@@ -78,23 +78,23 @@ TEST_F(MemoryExtractMetricsTest, RenderOpenMetricsHasAllSixMetricsAndTypes) {
 
     std::string out = M().RenderOpenMetrics();
     // All 6 metric names present.
-    EXPECT_NE(out.find("cortrix_mem02_extract_total"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem02_extract_duration_seconds"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem02_queue_depth"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem02_llm_tokens_total"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem02_contradictions_found_total"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem02_invalidations_total"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_extract_total"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_extract_duration_seconds"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_extract_queue_depth"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_extract_llm_tokens_total"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_extract_contradictions_found_total"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_extract_invalidations_total"), std::string::npos);
     // TYPE lines present.
-    EXPECT_NE(out.find("# TYPE cortrix_mem02_extract_total counter"), std::string::npos);
-    EXPECT_NE(out.find("# TYPE cortrix_mem02_queue_depth gauge"), std::string::npos);
-    EXPECT_NE(out.find("# TYPE cortrix_mem02_extract_duration_seconds histogram"),
+    EXPECT_NE(out.find("# TYPE cortrix_memory_extract_total counter"), std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_memory_extract_queue_depth gauge"), std::string::npos);
+    EXPECT_NE(out.find("# TYPE cortrix_memory_extract_duration_seconds histogram"),
               std::string::npos);
     // A histogram MUST render cumulative _bucket{le=...} lines incl +Inf (not just
     // _sum/_count) to be valid OpenMetrics.
-    EXPECT_NE(out.find("cortrix_mem02_extract_duration_seconds_bucket{"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_extract_duration_seconds_bucket{"), std::string::npos);
     EXPECT_NE(out.find("le=\"+Inf\""), std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem02_extract_duration_seconds_sum{"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem02_extract_duration_seconds_count{"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_extract_duration_seconds_sum{"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_memory_extract_duration_seconds_count{"), std::string::npos);
 }
 
 // The duration histogram renders well-formed cumulative buckets: every declared
@@ -109,7 +109,7 @@ TEST_F(MemoryExtractMetricsTest, ExtractDurationHistogramBucketsAreCumulativeAnd
     std::string out = M().RenderOpenMetrics();
 
     const std::string prefix =
-        "cortrix_mem02_extract_duration_seconds_bucket{model=\"gpt-4o-mini\",le=\"";
+        "cortrix_memory_extract_duration_seconds_bucket{model=\"gpt-4o-mini\",le=\"";
     auto bucket_value = [&](const std::string& le) -> long {
         std::string key = prefix + le + "\"} ";
         size_t p = out.find(key);
@@ -131,7 +131,7 @@ TEST_F(MemoryExtractMetricsTest, ExtractDurationHistogramBucketsAreCumulativeAnd
     EXPECT_EQ(bucket_value("2"), 3);     // + 1.5
     EXPECT_EQ(bucket_value("30"), 3);    // 40s only in +Inf
     EXPECT_EQ(bucket_value("+Inf"), 4);  // +Inf == total observations
-    EXPECT_NE(out.find("cortrix_mem02_extract_duration_seconds_count{model=\"gpt-4o-mini\"} 4"),
+    EXPECT_NE(out.find("cortrix_memory_extract_duration_seconds_count{model=\"gpt-4o-mini\"} 4"),
               std::string::npos);
 }
 

@@ -145,35 +145,35 @@ void MetadataMetrics::ObserveGenerateDuration(double seconds) {
 std::string MetadataMetrics::Render() const {
     std::ostringstream os;
 
-    os << "# HELP cortrix_f08_block_count_current Current metadata_blocks table row count.\n";
-    os << "# TYPE cortrix_f08_block_count_current gauge\n";
-    os << "cortrix_f08_block_count_current " << BlockCount() << "\n";
+    os << "# HELP cortrix_metadata_block_count_current Current metadata_blocks table row count.\n";
+    os << "# TYPE cortrix_metadata_block_count_current gauge\n";
+    os << "cortrix_metadata_block_count_current " << BlockCount() << "\n";
 
-    os << "# HELP cortrix_f08_block_generated_total Metadata block generations by status/source.\n";
-    os << "# TYPE cortrix_f08_block_generated_total counter\n";
+    os << "# HELP cortrix_metadata_block_generated_total Metadata block generations by status/source.\n";
+    os << "# TYPE cortrix_metadata_block_generated_total counter\n";
     for (auto st : {GenStatus::kSuccess, GenStatus::kPartialWarning, GenStatus::kFailed}) {
         for (auto sr : {GenSource::kApiUpload, GenSource::kBatchImport, GenSource::kReUpload}) {
-            os << "cortrix_f08_block_generated_total{status=\"" << ToString(st)
+            os << "cortrix_metadata_block_generated_total{status=\"" << ToString(st)
                << "\",source=\"" << ToString(sr) << "\"} " << GeneratedCount(st, sr) << "\n";
         }
     }
 
-    os << "# HELP cortrix_f08_field_missing_total Field-missing count by field_name.\n";
-    os << "# TYPE cortrix_f08_field_missing_total counter\n";
+    os << "# HELP cortrix_metadata_field_missing_total Field-missing count by field_name.\n";
+    os << "# TYPE cortrix_metadata_field_missing_total counter\n";
     {
         std::lock_guard<std::mutex> lk(S().field_mu);
         for (const auto& [field, count] : S().field_missing) {
-            os << "cortrix_f08_field_missing_total{field_name=\"" << field << "\"} " << count << "\n";
+            os << "cortrix_metadata_field_missing_total{field_name=\"" << field << "\"} " << count << "\n";
         }
     }
 
-    os << "# HELP cortrix_f08_metadata_size_bytes metadata_json byte-size distribution.\n";
-    os << "# TYPE cortrix_f08_metadata_size_bytes histogram\n";
-    RenderHist(os, "cortrix_f08_metadata_size_bytes", S().meta_size, kSizeBounds, kSizeBoundStr, 1.0);
+    os << "# HELP cortrix_metadata_size_bytes metadata_json byte-size distribution.\n";
+    os << "# TYPE cortrix_metadata_size_bytes histogram\n";
+    RenderHist(os, "cortrix_metadata_size_bytes", S().meta_size, kSizeBounds, kSizeBoundStr, 1.0);
 
-    os << "# HELP cortrix_f08_block_generate_duration_seconds block_text assembly + JSON serialization time.\n";
-    os << "# TYPE cortrix_f08_block_generate_duration_seconds histogram\n";
-    RenderHist(os, "cortrix_f08_block_generate_duration_seconds", S().gen_dur, kDurBounds, kDurBoundStr, 1e6);
+    os << "# HELP cortrix_metadata_block_generate_duration_seconds block_text assembly + JSON serialization time.\n";
+    os << "# TYPE cortrix_metadata_block_generate_duration_seconds histogram\n";
+    RenderHist(os, "cortrix_metadata_block_generate_duration_seconds", S().gen_dur, kDurBounds, kDurBoundStr, 1e6);
 
     return os.str();
 }

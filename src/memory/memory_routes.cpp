@@ -39,7 +39,7 @@ using json = nlohmann::json;
 
 // Isolation: resolve the requester's user_id from the `user_id` query param,
 // applying the CE no-auth `default` fallback. When the fallback fires it is a
-// cortrix_mem05_default_user_used_total event (ops signal: a node running auth-less
+// cortrix_memory_isolation_default_user_used_total event (ops signal: a node running auth-less
 // on default). Returns the effective user_id used for the isolation check.
 static std::string ResolveRequesterUserId(const httplib::Request& req) {
     std::string req_user_id = req.get_param_value("user_id");
@@ -1115,7 +1115,7 @@ void RegisterMemoryRoutes(
         // spoofed body user_id gets an empty result (no cross-user leak), the same
         // mask as GET /api/v1/memory list. EnforceOwnUserId records the isolation
         // decision (pass/violation); on a no-auth empty principal it resolves to
-        // "default" — that fallback is also the cortrix_mem05_default_user_used
+        // "default" — that fallback is also the cortrix_memory_isolation_default_user_used
         // signal.
         std::string user_id = body.value("user_id", "");
         const bool user_id_was_supplied = !user_id.empty();

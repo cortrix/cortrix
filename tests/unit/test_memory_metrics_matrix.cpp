@@ -97,7 +97,7 @@ TEST_F(MemoryExtractFx, ExtractDurationHistogramRender) {
     m().ObserveExtractDuration("gpt", 50);     // under
     m().ObserveExtractDuration("gpt", 999000);  // above largest -> +Inf
     std::string out = m().RenderOpenMetrics();
-    EXPECT_NE(out.find("# TYPE cortrix_mem02_extract_duration_seconds histogram"),
+    EXPECT_NE(out.find("# TYPE cortrix_memory_extract_duration_seconds histogram"),
               std::string::npos);
     EXPECT_NE(out.find("model=\"gpt\""), std::string::npos);
 }
@@ -112,9 +112,9 @@ TEST_F(MemoryExtractFx, RenderHelpTypeAndNoHighCardinality) {
     m().RecordExtract(ES::kSuccess);
     m().RecordTokens("gpt", TD::kInput, 3);
     std::string out = m().RenderOpenMetrics();
-    EXPECT_NE(out.find("# TYPE cortrix_mem02_extract_total counter"),
+    EXPECT_NE(out.find("# TYPE cortrix_memory_extract_total counter"),
               std::string::npos);
-    EXPECT_NE(out.find("# TYPE cortrix_mem02_llm_tokens_total counter"),
+    EXPECT_NE(out.find("# TYPE cortrix_memory_extract_llm_tokens_total counter"),
               std::string::npos);
     EXPECT_EQ(out.find("tenant_id="), std::string::npos);
     EXPECT_EQ(out.find("ns_id="), std::string::npos);
@@ -179,9 +179,9 @@ TEST_F(MemoryOptOutFx, NoLabelCounters) {
 TEST_F(MemoryOptOutFx, RenderHelpTypeNoHighCardinality) {
     m().RecordOptOut(TB::kUser);
     std::string out = m().RenderOpenMetrics();
-    EXPECT_NE(out.find("# TYPE cortrix_mem04_opt_out_total counter"),
+    EXPECT_NE(out.find("# TYPE cortrix_memory_opt_out_total counter"),
               std::string::npos);
-    EXPECT_NE(out.find("cortrix_mem04_opt_out_total{triggered_by=\"user\"} 1"),
+    EXPECT_NE(out.find("cortrix_memory_opt_out_total{triggered_by=\"user\"} 1"),
               std::string::npos);
     EXPECT_EQ(out.find("ns="), std::string::npos);
     EXPECT_EQ(out.find("user_id="), std::string::npos);
@@ -294,9 +294,9 @@ TEST_F(MemoryIsolationFx, RenderHelpTypeNoHighCardinality) {
     m().RecordIsolationCheck(CR::kPass, AC::kSearch);
     m().SetQuotaUsageRatio(QT::kItemsCount, 0.5);
     std::string out = m().RenderOpenMetrics();
-    EXPECT_NE(out.find("# TYPE cortrix_mem05_isolation_check_total counter"),
+    EXPECT_NE(out.find("# TYPE cortrix_memory_isolation_check_total counter"),
               std::string::npos);
-    EXPECT_NE(out.find("# TYPE cortrix_mem05_quota_usage_ratio gauge"),
+    EXPECT_NE(out.find("# TYPE cortrix_memory_isolation_quota_usage_ratio gauge"),
               std::string::npos);
     EXPECT_EQ(out.find("user_id="), std::string::npos);
 }

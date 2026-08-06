@@ -7,7 +7,7 @@
 namespace cortrix::memory {
 
 /// The `mem05` subsystem metrics (observability naming
-/// `cortrix_mem05_<metric>_<unit>`). Self-contained dependency-free recorder
+/// `cortrix_memory_isolation_<metric>_<unit>`). Self-contained dependency-free recorder
 /// (same pattern as MemoryExtractMetrics / ScoringMetrics): a process-wide singleton of
 /// atomic counters/gauges + an OpenMetrics text renderer.
 ///
@@ -28,13 +28,13 @@ namespace cortrix::memory {
 /// wiring **deferred to D3.5** (same status as ScoringMetrics / MemoryExtractMetrics).
 ///
 /// §8.bis metric schema (7 rows):
-///   cortrix_mem05_isolation_check_total       counter  {result, action}
-///   cortrix_mem05_isolation_violation_total   counter  {action, reason}  (safety alert)
-///   cortrix_mem05_quota_exceeded_total        counter  {quota_type}
-///   cortrix_mem05_quota_usage_ratio           gauge    {quota_type}
-///   cortrix_mem05_user_session_count          gauge    (no label)
-///   cortrix_mem05_default_user_used_total     counter  (no label — CE compat)
-///   cortrix_mem05_match_scope_excluded_total  counter  {reason}
+///   cortrix_memory_isolation_check_total       counter  {result, action}
+///   cortrix_memory_isolation_violation_total   counter  {action, reason}  (safety alert)
+///   cortrix_memory_isolation_quota_exceeded_total        counter  {quota_type}
+///   cortrix_memory_isolation_quota_usage_ratio           gauge    {quota_type}
+///   cortrix_memory_isolation_user_session_count          gauge    (no label)
+///   cortrix_memory_isolation_default_user_used_total     counter  (no label — CE compat)
+///   cortrix_memory_isolation_match_scope_excluded_total  counter  {reason}
 class MemoryIsolationMetrics {
 public:
     /// `result` label for isolation_check_total (§8.bis).
@@ -73,36 +73,36 @@ public:
     /// Process-wide instance (metrics are global counters/gauges).
     static MemoryIsolationMetrics& Instance();
 
-    // --- cortrix_mem05_isolation_check_total (Counter, labels: result, action) ---
+    // --- cortrix_memory_isolation_check_total (Counter, labels: result, action) ---
     // The isolation-check audit baseline: every per-user isolation decision point.
     void RecordIsolationCheck(CheckResult result, Action action);
     uint64_t IsolationCheckCount(CheckResult result, Action action) const;
 
-    // --- cortrix_mem05_isolation_violation_total (Counter, labels: action, reason) ---
+    // --- cortrix_memory_isolation_violation_total (Counter, labels: action, reason) ---
     // Cross-user access denied — the safety-critical alert metric.
     void RecordIsolationViolation(Action action, Reason reason);
     uint64_t IsolationViolationCount(Action action, Reason reason) const;
 
-    // --- cortrix_mem05_quota_exceeded_total (Counter, label: quota_type) ---
+    // --- cortrix_memory_isolation_quota_exceeded_total (Counter, label: quota_type) ---
     void RecordQuotaExceeded(QuotaType quota_type);
     uint64_t QuotaExceededCount(QuotaType quota_type) const;
 
-    // --- cortrix_mem05_quota_usage_ratio (Gauge, label: quota_type) ---
+    // --- cortrix_memory_isolation_quota_usage_ratio (Gauge, label: quota_type) ---
     // Current usage ratio in [0,1] per quota_type; near 1.0 → ops-side alert.
     void SetQuotaUsageRatio(QuotaType quota_type, double ratio);
     double QuotaUsageRatio(QuotaType quota_type) const;
 
-    // --- cortrix_mem05_user_session_count (Gauge, no label) ---
+    // --- cortrix_memory_isolation_user_session_count (Gauge, no label) ---
     // Active user-session total (no user_id label — §3.2; per-user via audit log).
     void SetUserSessionCount(int64_t count);
     int64_t UserSessionCount() const;
 
-    // --- cortrix_mem05_default_user_used_total (Counter, no label) ---
+    // --- cortrix_memory_isolation_default_user_used_total (Counter, no label) ---
     // CE no-auth default user="default" usage (topic 8 CE-compat observation).
     void RecordDefaultUserUsed();
     uint64_t DefaultUserUsedCount() const;
 
-    // --- cortrix_mem05_match_scope_excluded_total (Counter, label: reason) ---
+    // --- cortrix_memory_isolation_match_scope_excluded_total (Counter, label: reason) ---
     // MatchScope pre-filter exclusions (retrieval-path pre-filter, distinct from
     // the API-entry isolation_violation_total).
     void RecordMatchScopeExcluded(Reason reason);

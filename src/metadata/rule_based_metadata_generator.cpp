@@ -190,7 +190,7 @@ Result<GeneratorOutput> RuleBasedMetadataGenerator::Generate(
             "Failed to generate metadata block: doc_metadata is empty (F06 parse failed)");
     }
 
-    // §5.bis cortrix_f08_block_generate_duration_seconds — time block_text assembly +
+    // §5.bis cortrix_metadata_block_generate_duration_seconds — time block_text assembly +
     // JSON serialization (steady_clock, immune to wall-clock jumps). Mirrors the semantic-score
     // ObserveAssignDuration (commit d634fdb): the histogram was defined/rendered/tested
     // but Generate() never fed it. The GEN_FAILED early return above does no assembly, so

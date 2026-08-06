@@ -317,18 +317,18 @@ TEST_F(ImportFx, ImportAndQueryDurationHistogramsRender) {
     m().ObserveImportDuration("merge", 999.0);  // above largest -> +Inf
     m().ObserveQueryDuration(QT::kCustomSql, 0.05);
     std::string out = m().Render();
-    EXPECT_NE(out.find("# TYPE cortrix_f16a_import_duration_seconds histogram"),
+    EXPECT_NE(out.find("# TYPE cortrix_import_duration_seconds histogram"),
               std::string::npos);
-    EXPECT_NE(out.find("# TYPE cortrix_f16a_query_duration_seconds histogram"),
+    EXPECT_NE(out.find("# TYPE cortrix_import_query_duration_seconds histogram"),
               std::string::npos);
 }
 
 TEST_F(ImportFx, RenderHelpTypeNoHighCardinality) {
     m().RecordImport(IO::kSuccess);
     std::string out = m().Render();
-    EXPECT_NE(out.find("# TYPE cortrix_f16a_imports_total counter"),
+    EXPECT_NE(out.find("# TYPE cortrix_import_imports_total counter"),
               std::string::npos);
-    EXPECT_NE(out.find("cortrix_f16a_imports_total{status=\"success\"} 1"),
+    EXPECT_NE(out.find("cortrix_import_imports_total{status=\"success\"} 1"),
               std::string::npos);
     EXPECT_EQ(out.find("namespace="), std::string::npos);
     EXPECT_EQ(out.find("tenant_id="), std::string::npos);
@@ -407,16 +407,16 @@ TEST_F(MetadataFx, SizeAndDurationHistogramsRender) {
     m().ObserveGenerateDuration(0.01);
     m().ObserveGenerateDuration(999.0);  // above largest -> +Inf
     std::string out = m().Render();
-    EXPECT_NE(out.find("# TYPE cortrix_f08_metadata_size_bytes histogram"),
+    EXPECT_NE(out.find("# TYPE cortrix_metadata_size_bytes histogram"),
               std::string::npos);
-    EXPECT_NE(out.find("# TYPE cortrix_f08_block_generate_duration_seconds histogram"),
+    EXPECT_NE(out.find("# TYPE cortrix_metadata_block_generate_duration_seconds histogram"),
               std::string::npos);
 }
 
 TEST_F(MetadataFx, RenderHelpTypeNoHighCardinality) {
     m().RecordGenerated(GS::kSuccess, GSrc::kApiUpload);
     std::string out = m().Render();
-    EXPECT_NE(out.find("# TYPE cortrix_f08_block_generated_total counter"),
+    EXPECT_NE(out.find("# TYPE cortrix_metadata_block_generated_total counter"),
               std::string::npos);
     EXPECT_EQ(out.find("doc_id="), std::string::npos);
     EXPECT_EQ(out.find("ns_id="), std::string::npos);

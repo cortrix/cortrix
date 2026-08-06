@@ -37,25 +37,25 @@ uint64_t MemoryOptOutMetrics::ExtractSkippedCount() const {
 std::string MemoryOptOutMetrics::RenderOpenMetrics() const {
     std::ostringstream os;
 
-    // cortrix_mem04_opt_out_total
-    os << "# HELP cortrix_mem04_opt_out_total MEM04 session opt-out events by trigger.\n";
-    os << "# TYPE cortrix_mem04_opt_out_total counter\n";
+    // cortrix_memory_opt_out_total
+    os << "# HELP cortrix_memory_opt_out_total MEM04 session opt-out events by trigger.\n";
+    os << "# TYPE cortrix_memory_opt_out_total counter\n";
     for (int t = 0; t < kTriggeredByCount; ++t) {
-        os << "cortrix_mem04_opt_out_total{triggered_by=\""
+        os << "cortrix_memory_opt_out_total{triggered_by=\""
            << ToString(static_cast<TriggeredBy>(t)) << "\"} "
            << opt_out_[t].load(std::memory_order_relaxed) << "\n";
     }
 
-    // cortrix_mem04_opt_out_revoke_total
-    os << "# HELP cortrix_mem04_opt_out_revoke_total MEM04 session opt-out revocations.\n";
-    os << "# TYPE cortrix_mem04_opt_out_revoke_total counter\n";
-    os << "cortrix_mem04_opt_out_revoke_total "
+    // cortrix_memory_opt_out_revoke_total
+    os << "# HELP cortrix_memory_opt_out_revoke_total MEM04 session opt-out revocations.\n";
+    os << "# TYPE cortrix_memory_opt_out_revoke_total counter\n";
+    os << "cortrix_memory_opt_out_revoke_total "
        << opt_out_revoke_.load(std::memory_order_relaxed) << "\n";
 
-    // cortrix_mem04_extract_skipped_total
-    os << "# HELP cortrix_mem04_extract_skipped_total MEM02 extractions skipped for opted-out sessions.\n";
-    os << "# TYPE cortrix_mem04_extract_skipped_total counter\n";
-    os << "cortrix_mem04_extract_skipped_total "
+    // cortrix_memory_opt_out_extract_skipped_total
+    os << "# HELP cortrix_memory_opt_out_extract_skipped_total MEM02 extractions skipped for opted-out sessions.\n";
+    os << "# TYPE cortrix_memory_opt_out_extract_skipped_total counter\n";
+    os << "cortrix_memory_opt_out_extract_skipped_total "
        << extract_skipped_.load(std::memory_order_relaxed) << "\n";
 
     return os.str();

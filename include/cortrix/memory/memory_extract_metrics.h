@@ -8,7 +8,7 @@
 namespace cortrix::memory {
 
 /// The `mem02` subsystem metrics (observability naming
-/// `cortrix_mem02_<metric>_<unit>`). Mirrors the RagFusionMetrics /
+/// `cortrix_memory_extract_<metric>_<unit>`). Mirrors the RagFusionMetrics /
 /// ScatterMetrics template (process-wide singleton, atomic counters/histograms,
 /// OpenMetrics renderer).
 ///
@@ -24,12 +24,12 @@ namespace cortrix::memory {
 /// in-process and RenderOpenMetrics() produces what the server will serve.
 ///
 /// §5.4.1 metric schema (6 rows):
-///   cortrix_mem02_extract_total                counter   {status: success|failed}
-///   cortrix_mem02_extract_duration_seconds     histogram {model}
-///   cortrix_mem02_queue_depth                  gauge     {worker_id}  (process-aggregate)
-///   cortrix_mem02_llm_tokens_total             counter   {model, direction: input|output}
-///   cortrix_mem02_contradictions_found_total   counter   {confidence_bucket: high|medium|low}
-///   cortrix_mem02_invalidations_total          counter   {triggered_by: llm_auto|manual|agent_self}
+///   cortrix_memory_extract_total                counter   {status: success|failed}
+///   cortrix_memory_extract_duration_seconds     histogram {model}
+///   cortrix_memory_extract_queue_depth                  gauge     {worker_id}  (process-aggregate)
+///   cortrix_memory_extract_llm_tokens_total             counter   {model, direction: input|output}
+///   cortrix_memory_extract_contradictions_found_total   counter   {confidence_bucket: high|medium|low}
+///   cortrix_memory_extract_invalidations_total          counter   {triggered_by: llm_auto|manual|agent_self}
 class MemoryExtractMetrics {
 public:
     /// status label for extract_total (§5.4.1).
@@ -67,30 +67,30 @@ public:
     /// Process-wide instance (metrics are global counters/histograms).
     static MemoryExtractMetrics& Instance();
 
-    // --- cortrix_mem02_extract_total (Counter, label: status) ---
+    // --- cortrix_memory_extract_total (Counter, label: status) ---
     void RecordExtract(ExtractStatus status);
     uint64_t ExtractCount(ExtractStatus status) const;
 
-    // --- cortrix_mem02_extract_duration_seconds (Histogram, label: model) ---
+    // --- cortrix_memory_extract_duration_seconds (Histogram, label: model) ---
     // Observes the end-to-end extraction latency for `model` (a low-cardinality
     // config-driven enum string). Tracks per-model sum_ms + count (rendered seconds).
     void ObserveExtractDuration(const std::string& model, int latency_ms);
 
-    // --- cortrix_mem02_queue_depth (Gauge) ---
+    // --- cortrix_memory_extract_queue_depth (Gauge) ---
     // Process-aggregate queue depth (the per-worker_id label is reserved; V1
     // reports the single shared queue's depth). Set to the current size on push/pop.
     void SetQueueDepth(int64_t depth);
     int64_t QueueDepth() const;
 
-    // --- cortrix_mem02_llm_tokens_total (Counter, labels: model, direction) ---
+    // --- cortrix_memory_extract_llm_tokens_total (Counter, labels: model, direction) ---
     void RecordTokens(const std::string& model, TokenDirection direction, uint64_t tokens);
     uint64_t TokenCount(TokenDirection direction) const;  // summed over models
 
-    // --- cortrix_mem02_contradictions_found_total (Counter, label: confidence_bucket) ---
+    // --- cortrix_memory_extract_contradictions_found_total (Counter, label: confidence_bucket) ---
     void RecordContradiction(ConfidenceBucket bucket);
     uint64_t ContradictionCount(ConfidenceBucket bucket) const;
 
-    // --- cortrix_mem02_invalidations_total (Counter, label: triggered_by) ---
+    // --- cortrix_memory_extract_invalidations_total (Counter, label: triggered_by) ---
     void RecordInvalidation(TriggeredBy triggered_by);
     uint64_t InvalidationCount(TriggeredBy triggered_by) const;
 

@@ -119,19 +119,19 @@ uint64_t MemoryExtractMetrics::InvalidationCount(TriggeredBy triggered_by) const
 std::string MemoryExtractMetrics::RenderOpenMetrics() const {
     std::ostringstream os;
 
-    // cortrix_mem02_extract_total
-    os << "# HELP cortrix_mem02_extract_total Total memory extractions by status.\n";
-    os << "# TYPE cortrix_mem02_extract_total counter\n";
+    // cortrix_memory_extract_total
+    os << "# HELP cortrix_memory_extract_total Total memory extractions by status.\n";
+    os << "# TYPE cortrix_memory_extract_total counter\n";
     for (int i = 0; i < kExtractStatusCount; ++i) {
-        os << "cortrix_mem02_extract_total{status=\""
+        os << "cortrix_memory_extract_total{status=\""
            << ToString(static_cast<ExtractStatus>(i)) << "\"} "
            << extract_[i].load(std::memory_order_relaxed) << "\n";
     }
 
-    // cortrix_mem02_extract_duration_seconds — proper Prometheus histogram per model:
+    // cortrix_memory_extract_duration_seconds — proper Prometheus histogram per model:
     // cumulative _bucket{le=...} for each bound + le="+Inf", then _sum + _count.
-    os << "# HELP cortrix_mem02_extract_duration_seconds Extraction latency in seconds.\n";
-    os << "# TYPE cortrix_mem02_extract_duration_seconds histogram\n";
+    os << "# HELP cortrix_memory_extract_duration_seconds Extraction latency in seconds.\n";
+    os << "# TYPE cortrix_memory_extract_duration_seconds histogram\n";
     {
         std::lock_guard<std::mutex> lk(model_mu_);
         for (int i = 0; i < kModelSlots; ++i) {
@@ -142,29 +142,29 @@ std::string MemoryExtractMetrics::RenderOpenMetrics() const {
             uint64_t cum = 0;
             for (int b = 0; b < kNumDurBuckets; ++b) {
                 cum += model_latency_bkt_[i][b].load(std::memory_order_relaxed);
-                os << "cortrix_mem02_extract_duration_seconds_bucket{model=\"" << label
+                os << "cortrix_memory_extract_duration_seconds_bucket{model=\"" << label
                    << "\",le=\"" << kDurBoundStr[b] << "\"} " << cum << "\n";
             }
             cum += model_latency_bkt_[i][kNumDurBuckets].load(std::memory_order_relaxed);
-            os << "cortrix_mem02_extract_duration_seconds_bucket{model=\"" << label
+            os << "cortrix_memory_extract_duration_seconds_bucket{model=\"" << label
                << "\",le=\"+Inf\"} " << cum << "\n";
             const double sum_s =
                 static_cast<double>(model_latency_sum_ms_[i].load(std::memory_order_relaxed)) / 1000.0;
-            os << "cortrix_mem02_extract_duration_seconds_sum{model=\"" << label << "\"} "
+            os << "cortrix_memory_extract_duration_seconds_sum{model=\"" << label << "\"} "
                << sum_s << "\n";
-            os << "cortrix_mem02_extract_duration_seconds_count{model=\"" << label << "\"} "
+            os << "cortrix_memory_extract_duration_seconds_count{model=\"" << label << "\"} "
                << cnt << "\n";
         }
     }
 
-    // cortrix_mem02_queue_depth
-    os << "# HELP cortrix_mem02_queue_depth Current async extraction queue depth.\n";
-    os << "# TYPE cortrix_mem02_queue_depth gauge\n";
-    os << "cortrix_mem02_queue_depth " << queue_depth_.load(std::memory_order_relaxed) << "\n";
+    // cortrix_memory_extract_queue_depth
+    os << "# HELP cortrix_memory_extract_queue_depth Current async extraction queue depth.\n";
+    os << "# TYPE cortrix_memory_extract_queue_depth gauge\n";
+    os << "cortrix_memory_extract_queue_depth " << queue_depth_.load(std::memory_order_relaxed) << "\n";
 
-    // cortrix_mem02_llm_tokens_total (per model + direction)
-    os << "# HELP cortrix_mem02_llm_tokens_total LLM tokens consumed by extraction.\n";
-    os << "# TYPE cortrix_mem02_llm_tokens_total counter\n";
+    // cortrix_memory_extract_llm_tokens_total (per model + direction)
+    os << "# HELP cortrix_memory_extract_llm_tokens_total LLM tokens consumed by extraction.\n";
+    os << "# TYPE cortrix_memory_extract_llm_tokens_total counter\n";
     {
         std::lock_guard<std::mutex> lk(model_mu_);
         for (int i = 0; i < kModelSlots; ++i) {
@@ -172,27 +172,27 @@ std::string MemoryExtractMetrics::RenderOpenMetrics() const {
             const uint64_t out = model_token_out_[i].load(std::memory_order_relaxed);
             if (in == 0 && out == 0) continue;
             const std::string label = model_names_[i].empty() ? "other" : model_names_[i];
-            os << "cortrix_mem02_llm_tokens_total{model=\"" << label
+            os << "cortrix_memory_extract_llm_tokens_total{model=\"" << label
                << "\",direction=\"input\"} " << in << "\n";
-            os << "cortrix_mem02_llm_tokens_total{model=\"" << label
+            os << "cortrix_memory_extract_llm_tokens_total{model=\"" << label
                << "\",direction=\"output\"} " << out << "\n";
         }
     }
 
-    // cortrix_mem02_contradictions_found_total
-    os << "# HELP cortrix_mem02_contradictions_found_total Contradictions found by confidence.\n";
-    os << "# TYPE cortrix_mem02_contradictions_found_total counter\n";
+    // cortrix_memory_extract_contradictions_found_total
+    os << "# HELP cortrix_memory_extract_contradictions_found_total Contradictions found by confidence.\n";
+    os << "# TYPE cortrix_memory_extract_contradictions_found_total counter\n";
     for (int i = 0; i < kConfidenceBucketCount; ++i) {
-        os << "cortrix_mem02_contradictions_found_total{confidence_bucket=\""
+        os << "cortrix_memory_extract_contradictions_found_total{confidence_bucket=\""
            << ToString(static_cast<ConfidenceBucket>(i)) << "\"} "
            << contradiction_[i].load(std::memory_order_relaxed) << "\n";
     }
 
-    // cortrix_mem02_invalidations_total
-    os << "# HELP cortrix_mem02_invalidations_total Memory invalidations by trigger.\n";
-    os << "# TYPE cortrix_mem02_invalidations_total counter\n";
+    // cortrix_memory_extract_invalidations_total
+    os << "# HELP cortrix_memory_extract_invalidations_total Memory invalidations by trigger.\n";
+    os << "# TYPE cortrix_memory_extract_invalidations_total counter\n";
     for (int i = 0; i < kTriggeredByCount; ++i) {
-        os << "cortrix_mem02_invalidations_total{triggered_by=\""
+        os << "cortrix_memory_extract_invalidations_total{triggered_by=\""
            << ToString(static_cast<TriggeredBy>(i)) << "\"} "
            << invalidation_[i].load(std::memory_order_relaxed) << "\n";
     }

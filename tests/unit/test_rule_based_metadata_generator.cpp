@@ -287,7 +287,7 @@ TEST(MetadataGeneratorTest, FailedParseWithFilenameStillGenerates) {
     EXPECT_EQ(res.value().block.metadata_json["ingestion_status"], "failed");
 }
 
-// §5.bis cortrix_f08_block_generate_duration_seconds feed point: each produced-block
+// §5.bis cortrix_metadata_block_generate_duration_seconds feed point: each produced-block
 // Generate() must observe the histogram (the recorder method existed but Generate()
 // never fed it). Mirrors the semantic score AssignFeedsDurationHistogram regression — lock that
 // each generating call increments _count by 1.
@@ -300,7 +300,7 @@ TEST(MetadataGeneratorTest, GenerateFeedsDurationHistogram) {
     ASSERT_TRUE(gen.Generate(partial).ok());
 
     const std::string out = MetadataMetrics::Instance().Render();
-    EXPECT_NE(out.find("cortrix_f08_block_generate_duration_seconds_count 2"), std::string::npos)
+    EXPECT_NE(out.find("cortrix_metadata_block_generate_duration_seconds_count 2"), std::string::npos)
         << out;
     MetadataMetrics::Instance().ResetForTest();
 }
@@ -317,7 +317,7 @@ TEST(MetadataGeneratorTest, GenerateFailureDoesNotFeedDurationHistogram) {
     ASSERT_FALSE(gen.Generate(in).ok());
 
     const std::string out = MetadataMetrics::Instance().Render();
-    EXPECT_NE(out.find("cortrix_f08_block_generate_duration_seconds_count 0"), std::string::npos)
+    EXPECT_NE(out.find("cortrix_metadata_block_generate_duration_seconds_count 0"), std::string::npos)
         << out;
     MetadataMetrics::Instance().ResetForTest();
 }

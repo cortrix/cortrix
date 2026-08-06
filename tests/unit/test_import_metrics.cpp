@@ -46,10 +46,10 @@ TEST(ImportMetricsTest, RenderEmitsStableNamesWithoutHighCardinalityLabels) {
     m.AddRowsImported(10);
     std::string out = m.Render();
 
-    EXPECT_NE(out.find("cortrix_f16a_imports_total{status=\"success\"} 1"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_f16a_rows_imported_total 10"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_f16a_connections_active"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_f16a_tasks_queue_depth"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_import_imports_total{status=\"success\"} 1"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_import_rows_imported_total 10"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_import_connections_active"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_import_tasks_queue_depth"), std::string::npos);
     // §5.5 note: the removed high-cardinality labels must NOT appear.
     EXPECT_EQ(out.find("namespace="), std::string::npos);
     EXPECT_EQ(out.find("tenant_id="), std::string::npos);
@@ -64,15 +64,15 @@ TEST(ImportMetricsTest, DurationHistogramsObserveAndRender) {
     m.ObserveQueryDuration(ImportMetrics::QueryType::kCustomSql, 7.5);
     std::string out = m.Render();
     // §5.5 — both histograms present (TYPE + per-label cumulative _bucket/_sum/_count).
-    EXPECT_NE(out.find("# TYPE cortrix_f16a_import_duration_seconds histogram"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_f16a_import_duration_seconds_bucket{text_strategy=\"per_row\",le=\"0.25\"} 1"),
+    EXPECT_NE(out.find("# TYPE cortrix_import_duration_seconds histogram"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_import_duration_seconds_bucket{text_strategy=\"per_row\",le=\"0.25\"} 1"),
               std::string::npos);
-    EXPECT_NE(out.find("cortrix_f16a_import_duration_seconds_count{text_strategy=\"merge\"} 1"),
+    EXPECT_NE(out.find("cortrix_import_duration_seconds_count{text_strategy=\"merge\"} 1"),
               std::string::npos);
-    EXPECT_NE(out.find("# TYPE cortrix_f16a_query_duration_seconds histogram"), std::string::npos);
-    EXPECT_NE(out.find("cortrix_f16a_query_duration_seconds_count{query_type=\"table_filter\"} 1"),
+    EXPECT_NE(out.find("# TYPE cortrix_import_query_duration_seconds histogram"), std::string::npos);
+    EXPECT_NE(out.find("cortrix_import_query_duration_seconds_count{query_type=\"table_filter\"} 1"),
               std::string::npos);
-    EXPECT_NE(out.find("cortrix_f16a_query_duration_seconds_count{query_type=\"custom_sql\"} 1"),
+    EXPECT_NE(out.find("cortrix_import_query_duration_seconds_count{query_type=\"custom_sql\"} 1"),
               std::string::npos);
     EXPECT_NE(out.find("le=\"+Inf\"} 1"), std::string::npos);
     // still no high-cardinality labels.

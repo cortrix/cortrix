@@ -139,29 +139,29 @@ void ImportMetrics::ObserveQueryDuration(QueryType query_type, double seconds) {
 
 std::string ImportMetrics::Render() const {
     std::ostringstream os;
-    os << "# HELP cortrix_f16a_imports_total Total DB import tasks by status.\n";
-    os << "# TYPE cortrix_f16a_imports_total counter\n";
+    os << "# HELP cortrix_import_imports_total Total DB import tasks by status.\n";
+    os << "# TYPE cortrix_import_imports_total counter\n";
     for (auto o : {ImportOutcome::kSuccess, ImportOutcome::kFailed, ImportOutcome::kCancelled}) {
-        os << "cortrix_f16a_imports_total{status=\"" << ToString(o) << "\"} "
+        os << "cortrix_import_imports_total{status=\"" << ToString(o) << "\"} "
            << ImportsCount(o) << "\n";
     }
-    os << "# HELP cortrix_f16a_rows_imported_total Total rows imported.\n";
-    os << "# TYPE cortrix_f16a_rows_imported_total counter\n";
-    os << "cortrix_f16a_rows_imported_total " << RowsImportedTotal() << "\n";
-    os << "# HELP cortrix_f16a_connections_active Active registered DB connections.\n";
-    os << "# TYPE cortrix_f16a_connections_active gauge\n";
-    os << "cortrix_f16a_connections_active " << ConnectionsActive() << "\n";
-    os << "# HELP cortrix_f16a_tasks_queue_depth Import task queue depth.\n";
-    os << "# TYPE cortrix_f16a_tasks_queue_depth gauge\n";
-    os << "cortrix_f16a_tasks_queue_depth " << QueueDepth() << "\n";
-    os << "# HELP cortrix_f16a_import_duration_seconds DB import wall-clock by text strategy.\n";
-    os << "# TYPE cortrix_f16a_import_duration_seconds histogram\n";
-    RenderHist(os, "cortrix_f16a_import_duration_seconds", "text_strategy", "per_row", S().import_dur[0]);
-    RenderHist(os, "cortrix_f16a_import_duration_seconds", "text_strategy", "merge", S().import_dur[1]);
-    os << "# HELP cortrix_f16a_query_duration_seconds External-PG query wall-clock by query type.\n";
-    os << "# TYPE cortrix_f16a_query_duration_seconds histogram\n";
-    RenderHist(os, "cortrix_f16a_query_duration_seconds", "query_type", "table_filter", S().query_dur[0]);
-    RenderHist(os, "cortrix_f16a_query_duration_seconds", "query_type", "custom_sql", S().query_dur[1]);
+    os << "# HELP cortrix_import_rows_imported_total Total rows imported.\n";
+    os << "# TYPE cortrix_import_rows_imported_total counter\n";
+    os << "cortrix_import_rows_imported_total " << RowsImportedTotal() << "\n";
+    os << "# HELP cortrix_import_connections_active Active registered DB connections.\n";
+    os << "# TYPE cortrix_import_connections_active gauge\n";
+    os << "cortrix_import_connections_active " << ConnectionsActive() << "\n";
+    os << "# HELP cortrix_import_tasks_queue_depth Import task queue depth.\n";
+    os << "# TYPE cortrix_import_tasks_queue_depth gauge\n";
+    os << "cortrix_import_tasks_queue_depth " << QueueDepth() << "\n";
+    os << "# HELP cortrix_import_duration_seconds DB import wall-clock by text strategy.\n";
+    os << "# TYPE cortrix_import_duration_seconds histogram\n";
+    RenderHist(os, "cortrix_import_duration_seconds", "text_strategy", "per_row", S().import_dur[0]);
+    RenderHist(os, "cortrix_import_duration_seconds", "text_strategy", "merge", S().import_dur[1]);
+    os << "# HELP cortrix_import_query_duration_seconds External-PG query wall-clock by query type.\n";
+    os << "# TYPE cortrix_import_query_duration_seconds histogram\n";
+    RenderHist(os, "cortrix_import_query_duration_seconds", "query_type", "table_filter", S().query_dur[0]);
+    RenderHist(os, "cortrix_import_query_duration_seconds", "query_type", "custom_sql", S().query_dur[1]);
     return os.str();
 }
 

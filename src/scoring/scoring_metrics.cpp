@@ -112,30 +112,30 @@ uint64_t ScoringMetrics::ErrorCount(ScoringErrorCode code) const {
 std::string ScoringMetrics::Render() const {
     std::ostringstream os;
 
-    os << "# HELP cortrix_f07_score_total semantic_score assignment count by level.\n";
-    os << "# TYPE cortrix_f07_score_total counter\n";
+    os << "# HELP cortrix_scoring_score_total semantic_score assignment count by level.\n";
+    os << "# TYPE cortrix_scoring_score_total counter\n";
     for (uint8_t lv = 0; lv <= 4; ++lv) {
-        os << "cortrix_f07_score_total{level=\"" << static_cast<int>(lv) << "\"} "
+        os << "cortrix_scoring_score_total{level=\"" << static_cast<int>(lv) << "\"} "
            << ScoreCount(lv) << "\n";
     }
 
-    os << "# HELP cortrix_f07_anomalous_blocks_total Anomalous blocks scored 0.0 (D6 sentinel).\n";
-    os << "# TYPE cortrix_f07_anomalous_blocks_total counter\n";
-    os << "cortrix_f07_anomalous_blocks_total " << AnomalousCount() << "\n";
+    os << "# HELP cortrix_scoring_anomalous_blocks_total Anomalous blocks scored 0.0 (D6 sentinel).\n";
+    os << "# TYPE cortrix_scoring_anomalous_blocks_total counter\n";
+    os << "cortrix_scoring_anomalous_blocks_total " << AnomalousCount() << "\n";
 
-    os << "# HELP cortrix_f07_final_score_total ComputeFinalScore invocations (F02 fusion).\n";
-    os << "# TYPE cortrix_f07_final_score_total counter\n";
-    os << "cortrix_f07_final_score_total " << FinalScoreCount() << "\n";
+    os << "# HELP cortrix_scoring_final_score_total ComputeFinalScore invocations (F02 fusion).\n";
+    os << "# TYPE cortrix_scoring_final_score_total counter\n";
+    os << "cortrix_scoring_final_score_total " << FinalScoreCount() << "\n";
 
-    os << "# HELP cortrix_f07_assign_duration_seconds AssignInitialScore call latency.\n";
-    os << "# TYPE cortrix_f07_assign_duration_seconds histogram\n";
-    RenderHist(os, "cortrix_f07_assign_duration_seconds", S().assign_dur);
+    os << "# HELP cortrix_scoring_assign_duration_seconds AssignInitialScore call latency.\n";
+    os << "# TYPE cortrix_scoring_assign_duration_seconds histogram\n";
+    RenderHist(os, "cortrix_scoring_assign_duration_seconds", S().assign_dur);
 
-    os << "# HELP cortrix_f07_error_total F07 errors by CX_ERR_SCORING_* code (§4.4).\n";
-    os << "# TYPE cortrix_f07_error_total counter\n";
+    os << "# HELP cortrix_scoring_error_total F07 errors by CX_ERR_SCORING_* code (§4.4).\n";
+    os << "# TYPE cortrix_scoring_error_total counter\n";
     for (int i = 0; i < kScoringErrorCodeCount; ++i) {
         const auto code = static_cast<ScoringErrorCode>(i);
-        os << "cortrix_f07_error_total{code=\"" << ScoringErrorCodeString(code) << "\"} "
+        os << "cortrix_scoring_error_total{code=\"" << ScoringErrorCodeString(code) << "\"} "
            << ErrorCount(code) << "\n";
     }
 
