@@ -1570,12 +1570,12 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     if (extensions.on_shutdown) {
         extensions.on_shutdown();
     }
-    // Ordered graceful shutdown on the MAIN thread (
+    // Ordered graceful shutdown on the MAIN thread:
     // replaces the bare worker_pool.Stop() + spc_mgr.Stop() pair — Run()'s drain
-    // hook performs both, preserving the Plan B order: worker pool first so
+    // hook performs both, preserving the shutdown order: worker pool first so
     // doc_processor→spc_mgr quiesces, then the SPC drain joins workers and persists
     // the untouched queue remainder to .pending_tasks.json for next-start resume.
-    // DB tasks need no persist: status=queued is re-picked by Dequeue.)
+    // DB tasks need no persist: status=queued is re-picked by Dequeue.
     cortrix::deploy::ShutdownStatus final_status = graceful.Run();
     if (final_status == cortrix::deploy::ShutdownStatus::kForced) {
         CORTRIX_LOG_WARN("main", "Graceful shutdown persisted pending SPC tasks for resume");

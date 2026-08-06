@@ -11,7 +11,7 @@ namespace cortrix::metadata {
 // affinity, IF NOT EXISTS so a re-run on an already-migrated db is a no-op outside the
 // migrator's version gate. doc_id is UNIQUE (1 doc = 1 metadata block). The FK to
 // documents(doc_id) is intentionally omitted standalone — see the header's
-// "FK reconciliation (D3.5 deferred)" note (documents.doc_id is INTEGER vs the metadata block's TEXT
+// "FK reconciliation (integration deferred)" note (documents.doc_id is INTEGER vs the metadata block's TEXT
 // ULID; reconciling the type + wiring the FK is real pipeline work).
 const char* const kMetadataSchemaSql = R"SQL(
 CREATE TABLE IF NOT EXISTS metadata_blocks (

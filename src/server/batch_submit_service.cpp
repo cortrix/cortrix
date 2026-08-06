@@ -186,9 +186,9 @@ nlohmann::json BatchSubmitService::MakeFailureItem(const std::string& doc_id,
     const std::string detail = ExtractDetail(status.message());
     const PerDocErrorInfo& info = ClassifyPerDocCode(cx_code);
 
-    // batch submit §2.3 meta.failed[] item: doc_id + the GEN-Agent 5 fields. NOTE
+    // batch submit meta.failed[] item: doc_id + the GEN-Agent 5 fields. NOTE
     // the field is `error_code` (NOT the bare top-level-envelope `code`) — this is
-    // a partial-success *failure descriptor*, matching the §2.3 example and the
+    // a partial-success *failure descriptor*, matching the example and the
     // existing cross-NS QueryMeta.namespaces_failed[] convention (error_code /
     // category / retryable / retry_after_ms). error_code falls back to a generic
     // permanent token if the seam returned a non-CX_ERR_ message.
@@ -256,7 +256,7 @@ BatchHttpResult BatchSubmitService::Submit(const BatchRequest& req) {
     // SubmitRequest carries no on_duplicate field, and the duplicate decision
     // needs the real store/task dedup (cross-component wiring). Enqueue already
     // applies same-doc_id+same-content_hash debounce/merge; the on_duplicate
-    // overwrite→cancel-running path is the overwrite/cancel item (D3.5). Standalone, every
+    // overwrite→cancel-running path is the overwrite/cancel item (integration). Standalone, every
     // accepted doc is reported "submitted"; the "skipped" status variant becomes
     // reachable when that wiring lands. req.on_duplicate is parsed + validated
     // upstream so the contract is honored end-to-end at D3.5.
