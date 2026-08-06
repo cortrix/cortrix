@@ -690,7 +690,7 @@ std::string BuildQueryParamsSummary(const QueryContext& qctx) {
 
 // Serialize a scatter response, applying the CRAG verdict action + surfacing
 // meta.crag_verdict (B-class) when CRAG ran (Complex route). CragStage is a no-op on
-// simple/chat (ShouldSkipF37) so this is safe to call on every scatter path.
+// simple/chat (ShouldSkipCrag) so this is safe to call on every scatter path.
 json SerializeWithCrag(CrossNsResponse& resp, QueryContext& qctx, CragStage* crag) {
     crag->Apply(resp, qctx);
     json out = resp.ToJson();
@@ -834,7 +834,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             // handler->Handle, which produces the precise CX_ERR_DEPRECATED_FIELD /
             // bad-request body. On success run the scatter (or the RagFusionStage
             // when Complex + rag_fusion enabled), then apply CRAG before
-            // serializing. CragStage is a no-op on the Simple route (ShouldSkipF37).
+            // serializing. CragStage is a no-op on the Simple route (ShouldSkipCrag).
             QueryRequest cross_ns_req;
             Status parsed = CrossNsQueryHandler::ParseRequest(body, &cross_ns_req);
             if (parsed.ok()) {

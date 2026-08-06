@@ -186,7 +186,7 @@ public:
     }
 };
 
-TEST(AuthSchemaTest, ExtraProviderRunsAfterP08) {
+TEST(AuthSchemaTest, ExtraProviderRunsAfterAuth) {
     FakeProvider fake;
     PlatformDb pdb;
     Status st = pdb.Open(":memory:", {&fake});

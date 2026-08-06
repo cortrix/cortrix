@@ -82,7 +82,7 @@ TEST(ContextualEnricherTest, UsableViaBasePointer) {
     EXPECT_EQ(base->Name(), "contextual_retrieval");
 }
 
-TEST(ContextualEnricherTest, NameIsF35) {
+TEST(ContextualEnricherTest, NameIsContextual) {
     ContextualRetrievalEnricher e(ContextualRetrievalConfig{},
                                   std::make_shared<llm::MockLlmClient>(), MakeEmbedder());
     EXPECT_EQ(e.Name(), "contextual_retrieval");

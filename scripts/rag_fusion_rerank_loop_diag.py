@@ -470,7 +470,7 @@ def profile_matrix(
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Run a local RAG-Fusion/F02 rerank-loop diagnostic.")
+    ap = argparse.ArgumentParser(description="Run a local RAG-Fusion / score-fusion rerank-loop diagnostic.")
     ap.add_argument("--base-url", default="http://127.0.0.1:18485")
     ap.add_argument("--sample-dir", type=Path, required=True)
     ap.add_argument("--work-dir", type=Path, default=Path("/tmp/cortrix-min-llm-bench"))

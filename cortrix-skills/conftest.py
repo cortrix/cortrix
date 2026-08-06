@@ -15,8 +15,8 @@ import sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _SRC = os.path.join(_HERE, "src")
 # Python SDK source from the repository layout adjacent to cortrix-skills/.
-_P03_SDK = os.path.abspath(os.path.join(_HERE, "..", "sdk", "python"))
+_SDK_PATH = os.path.abspath(os.path.join(_HERE, "..", "sdk", "python"))
 
-for path in (_SRC, _P03_SDK):
+for path in (_SRC, _SDK_PATH):
     if os.path.isdir(path) and path not in sys.path:
         sys.path.insert(0, path)

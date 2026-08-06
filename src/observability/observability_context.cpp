@@ -138,7 +138,7 @@ bool ObservabilityValidator::IsValidFormat(const std::string& value, int max_len
 
 namespace {
 
-// Shared failure path: build the InvalidArgument Status with the CX_ERR_F13
+// Shared failure path: build the InvalidArgument Status with the CX_ERR_TRACE
 // token + which field failed (the boundary re-inflates value_preview from the
 // caller's raw value; we keep PII out of the Status message).
 Status InvalidFilterStatus(const char* field) {

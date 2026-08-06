@@ -531,7 +531,7 @@ TEST_F(SPCPipelineR7Test, CLEANING_NsResolverDisablesAnomaly_NoAnomalyKeys) {
 //   - the contextualized_embedding flag (kFlagExtHasContextualized) + WriteContextualized;
 //   - WriteEnrichment (enriched_score + entities);
 //   - the hype-question Block assembly + embed loop (block_type=16 rows persisted).
-TEST_F(SPCPipelineR7Test, EnricherChain_EnricherF35F38_PersistsEnrichmentAndHypeBlocks) {
+TEST_F(SPCPipelineR7Test, EnricherChain_AllThreeStages_PersistsEnrichmentAndHypeBlocks) {
     cortrix::spc::EnricherChain chain;
     chain.Append(std::make_shared<FakeSummaryEnricher>());     // Enricher
     chain.Append(std::make_shared<FakeContextualEnricher>());  // Contextual retrieval
@@ -763,7 +763,7 @@ TEST_F(SPCPipelineR7Test, EnrichState_ContextualSoftFailureDetectedViaContextual
 
 // Hype degrade (LLM fails inside GenerateHypeQuestions → step status != 0)
 // → rows owe exactly hype while the ok enricher head stays un-owed.
-TEST_F(SPCPipelineR7Test, EnrichState_HypeFailureOwedAsF38) {
+TEST_F(SPCPipelineR7Test, EnrichState_HypeFailureIsOwed) {
     auto failing_llm = std::make_shared<llm::MockLlmClient>();
     llm::ChatCompletionResponse fail;
     fail.status = Status::Unavailable("LLM_TRANSPORT: synthetic");

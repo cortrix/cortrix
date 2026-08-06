@@ -50,7 +50,7 @@ public:
     /// ambiguous_action_taken / web_fallback_triggered). Path handling per §6.3
     /// (correct: no-op return; ambiguous: mark action; incorrect: OBS counter +
     /// degrade). Does NOT decide skip — that is the QueryPipeline's job via
-    /// ShouldSkipF37. The real definition lands with the router.
+    /// ShouldSkipCrag. The real definition lands with the router.
     void EvaluateAndUpdateContext(query::QueryContext& ctx,
                                   const std::vector<RankedChunk>& chunks);
 

@@ -21,7 +21,7 @@
 
 // CRAG S4/S5/S7 coverage: EvaluateAndUpdateContext writes the 6 CRAG QueryContext
 // fields + path handling (§6.3), the explain-endpoint dump (§5.1), and the query routing
-// ShouldSkipF37 mock (§2 / §4.1). Standalone — heuristic backend, no ONNX.
+// ShouldSkipCrag mock (§2 / §4.1). Standalone — heuristic backend, no ONNX.
 namespace cortrix::retrieval {
 namespace {
 
@@ -138,27 +138,27 @@ TEST_F(CragContextTest, DoesNotTouchRouterFields) {
     EXPECT_TRUE(ctx.rerank);
 }
 
-// ---------------- §2 / §4.1 ShouldSkipF37 mock --------------------------------
+// ---------------- §2 / §4.1 ShouldSkipCrag mock --------------------------------
 
 TEST_F(CragContextTest, ShouldSkipCragMockByRoutingPath) {
     query::QueryContext complex;
     complex.routing_path = "complex";
-    EXPECT_FALSE(ShouldSkipF37(complex));  // complex → run CRAG
+    EXPECT_FALSE(ShouldSkipCrag(complex));  // complex → run CRAG
 
     query::QueryContext simple;
     simple.routing_path = "simple";
-    EXPECT_TRUE(ShouldSkipF37(simple));    // simple → skip
+    EXPECT_TRUE(ShouldSkipCrag(simple));    // simple → skip
 
     query::QueryContext chat;
     chat.routing_path = "chat";
-    EXPECT_TRUE(ShouldSkipF37(chat));
+    EXPECT_TRUE(ShouldSkipCrag(chat));
 
     query::QueryContext chatFlag;
     chatFlag.chat_path_triggered = true;
-    EXPECT_TRUE(ShouldSkipF37(chatFlag));
+    EXPECT_TRUE(ShouldSkipCrag(chatFlag));
 
     query::QueryContext unrouted;  // empty routing_path → default to running (fail-safe)
-    EXPECT_FALSE(ShouldSkipF37(unrouted));
+    EXPECT_FALSE(ShouldSkipCrag(unrouted));
 }
 
 TEST_F(CragContextTest, CragStageDisabledDoesNotEvaluateOrTruncate) {

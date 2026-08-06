@@ -23,7 +23,7 @@ struct QueryContext;  // fwd-decl (defined in query/query_context.h); RouteAndUp
 /// It lives in cortrix::query (not cortrix::retrieval) because it is a *query-path*
 /// component: the standalone routing mock left by the CRAG stage
 /// (retrieval/routing_mock.h) names the real owner as
-/// `cortrix::query::QueryComplexityClassifier::ShouldSkipF37`, and the QueryPipeline
+/// `cortrix::query::QueryComplexityClassifier::ShouldSkipCrag`, and the QueryPipeline
 /// drives it before RAG-Fusion, rerank and CRAG. Implementing retrieval::IClassifier across the
 /// namespace boundary is intentional and matches that documented contract.
 ///
@@ -40,7 +40,7 @@ struct QueryContext;  // fwd-decl (defined in query/query_context.h); RouteAndUp
 ///
 /// Standalone (D3): the backend is a HeuristicComplexityBackend stub (no ONNX); the
 /// real DistilBERT-tiny OnnxComplexityBackend + QueryPipeline step-3 wiring are
-/// The skip decisions are exposed via the static ShouldSkipF36/ShouldSkipF37
+/// The skip decisions are exposed via the static ShouldSkipRagFusion/ShouldSkipCrag
 /// helpers the QueryPipeline calls (this class never reaches into those stages).
 class QueryComplexityClassifier : public retrieval::IClassifier {
 public:
@@ -87,12 +87,12 @@ public:
     /// RAG-Fusion is skipped on the Simple and Chat paths: both
     /// keep the single original query (no LLM variant expansion). An empty
     /// routing_path (not yet routed) → do NOT skip (fail-safe to running it).
-    static bool ShouldSkipF36(const QueryContext& ctx);
+    static bool ShouldSkipRagFusion(const QueryContext& ctx);
 
     /// CRAG runs only on the Complex / (default) path; it is skipped on Simple
-    /// and Chat. Same fail-safe as ShouldSkipF36. Kept in
+    /// and Chat. Same fail-safe as ShouldSkipRagFusion. Kept in
     /// exact lockstep with the CRAG-side mock (retrieval/routing_mock.h).
-    static bool ShouldSkipF37(const QueryContext& ctx);
+    static bool ShouldSkipCrag(const QueryContext& ctx);
 
     // --- Exposed for unit tests / reuse ---
 

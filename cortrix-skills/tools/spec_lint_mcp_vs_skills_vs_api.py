@@ -15,7 +15,7 @@ Three-way rules:
   2. For each shared name, the Skill SDK method parameter set == the MCP server tool parameter
      set (modulo the known ``async_``↔``async`` alias and ``self``).
   3. Each method's underlying wire path is present in API spec, **or** is on the
-     ``D3.5_DEFERRED_PATHS`` allowlist (endpoints not yet in the frozen spec —
+     ``DEFERRED_PATHS`` allowlist (endpoints not yet in the frozen spec —
      feature design section 4 note †).
 
 **Run timing**: wired into the quick start release gate / CI (feature design section 2 /
@@ -24,7 +24,7 @@ section 10.4) — it is NOT part of the standalone unit suite. Exit code 0 = pas
 
 Usage::
 
-    python tools/spec_lint_mcp_vs_sdk_toolkit_vs_p04.py [--repo-root PATH] [--json]
+    python tools/spec_lint_mcp_vs_skills_vs_api.py [--repo-root PATH] [--json]
 """
 
 from __future__ import annotations
@@ -46,9 +46,9 @@ ADMIN_TOOLS: Set[str] = {
 PARAM_ALIASES: Dict[str, str] = {"async_": "async"}
 
 # Endpoints the toolkit/MCP target that are not yet in the frozen OpenAPI spec
-# (feature design section 4 note †; reconciled in D3.5). Path templates use the
+# (feature design section 4 note †; reconciled once the spec catches up). Path templates use the
 # server-relative form (no /api/v1 prefix).
-D3_5_DEFERRED_PATHS: Set[str] = {
+DEFERRED_PATHS: Set[str] = {
     "/interactions",
     "/memory/extract",
     "/memory/audit",
@@ -63,7 +63,7 @@ D3_5_DEFERRED_PATHS: Set[str] = {
 # Skill SDK: introspect CortrixToolKit
 # --------------------------------------------------------------------------- #
 
-def collect_p14(repo_root: str) -> Dict[str, Set[str]]:
+def collect_sdk_toolkit(repo_root: str) -> Dict[str, Set[str]]:
     """Return ``{method_name: {param, ...}}`` for the 29 toolkit methods."""
     import inspect
 
@@ -96,7 +96,7 @@ def _is_mcp_tool(fn: ast.FunctionDef) -> bool:
     return False
 
 
-def collect_p12(repo_root: str) -> Dict[str, Set[str]]:
+def collect_mcp(repo_root: str) -> Dict[str, Set[str]]:
     """Return ``{tool_name: {param, ...}}`` for every ``cortrix_*`` MCP tool."""
     tools_dir = os.path.join(repo_root, "cortrix-mcp", "src", "cortrix_mcp", "tools")
     out: Dict[str, Set[str]] = {}
@@ -170,20 +170,20 @@ def run_checks(repo_root: str) -> Tuple[List[str], List[str]]:
     errors: List[str] = []
     warnings: List[str] = []
 
-    sdk_toolkit = collect_p14(repo_root)
-    mcp_all = collect_p12(repo_root)
+    sdk_toolkit = collect_sdk_toolkit(repo_root)
+    mcp_all = collect_mcp(repo_root)
     if not mcp_all:
         errors.append("MCP: no cortrix-mcp tools found (check cortrix-mcp/src/.../tools/).")
         return errors, warnings
     mcp = {k: v for k, v in mcp_all.items() if k not in ADMIN_TOOLS}
 
     # Rule 1 — name set equality.
-    only_p14 = set(sdk_toolkit) - set(mcp)
-    only_p12 = set(mcp) - set(sdk_toolkit)
-    if only_p14:
-        errors.append(f"SDK toolkit methods with no MCP tool: {sorted(only_p14)}")
-    if only_p12:
-        errors.append(f"MCP tools with no SDK toolkit method: {sorted(only_p12)}")
+    only_sdk_toolkit = set(sdk_toolkit) - set(mcp)
+    only_mcp = set(mcp) - set(sdk_toolkit)
+    if only_sdk_toolkit:
+        errors.append(f"SDK toolkit methods with no MCP tool: {sorted(only_sdk_toolkit)}")
+    if only_mcp:
+        errors.append(f"MCP tools with no SDK toolkit method: {sorted(only_mcp)}")
     if len(sdk_toolkit) != 29:
         errors.append(f"SDK toolkit method count = {len(sdk_toolkit)} (expected 29).")
     if len(mcp) != 29:
@@ -202,10 +202,10 @@ def run_checks(repo_root: str) -> Tuple[List[str], List[str]]:
     if api_spec_paths is None:
         warnings.append("API spec: PyYAML not installed — skipped OpenAPI path coverage check.")
     else:
-        for path in sorted(D3_5_DEFERRED_PATHS):
+        for path in sorted(DEFERRED_PATHS):
             if path in api_spec_paths:
                 warnings.append(
-                    f"API spec now defines {path!r} — remove it from D3.5_DEFERRED_PATHS and wire the SDK verb."
+                    f"API spec now defines {path!r} — remove it from DEFERRED_PATHS and wire the SDK verb."
                 )
 
     return errors, warnings

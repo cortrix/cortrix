@@ -124,7 +124,7 @@ public:
 
 // ---------- ParseEnricherChainSpec ----------
 
-TEST(EnricherChainSpec, EmptyDefaultsToF03) {
+TEST(EnricherChainSpec, EmptyDefaultsToEnrich) {
     EXPECT_EQ(ParseEnricherChainSpec(""), (std::vector<std::string>{"enrich"}));
 }
 
@@ -173,7 +173,7 @@ TEST(EnricherChainResolve, DefaultWhenNothingSet) {
 
 // ---------- EnrichChunks (merge + fail-soft) ----------
 
-TEST(EnricherChainRun, MergesEnricherAndF35PerChunk) {
+TEST(EnricherChainRun, MergesEnricherAndContextualPerChunk) {
     auto dm = DocMeta();
     EnricherChain chain;
     chain.Append(std::make_shared<FakeSummaryEnricher>("a summary"));

@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS agent_trace (
 
     -- Session identity (topic 3 — VARCHAR(64) → VARCHAR(128))
     session_id    VARCHAR(128),                -- Agent session id (C2; same length as operation_log.session_id)
-    trace_id      VARCHAR(128),                -- call-chain id (C1/F18a-6; same length as operation_log.trace_id)
+    trace_id      VARCHAR(128),                -- call-chain id (C1; same length as operation_log.trace_id)
     agent_id      VARCHAR(128),                -- Agent identity (topic 3 — length aligned)
 
     -- call detail

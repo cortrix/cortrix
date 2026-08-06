@@ -150,7 +150,7 @@ TEST(CatalogSchemaMigrateCleanBreakTest, MissingBlobGcQueueCreatedFresh) {
 // CatalogSchemaProvider metadata accessors.
 // ---------------------------------------------------------------------------
 
-TEST(CatalogSchemaProviderTest, FeatureNameIsF12) {
+TEST(CatalogSchemaProviderTest, FeatureNameIsCatalog) {
     CatalogSchemaProvider p;
     EXPECT_EQ(p.FeatureName(), "catalog");
 }

@@ -154,7 +154,7 @@ add_executable(cortrix_unit_tests
     unit/test_memory_writer.cpp
     unit/test_memory_injector.cpp
     unit/test_memory_searcher.cpp
-    unit/test_memory_searcher_mem05.cpp
+    unit/test_memory_searcher_isolation.cpp
     unit/test_memory_routes.cpp
     unit/test_query_routes.cpp
     unit/test_rrf_fusion.cpp

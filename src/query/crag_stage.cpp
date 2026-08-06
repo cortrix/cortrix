@@ -10,11 +10,11 @@ namespace cortrix::query {
 void CragStage::Apply(CrossNsResponse& resp, QueryContext& qctx) {
     // Skip when the request explicitly disables CRAG, the router says so (simple / chat
     // routes), or no evaluator is wired. CRAG runs only on the Complex path (see
-    // ShouldSkipF37) — keep this gate in exact lockstep with that helper so
+    // ShouldSkipCrag) — keep this gate in exact lockstep with that helper so
     // the route decision drives it.
     if (!qctx.enable_crag) return;
     if (evaluator_ == nullptr) return;
-    if (QueryComplexityClassifier::ShouldSkipF37(qctx)) return;
+    if (QueryComplexityClassifier::ShouldSkipCrag(qctx)) return;
 
     // Convert the post-rerank ResultItems to the RankedChunks the evaluator consumes
     // (RETRIEVAL_TYPES_SPEC §1: child_id + chunk_text + scores). The multi-signal

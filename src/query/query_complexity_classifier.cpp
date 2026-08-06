@@ -143,15 +143,15 @@ bool QueryComplexityClassifier::HasMultiTurnSignal(const std::string& query) {
     return false;
 }
 
-bool QueryComplexityClassifier::ShouldSkipF36(const QueryContext& ctx) {
+bool QueryComplexityClassifier::ShouldSkipRagFusion(const QueryContext& ctx) {
     // Simple / Chat skip rag-fusion (keep the single original query, no LLM expansion).
     // Empty routing_path (not yet routed) → do NOT skip (fail-safe to Complex).
     if (ctx.chat_path_triggered) return true;
     return ctx.routing_path == "simple" || ctx.routing_path == "chat";
 }
 
-bool QueryComplexityClassifier::ShouldSkipF37(const QueryContext& ctx) {
-    // Kept in exact lockstep with retrieval/routing_mock.h::ShouldSkipF37.
+bool QueryComplexityClassifier::ShouldSkipCrag(const QueryContext& ctx) {
+    // Kept in exact lockstep with retrieval/routing_mock.h::ShouldSkipCrag.
     if (ctx.chat_path_triggered) return true;
     return ctx.routing_path == "simple" || ctx.routing_path == "chat";
 }

@@ -226,7 +226,7 @@ TEST_F(CatalogSchemaTest, ForeignKeysEnforced) {
 }
 
 // schema_version records at the current version after Open().
-TEST_F(CatalogSchemaTest, SchemaVersionRecordsF12) {
+TEST_F(CatalogSchemaTest, SchemaVersionRecordsCatalog) {
     EXPECT_EQ(QueryInt(db_,
         "SELECT version FROM schema_version WHERE feature='catalog'"),
         kCatalogSchemaVersion);

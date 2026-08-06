@@ -435,35 +435,35 @@ TEST_F(RouterClassifierTest, HasMultiTurnSignalDetectsCuesAndAvoidsFalsePositive
 
 // --- §6.3: RAG-Fusion / CRAG skip helpers (lockstep with routing_mock.h) ----------
 
-TEST_F(RouterClassifierTest, ShouldSkipRagFusionAndF37PerPath) {
+TEST_F(RouterClassifierTest, ShouldSkipRagFusionAndCragPerPath) {
     QueryContext simple;
     simple.routing_path = "simple";
-    EXPECT_TRUE(QueryComplexityClassifier::ShouldSkipF36(simple));
-    EXPECT_TRUE(QueryComplexityClassifier::ShouldSkipF37(simple));
+    EXPECT_TRUE(QueryComplexityClassifier::ShouldSkipRagFusion(simple));
+    EXPECT_TRUE(QueryComplexityClassifier::ShouldSkipCrag(simple));
 
     QueryContext complex;
     complex.routing_path = "complex";
-    EXPECT_FALSE(QueryComplexityClassifier::ShouldSkipF36(complex));
-    EXPECT_FALSE(QueryComplexityClassifier::ShouldSkipF37(complex));
+    EXPECT_FALSE(QueryComplexityClassifier::ShouldSkipRagFusion(complex));
+    EXPECT_FALSE(QueryComplexityClassifier::ShouldSkipCrag(complex));
 
     QueryContext chat;
     chat.routing_path = "chat";
     chat.chat_path_triggered = true;
-    EXPECT_TRUE(QueryComplexityClassifier::ShouldSkipF36(chat));
-    EXPECT_TRUE(QueryComplexityClassifier::ShouldSkipF37(chat));
+    EXPECT_TRUE(QueryComplexityClassifier::ShouldSkipRagFusion(chat));
+    EXPECT_TRUE(QueryComplexityClassifier::ShouldSkipCrag(chat));
 
     // Not-yet-routed (empty) → fail-safe to NOT skip (run the full pipeline).
     QueryContext fresh;
-    EXPECT_FALSE(QueryComplexityClassifier::ShouldSkipF36(fresh));
-    EXPECT_FALSE(QueryComplexityClassifier::ShouldSkipF37(fresh));
+    EXPECT_FALSE(QueryComplexityClassifier::ShouldSkipRagFusion(fresh));
+    EXPECT_FALSE(QueryComplexityClassifier::ShouldSkipCrag(fresh));
 }
 
 TEST_F(RouterClassifierTest, ChatFlagAloneTriggersSkipEvenWithoutRoutingPath) {
     // Defensive: chat_path_triggered set but routing_path somehow empty → still skip.
     QueryContext ctx;
     ctx.chat_path_triggered = true;
-    EXPECT_TRUE(QueryComplexityClassifier::ShouldSkipF36(ctx));
-    EXPECT_TRUE(QueryComplexityClassifier::ShouldSkipF37(ctx));
+    EXPECT_TRUE(QueryComplexityClassifier::ShouldSkipRagFusion(ctx));
+    EXPECT_TRUE(QueryComplexityClassifier::ShouldSkipCrag(ctx));
 }
 
 // --- end-to-end with the real heuristic backend (no mock) ---------------------

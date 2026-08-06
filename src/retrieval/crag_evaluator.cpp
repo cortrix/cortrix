@@ -232,7 +232,7 @@ CragMetrics::Decision DecisionForVerdict(const std::string& verdict) {
 void CragEvaluator::EvaluateAndUpdateContext(
     query::QueryContext& ctx, const std::vector<RankedChunk>& chunks) {
     // Classify and write the CRAG verdict fields onto QueryContext. This does
-    // NOT decide skip — the QueryPipeline gates on ShouldSkipF37 *before*
+    // NOT decide skip — the QueryPipeline gates on ShouldSkipCrag *before*
     // calling this. Skipped queries simply never reach here.
     ClassifierInput input{ctx.query, chunks,
                           ctx.ns_id.empty() ? std::optional<std::string>{}

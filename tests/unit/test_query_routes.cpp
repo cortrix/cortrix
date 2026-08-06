@@ -259,7 +259,7 @@ TEST_F(QueryRoutesIntegrationTest, ValidQuery_ExistingNamespace_Returns200) {
 
 // An invalid ?route query-string token is rejected with 400 + the query routing
 // CX_ERR_ROUTER_FORCE_ROUTE_INVALID body before any namespace acquisition.
-TEST_F(QueryRoutesIntegrationTest, InvalidRouteParam_Returns400F39) {
+TEST_F(QueryRoutesIntegrationTest, InvalidRouteParam_Returns400) {
     httplib::Client cli("127.0.0.1", port_);
     json req_body;
     req_body["query"] = "test";
@@ -276,7 +276,7 @@ TEST_F(QueryRoutesIntegrationTest, InvalidRouteParam_Returns400F39) {
 
 // An invalid ?route value carried in the JSON body (not the query string) is also
 // rejected — covers the body-value branch of ApplyRouteGranularityParams' absence.
-TEST_F(QueryRoutesIntegrationTest, InvalidRouteInBody_Returns400F39) {
+TEST_F(QueryRoutesIntegrationTest, InvalidRouteInBody_Returns400) {
     httplib::Client cli("127.0.0.1", port_);
     json req_body;
     req_body["query"] = "test";

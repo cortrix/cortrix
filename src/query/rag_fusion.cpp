@@ -131,7 +131,7 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
     // Deferred: routing-skip is interface-reserved — the frozen
     // QueryContext has no `routing_path` field (the router adds it). Once it
     // lands, this becomes:
-    //   if (qctx && QueryComplexityClassifier::ShouldSkipF36(*qctx)) {
+    //   if (qctx && QueryComplexityClassifier::ShouldSkipRagFusion(*qctx)) {
     //       explain_.reason = "skipped_by_Router_routing"; ... return {query};
     //   }
     // Until then qctx is accepted + threaded but does not alter behavior.
