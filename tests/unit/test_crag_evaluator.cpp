@@ -299,7 +299,7 @@ TEST(CragEvaluatorTest, CircuitBreakerOpensThenGatesSubsequentQuery) {
 
 TEST(CragEvaluatorTest, NameAndLabels) {
     CragEvaluator ev(std::make_shared<HeuristicGuardBackend>(), CragConfig{});
-    EXPECT_EQ(ev.Name(), "crag-crag");
+    EXPECT_EQ(ev.Name(), "crag");
     EXPECT_EQ(ev.Labels(),
               (std::vector<std::string>{"correct", "ambiguous", "incorrect"}));
     EXPECT_TRUE(ev.IsAvailable());

@@ -44,7 +44,7 @@ public:
     /// + a safe fallback label.
     virtual ClassificationResult Classify(const ClassifierInput& input) = 0;
 
-    /// Stable classifier name (logging / explain endpoint). e.g. "crag-crag".
+    /// Stable classifier name (logging / explain endpoint). e.g. "crag".
     virtual std::string Name() const = 0;
 
     /// The full set of labels this classifier can emit (stable, ordered).
