@@ -35,7 +35,7 @@ def _import_body(
 
 
 class Imports(SyncResource):
-    """Manual database import. Hand-written; real spec -> D3.5."""
+    """Manual database import. Hand-written; formal spec to follow."""
 
     def database(
         self,

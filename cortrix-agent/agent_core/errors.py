@@ -1,4 +1,4 @@
-"""agent error codes + GEN-Agent 4-field error response (design section 9.3 / section 10).
+"""agent error codes + GEN-Agent 4-field error response.
 
 GEN-Agent first principle (AGENT_FRIENDLY.md): every error carries machine-readable
 fields so an Agent caller can decide retry / routing autonomously. The wire shape is::

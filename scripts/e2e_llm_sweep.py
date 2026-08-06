@@ -244,7 +244,7 @@ def main():
         if ok_all:
             check("P5 interactions written", True)
 
-        # Memory extraction is wired (D3.5 r2 M1/M2): the queue drains interactions through
+        # Memory extraction is wired (integration r2 M1/M2): the queue drains interactions through
         # the LLM extractor. Poll up to 90s for the extracted fact to surface.
         hit = False
         last_resp = ""

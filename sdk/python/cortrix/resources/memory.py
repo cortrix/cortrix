@@ -170,7 +170,7 @@ class Memory_(SyncResource):
     ) -> Any:
         """Log an interaction. Live wire: ``POST /memory/sessions/{id}/interactions``
         (writes the agent trace interaction row; the designed one-shot /memory/log with the
-        Memory extraction auto-extract trigger is not mounted yet -> D3.5)."""
+        Memory extraction auto-extract trigger is not mounted yet)."""
         if not session_id:
             raise ValueError(
                 "session_id is required: the live wire logs interactions under "
@@ -288,7 +288,7 @@ class Memory_(SyncResource):
 
     def opt_out(self, session_id: str, *, namespace: Optional[str] = None) -> Any:
         """Session memory opt-out. ``POST /memory/session/{id}/opt-out``
-        (§2.12-only; API spec to be added -> D3.5)."""
+        (API spec to be added)."""
         effective_namespace = namespace or self._session_namespaces.get(session_id)
         return self._client._request(
             "POST",

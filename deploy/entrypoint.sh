@@ -357,7 +357,7 @@ else
     unset CORTRIX_RERANKER_MODEL_DIR
 fi
 
-# Query routing/CRAG query-complexity classifier (D3.5 r2 #26): point the server at the
+# Query routing/CRAG query-complexity classifier: point the server at the
 # bind-mounted model dir when present; absent = heuristic fallback by design.
 if [ -d "${CORTRIX_QUERY_COMPLEXITY_MODEL_DIR:-/data/models/query-complexity}" ]; then
     export CORTRIX_QUERY_COMPLEXITY_MODEL_DIR="${CORTRIX_QUERY_COMPLEXITY_MODEL_DIR:-/data/models/query-complexity}"

@@ -3,7 +3,7 @@
 These exercise the real framework + real LLM + a live cortrix-server (feature
 design sections 10.2 / 10.3 / 5.4-bis e2e). They are intentionally **skipped**
 in standalone development: they need network, API keys, and the installed
-frameworks, and the integration wiring lands at D3.5 / the quick start release gate. The
+frameworks, and the integration wiring lands at the quick start release gate. The
 standalone unit suite (``tests/test_*.py``) covers the conversion + error
 contract with mocks.
 

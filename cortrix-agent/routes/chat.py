@@ -16,8 +16,8 @@ Naming rule: this is the Cortrix Agent chat endpoint — never a
 "chatbot" endpoint; the executor class is ``ChatExecutor``.
 
 MEM co-processing (interaction_log write / memory extract trigger / memory isolation user_id
-filter — agent design) is the V1.5 ②-round scope and is intentionally NOT
-wired here; see the ``TODO(D3.5)`` marker below.
+filter — agent design) is the V1.5 scope and is intentionally NOT
+wired here; see the ``TODO(integration)`` marker below.
 """
 
 from __future__ import annotations
@@ -148,7 +148,7 @@ async def chat_endpoint(
             )
             # Feed the turn back into Cortrix memory (agent trace interaction_log + memory extract,
             # via one SDK memory.log call) fire-and-forget so it never blocks the response
-            # (design the agent design). TODO(D3.5): real cortrix-server interaction-log
+            # TODO(integration): real cortrix-server interaction-log
             # persistence + live memory extraction worker; memory isolation user_id from a real JWT claim.
             task = asyncio.create_task(
                 mem.record_turn(

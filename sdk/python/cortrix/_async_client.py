@@ -239,7 +239,7 @@ class AsyncCortrix(AsyncBaseClient):
         )
 
     async def get_sources(self, interaction_id: str) -> Any:
-        """Citation sources — §2.12-only endpoint (API spec -> D3.5)."""
+        """Citation sources — endpoint not yet in the published API spec."""
         return await self.query.get_sources(interaction_id)
 
     async def import_database(

@@ -1,4 +1,4 @@
-"""Cortrix Agent — FastAPI entry point (agent V1.0 ①-kernel / design section 4 + 11.bis).
+"""Cortrix Agent — FastAPI entry point (agent V1.0 kernel).
 
 Assembles the dependency graph and mounts the chat / sessions / config routers over the
 UI-agnostic :mod:`agent_core` kernel:
@@ -169,7 +169,7 @@ def build_app(
         # Design section 11.bis startup sequence (standalone: health ping stubbed).
         # HEALTHCHECK_MODE=live would attempt the cortrix-server ping with 5 retries
         # and raise CX_ERR_F48_CORTRIX_SERVER_UNREACHABLE on exhaustion (Step 4); the
-        # live probe wiring is TODO(D3.5) once cortrix-server runs in deployment compose.
+        # live probe wiring is TODO(integration) once cortrix-server runs in deployment compose.
         healthcheck_mode = os.environ.get("HEALTHCHECK_MODE", "stub")
         logger.info(
             "cortrix_agent_started",
@@ -255,7 +255,7 @@ def build_app(
                 llm_reachable = False
         return {
             "status": "ready",
-            "cortrix_server": "unknown",  # TODO(D3.5): live ping in deployment compose
+            "cortrix_server": "unknown",  # TODO(integration): live ping in deployment compose
             "llm_reachable": llm_reachable,
         }
 

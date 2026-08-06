@@ -9,7 +9,7 @@ tolerant shim for the pre-mount MVP response shape (chunk_text/block_id) —
 cross-NS-shaped responses pass through untouched.
 
 ``get_sources()`` -> ``GET /interactions/{id}/sources`` is **§2.12-only**
-(API spec to be added -> D3.5).
+(API spec to be added).
 """
 
 from __future__ import annotations
