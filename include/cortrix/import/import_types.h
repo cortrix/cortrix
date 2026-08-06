@@ -14,8 +14,8 @@
 namespace cortrix::import {
 
 /// Phase-1 string-alias IDs (ARCH §1.8 — distinct strong types are Phase 2). A
-/// connection ref is "db_conn_<ulid>"; an import task is "import_<ulid>" (
-/// §4.1 / §4.2). NsId / TenantId reuse the catalog's TEXT keys.
+/// connection ref is "db_conn_<ulid>"; an import task is "import_<ulid>".
+/// NsId / TenantId reuse the catalog's TEXT keys.
 using ConnectionRefId = std::string;
 using ImportTaskId    = std::string;
 using NsId            = cortrix::id::NamespaceId;

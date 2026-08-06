@@ -83,8 +83,8 @@ const AuthErrorInfo& GetAuthErrorInfo(AuthErrorCode code);
 /// The "CX_ERR_*" string for `code` (convenience over GetAuthErrorInfo).
 const char* AuthErrorCodeString(AuthErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (
-/// structured_data column). Empty where the spec lists `{}` (e.g.
+/// The structured_data keys a `code`'s error body MUST carry
+/// (structured_data column). Empty where the spec lists `{}` (e.g.
 /// kInvalidCredentials — empty to prevent enumeration). SoT for the
 /// Agent-friendly contract (GEN-Agent #5).
 const std::vector<std::string>& RequiredStructuredDataKeys(AuthErrorCode code);

@@ -56,8 +56,8 @@ const EnricherErrorInfo& GetEnricherErrorInfo(EnricherErrorCode code);
 /// The "CX_ERR_ENRICHER_*" string for `code` (convenience over GetEnricherErrorInfo).
 const char* EnricherErrorCodeString(EnricherErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (
-/// structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5);
+/// The structured_data keys a `code`'s error body MUST carry
+/// (structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5);
 /// lets call sites + tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(EnricherErrorCode code);
 

@@ -13,8 +13,8 @@
 
 namespace cortrix::async {
 
-/// WorkerPool — N resident worker threads draining the async task queue (
-/// / topic 1). Each worker loops: TaskScheduler::Dequeue → DocumentProcessor::
+/// WorkerPool — N resident worker threads draining the async task queue.
+/// Each worker loops: TaskScheduler::Dequeue → DocumentProcessor::
 /// ProcessTask → TaskScheduler::OnTaskCompleted(doc_id). When the queue is empty
 /// a worker blocks on a condition variable until Notify() (a new Enqueue) or Stop().
 ///

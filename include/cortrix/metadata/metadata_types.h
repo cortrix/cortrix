@@ -19,8 +19,8 @@
 // cortrix::spc::DocumentMetadata (parser.h:75) — its real field names are
 // filename / doc_title / mime_type / file_size_bytes / page_count / doc_language /
 // upload_timestamp / parse_time_ms (NOT the stale `lang`/`upload_time` of detailed design §2.1).
-// FileInfo / ProcessingStats below are this layer's OWN GeneratorInput DTOs (
-// they do NOT exist in dev) — they carry the request-level / pipeline-stats inputs
+// FileInfo / ProcessingStats below are this layer's OWN GeneratorInput DTOs
+// (defined here only) — they carry the request-level / pipeline-stats inputs
 // the parser's DocumentMetadata does not (source_uri / tags / parser_name / counts).
 namespace cortrix::metadata {
 
@@ -37,8 +37,8 @@ struct FileInfo {
 
 /// Parse / pipeline statistics (owned DTO — NOT a parser type,
 /// `stats`). Carries the producer/version provenance + chunk counts the schema's
-/// A-class system fields need. parent_count / child_count come from the chunker (
-/// parse → chunk → metadata, so they only exist after splitting); standalone these are supplied by the caller /
+/// A-class system fields need. parent_count / child_count come from the chunker
+/// (parse → chunk → metadata, so they only exist after splitting); standalone these are supplied by the caller /
 /// mock. parse_status / parse_failed_page are the cleaning-coordination signals passed through from the parser
 /// (V2 rework M-03), surfaced here so the generator can fill meta.parse_status /
 /// meta.parse_failed_page without re-deriving them.

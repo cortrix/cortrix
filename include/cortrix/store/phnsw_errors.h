@@ -26,8 +26,8 @@ enum class PhnswError {
     WAL_SYNC_FAILED = 9,
 };
 
-/// Stable CX_ERR_* identity codes for the P-HNSW scope (
-/// registered under ARCH § 4.1 `CX_ERR_PHNSW_*`). Per CODING_CONVENTIONS § 3 the
+/// Stable CX_ERR_* identity codes for the P-HNSW scope
+/// (registered as `CX_ERR_PHNSW_*`). Per CODING_CONVENTIONS § 3 the
 /// project uses one error model — `Result<T>` + `Status` — and distinguishes
 /// domain errors by a `CX_ERR_*` code string rather than a typed `Result<T, E>`.
 /// The code is carried as a stable prefix on the Status message

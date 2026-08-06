@@ -11,8 +11,8 @@
 namespace cortrix::async {
 
 /// TaskFinalizer — collapses the generic "terminal write + task-level metric"
-/// boilerplate that every ITaskHandler repeats at its terminal exits (
-/// finalize ownership = handler, decision A 2026-06-09). Each handler still OWNS the
+/// boilerplate that every ITaskHandler repeats at its terminal exits
+/// (finalize ownership = handler). Each handler still OWNS the
 /// terminal *decision + content* (which outcome, which CX_ERR_* code, which
 /// structured_data); this only unifies the mechanics: Mark* + RecordCompleted +
 /// ObserveDuration. The framework (WorkerLoop) does NOT finalize — it dispatches and

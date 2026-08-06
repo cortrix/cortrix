@@ -70,14 +70,14 @@ struct CompiledQuery {
 /// markers and statement separators (`;` stacked queries) are rejected too.
 Status ValidateSqlKeywords(const std::string& sql, const QueryConstraints& constraints);
 
-/// Validate a JSON DSL filter against the operator + field allowlists (
-/// v1.0.2 ruling 8). Returns CX_ERR_F16A_INVALID_SQL on an unknown operator, a field
+/// Validate a JSON DSL filter against the operator + field allowlists.
+/// Returns CX_ERR_F16A_INVALID_SQL on an unknown operator, a field
 /// not in the allowlist, or a malformed shape.
 Status ValidateFilterDsl(const nlohmann::json& filter_dsl,
                          const FilterDslConstraints& constraints);
 
-/// Compile a table + JSON DSL filter into a parameterized SELECT (
-/// build_query_from_filter_dsl). Validates first (ValidateFilterDsl); on success the
+/// Compile a table + JSON DSL filter into a parameterized SELECT
+/// (build_query_from_filter_dsl). Validates first (ValidateFilterDsl); on success the
 /// returned SQL uses only $N placeholders and `columns` are emitted as a quoted
 /// identifier list (validated against the allowlist). `table` must be a bare
 /// identifier (pattern ^[A-Za-z_][A-Za-z0-9_]*$).

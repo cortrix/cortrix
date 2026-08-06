@@ -50,8 +50,8 @@ const ContextualErrorInfo& GetContextualErrorInfo(ContextualErrorCode code);
 /// The "CX_ERR_F35_*" string for `code`.
 const char* ContextualErrorCodeString(ContextualErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (
-/// structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5).
+/// The structured_data keys a `code`'s error body MUST carry
+/// (structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5).
 const std::vector<std::string>& RequiredStructuredDataKeys(ContextualErrorCode code);
 
 /// True iff `structured_data` contains every required key for `code`.

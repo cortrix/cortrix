@@ -326,7 +326,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::catalog::CatalogDb catalog_db;
     {
         const std::string catalog_path = config.ns.data_dir + "/catalog.db";
-        // [D3.5 batch1/F18a] migrate the operation_log schema into the
+        // migrate the operation_log schema into the
         // catalog/global DB at startup so ObservabilityModule attaches to an
         // already-migrated handle (its ctor doc requires the schema to exist).
         cortrix::observability::OperationLogSchemaProvider oplog_schema;
@@ -1241,7 +1241,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // route dispatch / API-key auth. Config comes from CORTRIX_ADMIN_BIND.
     cortrix::middleware::InstallAdminGuard(server.server(),
         {config.security.admin_bind, config.security.allow_public_admin});
-    // Deployment wiring (Wave D-R1, additive). The DiskMonitor itself is
+    // Deployment wiring (additive). The DiskMonitor itself is
     // constructed earlier (6b) so the SPC admission gate + upload route hold it.
     // Dual health endpoint (F24 main impl): /api/v1/system/health/{live,ready}.
     // /ready aggregates the F20 ReadinessRegistry (unified

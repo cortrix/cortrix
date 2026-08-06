@@ -40,8 +40,8 @@ struct DeduplicatedChunkInfo {
     std::vector<DedupSourceNs> namespaces;   ///< brief multi-source array (NS + score), >= 2 entries
 };
 
-/// Cross-NS response meta — exactly the **8 A/C-class fields** (
-/// v1.0.2; rerank_enabled + dedup_applied B2 fields were deleted). All present on
+/// Cross-NS response meta — exactly the **8 A/C-class fields**
+/// (rerank_enabled + dedup_applied B2 fields were deleted). All present on
 /// every response (GEN-Agent #2 A-class "always included"); warnings is C-class (only populated
 /// under its trigger).
 struct CrossNsMeta {

@@ -37,8 +37,8 @@ public:
     /// Query: top-`top_k` children for `query` within `ns_id`, by descending
     /// SPLADE score. A namespace with no indexed sparse vectors returns an empty
     /// vector (success). Implementations that hit an internal fault return an
-    /// empty vector AND should let the caller observe the L2-fallback path (
-    /// §7.2) — Search itself does not throw.
+    /// empty vector AND should let the caller observe the L2-fallback path
+    /// — Search itself does not throw.
     virtual std::vector<SparseHit> Search(
         const SparseVector& query,
         const NamespaceId& ns_id,

@@ -5,8 +5,8 @@
 
 namespace cortrix::spc {
 
-/// The contextual-retrieval per-Unit schema contribution (
-/// unified-blocks reconcile). Registered through the
+/// The contextual-retrieval per-Unit schema contribution
+/// (unified-blocks reconcile). Registered through the
 /// SchemaMigrator framework (provider #6, after the enricher).
 ///
 /// Under unified blocks, these columns live on child rows of the framework-owned

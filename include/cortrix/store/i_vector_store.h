@@ -14,8 +14,8 @@ struct TraceContext;
 
 namespace cortrix::store {
 
-/// Minimal vector-store contract held by WriteCoordinator (
-/// 2026-04-19; ARCHITECTURE.md §5). This is the **6-method subset** of the index
+/// Minimal vector-store contract held by WriteCoordinator.
+/// This is the **6-method subset** of the index
 /// surface that the cross-store write transaction actually needs — AddPoint +
 /// MarkDelete for the write/rollback paths, Search for reads, Exists for the coordinator's
 /// three-way Recover consistency check (Q1-C), and Snapshot/Recover for lifecycle.

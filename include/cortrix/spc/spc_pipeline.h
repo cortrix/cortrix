@@ -82,8 +82,8 @@ public:
     void SetDocSummaryEnqueue(std::function<void(const async::SubmitRequest&)> fn);
 
     /// Install the ISpcEnricher chain (enrich → contextualize → HyPE, fail-soft
-    /// serial). When set, the Stage-3.6 enrich step runs the whole chain (
-    /// entities/summary + contextualized_* re-embedding + hype_question
+    /// serial). When set, the Stage-3.6 enrich step runs the whole chain
+    /// (entities/summary + contextualized_* re-embedding + hype_question
     /// Block generation) instead of the single injected `enricher_`. Unset =
     /// backward-compatible single-enricher behavior (the ctor `enricher_` only).
     /// The chain must outlive the pipeline (bootstrap owns it). Non-owning pointer

@@ -25,8 +25,8 @@ struct HandlerResult {
     nlohmann::json body;
 };
 
-/// CrossNsQueryHandler — the POST /api/v1/query handler **logic** (
-/// S4.1). Parses the cross-NS QueryRequest, rejects the deprecated MVP `namespace`
+/// CrossNsQueryHandler — the POST /api/v1/query handler **logic**.
+/// Parses the cross-NS QueryRequest, rejects the deprecated MVP `namespace`
 /// single field (CX_ERR_DEPRECATED_FIELD), validates the request, then runs
 /// ScatterGather and serializes the §2.5 response / §2.6 error body.
 ///

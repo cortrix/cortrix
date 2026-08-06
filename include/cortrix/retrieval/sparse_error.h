@@ -50,8 +50,8 @@ const SparseErrorInfo& GetSparseErrorInfo(SparseErrorCode code);
 /// The "CX_ERR_F40_*" string for `code`.
 const char* SparseErrorCodeString(SparseErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (
-/// structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5).
+/// The structured_data keys a `code`'s error body MUST carry
+/// (structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5).
 const std::vector<std::string>& RequiredStructuredDataKeys(SparseErrorCode code);
 
 /// True iff `structured_data` contains every required key for `code`.

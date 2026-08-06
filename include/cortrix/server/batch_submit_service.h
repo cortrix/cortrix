@@ -50,8 +50,8 @@ struct BatchLimits {
     int64_t max_doc_bytes = 10LL * 1024 * 1024;       ///< §2.2 — per-doc content 10MB
 };
 
-/// BatchSubmitService — the POST /documents/batch orchestration (
-/// §3), independent of the HTTP transport. Validates the batch envelope (the 4
+/// BatchSubmitService — the POST /documents/batch orchestration,
+/// independent of the HTTP transport. Validates the batch envelope (the 4
 /// CX_ERR_BATCH_* faults), then per-doc submits through the ITaskSubmitter seam
 /// (production = the frozen TaskScheduler), assembling the partial-success
 /// response with the GEN-Agent 5-field meta.failed[] schema.

@@ -6,8 +6,8 @@
 
 namespace cortrix::deploy {
 
-/// OpenMetrics `reason` controlled vocabulary (
-/// OBSERVABILITY_SPEC §3.bis is the maintained SoT). Every `reason` metric label
+/// OpenMetrics `reason` controlled vocabulary (this enum is the maintained
+/// SoT). Every `reason` metric label
 /// must be one of these enum values, in the `<subsystem>.<action_outcome>`
 /// pattern (lowercase + dot) — this prevents label cardinality explosion and
 /// keeps cross-subsystem queries friendly.

@@ -129,7 +129,7 @@ bool AtomicWriteFile(const std::string& path, const std::string& contents);
 /// ⚠️ D3.5 wiring: in D3 the GracefulShutdown's drain/wal/memory hooks are bound
 /// to the real SPC pipeline / P-HNSW WAL / Memory Store. Until those hooks are
 /// bound (cross-Feature), main.cpp keeps its existing SignalHandler → server.Stop()
-/// path and does NOT call this — see the `// D3.5` note in main.cpp. The
+/// path and does NOT call this — see the deferred-integration note in main.cpp. The
 /// coordinator + this installer are fully implemented and unit-tested standalone.
 void InstallGracefulShutdown(GracefulShutdown* gs);
 

@@ -13,8 +13,8 @@ struct EmbeddingResult {
     float inference_time_ms = 0.0f;
 };
 
-/// Dense + sparse pair from a single BGE-M3 forward pass (
-/// "write-time single inference outputs dense + sparse"). `dense` is the same
+/// Dense + sparse pair from a single BGE-M3 forward pass
+/// ("write-time single inference outputs dense + sparse"). `dense` is the same
 /// 1024-dim CLS embedding EmbedBatch produces; `sparse` is the SPLADE-style
 /// lexical_weights map (BGE-M3 vocab token_id → activation weight), top-K
 /// truncated by the caller (default K=100). An empty `sparse` map is a

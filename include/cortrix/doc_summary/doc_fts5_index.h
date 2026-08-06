@@ -47,8 +47,8 @@ Result<std::vector<DocFtsHit>> SearchDocFts5(sqlite3* db, const std::string& que
 /// Standalone (D3): owns its own SQLite DB (Open(":memory:") in tests), creating
 /// the `doc_fts5_index` virtual table from the F41SchemaProvider DDL SoT so the
 /// two never drift. Product code uses the borrowed-handle helpers above against
-/// the per-Unit store.db. The query path uses BM25 column weights (
-/// doc_title 2.0 / topics 1.5 / filename 1.0) and the shared SanitizeFts5Query
+/// the per-Unit store.db. The query path uses BM25 column weights
+/// (doc_title 2.0 / topics 1.5 / filename 1.0) and the shared SanitizeFts5Query
 /// guard (M-SEC-001) against FTS5 operator injection.
 class DocFts5Index {
 public:

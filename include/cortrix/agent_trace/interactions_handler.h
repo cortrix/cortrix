@@ -36,8 +36,8 @@ struct InteractionSourcesView {
 };
 
 /// The caller's permission context for an interactions read. The
-/// real values come from the AuthContext at the request boundary (
-/// wiring); standalone tests pass them directly. A handler enforces:
+/// real values come from the AuthContext at the request boundary;
+/// standalone tests pass them directly. A handler enforces:
 ///   - non-admin may only read interactions whose interaction_log.user_id ==
 ///     requester_user_id (else CX_ERR_F13_UNAUTHORIZED, anti-leak);
 ///   - admin may read across users; a missing interaction is

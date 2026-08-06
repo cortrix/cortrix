@@ -74,8 +74,8 @@ struct AnomalyResult {
     std::map<std::string, int> by_reason;         ///< {"empty": 5, "oversized": 2, ...}
 };
 
-/// The A-class (data-completeness) summary surfaced to the API caller (
-/// §5.2, v1.0.2): the 4 flat fields, NOT the deleted cleaning_applied wrapper.
+/// The A-class (data-completeness) summary surfaced to the API caller:
+/// the 4 flat fields, NOT the deleted cleaning_applied wrapper.
 /// B2 internal stats (hash/semantic split, by_reason, plugin flags) stay in the
 /// operation_log, never in the query response.
 struct CleaningResult {

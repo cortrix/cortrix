@@ -56,8 +56,8 @@ struct FivePathInput {
 std::vector<RrfFusedHit> FuseFivePathRrf(const FivePathInput& input,
                                          int top_n = 0, int k = kRrfKDefault);
 
-/// B-class explain payload for a sparse-path query (
-/// AGENT_FRIENDLY #2 — `?explain=true`). via_path is "sparse" on the normal path
+/// B-class explain payload for a sparse-path query
+/// (`?explain=true`). via_path is "sparse" on the normal path
 /// and a fallback token on L2; fallback_paths lists what actually ran.
 struct SparseExplain {
     std::string via_path;                  ///< "sparse" | "fallback_dense_fts5_hype"

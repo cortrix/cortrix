@@ -11,8 +11,8 @@
 namespace cortrix::observability {
 
 /// Multi-table retention-cleanup scheduler. A shared framework: the operation log
-/// registers its table, observability registers agent_trace / interaction_log (
-/// both reuse this class). Runs every day at UTC 02:00, plus a
+/// registers its table, observability registers agent_trace / interaction_log
+/// (both reuse this class). Runs every day at UTC 02:00, plus a
 /// catch-up check at StartScheduler() time. Registered cleanups run serially under
 /// an in-process advisory lock; a failing table is retried with exponential
 /// backoff (max 3 attempts: 1 / 5 / 15 min).

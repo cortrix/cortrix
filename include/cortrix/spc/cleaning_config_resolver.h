@@ -31,8 +31,8 @@ CleaningConfig LoadGlobalCleaningConfig(const IGlobalConfig* global);
 
 /// Resolve the effective CleaningConfig for one namespace = global ← NS override
 /// (three-layer order global → ns.cleaning_config → request; V1.0 has no
-/// request layer). Reuses the ConfigResolver<CleaningConfig> template (
-/// mandate) for the JSON-object shallow merge, then RE-ASSERTS the two
+/// request layer). Reuses the ConfigResolver<CleaningConfig> template
+/// for the JSON-object shallow merge, then RE-ASSERTS the two
 /// resource-level fields (max_chunk_chars / plugin_timeout_ms) back to `global`:
 /// those are system-resource level and NOT NS-overridable (§3.4 line 176), so a
 /// stray key for them in the NS blob is ignored.

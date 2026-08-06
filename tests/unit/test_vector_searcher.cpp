@@ -16,7 +16,7 @@ using ::testing::Return;
 namespace cortrix {
 namespace {
 
-// gmock IIndex — VectorSearcher now takes a store::IIndex& (D3.5 wire⑤c,
+// gmock IIndex — VectorSearcher now takes a store::IIndex& (integration wiring,
 // was the MVP CortrixVectorIndex). Only Search is exercised; the rest are stubbed
 // so the abstract base is concrete. IIndex::Search returns its hits directly
 // (std::vector<{block_id, distance}>), there is NO rc — empty = no match.

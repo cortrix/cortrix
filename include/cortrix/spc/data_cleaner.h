@@ -27,7 +27,7 @@ namespace cortrix::spc {
 /// D3 standalone: Dedup / DetectAnomaly / config validation are fully
 /// implemented + tested against the `Block` contract view. The
 /// SpcPipeline wiring (ChunkResult/EmbeddingResult ↔ Block, Storage-Write
-/// skip-index) is cross-Feature → D3.5. The op_logger audit sink is
+/// skip-index) is cross-Feature → integration. The op_logger audit sink is
 /// optional/nullable for the same reason.
 class DataCleaner {
 public:

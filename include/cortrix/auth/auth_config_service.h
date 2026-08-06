@@ -12,8 +12,8 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::auth {
 
-/// Loads + holds the runtime AuthConfig over platform.db `auth_config` (
-/// §2.12 / §3.6, topic 8 — minimal IGlobalConfig). This is the auth-domain owner of
+/// Loads + holds the runtime AuthConfig over platform.db `auth_config`
+/// (minimal IGlobalConfig). This is the auth-domain owner of
 /// the table; the canonical cortrix::IGlobalConfig stays the repo-wide interface
 /// and S7 bridges this to it (PlatformDbAuthConfig) when the admin API lands.
 ///
@@ -61,8 +61,8 @@ public:
         bool enable_email_verification = false;
     };
 
-    /// Persist SMTP credentials + the email_verification flag (
-    /// topic 8) to platform.db `auth_config`, then hot-reload the affected keys
+    /// Persist SMTP credentials + the email_verification flag
+    /// to platform.db `auth_config`, then hot-reload the affected keys
     /// (fires OnChange so a live SmtpEmailSender re-reads). One tx for all keys.
     Status SetSmtp(const SmtpSettings& s);
 

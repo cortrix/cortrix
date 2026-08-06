@@ -52,8 +52,8 @@ const F13ErrorInfo& GetF13ErrorInfo(F13ErrorCode code);
 /// The "CX_ERR_F13_*" string for `code` (convenience over GetF13ErrorInfo).
 const char* F13ErrorCodeString(F13ErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (
-/// structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5);
+/// The structured_data keys a `code`'s error body MUST carry
+/// (structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5);
 /// lets call sites + tests verify the body is complete. value_preview on
 /// INVALID_FILTER is optional (PII guard) so it is NOT in the required set.
 const std::vector<std::string>& RequiredStructuredDataKeys(F13ErrorCode code);

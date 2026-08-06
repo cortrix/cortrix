@@ -9,8 +9,8 @@ namespace cortrix::agent_trace {
 /// create (v0 -> v1).
 constexpr int kInteractionSourcesSchemaVersion = 1;
 
-/// The interaction_sources DDL emitted by the observability SchemaProvider (
-/// 6 + v1.0.5 §9.2 split). The CE citation-provenance table for GET
+/// The interaction_sources DDL emitted by the observability SchemaProvider.
+/// The CE citation-provenance table for GET
 /// /interactions/{id}/sources (T-106): which blocks/memories a past interaction's
 /// answer was grounded in.
 ///

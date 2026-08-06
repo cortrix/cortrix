@@ -12,8 +12,8 @@ namespace cortrix::resource {
 
 /// The 4 NS-pool error identities (PoolError). Each maps to a
 /// stable `CX_ERR_NS_*` string + a GEN-Agent category + retryability via the
-/// canonical registry below — the exact pattern CatalogErrorCode uses (
-/// is the template, per L1_ALPHA_BRIEFING §2).
+/// canonical registry below — the exact pattern CatalogErrorCode uses
+/// (it is the template).
 ///
 /// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
 /// Result<T,E>): the spec's `Result<…, PoolError>` is read as Result<T> / Status,

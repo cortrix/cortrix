@@ -11,8 +11,8 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::auth {
 
-/// JWT signing-secret lifecycle over platform.db `auth_secrets` (
-/// §3.5, topic 1.1 C — Cortrix auto-generate + admin-API rotate + dual-key window).
+/// JWT signing-secret lifecycle over platform.db `auth_secrets`
+/// (Cortrix auto-generate + admin-API rotate + dual-key window).
 ///
 /// S1 scope (this header): startup LoadOrInit + the current-secret accessor.
 ///   - LoadOrInit(): read the status='current' jwt_secret from platform.db; if

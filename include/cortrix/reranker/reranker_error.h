@@ -53,8 +53,8 @@ const RerankerErrorInfo& GetRerankerErrorInfo(RerankerErrorCode code);
 /// The "CX_ERR_*" string for `code` (convenience over GetRerankerErrorInfo).
 const char* RerankerErrorCodeString(RerankerErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (
-/// structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5);
+/// The structured_data keys a `code`'s error body MUST carry
+/// (structured_data column). SoT for the Agent-friendly contract (GEN-Agent #5);
 /// lets call sites + tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(RerankerErrorCode code);
 

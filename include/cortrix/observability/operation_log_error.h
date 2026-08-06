@@ -59,8 +59,8 @@ const OplogErrorInfo& GetOplogErrorInfo(OplogErrorCode code);
 /// The "CX_ERR_OPLOG_*" string for `code` (convenience over GetOplogErrorInfo).
 const char* OplogErrorCodeString(OplogErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (
-/// "structured_data required" column). This is the SoT for the Agent-friendly
+/// The structured_data keys a `code`'s error body MUST carry
+/// ("structured_data required" column). This is the SoT for the Agent-friendly
 /// contract (GEN-Agent #5) and lets call sites + tests verify the body is
 /// complete before it is returned.
 const std::vector<std::string>& RequiredStructuredDataKeys(OplogErrorCode code);

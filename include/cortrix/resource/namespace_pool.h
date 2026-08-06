@@ -103,8 +103,8 @@ public:
     virtual ~INamespacePool() = default;
 
     // —— Create path (admission control) ——
-    /// Called by INSRouter.CreateNamespace before the catalog INSERT (
-    /// reverse hook, §5.1). Checks the NS-count gate, then the memory-budget gate
+    /// Called by INSRouter.CreateNamespace before the catalog INSERT
+    /// (reverse hook). Checks the NS-count gate, then the memory-budget gate
     /// (if enabled), then loads the new NS into the pool. On success the NS is
     /// resident and Acquire will hit. Errors (as Status w/ CX_ERR_NS_* token):
     /// CX_ERR_NS_QUOTA_EXCEEDED / CX_ERR_NS_RESOURCE_BUDGET_EXCEEDED /

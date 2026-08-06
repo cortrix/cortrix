@@ -119,8 +119,8 @@ public:
     std::vector<EnrichResult> EnrichBatch(
         const std::vector<ChunkContext>& contexts) override;
 
-    /// Available iff a non-null LLM client was injected AND config.enabled (
-    /// a missing client / disabled config degrades the whole stage — the L2 path).
+    /// Available iff a non-null LLM client was injected AND config.enabled
+    /// (a missing client / disabled config degrades the whole stage — the L2 path).
     bool IsAvailable() const override;
 
     /// Enricher name (EnrichResult.enricher_name, §5.1).

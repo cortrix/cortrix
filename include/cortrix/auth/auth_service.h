@@ -35,8 +35,8 @@ namespace cortrix::auth {
 /// `users.email` UNIQUE constraint.
 class AuthService {
 public:
-    /// `email_sender` may be null → an internal NullEmailSender is used (
-    /// default; codes are logged, not delivered). S5 password-reset / email-verify
+    /// `email_sender` may be null → an internal NullEmailSender is used
+    /// (default; codes are logged, not delivered). S5 password-reset / email-verify
     /// route verification codes through it.
     AuthService(sqlite3* platform_db, config::AuthConfig config,
                 IPasswordHasher* hasher, std::string jwt_secret,

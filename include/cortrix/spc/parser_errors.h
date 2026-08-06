@@ -72,8 +72,8 @@ const ParserErrorInfo& GetParserErrorInfo(ParserErrorCode code);
 /// The "CX_ERR_*" string for `code` (convenience over GetParserErrorInfo).
 const char* ParserErrorCodeString(ParserErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (
-/// "structured_data" column). The SoT for the Agent-friendly contract
+/// The structured_data keys a `code`'s error body MUST carry
+/// ("structured_data" column). The SoT for the Agent-friendly contract
 /// (GEN-Agent #5); lets call sites + tests verify the body is complete.
 /// kOk / kEmptyDocument return an empty list.
 const std::vector<std::string>& RequiredParserStructuredDataKeys(ParserErrorCode code);
