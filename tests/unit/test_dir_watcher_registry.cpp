@@ -30,7 +30,7 @@
 #include "cortrix/connector/dir_watcher_registry.h"
 #include "cortrix/spc/spc_pipeline.h"  // complete type for MockSPCManager dtor
 #include "mock_spc_manager.h"
-#include "ns_pool_test_helper.h"  // D3.5 wire⑤c: NsPoolHarness (namespace pool INamespacePool)
+#include "ns_pool_test_helper.h"  // integration wiring: NsPoolHarness (namespace pool INamespacePool)
 
 using ::testing::_;
 using ::testing::Invoke;
@@ -83,7 +83,7 @@ using cortrix::testing::MockSPCManager;
 
 // ---- Fixture ----
 //
-// wire⑤c: DirWatcherRegistry takes an namespace pool resource::INamespacePool (the importers
+// integration wiring: DirWatcherRegistry takes a namespace pool resource::INamespacePool (the importers
 // it builds acquire a per-request NamespaceFacade from it) plus a catalog INSRouter
 // it creates subscribed namespaces through (catalog INSERT + namespace pool AdmitCreate). The
 // pool is stood up by the shared NsPoolHarness (real DefaultNamespacePool + mocked

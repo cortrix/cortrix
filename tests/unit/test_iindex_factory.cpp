@@ -86,8 +86,8 @@ TEST(IIndexFactoryTest, CreateUsesIndexConfigDefaults) {
     EXPECT_TRUE(created.ok());
 }
 
-// Index Wave A (S1) replaced the skeleton: the real PhnswIndexFactory builds a
-// working PHnsw IIndex. (Before S1 this test asserted kUnavailable.)
+// The real index build replaced the skeleton: PhnswIndexFactory now builds a
+// working PHnsw IIndex. (The skeleton version of this test asserted kUnavailable.)
 TEST(IIndexFactoryTest, PhnswFactoryCreatesWorkingIndex) {
     namespace fs = std::filesystem;
     const fs::path unit_dir = fs::temp_directory_path() / "cortrix_phnsw_factory_create";

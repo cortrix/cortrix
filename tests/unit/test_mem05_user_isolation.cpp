@@ -53,7 +53,7 @@ protected:
         int search_fulltext(const std::string&, int, std::vector<SearchResult>&) override { return 0; }
         int search_metadata(const std::string&, int, std::vector<SearchResult>&) override { return -1; }
     };
-    // VectorSearcher now takes a store::IIndex& (namespace pool wire⑤c); the shared
+    // VectorSearcher now takes a store::IIndex& (namespace pool wiring); the shared
     // cortrix::test::FakeIndex stands in for the old CortrixVectorIndex fake.
     // These tests only need the pipeline to construct (they exercise
     // MatchScope/Validate), so the default empty Search result is fine.

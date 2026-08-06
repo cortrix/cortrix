@@ -97,8 +97,8 @@ TEST(F41SchemaProviderTest, NullDbRejected) {
 }
 
 TEST(F41SchemaProviderTest, RegistersWithSchemaMigrator) {
-    // Doc summary provider runs inside the catalog SchemaMigrator transaction (the D3.5
-    // integrated path). Pin the closure: after MigrateUnit the table exists.
+    // Doc summary provider runs inside the catalog SchemaMigrator transaction
+    // (the integrated path). Pin the closure: after MigrateUnit the table exists.
     F41SchemaProvider p;
     cortrix::catalog::SchemaMigrator migrator;
     migrator.Register(&p);

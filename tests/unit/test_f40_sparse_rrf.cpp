@@ -108,7 +108,7 @@ TEST(F40SparseRrfTest, MockContextualizedAndHypeEmptyAreNoOps) {
 }
 
 TEST(F40SparseRrfTest, MockPathsCanContributeWhenPopulated) {
-    // The fusion is path-agnostic: when contextual retrieval/HyPE land (D3.5) they just supply
+    // The fusion is path-agnostic: when contextual retrieval/HyPE land (integration) they just supply
     // their lists. Verify the mechanism by populating them here.
     FivePathInput in;
     in.contextualized = L({"a"});

@@ -81,7 +81,7 @@ TEST(F38SchemaProviderTest, UnexpectedVersionStepIsError) {
 }
 
 TEST(F38SchemaProviderTest, RegistersWithSchemaMigrator) {
-    // HyPE provider runs inside the catalog SchemaMigrator (the D3.5 integrated path).
+    // HyPE provider runs inside the catalog SchemaMigrator (the integrated path).
     // Pin the closure: MigrateUnit succeeds and records HyPE at version 1 without
     // creating any HyPE table.
     F38SchemaProvider p;

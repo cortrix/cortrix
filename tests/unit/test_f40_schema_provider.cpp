@@ -135,8 +135,8 @@ TEST(F40SchemaProviderTest, NullDbRejected) {
 }
 
 TEST(F40SchemaProviderTest, RegistersWithSchemaMigrator) {
-    // Sparse retrieval provider runs inside the catalog SchemaMigrator transaction (the D3.5
-    // integrated path). Pin the closure: after MigrateUnit the table exists.
+    // Sparse retrieval provider runs inside the catalog SchemaMigrator transaction
+    // (the integrated path). Pin the closure: after MigrateUnit the table exists.
     F40SchemaProvider p;
     cortrix::catalog::SchemaMigrator migrator;
     migrator.Register(&p);

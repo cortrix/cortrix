@@ -8,7 +8,7 @@
 
 namespace cortrix::llm {
 
-/// Test double for IHttpTransport (enricher Wave B). Lets OpenAiLlmClient tests drive
+/// Test double for IHttpTransport (enricher). Lets OpenAiLlmClient tests drive
 /// the full request-build + response-parse path with no network. Either set a
 /// canned response, or a responder lambda for per-request control; records the
 /// last request so tests can assert the OpenAI request shape.

@@ -12,7 +12,7 @@
 
 // HyPE S3 — hype_question Block generation (block_type=16 + metadata_json
 // source_child_id/source_parent_id + hype{} + embedding via OnnxEmbedder mock).
-// The atomic write coordinator PWL write (chunk + hype_question same txn) = D3.5.
+// The atomic write coordinator PWL write (chunk + hype_question same txn) = integration.
 namespace cortrix::spc {
 namespace {
 

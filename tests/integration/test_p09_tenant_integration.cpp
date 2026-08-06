@@ -1,8 +1,8 @@
 // Tenancy -- standalone integration tests over a real in-memory catalog.db.
 //
 // The cross-feature IT cases that require auth / cross-NS query / DB import / memory isolation *live* wiring
-// (IT47 cross-NS query call-site switch, IT48 DB import, IT49 memory isolation) are D3.5-deferred per the
-// D-R1 standalone rule; here we exercise the tenancy contracts those features rely on
+// (IT47 cross-NS query call-site switch, IT48 DB import, IT49 memory isolation) are integration-deferred per the
+// standalone-first rule; here we exercise the tenancy contracts those features rely on
 // against the frozen catalog schema:
 //   IT45/46 -- the auth registration cross-service transaction (auth holds the tx,
 //             Tenancy CreatePersonal runs on the SAME conn; COMMIT persists all,

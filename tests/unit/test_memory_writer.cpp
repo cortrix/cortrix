@@ -1,7 +1,7 @@
 // Unit tests for memory_writer.cpp (136 lines, 0% -> target 85%+)
 //
 // Strategy: drive MemoryWriter::Write() and its helpers end-to-end over a real
-// NamespaceFacade. D3.5 wire⑤c moved MemoryWriter off CortrixNamespace onto a
+// NamespaceFacade. Integration wiring moved MemoryWriter off CortrixNamespace onto a
 // CortrixStore& (it only ever used ns.store()), so the fixture stands up the shared
 // NsPoolHarness (real DefaultNamespacePool + WriteCoordinator over a temp dir),
 // Acquires one long-lived facade, and constructs the writer with facade.memory()

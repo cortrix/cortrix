@@ -153,7 +153,7 @@ TEST(MeResponseTest, BuildMeResponseEmptyTenants) {
     const std::string body = BuildMeResponseJson(u);
     nlohmann::json j = nlohmann::json::parse(body);
     EXPECT_TRUE(j["tenants"].is_array());
-    EXPECT_EQ(j["tenants"].size(), 0u);  // empty until tenancy wiring (D3.5)
+    EXPECT_EQ(j["tenants"].size(), 0u);  // empty until tenancy wiring (integration)
 }
 
 }  // namespace

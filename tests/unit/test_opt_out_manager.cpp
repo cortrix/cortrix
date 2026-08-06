@@ -16,7 +16,7 @@
 // ISessionOptOutStore + a capturing IOperationLogger, plus an end-to-end pass through
 // the real MemoryStoreOptOutAdapter (proves the §4.1/§4.2 migration + the three store
 // ops + the adapter all work against real SQLite). Standalone-D3: no cross-process
-// Memory extraction wiring (that is D3.5).
+// Memory extraction wiring (that is integration).
 namespace cortrix::memory::immunity {
 namespace {
 

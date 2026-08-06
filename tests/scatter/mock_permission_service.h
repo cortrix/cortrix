@@ -9,7 +9,7 @@
 namespace cortrix::query {
 
 /// MockPermissionService — fixture tenancy for AuthorizeNamespaces tests.
-/// The real tenancy (ns_acl table) is **D3.5**. This fixture is configured with the
+/// The real tenancy (ns_acl table) is **integration**. This fixture is configured with the
 /// set of namespaces the principal may QUERY; BatchCheck returns everything else
 /// as unauthorized (anti-enumeration: not-found == unauthorized, since "authorized" is the
 /// only thing it knows). ListAuthorizedNamespaces backs the ["*"] wildcard.

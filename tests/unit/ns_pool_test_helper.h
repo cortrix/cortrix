@@ -1,5 +1,5 @@
 #pragma once
-// D3.5 wire⑤c test helper — shared NamespacePool test doubles + harness.
+// integration-wiring test helper — shared NamespacePool test doubles + harness.
 //
 // The wire⑤c migration moved every consumer off the MVP CortrixNamespaceManager
 // onto the namespace pool resource::INamespacePool + per-request resource::NamespaceFacade.

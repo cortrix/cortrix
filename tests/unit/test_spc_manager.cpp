@@ -12,7 +12,7 @@
 #include "cortrix/chunker/parent_child_chunker.h"
 #include "cortrix/config/config.h"
 
-// D3.5 wire⑤: SPCManager now acquires per-task NamespaceFacades from a real namespace pool
+// integration wiring: SPCManager now acquires per-task NamespaceFacades from a real namespace pool
 // INamespacePool (not the MVP CortrixNamespaceManager). The real-manager fixture
 // therefore stands up a DefaultNamespacePool (mocked catalog routers + FakeIndex + a
 // real WriteCoordinator) and admits namespaces through it.
@@ -364,7 +364,7 @@ TEST_F(SPCManagerRealTest, SubmitAndCancelBySourcePath) {
     mgr_->Stop();
 }
 
-// [D3.5 gap⑤ · deployment] Graceful-shutdown drain: Stop() + DrainRemaining()
+// [integration · deployment] Graceful-shutdown drain: Stop() + DrainRemaining()
 // moves out every not-yet-started task (cancelled ones skipped), leaving the
 // queue empty — these become .pending_tasks.json for next-start resume.
 TEST(SPCManagerTest, QueueDrainRemaining) {

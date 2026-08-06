@@ -110,7 +110,7 @@ TEST_F(RegisterTest, Success) {
     EXPECT_FALSE(r.value().email_verified);
     EXPECT_EQ(r.value().id.rfind("usr_", 0), 0u);
     EXPECT_GT(r.value().created_at, 0);
-    EXPECT_TRUE(r.value().tenants.empty());  // Tenancy wiring is D3.5
+    EXPECT_TRUE(r.value().tenants.empty());  // Tenancy wiring is integration
     EXPECT_EQ(UserRowCount(), 1);
 
     // Stored hash is the hasher output, NOT the plaintext.

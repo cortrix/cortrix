@@ -57,7 +57,7 @@
 
 #include <nlohmann/json.hpp>
 #include <sqlite3.h>
-#include "mock_llm_client.h"  // Enricher ③b: drive an available LlmEnricher without a live endpoint
+#include "mock_llm_client.h"  // Enricher stage: drive an available LlmEnricher without a live endpoint
 
 namespace cortrix {
 namespace {
@@ -1313,7 +1313,7 @@ TEST_F(SPCPipelineTest, ChildBlocks_CarryInheritedDocMetadata) {
 }
 
 // ============================================================
-// Enrich integration (③b): an available LlmEnricher feeds Stage 3.6
+// Enrich integration: an available LlmEnricher feeds Stage 3.6
 // (EnrichBatch) and the write phase persists enriched_score + entities and folds
 // the summary into block metadata_json, all on the real store handle.
 // ============================================================
@@ -1385,7 +1385,7 @@ TEST_F(SPCPipelineTest, LlmEnricherPersistsEnrichmentAndSummary) {
     EXPECT_GT(CountOf("SELECT COUNT(*) FROM entities"), 0);
     EXPECT_GT(CountOf("SELECT COUNT(*) FROM entities_fts WHERE entities_fts MATCH 'Cortrix'"), 0);
 
-    // ④ semantic score (option A — Matrix level owns block-level processing_level + semantic_score).
+    // Semantic score (Matrix level owns block-level processing_level + semantic_score).
     // docling parser (level 2) + LlmEnricher (level 4) → child Matrix level 4 / score 1.0;
     // the META block is locked to level 0 / score 0.2 (ARCH §5.2.1). ABS tolerance because a
     // 0.2f/0.6f REAL widens to double imprecisely (1.0f is exact, but ABS is harmless).
@@ -1426,7 +1426,7 @@ TEST_F(SPCPipelineTest, NullEnricherWritesNoEnrichment) {
     sqlite3_finalize(st);
     EXPECT_EQ(enriched, 0);
 
-    // ④ semantic score still runs without enrichment (it is independent of enricher): docling parser
+    // Semantic score still runs without enrichment (it is independent of enricher): docling parser
     // (level 2) + NullEnricher (level 0) → child Matrix level 2 / semantic_score 0.6.
     sqlite3_stmt* st2 = nullptr;
     ASSERT_EQ(sqlite3_prepare_v2(

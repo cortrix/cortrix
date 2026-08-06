@@ -2,7 +2,7 @@
 //
 // Standalone (B_R1_BRIEFING §7, mirroring cross-NS query's "7 §7.5 integration scenarios
 // standalone via MockIScatterExecutor"): the live QueryPipeline + cross-NS query
-// ScatterGather wiring is D3.5-deferred, so these exercise the *end-to-end RAG-Fusion
+// ScatterGather wiring is integration-deferred, so these exercise the *end-to-end RAG-Fusion
 // flow* — RagFusion::ExpandQueries (LLM variant generation via the frozen
 // MockLlmClient) → simulated per-variant retrieval → RagFusion::FuseResults
 // (global RRF) — plus the Issue 5/6 phased-rollout invariants and the Issue 4
@@ -68,7 +68,7 @@ std::shared_ptr<RagFusion> Service(std::shared_ptr<MockLlmClient> mock) {
         std::make_shared<RRFFusion>(60));
 }
 
-// Simulate cross-NS query ScatterGather returning per-variant top-K candidates (D3.5 wires
+// Simulate cross-NS query ScatterGather returning per-variant top-K candidates (integration wires
 // the real call). Each variant's results overlap so fusion meaningfully reorders.
 std::vector<std::vector<ScoredResult>> SimulateRetrieval(
     const std::vector<std::string>& queries) {
