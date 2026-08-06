@@ -33,6 +33,20 @@ on:
   pull_request:
 
 jobs:
+  # Runs the executable cases for the docs-only classifier on every PR, so a
+  # regression in scripts/ci/classify_changes.sh fails CI before the classifier
+  # is ever allowed to skip anything. Stage S1 of the staged rollout
+  # (RC-PERIODIC-CI-CADENCE / hub #21): the classifier is present and tested
+  # but not yet wired into any job condition; wiring lands in stage S3 after
+  # the pr-gate required check (S2) is in place and verified.
+  classifier_test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Classifier cases (14)
+        run: ./tests/ci/test_classify_changes.sh
+
   cpp_unit:
     runs-on: ubuntu-22.04
     timeout-minutes: 90
@@ -163,6 +177,29 @@ jobs:
         run: |
           pip install -q ruff
           ruff check cortrix-agent cortrix-mcp sdk/python
+
+  # Aggregate gate. This is the job the ruleset will require (stage S2), so
+  # the required-check name stays stable when later stages shard jobs into a
+  # matrix (cpp_unit -> cpp_unit (1)..(N)) or let the classifier skip jobs:
+  # a skipped upstream job counts as pass, a failed or cancelled one fails
+  # the gate, and `if: always()` guarantees the check always reports.
+  pr-gate:
+    if: always()
+    needs: [classifier_test, cpp_unit, python_unit, frontend_unit, lint]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify no upstream failure
+        run: |
+          RESULTS='${{ join(needs.*.result, ' ') }}'
+          echo "upstream results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "gate FAIL: found '$r'"; exit 1 ;;
+            esac
+          done
+          echo "gate PASS"
 
   # coverage_soft was removed from the PR lane.
   #
