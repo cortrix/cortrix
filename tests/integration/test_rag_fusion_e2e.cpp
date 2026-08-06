@@ -18,6 +18,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "cortrix/query/query_explain_json.h"
 #include "cortrix/query/query_variant_generator.h"
 #include "cortrix/query/rag_fusion.h"
 #include "cortrix/query/rag_fusion_error.h"
@@ -198,6 +199,9 @@ TEST_F(RagFusionE2ETest, E2E_RagFusion_DefaultQuery_NoMetaRagFusion) {
 }
 
 // IT 28: ?explain=true → full explain.rag_fusion active state.
+//
+// Asserts against BuildRagFusionExplain, the same serializer the /query route
+// calls, so a change to the emitted shape fails here.
 TEST_F(RagFusionE2ETest, E2E_RagFusion_ExplainEndpoint_Active) {
     auto mock = std::make_shared<MockLlmClient>();
     EXPECT_CALL(*mock, Chat(_, _)).WillOnce(Return(OkJson(FinanceVariants())));
@@ -206,23 +210,22 @@ TEST_F(RagFusionE2ETest, E2E_RagFusion_ExplainEndpoint_Active) {
 
     auto es = svc->GetExplainState();
     ASSERT_TRUE(es.active);
-    // Serialize as QueryPipeline would into explain.llm_dependent_features.rag_fusion.
-    nlohmann::json rf = {
-        {"active", es.active},
-        {"feature_id", "F36"},
-        {"reason", es.reason},
-        {"variant_count", es.variant_count},
-        {"variants_used", es.variants_used},
-        {"degraded", es.degraded},
-    };
+    const nlohmann::json rf = BuildRagFusionExplain(es);
     EXPECT_EQ(rf["active"], true);
+    EXPECT_EQ(rf["feature_id"], "F36");
     EXPECT_EQ(rf["variant_count"], 4);
     EXPECT_EQ(rf["variants_used"].size(), 4u);
     EXPECT_EQ(rf["reason"], "active");
+    EXPECT_EQ(rf["degraded"], false);
 }
 
-// IT 29: NS disabled → explain.potential_improvements has the F36 upgrade hint.
-TEST_F(RagFusionE2ETest, E2E_RagFusion_ExplainEndpoint_PotentialImprovements) {
+// IT 29 (rewritten): NS disabled → the inactive block still serializes.
+//
+// The old test here asserted an explain.potential_improvements array that it
+// had built itself — nothing in src/ emits potential_improvements, so the
+// test verified only its own construction. This replacement asserts what the
+// serializer really produces for the inactive state.
+TEST_F(RagFusionE2ETest, E2E_RagFusion_ExplainEndpoint_Inactive) {
     auto mock = std::make_shared<MockLlmClient>();
     EXPECT_CALL(*mock, Chat(_, _)).Times(0);
     auto svc = Service(mock);
@@ -232,18 +235,16 @@ TEST_F(RagFusionE2ETest, E2E_RagFusion_ExplainEndpoint_PotentialImprovements) {
     auto es = svc->GetExplainState();
     ASSERT_FALSE(es.active);
     ASSERT_EQ(es.reason, "ns_disabled");
-    // QueryPipeline maps an inactive-because-disabled state to a suggestion.
-    nlohmann::json improvements = nlohmann::json::array();
-    if (!es.active && es.reason == "ns_disabled") {
-        improvements.push_back({
-            {"feature", "F36 RAG-Fusion"},
-            {"impact", "+8-15% NDCG@10 on multi-faceted queries"},
-            {"config_path",
-             "PATCH /v1/namespaces/{id}/config {rag_fusion: {enabled: true, variant_count: 3}}"},
-        });
-    }
-    ASSERT_EQ(improvements.size(), 1u);
-    EXPECT_EQ(improvements[0]["feature"], "F36 RAG-Fusion");
+    const nlohmann::json rf = BuildRagFusionExplain(es);
+    EXPECT_EQ(rf["active"], false);
+    EXPECT_EQ(rf["feature_id"], "F36");
+    EXPECT_EQ(rf["reason"], "ns_disabled");
+    // The original query is always recorded as the single variant, even when
+    // the stage never ran.
+    EXPECT_EQ(rf["variant_count"], 1);
+    ASSERT_TRUE(rf.contains("variants_used"));
+    EXPECT_EQ(rf["variants_used"].size(), 1u);
+    EXPECT_EQ(rf["variants_used"][0], "company financial status");
 }
 
 }  // namespace
