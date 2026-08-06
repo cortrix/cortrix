@@ -54,6 +54,11 @@ cortrix/
 └── docs/                 # Documentation
 ```
 
+Comments and identifiers throughout the tree — `F13`, `MEM02`, `P08`,
+`GEN-Agent`, `D3`, `§` section marks — come from Cortrix's internal
+design-tracking vocabulary. [docs/feature-index.md](docs/feature-index.md) is
+the versioned public index that explains all of them.
+
 ---
 
 ## Development Setup
