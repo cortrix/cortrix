@@ -96,7 +96,7 @@ TEST(DataCleanerDedupTest, Disabled_NoDedup) {
     EXPECT_EQ(r.kept_count, 2);
 }
 
-// ---------- Dedup: semantic cosine (Step 2 /) ----------
+// ---------- Dedup: semantic cosine (Step 2) ----------
 
 TEST(DataCleanerDedupTest, Semantic_IdenticalVectorsRemoved) {
     DataCleaner c(DefaultCfg());  // threshold 0.95

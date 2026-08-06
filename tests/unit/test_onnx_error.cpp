@@ -113,7 +113,7 @@ TEST(OnnxErrorTest, HasRequiredStructuredData_NonObjectFails) {
 }
 
 // ============================================================
-// MakeOnnxError → AgentFriendlyError (ONNX runtime /)
+// MakeOnnxError → AgentFriendlyError (ONNX runtime)
 // ============================================================
 
 TEST(OnnxErrorTest, MakeOnnxError_FillsRegistryFields) {

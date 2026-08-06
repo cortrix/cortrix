@@ -16,7 +16,7 @@
 #include "cortrix/observability/operation_logger_impl.h"
 
 // S2 coverage: CleanupScheduler, the EmitSite helper, and the
-// ObservabilityModule DI wiring (/ Issue 10).
+// ObservabilityModule DI wiring (Issue 10).
 namespace cortrix::observability {
 namespace {
 
@@ -169,7 +169,7 @@ TEST(OperationLogEmitterTest, MakeEngineEntryReadsThreadLocalTrace) {
     octx.ClearTraceContext();  // don't leak into other tests on this thread
 }
 
-// ---- ObservabilityModule DI (/ Issue 10) -------------------------------
+// ---- ObservabilityModule DI (Issue 10) -------------------------------
 
 // A fake instrumentation site capturing the injected logger (stands in for the real Engine
 // modules wired at integration).

@@ -20,7 +20,7 @@ class MemoryStore;  // forward decl — MemoryStoreOptOutAdapter holds a referen
 // layer — mark a session "do not remember" so the extraction worker skips it
 // (interaction_log is still written; only blocks-table extraction is skipped).
 //
-// ⚠️ Contract reconciliation vs the detail design ( — the detail
+// ⚠️ Contract reconciliation vs the detail design (the detail
 // design predates the implemented headers and drifts):
 //   - names the session seam `IMemorySessionStore`; there is no such type in the
 //     tree. The concrete session store is cortrix::MemoryStore (memory_store.h). Like

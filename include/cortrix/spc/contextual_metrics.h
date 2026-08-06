@@ -10,8 +10,8 @@ namespace cortrix::spc {
 
 /// The Contextual Retrieval subsystem metrics (observability
 /// subsystem `contextual_retrieval`). Naming
-/// cortrix_contextual_retrieval_<metric>_<unit>. NO high-cardinality labels (
-/// V3 ruling 10 dropped the ns_id label; per-NS data is served via the
+/// cortrix_contextual_retrieval_<metric>_<unit>. NO high-cardinality labels
+/// (V3 ruling 10 dropped the ns_id label; per-NS data is served via the
 /// system/namespaces/<id>/stats endpoint — OBS_SPEC forbids
 /// tenant/ns/unit/user/request/chunk id); chunk_id etc. go to structured logs only.
 ///

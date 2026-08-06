@@ -58,7 +58,7 @@ GeneratorInput FullInput() {
     return in;
 }
 
-// --- 26-field schema completeness (/ + V2 rework) ---
+// --- 26-field schema completeness (+ V2 rework) ---
 
 TEST(MetadataGeneratorTest, FullInputProducesAll26SchemaFields) {
     std::vector<std::string> missing;
@@ -113,7 +113,7 @@ TEST(MetadataGeneratorTest, FullInputFieldValuesMatchInput) {
     EXPECT_EQ(j["custom_metadata"]["owner"], "finance-team");
 }
 
-// Case 2: page_count unknown → null + recorded in missing_fields (row 2 /).
+// Case 2: page_count unknown → null + recorded in missing_fields (row 2).
 TEST(MetadataGeneratorTest, MissingPageCountNullsAndWarns) {
     GeneratorInput in = FullInput();
     in.doc_metadata.page_count = -1;  // Parser couldn't determine page count

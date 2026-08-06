@@ -7,8 +7,8 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/spc/cleaning_errors.h"
 
-// Exhaustive parameterized error-registry sweep for data-cleaning (
-// codes). Distinct suite name (CleaningErrorMatrix) from test_cleaning_errors.cpp.
+// Exhaustive parameterized error-registry sweep for data-cleaning
+// (all codes). Distinct suite name (CleaningErrorMatrix) from test_cleaning_errors.cpp.
 //
 // NOTE: cleaning_errors.h does NOT expose RequiredStructuredDataKeys /
 // HasRequiredStructuredData (no per-code structured-data contract); instead

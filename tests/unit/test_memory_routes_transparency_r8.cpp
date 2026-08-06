@@ -228,7 +228,7 @@ TEST_F(MemoryRoutesTransparencyTest, DeleteMemorySoftDeletes) {
   EXPECT_TRUE(found) << "soft-deleted memory not in invalidated list: " << ij.dump();
 }
 
-// GET /api/v1/memory/invalidations → 200 audit list (/ audit success body).
+// GET /api/v1/memory/invalidations → 200 audit list (audit success body).
 TEST_F(MemoryRoutesTransparencyTest, InvalidationsAuditListReturns200) {
   httplib::Client cli("127.0.0.1", port_);
   auto res = cli.Get("/api/v1/memory/invalidations?ns=default", AuthHeaders());

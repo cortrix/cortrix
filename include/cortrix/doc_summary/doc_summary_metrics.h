@@ -12,8 +12,8 @@ namespace cortrix::doc_summary {
 ///   - `doc_summary`: llm_calls_total / llm_duration_seconds /
 ///     summaries_generated_total / fallback_triggered_total
 ///   - `fts5_fallback`: fts5_fallback_failed_total (hybrid fallback)
-/// Naming cortrix_<subsystem>_<metric>_<unit>. NO high-cardinality labels (
-/// forbids tenant/ns/unit/user/request/doc id); doc_id etc. go to structured
+/// Naming cortrix_<subsystem>_<metric>_<unit>. NO high-cardinality labels
+/// (the observability spec forbids tenant/ns/unit/user/request/doc id); doc_id etc. go to structured
 /// logs only.
 ///
 /// Standalone: a self-contained, dependency-free recorder + an OpenMetrics

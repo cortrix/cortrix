@@ -24,8 +24,8 @@ namespace cortrix::catalog {
 template <typename ConfigT>
 class ConfigResolver {
 public:
-    /// Restrict which top-level keys a request-level override may set (
-    /// strict whitelist). Keys outside the set are ignored in `request`. Empty
+    /// Restrict which top-level keys a request-level override may set
+    /// (strict whitelist). Keys outside the set are ignored in `request`. Empty
     /// set (default) = no request-level overrides honored.
     void SetRequestAllowedFields(const std::set<std::string>& fields) {
         request_allowed_ = fields;

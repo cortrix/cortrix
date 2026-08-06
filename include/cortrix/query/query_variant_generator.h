@@ -13,8 +13,8 @@ namespace cortrix::query {
 /// QueryVariantGenerator — LLM-backed query-variant generation.
 ///
 /// 🔑 Standalone seam: the design names the dependency
-/// `enrich::OpenAiLlmClient`, but the FROZEN scaffolding seam (
-/// `cortrix/llm/i_llm_client.h`) is `cortrix::llm::ILlmClient` — the interface the
+/// `enrich::OpenAiLlmClient`, but the FROZEN scaffolding seam
+/// (`cortrix/llm/i_llm_client.h`) is `cortrix::llm::ILlmClient` — the interface the
 /// real `OpenAiLlmClient` implements, and which lists RAG-Fusion as one of its 7
 /// consumers. We depend on the interface (the correct abstraction), and unit-test
 /// against the frozen `cortrix::llm::MockLlmClient`. The REAL `OpenAiLlmClient.Chat()`

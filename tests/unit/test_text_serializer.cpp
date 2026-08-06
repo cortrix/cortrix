@@ -33,7 +33,7 @@ SourceContext MakeSrc(const std::string& table = "users") {
     return s;
 }
 
-// --- source URI + prefix (/ ARCH) ---
+// --- source URI + prefix (ARCH) ---
 
 TEST(TextSerializerSourceTest, BuildsPostgresSourceUri) {
     auto src = MakeSrc();

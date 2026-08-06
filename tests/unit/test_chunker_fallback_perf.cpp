@@ -36,7 +36,7 @@ ChunkerInput MakeInput(std::vector<ParsedPage> pages) {
     return in;
 }
 
-// --- S3.2 flat fallback (/ lock) --------------------------------------
+// --- S3.2 flat fallback (lock) --------------------------------------
 
 TEST(ChunkerFallbackTest, ExplicitFlatStrategyProducesNoParents) {
     ChunkerConfig cfg;

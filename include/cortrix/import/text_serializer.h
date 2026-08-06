@@ -29,8 +29,8 @@ struct SourceContext {
 std::string BuildSourceUri(const SourceContext& src, const std::string& row_id);
 
 /// The source PREFIX for `src` (postgres://host:port/db/table/) — the LIKE anchor
-/// the full-overwrite uses to clear only this table's prior Blocks (
-/// cleanup_source_blocks /). A trailing '/' so "users" never matches "users2".
+/// the full-overwrite uses to clear only this table's prior Blocks
+/// (cleanup_source_blocks). A trailing '/' so "users" never matches "users2".
 std::string SourcePrefix(const SourceContext& src);
 
 /// textualization engine. Two strategies only — PER_ROW + MERGE; the

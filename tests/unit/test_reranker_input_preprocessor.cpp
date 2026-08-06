@@ -1,4 +1,4 @@
-// S3.3 — input length three-segment processing (reranker /):
+// S3.3 — input length three-segment processing (reranker):
 //   NORMAL  → score normally
 //   TRUNCATED (max_seq_length < passage ≤ 4×max_seq_length) → front-truncate +
 //             LOG_WARN + cortrix_reranker_truncated_total++

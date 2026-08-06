@@ -23,8 +23,8 @@ namespace cortrix::catalog {
 /// atomic words. Runtime stats use atomics.
 class BloomFilter : public IBloomFilter {
 public:
-    /// `capacity_bytes` sizes the bit array (100MB). `target_fp_rate` (
-    /// 0.01) sets k. Capacity in expected items is derived from m and the target.
+    /// `capacity_bytes` sizes the bit array (100MB). `target_fp_rate`
+    /// (0.01) sets k. Capacity in expected items is derived from m and the target.
     BloomFilter(size_t capacity_bytes, double target_fp_rate);
 
     Status Add(const std::string& file_hash) override;

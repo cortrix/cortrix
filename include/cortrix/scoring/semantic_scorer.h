@@ -10,7 +10,7 @@ namespace cortrix::scoring {
 
 /// Scoring main class (writes both BlockHeader.processing_level + blocks.semantic_score).
 ///
-/// Standalone Block reconciliation ( — "run UT against constructed Block/BlockHeader
+/// Standalone Block reconciliation ("run UT against constructed Block/BlockHeader
 /// test fixtures"): the design sketch is `AssignInitialScore(Block& block, ...)` writing
 /// `block.header.processing_level` (immutable) + `block.semantic_score` (dynamic). In dev
 /// the real header is the frozen 128-byte `cortrix::cortrix_block_header_t` (has

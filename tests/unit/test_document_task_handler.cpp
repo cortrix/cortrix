@@ -369,7 +369,7 @@ TEST_F(DocumentTaskHandlerTest, GetProgressFailedHint) {
 
 TEST(DocumentTaskHandlerSchemaTest, AllElevenCodesEmitFourFieldEnvelope) {
     // Every CX_ERR_* serialized via ToJson(MakeTaskError(...)) carries the 4
-    // GEN-Agent fields with the correct types (/ the Agent-friendly contract).
+    // GEN-Agent fields with the correct types (the Agent-friendly contract).
     constexpr TaskErrorCode kAll[] = {
         TaskErrorCode::kInvalidRequest,          TaskErrorCode::kMaxPagesExceeded,
         TaskErrorCode::kTaskNotFound,            TaskErrorCode::kTaskTimeout,

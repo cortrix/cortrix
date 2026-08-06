@@ -230,7 +230,7 @@ CrossNsResponse ScatterGather::GatherAndRerank(
                                  {"category", "permanent"}});
     }
 
-    // 8-field meta completion (/ topic 3.5 v1.0.2). deduplicated_chunks[] +
+    // 8-field meta completion (topic 3.5 v1.0.2). deduplicated_chunks[] +
     // deduplicated_chunks_count were filled by DedupeByContentHash above.
     const int queried = static_cast<int>(meta.namespaces_queried.size());
     const int succeeded = static_cast<int>(meta.namespaces_succeeded.size());

@@ -13,7 +13,7 @@ namespace cortrix::metadata {
 /// The sole Phase 1 V1.0 implementation (detailed design / lock): pure rule extraction, no LLM. Maps the
 /// consumed DocumentMetadata + the owned FileInfo/ProcessingStats DTOs into
 /// (a) block_text — a natural-language sentence over the 7-10 core fields (lock, embedding
-/// input), and (b) metadata_json — the full 26-field schema (/ + V2 rework). block_id
+/// input), and (b) metadata_json — the full 26-field schema (+ V2 rework). block_id
 /// is a fresh ULID (id/ulid.h, produced by the chunker — reuse, do not recreate).
 ///
 /// Standalone: the embedding vector is left empty — embedding(block_text)

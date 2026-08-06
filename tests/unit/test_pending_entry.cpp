@@ -72,8 +72,8 @@ TEST(PendingEntryTest, PendingHasBlobFalseRoundTrip) {
 }
 
 TEST(PendingEntryTest, HasBlobByteIsPendingOnly) {
-    // The has_blob byte sits between block_ids and the CRC, PENDING only (
-    // v1.0.2). A terminal record keeps its fixed 31-byte frame (no doc_id, no
+    // The has_blob byte sits between block_ids and the CRC, PENDING only
+    // (v1.0.2). A terminal record keeps its fixed 31-byte frame (no doc_id, no
     // block_ids, no has_blob byte); a PENDING frame is larger and parses cleanly.
     PendingEntry term;
     term.state = State::kCommitted;

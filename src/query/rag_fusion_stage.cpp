@@ -32,7 +32,7 @@ std::vector<ScoredResult> ToScoredResults(const CrossNsResponse& resp) {
     return out;
 }
 
-// Build the CX_WARN_RAG_FUSION_DEGRADED warning object (/ topic 4) for
+// Build the CX_WARN_RAG_FUSION_DEGRADED warning object (topic 4) for
 // meta.warnings. retry_after_ms comes from the canonical error table.
 nlohmann::json DegradedWarning() {
     const auto& info = GetRagFusionErrorInfo(RagFusionErrorCode::kDegraded);

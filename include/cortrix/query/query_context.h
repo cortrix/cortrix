@@ -21,7 +21,7 @@ namespace cortrix::query {
 /// V6 D-33: ScatterGather.Execute takes an *optional* `QueryContext*` so a
 /// caller (CRAG / Reranker) can share one; when null, ScatterGather builds
 /// the context from the QueryRequest + AuthContext. The reranker toggle and filter
-/// are passed through to every NS unchanged (/ topic 4.3).
+/// are passed through to every NS unchanged (topic 4.3).
 ///
 /// Unification of the CRAG and routing fields: the joint
 /// design (G3+G1.2) made QueryContext the single query-path context object that

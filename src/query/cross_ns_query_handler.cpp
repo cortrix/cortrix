@@ -19,7 +19,7 @@ nlohmann::json ErrorBody(const AgentFriendlyError& err) {
     return j;
 }
 
-// The CX_ERR_DEPRECATED_FIELD error (/ topic 4.1 B'). 400, permanent, with
+// The CX_ERR_DEPRECATED_FIELD error (topic 4.1 B'). 400, permanent, with
 // structured_data telling the Agent exactly which field to drop and what to use.
 AgentFriendlyError DeprecatedFieldError() {
     AgentFriendlyError err;

@@ -66,14 +66,14 @@ struct ProcessingStats {
 
 /// The document-level Metadata Block (detailed design). One per document. block_text is the
 /// embedding input (lock: a natural-language sentence, 7-10 core fields); metadata_json is the full
-/// 26-field JSON (/ + V2 rework); embedding is filled when the block enters P-HNSW
+/// 26-field JSON (+ V2 rework); embedding is filled when the block enters P-HNSW
 /// (lock — left empty standalone, real embedding is integration pipeline wiring).
 struct MetadataBlock {
     std::string block_id;              ///< ULID (id/ulid.h, produced by the chunker — reuse, do not recreate)
     std::string doc_id;                ///< Associated doc (cortrix::id::DocId = string)
     std::string namespace_id;
     std::string block_text;            ///< lock: natural-language sentence (embedding input)
-    nlohmann::json metadata_json;      ///< Full 26-field JSON (/ + V2 rework)
+    nlohmann::json metadata_json;      ///< Full 26-field JSON (+ V2 rework)
     std::vector<float> embedding;      ///< embedding(block_text) — lock; empty standalone → integration
 
     // B' compromise: V1.0 schema immutable (the business side sets custom_metadata once at upload time);

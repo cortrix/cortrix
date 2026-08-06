@@ -113,7 +113,7 @@ TEST(ChunkerAgentErrorTest, StatusCodeMappingAndBridge) {
     EXPECT_NE(s.message().find("no pages"), std::string::npos);
 }
 
-// --- warnings (rows 4-5 /) -----------------------------------------
+// --- warnings (rows 4-5) -----------------------------------------
 
 TEST(ChunkerAgentErrorTest, WarningCodeStrings) {
     EXPECT_STREQ(ChunkerWarningCodeString(ChunkerWarningCode::kTruncated), "CX_WARN_CHUNK_TRUNCATED");

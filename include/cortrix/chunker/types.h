@@ -73,7 +73,7 @@ struct ChunkerStats {
     uint32_t total_parents = 0;
     uint32_t total_children = 0;
     uint32_t empty_parents = 0;            ///< parents skipped (all-empty paragraphs)
-    bool fallback_to_flat = false;         ///< flat fallback triggered (/ lock)
+    bool fallback_to_flat = false;         ///< flat fallback triggered (lock)
 
     /// succeeded_pages / total_pages, clamped to [0,1]; 1.0 when total_pages == 0.
     double CoverageRatio() const {

@@ -62,7 +62,7 @@ const std::vector<std::string>& RequiredStructuredDataKeys(CrossNsErrorCode code
         // 401 unauthenticated: body is contextual (no required structured data).
         case CrossNsErrorCode::kAuthInvalidCredentials: return kEmpty;
         // 403: Agent extracts unauthorized_namespaces → re-queries authorized only
-        // (/ GEN-Agent #5).
+        // (GEN-Agent #5).
         case CrossNsErrorCode::kNsUnauthorized:         return kUnauthorized;
         // 400: Agent slices to the cap + parallel re-queries.
         case CrossNsErrorCode::kTooManyNamespaces:      return kTooMany;

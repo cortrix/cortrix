@@ -201,7 +201,7 @@ ClassificationResult CragEvaluator::Classify(const ClassifierInput& input) {
         return HeuristicGuard(signals);
     }
 
-    // 3. main path: backend inference with L3 retry/degrade (step 3 /).
+    // 3. main path: backend inference with L3 retry/degrade (step 3).
     ClassificationResult result =
         RunClassifier(input.query, input.chunks[0].chunk_text, signals);
 

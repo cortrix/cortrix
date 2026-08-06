@@ -6,8 +6,8 @@
 
 #include "cortrix/common/status.h"
 
-// TraceContext is defined by the observability scaffolding (
-// the observability spec, cortrix/observability/trace_context.h). It is only
+// TraceContext is defined by the observability scaffolding
+// (the observability spec, cortrix/observability/trace_context.h). It is only
 // referenced by pointer here, so a forward declaration keeps IIndex decoupled
 // from the observability build.
 namespace cortrix::observability {

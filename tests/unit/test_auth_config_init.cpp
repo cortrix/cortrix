@@ -12,7 +12,7 @@
 #include "cortrix/config/auth_config.h"
 
 // Auth S1 coverage: JwtSecretService::LoadOrInit + AuthConfigService::
-// LoadOrInitDefaults (auth steps 3-5 /).
+// LoadOrInitDefaults (auth steps 3-5).
 namespace cortrix::auth {
 namespace {
 

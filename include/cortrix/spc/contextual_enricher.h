@@ -54,7 +54,7 @@ struct ContextualRetrievalConfig {
 /// override, global layer). Reads the kContextual* keys via the generic
 /// IGlobalConfig accessors; any key absent / unparseable keeps the built-in
 /// default (fail-soft). `global == nullptr` returns all built-in defaults.
-/// max_output_tokens is clamped to [40,200] (/ prompt-injection guard).
+/// max_output_tokens is clamped to [40,200] (prompt-injection guard).
 /// The per-NS metadata layer is applied on top by the caller (NS metadata is a
 /// JSON blob resolved at the pipeline boundary → integration); exposed as a separate
 /// MergeNsOverride() so each layer is unit-testable.

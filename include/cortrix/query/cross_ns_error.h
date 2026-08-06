@@ -29,7 +29,7 @@ namespace cortrix::query {
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may be appended (api_version stays "v1").
 ///
-/// Anti-enumeration (topic 2.6 /): NS-not-found and NS-unauthorized BOTH return
+/// Anti-enumeration (topic 2.6): NS-not-found and NS-unauthorized BOTH return
 /// kNsUnauthorized — the existence of a namespace is never leaked. There is no
 /// separate "NS not found" code on purpose.
 enum class CrossNsErrorCode {

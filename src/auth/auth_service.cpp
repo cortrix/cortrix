@@ -690,8 +690,8 @@ Status AuthService::ConfirmPasswordReset(const std::string& email,
     Result<std::string> hash = hasher_->Hash(new_password);
     if (!hash.ok()) return hash.status();
 
-    // Atomic: update hash + mark code used + revoke all refresh tokens (
-    // side-effect — all issued refresh_tokens for the user are invalidated).
+    // Atomic: update hash + mark code used + revoke all refresh tokens
+    // (side-effect — all issued refresh_tokens for the user are invalidated).
     if (sqlite3_exec(db_, "BEGIN", nullptr, nullptr, nullptr) != SQLITE_OK) {
         return AuthStatus(AuthErrorCode::kServiceUnavailable, "begin tx failed");
     }

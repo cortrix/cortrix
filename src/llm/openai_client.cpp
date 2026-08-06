@@ -122,7 +122,7 @@ ChatCompletionResponse OpenAiLlmClient::Chat(const std::string& prompt,
         return resp;
     }
 
-    // --- HTTP-level error classification (S2.1 /) ---
+    // --- HTTP-level error classification (S2.1) ---
     if (http.status_code == 429) {
         std::string ra = http.header("Retry-After");
         // Surface the Retry-After header so the enricher can honor it.

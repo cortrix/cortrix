@@ -102,8 +102,8 @@ public:
 
     /// Confirm a password reset: validate the code (exists, type,
     /// unused, unexpired), validate the new password complexity, update the hash,
-    /// mark the code used, and revoke ALL of the user's refresh tokens (
-    /// side-effect). Errors: CX_ERR_AUTH_INVALID_RESET_CODE (bad/expired/used) /
+    /// mark the code used, and revoke ALL of the user's refresh tokens
+    /// (side-effect). Errors: CX_ERR_AUTH_INVALID_RESET_CODE (bad/expired/used) /
     /// CX_ERR_INVALID_REQUEST (weak new password).
     Status ConfirmPasswordReset(const std::string& email, const std::string& code,
                                 const std::string& new_password);

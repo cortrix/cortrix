@@ -215,7 +215,7 @@ public:
 
 /// Factory (design). V1 returns NullEnricher / LlmEnricher (mutually
 /// exclusive per topic 4.5). type == kLlm but unavailable (api_key missing /
-/// endpoint probe failed) auto-degrades to NullEnricher (topic 1.1 addendum /),
+/// endpoint probe failed) auto-degrades to NullEnricher (topic 1.1 addendum),
 /// recording the fallback metric. The production overload probes the
 /// endpoint via the default transport (real network GET → integration).
 std::unique_ptr<ISpcEnricher> CreateEnricher(const EnricherConfig& config);

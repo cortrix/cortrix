@@ -425,8 +425,8 @@ std::map<uint32_t, float> OnnxEmbedder::StubSparse(const std::string& text,
     // the uint16 window so the uint16 serializer round-trips — the real
     // 18-bit vocab encoding is a Phase-2 widening, see header note). Weight is a
     // stable [0,1) value per token; duplicate tokens accumulate weight (SPLADE
-    // term-frequency intuition). Empty / whitespace-only → empty map (
-    // empty_content path).
+    // term-frequency intuition). Empty / whitespace-only → empty map
+    // (empty_content path).
     std::map<uint32_t, float> sparse;
     std::string token;
     auto flush = [&]() {

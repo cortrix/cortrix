@@ -3,7 +3,7 @@
 ///        namespace-path-scoped protected HTTP endpoint.
 ///
 /// CORE INVARIANT (Cortrix's most important security property — see
-/// include/cortrix/query/cross_ns_error.h"Anti-enumeration", topic 2.6 /):
+/// include/cortrix/query/cross_ns_error.h ("Anti-enumeration", topic 2.6):
 ///
 ///   A namespace that does NOT exist and a namespace the caller is NOT
 ///   authorized for MUST be INDISTINGUISHABLE to the caller. Both must return

@@ -12,7 +12,7 @@ std::string BuildSourceUri(const SourceContext& src, const std::string& row_id) 
 
 std::string SourcePrefix(const SourceContext& src) {
     // Trailing '/' is load-bearing: the overwrite LIKE '<prefix>%' must not let
-    // table "users" match "users2" (/ R6 accidental-deletion mitigation).
+    // table "users" match "users2" (R6 accidental-deletion mitigation).
     return "postgres://" + src.host + ":" + std::to_string(src.port) + "/" + src.db_name +
            "/" + src.table + "/";
 }

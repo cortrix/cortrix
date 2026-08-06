@@ -50,7 +50,7 @@ public:
     /// outlives the server (bootstrap owns the ObservabilityModule).
     void SetOperationLogger(cortrix::observability::IOperationLogger* op_logger);
 
-    /// Open-Core edition seam (ARCH OPEN-6 /). The stock CE binary leaves
+    /// Open-Core edition seam (ARCH OPEN-6). The stock CE binary leaves
     /// this at the default "ce". An enterprise embedder sets "enterprise" from its
     /// on_assembled hook, so GET /api/v1/system/features advertises the enterprise
     /// edition; the web UI gates the Enterprise nav group on this value. Must be

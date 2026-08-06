@@ -15,8 +15,8 @@
 // engine surface uses Result<T>/Status (chunker_errors.h ChunkStatus carries the
 // CX_ERR_CHUNK_* token); this header is the API/SDK/MCP boundary inflation.
 //
-// The 3 HARD errors (rows 1-3) map to ErrorCategory; the 2 WARNINGS (
-// rows 4-5, "category: warning") are non-blocking and surface into meta.warnings
+// The 3 HARD errors (rows 1-3) map to ErrorCategory; the 2 WARNINGS
+// (rows 4-5, "category: warning") are non-blocking and surface into meta.warnings
 //, NOT the error body — built via MakeChunkWarning() below since the
 // frozen ErrorCategory enum has no `warning` member.
 namespace cortrix::chunker {
@@ -44,8 +44,8 @@ struct ChunkerErrorInfo {
 const ChunkerErrorInfo& GetChunkerErrorInfo(ChunkerErrorCode code);
 const char* ChunkerErrorCodeString(ChunkerErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (
-/// structured_data column). SoT for the GEN-Agent #5 contract.
+/// The structured_data keys a `code`'s error body MUST carry
+/// (structured_data column). SoT for the GEN-Agent #5 contract.
 const std::vector<std::string>& RequiredStructuredDataKeys(ChunkerErrorCode code);
 bool HasRequiredStructuredData(ChunkerErrorCode code, const nlohmann::json& structured_data);
 

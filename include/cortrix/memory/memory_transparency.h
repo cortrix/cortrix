@@ -21,7 +21,7 @@
 // `?explain=true` to surface the LLM-extraction provenance, all over the same
 // blocks.metadata_json store extraction writes.
 //
-// ⚠️ Contract reconciliation vs the detail design ( — the detail
+// ⚠️ Contract reconciliation vs the detail design (the detail
 // design predates the implemented headers and drifts):
 //   - the real memory-block store seam is cortrix::memory::IMemoryBlockStore
 //     (memory_extractor.h), NOT `storage::IBlockStore` (no such name in tree).

@@ -10,7 +10,7 @@ namespace cortrix::spc {
 
 /// The HyPE-index subsystem metrics (observability subsystem
 /// `hype_index`). Naming cortrix_hype_index_<metric>_<unit>. NO high-cardinality
-/// labels (/ OBS_SPEC forbids tenant/ns/unit/user/request/chunk id);
+/// labels (OBS_SPEC forbids tenant/ns/unit/user/request/chunk id);
 /// chunk_id etc. go to structured logs only (HypeLog, below).
 ///
 /// Standalone: a self-contained, dependency-free recorder + an OpenMetrics

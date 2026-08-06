@@ -11,8 +11,8 @@ namespace {
 constexpr double kVariantBounds[] = {1, 2, 3, 5, 10};
 constexpr const char* kVariantBoundStr[] = {"1", "2", "3", "5", "10"};
 
-// llm_latency_seconds `le` bounds (seconds) — generic duration set (
-// timeout_ms default 5000, typical ~500ms).
+// llm_latency_seconds `le` bounds (seconds) — generic duration set
+// (timeout_ms default 5000, typical ~500ms).
 constexpr double kLatBounds[] = {0.1, 0.25, 0.5, 1, 2, 5, 10, 30};
 constexpr const char* kLatBoundStr[] = {"0.1", "0.25", "0.5", "1", "2", "5", "10", "30"};
 

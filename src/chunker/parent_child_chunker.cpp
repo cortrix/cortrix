@@ -224,7 +224,7 @@ void ParentChildChunker::BuildParentChild(const ChunkerInput& input,
 void ParentChildChunker::BuildFlat(const ChunkerInput& input,
                                    const std::vector<Unit>& units,
                                    int64_t now_ms, ChunkerOutput* output) const {
-    // Flat fallback (/ lock): the whole document becomes one flat layer
+    // Flat fallback (lock): the whole document becomes one flat layer
     // of child-sized chunks with NO parent-child relationship. We concatenate all
     // unit text and split it into children; each child's parent_id stays empty.
     std::string full;

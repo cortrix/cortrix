@@ -66,7 +66,7 @@ TEST(CrossNsResponseTest, ResultItemSerializesScoreSignalsWhenPresent) {
     EXPECT_FLOAT_EQ(signals["semantic_score"].get<float>(), 1.0f);
 }
 
-// meta serializes exactly the 8 A/C-class fields (/ Issue 3.5 v1.0.2).
+// meta serializes exactly the 8 A/C-class fields (Issue 3.5 v1.0.2).
 TEST(CrossNsResponseTest, MetaSerializesExactlyEightFields) {
     CrossNsMeta meta;
     meta.namespaces_queried = {"ns_a", "ns_b"};

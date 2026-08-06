@@ -16,7 +16,7 @@ namespace cortrix::memory::transparency {
 /// + retryability + retry_after_ms + the structured_data keys its body MUST carry,
 /// via the canonical registry below.
 ///
-/// F-FREEZE-1 template A (, mirroring memory/memory_extract_error.h): the
+/// F-FREEZE-1 template A (mirroring memory/memory_extract_error.h): the
 /// detail design wrote `Result<T, MemoryTransparencyError>` (double-template) in
 /// places, which the project forbids — Cortrix uses `Result<T>` (StatusOr) + `Status`
 /// only. A domain error is carried as the Agent-friendly boundary type

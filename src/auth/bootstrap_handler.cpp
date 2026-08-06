@@ -67,8 +67,8 @@ Result<BootstrapHandler::BootstrapResult> BootstrapHandler::Consume(
         return AuthStatus(AuthErrorCode::kInternalError, "not initialized");
     }
 
-    // Validate the token under the lock; capture used/expiry reasons (
-    // reason: not_found | used | expired). Mark used on success BEFORE the DB work
+    // Validate the token under the lock; capture used/expiry reasons
+    // (reason: not_found | used | expired). Mark used on success BEFORE the DB work
     // so a concurrent second consume sees it used (single-use, V3 resolution 5).
     {
         std::lock_guard<std::mutex> lock(mu_);

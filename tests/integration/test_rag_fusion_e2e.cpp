@@ -1,6 +1,6 @@
 // RAG-Fusion integration tests (detail design: 7 IT, cases 23-29).
 //
-// Standalone (, mirroring cross-NS query's "7 integration scenarios
+// Standalone (mirroring cross-NS query's "7 integration scenarios
 // standalone via MockIScatterExecutor"): the live QueryPipeline + cross-NS query
 // ScatterGather wiring is integration-deferred, so these exercise the *end-to-end RAG-Fusion
 // flow* — RagFusion::ExpandQueries (LLM variant generation via the frozen

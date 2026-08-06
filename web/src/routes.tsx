@@ -108,7 +108,7 @@ export function AppRoutes() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="health" element={<HealthPage />} />
 
-            {/* Ent placeholders (web UI /) — feature-flag gated pages,
+            {/* Ent placeholders (web UI) — feature-flag gated pages,
                 registered in V1.0 so V1.5 bookmarks survive the swap. */}
             <Route path="ent/text-to-sql" element={<TextToSqlPage />} />
             <Route path="ent/audit-log" element={<AuditLogPage />} />

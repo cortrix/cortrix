@@ -62,7 +62,7 @@ private:
     /// Map a verdict score through the configured thresholds to a label.
     std::string LabelFromScore(float score) const;
 
-    /// Heuristic guard (step 2 /): a no-ONNX verdict derived purely from
+    /// Heuristic guard (step 2): a no-ONNX verdict derived purely from
     /// the multi-signals. Used for degenerate input (empty chunks / tiny query),
     /// low backend confidence, or when no backend is available.
     ClassificationResult HeuristicGuard(
