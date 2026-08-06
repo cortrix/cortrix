@@ -3,12 +3,12 @@
 Layered mapping per ERROR_CODE_SDK_MAP.md:
   - L1 base classes (12): HTTP-status grouping.
   - L2 high-frequency subclasses (23 concrete here; SoT target 26 incl. extension
-    slots — see ERROR_CODE_SDK_MAP § 3 and Python SDK design § 3.3 v1.0.3 tree note).
+    slots — see ERROR_CODE_SDK_MAP and Python SDK design v1.0.3 tree note).
   - L3 default (100+): routed via L1 base + ``error_code`` / ``category`` metadata.
 
 Every exception inherits ``CortrixError``, which carries the 4 GEN-Agent fields
 (``retryable`` / ``category`` / ``retry_after_ms`` / ``structured_data``) so Agent
-frameworks can make autonomous retry / routing decisions (AGENT_FRIENDLY.md,
+frameworks can make autonomous retry / routing decisions (the Agent-friendly contract,
 issue 4).
 """
 
@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, Optional
 
-# GEN-Agent first principle (AGENT_FRIENDLY.md) — enumerable category values.
+# GEN-Agent first principle (the Agent-friendly contract) — enumerable category values.
 ErrorCategory = Literal["auth", "quota", "transient", "permanent", "timeout"]
 
 
@@ -112,7 +112,7 @@ class TimeoutError(CortrixError):
     """Request timed out (504 / client-side timeout)."""
 
 
-# === L2 subclasses (23 concrete — ERROR_CODE_SDK_MAP § 3 / Python SDK tree) ===
+# === L2 subclasses (23 concrete — ERROR_CODE_SDK_MAP / Python SDK tree) ===
 
 # --- Namespace (1) ---
 class NamespaceNotFoundError(NotFoundError):
@@ -211,7 +211,7 @@ class CsrfMismatchError(ForbiddenError):
     """403 — CX_ERR_AUTH_CSRF_MISMATCH — CSRF token missing/mismatched (V4 CC-02)."""
 
 
-# Error-code -> L2 subclass registry (ERROR_CODE_SDK_MAP § 3). The base client
+# Error-code -> L2 subclass registry (ERROR_CODE_SDK_MAP). The base client
 # consults this first (high-frequency business codes get their precise subclass
 # so Agents can ``isinstance``-route); unknown codes fall back to the HTTP-status
 # L1 base. ``CX_ERR_QUOTA_*`` is handled by prefix in the selector, not here.

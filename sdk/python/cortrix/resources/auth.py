@@ -1,9 +1,9 @@
-"""Auth resource. ``/auth/*`` (ARCH § 4.1.9 + auth).
+"""Auth resource. ``/auth/*`` (ARCH + auth).
 
 This resource follows the implemented HTTP architecture. It covers
 register/login/password_reset plus
 logout/refresh/me (commonly needed). Email-verification / api-key CRUD endpoints
-exist in the real-arch surface and can be added if § 2.12 scope expands (D3.5).
+exist in the real-arch surface and can be added if scope expands.
 """
 
 from __future__ import annotations

@@ -8,7 +8,7 @@
 // modality), with chunker, contextual and sparse columns ALTER'd onto `blocks` by their per-Unit
 // SchemaProviders (ParentChildSchemaProvider owns child_id/parent_id/token_count/
 // parent_offset + the 3 indexes; metadata in blocks.metadata_json). See
-// ARCHITECTURE.md documents the durable in-repository model.
+// the architecture doc documents the durable in-repository model.
 //
 //   - kParentsSchemaSql  — the `parents` table (parent_text store,: SQLite
 //       over Blob for < 10MB/parent + sub-ms single-point lookup, + hotness

@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
-// SoT: ARCHITECTURE.md global ID system (V3 ruling 3). This header = the code realization of the ID type definitions
+// SoT: the architecture doc global ID system (V3 ruling 3). This header = the code realization of the ID type definitions
 // (missed by the Sprint 0 scaffolding, backfilled later).
 // Note: currently a type alias (=std::string), providing no compile-time mix-up protection; distinct strong types = Phase 2 (see PHASE2_BACKLOG TD-ID-DISTINCT-STRONGTYPE).
 namespace cortrix::id {

@@ -1,9 +1,9 @@
-"""SQL (Text-to-SQL) resource. ``/sql`` (ARCH § 4.1.6, pgcortrix).
+"""SQL (Text-to-SQL) resource. ``/sql`` (ARCH, pgcortrix).
 
 This resource follows the implemented HTTP architecture. ``query()`` ->
 ``POST /sql`` (``SqlResult``). The
 per-namespace schema CRUD (``register_schema`` / ``get_schema`` /
-``delete_schema``) is **§2.12-only** -> § 2.12 wire ``/namespaces/{ns}/sql/schema``
+``delete_schema``) is **not yet in the published API spec** — wire path ``/namespaces/{ns}/sql/schema``
 (API spec to be added). ``query()`` accepts an optional ``namespace``
 sent in the body for forward-compat (real-arch ``SqlRequest`` has no namespace).
 """
@@ -49,17 +49,17 @@ class SQL(SyncResource):
         )
 
     def register_schema(self, namespace: str, schema: dict[str, Any]) -> Any:
-        """Register DB schema. ``POST /namespaces/{ns}/sql/schema`` (§2.12-only -> D3.5 spec)."""
+        """Register DB schema. ``POST /namespaces/{ns}/sql/schema`` (spec to follow)."""
         return self._client._request(
             "POST", PATH_SQL_SCHEMA.format(ns=namespace), json={"schema": schema}
         )
 
     def get_schema(self, namespace: str) -> Any:
-        """Get registered schema. ``GET /namespaces/{ns}/sql/schema`` (§2.12-only -> D3.5 spec)."""
+        """Get registered schema. ``GET /namespaces/{ns}/sql/schema`` (spec to follow)."""
         return self._client._request("GET", PATH_SQL_SCHEMA.format(ns=namespace))
 
     def delete_schema(self, namespace: str) -> Any:
-        """Delete schema. ``DELETE /namespaces/{ns}/sql/schema`` (§2.12-only -> D3.5 spec)."""
+        """Delete schema. ``DELETE /namespaces/{ns}/sql/schema`` (spec to follow)."""
         return self._client._request("DELETE", PATH_SQL_SCHEMA.format(ns=namespace))
 
 

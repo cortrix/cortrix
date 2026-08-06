@@ -225,7 +225,7 @@ class TestExtensionFraming(unittest.TestCase):
         sql = _strip_line_comments(self.raw)
         for guc in ("pgcortrix.endpoint", "pgcortrix.api_key",
                     "pgcortrix.timeout_ms", "pgcortrix.retry_max"):
-            self.assertIn(guc, sql, f"GUC {guc} not registered (§2.2)")
+            self.assertIn(guc, sql, f"GUC {guc} not registered")
 
 
 if __name__ == "__main__":

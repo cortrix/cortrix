@@ -1,8 +1,8 @@
-"""Namespaces resource. ``/namespaces`` domain (ARCH § 4.1.1).
+"""Namespaces resource. ``/namespaces`` domain (ARCH).
 
 This resource follows the implemented HTTP architecture. ``set_permission()`` uses the ACL domain
-(``POST /namespaces/{ns}/acl`` grant) — § 2.12's ``PUT
-/namespaces/:ns/permissions/:uid`` is the obsoleted D1 draft.
+(``POST /namespaces/{ns}/acl`` grant) — the draft ``PUT
+/namespaces/:ns/permissions/:uid`` is obsoleted.
 """
 
 from __future__ import annotations

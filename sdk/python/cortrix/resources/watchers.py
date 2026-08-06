@@ -1,8 +1,8 @@
-"""Watchers resource. ``/watch`` domain (ARCH § 4.1.4 + watcher/async task).
+"""Watchers resource. ``/watch`` domain (ARCH + watcher/async task).
 
 This resource follows the implemented HTTP architecture. ``add()`` follows the fan-out shape (``path`` +
 ``target_namespaces`` array + ``recursive``); the design's per-watcher
-``patterns`` / ``auto_delete`` are reconciled in D3.5.
+``patterns`` / ``auto_delete`` are reconciled in integration.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Ops namespace (``client.ops.gc.*``) — design § 2.13 (issue 2 C).
+"""Ops namespace (``client.ops.gc.*``) — design (issue 2 C).
 
 Phase 1 contains ``gc`` (GcOps). Phase 2 evolution hooks: ``admin`` / ``tenant``.
 """

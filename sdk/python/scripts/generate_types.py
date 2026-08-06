@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Generate ``cortrix/types/_generated.py`` from the frozen OpenAPI spec.
 
-Design § 4.2 calls for ``openapi-generator-cli`` (a Java tool). When that tool
+Design calls for ``openapi-generator-cli`` (a Java tool). When that tool
 is unavailable (the common case in this repo / CI), this script is the
-design-§S4-permitted hand-written generator: it parses the OpenAPI 3.0 spec
+design- hand-written generator: it parses the OpenAPI 3.0 spec
 directly (PyYAML), resolves local ``$ref``s across ``api/components`` and
 ``api/paths``, and emits a typed ``@dataclass`` per ``components.schemas`` entry.
 
@@ -18,7 +18,7 @@ Usage::
 
 The resulting models are wire-faithful to the server contract; the hand-written
 ``cortrix/types/*.py`` modules import / re-export and Pythonic-enhance them
-(``__iter__`` / ``__len__`` / defaults) per design § 4.1.
+(``__iter__`` / ``__len__`` / defaults) per design
 """
 
 from __future__ import annotations
@@ -154,7 +154,7 @@ def _emit_dataclass(name: str, schema: dict[str, Any]) -> str:
 _HEADER = '''"""Auto-generated request/response models — DO NOT EDIT BY HAND.
 
 Generated from the frozen OpenAPI spec by ``scripts/generate_types.py``
-(hand-written generator standing in for openapi-generator-cli, design § S4).
+(hand-written generator standing in for openapi-generator-cli, design).
 Regenerate with::
 
     python scripts/generate_types.py

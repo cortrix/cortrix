@@ -2,13 +2,13 @@
 
 This resource follows the implemented HTTP architecture (= OPEN-2 GC, captured by the spec).
 The GC wire follows the implemented shapes; ``dry_run``/``scope``/``Gc*Result``/``blob_id`` are
-the obsoleted D1 draft):
+the obsoleted draft):
   - ``run()``     -> POST /gc/run  (parameterless + ``X-Ops-Confirm: true``) -> GcStatus
   - ``restore()`` -> POST /gc/restore  (body ``{document_ids: [...]}``) -> PartialSuccessById
   - ``purge()``   -> POST /gc/purge (parameterless + ``X-Ops-Confirm: true``) -> GcStatus
 Confirm header = ``X-Ops-Confirm: true`` (real-arch), required by run + purge.
 Real-arch defines only ``GcStatus``; blob-level restore / richer result shapes
-reconciled in D3.5 (no double ``/api/v1`` prefix — paths are ``/gc/*``).
+reconciled at integration (no double ``/api/v1`` prefix — paths are ``/gc/*``).
 """
 
 from __future__ import annotations

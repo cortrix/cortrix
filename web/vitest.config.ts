@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
-// Vitest config (web UI design § 17 — test matrix / § 17.3 coverage targets).
+// Vitest config (web UI design — test matrix / coverage targets).
 // Coverage gate mirrors the design: Lines > 70%, Functions > 80%, Branches > 60%
 // (web UI is one of the 17 core features → Story DoD also expects line ≥ 90% on the
 // store/util core, enforced in CI per-path; here we set the feature-wide floor).
@@ -15,11 +15,11 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary', 'html', 'lcov'],
-      // Test pyramid (§ 17.1, 70/20/10): the *unit* layer owns the logic core —
+      // Test pyramid: the *unit* layer owns the logic core —
       // stores, hooks, utils, the api client + the SafeMarkdown / ErrorDisplay /
       // error-boundary / Ent-gate components. The page/dialog tree (Memory /
       // Namespace dialogs / admin tables / Upload) is covered by the Playwright
-      // E2E layer, not vitest, so the § 17.3 "Lines > 70%" *release* gate is
+      // E2E layer, not vitest, so the "Lines > 70%" *release* gate is
       // measured on unit + E2E combined in CI. To keep the unit-side threshold
       // honest (not a perpetually-red global gate), coverage is scoped here to
       // the modules the unit suite actually owns.
@@ -46,7 +46,7 @@ export default defineConfig({
         'src/store/useAuthStore.ts',
         'src/store/useUploadStore.ts',
       ],
-      // § 17.3 unit-layer floor (Lines > 70% / Functions > 80% / Branches > 60%).
+      // unit-layer floor (Lines > 70% / Functions > 80% / Branches > 60%).
       thresholds: {
         lines: 70,
         functions: 80,

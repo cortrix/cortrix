@@ -1,4 +1,4 @@
-"""End-to-end round-trip tests — integration DEFERRED (skeleton only).
+"""End-to-end round-trip tests — DEFERRED to integration (skeleton only).
 
 These exercise the real framework + real LLM + a live cortrix-server (feature
 design sections 10.2 / 10.3 / 5.4-bis e2e). They are intentionally **skipped**

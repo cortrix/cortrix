@@ -274,7 +274,7 @@ memory:
 # Topic 3: V1.0 OSS defaults to disabled — must be explicitly enabled via the namespace-level rag_fusion_config,
 # and only runs when an LLM role is configured (see the LLM configuration block above); on LLM failure it degrades to a single query.
 # Three-tier override: this global default ← namespaces.rag_fusion_config ← request (not supported in Phase 1).
-# Note: in Phase 1 these keys fall back to RagFusionConfig defaults (interface reserved, server read = D3.5).
+# Note: in Phase 1 these keys fall back to RagFusionConfig defaults (interface reserved, server read = integration).
 # -----------------------------------------------------------------------------
 rag_fusion:
   default_enabled: false        # Global default (V1.0 OSS / Cloud V1 both false)
@@ -285,7 +285,7 @@ rag_fusion:
   llm_prompt_template_en: "default-en"
 
 # -----------------------------------------------------------------------------
-# gc — OPEN-2 three-stage garbage collection (ARCH §5.x, A6 §10.8)
+# gc — OPEN-2 three-stage garbage collection (ARCH, A6)
 # Stage 1 soft-delete (30d retention, restorable) -> Stage 2 hard-delete + ref_count
 # fix-up (blob enqueued, not unlinked) -> Stage 3 blob GC (90d second-confirm window,
 # then physical unlink). A built-in background thread scans every scan_interval_hours.

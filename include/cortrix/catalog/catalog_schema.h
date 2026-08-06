@@ -15,7 +15,7 @@ constexpr int kCatalogSchemaVersion = 2;  // +1: OPEN-2 GC blob_gc_queue SoT res
 /// (file_locations / ns_units / units / nodes / tenants / namespaces) + 6
 /// association tables (content_refs / blob_gc_queue / cross_tenant_whitelist /
 /// users / user_tenants / ns_acl), faithfully transcribed from
-/// catalog-two-layer-mapping.md (which mirrors ARCHITECTURE.md).
+/// catalog-two-layer-mapping.md (which mirrors the architecture doc).
 ///
 /// Notes on the SQLite dialect (catalog.db is SQLite WAL):
 ///  - The spec SQL uses `JSONB` / `BIGINT` column types and `'{}'::jsonb`

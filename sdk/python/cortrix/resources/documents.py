@@ -1,4 +1,4 @@
-"""Documents resource. ``/documents`` domain (ARCH § 4.1.2 + async task).
+"""Documents resource. ``/documents`` domain (ARCH + async task).
 
 This resource follows the implemented HTTP architecture. ``upload()`` is
 **async** (aligns with the async task Document Async Processing path; the old sync upload is superseded by
@@ -6,7 +6,7 @@ Async task): ``POST /documents`` -> 202 ``DocumentTask``, with
 ``GET /documents/tasks/{task_id}/progress`` + ``DELETE /documents/tasks/{task_id}``.
 ``upload_and_wait()`` is sync sugar (upload then poll to a terminal state).
 ``status()`` aliases ``get()`` (status lives in ``Document.status`` / ``progress``).
-Real multipart large-file endpoint -> D3.5.
+Real multipart large-file endpoint to follow at integration.
 """
 
 from __future__ import annotations
@@ -27,13 +27,13 @@ PATH_DOCUMENTS = "/documents"
 PATH_DOCUMENT = "/documents/{id}"
 PATH_TASK_PROGRESS = "/documents/tasks/{task_id}/progress"
 PATH_TASK = "/documents/tasks/{task_id}"
-# Agent-first batch submit. The design (Python SDK / batch submit §2.1)
+# Agent-first batch submit. The design (Python SDK / batch submit)
 # names this ``/documents/batch-submit``; the real-arch wire is ``/documents/batch``
 # (server route POST /api/v1/documents/batch, RegisterBatchRoutes), so per the
 # "SDK shape follows the SDK design, wire follows the real architecture" rule we map to the live route.
 PATH_BATCH = "/documents/batch"
 
-# on_duplicate policy values (batch submit §2.2 options.on_duplicate).
+# on_duplicate policy values (batch submit options.on_duplicate).
 _ON_DUPLICATE_VALUES = frozenset({"skip", "overwrite", "error"})
 
 # Terminal async-task states (DocumentTask.status enum).
@@ -92,7 +92,7 @@ def _batch_body(
     async_: bool,
     on_duplicate: str,
 ) -> dict[str, Any]:
-    """Build the batch-submit request body (batch submit §2.2).
+    """Build the batch-submit request body (batch submit).
 
     ``documents`` items are passed through verbatim (each needs a ``doc_id`` +
     ``content``; optional ``filename`` / ``metadata``) so the caller controls the

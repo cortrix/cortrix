@@ -1,4 +1,4 @@
-"""Synchronous Cortrix client. See Python SDK design § 2.2."""
+"""Synchronous Cortrix client."""
 
 from __future__ import annotations
 
@@ -265,8 +265,8 @@ class Cortrix(BaseClient):
         )
 
     def get_sources(self, interaction_id: str) -> Any:
-        """Citation sources for an interaction (§2.12-only endpoint
-        -> D3.5)."""
+        """Citation sources for an interaction (endpoint not yet in
+        the published API spec)."""
         return self.query.get_sources(interaction_id)
 
     def import_database(
@@ -279,7 +279,7 @@ class Cortrix(BaseClient):
         mode: str = "per_row",
     ) -> Any:
         """Manual database import. ``POST /import/database`` (import.yaml not yet
-        built -> D3.5)."""
+        built — formal spec to follow)."""
         if self._imports is None:
             self._imports = Imports(self)
         return self._imports.database(

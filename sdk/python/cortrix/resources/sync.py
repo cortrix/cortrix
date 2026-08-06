@@ -1,13 +1,13 @@
-"""Sync resource. ``/sync/*`` (ARCH § 4.1.8 Batch Sync).
+"""Sync resource. ``/sync/*`` (ARCH Batch Sync).
 
 This resource follows the implemented HTTP architecture
 (``start`` / ``status`` / ``stop``):
   - ``configure`` -> POST /sync/start  ({namespace, interval_seconds})
   - ``status``    -> GET  /sync/status (?namespace=)
   - ``stop``      -> POST /sync/stop   ({namespace})
-  - ``trigger``   -> POST /sync/trigger (§2.12-only -> D3.5 spec)
+  - ``trigger``   -> POST /sync/trigger (spec to follow)
 The real-arch ``/sync/start`` body is ``{namespace, interval_seconds}`` (the
-design's richer ``connection`` / ``sync_config`` dicts reconciled in D3.5).
+design's richer ``connection`` / ``sync_config`` dicts reconciled in integration).
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from ._base import AsyncResource, SyncResource
 PATH_SYNC_START = "/sync/start"
 PATH_SYNC_STATUS = "/sync/status"
 PATH_SYNC_STOP = "/sync/stop"
-PATH_SYNC_TRIGGER = "/sync/trigger"  # §2.12-only -> D3.5 spec
+PATH_SYNC_TRIGGER = "/sync/trigger"  # spec to follow
 
 
 class Sync(SyncResource):
@@ -50,7 +50,7 @@ class Sync(SyncResource):
 
     def trigger(self, namespace: str) -> Any:
         """Manually trigger an incremental sync. ``POST /sync/trigger``
-        (§2.12-only -> D3.5 spec)."""
+        (spec to follow)."""
         return self._client._request(
             "POST", PATH_SYNC_TRIGGER, json={"namespace": namespace}
         )

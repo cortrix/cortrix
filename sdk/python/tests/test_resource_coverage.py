@@ -36,7 +36,7 @@ CASES = [
     ("auth.logout", "POST", "/auth/logout", (), {}),
     ("auth.refresh", "POST", "/auth/refresh", ("rtok",), {}),
     ("auth.password_reset", "POST", "/auth/password-reset", ("u@e.com",), {}),
-    # sql schema (§2.12-only wire: /namespaces/{ns}/sql/schema)
+    # sql schema (wire: /namespaces/{ns}/sql/schema)
     ("sql.register_schema", "POST", "/namespaces/ns/sql/schema", ("ns", {"t": []}), {}),
     ("sql.get_schema", "GET", "/namespaces/ns/sql/schema", ("ns",), {}),
     ("sql.delete_schema", "DELETE", "/namespaces/ns/sql/schema", ("ns",), {}),
@@ -61,7 +61,7 @@ CASES = [
     ("watchers.events", "GET", "/watch/w1/events", ("w1",), {}),
     # documents
     ("documents.status", "GET", "/documents/d1", ("d1",), {}),
-    # query top-level get_sources (D3.5 endpoint)
+    # query top-level get_sources (integration endpoint)
     ("query.get_sources", "GET", "/interactions/i1/sources", ("i1",), {}),
     # ops
     ("ops.gc.restore", "POST", "/gc/restore", (["d1"],), {}),

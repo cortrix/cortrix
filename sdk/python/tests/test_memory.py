@@ -41,7 +41,7 @@ def test_search_posts_to_memory_search(api_base: str, client: Cortrix) -> None:
 @respx.mock
 def test_log_posts_to_session_interactions(api_base: str, client: Cortrix) -> None:
     # Live wire: interactions are written under /memory/sessions/{id}/interactions
-    # (the designed one-shot /memory/log is not mounted yet -> D3.5).
+    # (the designed one-shot /memory/log is not mounted yet -> integration).
     route = respx.post(api_base + "/memory/sessions/s1/interactions").mock(
         return_value=httpx.Response(200, json={"interaction_id": "i1"})
     )

@@ -4,7 +4,7 @@
 > links. Covers the CPU flavor's common same-major `.so` swap, rollback, the
 > rare cross-major rebuild, CUDA provider bundles, and rolling upgrades.
 >
-> Source of truth for the mechanism: `design/features/F22-onnx-runtime-upgrade.md`.
+> Source of truth for the mechanism: the ONNX-runtime upgrade feature design.
 
 ## Background — what an upgrade actually changes
 

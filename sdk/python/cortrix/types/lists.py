@@ -3,7 +3,7 @@
 The spec returns list endpoints as inline envelopes (e.g.
 ``{"namespaces": [...], "total": N}``); these wrappers give them a typed home
 plus ``__iter__`` / ``__len__`` so callers can ``for x in result`` and
-``len(result)`` (design § 3.2 / § 4.1).
+``len(result)`` (design).
 """
 
 from __future__ import annotations

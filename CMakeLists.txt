@@ -284,7 +284,7 @@ add_library(cortrix_core STATIC
     src/reranker/reranker_factory.cpp
     # --- Parent-Child Chunking ------------------
     src/id/ulid.cpp
-    # --- ID System Infrastructure (D3.5 Batch 0 prerequisite: SipHash block_id key) ---
+    # --- ID System Infrastructure (integration Batch 0 prerequisite: SipHash block_id key) ---
     src/id/hash.cc
     src/chunker/chunker_config.cpp
     src/chunker/chunker_guc.cpp

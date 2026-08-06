@@ -5,10 +5,10 @@ the sync (:class:`cortrix._client.Cortrix`) and async
 (:class:`cortrix._async_client.AsyncCortrix`) clients:
 
   - ``_build_headers`` — auth + User-Agent + X-Request-ID, plus issue-3
-    ``client_id`` / ``trace_id_provider`` injection (§ 4.3.1).
+    ``client_id`` / ``trace_id_provider`` injection.
   - ``_build_exception`` — parse the GEN-Agent 4 fields and pick the exception
-    class (§ 4.3.2).
-  - ``should_retry`` — retry decision with the issue-4 priority order (§ 5).
+    class.
+  - ``should_retry`` — retry decision with the issue-4 priority order.
 
 The actual HTTP send loops live on the sync/async subclasses (they own the
 ``httpx`` client); they call back into these helpers so behavior is identical
@@ -50,7 +50,7 @@ from ._exceptions import (
 
 # HTTP status -> L1 exception class. (L2 subclass refinement is driven by the
 # server's ``error.code`` via the registry in _exceptions; the SDK selects the
-# L1 base from status + a couple of path/code hints, per design § 4.3.2.)
+# L1 base from status + a couple of path/code hints.)
 _STATUS_EXCEPTION_MAP: dict[int, Type[CortrixError]] = {
     400: InvalidRequestError,
     401: AuthenticationError,
@@ -120,7 +120,7 @@ class BaseClient:
             path = "/" + path
         return f"{self.base_url}{API_PREFIX}{path}"
 
-    # --- headers (§ 4.3.1, issue 3) ---
+    # --- headers (issue 3) ---
 
     def _build_headers(self, extra: Optional[dict[str, str]] = None) -> dict[str, str]:
         headers: dict[str, str] = {
@@ -142,26 +142,26 @@ class BaseClient:
                     headers["traceparent"] = traceparent
             except Exception:
                 # A failing provider must never break the HTTP request
-                # (defensive — design § 4.3.1).
+                # (defensive — design).
                 pass
 
         if extra:
             headers.update(extra)
         return headers
 
-    # --- exception construction (§ 4.3.2, issue 4) ---
+    # --- exception construction (issue 4) ---
 
     def _select_exception_class(
         self, status_code: int, error_code: Optional[str], path: str
     ) -> Type[CortrixError]:
-        # 1. Precise L2 subclass by error code (ERROR_CODE_SDK_MAP § 3).
+        # 1. Precise L2 subclass by error code (ERROR_CODE_SDK_MAP).
         if error_code:
             mapped = CODE_EXCEPTION_MAP.get(error_code)
             if mapped is not None:
                 return mapped
             if error_code.startswith("CX_ERR_QUOTA"):
                 return QuotaExceededError
-            # 2. code-based hints (design § 4.3.2).
+            # 2. code-based hints (design).
             if status_code == 403 and "feature" in error_code.lower():
                 return FeatureNotAvailableError
         # 3. path hint: namespace 404.
@@ -200,7 +200,7 @@ class BaseClient:
 
         return exc_class(err.get("message", "Unknown error"), **kwargs)
 
-    # --- retry decision (§ 5, issue 4) ---
+    # --- retry decision (issue 4) ---
 
     def should_retry(
         self,
@@ -209,7 +209,7 @@ class BaseClient:
     ) -> tuple[bool, float]:
         """Return ``(retry?, wait_seconds)``.
 
-        Priority (design § 5):
+        Priority (design):
           1. server ``retryable`` field — strict
           2. fallback HTTP status (429/500/503)
           3. network errors (ConnectError / TimeoutException) — retry

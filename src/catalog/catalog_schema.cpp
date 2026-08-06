@@ -7,7 +7,7 @@
 namespace cortrix::catalog {
 
 // catalog.db framework schema — transcribed from catalog-two-layer-mapping.md
-// (mirrors ARCHITECTURE.md). Kept as one DDL batch so the migrator applies
+// (mirrors the architecture doc). Kept as one DDL batch so the migrator applies
 // it atomically. See catalog_schema.h for the SQLite-dialect notes (JSONB/BIGINT
 // type names kept; '{}'::jsonb casts → plain '{}' default; BOOLEAN → INTEGER).
 //

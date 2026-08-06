@@ -1,12 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Playwright E2E config (web UI design § 17 — test matrix / § 17.2 4-browser CI).
+// Playwright E2E config (web UI design — test matrix / 4-browser CI).
 //
-// The 4-browser strategy (§ 17.2): PR runs Chromium only; merge adds Firefox;
+// The 4-browser strategy: PR runs Chromium only; merge adds Firefox;
 // nightly + release run all 4 (Chromium / Firefox / WebKit / Edge). CI selects a
 // subset via `--project=<name>`; locally `npx playwright test` runs Chromium.
 //
-// Standalone (D3): `webServer` boots `vite dev` on :5173 so the spec runs with no
+// Standalone: `webServer` boots `vite dev` on :5173 so the spec runs with no
 // backend. The mock fallback is build-time gated (src/api/fallback.ts) — OFF in a
 // production build — so the webServer environment sets VITE_USE_MOCK=1 to force it on,
 // letting every api module fall back to its in-memory mock and the mock
@@ -25,7 +25,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
   },
-  // § 17.2 browser matrix — selected per trigger with --project.
+  // browser matrix — selected per trigger with --project.
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },

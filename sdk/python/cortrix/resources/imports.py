@@ -1,12 +1,12 @@
 """Database import — backs the top-level ``client.import_database()``.
 
-DB import reverse hook. The frozen ``api/paths/import.yaml`` is **not yet built**
-(B-R2 briefing) so this is hand-written per design § 2.12 (``POST
+DB import reverse hook. The frozen ``api/paths/import.yaml`` is **not yet built**,
+so this is hand-written per design (``POST
 /import/database``) and exercised against mocked HTTP responses; the real spec
-regen + server integration -> D3.5.
+regen + server wiring land at integration.
 
 (``import`` is a Python keyword, so the attribute is named ``import_database`` —
-matching design § 2.12's top-level ``client.import_database()`` — rather than a
+matching design's top-level ``client.import_database()`` — rather than a
 ``client.import.*`` namespace.)
 """
 
@@ -16,7 +16,7 @@ from typing import Any, Optional
 
 from ._base import AsyncResource, SyncResource
 
-PATH_IMPORT_DATABASE = "/import/database"  # import.yaml not yet built -> D3.5
+PATH_IMPORT_DATABASE = "/import/database"  # import.yaml not yet built; spec to follow
 
 
 def _import_body(

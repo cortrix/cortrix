@@ -2,7 +2,7 @@
 
 Unit tests mock the HTTP layer with ``respx`` (intercepts httpx). No real
 Cortrix Server is started — the ~10 real-server integration tests are deferred
-to D3.5 (B-R2 standalone rule).
+to integration (B-R2 standalone rule).
 """
 
 from __future__ import annotations

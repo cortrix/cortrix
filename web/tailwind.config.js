@@ -73,7 +73,7 @@ export default {
         },
       },
       fontFamily: {
-        // VI mockup § head — Inter (sans) + JetBrains Mono (mono), loaded via
+        // VI mockup — Inter (sans) + JetBrains Mono (mono), loaded via
         // Google Fonts <link> in index.html (no npm font packages).
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],

@@ -1,4 +1,4 @@
-"""Memory resource. ``/memory`` domain (ARCH § 4.1.5 + the memory features).
+"""Memory resource. ``/memory`` domain (ARCH + the memory features).
 
 This resource follows the implemented HTTP architecture. Method -> endpoint:
   - ``search``   -> POST   /memory/search   ({results,total_results,...})
@@ -8,7 +8,7 @@ This resource follows the implemented HTTP architecture. Method -> endpoint:
   - ``create``   -> POST   /memory          (MemoryCreateAck)
   - ``update``/``edit``       -> PATCH  /memory/{id}  (MemoryEditAck)
   - ``delete``/``invalidate`` -> DELETE /memory/{id}  (MemoryDeleteAck)
-  - ``opt_out``  -> POST   /memory/session/{id}/opt-out  (§2.12-only -> D3.5 spec)
+  - ``opt_out``  -> POST   /memory/session/{id}/opt-out  (spec to follow)
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ PATH_MEMORY_LOG = "/memory/sessions/{session_id}/interactions"
 PATH_MEMORY_SESSIONS = "/memory/sessions"
 PATH_MEMORY_EXTRACT = "/memory/extract"
 PATH_MEMORY_ID = "/memory/{id}"
-PATH_MEMORY_OPT_OUT = "/memory/session/{session_id}/opt-out"  # §2.12-only -> D3.5 spec
+PATH_MEMORY_OPT_OUT = "/memory/session/{session_id}/opt-out"  # spec to follow
 
 
 def _search_body(namespace: str, query: str, user_id: str, top_k: int) -> dict[str, Any]:

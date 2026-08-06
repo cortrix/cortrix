@@ -1,7 +1,7 @@
 {
   "ci": {
     "collect": {
-      "comment": "P02a design § 14.4 / § 17.4 — Lighthouse CI. Builds + serves the static bundle (the committed static/ output embedded into cortrix-server), then audits the SPA entry. Runs against the production build so code-split chunks are measured. numberOfRuns=3 medians out run-to-run noise.",
+      "comment": "Web UI design — Lighthouse CI. Builds + serves the static bundle (the committed static/ output embedded into cortrix-server), then audits the SPA entry. Runs against the production build so code-split chunks are measured. numberOfRuns=3 medians out run-to-run noise.",
       "staticDistDir": "./static",
       "url": ["http://localhost/index.html"],
       "numberOfRuns": 3,
@@ -10,7 +10,7 @@
       }
     },
     "assert": {
-      "comment": "§ 14.1 targets — Performance > 85 (release gate), Accessibility > 90, Best Practices > 90. LCP < 2.5s / TBT < 300ms / CLS < 0.1 (§ 14.1).",
+      "comment": " targets — Performance > 85 (release gate), Accessibility > 90, Best Practices > 90. LCP < 2.5s / TBT < 300ms / CLS < 0.1.",
       "assertions": {
         "categories:performance": ["error", { "minScore": 0.85 }],
         "categories:accessibility": ["error", { "minScore": 0.9 }],

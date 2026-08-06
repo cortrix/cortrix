@@ -1,17 +1,17 @@
 # Agent Memory Correction — Self-Service Loop
 
 > Best-practice guide for an Agent to find and undo a wrong memory invalidation
-> (memory extraction D6 + D9 self-correction loop). This is the public counterpart of
+> (memory extraction + self-correction loop). This is the public counterpart of
 > `cortrix.ai/docs/agent-memory-correction`.
 >
-> Source of truth for the mechanism: `design/features/MEM02-llm-extraction.md`
-> §6 (HTTP API), §7 (SDK), §8 (the full self-correction scenario).
+> Source of truth for the mechanism: the memory-extraction feature design
+> (HTTP API, SDK, and the full self-correction scenario).
 
 ## Background — why invalidations are reversible
 
 memory extracts long-term memories (`fact` / `preference` / `event`) from
-interactions. When a newly extracted fact contradicts an existing one (D5
-judgment), memory extraction marks the **old** block `status = invalidated` and records *why*
+interactions. When a newly extracted fact contradicts an existing one
+(contradiction judgment), memory extraction marks the **old** block `status = invalidated` and records *why*
 — it never deletes it (the full-retention policy). Every invalidation is
 therefore reversible.
 
@@ -98,4 +98,4 @@ data) with these `CX_ERR_MEMEXTRACT_*` codes:
 This guide describes a design contract. The live endpoints, Query-pipeline contradiction
 path, Python-middleware async worker, and opt-out integration are not currently
 implemented as one supported workflow. Do not treat the examples above as an executable
-Quick Start. Implementation notes remain in `design/features/MEM02-llm-extraction.md`.
+Quick Start. Implementation notes remain in the internal feature design.

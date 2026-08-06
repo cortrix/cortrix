@@ -2,13 +2,13 @@
 
 This resource follows the implemented HTTP architecture. The live ``POST /query`` route is
 the cross-NS handler: ``namespaces`` array (single NS = one-element
-list, all = ["*"]), singular ``filter``, and the § 2.12
+list, all = ["*"]), singular ``filter``, and the
 ``QueryResult{results, meta}`` response (child_id/content/content_hash
 items + 8-field A-class meta). ``_adapt_wire_result`` is kept as a
 tolerant shim for the pre-mount MVP response shape (chunk_text/block_id) —
 cross-NS-shaped responses pass through untouched.
 
-``get_sources()`` -> ``GET /interactions/{id}/sources`` is **§2.12-only**
+``get_sources()`` -> ``GET /interactions/{id}/sources`` is **not yet in the published API spec**
 (API spec to be added).
 """
 
@@ -21,7 +21,7 @@ from .._models import parse_model
 from ._base import AsyncResource, SyncResource
 
 PATH_QUERY = "/query"
-PATH_INTERACTION_SOURCES = "/interactions/{id}/sources"  # §2.12-only -> D3.5 spec
+PATH_INTERACTION_SOURCES = "/interactions/{id}/sources"  # spec to follow
 
 
 def _query_body(
@@ -47,20 +47,20 @@ def _query_body(
 
 
 def _adapt_wire_result(body: Any, namespace: Union[str, List[str]]) -> Any:
-    """Translate the live /query response into the § 2.12 ``QueryResult`` dict.
+    """Translate the live /query response into the ``QueryResult`` dict.
 
-    Field mapping (live route -> § 2.12):
+    Field mapping (live route -> SDK shape):
       ``chunk_text`` -> ``content``; ``block_id`` -> ``child_id`` (stringified);
       ``doc_id`` -> ``parent_id``; ``source_path`` / ``block_type`` /
       ``hit_routes`` / ``vector_score`` / ``related_blocks_count`` fold into
       ``metadata``. Route-degradation info surfaces as a ``meta.warnings`` entry.
-    Already-§2.12 payloads (e.g. a future cross-NS query mount, test stubs) pass through.
+    Already-normalized payloads (e.g. a future cross-NS query mount, test stubs) pass through.
     """
     if not isinstance(body, dict) or "results" not in body:
         return body
     wire_meta = body.get("meta") or {}
     if "namespaces_queried" in wire_meta:
-        return body  # already the §2.12 / cross-NS shape
+        return body  # already the normalized cross-NS shape
 
     ns = namespace if isinstance(namespace, str) else (list(namespace) or [""])[0]
     results: list[dict[str, Any]] = []
@@ -122,7 +122,7 @@ class Query(SyncResource):
 
     def get_sources(self, interaction_id: str) -> Any:
         """Citation sources for an interaction. ``GET /interactions/{id}/sources``
-        (§2.12-only -> D3.5 spec)."""
+        (spec to follow)."""
         return self._client._request(
             "GET", PATH_INTERACTION_SOURCES.format(id=interaction_id)
         )

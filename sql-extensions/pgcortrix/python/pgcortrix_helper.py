@@ -62,7 +62,7 @@ class ErrorCategory:
 
 
 # One canonical row per pgcortrix CX_ERR_* code. Mirrors catalog_error.cpp's
-# table-driven registry. SoT for these identities: ARCHITECTURE.md
+# table-driven registry. SoT for these identities: the architecture doc
 # (CX_ERR_PGCORTRIX_INVALID_FILTER / CX_ERR_PGCORTRIX_ENDPOINT_BLOCKED) + user_id
 # (CX_ERR_USER_ID_MISSING). retry_after_ms is None unless retryable.
 #

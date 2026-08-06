@@ -44,7 +44,7 @@ from ._generated import (
 )
 from ._generated import Namespace as Namespace
 
-# Hand-written list / wrapper types + ergonomics (design § 4.1).
+# Hand-written list / wrapper types + ergonomics (design).
 from .lists import (
     DocumentList,
     MemoryCreateAck,

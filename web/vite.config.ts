@@ -1,11 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Vite build + dev config (web UI design § 11.3 proxy + § 14.2 code-splitting).
+// Vite build + dev config (web UI design proxy + code-splitting).
 //
 // Build output is emitted to static/ (committed, embedded into cortrix-server
-// at container build per § 11.1 / deployment). manualChunks splits the vendor graph so
-// the initial bundle stays under the 250KB gzip release gate (§ 14.1): the big
+// at container build per / deployment). manualChunks splits the vendor graph so
+// the initial bundle stays under the 250KB gzip release gate: the big
 // libraries (react / state / ui / monaco) land in long-cached vendor chunks and
 // Monaco + the lazy route pages (see src/routes.tsx) are only fetched on demand.
 export default defineConfig({
@@ -17,7 +17,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
-        // § 14.2 vendor chunking. (The former editor-vendor / Monaco chunk was
+        // vendor chunking. (The former editor-vendor / Monaco chunk was
         // dropped: JsonEditor is now a self-contained textarea — see JsonEditor.tsx
         // for why Monaco's CDN-loaded core did not work in the self-hosted deploy.)
         manualChunks: {
@@ -31,11 +31,11 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // § 11.3 — API + agent + OTLP metrics all proxied to the local backend in
+      // — API + agent + OTLP metrics all proxied to the local backend in
       // dev so the SPA runs same-origin (matches the production reverse proxy;
       // no CORS, CSP connect-src stays 'self'). Backend API port = 8420 — the
       // local dev default in config.yaml.example and the port dev.sh starts the
-      // server on. OTLP metrics (§ 23-bis.2) post to /v1/metrics.
+      // server on. OTLP metrics post to /v1/metrics.
       '/api': 'http://localhost:8420',
       '/docs': 'http://localhost:8420',
       '/openapi.yaml': 'http://localhost:8420',

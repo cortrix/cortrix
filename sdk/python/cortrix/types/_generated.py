@@ -1,7 +1,7 @@
 """Auto-generated request/response models — DO NOT EDIT BY HAND.
 
 Generated from the frozen OpenAPI spec by ``scripts/generate_types.py``
-(hand-written generator standing in for openapi-generator-cli, design § S4).
+(hand-written generator standing in for openapi-generator-cli, design).
 Regenerate with::
 
     python scripts/generate_types.py

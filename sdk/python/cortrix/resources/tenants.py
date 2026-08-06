@@ -9,7 +9,7 @@ This resource follows the implemented HTTP architecture. Mapping:
   - ``remove_member``-> DELETE /tenants/{id}/members/{uid}
   - ``quota``        -> GET    /tenants/{id}/quota
   - ``create``       -> POST   /admin/tenants  (real-arch creation is admin-scope;
-                        § 2.12's user-level POST /tenants reconciled in D3.5)
+    the draft user-level POST /tenants is reconciled at integration)
 """
 
 from __future__ import annotations

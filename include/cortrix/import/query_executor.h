@@ -121,7 +121,7 @@ public:
 
 /// Production QueryExecutor — validates every request (the 5 constraints) then
 /// (integration) connects read-only + runs PQexecParams. In standalone the Execute/Estimate
-/// bodies return CX_ERR_IMPORT_CONNECTION_FAILED ("real PG → D3.5") AFTER validation,
+/// bodies return CX_ERR_IMPORT_CONNECTION_FAILED ("real PG → integration") AFTER validation,
 /// so the security gate is fully exercised without a live PG. The validation free
 /// functions above are what the fuzzing suite hammers.
 class QueryExecutor : public IQueryExecutor {

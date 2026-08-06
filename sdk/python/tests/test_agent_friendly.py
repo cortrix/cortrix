@@ -1,4 +1,4 @@
-"""SDK agent cases 1-5 — GEN-Agent 4-field decisions (design § 8 / issue 4)."""
+"""SDK agent cases 1-5 — GEN-Agent 4-field decisions."""
 
 from __future__ import annotations
 

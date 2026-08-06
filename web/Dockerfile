@@ -1,4 +1,4 @@
-# Cortrix Web UI — multi-stage build (web UI design § 11.1 / S9).
+# Cortrix Web UI — multi-stage build (web UI design / S9).
 #
 # AUTHORITATIVE SoT for the full image (cortrix-server binary stage +
 # multi-arch build-args + alpine security baseline) is deployment
@@ -8,14 +8,14 @@
 # production pipeline composes the `web-builder` stage below into the deployment server
 # image via `COPY --from`.
 #
-# Layout (§ 11.1 / § 11.2):
+# Layout:
 #   GET /            -> /cortrix-web/index.html
 #   GET /assets/*    -> static files (gzip + brotli + Cache-Control)  [readiness]
 #   any non-/api/*   -> SPA fallback to index.html                    [readiness]
 # cortrix-server is started with `--web-root=/cortrix-web` (deployment).
 
 # ── Stage 1: web-builder ────────────────────────────────────────────────────
-# Pinned node:20-alpine (matches § 11.1 sketch + the base-image baseline base-image baseline).
+# Pinned node:20-alpine (matches sketch + the base-image baseline base-image baseline).
 FROM node:20-alpine AS web-builder
 WORKDIR /app
 

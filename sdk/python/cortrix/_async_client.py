@@ -1,4 +1,4 @@
-"""Asynchronous Cortrix client. Symmetric to :class:`Cortrix`. See design § 2.3."""
+"""Asynchronous Cortrix client. Symmetric to :class:`Cortrix`."""
 
 from __future__ import annotations
 
@@ -252,7 +252,7 @@ class AsyncCortrix(AsyncBaseClient):
         mode: str = "per_row",
     ) -> Any:
         """Manual database import. ``POST /import/database`` (import.yaml not yet
-        built -> D3.5)."""
+        built — formal spec to follow)."""
         if self._imports is None:
             self._imports = AsyncImports(self)
         return await self._imports.database(

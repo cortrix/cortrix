@@ -95,7 +95,7 @@ public:
     // --- IVectorStore subset held by the write coordinator (distinct signatures from IIndex) ---
     // Search without ef_search: delegates to the IIndex Search with the
     // configured default. Exists/Snapshot/Recover carry a TraceContext per the
-    // ARCHITECTURE.md SoT signature.
+    // the architecture doc SoT signature.
     Status Snapshot(const observability::TraceContext* ctx) override;
     Status Recover(const observability::TraceContext* ctx) override;
     bool Exists(uint64_t block_id, const observability::TraceContext* ctx) override;

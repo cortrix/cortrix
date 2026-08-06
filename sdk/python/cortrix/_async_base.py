@@ -2,7 +2,7 @@
 
 The header / exception / retry-decision helpers are pure (I/O-free) and live on
 :class:`cortrix._base_client.BaseClient`; the async client reuses them verbatim
-(design § 2.13.1 architecture note: no separate async ``_build_headers``).
+(design architecture note: no separate async ``_build_headers``).
 ``AsyncBaseClient`` exists so async Resources can type their ``_client`` against
 an async-specific base whose ``_request`` is a coroutine. The overloads mirror
 :class:`cortrix._async_client.AsyncCortrix` so ``await client._request(...,

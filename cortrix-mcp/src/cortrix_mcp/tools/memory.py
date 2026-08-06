@@ -68,7 +68,7 @@ def register(mcp) -> None:
         """Self-service revoke of an auto-extracted fact (memory extraction).
 
         Marks the fact auto_revoke_eligible; the physical row is retained (full-retention
-        model). D3.5 deferred: POST /memory/{id}/revoke not yet in api/paths/*.yaml — mock.
+        model). Integration deferred: POST /memory/{id}/revoke not yet in api/paths/*.yaml — mock.
         """
         ns = namespace or CORTRIX_NAMESPACE
         body = {"namespace": ns}

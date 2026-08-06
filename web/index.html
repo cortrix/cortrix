@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!--
-      Content-Security-Policy (P02a design § 4.8 + § 4.6 V5-B4).
+      Content-Security-Policy (web UI design + V5-B4).
       This <meta> CSP is the in-document baseline; the AUTHORITATIVE production
       policy is the response header emitted by cortrix-server (SoT: security baseline security
-      hardening / SECURITY_BASELINE.md § 2.5). Header-only directives that are
+      hardening / the security baseline). Header-only directives that are
       ignored in <meta> — frame-ancestors / report-uri — are enforced there
       (frame-ancestors 'none' for clickjacking + HSTS on HTTPS deploys).
 
-      connect-src: 'self' only (§ 4.6 V5-B4 — production HTTPS, no localhost; the
+      connect-src: 'self' only (V5-B4 — production HTTPS, no localhost; the
       OTLP /v1/metrics push and all /api/v1/* fetches are same-origin; third-party
       LLMs are reached via the cortrix-server reverse proxy, never directly).
       style-src allows 'unsafe-inline' for Tailwind/Monaco runtime styles.

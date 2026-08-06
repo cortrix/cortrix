@@ -1,5 +1,5 @@
 # Web UI build / test artifacts (not source). The production static/ bundle IS
-# tracked (embedded into cortrix-server at container build per § 11.1) — only
+# tracked (embedded into cortrix-server at container build per) — only
 # transient test + coverage output is ignored here.
 coverage/
 test-results/

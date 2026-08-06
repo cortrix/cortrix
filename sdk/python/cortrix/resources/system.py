@@ -1,10 +1,10 @@
-"""System resource. ``/system/*`` (ARCH § 4.1.11).
+"""System resource. ``/system/*`` (ARCH).
 
 This resource follows the implemented HTTP architecture. Endpoints include
 ``health/live`` / ``version`` /
 ``namespaces/{ns}/stats`` / ``agent_llm_config``. ``features()``
-(``GET /system/features``) is **§2.12-only** -> § 2.12 wire (API spec to be
-added -> D3.5).
+(``GET /system/features``) is not yet in the published API spec (to be
+added at integration).
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ PATH_HEALTH = "/system/health/live"
 PATH_VERSION = "/system/version"
 PATH_NS_STATS = "/system/namespaces/{ns}/stats"
 PATH_AGENT_LLM_CONFIG = "/system/agent_llm_config"
-PATH_FEATURES = "/system/features"  # §2.12-only -> D3.5 spec
+PATH_FEATURES = "/system/features"  # spec to follow
 
 
 class System(SyncResource):
@@ -46,7 +46,7 @@ class System(SyncResource):
 
     def features(self) -> Any:
         """Feature flags for this deployment. ``GET /system/features``
-        (§2.12-only -> D3.5 spec)."""
+        (spec to follow)."""
         return self._client._request("GET", PATH_FEATURES)
 
 

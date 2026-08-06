@@ -1,7 +1,7 @@
 """Lightweight dataclass <- dict parsing (forward-compatible).
 
-Response types are plain ``@dataclass`` objects (Python SDK design § 3.2). The server
-JSON may carry extra fields (forward compat, AGENT_FRIENDLY principle 7) or omit
+Response types are plain ``@dataclass`` objects (Python SDK design). The server
+JSON may carry extra fields (forward compat, the Agent-friendly contract principle 7) or omit
 optional ones; :func:`parse_model` constructs the dataclass tolerantly:
 
   - unknown keys are ignored,
