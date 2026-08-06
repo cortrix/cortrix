@@ -11,7 +11,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/auth/auth_error.h"
 
-// Auth S1 coverage: the auth error codes (§5.2) — CX_ERR_ identity, category
+// Auth S1 coverage: the auth error codes — CX_ERR_ identity, category
 // mapping, retryability, structured_data keys, and the MakeAuthError boundary
 // factory (incl. the live retry_after override for ACCOUNT_LOCKED / RATE_LIMITED).
 namespace cortrix::auth {
@@ -57,7 +57,7 @@ TEST(AuthErrorTest, CodeCountMatchesAnchor) {
 }
 
 // Every code's CX_ERR_* string is unique and matches the ErrorResponseV1 pattern
-// ^CX_ERR_[A-Z][A-Z_]*$ (ARCH §4.1.11; auth V3-resolution-14 added AUTH prefix).
+// ^CX_ERR_[A-Z][A-Z_]*$ (ARCH; auth V3-resolution-14 added AUTH prefix).
 TEST(AuthErrorTest, EveryCodeHasUniqueWellFormedCxString) {
     static const std::regex kPattern("^CX_ERR_[A-Z][A-Z_]*$");
     std::set<std::string> seen;
@@ -71,7 +71,7 @@ TEST(AuthErrorTest, EveryCodeHasUniqueWellFormedCxString) {
 
 // The 14 auth-domain codes carry the CX_ERR_AUTH_ second-level prefix; the
 // project-shared + admin/users codes intentionally do NOT (master-table consolidated under,
-// V14 J6). Guards the §5.2 prefix decision against accidental drift.
+// V14 J6). Guards the prefix decision against accidental drift.
 TEST(AuthErrorTest, AuthDomainCodesCarryAuthPrefix) {
     const std::set<AuthErrorCode> kAuthPrefixed = {
         AuthErrorCode::kEmailAlreadyExists, AuthErrorCode::kInvalidCredentials,
@@ -110,7 +110,7 @@ TEST(AuthErrorTest, EveryCategoryIsOneOfFive) {
     }
 }
 
-// Spot-check the exact §5.2 rows downstream consumers depend on. NOTE: unlike the
+// Spot-check the exact rows downstream consumers depend on. NOTE: unlike the
 // catalog table, auth's ACCOUNT_LOCKED / RATE_LIMITED are retryable+quota with a
 // *live* retry_after (static default = nullopt, injected per-call) — asserted below.
 TEST(AuthErrorTest, SpecificRowsMatchSpec) {
@@ -139,7 +139,7 @@ TEST(AuthErrorTest, SpecificRowsMatchSpec) {
 }
 
 // MakeAuthError fills the boundary error from the registry and attaches
-// structured_data; ToJson then yields the AGENT_FRIENDLY §3.1 body shape.
+// structured_data; ToJson then yields the Agent-friendly contract body shape.
 TEST(AuthErrorTest, MakeAuthErrorBuildsAgentFriendlyBody) {
     nlohmann::json sd = {{"reason", "expired"}};
     auto err = MakeAuthError(AuthErrorCode::kInvalidResetCode, sd);
@@ -196,7 +196,7 @@ TEST(AuthErrorTest, AuthStatusCarriesCodeTokenAndCoarseStatus) {
     EXPECT_EQ(AuthErrorToStatusCode(AuthErrorCode::kJwtInitFailed), StatusCode::kInternal);
 }
 
-// HasRequiredStructuredData enforces the §5.2 structured_data keys; the
+// HasRequiredStructuredData enforces the structured_data keys; the
 // intentionally-empty codes (e.g. INVALID_CREDENTIALS — anti-enumeration) accept any object.
 TEST(AuthErrorTest, RequiredStructuredDataKeysEnforced) {
     // kAdminRequired requires required_role + current_role.

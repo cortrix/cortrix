@@ -51,7 +51,7 @@ EnricherConfig LlmCfg() {
     cfg.model = "gpt-4o-mini";
     cfg.batch_size = 8;
     cfg.prompt_template_id = "default-zh";
-    cfg.http_retry_backoff_ms = 1;  // §3.7 seconds-level default would stall tests
+    cfg.http_retry_backoff_ms = 1;  // seconds-level default would stall tests
     return cfg;
 }
 
@@ -128,7 +128,7 @@ TEST(LlmEnricherTest, DeepSeekStructuredCallDisablesThinkingAndUsesLargeTokenBud
     EXPECT_FALSE(captured.allow_reasoning_content_fallback);
 }
 
-// D5b operational relief: the batch-call response budget is a config knob now
+// operational relief: the batch-call response budget is a config knob now
 // (default stays 4096); deployments size it with batch_size instead of hitting
 // the hardcoded ceiling (~128 tokens/chunk at batch 32 truncated the JSON).
 TEST(LlmEnricherTest, ConfiguredMaxTokensFlowsToCall) {
@@ -190,7 +190,7 @@ TEST(LlmEnricherTest, LlmTransportFailureProducesLlmApiErrors) {
     llm::ChatCompletionResponse fail;
     fail.status = Status::Unavailable(std::string(llm::llm_tokens::kTransport) +
                                       ": connect refused");
-    // Transport failures are busy-retried (§5.1, up to 3 attempts) → the mock
+    // Transport failures are busy-retried (up to 3 attempts) → the mock
     // must answer every attempt with the failure (WillRepeatedly).
     EXPECT_CALL(*mock, Chat(_, _)).WillRepeatedly(Return(fail));
 
@@ -352,7 +352,7 @@ TEST(CreateEnricherTest, LlmWithApiKeyAndProbeOkMakesLlmEnricher) {
 
 TEST(CreateEnricherTest, LlmWithoutApiKeyDegradesToNull) {
     auto cfg = LlmCfg();
-    cfg.api_key = "";  // no key → no point calling → Null fallback (§4.4 scenario 2)
+    cfg.api_key = "";  // no key → no point calling → Null fallback (scenario 2)
     llm::FakeHttpTransport probe;  // not consulted (short-circuits before probe)
     auto e = CreateEnricher(cfg, probe);
     ASSERT_NE(e, nullptr);

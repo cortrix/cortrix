@@ -36,7 +36,7 @@ ChunkerInput MakeInput(std::vector<ParsedPage> pages) {
     return in;
 }
 
-// --- S3.2 flat fallback (§ 4.5 / D4 lock) --------------------------------------
+// --- S3.2 flat fallback (/ lock) --------------------------------------
 
 TEST(ChunkerFallbackTest, ExplicitFlatStrategyProducesNoParents) {
     ChunkerConfig cfg;
@@ -59,7 +59,7 @@ TEST(ChunkerFallbackTest, ThresholdTriggersFallback) {
     cfg.parent_size = 256;             // est_parents = total_tokens / 256
     cfg.child_size = 50;
     cfg.max_parents_per_doc = 2;
-    cfg.fallback_to_flat_threshold = 2;  // D4: == cap
+    cfg.fallback_to_flat_threshold = 2;  //: == cap
     // ~10 paragraphs * 100 tokens = ~1000 tokens -> est ~4 parents > 2 -> fallback
     auto r = ParentChildChunker(cfg).Chunk(MakeInput({MakePageWithParas(1, 10, 100)}));
     ASSERT_TRUE(r.ok()) << r.status().message();
@@ -106,13 +106,13 @@ TEST(ChunkerFallbackTest, FlatChildrenChunkIndexSequential) {
     for (size_t i = 0; i < kids.size(); ++i) EXPECT_EQ(kids[i].chunk_index, static_cast<uint32_t>(i));
 }
 
-// --- S3.4 perf-style (L1: chunking throughput, § 7.4) --------------------------
+// --- S3.4 perf-style (L1: chunking throughput) --------------------------
 
 TEST(ChunkerPerfTest, LargeDocChunksQuickly) {
     // Perf case: a large document chunks well under the L1 budget. Build a
     // ~200-page doc with substantial text and assert it completes fast + produces a
     // coherent parent/child tree. (Wall-clock is generous to avoid CI flakiness;
-    // the real D-perf recall gate vs benchmark dataset is D4/D5, § 7.4.)
+    // the real D-perf recall gate vs benchmark dataset is/)
     std::vector<ParsedPage> pages;
     for (int p = 1; p <= 200; ++p) pages.push_back(MakePageWithParas(p, 8, 120));
 

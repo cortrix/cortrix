@@ -153,7 +153,7 @@ ComplexityBackendResult OnnxComplexityBackend::Infer(const std::string& query) {
     inputs.push_back(std::move(ids_tensor));
     inputs.push_back(std::move(mask_tensor));
 
-    // One retry on a transient ONNX fault (mirrors OnnxEmbedder §10), then surface
+    // One retry on a transient ONNX fault (mirrors OnnxEmbedder), then surface
     // RouterInferenceError → QueryComplexityClassifier's L3 retry/degrade path.
     std::vector<Ort::Value> outputs;
     bool ok = false;

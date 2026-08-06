@@ -13,7 +13,7 @@
 #include "cortrix/common/in_memory_global_config.h"
 
 // S3 coverage: DocumentTaskHandler — POST async-decision/enqueue, GET progress
-// (§6.3 body + meta), DELETE cancel (§4.3), and the Issue 5 GEN-Agent 4-field error
+// (body + meta), DELETE cancel, and the Issue 5 GEN-Agent 4-field error
 // envelope across the 11 codes. No WorkerPool runs here (pool=nullptr), so tasks
 // stay queued and progress/cancel are observed deterministically.
 namespace cortrix::async {
@@ -45,7 +45,7 @@ class DocumentTaskHandlerTest : public ::testing::Test {
     std::unique_ptr<DocumentTaskHandler> handler_;
 };
 
-// ---- POST async decision (§2.2) -------------------------------------------
+// ---- POST async decision -------------------------------------------
 
 TEST_F(DocumentTaskHandlerTest, SmallDocRoutesToSyncPath) {
     auto r = handler_->SubmitAsync(MakeParams("docS", /*pages=*/50, /*ent=*/true));
@@ -135,7 +135,7 @@ TEST_F(DocumentTaskHandlerTest, ThresholdConfigurable) {
     EXPECT_EQ(r.status, 202);
 }
 
-// ---- GET progress (§6.3) ---------------------------------------------------
+// ---- GET progress ---------------------------------------------------
 
 TEST_F(DocumentTaskHandlerTest, GetProgressReturnsBodyWithMeta) {
     auto sub = handler_->SubmitAsync(MakeParams("docP", 800, true));
@@ -156,7 +156,7 @@ TEST_F(DocumentTaskHandlerTest, GetProgressReturnsBodyWithMeta) {
     EXPECT_EQ(r.body["task_id"], task_id);
     EXPECT_EQ(r.body["processed_pages"], 327);
     EXPECT_EQ(r.body["total_pages"], 1500);
-    // §6.3 meta 5 fields present
+    // meta 5 fields present
     ASSERT_TRUE(r.body.contains("meta"));
     const auto& meta = r.body["meta"];
     EXPECT_EQ(meta["worker_id"], 2);
@@ -184,7 +184,7 @@ TEST_F(DocumentTaskHandlerTest, GetProgressUnknownTask404) {
     EXPECT_EQ(r.body["error"]["retryable"], false);
 }
 
-// ---- DELETE cancel (§4.3) --------------------------------------------------
+// ---- DELETE cancel --------------------------------------------------
 
 TEST_F(DocumentTaskHandlerTest, CancelQueuedReturns200Cancelled) {
     auto sub = handler_->SubmitAsync(MakeParams("docCancelQ", 800, true));
@@ -223,7 +223,7 @@ TEST_F(DocumentTaskHandlerTest, CancelUnknownTask404) {
     EXPECT_EQ(r.body["error"]["code"], "CX_ERR_TASK_NOT_FOUND");
 }
 
-// ---- agent_decision_hint per status (§6.3 BuildProgressBody, all branches) -
+// ---- agent_decision_hint per status (BuildProgressBody, all branches) -
 
 TEST(DocumentTaskHandlerBodyTest, AgentDecisionHintCoversAllStatuses) {
     auto hint = [](const std::string& status) {
@@ -369,7 +369,7 @@ TEST_F(DocumentTaskHandlerTest, GetProgressFailedHint) {
 
 TEST(DocumentTaskHandlerSchemaTest, AllElevenCodesEmitFourFieldEnvelope) {
     // Every CX_ERR_* serialized via ToJson(MakeTaskError(...)) carries the 4
-    // GEN-Agent fields with the correct types (§6.2 / AGENT_FRIENDLY §3.1).
+    // GEN-Agent fields with the correct types (/ the Agent-friendly contract).
     constexpr TaskErrorCode kAll[] = {
         TaskErrorCode::kInvalidRequest,          TaskErrorCode::kMaxPagesExceeded,
         TaskErrorCode::kTaskNotFound,            TaskErrorCode::kTaskTimeout,

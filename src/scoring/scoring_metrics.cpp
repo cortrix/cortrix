@@ -42,7 +42,7 @@ struct State {
     std::atomic<uint64_t> anomalous{0};
     std::atomic<uint64_t> final_score{0};
     Hist assign_dur{};
-    std::array<std::atomic<uint64_t>, kScoringErrorCodeCount> error_by_code{};  // §4.4 (2 codes)
+    std::array<std::atomic<uint64_t>, kScoringErrorCodeCount> error_by_code{};  // (2 codes)
 };
 
 State& S() {
@@ -119,7 +119,7 @@ std::string ScoringMetrics::Render() const {
            << ScoreCount(lv) << "\n";
     }
 
-    os << "# HELP cortrix_scoring_anomalous_blocks_total Anomalous blocks scored 0.0 (D6 sentinel).\n";
+    os << "# HELP cortrix_scoring_anomalous_blocks_total Anomalous blocks scored 0.0 (sentinel).\n";
     os << "# TYPE cortrix_scoring_anomalous_blocks_total counter\n";
     os << "cortrix_scoring_anomalous_blocks_total " << AnomalousCount() << "\n";
 
@@ -131,7 +131,7 @@ std::string ScoringMetrics::Render() const {
     os << "# TYPE cortrix_scoring_assign_duration_seconds histogram\n";
     RenderHist(os, "cortrix_scoring_assign_duration_seconds", S().assign_dur);
 
-    os << "# HELP cortrix_scoring_error_total scoring errors by CX_ERR_SCORING_* code (§4.4).\n";
+    os << "# HELP cortrix_scoring_error_total scoring errors by CX_ERR_SCORING_* code.\n";
     os << "# TYPE cortrix_scoring_error_total counter\n";
     for (int i = 0; i < kScoringErrorCodeCount; ++i) {
         const auto code = static_cast<ScoringErrorCode>(i);

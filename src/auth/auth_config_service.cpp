@@ -23,7 +23,7 @@ int64_t NowMs() {
         .count();
 }
 
-// The §3.6 default key set, as (key, JSON literal) pairs. JSON literals match the
+// The default key set, as (key, JSON literal) pairs. JSON literals match the
 // spec's types (int / bool / null / string). kAuthConfigDefaultKeyCount anchors
 // the count in a test.
 struct DefaultKv { const char* key; const char* json; };

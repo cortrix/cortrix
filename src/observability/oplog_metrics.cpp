@@ -6,14 +6,14 @@ namespace cortrix::observability {
 
 namespace {
 
-// query_latency_seconds bucket upper bounds (seconds), §11. API query latencies
+// query_latency_seconds bucket upper bounds (seconds), API query latencies
 // are sub-second, so the bounds mirror the agent-trace query histogram.
 constexpr double kQBounds[OplogMetrics::kNumQueryBuckets] =
     {0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0};
 constexpr const char* kQBoundStr[OplogMetrics::kNumQueryBuckets] =
     {"0.005", "0.01", "0.025", "0.05", "0.1", "0.25", "0.5", "1"};
 
-// cleanup_duration_seconds bucket upper bounds (seconds), §11. A cleanup sweep is a
+// cleanup_duration_seconds bucket upper bounds (seconds), A cleanup sweep is a
 // SQLite DELETE over the retention window / row-cap, so the bounds run wider.
 constexpr double kClnBounds[OplogMetrics::kNumCleanupBuckets] =
     {0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0};

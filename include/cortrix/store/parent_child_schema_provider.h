@@ -20,10 +20,10 @@ namespace cortrix::store {
 ///   - idx_blocks_meta_doc  (UNIQUE, WHERE block_type = 8/*META*/) — the "1 doc =
 ///     1 META" uniqueness (this index is built by
 ///     ParentChildSchemaProvider; its semantics belong to the metadata block).
-///   - `parents` table (parent_text reverse-lookup store, § D6) via kParentsSchemaSql.
+///   - `parents` table (parent_text reverse-lookup store) via kParentsSchemaSql.
 ///
 /// Implements the frozen cortrix::catalog::ISchemaProvider. Migrate
-/// returns Status (CODING_CONVENTIONS § 3). All DDL is idempotent (column/table
+/// returns Status (the coding conventions). All DDL is idempotent (column/table
 /// existence guards + IF NOT EXISTS) so a re-run / already-current Unit DB is a
 /// no-op; if `blocks` is absent (isolated unit test) the blocks ALTERs no-op but
 /// `parents` is still created.

@@ -65,7 +65,7 @@ Status PlatformDb::Open(const std::string& db_path,
     // atomic batch. Auth is registered FIRST so its `users` table (the FK target
     // refresh_tokens / api_keys reference) exists before any extra provider.
     // NOTE: CatalogSchemaProvider is intentionally NOT registered here — catalog
-    // tables live in catalog.db, a different file (D3.5 reconciles the two).
+    // tables live in catalog.db, a different file (integration reconciles the two).
     AuthSchemaProvider auth_provider;
     catalog::SchemaMigrator migrator;
     migrator.Register(&auth_provider);

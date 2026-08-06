@@ -1,5 +1,5 @@
 /// @file test_e2e_persistence.cpp
-/// @brief D4 E2E: Persistence tests (data survives close/reopen cycle)
+/// @brief E2E: Persistence tests (data survives close/reopen cycle)
 ///
 /// Tests that stored data survives a store close + reopen:
 ///   1. Store data survives restart: create docs/blocks → close → reopen → verify

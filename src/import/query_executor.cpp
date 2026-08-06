@@ -289,7 +289,7 @@ Result<CompiledQuery> CompileQueryRequest(const QueryRequest& req,
     return out;
 }
 
-// --- QueryExecutor: validates, then defers the live PG path to D3.5 ---
+// --- QueryExecutor: validates, then defers the live PG path to integration ---
 
 QueryExecutor::QueryExecutor(FilterDslConstraints dsl_constraints)
     : dsl_constraints_(std::move(dsl_constraints)) {}
@@ -300,9 +300,9 @@ Result<int64_t> QueryExecutor::EstimateRowCount(const std::string& /*dsn*/,
     // Always run the full security gate first (this is exercised by standalone tests).
     Result<CompiledQuery> compiled = CompileQueryRequest(req, constraints, dsl_constraints_);
     if (!compiled.ok()) return compiled.status();
-    // Real SELECT COUNT(*) over the read-only connection → D3.5.
+    // Real SELECT COUNT(*) over the read-only connection → integration.
     return ImportStatus(ImportErrorCode::kConnectionFailed,
-                      "live PostgreSQL COUNT(*) is wired in D3.5 (standalone validates only)");
+                      "live PostgreSQL COUNT(*) is wired in integration (standalone validates only)");
 }
 
 Result<std::vector<DbRow>> QueryExecutor::Execute(const std::string& /*dsn*/,
@@ -310,9 +310,9 @@ Result<std::vector<DbRow>> QueryExecutor::Execute(const std::string& /*dsn*/,
                                                   const QueryConstraints& constraints) {
     Result<CompiledQuery> compiled = CompileQueryRequest(req, constraints, dsl_constraints_);
     if (!compiled.ok()) return compiled.status();
-    // Real read-only PQexecParams (timeout + row cap enforced at the connection) → D3.5.
+    // Real read-only PQexecParams (timeout + row cap enforced at the connection) → integration.
     return ImportStatus(ImportErrorCode::kConnectionFailed,
-                      "live PostgreSQL execution is wired in D3.5 (standalone validates only)");
+                      "live PostgreSQL execution is wired in integration (standalone validates only)");
 }
 
 }  // namespace cortrix::import

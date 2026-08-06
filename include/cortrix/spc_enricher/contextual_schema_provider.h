@@ -29,7 +29,7 @@ namespace cortrix::spc {
 ///   contextual_vec_labels(label PK, block_id, child_id)
 ///
 /// Implements the frozen cortrix::catalog::ISchemaProvider. Migrate
-/// returns Status (CODING_CONVENTIONS § 3). All DDL is idempotent (column
+/// returns Status (the coding conventions). All DDL is idempotent (column
 /// existence guards); if `blocks` is absent (isolated unit test) it no-ops.
 class ContextualSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:

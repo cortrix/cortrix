@@ -24,7 +24,7 @@
 //
 // The three "bridge reports status=N" cases are driven through ParseBridgeJson
 // (parser.cpp), the public function that re-inflates the Python bridge's numeric
-// status (§2.7 wire form) into a ParsedDoc — a real, in-band trigger of each code
+// status (wire form) into a ParsedDoc — a real, in-band trigger of each code
 // without needing a live Python subprocess.
 namespace cortrix::spc {
 namespace {
@@ -53,7 +53,7 @@ private:
 };
 
 // Build a minimal bridge JSON payload that reports a given numeric status (the
-// §2.7 ParserError wire value) plus an optional structured_data object — exactly
+// ParserError wire value) plus an optional structured_data object — exactly
 // what the Python Docling/OCR bridge emits on stdout.
 std::string BridgeJsonWithStatus(int status, const nlohmann::json& structured_data) {
     nlohmann::json j;
@@ -136,7 +136,7 @@ TEST(ParserErrPathTest, AllParsersFailed_PrimaryAndOcrBothFail_SurfacesCxCode) {
 // ---------------------------------------------------------------------------
 
 TEST(ParserErrPathTest, EncodingError_FromBridgeStatus_SurfacesCxCode) {
-    // The bridge attaches the §5.2 required key (detected_encoding) on a non-UTF-8
+    // The bridge attaches the required key (detected_encoding) on a non-UTF-8
     // file whose conversion failed.
     const std::string bridge =
         BridgeJsonWithStatus(static_cast<int>(ParserErrorCode::kEncodingError),
@@ -190,14 +190,14 @@ TEST(ParserErrPathTest, OutputTooLarge_FromBridgeStatus_SurfacesCxCode) {
     EXPECT_EQ(ParserErrorCodeString(doc.status), std::string("CX_ERR_OUTPUT_TOO_LARGE"));
     EXPECT_EQ(doc.structured_data["code"], "CX_ERR_OUTPUT_TOO_LARGE");
     EXPECT_EQ(doc.structured_data["limit_bytes"], 52428800);
-    // §5.2 / registry: OUTPUT_TOO_LARGE is a quota-category, non-retryable fault.
+    // registry: OUTPUT_TOO_LARGE is a quota-category, non-retryable fault.
     EXPECT_EQ(doc.category, agent_friendly::ErrorCategory::kQuota);
     auto err = MakeAgentFriendlyError(doc);
     EXPECT_EQ(err.code, "CX_ERR_OUTPUT_TOO_LARGE");
 }
 
 // ---------------------------------------------------------------------------
-// CX_ERR_EMPTY_DOCUMENT — bridge reports status=9. §5.1: an empty document is NOT
+// CX_ERR_EMPTY_DOCUMENT — bridge reports status=9.: an empty document is NOT
 // an error (status=OK, pages=[]) but it carries the CX_ERR_EMPTY_DOCUMENT identity
 // in the registry. ParseBridgeJson keeps the kEmptyDocument status on the OK path.
 // ---------------------------------------------------------------------------
@@ -209,7 +209,7 @@ TEST(ParserErrPathTest, EmptyDocument_FromBridgeStatus_IsOkButCarriesCxCode) {
     j["pages"] = nlohmann::json::array();  // empty document
     ParsedDoc doc = ParseBridgeJson(j.dump(), "/tmp/blank.pdf", "docling");
 
-    // §5.1: empty document is treated as success (IsParserOk(kEmptyDocument) == true).
+    //: empty document is treated as success (IsParserOk(kEmptyDocument) == true).
     EXPECT_TRUE(doc.ok());
     EXPECT_EQ(doc.status, ParserErrorCode::kEmptyDocument);
     EXPECT_TRUE(doc.pages.empty());

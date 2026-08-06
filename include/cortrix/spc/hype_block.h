@@ -11,7 +11,7 @@
 
 namespace cortrix::spc {
 
-/// Build the §4.2 hype_question Block metadata_json for one question. Shape:
+/// Build the hype_question Block metadata_json for one question. Shape:
 ///   {"source_child_id","source_parent_id",
 ///    "hype":{"question_index","prompt_version","llm_provider","llm_model",
 ///            "cost_usd","generated_at"}}
@@ -31,7 +31,7 @@ std::string BuildHypeQuestionMetadataJson(const HypeQuestion& q,
 /// Block that round-trips (block_type=16 is the recall discriminator — HyPE
 /// owns no flags_ext bit, so flags_ext stays 0).
 ///
-/// Standalone (D3): the actual atomic write (chunk + hype_question Blocks in one
+/// Standalone: the actual atomic write (chunk + hype_question Blocks in one
 /// write-coordinator transaction) is wired separately; here we build
 /// the BLOB the pipeline will hand to the write coordinator.
 std::vector<uint8_t> BuildHypeQuestionBlock(const HypeQuestion& q,
@@ -40,13 +40,13 @@ std::vector<uint8_t> BuildHypeQuestionBlock(const HypeQuestion& q,
                                             double cost_usd,
                                             const std::string& generated_at);
 
-/// Fill `q.embedding` from an embedder (the §9.1 `hype_q.embedding =
+/// Fill `q.embedding` from an embedder (the `hype_q.embedding =
 /// OnnxEmbedder.Embed(question_text)` step). Templated on the embedder so it works
 /// with the concrete OnnxEmbedder (stub mode) or a test FakeEmbedder — both expose
 /// `Status Embed(const std::string&, EmbeddingResult*)`. Returns the embed Status.
 ///
-/// Standalone (D3): the real BGE-M3 inference is the OnnxEmbedder stub path here;
-/// wiring the live pipeline embedder = D3.5.
+/// Standalone: the real BGE-M3 inference is the OnnxEmbedder stub path here;
+/// wiring the live pipeline embedder = integration.
 template <typename Embedder>
 Status FillHypeEmbedding(HypeQuestion& q, Embedder& embedder) {
     EmbeddingResult r;

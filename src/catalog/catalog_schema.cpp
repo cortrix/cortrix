@@ -6,8 +6,8 @@
 
 namespace cortrix::catalog {
 
-// catalog.db framework schema — transcribed from catalog-two-layer-mapping.md §4.1
-// (mirrors ARCHITECTURE.md §2.4). Kept as one DDL batch so the migrator applies
+// catalog.db framework schema — transcribed from catalog-two-layer-mapping.md
+// (mirrors ARCHITECTURE.md). Kept as one DDL batch so the migrator applies
 // it atomically. See catalog_schema.h for the SQLite-dialect notes (JSONB/BIGINT
 // type names kept; '{}'::jsonb casts → plain '{}' default; BOOLEAN → INTEGER).
 //
@@ -17,8 +17,8 @@ namespace cortrix::catalog {
 const char* const kCatalogSchemaSql = R"SQL(
 -- ===== 6 main tables =====
 
--- 1. file_locations (OPEN-1 dedup core + OPEN-2 three-stage GC + D15 Blob URI).
---    Full 16 columns, aligned with ARCH §2.4.
+-- 1. file_locations (OPEN-1 dedup core + OPEN-2 three-stage GC + Blob URI).
+--    Full 16 columns, aligned with ARCH
 CREATE TABLE IF NOT EXISTS file_locations (
     file_hash       TEXT PRIMARY KEY,
     unit_id         TEXT NOT NULL,
@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS content_refs (
 );
 CREATE INDEX IF NOT EXISTS idx_cr_ns ON content_refs(ns_id);
 
--- blob_gc_queue (OPEN-2 GC Stage 3; ARCH §5.x A6 §10.7 authoritative schema).
+-- blob_gc_queue (OPEN-2 GC Stage 3; ARCH A6 authoritative schema).
 -- PK = blob_uri (one file_hash can map to several blob_uris: cortrix-local + s3
 -- + …). Stage 2 hard-delete enqueues; the background GC thread scans eligible
 -- rows (eligible_at <= now AND status='pending') and unlinks them in Stage 3.
@@ -171,9 +171,9 @@ CREATE TABLE IF NOT EXISTS user_tenants (
     PRIMARY KEY (user_id, tenant_id)
 );
 
--- ns_acl (cross-Tenant shared ACL; ARCH §2.9 6-column authoritative schema).
+-- ns_acl (cross-Tenant shared ACL; ARCH 6-column authoritative schema).
 -- grantee_user_id NULL = whole grantee_tenant_id is granted. SQLite allows NULL
--- in a PK and treats multiple NULLs as distinct rows (ARCH §2.4 compat note).
+-- in a PK and treats multiple NULLs as distinct rows (ARCH compat note).
 CREATE TABLE IF NOT EXISTS ns_acl (
     ns_id                TEXT NOT NULL,
     grantee_tenant_id    TEXT NOT NULL,
@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS ns_acl (
     PRIMARY KEY (ns_id, grantee_tenant_id, grantee_user_id)
 );
 
--- ===== V1.0 OSS bootstrap rows (tenant management §10.1, idempotent) =====
+-- ===== V1.0 OSS bootstrap rows (tenant management, idempotent) =====
 -- Single-tenant OSS runs as 'default_tenant'; namespaces.tenant_id is NOT NULL
 -- with an FK (foreign_keys=ON), so these placeholders must exist before the
 -- first CreateNamespace. INSERT OR IGNORE keeps restarts idempotent.
@@ -202,7 +202,7 @@ Status CatalogSchemaProvider::Migrate(sqlite3* db, int /*from_ver*/, int /*to_ve
     // Phase 1: single-step creation from scratch (v0 → v1). Phase 2 internal
     // evolution will branch on (from_ver, to_ver) here.
     //
-    // blob_gc_queue clean-break (OPEN-2 / D3.5 r2): the pre-GC MVP image shipped
+    // blob_gc_queue clean-break (OPEN-2 / integration r2): the pre-GC MVP image shipped
     // a stale (blob_id/stage/enqueued_at/purge_after) shape with zero consumers.
     // CREATE IF NOT EXISTS keeps the stale table alive on an upgraded data dir
     // and Stage 3 then fails with "no such column: blob_uri". Pre-release the

@@ -13,7 +13,7 @@ std::string Tail(const std::string& s, size_t n) {
     return s.size() <= n ? s : s.substr(s.size() - n);
 }
 
-// §4.3: PaddleOCR only handles PDF + image formats; everything else is rejected
+//: PaddleOCR only handles PDF + image formats; everything else is rejected
 // up front (the factory routes Office/markup to Docling, never here).
 bool OcrSupports(const std::string& ext) {
     return ext == "pdf" || ext == "png" || ext == "jpg" || ext == "jpeg" ||
@@ -94,7 +94,7 @@ ParsedDoc PaddleOCRParser::Parse(const std::string& filepath,
                              {"limit_bytes", config_.max_output_size_bytes}}, Name());
     }
     if (sp.exit_code != 0) {
-        // A crash in the OCR engine maps to OCR_FAILED (retryable, §5.2) rather
+        // A crash in the OCR engine maps to OCR_FAILED (retryable) rather
         // than the generic SUBPROCESS_CRASHED — for the Agent the actionable
         // signal is "OCR failed, retry".
         return MakeErrorDoc(ParserErrorCode::kOcrFailed,

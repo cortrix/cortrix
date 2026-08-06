@@ -25,8 +25,8 @@ namespace cortrix::async {
 /// the process under test). Hot-reload of the pool size via the admin API is
 /// DEFERRED; Phase 1 size is fixed at Start().
 ///
-/// Standalone (D3): real threads + real Dequeue/ProcessTask loop, tested against
-/// an in-memory TaskManager + injected stub parser. DEFERRED → D3.5: real server
+/// Standalone: real threads + real Dequeue/ProcessTask loop, tested against
+/// an in-memory TaskManager + injected stub parser. DEFERRED → integration: real server
 /// lifecycle wiring (the pool is owned/started by the document service at boot).
 ///
 /// Thread-safe lifecycle: Start/Stop are not concurrent with each other (caller
@@ -71,7 +71,7 @@ public:
     /// parser.parser_max_concurrent as seen by the enforce check (topic 1.2).
     int ParserMaxConcurrent() const;
 
-    /// async.* / parser.* defaults (§4.0) when config absent / malformed.
+    /// async.* / parser.* defaults when config absent / malformed.
     static constexpr int kDefaultPoolSize = 2;            ///< async.worker_pool_size
     static constexpr int kDefaultParserMaxConcurrent = 4; ///< parser.parser_max_concurrent
 

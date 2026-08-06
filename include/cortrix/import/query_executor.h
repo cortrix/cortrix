@@ -13,18 +13,18 @@ namespace cortrix::import {
 
 /// The 5 security constraints. Read-only connection +
 /// SELECT whitelist + 5-min timeout + 10M row cap + operation-log audit. Field defaults are
-/// the §4.4 config defaults.
+/// the config defaults.
 struct QueryConstraints {
     int timeout_seconds = 300;          ///< 5-minute query timeout
     int64_t max_rows = 10'000'000;      ///< 10M row hard cap
-    int max_sql_length = 10'000;        ///< custom-SQL max length (§4.4 max_sql_length)
+    int max_sql_length = 10'000;        ///< custom-SQL max length (max_sql_length)
 
     /// Statement-level keyword allowlist (the only verbs a SELECT body may use).
     std::vector<std::string> allowed_keywords = {
         "SELECT", "FROM", "WHERE", "JOIN", "ORDER", "BY", "LIMIT",
         "ON", "AS", "AND", "OR", "IN", "NOT"};
 
-    /// Denylist (v1.0.2 D1 V3 ruling 8 + V3-E-01): write verbs + set operations (block
+    /// Denylist (v1.0.2 V3 ruling 8 + V3-E-01): write verbs + set operations (block
     /// UNION-SELECT injection) + metadata schemas + sensitive catalog tables (block
     /// probing / boolean-blind exfiltration) + time-based blind functions.
     std::vector<std::string> denied_keywords = {
@@ -39,7 +39,7 @@ struct QueryConstraints {
         "PG_SLEEP"};                                          // time-based blind
 };
 
-/// JSON DSL filter constraints (v1.0.2 D1 V3 ruling 8). 10-operator allowlist; the
+/// JSON DSL filter constraints (v1.0.2 V3 ruling 8). 10-operator allowlist; the
 /// field allowlist is computed per-table (table columns + metadata.* subkeys).
 struct FilterDslConstraints {
     std::vector<std::string> allowed_operators = {
@@ -51,7 +51,7 @@ struct FilterDslConstraints {
 };
 
 /// A bound parameter value for a parameterized query ($1, $2, ...). Phase-1 textual;
-/// the libpq paramValues array is built from `text` at D3.5 (PQexecParams).
+/// the libpq paramValues array is built from `text` at integration (PQexecParams).
 struct BindParam {
     std::string text;
 };
@@ -95,12 +95,12 @@ Result<CompiledQuery> CompileQueryRequest(const QueryRequest& req,
                                           const FilterDslConstraints& dsl_constraints);
 
 /// Connection seam (connect_readonly). The real libpq read-only connection
-/// is D3.5; standalone mocks this. Owns nothing the QueryExecutor outlives.
+/// is integration; standalone mocks this. Owns nothing the QueryExecutor outlives.
 class IConnectionManager;  // fwd (connection_manager.h)
 
 /// Executes a validated query against an external PostgreSQL. The real
 /// libpq PQexecParams path (read-only role, statement_timeout, paramValues) is
-/// D3.5; cortrix/ owns this CE interface so the ImportManager seam is mockable.
+/// integration; cortrix/ owns this CE interface so the ImportManager seam is mockable.
 class IQueryExecutor {
 public:
     virtual ~IQueryExecutor() = default;
@@ -112,15 +112,15 @@ public:
                                              const QueryConstraints& constraints) = 0;
 
     /// Run the (already-validated) query and return rows. Enforces timeout + row cap
-    /// at the connection level (D3.5). The dsn is resolved by the ConnectionManager
+    /// at the connection level (integration). The dsn is resolved by the ConnectionManager
     /// just before this call and never logged.
     virtual Result<std::vector<DbRow>> Execute(const std::string& dsn,
                                                const QueryRequest& req,
                                                const QueryConstraints& constraints) = 0;
 };
 
-/// Production QueryExecutor — validates every request (the §3.4 5 constraints) then
-/// (D3.5) connects read-only + runs PQexecParams. In standalone the Execute/Estimate
+/// Production QueryExecutor — validates every request (the 5 constraints) then
+/// (integration) connects read-only + runs PQexecParams. In standalone the Execute/Estimate
 /// bodies return CX_ERR_IMPORT_CONNECTION_FAILED ("real PG → D3.5") AFTER validation,
 /// so the security gate is fully exercised without a live PG. The validation free
 /// functions above are what the fuzzing suite hammers.

@@ -60,7 +60,7 @@ constexpr int kGcmTagBytes = 16;
 
 InMemorySecretStore::InMemorySecretStore() {
     // Process-ephemeral key — the plaintext DSN never sits unencrypted in the map.
-    // A persistent KMS/Vault-backed store is the D3.5 / Phase-2 swap (L1 evolution).
+    // A persistent KMS/Vault-backed store is the integration / Phase-2 swap (L1 evolution).
     if (RAND_bytes(key_, sizeof(key_)) != 1) {
         // RAND failure is catastrophic for a credential store; zero the key so any
         // later Put/Get fails closed rather than encrypting under a predictable key.
@@ -299,7 +299,7 @@ Result<std::string> ConnectionManager::ResolveDsn(const ConnectionRefId& ref_id,
         return ImportStatus(ImportErrorCode::kAuthDenied,
                           "connection ref not found: " + ref_id);
     }
-    // D7 tenant boundary: a ref may only be resolved by its owning tenant. We do NOT
+    // tenant boundary: a ref may only be resolved by its owning tenant. We do NOT
     // distinguish "not found" from "wrong tenant" in the public message (anti-enumeration), but
     // a cross-tenant attempt is its own code so the Agent can re-pick a valid ref.
     if (rec->tenant_id != auth_ctx.tenant_id) {

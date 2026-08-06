@@ -9,7 +9,7 @@ namespace cortrix::spc {
 
 namespace {
 
-// The bridge's status int is the wire form of ParserError (§2.7); we trust the
+// The bridge's status int is the wire form of ParserError; we trust the
 // registry for category/retryability rather than the JSON "category" string, so
 // only the numeric status is mapped here.
 ParserErrorCode StatusToCode(int status) {
@@ -171,7 +171,7 @@ void DrivePageProgress(const ParsedDoc& doc, const ParserOptions& opts) {
     if (!doc.ok()) return;  // a doc-level failure has no per-page progress
 
     // Merge succeeded + failed page numbers, ordered ascending, and report each
-    // once with its success flag. total = succeeded + failed (Q1 §5.3).
+    // once with its success flag. total = succeeded + failed (Q1).
     std::vector<std::pair<int, bool>> events;  // (page_num, success)
     events.reserve(doc.pages.size() + doc.failed_pages.size());
     for (const ParsedPage& p : doc.pages) events.emplace_back(p.page_num, true);

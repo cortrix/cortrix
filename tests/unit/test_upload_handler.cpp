@@ -6,7 +6,7 @@
 
 #include <memory>
 
-// D3.5 wire⑤c: UploadHandler's methods now take the narrow store/blob windows
+// integration wire⑤c: UploadHandler's methods now take the narrow store/blob windows
 // (CortrixStore& / CortrixBlobStore&) instead of a CortrixNamespace&. The fakes
 // below are passed DIRECTLY — no namespace/façade needed — which keeps the
 // store/blob fault-injection paths (create-fail, blob-fail, find-error,
@@ -859,7 +859,7 @@ TEST(SPCRouterTest, IsSupported_Empty) {
 }
 
 // ============================================================
-// SPCRouter::InferProcessingLevel Tests (D3 routing table)
+// SPCRouter::InferProcessingLevel Tests (routing table)
 // ============================================================
 
 TEST(SPCRouterTest, InferProcessingLevel_TempFile_L0) {
@@ -887,7 +887,7 @@ TEST(SPCRouterTest, InferProcessingLevel_Unknown_L3) {
 }
 
 // ============================================================
-// SPCRouter expanded MIME type tests (D3 routing table)
+// SPCRouter expanded MIME type tests (routing table)
 // ============================================================
 
 TEST(SPCRouterTest, InferMimeType_Csv) {
@@ -1181,7 +1181,7 @@ TEST_F(UploadOpLogTest, NewUploadEmitsOperationLog) {
     ASSERT_EQ(op_logger_->logged.size(), 1u);
     const auto& e = op_logger_->logged[0];
     EXPECT_EQ(e.action, "upload");
-    EXPECT_EQ(e.resource_type, "document");          // §9.1 SpcPipeline (non-db_import)
+    EXPECT_EQ(e.resource_type, "document");          // SpcPipeline (non-db_import)
     EXPECT_EQ(e.namespace_id, "test-ns");
     EXPECT_EQ(e.resource_id, result.doc_id);         // doc_id is the resource id
     EXPECT_EQ(e.user_id, "alice");                   // from the thread-local context
@@ -1209,7 +1209,7 @@ TEST_F(UploadOpLogTest, DuplicateSkipEmitsOperationLog) {
 
 TEST_F(UploadOpLogTest, SpcSubmitFailureDoesNotEmit) {
     // The doc + blob are saved, but Submit fails → non-Ok Status → success-only
-    // operation_log must NOT record it (§4.1).
+    // operation_log must NOT record it.
     spc_->set_should_fail(true);
     std::string content = "will not queue";
     auto req = MakeRequest("fail.txt", content, "text/plain");

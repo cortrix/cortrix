@@ -23,12 +23,12 @@ struct BatchMeta {
     std::vector<FailedItem>  failed;
     float coverage_ratio = 1.0f;     // succeeded / (succeeded + failed)
 
-    bool    dedup_applied = false;   // write-side internal (see §8.2 note)
+    bool    dedup_applied = false;   // write-side internal (see note)
     bool    bloom_filter_ready = true;
     int     catalog_version = 0;
     int64_t timestamp_ms = 0;
     std::optional<std::string> node_id;
-    std::string api_version = "v1";  // §8.3 versioning promise
+    std::string api_version = "v1";  // versioning promise
 };
 
 /// Partial-success batch result. GEN-Agent #3: a batch returns the

@@ -18,7 +18,7 @@ error model.
 Error codes are passed through from Python SDK (feature design section 7): the Skill
 SDK adds **no** ``CX_ERR_*`` prefix of its own.
 
-D3.5 deferred (standalone scope): real LLM round-trips, the spec_lint three-way
+integration deferred (standalone scope): real LLM round-trips, the spec_lint three-way
 check run, and notebook execution are out of scope here — methods are exercised
 with mocked SDK / HTTP responses. The ``cortrix_skills_*`` metrics are exported
 by cortrix-server (deployment), not by this package (feature design section 1.3 /
@@ -513,7 +513,7 @@ class CortrixToolKit:
         memory_id: str,
         namespace: str = "",
     ) -> dict:
-        """Self-service revoke of an auto-extracted fact (memory extraction D6).
+        """Self-service revoke of an auto-extracted fact (memory extraction).
 
         Marks the fact auto_revoke_eligible; the physical row is retained
         (full-retention model). Pass-through GEN-Agent 4-field error response.
@@ -533,7 +533,7 @@ class CortrixToolKit:
         opt_out: bool = True,
         namespace: str = "",
     ) -> dict:
-        """Per-session memory opt-out (and opt-out revoke), memory opt-out D2 + D5 combined.
+        """Per-session memory opt-out (and opt-out revoke), memory opt-out + combined.
 
         Args:
             session_id: session to opt out of memory extraction.
@@ -695,7 +695,7 @@ class CortrixToolKit:
         """Soft-delete a memory (memory transparency endpoint 4; DELETE /memory/{id}).
 
         Sets status=invalidated + revoked_at + deleted_by_user_id; the physical row
-        is retained (never hard-deleted) per the memory extraction D9 full-retention model and
+        is retained (never hard-deleted) per the memory extraction full-retention model and
         the memory transparency vision. ``reason`` is written to
         metadata_json.invalidation_reason.
 

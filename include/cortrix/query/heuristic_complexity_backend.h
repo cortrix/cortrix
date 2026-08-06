@@ -6,12 +6,12 @@
 namespace cortrix::query {
 
 /// HeuristicComplexityBackend — the standalone (no-ONNX) complexity inference
-/// backend (C-R2 briefing: real DistilBERT-tiny inference is D3.5-deferred;
+/// backend (C-R2 briefing: real DistilBERT-tiny inference is integration-deferred;
 /// standalone uses a heuristic guard stub). It derives a Simple/Complex/Chat label
 /// purely from cheap surface features of the query text (length in whitespace
 /// tokens + presence of multi-hop / comparison cue words), so
 /// QueryComplexityClassifier is fully exercisable + testable without any model. In
-/// D3.5 this is swapped for OnnxComplexityBackend behind the same
+/// integration this is swapped for OnnxComplexityBackend behind the same
 /// IComplexityClassifierBackend interface. This mirrors HeuristicGuardBackend.
 ///
 /// Heuristic (Adaptive-RAG label intuition NQ/HotpotQA/SQuAD2.0):
@@ -54,7 +54,7 @@ public:
 private:
     // A query with at least this many whitespace-separated tokens is treated as
     // multi-step (Complex). Kept small + documented so the standalone behavior is
-    // predictable for tests; the real classifier replaces this in D3.5.
+    // predictable for tests; the real classifier replaces this in integration.
     static constexpr int kComplexWordThreshold = 12;
 
     static std::string Trim(const std::string& s) {

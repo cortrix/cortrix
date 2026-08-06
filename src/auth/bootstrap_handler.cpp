@@ -52,7 +52,7 @@ Result<std::string> BootstrapHandler::GenerateToken() {
     Result<bool> first = IsFirstStart();
     if (!first.ok()) return first.status();
     if (!first.value()) {
-        return std::string("");  // not first start → no bootstrap token (§S6)
+        return std::string("");  // not first start → no bootstrap token
     }
     std::lock_guard<std::mutex> lock(mu_);
     token_ = "ctx_bootstrap_" + RandomHex(24);
@@ -67,7 +67,7 @@ Result<BootstrapHandler::BootstrapResult> BootstrapHandler::Consume(
         return AuthStatus(AuthErrorCode::kInternalError, "not initialized");
     }
 
-    // Validate the token under the lock; capture used/expiry reasons (§5.1
+    // Validate the token under the lock; capture used/expiry reasons (
     // reason: not_found | used | expired). Mark used on success BEFORE the DB work
     // so a concurrent second consume sees it used (single-use, V3 resolution 5).
     {
@@ -109,7 +109,7 @@ Result<BootstrapHandler::BootstrapResult> BootstrapHandler::Consume(
         return AuthStatus(AuthErrorCode::kServiceUnavailable, "admin user insert failed");
     }
 
-    // Mint the admin API Key (name='bootstrap-admin', §3.7) — shown once.
+    // Mint the admin API Key (name='bootstrap-admin') — shown once.
     Result<CreatedApiKey> key = api_keys_->CreateApiKey(user_id, "bootstrap-admin", 0);
     if (!key.ok()) return key.status();
 

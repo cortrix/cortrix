@@ -99,7 +99,7 @@ static bool EnforceOwnUserId(const RequestContext& rc, std::string& requested,
 // principal may only act on a session it owns; acting on another principal's
 // session is denied. Looks the owner up via MemoryStore::SessionGet.
 //
-// Semantics (anti-enumeration, design § 4.5):
+// Semantics (anti-enumeration, design):
 //   - session exists & owned (or admin / no-auth empty principal) → true (proceed).
 //   - session exists & owned by another principal → false; the caller emits a 404
 //     mask and returns. One isolation_violation_total{reason=mismatch} recorded.
@@ -143,8 +143,8 @@ static void WriteAgentError(httplib::Response& res, int http_status,
 // POST /api/v1/memory/extract            — single interaction (PartialSuccessById)
 // POST /api/v1/memory/extract/batch      — batch
 // POST /api/v1/memory/extract/run_for_ns — NS-level backfill
-// GET  /api/v1/memory/invalidations      — D6/D9 audit list
-// POST /api/v1/memory/invalidations/{id}/revoke — D9 admin revoke
+// GET  /api/v1/memory/invalidations      — audit list
+// POST /api/v1/memory/invalidations/{id}/revoke — admin revoke
 static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
                                         resource::INamespacePool& pool,
                                         OnnxEmbedder& embedder,
@@ -270,7 +270,7 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         std::string ns = body.value("ns", body.value("namespace", ""));
         if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
         // The backfill enumerates unextracted interactions and enqueues them; the
-        // enumeration source is the MemoryQueue periodic-scan wiring (D2 fallback). Here
+        // enumeration source is the MemoryQueue periodic-scan wiring (fallback). Here
         // we accept the request and report it scheduled (async, non-blocking).
         json resp;
         resp["ns"] = ns;
@@ -279,7 +279,7 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         WriteJsonResponse(res, 202, resp);
     }));
 
-    // GET /api/v1/memory/invalidations — D6/D9 audit list (over operation_log).
+    // GET /api/v1/memory/invalidations — audit list (over operation_log).
     svr.Get("/api/v1/memory/invalidations", WithAuth(auth, kPermRead,
         [](const httplib::Request& req, httplib::Response& res, const RequestContext&) {
         // The invalidation audit trail lives in operation_log (memory_invalidate /
@@ -293,7 +293,7 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         WriteJsonResponse(res, 200, resp);
     }));
 
-    // POST /api/v1/memory/invalidations/{id}/revoke — D9 admin revoke.
+    // POST /api/v1/memory/invalidations/{id}/revoke — admin revoke.
     // Body: { "ns": "<namespace>", "reason": "<why>" }. `ns` is required (the block is
     // NS-scoped; mirrors the opt-out/revoke admin sibling which also reads ns from the
     // body). `revoked_by` is the acting admin's user_id from auth — NEVER the body, so
@@ -755,7 +755,7 @@ void RegisterMemoryRoutes(
         std::string req_user_id = (!rc.auth.is_admin() && !rc.auth.user_id.empty())
                                       ? rc.auth.user_id
                                       : ResolveRequesterUserId(req);
-        // §8.bis: list enforces isolation in SQL (no cross-user leak), so the
+        //: list enforces isolation in SQL (no cross-user leak), so the
         // request itself is one isolation_check_total{result=pass,action=list}.
         memory::MemoryIsolationMetrics::Instance().RecordIsolationCheck(
             memory::MemoryIsolationMetrics::CheckResult::kPass,
@@ -822,7 +822,7 @@ void RegisterMemoryRoutes(
 
         // Ownership check — a session belonging to another user must not
         // be readable. Return 404 (not 403) to avoid leaking existence (anti-enumeration,
-        // design § 2.7 / § 4.5).
+        // design).
         //
         // When authenticated, the principal (rc.auth.user_id) is authoritative: a
         // non-admin must not read another user's session even if it passes the
@@ -903,7 +903,7 @@ void RegisterMemoryRoutes(
         MemoryStore* mem_store = &facade.memory();
 
         // Verify ownership before deleting. Cross-user (or missing)
-        // session -> 404, not leaking existence (anti-enumeration, design § 4.5).
+        // session -> 404, not leaking existence (anti-enumeration, design).
         // Authenticated principal is authoritative (a non-admin cannot delete
         // another user's session by passing its id in ?user_id=); CE no-auth falls
         // back to the param self-identification below.
@@ -1110,7 +1110,7 @@ void RegisterMemoryRoutes(
 
         // Isolation: user_id is always required. With auth it comes from the
         // AuthContext (JWT/API Key); in CE no-auth mode it defaults to "default"
-        // (design § CE single-user compatibility). Real AuthContext extraction is D3.5.
+        // (design single-user compatibility). Real AuthContext extraction is integration.
         // L1 IDOR guard: a non-admin requesting another user's memories via a
         // spoofed body user_id gets an empty result (no cross-user leak), the same
         // mask as GET /api/v1/memory list. EnforceOwnUserId records the isolation
@@ -1159,9 +1159,9 @@ void RegisterMemoryRoutes(
 
         // Inject the classified-decay scorer so /memory/search applies
         // event-decay ranking (fact/preference immune, invalidated filtered).
-        // Decay params come from the global GUC (config.decay_*, design § 2.5;
-        // D5 lock: V1.0 global-only). llm_available is logging-only and does not
-        // affect scoring (memory_type "" and "event" decay identically, § 4.2);
+        // Decay params come from the global GUC (config.decay_*, design;
+        // lock: V1.0 global-only). llm_available is logging-only and does not
+        // affect scoring (memory_type "" and "event" decay identically);
         // RegisterMemoryRoutes does not receive the LLM config, so it is left at
         // its default — wiring it through is a follow-up (does not change ranking).
         MemoryDecayConfig decay_config;

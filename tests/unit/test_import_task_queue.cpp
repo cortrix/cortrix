@@ -8,11 +8,11 @@
 #include "cortrix/import/import_error.h"
 #include "cortrix/import/import_task_queue.h"
 
-// S4 coverage: the self-built D6 ImportTaskQueue — submit / progress /
+// S4 coverage: the self-built ImportTaskQueue — submit / progress /
 // cancel state machine + import_tasks persistence + worker pool. Built ON the shared
-// cortrix::ExecutorEngine, with ZERO async task dependency (§0 red line). Work is a per-task
+// cortrix::ExecutorEngine, with ZERO async task dependency (red line). Work is a per-task
 // closure (the ImportManager captures its auth/trace ctx). Runs against the in-memory
-// task store (standalone; SQLite-backed store → D3.5).
+// task store (standalone; SQLite-backed store → integration).
 namespace cortrix::import {
 namespace {
 
@@ -126,7 +126,7 @@ TEST(ImportTaskQueueTest, CancelWhileRunningStopsCooperatively) {
     auto p = q.GetProgress("import_run");
     ASSERT_TRUE(p.has_value());
     EXPECT_EQ(p->status, ImportTaskStatus::kCancelled);
-    EXPECT_FALSE(p->error.has_value());  // cancel is not an error (§5.4 note)
+    EXPECT_FALSE(p->error.has_value());  // cancel is not an error (note)
 }
 
 TEST(ImportTaskQueueTest, ProgressRatioTracksRows) {

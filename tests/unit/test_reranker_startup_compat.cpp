@@ -1,7 +1,7 @@
 // S3.2 — startup compat check spc.chunk_size ≤ reranker.max_seq_length wired
 // through IGlobalConfig (CX_ERR_CONFIG_MISMATCH on violation). The pure
 // ValidateConfigCompat(int,int) is covered in test_reranker_init_failfast.cpp;
-// this exercises the standalone GUC-load entry point (live startup wiring = D3.5).
+// this exercises the standalone GUC-load entry point (live startup wiring = integration).
 #include <gtest/gtest.h>
 
 #include "cortrix/common/in_memory_global_config.h"

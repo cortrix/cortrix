@@ -7,24 +7,24 @@
 namespace cortrix::deploy {
 
 /// The deployment/system metrics (observability
-/// §2.3 subsystems `disk` / system). Self-contained dependency-free recorder
+/// subsystems `disk` / system). Self-contained dependency-free recorder
 /// (same pattern as ScoringMetrics / TaskMetrics): a process-wide singleton of
 /// atomic gauges + an OpenMetrics text renderer that the :9091 endpoint serves.
 ///
-/// 🚨 Cardinality control (OBS_SPEC §3.2): the gauges here are global (no
+/// 🚨 Cardinality control (OBS_SPEC): the gauges here are global (no
 /// per-NS / per-doc labels). The Bloom Filter gauges carry only the fixed
 /// subsystem="catalog" label.
 ///
-/// Scope (D3 standalone): the gauges this recorder owns directly are
+/// Scope (standalone): the gauges this recorder owns directly are
 ///   cortrix_disk_usage_ratio          (gauge — fed by DiskMonitor)
 ///   cortrix_shutdown_status           (gauge 0/1/2 — fed by GracefulShutdown)
 ///   cortrix_uptime_seconds            (gauge — derived from the process start)
 ///   cortrix_build_info{version,...}   (info gauge, value 1)
 /// plus the 4 Bloom Filter gauges, which are *rendered from* an
 /// IBloomFilter the metrics server is given (read-through, not stored here).
-/// The remaining ~21 subsystem metrics in §5.3 are owned by their own Feature
+/// The remaining ~21 subsystem metrics in are owned by their own Feature
 /// recorders (ScoringMetrics, TaskMetrics, ...); aggregating all of them into one
-/// /metrics body is cross-Feature wiring → D3.5 (see metrics_server.h).
+/// metrics body is cross-Feature wiring → integration (see metrics_server.h).
 class DeployMetrics {
 public:
     /// Process-wide instance (metrics are global gauges).

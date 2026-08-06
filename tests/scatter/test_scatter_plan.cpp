@@ -27,7 +27,7 @@ TEST(ScatterPlanTest, FlooredAtOne) {
     EXPECT_EQ(EffectiveMaxNamespacesWithPlan(100, 0), 1);
 }
 
-// 🚩 D3.5: the frozen CE AuthContext has no plan field, so PlanMaxNamespacesOf is
+// 🚩 integration: the frozen CE AuthContext has no plan field, so PlanMaxNamespacesOf is
 // nullopt today → the AuthContext overload == the global cap. (Once the cloud path injects
 // the field, the WithPlan logic above activates unchanged.)
 TEST(ScatterPlanTest, AuthContextHasNoPlanCapYet) {

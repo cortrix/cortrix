@@ -12,10 +12,10 @@
 #include "cortrix/query/query_router_metrics.h"
 #include "cortrix/query/router_error.h"
 
-// Query routing coverage: QueryComplexityClassifier — the routing algorithm (§6.1, all 7
-// routing_decision_source values), L1/L2/L3 fallbacks (§7), confidence threshold
-// (§6.1 step 5), the chat rule guard + multi-turn detection (§6.2), the
-// IClassifier contract (S1), and the RAG-Fusion/CRAG skip helpers (§6.3). Standalone: the
+// Query routing coverage: QueryComplexityClassifier — the routing algorithm (all 7
+// routing_decision_source values), L1/L2/L3 fallbacks, confidence threshold
+// (step 5), the chat rule guard + multi-turn detection, the
+// IClassifier contract (S1), and the RAG-Fusion/CRAG skip helpers. Standalone: the
 // backend is a stub (HeuristicComplexityBackend or the programmable mock below).
 namespace cortrix::query {
 namespace {
@@ -25,7 +25,7 @@ using retrieval::ClassifierInput;
 
 // A programmable backend: returns a fixed label/confidence, or throws
 // RouterInferenceError a configurable number of times before succeeding (to drive
-// the §7.3 L3 retry/degrade path). Mirrors the CRAG mock-backend test pattern.
+// the L3 retry/degrade path). Mirrors the CRAG mock-backend test pattern.
 class MockComplexityBackend : public IComplexityClassifierBackend {
 public:
     std::string label = "simple";
@@ -101,7 +101,7 @@ TEST_F(RouterClassifierTest, ClassifyDegradesToComplexWhenUnavailable) {
     EXPECT_EQ(r.label, "complex");  // L2 safe fallback
 }
 
-// --- §6.1 step 1: Agent ?route override ---------------------------------------
+// --- step 1: Agent ?route override ---------------------------------------
 
 TEST_F(RouterClassifierTest, ForceRouteOverridesToSimple) {
     auto backend = std::make_shared<MockComplexityBackend>();
@@ -158,7 +158,7 @@ TEST_F(RouterClassifierTest, ForceRouteInvalidReturnsErrorAndLeavesCtxUntouched)
     EXPECT_EQ(ctx.routing_decision_source, "");
 }
 
-// --- §6.1 step 2: NS-config force_route ---------------------------------------
+// --- step 2: NS-config force_route ---------------------------------------
 
 TEST_F(RouterClassifierTest, NsForceRouteOverrides) {
     auto backend = std::make_shared<MockComplexityBackend>();
@@ -201,7 +201,7 @@ TEST_F(RouterClassifierTest, AgentOverrideBeatsNsForceRoute) {
     EXPECT_EQ(ctx.routing_decision_source, "force_route");
 }
 
-// --- §6.1 step 3: heuristic chat rule guard -----------------------------------
+// --- step 3: heuristic chat rule guard -----------------------------------
 
 TEST_F(RouterClassifierTest, ChatRuleGuardRoutesGreeting) {
     auto backend = std::make_shared<MockComplexityBackend>();
@@ -227,7 +227,7 @@ TEST_F(RouterClassifierTest, IsChatQueryRecognizesPleasantries) {
 }
 
 TEST_F(RouterClassifierTest, IsChatQueryRejectsContentQueries) {
-    // §14 risk: a content question must NOT be mistaken for Chat (it would skip
+    // risk: a content question must NOT be mistaken for Chat (it would skip
     // all retrieval). "what is Cortrix" is a real retrieval query.
     EXPECT_FALSE(QueryComplexityClassifier::IsChatQuery("what is Cortrix"));
     EXPECT_FALSE(QueryComplexityClassifier::IsChatQuery("find the Q3 revenue report"));
@@ -235,7 +235,7 @@ TEST_F(RouterClassifierTest, IsChatQueryRejectsContentQueries) {
     EXPECT_FALSE(QueryComplexityClassifier::IsChatQuery(""));
 }
 
-// --- §7.1 L1: NS disabled / §7.2 L2: backend unavailable ----------------------
+// --- L1: NS disabled / L2: backend unavailable ----------------------
 
 TEST_F(RouterClassifierTest, NsDisabledDefaultsToComplex) {
     auto backend = std::make_shared<MockComplexityBackend>();
@@ -261,7 +261,7 @@ TEST_F(RouterClassifierTest, BackendUnavailableDefaultsToComplex) {
     EXPECT_EQ(ctx.routing_decision_source, "classifier_unavailable");
 }
 
-// --- §6.1 step 4: main classifier path ----------------------------------------
+// --- step 4: main classifier path ----------------------------------------
 
 TEST_F(RouterClassifierTest, ClassifierSimpleVerdictWritesLlmSource) {
     auto backend = std::make_shared<MockComplexityBackend>();
@@ -279,7 +279,7 @@ TEST_F(RouterClassifierTest, ClassifierSimpleVerdictWritesLlmSource) {
 }
 
 TEST_F(RouterClassifierTest, ClassifierChatVerdictIsDemotedToComplex) {
-    // D3.5 r2 S4: chat is double-gated. The chat path skips retrieval entirely,
+    // integration r2 S4: chat is double-gated. The chat path skips retrieval entirely,
     // and the Adaptive-RAG labels make the ML model misroute natural QA
     // sentences as chat (SQuAD2-unanswerable domain shift) - which would turn a
     // misroute into empty results. Only the rule guard may select chat; an ML
@@ -298,7 +298,7 @@ TEST_F(RouterClassifierTest, ClassifierChatVerdictIsDemotedToComplex) {
     EXPECT_EQ(ctx.routing_decision_source, "chat_demoted_guard");
 }
 
-// --- §6.1 step 5: confidence threshold fail-safe ------------------------------
+// --- step 5: confidence threshold fail-safe ------------------------------
 
 TEST_F(RouterClassifierTest, LowConfidenceFallsBackToComplex) {
     auto backend = std::make_shared<MockComplexityBackend>();
@@ -348,7 +348,7 @@ TEST_F(RouterClassifierTest, NsThresholdClampedToLowerBound) {
     EXPECT_EQ(ctx.routing_decision_source, "llm");
 }
 
-// --- §7.3 L3: transient inference failure → retry then degrade ----------------
+// --- L3: transient inference failure → retry then degrade ----------------
 
 TEST_F(RouterClassifierTest, TransientFaultRetriedThenSucceeds) {
     auto backend = std::make_shared<MockComplexityBackend>();
@@ -395,7 +395,7 @@ TEST_F(RouterClassifierTest, ClassifyTotalOnPersistentFault) {
     EXPECT_EQ(*r.error_code, "CX_ERR_ROUTER_INFERENCE_FAILED");
 }
 
-// --- §6.2: multi-turn signal detection (borrowed 6) ---------------------------
+// ---: multi-turn signal detection (borrowed 6) ---------------------------
 
 TEST_F(RouterClassifierTest, MultiTurnSignalSetsWarning) {
     auto backend = std::make_shared<MockComplexityBackend>();
@@ -433,7 +433,7 @@ TEST_F(RouterClassifierTest, HasMultiTurnSignalDetectsCuesAndAvoidsFalsePositive
     EXPECT_FALSE(QueryComplexityClassifier::HasMultiTurnSignal("find the revenue report"));
 }
 
-// --- §6.3: RAG-Fusion / CRAG skip helpers (lockstep with routing_mock.h) ----------
+// ---: RAG-Fusion / CRAG skip helpers (lockstep with routing_mock.h) ----------
 
 TEST_F(RouterClassifierTest, ShouldSkipRagFusionAndCragPerPath) {
     QueryContext simple;
@@ -490,7 +490,7 @@ TEST_F(RouterClassifierTest, HeuristicBackendRoutesShortQueryToSimple) {
     EXPECT_EQ(ctx.routing_decision_source, "llm");
 }
 
-// --- §10 metric bucketing: fallback is distinct from a confident complex --------
+// --- metric bucketing: fallback is distinct from a confident complex --------
 
 TEST_F(RouterClassifierTest, ConfidentComplexCountsAsComplexNotFallback) {
     auto backend = std::make_shared<MockComplexityBackend>();

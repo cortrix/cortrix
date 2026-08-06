@@ -5,7 +5,7 @@
 
 namespace cortrix::spc {
 
-/// Per-Unit `enrich_state` sidecar table (addendum §3.7 Fork-2 = 2c): one row per
+/// Per-Unit `enrich_state` sidecar table (addendum Fork-2 = 2c): one row per
 /// child block recording the chunk-level enrichment outcome (the enricher chain).
 /// The table is the durable SoT for enrichment coverage — the write phase inserts
 /// a row for EVERY enriched-eligible child ('ok' or 'pending_retry'), the retry

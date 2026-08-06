@@ -17,8 +17,8 @@ struct InteractionLog {
     std::string metadata_json;         // extension metadata JSON
     std::string created_at;            // ISO 8601 timestamp
     // Memory immunity (opt-out). Pure ADD — does not touch the frozen columns
-    // above. remember=false on a new interaction triggers session-level opt-out (D2).
-    bool remember = true;              // whether this interaction may be extracted (D2/D4)
+    // above. remember=false on a new interaction triggers session-level opt-out.
+    bool remember = true;              // whether this interaction may be extracted (/)
 };
 
 }  // namespace cortrix

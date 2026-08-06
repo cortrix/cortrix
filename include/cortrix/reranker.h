@@ -8,7 +8,7 @@
 
 namespace cortrix::reranker {
 
-/// IReranker — the pluggable Cross-Encoder reranker abstraction (ARCH §4.4.1 /
+/// IReranker — the pluggable Cross-Encoder reranker abstraction (ARCH /
 /// V1 implementation = OnnxReranker (bge-reranker-v2-m3); V2+ may add
 /// LlamaCppReranker / ApiReranker behind the same interface.
 class IReranker {
@@ -26,8 +26,8 @@ public:
 
     /// Rerank — the full rerank link.
     /// Input : RRF-fused ScoredResult[] (child_id + RRF score) + query.
-    /// Output: vector<RankedChunk> (field SoT = RETRIEVAL_TYPES_SPEC §1).
-    /// Internal steps (§4.2-bis): ChunkStore.GetBatch(child_id) → ScoreBatch →
+    /// Output: vector<RankedChunk> (field SoT = the retrieval-types spec).
+    /// Internal steps: ChunkStore.GetBatch(child_id) → ScoreBatch →
     /// RerankerScoreFusion::ComputeRerankRrfScore (reranker-owned RRF fusion, sort-only)
     /// → sort by fused score → return.
     /// Callers: ScatterGather, the CRAG Evaluator.

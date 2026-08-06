@@ -8,7 +8,7 @@
 #include "cortrix/import/import_error.h"
 #include "cortrix/import/query_executor.h"
 
-// S2 coverage: the 5 D2 security constraints — SELECT whitelist, dual
+// S2 coverage: the 5 security constraints — SELECT whitelist, dual
 // -mode discrimination, JSON DSL → parameterized SQL, length / row caps. The
 // dedicated injection-fuzzing corpus is in test_query_executor_injection.cpp.
 namespace cortrix::import {
@@ -156,7 +156,7 @@ TEST(QueryExecutorBuildTest, BetweenAndIsNullRenderCorrectly) {
     EXPECT_EQ(r.value().bind_params.size(), 2u);  // only the BETWEEN bounds bind
 }
 
-// --- dual-mode discrimination (§6.2 oneOf) ---
+// --- dual-mode discrimination (oneOf) ---
 
 TEST(QueryExecutorCompileTest, ExactlyOneOfTableOrSql) {
     QueryConstraints c;
@@ -179,9 +179,9 @@ TEST(QueryExecutorCompileTest, ExactlyOneOfTableOrSql) {
     EXPECT_TRUE(CompileQueryRequest(sql_mode, c, fc).ok());
 }
 
-// --- QueryExecutor: validates, then defers live PG to D3.5 ---
+// --- QueryExecutor: validates, then defers live PG to integration ---
 
-TEST(QueryExecutorTest, ExecuteValidatesBeforeDeferringToD35) {
+TEST(QueryExecutorTest, ExecuteValidatesBeforeDeferringToIntegration) {
     QueryExecutor exec;
     QueryConstraints c;
     // a malformed request fails on validation (INVALID_SQL), not on the PG seam.
@@ -190,14 +190,14 @@ TEST(QueryExecutorTest, ExecuteValidatesBeforeDeferringToD35) {
     EXPECT_FALSE(r.ok());
     EXPECT_NE(r.status().message().find("CX_ERR_IMPORT_INVALID_SQL"), std::string::npos);
 
-    // a well-formed request passes the gate and hits the D3.5 connection seam.
+    // a well-formed request passes the gate and hits the integration connection seam.
     QueryRequest good;
     good.table = "users";
     good.filter = json{{"status", {{"eq", "active"}}}};
     auto r2 = exec.Execute("dsn", good, c);
     EXPECT_FALSE(r2.ok());  // standalone: no live PG
     EXPECT_NE(r2.status().message().find("CX_ERR_IMPORT_CONNECTION_FAILED"), std::string::npos);
-    EXPECT_NE(r2.status().message().find("D3.5"), std::string::npos);
+    EXPECT_NE(r2.status().message().find("integration"), std::string::npos);
 }
 
 }  // namespace

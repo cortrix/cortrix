@@ -1,4 +1,4 @@
--- Agent Observability — agent_trace (§4.1, topic 3)
+-- Agent Observability — agent_trace (topic 3)
 -- Wave C C-R1. Lives in the global DB (cortrix_global.db), NOT a per-namespace DB.
 --
 -- This file is the human-readable mirror of the DDL the AgentTraceSchemaProvider

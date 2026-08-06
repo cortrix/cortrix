@@ -11,8 +11,8 @@ std::string BuildSourceUri(const SourceContext& src, const std::string& row_id) 
 }
 
 std::string SourcePrefix(const SourceContext& src) {
-    // Trailing '/' is load-bearing: the D3 overwrite LIKE '<prefix>%' must not let
-    // table "users" match "users2" (§3.2 / R6 accidental-deletion mitigation).
+    // Trailing '/' is load-bearing: the overwrite LIKE '<prefix>%' must not let
+    // table "users" match "users2" (/ R6 accidental-deletion mitigation).
     return "postgres://" + src.host + ":" + std::to_string(src.port) + "/" + src.db_name +
            "/" + src.table + "/";
 }
@@ -33,7 +33,7 @@ nlohmann::json TextSerializer::BuildMetadata(const SourceContext& src,
                                              int row_span,
                                              bool is_merge) {
     // The DB-import metadata_json block written into blocks. source_type = the import
-    // discriminator the D3 overwrite + Agent provenance queries key off.
+    // discriminator the overwrite + Agent provenance queries key off.
     nlohmann::json m;
     m["source"] = BuildSourceUri(src, row_id);
     m["source_type"] = "database_import";

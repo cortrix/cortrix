@@ -7,7 +7,7 @@
 
 namespace cortrix::llm {
 
-/// Shared gmock double for ILlmClient. Provided by scaffolding D2-pre-3 so the 7
+/// Shared gmock double for ILlmClient. Provided by scaffolding so the 7
 /// downstream consumers can unit-test
 /// their LLM-dependent logic without a live endpoint.
 class MockLlmClient : public ILlmClient {

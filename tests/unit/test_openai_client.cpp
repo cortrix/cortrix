@@ -266,7 +266,7 @@ TEST(MockLlmClientTest, DownstreamConsumesInterface) {
 }
 
 // Note: the real-endpoint integration test (live OpenAI/vLLM + CX_LLM_API_KEY,
-// HTTPS via CPPHTTPLIB_OPENSSL_SUPPORT) is D3.5 deferred wiring; it lives under
+// HTTPS via CPPHTTPLIB_OPENSSL_SUPPORT) is integration deferred wiring; it lives under
 // tests/integration/ once the transport build flag is enabled.
 
 }  // namespace

@@ -2,7 +2,7 @@
 #include "cortrix/connector/directory_importer.h"
 #include "cortrix/connector/file_utils.h"
 #include "cortrix/logging/logging.h"
-#include "cortrix/resource/namespace_facade.h"  // D3.5 wire⑤c: per-op NamespaceFacade
+#include "cortrix/resource/namespace_facade.h"  // integration wire⑤c: per-op NamespaceFacade
 #include <filesystem>
 #include <chrono>
 #include <unordered_map>
@@ -245,7 +245,7 @@ void DirectoryImporter::CleanupStaleDocs() {
 }
 
 Status DirectoryImporter::ProcessFile(const std::string& file_path) {
-    // D5 edge case #5: resolve symlinks to canonical path to avoid duplicates
+    // edge case #5: resolve symlinks to canonical path to avoid duplicates
     std::string resolved = ResolvePath(file_path);
     if (resolved.empty()) {
         CORTRIX_LOG_WARN(kModule, "failed to resolve path: {}", file_path);
@@ -454,7 +454,7 @@ Status DirectoryImporter::HandleFileDeletion(const std::string& file_path) {
     // Cancel any in-flight SPC tasks
     spc_mgr_.CancelBySourcePath(file_path);
 
-    // Per D5 design: set Document status to 'deleting' before cascade
+    // Per design: set Document status to 'deleting' before cascade
     int urc = facade.store().doc_update_status(doc.doc_id, DocStatus::kDeleting);
     if (urc != 0) {
         CORTRIX_LOG_WARN(kModule, "failed to set kDeleting for doc_id={}", doc.doc_id);

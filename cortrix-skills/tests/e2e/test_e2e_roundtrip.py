@@ -1,4 +1,4 @@
-"""End-to-end round-trip tests — D3.5 DEFERRED (skeleton only).
+"""End-to-end round-trip tests — integration DEFERRED (skeleton only).
 
 These exercise the real framework + real LLM + a live cortrix-server (feature
 design sections 10.2 / 10.3 / 5.4-bis e2e). They are intentionally **skipped**
@@ -22,7 +22,7 @@ _E2E_ENABLED = os.environ.get("CORTRIX_SKILLS_E2E") == "1"
 
 pytestmark = pytest.mark.skipif(
     not _E2E_ENABLED,
-    reason="D3.5-deferred: real LLM round-trips run at the integration gate "
+    reason="integration-deferred: real LLM round-trips run at the integration gate "
     "(set CORTRIX_SKILLS_E2E=1 + API keys to enable).",
 )
 
@@ -38,14 +38,14 @@ def _live_kit():
 
 def test_langchain_react_invokes_all_29_methods():
     """LangChain ReAct agent reaches all 29 tools; errors raise ToolException."""
-    pytest.skip("D3.5: implement against a live server + ChatAnthropic.")
+    pytest.skip("integration: implement against a live server + ChatAnthropic.")
 
 
 def test_claude_tool_use_roundtrip():
     """Anthropic Messages tool_use loop succeeds; is_error=True passes 4 fields."""
-    pytest.skip("D3.5: implement against a live server + Anthropic SDK.")
+    pytest.skip("integration: implement against a live server + Anthropic SDK.")
 
 
 def test_openai_function_calling_roundtrip():
     """OpenAI function-calling loop succeeds (gpt-4o-mini); 4-field error JSON."""
-    pytest.skip("D3.5: implement against a live server + OpenAI SDK.")
+    pytest.skip("integration: implement against a live server + OpenAI SDK.")

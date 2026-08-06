@@ -14,13 +14,13 @@ namespace cortrix::onnx {
 /// `CX_ERR_*` string + a GEN-Agent category + retryability via the canonical
 /// registry below.
 ///
-/// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
+/// Per the coding conventions, Cortrix uses Result<T> + Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// So OnnxErrorCode is the *enum of identities*, and MakeOnnxError() turns one
 /// (plus optional structured_data) into that boundary error. This mirrors the
 /// catalog::CatalogErrorCode template exactly — the spec's
-/// `Result<void, OnnxError>` / standalone `OnnxError` struct (§9.1) is the
+/// `Result<void, OnnxError>` / standalone `OnnxError` struct is the
 /// pre-convention draft; this is its convention-compliant form.
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
@@ -42,7 +42,7 @@ struct OnnxErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     agent_friendly::ErrorCategory category;   ///< permanent / transient / ...
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null unless retryable per §8.3
+    std::optional<int> retry_after_ms;        ///< null unless retryable per
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never
@@ -63,7 +63,7 @@ bool HasRequiredStructuredData(OnnxErrorCode code,
                                const nlohmann::json& structured_data);
 
 /// Build the Agent-friendly boundary error for `code`, attaching
-/// `structured_data` (the §8.3 required keys are the caller's responsibility at
+/// `structured_data` (the required keys are the caller's responsibility at
 /// each call site) and an optional human-readable `message`. category /
 /// retryable / retry_after_ms are filled from the canonical registry — call
 /// sites never restate them. The returned structured_data is always a JSON

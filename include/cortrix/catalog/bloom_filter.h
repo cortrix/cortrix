@@ -23,7 +23,7 @@ namespace cortrix::catalog {
 /// atomic words. Runtime stats use atomics.
 class BloomFilter : public IBloomFilter {
 public:
-    /// `capacity_bytes` sizes the bit array (§7: 100MB). `target_fp_rate` (§7:
+    /// `capacity_bytes` sizes the bit array (100MB). `target_fp_rate` (
     /// 0.01) sets k. Capacity in expected items is derived from m and the target.
     BloomFilter(size_t capacity_bytes, double target_fp_rate);
 
@@ -39,7 +39,7 @@ public:
     FalsePositiveStats GetFalsePositiveStats() const override;
     void ReportFalsePositive() override;
 
-    /// Startup recovery (§7.2): full-scan catalog.file_locations and Add() every
+    /// Startup recovery: full-scan catalog.file_locations and Add() every
     /// file_hash, then mark ready. Borrows the catalog sqlite3 handle.
     ///
     /// SPEC DEVIATION (flagged): the design spells this LoadFromCatalog(INSRouter*),

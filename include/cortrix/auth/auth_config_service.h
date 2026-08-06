@@ -18,11 +18,11 @@ namespace cortrix::auth {
 /// and S7 bridges this to it (PlatformDbAuthConfig) when the admin API lands.
 ///
 /// S1 scope (this header):
-///   - LoadOrInitDefaults(): on first start (empty table) write the §3.6 default
+///   - LoadOrInitDefaults(): on first start (empty table) write the default
 ///     key set, then load every row into the in-memory `config_` snapshot.
 ///   - thread-safe Get() of the snapshot; OnChange() registration.
 /// S7 will add the admin-API setters (SetSmtp / rotate trigger) that mutate rows
-/// and fire OnChange — wiring those to an HTTP route is D3.5.
+/// and fire OnChange — wiring those to an HTTP route is integration.
 class AuthConfigService {
 public:
     /// `db` is an open platform.db handle whose `auth_config` table already
@@ -30,7 +30,7 @@ public:
     explicit AuthConfigService(sqlite3* db) : db_(db) {}
 
     /// Idempotent startup init:
-    ///   - if `auth_config` is empty → INSERT the §3.6 defaults (updated_by='system');
+    ///   - if `auth_config` is empty → INSERT the defaults (updated_by='system');
     ///   - then SELECT all rows → populate `config_`.
     /// Re-running on a populated table only reloads (no duplicate writes).
     Status LoadOrInitDefaults();

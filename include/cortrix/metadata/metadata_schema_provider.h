@@ -16,7 +16,7 @@ constexpr int kMetadataSchemaVersion = 1;
 /// tables (a separate metadata_blocks table — does not pollute parents/children), applied via
 /// the shared SchemaMigrator so it runs inside the same versioned, atomic framework.
 ///
-/// FK reconciliation (D3.5 deferred — surfaced, not silently hacked): detailed design §3.3
+/// FK reconciliation (integration deferred — surfaced, not silently hacked): detailed design
 /// declares `FOREIGN KEY (doc_id) REFERENCES documents(doc_id)`, but the per-Unit
 /// `documents.doc_id` is currently `INTEGER PRIMARY KEY AUTOINCREMENT`
 /// (src/store/cortrix_store_sqlite.cpp) while this doc_id is the TEXT ULID
@@ -25,7 +25,7 @@ constexpr int kMetadataSchemaVersion = 1;
 /// it) → it belongs to real pipeline wiring, NOT a standalone unilateral fix. So the
 /// standalone DDL keeps the column `doc_id TEXT NOT NULL UNIQUE` (1 doc = 1 metadata
 /// block, per spec) but does NOT emit the FK constraint; wiring the FK once the
-/// documents.doc_id type is reconciled is a D3.5 deferred item.
+/// documents.doc_id type is reconciled is a integration deferred item.
 extern const char* const kMetadataSchemaSql;
 
 /// The metadata ISchemaProvider (frozen cortrix::catalog::ISchemaProvider): owns

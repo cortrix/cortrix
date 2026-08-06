@@ -1,10 +1,10 @@
-# swagger_ui.config.yaml — Swagger UI deployment config + environment-tiered exposure (D4 + D5 resolutions)
+# swagger_ui.config.yaml — Swagger UI deployment config + environment-tiered exposure ( resolutions)
 #
 # This is the swagger_ui config fragment for cortrix-server (merged into config.yaml). Consumed by the C++ SwaggerHandler in S7:
 # on startup it reads expose_tags[env] by current_env → filters the paths of build/openapi.bundled.yaml (by tag) → renders /docs.
 #
-# ⚠️ The actual server-side SwaggerHandler implementation + /docs route = S7 (needs a live server; under D3 standalone this is config + draft,
-#    end-to-end integration FLAG → D3.5). This file is the config contract (declarative; the server implementation aligns with it).
+# ⚠️ The actual server-side SwaggerHandler implementation + /docs route = S7 (needs a live server; under standalone this is config + draft,
+#    end-to-end integration FLAG → integration). This file is the config contract (declarative; the server implementation aligns with it).
 
 swagger_ui:
   enabled: true
@@ -24,7 +24,7 @@ swagger_ui:
   authorization_required: false       # /docs itself requires no auth (spec is readable)
   try_it_out_auth: api_key            # use API Key auth for "Try it out"
 
-  # ---- environment-tiered exposure (D5 resolution — expose different tags per environment) ----
+  # ---- environment-tiered exposure (resolution — expose different tags per environment) ----
   # prod exposes only public by default; staging does not expose ops; dev/self_hosted expose everything.
   # Guards against R5 (production-exposed spec being scanned by attackers for ops/admin endpoints).
   expose_tags:

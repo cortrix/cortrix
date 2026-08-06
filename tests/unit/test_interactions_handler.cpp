@@ -10,7 +10,7 @@
 #include "cortrix/agent_trace/interactions_handler.h"
 #include "cortrix/catalog/schema_provider.h"
 
-// S5 coverage: GET /interactions/{id}/sources business logic (§8.2) — permission
+// S5 coverage: GET /interactions/{id}/sources business logic — permission
 // (own vs admin vs UNAUTHORIZED), INTERACTION_NOT_FOUND, deleted-source counting
 // (source_block_id gone from blocks), snippet truncation, and the
 // interaction_sources CE schema (no highlight, FK to interaction_log.id TEXT).
@@ -105,7 +105,7 @@ TEST_F(InteractionsHandlerTest, AdminCanReadOtherUsersInteraction) {
     EXPECT_EQ(AgentTraceMetrics::Instance().TracesQueryCount(
                   AgentTraceMetrics::Role::kAdmin,
                   AgentTraceMetrics::Endpoint::kInteractionsSources), 1u);
-    // §12 forensics line for admin bob reading alice's interaction.
+    // forensics line for admin bob reading alice's interaction.
     EXPECT_NE(err.find("admin_cross_user_access"), std::string::npos);
     EXPECT_NE(err.find("\"target_user_id\":\"alice\""), std::string::npos);
 }
@@ -229,7 +229,7 @@ TEST_F(InteractionsListTest, AdminTargetsUserAndEmitsForensics) {
     ASSERT_TRUE(r.ok());
     EXPECT_EQ(r.value().total_count, 1);
     EXPECT_EQ(r.value().interactions[0].user_id, "bob");
-    // §12 forensics for admin targeting bob.
+    // forensics for admin targeting bob.
     EXPECT_NE(err.find("admin_cross_user_access"), std::string::npos);
     EXPECT_NE(err.find("\"endpoint\":\"interactions\""), std::string::npos);
 }
@@ -297,7 +297,7 @@ TEST_F(InteractionsListTest, AdminCrossUserNoRowsIsEmptyNotError) {
     InteractionListFilter f;
     f.user_id = "nobody";
     auto r = handler_->ListInteractions(f, RequesterContext{"root", true});
-    ASSERT_TRUE(r.ok());  // §8.3 — empty, not an error
+    ASSERT_TRUE(r.ok());  // — empty, not an error
     EXPECT_EQ(r.value().total_count, 0);
     EXPECT_TRUE(r.value().interactions.empty());
 }

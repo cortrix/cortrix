@@ -15,7 +15,7 @@ namespace {
 // a row" into a warning (treated as a build failure), so the registry can't
 // silently drift from the enum.
 //
-// http_status / category / retryable / retry_after_ms follow §12 exactly:
+// http_status / category / retryable / retry_after_ms follow exactly:
 //   507 DISK_FULL              permanent  false  null   (out of storage)
 //   503 SHUTDOWN_IN_PROGRESS   transient  true   5000   (retry after restart)
 //   503 HEALTH_CHECK_FAILED    transient  true   1000
@@ -52,11 +52,11 @@ int DeployErrorHttpStatus(DeployErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(DeployErrorCode code) {
-    // §6.3 / §12 structured_data column. Function-local statics → stable refs.
+    // structured_data column. Function-local statics → stable refs.
     static const std::vector<std::string> kDiskFullKeys
         {"disk_usage_ratio", "free_bytes", "data_path", "warn_threshold", "crit_threshold"};
     static const std::vector<std::string> kShutdownKeys
-        {"shutdown_status"};  // grace_remaining_ms is optional (§12 marks it "?")
+        {"shutdown_status"};  // grace_remaining_ms is optional (marks it "?")
     static const std::vector<std::string> kHealthKeys
         {"component", "error_id"};
     static const std::vector<std::string> kBfKeys

@@ -6,14 +6,14 @@
 // pseudo-random function. This is the reference algorithm (the authors released it
 // into the public domain / CC0), rewritten as a single header-only inline function.
 //
-// Why Cortrix self-implements it (ARCH §1.8.4, D1 ruling):
+// Why Cortrix self-implements it (ARCH, ruling):
 //   block_id (uint64 P-HNSW label) = SipHash24(business_ulid, k0, k1). The hash must
 //   be byte-for-byte STABLE across process restarts and library upgrades, otherwise
 //   the persisted P-HNSW index would silently point at the wrong nodes. abseil's
 //   absl::Hash explicitly does NOT guarantee cross-run stability (and abseil is not a
 //   Cortrix dependency anyway), so we pin the fixed SipHash-2-4 standard instead.
 //
-// Determinism contract (ARCH §1.8.1): 8-byte message words are assembled little-endian
+// Determinism contract (ARCH): 8-byte message words are assembled little-endian
 // by explicit shifts (never a raw reinterpret of host memory), so the output is
 // identical on any byte order — a hard requirement for a persistent on-disk index.
 

@@ -53,7 +53,7 @@ struct RagFusionErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" / "CX_WARN_*" string
     agent_friendly::ErrorCategory category;   ///< transient/timeout/quota/permanent
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< per §7 (5000 / 60000 / 30000 / null)
+    std::optional<int> retry_after_ms;        ///< per (5000 / 60000 / 30000 / null)
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never

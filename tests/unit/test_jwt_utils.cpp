@@ -7,7 +7,7 @@
 #include "cortrix/auth/jwt_utils.h"
 
 // Auth S3 coverage: HS256 JWT codec (OpenSSL HMAC-SHA256, team-lead approved
-// 2026-05-31). Round-trip / expiry / signature / type (§2.10 / §4.3).
+// 2026-05-31). Round-trip / expiry / signature / type.
 namespace cortrix::auth {
 namespace {
 

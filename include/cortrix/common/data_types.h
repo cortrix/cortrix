@@ -73,7 +73,7 @@ struct CortrixBlock {
 // The SPC layer converts ParentChunk → CortrixParent (its DocumentMetadata serialized
 // into the opaque metadata_json; the non-persisted child_ids dropped) so the store
 // interface stays free of chunker / parser / id-strong-type dependencies. The three
-// D8 hotness columns (access_count / last_access_at / hotness_score) are reserved —
+// hotness columns (access_count / last_access_at / hotness_score) are reserved —
 // V1.0 neither writes nor reads them; the DDL DEFAULTs fill them — so they are not on
 // this struct. All columns are NOT NULL in the DDL, so every field is always bound.
 struct CortrixParent {

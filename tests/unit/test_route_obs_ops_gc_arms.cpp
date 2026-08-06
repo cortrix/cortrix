@@ -80,7 +80,7 @@ static ApiKeyConfig MakeKey(const std::string& plaintext, const std::string& ten
 // ===========================================================================
 
 // A fake logger whose Query returns a caller-chosen error Status (CX_ERR_OPLOG_*
-// token), so the route's re-inflation switch (operations_routes.cpp §298-313) can be
+// token), so the route's re-inflation switch (operations_routes.cpp) can be
 // driven to every arm a clean in-memory OperationLogger never reaches.
 class FakeOplogLogger : public observability::IOperationLogger {
 public:
@@ -516,7 +516,7 @@ TEST_F(ObsRoutesArms, GlobalTraceOwnerResolvedReadsSession) {
     EXPECT_TRUE(body["traces"][0]["error_code"].is_null());  // optional column → null
 }
 
-// A non-owner, non-admin reading the resolved session → cross-user denied (the §8.1
+// A non-owner, non-admin reading the resolved session → cross-user denied (the
 // anti-leak arm over the global resolver path).
 TEST_F(ObsRoutesArms, GlobalTraceNonOwnerDenied) {
     auth_->LoadKeys({

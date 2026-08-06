@@ -18,7 +18,7 @@ namespace cortrix::query {
 /// variants] (LLM), then RRF-fuses the per-variant retrieval results into one
 /// globally-ranked list (topic 2 B: a single global second-pass fusion, NOT per-NS).
 ///
-/// 🔑 RRF reuse note (B_R1_BRIEFING §7): the frozen `cortrix::RRFFusion`
+/// 🔑 RRF reuse note: the frozen `cortrix::RRFFusion`
 /// (query/rrf_fusion.h) fuses `RouteResult` → `ScoredBlock` keyed by int64
 /// block_id — that is the INNER per-NS fusion of vector/BM25 routes that the cross-NS layer
 /// already performs. FuseResults is the OUTER second-pass fusion across
@@ -29,28 +29,28 @@ namespace cortrix::query {
 /// emitted first as a strong-hit guardrail; LLM variants receive weaker additive
 /// weights for the remaining order so variants can improve recall without
 /// displacing the original query's strongest evidence. The injected RRFFusion
-/// (held per the §4.3 ctor + §10.1 DI) carries the resolved default k; FuseResults
-/// takes an explicit rrf_k so the NS-config value (§4.4) wins.
+/// (held per the ctor + DI) carries the resolved default k; FuseResults
+/// takes an explicit rrf_k so the NS-config value wins.
 class RagFusion {
 public:
-    /// @param generator the LLM variant generator (§4.2)
-    /// @param rrf       the shared RRFFusion (§4.3 ctor / §10.1 DI; carries the
+    /// @param generator the LLM variant generator
+    /// @param rrf       the shared RRFFusion (ctor / DI; carries the
     ///                  global default k). Must be non-null.
     RagFusion(std::shared_ptr<QueryVariantGenerator> generator,
               std::shared_ptr<RRFFusion> rrf);
 
-    /// Expand `query` → [original query] + N variants (§4.3). topic 4: on LLM
+    /// Expand `query` → [original query] + N variants. topic 4: on LLM
     /// failure returns the CX_ERR_RAG_FUSION_* Status (the caller degrades to the
     /// single query + emits CX_WARN_RAG_FUSION_DEGRADED). When the NS config is
     /// disabled, or routing says skip, returns just `{query}` (Ok, no LLM call).
     ///
     /// v1.0.5 canonical 4-param signature (V2 QA M-05): trace_ctx + qctx both
-    /// optional. The result always begins with `query` itself (§4.5 invariant).
+    /// optional. The result always begins with `query` itself (invariant).
     ///
     /// 🔵 integration deferred: the `qctx` routing-skip (ShouldSkipRagFusion reading
     /// SPEC `routing_path`) is INTERFACE-RESERVED — the FROZEN QueryContext has no
     /// `routing_path` field yet (the router adds it, not frozen). So a non-null
-    /// `qctx` is accepted and threaded, but the real skip wiring lands at D3.5 when
+    /// `qctx` is accepted and threaded, but the real skip wiring lands at integration when
     /// that field exists; until then `qctx` does not change behavior.
     Result<std::vector<std::string>> ExpandQueries(
         const std::string& query,
@@ -58,7 +58,7 @@ public:
         const observability::TraceContext* trace_ctx = nullptr,
         const query::QueryContext* qctx = nullptr);
 
-    /// Global RRF second-pass fusion of the per-variant retrieval results (§4.3 /
+    /// Global RRF second-pass fusion of the per-variant retrieval results (/
     /// topic 2 B). `per_variant_results[i]` is variant i's ranked candidates (each
     /// list assumed sorted best-first; rank = position). Contract: index 0 is the
     /// original query; indexes 1..N are LLM variants. Returns one fused,
@@ -66,13 +66,13 @@ public:
     /// head anchored first, followed by remaining candidates sorted by weighted RRF
     /// score descending.
     ///
-    /// @param rrf_k RRF constant (§4.4 NS value; default 60). k ≤ 0 → treated as 60.
+    /// @param rrf_k RRF constant (NS value; default 60). k ≤ 0 → treated as 60.
     Result<std::vector<retrieval::ScoredResult>> FuseResults(
         const std::vector<std::vector<retrieval::ScoredResult>>& per_variant_results,
         int rrf_k = 60,
         const observability::TraceContext* ctx = nullptr);
 
-    /// v1.0.13 (§4.3.bis.5) config-aware overload: reads rrf_k plus the fusion
+    /// v1.0.13 config-aware overload: reads rrf_k plus the fusion
     /// policy knobs (fusion_original_weight / fusion_variant_weight /
     /// fusion_anchor_max) from `cfg`. The rrf_k-only overload above delegates
     /// here with a default-constructed config (byte-identical v1.0.7 policy).
@@ -108,7 +108,7 @@ public:
 private:
     std::shared_ptr<QueryVariantGenerator> generator_;
     std::shared_ptr<RRFFusion> rrf_;
-    ExplainState explain_;  ///< updated by ExpandQueries (§4.3)
+    ExplainState explain_;  ///< updated by ExpandQueries
 };
 
 }  // namespace cortrix::query

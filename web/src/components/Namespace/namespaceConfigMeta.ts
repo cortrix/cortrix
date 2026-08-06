@@ -6,7 +6,7 @@ import type { NamespaceConfigKey } from '../../types/api';
 // structured form). The UI treats every config as an opaque JSON blob — these
 // examples are guidance only, never enforced validation.
 //
-// Tab assignment follows web UI design § 8.2 (5 tabs). The original § 8.2 table
+// Tab assignment follows web UI design (5 tabs). The original table
 // predates sparse_config + doc_summary_config (catalog→v1.0.8 added 4 of the
 // 11); we slot them by capability: sparse_config → Retrieval, doc_summary_config
 // → Processing.

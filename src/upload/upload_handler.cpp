@@ -20,7 +20,7 @@ void UploadHandler::EmitUploadLog(const std::string& namespace_name,
                                   const std::string& filename,
                                   const std::string& status) {
     if (!op_logger_) return;  // observability strictly additive (C4)
-    // §9.1 SpcPipeline → resource_type "document"; resource_id = doc_id. Summary
+    // SpcPipeline → resource_type "document"; resource_id = doc_id. Summary
     // carries the filename + outcome (skipped / pending / updating) and is truncated
     // to ≤100 by the emitter. user_id / trace_id / session_id come from the
     // thread-local ObservabilityContext.
@@ -228,7 +228,7 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
                     doc.doc_id, req.filename, result->status);
     // Record the accepted upload (doc created + SPC task queued). The
     // SPC-submit-failed path above returns a non-Ok Status and is deliberately NOT
-    // logged (operation_log records successful operations only, §4.1).
+    // logged (operation_log records successful operations only).
     EmitUploadLog(req.namespace_name, doc.doc_id, req.filename, result->status);
     return Status::Ok();
 }

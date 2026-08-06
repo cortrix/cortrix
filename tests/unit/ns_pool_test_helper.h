@@ -51,7 +51,7 @@ namespace cortrix::test {
 // IIndex + IVectorStore stand-in. CAPTURES the ids handed to AddPoint/AddPoints
 // (so a test can assert a vector write went through facade.vec_index()) and can
 // be told to fail (the C2 rollback path). PHnsw implements both bases, so the
-// pool's cross-cast to IVectorStore (D3.5 C1) succeeds against this fake too.
+// pool's cross-cast to IVectorStore (integration C1) succeeds against this fake too.
 class FakeIndex : public cortrix::store::IIndex, public cortrix::store::IVectorStore {
 public:
     explicit FakeIndex(std::size_t footprint = 0) : footprint_(footprint) {}

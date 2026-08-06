@@ -102,7 +102,7 @@ bool ParseBatchRequest(const httplib::Request& req, httplib::Response& res,
         }
         doc.content = item["content"].get<std::string>();
         // Optional client filename — its extension drives server-side parser
-        // selection (batch submit §2.2 documents[] item; ".txt" fallback applied
+        // selection (batch submit documents[] item; ".txt" fallback applied
         // downstream when absent).
         if (item.contains("filename") && item["filename"].is_string()) {
             doc.filename = item["filename"].get<std::string>();
@@ -123,7 +123,7 @@ bool ParseBatchRequest(const httplib::Request& req, httplib::Response& res,
         out->documents.push_back(std::move(doc));
     }
 
-    // options (batch submit §2.2): async defaults true (must be true in V1);
+    // options (batch submit): async defaults true (must be true in V1);
     // on_duplicate defaults skip.
     out->async = true;
     out->on_duplicate = server::OnDuplicate::kSkip;
@@ -149,7 +149,7 @@ bool ParseBatchRequest(const httplib::Request& req, httplib::Response& res,
             }
         }
     }
-    // §2.2 topic 3 — V1 is always async; an explicit async=false is unsupported.
+    // topic 3 — V1 is always async; an explicit async=false is unsupported.
     if (!out->async) {
         WriteJsonError(res,
             Status::InvalidArgument("synchronous batch (async=false) is not supported in V1"),

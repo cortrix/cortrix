@@ -8,7 +8,7 @@
 #include "cortrix/import/import_schema_provider.h"
 
 // S1 coverage: ImportSchemaProvider creates db_connections + import_tasks + their
-// indices (DB import / §4.2) in the catalog DB, idempotently, inside the frozen
+// indices (DB import /) in the catalog DB, idempotently, inside the frozen
 // ISchemaProvider contract.
 namespace cortrix::import {
 namespace {

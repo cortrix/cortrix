@@ -14,7 +14,7 @@ namespace cortrix::import {
 /// `CX_ERR_IMPORT_*` string + a GEN-Agent category + retryability + the HTTP status
 /// its body carries, via the canonical registry below.
 ///
-/// Per CODING_CONVENTIONS §3 / F-FREEZE-1, Cortrix uses Result<T>+Status only (no
+/// Per the coding conventions / F-FREEZE-1, Cortrix uses Result<T>+Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// So ImportErrorCode is the *enum of identities*, and MakeImportError() turns one
@@ -50,7 +50,7 @@ struct ImportErrorInfo {
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
     bool retryable;
     std::optional<int> retry_after_ms;        ///< null unless retryable
-    int http_status;                          ///< §5.4 HTTP column
+    int http_status;                          ///< HTTP column
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never throws
@@ -88,7 +88,7 @@ Status ImportStatus(ImportErrorCode code, const std::string& detail = "");
 
 /// Throwing form — wraps the full Agent-friendly error. Paths that must abort the
 /// whole request (a query that fails the security gate, a cross-tenant ref) throw
-/// this; the handler catches it and serializes GetError() to the §5.3 error body.
+/// this; the handler catches it and serializes GetError() to the error body.
 class ImportException : public agent_friendly::AgentFriendlyException {
 public:
     explicit ImportException(ImportErrorCode code,

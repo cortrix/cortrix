@@ -6,8 +6,8 @@
 
 #include "cortrix/common/status.h"
 
-// TraceContext is defined by the observability scaffolding (D2-pre-6,
-// OBSERVABILITY_SPEC §5.3, cortrix/observability/trace_context.h). It is only
+// TraceContext is defined by the observability scaffolding (
+// the observability spec, cortrix/observability/trace_context.h). It is only
 // referenced by pointer here, so a forward declaration keeps IIndex decoupled
 // from the observability build.
 namespace cortrix::observability {
@@ -32,7 +32,7 @@ struct IndexStats {
 /// Error model: write/lifecycle ops return Status; Search returns its hits
 /// directly; MarkDelete is idempotent (missing block_id returns Ok
 /// + V5 #9). Every mutating/search op accepts an optional TraceContext for the
-/// observability span chain (OBS_SPEC §5.3).
+/// observability span chain (OBS_SPEC).
 class IIndex {
 public:
     virtual ~IIndex() = default;

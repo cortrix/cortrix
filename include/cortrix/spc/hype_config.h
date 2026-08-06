@@ -8,7 +8,7 @@ namespace cortrix::spc {
 //
 // Read through the generic IGlobalConfig accessors (GetInt/GetString) under the
 // keys below — HyPE does NOT add typed getters to the frozen IGlobalConfig
-// scaffolding header; an HyPE-typed getter on IGlobalConfig would be a D3.5
+// scaffolding header; an HyPE-typed getter on IGlobalConfig would be a integration
 // reverse hook (same approach sparse retrieval took for retrieval.sparse_top_k). The S1
 // HyPEConfig struct + the S6 NS-config resolver consume these.
 // -----------------------------------------------------------------------------

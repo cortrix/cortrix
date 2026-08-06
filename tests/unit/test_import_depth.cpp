@@ -61,7 +61,7 @@ TEST(ImportDepthTypesTest, ParseTextStrategyAcceptsKnownTokens) {
 }
 
 TEST(ImportDepthTypesTest, ParseTextStrategyRejectsTemplateAndUnknown) {
-    // "template" was deliberately removed in V1.0 (D1 V3 resolution 13).
+    // "template" was deliberately removed in V1.0 (V3 resolution 13).
     EXPECT_FALSE(ParseTextStrategy("template").has_value());
     EXPECT_FALSE(ParseTextStrategy("PER_ROW").has_value());  // case sensitive
     EXPECT_FALSE(ParseTextStrategy("").has_value());

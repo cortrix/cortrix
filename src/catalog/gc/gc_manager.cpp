@@ -120,7 +120,7 @@ Status GcManager::Stage2HardDelete(int64_t now_ms, bool bypass_windows, int* out
     std::vector<Cand> candidates;
     {
         // ref_count is recomputed authoritatively from active content_refs (ARCH
-        // §10.3 formula) rather than trusting the cached file_locations.ref_count
+        // formula) rather than trusting the cached file_locations.ref_count
         // aggregate — Stage 2 is the point where the spec mandates a recount.
         const char* sql =
             "SELECT fl.file_hash, COALESCE(fl.blob_uri, '') FROM file_locations fl "
@@ -329,7 +329,7 @@ Result<GcManager::RestoreOutcome> GcManager::Restore(const std::vector<std::stri
             }
         }
         // Clear the Stage-1 soft delete on the file row + recompute ref_count from
-        // active content_refs (ARCH §10.3 status='active' count).
+        // active content_refs (ARCH status='active' count).
         if (ok) {
             const char* sql =
                 "UPDATE file_locations SET status='active', deleted_at=NULL, "

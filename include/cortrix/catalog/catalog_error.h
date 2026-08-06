@@ -13,12 +13,12 @@ namespace cortrix::catalog {
 /// The 24 catalog error identities. Each maps to a stable `CX_ERR_*`
 /// string + a GEN-Agent category + retryability via the canonical registry below.
 ///
-/// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
+/// Per the coding conventions, Cortrix uses Result<T> + Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// So CatalogErrorCode is the *enum of identities*, and MakeCatalogError() turns
 /// one (plus optional structured_data) into that boundary error — we do NOT
-/// introduce a parallel CatalogError struct (the §3.9 `Result<T,CatalogError>`
+/// introduce a parallel CatalogError struct (the `Result<T,CatalogError>`
 /// spelling is the pre-convention draft; this is its convention-compliant form).
 ///
 /// V1.0 versioning promise: this set is not removed /
@@ -69,7 +69,7 @@ struct CatalogErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null unless retryable per §8.1
+    std::optional<int> retry_after_ms;        ///< null unless retryable per
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never
@@ -80,7 +80,7 @@ const CatalogErrorInfo& GetCatalogErrorInfo(CatalogErrorCode code);
 const char* CatalogErrorCodeString(CatalogErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry ("required keys"
-/// column). Empty for CX_ERR_INTERNAL_ERROR (§8.1 "case-by-case"). This
+/// column). Empty for CX_ERR_INTERNAL_ERROR ("case-by-case"). This
 /// is the SoT for the Agent-friendly contract (GEN-Agent #5) and lets call sites
 /// + tests verify the body is complete (S5.1 / topic 5).
 const std::vector<std::string>& RequiredStructuredDataKeys(CatalogErrorCode code);
@@ -91,7 +91,7 @@ bool HasRequiredStructuredData(CatalogErrorCode code,
                                const nlohmann::json& structured_data);
 
 /// Build the Agent-friendly boundary error for `code`, attaching `structured_data`
-/// (the §8.1 required keys are the caller's responsibility at each call site) and
+/// (the required keys are the caller's responsibility at each call site) and
 /// an optional human-readable `message`. category / retryable / retry_after_ms are
 /// filled from the canonical registry — call sites never restate them.
 agent_friendly::AgentFriendlyError MakeCatalogError(

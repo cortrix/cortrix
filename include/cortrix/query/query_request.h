@@ -47,7 +47,7 @@ struct QueryRequest {
 
     /// Normalize request parameters (call before Validate).
     /// Applies truncation: if query exceeds kMaxQueryLength chars, truncate and
-    /// set was_truncated = true.  Design spec (D8 boundary #13):
+    /// set was_truncated = true.  Design spec (boundary #13):
     /// "queries > 10000 chars -> truncate to max_query_length (default 2000), warning log"
     /// @return true if query was truncated
     bool Normalize();

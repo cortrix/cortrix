@@ -21,20 +21,20 @@
 // `?explain=true` to surface the LLM-extraction provenance, all over the same
 // blocks.metadata_json store extraction writes.
 //
-// ⚠️ Contract reconciliation vs the D1 detail design (C_R1_BRIEFING §2 — the detail
+// ⚠️ Contract reconciliation vs the detail design ( — the detail
 // design predates the implemented headers and drifts):
 //   - the real memory-block store seam is cortrix::memory::IMemoryBlockStore
 //     (memory_extractor.h), NOT `storage::IBlockStore` (no such name in tree).
 //     But that seam has NO list-by-user query, so this layer declares a minimal
 //     IMemoryBlockLister seam (existing-header style) for the GET /memory path; the
-//     real MemoryStore-backed adapter is wired in D3.5.
+//     real MemoryStore-backed adapter is wired in integration.
 //   - the operation logger is the real cortrix::observability::IOperationLogger
 //     (NOT `cortrix::operation_log::IOperationLogger`, which is stale).
 //   - status / type / extraction_method / timestamps are NOT struct fields on
 //     MemoryBlockRecord — extraction stamps them as keys inside metadata_json (JSONB).
 //     Transparency reads/writes those same keys (status / memory_type / extraction_method /
 //     user_id / source_session_id / source_interaction_id / invalidated_by_block_id /
-//     invalidated_at), and ADDS §6.1 keys (revoked_at / deleted_by_user_id /
+//     invalidated_at), and ADDS keys (revoked_at / deleted_by_user_id /
 //     deleted_at / last_modified_at). `extraction_method` is a free string, so the
 //     new value "user_edit" needs NO extractor enum change.
 //   - F-FREEZE-1: the design's `Result<T, MemoryTransparencyError>` (double-template)
@@ -70,7 +70,7 @@ constexpr int kMaxContentLength = 2000;
 
 /// One memory in the list response (MemoryListItem). The A-class fields are
 /// always returned; the B-class fields are populated only when `explain=true` (the
-/// §4.4 phased-rollout split). Values are projected from the block's metadata_json.
+/// phased-rollout split). Values are projected from the block's metadata_json.
 struct MemoryListItem {
     // A-class (default)
     std::string memory_id;
@@ -144,7 +144,7 @@ const char* ToString(TriggeredBy triggered_by);
 /// the GET /memory path needs to enumerate a user's blocks, so this layer adds this thin
 /// seam. Standalone UT mocks it; the real MemoryStore-backed adapter (a `SELECT ...
 /// WHERE metadata_json->>'user_id'=? AND metadata_json->>'memory_type' IS NOT NULL`)
-/// is wired in D3.5. NOT the forbidden `IBlockStore`.
+/// is wired in integration. NOT the forbidden `IBlockStore`.
 class IMemoryBlockLister {
 public:
     virtual ~IMemoryBlockLister() = default;
@@ -152,7 +152,7 @@ public:
     /// Return every memory block owned by `user_id` (i.e. metadata_json carries that
     /// user_id and a non-null memory_type). The service applies status / memory_type
     /// filtering + pagination on the result, so the seam returns the full owned set
-    /// (the real adapter pushes the predicates into SQL in D3.5). Returns an error
+    /// (the real adapter pushes the predicates into SQL in integration). Returns an error
     /// Status on store failure.
     virtual Result<std::vector<MemoryBlockRecord>> ListByUser(const std::string& user_id) = 0;
 };
@@ -162,13 +162,13 @@ public:
 /// MemoryExtractor is NOT a hard dependency in standalone ("reuse the extraction
 /// invalidate flow" is satisfied directly via the block store + metadata_json stamping,
 /// the same fields extraction writes); the real wiring to extraction and per-user isolation + the
-/// server memory_handler endpoints is DEFERRED → D3.5.
+/// server memory_handler endpoints is DEFERRED → integration.
 ///
-/// Standalone-D3: every collaborator is an injected seam, so all four operations run
+/// Standalone: every collaborator is an injected seam, so all four operations run
 /// fully in unit tests against mocks.
 class MemoryTransparency {
 public:
-    /// @param lister      list-by-user seam (D3.5 real adapter)
+    /// @param lister      list-by-user seam (integration real adapter)
     /// @param block_store memory-block read/write seam (IMemoryBlockStore)
     /// @param op_logger   operation logger (CE; real observability::IOperationLogger)
     MemoryTransparency(std::shared_ptr<IMemoryBlockLister> lister,
@@ -178,7 +178,7 @@ public:
     /// GET /memory (issue-1 A' + issue-5 A + issue-6 phased rollout). Lists the
     /// session user's memories with status / memory_type filtering + pagination.
     /// `filter.user_id` MUST equal `session_user_id` (L1) — a mismatch is FORBIDDEN.
-    /// `explain` adds the B-class provenance fields (§4.4).
+    /// `explain` adds the B-class provenance fields.
     Result<MemoryListResponse> List(const MemoryListFilter& filter,
                                     const std::string& session_user_id,
                                     bool explain = false,
@@ -201,7 +201,7 @@ public:
 
     /// DELETE /memory/{id} (issue-1 A' + L5 soft delete). Soft-deletes a memory
     /// (status=invalidated + deleted_by_user_id + deleted_at). Idempotent: a repeat
-    /// on an already-invalidated block returns Ok (§4.2 step 2). Cross-user → 404 mask.
+    /// on an already-invalidated block returns Ok (step 2). Cross-user → 404 mask.
     /// Audit action = memory_invalidate, triggered_by = user_manual.
     Status Delete(const std::string& memory_id,
                   const std::string& session_user_id,

@@ -9,7 +9,7 @@
 #include "cortrix/catalog/batch_result.h"
 #include "cortrix/catalog/catalog_error.h"
 
-// S5.1 coverage (catalog Issue 5 / §8.1 / §8.2): structured_data required-keys per
+// S5.1 coverage (catalog Issue 5 /): structured_data required-keys per
 // error code + the BatchResult/BatchMeta builder (5 meta fields + coverage_ratio).
 namespace cortrix::catalog {
 namespace {
@@ -32,7 +32,7 @@ const std::vector<CatalogErrorCode>& AllCodes() {
     return codes;
 }
 
-// §8.1 test #1: every code (except the case-by-case INTERNAL_ERROR) declares at
+// test #1: every code (except the case-by-case INTERNAL_ERROR) declares at
 // least one required structured_data key; INTERNAL_ERROR declares none.
 TEST(BatchResponseTest, EveryCodeDeclaresRequiredKeys) {
     for (CatalogErrorCode code : AllCodes()) {
@@ -80,7 +80,7 @@ TEST(BatchResponseTest, MakeCatalogErrorWithRequiredKeysValidates) {
                                           *err.structured_data));
 }
 
-// §8.2 test #3: coverage_ratio = succeeded / (succeeded + failed).
+// test #3: coverage_ratio = succeeded / (succeeded + failed).
 TEST(BatchResponseTest, BuilderComputesCoverageRatio) {
     BatchContext ctx;
     ctx.catalog_version = 7;

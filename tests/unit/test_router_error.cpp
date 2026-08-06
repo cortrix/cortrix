@@ -6,7 +6,7 @@
 #include "cortrix/query/router_error.h"
 
 // Query routing coverage: the query-router error model (template A) — all 4 CX_ERR_ROUTER_*
-// identities, their §4.3 attributes (category / retryable / retry_after_ms /
+// identities, their attributes (category / retryable / retry_after_ms /
 // structured_data keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::query {
 namespace {
@@ -37,7 +37,7 @@ TEST(RouterErrorTest, AllCodesHaveUniqueRouterCxStrings) {
     EXPECT_EQ(seen.size(), 4u);
 }
 
-// §4.3 table, row by row.
+// table, row by row.
 TEST(RouterErrorTest, RegistryMatchesSpecTable) {
     auto chk = [](RouterErrorCode c, const char* code, ErrorCategory cat,
                   bool retry, std::optional<int> retry_ms) {
@@ -53,7 +53,7 @@ TEST(RouterErrorTest, RegistryMatchesSpecTable) {
         ErrorCategory::kTransient, true, 100);
     chk(RouterErrorCode::kForceRouteInvalid, "CX_ERR_ROUTER_FORCE_ROUTE_INVALID",
         ErrorCategory::kPermanent, false, std::nullopt);
-    // §4.3 lists FALLBACK_TRIGGERED as transient + retryable with retry_after_ms "-"
+    // lists FALLBACK_TRIGGERED as transient + retryable with retry_after_ms "-"
     // (unspecified) → null. It is informational (the transparent Complex degrade
     // already happened), so no concrete back-off is advertised.
     chk(RouterErrorCode::kFallbackTriggered, "CX_ERR_ROUTER_FALLBACK_TRIGGERED",
@@ -65,7 +65,7 @@ TEST(RouterErrorTest, NonRetryablesCarryNoRetryHint) {
                      .retry_after_ms.has_value());
     EXPECT_FALSE(GetRouterErrorInfo(RouterErrorCode::kForceRouteInvalid)
                      .retry_after_ms.has_value());
-    // INFERENCE_FAILED is retryable AND advertises a positive back-off (§4.3 = 100).
+    // INFERENCE_FAILED is retryable AND advertises a positive back-off (= 100).
     const auto& inf = GetRouterErrorInfo(RouterErrorCode::kInferenceFailed);
     ASSERT_TRUE(inf.retry_after_ms.has_value());
     EXPECT_EQ(*inf.retry_after_ms, 100);

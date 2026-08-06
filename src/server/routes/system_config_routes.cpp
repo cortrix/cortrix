@@ -41,7 +41,7 @@ void WriteAuthError(httplib::Response& res, AuthErrorCode code,
     res.status = Status(cortrix::auth::AuthErrorToStatusCode(code), "").http_status();
 }
 
-// §6.3 GET shape — api_key masked (never the plaintext). provider "" surfaces as
+// GET shape — api_key masked (never the plaintext). provider "" surfaces as
 // the JSON null sentinel so an Agent sees "unconfigured" explicitly.
 nlohmann::json ToReadJson(const AgentLlmConfig& cfg) {
     nlohmann::json j;
@@ -136,7 +136,7 @@ void RegisterSystemConfigRoutes(httplib::Server& server, IGlobalConfig& config,
                     cfg.temperature = body["temperature"].get<double>();
 
                 config.SetAgentLlmConfig(cfg);
-                // Echo back the masked, persisted config (§6.3 read shape).
+                // Echo back the masked, persisted config (read shape).
                 WriteJsonResponse(res, 200, ToReadJson(config.GetAgentLlmConfig()),
                                   rctx.request_id);
             }));

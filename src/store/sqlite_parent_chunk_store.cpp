@@ -20,7 +20,7 @@ using cortrix::chunker::DocumentMetadata;
 using cortrix::chunker::ParentChunk;
 
 // Serialize DocumentMetadata to the JSON shape ParseDocMeta() reads back
-// (parser.cpp § ParseDocMeta), so parents.metadata_json round-trips with the parser
+// (parser.cpp), so parents.metadata_json round-trips with the parser
 // SoT field names. The enricher and META stages enrich this same blob per-parent (NER/Summary).
 std::string MetaToJson(const DocumentMetadata& m) {
     nlohmann::json j;
@@ -95,7 +95,7 @@ Status SqliteParentChunkStore::Migrate() {
     // [A unified-blocks] parents is kept; children is the legacy standalone table
     // (under A, child chunks live in `blocks` — see parent_chunk_schema.h). This
     // standalone store still creates both for its own unit tests until the SPC
-    // write path targets blocks (D3.5).
+    // write path targets blocks (integration).
     for (const char* ddl : {kParentsSchemaSql, kChildrenSchemaSql}) {
         char* err = nullptr;
         int rc = sqlite3_exec(db_, ddl, nullptr, nullptr, &err);
@@ -278,7 +278,7 @@ Result<std::vector<ParentChunk>> SqliteParentChunkStore::BulkGetParents(
     if (parent_ids.empty()) return out;
 
     // Prepare once, bind+step per id. Partial hits are fine (missing ids dropped);
-    // result order matches input order (§ 2.5 BulkGetParents contract).
+    // result order matches input order (BulkGetParents contract).
     std::string sql = std::string("SELECT ") + kParentSelectCols + " FROM parents WHERE parent_id = ?";
     sqlite3_stmt* st = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {

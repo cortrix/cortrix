@@ -16,8 +16,8 @@ namespace {
 // "import_<ulid>" task id.
 ImportTaskId NewTaskId() { return "import_" + cortrix::id::GenerateUlid(); }
 
-// A short, stable signature of the D2 query for Block provenance + the D3 overwrite
-// match (§4.3 source_query_signature). table+filter → "table:<keys>"; sql → its hash
+// A short, stable signature of the query for Block provenance + the overwrite
+// match (source_query_signature). table+filter → "table:<keys>"; sql → its hash
 // is overkill for V1 — use a truncated form so the signature stays human-skimmable.
 std::string QuerySignature(const QueryRequest& q) {
     if (q.table) {
@@ -68,14 +68,14 @@ ImportManager::ImportManager(std::shared_ptr<IConnectionManager> conn_mgr,
 Result<ImportTaskId> ImportManager::StartImport(const ImportRequest& req,
                                                 const AuthContext& auth_ctx,
                                                 const observability::TraceContext* /*ctx*/) {
-    // D7 permission: per-NS admin only (§4.4 require_per_ns_admin). A non-admin caller
+    // permission: per-NS admin only (require_per_ns_admin). A non-admin caller
     // is rejected synchronously.
     if (!auth_ctx.is_admin()) {
         return ImportStatus(ImportErrorCode::kAuthDenied,
                           "per-NS admin is required to start a database import");
     }
 
-    // D1 + D7: resolve the connection_ref under the tenant guard (this is the
+    // +: resolve the connection_ref under the tenant guard (this is the
     // synchronous security gate — a cross-tenant ref throws ImportException; an expired
     // / revoked / missing ref returns AUTH_DENIED). We resolve once here to fail fast
     // (and to learn the tenant for the worker); the DSN itself is re-resolved in the
@@ -83,13 +83,13 @@ Result<ImportTaskId> ImportManager::StartImport(const ImportRequest& req,
     Result<std::string> dsn = conn_mgr_->ResolveDsn(req.connection_ref, auth_ctx);
     if (!dsn.ok()) return dsn.status();
 
-    // D2 security gate (pre-validate before we ever enqueue) — bad SQL / DSL fails
+    // security gate (pre-validate before we ever enqueue) — bad SQL / DSL fails
     // synchronously with CX_ERR_IMPORT_INVALID_SQL.
     Result<CompiledQuery> compiled =
         CompileQueryRequest(req.query, config_.query_constraints, config_.dsl_constraints);
     if (!compiled.ok()) return compiled.status();
 
-    // R5 pre-check: COUNT(*) estimate (real PG → D3.5; standalone returns a transient
+    // R5 pre-check: COUNT(*) estimate (real PG → integration; standalone returns a transient
     // we treat as "unknown total", NOT a hard failure — the import still queues).
     int rows_total = 0;
     Result<int64_t> est = query_exec_->EstimateRowCount(*dsn, req.query, config_.query_constraints);
@@ -135,7 +135,7 @@ Status ImportManager::RunImport(const ImportRequest& req, const AuthContext& aut
     }
     if (handle.CancelRequested()) return Status::Ok();  // cancelled before work
 
-    // D2: fetch rows under the 5 security constraints (real PG → D3.5; standalone the
+    //: fetch rows under the 5 security constraints (real PG → integration; standalone the
     // executor returns CONNECTION_FAILED after validating).
     Result<std::vector<DbRow>> rows =
         query_exec_->Execute(*dsn, req.query, config_.query_constraints);
@@ -145,7 +145,7 @@ Status ImportManager::RunImport(const ImportRequest& req, const AuthContext& aut
     }
     if (handle.CancelRequested()) return Status::Ok();
 
-    // D4: textualize (per_row / merge — no template).
+    //: textualize (per_row / merge — no template).
     SourceContext src;
     src.host = config_.pg_host;
     src.port = config_.pg_port;
@@ -160,7 +160,7 @@ Status ImportManager::RunImport(const ImportRequest& req, const AuthContext& aut
                                          req.merge_size > 0 ? req.merge_size
                                                             : config_.default_merge_size);
 
-    // D3: clear this table's prior Blocks (ARCH §3.6 — only this source prefix).
+    //: clear this table's prior Blocks (ARCH — only this source prefix).
     Result<int> cleaned = block_cleaner_->CleanupSourceBlocks(req.namespace_id, SourcePrefix(src));
     if (!cleaned.ok()) {
         ImportMetrics::Instance().RecordImport(ImportMetrics::ImportOutcome::kFailed);
@@ -168,7 +168,7 @@ Status ImportManager::RunImport(const ImportRequest& req, const AuthContext& aut
     }
     if (handle.CancelRequested()) return Status::Ok();
 
-    // D5: feed the SPC pipeline (real SPCPipeline → D3.5; standalone records).
+    //: feed the SPC pipeline (real SPCPipeline → integration; standalone records).
     Result<int> fed = spc_feeder_->Feed(chunks, req.namespace_id);
     if (!fed.ok()) {
         ImportMetrics::Instance().RecordImport(ImportMetrics::ImportOutcome::kFailed);

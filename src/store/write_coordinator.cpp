@@ -48,13 +48,13 @@ void WriteCoordinator::SetRollbackCallback(RollbackCallback cb) {
 }
 
 bool WriteCoordinator::AllStoresHave(const PendingEntry& pending) {
-    // Three-way consistency check (design § 4.4 Q1-C). A "PENDING-only" txn is
+    // Three-way consistency check (design Q1-C). A "PENDING-only" txn is
     // inferred COMMITTED only if every store already holds the data — meaning
     // the three-way write finished and only the COMMITTED WAL record was lost.
     // Any single miss means the crash landed mid-write → not committed.
-    // Blob is required only when the txn declared it writes one (§4.4 v1.0.2): a
+    // Blob is required only when the txn declared it writes one (v1.0.2): a
     // blob-less doc (watch_dir/CDC/memory) legitimately has none, so its absence
-    // must NOT be read as an incomplete write — that was the §10.4 data-loss bug.
+    // must NOT be read as an incomplete write — that was the data-loss bug.
     if (pending.has_blob && !blob_store_->BlobExists(pending.doc_id)) return false;
     if (!pending.block_ids.empty() && !metadata_store_->BlockExists(pending.block_ids)) {
         return false;
@@ -76,7 +76,7 @@ Status WriteCoordinator::Recover() {
     }
 
     // 1. Read every record in EOF order (a corrupt tail is already truncated by
-    //    ReadAll → degraded recovery, design § 5).
+    //    ReadAll → degraded recovery, design).
     Result<std::vector<PendingEntry>> all = wal_->ReadAll();
     if (!all.ok()) return all.status();
     const std::vector<PendingEntry>& entries = all.value();

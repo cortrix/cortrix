@@ -33,7 +33,7 @@ struct DocSummaryConfig;
 /// path uses — doc_summary blocks were AddPoints'd by DocSummaryAsyncWorker), then resolves
 /// each hit from `store` and keeps ONLY block_type==kBlockDocSummary(17) rows whose
 /// metadata_json.status == "generated" (a failed/pending doc has no such block, so it
-/// is naturally absent → the §7.1 FTS5 fallback covers it). The 4 structured fields
+/// is naturally absent → the FTS5 fallback covers it). The 4 structured fields
 /// (summary_text=content_text + keywords/topics/one_liner from metadata_json) fill the
 /// DocDiscoveryHit; via_path = "llm_summary". `score` is the HNSW L2→similarity score
 /// (1/(1+distance)), used only for ordering (RRF rank). Results are sorted DESC and
@@ -83,7 +83,7 @@ DocDiscoveryCoreResult RunDocDiscoveryCore(store::IIndex& index,
 ///                      graceful degrade — increments cortrix_fts5_fallback_failed_total and
 ///                      returns the main-path results only, never throws).
 ///   Step 3:            FuseDocDiscovery (RRF, dedup by doc_id) → top_k.
-/// Returns the §6.1 response body { results:[...], meta:{succeeded,failed,coverage_ratio,
+/// Returns the response body { results:[...], meta:{succeeded,failed,coverage_ratio,
 /// warnings} }. `explain` adds the C-class meta.fallback_triggered signal. A NS that
 /// cannot be acquired yields coverage_ratio 0 + the NS in meta.failed (partial-success
 /// shape, never an exception).

@@ -8,7 +8,7 @@
 
 namespace cortrix {
 
-/// Map-backed IGlobalConfig for dev and tests (scaffolding D2-pre-9). Production
+/// Map-backed IGlobalConfig for dev and tests (scaffolding). Production
 /// config sources (pgcortrix GUC / config.json) implement the same interface.
 /// Set() updates a value and fires OnChange callbacks; typed getters parse the
 /// stored string, returning InvalidArgument on a malformed value and NotFound on
@@ -25,7 +25,7 @@ public:
 
     void OnChange(std::function<void(const std::string&)> cb) override;
 
-    /// [D3.5 r2 · P4] Persist the agent_llm config through Set() (api_key encrypted
+    /// [integration r2 · P4] Persist the agent_llm config through Set() (api_key encrypted
     /// at rest via the shared codec). Fires OnChange per touched key.
     void SetAgentLlmConfig(const AgentLlmConfig& cfg) override;
 

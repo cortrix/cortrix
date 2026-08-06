@@ -14,7 +14,7 @@ namespace cortrix::import {
 // catalog SoT — V6 Stage 3 A32 aligned both to TEXT). IF NOT EXISTS everywhere so a
 // re-run on an already-migrated db is a no-op outside the migrator's version gate.
 const char* const kImportSchemaSql = R"SQL(
--- db_connections (DB import §4.1, D1): pre-registered DB credential refs. Stores only an
+-- db_connections (DB import): pre-registered DB credential refs. Stores only an
 -- encrypted secret reference + non-sensitive metadata, never the raw DSN.
 CREATE TABLE IF NOT EXISTS db_connections (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS db_connections (
     registered_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER) * 1000),
     registered_by TEXT NOT NULL,                                 -- user_id
 
-    -- 30d expiry (D1 ref-rotation mechanism), Unix ms.
+    -- 30d expiry (ref-rotation mechanism), Unix ms.
     expires_at    INTEGER NOT NULL,
 
     -- revocation.
@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_db_connections_tenant ON db_connections(tenant_id
 CREATE INDEX IF NOT EXISTS idx_db_connections_active ON db_connections(tenant_id, expires_at)
     WHERE revoked_at IS NULL;
 
--- import_tasks (DB import §4.2, D6): one row per async import task (mimics the async task
+-- import_tasks (DB import): one row per async import task (mimics the async task
 -- table shape, but is DB import-owned — no dependency on async task's schema).
 CREATE TABLE IF NOT EXISTS import_tasks (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,8 +54,8 @@ CREATE TABLE IF NOT EXISTS import_tasks (
 
     -- request parameters.
     connection_ref_id     TEXT NOT NULL,                               -- references db_connections.ref_id
-    request_json          TEXT NOT NULL,                               -- D2 dual-mode params (JSON)
-    text_strategy         TEXT NOT NULL,                               -- D4: per_row / merge
+    request_json          TEXT NOT NULL,                               -- dual-mode params (JSON)
+    text_strategy         TEXT NOT NULL,                               --: per_row / merge
 
     -- state.
     status                TEXT NOT NULL DEFAULT 'queued',              -- queued/running/completed/failed/cancelling/cancelled

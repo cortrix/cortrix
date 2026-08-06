@@ -9,7 +9,7 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/config/auth_config.h"
 
-// Auth S7: SMTP admin API (§2.12 / §4.6, Issue 8) — SetSmtp persists + hot-reloads;
+// Auth S7: SMTP admin API (Issue 8) — SetSmtp persists + hot-reloads;
 // GetSmtpRedacted masks the password.
 namespace cortrix::auth {
 namespace {
@@ -57,7 +57,7 @@ TEST(SmtpAdminTest, ConfigurePersistsAndEnables) {
     EXPECT_EQ(ReadKey(pdb.db(), "email_verification"), "true");
 }
 
-// GET endpoint masks the password (§3.6 — never return the stored pass).
+// GET endpoint masks the password (never return the stored pass).
 TEST(SmtpAdminTest, GetRedactedMasksPassword) {
     PlatformDb pdb;
     ASSERT_TRUE(pdb.Open(":memory:").ok());

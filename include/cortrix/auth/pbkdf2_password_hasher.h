@@ -15,7 +15,7 @@ namespace cortrix::auth {
 /// This implementation uses a PBKDF2-HMAC-SHA256 placeholder that meets the
 /// security *substance* (salted, slow, tunable work factor, one-way) but emits a
 /// `pbkdf2$...` hash, NOT `$2b$`. SWITCH TO REAL bcrypt once network is available
-/// (D3.5): the IPasswordHasher seam means swapping = replacing this class +
+/// (integration): the IPasswordHasher seam means swapping = replacing this class +
 /// re-hashing. Pre-launch there are no stored passwords, so the migration is
 /// zero-cost. Tracked as TECH_DEBT-AUTH-PBKDF2-PLACEHOLDER.
 ///

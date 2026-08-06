@@ -115,7 +115,7 @@ private:
     retrieval::NamespaceQueryResult ExecuteChunkRetrieval(
         const QueryContext& ctx, const std::string& namespace_id, float oversample);
 
-    /// granularity=doc (§8.1 doc branch ≅ GET /documents/discover): run the shared
+    /// granularity=doc (doc branch ≅ GET /documents/discover): run the shared
     /// Doc-discovery core (doc_summary HNSW + doc-level FTS5 fallback + doc_id
     /// RRF), surfaced as doc-level RankedChunks (child_id = doc_id). No rerank (doc
     /// summaries / doc pseudos are not chunk passages). A NS with no doc candidates
@@ -123,7 +123,7 @@ private:
     retrieval::NamespaceQueryResult ExecuteDocRetrieval(
         const QueryContext& ctx, const std::string& namespace_id);
 
-    /// granularity=auto/both (§8.1 hybrid branch): run the chunk path AND the doc path,
+    /// granularity=auto/both (hybrid branch): run the chunk path AND the doc path,
     /// then fuse the two ranked lists with doc_id-keyed RRF before top_k. If a doc has
     /// both chunk and doc evidence, keep the chunk as the representative result while
     /// preserving doc-path evidence in metadata.

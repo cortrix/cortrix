@@ -53,7 +53,7 @@ const char* AgentTraceErrorCodeString(AgentTraceErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(AgentTraceErrorCode code) {
-    // §9.2 structured_data column, 1:1. Function-local statics → stable references.
+    // structured_data column, 1:1. Function-local statics → stable references.
     // INVALID_FILTER's value_preview is optional (PII guard) → not required.
     static const std::vector<std::string> kSession{"session_id"};
     static const std::vector<std::string> kFilter{"invalid_field", "reason"};

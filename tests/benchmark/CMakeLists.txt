@@ -7,7 +7,7 @@ add_executable(cortrix_benchmarks
     bench_bm25_search.cpp
     # bench_query_pipeline.cpp excluded (P6): its harness is built on the deleted MVP
     # query path — it constructs CortrixVectorHnswlib (removed) and feeds it to a
-    # pipeline signature replaced by ScatterGather/namespace pool in this D3.5 round. Re-porting
+    # pipeline signature replaced by ScatterGather/namespace pool in this integration round. Re-porting
     # it to the new query path is a fresh benchmark, not a fix; parked until then.
     bench_http_api.cpp
     bench_spc_pipeline.cpp

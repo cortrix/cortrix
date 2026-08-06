@@ -11,23 +11,23 @@ namespace cortrix::store {
 /// SparseMetrics template (process-wide singleton, atomic counters + histogram,
 /// OpenMetrics renderer).
 ///
-/// §2.5 metric schema (V1.0 — the third row, cache_hit_ratio, is deferred to the
-/// D3 LRU cache layer and is NOT emitted here):
+/// metric schema (V1.0 — the third row, cache_hit_ratio, is deferred to the
+/// LRU cache layer and is NOT emitted here):
 ///   cortrix_parent_chunk_store_lookup_total           counter   {result=hit|miss}
 ///   cortrix_parent_chunk_store_lookup_latency_seconds histogram (no label)
 ///
-/// Cardinality control (OBS_SPEC §3.2): the only label is the enum `result`
+/// Cardinality control (OBS_SPEC): the only label is the enum `result`
 /// (hit/miss) — NO parent_id / ns_id / doc_id labels (high-cardinality, forbidden;
 /// those go to structured logs).
 ///
-/// D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
+/// standalone: a self-contained, dependency-free recorder + an OpenMetrics
 /// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
-/// deferred to D3.5. Until then it is fully usable + testable in-process and
+/// deferred to integration. Until then it is fully usable + testable in-process and
 /// RenderOpenMetrics() produces what the server will serve.
 class ParentChunkStoreMetrics {
 public:
-    /// result label for cortrix_parent_chunk_store_lookup_total (§2.5).
+    /// result label for cortrix_parent_chunk_store_lookup_total.
     enum class LookupResult { kHit = 0, kMiss };
 
     /// Process-wide instance (metrics are global counters/histogram).

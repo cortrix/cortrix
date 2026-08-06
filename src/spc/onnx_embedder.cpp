@@ -337,7 +337,7 @@ Status OnnxEmbedder::Embed(const std::string& text, EmbeddingResult* result) {
         result->dim = actual_dim;
         auto end = std::chrono::steady_clock::now();
         result->inference_time_ms = std::chrono::duration<float, std::milli>(end - start).count();
-        // D35-MET-11: feed cortrix_onnx_inference_duration_seconds (real-model path
+        //-MET-11: feed cortrix_onnx_inference_duration_seconds (real-model path
         // only; the stub path below is not an ONNX inference).
         onnx::OnnxMetrics::Instance().ObserveInferenceDuration(
             std::chrono::duration<double>(end - start).count());
@@ -390,8 +390,8 @@ Status OnnxEmbedder::EmbedWithSparse(const std::string& text,
     }
     result->dense = std::move(dense.vector);
 
-    // Sparse half: standalone deterministic stub (D3). The real BGE-M3 sparse
-    // head is a 2nd model output that requires a re-exported model → D3.5; here
+    // Sparse half: standalone deterministic stub. The real BGE-M3 sparse
+    // head is a 2nd model output that requires a re-exported model → integration; here
     // the stub exercises the full serialize / inverted-index / RRF chain.
     result->sparse = StubSparse(text, top_k);
 
@@ -425,7 +425,7 @@ std::map<uint32_t, float> OnnxEmbedder::StubSparse(const std::string& text,
     // the uint16 window so the uint16 serializer round-trips — the real
     // 18-bit vocab encoding is a Phase-2 widening, see header note). Weight is a
     // stable [0,1) value per token; duplicate tokens accumulate weight (SPLADE
-    // term-frequency intuition). Empty / whitespace-only → empty map (§6.5
+    // term-frequency intuition). Empty / whitespace-only → empty map (
     // empty_content path).
     std::map<uint32_t, float> sparse;
     std::string token;

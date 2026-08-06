@@ -6,7 +6,7 @@
 #include "cortrix/memory/memory_opt_out_error.h"
 
 // S5 coverage: the memory opt-out error model (template A) — all 7 CX_ERR_MEMOPTOUT_* identities,
-// their ARCH §4.1.11 attributes (http/category/retryable/retry_after_ms/structured_data
+// their ARCH attributes (http/category/retryable/retry_after_ms/structured_data
 // keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::memory::immunity {
 namespace {
@@ -40,7 +40,7 @@ TEST(MemoryOptOutErrorTest, AllCodesHaveUniqueCxStrings) {
     EXPECT_EQ(seen.size(), 7u);
 }
 
-// ARCH §4.1.11 memory opt-out table, row by row.
+// ARCH memory opt-out table, row by row.
 TEST(MemoryOptOutErrorTest, RegistryMatchesArchTable) {
     auto chk = [](MemoryOptOutErrorCode c, const char* code, int http, ErrorCategory cat,
                   bool retry, std::optional<int> retry_ms) {

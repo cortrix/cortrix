@@ -7,7 +7,7 @@
 #include "cortrix/store/sqlite_parent_chunk_store.h"
 #include "cortrix/store/store_errors.h"
 
-// Error-path coverage for SqliteParentChunkStore (§ 2.5.1 CX_ERR_STORE_DB_ERROR).
+// Error-path coverage for SqliteParentChunkStore (CX_ERR_STORE_DB_ERROR).
 // Standalone DB-error injection without a real DB fault: an un-creatable path
 // (Open fails), and writes against a closed store (every op returns DB_ERROR).
 namespace cortrix::store {

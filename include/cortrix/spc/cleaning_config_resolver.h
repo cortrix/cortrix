@@ -11,7 +11,7 @@ namespace cortrix::spc {
 /// Read via the generic IGlobalConfig accessors — the canonical config surface has
 /// no cleaning-typed getter (that would be a reverse hook into IGlobalConfig);
 /// standalone reads the generic keys. Absent keys fall back to the CleaningConfig
-/// struct defaults (cleaning_types.h §3.1).
+/// struct defaults (cleaning_types.h).
 inline constexpr const char* kCleaningDedupEnabledKey =
     "cleaning.dedup_enabled";
 inline constexpr const char* kCleaningDedupThresholdKey =
@@ -23,7 +23,7 @@ inline constexpr const char* kCleaningMaxChunkCharsKey =
 inline constexpr const char* kCleaningPluginTimeoutMsKey =
     "cleaning.plugin_timeout_ms";
 
-/// Read the process-wide CleaningConfig defaults from IGlobalConfig (the §3.4
+/// Read the process-wide CleaningConfig defaults from IGlobalConfig (the
 /// "global" layer). A null `global` (tests / no-config) returns the struct
 /// defaults; a missing individual key falls back to that field's struct default.
 /// This is the lowest of the three layers (global → NS → request).
@@ -34,11 +34,11 @@ CleaningConfig LoadGlobalCleaningConfig(const IGlobalConfig* global);
 /// request layer). Reuses the ConfigResolver<CleaningConfig> template
 /// for the JSON-object shallow merge, then RE-ASSERTS the two
 /// resource-level fields (max_chunk_chars / plugin_timeout_ms) back to `global`:
-/// those are system-resource level and NOT NS-overridable (§3.4 line 176), so a
+/// those are system-resource level and NOT NS-overridable (line 176), so a
 /// stray key for them in the NS blob is ignored.
 ///
 /// `ns_blob` is the raw `namespaces.cleaning_config` JSONB ("" / "{}" / SQL NULL =
-/// inherit global entirely). Returns CX_ERR_CLEANING_NS_CONFIG_MERGE_FAILED (§5.1) when
+/// inherit global entirely). Returns CX_ERR_CLEANING_NS_CONFIG_MERGE_FAILED when
 /// the blob is present but not a JSON object, or when the merged result fails to
 /// deserialize — so the SPC path can surface the Agent-friendly merge error rather
 /// than silently using a wrong config.

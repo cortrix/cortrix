@@ -15,7 +15,7 @@ namespace cortrix::spc {
 /// NS-overridable B-class field `questions_per_chunk` (default 3,
 /// NS-configurable 1-10); every field is OPTIONAL so an absent key inherits the
 /// global default at resolve time. prompt_version is A-class (global) in Phase 1
-/// (NS-switchable prompt = Phase 2, §14), so it is NOT here.
+/// (NS-switchable prompt = Phase 2), so it is NOT here.
 struct NsHyPEConfig {
     std::optional<int> questions_per_chunk;  ///< NS K override (clamped 1-10 at resolve)
 

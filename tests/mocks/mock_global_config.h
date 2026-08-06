@@ -8,7 +8,7 @@
 
 namespace cortrix {
 
-/// Shared gmock double for IGlobalConfig (scaffolding D2-pre-9) so downstream
+/// Shared gmock double for IGlobalConfig (scaffolding) so downstream
 /// features can unit-test config-driven logic.
 class MockGlobalConfig : public IGlobalConfig {
 public:

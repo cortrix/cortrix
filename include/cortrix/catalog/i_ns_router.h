@@ -12,9 +12,9 @@ namespace cortrix::catalog {
 /// NS routing + namespace lifecycle. The catalog is the single SoT
 /// for NS / Unit metadata; upstream modules (ScatterGather,
 /// WriteCoordinator, Watcher, pgcortrix) go through this interface rather
-/// than touching catalog.db directly (§2 strict dependency inversion).
+/// than touching catalog.db directly (strict dependency inversion).
 ///
-/// Error model (F-FREEZE-1 / CODING_CONVENTIONS §3): value-returning methods use
+/// Error model (F-FREEZE-1 / the coding conventions): value-returning methods use
 /// Result<T> (StatusOr); the error path carries a Status whose code identifies a
 /// catalog error (CX_ERR_*, see catalog_error.h). Void-fallible methods return
 /// plain Status (no Result<void>). The rich Agent-friendly body is built at the

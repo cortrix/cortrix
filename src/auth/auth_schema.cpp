@@ -6,14 +6,14 @@
 
 namespace cortrix::auth {
 
-// platform.db Auth schema — transcribed from auth-auth-system.md §3.1–§3.7.
+// platform.db Auth schema — transcribed from auth-auth-system.md–
 // One DDL batch so the migrator applies it atomically. 7 tables (v0 4 + v1.0 3).
 // IF NOT EXISTS on every object (see auth_schema.h for the platform.db vs
 // catalog.db separation + idempotency notes).
 const char* const kAuthSchemaSql = R"SQL(
 -- ===== v0 base tables (4) =====
 
--- 1. users (§3.1). platform.db users — richer than catalog.db's relationship
+-- 1. users. platform.db users — richer than catalog.db's relationship
 --    users; see auth_schema.h DB-separation note.
 CREATE TABLE IF NOT EXISTS users (
     id              TEXT PRIMARY KEY,                  -- "usr_" + 8 hex chars
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash   TEXT NOT NULL,                     -- bcrypt hash
     display_name    TEXT NOT NULL,
     email_verified  INTEGER NOT NULL DEFAULT 0,        -- 0=unverified 1=verified
-    role            TEXT NOT NULL DEFAULT 'user',      -- admin | user (§2.13-bis admin/users)
+    role            TEXT NOT NULL DEFAULT 'user',      -- admin | user (admin/users)
     status          TEXT NOT NULL DEFAULT 'active',    -- active | locked | disabled
     locked_until    INTEGER,                           -- Unix ts, lockout expiry
     login_attempts  INTEGER NOT NULL DEFAULT 0,        -- consecutive failure count
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
--- 2. refresh_tokens (§3.2).
+-- 2. refresh_tokens.
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     jti             TEXT PRIMARY KEY,                  -- refresh token unique id
     user_id         TEXT NOT NULL,
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens(expires_at);
 
--- 3. verification_codes (§3.3). 6-digit numeric code, valid for 15min.
+-- 3. verification_codes. 6-digit numeric code, valid for 15min.
 CREATE TABLE IF NOT EXISTS verification_codes (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     email           TEXT NOT NULL,
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS verification_codes (
 CREATE INDEX IF NOT EXISTS idx_verification_codes_email_type
     ON verification_codes(email, type);
 
--- 4. token_blacklist (§3.4). Persists revoked access_tokens; loaded into an
+-- 4. token_blacklist. Persists revoked access_tokens; loaded into an
 --    in-memory set at startup.
 CREATE TABLE IF NOT EXISTS token_blacklist (
     token_hash      TEXT PRIMARY KEY,                  -- SHA-256(access_token)
@@ -68,9 +68,9 @@ CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires
 
 -- ===== v1.0 new tables (3) =====
 
--- 5. auth_secrets (§3.5, topic 1.1C). JWT secret auto-generated + persisted +
+-- 5. auth_secrets (topic 1.1C). JWT secret auto-generated + persisted +
 --    dual-key window.
---    Constraints (§3.5): one status='current' per secret_type; <=1 status='prev'.
+--    Constraints: one status='current' per secret_type; <=1 status='prev'.
 --    CHECK(secret_type IN ('jwt_secret','siphash_id_key')) — JWT signing secret +
 --    the ID-system SipHash key (16-byte k0||k1) share this table.
 CREATE TABLE IF NOT EXISTS auth_secrets (
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS auth_secrets (
 CREATE INDEX IF NOT EXISTS idx_auth_secrets_type_status
     ON auth_secrets(secret_type, status);
 
--- 6. auth_config (§3.6, topic 8). Minimal IGlobalConfig persistence (key/value JSON).
+-- 6. auth_config (topic 8). Minimal IGlobalConfig persistence (key/value JSON).
 CREATE TABLE IF NOT EXISTS auth_config (
     key             TEXT PRIMARY KEY,                  -- "access_token_ttl" / "smtp.host" / ...
     value           TEXT NOT NULL,                     -- JSON (int/string/bool/null)
@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS auth_config (
     updated_by      TEXT                               -- user_id | 'system'
 );
 
--- 7. api_keys (§3.7, topic 7D). Simplified API Key; key_hash stores no plaintext.
+-- 7. api_keys (topic 7D). Simplified API Key; key_hash stores no plaintext.
 --    Bootstrap admin key name='bootstrap-admin' is stored in the same table.
 CREATE TABLE IF NOT EXISTS api_keys (
     id              TEXT PRIMARY KEY,                  -- ULID / UUID (key_id)

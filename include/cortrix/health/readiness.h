@@ -11,7 +11,7 @@
 // catalog.db), vector_index (model load + WAL replay), secret_provider
 // (ISecretProvider::IsHealthy), spc_pipeline (parser / enricher workers),
 // memory_store. This layer ships the secret_provider adapter; the others are
-// registered by their owning Features in D3.5 (deferred).
+// registered by their owning Features in integration (deferred).
 
 #include <functional>
 #include <memory>

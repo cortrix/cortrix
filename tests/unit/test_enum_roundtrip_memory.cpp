@@ -11,7 +11,7 @@
 // Exhaustive matrices for the memory extraction/memory enums.
 //   MemoryType:   ToString <-> ParseMemoryType (round-trip, case-insensitive on
 //                 the 3 known values). Unknown -> kUnknown (caller coerces to
-//                 kEvent per D4). src/memory/memory_extractor.cpp.
+//                 kEvent per). src/memory/memory_extractor.cpp.
 //   MemoryStatus: ToString only (3 values).
 //   OptOutActor:  ToString only (4 values, cortrix::memory::immunity).
 //   TriggeredBy:  ToString only (4 values, cortrix::memory::transparency).

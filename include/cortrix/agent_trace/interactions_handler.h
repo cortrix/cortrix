@@ -48,9 +48,9 @@ struct RequesterContext {
 };
 
 /// One row in a GET /interactions list response. Projected from the
-/// real frozen interaction_log (MVP role/content model) — NOT the §4.2 draft shape
+/// real frozen interaction_log (MVP role/content model) — NOT the draft shape
 /// (query_text/response_summary), which predates the memory rebuild. query_text is
-/// returned in full (§8.3 — not truncated); namespace_id is the real
+/// returned in full (not truncated); namespace_id is the real
 /// namespace_name column.
 struct InteractionListItem {
     std::string interaction_id;       ///< interaction_log.id (UUID)
@@ -63,7 +63,7 @@ struct InteractionListItem {
     std::string created_at;           ///< ISO-8601 TEXT
 };
 
-/// Filter + pagination for GET /interactions. Defaults match §8.3:
+/// Filter + pagination for GET /interactions. Defaults match:
 /// limit 50 / cap 200, offset 0, DESC. user_id is admin-only cross-user (a
 /// non-admin gets their own rows regardless of this field).
 struct InteractionListFilter {
@@ -89,32 +89,32 @@ struct InteractionListView {
 /// Reads interaction_log (MVP frozen, role/content
 /// model) + interaction_sources (CE, this Feature) + probes `blocks` for deleted
 /// sources. Standalone: pure DB logic over a borrowed handle; the HTTP route
-/// registration (httplib) is D3.5. Thread-safe via a single mutex over the handle.
+/// registration (httplib) is integration. Thread-safe via a single mutex over the handle.
 class InteractionsHandler {
 public:
     /// @param db  borrowed handle to the DB holding interaction_log +
     ///            interaction_sources + blocks (the memory/global DB). Not owned.
     explicit InteractionsHandler(sqlite3* db);
 
-    /// GET /interactions/{id}/sources (§8.2, T-106). Permission-checks against
+    /// GET /interactions/{id}/sources (T-106). Permission-checks against
     /// interaction_log.user_id, then returns the live sources (deleted ones
     /// counted in deleted_sources_count). Errors: INTERACTION_NOT_FOUND /
     /// UNAUTHORIZED / INTERNAL (carried as a Status with the CX_ERR_TRACE_* token).
     Result<InteractionSourcesView> GetSources(const std::string& interaction_id,
                                               const RequesterContext& ctx);
 
-    /// GET /interactions (§8.3 — Agent self-service query history core). Lists
+    /// GET /interactions (Agent self-service query history core). Lists
     /// interactions with filter + pagination, projected from the real frozen
-    /// interaction_log. Permission (§8.3, mirrors §8.2): a non-admin is always
+    /// interaction_log. Permission (mirrors): a non-admin is always
     /// scoped to their own user_id (any user_id filter naming someone else ->
     /// CX_ERR_TRACE_UNAUTHORIZED); an admin may target another user_id (and the
-    /// access is logged via the §12 forensics line). admin cross-user with no rows
-    /// -> empty list (per §8.3, not an error). Invalid filter -> CX_ERR_TRACE_INVALID_FILTER.
+    /// access is logged via the forensics line). admin cross-user with no rows
+    /// -> empty list (per not an error). Invalid filter -> CX_ERR_TRACE_INVALID_FILTER.
     Result<InteractionListView> ListInteractions(const InteractionListFilter& filter,
                                                  const RequesterContext& ctx);
 
     /// Truncate a snippet to <=500 chars keeping the first 400 + last 100 with a
-    /// [...] marker (§6/§8.2). Exposed for tests.
+    /// [...] marker. Exposed for tests.
     static std::string TruncateSnippet(const std::string& snippet);
 
 private:

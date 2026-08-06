@@ -276,7 +276,7 @@ void RegisterFlatDocumentRoutes(httplib::Server& server,
 
     // GET /api/v1/documents/tasks/{task_id}/progress — task progress
     // (api/paths/documents.yaml getDocumentTaskProgress). Wraps the existing
-    // DocumentTaskHandler::GetProgress (GEN-Agent §6.3 body / 404 CX_ERR_TASK_NOT_FOUND).
+    // DocumentTaskHandler::GetProgress (GEN-Agent body / 404 CX_ERR_TASK_NOT_FOUND).
     server.Get(R"(/api/v1/documents/tasks/([^/]+)/progress)",
         WithAuth(auth, kPermRead,
             [&task_handler](const httplib::Request& req, httplib::Response& res,

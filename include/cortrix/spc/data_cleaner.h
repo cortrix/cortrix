@@ -20,11 +20,11 @@ namespace cortrix::operation_log { class IOperationLogger; }
 namespace cortrix::spc {
 
 /// SPC Pipeline data-cleaning module. Runs *before* Block assembly to
-/// drop duplicate chunks (exact hash + semantic cosine, D2/D3) and to mark
-/// anomalous chunks (5 reasons, D4) so Storage Write keeps them out of P-HNSW
-/// (D5). chunk-level; orthogonal to file-level dedup (tenants.dedup_scope).
+/// drop duplicate chunks (exact hash + semantic cosine,/) and to mark
+/// anomalous chunks (5 reasons) so Storage Write keeps them out of P-HNSW
+///. chunk-level; orthogonal to file-level dedup (tenants.dedup_scope).
 ///
-/// D3 standalone: Dedup / DetectAnomaly / config validation are fully
+/// standalone: Dedup / DetectAnomaly / config validation are fully
 /// implemented + tested against the `Block` contract view. The
 /// SpcPipeline wiring (ChunkResult/EmbeddingResult ↔ Block, Storage-Write
 /// skip-index) is cross-Feature → integration. The op_logger audit sink is
@@ -44,9 +44,9 @@ public:
     /// before use; exposed for the pipeline to fail fast / surface to the Agent.
     Status ValidateConfig() const;
 
-    /// Replace the active cleaning config (D3.5 NS-override wiring). The SPCPipeline
+    /// Replace the active cleaning config (integration NS-override wiring). The SPCPipeline
     /// owns one DataCleaner and re-resolves the effective CleaningConfig per task
-    /// (global ← NS cleaning_config, §3.4) before Dedup/DetectAnomaly, so the owned
+    /// (global ← NS cleaning_config) before Dedup/DetectAnomaly, so the owned
     /// instance must be reconfigurable. Dedup/DetectAnomaly read config_ on each
     /// call, so this takes effect on the next call. Not thread-safe with concurrent
     /// Dedup/DetectAnomaly on the same instance (the pipeline runs one task at a
@@ -57,20 +57,20 @@ public:
     /// pipeline to confirm the resolved values took effect.
     const CleaningConfig& config() const { return config_; }
 
-    /// ★ Main entry 1: dedup (in-place; removes duplicates). D2 chaining: exact SHA-256 of
-    /// chunk_text, then semantic cosine over the upstream embeddings (D3). No-op
+    /// ★ Main entry 1: dedup (in-place; removes duplicates). chaining: exact SHA-256 of
+    /// chunk_text, then semantic cosine over the upstream embeddings. No-op
     /// (returns 0 removed) when dedup_enabled=false. TraceContext: Phase-1 noop.
     DedupResult Dedup(std::vector<Block>& blocks,
                       const observability::TraceContext* ctx = nullptr);
 
     /// ★ Main entry 2: anomaly detection (in-place mark). Sets flags_ext bit2 kFlagExtIsAnomalous
     /// + metadata "cleaning.anomaly_reason" / "cleaning.skip_index". Anomalous
-    /// blocks are NOT removed — Storage Write reads the flag to skip P-HNSW (D5).
+    /// blocks are NOT removed — Storage Write reads the flag to skip P-HNSW.
     /// No-op when anomaly_detection_enabled=false.
     AnomalyResult DetectAnomaly(std::vector<Block>& blocks,
                                 const observability::TraceContext* ctx = nullptr);
 
-    /// Convenience: the §5.2 A-class summary from a dedup + anomaly run over an
+    /// Convenience: the A-class summary from a dedup + anomaly run over an
     /// `input_count`-sized batch (chunks_input / chunks_indexed /
     /// chunks_skipped_dedup / chunks_marked_anomalous).
     static CleaningResult Summarize(int input_count, const DedupResult& dedup,
@@ -105,7 +105,7 @@ public:
 constexpr uint8_t kBlockFlagExtAnomalous = 0x04;
 
 /// True iff `block` was marked anomalous (Storage Write reads this to skip
-/// P-HNSW — D5). Equivalent to the metadata "cleaning.skip_index" == true.
+/// P-HNSW). Equivalent to the metadata "cleaning.skip_index" == true.
 bool ShouldSkipIndex(const Block& block);
 
 }  // namespace cortrix::spc

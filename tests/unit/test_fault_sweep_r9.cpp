@@ -17,7 +17,7 @@
 // the target op for the workload. (Verified: without the pre-arm, matched==0 for
 // every op; with it, pwrite fires and doc_create returns -1 "disk I/O error".)
 //
-// Reachability honesty (matches R7-BRANCH-GAP §3): we sweep the WRITE path
+// Reachability honesty (matches R7-BRANCH-GAP): we sweep the WRITE path
 // (pwrite/fsync/fullfsync) which is syscall-reachable. The data file is opened with
 // PRAGMA mmap_size, so READS come from the mmap (page faults, no ::pread) — read-path
 // arms are not sweep-reachable and are intentionally not chased. We never pad with
@@ -270,7 +270,7 @@ TEST_F(StoreFaultSweepTest, BlockDeleteByDocPwriteFaultSweep) {
 // doc → COMMIT, each with a ROLLBACK-on-failure arm). Per k: open a clean store, seed
 // a doc + a block fault-free, then arm pwrite and delete — a write fault inside the
 // transaction must ROLLBACK and return non-zero without crashing, and the store must
-// stay usable. Reaches the §4.5-adjacent transaction error arms a :memory: db can't.
+// stay usable. Reaches the transaction error arms a :memory: db can't.
 TEST_F(StoreFaultSweepTest, DocDeleteTransactionPwriteFaultSweep) {
     bool any = false;
     for (int k = 0;; ++k) {

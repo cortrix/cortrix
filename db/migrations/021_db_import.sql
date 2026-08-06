@@ -1,4 +1,4 @@
--- DB Manual Import — db_connections (§4.1) + import_tasks (§4.2)
+-- DB Manual Import — db_connections + import_tasks
 -- Wave B-R2. Lives in the catalog DB (catalog.db) alongside tenants / namespaces.
 --
 -- This file is the human-readable mirror of the DDL the ImportSchemaProvider emits
@@ -12,7 +12,7 @@
 -- other catalog provider uses: INTEGER PRIMARY KEY AUTOINCREMENT, Unix-ms INTEGER
 -- timestamps, JSONB → TEXT affinity, IF NOT EXISTS on every object.
 
--- db_connections (D1): pre-registered DB credential refs. Stores only an encrypted
+-- db_connections: pre-registered DB credential refs. Stores only an encrypted
 -- secret reference + non-sensitive metadata, never the raw DSN.
 CREATE TABLE IF NOT EXISTS db_connections (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,7 +38,7 @@ CREATE INDEX IF NOT EXISTS idx_db_connections_tenant ON db_connections(tenant_id
 CREATE INDEX IF NOT EXISTS idx_db_connections_active ON db_connections(tenant_id, expires_at)
     WHERE revoked_at IS NULL;
 
--- import_tasks (D6): one row per async import task (mimics the async task table shape,
+-- import_tasks: one row per async import task (mimics the async task table shape,
 -- but is import-owned — no dependency on async task's schema).
 CREATE TABLE IF NOT EXISTS import_tasks (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,8 +47,8 @@ CREATE TABLE IF NOT EXISTS import_tasks (
     tenant_id             TEXT NOT NULL REFERENCES tenants(tenant_id), -- catalog SoT (TEXT PK)
 
     connection_ref_id     TEXT NOT NULL,                               -- references db_connections.ref_id
-    request_json          TEXT NOT NULL,                               -- D2 dual-mode params (JSON)
-    text_strategy         TEXT NOT NULL,                               -- D4: per_row / merge
+    request_json          TEXT NOT NULL,                               -- dual-mode params (JSON)
+    text_strategy         TEXT NOT NULL,                               --: per_row / merge
 
     status                TEXT NOT NULL DEFAULT 'queued',              -- queued/running/completed/failed/cancelling/cancelled
     progress              REAL NOT NULL DEFAULT 0.0,                   -- 0.0 - 1.0

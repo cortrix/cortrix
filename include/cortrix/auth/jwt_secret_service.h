@@ -18,7 +18,7 @@ namespace cortrix::auth {
 ///   - LoadOrInit(): read the status='current' jwt_secret from platform.db; if
 ///     none, Cortrix auto-generates a 64-byte random secret and persists it.
 ///     An optional `CORTRIX_JWT_SECRET` env var overrides + is written through
-///     (K8s Secret / docker-compose env advanced path, §2.11 startup behavior 1-3).
+///     (K8s Secret / docker-compose env advanced path, startup behavior 1-3).
 /// S7 (this) adds RotateJwtSecret() (current→prev + new current, 24h prev
 ///   window), GetAcceptSecrets() (the dual-key verify set = current + valid
 ///   prev) and CleanupExpiredPrev() (the 24h cron). AuthService feeds
@@ -35,7 +35,7 @@ public:
     ///   2) else if a status='current' jwt_secret row exists → load it;
     ///   3) else auto-generate 64 random bytes → persist as current → use it.
     /// On platform.db write failure returns CX_ERR_AUTH_JWT_INIT_FAILED (a FATAL
-    /// startup condition per §5.1 — the caller refuses to start).
+    /// startup condition per — the caller refuses to start).
     Status LoadOrInit();
 
     /// The in-use HS256 secret (raw bytes). Valid only after a successful

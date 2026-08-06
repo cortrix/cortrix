@@ -40,7 +40,7 @@ using cortrix::store::WriteCoordinator;
 using cortrix::store::WriteCoordinatorConfig;
 
 // An IIndex that does NOT also implement IVectorStore. The pool cross-casts
-// bundle.index to IVectorStore* (D3.5 C1 §9.3); against this index the
+// bundle.index to IVectorStore* (integration C1); against this index the
 // dynamic_cast returns null → the "index_not_ivector_store" load-failure branch.
 class NonVectorIndex : public IIndex {
 public:

@@ -1,5 +1,5 @@
 /// @file test_e2e_document_lifecycle.cpp
-/// @brief D4 E2E: Document lifecycle tests (upload → query → delete → verify)
+/// @brief E2E: Document lifecycle tests (upload → query → delete → verify)
 ///
 /// Tests complete document lifecycle flows:
 ///   1. Full lifecycle: upload → store → query → delete → verify query returns empty

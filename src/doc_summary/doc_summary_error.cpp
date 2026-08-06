@@ -13,9 +13,9 @@ namespace {
 // switches below are intentionally exhaustive: -Wswitch turns "added a code
 // without a row" into a build failure, so the registry can't drift from the enum.
 //
-// retry_after_ms (§7 table): LLM_TIMEOUT 5000 / LLM_BUDGET_EXCEEDED 60000 are
+// retry_after_ms (table): LLM_TIMEOUT 5000 / LLM_BUDGET_EXCEEDED 60000 are
 // explicit. LLM_INVALID_OUTPUT / FALLBACK_FAILED / FTS5_FALLBACK_FAILED are
-// transient/retryable with no §7-stated interval → a modest 200ms. DOC_TOO_LARGE
+// transient/retryable with no interval → a modest 200ms. DOC_TOO_LARGE
 // + SCHEMA_VERSION_MISMATCH are permanent (data / operator fix) → not retryable.
 constexpr DocSummaryErrorInfo kLlmTimeout{
     "CX_ERR_DOCSUMMARY_LLM_TIMEOUT", ErrorCategory::kTimeout, true, 5000};
@@ -52,7 +52,7 @@ const char* DocSummaryErrorCodeString(DocSummaryErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(DocSummaryErrorCode code) {
-    // §7 structured_data column, 1:1. Function-local statics → stable references.
+    // structured_data column, 1:1. Function-local statics → stable references.
     static const std::vector<std::string> kTimeout{"doc_id", "attempt_count",
                                                     "last_error_message"};
     static const std::vector<std::string> kInvalid{"doc_id", "raw_output_preview",

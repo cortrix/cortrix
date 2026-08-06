@@ -7,11 +7,11 @@ namespace cortrix::query {
 
 namespace {
 
-// variant_count `le` bounds — count-type (§topic-1 N=3 default, NS-adjustable [1-10]).
+// variant_count `le` bounds — count-type (N=3 default, NS-adjustable [1-10]).
 constexpr double kVariantBounds[] = {1, 2, 3, 5, 10};
 constexpr const char* kVariantBoundStr[] = {"1", "2", "3", "5", "10"};
 
-// llm_latency_seconds `le` bounds (seconds) — generic duration set (§4.2
+// llm_latency_seconds `le` bounds (seconds) — generic duration set (
 // timeout_ms default 5000, typical ~500ms).
 constexpr double kLatBounds[] = {0.1, 0.25, 0.5, 1, 2, 5, 10, 30};
 constexpr const char* kLatBoundStr[] = {"0.1", "0.25", "0.5", "1", "2", "5", "10", "30"};
@@ -117,7 +117,7 @@ void RagFusionMetrics::ObserveLlmLatency(const std::string& model, int latency_m
         }
         if (slot < 0) {
             // New model: take an empty slot, or fold into the last slot as the
-            // shared "other" bucket once the (low-cardinality, §8 < 50) table fills.
+            // shared "other" bucket once the (low-cardinality, < 50) table fills.
             slot = (empty >= 0) ? empty : (kModelSlots - 1);
             if (empty >= 0) model_names_[slot] = model;
         }

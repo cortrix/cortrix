@@ -15,7 +15,7 @@ namespace {
 // code without a row" into a warning (treated as a build failure), so the registry
 // can't silently drift from the enum.
 //
-// retry_after_ms follows §4.3.4.bis: INVALIDATE_FAILED (transient DB/oplog/trace
+// retry_after_ms follows: INVALIDATE_FAILED (transient DB/oplog/trace
 // fault) advises 5000ms; QUOTA (rate limit) advises 60000ms. The three non-retryable
 // faults (MEMORY_NOT_FOUND / USER_MISMATCH / ALREADY_INVALIDATED) carry no hint.
 constexpr MemoryErrorInfo kMemoryNotFound
@@ -53,7 +53,7 @@ int MemoryErrorHttpStatus(MemoryErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(MemoryErrorCode code) {
-    // §4.3.4.bis structured_data column + the data each fault needs to be actionable
+    // structured_data column + the data each fault needs to be actionable
     // by an Agent. Function-local statics → stable refs.
     static const std::vector<std::string> kNotFoundKeys
         {"memory_id"};

@@ -310,10 +310,10 @@ StartupValidator::ValidationConfig StartupValidator::CollectRegisteredOnnxModels
             cfg.registered_model_paths.push_back(model);
         }
     }
-    // --- D3.5 wiring (do NOT add here during D3 standalone) ---
+    // --- integration wiring (do NOT add here during standalone) ---
     // The sparse model reuses bge-m3 (config.embedding.model_path) — no
     // distinct model to register. Any future *distinct* ONNX model appends here; the
-    // collector is the only place that learns about them (D5=A static binding).
+    // collector is the only place that learns about them (=A static binding).
     return cfg;
 }
 

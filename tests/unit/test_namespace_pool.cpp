@@ -39,12 +39,12 @@
 // Namespace pool S1 coverage: NamespaceResourceBundle / UnitResourceBundle (UT1, UT2),
 // NamespacePoolConfig defaults (UT3), AdmitCreate admission control + rejection log
 // (UT4-UT8), Acquire (UT13, UT14), PoolStats / ExplainState surfaces (UT18), and
-// the PoolError registry (the §8.1 4-code identity set).
+// the PoolError registry (the 4-code identity set).
 //
-// Standalone (D3): the pool is exercised against mocked catalog routers + a real
+// Standalone: the pool is exercised against mocked catalog routers + a real
 // PhnswIndexFactory-style FakeIndex + a real WriteCoordinator over temp
 // dirs. No cross-Feature wiring (no real INSRouter / IGlobalConfig hook) — those
-// are D3.5.
+// are integration.
 namespace cortrix::resource {
 namespace {
 
@@ -113,7 +113,7 @@ private:
 // gate (UT5/UT6) is deterministic without a real P-HNSW graph.
 // Implements BOTH IIndex and IVectorStore — like the real PHnsw (i_vector_store.h
 // "PHnsw inherits both"). The pool cross-casts bundle.index to IVectorStore* for
-// the WriteCoordinator (D3.5 C1 §9.3), so the fake the index factory returns must
+// the WriteCoordinator (integration C1), so the fake the index factory returns must
 // satisfy both surfaces or the dynamic_cast returns null and the load fails.
 // AddPoint/MarkDelete have identical signatures across the two bases → one
 // override covers both; Search/Exists/Snapshot/Recover differ (ef_search arg /
@@ -262,7 +262,7 @@ protected:
     // Factory building a real WriteCoordinator (Init'd) over the per-NS dir, with
     // the three fake stores so Recover() succeeds on an empty log.
     WriteCoordinatorFactory MakeRealCoordFactory() {
-        // D3.5 C1: the pool now resolves the three stores (vector = the Unit's
+        // integration C1: the pool now resolves the three stores (vector = the Unit's
         // index cross-cast to IVectorStore; metadata + blob = the pool's recover
         // adapters) and passes them in. The factory just news + Init()s the WC
         // over them — it no longer reaches into the fixture's standalone fakes.
@@ -354,7 +354,7 @@ TEST(NamespacePoolConfigTest, Defaults) {
     EXPECT_EQ(c.memory_budget_bytes, 0u);  // disabled by default
     EXPECT_EQ(c.startup_load_workers, 8);
     EXPECT_EQ(c.load_timeout_ms_per_ns, 60000);  // raised from 5000: large healthy NS load guard (~42s for 5183-doc NS)
-    // SQLite PRAGMA defaults (§4.1 / §7.1).
+    // SQLite PRAGMA defaults.
     EXPECT_EQ(c.pragmas.journal_mode, "WAL");
     EXPECT_EQ(c.pragmas.synchronous, "NORMAL");
     EXPECT_EQ(c.pragmas.cache_size_kb, -2000);
@@ -400,7 +400,7 @@ TEST(NamespaceResourceBundleTest, DestructorReleasesResources) {
         b.unit_bundles.push_back(std::move(u));
 
         // index footprint (4096) + pwl size (>=0) accounted; store.db not double
-        // counted (its cache is PRAGMA-bounded, §7.1).
+        // counted (its cache is PRAGMA-bounded).
         EXPECT_GE(b.TotalMemoryEstimateBytes(), 4096u);
     }  // <- all resources released here
     std::error_code ec;
@@ -492,7 +492,7 @@ TEST_F(NamespacePoolTest, EvictForDeleteUndoesPoolAdd) {
     ASSERT_TRUE(pool->AdmitCreate("ns-r", 100).ok());
     EXPECT_EQ(pool->GetPoolStats().pool_size_current, 1u);
 
-    // Simulates catalog INSERT failure → reverse-undo (§5.2).
+    // Simulates catalog INSERT failure → reverse-undo.
     ASSERT_TRUE(pool->EvictForDelete("ns-r").ok());
     EXPECT_EQ(pool->GetPoolStats().pool_size_current, 0u);
     EXPECT_FALSE(pool->Acquire("ns-r").ok());
@@ -571,7 +571,7 @@ TEST_F(NamespacePoolTest, AdmitLoadFailureSurfacesLoadFailed) {
     EXPECT_EQ(pool.GetPoolStats().pool_size_current, 0u);  // nothing added
 }
 
-// ── PoolError registry: the 4-code §8.1 identity set ─────────────────────────
+// ── PoolError registry: the 4-code identity set ─────────────────────────
 
 TEST(PoolErrorTest, FourCodesWellFormedAndMapped) {
     EXPECT_EQ(kPoolErrorCodeCount, 4);
@@ -602,8 +602,8 @@ TEST(PoolErrorTest, FourCodesWellFormedAndMapped) {
     }
 }
 
-// MakePoolError builds the GEN-Agent body (§8.3), and HasRequiredStructuredData
-// enforces the §8.1 required-key set.
+// MakePoolError builds the GEN-Agent body, and HasRequiredStructuredData
+// enforces the required-key set.
 TEST(PoolErrorTest, MakePoolErrorBodyAndRequiredKeys) {
     nlohmann::json sd = {{"current_count", 64}, {"limit", 64}, {"namespace_id", "ns-z"}};
     EXPECT_TRUE(HasRequiredStructuredData(PoolErrorCode::kNsQuotaExceeded, sd));
@@ -876,7 +876,7 @@ TEST_F(NamespacePoolTest, ApplyPragmasSetsAllSixVerifiedByReadback) {
     SqliteConn conn;
     ASSERT_TRUE(conn.Open((dir / "store.db").string()).ok());
 
-    SqlitePragmas p;  // defaults (§4.1)
+    SqlitePragmas p;  // defaults
     ASSERT_TRUE(conn.ApplyPragmas(p).ok());
 
     // Read each PRAGMA back and confirm it took. SQLite normalizes some values
@@ -914,8 +914,8 @@ TEST_F(NamespacePoolTest, StartupEmptyCatalogLoadsNothing) {
     EXPECT_EQ(pool->GetPoolStats().pool_size_current, 0u);
 }
 
-// ── D3.5 wire④: NamespaceFacade smoke tests (reuse the pool fixture) ──────────
-// The façade is the thin layer over Pool.Acquire (§4). These prove the five
+// ── integration wire④: NamespaceFacade smoke tests (reuse the pool fixture) ──────────
+// The façade is the thin layer over Pool.Acquire. These prove the five
 // windows wire up and, critically, that the D-I1 external-conn CortrixStore works
 // against the bundle's own store.db connection (no second open of the file).
 

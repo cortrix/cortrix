@@ -7,9 +7,9 @@
 #include "cortrix/common/block_types.h"
 #include "cortrix/spc/data_cleaner.h"
 
-// Cleaning DataCleaner: Dedup (exact hash + semantic cosine, D2/D3), DetectAnomaly
-// (5 reasons, D4), config validation (D9), NS config merge (D1, reuse catalog
-// ConfigResolver), and the skip-index helper (D5). Standalone over the cleaning
+// Cleaning DataCleaner: Dedup (exact hash + semantic cosine,/), DetectAnomaly
+// (5 reasons), config validation, NS config merge (reuse catalog
+// ConfigResolver), and the skip-index helper. Standalone over the cleaning
 // `Block` contract view.
 namespace cortrix::spc {
 namespace {
@@ -28,7 +28,7 @@ Block MakeBlock(const std::string& id, const std::string& text,
 
 CleaningConfig DefaultCfg() { return CleaningConfig{}; }  // dedup+anomaly on, 0.95
 
-// ---------- Dedup: exact hash (D2 Step 1) ----------
+// ---------- Dedup: exact hash (Step 1) ----------
 
 TEST(DataCleanerDedupTest, ExactDup_SameTextRemoved) {
     DataCleaner c(DefaultCfg());
@@ -96,7 +96,7 @@ TEST(DataCleanerDedupTest, Disabled_NoDedup) {
     EXPECT_EQ(r.kept_count, 2);
 }
 
-// ---------- Dedup: semantic cosine (D2 Step 2 / D3) ----------
+// ---------- Dedup: semantic cosine (Step 2 /) ----------
 
 TEST(DataCleanerDedupTest, Semantic_IdenticalVectorsRemoved) {
     DataCleaner c(DefaultCfg());  // threshold 0.95
@@ -189,7 +189,7 @@ TEST(DataCleanerDedupTest, HashThenSemantic_Combined) {
     EXPECT_EQ(blocks[0].id, "a");
 }
 
-// ---------- DetectAnomaly (D4 5 reasons) ----------
+// ---------- DetectAnomaly (5 reasons) ----------
 
 TEST(DataCleanerAnomalyTest, EmptyChunk) {
     DataCleaner c(DefaultCfg());
@@ -290,7 +290,7 @@ TEST(DataCleanerAnomalyTest, Disabled_NoMarking) {
     EXPECT_FALSE(blocks[0].flags_ext & kFlagExtIsAnomalous);
 }
 
-// ---------- skip-index helper (D5) ----------
+// ---------- skip-index helper ----------
 
 TEST(DataCleanerSkipIndexTest, ShouldSkipIndex) {
     DataCleaner c(DefaultCfg());
@@ -301,7 +301,7 @@ TEST(DataCleanerSkipIndexTest, ShouldSkipIndex) {
     EXPECT_FALSE(ShouldSkipIndex(blocks[1]));  // clean → indexed
 }
 
-// ---------- config validation (D9) ----------
+// ---------- config validation ----------
 
 TEST(DataCleanerConfigTest, ValidConfigPasses) {
     DataCleaner c(DefaultCfg());
@@ -324,7 +324,7 @@ TEST(DataCleanerConfigTest, MaxChunkCharsNonPositive) {
     EXPECT_NE(s.message().find("CX_ERR_CLEANING_ANOMALY_CONFIG_INVALID"), std::string::npos);
 }
 
-// ---------- Summarize (§5.2 A-class meta) ----------
+// ---------- Summarize (A-class meta) ----------
 
 TEST(DataCleanerSummarizeTest, FourFlatFields) {
     DedupResult d; d.removed_count = 3;
@@ -344,7 +344,7 @@ TEST(DataCleanerSummarizeTest, FourFlatFields) {
     EXPECT_FALSE(meta.contains("cleaning_applied"));
 }
 
-// ---------- NS config merge (D1, reuse catalog ConfigResolver) ------
+// ---------- NS config merge (reuse catalog ConfigResolver) ------
 
 TEST(DataCleanerConfigMergeTest, NsOverridesGlobal) {
     cortrix::catalog::ConfigResolver<CleaningConfig> resolver;

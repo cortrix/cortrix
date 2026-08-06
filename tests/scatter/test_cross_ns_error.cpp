@@ -51,7 +51,7 @@ TEST(CrossNsErrorTest, EveryCodeHasUniqueWellFormedCxString) {
     EXPECT_EQ(seen.size(), 6u);
 }
 
-// The exact 6 CX_ERR_* strings (§3.1) — locks the contract values.
+// The exact 6 CX_ERR_* strings — locks the contract values.
 TEST(CrossNsErrorTest, ExactCodeStrings) {
     EXPECT_STREQ(CrossNsErrorCodeString(CrossNsErrorCode::kAuthInvalidCredentials),
                  "CX_ERR_AUTH_INVALID_CREDENTIALS");
@@ -65,7 +65,7 @@ TEST(CrossNsErrorTest, ExactCodeStrings) {
                  "CX_ERR_SCATTER_TIMEOUT");
 }
 
-// §3.1 / §3.2 decision matrix: category + retryability + http status per code.
+// decision matrix: category + retryability + http status per code.
 TEST(CrossNsErrorTest, CategoryRetryabilityHttpMatrix) {
     struct Row {
         CrossNsErrorCode code;
@@ -90,7 +90,7 @@ TEST(CrossNsErrorTest, CategoryRetryabilityHttpMatrix) {
 }
 
 // GEN-Agent #6: retry_after_ms is present iff retryable; the two timeout codes use
-// 1000ms (§3.2), everything else is null.
+// 1000ms, everything else is null.
 TEST(CrossNsErrorTest, RetryAfterMsConsistentWithRetryable) {
     for (CrossNsErrorCode code : AllCodes()) {
         const CrossNsErrorInfo& info = GetCrossNsErrorInfo(code);
@@ -107,7 +107,7 @@ TEST(CrossNsErrorTest, RetryAfterMsConsistentWithRetryable) {
 }
 
 // MakeCrossNsError fills category/retryable/retry_after_ms from the registry and
-// attaches structured_data — the GEN-Agent 4 field boundary (§2.6).
+// attaches structured_data — the GEN-Agent 4 field boundary.
 TEST(CrossNsErrorTest, MakeCrossNsErrorFillsAgentFriendlyFields) {
     auto err = MakeCrossNsError(CrossNsErrorCode::kNsTimeout,
                                 nlohmann::json{{"namespace", "ns_b"}}, "ns_b timed out");
@@ -166,8 +166,8 @@ TEST(CrossNsErrorTest, HasRequiredStructuredDataDetectsMissingKey) {
         nlohmann::json{{"requested_count", 150}, {"max_namespaces", 100}}));
 }
 
-// The serialized error body has every GEN-Agent #1/#4/#5/#6 field (AGENT_FRIENDLY
-// §3.1) and a valid category enum string.
+// The serialized error body has every GEN-Agent #1/#4/#5/#6 field (the Agent-friendly contract
+//) and a valid category enum string.
 TEST(CrossNsErrorTest, SerializedBodyIsAgentFriendlySchemaCompliant) {
     for (CrossNsErrorCode code : AllCodes()) {
         auto err = MakeCrossNsError(code, nlohmann::json::object(), "");

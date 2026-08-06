@@ -6,8 +6,8 @@
 namespace cortrix::store {
 
 /// Stable CX_ERR_* identity codes for the Write Coordinator / PWL scope
-/// (design § 2.4, registered under ARCH § 4.1.11 `CX_ERR_PWL_*`). Per
-/// CODING_CONVENTIONS § 3 the project uses one error model — `Result<T>` +
+/// (design, registered under ARCH `CX_ERR_PWL_*`). Per
+/// the coding conventions the project uses one error model — `Result<T>` +
 /// `Status` — and distinguishes domain errors by a `CX_ERR_*` code string
 /// rather than a typed `Result<T, E>`. We carry that code as a stable prefix on
 /// the Status message (`"<CODE>: <detail>"`); the API/SDK/MCP boundary lifts it

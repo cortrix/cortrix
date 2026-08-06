@@ -21,7 +21,7 @@ namespace cortrix {
 namespace doc_summary {
 namespace {
 
-// §4.2 doc_summary block metadata_json. status ∈ {pending|generated|failed}; here it
+// doc_summary block metadata_json. status ∈ {pending|generated|failed}; here it
 // is always "generated" — the worker writes a block only on LLM success (a failed doc
 // has no block). summary_text itself rides on content_text + the embedding.
 std::string BuildMetadataJson(const DocSummaryStructured& s, const DocSummaryConfig& cfg) {
@@ -64,7 +64,7 @@ Status DocSummaryAsyncWorker::ProcessTask(const async::TaskInfo& task) {
     DocSummaryGenerator generator(config_, llm_client_, chunk_store);
     GenerationResult result = generator.Generate(task.doc_id, task.namespace_id);
     if (!result.success) {
-        // No block written → doc-discovery degrades to FTS5 (§7.1); finalize failed
+        // No block written → doc-discovery degrades to FTS5; finalize failed
         // (Phase 1 terminal-on-failure). The generator already recorded its metrics.
         const std::string code =
             result.error ? result.error->code : "CX_ERR_DOCSUMMARY_GENERATION_FAILED";
@@ -101,7 +101,7 @@ Status DocSummaryAsyncWorker::ProcessTask(const async::TaskInfo& task) {
     CortrixBlock block = assembler_.Assemble(task.doc_id, chunk, emb, kBlockDocSummary,
                                              /*processing_level=*/3, metadata_json);
     // Assemble (flat) embeds metadata_json only into `data`; doc-discovery queries the
-    // blocks.metadata_json COLUMN (§4.2 keywords/topics/status), so set it explicitly
+    // blocks.metadata_json COLUMN (keywords/topics/status), so set it explicitly
     // here. (AssembleChild already sets the column; aligning the flat Assemble's column
     // for every block_type — incl. the memory path — is a separate A-blocks #4 item.)
     block.metadata_json = metadata_json;

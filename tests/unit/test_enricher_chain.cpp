@@ -86,7 +86,7 @@ public:
 
 // A fake contextual-style enricher whose member FAILS while the step stays OK
 // (status 0, contextualized_status 2, error_msg set) — the real contextual retrieval degrade
-// shape (§7.3 transparent degrade / §8 injection-guard reject).
+// shape (transparent degrade / injection-guard reject).
 class FailSoftContextualEnricher : public ISpcEnricher {
 public:
     EnrichResult Enrich(const std::string&, const DocumentMetadata&,
@@ -193,9 +193,9 @@ TEST(EnricherChainRun, MergesEnricherAndContextualPerChunk) {
     }
 }
 
-// D12 (2026-07-11): the contextual retrieval fail-soft outcome (step OK, contextualized_status 2)
+// (2026-07-11): the contextual retrieval fail-soft outcome (step OK, contextualized_status 2)
 // must carry its error_msg into the step record — otherwise the debt row is
-// written with a blank last_error and the real cause (live 5k ingest: the §8
+// written with a blank last_error and the real cause (live 5k ingest: the
 // injection-guard byte limit, 4,139 blank rows) is unobservable.
 TEST(EnricherChainRun, ContextualFailSoftCarriesErrorCodeInStepRecord) {
     auto dm = DocMeta();

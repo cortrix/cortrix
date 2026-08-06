@@ -1,7 +1,7 @@
 import type { AgentError } from '../../types/api';
 import { ErrorDisplay } from '../Common/ErrorDisplay';
 
-// Namespace pool admission error friendly handling (web UI design § 8.4). Maps the three namespace pool
+// Namespace pool admission error friendly handling (web UI design). Maps the three namespace pool
 // admission codes to a remediation hint, then renders the standard GEN-Agent
 // ErrorDisplay (which already shows structured_data + retry countdown). Any
 // other error falls through to a plain ErrorDisplay.

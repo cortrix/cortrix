@@ -21,7 +21,7 @@
 #include "cortrix/spc/enricher_chain.h"            // EnricherChain (enrich → contextualize → HyPE, fail-soft serial)
 #include "cortrix/spc/hype_block.h"                // I3 BuildHypeQuestionBlock / FillHypeEmbedding
 #include "cortrix/spc_enricher/enricher_store.h"   // WriteEnrichment (enriched_score + entities persist)
-#include "cortrix/spc_enricher/enrich_state_store.h"  // §3.7 enrich_state coverage rows
+#include "cortrix/spc_enricher/enrich_state_store.h"  // enrich_state coverage rows
 #include "cortrix/spc/contextual_store.h"          // WriteContextualized (contextualized_* cols)
 #include "cortrix/retrieval/sparse_codec.h"        // SparseVector
 #include "cortrix/retrieval/sparse_index_registry.h"  // per-NS index registry
@@ -29,7 +29,7 @@
 #include "cortrix/retrieval/sparse_vec_store.h"    // WriteSparseVec (blocks.sparse_vec)
 #include "cortrix/scoring/score_map.h"             // ScoringInput (parser/enricher/anomaly signals)
 #include "cortrix/scoring/scoring_store.h"          // WriteScore (semantic_score persist)
-#include "cortrix/resource/namespace_facade.h"    // D3.5 wire⑤: Process over the façade
+#include "cortrix/resource/namespace_facade.h"    // integration wire⑤: Process over the façade
 #include "cortrix/store/write_coordinator.h"      // C2: BeginWrite/Commit/Rollback
 #include "cortrix/store/iindex.h"                 // M3: AddPoints
 #include "cortrix/id/hash.h"                      // block_id = HashChildIdToBlockId (memory block)
@@ -135,7 +135,7 @@ int SPCPipeline::Process(SPCTask& task, resource::NamespaceFacade& facade) {
         SPCRouter::InferBlockType(task.mime_type));
     bool is_memory = (task.source_type == "memory_session");
 
-    // Determine processing level from task (D3: L0 skip, L1 metadata only,
+    // Determine processing level from task (L0 skip, L1 metadata only,
     // L2 chunked, L3 full vector).
     uint8_t level = task.processing_level;
 
@@ -276,7 +276,7 @@ int SPCPipeline::Process(SPCTask& task, resource::NamespaceFacade& facade) {
     task.stage = SPCStage::kParsing;
 
     // ParserOptions defaults are the catalog-resolved CE values (max_pages / file-size
-    // limits / OCR fallback on); a per-task / NS override merge is a separate D3.5
+    // limits / OCR fallback on); a per-task / NS override merge is a separate integration
     // item, so use defaults here.
     cortrix::spc::ParserOptions opts;
     cortrix::spc::ParsedDoc d = parser_factory_.ParseDocument(task.source_path, opts);
@@ -394,7 +394,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     std::unordered_map<std::string, cortrix::spc::EnrichResult> enrich_by_child;
     // Hype questions per source child (the write phase builds block_type=16 Blocks).
     std::unordered_map<std::string, std::vector<cortrix::spc::HypeQuestion>> hype_by_child;
-    // [addendum §3.7] Per-child enrichment debt for the enrich_state coverage SoT:
+    // [addendum] Per-child enrichment debt for the enrich_state coverage SoT:
     // csv of owed-but-missing chain tokens (canonical enrich,contextual,hype order) + the first
     // error detail. Filled by the enrich branches below (and the hype-embed drop
     // path); the write phase persists one enrich_state row per enriched-eligible
@@ -454,7 +454,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                     if (st.status == 0) {
                         // The contextual fail-soft carries its cause in error_code with
                         // status==0 (see enricher_chain); harvest it so the debt
-                        // row records why instead of a blank last_error (D12).
+                        // row records why instead of a blank last_error.
                         if (first_err.empty() && !st.error_code.empty()) first_err = st.error_code;
                         continue;
                     }
@@ -558,7 +558,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         // embed failure for META → non-fatal: write the block without a vector.
     }
 
-    // Stage 5: Assemble + Store, transactionally (C2 / design §10.2). (Inc 4-3 item 5.)
+    // Stage 5: Assemble + Store, transactionally (C2 / design). (Inc 4-3 item 5.)
     if (task.cancelled.load()) {
         task.stage = SPCStage::kCancelled;
         return -1;
@@ -742,7 +742,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     // hype side channel and append them to the SAME write set so the same BeginWrite /
     // block_insert loop persists them in ONE PWL transaction with the chunk + META
     // Blocks (atomic write). Each question's embedding is the BGE-M3 vector of
-    // the question text (the §9.1 `hype_q.embedding = OnnxEmbedder.Embed(question_text)`
+    // the question text (the `hype_q.embedding = OnnxEmbedder.Embed(question_text)`
     // step); block_id = HashChildIdToBlockId(a fresh ULID per question). The questions are
     // keyed by source child_id (provenance in metadata_json.source_child_id) so recall can
     // expand a hype hit back to its child. L3 only (hype Blocks index into P-HNSW);
@@ -767,7 +767,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                     "hype embedding failed for doc_id={}, dropping hype blocks: {}",
                     task.doc_id, qes.message());
                 q_embs.clear();
-                // [addendum §3.7] The dropped hype blocks are silent coverage debt:
+                // [addendum] The dropped hype blocks are silent coverage debt:
                 // mark hype owed for every child that had questions so the backfill
                 // regenerates them.
                 for (const auto& kv : hype_by_child) {
@@ -812,7 +812,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     // earlier; here only construct.]
     if (meta_mb) {
         // Scoring for the META block: ComputeLevel special-cases block_type==kBlockMeta → Matrix
-        // level 0 / score 0.2 (ARCH §5.2.1 lock), regardless of parser/enricher. Same dual-write
+        // level 0 / score 0.2 (ARCH lock), regardless of parser/enricher. Same dual-write
         // as children: the level goes into both the header byte and blocks.processing_level (the
         // embed gating above used the TASK level, so a META block can still carry its L3 vector).
         cortrix_block_header_t meta_hdr{};
@@ -843,8 +843,8 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     }
 
     // Phase 2 — transactional write. SPC never writes a blob, so writes_blob=false
-    //. P-HNSW first, then SQLite (parents + child blocks) (design §4.5);
-    // the rollback callback (§9.4) cleans blocks + parents idempotently on failure.
+    //. P-HNSW first, then SQLite (parents + child blocks) (design);
+    // the rollback callback cleans blocks + parents idempotently on failure.
     std::vector<BlockId> child_block_ids;
     child_block_ids.reserve(child_blocks.size());
     for (const auto& b : child_blocks) child_block_ids.push_back(b.block_id);
@@ -894,7 +894,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         }
     }
 
-    // [addendum §3.8 W2] contextual dual-vector label mapping rows (same PWL
+    // [addendum W2] contextual dual-vector label mapping rows (same PWL
     // lifecycle as the block writes). Non-fatal like the other auxiliary persists:
     // a missing row degrades that contextual point to an unresolvable (dropped)
     // ANN hit, never the doc write.
@@ -950,7 +950,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             // enriched_score + entities, keyed by child_id (META / memory carry none).
             if (!b.child_id.empty()) {
                 auto eit = enrich_by_child.find(b.child_id);
-                // [D10a] A persist failure AFTER a successful enrich stage must be
+                // [] A persist failure AFTER a successful enrich stage must be
                 // re-owed in enrich_state below — a WARN alone loses the member
                 // silently, because the retry sweeper only repairs what the ledger
                 // owes (the backfill side already accounts this way).
@@ -993,7 +993,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                 // Persist the child's SPLADE sparse vector to
                 // blocks.sparse_vec (durable copy / index-rebuild source) AND index
                 // it into the per-NS inverted index (live serving). A child with no
-                // active sparse terms (dead chunk, §6.5) writes NULL + indexes
+                // active sparse terms (dead chunk) writes NULL + indexes
                 // nothing. Both are best-effort fail-soft: a sparse persist/index
                 // fault degrades the chunk to dense+FTS5, never fails the doc write.
                 if (sparse_registry_ != nullptr) {
@@ -1019,7 +1019,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                         }
                     }
                 }
-                // [addendum §3.7] enrich_state coverage row — the per-chunk SoT the
+                // [addendum] enrich_state coverage row — the per-chunk SoT the
                 // retry sweeper scans. Written only when the enrich stage ran (no
                 // LLM configured ⇒ no debt concept). Non-fatal like the other
                 // auxiliary persists.
@@ -1032,7 +1032,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                     std::string owed_members = fit != enrich_failed_by_child.end()
                                                    ? fit->second
                                                    : std::string();
-                    // [D10a] union in members whose enrich succeeded but persist
+                    // [] union in members whose enrich succeeded but persist
                     // failed, so the sweeper regenerates AND re-persists them.
                     auto add_owed = [&owed_members](const char* m) {
                         if (owed_members.find(m) != std::string::npos) return;

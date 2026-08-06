@@ -12,7 +12,7 @@
 #include "cortrix/config/auth_config.h"
 
 // Auth S3 coverage: Login / Logout / RefreshAccessToken / ValidateAccessToken
-// (§2.3-2.5 / §4.2-4.4 / §4.7) — account lockout, token blacklist, refresh
+// (4.4 /) — account lockout, token blacklist, refresh
 // revoke. Uses the fake hasher (bcrypt-independent; real bcrypt round-trip is in
 // test_bcrypt.cpp once the lib lands).
 namespace cortrix::auth {

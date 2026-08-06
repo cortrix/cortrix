@@ -10,14 +10,14 @@
 // Metadata Block — Phase 1 V1.0 rule-based generator.
 namespace cortrix::metadata {
 
-/// The sole Phase 1 V1.0 implementation (detailed design §2.1 / D4 lock): pure rule extraction, no LLM. Maps the
+/// The sole Phase 1 V1.0 implementation (detailed design / lock): pure rule extraction, no LLM. Maps the
 /// consumed DocumentMetadata + the owned FileInfo/ProcessingStats DTOs into
-/// (a) block_text — a natural-language sentence over the 7-10 core fields (D3 lock, embedding
-/// input), and (b) metadata_json — the full 26-field schema (D2/D9 + V2 rework). block_id
+/// (a) block_text — a natural-language sentence over the 7-10 core fields (lock, embedding
+/// input), and (b) metadata_json — the full 26-field schema (/ + V2 rework). block_id
 /// is a fresh ULID (id/ulid.h, produced by the chunker — reuse, do not recreate).
 ///
-/// Standalone (B_R3_BRIEFING §2): the embedding vector is left empty — embedding(block_text)
-/// + P-HNSW insert is D3.5 pipeline wiring. parent_count / child_count come from the
+/// Standalone: the embedding vector is left empty — embedding(block_text)
+/// + P-HNSW insert is integration pipeline wiring. parent_count / child_count come from the
 /// caller's ProcessingStats (real source = the chunker). The doc-summary
 /// doc_fts5_index product sync is wired in SPCPipeline from the derived columns below,
 /// keeping this generator pure and free of SQLite / doc-summary table dependencies.
@@ -25,7 +25,7 @@ class RuleBasedMetadataGenerator : public IMetadataGenerator {
 public:
     RuleBasedMetadataGenerator() = default;
 
-    /// The detailed design §4.1 main generation flow. Returns CX_ERR_METADATA_GEN_FAILED when there is no usable
+    /// The detailed design main generation flow. Returns CX_ERR_METADATA_GEN_FAILED when there is no usable
     /// metadata (empty filename AND no source_uri AND failed parse status — i.e. the parser
     /// produced nothing); otherwise Ok, with output.missing_fields listing any
     /// optional fields that could not be filled (→ CX_WARN_METADATA_PARTIAL upstream).
@@ -33,17 +33,17 @@ public:
         const GeneratorInput& input,
         const observability::TraceContext* ctx = nullptr) override;
 
-    // --- Exposed building blocks (core functions, detailed design §3.2 / §3.1; ≥95% coverage) ---
+    // --- Exposed building blocks (core functions, detailed design; ≥95% coverage) ---
 
-    /// Assemble block_text (D3 lock: natural-language sentence) from the 7-10 core fields (filename /
+    /// Assemble block_text (lock: natural-language sentence) from the 7-10 core fields (filename /
     /// mime_type / page_count / upload_time / lang / tags / parser). Not in block_text:
     /// block_id / doc_id / namespace_id / *_version / file_size / counts / business
-    /// fields (detailed design §3.2). Stable, deterministic ordering so embeddings are reproducible.
+    /// fields (detailed design). Stable, deterministic ordering so embeddings are reproducible.
     static std::string BuildBlockText(const GeneratorInput& input);
 
-    /// Assemble the full 26-field metadata_json (detailed design §3.1). Missing optional fields
-    /// are filled per §5.3 (page_count → null when unknown), and every key in the
-    /// §3.1 schema is present. `missing_fields` is appended with any A-class field
+    /// Assemble the full 26-field metadata_json (detailed design). Missing optional fields
+    /// are filled per (page_count → null when unknown), and every key in the
+    /// schema is present. `missing_fields` is appended with any A-class field
     /// that fell back to null (drives coverage_ratio + CX_WARN_METADATA_PARTIAL).
     static nlohmann::json BuildMetadataJson(const GeneratorInput& input,
                                             std::vector<std::string>* missing_fields);

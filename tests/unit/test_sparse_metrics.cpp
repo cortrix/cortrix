@@ -5,7 +5,7 @@
 #include "cortrix/retrieval/sparse_metrics.h"
 
 // Sparse retrieval S10 (metrics) — the 4 bge_m3_sparse subsystem metrics. Recorder
-// correctness + OpenMetrics rendering + label naming (no ns_id, D1 V3 ruling 10).
+// correctness + OpenMetrics rendering + label naming (no ns_id, V3 ruling 10).
 namespace cortrix::retrieval {
 namespace {
 
@@ -64,14 +64,14 @@ TEST_F(SparseMetricsTest, RenderContainsAll4Metrics) {
     M().SetInvertedIndexSizeBytes(1234);
     std::string out = M().RenderOpenMetrics();
 
-    // All 4 §10 metric names present + cortrix_ prefix + no ns_id label.
+    // All 4 metric names present + cortrix_ prefix + no ns_id label.
     EXPECT_NE(out.find("cortrix_bge_m3_sparse_inference_total"), std::string::npos);
     EXPECT_NE(out.find("cortrix_bge_m3_sparse_fallback_ratio"), std::string::npos);
     EXPECT_NE(out.find("cortrix_bge_m3_sparse_inverted_index_size_bytes"),
               std::string::npos);
     EXPECT_NE(out.find("cortrix_bge_m3_sparse_query_via_path_total"),
               std::string::npos);
-    EXPECT_EQ(out.find("ns_id"), std::string::npos);  // D1 V3 ruling 10
+    EXPECT_EQ(out.find("ns_id"), std::string::npos);  // V3 ruling 10
 
     // TYPE lines + a labeled sample.
     EXPECT_NE(out.find("# TYPE cortrix_bge_m3_sparse_inference_total counter"),

@@ -24,7 +24,7 @@ namespace cortrix::catalog {
 
 /// catalog.db-backed INSRouter. Borrows the sqlite3
 /// handle owned by CatalogDb (does not open/close it). Reads/writes the
-/// namespaces / units / ns_units tables and fronts them with the §6.3 caches:
+/// namespaces / units / ns_units tables and fronts them with the caches:
 /// NS metadata (10K / 60s) + Unit descriptor (1K / 60s).
 ///
 /// Error model (F-FREEZE-1): value methods return Result<T> whose error path is a
@@ -37,7 +37,7 @@ class DefaultINSRouter : public INSRouter {
 public:
     /// Construct over an already-opened catalog.db handle (from CatalogDb::db()).
     /// `ns_pool` is the optional Layer-1 admission hook (nullptr in Phase 1 /
-    /// catalog-standalone → admission is skipped). Cache sizes/TTL default to §6.3.
+    /// catalog-standalone → admission is skipped). Cache sizes/TTL default to
     explicit DefaultINSRouter(sqlite3* db, resource::INamespacePool* ns_pool = nullptr);
 
     /// Late-bind the admission hook after construction. Breaks the

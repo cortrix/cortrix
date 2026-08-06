@@ -8,7 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import type { ComponentType, SVGProps } from 'react';
 
-// Cortrix VI § 6.7 Toast — built on react-hot-toast, 4 semantic types
+// Cortrix VI Toast — built on react-hot-toast, 4 semantic types
 // (success / warning / error / info), auto-dismiss 3s, manually closable.
 
 type ToastType = 'success' | 'warning' | 'error' | 'info';

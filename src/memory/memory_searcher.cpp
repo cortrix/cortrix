@@ -25,7 +25,7 @@ MemorySearcher::MemorySearcher(QueryPipeline& pipeline,
 
 namespace {
 // Isolation: user_id format rule — max 128 chars, ASCII printable (0x20-0x7E).
-// Guards against injection / oversized identifiers (design § 5).
+// Guards against injection / oversized identifiers (design).
 constexpr size_t kMaxUserIdLen = 128;
 bool IsValidUserIdFormat(const std::string& user_id) {
     if (user_id.size() > kMaxUserIdLen) return false;
@@ -38,7 +38,7 @@ bool IsValidUserIdFormat(const std::string& user_id) {
 // Parse an ISO 8601 "YYYY-MM-DDTHH:MM:SSZ" timestamp to Unix seconds.
 // Returns 0 on a malformed / empty string — the scorer treats created_at <= 0
 // as "unknown age" (age_days=0, decay_factor=1.0), i.e. no decay rather than a
-// penalty (design § 5 boundary: created_at missing -> no decay).
+// penalty (design boundary: created_at missing -> no decay).
 int64_t ParseCreatedAtToEpoch(const std::string& iso) {
     if (iso.size() < 19) return 0;
     std::tm tm_utc{};
@@ -60,7 +60,7 @@ int64_t ParseCreatedAtToEpoch(const std::string& iso) {
 }
 
 // Read the memory block status ("active"/"tentative"/"invalidated") from
-// item metadata. Missing/non-string -> "active" (design § 5: status missing ->
+// item metadata. Missing/non-string -> "active" (design: status missing ->
 // treated as a valid/active state). ToMemoryResult does not surface status, so
 // the scoring path reads it directly here.
 std::string ExtractStatus(const json& metadata) {
@@ -179,7 +179,7 @@ MemorySearchResponse MemorySearcher::Search(const MemorySearchRequest& request) 
     if (scorer_ != nullptr) {
         // Scorer path: classified-decay scoring + invalidated filter + rank by
         // final_score + top_k truncation (all in MemoryScorer::ScoreAndRank,
-        // design § 4.1 step 4). Map each ScoredMemory back to its kept row via
+        // design step 4). Map each ScoredMemory back to its kept row via
         // the index stashed in block_id, writing final_score / decay_factor.
         const int64_t now = std::chrono::system_clock::to_time_t(
             std::chrono::system_clock::now());
@@ -288,7 +288,7 @@ bool MemorySearcher::MatchScope(const json& metadata,
                                 const MemorySearchRequest& request) const {
     // ALWAYS filter by user_id first — this is the core isolation line.
     // A memory with no user_id (or wrong user_id) is excluded on every path.
-    // §8.bis: each exclusion is a match_scope_excluded_total{reason} event (the
+    //: each exclusion is a match_scope_excluded_total{reason} event (the
     // retrieval-path pre-filter, distinct from the API-entry isolation_violation).
     if (!metadata.contains("user_id") || !metadata["user_id"].is_string()) {
         memory::MemoryIsolationMetrics::Instance().RecordMatchScopeExcluded(

@@ -23,7 +23,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const csrfHeader: Record<string, string> = SAFE_METHODS.has(method)
     ? {}
     : { [CSRF_HEADER]: getCsrfToken() };
-  // § 23-bis.1 cortrix_webui_api_latency_seconds — client-perceived latency.
+  // cortrix_webui_api_latency_seconds — client-perceived latency.
   const start = typeof performance !== 'undefined' ? performance.now() : 0;
   const elapsed = () => (start ? (performance.now() - start) / 1000 : 0);
   let res: Response;

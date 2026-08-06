@@ -21,9 +21,9 @@ namespace cortrix::async {
 /// decoupled from the catalog blob_gc_queue, so this does NOT register
 /// with the catalog SchemaMigrator.
 ///
-/// Standalone (D3): the table + CRUD + cleanup are real and fully tested against
+/// Standalone: the table + CRUD + cleanup are real and fully tested against
 /// ":memory:". Cross-Feature wiring (real SPC pipeline, real server route
-/// registration) is deferred to D3.5; TaskManager itself has no such dependency.
+/// registration) is deferred to integration; TaskManager itself has no such dependency.
 ///
 /// Thread-safe: all public methods serialize on mutex_. The owned sqlite3 handle
 /// is opened in WAL mode with foreign_keys enforcement.
@@ -61,14 +61,14 @@ public:
     // ----- State transitions (S1; driven by S2 scheduler / S3 cancel) -----
 
     /// queued → processing: stamp worker_id + started_at + updated_at (topic 2.3 /
-    /// §4.2 Dequeue). NotFound if absent.
+    /// Dequeue). NotFound if absent.
     Status MarkProcessing(const std::string& task_id, int worker_id);
 
     /// → completed: set doc_id, status=completed, progress_pct=100, completed_at.
     Status MarkCompleted(const std::string& task_id, const std::string& doc_id);
 
     /// → failed: set status=failed + error_code + error_msg + structured_data
-    /// (§6.2 GEN-Agent persistence) + completed_at.
+    /// (GEN-Agent persistence) + completed_at.
     Status MarkFailed(const std::string& task_id, const std::string& error_code,
                       const std::string& error_msg,
                       const std::string& structured_data = "");
@@ -144,16 +144,16 @@ public:
     /// error_code=CX_ERR_ZOMBIE_TASK_CLEANUP. Returns the row count swept.
     Result<int> SweepZombies(int64_t now_unix, int zombie_hours);
 
-    /// §6.1 / §7 v0 timeout protection — tasks still status=processing whose started_at is
+    /// v0 timeout protection — tasks still status=processing whose started_at is
     /// older than `now_unix - timeout_seconds` have exceeded the processing budget
     /// → set status=failed + error_code=CX_ERR_TASK_TIMEOUT. Run AFTER SweepZombies
     /// so a 24h-stale (no-progress) row is recorded as a zombie rather than a
     /// timeout. Returns the row count timed out. (Driven by TaskCleanupCron, reading
-    /// async.task_timeout_seconds; sub-daily prompt enforcement → D3.5 server runtime.)
+    /// async.task_timeout_seconds; sub-daily prompt enforcement → integration server runtime.)
     Result<int> SweepTimedOut(int64_t now_unix, int timeout_seconds);
 
     /// Boundary — tasks left status=processing on a crash but younger than the zombie
-    /// threshold are re-queued on restart (§6.1 / §7 crash recovery): status → queued,
+    /// threshold are re-queued on restart (crash recovery): status → queued,
     /// worker_id cleared. Returns the row count re-queued.
     Result<int> RequeueStaleProcessing(int64_t now_unix, int zombie_hours);
 

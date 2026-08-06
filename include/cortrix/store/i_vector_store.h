@@ -7,7 +7,7 @@
 
 // TraceContext is forward-declared (referenced by pointer only), mirroring
 // cortrix/store/iindex.h, so this minimal store contract stays decoupled from
-// the observability build (OBSERVABILITY_SPEC §5.3).
+// the observability build (the observability spec).
 namespace cortrix::observability {
 struct TraceContext;
 }

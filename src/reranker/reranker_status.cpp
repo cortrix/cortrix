@@ -62,19 +62,19 @@ void RerankerStatusReporter::OnCircuitStateChange(CircuitBreakerState new_state,
             spdlog::info("reranker circuit breaker CLOSED, normal operation resumed");
             break;
         case CircuitBreakerState::kHalfOpen:
-            // Half-open is a transient probe; no WARN/INFO per §3.4 (only the gauge
+            // Half-open is a transient probe; no WARN/INFO per (only the gauge
             // moves to 2). Kept explicit so -Wswitch covers the enum.
             break;
     }
 }
 
 std::string RerankerStatusReporter::AlertRuleCircuitOpen5m() {
-    // §3.4: circuit_breaker_state == 1 sustained >= 5 minutes → systemic failure.
+    //: circuit_breaker_state == 1 sustained >= 5 minutes → systemic failure.
     return "cortrix_reranker_circuit_breaker_state == 1 for 5m";
 }
 
 std::string RerankerStatusReporter::AlertRuleFrequentTrips1h() {
-    // §3.4: trips_total increases >= 3 within 1h → instability.
+    //: trips_total increases >= 3 within 1h → instability.
     return "increase(cortrix_reranker_circuit_breaker_trips_total[1h]) >= 3";
 }
 

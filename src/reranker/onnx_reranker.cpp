@@ -151,7 +151,7 @@ OnnxReranker::OnnxReranker(const RerankerConfig& config, store::ChunkStore* chun
 
 OnnxReranker::~OnnxReranker() {
     // Join pool workers FIRST: a timed-out ScoreBatch task is still running on
-    // its worker (§3.3) and may be inside ScoreForTask using session_. The dtor
+    // its worker and may be inside ScoreForTask using session_. The dtor
     // body runs before member destruction, so without this the session below is
     // deleted out from under an in-flight inference (TSAN-caught UAF).
     Shutdown();
@@ -240,7 +240,7 @@ Status OnnxReranker::Init() {
                               "model path not found: " + config_.model_path);
     }
 
-    // --- Shared tokenizer (TokenizerRegistry, §2.4-bis) ---
+    // --- Shared tokenizer (TokenizerRegistry) ---
     std::string tok_path = config_.tokenizer_path;
     if (tok_path.empty()) {
         tok_path = (fs::path(config_.model_path).parent_path() / "tokenizer.json").string();
@@ -253,7 +253,7 @@ Status OnnxReranker::Init() {
     }
     tokenizer_ = ml::TokenizerRegistry::Get(kTokenizerKey);
 
-    // --- Shared Ort::Env (OrtEnvSingleton, §2.4-bis) ---
+    // --- Shared Ort::Env (OrtEnvSingleton) ---
     ml::OrtEnvSingleton::Init();
     env_ = ml::OrtEnvSingleton::EnvHandle();
     if (env_ == nullptr) {
@@ -407,7 +407,7 @@ std::vector<float> OnnxReranker::ScoreBatch(const char* query,
         RerankerMetrics::Instance().SetQueueDepth(thread_pool_->QueueDepth());
     }
 
-    // §4.2 step 1 — circuit-breaker gate. OPEN → skip the reranker entirely and
+    // step 1 — circuit-breaker gate. OPEN → skip the reranker entirely and
     // return an all-zero score vector so the upper layer falls back to the RRF
     // ordering (rerank_score=NULL semantics). half_open/closed → proceed (the
     // single half-open probe is this batch's first scored task).
@@ -417,10 +417,10 @@ std::vector<float> OnnxReranker::ScoreBatch(const char* query,
 
     std::vector<float> scores(n, 0.0f);
 
-    // §4.2 inner loop: per passage apply the §3.3 three-segment policy, then run
+    // inner loop: per passage apply the three-segment policy, then run
     // the guarded inference task on the pool. A NORMAL/TRUNCATED passage is a real
     // inference (counts toward the breaker); an EXTREMELY_LONG passage is forced
-    // to 0 as a data-quality fallback (does NOT count as a task failure, §5.1).
+    // to 0 as a data-quality fallback (does NOT count as a task failure).
     for (size_t i = 0; i < n; ++i) {
         const std::string passage = passages[i] ? passages[i] : "";
         PreprocessedPassage pre =
@@ -453,18 +453,18 @@ std::vector<float> OnnxReranker::ScoreBatch(const char* query,
             } catch (...) {
                 // ONNX exception / any internal error → score=0 (candidate ranked
                 // last). The rich identity is observed via the metric, not thrown
-                // to the query user (§5.1).
+                // to the query user.
                 return {0.0f, true, RerankerMetrics::FailedTaskReason::kOnnxException};
             }
         };
 
         bool failed = false;
         if (thread_pool_) {
-            // Refresh the gauge with the live depth around each submit (D35-MET-04).
+            // Refresh the gauge with the live depth around each submit (MET-04).
             RerankerMetrics::Instance().SetQueueDepth(thread_pool_->QueueDepth());
             std::pair<RerankTaskResult, bool> r = thread_pool_->SubmitWaitFor(task);
             if (!r.second) {
-                // §1.2 / §5.1: per-task timeout → score=0 + timeout metric +
+                //: per-task timeout → score=0 + timeout metric +
                 // counts toward the breaker. The abandoned task's RerankTaskResult
                 // (whatever it eventually returns) stays inside the dropped future.
                 scores[i] = 0.0f;
@@ -488,7 +488,7 @@ std::vector<float> OnnxReranker::ScoreBatch(const char* query,
             }
         }
 
-        // §1.3 / §3.4 breaker accounting, in passage order (models "consecutive
+        // breaker accounting, in passage order (models "consecutive
         // task failures"): a failure advances the trip counter, a success resets
         // it / closes a half-open probe.
         if (circuit_breaker_) {
@@ -555,7 +555,7 @@ std::vector<retrieval::RankedChunk> OnnxReranker::Rerank(
         result[i].rerank_score = rerank_scores[i];
     }
 
-    // 4. reranker-owned RRF fusion (§4.2-ter): base ordering score =
+    // 4. reranker-owned RRF fusion: base ordering score =
     //    rerank_score*0.7 + rrf_score*0.3 (rrf_score = the candidate's RRF score,
     //    carried as RankedChunk.score), then the optional semantic multiplier.
     //    Write the final score back so downstream query surfaces use one score

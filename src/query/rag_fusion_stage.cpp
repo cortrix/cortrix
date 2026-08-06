@@ -16,7 +16,7 @@ using retrieval::ResultItem;
 using retrieval::ScoredResult;
 
 // CrossNsResponse.results → ScoredResult[] (child_id + score). Fusion runs on the
-// child_id keyspace (RETRIEVAL_TYPES_SPEC §1); we use the per-item final score as
+// child_id keyspace (the retrieval-types spec); we use the per-item final score as
 // the rank carrier (the list is already sorted best-first by the scatter).
 std::vector<ScoredResult> ToScoredResults(const CrossNsResponse& resp) {
     std::vector<ScoredResult> out;
@@ -32,7 +32,7 @@ std::vector<ScoredResult> ToScoredResults(const CrossNsResponse& resp) {
     return out;
 }
 
-// Build the CX_WARN_RAG_FUSION_DEGRADED warning object (§7 / topic 4) for
+// Build the CX_WARN_RAG_FUSION_DEGRADED warning object (/ topic 4) for
 // meta.warnings. retry_after_ms comes from the canonical error table.
 nlohmann::json DegradedWarning() {
     const auto& info = GetRagFusionErrorInfo(RagFusionErrorCode::kDegraded);
@@ -156,7 +156,7 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
         }
     }
 
-    // 1. Expand the query into [original + N variants] (§4.3). On LLM failure
+    // 1. Expand the query into [original + N variants]. On LLM failure
     //    ExpandQueries returns non-ok → degrade to the single original query +
     //    the CX_WARN_RAG_FUSION_DEGRADED warning (topic 4).
     std::vector<std::string> all_queries = {request.query};
@@ -184,7 +184,7 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
         return resp;
     }
 
-    // 2. Run ScatterGather per query (§4.3 steps 5-8). Keep the FIRST (original)
+    // 2. Run ScatterGather per query (steps 5-8). Keep the FIRST (original)
     //    query's full response as the base — its ResultItems carry the content /
     //    metadata we re-order below (no content re-fetch). Collect each variant's
     //    ScoredResult[] for the global RRF.
@@ -220,7 +220,7 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
         }
     }
 
-    // 3. Global RRF second-pass fusion across variants (§4.3 step 9 / topic 2 B).
+    // 3. Global RRF second-pass fusion across variants (step 9 / topic 2 B).
     auto fused = fusion_->FuseResults(per_variant, cfg, /*ctx=*/nullptr);
 
     // 4. Re-order the union of ResultItems by the fused order. A fused child that

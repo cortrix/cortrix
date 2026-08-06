@@ -215,7 +215,7 @@ class ChatExecutor(IAgentExecutor):
             prompt_text=prompt,
             rag_chunks_full=[c.to_full() for c in chunks],
             model_used=self._model_name or None,
-            llm_token_count={},  # TODO(D3.5): real token accounting from provider usage.
+            llm_token_count={},  # TODO(integration): real token accounting from provider usage.
             rag_call_failed_detail=rag_failed_detail,
             llm_call_failed_detail=llm_failed_detail,
         )

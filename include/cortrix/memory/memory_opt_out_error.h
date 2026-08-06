@@ -11,11 +11,11 @@
 namespace cortrix::memory::immunity {
 
 /// The 7 memory-immunity error identities (registered in
-/// ARCH §4.1.11 — "M-05 +5 + V14 J5 +2 = 7", issue D6). Each maps to a stable
+/// ARCH — "M-05 +5 + V14 J5 +2 = 7", issue). Each maps to a stable
 /// `CX_ERR_*` string + a GEN-Agent category + retryability + retry_after_ms + the
 /// structured_data keys its body MUST carry, via the canonical registry below.
 ///
-/// F-FREEZE-1 template A (C_R2_BRIEFING §2, mirroring memory/memory_error.h): the D1
+/// F-FREEZE-1 template A (, mirroring memory/memory_error.h): the
 /// detail design wrote `Result<T, ...>` (double-template) in places, which the
 /// project forbids — Cortrix uses `Result<T>` (StatusOr) + `Status` only. A domain
 /// error is carried as the Agent-friendly boundary type
@@ -25,8 +25,8 @@ namespace cortrix::memory::immunity {
 ///
 /// SoT note: the canonical attributes (http / category / retryable / retry_after_ms /
 /// structured_data keys) follow the server error registry (the authority), which this layer
-/// §5.4 explicitly defers to (memory-opt-out-rev-1 registers them in ARCH §4.1.11). Where the
-/// detail design §5.4 table and ARCH §4.1.11 differ on a structured_data key (ALREADY_OPTED_OUT →
+/// explicitly defers to (memory-opt-out-rev-1 registers them in ARCH). Where the
+/// detail design table and ARCH differ on a structured_data key (ALREADY_OPTED_OUT →
 /// `opted_out_at`; REVOKE_DENIED → `required_role`; OPT_OUT_DISABLED → `config_source`),
 /// ARCH wins.
 ///
@@ -46,13 +46,13 @@ enum class MemoryOptOutErrorCode {
 /// API-compatibility regression test (the set must not shrink).
 constexpr int kMemoryOptOutErrorCodeCount = 7;
 
-/// Canonical, immutable attributes of one error code (ARCH §4.1.11 columns).
+/// Canonical, immutable attributes of one error code (ARCH columns).
 struct MemoryOptOutErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
-    int http_status;                          ///< ARCH §4.1.11 HTTP column (404/409/403/503/422)
+    int http_status;                          ///< ARCH HTTP column (404/409/403/503/422)
     agent_friendly::ErrorCategory category;   ///< permanent / auth (all 7 are non-retryable)
-    bool retryable;                           ///< ARCH §4.1.11 retryable column (all false)
-    std::optional<int> retry_after_ms;        ///< ARCH §4.1.11 retry hint (all null)
+    bool retryable;                           ///< ARCH retryable column (all false)
+    std::optional<int> retry_after_ms;        ///< ARCH retry hint (all null)
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never throws /
@@ -62,11 +62,11 @@ const MemoryOptOutErrorInfo& GetMemoryOptOutErrorInfo(MemoryOptOutErrorCode code
 /// The "CX_ERR_*" string for `code`.
 const char* MemoryOptOutErrorCodeString(MemoryOptOutErrorCode code);
 
-/// The ARCH §4.1.11 HTTP status code for `code`.
+/// The ARCH HTTP status code for `code`.
 int MemoryOptOutErrorHttpStatus(MemoryOptOutErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5,
-/// ARCH §4.1.11 structured_data column). SoT for the Agent-friendly contract; lets
+/// ARCH structured_data column). SoT for the Agent-friendly contract; lets
 /// call sites + tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(MemoryOptOutErrorCode code);
 

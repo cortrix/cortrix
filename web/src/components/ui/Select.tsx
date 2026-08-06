@@ -2,8 +2,8 @@ import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from '@headless
 import { ChevronUpDownIcon, CheckIcon } from '@heroicons/react/24/outline';
 import type { ReactNode } from 'react';
 
-// Cortrix VI § 6.3 Select — single-select built on @headlessui/react Listbox,
-// brand-colored with rounded + shadowed dropdown (VI § 7).
+// Cortrix VI Select — single-select built on @headlessui/react Listbox,
+// brand-colored with rounded + shadowed dropdown (VI).
 
 export interface SelectOption<T extends string = string> {
   value: T;

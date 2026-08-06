@@ -113,7 +113,7 @@ private:
     /// Sync fdatasyncs the WAL and — only after it is durable — replays that
     /// batch into the in-memory graph under the write lock, so AddPoint returns
     /// (its future resolves) only once the record is both crash-safe and visible
-    /// (design § 4.1). Defined in phnsw.cpp.
+    /// (design). Defined in phnsw.cpp.
     class ApplySink;
 
     // Apply one decoded WAL record to the graph. Caller holds the write lock.
@@ -140,12 +140,12 @@ private:
     std::size_t GetMemoryFootprintBytesLocked() const;
 
     // S4: load the newest snapshot into index_ then replay hnsw.wal entries with
-    // LSN > snapshot_lsn (design § 4.4). Run once from the constructor (and
+    // LSN > snapshot_lsn (design). Run once from the constructor (and
     // re-runnable via Recover()). Returns the recovery Status; on success the
     // index is ready. Builds a fresh empty index when there is no snapshot.
     Status RecoverInternal();
 
-    // S6 auto-snapshot (design § 4.1 step 6): after a write batch is applied, if
+    // S6 auto-snapshot (design step 6): after a write batch is applied, if
     // the WAL exceeds snapshot_max_wal_entries or snapshot_max_wal_size_mb, wake
     // the background snapshot thread (coalescing — many crossings collapse into
     // one pending request). Caller holds the write lock (called from the flush).
@@ -168,9 +168,9 @@ private:
     // under the write lock in lock-step with ApplyEntryLocked). Snapshot records
     // this — not the WAL's committed_lsn — so a snapshot's lsn always matches the
     // graph state it captured, even if a record is durably written but not yet
-    // applied (design § 4.4 recovery filtering).
+    // applied (design recovery filtering).
     uint64_t applied_lsn_ = 0;
-    bool ready_ = false;                              // §4.4-ter READY gate
+    bool ready_ = false;                              // READY gate
 
     // S6 auto-snapshot background thread + its coalescing request flag. The
     // thread runs Snapshot() off the write path so a large flush never blocks on

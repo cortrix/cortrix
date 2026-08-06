@@ -28,9 +28,9 @@ class InteractionsHandler;
 /// query params, and renders the result / the GEN-Agent CX_ERR_TRACE_* error body.
 ///
 /// Endpoints (all WithAuth, Read permission):
-///   GET /api/v1/traces/:session_id            -- session interaction trace list (§8.1)
-///   GET /api/v1/interactions/:id/sources       -- retrieval source attribution (§8.2)
-///   GET /api/v1/interactions                   -- Agent self-serve history query (§8.3)
+///   GET /api/v1/traces/:session_id            -- session interaction trace list
+///   GET /api/v1/interactions/:id/sources       -- retrieval source attribution
+///   GET /api/v1/interactions                   -- Agent self-serve history query
 ///
 /// @param server   the raw httplib server (routes registered on it).
 /// @param traces   GET /traces/{session_id} business logic (owns permission + the
@@ -51,7 +51,7 @@ void RegisterObservabilityRoutes(httplib::Server& server,
 
 /// Register GET /api/v1/traces/:session_id over the GLOBAL cortrix_global.db
 /// (where agent_trace lives after TC4). A session's calls can span namespaces, so the
-/// read is global and does NOT take `?namespace=`. Ownership for the §8.1 permission
+/// read is global and does NOT take `?namespace=`. Ownership for the permission
 /// check is resolved out-of-band: agent_trace carries no user_id and the session->user
 /// mapping (interaction_log / memory_sessions) is per-NS, so the wiring reads the
 /// session's namespace off the global agent_trace, then resolves user_id in that

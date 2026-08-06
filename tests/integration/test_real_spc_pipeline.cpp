@@ -1,5 +1,5 @@
 /// @file test_real_spc_pipeline.cpp
-/// @brief D3.5 Integration: Full SPC pipeline with real bge-m3 ONNX embeddings.
+/// @brief integration Integration: Full SPC pipeline with real bge-m3 ONNX embeddings.
 ///
 /// Tests end-to-end: Document → Parse → Chunk → Real Embed (bge-m3) →
 ///   Store (SQLite + HNSW 1024-dim) → Query (FTS + Vector + RRF) → Semantic results

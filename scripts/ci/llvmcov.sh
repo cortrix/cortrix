@@ -403,7 +403,7 @@ if [ "$MODE" = "--check" ]; then
   CORE_BRANCH=$(awk -v c="$CORE_BRANCH_COVERED" -v t="$CORE_BRANCH_TOTAL" \
     'BEGIN {printf "%.2f", c * 100 / t}')
   echo ""
-  printf "  core-17 branch : %6s%%  (gate ≥ %s%%, clang region/branch — test plan §4.1.bis)\n" \
+  printf "  core-17 branch : %6s%%  (gate ≥ %s%%, clang region/branch — test plan)\n" \
     "$CORE_BRANCH" "$CORE_BRANCH_MIN"
   if [ $((CORE_BRANCH_COVERED * 100)) -ge \
        $((CORE_BRANCH_MIN * CORE_BRANCH_TOTAL)) ]; then

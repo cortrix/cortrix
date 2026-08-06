@@ -101,9 +101,9 @@ std::string MaskUserId(const std::string& uid) {
 
 /// Build the operation_log entry for a memory operation. triggered_by is encoded in
 /// the CE-visible `summary` field (the user-view track) — the CE OperationLogEntry has
-/// no details_json (that is the Ent extension table, §5.1 note), so the real
-/// details_json.triggered_by lands in D3.5; the standalone CE record carries it in
-/// summary so the audit trail still distinguishes the 4 paths (§5.4).
+/// no details_json (that is the Ent extension table, note), so the real
+/// details_json.triggered_by lands in integration; the standalone CE record carries it in
+/// summary so the audit trail still distinguishes the 4 paths.
 OperationLogEntry MakeOpLogEntry(const std::string& action,
                                  const std::string& user_id,
                                  const std::string& ns_id,
@@ -205,7 +205,7 @@ Result<MemoryListResponse> MemoryTransparency::List(const MemoryListFilter& filt
                                                     const std::string& session_user_id,
                                                     bool explain,
                                                     const observability::TraceContext* ctx) {
-    (void)ctx;  // trace propagation is a D3.5 wiring concern (seam takes no ctx)
+    (void)ctx;  // trace propagation is a integration wiring concern (seam takes no ctx)
     const auto t0 = std::chrono::steady_clock::now();
     auto& metrics = MemoryMetrics::Instance();
 
@@ -417,7 +417,7 @@ Result<MemoryEditResult> MemoryTransparency::Edit(const MemoryEditRequest& req,
     }
 
     // 5. audit: memory_edit + the cascaded memory_invalidate of the old block
-    //    (§4.2 step 5 — two records; triggered_by=user_edit distinguishes the cascade).
+    //    (step 5 — two records; triggered_by=user_edit distinguishes the cascade).
     if (op_logger_) op_logger_->Log(MakeOpLogEntry("memory_edit", session_user_id, new_block.ns_id,
                                    new_block.block_id, TriggeredBy::kUserEdit,
                                    "old_memory_id=" + old_block.block_id));
@@ -449,13 +449,13 @@ Status MemoryTransparency::Delete(const std::string& memory_id,
         rec.metadata_json = nlohmann::json::object();
     }
 
-    // 2. Idempotent: already invalidated → return Ok (no error, §4.2 step 2).
+    // 2. Idempotent: already invalidated → return Ok (no error, step 2).
     if (ReadString(rec.metadata_json, "status") == ToString(MemoryStatus::kInvalidated)) {
         metrics.RecordOp(MemoryMetrics::Op::kInvalidate, MemoryMetrics::OpStatus::kSuccess);
         return Status::Ok();
     }
 
-    // 3. Soft delete: status=invalidated + deleted_by_user_id + deleted_at (§6.1 keys).
+    // 3. Soft delete: status=invalidated + deleted_by_user_id + deleted_at (keys).
     const int64_t now_ms = NowEpochMs();
     rec.metadata_json["status"] = ToString(MemoryStatus::kInvalidated);
     rec.metadata_json["deleted_by_user_id"] = session_user_id;
@@ -470,7 +470,7 @@ Status MemoryTransparency::Delete(const std::string& memory_id,
         return MemoryStatus(MemoryErrorCode::kInvalidateFailed, "soft-delete update failed");
     }
 
-    // 4. audit: memory_invalidate, triggered_by=user_manual (§4.2 step 4).
+    // 4. audit: memory_invalidate, triggered_by=user_manual (step 4).
     if (op_logger_) op_logger_->Log(MakeOpLogEntry("memory_invalidate", session_user_id, rec.ns_id,
                                    memory_id, TriggeredBy::kUserManual));
 

@@ -16,7 +16,7 @@
 #include "cortrix/server/http_server.h"
 #include "cortrix/common/data_types.h"
 
-// D3.5 wire⑤c: document routes now take a resource::INamespacePool& (was the MVP
+// integration wire⑤c: document routes now take a resource::INamespacePool& (was the MVP
 // CortrixNamespaceManager&). The shared harness stands up a real DefaultNamespacePool
 // (mocked catalog routers + FakeIndex + real WriteCoordinator over a temp dir).
 #include "ns_pool_test_helper.h"

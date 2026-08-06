@@ -13,23 +13,23 @@ namespace cortrix::retrieval {
 ///
 /// 🚨 Cardinality control (observability
 /// M3): labels are enum-only. NO `ns_id` (high-cardinality, forbidden — removed in
-/// D1 V3 decision 10); per-NS data goes through
-/// `GET /api/v1/system/namespaces/<ns_id>/stats` (OBS_SPEC §3.4).
+/// V3 decision 10); per-NS data goes through
+/// `GET /api/v1/system/namespaces/<ns_id>/stats` (OBS_SPEC).
 ///
-/// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
+/// 🚨 standalone: a self-contained, dependency-free recorder + an OpenMetrics
 /// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
-/// **deferred to D3.5**. Until then it is fully usable + testable in-process and
+/// **deferred to integration**. Until then it is fully usable + testable in-process and
 /// RenderOpenMetrics() produces what the server will serve.
 ///
-/// §10 metric schema (4 rows):
+/// metric schema (4 rows):
 ///   cortrix_crag_evaluation_total            counter   {decision}
 ///   cortrix_crag_classifier_latency_seconds  histogram (no labels)
 ///   cortrix_crag_fallback_ratio              gauge     (no labels)
 ///   cortrix_crag_incorrect_ratio             gauge     (no labels)
 class CragMetrics {
 public:
-    /// decision label for cortrix_crag_evaluation_total (§10). `fallback` = the L3
+    /// decision label for cortrix_crag_evaluation_total. `fallback` = the L3
     /// transparent-degrade verdict ("correct_fallback_classifier_failed").
     enum class Decision {
         kCorrect = 0,
@@ -57,7 +57,7 @@ public:
     double FallbackRatio() const;
 
     // --- cortrix_crag_incorrect_ratio (Gauge, no label) ---
-    // Incorrect-verdict ratio (§10 — business alarm threshold). Gauge.
+    // Incorrect-verdict ratio (business alarm threshold). Gauge.
     void SetIncorrectRatio(double ratio);
     double IncorrectRatio() const;
 

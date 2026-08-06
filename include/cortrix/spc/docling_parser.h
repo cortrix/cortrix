@@ -16,13 +16,13 @@ struct DoclingParserConfig {
 };
 
 /// Default document parser: drives the Docling library via a Python
-/// subprocess (docling_bridge.py) and maps its JSON output (§3.1 page-level
+/// subprocess (docling_bridge.py) and maps its JSON output (page-level
 /// protocol) to ParsedDoc.
 ///
-/// D3 standalone: the wrapper logic (command build / timeout / output cap /
+/// standalone: the wrapper logic (command build / timeout / output cap /
 /// error-code mapping / JSON→ParsedDoc) is what's exercised here, against a
 /// *mock* bridge script — the machine has python3 but not necessarily docling.
-/// Real docling end-to-end belongs to D3.5.
+/// Real docling end-to-end belongs to integration.
 class DoclingParser : public IDocumentParser {
 public:
     explicit DoclingParser(DoclingParserConfig config);
@@ -32,7 +32,7 @@ public:
     std::vector<std::string> SupportedFormats() const override;
     const char* Name() const override { return "docling"; }
 
-    /// argv for the bridge subprocess (§3.1 request line). Public so a test can
+    /// argv for the bridge subprocess (request line). Public so a test can
     /// assert the request contract without spawning a process.
     std::vector<std::string> BuildArgv(const std::string& filepath,
                                        const ParserOptions& opts) const;

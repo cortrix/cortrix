@@ -7,8 +7,8 @@
 namespace cortrix::spc {
 
 /// Per-1K-token prices for a model, in micro-USD (1 USD = 1e6 micro-USD). V1
-/// ships a small static table (design §3.5 "V1 static model_pricing.json"); the
-/// real file-loaded pricing is a Phase 2 / D3.5 concern. Unknown models fall back
+/// ships a small static table (design "V1 static model_pricing.json"); the
+/// real file-loaded pricing is a Phase 2 / integration concern. Unknown models fall back
 /// to a conservative default so budget accounting never silently undercounts.
 struct ModelPrice {
     int64_t input_micro_usd_per_1k = 0;   ///< prompt tokens
@@ -35,11 +35,11 @@ private:
     ModelPrice default_price_;
 };
 
-/// BudgetTracker (design §3.5). Enforces a global USD spend cap across enrichment
+/// BudgetTracker (design). Enforces a global USD spend cap across enrichment
 /// calls. budget_cap_usd == 0 disables the cap (AllowRequest always true). Costs
 /// accumulate in micro-USD (atomic) to avoid floating-point drift.
 ///
-/// AllowRequest() is the §4.2 pre-call gate: false once the accumulated cost has
+/// AllowRequest() is the pre-call gate: false once the accumulated cost has
 /// reached the cap → caller returns CX_ERR_ENRICHER_BUDGET + degrades to Null.
 class BudgetTracker {
 public:
@@ -49,7 +49,7 @@ public:
     /// Inject a custom pricing table (default = the built-in V1 ModelPricing).
     BudgetTracker(int budget_cap_usd, ModelPricing pricing);
 
-    /// §4.2 pre-call gate. True while under the cap (or cap disabled).
+    /// pre-call gate. True while under the cap (or cap disabled).
     bool AllowRequest() const;
 
     /// Add the cost of one call's usage (topic 3.5). Thread-safe.

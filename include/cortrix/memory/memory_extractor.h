@@ -16,19 +16,19 @@
 
 // LLM memory extraction. Extends the existing
 // cortrix::memory module (it does NOT replace interaction_log / memory_store /
-// memory_writer). Standalone-D3 scope: the LLM extraction algorithm, the
+// memory_writer). Standalone scope: the LLM extraction algorithm, the
 // three-class memory model, the contradiction-judgment helper (mock QueryPipeline),
 // invalidation writes to blocks.metadata_json, and operation_log emission — all
 // against injected seams (ILlmClient, IMemoryBlockStore, IOperationLogger,
 // IContradictionQuery) so it unit-tests with no live endpoint / DB / server.
 //
-// ⚠️ Contract reconciliation vs the D1 detail design (per B_R3_BRIEFING §2 — the
+// ⚠️ Contract reconciliation vs the detail design (per — the
 // detail design predates the implemented headers and drifts):
 //   - input type is the real cortrix::InteractionLog (NOT a placeholder `Interaction`)
 //   - there is NO `IBlockStore` in the tree; this file declares a minimal
 //     IMemoryBlockStore seam in the existing-header style (MemoryStore is concrete +
 //     SQLite-bound, so a thin interface is the standalone test seam; the real
-//     MemoryStore-backed adapter is wired in D3.5)
+//     MemoryStore-backed adapter is wired in integration)
 //   - the operation logger is the real cortrix::observability::IOperationLogger
 //     (NOT `cortrix::operation_log::IOperationLogger`)
 //   - the contradiction path consumes the real single-arg
@@ -38,18 +38,18 @@ namespace cortrix::memory {
 
 /// Three-class memory model (2026-04-06 redesign). kUnknown is the
 /// internal sentinel for an LLM `type` that does not parse to one of the three
-/// classes; the code-layer fallback (D4) coerces it to kEvent before persistence.
+/// classes; the code-layer fallback coerces it to kEvent before persistence.
 enum class MemoryType {
-    kFact = 0,    ///< objective, long-term — permanent immunity (D7)
-    kPreference,  ///< personal preference — immune after N mentions in window (D8)
-    kEvent,       ///< event/dynamic — exponential decay; also the D4 fallback class
+    kFact = 0,    ///< objective, long-term — permanent immunity
+    kPreference,  ///< personal preference — immune after N mentions in window
+    kEvent,       ///< event/dynamic — exponential decay; also the fallback class
     kUnknown,     ///< unparseable LLM type (never persisted; coerced to kEvent)
 };
 
 const char* ToString(MemoryType type);
 
 /// Parse an LLM `type` string to a MemoryType. Unrecognized → kUnknown (the caller
-/// applies the D4 fallback to kEvent). Case-insensitive on the three known values.
+/// applies the fallback to kEvent). Case-insensitive on the three known values.
 MemoryType ParseMemoryType(const std::string& s);
 
 /// Memory lifecycle status persisted in blocks.metadata_json.
@@ -72,7 +72,7 @@ struct ExtractedMemory {
     std::string source_interaction_id;
     std::string source_session_id;
     std::string extraction_method = "llm";
-    std::vector<std::string> invalidates;  ///< old block_ids this one invalidates (D6)
+    std::vector<std::string> invalidates;  ///< old block_ids this one invalidates
 };
 
 /// extract_meta block returned alongside the memories.
@@ -117,7 +117,7 @@ struct ContradictionPair {
 /// A memory block as stored (the subset extraction reads/writes). `metadata_json` is the
 /// JSONB field extraction stamps with memory_type/status/provenance/invalidation state
 /// This mirrors the shape the real `blocks` row exposes; the
-/// D3.5 adapter maps it onto the concrete store.
+/// integration adapter maps it onto the concrete store.
 struct MemoryBlockRecord {
     std::string block_id;
     std::string ns_id;
@@ -129,7 +129,7 @@ struct MemoryBlockRecord {
 /// Minimal memory-block persistence seam (existing-header interface style, cf.
 /// ILlmClient / IOperationLogger). NOT the forbidden `IBlockStore` — it is scoped to
 /// the metadata-block operations extraction needs and is mockable for standalone UT. The
-/// real MemoryStore-backed adapter is wired in D3.5.
+/// real MemoryStore-backed adapter is wired in integration.
 class IMemoryBlockStore {
 public:
     virtual ~IMemoryBlockStore() = default;
@@ -140,7 +140,7 @@ public:
     virtual Result<std::string> InsertMemoryBlock(const MemoryBlockRecord& block) = 0;
 
     /// Update an existing block's content/metadata_json (used to stamp invalidation
-    /// state on the old block, D6, and to mutate mention_count on preference upgrade).
+    /// state on the old block,, and to mutate mention_count on preference upgrade).
     virtual Status UpdateMemoryBlock(const MemoryBlockRecord& block) = 0;
 
     /// Fetch one block by id (used by the revoke path to restore status=active).
@@ -151,7 +151,7 @@ public:
 /// Contradiction-retrieval seam over the Query unified read pipeline. Extraction
 /// does NOT depend on the concrete QueryPipeline in standalone; it depends on this
 /// seam, whose real adapter calls QueryPipeline::Execute(const QueryRequest&) (the
-/// real single-arg signature) and is wired in D3.5. The mock returns candidate old
+/// real single-arg signature) and is wired in integration. The mock returns candidate old
 /// memories for a new fact so the judge prompt can run.
 struct CandidateBlock {
     std::string block_id;
@@ -165,16 +165,16 @@ public:
     virtual ~IContradictionQuery() = default;
 
     /// Retrieve up to `top_k` existing memory blocks in `ns` semantically closest to
-    /// `content` (vector + BM25 → RRF, per D5). The extractor then runs the
+    /// `content` (vector + BM25 → RRF, per). The extractor then runs the
     /// contradiction-judgment prompt over each candidate.
     virtual std::vector<CandidateBlock> FindCandidates(const std::string& ns,
                                                        const std::string& content,
                                                        int top_k) = 0;
 
-    /// D8 preference-upgrade lookup: find the existing active preference block in `ns`
+    /// preference-upgrade lookup: find the existing active preference block in `ns`
     /// that represents the same preference as `content` (so its mention_count can be
     /// incremented), or std::nullopt if this is a first mention. Standalone returns a
-    /// mock match; the real semantic/dedup match behind this seam is D3.5. Default
+    /// mock match; the real semantic/dedup match behind this seam is integration. Default
     /// no-match keeps existing mocks that don't override it compiling.
     virtual std::optional<CandidateBlock> FindMatchingPreference(const std::string& ns,
                                                                  const std::string& content) {
@@ -191,12 +191,12 @@ struct MemoryExtractorConfig {
     int llm_timeout_ms = 60000;                ///< per-call timeout (structured extraction +
                                                ///< contradiction judge are slower than a chat
                                                ///< turn; override via enricher_llm.timeout_ms)
-    int window_size_default = 3;               ///< D3 multi-turn window (1-10)
+    int window_size_default = 3;               ///< multi-turn window (1-10)
     int window_size_max = 10;
-    int preference_immunization_threshold = 2; ///< D8 N=2
+    int preference_immunization_threshold = 2; ///< N=2
     int preference_immunization_window_days = 30;
-    double auto_revoke_confidence_threshold = 0.7;  ///< D6 low-confidence auto-revoke mark
-    int contradiction_top_k = 5;               ///< D5 candidate count from read pipeline
+    double auto_revoke_confidence_threshold = 0.7;  ///< low-confidence auto-revoke mark
+    int contradiction_top_k = 5;               ///< candidate count from read pipeline
     double tokens_cost_per_1k_usd = 0.0;       ///< optional cost model for extract_meta
 };
 
@@ -204,16 +204,16 @@ struct MemoryExtractorConfig {
 /// ILlmClient; prompt templates live in this module's namespace). Extends the
 /// existing cortrix::memory module; adds no dependency the frozen tree lacks.
 ///
-/// Standalone-D3: every collaborator is an injected seam, so extract() runs fully
-/// in unit tests against mocks (§12.3 eight LLM-mock scenarios). DEFERRED → D3.5:
+/// Standalone: every collaborator is an injected seam, so extract() runs fully
+/// in unit tests against mocks (eight LLM-mock scenarios). DEFERRED → integration:
 /// the real MemoryStore adapter, the real QueryPipeline contradiction path, the
 /// server memory_handler endpoints, the Python middleware async worker, and the
 /// opt-out live wiring.
 class MemoryExtractor {
 public:
     /// @param llm        shared LLM client (ILlmClient; OpenAiLlmClient is the V1 impl)
-    /// @param block_store memory-block persistence seam (D3.5 real adapter)
-    /// @param contradiction_query contradiction-retrieval seam over the read pipeline (D5)
+    /// @param block_store memory-block persistence seam (integration real adapter)
+    /// @param contradiction_query contradiction-retrieval seam over the read pipeline
     /// @param op_logger  operation logger (CE; real cortrix::observability::IOperationLogger)
     /// @param config     memory_extract.* config
     MemoryExtractor(std::shared_ptr<llm::ILlmClient> llm,
@@ -222,7 +222,7 @@ public:
                     std::shared_ptr<observability::IOperationLogger> op_logger,
                     MemoryExtractorConfig config);
 
-    // --- D12 entry points (Agent self-service extract) ---
+    // --- entry points (Agent self-service extract) ---
 
     /// Extract memories from a single interaction (its window of preceding turns is
     /// supplied by the caller; standalone uses an explicit window — see
@@ -230,9 +230,9 @@ public:
     MemoryExtractionResult Extract(const InteractionLog& current_turn,
                                    const observability::TraceContext* ctx = nullptr);
 
-    /// Extract over an explicit multi-turn window (D3). The last element is the
+    /// Extract over an explicit multi-turn window. The last element is the
     /// current turn; earlier elements are context. This is the standalone-testable
-    /// core (real get_window from the store is a D3.5 wiring concern).
+    /// core (real get_window from the store is a integration wiring concern).
     MemoryExtractionResult ExtractFromWindow(const std::vector<InteractionLog>& window,
                                              const observability::TraceContext* ctx = nullptr);
 
@@ -240,9 +240,9 @@ public:
     MemoryExtractionBatchResult ExtractBatch(const std::vector<InteractionLog>& turns,
                                              const observability::TraceContext* ctx = nullptr);
 
-    // --- D9 revoke / manual invalidate (SDK admin) ---
+    // --- revoke / manual invalidate (SDK admin) ---
 
-    /// Revoke a prior invalidation (D9): restore the old block's status to active and
+    /// Revoke a prior invalidation: restore the old block's status to active and
     /// emit a memory_revoke operation_log entry. `triggered_by` is one of
     /// "user_manual" / "agent_self" / "system_auto". Returns the restored block.
     Result<MemoryBlockRecord> RevokeInvalidation(const std::string& invalidated_block_id,
@@ -250,7 +250,7 @@ public:
                                                  const std::string& revoked_by,
                                                  const observability::TraceContext* ctx = nullptr);
 
-    /// Manually invalidate a memory (D9 `memory.invalidate`): stamp status=invalidated
+    /// Manually invalidate a memory (`memory.invalidate`): stamp status=invalidated
     /// (triggered_by=manual) and emit a memory_blocks_update operation_log entry.
     Status InvalidateMemory(const std::string& block_id,
                             const std::string& reason,
@@ -262,7 +262,7 @@ public:
     /// (oldest→newest), truncated to the config window size.
     std::string BuildWindowText(const std::vector<InteractionLog>& window) const;
 
-    /// Parse the LLM extraction JSON array → ExtractedMemory list. Applies the D4
+    /// Parse the LLM extraction JSON array → ExtractedMemory list. Applies the
     /// fallback (unknown type → event). Returns InvalidArgument (carrying
     /// CX_ERR_MEMEXTRACT_INVALID_OUTPUT identity via MemoryExtractStatus) on non-JSON /
     /// wrong-shape output.
@@ -277,7 +277,7 @@ public:
     };
     Result<Judgment> ParseJudgmentJson(const std::string& llm_output) const;
 
-    /// Run the contradiction pipeline for the extracted memories (D5): for each new
+    /// Run the contradiction pipeline for the extracted memories: for each new
     /// fact, retrieve candidates (seam) + judge each (LLM). Returns the confirmed pairs.
     std::vector<ContradictionPair> FindContradictions(
         const std::string& ns,
@@ -285,7 +285,7 @@ public:
         const observability::TraceContext* ctx);
 
     /// Persist new memories + stamp invalidation state on contradicted old blocks +
-    /// emit operation_log (D6 / §4.2.3). Fills each new memory's block_id and
+    /// emit operation_log (/). Fills each new memory's block_id and
     /// invalidates[]. `ns`/`user_id` come from the source interaction.
     Status WriteWithOperationLog(const std::string& ns,
                                  const std::string& user_id,
@@ -293,7 +293,7 @@ public:
                                  const std::vector<ContradictionPair>& contradictions,
                                  const observability::TraceContext* ctx);
 
-    /// D8 preference immunity: given the existing mention_count + first_mentioned_at
+    /// preference immunity: given the existing mention_count + first_mentioned_at
     /// of a matching preference and the config threshold/window, decide whether the
     /// preference is now immune (count+1 ≥ N within the window). Pure helper.
     static bool IsPreferenceImmune(int existing_mention_count,
@@ -304,7 +304,7 @@ public:
 
     const MemoryExtractorConfig& config() const { return config_; }
 
-    /// D8 preference upgrade: if `mem` is a preference that matches an existing active
+    /// preference upgrade: if `mem` is a preference that matches an existing active
     /// preference (via the IContradictionQuery seam), increment that block's
     /// mention_count, stamp immunity when the threshold+window is met, and emit a
     /// memory_blocks_update operation_log entry. Returns true iff an existing
@@ -315,7 +315,7 @@ public:
                                 const observability::TraceContext* ctx);
 
 private:
-    /// Construct the Agent-friendly LLM_DISABLED result (NullEnricher mode, D11).
+    /// Construct the Agent-friendly LLM_DISABLED result (NullEnricher mode).
     MemoryExtractionResult DisabledResult(const std::string& interaction_id) const;
 
     std::shared_ptr<llm::ILlmClient> llm_;

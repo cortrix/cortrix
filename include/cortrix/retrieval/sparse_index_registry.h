@@ -31,7 +31,7 @@ public:
 
     /// Return the retriever for `ns_id`, opening + Open()-ing it on first use.
     /// Returns nullptr only if the index could not be opened (the caller then
-    /// treats sparse as unavailable → L2 fallback, §7.2). Never throws.
+    /// treats sparse as unavailable → L2 fallback). Never throws.
     ISparseRetriever* GetOrOpen(const std::string& ns_id);
 
 private:

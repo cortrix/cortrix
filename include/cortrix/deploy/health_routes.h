@@ -13,7 +13,7 @@ namespace cortrix::deploy {
 ///
 /// Unified onto the ReadinessRegistry: /ready now
 /// calls `health::ReadinessRegistry::BuildReport()` (replacing the standalone
-/// HealthProviders struct, which was a D3 standalone placeholder). The 5 readiness
+/// HealthProviders struct, which was a standalone placeholder). The 5 readiness
 /// components (catalog / vector_index / secret_provider / spc_pipeline /
 /// memory_store, design sec 8.4) are registered with `registry` at main.cpp wiring
 /// time as each owning subsystem exposes its IsReady() probe; this endpoint

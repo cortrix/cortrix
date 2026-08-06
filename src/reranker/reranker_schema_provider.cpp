@@ -12,7 +12,7 @@ Status RerankerSchemaProvider::Migrate(sqlite3* /*db*/, int from_ver, int to_ver
         return Status::Ok();
     }
     // Phase 2 placeholder: from_ver==1 && to_ver==2 → reranker_config V1→V2
-    // evolution (§2.4 adds the model / score_threshold per-NS keys). Until then,
+    // evolution (adds the model / score_threshold per-NS keys). Until then,
     // an unexpected version step is an error.
     return Status::InvalidArgument(
         "CX_ERR_SCHEMA_VERSION_MISMATCH: reranker unsupported migration " +

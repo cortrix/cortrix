@@ -160,7 +160,7 @@ export const mockApi = {
 
   async getFeatureFlags(): Promise<FeatureFlags> {
     await delay(50);
-    // CE default: all three Ent features are placeholders, none enabled (§ 5.1).
+    // CE default: all three Ent features are placeholders, none enabled.
     return {
       edition: 'ce',
       features: {
@@ -344,7 +344,7 @@ export const mockApi = {
     if (filter.memory_type) {
       items = items.filter((m) => m.memory_type === filter.memory_type);
     }
-    // Strip B-class fields unless explain mode is on (phased rollout § 7.3).
+    // Strip B-class fields unless explain mode is on (phased rollout).
     const projected = items.map((m) => (filter.explain ? m : stripExplain(m)));
     const page = filter.page ?? 0;
     const pageSize = filter.page_size ?? 20;

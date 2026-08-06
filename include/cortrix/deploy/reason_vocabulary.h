@@ -92,14 +92,14 @@ std::string ErrorCodeToReason(const std::string& error_code);
 
 /// Whether a field of a given semantic kind belongs on a metric label, in the
 /// error structured_data, or both (the field-ownership table). Used to audit
-/// that high-cardinality fields never become labels (OBS_SPEC §3.2).
+/// that high-cardinality fields never become labels (OBS_SPEC).
 enum class FieldChannel {
     kLabelOnly,         ///< low-cardinality enum: metric label only
     kStructuredOnly,    ///< high-cardinality / business data: structured_data only
-    kBoth,              ///< category (5 enum) — enforced consistent across both (§9.2)
+    kBoth,              ///< category (5 enum) — enforced consistent across both
 };
 
-/// The semantic field kinds the §9.2 table classifies.
+/// The semantic field kinds the table classifies.
 enum class FieldKind {
     kCategory,          ///< the 5-value category enum            → both (consistent)
     kReason,            ///< the controlled reason vocabulary     → label (→ error_code in errors)
@@ -109,7 +109,7 @@ enum class FieldKind {
     kBusinessObject,    ///< business object / stack trace        → structured_data only
 };
 
-/// The §9.2 channel for `kind`. Total. The SoT for the field-ownership audit.
+/// The channel for `kind`. Total. The SoT for the field-ownership audit.
 FieldChannel ChannelFor(FieldKind kind);
 
 /// The 5 category enum values, as the lowercase strings shared across the metric

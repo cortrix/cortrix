@@ -1,7 +1,7 @@
 """Unit tests for ChatExecutor RAG degradation L1/L2/L3 (design section 9.2).
 
 The executor is exercised against a stubbed SdkRagProvider and a stubbed LLM adapter
-(standalone D3 discipline — cortrix-server is not running). Backoff sleeps are patched
+(standalone discipline — cortrix-server is not running). Backoff sleeps are patched
 to zero so the N=3 retry path runs fast.
 """
 

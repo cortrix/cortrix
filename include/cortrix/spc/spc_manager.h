@@ -13,7 +13,7 @@
 
 namespace cortrix {
 
-namespace resource { class INamespacePool; }  // D3.5 wire⑤: SPC acquires per-task façades from the pool
+namespace resource { class INamespacePool; }  // integration wire⑤: SPC acquires per-task façades from the pool
 namespace retrieval { class SparseIndexRegistry; }  // per-NS SPLADE index owner
 
 /// Manages SPC worker lifecycle and namespace write locks

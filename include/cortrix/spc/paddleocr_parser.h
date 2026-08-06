@@ -18,13 +18,13 @@ struct PaddleOCRParserConfig {
 };
 
 /// OCR fallback parser: drives PaddleOCR via a Python subprocess
-/// (paddleocr_bridge.py) for scanned PDFs and images. Outputs the same §3.1
+/// (paddleocr_bridge.py) for scanned PDFs and images. Outputs the same
 /// page-level envelope as Docling; OCR paragraphs are all TEXT with empty
 /// section (OCR can't distinguish tables/captions). Used by the factory as the
 /// fallback when Docling returns empty / low-confidence pages.
 ///
-/// D3 standalone: the wrapper logic is exercised against a *mock* bridge — the
-/// machine has python3 but not necessarily paddleocr. Real OCR is D3.5.
+/// standalone: the wrapper logic is exercised against a *mock* bridge — the
+/// machine has python3 but not necessarily paddleocr. Real OCR is integration.
 class PaddleOCRParser : public IDocumentParser {
 public:
     explicit PaddleOCRParser(PaddleOCRParserConfig config);

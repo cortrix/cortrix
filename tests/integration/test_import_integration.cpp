@@ -16,11 +16,11 @@
 #include "cortrix/observability/operation_logger.h"
 #include "cortrix/server/import_handler.h"
 
-// DB import standalone integration: drives the 9-issue decision matrix (DB import D1-D9)
+// DB import standalone integration: drives the 9-issue decision matrix (DB import)
 // end-to-end through the composed stack (ConnectionManager + QueryExecutor +
 // TextSerializer + SPC feed + BlockCleaner + ImportTaskQueue + ImportManager + the
 // HTTP handler), with operation_log + metrics observed. Real PG / SPCPipeline /
-// server routing are mocked → D3.5.
+// server routing are mocked → integration.
 namespace cortrix::import {
 namespace {
 
@@ -105,7 +105,7 @@ struct Stack {
     explicit Stack(std::vector<DbRow> rows) {
         auto secret = std::make_shared<InMemorySecretStore>();
         auto store = std::make_shared<InMemoryConnectionStore>();
-        conn_mgr = std::make_shared<ConnectionManager>(secret, store, oplog);  // D1 + S6 audit
+        conn_mgr = std::make_shared<ConnectionManager>(secret, store, oplog);  // + S6 audit
         auto qexec = std::make_shared<FakeQueryExecutor>(std::move(rows));
         auto serializer = std::make_shared<TextSerializer>();
         auto task_store = std::make_shared<InMemoryImportTaskStore>();
@@ -119,34 +119,34 @@ struct Stack {
     }
 };
 
-// Full happy path through the HTTP handler: D1 register → D2/D4/D5/D6 import →
-// progress → completed. Asserts D1/D5/D6/D9 + S6 (all 3 oplog actions).
+// Full happy path through the HTTP handler: register →// import →
+// progress → completed. Asserts// + S6 (all 3 oplog actions).
 TEST(ImportIntegration, RegisterThenImportEndToEndViaHandler) {
     ImportMetrics::Instance().ResetForTest();
     Stack s({Row("1", "Ada"), Row("2", "Bob"), Row("3", "Cy")});
 
-    // D1: register a connection (admin API).
+    //: register a connection (admin API).
     int http = 0;
     auto reg = s.handler->HandleRegisterConnection(
         {{"name", "crm"}, {"dsn", "postgres://u:p@db.internal:5432/crm"}}, Admin(), http);
     ASSERT_EQ(http, 200) << reg.dump();
     std::string ref = reg["ref_id"].get<std::string>();
 
-    // D6: start import.
+    //: start import.
     auto start = s.handler->HandleStartImport(
         {{"namespace", "customer_kb"}, {"connection_ref", ref}, {"table", "users"}}, Admin(), http);
     ASSERT_EQ(http, 200) << start.dump();
     std::string task_id = start["task_id"].get<std::string>();
     EXPECT_EQ(start["estimated_rows"], 3);  // R5 COUNT(*) pre-estimate flowed through
 
-    // D6: poll progress to completion.
+    //: poll progress to completion.
     ASSERT_TRUE(WaitFor([&] {
         int h = 0;
         auto p = s.handler->HandleGetProgress(task_id, h);
         return h == 200 && p["status"] == "completed";
     }));
 
-    // D5: the 3 rows were fed to the SPC pipeline.
+    //: the 3 rows were fed to the SPC pipeline.
     EXPECT_EQ(s.feeder->total_chunks(), 3);
 
     // S6 (import-rev-6): all 3 operation_log actions recorded.
@@ -154,7 +154,7 @@ TEST(ImportIntegration, RegisterThenImportEndToEndViaHandler) {
     EXPECT_NE(std::find(acts.begin(), acts.end(), "db_connection_register"), acts.end());
     EXPECT_NE(std::find(acts.begin(), acts.end(), "database_import"), acts.end());
 
-    // D1 revoke → 3rd action.
+    // revoke → 3rd action.
     auto rev = s.handler->HandleRevokeConnection(ref, {{"reason", "rotation"}}, Admin(), http);
     ASSERT_EQ(http, 200) << rev.dump();
     acts = s.oplog->actions();
@@ -165,8 +165,8 @@ TEST(ImportIntegration, RegisterThenImportEndToEndViaHandler) {
     EXPECT_EQ(ImportMetrics::Instance().RowsImportedTotal(), 3u);
 }
 
-// D2 security: an INSERT/UPDATE custom-SQL is rejected with CX_ERR_IMPORT_INVALID_SQL.
-TEST(ImportIntegration, D2WriteSqlRejected) {
+// security: an INSERT/UPDATE custom-SQL is rejected with CX_ERR_IMPORT_INVALID_SQL.
+TEST(ImportIntegration, WriteSqlRejected) {
     Stack s({Row("1", "Ada")});
     int http = 0;
     auto reg = s.handler->HandleRegisterConnection(
@@ -178,8 +178,8 @@ TEST(ImportIntegration, D2WriteSqlRejected) {
     EXPECT_EQ(out["error"]["code"], "CX_ERR_IMPORT_INVALID_SQL");
 }
 
-// D7 cross-tenant: tenant t2 cannot use t1's ref (CX_ERR_IMPORT_CROSS_TENANT_REF, 403).
-TEST(ImportIntegration, D7CrossTenantRefRejected) {
+// cross-tenant: tenant t2 cannot use t1's ref (CX_ERR_IMPORT_CROSS_TENANT_REF, 403).
+TEST(ImportIntegration, CrossTenantRefRejected) {
     Stack s({Row("1", "Ada")});
     int http = 0;
     auto reg = s.handler->HandleRegisterConnection(
@@ -192,8 +192,8 @@ TEST(ImportIntegration, D7CrossTenantRefRejected) {
     EXPECT_EQ(out["error"]["code"], "CX_ERR_IMPORT_CROSS_TENANT_REF");
 }
 
-// D3 full-overwrite: a re-import of the same table clears the prior Blocks first.
-TEST(ImportIntegration, D3FullOverwriteOnReimport) {
+// full-overwrite: a re-import of the same table clears the prior Blocks first.
+TEST(ImportIntegration, FullOverwriteOnReimport) {
     Stack s({Row("1", "Ada")});
     s.cleaner->SeedBlock("customer_kb", "postgres://db.internal:5432/crm/users/old");
     s.cleaner->SeedBlock("customer_kb", "postgres://db.internal:5432/crm/orders/keep");
@@ -209,12 +209,12 @@ TEST(ImportIntegration, D3FullOverwriteOnReimport) {
         int h = 0;
         return s.handler->HandleGetProgress(task_id, h)["status"] == "completed";
     }));
-    // prior users Block cleared (D3); orders Block survives.
+    // prior users Block cleared; orders Block survives.
     EXPECT_EQ(s.cleaner->RemainingCount("customer_kb"), 1);
 }
 
-// D6 cancel: a cancel resolves to status=cancelled (not an error).
-TEST(ImportIntegration, D6CancelResolvesToCancelled) {
+// cancel: a cancel resolves to status=cancelled (not an error).
+TEST(ImportIntegration, CancelResolvesToCancelled) {
     Stack s({Row("1", "Ada")});
     int http = 0;
     auto reg = s.handler->HandleRegisterConnection(
@@ -235,7 +235,7 @@ TEST(ImportIntegration, D6CancelResolvesToCancelled) {
     }));
     int h = 0;
     auto p = s.handler->HandleGetProgress(task_id, h);
-    EXPECT_TRUE(p["error"].is_null());  // §5.4 note: cancel/complete carry no error body
+    EXPECT_TRUE(p["error"].is_null());  // note: cancel/complete carry no error body
 }
 
 }  // namespace

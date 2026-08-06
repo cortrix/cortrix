@@ -7,7 +7,7 @@
 namespace cortrix::spc {
 
 namespace {
-// Split LLM output into trimmed, non-empty lines (one question per line, §6.2).
+// Split LLM output into trimmed, non-empty lines (one question per line).
 std::vector<std::string> SplitLines(const std::string& text) {
     std::vector<std::string> out;
     std::istringstream is(text);
@@ -42,7 +42,7 @@ std::string HyPEEnricher::BuildPrompt(const std::string& chunk_text,
                                       const std::string& parent_text,
                                       const DocumentMetadata& doc_meta,
                                       int k) const {
-    // §6.1 Phase-1 English template v1. parent_text is optional (reconcile 2):
+    // Phase-1 English template v1. parent_text is optional (reconcile 2):
     // when empty the "Parent context" section is OMITTED entirely (a blank
     // context block would just waste tokens / confuse the model).
     std::ostringstream os;
@@ -70,13 +70,13 @@ Result<std::vector<std::string>> HyPEEnricher::ParseQuestions(
     const std::string& llm_output, int expected_k) {
     std::vector<std::string> questions = SplitLines(llm_output);
     if (questions.empty()) {
-        // Entirely empty / whitespace output → invalid LLM output (§7).
+        // Entirely empty / whitespace output → invalid LLM output.
         return HypeStatus(HypeErrorCode::kLlmInvalidOutput,
                           "empty output, expected " + std::to_string(expected_k) +
                               " questions");
     }
     if (static_cast<int>(questions.size()) != expected_k) {
-        // §6.2: count mismatch → parse failure (transient, retryable).
+        //: count mismatch → parse failure (transient, retryable).
         return HypeStatus(HypeErrorCode::kQuestionParseFailed,
                           "expected " + std::to_string(expected_k) +
                               " questions, got " +
@@ -123,7 +123,7 @@ Result<std::vector<HypeQuestion>> HyPEEnricher::GenerateHypeQuestions(
         return HypeStatus(HypeErrorCode::kLlmTimeout, resp.status.message());
     }
 
-    // §6.2 strict parse: exactly K lines, else CX_ERR_HYPE_QUESTION_PARSE_FAILED /
+    // strict parse: exactly K lines, else CX_ERR_HYPE_QUESTION_PARSE_FAILED /
     // CX_ERR_HYPE_LLM_INVALID_OUTPUT (S2).
     Result<std::vector<std::string>> parsed = ParseQuestions(resp.content, k);
     if (!parsed.ok()) {
@@ -148,7 +148,7 @@ EnrichResult HyPEEnricher::Enrich(const std::string& chunk_text,
                                   const ChunkContext& ctx) {
     (void)ctx;  // parent_id is not in the frozen 3-param signature (reconcile 2);
                 // standalone Enrich() runs HyPE with no parent context. The real
-                // pipeline resolves parent_text + writes hype_question Blocks → D3.5.
+                // pipeline resolves parent_text + writes hype_question Blocks → integration.
     EnrichResult result;
     result.enricher_name = Name();
     result.model_used = config_.llm_model;
@@ -156,7 +156,7 @@ EnrichResult HyPEEnricher::Enrich(const std::string& chunk_text,
 
     // reconcile 1: the frozen EnrichResult has no hype_questions slot, so Enrich()
     // only reports the HyPE outcome status. Questions are produced by
-    // GenerateHypeQuestions(); the pipeline calls that + builds Blocks at D3.5.
+    // GenerateHypeQuestions(); the pipeline calls that + builds Blocks at integration.
     Result<std::vector<HypeQuestion>> q = GenerateHypeQuestions(
         chunk_text, /*parent_text=*/"", doc_meta, /*source_child_id=*/"",
         /*source_parent_id=*/"");
@@ -164,7 +164,7 @@ EnrichResult HyPEEnricher::Enrich(const std::string& chunk_text,
         // Transparent degrade: HyPE skipped, chunk Block still written
         // upstream. error_meta carries the Agent-friendly detail (S5 fills the
         // canonical category/retryable from the registry).
-        result.status = 1;  // non-zero = failed (S5 maps to the EnricherErrorCode/§7)
+        result.status = 1;  // non-zero = failed (S5 maps to the EnricherErrorCode/)
         result.error_msg = q.status().message();
         result.error_meta.structured_data =
             std::string("{\"enricher\":\"hype\"}");

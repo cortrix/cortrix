@@ -52,12 +52,12 @@ TEST(PendingEntryTest, CommittedRoundTrip) {
     EXPECT_EQ(out->timestamp_ms, 123456789);
     EXPECT_TRUE(out->doc_id.empty());
     EXPECT_TRUE(out->block_ids.empty());
-    EXPECT_FALSE(out->has_blob);  // terminal records carry no has_blob byte (§3.1)
+    EXPECT_FALSE(out->has_blob);  // terminal records carry no has_blob byte
 }
 
 TEST(PendingEntryTest, PendingHasBlobFalseRoundTrip) {
     // The blob-less case (watch_dir / CDC / memory): has_blob=false must survive
-    // the round trip so Recover skips the blob check (§4.4, the §10.4 fix).
+    // the round trip so Recover skips the blob check (the fix).
     PendingEntry in;
     in.state = State::kPending;
     in.txn_id = 11;
@@ -72,7 +72,7 @@ TEST(PendingEntryTest, PendingHasBlobFalseRoundTrip) {
 }
 
 TEST(PendingEntryTest, HasBlobByteIsPendingOnly) {
-    // The has_blob byte sits between block_ids and the CRC, PENDING only (§3.1
+    // The has_blob byte sits between block_ids and the CRC, PENDING only (
     // v1.0.2). A terminal record keeps its fixed 31-byte frame (no doc_id, no
     // block_ids, no has_blob byte); a PENDING frame is larger and parses cleanly.
     PendingEntry term;

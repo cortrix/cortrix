@@ -26,7 +26,7 @@ namespace cortrix::memory {
 // opt-out double-check (worker logic, kernel-side here instead of the design's
 // Python middleware): before extracting, the worker (1) skips when the session is
 // opted out (records operation_log.memory_extract_skipped) and (2) skips +
-// session-opts-out when interaction.remember==false (D2). When no LLM is configured the
+// session-opts-out when interaction.remember==false. When no LLM is configured the
 // service is OFF — interactions are still written (interaction_log) but never extracted.
 class MemoryExtractionService {
 public:
@@ -74,7 +74,7 @@ public:
     MemoryExtractionResult ExtractOne(const InteractionLog& interaction,
                                       const observability::TraceContext* ctx = nullptr);
 
-    /// D9 admin revoke (#22 HTTP wiring): restore a prior invalidation. Acquires the
+    /// admin revoke (#22 HTTP wiring): restore a prior invalidation. Acquires the
     /// NS façade and builds the NS-scoped MemoryExtractor (same construction as
     /// ExtractOne — sessions / blocks are NS-scoped), then delegates to
     /// MemoryExtractor::RevokeInvalidation. Unlike extraction this works even when the

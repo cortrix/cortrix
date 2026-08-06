@@ -97,7 +97,7 @@ private:
     /// successful upload. No-op when op_logger_ is null. Identity (user_id / trace_id /
     /// session_id) is read from the thread-local ObservabilityContext by MakeEngineEntry
     /// (HandleUpload runs synchronously on the request thread WithAuth populated). Never
-    /// throws across the business path (C4 — the logger itself is no-throw, §5.1).
+    /// throws across the business path (C4 — the logger itself is no-throw).
     void EmitUploadLog(const std::string& namespace_name, const std::string& doc_id,
                        const std::string& filename, const std::string& status);
 

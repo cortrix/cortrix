@@ -8,15 +8,15 @@
 // modality), with chunker, contextual and sparse columns ALTER'd onto `blocks` by their per-Unit
 // SchemaProviders (ParentChildSchemaProvider owns child_id/parent_id/token_count/
 // parent_offset + the 3 indexes; metadata in blocks.metadata_json). See
-// ARCHITECTURE.md § 1.3.bis.3 documents the durable in-repository model.
+// ARCHITECTURE.md documents the durable in-repository model.
 //
-//   - kParentsSchemaSql  — the `parents` table (parent_text store, § D6: SQLite
-//       over Blob for < 10MB/parent + sub-ms single-point lookup, + D8 hotness
+//   - kParentsSchemaSql  — the `parents` table (parent_text store,: SQLite
+//       over Blob for < 10MB/parent + sub-ms single-point lookup, + hotness
 //       fields reserved). ParentChildSchemaProvider creates this in the production
 //       MigrateUnit path; SqliteParentChunkStore (standalone) also creates it.
 //   - kChildrenSchemaSql — LEGACY. The pre-A standalone `children` table, kept ONLY
 //       for SqliteParentChunkStore's standalone unit tests until the SPC write path
-//       writes children into `blocks` (D3.5 SPC wiring). NOT created by any
+//       writes children into `blocks` (integration SPC wiring). NOT created by any
 //       SchemaProvider; not part of the A unified-blocks model. Slated for removal
 //       once SqliteParentChunkStore's write path targets blocks.
 
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS parents (
     byte_offset_end   INTEGER NOT NULL,
     metadata_json    TEXT NOT NULL,
     created_at   INTEGER NOT NULL,
-    -- D8 reserved (V1.0 neither written nor read, Phase 2 per-parent hotness)
+    -- reserved (V1.0 neither written nor read, Phase 2 per-parent hotness)
     access_count    INTEGER NOT NULL DEFAULT 0,
     last_access_at  INTEGER,
     hotness_score   REAL NOT NULL DEFAULT 0.0
@@ -47,7 +47,7 @@ CREATE INDEX IF NOT EXISTS idx_parents_ns  ON parents(namespace_id, created_at);
 
 // children — LEGACY (pre-A). See header note. Under A unified-blocks, child chunks
 // are rows of `blocks`; this table is retained only for SqliteParentChunkStore's
-// standalone path until SPC writes children to blocks (D3.5).
+// standalone path until SPC writes children to blocks (integration).
 inline constexpr const char* kChildrenSchemaSql = R"SQL(
 CREATE TABLE IF NOT EXISTS children (
     child_id     TEXT PRIMARY KEY,

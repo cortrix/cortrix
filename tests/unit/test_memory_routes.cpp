@@ -34,7 +34,7 @@ using json = nlohmann::json;
 using ::testing::Return;
 using ::testing::_;
 
-// D3.5 wire⑤c: the routes were migrated off the MVP CortrixNamespaceManager onto
+// integration wire⑤c: the routes were migrated off the MVP CortrixNamespaceManager onto
 // the namespace pool resource::INamespacePool + per-request resource::NamespaceFacade. These
 // tests therefore stand up a real DefaultNamespacePool via the shared NsPoolHarness
 // (mocked catalog routers + a real WriteCoordinator over a temp dir) and admit the
@@ -1069,7 +1069,7 @@ TEST_F(MemoryRoutesTest, SearchSessionScopeMissingSessionId) {
 }
 
 // Memory isolation: at the HTTP route level a missing user_id is NOT a 400 — CE no-auth
-// mode injects user_id="default" before validation (design § CE single-user compatibility).
+// mode injects user_id="default" before validation (design single-user compatibility).
 // The 400-on-empty-user_id contract is enforced by MemorySearchRequest::Validate()
 // directly (see test_memory_searcher memory isolation unit tests).
 TEST_F(MemoryRoutesTest, SearchUserScopeMissingUserIdDefaultsToDefaultUser) {
@@ -1409,7 +1409,7 @@ TEST_F(MemoryRoutesInteractionLimitTest, WriteInteractionAtMaxLimitRejected) {
     EXPECT_EQ(res2->status, 400);
 }
 
-// D9 admin revoke when NO extraction service is wired (this fixture's default): the
+// admin revoke when NO extraction service is wired (this fixture's default): the
 // route cannot honor the revoke, so it returns an honest 503 (service unavailable) —
 // never a misleading 200 "accepted" (GEN-Agent honesty, CLAUDE.md sec.5). The wired
 // 200 path is covered by AdminRevokeWiredRestoresActive below (separate server with a
@@ -1429,7 +1429,7 @@ TEST_F(MemoryRoutesTest, AdminRevokeNoServiceReturns503) {
 // #22 wired path: a server with a REAL MemoryExtractionService honors the admin
 // revoke end-to-end. Seeds an invalidated block into the live "default" NS store,
 // POSTs the revoke, and asserts 200 + the block is active again (real dependency
-// stack — only the live stack proves a D3.5-mounted wiring, not a mock).
+// stack — only the live stack proves a integration-mounted wiring, not a mock).
 TEST_F(MemoryRoutesTest, AdminRevokeWiredRestoresActive) {
     // A real extraction service (no LLM needed — revoke is a pure store transition).
     memory::MemoryExtractionService extraction(

@@ -10,7 +10,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/spc/cleaning_errors.h"
 
-// Cleaning (D9): the 7 CX_ERR_CLEANING_* identities + category/retryability registry
+// Cleaning: the 7 CX_ERR_CLEANING_* identities + category/retryability registry
 // + MakeCleaningError boundary factory. Mirrors the catalog/parser error tests.
 namespace cortrix::spc {
 namespace {
@@ -55,7 +55,7 @@ TEST(CleaningErrorTest, RetryableIffRetryAfterPresent) {
     }
 }
 
-// Exact §5.1 rows.
+// Exact rows.
 TEST(CleaningErrorTest, RowsMatchSpec) {
     auto check = [](CleaningErrorCode c, const char* cx, ErrorCategory cat,
                     bool retry, std::optional<int> after) {
@@ -82,7 +82,7 @@ TEST(CleaningErrorTest, RowsMatchSpec) {
 }
 
 // MakeCleaningError fills the boundary body from the registry; ToJson yields the
-// AGENT_FRIENDLY §3.1 shape.
+// the Agent-friendly contract shape.
 TEST(CleaningErrorTest, MakeCleaningErrorBuildsAgentFriendlyBody) {
     auto err = MakeCleaningError(CleaningErrorCode::kPluginTimeout,
                                  {{"plugin", "redactor"}, {"timeout_ms", 3000}},

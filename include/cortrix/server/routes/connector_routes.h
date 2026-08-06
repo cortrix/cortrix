@@ -12,7 +12,7 @@ class ApiKeyAuth;
 class NamespaceManager;
 class SPCManager;
 
-// D3.5 wire⑤c: connector routes acquire per-operation NamespaceFacades over the
+// integration wire⑤c: connector routes acquire per-operation NamespaceFacades over the
 // resource pool, and route namespace creation+admission through the catalog and
 // catalog router (the DirWatcherRegistry holds these two; the MVP NamespaceManager
 // is no longer on the watcher path).

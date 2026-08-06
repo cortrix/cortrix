@@ -153,7 +153,7 @@ std::string RenderBloomFilterMetrics(const BloomFilterMetricSource& src) {
            << src.false_positive_rate() << "\n";
     }
     if (src.last_rebuild_epoch_sec) {
-        // §10.1: Unix epoch second. A never-rebuilt filter (-1) emits 0.
+        //: Unix epoch second. A never-rebuilt filter (-1) emits 0.
         int64_t ts = src.last_rebuild_epoch_sec();
         if (ts < 0) ts = 0;
         os << "# HELP cortrix_bloom_filter_last_rebuild_ts BF last rebuild time (Unix epoch second).\n";

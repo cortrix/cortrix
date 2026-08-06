@@ -13,7 +13,7 @@
 #include "parser_stub.h"
 
 // Parser S1 coverage: IDocumentParser interface contract (StubParser) + the
-// ParserErrorCode registry (§2.7 / §5.2 Agent-friendly mapping). Mirrors the
+// ParserErrorCode registry (Agent-friendly mapping). Mirrors the
 // catalog_error test for the registry half.
 namespace cortrix::spc {
 namespace {
@@ -64,7 +64,7 @@ TEST(ParserInterfaceTest, ChunkTypeRoundTripsThroughString) {
     EXPECT_EQ(ChunkTypeFromString("NONSENSE"), ChunkType::TEXT);
 }
 
-// --- ParserErrorCode registry (§2.7 + §5.2) ---
+// --- ParserErrorCode registry ---
 
 // All 16 codes, in enum order. Explicit (not a loop over ints) so the test
 // documents the locked set and fails to compile if an enumerator disappears.
@@ -107,7 +107,7 @@ TEST(ParserErrorTest, EnumValuesMatchWireProtocol) {
     EXPECT_EQ(static_cast<int>(ParserErrorCode::kMaxPagesExceeded), 15);
 }
 
-// kOk and kEmptyDocument are the only non-error outcomes (§5.1: empty doc =>
+// kOk and kEmptyDocument are the only non-error outcomes (empty doc =>
 // status=OK, pages=[]).
 TEST(ParserErrorTest, OnlyOkAndEmptyAreNonError) {
     for (ParserErrorCode code : AllCodes()) {
@@ -132,7 +132,7 @@ TEST(ParserErrorTest, EveryCodeHasUniqueWellFormedCxString) {
 }
 
 // retryable ⇔ retry_after_ms present, and only transient/timeout codes retry
-// (mirrors the §5.2 retry_after_ms column).
+// (mirrors the retry_after_ms column).
 TEST(ParserErrorTest, RetryableIffRetryAfterPresent) {
     for (ParserErrorCode code : AllCodes()) {
         const ParserErrorInfo& info = GetParserErrorInfo(code);
@@ -147,7 +147,7 @@ TEST(ParserErrorTest, RetryableIffRetryAfterPresent) {
     }
 }
 
-// Spot-check the exact §5.2 rows downstream consumers (HTTP API / async task progress)
+// Spot-check the exact rows downstream consumers (HTTP API / async task progress)
 // depend on.
 TEST(ParserErrorTest, SpecificRowsMatchSpec) {
     auto check = [](ParserErrorCode c, const char* cx, ErrorCategory cat,
@@ -175,7 +175,7 @@ TEST(ParserErrorTest, SpecificRowsMatchSpec) {
 }
 
 // MakeParserError fills the boundary error from the registry, injects the code
-// into structured_data, and ToJson yields the AGENT_FRIENDLY §3.1 body shape.
+// into structured_data, and ToJson yields the Agent-friendly contract body shape.
 TEST(ParserErrorTest, MakeParserErrorBuildsAgentFriendlyBody) {
     nlohmann::json sd = {{"actual_size_mb", 350}, {"limit_mb", 200},
                          {"tier", "ce"}};
@@ -211,7 +211,7 @@ TEST(ParserErrorTest, RetryableCodeExposesRetryAfterInJson) {
     EXPECT_EQ(body["message"], "Subprocess timeout");
 }
 
-// Required structured_data keys match §5.2 and the completeness check works.
+// Required structured_data keys match and the completeness check works.
 TEST(ParserErrorTest, RequiredStructuredDataKeysEnforced) {
     // FILE_TOO_LARGE requires actual_size_mb / limit_mb / tier.
     nlohmann::json complete = {{"code", "CX_ERR_FILE_TOO_LARGE"},

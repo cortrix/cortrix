@@ -10,9 +10,9 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/config/auth_config.h"
 
-// Auth S4: JWT auth-middleware decision logic + /me response builder (§2.16 /
-// §4.3 / §2.9). The httplib route mounting + CE/Cloud edition switch + protecting
-// existing routes is cross-Feature server wiring → D3.5; this exercises the pure
+// Auth S4: JWT auth-middleware decision logic + /me response builder (/
+//). The httplib route mounting + CE/Cloud edition switch + protecting
+// existing routes is cross-Feature server wiring → integration; this exercises the pure
 // logic those will call.
 namespace cortrix::auth {
 namespace {
@@ -51,7 +51,7 @@ TEST(MiddlewareHelpersTest, IsApiKeyToken) {
     EXPECT_FALSE(JwtAuthMiddleware::IsApiKeyToken(""));
 }
 
-// ---- AuthenticateHeaders decision logic (§4.3) ----
+// ---- AuthenticateHeaders decision logic ----
 
 // `Middleware_ValidToken`: a valid Bearer JWT → AuthContext populated.
 TEST_F(MiddlewareTest, ValidToken) {
@@ -88,7 +88,7 @@ TEST_F(MiddlewareTest, InvalidToken) {
 
 // `Middleware_ApiKeyFallback`: an X-API-Key (or cortrix_sk_ bearer) is routed to
 // the API-Key path (S6). Here AuthenticateHeaders reports "not the JWT path"
-// (CX_ERR_NOT_FOUND) so D3.5 wiring delegates to ApiKeyService.
+// (CX_ERR_NOT_FOUND) so integration wiring delegates to ApiKeyService.
 TEST_F(MiddlewareTest, ApiKeyFallbackDeferredToS6) {
     AuthService svc = Svc();
     JwtAuthMiddleware mw(&svc);
@@ -103,7 +103,7 @@ TEST_F(MiddlewareTest, ApiKeyFallbackDeferredToS6) {
 
 // E2E (unit-level, no httplib): register → login → authenticate succeeds; after
 // logout the same token is rejected (`E2E_RegisterLoginAccess` +
-// `E2E_RegisterLoginLogoutAccess` from §S4, minus the httplib route).
+// `E2E_RegisterLoginLogoutAccess` from, minus the httplib route).
 TEST_F(MiddlewareTest, E2ERegisterLoginAccessThenLogout) {
     AuthService svc = Svc();
     ASSERT_TRUE(svc.Register("e2e@example.com", "Secure123!", "E2E").ok());
@@ -121,7 +121,7 @@ TEST_F(MiddlewareTest, E2ERegisterLoginAccessThenLogout) {
     EXPECT_NE(after.status().message().find("CX_ERR_AUTH_TOKEN_REVOKED"), std::string::npos);
 }
 
-// ---- /me response builder (§2.9) ----
+// ---- /me response builder ----
 
 TEST(MeResponseTest, BuildMeResponseJson) {
     UserInfo u;

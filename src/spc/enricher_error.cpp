@@ -15,11 +15,11 @@ namespace {
 // a code without a row" into a warning, which the project treats as a build
 // failure — the registry can't silently drift from the enum.
 //
-// retry_after_ms (§5.1 table): LLM_TIMEOUT → 1000; LLM_API → 2000; RATE_LIMIT →
+// retry_after_ms (table): LLM_TIMEOUT → 1000; LLM_API → 2000; RATE_LIMIT →
 // 60000 (default Retry-After header value, overridden per-call by the actual
 // header). The matrix's "-1 = N/A" sentinel for non-retryable codes is expressed
 // as std::nullopt (the AgentFriendlyError.retry_after_ms optional serializes to
-// JSON null, AGENT_FRIENDLY §3.1) — same convention as reranker_error.h.
+// JSON null, the Agent-friendly contract) — same convention as reranker_error.h.
 constexpr EnricherErrorInfo kInitFailed{
     "CX_ERR_ENRICHER_INIT_FAILED", ErrorCategory::kPermanent, false, std::nullopt};
 constexpr EnricherErrorInfo kLlmTimeout{
@@ -52,7 +52,7 @@ const char* EnricherErrorCodeString(EnricherErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(EnricherErrorCode code) {
-    // §5.1 structured_data column, 1:1. Function-local statics → stable refs.
+    // structured_data column, 1:1. Function-local statics → stable refs.
     // (json_snippet / missing_chunk_indices are layer-specific extras the PARSE
     // call site adds; only the always-present keys are required here.)
     static const std::vector<std::string> kInit{"reason", "endpoint", "fallback"};

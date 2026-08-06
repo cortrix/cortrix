@@ -4,8 +4,8 @@ These run under an independent admin scope and are NOT counted in the 29 main to
 Bearer claim role=admin is required (V1.0 fallback: CORTRIX_MCP_ADMIN=true env var);
 otherwise CX_ERR_MCP_ADMIN_REQUIRED (403) is raised.
 
-  A1 cortrix_admin_db_credential_register -> POST /admin/db-connections  (DB import D1)
-  A2 cortrix_admin_db_import_run          -> POST /import/database        (DB import D2)
+  A1 cortrix_admin_db_credential_register -> POST /admin/db-connections  (DB import)
+  A2 cortrix_admin_db_import_run          -> POST /import/database        (DB import)
 
 Both routes are live in the backend (import_routes.cpp) under kPermAdmin; the register
 route additionally sits behind the /api/v1/admin/* AdminGuard prefix.
@@ -29,7 +29,7 @@ def register(mcp) -> None:
         connection_ref: Optional[str] = None,
         description: Optional[str] = None,
     ) -> dict:
-        """Register a database connection credential (DB import D1; admin only).
+        """Register a database connection credential (DB import; admin only).
 
         Stores the secret in the encrypted secret store and returns a ref_id handle for
         later imports (the plaintext secret is never echoed back).
@@ -65,7 +65,7 @@ def register(mcp) -> None:
         filter: Optional[dict[str, Any]] = None,
         sql: Optional[str] = None,
     ) -> dict:
-        """Trigger a database import run (DB import D2; admin only).
+        """Trigger a database import run (DB import; admin only).
 
         Two modes (mutually exclusive):
           * table + filter — import rows from ``table`` matching an optional ``filter``.

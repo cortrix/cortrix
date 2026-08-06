@@ -14,10 +14,10 @@
 #include "cortrix/catalog/schema_provider.h"
 #include "cortrix/common/i_global_config.h"
 
-// S3 coverage: the MCP session handler (§7.1) — session_id resolution (generated
+// S3 coverage: the MCP session handler — session_id resolution (generated
 // vs validated client id), per-tool_call agent_trace double-write, the Phase-1
 // 10K hard limit (drop + metric), session_end on close, idle-timeout backstop,
-// and the §3 truncation helpers.
+// and the truncation helpers.
 namespace cortrix::agent_trace {
 namespace {
 

@@ -17,7 +17,7 @@ namespace cortrix::spc {
 /// Layers:
 ///   - L3 (whole-batch): body is not a parseable JSON object → EVERY result gets
 ///     status=kParse, layer="L3", score=0. (Caller does NOT count L3 toward the
-///     circuit breaker — §4.2.)
+///     circuit breaker)
 ///   - L2 (chunk missing): the object parses but a chunk index key is absent →
 ///     that result gets status=kParse, layer="L2"; others proceed.
 ///   - L1 (field missing/malformed inside a chunk): default empty value for the

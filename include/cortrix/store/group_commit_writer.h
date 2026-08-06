@@ -30,7 +30,7 @@ public:
     virtual Status Sync() = 0;
 };
 
-/// Runtime counters for observability (wired to OBSERVABILITY_SPEC metrics by
+/// Runtime counters for observability (wired to the observability spec metrics by
 /// the consuming feature). Snapshot via GroupCommitWriter::GetStats().
 struct GroupCommitStats {
     uint64_t submitted = 0;  ///< total Submit() calls accepted
@@ -40,7 +40,7 @@ struct GroupCommitStats {
     uint64_t pending   = 0;  ///< entries queued but not yet flushed (live)
 };
 
-/// Group-commit WAL writer (shared scaffolding D2-pre-1).
+/// Group-commit WAL writer (shared scaffolding).
 ///
 /// Many threads call Submit() concurrently; a single background thread coalesces
 /// the queued entries into batches — bounded by `max_batch` entries or

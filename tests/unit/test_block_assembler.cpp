@@ -78,7 +78,7 @@ TEST(BlockAssemblerTest, AssembleEmptyMetadata) {
 }
 
 TEST(BlockAssemblerTest, MintsNonZeroUniqueBlockId) {
-    // D3.5 wire⑤: every assembled block gets a real uint64 block_id =
+    // integration wire⑤: every assembled block gets a real uint64 block_id =
     // HashChildIdToBlockId(a freshly-minted child_id ULID), not a DB rowid. Two
     // assembles of the same chunk get distinct ids (distinct child_ids).
     id::SetDeploymentHashKeyForTesting({0x0123456789abcdefULL, 0xfedcba9876543210ULL});

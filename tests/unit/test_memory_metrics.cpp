@@ -6,7 +6,7 @@
 
 // S6 coverage: the 5 cortrix_memory_transparency_* metrics — counters +
 // per-op latency histogram recording + the OpenMetrics renderer + label-enum
-// discipline (OBS_SPEC §3.2 no high-cardinality labels).
+// discipline (OBS_SPEC no high-cardinality labels).
 namespace cortrix::memory::transparency {
 namespace {
 
@@ -131,7 +131,7 @@ TEST_F(MemoryMetricsTest, OpLatencyHistogramBucketsAreCumulativeAndComplete) {
 }
 
 TEST_F(MemoryMetricsTest, RenderHasNoHighCardinalityLabels) {
-    // OBS_SPEC §3.2 / memory transparency: labels are enum-only. No tenant_id / ns_id / user_id.
+    // OBS_SPEC / memory transparency: labels are enum-only. No tenant_id / ns_id / user_id.
     M().RecordOp(Op::kList, OpStatus::kSuccess);
     M().ObserveOpLatency(Op::kList, 10);
     M().RecordInvalidInput(ErrorCodeLabel::kUserMismatch);

@@ -14,15 +14,15 @@
 
 #include <nlohmann/json.hpp>
 
-#include "cortrix/catalog/schema_provider.h"     // [D3.5-B] SchemaMigrator (MigrateUnit)
+#include "cortrix/catalog/schema_provider.h"     // [integration-B] SchemaMigrator (MigrateUnit)
 #include "cortrix/common/executor_engine.h"
-#include "cortrix/id/types.h"  // ToSqliteInt (BlockId → SQLite int64, ARCH §1.8)
+#include "cortrix/id/types.h"  // ToSqliteInt (BlockId → SQLite int64, ARCH)
 #include "cortrix/logging/logging.h"             // CORTRIX_LOG_WARN (step 8b)
 #include "cortrix/memory/memory_store.h"         // step 8c memory.db pre-warm (D-I1.bis)
 #include "cortrix/store/cortrix_store_sqlite.h"  // step 8b doc crash recovery view (D-I1.bis)
 #include "cortrix/observability/observability_context.h"
 #include "cortrix/resource/ns_pool_metrics.h"
-#include "cortrix/store/block_framework_schema_provider.h"   // [D3.5-B] per-Unit framework provider
+#include "cortrix/store/block_framework_schema_provider.h"   // [integration-B] per-Unit framework provider
 #include "cortrix/store/parent_child_schema_provider.h"   // [A unified-blocks] child cols + parents + indexes
 #include "cortrix/spc_enricher/enricher_schema_provider.h"  // unified-blocks: enriched_score +3 + entities + FTS5
 #include "cortrix/scoring/scoring_schema_provider.h"   // unified-blocks: semantic_score col (gap-fill 2026-06-08)
@@ -44,11 +44,11 @@ int64_t NowMs() {
         .count();
 }
 
-// Emit one OBS_SPEC §6 structured log line (§10.2). The metric *recorder*
-// (cortrix_ns_pool_* counters/gauges/histograms, §10.1) is now implemented in
+// Emit one OBS_SPEC structured log line. The metric *recorder*
+// (cortrix_ns_pool_* counters/gauges/histograms) is now implemented in
 // ns_pool_metrics.{h,cpp} (NsPoolMetrics::Instance(), fed from this file); only
 // registering it into the `/metrics` scrape endpoint is still cross-component
-// wiring → D3.5. The A-class values are also exposed via GetPoolStats() and the
+// wiring → integration. The A-class values are also exposed via GetPoolStats() and the
 // durations via StartupReport. Standalone we emit both the structured-log half
 // (here) and the metric half (NsPoolMetrics feed points below).
 void LogEvent(obs::LogLevel level, const std::string& event,
@@ -58,10 +58,10 @@ void LogEvent(obs::LogLevel level, const std::string& event,
     obs::ObservabilityContext::ThreadLocal().LogStructured(level, line.dump());
 }
 
-// Per-Unit on-disk layout for standalone D3: <data_root>/<unit_id>/ holds the
+// Per-Unit on-disk layout for standalone: <data_root>/<unit_id>/ holds the
 // index, pending.wal and store.db for that Unit. The real production scheme is
 // owned by the catalog / deployment (how the filesystem is laid out per Unit) and is an
-// integration concern → resolved at D3.5; standalone derives it deterministically
+// integration concern → resolved at integration; standalone derives it deterministically
 // so the load path and its tests are reproducible.
 std::string UnitDataDir(const std::string& data_root, const std::string& unit_id) {
     if (data_root.empty()) return unit_id;
@@ -82,7 +82,7 @@ std::string UnitBlobDir(const std::string& unit_data_dir) {
 // WriteCoordinator's three-way Recover consistency check has its metadata + blob
 // "does this exist?" answers WITHOUT requiring the façade layer (D-I4 unbroken).
 // They borrow the resource layer's own backends: the store.db conn and the
-// <unit_dir>/blob directory — see §9.2.
+// <unit_dir>/blob directory — see
 
 /// IMetadataStore over the Unit's store.db conn. BlockExists = "every block_id is
 /// a row in `blocks`" via one COUNT(*) … IN (…) query. A prepare/step failure
@@ -160,7 +160,7 @@ size_t DefaultNamespacePool::CurrentMemoryUsedLocked() const {
 }
 
 void DefaultNamespacePool::RefreshPoolGauges() const {
-    // §10.1 cortrix_ns_pool_size + cortrix_ns_pool_memory_budget_used_bytes — take
+    // cortrix_ns_pool_size + cortrix_ns_pool_memory_budget_used_bytes — take
     // a snapshot of the resident pool under the shared lock and push it to the
     // gauges. Called after any pool mutation (admit / evict / startup).
     int64_t size = 0;
@@ -194,14 +194,14 @@ void DefaultNamespacePool::RecordRejection(const std::string& namespace_id,
             recent_rejections_.pop_front();
         }
     }
-    // §10.2 NAMESPACEPOOL_POOL_REJECTION (WARN). Structured fields mirror the RejectionEvent.
+    // NAMESPACEPOOL_POOL_REJECTION (WARN). Structured fields mirror the RejectionEvent.
     LogEvent(obs::LogLevel::kWarn, "NAMESPACEPOOL_POOL_REJECTION",
              {{"namespace_id", ev.namespace_id},
               {"reason", ev.reason},
               {"budget_used", ev.budget_used},
               {"budget_limit", ev.budget_limit},
               {"estimated_size", ev.estimated_size}});
-    // §10.1 cortrix_ns_pool_rejected_creates_total{reason}. The two callers pass
+    // cortrix_ns_pool_rejected_creates_total{reason}. The two callers pass
     // the exact reason strings that map 1:1 to the metric label enum.
     const std::string reason_str(reason);
     NsPoolMetrics::Instance().RecordRejectedCreate(
@@ -212,7 +212,7 @@ void DefaultNamespacePool::RecordRejection(const std::string& namespace_id,
 
 Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
     const std::string& ns_id) {
-    // §10.1 cortrix_ns_pool_ns_load_duration_seconds — time the per-NS load. This
+    // cortrix_ns_pool_ns_load_duration_seconds — time the per-NS load. This
     // is the single common load path (startup, admit-create, reload all reach it),
     // so every NS load is observed exactly once. Observed on every return via the
     // scope guard below (success or failure).
@@ -244,8 +244,8 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
     }
     std::unique_ptr<cortrix::store::IIndex> index = std::move(idx_res.value());
 
-    // 3. Open store.db + apply the 6 PRAGMAs — BEFORE the coordinator (D3.5 C1,
-    //    §9.1 ordering fix): the metadata recover adapter borrows this conn and
+    // 3. Open store.db + apply the 6 PRAGMAs — BEFORE the coordinator (integration C1,
+    //    ordering fix): the metadata recover adapter borrows this conn and
     //    SetRollbackCallback needs it, so store.db must exist before the WC.
     auto store_db = std::make_unique<SqliteConn>();
     Status opened = store_db->Open(StoreDbPath(unit_dir));
@@ -253,9 +253,9 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
         return PoolStatus(PoolErrorCode::kNsLoadFailed,
                           "open_store_db: " + opened.message());
     }
-    store_db->ApplyPragmas(config_.pragmas);  // tolerated on failure (§7.1)
+    store_db->ApplyPragmas(config_.pragmas);  // tolerated on failure
 
-    // 3b. [D3.5-B] Per-Unit schema migration (ARCH §1.3.bis.3 unified governance) —
+    // 3b. [integration-B] Per-Unit schema migration (ARCH unified governance) —
     //     run ONCE here, BEFORE the recover adapters (step 4) and the WC Recover
     //     (step 8), so documents/blocks exist before any read/write or the rollback
     //     DELETE FROM blocks. BlockFrameworkSchemaProvider owns the framework schema; this
@@ -265,7 +265,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
         cortrix::store::BlockFrameworkSchemaProvider block_provider;
         cortrix::store::ParentChildSchemaProvider parent_child_provider;  // unified-blocks: after the block header (needs blocks)
         cortrix::spc::EnricherSchemaProvider enrich_provider;    // [A unified-blocks] enriched_score +3 cols + entities + FTS5
-        cortrix::scoring::ScoringSchemaProvider scoring_provider;  // [A unified-blocks] semantic_score col (§1.3.bis.3 #6, gap-fill 2026-06-08)
+        cortrix::scoring::ScoringSchemaProvider scoring_provider;  // [A unified-blocks] semantic_score col (#6, gap-fill 2026-06-08)
         cortrix::spc::ContextualSchemaProvider contextual_provider;    // [A unified-blocks] contextualized/embedding cols
         cortrix::doc_summary::DocSummarySchemaProvider doc_summary_provider;  // [A unified-blocks] doc-level doc_fts5_index (block_type=17 reuses blocks)
         cortrix::retrieval::SparseSchemaProvider sparse_provider;  // [A unified-blocks] sparse_vec + inverted index
@@ -294,7 +294,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
     auto blob_recover =
         std::make_unique<BlobRecoverAdapter>(UnitBlobDir(unit_dir));
 
-    // 5. Cross-cast the index handle to IVectorStore for the coordinator (§9.3 ★
+    // 5. Cross-cast the index handle to IVectorStore for the coordinator (★
     //    type contract): bundle.index is an IIndex*, but WriteCoordinator needs an
     //    IVectorStore* — independent base classes (i_vector_store.h), so PHnsw's
     //    multiple inheritance requires an RTTI sibling cross-cast (static_cast is
@@ -306,7 +306,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
     }
 
     // 6. Construct the per-NS WriteCoordinator over the three stores (factory
-    //    news + Init()s it; §6.3 step 3 / §9.3 step 6).
+    //    news + Init()s it; step 3 / step 6).
     auto coord_res = write_coord_factory_(unit_dir, config_.write_coord_config,
                                           vstore, meta_recover.get(),
                                           blob_recover.get());
@@ -318,7 +318,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
         std::move(coord_res.value());
 
     if (coord) {
-        // 7. Register the rollback cleanup (§9.4) BEFORE Recover — Recover replays
+        // 7. Register the rollback cleanup BEFORE Recover — Recover replays
         //    it for any PENDING-only txn that needs cleanup. Phase 1 cleanup =
         //    drop the vectors (idempotent MarkDelete) + delete the metadata blocks.
         //    Captures stay valid for the bundle's lifetime: moving the unique_ptrs
@@ -373,7 +373,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
                 return Status::Ok();
             });
 
-        // 8. Crash recovery — three stores now all non-null (§6.3 step 9).
+        // 8. Crash recovery — three stores now all non-null (step 9).
         Status recovered = coord->Recover();
         if (!recovered.ok()) {
             return PoolStatus(PoolErrorCode::kNsLoadFailed,
@@ -381,7 +381,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
         }
     }
 
-    // 8b. Doc-level crash recovery (§6.3.bis step 5.5, D-I1.bis) — AFTER the WC
+    // 8b. Doc-level crash recovery (step 5.5, D-I1.bis) — AFTER the WC
     //     Recover (bottom-up: block-level three-way consistency first, then the
     //     doc state machine): reset 'processing' docs to 'pending' (+ drop their
     //     partial blocks) and complete 'deleting' cascades. Runs ONCE here on the
@@ -419,7 +419,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
         }
     }
 
-    // 9. Assemble the bundle (§6.3 step 10). Move order mirrors the §9.3 field
+    // 9. Assemble the bundle (step 10). Move order mirrors the field
     //    declaration order; pwl last so it destructs first.
     NamespaceResourceBundle bundle;
     bundle.namespace_id = ns_id;
@@ -437,7 +437,7 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
 
 Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespace(
     const std::string& ns_id) {
-    // §6.3 C1 fix: enforce a hard per-NS timeout so one slow/hung NS load cannot
+    // C1 fix: enforce a hard per-NS timeout so one slow/hung NS load cannot
     // stall the whole startup. The inner load runs on its own async task; we wait
     // up to load_timeout_ms_per_ns for it. On timeout we deliberately do NOT
     // detach-and-kill — the future stays alive (its thread finishes in the
@@ -464,13 +464,13 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespace(
     return fut.get();
 }
 
-// ── admission control (§5) ───────────────────────────────────────────────────
+// ── admission control ───────────────────────────────────────────────────
 
 Status DefaultNamespacePool::AdmitCreate(const std::string& namespace_id,
                                          size_t estimated_size_bytes) {
     std::unique_lock<std::shared_mutex> lock(pool_mutex_);
 
-    // Gate 1 — NS count (§5.1). Re-admitting an already-resident NS is not a quota
+    // Gate 1 — NS count. Re-admitting an already-resident NS is not a quota
     // hit (idempotent create from a retried catalog op): only a *new* NS counts.
     // A slot still marked pending_delete (a DeleteNamespace racing this create) is
     // treated as NOT resident: we cancel the pending reap and reload below, so the
@@ -493,7 +493,7 @@ Status DefaultNamespacePool::AdmitCreate(const std::string& namespace_id,
                               " reached");
     }
 
-    // Gate 2 — memory budget, only when enabled (§5.1). Uses the live sum of
+    // Gate 2 — memory budget, only when enabled. Uses the live sum of
     // resident bundles plus the caller's estimate for the new NS.
     if (config_.memory_budget_bytes > 0 && !already_resident) {
         const size_t used = CurrentMemoryUsedLocked();
@@ -510,7 +510,7 @@ Status DefaultNamespacePool::AdmitCreate(const std::string& namespace_id,
 
     if (already_resident) return Status::Ok();  // idempotent re-admit
 
-    // Load the new NS into the pool (§5.1 "load new NS"). A load failure surfaces as
+    // Load the new NS into the pool ("load new NS"). A load failure surfaces as
     // CX_ERR_NS_LOAD_FAILED (the catalog maps the non-quota case to CX_ERR_NS_POOL_INTERNAL).
     auto loaded = LoadOneNamespaceInner(namespace_id);
     if (!loaded.ok()) {
@@ -524,7 +524,7 @@ Status DefaultNamespacePool::AdmitCreate(const std::string& namespace_id,
     slot.bundle = std::move(loaded.value());
     slot.refcount.store(0, std::memory_order_relaxed);
     slot.pending_delete.store(false, std::memory_order_release);
-    // §10.1 size / memory_budget_used gauges — set under the lock we already hold
+    // size / memory_budget_used gauges — set under the lock we already hold
     // (RefreshPoolGauges would re-lock → deadlock here).
     NsPoolMetrics::Instance().SetSize(static_cast<int64_t>(bundles_.size()));
     NsPoolMetrics::Instance().SetMemoryBudgetUsedBytes(
@@ -535,7 +535,7 @@ Status DefaultNamespacePool::AdmitCreate(const std::string& namespace_id,
     return Status::Ok();
 }
 
-// ── access (§3.2) ────────────────────────────────────────────────────────────
+// ── access ────────────────────────────────────────────────────────────
 
 Result<NamespaceResourceBundle*> DefaultNamespacePool::Acquire(
     const std::string& namespace_id) {
@@ -592,7 +592,7 @@ void DefaultNamespacePool::Release(const std::string& namespace_id) {
     if (slot.pending_delete.load(std::memory_order_acquire) &&
         slot.refcount.load(std::memory_order_acquire) == 0) {
         bundles_.erase(it);
-        // §10.1 size / memory_budget_used gauges — set under the lock we already hold.
+        // size / memory_budget_used gauges — set under the lock we already hold.
         NsPoolMetrics::Instance().SetSize(static_cast<int64_t>(bundles_.size()));
         NsPoolMetrics::Instance().SetMemoryBudgetUsedBytes(
             static_cast<int64_t>(CurrentMemoryUsedLocked()));
@@ -602,13 +602,13 @@ void DefaultNamespacePool::Release(const std::string& namespace_id) {
     }
 }
 
-// ── unload (§5.2 / §13.1) ────────────────────────────────────────────────────
+// ── unload ────────────────────────────────────────────────────
 
 Status DefaultNamespacePool::EvictForDelete(const std::string& namespace_id) {
     std::unique_lock<std::shared_mutex> lock(pool_mutex_);
     auto it = bundles_.find(namespace_id);
     // Idempotent: evicting an absent NS is Ok (the catalog rollback path may call this
-    // for an NS that never made it into the pool, §5.2).
+    // for an NS that never made it into the pool).
     if (it == bundles_.end()) return Status::Ok();
 
     NamespaceSlot& slot = it->second;
@@ -616,7 +616,7 @@ Status DefaultNamespacePool::EvictForDelete(const std::string& namespace_id) {
     // every Acquire, so this refcount read is stable: no new reference can appear
     // while we decide. If readers are in flight, DEFER — mark pending_delete (which
     // blocks new Acquires) and let the last Release reap the slot. This is the fix
-    // for the §13.1 DeleteNamespace UAF: erasing here while a NamespaceFacade holds
+    // for the DeleteNamespace UAF: erasing here while a NamespaceFacade holds
     // &slot.bundle would dangle its pointer for the rest of the request.
     if (slot.refcount.load(std::memory_order_acquire) > 0) {
         slot.pending_delete.store(true, std::memory_order_release);
@@ -629,14 +629,14 @@ Status DefaultNamespacePool::EvictForDelete(const std::string& namespace_id) {
     // No readers in flight → erase now. Dropping the bundle's unique_ptrs releases
     // index / WriteCoordinator / store.db here.
     bundles_.erase(it);
-    // §10.1 size / memory_budget_used gauges — set under the lock we already hold.
+    // size / memory_budget_used gauges — set under the lock we already hold.
     NsPoolMetrics::Instance().SetSize(static_cast<int64_t>(bundles_.size()));
     NsPoolMetrics::Instance().SetMemoryBudgetUsedBytes(
         static_cast<int64_t>(CurrentMemoryUsedLocked()));
     return Status::Ok();
 }
 
-// ── startup (§6) — S1 baseline; 8-worker concurrency + timeout land in S2 ─────
+// ── startup — S1 baseline; 8-worker concurrency + timeout land in S2 ─────
 
 Result<StartupReport> DefaultNamespacePool::StartupLoadAll() {
     StartupReport report;
@@ -648,7 +648,7 @@ Result<StartupReport> DefaultNamespacePool::StartupLoadAll() {
     }
     std::vector<std::string> ns_list = list_res.value().results;
 
-    // Startup admission backstop (§6.2): never load past the NS-count ceiling.
+    // Startup admission backstop: never load past the NS-count ceiling.
     if (ns_list.size() > config_.max_namespaces_per_instance) {
         LogEvent(obs::LogLevel::kError, "NAMESPACEPOOL_POOL_STARTUP_TRUNCATED",
                  {{"catalog_ns_count", ns_list.size()},
@@ -657,10 +657,10 @@ Result<StartupReport> DefaultNamespacePool::StartupLoadAll() {
     }
     report.total_namespaces = ns_list.size();
 
-    // Eager concurrent load on the shared bounded-queue thread pool (§6.2). The
+    // Eager concurrent load on the shared bounded-queue thread pool. The
     // queue is sized to hold every NS so Submit never blocks the startup thread;
     // `startup_load_workers` (default 8) caps real concurrency. Each task runs the
-    // timeout-guarded LoadOneNamespace (§6.3 C1). A per-NS load failure is recorded
+    // timeout-guarded LoadOneNamespace (C1). A per-NS load failure is recorded
     // and does NOT abort the others (UT11) — partial failure is reported via the
     // StartupReport + admin ReloadNamespace.
     const int workers = config_.startup_load_workers > 0
@@ -686,7 +686,7 @@ Result<StartupReport> DefaultNamespacePool::StartupLoadAll() {
             report.loaded_successfully++;
         } else {
             startup_load_failures_.fetch_add(1, std::memory_order_relaxed);
-            // §10.1 cortrix_ns_pool_startup_load_failures_total.
+            // cortrix_ns_pool_startup_load_failures_total.
             NsPoolMetrics::Instance().AddStartupLoadFailures(1);
             report.failed++;
             report.failed_namespaces.push_back(ns_list[i]);
@@ -704,7 +704,7 @@ Result<StartupReport> DefaultNamespacePool::StartupLoadAll() {
         std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - start)
             .count();
-    // §10.1 cortrix_ns_pool_startup_load_duration_seconds (whole-pool startup) +
+    // cortrix_ns_pool_startup_load_duration_seconds (whole-pool startup) +
     // refresh the size / memory_budget_used gauges to the post-startup state.
     NsPoolMetrics::Instance().ObserveStartupLoadDuration(
         static_cast<double>(report.total_duration_ms) / 1000.0);
@@ -736,20 +736,20 @@ Status DefaultNamespacePool::ReloadNamespace(const std::string& namespace_id) {
     // applies to a load-failed NS — which was never inserted, so refcount is 0 and
     // there is no pending_delete to worry about; assign just the bundle field.
     bundles_[namespace_id].bundle = std::move(loaded.value());
-    // Clear it from the startup-failed list on a successful reload (§8.3.3).
+    // Clear it from the startup-failed list on a successful reload.
     for (auto it = startup_failed_namespaces_.begin();
          it != startup_failed_namespaces_.end();) {
         it = (*it == namespace_id) ? startup_failed_namespaces_.erase(it)
                                    : it + 1;
     }
-    // §10.1 size / memory_budget_used gauges — set under the lock we already hold.
+    // size / memory_budget_used gauges — set under the lock we already hold.
     NsPoolMetrics::Instance().SetSize(static_cast<int64_t>(bundles_.size()));
     NsPoolMetrics::Instance().SetMemoryBudgetUsedBytes(
         static_cast<int64_t>(CurrentMemoryUsedLocked()));
     return Status::Ok();
 }
 
-// ── state queries (§3.2 / §9) ────────────────────────────────────────────────
+// ── state queries ────────────────────────────────────────────────
 
 PoolStats DefaultNamespacePool::GetPoolStats() const {
     PoolStats stats;

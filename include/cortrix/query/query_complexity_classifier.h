@@ -16,7 +16,7 @@ struct QueryContext;  // fwd-decl (defined in query/query_context.h); RouteAndUp
 
 /// QueryComplexityClassifier — the Adaptive-RAG query-complexity router
 /// It implements the shared IClassifier contract (ruling of the
-/// G3+G1.2 joint D1 — declared in cortrix::retrieval, reused here) and the
+/// G3+G1.2 joint — declared in cortrix::retrieval, reused here) and the
 /// router-specific RouteAndUpdateContext that writes the routing decision onto
 /// QueryContext (S3 ruling).
 ///
@@ -27,7 +27,7 @@ struct QueryContext;  // fwd-decl (defined in query/query_context.h); RouteAndUp
 /// drives it before RAG-Fusion, rerank and CRAG. Implementing retrieval::IClassifier across the
 /// namespace boundary is intentional and matches that documented contract.
 ///
-/// Routing algorithm (§6.1, in order):
+/// Routing algorithm (in order):
 ///   1. Agent ?route override (force_route arg)        → routing_decision_source="force_route"
 ///   2. NS-config force_route override                 → "ns_force_route"
 ///   3. heuristic chat rule guard (IsChatQuery)        → "rule" (Chat)
@@ -38,14 +38,14 @@ struct QueryContext;  // fwd-decl (defined in query/query_context.h); RouteAndUp
 ///   L3 transient inference fault → retry then default to Complex ("inference_failed_fallback").
 ///   L1 (NS disabled) / L2 (backend unavailable) → default to Complex ("classifier_unavailable").
 ///
-/// Standalone (D3): the backend is a HeuristicComplexityBackend stub (no ONNX); the
+/// Standalone: the backend is a HeuristicComplexityBackend stub (no ONNX); the
 /// real DistilBERT-tiny OnnxComplexityBackend + QueryPipeline step-3 wiring are
 /// The skip decisions are exposed via the static ShouldSkipRagFusion/ShouldSkipCrag
 /// helpers the QueryPipeline calls (this class never reaches into those stages).
 class QueryComplexityClassifier : public retrieval::IClassifier {
 public:
     /// @param backend  inference backend (HeuristicComplexityBackend standalone /
-    ///                 OnnxComplexityBackend in D3.5). May be null → IsAvailable()
+    ///                 OnnxComplexityBackend in integration). May be null → IsAvailable()
     ///                 ==false and routing takes the L2 "classifier_unavailable"
     ///                 default-Complex path (after the rule/force guards).
     /// @param config   resolved ComplexityConfig (defaults or NS-override).
@@ -66,7 +66,7 @@ public:
     }
     bool IsAvailable() const override;
 
-    /// router-specific (§6.1): route `ctx.query` and write the routing fields back onto
+    /// router-specific: route `ctx.query` and write the routing fields back onto
     /// `ctx` (routing_path / complexity_score / routing_decision_source /
     /// chat_path_triggered / multi_turn_context_warning), honoring an optional
     /// Agent `?route=` override and the resolved NS ComplexityConfig.
@@ -96,26 +96,26 @@ public:
 
     // --- Exposed for unit tests / reuse ---
 
-    /// Heuristic chat rule guard (§6.1 step 3): true for trivial greetings /
+    /// Heuristic chat rule guard (step 3): true for trivial greetings /
     /// acknowledgments with no retrievable content ("hi", "thanks", CJK greetings, …).
-    /// Conservative by design (§14 risk): only an exact-ish match of a short
+    /// Conservative by design (risk): only an exact-ish match of a short
     /// pleasantry routes to Chat, because Chat skips all retrieval.
     static bool IsChatQuery(const std::string& query);
 
-    /// Multi-turn / anaphora signal detection (§6.2, borrowed 6): true when the
+    /// Multi-turn / anaphora signal detection (borrowed 6): true when the
     /// query leans on prior-turn context (pronouns / demonstratives / follow-up
     /// cues). Cortrix does NOT rewrite the query — it only sets
     /// multi_turn_context_warning so the Agent framework can react.
     static bool HasMultiTurnSignal(const std::string& query);
 
 private:
-    /// Run the backend with the §7.3 L3 retry-then-degrade policy. On success
+    /// Run the backend with the L3 retry-then-degrade policy. On success
     /// returns the backend result with error_code unset; after `max_inference_retries`
     /// transient faults returns the degraded Complex result (error_code =
     /// CX_ERR_ROUTER_INFERENCE_FAILED). Never throws.
     retrieval::ClassificationResult RunClassifier(const std::string& query);
 
-    /// The §7.3 transparent-degrade result: Complex label, confidence 0.5,
+    /// The transparent-degrade result: Complex label, confidence 0.5,
     /// error_code CX_ERR_ROUTER_INFERENCE_FAILED.
     static retrieval::ClassificationResult DegradedResult();
 

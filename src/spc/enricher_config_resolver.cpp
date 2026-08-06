@@ -48,8 +48,8 @@ EnricherConfig EnricherConfigResolver::Resolve(const EnricherNsConfig& ns,
     if (ns.score_threshold) eff.score_threshold = *ns.score_threshold;
     if (ns.prompt_template_id) eff.prompt_template_id = *ns.prompt_template_id;
 
-    // `enabled` request layer is highest (only sets enabled, §2.9). This is the
-    // §2.9 example: NS {"enabled":false} + request enrich=true → enabled.
+    // `enabled` request layer is highest (only sets enabled). This is the
+    // example: NS {"enabled":false} + request enrich=true → enabled.
     if (request.enrich) eff.enabled = *request.enrich;
 
     return eff;

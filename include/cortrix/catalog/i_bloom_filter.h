@@ -11,7 +11,7 @@ namespace cortrix::catalog {
 /// Probabilistic dedup accelerator. A fast negative filter in
 /// front of the catalog dedup lookup: MightContain()==false means the file_hash
 /// is definitely absent (skip the SQLite query); ==true means "maybe" (verify
-/// against file_locations — catalog stays the SoT, §7.3).
+/// against file_locations — catalog stays the SoT).
 ///
 /// Error model (F-FREEZE-1): Add returns Status (void-fallible). Reads are plain
 /// (a filter check never errors — an unready filter answers conservatively true).
@@ -19,12 +19,12 @@ class IBloomFilter {
 public:
     virtual ~IBloomFilter() = default;
 
-    /// Record a file_hash as present. Status (void-fallible) per CONVENTIONS §3.
+    /// Record a file_hash as present. Status (void-fallible) per CONVENTIONS
     virtual Status Add(const std::string& file_hash) = 0;
 
     /// True = possibly present (caller must verify); false = definitely absent.
     /// While not ready (startup rebuild in progress) this returns true
-    /// conservatively (§9.2) so correctness never depends on the filter.
+    /// conservatively so correctness never depends on the filter.
     virtual bool MightContain(const std::string& file_hash) const = 0;
 
     /// Number of distinct Add()s observed (approximate — counts Add calls).

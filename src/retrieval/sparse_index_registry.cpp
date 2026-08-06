@@ -41,7 +41,7 @@ ISparseRetriever* SparseIndexRegistry::GetOrOpen(const std::string& ns_id) {
     if (!s.ok()) {
         CORTRIX_LOG_WARN("main", "sparse index open failed for ns '{}': {}",
                          ns_id, s.message());
-        return nullptr;  // caller falls back to the non-sparse paths (§7.2)
+        return nullptr;  // caller falls back to the non-sparse paths
     }
     ISparseRetriever* raw = retriever.get();
     by_ns_.emplace(ns_id, std::move(retriever));

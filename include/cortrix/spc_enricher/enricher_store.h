@@ -11,14 +11,14 @@
 namespace cortrix::spc {
 
 /// Persists an EnrichResult into the per-Unit DB schema EnricherSchemaProvider creates
-/// (design §3.1, S5.4). Free functions over a sqlite3* so they are unit-testable
+/// (design, S5.4). Free functions over a sqlite3* so they are unit-testable
 /// against an in-memory DB with the enricher migration applied; the live wiring (which
 /// block_id, transaction boundaries with block writes) is wired separately.
 ///
-/// Field placement (design §3.1 field classification):
+/// Field placement (design field classification):
 ///   - enriched_score / enriched_at → blocks columns (A-class, query-returned)
 ///   - enricher_metadata (prompt_version / model_used / enricher_name JSON) →
-///     blocks.enricher_metadata (B-class audit; query default hides it, §3.1)
+///     blocks.enricher_metadata (B-class audit; query default hides it)
 ///   - summary → caller writes into Block.payload.metadata JSONB (block-header-owned; not
 ///     here — this module owns only the enricher columns + entities table)
 ///   - entities[] → entities table + entities_fts FTS5 index

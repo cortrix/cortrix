@@ -13,7 +13,7 @@ namespace cortrix::query {
 /// passes it to AuthorizeNamespaces (which throws CX_ERR_TOO_MANY_NAMESPACES when
 /// the request — or the ["*"] expansion — exceeds it).
 ///
-/// 🚩 D3.5 FLAG: the frozen `cortrix::AuthContext` (auth/auth_context.h) does NOT yet
+/// 🚩 integration FLAG: the frozen `cortrix::AuthContext` (auth/auth_context.h) does NOT yet
 /// carry a `plan_max_namespaces` field (it is the CE single-tenant struct). The cloud plan
 /// will inject it on the Cloud auth path. Standalone, the plan cap is supplied
 /// out-of-band (PlanMaxNamespacesOf returns nullopt = "no plan cap" → effective cap

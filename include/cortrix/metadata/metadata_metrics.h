@@ -12,16 +12,16 @@ namespace cortrix::metadata {
 /// Standalone scope: this recorder covers the generator's own metadata_block
 /// lifecycle — block_generated_total / metadata_size_bytes / field_missing_total /
 /// generate_duration / block_count. The PWL-coupled (block_flush_duration) and
-/// doc-summary-coupled (doc_fts5_sync_total) metrics in §5.bis are emitted at the real
-/// single-transaction / hybrid-fallback wiring sites → D3.5; their counters live here
+/// doc-summary-coupled (doc_fts5_sync_total) metrics in are emitted at the real
+/// single-transaction / hybrid-fallback wiring sites → integration; their counters live here
 /// so the call sites are a one-line add when that wiring lands, but are not driven
 /// standalone.
 ///
-/// High-cardinality labels (doc_id / ns_id) are forbidden (OBS_SPEC §3.2 deny list);
-/// per-NS data goes through the OBS_SPEC §3.4 system stats API, not metric labels.
+/// High-cardinality labels (doc_id / ns_id) are forbidden (OBS_SPEC deny list);
+/// per-NS data goes through the OBS_SPEC system stats API, not metric labels.
 class MetadataMetrics {
 public:
-    /// status label for cortrix_metadata_block_generated_total (detailed design §5.bis).
+    /// status label for cortrix_metadata_block_generated_total (detailed design).
     enum class GenStatus { kSuccess = 0, kPartialWarning, kFailed };
     /// source label for cortrix_metadata_block_generated_total.
     enum class GenSource { kApiUpload = 0, kBatchImport, kReUpload };
@@ -48,7 +48,7 @@ public:
     void ObserveMetadataSize(double bytes);
 
     // cortrix_metadata_block_generate_duration_seconds (Histogram — total time for block_text assembly +
-    // JSON serialization [+ SQLite insert in D3.5]; §5.bis SLA P95 ≤ 50ms).
+    // JSON serialization [+ SQLite insert in integration]; SLA P95 ≤ 50ms).
     void ObserveGenerateDuration(double seconds);
 
     /// Render the current values as OpenMetrics text (what the endpoint will

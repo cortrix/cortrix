@@ -15,11 +15,11 @@ namespace cortrix::query {
 /// keys its body MUST carry, via the canonical registry below.
 ///
 /// 🌟 The cross-NS error responses are the **project-level Agent-friendly reference**
-/// (topic 2.7 drives GEN-Agent's first principle — AGENT_FRIENDLY.md). All 7 principles must
+/// (topic 2.7 drives GEN-Agent's first principle — the Agent-friendly contract). All 7 principles must
 /// hold: machine-readable code (#1) + enumerable category (#4) + structured_data
 /// (#5) + machine-readable retry (#6) + stable/versioned set (#7).
 ///
-/// Per CODING_CONVENTIONS §3 / F-FREEZE-1, Cortrix uses Result<T>+Status only (no
+/// Per the coding conventions / F-FREEZE-1, Cortrix uses Result<T>+Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// So CrossNsErrorCode is the *enum of identities*, and MakeCrossNsError() turns
@@ -29,7 +29,7 @@ namespace cortrix::query {
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may be appended (api_version stays "v1").
 ///
-/// Anti-enumeration (topic 2.6 / §5): NS-not-found and NS-unauthorized BOTH return
+/// Anti-enumeration (topic 2.6 /): NS-not-found and NS-unauthorized BOTH return
 /// kNsUnauthorized — the existence of a namespace is never leaked. There is no
 /// separate "NS not found" code on purpose.
 enum class CrossNsErrorCode {
@@ -50,8 +50,8 @@ struct CrossNsErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null unless retryable per §3.2
-    int http_status;                          ///< §3.1 HTTP column (200 for partial-failure codes)
+    std::optional<int> retry_after_ms;        ///< null unless retryable per
+    int http_status;                          ///< HTTP column (200 for partial-failure codes)
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never
@@ -94,8 +94,8 @@ StatusCode CrossNsErrorToStatusCode(CrossNsErrorCode code);
 Status CrossNsStatus(CrossNsErrorCode code, const std::string& detail = "");
 
 /// Throwing form — wraps the full Agent-friendly error. AuthorizeNamespaces and
-/// other "abort the whole request" paths (§4.2) throw this; the handler catches it
-/// and serializes GetError() to the §2.6 error body.
+/// other "abort the whole request" paths throw this; the handler catches it
+/// and serializes GetError() to the error body.
 class CrossNsException : public agent_friendly::AgentFriendlyException {
 public:
     explicit CrossNsException(CrossNsErrorCode code,

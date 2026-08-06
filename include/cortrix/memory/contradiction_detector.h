@@ -13,9 +13,9 @@
 // extractor's WriteWithOperationLog path stays readable and the judge logic is
 // independently testable.
 //
-// Standalone-D3: depends only on the injected ILlmClient (mockable). The candidate
+// Standalone: depends only on the injected ILlmClient (mockable). The candidate
 // retrieval that feeds it comes from IContradictionQuery (the read-pipeline seam in
-// memory_extractor.h); the real QueryPipeline adapter behind that seam is D3.5.
+// memory_extractor.h); the real QueryPipeline adapter behind that seam is integration.
 namespace cortrix::memory {
 
 class ContradictionDetector {
@@ -27,7 +27,7 @@ public:
                           std::string model,
                           int timeout_ms);
 
-    /// Judge whether `new_content` contradicts `old_content` (D5 prompt). Returns the
+    /// Judge whether `new_content` contradicts `old_content` (prompt). Returns the
     /// parsed judgment, or an error Status (CX_ERR_MEMEXTRACT_INVALID_OUTPUT on bad
     /// JSON, CX_ERR_MEMEXTRACT_LLM_TIMEOUT / _CONTRADICTION_AMBIGUOUS on the LLM
     /// fault paths) carried via MemoryExtractStatus.

@@ -12,11 +12,11 @@ namespace cortrix::memory::transparency {
 
 /// The 5 memory-transparency error identities (the
 /// invalidate-tool error set the DELETE / invalidate path returns, registered in
-/// ARCH §4.1.11.X). Each maps to a stable `CX_ERR_*` string + a GEN-Agent category
+/// ARCH). Each maps to a stable `CX_ERR_*` string + a GEN-Agent category
 /// + retryability + retry_after_ms + the structured_data keys its body MUST carry,
 /// via the canonical registry below.
 ///
-/// F-FREEZE-1 template A (C_R1_BRIEFING §3, mirroring memory/memory_extract_error.h): the D1
+/// F-FREEZE-1 template A (, mirroring memory/memory_extract_error.h): the
 /// detail design wrote `Result<T, MemoryTransparencyError>` (double-template) in
 /// places, which the project forbids — Cortrix uses `Result<T>` (StatusOr) + `Status`
 /// only. A domain error is carried as the Agent-friendly boundary type
@@ -26,14 +26,14 @@ namespace cortrix::memory::transparency {
 ///
 /// Scope note: the design also lists a "CRUD generic" 5-code set (NOT_FOUND /
 /// FORBIDDEN / INVALID_TYPE / CONTENT_TOO_LONG / EDIT_CONCURRENT) used by the
-/// GET/POST/PATCH paths. §4.3.4.bis is explicit that the canonical Phase-1 v1.0
+/// GET/POST/PATCH paths. is explicit that the canonical Phase-1 v1.0
 /// error family — the one in the server error registry, surfaced by the MCP server
 /// `cortrix_memory_invalidate` — is *this* 5-code invalidate set, and the briefing
 /// which pins transparency to exactly these 5 (MEMORY_NOT_FOUND 404 / USER_MISMATCH 403 /
 /// ALREADY_INVALIDATED 410 / INVALIDATE_FAILED 500 / QUOTA 429). The CRUD-path
 /// semantics (type validation, content length, optimistic-lock conflict,
 /// cross-user 404 mask) are folded onto these 5 where they overlap and otherwise
-/// reported via plain InvalidArgument Status (see MemoryTransparency); the §7 CRUD
+/// reported via plain InvalidArgument Status (see MemoryTransparency); the CRUD
 /// strings are a Phase-2 superset. This header is the
 /// SoT for the registered 5.
 ///
@@ -54,10 +54,10 @@ constexpr int kMemoryErrorCodeCount = 5;
 /// Canonical, immutable attributes of one error code.
 struct MemoryErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
-    int http_status;                          ///< §4.3.4.bis HTTP column (404/403/410/500/429)
+    int http_status;                          ///< HTTP column (404/403/410/500/429)
     agent_friendly::ErrorCategory category;   ///< permanent/auth/transient/quota
-    bool retryable;                           ///< §4.3.4.bis retryable column
-    std::optional<int> retry_after_ms;        ///< §4.3.4.bis retry hint (5000 / 60000 / null)
+    bool retryable;                           ///< retryable column
+    std::optional<int> retry_after_ms;        ///< retry hint (5000 / 60000 / null)
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never
@@ -67,7 +67,7 @@ const MemoryErrorInfo& GetMemoryErrorInfo(MemoryErrorCode code);
 /// The "CX_ERR_*" string for `code`.
 const char* MemoryErrorCodeString(MemoryErrorCode code);
 
-/// The §4.3.4.bis HTTP status code for `code`.
+/// The HTTP status code for `code`.
 int MemoryErrorHttpStatus(MemoryErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5,

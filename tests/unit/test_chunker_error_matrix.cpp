@@ -60,7 +60,7 @@ TEST_P(ChunkerErrorMatrix, CategoryInValidSet) {
         << "code " << info.cx_code;
 }
 
-// All 3 hard chunker errors are permanent / non-retryable (§5.1).
+// All 3 hard chunker errors are permanent / non-retryable.
 TEST_P(ChunkerErrorMatrix, RetryAfterImpliesRetryable) {
     const ChunkerErrorInfo& info = GetChunkerErrorInfo(GetParam());
     if (info.retry_after_ms.has_value()) {

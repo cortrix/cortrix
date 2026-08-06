@@ -49,7 +49,7 @@ public:
     OperationLogStats GetStats() override;
     HealthStatus Health() override;
 
-    /// Last delete count from Cleanup() (test/metric aid; the §11 metric wiring
+    /// Last delete count from Cleanup() (test/metric aid; the metric wiring
     /// lands with OBS_SPEC). Reset at the start of each Cleanup().
     int64_t last_cleanup_deleted() const;
 

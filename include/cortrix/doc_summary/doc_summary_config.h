@@ -8,7 +8,7 @@ namespace cortrix::doc_summary {
 //
 // Read through the generic IGlobalConfig accessors (GetInt/GetFloat/GetBool/
 // GetString) under the keys below — this layer does NOT add typed getters to the frozen
-// IGlobalConfig scaffolding header (an doc-summary-typed getter would be a D3.5 reverse
+// IGlobalConfig scaffolding header (an doc-summary-typed getter would be a integration reverse
 // hook, the same approach HyPE took for hype.* and sparse retrieval for retrieval.sparse_top_k).
 // The DocSummaryConfig struct + the resolver consume these.
 // -----------------------------------------------------------------------------
@@ -22,9 +22,9 @@ inline constexpr const char* kPromptVersionKey = "doc_summary.prompt_version";
 inline constexpr const char* kFts5FallbackEnabledKey =
     "doc_summary.fts5_fallback_enabled";
 
-/// §4.4 defaults.
+/// defaults.
 inline constexpr int kMaxCharsDefault = 500;             ///< summary_text upper bound
-inline constexpr int kMinChars = 200;                    ///< §1.1 lower bound (200-500)
+inline constexpr int kMinChars = 200;                    ///< lower bound (200-500)
 inline constexpr int kChunkThresholdDefault = 50;        ///< > this → map-reduce
 inline constexpr float kFallbackScoreThresholdDefault = 0.7f;  ///< fallback trigger
 inline constexpr int kFallbackTopNDefault = 3;           ///< fallback per-doc chunks

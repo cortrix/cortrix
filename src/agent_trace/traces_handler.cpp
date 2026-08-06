@@ -13,7 +13,7 @@ namespace cortrix::agent_trace {
 
 namespace {
 
-// Rough serialized-size estimate for one trace row (§8.1 1MB soft limit). The
+// Rough serialized-size estimate for one trace row (1MB soft limit). The
 // variable-length fields dominate; a flat per-row overhead covers the fixed JSON
 // keys/punctuation. This is intentionally an estimate (not a real serialize) —
 // it only drives the "you should paginate" hint.
@@ -62,19 +62,19 @@ TracesHandler::Owner TracesHandler::ResolveOwnerFromDb(const std::string& sessio
 Result<TracesResponse> TracesHandler::GetSession(const std::string& session_id,
                                                  const TraceFilter& filter,
                                                  const RequesterContext& ctx) {
-    // Permission (§8.1). Resolve the session owner via interaction_log.
+    // Permission. Resolve the session owner via interaction_log.
     const Owner owner = ResolveOwner(session_id);
 
     if (!ctx.is_admin) {
         // A non-admin may only read a session they own. If the owner is unknown or
         // someone else's, that is a cross-user attempt -> UNAUTHORIZED (anti-leak;
-        // we deliberately do NOT reveal whether the session exists, §8.1).
+        // we deliberately do NOT reveal whether the session exists).
         if (!owner.found || owner.user_id != ctx.requester_user_id) {
             return AgentTraceStatus(AgentTraceErrorCode::kUnauthorized,
                              "cross-user trace access requires admin");
         }
     } else if (owner.found && owner.user_id != ctx.requester_user_id) {
-        // §12 forensics: an admin reading another user's session writes the
+        // forensics: an admin reading another user's session writes the
         // OBS_SPEC structured log (not operation_log, not a metric).
         ObservabilityAuditLog::Emit(ctx.requester_user_id, owner.user_id,
                                     ObservabilityAuditLog::Endpoint::kTraces);
@@ -88,7 +88,7 @@ Result<TracesResponse> TracesHandler::GetSession(const std::string& session_id,
     TraceSession ts = std::move(qr.value());
 
     // admin reading a session that has no traces at all -> SESSION_NOT_FOUND
-    // (§8.1: admin cross-user nonexistent session). For a non-admin owner we keep
+    // (admin cross-user nonexistent session). For a non-admin owner we keep
     // an empty page (the session is theirs; it is simply empty).
     if (ctx.is_admin && ts.total_count == 0 && !owner.found) {
         return AgentTraceStatus(AgentTraceErrorCode::kSessionNotFound,
@@ -96,7 +96,7 @@ Result<TracesResponse> TracesHandler::GetSession(const std::string& session_id,
     }
 
     TracesResponse out;
-    // §8.1 1MB soft-limit warning over the returned page.
+    // 1MB soft-limit warning over the returned page.
     int64_t bytes = 256;  // envelope (meta + braces)
     for (const auto& e : ts.traces) bytes += EstimateRowBytes(e);
     out.response_size_warning = bytes > kResponseSizeSoftLimitBytes;

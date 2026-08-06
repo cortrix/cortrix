@@ -2,16 +2,16 @@
 #include <vector>
 
 #include "cortrix/common/status.h"
-#include "cortrix/id/types.h"          // ID type SoT (ARCH §1.8.1)
+#include "cortrix/id/types.h"          // ID type SoT (ARCH)
 #include "cortrix/retrieval/sparse_codec.h"  // SparseVector
 
 namespace cortrix::retrieval {
 
-using cortrix::id::ChildId;       ///< ULID TEXT — SoT cortrix::id (ARCH §1.8.1)
+using cortrix::id::ChildId;       ///< ULID TEXT — SoT cortrix::id (ARCH)
 using cortrix::id::NamespaceId;   ///< NS string — SoT cortrix::id
 
 /// One sparse-retrieval candidate. SoT for the retrieval-link sparse
-/// hit type is RETRIEVAL_TYPES_SPEC §1; this is the in-tree realization. The
+/// hit type is the retrieval-types spec; this is the in-tree realization. The
 /// `child_id` aligns with children.child_id (renamed
 /// block_id→child_id). `score` is the SPLADE dot-product accumulator value.
 struct SparseHit {
@@ -22,7 +22,7 @@ struct SparseHit {
 /// Sparse retriever interface (Cortrix consistent interface-reservation pattern,
 /// like IIndexFactory / ConfigResolver). The SPLADE inverted-index
 /// implementation is SpladeSparseRetriever (S5/S6); the interface exists so the
-/// query pipeline + RRF code (D3.5 wiring) depends on the abstraction, and so a
+/// query pipeline + RRF code (integration wiring) depends on the abstraction, and so a
 /// future IVF-sparse impl (Phase 2, N>100M) drops in without touching callers.
 ///
 /// Errors are surfaced via cortrix::Status (F-FREEZE-1, no Result<T,E>); the
@@ -46,7 +46,7 @@ public:
 
     /// Write/update the sparse vector for `child_id` in `ns_id` (incremental
     /// index). Re-adding an existing child_id replaces its postings.
-    /// An empty `vec` removes any existing postings (the dead-chunk / §6.5
+    /// An empty `vec` removes any existing postings (the dead-chunk /
     /// path — equivalent to Remove). Returns CX_ERR_SPARSE_INVERTED_INDEX_WRITE_*
     /// on a write fault (retryable).
     virtual Status Add(

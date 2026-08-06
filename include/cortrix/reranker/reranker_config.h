@@ -31,7 +31,7 @@ struct RerankerConfig {
     // --- Input preprocessing (topic 3.5) ---
     int max_seq_length = 512;     ///< range 128-8192
 
-    // --- top_N (E2 ruling D7) ---
+    // --- top_N (E2 ruling) ---
     int candidate_multiplier = 3; ///< top_N = min(top_k × N, max_candidates)
     int max_candidates = 50;
 

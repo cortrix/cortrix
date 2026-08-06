@@ -4,11 +4,11 @@
 
 #include "cortrix/query/query_router_metrics.h"
 
-// Query routing coverage: the `query_router` subsystem metrics (§10) — 4 metrics
+// Query routing coverage: the `query_router` subsystem metrics — 4 metrics
 // (router_total counter{decision} / classifier_latency histogram /
 // fallback_ratio gauge / compute_saved_seconds counter{path}), the enum labels,
-// and the OpenMetrics renderer. Cardinality: NO ns_id label (D1 V3 decision 10 /
-// OBS_SPEC §3.2).
+// and the OpenMetrics renderer. Cardinality: NO ns_id label (V3 decision 10 /
+// OBS_SPEC).
 namespace cortrix::query {
 namespace {
 
@@ -118,7 +118,7 @@ TEST_F(RouterMetricsTest, RenderOpenMetricsContainsAll4Metrics) {
               std::string::npos);
 }
 
-// Cardinality guard (OBS_SPEC §3.2 / D1 V3 decision 10): the only labels ever
+// Cardinality guard (OBS_SPEC / V3 decision 10): the only labels ever
 // emitted are the low-cardinality `decision` and `path` enums — never ns_id /
 // tenant_id / user_id.
 TEST_F(RouterMetricsTest, RenderHasNoHighCardinalityLabels) {

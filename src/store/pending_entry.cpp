@@ -10,7 +10,7 @@ namespace cortrix::store {
 
 namespace {
 
-// Fixed on-disk layout offsets (design § 3.1). The leading entry_size (u32) is
+// Fixed on-disk layout offsets (design). The leading entry_size (u32) is
 // followed by the CRC-covered body; the trailing u32 is the CRC itself.
 constexpr size_t kSizePrefixLen = 4;   // entry_size (u32), not CRC-covered
 constexpr size_t kChecksumLen = 4;     // trailing CRC32 (u32)
@@ -57,7 +57,7 @@ uint64_t GetU64(const uint8_t* p) {
 
 std::vector<uint8_t> PendingEntry::Serialize() const {
     // doc_id and block_ids are only carried by PENDING records; COMMITTED /
-    // ROLLBACK reference the originating txn purely by txn_id (design § 3.1).
+    // ROLLBACK reference the originating txn purely by txn_id (design).
     const bool is_pending = (state == State::kPending);
     const std::string& did = is_pending ? doc_id : std::string();
     const size_t block_count = is_pending ? block_ids.size() : 0;
@@ -73,7 +73,7 @@ std::vector<uint8_t> PendingEntry::Serialize() const {
     PutU32(body, static_cast<uint32_t>(block_count));
     if (is_pending) {
         for (BlockId b : block_ids) PutU64(body, static_cast<uint64_t>(b));
-        // has_blob (1B) trails block_ids, PENDING only (§3.1 v1.0.2). COMMITTED/
+        // has_blob (1B) trails block_ids, PENDING only (v1.0.2). COMMITTED/
         // ROLLBACK frames stop at block_count, keeping their fixed 31-byte size.
         PutU8(body, has_blob ? 1 : 0);
     }
@@ -157,7 +157,7 @@ Result<PendingEntry> PendingEntry::DeserializeFrom(const uint8_t* data, size_t s
         pos += 8;
     }
 
-    // has_blob (1B) — PENDING only (§3.1 v1.0.2). COMMITTED/ROLLBACK frames end at
+    // has_blob (1B) — PENDING only (v1.0.2). COMMITTED/ROLLBACK frames end at
     // block_count (block_count=0), so only PENDING carries the byte; the others
     // keep e.has_blob at its default false.
     if (e.state == State::kPending) {

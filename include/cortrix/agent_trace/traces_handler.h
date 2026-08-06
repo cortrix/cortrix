@@ -18,25 +18,25 @@ namespace cortrix::agent_trace {
 constexpr int64_t kResponseSizeSoftLimitBytes = 1024 * 1024;
 
 /// GET /api/v1/traces/{session_id} result. Wraps the writer's
-/// TraceSession plus the §8.1 meta extras the handler computes (the soft-limit
+/// TraceSession plus the meta extras the handler computes (the soft-limit
 /// warning). The permission decision is made here, not in the writer.
 struct TracesResponse {
     TraceSession session;
-    bool response_size_warning = false;   ///< §8.1 — page estimate > 1MB soft limit
+    bool response_size_warning = false;   ///< — page estimate > 1MB soft limit
 };
 
 /// CE business logic for GET /api/v1/traces/{session_id}. Owns the
 /// permission decision (the writer just filters + paginates):
 ///   - the session's owner is resolved via interaction_log (session_id ->
-///     user_id) — agent_trace itself carries no user_id, and the §11 closed loop ties
+///     user_id) — agent_trace itself carries no user_id, and the closed loop ties
 ///     interactions/traces by session_id;
 ///   - non-admin reading a session they do not own -> CX_ERR_TRACE_UNAUTHORIZED
-///     (anti-leak, §8.1);
+///     (anti-leak);
 ///   - admin reading a session with no traces -> CX_ERR_TRACE_SESSION_NOT_FOUND;
 ///   - otherwise delegate to writer.Query and tag the soft-limit warning.
 ///
 /// Standalone: pure logic over the writer + a borrowed DB handle (for the
-/// session->owner lookup). The HTTP route registration is D3.5.
+/// session->owner lookup). The HTTP route registration is integration.
 class TracesHandler {
 public:
     /// Resolution of a session's owner (session_id -> user_id). `found` is false when

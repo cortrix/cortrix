@@ -68,8 +68,8 @@ struct LlmConfig {
                                  ///< F-7; this raw field itself stays as parsed).
                                  ///< Size it with batch_size — 4096 across a 32-chunk
                                  ///< batch is ~128 tokens/chunk and truncates the batch
-                                 ///< JSON (D5b evidence); the budget/batch policy itself
-                                 ///< stays a deployment decision until the D5b round.
+                                 ///< JSON (evidence); the budget/batch policy itself
+                                 ///< stays a deployment decision until the round.
     int hype_questions_per_chunk = 0;  ///< enricher role only: hypothetical
                                        ///< questions per chunk (0 = built-in default 3;
                                        ///< clamped to the design range [1, 10]). The
@@ -81,7 +81,7 @@ struct LlmConfig {
                                        ///< bytes-per-token multiplier (0 = built-in
                                        ///< default 6; clamped to [1, 20]). The old
                                        ///< default 2 rejected legitimate >160-byte
-                                       ///< outputs as injection (D12).
+                                       ///< outputs as injection.
 
     bool IsConfigured() const {
         return !provider.empty() && !api_key.empty() && !model.empty();
@@ -153,8 +153,8 @@ struct MemoryConfig {
     int max_sessions_per_namespace = 10000;
     int max_interactions_per_session = 1000;
     std::string chunk_strategy = "per_turn";
-    // Classified-decay scoring for memory search (design § 2.5).
-    // D5 lock: V1.0 is global-GUC only (no per-namespace override). These feed
+    // Classified-decay scoring for memory search (design).
+    // lock: V1.0 is global-GUC only (no per-namespace override). These feed
     // MemoryDecayConfig at the MemorySearcher wiring site (memory_routes.cpp).
     double decay_lambda = 0.01;     // memory.decay.lambda  — decay coefficient (half-life ~70d)
     double decay_min_score = 0.0;   // memory.decay.min_score — decay floor (0 = old events sink)
@@ -181,7 +181,7 @@ struct RetrievalConfig {
     int max_candidates = 50;        ///< hard ceiling on the candidate pool (>=1)
 };
 
-// === [OPEN-2] three-stage GC (ARCH §5.x, A6 §10.8) ===
+// === [OPEN-2] three-stage GC (ARCH, A6) ===
 // Config for the built-in background GC thread + manual ops endpoints. Defaults
 // mirror the ARCH `gc:` section. CE runs with immediate_purge_enabled=false
 // (the GDPR immediate-purge API is a Cloud V1 feature, not built in CE).

@@ -47,7 +47,7 @@ struct ChatCompletionResponse {
     bool ok() const { return status.ok(); }
 };
 
-/// Shared OpenAI-compatible chat LLM client interface (scaffolding D2-pre-3).
+/// Shared OpenAI-compatible chat LLM client interface (scaffolding).
 /// Consumers: LlmEnricher, contextual retrieval, HyPE, doc summary, text-to-SQL,
 /// memory extraction and RAG-Fusion — 7 in total. Mock via tests/mocks/mock_llm_client.h.
 class ILlmClient {

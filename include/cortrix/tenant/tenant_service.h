@@ -34,7 +34,7 @@ namespace cortrix::tenant {
 ///
 /// V1.0 OSS scope: CreateOrganization runs against UnlimitedPlanProvider-backed
 /// quota via the injected QuotaService is NOT wired here (standalone); quota
-/// enforcement for org creation is a D3.5 cross-feature concern. CreateOrganization
+/// enforcement for org creation is a integration cross-feature concern. CreateOrganization
 /// performs the structural INSERTs + caller-authz only in this Wave.
 class TenantService {
 public:

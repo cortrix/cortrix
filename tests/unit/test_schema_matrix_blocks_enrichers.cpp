@@ -283,7 +283,7 @@ protected:
 
 TEST_F(ContextualBlkMatrix, FeatureIdentity) {
     EXPECT_EQ(p_.FeatureName(), "contextual");
-    EXPECT_EQ(p_.CurrentVersion(), 2);  // V2 = + contextual_vec_labels (§3.8 W2)
+    EXPECT_EQ(p_.CurrentVersion(), 2);  // V2 = + contextual_vec_labels (W2)
 }
 
 TEST_F(ContextualBlkMatrix, MigrateAddsFourColumns) {

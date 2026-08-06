@@ -173,7 +173,7 @@ uint64_t RerankerMetrics::ExtremelyLongCount() const {
     return extremely_long_.load(std::memory_order_relaxed);
 }
 
-// --- queue_depth_current / score_duration_seconds (D35-MET-04) ---
+// --- queue_depth_current / score_duration_seconds (MET-04) ---
 
 void RerankerMetrics::SetQueueDepth(int depth) {
     if (depth < 0) depth = 0;
@@ -258,11 +258,11 @@ std::string RerankerMetrics::RenderOpenMetrics() const {
     os << "# TYPE cortrix_reranker_extremely_long_total counter\n";
     os << "cortrix_reranker_extremely_long_total "
        << extremely_long_.load(std::memory_order_relaxed) << "\n";
-    // queue_depth_current gauge (D35-MET-04).
+    // queue_depth_current gauge (MET-04).
     os << "# TYPE cortrix_reranker_queue_depth_current gauge\n";
     os << "cortrix_reranker_queue_depth_current "
        << queue_depth_.load(std::memory_order_relaxed) << "\n";
-    // score_duration_seconds histogram (D35-MET-04): cumulative le buckets + +Inf
+    // score_duration_seconds histogram (MET-04): cumulative le buckets + +Inf
     // + _sum + _count.
     os << "# TYPE cortrix_reranker_score_duration_seconds histogram\n";
     uint64_t sd_cum = 0;

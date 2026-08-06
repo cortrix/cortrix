@@ -17,14 +17,14 @@ Status SqlErr(sqlite3* db, const char* what) {
 Status WriteBlockEnrichment(sqlite3* db, uint64_t block_id, const EnrichResult& result) {
     if (!db) return Status::InvalidArgument("WriteBlockEnrichment: null db");
     // Persist enrichment columns only when an enricher actually ran. Two cases
-    // leave the columns NULL (no enrichment, per §3.1):
+    // leave the columns NULL (no enrichment, per):
     //   - a failed result (status != 0);
     //   - a NullEnricher empty-success result — status==0 but enricher_name=="" —
     //     which carries no real score/summary/entities (a 0.0 score there would
     //     falsely read as "enriched, quality 0", so we must NOT write it).
     if (!result.ok() || result.enricher_name.empty()) return Status::Ok();
 
-    // enricher_metadata JSONB = the B-class audit fields (§3.1).
+    // enricher_metadata JSONB = the B-class audit fields.
     nlohmann::json meta = {
         {"prompt_version", result.prompt_version},
         {"model_used", result.model_used},

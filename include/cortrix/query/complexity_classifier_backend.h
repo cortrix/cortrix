@@ -15,22 +15,22 @@ struct ComplexityBackendResult {
 /// QueryComplexityClassifier (RunClassifier).
 ///
 /// WHY THIS INTERFACE (standalone / mirrors ICragClassifierBackend): the router
-/// §5.1's QueryComplexityClassifier ctor names `std::shared_ptr<OnnxSession>`, but
+///'s QueryComplexityClassifier ctor names `std::shared_ptr<OnnxSession>`, but
 /// `OnnxSession` is a stale name — no such type exists in the frozen tree (onnx/
 /// only exposes the static cortrix::onnx::Runtime version/opset introspector; the reranker
 /// holds its own raw Ort::Session). Per the C-R2 briefing the real DistilBERT-tiny
-/// inference is D3.5-deferred and standalone uses a heuristic-guard stub. So
+/// inference is integration-deferred and standalone uses a heuristic-guard stub. So
 /// QueryComplexityClassifier depends on THIS small interface instead of a
 /// non-existent ONNX session:
 ///   - HeuristicComplexityBackend (this round): no ONNX dependency, fully testable.
-///   - OnnxComplexityBackend (D3.5): real DistilBERT-tiny via cortrix::onnx::Runtime.
+///   - OnnxComplexityBackend (integration): real DistilBERT-tiny via cortrix::onnx::Runtime.
 /// The interface keeps QueryComplexityClassifier's API stable across that swap.
 /// This exactly follows the already-merged ICragClassifierBackend pattern.
 class IComplexityClassifierBackend {
 public:
     virtual ~IComplexityClassifierBackend() = default;
 
-    /// Infer a 3-class verdict for `query` (the model's only text input, §6.1).
+    /// Infer a 3-class verdict for `query` (the model's only text input).
     /// Must be total: a transient backend fault is signalled by throwing
     /// RouterInferenceError (caught by QueryComplexityClassifier's L3 retry/degrade
     /// path), never by a partial result. No other exception may escape.

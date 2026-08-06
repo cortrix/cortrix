@@ -10,10 +10,10 @@ namespace cortrix::reranker {
 
 /// Reranker GUC keys + range validation (the GUC table SoT in code).
 ///
-/// Standalone (D3): defines the GUC names + [min,max] ranges and provides pure
+/// Standalone: defines the GUC names + [min,max] ranges and provides pure
 /// validation + a load-from-IGlobalConfig path. Registering these with the live
 /// PostgreSQL GUC machinery (DefineCustomIntVariable etc.) is the pgcortrix /
-/// server integration → D3.5; here the validated values flow into RerankerConfig
+/// server integration → integration; here the validated values flow into RerankerConfig
 /// for the OnnxReranker + RerankerThreadPool.
 ///
 /// Range-violation policy: REJECT (return Status error), not silent clamp — a GUC
@@ -29,7 +29,7 @@ inline constexpr const char* kCircuitThreshold = "reranker.circuit_breaker.thres
 inline constexpr const char* kCircuitCooldown = "reranker.circuit_breaker.cooldown_sec";
 
 // spc.chunk_size — owned by SPC but read here
-// for the §3.5.1 startup compat check (spc.chunk_size ≤ reranker.max_seq_length).
+// for the startup compat check (spc.chunk_size ≤ reranker.max_seq_length).
 // Its [min,max] mirror reranker.max_seq_length (both bound by the model's token
 // limit); the default 512 matches recursive_chunker's chunk_size default.
 inline constexpr const char* kSpcChunkSize    = "spc.chunk_size";
@@ -45,7 +45,7 @@ inline constexpr int kSpcChunkSizeMin = 128,  kSpcChunkSizeMax = 8192;
 
 class RerankerGuc {
 public:
-    /// Validate every ranged field of `config` against its §2.4 range. Returns OK
+    /// Validate every ranged field of `config` against its range. Returns OK
     /// or the first out-of-range field's Status (InvalidArgument with the field
     /// name + value + range in the message). Validates queue_size + task_timeout_ms
     /// + workers + max_seq_length + circuit-breaker bounds.
@@ -57,7 +57,7 @@ public:
 
     /// Read reranker.* keys from `cfg` into `out` (keeping the struct default when
     /// a key is absent), then ValidateConfig(*out). Returns OK or the validation
-    /// error. (Live PostgreSQL GUC registration = D3.5; this is the standalone
+    /// error. (Live PostgreSQL GUC registration = integration; this is the standalone
     /// IGlobalConfig path.)
     static Status LoadFromGlobalConfig(const IGlobalConfig& cfg, RerankerConfig* out);
 

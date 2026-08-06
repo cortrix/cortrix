@@ -12,7 +12,7 @@ Status HypeSchemaProvider::Migrate(sqlite3* /*db*/, int from_ver, int to_ver) {
     if ((from_ver == 0 && to_ver == 1) || from_ver == to_ver) {
         return Status::Ok();
     }
-    // Phase 2 (independent P-HNSW / Block versioning, §14) is the only future
+    // Phase 2 (independent P-HNSW / Block versioning) is the only future
     // step; until it is defined an unexpected version jump is a mismatch. The
     // CX_ERR_HYPE_SCHEMA_VERSION_MISMATCH identity (registered in the HyPE error
     // registry) survives via the token prefix on the Status message.

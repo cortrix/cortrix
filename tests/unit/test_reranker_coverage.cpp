@@ -55,7 +55,7 @@ auto AllPresentGetBatch() {
 
 // Missing-chunk tolerance: a child_id absent from the store is skipped by
 // GetBatch + appended to missing_ids; Rerank keeps the candidate (empty
-// chunk_text) rather than failing (§2.1-bis CX_ERR_CHUNK_NOT_FOUND existence
+// chunk_text) rather than failing (CX_ERR_CHUNK_NOT_FOUND existence
 // tolerance — the not-found path is Agent-friendly, child_id retained).
 TEST(RerankerCoverageTest, RerankToleratesMissingChunk) {
     store::MockChunkStore store;
@@ -94,7 +94,7 @@ TEST(RerankerCoverageTest, RerankToleratesMissingChunk) {
 
 // Open-breaker RRF fallback: once the breaker is open, Rerank → ScoreBatch returns
 // all zeros, so every RankedChunk.rerank_score is 0 (the upper layer keeps RRF
-// ordering). (§4.2-bis step 1.)
+// ordering). (step 1.)
 TEST(RerankerCoverageTest, RerankOpenBreakerYieldsZeroRerankScores) {
     store::MockChunkStore store;
     EXPECT_CALL(store, GetBatch(_, _)).WillRepeatedly(AllPresentGetBatch());
@@ -127,7 +127,7 @@ TEST(RerankerCoverageTest, RerankOpenBreakerYieldsZeroRerankScores) {
 }
 
 // Field assembly: chunk_text from the store, rerank_score set, and the NEW reranker
-// contract (§4.2-ter) — RankedChunk.score is the FUSED ordering score written
+// contract — RankedChunk.score is the FUSED ordering score written
 // back (rerank_score*0.7 + rrf_score*0.3), with the output sorted by that fused
 // score descending (no score_signals here, so the multiplier is identity).
 TEST(RerankerCoverageTest, RerankAssemblesAllFields) {
@@ -219,7 +219,7 @@ TEST(RerankerCoverageTest, BreakerDisabledStillScoresZeroAndRecordsMetricOnExcep
     EXPECT_EQ(r.circuit_state(), CircuitBreakerState::kClosed);  // never tripped
 }
 
-// ===================== MockReranker scenarios (§7.2) =====================
+// ===================== MockReranker scenarios =====================
 
 // "throws ONNX exception": a mock Score that throws propagates to the caller (units that
 // integrate a reranker can drive the exception path through the interface).

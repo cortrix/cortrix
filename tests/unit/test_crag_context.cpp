@@ -20,8 +20,8 @@
 #include "cortrix/retrieval/types.h"
 
 // CRAG S4/S5/S7 coverage: EvaluateAndUpdateContext writes the 6 CRAG QueryContext
-// fields + path handling (§6.3), the explain-endpoint dump (§5.1), and the query routing
-// ShouldSkipCrag mock (§2 / §4.1). Standalone — heuristic backend, no ONNX.
+// fields + path handling, the explain-endpoint dump, and the query routing
+// ShouldSkipCrag mock. Standalone — heuristic backend, no ONNX.
 namespace cortrix::retrieval {
 namespace {
 
@@ -50,7 +50,7 @@ protected:
     void TearDown() override { CragMetrics::Instance().ResetForTest(); }
 };
 
-// ---------------- §6.3 EvaluateAndUpdateContext: field writes + paths ----------
+// ---------------- EvaluateAndUpdateContext: field writes + paths ----------
 
 TEST_F(CragContextTest, CorrectVerdictWritesFieldsNoAction) {
     CragEvaluator ev(std::make_shared<HeuristicGuardBackend>(), CragConfig{});
@@ -120,7 +120,7 @@ TEST_F(CragContextTest, DegradeVerdictCountsAsFallbackAndTakesCorrectPath) {
 }
 
 TEST_F(CragContextTest, DoesNotTouchRouterFields) {
-    // §6.2 write-failure isolation: CRAG only writes its own fields, never query routing's.
+    // write-failure isolation: CRAG only writes its own fields, never query routing's.
     CragEvaluator ev(std::make_shared<HeuristicGuardBackend>(), CragConfig{});
     query::QueryContext ctx;
     ctx.query = "a real query";
@@ -138,7 +138,7 @@ TEST_F(CragContextTest, DoesNotTouchRouterFields) {
     EXPECT_TRUE(ctx.rerank);
 }
 
-// ---------------- §2 / §4.1 ShouldSkipCrag mock --------------------------------
+// ---------------- ShouldSkipCrag mock --------------------------------
 
 TEST_F(CragContextTest, ShouldSkipCragMockByRoutingPath) {
     query::QueryContext complex;
@@ -178,7 +178,7 @@ TEST_F(CragContextTest, CragStageDisabledDoesNotEvaluateOrTruncate) {
     EXPECT_EQ(CragMetrics::Instance().EvaluationCount(CragMetrics::Decision::kAmbiguous), 0u);
 }
 
-// ---------------- §5.1 explain-endpoint dump ----------------------------------
+// ---------------- explain-endpoint dump ----------------------------------
 
 TEST_F(CragContextTest, ExplainJsonContainsAll13FieldsSnakeCase) {
     query::QueryContext ctx;
@@ -193,7 +193,7 @@ TEST_F(CragContextTest, ExplainJsonContainsAll13FieldsSnakeCase) {
 
     nlohmann::json j = query::ToExplainJson(ctx);
 
-    // All 13 SPEC fields present (none omitted — SPEC §6.3).
+    // All 13 SPEC fields present (none omitted — SPEC).
     for (const char* key : {"query", "ns_id", "multi_turn_context_warning",
                             "web_fallback_triggered", "routing_path", "complexity_score",
                             "routing_decision_source", "chat_path_triggered", "crag_verdict",

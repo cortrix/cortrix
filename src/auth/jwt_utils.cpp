@@ -16,7 +16,7 @@ namespace cortrix::auth {
 namespace {
 
 // Standard base64 alphabets. We encode with the standard table then translate to
-// the URL-safe alphabet and strip '=' padding (RFC 7515 §2). Decoding reverses it.
+// the URL-safe alphabet and strip '=' padding (RFC 7515). Decoding reverses it.
 const char kStdAlphabet[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -201,7 +201,7 @@ Result<JwtPayload> JwtCodec::Decode(const std::string& token,
         return AuthStatus(AuthErrorCode::kUnauthorized, "bad jwt payload json");
     }
 
-    // 5) expiry (§4.3 / §5.1 — distinct CX_ERR_AUTH_TOKEN_EXPIRED).
+    // 5) expiry (distinct CX_ERR_AUTH_TOKEN_EXPIRED).
     if (p.exp != 0 && now_sec >= p.exp) {
         return AuthStatus(AuthErrorCode::kTokenExpired, "jwt expired");
     }

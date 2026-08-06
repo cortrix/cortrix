@@ -4,10 +4,10 @@
 
 #include "cortrix/retrieval/crag_metrics.h"
 
-// CRAG S6 coverage: the `crag` subsystem metrics (§10) — 4 metrics
+// CRAG S6 coverage: the `crag` subsystem metrics — 4 metrics
 // (evaluation_total counter / classifier_latency histogram / fallback_ratio gauge
 // / incorrect_ratio gauge), the decision enum label, and the OpenMetrics renderer.
-// Cardinality: NO ns_id label (D1 V3 decision 10 / OBS_SPEC §3.2).
+// Cardinality: NO ns_id label (V3 decision 10 / OBS_SPEC).
 namespace cortrix::retrieval {
 namespace {
 
@@ -92,7 +92,7 @@ TEST_F(CragMetricsTest, RenderOpenMetricsShapeAndNoHighCardinalityLabel) {
     EXPECT_NE(out.find("cortrix_crag_classifier_latency_seconds_count 1"),
               std::string::npos);
 
-    // 🚨 Cardinality: NO ns_id / tenant_id / user_id label anywhere (OBS_SPEC §3.2).
+    // 🚨 Cardinality: NO ns_id / tenant_id / user_id label anywhere (OBS_SPEC).
     EXPECT_EQ(out.find("ns_id"), std::string::npos);
     EXPECT_EQ(out.find("tenant_id"), std::string::npos);
     EXPECT_EQ(out.find("user_id"), std::string::npos);

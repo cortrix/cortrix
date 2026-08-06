@@ -11,10 +11,10 @@ namespace cortrix::onnx {
 /// infrastructure-layer signals an ops Agent queries to answer "why did the
 /// ONNX upgrade fail / what runtime version is loaded / did inference regress".
 ///
-/// Standalone (D3): this is a self-contained, dependency-free recorder + an
+/// Standalone: this is a self-contained, dependency-free recorder + an
 /// OpenMetrics text renderer. The `/metrics` scrape ENDPOINT does not exist
 /// yet (no metrics registry in the frozen tree) — registering this recorder
-/// into that endpoint is cross-Feature wiring deferred to D3.5. Until then the
+/// into that endpoint is cross-Feature wiring deferred to integration. Until then the
 /// recorder is fully usable + testable in-process, and Render() produces the
 /// exact text the server will serve.
 class OnnxMetrics {
@@ -42,13 +42,13 @@ class OnnxMetrics {
     uint64_t StartupValidationCount(StartupResult result) const;
 
     // --- cortrix_onnx_inference_failed_total (Counter, label: retry_attempt=1) ---
-    // Per §13.5 the only label value is retry_attempt=1 (V1.0 does exactly one
+    // Per the only label value is retry_attempt=1 (V1.0 does exactly one
     // retry); incremented once per run-time inference that fails after its retry.
     void RecordInferenceFailed();
     uint64_t InferenceFailedCount() const;
 
     // --- cortrix_onnx_inference_duration_seconds (Histogram, no high-card label) ---
-    // D35-MET-03: a full cumulative-bucket histogram (le buckets + +Inf + _sum +
+    //-MET-03: a full cumulative-bucket histogram (le buckets + +Inf + _sum +
     // _count). The sum+count accessors below are kept (the avg is still derivable
     // and the existing TC depends on them); ObserveInferenceDuration now also lands
     // the sample in a bucket. Bounds straddle the ONNX single-call latency band

@@ -10,22 +10,22 @@ namespace cortrix::query {
 ///
 /// When the same chunk (identical `content_hash`) is returned by more than one NS,
 /// the copies collapse to a single result whose **primary = the highest final score
-/// source** (§3.3.1). The primary's full metadata / content / parent_content is kept
-/// (§3.3.3 "primary metadata"); the other sources are recorded — only their NS +
+/// source**. The primary's full metadata / content / parent_content is kept
+/// ("primary metadata"); the other sources are recorded — only their NS +
 /// final score + rerank_score — as a brief multi-source entry in
-/// `meta.deduplicated_chunks[]` (§2.5), and
+/// `meta.deduplicated_chunks[]`, and
 /// `meta.deduplicated_chunks_count` is set to the number of collapsed (removed)
 /// copies. Singletons (a hash seen in exactly one NS) pass through untouched and are
 /// NOT listed in deduplicated_chunks.
 ///
 /// Order is preserved by **first appearance of each hash** in `items`, so a caller
-/// that pre-sorts by final score (the gather order, ARCH §3.3) keeps the deduped
+/// that pre-sorts by final score (the gather order, ARCH) keeps the deduped
 /// list in descending final score (the primary of each group is, by construction,
 /// the first occurrence of its hash in a final-score-descending list). Items with
 /// an empty content_hash are treated as distinct (never collapsed) — a missing hash
 /// must not merge unrelated chunks.
 ///
-/// 🚨 D3 standalone: operates purely on in-memory ResultItems whose content_hash was
+/// 🚨 standalone: operates purely on in-memory ResultItems whose content_hash was
 /// set by the gather layer (content-derived standalone; Block-header sourced once
 /// that hook is wired). No storage / index access.
 ///

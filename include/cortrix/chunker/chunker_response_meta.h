@@ -17,17 +17,17 @@
 // NOT emitted (B2 — always-on / NS-known). Only the A-class fields above remain.
 namespace cortrix::chunker {
 
-/// Build the index-time `meta.stats` object (§ 5.3) from chunker stats.
+/// Build the index-time `meta.stats` object from chunker stats.
 nlohmann::json BuildStatsMeta(const ChunkerStats& stats);
 
-/// Build the index-time `meta.warnings[]` array (§ 5.3). Includes a
+/// Build the index-time `meta.warnings[]` array. Includes a
 /// CX_WARN_CHUNK_FALLBACK entry when stats.fallback_to_flat; per-page parse
-/// warnings (§ 5.3 example) are appended by the parser/pipeline layer (their text
+/// warnings (example) are appended by the parser/pipeline layer (their text
 /// is not on ChunkerStats), so this returns just the chunker-owned warnings.
 nlohmann::json BuildWarningsMeta(const ChunkerStats& stats, const std::string& doc_id,
                                  int parent_count, int threshold);
 
-/// Build the query-time `meta.children_hits_per_parent[]` array (§ 3.3) from
+/// Build the query-time `meta.children_hits_per_parent[]` array from
 /// deduped groups: [{parent_id, hits:[...], primary_child}, ...].
 nlohmann::json BuildChildrenHitsMetaJson(const std::vector<ParentHitGroup>& groups);
 

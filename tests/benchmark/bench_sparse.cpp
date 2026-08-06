@@ -8,12 +8,12 @@
 #include "cortrix/retrieval/sparse_rrf.h"
 #include "cortrix/retrieval/splade_sparse_retriever.h"
 
-// Sparse retrieval S11 benchmarks (detailed-design §13.bis 2.1/2.2). Synthetic-data micro-
+// Sparse retrieval S11 benchmarks (detailed-design 2.1/2.2). Synthetic-data micro-
 // benchmarks for the inverted-index write/query + sparse_vec codec. These
-// validate the *algorithm* cost shape standalone; the full §13.bis perf gates
-// (N=1M write <2h, query N=1M P50<100ms) + the §2.3 BEIR Recall@10 hybrid vs
+// validate the *algorithm* cost shape standalone; the full perf gates
+// (N=1M write <2h, query N=1M P50<100ms) + the BEIR Recall@10 hybrid vs
 // dense-only +3pp hard threshold need the real BGE-M3 model + BEIR fiqa dataset
-// → run at D3.5 (real model/dataset not present in the standalone tree).
+// → run at integration (real model/dataset not present in the standalone tree).
 namespace {
 
 using namespace cortrix::retrieval;
@@ -39,7 +39,7 @@ static void BM_SparseCodecRoundTrip(benchmark::State& state) {
 }
 BENCHMARK(BM_SparseCodecRoundTrip)->Arg(50)->Arg(100)->Arg(200);
 
-// --- inverted index: Add N chunks (write path, §6.1) ---
+// --- inverted index: Add N chunks (write path) ---
 static void BM_SpladeAdd(benchmark::State& state) {
     const int n = static_cast<int>(state.range(0));
     for (auto _ : state) {
@@ -55,7 +55,7 @@ static void BM_SpladeAdd(benchmark::State& state) {
 }
 BENCHMARK(BM_SpladeAdd)->Arg(1000)->Arg(5000);
 
-// --- inverted index: Search over a seeded index (query path, §6.3) ---
+// --- inverted index: Search over a seeded index (query path) ---
 static void BM_SpladeSearch(benchmark::State& state) {
     const int n = static_cast<int>(state.range(0));
     SpladeSparseRetriever idx(SpladeConfig{}, ":memory:");
@@ -63,7 +63,7 @@ static void BM_SpladeSearch(benchmark::State& state) {
     for (int i = 0; i < n; ++i) {
         idx.Add("ns", "c" + std::to_string(i), MakeVec(i, 100));
     }
-    SparseVector q = MakeVec(7, 30);  // ~30-term query (§4.3 query-term estimate)
+    SparseVector q = MakeVec(7, 30);  // ~30-term query (query-term estimate)
     for (auto _ : state) {
         auto hits = idx.Search(q, "ns", 100);
         benchmark::DoNotOptimize(hits);

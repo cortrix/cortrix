@@ -1,5 +1,5 @@
 /// @file test_e2e_full_server.cpp
-/// @brief D4 Comprehensive E2E: Full HTTP server with ALL route groups
+/// @brief Comprehensive E2E: Full HTTP server with ALL route groups
 ///
 /// Tests complete user journeys through the full Cortrix HTTP API:
 ///   1. Complete user journey: NS → Upload → Query → Memory → Delete

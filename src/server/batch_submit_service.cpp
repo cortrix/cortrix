@@ -57,20 +57,20 @@ bool IsWithin(const std::filesystem::path& path, const std::filesystem::path& ba
     return *rel.begin() != "..";
 }
 
-// --- per-doc failure classification (batch submit §2.4.2) -------------------
+// --- per-doc failure classification (batch submit) -------------------
 //
 // per-doc failures REUSE the originating Feature's existing CX_ERR_* code (no new
-// BATCH-per-doc codes — §2.4.2 "avoid error-code explosion"). The submit seam
+// BATCH-per-doc codes — "avoid error-code explosion"). The submit seam
 // (ITaskSubmitter, prod = TaskScheduler::Enqueue) hands back a coarse Status
 // whose message carries the "CX_ERR_X: detail" token (the TaskStatus / catalog
 // /pool error-bridge convention). To re-inflate the GEN-Agent 5-field meta.failed[]
 // item we map that token → {category, retryable, retry_after_ms}.
 //
-// This table is the §2.4.2 reuse set verbatim from the detailed design (the
+// This table is the reuse set verbatim from the detailed design (the
 // CX_ERR_NS_QUOTA_EXCEEDED row cross-checked against catalog_error.cpp /
 // pool_error.cpp = quota/false). Codes not listed fall back to permanent /
 // non-retryable (the safe GEN-Agent default — an Agent will not blindly retry an
-// unclassified failure). D3.5 may centralize this into a single repo-wide
+// unclassified failure). integration may centralize this into a single repo-wide
 // code registry; standalone, the batch layer owns the contract it presents.
 struct PerDocErrorInfo {
     ErrorCategory category;
@@ -121,7 +121,7 @@ BatchSubmitService::BatchSubmitService(ITaskSubmitter* submitter, BatchLimits li
 
 std::optional<BatchSubmitService::EnvelopeError>
 BatchSubmitService::ValidateEnvelope(const BatchRequest& req) const {
-    // §2.4.1 order: empty → size → payload → duplicate doc_id. (Empty first so a
+    // order: empty → size → payload → duplicate doc_id. (Empty first so a
     // 0-doc request is BATCH_EMPTY, not a vacuous success.)
     const int n = static_cast<int>(req.documents.size());
 
@@ -137,7 +137,7 @@ BatchSubmitService::ValidateEnvelope(const BatchRequest& req) const {
             "batch exceeds the maximum document count"};
     }
 
-    // total payload = sum of content bytes (the request body size proxy; §2.2
+    // total payload = sum of content bytes (the request body size proxy;
     // 100MB total). Per-doc 10MB cap is also a payload fault (same code/category).
     int64_t total_bytes = 0;
     for (const BatchDocument& d : req.documents) {
@@ -151,7 +151,7 @@ BatchSubmitService::ValidateEnvelope(const BatchRequest& req) const {
         }
     }
 
-    // duplicate doc_id within one batch (§2.4.1 topic 4 Q2). Collect ALL offenders
+    // duplicate doc_id within one batch (topic 4 Q2). Collect ALL offenders
     // so the Agent can fix every collision in one pass.
     std::set<std::string> seen;
     std::set<std::string> dups;
@@ -200,7 +200,7 @@ nlohmann::json BatchSubmitService::MakeFailureItem(const std::string& doc_id,
     item["retry_after_ms"] = info.retry_after_ms.has_value()
         ? nlohmann::json(*info.retry_after_ms) : nlohmann::json(nullptr);
     // structured_data left null at the batch layer — per-doc structured_data is
-    // produced by the originating Feature when the real pipeline is wired (D3.5);
+    // produced by the originating Feature when the real pipeline is wired (integration);
     // standalone the 5th field is present-and-null (schema-complete).
     item["structured_data"] = nlohmann::json(nullptr);
     // message: human-readable detail (the token prefix stripped).
@@ -259,7 +259,7 @@ BatchHttpResult BatchSubmitService::Submit(const BatchRequest& req) {
     // overwrite→cancel-running path is the overwrite/cancel item (integration). Standalone, every
     // accepted doc is reported "submitted"; the "skipped" status variant becomes
     // reachable when that wiring lands. req.on_duplicate is parsed + validated
-    // upstream so the contract is honored end-to-end at D3.5.
+    // upstream so the contract is honored end-to-end at integration.
     nlohmann::json results = nlohmann::json::array();
     nlohmann::json succeeded = nlohmann::json::array();
     nlohmann::json failed = nlohmann::json::array();
@@ -307,7 +307,7 @@ BatchHttpResult BatchSubmitService::Submit(const BatchRequest& req) {
     meta["total_submitted"] = total;
 
     BatchHttpResult out;
-    out.status = 200;  // §2.3 — partial-success is still 200; inspect meta.failed[]
+    out.status = 200;  // — partial-success is still 200; inspect meta.failed[]
     out.body = {{"results", std::move(results)}, {"meta", std::move(meta)}};
     return out;
 }

@@ -9,20 +9,20 @@ namespace cortrix::query {
 
 /// The 5 global GUCs, as a compile-time SoT (name / default / min / max).
 ///
-/// 🚨 D3 standalone (S4.2): this is the **GUC table + range-validated load** from an
+/// 🚨 standalone (S4.2): this is the **GUC table + range-validated load** from an
 /// IGlobalConfig. The real PostgreSQL `DefineCustomVariable` registration (GUC
-/// context, flags, hooks) is **D3.5** — it consumes exactly this table so the
+/// context, flags, hooks) is **integration** — it consumes exactly this table so the
 /// name/default/range stay single-sourced. `executor.workers` / `executor.queue_size`
 /// size the F-Common ExecutorEngine (topic 1.3); the three `scatter.*` knobs drive
 /// ScatterGather's per-query cap + dual-layer timeouts (topic 1.5 / 2.5).
 struct ScatterGucDef {
     const char* name;     ///< GUC key (e.g. "scatter.ns_query_timeout_ms")
     int default_value;
-    int min_value;        ///< §2.7 range lower bound (inclusive)
-    int max_value;        ///< §2.7 range upper bound (inclusive)
+    int min_value;        ///< range lower bound (inclusive)
+    int max_value;        ///< range upper bound (inclusive)
 };
 
-/// The §2.7 GUC clinic. Order is the §2.7 table order; indices below alias into it.
+/// The GUC clinic. Order is the table order; indices below alias into it.
 inline constexpr std::array<ScatterGucDef, 5> kScatterGucs = {{
     {"executor.workers", 8, 4, 32},
     {"executor.queue_size", 500, 100, 5000},
@@ -58,12 +58,12 @@ struct ScatterConfig {
     }
 };
 
-/// Clamp `value` into the GUC's [min, max] (§2.7 range validation). Out-of-range values are
+/// Clamp `value` into the GUC's [min, max] (range validation). Out-of-range values are
 /// clamped (not rejected) — a GUC must always resolve to a usable value; the real
-/// DefineCustomVariable hook will additionally WARN on clamp (D3.5).
+/// DefineCustomVariable hook will additionally WARN on clamp (integration).
 int ClampScatterGuc(ScatterGucIndex idx, int value);
 
-/// Load the 5 GUCs from `cfg` into a ScatterConfig, clamping each to its §2.7 range.
+/// Load the 5 GUCs from `cfg` into a ScatterConfig, clamping each to its range.
 /// A missing/malformed key falls back to the spec default (also in range). `cfg` may
 /// be null (everything → defaults), keeping ScatterGather standalone-constructible.
 ScatterConfig LoadScatterConfig(const IGlobalConfig* cfg);

@@ -36,12 +36,12 @@ enum class BatchErrorCode {
 /// not shrink).
 constexpr int kBatchErrorCodeCount = 4;
 
-/// Canonical, immutable attributes of one batch error code (§2.4.1 columns).
+/// Canonical, immutable attributes of one batch error code (columns).
 struct BatchErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_BATCH_*" string
     int http_status;                          ///< HTTP status (400 / 413)
-    agent_friendly::ErrorCategory category;   ///< §2.4.1 category column (all permanent)
-    bool retryable;                           ///< §2.4.1 retryable column (all false)
+    agent_friendly::ErrorCategory category;   ///< category column (all permanent)
+    bool retryable;                           ///< retryable column (all false)
     std::optional<int> retry_after_ms;        ///< null for all batch-level codes
 };
 

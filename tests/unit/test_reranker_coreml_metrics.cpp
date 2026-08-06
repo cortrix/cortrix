@@ -1,6 +1,6 @@
 // S1.4 — CoreML EP auto-detection + coreml_fallback_total metric + active_ep
 // gauge + CPU fallback. The live EP-selection branch only runs when a real ONNX
-// session is created (needs a model file, absent offline → exercised at D3.5 /
+// session is created (needs a model file, absent offline → exercised at integration /
 // the W1 GB benchmark). The standalone-testable core is the metrics recorder +
 // the config plumbing, covered here.
 #include <gtest/gtest.h>
@@ -57,7 +57,7 @@ TEST(RerankerMetricsTest, ReasonLabelStrings) {
     EXPECT_STREQ(ToString(Reason::kUnsupportedPlatform), "unsupported_platform");
 }
 
-// --- D35-MET-04: queue_depth_current gauge + score_duration_seconds histogram ---
+// ----MET-04: queue_depth_current gauge + score_duration_seconds histogram ---
 
 TEST(RerankerMetricsTest, QueueDepthGaugeLastWriteWins) {
     auto& m = RerankerMetrics::Instance();

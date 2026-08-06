@@ -20,14 +20,14 @@ namespace cortrix::deploy {
 ///
 ///   GET /metrics
 ///     → 200 OK, Content-Type: text/plain; version=0.0.4; charset=utf-8
-///     → anonymous (no auth — port-level isolation is the boundary, §5.2)
+///     → anonymous (no auth — port-level isolation is the boundary)
 ///     → body = concatenation of every registered metric source's render
 ///
 /// Sources: the DeployMetrics gauges (disk_usage_ratio / shutdown_status /
-/// uptime / build_info) + the read-through Bloom Filter gauges (§10) + any extra
-/// renderers added via AddSource(). The remaining §5.3 subsystem recorders
-/// (TaskMetrics, ScoringMetrics, ...) are aggregated by AddSource() at D3.5 wiring
-/// time — the server is the §5 piece; collecting all 25 metrics into one body is
+/// uptime / build_info) + the read-through Bloom Filter gauges + any extra
+/// renderers added via AddSource(). The remaining subsystem recorders
+/// (TaskMetrics, ScoringMetrics, ...) are aggregated by AddSource() at integration wiring
+/// time — the server is the piece; collecting all 25 metrics into one body is
 /// the cross-Feature wiring step.
 class MetricsServer {
 public:
@@ -46,7 +46,7 @@ public:
     /// The DeployMetrics gauges are added automatically in the constructor.
     void AddSource(MetricSource source);
 
-    /// Bind the read-through Bloom Filter gauges (§10) from a source struct.
+    /// Bind the read-through Bloom Filter gauges from a source struct.
     /// Convenience over AddSource(RenderBloomFilterMetrics-bound).
     void AddBloomFilterSource(BloomFilterMetricSource src);
 
@@ -63,7 +63,7 @@ public:
 
     int port() const { return port_; }
 
-    /// The fixed content type for the /metrics response (OBS_SPEC §5.2).
+    /// The fixed content type for the /metrics response (OBS_SPEC).
     static constexpr const char* kContentType =
         "text/plain; version=0.0.4; charset=utf-8";
 

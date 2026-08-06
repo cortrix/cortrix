@@ -11,10 +11,10 @@
 namespace cortrix::spc {
 
 /// The 5 contextual-retrieval error identities (registered in the
-/// §4.1.11). Each maps to a stable `CX_ERR_CONTEXTUAL_*` string + a GEN-Agent category +
+///). Each maps to a stable `CX_ERR_CONTEXTUAL_*` string + a GEN-Agent category +
 /// retryability via the canonical registry below.
 ///
-/// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
+/// Per the coding conventions, Cortrix uses Result<T> + Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// ContextualErrorCode is the *enum of identities*; MakeContextualError() turns
@@ -24,11 +24,11 @@ namespace cortrix::spc {
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may only be appended.
 enum class ContextualErrorCode {
-    kLlmFailed,        ///< LLM transient failure (timeout / rate limit / network) — §7.3 L3
+    kLlmFailed,        ///< LLM transient failure (timeout / rate limit / network) — L3
     kBudgetExceeded,   ///< per-NS soft quota exhausted
     kPromptInjection,  ///< LLM output exceeds max_output_tokens x2 (defense)
     kEmbeddingFailed,  ///< BGE-M3 contextualized embedding failed
-    kStartupNoLlm,     ///< LLM unavailable at startup (§7.2 L2)
+    kStartupNoLlm,     ///< LLM unavailable at startup (L2)
 };
 
 /// Total contextual-retrieval error codes (= 5). Compile-time anchor for the
@@ -40,7 +40,7 @@ struct ContextualErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_CONTEXTUAL_*" string
     agent_friendly::ErrorCategory category;   ///< transient/quota/permanent
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null unless retryable per §8
+    std::optional<int> retry_after_ms;        ///< null unless retryable per
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never

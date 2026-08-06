@@ -43,7 +43,7 @@ int ParseMinor(const std::string& v) {
 // derive it from the loaded runtime's major/minor against the public ORT release
 // "opset support" matrix. For the 1.x line the lower bound has long been opset 7
 // and the upper bound advances roughly one opset per minor release. This is a
-// thin lookup (D4=A) — when a future minor is loaded that is newer than the
+// thin lookup (=A) — when a future minor is loaded that is newer than the
 // table, we extrapolate the upper bound from the last known anchor rather than
 // failing, and clamp anything older to the floor. Cross-major (2.x) is out of
 // the V1.0 scope and returns the conservative {0, 0} "unknown".

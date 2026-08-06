@@ -32,7 +32,7 @@ struct GcRunReport {
     bool hit_run_cap = false; ///< true if max_purge_per_run / max_run_duration stopped the sweep early
 };
 
-/// OPEN-2 three-stage GC over catalog.db (ARCH §5.x). Drives the soft-delete →
+/// OPEN-2 three-stage GC over catalog.db (ARCH). Drives the soft-delete →
 /// hard-delete → blob-unlink state machine; `GcThread` wraps it in a background
 /// scan loop. Borrows the catalog sqlite3 handle (owned by CatalogDb), an
 /// IContentRefStore for ref_count fix-up, and an IBlobGcSink for Stage 3 unlinks.

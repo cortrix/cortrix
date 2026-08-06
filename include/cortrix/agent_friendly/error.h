@@ -22,7 +22,7 @@ enum class ErrorCategory {
 const char* ToString(ErrorCategory category);
 
 /// Machine-readable, Agent-friendly error (CLAUDE.md GEN-Agent first principle, 4 fields).
-/// Shared scaffolding D2-pre-7; the structured error body every Feature returns.
+/// Shared scaffolding; the structured error body every Feature returns.
 struct AgentFriendlyError {
     std::string code;                       ///< CX_ERR_* stable code
     std::string message;                    ///< human-readable detail
@@ -42,7 +42,7 @@ private:
     AgentFriendlyError error_;
 };
 
-/// Serialize to the AGENT_FRIENDLY §3.1/§3.3 error body:
+/// Serialize to the Agent-friendly contract error body:
 /// {code, message, retryable, category, retry_after_ms, structured_data}.
 /// retry_after_ms / structured_data become JSON null when unset.
 json ToJson(const AgentFriendlyError& error);

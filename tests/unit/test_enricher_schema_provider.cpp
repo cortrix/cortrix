@@ -8,7 +8,7 @@
 
 #include "cortrix/catalog/schema_provider.h"
 
-// design §3.1 (v1.0.2 Major-2): EnricherSchemaProvider extends the per-Unit blocks
+// design (v1.0.2 Major-2): EnricherSchemaProvider extends the per-Unit blocks
 // table (+3 cols) + adds entities + FTS5, registered via the catalog SchemaMigrator.
 namespace cortrix::spc {
 namespace {

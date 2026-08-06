@@ -2,7 +2,7 @@ import { Dialog, DialogPanel, DialogTitle, DialogBackdrop } from '@headlessui/re
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import type { ReactNode } from 'react';
 
-// Right-anchored slide-over drawer (web UI design § 8.5 NamespaceDetailDrawer) —
+// Right-anchored slide-over drawer (web UI design NamespaceDetailDrawer) —
 // shows detail without losing the list context. Built on @headlessui/react
 // Dialog; Magma VI surface/line tokens (works light + dark).
 

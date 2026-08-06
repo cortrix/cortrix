@@ -12,7 +12,7 @@ namespace cortrix::spc {
 namespace {
 
 // Build a small ChunkContext batch over a shared DocumentMetadata (non-owning
-// pointer, per the §2.4 reconcile — meta must outlive the contexts).
+// pointer, per the reconcile — meta must outlive the contexts).
 std::vector<ChunkContext> MakeBatch(const DocumentMetadata& meta, int n) {
     std::vector<ChunkContext> out;
     for (int i = 0; i < n; ++i) {
@@ -67,7 +67,7 @@ TEST(EnricherErrorMetaTest, FromCodeRegistryDriven) {
     EXPECT_EQ(meta.retry_after_ms, 1000);
     EXPECT_EQ(meta.structured_data, R"({"model":"gpt-4o-mini"})");
 
-    // Non-retryable → -1 sentinel (design §2.5b "0 / -1 = N/A").
+    // Non-retryable → -1 sentinel (design "0 / -1 = N/A").
     auto meta2 = EnricherErrorMeta::FromCode(EnricherErrorCode::kBudget);
     EXPECT_FALSE(meta2.retryable);
     EXPECT_EQ(meta2.category, agent_friendly::ErrorCategory::kQuota);
@@ -171,7 +171,7 @@ TEST(CreateEnricherTest, LocalNerDegradesToNullInV1) {
     EXPECT_EQ(e->Name(), "NullEnricher");
 }
 
-// kLlm with no api_key degrades to NullEnricher (§4.4 fail-soft — no point
+// kLlm with no api_key degrades to NullEnricher (fail-soft — no point
 // calling without credentials). The kLlm + api_key → LlmEnricher path is covered
 // in test_llm_enricher.cpp (CreateEnricherTest.LlmWithApiKeyMakesLlmEnricher).
 TEST(CreateEnricherTest, LlmTypeWithoutApiKeyDegradesToNull) {

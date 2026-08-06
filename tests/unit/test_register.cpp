@@ -10,8 +10,8 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/config/auth_config.h"
 
-// Auth S2 coverage: ValidatePassword / ValidateEmail / GenerateUserId (§4.5) +
-// Register flow (§4.1). The bcrypt library choice is abstracted behind
+// Auth S2 coverage: ValidatePassword / ValidateEmail / GenerateUserId +
+// Register flow. The bcrypt library choice is abstracted behind
 // IPasswordHasher; these tests use a fast fake so they are independent of it
 // (the real bcrypt round-trip lives in test_bcrypt.cpp once the lib is wired).
 namespace cortrix::auth {

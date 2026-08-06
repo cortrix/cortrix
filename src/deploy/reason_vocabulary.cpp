@@ -132,7 +132,7 @@ std::string ErrorCodeToReason(const std::string& error_code) {
 
 FieldChannel ChannelFor(FieldKind kind) {
     switch (kind) {
-        case FieldKind::kCategory:            return FieldChannel::kBoth;      // §9.2 (consistent)
+        case FieldKind::kCategory:            return FieldChannel::kBoth;      // (consistent)
         case FieldKind::kReason:              return FieldChannel::kLabelOnly; // → error_code in errors
         case FieldKind::kPlanRegionInstance:  return FieldChannel::kBoth;
         case FieldKind::kHighCardId:          return FieldChannel::kStructuredOnly;

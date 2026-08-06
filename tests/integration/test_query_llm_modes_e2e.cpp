@@ -5,7 +5,7 @@
 /// Covers the LLM-configured query (rag-fusion: LLM query-
 /// variant expansion → vector + BM25 + RRF fusion) AND the no-LLM path (graceful
 /// degradation to vector + BM25 without RAG-Fusion). The rag-fusion LLM is wired through
-/// CrossNsQueryWiring (bootstrap §822) — NOT the per-NS RegisterQueryRoutes used by
+/// CrossNsQueryWiring (bootstrap) — NOT the per-NS RegisterQueryRoutes used by
 /// the ingest E2E — so this test stands that production assembly up directly.
 ///
 /// Three production gates govern whether rag-fusion actually invokes the LLM (all

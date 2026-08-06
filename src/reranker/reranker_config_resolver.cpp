@@ -6,7 +6,7 @@ namespace cortrix::reranker {
 
 int EffectiveRerankerConfig::ComputeTopN(int top_k) const {
     if (top_k <= 0) return 0;
-    // E2 D7: top_N = min(top_k × multiplier, max_candidates).
+    // E2: top_N = min(top_k × multiplier, max_candidates).
     const int mult = std::max(1, candidate_multiplier);
     long top_n = std::min<long>(static_cast<long>(top_k) * mult, max_candidates);
     // Safety floor: never below top_k (a too-small max_candidates must not make
@@ -18,8 +18,8 @@ EffectiveRerankerConfig RerankerConfigResolver::Resolve(
     const NsRerankerConfig& ns, const RerankerRequestParams& request) const {
     EffectiveRerankerConfig eff;
 
-    // enabled: request > NS > global (§2.6). The request `rerank` boolean, when
-    // present, wins over everything (the §2.6 example: NS enabled=false but
+    // enabled: request > NS > global. The request `rerank` boolean, when
+    // present, wins over everything (the example: NS enabled=false but
     // request rerank=true → enabled).
     if (request.rerank.has_value()) {
         eff.enabled = *request.rerank;

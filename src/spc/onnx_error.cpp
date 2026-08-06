@@ -16,7 +16,7 @@ namespace {
 // registry can't silently drift from the enum.
 //
 // retry_after_ms: only the run-time INFERENCE_FAILED is retryable (transient,
-// 200ms per §8.3 / §10 flow). The two startup errors are permanent — the user
+// 200ms per flow). The two startup errors are permanent — the user
 // must swap the `.so` or rebuild, so retry is meaningless.
 constexpr OnnxErrorInfo kRuntimeVersionMismatch{
     "CX_ERR_ONNXRT_VERSION_MISMATCH", ErrorCategory::kPermanent, false, std::nullopt};
@@ -44,7 +44,7 @@ const char* OnnxErrorCodeString(OnnxErrorCode code) {
 
 const std::vector<std::string>& RequiredStructuredDataKeys(OnnxErrorCode code) {
     // The structured_data column, 1:1. Function-local statics → stable
-    // references. `action` is included for the two startup errors because §8.3
+    // references. `action` is included for the two startup errors because
     // carries an `action` field telling the Agent how to decide
     // (replace_so_or_rebuild / downgrade_model_or_upgrade_runtime).
     static const std::vector<std::string> kVersionMismatch{

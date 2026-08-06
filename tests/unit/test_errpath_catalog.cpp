@@ -32,7 +32,7 @@ using json = nlohmann::json;
 
 // CX_ERR_NAMESPACE_NOT_FOUND: a namespace route returns NotFound carrying the
 // token; the gateway error writer surfaces it as the envelope code, and the
-// Sdk3Map row pins category=permanent / retryable=false (the §3.1 namespace row).
+// Sdk3Map row pins category=permanent / retryable=false (the namespace row).
 TEST(NamespaceErrPathTest, NamespaceNotFound_SurfacesCxCodeAndCategory) {
     httplib::Response res;
     // The real flow: a not-found namespace lookup returns a Status whose message

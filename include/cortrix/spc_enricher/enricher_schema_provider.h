@@ -19,11 +19,11 @@ namespace cortrix::spc {
 ///   - entities_fts FTS5 (text, type; content='entities', content_rowid=entity_id).
 ///
 /// Implements the frozen cortrix::catalog::ISchemaProvider. Migrate
-/// returns Status (F-FREEZE-1 / CODING_CONVENTIONS §3 — not Result<void>). All
+/// returns Status (F-FREEZE-1 / the coding conventions — not Result<void>). All
 /// DDL is idempotent (table/column existence guards) so a re-run / already-current
 /// Unit DB is a no-op; if `blocks` is absent (isolated unit test) it no-ops too.
 ///
-/// Standalone (D3): registering this with the SchemaMigrator at server bootstrap
+/// Standalone: registering this with the SchemaMigrator at server bootstrap
 /// (the MigrateUnit path) is wired separately; here it is fully
 /// unit-testable against a SchemaMigrator + an in-memory blocks table.
 class EnricherSchemaProvider : public cortrix::catalog::ISchemaProvider {

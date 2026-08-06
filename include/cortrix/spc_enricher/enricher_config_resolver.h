@@ -8,7 +8,7 @@
 namespace cortrix::spc {
 
 /// Per-namespace enricher overrides parsed from `namespaces.enricher_config`
-/// JSONB (design §2.8 / topic 2.2). V1 = the 4 B-class fields; every field is
+/// JSONB (design / topic 2.2). V1 = the 4 B-class fields; every field is
 /// OPTIONAL so an absent key falls back to the global default at resolve time
 /// (topic 2.4 "a missing key falls back to the global default"). Unknown keys ignored (forward-compatible).
 ///
@@ -35,7 +35,7 @@ struct EnricherNsConfig {
     static Result<EnricherNsConfig> Parse(const std::string& json_blob);
 };
 
-/// Request-level enricher params (design §2.5 / topic 2.5). V1 exposes exactly ONE
+/// Request-level enricher params (design / topic 2.5). V1 exposes exactly ONE
 /// request control: `enrich` boolean. model / score_threshold / prompt_template_id
 /// are NS-level, never per-request (topic 2.5), so absent here. Unset = the request
 /// does not override `enabled`.
@@ -43,7 +43,7 @@ struct EnricherRequestParams {
     std::optional<bool> enrich;  ///< pgcortrix request enrich=true/false
 };
 
-/// EnricherConfigResolver — the §2.9 three-layer priority resolver:
+/// EnricherConfigResolver — the three-layer priority resolver:
 ///
 ///     request (enrich=true/false)         ── highest, only sets `enabled`
 ///         ↓ overrides
@@ -54,15 +54,15 @@ struct EnricherRequestParams {
 /// `enabled` cascades request → NS → global; model / score_threshold /
 /// prompt_template_id cascade NS → global only (no request layer, topic 2.5).
 ///
-/// Standalone (D3): this resolves whatever it is handed (the global EnricherConfig +
+/// Standalone: this resolves whatever it is handed (the global EnricherConfig +
 /// an NS blob + request params), producing the EnricherConfig the factory /
 /// LlmEnricher use. Phasing of the live wiring that hands it those inputs:
 ///   - the request `enrich` arg from the SQL/HTTP layer is the Phase-1 per-request
-///     override (§2.9 three-layer priority); wiring it in is D3.5 cross-Feature work.
+///     override (three-layer priority); wiring it in is integration cross-Feature work.
 ///   - reading the NS blob from the NS-router cache (namespaces.enricher_config) is
 ///     PHASE-2 (Phase-1 enricher connection is global via the
 ///     config.yaml enricher_llm role; per-NS api_key/model/budget is Phase 2). The
-///     resolver is the Phase-2-ready pre-build — NOT a D3.5 wiring gap.
+///     resolver is the Phase-2-ready pre-build — NOT a integration wiring gap.
 class EnricherConfigResolver {
 public:
     explicit EnricherConfigResolver(const EnricherConfig& global) : global_(global) {}

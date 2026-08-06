@@ -1,8 +1,8 @@
 """New 4 tools (feature design section 4.3): #17-#20.
 
-  #17 cortrix_memory_extract  -> POST /memory/extract           (one-shot extraction from text, memory extraction D11)
+  #17 cortrix_memory_extract  -> POST /memory/extract           (one-shot extraction from text, memory extraction)
   #18 cortrix_task_status     -> GET  /documents/tasks/{id}/progress (async task)
-  #19 cortrix_cancel_task     -> DELETE /documents/tasks/{id}    (async task D3)
+  #19 cortrix_cancel_task     -> DELETE /documents/tasks/{id}    (async task)
   #20 cortrix_query_explain   -> POST /query?explain=true        (Class-A/B fields, ARCH section 1.6)
 """
 

@@ -30,7 +30,7 @@ Status DocSummarySchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) 
         }
         return Status::Ok();
     }
-    // Phase 2 (§15) is the only future step; until it is defined an unexpected
+    // Phase 2 is the only future step; until it is defined an unexpected
     // version jump is an error.
     return DocSummaryStatus(
         DocSummaryErrorCode::kSchemaVersionMismatch,

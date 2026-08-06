@@ -1,5 +1,5 @@
 # =============================================================
-# Test suite W1: RAGAS evaluation config (design: test-suite-tests.md §3.2)
+# Test suite W1: RAGAS evaluation config (design: test-suite-tests.md)
 # Evaluates enrich + retrieval quality: Context Precision /
 # Context Recall over a pinned Q-A-context dataset.
 # Runner: tests/ragas/run_eval.py (Nightly + Release; needs an

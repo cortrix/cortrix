@@ -294,7 +294,7 @@ def main():
             if iid:
                 # NB: the sources sub-resource uses the `namespace` param (per-NS storage),
                 # NOT `namespace_id` like the /interactions list above — a documented agent trace
-                # contract addendum (observability_routes.cpp §TC4), so pass `namespace`.
+                # contract addendum (observability_routes.cpp), so pass `namespace`.
                 rs = s.get(f"{api}/interactions/{iid}/sources",
                            params={"namespace": args.ns}, timeout=15)
                 check("P5 agent trace /interactions/{id}/sources 200 + source_count",
@@ -325,7 +325,7 @@ def main():
             r = s.get(f"{api}/traces/{trace_sid}", timeout=15)
             if r.status_code == 200:
                 b = r.json() or {}
-                # §8.1 body: trace_count = rows on this page; meta.total_count = total match.
+                # body: trace_count = rows on this page; meta.total_count = total match.
                 n = b.get("trace_count", 0) or (b.get("meta") or {}).get("total_count", 0)
                 if n >= 1:
                     wrote = True
@@ -357,7 +357,7 @@ def main():
         skip("P5 memory suite", "no session id")
 
 
-    # ---------- P6 platform surfaces (D3.5 r2 Wave P) ----------
+    # ---------- P6 platform surfaces (integration r2 Wave P) ----------
     r = s.get(f"{api}/system/version", timeout=10)
     if check("P6 /system/version 200", r.status_code == 200, r.text[:160]):
         check("P6 version == 1.0.0-rc.1", (r.json() or {}).get("version") == "1.0.0-rc.1", r.text[:160])

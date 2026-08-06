@@ -16,11 +16,11 @@
 // fallback). A self-contained C++ in-process queue + resident worker pool that
 // drains queued interactions through a supplied handler.
 //
-// 🚨 D3 standalone discipline (B_R3_BRIEFING §2 redline 2): this is modeled on the
+// 🚨 standalone discipline ( redline 2): this is modeled on the
 // WorkerPool fan-out *pattern* but does NOT #include or consume the task-scheduler code —
 // it is an independent queue scoped to extraction. The real cross-language async worker
 // (the Python middleware) and the real cortrix_log_interaction
-// trigger are DEFERRED → D3.5; this kernel-side queue is the in-process basis they
+// trigger are DEFERRED → integration; this kernel-side queue is the in-process basis they
 // build on and is fully testable standalone (push → worker → handler).
 //
 // The TraceContext travels with each queued item so the async link
@@ -41,12 +41,12 @@ struct MemoryQueueItem {
 /// a lambda.
 using MemoryQueueHandler = std::function<bool(const MemoryQueueItem&)>;
 
-/// Dead-letter sink: invoked when an item exhausts its retries (D2 reliability).
+/// Dead-letter sink: invoked when an item exhausts its retries (reliability).
 using MemoryDeadLetterSink = std::function<void(const MemoryQueueItem&)>;
 
-/// Periodic-scan source: returns interactions that were never extracted (the D2
+/// Periodic-scan source: returns interactions that were never extracted (the
 /// hourly fallback re-enqueues these). Standalone tests inject a lambda; the real
-/// source (a store query for unextracted interactions) is wired in D3.5.
+/// source (a store query for unextracted interactions) is wired in integration.
 using MemoryUnextractedSource = std::function<std::vector<InteractionLog>()>;
 
 class MemoryQueue {
@@ -56,7 +56,7 @@ public:
         int worker_count = 4;                 ///< resident worker threads (NS-level configurable)
         size_t queue_max_size = 10000;        ///< backpressure cap; push past it is rejected
         int retry_max = 3;                    ///< per-item retries before dead-letter
-        int periodic_scan_interval_s = 3600;  ///< D2 fallback sweep interval
+        int periodic_scan_interval_s = 3600;  ///< fallback sweep interval
     };
 
     MemoryQueue();                       ///< default Config
@@ -67,7 +67,7 @@ public:
     MemoryQueue& operator=(const MemoryQueue&) = delete;
 
     /// Enqueue an interaction for async extraction (the cortrix_log_interaction
-    /// trigger calls this; D3.5 wiring). Returns false if the queue is at
+    /// trigger calls this; integration wiring). Returns false if the queue is at
     /// queue_max_size (backpressure) — the caller may fall back to the periodic scan.
     bool Push(const InteractionLog& interaction,
               const observability::TraceContext* ctx = nullptr);
@@ -81,7 +81,7 @@ public:
     void StartWorkers(MemoryQueueHandler handler,
                       MemoryDeadLetterSink dead_letter = nullptr);
 
-    /// Start the D2 periodic fallback: every periodic_scan_interval_s, call `source`
+    /// Start the periodic fallback: every periodic_scan_interval_s, call `source`
     /// and re-enqueue any returned (unextracted) interactions. No-op if already started.
     void StartPeriodicScan(MemoryUnextractedSource source);
 

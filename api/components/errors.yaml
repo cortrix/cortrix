@@ -6,7 +6,7 @@ components:
     ErrorResponseV1:
       # version annotation (evolution anchor L3)
       x-cortrix-version: "v1"
-      x-cortrix-deprecation-policy: "stable until Phase 2 D0 review"
+      x-cortrix-deprecation-policy: "stable until Phase 2 review"
       x-cortrix-migration-target: "ErrorResponseV2 (TBD Phase 2)"
       type: object
       required: [error]

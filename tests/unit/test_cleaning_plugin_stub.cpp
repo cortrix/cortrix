@@ -3,7 +3,7 @@
 #include "cortrix/spc/data_cleaner.h"
 
 // Cleaning S8: cleaning-plugin seam. cleaning gives the RegisterPlugin / ApplyPlugins /
-// ICleaningPlugin signatures (D8 — cleaning plugin implements the full ecosystem); the
+// ICleaningPlugin signatures (cleaning plugin implements the full ecosystem); the
 // seam is always compiled, these tests pin its stub behavior.
 namespace cortrix::spc {
 namespace {

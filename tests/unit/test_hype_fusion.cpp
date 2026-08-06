@@ -8,15 +8,15 @@
 #include "cortrix/spc/hype_fusion.h"
 
 // HyPE S4 — chunk-level RRF + by-parent dedup over a mixed P-HNSW candidate pool
-// (§8.1) + the 3 B-class explain fields (§8.2). Real P-HNSW split / QueryPipeline
-// = D3.5.
+// + the 3 B-class explain fields. Real P-HNSW split / QueryPipeline
+// = integration.
 namespace cortrix::spc {
 namespace {
 
 // A "chunk" candidate = any non-hype block_type. The real CortrixBlockType has
 // no kBlockChunk=0 (content blocks use kBlockFile=1 etc.); the fusion split is
 // purely "== kBlockHypeQuestion(16) ? hype : chunk", so 0 is a fine chunk-path
-// sentinel here (matches §8.1's chunk-path treatment).
+// sentinel here (matches's chunk-path treatment).
 HypeCandidate Chunk(std::string child, float score) {
     return {child, /*block_type=*/0, score, "", ""};
 }

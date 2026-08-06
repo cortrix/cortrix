@@ -1,7 +1,7 @@
 import { CommandLineIcon } from '@heroicons/react/24/outline';
 import type { ReactNode } from 'react';
 
-// Agent-friendly "Programmatic equivalent" banner (web UI design § 15.3). Every
+// Agent-friendly "Programmatic equivalent" banner (web UI design). Every
 // screen that exposes a CRUD action also surfaces the SDK / MCP / REST
 // equivalent so an Agent can discover the programmatic path. Magma VI: codebg
 // surface + mono snippet (SoT: design/vi-mockup/cortrix-vi-console.html

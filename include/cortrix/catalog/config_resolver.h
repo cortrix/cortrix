@@ -11,7 +11,7 @@ namespace cortrix::catalog {
 
 /// Three-layer config resolution: the effective config for a
 /// Feature is global default ← NS override ← request override, where the request
-/// layer may only set whitelisted fields (§3.5/§6.2). Generic over any config
+/// layer may only set whitelisted fields. Generic over any config
 /// struct `ConfigT` that is nlohmann-JSON serializable (has to_json/from_json) —
 /// merging happens at the JSON object layer, so no reflection is needed.
 ///
@@ -19,12 +19,12 @@ namespace cortrix::catalog {
 /// layer's value (shallow merge on top-level keys). NS config is the parsed
 /// `namespaces.<feature>_config` blob ('{}' = no override = inherit global).
 ///
-/// Not a cache itself — INSRouter holds the §6.3 NS-metadata cache; this resolves
+/// Not a cache itself — INSRouter holds the NS-metadata cache; this resolves
 /// against whatever NS JSON it is handed.
 template <typename ConfigT>
 class ConfigResolver {
 public:
-    /// Restrict which top-level keys a request-level override may set (§3.5
+    /// Restrict which top-level keys a request-level override may set (
     /// strict whitelist). Keys outside the set are ignored in `request`. Empty
     /// set (default) = no request-level overrides honored.
     void SetRequestAllowedFields(const std::set<std::string>& fields) {

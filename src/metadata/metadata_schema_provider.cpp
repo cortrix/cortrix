@@ -18,12 +18,12 @@ CREATE TABLE IF NOT EXISTS metadata_blocks (
     block_id      TEXT PRIMARY KEY,                    -- ULID (id/ulid.h)
     doc_id        TEXT NOT NULL UNIQUE,                -- 1 doc = 1 metadata block
     namespace_id  TEXT NOT NULL,
-    block_text    TEXT NOT NULL,                       -- D3 natural-language sentence (embedding input)
-    metadata_json TEXT NOT NULL,                       -- D2/D9 + V2 remediation: complete 26-field JSON
+    block_text    TEXT NOT NULL,                       -- natural-language sentence (embedding input)
+    metadata_json TEXT NOT NULL,                       -- + V2 remediation: complete 26-field JSON
     created_at    INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER) * 1000)
-    -- D9 B' compromise: V1.0 immutable schema; Phase 2 adds block_version / updated_at
+    -- B' compromise: V1.0 immutable schema; Phase 2 adds block_version / updated_at
     --             + Block Versioning + Update API Feature.
-    -- D3.5: FOREIGN KEY (doc_id) REFERENCES documents(doc_id) — pending doc_id type
+    -- integration: FOREIGN KEY (doc_id) REFERENCES documents(doc_id) — pending doc_id type
     --       reconciliation (documents.doc_id INTEGER vs metadata block TEXT ULID).
 );
 

@@ -21,13 +21,13 @@ int64_t NowMs() {
         .count();
 }
 
-// §3 truncation budgets.
+// truncation budgets.
 constexpr size_t kParamsMaxBytes = 2048;          // ≤2KB
 constexpr size_t kParamsHeadBytes = 1536;         // first 1.5KB
 constexpr size_t kParamsTailBytes = 512;          // last 0.5KB
 constexpr const char* kTruncMid = "[...truncated...]";
 constexpr size_t kResultMaxBytes = 512;
-constexpr size_t kResultHeadBytes = 400;          // mirrors §8.2 snippet 400+100 split
+constexpr size_t kResultHeadBytes = 400;          // mirrors snippet 400+100 split
 constexpr size_t kResultTailBytes = 100;
 constexpr const char* kTruncTail = "[truncated]";
 constexpr size_t kErrorMsgMaxBytes = 256;         // first 256 chars of error message
@@ -36,7 +36,7 @@ constexpr size_t kErrorMsgMaxBytes = 256;         // first 256 chars of error me
 
 std::string McpSessionHandler::TruncateParams(const std::string& params) {
     if (params.size() <= kParamsMaxBytes) return params;
-    // Keep head + tail with a middle marker (§3 — preserve first 1.5KB + last 0.5KB).
+    // Keep head + tail with a middle marker (preserve first 1.5KB + last 0.5KB).
     return params.substr(0, kParamsHeadBytes) + kTruncMid +
            params.substr(params.size() - kParamsTailBytes);
 }
@@ -49,7 +49,7 @@ std::string McpSessionHandler::TruncateResult(const std::string& summary) {
 
 std::string McpSessionHandler::FormatError(const std::optional<std::string>& error_code,
                                            const std::string& error_message) {
-    // §3: on failure keep only the error_code + first 256 chars of the message.
+    //: on failure keep only the error_code + first 256 chars of the message.
     std::string code = error_code.value_or("CX_ERR_TRACE_INTERNAL");
     std::string msg = error_message.size() > kErrorMsgMaxBytes
                           ? error_message.substr(0, kErrorMsgMaxBytes)

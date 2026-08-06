@@ -12,7 +12,7 @@
 #include "cortrix/reranker/circuit_breaker.h"        // reranker infrastructure, reused
 #include "cortrix/reranker/reranker_thread_pool.h"   // reranker infrastructure, reused
 #include "cortrix/spc_enricher.h"
-#include "cortrix/spc_enricher/budget_tracker.h"     // W4 budget cap (§3.5)
+#include "cortrix/spc_enricher/budget_tracker.h"     // W4 budget cap
 #include "cortrix/spc_enricher/enricher_error.h"
 #include "cortrix/spc_enricher/enricher_metrics.h"
 #include "cortrix/spc_enricher/enricher_response_parser.h"
@@ -29,8 +29,8 @@ int64_t NowMs() {
 }
 
 // Map the feature-neutral OpenAiLlmClient status token (llm_error_tokens.h) to
-// the enricher error code (§4.2). RATE_LIMIT is distinct; transport / HTTP
-// 5xx / bad-body all surface as LLM_API (transient, retryable per §5.1).
+// the enricher error code. RATE_LIMIT is distinct; transport / HTTP
+// 5xx / bad-body all surface as LLM_API (transient, retryable per).
 EnricherErrorCode ClassifyLlmFailure(const std::string& status_msg) {
     if (status_msg.rfind(llm::llm_tokens::kRateLimit, 0) == 0) {
         return EnricherErrorCode::kRateLimit;
@@ -125,7 +125,7 @@ LlmEnricher::LlmEnricher(const EnricherConfig& config,
 
     // S3.1: bounded-concurrency pool (4 workers / queue 100 / task_timeout 30s,
     // The RerankerThreadPool is reused. One pool task = one
-    // Chat call (the §5.1 retry schedule runs on the caller thread), so the pool
+    // Chat call (the retry schedule runs on the caller thread), so the pool
     // timeout keeps its single-call meaning.
     thread_pool_ = std::make_unique<reranker::RerankerThreadPool<float>>(
         config_.workers, config_.queue_size, config_.task_timeout_ms);
@@ -167,7 +167,7 @@ std::vector<EnrichResult> LlmEnricher::EnrichBatch(
     out.reserve(contexts.size());
     if (contexts.empty()) return out;
 
-    // §4.2: circuit breaker check. Open → all chunks score=0 (degrade to the
+    //: circuit breaker check. Open → all chunks score=0 (degrade to the
     // NullEnricher behavior for the cooldown window) without hitting the LLM.
     if (circuit_breaker_ && !circuit_breaker_->AllowRequest()) {
         EnricherMetrics::Instance().RecordFallbackToNull(
@@ -177,7 +177,7 @@ std::vector<EnrichResult> LlmEnricher::EnrichBatch(
                           "circuit breaker open", /*retry_count=*/0);
     }
 
-    // §4.2: budget check (after the breaker). Over cap → all chunks score=0 +
+    //: budget check (after the breaker). Over cap → all chunks score=0 +
     // CX_ERR_ENRICHER_BUDGET + degrade (operator must raise budget_cap_usd / wait
     // for the next cycle). 0 cap = disabled.
     if (budget_tracker_ && !budget_tracker_->AllowRequest()) {
@@ -218,7 +218,7 @@ std::vector<EnrichResult> LlmEnricher::EnrichBatch(
 std::vector<EnrichResult> LlmEnricher::RunOneBatch(
     const std::vector<ChunkContext>& group) {
     const int n = static_cast<int>(group.size());
-    // §3.6 cortrix_enricher_batch_size_actual — the actual per-LLM-call batch size
+    // cortrix_enricher_batch_size_actual — the actual per-LLM-call batch size
     // (topic 1.2 batching of EnrichBatch); recorded for every dispatched batch.
     EnricherMetrics::Instance().ObserveBatchSizeActual(n);
     const std::string model = config_.model;
@@ -241,9 +241,9 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
     };
 
     // ONE pool task == ONE Chat call, bounded by task_timeout_ms at both the
-    // transport (call.timeout_ms) and the pool level. The §5.1 retry schedule
+    // transport (call.timeout_ms) and the pool level. The retry schedule
     // (transport retries + backoff sleeps + the timeout retry) is driven from the
-    // caller thread below — the seconds-level backoff (addendum §3.7 A-part) must
+    // caller thread below — the seconds-level backoff (addendum A-part) must
     // not run inside the pool task or it would eat the per-call timeout budget.
     auto submit_one_call = [this, &prompt, &model]() -> std::shared_ptr<Slot> {
         auto slot = std::make_shared<Slot>();
@@ -277,7 +277,7 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
         return completed ? slot : nullptr;  // nullptr == pool-level timeout
     };
 
-    // §5.1 retry schedule, caller-thread driven: transport/HTTP-5xx failures are
+    // retry schedule, caller-thread driven: transport/HTTP-5xx failures are
     // retried up to kEnricherMaxHttpAttempts calls with backoff base × attempt
     // between them; a pool-level timeout is retried exactly once (no backoff);
     // rate-limit + bad-body return immediately for higher-level handling.
@@ -288,7 +288,7 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
         slot = submit_one_call();
         if (slot == nullptr) {
             if (!timeout_retried) {
-                timeout_retried = true;  // §5.1 timeout → retry 1 time
+                timeout_retried = true;  // timeout → retry 1 time
                 continue;
             }
             break;  // hard timeout after the retry
@@ -299,7 +299,7 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
         const bool retryable = msg.rfind(llm::llm_tokens::kHttp, 0) == 0 ||
                                msg.rfind(llm::llm_tokens::kTransport, 0) == 0;
         if (!retryable || transport_attempts >= kEnricherMaxHttpAttempts) break;
-        // Seconds-level backoff (addendum §3.7 A-part): base × attempt.
+        // Seconds-level backoff (addendum A-part): base × attempt.
         std::this_thread::sleep_for(std::chrono::milliseconds(
             static_cast<int64_t>(config_.http_retry_backoff_ms) *
             transport_attempts));
@@ -318,7 +318,7 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
 
     const llm::ChatCompletionResponse& chat = slot->chat;
     const int duration_ms = static_cast<int>(slot->duration_ms);
-    // §3.6 cortrix_enricher_score_duration_seconds — the completed LLM-call latency,
+    // cortrix_enricher_score_duration_seconds — the completed LLM-call latency,
     // recorded for both the failure-after-retries and success paths (the hard-timeout
     // path above has no measured call latency, so it is excluded). slot->duration_ms is
     // wall-clock ms → seconds.
@@ -349,7 +349,7 @@ std::vector<EnrichResult> LlmEnricher::RunOneBatch(
             model, pricing.CostMicroUsd(model, chat.prompt_tokens, chat.completion_tokens));
     }
 
-    // topic 3.3 L1/L2/L3 parse (S2.4). NOTE (§4.2): an L3 whole-batch parse failure
+    // topic 3.3 L1/L2/L3 parse (S2.4). NOTE: an L3 whole-batch parse failure
     // is NOT counted toward the breaker (the transport succeeded) — we record the
     // PARSE failure metric only.
     auto results = ParseEnrichBatchResponse(chat.content, n, model,

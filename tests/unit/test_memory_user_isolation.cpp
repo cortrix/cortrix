@@ -1,5 +1,5 @@
 // Memory isolation unit tests — Per-user memory isolation.
-// Covers design § 8.1 matrix (14 cases) + user_id format + a few extras:
+// Covers design matrix (14 cases) + user_id format + a few extras:
 //   - MemorySearchRequest::Validate() : user_id unconditionally required,
 //     format enforced (<=128 chars, ASCII printable).
 //   - MemorySearcher::MatchScope()   : every path filters user_id first.
@@ -106,7 +106,7 @@ MemorySearchRequest BaseReq() {
     return r;
 }
 
-// ===== § 8.1 case 1-4, 12-13: Validate() =====
+// ===== case 1-4, 12-13: Validate() =====
 
 // 1. user_id empty -> InvalidArgument
 TEST_F(MemoryIsolationTest, Validate_UserIdEmpty_Fails) {
@@ -178,7 +178,7 @@ TEST_F(MemoryIsolationTest, UserIdFormat_NonAscii_Rejected) {
     EXPECT_NE(s.message().find("format"), std::string::npos);
 }
 
-// ===== § 8.1 case 5-11: MatchScope() =====
+// ===== case 5-11: MatchScope() =====
 
 // 5. metadata.user_id != request.user_id -> false
 TEST_F(MemoryIsolationTest, MatchScope_UserIdMismatch_Excluded) {

@@ -7,11 +7,11 @@ import {
 import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { PlaceholderPage, type PlaceholderMarketingLinks } from './PlaceholderPage';
 
-// Ent feature gate pages (web UI design § 6.2 / § 10.2). Each page reads the
+// Ent feature gate pages (web UI design). Each page reads the
 // feature flag store: when the backend reports the feature enabled it renders
 // the real component (V1.5 — not bundled in V1.0), when it is a placeholder it
 // renders the marketing PlaceholderPage. The routes are registered in V1.0
-// already (§ 10.1) so bookmarks survive the V1.5 swap.
+// already so bookmarks survive the V1.5 swap.
 
 const MARKETING: PlaceholderMarketingLinks = {
   roadmap: 'https://cortrix.ai/roadmap',
@@ -19,7 +19,7 @@ const MARKETING: PlaceholderMarketingLinks = {
   contact: 'mailto:enterprise@cortrix.ai',
 };
 
-// V1.0 stub — the real component ships in V1.5 (lazy chunk, § 14.3). Until then
+// V1.0 stub — the real component ships in V1.5 (lazy chunk). Until then
 // an enabled flag with no real component still falls through to the placeholder.
 function notYetBundled(): null {
   return null;

@@ -8,7 +8,7 @@ namespace cortrix {
 
 /// StatusOr-style result: holds either a value (Ok) or an error Status.
 ///
-/// Convention (CODING_CONVENTIONS §3): a fallible operation that returns a
+/// Convention (the coding conventions): a fallible operation that returns a
 /// value returns `Result<T>`; a fallible operation that returns nothing returns
 /// plain `Status`. An Ok future/Result always carries a value; an error Result
 /// carries only the Status and value() must not be called.

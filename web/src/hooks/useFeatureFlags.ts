@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { getFeatureFlags } from '../api/system';
 import type { FeatureDescriptor, SystemEdition } from '../types/api';
 
-// Feature-flag store (web UI design § 5.3). Loads GET /api/v1/system/features
+// Feature-flag store (web UI design). Loads GET /api/v1/system/features
 // (credentials:'include' + X-CSRF-Token are applied by the shared api client)
 // and exposes edition + per-feature enabled / placeholder probes. Optional
 // features are toggled by `isEnabled`; not-yet-available ones report

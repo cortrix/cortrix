@@ -12,7 +12,7 @@ namespace cortrix::scoring {
 // LevelToScore, read by value in tests), so no separate definition is required.
 
 uint8_t ScoreMap::ParserLevel(const std::string& parser_name) {
-    // D2 Matrix: Docling=2, PaddleOCR=1, Docling+PaddleOCR=2 (the structured Docling
+    // Matrix: Docling=2, PaddleOCR=1, Docling+PaddleOCR=2 (the structured Docling
     // signal dominates the combined pipeline), anything else (empty/unknown) = 0.
     if (parser_name == "docling" || parser_name == "docling+paddleocr") return 2;
     if (parser_name == "paddleocr") return 1;
@@ -20,7 +20,7 @@ uint8_t ScoreMap::ParserLevel(const std::string& parser_name) {
 }
 
 uint8_t ScoreMap::EnricherLevel(const std::string& enricher_name) {
-    // D2 Matrix: LlmEnricher=4, ContextualRetrieval=3, HyPE=3, NullEnricher/unknown=0.
+    // Matrix: LlmEnricher=4, ContextualRetrieval=3, HyPE=3, NullEnricher/unknown=0.
     if (enricher_name == "llm") return 4;
     if (enricher_name == "contextual" || enricher_name == "hype") return 3;
     return 0;
@@ -45,9 +45,9 @@ uint8_t ScoreMap::ComputeLevel(const ScoringInput& input) {
 
 float ScoreMap::LevelToScore(uint8_t level) {
     if (level > 4) {
-        // §4.4 defensive bottom-out: ComputeLevel never emits >4, so reaching here means
+        // defensive bottom-out: ComputeLevel never emits >4, so reaching here means
         // a caller passed a raw bad level. Carry the exact identity + structured_data.
-        ScoringMetrics::Instance().RecordError(ScoringErrorCode::kLevelInvalid);  // §6 error_total
+        ScoringMetrics::Instance().RecordError(ScoringErrorCode::kLevelInvalid);  // error_total
         throw agent_friendly::AgentFriendlyException(MakeScoringError(
             ScoringErrorCode::kLevelInvalid,
             {{"level_received", level}, {"max_allowed", 4}, {"scoring_input", nullptr}},

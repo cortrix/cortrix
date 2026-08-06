@@ -32,7 +32,7 @@ using observability::OplogErrorCode;
 // --- query-param parsing helpers --------------------------------------------
 
 // Split a comma-separated list, trimming surrounding ASCII whitespace and
-// dropping empty tokens ("a,,b" -> {"a","b"}). Used for action_in (§6.1 csv).
+// dropping empty tokens ("a,,b" -> {"a","b"}). Used for action_in (csv).
 std::vector<std::string> SplitCsv(const std::string& s) {
     std::vector<std::string> out;
     std::stringstream ss(s);
@@ -77,7 +77,7 @@ std::string MakeErrorId() {
     return std::string(buf);
 }
 
-// §7.2 CX_ERR_OPLOG_CLEANUP_RUNNING retry_at_ms = base backoff + [0,1000) jitter
+// CX_ERR_OPLOG_CLEANUP_RUNNING retry_at_ms = base backoff + [0,1000) jitter
 // (relative ms the client should wait), so retries from many clients don't thunder.
 int CleanupRetryAtMs() {
     std::uniform_int_distribution<int> jitter(0, 999);
@@ -88,7 +88,7 @@ int CleanupRetryAtMs() {
 // OperationLogger::Query returns a Status whose message is "CX_ERR_OPLOG_X: detail"
 // (OplogStatus). We recover the identity here and rebuild the full Agent-friendly
 // body — the token-only Status deliberately does not carry structured_data, so the
-// API boundary is the SoT for the §7.2 required keys (mirrors batch_submit_service
+// API boundary is the SoT for the required keys (mirrors batch_submit_service
 // ExtractCxCode + import_task_queue re-inflation precedent).
 
 // "CX_ERR_OPLOG_X" from "CX_ERR_OPLOG_X: detail" (or the whole string if no ':').
@@ -118,7 +118,7 @@ OplogErrorCode CodeFromToken(const std::string& cx) {
 }
 
 // Best-effort recover "total_count N" from the pagination detail string
-// ("offset X >= total_count Y") so the §7.2 {offset,total_count} body is exact.
+// ("offset X >= total_count Y") so the {offset,total_count} body is exact.
 std::optional<int64_t> ParseTrailingTotalCount(const std::string& detail) {
     const std::string key = "total_count ";
     size_t p = detail.rfind(key);
@@ -130,7 +130,7 @@ std::optional<int64_t> ParseTrailingTotalCount(const std::string& detail) {
     }
 }
 
-// Serialize one operation_log row to the §6.1 response shape (optional columns
+// Serialize one operation_log row to the response shape (optional columns
 // become JSON null when NULL in the DB).
 nlohmann::json EntryToJson(const OperationLogEntry& e) {
     auto opt = [](const std::optional<std::string>& v) {
@@ -150,8 +150,8 @@ nlohmann::json EntryToJson(const OperationLogEntry& e) {
     return j;
 }
 
-// Write a CX_ERR_OPLOG_* error as the GEN-Agent 4-field body (§7.1/§7.2).
-// `structured_data` carries the §7.2 required keys for `code`; category /
+// Write a CX_ERR_OPLOG_* error as the GEN-Agent 4-field body.
+// `structured_data` carries the required keys for `code`; category /
 // retryable / retry_after_ms come from the canonical registry via MakeOplogError.
 // The HTTP status is the StatusCode→http mapping of the code.
 void WriteOplogError(httplib::Response& res, OplogErrorCode code,
@@ -180,7 +180,7 @@ void RegisterOperationsRoutes(httplib::Server& server,
                       const RequestContext& rctx) {
                 OperationLogFilter filter;
 
-                // ---- string filters (§6.1) ----
+                // ---- string filters ----
                 if (req.has_param("action"))
                     filter.action = req.get_param_value("action");
                 if (req.has_param("namespace_id"))
@@ -192,7 +192,7 @@ void RegisterOperationsRoutes(httplib::Server& server,
                 if (req.has_param("action_in"))
                     filter.action_in = SplitCsv(req.get_param_value("action_in"));
 
-                // ---- user_id scope + admin cross-user check (§6.1) ----
+                // ---- user_id scope + admin cross-user check ----
                 // Default scope = the caller's own user_id. A request for someone
                 // else's rows requires an admin key, else CX_ERR_OPLOG_UNAUTHORIZED.
                 const std::string& self = rctx.auth.user_id;
@@ -207,7 +207,7 @@ void RegisterOperationsRoutes(httplib::Server& server,
                     }
                     filter.user_id = requested;
                 } else if (!self.empty()) {
-                    // No user_id given: scope to the caller's own rows (§6.1 default).
+                    // No user_id given: scope to the caller's own rows (default).
                     filter.user_id = self;
                 }
                 // else: self is empty AND admin — the only case is auth-disabled dev
@@ -215,7 +215,7 @@ void RegisterOperationsRoutes(httplib::Server& server,
                 // user_id unconstrained so the operator sees all rows; a real
                 // non-admin always has a non-empty user_id and is scoped above.
 
-                // ---- timestamp range (§6.1; unparsable -> INVALID_FILTER) ----
+                // ---- timestamp range (unparsable -> INVALID_FILTER) ----
                 if (req.has_param("from_timestamp")) {
                     auto v = ParseInt64Param(req, "from_timestamp");
                     if (!v.has_value()) {
@@ -241,7 +241,7 @@ void RegisterOperationsRoutes(httplib::Server& server,
                     filter.to_timestamp = v;
                 }
 
-                // ---- pagination + sort (§6.1) ----
+                // ---- pagination + sort ----
                 if (req.has_param("limit")) {
                     auto v = ParseInt64Param(req, "limit");
                     if (!v.has_value()) {
@@ -265,7 +265,7 @@ void RegisterOperationsRoutes(httplib::Server& server,
                     filter.offset = static_cast<int>(*v);
                 }
                 if (req.has_param("sort_order")) {
-                    // Uppercase so "asc"/"desc" are accepted (§6.1 ASC|DESC). An
+                    // Uppercase so "asc"/"desc" are accepted (ASC|DESC). An
                     // out-of-set value falls through to Query's INVALID_FILTER.
                     std::string so = req.get_param_value("sort_order");
                     std::transform(so.begin(), so.end(), so.begin(),
@@ -277,7 +277,7 @@ void RegisterOperationsRoutes(httplib::Server& server,
                 Result<OperationLogQueryResult> r = logger.Query(filter);
                 if (!r.ok()) {
                     // Re-inflate the CX_ERR_OPLOG_* token into the full body, rebuilding
-                    // the §7.2 structured_data from what the request already knows.
+                    // the structured_data from what the request already knows.
                     const std::string& msg = r.status().message();
                     const std::string cx = ExtractCxCode(msg);
                     const std::string detail = ExtractDetail(msg);
@@ -298,7 +298,7 @@ void RegisterOperationsRoutes(httplib::Server& server,
                             sd = {{"required_role", "admin"}};
                             break;
                         case OplogErrorCode::kCleanupRunning:
-                            // §7.2: retry_at_ms = base backoff + jitter (relative ms).
+                            //: retry_at_ms = base backoff + jitter (relative ms).
                             sd = {{"retry_at_ms", CleanupRetryAtMs()}};
                             break;
                         case OplogErrorCode::kInternal:
@@ -316,7 +316,7 @@ void RegisterOperationsRoutes(httplib::Server& server,
                     return;
                 }
 
-                // ---- success: §6.1 response shape (Lead-decided top-level keys) ----
+                // ---- success: response shape (Lead-decided top-level keys) ----
                 const OperationLogQueryResult& qr = *r;
                 nlohmann::json ops = nlohmann::json::array();
                 for (const auto& e : qr.entries) ops.push_back(EntryToJson(e));
@@ -326,7 +326,7 @@ void RegisterOperationsRoutes(httplib::Server& server,
                 body["total_count"] = qr.total_count;
                 body["limit"]       = filter.limit;
                 body["offset"]      = filter.offset;
-                // Pagination hints (§6.1 meta) kept under meta for Agent paging.
+                // Pagination hints (meta) kept under meta for Agent paging.
                 body["meta"]["total_count"] = qr.total_count;
                 body["meta"]["has_next"]    = qr.has_next;
                 body["meta"]["next_offset"] = qr.next_offset;

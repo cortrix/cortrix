@@ -10,23 +10,23 @@ namespace cortrix::spc {
 
 /// The Contextual Retrieval subsystem metrics (observability
 /// subsystem `contextual_retrieval`). Naming
-/// cortrix_contextual_retrieval_<metric>_<unit>. NO high-cardinality labels (§10
+/// cortrix_contextual_retrieval_<metric>_<unit>. NO high-cardinality labels (
 /// V3 ruling 10 dropped the ns_id label; per-NS data is served via the
-/// /system/namespaces/<id>/stats endpoint — OBS_SPEC §3.2 forbids
+/// system/namespaces/<id>/stats endpoint — OBS_SPEC forbids
 /// tenant/ns/unit/user/request/chunk id); chunk_id etc. go to structured logs only.
 ///
-/// Standalone (D3): a self-contained, dependency-free recorder + an OpenMetrics
+/// Standalone: a self-contained, dependency-free recorder + an OpenMetrics
 /// text renderer (same pattern as EnricherMetrics / HypeMetrics /
 /// SparseMetrics / OnnxMetrics). The `/metrics` scrape endpoint does not
 /// exist in the frozen tree — registering this recorder there is cross-Feature
-/// wiring → D3.5.
+/// wiring → integration.
 class ContextualRetrievalMetrics {
 public:
-    /// status label for cortrix_contextual_retrieval_chunks_total (§10) — the
+    /// status label for cortrix_contextual_retrieval_chunks_total — the
     /// write-time outcome per chunk. Mirrors contextualized_status 1/2/3.
     enum class ChunkStatus { kGenerated = 0, kFailed, kSkippedNoLlm };
 
-    /// path label for cortrix_contextual_retrieval_query_via_path_total (§10) —
+    /// path label for cortrix_contextual_retrieval_query_via_path_total —
     /// which recall path served a query hit (B-class explain via_path).
     enum class QueryPath { kDense = 0, kContextualized, kFallbackDense };
 

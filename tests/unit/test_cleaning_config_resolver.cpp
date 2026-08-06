@@ -81,7 +81,7 @@ TEST(CleaningConfigResolveTest, MissingFields_FallBackToGlobal) {
                      g.dedup_similarity_threshold);                // global default
 }
 
-// (5) Resource-level fields are NOT NS-overridable (§3.4 line 176): a stray
+// (5) Resource-level fields are NOT NS-overridable (line 176): a stray
 // max_chunk_chars / plugin_timeout_ms in the NS blob is ignored — the global value
 // is re-asserted.
 TEST(CleaningConfigResolveTest, ResourceLevelFields_NotNsOverridable) {
@@ -118,7 +118,7 @@ TEST(CleaningConfigResolveTest, InvalidJsonBlob_MergeFailed) {
 
 // ---------- LoadGlobalCleaningConfig: the global (lowest) layer ----------
 
-// (8) Null IGlobalConfig → struct defaults (cleaning_types.h §3.1).
+// (8) Null IGlobalConfig → struct defaults (cleaning_types.h).
 TEST(CleaningConfigGlobalTest, NullConfig_StructDefaults) {
     CleaningConfig c = LoadGlobalCleaningConfig(nullptr);
     CleaningConfig def;  // struct defaults

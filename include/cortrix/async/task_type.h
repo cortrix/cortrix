@@ -13,12 +13,12 @@ namespace cortrix::async {
 ///  - The values (1/2/3) are stable across Phases so the tasks.task_type column
 ///    stays backward-compatible.
 ///  - A new TaskType MUST be added by a PR that also updates the design
-///    §2.10 (no Feature may declare one unilaterally).
+///    (no Feature may declare one unilaterally).
 enum TaskType {
     kTaskDocParse        = 1,   ///< PDF/Office parse task
     kTaskWatcherFanout   = 2,   ///< Watcher cross-NS broadcast task
     kTaskDocSummary      = 3,   ///< document-level summary index generation task
-    kTaskEnrichBackfill  = 4,   ///< addendum §3.7 added (per-doc chunk-enrichment backfill;
+    kTaskEnrichBackfill  = 4,   ///< addendum added (per-doc chunk-enrichment backfill;
                                 ///< payload = namespace_id + doc_id, owed members re-read
                                 ///< from enrich_state — idempotent)
 };

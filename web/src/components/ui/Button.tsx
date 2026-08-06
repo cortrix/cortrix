@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 
-// Cortrix VI § 6.1 Button — primary / secondary / danger variants, sm/base/lg
+// Cortrix VI Button — primary / secondary / danger variants, sm/base/lg
 // sizes, with default/hover/active/disabled/loading states. Magma VI: primary
 // uses the `magma-grad` gradient, secondary uses the surface/line tokens
 // (SoT: design/vi-mockup/cortrix-vi-console.html).

@@ -1,19 +1,19 @@
 import { metrics, type Counter, type Histogram } from '@opentelemetry/api';
 
-// Web UI observability — OpenTelemetry metrics (web UI design § 23-bis).
+// Web UI observability — OpenTelemetry metrics (web UI design).
 //
-// The 4 V1.0 minimal-set metrics (§ 23-bis.1) are emitted client-side and
+// The 4 V1.0 minimal-set metrics are emitted client-side and
 // pushed via OTLP/HTTP to cortrix-server's /v1/metrics reverse proxy
-// (§ 23-bis.2 — same-origin, so CSP connect-src stays 'self'), which forwards
+// (same-origin, so CSP connect-src stays 'self'), which forwards
 // to the collector → Prometheus :9091. Backend correlates client-perceived vs
-// server-side latency (§ 23-bis.3).
+// server-side latency.
 //
 //   cortrix_webui_page_views_total       Counter   (page, edition)
 //   cortrix_webui_session_duration_secs  Histogram (edition)
 //   cortrix_webui_error_total            Counter   (category, code, page)
 //   cortrix_webui_api_latency_seconds    Histogram (endpoint, status, method)
 //
-// Standalone discipline (D3): exporting is best-effort. With no collector the
+// Standalone discipline: exporting is best-effort. With no collector the
 // OTLP POSTs simply fail and are dropped — initialization never throws and the
 // app runs unaffected. The instruments are created lazily and memoized so the
 // recording helpers are cheap no-ops before init / in tests.
@@ -28,7 +28,7 @@ let errorTotal: Counter | undefined;
 let apiLatency: Histogram | undefined;
 let sessionStart = 0;
 
-/** Resolve the build version stamped at compile time (§ 23-bis.2 service.version). */
+/** Resolve the build version stamped at compile time (service.version). */
 function serviceVersion(): string {
   // Vite replaces import.meta.env at build; fall back to package version.
   const env = (import.meta as unknown as { env?: Record<string, string> }).env;
@@ -78,7 +78,7 @@ export function initWebMetrics(): void {
         exportIntervalMillis: 30_000,
       });
       const provider = new MeterProvider({
-        // § 23-bis.2 resource attributes.
+        // resource attributes.
         resource: resourceFromAttributes({
           [ATTR_SERVICE_NAME]: 'cortrix-webui',
           [ATTR_SERVICE_VERSION]: serviceVersion(),
@@ -104,7 +104,7 @@ export function initWebMetrics(): void {
         unit: 's',
       });
 
-      // § 23-bis.1 session_duration — measure first-load → unload.
+      // session_duration — measure first-load → unload.
       sessionStart = performance.now();
       window.addEventListener('pagehide', flushSession, { once: true });
     } catch {
@@ -130,17 +130,17 @@ function currentEdition(): string {
   return editionTag;
 }
 
-/** Record a page view (§ 23-bis.1). Safe before init. */
+/** Record a page view. Safe before init. */
 export function recordPageView(page: string): void {
   pageViews?.add(1, { page, edition: currentEdition() });
 }
 
-/** Record a UI-surfaced business error (§ 23-bis.1 — ErrorDisplay trigger). */
+/** Record a UI-surfaced business error (ErrorDisplay trigger). */
 export function recordUiError(category: string, code: string, page: string): void {
   errorTotal?.add(1, { category, code, page });
 }
 
-/** Record a client-side API latency sample in seconds (§ 23-bis.1). */
+/** Record a client-side API latency sample in seconds. */
 export function recordApiLatency(
   endpoint: string,
   status: '2xx' | '4xx' | '5xx',

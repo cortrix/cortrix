@@ -36,7 +36,7 @@ class MemoryWriter {
 public:
     /// @param memory_store: MemoryStore instance (per-namespace)
     /// @param spc_mgr: SPCManager instance (global shared)
-    /// @param store: per-namespace CortrixStore view (D3.5: the caller holds a
+    /// @param store: per-namespace CortrixStore view (integration: the caller holds a
     ///        NamespaceFacade for the request and passes facade.store(); the
     ///        writer only needs the metadata store for the session document)
     /// @param config: MemoryConfig

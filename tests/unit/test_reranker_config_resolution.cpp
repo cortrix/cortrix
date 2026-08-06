@@ -1,5 +1,5 @@
 // S4.3 / S4.4 — request-level `rerank` boolean (RerankerRequestParams) + the
-// §2.6 three-layer priority resolution (request → NS → global). NS JSONB parse
+// three-layer priority resolution (request → NS → global). NS JSONB parse
 // itself is covered in test_reranker_ns_config.cpp (S4.2).
 #include <gtest/gtest.h>
 
@@ -45,7 +45,7 @@ TEST(RerankerConfigResolverTest, NsDisablesReranker) {
     EXPECT_FALSE(r.value().enabled);
 }
 
-// --- §2.6 worked example: NS enabled=false, request rerank=true → enabled ---
+// --- worked example: NS enabled=false, request rerank=true → enabled ---
 TEST(RerankerConfigResolverTest, RequestTrueBeatsNsFalse) {
     RerankerConfigResolver res(GlobalDefaults(), true);
     RerankerRequestParams req;
@@ -112,7 +112,7 @@ TEST(RerankerConfigResolverTest, ResolveErrorOnBadNsJson) {
     EXPECT_FALSE(res.Resolve("[]").ok());
 }
 
-// ===================== top_N computation (E2 D7) =====================
+// ===================== top_N computation (E2) =====================
 
 TEST(EffectiveRerankerConfigTest, ComputeTopNAppliesMultiplierAndCap) {
     EffectiveRerankerConfig eff{true, 3, 50};

@@ -17,8 +17,8 @@ struct MemorySession {
     std::string updated_at;            // ISO 8601
     // Memory immunity (opt-out). Pure ADD — does not touch the frozen columns
     // above. opt_out_at empty = not opted-out; non-empty (ISO 8601) = opted-out time.
-    std::string opt_out_at;            // ISO 8601, empty when active (D4)
-    std::string opted_out_by;          // "user_manual" | "agent_auto" | "system_auto" | "test" (D4)
+    std::string opt_out_at;            // ISO 8601, empty when active
+    std::string opted_out_by;          // "user_manual" | "agent_auto" | "system_auto" | "test"
 };
 
 /// Full session detail (with interaction history)

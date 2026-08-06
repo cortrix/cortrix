@@ -13,7 +13,7 @@ namespace {
 // switches below are intentionally exhaustive: -Wswitch turns "added a code
 // without a row" into a build failure, so the registry can't drift from the enum.
 //
-// retry_after_ms (§8 table): LLM_FAILED 1000 / EMBEDDING_FAILED 500 are explicit
+// retry_after_ms (table): LLM_FAILED 1000 / EMBEDDING_FAILED 500 are explicit
 // transient retries. BUDGET_EXCEEDED is a quota wall (no retry) and
 // PROMPT_INJECTION / STARTUP_NO_LLM are permanent (defense / operator fix) → not
 // retryable, no interval.
@@ -46,7 +46,7 @@ const char* ContextualErrorCodeString(ContextualErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(ContextualErrorCode code) {
-    // §8 structured_data column, 1:1. Function-local statics → stable references.
+    // structured_data column, 1:1. Function-local statics → stable references.
     static const std::vector<std::string> kFailed{"chunk_id", "retry_count"};
     static const std::vector<std::string> kBudget{"ns_id", "monthly_quota", "used"};
     static const std::vector<std::string> kInjection{"chunk_id", "output_length"};

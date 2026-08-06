@@ -13,7 +13,7 @@ namespace cortrix::onnx {
 /// version/opset facts the StartupValidator needs.
 ///
 /// Phase 1: static methods (one runtime instance per Cortrix binary, build-time
-/// locked per D1=A). A future multi-runtime mode would require a breaking change
+/// locked per=A). A future multi-runtime mode would require a breaking change
 /// to an instance-based API in Phase 2.
 class Runtime {
  public:

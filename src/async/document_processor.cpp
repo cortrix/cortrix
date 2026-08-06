@@ -61,13 +61,13 @@ int DocumentProcessor::AsyncMaxPages() const {
 
 Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
     // Task metrics — record the terminal outcome + end-to-end duration,
-    // keyed on the task's task_type. The /metrics endpoint wiring is D3.5; the
-    // recorder + these feed points are the D3 piece.
+    // keyed on the task's task_type. The /metrics endpoint wiring is integration; the
+    // recorder + these feed points are the piece.
     const auto t_start = std::chrono::steady_clock::now();
 
     // Local progress accumulator mirrored into the tasks table each page.
     TaskInfo prog = task;
-    prog.current_phase = task_phase::kParsing;  // topic 5 — only the parse phase is wired in D3
+    prog.current_phase = task_phase::kParsing;  // topic 5 — only the parse phase is wired in
     prog.failed_pages.clear();
 
     spc::ParserOptions opts;
@@ -85,8 +85,8 @@ Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
         prog.progress_pct = total > 0 ? 100.0f * static_cast<float>(page) /
                                             static_cast<float>(total)
                                       : 0.0f;
-        // ETA: remaining pages × observed per-page time is wired in S3/D3.5 with a
-        // real clock; D3 records -1 (unknown) until the streaming driver exists.
+        // ETA: remaining pages × observed per-page time is wired in S3/integration with a
+        // real clock; records -1 (unknown) until the streaming driver exists.
         prog.eta_seconds = -1;
         Status s = mgr_->UpdateProgress(prog);
         if (!s.ok()) {
@@ -102,7 +102,7 @@ Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
         // The parser subprocess is not force-killed; the current page
         // finished naturally and the checkpoint threw. Finalize as cancelled.
         // DEFERRED: if a downstream BeginWrite had already landed
-        // chunks, invoke RollbackCallback here (nothing is written in D3, so the
+        // chunks, invoke RollbackCallback here (nothing is written in, so the
         // cancel is clean).
         return finalizer_.Cancel(task, t_start);
     }
@@ -127,7 +127,7 @@ Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
 
     // If wired to SPC, hand the parsed doc to the shared post-parse
     // stages (chunk → META → enrich → embed → assemble → write) via SPCManager; else
-    // (standalone D3) finalize parse-only with the task's content-hash-derived doc_id.
+    // (standalone) finalize parse-only with the task's content-hash-derived doc_id.
     if (spc_mgr_) {
         SPCTask spc_task;
         spc_task.doc_id = task.doc_id;
@@ -145,7 +145,7 @@ Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
         // Carry caller-supplied document metadata (e.g. an external corpus id) so it
         // round-trips to query results (post_filter reads documents.metadata_json).
         spc_task.metadata_json = task.metadata_json;
-        // §4.1.2 ② — the sync call leaves SPCTask.cancelled false; post-parse mid-flight
+        // ② — the sync call leaves SPCTask.cancelled false; post-parse mid-flight
         // cancel is Phase 2 (cancel's main checkpoint is the per-page parse above).
         int rc = spc_mgr_->ProcessParsedDoc(result, spc_task);
         if (rc != 0) {

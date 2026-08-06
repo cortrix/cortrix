@@ -21,14 +21,14 @@ DoclingParser::DoclingParser(DoclingParserConfig config)
     : config_(std::move(config)) {}
 
 std::vector<std::string> DoclingParser::SupportedFormats() const {
-    // §1 format table: Docling handles everything except pure images (those go
+    // format table: Docling handles everything except pure images (those go
     // to OCR via the factory).
     return {"pdf", "docx", "pptx", "xlsx", "html", "htm", "md", "markdown", "txt"};
 }
 
 std::vector<std::string> DoclingParser::BuildArgv(const std::string& filepath,
                                                   const ParserOptions& opts) const {
-    // §3.1 request line: python3 docling_bridge.py --filepath … --timeout …
+    // request line: python3 docling_bridge.py --filepath … --timeout …
     // --max-pages … --language-hint … --output-format json
     std::vector<std::string> argv = {
         config_.python_path,
@@ -56,7 +56,7 @@ ParsedDoc DoclingParser::Parse(const std::string& filepath,
     SubprocessResult sp = RunParserSubprocess(argv, timeout_ms,
                                               config_.max_output_size_bytes);
 
-    // --- map the subprocess outcome to ParserError (§4.2 steps 3-6) ---
+    // --- map the subprocess outcome to ParserError (steps 3-6) ---
     if (!sp.launched) {
         return MakeErrorDoc(ParserErrorCode::kSubprocessFailed,
                             "Failed to launch Docling bridge subprocess",
@@ -80,7 +80,7 @@ ParsedDoc DoclingParser::Parse(const std::string& filepath,
                              {"stderr_tail", Tail(sp.stderr_data, 1024)}}, Name());
     }
 
-    // --- exit 0: parse the §3.1 JSON payload (handles bridge-reported errors
+    // --- exit 0: parse the JSON payload (handles bridge-reported errors
     //     and the empty-document OK path internally) ---
     ParsedDoc doc = ParseBridgeJson(sp.stdout_data, filepath, Name());
     DrivePageProgress(doc, opts);  // Q1 page-level progress (standalone replay)

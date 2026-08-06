@@ -20,7 +20,7 @@ extension + shared-memory IPC:
   with identical function signatures.
 
 The shared-memory IPC design (`response_buf=1MB`, 32-slot state machine, etc.) is
-the **V3+ roadmap** (§9 of the SoT), not V1.
+the **V3+ roadmap** (of the SoT), not V1.
 
 ## Layout
 
@@ -36,7 +36,7 @@ the **V3+ roadmap** (§9 of the SoT), not V1.
 
 **Main (5):**
 
-| Function | Returns | HTTP endpoint (§3.3) |
+| Function | Returns | HTTP endpoint |
 |---|---|---|
 | `pgcortrix_search(namespace, query, top_k, filter, rerank)` | `SETOF pgcortrix_search_result` | `POST /api/v1/query` |
 | `pgcortrix_upload(namespace, file_path)` | `TEXT` (doc_id) | `POST /api/v1/documents` |
@@ -49,7 +49,7 @@ the **V3+ roadmap** (§9 of the SoT), not V1.
 `pgcortrix_memory_search` / `pgcortrix_list_interactions` require `user_id`
 (per-user isolation — three-way parity with the MCP + HTTP layers).
 
-## Configuration (GUC, §2.2)
+## Configuration (GUC)
 
 | GUC | Default | Scope | Notes |
 |---|---|---|---|
@@ -58,7 +58,7 @@ the **V3+ roadmap** (§9 of the SoT), not V1.
 | `pgcortrix.timeout_ms` | `30000` | USERSET | HTTP request timeout. |
 | `pgcortrix.retry_max` | `3` | USERSET | Max retries on 5xx. |
 
-## Install (requires a live PG — D3.5)
+## Install (requires a live PG — integration)
 
 ```bash
 make && make install          # needs pg_config on PATH + plpython3u available
@@ -79,5 +79,5 @@ python3 -m unittest discover -s tests -v
 - `tests/test_sql_helper_seam.py` — asserts every `client.<m>(...)` call in the
   SQL matches a helper method of the same arity (catches SQL/Python drift).
 
-Live PG load + `CREATE EXTENSION` + `pg_regress` integration is **D3.5** (the
+Live PG load + `CREATE EXTENSION` + `pg_regress` integration is **integration** (the
 build machine has no PostgreSQL).

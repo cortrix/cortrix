@@ -90,7 +90,7 @@ void DiskMonitor::Apply(const DiskUsage& sample) {
     // CRIT → reject new writes; NORMAL/WARN → allow.
     reject_new_writes_.store(sample.stage == DiskStage::kCrit, std::memory_order_relaxed);
 
-    // Update the gauge on every sample (§6.1 "metric gauge update").
+    // Update the gauge on every sample ("metric gauge update").
     DeployMetrics::Instance().SetDiskUsageRatio(sample.usage_ratio);
 
     // Fire the callback only when the stage actually changed (log throttling).

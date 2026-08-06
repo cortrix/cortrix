@@ -13,7 +13,7 @@ Status RerankerStartupValidator::ValidateConfigCompat(int spc_chunk_size,
     if (spc_chunk_size <= max_seq_length) {
         return Status::Ok();
     }
-    // §4.1: fail-fast with the two values + a fix hint in the message. The
+    //: fail-fast with the two values + a fix hint in the message. The
     // structured_data object {chunk_size, max_seq_length} is attached by the
     // boundary MakeRerankerError(kConfigMismatch, {...}) at the surface that
     // returns this to a client.

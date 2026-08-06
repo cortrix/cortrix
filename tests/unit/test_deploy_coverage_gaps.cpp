@@ -153,7 +153,7 @@ TEST_F(DiskMonitorGapFixture, CheckOnceRealStatvfsClassifiesAndStores) {
 TEST_F(DiskMonitorGapFixture, CheckOnceFailSafeKeepsLastSample) {
     // Seed a known sample via the injection seam, then point at a non-existent
     // path: statvfs fails, CheckOnce must return the *last* sample unchanged and
-    // never flip the reject flag (fail-safe, §6.2).
+    // never flip the reject flag (fail-safe).
     DiskMonitorConfig cfg;
     cfg.data_dir = "/no/such/path/for/statvfs_xyz_404";
     cfg.warn_threshold = 0.80;

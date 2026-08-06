@@ -17,7 +17,7 @@ namespace cortrix::observability {
 /// an in-process advisory lock; a failing table is retried with exponential
 /// backoff (max 3 attempts: 1 / 5 / 15 min).
 ///
-/// Standalone (D3): the daily wall-clock loop is real, but cross-Feature wiring
+/// Standalone: the daily wall-clock loop is real, but cross-Feature wiring
 /// (registering the observability tables, the metric emission) is deferred. Tests
 /// drive RunCleanupNow() / the pure NextRunDelayMs() directly.
 class CleanupScheduler {
@@ -50,7 +50,7 @@ public:
     /// Number of registered tables (test aid).
     size_t registered_count() const;
 
-    /// True while a sweep is in progress (the advisory-lock state; §8.1).
+    /// True while a sweep is in progress (the advisory-lock state).
     bool is_running() const { return running_.load(); }
 
     /// Milliseconds from `now_unix_ms` until the next UTC 02:00 (pure; testable).

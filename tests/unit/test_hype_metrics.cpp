@@ -4,7 +4,7 @@
 
 #include "cortrix/spc/hype_metrics.h"
 
-// HyPE S7 — the 4 hype_index subsystem metrics (§11). Recorder + OpenMetrics
+// HyPE S7 — the 4 hype_index subsystem metrics. Recorder + OpenMetrics
 // render + no-high-cardinality-label compliance.
 namespace cortrix::spc {
 namespace {
@@ -85,7 +85,7 @@ TEST_F(HypeMetricsTest, NoForbiddenHighCardinalityLabels) {
     M().RecordMatch(HT::kChunk);
     M().ObserveLlmDuration("gpt-4o-mini", 0.5);
     std::string out = M().RenderOpenMetrics();
-    // §11 / OBS_SPEC §3.2 forbidden labels must NOT appear.
+    // OBS_SPEC forbidden labels must NOT appear.
     EXPECT_EQ(out.find("chunk_id"), std::string::npos);
     EXPECT_EQ(out.find("ns_id"), std::string::npos);
     EXPECT_EQ(out.find("tenant"), std::string::npos);

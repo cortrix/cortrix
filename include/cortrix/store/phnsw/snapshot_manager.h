@@ -16,27 +16,27 @@ class HierarchicalNSW;
 
 namespace cortrix::store {
 
-/// Manages P-HNSW snapshots under a per-Unit data dir (design § 2.5 / § 4.3).
+/// Manages P-HNSW snapshots under a per-Unit data dir (design).
 ///
 /// A snapshot is a pair of sibling files:
 ///   hnsw_{timestamp}.index       — hnswlib's native serialization (saveIndex)
-///   hnsw_{timestamp}.index.meta  — 24-byte footer (design § 3.3):
+///   hnsw_{timestamp}.index.meta  — 24-byte footer (design):
 ///       snapshot_lsn  u64   the committed_lsn captured at snapshot time
 ///       entry_count   u32   vectors in the snapshot (sanity)
-///       dim           u32   index dimension (D35-NEW-01: Open reads this back)
-///       M             u32   HNSW graph degree (D35-NEW-01)
+///       dim           u32   index dimension (NEW-01: Open reads this back)
+///       M             u32   HNSW graph degree (NEW-01)
 ///       checksum      u32   CRC32 of the .index file's bytes
 ///
 /// Why a sibling .meta instead of appending the footer to the .index file
-/// (as design § 3.3 literally sketches): hnswlib v0.8.0 `loadIndex` seeks to EOF
+/// (as design literally sketches): hnswlib v0.8.0 `loadIndex` seeks to EOF
 /// and throws unless `tellg() == total_filesize`, so any trailing footer makes
 /// the native load fail. The sibling .meta keeps the exact footer fields +
 /// integrity (CRC over the whole .index) while staying compatible with the
-/// upstream loader (CODING_CONVENTIONS — normalize spec to the real hnswlib).
+/// upstream loader (the coding conventions — normalize spec to the real hnswlib).
 ///
 /// Save is atomic (write temp files, fsync, rename into place). Load picks the
 /// newest snapshot whose .meta CRC validates the .index; on a CRC/parse failure
-/// it falls back to the previous snapshot (design § 4.4).
+/// it falls back to the previous snapshot (design).
 class SnapshotManager {
 public:
     SnapshotManager(std::string data_dir, int keep_count);
@@ -66,7 +66,7 @@ public:
     /// Newest snapshot's lsn, or 0 if none / unreadable. (Diagnostic.)
     uint64_t LatestSnapshotLsn() const;
 
-    /// Footer fields of the newest valid snapshot's .meta (D35-NEW-01). Used by
+    /// Footer fields of the newest valid snapshot's .meta (NEW-01). Used by
     /// IIndexFactory::Open to reconstruct the index with the Unit's persisted
     /// graph parameters instead of assuming defaults.
     struct SnapshotMeta {

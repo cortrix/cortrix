@@ -21,7 +21,7 @@ struct WalWriterStats {
     std::size_t file_size_bytes = 0;
 };
 
-/// P-HNSW write-ahead log file (hnsw.wal, design § 3.1/§3.2) and the real
+/// P-HNSW write-ahead log file (hnsw.wal, design) and the real
 /// IWalSink behind the shared GroupCommitWriter.
 ///
 /// S2 (this Story) builds the file layer: the 32-byte header, framed record
@@ -32,7 +32,7 @@ struct WalWriterStats {
 /// `sink = this`. A record is crash-recoverable once its Append() returns Ok
 /// (its bytes reached fdatasync) — same durability contract as the PWL.
 ///
-/// On-disk header (32 bytes, design § 3.2, little-endian):
+/// On-disk header (32 bytes, design, little-endian):
 ///   magic         "PWAL" (4B)
 ///   version       u16
 ///   dim           u32
@@ -54,7 +54,7 @@ public:
     /// file has its header validated (magic/version/header_crc) and its declared
     /// `dim` must equal `dim` (else CX_ERR_PHNSW_WAL_CORRUPTED). On a header_crc
     /// failure the count fields are not trusted — ReadAll re-derives them by
-    /// scanning (design § 5).
+    /// scanning (design).
     static Result<std::unique_ptr<WalWriter>> Open(const std::string& wal_path, int dim);
 
     ~WalWriter() override;
@@ -71,10 +71,10 @@ public:
     /// S3's group commit calls WriteBatch/Sync instead).
     Status AppendBatch(const std::vector<std::vector<uint8_t>>& records);
 
-    /// Read every record in EOF order (design § 4.4 — does NOT trust the header
+    /// Read every record in EOF order (design — does NOT trust the header
     /// entry_count). A trailing record that fails its CRC or is short truncates
     /// the scan: all records up to the corruption are returned and the file is
-    /// truncated to the last valid record (degraded recovery, design § 5).
+    /// truncated to the last valid record (degraded recovery, design).
     /// `expected_dim` cross-checks INSERT vectors (0 = accept declared dim).
     Result<std::vector<WalEntry>> ReadAll(int expected_dim = 0);
 
@@ -82,7 +82,7 @@ public:
     /// committed_lsn is PRESERVED — it is a monotonic absolute counter across the
     /// WAL's lifetime, so post-truncate appends keep ascending LSNs and recovery
     /// can still tell which records a snapshot already incorporates (design
-    /// § 4.4 LSN filtering). Called by Snapshot (S4) once a snapshot captures the
+    /// LSN filtering). Called by Snapshot (S4) once a snapshot captures the
     /// state the WAL described. Atomic: header rewritten + file truncated + fsync.
     Status Truncate();
 

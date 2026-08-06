@@ -103,7 +103,7 @@ export function ChatPage() {
           </div>
         )}
 
-        {/* Programmatic equivalent — drive chat with the Agent SDK (§ 15.3) */}
+        {/* Programmatic equivalent — drive chat with the Agent SDK */}
         <div className="px-6 pt-3">
           <ProgrammaticBanner
             comment={t('chat.sdkComment')}

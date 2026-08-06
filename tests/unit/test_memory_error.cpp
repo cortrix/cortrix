@@ -6,7 +6,7 @@
 #include "cortrix/memory/memory_error.h"
 
 // S5 coverage: the memory transparency error model (template A) — all 5 CX_ERR_MEMORY_* identities,
-// their §4.3.4.bis attributes (http/category/retryable/retry_after_ms/structured_data
+// their attributes (http/category/retryable/retry_after_ms/structured_data
 // keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::memory::transparency {
 namespace {
@@ -38,7 +38,7 @@ TEST(MemoryErrorTest, AllCodesHaveUniqueCxStrings) {
     EXPECT_EQ(seen.size(), 5u);
 }
 
-// §4.3.4.bis table, row by row.
+// table, row by row.
 TEST(MemoryErrorTest, RegistryMatchesSpecTable) {
     auto chk = [](MemoryErrorCode c, const char* code, int http, ErrorCategory cat,
                   bool retry, std::optional<int> retry_ms) {

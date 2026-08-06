@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/memory/memory_extract_error.h"
 
-// Exhaustive parameterized error-registry sweep for memory extraction (§5.3). Distinct suite
+// Exhaustive parameterized error-registry sweep for memory extraction. Distinct suite
 // name (MemoryExtractErrorMatrix) from the basic test_memory_extract_error.cpp (MemoryExtractErrorTest) so
 // the two coexist. Walks EVERY MemoryExtractErrorCode asserting the registry invariants:
 // code-string format/uniqueness, category set membership, retryable<=>retry_after,

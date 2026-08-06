@@ -51,7 +51,7 @@ Status SqliteConn::Open(const std::string& db_path) {
 Status SqliteConn::ApplyPragmas(const SqlitePragmas& pragmas) {
     if (db_ == nullptr) return Status::Ok();  // nothing to configure yet
 
-    // PRAGMA failures degrade performance but do not corrupt data (§7.1), so a
+    // PRAGMA failures degrade performance but do not corrupt data, so a
     // failed PRAGMA is logged-and-tolerated rather than fatal. We still surface
     // the first failure as a non-Ok Status so callers can log it; the connection
     // stays usable.

@@ -42,7 +42,7 @@ struct MemorySearchResultItem {
     std::string response_text;         // original A (interaction rows)
     std::string query_type;
     // fact/preference/event blocks surfaced by the unified read pipeline
-    // (§6.5.3): content is the fact statement (no Q/A split), memory_type is
+    //: content is the fact statement (no Q/A split), memory_type is
     // fact|preference|event, block_id is the memory ULID. Empty on interaction rows.
     std::string content;
     std::string memory_type;
@@ -75,7 +75,7 @@ public:
     ///                results carry classified-decay scoring; when null the
     ///                searcher falls back to raw RRF scoring (pre-scoring behavior).
     ///                The full raw_score -> decay wiring against live blocks
-    ///                (memory_type / created_at extraction) is D3.5.
+    ///                (memory_type / created_at extraction) is integration.
     MemorySearcher(QueryPipeline& pipeline,
                    MemoryStore& memory_store,
                    const MemoryConfig& config,

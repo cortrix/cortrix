@@ -6,7 +6,7 @@
 
 #include "cortrix/retrieval/sparse_fallback.h"
 
-// Sparse retrieval S9 — L1 (write-time) + L2 (query-time) fallback (§7). L1: serialize with
+// Sparse retrieval S9 — L1 (write-time) + L2 (query-time) fallback. L1: serialize with
 // N=3 retry then degrade to NULL (no chunk-write failure). L2: drop the sparse
 // path, transparent degrade to dense+FTS5(+hype), via_path explain.
 namespace cortrix::retrieval {
@@ -35,7 +35,7 @@ TEST(SparseFallbackTest, L1SerializesNonEmptyAndSetsFlag) {
 }
 
 TEST(SparseFallbackTest, L1EmptyVectorWritesNullClearsFlagNoError) {
-    auto r = L1SerializeSparseVec(V({}));  // dead chunk (§6.5)
+    auto r = L1SerializeSparseVec(V({}));  // dead chunk
     EXPECT_FALSE(r.serialized);            // → write NULL
     EXPECT_FALSE(r.set_has_sparse_vec);    // flag cleared
     EXPECT_TRUE(r.blob.empty());
@@ -101,7 +101,7 @@ TEST(SparseFallbackTest, DropSparsePathZeroesSparseOnly) {
 
 TEST(SparseFallbackTest, L2FusionDegradesToFourPath) {
     // Build a normal 5-path input, then drop sparse → RRF must still fuse the
-    // remaining paths (§7.2 4-path degrade), and a sparse-only child disappears.
+    // remaining paths (4-path degrade), and a sparse-only child disappears.
     FivePathInput in;
     in.dense = L({"a"});
     in.sparse = L({"sparse_only"});  // only reachable via sparse

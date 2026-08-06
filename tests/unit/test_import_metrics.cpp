@@ -4,7 +4,7 @@
 
 #include "cortrix/import/import_metrics.h"
 
-// S6 coverage: DB import observability metrics (§5.5) — counters/gauges + OpenMetrics
+// S6 coverage: DB import observability metrics — counters/gauges + OpenMetrics
 // render + the v1.0.2 high-cardinality-label removal (no namespace / tenant_id
 // labels). Process-global singleton, so each test resets first.
 namespace cortrix::import {
@@ -50,7 +50,7 @@ TEST(ImportMetricsTest, RenderEmitsStableNamesWithoutHighCardinalityLabels) {
     EXPECT_NE(out.find("cortrix_import_rows_imported_total 10"), std::string::npos);
     EXPECT_NE(out.find("cortrix_import_connections_active"), std::string::npos);
     EXPECT_NE(out.find("cortrix_import_tasks_queue_depth"), std::string::npos);
-    // §5.5 note: the removed high-cardinality labels must NOT appear.
+    // note: the removed high-cardinality labels must NOT appear.
     EXPECT_EQ(out.find("namespace="), std::string::npos);
     EXPECT_EQ(out.find("tenant_id="), std::string::npos);
 }
@@ -63,7 +63,7 @@ TEST(ImportMetricsTest, DurationHistogramsObserveAndRender) {
     m.ObserveQueryDuration(ImportMetrics::QueryType::kTableFilter, 0.02);
     m.ObserveQueryDuration(ImportMetrics::QueryType::kCustomSql, 7.5);
     std::string out = m.Render();
-    // §5.5 — both histograms present (TYPE + per-label cumulative _bucket/_sum/_count).
+    // — both histograms present (TYPE + per-label cumulative _bucket/_sum/_count).
     EXPECT_NE(out.find("# TYPE cortrix_import_duration_seconds histogram"), std::string::npos);
     EXPECT_NE(out.find("cortrix_import_duration_seconds_bucket{text_strategy=\"per_row\",le=\"0.25\"} 1"),
               std::string::npos);

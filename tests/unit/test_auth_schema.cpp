@@ -11,7 +11,7 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/catalog/schema_provider.h"
 
-// Auth S1 coverage: the 7-table platform.db schema + idempotency (auth / §S1
+// Auth S1 coverage: the 7-table platform.db schema + idempotency (auth /
 // `Schema_Create7Tables`, `Schema_Idempotent`).
 namespace cortrix::auth {
 namespace {
@@ -104,7 +104,7 @@ TEST(AuthSchemaTest, Idempotent) {
     std::remove(path.c_str());
 }
 
-// The §3.5 CHECK constraints are real: secret_type must be 'jwt_secret' and
+// The CHECK constraints are real: secret_type must be 'jwt_secret' and
 // status must be in the enum. Proves the DDL carries the constraints (defensive
 // against a silently-dropped CHECK during a future edit).
 TEST(AuthSchemaTest, AuthSecretsCheckConstraints) {

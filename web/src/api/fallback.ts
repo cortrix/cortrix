@@ -13,7 +13,7 @@
 //
 //   USE_MOCK === false  (production build, the default)
 //       The mock is OFF. Every API error RE-THROWS and surfaces as a real
-//       GEN-Agent envelope (CLAUDE.md § 5). The mock never touches the live
+//       GEN-Agent envelope (CLAUDE.md). The mock never touches the live
 //       path — the anti-pattern is eliminated at the root.
 //
 //   USE_MOCK === true   (dev / test / `VITE_USE_MOCK=1`)

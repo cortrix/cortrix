@@ -17,9 +17,9 @@ ParserError) + the GEN-Agent 4 fields, and the process exits 0 (the C++ side
 reads the structured error). Unexpected exceptions exit non-zero → the C++ side
 maps to OCR_FAILED.
 
-D3 standalone: paddleocr need not be installed — this reports SUBPROCESS_FAILED
+standalone: paddleocr need not be installed — this reports SUBPROCESS_FAILED
 cleanly and the C++ wrapper logic is unit-tested against a mock bridge. Real OCR
-end-to-end is D3.5.
+end-to-end is integration.
 """
 import argparse
 import json
@@ -61,7 +61,7 @@ def _error(status, msg, *, retryable=False, category="PERMANENT",
 
 
 def _page(page_num, lines, lang):
-    """Build one §3.1 page from OCR lines [{text, confidence}]."""
+    """Build one page from OCR lines [{text, confidence}]."""
     paras = []
     char_count = 0
     for ln in lines:

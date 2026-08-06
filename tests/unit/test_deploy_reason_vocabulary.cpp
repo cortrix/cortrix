@@ -5,9 +5,9 @@
 
 #include "cortrix/deploy/reason_vocabulary.h"
 
-// Deployment coverage: the OpenMetrics `reason` controlled vocabulary (§8),
-// the reason<->error_code naming alignment (§9.3), and the label vs
-// structured_data field-ownership table (§9.2).
+// Deployment coverage: the OpenMetrics `reason` controlled vocabulary,
+// the reason<->error_code naming alignment, and the label vs
+// structured_data field-ownership table.
 namespace cortrix::deploy {
 namespace {
 
@@ -48,7 +48,7 @@ TEST(ReasonVocabularyTest, IsValidReasonAcceptsMembersRejectsOthers) {
 }
 
 TEST(ReasonVocabularyTest, ReasonToErrorCodeFollowsAlignmentRule) {
-    // §9.3 examples.
+    // examples.
     EXPECT_EQ(ReasonToErrorCode("llm.budget_exceeded"), "CX_ERR_LLM_BUDGET_EXCEEDED");
     EXPECT_EQ(ReasonToErrorCode("spc.queue_full"), "CX_ERR_SPC_QUEUE_FULL");
     EXPECT_EQ(ReasonToErrorCode("catalog.bf_not_ready"), "CX_ERR_CATALOG_BF_NOT_READY");
@@ -73,7 +73,7 @@ TEST(CategoryAlignmentTest, FiveCategoryStringsMatchAgentFriendly) {
 }
 
 TEST(FieldOwnershipTest, HighCardinalityFieldsAreStructuredOnly) {
-    // §9.2 — the OBS_SPEC §3.2 deny-list fields never become labels.
+    // — the OBS_SPEC deny-list fields never become labels.
     EXPECT_EQ(ChannelFor(FieldKind::kHighCardId), FieldChannel::kStructuredOnly);
     EXPECT_EQ(ChannelFor(FieldKind::kNumericValue), FieldChannel::kStructuredOnly);
     EXPECT_EQ(ChannelFor(FieldKind::kBusinessObject), FieldChannel::kStructuredOnly);

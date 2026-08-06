@@ -15,8 +15,8 @@
 #include "cortrix/observability/operation_log_schema.h"
 #include "cortrix/observability/operation_logger_impl.h"
 
-// S2 coverage: CleanupScheduler, the EmitSite helper (§9.1), and the
-// ObservabilityModule DI wiring (§5.3 / Issue 10).
+// S2 coverage: CleanupScheduler, the EmitSite helper, and the
+// ObservabilityModule DI wiring (/ Issue 10).
 namespace cortrix::observability {
 namespace {
 
@@ -127,7 +127,7 @@ TEST(CleanupSchedulerLoopTest, StopWithoutStartIsSafe) {
     SUCCEED();
 }
 
-// ---- EmitSite helper (§9.1) -----------------------------------------------
+// ---- EmitSite helper -----------------------------------------------
 
 TEST(OperationLogEmitterTest, ResourceTypePerSite) {
     EXPECT_STREQ(ResourceTypeFor(EmitSite::kQueryEngine, "query"), "query");
@@ -163,16 +163,16 @@ TEST(OperationLogEmitterTest, MakeEngineEntryReadsThreadLocalTrace) {
     EXPECT_EQ(e.resource_type, "memory");
     EXPECT_EQ(e.namespace_id, std::optional<std::string>("sales"));
     EXPECT_EQ(e.trace_id, std::optional<std::string>("tl-trace"));
-    EXPECT_EQ(e.user_id, "anonymous");  // §9.2 default until auth
+    EXPECT_EQ(e.user_id, "anonymous");  // default until auth
     EXPECT_EQ(e.timestamp, 0);          // logger fills now()
 
     octx.ClearTraceContext();  // don't leak into other tests on this thread
 }
 
-// ---- ObservabilityModule DI (§5.3 / Issue 10) -------------------------------
+// ---- ObservabilityModule DI (/ Issue 10) -------------------------------
 
 // A fake instrumentation site capturing the injected logger (stands in for the real Engine
-// modules wired at D3.5).
+// modules wired at integration).
 class FakeAware : public IOperationLoggerAware {
 public:
     void SetOperationLogger(std::shared_ptr<IOperationLogger> l) override { logger = l; }

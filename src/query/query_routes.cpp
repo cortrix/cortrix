@@ -98,7 +98,7 @@ void RegisterQueryRoutes(
 
             // ?route enum: an invalid token returns the Agent-friendly
             // CX_ERR_ROUTER_FORCE_ROUTE_INVALID body with structured_data.invalid_route_value
-            // (machine-readable per CLAUDE.md §5 / GEN-Agent #1,#5), not a generic
+            // (machine-readable per CLAUDE.md / GEN-Agent #1,#5), not a generic
             // parse error. "auto" means "no override; let the router decide".
             if (!IsValidRoute(query_req.route)) {
                 auto err = cortrix::query::MakeRouterError(
@@ -187,11 +187,11 @@ void RegisterQueryRoutes(
                 // (RouteAndUpdateContext, Wave C-R2) — the route handler is the read
                 // side that surfaces the already-implemented decision logic; it adds
                 // no new routing behavior. Standalone backend is the heuristic guard
-                // (real DistilBERT-tiny ONNX wiring is D3.5); QueryComplexityClassifier
+                // (real DistilBERT-tiny ONNX wiring is integration); QueryComplexityClassifier
                 // is total (never throws). The granularity is echoed so the Agent sees
                 // the resolved value; CRAG fields stay at their SPEC defaults
                 // (""/0.0/{}) because no CRAG evaluation runs on this MVP path — per
-                // QUERY_CONTEXT_SPEC §6.3 a default value reads as "not triggered".
+                // the query-context spec a default value reads as "not triggered".
                 cortrix::query::QueryContext qctx;
                 qctx.query = query_req.query;
                 qctx.ns_id = query_req.namespace_name;
@@ -200,13 +200,13 @@ void RegisterQueryRoutes(
                     std::make_shared<cortrix::query::HeuristicComplexityBackend>(),
                     cortrix::query::ComplexityConfig{});
                 // The validated route ("auto" = let the classifier decide) drives the
-                // §6.1 override step; an out-of-set token was already rejected above,
+                // override step; an out-of-set token was already rejected above,
                 // so this never returns the force-route-invalid status here.
                 std::optional<std::string> route_override = query_req.route;
                 router.RouteAndUpdateContext(qctx, route_override);
 
                 // C-class debug fields are exposed only when a capability ran AND
-                // failed (SPEC §3). On this path the only such signal is the router's
+                // failed (SPEC). On this path the only such signal is the router's
                 // transient-inference fallback; include the C block then.
                 const bool include_debug =
                     qctx.routing_decision_source == "inference_failed_fallback";

@@ -12,17 +12,17 @@ namespace cortrix::doc_summary {
 ///   - `doc_summary`: llm_calls_total / llm_duration_seconds /
 ///     summaries_generated_total / fallback_triggered_total
 ///   - `fts5_fallback`: fts5_fallback_failed_total (hybrid fallback)
-/// Naming cortrix_<subsystem>_<metric>_<unit>. NO high-cardinality labels (§12
+/// Naming cortrix_<subsystem>_<metric>_<unit>. NO high-cardinality labels (
 /// forbids tenant/ns/unit/user/request/doc id); doc_id etc. go to structured
 /// logs only.
 ///
-/// Standalone (D3): a self-contained, dependency-free recorder + an OpenMetrics
+/// Standalone: a self-contained, dependency-free recorder + an OpenMetrics
 /// text renderer (same pattern as EnricherMetrics / HypeMetrics /
 /// SparseMetrics). The `/metrics` scrape endpoint does not exist in the frozen
-/// tree — registering this recorder there is cross-Feature wiring → D3.5.
+/// tree — registering this recorder there is cross-Feature wiring → integration.
 class DocSummaryMetrics {
 public:
-    /// status label for cortrix_doc_summary_llm_calls_total (§12 / §10.2).
+    /// status label for cortrix_doc_summary_llm_calls_total.
     enum class LlmCallStatus { kStarted = 0, kSuccess, kFailed };
 
     /// result label for cortrix_doc_summary_fallback_triggered_total.
@@ -80,7 +80,7 @@ private:
     std::atomic<uint64_t> summaries_generated_{0};
     std::atomic<uint64_t> fts5_fallback_failed_{0};
 
-    // Per-model histogram (model is low-cardinality, §12 label=model). Guarded by
+    // Per-model histogram (model is low-cardinality, label=model). Guarded by
     // mu_ because the map structure mutates (atomics can't cover map growth).
     mutable std::mutex mu_;
     std::map<std::string, Histogram> llm_duration_;

@@ -73,7 +73,7 @@ void RegisterImportRoutes(httplib::Server& server, server::ImportHandler& handle
                 Emit(res, body, http_status, rctx.request_id);
             }));
 
-    // POST /api/v1/admin/db-connections — register a connection (D1). Under the
+    // POST /api/v1/admin/db-connections — register a connection. Under the
     // /api/v1/admin/* AdminGuard prefix (Layer 1) + handler.is_admin() (Layer 2).
     server.Post("/api/v1/admin/db-connections",
         WithAuth(auth, kPermAdmin,

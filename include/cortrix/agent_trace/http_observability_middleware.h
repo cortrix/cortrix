@@ -8,7 +8,7 @@
 namespace cortrix::agent_trace {
 
 /// Result of running the HTTP observability middleware over one request's
-/// headers (§6.1). The `context` is ready to install on the thread-local
+/// headers. The `context` is ready to install on the thread-local
 /// (ctx.SetThreadLocal()); `warnings` lists the headers that were present but
 /// invalid (the caller sets `X-Cortrix-Header-Warning: invalid-format` on the
 /// response when non-empty); `generated_trace_id` is true when the middleware had
@@ -22,7 +22,7 @@ struct HttpObservabilityResult {
 
 /// Stateless parser+validator for the three identity headers:
 ///   X-Session-Id / X-Trace-Id / X-Agent-Id
-/// Pure (no server dependency) so it is unit-testable in isolation; the D3.5
+/// Pure (no server dependency) so it is unit-testable in isolation; the integration
 /// wiring adapts httplib::Request headers → observability::HttpHeaders and calls
 /// Process(), then installs the returned context on the thread-local and copies
 /// the warnings onto the response. Invalid headers are dropped (topic 4 — ignore +
@@ -46,7 +46,7 @@ public:
     /// server's CORS config (config/cors.yaml) and tests share one source.
     static const std::vector<std::string>& CorsAllowedHeaders();
 
-    /// The CORS `allowed_methods` list (§6.2 — GET / POST / OPTIONS preflight).
+    /// The CORS `allowed_methods` list (GET / POST / OPTIONS preflight).
     static const std::vector<std::string>& CorsAllowedMethods();
 
 private:
@@ -55,7 +55,7 @@ private:
 
 /// Generate a v4-style UUID (lowercase hex, 8-4-4-4-12). ASCII + within the
 /// identity whitelist, so it round-trips through ObservabilityValidator. Exposed
-/// for reuse (MCP session id generation, §7.1) + tests.
+/// for reuse (MCP session id generation) + tests.
 std::string GenerateUuidV4();
 
 }  // namespace cortrix::agent_trace

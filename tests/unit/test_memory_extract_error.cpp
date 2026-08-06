@@ -6,7 +6,7 @@
 #include "cortrix/memory/memory_extract_error.h"
 
 // S6 coverage: the memory extraction error model (template A) — all 5 CX_ERR_MEMEXTRACT_* identities,
-// their §5.3 attributes (http/category/retryable/retry_after_ms/structured_data
+// their attributes (http/category/retryable/retry_after_ms/structured_data
 // keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::memory {
 namespace {
@@ -38,7 +38,7 @@ TEST(MemoryExtractErrorTest, AllCodesHaveUniqueCxStrings) {
     EXPECT_EQ(seen.size(), 5u);
 }
 
-// §5.3 table, row by row.
+// table, row by row.
 TEST(MemoryExtractErrorTest, RegistryMatchesSpecTable) {
     auto chk = [](MemoryExtractErrorCode c, const char* code, int http, ErrorCategory cat,
                   bool retry, std::optional<int> retry_ms) {

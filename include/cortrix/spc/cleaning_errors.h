@@ -16,7 +16,7 @@ namespace cortrix::spc {
 /// canonical registry below — same pattern as catalog::CatalogErrorCode
 /// (the template) and spc::ParserErrorCode.
 ///
-/// Per CODING_CONVENTIONS §3, a domain error is carried as the Agent-friendly
+/// Per the coding conventions, a domain error is carried as the Agent-friendly
 /// boundary type cortrix::agent_friendly::AgentFriendlyError, identified by its
 /// CX_ERR_* code; MakeCleaningError() builds that boundary error.
 enum class CleaningErrorCode : uint8_t {
@@ -33,17 +33,17 @@ enum class CleaningErrorCode : uint8_t {
 /// API-compatibility regression test (the set must not shrink).
 constexpr int kCleaningErrorCodeCount = 7;
 
-/// Canonical, immutable attributes of one error code (§5.1 columns). Mirrors
+/// Canonical, immutable attributes of one error code (columns). Mirrors
 /// catalog::CatalogErrorInfo / spc::ParserErrorInfo so the registries read alike.
 struct CleaningErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_CLEANING_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null unless retryable per §5.1
+    std::optional<int> retry_after_ms;        ///< null unless retryable per
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never
-/// throws / never returns a partial). Single source of truth for the §5.1 rows.
+/// throws / never returns a partial). Single source of truth for the rows.
 const CleaningErrorInfo& GetCleaningErrorInfo(CleaningErrorCode code);
 
 /// The "CX_ERR_CLEANING_*" string for `code`.

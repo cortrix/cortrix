@@ -28,13 +28,13 @@ class BudgetTracker;    // spc_enricher/budget_tracker.h (Wave 4)
 // V1: ISpcEnricher pluggable framework (NullEnricher default + LlmEnricher V1
 // sole implementation). See design/features/enricher-ner-summary.md.
 //
-// 🔒 ISpcEnricher base SoT lock (v1.0.5/v1.0.6, design §2.1): Enrich = 3-param
+// 🔒 ISpcEnricher base SoT lock (v1.0.5/v1.0.6, design): Enrich = 3-param
 // (chunk_text:const std::string& / doc_meta:const DocumentMetadata& / ctx:const
 // ChunkContext&); IsAvailable() (NOT IsEnabled); Name() returns std::string.
 // the contextual and HyPE subclasses already sit on this SoT — must not drift.
 // =============================================================================
 
-/// One NER-extracted entity (design §2.5). The design wrote char* for
+/// One NER-extracted entity (design). The design wrote char* for
 /// text/type; reconciled to std::string here for the same reason the base SoT
 /// locked chunk_text/Name() to std::string — avoid raw owning-pointer lifetime
 /// management. Entity is a struct-internal value with no cross-Feature signature
@@ -46,7 +46,7 @@ struct Entity {
     int end_offset = 0;
 };
 
-/// Agent-friendly error response metadata (design §2.5b, Major-1 / GEN-Agent).
+/// Agent-friendly error response metadata (design, Major-1 / GEN-Agent).
 /// Populated on EnrichResult when status != 0. `category` reuses the FROZEN
 /// agent_friendly::ErrorCategory (the design's parallel "EnricherCategory" enum
 /// is reconciled away — same discipline as spc::parser.h). The canonical
@@ -65,11 +65,11 @@ struct EnricherErrorMeta {
 };
 
 /// LLM enrichment output for one chunk (15 fields (+3 contextual,
-/// §5.2) = original 5 from ARCH + 6 added by topic 1.4 + topic 1.6
+///) = original 5 from ARCH + 6 added by topic 1.4 + topic 1.6
 /// EnricherErrorMeta + 3 added by ContextualRetrieval). status == 0 = success;
 /// otherwise one of the 6 EnricherErrorCode (cast to int) and error_meta filled.
 struct EnrichResult {
-    // The original 5 fields from ARCH §4.4.3
+    // The original 5 fields from ARCH
     int status = 0;                      ///< 0 = success / else (int)EnricherErrorCode
     std::vector<Entity> entities;        ///< NER-extracted entities
     std::string summary;                 ///< One-sentence summary
@@ -84,7 +84,7 @@ struct EnrichResult {
     std::string enricher_name;           ///< Multi-Enricher chain provenance
     int64_t enriched_at = 0;             ///< hotness coordination (Unix epoch ms)
 
-    // v1.0.2 Major-1: Agent-friendly error response (populated when status != 0, design §2.5b)
+    // v1.0.2 Major-1: Agent-friendly error response (populated when status != 0, design)
     EnricherErrorMeta error_meta;        ///< topic 1.6 mapping of 6 error codes → 4 fields
 
     // ✨ ContextualRetrieval (pure ADD). Populated only by
@@ -99,9 +99,9 @@ struct EnrichResult {
     bool ok() const { return status == 0; }
 };
 
-/// Per-chunk enrichment input (design §2.4, topic 1.5 ruling A + v1.0.4 G1.1).
+/// Per-chunk enrichment input (design, topic 1.5 ruling A + v1.0.4 G1.1).
 ///
-/// 🔧 Reconcile (B-R1 §1 standalone): the design wrote `const char*` text fields
+/// 🔧 Reconcile (B-R1 standalone): the design wrote `const char*` text fields
 /// + a `const DocumentMetadata&` reference member. A reference member makes
 /// ChunkContext non-assignable, which is incompatible with the LOCKED
 /// `EnrichBatch(const std::vector<ChunkContext>&)` signature (vector requires
@@ -126,10 +126,10 @@ struct ChunkContext {
 };
 
 // -----------------------------------------------------------------------------
-// EnricherConfig + types (design §2.6)
+// EnricherConfig + types (design)
 // -----------------------------------------------------------------------------
 
-/// Enricher backend kind (design §2.6 EnricherType). local_ner = Phase 2.
+/// Enricher backend kind (design EnricherType). local_ner = Phase 2.
 enum class EnricherType {
     kNull,       ///< NullEnricher (default)
     kLlm,        ///< LlmEnricher (V1 sole implementation)
@@ -147,11 +147,11 @@ const char* EnricherTypeString(EnricherType t);
 /// batch. Generous versus any real provider output budget.
 inline constexpr int kEnricherMaxTokensCap = 32768;
 
-/// Enricher configuration (design §2.6). A-class fields are global-only (GUC);
+/// Enricher configuration (design). A-class fields are global-only (GUC);
 /// B-class fields (enabled / model / score_threshold / prompt_template_id) are
-/// NS-overridable (topic 2.2). Defaults match the §2.7 GUC table.
+/// NS-overridable (topic 2.2). Defaults match the GUC table.
 struct EnricherConfig {
-    // A-class global (topic 2.1 + 3.5/3.6 = 11 items, §2.7)
+    // A-class global (topic 2.1 + 3.5/3.6 = 11 items)
     EnricherType type = EnricherType::kNull;
     std::string endpoint = "https://api.openai.com/v1";
     std::string api_key;                          ///< V1.0 global; per-NS Phase 2
@@ -161,14 +161,14 @@ struct EnricherConfig {
     int batch_size = 8;                           ///< topic 1.2 (1-32)
     int max_tokens = 4096;                        ///< batch-call response budget; size it
                                                   ///< with batch_size (128 tokens/chunk at
-                                                  ///< batch 32 truncates the batch JSON — D5b)
+                                                  ///< batch 32 truncates the batch JSON)
     bool circuit_breaker_enabled = true;          ///< topic 3.4
     int circuit_breaker_threshold = 10;
     int circuit_breaker_cooldown_sec = 60;        ///< 60s (differs from the reranker's 30s)
     int budget_cap_usd = 0;                       ///< topic 3.5 (0 = disabled)
     int startup_probe_timeout_ms = 5000;          ///< topic 3.6
-    int http_retry_backoff_ms = 5000;             ///< §5.1 transport/5xx retry backoff base
-                                                  ///< (sleep = base × attempt; addendum §3.7
+    int http_retry_backoff_ms = 5000;             ///< transport/5xx retry backoff base
+                                                  ///< (sleep = base × attempt; addendum
                                                   ///< A-part raises the old 50ms to seconds
                                                   ///< so inline retries survive short bursts)
 
@@ -179,12 +179,12 @@ struct EnricherConfig {
     std::string prompt_template_id = "default-zh";
 };
 
-/// §5.1 inline HTTP attempts per LLM call (transport/5xx only; 429 returns
+/// inline HTTP attempts per LLM call (transport/5xx only; 429 returns
 /// immediately for higher-level handling).
 inline constexpr int kEnricherMaxHttpAttempts = 3;
 
 // -----------------------------------------------------------------------------
-// ISpcEnricher abstract interface (design §2.1, 🔒 base SoT lock)
+// ISpcEnricher abstract interface (design, 🔒 base SoT lock)
 // -----------------------------------------------------------------------------
 
 /// Pluggable SPC enrichment stage. 🔒 SoT-locked signatures (v1.0.5/v1.0.6) —
@@ -213,20 +213,20 @@ public:
     virtual std::string Name() const = 0;
 };
 
-/// Factory (design §2.1). V1 returns NullEnricher / LlmEnricher (mutually
+/// Factory (design). V1 returns NullEnricher / LlmEnricher (mutually
 /// exclusive per topic 4.5). type == kLlm but unavailable (api_key missing /
-/// endpoint probe failed) auto-degrades to NullEnricher (topic 1.1 addendum / §4.4),
-/// recording the §4.4 fallback metric. The production overload probes the
-/// endpoint via the default transport (real network GET → D3.5).
+/// endpoint probe failed) auto-degrades to NullEnricher (topic 1.1 addendum /),
+/// recording the fallback metric. The production overload probes the
+/// endpoint via the default transport (real network GET → integration).
 std::unique_ptr<ISpcEnricher> CreateEnricher(const EnricherConfig& config);
 
-/// Seam overload (S4.2): inject the startup-probe transport (tests / D3.5). Runs
-/// the same §4.1 validation against `probe_transport` instead of a live network.
+/// Seam overload (S4.2): inject the startup-probe transport (tests / integration). Runs
+/// the same validation against `probe_transport` instead of a live network.
 std::unique_ptr<ISpcEnricher> CreateEnricher(const EnricherConfig& config,
                                              llm::IHttpTransport& probe_transport);
 
 // -----------------------------------------------------------------------------
-// NullEnricher (V1 default — design §2.2)
+// NullEnricher (V1 default — design)
 // -----------------------------------------------------------------------------
 
 /// No-op enricher: the default + the fail-soft degradation target. Returns empty
@@ -244,7 +244,7 @@ public:
 };
 
 // -----------------------------------------------------------------------------
-// LlmEnricher (V1 sole real implementation — design §2.2)
+// LlmEnricher (V1 sole real implementation — design)
 // -----------------------------------------------------------------------------
 
 /// LLM-backed enricher: combined NER + Summary over OpenAI-compatible chat
@@ -255,7 +255,7 @@ public:
 ///
 /// 🔌 Network seam: the LLM is reached through an injected ILlmClient — the
 /// production factory injects an OpenAiLlmClient (topic 4.3 shared module); tests
-/// inject MockLlmClient. Real endpoint wiring → D3.5.
+/// inject MockLlmClient. Real endpoint wiring → integration.
 class LlmEnricher : public ISpcEnricher {
 public:
     /// @param config  resolved EnricherConfig (A-class global + B-class, post three-layer

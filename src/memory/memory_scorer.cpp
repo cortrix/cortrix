@@ -8,7 +8,7 @@
 
 namespace cortrix {
 
-// Immune types: fact / preference never decay (design § 3.2 / § 4.3).
+// Immune types: fact / preference never decay (design).
 const std::unordered_set<std::string> MemoryScorer::kImmuneTypes = {
     "fact", "preference"};
 
@@ -18,7 +18,7 @@ bool MemoryScorer::IsDecayImmune(const std::string& memory_type) const {
     if (kImmuneTypes.count(memory_type) > 0) {
         return true;
     }
-    // D3 lock: defensively treat unknown types as event + WARN log.
+    // lock: defensively treat unknown types as event + WARN log.
     // "event" and "" are known degradation cases and do NOT warn.
     if (memory_type != "event" && !memory_type.empty()) {
         spdlog::warn("Unknown memory_type: '{}', falling back to event decay",
@@ -81,7 +81,7 @@ std::vector<ScoredMemory> MemoryScorer::ScoreAndRank(
     results.reserve(candidates.size());
 
     for (const auto& cand : candidates) {
-        // D4 conditional filter: drop invalidated unless explicitly included.
+        // conditional filter: drop invalidated unless explicitly included.
         if (cand.status == "invalidated" && !include_invalidated) {
             continue;
         }
@@ -89,7 +89,7 @@ std::vector<ScoredMemory> MemoryScorer::ScoreAndRank(
     }
 
     // Rank by final_score desc; stable_sort keeps original order on ties
-    // (deterministic ordering — design § 5 boundary "same final_score").
+    // (deterministic ordering — design boundary "same final_score").
     std::stable_sort(results.begin(), results.end(),
                      [](const ScoredMemory& a, const ScoredMemory& b) {
                          return a.final_score > b.final_score;

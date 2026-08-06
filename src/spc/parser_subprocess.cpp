@@ -163,7 +163,7 @@ SubprocessResult RunParserSubprocess(const std::vector<std::string>& args,
     ::close(err_pipe[0]);
 
     if (must_kill) {
-        // SIGTERM → grace → SIGKILL (§3.3). Signal the whole process group.
+        // SIGTERM → grace → SIGKILL. Signal the whole process group.
         ::kill(-pid, SIGTERM);
         const auto grace_deadline =
             std::chrono::steady_clock::now() + std::chrono::milliseconds(kill_grace_ms);

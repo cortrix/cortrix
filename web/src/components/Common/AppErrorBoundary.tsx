@@ -3,12 +3,12 @@ import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 import { ExclamationTriangleIcon, ArrowPathIcon, BookOpenIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 
-// Global ErrorBoundary (web UI design § 16.3, § 16.4 "JS exception" placement).
+// Global ErrorBoundary (web UI design "JS exception" placement).
 // Catches React render-time exceptions that would otherwise blank the app and
 // renders a recoverable fallback: message + reset button + a link to the
 // troubleshooting docs. Built on `react-error-boundary`. Magma VI tokens only.
 //
-// This is the page-level error surface (§ 16.4: JS exception → ErrorBoundary);
+// This is the page-level error surface (JS exception → ErrorBoundary);
 // the other three placements are ErrorDisplay inline (Dialog), notify.error
 // (Toast), and PrivateRoute redirect (route auth).
 

@@ -244,7 +244,7 @@ std::vector<CandidateBlock> MemoryContradictionAdapter::FindCandidates(
 std::optional<CandidateBlock> MemoryContradictionAdapter::FindMatchingPreference(
     const std::string& ns, const std::string& content) {
     (void)ns;
-    // D8 first-mention check: a same-text active preference is a repeat mention. Exact
+    // first-mention check: a same-text active preference is a repeat mention. Exact
     // content match is the conservative Phase-1 rule (semantic dedup = Phase 2).
     sqlite3* db = store_.db_handle();
     if (!db) return std::nullopt;

@@ -581,10 +581,10 @@ TEST_F(DirectoryImportTest, DocFindBySourceErrorCountedAsSkipError) {
     EXPECT_EQ(3, stats.skipped_error);
 }
 
-// ---- D5 design alignment tests (added during review) ----
+// ---- design alignment tests (added during review) ----
 
 TEST_F(DirectoryImportTest, HandleFileDeletionSetsStatusDeleting) {
-    // Verify D5 design requirement: Document.status = 'deleting' before cascade.
+    // Verify design requirement: Document.status = 'deleting' before cascade.
     // The initial scan of NEW files performs no status updates, so all 3 docs land
     // as kPending (never kDeleting) -- the deletion path is exercised separately by
     // HandleFileDeletion_FullCascadeWithBlocks.
@@ -611,7 +611,7 @@ TEST_F(DirectoryImportTest, HandleFileDeletionSetsStatusDeleting) {
 }
 
 TEST_F(DirectoryImportTest, SymlinkResolvesToCanonicalPath) {
-    // Verify D5 edge case #5: symlink dedup via canonical path resolution
+    // Verify edge case #5: symlink dedup via canonical path resolution
     namespace fs = std::filesystem;
 
     // Create a symlink to test.txt
@@ -652,7 +652,7 @@ TEST_F(DirectoryImportTest, SymlinkResolvesToCanonicalPath) {
 }
 
 TEST_F(DirectoryImportTest, UpdateRedetectsMimeType) {
-    // Verify D5 edge case #8: format change triggers MIME re-detection
+    // Verify edge case #8: format change triggers MIME re-detection
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
     EXPECT_CALL(mock_spc, CancelBySourcePath(_)).WillRepeatedly(Return(0));
@@ -823,7 +823,7 @@ TEST_F(DirectoryImportTest, HandleFileDeletion_FullCascadeWithBlocks) {
 }
 
 TEST_F(DirectoryImportTest, HandleFileDeletion_DocNotFound_NoError) {
-    // D5 3.6.4: file deletion for a non-existing doc should be idempotent (no error).
+    // 3.6.4: file deletion for a non-existing doc should be idempotent (no error).
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
     EXPECT_CALL(mock_spc, Submit(_)).WillRepeatedly(Return(Status::Ok()));
@@ -1204,7 +1204,7 @@ TEST_F(DirectoryImportTest, UpdateSetsStatusStaleAndPending) {
 }
 
 TEST_F(DirectoryImportTest, UpdateCancelsPreviousSPCTask) {
-    // D5 3.6.5: Before re-enqueue, cancel any in-flight SPC task for same path.
+    // 3.6.5: Before re-enqueue, cancel any in-flight SPC task for same path.
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
     EXPECT_CALL(mock_spc, Submit(_)).WillRepeatedly(Return(Status::Ok()));

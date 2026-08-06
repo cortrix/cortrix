@@ -7,14 +7,14 @@
 // Forward-declare the SQLite handle; full <sqlite3.h> is pulled in by the .cpp.
 typedef struct sqlite3 sqlite3;
 
-// Cortrix global ID hashing (ARCH §1.8.2). A Block's uint64 P-HNSW label is the
+// Cortrix global ID hashing (ARCH). A Block's uint64 P-HNSW label is the
 // SipHash-2-4 of its business ULID under a per-deployment 128-bit key:
 //   block_id = HashChildIdToBlockId(child_id) = SipHash24(child_id, k0, k1)
 // The key is loaded once at startup from platform.db (auth_secrets, secret_type=
 // 'siphash_id_key'), mirroring JwtSecretService::LoadOrInit. It must stay
 // stable for the life of an index (so the persisted P-HNSW labels keep pointing at
 // the right nodes), hence it is generated once and persisted — per deployment, not
-// per namespace (§1.8.2 V4 ruling 3).
+// per namespace (V4 ruling 3).
 namespace cortrix::id {
 
 /// The 128-bit SipHash key, as two 64-bit halves (the persisted deployment key).

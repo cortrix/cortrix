@@ -54,7 +54,7 @@ std::string U8(char32_t cp) {
 }
 
 // A rapidcheck generator for valid Unicode scalar values (skips the UTF-16
-// surrogate range U+D800–U+DFFF, which is not a legal scalar and which our U8
+// surrogate range U+–U+DFFF, which is not a legal scalar and which our U8
 // encoder would mangle). Covers BMP + the astral planes the CJK-Ext blocks live in.
 rc::Gen<char32_t> genCodePoint() {
     return rc::gen::suchThat(

@@ -10,7 +10,7 @@ V1.0 surface:
 In V1.0 the authoritative agent_llm config lives in the C++ ``IGlobalConfig`` and is
 mutated through the cortrix-server admin endpoint ``PUT /api/v1/system/agent_llm_config``
 (design section 6.2 / 6.3). ``PUT /config/agent_llm`` here forwards to that endpoint
-(D3.5 r2 · Wave P · P4) so the Settings UI has a single same-origin write path; the
+(integration r2 · Wave P · P4) so the Settings UI has a single same-origin write path; the
 Python side does not own a durable config store.
 
 Demo-only routes from the MVP agent-demo (``/demo-flows``, the ``.env``-writing role
@@ -66,7 +66,7 @@ def get_agent_llm_config() -> AgentLlmConfigView:
     """Injected from main.py — the current (display) agent LLM config.
 
     Sourced from the local Settings in V1.0; becomes the C++ IGlobalConfig
-    ``GetAgentLlmConfig`` mirror in D3.5.
+    ``GetAgentLlmConfig`` mirror in integration.
     """
     raise NotImplementedError("agent_llm config dependency not wired (see main.py).")
 

@@ -12,7 +12,7 @@ SDK.
 a ``role: "tool"`` message; a Python SDK ``CortrixError`` is encoded as the GEN-Agent
 4-field JSON payload (error codes / fields passed through from Python SDK unchanged).
 
-Real GPT round-trips are D3.5-deferred; standalone tests exercise the conversion
+Real GPT round-trips are integration-deferred; standalone tests exercise the conversion
 + dispatch with a mocked toolkit. ``require_openai()`` lets callers fail fast
 when the optional ``openai`` SDK is missing.
 """

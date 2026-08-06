@@ -25,7 +25,7 @@ EnricherConfig LlmCfg() {
     return cfg;
 }
 
-// --- StartupValidate (§4.1) --------------------------------------------------
+// --- StartupValidate --------------------------------------------------
 
 TEST(StartupValidateTest, NullTypeIsNullType) {
     EnricherConfig cfg;  // default type = kNull
@@ -70,7 +70,7 @@ TEST(StartupValidateTest, ProbeHttp401Unreachable) {
     EXPECT_EQ(StartupValidate(cfg, t), StartupCheck::kEndpointUnreachable);
 }
 
-// --- CreateEnricher fallback wiring + metrics (§4.4 scenarios) ---------------
+// --- CreateEnricher fallback wiring + metrics (scenarios) ---------------
 
 class FactoryFallbackTest : public ::testing::Test {
 protected:

@@ -12,7 +12,7 @@ import './index.css';
 // pipeline. Best-effort: a no-op when no collector is reachable (standalone).
 initWebMetrics();
 
-// TanStack Query client (web UI design § 3.2). Conservative defaults: no
+// TanStack Query client (web UI design). Conservative defaults: no
 // refetch-on-focus churn, one retry for transient failures, 30s stale window.
 const queryClient = new QueryClient({
   defaultOptions: {

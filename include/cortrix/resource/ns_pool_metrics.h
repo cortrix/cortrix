@@ -17,15 +17,15 @@ namespace cortrix::resource {
 /// tenant_id (high cardinality); per-NS data goes through the pool explain/stats
 /// API (the namespace_id inside that JSON is a data field, not a metric label).
 ///
-/// 🚨 D3 standalone: this recorder + RenderOpenMetrics() are fully usable +
+/// 🚨 standalone: this recorder + RenderOpenMetrics() are fully usable +
 /// testable in-process. The `/metrics` scrape endpoint does not exist in the
 /// frozen tree — registering this recorder into that endpoint is cross-Feature
-/// wiring **deferred to D3.5**. This makes explicit the registration convention that
+/// wiring **deferred to integration**. This makes explicit the registration convention that
 /// namespace_pool.cpp:26-32 previously left only as a code comment: the A-class
 /// values were already exposed via GetPoolStats()/StartupReport; this recorder is
 /// the metric half, fed alongside the existing structured-log half.
 ///
-/// §10.1 metric schema (6 rows):
+/// metric schema (6 rows):
 ///   cortrix_ns_pool_size                          gauge      (no label)
 ///   cortrix_ns_pool_memory_budget_used_bytes      gauge      (no label)
 ///   cortrix_ns_pool_rejected_creates_total        counter    {reason}
@@ -34,7 +34,7 @@ namespace cortrix::resource {
 ///   cortrix_ns_pool_ns_load_duration_seconds      histogram  (no label)
 class NsPoolMetrics {
 public:
-    /// `reason` label for rejected_creates_total (§10.1 — the two admission gates).
+    /// `reason` label for rejected_creates_total (the two admission gates).
     /// Values match the PoolStats.rejected_creates_total struct field names + the
     /// RejectionEvent.reason strings 1:1.
     enum class RejectReason {

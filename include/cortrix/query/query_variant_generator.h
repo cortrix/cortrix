@@ -12,8 +12,8 @@ namespace cortrix::query {
 
 /// QueryVariantGenerator — LLM-backed query-variant generation.
 ///
-/// 🔑 Standalone seam (B_R1_BRIEFING §7): the D1 design names the dependency
-/// `enrich::OpenAiLlmClient`, but the FROZEN scaffolding seam (D2-pre-3,
+/// 🔑 Standalone seam: the design names the dependency
+/// `enrich::OpenAiLlmClient`, but the FROZEN scaffolding seam (
 /// `cortrix/llm/i_llm_client.h`) is `cortrix::llm::ILlmClient` — the interface the
 /// real `OpenAiLlmClient` implements, and which lists RAG-Fusion as one of its 7
 /// consumers. We depend on the interface (the correct abstraction), and unit-test
@@ -49,7 +49,7 @@ public:
     /// @param original_query the user/Agent query (untrusted — injection-guarded)
     /// @param config         the resolved NS config (variant_count / strategies / timeout)
     /// @param locale         prompt locale ("zh" default, "en" for English corpora such as BEIR)
-    /// @param ctx            optional TraceContext (V1.0 OSS always nullptr; §9)
+    /// @param ctx            optional TraceContext (V1.0 OSS always nullptr)
     Result<QueryVariants> Generate(
         const std::string& original_query,
         const RagFusionConfig& config,
@@ -66,7 +66,7 @@ public:
     }
 
     /// The prompt-template version string surfaced in QueryVariants (B-class,
-    /// ?explain=true only) and the IGlobalConfig default (§4.7). Stable token.
+    /// ?explain=true only) and the IGlobalConfig default. Stable token.
     static constexpr const char* kPromptVersion = "default-v1";
 
     // --- exposed for unit testing the injection-hardening + parsing in isolation ---

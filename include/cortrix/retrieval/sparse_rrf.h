@@ -35,7 +35,7 @@ struct RrfFusedHit {
 /// The 5 per-path ranked candidate lists (each already sorted by its own score
 /// DESC; only rank position matters to RRF). A path that did not run / produced
 /// nothing is an empty list — e.g. an un-enriched namespace feeds contextualized
-/// and hype empty, an L2 sparse fallback drops the sparse list (§7.2), and
+/// and hype empty, an L2 sparse fallback drops the sparse list, and
 /// simple/chat routes stay chunk-only.
 struct FivePathInput {
     std::vector<SparseHit> dense;
@@ -47,12 +47,12 @@ struct FivePathInput {
 
 /// chunk-level 5-path RRF fusion. For each path, a candidate's
 /// contribution is 1/(k + rank) where rank is its 0-based position in that path's
-/// list (so the §9.1 formula 1/(k+rank); rank starts at 0 here → the top hit
+/// list (so the formula 1/(k+rank); rank starts at 0 here → the top hit
 /// contributes 1/k). Results are deduped by child_id (scores summed across
 /// paths), sorted by rrf_score DESC, truncated to `top_n` (<=0 → all).
 ///
 /// This is the pure fusion function; the producing retrievers are wired in the
-/// live executor's vector-route split (live_single_unit_executor.cpp, §3.8 W2).
+/// live executor's vector-route split (live_single_unit_executor.cpp, W2).
 std::vector<RrfFusedHit> FuseFivePathRrf(const FivePathInput& input,
                                          int top_n = 0, int k = kRrfKDefault);
 

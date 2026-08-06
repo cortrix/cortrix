@@ -10,8 +10,8 @@
 #include "cortrix/auth/jwt_utils.h"
 #include "cortrix/auth/platform_db.h"
 
-// Auth S7: JWT secret rotation + dual-key window + 24h prev cron (§2.11 / §3.5 /
-// §3.9, Issue 1.1 C).
+// Auth S7: JWT secret rotation + dual-key window + 24h prev cron (/
+//, Issue 1.1 C).
 namespace cortrix::auth {
 namespace {
 

@@ -26,7 +26,7 @@ RerankerConfig StubConfig() {
     return c;
 }
 
-// --- OrtEnvSingleton (§2.4-bis: std::call_once, one Env per process) ---
+// --- OrtEnvSingleton (std::call_once, one Env per process) ---
 
 TEST(OrtEnvSingletonTest, InitIsIdempotentAndMarksInitialized) {
     ml::OrtEnvSingleton::Init();
@@ -37,7 +37,7 @@ TEST(OrtEnvSingletonTest, InitIsIdempotentAndMarksInitialized) {
     EXPECT_EQ(h1, h2);
 }
 
-// --- TokenizerRegistry (§2.4-bis: shared, mutex on register, lock-free read) ---
+// --- TokenizerRegistry (shared, mutex on register, lock-free read) ---
 
 TEST(TokenizerRegistryTest, MissingKeyReturnsNull) {
     ml::TokenizerRegistry::ResetForTest();
@@ -106,7 +106,7 @@ TEST(OnnxRerankerSkeletonTest, RerankReversesLookupViaChunkStoreAndSortsByFusedS
     }
     // Cross-encoder order preserved on rerank_score.
     EXPECT_GE(ranked[0].rerank_score, ranked[1].rerank_score);
-    // New reranker contract (§4.2-ter): RankedChunk.score is the FUSED ordering score
+    // New reranker contract: RankedChunk.score is the FUSED ordering score
     // written back (rerank*0.7 + rrf*0.3; no score_signals here), so the output is
     // sorted by the fused score and `score` is no longer the raw pre-rerank RRF.
     EXPECT_GE(ranked[0].score, ranked[1].score);

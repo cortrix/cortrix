@@ -36,7 +36,7 @@ struct RerankTaskResult {
 /// Ort::Session. Ort types are kept out of this header (opaque void* session_),
 /// mirroring the in-tree OnnxEmbedder pattern so non-ONNX TUs can include it.
 ///
-/// Standalone (D3): with no model file present Init() runs in stub mode (no
+/// Standalone: with no model file present Init() runs in stub mode (no
 /// Session, Score returns a deterministic stub) so the class is constructible and
 /// testable offline; the real-model + fail-fast paths land in S1.3.
 class OnnxReranker : public IReranker {
@@ -56,7 +56,7 @@ public:
 
     /// Stop the worker pool and join in-flight scoring tasks. Idempotent; the
     /// dtor calls it. A timed-out ScoreBatch task keeps RUNNING on its pool
-    /// worker after ScoreBatch returns (§3.3) — destroying the reranker while
+    /// worker after ScoreBatch returns — destroying the reranker while
     /// it runs is a use-after-free on session_ (and a vptr race for derived
     /// classes). Subclasses overriding ScoreForTask MUST call Shutdown() in
     /// their own dtor so workers quiesce before the vtable is demoted.
@@ -92,7 +92,7 @@ protected:
     /// Single-pair inference invoked by ScoreBatch's per-task body. The real ONNX
     /// path (later Wave) runs Score() here and MAY throw (Ort::Exception / OOM);
     /// ScoreBatch guards it (try/catch → score=0 + failed_tasks_total + breaker).
-    /// virtual so tests can inject ONNX-exception / OOM failures (S3.4 §7 DoD
+    /// virtual so tests can inject ONNX-exception / OOM failures (S3.4 DoD
     /// "ONNX session exception injection"). Default delegates to the public Score().
     virtual float ScoreForTask(const char* query, const char* passage) {
         return Score(query, passage);

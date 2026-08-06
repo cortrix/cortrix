@@ -45,7 +45,7 @@ std::vector<std::string> ParseEnricherChainSpec(const std::string& spec) {
     }
     // The `enrich` enricher always leads. If any token is present but enrich is not, prepend it
     // (`contextual`/`hype` are chain peers AFTER `enrich`). An empty/all-unknown spec defaults to
-    // the single-enricher {"enrich"} chain (§7.1 L1).
+    // the single-enricher {"enrich"} chain (L1).
     if (out.empty()) return {"enrich"};
     if (std::find(out.begin(), out.end(), "enrich") == out.end()) {
         out.insert(out.begin(), "enrich");
@@ -124,7 +124,7 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
             continue;
         }
         const std::string name = enricher->Name();
-        // addendum §3.7 backfill: only the owed members run — a filtered-out
+        // addendum backfill: only the owed members run — a filtered-out
         // member records a skipped step (same bookkeeping as unavailable), so the
         // debt detection downstream never re-owes an already-repaired member.
         if (member_filter &&
@@ -229,9 +229,9 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
                 // Contextual fail-soft: the step reports OK (the chunk keeps its original
                 // embedding) but the member outcome is a failure recorded only in
                 // contextualized_status. Without this, the contextual debt row is written
-                // with an empty last_error and the real cause (e.g. the §8
+                // with an empty last_error and the real cause (e.g. the
                 // injection-guard byte limit) is unobservable — 2026-07-11 live 5k
-                // ingest: 4,139 such rows, all blank (D12).
+                // ingest: 4,139 such rows, all blank.
                 err_code = step.error_msg;
             }
             results[i].steps.push_back({name, step.status, err_code, false});

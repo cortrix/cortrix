@@ -2,7 +2,7 @@
 //
 // The existing test_spc_pipeline.cpp drives the core orchestration (L0-L3, memory
 // path, store/WAL fault injection, the NullEnricher path) but never installs the
-// optional D3.5 seams, so their branches in Process()/ProcessParsed() are dead in
+// optional integration seams, so their branches in Process()/ProcessParsed() are dead in
 // the coverage build:
 //   - the EnricherChain path (use_chain): I1 enricher→contextual retrieval→HyPE fail-soft serial, the
 //     contextualized_embedding flag (kFlagExtHasContextualized), WriteEnrichment +
@@ -46,10 +46,10 @@
 #include "cortrix/spc/block_assembler.h"
 #include "cortrix/spc_enricher.h"            // NullEnricher (ctor injection)
 #include "cortrix/spc/enricher_chain.h"      // I1 EnricherChain
-#include "cortrix/spc/contextual_store.h"    // §3.8 W2 DeriveContextualVecLabel
-#include "cortrix/spc_enricher/enrich_backfill_worker.h"  // §3.7 backfill worker
-#include "cortrix/spc_enricher/enrich_retry_sweeper.h"    // §3.7 retry sweeper
-#include "cortrix/spc_enricher/enrich_state_store.h"      // §3.7 coverage SoT helpers
+#include "cortrix/spc/contextual_store.h"    // W2 DeriveContextualVecLabel
+#include "cortrix/spc_enricher/enrich_backfill_worker.h"  // backfill worker
+#include "cortrix/spc_enricher/enrich_retry_sweeper.h"    // retry sweeper
+#include "cortrix/spc_enricher/enrich_state_store.h"      // coverage SoT helpers
 #include "cortrix/async/task_manager.h"
 #include "cortrix/async/task_scheduler.h"
 #include "cortrix/async/task_info.h"
@@ -498,7 +498,7 @@ TEST_F(SPCPipelineR7Test, CLEANING_DefaultResolverEnablesDedup_CollapsesDuplicat
         << "default config dedup on → no two surviving children share text";
 }
 
-// Resolver that turns anomaly detection OFF (the other §3.4 boolean field). Exercises
+// Resolver that turns anomaly detection OFF (the other boolean field). Exercises
 // the resolver SetConfig branch with anomaly_detection_enabled=false (DetectAnomaly
 // early-returns). The doc still writes; no child carries a cleaning.* anomaly key.
 TEST_F(SPCPipelineR7Test, CLEANING_NsResolverDisablesAnomaly_NoAnomalyKeys) {
@@ -609,7 +609,7 @@ TEST_F(SPCPipelineR7Test, EnricherChain_L2_EnrichesButSkipsHypeBlocks) {
 }
 
 // ============================================================
-// enrich_state coverage rows (addendum §3.7) — the per-chunk SoT the retry
+// enrich_state coverage rows (addendum) — the per-chunk SoT the retry
 // sweeper scans. One row per enriched-eligible child; 'ok' when every owed
 // chain member succeeded, 'pending_retry' + failed_members csv otherwise.
 // ============================================================
@@ -684,7 +684,7 @@ TEST_F(SPCPipelineR7Test, EnrichState_OkChainWritesOkRowPerChild) {
     pipeline_->SetEnricherChain(nullptr);
 }
 
-// [D10a] Persist failure AFTER a successful enrich stage must be re-owed in
+// [] Persist failure AFTER a successful enrich stage must be re-owed in
 // enrich_state, not just WARN-logged: sabotage the entities table so
 // WriteEnrichment fails while the chain member itself succeeded. The row must
 // land pending_retry owing enrich with a persist-flavored last_error, so the
@@ -840,7 +840,7 @@ TEST_F(SPCPipelineR7Test, EnrichState_NoEnricherWritesNoRows) {
 }
 
 // ============================================================
-// §3.7 backfill worker + retry sweeper (enrich_state → repair).
+// backfill worker + retry sweeper (enrich_state → repair).
 // ============================================================
 
 TEST(EnrichBackfillSchedule, ExponentialCappedForwardOnly) {
@@ -920,7 +920,7 @@ TEST_F(SPCPipelineR7Test, EnrichBackfill_RepairsPendingRowsEndToEnd) {
 // QA 2026-07-12 F-5: a backfill whose enrich SUCCEEDS but whose persist fails
 // must leave a non-empty last_error on the row — the unconditional flip used
 // to rewrite it from an empty rep.last_error, blanking the diagnosis ingest
-// had recorded (the exact blank-last_error shape D12 closed on ingest).
+// had recorded (the exact blank-last_error shape closed on ingest).
 TEST_F(SPCPipelineR7Test, EnrichBackfill_PersistFailureKeepsNonEmptyLastError) {
     cortrix::spc::EnricherChain broken;
     broken.Append(std::make_shared<FailingSummaryEnricher>());

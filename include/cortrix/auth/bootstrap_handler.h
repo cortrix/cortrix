@@ -19,7 +19,7 @@ namespace cortrix::auth {
 /// JSON) share ONE token (V3 ruling 5).
 ///
 /// The token lives in memory only (never persisted). This class owns the token
-/// lifecycle + the consume logic; the HTTP routes + the stdout banner are D3.5
+/// lifecycle + the consume logic; the HTTP routes + the stdout banner are integration
 /// wiring. Borrows an open platform.db handle + an ApiKeyService.
 class BootstrapHandler {
 public:
@@ -31,8 +31,8 @@ public:
 
     /// If first start, generate + store a fresh 60s single-use token and return
     /// it (for the stdout banner). If users already exist, returns "" (no token,
-    /// §S6 `Bootstrap_NotFirstStart`). Regenerates (invalidating any prior token)
-    /// — used by `cortrix-setup --rotate-bootstrap` (§S6 `Bootstrap_RotateCommand`).
+    /// `Bootstrap_NotFirstStart`). Regenerates (invalidating any prior token)
+    /// — used by `cortrix-setup --rotate-bootstrap` (`Bootstrap_RotateCommand`).
     Result<std::string> GenerateToken();
 
     /// The result of consuming the bootstrap token (the one-time admin key).
@@ -49,10 +49,10 @@ public:
     /// (expired | used | not_found). Idempotent failure after consume (token gone).
     Result<BootstrapResult> Consume(const std::string& token);
 
-    /// Render the §2.13.2.a one-time HTML page showing `admin_api_key` (GET path).
+    /// Render the one-time HTML page showing `admin_api_key` (GET path).
     static std::string RenderHtml(const std::string& admin_api_key);
 
-    /// Render the §2.13.2.b JSON body for the POST path.
+    /// Render the JSON body for the POST path.
     static std::string RenderJson(const std::string& admin_api_key);
 
     /// Token validity window (60 seconds).

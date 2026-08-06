@@ -23,13 +23,13 @@ const char* ToString(UnitLevel u) {
 ChunkStrategy ChunkStrategyFromString(const std::string& s) {
     if (s == "flat") return ChunkStrategy::kFlat;
     if (s == "semantic") return ChunkStrategy::kSemantic;
-    return ChunkStrategy::kParentChild;  // default (§ 2.3)
+    return ChunkStrategy::kParentChild;  // default
 }
 
 UnitLevel UnitLevelFromString(const std::string& s) {
     if (s == "page") return UnitLevel::kPage;
     if (s == "sentence") return UnitLevel::kSentence;
-    return UnitLevel::kParagraph;  // default (D2 lock)
+    return UnitLevel::kParagraph;  // default (lock)
 }
 
 }  // namespace cortrix::chunker

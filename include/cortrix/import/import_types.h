@@ -13,7 +13,7 @@
 
 namespace cortrix::import {
 
-/// Phase-1 string-alias IDs (ARCH §1.8 — distinct strong types are Phase 2). A
+/// Phase-1 string-alias IDs (ARCH — distinct strong types are Phase 2). A
 /// connection ref is "db_conn_<ulid>"; an import task is "import_<ulid>".
 /// NsId / TenantId reuse the catalog's TEXT keys.
 using ConnectionRefId = std::string;
@@ -21,7 +21,7 @@ using ImportTaskId    = std::string;
 using NsId            = cortrix::id::NamespaceId;
 using TenantId        = std::string;
 
-/// D4 textualization strategy. TEMPLATE was removed in v1.0.2 (D1 V3
+/// textualization strategy. TEMPLATE was removed in v1.0.2 (V3
 /// ruling 13 — Jinja pushed to V1.5); only PER_ROW + MERGE exist in V1.0.
 enum class TextStrategy {
     kPerRow,   ///< default: one Block per row ("col: val\n...")
@@ -33,7 +33,7 @@ const char* ToString(TextStrategy strategy);
 /// (notably "template", deliberately rejected in V1.0).
 std::optional<TextStrategy> ParseTextStrategy(const std::string& s);
 
-/// D6 task lifecycle. Terminal states = COMPLETED / FAILED / CANCELLED.
+/// task lifecycle. Terminal states = COMPLETED / FAILED / CANCELLED.
 enum class ImportTaskStatus {
     kQueued,
     kRunning,
@@ -61,14 +61,14 @@ struct DbRow {
 };
 
 /// A textualized chunk ready to feed the SPC pipeline. `source`
-/// is the full postgres:// URI written into blocks.metadata_json (§4.3).
+/// is the full postgres:// URI written into blocks.metadata_json.
 struct TextChunk {
     std::string text;
     std::string source;          ///< postgres://host:port/db/table/<row_id>
-    nlohmann::json metadata;     ///< the §4.3 metadata_json block (source_type, ref, signature, ...)
+    nlohmann::json metadata;     ///< the metadata_json block (source_type, ref, signature, ...)
 };
 
-/// D2 query request — oneOf table+filter (mode 1) / custom SQL (mode 2). Exactly
+/// query request — oneOf table+filter (mode 1) / custom SQL (mode 2). Exactly
 /// one of {table, sql} is set; the QueryExecutor validates the discriminator.
 struct QueryRequest {
     // mode 1: table + filter DSL
@@ -90,7 +90,7 @@ struct ImportRequest {
 };
 
 /// Progress snapshot. `error` is set only in the FAILED
-/// terminal state (cancel resolves to status=cancelled, no error — §5.4 note).
+/// terminal state (cancel resolves to status=cancelled, no error — note).
 struct ImportTaskProgress {
     ImportTaskId task_id;
     ImportTaskStatus status = ImportTaskStatus::kQueued;

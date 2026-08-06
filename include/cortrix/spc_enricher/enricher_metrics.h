@@ -15,14 +15,14 @@ namespace cortrix::spc {
 /// prefix, no plugin prefix; V12 P0 CRIT-2 dropped the high-cardinality ns_id
 /// label from tokens_total / cost_usd_total).
 ///
-/// Standalone (D3): a self-contained, dependency-free recorder + OpenMetrics text
+/// Standalone: a self-contained, dependency-free recorder + OpenMetrics text
 /// renderer (same pattern as RerankerMetrics / OnnxMetrics). The `/metrics`
 /// scrape endpoint does not exist in the frozen tree — registering this recorder
-/// into that endpoint is cross-Feature wiring deferred to D3.5. Until then it is
+/// into that endpoint is cross-Feature wiring deferred to integration. Until then it is
 /// fully usable + testable in-process and Render() produces what the server will serve.
 class EnricherMetrics {
 public:
-    /// Reason label for cortrix_enricher_fallback_to_null_total (§4.4 scenarios).
+    /// Reason label for cortrix_enricher_fallback_to_null_total (scenarios).
     enum class FallbackReason {
         kApiKeyMissing = 0,        ///< enricher.type=llm but api_key unset
         kEndpointUnreachable,      ///< startup endpoint probe failed
@@ -70,13 +70,13 @@ public:
     void SetQueueDepth(int depth);
     int QueueDepth() const;
 
-    // --- cortrix_enricher_batch_size_actual (Histogram, §3.6) — actual per-LLM-call
+    // --- cortrix_enricher_batch_size_actual (Histogram) — actual per-LLM-call
     // batch size (topic 1.2 batch_size 1-32, default 8); fed once per RunOneBatch. ---
     void ObserveBatchSizeActual(int batch_size);
     uint64_t BatchSizeActualCount() const;
 
-    // --- cortrix_enricher_score_duration_seconds (Histogram, §3.6) — EnrichBatch
-    // per-LLM-call latency distribution (§4.2 "update metric ... duration"). ---
+    // --- cortrix_enricher_score_duration_seconds (Histogram) — EnrichBatch
+    // per-LLM-call latency distribution ("update metric ... duration"). ---
     void ObserveScoreDuration(double seconds);
     uint64_t ScoreDurationCount() const;
 

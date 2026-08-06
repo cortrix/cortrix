@@ -103,7 +103,7 @@ TEST_F(SqliteConnTest, ApplyPragmasOnClosedConnIsOkNoOp) {
 
 // A PRAGMA whose value carries trailing SQL makes sqlite3_exec hit a syntax error
 // on the appended statement → the first-error branch surfaces a kInternal Status,
-// while the connection stays usable (failure is tolerated, §7.1).
+// while the connection stays usable (failure is tolerated).
 TEST_F(SqliteConnTest, ApplyPragmasSurfacesFirstFailureButStaysUsable) {
     SqliteConn conn;
     ASSERT_TRUE(conn.Open((dir_ / "store.db").string()).ok());

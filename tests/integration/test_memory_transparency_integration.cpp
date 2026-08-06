@@ -8,8 +8,8 @@
 #include "cortrix/memory/memory_metrics.h"
 #include "cortrix/memory/memory_transparency.h"
 
-// Memory transparency / §11.3 standalone integration: the full CRUD lifecycle over a single
-// shared in-memory store + operation logger (the D3.5 real MemoryStore adapter / server
+// Memory transparency / standalone integration: the full CRUD lifecycle over a single
+// shared in-memory store + operation logger (the integration real MemoryStore adapter / server
 // routing / memory-feature wiring are deferred). Covers End2End (list→create→edit→delete→
 // list), the phased rollout, the operation_log integration across endpoints, the
 // Memory isolation multi-user isolation + 404 mask, the admin-revoke visibility (revoked_at), and
@@ -121,7 +121,7 @@ protected:
     static constexpr const char* kUser = "user_xxx";
 };
 
-// §11.2 MemoryTransparency_End2End: list → create → edit → delete → list.
+// MemoryTransparency_End2End: list → create → edit → delete → list.
 TEST_F(MemoryTransparencyIntegrationTest, End2End) {
     // Start empty.
     auto l0 = mt_->List(Filter(kUser), kUser);
@@ -173,7 +173,7 @@ TEST_F(MemoryTransparencyIntegrationTest, End2End) {
     EXPECT_EQ(l3_all.value().total, 2);
 }
 
-// §11.2 MemoryTransparency_PhasedRollout: default A-class only; explain adds B-class.
+// MemoryTransparency_PhasedRollout: default A-class only; explain adds B-class.
 TEST_F(MemoryTransparencyIntegrationTest, PhasedRollout) {
     MemoryCreateRequest cr;
     cr.user_id = kUser;
@@ -193,7 +193,7 @@ TEST_F(MemoryTransparencyIntegrationTest, PhasedRollout) {
     EXPECT_EQ(*ex.value().memories[0].extraction_method, "explicit");  // create path
 }
 
-// §11.2 MemoryTransparency_OperationLogOpLogIntegration: create/edit/delete all emit audit.
+// MemoryTransparency_OperationLogOpLogIntegration: create/edit/delete all emit audit.
 TEST_F(MemoryTransparencyIntegrationTest, OperationLogOpLogIntegration) {
     MemoryCreateRequest cr;
     cr.user_id = kUser;
@@ -221,7 +221,7 @@ TEST_F(MemoryTransparencyIntegrationTest, OperationLogOpLogIntegration) {
     }
 }
 
-// §11.2 MemoryTransparency_MemoryIsolation: multi-user isolation + 404 mask.
+// MemoryTransparency_MemoryIsolation: multi-user isolation + 404 mask.
 TEST_F(MemoryTransparencyIntegrationTest, MemoryIsolation) {
     // user_a and user_b each create a memory.
     MemoryCreateRequest ca;
@@ -261,7 +261,7 @@ TEST_F(MemoryTransparencyIntegrationTest, MemoryIsolation) {
     EXPECT_EQ(store_->blocks[id_a].content, "a's secret");
 }
 
-// §11.2 MemoryTransparency_AdminRevokeVisible: after a (simulated memory extraction admin) revoke
+// MemoryTransparency_AdminRevokeVisible: after a (simulated memory extraction admin) revoke
 // stamps revoked_at + restores status=active, the user's list surfaces revoked_at
 // (the A-class transparency field). The admin revoke path itself is memory extraction's; here we
 // simulate its metadata_json effect on the shared store and assert memory transparency surfaces it.
@@ -294,7 +294,7 @@ TEST_F(MemoryTransparencyIntegrationTest, AdminRevokeVisible) {
     EXPECT_EQ(*m.revoked_at, 1716220800000LL);
 }
 
-// §11.3 MemoryTransparency_AgentSelfManagement: Agent self-service list → create →
+// MemoryTransparency_AgentSelfManagement: Agent self-service list → create →
 // edit → delete closed loop (Skill SDK is mocked at the service boundary).
 TEST_F(MemoryTransparencyIntegrationTest, AgentSelfManagement) {
     // Agent creates three memories.

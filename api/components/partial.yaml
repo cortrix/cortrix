@@ -6,7 +6,7 @@ components:
     # ---- ById: for batch upload / batch delete / memory extract (primary key = id) ----
     PartialSuccessByIdV1:
       x-cortrix-version: "v1"
-      x-cortrix-deprecation-policy: "stable until Phase 2 D0 review"
+      x-cortrix-deprecation-policy: "stable until Phase 2 review"
       x-cortrix-usage: "Use when items have unique IDs (document_id / memory_id / task_id)"
       type: object
       required: [succeeded, failed, coverage_ratio]
@@ -74,7 +74,7 @@ components:
     # ---- ByNamespace: for cross-NS query / cross-NS memory search / sync status (primary key = namespace) ----
     PartialSuccessByNamespaceV1:
       x-cortrix-version: "v1"
-      x-cortrix-deprecation-policy: "stable until Phase 2 D0 review"
+      x-cortrix-deprecation-policy: "stable until Phase 2 review"
       x-cortrix-usage: "Use when operation spans multiple namespaces (cross-NS query / sync)"
       type: object
       required: [namespaces_succeeded, namespaces_failed, coverage_ratio]

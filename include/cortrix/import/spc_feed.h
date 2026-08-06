@@ -18,14 +18,14 @@ namespace cortrix::import {
 /// deps + `int Process(SPCTask&, CortrixNamespace&)`. It is heavyweight and not
 /// directly mockable, so the importer consumes it behind THIS thin `ISpcFeeder` seam:
 /// standalone uses InMemorySpcFeeder; the real adapter (TextChunk → SPCTask →
-/// SPCPipeline::Process against a live CortrixNamespace) is wired in D3.5.
+/// SPCPipeline::Process against a live CortrixNamespace) is wired in integration.
 class ISpcFeeder {
 public:
     virtual ~ISpcFeeder() = default;
 
     /// Feed one batch of textualized chunks into namespace `ns`. Returns the number
     /// of chunks successfully ingested (== chunks.size() on full success); an error
-    /// Status aborts the batch. Each chunk's source URI + metadata (§4.3) flow into
+    /// Status aborts the batch. Each chunk's source URI + metadata flow into
     /// the resulting Block.
     virtual Result<int> Feed(const std::vector<TextChunk>& chunks, const NsId& ns) = 0;
 };
@@ -33,7 +33,7 @@ public:
 /// Standalone SPC feeder — records what it would ingest (no real embedding / store).
 /// Lets the import-flow unit tests assert "the right chunks, with the right source
 /// URIs + metadata, reached the pipeline" without a live SPCPipeline. Real ingest →
-/// D3.5. Thread-safe.
+/// integration. Thread-safe.
 class InMemorySpcFeeder : public ISpcFeeder {
 public:
     Result<int> Feed(const std::vector<TextChunk>& chunks, const NsId& ns) override;
@@ -52,10 +52,10 @@ private:
 
 /// Full-overwrite seam (cleanup_source_blocks). Clears only the
 /// Blocks in `ns` whose metadata_json `source` begins with `source_prefix` — i.e.
-/// the prior import of this exact table (ARCH §3.6 lock: only clears Blocks sourced from this table).
+/// the prior import of this exact table (ARCH lock: only clears Blocks sourced from this table).
 ///
 /// Real impl issues `DELETE FROM blocks WHERE ns_id=? AND metadata_json->>'source'
-/// LIKE '<prefix>%'` against the namespace store → D3.5; standalone uses
+/// LIKE '<prefix>%'` against the namespace store → integration; standalone uses
 /// InMemoryBlockCleaner.
 class IBlockCleaner {
 public:
@@ -69,8 +69,8 @@ public:
 };
 
 /// Standalone block cleaner — models a set of Block source URIs per namespace so the
-/// D3 prefix-match semantics (and the "users/ ≠ users2/" boundary) are unit-tested
-/// without a live store. Real DELETE → D3.5. Thread-safe.
+/// prefix-match semantics (and the "users/ ≠ users2/" boundary) are unit-tested
+/// without a live store. Real DELETE → integration. Thread-safe.
 class InMemoryBlockCleaner : public IBlockCleaner {
 public:
     /// Seed a Block source URI (test setup — pretend a prior import wrote it).

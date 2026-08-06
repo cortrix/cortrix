@@ -22,10 +22,10 @@ struct SqlitePragmas {
 ///
 /// Scope is **global only**: a namespace cannot decide its own quota
 /// rules, so there is no NS-level ns_pool_config blob. In production this is sourced
-/// from IGlobalConfig::GetNamespacePoolConfig() — that getter is a D3.5 reverse hook into
+/// from IGlobalConfig::GetNamespacePoolConfig() — that getter is a integration reverse hook into
 /// the shared scaffolding; standalone code (and tests) construct an
 /// NamespacePoolConfig directly and pass it to the pool, so the pool stays decoupled from the
-/// shared IGlobalConfig contract during D3.
+/// shared IGlobalConfig contract during.
 struct NamespacePoolConfig {
     // topic 2 — NS count ceiling.
     size_t max_namespaces_per_instance = 64;
@@ -34,7 +34,7 @@ struct NamespacePoolConfig {
     size_t memory_budget_bytes = 0;
 
     // topic 5 — eager startup load (8 workers, per-NS load timeout).
-    // The timeout is a guard against ONE hung NS stalling startup (§6.3 C1), not a
+    // The timeout is a guard against ONE hung NS stalling startup (C1), not a
     // performance budget: a large-but-healthy NS legitimately needs many seconds to
     // load (open 100MB+ store.db, replay the HNSW WAL, mmap a multi-hundred-MB sparse
     // index, run per-Unit schema migrations). 5s was too aggressive — it mis-classified
@@ -52,7 +52,7 @@ struct NamespacePoolConfig {
     // Root dir under which the pool derives a Unit's on-disk layout
     // (<data_root>/<unit_id>/{index, pending.wal, store.db}) when loading. The
     // *production* per-Unit path scheme is owned by the catalog / deployment and resolved
-    // at D3.5; this knob keeps the standalone load path + tests deterministic.
+    // at integration; this knob keeps the standalone load path + tests deterministic.
     std::string data_root;
 
     // Per-NS WriteCoordinator tuning, passed to the WriteCoordinatorFactory when a

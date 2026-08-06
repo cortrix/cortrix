@@ -1,7 +1,7 @@
 import { ApiError } from './client';
 import type { AgentError, AgentErrorCategory } from '../types/api';
 
-// GEN-Agent error parsing (CLAUDE.md § 5 — machine-readable errors). The HTTP
+// GEN-Agent error parsing (CLAUDE.md — machine-readable errors). The HTTP
 // client throws `ApiError(status, body)` where `body` is the raw response text.
 // Backends return `{ error: { code, message, retryable, category,
 // retry_after_ms, structured_data } }`. This helper normalizes any thrown value

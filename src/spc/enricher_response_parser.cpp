@@ -16,7 +16,7 @@ using json = nlohmann::json;
 
 namespace {
 
-// Fill a result as an L2/L3 parse failure (topic 1.6 / §5.1). score stays 0.
+// Fill a result as an L2/L3 parse failure (topic 1.6 /). score stays 0.
 void FillParseError(EnrichResult& r, const char* layer, int batch_size,
                     const std::string& model) {
     r.status = static_cast<int>(EnricherErrorCode::kParse);

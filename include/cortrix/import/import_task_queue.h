@@ -15,7 +15,7 @@
 namespace cortrix::import {
 
 /// Persistence seam for the task lifecycle (import_tasks). cortrix/ owns
-/// this CE interface; the SQLite-backed store (real import_tasks rows) is D3.5.
+/// this CE interface; the SQLite-backed store (real import_tasks rows) is integration.
 /// Standalone uses InMemoryImportTaskStore. Mutating ops are CAS-on-status so a
 /// cancel racing a worker resolves deterministically.
 class IImportTaskStore {
@@ -62,7 +62,7 @@ public:
     const ImportTaskId& id() const { return id_; }
 
     /// True once cancel() was called for this task — the worker's cooperative-cancel
-    /// poll point (§3.6 CANCELLING → the worker stops at the next checkpoint).
+    /// poll point (CANCELLING → the worker stops at the next checkpoint).
     bool CancelRequested() const { return cancel_flag_->load(); }
 
     /// Report incremental progress (rows_imported / rows_total → progress ratio).
@@ -83,16 +83,16 @@ using ImportTaskWork = std::function<Status(ImportTaskHandle&)>;
 
 struct ImportTaskQueueConfig {
     int worker_count = 2;        // task.worker_count (limit external PG pressure)
-    int queue_max_size = 100;    // §4.4 task.queue_max_size
+    int queue_max_size = 100;    // task.queue_max_size
 };
 
-/// D6 async import queue. **Self-built in cortrix::import, modeled on the
+/// async import queue. **Self-built in cortrix::import, modeled on the
 /// the async task pattern but with ZERO dependency on the scheduler** (the red line: no
 /// `#include` / link of cortrix::async::TaskScheduler). Worker threads come from the
 /// shared cortrix::ExecutorEngine (common, frozen — NOT the scheduler); the lifecycle
 /// state machine + import_tasks persistence are owned here.
 ///
-/// State machine (§3.6): QUEUED → RUNNING → {COMPLETED | FAILED | CANCELLED}, with
+/// State machine: QUEUED → RUNNING → {COMPLETED | FAILED | CANCELLED}, with
 /// CANCELLING as the intermediate a cancel sets. A cancel before RUNNING resolves to
 /// CANCELLED directly; during RUNNING it sets CANCELLING and the worker stops
 /// cooperatively at its next CancelRequested() checkpoint.
@@ -114,10 +114,10 @@ public:
                                 ImportTaskWork work,
                                 int rows_total = 0);
 
-    /// Current progress snapshot (§5.2). nullopt if the task_id is unknown.
+    /// Current progress snapshot. nullopt if the task_id is unknown.
     std::optional<ImportTaskProgress> GetProgress(const ImportTaskId& task_id);
 
-    /// Request cancellation (§3.6). QUEUED → CANCELLED immediately; RUNNING →
+    /// Request cancellation. QUEUED → CANCELLED immediately; RUNNING →
     /// CANCELLING (the worker finishes the current row then stops). Terminal states
     /// are no-ops. Returns false only for an unknown task_id.
     bool Cancel(const ImportTaskId& task_id);

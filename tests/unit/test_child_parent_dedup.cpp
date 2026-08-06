@@ -120,7 +120,7 @@ TEST(ChildParentDedupTest, ChildrenHitsMetaReflectsAllHits) {
     ASSERT_EQ(meta.size(), 1u);
     EXPECT_EQ(meta[0].parent_id, "P1");
     EXPECT_EQ(meta[0].primary_child, "C7");
-    // matches the § 3.3 example shape {parent_id:"P01", hits:["C03","C07","C12"], primary_child:"C07"}
+    // matches the example shape {parent_id:"P01", hits:["C03","C07","C12"], primary_child:"C07"}
     EXPECT_EQ(meta[0].hits, (std::vector<std::string>{"C7", "C12", "C3"}));
 }
 

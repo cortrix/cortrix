@@ -19,7 +19,7 @@
 // Enricher standalone integration (Issue 6.5 E2E within-feature): resolve NS config →
 // enrich a batch through the (mocked) LLM → persist to the per-Unit store →
 // read back + FTS5 search. The CROSS-feature E2E (real SPC pipeline Parse→Chunk→
-// Enricher→Embed→Store, real LLM) is D3.5 deferred wiring.
+// Enricher→Embed→Store, real LLM) is integration deferred wiring.
 namespace cortrix::spc {
 namespace {
 
@@ -109,7 +109,7 @@ TEST_F(EnricherIntegrationTest, ResolveEnrichPersistSearchRoundTrip) {
 
 TEST_F(EnricherIntegrationTest, NullEnricherPathPersistsNothing) {
     // type=null → NullEnricher; results are empty-success → store writes no
-    // enrichment (columns stay NULL), matching the §4.4 scenario-1 normal path.
+    // enrichment (columns stay NULL), matching the scenario-1 normal path.
     EnricherConfig cfg;  // kNull
     auto enr = CreateEnricher(cfg);  // single-arg (no probe needed for null)
     EXPECT_EQ(enr->Name(), "NullEnricher");

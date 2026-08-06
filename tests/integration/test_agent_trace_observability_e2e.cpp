@@ -7,10 +7,10 @@
 /// *co-located* RegisterObservabilityRoutes — agent_trace and interaction_log share one
 /// DB. Production does NOT: bootstrap wires RegisterTracesRoutesGlobal (agent_trace in
 /// the GLOBAL cortrix_global.db) + RegisterInteractionsRoutesPerNs (interaction_log in
-/// each namespace's memory.db). The §8.1 permission check therefore runs a CROSS-DB
+/// each namespace's memory.db). The permission check therefore runs a CROSS-DB
 /// owner resolver (ResolveGlobalTraceOwner): read the session's namespace_id off the
 /// global agent_trace, then look up user_id in THAT namespace's memory.db. That live
-/// assembly seam — the exact D3.5 live-only class of bug — has never been E2E-covered.
+/// assembly seam — the exact integration live-only class of bug — has never been E2E-covered.
 ///
 /// This test stands up the production assembly via FullStackE2E (real CatalogDb global
 /// db + real DefaultINSRouter/Pool + real PhnswIndexFactory), seeds an owner via the
@@ -164,7 +164,7 @@ TEST_F(AgentTraceObservabilityE2E, OwnerReadsOwnSessionTraces) {
   }
 }
 
-// An admin reads any session regardless of ownership (§8.1).
+// An admin reads any session regardless of ownership.
 TEST_F(AgentTraceObservabilityE2E, AdminReadsAnySessionTraces) {
   auto c = h_->Client();
   auto res = c.Get("/api/v1/traces/" + alice_session_, h_->Bearer(h_->admin_key()));
@@ -197,7 +197,7 @@ TEST_F(AgentTraceObservabilityE2E, TracesRequireAuth) {
 }
 
 // An admin querying a session with no traces gets SESSION_NOT_FOUND (the session
-// resolves to no namespace -> owner unknown -> NOT_FOUND for an admin, §8.1).
+// resolves to no namespace -> owner unknown -> NOT_FOUND for an admin).
 TEST_F(AgentTraceObservabilityE2E, AdminUnknownSessionNotFound) {
   auto c = h_->Client();
   auto res = c.Get("/api/v1/traces/no-such-session", h_->Bearer(h_->admin_key()));
@@ -246,7 +246,7 @@ TEST_F(AgentTraceObservabilityE2E, ListInteractionsPerNamespace) {
 }
 
 // A non-admin naming someone else's user_id in the interactions filter is denied
-// (§8.3 mirrors §8.2 anti-leak).
+// (mirrors anti-leak).
 TEST_F(AgentTraceObservabilityE2E, ListInteractionsCrossUserDenied) {
   auto c = h_->Client();
   auto res =

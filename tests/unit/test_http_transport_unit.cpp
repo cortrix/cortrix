@@ -17,7 +17,7 @@
 //
 // Paths SKIPPED (require a live httplib server):
 //   - Real GET / POST through HttplibTransport
-//   - HTTPS (CPPHTTPLIB_OPENSSL_SUPPORT deferred to D3.5)
+//   - HTTPS (CPPHTTPLIB_OPENSSL_SUPPORT deferred to integration)
 //   - Timeout / connection failure through the real transport
 
 #include <gtest/gtest.h>

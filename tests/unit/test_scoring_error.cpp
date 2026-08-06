@@ -10,7 +10,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/scoring/scoring_error.h"
 
-// Semantic score S8 / §4.4 coverage: the 2 semantic score error identities — CX_ERR_SCORING_* identity, category
+// Semantic score S8 / coverage: the 2 semantic score error identities — CX_ERR_SCORING_* identity, category
 // mapping, retryability, the GEN-Agent 4-field boundary factory, the structured_data
 // contract, and the Status bridge. Mirrors tests/unit/test_import_error.cpp (template A).
 namespace cortrix::scoring {
@@ -46,7 +46,7 @@ TEST(ScoringErrorTest, EveryCodeHasUniqueWellFormedCxString) {
               "CX_ERR_SCORING_CONFIG_INVALID");
 }
 
-// §4.4: both permanent, neither retryable, retry_after_ms null.
+//: both permanent, neither retryable, retry_after_ms null.
 TEST(ScoringErrorTest, RegistryMatchesSpecTable) {
     for (ScoringErrorCode code : AllCodes()) {
         const ScoringErrorInfo& info = GetScoringErrorInfo(code);
@@ -57,7 +57,7 @@ TEST(ScoringErrorTest, RegistryMatchesSpecTable) {
 }
 
 // MakeScoringError fills the 4 GEN-Agent fields from the registry + serializes to the
-// §3.1 error body.
+// error body.
 TEST(ScoringErrorTest, MakeErrorPopulatesAgentFriendlyFields) {
     auto err = MakeScoringError(
         ScoringErrorCode::kConfigInvalid,
@@ -82,7 +82,7 @@ TEST(ScoringErrorTest, EmptyMessageFallsBackToCode) {
     EXPECT_EQ(err.message, "CX_ERR_SCORING_LEVEL_INVALID");
 }
 
-// §4.4 structured_data contract (GEN-Agent #5).
+// structured_data contract (GEN-Agent #5).
 TEST(ScoringErrorTest, RequiredStructuredDataContract) {
     nlohmann::json level_full = {
         {"level_received", 7}, {"max_allowed", 4}, {"scoring_input", nullptr}};

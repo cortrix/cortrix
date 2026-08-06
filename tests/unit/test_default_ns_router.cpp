@@ -10,7 +10,7 @@
 #include "cortrix/catalog/default_ns_router.h"
 
 // S2.2 coverage: DefaultINSRouter against a real in-memory catalog.db. Exercises
-// the 6 methods end-to-end + the §8.1 error codes on the not-found / duplicate
+// the 6 methods end-to-end + the error codes on the not-found / duplicate
 // paths.
 namespace cortrix::catalog {
 namespace {

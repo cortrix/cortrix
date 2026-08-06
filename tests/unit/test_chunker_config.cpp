@@ -17,11 +17,11 @@ TEST(ChunkerConfigTest, DefaultsMatchLockedValues) {
     EXPECT_EQ(c.strategy, ChunkStrategy::kParentChild);
     EXPECT_EQ(c.parent_size, 1024);
     EXPECT_EQ(c.child_size, 200);
-    EXPECT_EQ(c.child_overlap, 20);              // D1
-    EXPECT_EQ(c.unit_level, UnitLevel::kParagraph);  // D2
-    EXPECT_EQ(c.max_parents_per_doc, 10000);     // D3
-    EXPECT_EQ(c.fallback_to_flat_threshold, 10000);  // D4
-    EXPECT_EQ(c.children_per_parent_for_rerank, 3);  // D5
+    EXPECT_EQ(c.child_overlap, 20);              //
+    EXPECT_EQ(c.unit_level, UnitLevel::kParagraph);  //
+    EXPECT_EQ(c.max_parents_per_doc, 10000);     //
+    EXPECT_EQ(c.fallback_to_flat_threshold, 10000);  //
+    EXPECT_EQ(c.children_per_parent_for_rerank, 3);  //
 }
 
 TEST(ChunkerConfigTest, StrategyRoundTrip) {

@@ -30,7 +30,7 @@ struct SubprocessResult {
 ///                        child gets SIGTERM, then SIGKILL after `kill_grace_ms`.
 /// @param max_output_bytes stdout cap (<=0 = unlimited). On overflow the child is
 ///                        killed and output_truncated=true.
-/// @param kill_grace_ms   SIGTERM→SIGKILL grace window (default 5s per §3.3).
+/// @param kill_grace_ms   SIGTERM→SIGKILL grace window (default 5s per).
 /// @return SubprocessResult (never throws; launch failure → launched=false).
 SubprocessResult RunParserSubprocess(const std::vector<std::string>& args,
                                      int timeout_ms,

@@ -38,7 +38,7 @@ std::optional<std::string> ColOptText(sqlite3_stmt* stmt, int col) {
     return ColText(stmt, col);
 }
 
-// SELECT column order ReadRow() depends on (matches agent_trace §4.1, minus id
+// SELECT column order ReadRow() depends on (matches agent_trace, minus id
 // which leads). Excludes nothing the AgentTraceEntry carries back.
 constexpr const char* kSelectCols =
     "session_id, trace_id, agent_id, method, params, result_summary, "
@@ -112,7 +112,7 @@ void AgentTraceWriterImpl::Write(const AgentTraceEntry& entry,
                                  const observability::TraceContext* ctx) {
     std::lock_guard<std::mutex> lock(mu_);
     const bool ok = InsertLocked(entry, ctx);
-    // OBS_SPEC §13 — count every write attempt by source + status. A failed DB
+    // OBS_SPEC — count every write attempt by source + status. A failed DB
     // insert records last_error_ but never throws (C4 isolation).
     AgentTraceMetrics::WriteStatus ms = AgentTraceMetrics::WriteStatus::kSuccess;
     if (!ok) {
@@ -136,7 +136,7 @@ Result<TraceSession> AgentTraceWriterImpl::Query(const std::string& session_id,
                                                  const TraceFilter& filter,
                                                  const observability::TraceContext* /*ctx*/) {
     const int64_t t0 = NowMs();
-    // ---- validate (§8.1 permanent input faults → CX_ERR_TRACE_INVALID_FILTER) ----
+    // ---- validate (permanent input faults → CX_ERR_TRACE_INVALID_FILTER) ----
     if (filter.limit < 1 || filter.limit > 200) {
         return AgentTraceStatus(AgentTraceErrorCode::kInvalidFilter,
                          "limit must be in [1,200], got " + std::to_string(filter.limit));
@@ -197,7 +197,7 @@ Result<TraceSession> AgentTraceWriterImpl::Query(const std::string& session_id,
         sqlite3_finalize(stmt);
     }
 
-    // offset past the end of a non-empty set is out of range (§8.1).
+    // offset past the end of a non-empty set is out of range.
     if (filter.offset > 0 && filter.offset >= total_count) {
         return AgentTraceStatus(AgentTraceErrorCode::kInvalidFilter,
                          "offset " + std::to_string(filter.offset) +
@@ -208,7 +208,7 @@ Result<TraceSession> AgentTraceWriterImpl::Query(const std::string& session_id,
     out.session_id = session_id;
     out.total_count = total_count;
 
-    // ---- session-wide aggregate meta (NOT filtered by the query dims, §8.1
+    // ---- session-wide aggregate meta (NOT filtered by the query dims,
     //      meta is over the whole session: start / end / total_duration) ----
     {
         sqlite3_stmt* stmt = nullptr;
@@ -256,7 +256,7 @@ Result<TraceSession> AgentTraceWriterImpl::Query(const std::string& session_id,
 void AgentTraceWriterImpl::OnSessionEnd(const std::string& /*session_id*/,
                                         const observability::TraceContext* /*ctx*/) {
     // Phase 1: the session_end agent_trace row is written by the caller via Write()
-    // (§7.1 OnConnectionClosed). No extra per-session state to finalize here; the
+    // (OnConnectionClosed). No extra per-session state to finalize here; the
     // hook exists so an implementation (or Ent) can flush aggregates. No-op for CE.
 }
 
@@ -266,7 +266,7 @@ void AgentTraceWriterImpl::CheckAndMarkTimeoutSessions(
     const int64_t cutoff = NowMs() - static_cast<int64_t>(idle_threshold_seconds) * 1000LL;
 
     // Find mcp sessions whose last activity is older than the idle threshold and
-    // that have no terminal (session_end / session_timeout) row yet (§7.2).
+    // that have no terminal (session_end / session_timeout) row yet.
     std::vector<std::string> stale;
     {
         sqlite3_stmt* stmt = nullptr;

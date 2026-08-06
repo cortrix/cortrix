@@ -76,7 +76,7 @@ bool QueryComplexityClassifier::IsAvailable() const {
 bool QueryComplexityClassifier::IsChatQuery(const std::string& query) {
     const std::string n = NormalizeForChat(query);
     if (n.empty()) return false;  // empty content is handled as a fail-safe elsewhere
-    // Conservative pleasantry set (§14 risk: Chat skips all retrieval, so only a
+    // Conservative pleasantry set (risk: Chat skips all retrieval, so only a
     // tight match of a content-free greeting/acknowledgment routes here).
     static const char* chat_exact[] = {
         "hi", "hello", "hey", "yo", "hiya",
@@ -167,9 +167,9 @@ retrieval::ClassificationResult QueryComplexityClassifier::DegradedResult() {
 
 retrieval::ClassificationResult QueryComplexityClassifier::RunClassifier(
     const std::string& query) {
-    // §7.3 L3: retry transient faults with exponential back-off (50/100/200ms),
+    // L3: retry transient faults with exponential back-off (50/100/200ms),
     // then transparently degrade to Complex. We do NOT actually sleep here — the
-    // back-off schedule is a D3.5 concern once a real (network/IPC) backend exists;
+    // back-off schedule is a integration concern once a real (network/IPC) backend exists;
     // standalone the loop just bounds the retry count. The boundary stays total.
     const int max_attempts = std::max(1, config_.max_inference_retries);
     for (int attempt = 0; attempt < max_attempts; ++attempt) {
@@ -215,10 +215,10 @@ Status QueryComplexityClassifier::RouteAndUpdateContext(
     const std::optional<std::string>& force_route) {
     auto& metrics = QueryRouterMetrics::Instance();
 
-    // Commit a decision onto ctx + record the §10 distribution metric. The metric
+    // Commit a decision onto ctx + record the distribution metric. The metric
     // bucket is taken from the routing label by default; the fail-safe paths pass
     // an explicit `metric` so a degrade-to-Complex counts in the `fallback` bucket
-    // (not `complex`) — §10 keeps `fallback` distinct from a confident `complex`.
+    // (not `complex`) — keeps `fallback` distinct from a confident `complex`.
     auto commit_as = [&](const std::string& path, float score, const char* source,
                          bool chat, QueryRouterMetrics::Decision metric) {
         ctx.routing_path = path;
@@ -232,13 +232,13 @@ Status QueryComplexityClassifier::RouteAndUpdateContext(
         commit_as(path, score, source, chat, DecisionForLabel(path));
     };
 
-    // --- 1. Agent ?route override (§6.1 step 1) ---
+    // --- 1. Agent ?route override (step 1) ---
     if (force_route.has_value()) {
         const std::string& route = force_route.value();
         if (route != "auto" && route != "simple" && route != "complex" &&
             route != "chat") {
             // Invalid token → leave ctx untouched; caller surfaces
-            // CX_ERR_ROUTER_FORCE_ROUTE_INVALID (the §4.3 structured_data carries
+            // CX_ERR_ROUTER_FORCE_ROUTE_INVALID (the structured_data carries
             // invalid_route_value at the call site).
             return RouterStatus(RouterErrorCode::kForceRouteInvalid, route);
         }
@@ -249,7 +249,7 @@ Status QueryComplexityClassifier::RouteAndUpdateContext(
         // route == "auto" → fall through to NS-config / classifier.
     }
 
-    // --- 2. NS-config force_route override (§6.1 step 2) ---
+    // --- 2. NS-config force_route override (step 2) ---
     // Standalone: config_ is the resolved ComplexityConfig (defaults / NS-override;
     // the NS-config resolution path is not wired yet). An out-of-set NS force_route is a
     // config error surfaced the same way as the Agent override.
@@ -262,22 +262,22 @@ Status QueryComplexityClassifier::RouteAndUpdateContext(
         return Status::Ok();
     }
 
-    // --- 3. heuristic chat rule guard (§6.1 step 3) ---
+    // --- 3. heuristic chat rule guard (step 3) ---
     if (IsChatQuery(ctx.query)) {
         commit("chat", 1.0f, "rule", /*chat=*/true);
         return Status::Ok();
     }
 
     // --- L1 / L2: NS disabled or backend unavailable → default to Complex ---
-    // (§7.1 L1 / §7.2 L2). routing_decision_source = "classifier_unavailable". The
-    // §10 metric bucket is `fallback` (a fail-safe Complex, not a confident one).
+    // (L1 / L2). routing_decision_source = "classifier_unavailable". The
+    // metric bucket is `fallback` (a fail-safe Complex, not a confident one).
     if (!config_.enabled || !IsAvailable()) {
         commit_as("complex", 0.5f, "classifier_unavailable", /*chat=*/false,
                   QueryRouterMetrics::Decision::kFallback);
         return Status::Ok();
     }
 
-    // --- 4. main path: classifier backend inference (§6.1 step 4) ---
+    // --- 4. main path: classifier backend inference (step 4) ---
     const auto t0 = std::chrono::steady_clock::now();
     retrieval::ClassificationResult result = RunClassifier(ctx.query);
     const auto t1 = std::chrono::steady_clock::now();
@@ -298,8 +298,8 @@ Status QueryComplexityClassifier::RouteAndUpdateContext(
         return Status::Ok();
     }
 
-    // --- 6. write the classifier decision (§6.1 step 6) ---
-    // Chat demotion guard (D3.5 r2 S4 finding): the Adaptive-RAG training labels
+    // --- 6. write the classifier decision (step 6) ---
+    // Chat demotion guard (integration r2 S4 finding): the Adaptive-RAG training labels
     // map "chat" to SQuAD2-unanswerable patterns, so natural full-sentence QA
     // ("Which planet is the hottest...?") can classify as chat - and the chat
     // path SKIPS retrieval entirely, turning a misroute into empty results.
@@ -316,7 +316,7 @@ Status QueryComplexityClassifier::RouteAndUpdateContext(
     // DistilBERT-tiny is an ML model → routing_decision_source = "llm".
     commit(result.label, result.confidence, "llm", result.label == "chat");
 
-    // --- 7. multi-turn signal detection (§6.2, borrowed 6) ---
+    // --- 7. multi-turn signal detection (borrowed 6) ---
     if (config_.multi_turn_warning_enabled && HasMultiTurnSignal(ctx.query)) {
         ctx.multi_turn_context_warning = true;
     }

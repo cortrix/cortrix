@@ -1,5 +1,5 @@
 // Memory isolation integration tests — per-user isolation across the read path and the
-// session-ownership CRUD path. Maps design § 8.2 (6 scenarios) onto the
+// session-ownership CRUD path. Maps design (6 scenarios) onto the
 // capabilities present in the standalone build:
 //   1. cross-user search isolation       -> MemorySearcher + stub pipeline
 //   2. cross-user list isolation         -> SessionList + user filter
@@ -8,9 +8,9 @@
 //   5. cross-user session isolation      -> SessionGet ownership (404)
 //   6. CE default user                   -> user_id="default" round-trips
 //
-// NOTE (D3.5): HTTP PUT/DELETE /memory/:id ownership wiring has no endpoint in
+// NOTE (integration): HTTP PUT/DELETE /memory/:id ownership wiring has no endpoint in
 // the MVP yet; scenarios 3/4 are exercised here via the session-ownership 404
-// analog (same isolation principle). Full memory-id CRUD ownership -> D3.5.
+// analog (same isolation principle). Full memory-id CRUD ownership -> integration.
 #include <gtest/gtest.h>
 
 #include <memory>
@@ -347,7 +347,7 @@ TEST_F(MemoryIsolationStoreIsolation, DefaultUser_RoundTrips) {
     EXPECT_EQ(default_count, 1);
 }
 
-// Bonus: interaction_log search honors the user_id filter (D4 isolation).
+// Bonus: interaction_log search honors the user_id filter (isolation).
 TEST_F(MemoryIsolationStoreIsolation, InteractionSearchUserFilter) {
     std::string a_sid = CreateSession("user_A");
     std::string b_sid = CreateSession("user_B");

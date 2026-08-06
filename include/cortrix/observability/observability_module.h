@@ -23,9 +23,9 @@ namespace cortrix::observability {
 /// instrumentation injection) is shared, and this tree never names any
 /// override (interface-extension isolation).
 ///
-/// Standalone (D3): the instrumentation sites are injected through the IOperationLoggerAware
+/// Standalone: the instrumentation sites are injected through the IOperationLoggerAware
 /// seam; the REAL QueryEngine / SpcPipeline / MemoryStore / NamespaceManager
-/// instances are attached at D3.5. `db` is the already-migrated cortrix_global.db
+/// instances are attached at integration. `db` is the already-migrated cortrix_global.db
 /// handle (the OperationLogSchemaProvider ran at startup).
 class ObservabilityModule {
 public:
@@ -40,9 +40,9 @@ public:
     /// the daily sweep. Idempotent.
     void Initialize();
 
-    /// Register an instrumentation-bearing Engine module to receive the logger (§5.3). Call
+    /// Register an instrumentation-bearing Engine module to receive the logger. Call
     /// before Initialize() (queued) or after (injected immediately). The pointer
-    /// is borrowed; the caller owns the module's lifetime (D3.5 attaches the real
+    /// is borrowed; the caller owns the module's lifetime (integration attaches the real
     /// Engine instances).
     void RegisterEmitter(IOperationLoggerAware* aware);
 

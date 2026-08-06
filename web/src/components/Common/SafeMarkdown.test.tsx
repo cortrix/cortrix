@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { SafeMarkdown } from './SafeMarkdown';
 
-// SafeMarkdown XSS defense tests (web UI design § 4.7). These assert the sanitize
+// SafeMarkdown XSS defense tests (web UI design). These assert the sanitize
 // chain (DOMPurify + rehypeSanitize) on the markdown surface shared by Chat and
 // Search — the LLM-output / indexed-content render path.
 
-describe('SafeMarkdown (§ 4.7 XSS)', () => {
+describe('SafeMarkdown (XSS)', () => {
   it('renders safe markdown (bold / code)', () => {
     const { container } = render(<SafeMarkdown content={'**bold** and `code`'} />);
     expect(container.querySelector('strong')?.textContent).toBe('bold');

@@ -92,7 +92,7 @@ TEST_F(QueryWiringTest, InvalidRouteOverrideYieldsRouterError) {
 }
 
 // Each valid override token is honored verbatim with source = "force_route"
-// (the §6.1 step 1 path the closure relies on).
+// (the step 1 path the closure relies on).
 TEST_F(QueryWiringTest, ValidRouteOverridesHonored) {
     for (const char* route : {"simple", "complex", "chat"}) {
         auto classifier = MakeClassifier();
@@ -191,7 +191,7 @@ TEST_F(QueryWiringTest, DecisionFallbackOnUnavailableBackend) {
     ASSERT_TRUE(classifier.RouteAndUpdateContext(ctx, std::nullopt).ok());
     EXPECT_EQ(ctx.routing_path, "complex");  // fail-safe to Complex
     EXPECT_EQ(ctx.routing_decision_source, "classifier_unavailable");
-    // DecisionOf maps this source -> kFallback (the §10 fallback bucket).
+    // DecisionOf maps this source -> kFallback (the fallback bucket).
     EXPECT_EQ(QueryRouterMetrics::Instance().DecisionCount(
                   QueryRouterMetrics::Decision::kFallback), 1u);
 }

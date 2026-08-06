@@ -11,7 +11,7 @@ unchanged — no re-wrapping of the values, only of the carrier exception.
 Soft dependency: ``langchain`` is imported here, not in the package root.
 Missing or wrong-version langchain raises a clear error with an install hint
 (feature design section 12.x). Real LangChain ReAct round-trips against a live
-LLM are D3.5-deferred; standalone tests exercise the conversion + error wrapping
+LLM are integration-deferred; standalone tests exercise the conversion + error wrapping
 with a mocked toolkit.
 """
 

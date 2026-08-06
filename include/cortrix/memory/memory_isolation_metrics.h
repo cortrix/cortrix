@@ -18,16 +18,16 @@ namespace cortrix::memory {
 /// owned by the memory core / transparency surface).
 ///
 /// 🚨 Cardinality control: labels are
-/// enum-only (result / action / reason / quota_type). `user_id` is on the §3.2
+/// enum-only (result / action / reason / quota_type). `user_id` is on the
 /// absolute deny list (high cardinality); per-user data goes through the audit
 /// log, never a metric label.
 ///
-/// 🚨 D3 standalone: this recorder + RenderOpenMetrics() are fully usable +
+/// 🚨 standalone: this recorder + RenderOpenMetrics() are fully usable +
 /// testable in-process. The `/metrics` scrape endpoint does not exist in the
 /// frozen tree — registering this recorder into that endpoint is cross-Feature
-/// wiring **deferred to D3.5** (same status as ScoringMetrics / MemoryExtractMetrics).
+/// wiring **deferred to integration** (same status as ScoringMetrics / MemoryExtractMetrics).
 ///
-/// §8.bis metric schema (7 rows):
+/// metric schema (7 rows):
 ///   cortrix_memory_isolation_check_total       counter  {result, action}
 ///   cortrix_memory_isolation_violation_total   counter  {action, reason}  (safety alert)
 ///   cortrix_memory_isolation_quota_exceeded_total        counter  {quota_type}
@@ -37,14 +37,14 @@ namespace cortrix::memory {
 ///   cortrix_memory_isolation_match_scope_excluded_total  counter  {reason}
 class MemoryIsolationMetrics {
 public:
-    /// `result` label for isolation_check_total (§8.bis).
+    /// `result` label for isolation_check_total.
     enum class CheckResult {
         kPass = 0,
         kViolation,
     };
 
     /// `action` label for isolation_check_total / isolation_violation_total
-    /// (§8.bis). `session` (violation) and `session_access` (check) keep the spec's
+    ///. `session` (violation) and `session_access` (check) keep the spec's
     /// distinct wording — both are valid label values, mapped by the action enum.
     enum class Action {
         kSearch = 0,
@@ -56,14 +56,14 @@ public:
     };
 
     /// `reason` label for isolation_violation_total / match_scope_excluded_total
-    /// (§8.bis). The controlled vocabulary for why a user_id check failed.
+    ///. The controlled vocabulary for why a user_id check failed.
     enum class Reason {
         kMissingUserId = 0,
         kEmptyUserId,
         kMismatch,
     };
 
-    /// `quota_type` label for quota_exceeded_total / quota_usage_ratio (§8.bis).
+    /// `quota_type` label for quota_exceeded_total / quota_usage_ratio.
     enum class QuotaType {
         kItemsCount = 0,
         kSessionCount,
@@ -93,7 +93,7 @@ public:
     double QuotaUsageRatio(QuotaType quota_type) const;
 
     // --- cortrix_memory_isolation_user_session_count (Gauge, no label) ---
-    // Active user-session total (no user_id label — §3.2; per-user via audit log).
+    // Active user-session total (no user_id label —; per-user via audit log).
     void SetUserSessionCount(int64_t count);
     int64_t UserSessionCount() const;
 

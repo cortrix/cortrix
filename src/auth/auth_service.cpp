@@ -68,7 +68,7 @@ Result<UserInfo> AuthService::Register(const std::string& email,
     }
 
     // 1) Parameter validation (registration step 1). Distinct rules → CX_ERR_INVALID_REQUEST
-    //    with the violated rule(s) in structured_data (§5.2 { rules_violated }).
+    //    with the violated rule(s) in structured_data ({ rules_violated }).
     nlohmann::json rules = nlohmann::json::array();
     if (!ValidateEmail(email)) rules.push_back("email_format");
     if (!ValidatePassword(password, config_.password_min_length))
@@ -228,7 +228,7 @@ Result<AuthTokenPair> AuthService::Login(const std::string& email,
     }
 
     // 1) look up user (login step 1). Nonexistent email → same error as wrong
-    //    password (anti-enumeration, §5.1).
+    //    password (anti-enumeration).
     sqlite3_stmt* stmt = nullptr;
     const char* sql =
         "SELECT id, password_hash, status, locked_until, login_attempts "
@@ -363,7 +363,7 @@ Status AuthService::Logout(const std::string& access_token) {
     if (db_ == nullptr) return AuthStatus(AuthErrorCode::kInternalError, "not initialized");
 
     // Decode best-effort to recover exp + sid; a bad token is an idempotent no-op
-    // success (logging out an already-invalid token must not error, §4.7).
+    // success (logging out an already-invalid token must not error).
     Result<JwtPayload> decoded = JwtCodec::Decode(access_token, accept_secrets_, NowSec());
     if (!decoded.ok()) {
         return Status::Ok();  // nothing to revoke
@@ -371,7 +371,7 @@ Status AuthService::Logout(const std::string& access_token) {
     const JwtPayload& p = decoded.value();
     const int64_t now = NowSec();
 
-    // 1) blacklist the access token (memory + persist, §4.7 step 3).
+    // 1) blacklist the access token (memory + persist, step 3).
     const std::string thash = HashToken(access_token);
     {
         std::lock_guard<std::mutex> lock(blacklist_mutex_);
@@ -389,8 +389,8 @@ Status AuthService::Logout(const std::string& access_token) {
         sqlite3_finalize(ins);
     }
 
-    // 2) revoke the refresh token(s) for this session (§4.7 step 4). Logout is
-    //    per-session (the sid) so other devices keep working (§2.10 sid note).
+    // 2) revoke the refresh token(s) for this session (step 4). Logout is
+    //    per-session (the sid) so other devices keep working (sid note).
     if (!p.sid.empty()) {
         sqlite3_stmt* upd = nullptr;
         const char* usql =
@@ -398,7 +398,7 @@ Status AuthService::Logout(const std::string& access_token) {
             "AND jti IN (SELECT jti FROM refresh_tokens WHERE user_id=?)";
         // Note: refresh tokens don't store sid; revoke this user's active refresh
         // tokens. (Per-sid refresh revocation refinement is fine to tighten later;
-        // single-session V1 behavior matches §4.7 "revoke associated refresh".)
+        // single-session V1 behavior matches "revoke associated refresh".)
         if (sqlite3_prepare_v2(db_, usql, -1, &upd, nullptr) == SQLITE_OK) {
             sqlite3_bind_text(upd, 1, p.sub.c_str(), -1, SQLITE_TRANSIENT);
             sqlite3_bind_text(upd, 2, p.sub.c_str(), -1, SQLITE_TRANSIENT);
@@ -419,7 +419,7 @@ Result<std::string> AuthService::RefreshAccessToken(const std::string& refresh_t
     Result<JwtPayload> decoded = JwtCodec::Decode(refresh_token, accept_secrets_, now);
     if (!decoded.ok()) {
         // JwtCodec returns kTokenExpired for expiry, kUnauthorized otherwise; remap
-        // the generic case to the refresh-token-specific code (§2.5).
+        // the generic case to the refresh-token-specific code.
         if (decoded.status().code() == StatusCode::kUnauthenticated &&
             decoded.status().message().find("CX_ERR_AUTH_TOKEN_EXPIRED") == std::string::npos) {
             return AuthStatus(AuthErrorCode::kInvalidRefreshToken, "decode failed");
@@ -494,12 +494,12 @@ Result<AuthContext> AuthService::ValidateAccessToken(const std::string& access_t
     if (!decoded.ok()) return decoded.status();  // kUnauthorized / kTokenExpired
     const JwtPayload& p = decoded.value();
 
-    // type must be access (a refresh token is not valid here, §4.3 step 2).
+    // type must be access (a refresh token is not valid here, step 2).
     if (p.is_refresh()) {
         return AuthStatus(AuthErrorCode::kUnauthorized, "refresh token used as access");
     }
 
-    // blacklist check (§4.3 step 2 — O(1) memory set).
+    // blacklist check (step 2 — O(1) memory set).
     {
         std::lock_guard<std::mutex> lock(blacklist_mutex_);
         if (token_blacklist_.count(HashToken(access_token)) != 0) {
@@ -623,7 +623,7 @@ Status AuthService::RequestPasswordReset(const std::string& email) {
     }
     if (exists) {
         Status st = IssueVerificationCode(email, "password_reset");
-        if (!st.ok()) return st;  // a real send/db error is surfaced (§5.1)
+        if (!st.ok()) return st;  // a real send/db error is surfaced
     }
     return Status::Ok();
 }
@@ -656,7 +656,7 @@ Status CheckVerificationCode(sqlite3* db, const std::string& email,
     }
     sqlite3_finalize(stmt);
 
-    // All three failure modes collapse to one code (§5.1: expired/wrong/reused →
+    // All three failure modes collapse to one code (expired/wrong/reused →
     // CX_ERR_AUTH_INVALID_RESET_CODE; reason in structured_data at the API layer).
     if (!found) return AuthStatus(AuthErrorCode::kInvalidResetCode, "reason=invalid");
     if (used != 0) return AuthStatus(AuthErrorCode::kInvalidResetCode, "reason=reused");
@@ -690,7 +690,7 @@ Status AuthService::ConfirmPasswordReset(const std::string& email,
     Result<std::string> hash = hasher_->Hash(new_password);
     if (!hash.ok()) return hash.status();
 
-    // Atomic: update hash + mark code used + revoke all refresh tokens (§2.7
+    // Atomic: update hash + mark code used + revoke all refresh tokens (
     // side-effect — all issued refresh_tokens for the user are invalidated).
     if (sqlite3_exec(db_, "BEGIN", nullptr, nullptr, nullptr) != SQLITE_OK) {
         return AuthStatus(AuthErrorCode::kServiceUnavailable, "begin tx failed");
@@ -713,7 +713,7 @@ Status AuthService::ConfirmPasswordReset(const std::string& email,
         return AuthStatus(AuthErrorCode::kServiceUnavailable, "password update failed");
     }
     MarkCodeUsed(db_, code_id);
-    // Revoke all of this user's refresh tokens (§2.7 side effect).
+    // Revoke all of this user's refresh tokens (side effect).
     sqlite3_exec(db_,
                  ("UPDATE refresh_tokens SET revoked=1 WHERE revoked=0 AND user_id="
                   "(SELECT id FROM users WHERE email='" + email + "')").c_str(),
@@ -728,7 +728,7 @@ Status AuthService::ConfirmPasswordReset(const std::string& email,
 Status AuthService::VerifyEmail(const std::string& email, const std::string& code) {
     if (db_ == nullptr) return AuthStatus(AuthErrorCode::kInternalError, "not initialized");
 
-    // Idempotent: if already verified, succeed without requiring a code (§2.8).
+    // Idempotent: if already verified, succeed without requiring a code.
     {
         sqlite3_stmt* q = nullptr;
         if (sqlite3_prepare_v2(db_, "SELECT email_verified FROM users WHERE email=?", -1,

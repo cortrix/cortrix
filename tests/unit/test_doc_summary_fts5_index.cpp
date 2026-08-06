@@ -1,4 +1,4 @@
-// Doc summary S4.6 — doc-level FTS5 hybrid fallback index (§4.3 / §8.2). Self-contained
+// Doc summary S4.6 — doc-level FTS5 hybrid fallback index. Self-contained
 // (:memory: SQLite), BM25 column weights, FTS5 injection guard, and the two-path
 // doc-discovery RRF fusion (FuseDocDiscovery).
 #include <gtest/gtest.h>
@@ -56,7 +56,7 @@ TEST_F(DocSummaryFts5IndexTest, SearchMatchesTopics) {
     EXPECT_EQ(r.value()[0].doc_id, "d2");
 }
 
-// QA 2026-07-12 F-2: SearchDocFts5 shares the block-path sanitizer, so the D6
+// QA 2026-07-12 F-2: SearchDocFts5 shares the block-path sanitizer, so the
 // OR-join applies to doc discovery too. A natural-language query whose tokens
 // do NOT all co-occur in one row must still surface the partial matches —
 // the old implicit-AND semantics starved this to zero rows.
@@ -163,7 +163,7 @@ TEST(DocSummaryFts5SharedHandleTest, BorrowedHandleErrorsWithoutMigratedTable) {
     sqlite3_close(db);
 }
 
-// ---------- FuseDocDiscovery (two-path RRF, §8.2) ----------
+// ---------- FuseDocDiscovery (two-path RRF) ----------
 
 DocDiscoveryHit LlmHit(std::string doc_id, std::string summary) {
     DocDiscoveryHit h;

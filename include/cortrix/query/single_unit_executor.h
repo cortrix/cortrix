@@ -15,15 +15,15 @@ namespace cortrix::query {
 ///   IReranker::Rerank (frozen contract; skipped when ctx.rerank == false)  →
 ///   truncate to top_k  →  NamespaceQueryResult.
 ///
-/// 🚨 D3 standalone: it programs against the INamespacePipeline + IReranker
+/// 🚨 standalone: it programs against the INamespacePipeline + IReranker
 /// *interfaces* and never touches live MVP instances. Wiring the real per-NS
 /// pipeline (VectorSearcher/BM25Searcher/RRFFusion bound to a live index/store)
-/// and the real OnnxReranker is **D3.5**. Unit tests inject a mock pipeline + the
+/// and the real OnnxReranker is **integration**. Unit tests inject a mock pipeline + the
 /// shared MockReranker.
 ///
 /// candidate over-fetch: candidate_k = min(top_k × multiplier, max_candidates)
 /// (multiplier/cap mirror RerankerConfig defaults 3 / 50). The
-/// reranker reorders by cross-encoder score (comparable across NS, ARCH §3.3); when
+/// reranker reorders by cross-encoder score (comparable across NS, ARCH); when
 /// rerank is off, the RRF score carries the ordering (RRF fallback — final gather
 /// fallback lives in ScatterGather, this NS-local path just preserves RRF order).
 class SingleUnitExecutor : public IScatterExecutor {

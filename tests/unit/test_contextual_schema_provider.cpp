@@ -48,7 +48,7 @@ bool HasTable(sqlite3* db, const char* table) {
 TEST(ContextualSchemaProviderTest, IdentityAndVersion) {
     ContextualSchemaProvider p;
     EXPECT_EQ(p.FeatureName(), "contextual");
-    EXPECT_EQ(p.CurrentVersion(), 2);  // V2 = + contextual_vec_labels (§3.8 W2)
+    EXPECT_EQ(p.CurrentVersion(), 2);  // V2 = + contextual_vec_labels (W2)
 }
 
 TEST(ContextualSchemaProviderTest, AddsFourContextualColumnsAndLabelTable) {

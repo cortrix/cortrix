@@ -30,7 +30,7 @@ Status SpladeSparseRetriever::Open() {
         return SparseStatus(SparseErrorCode::kInvertedIndexWriteFailed,
                             "open " + db_path_ + ": " + msg);
     }
-    // WAL improves concurrent write throughput (§6.5 concurrent-write row).
+    // WAL improves concurrent write throughput (concurrent-write row).
     sqlite3_exec(db_, "PRAGMA journal_mode = WAL", nullptr, nullptr, nullptr);
 
     char* err = nullptr;
@@ -69,7 +69,7 @@ std::string SpladeSparseRetriever::CacheKey(const NamespaceId& ns_id,
     return k;
 }
 
-// --- S5: write / delete (§6.1, §6.2) ---
+// --- S5: write / delete ---
 
 Status SpladeSparseRetriever::Remove(const NamespaceId& ns_id,
                                      const ChildId& child_id) {
@@ -119,7 +119,7 @@ Status SpladeSparseRetriever::Remove(const NamespaceId& ns_id,
 Status SpladeSparseRetriever::Add(const NamespaceId& ns_id,
                                   const ChildId& child_id,
                                   const SparseVector& vec) {
-    // Empty vector → drop the child (dead chunk, §6.5). Remove takes the lock.
+    // Empty vector → drop the child (dead chunk). Remove takes the lock.
     if (vec.empty()) {
         return Remove(ns_id, child_id);
     }
@@ -195,7 +195,7 @@ Status SpladeSparseRetriever::Add(const NamespaceId& ns_id,
     return Status::Ok();
 }
 
-// --- S6: query (§6.3) + posting-list LRU cache ---
+// --- S6: query + posting-list LRU cache ---
 
 void SpladeSparseRetriever::InvalidateTerm(const NamespaceId& ns_id,
                                            uint32_t term_id) {
@@ -219,7 +219,7 @@ SpladeSparseRetriever::GetPostingList(const NamespaceId& ns_id, uint32_t term_id
     }
     ++cache_misses_;
 
-    // Miss: load from DB (capped, weight DESC per §6.5 posting_list_cap).
+    // Miss: load from DB (capped, weight DESC per posting_list_cap).
     PostingList pl;
     const char* q =
         "SELECT child_id, weight FROM sparse_inverted_index "
@@ -258,14 +258,14 @@ std::vector<SparseHit> SpladeSparseRetriever::Search(const SparseVector& query,
     last_search_failed_ = false;
     std::vector<SparseHit> out;
     if (!db_) {
-        last_search_failed_ = true;  // L2 fallback signal (§7.2)
+        last_search_failed_ = true;  // L2 fallback signal
         return out;
     }
     if (query.empty()) return out;  // empty query → empty result (success)
 
     int k = (top_k > 0) ? top_k : config_.default_top_k;
 
-    // Score accumulator: child_id → Σ query_weight × chunk_weight (§6.3).
+    // Score accumulator: child_id → Σ query_weight × chunk_weight.
     std::unordered_map<ChildId, float> score_map;
     for (const auto& [term_id, query_weight] : query.terms) {
         const PostingList& posting = GetPostingList(ns_id, term_id);
@@ -278,7 +278,7 @@ std::vector<SparseHit> SpladeSparseRetriever::Search(const SparseVector& query,
     for (const auto& [child_id, score] : score_map) {
         out.push_back({child_id, score});
     }
-    // top-K by score DESC (§6.3). partial_sort when we have more than K.
+    // top-K by score DESC. partial_sort when we have more than K.
     if (k > 0 && static_cast<int>(out.size()) > k) {
         std::partial_sort(
             out.begin(), out.begin() + k, out.end(),

@@ -18,7 +18,7 @@
 namespace cortrix::catalog {
 namespace {
 
-// A minimal "CatalogModule" assembled the way §9.1 prescribes.
+// A minimal "CatalogModule" assembled the way prescribes.
 struct CatalogModule {
     CatalogDb db;
     std::unique_ptr<DefaultINSRouter> ns_router;
@@ -69,7 +69,7 @@ TEST(CatalogStartupTest, CreateNamespaceThenRouteToUnit) {
 }
 
 TEST(CatalogStartupTest, DedupPathBloomThenRefStore) {
-    // The §9.3 write/dedup interplay across BloomFilter + ContentRefStore +
+    // The write/dedup interplay across BloomFilter + ContentRefStore +
     // file_locations: an unseen file misses the BF; after recording it, a rebuilt
     // BF reports it present and the ref store tracks the count.
     CatalogModule m;

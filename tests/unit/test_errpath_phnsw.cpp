@@ -1,7 +1,7 @@
 // Error-path coverage for the index P-HNSW durability codes (WAL / snapshot) and the
 // Semantic score scoring-store code. Each CX_ERR_* below had ZERO referencing test. We assert
 // the *code string* surfaces on the returned cortrix::Status (the project carries the
-// stable identity as a "<CX_ERR_*>: detail" message prefix per CODING_CONVENTIONS §3
+// stable identity as a "<CX_ERR_*>: detail" message prefix per the coding conventions
 // — there is no separate code field at the store layer), not merely that the call
 // failed. The existing fault-sweep tests reach these I/O sites but assert only
 // !ok(); these tests pin the precise CX_ERR_PHNSW_* / CX_ERR_SCORING_STORE identity.

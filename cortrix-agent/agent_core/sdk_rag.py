@@ -6,12 +6,12 @@ module is the single RAG seam: it calls ``client.search(namespace, query, top_k)
 normalizes the wire-faithful ``QueryResult`` into the flat chunk shape the prompt
 builder and explain meta consume.
 
-Standalone discipline (D3 rule): during standalone development cortrix-server is not
+Standalone discipline (standalone rule): during standalone development cortrix-server is not
 running, so the ``AsyncCortrix.search`` coroutine is monkeypatched/stubbed in tests.
 The L2 LLM-only fallback and L3 error paths (design section 9.2) live in the executor;
 this module surfaces a clean ``RagResult`` (or raises) so the executor can decide.
 
-TODO(D3.5): real cortrix-server RAG over the live /query endpoint (currently exercised
+TODO(integration): real cortrix-server RAG over the live /query endpoint (currently exercised
 only against the stubbed SDK).
 """
 

@@ -67,10 +67,10 @@ void TaskCleanupCron::RunCleanupNow(int* deleted, int* zombies, int* timed_out) 
     // crashed → failed + ZOMBIE_TASK_CLEANUP.
     auto z = mgr_->SweepZombies(now_secs, ZombieHours());
     int zn = z.ok() ? z.value() : 0;
-    // §6.bis cortrix_tasks_zombie_cleaned_total — count the rows this sweep moved
+    // cortrix_tasks_zombie_cleaned_total — count the rows this sweep moved
     // processing→failed (bulk SQL sweep carries no per-row task_type, hence no label).
     if (zn > 0) TaskMetrics::Instance().AddZombieCleaned(static_cast<uint64_t>(zn));
-    // Then timeout sweep (§6.1 / §7 v0): remaining processing rows that started
+    // Then timeout sweep (v0): remaining processing rows that started
     // more than task_timeout_seconds ago exceeded the budget → failed + TASK_TIMEOUT.
     auto t = mgr_->SweepTimedOut(now_secs, TimeoutSeconds());
     int tn = t.ok() ? t.value() : 0;

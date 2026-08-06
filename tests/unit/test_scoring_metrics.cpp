@@ -4,7 +4,7 @@
 
 #include "cortrix/scoring/scoring_metrics.h"
 
-// Semantic score / S9 coverage: ScoringMetrics (OBSERVABILITY_SPEC subsystem `scoring`) — the
+// Semantic score / S9 coverage: ScoringMetrics (the observability spec subsystem `scoring`) — the
 // score-by-level / anomalous / final-score counters + assign-duration histogram, and the
 // OpenMetrics Render() naming. Mirrors tests/unit/test_import_metrics.cpp style.
 namespace cortrix::scoring {
@@ -53,7 +53,7 @@ TEST_F(ScoringMetricsTest, RenderEmitsStableMetricNames) {
     EXPECT_NE(out.find("cortrix_scoring_assign_duration_seconds_count 1"), std::string::npos);
     EXPECT_NE(out.find("# TYPE cortrix_scoring_score_total counter"), std::string::npos);
 
-    // No high-cardinality ns_id label (OBS_SPEC §3.2 / semantic score C1 removed it).
+    // No high-cardinality ns_id label (OBS_SPEC / semantic score C1 removed it).
     EXPECT_EQ(out.find("ns_id=\""), std::string::npos);
 }
 

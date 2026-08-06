@@ -1,4 +1,4 @@
--- Memory Immunity — opt-out columns (§4.1 / §4.2, issue D4/D2)
+-- Memory Immunity — opt-out columns (issue/)
 -- Wave C C-R2. Lives in the per-namespace memory DB (interaction_log / memory_sessions).
 --
 -- This file is the human-readable mirror of the DDL the runtime emits in
@@ -13,7 +13,7 @@
 -- interaction_log id/session_id/namespace_name/user_id/role/content/query_type/status/
 -- latency_ms/metadata_json/created_at).
 
--- memory_sessions: opt-out state (D4 A+B double-field). NULL opt_out_at = active.
+-- memory_sessions: opt-out state (A+B double-field). NULL opt_out_at = active.
 ALTER TABLE memory_sessions ADD COLUMN opt_out_at   TEXT DEFAULT NULL;  -- ISO 8601 opt-out time
 ALTER TABLE memory_sessions ADD COLUMN opted_out_by TEXT DEFAULT NULL;  -- user_manual | agent_auto | system_auto | test
 
@@ -22,6 +22,6 @@ ALTER TABLE memory_sessions ADD COLUMN opted_out_by TEXT DEFAULT NULL;  -- user_
 CREATE INDEX IF NOT EXISTS idx_memory_sessions_opt_out_at
     ON memory_sessions(opt_out_at) WHERE opt_out_at IS NOT NULL;
 
--- interaction_log: remember flag (D2 — remember=false on a new interaction triggers
+-- interaction_log: remember flag (remember=false on a new interaction triggers
 -- session-level opt-out). DEFAULT 1 (TRUE): existing/new interactions are remembered.
 ALTER TABLE interaction_log ADD COLUMN remember BOOLEAN DEFAULT 1;

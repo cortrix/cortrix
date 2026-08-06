@@ -49,7 +49,7 @@ const std::vector<CatalogErrorCode>& AllCodes() {
     return codes;
 }
 
-// §8.1 set size is exactly 24, and the count anchor agrees.
+// set size is exactly 24, and the count anchor agrees.
 TEST(CatalogErrorTest, TwentyFourCodesTotal) {
     EXPECT_EQ(AllCodes().size(), 24u);
     EXPECT_EQ(kCatalogErrorCodeCount, 24);
@@ -81,7 +81,7 @@ TEST(CatalogErrorTest, EveryCategoryIsOneOfFive) {
 }
 
 // retryable ⇔ retry_after_ms present (transient codes carry a backoff; permanent
-// / auth / quota codes do not). Mirrors the §8.1 retry_after_ms column.
+// auth / quota codes do not). Mirrors the retry_after_ms column.
 TEST(CatalogErrorTest, RetryableIffRetryAfterPresent) {
     for (CatalogErrorCode code : AllCodes()) {
         const CatalogErrorInfo& info = GetCatalogErrorInfo(code);
@@ -90,12 +90,12 @@ TEST(CatalogErrorTest, RetryableIffRetryAfterPresent) {
         if (info.retryable) {
             EXPECT_GT(*info.retry_after_ms, 0) << info.cx_code;
             EXPECT_EQ(info.category, ErrorCategory::kTransient)
-                << info.cx_code << ": only transient codes are retryable in §8.1";
+                << info.cx_code << ": only transient codes are retryable in";
         }
     }
 }
 
-// Spot-check the exact §8.1 rows that downstream consumers depend on.
+// Spot-check the exact rows that downstream consumers depend on.
 TEST(CatalogErrorTest, SpecificRowsMatchSpec) {
     auto check = [](CatalogErrorCode c, const char* cx, ErrorCategory cat,
                     bool retry, std::optional<int> after) {
@@ -119,13 +119,13 @@ TEST(CatalogErrorTest, SpecificRowsMatchSpec) {
           ErrorCategory::kTransient, true, 1000);
     check(CatalogErrorCode::kNsQuotaExceeded, "CX_ERR_NS_QUOTA_EXCEEDED",
           ErrorCategory::kQuota, false, std::nullopt);
-    // Phase-2-reserved code is present with its §8.1 attributes.
+    // Phase-2-reserved code is present with its attributes.
     check(CatalogErrorCode::kUnitArchived, "CX_ERR_UNIT_ARCHIVED",
           ErrorCategory::kTransient, true, 10000);
 }
 
 // MakeCatalogError fills the boundary error from the registry and attaches
-// structured_data; ToJson then yields the AGENT_FRIENDLY §3.1 body shape.
+// structured_data; ToJson then yields the Agent-friendly contract body shape.
 TEST(CatalogErrorTest, MakeCatalogErrorBuildsAgentFriendlyBody) {
     nlohmann::json sd = {{"ns_id", "ns-42"}};
     auto err = MakeCatalogError(CatalogErrorCode::kNsNotFound, sd);

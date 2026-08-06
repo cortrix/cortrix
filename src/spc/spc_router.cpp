@@ -16,7 +16,7 @@ std::string SPCRouter::InferMimeType(const std::string& filename) {
     std::transform(ext.begin(), ext.end(), ext.begin(),
                    [](unsigned char c) { return std::tolower(c); });
 
-    // Document types (D3 routing table)
+    // Document types (routing table)
     if (ext == ".pdf")  return "application/pdf";
     if (ext == ".docx") return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     if (ext == ".doc")  return "application/msword";
@@ -36,7 +36,7 @@ std::string SPCRouter::InferMimeType(const std::string& filename) {
     if (ext == ".tiff" || ext == ".tif")  return "image/tiff";
     if (ext == ".bmp")  return "image/bmp";
 
-    // L0 skip types (D3: temp/binary/font files)
+    // L0 skip types (temp/binary/font files)
     if (ext == ".tmp" || ext == ".bak") return "application/x-temp";
     if (ext == ".exe" || ext == ".dll" || ext == ".so") return "application/x-executable";
     if (ext == ".ttf" || ext == ".otf" || ext == ".woff") return "font/ttf";
@@ -45,7 +45,7 @@ std::string SPCRouter::InferMimeType(const std::string& filename) {
 }
 
 bool SPCRouter::IsSupported(const std::string& mime_type) {
-    // D3 routing table: all these types are processable
+    // routing table: all these types are processable
     return mime_type == "application/pdf" ||
            mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
            mime_type == "application/msword" ||
@@ -79,7 +79,7 @@ bool SPCRouter::NeedsOcr(const std::string& mime_type, bool has_text) {
         mime_type == "image/tiff" || mime_type == "image/bmp") {
         return true;
     }
-    // PDF with no text needs OCR (image-only PDF) — D3 PROBE mechanism
+    // PDF with no text needs OCR (image-only PDF) — PROBE mechanism
     if (mime_type == "application/pdf" && !has_text) {
         return true;
     }
@@ -87,7 +87,7 @@ bool SPCRouter::NeedsOcr(const std::string& mime_type, bool has_text) {
 }
 
 uint8_t SPCRouter::InferProcessingLevel(const std::string& mime_type) {
-    // D3 routing table: determine processing level
+    // routing table: determine processing level
     // L0: temp files, executables, fonts, empty/unknown binary
     if (mime_type == "application/x-temp" ||
         mime_type == "application/x-executable" ||

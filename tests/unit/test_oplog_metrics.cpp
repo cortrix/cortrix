@@ -19,7 +19,7 @@ protected:
     OplogMetrics& M() { return OplogMetrics::Instance(); }
 };
 
-// All 6 §11 metrics are present in the OpenMetrics exposition (registration proof).
+// All 6 metrics are present in the OpenMetrics exposition (registration proof).
 TEST_F(OplogMetricsTest, AllSixMetricsRegistered) {
     // Drive at least one observation into each so labeled/histogram series render.
     M().RecordWrite("namespace_create", "namespace");

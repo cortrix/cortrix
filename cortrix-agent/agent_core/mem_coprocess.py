@@ -6,9 +6,9 @@ LLM extraction server-side. It runs fire-and-forget so a logging/extraction fail
 blocks the user's chat response (agent design). Per-user isolation is honored by
 always passing a user_id (design the agent design1).
 
-Standalone discipline (D3): the Python SDK ``client.memory.log`` call is exercised against a
+Standalone discipline: the Python SDK ``client.memory.log`` call is exercised against a
 stubbed SDK here; real cortrix-server interaction-log persistence + the live memory extraction worker
-are TODO(D3.5).
+are TODO(integration).
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import structlog
 logger = structlog.get_logger()
 
 # CE single-tenant fallback subject when no authenticated user_id is present. The real
-# JWT-derived user_id is TODO(D3.5) (design P-5 / section 8.2).
+# JWT-derived user_id is TODO(integration) (design P-5 / section 8.2).
 _DEFAULT_USER_ID = "default"
 
 

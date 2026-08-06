@@ -135,7 +135,7 @@ TEST_F(CatalogSchemaTest, UnitsDefaultValuesCorrect) {
               2147483647);
 }
 
-// file_locations carries the full 16-column schema (ARCH §2.4).
+// file_locations carries the full 16-column schema (ARCH).
 TEST_F(CatalogSchemaTest, FileLocationsSixteenColumns) {
     auto cols = TableColumns(db_, "file_locations");
     for (const char* c : {"file_hash", "unit_id", "ns_id", "tenant_id",
@@ -202,7 +202,7 @@ TEST_F(CatalogSchemaTest, ContentRefsHasTargetUnitId) {
     EXPECT_TRUE(Contains(cols, "target_unit_id"));
 }
 
-// ns_acl uses the 6-column ARCH §2.9 schema (not the early simplified 3-col one).
+// ns_acl uses the 6-column ARCH schema (not the early simplified 3-col one).
 TEST_F(CatalogSchemaTest, NsAclSixColumnSchema) {
     auto cols = TableColumns(db_, "ns_acl");
     for (const char* c : {"ns_id", "grantee_tenant_id", "grantee_user_id",

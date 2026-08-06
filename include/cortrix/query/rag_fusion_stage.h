@@ -22,7 +22,7 @@ namespace cortrix::query {
 /// the resolved RagFusionConfig.enabled is true (topic 3 — V1.0 OSS default false).
 /// On every other path the caller skips this stage and runs the plain scatter.
 ///
-/// Flow (§4.3 steps 4-9): ExpandQueries(query) → [original + N variants] (LLM via
+/// Flow (steps 4-9): ExpandQueries(query) → [original + N variants] (LLM via
 /// the injected RagFusion); run ScatterGather.Execute per query; convert each
 /// CrossNsResponse to the ScoredResult[] (child_id + score); global RRF
 /// FuseResults across variants; then re-rank the union of the per-variant

@@ -11,7 +11,7 @@ namespace cortrix::catalog { class ISchemaProvider; }
 namespace cortrix::auth {
 
 /// Owns the platform.db SQLite handle (the Auth-layer SoT). Opens the
-/// database with the §3.8 pragmas (WAL + foreign_keys + synchronous=NORMAL +
+/// database with the pragmas (WAL + foreign_keys + synchronous=NORMAL +
 /// busy_timeout) and runs the Auth schema migration through the shared
 /// SchemaMigrator (the FROZEN L0 scaffold, catalog/schema_provider.h): the
 /// AuthSchemaProvider's 7 tables first, then any extra providers.
@@ -19,7 +19,7 @@ namespace cortrix::auth {
 /// 🔒 platform.db is a SEPARATE database file from catalog.db (see
 /// auth_schema.h). This class deliberately does NOT register CatalogSchemaProvider —
 /// the catalog tables do not belong in platform.db. Joining the two (one users
-/// SoT) is cross-Feature wiring = D3.5, not this Story.
+/// SoT) is cross-Feature wiring = integration, not this Story.
 ///
 /// Mirrors catalog::CatalogDb verbatim in shape so the two composition roots read
 /// the same. Not thread-safe to construct/Open concurrently; callers serialize

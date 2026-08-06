@@ -7,8 +7,8 @@ import {
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import type { ReactNode } from 'react';
 
-// Cortrix VI § 6.5 Modal — built on @headlessui/react Dialog, backdrop blur +
-// fade-in transition, max-w-2xl default (VI § 7 rounded-lg / shadow-lg).
+// Cortrix VI Modal — built on @headlessui/react Dialog, backdrop blur +
+// fade-in transition, max-w-2xl default (VI rounded-lg / shadow-lg).
 
 export type ModalSize = 'sm' | 'base' | 'lg';
 

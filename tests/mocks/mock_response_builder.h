@@ -13,7 +13,7 @@ namespace cortrix::llm {
 ///
 /// Lives in tests/mocks/ alongside MockLlmClient (the MVP scaffolding home for
 /// shared mocks) rather than a separate tests/llm/ dir — one place for shared
-/// test doubles. (design §5.4 envisioned tests/llm/; consolidated here.)
+/// test doubles. (design envisioned tests/llm/; consolidated here.)
 class MockResponseBuilder {
 public:
     /// A valid response for `batch_size` chunks (Issue 5.2 #1). Each chunk index

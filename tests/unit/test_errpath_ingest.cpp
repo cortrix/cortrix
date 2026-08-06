@@ -47,7 +47,7 @@ private:
 };
 
 // CX_ERR_DOC_ALREADY_EXISTS: the submit seam reports a duplicate doc (async task dedup);
-// BatchSubmitService::ClassifyPerDocCode reuses the originating code (§2.4.2) and
+// BatchSubmitService::ClassifyPerDocCode reuses the originating code and
 // surfaces it as the failed[] error_code with the permanent/non-retryable contract.
 TEST(IngestErrPathTest, DocAlreadyExists_SurfacesInFailedItem) {
     StubTaskSubmitter stub;
@@ -66,7 +66,7 @@ TEST(IngestErrPathTest, DocAlreadyExists_SurfacesInFailedItem) {
     const auto& f = r.body["meta"]["failed"][0];
     EXPECT_EQ(f["doc_id"], "dup");
     EXPECT_EQ(f["error_code"], "CX_ERR_DOC_ALREADY_EXISTS");
-    EXPECT_EQ(f["category"], "permanent");  // §2.4.2 reuse-set row = permanent
+    EXPECT_EQ(f["category"], "permanent");  // reuse-set row = permanent
     EXPECT_EQ(f["retryable"], false);
     EXPECT_TRUE(f["retry_after_ms"].is_null());
     EXPECT_EQ(f["message"], "doc 'dup' already ingested");  // detail after the token

@@ -6,7 +6,7 @@
 namespace cortrix::retrieval {
 
 /// Canonical inverted-index DDL — the single SoT for the
-/// sparse_inverted_index table, shared by SparseSchemaProvider::Migrate (the D3.5
+/// sparse_inverted_index table, shared by SparseSchemaProvider::Migrate (the integration
 /// integrated path) and SpladeSparseRetriever::Open (the standalone self-contained
 /// path) so the two can never drift.
 ///
@@ -15,8 +15,8 @@ namespace cortrix::retrieval {
 ///     live in `blocks` and blocks.child_id has a partial-unique index
 ///     (WHERE child_id IS NOT NULL), which SQLite cannot bind as a hard FK parent
 ///     key — so the reference is app-enforced (join: blocks WHERE child_id=?).
-///     ARCH §1.8.2 keeps sparse keyed by child_id (not hashed to block_id).
-///   - the §4.3 inline `INDEX idx_term_lookup` is a separate CREATE INDEX
+///     ARCH keeps sparse keyed by child_id (not hashed to block_id).
+///   - the inline `INDEX idx_term_lookup` is a separate CREATE INDEX
 ///     (SQLite has no inline table index).
 inline constexpr const char* kSparseInvertedIndexDdl = R"SQL(
 CREATE TABLE IF NOT EXISTS sparse_inverted_index (
@@ -39,12 +39,12 @@ CREATE INDEX IF NOT EXISTS idx_child_lookup
 ///     that was declared in store/parent_chunk_schema.h pre-A).
 /// Unlike the reranker (which owns no extra column), this Migrate(0→1) emits real DDL.
 ///
-/// Implements the frozen cortrix::catalog::ISchemaProvider (D2-pre-5); Migrate
-/// returns Status (F-FREEZE-1 / CODING_CONVENTIONS §3), runs inside the
+/// Implements the frozen cortrix::catalog::ISchemaProvider; Migrate
+/// returns Status (F-FREEZE-1 / the coding conventions), runs inside the
 /// SchemaMigrator's transaction.
 ///
-/// Standalone (D3): registering this with the live CatalogDb/Unit migrator at
-/// bootstrap is cross-Feature wiring → D3.5. SpladeSparseRetriever::Open()
+/// Standalone: registering this with the live CatalogDb/Unit migrator at
+/// bootstrap is cross-Feature wiring → integration. SpladeSparseRetriever::Open()
 /// creates the same table self-contained for standalone tests; this provider is
 /// the integrated, versioned path that runs against the Unit DB once wired.
 class SparseSchemaProvider : public cortrix::catalog::ISchemaProvider {
@@ -53,7 +53,7 @@ public:
     std::string FeatureName() const override { return "sparse_index"; }
 
     /// V1 = the sparse_inverted_index table + blocks.sparse_vec column. Phase 2
-    /// (IVF-sparse / sharding, §14) would bump this.
+    /// (IVF-sparse / sharding) would bump this.
     int CurrentVersion() const override { return 1; }
 
     /// from_ver 0 → 1: CREATE the sparse_inverted_index table + indexes AND ALTER

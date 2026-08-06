@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS interaction_sources (
     source_block_id TEXT NOT NULL,               -- -> blocks table
     source_type     VARCHAR(16),                 -- "block" / "memory" / "metadata"
     relevance_score REAL,
-    snippet         TEXT,                         -- §6 -- <=500 chars, keep first 400 + last 100
+    snippet         TEXT,                         -- -- <=500 chars, keep first 400 + last 100
 
     FOREIGN KEY (interaction_id) REFERENCES interaction_log(id) ON DELETE CASCADE
 );

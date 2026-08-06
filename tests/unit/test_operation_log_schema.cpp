@@ -110,7 +110,7 @@ TEST_F(OperationLogSchemaTest, TableExistsAndVersionRecorded) {
     EXPECT_EQ(m.CurrentVersion(db_, "operation_log"), kOplogSchemaVersion);
 }
 
-// DoD: the full §5.1 column set is present (10 columns).
+// DoD: the full column set is present (10 columns).
 TEST_F(OperationLogSchemaTest, AllColumnsPresent) {
     auto cols = TableColumns(db_, "operation_log");
     for (const char* c : {"id", "timestamp", "user_id", "action", "namespace_id",
@@ -121,7 +121,7 @@ TEST_F(OperationLogSchemaTest, AllColumnsPresent) {
     EXPECT_EQ(cols.size(), 10u);
 }
 
-// DoD: all 5 §5.1 indices exist.
+// DoD: all 5 indices exist.
 TEST_F(OperationLogSchemaTest, FiveIndicesExist) {
     auto idx = QueryTextSet(
         db_, "SELECT name FROM sqlite_master WHERE type='index' "

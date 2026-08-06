@@ -19,7 +19,7 @@ class ISchemaProvider;  // cortrix/catalog/schema_provider.h
 /// Provider ordering: the catalog is always registered first so the base
 /// tables its FK targets reference (units / tenants / namespaces) exist before
 /// downstream providers extend them. The
-/// caller passes the downstream providers in the ARCH §1.3.bis.3 topological
+/// caller passes the downstream providers in the ARCH topological
 /// order; the migrator runs them in that registration order, atomically.
 ///
 /// Scope so far: open + framework-schema init + multi-provider registration.

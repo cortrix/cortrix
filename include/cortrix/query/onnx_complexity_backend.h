@@ -6,7 +6,7 @@
 
 namespace cortrix::query {
 
-/// OnnxComplexityBackend — the D3.5 real DistilBERT inference backend behind
+/// OnnxComplexityBackend — the integration real DistilBERT inference backend behind
 /// QueryComplexityClassifier. It replaces the standalone
 /// HeuristicComplexityBackend behind the same IComplexityClassifierBackend
 /// interface, so QueryComplexityClassifier (and its rule-guard / force-route /

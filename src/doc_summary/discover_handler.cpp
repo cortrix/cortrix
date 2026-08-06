@@ -21,7 +21,7 @@ namespace cortrix::doc_summary {
 
 namespace {
 
-// Serialize one fused DocDiscoveryHit into the §6.1 result object. The llm_summary
+// Serialize one fused DocDiscoveryHit into the result object. The llm_summary
 // path carries the 4 structured fields; the fts5_fallback path carries the META fields.
 nlohmann::json HitToJson(const DocDiscoveryHit& h) {
     nlohmann::json j;
@@ -64,13 +64,13 @@ std::vector<DocDiscoveryHit> RecallDocSummaryHnsw(store::IIndex& index,
         CortrixBlock block;
         if (store.block_get(block_id, block) != 0) continue;
         if (block.block_type != kBlockDocSummary) continue;  // only doc_summary blocks
-        // Parse the §4.2 metadata_json column (keywords/topics/one_liner/status). A
+        // Parse the metadata_json column (keywords/topics/one_liner/status). A
         // failed/pending doc has no doc_summary block, so a present block is "generated";
         // we still gate on status defensively (skip anything not "generated").
         DocDiscoveryHit hit;
         hit.doc_id = block.doc_id;
         hit.via_path = "llm_summary";
-        hit.summary_text = block.content_text;  // §4.2: summary_text rides on content_text
+        hit.summary_text = block.content_text;  //: summary_text rides on content_text
         hit.match_score = 1.0f / (1.0f + distance);  // L2 distance → similarity (ordering only)
         if (!block.metadata_json.empty()) {
             try {
@@ -186,7 +186,7 @@ nlohmann::json ExecuteDocDiscovery(cortrix::resource::INamespacePool& pool,
     meta["coverage_ratio"] = 1.0;
     meta["warnings"] = warnings;
     if (explain) {
-        // C-class debug signal (§8.3): surface only when the fallback path actually
+        // C-class debug signal: surface only when the fallback path actually
         // contributed or faulted (i.e. it "ran"). fallback_docs_count = #docs that came
         // in via the fts5 path (present in fused with via_path == "fts5_fallback").
         int fallback_docs = 0;
@@ -221,7 +221,7 @@ void HandleDocumentsDiscover(const httplib::Request& req, httplib::Response& res
         return;
     }
 
-    // ?ns or ?namespace (required) — accept both spellings (§6.1 uses `ns`; the rest of
+    // ?ns or ?namespace (required) — accept both spellings (uses `ns`; the rest of
     // the documents surface uses `namespace`).
     std::string ns;
     if (req.has_param("ns")) ns = req.get_param_value("ns");

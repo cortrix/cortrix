@@ -1,8 +1,8 @@
 """S1 SQL contract self-check for pgcortrix--1.0.sql.
 
 The build machine has no PostgreSQL, so we cannot run pg_regress / a live server
-(that is deferred to D3.5). Instead this test parses the DDL text and asserts the
-SQL *contract* defined by the pgcortrix design §2.1: the 4 composite types with their
+(that is deferred to integration). Instead this test parses the DDL text and asserts the
+SQL *contract* defined by the pgcortrix design: the 4 composite types with their
 exact columns, the 5 main + 2 helper function signatures (name, ordered params
 with types + defaults, return type, volatility/parallel markers). It catches the
 kinds of drift a human review misses — a renamed column, a dropped DEFAULT, a
@@ -35,7 +35,7 @@ def _strip_line_comments(sql):
 
 
 class TestCompositeTypes(unittest.TestCase):
-    """§2.1.1 — 4 composite return types, exact column sets."""
+    """ — 4 composite return types, exact column sets."""
 
     # name -> ordered [(column, type)]. Types normalized to the spec spelling.
     EXPECTED = {
@@ -92,11 +92,11 @@ class TestCompositeTypes(unittest.TestCase):
                 got = self._parse_columns(self._type_body(name))
                 self.assertEqual(
                     got, expected,
-                    f"{name} columns drifted from pgcortrix §2.1.1 SoT")
+                    f"{name} columns drifted from pgcortrix SoT")
 
 
 class TestFunctionSignatures(unittest.TestCase):
-    """§2.1.2 / §2.1.3 — 5 main + 2 helper function signatures."""
+    """ — 5 main + 2 helper function signatures."""
 
     @classmethod
     def setUpClass(cls):
@@ -167,7 +167,7 @@ class TestFunctionSignatures(unittest.TestCase):
         # v1.0.2 5-param shape: namespace, user_id, filter, limit_n, offset_n.
         self.assertEqual(
             names, ["namespace", "user_id", "filter", "limit_n", "offset_n"])
-        # user_id mandatory (memory isolation D4): no DEFAULT on it; filter is optional.
+        # user_id mandatory (memory isolation): no DEFAULT on it; filter is optional.
         self.assertNotRegex(params, r"user_id\s+TEXT\s+DEFAULT")
         self.assertRegex(params, r"filter\s+JSONB\s+DEFAULT\s+NULL")
         self.assertIn("DEFAULT 50", params)

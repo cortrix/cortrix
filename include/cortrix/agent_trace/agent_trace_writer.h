@@ -13,8 +13,8 @@ namespace cortrix::agent_trace {
 /// One row written to the agent_trace table. The CE ops-view
 /// record of "what call did the Agent make, how long, why it failed" — the
 /// protocol-detail half of the three-track split (operation_log is the
-/// user-view track; §2.13 System Observability is the SRE track). status defaults
-/// to "success"; a failure sets status + error_code and (per §3) keeps only the
+/// user-view track; System Observability is the SRE track). status defaults
+/// to "success"; a failure sets status + error_code and (per) keeps only the
 /// error in result_summary.
 ///
 /// Boundary note: this is the public struct. A downstream extension writes
@@ -25,9 +25,9 @@ struct AgentTraceEntry {
     std::optional<std::string> session_id;
     std::optional<std::string> trace_id;
     std::optional<std::string> agent_id;
-    std::string method;                         ///< §4.1 — VARCHAR(64), NOT NULL
-    std::optional<std::string> params;          ///< ≤2KB JSON (caller truncates, §3)
-    std::optional<std::string> result_summary;  ///< ≤512 (caller truncates, §3)
+    std::string method;                         ///< — VARCHAR(64), NOT NULL
+    std::optional<std::string> params;          ///< ≤2KB JSON (caller truncates)
+    std::optional<std::string> result_summary;  ///< ≤512 (caller truncates)
     int duration_ms = 0;
     std::string source;                         ///< "http" | "mcp"
 
@@ -40,7 +40,7 @@ struct AgentTraceEntry {
 };
 
 /// Query filter for GET /api/v1/traces/{session_id}. Defaults match
-/// §8.1: limit 50 / cap 200, offset 0. The session_id is the path param (passed
+///: limit 50 / cap 200, offset 0. The session_id is the path param (passed
 /// to Query separately); these are the additional query-string dimensions.
 struct TraceFilter {
     std::optional<std::string> trace_id;
@@ -49,7 +49,7 @@ struct TraceFilter {
     std::optional<std::string> namespace_id;
     std::optional<int64_t> from_timestamp;      ///< Unix ms
     std::optional<int64_t> to_timestamp;
-    int limit = 50;                             ///< default 50 / cap 200 (§8.1)
+    int limit = 50;                             ///< default 50 / cap 200
     int offset = 0;
 };
 
@@ -75,7 +75,7 @@ struct TraceSession {
 /// MCP session handler / Cleanup Scheduler) depend on this interface via DI, never
 /// on the concrete class.
 ///
-/// Per CODING_CONVENTIONS §3 / F-FREEZE-1, Query returns Result<T> (no Result<T,E>);
+/// Per the coding conventions / F-FREEZE-1, Query returns Result<T> (no Result<T,E>);
 /// a domain error is carried as a Status whose message is prefixed with the
 /// CX_ERR_TRACE_* token (see agent_trace_error.h AgentTraceStatus), re-inflated to the full
 /// Agent-friendly body at the API boundary.
@@ -92,7 +92,7 @@ public:
                        const observability::TraceContext* ctx = nullptr) = 0;
 
     /// Query one session's traces with filter + pagination + permission scope
-    /// (§8.1). Returns an error Status (CX_ERR_TRACE_* token) on invalid filter /
+    ///. Returns an error Status (CX_ERR_TRACE_* token) on invalid filter /
     /// bad range / out-of-range pagination. The caller (handler) is responsible
     /// for the cross-user permission check (admin vs UNAUTHORIZED) before calling.
     virtual Result<TraceSession> Query(
@@ -113,7 +113,7 @@ public:
         int idle_threshold_seconds,
         const observability::TraceContext* ctx = nullptr) = 0;
 
-    /// Delete rows past the retention window (§10.1 — agent_trace_retention_days).
+    /// Delete rows past the retention window (agent_trace_retention_days).
     /// Invoked by the CleanupScheduler under an advisory lock (S10).
     virtual void Cleanup() = 0;
 };

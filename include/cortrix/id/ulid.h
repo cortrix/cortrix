@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <string>
 
-// ULID generation (ARCH § 1.8.1 — IDs are 26-char Crockford-base32 ULIDs:
+// ULID generation (ARCH — IDs are 26-char Crockford-base32 ULIDs:
 // 48-bit millisecond timestamp + 80-bit randomness, lexicographically sortable so
 // IDs are time-ordered). Scaffolding note: the id/ header previously only carried
 // the type aliases (id/types.h); the chunker is the first to mint IDs, so it adds

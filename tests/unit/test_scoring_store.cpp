@@ -58,7 +58,7 @@ TEST_F(ScoringStoreTest, OverwritesExistingScore) {
 }
 
 TEST_F(ScoringStoreTest, AnomalySentinelZeroIsPersisted) {
-    // D6: an anomalous block's 0.0 is a real value, distinct from NULL ("never scored").
+    //: an anomalous block's 0.0 is a real value, distinct from NULL ("never scored").
     ASSERT_TRUE(WriteScore(db_, 1, 0.0f).ok());
     EXPECT_DOUBLE_EQ(Score(1), 0.0);
 }

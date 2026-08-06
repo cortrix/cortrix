@@ -19,7 +19,7 @@ import { ProgrammaticBanner } from '../../components/Common/ProgrammaticBanner';
 import { ErrorDisplay } from '../../components/Common/ErrorDisplay';
 import { UserFormModal, type UserFormValues } from './UserFormModal';
 
-// UsersPage (web UI design § 9-bis.1 — Day-2 admin, CE). Integrates the auth
+// UsersPage (web UI design — Day-2 admin, CE). Integrates the auth
 // admin/users 5-endpoint set (list / create / update / disable / enable) via
 // TanStack Query. Note (web UI): there is NO hard delete — the
 // disable+enable pair is the lifecycle, so disabled users are retained. Access

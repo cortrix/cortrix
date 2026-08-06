@@ -59,7 +59,7 @@ struct WalEntry {
     /// Used by the EOF-order recovery scan (S4) reading back-to-back records. On
     /// a short/corrupt record `*offset` is left unchanged and
     /// CX_ERR_PHNSW_WAL_CORRUPTED is returned (caller truncates the tail — design
-    /// § 5 "WAL Entry: on CRC failure, truncate to the last valid entry").
+    /// "WAL Entry: on CRC failure, truncate to the last valid entry").
     static Result<WalEntry> DeserializeFrom(const uint8_t* data, size_t size,
                                             size_t* offset, int expected_dim = 0);
 };

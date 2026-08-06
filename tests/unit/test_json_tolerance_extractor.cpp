@@ -6,7 +6,7 @@
 //   2. If still discarded / not array  -> Result error (MemoryExtractStatus,
 //      kExtractInvalidOutput, message carries "CX_ERR_MEMEXTRACT_INVALID_OUTPUT").
 //   3. Each element must be an object with a string "content", else error.
-//      type missing/unknown -> kEvent (D4 fallback). confidence clamped [0,1].
+//      type missing/unknown -> kEvent (fallback). confidence clamped [0,1].
 //
 // Documented tolerance therefore PARSES: clean array, ```json fenced array, bare
 // ``` fenced array, object-wrapped {"memories":[...]}, prose-surrounded array,

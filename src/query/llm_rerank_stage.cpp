@@ -22,7 +22,7 @@ std::string ToLower(std::string s) {
 
 // The zh / en listwise-rerank prompt templates. {N}, {suffix},
 // {query}, {passages} are substituted by BuildPrompt. Same LLM01 defense as rag-fusion
-// §4.2: random-suffix delimiter + ignore-instructions rule + strict JSON schema.
+//: random-suffix delimiter + ignore-instructions rule + strict JSON schema.
 // kListwisePromptZh is functional engine data (multilingual support) — its
 // Chinese body is intentional; the English form is kListwisePromptEn.
 constexpr const char* kListwisePromptZh =
@@ -249,7 +249,7 @@ bool LlmRerankStage::ParseRankingJson(const std::string& llm_content, std::size_
     const nlohmann::json& ranking = j["ranking"];
     if (!ranking.is_array()) return fail("'ranking' is not an array");
 
-    // §3.5.3 tolerant entry decoding: integer / string carrying an integer
+    // tolerant entry decoding: integer / string carrying an integer
     // ("3", "[3]", "3.", "passage 3") / object with an index-ish integer key.
     auto first_int_in_string = [](const std::string& s) -> long long {
         std::size_t i = 0;
@@ -343,7 +343,7 @@ LlmRerankStage::ExplainState LlmRerankStage::Apply(CrossNsResponse* resp,
     std::vector<std::size_t> position(n);
     for (std::size_t i = 0; i < n; ++i) position[i] = i;
 
-    // §3.5.2 bottom-up sliding windows over [0, n): the LAST window starts at 0.
+    // bottom-up sliding windows over [0, n): the LAST window starts at 0.
     std::vector<std::size_t> window_starts;
     {
         const std::size_t w = static_cast<std::size_t>(kLlmRerankWindowSize);
@@ -423,7 +423,7 @@ LlmRerankStage::ExplainState LlmRerankStage::Apply(CrossNsResponse* resp,
         }
 
         if (window_votes == 0) {
-            // §2.4: no usable vote for this window → whole stage degrades and the
+            //: no usable vote for this window → whole stage degrades and the
             // response keeps its pre-stage order (never a partially-LLM order).
             es.degraded = true;
             es.degrade_reason =
@@ -465,7 +465,7 @@ LlmRerankStage::ExplainState LlmRerankStage::Apply(CrossNsResponse* resp,
 
     // Rewrite head scores to a strictly decreasing rank score above the tail's
     // max, so "sorted by score desc" holds across head + tail. The
-    // cross-encoder score stays in rerank_score untouched (§2.3 traceability).
+    // cross-encoder score stays in rerank_score untouched (traceability).
     float tail_max = 0.0f;
     for (std::size_t i = n; i < resp->results.size(); ++i) {
         tail_max = std::max(tail_max, resp->results[i].score);

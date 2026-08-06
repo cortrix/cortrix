@@ -52,14 +52,14 @@ TEST(SipHash24Test, PaperAppendixVector) {
 }
 
 // Stability is the whole point: the same (key, input) must yield the same output on
-// every call, so block_id = SipHash24(ulid) survives process restarts (ARCH §1.8.2).
+// every call, so block_id = SipHash24(ulid) survives process restarts (ARCH).
 TEST(SipHash24Test, DeterministicAcrossCalls) {
     const std::string ulid = "01HQ8Z9K7M3N5P7R9T1V3W5X7Y";  // 26-char ULID shape
     EXPECT_EQ(SipHash24(ulid.data(), ulid.size(), kK0, kK1),
               SipHash24(ulid.data(), ulid.size(), kK0, kK1));
 }
 
-// A different per-deployment key yields a different mapping (key isolation, §1.8.2 V4).
+// A different per-deployment key yields a different mapping (key isolation, V4).
 TEST(SipHash24Test, KeyDependent) {
     const std::string ulid = "01HQ8Z9K7M3N5P7R9T1V3W5X7Y";
     EXPECT_NE(SipHash24(ulid.data(), ulid.size(), kK0, kK1),

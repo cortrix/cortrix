@@ -11,7 +11,7 @@ namespace cortrix::ml {
 /// Thread-safety: lazily initialized exactly once via std::call_once on first
 /// EnvHandle()/Init() call ("std::call_once guarantees one-time initialization").
 ///
-/// Standalone (D3): no real model needed to construct the Env — Ort::Env is just
+/// Standalone: no real model needed to construct the Env — Ort::Env is just
 /// the logging/threadpool context, so this is fully testable in-process. The
 /// concrete Ort::Env type stays out of this header (opaque void*), mirroring the
 /// in-tree OnnxEmbedder pattern, so non-ONNX translation units can include it.

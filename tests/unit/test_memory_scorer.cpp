@@ -1,5 +1,5 @@
 // Memory decay unit tests — MemoryScorer (classified decay scoring).
-// Covers design § 6 unit-test matrix (~24 cases) plus extra boundary coverage
+// Covers design unit-test matrix (~24 cases) plus extra boundary coverage
 // to meet line >= 95% / branch >= 80% targets. Pure-compute, no I/O / mocks.
 #include <gtest/gtest.h>
 
@@ -347,7 +347,7 @@ TEST(MemoryScorerRank, DefaultIncludeInvalidatedIsFalse) {
 }
 
 // ---------------------------------------------------------------------------
-// D3 lock: unknown memory_type emits a WARN containing "Unknown memory_type"
+// lock: unknown memory_type emits a WARN containing "Unknown memory_type"
 // ---------------------------------------------------------------------------
 
 TEST(MemoryScorerLog, UnknownType_LogsWarn) {

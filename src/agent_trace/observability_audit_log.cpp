@@ -32,7 +32,7 @@ std::string ObservabilityAuditLog::BuildLine(const std::string& admin_user_id,
                                              Endpoint endpoint,
                                              int64_t timestamp_ms) {
     nlohmann::json j;
-    j["event"] = "admin_cross_user_access";  // §12 forensics marker
+    j["event"] = "admin_cross_user_access";  // forensics marker
     j["level"] = "warn";
     j["admin_user_id"] = admin_user_id;
     j["target_user_id"] = target_user_id;

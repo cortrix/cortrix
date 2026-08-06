@@ -154,7 +154,7 @@ TEST(SparseIndexRegistryTest, GetOrOpen_ReAddReplaces_ViaRegistry) {
     EXPECT_EQ(hits[0].child_id, "ch");
 }
 
-// Empty SparseVector Add removes the child's postings (dead-chunk §6.5 path).
+// Empty SparseVector Add removes the child's postings (dead-chunk path).
 TEST(SparseIndexRegistryTest, GetOrOpen_AddEmpty_RemovesPostings) {
     SparseIndexRegistry reg("", SpladeConfig{});
     ISparseRetriever* r = reg.GetOrOpen("ns-dead");

@@ -6,7 +6,7 @@
 
 // MET-12 coverage: the 6 cortrix_ns_pool_* metrics — gauges/counters/
 // histograms recording + the OpenMetrics renderer + label-enum discipline
-// (OBS_SPEC §3.2 no high-cardinality labels; the namespace_id lives only in the
+// (OBS_SPEC no high-cardinality labels; the namespace_id lives only in the
 // explain/stats API JSON, never a metric label).
 namespace cortrix::resource {
 namespace {
@@ -106,7 +106,7 @@ TEST_F(NsPoolMetricsTest, NsLoadDurationHistogramBucketsAreCumulativeAndComplete
 }
 
 TEST_F(NsPoolMetricsTest, RenderHasNoHighCardinalityLabels) {
-    // OBS_SPEC §3.2 / namespace pool: no namespace / unit_id / tenant_id labels.
+    // OBS_SPEC / namespace pool: no namespace / unit_id / tenant_id labels.
     M().SetSize(1);
     M().RecordRejectedCreate(RejectReason::kNsCountExceeded);
     std::string out = M().RenderOpenMetrics();

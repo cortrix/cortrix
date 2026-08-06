@@ -10,7 +10,7 @@ namespace cortrix::doc_summary {
 
 /// The 4 structured fields the LLM produces (metadata_json).
 struct DocSummaryStructured {
-    std::string summary_text;            ///< 200-500 chars (the §4.2 main embedding field)
+    std::string summary_text;            ///< 200-500 chars (the main embedding field)
     std::vector<std::string> keywords;   ///< 3-8 keywords/phrases (Agent direct-read)
     std::vector<std::string> topics;     ///< 1-3 topic categories (Agent direct-read)
     std::string one_liner;               ///< <= 50 chars (UI display)
@@ -21,7 +21,7 @@ struct DocSummaryStructured {
 struct GenerationResult {
     bool success = false;
     DocSummaryStructured summary;
-    std::vector<float> embedding;        ///< BGE-M3 1024-dim (empty standalone → D3.5 pipeline)
+    std::vector<float> embedding;        ///< BGE-M3 1024-dim (empty standalone → integration pipeline)
     std::optional<agent_friendly::AgentFriendlyError> error;
     bool is_chunked = false;             ///< true when the map-reduce path ran (long doc)
     bool no_summary_content = false;     ///< true when the doc exists but has no chunks to summarize

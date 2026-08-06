@@ -23,9 +23,9 @@ std::shared_ptr<llm::ILlmClient> MakeClient(const EnricherConfig& config) {
     return std::make_shared<llm::OpenAiLlmClient>(std::move(client_cfg));
 }
 
-// Map the startup check to the §4.4 fallback metric + record it, then return the
+// Map the startup check to the fallback metric + record it, then return the
 // NullEnricher (scenarios 2 & 3). The actual LOG_WARN is emitted by the caller
-// at server bootstrap (D3.5 wiring); the metric is recorded here so it is
+// at server bootstrap (integration wiring); the metric is recorded here so it is
 // observable + unit-testable now.
 std::unique_ptr<ISpcEnricher> FallbackNull(StartupCheck check) {
     auto& m = EnricherMetrics::Instance();
@@ -47,7 +47,7 @@ EnricherErrorMeta EnricherErrorMeta::FromCode(EnricherErrorCode code, std::strin
     EnricherErrorMeta meta;
     meta.retryable = info.retryable;
     meta.category = info.category;
-    // -1 sentinel == N/A (design §2.5b: "0 / -1 = N/A"); registry null → -1.
+    // -1 sentinel == N/A (design: "0 / -1 = N/A"); registry null → -1.
     meta.retry_after_ms = info.retry_after_ms.value_or(-1);
     meta.structured_data = std::move(data);
     return meta;
@@ -91,7 +91,7 @@ std::unique_ptr<ISpcEnricher> CreateEnricher(const EnricherConfig& config,
     if (config.type != EnricherType::kLlm || !config.enabled) {
         return std::make_unique<NullEnricher>();
     }
-    // §4.1 startup validation (topic 3.6): api_key check → endpoint probe.
+    // startup validation (topic 3.6): api_key check → endpoint probe.
     StartupCheck check = StartupValidate(config, probe_transport);
     if (check != StartupCheck::kOk) {
         return FallbackNull(check);  // scenario 2 / 3 fallback + metric

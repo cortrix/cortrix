@@ -33,13 +33,13 @@ size_t SerializedSparseVecSize(const SparseVector& vec) {
 
 std::vector<uint8_t> SerializeSparseVec(const SparseVector& vec, bool* ok) {
     std::vector<uint8_t> out;
-    // num_terms is uint16 (§4.2); a vector with > 65535 active terms cannot be
+    // num_terms is uint16; a vector with > 65535 active terms cannot be
     // represented — that never happens after top-K (K≤200) but guard anyway.
     if (vec.terms.size() > 0xFFFFu) {
         if (ok) *ok = false;
         return out;
     }
-    // term_id is uint16 (§4.2). The standalone stub keeps ids in range; reject an
+    // term_id is uint16. The standalone stub keeps ids in range; reject an
     // out-of-range id rather than truncate it (a silent truncation would corrupt
     // the inverted index). Real 250K-vocab ids = Phase 2 wider encoding.
     for (const auto& [term_id, weight] : vec.terms) {

@@ -14,7 +14,7 @@ namespace {
 // without a row" into a build failure, so the registry can't drift from the enum.
 //
 // The 3 admission codes reuse the same CX_ERR_NS_* strings + attributes that
-// catalog_error.cpp registers (shared NS semantic domain, §8.1 m4) — they are
+// catalog_error.cpp registers (shared NS semantic domain, m4) — they are
 // the same wire identities, seen from the pool side.
 constexpr PoolErrorInfo kNsQuotaExceeded     {"CX_ERR_NS_QUOTA_EXCEEDED",           ErrorCategory::kQuota,     false, std::nullopt};
 constexpr PoolErrorInfo kNsResourceBudget    {"CX_ERR_NS_RESOURCE_BUDGET_EXCEEDED", ErrorCategory::kQuota,     false, std::nullopt};

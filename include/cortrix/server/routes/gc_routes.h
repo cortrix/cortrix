@@ -11,7 +11,7 @@ class GcManager;
 class DocumentGcSweeper;
 }
 
-/// Register the OPEN-2 GC + maintenance ops routes (ARCH §5.x, api/paths/ops.yaml).
+/// Register the OPEN-2 GC + maintenance ops routes (ARCH, api/paths/ops.yaml).
 /// All endpoints are mounted under /api/v1 and require the ops:admin scope
 /// (kPermAdmin); the destructive ones additionally require X-Ops-Confirm: true.
 ///

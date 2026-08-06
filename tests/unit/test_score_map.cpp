@@ -5,7 +5,7 @@
 #include "cortrix/scoring/score_map.h"
 #include "cortrix/scoring/scoring_error.h"
 
-// Semantic score S1 + S2 / §7.1 coverage: ScoreMap.ComputeLevel (D2 Matrix multi-dimensional decision, 8 cases) +
+// Semantic score S1 + S2 / coverage: ScoreMap.ComputeLevel (Matrix multi-dimensional decision, 8 cases) +
 // LevelToScore (5 discrete levels + out-of-range exception). The core scoring algorithm.
 namespace cortrix::scoring {
 namespace {
@@ -63,7 +63,7 @@ TEST(ScoreMapComputeLevelTest, MetaBlockSpecialCaseForcesLevel0) {
     EXPECT_NE(ScoreMap::ComputeLevel(Input("docling", "llm", true, kBlockFile)), 0);
 }
 
-// ComputeLevel output is always in [0,4] (D3 strict 5 discrete levels — never out of range).
+// ComputeLevel output is always in [0,4] (strict 5 discrete levels — never out of range).
 TEST(ScoreMapComputeLevelTest, OutputAlwaysInRange) {
     for (uint16_t bt : {kBlockFile, kBlockScan, kBlockMeta, kBlockImage}) {
         for (const char* p : {"docling", "paddleocr", "docling+paddleocr", "", "x"}) {
@@ -111,7 +111,7 @@ TEST(ScoreMapLevelToScoreTest, OutOfRangeThrowsLevelInvalid) {
     EXPECT_THROW(ScoreMap::LevelToScore(255), agent_friendly::AgentFriendlyException);
 }
 
-// The static array is exactly the ARCH §5.1.2 SoT table.
+// The static array is exactly the ARCH SoT table.
 TEST(ScoreMapLevelToScoreTest, KLevelScoreTableMatchesArchSoT) {
     EXPECT_FLOAT_EQ(ScoreMap::kLevelScore[0], 0.2f);
     EXPECT_FLOAT_EQ(ScoreMap::kLevelScore[4], 1.0f);

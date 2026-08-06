@@ -9,7 +9,7 @@
 #include "cortrix/retrieval/cross_ns_types.h"
 
 // S2.5 + S3.1 surface coverage: CrossNsResponse / CrossNsMeta JSON schema
-// compliance (§2.5) — ResultItem uses child_id:string (V5 decision #6A, NOT block_id:int)
+// compliance — ResultItem uses child_id:string (V5 decision #6A, NOT block_id:int)
 // + the GEN-Agent Agent-friendly response shape.
 namespace cortrix::query {
 namespace {
@@ -29,7 +29,7 @@ retrieval::ResultItem MakeItem(const std::string& child, const std::string& ns, 
 }
 
 // ResultItem serializes with child_id/parent_id as STRINGS (ULID), not an int
-// block_id (§2.5 v1.0.3 — JS number-precision safe).
+// block_id (v1.0.3 — JS number-precision safe).
 TEST(CrossNsResponseTest, ResultItemUsesStringChildId) {
     CrossNsResponse resp;
     resp.results.push_back(MakeItem("01HXYZ", "ns_a", 0.9f));
@@ -41,8 +41,8 @@ TEST(CrossNsResponseTest, ResultItemUsesStringChildId) {
     EXPECT_TRUE(item["child_id"].is_string());
     EXPECT_EQ(item["child_id"], "01HXYZ");
     EXPECT_TRUE(item["parent_id"].is_string());
-    EXPECT_FALSE(item.contains("block_id"));  // §2.5: block_id:int was DELETED
-    // §2.5 field set
+    EXPECT_FALSE(item.contains("block_id"));  //: block_id:int was DELETED
+    // field set
     for (const char* key : {"child_id", "parent_id", "content", "parent_content", "score",
                             "rerank_score", "namespace", "content_hash", "metadata"}) {
         EXPECT_TRUE(item.contains(key)) << "missing result field: " << key;
@@ -66,7 +66,7 @@ TEST(CrossNsResponseTest, ResultItemSerializesScoreSignalsWhenPresent) {
     EXPECT_FLOAT_EQ(signals["semantic_score"].get<float>(), 1.0f);
 }
 
-// meta serializes exactly the 8 A/C-class fields (§2.5 / Issue 3.5 v1.0.2).
+// meta serializes exactly the 8 A/C-class fields (/ Issue 3.5 v1.0.2).
 TEST(CrossNsResponseTest, MetaSerializesExactlyEightFields) {
     CrossNsMeta meta;
     meta.namespaces_queried = {"ns_a", "ns_b"};
@@ -85,7 +85,7 @@ TEST(CrossNsResponseTest, MetaSerializesExactlyEightFields) {
     EXPECT_EQ(j["deduplicated_chunks_count"], 0);
 }
 
-// A namespaces_failed[] entry carries the full GEN-Agent 4 field (§2.5 / 2.7).
+// A namespaces_failed[] entry carries the full GEN-Agent 4 field.
 TEST(CrossNsResponseTest, FailedNamespaceEntryIsAgentFriendly) {
     CrossNsMeta meta;
     NamespaceFailure f;
@@ -164,7 +164,7 @@ TEST(CrossNsResponseTest, NonRetryableFailureHasNullRetryAfterMs) {
     EXPECT_TRUE(j["namespaces_failed"][0]["retry_after_ms"].is_null());
 }
 
-// deduplicated_chunks[] entry shape (§2.5 / §3.3 B-simplified multi-source).
+// deduplicated_chunks[] entry shape (B-simplified multi-source).
 TEST(CrossNsResponseTest, DeduplicatedChunkEntryShape) {
     CrossNsMeta meta;
     DeduplicatedChunkInfo d;
@@ -187,7 +187,7 @@ TEST(CrossNsResponseTest, DeduplicatedChunkEntryShape) {
 }
 
 // The scatter-timeout partial response serializes a top-level error block alongside
-// results + meta (§2.5 — HTTP 200 + partial + error).
+// results + meta (HTTP 200 + partial + error).
 TEST(CrossNsResponseTest, ScatterTimeoutSerializesErrorBlock) {
     CrossNsResponse resp;
     resp.results.push_back(MakeItem("c0", "ns_a", 0.9f));
@@ -201,7 +201,7 @@ TEST(CrossNsResponseTest, ScatterTimeoutSerializesErrorBlock) {
     EXPECT_FALSE(j["results"].empty());  // partial results still present
 }
 
-// ToResultItem maps RankedChunk → ResultItem (RETRIEVAL_TYPES_SPEC §1-bis).
+// ToResultItem maps RankedChunk → ResultItem (the retrieval-types spec).
 TEST(CrossNsResponseTest, ToResultItemMapsRankedChunk) {
     retrieval::RankedChunk rc;
     rc.child_id = "c1";

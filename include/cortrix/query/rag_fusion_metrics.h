@@ -15,19 +15,19 @@ namespace cortrix::query {
 ///
 /// 🚨 Cardinality control: labels are
 /// enum-only. NO `tenant_id` / `ns_id` / `user_id` (high-cardinality, forbidden);
-/// per-NS / per-tenant data goes through the §3.4 per-tenant API. The model label
-/// is a low-cardinality enum (< 50, provider × mainstream model — §8 Phase 2
+/// per-NS / per-tenant data goes through the per-tenant API. The model label
+/// is a low-cardinality enum (< 50, provider × mainstream model — Phase 2
 /// re-review anchor) but represented as a free string here because models are
 /// config-driven; the test `Metrics_RagFusionDegradedTotal_LabelEnum` (UT 21)
 /// asserts no high-cardinality label string ever appears.
 ///
-/// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
+/// 🚨 standalone: a self-contained, dependency-free recorder + an OpenMetrics
 /// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
-/// **deferred to D3.5**. Until then it is fully usable + testable in-process and
+/// **deferred to integration**. Until then it is fully usable + testable in-process and
 /// RenderOpenMetrics() produces what the server will serve.
 ///
-/// §8 metric schema (6 rows):
+/// metric schema (6 rows):
 ///   cortrix_rag_fusion_invocation_total          counter   {result}
 ///   cortrix_rag_fusion_variant_count             histogram {strategy}
 ///   cortrix_rag_fusion_llm_latency_seconds       histogram {model}
@@ -36,7 +36,7 @@ namespace cortrix::query {
 ///   cortrix_rag_fusion_rrf_fusion_duration_seconds histogram (no labels)
 class RagFusionMetrics {
 public:
-    /// result label for invocation_total (§8). `success` = variants generated;
+    /// result label for invocation_total. `success` = variants generated;
     /// `degraded` = LLM failed → single-query fallback; `disabled` = NS disabled /
     /// skipped (no LLM call).
     enum class Result {
@@ -45,7 +45,7 @@ public:
         kDisabled,
     };
 
-    /// reason label for degraded_total (§8) — the §7 degrade causes.
+    /// reason label for degraded_total — the degrade causes.
     enum class DegradeReason {
         kLlmTimeout = 0,
         kCircuitOpen,
@@ -56,7 +56,7 @@ public:
         kOther,
     };
 
-    /// direction label for token_total (§8).
+    /// direction label for token_total.
     enum class TokenDirection {
         kInput = 0,
         kOutput,
@@ -72,7 +72,7 @@ public:
     // --- cortrix_rag_fusion_variant_count (Histogram, label: strategy) ---
     // Observes, per strategy, the number of variants actually produced for that
     // strategy on one query (degraded → 0). Tracks per-strategy `le` buckets
-    // {1,2,3,5,10} (count-type, §topic-1 N=3 default, NS-adjustable [1-10]) + sum + count.
+    // {1,2,3,5,10} (count-type, N=3 default, NS-adjustable [1-10]) + sum + count.
     void ObserveVariantCount(VariantStrategy strategy, int count);
     uint64_t VariantCountSum(VariantStrategy strategy) const;
     uint64_t VariantCountObservations(VariantStrategy strategy) const;
@@ -82,8 +82,8 @@ public:
 
     // --- cortrix_rag_fusion_llm_latency_seconds (Histogram, label: model) ---
     // Observes the LLM variant-generation latency for `model` (a low-cardinality
-    // enum string, §8). Tracks per-model `le` buckets {0.1,0.25,0.5,1,2,5,10,30}s
-    // (generic duration set; §4.2 timeout_ms default 5000, typical ~500ms) +
+    // enum string). Tracks per-model `le` buckets {0.1,0.25,0.5,1,2,5,10,30}s
+    // (generic duration set; timeout_ms default 5000, typical ~500ms) +
     // sum_ms + count (rendered as seconds).
     void ObserveLlmLatency(const std::string& model, int latency_ms);
 
@@ -119,7 +119,7 @@ private:
     static constexpr int kStrategyCount = 3;     // paraphrase / subquery / reverse
     static constexpr int kDirectionCount = 2;    // input / output
     // Per-model latency: a tiny fixed-size table keyed by model name (low
-    // cardinality, §8 < 50). Models seen beyond the table size fold into a shared
+    // cardinality, < 50). Models seen beyond the table size fold into a shared
     // "other" bucket so the recorder stays allocation-free + bounded.
     static constexpr int kModelSlots = 8;
     // histogram `le` bucket counts (finite bounds; each array carries one extra

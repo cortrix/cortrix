@@ -11,11 +11,11 @@ namespace cortrix::query {
 /// to the fused-candidate stage" (Vector+BM25 → RRF), i.e. everything
 /// SingleUnitExecutor needs *before* the reranker step.
 ///
-/// 🚨 D3 standalone: SingleUnitExecutor is written against THIS interface, not
+/// 🚨 standalone: SingleUnitExecutor is written against THIS interface, not
 /// against the concrete MVP classes (VectorSearcher / BM25Searcher / RRFFusion,
 /// which are bound to live per-NS CortrixVectorIndex / CortrixStore instances).
 /// Adapting this interface onto the real MVP pipeline (and wiring per-NS index/
-/// store handles) is **D3.5 integration** — flagged, not done here. Unit tests
+/// store handles) is **integration** — flagged, not done here. Unit tests
 /// drive a mock of this interface; the CRAG and RAG-Fusion stages can also reuse it.
 ///
 /// Output is `retrieval::ScoredResult[]` (child_id + fused score) — exactly the

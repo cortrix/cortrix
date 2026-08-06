@@ -20,16 +20,16 @@ struct CragBackendResult {
 /// stale name — no such type exists in the frozen tree (onnx/ only exposes the
 /// static cortrix::onnx::Runtime version/opset introspector; the reranker holds its own raw
 /// Ort::Session). Per the C-R1 briefing the real DistilBERT-tiny inference is
-/// D3.5-deferred and standalone uses a heuristic-guard stub. So CragEvaluator
+/// integration-deferred and standalone uses a heuristic-guard stub. So CragEvaluator
 /// depends on THIS small interface instead of a non-existent ONNX session:
 ///   - HeuristicGuardBackend (this round): no ONNX dependency, fully testable.
-///   - OnnxCragBackend (D3.5): real DistilBERT-tiny via cortrix::onnx::Runtime.
+///   - OnnxCragBackend (integration): real DistilBERT-tiny via cortrix::onnx::Runtime.
 /// The interface keeps CragEvaluator's API stable across that swap.
 class ICragClassifierBackend {
 public:
     virtual ~ICragClassifierBackend() = default;
 
-    /// Infer a verdict from the query, the top-1 chunk text (§6.2 uses only
+    /// Infer a verdict from the query, the top-1 chunk text (uses only
     /// chunks[0].chunk_text as the model's text input), and the precomputed
     /// multi-signal feature map (top1 / median / std / high_score_ratio / ...).
     /// Must be total: a backend fault is signalled by throwing CragInferenceError

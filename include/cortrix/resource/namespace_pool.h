@@ -26,14 +26,14 @@ namespace cortrix::resource {
 // ── Stats / report value types ───────────────────────────────────
 
 /// Rejected-create counters, nested to mirror the admin API JSON 1:1
-/// (`rejected_creates_total.{ns_count_exceeded, memory_exceeded}`, §8.2) so the
-/// C++ → JSON serialization needs no field-name mapping (§3.2 v1.0.1 m6).
+/// (`rejected_creates_total.{ns_count_exceeded, memory_exceeded}`) so the
+/// C++ → JSON serialization needs no field-name mapping (v1.0.1 m6).
 struct RejectedCreatesTotal {
     size_t ns_count_exceeded = 0;
     size_t memory_exceeded = 0;
 };
 
-/// A-class fields (topic 6 default-exposed): admin API + Prometheus metric (§9).
+/// A-class fields (topic 6 default-exposed): admin API + Prometheus metric.
 struct PoolStats {
     size_t pool_size_current = 0;
     size_t pool_size_max = 0;
@@ -44,8 +44,8 @@ struct PoolStats {
 };
 
 /// One admission rejection, kept in the recent-rejections ring buffer (C class,
-/// §3.2 / §8.2 explain endpoint). `reason` is "ns_count_exceeded" or
-/// "memory_exceeded" — the enumerable values from RejectedCreatesTotal (§10.1).
+/// explain endpoint). `reason` is "ns_count_exceeded" or
+/// "memory_exceeded" — the enumerable values from RejectedCreatesTotal.
 struct RejectionEvent {
     int64_t timestamp_ms = 0;
     std::string namespace_id;
@@ -64,7 +64,7 @@ struct StartupReport {
     int64_t total_duration_ms = 0;
 };
 
-/// C-class debug snapshot (topic 6, only `/api/v1/system/pool/explain`, §8.2).
+/// C-class debug snapshot (topic 6, only `/api/v1/system/pool/explain`).
 struct ExplainState {
     std::vector<std::string> active_namespaces;
     size_t memory_estimate_bytes = 0;
@@ -76,7 +76,7 @@ struct ExplainState {
 /// pool calls it during load with the NS's data_dir + tuning AND the three stores
 /// the coordinator's Recover() needs — the pool resolves these in
 /// LoadOneNamespaceInner (vector = the Unit's index cast to IVectorStore; metadata
-/// + blob = the two narrow recover adapters the pool self-constructs, §9.2). The
+/// + blob = the two narrow recover adapters the pool self-constructs). The
 /// factory news the WriteCoordinator over them and Init()s it; injecting it (vs
 /// newing directly) keeps the pool testable with a stub coordinator. Returns a
 /// Result so a construction/Init failure maps to CX_ERR_NS_LOAD_FAILED.
@@ -94,7 +94,7 @@ using WriteCoordinatorFactory =
 /// (index / WriteCoordinator / store.db) with NS-count + memory-budget admission
 /// control. Phase 1: all-hot, no eviction (eviction is Phase 2).
 ///
-/// Error model (CODING_CONVENTIONS §3 / F-FREEZE-1): the spec's
+/// Error model (the coding conventions / F-FREEZE-1): the spec's
 /// `Result<…, PoolError>` is read as Result<T> (value path) or plain Status
 /// (void path). Every error Status carries a CX_ERR_NS_* token (PoolStatus());
 /// the API/SDK boundary re-inflates the Agent-friendly body via MakePoolError().
@@ -108,7 +108,7 @@ public:
     /// (if enabled), then loads the new NS into the pool. On success the NS is
     /// resident and Acquire will hit. Errors (as Status w/ CX_ERR_NS_* token):
     /// CX_ERR_NS_QUOTA_EXCEEDED / CX_ERR_NS_RESOURCE_BUDGET_EXCEEDED /
-    /// CX_ERR_NS_LOAD_FAILED. Wiring this into the real INSRouter is D3.5.
+    /// CX_ERR_NS_LOAD_FAILED. Wiring this into the real INSRouter is integration.
     virtual Status AdmitCreate(const std::string& namespace_id,
                                size_t estimated_size_bytes) = 0;
 
@@ -127,17 +127,17 @@ public:
     /// Drop the reference taken by a paired Acquire. If this was the last reference
     /// AND the NS is marked pending_delete (a DeleteNamespace raced an in-flight
     /// borrow), this call reaps the slot — releasing index / WriteCoordinator /
-    /// store.db. (Phase 2 extends this seam with full drain/grace, §14
+    /// store.db. (Phase 2 extends this seam with full drain/grace,
     /// eviction lands in Phase 2.) Calling Release for a non-resident NS is a safe no-op.
     virtual void Release(const std::string& namespace_id) = 0;
 
     // —— Startup path ——
-    /// Eager-load every NS in the catalog at startup, 8 workers concurrent (§6).
+    /// Eager-load every NS in the catalog at startup, 8 workers concurrent.
     /// Partial failure is reported in the StartupReport (failed_namespaces) rather
     /// than aborting startup; failed NS are retried via ReloadNamespace.
     virtual Result<StartupReport> StartupLoadAll() = 0;
 
-    /// Admin retry of a NS that failed to load (post-startup, §8.3.3). Status
+    /// Admin retry of a NS that failed to load (post-startup). Status
     /// error: CX_ERR_NS_LOAD_FAILED if it still cannot be loaded.
     virtual Status ReloadNamespace(const std::string& namespace_id) = 0;
 
@@ -161,7 +161,7 @@ public:
 // ── DefaultNamespacePool ──────────────────────────────────────────
 
 /// One resident NS slot: the resource bundle plus the minimal Phase-1 lifecycle
-/// gate that makes the §13.1 DeleteNamespace → EvictForDelete path safe against an
+/// gate that makes the DeleteNamespace → EvictForDelete path safe against an
 /// in-flight Acquire. `Acquire` hands out `&bundle` as a borrowed raw pointer that
 /// a NamespaceFacade holds across a whole request; an unguarded EvictForDelete
 /// erase would invalidate that pointer → UAF. So Acquire ++refcount, Release
@@ -203,7 +203,7 @@ public:
     /// @param ns_router            borrowed NS router (catalog NS list / lookup)
     /// @param unit_router          borrowed Unit router (active Unit descriptor)
     /// @param config               global pool config (standalone passes it
-    ///                             directly — the IGlobalConfig getter is D3.5)
+    ///                             directly — the IGlobalConfig getter is integration)
     DefaultNamespacePool(cortrix::store::IIndexFactory* index_factory,
                          WriteCoordinatorFactory write_coord_factory,
                          cortrix::catalog::INSRouter* ns_router,
@@ -225,7 +225,7 @@ private:
     size_t CurrentMemoryUsedLocked() const;
 
     // Snapshot the resident pool under a shared lock and push size +
-    // memory_budget_used to the §10.1 ns_pool gauges. Caller must NOT already hold
+    // memory_budget_used to the ns_pool gauges. Caller must NOT already hold
     // pool_mutex_ (takes a shared lock itself).
     void RefreshPoolGauges() const;
 
@@ -239,7 +239,7 @@ private:
     // CX_ERR_NS_LOAD_FAILED Status. Does not take pool_mutex_.
     Result<NamespaceResourceBundle> LoadOneNamespaceInner(const std::string& ns_id);
 
-    // Timeout-guarded wrapper around LoadOneNamespaceInner (§6.3 C1 fix). Runs the
+    // Timeout-guarded wrapper around LoadOneNamespaceInner (C1 fix). Runs the
     // inner load on a std::async task and waits up to load_timeout_ms_per_ns; a
     // timeout is reported as CX_ERR_NS_LOAD_FAILED without force-killing the
     // future (avoids partial-state corruption — the orphaned task finishes in the

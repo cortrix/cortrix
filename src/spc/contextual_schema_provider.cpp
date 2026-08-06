@@ -59,7 +59,7 @@ Status ContextualSchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) 
     }
     if (!db) return Status::InvalidArgument("contextual migrate: null db");
 
-    // --- V2: contextual_vec_labels (addendum §3.8 dual-vector ANN label map) ---
+    // --- V2: contextual_vec_labels (addendum dual-vector ANN label map) ---
     // Independent of blocks (no FK) so it is created even in isolated unit tests;
     // rows are written by the ingest write phase / backfill worker alongside the
     // contextual vector point.
@@ -79,7 +79,7 @@ Status ContextualSchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) 
     // If absent (isolated unit test), no-op so the migrator batch isn't blocked.
     if (!TableExists(db, "blocks")) return Status::Ok();
 
-    // --- blocks +4 contextual-retrieval columns (A unified-blocks § 4.1) — idempotent ---
+    // --- blocks +4 contextual-retrieval columns (A unified-blocks) — idempotent ---
     if (Status s = AddBlocksColumnIfAbsent(
             db, "embedding",
             "ALTER TABLE blocks ADD COLUMN embedding BLOB DEFAULT NULL",

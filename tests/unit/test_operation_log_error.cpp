@@ -32,7 +32,7 @@ const std::vector<OplogErrorCode>& AllCodes() {
     return codes;
 }
 
-// §7.2 set size is exactly 6, and the count anchor agrees.
+// set size is exactly 6, and the count anchor agrees.
 TEST(OplogErrorTest, SixCodesTotal) {
     EXPECT_EQ(AllCodes().size(), 6u);
     EXPECT_EQ(kOplogErrorCodeCount, 6);
@@ -51,14 +51,14 @@ TEST(OplogErrorTest, EveryCodeHasUniqueWellFormedCxString) {
     EXPECT_EQ(seen.size(), 6u);
 }
 
-// The §7.2 "note": CX_ERR_OPLOG_QUOTA_EXCEEDED was deliberately dropped (write-path
+// The "note": CX_ERR_OPLOG_QUOTA_EXCEEDED was deliberately dropped (write-path
 // auto-cleanup absorbs the cap). Assert no code carries the quota category.
 TEST(OplogErrorTest, NoQuotaExceededCode) {
     for (OplogErrorCode code : AllCodes()) {
         const OplogErrorInfo& info = GetOplogErrorInfo(code);
         EXPECT_STRNE(info.cx_code, "CX_ERR_OPLOG_QUOTA_EXCEEDED");
         EXPECT_NE(info.category, ErrorCategory::kQuota)
-            << info.cx_code << ": operation log §7.2 has no quota-category code";
+            << info.cx_code << ": operation log has no quota-category code";
     }
 }
 
@@ -74,7 +74,7 @@ TEST(OplogErrorTest, EveryCategoryIsOneOfFive) {
     }
 }
 
-// Exact §7.2 row attributes. CLEANUP_RUNNING is the one row with a backoff
+// Exact row attributes. CLEANUP_RUNNING is the one row with a backoff
 // (5000ms base + jitter); INTERNAL is transient but carries no fixed backoff.
 TEST(OplogErrorTest, RowsMatchSpec) {
     auto check = [](OplogErrorCode c, const char* cx, ErrorCategory cat,
@@ -100,7 +100,7 @@ TEST(OplogErrorTest, RowsMatchSpec) {
     EXPECT_EQ(kOplogCleanupRetryBaseMs, 5000);
 }
 
-// Required structured_data keys mirror the §7.2 "structured_data required" column 1:1.
+// Required structured_data keys mirror the "structured_data required" column 1:1.
 TEST(OplogErrorTest, RequiredStructuredDataKeysMatchSpec) {
     auto keys = [](OplogErrorCode c) {
         return std::set<std::string>(RequiredStructuredDataKeys(c).begin(),
@@ -134,7 +134,7 @@ TEST(OplogErrorTest, HasRequiredStructuredDataChecksEveryKey) {
 }
 
 // MakeOplogError fills the boundary error from the registry and attaches
-// structured_data; ToJson then yields the AGENT_FRIENDLY §3.1 body shape.
+// structured_data; ToJson then yields the Agent-friendly contract body shape.
 TEST(OplogErrorTest, MakeOplogErrorBuildsAgentFriendlyBody) {
     nlohmann::json sd = {{"required_role", "admin"}};
     auto err = MakeOplogError(OplogErrorCode::kUnauthorized, sd);

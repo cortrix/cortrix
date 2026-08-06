@@ -12,7 +12,7 @@
 #include "cortrix/async/task_manager.h"
 #include "cortrix/async/task_type.h"
 
-// S1 coverage: TaskType enum SoT, tasks-table CRUD, the §3.1 status state
+// S1 coverage: TaskType enum SoT, tasks-table CRUD, the status state
 // machine, the Issue 2 scheduler-support queries, and the Issue 4 cleanup paths —
 // all against an in-memory SQLite TaskManager.
 namespace cortrix::async {
@@ -42,7 +42,7 @@ class TaskManagerTest : public ::testing::Test {
     TaskManager mgr_;
 };
 
-// ---- TaskType enum (SoT, §3.2) --------------------------------------------
+// ---- TaskType enum (SoT) --------------------------------------------
 
 TEST(TaskTypeTest, EnumValuesAreStable) {
     EXPECT_EQ(static_cast<int>(kTaskDocParse), 1);
@@ -519,7 +519,7 @@ TEST_F(TaskManagerTest, SweepZombiesLeavesFreshProcessingAlone) {
 TEST_F(TaskManagerTest, RequeueStaleProcessingReturnsFreshToQueue) {
     auto p = mgr_.CreateTask(MakeTask("ns1", "dp"));
     mgr_.MarkProcessing(p.value().task_id, 3);
-    // §6.1: a processing row younger than the 24h zombie threshold is re-queued
+    //: a processing row younger than the 24h zombie threshold is re-queued
     // on restart (worker crashed but recent).
     auto requeued = mgr_.RequeueStaleProcessing(NowUnix(), 24);
     ASSERT_TRUE(requeued.ok());
@@ -532,7 +532,7 @@ TEST_F(TaskManagerTest, RequeueStaleProcessingReturnsFreshToQueue) {
 TEST_F(TaskManagerTest, SweepTimedOutFlipsLongRunningToFailed) {
     auto p = mgr_.CreateTask(MakeTask("ns1", "dt"));
     mgr_.MarkProcessing(p.value().task_id, 1);  // started_at ~now
-    // now+31min → started_at older than the 30-min (1800s) timeout cutoff (§7 v0).
+    // now+31min → started_at older than the 30-min (1800s) timeout cutoff (v0).
     int64_t now_plus_31m = NowUnix() + 31LL * 60;
     auto swept = mgr_.SweepTimedOut(now_plus_31m, 1800);
     ASSERT_TRUE(swept.ok());

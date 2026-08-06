@@ -60,7 +60,7 @@ TEST_P(MetadataErrorMatrix, CategoryInValidSet) {
 }
 
 // retry_after_ms present implies retryable. All 3 metadata codes are non-retryable,
-// so retry_after_ms is absent for every one (§5.1).
+// so retry_after_ms is absent for every one.
 TEST_P(MetadataErrorMatrix, RetryAfterImpliesRetryable) {
     const MetadataErrorInfo& info = GetMetadataErrorInfo(GetParam());
     if (info.retry_after_ms.has_value()) {

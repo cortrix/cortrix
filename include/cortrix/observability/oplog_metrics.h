@@ -13,14 +13,14 @@ namespace cortrix::observability {
 /// naming `cortrix_<metric>_<unit>`). Mirrors the AgentTraceMetrics template
 /// (process-wide singleton, atomic counters/gauge/histogram + OpenMetrics renderer).
 ///
-/// Cardinality control (OBSERVABILITY_SPEC §3.2 — C5 decision): labels are
+/// Cardinality control (the observability spec — C5 decision): labels are
 /// low-cardinality only. NO user_id / namespace_id / trace_id labels (forbidden,
-/// high-cardinality). `action` is the §5.1 {resource}_{verb} string (≤20 distinct
-/// in practice); `resource_type` is one of the §9.1 site categories. Because
+/// high-cardinality). `action` is the {resource}_{verb} string (≤20 distinct
+/// in practice); `resource_type` is one of the site categories. Because
 /// `action` is a free string (not a fixed enum), writes_total is held in a
 /// mutex-guarded map keyed by {action, resource_type} rather than a fixed array.
 ///
-/// §11 metric schema (6 rows):
+/// metric schema (6 rows):
 ///   cortrix_oplog_writes_total              counter   {action, resource_type}
 ///   cortrix_oplog_query_latency_seconds     histogram {filter_dimensions} (0-8)
 ///   cortrix_oplog_cleanup_deleted_total     counter   {reason} (age|quota)
@@ -33,7 +33,7 @@ namespace cortrix::observability {
 /// RenderOpenMetrics() the same way as every other subsystem (bootstrap.cpp).
 class OplogMetrics {
 public:
-    /// reason label for cleanup_deleted_total (§8.3 — age window vs row-cap quota).
+    /// reason label for cleanup_deleted_total (age window vs row-cap quota).
     enum class CleanupReason { kAge = 0, kQuota };
 
     /// Process-wide instance (metrics are global counters/gauge/histogram).
@@ -42,8 +42,8 @@ public:
     // --- cortrix_oplog_writes_total (Counter, labels: action, resource_type) ---
     /// `action` is bounded-by-convention: it is the closed action
     /// vocabulary (CE domain = 20 values, `{resource}_{verb}` naming), NOT free user
-    /// input — so it is low-cardinality and safe as a label (OBSERVABILITY_SPEC §3.2).
-    /// `resource_type` is one of the 6 §9.1 site categories. A caller passing an
+    /// input — so it is low-cardinality and safe as a label (the observability spec).
+    /// `resource_type` is one of the 6 site categories. A caller passing an
     /// off-vocabulary action would be a caller bug, not a design defect (mirrors the
     /// agent_trace bounded-label posture).
     void RecordWrite(const std::string& action, const std::string& resource_type);
@@ -82,7 +82,7 @@ public:
     /// bounds run wider than the sub-second query histogram.
     static constexpr int kNumCleanupBuckets = 8;  // {0.01,0.05,0.1,0.5,1,5,10,30}
 
-    /// filter_dimensions histogram: one series per dimension count 0..8 (§11 label
+    /// filter_dimensions histogram: one series per dimension count 0..8 (label
     /// "filter_dimensions (0-8 values)"); index 8 also absorbs any clamp overflow.
     static constexpr int kMaxFilterDimensions = 8;
     static constexpr int kFilterDimensionSeries = kMaxFilterDimensions + 1;  // 0..8

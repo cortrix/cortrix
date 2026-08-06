@@ -78,7 +78,7 @@ const char* CatalogErrorCodeString(CatalogErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(CatalogErrorCode code) {
-    // §8.1 "structured_data required keys" column, 1:1. Function-local statics → stable
+    // "structured_data required keys" column, 1:1. Function-local statics → stable
     // references. kInternalError is "by scenario" (case-by-case) → no fixed keys.
     static const std::vector<std::string> kEmpty{};
     static const std::vector<std::string> kNsId{"ns_id"};

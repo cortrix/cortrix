@@ -1,7 +1,7 @@
 // Unit tests for the read-side decision-signal params (CRAG ?explain / query routing ?route /
 // Doc summary ?granularity) on the query path:
 //   - QueryRequest body parsing of explain / route / granularity (+ defaults).
-//   - BuildExplainNode A/B/C phased-rollout gating (QUERY_CONTEXT_SPEC §3).
+//   - BuildExplainNode A/B/C phased-rollout gating (the query-context spec).
 //   - The end-to-end marshalling the POST /api/v1/query handler performs: build a
 //     QueryContext, run the FROZEN QueryComplexityClassifier::RouteAndUpdateContext
 //     (Wave C-R2) honoring a ?route override, then dump the explain node + granularity.
@@ -118,7 +118,7 @@ TEST(QueryExplainNodeTest, OmitsCClassUnlessDebug) {
     ctx.crag_signals = {{"top1", 0.9f}};  // a value exists, but must stay hidden
 
     // include_debug=false → C class (crag_signals / routing_misclassified) omitted so
-    // an Agent never mistakes a default/leftover signal for a triggered one (SPEC §3).
+    // an Agent never mistakes a default/leftover signal for a triggered one (SPEC).
     nlohmann::json off = query::BuildExplainNode(ctx, /*include_debug=*/false);
     EXPECT_FALSE(off.contains("crag_signals"));
     EXPECT_FALSE(off.contains("routing_misclassified"));
@@ -132,7 +132,7 @@ TEST(QueryExplainNodeTest, OmitsCClassUnlessDebug) {
 
 TEST(QueryExplainNodeTest, DefaultCragFieldsEmittedNotOmitted) {
     // On the MVP query path no CRAG runs, so CRAG fields stay at SPEC defaults; they
-    // must still appear (SPEC §6.3: default value reads as "not triggered").
+    // must still appear (SPEC: default value reads as "not triggered").
     query::QueryContext ctx;
     ctx.query = "q";
 

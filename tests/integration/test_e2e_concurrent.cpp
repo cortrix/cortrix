@@ -1,5 +1,5 @@
 /// @file test_e2e_concurrent.cpp
-/// @brief D4 E2E: Concurrency tests for thread safety
+/// @brief E2E: Concurrency tests for thread safety
 ///
 /// Tests concurrent access patterns:
 ///   1. Concurrent uploads: 5 threads each creating a doc → all succeed

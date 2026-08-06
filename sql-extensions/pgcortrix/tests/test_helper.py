@@ -2,7 +2,7 @@
 
 No PostgreSQL and no network: `plpy` is a small fake (FakePlpy) and urllib is
 replaced by a fake urlopen (FakeUrlopen / capture). These cover the three things
-the standalone DoD asks for (L1-α briefing §6):
+the standalone DoD asks for (L1-α briefing):
   * HTTP call shape — URL, method, body, headers per endpoint
   * user_id resolution — "pg:<PG_user>:<pid>" synthesis + parse, memory isolation mandatory
   * error-code mapping — CX_ERR_PGCORTRIX_* + transport → plpy.error()
@@ -409,7 +409,7 @@ class TestSsrf(unittest.TestCase):
 
 
 # ===========================================================================
-# Retry / backoff / transport errors (pgcortrix, §5)
+# Retry / backoff / transport errors (pgcortrix)
 # ===========================================================================
 
 
@@ -487,7 +487,7 @@ class TestCancel(unittest.TestCase):
 
 
 # ===========================================================================
-# status() (V23 D6)
+# status() (V23)
 # ===========================================================================
 
 

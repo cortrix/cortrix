@@ -17,8 +17,8 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/auth/api_key_service.h"
 #include "cortrix/auth/bootstrap_handler.h"
-#include "cortrix/auth/admin_users_service.h"      // §2.13-bis admin/users
-#include "cortrix/auth/jwt_secret_service.h"        // §2.11 JWT rotation
+#include "cortrix/auth/admin_users_service.h"      // admin/users
+#include "cortrix/auth/jwt_secret_service.h"        // JWT rotation
 #include "cortrix/auth/pbkdf2_password_hasher.h"    // invite-mode create hasher
 #include "cortrix/server/routes/auth_routes.h"
 #include "cortrix/namespace/namespace_manager.h"
@@ -42,9 +42,9 @@
 #include "cortrix/spc/block_assembler.h"
 #include "cortrix/spc_enricher.h"                  // CreateEnricher / EnricherConfig
 #include "cortrix/spc/enricher_chain.h"            // EnricherChain (enrich → contextualize → HyPE)
-#include "cortrix/spc_enricher/enrich_backfill_worker.h"  // §3.7 kTaskEnrichBackfill handler
-#include "cortrix/spc_enricher/enrich_retry_sweeper.h"    // §3.7 enrich_state due-row sweeper
-#include "cortrix/server/routes/enrich_routes.h"          // §3.7 backfill ops surface
+#include "cortrix/spc_enricher/enrich_backfill_worker.h"  // kTaskEnrichBackfill handler
+#include "cortrix/spc_enricher/enrich_retry_sweeper.h"    // enrich_state due-row sweeper
+#include "cortrix/server/routes/enrich_routes.h"          // backfill ops surface
 #include "cortrix/spc/contextual_enricher.h"       // I2 ContextualRetrievalEnricher / ResolveContextualConfig
 #include "cortrix/spc/hype_enricher.h"             // I3 HyPEEnricher / HyPEConfig
 #include "cortrix/spc/hype_ns_config.h"            // ClampHypeK (HyPE yaml wiring)
@@ -132,7 +132,7 @@
 #include "cortrix/deploy/metrics_server.h"
 #include "cortrix/deploy/deploy_metrics.h"
 #include "cortrix/deploy/disk_monitor.h"
-// [D3.5 wire · gap④] §5.3 subsystem metric recorders (process-wide singletons,
+// [integration wire · gap④] subsystem metric recorders (process-wide singletons,
 // MET round standalone-implemented) aggregated into the :9091 /metrics endpoint.
 #include "cortrix/async/task_metrics.h"
 #include "cortrix/query/scatter_metrics.h"
@@ -163,7 +163,7 @@
 #include <string>
 
 static cortrix::CortrixHttpServer* g_server = nullptr;
-// [D3.5 wire] Set when shutdown begins so the /ready endpoint reports not-ready
+// [integration wire] Set when shutdown begins so the /ready endpoint reports not-ready
 // (503) before the listener actually closes — the orchestrator stops routing to a
 // draining process. Read from request threads, so atomic.
 static std::atomic<bool> g_shutting_down{false};
@@ -282,11 +282,11 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     auth.SetApiKeyService(&api_key_service);
     cortrix::auth::BootstrapHandler bootstrap_handler(platform_db.db(), &api_key_service);
 
-    // admin/users (§2.13-bis) + JWT rotation (§2.11) backends.
+    // admin/users + JWT rotation backends.
     // The PBKDF2 hasher is the invite-mode create path's password hasher (same
     // TECH_DEBT-AUTH-PBKDF2-PLACEHOLDER seam as the login flow). JwtSecretService
     // LoadOrInit reads/auto-generates the HS256 secret in platform.db auth_secrets
-    // (§2.11) so the rotation route has a live current secret to rotate.
+    // so the rotation route has a live current secret to rotate.
     cortrix::auth::Pbkdf2PasswordHasher admin_users_hasher;
     cortrix::auth::AdminUsersService admin_users_service(platform_db.db(), &admin_users_hasher);
     cortrix::auth::JwtSecretService jwt_secret_service(platform_db.db());
@@ -457,7 +457,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
 
     // 7. SPC pipeline components — structured parser (owns OCR/VLM internally)
     //    + parent-child chunker (Inc 4-3: A unified-blocks ingest swap).
-    // [D3.5 wire · #479] Real bridge-script lookup: the old "" placeholder went
+    // [integration wire · #479] Real bridge-script lookup: the old "" placeholder went
     // straight into argv (python3 "" …) and every parse failed. Resolution order:
     // CORTRIX_SCRIPTS_DIR env → /app/scripts (container layout) → ./scripts
     // (repo-root dev run). Empty result = script genuinely absent; the parser
@@ -522,8 +522,8 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // enricher (plan B): the connection triple
     // comes from the config.yaml `enricher_llm` role (symmetric with doc_summary_llm);
     // the remaining tuning fields keep the enricher defaults. Unconfigured → kNull
-    // (NullEnricher short-circuit). CreateEnricher then runs the §4.1 startup probe
-    // and auto-degrades to NullEnricher on api_key/endpoint failure (§4.4).
+    // (NullEnricher short-circuit). CreateEnricher then runs the startup probe
+    // and auto-degrades to NullEnricher on api_key/endpoint failure.
     cortrix::spc::EnricherConfig enricher_cfg;
     if (config.enricher_llm.IsConfigured()) {
         enricher_cfg.type = cortrix::spc::EnricherType::kLlm;
@@ -539,7 +539,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         if (config.enricher_llm.timeout_ms > 0) {
             enricher_cfg.task_timeout_ms = config.enricher_llm.timeout_ms;
         }
-        // Same plumb for batch_size (clamped to the §2.7 documented 1-32 range):
+        // Same plumb for batch_size (clamped to the documented 1-32 range):
         // batch-8 JSON generation can outlast provider gateway idle windows on
         // slower models — observed live as mid-read connection resets.
         if (config.enricher_llm.batch_size > 0) {
@@ -608,14 +608,14 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                     contextual_cfg.llm_model = config.enricher_llm.model;
                 }
                 // Same wiring for the per-call deadline: a configured
-                // enricher_llm.timeout_ms overrides the §6.1 10s built-in,
+                // enricher_llm.timeout_ms overrides the 10s built-in,
                 // which slow providers exceed on every large-prompt call.
                 if (config.enricher_llm.timeout_ms > 0) {
                     contextual_cfg.timeout_ms = std::max(config.enricher_llm.timeout_ms,
                                                   cortrix::spc::kContextualTimeoutMsMin);
                 }
                 // Contextual-enrichment knobs without a yaml alias until 2026-07-10 (deep-QA):
-                // context token budget + the §8 injection-guard multiplier (whose
+                // context token budget + the injection-guard multiplier (whose
                 // fixed 2 rejected legitimate >160-byte contexts and silently
                 // dropped their contextualized vectors). 0 = built-in defaults.
                 if (config.enricher_llm.ctx_max_output_tokens > 0) {
@@ -753,7 +753,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         llm_cfg.api_key = config.doc_summary_llm.api_key;
         llm_cfg.default_model = config.doc_summary_llm.model;
         doc_summary_llm = std::make_shared<cortrix::llm::OpenAiLlmClient>(std::move(llm_cfg));
-        // D5 wiring (2026-06-26): ResolveDocSummaryConfig leaves llm_model at the
+        // wiring (2026-06-26): ResolveDocSummaryConfig leaves llm_model at the
         // kDefaultLlmModel "gpt-4o-mini" default — the generator sends call.model =
         // config_.llm_model, so without this the request ALWAYS asks for gpt-4o-mini,
         // ignoring the configured doc_summary_llm.model. Any non-OpenAI provider (GLM,
@@ -768,7 +768,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
             ns_pool, doc_summary_llm, ds_cfg, embedder, assembler, &task_mgr);
     }
 
-    // [addendum §3.7] Enrich-backfill worker (kTaskEnrichBackfill): repairs the
+    // [addendum] Enrich-backfill worker (kTaskEnrichBackfill): repairs the
     // chunk-enrichment debt recorded in enrich_state. Constructed BEFORE the
     // WorkerPool (handlers must outlive the worker threads); enabled only when the
     // enricher chain has an available member (no LLM ⇒ no debt concept).
@@ -808,7 +808,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
 
     // Install the doc-summary enqueue seam NOW — the WorkerPool exists (the seam
     // captures &worker_pool) and the pipeline has already moved into spc_mgr, so set it via
-    // the spc_mgr proxy (Plan B · §4.1.2: this ordering breaks the doc_processor ↔ spc_mgr ↔
+    // the spc_mgr proxy (Plan B ·: this ordering breaks the doc_processor ↔ spc_mgr ↔
     // seam ↔ pool construction cycle). Only when the doc-summary worker is registered (LLM
     // configured); else the seam stays unset and OnDocumentWritten is a no-op (→ FTS5).
     if (doc_summary_worker) {
@@ -820,7 +820,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
             });
     }
 
-    // [addendum §3.7] Retry sweeper: enrich_state IS the durable queue SoT; the
+    // [addendum] Retry sweeper: enrich_state IS the durable queue SoT; the
     // sweeper turns due 'pending_retry' rows into kTaskEnrichBackfill tasks.
     // Declared after the WorkerPool (destroyed before it; its dtor joins the
     // sweep thread) and Start()ed only after worker_pool.Start() succeeds below.
@@ -899,7 +899,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // global defaults once from global_config, then per task merge global ←
     // namespaces.cleaning_config (INSRouter::GetNamespace). A missing NS / absent blob
     // / merge failure degrades to the global defaults (never blocks ingest). Wired here
-    // (not at the §8 pipeline build) because global_config is constructed in this block.
+    // (not at the pipeline build) because global_config is constructed in this block.
     const cortrix::spc::CleaningConfig cleaning_global =
         cortrix::spc::LoadGlobalCleaningConfig(global_config.get());
     spc_mgr.SetCleaningConfigResolver(
@@ -959,10 +959,10 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // 10d. DB-import assembly. The ConnectionManager
     // (encrypted secret store + ref lifecycle) and ImportManager (validate → fetch
     // → textualize → feed) are built over: the validating QueryExecutor (real PG
-    // connect → D3.5, so it returns CONNECTION_FAILED after the §3.4 security gate
+    // connect → integration, so it returns CONNECTION_FAILED after the security gate
     // today), in-memory secret/conn stores + import task store, plus —
     // [P2b] real SPCManager feed (textualized rows → live Pipeline → searchable
-    // blocks, step 6) + [P2c] real D3 full-overwrite cleanup
+    // blocks, step 6) + [P2c] real full-overwrite cleanup
     // (RealBlockCleaner deletes the prior import's docs+blocks by source_path prefix
     // over the namespace pool, so a re-import replaces rather than duplicates) + the real
     // operation logger (db_connection_register/revoke + database_import audit,
@@ -1139,7 +1139,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         });
     }
     cortrix::RegisterBatchRoutes(server.server(), batch_service, auth);
-    // [D3.5 r2 · Wave S routes] Flat design-surface /documents family. Mounts the
+    // [integration r2 · Wave S routes] Flat design-surface /documents family. Mounts the
     // openapi/SDK/MCP shape (POST/GET/GET{id}/DELETE{id} + tasks progress/cancel) on
     // top of the live per-NS handlers while keeping nested routes. POST reuses
     // batch_service as a batch-of-1; the async task progress/cancel bodies come from a
@@ -1189,7 +1189,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                                              {config.watch_dir.namespace_name},
                                              /*recursive=*/true, /*autostart=*/false);
     }
-    // [D3.5 r2 · Wave S routes] /watch aliases (openapi/SDK/MCP fan-out shape) mapped
+    // [integration r2 · Wave S routes] /watch aliases (openapi/SDK/MCP fan-out shape) mapped
     // onto the same connector registry (POST = one Subscribe(path, target_namespaces)).
     cortrix::RegisterWatchAliasRoutes(server.server(), connector_state, ns_pool, ns_router, spc_mgr, auth);
     // tenant/permission/quota REST (15 endpoints, sec 4.5). In CE
@@ -1198,7 +1198,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::RegisterTenantRoutes(server.server(), tenant_svc, perm_svc, quota_svc, auth);
     // operation-log query route (GET /api/v1/operations, read-only).
     cortrix::RegisterOperationsRoutes(server.server(), *obs_module.logger(), auth);
-    // [addendum §3.7 G4] enrichment-backfill ops surface (admin; audit + enqueue).
+    // [addendum G4] enrichment-backfill ops surface (admin; audit + enqueue).
     {
         std::vector<std::string> enrich_chain_tokens;
         if (enrich_backfill_worker) {
@@ -1221,13 +1221,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // JWT /auth/me is cloud-enterprise; this CE shim avoids the no-auth login dead-end.
     cortrix::RegisterAuthSessionRoute(server.server(), auth);
     // admin/users 5 endpoints (admin-gated; mutations write
-    // operation_log) + §2.11 JWT secret rotation endpoint. AdminGuard adds the
+    // operation_log) + JWT secret rotation endpoint. AdminGuard adds the
     // loopback IP layer on the /api/v1/admin/* prefix.
     cortrix::RegisterAdminUsersRoutes(server.server(), admin_users_service, auth,
                                       obs_module.logger().get());
     cortrix::RegisterJwtRotateRoute(server.server(), jwt_secret_service, auth);
     // DB-import 6-endpoint surface (admin-gated;
-    // /admin/db-connections* under AdminGuard, /import/* Layer-2 only per §6.1).
+    // admin/db-connections* under AdminGuard, /import/* Layer-2 only per).
     cortrix::RegisterImportRoutes(server.server(), import_handler, auth);
     // agent_llm_config GET (read) / PUT (admin).
     // Backed by the shared global_config (api_key encrypted at rest). The PUT path
@@ -1264,7 +1264,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
 
     // catalog (real): the global catalog.db handle is non-null only after a successful
     // CatalogDb::Open() above (which also ran the schema migration). That is the
-    // startup-completion signal design §8.4 refers to as "catalog.db ready". The per-NS
+    // startup-completion signal design refers to as "catalog.db ready". The per-NS
     // IBloomFilter::IsReady() lives on each namespace's BloomFilter (no global accessor in
     // bootstrap scope — namespaces are created lazily via INSRouter), so bloom_filter_ready
     // is reported per-NS through that Feature's own surface, not aggregated here; the
@@ -1285,7 +1285,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
 
     // spc_pipeline (real: parser + enricher): ready iff the WorkerPool has live worker threads
     // (worker_count() > 0 only after WorkerPool::Start(), driven by spc_mgr.Start() below).
-    // queue_depth = SPCManager::QueueSize() — design §8.3 example field. Captures the two
+    // queue_depth = SPCManager::QueueSize() — design example field. Captures the two
     // objects by reference so the probe sees the current (post-Start) state.
     readiness.Register("spc_pipeline", [&worker_pool, &spc_mgr]() {
         cortrix::health::ComponentReadiness r;
@@ -1379,7 +1379,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         cortrix::kCortrixVersion);
     // OpenMetrics endpoint on a loopback-only, separate port. The MetricsServer
     // always renders the DeployMetrics gauges (disk/shutdown/uptime/build_info); the
-    // §5.3 subsystem recorders are AddSource()'d below.
+    // subsystem recorders are AddSource()'d below.
     cortrix::deploy::DeployMetrics::Instance().SetBuildInfo(cortrix::kCortrixVersion, "", "");
     cortrix::deploy::DeployMetrics::Instance().MarkStart();
     int metrics_port = 9091;
@@ -1399,7 +1399,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     }
     auto deploy_metrics_server = cortrix::deploy::RegisterMetricsServer(metrics_port);
     if (deploy_metrics_server) {
-        // [D3.5 wire · gap④] Aggregate the §5.3 subsystem metric recorders into the
+        // [integration wire · gap④] Aggregate the subsystem metric recorders into the
         // /metrics body. Each is a process-wide singleton (MET round standalone recorders);
         // AddSource captures its render fn, concatenated by MetricsServer::RenderAll().
         // The catalog IBloomFilter source needs a BF accessor → deferred alongside the
@@ -1497,7 +1497,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     CORTRIX_LOG_INFO("main", "SPC + async task workers started ({} SPC threads)", config.spc.worker_count);
     if (enrich_backfill_worker) {
         enrich_sweeper.Start();
-        // D7b: report the EFFECTIVE interval (KV-seeded knob or default), not the
+        //: report the EFFECTIVE interval (KV-seeded knob or default), not the
         // compile-time constant — the constant masked live knob state twice.
         CORTRIX_LOG_INFO("main", "enrich retry sweeper started ({}s interval)",
                          enrich_sweeper.SweepIntervalSec());

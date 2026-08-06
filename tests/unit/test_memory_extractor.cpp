@@ -15,14 +15,14 @@
 #include "cortrix/memory/memory_extractor.h"
 
 // S3/S4/S5/S7 coverage: the memory extraction LLM extraction pipeline against injected seams +
-// a scriptable LLM client. Includes the §12.3 eight LLM-mock scenarios (fact /
+// a scriptable LLM client. Includes the eight LLM-mock scenarios (fact /
 // preference / event classification, new-fact contradiction, non-contradiction,
-// unknown→event fallback, invalid JSON, timeout), the D6 invalidation + operation_log
-// writes, the D9 revoke path, and the D8 preference-immunity helper.
+// unknown→event fallback, invalid JSON, timeout), the invalidation + operation_log
+// writes, the revoke path, and the preference-immunity helper.
 namespace cortrix::memory {
 namespace {
 
-// Build an ISO-8601 UTC timestamp `days` days before now. D8 immunity asserts a
+// Build an ISO-8601 UTC timestamp `days` days before now. immunity asserts a
 // "within window" condition against the real wall clock (MemoryExtractor uses
 // NowIso8601()), so a hard-coded absolute first_mentioned_at silently crosses the
 // 30-day window boundary as the calendar advances (the 2026-06-14 S2b time-bomb:
@@ -260,7 +260,7 @@ TEST_F(MemoryExtractorTest, ConfidenceClampedToUnitRange) {
     EXPECT_DOUBLE_EQ(r.extracted_memories[1].confidence, 0.0);  // clamped up
 }
 
-// ---------- §12.3 LLM-mock scenarios ----------
+// ---------- LLM-mock scenarios ----------
 
 // Scenario 1: fact classification.
 TEST_F(MemoryExtractorTest, S1_FactClassification) {
@@ -308,14 +308,14 @@ TEST_F(MemoryExtractorTest, S2_PreferenceClassification) {
     ASSERT_TRUE(r.ok());
     ASSERT_EQ(r.extracted_memories.size(), 1u);
     EXPECT_EQ(r.extracted_memories[0].type, MemoryType::kPreference);
-    // Preference blocks carry mention_count + first_mentioned_at (D8).
+    // Preference blocks carry mention_count + first_mentioned_at.
     const MemoryBlockRecord* b = store_->Get(r.extracted_memories[0].block_id);
     ASSERT_NE(b, nullptr);
     EXPECT_EQ(b->metadata_json["mention_count"], 1);
     EXPECT_TRUE(b->metadata_json.contains("first_mentioned_at"));
 }
 
-// D8 preference upgrade: a repeat mention increments the existing block's
+// preference upgrade: a repeat mention increments the existing block's
 // mention_count and marks it immune at the threshold (N=2), instead of inserting a
 // duplicate. The existing-preference match comes from the (mocked) read-pipeline seam.
 TEST_F(MemoryExtractorTest, S2b_RepeatPreferenceUpgradesMentionCountAndImmunity) {
@@ -325,7 +325,7 @@ TEST_F(MemoryExtractorTest, S2b_RepeatPreferenceUpgradesMentionCountAndImmunity)
     pref.ns_id = "memory";
     pref.user_id = "user_123";
     pref.content = "user likes the dark theme";
-    // (Time-bomb fix) relative date so the D8 "within 30d window" immunity assertion
+    // (Time-bomb fix) relative date so the "within 30d window" immunity assertion
     // below stays valid regardless of the wall-clock date (was hard-coded 2026-05-15).
     pref.metadata_json = {{"memory_type", "preference"}, {"status", "active"},
                           {"mention_count", 1}, {"first_mentioned_at", IsoDaysAgo(1)}};
@@ -451,7 +451,7 @@ TEST_F(MemoryExtractorTest, S4_NewFactContradictsOldFact_InvalidatesOld) {
     EXPECT_EQ(r.extracted_memories[0].invalidates,
               (std::vector<std::string>{"block_old_sh"}));
 
-    // Old block now invalidated with the §4.2 fields + auto_revoke_eligible (conf<0.7? no→false).
+    // Old block now invalidated with the fields + auto_revoke_eligible (conf<0.7? no→false).
     const MemoryBlockRecord* updated = store_->Get("block_old_sh");
     ASSERT_NE(updated, nullptr);
     EXPECT_EQ(updated->metadata_json["status"], "invalidated");
@@ -512,7 +512,7 @@ TEST_F(MemoryExtractorTest, S5_NonContradiction_NoInvalidation) {
     EXPECT_EQ(oplog_->CountAction("memory_invalidate"), 0);
 }
 
-// Scenario 6: LLM returns unknown memory_type → coerced to event (D4).
+// Scenario 6: LLM returns unknown memory_type → coerced to event.
 TEST_F(MemoryExtractorTest, S6_UnknownTypeFallsBackToEvent) {
     llm_->PushOk(R"([{"type":"mystery","content":"something","confidence":0.7}])");
     auto ex = Make();
@@ -557,7 +557,7 @@ TEST_F(MemoryExtractorTest, S8_LlmTimeoutReturnsTimeoutRetryable) {
     EXPECT_EQ((*r.error->structured_data)["interaction_id"], "i_123");
 }
 
-// ---------- D11 LLM_DISABLED (NullEnricher) ----------
+// ---------- LLM_DISABLED (NullEnricher) ----------
 
 TEST_F(MemoryExtractorTest, DisabledModeReturnsLlmDisabled) {
     MemoryExtractorConfig cfg;
@@ -571,7 +571,7 @@ TEST_F(MemoryExtractorTest, DisabledModeReturnsLlmDisabled) {
     EXPECT_EQ(llm_->call_count, 0);  // no LLM call in disabled mode
 }
 
-// ---------- extract_meta completeness (D11) ----------
+// ---------- extract_meta completeness ----------
 
 TEST_F(MemoryExtractorTest, ExtractMetaPopulated) {
     llm_->PushOk(R"([{"type":"fact","content":"user is a doctor","confidence":0.95}])",
@@ -638,7 +638,7 @@ TEST_F(MemoryExtractorTest, ExtractBatchReturnsResultPerTurn) {
     EXPECT_TRUE(batch.results[1].ok());
 }
 
-// ---------- D9 revoke ----------
+// ---------- revoke ----------
 
 TEST_F(MemoryExtractorTest, RevokeInvalidationRestoresActiveAndLogs) {
     MemoryBlockRecord b;
@@ -670,7 +670,7 @@ TEST_F(MemoryExtractorTest, RevokeMissingBlockReturnsNotFound) {
     EXPECT_EQ(r.status().code(), StatusCode::kNotFound);
 }
 
-// ---------- D9 manual invalidate ----------
+// ---------- manual invalidate ----------
 
 TEST_F(MemoryExtractorTest, InvalidateMemoryManualStampsAndLogs) {
     MemoryBlockRecord b;
@@ -691,7 +691,7 @@ TEST_F(MemoryExtractorTest, InvalidateMemoryManualStampsAndLogs) {
     EXPECT_EQ(oplog_->CountAction("memory_blocks_update"), 1);
 }
 
-// ---------- D8 preference immunity helper ----------
+// ---------- preference immunity helper ----------
 
 TEST_F(MemoryExtractorTest, PreferenceImmunityThresholdAndWindow) {
     // existing count 1 + this mention = 2 == threshold, within window → immune.

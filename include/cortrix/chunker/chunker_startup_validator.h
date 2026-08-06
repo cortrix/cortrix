@@ -23,7 +23,7 @@ public:
     /// Read spc.chunker.* (via ChunkerGuc, range-validated first) +
     /// reranker.max_seq_length from `cfg`, then run ValidateChildSizeCompat.
     /// Standalone IGlobalConfig entry point; invoking it inside the live
-    /// cortrix-server startup sequence is D3.5 (mirrors reranker validator).
+    /// cortrix-server startup sequence is integration (mirrors reranker validator).
     static Status ValidateStartupFromGlobalConfig(const IGlobalConfig& cfg);
 };
 

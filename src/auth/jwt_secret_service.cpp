@@ -23,7 +23,7 @@ int64_t NowMs() {
         .count();
 }
 
-// 16 random bytes → 32-char hex id (auth_secrets.id; ULID/UUID per §3.5, hex is
+// 16 random bytes → 32-char hex id (auth_secrets.id; ULID/UUID per hex is
 // equivalent for a unique opaque key). Reuses the GenerateRequestId idiom.
 std::string RandomHexId() {
     unsigned char buf[16];
@@ -80,7 +80,7 @@ Status JwtSecretService::LoadOrInit() {
     }
 
     // (1) env var override — write through so restarts without the env still
-    //     load the same secret from platform.db (§2.11 startup behavior step 1).
+    //     load the same secret from platform.db (startup behavior step 1).
     if (const char* env = std::getenv("CORTRIX_JWT_SECRET");
         env != nullptr && env[0] != '\0') {
         std::string secret(env);
@@ -159,7 +159,7 @@ Result<JwtSecretService::RotationResult> JwtSecretService::RotateJwtSecret() {
         }
     }
 
-    // Retire any existing prev first (only one prev allowed, §3.5), then demote
+    // Retire any existing prev first (only one prev allowed), then demote
     // current → prev with a 24h expiry.
     auto fail = [&](const char* msg) -> Status {
         sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);

@@ -26,7 +26,7 @@ public:
 /// `CX_ERR_ROUTER_*` string + a GEN-Agent category + retryability via the canonical
 /// registry below.
 ///
-/// Per CODING_CONVENTIONS / B_R1+C_R2 template A, Cortrix uses Result<T> + Status
+/// Per the coding conventions / B_R1+C_R2 template A, Cortrix uses Result<T> + Status
 /// only (no Result<T,E>); a domain error is carried as the Agent-friendly boundary
 /// type cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_*
 /// code. So RouterErrorCode is the *enum of identities*, and MakeRouterError()
@@ -51,7 +51,7 @@ struct RouterErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_ROUTER_*" string
     agent_friendly::ErrorCategory category;   ///< permanent / transient
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< per §4.3 (100 for inference; null/none otherwise)
+    std::optional<int> retry_after_ms;        ///< per (100 for inference; null/none otherwise)
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never
@@ -71,7 +71,7 @@ bool HasRequiredStructuredData(RouterErrorCode code,
                                const nlohmann::json& structured_data);
 
 /// Build the Agent-friendly boundary error for `code`, attaching `structured_data`
-/// (the §4.3 required keys are the caller's responsibility at each call site) and
+/// (the required keys are the caller's responsibility at each call site) and
 /// an optional human-readable `message`. category / retryable / retry_after_ms are
 /// filled from the canonical registry — call sites never restate them.
 agent_friendly::AgentFriendlyError MakeRouterError(

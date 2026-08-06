@@ -13,7 +13,7 @@ namespace cortrix::auth {
 /// The Auth error identities. Each maps to a stable
 /// `CX_ERR_*` string + a GEN-Agent category + retryability via the canonical
 /// registry below. This is the exact convention-compliant mirror of
-/// catalog::CatalogErrorCode (CODING_CONVENTIONS §3 / L1-α §2): an *enum of
+/// catalog::CatalogErrorCode (the coding conventions / L1-α): an *enum of
 /// identities* turned into the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError by MakeAuthError() — we do NOT
 /// introduce a parallel AuthError struct.
@@ -50,7 +50,7 @@ enum class AuthErrorCode {
     kEmailSendFailed,             // 500  CX_ERR_AUTH_EMAIL_SEND_FAILED
     kBcryptTimeout,               // 500  CX_ERR_AUTH_BCRYPT_TIMEOUT
     kJwtInitFailed,               // 500  CX_ERR_AUTH_JWT_INIT_FAILED
-    // --- admin/users 5 endpoints (§2.13-bis, V14 J6 genuinely new codes) ---
+    // --- admin/users 5 endpoints (V14 J6 genuinely new codes) ---
     kUserNotFound,                // 404  CX_ERR_USER_NOT_FOUND
     kUserEmailExists,             // 409  CX_ERR_USER_EMAIL_EXISTS
     kUserValidation,              // 422  CX_ERR_USER_VALIDATION
@@ -73,7 +73,7 @@ struct AuthErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null unless retryable per §5.2
+    std::optional<int> retry_after_ms;        ///< null unless retryable per
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never

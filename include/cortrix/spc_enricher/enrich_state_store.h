@@ -67,7 +67,7 @@ struct EnrichStateCounts {
 /// Coverage counters for the namespace (ops API / metrics gauge source).
 Result<EnrichStateCounts> CountEnrichStates(sqlite3* db);
 
-/// addendum §3.7 G4 — legacy/silent-degrade audit. Scans the namespace's child
+/// addendum G4 — legacy/silent-degrade audit. Scans the namespace's child
 /// blocks against the CONFIGURED chain members and synthesizes 'pending_retry'
 /// rows (due at now_unix) for chunks whose artifacts are missing:
 ///   enrich ⇔ blocks.enriched_score non-NULL; contextual ⇔ contextualized_status == 1;

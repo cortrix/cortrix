@@ -12,11 +12,11 @@ namespace cortrix::query {
 /// runs on the post-ScatterGather CrossNsResponse (cross-NS merged + reranked),
 /// gated by ShouldSkipCrag (complex route only; simple/chat skip). The frozen
 /// CragEvaluator writes the verdict onto QueryContext but does NOT mutate the result
-/// set — that is the Query-Engine's job (§6.3 "downstream"). This stage is that
+/// set — that is the Query-Engine's job ("downstream"). This stage is that
 /// downstream: it converts the ResultItems to RankedChunks, runs
 /// EvaluateAndUpdateContext, then applies the verdict:
 ///   - correct  (≥ threshold_correct): keep the reranker top-K as-is.
-///   - ambiguous: keep the top-N/2 by rerank_score (fine-grained filter, §6.3).
+///   - ambiguous: keep the top-N/2 by rerank_score (fine-grained filter).
 ///   - incorrect (< threshold_incorrect): Phase 1 keeps the degraded top-K (OBS
 ///     counter already recorded by the evaluator); no Web fallback in Phase 1.
 /// The resolved verdict is exposed via qctx.crag_verdict for the caller to surface
@@ -26,7 +26,7 @@ class CragStage {
 public:
     explicit CragStage(retrieval::CragEvaluator* evaluator) : evaluator_(evaluator) {}
 
-    /// Evaluate `resp` for `qctx.query` and apply the §6.3 verdict action in place.
+    /// Evaluate `resp` for `qctx.query` and apply the verdict action in place.
     /// No-op when qctx.enable_crag is false, ShouldSkipCrag(qctx) (simple/chat), or
     /// the evaluator is null. Writes qctx.crag_verdict / crag_score /
     /// ambiguous_action_taken. Never throws.

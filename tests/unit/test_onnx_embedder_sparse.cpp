@@ -3,8 +3,8 @@
 #include <cmath>
 
 // Sparse retrieval S1 — OnnxEmbedder.EmbedWithSparse / EmbedBatchWithSparse.
-// Standalone D3: dense reuses the frozen embed path; sparse is the deterministic
-// stub (real BGE-M3 sparse-head extraction = D3.5). These tests pin the API
+// Standalone: dense reuses the frozen embed path; sparse is the deterministic
+// stub (real BGE-M3 sparse-head extraction = integration). These tests pin the API
 // contract + the stub's reproducibility / top-K behavior so the downstream
 // serialize / inverted-index / RRF stories build on a stable foundation.
 namespace cortrix {

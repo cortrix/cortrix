@@ -14,7 +14,7 @@ namespace cortrix::metadata {
 /// mapping to a stable `CX_ERR_*` / `CX_WARN_*` string + a GEN-Agent category +
 /// retryability + the HTTP status its body carries, via the canonical registry below.
 ///
-/// Per CODING_CONVENTIONS §3 / F-FREEZE-1, Cortrix uses Result<T>+Status only (no
+/// Per the coding conventions / F-FREEZE-1, Cortrix uses Result<T>+Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code. So
 /// MetadataErrorCode is the *enum of identities*, and MakeMetadataError() turns one
@@ -29,20 +29,20 @@ enum class MetadataErrorCode {
     kPartial,         ///< CX_WARN_METADATA_PARTIAL — some fields missing (e.g. page_count unknown)
                       ///< but the Block is still generated (HTTP 200 + meta.warnings[]). warning, not error.
     kFieldImmutable,  ///< CX_ERR_METADATA_FIELD_IMMUTABLE — V1.0 PATCH /metadata attempts
-                      ///< to change a field (D9 B' lock, HTTP 405). permanent, not retryable.
+                      ///< to change a field (B' lock, HTTP 405). permanent, not retryable.
 };
 
 /// Total number of metadata error codes (= 3 = 2 err + 1 warn). Compile-time
 /// anchor for the API-compatibility regression test (the set must not shrink).
 constexpr int kMetadataErrorCodeCount = 3;
 
-/// Canonical, immutable attributes of one error code (detailed design §5.1 columns).
+/// Canonical, immutable attributes of one error code (detailed design columns).
 struct MetadataErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" / "CX_WARN_*" string
     agent_friendly::ErrorCategory category;   ///< warning/permanent
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null for all 3 (none retryable, §5.1)
-    int http_status;                          ///< §5.1 / §5.2 HTTP column (5xx / 200 / 405)
+    std::optional<int> retry_after_ms;        ///< null for all 3 (none retryable)
+    int http_status;                          ///< HTTP column (5xx / 200 / 405)
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never throws /
@@ -52,7 +52,7 @@ const MetadataErrorInfo& GetMetadataErrorInfo(MetadataErrorCode code);
 /// The "CX_ERR_*" / "CX_WARN_*" string for `code`.
 const char* MetadataErrorCodeString(MetadataErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5, §5.1.1
+/// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5,
 /// JSON examples). SoT for the Agent-friendly contract; lets call sites + tests
 /// verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(MetadataErrorCode code);

@@ -13,7 +13,7 @@ namespace cortrix::reranker {
 /// The 5 reranker error identities. Each maps to a stable `CX_ERR_*`
 /// string + a GEN-Agent category + retryability via the canonical registry below.
 ///
-/// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
+/// Per the coding conventions, Cortrix uses Result<T> + Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// So RerankerErrorCode is the *enum of identities*, and MakeRerankerError() turns
@@ -23,7 +23,7 @@ namespace cortrix::reranker {
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may only be appended.
 ///
-/// NOTE (§5.2 note): single-task ONNX failure / extreme-input score=0 are
+/// NOTE (note): single-task ONNX failure / extreme-input score=0 are
 /// degradation fallbacks (transient semantics, no client-facing error code) —
 /// observed via the cortrix_reranker_failed_tasks_total metric, not this enum.
 enum class RerankerErrorCode {
@@ -43,7 +43,7 @@ struct RerankerErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     agent_friendly::ErrorCategory category;   ///< permanent / timeout / transient
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null unless retryable per §5.2
+    std::optional<int> retry_after_ms;        ///< null unless retryable per
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never
@@ -63,7 +63,7 @@ bool HasRequiredStructuredData(RerankerErrorCode code,
                                const nlohmann::json& structured_data);
 
 /// Build the Agent-friendly boundary error for `code`, attaching `structured_data`
-/// (the §5.2 required keys are the caller's responsibility at each call site) and
+/// (the required keys are the caller's responsibility at each call site) and
 /// an optional human-readable `message`. category / retryable / retry_after_ms are
 /// filled from the canonical registry — call sites never restate them.
 agent_friendly::AgentFriendlyError MakeRerankerError(

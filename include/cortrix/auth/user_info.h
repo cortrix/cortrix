@@ -22,7 +22,7 @@ struct UserInfo {
     std::string email;
     std::string display_name;
     bool email_verified = false;
-    int64_t created_at = 0;     ///< Unix ts (seconds, per §2.2 ISO-8601 surface)
+    int64_t created_at = 0;     ///< Unix ts (seconds, per ISO-8601 surface)
     std::vector<TenantRef> tenants;
 };
 

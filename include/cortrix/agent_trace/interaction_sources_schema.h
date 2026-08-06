@@ -31,7 +31,7 @@ constexpr int kInteractionSourcesSchemaVersion = 1;
 extern const char* const kInteractionSourcesSchemaSql;
 
 /// The ISchemaProvider for interaction_sources (frozen cortrix::catalog::
-/// ISchemaProvider, D2-pre-5). Lives in the same DB as interaction_log (the
+/// ISchemaProvider). Lives in the same DB as interaction_log (the
 /// memory/global DB). Registered with the SchemaMigrator. FeatureName is distinct
 /// from the agent_trace provider's key so both can coexist in schema_version.
 class InteractionSourcesSchemaProvider : public cortrix::catalog::ISchemaProvider {

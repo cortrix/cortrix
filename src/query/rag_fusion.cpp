@@ -21,7 +21,7 @@ namespace {
 // variants are additive weak evidence: they can promote a candidate that is
 // repeatedly found by variants, but they reorder only the non-anchored tail.
 //
-// v1.0.13 (§4.3.bis.5): the three policy constants moved into RagFusionConfig
+// v1.0.13: the three policy constants moved into RagFusionConfig
 // (fusion_original_weight / fusion_variant_weight / fusion_anchor_max) with
 // these values as byte-identical defaults — the fixed policy proved
 // scale-sensitive (FiQA-5000: -10.8pp recall@10 vs listwise on identical pools).
@@ -136,9 +136,9 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
     //   }
     // Until then qctx is accepted + threaded but does not alter behavior.
     (void)qctx;
-    (void)trace_ctx;  // §9: TraceContext interface-reserved in V1.0 OSS (always null)
+    (void)trace_ctx;  //: TraceContext interface-reserved in V1.0 OSS (always null)
 
-    // topic 3: NS disabled → no LLM call, single query (§4.3).
+    // topic 3: NS disabled → no LLM call, single query.
     if (!ns_config.enabled) {
         explain_.active = false;
         explain_.reason = "ns_disabled";
@@ -146,7 +146,7 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
         return std::vector<std::string>{query};
     }
 
-    // Generate variants via the LLM (§4.2). Time the call for the explain latency.
+    // Generate variants via the LLM. Time the call for the explain latency.
     const auto t0 = std::chrono::steady_clock::now();
     Result<QueryVariants> gen = generator_->Generate(
         query, ns_config, ns_config.locale, trace_ctx);
@@ -158,7 +158,7 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
     if (!gen.ok()) {
         // topic 4: LLM failure → degrade to single query. The CX_ERR identity is
         // carried in the Status; the caller (QueryPipeline) emits the C-class
-        // CX_WARN_RAG_FUSION_DEGRADED warning (§5.3).
+        // CX_WARN_RAG_FUSION_DEGRADED warning.
         explain_.active = true;
         explain_.degraded = true;
         explain_.degrade_reason = DegradeReasonToken(gen.status());
@@ -170,7 +170,7 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
         return gen.status();  // Result<vector<string>> failure carries the CX_ERR
     }
 
-    // Success: all_queries = [original] + variants (§4.5 invariant — original first).
+    // Success: all_queries = [original] + variants (invariant — original first).
     const QueryVariants& qv = gen.value();
     std::vector<std::string> all_queries;
     all_queries.reserve(qv.variants.size() + 1);
@@ -184,7 +184,7 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
     explain_.variant_count = static_cast<int>(all_queries.size());
 
     metrics.RecordInvocation(RagFusionMetrics::Result::kSuccess);
-    // §8 variant_count histogram: attribute the produced variants across the
+    // variant_count histogram: attribute the produced variants across the
     // configured strategies (round-robin, since the LLM returns a flat list).
     if (!ns_config.variant_strategies.empty()) {
         std::unordered_map<int, int> per_strategy;
@@ -221,7 +221,7 @@ Result<std::vector<retrieval::ScoredResult>> RagFusion::FuseResults(
     const std::vector<std::vector<retrieval::ScoredResult>>& per_variant_results,
     const RagFusionConfig& cfg,
     const observability::TraceContext* ctx) {
-    (void)ctx;  // §9: interface-reserved
+    (void)ctx;  //: interface-reserved
     int rrf_k = cfg.rrf_k;
     if (rrf_k <= 0) rrf_k = 60;  // RRF formula needs k > 0 (sentinel ARCH default)
     const double original_weight = static_cast<double>(cfg.fusion_original_weight);

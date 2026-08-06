@@ -18,8 +18,8 @@ inline constexpr char kCxErrDeprecatedField[] = "CX_ERR_DEPRECATED_FIELD";
 
 /// The HTTP-shaped result of handling a POST /api/v1/query request (S4.1). `status`
 /// is the HTTP status; `body` is the JSON to serialize. Hard auth/quota failures
-/// surface as their §3.1 status (401/403/400); partial scatter timeout is 200 with a
-/// partial body (§2.7 principle 3); a normal response is 200.
+/// surface as their status (401/403/400); partial scatter timeout is 200 with a
+/// partial body (principle 3); a normal response is 200.
 struct HandlerResult {
     int status = 200;
     nlohmann::json body;
@@ -28,11 +28,11 @@ struct HandlerResult {
 /// CrossNsQueryHandler — the POST /api/v1/query handler **logic**.
 /// Parses the cross-NS QueryRequest, rejects the deprecated MVP `namespace`
 /// single field (CX_ERR_DEPRECATED_FIELD), validates the request, then runs
-/// ScatterGather and serializes the §2.5 response / §2.6 error body.
+/// ScatterGather and serializes the response / error body.
 ///
-/// 🚩 D3.5 FLAG: this is the handler logic only. Mounting it on the live HTTP server
+/// 🚩 integration FLAG: this is the handler logic only. Mounting it on the live HTTP server
 /// route table (httplib/Drogon binding, request-context plumbing, the
-/// AuthMiddleware-populated AuthContext) is **D3.5**. Standalone it is driven
+/// AuthMiddleware-populated AuthContext) is **integration**. Standalone it is driven
 /// directly with a parsed JSON body + an AuthContext, so the parse → deprecation →
 /// validate → scatter → serialize pipeline is fully unit-testable now.
 class CrossNsQueryHandler {
@@ -51,7 +51,7 @@ public:
     HandlerResult Handle(const nlohmann::json& body, const AuthContext& auth,
                          const QueryContext* routing_ctx = nullptr);
 
-    /// Parse a cross-NS QueryRequest from a JSON body (§2.4 schema). Returns
+    /// Parse a cross-NS QueryRequest from a JSON body (schema). Returns
     /// InvalidArgument with a message starting `CX_ERR_DEPRECATED_FIELD` when the
     /// deprecated single `namespace` field is present (topic 4.1 B'), or a plain
     /// InvalidArgument for a malformed/empty request. The token in the message lets

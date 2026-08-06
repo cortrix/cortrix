@@ -7,10 +7,10 @@
 namespace cortrix::retrieval {
 
 /// HeuristicGuardBackend — the standalone (no-ONNX) CRAG inference backend
-/// (C-R1 briefing: real DistilBERT-tiny inference is D3.5-deferred; standalone
+/// (C-R1 briefing: real DistilBERT-tiny inference is integration-deferred; standalone
 /// uses a heuristic guard stub). It derives a verdict score purely from the
 /// precomputed multi-signals, so CragEvaluator is fully exercisable + testable
-/// without any model. In D3.5 this is swapped for OnnxCragBackend behind the same
+/// without any model. In integration this is swapped for OnnxCragBackend behind the same
 /// ICragClassifierBackend interface.
 ///
 /// Scoring: a weighted blend of top1 (dominant relevance) and the high-score ratio

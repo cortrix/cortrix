@@ -6,7 +6,7 @@
 #include "cortrix/memory/memory_extract_error.h"
 
 // DEPTH — a dedicated suite for ContradictionDetector::ParseJudgmentJson (the
-// static single-object JSON parse contract used by the memory extraction D5 judge). The
+// static single-object JSON parse contract used by the memory extraction judge). The
 // existing test_memory_extractor.cpp only smoke-tests valid / "not json" /
 // missing-verdict via the MemoryExtractor delegate; this suite pins every
 // reachable arm of the parser directly: the bool/numeric verdict accept, the

@@ -1,4 +1,4 @@
-// Index S4 — snapshot + crash recovery tests (design § 4.3/4.4 / § 6 S4).
+// Index S4 — snapshot + crash recovery tests (design S4).
 //
 // Exercises PHnsw's durable lifecycle end to end: write -> reopen replays the
 // WAL; Snapshot() captures the graph + truncates the WAL; reopen after a

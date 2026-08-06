@@ -188,7 +188,7 @@ TEST_F(AdminUsersRoutesTest, NoAuthIsUnauthenticated) {
     EXPECT_EQ(res->status, 401);
 }
 
-// ---- error bodies (§2.13-bis 404 / 409 / 422) --------------------------------
+// ---- error bodies (404 / 409 / 422) --------------------------------
 
 TEST_F(AdminUsersRoutesTest, UpdateMissingUserIs404) {
     httplib::Client cli("127.0.0.1", port_);

@@ -39,10 +39,10 @@ constexpr int kMemoryExtractErrorCodeCount = 5;
 /// Canonical, immutable attributes of one error code.
 struct MemoryExtractErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
-    int http_status;                          ///< §5.3 HTTP column (504/500/429/503)
+    int http_status;                          ///< HTTP column (504/500/429/503)
     agent_friendly::ErrorCategory category;   ///< transient/timeout/quota/permanent
-    bool retryable;                           ///< §5.3 retryable column
-    std::optional<int> retry_after_ms;        ///< §5.3 retry hint (5000 for retryable LLM, null otherwise)
+    bool retryable;                           ///< retryable column
+    std::optional<int> retry_after_ms;        ///< retry hint (5000 for retryable LLM, null otherwise)
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never
@@ -52,7 +52,7 @@ const MemoryExtractErrorInfo& GetMemoryExtractErrorInfo(MemoryExtractErrorCode c
 /// The "CX_ERR_*" string for `code`.
 const char* MemoryExtractErrorCodeString(MemoryExtractErrorCode code);
 
-/// The §5.3 HTTP status code for `code`.
+/// The HTTP status code for `code`.
 int MemoryExtractErrorHttpStatus(MemoryExtractErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5,

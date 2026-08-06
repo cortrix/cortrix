@@ -8,7 +8,7 @@
 #include "cortrix/logging/logging.h"
 #include "cortrix/common/version.h"                       // [P5] version SoT
 #include "cortrix/observability/operation_logger.h"       // ns_* operation_log
-#include "cortrix/observability/operation_log_emitter.h"  // §9.1 MakeEngineEntry / EmitSite
+#include "cortrix/observability/operation_log_emitter.h"  // MakeEngineEntry / EmitSite
 
 #include <cstdlib>
 #include <cctype>
@@ -99,7 +99,7 @@ const std::unordered_map<std::string, std::pair<ErrorCategory, bool>>& Sdk3Map()
 }
 
 // StatusCode -> GEN-Agent category fallback (ERROR_CODE_SDK_MAP sec.4.1 HTTP-default
-// column / AGENT_FRIENDLY #4) for codes the sec.3 map does not list (incl. bare
+// column / the Agent-friendly contract #4) for codes the sec.3 map does not list (incl. bare
 // Status with no token). The Status primitive is a lossy carrier (catalog_error.h:
 // "deliberately do NOT widen cortrix::Status"), so quota/timeout domain codes that
 // coarsen onto kPermissionDenied/kInvalidArgument approximate here - the sec.3 map
@@ -123,7 +123,7 @@ ErrorCategory StatusCodeToCategory(StatusCode code) {
     }
 }
 
-// StatusCode -> retry signal fallback (AGENT_FRIENDLY #6). Only the transient class
+// StatusCode -> retry signal fallback (the Agent-friendly contract #6). Only the transient class
 // (500 Internal / 503 Unavailable) is retryable; client-fault classes are not.
 bool StatusCodeRetryable(StatusCode code) {
     return code == StatusCode::kInternal || code == StatusCode::kUnavailable;
@@ -318,7 +318,7 @@ ResolvedError ResolveError(const Status& status) {
 
 void WriteJsonError(httplib::Response& res, const Status& status, const std::string& request_id) {
     nlohmann::json body;
-    // GEN-Agent error schema (AGENT_FRIENDLY sec.3.1 - 6 fields). The legacy
+    // GEN-Agent error schema (the Agent-friendly contract sec.3.1 - 6 fields). The legacy
     // code/message/request_id/timestamp are preserved; retryable/category/
     // retry_after_ms/structured_data are added so Agents can route deterministically
     // (R2-C3). code/category/retryable resolve via the CX_ERR_* token + sec.3 SoT
@@ -400,7 +400,7 @@ void CortrixHttpServer::RegisterRoutes() {
 
     // Global exception handler (R2-M2). Without this, any exception a route
     // handler fails to catch escapes to cpp-httplib's default, which returns a
-    // bare text/plain 500 - an Agent cannot route on it (violates AGENT_FRIENDLY
+    // bare text/plain 500 - an Agent cannot route on it (violates the Agent-friendly contract
     // principle 1). Re-emit the GEN-Agent error envelope so the schema stays
     // uniform. An uncaught exception is an internal *bug*, not a transient blip,
     // so it is category=permanent / retryable=false (a blind retry would just
@@ -590,7 +590,7 @@ void CortrixHttpServer::SetEdition(const std::string& edition) {
 
 void CortrixHttpServer::EmitNsLog(const std::string& action, const std::string& name) {
     if (!op_logger_) return;  // observability strictly additive (C4)
-    // §9.1 NamespaceManager → resource_type "namespace"; resource_id = the NS name
+    // NamespaceManager → resource_type "namespace"; resource_id = the NS name
     // (the namespace_id in this single-SoT model). user_id / trace_id / session_id
     // come from the thread-local ObservabilityContext (request thread, WithAuth).
     auto entry = observability::MakeEngineEntry(observability::EmitSite::kNamespaceManager, action,

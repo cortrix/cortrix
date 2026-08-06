@@ -14,7 +14,7 @@ namespace cortrix::reranker {
 /// MakeRerankerError); cortrix-server's startup aborts on a non-OK Status
 /// (fail-fast, mirrors the ONNX StartupValidator).
 ///
-/// Standalone (D3): this validates *given* values. Reading the live GUCs
+/// Standalone: this validates *given* values. Reading the live GUCs
 /// (spc.chunk_size, reranker.max_seq_length) from IGlobalConfig and invoking this
 /// in the live cortrix-server startup sequence is cross-Feature wiring deferred to
 /// later (same discipline as StartupValidator::CollectRegisteredOnnxModels).

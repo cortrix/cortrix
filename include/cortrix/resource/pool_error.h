@@ -15,7 +15,7 @@ namespace cortrix::resource {
 /// canonical registry below — the exact pattern CatalogErrorCode uses
 /// (it is the template).
 ///
-/// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
+/// Per the coding conventions, Cortrix uses Result<T> + Status only (no
 /// Result<T,E>): the spec's `Result<…, PoolError>` is read as Result<T> / Status,
 /// and a domain error is carried as cortrix::agent_friendly::AgentFriendlyError,
 /// identified by its CX_ERR_* code. So PoolErrorCode is the *enum of identities*
@@ -65,9 +65,9 @@ const std::vector<std::string>& RequiredStructuredDataKeys(PoolErrorCode code);
 bool HasRequiredStructuredData(PoolErrorCode code,
                                const nlohmann::json& structured_data);
 
-/// Build the Agent-friendly boundary error for `code` (§8.3 response bodies).
+/// Build the Agent-friendly boundary error for `code` (response bodies).
 /// category / retryable / retry_after_ms come from the registry — call sites
-/// supply only structured_data (the §8.1 required keys) and an optional message.
+/// supply only structured_data (the required keys) and an optional message.
 agent_friendly::AgentFriendlyError MakePoolError(
     PoolErrorCode code,
     nlohmann::json structured_data = nlohmann::json::object(),

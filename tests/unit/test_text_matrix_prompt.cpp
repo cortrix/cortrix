@@ -1,4 +1,4 @@
-// Breadth matrix for cortrix::memory prompt_templates text helpers (D10):
+// Breadth matrix for cortrix::memory prompt_templates text helpers:
 //   - ContainsCjk(text): true iff any UTF-8 3-byte sequence decodes to
 //     U+4E00..U+9FFF (CJK Unified Ideographs). 2-byte/4-byte/ASCII never match.
 //   - RenderPrompt(tmpl, token, value): single-pass replace ALL occurrences of

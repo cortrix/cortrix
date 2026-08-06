@@ -10,9 +10,9 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/metadata/metadata_error.h"
 
-// META block S1.2 / §5.1 coverage: the 3 metadata error identities — CX_ERR_*/CX_WARN_*
+// META block S1.2 / coverage: the 3 metadata error identities — CX_ERR_*/CX_WARN_*
 // identity, category mapping, retryability, the GEN-Agent 4-field boundary factory,
-// the §5.1.1 structured_data contract, and the Status bridge. Mirrors the project
+// the structured_data contract, and the Status bridge. Mirrors the project
 // reference test tests/unit/test_import_error.cpp (template A).
 namespace cortrix::metadata {
 namespace {
@@ -55,7 +55,7 @@ TEST(MetadataErrorTest, EveryCodeHasUniqueWellFormedCxString) {
               "CX_ERR_METADATA_FIELD_IMMUTABLE");
 }
 
-// §5.1 column values pinned exactly (HTTP / category / retryable).
+// column values pinned exactly (HTTP / category / retryable).
 TEST(MetadataErrorTest, RegistryMatchesSpecTable) {
     auto info = [](MetadataErrorCode c) { return GetMetadataErrorInfo(c); };
 
@@ -73,7 +73,7 @@ TEST(MetadataErrorTest, RegistryMatchesSpecTable) {
 }
 
 // retry_after_ms is present iff retryable (GEN-Agent #6). All 3 codes are
-// non-retryable → all have null retry_after_ms (§5.1).
+// non-retryable → all have null retry_after_ms.
 TEST(MetadataErrorTest, RetryAfterMsConsistentWithRetryable) {
     for (MetadataErrorCode code : AllCodes()) {
         const MetadataErrorInfo& info = GetMetadataErrorInfo(code);
@@ -102,7 +102,7 @@ TEST(MetadataErrorTest, MakeErrorPopulatesAgentFriendlyFields) {
     ASSERT_TRUE(err.structured_data.has_value());
     EXPECT_EQ((*err.structured_data)["parser_parse_status"], "failed");
 
-    // Serializes to the §3.1 error body shape (retry_after_ms → JSON null).
+    // Serializes to the error body shape (retry_after_ms → JSON null).
     auto body = agent_friendly::ToJson(err);
     EXPECT_EQ(body["code"], "CX_ERR_METADATA_GEN_FAILED");
     EXPECT_EQ(body["category"], "permanent");
@@ -116,13 +116,13 @@ TEST(MetadataErrorTest, EmptyMessageFallsBackToCode) {
     EXPECT_EQ(err.message, "CX_ERR_METADATA_FIELD_IMMUTABLE");
 }
 
-// Required structured_data keys (GEN-Agent #5, §5.1.1 example bodies).
+// Required structured_data keys (GEN-Agent #5, example bodies).
 TEST(MetadataErrorTest, RequiredStructuredDataContract) {
     // PARTIAL's required top-level keys are contextual (warning body built by the
     // response layer's meta.warnings[]).
     EXPECT_TRUE(RequiredStructuredDataKeys(MetadataErrorCode::kPartial).empty());
 
-    // GEN_FAILED full body (§5.1.1 example A).
+    // GEN_FAILED full body (example A).
     nlohmann::json gen_full = {
         {"doc_id", "d"}, {"namespace_id", "n"}, {"stage", "s"},
         {"missing_fields", nlohmann::json::array()},
@@ -132,7 +132,7 @@ TEST(MetadataErrorTest, RequiredStructuredDataContract) {
     nlohmann::json gen_partial = {{"doc_id", "d"}};
     EXPECT_FALSE(HasRequiredStructuredData(MetadataErrorCode::kGenFailed, gen_partial));
 
-    // FIELD_IMMUTABLE full body (§5.1.1 example B).
+    // FIELD_IMMUTABLE full body (example B).
     nlohmann::json imm_full = {
         {"doc_id", "d"}, {"namespace_id", "n"},
         {"attempted_fields", nlohmann::json::array()},

@@ -12,7 +12,7 @@
 #include "cortrix/config/auth_config.h"
 
 // Auth S1 coverage: JwtSecretService::LoadOrInit + AuthConfigService::
-// LoadOrInitDefaults (auth §S1 steps 3-5 / §2.11 / §2.12 / §3.6).
+// LoadOrInitDefaults (auth steps 3-5 /).
 namespace cortrix::auth {
 namespace {
 
@@ -80,7 +80,7 @@ TEST(JwtSecretServiceTest, LoadExistingAcrossRestart) {
 }
 
 // `JwtSecret_EnvOverride`: CORTRIX_JWT_SECRET set → that value is used + written
-// through as the sole current secret (advanced K8s/docker path, §2.11 step 1).
+// through as the sole current secret (advanced K8s/docker path, step 1).
 TEST(JwtSecretServiceTest, EnvOverride) {
     const std::string path = std::string(::testing::TempDir()) + "auth_jwt_env.db";
     std::remove(path.c_str());
@@ -131,7 +131,7 @@ TEST(JwtSecretServiceTest, NullDbHandleFails) {
     EXPECT_FALSE(svc.initialized());
 }
 
-// `AuthConfig_LoadDefaults_FirstStart`: fresh db → the §3.6 default key set is
+// `AuthConfig_LoadDefaults_FirstStart`: fresh db → the default key set is
 // written, and the loaded snapshot matches the documented defaults.
 TEST(AuthConfigServiceTest, LoadDefaultsFirstStart) {
     PlatformDb pdb;

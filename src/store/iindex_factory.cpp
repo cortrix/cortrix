@@ -35,7 +35,7 @@ Result<std::unique_ptr<IIndex>> PhnswIndexFactory::Create(const std::string& uni
 }
 
 Result<std::unique_ptr<IIndex>> PhnswIndexFactory::Open(const std::string& unit_data_dir) {
-    // Open loads an existing Unit (its ctor runs Recover). D35-NEW-01: read the
+    // Open loads an existing Unit (its ctor runs Recover).-NEW-01: read the
     // persisted dim/M from the newest snapshot's .meta footer so the index is
     // reconstructed with the Unit's real graph parameters (an L2Space of the right
     // dimension) instead of assuming defaults. On a fresh Unit with no snapshot

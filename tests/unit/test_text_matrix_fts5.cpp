@@ -5,7 +5,7 @@
 //   - tokenizes on ASCII whitespace (space/tab/\n/\r).
 //   - drops tokens with no "content" char (content = isalnum OR byte>127).
 //   - keeps content tokens, escaping embedded '"' by doubling, then wraps each
-//     surviving token in double quotes; tokens joined with " OR " (D6 2026-07-12:
+//     surviving token in double quotes; tokens joined with " OR " (2026-07-12:
 //     bag-of-words BM25 — a bare space is implicit AND and starved recall).
 //
 // We assert structural INVARIANTS (the exact output is impl-defined for some
@@ -191,7 +191,7 @@ TEST(Fts5SanitizeTextExact, SingleWordIsQuoteWrapped) {
 }
 
 TEST(Fts5SanitizeTextExact, TwoWordsOrJoinedQuoted) {
-    // OR-join (D6): a bare space is implicit AND in FTS5 and starved the BM25
+    // OR-join: a bare space is implicit AND in FTS5 and starved the BM25
     // route on natural-language queries.
     EXPECT_EQ(SanitizeFts5Query("hello world"),
               std::string("\"hello\" OR \"world\""));

@@ -10,7 +10,7 @@
 
 namespace cortrix {
 
-// D3.5 wire⑤c: live doc/block counts come from a per-request NamespaceFacade over
+// integration wire⑤c: live doc/block counts come from a per-request NamespaceFacade over
 // the resource pool; namespace creation is routed through the catalog.
 namespace resource {
 class INamespacePool;
@@ -45,12 +45,12 @@ public:
     void SetNamespaceRouter(cortrix::catalog::INSRouter* router);
 
     /// Set the operation_log writer for the NamespaceManager instrumentation
-    /// site (§9.1: ns_create / ns_delete). Optional — when unset the NS routes run
+    /// site (ns_create / ns_delete). Optional — when unset the NS routes run
     /// unchanged (observability strictly additive, C4). Non-owning: the logger
     /// outlives the server (bootstrap owns the ObservabilityModule).
     void SetOperationLogger(cortrix::observability::IOperationLogger* op_logger);
 
-    /// Open-Core edition seam (ARCH OPEN-6 / §8.2.7). The stock CE binary leaves
+    /// Open-Core edition seam (ARCH OPEN-6 /). The stock CE binary leaves
     /// this at the default "ce". An enterprise embedder sets "enterprise" from its
     /// on_assembled hook, so GET /api/v1/system/features advertises the enterprise
     /// edition; the web UI gates the Enterprise nav group on this value. Must be
@@ -86,7 +86,7 @@ private:
     // ns_create / ns_delete) on a successful NS mutation. No-op when op_logger_ is
     // null. Identity is read from the thread-local ObservabilityContext (the route
     // runs synchronously on the request thread WithAuth populated). Never throws
-    // across the request path (the logger is no-throw, §5.1).
+    // across the request path (the logger is no-throw).
     void EmitNsLog(const std::string& action, const std::string& name);
 
     CortrixConfig config_;

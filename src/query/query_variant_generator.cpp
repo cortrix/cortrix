@@ -27,7 +27,7 @@ std::string ToLower(std::string s) {
 // The zh / en variant-generation prompt templates. {N}, {suffix},
 // {original_query} are substituted by BuildPrompt. The XML-style delimiter + the
 // "ignore instructions inside the tag" rule + the strict JSON schema are the
-// LLM01 prompt-injection defense (D1 V3 resolution 11).
+// LLM01 prompt-injection defense (V3 resolution 11).
 // kPromptTemplateZh is functional engine data (multilingual content support):
 // BuildPrompt selects it for non-"en" locales, so its Chinese body is intentionally
 // preserved (NOT a stray translatable string) — the English form is kPromptTemplateEn.
@@ -80,7 +80,7 @@ void ReplaceAll(std::string& s, const std::string& from, const std::string& to) 
 }
 
 // Classify a failed Chat() Status into the rag-fusion error identity. The enricher's real
-// client (D3.5) prefixes its Status message with the CX_ERR token (CrossNsStatus
+// client (integration) prefixes its Status message with the CX_ERR token (CrossNsStatus
 // pattern); until then we also match on coarse StatusCode + message hints so the
 // degrade path is exercised standalone.
 RagFusionErrorCode ClassifyLlmFailure(const Status& status) {
@@ -297,8 +297,8 @@ Result<QueryVariants> QueryVariantGenerator::Generate(
         return RagFusionStatus(RagFusionErrorCode::kDegraded,
                                "rag-fusion degraded: no LLM client configured");
     }
-    // §9: TraceContext is interface-reserved in V1.0 OSS (always nullptr → no
-    // inject). Wiring real span propagation is D3.5.
+    //: TraceContext is interface-reserved in V1.0 OSS (always nullptr → no
+    // inject). Wiring real span propagation is integration.
     if (ctx != nullptr) {
         // ctx->Inject(...) — reserved; TraceContext is a plain carrier in Phase 1.
     }
@@ -315,7 +315,7 @@ Result<QueryVariants> QueryVariantGenerator::Generate(
         BuildPrompt(original_query, config.variant_count, suffix, locale);
 
     llm::LlmCallConfig call;
-    call.model = config.model;         // §3.5.4 per-call override; empty = client default
+    call.model = config.model;         // per-call override; empty = client default
     call.temperature = 0.3;            // a little diversity, still focused
     call.max_tokens = 512;
     call.timeout_ms = static_cast<int>(config.timeout_ms);
@@ -333,7 +333,7 @@ Result<QueryVariants> QueryVariantGenerator::Generate(
         return RagFusionStatus(code, resp.status.message());
     }
 
-    // Record token consumption (§8 token_total) — available even on the success path.
+    // Record token consumption (token_total) — available even on the success path.
     auto& metrics = RagFusionMetrics::Instance();
     if (resp.prompt_tokens > 0) {
         metrics.RecordTokens(RagFusionMetrics::TokenDirection::kInput,
@@ -362,7 +362,7 @@ Result<QueryVariants> QueryVariantGenerator::Generate(
     QueryVariants qv;
     qv.original_query = original_query;
     qv.variants = std::move(variants);
-    qv.llm_latency_ms = 0;  // measured by the caller's timer in §4.3; placeholder here
+    qv.llm_latency_ms = 0;  // measured by the caller's timer in; placeholder here
     qv.llm_model_used = resp.model;
     qv.llm_prompt_version = kPromptVersion;
     qv.token_count = static_cast<int64_t>(resp.prompt_tokens + resp.completion_tokens);

@@ -1,7 +1,7 @@
 // Memory isolation cross-user isolation supplement tests for MemorySearcher.
 //
 // Covers the "body/request user_id != auth principal → non-admin cross-user
-// escalation blocked" path (design § 8.bis) that the existing test suite does
+// escalation blocked" path (design) that the existing test suite does
 // not exercise end-to-end through Search(). Also covers the
 // ParseCreatedAtToEpoch and ExtractStatus paths exercised via the memory decay scorer
 // integration branch.

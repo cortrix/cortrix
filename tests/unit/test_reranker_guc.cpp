@@ -10,7 +10,7 @@ namespace cortrix::reranker {
 namespace {
 
 TEST(RerankerGucTest, DefaultConfigIsValid) {
-    RerankerConfig c;  // struct defaults = §2.4 defaults
+    RerankerConfig c;  // struct defaults = defaults
     EXPECT_TRUE(RerankerGuc::ValidateConfig(c).ok());
     EXPECT_EQ(c.queue_size, 200);
     EXPECT_EQ(c.task_timeout_ms, 5000);

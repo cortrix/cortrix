@@ -25,7 +25,7 @@ Status RerankerGuc::ValidateConfig(const RerankerConfig& config) {
     s = ValidateRange(guc::kMaxSeqLength, config.max_seq_length,
                       guc::kMaxSeqLenMin, guc::kMaxSeqLenMax);
     if (!s.ok()) return s;
-    // Circuit-breaker bounds are sanity-checked (must be positive); §2.4 lists no
+    // Circuit-breaker bounds are sanity-checked (must be positive); lists no
     // hard upper bound, so only reject non-positive values.
     if (config.circuit_breaker_threshold <= 0) {
         return Status::InvalidArgument(std::string(guc::kCircuitThreshold) +

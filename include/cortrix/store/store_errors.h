@@ -6,11 +6,11 @@
 // Store-layer Repository-pattern error codes.
 //
 // The Store-layer interfaces (ParentChunkStore today; future ChunkStore impls)
-// share one error model. Per CODING_CONVENTIONS § 3 the project uses Result<T> /
+// share one error model. Per the coding conventions the project uses Result<T> /
 // Status and distinguishes domain errors by a stable CX_ERR_* code string rather
 // than a typed Result<T, E>; we carry that code as a prefix on the Status message
 // ("<CODE>: <detail>"). The design's `Result<ParentChunk, StoreError>` /
-// `StoreError{code,...}` (§ 2.5/§ 2.5.1, written pre-F-FREEZE-1) reconciles to
+// `StoreError{code,...}` (written pre-F-FREEZE-1) reconciles to
 // this here. Same shape as store/pwl_errors.h.
 namespace cortrix::store {
 
@@ -25,7 +25,7 @@ inline constexpr char kDbError[]  = "CX_ERR_STORE_DB_ERROR";   ///< underlying S
 /// CX_ERR_STORE_* identity alongside the human-readable detail. `sc` is the coarse
 /// StatusCode the boundary maps to HTTP; the precise identity is `code`. The
 /// API/SDK/MCP boundary lifts `code` into the AgentFriendlyError `code` field
-/// (NOT_FOUND → permanent; DB_ERROR → transient/retryable, § 2.5.1).
+/// (NOT_FOUND → permanent; DB_ERROR → transient/retryable).
 inline Status StoreStatus(StatusCode sc, const char* code, const std::string& detail) {
     return Status(sc, std::string(code) + ": " + detail);
 }

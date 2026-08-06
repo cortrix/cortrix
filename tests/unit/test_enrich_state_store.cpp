@@ -1,5 +1,5 @@
 // enrich_state sidecar table: schema provider migration + store helpers
-// (addendum §3.7 — coverage SoT for the chunk-level enrichment chain).
+// (addendum — coverage SoT for the chunk-level enrichment chain).
 #include <gtest/gtest.h>
 
 #include <sqlite3.h>

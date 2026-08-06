@@ -12,7 +12,7 @@ import type {
   MemoryInvalidateResponse,
 } from '../types/api';
 
-// Memory Transparency client (4 endpoints, web UI design § 7.2):
+// Memory Transparency client (4 endpoints, web UI design):
 //   GET    /api/v1/memory?explain={bool}   list
 //   POST   /api/v1/memory                  create
 //   PATCH  /api/v1/memory/{id}             edit (server sets extraction_method=user_edit)
@@ -21,7 +21,7 @@ import type {
 // Mock fallback is build-time gated (./fallback.ts): production surfaces every
 // error; only a standalone build falls back to the in-memory mock (and a 4xx
 // still surfaces). Cross-feature wiring (content materialization, real auth) is
-// deferred to D3.5.
+// deferred to integration.
 
 const BASE = '/api/v1/memory';
 

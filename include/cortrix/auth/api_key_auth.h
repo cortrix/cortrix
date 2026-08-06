@@ -34,7 +34,7 @@ public:
     /// Load API key list from config
     void LoadKeys(const std::vector<ApiKeyConfig>& keys);
 
-    /// [D3.5 r2 · Wave P · P1] Bind the platform.db-backed ApiKeyService so keys
+    /// [integration r2 · Wave P · P1] Bind the platform.db-backed ApiKeyService so keys
     /// minted at runtime (bootstrap admin key + /auth/api-keys) authenticate too.
     /// When set, Authenticate() falls back to ApiKeyService::ValidateApiKey on a
     /// config-map miss: a valid DB key yields an admin AuthContext (the CE single-

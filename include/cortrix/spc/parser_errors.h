@@ -15,7 +15,7 @@ namespace cortrix::spc {
 /// `CX_ERR_*` string + a GEN-Agent category + retryability via the canonical
 /// registry below.
 ///
-/// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
+/// Per the coding conventions, Cortrix uses Result<T> + Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// So ParserErrorCode is the *enum of identities*, and MakeParserError() turns
@@ -26,7 +26,7 @@ namespace cortrix::spc {
 /// ParsedDoc.status wire value the Python bridge returns over JSON.
 ///
 /// EMPTY_DOCUMENT (9) is *not* an error: an all-blank document returns
-/// status=OK, pages=[] (§5.1 / §5.2). It is kept in the enum for the bridge's
+/// status=OK, pages=[]. It is kept in the enum for the bridge's
 /// status field but carries category NONE — see GetParserErrorInfo.
 enum class ParserErrorCode : uint8_t {
     kOk = 0,
@@ -51,22 +51,22 @@ enum class ParserErrorCode : uint8_t {
 /// the API-compatibility regression test (the set must not shrink).
 constexpr int kParserErrorCodeCount = 16;
 
-/// Canonical, immutable attributes of one error code (§5.2 columns). Mirrors
+/// Canonical, immutable attributes of one error code (columns). Mirrors
 /// catalog::CatalogErrorInfo so the two registries read identically.
 struct ParserErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null unless retryable per §5.2
+    std::optional<int> retry_after_ms;        ///< null unless retryable per
 };
 
 /// True iff `code` denotes a successful (non-error) outcome. kOk and
-/// kEmptyDocument both yield status=OK responses (§5.1: empty doc is not an
+/// kEmptyDocument both yield status=OK responses (empty doc is not an
 /// error); every other code is an error to be surfaced as an AgentFriendlyError.
 bool IsParserOk(ParserErrorCode code);
 
 /// Look up the canonical attributes for `code`. Total over the enum (never
-/// throws / never returns a partial). Single source of truth for the §5.2 rows.
+/// throws / never returns a partial). Single source of truth for the rows.
 const ParserErrorInfo& GetParserErrorInfo(ParserErrorCode code);
 
 /// The "CX_ERR_*" string for `code` (convenience over GetParserErrorInfo).
@@ -84,7 +84,7 @@ bool HasRequiredParserStructuredData(ParserErrorCode code,
                                      const nlohmann::json& structured_data);
 
 /// Build the Agent-friendly boundary error for `code`, attaching `structured_data`
-/// (the §5.2 required keys are the caller's responsibility at each call site) and
+/// (the required keys are the caller's responsibility at each call site) and
 /// an optional human-readable `message`. category / retryable / retry_after_ms are
 /// filled from the canonical registry — call sites never restate them.
 /// Precondition: `code` is an error code (!IsParserOk).

@@ -7,8 +7,8 @@
 
 // MET-10 coverage: the 6 cortrix_tasks_* metrics — counters/gauge/
 // histogram recording + the OpenMetrics renderer + label-enum discipline
-// (OBS_SPEC §3.2 no high-cardinality labels). Note metric names are
-// `cortrix_tasks_*` (the locked OBS_SPEC §2.3 names).
+// (OBS_SPEC no high-cardinality labels). Note metric names are
+// `cortrix_tasks_*` (the locked OBS_SPEC names).
 namespace cortrix::async {
 namespace {
 
@@ -126,7 +126,7 @@ TEST_F(TaskMetricsTest, DurationHistogramBucketsAreCumulativeAndComplete) {
 }
 
 TEST_F(TaskMetricsTest, RenderHasNoHighCardinalityLabels) {
-    // OBS_SPEC §3.2: no task_id / namespace_id / doc_id labels ever appear.
+    // OBS_SPEC: no task_id / namespace_id / doc_id labels ever appear.
     M().RecordSubmitted(kTaskDocParse);
     M().RecordCompleted(kTaskDocParse, CompletionStatus::kSuccess);
     std::string out = M().RenderOpenMetrics();

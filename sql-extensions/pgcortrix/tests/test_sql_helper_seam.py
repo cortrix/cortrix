@@ -4,7 +4,7 @@ the helper methods accept.
 The SQL DDL (sql/pgcortrix--1.0.sql) and the Python helper (python/
 pgcortrix_helper.py) live in separate files but are coupled: each plpython3u
 body does `client.<method>(<args>)`. Off a live PG nothing forces them to agree,
-so a rename on one side would only surface at D3.5. This test parses both and
+so a rename on one side would only surface at integration. This test parses both and
 asserts every `client.<m>(...)` call in the SQL matches a PgcortrixClient method
 with the same positional arity.
 

@@ -13,9 +13,9 @@ namespace {
 // switches below are intentionally exhaustive: -Wswitch turns "added a code
 // without a row" into a build failure, so the registry can't drift from the enum.
 //
-// retry_after_ms (§7 table): LLM_TIMEOUT 5000 / LLM_BUDGET_EXCEEDED 60000 are
+// retry_after_ms (table): LLM_TIMEOUT 5000 / LLM_BUDGET_EXCEEDED 60000 are
 // explicit; INVALID_OUTPUT + QUESTION_PARSE_FAILED are transient/retryable with
-// no §7-stated interval → a modest 200ms (re-ask the LLM). SCHEMA_VERSION_MISMATCH
+// no interval → a modest 200ms (re-ask the LLM). SCHEMA_VERSION_MISMATCH
 // + PARENT_NOT_FOUND are permanent (operator/data fix) → not retryable.
 constexpr HypeErrorInfo kLlmTimeout{
     "CX_ERR_HYPE_LLM_TIMEOUT", ErrorCategory::kTimeout, true, 5000};
@@ -49,7 +49,7 @@ const char* HypeErrorCodeString(HypeErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(HypeErrorCode code) {
-    // §7 structured_data column, 1:1. Function-local statics → stable references.
+    // structured_data column, 1:1. Function-local statics → stable references.
     static const std::vector<std::string> kTimeout{"chunk_id", "attempt_count",
                                                     "last_error_message"};
     static const std::vector<std::string> kInvalid{"chunk_id", "raw_output_preview",

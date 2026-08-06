@@ -25,9 +25,9 @@ exits 0 in that case so the C++ side reads the structured error from stdout
 rather than treating it as a crash; genuine crashes (uncaught) exit non-zero
 and the C++ side maps them to SUBPROCESS_CRASHED.
 
-D3 standalone note: real `docling` need not be installed on the dev machine —
+standalone note: real `docling` need not be installed on the dev machine —
 this script reports MISSING_DEPENDENCY cleanly, and DoclingParser wrapper logic
-is unit-tested against a mock bridge. Real docling end-to-end is D3.5.
+is unit-tested against a mock bridge. Real docling end-to-end is integration.
 """
 import argparse
 import json
@@ -35,7 +35,7 @@ import os
 import sys
 import time
 
-# ParserError integer codes (mirror parser_errors.h §2.7).
+# ParserError integer codes (mirror parser_errors.h).
 OK = 0
 FILE_NOT_FOUND = 1
 PARSE_TIMEOUT = 4
@@ -169,7 +169,7 @@ def ext_is_md(filepath):
 
 
 def parse_document(filepath, timeout, max_pages, lang_hint):
-    """Drive Docling and assemble the §3.1 page-level envelope.
+    """Drive Docling and assemble the page-level envelope.
 
     Returns the JSON-able dict (never raises for expected conditions; unexpected
     exceptions propagate to main() which maps them to a crash exit code).
@@ -181,7 +181,7 @@ def parse_document(filepath, timeout, max_pages, lang_hint):
 
     # Plain-text fast path (txt/md): no document *structure* to recover, so the
     # heavy docling stack is pointless — read the bytes, split paragraphs, emit
-    # the same §3.1 envelope. Keeps plain ingestion working on deployments that
+    # the same envelope. Keeps plain ingestion working on deployments that
     # ship without the docling dependency (the all-in-one image installs it only
     # for the real-model pass, D-R3 #483).
     ext = os.path.splitext(filepath)[1].lower().lstrip(".")
@@ -192,7 +192,7 @@ def parse_document(filepath, timeout, max_pages, lang_hint):
         from docling.document_converter import DocumentConverter
     except ImportError as e:
         # Dependency missing — surface as SUBPROCESS_FAILED so the Agent gets a
-        # clear, non-retryable signal (and D3.5 knows to install docling).
+        # clear, non-retryable signal (and integration knows to install docling).
         return _error(SUBPROCESS_FAILED,
                       "docling not installed: %s" % e,
                       structured_data={"code": "CX_ERR_SUBPROCESS_FAILED",

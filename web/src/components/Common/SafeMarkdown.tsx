@@ -2,7 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import DOMPurify from 'dompurify';
 
-// SafeMarkdown (web UI design § 4.7 — XSS defense: DOMPurify + rehypeSanitize).
+// SafeMarkdown (web UI design — XSS defense: DOMPurify + rehypeSanitize).
 //
 // Both the Chat assistant stream and the Search result snippets render
 // model-produced / user-supplied content as Markdown. Rendering that through a
@@ -21,7 +21,7 @@ import DOMPurify from 'dompurify';
 // plugin from re-opening the hole.
 //
 // Links: anchors are forced to rel="noopener noreferrer" + target="_blank" to
-// block reverse-tabnabbing (§ 4.7). data:/javascript: protocols are dropped by
+// block reverse-tabnabbing. data:/javascript: protocols are dropped by
 // the protocol allow-list below.
 
 // Allowed inline/markdown tags (web UI ALLOWED_TAGS).
@@ -75,7 +75,7 @@ export function SafeMarkdown({ content }: { content: string }) {
       // Layer 2 — re-sanitize the parsed tree against the allow-list schema.
       rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
       components={{
-        // Force every anchor to open safely (no reverse-tabnabbing, § 4.7).
+        // Force every anchor to open safely (no reverse-tabnabbing).
         a: ({ node: _node, ...props }) => (
           <a {...props} target="_blank" rel="noopener noreferrer" />
         ),

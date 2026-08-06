@@ -22,7 +22,7 @@ std::string ToIso8601Utc(std::chrono::system_clock::time_point tp) {
 
 namespace {
 
-// "/api/v1/import/tasks/<id>/progress" and ".../<id>" — the §5.1 self-links.
+// "/api/v1/import/tasks/<id>/progress" and ".../<id>" — the self-links.
 std::string ProgressEndpoint(const ImportTaskId& task_id) {
     return "/api/v1/import/tasks/" + task_id + "/progress";
 }
@@ -37,7 +37,7 @@ nlohmann::json BuildImportStartedResponse(const ImportTaskProgress& task,
                                           int64_t estimated_rows) {
     nlohmann::json body;
     body["task_id"] = task.task_id;
-    // §5.1: the POST /import/database response is the ACCEPTANCE ack — its status is
+    //: the POST /import/database response is the ACCEPTANCE ack — its status is
     // deterministically "queued" (enqueued, returned immediately). We do NOT echo
     // task.status here: a worker thread may already have advanced it to "running"
     // (or further) by the time the handler builds this body, which would race the
@@ -68,7 +68,7 @@ nlohmann::json BuildProgressResponse(const ImportTaskProgress& task) {
         task.estimated_completion_at
             ? nlohmann::json(ToIso8601Utc(*task.estimated_completion_at))
             : nlohmann::json(nullptr);
-    // §5.4 note: cancel is not an error — only the FAILED terminal state carries a body.
+    // note: cancel is not an error — only the FAILED terminal state carries a body.
     body["error"] = task.error ? agent_friendly::ToJson(*task.error) : nlohmann::json(nullptr);
     return body;
 }

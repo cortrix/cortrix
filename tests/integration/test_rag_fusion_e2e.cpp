@@ -1,13 +1,13 @@
-// RAG-Fusion integration tests (detail design §11.2: 7 IT, cases 23-29).
+// RAG-Fusion integration tests (detail design: 7 IT, cases 23-29).
 //
-// Standalone (B_R1_BRIEFING §7, mirroring cross-NS query's "7 §7.5 integration scenarios
+// Standalone (, mirroring cross-NS query's "7 integration scenarios
 // standalone via MockIScatterExecutor"): the live QueryPipeline + cross-NS query
 // ScatterGather wiring is integration-deferred, so these exercise the *end-to-end RAG-Fusion
 // flow* — RagFusion::ExpandQueries (LLM variant generation via the frozen
 // MockLlmClient) → simulated per-variant retrieval → RagFusion::FuseResults
 // (global RRF) — plus the Issue 5/6 phased-rollout invariants and the Issue 4
 // degrade path. The actual cross-Feature retrieval call is simulated with
-// crafted ScoredResult lists; wiring the real ScatterGather is the D3.5 step.
+// crafted ScoredResult lists; wiring the real ScatterGather is the integration step.
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
@@ -122,7 +122,7 @@ TEST_F(RagFusionE2ETest, E2E_RagFusion_LlmFailure_Degrade) {
     EXPECT_EQ(es.degrade_reason, "llm_timeout");
 
     // The QueryPipeline builds CX_WARN_RAG_FUSION_DEGRADED from this — verify the
-    // 4-field GEN-Agent body + the 3 required structured_data keys (§7).
+    // 4-field GEN-Agent body + the 3 required structured_data keys.
     auto warn = MakeRagFusionError(
         RagFusionErrorCode::kDegraded,
         {{"degrade_reason", "llm_timeout"},
@@ -149,7 +149,7 @@ TEST_F(RagFusionE2ETest, E2E_RagFusion_DisabledNs_DirectSingleQuery) {
     ASSERT_TRUE(qs.ok());
     ASSERT_EQ(qs.value().size(), 1u);
 
-    // Single query → caller returns per_variant_results[0] directly (§4.5 step 9
+    // Single query → caller returns per_variant_results[0] directly (step 9
     // else-branch); FuseResults of one list is the identity reorder.
     auto fused = svc->FuseResults(SimulateRetrieval(qs.value()), 60);
     ASSERT_TRUE(fused.ok());

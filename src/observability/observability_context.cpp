@@ -13,7 +13,7 @@ namespace {
 
 // CX_ERR_TRACE_INVALID_FILTER token. Carried in the Status message so
 // the exact identity survives to the API boundary, which re-inflates the
-// full Agent-friendly body (the §3.1 4-field schema). Kept as a literal here so
+// full Agent-friendly body (the 4-field schema). Kept as a literal here so
 // this widely-included shared TU does not pull in agent_trace_error.h (S7).
 constexpr const char* kInvalidFilterToken = "CX_ERR_TRACE_INVALID_FILTER";
 
@@ -71,7 +71,7 @@ void ObservabilityContext::LogStructured(LogLevel level, const std::string& msg)
     std::fprintf(stderr, "%s\n", line.c_str());
 }
 
-// ===== identity extension (§5.1 v1.0.1) =====
+// ===== identity extension (v1.0.1) =====
 
 ObservabilityContext ObservabilityContext::FromHttpHeaders(const HttpHeaders& headers) {
     ObservabilityContext ctx;
@@ -100,7 +100,7 @@ ObservabilityContext ObservabilityContext::FromMcpCapability(const McpSession& s
     ObservabilityContext ctx;
     ctx.created_at = NowMs();
     // session_id is already server-resolved (generated or validated) by
-    // McpSessionHandler (§7.1) — taken as-is, not re-validated here.
+    // McpSessionHandler — taken as-is, not re-validated here.
     if (!session.session_id.empty()) ctx.session_id = session.session_id;
     ctx.agent_id = session.agent_id;
     ctx.namespace_id = session.namespace_id;

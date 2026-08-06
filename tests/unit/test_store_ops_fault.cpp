@@ -103,7 +103,7 @@ protected:
 // =============================================================================
 // MATRIX 1 — every public CRUD op's injected-fault arm.
 //
-// Contract (cortrix_store_sqlite.h §4.5): SetFailNextOps(n) forces the next n
+// Contract (cortrix_store_sqlite.h): SetFailNextOps(n) forces the next n
 // public CRUD calls to return -1 WITHOUT touching the db. We arm exactly 1, run
 // one op, assert it returns -1, then assert the third (un-armed) call resumes
 // real behavior AND the store state is untouched by the faulted op.

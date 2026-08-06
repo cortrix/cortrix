@@ -7,7 +7,7 @@ namespace cortrix::store {
 
 namespace {
 
-// lookup_latency_seconds histogram bucket upper bounds (seconds), §2.5. Parallel
+// lookup_latency_seconds histogram bucket upper bounds (seconds), Parallel
 // string array for rendering exact `le` labels. The trailing +Inf bucket is
 // implicit (index kNumDurBuckets). A parent lookup is a single indexed SQLite
 // point query, so the bounds are sub-millisecond-centric.

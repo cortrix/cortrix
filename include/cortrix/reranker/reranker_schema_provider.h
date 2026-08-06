@@ -15,17 +15,17 @@ namespace cortrix::reranker {
 /// Phase 1 Migrate(0 → 1) is consequently a no-op: it registers with the
 /// SchemaMigrator purely so future reranker_config evolution runs inside the same
 /// versioned, atomic framework as the other Feature providers (mirrors the
-/// WatcherSchemaProvider / BlockFrameworkSchemaProvider pattern, ARCH §1.3.bis.3 topological
-/// order). Phase 2 (§2.4 NS JSONB extension) activates the `model` /
+/// WatcherSchemaProvider / BlockFrameworkSchemaProvider pattern, ARCH topological
+/// order). Phase 2 (NS JSONB extension) activates the `model` /
 /// `score_threshold` keys as per-NS overrides; those are JSON values inside the
 /// existing column (not new SQL columns), so the V1 → V2 step bumps
 /// CurrentVersion() without an ADD COLUMN.
 ///
-/// Implements the frozen cortrix::catalog::ISchemaProvider (D2-pre-5). Migrate
-/// returns Status, not Result<void> (F-FREEZE-1 / CODING_CONVENTIONS §3).
+/// Implements the frozen cortrix::catalog::ISchemaProvider. Migrate
+/// returns Status, not Result<void> (F-FREEZE-1 / the coding conventions).
 ///
-/// Standalone (D3): registering this with the live CatalogDb::Open(extra_providers)
-/// list at server bootstrap is cross-Feature wiring → D3.5; here it is fully
+/// Standalone: registering this with the live CatalogDb::Open(extra_providers)
+/// list at server bootstrap is cross-Feature wiring → integration; here it is fully
 /// unit-testable against a SchemaMigrator + the frozen base schema.
 class RerankerSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
@@ -33,7 +33,7 @@ public:
     std::string FeatureName() const override { return "reranker"; }
 
     /// Schema version. V1 = base reranker_config already in the catalog schema.
-    /// Phase 2 -> V2 (§2.4 NS JSONB extension).
+    /// Phase 2 -> V2 (NS JSONB extension).
     int CurrentVersion() const override { return 1; }
 
     /// Phase 1 (from_ver 0 → 1): no-op (reranker_config supplied by the catalog base

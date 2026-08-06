@@ -60,7 +60,7 @@ Status ParentChildSchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver)
     }
     if (!db) return Status::InvalidArgument("parent_child migrate: null db");
 
-    // --- parents table (kept under A; parent_text reverse-lookup, § D6) ---
+    // --- parents table (kept under A; parent_text reverse-lookup) ---
     // Created unconditionally (independent of blocks). Idempotent (IF NOT EXISTS).
     if (Status s = Exec(db, kParentsSchemaSql, "create parents"); !s.ok()) {
         return s;

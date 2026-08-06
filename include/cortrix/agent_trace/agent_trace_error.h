@@ -14,7 +14,7 @@ namespace cortrix::agent_trace {
 /// stable `CX_ERR_TRACE_*` string + a GEN-Agent category + retryability via the
 /// canonical registry below.
 ///
-/// Per CODING_CONVENTIONS §3 / F-FREEZE-1, Cortrix uses Result<T> + Status only
+/// Per the coding conventions / F-FREEZE-1, Cortrix uses Result<T> + Status only
 /// (no Result<T,E>); a domain error is carried as the Agent-friendly boundary
 /// type cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_*
 /// code. So AgentTraceErrorCode is the *enum of identities*, and MakeAgentTraceError() turns
@@ -24,10 +24,10 @@ namespace cortrix::agent_trace {
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may only be appended.
 enum class AgentTraceErrorCode {
-    kSessionNotFound,     ///< admin cross-user session does not exist (§8.1)
+    kSessionNotFound,     ///< admin cross-user session does not exist
     kInvalidFilter,       ///< invalid header / filter value (topic 9 — renamed from INVALID_SESSION_ID)
-    kInteractionNotFound, ///< GET /interactions/{id}/sources — interaction missing (§8.2)
-    kUnauthorized,        ///< non-admin cross-user query (§8.1/§8.3 anti-leak)
+    kInteractionNotFound, ///< GET /interactions/{id}/sources — interaction missing
+    kUnauthorized,        ///< non-admin cross-user query (anti-leak)
     kMcpSessionInvalid,   ///< MCP capability sessionId failed validation (v1.0.2)
     kSessionExpired,      ///< session past the retention window (v1.0.2)
     kInternal,            ///< unexpected server fault
@@ -63,7 +63,7 @@ bool HasRequiredStructuredData(AgentTraceErrorCode code,
                                const nlohmann::json& structured_data);
 
 /// Build the Agent-friendly boundary error for `code`, attaching `structured_data`
-/// (the §9.2 required keys are the caller's responsibility at each call site) and
+/// (the required keys are the caller's responsibility at each call site) and
 /// an optional human-readable `message`. category / retryable / retry_after_ms are
 /// filled from the canonical registry — call sites never restate them.
 agent_friendly::AgentFriendlyError MakeAgentTraceError(

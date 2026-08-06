@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 import type { InputHTMLAttributes, TextareaHTMLAttributes, ReactNode } from 'react';
 
-// Cortrix VI § 6.2 Input — text / textarea variants with error + focus states.
+// Cortrix VI Input — text / textarea variants with error + focus states.
 // (select / number reuse the native element styled by the same class set; the
 // dedicated Select component lives in Select.tsx.)
 

@@ -43,16 +43,16 @@ struct HypeFusedResult {
 ///           source_child_id).
 ///   Step 2: RRF fuse the two rank lists (contribution 1/(k+rank) per path).
 ///   Step 3: by-parent dedup — among children sharing a parent_id, keep the one
-///           with the highest rrf_score (§8.1 step 4). `parent_of` maps child_id
+///           with the highest rrf_score (step 4). `parent_of` maps child_id
 ///           → parent_id; a child absent from the map is its own dedup group
 ///           (kept as-is, empty parent_id).
 ///   Step 4: sort by rrf_score DESC (child_id tie-break), truncate to top_n.
 /// The 3 B-class explain fields are filled: via_hype + the best matched question
 /// + its score for any chunk that got a hype contribution.
 ///
-/// Standalone (D3): the real P-HNSW mixed-pool Search + the routing_path
-/// block_type filter (simple/chat skip type 16, §8) + ExpandParentText +
-/// QueryPipeline integration = D3.5; here the candidate pool + parent map are
+/// Standalone: the real P-HNSW mixed-pool Search + the routing_path
+/// block_type filter (simple/chat skip type 16) + ExpandParentText +
+/// QueryPipeline integration = integration; here the candidate pool + parent map are
 /// provided directly.
 std::vector<HypeFusedResult> FuseHypeRecall(
     const std::vector<HypeCandidate>& candidates,

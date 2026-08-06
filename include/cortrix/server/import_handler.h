@@ -13,12 +13,12 @@
 namespace cortrix::server {
 
 /// HTTP handler core for the 6 database-import endpoints. This is the request-
-/// parse + response-build logic the D3.5 httplib routes call; binding it into the
-/// real `httplib::Server` (+ AdminGuard middleware §6.1 two-layer protection) is D3.5 wiring, so
+/// parse + response-build logic the integration httplib routes call; binding it into the
+/// real `httplib::Server` (+ AdminGuard middleware two-layer protection) is integration wiring, so
 /// here it is a plain, fully-unit-testable class over the import/connection managers.
 ///
 /// Each method returns the JSON body to serialize + sets `out_http_status` to the
-/// §5.4 / §6.2 HTTP code. Errors are the Agent-friendly body (§5.3); the parse layer
+/// HTTP code. Errors are the Agent-friendly body; the parse layer
 /// maps a malformed request to CX_ERR_IMPORT_INVALID_SQL (400).
 class ImportHandler {
 public:
@@ -43,7 +43,7 @@ public:
     // DELETE /api/v1/import/tasks/{task_id} — cancel. 200 / 404.
     nlohmann::json HandleCancel(const std::string& task_id, int& out_http_status);
 
-    // POST /api/v1/admin/db-connections — register (D1). 200 / 400 / 403.
+    // POST /api/v1/admin/db-connections — register. 200 / 400 / 403.
     nlohmann::json HandleRegisterConnection(const nlohmann::json& body,
                                             const AuthContext& auth_ctx,
                                             int& out_http_status);

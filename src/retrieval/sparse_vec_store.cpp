@@ -21,8 +21,8 @@ Status WriteSparseVec(sqlite3* db, uint64_t block_id, const SparseVector& vec) {
                             std::string("WriteSparseVec prepare: ") + sqlite3_errmsg(db));
     }
 
-    // Empty vector (dead chunk, §6.5) → SQL NULL. A non-empty vector serializes to
-    // the §4.2 packed BLOB; an out-of-range term_id fails serialization.
+    // Empty vector (dead chunk) → SQL NULL. A non-empty vector serializes to
+    // the packed BLOB; an out-of-range term_id fails serialization.
     std::vector<uint8_t> blob;
     bool serialized_ok = true;
     if (!vec.empty()) {

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AppErrorBoundary } from './AppErrorBoundary';
 
-// AppErrorBoundary tests (web UI design § 16.3 / § 16.4 — JS exception placement).
+// AppErrorBoundary tests (web UI design — JS exception placement).
 // A child that throws on its first render shows the fallback; the reset button
 // re-renders the children (which then succeed) so the app recovers.
 
@@ -12,7 +12,7 @@ function Boom() {
   return <div data-testid="recovered">recovered</div>;
 }
 
-describe('AppErrorBoundary (§ 16.3)', () => {
+describe('AppErrorBoundary', () => {
   afterEach(() => {
     shouldThrow = true;
   });

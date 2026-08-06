@@ -25,7 +25,7 @@ struct ParserOptions {
     std::function<void(int page, int total, bool success)> on_page_progress = nullptr;
 };
 
-/// Chunk type. Serialized as the uppercase string of the §3.1 JSON protocol ("TEXT" etc.).
+/// Chunk type. Serialized as the uppercase string of the JSON protocol ("TEXT" etc.).
 enum class ChunkType : uint8_t {
     TEXT = 0,
     TABLE = 1,
@@ -35,7 +35,7 @@ enum class ChunkType : uint8_t {
 };
 
 const char* ToString(ChunkType type);
-/// Reverse: §3.1 JSON string → ChunkType (unknown string falls back to TEXT). Used by bridge JSON parsing (S2).
+/// Reverse: JSON string → ChunkType (unknown string falls back to TEXT). Used by bridge JSON parsing (S2).
 ChunkType ChunkTypeFromString(const std::string& s);
 
 /// Parsed paragraph-level text chunk (ParsedPage.paragraphs[] sub-structure).
@@ -89,7 +89,7 @@ struct DocumentMetadata {
 /// An error response (status != 0 and not EMPTY_DOCUMENT) carries the 4 fields of the Agent-friendly 7 principles
 /// (retryable / category / retry_after_ms / structured_data_json). Use
 /// MakeAgentFriendlyError() to obtain the canonical agent_friendly::AgentFriendlyError, serialized
-/// uniformly at the API/SDK/MCP boundary (AGENT_FRIENDLY §3.1). See §5 + parser_errors.h.
+/// uniformly at the API/SDK/MCP boundary (the Agent-friendly contract). See + parser_errors.h.
 struct ParsedDoc {
     ParserErrorCode status = ParserErrorCode::kOk;  ///< kOk / kEmptyDocument = success
     std::vector<ParsedPage> pages;          ///< Page-level output (v1.0.1 replaces chunks)
@@ -114,13 +114,13 @@ struct ParsedDoc {
 agent_friendly::AgentFriendlyError MakeAgentFriendlyError(const ParsedDoc& doc);
 
 /// Construct a failed ParsedDoc: fill the Agent-friendly fields (retryable /
-/// category / retry_after_ms) from the §5.2 registry + inject structured_data["code"]. The unified error
+/// category / retry_after_ms) from the registry + inject structured_data["code"]. The unified error
 /// exit for parsers/factories. parser_name marks the parser that produced the error.
 ParsedDoc MakeErrorDoc(ParserErrorCode code, const std::string& message,
                        nlohmann::json structured_data = nlohmann::json::object(),
                        const std::string& parser_name = "");
 
-/// Parse the bridge subprocess's stdout JSON (§3.1 page-level protocol) into a ParsedDoc.
+/// Parse the bridge subprocess's stdout JSON (page-level protocol) into a ParsedDoc.
 /// Tolerates missing fields (uses struct defaults); invalid JSON / non-object top level → INVALID_OUTPUT.
 /// An error reported by the bridge itself (status != 0 and non-empty) is also respected and mapped to the corresponding ParserErrorCode.
 /// @param json_str  subprocess stdout
@@ -133,7 +133,7 @@ ParsedDoc ParseBridgeJson(const std::string& json_str,
 /// If opts.on_page_progress is non-null, drive the callback per page (Q1 page-level progress): call once for each
 /// successful page of doc (success=true) and each failed_pages page (success=false); total =
 /// successful pages + failed pages; callbacks fire in ascending page-number order. The standalone implementation = a single
-/// replay after parsing completes (true per-page streaming driving requires incremental bridge output → D3.5). No callback when doc is an error result.
+/// replay after parsing completes (true per-page streaming driving requires incremental bridge output → integration). No callback when doc is an error result.
 void DrivePageProgress(const ParsedDoc& doc, const ParserOptions& opts);
 
 /// Abstract document parser interface. Pluggable: DoclingParser (default) / PaddleOCRParser

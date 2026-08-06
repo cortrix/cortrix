@@ -320,7 +320,7 @@ std::vector<PermissionService::BatchPermissionCheck> PermissionService::BatchChe
         c.can_write = CanWrite(ctx, ns_id);
         out.push_back(std::move(c));
     }
-    // cortrix_permission_check_total per-action metric wiring is D3.5 deferred.
+    // cortrix_permission_check_total per-action metric wiring is integration deferred.
     return out;
 }
 

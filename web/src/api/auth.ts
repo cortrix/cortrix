@@ -5,13 +5,13 @@ import type { AuthMeResponse, LoginResponse, BootstrapResponse } from '../types/
 
 // Auth client (auth / web UI — HttpOnly cookie model). All calls send
 // credentials:'include' via the shared client; mutations also carry the
-// X-CSRF-Token header (§ 4.6). The token itself is never read or stored by JS.
+// X-CSRF-Token header. The token itself is never read or stored by JS.
 //
 // Mock fallback is build-time gated (see ./fallback.ts): in production the mock
 // is OFF and every error surfaces — what stops e.g. a rejected bootstrap token
 // from minting a fabricated admin key. Only a standalone build (dev / test /
 // VITE_USE_MOCK) falls back to the in-memory session, and even then a 4xx still
-// surfaces. Real Set-Cookie wiring lands at D3.5.
+// surfaces. Real Set-Cookie wiring lands at integration.
 
 /** GET /api/v1/auth/me — cookie probe. Returns null when unauthenticated. */
 export async function fetchMe(): Promise<AuthMeResponse | null> {

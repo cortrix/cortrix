@@ -15,14 +15,14 @@ namespace cortrix::spc {
 
 /// Embedder seam for the contextualized re-embedding (`embedder_`).
 ///
-/// 🔌 Reconcile (standalone): the design's §5.1 wrote a concrete
+/// 🔌 Reconcile (standalone): the design's wrote a concrete
 /// `std::shared_ptr<BgeM3Embedder>` member, but the frozen embedder
 /// (cortrix::OnnxEmbedder) is a concrete, non-virtual class with no shared base
 /// interface — so it cannot be a mockable injection point directly. We introduce
 /// this contextual-local virtual seam (same role ILlmClient plays for OpenAiLlmClient):
 /// production injects an adapter wrapping OnnxEmbedder (ContextualOnnxEmbedder,
 /// below); tests inject a fake. Wiring the real OnnxEmbedder through the SPC
-/// pipeline is cross-Feature integration → D3.5. A null embedder means "no
+/// pipeline is cross-Feature integration → integration. A null embedder means "no
 /// re-embedding available" — Enrich() then produces contextualized_text only and
 /// reports CX_ERR_CONTEXTUAL_EMBEDDING_FAILED for the embedding half.
 class IContextualEmbedder {
@@ -31,7 +31,7 @@ public:
 
     /// Embed `text` into a dense vector (BGE-M3 1024-dim). Never throws; a failure
     /// is reported as a non-OK Status (the enricher maps it to
-    /// CX_ERR_CONTEXTUAL_EMBEDDING_FAILED + a transparent degrade, §7.3).
+    /// CX_ERR_CONTEXTUAL_EMBEDDING_FAILED + a transparent degrade).
     virtual Result<std::vector<float>> Embed(const std::string& text) = 0;
 };
 
@@ -41,11 +41,11 @@ public:
 /// consumes. Mirrors the HyPEConfig shape.
 struct ContextualRetrievalConfig {
     bool enabled = true;
-    std::string prompt_template;   ///< empty == use the built-in Anthropic default (§6.1)
+    std::string prompt_template;   ///< empty == use the built-in Anthropic default
     int max_output_tokens = kContextualMaxOutputTokensDefault;  ///< 80 default (40-200)
     std::string llm_model = kContextualDefaultLlmModel;          ///< "gpt-4o-mini"
-    int timeout_ms = kContextualTimeoutMs;  ///< per-call LLM deadline (§6.1 10s default)
-    /// §8 injection-guard bytes-per-token multiplier (default 2, range 1-20).
+    int timeout_ms = kContextualTimeoutMs;  ///< per-call LLM deadline (10s default)
+    /// injection-guard bytes-per-token multiplier (default 2, range 1-20).
     /// guard_limit = max_output_tokens x this; see kContextualGuardCharsPerTokenKey.
     int guard_chars_per_token = kContextualGuardCharsPerTokenDefault;
 };
@@ -54,9 +54,9 @@ struct ContextualRetrievalConfig {
 /// override, global layer). Reads the kContextual* keys via the generic
 /// IGlobalConfig accessors; any key absent / unparseable keeps the built-in
 /// default (fail-soft). `global == nullptr` returns all built-in defaults.
-/// max_output_tokens is clamped to [40,200] (§6.2 / prompt-injection guard).
+/// max_output_tokens is clamped to [40,200] (/ prompt-injection guard).
 /// The per-NS metadata layer is applied on top by the caller (NS metadata is a
-/// JSON blob resolved at the pipeline boundary → D3.5); exposed as a separate
+/// JSON blob resolved at the pipeline boundary → integration); exposed as a separate
 /// MergeNsOverride() so each layer is unit-testable.
 ContextualRetrievalConfig ResolveContextualConfig(const IGlobalConfig* global);
 
@@ -76,7 +76,7 @@ ContextualRetrievalConfig MergeNsOverride(const ContextualRetrievalConfig& base,
 /// P-HNSW alongside the original child embedding (double-vector coexistence,
 /// The 5-path chunk-level RRF fusion that consumes both vectors is owned
 /// by the sparse retrieval path (retrieval/sparse_rrf.h FuseFivePathRrf, kContextualized) and wired
-/// at D3.5 — this round produces contextualized_text + contextualized_embedding +
+/// at integration — this round produces contextualized_text + contextualized_embedding +
 /// contextualized_status onto the (frozen) EnrichResult, which the pipeline writes
 /// into the child-chunk contextualized_* columns.
 ///
@@ -85,7 +85,7 @@ ContextualRetrievalConfig MergeNsOverride(const ContextualRetrievalConfig& base,
 /// IContextualEmbedder (production: ContextualOnnxEmbedder; tests: fake). Metrics
 /// use the self-contained ContextualRetrievalMetrics recorder (S7), not an
 /// IMetricsRegistry (which does not exist in the frozen tree — same reconcile
-/// made). Three-layer fallback (§7): L1 NullEnricher zero-config (the chain simply
+/// made). Three-layer fallback: L1 NullEnricher zero-config (the chain simply
 /// omits contextual), L2 startup LLM-unavailable skip (IsAvailable()==false →
 /// status=skipped_no_llm), L3 transient retry+degrade (LLM/embedding failure →
 /// status=failed, fall back to the original child embedding).
@@ -97,7 +97,7 @@ public:
     /// @param embedder  injected re-embedding seam (production: ContextualOnnxEmbedder;
     ///                   tests: fake). May be null — the embedding half then degrades
     ///                   to CX_ERR_CONTEXTUAL_EMBEDDING_FAILED while contextualized_text is
-    ///                   still produced (partial result, §7.3).
+    ///                   still produced (partial result).
     ContextualRetrievalEnricher(const ContextualRetrievalConfig& config,
                                 std::shared_ptr<llm::ILlmClient> llm_client,
                                 std::shared_ptr<IContextualEmbedder> embedder);
@@ -123,7 +123,7 @@ public:
     /// (a missing client / disabled config degrades the whole stage — the L2 path).
     bool IsAvailable() const override;
 
-    /// Enricher name (EnrichResult.enricher_name, §5.1).
+    /// Enricher name (EnrichResult.enricher_name).
     std::string Name() const override { return "contextual_retrieval"; }
 
     // --- contextual-specific API ---
@@ -131,14 +131,14 @@ public:
     /// Generate the contextualized prefix for `chunk_text`. On success
     /// returns the LLM prefix text. On LLM transport/timeout failure returns a
     /// non-OK Status carrying CX_ERR_CONTEXTUAL_LLM_FAILED; on an over-long output
-    /// (length > 2 x max_output_tokens, §8 defense) returns
+    /// (length > 2 x max_output_tokens, defense) returns
     /// CX_ERR_CONTEXTUAL_PROMPT_INJECTION. Null client => CX_ERR_CONTEXTUAL_STARTUP_NO_LLM.
     Result<std::string> GenerateContextualizedText(const std::string& chunk_text,
                                                    const DocumentMetadata& doc_meta,
                                                    const ChunkContext& ctx);
 
-    /// Build the §6.1 Anthropic v1 English prompt. Uses config.prompt_template when
-    /// non-empty (NS override, §6.2) substituting {{doc_title}} / {{section_heading}}
+    /// Build the Anthropic v1 English prompt. Uses config.prompt_template when
+    /// non-empty (NS override) substituting {{doc_title}} / {{section_heading}}
     /// / {{prev_chunk_text}} / {{chunk_text}} / {{next_chunk_text}}; otherwise emits
     /// the built-in default. Exposed for tests asserting the rendered prompt.
     std::string BuildPrompt(const std::string& chunk_text,
@@ -155,7 +155,7 @@ private:
 
 /// Production adapter: wraps the frozen concrete cortrix::OnnxEmbedder behind the
 /// IContextualEmbedder seam (reuses the shared dense inference path). Kept
-/// header-declared so the production factory (D3.5) can construct it; tests use
+/// header-declared so the production factory (integration) can construct it; tests use
 /// their own fake instead of touching ONNX. Defined in contextual_enricher.cpp.
 class ContextualOnnxEmbedder : public IContextualEmbedder {
 public:

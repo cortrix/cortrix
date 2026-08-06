@@ -21,13 +21,13 @@ namespace cortrix::chunker {
 
 /// DocumentMetadata is the parser SoT type (cortrix::spc::DocumentMetadata),
 /// not redefined here. Parents inherit it from the doc; Children inherit it from
-/// their Parent (per-parent granularity, § 3.2 / D9 lock).
+/// their Parent (per-parent granularity, / lock).
 using cortrix::spc::DocumentMetadata;
 
 /// Parent chunk — coarse context block persisted in the SQLite `parents` table
-/// (§ 3.1). `parent_text` is the full ~1024t span expanded into the LLM context
+///. `parent_text` is the full ~1024t span expanded into the LLM context
 /// at recall time. metadata carries doc-level fields + (post-enrichment) per-parent
-/// NER/Summary; Children inherit it. (detailed design § 2.2)
+/// NER/Summary; Children inherit it. (detailed design)
 struct ParentChunk {
     cortrix::id::ParentId parent_id;       ///< ULID, time-ordered
     cortrix::id::DocId    doc_id;          ///< upstream document id
@@ -44,10 +44,10 @@ struct ParentChunk {
 };
 
 /// Child chunk — fine retrieval unit. `child_text` (≤ reranker max_seq_length) is the
-/// reranker / embedding input. metadata is inherited from the Parent (D9 lock:
+/// reranker / embedding input. metadata is inherited from the Parent (lock:
 /// child does not generate its own NER/Summary). The embedding is NOT stored
 /// here — it goes to P-HNSW keyed by child_id with parent_id in vec metadata.
-/// (detailed design § 2.2)
+/// (detailed design)
 struct ChildChunk {
     cortrix::id::ChildId  child_id;        ///< ULID, time-ordered
     cortrix::id::ParentId parent_id;       ///< FK → ParentChunk.parent_id
@@ -63,17 +63,17 @@ struct ChildChunk {
 };
 
 /// Chunking statistics surfaced into the Agent-friendly response `meta.stats`
-/// (§ 5.3). Tracks document-parse completeness + chunk counts; `failed_pages`
+///. Tracks document-parse completeness + chunk counts; `failed_pages`
 /// carries the per-page warnings the parser reported (the chunker inherits per-page tolerance,
-/// § 4.5).
+///).
 struct ChunkerStats {
     uint32_t total_pages = 0;              ///< pages received from the parser
     uint32_t succeeded_pages = 0;          ///< pages with usable content
     uint32_t failed_pages = 0;             ///< pages the parser flagged failed (skipped)
     uint32_t total_parents = 0;
     uint32_t total_children = 0;
-    uint32_t empty_parents = 0;            ///< parents skipped (all-empty paragraphs, § 4.5)
-    bool fallback_to_flat = false;         ///< flat fallback triggered (§ 4.5 / D4 lock)
+    uint32_t empty_parents = 0;            ///< parents skipped (all-empty paragraphs)
+    bool fallback_to_flat = false;         ///< flat fallback triggered (/ lock)
 
     /// succeeded_pages / total_pages, clamped to [0,1]; 1.0 when total_pages == 0.
     double CoverageRatio() const {

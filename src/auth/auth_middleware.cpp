@@ -31,9 +31,9 @@ void InstallObservabilityContext(const httplib::Request& req, httplib::Response&
     }
     static const agent_trace::HttpObservabilityMiddleware kMiddleware;
     agent_trace::HttpObservabilityResult parsed = kMiddleware.Process(headers);
-    // user_id is not a header — it comes from the authenticated principal (§5.1).
+    // user_id is not a header — it comes from the authenticated principal.
     if (!user_id.empty()) parsed.context.user_id = user_id;
-    // agent_id: the X-Agent-Id header wins (§6.1); fall back to the auth principal's
+    // agent_id: the X-Agent-Id header wins; fall back to the auth principal's
     // agent_id only when the header supplied none.
     if (!parsed.context.agent_id.has_value() && !agent_id.empty()) {
         parsed.context.agent_id = agent_id;
@@ -112,7 +112,7 @@ httplib::Server::Handler WithAuth(ApiKeyAuth& auth, int required_permission, Htt
 
             rctx.auth = actx;
             // Auth succeeded: install the obs context from the identity
-            // headers + the authenticated user_id (§5.1 C1/C2). Runs after the auth
+            // headers + the authenticated user_id (C1/C2). Runs after the auth
             // decision so it cannot influence authn/authz (pure-ADD).
             InstallObservabilityContext(req, res, actx.user_id, actx.agent_id);
             handler(req, res, rctx);

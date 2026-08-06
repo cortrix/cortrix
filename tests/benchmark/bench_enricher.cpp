@@ -12,8 +12,8 @@
 
 // Enricher single-component Google Benchmark (Issue 6.5 — GB single-component layer). Pure-CPU, no network:
 // batch prompt assembly + JSON response parse + NS config JSONB parse. The
-// end-to-end pgbench SLA (remote OpenAI / local vLLM) is D4/D3.5 (needs a live
-// endpoint) — see design §7.4.
+// end-to-end pgbench SLA (remote OpenAI / local vLLM) is/integration (needs a live
+// endpoint) — see design
 
 namespace {
 

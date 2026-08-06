@@ -16,7 +16,7 @@
 // the 0xFFFD return arms. (The recon's "call CleanText directly" would not compile.)
 //
 // Unreachable / ERROR-INJECTION-ONLY arms left uncovered ON PURPOSE (a healthy
-// :memory: DB never fails prepare/step; §4.1.bis#4 — do not force):
+// memory: DB never fails prepare/step;#4 — do not force):
 //   - contextual/contextual_store: the sqlite3_prepare / sqlite3_step != OK error returns.
 //
 // Standalone NEW file; touches no existing test.

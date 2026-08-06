@@ -13,7 +13,7 @@
 
 namespace cortrix::deploy {
 
-// --------------------------- serialization (§7.2) ---------------------------
+// --------------------------- serialization ---------------------------
 
 nlohmann::json SerializePending(const std::vector<PendingTask>& tasks) {
     nlohmann::json arr = nlohmann::json::array();
@@ -98,7 +98,7 @@ bool AtomicWriteFile(const std::string& path, const std::string& contents) {
     return true;
 }
 
-// --------------------------- coordinator (§7.1) ---------------------------
+// --------------------------- coordinator ---------------------------
 
 GracefulShutdown::GracefulShutdown(ShutdownConfig config, Hooks hooks)
     : config_(std::move(config)), hooks_(std::move(hooks)) {}
@@ -166,11 +166,11 @@ int GracefulShutdown::ResumeOnStartup(
     if (resubmit) {
         for (const auto& t : tasks) resubmit(ToSubmitRequest(t));
     }
-    std::remove(path.c_str());  // consumed → delete (§7.2)
+    std::remove(path.c_str());  // consumed → delete
     return static_cast<int>(tasks.size());
 }
 
-// --------------------------- signal installer (§7) ---------------------------
+// --------------------------- signal installer ---------------------------
 
 namespace {
 

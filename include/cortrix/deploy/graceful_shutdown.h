@@ -46,7 +46,7 @@ async::SubmitRequest ToSubmitRequest(const PendingTask& t);
 struct ShutdownConfig {
     int grace_period_sec = 30;   ///< key "grace_period_sec" (range 5–300)
     static constexpr const char* kGracePeriodKey = "grace_period_sec";
-    static constexpr int kReservedSyncSeconds = 7;  ///< §7.1: WAL flush + memory persist budget
+    static constexpr int kReservedSyncSeconds = 7;  ///<: WAL flush + memory persist budget
 
     std::string data_dir = "./data";   ///< where .pending_tasks.json lives
 };
@@ -65,10 +65,10 @@ std::string PendingTasksPath(const std::string& data_dir);
 ///   3. flush the P-HNSW WAL (fdatasync)
 ///   4. persist the Memory Store
 ///
-/// Standalone (D3): the *ordering*, the *deadline math*, and the *persist/resume
+/// Standalone: the *ordering*, the *deadline math*, and the *persist/resume
 /// of .pending_tasks.json* are real and fully unit-tested via injected hooks.
 /// The hooks (close-http / drain / wal-flush / memory-persist) are bound to the
-/// real subsystems by main.cpp at D3.5 wiring time; here they default to no-ops,
+/// real subsystems by main.cpp at integration wiring time; here they default to no-ops,
 /// so the coordinator runs end-to-end against fakes in a test.
 ///
 /// Wires DeployMetrics::SetShutdownStatus on each phase transition.
@@ -126,7 +126,7 @@ bool AtomicWriteFile(const std::string& path, const std::string& contents);
 /// context (calling the ordered shutdown — file I/O, joins — from a signal
 /// handler is unsafe). `gs` must outlive the process's signal-handling lifetime.
 ///
-/// ⚠️ D3.5 wiring: in D3 the GracefulShutdown's drain/wal/memory hooks are bound
+/// ⚠️ integration wiring: in the GracefulShutdown's drain/wal/memory hooks are bound
 /// to the real SPC pipeline / P-HNSW WAL / Memory Store. Until those hooks are
 /// bound (cross-Feature), main.cpp keeps its existing SignalHandler → server.Stop()
 /// path and does NOT call this — see the deferred-integration note in main.cpp. The

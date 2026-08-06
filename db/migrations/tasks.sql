@@ -1,12 +1,12 @@
--- Async task Document Async Processing — tasks table (detailed design §3.1).
+-- Async task Document Async Processing — tasks table (detailed design).
 --
--- Async-scheduling metadata, decoupled from the catalog blob_gc_queue (§4.4):
+-- Async-scheduling metadata, decoupled from the catalog blob_gc_queue:
 -- platform-level, applied by cortrix::async::TaskManager::Init at runtime
 -- (CREATE TABLE IF NOT EXISTS). This file is the canonical schema artifact and
 -- MUST stay byte-identical to TaskManager::CreateTasksTable() DDL.
 --
 -- SQLite dialect: BOOLEAN → INTEGER 0/1; JSON columns → TEXT (failed_pages,
--- structured_data). status CHECK enforces the §3.1 state machine:
+-- structured_data). status CHECK enforces the state machine:
 --   queued → processing → completed
 --                      ↘ failed
 --          ↗ cancelling → cancelled

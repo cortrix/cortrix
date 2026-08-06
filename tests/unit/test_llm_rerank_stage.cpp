@@ -1,5 +1,5 @@
 // LlmRerankStage unit tests (the listwise-rerank addendum
-// §4): prompt construction (suffix /
+//): prompt construction (suffix /
 // truncation / locale), ranking JSON parsing (valid / tolerant / hostile),
 // permutation application (order / score monotonicity / tail preservation),
 // degrade paths, and config validation. LLM doubled via MockLlmClient.
@@ -204,7 +204,7 @@ TEST(LlmRerankParseTest, AppendsMissingIndicesInOriginalOrder) {
 }
 
 TEST(LlmRerankParseTest, ToleratesBracketedDottedAndWordyStrings) {
-    // §3.5.3 hardening: extract the first integer from decorated strings.
+    // hardening: extract the first integer from decorated strings.
     std::vector<std::size_t> order;
     std::string err;
     ASSERT_TRUE(LlmRerankStage::ParseRankingJson(
@@ -348,7 +348,7 @@ TEST(LlmRerankApplyTest, NullClientDegradesWithWarning) {
     EXPECT_EQ(resp.meta.warnings.size(), 1u);
 }
 
-// ---- PresentationOrder / consensus / sliding window (§3.5.1/.2) -------------
+// ---- PresentationOrder / consensus / sliding window -------------
 
 TEST(LlmRerankPresentationTest, ThreeDeterministicOrders) {
     EXPECT_EQ(LlmRerankStage::PresentationOrder(4, 0),

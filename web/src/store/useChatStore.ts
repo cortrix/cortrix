@@ -88,10 +88,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         cancelStream: null,
       }));
 
-    // Agent multi-tenant header pass-through (§ 8.2): X-Cortrix-Namespace is the
+    // Agent multi-tenant header pass-through: X-Cortrix-Namespace is the
     // request-level NS override. X-Cortrix-Tenant-Id is a Cloud (V1.5) concern
     // — CE is single-tenant so it is omitted here (cortrix-server ignores an
-    // absent header). CSRF header is required on this POST (§ 4.6).
+    // absent header). CSRF header is required on this POST.
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       [CSRF_HEADER]: getCsrfToken(),
@@ -195,7 +195,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }));
           return;
         }
-        // Standalone (D3): backend unreachable (fetch throws TypeError) → stream
+        // Standalone: backend unreachable (fetch throws TypeError) → stream
         // the mock SSE so the chat demo works without cortrix-server. A real
         // HTTP error surfaces a message instead. The mock is build-time gated
         // (./fallback.ts) so it never runs in a production build.

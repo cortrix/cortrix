@@ -17,7 +17,7 @@ struct ChunkRecord {
     ScoreSignals score_signals;   ///< optional query-time scoring signals
 };
 
-/// Child-level chunk content reverse-lookup interface (scaffolding D2-pre-8,
+/// Child-level chunk content reverse-lookup interface (scaffolding,
 /// interface SoT). Consumed by Rerank, ScatterGather, and
 /// CRAG. The Phase 1 concrete implementation is SqliteChunkStore over the
 /// unified `blocks` table: child

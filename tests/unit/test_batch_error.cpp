@@ -6,7 +6,7 @@
 #include "cortrix/server/batch_error.h"
 
 // Batch-submit coverage: the batch error model (template A, mirrors async_error) —
-// all 4 CX_ERR_BATCH_* identities, their §2.4.1 attributes
+// all 4 CX_ERR_BATCH_* identities, their attributes
 // (http/category/retryable/retry_after_ms/structured_data keys), and the
 // AgentFriendlyError builder.
 namespace cortrix::server {
@@ -38,7 +38,7 @@ TEST(BatchErrorTest, AllCodesHaveUniqueCxBatchStrings) {
     EXPECT_EQ(seen.size(), 4u);
 }
 
-// §2.4.1 table, row by row.
+// table, row by row.
 TEST(BatchErrorTest, RegistryMatchesSpecTable) {
     auto chk = [](BatchErrorCode c, const char* code, int http, ErrorCategory cat,
                   bool retry, std::optional<int> retry_ms) {
@@ -60,7 +60,7 @@ TEST(BatchErrorTest, RegistryMatchesSpecTable) {
 }
 
 TEST(BatchErrorTest, AllBatchLevelFaultsArePermanentAndNonRetryable) {
-    // §2.4.1: every batch-envelope fault rejects the whole request and is not
+    //: every batch-envelope fault rejects the whole request and is not
     // retryable (no retry_after_ms). GEN-Agent #6 consistency.
     for (BatchErrorCode c : kAll) {
         const BatchErrorInfo& i = GetBatchErrorInfo(c);

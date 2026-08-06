@@ -14,7 +14,7 @@ namespace cortrix::auth {
 namespace {
 
 constexpr int kDisplayNameMax = 64;  // display_name 1..64
-constexpr int kListLimitCap = 200;   // §2.13-bis pagination cap
+constexpr int kListLimitCap = 200;   // pagination cap
 
 int64_t NowSec() {
     return std::chrono::duration_cast<std::chrono::seconds>(
@@ -26,7 +26,7 @@ bool ValidRole(const std::string& role) {
     return role == "admin" || role == "user";
 }
 
-// The API surfaces only 'active' | 'disabled' (§2.13-bis): the internal
+// The API surfaces only 'active' | 'disabled': the internal
 // transient 'locked' state is reported as 'active' (it is a login concern, not
 // an admin-managed status).
 std::string ApiStatus(const std::string& db_status) {
@@ -84,7 +84,7 @@ Result<AdminUserListResult> AdminUsersService::List(const AdminUserListFilter& f
         return AuthStatus(AuthErrorCode::kInternalError, "AdminUsersService not initialized");
     }
 
-    // Clamp pagination (§2.13-bis: page 1-based, limit default 20 cap 200).
+    // Clamp pagination (page 1-based, limit default 20 cap 200).
     int page = filter.page < 1 ? 1 : filter.page;
     int limit = filter.limit;
     if (limit < 1) limit = 20;
@@ -189,7 +189,7 @@ Result<AdminUserRecord> AdminUsersService::Create(const std::string& email,
 
     const std::string user_id = GenerateUserId();
     const int64_t now = NowSec();
-    // Admin invite mode: no email-verification flow (§2.13-bis) → email_verified=1.
+    // Admin invite mode: no email-verification flow → email_verified=1.
     const std::string dn = display_name.empty() ? email : display_name;
 
     sqlite3_stmt* stmt = nullptr;

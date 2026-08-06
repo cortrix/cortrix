@@ -16,7 +16,7 @@
 ///
 /// Note on route classes wired here: CortrixHttpServer::RegisterRoutes() mounts the
 /// CE core (health/openapi/system/namespace) only. The admin/users, jwt-rotate,
-/// smtp-admin, gc and system-config routes are registered by separate D3.5 wiring
+/// smtp-admin, gc and system-config routes are registered by separate integration wiring
 /// (RegisterAdminUsersRoutes / RegisterGcRoutes / RegisterSystemConfigRoutes) that
 /// is NOT mounted by this server, so they are not reachable through this fixture.
 /// The admin/users permission gate is covered standalone in

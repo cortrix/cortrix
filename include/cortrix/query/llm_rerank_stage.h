@@ -19,16 +19,16 @@ namespace cortrix::query {
 /// Contract:
 ///  - Reorders `resp->results` in place; never fails the query. On any LLM /
 ///    parse fault the pre-stage order is kept and the response gains
-///    meta.warnings[CX_WARN_LLM_RERANK_DEGRADED] (§2.4).
+///    meta.warnings[CX_WARN_LLM_RERANK_DEGRADED].
 ///  - Reordered head scores are rewritten to a monotonically decreasing rank
 ///    score strictly above the tail's max score, so the "results sorted by
 ///    score desc" downstream contract holds; the cross-encoder score stays
-///    untouched in `rerank_score` for traceability (§2.3).
+///    untouched in `rerank_score` for traceability.
 ///  - Prompt carries the same injection defense as the variant generator: random
 ///    suffix delimiter tags + ignore-instructions rule + strict JSON schema.
 class LlmRerankStage {
 public:
-    /// B/C-class explain state for one Apply() call (§2.5). Returned by value —
+    /// B/C-class explain state for one Apply() call. Returned by value —
     /// the stage itself is stateless across requests.
     struct ExplainState {
         bool active = false;         ///< an LLM listwise call actually ran
@@ -36,7 +36,7 @@ public:
         bool order_changed = false;  ///< the permutation differs from identity
         int top_n_effective = 0;     ///< min(cfg.top_n, results.size())
         int llm_latency_ms = 0;      ///< summed across windows × consensus votes
-        int llm_calls = 0;           ///< total listwise calls issued (§3.5.1/.2)
+        int llm_calls = 0;           ///< total listwise calls issued
         int votes_ok = 0;            ///< calls whose ranking was usable
         std::string model_used;
         std::string reason;          ///< "active" / "disabled" / "too_few_results" / "llm_unavailable"
@@ -59,7 +59,7 @@ public:
     // ---- testing seams (pure helpers) ----
 
     /// Build the listwise prompt over `presented` (result indices in
-    /// presentation order — §3.5.1 consensus varies this order per vote).
+    /// presentation order — consensus varies this order per vote).
     /// Passage [k] in the prompt is resp.results[presented[k-1]].
     static std::string BuildPrompt(const CrossNsResponse& resp,
                                    const std::vector<std::size_t>& presented,
@@ -69,14 +69,14 @@ public:
 
     /// Parse {"ranking":[...]} into a 0-based permutation of [0, n). Tolerates
     /// integer entries, strings carrying an integer ("3", "[3]", "passage 3"),
-    /// and objects with an index/id/passage integer key (§3.5.3); drops
+    /// and objects with an index/id/passage integer key; drops
     /// out-of-range / duplicate entries; appends missing indices in original
     /// order. Returns false (with `schema_error`) when nothing is usable.
     static bool ParseRankingJson(const std::string& llm_content, std::size_t n,
                                  std::vector<std::size_t>* order_out,
                                  std::string* schema_error);
 
-    /// §3.5.1 presentation order for consensus vote `run` over `n` items:
+    /// presentation order for consensus vote `run` over `n` items:
     /// run 0 = identity (CE order), run 1 = reversed, run 2 = odd-even
     /// interleave. Deterministic (reproducible benchmarks).
     static std::vector<std::size_t> PresentationOrder(std::size_t n, int run);

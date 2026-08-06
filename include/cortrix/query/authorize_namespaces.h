@@ -12,7 +12,7 @@ namespace cortrix::query {
 /// spec default + the value AuthorizeNamespaces/ExpandNamespaces use when none is given.
 constexpr int kDefaultMaxNamespaces = 100;
 
-/// ExpandNamespaces — resolve the requested namespace list (topic 1.5 + §4.2 Step 2).
+/// ExpandNamespaces — resolve the requested namespace list (topic 1.5 + Step 2).
 ///
 /// - `["*"]`  → the principal's full authorized set (perm_service->ListAuthorized…),
 ///              i.e. NS the Agent may actually QUERY (not the global universe).
@@ -31,9 +31,9 @@ std::vector<std::string> ExpandNamespaces(
     PermissionService* perm_service,
     int max_namespaces = kDefaultMaxNamespaces);
 
-/// AuthorizeNamespaces — the §4.2 5-step batch authorization, returns the list of
+/// AuthorizeNamespaces — the 5-step batch authorization, returns the list of
 /// namespaces to actually query (all authorized). Throws CrossNsException on any
-/// failure (the handler serializes it to the §2.6 error body):
+/// failure (the handler serializes it to the error body):
 ///
 ///   Step 1  auth.user_id.empty()                 → CX_ERR_AUTH_INVALID_CREDENTIALS
 ///   Step 2  ExpandNamespaces (["*"] + hard cap)   → CX_ERR_TOO_MANY_NAMESPACES

@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "cortrix/common/types.h"  // json alias (metadata_json flatten)
-#include "cortrix/common/block_types.h"  // kBlockHypeQuestion (vector-hit split, §3.8 W2)
+#include "cortrix/common/block_types.h"  // kBlockHypeQuestion (vector-hit split, W2)
 #include "cortrix/common/json_depth.h"  // metadata depth guard (DoS: deep-JSON dump)
 #include "cortrix/doc_summary/discover_handler.h"  // RecallDocSummaryHnsw (granularity=doc/both)
 #include "cortrix/doc_summary/doc_summary_types.h"  // DocDiscoveryHit
@@ -401,7 +401,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             out.retryable = info.retryable;
             // GEN-Agent #5: kIndexCorrupt requires {namespace, index_state}.
             // "unavailable" is deliberately non-committal — per cross_ns_error.h
-            // anti-enumeration (§2.6/§5), a per-NS failure must NOT leak whether
+            // anti-enumeration, a per-NS failure must NOT leak whether
             // the NS is absent vs internally broken, so we do not surface
             // "not_found" here.
             out.structured_data = {{"index_state", "unavailable"}};
@@ -430,7 +430,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         vector_result.status = RouteStatus::kSkipped;
         if (ctx.enable_vector) {
             VectorSearcher vec_searcher(facade.vec_index(), embedder_);
-            // §3.8 W2: the ANN pool mixes chunk + hype (≤3) + contextual (≤1)
+            // W2: the ANN pool mixes chunk + hype (≤3) + contextual (≤1)
             // points per fully-enriched chunk, so over-fetch to keep the
             // distinct-chunk depth (top_k*4 spirit; the aux points are
             // votes for their chunks, not waste, so 3× is enough headroom).
@@ -595,11 +595,11 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
 
         // chunk-level multi-path RRF — all five paths live: dense +
         // fts5 + sparse + contextualized + hype, wired by the
-        // vector-route split above (addendum §3.8 W2).
+        // vector-route split above (addendum W2).
         std::vector<retrieval::RrfFusedHit> fused =
             retrieval::FuseFivePathRrf(rrf_in, candidate_k);
 
-        // [addendum §3.8 W2 · Agent-friendly principle 2] Under ?explain, each result
+        // [addendum W2 · Agent-friendly principle 2] Under ?explain, each result
         // carries an `rrf_paths` field (which of the five chunk-level paths ranked
         // it) so a caller can SEE whether the ingest-LLM paths (contextualized /
         // hype_question) actually voted, not just infer it (assembled per-chunk
@@ -616,13 +616,13 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             rc.child_id = fh.child_id;
             rc.chunk_text = row.content_text;
             // parent_text reverse-lookup (ParentChunkStore) is a separate seam;
-            // left empty here per RETRIEVAL_TYPES_SPEC ("empty until the parent-chunk store wires in").
+            // left empty here per the retrieval-types spec ("empty until the parent-chunk store wires in").
             // RankedChunk carries no parent_id field — ToResultItem sets ResultItem.
             // parent_id to its default until that reverse-lookup lands.
             rc.score = fh.rrf_score;        // pre-rerank (multi-path RRF) score
             rc.rerank_score = fh.rrf_score;  // overwritten below when reranking
             rc.score_signals = row.score_signals;
-            // [§3.8 W2] Which of the five chunk-level paths ranked THIS candidate
+            // [ W2] Which of the five chunk-level paths ranked THIS candidate
             // (explain only). Comma-joined in label order; lets the caller confirm
             // an ingest-LLM path (contextualized/hype_question) contributed.
             if (ctx.explain && !fh.contributing_paths.empty()) {
@@ -827,7 +827,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteDocRetrieval(
 
 NamespaceQueryResult LiveSingleUnitExecutor::ExecuteHybridRetrieval(
     const QueryContext& ctx, const std::string& namespace_id, float oversample) {
-    // §8.1 hybrid branch: run BOTH paths and fuse their ranked lists with RRF before
+    // hybrid branch: run BOTH paths and fuse their ranked lists with RRF before
     // the per-NS top_k cap. This keeps doc-summary candidates from being suppressed by
     // a chunk-first concatenation while avoiding raw-score comparisons across different
     // scoring scales. A per-path NS failure (error_code set) is surfaced if BOTH fail; if

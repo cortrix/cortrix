@@ -3,11 +3,11 @@
 #include "cortrix/common/in_memory_global_config.h"
 #include "cortrix/query/scatter_guc.h"
 
-// S4.2 coverage: the 5 §2.7 GUCs — SoT table, range clamp, IGlobalConfig load.
+// S4.2 coverage: the 5 GUCs — SoT table, range clamp, IGlobalConfig load.
 namespace cortrix::query {
 namespace {
 
-// The §2.7 table is exactly the 5 documented GUCs with the documented ranges.
+// The table is exactly the 5 documented GUCs with the documented ranges.
 TEST(ScatterGucTest, TableMatchesSpec) {
     ASSERT_EQ(kScatterGucs.size(), 5u);
     EXPECT_STREQ(kScatterGucs[kGucExecutorWorkers].name, "executor.workers");
@@ -56,7 +56,7 @@ TEST(ScatterGucTest, LoadsValuesFromConfig) {
     EXPECT_EQ(c.total_timeout_ms, 30000);  // unset → default
 }
 
-// Out-of-range config values are clamped to the §2.7 range.
+// Out-of-range config values are clamped to the range.
 TEST(ScatterGucTest, OutOfRangeConfigClamped) {
     InMemoryGlobalConfig cfg;
     cfg.Set("scatter.max_namespaces_per_query", "99999");  // > 1000

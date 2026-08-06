@@ -18,7 +18,7 @@ int64_t NowMs() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
 }
 
-// Trim ASCII whitespace from both ends; used to drop blank paragraphs (§ 4.5).
+// Trim ASCII whitespace from both ends; used to drop blank paragraphs.
 std::string Trim(const std::string& s) {
     size_t b = s.find_first_not_of(" \t\r\n\f");
     if (b == std::string::npos) return "";
@@ -31,7 +31,7 @@ std::string Trim(const std::string& s) {
 uint32_t EstimateTokens(const std::string& text) {
     // Char-based heuristic (standalone): ASCII run ≈ len/4 tokens (min 1 per run),
     // each non-ASCII UTF-8 char ≈ 1 token (CJK ≈ 1 token/char). Deterministic;
-    // never 0 for non-empty text. Production wires the real bge-m3 tokenizer (D3.5).
+    // never 0 for non-empty text. Production wires the real bge-m3 tokenizer (integration).
     uint32_t tokens = 0;
     size_t i = 0;
     const size_t n = text.size();
@@ -137,7 +137,7 @@ std::vector<ParentChildChunker::ChildSpan> ParentChildChunker::SplitIntoChildren
     for (const auto& cr : raw) {
         if (cr.text.empty()) continue;
         // parent_offset = byte offset of this child inside parent_text (used for
-        // context reverse-lookup, § 2.2). Recover via find; fall back to the
+        // context reverse-lookup). Recover via find; fall back to the
         // running cursor if the overlap-prefixed text is not found verbatim.
         size_t pos = parent_text.find(cr.text, search_from);
         if (pos == std::string::npos) pos = search_from <= parent_text.size() ? search_from : 0;
@@ -158,7 +158,7 @@ void ParentChildChunker::BuildParentChild(const ChunkerInput& input,
 
     // Accumulate units into a parent until adding the next unit would exceed
     // parent_size; then flush. A single oversized unit still forms its own parent
-    // (its children get split down by SplitIntoChildren). (§ 4.1)
+    // (its children get split down by SplitIntoChildren).
     size_t i = 0;
     const size_t n = units.size();
     while (i < n) {
@@ -197,21 +197,21 @@ void ParentChildChunker::BuildParentChild(const ChunkerInput& input,
         parent.page_end = page_end;
         parent.byte_offset_start = byte_start;
         parent.byte_offset_end = byte_end;
-        parent.metadata = input.metadata;  // inherit doc-level (§ 3.2)
+        parent.metadata = input.metadata;  // inherit doc-level
         parent.created_at = now_ms;
 
         // Split this parent into children.
         for (const auto& span : SplitIntoChildren(parent_text)) {
             ChildChunk child;
             child.child_id = cortrix::id::GenerateUlid(now_ms);
-            child.parent_id = parent.parent_id;     // FK → parent (§ 3.2)
+            child.parent_id = parent.parent_id;     // FK → parent
             child.doc_id = input.doc_id;
             child.namespace_id = input.namespace_id;
             child.child_text = span.text;
             child.token_count = span.token_count;
             child.parent_offset = span.parent_offset;
             child.chunk_index = chunk_index++;
-            child.metadata = parent.metadata;       // child inherits parent metadata (D9)
+            child.metadata = parent.metadata;       // child inherits parent metadata
             child.created_at = now_ms;
             parent.child_ids.push_back(child.child_id);
             output->children.push_back(std::move(child));
@@ -224,7 +224,7 @@ void ParentChildChunker::BuildParentChild(const ChunkerInput& input,
 void ParentChildChunker::BuildFlat(const ChunkerInput& input,
                                    const std::vector<Unit>& units,
                                    int64_t now_ms, ChunkerOutput* output) const {
-    // Flat fallback (§ 4.5 / D4 lock): the whole document becomes one flat layer
+    // Flat fallback (/ lock): the whole document becomes one flat layer
     // of child-sized chunks with NO parent-child relationship. We concatenate all
     // unit text and split it into children; each child's parent_id stays empty.
     std::string full;
@@ -257,7 +257,7 @@ Result<ChunkerOutput> ParentChildChunker::Chunk(const ChunkerInput& input) {
 
     std::vector<Unit> units = CollectUnits(input, &output.stats);
 
-    // Empty document (§ 4.5 → CX_ERR_CHUNK_EMPTY_DOCUMENT): no usable page/text.
+    // Empty document (→ CX_ERR_CHUNK_EMPTY_DOCUMENT): no usable page/text.
     if (units.empty()) {
         return ChunkStatus(
             StatusCode::kInvalidArgument, chunk_errors::kEmptyDocument,
@@ -266,7 +266,7 @@ Result<ChunkerOutput> ParentChildChunker::Chunk(const ChunkerInput& input) {
                 std::to_string(output.stats.failed_pages) + ")");
     }
 
-    // Estimate parent count to decide flat fallback (§ 4.5). An upper bound on the
+    // Estimate parent count to decide flat fallback. An upper bound on the
     // number of parents = total_tokens / parent_size (each parent holds ≥ ~1
     // parent_size worth of units except possibly the last), rounded up; this is
     // conservative and avoids building the full tree before deciding.
@@ -288,7 +288,7 @@ Result<ChunkerOutput> ParentChildChunker::Chunk(const ChunkerInput& input) {
 
         // Overflow guard: even after building, if the realized parent count blew
         // past the cap AND flat fallback is somehow unavailable, that is a hard
-        // error. With D4's fallback == threshold this is unreachable in practice
+        // error. With's fallback == threshold this is unreachable in practice
         // (we'd have taken the flat path above), but we keep the gate for the
         // case strategy=parent-child with fallback disabled below the cap.
         if (output.parents.size() > static_cast<size_t>(config_.max_parents_per_doc)) {

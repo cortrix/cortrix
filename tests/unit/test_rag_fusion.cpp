@@ -1,11 +1,11 @@
 // RAG-Fusion unit tests (detail design sec 11.1: 22 UT + sec 11.3: 3 Perf).
 //
-// Standalone (B_R1_BRIEFING sec 7): the LLM dependency is the FROZEN
+// Standalone (sec 7): the LLM dependency is the FROZEN
 // `cortrix::llm::ILlmClient` seam, exercised via the frozen
 // `cortrix::llm::MockLlmClient`. The QueryPipeline integration cases (design UT
 // 14-19) are validated here at the RagFusion *service* level (ExpandQueries /
 // GetExplainState / degrade), since the live QueryPipeline step-4 wiring is
-// D3.5-deferred; the sec 13.2 V5/V6 phased-rollout behavior (no meta.rag_fusion on a
+// integration-deferred; the sec 13.2 V5/V6 phased-rollout behavior (no meta.rag_fusion on a
 // default response, explain-only exposure) is enforced by the ExplainState being
 // a pure accessor never serialized into the default path.
 
@@ -207,7 +207,7 @@ public:
     }
 };
 
-// D11: every chunk carries explain attribution (metadata["rrf_paths"]) the way
+//: every chunk carries explain attribution (metadata["rrf_paths"]) the way
 // the per-NS executor attaches it under ?explain; the stage must not shed it.
 class StageMetadataExecutor : public IScatterExecutor {
 public:
@@ -268,7 +268,7 @@ TEST_F(RagFusionTest, QueryVariantGenerator_Generate_Success_3Variants) {
 }
 
 // UT 1b: the Chat call carries the structured-output + reasoning-off contract
-// and the per-call model override (§3.5.4). E-v2 measured 53/120 degrades with
+// and the per-call model override. E-v2 measured 53/120 degrades with
 // glm-4.5-air until thinking was disabled — lock the call shape here.
 TEST_F(RagFusionTest, QueryVariantGenerator_CallDisablesThinkingAndOverridesModel) {
     auto mock = std::make_shared<MockLlmClient>();
@@ -491,7 +491,7 @@ TEST_F(RagFusionTest, QueryPipeline_LlmFailureDegrade) {
 }
 
 // UT 14/15 (service-level): enabled -> step-4 expansion happened; disabled -> skip.
-// (Live QueryPipeline step-4/step-9 wiring is D3.5; here we assert the service
+// (Live QueryPipeline step-4/step-9 wiring is integration; here we assert the service
 // contract those steps depend on.)
 TEST_F(RagFusionTest, QueryPipeline_Integration_RagFusionEnabledVsDisabled) {
     auto mock_on = std::make_shared<MockLlmClient>();
@@ -505,7 +505,7 @@ TEST_F(RagFusionTest, QueryPipeline_Integration_RagFusionEnabledVsDisabled) {
 }
 
 // qctx threaded through the canonical 4-param signature without altering behavior
-// (D3.5 routing-skip is interface-reserved -- frozen QueryContext has no routing_path).
+// (integration routing-skip is interface-reserved -- frozen QueryContext has no routing_path).
 TEST_F(RagFusionTest, ExpandQueries_QctxThreaded_NoSkipYet) {
     auto mock = std::make_shared<MockLlmClient>();
     EXPECT_CALL(*mock, Chat(_, _)).WillOnce(Return(OkResponse(ThreeVariantJson())));
@@ -584,7 +584,7 @@ TEST_F(RagFusionTest, RagFusion_FuseResults_RrfKNonPositiveFallback) {
 }
 
 // ===========================================================================
-// v1.0.13 (§4.3.bis.5): fusion-policy knobs. Defaults are byte-identical to the
+// v1.0.13: fusion-policy knobs. Defaults are byte-identical to the
 // v1.0.7 constants — every pre-v1.0.13 test above already exercises the default
 // path through the legacy rrf_k-only overload's delegation.
 // ===========================================================================
@@ -965,7 +965,7 @@ TEST_F(RagFusionTest, RagFusionStage_ExpandedCandidatePoolThenFinalRerank) {
                             [](bool rerank) { return !rerank; }));
 }
 
-// D11 regression: explain attribution (metadata["rrf_paths"]) attached by the
+// regression: explain attribution (metadata["rrf_paths"]) attached by the
 // per-NS executor must survive the fusion union + global-RRF reorder end to
 // end — including a variant-only candidate whose rich item comes from a
 // variant sub-query (5k C-arm evidence 2026-07-09: 36/41 fused queries
@@ -1354,7 +1354,7 @@ TEST_F(RagFusionTest, Perf_RrfFusion_50Variants_50NS) {
 
 // Perf 30 (proxy): the generator's LLM call latency is the mock's; here we assert
 // the per-call overhead (prompt build + parse) is negligible. Real LLM P99 < 1500ms
-// is a D3.5 live-endpoint measurement.
+// is a integration live-endpoint measurement.
 TEST_F(RagFusionTest, Perf_LlmLatency_OverheadNegligible) {
     auto mock = std::make_shared<MockLlmClient>();
     EXPECT_CALL(*mock, Chat(_, _))

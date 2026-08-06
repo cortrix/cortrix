@@ -31,7 +31,7 @@ public:
 };
 
 /// NullRetrievalFallback — the Phase-1 default (no-op). Returns the original chunks
-/// untouched (§5.3): Phase 1 does not perform Web corrective retrieval.
+/// untouched: Phase 1 does not perform Web corrective retrieval.
 class NullRetrievalFallback : public IRetrievalFallback {
 public:
     std::vector<RankedChunk> Fallback(

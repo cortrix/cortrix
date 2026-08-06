@@ -4,8 +4,8 @@
 
 #include "cortrix/memory/memory_extract_metrics.h"
 
-// S9 coverage: the 6 cortrix_memory_extract_* metrics (§5.4.1) — counters/gauge/histogram
-// recording + the OpenMetrics renderer + label-enum discipline (§5.4.2 no
+// S9 coverage: the 6 cortrix_memory_extract_* metrics — counters/gauge/histogram
+// recording + the OpenMetrics renderer + label-enum discipline (no
 // high-cardinality labels).
 namespace cortrix::memory {
 namespace {
@@ -136,7 +136,7 @@ TEST_F(MemoryExtractMetricsTest, ExtractDurationHistogramBucketsAreCumulativeAnd
 }
 
 TEST_F(MemoryExtractMetricsTest, RenderHasNoHighCardinalityLabels) {
-    // §5.4.2 / OBS_SPEC §3.2: labels are enum-only or low-cardinality model strings.
+    // OBS_SPEC: labels are enum-only or low-cardinality model strings.
     // No tenant_id / ns_id / user_id labels ever appear.
     M().RecordExtract(ExtractStatus::kSuccess);
     M().RecordTokens("gpt-4o-mini", TokenDirection::kInput, 10);

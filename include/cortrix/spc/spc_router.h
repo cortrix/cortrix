@@ -19,7 +19,7 @@ public:
     /// Check if file needs OCR (image-only PDF, scanned images)
     static bool NeedsOcr(const std::string& mime_type, bool has_text);
 
-    /// Infer processing level from MIME type (D3 routing table)
+    /// Infer processing level from MIME type (routing table)
     /// @return L0=0 (skip), L1=1 (metadata), L2=2 (FTS), L3=3 (full)
     static uint8_t InferProcessingLevel(const std::string& mime_type);
 };

@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/memory/memory_opt_out_error.h"
 
-// Exhaustive parameterized error-registry sweep for memory opt-out (ARCH §4.1.11, 7 codes).
+// Exhaustive parameterized error-registry sweep for memory opt-out (ARCH codes).
 // Distinct suite name (MemoryOptOutErrorMatrix) from the basic test_memory_opt_out_error.cpp.
 namespace cortrix::memory::immunity {
 namespace {
@@ -46,7 +46,7 @@ TEST_P(MemoryOptOutErrorMatrix, CategoryAndRetryInvariant) {
     const MemoryOptOutErrorCode code = GetParam();
     const MemoryOptOutErrorInfo& info = GetMemoryOptOutErrorInfo(code);
     EXPECT_TRUE(IsValidCategory(info.category));
-    // All 7 memory opt-out codes are non-retryable per ARCH §4.1.11.
+    // All 7 memory opt-out codes are non-retryable per ARCH
     EXPECT_FALSE(info.retryable) << info.cx_code;
     EXPECT_FALSE(info.retry_after_ms.has_value()) << info.cx_code;
     EXPECT_GT(MemoryOptOutErrorHttpStatus(code), 0);

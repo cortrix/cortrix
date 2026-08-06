@@ -53,7 +53,7 @@ namespace cortrix::query {
 namespace {
 
 // Adapt the tenant PermissionService (cortrix::tenant) onto the query stack's minimal
-// cortrix::query::PermissionService contract (§4.2). The tenant service keys its
+// cortrix::query::PermissionService contract. The tenant service keys its
 // checks off a full AuthContext; the query stack hands us (user_id, tenant_id, role) strings,
 // so we reconstruct a minimal AuthContext from them. In the CE single-tenant OSS
 // hot path CanRead returns true once owner_tenant_id == caller
@@ -637,11 +637,11 @@ Status ValidateResolvedLlmRerankConfigForRequest(const LlmRerankConfig& cfg) {
 // The helper itself never throws (EngineInstrumentation::Record isolates both
 // writes, C4), so it is safe to call on the request path. Identity
 // (trace_id/session_id/agent_id/user_id) is read from the thread-local
-// ObservabilityContext WithAuth installed (§5.1); a cross-NS query stamps no single
-// namespace_id (NULL = global call, §4.1). `params_summary` is a compact JSON
+// ObservabilityContext WithAuth installed; a cross-NS query stamps no single
+// namespace_id (NULL = global call). `params_summary` is a compact JSON
 // (truncated to ≤2KB on write); on failure the error code + message are kept.
 //
-// op_summary (the operation_log summary, §11 — query_text prefix) is filled too,
+// op_summary (the operation_log summary, — query_text prefix) is filled too,
 // but the operation_log write happens ONLY when the bootstrap constructs this
 // EngineInstrumentation WITH an operation_logger. This cell wires agent_trace, so the
 // recommended query instance is trace-only (op_logger null) → Record skips the operation-log
@@ -660,7 +660,7 @@ void RecordQueryTrace(agent_trace::EngineInstrumentation* engine_instr,
     call.params_json = params_summary;
     call.duration_ms = duration_ms;
     call.is_success = is_success;
-    call.op_summary = query_text_summary;  // §11 operation_log summary (op_logger-gated)
+    call.op_summary = query_text_summary;  // operation_log summary (op_logger-gated)
     if (is_success) {
         call.result_summary = result_summary;
     } else {
@@ -670,12 +670,12 @@ void RecordQueryTrace(agent_trace::EngineInstrumentation* engine_instr,
     engine_instr->Record(call);
 }
 
-// First 100 chars of the query text — the operation_log summary shape (§11).
+// First 100 chars of the query text — the operation_log summary shape.
 std::string QueryTextSummary(const QueryContext& qctx) {
     return qctx.query.size() > 100 ? qctx.query.substr(0, 100) : qctx.query;
 }
 
-// Build the compact params JSON for the trace row (§4.1 — params ≤2KB, the writer
+// Build the compact params JSON for the trace row (params ≤2KB, the writer
 // truncates). Keeps just the routing-relevant request shape (query text is the
 // Agent's own input; top_k / route / granularity describe the call), not the full
 // body, so a trace row stays small and PII-light.
@@ -754,7 +754,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             if (auth_ctx.user_id.empty()) auth_ctx.user_id = "default";
 
             // Complexity routing: classify the query and write routing_path onto
-            // the QueryContext BEFORE retrieval. The classifier runs the §6.1 order
+            // the QueryContext BEFORE retrieval. The classifier runs the order
             // internally (Agent ?route override → NS force_route → IsChatQuery rule
             // guard → backend Infer → confidence<threshold fail-safe → Complex), so
             // the chat rule guard correctly precedes the ML backend (team-lead note
@@ -797,7 +797,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             // Time the actual query execution (chat / scatter) for the
             // agent_trace duration_ms. Started after routing resolves so it measures
             // the execution, not the pre-execution validation (those 400s are request
-            // -shape errors, not Engine calls, and are not traced — matching §11 which
+            // -shape errors, not Engine calls, and are not traced — matching which
             // instruments DoQuery, and the operation log which logs success only).
             const auto exec_start = std::chrono::steady_clock::now();
             auto elapsed_ms = [&exec_start]() -> int {
@@ -839,7 +839,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             QueryRequest cross_ns_req;
             Status parsed = CrossNsQueryHandler::ParseRequest(body, &cross_ns_req);
             if (parsed.ok()) {
-                // ?explain (B/C-class transparency, QUERY_CONTEXT_SPEC §2 / GEN-Agent):
+                // ?explain (B/C-class transparency, the query-context spec / GEN-Agent):
                 // the cross-NS request contract (ParseRequest) carries the retrieval
                 // fields only, so the explain presentation flag is read here from the
                 // body and the query string (truthy "true"/"1") — mirroring the
@@ -852,7 +852,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                     explain = (v == "true" || v == "TRUE" || v == "True" || v == "1");
                 }
                 // Pass the presentation flag into the per-NS executor so it attaches
-                // the chunk-level RRF `rrf_paths` explain detail (§3.8 W2). Read
+                // the chunk-level RRF `rrf_paths` explain detail (W2). Read
                 // above from body/param; set before scatter/rag runs (line ~850).
                 qctx.explain = explain;
                 RagFusionConfig rag_cfg = ResolveRagFusionConfig(req, body);
@@ -905,7 +905,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                     json out = SerializeWithCrag(resp, qctx, crag_stage);
                     if (explain) {
                         // C-class debug fields surface only when a capability ran AND
-                        // failed (SPEC §3); on this path the router's transient-inference
+                        // failed (SPEC); on this path the router's transient-inference
                         // fallback is the only such signal. Reuses the single-NS
                         // BuildExplainNode so the explain schema is identical across
                         // both query paths.
@@ -916,7 +916,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                         // Echo the resolved granularity so the Agent sees the
                         // effective value (mirrors the single-NS query_routes.cpp echo).
                         out["explain"]["granularity"] = qctx.granularity;
-                        // [addendum §3.8 W2 · P5] Aggregate per-path vote counts over
+                        // [addendum W2 · P5] Aggregate per-path vote counts over
                         // the RETURNED results: rrf_path_counts = how many results each
                         // of the five chunk-level paths helped rank (dense / fts5 /
                         // sparse / contextualized / hype_question); via_path_counts =

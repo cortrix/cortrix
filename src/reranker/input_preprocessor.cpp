@@ -126,7 +126,7 @@ PreprocessedPassage InputPreprocessor::Prepare(const std::string& query,
         }
 
         case InputCategory::kExtremelyLong:
-            // §5.1: data-quality problem — do NOT raise a PG ERROR to the query
+            //: data-quality problem — do NOT raise a PG ERROR to the query
             // user (no "re-upload" entry point); surface via LOG_ERROR + metric so
             // ops sees it. The candidate gets score=0 (ranked last).
             spdlog::error(

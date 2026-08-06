@@ -3,7 +3,7 @@
 namespace cortrix::query {
 
 nlohmann::json ToExplainJson(const QueryContext& ctx) {
-    // Key order follows QUERY_CONTEXT_SPEC §5.1 (A class, then B class, then C
+    // Key order follows the query-context spec (A class, then B class, then C
     // class). nlohmann::json object preserves insertion order.
     nlohmann::json j;
 
@@ -30,7 +30,7 @@ nlohmann::json ToExplainJson(const QueryContext& ctx) {
 }
 
 nlohmann::json BuildExplainNode(const QueryContext& ctx, bool include_debug) {
-    // Key order follows QUERY_CONTEXT_SPEC §5.1 (A class, then B class, then C
+    // Key order follows the query-context spec (A class, then B class, then C
     // class). nlohmann::json object preserves insertion order.
     nlohmann::json j;
 
@@ -50,7 +50,7 @@ nlohmann::json BuildExplainNode(const QueryContext& ctx, bool include_debug) {
     j["ambiguous_action_taken"] = ctx.ambiguous_action_taken;
 
     // --- C class (anomaly debug — only when a capability ran AND failed) ---
-    // SPEC §3 C-class rule: do not surface these unless explicitly triggered, so a
+    // SPEC C-class rule: do not surface these unless explicitly triggered, so a
     // default-valued signal is never mistaken for a real one.
     if (include_debug) {
         j["crag_signals"] = ctx.crag_signals;        // map<string,float> → JSON object

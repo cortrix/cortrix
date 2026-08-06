@@ -193,7 +193,7 @@ TEST_F(StoreSqliteTest, DocDeleteCascade) {
     EXPECT_TRUE(blocks.empty());
 }
 
-// [DB import D3 · P2c] DeleteBySourcePrefix — full-overwrite import cleanup.
+// [DB import · P2c] DeleteBySourcePrefix — full-overwrite import cleanup.
 TEST_F(StoreSqliteTest, DeleteBySourcePrefix) {
     auto add_doc = [&](const std::string& source_path, int n_blocks) {
         CortrixDoc doc;
@@ -243,7 +243,7 @@ TEST_F(StoreSqliteTest, DeleteBySourcePrefix) {
     EXPECT_EQ(after, 2);
 }
 
-// [DB import D3 · P2c] DeleteBySourcePrefix is a no-op on an empty prefix (never wipes
+// [DB import · P2c] DeleteBySourcePrefix is a no-op on an empty prefix (never wipes
 // the whole namespace) and on a prefix that matches nothing.
 TEST_F(StoreSqliteTest, DeleteBySourcePrefixGuards) {
     CortrixDoc doc;
@@ -678,7 +678,7 @@ TEST(Fts5SanitizeTest, SimpleWord) {
 }
 
 // Test 19: SanitizeFts5Query - multiple words are individually quoted and
-// OR-joined (D6: a bare space is implicit AND in FTS5, which forced every
+// OR-joined (a bare space is implicit AND in FTS5, which forced every
 // token to co-occur in one block and starved the BM25 route).
 TEST(Fts5SanitizeTest, MultipleWords) {
     EXPECT_EQ(SanitizeFts5Query("hello world"), "\"hello\" OR \"world\"");
@@ -762,7 +762,7 @@ TEST_F(StoreSqliteTest, FTS5OperatorInjectionSafe) {
     // (tokens are quoted individually and OR-joined by the sanitizer)
 }
 
-// D6 regression: a natural-language query must match blocks that contain only
+// regression: a natural-language query must match blocks that contain only
 // a SUBSET of its terms. Under the old implicit-AND join this returned zero
 // rows (live 5k evidence: fts5 path had 0 votes on ~98% of queries).
 TEST_F(StoreSqliteTest, FTS5NaturalLanguageMatchesPartialTerms) {
@@ -790,7 +790,7 @@ TEST_F(StoreSqliteTest, FTS5NaturalLanguageMatchesPartialTerms) {
     EXPECT_EQ(results.size(), 2u);  // each block matches one informative term
 }
 
-// D6 regression: bm25 rank still rewards the block matching more query terms,
+// regression: bm25 rank still rewards the block matching more query terms,
 // so OR-joining does not degrade ordering quality.
 TEST_F(StoreSqliteTest, FTS5RankPrefersMoreMatchedTerms) {
     CortrixDoc doc;
@@ -1691,7 +1691,7 @@ TEST_F(StoreSqliteTest, PragmaAutoVacuumIncremental) {
     store_->Open();
 }
 
-// D3.5 wire⑤ step①: block_insert honors a caller-provided uint64 block_id (the
+// integration wire⑤ step①: block_insert honors a caller-provided uint64 block_id (the
 // HashChildIdToBlockId hash), not the rowid. A high-bit-set id stores as a negative
 // INTEGER rowid (bit-preserving), and must still round-trip through block_get +
 // FTS5 search (content_rowid='block_id' triggers fire on the negative rowid).
@@ -1730,7 +1730,7 @@ TEST_F(StoreSqliteTest, ExplicitBlockIdRoundTripIncludingNegativeRowid) {
 // unified-blocks: parent_insert/parent_get round-trip the `parents` table on the
 // unified store (the table is created standalone by ParentChildSchemaProvider in
 // CreateTables()). The SPC write path uses this so parents + child-blocks commit in
-// one write coordinator transaction (ARCH §3.2). CortrixParent is the storage twin of
+// one write coordinator transaction (ARCH). CortrixParent is the storage twin of
 // chunker::ParentChunk; the store treats metadata_json as opaque text.
 TEST_F(StoreSqliteTest, ParentInsertGetRoundTripAndDuplicate) {
     CortrixParent p;

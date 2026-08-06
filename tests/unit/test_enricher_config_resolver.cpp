@@ -66,7 +66,7 @@ TEST(EnricherNsConfigTest, JsonNullInheritsGlobal) {
     EXPECT_TRUE(r.value().empty());
 }
 
-// --- EnricherConfigResolver (three-layer §2.9) -------------------------------
+// --- EnricherConfigResolver (three-layer) -------------------------------
 
 TEST(EnricherConfigResolverTest, EmptyNsInheritsGlobal) {
     EnricherConfigResolver r(Global());
@@ -89,7 +89,7 @@ TEST(EnricherConfigResolverTest, NsOverridesGlobalBClass) {
 }
 
 TEST(EnricherConfigResolverTest, RequestEnrichIsHighestPriority) {
-    // §2.9 example: NS {"enabled":false} + request enrich=true → enabled.
+    // example: NS {"enabled":false} + request enrich=true → enabled.
     EnricherConfigResolver r(Global());
     EnricherRequestParams req;
     req.enrich = true;

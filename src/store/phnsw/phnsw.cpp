@@ -27,7 +27,7 @@ namespace cortrix::store {
 // AddPoint). S3 makes writes crash-safe: AddPoint/AddPoints/MarkDelete now frame
 // a WalEntry and Submit() it to a shared GroupCommitWriter whose sink (ApplySink)
 // fdatasyncs hnsw.wal and only then replays the batch into the graph under the
-// write lock (design § 4.1). So a write returns once it is BOTH durable and
+// write lock (design). So a write returns once it is BOTH durable and
 // visible, and concurrent writers coalesce into one fsync per batch.
 //
 // Snapshot/Recover wiring (loading state from hnsw.wal on open) is S4; the
@@ -35,7 +35,7 @@ namespace cortrix::store {
 // hardening + TSAN is S5.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Durable-then-apply sink behind the GroupCommitWriter (design § 4.1). The
+// Durable-then-apply sink behind the GroupCommitWriter (design). The
 // committer guarantees exactly one WriteBatch()+Sync() per coalesced batch
 // (group_commit_writer.h), so this stashes the batch's raw frames in WriteBatch
 // and consumes them in Sync: WriteBatch appends to hnsw.wal (no fsync), Sync
@@ -85,7 +85,7 @@ public:
             }
             owner_->ApplyEntryLocked(e.value());
         }
-        // 3. Auto-snapshot check (design § 4.1 step 6): if the WAL has grown past
+        // 3. Auto-snapshot check (design step 6): if the WAL has grown past
         //    its thresholds, ask the background thread to snapshot. Still under
         //    the write lock — only flips a flag + notifies, never blocks here.
         owner_->MaybeRequestSnapshotLocked();
@@ -123,8 +123,8 @@ PHnsw::PHnsw(const std::string& unit_data_dir, const PhnswConfig& config)
     }
     wal_ = std::move(wal.value());
 
-    // S4: load the newest snapshot + replay WAL (design § 4.4) before accepting
-    // traffic (§ 4.4-ter READY gate). On failure the index stays NOT READY.
+    // S4: load the newest snapshot + replay WAL (design) before accepting
+    // traffic (READY gate). On failure the index stays NOT READY.
     Status rec = RecoverInternal();
     if (!rec.ok()) {
         CORTRIX_LOG_ERROR("phnsw", "Recover failed for {}: {}", unit_data_dir_, rec.message());
@@ -147,15 +147,15 @@ PHnsw::PHnsw(const std::string& unit_data_dir, const PhnswConfig& config)
 Status PHnsw::RecoverInternal() {
     // Phase-QA C1-1 guard: when WalWriter::Open fails in the ctor, wal_ stays null and
     // ready_=false. The public Recover() (factory Open path) calls this unconditionally —
-    // without this guard the wal_->ReadAll() in § 4.4 step 2 below null-derefs (SIGSEGV)
+    // without this guard the wal_->ReadAll() in step 2 below null-derefs (SIGSEGV)
     // on any unopenable/corrupt-header WAL (the recovery path should fail gracefully on
-    // disk faults). Return a clean NOT_READY, consistent with the § 4.4-ter READY gate.
+    // disk faults). Return a clean NOT_READY, consistent with the READY gate.
     if (!wal_) {
         return PhnswStatus(StatusCode::kUnavailable, phnsw_errors::kNotReady,
                            "Recover: WAL not open (index not ready); "
                            "WalWriter::Open failed during construction");
     }
-    // 1. Load the newest valid snapshot into index_ (design § 4.4 step 1).
+    // 1. Load the newest valid snapshot into index_ (design step 1).
     uint64_t snapshot_lsn = 0;
     std::unique_ptr<hnswlib::HierarchicalNSW<float>> loaded;
     Status ls = snapshot_mgr_->Load(space_.get(), config_.max_elements, &loaded, &snapshot_lsn);
@@ -185,7 +185,7 @@ Status PHnsw::RecoverInternal() {
     deleted_count_ = index_->getDeletedCount();
     applied_lsn_ = snapshot_lsn;
 
-    // 2. Replay WAL records whose global LSN > snapshot_lsn (design § 4.4 step 2).
+    // 2. Replay WAL records whose global LSN > snapshot_lsn (design step 2).
     //    A record's global LSN = base + position, where base is the LSN just
     //    before the first record currently in the file.
     Result<std::vector<WalEntry>> recs = wal_->ReadAll(config_.dim);
@@ -355,7 +355,7 @@ bool PHnsw::IsLabelMarkedDeletedLocked(uint64_t label) const {
 
 Status PHnsw::AddPoint(const float* vec, uint64_t block_id,
                        const observability::TraceContext* /*ctx*/) {
-    // Step 1 (design § 4.1): validate dim and readiness up front — fail fast
+    // Step 1 (design): validate dim and readiness up front — fail fast
     // WITHOUT touching the WAL.
     if (vec == nullptr) {
         return Status::InvalidArgument("PHnsw::AddPoint: null vector");
@@ -500,7 +500,7 @@ bool PHnsw::Exists(uint64_t block_id) {
 }
 
 Status PHnsw::Snapshot() {
-    // design § 4.3: take the write lock (blocks writes + reads for the snapshot
+    // design: take the write lock (blocks writes + reads for the snapshot
     // window, Phase 1 — COW is deferred to Phase 2), persist the graph stamped
     // with applied_lsn_ (which exactly matches the graph state under this lock),
     // then truncate the WAL. SnapshotManager::Save also prunes old snapshots.
@@ -526,7 +526,7 @@ Status PHnsw::Snapshot() {
 }
 
 Status PHnsw::Recover() {
-    // Reload from disk: newest snapshot + WAL replay (design § 4.4). Used by the
+    // Reload from disk: newest snapshot + WAL replay (design). Used by the
     // factory Open path and after a fault. Takes the write lock so it cannot race
     // a concurrent write/search. (The constructor runs RecoverInternal once
     // before the committer exists; this public entry re-runs it safely.)

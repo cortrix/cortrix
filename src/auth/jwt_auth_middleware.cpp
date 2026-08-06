@@ -32,7 +32,7 @@ Result<AuthContext> JwtAuthMiddleware::AuthenticateHeaders(
 
     // API-Key path (step 1): a `cortrix_sk_*` bearer or an X-API-Key
     // header. The API-Key validation itself is S6 — here we report it is not the
-    // JWT path so the caller (D3.5 wiring) routes it to ApiKeyService.
+    // JWT path so the caller (integration wiring) routes it to ApiKeyService.
     if (IsApiKeyToken(bearer) || !x_api_key.empty()) {
         return AuthStatus(AuthErrorCode::kNotFound, "api-key path handled by S6 ApiKeyService");
     }
@@ -43,7 +43,7 @@ Result<AuthContext> JwtAuthMiddleware::AuthenticateHeaders(
                           "missing Authorization bearer token or X-API-Key");
     }
 
-    // JWT path (§4.3 step 2-4): validate + return AuthContext. AuthService maps
+    // JWT path (step 2-4): validate + return AuthContext. AuthService maps
     // expiry/blacklist/signature to the right CX_ERR_AUTH_* codes.
     return auth_->ValidateAccessToken(bearer);
 }

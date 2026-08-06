@@ -42,7 +42,7 @@ const char* OplogErrorCodeString(OplogErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(OplogErrorCode code) {
-    // §7.2 "structured_data required" column, 1:1. Function-local statics → stable
+    // "structured_data required" column, 1:1. Function-local statics → stable
     // references.
     static const std::vector<std::string> kInvalidField{"invalid_field", "reason"};
     static const std::vector<std::string> kFromTo{"from", "to"};

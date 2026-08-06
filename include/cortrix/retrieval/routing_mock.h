@@ -13,7 +13,7 @@ namespace cortrix::retrieval {
 /// this round, so CRAG provides this mock to (a) make the
 /// skip semantics testable standalone and (b) give a stable call shape. When the router
 /// freezes, the QueryPipeline calls its real helper and this mock is dropped
-/// (D3.5 wiring) — it is intentionally NOT referenced by CragEvaluator.
+/// (integration wiring) — it is intentionally NOT referenced by CragEvaluator.
 ///
 /// Mock rule (decide by the routing_path value): CRAG runs for the Complex /
 /// (default) path; it is skipped on the Simple and Chat paths. Chat skips all

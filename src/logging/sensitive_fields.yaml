@@ -4,7 +4,7 @@
 # redacts, masks, truncates, or hashes before anything is written to a log sink
 # or returned in an error body. 22 controlled fields total (GDPR / SOC2 PII +
 # content). Every new Feature that introduces a sensitive field MUST add it here
-# (D1_MUST_COVER GEN-LOG-Agent rule). The Python SDK loads a synced copy of this
+# (the design checklist GEN-LOG-Agent rule). The Python SDK loads a synced copy of this
 # same file (design sec 6.4) so C++ and Python share one rule set.
 
 # P0 fully redacted (11 fields) — value replaced with "****"

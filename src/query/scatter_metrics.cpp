@@ -9,13 +9,13 @@ using agent_friendly::ErrorCategory;
 
 namespace {
 
-// namespaces_per_query `le` bounds — count-type, aligned to the §7.5 SLA NS
+// namespaces_per_query `le` bounds — count-type, aligned to the SLA NS
 // tiers (1 / 3 / 10 / 100). kNsBuckets finite bounds + a trailing +Inf.
 constexpr double kNsBounds[] = {1, 3, 10, 100};
 constexpr const char* kNsBoundStr[] = {"1", "3", "10", "100"};
 
 // duration_seconds `le` latency bounds (seconds) — generic duration set that
-// straddles the §7.5 target/max SLA tiers (0.5/0.6/1.0/5.0s target,
+// straddles the target/max SLA tiers (0.5/0.6/1.0/5.0s target,
 // 1.5/1.8/3.0/15.0s max). kLatencyBuckets finite bounds + a trailing +Inf.
 constexpr double kLatBounds[] = {0.1, 0.25, 0.5, 1, 2, 5, 10, 30};
 constexpr const char* kLatBoundStr[] = {"0.1", "0.25", "0.5", "1", "2", "5", "10", "30"};

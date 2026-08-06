@@ -18,7 +18,7 @@ CortrixBlock BlockAssembler::Assemble(const std::string& doc_id,
     block.block_type = static_cast<int>(block_type);
     block.processing_level = static_cast<int>(processing_level);
     block.content_text = chunk.text;
-    // block_id = HashChildIdToBlockId(child_id) (ID_SYSTEM_IMPL §6.1 / ARCH §1.8):
+    // block_id = HashChildIdToBlockId(child_id) (ID_SYSTEM_IMPL / ARCH):
     // mint the chunk's business ULID (its child_id) here and derive the uint64
     // P-HNSW label from its SipHash. The parent-child chunker will supply the
     // child_id later; the block_id formula is unchanged, so this is the final form.
@@ -53,7 +53,7 @@ CortrixBlock BlockAssembler::AssembleChild(const cortrix::chunker::ChildChunk& c
     block.block_type = static_cast<int>(modality);
     block.processing_level = static_cast<int>(processing_level);
     block.content_text = child.child_text;
-    // block_id = HashChildIdToBlockId(real child ULID) — the P-HNSW label (ARCH §1.8.2).
+    // block_id = HashChildIdToBlockId(real child ULID) — the P-HNSW label (ARCH).
     block.block_id = id::HashChildIdToBlockId(child.child_id);
     // A child columns carried onto the blocks row.
     block.child_id = child.child_id;

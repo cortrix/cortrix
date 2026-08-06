@@ -11,14 +11,14 @@ namespace cortrix::config {
 
 /// File-backed IGlobalConfig (the CE default
 /// global-config source, `~/.cortrix/config.json`). Implements the canonical
-/// cortrix::IGlobalConfig (D2-pre-9 scaffolding) — does NOT redefine it.
+/// cortrix::IGlobalConfig (scaffolding) — does NOT redefine it.
 ///
 /// Loads a flat JSON object of key→value at construction (values coerced to
 /// strings); typed getters parse on read (InvalidArgument on malformed, NotFound
 /// on missing). Reload() re-reads the file and fires OnChange for changed keys.
 ///
 /// Scope note: the catalog owns this CE file impl + reuses the dev/test
-/// InMemoryGlobalConfig (common/). The other §3.8 sources — PgcortrixGucConfig
+/// InMemoryGlobalConfig (common/). The other sources — PgcortrixGucConfig
 /// (PostgreSQL GUC) and WebUIConfig — belong to pgcortrix / the web UI respectively
 /// and are delivered there on this same canonical interface; the catalog (Layer 0) does
 /// not stub them (they'd pull cross-Feature deps).
@@ -45,7 +45,7 @@ public:
     Result<float>       GetFloat(const std::string& key) const override;
     void OnChange(std::function<void(const std::string&)> cb) override;
 
-    /// [D3.5 r2 · P4] Persist the agent_llm config in memory through Set() (api_key
+    /// [integration r2 · P4] Persist the agent_llm config in memory through Set() (api_key
     /// encrypted at rest via the shared codec). Does NOT write the file — mirrors
     /// Set()'s in-memory semantics; the CE config-persist path is a Phase-2 concern.
     void SetAgentLlmConfig(const AgentLlmConfig& cfg) override;

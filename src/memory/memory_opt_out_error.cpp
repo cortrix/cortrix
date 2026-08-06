@@ -59,7 +59,7 @@ int MemoryOptOutErrorHttpStatus(MemoryOptOutErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(MemoryOptOutErrorCode code) {
-    // ARCH §4.1.11 structured_data column + the data each fault needs to be actionable
+    // ARCH structured_data column + the data each fault needs to be actionable
     // by an Agent. Function-local statics → stable refs.
     static const std::vector<std::string> kSessionNotFoundKeys
         {"session_id"};

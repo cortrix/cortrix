@@ -51,7 +51,7 @@ uint32_t GetU32(const uint8_t* p) {
 
 // Build the 32B header image: magic(4) version(2) reserved(22) header_crc(4).
 // Reserved stays zero in Phase 1 (entry_count / committed_lsn deferred, design
-// § 3.2 / TD-PWL-HEADER-FIELDS). header_crc covers magic+version+reserved.
+// TD-PWL-HEADER-FIELDS). header_crc covers magic+version+reserved.
 std::vector<uint8_t> MakeHeader() {
     std::vector<uint8_t> h(PendingLogWriter::kHeaderSize, 0);
     std::memcpy(h.data(), PendingLogWriter::kMagic, 4);
@@ -281,7 +281,7 @@ std::vector<PendingEntry> PendingLogWriter::ScanRecords(const std::vector<uint8_
             PendingEntry::DeserializeFrom(image.data(), image.size(), &next);
         if (!r.ok()) {
             // Corrupt/short tail — stop; everything before `off` is durable and
-            // valid (design § 4.4 / § 5 truncate-to-last-valid).
+            // valid (design truncate-to-last-valid).
             break;
         }
         out.push_back(std::move(r.value()));

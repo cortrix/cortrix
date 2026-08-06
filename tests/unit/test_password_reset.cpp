@@ -11,9 +11,9 @@
 #include "cortrix/auth/platform_db.h"
 #include "cortrix/config/auth_config.h"
 
-// Auth S5: password reset + email verification (§2.6-2.8 / §4.5 / §4.6). Uses the
+// Auth S5: password reset + email verification. Uses the
 // fake hasher + a capturing NullEmailSender so the verification code is readable
-// without real delivery (bcrypt-independent; SMTP delivery is D3.5).
+// without real delivery (bcrypt-independent; SMTP delivery is integration).
 namespace cortrix::auth {
 namespace {
 
@@ -166,7 +166,7 @@ TEST_F(ResetTest, ConfirmInvalidNewPassword) {
 }
 
 // `ResetConfirm_RevokesRefreshTokens`: after reset, all the user's refresh tokens
-// are revoked (§2.7 side-effect).
+// are revoked (side-effect).
 TEST_F(ResetTest, ConfirmRevokesRefreshTokens) {
     Seed();
     AuthService svc = Svc();
@@ -216,7 +216,7 @@ TEST_F(ResetTest, VerifyEmailExpiredCode) {
 }
 
 // `VerifyEmail_AlreadyVerified`: idempotent — succeeds even with a bogus code once
-// the user is already verified (§2.8).
+// the user is already verified.
 TEST_F(ResetTest, VerifyEmailAlreadyVerified) {
     Seed();
     AuthService svc = Svc();

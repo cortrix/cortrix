@@ -9,7 +9,7 @@
 #include "cortrix/auth/bootstrap_handler.h"
 #include "cortrix/auth/platform_db.h"
 
-// Auth S6: API Key Resource + Bootstrap URL (§2.13 / §3.7, Issue 7 D).
+// Auth S6: API Key Resource + Bootstrap URL (Issue 7 D).
 namespace cortrix::auth {
 namespace {
 
@@ -140,8 +140,8 @@ TEST_F(ApiKeyTest, ExpiredKeyRejected) {
     EXPECT_NE(v.status().message().find("reason=expired"), std::string::npos);
 }
 
-// NOTE (§S6 `ApiKey_Create_NonAdmin` → 403): the admin-role gate is enforced by
-// the middleware/route layer (D3.5), not ApiKeyService. Covered there.
+// NOTE (`ApiKey_Create_NonAdmin` → 403): the admin-role gate is enforced by
+// the middleware/route layer (integration), not ApiKeyService. Covered there.
 
 // ---- Bootstrap ----
 
@@ -200,7 +200,7 @@ TEST_F(BootstrapTest, ValidConsumeMintsAdminAndInvalidates) {
     EXPECT_NE(again.status().message().find("reason=used"), std::string::npos);
 }
 
-// POST JSON path shares the token + shape (§2.13.2.b).
+// POST JSON path shares the token + shape.
 TEST_F(BootstrapTest, JsonRenderShape) {
     auto r = nlohmann::json::parse(BootstrapHandler::RenderJson("cortrix_sk_abc"));
     EXPECT_EQ(r["admin_api_key"], "cortrix_sk_abc");

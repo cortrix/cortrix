@@ -16,7 +16,7 @@ namespace cortrix::agent_trace {
 namespace {
 
 constexpr size_t kSnippetMaxBytes = 500;
-constexpr size_t kSnippetHeadBytes = 400;  // §6/§8.2 -- first 400
+constexpr size_t kSnippetHeadBytes = 400;  // -- first 400
 constexpr size_t kSnippetTailBytes = 100;  // + last 100
 constexpr const char* kSnippetMid = "[...]";
 
@@ -100,14 +100,14 @@ Result<InteractionSourcesView> InteractionsHandler::GetSources(
                          "no interaction with id " + interaction_id);
     }
 
-    // 2. Permission (§8.2/§8.3 anti-leak): non-admin may only read their own.
+    // 2. Permission (anti-leak): non-admin may only read their own.
     if (!ctx.is_admin && owner_user_id.value_or("") != ctx.requester_user_id) {
         return AgentTraceStatus(AgentTraceErrorCode::kUnauthorized,
                          "cross-user interaction access requires admin");
     }
     if (ctx.is_admin && owner_user_id.has_value() &&
         *owner_user_id != ctx.requester_user_id) {
-        // §12 forensics: admin reading another user's interaction sources.
+        // forensics: admin reading another user's interaction sources.
         ObservabilityAuditLog::Emit(ctx.requester_user_id, *owner_user_id,
                                     ObservabilityAuditLog::Endpoint::kInteractionsSources);
     }
@@ -143,7 +143,7 @@ Result<InteractionSourcesView> InteractionsHandler::GetSources(
     }
     out.source_count = static_cast<int>(out.sources.size());
 
-    // OBS_SPEC §13 -- count the read by role + endpoint.
+    // OBS_SPEC -- count the read by role + endpoint.
     AgentTraceMetrics::Instance().RecordTracesQuery(
         ctx.is_admin ? AgentTraceMetrics::Role::kAdmin : AgentTraceMetrics::Role::kUser,
         AgentTraceMetrics::Endpoint::kInteractionsSources);
@@ -152,7 +152,7 @@ Result<InteractionSourcesView> InteractionsHandler::GetSources(
 
 Result<InteractionListView> InteractionsHandler::ListInteractions(
     const InteractionListFilter& filter, const RequesterContext& ctx) {
-    // ---- validate (§8.3 -> CX_ERR_TRACE_INVALID_FILTER) ----
+    // ---- validate (> CX_ERR_TRACE_INVALID_FILTER) ----
     if (filter.limit < 1 || filter.limit > 200) {
         return AgentTraceStatus(AgentTraceErrorCode::kInvalidFilter,
                          "limit must be in [1,200], got " + std::to_string(filter.limit));
@@ -170,7 +170,7 @@ Result<InteractionListView> InteractionsHandler::ListInteractions(
         return AgentTraceStatus(AgentTraceErrorCode::kInvalidFilter, "from_timestamp > to_timestamp");
     }
 
-    // ---- resolve the effective user scope (§8.3 permission) ----
+    // ---- resolve the effective user scope (permission) ----
     // A non-admin is hard-scoped to their own user_id; a user_id filter naming
     // anyone else is a cross-user attempt -> UNAUTHORIZED (anti-leak). An admin may
     // target a specific user_id (logged) or list across all when unset.
@@ -252,7 +252,7 @@ Result<InteractionListView> InteractionsHandler::ListInteractions(
             it.user_id        = ColText(stmt, 2);
             it.namespace_id   = ColText(stmt, 3);
             it.role           = ColText(stmt, 4);
-            it.query_text     = ColText(stmt, 5);   // full text, not truncated (§8.3)
+            it.query_text     = ColText(stmt, 5);   // full text, not truncated
             it.query_type     = ColText(stmt, 6);
             it.created_at     = ColText(stmt, 7);
             out.interactions.push_back(std::move(it));

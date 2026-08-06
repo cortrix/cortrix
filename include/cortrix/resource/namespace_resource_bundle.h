@@ -22,7 +22,7 @@ namespace cortrix::resource {
 /// "the pending-write-log resource", per the spec.
 struct UnitResourceBundle {
     std::string unit_id;
-    std::string data_dir;   ///< per-Unit dir <data_root>/units/<unit_id> (D3.5 wire④):
+    std::string data_dir;   ///< per-Unit dir <data_root>/units/<unit_id> (integration wire④):
                             ///< the NamespaceFacade reads it to site blob/ + memory.db.
     std::unique_ptr<cortrix::store::IIndex> index;             ///< P-HNSW handle
     /// per-Unit store.db connection — ASSEMBLY-TIME ONLY (D-I1.bis): serves the
@@ -41,7 +41,7 @@ struct UnitResourceBundle {
     std::unique_ptr<cortrix::store::IBlobStore> blob_recover;      ///< probes <unit_dir>/blob/
     // ★ `pwl` declared LAST → destructs FIRST (members destruct in reverse
     // declaration order). The coordinator borrows index + store_db + the two
-    // recover adapters via raw pointers, so it must die before them. §9.3.
+    // recover adapters via raw pointers, so it must die before them.
     std::unique_ptr<cortrix::store::WriteCoordinator> pwl;     ///< write coordinator (holds pending.wal)
 
     UnitResourceBundle() = default;

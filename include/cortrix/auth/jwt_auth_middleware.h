@@ -12,11 +12,11 @@ namespace cortrix::auth {
 /// turns the request's auth headers into either an AuthContext or an
 /// Agent-friendly error, by delegating JWT validation to AuthService.
 ///
-/// 🚩 D3.5 (route wiring): mounting this on the real httplib server — the
+/// 🚩 integration (route wiring): mounting this on the real httplib server — the
 /// `Authenticate(httplib::Request) -> optional<Response>` wrapper, protecting the
 /// existing routes, the CE-vs-Cloud edition switch (CE keeps the MVP ApiKeyAuth
 /// path untouched), and the Bearer-cortrix_sk_* API-Key branch (S6) — is
-/// cross-Feature server wiring and lands at D3.5. This class is the logic those
+/// cross-Feature server wiring and lands at integration. This class is the logic those
 /// will call.
 class JwtAuthMiddleware {
 public:
@@ -28,7 +28,7 @@ public:
     ///       → API-Key path → returns CX_ERR_NOT_FOUND here (the API-Key branch
     ///       is S6; this method handles the JWT path and reports "not handled");
     ///   - neither present → CX_ERR_UNAUTHORIZED (missing credentials).
-    /// On a valid JWT, returns the AuthContext (§2.15).
+    /// On a valid JWT, returns the AuthContext.
     Result<AuthContext> AuthenticateHeaders(const std::string& authorization,
                                             const std::string& x_api_key) const;
 
@@ -45,7 +45,7 @@ private:
 };
 
 /// Build the `GET /api/v1/auth/me` JSON body from a UserInfo. Pure
-/// (no IO) so it is unit-testable; the route that calls it is D3.5.
+/// (no IO) so it is unit-testable; the route that calls it is integration.
 std::string BuildMeResponseJson(const UserInfo& user);
 
 }  // namespace cortrix::auth

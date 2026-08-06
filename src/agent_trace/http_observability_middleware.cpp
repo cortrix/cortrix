@@ -119,14 +119,14 @@ HttpObservabilityResult HttpObservabilityMiddleware::Process(
 }
 
 const std::vector<std::string>& HttpObservabilityMiddleware::CorsAllowedHeaders() {
-    // §6.2 config/cors.yaml allowed_headers.
+    // config/cors.yaml allowed_headers.
     static const std::vector<std::string> kHeaders = {
         "X-Session-Id", "X-Trace-Id", "X-Agent-Id", "Content-Type", "Authorization"};
     return kHeaders;
 }
 
 const std::vector<std::string>& HttpObservabilityMiddleware::CorsAllowedMethods() {
-    // §6.2 — GET / POST / OPTIONS (preflight).
+    // — GET / POST / OPTIONS (preflight).
     static const std::vector<std::string> kMethods = {"GET", "POST", "OPTIONS"};
     return kMethods;
 }

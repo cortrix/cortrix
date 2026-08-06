@@ -50,7 +50,7 @@ RequesterContext MakeRequesterContext(const RequestContext& rctx) {
     return RequesterContext{rctx.auth.user_id, rctx.auth.is_admin()};
 }
 
-// ---- identity headers (§6.1) -------------------------------------------
+// ---- identity headers -------------------------------------------
 
 // Parse X-Session-Id/X-Trace-Id/X-Agent-Id via the shared middleware, install the
 // resulting ObservabilityContext on the thread-local (so the downstream read path
@@ -71,7 +71,7 @@ void ParseAndInstallObservabilityHeaders(const httplib::Request& req,
     }
 }
 
-// ---- error rendering (GEN-Agent CX_ERR_TRACE_* body, §9.1) -------------------
+// ---- error rendering (GEN-Agent CX_ERR_TRACE_* body) -------------------
 
 // Recover the "CX_ERR_TRACE_*" token from a Status message ("CX_ERR_TRACE_X: detail").
 // "" if the message does not start with the token. Mirrors batch_submit_service's
@@ -93,7 +93,7 @@ AgentTraceErrorCode AgentTraceCodeFromToken(const std::string& cx) {
     return AgentTraceErrorCode::kInternal;
 }
 
-// Build the §9.2-required structured_data for `code` from the values this route
+// Build the structured_data for `code` from the values this route
 // holds. The structured_data contract is the call site's responsibility (see
 // agent_trace_error.h); the route is where the concrete ids live (session_id /
 // interaction_id from the path, required_role for the auth denial, error_id for an
@@ -155,7 +155,7 @@ void WriteAgentTraceError(httplib::Response& res, const Status& status,
 }
 
 // Render a route-originated CX_ERR_TRACE_INVALID_FILTER (a malformed query param) with
-// the exact offending field + reason + a PII-guarded preview (§9.2 — value_preview
+// the exact offending field + reason + a PII-guarded preview (value_preview
 // optional, first 100 chars). HTTP 400.
 void WriteAgentTraceInvalidFilter(httplib::Response& res, const std::string& request_id,
                            const std::string& field, const std::string& reason,
@@ -223,9 +223,9 @@ bool ParseTimestampParam(const httplib::Request& req, const char* name,
 
 // ---- response serializers --------------------------------------------------
 
-// One agent_trace row as the §8.1 JSON object. Optional columns become JSON null
+// One agent_trace row as the JSON object. Optional columns become JSON null
 // when unset (stable schema, GEN-Agent #7). created_at is the raw stored value
-// (the writer stamps Unix ms; §8.1's example ISO string is illustrative).
+// (the writer stamps Unix ms;'s example ISO string is illustrative).
 json TraceEntryToJson(const agent_trace::AgentTraceEntry& e) {
     json j;
     j["session_id"]     = e.session_id     ? json(*e.session_id)     : json(nullptr);
@@ -243,9 +243,9 @@ json TraceEntryToJson(const agent_trace::AgentTraceEntry& e) {
     return j;
 }
 
-// GET /traces/{session_id} body (§8.1). Pagination (total_count/has_next/
+// GET /traces/{session_id} body. Pagination (total_count/has_next/
 // next_offset) is computed by the writer and carried on TraceSession; trace_count
-// is the rows in THIS page. meta carries the §8.1 soft-limit warning.
+// is the rows in THIS page. meta carries the soft-limit warning.
 json TracesResponseToJson(const TraceSession& s, bool size_warning) {
     json traces = json::array();
     for (const auto& e : s.traces) traces.push_back(TraceEntryToJson(e));
@@ -266,7 +266,7 @@ json TracesResponseToJson(const TraceSession& s, bool size_warning) {
     return body;
 }
 
-// GET /interactions/{id}/sources body (§8.2). highlight_ranges is deliberately
+// GET /interactions/{id}/sources body. highlight_ranges is deliberately
 // absent in CE (Ent writes it to interaction_sources_extension).
 json SourcesViewToJson(const InteractionSourcesView& v) {
     json sources = json::array();
@@ -286,7 +286,7 @@ json SourcesViewToJson(const InteractionSourcesView& v) {
     return body;
 }
 
-// GET /interactions body (§8.3). query_text returned in full (not truncated);
+// GET /interactions body. query_text returned in full (not truncated);
 // namespace_id is the real namespace_name column.
 json InteractionListToJson(const InteractionListView& v) {
     json items = json::array();
@@ -314,7 +314,7 @@ json InteractionListToJson(const InteractionListView& v) {
 
 // ---- shared route bodies (called by both the static-handler + per-NS paths) ----
 
-// GET /api/v1/traces/:session_id body (§8.1). `traces` is built once (static path)
+// GET /api/v1/traces/:session_id body. `traces` is built once (static path)
 // or per-request over the NS memory.db (per-NS path).
 void ServeTraces(agent_trace::TracesHandler& traces, const httplib::Request& req,
                  httplib::Response& res, const RequestContext& rctx) {
@@ -355,7 +355,7 @@ void ServeTraces(agent_trace::TracesHandler& traces, const httplib::Request& req
         rctx.request_id);
 }
 
-// GET /api/v1/interactions/:id/sources body (§8.2).
+// GET /api/v1/interactions/:id/sources body.
 void ServeSources(agent_trace::InteractionsHandler& inter, const httplib::Request& req,
                   httplib::Response& res, const RequestContext& rctx) {
     ParseAndInstallObservabilityHeaders(req, res);
@@ -374,7 +374,7 @@ void ServeSources(agent_trace::InteractionsHandler& inter, const httplib::Reques
     WriteJsonResponse(res, 200, SourcesViewToJson(r.value()), rctx.request_id);
 }
 
-// GET /api/v1/interactions body (§8.3).
+// GET /api/v1/interactions body.
 void ServeListInteractions(agent_trace::InteractionsHandler& inter,
                            const httplib::Request& req, httplib::Response& res,
                            const RequestContext& rctx) {
@@ -501,11 +501,11 @@ bool ReadOwnerFromNsTable(sqlite3* mem_db, const char* table,
 // to one user, and every agent_trace row stamps the namespace_id of the call, so:
 //   1) read the namespaces this session touched off the global agent_trace, then
 //   2) look up user_id in THOSE namespaces' memory.db (interaction_log first — the
-//      §11 closed loop ties interactions/traces by session_id; memory_sessions is
+//      closed loop ties interactions/traces by session_id; memory_sessions is
 //      the fallback for a session with traces but no logged interaction yet).
 // Returns {found=false} when the session appears in no global trace, or its
 // namespace is gone / has no owner record (then ownership is "unknown" and the
-// §8.1 anti-leak rule denies a non-admin / yields SESSION_NOT_FOUND for an admin).
+// anti-leak rule denies a non-admin / yields SESSION_NOT_FOUND for an admin).
 TracesHandlerOwnerResolverResult ResolveGlobalTraceOwner(
     sqlite3* global_db, resource::INamespacePool& pool, const std::string& session_id) {
     TracesHandlerOwnerResolverResult out;
@@ -553,7 +553,7 @@ void RegisterTracesRoutesGlobal(httplib::Server& server,
                                 ApiKeyAuth& auth) {
     // One writer over the global agent_trace (shared across requests; AgentTraceWriterImpl
     // is internally mutex-guarded). The owner resolver closes over the global db + pool
-    // so the §8.1 permission check works across namespaces (TC4).
+    // so the permission check works across namespaces (TC4).
     auto writer = std::make_shared<agent_trace::AgentTraceWriterImpl>(global_db, global_config);
     auto owner_resolver = [global_db, &pool](const std::string& session_id)
         -> agent_trace::TracesHandler::Owner {

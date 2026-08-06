@@ -7,7 +7,7 @@
 #include "cortrix/metadata/metadata_schema_provider.h"
 
 // META block S1.3 coverage: MetadataSchemaProvider creates metadata_blocks + idx_metablocks_ns
-// (detailed design §3.3, D5 locked separate table) idempotently, inside the frozen ISchemaProvider contract.
+// (detailed design, locked separate table) idempotently, inside the frozen ISchemaProvider contract.
 // Mirrors tests/unit/test_import_schema_provider.cpp.
 namespace cortrix::metadata {
 namespace {
@@ -77,7 +77,7 @@ TEST_F(MetadataSchemaTest, UnsupportedVersionStepRejected) {
 }
 
 // The created table accepts a row shaped like a real metadata block, and doc_id is
-// UNIQUE (1 doc = 1 metadata block — detailed design §3.3).
+// UNIQUE (1 doc = 1 metadata block — detailed design).
 TEST_F(MetadataSchemaTest, TableShapeAcceptsRowAndEnforcesDocIdUnique) {
     MetadataSchemaProvider p;
     ASSERT_TRUE(p.Migrate(db_, 0, 1).ok());

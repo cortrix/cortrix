@@ -8,14 +8,14 @@
 #include <vector>
 
 #include "cortrix/catalog/catalog_error.h"
-#include "cortrix/logging/logging.h"           // CORTRIX_LOG_WARN (§3.1.bis evict-fail log)
+#include "cortrix/logging/logging.h"           // CORTRIX_LOG_WARN (evict-fail log)
 #include "cortrix/resource/namespace_pool.h"  // Complete INamespacePool for AdmitCreate/EvictForDelete
 
 namespace cortrix::catalog {
 
 namespace {
 
-// §6.3 cache sizing.
+// cache sizing.
 constexpr std::size_t kNsCacheCapacity   = 10000;
 constexpr std::size_t kUnitCacheCapacity = 1000;
 constexpr int64_t     kCacheTtlMs        = 60000;  // 60s
@@ -242,7 +242,7 @@ Status DefaultINSRouter::CreateNamespace(const NSMetadata& metadata) {
         return CatalogStatus(CatalogErrorCode::kInvalidConfigJson, "ns_id is empty");
     }
     // Catalog INSERT first, then pool admission.
-    // The original §5.1 order (admit → insert) was a dependency knot: AdmitCreate's
+    // The original order (admit → insert) was a dependency knot: AdmitCreate's
     // load calls GetActiveUnit, which reads the very ns_units row this INSERT
     // creates — fresh creates always failed NS_NOT_FOUND (masked by mock routers /
     // null pools in unit tests). Wrapping the admit inside the catalog txn is
@@ -250,7 +250,7 @@ Status DefaultINSRouter::CreateNamespace(const NSMetadata& metadata) {
     // mu_→pool against the regular pool→mu_ order = AB-BA). So: commit the row
     // first (own txn, mu_ released), then admit (lock order stays pool→mu_,
     // one-way), and compensate with DeleteNamespace on rejection — symmetric to
-    // the §5.2 EvictForDelete pattern. A crash between the two self-heals:
+    // the EvictForDelete pattern. A crash between the two self-heals:
     // StartupLoadAll picks the orphan row up on the next boot.
     Status catalog = InsertNamespaceCatalog(metadata);
     if (!catalog.ok()) return catalog;
@@ -265,7 +265,7 @@ Status DefaultINSRouter::CreateNamespace(const NSMetadata& metadata) {
     return Status::Ok();
 }
 
-// §12.2②: INSERT the namespace row + its sole Unit + the 1:1 ns_units mapping in
+//②: INSERT the namespace row + its sole Unit + the 1:1 ns_units mapping in
 // one txn. Extracted from CreateNamespace so the pool admission/rollback wraps it.
 Status DefaultINSRouter::InsertNamespaceCatalog(const NSMetadata& metadata) {
     std::lock_guard<std::mutex> lock(mu_);
@@ -423,7 +423,7 @@ Status DefaultINSRouter::DeleteNamespace(const std::string& namespace_id) {
     // Pool eviction hook: after the catalog soft-delete,
     // release the NS's pool resources (index / WriteCoordinator / store.db). When
     // ns_pool_ is null (Phase 1 standalone / catalog-standalone) this is skipped. Per
-    // §3.1.bis the catalog delete is authoritative: an EvictForDelete failure is
+    // the catalog delete is authoritative: an EvictForDelete failure is
     // logged but NOT rolled back (any pool residue is reclaimable via the admin API,
     // and self-heals on restart since StartupLoadAll skips deleted NS). EvictForDelete
     // itself is UAF-safe — if a request still holds the NS it defers the actual erase

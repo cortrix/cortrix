@@ -5,7 +5,7 @@
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/server/http_server.h"
 #include "cortrix/logging/logging.h"
-#include "cortrix/deploy/disk_monitor.h"     // [D3.5 gap②] disk pressure gate
+#include "cortrix/deploy/disk_monitor.h"     // [integration gap②] disk pressure gate
 #include "cortrix/agent_friendly/error.h"    // CX_ERR_DISK_FULL body serialization
 #include "cortrix/common/json_depth.h"       // metadata depth guard (DoS: deep-JSON dump)
 

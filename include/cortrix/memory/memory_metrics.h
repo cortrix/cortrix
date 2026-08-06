@@ -7,24 +7,24 @@
 namespace cortrix::memory::transparency {
 
 /// The `memory_transparency` subsystem metrics (observability
-/// naming `cortrix_memory_transparency_<metric>_<unit>`, §2.3 line 105 SoT). Mirrors
+/// naming `cortrix_memory_transparency_<metric>_<unit>`, line 105 SoT). Mirrors
 /// the memory_extract_metrics.h / RagFusionMetrics template (process-wide singleton,
 /// atomic counters/histograms, OpenMetrics renderer).
 ///
 /// 🚨 Cardinality control: labels are enum-only.
 /// NO `tenant_id` / `ns_id` / `user_id` (high-cardinality, forbidden); per-NS /
-/// per-tenant data goes through the §3.4 per-tenant API. `op` is the 4-value op enum
+/// per-tenant data goes through the per-tenant API. `op` is the 4-value op enum
 /// (list/create/edit/invalidate — V8 G2 M1: op=invalidate is 1:1 with the audit
 /// action name), `status` is success/error, `error_code` is the 5-value transparency
 /// error-code enum (all bounded, low-cardinality).
 ///
-/// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics text
+/// 🚨 standalone: a self-contained, dependency-free recorder + an OpenMetrics text
 /// renderer. The `/metrics` scrape endpoint does not exist in the frozen tree —
 /// registering this recorder into that endpoint is cross-Feature wiring **deferred to
-/// D3.5**. Until then it is fully usable + testable in-process and RenderOpenMetrics()
+/// integration**. Until then it is fully usable + testable in-process and RenderOpenMetrics()
 /// produces what the server will serve.
 ///
-/// §8 metric schema (5 rows):
+/// metric schema (5 rows):
 ///   cortrix_memory_transparency_op_total                counter   {op, status}
 ///   cortrix_memory_transparency_op_latency_seconds      histogram {op}
 ///   cortrix_memory_transparency_cross_user_blocked_total counter  {}  (L1.bis 404 mask)
@@ -32,7 +32,7 @@ namespace cortrix::memory::transparency {
 ///   cortrix_memory_transparency_invalid_input_total     counter   {error_code}
 class MemoryMetrics {
 public:
-    /// op label for op_total / op_latency_seconds (§8). list/create/edit/invalidate —
+    /// op label for op_total / op_latency_seconds. list/create/edit/invalidate —
     /// `invalidate` (not `delete`) is 1:1 with the audit action + MCP tool name
     /// (naming sync with the audit surface).
     enum class Op {
@@ -42,7 +42,7 @@ public:
         kInvalidate,
     };
 
-    /// status label for op_total (§8).
+    /// status label for op_total.
     enum class OpStatus {
         kSuccess = 0,
         kError,

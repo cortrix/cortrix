@@ -25,12 +25,12 @@ namespace cortrix::onnx {
 ///
 /// On failure it returns a Status carrying the CX_ERR_* identity (re-inflatable
 /// to the full Agent-friendly body via MakeOnnxError); main() aborts on a
-/// non-OK Status (hard-fail, D3=A — no degrade, no fallback).
+/// non-OK Status (hard-fail,=A — no degrade, no fallback).
 ///
-/// Standalone (D3): this class validates a *given* list of model paths. Wiring
+/// Standalone: this class validates a *given* list of model paths. Wiring
 /// it into the live cortrix-server startup and populating the list from the reranker's
 /// reranker_config + the live OnnxEmbedder config is cross-Feature integration
-/// → deferred to D3.5 (see collect_registered_onnx_models, not built here).
+/// → deferred to integration (see collect_registered_onnx_models, not built here).
 class StartupValidator {
  public:
     struct ValidationConfig {
@@ -86,12 +86,12 @@ class StartupValidator {
     /// Build a ValidationConfig from a loaded CortrixConfig by collecting the
     /// registered ONNX model consumers (collect_registered_onnx_models).
     ///
-    /// Standalone (D3) scope — registers only the consumers whose model_path
+    /// Standalone scope — registers only the consumers whose model_path
     /// already exists in the FROZEN config: the OnnxEmbedder (bge-m3,
     /// `config.embedding.model_path`). The reranker (bge-reranker-v2-m3)
     /// has no model_path field in the current config (it has not landed its
     /// config), so it is NOT collected here — adding it (and the sparse
-    /// model) is cross-Feature wiring deferred to D3.5. Empty paths are skipped
+    /// model) is cross-Feature wiring deferred to integration. Empty paths are skipped
     /// (a stub-only deployment registers nothing).
     ///
     /// Defined inline against config.h so this header stays

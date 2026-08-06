@@ -18,7 +18,7 @@
 
 namespace cortrix::store {
 
-/// Tuning for the Write Coordinator (design § 2.2). Defaults match the spec.
+/// Tuning for the Write Coordinator (design). Defaults match the spec.
 struct WriteCoordinatorConfig {
     // pending.wal group-commit flush policy (shared GroupCommitWriter).
     int group_commit_max_batch = 32;
@@ -32,7 +32,7 @@ struct WriteCoordinatorConfig {
     // Inline compaction (Q3): compact pending.wal every N committed txns.
     int compact_threshold = 1000;
 
-    // Recovery policy (design § 2.2).
+    // Recovery policy (design).
     int max_recovery_entries = 10000;  // abort recovery past this many records
     bool strict_recovery = false;      // true: any cleanup failure aborts startup
 };
@@ -45,9 +45,9 @@ struct TxnHandle {
 
 // WalStats (pending/committed/rollback counts) is defined in
 // pending_log_writer.h and reused here — the coordinator's GetStats is a thin
-// pass-through over the writer's counts (design § 2.1).
+// pass-through over the writer's counts (design).
 
-/// Write Coordinator — the PWL transaction state machine (design § 2.1).
+/// Write Coordinator — the PWL transaction state machine (design).
 ///
 /// A document write is PENDING → COMMITTED/ROLLBACK, persisted via the
 /// PendingLogWriter (S1). The caller drives the three-way store write between
@@ -63,7 +63,7 @@ struct TxnHandle {
 ///
 /// Thread-safe: BeginWrite/Commit/Rollback may be called concurrently. Same
 /// doc_id must not be written concurrently by the caller (Q2 is an assertion-
-/// level guard, not a business feature — design § 1 boundary).
+/// level guard, not a business feature — design boundary).
 class WriteCoordinator {
 public:
     /// @param data_dir       per-namespace dir; pending.wal lives here
@@ -72,7 +72,7 @@ public:
     /// @param metadata_store borrowed; Recover's BlockExists check
     /// @param blob_store     borrowed; Recover's BlobExists check
     /// Any store may be null when Recover() is not exercised (e.g. write-only
-    /// unit tests); Recover() requires all three (design § 4.4 Q1-C).
+    /// unit tests); Recover() requires all three (design Q1-C).
     WriteCoordinator(const std::string& data_dir, const WriteCoordinatorConfig& config,
                      IVectorStore* vector_store, IMetadataStore* metadata_store,
                      IBlobStore* blob_store);
@@ -81,7 +81,7 @@ public:
     WriteCoordinator(const WriteCoordinator&) = delete;
     WriteCoordinator& operator=(const WriteCoordinator&) = delete;
 
-    /// Rollback cleanup hook (design § 2.1). Receives the originating PENDING
+    /// Rollback cleanup hook (design). Receives the originating PENDING
     /// entry (doc_id + block_ids) so the layer above can drop whatever it wrote.
     /// Must be idempotent: cleaning data that is absent returns Ok (Q6).
     using RollbackCallback = std::function<Status(const PendingEntry&)>;
@@ -95,7 +95,7 @@ public:
     /// thread-safe against concurrent Rollback.
     void SetRollbackCallback(RollbackCallback cb);
 
-    /// Crash recovery (design § 4.4). Scans pending.wal in EOF order, groups
+    /// Crash recovery (design). Scans pending.wal in EOF order, groups
     /// records by txn, and for each:
     ///   - has COMMITTED → already durable, nothing to do;
     ///   - has ROLLBACK  → replay the idempotent cleanup callback (Q6);
@@ -114,9 +114,9 @@ public:
 
     /// Begin a document write: allocate a txn_id, append PENDING, record intent
     /// in the state tables. `writes_blob` records whether this txn writes a blob
-    /// (v1.0.2 D3.5 #1): a blob-less doc (watch_dir/CDC/memory) passes false so
+    /// (v1.0.2 integration #1): a blob-less doc (watch_dir/CDC/memory) passes false so
     /// Recover does not read its (legitimately absent) blob as an incomplete write
-    /// (§4.4, the §10.4 data-loss fix). Returns CX_ERR_PWL_DOC_WRITE_IN_PROGRESS if
+    /// (the data-loss fix). Returns CX_ERR_PWL_DOC_WRITE_IN_PROGRESS if
     /// `doc_id` already has a live transaction (Q2), CX_ERR_PWL_WRITE_FAILED on I/O.
     Status BeginWrite(const std::string& doc_id, const std::vector<BlockId>& block_ids,
                       bool writes_blob, TxnHandle* out_txn);
@@ -135,11 +135,11 @@ public:
 
     // --- diagnostics ---
 
-    /// Live transaction counts from pending.wal (design § 2.1).
+    /// Live transaction counts from pending.wal (design).
     Result<WalStats> GetStats();
 
     /// Current pending.wal size in bytes — O(1), for memory budgeting
-    /// (design § 2.1 v1.0.1, GetPwlSizeBytes). Zero before Init().
+    /// (design v1.0.1, GetPwlSizeBytes). Zero before Init().
     size_t GetPwlSizeBytes() const;
 
     /// Testing seam: force the next `n` pending.wal appends to fail, to drive
@@ -154,7 +154,7 @@ private:
     // Rollback can hand the original PENDING payload to the cleanup callback
     // (block_ids drive the vector-index per-block delete). block_ids are dropped
     // once the txn finalizes (committed/rolled-back txns no longer need them),
-    // keeping the table within the design § 2.1 memory budget.
+    // keeping the table within the design memory budget.
     struct TxnState {
         PendingEntry::State state;
         std::string doc_id;
@@ -177,7 +177,7 @@ private:
     std::string data_dir_;
     WriteCoordinatorConfig config_;
 
-    // Borrowed storage backends for Recover()'s three-way check (design § 4.4).
+    // Borrowed storage backends for Recover()'s three-way check (design).
     IVectorStore* vector_store_;
     IMetadataStore* metadata_store_;
     IBlobStore* blob_store_;

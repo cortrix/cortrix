@@ -6,7 +6,7 @@ import { parseAgentError } from '../api/errors';
 import { Button, Input, Card, CardHeader, CardTitle, CardBody, notify } from '../components/ui';
 import { ProgrammaticBanner } from '../components/Common/ProgrammaticBanner';
 
-// BootstrapPage (web UI design § 9.1 — Bootstrap URL flow). First-run setup: the
+// BootstrapPage (web UI design — Bootstrap URL flow). First-run setup: the
 // `cortrix-setup` process prints a 60s one-time URL containing a token. This
 // page exchanges that token via POST /api/v1/admin/bootstrap for the admin API
 // key (the programmatic path; the GET path is a server-rendered HTML page).

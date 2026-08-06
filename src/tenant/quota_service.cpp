@@ -50,14 +50,14 @@ bool QuotaService::CheckQuota(const TenantId& tenant_id, QuotaType type, int64_t
     QuotaLimit limit = provider_->GetLimit(tenant_id, type);
     if (limit.IsUnlimited()) return true;
     // V1.0 OSS tracks no usage, so the comparison is against amount alone; Cloud V1
-    // adds the persisted usage from platform.db (D3.5/Cloud-V1 wiring).
+    // adds the persisted usage from platform.db (integration/Cloud-V1 wiring).
     return amount <= limit.limit;
 }
 
 void QuotaService::RecordUsage(const TenantId& /*tenant_id*/, QuotaType /*type*/,
                                int64_t /*amount*/, const observability::TraceContext* /*ctx*/) {
     // V1.0 OSS: no-op (topic 4 -- quota_usage table is not created). Cloud V1 persists
-    // to platform.db here. cortrix_quota_record_total{result=noop} metric is D3.5.
+    // to platform.db here. cortrix_quota_record_total{result=noop} metric is integration.
 }
 
 Status QuotaService::UpdateQuotaOverride(const TenantId& tenant_id, QuotaType /*type*/,

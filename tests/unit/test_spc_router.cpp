@@ -345,7 +345,7 @@ TEST(SPCRouterStandaloneTest, NeedsOcr_PdfWithText_No) {
 }
 
 TEST(SPCRouterStandaloneTest, NeedsOcr_PdfWithoutText_Yes) {
-    // D3 PROBE mechanism: image-only PDF needs OCR
+    // PROBE mechanism: image-only PDF needs OCR
     EXPECT_TRUE(SPCRouter::NeedsOcr("application/pdf", false));
 }
 

@@ -10,8 +10,8 @@
 
 namespace cortrix::resource {
 
-/// D3.5 wire④ — the thin façade over one acquired Namespace (NAMESPACEPOOL_NS_INTEGRATION
-/// §4). Phase-1 access model (§3 = authoritative): a consumer constructs a
+/// integration wire④ — the thin façade over one acquired Namespace (NAMESPACEPOOL_NS_INTEGRATION
+///). Phase-1 access model (= authoritative): a consumer constructs a
 /// NamespaceFacade per request, calls Acquire() (= Pool.Acquire), uses the
 /// five windows, and lets the destructor Release() (D-I5(a) per-request).
 ///
@@ -23,13 +23,13 @@ namespace cortrix::resource {
 /// bundle-conn view segfaulted under concurrency and was overturned).
 ///
 /// This is NOT the MVP CortrixNamespace copied; it is strictly a wrapper on top of
-/// Acquire (§3: the façade may only be a thin wrapper above Acquire).
+/// Acquire (the façade may only be a thin wrapper above Acquire).
 class NamespaceFacade {
 public:
     /// Bind to a pool + namespace. Does NOT acquire yet — call Acquire() first.
     NamespaceFacade(INamespacePool& pool, std::string namespace_id);
 
-    /// Releases the acquired bundle (if any) — RAII pairing of Acquire (§4 D-I5a).
+    /// Releases the acquired bundle (if any) — RAII pairing of Acquire (D-I5a).
     ~NamespaceFacade();
 
     NamespaceFacade(const NamespaceFacade&) = delete;
@@ -43,7 +43,7 @@ public:
     bool acquired() const { return acquired_; }
     const std::string& namespace_id() const { return namespace_id_; }
 
-    // ── Five windows (§4). Precondition: Acquire() returned Ok. ──────────────
+    // ── Five windows. Precondition: Acquire() returned Ok. ──────────────
 
     /// Bundle's P-HNSW index (IIndex) — the heavy resource (forwarded).
     cortrix::store::IIndex& vec_index();

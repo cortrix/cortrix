@@ -29,10 +29,10 @@ interface NavItem {
   end?: boolean;
 }
 
-// Primary navigation (web UI design § 10 / § 9-bis). Migrated from the old
+// Primary navigation (web UI design-bis). Migrated from the old
 // `activePage` zustand selection to react-router <NavLink> in R3/S5 — the active
 // state now derives from the URL. The Admin group (Users / Operation Log,
-// § 9-bis) renders only for admin-role sessions. The Enterprise group renders
+//) renders only for admin-role sessions. The Enterprise group renders
 // only on enterprise builds (edition === 'enterprise'); CE hides it entirely
 // (the community edition must not advertise enterprise-only
 // surfaces).

@@ -29,7 +29,7 @@ int DurableSync(int fd) {
 #endif
 }
 
-// --- little-endian header field helpers (32B header, design § 3.2) ---
+// --- little-endian header field helpers (32B header, design) ---
 void PutU16(uint8_t* p, uint16_t v) {
     p[0] = static_cast<uint8_t>(v & 0xFF);
     p[1] = static_cast<uint8_t>((v >> 8) & 0xFF);
@@ -54,7 +54,7 @@ uint64_t GetU64(const uint8_t* p) {
     return v;
 }
 
-// Header byte layout (design § 3.2):
+// Header byte layout (design):
 //   [0,4)   magic "PWAL"
 //   [4,6)   version u16
 //   [6,10)  dim u32
@@ -187,7 +187,7 @@ Result<std::unique_ptr<WalWriter>> WalWriter::Open(const std::string& wal_path, 
         const uint32_t stored_crc = GetU32(hdr + kHdrCrc);
         const uint32_t actual_crc = Crc32(hdr, kHdrCrcCovered);
         if (stored_crc != actual_crc) {
-            // Header CRC failed: do not trust the count fields (design § 5 — the
+            // Header CRC failed: do not trust the count fields (design — the
             // entry_count is re-derived by a scan). Keep the file open; ReadAll
             // recomputes counts and can rewrite a clean header. committed_lsn is
             // re-derived as the post-scan entry_count (monotonic base lost, but a
@@ -325,7 +325,7 @@ Result<std::vector<WalEntry>> WalWriter::ReadAll(int expected_dim) {
     while (offset < img.size()) {
         Result<WalEntry> e = WalEntry::DeserializeFrom(img.data(), img.size(), &offset, dim_check);
         if (!e.ok()) {
-            // Corrupt/short trailing record — stop and truncate the tail (design § 5).
+            // Corrupt/short trailing record — stop and truncate the tail (design).
             break;
         }
         out.push_back(std::move(e.value()));
@@ -371,7 +371,7 @@ Status WalWriter::Truncate() {
     }
     entry_count_ = 0;
     // committed_lsn_ is PRESERVED (monotonic) — post-truncate appends continue the
-    // ascending sequence so recovery's LSN filtering still works (design § 4.4).
+    // ascending sequence so recovery's LSN filtering still works (design).
     Status h = RewriteHeaderLocked();
     if (!h.ok()) {
         return h;

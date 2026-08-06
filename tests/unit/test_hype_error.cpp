@@ -6,7 +6,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/spc/hype_error.h"
 
-// HyPE S5 — HyPE error model (§7, ARCH §4.1.11) — template A registry. Pins the 6
+// HyPE S5 — HyPE error model (ARCH) — template A registry. Pins the 6
 // codes, categories/retryability/retry_after_ms, structured_data contracts, and
 // the Status bridge.
 namespace cortrix::spc {

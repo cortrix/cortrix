@@ -15,7 +15,7 @@ namespace {
 // row" into a warning (treated as a build failure), so the registry can't silently
 // drift from the enum.
 //
-// §4.4: both codes are permanent + non-retryable (retry_after_ms = null). LEVEL_INVALID
+//: both codes are permanent + non-retryable (retry_after_ms = null). LEVEL_INVALID
 // is a defensive bottom-out (ComputeLevel should never exceed 4); CONFIG_INVALID is a
 // startup-time bad-α rejection (not part of a query response body).
 constexpr ScoringErrorInfo kLevelInvalid
@@ -39,7 +39,7 @@ const char* ScoringErrorCodeString(ScoringErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(ScoringErrorCode code) {
-    // §4.4 structured_data column — the keys the Agent needs to locate the problem
+    // structured_data column — the keys the Agent needs to locate the problem
     // without parsing message. Function-local statics → stable refs.
     static const std::vector<std::string> kLevelKeys{
         "level_received", "max_allowed", "scoring_input"};

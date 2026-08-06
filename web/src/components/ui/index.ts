@@ -1,4 +1,4 @@
-// Cortrix VI § 6 base component library (web UI).
+// Cortrix VI base component library (web UI).
 // New UI should import primitives from here.
 export { Button } from './Button';
 export type { ButtonProps, ButtonVariant, ButtonSize } from './Button';

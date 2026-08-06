@@ -14,7 +14,7 @@ namespace cortrix::query {
 /// tests re-declared the same object literal, which meant a change to the
 /// route's shape could not fail a test.
 ///
-/// Both blocks are B-class explain state (§2.5 / §8.2): present only when
+/// Both blocks are B-class explain state: present only when
 /// `?explain=true` and the corresponding stage ran.
 
 /// `explain.llm_dependent_features.rag_fusion`.

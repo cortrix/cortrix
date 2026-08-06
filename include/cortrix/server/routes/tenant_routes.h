@@ -40,7 +40,7 @@ class QuotaService;
 /// Shared-file rule (D-R1 sec 2): this is the single encapsulated entry point to
 /// be added to src/main.cpp / the server bootstrap (one ADD line); the route
 /// bodies live here, not inline. Wiring it into main.cpp requires a catalog.db
-/// handle + the three services, which is cross-feature bootstrap -> D3.5.
+/// handle + the three services, which is cross-feature bootstrap -> integration.
 void RegisterTenantRoutes(httplib::Server& server,
                           tenant::TenantService& tenant_svc,
                           tenant::PermissionService& perm_svc,

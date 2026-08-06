@@ -28,7 +28,7 @@ Status ApiKeyAuth::Authenticate(const std::string& bearer_token, AuthContext* co
     std::lock_guard<std::mutex> lock(mu_);
     auto it = keys_.find(hash);
     if (it == keys_.end()) {
-        // [D3.5 r2 · P1] Fall back to the platform.db key store (bootstrap admin
+        // [integration r2 · P1] Fall back to the platform.db key store (bootstrap admin
         // key + /auth/api-keys-minted keys) when no static config key matches. A
         // valid DB key authenticates as admin (CE single-user model): platform.db
         // keys are all admin-minted; ValidateApiKey enforces active+not-expired and

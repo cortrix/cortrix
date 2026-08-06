@@ -14,11 +14,11 @@
 #include "mock_response_builder.h"
 #include "mock_scatter_executor.h"
 
-// S5.2 — the 7 §7.5 integration scenarios, driven standalone through the full
-// CrossNsQueryHandler → ScatterGather pipeline over MockIScatterExecutor (§7.2):
+// S5.2 — the 7 integration scenarios, driven standalone through the full
+// CrossNsQueryHandler → ScatterGather pipeline over MockIScatterExecutor:
 //   IT-1 single-NS direct path / IT-2 3 NS / IT-3 10 NS (SLA) / IT-4 ["*"] wildcard /
 //   IT-5 partial failure / IT-6 cross-NS same content_hash dedup / IT-7 rerank=false
-//   RRF fallback. (Real per-NS pipeline / reranker / pgbench SLA = D3.5 / S5.3.)
+//   RRF fallback. (Real per-NS pipeline / reranker / pgbench SLA = integration / S5.3.)
 namespace cortrix::query {
 namespace {
 
@@ -130,7 +130,7 @@ TEST(ScatterIntegrationTest, IT5_PartialFailure) {
         .WillOnce(Return(ScatterMockResponseBuilder::IndexCorrupt("ns_bad")));
 
     HandlerResult r = s.handler.Handle(QueryBody({"ns_ok", "ns_bad"}), Auth());
-    EXPECT_EQ(r.status, 200);  // partial success is still 200 (§2.7 principle 3)
+    EXPECT_EQ(r.status, 200);  // partial success is still 200 (principle 3)
     EXPECT_EQ(r.body["meta"]["namespaces_succeeded"], (nlohmann::json{"ns_ok"}));
     ASSERT_EQ(r.body["meta"]["namespaces_failed"].size(), 1u);
     const auto& f = r.body["meta"]["namespaces_failed"][0];

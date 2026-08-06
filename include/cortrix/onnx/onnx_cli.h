@@ -19,15 +19,15 @@ namespace cortrix::onnx {
 /// Pure rendering over a given report → fully testable with no real server /
 /// no real models. This is the dry-run path's core; the `main.cpp` argv
 /// dispatch that builds the report from a loaded config and calls this is the
-/// thin D3.5 wiring (see RunCheckOnnxCli).
+/// thin integration wiring (see RunCheckOnnxCli).
 int RenderCheckOnnxReport(const StartupValidator::ValidationReport& report,
                           std::ostream& out, std::ostream& err);
 
 /// Full `--check-onnx` entry: collect registered models from `config`, run
 /// StartupValidator::ValidateVerbose, render via RenderCheckOnnxReport. Returns
 /// the exit code. Standalone-usable, but its CALLER (the argv branch in
-/// main.cpp, before server boot) is D3.5 wiring — kept out of this Story's
-/// scope to honor the D3 standalone rule.
+/// main.cpp, before server boot) is integration wiring — kept out of this Story's
+/// scope to honor the standalone rule.
 int RunCheckOnnxCli(const CortrixConfig& config,
                     std::ostream& out, std::ostream& err);
 

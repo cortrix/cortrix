@@ -13,7 +13,7 @@
 // Contextual retrieval — ContextualRetrievalEnricher: ISpcEnricher impl (Enrich + EnrichBatch +
 // IsAvailable + Name), GenerateContextualizedText (LLM mock), BuildPrompt
 // (default Anthropic + NS-override template), the three-layer config resolver,
-// and the §7 L1/L2/L3 fallback paths. Enrich() populates the 3 contextual retrieval EnrichResult
+// and the L1/L2/L3 fallback paths. Enrich() populates the 3 contextual retrieval EnrichResult
 // fields (contextualized_text / contextualized_embedding / contextualized_status).
 namespace cortrix::spc {
 namespace {
@@ -157,7 +157,7 @@ TEST(ContextualEnricherTest, GenerateOverlongOutputIsPromptInjection) {
               std::string::npos);
 }
 
-// D12 regression: the default multiplier must accept a provider's natural
+// regression: the default multiplier must accept a provider's natural
 // output at the default 80-token budget (~400 bytes observed live on the 5k
 // ingest). At the old default of 2 this exact case was rejected as injection
 // (41% false-reject rate).
@@ -238,7 +238,7 @@ TEST(ContextualEnricherTest, EnrichSuccessPopulatesAllThreeFields) {
     EXPECT_EQ(res.enricher_name, "contextual_retrieval");
     EXPECT_EQ(res.contextualized_status, 1);            // generated
     ASSERT_TRUE(res.contextualized_text.has_value());
-    // contextualized_text = prefix + "\n" + original chunk (§1.1).
+    // contextualized_text = prefix + "\n" + original chunk.
     EXPECT_EQ(*res.contextualized_text, "PREFIX CONTEXT\nchunk body");
     ASSERT_TRUE(res.contextualized_embedding.has_value());
     EXPECT_EQ(res.contextualized_embedding->size(), 8u);
@@ -358,7 +358,7 @@ TEST(ContextualEnricherTest, EnrichBatchNullDocMetadataUsesEmpty) {
     EXPECT_EQ(results[0].contextualized_status, 1);
 }
 
-// ---------- Config resolution: three-layer override (§6.2) ----------
+// ---------- Config resolution: three-layer override ----------
 
 TEST(ContextualConfigTest, ResolveNullGlobalGivesDefaults) {
     ContextualRetrievalConfig cfg = ResolveContextualConfig(nullptr);
@@ -429,7 +429,7 @@ TEST(ContextualConfigTest, ResolveGuardAbsentKeepsFrozenDefault) {
               kContextualGuardCharsPerTokenDefault);
 }
 
-// §8 guard with a widened multiplier: a legitimate long context (300 bytes >
+// guard with a widened multiplier: a legitimate long context (300 bytes >
 // the historical 2x80=160 ceiling) is ACCEPTED at guard_chars_per_token=5
 // (limit 400) — the deep-QA fix for silently dropped contextualized vectors.
 TEST(ContextualEnricherTest, GenerateGuardMultiplierWidensLimit) {
@@ -518,12 +518,12 @@ TEST(ContextualConfigTest, MergeNsOverrideEmptyModelIgnored) {
     EXPECT_EQ(merged.llm_model, "gpt-4o");  // empty override ignored
 }
 
-// ---------- ContextualOnnxEmbedder adapter (null-guard; real ONNX path = D3.5) ----------
+// ---------- ContextualOnnxEmbedder adapter (null-guard; real ONNX path = integration) ----------
 
 TEST(ContextualOnnxEmbedderTest, NullOnnxEmbedderIsUnavailable) {
     // The adapter over a null OnnxEmbedder reports Unavailable rather than crashing.
     // The real-model success path needs an initialized OnnxEmbedder (ONNX runtime) →
-    // exercised at D3.5, not in standalone.
+    // exercised at integration, not in standalone.
     ContextualOnnxEmbedder adapter(/*embedder=*/nullptr);
     auto r = adapter.Embed("some text");
     EXPECT_FALSE(r.ok());

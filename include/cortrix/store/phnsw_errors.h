@@ -7,7 +7,7 @@ namespace cortrix::store {
 
 /// P-HNSW error taxonomy. These name the failure conditions internal
 /// to the index; at the public API boundary they are surfaced through
-/// cortrix::Status (CODING_CONVENTIONS §3 — single Status error model, with the
+/// cortrix::Status (the coding conventions — single Status error model, with the
 /// CX_ERR_PHNSW_* string codes documented in ERROR_CODE_SDK_MAP).
 ///
 /// v1.1 (V5 #9): BLOCK_ID_NOT_FOUND was removed — MarkDelete is idempotent and
@@ -27,7 +27,7 @@ enum class PhnswError {
 };
 
 /// Stable CX_ERR_* identity codes for the P-HNSW scope
-/// (registered as `CX_ERR_PHNSW_*`). Per CODING_CONVENTIONS § 3 the
+/// (registered as `CX_ERR_PHNSW_*`). Per the coding conventions the
 /// project uses one error model — `Result<T>` + `Status` — and distinguishes
 /// domain errors by a `CX_ERR_*` code string rather than a typed `Result<T, E>`.
 /// The code is carried as a stable prefix on the Status message

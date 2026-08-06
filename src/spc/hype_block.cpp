@@ -11,7 +11,7 @@ std::string BuildHypeQuestionMetadataJson(const HypeQuestion& q,
                                           double cost_usd,
                                           const std::string& generated_at,
                                           const std::string& llm_provider) {
-    // §4.2 metadata_json layout.
+    // metadata_json layout.
     nlohmann::json j;
     j["source_child_id"] = q.source_child_id;
     j["source_parent_id"] = q.source_parent_id;

@@ -13,7 +13,7 @@ namespace cortrix::observability {
 /// One row of the operation_log table. The CE user-facing record of
 /// "what data operation did the user perform" — the business-semantics half of
 /// the three-track split (this is the user-view track; agent_trace is the
-/// ops-view track; §2.13 System Observability is the SRE track).
+/// ops-view track; System Observability is the SRE track).
 ///
 /// Boundary note: this is the public struct. A downstream extension writes
 /// its extra fields (ip / status / details_json / tenant_id) to a SEPARATE
@@ -33,7 +33,7 @@ struct OperationLogEntry {
 };
 
 /// Query filter for GET /api/v1/operations (8 dimensions). Defaults
-/// match §6.1: limit 50 / cap 200, offset 0, DESC.
+/// match: limit 50 / cap 200, offset 0, DESC.
 struct OperationLogFilter {
     std::optional<std::string> action;                       ///< single-value filter
     std::optional<std::vector<std::string>> action_in;       ///< topic 2 multi-select
@@ -43,7 +43,7 @@ struct OperationLogFilter {
     std::optional<std::string> trace_id;                     ///< topic 6 + topic 2 link
     std::optional<int64_t> from_timestamp;                   ///< topic 2 time range (Unix ms)
     std::optional<int64_t> to_timestamp;
-    int limit = 50;                                          ///< default 50 / cap 200 (§6.1)
+    int limit = 50;                                          ///< default 50 / cap 200
     int offset = 0;
     std::string sort_order = "DESC";                         ///< "ASC" | "DESC"
 };
@@ -79,7 +79,7 @@ struct HealthStatus {
 /// exists (GEN-OpenCore-Boundary). Consumers (Engine instrumentation / API handler / Cleanup
 /// Scheduler) depend on this interface via DI, never on the concrete class.
 ///
-/// Per CODING_CONVENTIONS §3, Query returns Result<T> (no Result<T,E>); a domain
+/// Per the coding conventions, Query returns Result<T> (no Result<T,E>); a domain
 /// error is carried as a Status whose message is prefixed with the CX_ERR_OPLOG_*
 /// token (see operation_log_error.h OplogStatus), re-inflated to the full
 /// Agent-friendly body at the API boundary.
@@ -99,14 +99,14 @@ public:
     virtual void BatchLog(const std::vector<OperationLogEntry>& entries,
                           const TraceContext* ctx = nullptr) = 0;
 
-    /// Query with filter + pagination + permission scope (§6.1). Returns an error
+    /// Query with filter + pagination + permission scope. Returns an error
     /// Status (CX_ERR_OPLOG_* token) on invalid filter / bad range / out-of-range
     /// pagination / unauthorized cross-user query.
     virtual Result<OperationLogQueryResult> Query(
         const OperationLogFilter& filter,
         const TraceContext* ctx = nullptr) = 0;
 
-    /// Delete rows past retention / over the row cap (§8.3). Invoked by the
+    /// Delete rows past retention / over the row cap. Invoked by the
     /// CleanupScheduler under an advisory lock.
     virtual void Cleanup() = 0;
 

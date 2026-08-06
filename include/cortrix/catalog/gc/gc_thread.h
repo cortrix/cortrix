@@ -14,7 +14,7 @@ namespace cortrix::catalog::gc {
 /// layers each cycle (B① layering): GcManager::RunOnce (catalog.db / blob_gc_queue)
 /// then DocumentGcSweeper::RunOnce (per-Unit documents/blocks/vectors/blobs). Same
 /// lifecycle shape as async::TaskCleanupCron (thread + cv + stop flag) — "built-in
-/// auto GC thread, on par with the P-HNSW background merge" (ARCH §5.x).
+/// auto GC thread, on par with the P-HNSW background merge" (ARCH).
 /// Start()/Stop() are deployment-graceful-shutdown friendly: Stop() signals the cv and
 /// joins, so a sweep in flight finishes and the next wait returns immediately.
 ///

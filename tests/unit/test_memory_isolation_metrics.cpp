@@ -5,7 +5,7 @@
 #include "cortrix/memory/memory_isolation_metrics.h"
 
 // MET-09 coverage: the 7 cortrix_memory_isolation_* metrics — counters/gauges
-// recording + the OpenMetrics renderer + label-enum discipline (OBS_SPEC §3.2 no
+// recording + the OpenMetrics renderer + label-enum discipline (OBS_SPEC no
 // high-cardinality labels, esp. no user_id).
 namespace cortrix::memory {
 namespace {
@@ -107,7 +107,7 @@ TEST_F(MemoryIsolationMetricsTest, RenderOpenMetricsHasAllSevenMetricsAndTypes) 
 }
 
 TEST_F(MemoryIsolationMetricsTest, RenderHasNoHighCardinalityLabels) {
-    // Memory isolation / OBS_SPEC §3.2: user_id is on the absolute deny list. Labels
+    // Memory isolation / OBS_SPEC: user_id is on the absolute deny list. Labels
     // are enum-only; per-user data goes through the audit log, never a label.
     M().RecordIsolationCheck(CheckResult::kPass, Action::kSearch);
     M().RecordDefaultUserUsed();
@@ -115,7 +115,7 @@ TEST_F(MemoryIsolationMetricsTest, RenderHasNoHighCardinalityLabels) {
     // Check each forbidden field as a LABEL KEY (`<key>="..."`), not a bare
     // substring: the match_scope_excluded reason enum legitimately contains
     // low-cardinality values like "missing_user_id" / "empty_user_id" — reason is
-    // a bounded enum label, not the OBS_SPEC §3.2-forbidden high-cardinality user_id key.
+    // a bounded enum label, not the OBS_SPEC high-cardinality user_id key.
     EXPECT_EQ(out.find("user_id=\""), std::string::npos);
     EXPECT_EQ(out.find("tenant_id=\""), std::string::npos);
     EXPECT_EQ(out.find("ns_id=\""), std::string::npos);

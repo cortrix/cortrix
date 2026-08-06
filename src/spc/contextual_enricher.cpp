@@ -15,7 +15,7 @@ namespace {
 
 using json = nlohmann::json;
 
-/// Clamp max_output_tokens to the §6.2 / prompt-injection range [40,200].
+/// Clamp max_output_tokens to the / prompt-injection range [40,200].
 int ClampMaxOutputTokens(int v) {
     if (v < kContextualMaxOutputTokensMin) return kContextualMaxOutputTokensMin;
     if (v > kContextualMaxOutputTokensMax) return kContextualMaxOutputTokensMax;
@@ -23,7 +23,7 @@ int ClampMaxOutputTokens(int v) {
 }
 
 /// Replace every occurrence of `token` in `s` with `value` (NS-template
-/// substitution, §6.2). Simple literal replace; tokens are the {{...}} markers.
+/// substitution). Simple literal replace; tokens are the {{...}} markers.
 void ReplaceAll(std::string& s, const std::string& token, const std::string& value) {
     if (token.empty()) return;
     size_t pos = 0;
@@ -76,7 +76,7 @@ ContextualRetrievalConfig MergeNsOverride(const ContextualRetrievalConfig& base,
     json root = json::parse(ns_metadata_json, /*cb=*/nullptr, /*allow_exceptions=*/false);
     if (root.is_discarded() || !root.is_object()) return cfg;  // fail-soft
 
-    // The NS layer may nest under "contextual_retrieval" (§6.2 example) or be flat.
+    // The NS layer may nest under "contextual_retrieval" (example) or be flat.
     const json* node = &root;
     if (root.contains("contextual_retrieval") &&
         root["contextual_retrieval"].is_object()) {
@@ -125,15 +125,15 @@ bool ContextualRetrievalEnricher::IsAvailable() const {
 std::string ContextualRetrievalEnricher::BuildPrompt(const std::string& chunk_text,
                                                      const DocumentMetadata& doc_meta,
                                                      const ChunkContext& ctx) const {
-    // §6.1 Anthropic v1 English default. section_heading is chunk-level
+    // Anthropic v1 English default. section_heading is chunk-level
     // (ParsedChunk.section, threaded via the pipeline) — not on the frozen
-    // DocumentMetadata; standalone leaves it empty (D3.5 supplies it). prev/next
+    // DocumentMetadata; standalone leaves it empty (integration supplies it). prev/next
     // chunk text come from the frozen ChunkContext (empty == doc boundary).
     if (!config_.prompt_template.empty()) {
-        // §6.2 NS override: substitute the {{...}} markers into the custom template.
+        // NS override: substitute the {{...}} markers into the custom template.
         std::string p = config_.prompt_template;
         ReplaceAll(p, "{{doc_title}}", doc_meta.doc_title);
-        ReplaceAll(p, "{{section_heading}}", "");  // chunk-level, D3.5
+        ReplaceAll(p, "{{section_heading}}", "");  // chunk-level, integration
         ReplaceAll(p, "{{prev_chunk_text}}", ctx.prev_chunk_text);
         ReplaceAll(p, "{{chunk_text}}", chunk_text);
         ReplaceAll(p, "{{next_chunk_text}}", ctx.next_chunk_text);
@@ -143,7 +143,7 @@ std::string ContextualRetrievalEnricher::BuildPrompt(const std::string& chunk_te
     std::ostringstream os;
     os << "<document_metadata>\n"
        << "  title: " << doc_meta.doc_title << "\n"
-       << "  section: " << "" << "\n"  // section_heading: chunk-level (D3.5)
+       << "  section: " << "" << "\n"  // section_heading: chunk-level (integration)
        << "</document_metadata>\n\n"
        << "<previous_chunk>" << ctx.prev_chunk_text << "</previous_chunk>\n\n"
        << "<chunk>" << chunk_text << "</chunk>\n\n"
@@ -159,26 +159,26 @@ Result<std::string> ContextualRetrievalEnricher::GenerateContextualizedText(
     const std::string& chunk_text, const DocumentMetadata& doc_meta,
     const ChunkContext& ctx) {
     if (llm_client_ == nullptr) {
-        // §7.2 L2: no LLM at all → the startup-no-LLM identity (caller maps to skip).
+        // L2: no LLM at all → the startup-no-LLM identity (caller maps to skip).
         return ContextualStatus(ContextualErrorCode::kStartupNoLlm,
                                 "no LLM client");
     }
 
     llm::LlmCallConfig call;
     call.model = config_.llm_model;
-    call.temperature = 0.0;                       // §6.1 deterministic
-    call.max_tokens = config_.max_output_tokens;  // §6.1 (80 default, 40-200)
-    call.timeout_ms = config_.timeout_ms;         // §6.1 10s default, configurable
+    call.temperature = 0.0;                       // deterministic
+    call.max_tokens = config_.max_output_tokens;  // (80 default, 40-200)
+    call.timeout_ms = config_.timeout_ms;         // 10s default, configurable
 
     llm::ChatCompletionResponse resp =
         llm_client_->Chat(BuildPrompt(chunk_text, doc_meta, ctx), call);
     if (!resp.ok()) {
-        // §7.3 L3: transport / timeout / rate-limit / network → CX_ERR_CONTEXTUAL_LLM_FAILED
+        // L3: transport / timeout / rate-limit / network → CX_ERR_CONTEXTUAL_LLM_FAILED
         // (transient, retryable; the caller degrades to the original embedding).
         return ContextualStatus(ContextualErrorCode::kLlmFailed, resp.status.message());
     }
 
-    // §8 prompt-injection defense: an output longer than guard_chars_per_token x
+    // prompt-injection defense: an output longer than guard_chars_per_token x
     // max_output_tokens (BYTES as a proxy for token budget — no tokenizer in this
     // seam) is treated as a hostile / runaway generation → permanent reject.
     // CAUTION: the historical fixed 2 under-counts real text (80 English tokens
@@ -206,7 +206,7 @@ EnrichResult ContextualRetrievalEnricher::Enrich(const std::string& chunk_text,
     result.enricher_name = Name();
     result.model_used = config_.llm_model;
 
-    // §7.2 L2: the stage is unavailable (no client / disabled) → skipped_no_llm.
+    // L2: the stage is unavailable (no client / disabled) → skipped_no_llm.
     // The chunk Block is still written upstream with its original embedding.
     if (!IsAvailable()) {
         result.contextualized_status = 3;  // skipped_no_llm
@@ -214,7 +214,7 @@ EnrichResult ContextualRetrievalEnricher::Enrich(const std::string& chunk_text,
         return result;
     }
 
-    // 1) LLM contextualized prefix (§6).
+    // 1) LLM contextualized prefix.
     Result<std::string> text = GenerateContextualizedText(chunk_text, doc_meta, ctx);
     if (!text.ok()) {
         // Transparent degrade: contextualization skipped, original embedding kept. The
@@ -233,9 +233,9 @@ EnrichResult ContextualRetrievalEnricher::Enrich(const std::string& chunk_text,
     std::string contextualized = text.value() + "\n" + chunk_text;
     result.contextualized_text = contextualized;
 
-    // 2) Re-embed the contextualized text (§5 double-vector coexistence). A null /
+    // 2) Re-embed the contextualized text (double-vector coexistence). A null /
     // failing embedder degrades only the embedding half — the text is still useful
-    // (partial result, §7.3).
+    // (partial result).
     if (embedder_ == nullptr) {
         result.contextualized_status = 2;  // failed (embedding half unavailable)
         result.error_msg =

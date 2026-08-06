@@ -10,9 +10,9 @@ namespace cortrix::server {
 /// the only change needed if the per-doc submission seam is ever re-targeted.
 /// 0 change to the scheduler: it only *calls* the already-frozen Enqueue surface.
 ///
-/// D3.5: the SubmitRequest handed here must already carry a server-side
+/// integration: the SubmitRequest handed here must already carry a server-side
 /// `filepath` (the materialized inline content) — that materialization is the
-/// batch service's D3.5 deferred step (see BatchSubmitService). Standalone, the
+/// batch service's integration deferred step (see BatchSubmitService). Standalone, the
 /// service is exercised against MockTaskSubmitter, not this adapter.
 class TaskSubmitterAdapter : public ITaskSubmitter {
 public:

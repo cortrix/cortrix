@@ -1,6 +1,6 @@
 """MCP protocol-level checks — what an IDE (Claude Code / Cline / Cursor) sees on connect.
 
-D3.5 deferred: the full real-machine round-trip (live cortrix-server + IDE stdio handshake)
+integration deferred: the full real-machine round-trip (live cortrix-server + IDE stdio handshake)
 runs during integration. Standalone, we validate the discoverable surface: tool count,
 JSON input schemas, names, and server identity — i.e. what tools/list returns.
 """

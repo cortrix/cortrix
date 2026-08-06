@@ -14,7 +14,7 @@
 //   ChunkStrategy (cortrix::chunker): ToString <-> ChunkStrategyFromString.
 //                                     unknown -> kParentChild.
 //   UnitLevel (cortrix::chunker):     ToString <-> UnitLevelFromString.
-//                                     unknown -> kParagraph (D2 lock).
+//                                     unknown -> kParagraph (lock).
 //   EnricherType (cortrix::spc): EnricherTypeString <-> ParseEnricherType.
 //                                unknown -> kNull (fail-soft).
 //   AnomalyReason (cortrix::spc): ToString only (cleaning, 5 values starting at 1).

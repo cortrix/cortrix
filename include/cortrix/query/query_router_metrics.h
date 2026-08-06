@@ -11,24 +11,24 @@ namespace cortrix::query {
 /// (process-wide singleton, atomic counters/histogram/gauge, OpenMetrics renderer).
 ///
 /// 🚨 Cardinality control:
-/// labels are enum-only. NO `ns_id` (high-cardinality, forbidden — removed in D1 V3
+/// labels are enum-only. NO `ns_id` (high-cardinality, forbidden — removed in V3
 /// decision 10); per-NS data goes through
-/// `GET /api/v1/system/namespaces/<ns_id>/stats` (OBS_SPEC §3.4).
+/// `GET /api/v1/system/namespaces/<ns_id>/stats` (OBS_SPEC).
 ///
-/// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
+/// 🚨 standalone: a self-contained, dependency-free recorder + an OpenMetrics
 /// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
-/// **deferred to D3.5**. Until then it is fully usable + testable in-process and
+/// **deferred to integration**. Until then it is fully usable + testable in-process and
 /// RenderOpenMetrics() produces what the server will serve.
 ///
-/// §10 metric schema (4 rows):
+/// metric schema (4 rows):
 ///   cortrix_query_router_total                     counter   {decision}
 ///   cortrix_query_router_classifier_latency_seconds histogram (no labels)
 ///   cortrix_query_router_fallback_ratio            gauge     (no labels)
 ///   cortrix_query_router_compute_saved_seconds     counter   {path}
 class QueryRouterMetrics {
 public:
-    /// decision label for cortrix_query_router_total (§10) — the three-tier routing
+    /// decision label for cortrix_query_router_total — the three-tier routing
     /// distribution plus the fail-safe `fallback` bucket (L1/L2/L3 → Complex).
     enum class Decision {
         kSimple = 0,
@@ -37,7 +37,7 @@ public:
         kFallback,
     };
 
-    /// path label for cortrix_query_router_compute_saved_seconds (§10) — which
+    /// path label for cortrix_query_router_compute_saved_seconds — which
     /// short-path produced the saving vs the full Complex pipeline. `simple` skips
     /// RAG-Fusion, CRAG and HyPE; `chat` skips all retrieval (larger saving).
     enum class SavedPath {
@@ -66,7 +66,7 @@ public:
 
     // --- cortrix_query_router_compute_saved_seconds (Counter, label: path) ---
     // Cumulative compute-time saved by short paths vs the full Complex pipeline
-    // (monitoring value, §10). Recorded in seconds (accumulated in microseconds).
+    // (monitoring value). Recorded in seconds (accumulated in microseconds).
     void AddComputeSaved(SavedPath path, double seconds);
     double ComputeSavedSeconds(SavedPath path) const;
 

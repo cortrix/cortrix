@@ -43,7 +43,7 @@ TEST(IdHashKeyTest, BootstrapFirstStart) {
 }
 
 // A second load over the same on-disk db yields the SAME key and adds NO new row —
-// persistence is the property the P-HNSW index relies on (ARCH §1.8.2).
+// persistence is the property the P-HNSW index relies on (ARCH).
 TEST(IdHashKeyTest, LoadExistingAcrossRestart) {
     ::unsetenv("CORTRIX_SIPHASH_ID_KEY");
     const std::string path = std::string(::testing::TempDir()) + "id_siphash_restart.db";

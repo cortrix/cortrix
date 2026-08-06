@@ -124,7 +124,7 @@ Result<std::vector<DocFtsHit>> SearchDocFts5(sqlite3* db, const std::string& que
     std::string sanitized = cortrix::SanitizeFts5Query(query);
     if (sanitized.empty()) return hits;
 
-    // §8.2 BM25 column weights: filename 1.0 / doc_title 2.0 / topics 1.5 /
+    // BM25 column weights: filename 1.0 / doc_title 2.0 / topics 1.5 /
     // authors 1.0. doc_id is UNINDEXED (weight 0). bm25() is lower-is-better; we
     // negate to a positive score, then squash into (0,1] so it joins RRF cleanly.
     const char* sql =

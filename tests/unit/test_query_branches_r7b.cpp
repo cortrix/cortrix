@@ -9,7 +9,7 @@
 //     return (line 30-46).
 // All are pure, deterministic, fully reachable.
 //
-// Left uncovered ON PURPOSE (§4.1.bis#4 — physically unreachable):
+// Left uncovered ON PURPOSE (#4 — physically unreachable):
 //   - rag_fusion_types.cpp:11 VariantStrategyString's post-switch `return
 //     "paraphrase"` (the "unreachable for a valid enum" line): reaching it needs a
 //     value cast outside the 3 enumerators (UB) — not a legitimate test input.

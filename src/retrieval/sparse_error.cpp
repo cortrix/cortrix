@@ -13,7 +13,7 @@ namespace {
 // switches below are intentionally exhaustive: -Wswitch turns "added a code
 // without a row" into a build failure, so the registry can't drift from the enum.
 //
-// retry_after_ms (§8 table): INFERENCE_FAILED 500 / SERIALIZE 100 / INDEX_WRITE
+// retry_after_ms (table): INFERENCE_FAILED 500 / SERIALIZE 100 / INDEX_WRITE
 // 1000 / RETRIEVER 200 (all transient/retryable); ONNX_RUNTIME_INIT is permanent
 // (operator must fix the model/path) → not retryable.
 constexpr SparseErrorInfo kInferenceFailed{
@@ -45,7 +45,7 @@ const char* SparseErrorCodeString(SparseErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(SparseErrorCode code) {
-    // §8 structured_data column, 1:1. Function-local statics → stable references.
+    // structured_data column, 1:1. Function-local statics → stable references.
     static const std::vector<std::string> kInfer{"chunk_id", "model"};
     static const std::vector<std::string> kSer{"chunk_id", "sparse_size"};
     static const std::vector<std::string> kIdxWrite{"child_id", "term_count"};

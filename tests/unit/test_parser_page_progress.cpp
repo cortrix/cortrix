@@ -9,7 +9,7 @@
 
 // Parser page-level progress + per-page tolerance (Q1, design S5). Standalone: the
 // callback is driven by replaying the parsed ParsedDoc (real per-page streaming
-// from the bridge is D3.5). DrivePageProgress is also tested directly.
+// from the bridge is integration). DrivePageProgress is also tested directly.
 namespace cortrix::spc {
 namespace {
 

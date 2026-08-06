@@ -96,13 +96,13 @@ public:
 
     /// Request a password reset: if the email exists, store a
     /// 6-digit code (type='password_reset', 15-min TTL) and send it. ALWAYS
-    /// returns Ok regardless of whether the email exists (anti-enumeration, §2.6) — a
+    /// returns Ok regardless of whether the email exists (anti-enumeration) — a
     /// genuine send/DB error is the only failure surfaced.
     Status RequestPasswordReset(const std::string& email);
 
     /// Confirm a password reset: validate the code (exists, type,
     /// unused, unexpired), validate the new password complexity, update the hash,
-    /// mark the code used, and revoke ALL of the user's refresh tokens (§2.7
+    /// mark the code used, and revoke ALL of the user's refresh tokens (
     /// side-effect). Errors: CX_ERR_AUTH_INVALID_RESET_CODE (bad/expired/used) /
     /// CX_ERR_INVALID_REQUEST (weak new password).
     Status ConfirmPasswordReset(const std::string& email, const std::string& code,
@@ -115,7 +115,7 @@ public:
 
     /// Issue + store + send a verification code for `email` of `type`
     /// ("password_reset" | "email_verify"). Exposed so Register (S2) can trigger
-    /// the initial verify email when email_verification is on (D3.5 wiring).
+    /// the initial verify email when email_verification is on (integration wiring).
     Status IssueVerificationCode(const std::string& email, const std::string& type);
 
     /// Generate a 6-digit numeric code using a uniform CSPRNG draw.

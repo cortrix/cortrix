@@ -10,9 +10,9 @@
 #include "cortrix/scoring/scoring_metrics.h"
 #include "cortrix/scoring/semantic_scorer.h"
 
-// Semantic score S3 + S4 / §7.1 coverage: SemanticScorer.AssignInitialScore (D7 writes to both places + D6
-// sentinel) + ComputeFinalScore (D5 multiplier formula). Standalone = pure algorithm over constructed
-// cortrix_block_header_t fixtures (B_R3_BRIEFING §2/§7).
+// Semantic score S3 + S4 / coverage: SemanticScorer.AssignInitialScore (writes to both places +
+// sentinel) + ComputeFinalScore (multiplier formula). Standalone = pure algorithm over constructed
+// cortrix_block_header_t fixtures.
 namespace cortrix::scoring {
 namespace {
 
@@ -33,7 +33,7 @@ cortrix::cortrix_block_header_t Header() {
     return h;
 }
 
-// --- AssignInitialScore (D7 dual-write + D6 sentinel) ---
+// --- AssignInitialScore (dual-write + sentinel) ---
 
 TEST(SemanticScorerAssignTest, WritesBothHeaderLevelAndScore) {
     SemanticScorer scorer;
@@ -41,8 +41,8 @@ TEST(SemanticScorerAssignTest, WritesBothHeaderLevelAndScore) {
     float score = -1.0f;
     // docling + llm → Level 4 → score 1.0.
     scorer.AssignInitialScore(h, score, Input("docling", "llm"));
-    EXPECT_EQ(h.processing_level, 4);     // D7: header byte (immutable) written
-    EXPECT_FLOAT_EQ(score, 1.0f);          // D7: blocks-column score written
+    EXPECT_EQ(h.processing_level, 4);     //: header byte (immutable) written
+    EXPECT_FLOAT_EQ(score, 1.0f);          //: blocks-column score written
 }
 
 TEST(SemanticScorerAssignTest, LevelScoreConsistencyAcrossLevels) {
@@ -64,14 +64,14 @@ TEST(SemanticScorerAssignTest, LevelScoreConsistencyAcrossLevels) {
     }
 }
 
-// D6: anomalous → score 0.0 sentinel, but processing_level keeps the real computed value.
+//: anomalous → score 0.0 sentinel, but processing_level keeps the real computed value.
 TEST(SemanticScorerAssignTest, AnomalousGetsSentinelZeroButRealLevel) {
     SemanticScorer scorer;
     auto h = Header();
     float score = -1.0f;
     // docling+llm would be Level 4 / 1.0; anomalous forces score 0.0 but level stays 4.
     scorer.AssignInitialScore(h, score, Input("docling", "llm", /*anomalous=*/true));
-    EXPECT_FLOAT_EQ(score, 0.0f);     // D6 sentinel
+    EXPECT_FLOAT_EQ(score, 0.0f);     // sentinel
     EXPECT_EQ(h.processing_level, 4);  // level preserved (actual processing depth)
 }
 
@@ -97,7 +97,7 @@ TEST(SemanticScorerAssignTest, ReassignOverwrites) {
     EXPECT_EQ(h.processing_level, 1);
 }
 
-// QA regression: AssignInitialScore must feed the §6 assign_duration histogram
+// QA regression: AssignInitialScore must feed the assign_duration histogram
 // (it was defined/rendered but never observed). Lock the wiring: each call increments
 // cortrix_scoring_assign_duration_seconds_count by 1.
 TEST(SemanticScorerAssignTest, AssignFeedsDurationHistogram) {
@@ -114,7 +114,7 @@ TEST(SemanticScorerAssignTest, AssignFeedsDurationHistogram) {
     ScoringMetrics::Instance().ResetForTest();
 }
 
-// --- ComputeFinalScore (D5 multiplier formula) ---
+// --- ComputeFinalScore (multiplier formula) ---
 
 TEST(SemanticScorerFinalTest, FourKeyEffectivePoints) {
     const float rerank = 1.0f;

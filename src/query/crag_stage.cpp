@@ -17,7 +17,7 @@ void CragStage::Apply(CrossNsResponse& resp, QueryContext& qctx) {
     if (QueryComplexityClassifier::ShouldSkipCrag(qctx)) return;
 
     // Convert the post-rerank ResultItems to the RankedChunks the evaluator consumes
-    // (RETRIEVAL_TYPES_SPEC §1: child_id + chunk_text + scores). The multi-signal
+    // (the retrieval-types spec: child_id + chunk_text + scores). The multi-signal
     // feature engineering reads rerank_score + chunk_text.
     std::vector<retrieval::RankedChunk> chunks;
     chunks.reserve(resp.results.size());
@@ -32,12 +32,12 @@ void CragStage::Apply(CrossNsResponse& resp, QueryContext& qctx) {
         chunks.push_back(std::move(rc));
     }
 
-    // §6.3: classify + write qctx.crag_verdict / crag_score / ambiguous_action_taken.
+    //: classify + write qctx.crag_verdict / crag_score / ambiguous_action_taken.
     // The evaluator records the OBS metric and takes the verdict's internal path;
     // it does NOT mutate the result set — that is applied below.
     evaluator_->EvaluateAndUpdateContext(qctx, chunks);
 
-    // §6.3 verdict actions on the result set:
+    // verdict actions on the result set:
     //   - ambiguous → fine-grained filter: keep the top-N/2 by rerank_score (the
     //     results are already sorted best-first by the cross-NS gather, so this is a
     //     prefix truncation to ceil(N/2)).

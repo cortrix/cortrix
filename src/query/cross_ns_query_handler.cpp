@@ -12,14 +12,14 @@ namespace {
 using agent_friendly::AgentFriendlyError;
 using agent_friendly::ErrorCategory;
 
-// Wrap one Agent-friendly error into the §2.6 body: {"error": {...}}.
+// Wrap one Agent-friendly error into the body: {"error": {...}}.
 nlohmann::json ErrorBody(const AgentFriendlyError& err) {
     nlohmann::json j;
     j["error"] = agent_friendly::ToJson(err);
     return j;
 }
 
-// The CX_ERR_DEPRECATED_FIELD error (§2.4 / topic 4.1 B'). 400, permanent, with
+// The CX_ERR_DEPRECATED_FIELD error (/ topic 4.1 B'). 400, permanent, with
 // structured_data telling the Agent exactly which field to drop and what to use.
 AgentFriendlyError DeprecatedFieldError() {
     AgentFriendlyError err;
@@ -115,7 +115,7 @@ Status CrossNsQueryHandler::ParseRequest(const nlohmann::json& body,
 HandlerResult CrossNsQueryHandler::Handle(const nlohmann::json& body,
                                           const AuthContext& auth,
                                           const QueryContext* routing_ctx) {
-    // 1. Parse + B' deprecation + validation (§2.4).
+    // 1. Parse + B' deprecation + validation.
     QueryRequest request;
     Status parsed = ParseRequest(body, &request);
     if (!parsed.ok()) {
@@ -128,9 +128,9 @@ HandlerResult CrossNsQueryHandler::Handle(const nlohmann::json& body,
     }
 
     // 2. Run the scatter. Hard failures (auth / too-many / unauthorized) throw
-    //    CrossNsException → serialize GetError() with the §3.1 HTTP status. The
+    //    CrossNsException → serialize GetError() with the HTTP status. The
     //    overall scatter-timeout partial case does NOT throw — it returns a 200
-    //    response whose .error is set (§2.7 principle 3), handled below. The
+    //    response whose .error is set (principle 3), handled below. The
     //    optional routing_ctx carries the resolved route into the per-NS
     //    executors; when null ScatterGather builds the context itself (unchanged).
     try {

@@ -1,6 +1,6 @@
 // Error-path coverage for the catalog GC codes. Each CX_ERR_* below had ZERO
 // referencing test. CX_ERR_GC_INTERNAL / _VACUUM_FAILED / _REINDEX_FAILED are carried
-// as a "<CODE>: detail" prefix on the GcManager Status message (CODING_CONVENTIONS §3);
+// as a "<CODE>: detail" prefix on the GcManager Status message (the coding conventions);
 // CX_ERR_GC_INVALID_BODY is a real envelope error.code written by the restore route's
 // WriteAgentError on a malformed JSON body.
 //

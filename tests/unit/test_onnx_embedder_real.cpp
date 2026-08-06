@@ -169,7 +169,7 @@ TEST_F(OnnxEmbedderRealTest, EmbedBatchRealAllDims) {
 }
 
 // Sparse retrieval EmbedWithSparse over the REAL model: the dense half runs the real inference
-// path (1024-dim unit vector), the sparse half is the standalone stub (D3) keyed off
+// path (1024-dim unit vector), the sparse half is the standalone stub keyed off
 // the same text. Exercises the EmbedWithSparse dense=real branch + sparse stub on a
 // real session (the dense path is the part that was uncovered in the unit metric).
 TEST_F(OnnxEmbedderRealTest, EmbedWithSparseRealDenseHalf) {

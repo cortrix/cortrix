@@ -117,7 +117,7 @@ TEST(FileBasedGlobalConfigTest, ReloadFiresOnChangeForChangedKeys) {
 }
 
 TEST(FileBasedGlobalConfigTest, IsAnIGlobalConfig) {
-    // Usable through the canonical interface (the whole point of §3.8).
+    // Usable through the canonical interface (the whole point of).
     FileBasedGlobalConfig cfg;
     cfg.Set("k", "v");
     cortrix::IGlobalConfig& base = cfg;

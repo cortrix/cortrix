@@ -23,7 +23,7 @@
 // unified-blocks: The pipeline now runs the structured parser
 // (DocumentParserFactory::ParseDocument → ParsedDoc) → ParentChildChunker →
 // unified write (parents into `parents`, children into `blocks`). The fixture
-// injects a *mock* Docling bridge (a python script that prints a fixed §3.1
+// injects a *mock* Docling bridge (a python script that prints a fixed
 // page-level JSON envelope — identical plumbing to test_parser_fallback.cpp) so
 // the orchestration is exercised standalone (the machine has python3 but not
 // docling). Writes are verified against real SQLite (block_get_by_doc / parent_get
@@ -73,7 +73,7 @@ using ::testing::NiceMock;
 // IIndex + IVectorStore stand-in. CAPTURES the ids handed to AddPoint/AddPoints
 // (so a test can assert the L3 vector write went through facade.vec_index()) and
 // can be told to fail (the C2 rollback path). PHnsw implements both bases, so the
-// pool's cross-cast to IVectorStore (D3.5 C1) succeeds against this fake too.
+// pool's cross-cast to IVectorStore (integration C1) succeeds against this fake too.
 class FakeIndex : public cortrix::store::IIndex, public cortrix::store::IVectorStore {
 public:
     explicit FakeIndex(std::size_t footprint = 0) : footprint_(footprint) {}
@@ -446,7 +446,7 @@ TEST_F(SPCPipelineTest, UnifiedWrite_ParentsAndChildrenPersisted) {
     }
 }
 
-// [A unified-blocks META block] After chunking (D6 lock parser→parent-child chunking→META block) one doc-level Metadata
+// [A unified-blocks META block] After chunking (lock parser→parent-child chunking→META block) one doc-level Metadata
 // Block (block_type = kBlockMeta = 8) is written into the same `blocks` table. It
 // carries no child_id/parent_id but has a natural-language block_text (content_text)
 // + the 26-field metadata_json; exactly one per doc (idx_blocks_meta_doc).
@@ -566,7 +566,7 @@ TEST_F(SPCPipelineTest, CLEANING_ResponseMetaCarriesCleaningSummary) {
     int rc = pipeline_->Process(task, *facade_);
     ASSERT_EQ(rc, 0) << task.error_message;
 
-    // 4 flat A-class fields present in the response meta (§5.2 v1.0.2 contract).
+    // 4 flat A-class fields present in the response meta (v1.0.2 contract).
     nlohmann::json meta = task.ResponseMetaJson();
     ASSERT_TRUE(meta.contains("chunks_input"));
     ASSERT_TRUE(meta.contains("chunks_indexed"));
@@ -789,7 +789,7 @@ TEST_F(SPCPipelineTest, ChunkIndicesAreSequential) {
 }
 
 // ============================================================
-// Processing Level Tests (D3 design alignment)
+// Processing Level Tests (design alignment)
 // ============================================================
 
 TEST_F(SPCPipelineTest, L0_SkipEntireProcessing) {
@@ -937,7 +937,7 @@ TEST_F(SPCPipelineTest, MemorySession_WritesOneFlatBlock) {
 }
 
 // ============================================================
-// SPCRouter Tests (D3 design alignment) — pure static, façade-independent
+// SPCRouter Tests (design alignment) — pure static, façade-independent
 // ============================================================
 
 TEST_F(SPCPipelineTest, Router_InferProcessingLevel_TempFile_L0) {
@@ -1169,7 +1169,7 @@ TEST_F(SPCPipelineTest, L3_VecAddFailure_ProducesCorrectError) {
 }
 
 // ============================================================
-// C2 §9.4 rollback cleanup is in-process. A mid-write Rollback must wipe the
+// C2 rollback cleanup is in-process. A mid-write Rollback must wipe the
 // already-inserted SQLite blocks AND parents via the pool's rollback callback
 // (WC::Rollback -> rollback_cb_ -> MarkDelete vectors + DELETE FROM blocks WHERE
 // block_id IN … + DELETE FROM parents WHERE doc_id = ?). Driven directly through
@@ -1387,7 +1387,7 @@ TEST_F(SPCPipelineTest, LlmEnricherPersistsEnrichmentAndSummary) {
 
     // Semantic score (Matrix level owns block-level processing_level + semantic_score).
     // docling parser (level 2) + LlmEnricher (level 4) → child Matrix level 4 / score 1.0;
-    // the META block is locked to level 0 / score 0.2 (ARCH §5.2.1). ABS tolerance because a
+    // the META block is locked to level 0 / score 0.2 (ARCH). ABS tolerance because a
     // 0.2f/0.6f REAL widens to double imprecisely (1.0f is exact, but ABS is harmless).
     EXPECT_GT(CountOf("SELECT COUNT(*) FROM blocks WHERE semantic_score IS NOT NULL"), 0);
     EXPECT_GT(CountOf("SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL AND child_id != '' "

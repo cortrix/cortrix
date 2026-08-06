@@ -10,19 +10,19 @@ namespace cortrix::spc {
 
 /// The HyPE-index subsystem metrics (observability subsystem
 /// `hype_index`). Naming cortrix_hype_index_<metric>_<unit>. NO high-cardinality
-/// labels (§11 / OBS_SPEC §3.2 forbids tenant/ns/unit/user/request/chunk id);
+/// labels (/ OBS_SPEC forbids tenant/ns/unit/user/request/chunk id);
 /// chunk_id etc. go to structured logs only (HypeLog, below).
 ///
-/// Standalone (D3): a self-contained, dependency-free recorder + an OpenMetrics
+/// Standalone: a self-contained, dependency-free recorder + an OpenMetrics
 /// text renderer (same pattern as EnricherMetrics / SparseMetrics /
 /// OnnxMetrics). The `/metrics` scrape endpoint does not exist in the frozen
-/// tree — registering this recorder there is cross-Feature wiring → D3.5.
+/// tree — registering this recorder there is cross-Feature wiring → integration.
 class HypeMetrics {
 public:
-    /// status label for cortrix_hype_index_llm_calls_total (§11).
+    /// status label for cortrix_hype_index_llm_calls_total.
     enum class LlmCallStatus { kSuccess = 0, kFailed };
 
-    /// hit_type label for cortrix_hype_index_match_total (§11).
+    /// hit_type label for cortrix_hype_index_match_total.
     enum class MatchHitType { kChunk = 0, kHype, kBoth };
 
     /// Process-wide instance (metrics are global counters/gauges).
@@ -73,7 +73,7 @@ private:
     std::array<std::atomic<uint64_t>, kMatchHitTypeCount> matches_{};
     std::atomic<uint64_t> questions_generated_{0};
 
-    // Per-model histogram (model is low-cardinality, §11 label=model). Guarded by
+    // Per-model histogram (model is low-cardinality, label=model). Guarded by
     // mu_ because the map structure mutates (atomics can't cover map growth).
     mutable std::mutex mu_;
     std::map<std::string, Histogram> llm_duration_;

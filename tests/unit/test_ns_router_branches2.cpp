@@ -123,7 +123,7 @@ TEST_F(NsRouterBranch2Test, CreateWithPoolAdmitSuccess) {
 
 // ── namespace pool admission hook: failure arm → compensation ────────────────
 
-// A failing AdmitCreate triggers the §5.1.bis compensation path: the admit Status
+// A failing AdmitCreate triggers the compensation path: the admit Status
 // is returned to the caller and RemoveNamespaceCatalogRows runs (lines 256-260 +
 // 375-393). The catalog opens with foreign_keys=ON; the compensation deletes
 // units→ns_units→namespaces in one txn (its FK-ordering / self-heal semantics are

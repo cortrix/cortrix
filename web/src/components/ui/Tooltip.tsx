@@ -1,8 +1,8 @@
 import { useId, useState, useRef } from 'react';
 import type { ReactNode } from 'react';
 
-// Cortrix VI § 6.6 Tooltip — top/bottom/left/right placement, 200ms show delay
-// (VI § 7). Self-implemented hover tooltip (headlessui Popover is click-driven
+// Cortrix VI Tooltip — top/bottom/left/right placement, 200ms show delay
+// (VI). Self-implemented hover tooltip (headlessui Popover is click-driven
 // and unsuited to hover hints); accessible via aria-describedby.
 
 export type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right';

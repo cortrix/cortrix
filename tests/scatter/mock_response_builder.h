@@ -9,7 +9,7 @@ namespace cortrix::query {
 
 /// ScatterMockResponseBuilder — the 6 NamespaceQueryResult factories.
 /// Shared test fixtures for the scatter tests (and Phase 2's multi-Unit router).
-/// Each models one §7.5 integration scenario so a ScatterGather/SingleUnitExecutor
+/// Each models one integration scenario so a ScatterGather/SingleUnitExecutor
 /// test can compose multi-NS scenes without hand-building RankedChunks.
 class ScatterMockResponseBuilder {
 public:

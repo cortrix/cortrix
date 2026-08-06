@@ -12,13 +12,13 @@ namespace cortrix::query {
 /// `scatter`). Naming `cortrix_scatter_<metric>_<unit>` (V2 ruling #3: cortrix_
 /// prefix, no plugin prefix). Mirrors the RerankerMetrics template.
 ///
-/// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
+/// 🚨 standalone: a self-contained, dependency-free recorder + an OpenMetrics
 /// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
-/// **deferred to D3.5**. Until then it is fully usable + testable in-process and
+/// **deferred to integration**. Until then it is fully usable + testable in-process and
 /// RenderOpenMetrics() produces what the server will serve.
 ///
-/// §3.4 metric schema (6 rows):
+/// metric schema (6 rows):
 ///   cortrix_scatter_requests_total          counter   {reason, category}
 ///   cortrix_scatter_failed_total            counter   {reason, category}
 ///   cortrix_scatter_namespaces_per_query    histogram (per-query NS count)
@@ -52,7 +52,7 @@ public:
 
     // --- cortrix_scatter_namespaces_per_query (Histogram) ---
     // Observes the per-query NS count; tracks per-`le` buckets + sum + count.
-    // Bucket bounds {1,3,10,100} mirror the §7.5 SLA NS tiers (count-type, so
+    // Bucket bounds {1,3,10,100} mirror the SLA NS tiers (count-type, so
     // integer bounds); `max_namespaces_per_query` defaults to 100 (range 1-1000).
     void ObserveNamespacesPerQuery(int n);
     uint64_t NamespacesPerQuerySum() const;
@@ -73,12 +73,12 @@ public:
 
     // --- cortrix_scatter_duration_seconds (Histogram, label: namespace_count_bucket) ---
     // Observes the overall scatter latency, bucketed by NS count (1 / 3 / 10 / 100
-    // per the §7.5 SLA tiers). Within each NS-count series tracks per-`le` latency
-    // buckets {0.1,0.25,0.5,1,2,5,10,30}s (straddle the §7.5 target/max tiers:
+    // per the SLA tiers). Within each NS-count series tracks per-`le` latency
+    // buckets {0.1,0.25,0.5,1,2,5,10,30}s (straddle the target/max tiers:
     // 0.5/0.6/1.0/5.0s targets, 1.5/1.8/3.0/15.0s max) + sum_ms + count.
     void ObserveDuration(int namespace_count, int latency_ms);
 
-    /// The §7.5 SLA bucket index for an NS count (0:≤1, 1:≤3, 2:≤10, 3:>10).
+    /// The SLA bucket index for an NS count (0:≤1, 1:≤3, 2:≤10, 3:>10).
     static int DurationBucket(int namespace_count);
     uint64_t DurationSumMs(int bucket) const;
     uint64_t DurationCount(int bucket) const;
@@ -98,9 +98,9 @@ private:
     static constexpr int kReasonCount = 3;     // single / multi / wildcard
     static constexpr int kCategoryCount = 5;   // auth/quota/transient/permanent/timeout
     static constexpr int kDurationBuckets = 4; // ≤1 / ≤3 / ≤10 / >10
-    // namespaces_per_query `le` bounds (count-type; §7.5 SLA NS tiers).
+    // namespaces_per_query `le` bounds (count-type; SLA NS tiers).
     static constexpr int kNsBuckets = 4;       // ≤1 / ≤3 / ≤10 / ≤100 (+ +Inf)
-    // duration_seconds `le` latency bounds (generic duration set straddling §7.5).
+    // duration_seconds `le` latency bounds (generic duration set straddling).
     static constexpr int kLatencyBuckets = 8;  // 0.1/0.25/0.5/1/2/5/10/30s (+ +Inf)
 
     static int Idx(Reason r, agent_friendly::ErrorCategory c);

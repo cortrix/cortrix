@@ -15,7 +15,7 @@ namespace {
 // row" into a warning (treated as a build failure), so the registry can't silently
 // drift from the enum.
 //
-// retry_after_ms follows §7: DEGRADED / LLM_TIMEOUT → 5000ms; LLM_QUOTA → 60000ms;
+// retry_after_ms follows: DEGRADED / LLM_TIMEOUT → 5000ms; LLM_QUOTA → 60000ms;
 // LLM_CIRCUIT_OPEN → 30000ms; INVALID_RESPONSE (permanent) / CONFIG_INVALID
 // (startup) → null.
 constexpr RagFusionErrorInfo kDegraded
@@ -52,7 +52,7 @@ const char* RagFusionErrorCodeString(RagFusionErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(RagFusionErrorCode code) {
-    // §7 structured_data column. Function-local statics → stable refs.
+    // structured_data column. Function-local statics → stable refs.
     static const std::vector<std::string> kDegradedKeys
         {"degrade_reason", "llm_error", "original_query_used"};
     static const std::vector<std::string> kTimeoutKeys

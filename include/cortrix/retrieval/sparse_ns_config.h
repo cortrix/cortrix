@@ -17,7 +17,7 @@ inline constexpr int kSparseTopKMax = 200;
 /// The IGlobalConfig key holding the process-wide default sparse top-K. Read via
 /// the generic IGlobalConfig::GetInt accessor (the canonical config surface does
 /// not have a sparse-typed getter — that would be a reverse hook into
-/// IGlobalConfig at D3.5; standalone reads the generic key).
+/// IGlobalConfig at integration; standalone reads the generic key).
 inline constexpr const char* kSparseTopKConfigKey = "retrieval.sparse_top_k";
 
 /// Per-namespace sparse overrides parsed from a `*_config` JSONB blob (mirrors

@@ -4,9 +4,9 @@
 
 #include "cortrix/spc/contextual_metrics.h"
 
-// Contextual retrieval S7 — Contextual Retrieval metrics (§10, subsystem `contextual_retrieval`).
+// Contextual retrieval S7 — Contextual Retrieval metrics (subsystem `contextual_retrieval`).
 // Self-contained recorder + OpenMetrics renderer (same pattern as HypeMetrics
-// / SparseMetrics). NO high-cardinality labels (§10 V3 ruling 10 dropped ns_id).
+// SparseMetrics). NO high-cardinality labels (V3 ruling 10 dropped ns_id).
 namespace cortrix::spc {
 namespace {
 
@@ -94,7 +94,7 @@ TEST_F(ContextualMetricsTest, RenderOpenMetricsContainsAllSeries) {
 }
 
 TEST_F(ContextualMetricsTest, RenderHasNoHighCardinalityLabels) {
-    // §10 V3 ruling 10: ns_id (and other high-card labels) must NOT appear.
+    // V3 ruling 10: ns_id (and other high-card labels) must NOT appear.
     m().RecordChunk(ChunkStatus::kGenerated);
     std::string out = m().RenderOpenMetrics();
     EXPECT_EQ(out.find("ns_id"), std::string::npos);

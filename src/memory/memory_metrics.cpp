@@ -7,7 +7,7 @@ namespace cortrix::memory::transparency {
 
 namespace {
 
-// op_latency_seconds histogram bucket upper bounds (seconds), §8. CRUD endpoints are
+// op_latency_seconds histogram bucket upper bounds (seconds), CRUD endpoints are
 // sub-second metadata operations, so the bounds are tighter than the LLM-extraction
 // histogram (memory_extract). Parallel string array renders exact `le` labels; the trailing
 // +Inf bucket is implicit (index kNumDurBuckets). Mirrors the memory_extract kDurBounds template.

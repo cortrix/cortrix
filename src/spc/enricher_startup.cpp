@@ -17,9 +17,9 @@ StartupCheck StartupValidate(const EnricherConfig& config, llm::IHttpTransport& 
         return StartupCheck::kNullType;  // null / local_ner → normal NullEnricher
     }
     if (config.api_key.empty()) {
-        return StartupCheck::kApiKeyMissing;  // scenario 2 (§4.4)
+        return StartupCheck::kApiKeyMissing;  // scenario 2
     }
-    // Endpoint probe: GET {endpoint}/models within startup_probe_timeout_ms (§4.1).
+    // Endpoint probe: GET {endpoint}/models within startup_probe_timeout_ms.
     llm::HttpRequest probe;
     probe.method = llm::HttpMethod::kGet;
     probe.url = config.endpoint + "/models";

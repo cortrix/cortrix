@@ -20,9 +20,9 @@ namespace cortrix::connector {
 /// existing column (not new SQL columns), so the V1 → V2 step bumps
 /// CurrentVersion() without an ADD COLUMN.
 ///
-/// Implements the frozen cortrix::catalog::ISchemaProvider (D2-pre-5). Migrate
-/// returns Status, not Result<void> (F-FREEZE-1 / CODING_CONVENTIONS § 3) — the
-/// § 2.6 sketch's `Result<void>` is reconciled to the frozen interface signature.
+/// Implements the frozen cortrix::catalog::ISchemaProvider. Migrate
+/// returns Status, not Result<void> (F-FREEZE-1 / the coding conventions) — the
+/// sketch's `Result<void>` is reconciled to the frozen interface signature.
 class WatcherSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     /// Registration key (aligns with the startup registration order + the

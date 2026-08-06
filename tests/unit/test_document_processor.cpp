@@ -123,7 +123,7 @@ TEST_F(DocumentProcessorTest, SetsParsingPhaseDuringProgress) {
     TaskInfo task = SeedProcessingTask("docPhase");
     proc.ProcessTask(task);
     // current_phase is set to "parsing" (Issue 5) during progress persistence and
-    // retained through MarkCompleted (the D3 wiring only runs the parse phase).
+    // retained through MarkCompleted (the wiring only runs the parse phase).
     auto got = mgr_.GetTask(task.task_id);
     EXPECT_EQ(got.value().current_phase, std::string(task_phase::kParsing));
 }

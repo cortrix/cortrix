@@ -1,4 +1,4 @@
-// doc_summary end-to-end dispatch (candidate ① D3.5 within-feature E2E): proves
+// doc_summary end-to-end dispatch (candidate ① integration within-feature E2E): proves
 // the data path wired by ⑤a (SqliteChunkStore) + ⑤b (DocSummaryAsyncWorker) + T4 (WorkerPool
 // task_type dispatch) + the main wiring actually runs THROUGH the real async task scheduler:
 //
@@ -75,7 +75,7 @@ llm::ChatCompletionResponse OkChat(std::string content) {
     return r;  // Status defaults ok()
 }
 
-// A valid §9.1 structured-output body the DocSummaryGenerator will parse.
+// A valid structured-output body the DocSummaryGenerator will parse.
 const char* kSummaryJson = R"({
   "summary_text": "Q3 2026 financials: revenue grew twenty three percent year over year.",
   "keywords": ["revenue", "finance", "Q3"],

@@ -2,19 +2,19 @@
 #include <string>
 #include <vector>
 
-#include "cortrix/chunker/types.h"  // cortrix::chunker::ParentChunk (§ 2.2 SoT)
+#include "cortrix/chunker/types.h"  // cortrix::chunker::ParentChunk (SoT)
 #include "cortrix/common/result.h"
 
 // ParentChunkStore — parents-table data-access layer (Repository pattern,
-// detailed design § 2.5 / § 2.5.1, D1 V3 ruling 2).
+// detailed design, V3 ruling 2).
 //
 // Single-point + batch lookup of parent_text for downstream Enrichers reverse-
 // looking-up context: HyPEEnricher (GetParent), doc-summary /
-// ExpandParentText (§ 8.1 BulkGetParents). Dependency-injected + mock-friendly so
+// ExpandParentText (BulkGetParents). Dependency-injected + mock-friendly so
 // those callers unit-test against this interface (parallel to the reranker's ChunkStore,
 // which is a *child*-level lookup — separate class, not a base of this one).
 //
-// Error model (briefing § 3 template B): fallible ops return Result<T> (StatusOr); the
+// Error model (briefing template B): fallible ops return Result<T> (StatusOr); the
 // domain identity is a CX_ERR_STORE_* code carried on the Status message via
 // store/store_errors.h::StoreStatus(). NOT Result<T, StoreError>.
 namespace cortrix::store {

@@ -3,9 +3,9 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { ErrorDisplay } from './ErrorDisplay';
 import type { AgentError } from '../../types/api';
 
-// ErrorDisplay GEN-Agent tests (web UI design § 16.1). Covers code/message,
+// ErrorDisplay GEN-Agent tests (web UI design). Covers code/message,
 // category badge, structured_data collapsible, and the retryable + retry button
-// contract. The error-metric side effect (§ 23-bis) is a no-op in tests (metrics
+// contract. The error-metric side effect is a no-op in tests (metrics
 // uninitialized) so it does not interfere.
 
 function makeError(over: Partial<AgentError> = {}): AgentError {
@@ -18,7 +18,7 @@ function makeError(over: Partial<AgentError> = {}): AgentError {
   } as AgentError;
 }
 
-describe('ErrorDisplay (§ 16.1 GEN-Agent)', () => {
+describe('ErrorDisplay (GEN-Agent)', () => {
   it('renders the code, message and category label', () => {
     render(<ErrorDisplay error={makeError()} />);
     expect(screen.getByText('CX_ERR_NS_QUOTA_EXCEEDED')).toBeInTheDocument();

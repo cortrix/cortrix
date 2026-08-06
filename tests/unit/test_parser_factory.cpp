@@ -200,7 +200,7 @@ TEST(ParserFactoryTest, Factory_FallbackBothFail) {
 TEST(ParserFactoryTest, Factory_PasswordProtected_NoFallback) {
     Fixture fx;
     TempFile pdf(".pdf", 1024);
-    // §4.1 step 5: password-protected does not fall back to OCR.
+    // step 5: password-protected does not fall back to OCR.
     ParsedDoc pwd;
     pwd.status = ParserErrorCode::kPasswordProtected;
     fx.primary->SetResult(pwd);

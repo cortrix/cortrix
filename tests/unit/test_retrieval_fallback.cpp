@@ -7,7 +7,7 @@
 #include "cortrix/retrieval/types.h"
 
 // CRAG S5 coverage (interface reservation): IRetrievalFallback / NullRetrievalFallback
-// (§5.3). Phase 1 the Null impl returns the original chunks unchanged; Phase 2 will
+//. Phase 1 the Null impl returns the original chunks unchanged; Phase 2 will
 // add WebSearchFallback behind the same interface.
 namespace cortrix::retrieval {
 namespace {

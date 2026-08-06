@@ -1,6 +1,6 @@
 # Document Parser — Python bridge dependencies.
-# Installed into the parser venv (real docling/paddleocr are D3.5 — not required
-# for D3 standalone, where the C++ wrappers are tested against mock bridges).
+# Installed into the parser venv (real docling/paddleocr are integration — not required
+# for standalone, where the C++ wrappers are tested against mock bridges).
 
 # Docling structured parser (MIT, IBM): DocLayNet layout + TableFormer tables.
 # Pinned: docling's bundled OCR engine (rapidocr) default changed across versions;

@@ -8,7 +8,7 @@
 #include "cortrix/query/cross_ns_error.h"
 #include "mock_permission_service.h"
 
-// S2.1 coverage: AuthorizeNamespaces 5-step (§4.2) + ExpandNamespaces (["*"] +
+// S2.1 coverage: AuthorizeNamespaces 5-step + ExpandNamespaces (["*"] +
 // hard cap 100) + anti-enumeration (NS-not-found == unauthorized).
 namespace cortrix::query {
 namespace {

@@ -7,7 +7,7 @@ namespace cortrix::agent_trace {
 
 namespace {
 
-// query_latency_seconds histogram bucket upper bounds (seconds), §13. Parallel
+// query_latency_seconds histogram bucket upper bounds (seconds), Parallel
 // string array for rendering exact `le` labels. The trailing +Inf bucket is
 // implicit (index kNumDurBuckets). API query latencies are sub-second, so the
 // bounds are tighter than the memory extraction histogram.

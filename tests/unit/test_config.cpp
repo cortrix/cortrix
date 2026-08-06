@@ -110,7 +110,7 @@ namespace:
 }
 
 // The two ingest-side LLM roles parse from yaml: enricher_llm (enricher
-// plan B, §2.7.bis) and doc_summary_llm (doc summary — its parse was MISSING when the scheduler
+// plan B) and doc_summary_llm (doc summary — its parse was MISSING when the scheduler
 // landed the field, so a configured block silently never reached IsConfigured()).
 TEST_F(ConfigTest, IngestLlmRolesParsed) {
     WriteYaml(R"(

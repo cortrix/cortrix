@@ -6,7 +6,7 @@
 #include "cortrix/retrieval/crag_error.h"
 
 // CRAG S1 coverage: the CRAG error model (template A) — all 4 CX_ERR_CRAG_*
-// identities, their §4.3 attributes (category / retryable / retry_after_ms /
+// identities, their attributes (category / retryable / retry_after_ms /
 // structured_data keys), the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::retrieval {
 namespace {
@@ -37,7 +37,7 @@ TEST(CragErrorTest, AllCodesHaveUniqueCragCxStrings) {
     EXPECT_EQ(seen.size(), 4u);
 }
 
-// §4.3 table, row by row.
+// table, row by row.
 TEST(CragErrorTest, RegistryMatchesSpecTable) {
     auto chk = [](CragErrorCode c, const char* code, ErrorCategory cat,
                   bool retry, std::optional<int> retry_ms) {
@@ -53,7 +53,7 @@ TEST(CragErrorTest, RegistryMatchesSpecTable) {
         ErrorCategory::kTransient, true, 200);
     chk(CragErrorCode::kThresholdInvalid, "CX_ERR_CRAG_THRESHOLD_INVALID",
         ErrorCategory::kPermanent, false, std::nullopt);
-    // §4.3 lists FALLBACK_TRIGGERED as transient + retryable with retry_after_ms
+    // lists FALLBACK_TRIGGERED as transient + retryable with retry_after_ms
     // "-" (unspecified) → null. It is informational (the transparent all-Correct
     // degrade already happened), so no concrete back-off is advertised.
     chk(CragErrorCode::kFallbackTriggered, "CX_ERR_CRAG_FALLBACK_TRIGGERED",
@@ -94,7 +94,7 @@ TEST(CragErrorTest, HasRequiredStructuredDataValidatesKeys) {
 }
 
 TEST(CragErrorTest, EveryCodeRequiresAtLeastOneStructuredKey) {
-    // All 4 CRAG codes have a non-empty structured_data contract (§4.3).
+    // All 4 CRAG codes have a non-empty structured_data contract.
     for (CragErrorCode c : kAll) {
         EXPECT_FALSE(RequiredStructuredDataKeys(c).empty()) << CragErrorCodeString(c);
     }

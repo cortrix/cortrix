@@ -48,7 +48,7 @@ llm::ChatCompletionResponse OkChat(std::string content) {
     return r;  // Status defaults ok()
 }
 
-// A valid §9.1 structured-output body the DocSummaryGenerator will parse.
+// A valid structured-output body the DocSummaryGenerator will parse.
 const char* kSummaryJson = R"({
   "summary_text": "Q3 2026 financials: revenue grew twenty three percent year over year.",
   "keywords": ["revenue", "finance", "Q3"],
@@ -156,7 +156,7 @@ TEST_F(DocSummaryAsyncWorkerTest, WritesDocSummaryBlockOnSuccess) {
     ASSERT_TRUE(block.has_value());
     EXPECT_NE(block->content_text.find("Q3 2026 financials"), std::string::npos);
 
-    // metadata_json carries the §4.2 fields + status="generated".
+    // metadata_json carries the fields + status="generated".
     auto meta = nlohmann::json::parse(block->metadata_json, nullptr, false);
     ASSERT_FALSE(meta.is_discarded());
     EXPECT_EQ(meta.value("status", ""), "generated");

@@ -195,7 +195,7 @@ TEST_F(ObservabilityRoutesTest, NonAdminCrossUserUnauthorized) {
     EXPECT_EQ(body["error"]["code"], "CX_ERR_TRACE_UNAUTHORIZED");
     EXPECT_EQ(body["error"]["category"], "auth");
     EXPECT_FALSE(body["error"]["retryable"].get<bool>());
-    // §9.2 structured_data required key for UNAUTHORIZED.
+    // structured_data required key for UNAUTHORIZED.
     EXPECT_EQ(body["error"]["structured_data"]["required_role"], "admin");
 }
 
@@ -247,7 +247,7 @@ TEST_F(ObservabilityRoutesTest, OutOfRangeLimitFromHandlerIsInvalidFilter) {
     EXPECT_EQ(json::parse(res->body)["error"]["code"], "CX_ERR_TRACE_INVALID_FILTER");
 }
 
-// ---- header validation (§6.1, topic 4) ------------------------------------
+// ---- header validation (topic 4) ------------------------------------
 
 TEST_F(ObservabilityRoutesTest, InvalidIdentityHeaderWarnsButDoesNotReject) {
     httplib::Client cli("127.0.0.1", port_);

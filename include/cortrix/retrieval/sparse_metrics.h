@@ -8,25 +8,25 @@ namespace cortrix::retrieval {
 
 /// The BGE-M3-sparse subsystem metrics (observability subsystem
 /// `bge_m3_sparse`). Naming `cortrix_bge_m3_sparse_<metric>` (no ns_id label —
-/// D1 V3 ruling 10 removed the high-cardinality label; per-NS data goes through
+/// V3 ruling 10 removed the high-cardinality label; per-NS data goes through
 /// the namespaces/<ns_id>/stats API).
 ///
-/// Standalone (D3): a self-contained, dependency-free recorder + an OpenMetrics
+/// Standalone: a self-contained, dependency-free recorder + an OpenMetrics
 /// text renderer (same pattern as RerankerMetrics / OnnxMetrics). The
 /// `/metrics` scrape endpoint does not exist in the frozen tree — registering
-/// this recorder into that endpoint is cross-Feature wiring → D3.5. Until then it
+/// this recorder into that endpoint is cross-Feature wiring → integration. Until then it
 /// is fully usable + testable in-process and RenderOpenMetrics() produces what
 /// the server will serve.
 class SparseMetrics {
 public:
-    /// status label for cortrix_bge_m3_sparse_inference_total (§10).
+    /// status label for cortrix_bge_m3_sparse_inference_total.
     enum class InferenceStatus {
         kSuccess = 0,
         kFailed,
         kFallback,
     };
 
-    /// path label for cortrix_bge_m3_sparse_query_via_path_total (§10).
+    /// path label for cortrix_bge_m3_sparse_query_via_path_total.
     enum class ViaPath {
         kSparse = 0,             ///< query used the sparse path
         kFallbackDenseFts5,      ///< L2 fallback: dense + FTS5 (+hype)

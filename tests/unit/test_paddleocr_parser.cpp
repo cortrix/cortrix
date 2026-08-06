@@ -7,7 +7,7 @@
 #include "parser_script_fixture.h"
 
 // Parser S3 coverage: PaddleOCRParser subprocess wrapper. Standalone — exercised
-// against a mock bridge (paddleocr need not be installed). Real OCR is D3.5.
+// against a mock bridge (paddleocr need not be installed). Real OCR is integration.
 namespace cortrix::spc {
 namespace {
 
@@ -24,7 +24,7 @@ protected:
     }
 };
 
-// A §3.1 OCR success payload (one scan page, all TEXT, empty section).
+// A OCR success payload (one scan page, all TEXT, empty section).
 const char* kOcrJson = R"JSON({
   "status": 0, "parser": "paddleocr",
   "metadata": {"filename": "scan.pdf", "page_count": 1, "doc_language": "zh"},
@@ -59,7 +59,7 @@ TEST_F(PaddleOCRParserTest, Image_Success) {
     EXPECT_TRUE(doc.ok());
 }
 
-// §4.3: non-PDF/non-image formats are rejected before any subprocess spawn.
+//: non-PDF/non-image formats are rejected before any subprocess spawn.
 TEST_F(PaddleOCRParserTest, UnsupportedFormat_NoSpawn) {
     // Point at a script that would crash if run, to prove it's never invoked.
     PaddleOCRParser p(CfgFor(Write(".py", "import sys\nsys.exit(2)\n")));
@@ -197,7 +197,7 @@ TEST_F(PaddleOCRParserTest, RequestTimeoutZeroKeepsConfigTimeout) {
 }
 
 // End-to-end against the real paddleocr_bridge.py (paddleocr likely absent →
-// SUBPROCESS_FAILED). Proves the C++↔Python contract; real OCR is D3.5.
+// SUBPROCESS_FAILED). Proves the C++↔Python contract; real OCR is integration.
 TEST_F(PaddleOCRParserTest, RealBridge_ContractHolds) {
     const char* candidates[] = {
         "scripts/paddleocr_bridge.py",

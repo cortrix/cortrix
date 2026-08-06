@@ -15,7 +15,7 @@ namespace {
 // warning, which the project treats as a build failure — the registry can't
 // silently drift from the enum.
 //
-// retry_after_ms (§5.2 table): TASK_TIMEOUT → 5000 (== default task_timeout_ms);
+// retry_after_ms (table): TASK_TIMEOUT → 5000 (== default task_timeout_ms);
 // CIRCUIT_OPEN → 30000 (== default cooldown_sec); the two startup errors are
 // permanent (user must fix config / model), CHUNK_NOT_FOUND is permanent.
 constexpr RerankerErrorInfo kInitFailed{
@@ -47,7 +47,7 @@ const char* RerankerErrorCodeString(RerankerErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(RerankerErrorCode code) {
-    // §5.2 structured_data column, 1:1. Function-local statics → stable references.
+    // structured_data column, 1:1. Function-local statics → stable references.
     static const std::vector<std::string> kInit{"model_path", "ep"};
     static const std::vector<std::string> kCfg{"chunk_size", "max_seq_length"};
     static const std::vector<std::string> kTimeout{"child_id", "timeout_ms"};

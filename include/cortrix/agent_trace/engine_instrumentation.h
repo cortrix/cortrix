@@ -40,7 +40,7 @@ struct EngineCall {
 ///      (write_failed{oplog} on throw). Skipped when no operation_logger is given.
 /// Identity (trace_id/session_id/agent_id/user_id) is read from the thread-local
 /// ObservabilityContext (C1). Pure helper — standalone: the real Engine call sites
-/// invoke this at D3.5; here it is fully testable with mock writers (incl. ones
+/// invoke this at integration; here it is fully testable with mock writers (incl. ones
 /// that throw).
 ///
 /// The agent_trace writer is required; the operation_logger is optional (a query

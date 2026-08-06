@@ -26,7 +26,7 @@ enum class OnDuplicate { kSkip, kOverwrite, kError };
 
 /// A parsed batch submission request. The HTTP layer
 /// (batch_routes) parses the JSON body into this; the service is transport-free
-/// so it is unit-testable standalone (mirrors DocumentTaskHandler / §5 step 1-2).
+/// so it is unit-testable standalone (mirrors DocumentTaskHandler / step 1-2).
 struct BatchRequest {
     std::string namespace_id;
     std::vector<BatchDocument> documents;
@@ -35,7 +35,7 @@ struct BatchRequest {
 };
 
 /// A fully-formed HTTP reply: status code + JSON body. A 200 body is the
-/// §2.3 partial-success envelope (results[] + meta); a batch-level rejection body
+/// partial-success envelope (results[] + meta); a batch-level rejection body
 /// is the GEN-Agent error envelope (agent_friendly::ToJson(MakeBatchError(...))).
 struct BatchHttpResult {
     int status = 200;
@@ -45,9 +45,9 @@ struct BatchHttpResult {
 /// Batch submission limits. Defaults match the detailed
 /// design; a Phase 2 anchor exposes these via IGlobalConfig.
 struct BatchLimits {
-    int max_documents = 100;                          ///< §2.2 — single batch cap
-    int64_t max_payload_bytes = 100LL * 1024 * 1024;  ///< §2.2 — total body 100MB
-    int64_t max_doc_bytes = 10LL * 1024 * 1024;       ///< §2.2 — per-doc content 10MB
+    int max_documents = 100;                          ///< — single batch cap
+    int64_t max_payload_bytes = 100LL * 1024 * 1024;  ///< — total body 100MB
+    int64_t max_doc_bytes = 10LL * 1024 * 1024;       ///< — per-doc content 10MB
 };
 
 /// BatchSubmitService — the POST /documents/batch orchestration,
@@ -56,8 +56,8 @@ struct BatchLimits {
 /// (production = the frozen TaskScheduler), assembling the partial-success
 /// response with the GEN-Agent 5-field meta.failed[] schema.
 ///
-/// Standalone (D3): real validation + fan-out + response assembly over a mock
-/// ITaskSubmitter, fully unit-tested. DEFERRED → D3.5: (1) the inline
+/// Standalone: real validation + fan-out + response assembly over a mock
+/// ITaskSubmitter, fully unit-tested. DEFERRED → integration: (1) the inline
 /// content → server-side temp-file materialization that fills SubmitRequest.filepath
 /// for the real task/SPC pipeline; (2) real on_duplicate=overwrite cancel-running
 /// (write/task coordination); (3) the batch `metric` subsystem wiring
@@ -66,11 +66,11 @@ struct BatchLimits {
 class BatchSubmitService {
 public:
     /// @param submitter borrowed per-doc submission seam (must outlive the service)
-    /// @param limits    batch envelope limits (§2.2); defaults to the spec values
+    /// @param limits    batch envelope limits; defaults to the spec values
     explicit BatchSubmitService(ITaskSubmitter* submitter,
                                 BatchLimits limits = {});
 
-    /// [D3.5 r2 · P3b] Enable real inline-content materialization: each accepted
+    /// [integration r2 · P3b] Enable real inline-content materialization: each accepted
     /// doc's content is written to a server-named file under `dir` and that path
     /// becomes the SubmitRequest.filepath the doc-parse worker reads. The dir
     /// is created if absent. When unset (the default), filepath stays "" — the
@@ -88,12 +88,12 @@ public:
         input_releaser_ = std::move(fn);
     }
 
-    /// Process a parsed batch. Returns the §2.3 partial-success reply (200) when
+    /// Process a parsed batch. Returns the partial-success reply (200) when
     /// the envelope is accepted, or a single GEN-Agent CX_ERR_BATCH_* error reply
     /// (400/413) when the envelope is rejected. Never throws.
     BatchHttpResult Submit(const BatchRequest& req);
 
-    /// The batch-level envelope check (§2.4.1), exposed for tests. Returns the
+    /// The batch-level envelope check, exposed for tests. Returns the
     /// failing BatchErrorCode + its structured_data when the envelope is invalid;
     /// nullopt when the envelope is acceptable.
     struct EnvelopeError {
@@ -104,12 +104,12 @@ public:
     std::optional<EnvelopeError> ValidateEnvelope(const BatchRequest& req) const;
 
 private:
-    /// Build the §2.3 results[] item for an accepted doc.
+    /// Build the results[] item for an accepted doc.
     static nlohmann::json MakeResultItem(const std::string& doc_id,
                                          const std::string& task_id,
                                          const std::string& status);
 
-    /// Map a per-doc submit failure Status to the §2.3 / §2.4.2 GEN-Agent 5-field
+    /// Map a per-doc submit failure Status to the GEN-Agent 5-field
     /// meta.failed[] item, reusing the originating Feature's CX_ERR_* token carried
     /// in the Status message (e.g. "CX_ERR_X: detail").
     static nlohmann::json MakeFailureItem(const std::string& doc_id,

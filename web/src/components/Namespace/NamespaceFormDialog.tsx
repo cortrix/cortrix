@@ -14,10 +14,10 @@ import { ConfigSection } from './ConfigSection';
 import { JsonEditor } from './JsonEditor';
 import { CONFIG_KEYS, configsForTab, type ConfigTab } from './namespaceConfigMeta';
 
-// Namespace create / edit dialog (web UI design § 8.1-8.3). 5 tabs (§ 8.2):
+// Namespace create / edit dialog (web UI design). 5 tabs:
 // Basic / Retrieval / Processing / Memory / Advanced. Each *_config is a JSON
 // blob edited via ConfigSection (Monaco); Advanced also exposes a single Raw
-// JSON editor over all 11 configs (Hybrid Form / JSON, § 8.2). Invalid JSON in
+// JSON editor over all 11 configs (Hybrid Form / JSON). Invalid JSON in
 // any block blocks the save.
 
 type ConfigTextMap = Record<NamespaceConfigKey, string>;

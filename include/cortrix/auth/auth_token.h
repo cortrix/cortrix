@@ -6,13 +6,13 @@ namespace cortrix::auth {
 /// Decoded identity of an authenticated principal. This is the
 /// (Cloud JWT) auth context — distinct from the MVP root-namespace
 /// `cortrix::AuthContext` (API-Key, tenant/permissions bitmask). The two coexist
-/// during D3; unifying them is part of the middleware wiring (D3.5).
+/// during; unifying them is part of the middleware wiring (integration).
 struct AuthContext {
     std::string user_id;    ///< "usr_..."  (= JWT sub)
     std::string email;
     std::string tenant_id;  ///< active tenant ("tenant-<uuid>")
     std::string role;       ///< owner | admin | member | viewer
-    std::string session_id; ///< "sess_..." (= JWT sid; OBSERVABILITY §5.3)
+    std::string session_id; ///< "sess_..." (= JWT sid; OBSERVABILITY)
 };
 
 /// Token pair returned by Login.

@@ -18,7 +18,7 @@ namespace {
 using catalog::gc::DocumentGcSweeper;
 using catalog::gc::GcManager;
 
-// GEN-Agent 4-field error body (CLAUDE.md §5). Used for the local route-level
+// GEN-Agent 4-field error body (CLAUDE.md). Used for the local route-level
 // checks (X-Ops-Confirm) that don't go through WriteJsonError's Status mapping.
 void WriteAgentError(httplib::Response& res, int http_status, const std::string& code,
                      const std::string& message, agent_friendly::ErrorCategory category,

@@ -12,18 +12,18 @@
 
 namespace cortrix::agent_trace {
 
-/// One MCP tool invocation as seen by the session handler (§7.1). The real MCP
+/// One MCP tool invocation as seen by the session handler. The real MCP
 /// transport (mcp-server/) adapts its call payload to this; standalone tests drive
 /// it directly. params is the raw JSON the client sent (the handler truncates it
-/// to ≤2KB before writing, §3).
+/// to ≤2KB before writing).
 struct McpToolCall {
     std::string tool_name;
     std::string params;   ///< raw call params JSON
 };
 
-/// The result of an MCP tool invocation (§7.1). On failure, is_success=false +
+/// The result of an MCP tool invocation. On failure, is_success=false +
 /// error_code/error_message are set; the handler then writes status=failed and
-/// keeps only the error in result_summary (§3).
+/// keeps only the error in result_summary.
 struct McpToolResult {
     bool is_success = true;
     std::string summary;          ///< result summary (truncated to ≤512 on write)
@@ -53,7 +53,7 @@ struct McpClientCapability {
 ///     drop the active-session gauge.
 ///   - CheckIdleSessions: deterministic idle sweep (topic 5 idle timeout) — sessions
 ///     idle beyond agent_trace_mcp_idle_timeout_seconds get a session_timeout row and are
-///     evicted. The real wall-clock watcher thread wiring is D3.5; tests call this
+///     evicted. The real wall-clock watcher thread wiring is integration; tests call this
 ///     directly (mirrors CleanupScheduler.RunCleanupNow).
 ///
 /// Standalone: no MCP transport / no timer thread; pure call-driven + injected
@@ -73,7 +73,7 @@ public:
     McpSessionHandler(std::shared_ptr<IAgentTraceWriter> writer,
                       int idle_timeout_seconds);
 
-    /// Test/D3.5 ctor with injectable uuid + clock seams.
+    /// Test/integration ctor with injectable uuid + clock seams.
     McpSessionHandler(std::shared_ptr<IAgentTraceWriter> writer,
                       int idle_timeout_seconds,
                       UuidGenerator uuid_gen,
@@ -95,20 +95,20 @@ public:
     /// Sweep registered sessions: any whose last activity is older than the idle
     /// window gets a session_timeout row (topic 5) and is evicted. Returns the count
     /// timed out. Deterministic (uses the injected clock); the wall-clock watcher
-    /// thread is D3.5.
+    /// thread is integration.
     int CheckIdleSessions();
 
     /// Number of currently-registered (open) sessions (test aid).
     size_t active_session_count() const;
 
-    /// Truncate call params to ≤2KB keeping head + tail (§3 — params ≤2KB,
+    /// Truncate call params to ≤2KB keeping head + tail (params ≤2KB,
     /// preserve first 1.5KB + last 0.5KB + [...truncated...] marker). Exposed for tests.
     static std::string TruncateParams(const std::string& params);
 
-    /// Truncate a result summary to ≤512 keeping head + tail (§3). Exposed for tests.
+    /// Truncate a result summary to ≤512 keeping head + tail. Exposed for tests.
     static std::string TruncateResult(const std::string& summary);
 
-    /// Format a failure into the result_summary (§3 — only error_code + first 256
+    /// Format a failure into the result_summary (only error_code + first 256
     /// chars of the message are kept on failure). Exposed for tests.
     static std::string FormatError(const std::optional<std::string>& error_code,
                                    const std::string& error_message);

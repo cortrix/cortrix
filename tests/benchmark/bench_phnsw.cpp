@@ -1,8 +1,8 @@
-// Index S6 — P-HNSW benchmarks (design § 6 S6 / § 8 perf targets).
+// Index S6 — P-HNSW benchmarks (design S6 / perf targets).
 //
 // Measures PHnsw directly (not the MVP CortrixVectorHnswlib): search latency
 // (report P50/P99 via --benchmark_repetitions), single-write latency, batch
-// write throughput, and crash-recovery time. Targets (design § 8):
+// write throughput, and crash-recovery time. Targets (design):
 //   search 1K blocks P50 <= 500us, P99 <= 1ms
 //   single write <= 5ms ; batch write throughput >= 1000 vec/s
 //   recovery of 10K WAL entries <= 2s

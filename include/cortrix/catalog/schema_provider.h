@@ -11,7 +11,7 @@ typedef struct sqlite3 sqlite3;
 
 namespace cortrix::catalog {
 
-/// A Feature's schema contribution (scaffolding D2-pre-5, interface SoT =
+/// A Feature's schema contribution (scaffolding, interface SoT =
 /// Each subsystem (catalog / parser / block header / write coordinator / enricher /
 /// watcher / HyPE / doc summary / memory) implements one and registers it with the SchemaMigrator.
 class ISchemaProvider {
@@ -27,11 +27,11 @@ public:
     /// Apply the migration steps to move `db` from `from_ver` to `to_ver`.
     /// Runs inside the migrator's transaction; return an error Status to abort
     /// and roll back the whole batch. (Note: void-fallible → Status, not
-    /// Result<void>, per CODING_CONVENTIONS §3.)
+    /// Result<void>, per the coding conventions)
     virtual Status Migrate(sqlite3* db, int from_ver, int to_ver) = 0;
 };
 
-/// Central schema-migration orchestrator (scaffolding D2-pre-5). Registers
+/// Central schema-migration orchestrator (scaffolding). Registers
 /// providers, tracks per-Feature versions in a `schema_version` table, and runs
 /// outstanding migrations in registration (dependency-topological) order inside
 /// a single transaction — all-or-nothing.

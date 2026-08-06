@@ -1,6 +1,6 @@
 // S3.1 — reranker.max_seq_length GUC (default 512 / range 128-8192) + the
 // spc.chunk_size GUC registration backfilled (reranker V5-B2-05). Range-violation policy
-// = REJECT (Status error), not clamp. Live PostgreSQL GUC registration = D3.5;
+// = REJECT (Status error), not clamp. Live PostgreSQL GUC registration = integration;
 // these exercise the standalone reranker_guc.h SoT + IGlobalConfig load path.
 #include <gtest/gtest.h>
 
@@ -20,7 +20,7 @@ TEST(RerankerMaxSeqLenTest, DefaultIs512) {
 }
 
 TEST(RerankerMaxSeqLenTest, KeyAndRangeConstantsMatchSpec) {
-    // §2.4: reranker.max_seq_length, range 128-8192.
+    //: reranker.max_seq_length, range 128-8192.
     EXPECT_STREQ(guc::kMaxSeqLength, "reranker.max_seq_length");
     EXPECT_EQ(guc::kMaxSeqLenMin, 128);
     EXPECT_EQ(guc::kMaxSeqLenMax, 8192);
@@ -66,7 +66,7 @@ TEST(RerankerMaxSeqLenTest, LoadRejectsOutOfRangeMaxSeqLen) {
     EXPECT_NE(s.message().find("reranker.max_seq_length"), std::string::npos);
 }
 
-// --- spc.chunk_size GUC (read here for the §3.5.1 compat check) ---
+// --- spc.chunk_size GUC (read here for the compat check) ---
 
 TEST(SpcChunkSizeGucTest, AbsentDefaultsTo512) {
     InMemoryGlobalConfig cfg;  // no spc.chunk_size set

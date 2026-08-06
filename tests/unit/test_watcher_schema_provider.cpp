@@ -82,7 +82,7 @@ TEST(WatcherSchemaProviderTest, WatcherConfigColumnSuppliedByCatalogBaseSchema) 
     cortrix::catalog::CatalogSchemaProvider catalog;
     WatcherSchemaProvider dir_watcher;
     cortrix::catalog::SchemaMigrator m;
-    m.Register(&catalog);  // Catalog first (ARCH §1.3.bis.3 topological order)
+    m.Register(&catalog);  // Catalog first (ARCH topological order)
     m.Register(&dir_watcher);
 
     Status st = m.MigrateCatalog(db);

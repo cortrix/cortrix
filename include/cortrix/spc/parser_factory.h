@@ -34,7 +34,7 @@ struct ParserFactoryConfig {
     bool enable_paddleocr = true;          ///< Global OCR fallback switch
 
     /// Average-confidence threshold that triggers fallback: when the primary parser's average confidence is below this value (or
-    /// 0 paragraphs / a high failed_pages ratio), fall back to OCR. Default 0.3 (aligned with §4.4.2 ARCH).
+    /// 0 paragraphs / a high failed_pages ratio), fall back to OCR. Default 0.3 (aligned with ARCH).
     float fallback_confidence_threshold = 0.3f;
 };
 

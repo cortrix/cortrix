@@ -302,7 +302,7 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (m["max_sessions_per_namespace"]) config.memory.max_sessions_per_namespace = m["max_sessions_per_namespace"].as<int>();
         if (m["max_interactions_per_session"]) config.memory.max_interactions_per_session = m["max_interactions_per_session"].as<int>();
         if (m["chunk_strategy"]) config.memory.chunk_strategy = m["chunk_strategy"].as<std::string>();
-        // memory.decay.* — classified-decay scoring (design § 2.5).
+        // memory.decay.* — classified-decay scoring (design).
         if (m["decay"]) {
             auto decay = m["decay"];
             if (decay["lambda"]) config.memory.decay_lambda = decay["lambda"].as<double>();

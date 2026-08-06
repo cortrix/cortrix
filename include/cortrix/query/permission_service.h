@@ -31,7 +31,7 @@ public:
     virtual ~PermissionService() = default;
 
     /// Batch-check `namespaces` for (`user_id`, `tenant_id`, `role`, `action`).
-    /// Returns the unauthorized subset (§4.2). An empty result == all authorized.
+    /// Returns the unauthorized subset. An empty result == all authorized.
     virtual BatchCheckResult BatchCheck(const std::string& user_id,
                                         const std::string& tenant_id,
                                         const std::string& role,

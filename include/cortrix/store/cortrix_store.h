@@ -76,7 +76,7 @@ public:
     // ---- Parent CRUD (`parents` table) ----
     // parents is a per-Unit table KEPT under A (child chunks moved to `blocks`). The
     // SPC write path inserts parents on the SAME store.db handle inside the SAME
-    // transaction as the doc's child-blocks (ARCH §3.2 atomic write), so the write
+    // transaction as the doc's child-blocks (ARCH atomic write), so the write
     // lives on this unified store rather than a second handle/wrapper. Default impls
     // return -1 (not implemented) so the many lightweight test fakes/stubs need not
     // override. Return convention: 0 ok, -1 error, -2 not found, -3 already exists.

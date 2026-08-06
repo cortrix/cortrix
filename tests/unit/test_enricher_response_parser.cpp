@@ -57,7 +57,7 @@ TEST(EnricherResponseParserTest, L3WholeBatchParseFail) {
         auto sd = nlohmann::json::parse(res.error_meta.structured_data);
         EXPECT_EQ(sd["layer"], "L3");
         EXPECT_EQ(sd["batch_size"], 2);
-        // PARSE is permanent / not retryable (§5.1).
+        // PARSE is permanent / not retryable.
         EXPECT_FALSE(res.error_meta.retryable);
         EXPECT_EQ(res.error_meta.category, agent_friendly::ErrorCategory::kPermanent);
     }

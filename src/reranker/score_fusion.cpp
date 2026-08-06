@@ -14,7 +14,7 @@ float RerankerScoreFusion::ComputeRerankRrfScore(
     const float base_score = rerank_score * kRerankWeight + rrf_score * kRrfWeight;
     if (chunk.score_signals.HasAny()) {
         // The scorer reserves semantic_score=0.0 as the persisted anomaly sentinel; all
-        // non-anomalous write-time levels are in [0.2, 1.0]. Preserve the D6/M2
+        // non-anomalous write-time levels are in [0.2, 1.0]. Preserve the/M2
         // priority rule here so an enriched_score cannot re-boost an anomalous
         // block after retrieval.
         const bool is_anomalous =

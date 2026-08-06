@@ -1,12 +1,12 @@
 #include <cstdint>
 #include "cortrix/store/cortrix_store_sqlite.h"
-#include "cortrix/store/per_unit_schema_ddl.h"  // [D3.5-B] kPerUnitFrameworkDdl (single DDL SoT)
+#include "cortrix/store/per_unit_schema_ddl.h"  // [integration-B] kPerUnitFrameworkDdl (single DDL SoT)
 #include "cortrix/store/parent_child_schema_provider.h"  // [A unified-blocks] standalone child cols + parents
 #include "cortrix/logging/logging.h"
 #include <sqlite3.h>
 #include <algorithm>
 #include "cortrix/id/ulid.h"   // id::GenerateUlid (doc_id ULID mint, D-I6)
-#include "cortrix/id/types.h"  // id::ToSqliteInt (block_id uint64 → int64, D3.5 wire⑤)
+#include "cortrix/id/types.h"  // id::ToSqliteInt (block_id uint64 → int64, integration wire⑤)
 
 namespace cortrix {
 
@@ -134,7 +134,7 @@ std::string SanitizeFts5Query(const std::string& raw_query) {
         }
 
         if (!first_token) {
-            // OR-join (D6): FTS5 treats a bare space between terms as implicit
+            // OR-join: FTS5 treats a bare space between terms as implicit
             // AND, so a natural-language query required every token to co-occur
             // inside ONE block — the BM25 route returned zero rows on ~98% of
             // benchmark queries. OR restores bag-of-words BM25 (rank still
@@ -330,7 +330,7 @@ int CortrixStoreSqlite::ExecutePragma() {
 }
 
 int CortrixStoreSqlite::CreateTables() {
-    // [D3.5-B] Single DDL SoT shared with BlockFrameworkSchemaProvider (production MigrateUnit
+    // [integration-B] Single DDL SoT shared with BlockFrameworkSchemaProvider (production MigrateUnit
     // path). This method now serves only the standalone owns-db path (see Open()).
     const char* ddl = store::kPerUnitFrameworkDdl;
 
@@ -852,7 +852,7 @@ int CortrixStoreSqlite::block_insert(CortrixBlock& block) {
     if (TryConsumeOpFault()) return -1;  // testing seam
     std::lock_guard<std::mutex> lock(mu_);
 
-    // D3.5 wire⑤: the business layer (BlockAssembler / SPC) provides a real uint64
+    // integration wire⑤: the business layer (BlockAssembler / SPC) provides a real uint64
     // block_id = HashChildIdToBlockId(child_id). When non-zero we INSERT it
     // explicitly; a zero id (test / legacy callers) falls back to the SQLite rowid,
     // mirroring the dual-mode store ctor (D-I1). uint64 ↔ int64 is bit-preserving
@@ -894,7 +894,7 @@ int CortrixStoreSqlite::block_insert(CortrixBlock& block) {
         sqlite3_bind_null(stmt, col++);
     }
     if (!block.content_hash.empty()) {
-        // Design D2: content_hash is BLOB (SHA-256 first 16 bytes)
+        // Design: content_hash is BLOB (SHA-256 first 16 bytes)
         sqlite3_bind_blob(stmt, col++, block.content_hash.data(),
                           static_cast<int>(block.content_hash.size()), SQLITE_TRANSIENT);
     } else {
@@ -1133,7 +1133,7 @@ int CortrixStoreSqlite::parent_insert(CortrixParent& parent) {
 
     // The `parents` table is created standalone by ParentChildSchemaProvider in CreateTables()
     // and in production by ParentChildSchemaProvider@MigrateUnit, so its 11 written columns
-    // exist on both paths. The 3 D8 hotness columns are left to their DDL DEFAULTs
+    // exist on both paths. The 3 hotness columns are left to their DDL DEFAULTs
     // (V1.0 does not write them). No BEGIN/COMMIT here: a single INSERT autocommits
     // standalone, and the write coordinator's PWL wraps it in the SPC write transaction.
     const char* sql = R"SQL(
@@ -1308,7 +1308,7 @@ int CortrixStoreSqlite::RecoverCrashedDocs() {
     }
 
     // Phase 2: Find docs stuck in 'deleting' → complete the cascade delete
-    // Per D5 design: if crash during deletion, complete the delete on recovery
+    // Per design: if crash during deletion, complete the delete on recovery
     const char* find_deleting_sql =
         "SELECT doc_id FROM documents WHERE status = 'deleting'";
     stmt = nullptr;

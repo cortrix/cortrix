@@ -18,7 +18,7 @@ class ApiKeyAuth;
 ///   GET    /api/v1/namespaces/:ns/documents/:id/status  -- query processing status
 ///   DELETE /api/v1/namespaces/:ns/documents/:id         -- delete document + blocks
 ///
-/// [D3.5 wire · gap②] `disk_monitor` (optional): when set, the upload endpoint
+/// [integration wire · gap②] `disk_monitor` (optional): when set, the upload endpoint
 /// consults DiskMonitor::ShouldRejectWrites() BEFORE any byte is written
 /// (doc_create / blob.store) and rejects with 507 + the CX_ERR_DISK_FULL
 /// Agent-friendly body (reject all new writes at

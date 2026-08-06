@@ -61,7 +61,7 @@ bool ValidateRagFusionConfig(const RagFusionConfig& cfg,
         cfg.activation_min_results > kRagFusionActivationMinResultsMax) {
         return fail("activation_min_results", "[2, 200]");
     }
-    // v1.0.13 fusion-policy knobs (§4.3.bis.5).
+    // v1.0.13 fusion-policy knobs.
     if (cfg.fusion_original_weight < kRagFusionOriginalWeightMin ||
         cfg.fusion_original_weight > kRagFusionFusionWeightMax) {
         return fail("fusion_original_weight", "[0.1, 10]");

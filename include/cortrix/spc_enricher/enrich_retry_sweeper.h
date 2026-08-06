@@ -19,7 +19,7 @@ namespace resource { class INamespacePool; }
 
 namespace spc {
 
-/// EnrichRetrySweeper — the addendum §3.7 periodic sentinel that turns durable
+/// EnrichRetrySweeper — the addendum periodic sentinel that turns durable
 /// enrich_state debt into kTaskEnrichBackfill work. Every sweep tick it walks
 /// the loaded namespaces, finds documents with due 'pending_retry' rows
 /// (next_retry_at <= now), LEASES them forward (so the next tick cannot
@@ -69,7 +69,7 @@ public:
     /// (yaml spc.enrich_sweep_interval_sec), else kDefaultSweepIntervalSec.
     /// Public so startup logging can report the value actually in force —
     /// the old log printed the compile-time constant and masked live knob
-    /// state twice (2026-07-10/11, D7b).
+    /// state twice (2026-07-10/11).
     int SweepIntervalSec() const;
 
 private:

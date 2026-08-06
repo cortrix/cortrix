@@ -19,7 +19,7 @@ struct BatchContext {
 
 /// Accumulates a partial-success batch and finalizes a BatchResult<T>
 /// with the 5 standard meta fields + a coverage_ratio computed from the actual
-/// succeeded/failed counts. Keeps the §8.2 contract (api_version "v1", node_id,
+/// succeeded/failed counts. Keeps the contract (api_version "v1", node_id,
 /// catalog_version, bloom_filter_ready, timestamp_ms) in one place.
 template <typename T>
 class BatchBuilder {
@@ -50,7 +50,7 @@ public:
         result_.meta.catalog_version = ctx_.catalog_version;
         result_.meta.timestamp_ms = ctx_.timestamp_ms;
         result_.meta.node_id = ctx_.node_id;
-        // api_version stays "v1" (the struct default; §8.3 versioning promise).
+        // api_version stays "v1" (the struct default; versioning promise).
         return std::move(result_);
     }
 

@@ -4,7 +4,7 @@
 
 namespace cortrix::server {
 
-/// GC admin CLI (ARCH §5.x: gc-status / gc-run / restore / purge). The
+/// GC admin CLI (ARCH: gc-status / gc-run / restore / purge). The
 /// cortrix-server binary has no separate CLI framework, so these run as
 /// subcommands of the server binary against the same catalog.db
 /// (`cortrix-server gc-status`, etc.). Agent-first design keeps the SDK ops.gc.*

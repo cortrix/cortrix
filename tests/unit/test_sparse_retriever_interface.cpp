@@ -9,7 +9,7 @@
 // Sparse retrieval S4 — ISparseRetriever interface contract. A header-only abstraction; this
 // test pins the signatures + polymorphic contract by implementing a minimal
 // in-memory retriever against it (the real SPLADE impl lands in S5/S6). It also
-// doubles as the reusable mock other stories / D3.5 wiring can lean on.
+// doubles as the reusable mock other stories / integration wiring can lean on.
 namespace cortrix::retrieval {
 namespace {
 
@@ -41,7 +41,7 @@ public:
     Status Add(const NamespaceId& ns_id, const ChildId& child_id,
                const SparseVector& vec) override {
         if (vec.empty()) {
-            return Remove(ns_id, child_id);  // dead chunk → drop (§6.5)
+            return Remove(ns_id, child_id);  // dead chunk → drop
         }
         store_[ns_id][child_id] = vec;
         return Status::Ok();
@@ -103,7 +103,7 @@ TEST(SparseRetrieverInterfaceTest, AddEmptyVectorRemoves) {
     InMemorySparseRetriever r;
     r.Add("ns", "c", V({{1, 0.5f}}));
     ASSERT_EQ(r.Search(V({{1, 1.0f}}), "ns", 10).size(), 1u);
-    ASSERT_TRUE(r.Add("ns", "c", V({})).ok());  // empty → remove (§6.5)
+    ASSERT_TRUE(r.Add("ns", "c", V({})).ok());  // empty → remove
     EXPECT_TRUE(r.Search(V({{1, 1.0f}}), "ns", 10).empty());
 }
 

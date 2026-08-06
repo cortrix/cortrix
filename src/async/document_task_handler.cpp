@@ -12,7 +12,7 @@ namespace cortrix::async {
 
 namespace {
 
-/// Build the GEN-Agent error HttpResult (topic 5): http status from the §6.2
+/// Build the GEN-Agent error HttpResult (topic 5): http status from the
 /// registry, body = {"error": agent_friendly::ToJson(MakeTaskError(...))}. The
 /// single error exit for every handler so the wrapped envelope (R2-M8: fields
 /// under the "error" key, matching WriteJsonError + the 16 other ToJson call
@@ -50,7 +50,7 @@ int DocumentTaskHandler::AsyncMaxPages() const {
 }
 
 nlohmann::json DocumentTaskHandler::BuildProgressBody(const TaskInfo& task) {
-    // §6.3 Progress API body + topic 5 meta (5 fields). retryable_if_fail mirrors
+    // Progress API body + topic 5 meta (5 fields). retryable_if_fail mirrors
     // the persisted error_code's registry retryability when failed, else true.
     nlohmann::json body;
     body["task_id"] = task.task_id;
@@ -106,7 +106,7 @@ nlohmann::json DocumentTaskHandler::BuildProgressBody(const TaskInfo& task) {
     meta["retryable_if_fail"] = true;  // async parse path is retryable by default
     meta["agent_decision_hint"] = hint;
     // estimated_finish_at: filled when a real ETA exists (eta_seconds >= 0);
-    // otherwise null (the streaming-ETA clock is wired in D3.5, §4.5 note).
+    // otherwise null (the streaming-ETA clock is wired in integration, note).
     meta["estimated_finish_at"] = nullptr;
     body["meta"] = meta;
     return body;
@@ -126,7 +126,7 @@ HttpResult DocumentTaskHandler::SubmitAsync(const SubmitParams& params) {
     const int threshold = AsyncThresholdPages();
     const int hard_cap = AsyncMaxPages();
 
-    // §2.2 / scenario table — over the async hard cap → reject for everyone.
+    // scenario table — over the async hard cap → reject for everyone.
     if (params.page_count > hard_cap) {
         return ErrorResult(TaskErrorCode::kMaxPagesExceeded,
                            {{"max_pages", hard_cap},
@@ -135,7 +135,7 @@ HttpResult DocumentTaskHandler::SubmitAsync(const SubmitParams& params) {
                            "document exceeds the maximum page limit");
     }
 
-    // §2.2 — small docs go through the synchronous upload path (owned elsewhere);
+    // — small docs go through the synchronous upload path (owned elsewhere);
     // this async handler only mints tasks beyond the threshold.
     if (params.page_count <= threshold) {
         HttpResult r;
@@ -169,13 +169,13 @@ HttpResult DocumentTaskHandler::SubmitAsync(const SubmitParams& params) {
 
     auto enq = scheduler_->Enqueue(sreq);
     if (!enq.ok()) {
-        // Surface a transient service error (tasks_db) — retryable per §6.2.
+        // Surface a transient service error (tasks_db) — retryable per
         return ErrorResult(TaskErrorCode::kServiceUnavailable,
                            {{"component", "tasks_db"}}, enq.status().message());
     }
     if (pool_) pool_->Notify();  // wake a worker to pick it up
 
-    // 202 TASK_SUBMITTED success body (§6.2 row 1).
+    // 202 TASK_SUBMITTED success body (row 1).
     HttpResult r;
     r.status = 202;
     r.body = {{"status", "processing"},
@@ -201,7 +201,7 @@ HttpResult DocumentTaskHandler::CancelTask(const std::string& task_id) {
     TaskInfo out;
     Status s = mgr_->RequestCancel(task_id, &out);
     if (s.ok()) {
-        // §6.bis cortrix_tasks_cancel_total{phase}: derive the lifecycle phase from
+        // cortrix_tasks_cancel_total{phase}: derive the lifecycle phase from
         // the post-transition status — a queued task cancels terminally (pre_dequeue),
         // a processing task is signalled to its checkpoint (mid_processing). The
         // post_chunk_idx phase (cancel after a chunk-index write) is only reachable
@@ -217,7 +217,7 @@ HttpResult DocumentTaskHandler::CancelTask(const std::string& task_id) {
         if (out.status == task_status::kCancelled) {
             ReleaseManagedInput(managed_input_dir_, out, mgr_);
         }
-        // §4.3 — 200 + GEN-Agent cancel-accepted body.
+        // — 200 + GEN-Agent cancel-accepted body.
         HttpResult r;
         r.status = 200;
         r.body = {
@@ -231,7 +231,7 @@ HttpResult DocumentTaskHandler::CancelTask(const std::string& task_id) {
         return r;
     }
     // RequestCancel maps NotFound → CX_ERR_TASK_NOT_FOUND, AlreadyExists →
-    // CX_ERR_TASK_CANCELLING (repeat cancel of cancelling/terminal, §6.2 423).
+    // CX_ERR_TASK_CANCELLING (repeat cancel of cancelling/terminal, 423).
     if (s.code() == StatusCode::kNotFound) {
         return ErrorResult(TaskErrorCode::kTaskNotFound, nlohmann::json::object(),
                            "no such task: " + task_id);

@@ -8,7 +8,7 @@
 #include "cortrix/import/import_error.h"
 #include "cortrix/import/query_executor.h"
 
-// S2 SQL-injection fuzzing (DB import / §7 / V3-E-01 root-cause). Hammers BOTH query
+// S2 SQL-injection fuzzing (DB import / / V3-E-01 root-cause). Hammers BOTH query
 // modes with adversarial input and asserts the security gate holds:
 //   1. custom-SQL mode: every classic injection family is rejected by the keyword /
 //      separator / comment gate (CX_ERR_IMPORT_INVALID_SQL).

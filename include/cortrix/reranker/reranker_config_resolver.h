@@ -24,13 +24,13 @@ struct EffectiveRerankerConfig {
     int  candidate_multiplier;  ///< effective top_N multiplier
     int  max_candidates;        ///< effective top_N cap
 
-    /// top_N = min(top_k × candidate_multiplier, max_candidates) (E2 D7), floored
+    /// top_N = min(top_k × candidate_multiplier, max_candidates) (E2), floored
     /// at top_k so reranking never returns fewer than the requested results when
     /// enough candidates exist. top_k ≤ 0 → 0.
     int ComputeTopN(int top_k) const;
 };
 
-/// RerankerConfigResolver — the §2.6 three-layer priority resolver:
+/// RerankerConfigResolver — the three-layer priority resolver:
 ///
 ///     request (rerank=true/false)   ── highest, only sets `enabled`
 ///         ↓ overrides
@@ -40,18 +40,18 @@ struct EffectiveRerankerConfig {
 ///
 /// `enabled` cascades request → NS → global; candidate_multiplier / max_candidates
 /// cascade NS → global only (no request layer, topic 2.5). This implements the
-/// §2.6 example: NS `{"enabled":false}` + request `rerank=true` → enabled.
+/// example: NS `{"enabled":false}` + request `rerank=true` → enabled.
 ///
 /// Built from the global RerankerConfig (the resident defaults) plus a global
 /// `reranker.enabled` GUC (which is NOT a field of RerankerConfig — it is a
-/// separate NS-overridable GUC, §2.4). Standalone (D3): this resolves whatever it is
+/// separate NS-overridable GUC). Standalone: this resolves whatever it is
 /// handed. Phasing of the live wiring that hands it those inputs:
 ///   - the request `rerank` arg from the SQL function is the Phase-1 per-request
-///     override (§2.6 example); wiring it in is D3.5 cross-Feature work.
+///     override (example); wiring it in is integration cross-Feature work.
 ///   - reading the NS blob from the INSRouter cache (namespaces.reranker_config) is
 ///     PHASE-2 (per-NS model / score_threshold land "after the
 ///     LlamaCppReranker is introduced"). The resolver is the Phase-2-ready pre-build
-///     — NOT a D3.5 wiring gap.
+///     — NOT a integration wiring gap.
 class RerankerConfigResolver {
 public:
     /// @param global          resident defaults (candidate_multiplier / max_candidates)

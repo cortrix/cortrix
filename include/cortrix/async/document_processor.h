@@ -42,7 +42,7 @@ private:
 /// production passes a checker backed by TaskManager::GetTask.
 ///
 /// Standalone: the parser call + progress + cancel checkpoint are real
-/// (tested against an injected stub IDocumentParser, no Python). DEFERRED → D3.5:
+/// (tested against an injected stub IDocumentParser, no Python). DEFERRED → integration:
 /// the post-parse SPC pipeline (Enricher/Chunk/Index stages) + BeginWrite /
 /// RollbackCallback on cancel-after-write + real TraceContext threading. Until
 /// then ProcessTask stops at "parsed", and on cancel simply finalizes cancelled
@@ -59,7 +59,7 @@ public:
     /// @param cancel_checker how to poll the cancel flag (defaults to GetTask)
     /// @param spc_mgr  optional SPC entry: when set, a successful
     ///                 parse is handed to SPCManager::ProcessParsedDoc (Chunk→…→write);
-    ///                 nullptr = parse-only standalone (D3, SPC deferred).
+    ///                 nullptr = parse-only standalone (SPC deferred).
     /// @param managed_input_dir forwarded to TaskFinalizer: server-materialized batch
     ///                 inputs living in this directory are released when the task
     ///                 reaches any terminal state. Pass server::BatchTempDir(data_dir)
@@ -78,7 +78,7 @@ public:
     /// the error Status otherwise) so the caller (worker) can log/observe.
     Status ProcessTask(const TaskInfo& task) override;
 
-    /// async.async_max_pages default (§4.0 topic 1.3 — async-path page cap).
+    /// async.async_max_pages default (topic 1.3 — async-path page cap).
     static constexpr int kDefaultAsyncMaxPages = 2000;
 
 private:

@@ -39,7 +39,7 @@ TEST(SpladeDepthTest, CloseThenSearchFlagsFallback) {
     r->Close();  // db_ -> nullptr
     EXPECT_FALSE(r->IsAvailable());
 
-    // Search after Close: empty result + last_search_failed() flipped (the §7.2
+    // Search after Close: empty result + last_search_failed() flipped (the
     // L2 fallback signal), and never throws.
     auto post = r->Search(V({{1, 1.0f}}), "ns", 10);
     EXPECT_TRUE(post.empty());

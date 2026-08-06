@@ -15,28 +15,28 @@ namespace cortrix::query {
 /// forward-declares `cortrix::query::QueryContext` / `UnitQueryResult`). It does
 /// NOT define `UnitQueryResult` (that is the Unit-level Phase-2 type owned by the
 /// catalog MultiUnitNSExecutor); the NS-level result is
-/// `cortrix::retrieval::NamespaceQueryResult` (RETRIEVAL_TYPES_SPEC §1-bis), which
+/// `cortrix::retrieval::NamespaceQueryResult` (the retrieval-types spec), which
 /// is a different concept.
 ///
-/// V6 D-33 (§2.2): ScatterGather.Execute takes an *optional* `QueryContext*` so a
+/// V6 D-33: ScatterGather.Execute takes an *optional* `QueryContext*` so a
 /// caller (CRAG / Reranker) can share one; when null, ScatterGather builds
 /// the context from the QueryRequest + AuthContext. The reranker toggle and filter
-/// are passed through to every NS unchanged (§4.1 / topic 4.3).
+/// are passed through to every NS unchanged (/ topic 4.3).
 ///
 /// Unification of the CRAG and routing fields: the joint
-/// design (G3+G1.2 §S3) made QueryContext the single query-path context object that
+/// design (G3+G1.2) made QueryContext the single query-path context object that
 /// also carries the routing + CRAG decision signals exposed via the
-/// ARCH `?explain=true` endpoint. QUERY_CONTEXT_SPEC.md §2 is the SoT for those
+/// ARCH `?explain=true` endpoint. the query-context spec is the SoT for those
 /// fields. They are added here as a **pure ADD** (C-R1 briefing red-line 2): the
 /// original execution fields above are unchanged, so existing consumers
 /// (ScatterGather / SingleUnitExecutor / RagFusion) are untouched.
 ///   - This round CRAG writes only its 6 fields (see CragEvaluator
 ///     EvaluateAndUpdateContext). The 5 routing fields are declared with
 ///     defaults; their write logic lands with the router.
-///   - All fields have safe defaults (QUERY_CONTEXT_SPEC §6.1: ""/0.0/false/{}) so
+///   - All fields have safe defaults (the query-context spec: ""/0.0/false/{}) so
 ///     `?explain=true` never returns null.
 struct QueryContext {
-    std::string query;       ///< the user/Agent query text (passed through to every NS) — also SPEC §2.1
+    std::string query;       ///< the user/Agent query text (passed through to every NS) — also SPEC
     int  top_k = 10;         ///< per-NS top_k requested by the caller (range 1-100)
     bool rerank = true;      ///< topic 4.3 — pass-through to all NS; false → RRF fallback path
     std::map<std::string, std::string> filter;  ///< topic 4.3 JSONB filter passed through (flattened)
@@ -64,20 +64,20 @@ struct QueryContext {
     std::string user_id;     ///< passed through for downstream isolation / audit (empty in CE single-tenant)
     std::string tenant_id;   ///< passed-through tenant scope (empty/"" = CE single-tenant)
 
-    // --- Trace pass-through (OBS_SPEC §5.3, optional) ---
+    // --- Trace pass-through (OBS_SPEC, optional) ---
     std::string trace_id;    ///< empty when no TraceContext was supplied
 
     // ====================================================================
-    // QUERY_CONTEXT_SPEC.md §2 — Wave C query-path decision signals (pure ADD)
+    // the query-context spec — Wave C query-path decision signals (pure ADD)
     // ====================================================================
 
     // --- Base fields (router-initialized; `query` above is the other base field) ---
     std::string ns_id;       ///< target namespace ID (TEXT/ULID).
 
     // --- Router writes (routing decision) ---
-    std::string routing_path;            ///< "simple" / "complex" / "chat" (SPEC §2.2)
+    std::string routing_path;            ///< "simple" / "complex" / "chat" (SPEC)
     float complexity_score = 0.0f;       ///< classifier softmax confidence
-    std::string routing_decision_source; ///< 8-value enum (SPEC §2.2: rule/llm/force_route/.../chat_demoted_guard)
+    std::string routing_decision_source; ///< 8-value enum (SPEC: rule/llm/force_route/.../chat_demoted_guard)
     bool chat_path_triggered = false;
     bool multi_turn_context_warning = false;  ///< Agent-framework responsibility
 
@@ -89,10 +89,10 @@ struct QueryContext {
     bool web_fallback_triggered = false; ///< Phase 1 always false (Phase 2 Web fallback → true)
     bool routing_misclassified = false;  ///< Phase 1 always false (Phase 2 bidirectional feedback → true)
 
-    // --- §2.bis presentation flag (pass-through to the per-NS executor) ---
+    // --- presentation flag (pass-through to the per-NS executor) ---
     bool explain = false;  ///< ?explain=true — per-NS executors attach B/C-class
                            ///< explain detail (e.g. chunk-level RRF `rrf_paths`,
-                           ///< §3.8 W2) only when set. Default off (no overhead).
+                           ///< W2) only when set. Default off (no overhead).
 };
 
 }  // namespace cortrix::query

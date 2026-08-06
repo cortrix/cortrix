@@ -11,7 +11,7 @@ namespace cortrix::chunker {
 
 Status ChunkerStartupValidator::ValidateChildSizeCompat(int child_size, int max_seq_length) {
     if (child_size > max_seq_length) {
-        // CX_ERR_CHUNK_SIZE_INVALID (§ 5.1). The boundary re-inflates this into the
+        // CX_ERR_CHUNK_SIZE_INVALID. The boundary re-inflates this into the
         // full Agent-friendly body (retryable=false / category=permanent /
         // structured_data {child_size, max_seq_length}) at the surfacing call site.
         return ChunkStatus(

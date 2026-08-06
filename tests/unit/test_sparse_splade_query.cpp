@@ -6,7 +6,7 @@
 
 #include "cortrix/retrieval/splade_sparse_retriever.h"
 
-// Sparse retrieval S6 — SpladeSparseRetriever query (§6.3): score accumulator (Σ q·c over
+// Sparse retrieval S6 — SpladeSparseRetriever query: score accumulator (Σ q·c over
 // shared terms), top-K truncation, per-term posting-list cap, and the posting-
 // list LRU cache (hit-rate / invalidation). In-memory DB; algorithm-level.
 namespace cortrix::retrieval {
@@ -24,7 +24,7 @@ std::unique_ptr<SpladeSparseRetriever> Open(SpladeConfig cfg = {}) {
     return r;
 }
 
-// ---------- score accumulation (§6.3) ----------
+// ---------- score accumulation ----------
 
 TEST(SparseSpladeQueryTest, SingleTermScoreIsProduct) {
     auto r = Open();
@@ -109,7 +109,7 @@ TEST(SparseSpladeQueryTest, NotOpenSearchFlagsFallback) {
     SpladeSparseRetriever r(SpladeConfig{}, ":memory:");  // no Open()
     auto hits = r.Search(V({{1, 1.0f}}), "ns", 10);
     EXPECT_TRUE(hits.empty());
-    EXPECT_TRUE(r.last_search_failed());  // L2 fallback signal (§7.2)
+    EXPECT_TRUE(r.last_search_failed());  // L2 fallback signal
 }
 
 TEST(SparseSpladeQueryTest, OpenSearchDoesNotFlagFallback) {
@@ -119,7 +119,7 @@ TEST(SparseSpladeQueryTest, OpenSearchDoesNotFlagFallback) {
     EXPECT_FALSE(r->last_search_failed());
 }
 
-// ---------- per-term posting-list cap (§6.5) ----------
+// ---------- per-term posting-list cap ----------
 
 TEST(SparseSpladeQueryTest, PostingListCapLimitsScan) {
     SpladeConfig cfg;
@@ -144,7 +144,7 @@ TEST(SparseSpladeQueryTest, RepeatedQueryHitsCache) {
     for (int i = 0; i < 10; ++i) {
         (void)r->Search(V({{1, 1.0f}, {2, 1.0f}}), "ns", 10);
     }
-    // 18 hits / 20 lookups = 0.9 ≥ 0.70 target (§verify).
+    // 18 hits / 20 lookups = 0.9 ≥ 0.70 target.
     EXPECT_GE(r->cache_hit_rate(), 0.70);
 }
 

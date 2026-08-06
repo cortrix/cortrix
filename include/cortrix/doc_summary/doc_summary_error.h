@@ -11,10 +11,10 @@
 namespace cortrix::doc_summary {
 
 /// The 7 Document Summary error identities (registered in the
-/// §4.1.11). Each maps to a stable `CX_ERR_DOCSUMMARY_*` string + a GEN-Agent category +
+///). Each maps to a stable `CX_ERR_DOCSUMMARY_*` string + a GEN-Agent category +
 /// retryability via the canonical registry below.
 ///
-/// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
+/// Per the coding conventions, Cortrix uses Result<T> + Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// DocSummaryErrorCode is the *enum of identities*; MakeDocSummaryError() turns
@@ -42,7 +42,7 @@ struct DocSummaryErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_DOCSUMMARY_*" string
     agent_friendly::ErrorCategory category;   ///< timeout/transient/quota/permanent
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null unless retryable per §7
+    std::optional<int> retry_after_ms;        ///< null unless retryable per
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never

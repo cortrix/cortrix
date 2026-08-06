@@ -6,7 +6,7 @@ import { parseAgentError } from '../api/errors';
 import { Button, Input, Card, CardHeader, CardTitle, CardBody } from '../components/ui';
 import { ProgrammaticBanner } from '../components/Common/ProgrammaticBanner';
 
-// LoginPage (web UI design § 9.3). Email + password → useAuthStore.login, which
+// LoginPage (web UI design). Email + password → useAuthStore.login, which
 // POSTs to /api/v1/auth/login. The backend sets HttpOnly auth + CSRF cookies;
 // the frontend never sees the token. On success we redirect to the page the
 // user was trying to reach (PrivateRoute stashes it in location.state.from).

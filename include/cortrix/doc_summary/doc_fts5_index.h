@@ -44,7 +44,7 @@ Result<std::vector<DocFtsHit>> SearchDocFts5(sqlite3* db, const std::string& que
 
 /// Self-contained doc-level FTS5 index (hybrid fallback).
 ///
-/// Standalone (D3): owns its own SQLite DB (Open(":memory:") in tests), creating
+/// Standalone: owns its own SQLite DB (Open(":memory:") in tests), creating
 /// the `doc_fts5_index` virtual table from the DocSummarySchemaProvider DDL SoT so the
 /// two never drift. Product code uses the borrowed-handle helpers above against
 /// the per-Unit store.db. The query path uses BM25 column weights

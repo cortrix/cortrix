@@ -117,7 +117,7 @@ TEST(CrossNsQueryHandlerParseTest, RejectsNonObjectBody) {
 
 // --- Handle() end-to-end (status + body) ---
 
-// Deprecated field → 400 + the §2.4 CX_ERR_DEPRECATED_FIELD body (no scatter call).
+// Deprecated field → 400 + the CX_ERR_DEPRECATED_FIELD body (no scatter call).
 TEST(CrossNsQueryHandlerTest, DeprecatedFieldReturns400Body) {
     Harness h({"ns_a"});
     EXPECT_CALL(h.executor, ExecuteForNamespace(_, _, _)).Times(0);
@@ -142,7 +142,7 @@ TEST(CrossNsQueryHandlerTest, MalformedReturns400) {
     ASSERT_TRUE(r.body.contains("error"));
 }
 
-// Happy path → 200 + a §2.5 body (results + meta).
+// Happy path → 200 + a body (results + meta).
 TEST(CrossNsQueryHandlerTest, ValidRequestReturns200WithResults) {
     Harness h({"ns_a"});
     EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _))

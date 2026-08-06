@@ -12,14 +12,14 @@ namespace cortrix::resource {
 /// RAII owner of a per-Unit store.db connection (UnitResourceBundle.store_db).
 ///
 /// The pool opens one of these per Unit during load and applies the tuned PRAGMAs
-/// (§7). The bundle owns it via unique_ptr, so closing the SQLite handle is tied
+///. The bundle owns it via unique_ptr, so closing the SQLite handle is tied
 /// to bundle lifetime — dropping a NamespaceResourceBundle releases its index,
 /// WriteCoordinator and every store.db connection together (UT2).
 ///
 /// MVP store code (CortrixStoreSqlite) keeps its own sqlite3* and is not reused
 /// here: the pool owns the runtime *resource object* (the open connection), whereas
 /// CortrixStoreSqlite owns the doc/block *schema + queries*. Wiring the pool's
-/// connection through to the MVP store layer is integration → D3.5.
+/// connection through to the MVP store layer is integration → integration.
 class SqliteConn {
 public:
     SqliteConn() = default;
@@ -36,11 +36,11 @@ public:
 
     /// Apply the 6 tuned PRAGMAs. No-op (returns Ok) when not open. PRAGMA
     /// failures are logged-and-tolerated rather than fatal: a missing PRAGMA
-    /// degrades performance, it does not corrupt data (§7.1).
+    /// degrades performance, it does not corrupt data.
     Status ApplyPragmas(const SqlitePragmas& pragmas);
 
     /// Borrowed handle, nullptr before Open / after a moved-from state. The pool
-    /// hands this to the store layer at D3.5; never owned by the caller.
+    /// hands this to the store layer at integration; never owned by the caller.
     sqlite3* handle() const { return db_; }
     bool is_open() const { return db_ != nullptr; }
 

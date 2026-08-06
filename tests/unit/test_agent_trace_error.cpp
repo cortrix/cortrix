@@ -6,7 +6,7 @@
 #include "cortrix/agent_trace/agent_trace_error.h"
 
 // S7 coverage: the agent trace error model (template A) — all 7 CX_ERR_TRACE_* identities,
-// their §9.2 attributes (category/retryable/retry_after_ms/structured_data keys),
+// their attributes (category/retryable/retry_after_ms/structured_data keys),
 // the AgentFriendlyError builder, the JSON body, and the Status bridge.
 namespace cortrix::agent_trace {
 namespace {
@@ -39,14 +39,14 @@ TEST(AgentTraceErrorTest, AllCodesHaveUniqueCxStrings) {
     EXPECT_EQ(seen.size(), 7u);
 }
 
-// §9.2 table, row by row.
+// table, row by row.
 TEST(AgentTraceErrorTest, RegistryMatchesSpecTable) {
     auto chk = [](AgentTraceErrorCode c, const char* code, ErrorCategory cat, bool retry) {
         const AgentTraceErrorInfo& i = GetAgentTraceErrorInfo(c);
         EXPECT_STREQ(i.cx_code, code);
         EXPECT_EQ(i.category, cat) << code;
         EXPECT_EQ(i.retryable, retry) << code;
-        // §9.2 retry_after_ms column is "-" for every agent trace code.
+        // retry_after_ms column is "-" for every agent trace code.
         EXPECT_FALSE(i.retry_after_ms.has_value()) << code;
     };
     chk(AgentTraceErrorCode::kSessionNotFound, "CX_ERR_TRACE_SESSION_NOT_FOUND",

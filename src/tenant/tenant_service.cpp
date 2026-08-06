@@ -178,7 +178,7 @@ Result<Tenant> TenantService::CreateOrganization(const std::string& name,
     }
     // V1.0 OSS: plan-based org-creation quota is enforced by QuotaService at the
     // Cloud-V1 layer (UnlimitedPlanProvider here). Cross-feature wiring of that
-    // check is D3.5 deferred -- this Wave performs the structural INSERTs only.
+    // check is integration deferred -- this Wave performs the structural INSERTs only.
 
     const std::string tenant_id = "tenant-" + UuidV4();
     const int64_t now = NowSec();

@@ -11,7 +11,7 @@ namespace cortrix::metadata {
 
 namespace {
 
-// Histogram bucket bounds (seconds) for generate_duration (§5.bis SLA P95 ≤ 50ms,
+// Histogram bucket bounds (seconds) for generate_duration (SLA P95 ≤ 50ms,
 // P99 ≤ 200ms — buckets straddle those alarm thresholds).
 constexpr size_t kNumDurBuckets = 6;
 constexpr double kDurBounds[kNumDurBuckets] = {0.005, 0.01, 0.05, 0.1, 0.2, 1.0};

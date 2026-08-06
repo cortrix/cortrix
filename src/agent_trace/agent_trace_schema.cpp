@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS agent_trace (
     created_at    INTEGER NOT NULL             -- Unix ms (topic 3 — same clock as operation_log)
 );
 
--- indices (§4.1: session + agent + trace-id correlation chain)
+-- indices (session + agent + trace-id correlation chain)
 CREATE INDEX IF NOT EXISTS idx_agent_trace_session  ON agent_trace(session_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_agent_trace_agent    ON agent_trace(agent_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_agent_trace_trace_id ON agent_trace(trace_id, created_at);

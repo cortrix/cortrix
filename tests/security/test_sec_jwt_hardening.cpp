@@ -5,7 +5,7 @@
 ///   1. JwtCodec::Decode (crypto core, src/auth/jwt_utils.cpp): forge attack tokens
 ///      directly (alg=none, algorithm-confusion, tampered payload, wrong signature,
 ///      expired) and assert each is rejected.
-///   2. AuthService::ValidateAccessToken (the §4.3 middleware decision the route
+///   2. AuthService::ValidateAccessToken (the middleware decision the route
 ///      WithAuth wrapper calls): real register/login mints a valid token (positive
 ///      control) and rotation invalidates an old-secret token.
 ///   Every attack MUST be rejected (kUnauthenticated / kTokenExpired). A token that
@@ -229,7 +229,7 @@ protected:
     FakePasswordHasher hasher_;
 };
 
-// Positive control through the real §4.3 middleware decision: register -> login ->
+// Positive control through the real middleware decision: register -> login ->
 // the minted access token validates and yields the principal's identity.
 TEST_F(AuthServiceFixture, ValidLoginToken_ValidatesThroughMiddleware) {
     AuthService svc = Svc();

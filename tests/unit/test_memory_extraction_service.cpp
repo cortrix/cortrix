@@ -2,7 +2,7 @@
 //
 // Coverage target: the 5 ExtractOne() branches (lines 52-119) that are at 0%
 // in the core-17 line-coverage report, pulling mem-extraction-service from 0%
-// toward the D4 >= 90% line-coverage gate.
+// toward the >= 90% line-coverage gate.
 //
 // Branch map (see memory_extraction_service.cpp):
 //   Branch 1 (line 55-58):  !enabled() — llm=nullptr => benign success, no extraction
@@ -274,7 +274,7 @@ TEST_F(MemoryExtractionServiceTest, ExtractOne_Branch3_RememberFalseSkipsOk) {
     auto svc = MakeService(llm);
     ASSERT_TRUE(svc->enabled());
 
-    // remember=false triggers memory opt-out D2 opt-out and immediate skip.
+    // remember=false triggers memory opt-out opt-out and immediate skip.
     auto log = MakeInteraction("default", "session-b3",
                                /*id=*/"ilog-b3", /*remember=*/false);
     MemoryExtractionResult result = svc->ExtractOne(log);
@@ -394,7 +394,7 @@ TEST_F(MemoryExtractionServiceTest, ExtractOne_Branch5b_LlmErrorResultNotOk) {
 }
 
 // ---------------------------------------------------------------------------
-// RevokeInvalidation (#22 D9 admin revoke) — real NS dependency stack
+// RevokeInvalidation (#22 admin revoke) — real NS dependency stack
 // ---------------------------------------------------------------------------
 
 // Minimal IOperationLogger recorder (local; the test_memory_extractor.cpp copy is in
@@ -424,7 +424,7 @@ public:
 // Real-dependency-stack revoke: seed an invalidated block into the live "default" NS
 // store via the same MemoryBlockAdapter the service uses, revoke through the service,
 // then read the block back from the store and assert it is active again + the audit
-// entry was written. (A D3.5-mounted wiring is only proven by the real dependency
+// entry was written. (A integration-mounted wiring is only proven by the real dependency
 // stack, not a mocked store — single-unit tests can pass while live assembly is broken.)
 TEST_F(MemoryExtractionServiceTest, RevokeInvalidationRestoresActiveOnRealStore) {
     auto oplog = std::make_shared<CountingOpLogger>();
@@ -461,7 +461,7 @@ TEST_F(MemoryExtractionServiceTest, RevokeInvalidationRestoresActiveOnRealStore)
     ASSERT_TRUE(got.ok());
     EXPECT_EQ(got.value().metadata_json.value("status", ""), "active");
 
-    // The D9 revoke wrote exactly one memory_revoke audit entry.
+    // The revoke wrote exactly one memory_revoke audit entry.
     EXPECT_EQ(oplog->CountAction("memory_revoke"), 1);
 }
 

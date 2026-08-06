@@ -152,7 +152,7 @@ TEST_F(LiveExecutorTest, FlattenToleratesEmptyNonObjectInvalid) {
     EXPECT_EQ(out["x"], "1");
 }
 
-// --- ClassifyVectorHit: the §3.8 W2 vector-route split (pure function) --------
+// --- ClassifyVectorHit: the W2 vector-route split (pure function) --------
 
 TEST_F(LiveExecutorTest, ClassifyVectorHitDenseUsesOwnChildId) {
     std::string child;

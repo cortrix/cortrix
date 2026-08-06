@@ -12,7 +12,7 @@
 #   scripts/bundle_openapi.sh --no-lint
 #
 # Dependency: @redocly/cli (if not preinstalled, `npm i -g @redocly/cli`, or this script falls back to npx)
-# SoT: API spec + § 6.3
+# SoT: API spec +
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

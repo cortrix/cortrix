@@ -11,12 +11,12 @@ import {
 } from './metrics';
 import { pageLabel, usePageViews } from './usePageViews';
 
-// Web UI metrics unit tests (web UI design § 23-bis). The recording helpers are
+// Web UI metrics unit tests (web UI design). The recording helpers are
 // no-ops before initWebMetrics() (the SDK is not started in jsdom) — the test
 // asserts they are total no-ops (no throw) and that the pure label/bucket
 // helpers map correctly.
 
-describe('telemetry metrics (§ 23-bis)', () => {
+describe('telemetry metrics', () => {
   it('statusBucket maps HTTP codes to coarse buckets', () => {
     expect(statusBucket(200)).toBe('2xx');
     expect(statusBucket(204)).toBe('2xx');

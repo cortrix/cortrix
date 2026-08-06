@@ -24,8 +24,8 @@ namespace cortrix::async {
 /// lifetime); crash recovery rebuilds queued/processing state from the tasks
 /// table (TaskManager::RequeueStaleProcessing / SweepZombies).
 ///
-/// Standalone (D3): real and fully tested against an in-memory TaskManager. The
-/// debounce window comes from IGlobalConfig async.watcher_debounce_seconds (§4.0)
+/// Standalone: real and fully tested against an in-memory TaskManager. The
+/// debounce window comes from IGlobalConfig async.watcher_debounce_seconds
 /// with a documented default; admin-API hot-reload → next Enqueue picks it up.
 ///
 /// Thread-safe: Enqueue / Dequeue / OnTaskCompleted serialize on mutex_.
@@ -78,7 +78,7 @@ public:
         unadopted_input_releaser_ = std::move(fn);
     }
 
-    /// async.watcher_debounce_seconds default (§4.0, topic 2.2 C) when config absent.
+    /// async.watcher_debounce_seconds default (topic 2.2 C) when config absent.
     static constexpr int kDefaultDebounceSeconds = 5;
 
 private:

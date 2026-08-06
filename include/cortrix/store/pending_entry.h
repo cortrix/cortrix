@@ -28,12 +28,12 @@ namespace cortrix::store {
 ///   doc_id       bytes (doc_id_len)
 ///   block_count  u32
 ///   block_ids    u64 * block_count   (only meaningful for PENDING)
-///   has_blob     u8    0/1   (PENDING only — v1.0.2 D3.5 #1; gates Recover blob check)
+///   has_blob     u8    0/1   (PENDING only — v1.0.2 integration #1; gates Recover blob check)
 ///   checksum     u32   CRC32 over entry_type..has_blob
 ///
 /// COMMITTED / ROLLBACK records carry an empty doc_id, no block_ids and no
 /// has_blob byte; they reference the originating PENDING purely by txn_id
-/// (design § 3.1) and end right after block_count.
+/// (design) and end right after block_count.
 struct PendingEntry {
     enum class State : uint8_t {
         kPending = 1,
@@ -46,9 +46,9 @@ struct PendingEntry {
     int64_t timestamp_ms = 0;  ///< Unix milliseconds
     std::string doc_id;
     std::vector<BlockId> block_ids;
-    bool has_blob = false;  ///< v1.0.2 (D3.5 #1): did this txn write a blob? Only
+    bool has_blob = false;  ///< v1.0.2 (integration #1): did this txn write a blob? Only
                             ///< meaningful for PENDING; gates the Recover three-way
-                            ///< blob check (§4.4). On-disk only for PENDING records.
+                            ///< blob check. On-disk only for PENDING records.
 
     /// Serialize into the on-disk frame above (length-prefixed, CRC-suffixed).
     /// The returned buffer is one self-describing, caller-framed WAL record —
@@ -64,7 +64,7 @@ struct PendingEntry {
     /// Used by the EOF-order recovery scan, which reads back-to-back records
     /// from a single buffer. On a short/corrupt record `offset` is left
     /// unchanged and CX_ERR_PWL_CORRUPTED is returned (caller truncates the
-    /// tail — design § 5 "on CRC failure, truncate to the last valid entry").
+    /// tail — design "on CRC failure, truncate to the last valid entry").
     static Result<PendingEntry> DeserializeFrom(const uint8_t* data, size_t size,
                                                 size_t* offset);
 };

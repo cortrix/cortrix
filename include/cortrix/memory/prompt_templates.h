@@ -17,18 +17,18 @@ inline constexpr const char* kPlaceholderInteractionWindow = "{interaction_windo
 inline constexpr const char* kPlaceholderNewFact = "{new_fact}";
 inline constexpr const char* kPlaceholderOldFact = "{old_fact}";
 
-// --- Extraction prompts (D10) ---
+// --- Extraction prompts ---
 
 /// Chinese extraction prompt. The model returns a JSON array of
 /// {type, content, confidence} objects (no surrounding prose). `type` is one of
 /// fact/preference/event; an unrecognized value is coerced to `event` in the
-/// code-layer fallback (D4), NOT in the prompt.
+/// code-layer fallback, NOT in the prompt.
 extern const char* const kMemoryExtractPromptZh;
 
 /// English extraction prompt (same contract as the Chinese variant).
 extern const char* const kMemoryExtractPromptEn;
 
-// --- Contradiction-judgment prompts (D5) ---
+// --- Contradiction-judgment prompts ---
 
 /// Chinese contradiction-judgment prompt. The model returns a single JSON object
 /// {is_contradiction: bool, reason: string, confidence: number}.
@@ -37,7 +37,7 @@ extern const char* const kContradictionDetectPromptZh;
 /// English contradiction-judgment prompt (same contract).
 extern const char* const kContradictionDetectPromptEn;
 
-/// Language selector for the V1 two-language prompt set (D10). `kAuto` picks ZH
+/// Language selector for the V1 two-language prompt set. `kAuto` picks ZH
 /// when the input contains CJK characters, otherwise EN.
 enum class PromptLang {
     kAuto = 0,

@@ -147,7 +147,7 @@ Result<std::string> ApiKeyService::ValidateApiKey(const std::string& plaintext) 
     }
     sqlite3_finalize(stmt);
 
-    // §5.1: invalid/revoked/expired → CX_ERR_AUTH_INVALID_API_KEY (reason in
+    //: invalid/revoked/expired → CX_ERR_AUTH_INVALID_API_KEY (reason in
     // structured_data at the API layer: not_found | revoked | expired).
     if (!found) return AuthStatus(AuthErrorCode::kInvalidApiKey, "reason=not_found");
     if (status == "revoked") return AuthStatus(AuthErrorCode::kInvalidApiKey, "reason=revoked");

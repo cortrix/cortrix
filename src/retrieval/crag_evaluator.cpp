@@ -14,7 +14,7 @@ namespace cortrix::retrieval {
 
 namespace {
 
-// --- §6.1 score-distribution helpers (no existing util in the frozen tree) ---
+// --- score-distribution helpers (no existing util in the frozen tree) ---
 
 float ComputeMedian(std::vector<float> v) {
     if (v.empty()) return 0.0f;
@@ -42,7 +42,7 @@ float ComputeStd(const std::vector<float>& v) {
     return std::sqrt(acc / static_cast<float>(v.size()));
 }
 
-// L3 retry back-off (§7.3): 50 / 100 / 200 ms exponential. Index clamps to the cap.
+// L3 retry back-off: 50 / 100 / 200 ms exponential. Index clamps to the cap.
 int BackoffMs(int retry_index) {
     static const int kSchedule[] = {50, 100, 200};
     const int n = static_cast<int>(std::size(kSchedule));
@@ -79,8 +79,8 @@ std::map<std::string, float> CragEvaluator::ComputeMultiSignals(
     }
 
     // The score distribution drives the multi-signal features. CRAG evaluates
-    // on the reranker output; per RETRIEVAL_TYPES_SPEC the pre-rerank `score`
-    // field is the RRF score and `rerank_score` the cross-encoder score. §6.1's
+    // on the reranker output; per the retrieval-types spec the pre-rerank `score`
+    // field is the RRF score and `rerank_score` the cross-encoder score.'s
     // reference code reads chunk.score, so we mirror that exactly.
     std::vector<float> scores;
     scores.reserve(chunks.size());
@@ -95,7 +95,7 @@ std::map<std::string, float> CragEvaluator::ComputeMultiSignals(
     signals["high_score_ratio"] =
         static_cast<float>(high_score_count) / static_cast<float>(scores.size());
 
-    // top1-top5 gap (§6.1 — CRAG paper style; only when >=5 candidates).
+    // top1-top5 gap (CRAG paper style; only when >=5 candidates).
     if (scores.size() >= 5) {
         signals["top1_top5_gap"] = scores[0] - scores[4];
     }
@@ -105,7 +105,7 @@ std::map<std::string, float> CragEvaluator::ComputeMultiSignals(
 }
 
 std::string CragEvaluator::LabelFromScore(float score) const {
-    // §6.2 three-tier mapping using the resolved thresholds.
+    // three-tier mapping using the resolved thresholds.
     if (score >= config_.threshold_correct) return "correct";
     if (score < config_.threshold_incorrect) return "incorrect";
     return "ambiguous";
@@ -113,7 +113,7 @@ std::string CragEvaluator::LabelFromScore(float score) const {
 
 ClassificationResult CragEvaluator::HeuristicGuard(
     const std::map<std::string, float>& signals) const {
-    // §6.2 step 2 / §7.3: a no-ONNX verdict from the score distribution. The score
+    // step 2 /: a no-ONNX verdict from the score distribution. The score
     // blends top1 (dominant) with the high-score ratio so a single strong hit and
     // broad agreement both push toward "correct", while weak/sparse hits fall to
     // "incorrect". This is the standalone classifier and the safety net when the
@@ -139,7 +139,7 @@ ClassificationResult CragEvaluator::RunClassifier(
     const std::string& query,
     const std::string& chunk_text,
     const std::map<std::string, float>& signals) {
-    // §7.3 L3: retry the backend on transient failure, then transparently degrade.
+    // L3: retry the backend on transient failure, then transparently degrade.
     // The circuit breaker is a SYSTEMIC gate (shared reranker component): it is checked
     // ONCE at entry so a query does not even start the retry loop against a backend
     // that recent queries proved dead. Inside one query, the full
@@ -180,7 +180,7 @@ ClassificationResult CragEvaluator::RunClassifier(
 
 ClassificationResult CragEvaluator::DegradedResult(
     const std::map<std::string, float>& signals) const {
-    // §7.3: transparent degrade. Encode the fallback into the verdict enum (SPEC:
+    //: transparent degrade. Encode the fallback into the verdict enum (SPEC:
     // "correct_fallback_classifier_failed") and tag the inference error code;
     // signals are preserved for ?explain=true.
     ClassificationResult degraded;
@@ -193,22 +193,22 @@ ClassificationResult CragEvaluator::DegradedResult(
 }
 
 ClassificationResult CragEvaluator::Classify(const ClassifierInput& input) {
-    // 1. multi-signal features (§6.1)
+    // 1. multi-signal features
     auto signals = ComputeMultiSignals(input.chunks);
 
-    // 2. heuristic guard for degenerate input (§6.2 step 2) or no backend (L1/L2).
+    // 2. heuristic guard for degenerate input (step 2) or no backend (L1/L2).
     if (input.query.length() < 3 || input.chunks.empty() || !IsAvailable()) {
         return HeuristicGuard(signals);
     }
 
-    // 3. main path: backend inference with L3 retry/degrade (§6.2 step 3 / §7.3).
+    // 3. main path: backend inference with L3 retry/degrade (step 3 /).
     ClassificationResult result =
         RunClassifier(input.query, input.chunks[0].chunk_text, signals);
 
     // A degraded verdict already encodes its own fallback label — return as-is.
     if (result.error_code.has_value()) return result;
 
-    // 4. low-confidence guard → heuristic (§6.2).
+    // 4. low-confidence guard → heuristic.
     if (result.confidence < config_.classifier_min_confidence) {
         return HeuristicGuard(signals);
     }
@@ -217,7 +217,7 @@ ClassificationResult CragEvaluator::Classify(const ClassifierInput& input) {
 
 namespace {
 
-// Map a verdict label to the §10 metric decision bucket. The transparent-degrade
+// Map a verdict label to the metric decision bucket. The transparent-degrade
 // verdict ("correct_fallback_classifier_failed") and any unknown label fold into
 // `fallback`.
 CragMetrics::Decision DecisionForVerdict(const std::string& verdict) {
@@ -239,21 +239,21 @@ void CragEvaluator::EvaluateAndUpdateContext(
                                             : std::optional<std::string>{ctx.ns_id}};
     ClassificationResult result = Classify(input);
 
-    // Write the CRAG fields (QUERY_CONTEXT_SPEC). The classification helper
+    // Write the CRAG fields (the query-context spec). The classification helper
     // already wrote QueryContext-independent state; here we only touch CRAG's own
     // fields, never the router's (write-failure isolation).
     ctx.crag_verdict = result.label;
     ctx.crag_score = result.score;
     ctx.crag_signals = result.raw_signals;
 
-    // §10 metric: one evaluation_total increment per verdict (enum label only).
+    // metric: one evaluation_total increment per verdict (enum label only).
     CragMetrics::Instance().RecordEvaluation(DecisionForVerdict(result.label));
 
-    // --- §6.3 path handling ---
+    // --- path handling ---
     if (result.label == "correct" ||
         result.label == "correct_fallback_classifier_failed") {
         // Directly return reranker top-K (no extra processing). The
-        // fallback verdict also takes the correct path (transparent degrade, §7.3).
+        // fallback verdict also takes the correct path (transparent degrade).
         return;
     }
 

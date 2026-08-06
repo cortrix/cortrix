@@ -25,7 +25,7 @@ HypeQuestion MakeQ(std::string text, int idx, std::string child, std::string par
     return q;
 }
 
-// ---------- metadata_json (§4.2) ----------
+// ---------- metadata_json ----------
 
 TEST(HypeBlockTest, MetadataJsonShape) {
     HypeQuestion q = MakeQ("What was Q1 revenue?", 2, "child_7", "parent_3");
@@ -94,7 +94,7 @@ TEST(HypeBlockTest, BlockCrcDetectsTamper) {
     EXPECT_FALSE(BlockParse(blob.data(), blob.size(), &hdr));
 }
 
-// ---------- embedding fill (§9.1) ----------
+// ---------- embedding fill ----------
 
 TEST(HypeBlockTest, FillEmbeddingFromEmbedder) {
     cortrix::testing::FakeEmbedder emb(1024);

@@ -12,7 +12,7 @@
 // Parser (Major-2, design S6): every ParserError maps to a ParsedDoc /
 // AgentFriendlyError carrying the GEN-Agent 4 fields (retryable / category /
 // retry_after_ms / structured_data) with the right values, and the error body
-// serializes to the AGENT_FRIENDLY §3.1 shape.
+// serializes to the Agent-friendly contract shape.
 namespace cortrix::spc {
 namespace {
 
@@ -40,7 +40,7 @@ const std::vector<ParserErrorCode>& AllErrorCodes() {
 }
 
 // Every error code yields a non-ok ParsedDoc whose 4 Agent-friendly fields match
-// the registry, and whose body serializes to the §3.1 shape with all keys.
+// the registry, and whose body serializes to the shape with all keys.
 TEST(ParserAgentFriendlyTest, EveryErrorCodeFillsFourFields) {
     for (ParserErrorCode code : AllErrorCodes()) {
         const ParserErrorInfo& info = GetParserErrorInfo(code);
@@ -55,7 +55,7 @@ TEST(ParserAgentFriendlyTest, EveryErrorCodeFillsFourFields) {
         ASSERT_TRUE(doc.structured_data.is_object()) << info.cx_code;
         EXPECT_EQ(doc.structured_data["code"], info.cx_code);
 
-        // Body round-trips to the AGENT_FRIENDLY §3.1 shape.
+        // Body round-trips to the Agent-friendly contract shape.
         nlohmann::json body = agent_friendly::ToJson(MakeAgentFriendlyError(doc));
         EXPECT_EQ(body["code"], info.cx_code);
         EXPECT_EQ(body["retryable"], info.retryable);
@@ -70,7 +70,7 @@ TEST(ParserAgentFriendlyTest, EveryErrorCodeFillsFourFields) {
     }
 }
 
-// Spot-check the §5.2 rows the design lists as the canonical examples.
+// Spot-check the rows the design lists as the canonical examples.
 TEST(ParserAgentFriendlyTest, FileTooLarge_QuotaStructuredData) {
     ParsedDoc doc = MakeErrorDoc(
         ParserErrorCode::kFileTooLarge, "File size exceeds limit",
@@ -113,7 +113,7 @@ TEST(ParserAgentFriendlyTest, PasswordProtected_PermanentWithHint) {
                                                 doc.structured_data));
 }
 
-// Required-structured-data lists cover the keys the §5.2 examples show, for
+// Required-structured-data lists cover the keys the examples show, for
 // every code that mandates them.
 TEST(ParserAgentFriendlyTest, RequiredKeysPresentForRepresentativeCodes) {
     auto keys = [](ParserErrorCode c) {

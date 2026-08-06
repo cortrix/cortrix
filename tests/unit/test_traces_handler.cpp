@@ -13,7 +13,7 @@
 #include "cortrix/catalog/schema_provider.h"
 #include "cortrix/common/i_global_config.h"
 
-// S4 coverage: GET /traces/{session_id} permission + pagination wiring (§8.1) —
+// S4 coverage: GET /traces/{session_id} permission + pagination wiring —
 // owner resolved via interaction_log, non-admin cross-user -> UNAUTHORIZED, admin
 // nonexistent -> SESSION_NOT_FOUND, owner sees own (incl. empty), invalid filter
 // token propagated, and the 1MB soft-limit warning.
@@ -106,7 +106,7 @@ TEST_F(TracesHandlerTest, NonAdminUnknownSessionIsUnauthorizedNotLeaked) {
 }
 
 TEST_F(TracesHandlerTest, AdminReadsAnyOwnedSession) {
-    // §12: admin reading alice's session emits the forensics structured log.
+    //: admin reading alice's session emits the forensics structured log.
     testing::internal::CaptureStderr();
     auto r = handler_->GetSession("alice-sess", TraceFilter{}, RequesterContext{"root", true});
     std::string err = testing::internal::GetCapturedStderr();

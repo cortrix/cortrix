@@ -7,13 +7,13 @@ import { LoginPage } from './pages/LoginPage';
 import { NamespacesPage } from './components/Namespace/NamespacesPage';
 import { LoadingSpinner } from './components/Common/LoadingSpinner';
 
-// Route registry (web UI design § 10 — react-router-dom). Migration note (R3/S5):
+// Route registry (web UI design — react-router-dom). Migration note (R3/S5):
 // page selection moved off the old `activePage` zustand field onto the URL. The
 // app shell (Layout) is itself guarded by PrivateRoute, so every authenticated
 // page (all R1/R2 pages + admin pages) sits behind the auth cookie probe; the
 // standalone setup/sign-in routes (/bootstrap, /login) stay public.
 //
-// Perf (web UI/§ 14.3 — S10 code-split): the landing route (Namespaces)
+// Perf (web UI/ — S10 code-split): the landing route (Namespaces)
 // and the public auth shell (Bootstrap / Login) stay eager so first paint is
 // immediate. Every other page is React.lazy-imported so it ships in its own
 // route chunk fetched on navigation — this pulls Chat (react-markdown),
@@ -29,8 +29,8 @@ import { LoadingSpinner } from './components/Common/LoadingSpinner';
 //   /admin/operation-log -> OperationLogPage (admin)
 //
 // Ent placeholder routes (/ent/text-to-sql, /ent/audit-log, /ent/multi-tenant,
-// § 10.1) are registered in V1.0 already (R4/S6) so bookmarks survive the V1.5
-// swap; each page is a feature-flag gate (§ 10.2 — EntPages) rendering the
+//) are registered in V1.0 already (R4/S6) so bookmarks survive the V1.5
+// swap; each page is a feature-flag gate (EntPages) rendering the
 // marketing PlaceholderPage until the backend reports the feature enabled. The
 // Health dashboard (/health, readiness /live + /ready) is also a guarded route
 // (R4/S7).
@@ -108,7 +108,7 @@ export function AppRoutes() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="health" element={<HealthPage />} />
 
-            {/* Ent placeholders (web UI / § 10.1) — feature-flag gated pages,
+            {/* Ent placeholders (web UI /) — feature-flag gated pages,
                 registered in V1.0 so V1.5 bookmarks survive the swap. */}
             <Route path="ent/text-to-sql" element={<TextToSqlPage />} />
             <Route path="ent/audit-log" element={<AuditLogPage />} />

@@ -13,8 +13,8 @@ namespace cortrix::store {
 /// schema governance). The Phase-2 header V1→V2 upgrade (TD-BLOCK-V2-UPGRADE)
 /// will run inside the same versioned framework.
 ///
-/// Implements the frozen cortrix::catalog::ISchemaProvider (D2-pre-5). Migrate
-/// returns Status (F-FREEZE-1: no Result<void>) — the §4.4 sketch's Result<void>
+/// Implements the frozen cortrix::catalog::ISchemaProvider. Migrate
+/// returns Status (F-FREEZE-1: no Result<void>) — the sketch's Result<void>
 /// is reconciled to the frozen interface signature.
 class BlockFrameworkSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:

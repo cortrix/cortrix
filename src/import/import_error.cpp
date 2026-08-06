@@ -15,9 +15,9 @@ namespace {
 // row" into a warning (treated as a build failure), so the registry can't silently
 // drift from the enum.
 //
-// retry_after_ms: §5.4 marks CONNECTION_FAILED (transient) + TIMEOUT (timeout) as
+// retry_after_ms: marks CONNECTION_FAILED (transient) + TIMEOUT (timeout) as
 // retryable. CONNECTION_FAILED gets a short 5s backoff (network blip); TIMEOUT gets
-// 30s (the §5.3 example body) — a re-run of a slow query benefits from a longer
+// 30s (the example body) — a re-run of a slow query benefits from a longer
 // pause. The 4 non-retryable codes carry null.
 constexpr ImportErrorInfo kConnectionFailed
     {"CX_ERR_IMPORT_CONNECTION_FAILED",   ErrorCategory::kTransient, true,  5000,         503};
@@ -59,17 +59,17 @@ const char* ImportErrorCodeString(ImportErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(ImportErrorCode code) {
-    // §5.3 / §5.4 structured_data keys the Agent needs to act. Function-local
+    // structured_data keys the Agent needs to act. Function-local
     // statics → stable refs.
     static const std::vector<std::string> kEmpty{};
-    // §5.3 example body for TIMEOUT carries task_id + timeout_seconds +
+    // example body for TIMEOUT carries task_id + timeout_seconds +
     // rows_imported_before_timeout so the Agent can resume / narrow the query.
     static const std::vector<std::string> kTimeoutKeys{
         "task_id", "timeout_seconds", "rows_imported_before_timeout"};
     // ROWS_LIMIT: the Agent slices the query under the cap (R5 — needs the cap +
     // the estimate that tripped it).
     static const std::vector<std::string> kRowsKeys{"max_rows", "estimated_rows"};
-    // CROSS_TENANT_REF: which ref / tenant pair was rejected (D7 — Agent re-picks a
+    // CROSS_TENANT_REF: which ref / tenant pair was rejected (Agent re-picks a
     // ref owned by the caller's tenant).
     static const std::vector<std::string> kCrossTenantKeys{"connection_ref", "tenant_id"};
 

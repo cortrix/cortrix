@@ -36,7 +36,7 @@ struct DiskUsage {
 /// The IGlobalConfig keys + documented defaults the monitor reads.
 /// Generic KV accessors (IGlobalConfig::GetFloat/GetInt) keep the canonical
 /// config header dependency-free; an admin hot-reload is picked up on the
-/// next check tick. Standalone (D3): real + tested against InMemoryGlobalConfig.
+/// next check tick. Standalone: real + tested against InMemoryGlobalConfig.
 struct DiskMonitorConfig {
     std::string data_dir = "./data";   ///< path passed to statvfs (CORTRIX_DATA_DIR)
     double warn_threshold = 0.80;      ///< key "disk_warn_threshold"      (range 0.5–0.95)
@@ -48,7 +48,7 @@ struct DiskMonitorConfig {
     static constexpr const char* kIntervalKey = "disk_check_interval_sec";
 
     /// Read the three keys from `config` over the defaults above (each key absent
-    /// → keep the default). Out-of-range values are clamped to the §6.4 ranges.
+    /// → keep the default). Out-of-range values are clamped to the ranges.
     /// `config` may be nullptr (all defaults). `data_dir` is set by the caller.
     static DiskMonitorConfig FromGlobalConfig(const IGlobalConfig* config,
                                               const std::string& data_dir);
@@ -59,10 +59,10 @@ struct DiskMonitorConfig {
 /// ratio, transitions NORMAL/WARN/CRIT, and flips an atomic `reject_new_writes`
 /// flag the SPC write path consults before admitting a new write.
 ///
-/// Standalone (D3): the monitor + CheckOnce() are fully usable and tested
+/// Standalone: the monitor + CheckOnce() are fully usable and tested
 /// in-process (CheckOnce drives the FSM deterministically; the thread is just a
 /// scheduler around it). Wiring the gauge into the /metrics endpoint and the
-/// flag into the real SPC pipeline is in this Feature; cross-Feature E2E is D3.5.
+/// flag into the real SPC pipeline is in this Feature; cross-Feature E2E is integration.
 ///
 /// Thread-safe: ShouldRejectWrites() / Usage() are lock-free (atomics); Start /
 /// Stop serialize on the internal mutex.
@@ -107,7 +107,7 @@ public:
     DiskUsage Usage() const;
 
     /// Build the CX_ERR_DISK_FULL Agent-friendly error body for the current
-    /// sample (§6.3 — fills the 5 required structured_data keys from `cfg`/usage).
+    /// sample (fills the 5 required structured_data keys from `cfg`/usage).
     agent_friendly::AgentFriendlyError MakeDiskFullError() const;
 
     const DiskMonitorConfig& config() const { return config_; }

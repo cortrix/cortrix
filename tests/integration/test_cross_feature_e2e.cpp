@@ -1,5 +1,5 @@
 /// @file test_cross_feature_e2e.cpp
-/// @brief D3.5 Phase 5: Cross-Feature integration & E2E smoke tests
+/// @brief integration Phase 5: Cross-Feature integration & E2E smoke tests
 ///
 /// Tests the following cross-Feature data flows:
 ///   1. Upload → SPC → Store → Query

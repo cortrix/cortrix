@@ -1,4 +1,4 @@
-// Index S6 — automatic snapshot triggering (design § 4.1 step 6 / § 6 S4
+// Index S6 — automatic snapshot triggering (design step 6 / S4
 // AutoSnapshot_*). When the WAL grows past snapshot_max_wal_entries or
 // snapshot_max_wal_size_mb, a background thread snapshots and truncates the WAL —
 // off the write path. These tests drive writes past a low threshold and wait for

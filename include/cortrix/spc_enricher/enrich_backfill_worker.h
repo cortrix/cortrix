@@ -18,7 +18,7 @@ namespace spc {
 class EnricherChain;
 
 /// EnrichBackfillWorker — the async-task callback for kTaskEnrichBackfill
-/// (addendum §3.7 Fork-1 B). For one document it repairs the chunk-level
+/// (addendum Fork-1 B). For one document it repairs the chunk-level
 /// enrichment debt recorded in enrich_state:
 ///   (1) acquires the task's NamespaceFacade (RAII Release);
 ///   (2) loads the doc's 'pending_retry' enrich_state rows; nothing pending →
@@ -41,7 +41,7 @@ class EnricherChain;
 /// The semantic_score is NOT recomputed for repaired chunks (the write-time
 /// score keeps its no-enricher value): the parser identity needed by the scorer
 /// is not persisted per block, and the relative order among backfilled chunks is
-/// unaffected. Recorded as a known deviation in addendum §3.7.4.
+/// unaffected. Recorded as a known deviation in addendum
 class EnrichBackfillWorker : public async::ITaskHandler {
 public:
     /// @param pool     borrowed namespace pool (per-task Acquire/Release).
@@ -55,11 +55,11 @@ public:
 
     Status ProcessTask(const async::TaskInfo& task) override;
 
-    /// Exponential backoff schedule (addendum §3.7): 60s → 300 → 900 → 3600 →
+    /// Exponential backoff schedule (addendum): 60s → 300 → 900 → 3600 →
     /// 21600, capped at 21600 (6h). `attempts` = attempts already spent.
     static int64_t NextRetryDelaySec(int attempts);
 
-    /// Give-up threshold → 'failed_permanent' (addendum §3.7 default).
+    /// Give-up threshold → 'failed_permanent' (addendum default).
     static constexpr int kMaxAttempts = 8;
 
 private:

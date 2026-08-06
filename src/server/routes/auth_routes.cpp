@@ -30,7 +30,7 @@ using cortrix::auth::BootstrapHandler;
 using cortrix::auth::JwtSecretService;
 using cortrix::auth::MakeAuthError;
 
-// Write the GEN-Agent 4-field auth error body for `code` (§5.x) with the matching
+// Write the GEN-Agent 4-field auth error body for `code` with the matching
 // HTTP status. Mirrors operations_routes::WriteOplogError — the boundary owns the
 // full Agent-friendly envelope, not the bare Status.
 void WriteAuthError(httplib::Response& res, AuthErrorCode code,
@@ -47,7 +47,7 @@ void WriteAuthError(httplib::Response& res, AuthErrorCode code,
     res.status = Status(cortrix::auth::AuthErrorToStatusCode(code), "").http_status();
 }
 
-// Serialize one ApiKeyInfo to the §2.13.3 list shape (never the plaintext). 0 / ""
+// Serialize one ApiKeyInfo to the list shape (never the plaintext). 0 / ""
 // optional fields become JSON null so Agents see an explicit "never" sentinel.
 nlohmann::json ApiKeyInfoToJson(const ApiKeyInfo& k) {
     nlohmann::json j;
@@ -63,7 +63,7 @@ nlohmann::json ApiKeyInfoToJson(const ApiKeyInfo& k) {
     return j;
 }
 
-// Serialize one AdminUserRecord to the §2.13-bis UserRecord shape. created_at is
+// Serialize one AdminUserRecord to the UserRecord shape. created_at is
 // surfaced as Unix seconds (the frontend treats it as an opaque timestamp).
 nlohmann::json AdminUserToJson(const AdminUserRecord& u) {
     nlohmann::json j;
@@ -91,8 +91,8 @@ AuthErrorCode AdminUserErrorCode(const Status& s) {
 }
 
 // Write the GEN-Agent error body for an AdminUsersService failure. Mirrors
-// WriteAuthError but pins the §2.13-bis HTTP statuses: 404 / 409 / 422 / 400.
-// (CX_ERR_USER_VALIDATION is 422 per §2.13-bis — distinct from the coarse
+// WriteAuthError but pins the HTTP statuses: 404 / 409 / 422 / 400.
+// (CX_ERR_USER_VALIDATION is 422 per — distinct from the coarse
 // kInvalidArgument→400 Status mapping, so it is set explicitly here.)
 void WriteAdminUserError(httplib::Response& res, const Status& s,
                          const std::string& request_id) {
@@ -101,7 +101,7 @@ void WriteAdminUserError(httplib::Response& res, const Status& s,
     if (code == AuthErrorCode::kUserValidation) res.status = 422;
 }
 
-// Best-effort operation_log write for the admin/users mutations (§2.13-bis: the
+// Best-effort operation_log write for the admin/users mutations (the
 // 4 mutating endpoints log user.created / user.updated / user.disabled /
 // user.enabled). `logger` may be null (the route can be registered without an
 // observability module in tests) — a null logger is a silent no-op.
@@ -120,7 +120,7 @@ void LogAdminUserAction(observability::IOperationLogger* logger,
 }  // namespace
 
 void RegisterBootstrapRoutes(httplib::Server& server, BootstrapHandler& handler) {
-    // GET /api/v1/admin/bootstrap?token=<t> — first-run browser flow (§2.13.2.a).
+    // GET /api/v1/admin/bootstrap?token=<t> — first-run browser flow.
     // Consumes the shared token, mints the admin key, renders the one-time HTML.
     server.Get("/api/v1/admin/bootstrap",
         [&handler](const httplib::Request& req, httplib::Response& res) {
@@ -144,7 +144,7 @@ void RegisterBootstrapRoutes(httplib::Server& server, BootstrapHandler& handler)
         });
 
     // POST /api/v1/admin/bootstrap body {token} — programmatic JSON variant
-    // (§2.13.2.b). Same token + same Consume logic; only the rendering differs.
+    //. Same token + same Consume logic; only the rendering differs.
     server.Post("/api/v1/admin/bootstrap",
         [&handler](const httplib::Request& req, httplib::Response& res) {
             const std::string request_id = GenerateRequestId();
@@ -176,7 +176,7 @@ void RegisterBootstrapRoutes(httplib::Server& server, BootstrapHandler& handler)
 
 void RegisterApiKeyRoutes(httplib::Server& server, ApiKeyService& keys,
                           ApiKeyAuth& auth) {
-    // POST /api/v1/auth/api-keys — create a key for the caller (§2.13.3). The
+    // POST /api/v1/auth/api-keys — create a key for the caller. The
     // plaintext is returned ONCE here and never persisted in cleartext.
     server.Post("/api/v1/auth/api-keys",
         WithAuth(auth, kPermAdmin,
@@ -253,7 +253,7 @@ void RegisterApiKeyRoutes(httplib::Server& server, ApiKeyService& keys,
 }
 
 void RegisterAuthSessionRoute(httplib::Server& server, ApiKeyAuth& auth) {
-    // GET /api/v1/auth/me — CE Web UI session probe (the web UI §9.2 / quick-experience mode).
+    // GET /api/v1/auth/me — CE Web UI session probe (the web UI / quick-experience mode).
     //
     // The JWT email/password /auth/me is a cloud-enterprise endpoint, absent in CE (an
     // un-shimmed CE would 404 here). The self-hosted Web UI probes this on startup to
@@ -291,7 +291,7 @@ void RegisterAuthSessionRoute(httplib::Server& server, ApiKeyAuth& auth) {
 void RegisterAdminUsersRoutes(httplib::Server& server, AdminUsersService& users,
                               ApiKeyAuth& auth,
                               observability::IOperationLogger* logger) {
-    // GET /api/v1/admin/users — list with q / status / role / page / limit (§2.13-bis).
+    // GET /api/v1/admin/users — list with q / status / role / page / limit.
     server.Get("/api/v1/admin/users",
         WithAuth(auth, kPermAdmin,
             [&users](const httplib::Request& req, httplib::Response& res,
@@ -317,7 +317,7 @@ void RegisterAdminUsersRoutes(httplib::Server& server, AdminUsersService& users,
                 WriteJsonResponse(res, 200, out, rctx.request_id);
             }));
 
-    // POST /api/v1/admin/users — invite-mode create (§2.13-bis).
+    // POST /api/v1/admin/users — invite-mode create.
     server.Post("/api/v1/admin/users",
         WithAuth(auth, kPermAdmin,
             [&users, logger](const httplib::Request& req, httplib::Response& res,
@@ -389,7 +389,7 @@ void RegisterAdminUsersRoutes(httplib::Server& server, AdminUsersService& users,
                 WriteJsonResponse(res, 200, out, rctx.request_id);
             }));
 
-    // POST /api/v1/admin/users/:id/disable — active → disabled (soft, §2.13-bis).
+    // POST /api/v1/admin/users/:id/disable — active → disabled (soft).
     server.Post(R"(/api/v1/admin/users/([^/]+)/disable)",
         WithAuth(auth, kPermAdmin,
             [&users, logger](const httplib::Request& req, httplib::Response& res,
@@ -406,7 +406,7 @@ void RegisterAdminUsersRoutes(httplib::Server& server, AdminUsersService& users,
                 WriteJsonResponse(res, 200, out, rctx.request_id);
             }));
 
-    // POST /api/v1/admin/users/:id/enable — disabled → active (§2.13-bis).
+    // POST /api/v1/admin/users/:id/enable — disabled → active.
     server.Post(R"(/api/v1/admin/users/([^/]+)/enable)",
         WithAuth(auth, kPermAdmin,
             [&users, logger](const httplib::Request& req, httplib::Response& res,
@@ -426,10 +426,10 @@ void RegisterAdminUsersRoutes(httplib::Server& server, AdminUsersService& users,
 
 void RegisterJwtRotateRoute(httplib::Server& server, JwtSecretService& jwt,
                             ApiKeyAuth& auth) {
-    // POST /api/v1/admin/auth/rotate-jwt-secret — topic 1.1 C (§2.11). Rotates the
+    // POST /api/v1/admin/auth/rotate-jwt-secret — topic 1.1 C. Rotates the
     // HS256 signing secret (current → prev 24h window + new current) and returns the
     // Agent-friendly RotationResult. kPermAdmin-gated; AdminGuard adds the loopback
-    // IP layer (§ "Admin Endpoint dual-layer protection").
+    // IP layer ("Admin Endpoint dual-layer protection").
     server.Post("/api/v1/admin/auth/rotate-jwt-secret",
         WithAuth(auth, kPermAdmin,
             [&jwt](const httplib::Request& /*req*/, httplib::Response& res,
@@ -440,7 +440,7 @@ void RegisterJwtRotateRoute(httplib::Server& server, JwtSecretService& jwt,
                     return;
                 }
                 const auto& rot = r.value();
-                // §2.11 response shape: rotated / new_key_id / prev_key_id /
+                // response shape: rotated / new_key_id / prev_key_id /
                 // prev_expires_at + the Agent-friendly warning.
                 nlohmann::json out;
                 out["rotated"]      = true;

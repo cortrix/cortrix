@@ -56,7 +56,7 @@ TEST(BloomFilterTest, UnreadyFilterIsConservativelyTrue) {
     BloomFilter bf(1024 * 1024, 0.01);  // not marked ready
     EXPECT_FALSE(bf.IsReady());
     // While rebuilding, MightContain must say "maybe" (true) for ANY key so the
-    // caller falls back to the catalog (§9.2).
+    // caller falls back to the catalog.
     EXPECT_TRUE(bf.MightContain("anything"));
     EXPECT_TRUE(bf.MightContain("never-added"));
 }

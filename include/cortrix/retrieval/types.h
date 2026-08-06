@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "cortrix/common/score_signals.h"
-#include "cortrix/id/types.h"  // ARCH §1.8.1 ID type SoT (cortrix::id::*)
+#include "cortrix/id/types.h"  // ARCH ID type SoT (cortrix::id::*)
 
 namespace cortrix::retrieval {
 
@@ -12,12 +12,12 @@ namespace cortrix::retrieval {
 /// first consumer (it `#include "cortrix/retrieval/types.h"`), so this
 /// header is introduced here.
 ///
-/// ID types (ARCH §1.8.1): the canonical `cortrix::id` namespace is the single SoT
-/// for ID type aliases. Per §1.8.1 line 1414 ("a Feature must not independently use ChildId =
+/// ID types (ARCH): the canonical `cortrix::id` namespace is the single SoT
+/// for ID type aliases. Per line 1414 ("a Feature must not independently use ChildId =
 /// std::string; ... it should reference cortrix::id::ChildId instead"), this header does NOT define a
 /// local alias; it re-exports the canonical ones so `cortrix::retrieval::ChildId`
 /// remains usable (and = std::string) for downstream code with zero churn.
-using cortrix::id::ChildId;   ///< ULID, 26 chars — SoT cortrix::id (ARCH §1.8.1)
+using cortrix::id::ChildId;   ///< ULID, 26 chars — SoT cortrix::id (ARCH)
 using cortrix::id::ParentId;  ///< doc-level parent block id — SoT cortrix::id
 
 /// Raw retrieval result (minimal) — VectorSearcher / BM25Searcher / RRFFusion
@@ -28,7 +28,7 @@ struct ScoredResult {
 };
 
 /// Reranker output (carries full chunk content) — reranker output / CRAG input.
-/// Field SoT = RETRIEVAL_TYPES_SPEC §1.
+/// Field SoT = the retrieval-types spec
 struct RankedChunk {
     ChildId     child_id;
     std::string chunk_text;

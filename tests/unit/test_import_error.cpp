@@ -14,7 +14,7 @@
 
 // S5 coverage: the 6 DB import error codes — CX_ERR_IMPORT_ identity, category
 // mapping, retryability, structured_data contract, the GEN-Agent 4-field boundary
-// factory, and the §5.1/§5.2/§5.3 Agent-friendly response bodies. Mirrors the
+// factory, and the Agent-friendly response bodies. Mirrors the
 // project reference test scatter/test_cross_ns_error.cpp.
 namespace cortrix::import {
 namespace {
@@ -55,7 +55,7 @@ TEST(ImportErrorTest, EveryCodeHasUniqueWellFormedCxString) {
     EXPECT_EQ(seen.size(), 7u);
 }
 
-// §5.4 column values pinned exactly (HTTP / category / retryable).
+// column values pinned exactly (HTTP / category / retryable).
 TEST(ImportErrorTest, RegistryMatchesSpecTable) {
     auto info = [](ImportErrorCode c) { return GetImportErrorInfo(c); };
 
@@ -166,7 +166,7 @@ TEST(ImportErrorTest, ExceptionCarriesFullError) {
     }
 }
 
-// --- §5.1 / §5.2 / §5.3 Agent-friendly response bodies ---
+// --- Agent-friendly response bodies ---
 
 TEST(ImportResponseTest, ImportStartedBodyMatchesSpec) {
     ImportTaskProgress task;
@@ -226,7 +226,7 @@ TEST(ImportResponseTest, ProgressBodyFailedEmbedsErrorBody) {
     EXPECT_EQ(body["error"]["retry_after_ms"], 30000);
 }
 
-// Cancelled is a clean terminal state, NOT an error (§5.4 note).
+// Cancelled is a clean terminal state, NOT an error (note).
 TEST(ImportResponseTest, CancelledHasNoErrorBody) {
     ImportTaskProgress task;
     task.task_id = "import_xyz";

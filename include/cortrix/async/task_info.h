@@ -47,7 +47,7 @@ struct TaskInfo {
     int eta_seconds = -1;
     std::string current_phase;       ///< topic 5 — parsing | enriching | indexing
     int worker_id = -1;              ///< topic 5 — which Worker is processing (-1 = unassigned)
-    std::string trace_id;            ///< topic 6 — cross-Worker trace (filled at D3 implementation)
+    std::string trace_id;            ///< topic 6 — cross-Worker trace (filled at implementation)
     std::string error_code;          ///< topic 5 — GEN-Agent CX_ERR_* code
     std::string error_msg;
     std::string structured_data;     ///< topic 5 — GEN-Agent JSON error context (serialized string)
@@ -66,7 +66,7 @@ struct SubmitRequest {
     std::string filepath;
     std::string doc_id;          ///< Phase 1: content-hash-derived doc identity
     std::string content_hash;    ///< topic 2.2 debounce/dedup
-    std::string trace_id;        ///< topic 6 — extracted from the traceparent header at D3 implementation
+    std::string trace_id;        ///< topic 6 — extracted from the traceparent header at implementation
     std::string metadata_json;   ///< caller-supplied document metadata (JSON object string); persisted on the task so it survives the queue to the doc row
     int total_pages = 0;         ///< total page count estimated by pre-check
     int task_type = 1;           ///< async::TaskType value; default kTaskDocParse

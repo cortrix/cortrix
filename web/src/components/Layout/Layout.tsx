@@ -11,7 +11,7 @@ import { ErrorMessage } from '../Common/ErrorMessage';
 import { usePageViews } from '../../telemetry/usePageViews';
 import { setMetricsEdition } from '../../telemetry/metrics';
 
-// App shell (web UI design § 10 — react-router). Header + Sidebar frame an
+// App shell (web UI design — react-router). Header + Sidebar frame an
 // <Outlet/> that renders the active route. Page selection moved from the old
 // `activePage` zustand field to the URL (BrowserRouter) in R3/S5; every R1/R2
 // page (Upload / Search / Chat / Memory / Namespaces / Settings) is now a
@@ -21,10 +21,10 @@ export function Layout() {
   const loadFeatures = useFeatureFlagsStore((s) => s.loadFeatures);
   const edition = useAuthStore((s) => s.edition);
 
-  // Page-view metric per route change (§ 23-bis.1).
+  // Page-view metric per route change.
   usePageViews();
 
-  // Tag session/page metrics with the resolved edition (§ 23-bis.1 labels).
+  // Tag session/page metrics with the resolved edition (labels).
   useEffect(() => {
     setMetricsEdition(edition);
   }, [edition]);

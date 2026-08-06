@@ -12,7 +12,7 @@ and returns the matching ``tool_result`` block; a Python SDK ``CortrixError`` be
 
 ``require_anthropic()`` is provided for callers that want to fail fast when the
 optional ``anthropic`` SDK (needed only for the real Messages round-trip, which
-is D3.5-deferred) is not installed; the schema/dispatch helpers themselves do
+is integration-deferred) is not installed; the schema/dispatch helpers themselves do
 not import it.
 """
 
@@ -39,7 +39,7 @@ def require_anthropic() -> None:
 
     Building tool definitions (``as_claude_tools``) and dispatching tool_use
     blocks do not need the SDK; this is for callers that drive a real Messages
-    round-trip (D3.5).
+    round-trip (integration).
     """
     try:
         import anthropic  # noqa: F401

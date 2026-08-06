@@ -14,7 +14,7 @@ namespace {
 
 using agent_friendly::ErrorCategory;
 
-// --- error registry (§ 5.1 / § 5.2) --------------------------------------------
+// --- error registry --------------------------------------------
 
 TEST(ChunkerAgentErrorTest, CodeStringsMatchSpec) {
     EXPECT_STREQ(ChunkerErrorCodeString(ChunkerErrorCode::kSizeInvalid), "CX_ERR_CHUNK_SIZE_INVALID");
@@ -94,7 +94,7 @@ TEST(ChunkerAgentErrorTest, MakeChunkerErrorBuildsGenAgentBody) {
     ASSERT_TRUE(err.structured_data.has_value());
     EXPECT_EQ((*err.structured_data)["estimated_parent_count"], 12500);
 
-    // Serializes to the AGENT_FRIENDLY § 5.2 body.
+    // Serializes to the Agent-friendly contract body.
     auto j = agent_friendly::ToJson(err);
     EXPECT_EQ(j["code"], "CX_ERR_CHUNK_OVERFLOW");
     EXPECT_EQ(j["retryable"], false);
@@ -113,7 +113,7 @@ TEST(ChunkerAgentErrorTest, StatusCodeMappingAndBridge) {
     EXPECT_NE(s.message().find("no pages"), std::string::npos);
 }
 
-// --- warnings (§ 5.1 rows 4-5 / § 5.3) -----------------------------------------
+// --- warnings (rows 4-5 /) -----------------------------------------
 
 TEST(ChunkerAgentErrorTest, WarningCodeStrings) {
     EXPECT_STREQ(ChunkerWarningCodeString(ChunkerWarningCode::kTruncated), "CX_WARN_CHUNK_TRUNCATED");
@@ -128,7 +128,7 @@ TEST(ChunkerAgentErrorTest, MakeChunkWarningShape) {
     EXPECT_TRUE(w.contains("message"));
 }
 
-// --- response meta (§ 3.3 / § 5.3) ---------------------------------------------
+// --- response meta ---------------------------------------------
 
 TEST(ChunkerResponseMetaTest, StatsMetaShape) {
     ChunkerStats stats;

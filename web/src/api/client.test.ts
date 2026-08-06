@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { get, post, patch, put, del, ApiError } from './client';
 
-// api client tests (web UI/§ 4.6 — credentials + CSRF + error envelope).
+// api client tests (web UI/ — credentials + CSRF + error envelope).
 // Asserts the request contract every store/api module relies on: cookies are
 // always sent, mutations carry the X-CSRF-Token header, safe methods don't, and
 // a non-2xx response throws an ApiError with the body text.

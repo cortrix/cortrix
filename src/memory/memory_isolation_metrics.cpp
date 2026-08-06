@@ -61,7 +61,7 @@ uint64_t MemoryIsolationMetrics::QuotaExceededCount(QuotaType quota_type) const 
 
 void MemoryIsolationMetrics::SetQuotaUsageRatio(QuotaType quota_type, double ratio) {
     if (ratio < 0.0) ratio = 0.0;
-    if (ratio > 1.0) ratio = 1.0;  // §8.bis: ratio is 0-1.
+    if (ratio > 1.0) ratio = 1.0;  //: ratio is 0-1.
     StoreDouble(quota_usage_ratio_bits_[static_cast<int>(quota_type)], ratio);
 }
 

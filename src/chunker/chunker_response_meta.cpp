@@ -5,7 +5,7 @@
 namespace cortrix::chunker {
 
 nlohmann::json BuildStatsMeta(const ChunkerStats& stats) {
-    // § 5.3 stats shape (A-class: document-parse completeness).
+    // stats shape (A-class: document-parse completeness).
     nlohmann::json s;
     s["total_pages"] = stats.total_pages;
     s["succeeded_pages"] = stats.succeeded_pages;
@@ -21,7 +21,7 @@ nlohmann::json BuildWarningsMeta(const ChunkerStats& stats, const std::string& d
     nlohmann::json warnings = nlohmann::json::array();
     if (stats.fallback_to_flat) {
         // CX_WARN_CHUNK_FALLBACK structured_data = {doc_id, parent_count, threshold}
-        // (§ 5.1). Non-blocking; surfaced to the client so it knows parent-child was degraded.
+        //. Non-blocking; surfaced to the client so it knows parent-child was degraded.
         warnings.push_back(MakeChunkWarning(
             ChunkerWarningCode::kFallback,
             {{"doc_id", doc_id}, {"parent_count", parent_count}, {"threshold", threshold}},
@@ -31,7 +31,7 @@ nlohmann::json BuildWarningsMeta(const ChunkerStats& stats, const std::string& d
 }
 
 nlohmann::json BuildChildrenHitsMetaJson(const std::vector<ParentHitGroup>& groups) {
-    // § 3.3 children_hits_per_parent: [{parent_id, hits:[...], primary_child}, ...].
+    // children_hits_per_parent: [{parent_id, hits:[...], primary_child}, ...].
     nlohmann::json arr = nlohmann::json::array();
     for (const auto& e : BuildChildrenHitsMeta(groups)) {
         nlohmann::json o;

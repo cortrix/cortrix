@@ -15,15 +15,15 @@ namespace cortrix::memory {
 /// 🚨 Cardinality control: labels are
 /// enum-only or a low-cardinality config-driven model string. NO `tenant_id` /
 /// `ns_id` / `user_id` (high-cardinality, forbidden); per-NS / per-tenant data
-/// goes through the §3.4 per-tenant API.
+/// goes through the per-tenant API.
 ///
-/// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
+/// 🚨 standalone: a self-contained, dependency-free recorder + an OpenMetrics
 /// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
-/// **deferred to D3.5** (memory-extraction-rev-7). Until then it is fully usable + testable
+/// **deferred to integration** (memory-extraction-rev-7). Until then it is fully usable + testable
 /// in-process and RenderOpenMetrics() produces what the server will serve.
 ///
-/// §5.4.1 metric schema (6 rows):
+/// metric schema (6 rows):
 ///   cortrix_memory_extract_total                counter   {status: success|failed}
 ///   cortrix_memory_extract_duration_seconds     histogram {model}
 ///   cortrix_memory_extract_queue_depth                  gauge     {worker_id}  (process-aggregate)
@@ -32,19 +32,19 @@ namespace cortrix::memory {
 ///   cortrix_memory_extract_invalidations_total          counter   {triggered_by: llm_auto|manual|agent_self}
 class MemoryExtractMetrics {
 public:
-    /// status label for extract_total (§5.4.1).
+    /// status label for extract_total.
     enum class ExtractStatus {
         kSuccess = 0,
         kFailed,
     };
 
-    /// direction label for llm_tokens_total (§5.4.1).
+    /// direction label for llm_tokens_total.
     enum class TokenDirection {
         kInput = 0,
         kOutput,
     };
 
-    /// confidence_bucket label for contradictions_found_total (§5.4.1).
+    /// confidence_bucket label for contradictions_found_total.
     /// high = [0.8,1.0], medium = [0.5,0.8), low = [0,0.5).
     enum class ConfidenceBucket {
         kHigh = 0,
@@ -52,7 +52,7 @@ public:
         kLow,
     };
 
-    /// triggered_by label for invalidations_total (§5.4.1). `agent_self` is the
+    /// triggered_by label for invalidations_total. `agent_self` is the
     /// ASCII rendering of the spec's "agent self-service" (label values stay ASCII for
     /// Prometheus compatibility).
     enum class TriggeredBy {

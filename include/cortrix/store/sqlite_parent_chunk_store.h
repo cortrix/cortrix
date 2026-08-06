@@ -13,11 +13,11 @@ struct sqlite3;
 
 // SqliteParentChunkStore — the default ParentChunkStore.
 //
-// Persists parents + children to SQLite (§ 3.1 schema) and serves the parent
+// Persists parents + children to SQLite (schema) and serves the parent
 // reverse-lookups. Standalone: it owns its own sqlite3 handle so chunker unit-tests
 // run against a real (in-memory or temp-file) DB without the PWL / metadata / index
-// wiring (that single-transaction integration is D3.5). The LRU cache layer
-// (§ 2.5 Phase-2 anchor TD-PARENT-CHUNK-STORE-CACHE) is not implemented in V1.0.
+// wiring (that single-transaction integration is integration). The LRU cache layer
+// (Phase-2 anchor TD-PARENT-CHUNK-STORE-CACHE) is not implemented in V1.0.
 namespace cortrix::store {
 
 class SqliteParentChunkStore : public ParentChunkStore {
@@ -34,15 +34,15 @@ public:
     SqliteParentChunkStore(const SqliteParentChunkStore&) = delete;
     SqliteParentChunkStore& operator=(const SqliteParentChunkStore&) = delete;
 
-    /// Open the DB + run the § 3.1 schema migration (CREATE TABLE IF NOT EXISTS
+    /// Open the DB + run the schema migration (CREATE TABLE IF NOT EXISTS
     /// parents/children + indexes). Idempotent. OK or CX_ERR_STORE_DB_ERROR.
     Status Open();
     void Close();
 
-    // --- write path (§ 4.2; standalone — real PWL single-txn wiring = D3.5) -----
+    // --- write path (standalone — real PWL single-txn wiring = integration) -----
 
     /// Insert one parent + its children in a single SQLite transaction (the
-    /// PWL BeginWrite→Commit boundary wraps this at D3.5; here it is a local txn so
+    /// PWL BeginWrite→Commit boundary wraps this at integration; here it is a local txn so
     /// a partial failure rolls back). metadata is JSON-serialized into
     /// metadata_json. OK or CX_ERR_STORE_DB_ERROR.
     Status PutParentWithChildren(const cortrix::chunker::ParentChunk& parent,

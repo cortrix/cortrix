@@ -15,12 +15,12 @@ namespace {
 // warning, which the project treats as a build failure — the registry can't
 // silently drift from the enum.
 //
-// retry_after_ms (§4.3 table):
+// retry_after_ms (table):
 //   CLASSIFIER_LOAD_FAILED → permanent (operator must fix model/config), null.
 //   INFERENCE_FAILED       → transient, 200ms (matches the L3 retry back-off cap
-//                            50/100/200 in §7.3).
+//                            50/100/200 in).
 //   THRESHOLD_INVALID      → permanent (bad NS crag_config), null.
-//   FALLBACK_TRIGGERED     → transient; §4.3 lists "-" (unspecified) → null. This
+//   FALLBACK_TRIGGERED     → transient; lists "-" (unspecified) → null. This
 //                            code is informational (the transparent all-Correct
 //                            degrade already happened); there is no caller action,
 //                            so no concrete back-off is advertised.
@@ -50,7 +50,7 @@ const char* CragErrorCodeString(CragErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(CragErrorCode code) {
-    // §4.3 structured_data column, 1:1. Function-local statics → stable references.
+    // structured_data column, 1:1. Function-local statics → stable references.
     static const std::vector<std::string> kLoad{"model_path", "version"};
     static const std::vector<std::string> kInfer{"chunk_id", "retry_count"};
     static const std::vector<std::string> kThreshold{"invalid_field", "value"};

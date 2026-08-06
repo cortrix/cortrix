@@ -29,7 +29,7 @@ ImportErrorCode CodeFromStatus(const cortrix::Status& s) {
     return ImportErrorCode::kConnectionFailed;
 }
 
-// Build the §5.3 Agent-friendly error envelope { "error": {...} } from a Status.
+// Build the Agent-friendly error envelope { "error": {...} } from a Status.
 nlohmann::json ErrorBody(const cortrix::Status& s) {
     ImportErrorCode code = CodeFromStatus(s);
     auto err = MakeImportError(code, nlohmann::json::object(), s.message());

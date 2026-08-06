@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS operation_log (
     session_id    VARCHAR(128)                 -- C2     — agent trace agent_trace.session_id (same session)
 );
 
--- indices (§5.1: 2 baseline + 3 added by topic 2/6 + C2)
+-- indices (2 baseline + 3 added by topic 2/6 + C2)
 CREATE INDEX IF NOT EXISTS idx_oplog_timestamp     ON operation_log(timestamp);
 CREATE INDEX IF NOT EXISTS idx_oplog_user_action   ON operation_log(user_id, action, timestamp);
 CREATE INDEX IF NOT EXISTS idx_oplog_trace_id      ON operation_log(trace_id, timestamp);

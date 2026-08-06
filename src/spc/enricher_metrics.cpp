@@ -8,11 +8,11 @@ namespace cortrix::spc {
 namespace {
 
 // batch_size_actual bucket bounds — topic 1.2 batch_size 1-32 (default 8); count
-// distribution (unitless, per §3.6). Powers-of-two straddle the configurable range.
+// distribution (unitless, per). Powers-of-two straddle the configurable range.
 constexpr double kBatchBounds[6] = {1, 2, 4, 8, 16, 32};
 constexpr const char* kBatchBoundStr[6] = {"1", "2", "4", "8", "16", "32"};
 
-// score_duration bucket bounds (seconds) — generic latency buckets (OBS_SPEC §2.2 /
+// score_duration bucket bounds (seconds) — generic latency buckets (OBS_SPEC /
 // briefing default; no sub-ms SLA — LLM calls span 0.1s..task_timeout 30s).
 constexpr double kDurBounds[8] = {0.1, 0.25, 0.5, 1, 2, 5, 10, 30};
 constexpr const char* kDurBoundStr[8] = {"0.1", "0.25", "0.5", "1", "2", "5", "10", "30"};
@@ -119,7 +119,7 @@ int EnricherMetrics::QueueDepth() const {
     return queue_depth_.load(std::memory_order_relaxed);
 }
 
-// --- batch_size_actual (histogram, §3.6) ---
+// --- batch_size_actual (histogram) ---
 
 void EnricherMetrics::ObserveBatchSizeActual(int batch_size) {
     if (batch_size < 0) batch_size = 0;
@@ -135,7 +135,7 @@ uint64_t EnricherMetrics::BatchSizeActualCount() const {
     return batch_count_.load(std::memory_order_relaxed);
 }
 
-// --- score_duration_seconds (histogram, §3.6) ---
+// --- score_duration_seconds (histogram) ---
 
 void EnricherMetrics::ObserveScoreDuration(double seconds) {
     if (seconds < 0) seconds = 0;

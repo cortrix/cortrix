@@ -269,7 +269,7 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
                     // Contextual fail-soft: status==0 with a populated error_code (see
                     // enricher_chain). Harvest it — this was the writer that left
                     // 4,139 contextual debt rows with a blank last_error on the 2026-07-11
-                    // live 5k ingest (D12).
+                    // live 5k ingest.
                     if (rep.last_error.empty() && !st.error_code.empty()) {
                         rep.last_error = st.error_code;
                     }
@@ -407,7 +407,7 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
                 // QA 2026-07-12 F-5: without this, the unconditional flip below
                 // rewrites the row's last_error from an empty rep.last_error and
                 // blanks the diagnosis ingest already recorded (the exact blank-
-                // last_error shape D12 closed on the ingest side).
+                // last_error shape closed on the ingest side).
                 if (rep.last_error.empty()) {
                     rep.last_error =
                         "CX_ERR_SPC_PERSIST_FAILED[enrich]: " + we.message();

@@ -244,7 +244,7 @@ def test_config_providers_lists_six_with_deepseek():
 
 
 def test_put_agent_llm_forwards_to_cortrix_server():
-    # D3.5 r2 · Wave P · P4: PUT /config/agent_llm forwards to the cortrix-server
+    # integration r2 · Wave P · P4: PUT /config/agent_llm forwards to the cortrix-server
     # admin endpoint and returns its (masked) response. Override the forwarder so
     # the test does not hit a live server, and assert the payload is forwarded with
     # None fields stripped (server-side merge semantics).

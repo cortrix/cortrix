@@ -29,7 +29,7 @@ public:
     /// Production ctor — default cpp-httplib transport.
     explicit OpenAiLlmClient(LlmClientConfig config);
 
-    /// Seam ctor — inject a transport (tests / D3.5 alternate transports).
+    /// Seam ctor — inject a transport (tests / integration alternate transports).
     OpenAiLlmClient(LlmClientConfig config, std::unique_ptr<IHttpTransport> transport);
 
     ChatCompletionResponse Chat(const std::string& prompt,

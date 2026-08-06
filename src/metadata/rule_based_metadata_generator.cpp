@@ -16,7 +16,7 @@ namespace cortrix::metadata {
 namespace {
 
 // Format a Unix-epoch-ms timestamp as ISO-8601 UTC ("2026-04-02T10:30:00Z"), the
-// schema upload_time shape (detailed design §3.1). 0 (unset) → empty string so the caller can
+// schema upload_time shape (detailed design). 0 (unset) → empty string so the caller can
 // fall back to null. Uses gmtime (UTC) — the wire contract is always Z-suffixed UTC.
 std::string FormatIso8601Utc(int64_t epoch_ms) {
     if (epoch_ms <= 0) return "";
@@ -32,7 +32,7 @@ std::string FormatIso8601Utc(int64_t epoch_ms) {
     return std::string(buf);
 }
 
-// doc_title derivation (§9.quater.2): filename with the last extension stripped.
+// doc_title derivation: filename with the last extension stripped.
 // "report.pdf" → "report"; no-dot / leading-dot names (".gitignore") are returned unchanged.
 std::string DeriveDocTitle(const std::string& filename) {
     auto dot = filename.find_last_of('.');
@@ -40,7 +40,7 @@ std::string DeriveDocTitle(const std::string& filename) {
     return filename.substr(0, dot);
 }
 
-// Join tags with single spaces (topics_rule_extracted derivation §9.quater.2 + block_text
+// Join tags with single spaces (topics_rule_extracted derivation + block_text
 // tags rendering). Empty vector → empty string.
 std::string JoinTags(const std::vector<std::string>& tags, const char* sep) {
     std::string out;
@@ -54,7 +54,7 @@ std::string JoinTags(const std::vector<std::string>& tags, const char* sep) {
 }  // namespace
 
 std::string RuleBasedMetadataGenerator::BuildBlockText(const GeneratorInput& input) {
-    // D3 lock: a natural-language sentence over the 7-10 core fields (detailed design §3.2):
+    // lock: a natural-language sentence over the 7-10 core fields (detailed design):
     // filename / mime_type / page_count / upload_time / lang / tags / parser. Deterministic
     // ordering + only-present clauses so the same input always embeds identically and
     // missing fields don't inject empty noise.
@@ -83,7 +83,7 @@ nlohmann::json RuleBasedMetadataGenerator::BuildMetadataJson(
     const auto& dm = input.doc_metadata;
     nlohmann::json j;
 
-    // --- identity / system fields (class A, detailed design §3.1 / §3.3) ---
+    // --- identity / system fields (class A, detailed design) ---
     j["block_id"] = nullptr;  // filled by Generate after minting the ULID
     j["block_type"] = "metadata";
     j["doc_id"] = input.doc_id;
@@ -136,7 +136,7 @@ nlohmann::json RuleBasedMetadataGenerator::BuildMetadataJson(
         j["meta.parse_failed_page"] = nullptr;
     }
 
-    // --- business fields (class B, V1.0 set once at upload time + immutable, D9 B' lock) ---
+    // --- business fields (class B, V1.0 set once at upload time + immutable, B' lock) ---
     j["tags"] = input.file_info.tags;  // array (possibly empty)
     // ingestion_status: derived from the parse status (completed unless failed).
     j["ingestion_status"] = (parse_status == "failed") ? "failed" : "completed";
@@ -156,7 +156,7 @@ nlohmann::json RuleBasedMetadataGenerator::DeriveDocFts5Columns(const GeneratorI
     cols["filename"] = input.doc_metadata.filename;
     cols["doc_title"] = DeriveDocTitle(input.doc_metadata.filename);
     cols["topics_rule_extracted"] = JoinTags(input.file_info.tags, " ");
-    // authors: business may self-fill custom_metadata.authors (D9 B' lock); else null.
+    // authors: business may self-fill custom_metadata.authors (B' lock); else null.
     if (input.custom_metadata.is_object() && input.custom_metadata.contains("authors")) {
         cols["authors"] = input.custom_metadata["authors"];
     } else {
@@ -190,7 +190,7 @@ Result<GeneratorOutput> RuleBasedMetadataGenerator::Generate(
             "Failed to generate metadata block: doc_metadata is empty (parser parse failed)");
     }
 
-    // §5.bis cortrix_metadata_block_generate_duration_seconds — time block_text assembly +
+    // cortrix_metadata_block_generate_duration_seconds — time block_text assembly +
     // JSON serialization (steady_clock, immune to wall-clock jumps). Mirrors the semantic-score
     // ObserveAssignDuration (commit d634fdb): the histogram was defined/rendered/tested
     // but Generate() never fed it. The GEN_FAILED early return above does no assembly, so
@@ -204,7 +204,7 @@ Result<GeneratorOutput> RuleBasedMetadataGenerator::Generate(
     out.block.block_text = BuildBlockText(input);
     out.block.metadata_json = BuildMetadataJson(input, &out.missing_fields);
     out.block.metadata_json["block_id"] = out.block.block_id;
-    // embedding(block_text) + P-HNSW insert = D3.5 pipeline wiring → left empty here.
+    // embedding(block_text) + P-HNSW insert = integration pipeline wiring → left empty here.
 
     for (const std::string& f : out.missing_fields) {
         metrics.RecordFieldMissing(f);

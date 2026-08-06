@@ -166,7 +166,7 @@ void ImportTaskQueue::RunTask(ImportTaskId task_id, ImportTaskWork work) {
         }
         if (terminal == ImportTaskStatus::kFailed && err) {
             // Re-inflate the CX_ERR_IMPORT_* identity carried in the Status message
-            // into the Agent-friendly error body (§5.3).
+            // into the Agent-friendly error body.
             t->error = MakeImportError(ImportErrorCode::kConnectionFailed, nlohmann::json::object(),
                                      err->message());
             // Prefer the precise code if the work returned one in the message prefix.

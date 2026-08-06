@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/reranker/reranker_error.h"
 
-// Exhaustive parameterized error-registry sweep for reranker (§5.2, 5 codes).
+// Exhaustive parameterized error-registry sweep for reranker (codes).
 namespace cortrix::reranker {
 namespace {
 

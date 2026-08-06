@@ -54,9 +54,9 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       });
       set({ results: res.results, meta: res.meta, error: null });
     } catch (e) {
-      // Standalone (D3): a network failure (TypeError) falls back to the mock so
+      // Standalone: a network failure (TypeError) falls back to the mock so
       // search demos work offline; a real backend error is surfaced inline as a
-      // structured GEN-Agent error (§ 16.4). The mock is build-time gated
+      // structured GEN-Agent error. The mock is build-time gated
       // (./fallback.ts) so it never runs in a production build.
       if (USE_MOCK && e instanceof TypeError) {
         try {

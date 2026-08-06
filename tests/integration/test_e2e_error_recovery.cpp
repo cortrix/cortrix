@@ -1,5 +1,5 @@
 /// @file test_e2e_error_recovery.cpp
-/// @brief D4 E2E: Error recovery and graceful degradation tests
+/// @brief E2E: Error recovery and graceful degradation tests
 ///
 /// Tests that the system handles error conditions gracefully without crashing:
 ///   1. Query on nonexistent namespace → proper error, no crash

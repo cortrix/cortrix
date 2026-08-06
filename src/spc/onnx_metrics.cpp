@@ -203,7 +203,7 @@ std::string OnnxMetrics::RenderOpenMetrics() const {
        << inference_failed_.load(std::memory_order_relaxed) << "\n";
 
     // cortrix_onnx_inference_duration_seconds — full histogram (cumulative le
-    // buckets + +Inf + _sum + _count). D35-MET-03: was sum+count only.
+    // buckets + +Inf + _sum + _count).-MET-03: was sum+count only.
     os << "# HELP cortrix_onnx_inference_duration_seconds ONNX inference latency.\n";
     os << "# TYPE cortrix_onnx_inference_duration_seconds histogram\n";
     uint64_t inf_cum = 0;

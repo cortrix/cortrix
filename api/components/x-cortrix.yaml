@@ -1,4 +1,4 @@
-# components/x-cortrix.yaml — strict schema definition for x-cortrix-* extension fields (D7 resolution)
+# components/x-cortrix.yaml — strict schema definition for x-cortrix-* extension fields (resolution)
 #
 # CI-enforced (S7 validate_x_cortrix_extensions.py): every x-cortrix-* field used in any paths/*.yaml
 # must be defined here; out-of-range enum values / undefined fields → lint fail.
@@ -13,7 +13,7 @@ x-cortrix-extensions:
 
   x-cortrix-agent-workflow:
     type: string
-    enum: [public, admin, ops]          # consistent with the D5 tags, avoids duplication
+    enum: [public, admin, ops]          # consistent with the tags, avoids duplication
     description: "Which type of Agent typically uses this endpoint"
 
   x-cortrix-retryable:

@@ -156,7 +156,7 @@ void DirWatcherRegistry::FanOutEvents(WatcherSlot& slot,
     }
 
     for (auto& importer : targets) {
-        // Per-NS isolation (§ 5.2.3): a failure in one importer must not stop
+        // Per-NS isolation: a failure in one importer must not stop
         // fan-out to the others. HandleFileEvents swallows per-file errors into
         // its own stats, so a try/catch here is purely defensive.
         try {
@@ -226,7 +226,7 @@ Status DirWatcherRegistry::Subscribe(
         slot = new_slot.get();
         slots_.push_back(std::move(new_slot));
     }
-    // For an existing watcher the recursive flag is fixed (§ 5 edge case: a later
+    // For an existing watcher the recursive flag is fixed (edge case: a later
     // Subscribe's recursive arg is silently ignored).
 
     // Track which importers are newly added so autostart only scans those.
@@ -248,7 +248,7 @@ Status DirWatcherRegistry::Subscribe(
         meta.namespace_id = ns;
         meta.name         = ns;
         // [R7 fix] Single-tenant OSS runs as 'default_tenant' (catalog_schema.cpp
-        // §188). Without this, namespaces/units.tenant_id (NOT NULL, FK->tenants)
+        //). Without this, namespaces/units.tenant_id (NOT NULL, FK->tenants)
         // gets an empty string, the FK fails, CreateNamespace returns an error, the
         // NS is never admitted, and the importer silently skips every file — a
         // live-only watch_dir bug caught by the full-stack fan-out E2E.
@@ -529,7 +529,7 @@ Status DirWatcherRegistry::LoadState(const std::string& data_dir) {
         std::ifstream in(path);
         in >> j;
     } catch (const std::exception& e) {
-        // Corrupt file is non-fatal (§ 5 edge case: WARN + skip, do not block startup).
+        // Corrupt file is non-fatal (edge case: WARN + skip, do not block startup).
         CORTRIX_LOG_WARN(kModule, "watchers.json parse failed, skipping: {}",
                          e.what());
         return Status::Ok();
@@ -563,7 +563,7 @@ Status DirWatcherRegistry::LoadState(const std::string& data_dir) {
     // Deserialization is non-fatal too: a well-formed-but-mistyped field (e.g. a
     // string "version" or "recursive") makes nlohmann throw type_error, which must
     // be treated like a parse failure (WARN + skip) — a corrupt state file must
-    // never block startup (§ 5 edge case). The field reads below live inside the
+    // never block startup (edge case). The field reads below live inside the
     // try for exactly this reason.
     int version = 1;
     try {
@@ -581,7 +581,7 @@ Status DirWatcherRegistry::LoadState(const std::string& data_dir) {
                 for (const auto& ns : nss) add(dir, ns, recursive);
             } else {
                 // v1: each entry = (data_dir, namespace_name). Merge same data_dir
-                // entries into one watcher's target_namespaces (§ 3.1 / § 4.4).
+                // entries into one watcher's target_namespaces.
                 std::string dir = w.value("data_dir", "");
                 std::string ns = w.value("namespace_name", "default");
                 if (dir.empty()) continue;

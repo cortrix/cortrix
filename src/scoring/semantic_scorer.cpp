@@ -13,7 +13,7 @@ void SemanticScorer::AssignInitialScore(cortrix::cortrix_block_header_t& header,
                                         float& semantic_score,
                                         const ScoringInput& input,
                                         const observability::TraceContext* /*ctx*/) {
-    // §6 cortrix_scoring_assign_duration_seconds — time the scoring work (steady_clock,
+    // cortrix_scoring_assign_duration_seconds — time the scoring work (steady_clock,
     // immune to wall-clock jumps). QA finding: the histogram was defined but never fed.
     const auto start = std::chrono::steady_clock::now();
 
@@ -23,7 +23,7 @@ void SemanticScorer::AssignInitialScore(cortrix::cortrix_block_header_t& header,
     // actual processing depth).
     header.processing_level = level;
 
-    // D6: anomalous → 0.0 sentinel (matching D5's formula natural decay final = rerank × 0.9); else the
+    //: anomalous → 0.0 sentinel (matching's formula natural decay final = rerank × 0.9); else the
     // discrete level score.
     semantic_score = input.is_anomalous ? 0.0f : ScoreMap::LevelToScore(level);
 
@@ -42,8 +42,8 @@ float SemanticScorer::ComputeFinalScore(float rerank_score,
                                         float alpha,
                                         const observability::TraceContext* /*ctx*/) {
     if (alpha < 0.0f || alpha > 1.0f) {
-        // §4.4 CX_ERR_SCORING_CONFIG_INVALID — α must be in [0, 1].
-        ScoringMetrics::Instance().RecordError(ScoringErrorCode::kConfigInvalid);  // §6 error_total
+        // CX_ERR_SCORING_CONFIG_INVALID — α must be in [0, 1].
+        ScoringMetrics::Instance().RecordError(ScoringErrorCode::kConfigInvalid);  // error_total
         throw agent_friendly::AgentFriendlyException(MakeScoringError(
             ScoringErrorCode::kConfigInvalid,
             {{"alpha_received", alpha},
@@ -53,7 +53,7 @@ float SemanticScorer::ComputeFinalScore(float rerank_score,
     }
 
     // (v1.0.1 M2) anomalous Block explicit priority: even if an enriched_score exists, an anomalous
-    // block's effective semantic is the D6 sentinel 0.0 — not coalesce(enriched, 0.0).
+    // block's effective semantic is the sentinel 0.0 — not coalesce(enriched, 0.0).
     const float effective = is_anomalous
                                 ? 0.0f
                                 : (enriched_score.has_value() ? *enriched_score : semantic_score);

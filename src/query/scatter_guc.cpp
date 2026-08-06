@@ -13,7 +13,7 @@ namespace {
 
 // One GUC's resolved value: cfg->GetInt(name) when present + valid, else the spec
 // default; then range-clamped. A null cfg → default. Defaults are themselves in
-// range so the result is always usable (§2.7 range validation).
+// range so the result is always usable (range validation).
 int ResolveGuc(const IGlobalConfig* cfg, ScatterGucIndex idx) {
     const ScatterGucDef& def = kScatterGucs[static_cast<std::size_t>(idx)];
     int value = def.default_value;

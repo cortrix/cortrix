@@ -310,7 +310,7 @@ TEST_F(OnnxCollectModelsTest, EmptyModelPathRegistersNothing) {
 // (config.embedding.model_path) — there is NO separate sparse model to
 // register. These tests pin that closure: the single registration validated for
 // the dense path also certifies the model sparse path runs on. Appending
-// any *distinct* future model to the collector stays D3.5 (collector comment).
+// any *distinct* future model to the collector stays integration (collector comment).
 
 TEST_F(OnnxCollectModelsTest, SparseReusesBgeM3SingleRegistration) {
     // The bge-m3 registration is shared: registering it once covers both the

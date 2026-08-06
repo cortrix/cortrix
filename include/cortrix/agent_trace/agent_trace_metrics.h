@@ -11,18 +11,18 @@ namespace cortrix::agent_trace {
 /// template (process-wide singleton, atomic counters/gauge/histogram, OpenMetrics
 /// renderer).
 ///
-/// Cardinality control (OBSERVABILITY_SPEC §3.2 — C5 decision): labels are enum-only
+/// Cardinality control (the observability spec — C5 decision): labels are enum-only
 /// + low-cardinality. NO session_id / agent_id / user_id / namespace_id labels
 /// (high-cardinality, forbidden) — long_session_count_total in particular drops
 /// the session_id label (it goes to the structured log, topic 5 v1.0.2).
 ///
-/// 🚨 D3 standalone: a self-contained, dependency-free recorder + an OpenMetrics
+/// 🚨 standalone: a self-contained, dependency-free recorder + an OpenMetrics
 /// text renderer. The `/metrics` scrape endpoint does not exist in the frozen
 /// tree — registering this recorder into that endpoint is cross-Feature wiring
-/// **deferred to D3.5**. Until then it is fully usable + testable in-process and
+/// **deferred to integration**. Until then it is fully usable + testable in-process and
 /// RenderOpenMetrics() produces what the server will serve.
 ///
-/// §13 metric schema (9 rows):
+/// metric schema (9 rows):
 ///   cortrix_agent_trace_writes_total           counter   {source, status}
 ///   cortrix_agent_trace_query_latency_seconds  histogram (no label)
 ///   cortrix_invalid_header_total               counter   {header_name}
@@ -34,16 +34,16 @@ namespace cortrix::agent_trace {
 ///   cortrix_observability_write_failed_total   counter   {module}
 class AgentTraceMetrics {
 public:
-    /// source label for agent_trace_writes_total (§4.1).
+    /// source label for agent_trace_writes_total.
     enum class Source { kHttp = 0, kMcp };
 
-    /// status label for agent_trace_writes_total (§4.1).
+    /// status label for agent_trace_writes_total.
     enum class WriteStatus { kSuccess = 0, kFailed, kCancelled, kSessionTimeout };
 
-    /// header_name label for invalid_header_total (§6.1).
+    /// header_name label for invalid_header_total.
     enum class HeaderName { kSessionId = 0, kTraceId, kAgentId };
 
-    /// by_role label for traces_query_total (§8.x permission tiers).
+    /// by_role label for traces_query_total (permission tiers).
     enum class Role { kUser = 0, kAdmin };
 
     /// endpoint label for traces_query_total (3 read endpoints).

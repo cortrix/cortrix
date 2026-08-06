@@ -18,10 +18,10 @@ import { NamespaceFormDialog, type NamespaceFormValues } from './NamespaceFormDi
 import { NamespaceDetailDrawer } from './NamespaceDetailDrawer';
 import { DeleteNamespaceDialog } from './DeleteNamespaceDialog';
 
-// Namespace CRUD page (web UI design § 8 / catalog). Stat cards + table → row click
+// Namespace CRUD page (web UI design / catalog). Stat cards + table → row click
 // opens the detail drawer (fetches full 11-config detail) → Edit / Delete /
 // Create dialogs. namespace pool admission errors on create are surfaced via AdmissionError
-// (§ 8.4). TanStack Query owns the list cache; mutations invalidate + refetch.
+//. TanStack Query owns the list cache; mutations invalidate + refetch.
 
 function StatCard({
   label,

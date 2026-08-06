@@ -177,7 +177,7 @@ void RegisterTenantRoutes(httplib::Server& server, tenant::TenantService& tenant
                 }
                 // The admin list-all enumeration is a Cloud-V1 admin surface; V1.0
                 // OSS returns the structurally-correct empty envelope (single
-                // default_tenant deployments do not enumerate). D3.5 wires the
+                // default_tenant deployments do not enumerate). integration wires the
                 // full SELECT once admin list semantics are integrated.
                 WriteJsonResponse(res, 200, {{"tenants", nlohmann::json::array()}}, rctx.request_id);
             }));

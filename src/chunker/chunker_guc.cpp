@@ -27,7 +27,7 @@ Status ChunkerGuc::ValidateConfig(const ChunkerConfig& config) {
     s = ValidateRange(guc::kMaxParentsPerDoc, config.max_parents_per_doc,
                       guc::kMaxParentsMin, guc::kMaxParentsMax);
     if (!s.ok()) return s;
-    // fallback threshold is locked to = max_parents_per_doc (D4); share its range.
+    // fallback threshold is locked to = max_parents_per_doc; share its range.
     s = ValidateRange(guc::kFallbackToFlatThreshold, config.fallback_to_flat_threshold,
                       guc::kMaxParentsMin, guc::kMaxParentsMax);
     if (!s.ok()) return s;
@@ -35,7 +35,7 @@ Status ChunkerGuc::ValidateConfig(const ChunkerConfig& config) {
                       guc::kChildrenPerParentMin, guc::kChildrenPerParentMax);
     if (!s.ok()) return s;
 
-    // Cross-field invariant: a child cannot be larger than its parent (§ 2.3 —
+    // Cross-field invariant: a child cannot be larger than its parent (
     // child is a sub-span of parent_text). The child_size ≤ max_seq_length gate
     // needs the reranker config and lives in ChunkerStartupValidator.
     if (config.child_size > config.parent_size) {

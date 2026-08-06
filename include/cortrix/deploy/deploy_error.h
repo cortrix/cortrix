@@ -14,7 +14,7 @@ namespace cortrix::deploy {
 /// `CX_ERR_*` string + a GEN-Agent category + retryability + retry_after_ms + the
 /// structured_data keys its body MUST carry, via the canonical registry below.
 ///
-/// Same convention as catalog_error.h / task_error.h (CODING_CONVENTIONS §3):
+/// Same convention as catalog_error.h / task_error.h (the coding conventions):
 /// Cortrix uses Result<T> (StatusOr) + Status only. A domain error is carried as
 /// the Agent-friendly boundary type cortrix::agent_friendly::AgentFriendlyError,
 /// identified by its CX_ERR_* code. So DeployErrorCode is the *enum of identities*,
@@ -39,8 +39,8 @@ struct DeployErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
     int http_status;                          ///< HTTP status (507/503)
     agent_friendly::ErrorCategory category;   ///< permanent / transient
-    bool retryable;                           ///< §12 retryable column
-    std::optional<int> retry_after_ms;        ///< §12 retry_after_ms column (null unless retryable)
+    bool retryable;                           ///< retryable column
+    std::optional<int> retry_after_ms;        ///< retry_after_ms column (null unless retryable)
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never throws

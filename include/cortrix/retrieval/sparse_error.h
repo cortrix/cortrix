@@ -14,12 +14,12 @@ namespace cortrix::retrieval {
 /// Each maps to a stable `CX_ERR_SPARSE_*` string + a GEN-Agent category +
 /// retryability via the canonical registry below.
 ///
-/// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
+/// Per the coding conventions, Cortrix uses Result<T> + Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// SparseErrorCode is the *enum of identities*; MakeSparseError() turns one
 /// (plus structured_data) into that boundary error. Mirrors the
-/// reranker_error template exactly (Briefing §3 template A).
+/// reranker_error template exactly (Briefing template A).
 ///
 /// V1.0 versioning promise (GEN-Agent #7): this set is not removed / renamed /
 /// re-categorized; new codes may only be appended.
@@ -40,7 +40,7 @@ struct SparseErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_SPARSE_*" string
     agent_friendly::ErrorCategory category;   ///< transient / permanent
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null unless retryable per §8
+    std::optional<int> retry_after_ms;        ///< null unless retryable per
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never

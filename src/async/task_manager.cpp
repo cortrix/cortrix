@@ -767,7 +767,7 @@ Result<int> TaskManager::SweepZombies(int64_t now_unix, int zombie_hours) {
 
 Result<int> TaskManager::SweepTimedOut(int64_t now_unix, int timeout_seconds) {
     std::lock_guard<std::mutex> lock(mutex_);
-    // §6.1 / §7 v0 — processing tasks that started more than `timeout_seconds` ago
+    // v0 — processing tasks that started more than `timeout_seconds` ago
     // exceeded the budget → failed + CX_ERR_TASK_TIMEOUT. Keyed on started_at (not
     // updated_at) so an actively-progressing-but-too-long task is still caught.
     const std::string cutoff =
@@ -793,7 +793,7 @@ Result<int> TaskManager::SweepTimedOut(int64_t now_unix, int timeout_seconds) {
 
 Result<int> TaskManager::RequeueStaleProcessing(int64_t now_unix, int zombie_hours) {
     std::lock_guard<std::mutex> lock(mutex_);
-    // §6.1 crash recovery: processing rows younger than the zombie threshold are
+    // crash recovery: processing rows younger than the zombie threshold are
     // re-queued on restart (worker crashed but the doc is still worth retrying);
     // rows older than the threshold are left for SweepZombies → failed.
     const std::string cutoff =

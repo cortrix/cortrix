@@ -9,7 +9,7 @@
 #include "cortrix/deploy/deploy_metrics.h"
 #include "cortrix/deploy/graceful_shutdown.h"
 
-// Deployment coverage: graceful shutdown (§7) — pending-task
+// Deployment coverage: graceful shutdown — pending-task
 // serialization round-trip, the ordered Run() phases with injected hooks, the
 // drain-timeout → forced + persist path, the shutdown_status gauge feed, and the
 // startup resume path (parse + resubmit + delete .pending_tasks.json).
@@ -89,7 +89,7 @@ TEST_F(GracefulShutdownTest, CleanDrainRunsAllPhasesInOrderNoPersist) {
     GracefulShutdown gs(cfg, hooks);
     ShutdownStatus st = gs.Run();
 
-    // §7.1 ordering: close_http → drain → flush_wal → persist_memory.
+    // ordering: close_http → drain → flush_wal → persist_memory.
     std::vector<std::string> want = {"close_http", "drain", "flush_wal", "persist_memory"};
     EXPECT_EQ(order, want);
     EXPECT_FALSE(persisted);  // clean drain → no pending file written

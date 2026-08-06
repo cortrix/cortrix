@@ -117,7 +117,7 @@ TEST(InteractionSourcesSchemaProviderTest, ExecFailureReportsInternalError) {
     sqlite3_close(db);
 }
 
-// The table and both §4.3 indices exist after migration.
+// The table and both indices exist after migration.
 TEST_F(InteractionSourcesSchemaTest, TableAndIndicesExist) {
     auto tables = QueryTextSet(db_, "SELECT name FROM sqlite_master WHERE type='table'");
     EXPECT_TRUE(Contains(tables, "interaction_sources"));

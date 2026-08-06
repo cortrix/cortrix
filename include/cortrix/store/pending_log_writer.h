@@ -14,7 +14,7 @@
 
 namespace cortrix::store {
 
-/// Aggregate counters over the records currently in pending.wal (design § 2.1
+/// Aggregate counters over the records currently in pending.wal (design
 /// WalStats). `pending` is the count of txns that have a PENDING record but no
 /// COMMITTED/ROLLBACK yet — the operational backlog gauge.
 struct WalStats {
@@ -23,7 +23,7 @@ struct WalStats {
     uint64_t rollback = 0;
 };
 
-/// Pending Write Log file (design § 3.1/§3.2) and the real IWalSink behind the
+/// Pending Write Log file (design) and the real IWalSink behind the
 /// shared GroupCommitWriter.
 ///
 /// PendingLogWriter owns the `pending.wal` file descriptor and is the durable
@@ -31,14 +31,14 @@ struct WalStats {
 /// and drives exactly one WriteBatch()+Sync() per batch against `this`. So a
 /// PENDING/COMMITTED/ROLLBACK record is crash-recoverable once Append() returns
 /// Ok (its batch reached fdatasync). The group-commit machinery is reused, not
-/// reimplemented (design § 2.2 / CODING_CONVENTIONS — shared GroupCommitWriter).
+/// reimplemented (design / the coding conventions — shared GroupCommitWriter).
 ///
 /// Thread-safe: Append/AppendBatch are safe to call concurrently; ReadAll and
 /// Compact take the file mutex and must not race a live Append (the coordinator
 /// calls Compact while holding its own txn lock, i.e. no in-flight appends).
 class PendingLogWriter : public IWalSink {
 public:
-    /// File layout for the 32-byte header (design § 3.2).
+    /// File layout for the 32-byte header (design).
     static constexpr char kMagic[4] = {'P', 'W', 'L', 'G'};
     static constexpr uint16_t kVersion = 1;
     static constexpr size_t kHeaderSize = 32;
@@ -72,10 +72,10 @@ public:
     /// recovery reconciles via the three-way consistency check).
     Status AppendBatch(const std::vector<PendingEntry>& entries);
 
-    /// Read every record in EOF order (design § 4.4 — does not trust any header
+    /// Read every record in EOF order (design — does not trust any header
     /// count). A trailing record that fails its CRC or is short truncates the
     /// scan: all records up to the corruption are returned and the file is
-    /// truncated to the last valid record (degraded recovery, design § 5).
+    /// truncated to the last valid record (degraded recovery, design).
     Result<std::vector<PendingEntry>> ReadAll();
 
     /// Rewrite pending.wal keeping only records for txns that are NOT finalized
@@ -84,7 +84,7 @@ public:
     /// rename, then fsync. Safe to call when no Append is in flight.
     Status Compact();
 
-    /// Snapshot of pending/committed/rollback record counts (design § 2.1).
+    /// Snapshot of pending/committed/rollback record counts (design).
     /// Reads the file; O(file size).
     Result<WalStats> GetStats();
 
@@ -92,7 +92,7 @@ public:
     /// records), as last extended by WriteBatch. O(1) — reads a cached counter
     /// updated under file_mu_, never touches the filesystem. Backs
     /// WriteCoordinator::GetPwlSizeBytes() for memory-budget tracking
-    /// (design § 2.1 v1.0.1). Records still buffered in the group-commit queue
+    /// (design v1.0.1). Records still buffered in the group-commit queue
     /// are not yet counted (they have no file bytes until their batch writes).
     size_t SizeBytes() const;
 

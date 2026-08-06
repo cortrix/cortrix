@@ -1,5 +1,5 @@
 // S2.5 — circuit breaker metric (state gauge / trips counter / failed_tasks) +
-// status JSONB (§3.5) + WARN/INFO log + alert rules.
+// status JSONB + WARN/INFO log + alert rules.
 #include <gtest/gtest.h>
 
 #include <string>
@@ -11,7 +11,7 @@
 namespace cortrix::reranker {
 namespace {
 
-// --- status JSONB (§3.5) ---
+// --- status JSONB ---
 
 TEST(RerankerStatusTest, ClosedStateJson) {
     auto j = RerankerStatusReporter::BuildStatusJson(
@@ -92,7 +92,7 @@ TEST(RerankerStatusTest, FailedTasksCounterPerReason) {
     EXPECT_EQ(m.FailedTasksCount(RerankerMetrics::FailedTaskReason::kOom), 0u);
 }
 
-// --- alert rules (§3.4) ---
+// --- alert rules ---
 
 TEST(RerankerStatusTest, AlertRulesMatchSpec) {
     EXPECT_NE(RerankerStatusReporter::AlertRuleCircuitOpen5m()

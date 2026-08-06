@@ -11,17 +11,17 @@ namespace cortrix::spc {
 /// The data cleaner's in-memory block view. The SPC Pipeline assembles richer
 /// CortrixBlock BLOBs (header + payload); cleaning operates *before* assembly on
 /// this lightweight view carrying exactly what dedup + anomaly detection need:
-/// id, chunk text, the upstream OnnxEmbedder embedding (D3 — zero-cost reuse),
+/// id, chunk text, the upstream OnnxEmbedder embedding (zero-cost reuse),
 /// the JSONB metadata namespace, and the flags_ext byte to mark anomalies.
 ///
-/// NOTE (D3.5): the design's §4.3 SpcPipeline integration maps
+/// NOTE (integration): the design's SpcPipeline integration maps
 /// ChunkResult + EmbeddingResult (→ CortrixBlock) onto this view and back. That
 /// The wiring and the unified post-chunk Block land separately — cleaning is standalone
 /// defines and operates on this contract view.
 struct Block {
     std::string id;                  ///< block id (chunk id pre-assembly)
     std::string chunk_text;          ///< chunk text (UTF-8) — hash + empty/oversized checks
-    std::vector<float> embedding;    ///< upstream embedding (D3 reuse) — semantic dedup + NaN/zero check
+    std::vector<float> embedding;    ///< upstream embedding (reuse) — semantic dedup + NaN/zero check
     nlohmann::json metadata_json =   ///< JSONB metadata; cleaning writes the "cleaning.*" namespace
         nlohmann::json::object();
     uint8_t flags_ext = 0;           ///< BlockFlagsExt byte; cleaning sets bit2 kFlagExtIsAnomalous
@@ -57,7 +57,7 @@ enum class AnomalyReason : uint8_t {
     INVALID_EMBEDDING = 5,   // embedding contains NaN / all zeros
 };
 
-/// The §7.bis metric label / cleaning.anomaly_reason token for a reason
+/// The metric label / cleaning.anomaly_reason token for a reason
 /// ("empty" / "oversized" / "parse_failed" / "duplicate_id" / "invalid_embedding").
 const char* ToString(AnomalyReason reason);
 

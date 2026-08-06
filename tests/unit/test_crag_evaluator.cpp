@@ -12,9 +12,9 @@
 #include "cortrix/retrieval/heuristic_guard_backend.h"
 #include "cortrix/retrieval/types.h"
 
-// CRAG S2/S3 coverage: CragEvaluator multi-signal feature engineering (§6.1),
-// three-tier threshold classification (§6.2), heuristic guard (§7.3), and the L3
-// retry-then-transparent-degrade path (§7.3). Standalone — backend is a stub /
+// CRAG S2/S3 coverage: CragEvaluator multi-signal feature engineering,
+// three-tier threshold classification, heuristic guard, and the L3
+// retry-then-transparent-degrade path. Standalone — backend is a stub /
 // throwing mock, no ONNX.
 namespace cortrix::retrieval {
 namespace {
@@ -55,7 +55,7 @@ public:
 
 constexpr float kEps = 1e-4f;
 
-// ---------------- §6.1 multi-signal feature engineering ----------------
+// ---------------- multi-signal feature engineering ----------------
 
 TEST(CragEvaluatorTest, MultiSignalsEmptyChunks) {
     CragEvaluator ev(std::make_shared<HeuristicGuardBackend>(), CragConfig{});
@@ -102,7 +102,7 @@ TEST(CragEvaluatorTest, StdSingleElementIsZero) {
     EXPECT_NEAR(s["high_score_ratio"], 1.0f, kEps);
 }
 
-// ---------------- §6.2 three-tier classification (via heuristic backend) -------
+// ---------------- three-tier classification (via heuristic backend) -------
 
 TEST(CragEvaluatorTest, HighScoresClassifyCorrect) {
     // Strong top1 + full agreement → score ~0.97 → "correct" (>=0.7).
@@ -193,7 +193,7 @@ TEST(CragEvaluatorTest, LowConfidenceBackendFallsBackToGuard) {
     EXPECT_EQ(r.label, "correct");  // but guard verdict (high signals) won
 }
 
-// ---------------- §7.3 L3 retry-then-degrade ----------------------------------
+// ---------------- L3 retry-then-degrade ----------------------------------
 
 TEST(CragEvaluatorTest, InferenceFailureDegradesTransparently) {
     CragConfig cfg;
@@ -254,7 +254,7 @@ TEST(CragEvaluatorTest, BackendScoreClampedToUnitRange) {
 }
 
 TEST(CragEvaluatorTest, BoundaryScoresAtThresholds) {
-    // Exact-threshold behavior (§6.2): >= threshold_correct → correct; the lower
+    // Exact-threshold behavior: >= threshold_correct → correct; the lower
     // boundary uses strict < threshold_incorrect for incorrect.
     CragConfig cfg;  // 0.7 / 0.3 defaults
     // score exactly 0.7 → correct (>=). Build signals so heuristic score == 0.7:
@@ -275,7 +275,7 @@ TEST(CragEvaluatorTest, BoundaryScoresAtThresholds) {
 TEST(CragEvaluatorTest, CircuitBreakerOpensThenGatesSubsequentQuery) {
     // Breaker threshold = 3 (ctor). Query 1 fails 1+3=4 times → trips the breaker
     // open. Query 2 then sees the breaker open at entry → backend NOT called,
-    // straight to the transparent degrade (systemic gate, §7.3 / reranker breaker).
+    // straight to the transparent degrade (systemic gate, / reranker breaker).
     CragConfig cfg;
     cfg.max_inference_retries = 3;
     auto backend = std::make_shared<ThrowingBackend>();

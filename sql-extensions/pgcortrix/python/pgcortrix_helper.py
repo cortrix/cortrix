@@ -2,10 +2,10 @@
 
 Installed into PG's plpython3u site-packages (see Makefile); the SQL function
 bodies do `from pgcortrix_helper import get_client`. SoT: the pgcortrix design
-(§2.2.bis SSRF, §2.4 client, §4.2 cancel, §4.3 retry, §5 errors).
+(SSRF, client, cancel, retry, errors).
 
 Why this shape — the build machine has no PostgreSQL, so the design constraint
-(L1-α briefing §6) is that this module be *unit-testable off a live PG by
+(L1-α briefing) is that this module be *unit-testable off a live PG by
 mocking urllib*. We get there by keeping the PG-specific surface tiny and
 injected:
 
@@ -62,13 +62,13 @@ class ErrorCategory:
 
 
 # One canonical row per pgcortrix CX_ERR_* code. Mirrors catalog_error.cpp's
-# table-driven registry. SoT for these identities: ARCHITECTURE.md §4.1.11
-# (CX_ERR_PGCORTRIX_INVALID_FILTER / CX_ERR_PGCORTRIX_ENDPOINT_BLOCKED) + §4.1 user_id
+# table-driven registry. SoT for these identities: ARCHITECTURE.md
+# (CX_ERR_PGCORTRIX_INVALID_FILTER / CX_ERR_PGCORTRIX_ENDPOINT_BLOCKED) + user_id
 # (CX_ERR_USER_ID_MISSING). retry_after_ms is None unless retryable.
 #
-# NOTE (design flag raised to Lead): pgcortrix/§7.bis acceptance prose also names
+# NOTE (design flag raised to Lead): pgcortrix/ acceptance prose also names
 # a CX_ERR_PG_* family (SSRF_BLOCKED / HTTP_TIMEOUT / ...). Those are NOT in the
-# architecture SoT registry, and §5 explicitly says V1 transport errors
+# architecture SoT registry, and explicitly says V1 transport errors
 # (timeout/5xx/conn/4xx) are surfaced as plain plpy.error() PG ERRORs, not
 # structured codes. So we register only the SoT codes here; transport failures
 # go through `plpy.error()` (see PgcortrixClient._post).
@@ -101,7 +101,7 @@ class CortrixError(Exception):
         super().__init__("%s: %s" % (self.code, self.message))
 
     def to_body(self):
-        """The AGENT_FRIENDLY §3.1 error body (4+ fields). retry_after_ms /
+        """The the Agent-friendly contract error body (4+ fields). retry_after_ms /
         structured_data become None (JSON null) when unset."""
         return {
             "code": self.code,
@@ -114,7 +114,7 @@ class CortrixError(Exception):
 
 
 # ===========================================================================
-# §2.1.5 — filter JSONB whitelist (anti SQL-injection / over-posting)
+# — filter JSONB whitelist (anti SQL-injection / over-posting)
 # ===========================================================================
 
 ALLOWED_FILTER_KEYS = frozenset(
@@ -158,7 +158,7 @@ def validate_filter(filter_jsonb):
 
 
 # ===========================================================================
-# §2.2.bis — endpoint SSRF defense (V3-E-02)
+# — endpoint SSRF defense (V3-E-02)
 # ===========================================================================
 
 ALLOWED_HOSTS = frozenset(["localhost", "127.0.0.1", "cortrix-server"])
@@ -410,7 +410,7 @@ class PgcortrixClient:
     def _request(self, method, path, cfg, body=None, params=None):
         """Single HTTP attempt. Validates the endpoint first (SSRF), builds the
         Request, runs it in a daemon thread while the main thread polls PG for
-        cancel (§4.2). Returns parsed JSON. Raises urllib errors to the retry
+        cancel. Returns parsed JSON. Raises urllib errors to the retry
         loop; raises CortrixError for SSRF; calls plpy.error() for cancel /
         timeout."""
         validate_endpoint(cfg["endpoint"])  # V3-E-02, every call
@@ -435,7 +435,7 @@ class PgcortrixClient:
         deadline = time.time() + cfg["timeout_ms"] / 1000.0
         while t.is_alive() and time.time() < deadline:
             t.join(timeout=0.1)
-            # Touch PG so CHECK_FOR_INTERRUPTS runs; any raise = cancel (§4.2).
+            # Touch PG so CHECK_FOR_INTERRUPTS runs; any raise = cancel.
             try:
                 self._pg.ping_for_interrupt()
             except Exception:
@@ -456,7 +456,7 @@ class PgcortrixClient:
         return self._do_with_retry("GET", path, body=None, params=params)
 
     def _do_with_retry(self, method, path, body=None, params=None):
-        """Retry 5xx / connection errors per §4.3 (exponential backoff); 4xx and
+        """Retry 5xx / connection errors per (exponential backoff); 4xx and
         SSRF are not retried. Terminal transport failures are surfaced as PG
         ERRORs via plpy.error() (pgcortrix — V1 does not map to structured codes)."""
         cfg = self._get_config()
@@ -484,7 +484,7 @@ class PgcortrixClient:
                     % (e.code, getattr(e, "reason", ""),
                        (" — " + detail) if detail else ""))
             except error.URLError as e:
-                # Connection-level failure: treat like 5xx (§4.3).
+                # Connection-level failure: treat like 5xx.
                 if attempt < len(delays):
                     self._sleep(delays[attempt] / 1000.0)
                     attempt += 1
@@ -493,7 +493,7 @@ class PgcortrixClient:
                     "pgcortrix endpoint unreachable: %s (%s)"
                     % (cfg["endpoint"], getattr(e, "reason", e)))
 
-    # ---- typed endpoints (pgcortrix + v1.0.3 endpoint map §3.3) ---------
+    # ---- typed endpoints (pgcortrix + v1.0.3 endpoint map) ---------
 
     def search(self, namespace, query, top_k, filter, rerank):
         resp = self._post("/api/v1/query", {
@@ -526,7 +526,7 @@ class PgcortrixClient:
         resp = self._post("/api/v1/documents", {
             "namespace": namespace,
             "filename": file_path.split("/")[-1],
-            "content_base64": content.hex(),  # V1 simplification (§2.4)
+            "content_base64": content.hex(),  # V1 simplification
         })
         return resp.get("doc_id")
 
@@ -579,17 +579,17 @@ class PgcortrixClient:
         return resp.get("results", [])
 
     def list_interactions(self, namespace, user_id, filter, limit_n, offset_n):
-        """v1.0.2: memory isolation D4 user_id mandatory + whitelist filter (§2.1.5).
-        Endpoint GET /api/v1/memory/interactions (§3.3 v1.0.3)."""
+        """v1.0.2: memory isolation user_id mandatory + whitelist filter.
+        Endpoint GET /api/v1/memory/interactions (v1.0.3)."""
         if not user_id:
             raise CortrixError(
                 "CX_ERR_USER_ID_MISSING",
-                "pgcortrix_list_interactions requires user_id (memory isolation D4)",
+                "pgcortrix_list_interactions requires user_id (memory isolation)",
                 {"reason": "user_id_required_for_memory_isolation"})
         validated = validate_filter(filter)  # raises CX_ERR_PGCORTRIX_INVALID_FILTER
         params = {
             "namespace": namespace,
-            "user_id": user_id,            # memory isolation D4: never NULL
+            "user_id": user_id,            # memory isolation: never NULL
             "limit": limit_n,
             "offset": offset_n,
         }
@@ -602,7 +602,7 @@ class PgcortrixClient:
         return resp.get("interactions", resp.get("results", []))
 
     def status(self):
-        """V23 D6: JSONB-friendly dict. Probes /api/v1/health for connectivity
+        """V23: JSONB-friendly dict. Probes /api/v1/health for connectivity
         with a /health fallback. Never raises — a disconnected server still yields a status
         blob with http_connected=false (diagnostics must always answer)."""
         cfg = self._get_config()

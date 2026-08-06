@@ -72,7 +72,7 @@ Status SparseSchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
         }
         return Status::Ok();
     }
-    // Phase 2 (IVF-sparse / sharding, §14) is the only future step; until it is
+    // Phase 2 (IVF-sparse / sharding) is the only future step; until it is
     // defined an unexpected version jump is an error.
     return Status::InvalidArgument(
         "CX_ERR_SCHEMA_VERSION_MISMATCH: sparse_index unsupported migration " +

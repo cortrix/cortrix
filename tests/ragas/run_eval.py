@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =============================================================
-# Test suite W1: RAGAS evaluation runner (design: test-suite-tests.md §3.2)
+# Test suite W1: RAGAS evaluation runner (design: test-suite-tests.md)
 # Reads tests/ragas/config.yaml, queries a running Cortrix server,
 # and scores retrieval quality with RAGAS.
 #

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { LoadingSpinner } from '../components/Common/LoadingSpinner';
 
-// PrivateRoute (web UI design § 9.3 — route guard). Wraps protected routes:
+// PrivateRoute (web UI design — route guard). Wraps protected routes:
 //   - On first mount it runs the cookie probe (GET /api/v1/auth/me) once.
 //   - While the probe is in flight it shows a spinner (avoids a flash redirect).
 //   - Unauthenticated → redirect to /login, remembering the attempted path so

@@ -4,7 +4,7 @@
 #include "cortrix/retrieval/sparse_codec.h"
 
 // Sparse retrieval S3 — sparse_vec BLOB serialize/deserialize round-trip + block header flags_ext
-// has_sparse_vec semantics. Wire format (§4.2): [u16 num_terms]([u16 id][f32 w])*.
+// has_sparse_vec semantics. Wire format: [u16 num_terms]([u16 id][f32 w])*.
 namespace cortrix::retrieval {
 namespace {
 
@@ -23,7 +23,7 @@ TEST(SparseCodecTest, SerializedSize) {
 }
 
 TEST(SparseCodecTest, K100SizeMatchesDesign) {
-    // §4.2: K=100 → 2 + 100×6 = 602 bytes.
+    //: K=100 → 2 + 100×6 = 602 bytes.
     std::map<uint32_t, float> terms;
     for (uint32_t i = 1; i <= 100; ++i) terms[i] = 0.1f * static_cast<float>(i);
     EXPECT_EQ(SerializedSparseVecSize(MakeVec(terms)), 602u);

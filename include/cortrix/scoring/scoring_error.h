@@ -11,12 +11,12 @@
 namespace cortrix::scoring {
 
 /// The 2 Semantic Score error identities. Scoring is an internal module
-/// (few error scenarios, §4.4 note), so the set is small: an out-of-range level (defensive
+/// (few error scenarios, note), so the set is small: an out-of-range level (defensive
 /// bottom-out) and a bad α config. Each maps to a stable `CX_ERR_SCORING_*` string + a
 /// GEN-Agent category + retryability + the structured_data keys its body MUST carry,
 /// via the canonical registry below.
 ///
-/// Per CODING_CONVENTIONS §3 / F-FREEZE-1, Cortrix uses Result<T>+Status only (no
+/// Per the coding conventions / F-FREEZE-1, Cortrix uses Result<T>+Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code. So
 /// ScoringErrorCode is the *enum of identities*, and MakeScoringError() turns one (plus
@@ -43,7 +43,7 @@ struct ScoringErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_SCORING_*" string
     agent_friendly::ErrorCategory category;   ///< permanent (both)
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null for both (neither retryable, §4.4)
+    std::optional<int> retry_after_ms;        ///< null for both (neither retryable)
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never throws /
@@ -53,7 +53,7 @@ const ScoringErrorInfo& GetScoringErrorInfo(ScoringErrorCode code);
 /// The "CX_ERR_SCORING_*" string for `code`.
 const char* ScoringErrorCodeString(ScoringErrorCode code);
 
-/// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5, §4.4
+/// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5,
 /// structured_data column). SoT for the Agent-friendly contract; lets call sites +
 /// tests verify the body is complete.
 const std::vector<std::string>& RequiredStructuredDataKeys(ScoringErrorCode code);

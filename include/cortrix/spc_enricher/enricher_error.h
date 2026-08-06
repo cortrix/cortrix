@@ -14,7 +14,7 @@ namespace cortrix::spc {
 /// `CX_ERR_ENRICHER_*` string + a GEN-Agent category + retryability via the
 /// canonical registry below.
 ///
-/// Per CODING_CONVENTIONS §3 / B-R1 §3 (F-FREEZE-1 reconcile), Cortrix uses
+/// Per the coding conventions / B-R1 (F-FREEZE-1 reconcile), Cortrix uses
 /// Result<T> + Status only (no Result<T,E>); a domain error is carried as the
 /// Agent-friendly boundary type cortrix::agent_friendly::AgentFriendlyError,
 /// identified by its CX_ERR_* code. So EnricherErrorCode is the *enum of
@@ -22,7 +22,7 @@ namespace cortrix::spc {
 /// structured_data) into that boundary error. Mirrors reranker_error.h /
 /// catalog::CatalogErrorCode exactly.
 ///
-/// The design's §2.5b "EnricherCategory" enum is reconciled to the frozen
+/// The design's "EnricherCategory" enum is reconciled to the frozen
 /// agent_friendly::ErrorCategory (auth/quota/transient/permanent/timeout) — no
 /// parallel enum (same discipline as spc::parser.h reusing ErrorCategory).
 ///
@@ -46,7 +46,7 @@ struct EnricherErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_ENRICHER_*" string
     agent_friendly::ErrorCategory category;   ///< auth/quota/transient/permanent/timeout
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null (== -1 in matrix) unless retryable per §5.1
+    std::optional<int> retry_after_ms;        ///< null (== -1 in matrix) unless retryable per
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never
@@ -66,7 +66,7 @@ bool HasRequiredStructuredData(EnricherErrorCode code,
                                const nlohmann::json& structured_data);
 
 /// Build the Agent-friendly boundary error for `code`, attaching `structured_data`
-/// (the §5.1 required keys are the caller's responsibility at each call site) and
+/// (the required keys are the caller's responsibility at each call site) and
 /// an optional human-readable `message`. category / retryable / retry_after_ms are
 /// filled from the canonical registry — call sites never restate them.
 agent_friendly::AgentFriendlyError MakeEnricherError(

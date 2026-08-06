@@ -11,9 +11,9 @@ import type { AgentError, AgentErrorCategory } from '../../types/api';
 import { Button } from '../ui';
 import { recordUiError } from '../../telemetry/metrics';
 
-// GEN-Agent 5-field error display (web UI design § 16.1). Renders code / message /
+// GEN-Agent 5-field error display (web UI design). Renders code / message /
 // category badge / retry countdown (retry_after_ms) / collapsible
-// structured_data. Category → variant + icon mapping per § 16.1. Magma VI
+// structured_data. Category → variant + icon mapping per Magma VI
 // tokens only (no hard-coded colors) so it works in both themes.
 
 const CATEGORY_META: Record<
@@ -49,7 +49,7 @@ export function ErrorDisplay({ error, onRetry, className = '' }: ErrorDisplayPro
 
   useEffect(() => {
     setRemainingMs(error.retry_after_ms ?? 0);
-    // § 23-bis.1 — count each surfaced business error (category/code labels
+    // — count each surfaced business error (category/code labels
     // align with the CX_ERR_* family). Best-effort; no-op before metrics init.
     recordUiError(error.category, error.code, window.location.pathname);
   }, [error.retry_after_ms, error.code, error.message, error.category]);

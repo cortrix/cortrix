@@ -9,13 +9,13 @@ using agent_friendly::ErrorCategory;
 
 namespace {
 
-// One canonical row per code (batch submit §2.4.1). Defined as function-local
+// One canonical row per code (batch submit). Defined as function-local
 // statics so each returns a stable reference. The switch in GetBatchErrorInfo is
 // intentionally exhaustive: building with -Wall -Wextra (-Wswitch) turns "added
 // a code without a row" into a warning (treated as a build failure), so the
 // registry can't silently drift from the enum.
 //
-// http_status / category / retryable / retry_after_ms follow §2.4.1 exactly —
+// http_status / category / retryable / retry_after_ms follow exactly —
 // all four batch-level faults are permanent envelope rejections, not retryable:
 //   400 BATCH_SIZE_EXCEEDED     permanent  false  null
 //   413 BATCH_PAYLOAD_TOO_LARGE permanent  false  null
@@ -53,7 +53,7 @@ int BatchErrorHttpStatus(BatchErrorCode code) {
 }
 
 const std::vector<std::string>& BatchRequiredStructuredDataKeys(BatchErrorCode code) {
-    // §2.4.1 trigger scenarios → the structured_data an Agent needs to react
+    // trigger scenarios → the structured_data an Agent needs to react
     // (GEN-Agent #5). Function-local statics → stable refs.
     static const std::vector<std::string> kSizeExceededKeys
         {"max_size", "actual_size"};

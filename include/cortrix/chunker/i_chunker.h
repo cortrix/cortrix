@@ -21,7 +21,7 @@ namespace cortrix::chunker {
 /// a deterministic char-based estimate). Must be deterministic and total.
 using TokenCounter = std::function<uint32_t(const std::string&)>;
 
-/// Default standalone token estimate when no real tokenizer is wired (D3.5 wires
+/// Default standalone token estimate when no real tokenizer is wired (integration wires
 /// HfTokenizer). Heuristic mirrors RecursiveChunker's char-based approximation:
 /// ASCII bytes count ~1/4 token (≈4 chars/token), each non-ASCII UTF-8 lead byte
 /// counts as ~1 token (CJK ≈ 1 token/char). Never returns 0 for non-empty text.
@@ -36,7 +36,7 @@ struct ChunkerInput {
 };
 
 /// Chunker output — flat parents + children (relationship via child.parent_id /
-/// parent.child_ids) + stats (§ 2.1).
+/// parent.child_ids) + stats.
 struct ChunkerOutput {
     std::vector<ParentChunk> parents;
     std::vector<ChildChunk>  children;
@@ -46,7 +46,7 @@ struct ChunkerOutput {
 /// L1 chunking abstraction. `Chunk` is fallible (Result<ChunkerOutput>): hard
 /// errors (empty document / overflow) come back as a chunker Status carrying a
 /// CX_ERR_CHUNK_* code (chunker_errors.h); non-fatal page failures are tolerated
-/// and recorded in output.stats (§ 4.5).
+/// and recorded in output.stats.
 class IChunker {
 public:
     virtual ~IChunker() = default;

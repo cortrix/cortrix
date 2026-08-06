@@ -28,7 +28,7 @@ namespace cortrix::spc {
 
 /// Parse an `enricher.chain` spec ("enrich,contextual,hype") into a normalized, de-duplicated
 /// token list. Tokens are lowercased + trimmed; unknown tokens are dropped
-/// (fail-soft). An empty / absent spec yields {"enrich"} (the §7.1 default chain).
+/// (fail-soft). An empty / absent spec yields {"enrich"} (the default chain).
 /// enrich is always implied first when any token is present (the enricher leads), so
 /// "contextual" alone resolves to {"enrich","contextual"}. Pure + static for unit testing.
 std::vector<std::string> ParseEnricherChainSpec(const std::string& spec);
@@ -45,7 +45,7 @@ std::vector<std::string> ResolveEnricherChain(const IGlobalConfig* global,
 /// token when the enricher degraded (empty on success / skip). Exception: the
 /// The contextualizer fail-soft shape keeps status==0 (the chunk retains its original
 /// embedding) while contextualized_status==2 — there error_code carries the
-/// member's cause so debt rows record why (D12, 2026-07-11).
+/// member's cause so debt rows record why (2026-07-11).
 struct EnricherStepOutcome {
     std::string name;
     int status = 0;
@@ -72,7 +72,7 @@ struct ChunkChainResult {
 /// Construction: the production bootstrap builds the chain from
 /// the resolved token list + the shared LLM client / embedder / parent store; an
 /// empty chain (or all enrichers unavailable) makes EnrichChunks() a transparent
-/// pass-through (the §7.1 L1 default).
+/// pass-through (the L1 default).
 class EnricherChain {
 public:
     EnricherChain() = default;
@@ -99,7 +99,7 @@ public:
     /// `source_parent_ids` are the provenance stamped on each generated
     /// question (index-aligned; empty vectors → provenance left blank).
     ///
-    /// `member_filter` (addendum §3.7 backfill): when non-null, only members whose
+    /// `member_filter` (addendum backfill): when non-null, only members whose
     /// ChainMemberToken is in the set run; the rest record a skipped step (same
     /// bookkeeping as an unavailable member). nullptr == run all (ingest path).
     std::vector<ChunkChainResult> EnrichChunks(

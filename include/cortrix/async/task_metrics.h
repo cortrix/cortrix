@@ -15,18 +15,18 @@ namespace cortrix::async {
 /// process-wide singleton of atomic counters/gauges/histograms + an OpenMetrics
 /// text renderer.
 ///
-/// 🚨 Cardinality control (OBSERVABILITY_SPEC §3.2): labels are enum-only —
+/// 🚨 Cardinality control (the observability spec): labels are enum-only —
 /// `task_type` (the closed async::TaskType enum), `status`, `state`, `phase`. No
 /// task_id / namespace_id / doc_id (high cardinality); per-task data goes through
 /// the tasks table + progress API, never a metric label.
 ///
-/// 🚨 D3 standalone: this recorder + RenderOpenMetrics() are fully usable +
+/// 🚨 standalone: this recorder + RenderOpenMetrics() are fully usable +
 /// testable in-process. The `/metrics` scrape endpoint does not exist in the
 /// frozen tree — registering this recorder into that endpoint is cross-Feature
-/// wiring **deferred to D3.5** (B-R2-FREEZE-REVIEW §66 lists "OBSERVABILITY
-/// async metrics" as deferred wiring; the recorder itself is the D3 piece).
+/// wiring **deferred to integration** (B-R2-FREEZE-REVIEW lists "OBSERVABILITY
+/// async metrics" as deferred wiring; the recorder itself is the piece).
 ///
-/// §6.bis metric schema (6 rows):
+/// metric schema (6 rows):
 ///   cortrix_tasks_submitted_total       counter    {task_type}
 ///   cortrix_tasks_completed_total       counter    {task_type, status}
 ///   cortrix_tasks_duration_seconds      histogram  {task_type}
@@ -35,7 +35,7 @@ namespace cortrix::async {
 ///   cortrix_tasks_cancel_total          counter    {phase}
 class TaskMetrics {
 public:
-    /// `status` label for completed_total (§6.bis). The terminal outcome of a task.
+    /// `status` label for completed_total. The terminal outcome of a task.
     enum class CompletionStatus {
         kSuccess = 0,
         kFailed,
@@ -43,13 +43,13 @@ public:
         kTimeout,   ///< the 30-min budget overrun (CX_ERR_TASK_TIMEOUT)
     };
 
-    /// `state` label for queue_depth (§6.bis). The two countable queue states.
+    /// `state` label for queue_depth. The two countable queue states.
     enum class QueueState {
         kQueued = 0,
         kProcessing,
     };
 
-    /// `phase` label for cancel_total (§6.bis). When in the task lifecycle the
+    /// `phase` label for cancel_total. When in the task lifecycle the
     /// DELETE /tasks/{id} cancel landed.
     enum class CancelPhase {
         kPreDequeue = 0,    ///< queued task cancelled before a Worker picked it up
@@ -77,7 +77,7 @@ public:
     int64_t QueueDepth(QueueState state) const;
 
     // --- cortrix_tasks_zombie_cleaned_total (Counter, no label) ---
-    // Increment by the number of zombie tasks the cron swept to failed (§4.3).
+    // Increment by the number of zombie tasks the cron swept to failed.
     void AddZombieCleaned(uint64_t n);
     uint64_t ZombieCleanedCount() const;
 

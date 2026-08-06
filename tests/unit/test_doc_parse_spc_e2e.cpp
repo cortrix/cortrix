@@ -228,7 +228,7 @@ TEST_F(DocParseSpcE2ETest, ParsedDocReachesSpcPipelineAndWritesBlocks) {
     Status s = proc.ProcessTask(task);
     EXPECT_TRUE(s.ok()) << s.message();
 
-    // Task reached the terminal completed state (handler-owned finalize · §4.1.1).
+    // Task reached the terminal completed state (handler-owned finalize ·).
     EXPECT_EQ(mgr_.GetTask(task.task_id).value().status, async::task_status::kCompleted);
 
     // Blocks really persisted in the test-ns store: ≥1 child (kBlockFile) + exactly one

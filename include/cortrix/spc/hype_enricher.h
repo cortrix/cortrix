@@ -38,23 +38,23 @@ struct HypeQuestion {
 /// peer of LlmEnricher / ContextualRetrieval.
 ///
 /// ⚠️ Two contract reconciles (Lead-ruled 2026-06-01, the HyPE design
-/// §7.1 / §6.3 reverse-revised to D3.5):
+/// reverse-revised to integration):
 ///   1. The frozen ISpcEnricher::EnrichResult (shared enricher type) has NO
 ///      hype_questions field and no generic extension slot, so Enrich() returns a
 ///      STANDARD EnrichResult (status only — HyPE does no NER, so entities/summary
 ///      stay empty). The hype questions are produced by the dedicated
 ///      GenerateHypeQuestions() below; the SPC pipeline consuming them into
-///      hype_question Blocks (design §5.2 / §9.1 `result.hype_questions`) is
-///      cross-Feature wiring → D3.5.
+///      hype_question Blocks (design `result.hype_questions`) is
+///      cross-Feature wiring → integration.
 ///   2. The frozen 3-param Enrich(chunk_text, doc_meta, ctx) carries NO parent_id
 ///      (neither DocumentMetadata nor ChunkContext has one), so parent_text is an
 ///      OPTIONAL context: GenerateHypeQuestions takes an explicit parent_text (the
 ///      caller resolves it via ParentChunkStore when it has a parent_id). The real
-///      chunk→parent binding through the pipeline = D3.5. Standalone covers both
+///      chunk→parent binding through the pipeline = integration. Standalone covers both
 ///      "with parent_text" and "no parent_text" paths.
 ///
 /// 🔌 Network seam: the LLM is reached through an injected llm::ILlmClient (design
-/// §5.1 wrote the concrete OpenAiLlmClient + an IMetricsRegistry — reconciled here
+/// wrote the concrete OpenAiLlmClient + an IMetricsRegistry — reconciled here
 /// to the frozen ILlmClient seam; metrics use the self-contained HypeMetrics
 /// recorder (S7), the IMetricsRegistry type does not exist in the frozen tree).
 /// Tests inject MockLlmClient + MockParentChunkStore.
@@ -123,7 +123,7 @@ public:
     static Result<std::vector<std::string>> ParseQuestions(
         const std::string& llm_output, int expected_k);
 
-    /// Build the §6.1 v1 English prompt. `parent_text` is optional (reconcile 2):
+    /// Build the v1 English prompt. `parent_text` is optional (reconcile 2):
     /// when empty the "Parent context" section is OMITTED entirely (not emitted
     /// with an empty body). Exposed for tests asserting the rendered prompt.
     std::string BuildPrompt(const std::string& chunk_text,

@@ -8,7 +8,7 @@ std::size_t UnitResourceBundle::MemoryEstimateBytes() const {
     if (index) total += index->GetMemoryFootprintBytes();
     // pending.wal size (pool hook, WriteCoordinator::GetPwlSizeBytes). The
     // store.db connection's own SQLite cache is bounded by the PRAGMA cache_size
-    // (§7.1, 2MB/Unit) and is not separately accounted here — the index dominates.
+    // (/Unit) and is not separately accounted here — the index dominates.
     if (pwl) total += pwl->GetPwlSizeBytes();
     return total;
 }

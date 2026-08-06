@@ -7,12 +7,12 @@ namespace cortrix::import {
 /// Database-import observability metrics (subsystem `import`).
 /// Naming `cortrix_import_<metric>_<unit>`. Self-contained dependency-free recorder
 /// (same pattern as RerankerMetrics / OnnxMetrics); registering into the
-/// `/metrics` scrape endpoint is cross-Feature wiring → D3.5.
+/// `/metrics` scrape endpoint is cross-Feature wiring → integration.
 ///
-/// v1.0.2 reverse-fix (§5.5 note): the high-cardinality labels `namespace` (on
+/// v1.0.2 reverse-fix (note): the high-cardinality labels `namespace` (on
 /// rows_imported) and `tenant_id` (on connections_active) were REMOVED — they are on
-/// the OBS_SPEC §3.2 absolute-deny list. per-tenant / per-namespace breakdown goes
-/// through the OBS_SPEC §3.4 per-tenant API, not metric labels.
+/// the OBS_SPEC absolute-deny list. per-tenant / per-namespace breakdown goes
+/// through the OBS_SPEC per-tenant API, not metric labels.
 class ImportMetrics {
 public:
     /// status label for cortrix_import_imports_total.
@@ -27,11 +27,11 @@ public:
     void RecordImport(ImportOutcome outcome);
     uint64_t ImportsCount(ImportOutcome outcome) const;
 
-    // cortrix_import_rows_imported_total (Counter, no label — §5.5 note removed namespace).
+    // cortrix_import_rows_imported_total (Counter, no label — note removed namespace).
     void AddRowsImported(int64_t rows);
     uint64_t RowsImportedTotal() const;
 
-    // cortrix_import_connections_active (Gauge, no label — §5.5 note removed tenant_id).
+    // cortrix_import_connections_active (Gauge, no label — note removed tenant_id).
     void IncConnectionsActive();
     void DecConnectionsActive();
     int64_t ConnectionsActive() const;
@@ -41,7 +41,7 @@ public:
     int64_t QueueDepth() const;
 
     // cortrix_import_duration_seconds (Histogram, label: text_strategy).
-    // text_strategy is "per_row" / "merge" (§5.5; any other value buckets as per_row).
+    // text_strategy is "per_row" / "merge" (any other value buckets as per_row).
     void ObserveImportDuration(const std::string& text_strategy, double seconds);
 
     // cortrix_import_query_duration_seconds (Histogram, label: query_type).

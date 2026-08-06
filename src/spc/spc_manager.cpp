@@ -1,7 +1,7 @@
 #include <cstdint>
 #include "cortrix/spc/spc_manager.h"
 #include "cortrix/spc/spc_pipeline.h"
-#include "cortrix/resource/namespace_facade.h"  // D3.5 wire⑤: per-task NamespaceFacade
+#include "cortrix/resource/namespace_facade.h"  // integration wire⑤: per-task NamespaceFacade
 #include <chrono>
 #include <fstream>
 #include <cstdio>

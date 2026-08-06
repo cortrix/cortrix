@@ -2,7 +2,7 @@ import { API_BASE } from '../utils/constants';
 import { mockApi } from './mock';
 import { fallbackToMock } from './fallback';
 
-// Health endpoints (web UI design § 4.2, readiness). Two K8s-style probes:
+// Health endpoints (web UI design, readiness). Two K8s-style probes:
 //   GET /api/v1/system/health/live   — process liveness (always 200 when up)
 //   GET /api/v1/system/health/ready  — readiness, 200 when all 5 components are
 //                                      ready, 503 (not_ready) while any is down.

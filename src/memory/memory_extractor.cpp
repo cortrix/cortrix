@@ -70,7 +70,7 @@ MemoryType ParseMemoryType(const std::string& s) {
     if (lower == "fact") return MemoryType::kFact;
     if (lower == "preference") return MemoryType::kPreference;
     if (lower == "event") return MemoryType::kEvent;
-    return MemoryType::kUnknown;  // D4: caller coerces to event
+    return MemoryType::kUnknown;  //: caller coerces to event
 }
 
 const char* ToString(MemoryStatus status) {
@@ -94,7 +94,7 @@ MemoryExtractor::MemoryExtractor(std::shared_ptr<llm::ILlmClient> llm,
       config_(std::move(config)) {}
 
 std::string MemoryExtractor::BuildWindowText(const std::vector<InteractionLog>& window) const {
-    // Keep only the most recent `window_size_default` turns (D3). The window is
+    // Keep only the most recent `window_size_default` turns. The window is
     // oldest→newest; we take the tail.
     const int max_turns = std::max(1, config_.window_size_default);
     size_t start = 0;
@@ -147,7 +147,7 @@ MemoryExtractor::ParseExtractionJson(const std::string& llm_output) const {
         }
         ExtractedMemory mem;
         mem.content = item["content"].get<std::string>();
-        // D4 fallback: unknown/missing type → event.
+        // fallback: unknown/missing type → event.
         MemoryType t = MemoryType::kUnknown;
         if (item.contains("type") && item["type"].is_string()) {
             t = ParseMemoryType(item["type"].get<std::string>());
@@ -181,7 +181,7 @@ MemoryExtractionResult MemoryExtractor::DisabledResult(const std::string& intera
 MemoryExtractionResult MemoryExtractor::Extract(const InteractionLog& current_turn,
                                                 const observability::TraceContext* ctx) {
     // Standalone: the real multi-turn get_window pulls preceding turns from the store
-    // (D3.5 wiring). Here we extract over the single current turn as the window.
+    // (integration wiring). Here we extract over the single current turn as the window.
     return ExtractFromWindow({current_turn}, ctx);
 }
 
@@ -209,7 +209,7 @@ MemoryExtractionResult MemoryExtractor::ExtractFromWindow(
         return result;
     }
 
-    // 1. Build prompt + call LLM (D3 / D10).
+    // 1. Build prompt + call LLM (/).
     const std::string window_text = BuildWindowText(window);
     const char* tmpl = ExtractPromptTemplate(PromptLang::kAuto, window_text);
     const std::string prompt = RenderPrompt(tmpl, kPlaceholderInteractionWindow, window_text);
@@ -257,7 +257,7 @@ MemoryExtractionResult MemoryExtractor::ExtractFromWindow(
         return result;
     }
 
-    // 2. Parse extraction JSON (D4 fallback applied inside).
+    // 2. Parse extraction JSON (fallback applied inside).
     Result<std::vector<ExtractedMemory>> parsed = ParseExtractionJson(resp.content);
     if (!parsed.ok()) {
         metrics.RecordExtract(MemoryExtractMetrics::ExtractStatus::kFailed);
@@ -275,11 +275,11 @@ MemoryExtractionResult MemoryExtractor::ExtractFromWindow(
         m.source_session_id = session_id;
     }
 
-    // 3. Contradiction judgment (D5) over the extracted facts.
+    // 3. Contradiction judgment over the extracted facts.
     std::vector<ContradictionPair> contradictions =
         FindContradictions(ns, memories, ctx);
 
-    // 4. Persist + stamp invalidation + operation_log (D6 / §4.2.3).
+    // 4. Persist + stamp invalidation + operation_log (/).
     Status wstatus = WriteWithOperationLog(ns, user_id, memories, contradictions, ctx);
     if (!wstatus.ok()) {
         metrics.RecordExtract(MemoryExtractMetrics::ExtractStatus::kFailed);
@@ -290,7 +290,7 @@ MemoryExtractionResult MemoryExtractor::ExtractFromWindow(
         return result;
     }
 
-    // 5. Assemble result + extract_meta (D11).
+    // 5. Assemble result + extract_meta.
     ExtractMeta meta;
     meta.llm_model = used_model;
     meta.llm_latency_ms = latency_ms;
@@ -332,8 +332,8 @@ std::vector<ContradictionPair> MemoryExtractor::FindContradictions(
     auto& metrics = MemoryExtractMetrics::Instance();
 
     for (const auto& nm : new_memories) {
-        // Only facts participate in contradiction (D5: "judge whether the new fact contradicts the old fact" —
-        // the judge is fact-centric; preferences upgrade via the D8 mention-count
+        // Only facts participate in contradiction ("judge whether the new fact contradicts the old fact" —
+        // the judge is fact-centric; preferences upgrade via the mention-count
         // path, and events are temporal — "temporary event vs long-term fact" is
         // explicitly NOT a contradiction).
         if (nm.type != MemoryType::kFact) continue;
@@ -384,7 +384,7 @@ bool MemoryExtractor::MaybeUpgradePreference(const std::string& ns,
         block.metadata_json = nlohmann::json::object();
     }
 
-    // Increment mention_count (D8). Read the existing count defensively.
+    // Increment mention_count. Read the existing count defensively.
     int count = 1;
     if (block.metadata_json.contains("mention_count") &&
         block.metadata_json["mention_count"].is_number_integer()) {
@@ -397,7 +397,7 @@ bool MemoryExtractor::MaybeUpgradePreference(const std::string& ns,
     }
 
     block.metadata_json["mention_count"] = count + 1;
-    // D8 immunity: once count+1 >= threshold within the window, the preference is
+    // immunity: once count+1 >= threshold within the window, the preference is
     // immune (status stays active — the scorer reads status=active → weight ×1.0; the
     // immune flag records that it no longer decays as an event-like preference).
     const bool immune = IsPreferenceImmune(
@@ -440,8 +440,8 @@ Status MemoryExtractor::WriteWithOperationLog(
     auto& metrics = MemoryExtractMetrics::Instance();
     const std::string now = NowIso8601();
 
-    // 1. Insert each new memory block with the §4.1 metadata_json fields; mint a ULID.
-    //    A repeat preference (D8) upgrades the existing block's mention_count instead
+    // 1. Insert each new memory block with the metadata_json fields; mint a ULID.
+    //    A repeat preference upgrades the existing block's mention_count instead
     //    of inserting a duplicate.
     for (auto& m : new_memories) {
         if (m.type == MemoryType::kPreference &&
@@ -466,7 +466,7 @@ Status MemoryExtractor::WriteWithOperationLog(
             {"user_id", user_id},
         };
         if (m.type == MemoryType::kPreference) {
-            // First mention (D8): count starts at 1, not yet immune.
+            // First mention: count starts at 1, not yet immune.
             rec.metadata_json["mention_count"] = 1;
             rec.metadata_json["first_mentioned_at"] = now;
         }
@@ -476,7 +476,7 @@ Status MemoryExtractor::WriteWithOperationLog(
         }
     }
 
-    // 2. Stamp invalidation state on contradicted old blocks (D6 / §4.2.3) + record
+    // 2. Stamp invalidation state on contradicted old blocks (/) + record
     //    which new block invalidated each.
     for (const auto& c : contradictions) {
         // Find the minting new block for this contradiction (match by content).
@@ -512,7 +512,7 @@ Status MemoryExtractor::WriteWithOperationLog(
         }
         metrics.RecordInvalidation(MemoryExtractMetrics::TriggeredBy::kLlmAuto);
 
-        // operation_log: memory_invalidate (§4.2.2 — action {resource}_{verb}).
+        // operation_log: memory_invalidate (action {resource}_{verb}).
         if (op_logger_) {
             observability::OperationLogEntry e;
             e.user_id = user_id.empty() ? "anonymous" : user_id;
@@ -529,7 +529,7 @@ Status MemoryExtractor::WriteWithOperationLog(
         }
     }
 
-    // 3. operation_log: memory_extract (one summary row for the batch, §4.2.2).
+    // 3. operation_log: memory_extract (one summary row for the batch).
     if (op_logger_ && !new_memories.empty()) {
         observability::OperationLogEntry e;
         e.user_id = user_id.empty() ? "anonymous" : user_id;
@@ -645,7 +645,7 @@ bool MemoryExtractor::IsPreferenceImmune(int existing_mention_count,
                                          const std::string& now_iso,
                                          int threshold,
                                          int window_days) {
-    // D8: a preference becomes immune once it has been mentioned >= threshold times
+    //: a preference becomes immune once it has been mentioned >= threshold times
     // within the rolling window. This call represents one new mention, so the
     // effective count is existing + 1.
     const int effective_count = existing_mention_count + 1;

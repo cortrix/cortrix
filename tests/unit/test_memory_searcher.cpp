@@ -270,7 +270,7 @@ TEST_F(MemorySearchRequestTest, DefaultValuesAreReasonable) {
     EXPECT_EQ(req.top_k, 10);
     EXPECT_EQ(req.scope, MemoryScope::kUser);  // Memory isolation: default changed kAll -> kUser
     EXPECT_FALSE(req.include_expired);
-    EXPECT_FALSE(req.include_invalidated);     // Memory decay D4 default
+    EXPECT_FALSE(req.include_invalidated);     // Memory decay default
     EXPECT_EQ(req.timeout_ms, 5000);
 }
 

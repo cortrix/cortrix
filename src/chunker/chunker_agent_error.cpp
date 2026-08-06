@@ -11,7 +11,7 @@ using agent_friendly::ErrorCategory;
 
 namespace {
 
-// One canonical row per hard error (§ 5.1). All three are caller-side permanent
+// One canonical row per hard error. All three are caller-side permanent
 // (bad config / empty input / over-cap), retryable=false, retry_after_ms=null.
 constexpr ChunkerErrorInfo kSizeInvalidInfo{
     chunk_errors::kSizeInvalid, ErrorCategory::kPermanent, false, std::nullopt};
@@ -36,7 +36,7 @@ const char* ChunkerErrorCodeString(ChunkerErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(ChunkerErrorCode code) {
-    // § 5.1 structured_data column, 1:1. Function-local statics → stable references.
+    // structured_data column, 1:1. Function-local statics → stable references.
     static const std::vector<std::string> kSize{"child_size", "max_seq_length"};
     static const std::vector<std::string> kEmpty{"doc_id", "total_pages", "failed_pages"};
     static const std::vector<std::string> kOverflow{

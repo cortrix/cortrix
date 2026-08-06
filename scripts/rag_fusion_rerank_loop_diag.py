@@ -276,7 +276,7 @@ def profile_matrix(
     }
     if llm_rerank_model:
         llm_rerank_config["model"] = llm_rerank_model
-    # v2 window: widened listwise (§3.5.2 sliding window) + doc-dedup slots via
+    # v2 window: widened listwise (sliding window) + doc-dedup slots via
     # top_k=20 (metric layer dedups doc ids and keeps @10).
     llm_rerank_config_v2 = dict(llm_rerank_config)
     llm_rerank_config_v2["top_n"] = 30
@@ -388,7 +388,7 @@ def profile_matrix(
             "llm_rerank": True,
             "llm_rerank_config": llm_rerank_config,
         },
-        # §3.5.5 attribution control: CE-only over the same widened pool as v2
+        # attribution control: CE-only over the same widened pool as v2
         # (top_k=30). Metric layer trims to @10; artifacts keep the full list so
         # Recall@20/@30 ceilings are measurable offline.
         "dense_rerank_w30": {
@@ -397,7 +397,7 @@ def profile_matrix(
             "search_config": dense_search_config,
             "top_k": 30,
         },
-        # §3.5.5 D-v2: sliding-window listwise over top 30 + presentation-order
+        # D-v2: sliding-window listwise over top 30 + presentation-order
         # consensus + doc-dedup slots (top_k=20 response, metric dedups to @10).
         "dense_rerank_llm_listwise_v2": {
             "rerank": True,
@@ -407,7 +407,7 @@ def profile_matrix(
             "llm_rerank": True,
             "llm_rerank_config": llm_rerank_config_v2,
         },
-        # §3.5.5 E-v2: RAG-Fusion variants widen candidates + v2 listwise ordering.
+        # E-v2: RAG-Fusion variants widen candidates + v2 listwise ordering.
         "dense_llm_full_listwise_v2": {
             "rerank": True,
             "rag_fusion": True,
@@ -417,7 +417,7 @@ def profile_matrix(
             "llm_rerank": True,
             "llm_rerank_config": llm_rerank_config_v2,
         },
-        # §3.5.5 H-v2: hybrid candidate stream (dense + BM25 [+ sparse]) + CE +
+        # H-v2: hybrid candidate stream (dense + BM25 [+ sparse]) + CE +
         # v2 listwise ordering. Stage-A2 found the dense route's recall ceiling
         # (Recall@20 == Recall@30); BM25 adds lexical-match candidates the dense
         # route misses, and the LLM final ordering absorbs the score-scale mix
@@ -429,7 +429,7 @@ def profile_matrix(
             "llm_rerank": True,
             "llm_rerank_config": llm_rerank_config_v2,
         },
-        # §3.5.5 HE-v2: widest LLM path — hybrid candidate routes + RAG-Fusion variant
+        # HE-v2: widest LLM path — hybrid candidate routes + RAG-Fusion variant
         # expansion (candidate side) + v2 listwise (ordering side).
         "hybrid_llm_full_listwise_v2": {
             "rerank": True,
@@ -606,7 +606,7 @@ def main() -> int:
                     ensure_ascii=False,
                 )
                 raise SystemExit(f"query failed; aborting invalid benchmark run: {detail}")
-            # Keep the FULL deduped doc list in artifacts (§3.5.5 — offline
+            # Keep the FULL deduped doc list in artifacts (offline
             # Recall@20/@30 ceilings); metric helpers slice to @k themselves.
             docs_out = extract_doc_ids(response)
             rag = extract_rag_state(response)

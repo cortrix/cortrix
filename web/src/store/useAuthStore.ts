@@ -2,17 +2,17 @@ import { create } from 'zustand';
 import type { CurrentUser } from '../types/api';
 import { login as apiLogin, logout as apiLogout, fetchMe } from '../api/auth';
 
-// useAuthStore (web UI design § 9.2 — V4 CC-02 HttpOnly Cookie refactor).
+// useAuthStore (web UI design — V4 CC-02 HttpOnly Cookie refactor).
 //
 // The auth token is NEVER stored in the frontend (no localStorage / no
-// sessionStorage — that is an XSS one-shot per § 4.5). It lives in an HttpOnly
+// sessionStorage — that is an XSS one-shot per). It lives in an HttpOnly
 // cookie set by the backend on login. This store only tracks UI-level state:
 //   - isAuthenticated  — derived from a /api/v1/auth/me cookie probe
 //   - currentUser      — { id, email, role } from /api/v1/auth/me
 //   - edition          — deployment edition tag (drives feature-flag UI)
 //
 // All auth fetches go through src/api/auth.ts which sends credentials:'include'
-// (cookie auto-attached) + X-CSRF-Token on mutations (§ 4.6). Standalone (D3):
+// (cookie auto-attached) + X-CSRF-Token on mutations. Standalone:
 // auth.ts falls back to a mock session when the backend is unreachable, so the
 // UI is fully exercisable without a live server.
 

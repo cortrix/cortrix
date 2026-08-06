@@ -18,7 +18,7 @@ public:
 
 /// Default sender: does not send; logs the message at INFO so a dev /
 /// CI run can read the verification code. Used whenever email_verification is
-/// false (the §3.6 default) or SMTP is unconfigured. Always succeeds.
+/// false (the default) or SMTP is unconfigured. Always succeeds.
 class NullEmailSender : public IEmailSender {
 public:
     Status Send(const std::string& to, const std::string& subject,

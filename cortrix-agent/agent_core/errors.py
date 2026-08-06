@@ -1,6 +1,6 @@
 """agent error codes + GEN-Agent 4-field error response.
 
-GEN-Agent first principle (AGENT_FRIENDLY.md): every error carries machine-readable
+GEN-Agent first principle (the Agent-friendly contract): every error carries machine-readable
 fields so an Agent caller can decide retry / routing autonomously. The wire shape is::
 
     {"error": {"code", "message", "retryable", "category",
@@ -13,7 +13,7 @@ Scope (design section 10):
   * STARTUP_ERROR_TABLE  = the 5 startup/init-period codes (section 10.3); these are a
     separate group from the "10 locked" runtime codes.
 
-V1.5 stub codes (section 10.2) and D3-implementation boundary codes (section 10.4) are
+V1.5 stub codes (section 10.2) and implementation boundary codes (section 10.4) are
 intentionally NOT emitted by the V1.0 ChatExecutor and are therefore not registered here.
 """
 

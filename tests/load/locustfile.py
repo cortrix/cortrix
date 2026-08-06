@@ -1,5 +1,5 @@
 # =============================================================
-# Test suite W3: Locust load profile (design: test-suite-tests.md §3.2 / §6.3)
+# Test suite W3: Locust load profile (design: test-suite-tests.md)
 # Nightly: locust -f tests/load/locustfile.py --headless -u 100 -r 10
 #          --run-time 5m --host http://localhost:8420
 #

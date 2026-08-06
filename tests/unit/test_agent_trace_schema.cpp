@@ -132,7 +132,7 @@ TEST_F(AgentTraceSchemaTest, TableExistsAndVersionRecorded) {
     EXPECT_EQ(m.CurrentVersion(db_, "agent_trace"), kAgentTraceSchemaVersion);
 }
 
-// DoD: the full §4.1 column set is present (13 columns).
+// DoD: the full column set is present (13 columns).
 TEST_F(AgentTraceSchemaTest, AllColumnsPresent) {
     auto cols = TableColumns(db_, "agent_trace");
     for (const char* c : {"id", "session_id", "trace_id", "agent_id", "method",
@@ -143,7 +143,7 @@ TEST_F(AgentTraceSchemaTest, AllColumnsPresent) {
     EXPECT_EQ(cols.size(), 13u);
 }
 
-// DoD: all 3 §4.1 indices exist.
+// DoD: all 3 indices exist.
 TEST_F(AgentTraceSchemaTest, ThreeIndicesExist) {
     auto idx = QueryTextSet(
         db_, "SELECT name FROM sqlite_master WHERE type='index' "

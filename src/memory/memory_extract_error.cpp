@@ -15,9 +15,9 @@ namespace {
 // row" into a warning (treated as a build failure), so the registry can't silently
 // drift from the enum.
 //
-// retry_after_ms follows §5.3: the three transient/timeout LLM faults
+// retry_after_ms follows: the three transient/timeout LLM faults
 // (EXTRACT_LLM_TIMEOUT / EXTRACT_INVALID_OUTPUT / CONTRADICTION_AMBIGUOUS) advise a
-// 5000ms backoff (§5.2 example body). BUDGET_EXCEEDED (quota) + LLM_DISABLED
+// 5000ms backoff (example body). BUDGET_EXCEEDED (quota) + LLM_DISABLED
 // (permanent) carry no retry hint.
 constexpr MemoryExtractErrorInfo kExtractLlmTimeout
     {"CX_ERR_MEMEXTRACT_LLM_TIMEOUT",      504, ErrorCategory::kTimeout,    true,  5000};
@@ -54,7 +54,7 @@ int MemoryExtractErrorHttpStatus(MemoryExtractErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(MemoryExtractErrorCode code) {
-    // §5.2 structured_data example + the data each fault needs to be actionable by
+    // structured_data example + the data each fault needs to be actionable by
     // an Agent. Function-local statics → stable refs.
     static const std::vector<std::string> kTimeoutKeys
         {"interaction_id", "llm_model", "timeout_ms"};

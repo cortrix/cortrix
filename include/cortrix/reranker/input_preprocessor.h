@@ -15,7 +15,7 @@ enum class InputCategory {
 };
 
 /// Reserved special tokens in a cross-encoder pair input ([CLS] q [SEP] p [SEP]).
-/// (§3.3 "max_seq_length - query - 3 tokens".)
+/// ("max_seq_length - query - 3 tokens".)
 inline constexpr int kReservedSpecialTokens = 3;
 
 /// Categorize one query-passage pair by length (the inner loop's
@@ -39,12 +39,12 @@ struct PreprocessedPassage {
     bool          force_zero;    ///< true for EXTREMELY_LONG → caller sets score=0 (does NOT score)
 };
 
-/// InputPreprocessor — applies the §3.3 three-segment policy to a passage and
+/// InputPreprocessor — applies the three-segment policy to a passage and
 /// drives the truncated_total / extremely_long_total metrics + WARN/ERROR logs.
 ///
-/// Standalone (D3): token counting uses an injected counter (real HfTokenizer
+/// Standalone: token counting uses an injected counter (real HfTokenizer
 /// in S-W later / production; a byte-based proxy by default so it is testable
-/// offline). The query keeps its full length (§7 DoD: "truncation keeps the full query length +
+/// offline). The query keeps its full length (DoD: "truncation keeps the full query length +
 /// the front of the passage"); only the passage is truncated.
 class InputPreprocessor {
 public:

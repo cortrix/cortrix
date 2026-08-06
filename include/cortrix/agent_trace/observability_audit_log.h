@@ -6,12 +6,12 @@ namespace cortrix::agent_trace {
 
 /// Forensics log for admin cross-user access. When an
 /// admin reads another user's traces/interactions/sources, this layer writes a structured
-/// JSON log line (NOT operation_log, NOT a metric — v1.0.5 §9.2: retention is via
+/// JSON log line (NOT operation_log, NOT a metric — v1.0.5: retention is via
 /// log rotation) carrying admin_user_id / target_user_id / endpoint / timestamp so
 /// the access is forensically traceable.
 ///
 /// Standalone: BuildLine() is a pure JSON formatter (testable); Emit() writes it to
-/// stderr (the OBS_SPEC §6 sink wiring — spdlog/file — is D3.5, same as
+/// stderr (the OBS_SPEC sink wiring — spdlog/file — is integration, same as
 /// ObservabilityContext::LogStructured). The handler calls Emit() only on the
 /// admin-cross-user branch.
 class ObservabilityAuditLog {

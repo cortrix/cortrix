@@ -20,7 +20,7 @@ std::string ToLower(std::string s) {
 // Error ParsedDocs use the shared cortrix::spc::MakeErrorDoc (parser.cpp) so the
 // registry-fill logic lives in one place.
 
-/// The pure-image formats that route straight to OCR (§4.1 step 2): Docling does
+/// The pure-image formats that route straight to OCR (step 2): Docling does
 /// not handle them.
 bool IsImageExt(const std::string& ext) {
     return ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tiff" ||
@@ -86,9 +86,9 @@ std::vector<std::string> DocumentParserFactory::ListParsers() const {
 }
 
 IDocumentParser* DocumentParserFactory::SelectPrimary(const std::string& ext) const {
-    // §4.1 step 2: pure images go straight to OCR; everything else (PDF / Office
+    // step 2: pure images go straight to OCR; everything else (PDF / Office
     // / markup / text) routes to the primary (Docling) parser. PDF per-page
-    // pre-detection (§4.1 step 3) lives inside the Docling/OCR path itself (S2/S3).
+    // pre-detection (step 3) lives inside the Docling/OCR path itself (S2/S3).
     if (IsImageExt(ext)) {
         return fallback_.get();
     }
@@ -99,7 +99,7 @@ bool DocumentParserFactory::NeedsFallback(const ParsedDoc& result,
                                           float threshold) const {
     // Never fall back on a hard error the primary already classified as a
     // permanent failure of the *file* (password / corrupted): those don't get
-    // better with OCR (§4.1 step 5, §5.1).
+    // better with OCR (step 5).
     if (result.status == ParserErrorCode::kPasswordProtected ||
         result.status == ParserErrorCode::kCorruptedFile) {
         return false;
@@ -133,7 +133,7 @@ bool DocumentParserFactory::NeedsFallback(const ParsedDoc& result,
 
 ParsedDoc DocumentParserFactory::ParseDocument(const std::string& filepath,
                                                const ParserOptions& opts) {
-    // --- 1. file pre-check (§4.1 step 1) ---
+    // --- 1. file pre-check (step 1) ---
     struct stat st {};
     if (::stat(filepath.c_str(), &st) != 0) {
         return MakeErrorDoc(ParserErrorCode::kFileNotFound,
@@ -166,7 +166,7 @@ ParsedDoc DocumentParserFactory::ParseDocument(const std::string& filepath,
                                                   "jpg", "tiff"})}});
     }
 
-    // --- 2. parser selection (§4.1 step 2) ---
+    // --- 2. parser selection (step 2) ---
     IDocumentParser* primary = SelectPrimary(ext);
     if (primary == nullptr) {
         // No parser registered for this route (e.g. image with no OCR parser
@@ -179,7 +179,7 @@ ParsedDoc DocumentParserFactory::ParseDocument(const std::string& filepath,
     // --- 3. primary parse execution ---
     ParsedDoc result = primary->Parse(filepath, opts);
 
-    // --- 4. fallback orchestration (§4.1 step 4-5, Q2) ---
+    // --- 4. fallback orchestration (step 4-5, Q2) ---
     const bool fallback_allowed =
         opts.enable_ocr_fallback && config_.enable_paddleocr &&
         fallback_ != nullptr && fallback_.get() != primary;
@@ -193,7 +193,7 @@ ParsedDoc DocumentParserFactory::ParseDocument(const std::string& filepath,
             }
             return ocr;
         }
-        // Both failed → ALL_PARSERS_FAILED (§4.1 step 4 double failure).
+        // Both failed → ALL_PARSERS_FAILED (step 4 double failure).
         if (!result.ok() && !ocr.ok()) {
             return MakeErrorDoc(
                 ParserErrorCode::kAllParsersFailed,

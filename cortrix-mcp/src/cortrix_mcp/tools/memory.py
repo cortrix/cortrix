@@ -2,8 +2,8 @@
 4.5.ter / 4.5.quinquies).
 
   #21 cortrix_memory_get_audit  -> GET  /operations?action_in=memory_* (memory extraction audit over operation_log)
-  #22 cortrix_memory_revoke_fact-> POST /memory/{id}/revoke      (memory extraction D6 self-revoke)             [D3.5]
-  #23 cortrix_memory_opt_out    -> POST /memory/session/{id}/opt-out[/revoke] (memory opt-out D2+D5)
+  #22 cortrix_memory_revoke_fact-> POST /memory/{id}/revoke      (memory extraction self-revoke)             [integration]
+  #23 cortrix_memory_opt_out    -> POST /memory/session/{id}/opt-out[/revoke] (memory opt-out)
   #24 cortrix_batch_submit      -> POST /documents/batch         (batch submit, <=100 docs, async)
   #25 cortrix_list_operations   -> GET  /operations              (operation_log)
   #26 cortrix_memory_list       -> GET  /memory                  (memory transparency endpoint 1, API spec real)
@@ -11,9 +11,9 @@
   #28 cortrix_memory_edit       -> PATCH /memory/{id}            (memory transparency endpoint 3, API spec real)
   #29 cortrix_memory_invalidate -> DELETE /memory/{id}           (memory transparency endpoint 4 soft-delete, API spec real)
 
-[D3.5] = endpoint not yet present in the backend HTTP surface; implemented per the feature
+[integration] = endpoint not yet present in the backend HTTP surface; implemented per the feature
 design contract and exercised with mocked HTTP responses during standalone development.
-(#22 stays [D3.5]: the revoke HTTP route is deferred — POST /memory/invalidations/{id}/revoke
+(#22 stays [integration]: the revoke HTTP route is deferred — POST /memory/invalidations/{id}/revoke
 currently returns 501 pending Wave S2 wiring.)
 """
 
@@ -65,7 +65,7 @@ def register(mcp) -> None:
         memory_id: str,
         namespace: str = "",
     ) -> dict:
-        """Self-service revoke of an auto-extracted fact (memory extraction D6).
+        """Self-service revoke of an auto-extracted fact (memory extraction).
 
         Marks the fact auto_revoke_eligible; the physical row is retained (full-retention
         model). D3.5 deferred: POST /memory/{id}/revoke not yet in api/paths/*.yaml — mock.
@@ -84,7 +84,7 @@ def register(mcp) -> None:
         namespace: str = "",
         reason: str = "",
     ) -> dict:
-        """Per-session memory opt-out (and opt-out revoke), memory opt-out D2 + D5 combined.
+        """Per-session memory opt-out (and opt-out revoke), memory opt-out + combined.
 
         Args:
             session_id: session to opt out of memory extraction.
@@ -266,7 +266,7 @@ def register(mcp) -> None:
         """Soft-delete a memory (memory transparency endpoint 4; DELETE /memory/{id}).
 
         Sets status=invalidated + revoked_at + deleted_by_user_id; the physical row is
-        retained (never hard-deleted) per the memory extraction D9 full-retention model and the memory transparency
+        retained (never hard-deleted) per the memory extraction full-retention model and the memory transparency
         transparency vision. ``reason`` is written to metadata_json.invalidation_reason.
 
         Errors pass through: CX_ERR_MEMORY_NOT_FOUND / CX_ERR_MEMORY_USER_MISMATCH /

@@ -34,9 +34,9 @@ DocSummaryConfig ResolveDocSummaryConfig(const cortrix::IGlobalConfig* global);
 /// map-reduce path for long documents (> chunk_threshold). The result
 /// is written to a doc_summary Block (block_type=17) + indexed in P-HNSW; that
 /// write + the async scheduling + the embedding are wired
-/// D3.5 (this round produces the parsed structured summary, standalone-testable).
+/// integration (this round produces the parsed structured summary, standalone-testable).
 ///
-/// 🔌 Seams (standalone reconcile): the design §5.1 wrote a concrete
+/// 🔌 Seams (standalone reconcile): the design wrote a concrete
 /// OpenAiLlmClient + ParentChunkStore + TaskScheduler + IMetricsRegistry. Here
 /// the LLM is the frozen llm::ILlmClient seam (production: OpenAiLlmClient; tests:
 /// MockLlmClient); chunks come from the frozen store::ChunkStore seam
@@ -63,10 +63,10 @@ public:
     /// failure GenerationResult.success is false and .error carries the
     /// CX_ERR_DOCSUMMARY_* identity (the worker maps it to retry / DLQ +
     /// doc_summary_status="failed"). `embedding` is left empty (the OnnxEmbedder
-    /// re-embed is D3.5 pipeline wiring).
+    /// re-embed is integration pipeline wiring).
     GenerationResult Generate(const std::string& doc_id, const std::string& ns_id);
 
-    /// §9.2 map-reduce: short docs (chunks <= chunk_threshold) → one structured
+    /// map-reduce: short docs (chunks <= chunk_threshold) → one structured
     /// call; long docs → Map each kMapGroupSize-chunk group to a partial summary,
     /// then Reduce the partials into the final structured summary. Exposed for
     /// tests; `doc_title` threads into the prompts.
@@ -90,18 +90,18 @@ public:
                                                        int max_chars,
                                                        std::string* parse_repair = nullptr);
 
-    /// Build the §9.1 v1 English structured-output prompt for the full document
+    /// Build the v1 English structured-output prompt for the full document
     /// (short-doc path / Reduce input is BuildReducePrompt). `chunks_concatenated`
     /// is the joined chunk text. Exposed for tests asserting the rendered prompt.
     std::string BuildPrompt(const std::string& doc_title,
                             const std::string& chunks_concatenated) const;
 
-    /// Build the §9.2 Map-stage prompt (a plain-text partial summary for one chunk
+    /// Build the Map-stage prompt (a plain-text partial summary for one chunk
     /// group — not structured JSON).
     std::string BuildGroupSummaryPrompt(const std::string& doc_title,
                                         const std::string& group_text) const;
 
-    /// Build the §9.2 Reduce-stage prompt (combine the Map partials into the final
+    /// Build the Reduce-stage prompt (combine the Map partials into the final
     /// structured JSON summary).
     std::string BuildReducePrompt(const std::string& doc_title,
                                   const std::vector<std::string>& partials) const;

@@ -5,8 +5,8 @@
 #include "cortrix/deploy/deploy_metrics.h"
 
 // Deployment coverage: the deployment/system gauges (disk_usage_ratio /
-// shutdown_status / uptime / build_info, §5.3 + §7.4) and the read-through Bloom
-// Filter gauges (§10) — recording + the OpenMetrics text renderer (stable names,
+// shutdown_status / uptime / build_info) and the read-through Bloom
+// Filter gauges — recording + the OpenMetrics text renderer (stable names,
 // HELP/TYPE lines, subsystem="catalog" label, epoch-second conversion).
 namespace cortrix::deploy {
 namespace {

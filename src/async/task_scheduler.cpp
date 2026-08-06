@@ -58,7 +58,7 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
                 // same doc + different content_hash within window → refresh + reset.
                 // The conditional UPDATE is the authority; the snapshot check only
                 // skips a write we already know is pointless for an in-flight row.
-                // A reset-to-queued is a fresh submission for metrics (§6.bis).
+                // A reset-to-queued is a fresh submission for metrics.
                 const std::string superseded = r.filepath;
                 auto refreshed = mgr_->UpdateTaskForDebounce(r.task_id, req);
                 if (refreshed.ok()) {
@@ -83,7 +83,7 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
     task.filepath = req.filepath;
     task.doc_id = req.doc_id;
     task.content_hash = req.content_hash;
-    task.trace_id = req.trace_id;  // topic 6 — populated during D3 implementation
+    task.trace_id = req.trace_id;  // topic 6 — populated during implementation
     task.metadata_json = req.metadata_json;  // caller doc metadata → persisted on the task
     task.total_pages = req.total_pages;
     task.task_type = req.task_type;
@@ -125,7 +125,7 @@ Result<std::optional<TaskInfo>> TaskScheduler::Dequeue(int worker_id) {
     }
     task.status = task_status::kProcessing;
     task.worker_id = worker_id;
-    // §6.bis cortrix_tasks_queue_depth{state="processing"}: the in-flight doc set
+    // cortrix_tasks_queue_depth{state="processing"}: the in-flight doc set
     // is this scheduler's authoritative processing count within the process.
     TaskMetrics::Instance().SetQueueDepth(
         TaskMetrics::QueueState::kProcessing,

@@ -6,9 +6,9 @@
 #include "cortrix/import/spc_feed.h"
 #include "cortrix/import/text_serializer.h"
 
-// S3 coverage: TextSerializer D4 strategies (PER_ROW / MERGE — no template, DB import
-// §3.5 v1.0.2 resolution 13), the §4.3 Block source URI + metadata, the D5 SPC-feed seam,
-// and the D3 full-overwrite prefix matching (incl. the "users/ ≠ users2/" boundary).
+// S3 coverage: TextSerializer strategies (PER_ROW / MERGE — no template, DB import
+// v1.0.2 resolution 13), the Block source URI + metadata, the SPC-feed seam,
+// and the full-overwrite prefix matching (incl. the "users/ ≠ users2/" boundary).
 namespace cortrix::import {
 namespace {
 
@@ -33,7 +33,7 @@ SourceContext MakeSrc(const std::string& table = "users") {
     return s;
 }
 
-// --- source URI + prefix (§4.3 / ARCH §5.1) ---
+// --- source URI + prefix (/ ARCH) ---
 
 TEST(TextSerializerSourceTest, BuildsPostgresSourceUri) {
     auto src = MakeSrc();
@@ -103,7 +103,7 @@ TEST(TextSerializerTest, EmptyRowsYieldNoChunks) {
     EXPECT_TRUE(ts.Serialize({}, TextStrategy::kMerge, MakeSrc()).empty());
 }
 
-// --- D5 SPC feed seam ---
+// --- SPC feed seam ---
 
 TEST(SpcFeedTest, FeederRecordsChunksAndCounts) {
     InMemorySpcFeeder feeder;
@@ -118,7 +118,7 @@ TEST(SpcFeedTest, FeederRecordsChunksAndCounts) {
     EXPECT_EQ(feeder.batches()[0].chunks[0].source, "postgres://db.internal:5432/crm/users/1");
 }
 
-// --- D3 full-overwrite prefix matching (ARCH §3.6: only this table's Blocks) ---
+// --- full-overwrite prefix matching (ARCH: only this table's Blocks) ---
 
 TEST(BlockCleanerTest, ClearsOnlyMatchingTablePrefix) {
     InMemoryBlockCleaner cleaner;

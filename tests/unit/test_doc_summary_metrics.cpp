@@ -4,9 +4,9 @@
 
 #include "cortrix/doc_summary/doc_summary_metrics.h"
 
-// Doc summary S6 — Document Summary metrics (§12, subsystems `doc_summary` +
+// Doc summary S6 — Document Summary metrics (subsystems `doc_summary` +
 // `fts5_fallback`). Self-contained recorder + OpenMetrics renderer (same pattern
-// as HypeMetrics / SparseMetrics). NO high-cardinality labels (§12).
+// as HypeMetrics / SparseMetrics). NO high-cardinality labels.
 namespace cortrix::doc_summary {
 namespace {
 

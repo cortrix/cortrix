@@ -32,13 +32,13 @@ namespace doc_summary {
 /// retry / DLQ (3 attempts), and doc-discovery degrades to the metadata-field FTS5 fallback
 /// for that doc (a failed doc simply has no doc_summary block). The doc-level
 /// FTS5 index (rule-extracted fields, not the LLM summary) is a separate path; wiring it to
-/// the per-Unit store is its own D3.5 item, NOT this worker.
+/// the per-Unit store is its own integration item, NOT this worker.
 ///
 /// ProcessTask(TaskInfo) is shaped like async::DocumentProcessor::ProcessTask so the
 /// WorkerPool can dispatch by task_type (the dispatch wiring itself is scheduler productization).
 ///
 /// Metrics: the doc_summary OBS counters (llm_calls_total / summaries_generated_total)
-/// are recorded by DocSummaryGenerator itself (the LLM data layer, §12); the worker does
+/// are recorded by DocSummaryGenerator itself (the LLM data layer); the worker does
 /// NOT re-record them (no double counting). It is a pure orchestration layer.
 ///
 /// Seams: the LLM is the frozen llm::ILlmClient (prod OpenAiLlmClient; tests

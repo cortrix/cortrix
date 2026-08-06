@@ -14,11 +14,11 @@
 
 // Sparse retrieval S11 — standalone integration: the full sparse pipeline wired together
 // against the stub embedder + in-memory inverted index. Covers cases 1/2/3/4/5/
-// 7/8 (the ones that don't need a real model/BEIR dataset — those are D3.5):
+// 7/8 (the ones that don't need a real model/BEIR dataset — those are integration):
 //   embed (dense+sparse) -> serialize round-trip -> index Add -> Search ->
 //   5-path RRF fuse -> L2 fallback degrade.
-// Real ONNX inference + BEIR Recall@10 (+3pp) = D3.5 (see bench_sparse +
-// detailed-design §13.bis 2.3).
+// Real ONNX inference + BEIR Recall@10 (+3pp) = integration (see bench_sparse +
+// detailed-design 2.3).
 namespace cortrix::retrieval {
 namespace {
 
@@ -146,10 +146,10 @@ TEST(SparseIntegrationTest, IT8_CacheHitRateUnderLoad) {
     }
     auto q = EmbedToSparse(emb, "stable corpus tokens here");
     for (int i = 0; i < 20; ++i) (void)idx.Search(q, "ns", 50);
-    EXPECT_GE(idx.cache_hit_rate(), 0.70);  // §verify ≥70%
+    EXPECT_GE(idx.cache_hit_rate(), 0.70);  // ≥70%
 }
 
-// Metric integration: the pipeline can record the §10 metrics end-to-end.
+// Metric integration: the pipeline can record the metrics end-to-end.
 TEST(SparseIntegrationTest, MetricsRecordedAlongPipeline) {
     SparseMetrics::Instance().ResetForTest();
     using IS = SparseMetrics::InferenceStatus;

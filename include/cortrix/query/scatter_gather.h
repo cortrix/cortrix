@@ -17,7 +17,7 @@ namespace cortrix::query {
 
 /// TraceContext — minimal placeholder for end-to-end tracing (4th
 /// param). The full type is owned by the observability subsystem; this layer only needs a
-/// trace_id to pass through into QueryContext. Real TraceContext wiring = D3.5.
+/// trace_id to pass through into QueryContext. Real TraceContext wiring = integration.
 struct TraceContext {
     std::string trace_id;
 };
@@ -33,9 +33,9 @@ struct ScatterTimeouts {
 
 /// ScatterGather — the top-level cross-NS query orchestrator.
 ///
-/// Pipeline: AuthorizeNamespaces (§4.2, 5 steps) → single/multi-NS split (topic 1.6) →
+/// Pipeline: AuthorizeNamespaces (steps) → single/multi-NS split (topic 1.6) →
 /// per-NS execute (single = inline, multi = engine_->Submit) with dual-layer
-/// timeouts (topic 2.5) → Gather (§3, W3) → §2.5 8-field response.
+/// timeouts (topic 2.5) → Gather (W3) → 8-field response.
 ///
 /// 🚨 Standalone: ScatterGather holds the IReranker* by its **frozen
 /// contract** (compiled against reranker.h) and the F-Common ExecutorEngine
@@ -43,39 +43,39 @@ struct ScatterTimeouts {
 /// MockIScatterExecutor + MockReranker + MockPermissionService; a real OnnxReranker
 /// / the real permission service / the server route are wired later.
 ///
-/// Scope: Execute() does auth (§4.2) + single/multi split (topic 1.6) + dual-timeout
-/// scatter (topic 2.5) + Gather (§4.1 step 3 — sort by cross-NS rerank_score → B simplified
-/// DedupeByContentHash §3.3 → top_k) + the §2.5 8-field meta (incl. deduplicated_chunks
-/// + warnings) + §3.4 scatter metrics. content_hash is content-derived standalone;
+/// Scope: Execute() does auth + single/multi split (topic 1.6) + dual-timeout
+/// scatter (topic 2.5) + Gather (step 3 — sort by cross-NS rerank_score → B simplified
+/// DedupeByContentHash → top_k) + the 8-field meta (incl. deduplicated_chunks
+/// + warnings) + scatter metrics. content_hash is content-derived standalone;
 /// the Block-header source is wired later.
 class ScatterGather {
 public:
     /// @param executor   the NS executor (V1 = SingleUnitExecutor; NOT owned).
     /// @param engine     shared thread pool for the multi-NS fan-out (NOT owned).
     /// @param reranker   reranker for cross-NS re-rank in Gather (NOT owned;
-    ///                  uses it — held now per §2.2 ctor SoT).
+    ///                  uses it — held now per ctor SoT).
     /// @param perm       permission service for AuthorizeNamespaces (NOT owned).
     ScatterGather(IScatterExecutor* executor,
                   ExecutorEngine* engine,
                   reranker::IReranker* reranker,
                   PermissionService* perm);
 
-    /// Top-level cross-NS query entry (§2.2 V6 D-33: 4-param signature aligned with
-    /// ARCH §2.2 SoT). Throws CrossNsException for hard failures (auth / too-many /
+    /// Top-level cross-NS query entry (V6 D-33: 4-param signature aligned with
+    /// ARCH SoT). Throws CrossNsException for hard failures (auth / too-many /
     /// unauthorized); returns a partial CrossNsResponse (with .error set) for
-    /// scatter-timeout (§2.7 principle 3 — HTTP 200 + partial).
+    /// scatter-timeout (principle 3 — HTTP 200 + partial).
     ///
     /// @param request   query / namespaces / top_k / rerank / filter.
     /// @param auth      BatchCheck input.
     /// @param qctx      optional shared QueryContext; when null, built
     ///                 from request + auth.
-    /// @param trace_ctx optional end-to-end tracing context (OBS_SPEC §5.3).
+    /// @param trace_ctx optional end-to-end tracing context (OBS_SPEC).
     CrossNsResponse Execute(const QueryRequest& request,
                             const AuthContext& auth,
                             const QueryContext* qctx = nullptr,
                             const TraceContext* trace_ctx = nullptr);
 
-    /// Override the dual-layer timeouts (default = §2.7 spec 5s/30s). S4.2 wires
+    /// Override the dual-layer timeouts (default = spec 5s/30s). S4.2 wires
     /// these from the GUC registry; tests set tiny values to exercise timeout paths.
     void SetTimeouts(const ScatterTimeouts& t) { timeouts_ = t; }
     const ScatterTimeouts& timeouts() const { return timeouts_; }
@@ -101,10 +101,10 @@ private:
     CrossNsResponse ExecuteMultiNs(const QueryContext& ctx,
                                    const std::vector<std::string>& nss);
 
-    /// Fold a vector of per-NS results into the §2.5 response (§4.1 step 3): success →
+    /// Fold a vector of per-NS results into the response (step 3): success →
     /// ResultItems sorted by cross-NS rerank_score → B simplified DedupeByContentHash
-    /// (§3.3) → top_k; failures → meta.namespaces_failed[]; the 8-field meta (incl.
-    /// deduplicated_chunks + warnings) is filled; §3.4 metrics recorded.
+    /// → top_k; failures → meta.namespaces_failed[]; the 8-field meta (incl.
+    /// deduplicated_chunks + warnings) is filled; metrics recorded.
     CrossNsResponse GatherAndRerank(std::vector<retrieval::NamespaceQueryResult> results,
                                     const std::vector<std::string>& queried_order,
                                     int top_k,
@@ -118,7 +118,7 @@ private:
 
     IScatterExecutor* executor_;
     ExecutorEngine* engine_;
-    // Held per the §2.2 ctor SoT; consumed by GatherAndRerank's cross-NS re-rank in
+    // Held per the ctor SoT; consumed by GatherAndRerank's cross-NS re-rank in
     // Wave 3 (maybe_unused until then so the W1/W2 build stays warning-clean).
     [[maybe_unused]] reranker::IReranker* reranker_;
     PermissionService* perm_;

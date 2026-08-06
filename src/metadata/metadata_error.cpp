@@ -9,16 +9,16 @@ using agent_friendly::ErrorCategory;
 
 namespace {
 
-// One canonical row per code (detailed design §5.1). Defined as function-local statics so each
+// One canonical row per code (detailed design). Defined as function-local statics so each
 // returns a stable reference. The switch in GetMetadataErrorInfo is intentionally
 // exhaustive: building with -Wall -Wextra (-Wswitch) turns "added a code without a
 // row" into a warning (treated as a build failure), so the registry can't silently
 // drift from the enum.
 //
-// §5.1: all 3 codes are non-retryable (retry_after_ms = null). GEN_FAILED is a 5xx
+//: all 3 codes are non-retryable (retry_after_ms = null). GEN_FAILED is a 5xx
 // permanent error (the parser produced no usable metadata — re-uploading won't help until
 // the source is fixed); PARTIAL is a warning rendered into the HTTP 200 success body
-// (meta.warnings[], §5.3); FIELD_IMMUTABLE is the 405 V1.0 returns for PATCH /metadata
+// (meta.warnings[]); FIELD_IMMUTABLE is the 405 V1.0 returns for PATCH /metadata
 // (locked for V1; Block Versioning changes it to 200 later).
 constexpr MetadataErrorInfo kGenFailed
     {"CX_ERR_METADATA_GEN_FAILED",       ErrorCategory::kPermanent, false, std::nullopt, 500};
@@ -45,20 +45,20 @@ const char* MetadataErrorCodeString(MetadataErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(MetadataErrorCode code) {
-    // §5.1.1 example bodies — the structured_data keys the Agent needs to act.
+    // example bodies — the structured_data keys the Agent needs to act.
     // Function-local statics → stable refs.
     static const std::vector<std::string> kEmpty{};
-    // GEN_FAILED (§5.1.1 example A): the Agent needs to know which stage failed +
+    // GEN_FAILED (example A): the Agent needs to know which stage failed +
     // what is missing + the parse status + what downstream was blocked.
     static const std::vector<std::string> kGenFailedKeys{
         "doc_id", "namespace_id", "stage", "missing_fields",
         "parser_parse_status", "downstream_blocked"};
-    // FIELD_IMMUTABLE (§5.1.1 example B): which fields were attempted + the full
+    // FIELD_IMMUTABLE (example B): which fields were attempted + the full
     // immutable set + the Phase 2 feature + the re-upload workaround.
     static const std::vector<std::string> kFieldImmutableKeys{
         "doc_id", "namespace_id", "attempted_fields",
         "v1_immutable_fields", "phase2_feature", "workaround"};
-    // PARTIAL: the §5.3 warning body carries missing_fields + fallback_reason inside
+    // PARTIAL: the warning body carries missing_fields + fallback_reason inside
     // the meta.warnings[] item (built by the response layer), so the error-registry
     // contract for the warning code itself is contextual (no required top-level keys).
     static const std::vector<std::string> kPartialKeys{};

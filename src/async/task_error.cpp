@@ -15,7 +15,7 @@ namespace {
 // a row" into a warning (treated as a build failure), so the registry can't
 // silently drift from the enum.
 //
-// http_status / category / retryable / retry_after_ms follow §6.2 exactly:
+// http_status / category / retryable / retry_after_ms follow exactly:
 //   400 INVALID_REQUEST            permanent  false  null
 //   403 MAX_PAGES_EXCEEDED         permanent  false  null
 //   404 TASK_NOT_FOUND             permanent  false  null
@@ -80,12 +80,12 @@ int TaskErrorHttpStatus(TaskErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(TaskErrorCode code) {
-    // §6.2 structured_data column. Function-local statics → stable refs.
+    // structured_data column. Function-local statics → stable refs.
     static const std::vector<std::string> kInvalidRequestKeys
         {"rules_violated"};
     static const std::vector<std::string> kMaxPagesKeys
         {"max_pages", "actual_pages", "edition"};
-    static const std::vector<std::string> kEmptyKeys{};  // §6.2: TASK_NOT_FOUND → {}
+    static const std::vector<std::string> kEmptyKeys{};  //: TASK_NOT_FOUND → {}
     static const std::vector<std::string> kTimeoutKeys
         {"task_id", "timeout_seconds", "last_phase"};
     static const std::vector<std::string> kDocInProgressKeys

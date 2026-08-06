@@ -17,12 +17,12 @@ add_executable(cortrix_unit_tests
     unit/test_auth_middleware_jwt.cpp
     unit/test_password_reset.cpp
     unit/test_api_keys.cpp
-    # --- D3.5 r2 · Wave P wiring logic (ApiKeyAuth DB fallback + agent_llm codec) ---
+    # --- integration r2 · Wave P wiring logic (ApiKeyAuth DB fallback + agent_llm codec) ---
     unit/test_wavep_wiring.cpp
     unit/test_batch_temp_lifecycle.cpp
     unit/test_batch_ingest_identity_and_ownership.cpp
     unit/test_jwt_secret_rotate.cpp
-    # --- FA1 R11: auth admin/users (§2.13-bis) + JWT rotation route (§2.11) ---
+    # --- FA1 R11: auth admin/users + JWT rotation route ---
     unit/test_admin_users_routes.cpp
     unit/test_jwt_rotate_route.cpp
     unit/test_smtp_admin_api.cpp
@@ -90,12 +90,12 @@ add_executable(cortrix_unit_tests
     unit/test_contextual_metrics.cpp
     unit/test_contextual_enricher.cpp
     unit/test_enricher_store.cpp
-    # --- I1/I2 enricher chain + contextualized persist (D3.5 round-2 Wave I) ---
+    # --- I1/I2 enricher chain + contextualized persist (integration round-2 Wave I) ---
     unit/test_enricher_chain.cpp
     unit/test_contextual_store.cpp
-    # --- M1 memory store adapters + user_facts (D3.5 round-2 Wave M) ---
+    # --- M1 memory store adapters + user_facts (integration round-2 Wave M) ---
     unit/test_memory_block_adapter.cpp
-    # --- M6 agent trace observability per-NS routes (D3.5 round-2 Wave M) ---
+    # --- M6 agent trace observability per-NS routes (integration round-2 Wave M) ---
     unit/test_observability_routes_per_ns.cpp
     unit/test_mock_response_builder.cpp
     mocks/mock_response_builder.cpp
@@ -272,7 +272,7 @@ add_executable(cortrix_unit_tests
     scatter/test_scatter_guc.cpp
     scatter/test_scatter_plan.cpp
     scatter/test_cross_ns_query_handler.cpp
-    # --- Cross-NS Query (Wave 5 — 7 §7.5 integration scenarios) -------
+    # --- Cross-NS Query (Wave 5 — 7 integration scenarios) -------
     scatter/test_scatter_integration.cpp
     # --- RAG-Fusion (Wave B) -------
     unit/test_rag_fusion.cpp
@@ -339,7 +339,7 @@ add_executable(cortrix_unit_tests
     unit/test_memory_opt_out_error.cpp
     unit/test_memory_opt_out_metrics.cpp
     unit/test_opt_out_manager.cpp
-    # --- memory isolation Per-user Isolation metrics (D35-MET-09) ---
+    # --- memory isolation Per-user Isolation metrics (MET-09) ---
     unit/test_memory_isolation_metrics.cpp
     unit/test_prompt_templates.cpp
     unit/test_memory_queue.cpp
@@ -368,7 +368,7 @@ add_executable(cortrix_unit_tests
     unit/test_deploy_metrics.cpp
     unit/test_deploy_reason_vocabulary.cpp
     unit/test_deploy_graceful_shutdown.cpp
-    # --- ID System Infrastructure (D3.5 Batch 0 prerequisite) ---
+    # --- ID System Infrastructure (integration Batch 0 prerequisite) ---
     unit/test_siphash.cpp
     unit/test_id_hash.cpp
     unit/test_store_persistence_r7.cpp

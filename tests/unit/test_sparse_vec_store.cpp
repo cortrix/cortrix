@@ -11,8 +11,8 @@
 
 // Q4 — WriteSparseVec persists a child's SPLADE sparse vector into the
 // blocks.sparse_vec BLOB column SparseSchemaProvider adds. Tests the write, the BLOB
-// round-trip through the §4.2 codec, and the empty-vector → SQL NULL (dead chunk,
-// §6.5) path.
+// round-trip through the codec, and the empty-vector → SQL NULL (dead chunk,
+//) path.
 namespace cortrix::retrieval {
 namespace {
 
@@ -72,7 +72,7 @@ TEST_F(SparseVecStoreTest, EmptyVectorWritesSqlNull) {
     ASSERT_TRUE(WriteSparseVec(db_, 7, empty).ok());
 
     auto [is_null, got] = ReadSparse(7);
-    EXPECT_TRUE(is_null);          // dead chunk (§6.5) → NULL, not an all-zero BLOB
+    EXPECT_TRUE(is_null);          // dead chunk → NULL, not an all-zero BLOB
     EXPECT_TRUE(got.terms.empty());
 }
 

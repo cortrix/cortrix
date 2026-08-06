@@ -25,7 +25,7 @@ namespace cortrix::async {
 /// finalizer agnostic to any one handler's error namespace.
 ///
 /// Duration: the handler times its own execution (it knows the boundary) and passes
-/// t_start; the finalizer records it (cortrix_tasks_duration_seconds, End-to-end §6.bis).
+/// t_start; the finalizer records it (cortrix_tasks_duration_seconds, End-to-end).
 class TaskFinalizer {
 public:
     /// @param mgr borrowed TaskManager (terminal row write)

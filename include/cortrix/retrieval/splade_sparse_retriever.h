@@ -22,8 +22,8 @@ namespace cortrix::retrieval {
 /// global), not NS-overridable.
 struct SpladeConfig {
     int default_top_k = 100;          ///< K=100 default (NS 50-200)
-    int posting_list_cap = 1000;      ///< per-term posting cap, weight DESC (§6.5)
-    size_t posting_cache_capacity = 1024;  ///< LRU: max cached posting lists (§6 S6)
+    int posting_list_cap = 1000;      ///< per-term posting cap, weight DESC
+    size_t posting_cache_capacity = 1024;  ///< LRU: max cached posting lists (S6)
 };
 
 /// SPLADE inverted-index sparse retriever (Phase 1 direct impl).
@@ -31,13 +31,13 @@ struct SpladeConfig {
 /// Search accumulates SPLADE dot-product scores over the query terms' posting
 /// lists with a per-term LRU cache.
 ///
-/// Standalone (D3): owns its own sqlite3 handle (":memory:" or temp file) so the
+/// Standalone: owns its own sqlite3 handle (":memory:" or temp file) so the
 /// algorithm is unit-testable without the write coordinator / namespace pool / children
-/// wiring (that single-DB, FK-to-children, atomic-write integration = D3.5). The
+/// wiring (that single-DB, FK-to-children, atomic-write integration = integration). The
 /// detailed design's `shared_ptr<SQLiteHandle>` ctor param does not exist in the
 /// frozen tree (there is no SQLiteHandle type) — standalone takes a db_path and
 /// owns the connection (mirrors SqliteParentChunkStore); injecting the pooled
-/// pool connection is D3.5.
+/// pool connection is integration.
 class SpladeSparseRetriever : public ISparseRetriever {
 public:
     /// @param config  top-K + caps + cache size.
@@ -56,22 +56,22 @@ public:
 
     // --- ISparseRetriever ---
 
-    /// Query top-K (§6.3): for each query term, read its posting list (LRU
+    /// Query top-K: for each query term, read its posting list (LRU
     /// cached), accumulate query_weight × chunk_weight per child, return top-K by
     /// score DESC. `top_k <= 0` uses config.default_top_k. On an internal fault
     /// returns an empty vector + flips last_search_failed() (L2 fallback signal,
-    /// §7.2) — never throws.
+    ///) — never throws.
     std::vector<SparseHit> Search(const SparseVector& query,
                                   const NamespaceId& ns_id, int top_k) override;
 
-    /// Incremental write (§6.1): replace `child_id`'s postings with `vec` (delete
-    /// then insert, in one txn). Empty `vec` = remove (§6.5). Invalidates the
+    /// Incremental write: replace `child_id`'s postings with `vec` (delete
+    /// then insert, in one txn). Empty `vec` = remove. Invalidates the
     /// affected terms' cache entries. OK or
     /// CX_ERR_SPARSE_INVERTED_INDEX_WRITE_FAILED (retryable).
     Status Add(const NamespaceId& ns_id, const ChildId& child_id,
                const SparseVector& vec) override;
 
-    /// Incremental delete (§6.2): drop all postings for `child_id` in `ns_id`.
+    /// Incremental delete: drop all postings for `child_id` in `ns_id`.
     /// Idempotent. OK or CX_ERR_SPARSE_INVERTED_INDEX_WRITE_FAILED.
     Status Remove(const NamespaceId& ns_id, const ChildId& child_id) override;
 
@@ -81,10 +81,10 @@ public:
     // --- observability hooks (S6/S9; metric wiring lands in S10) ---
 
     /// Whether the most recent Search hit an internal fault (→ caller takes L2
-    /// fallback, §7.2). Reset at the start of each Search.
+    /// fallback). Reset at the start of each Search.
     bool last_search_failed() const;
 
-    /// Posting-list LRU cache hit-rate since construction (S6 / §verify ≥70%).
+    /// Posting-list LRU cache hit-rate since construction (S6 / ≥70%).
     double cache_hit_rate() const;
 
 private:

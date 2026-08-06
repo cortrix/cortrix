@@ -14,7 +14,7 @@ constexpr int kAuthSchemaVersion = 1;
 /// tables (total tables = 7):
 ///   v0 4 tables: users / refresh_tokens / verification_codes / token_blacklist
 ///   v1.0 adds 3 tables: auth_secrets (topic 1.1C) / auth_config (topic 8) / api_keys (topic 7D)
-/// faithfully transcribed from auth-auth-system.md §3.1–§3.7.
+/// faithfully transcribed from auth-auth-system.md–
 ///
 /// 🔒 DB SEPARATION (important — do NOT confuse with the catalog `users` table):
 /// these tables live in **platform.db**, a *different*
@@ -23,7 +23,7 @@ constexpr int kAuthSchemaVersion = 1;
 /// — that is the FROZEN L0 contract and is left untouched. The richer auth
 /// `users` (password_hash / status / login_attempts / …) is a platform.db table.
 /// Same table *name*, different *database file*, different grain — no collision.
-/// Reconciling the two (one users SoT) is cross-Feature wiring = D3.5, not D3.
+/// Reconciling the two (one users SoT) is cross-Feature wiring = integration, not integration.
 ///
 /// SQLite-dialect notes (platform.db is SQLite WAL): types are stored
 /// per affinity; BOOLEAN/bit flags as INTEGER 0/1; `value BLOB` on auth_secrets

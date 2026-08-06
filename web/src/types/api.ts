@@ -257,7 +257,7 @@ export interface LLMConfigRequest {
   base_url?: string;
 }
 
-// --- GEN-Agent structured error (CLAUDE.md § 5 + AGENT_FRIENDLY.md) ---
+// --- GEN-Agent structured error (CLAUDE.md + the Agent-friendly contract) ---
 // Standardized 5-field machine-readable error envelope returned by the backend
 // for 4xx/5xx responses: { error: { code, message, retryable, category,
 // retry_after_ms, structured_data } }. The ErrorDisplay component consumes this
@@ -549,7 +549,7 @@ export interface UserMutationResponse {
 }
 
 // --- Operation Log (operation log CE — GET /api/v1/operations) ---
-// Response shape is the SoT (operation log). The §9-bis.2 table maps the display
+// Response shape is the SoT (operation log). The table maps the display
 // column `namespace` -> `namespace_id` and `status` -> the schema default
 // ('success'); Ent (the Ent audit extension) adds source_ip / user_agent / details_json /
 // failure_reason via the audit_log_extension table (surfaced when the

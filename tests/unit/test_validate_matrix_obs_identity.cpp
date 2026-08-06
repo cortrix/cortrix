@@ -8,7 +8,7 @@
 
 // Exhaustive char-class + length-boundary sweep over the agent trace identity validator
 // (ObservabilityValidator::IsValidFormat + the three Validate* wrappers that
-// share it). Whitelist (header §6.1) = [a-zA-Z0-9_.:/-], non-empty, length
+// share it). Whitelist (header) = [a-zA-Z0-9_.:/-], non-empty, length
 // <= kMaxIdentityLength (128). A basic test exists elsewhere; this is the
 // EXHAUSTIVE per-character + boundary matrix in NEW unique suites
 // (ObsIdentityFormatMatrix / ObsIdentityWrapperMatrix).

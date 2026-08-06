@@ -11,7 +11,7 @@ namespace cortrix::import {
 constexpr int kImportSchemaVersion = 1;
 
 /// The DDL emitted by the schema provider (db_connections +
-/// §4.2 import_tasks). Lives in the catalog DB (catalog.db) alongside the
+/// import_tasks). Lives in the catalog DB (catalog.db) alongside the
 /// tenants / namespaces tables its FKs reference, applied via the shared
 /// SchemaMigrator so it runs inside the same versioned, atomic framework.
 ///

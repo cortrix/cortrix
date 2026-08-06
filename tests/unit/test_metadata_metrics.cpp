@@ -4,7 +4,7 @@
 
 #include "cortrix/metadata/metadata_metrics.h"
 
-// META block coverage: MetadataMetrics (OBSERVABILITY_SPEC subsystem `metadata`) — the
+// META block coverage: MetadataMetrics (the observability spec subsystem `metadata`) — the
 // metadata_block lifecycle counters/gauges/histograms META block drives standalone, and the
 // OpenMetrics Render() naming. Mirrors tests/unit/test_import_metrics.cpp style.
 namespace cortrix::metadata {
@@ -71,7 +71,7 @@ TEST_F(MetadataMetricsTest, RenderEmitsStableMetricNames) {
     EXPECT_NE(out.find("# TYPE cortrix_metadata_block_generated_total counter"), std::string::npos);
     EXPECT_NE(out.find("# TYPE cortrix_metadata_block_count_current gauge"), std::string::npos);
 
-    // High-cardinality labels are forbidden (OBS_SPEC §3.2) — no doc_id / ns_id labels.
+    // High-cardinality labels are forbidden (OBS_SPEC) — no doc_id / ns_id labels.
     EXPECT_EQ(out.find("doc_id=\""), std::string::npos);
     EXPECT_EQ(out.find("ns_id=\""), std::string::npos);
 }

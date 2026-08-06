@@ -16,14 +16,14 @@
 #include "cortrix/observability/operation_logger.h"
 #include "cortrix/server/import_handler.h"
 
-// S3 + S4 + S6 coverage: ImportManager end-to-end orchestration (D1 ref resolve →
-// D2 fetch → D4 textualize → D3 cleanup → D5 feed → D6 async), the operation log
+// S3 + S4 + S6 coverage: ImportManager end-to-end orchestration (ref resolve →
+// fetch → textualize → cleanup → feed → async), the operation log
 // operation_loginstrumentation, the metrics, and the HTTP handler parse/response. Real PG /
-// SPCPipeline / server routing are mocked → D3.5.
+// SPCPipeline / server routing are mocked → integration.
 namespace cortrix::import {
 namespace {
 
-// --- a fake IQueryExecutor that returns canned rows (real PG → D3.5) ---
+// --- a fake IQueryExecutor that returns canned rows (real PG → integration) ---
 class FakeQueryExecutor : public IQueryExecutor {
 public:
     explicit FakeQueryExecutor(std::vector<DbRow> rows) : rows_(std::move(rows)) {}
@@ -150,11 +150,11 @@ TEST(ImportManagerTest, EndToEndImportFeedsChunksAndCompletes) {
         return p && p->status == ImportTaskStatus::kCompleted;
     }));
 
-    // D5: the 2 rows were textualized + fed to the SPC pipeline for the right ns.
+    //: the 2 rows were textualized + fed to the SPC pipeline for the right ns.
     EXPECT_EQ(f.feeder->total_chunks(), 2);
     ASSERT_EQ(f.feeder->batches().size(), 1u);
     EXPECT_EQ(f.feeder->batches()[0].ns, "customer_kb");
-    // §4.3 source URI stamped on the chunk.
+    // source URI stamped on the chunk.
     EXPECT_EQ(f.feeder->batches()[0].chunks[0].source,
               "postgres://db.internal:5432/crm/users/1");
 
@@ -199,7 +199,7 @@ TEST(ImportManagerTest, InvalidQueryRejectedSynchronously) {
     EXPECT_NE(r.status().message().find("CX_ERR_IMPORT_INVALID_SQL"), std::string::npos);
 }
 
-TEST(ImportManagerTest, D3FullOverwriteClearsPriorTableBlocks) {
+TEST(ImportManagerTest, FullOverwriteClearsPriorTableBlocks) {
     ManagerFixture f({Row("1", "Ada")});
     // seed prior Blocks: 2 from this table, 1 from another table.
     f.cleaner->SeedBlock("customer_kb", "postgres://db.internal:5432/crm/users/old1");
@@ -212,7 +212,7 @@ TEST(ImportManagerTest, D3FullOverwriteClearsPriorTableBlocks) {
         auto p = f.mgr->GetProgress(r.value());
         return p && p->status == ImportTaskStatus::kCompleted;
     }));
-    // only the orders Block survives (the 2 prior users Blocks were cleared by D3).
+    // only the orders Block survives (the 2 prior users Blocks were cleared by).
     EXPECT_EQ(f.cleaner->RemainingCount("customer_kb"), 1);
 }
 
@@ -430,8 +430,8 @@ TEST(ImportHandlerTest, ParseRejectsNonObjectAndMissingNamespace) {
                      .ok());  // no connection_ref
 }
 
-// A failed import's progress body embeds the §5.3 error (via the real QueryExecutor
-// which returns CONNECTION_FAILED in standalone — the live PG path is D3.5).
+// A failed import's progress body embeds the error (via the real QueryExecutor
+// which returns CONNECTION_FAILED in standalone — the live PG path is integration).
 TEST(ImportHandlerTest, ProgressBodyForFailedImportHasErrorEnvelope) {
     // Use the *real* validating QueryExecutor so the worker fails on the PG seam.
     auto secret = std::make_shared<InMemorySecretStore>();

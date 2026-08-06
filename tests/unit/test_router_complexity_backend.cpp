@@ -4,7 +4,7 @@
 #include "cortrix/query/heuristic_complexity_backend.h"
 
 // Query routing coverage: the standalone HeuristicComplexityBackend (no-ONNX stub) + the
-// ComplexityConfig validation helpers (§4.2).
+// ComplexityConfig validation helpers.
 namespace cortrix::query {
 namespace {
 
@@ -56,7 +56,7 @@ TEST(RouterHeuristicBackendTest, ReportedConfidenceConfigurable) {
     EXPECT_NEAR(b.Infer("anything short").confidence, 0.3f, 1e-6);
 }
 
-// --- ComplexityConfig (§4.2) --------------------------------------------------
+// --- ComplexityConfig --------------------------------------------------
 
 TEST(RouterComplexityConfigTest, DefaultsMatchSpec) {
     ComplexityConfig c;

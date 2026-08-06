@@ -9,7 +9,7 @@
 
 // Auth S2 (final): Pbkdf2PasswordHasher — the OpenSSL PBKDF2-HMAC-SHA256 production
 // hasher (TECH_DEBT-AUTH-PBKDF2-PLACEHOLDER; a future compatibility update can add real
-// bcrypt). Maps the §S2 hash test cases onto the placeholder (the `$2b$` format
+// bcrypt). Maps the hash test cases onto the placeholder (the `$2b$` format
 // case becomes a `pbkdf2$` format assertion, documenting the deviation).
 namespace cortrix::auth {
 namespace {
@@ -38,7 +38,7 @@ TEST(Pbkdf2HasherTest, WrongPassword) {
     EXPECT_FALSE(ok.value());
 }
 
-// Placeholder format (replaces §S2 `Password_BcryptCost12`): the hash is the
+// Placeholder format (replaces `Password_BcryptCost12`): the hash is the
 // self-describing `pbkdf2$sha256$<iters>$<salt>$<dk>`, NOT `$2b$`. This test
 // documents the intentional spec deviation (TECH_DEBT-AUTH-PBKDF2-PLACEHOLDER).
 TEST(Pbkdf2HasherTest, PlaceholderFormatNotBcrypt) {

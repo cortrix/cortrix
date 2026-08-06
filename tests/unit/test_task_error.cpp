@@ -6,7 +6,7 @@
 #include "cortrix/async/task_error.h"
 
 // S1 coverage: the async task error model (template A) — all 11 CX_ERR_* identities, their
-// §6.2 attributes (http/category/retryable/retry_after_ms/structured_data keys),
+// attributes (http/category/retryable/retry_after_ms/structured_data keys),
 // the AgentFriendlyError builder, and the Status bridge.
 namespace cortrix::async {
 namespace {
@@ -39,7 +39,7 @@ TEST(TaskErrorTest, AllCodesHaveUniqueCxStrings) {
     EXPECT_EQ(seen.size(), 11u);
 }
 
-// §6.2 table, row by row.
+// table, row by row.
 TEST(TaskErrorTest, RegistryMatchesSpecTable) {
     auto chk = [](TaskErrorCode c, const char* code, int http, ErrorCategory cat,
                   bool retry, std::optional<int> retry_ms) {

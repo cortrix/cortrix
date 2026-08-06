@@ -9,15 +9,15 @@
 #include "cortrix/deploy/deploy_error.h"
 
 // Deployment coverage: the disk-space management model — the 4 CX_ERR_* identities
-// (§12 registry table + structured_data keys + AgentFriendlyError builder), the
-// DiskMonitor NORMAL/WARN/CRIT FSM + write-rejection flag (§6.1),
-// the IGlobalConfig threshold loader (§6.4), and the disk_usage_ratio gauge feed.
+// (registry table + structured_data keys + AgentFriendlyError builder), the
+// DiskMonitor NORMAL/WARN/CRIT FSM + write-rejection flag,
+// the IGlobalConfig threshold loader, and the disk_usage_ratio gauge feed.
 namespace cortrix::deploy {
 namespace {
 
 using agent_friendly::ErrorCategory;
 
-// ------------------------- deployment error registry (§12) ------------------
+// ------------------------- deployment error registry ------------------
 
 constexpr DeployErrorCode kAll[] = {
     DeployErrorCode::kDiskFull,
@@ -66,7 +66,7 @@ TEST(DeployErrorTest, RegistryMatchesSpecTable) {
 
 TEST(DeployErrorTest, DiskFullRequiresFiveStructuredKeys) {
     const auto& keys = RequiredStructuredDataKeys(DeployErrorCode::kDiskFull);
-    EXPECT_EQ(keys.size(), 5u);  // §6.3
+    EXPECT_EQ(keys.size(), 5u);  //
     nlohmann::json complete = {
         {"disk_usage_ratio", 0.93}, {"free_bytes", 1024}, {"data_path", "/cortrix-data"},
         {"warn_threshold", 0.8}, {"crit_threshold", 0.9}};
@@ -95,7 +95,7 @@ TEST(DeployErrorTest, StatusBridgePreservesCodeToken) {
     EXPECT_NE(s.message().find("no space"), std::string::npos);
 }
 
-// ------------------------- DiskMonitor FSM (§6.1) -------------------------
+// ------------------------- DiskMonitor FSM -------------------------
 
 DiskUsage RawAtRatio(double ratio) {
     DiskUsage u;
@@ -130,7 +130,7 @@ TEST_F(DiskMonitorTest, BoundaryRatiosAreInclusive) {
     DiskMonitorConfig cfg;
     cfg.data_dir = "/tmp";
     DiskMonitor mon(cfg);
-    // exactly at warn → WARN; exactly at crit → CRIT (>= semantics, §6.1).
+    // exactly at warn → WARN; exactly at crit → CRIT (>= semantics).
     EXPECT_EQ(mon.CheckWithSample(RawAtRatio(0.80)).stage, DiskStage::kWarn);
     EXPECT_EQ(mon.CheckWithSample(RawAtRatio(0.90)).stage, DiskStage::kCrit);
     // dropping back below warn clears the reject flag (recovery).
@@ -177,7 +177,7 @@ TEST_F(DiskMonitorTest, MakeDiskFullErrorHasCompleteBody) {
     EXPECT_DOUBLE_EQ((*err.structured_data)["crit_threshold"].get<double>(), 0.9);
 }
 
-// ------------------------- threshold loader (§6.4) -------------------------
+// ------------------------- threshold loader -------------------------
 
 TEST(DiskConfigTest, DefaultsWhenConfigNull) {
     auto c = DiskMonitorConfig::FromGlobalConfig(nullptr, "/data");

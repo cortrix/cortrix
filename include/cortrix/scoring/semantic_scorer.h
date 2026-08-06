@@ -10,7 +10,7 @@ namespace cortrix::scoring {
 
 /// Scoring main class (writes both BlockHeader.processing_level + blocks.semantic_score).
 ///
-/// Standalone Block reconciliation (B_R3_BRIEFING §2 / §7 — "run UT against constructed Block/BlockHeader
+/// Standalone Block reconciliation ( — "run UT against constructed Block/BlockHeader
 /// test fixtures"): the design sketch is `AssignInitialScore(Block& block, ...)` writing
 /// `block.header.processing_level` (immutable) + `block.semantic_score` (dynamic). In dev
 /// the real header is the frozen 128-byte `cortrix::cortrix_block_header_t` (has
@@ -25,18 +25,18 @@ class SemanticScorer {
 public:
     SemanticScorer() = default;
 
-    /// Called at write time: compute processing_level + initial semantic_score, writing both destinations (D7).
+    /// Called at write time: compute processing_level + initial semantic_score, writing both destinations.
     /// - header.processing_level ← ComputeLevel(input) (immutable, the header byte).
     /// - semantic_score          ← LevelToScore(level), OR 0.0 when input.is_anomalous
-    ///                             (D6 sentinel; processing_level is still written with the normal value — anomalous Blocks
+    ///                             (sentinel; processing_level is still written with the normal value — anomalous Blocks
     ///                             do not enter P-HNSW, but the header level retains the true processing depth).
-    /// `ctx` is the OBS_SPEC §5.3 trace context (nullptr when untraced).
+    /// `ctx` is the OBS_SPEC trace context (nullptr when untraced).
     void AssignInitialScore(cortrix::cortrix_block_header_t& header,
                             float& semantic_score,
                             const ScoringInput& input,
                             const observability::TraceContext* ctx = nullptr);
 
-    /// Query-time fusion (D5 formula C, multiplier mode):
+    /// Query-time fusion (formula C, multiplier mode):
     ///   final_score = rerank_score × (1 + α × (effective_semantic - 0.5))
     ///   effective_semantic = is_anomalous ? 0.0 : coalesce(enriched_score, semantic_score)
     ///     ★ (v1.0.1 M2) anomalous Block explicit priority — forced to 0.0 even when enriched_score exists

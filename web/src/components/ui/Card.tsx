@@ -1,7 +1,7 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 
-// Cortrix VI § 6.4 Card — rounded-lg + shadow-sm (hover:shadow-md), p-4 / p-6
-// padding, with optional Header / Body / Footer sub-sections (VI § 7).
+// Cortrix VI Card — rounded-lg + shadow-sm (hover:shadow-md), p-4 / p-6
+// padding, with optional Header / Body / Footer sub-sections (VI).
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   padding?: 'sm' | 'base';

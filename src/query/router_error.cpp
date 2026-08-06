@@ -15,7 +15,7 @@ namespace {
 // row" into a warning (treated as a build failure), so the registry can't silently
 // drift from the enum.
 //
-// retry_after_ms follows §4.3: INFERENCE_FAILED → 100ms; FALLBACK_TRIGGERED →
+// retry_after_ms follows: INFERENCE_FAILED → 100ms; FALLBACK_TRIGGERED →
 // transient but no fixed delay (the degrade is already applied, "-" in the table);
 // CLASSIFIER_LOAD_FAILED / FORCE_ROUTE_INVALID (permanent) → null.
 constexpr RouterErrorInfo kClassifierLoadFailed
@@ -46,7 +46,7 @@ const char* RouterErrorCodeString(RouterErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(RouterErrorCode code) {
-    // §4.3 structured_data column. Function-local statics → stable refs.
+    // structured_data column. Function-local statics → stable refs.
     static const std::vector<std::string> kLoadKeys
         {"model_path", "version"};
     static const std::vector<std::string> kInferenceKeys

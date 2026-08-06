@@ -11,7 +11,7 @@ import { ProgrammaticBanner } from '../../components/Common/ProgrammaticBanner';
 import { ErrorDisplay } from '../../components/Common/ErrorDisplay';
 import { DynamicColumns, type ColumnDef } from '../../components/Table/DynamicColumns';
 
-// OperationLogPage (web UI design § 9-bis.2 — CE simplified). Integrates the operation log
+// OperationLogPage (web UI design — CE simplified). Integrates the operation log
 // CE operation_log via GET /api/v1/operations (business prefix — NOT
 // /admin/operations, per V5-B4 P0-V5-66). Renders 8 CE columns; when the
 // Filters: user_id / action / resource_type / date range.

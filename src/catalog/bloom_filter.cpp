@@ -42,7 +42,7 @@ BloomFilter::BloomFilter(size_t capacity_bytes, double target_fp_rate) {
     words_ = std::vector<std::atomic<uint64_t>>(words);  // value-init → all 0
 
     // k from the target FP rate: k = round(-log2(p)), the optimal count for a
-    // target p (clamped to [1, 30]). §7 p=0.01 → k≈7.
+    // target p (clamped to [1, 30]). p=0.01 → k≈7.
     double p = (target_fp_rate > 0.0 && target_fp_rate < 1.0) ? target_fp_rate : 0.01;
     int k = static_cast<int>(std::lround(-std::log2(p)));
     if (k < 1) k = 1;
@@ -83,7 +83,7 @@ Status BloomFilter::Add(const std::string& file_hash) {
 }
 
 bool BloomFilter::MightContain(const std::string& file_hash) const {
-    // Conservative while rebuilding (§9.2): claim "maybe present" so the caller
+    // Conservative while rebuilding: claim "maybe present" so the caller
     // falls back to the catalog and correctness never hinges on a partial filter.
     if (!ready_.load(std::memory_order_acquire)) {
         return true;

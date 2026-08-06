@@ -44,7 +44,7 @@ int DedupeByContentHash(std::vector<ResultItem>& items, CrossNsMeta& meta) {
         }
 
         // Multi-NS hit on one content_hash. primary = highest final score source
-        // (§3.3.1); ties resolve to the earliest occurrence (stable).
+        //; ties resolve to the earliest occurrence (stable).
         std::size_t primary_idx = group[0];
         for (std::size_t k = 1; k < group.size(); ++k) {
             if (items[group[k]].score > items[primary_idx].score) {
@@ -52,7 +52,7 @@ int DedupeByContentHash(std::vector<ResultItem>& items, CrossNsMeta& meta) {
             }
         }
 
-        // brief multi-source entry (§2.5): content_hash + primary NS + scores per
+        // brief multi-source entry: content_hash + primary NS + scores per
         // source, in the items' encounter order so it is deterministic.
         DeduplicatedChunkInfo info;
         info.content_hash = items[primary_idx].content_hash;
@@ -67,7 +67,7 @@ int DedupeByContentHash(std::vector<ResultItem>& items, CrossNsMeta& meta) {
         }
         meta.deduplicated_chunks.push_back(std::move(info));
 
-        // Keep the primary's full item (full metadata/content — §3.3.3); the other
+        // Keep the primary's full item (full metadata/content); the other
         // copies are dropped. collapsed counts the removed copies.
         collapsed += static_cast<int>(group.size()) - 1;
         deduped.push_back(std::move(items[primary_idx]));

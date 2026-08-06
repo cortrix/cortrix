@@ -13,11 +13,11 @@ namespace resource { class INamespacePool; }
 
 namespace cortrix::import {
 
-/// [D3.5 r2 · Wave P · P2b] Real ISpcFeeder over the live SPCManager — replaces
+/// [integration r2 · Wave P · P2b] Real ISpcFeeder over the live SPCManager — replaces
 /// InMemorySpcFeeder (feed_to_spc_pipeline, step 6 "feed the
 /// textualized rows into the Pipeline"). Each TextChunk (one textualized DB row,
 /// or a MERGE batch) becomes a single document: a one-page ParsedDoc carrying the
-/// chunk text + the §4.3 source metadata, handed to SPCManager::ProcessParsedDoc
+/// chunk text + the source metadata, handed to SPCManager::ProcessParsedDoc
 /// (the same post-parse seam DocumentProcessor uses — Chunk→META→enrich→embed→
 /// assemble→coordinated write). doc_id is a fresh ULID; content_hash is the chunk text
 /// hash (the dedup identity). The resulting blocks are real + searchable.
@@ -37,7 +37,7 @@ private:
     SPCManager* spc_mgr_;
 };
 
-/// [D3.5 r2 · Wave P · P2c] Real IBlockCleaner for the D3 full-overwrite step
+/// [integration r2 · Wave P · P2c] Real IBlockCleaner for the full-overwrite step
 /// (cleanup_source_blocks). Acquires the target namespace's façade
 /// (the same per-Unit store the SpcManagerFeeder writes into) and deletes every
 /// document whose source_path begins with `source_prefix` together with its blocks,
@@ -56,7 +56,7 @@ private:
     resource::INamespacePool* pool_;
 };
 
-/// [D3.5 r2 · Wave P · P2b] No-op IBlockCleaner — retained as the standalone/test
+/// [integration r2 · Wave P · P2b] No-op IBlockCleaner — retained as the standalone/test
 /// double (never touches a store). Production uses RealBlockCleaner.
 class NoopBlockCleaner : public IBlockCleaner {
 public:

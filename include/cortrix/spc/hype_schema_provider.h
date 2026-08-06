@@ -17,9 +17,9 @@ namespace cortrix::spc {
 ///
 /// Implements the frozen cortrix::catalog::ISchemaProvider. Migrate
 /// returns Status (the HyPE design
-/// §4.4 wrote Result<void>, reconciled to the frozen Status signature here).
+/// wrote Result<void>, reconciled to the frozen Status signature here).
 ///
-/// Standalone (D3): registering this with the live SchemaMigrator at server
+/// Standalone: registering this with the live SchemaMigrator at server
 /// bootstrap (the MigrateUnit path) is wired separately; here it is
 /// fully unit-testable against a SchemaMigrator.
 class HypeSchemaProvider : public cortrix::catalog::ISchemaProvider {
@@ -28,7 +28,7 @@ public:
     std::string FeatureName() const override { return "hype"; }
 
     /// Schema version. V1 = the kBlockHypeQuestion=16 block sub-type (code-level
-    /// enum; no DB schema object). Phase 2 (independent P-HNSW / versioning, §14)
+    /// enum; no DB schema object). Phase 2 (independent P-HNSW / versioning)
     /// would bump this.
     int CurrentVersion() const override { return 1; }
 

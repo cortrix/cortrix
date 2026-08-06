@@ -23,12 +23,12 @@ void ObservabilityModule::Initialize() {
     logger_ = MakeLogger();
 
     // Register operation_log for the daily UTC-02:00 sweep. The trace module registers
-    // agent_trace / interaction_log on the same scheduler at its D3.
+    // agent_trace / interaction_log on the same scheduler at its.
     auto logger = logger_;
     scheduler_.RegisterTable("operation_log", [logger] { logger->Cleanup(); });
     scheduler_.StartScheduler();
 
-    // Inject the logger into every instrumentation site queued so far (§5.3).
+    // Inject the logger into every instrumentation site queued so far.
     for (IOperationLoggerAware* aware : emitters_) {
         if (aware != nullptr) aware->SetOperationLogger(logger_);
     }

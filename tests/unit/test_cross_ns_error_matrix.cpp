@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/query/cross_ns_error.h"
 
-// Exhaustive parameterized error-registry sweep for cross-NS query (§3.1, 6
+// Exhaustive parameterized error-registry sweep for cross-NS query (
 // codes). The query namespace overloads RequiredStructuredDataKeys /
 // HasRequiredStructuredData per enum; this TU only sees the CrossNs overloads.
 namespace cortrix::query {

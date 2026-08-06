@@ -45,7 +45,7 @@ public:
     virtual Result<bool> Verify(const std::string& password,
                                 const std::string& hash) = 0;
 
-    /// The cost factor this hasher applies (bcrypt work factor; 12 per §4.2).
+    /// The cost factor this hasher applies (bcrypt work factor; 12 per).
     virtual int cost() const = 0;
 };
 

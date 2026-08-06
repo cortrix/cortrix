@@ -132,7 +132,7 @@ def build_app(
 
     Components can be injected (tests pass mocks); otherwise they are built from
     ``config.settings``. The Python SDK client is constructed but NOT connected
-    (standalone D3 discipline — design section 5 / sdk_rag TODO(D3.5)).
+    (standalone discipline — design section 5 / sdk_rag TODO(integration)).
     """
     store = session_store or SessionStore()
     llm = llm_adapter if llm_adapter is not None else _create_llm_adapter()
@@ -243,7 +243,7 @@ def build_app(
         """Health check (design section 9.1).
 
         ``cortrix_server`` / ``llm_reachable`` are best-effort: in standalone the
-        cortrix-server status is reported as ``unknown`` (no live ping — TODO(D3.5));
+        cortrix-server status is reported as ``unknown`` (no live ping — TODO(integration));
         LLM reachability uses the adapter's ``check_connection`` when available.
         """
         llm_reachable: Optional[bool] = None

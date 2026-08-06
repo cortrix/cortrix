@@ -8,12 +8,12 @@
 namespace cortrix::store {
 
 /// Minimal consumer-side (DIP) contracts the WriteCoordinator depends on for
-/// the three-way crash-recovery consistency check (design § 4.4, Q1-C). Defined
+/// the three-way crash-recovery consistency check (design, Q1-C). Defined
 /// here on the *consumer* side so Recover() can be unit-tested against mocks —
 /// reproducing a crash mid-write requires each store's "does this exist?" answer
-/// to be programmable, which a concrete MVP store cannot offer (D3 decision
+/// to be programmable, which a concrete MVP store cannot offer (decision
 /// 2026-05-30). Real MVP adapters (`BlockExists ≡ block_get != not_found`,
-/// `BlobExists ≡ load != not_found`) are wired at D3.5 L0 integration.
+/// `BlobExists ≡ load != not_found`) are wired at integration L0 integration.
 ///
 /// The vector side uses the richer IVectorStore (cortrix/store/i_vector_store.h,
 /// whose Exists() is the canonical membership check) — the coordinator does not redefine it.
@@ -37,7 +37,7 @@ class IBlobStore {
 public:
     virtual ~IBlobStore() = default;
 
-    /// True iff the document's blob is present (design § 4.4 Blob.BlobExists).
+    /// True iff the document's blob is present (design Blob.BlobExists).
     virtual bool BlobExists(const std::string& doc_id) = 0;
 };
 

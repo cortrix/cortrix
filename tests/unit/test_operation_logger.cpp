@@ -13,7 +13,7 @@
 #include "cortrix/observability/operation_log_error.h"
 #include "cortrix/observability/operation_log_schema.h"
 #include "cortrix/observability/operation_logger_impl.h"
-#include "cortrix/observability/oplog_metrics.h"  // §11 emit-integration assertions
+#include "cortrix/observability/oplog_metrics.h"  // emit-integration assertions
 
 // S2 coverage: OperationLogger CE implementation — Log / BatchLog
 // (all-or-nothing) / Query (filters + pagination + validation) / Cleanup
@@ -531,7 +531,7 @@ TEST_F(OperationLoggerTest, BatchLogBeginFailureAborts) {
     EXPECT_FALSE(logger_->Health().last_error.empty());
 }
 
-// ---- §11 OBS_SPEC metric emit-integration (real Log/Query/Cleanup drive the
+// ---- OBS_SPEC metric emit-integration (real Log/Query/Cleanup drive the
 // process-wide OplogMetrics recorder) -------------------------------------------
 
 // A successful Log() bumps cortrix_oplog_writes_total{action, resource_type}.

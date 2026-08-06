@@ -32,7 +32,7 @@ struct ConnectionInfo {
 /// handed in once at register time, stored encrypted, and only ever returned to the
 /// ImportManager via the ConnectionManager. cortrix/ owns this CE interface; a Vault
 /// / AWS-SM backed impl is a Phase-2 swap (L1 evolution). For standalone the in-memory
-/// AES impl (InMemorySecretStore) is the test double; a real KMS/Vault store → D3.5.
+/// AES impl (InMemorySecretStore) is the test double; a real KMS/Vault store → integration.
 class ISecretStore {
 public:
     virtual ~ISecretStore() = default;
@@ -50,7 +50,7 @@ public:
 
 /// In-memory AES-256-GCM secret store. Standalone default + the unit
 /// test double. Encrypts with a process-ephemeral key so the plaintext never sits
-/// in the map; a persistent KMS/Vault store is the D3.5 / Phase-2 swap. Thread-safe.
+/// in the map; a persistent KMS/Vault store is the integration / Phase-2 swap. Thread-safe.
 class InMemorySecretStore : public ISecretStore {
 public:
     InMemorySecretStore();
@@ -99,7 +99,7 @@ public:
 };
 
 /// In-memory IConnectionStore — standalone default + unit test double. The
-/// SQLite-backed SqliteConnectionStore (real catalog.db) → D3.5. Thread-safe.
+/// SQLite-backed SqliteConnectionStore (real catalog.db) → integration. Thread-safe.
 class InMemoryConnectionStore : public IConnectionStore {
 public:
     Status Insert(const Record& rec) override;
@@ -115,10 +115,10 @@ private:
 
 struct ConnectionManagerConfig {
     int expire_default_days = 30;    // connection.expire_default_days
-    int expire_max_days = 365;       // §4.4 connection.expire_max_days
+    int expire_max_days = 365;       // connection.expire_max_days
 };
 
-/// Pure-virtual interface for the D1 credential-ref lifecycle, so the
+/// Pure-virtual interface for the credential-ref lifecycle, so the
 /// ImportManager / QueryExecutor seam can be mocked. resolve_dsn is the only path
 /// that ever materializes a plaintext DSN.
 class IConnectionManager {
@@ -131,7 +131,7 @@ public:
                                              const std::string& registered_by,
                                              std::optional<int> expire_days = std::nullopt) = 0;
 
-    /// Resolve a ref → plaintext DSN for the ImportManager. Enforces the D7 tenant
+    /// Resolve a ref → plaintext DSN for the ImportManager. Enforces the tenant
     /// boundary (cross-tenant ref → CX_ERR_IMPORT_CROSS_TENANT_REF) and expiry/
     /// revocation (→ CX_ERR_IMPORT_AUTH_DENIED). The auth_ctx.tenant_id is the gate.
     virtual Result<std::string> ResolveDsn(const ConnectionRefId& ref_id,
@@ -144,10 +144,10 @@ public:
                           const std::string& reason) = 0;
 };
 
-/// D1 connection-ref management: encrypted secret store + ref expiry +
-/// revoke + the D7 cross-tenant guard. Holds only refs + metadata; the DSN is
+/// connection-ref management: encrypted secret store + ref expiry +
+/// revoke + the cross-tenant guard. Holds only refs + metadata; the DSN is
 /// encrypted in the ISecretStore. The 3 admin endpoints (register/list/revoke,
-/// §6.1) bind to these methods.
+///) bind to these methods.
 class ConnectionManager : public IConnectionManager {
 public:
     /// `op_logger` (optional, may be null) receives the import-rev-6 operation_log

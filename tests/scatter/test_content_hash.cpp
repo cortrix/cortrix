@@ -5,8 +5,8 @@
 
 #include "cortrix/query/content_hash.h"
 
-// content_hash representation layer (RETRIEVAL_TYPES_SPEC §6) — the dedup hash-table
-// key form "sha256:<32-hex>" + roundtrip + content-addressed determinism (§3.3.2).
+// content_hash representation layer (the retrieval-types spec) — the dedup hash-table
+// key form "sha256:<32-hex>" + roundtrip + content-addressed determinism.
 namespace cortrix::query {
 namespace {
 
@@ -39,7 +39,7 @@ TEST(ContentHashTest, FromStringRejectsMalformed) {
 }
 
 // Content-addressed: identical text → identical hash (so two NS holding the same
-// chunk collapse to one dedup key, §3.3 B-simplified).
+// chunk collapse to one dedup key, B-simplified).
 TEST(ContentHashTest, SameContentSameHash) {
     EXPECT_EQ(ContentHashOfContent("hello world"), ContentHashOfContent("hello world"));
 }

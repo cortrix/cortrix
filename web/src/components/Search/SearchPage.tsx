@@ -33,7 +33,7 @@ export function SearchPage() {
 
       <SearchBox />
 
-      {/* Inline structured error (§ 16.4 inline placement) */}
+      {/* Inline structured error (inline placement) */}
       {error && (
         <div className="mb-6">
           <ErrorDisplay error={error} onRetry={() => void search()} />

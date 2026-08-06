@@ -8,7 +8,7 @@ import { Badge, Button } from '../ui';
 import { formatFileSize } from '../../utils/formatters';
 import { CONFIG_META } from './namespaceConfigMeta';
 
-// NamespaceDetailDrawer (web UI design § 8.5) — right slide-over showing metadata
+// NamespaceDetailDrawer (web UI design) — right slide-over showing metadata
 // + all 11 *_config as collapsible read-only JSON accordions + namespace pool admission
 // state, with Edit / Delete actions at the bottom. Does not disturb the list.
 

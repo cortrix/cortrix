@@ -18,7 +18,7 @@ constexpr int kOplogSchemaVersion = 1;
 /// SEPARATE downstream migration keyed by operation_log.id — it does
 /// not alter this table (the open-core boundary).
 ///
-/// SQLite dialect note (cortrix_global.db is SQLite WAL): the §5.1 spec spells
+/// SQLite dialect note (cortrix_global.db is SQLite WAL): the spec spells
 /// trace_id/session_id as VARCHAR(128); SQLite is dynamically typed and accepts
 /// VARCHAR(n) as a type name (TEXT affinity, no length enforcement), so the
 /// declared type is kept verbatim for spec fidelity. timestamp is Unix ms.

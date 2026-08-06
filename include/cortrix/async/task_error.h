@@ -46,10 +46,10 @@ constexpr int kTaskErrorCodeCount = 11;
 /// Canonical, immutable attributes of one error code.
 struct TaskErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_*" string
-    int http_status;                          ///< §6.2 HTTP column (400/403/404/408/409/423/500/503)
+    int http_status;                          ///< HTTP column (400/403/404/408/409/423/500/503)
     agent_friendly::ErrorCategory category;   ///< permanent/transient/timeout
-    bool retryable;                           ///< §6.2 retryable column
-    std::optional<int> retry_after_ms;        ///< §6.2 retry_after_ms column (null / 10000 / 30000 / 60000)
+    bool retryable;                           ///< retryable column
+    std::optional<int> retry_after_ms;        ///< retry_after_ms column (null / 10000 / 30000 / 60000)
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never
@@ -59,7 +59,7 @@ const TaskErrorInfo& GetTaskErrorInfo(TaskErrorCode code);
 /// The "CX_ERR_*" string for `code`.
 const char* TaskErrorCodeString(TaskErrorCode code);
 
-/// The §6.2 HTTP status code for `code`.
+/// The HTTP status code for `code`.
 int TaskErrorHttpStatus(TaskErrorCode code);
 
 /// The structured_data keys a `code`'s error body MUST carry (GEN-Agent #5,

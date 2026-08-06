@@ -6,11 +6,11 @@
 // FakeIndex (MockIndexFactory) and whose SPC layer is a no-op TestSPCManager. They
 // exercise the HTTP/route/auth plumbing, but NOT the production assembly: a real
 // PhnswIndexFactory pool + a real SPCManager driving a real SPCPipeline through real
-// PHnsw. That production wiring — the D3.5 live-only assembly seams — has never been
+// PHnsw. That production wiring — the integration live-only assembly seams — has never been
 // E2E-covered. This harness fills that gap and is the shared foundation for the R7
 // full-stack E2E suite (agent trace observability / ingest pipeline / multi-NS fan-out).
 //
-// It mirrors the production bootstrap assembly (src/server/bootstrap.cpp §7-§8):
+// It mirrors the production bootstrap assembly (src/server/bootstrap.cpp):
 //   CatalogDb (global cortrix_global.db, agent_trace + operation_log migrated)
 //     → DefaultINSRouter + DefaultUnitRouter (real catalog routers)
 //     → PhnswIndexFactory + real WriteCoordinator factory
@@ -290,7 +290,7 @@ class FullStackE2E {
                    const std::string& embedder_model_path = "") {
     BuildCore(embedding_dim);
 
-    // Real SPC components (mirrors bootstrap §7).
+    // Real SPC components (mirrors bootstrap).
     cortrix::spc::ParserFactoryConfig pf_cfg;
     parser_factory_ =
         std::make_unique<cortrix::spc::DocumentParserFactory>(pf_cfg);
@@ -326,7 +326,7 @@ class FullStackE2E {
     spc_mgr_->SetSparseIndexRegistry(sparse_index_registry_.get());
 
     // HTTP-facing components for the document upload + query routes (mirrors
-    // bootstrap §9-§10). UploadHandler borrows the SPCManager (enqueues parse
+    // bootstrap). UploadHandler borrows the SPCManager (enqueues parse
     // tasks); query side needs the embedder (already built) + a classifier +
     // RRF fusion. All default-configured (no real LLM): IntentClassifier with a
     // default LlmConfig classifies heuristically; RRFFusion uses k=60.

@@ -1,4 +1,4 @@
-// Index S3 — group-commit + durable WAL integration tests (design § 4.1 / § 6 S3).
+// Index S3 — group-commit + durable WAL integration tests (design S3).
 //
 // The GroupCommitWriter coalescing mechanics (batch-full / timeout / concurrent
 // merge / shutdown) are covered by test_group_commit_writer.cpp. These tests

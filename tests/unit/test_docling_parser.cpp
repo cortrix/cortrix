@@ -11,12 +11,12 @@
 #include "cortrix/spc/parser.h"
 #include "cortrix/spc/parser_subprocess.h"
 
-// Parser S2 coverage: DoclingParser subprocess wrapper + ParseBridgeJson (§3.1).
+// Parser S2 coverage: DoclingParser subprocess wrapper + ParseBridgeJson.
 //
 // Standalone strategy (briefing): the dev machine has python3 but not
 // necessarily docling, so the wrapper logic is exercised against *mock* bridge
 // scripts (canned JSON / sleep / crash / bad output). Real docling end-to-end
-// is D3.5. ParseBridgeJson is also tested directly with no subprocess.
+// is integration. ParseBridgeJson is also tested directly with no subprocess.
 namespace cortrix::spc {
 namespace {
 
@@ -62,7 +62,7 @@ protected:
     std::vector<std::string> paths_;
 };
 
-// A realistic §3.1 success payload (single text page).
+// A realistic success payload (single text page).
 const char* kSuccessJson = R"JSON({
   "status": 0, "parser": "docling",
   "metadata": {"filename": "report.pdf", "doc_title": "Q1 Report",
@@ -123,7 +123,7 @@ TEST_F(ScriptEnv, Docling_BuildArgv_MatchesProtocol) {
     EXPECT_TRUE(has("--output-format", "json"));
 }
 
-// --- subprocess wrapper error mapping (§4.2) ---
+// --- subprocess wrapper error mapping ---
 
 TEST_F(ScriptEnv, Docling_SubprocessFailed_BadPython) {
     DoclingParserConfig cfg = CfgFor("/nonexistent/script.py");
@@ -160,7 +160,7 @@ TEST_F(ScriptEnv, Docling_InvalidJSON) {
     DoclingParser p(CfgFor(script));
     ParsedDoc doc = p.Parse("/tmp/x.pdf");
     EXPECT_EQ(doc.status, ParserErrorCode::kInvalidOutput);
-    EXPECT_TRUE(doc.retryable);  // §5.2: INVALID_OUTPUT is transient
+    EXPECT_TRUE(doc.retryable);  //: INVALID_OUTPUT is transient
 }
 
 TEST_F(ScriptEnv, Docling_Timeout) {
@@ -188,7 +188,7 @@ TEST_F(ScriptEnv, Docling_OutputTooLarge) {
     EXPECT_EQ(doc.category, agent_friendly::ErrorCategory::kQuota);
 }
 
-// --- bridge-reported errors are honored (§3.1 error envelope) ---
+// --- bridge-reported errors are honored (error envelope) ---
 
 TEST_F(ScriptEnv, Docling_BridgeReportsPasswordProtected) {
     const char* json = R"JSON({"status": 13, "parser": "docling",
@@ -209,7 +209,7 @@ TEST_F(ScriptEnv, Docling_BridgeReportsPasswordProtected) {
 // installed — the bridge then reports SUBPROCESS_FAILED (CX_ERR_SUBPROCESS_FAILED)
 // for a missing dependency, and DoclingParser surfaces it. If docling IS present
 // and parses the stub PDF, that's also acceptable (real parse → ok or a doc-level
-// error). Real docling parse coverage is D3.5.
+// error). Real docling parse coverage is integration.
 TEST_F(ScriptEnv, Docling_RealBridge_ContractHolds) {
     // Locate the repo's docling_bridge.py relative to this test's source tree.
     // tests/unit/ → ../../scripts/docling_bridge.py.
@@ -249,7 +249,7 @@ TEST(ParseBridgeJsonTest, EmptyDocumentIsOkNotError) {
       "metadata": {"filename": "blank.pdf", "page_count": 0},
       "structured_data": {"empty_reason": "all_pages_blank"}})JSON";
     ParsedDoc doc = ParseBridgeJson(json, "/tmp/blank.pdf", "docling");
-    EXPECT_TRUE(doc.ok());  // §5.1: empty doc => OK, pages=[]
+    EXPECT_TRUE(doc.ok());  //: empty doc => OK, pages=[]
     EXPECT_EQ(doc.status, ParserErrorCode::kEmptyDocument);
     EXPECT_TRUE(doc.pages.empty());
 }

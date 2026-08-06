@@ -4,10 +4,10 @@
 #include "cortrix/common/status.h"
 
 // Chunker error codes. Same one-error-model convention as
-// store/pwl_errors.h (CODING_CONVENTIONS § 3): a fallible op returns Result<T> /
+// store/pwl_errors.h (the coding conventions): a fallible op returns Result<T> /
 // Status, domain identity is a stable CX_* code carried as a prefix on the Status
 // message ("<CODE>: <detail>"); the API/SDK/MCP boundary lifts it into the
-// AgentFriendlyError `code` field with the § 5.2 retryable/category/structured_data.
+// AgentFriendlyError `code` field with the retryable/category/structured_data.
 namespace cortrix::chunker {
 
 namespace chunk_errors {

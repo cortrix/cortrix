@@ -124,10 +124,10 @@ TEST(IIndexFactoryTest, PhnswFactoryOpensExistingUnit) {
     fs::remove_all(unit_dir);
 }
 
-// D35-NEW-01: Open() must reconstruct the index with the Unit's persisted dim/M
+//-NEW-01: Open() must reconstruct the index with the Unit's persisted dim/M
 // (read from the newest snapshot's .meta footer), not the 1024 default. A Unit
 // created at dim=8 and snapshotted must reopen as dim=8 and stay searchable —
-// before D35-NEW-01 Open() built a 1024-dim L2Space over an 8-dim snapshot.
+// before-NEW-01 Open() built a 1024-dim L2Space over an 8-dim snapshot.
 TEST(IIndexFactoryTest, PhnswFactoryOpenReadsPersistedDim) {
     namespace fs = std::filesystem;
     const fs::path unit_dir = fs::temp_directory_path() / "cortrix_phnsw_factory_reopen_dim";

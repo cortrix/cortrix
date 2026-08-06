@@ -6,7 +6,7 @@
 
 #include "cortrix/agent_trace/observability_audit_log.h"
 
-// S7 coverage (§12 — admin cross-user forensics): the structured JSON log line
+// S7 coverage (admin cross-user forensics): the structured JSON log line
 // shape + endpoint labels + Emit() writing to stderr.
 namespace cortrix::agent_trace {
 namespace {

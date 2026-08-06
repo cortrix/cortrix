@@ -56,10 +56,10 @@ CrossNsResponse ScatterGather::Execute(const QueryRequest& request,
                                        const AuthContext& auth,
                                        const QueryContext* qctx,
                                        const TraceContext* trace_ctx) {
-    // 1. Authorization (§4.2 5 steps). The effective per-query cap is min(global GUC
+    // 1. Authorization (5 steps). The effective per-query cap is min(global GUC
     //    cap, AuthContext plan cap) — cloud plan coordination. Throws
     //    CrossNsException on auth / too-many / unauthorized — the handler serializes
-    //    GetError() to the §2.6 body.
+    //    GetError() to the body.
     const int effective_cap = EffectiveMaxNamespaces(max_namespaces_, auth);
     std::vector<std::string> authorized =
         AuthorizeNamespaces(request.namespaces, auth, perm_, effective_cap);
@@ -73,7 +73,7 @@ CrossNsResponse ScatterGather::Execute(const QueryRequest& request,
     }
     const QueryContext& ctx = *ctx_ptr;
 
-    // §3.4 request counter: classify the request shape for the `reason` label
+    // request counter: classify the request shape for the `reason` label
     // (wildcard takes precedence over the post-expansion NS count). category here is
     // the success class (kPermanent) — hard-rejected requests threw above and are
     // not counted as served requests.
@@ -152,7 +152,7 @@ CrossNsResponse ScatterGather::ExecuteMultiNs(const QueryContext& ctx,
                     .count());
             results[i] = std::move(timed);
             // NOTE: the detached task may still finish on the pool; its result is
-            // discarded. Cooperative per-NS cancellation = D3.5 (needs pipeline support).
+            // discarded. Cooperative per-NS cancellation = integration (needs pipeline support).
         }
     }
 
@@ -199,8 +199,8 @@ CrossNsResponse ScatterGather::GatherAndRerank(
         }
     }
 
-    // Gather (§4.1 step 3): rank by final score, then B-simplified cross-NS
-    // dedup (§3.3 — collapses copies of one content_hash to the highest-score
+    // Gather (step 3): rank by final score, then B-simplified cross-NS
+    // dedup (collapses copies of one content_hash to the highest-score
     // primary + records a brief multi-source note in meta), then truncate to
     // top_k. Sort-before-dedup keeps the deduped list in descending final score
     // (each group's primary is its first occurrence in the sorted list).
@@ -209,7 +209,7 @@ CrossNsResponse ScatterGather::GatherAndRerank(
                          return a.score > b.score;
                      });
 
-    // §3.3 / §4.3: populates meta.deduplicated_chunks[] + deduplicated_chunks_count.
+    //: populates meta.deduplicated_chunks[] + deduplicated_chunks_count.
     const int collapsed = DedupeByContentHash(items, meta);
     if (collapsed > 0) {
         ScatterMetrics::Instance().RecordDedupCollisions(
@@ -230,7 +230,7 @@ CrossNsResponse ScatterGather::GatherAndRerank(
                                  {"category", "permanent"}});
     }
 
-    // 8-field meta completion (§2.5 / topic 3.5 v1.0.2). deduplicated_chunks[] +
+    // 8-field meta completion (/ topic 3.5 v1.0.2). deduplicated_chunks[] +
     // deduplicated_chunks_count were filled by DedupeByContentHash above.
     const int queried = static_cast<int>(meta.namespaces_queried.size());
     const int succeeded = static_cast<int>(meta.namespaces_succeeded.size());
@@ -242,7 +242,7 @@ CrossNsResponse ScatterGather::GatherAndRerank(
     for (const auto& r : results) total_latency = std::max(total_latency, r.latency_ms);
     meta.latency_ms = total_latency;
 
-    // Observability (§3.4): NS-count + latency histograms, and the partial-success
+    // Observability: NS-count + latency histograms, and the partial-success
     // counter when any NS failed (a partial-success response always carries a
     // non-empty meta.namespaces_failed[]). Standalone recorder; the /metrics wiring lands with deployment.
     ScatterMetrics& m = ScatterMetrics::Instance();
@@ -250,7 +250,7 @@ CrossNsResponse ScatterGather::GatherAndRerank(
     m.ObserveDuration(queried, total_latency);
     if (!meta.namespaces_failed.empty()) m.RecordPartialSuccess();
 
-    // Overall scatter timeout (§2.7 principle 3): HTTP 200 + partial results + top-level
+    // Overall scatter timeout (principle 3): HTTP 200 + partial results + top-level
     // CX_ERR_SCATTER_TIMEOUT carrying the GEN-Agent 4 fields.
     if (scatter_timed_out) {
         resp.error = MakeCrossNsError(

@@ -6,7 +6,7 @@ namespace cortrix::query {
 
 namespace {
 
-// One client-facing result item (§2.5 schema). child_id/parent_id are ULID strings
+// One client-facing result item (schema). child_id/parent_id are ULID strings
 // (V5 decision #6A — never an int block_id, JS-precision-safe). content_hash is the
 // "sha256:..." string. metadata is a flat string→string object.
 nlohmann::json ResultItemToJson(const retrieval::ResultItem& it) {
@@ -33,7 +33,7 @@ nlohmann::json ResultItemToJson(const retrieval::ResultItem& it) {
     return j;
 }
 
-// One meta.namespaces_failed[] entry (§2.5 + GEN-Agent 4 fields).
+// One meta.namespaces_failed[] entry (GEN-Agent 4 fields).
 nlohmann::json FailureToJson(const NamespaceFailure& f) {
     nlohmann::json j;
     j["namespace"] = f.namespace_id;
@@ -59,7 +59,7 @@ nlohmann::json FailureToJson(const NamespaceFailure& f) {
     return j;
 }
 
-// One meta.deduplicated_chunks[] entry (§2.5 / §3.3 B-simplified).
+// One meta.deduplicated_chunks[] entry (B-simplified).
 nlohmann::json DedupToJson(const DeduplicatedChunkInfo& d) {
     nlohmann::json j;
     j["content_hash"] = d.content_hash;

@@ -22,7 +22,7 @@ struct SparseVector {
 
 /// sparse_vec on-disk serialization (the children.sparse_vec BLOB).
 ///
-/// Wire format (little-endian, packed; matches the §4.2 sketch):
+/// Wire format (little-endian, packed; matches the sketch):
 ///   [uint16 num_terms] then num_terms × ([uint16 term_id][float weight])
 /// Size = 2 + num_terms × 6 bytes (K=100 → 602 bytes). An empty vector
 /// serializes to the 2-byte header {num_terms=0}; the caller, however, should
@@ -30,7 +30,7 @@ struct SparseVector {
 /// flags_ext has_sparse_vec bit — an all-zero BLOB is reserved for the rare
 /// "deserialized-but-empty" round-trip, not the dead-chunk sentinel.
 ///
-/// term_id is stored as uint16 per §4.2. The real BGE-M3 vocab is 250K (needs
+/// term_id is stored as uint16 per The real BGE-M3 vocab is 250K (needs
 /// ~18 bits) — a term_id ≥ 65536 is rejected by Serialize with
 /// CX_ERR_SPARSE_SERIALIZE_FAILED (the standalone stub keeps ids in-range;
 /// the wider real-vocab encoding is Phase 2).
@@ -48,7 +48,7 @@ Result<SparseVector> DeserializeSparseVec(const std::vector<uint8_t>& blob);
 Result<SparseVector> DeserializeSparseVec(const uint8_t* data, size_t len);
 
 /// Byte size SerializeSparseVec(vec) would produce, without serializing
-/// (2 + terms × 6). Lets callers size buffers / enforce the §6.5
+/// (2 + terms × 6). Lets callers size buffers / enforce the
 /// serialize-truncation guard before paying for the bytes.
 size_t SerializedSparseVecSize(const SparseVector& vec);
 

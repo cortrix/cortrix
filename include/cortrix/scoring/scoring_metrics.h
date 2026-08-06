@@ -9,10 +9,10 @@ namespace cortrix::scoring {
 /// Scoring observability metrics (subsystem `scoring`). Naming
 /// `cortrix_scoring_<metric>_<unit>`. Self-contained dependency-free recorder (same pattern
 /// as ImportMetrics / RerankerMetrics); registering into the `/metrics` scrape
-/// endpoint is cross-Feature wiring → D3.5.
+/// endpoint is cross-Feature wiring → integration.
 ///
-/// v1.0.2: no ns_id label (on the OBS_SPEC §3.2 absolute deny list for high-cardinality labels) —
-/// per-NS data goes through the OBS_SPEC §3.4 system stats API
+/// v1.0.2: no ns_id label (on the OBS_SPEC absolute deny list for high-cardinality labels) —
+/// per-NS data goes through the OBS_SPEC system stats API
 /// (GET /api/v1/system/namespaces/<id>/scoring_stats), not metric labels.
 class ScoringMetrics {
 public:
@@ -23,7 +23,7 @@ public:
     void RecordScore(uint8_t level);
     uint64_t ScoreCount(uint8_t level) const;
 
-    // cortrix_scoring_anomalous_blocks_total (Counter — D6 sentinel 0.0).
+    // cortrix_scoring_anomalous_blocks_total (Counter — sentinel 0.0).
     void RecordAnomalous();
     uint64_t AnomalousCount() const;
 

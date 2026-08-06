@@ -1,4 +1,4 @@
-// ARCH §5.x — gc_cli MaybeRunGcCli unit tests (previously ZERO coverage).
+// ARCH — gc_cli MaybeRunGcCli unit tests (previously ZERO coverage).
 // ParseConfigPath / StatusJson / ReportJson live in an anonymous namespace and
 // are not directly reachable; the public entry point is MaybeRunGcCli, which we
 // drive end to end against a real temp data dir (catalog.db auto-created by

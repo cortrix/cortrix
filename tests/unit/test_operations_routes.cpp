@@ -19,9 +19,9 @@
 #include "cortrix/observability/operation_logger_impl.h"
 #include "cortrix/server/routes/operations_routes.h"
 
-// Operation log S3 coverage: GET /api/v1/operations route (§6.1). Exercises the 8 query
-// params, the admin cross-user permission gate (§6.1 permission grading), pagination +
-// sort, and the 6 CX_ERR_OPLOG_* Agent-friendly error bodies (§7.2) over a real
+// Operation log S3 coverage: GET /api/v1/operations route. Exercises the 8 query
+// params, the admin cross-user permission gate (permission grading), pagination +
+// sort, and the 6 CX_ERR_OPLOG_* Agent-friendly error bodies over a real
 // httplib server backed by an in-memory operation_log (migrated with the operation log
 // provider) and a real ApiKeyAuth (MVP: user_id == tenant_id).
 namespace cortrix {
@@ -111,7 +111,7 @@ protected:
 
 // ---- basic list + self-scope --------------------------------------------------
 
-// Alice with no user_id param sees only her own 3 rows (§6.1 default scope).
+// Alice with no user_id param sees only her own 3 rows (default scope).
 TEST_F(OperationsRoutesTest, ListSelfScopeReturnsOwnRows) {
     httplib::Client cli("127.0.0.1", port_);
     auto res = cli.Get("/api/v1/operations", Alice());
@@ -125,7 +125,7 @@ TEST_F(OperationsRoutesTest, ListSelfScopeReturnsOwnRows) {
     for (const auto& op : body["operations"]) {
         EXPECT_EQ(op["user_id"], "alice");
     }
-    // §6.1 top-level shape (Lead-decided) + meta paging hints.
+    // top-level shape (Lead-decided) + meta paging hints.
     EXPECT_TRUE(body.contains("limit"));
     EXPECT_TRUE(body.contains("offset"));
     ASSERT_TRUE(body.contains("meta"));
@@ -144,7 +144,7 @@ TEST_F(OperationsRoutesTest, ListDefaultSortDescAndRowShape) {
     ASSERT_EQ(ops.size(), 3u);
     EXPECT_EQ(ops[0]["timestamp"], 3000);  // newest first (DESC default)
     EXPECT_EQ(ops[2]["timestamp"], 1000);
-    // Row shape per §6.1.
+    // Row shape per
     const auto& top = ops[0];
     for (const char* k : {"id", "timestamp", "user_id", "action", "namespace_id",
                           "resource_type", "resource_id", "summary", "trace_id",
@@ -204,7 +204,7 @@ TEST_F(OperationsRoutesTest, PaginationAndAscSort) {
     EXPECT_EQ(body["limit"], 2);
 }
 
-// ---- admin cross-user (§6.1 permission grading) -------------------------------
+// ---- admin cross-user (permission grading) -------------------------------
 
 TEST_F(OperationsRoutesTest, AdminCrossUserFilterReturnsTargetRows) {
     httplib::Client cli("127.0.0.1", port_);
@@ -240,7 +240,7 @@ TEST_F(OperationsRoutesTest, NonAdminOwnUserIdAllowed) {
     EXPECT_EQ(body["total_count"], 3);
 }
 
-// ---- CX_ERR_OPLOG_* error bodies (§7.2) ---------------------------------------
+// ---- CX_ERR_OPLOG_* error bodies ---------------------------------------
 
 TEST_F(OperationsRoutesTest, BadSortOrderIsInvalidFilter) {
     httplib::Client cli("127.0.0.1", port_);

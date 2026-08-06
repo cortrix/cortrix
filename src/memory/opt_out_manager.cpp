@@ -16,7 +16,7 @@ using observability::TraceContext;
 namespace {
 
 // ISO 8601 UTC millis — same format as MemoryStore::NowISO8601, kept local so the
-// manager does not depend on a store private. (D3.5 may unify these.)
+// manager does not depend on a store private. (integration may unify these.)
 std::string NowISO8601() {
     auto now = std::chrono::system_clock::now();
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -32,7 +32,7 @@ std::string NowISO8601() {
     return std::string(buf);
 }
 
-// OptOutActor → the low-cardinality metric label (D4 enum collapsed to actor class).
+// OptOutActor → the low-cardinality metric label (enum collapsed to actor class).
 MemoryOptOutMetrics::TriggeredBy MetricTrigger(OptOutActor actor) {
     switch (actor) {
         case OptOutActor::kUserManual: return MemoryOptOutMetrics::TriggeredBy::kUser;
@@ -83,10 +83,10 @@ const char* OptOutManager::ActorString(OptOutActor actor) {
 }
 
 bool OptOutManager::IsValidSessionId(const std::string& session_id) {
-    // §11.x boundary matrix: reject empty / structurally invalid ids. A permissive
+    // boundary matrix: reject empty / structurally invalid ids. A permissive
     // "recognizable id" check — 8..64 chars over [0-9A-Za-z_-] — so the real client
     // ids MemoryStore accepts all pass: its own UUID v4 "8-4-4-4-12", ULIDs, and the
-    // design's own `s_<digits>` session ids (§5.1). Empty strings and obvious junk
+    // design's own `s_<digits>` session ids. Empty strings and obvious junk
     // (spaces, control chars, oversize) are rejected.
     const size_t n = session_id.size();
     if (n < 8 || n > 64) return false;
@@ -118,8 +118,8 @@ Result<OptOutResult> OptOutManager::OptOut(const std::string& session_id,
         return MemoryOptOutStatus(MemoryOptOutErrorCode::kSessionNotFound, session_id);
     }
     if (state->opted_out) {
-        // ARCH §4.1.11: a repeat opt-out is ALREADY_OPTED_OUT (409). The §11.x
-        // idempotent-200 variant is an HTTP-handler concern (D3.5).
+        // ARCH: a repeat opt-out is ALREADY_OPTED_OUT (409). The
+        // idempotent-200 variant is an HTTP-handler concern (integration).
         return MemoryOptOutStatus(MemoryOptOutErrorCode::kAlreadyOptedOut, session_id);
     }
 
@@ -153,7 +153,7 @@ Result<RevokeResult> OptOutManager::OptOutRevoke(const std::string& session_id,
                            "memory_opt_out.enabled is false");
     }
     if (reason.empty()) {
-        // §6.2 revoke requestBody: reason is required (recorded in operation_log).
+        // revoke requestBody: reason is required (recorded in operation_log).
         return MemoryOptOutStatus(MemoryOptOutErrorCode::kInvalidSessionId,
                            "revoke reason is required");
     }

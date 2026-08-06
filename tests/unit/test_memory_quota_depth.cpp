@@ -12,7 +12,7 @@
 // frozen tree shows MemoryTransparency::Create and memory_routes.cpp DO NOT
 // enforce any per-user/per-NS quota (no quota seam exists on the service or the
 // HTTP layer in Phase-1 standalone — the 429 is the registered identity awaiting
-// the D3.5 rate-limit wiring). So the over-quota business trigger is NOT
+// the integration rate-limit wiring). So the over-quota business trigger is NOT
 // deterministically reachable; see the REPORT note. What IS reachable + worth
 // pinning is the QUOTA error-identity contract a future 429 body must satisfy:
 // the structured_data key set (partial vs complete), the Agent-friendly JSON
@@ -23,7 +23,7 @@ namespace {
 
 using agent_friendly::ErrorCategory;
 
-// The §4.3.4.bis QUOTA structured_data contract: a 429 body MUST carry exactly
+// The QUOTA structured_data contract: a 429 body MUST carry exactly
 // these 5 keys so an Agent can read the quota usage/limit/window machine-readably.
 TEST(MemoryQuotaDepthTest, QuotaRequiredKeysAreTheFiveSpecKeys) {
     const std::vector<std::string>& keys =

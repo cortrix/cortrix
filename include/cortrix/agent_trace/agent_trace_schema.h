@@ -15,7 +15,7 @@ constexpr int kAgentTraceSchemaVersion = 1;
 /// runs inside the same versioned, atomic framework as the catalog / operation log
 /// providers.
 ///
-/// Open-Core (topic 7, §4.4): this is the CE-only schema. Ent's
+/// Open-Core (topic 7): this is the CE-only schema. Ent's
 /// agent_trace_extension table (input_tokens / output_tokens / query_pattern_id)
 /// is a SEPARATE downstream migration keyed by agent_trace.id — it
 /// does NOT alter this table (GEN-OpenCore-Boundary). cortrix/ has no
@@ -23,7 +23,7 @@ constexpr int kAgentTraceSchemaVersion = 1;
 /// enforced by tests/unit/test_open_core_boundary.cpp (scans the CE tree, fails on
 /// any enterprise macro / namespace / interface / #include / *_extension DDL).
 ///
-/// SQLite dialect note (cortrix_global.db is SQLite WAL): the §4.1 spec spells
+/// SQLite dialect note (cortrix_global.db is SQLite WAL): the spec spells
 /// session_id/trace_id/agent_id as VARCHAR(128); SQLite is dynamically typed and
 /// accepts VARCHAR(n) as a type name (TEXT affinity, no length enforcement), so
 /// the declared type is kept verbatim for spec fidelity. created_at is Unix ms

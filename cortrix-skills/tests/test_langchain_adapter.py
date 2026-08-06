@@ -1,6 +1,6 @@
 """LangChain adapter tests (mock; a fake ``langchain`` module is injected).
 
-Real LangChain ReAct round-trips against a live LLM are D3.5-deferred and not
+Real LangChain ReAct round-trips against a live LLM are integration-deferred and not
 run here. We inject a minimal fake ``langchain`` (StructuredTool + ToolException)
 into ``sys.modules`` to exercise: 29 -> 29 conversion, name/description/args_schema
 wiring, CortrixError -> ToolException(4-field JSON), the missing-dependency

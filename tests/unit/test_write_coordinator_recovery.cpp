@@ -96,7 +96,7 @@ protected:
         e.txn_id = txn;
         e.doc_id = doc;
         e.block_ids = std::move(blocks);
-        e.has_blob = has_blob;  // v1.0.2: gates the Recover blob check (§4.4)
+        e.has_blob = has_blob;  // v1.0.2: gates the Recover blob check
         return e;
     }
     static PendingEntry Terminal(State s, uint64_t txn) {
@@ -208,7 +208,7 @@ TEST_F(RecoveryTest, PendingOnlyPartialStoresRollsBack) {
 }
 
 TEST_F(RecoveryTest, BlobLessDocMissingBlobInfersCommitted) {
-    // §10.4 data-loss fix: a blob-less doc (has_blob=false — watch_dir / CDC /
+    // data-loss fix: a blob-less doc (has_blob=false — watch_dir / CDC /
     // memory writes that never touch the blob store) legitimately has no blob.
     // With vector + metadata present, Recover MUST infer COMMITTED and NOT roll it
     // back, even though the blob store is empty. Pre-fix this silently deleted a
@@ -227,7 +227,7 @@ TEST_F(RecoveryTest, BlobLessDocMissingBlobInfersCommitted) {
     ASSERT_TRUE(wc.Recover().ok());
 
     EXPECT_EQ(cleanups, 0)
-        << "blob-less doc with vector+metadata present → infer COMMITTED, no rollback (§10.4)";
+        << "blob-less doc with vector+metadata present → infer COMMITTED, no rollback";
     auto stats = wc.GetStats();
     ASSERT_TRUE(stats.ok());
     EXPECT_EQ(stats->pending, 0u);  // finalized + compacted away
@@ -449,7 +449,7 @@ TEST_F(RecoveryTest, RequiresAllStores) {
 TEST_F(RecoveryTest, CorruptedTailTruncatedThenRecovers) {
     // Two clean committed txns, then a torn write at the tail. Recovery's
     // ReadAll truncates the garbage, leaving the two committed txns to resolve
-    // normally (design § 4.4 + § 5 degraded recovery).
+    // normally (design + degraded recovery).
     SeedWal({Pending(1, "d1", {1}), Terminal(State::kCommitted, 1),
              Pending(2, "d2", {2}), Terminal(State::kCommitted, 2)});
     int fd = ::open(wal_path_.c_str(), O_RDWR);

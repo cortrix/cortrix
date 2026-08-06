@@ -14,7 +14,7 @@ namespace cortrix::spc {
 /// maps to a stable `CX_ERR_HYPE_*` string + a GEN-Agent category + retryability
 /// via the canonical registry below.
 ///
-/// Per CODING_CONVENTIONS §3, Cortrix uses Result<T> + Status only (no
+/// Per the coding conventions, Cortrix uses Result<T> + Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// HypeErrorCode is the *enum of identities*; MakeHypeError() turns one (plus
@@ -27,9 +27,9 @@ enum class HypeErrorCode {
     kLlmTimeout,            ///< LLM call exceeded the timeout
     kLlmInvalidOutput,      ///< LLM returned empty / unparseable output
     kLlmBudgetExceeded,     ///< per-Feature / global LLM budget cap hit
-    kQuestionParseFailed,   ///< parsed question count != expected K (§6.2)
+    kQuestionParseFailed,   ///< parsed question count != expected K
     kSchemaVersionMismatch, ///< HypeSchemaProvider unexpected version step
-    kParentNotFound,        ///< ParentChunkStore.GetParent miss / DB error (§6.3)
+    kParentNotFound,        ///< ParentChunkStore.GetParent miss / DB error
 };
 
 /// Total HyPE error codes (= 6). Compile-time anchor for the
@@ -41,7 +41,7 @@ struct HypeErrorInfo {
     const char* cx_code;                      ///< stable "CX_ERR_HYPE_*" string
     agent_friendly::ErrorCategory category;   ///< timeout/transient/quota/permanent
     bool retryable;
-    std::optional<int> retry_after_ms;        ///< null unless retryable per §7
+    std::optional<int> retry_after_ms;        ///< null unless retryable per
 };
 
 /// Look up the canonical attributes for `code`. Total over the enum (never

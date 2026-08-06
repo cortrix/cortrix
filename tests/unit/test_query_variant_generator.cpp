@@ -5,7 +5,7 @@
 //
 // These complement test_rag_fusion.cpp (which drives Generate() through the mock
 // LLM): here we pin the *pure* helpers the generator exposes "for unit testing the
-// injection-hardening + parsing in isolation" (header §61), so the prompt-build and
+// injection-hardening + parsing in isolation" (header), so the prompt-build and
 // JSON-schema contracts are locked independently of the LLM round-trip.
 
 #include <gtest/gtest.h>

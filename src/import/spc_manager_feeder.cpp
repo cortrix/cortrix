@@ -18,7 +18,7 @@ namespace {
 
 // Build a one-page ParsedDoc from a textualized DB row. The row text becomes the
 // single page's text + one TEXT paragraph (the chunker's input material); the
-// §4.3 source metadata rides on the SPCTask.metadata_json (set by the caller), not
+// source metadata rides on the SPCTask.metadata_json (set by the caller), not
 // here. status=kOk so ProcessParsedDoc treats it as a normal post-parse doc.
 spc::ParsedDoc MakeParsedDoc(const TextChunk& chunk) {
     spc::ParsedDoc doc;
@@ -59,7 +59,7 @@ Result<int> SpcManagerFeeder::Feed(const std::vector<TextChunk>& chunks, const N
         task.content_hash = query::ContentHashOfContent(chunk.text);
         task.mime_type = "text/plain";
         task.processing_level = 3;                  // L3 full processing (embed + store)
-        // The §4.3 source metadata (source_type/ref/signature/imported_*) flows into
+        // The source metadata (source_type/ref/signature/imported_*) flows into
         // the block records through SPCTask.metadata_json.
         task.metadata_json = chunk.metadata.dump();
 

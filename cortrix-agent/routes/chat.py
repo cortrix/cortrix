@@ -103,7 +103,7 @@ async def chat_endpoint(
 
     # Bearer token is parsed for forward-compat (P-5); V1.0 CE does not validate it
     # and tenant_id comes from the header. In V1.5 Cloud the JWT claim takes priority
-    # (design section 8.2 anti-BOLA) — TODO(D3.5) wire JWT claim extraction.
+    # (design section 8.2 anti-BOLA) — TODO(integration) wire JWT claim extraction.
     _ = authorization  # reserved (agent design)
 
     # A-class tenant_id: None in CE single-tenant; echoes the header when provided

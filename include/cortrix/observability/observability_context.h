@@ -18,7 +18,7 @@ const char* ToString(LogLevel level);
 /// X-Agent-Id from it. Defined here (not pulled from the http server) so the
 /// shared ObservabilityContext stays dependency-light and unit-testable without
 /// the server. The real middleware adapts the server's header type to this in
-/// the D3.5 wiring.
+/// the integration wiring.
 struct HttpHeaders {
     std::map<std::string, std::string> values;
 
@@ -42,7 +42,7 @@ struct McpSession {
 
 /// Thread-local observability scope (identity
 /// extension). Carries the current TraceContext + the identity fields and
-/// emits OBSERVABILITY_SPEC §6 structured logs with trace correlation. Each
+/// emits the observability spec structured logs with trace correlation. Each
 /// thread has its own instance via ThreadLocal(); consumers (index, reranker, query, write,
 /// fusion, CRAG + the whole trace chain) read/set the context and log through it.
 ///
@@ -64,13 +64,13 @@ public:
     void SetTraceContext(TraceContext ctx);
     void ClearTraceContext();
 
-    /// Build the OBS_SPEC §6 structured log line (JSON string) for `msg` at
+    /// Build the OBS_SPEC structured log line (JSON string) for `msg` at
     /// `level`, injecting the current trace_id/span_id (null when unset). Pure
     /// (no I/O) so callers and tests can inspect the exact payload.
     std::string FormatStructured(LogLevel level, const std::string& msg) const;
 
     /// Emit a structured log line. Phase 1 writes the FormatStructured() JSON to
-    /// stderr; the OBS_SPEC §6 sink wiring (spdlog/OTel) lands with the full
+    /// stderr; the OBS_SPEC sink wiring (spdlog/OTel) lands with the full
     /// observability feature.
     void LogStructured(LogLevel level, const std::string& msg);
 
@@ -106,7 +106,7 @@ private:
 
 /// Shared validator for the identity headers / MCP capability: a
 /// single length + character-whitelist rule reused by both entry points. Per
-/// CODING_CONVENTIONS §3 / F-FREEZE-1 it returns Result<T> + Status (NO
+/// the coding conventions / F-FREEZE-1 it returns Result<T> + Status (NO
 /// Result<T,E> double-param); an invalid value yields an InvalidArgument Status
 /// carrying the CX_ERR_TRACE_INVALID_FILTER token, re-inflated to the full
 /// Agent-friendly body at the API boundary.

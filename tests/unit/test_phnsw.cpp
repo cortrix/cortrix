@@ -23,7 +23,7 @@ namespace {
 
 namespace fs = std::filesystem;
 
-// Deterministic helper (index §"test-data strategy" — fixed seed for repeatability).
+// Deterministic helper (index"test-data strategy" — fixed seed for repeatability).
 std::vector<float> MakeVector(int dim, int index) {
     std::vector<float> v(static_cast<size_t>(dim));
     // Simple deterministic fill; distinct per index so neighbors are well-ordered.
@@ -138,7 +138,7 @@ TEST_F(PHnswTest, MarkDeleteIsIdempotent) {
 }
 
 TEST_F(PHnswTest, AddPoint_AfterMarkDelete_SameBlockId_Reinserts) {
-    // Regression for the store-C1 silent data-loss bug. index design § 5 sanctions a
+    // Regression for the store-C1 silent data-loss bug. index design sanctions a
     // re-write as "MarkDelete(id) then AddPoint(id)" with the SAME block_id. The
     // index is built with allow_replace_deleted_=true, under which hnswlib's 2-arg
     // addPoint THROWS on a marked-deleted label; that throw was swallowed by

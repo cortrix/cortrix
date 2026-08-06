@@ -40,7 +40,7 @@ std::optional<std::string> ColOptText(sqlite3_stmt* stmt, int col) {
     return ColText(stmt, col);
 }
 
-// The SELECT column order Read() below depends on (matches operation_log §5.1).
+// The SELECT column order Read() below depends on (matches operation_log).
 constexpr const char* kSelectCols =
     "id, timestamp, user_id, action, namespace_id, resource_type, resource_id, "
     "summary, trace_id, session_id";
@@ -110,8 +110,8 @@ void OperationLogger::Log(const OperationLogEntry& entry, const TraceContext* ct
         std::lock_guard<std::mutex> lock(mu_);
         ok = InsertLocked(entry, ctx);
     }
-    // §11 cortrix_oplog_writes_total{action, resource_type}: count successful writes
-    // only (operation_log records successful operations — §4.1). Recorded outside mu_
+    // cortrix_oplog_writes_total{action, resource_type}: count successful writes
+    // only (operation_log records successful operations). Recorded outside mu_
     // so the metric's own lock never nests under the DB lock.
     if (ok) {
         OplogMetrics::Instance().RecordWrite(entry.action, entry.resource_type);
@@ -141,7 +141,7 @@ void OperationLogger::BatchLog(const std::vector<OperationLogEntry>& entries,
 Result<OperationLogQueryResult> OperationLogger::Query(
     const OperationLogFilter& filter, const TraceContext* /*ctx*/) {
     const int64_t query_start_ms = NowMs();
-    // §11 filter_dimensions label = number of active query filter fields (the 8 §6.1
+    // filter_dimensions label = number of active query filter fields (the 8
     // query dimensions). Low-cardinality (0-8), bucketed by the metric recorder.
     int filter_dimensions = 0;
     if (filter.action.has_value())         ++filter_dimensions;
@@ -153,7 +153,7 @@ Result<OperationLogQueryResult> OperationLogger::Query(
     if (filter.from_timestamp.has_value()) ++filter_dimensions;
     if (filter.to_timestamp.has_value())   ++filter_dimensions;
 
-    // ---- validate (§7.2 permanent input faults) ----
+    // ---- validate (permanent input faults) ----
     if (filter.limit < 1 || filter.limit > 200) {
         return OplogStatus(OplogErrorCode::kInvalidFilter,
                            "limit must be in [1,200], got " + std::to_string(filter.limit));
@@ -240,7 +240,7 @@ Result<OperationLogQueryResult> OperationLogger::Query(
         sqlite3_finalize(stmt);
     }
 
-    // offset past the end of a non-empty result set is out-of-range (§7.2). An
+    // offset past the end of a non-empty result set is out-of-range. An
     // offset of 0 on an empty set is a valid empty page (not an error).
     if (filter.offset > 0 && filter.offset >= total_count) {
         nlohmann::json sd = {{"offset", filter.offset}, {"total_count", total_count}};
@@ -273,7 +273,7 @@ Result<OperationLogQueryResult> OperationLogger::Query(
 
     result.next_offset = filter.offset + static_cast<int>(result.entries.size());
     result.has_next = result.next_offset < total_count;
-    // §11 cortrix_oplog_query_latency_seconds{filter_dimensions}: observe the
+    // cortrix_oplog_query_latency_seconds{filter_dimensions}: observe the
     // successful read path latency (validation-reject paths return before the DB
     // work and are not query-latency samples).
     OplogMetrics::Instance().ObserveQueryLatency(
@@ -343,7 +343,7 @@ void OperationLogger::Cleanup() {
         }
     }
 
-    // §11 metrics emitted outside mu_ (the metric recorder has its own locking).
+    // metrics emitted outside mu_ (the metric recorder has its own locking).
     OplogMetrics& m = OplogMetrics::Instance();
     m.RecordCleanupDeleted(OplogMetrics::CleanupReason::kAge, deleted_age);
     m.RecordCleanupDeleted(OplogMetrics::CleanupReason::kQuota, deleted_quota);
@@ -378,7 +378,7 @@ OperationLogStats OperationLogger::GetStats() {
         sqlite3_finalize(pg);
     }
     s.size_bytes = page_count * page_size;
-    // §11 cortrix_oplog_size_rows: refresh the gauge from the live row count so it
+    // cortrix_oplog_size_rows: refresh the gauge from the live row count so it
     // stays current between cleanup sweeps (GetStats already counted the rows).
     OplogMetrics::Instance().SetSizeRows(s.total_count);
     return s;

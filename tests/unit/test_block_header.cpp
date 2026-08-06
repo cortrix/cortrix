@@ -358,7 +358,7 @@ TEST(BlockHeaderTest, RelativeOffsetsFromHeaderEnd) {
 
 // Test 20: kFlagCompressed exists and has correct value
 TEST(BlockHeaderTest, FlagCompressedDefined) {
-    // Design D2: CORTRIX_BF_COMPRESSED = (1 << 5) = 0x20
+    // Design: CORTRIX_BF_COMPRESSED = (1 << 5) = 0x20
     EXPECT_EQ(kFlagCompressed, 0x20);
     // Verify it doesn't overlap with other flags
     EXPECT_EQ(kFlagHasContent & kFlagCompressed, 0);
@@ -370,7 +370,7 @@ TEST(BlockHeaderTest, FlagCompressedDefined) {
 
 // Test 21: kFlagHasFts value matches design bit position
 TEST(BlockHeaderTest, FlagHasFtsValue) {
-    // Design D2: CORTRIX_BF_HAS_FTS = (1 << 2) = 0x04
+    // Design: CORTRIX_BF_HAS_FTS = (1 << 2) = 0x04
     EXPECT_EQ(kFlagHasFts, 0x04);
 }
 
@@ -388,18 +388,18 @@ TEST(BlockHeaderTest, ContentOnlyOffsetZero) {
     EXPECT_EQ(hdr->chain_length, 0u);
 }
 
-// Test 23: ProcessingLevel enum values match design D2
+// Test 23: ProcessingLevel enum values match design
 TEST(BlockHeaderTest, ProcessingLevelValues) {
-    // Design D2: L0=0 skip, L1=1 metadata, L2=2 BM25+meta, L3=3 vec+BM25+meta
+    // Design: L0=0 skip, L1=1 metadata, L2=2 BM25+meta, L3=3 vec+BM25+meta
     EXPECT_EQ(static_cast<uint8_t>(ProcessingLevel::kLevelL0), 0);
     EXPECT_EQ(static_cast<uint8_t>(ProcessingLevel::kLevelL1), 1);
     EXPECT_EQ(static_cast<uint8_t>(ProcessingLevel::kLevelL2), 2);
     EXPECT_EQ(static_cast<uint8_t>(ProcessingLevel::kLevelL3), 3);
 }
 
-// Test 24: CortrixBlockType enum values match design D2
+// Test 24: CortrixBlockType enum values match design
 TEST(BlockHeaderTest, BlockTypeValues) {
-    // Design D2: FILE=1, SCAN=2, DATABASE=3, AUDIO=4, VIDEO=5, IMAGE=6, MEMORY=7
+    // Design: FILE=1, SCAN=2, DATABASE=3, AUDIO=4, VIDEO=5, IMAGE=6, MEMORY=7
     EXPECT_EQ(static_cast<uint16_t>(CortrixBlockType::kBlockFile), 1);
     EXPECT_EQ(static_cast<uint16_t>(CortrixBlockType::kBlockScan), 2);
     EXPECT_EQ(static_cast<uint16_t>(CortrixBlockType::kBlockDatabase), 3);
@@ -413,7 +413,7 @@ TEST(BlockHeaderTest, BlockTypeValues) {
 // Design Alignment Tests (index+reranker Final Review)
 // ============================================================
 
-// Test 25: kFlagHasFts is set for L2 blocks with content (design D2)
+// Test 25: kFlagHasFts is set for L2 blocks with content (design)
 TEST(BlockHeaderTest, FlagHasFtsSetForL2WithContent) {
     auto buf = BlockBuild(
         CortrixBlockType::kBlockFile,
@@ -581,7 +581,7 @@ TEST(BlockHeaderTest, DifferentContentDifferentHash) {
 // ============================================================================
 // Block header Phase 1 — new fields (flags_ext / enrichment_source / compression_algo),
 // extended enums (META=8, L4), CRC range 84-127, magic CRTX, ToString.
-// (Design §6 tests #33-48.)
+// (Design tests #33-48.)
 // ============================================================================
 
 TEST(BlockHeaderTest, BLOCKFRAMEWORK_StructSize128) {

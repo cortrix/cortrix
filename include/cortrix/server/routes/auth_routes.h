@@ -56,7 +56,7 @@ void RegisterAuthSessionRoute(httplib::Server& server, ApiKeyAuth& auth);
 /// All WithAuth(kPermAdmin) (+ AdminGuard loopback IP layer). The 4 mutating
 /// endpoints write the user.created / user.updated / user.disabled / user.enabled
 /// operation_log actions through `logger` (may be null = no-op, e.g. in tests).
-/// Errors are the GEN-Agent body with the §2.13-bis statuses (404/409/422/400).
+/// Errors are the GEN-Agent body with the statuses (404/409/422/400).
 /// `users` (and `logger` when non-null) must outlive `server`.
 void RegisterAdminUsersRoutes(httplib::Server& server, auth::AdminUsersService& users,
                               ApiKeyAuth& auth,

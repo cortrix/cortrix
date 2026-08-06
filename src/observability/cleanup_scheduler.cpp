@@ -107,7 +107,7 @@ void CleanupScheduler::StopScheduler() {
 }
 
 void CleanupScheduler::RunLoop() {
-    // Catch-up sweep on startup (§8.1 "startup check").
+    // Catch-up sweep on startup ("startup check").
     RunCleanupNow();
 
     for (;;) {

@@ -29,7 +29,7 @@ using ::testing::_;
 class MemoryWriterTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // D3.5 wire⑤c: MemoryWriter takes a CortrixStore& directly (it only ever used
+        // integration wire⑤c: MemoryWriter takes a CortrixStore& directly (it only ever used
         // ns.store()). Stand up the shared namespace pool harness, admit a namespace, and hold a
         // long-lived facade — facade.memory()/facade.store() back the writer.
         harness_ = std::make_unique<cortrix::test::NsPoolHarness>(

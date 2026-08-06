@@ -57,7 +57,7 @@ Result<Judgment> ContradictionDetector::Judge(const std::string& new_content,
         return MemoryExtractStatus(MemoryExtractErrorCode::kLlmDisabled, "no LLM client for judge");
     }
 
-    // Build the D5 judgment prompt (language auto-picked from the new fact text).
+    // Build the judgment prompt (language auto-picked from the new fact text).
     const char* tmpl = ContradictionPromptTemplate(PromptLang::kAuto, new_content);
     std::string prompt = RenderPrompt(tmpl, kPlaceholderNewFact, new_content);
     prompt = RenderPrompt(prompt, kPlaceholderOldFact, old_content);

@@ -12,7 +12,7 @@ namespace cortrix::query {
 
 /// One failed namespace inside meta.namespaces_failed[].
 /// Carries the full GEN-Agent error contract so an Agent can decide per-NS whether
-/// to retry (timeout) or notify ops (permanent) — see §3.2 decision matrix.
+/// to retry (timeout) or notify ops (permanent) — see decision matrix.
 struct NamespaceFailure {
     std::string namespace_id;                  ///< serialized as "namespace"
     std::string error_code;                    ///< CX_ERR_* (CX_ERR_NS_TIMEOUT / CX_ERR_INDEX_CORRUPT)
@@ -66,7 +66,7 @@ struct CrossNsResponse {
     CrossNsMeta meta;
     std::optional<agent_friendly::AgentFriendlyError> error;  ///< CX_ERR_SCATTER_TIMEOUT only
 
-    /// Serialize to the §2.5 JSON body: {results, meta[, error]}.
+    /// Serialize to the JSON body: {results, meta[, error]}.
     nlohmann::json ToJson() const;
 };
 

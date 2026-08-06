@@ -9,7 +9,7 @@ namespace cortrix::config {
 /// the platform.db `auth_config` table (AuthConfigService::LoadOrInitDefaults
 /// writes the defaults on first start; the SMTP-related keys are later set via
 /// the admin API `POST /api/v1/admin/config/smtp`). The single startup-required
-/// env var is `CORTRIX_DATA_DIR`. The fields below mirror the §3.6 default key
+/// env var is `CORTRIX_DATA_DIR`. The fields below mirror the default key
 /// set 1:1 and are the in-memory snapshot AuthService reads.
 ///
 /// This is the minimal form of the canonical cortrix::IGlobalConfig

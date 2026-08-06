@@ -65,7 +65,7 @@ Status CatalogDb::Open(const std::string& db_path,
     // batch. The catalog is registered FIRST so its base tables (units / tenants /
     // namespaces) — the FK targets the rest reference — exist before any
     // downstream Feature provider extends them. The caller supplies the
-    // downstream providers already in ARCH §1.3.bis.3 topological order;
+    // downstream providers already in ARCH topological order;
     // SchemaMigrator preserves registration order and skips nullptr entries.
     CatalogSchemaProvider catalog_provider;
     SchemaMigrator migrator;

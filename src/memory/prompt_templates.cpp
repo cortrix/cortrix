@@ -4,7 +4,7 @@
 
 namespace cortrix::memory {
 
-// --- Extraction prompts (D10) — few-shot, JSON-array output contract ---
+// --- Extraction prompts — few-shot, JSON-array output contract ---
 //
 // The *Zh / *En pairs below are functional engine data (multilingual content
 // support): ExtractPromptTemplate / ContradictionPromptTemplate pick the Chinese
@@ -63,7 +63,7 @@ Conversation:
 Output ONLY the JSON array (no other text):
 )";
 
-// --- Contradiction-judgment prompts (D5) — single JSON object output ---
+// --- Contradiction-judgment prompts — single JSON object output ---
 
 const char* const kContradictionDetectPromptZh = R"(判断新事实和旧事实是否矛盾。
 

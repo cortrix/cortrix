@@ -9,7 +9,7 @@
 
 // Exhaustive matrices for the DB import enums (src/import/import_types.cpp).
 //   TextStrategy:     ToString <-> ParseTextStrategy (round-trip). "template"
-//                     and everything else -> nullopt (V1.0 D1 V3 ruling 13).
+//                     and everything else -> nullopt (V1.0 V3 ruling 13).
 //   ImportTaskStatus: ToString only (one-way; lifecycle status). We pin each of
 //                     the 6 tokens + uniqueness; no Parse surface exists.
 // Suite names unique with RtImport* prefix.

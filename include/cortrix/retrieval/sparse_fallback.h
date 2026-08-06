@@ -27,13 +27,13 @@ struct L1SerializeResult {
     int attempts = 0;                 ///< how many serialize attempts were made
 };
 
-/// L1 write-time sparse serialization with the §7.1 degrade policy. Empty `vec`
-/// (dead chunk, §6.5) → serialized=false, write NULL, clear the flag (no error,
+/// L1 write-time sparse serialization with the degrade policy. Empty `vec`
+/// (dead chunk) → serialized=false, write NULL, clear the flag (no error,
 /// no retries). A non-empty vec is serialized; on a serializer failure it retries
 /// up to `retries` times, then degrades to NULL (serialized=false) rather than
 /// failing the write. SerializeSparseVec is deterministic, so a retry only helps
 /// a transient (it never does for a genuine out-of-range id) — the loop matches
-/// the §7.1 contract and surfaces the attempt count for the metric.
+/// the contract and surfaces the attempt count for the metric.
 L1SerializeResult L1SerializeSparseVec(const SparseVector& vec,
                                        int retries = kSparseSerializeRetries);
 
@@ -46,7 +46,7 @@ SparseExplain DecideL2Fallback(bool sparse_available, int resolved_top_k);
 
 /// Build the 5-path RRF input for the L2 fallback path: identical to the normal
 /// input but with the sparse list dropped (empty), so FuseFivePathRrf degrades to
-/// dense + contextualized + fts5 + hype (the §7.2 "4-path RRF"). The caller passes
+/// dense + contextualized + fts5 + hype (the "4-path RRF"). The caller passes
 /// the lists it has; this just zeroes the sparse one to make the intent explicit
 /// + testable.
 FivePathInput DropSparsePath(FivePathInput input);

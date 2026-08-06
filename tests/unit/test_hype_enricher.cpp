@@ -233,7 +233,7 @@ TEST(HypeHyPEEnricherTest, EnrichDegradesOnLlmFailure) {
     EXPECT_FALSE(res.error_msg.empty());
 }
 
-// ---------- S2: strict ParseQuestions (§6.2) ----------
+// ---------- S2: strict ParseQuestions ----------
 
 TEST(HypeHyPEParseTest, ExactCountSucceeds) {
     auto r = HyPEEnricher::ParseQuestions("q1\nq2\nq3", 3);

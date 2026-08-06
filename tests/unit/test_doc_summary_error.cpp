@@ -6,7 +6,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/doc_summary/doc_summary_error.h"
 
-// Doc summary S5 — Document Summary error model (§7, ARCH §4.1.11) — template A registry.
+// Doc summary S5 — Document Summary error model (ARCH) — template A registry.
 // Pins the 7 codes, categories/retryability/retry_after_ms, structured_data
 // contracts, and the Status bridge.
 namespace cortrix::doc_summary {

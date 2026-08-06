@@ -55,7 +55,7 @@ EnricherConfig FastCfg() {
     cfg.workers = 2;
     cfg.queue_size = 16;
     cfg.task_timeout_ms = 200;          // small so timeout tests are fast
-    cfg.http_retry_backoff_ms = 1;      // §3.7 seconds-level default would stall tests
+    cfg.http_retry_backoff_ms = 1;      // seconds-level default would stall tests
     cfg.circuit_breaker_enabled = true;
     cfg.circuit_breaker_threshold = 3;  // trip quickly for the test
     cfg.circuit_breaker_cooldown_sec = 60;
@@ -88,7 +88,7 @@ TEST_F(ResilienceTest, Http5xxRetriedThreeTimesThenFails) {
 
     ASSERT_EQ(results.size(), 1u);
     EXPECT_EQ(results[0].status, static_cast<int>(EnricherErrorCode::kLlmApi));
-    // §5.1 LLM_API retry 3  times → exactly 3 Chat calls for the single batch.
+    // LLM_API retry 3  times → exactly 3 Chat calls for the single batch.
     EXPECT_EQ(client->calls.load(), 3);
 }
 
@@ -167,7 +167,7 @@ TEST_F(ResilienceTest, CircuitBreakerOpensAndDegradesWithoutCalling) {
 }
 
 TEST_F(ResilienceTest, TransportBackoffEngagesBetweenRetries) {
-    // Contract: the default base is seconds-level (addendum §3.7 A-part).
+    // Contract: the default base is seconds-level (addendum A-part).
     EXPECT_EQ(EnricherConfig{}.http_retry_backoff_ms, 5000);
 
     auto client = std::make_shared<ConfigurableLlmClient>();
@@ -205,7 +205,7 @@ TEST_F(ResilienceTest, SuccessRecordsTokensMetric) {
 
 TEST_F(ResilienceTest, BudgetCapRefusesAfterSpend) {
     // Tiny $1 cap. The client reports a large prompt_tokens so one successful call
-    // accrues > $1, tripping the budget gate for the next batch (§4.2 / §5.1).
+    // accrues > $1, tripping the budget gate for the next batch.
     auto client = std::make_shared<ConfigurableLlmClient>();
     client->ok_content = R"({"0":{"summary":"ok","score":0.5}})";
     // Override the canned token usage: 1M gpt-4o-mini input ≈ $0.15; 10M ≈ $1.5 > $1.

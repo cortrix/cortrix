@@ -5,7 +5,7 @@
 namespace cortrix::observability {
 
 namespace {
-constexpr size_t kSummaryMaxBytes = 100;  // §5.1 — summary ≤ 100 chars
+constexpr size_t kSummaryMaxBytes = 100;  // — summary ≤ 100 chars
 }  // namespace
 
 const char* ResourceTypeFor(EmitSite site, const std::string& action) {
@@ -13,7 +13,7 @@ const char* ResourceTypeFor(EmitSite site, const std::string& action) {
         case EmitSite::kQueryEngine:
             return "query";
         case EmitSite::kSpcPipeline:
-            // §9.1: SpcPipeline emits upload / delete (document) + db_import.
+            //: SpcPipeline emits upload / delete (document) + db_import.
             // The resource_type domain also has db_connection for the DB-import hooks.
             if (action == "database_import") return "db_import";
             if (action == "db_connection_register" || action == "db_connection_revoke")
@@ -49,7 +49,7 @@ OperationLogEntry MakeEngineEntry(EmitSite site,
     // C1/C2: read trace_id / session_id / user_id from the thread-local context.
     // The entry point (WithAuth, auth_middleware.cpp) now fills the ObservabilityContext
     // from the identity headers + the authenticated principal before the handler
-    // runs, so this fulfills the previously-deferred D3.5 wiring: trace_id comes from the
+    // runs, so this fulfills the previously-deferred integration wiring: trace_id comes from the
     // W3C TraceContext; session_id (C2) + user_id come from the identity fields.
     const ObservabilityContext& octx = ObservabilityContext::ThreadLocal();
     if (const TraceContext* tc = octx.GetTraceContext(); tc != nullptr) {
@@ -59,7 +59,7 @@ OperationLogEntry MakeEngineEntry(EmitSite site,
     if (octx.session_id.has_value() && !octx.session_id->empty()) {
         e.session_id = octx.session_id;
     }
-    // user_id: from the authenticated principal the entry point installed; §9.2
+    // user_id: from the authenticated principal the entry point installed;
     // default "anonymous" when the context carries none (dev / no-auth path).
     e.user_id = (octx.user_id.has_value() && !octx.user_id->empty())
                     ? *octx.user_id

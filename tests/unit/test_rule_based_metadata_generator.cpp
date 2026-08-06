@@ -11,9 +11,9 @@
 #include "cortrix/metadata/metadata_types.h"
 #include "cortrix/metadata/rule_based_metadata_generator.h"
 
-// META block S1.2 / S2.4 / §7.2 coverage: RuleBasedMetadataGenerator — the core block_text
+// META block S1.2 / S2.4 / coverage: RuleBasedMetadataGenerator — the core block_text
 // assembly + 26-field metadata_json serialization (≥95% target), the three metadata
-// cases (full input / missing page_count / parser total failure), and the §9.quater.2
+// cases (full input / missing page_count / parser total failure), and the
 // doc_fts5 derived mapping.
 namespace cortrix::metadata {
 namespace {
@@ -58,13 +58,13 @@ GeneratorInput FullInput() {
     return in;
 }
 
-// --- 26-field schema completeness (D2/D9 + V2 rework §3.1) ---
+// --- 26-field schema completeness (/ + V2 rework) ---
 
 TEST(MetadataGeneratorTest, FullInputProducesAll26SchemaFields) {
     std::vector<std::string> missing;
     nlohmann::json j = RuleBasedMetadataGenerator::BuildMetadataJson(FullInput(), &missing);
 
-    // Every §3.1 key is present (the schema must not silently shrink). Listed
+    // Every key is present (the schema must not silently shrink). Listed
     // explicitly so the test documents the locked 26-field set.
     static const std::vector<std::string> kSchema = {
         "block_id", "block_type", "doc_id", "namespace_id",
@@ -113,7 +113,7 @@ TEST(MetadataGeneratorTest, FullInputFieldValuesMatchInput) {
     EXPECT_EQ(j["custom_metadata"]["owner"], "finance-team");
 }
 
-// Case 2: page_count unknown → null + recorded in missing_fields (§5.2 row 2 / §5.3).
+// Case 2: page_count unknown → null + recorded in missing_fields (row 2 /).
 TEST(MetadataGeneratorTest, MissingPageCountNullsAndWarns) {
     GeneratorInput in = FullInput();
     in.doc_metadata.page_count = -1;  // Parser couldn't determine page count
@@ -164,7 +164,7 @@ TEST(MetadataGeneratorTest, ParseStatusCleaningSignals) {
     EXPECT_TRUE(j["meta.parse_failed_page"].is_null());
 }
 
-// Empty parse_status normalizes to "ok" (§3.1 required enum; never empty on the wire).
+// Empty parse_status normalizes to "ok" (required enum; never empty on the wire).
 TEST(MetadataGeneratorTest, EmptyParseStatusNormalizesToOk) {
     GeneratorInput in = FullInput();
     in.stats.parse_status = "";
@@ -183,12 +183,12 @@ TEST(MetadataGeneratorTest, NullCustomMetadataBecomesEmptyObject) {
     EXPECT_TRUE(j["custom_metadata"].empty());
 }
 
-// --- block_text (D3 locked: natural-language sentence, §3.2) ---
+// --- block_text (locked: natural-language sentence) ---
 
 TEST(MetadataGeneratorTest, BlockTextContainsCoreFieldsOnly) {
     std::string text = RuleBasedMetadataGenerator::BuildBlockText(FullInput());
 
-    // Core fields (§3.2): filename / mime_type / page_count / upload_time / lang / tags / parser.
+    // Core fields: filename / mime_type / page_count / upload_time / lang / tags / parser.
     EXPECT_NE(text.find("quarterly_report.pdf"), std::string::npos);
     EXPECT_NE(text.find("application/pdf"), std::string::npos);
     // "15 pages" = page-count suffix emitted by production BuildBlockText
@@ -200,7 +200,7 @@ TEST(MetadataGeneratorTest, BlockTextContainsCoreFieldsOnly) {
     EXPECT_NE(text.find("financial"), std::string::npos);
     EXPECT_NE(text.find("docling"), std::string::npos);
 
-    // NOT in block_text (§3.2): block_id / doc_id / namespace_id / *_version /
+    // NOT in block_text: block_id / doc_id / namespace_id / *_version /
     // file_size / business custom_metadata.
     EXPECT_EQ(text.find("01HXXDOC"), std::string::npos);       // doc_id
     EXPECT_EQ(text.find("default"), std::string::npos);        // namespace_id
@@ -236,7 +236,7 @@ TEST(MetadataGeneratorTest, GenerateSucceedsAndMintsUlidBlockId) {
     // block_id is reflected into the JSON too.
     EXPECT_EQ(blk.metadata_json["block_id"], blk.block_id);
     EXPECT_FALSE(blk.block_text.empty());
-    // embedding(block_text) is D3.5 pipeline wiring → empty standalone.
+    // embedding(block_text) is integration pipeline wiring → empty standalone.
     EXPECT_TRUE(blk.embedding.empty());
     EXPECT_TRUE(res.value().missing_fields.empty());
 }
@@ -256,7 +256,7 @@ TEST(MetadataGeneratorTest, GeneratePartialSurfacesMissingFields) {
     in.doc_metadata.page_count = -1;
     RuleBasedMetadataGenerator gen;
     auto res = gen.Generate(in);
-    ASSERT_TRUE(res.ok());  // partial is still HTTP 200 (§5.2)
+    ASSERT_TRUE(res.ok());  // partial is still HTTP 200
     ASSERT_EQ(res.value().missing_fields.size(), 1u);
     EXPECT_EQ(res.value().missing_fields[0], "page_count");
 }
@@ -277,7 +277,7 @@ TEST(MetadataGeneratorTest, GenerateFailsWhenParserParseCompletelyFailed) {
 }
 
 // A failed parse that still has identity (filename present) is NOT a hard failure —
-// the block is generated as an L0 fallback (§5.2: only "completely empty" fails).
+// the block is generated as an L0 fallback (only "completely empty" fails).
 TEST(MetadataGeneratorTest, FailedParseWithFilenameStillGenerates) {
     GeneratorInput in = FullInput();
     in.stats.parse_status = "failed";
@@ -287,7 +287,7 @@ TEST(MetadataGeneratorTest, FailedParseWithFilenameStillGenerates) {
     EXPECT_EQ(res.value().block.metadata_json["ingestion_status"], "failed");
 }
 
-// §5.bis cortrix_metadata_block_generate_duration_seconds feed point: each produced-block
+// cortrix_metadata_block_generate_duration_seconds feed point: each produced-block
 // Generate() must observe the histogram (the recorder method existed but Generate()
 // never fed it). Mirrors the semantic score AssignFeedsDurationHistogram regression — lock that
 // each generating call increments _count by 1.
@@ -322,7 +322,7 @@ TEST(MetadataGeneratorTest, GenerateFailureDoesNotFeedDurationHistogram) {
     MetadataMetrics::Instance().ResetForTest();
 }
 
-// --- §9.quater.2 doc_fts5 derived mapping ---
+// --- doc_fts5 derived mapping ---
 
 TEST(MetadataGeneratorTest, DeriveDocFts5Columns) {
     nlohmann::json cols = RuleBasedMetadataGenerator::DeriveDocFts5Columns(FullInput());

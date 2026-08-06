@@ -66,7 +66,7 @@ TEST_F(OnnxMetricsTest, InferenceDurationSummary) {
     EXPECT_NEAR(m().InferenceDurationSum(), 0.060, 1e-9);
 }
 
-// D35-MET-03: inference_duration_seconds now renders cumulative le buckets +Inf.
+//-MET-03: inference_duration_seconds now renders cumulative le buckets +Inf.
 TEST_F(OnnxMetricsTest, InferenceDurationHistogramBuckets) {
     m().ObserveInferenceDuration(0.004);   // <= 0.005
     m().ObserveInferenceDuration(0.030);   // <= 0.05  (not <= 0.025)

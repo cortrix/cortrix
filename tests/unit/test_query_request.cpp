@@ -84,7 +84,7 @@ TEST(QueryRequestTest, Validate_EmptyQuery) {
     EXPECT_EQ(s.message(), "query is required");
 }
 
-// Design spec (D8 boundary #13): queries > max_query_length are TRUNCATED, not rejected.
+// Design spec (boundary #13): queries > max_query_length are TRUNCATED, not rejected.
 // Normalize() must be called before Validate() to apply truncation.
 TEST(QueryRequestTest, Normalize_TruncatesLongQuery) {
     QueryRequest req;

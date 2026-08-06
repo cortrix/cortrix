@@ -14,7 +14,7 @@ namespace cortrix::tenant {
 /// stable `CX_ERR_*` string + a GEN-Agent category + retryability via the
 /// canonical registry below.
 ///
-/// Per CODING_CONVENTIONS sec 3, Cortrix uses Result<T> + Status only (no
+/// Per the coding conventions sec 3, Cortrix uses Result<T> + Status only (no
 /// Result<T,E>); a domain error is carried as the Agent-friendly boundary type
 /// cortrix::agent_friendly::AgentFriendlyError, identified by its CX_ERR_* code.
 /// So TenantErrorCode is the *enum of identities*, and MakeTenantError() turns one

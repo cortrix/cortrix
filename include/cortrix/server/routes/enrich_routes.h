@@ -11,7 +11,7 @@ namespace cortrix::spc { class EnrichRetrySweeper; }
 
 namespace cortrix {
 
-/// addendum §3.7 G4 — the enrichment-backfill ops surface (Agent self-service):
+/// addendum G4 — the enrichment-backfill ops surface (Agent self-service):
 ///
 ///   POST /api/v1/namespaces/:name/enrich/backfill   (admin)
 ///     body (optional): {"audit": true}

@@ -7,7 +7,7 @@ namespace cortrix::memory {
 
 namespace {
 
-// extract_duration_seconds histogram bucket upper bounds (seconds), §5.4. Parallel
+// extract_duration_seconds histogram bucket upper bounds (seconds), Parallel
 // string array for rendering exact `le` labels. The trailing +Inf bucket is implicit
 // (index kNumDurBuckets). Mirrors the import_metrics kDurBounds/kDurBoundStr template.
 constexpr double kDurBounds[MemoryExtractMetrics::kNumDurBuckets] =

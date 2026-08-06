@@ -97,7 +97,7 @@ const std::vector<DocSummaryJsonCase> kDocSummaryCases = {
     {"wrapped_summary", R"({"summary":)" + std::string(kGood) + "}", DTol::kRejected, 0, -1},
 
     // ---- prose-surrounded -> ACCEPTED via balanced-extract repair ----
-    // Contract revision 2026-07-10 (recorded method change, doc §9.1
+    // Contract revision 2026-07-10 (recorded method change, doc
     // as-built note): prose wrappers around one balanced object are provider
     // noise (observed live with DeepSeek-V4-Flash), rescued by the
     // second-chance extraction. Wrong STRUCTURES (array/scalar/wrapped-object

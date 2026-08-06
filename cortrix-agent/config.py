@@ -3,7 +3,7 @@
 Priority (highest -> lowest):
   1. Real environment variables (e.g. export LLM_PROVIDER=claude)
   2. cortrix-agent/.env file         (local override)
-  3. build/config.yaml -> agent_llm  (main unified config; D3.5 -> IGlobalConfig)
+  3. build/config.yaml -> agent_llm  (main unified config; integration -> IGlobalConfig)
   4. Hardcoded defaults              (mock / safe defaults)
 """
 

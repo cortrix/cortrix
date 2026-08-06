@@ -1,5 +1,5 @@
 // Doc summary S1/S2 — DocSummaryGenerator: structured-output prompt, JSON parse (with
-// max_chars truncation), short-doc single-call + long-doc map-reduce (§9.2),
+// max_chars truncation), short-doc single-call + long-doc map-reduce,
 // Generate end-to-end (success / no-chunks / LLM failure / null store), and the
 // config resolver + doc_summary_status state machine.
 #include <gtest/gtest.h>
@@ -348,7 +348,7 @@ TEST(DocSummaryGeneratorTest, SendsConfiguredModelNotDefault) {
     ASSERT_TRUE(r.ok()) << r.status().message();
 }
 
-// ---------- GenerateSummary: map-reduce long path (§9.2) ----------
+// ---------- GenerateSummary: map-reduce long path ----------
 
 TEST(DocSummaryGeneratorTest, LongDocMapReduce) {
     auto llm = std::make_shared<llm::MockLlmClient>();
@@ -396,7 +396,7 @@ TEST(DocSummaryGeneratorTest, GenerateSuccess) {
     EXPECT_TRUE(res.success);
     EXPECT_FALSE(res.is_chunked);
     EXPECT_NE(res.summary.summary_text.find("Q3 2026"), std::string::npos);
-    EXPECT_TRUE(res.embedding.empty());  // D3.5 pipeline wiring
+    EXPECT_TRUE(res.embedding.empty());  // integration pipeline wiring
     EXPECT_FALSE(res.error.has_value());
     EXPECT_EQ(DocSummaryMetrics::Instance().SummariesGeneratedCount(), 1u);
     DocSummaryMetrics::Instance().ResetForTest();
@@ -499,7 +499,7 @@ TEST(DocSummaryGeneratorTest, GenerateNullChunkStoreErrors) {
     ASSERT_TRUE(res.error.has_value());
 }
 
-// ---------- Config resolver (§4.4) ----------
+// ---------- Config resolver ----------
 
 TEST(DocSummaryConfigTest, ResolveNullGlobalGivesDefaults) {
     DocSummaryConfig cfg = ResolveDocSummaryConfig(nullptr);
@@ -531,7 +531,7 @@ TEST(DocSummaryConfigTest, ResolveIgnoresNonPositiveAndUnparseable) {
     EXPECT_EQ(cfg.chunk_threshold, kChunkThresholdDefault);
 }
 
-// ---------- doc_summary_status state machine (§7.1) ----------
+// ---------- doc_summary_status state machine ----------
 
 TEST(DocSummaryStatusTest, ToStringValues) {
     EXPECT_STREQ(ToString(DocSummaryStatus::kPending), "pending");

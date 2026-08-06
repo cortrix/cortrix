@@ -55,12 +55,12 @@ public:
     ///
     /// Real sparse-head extraction from a re-exported BGE-M3 ONNX model that
     /// exposes the lexical_weights output is cross-Feature wiring (model export
-    /// + a 2nd model output) → D3.5. In standalone D3 the dense half reuses the
+    /// + a 2nd model output) → integration. In standalone the dense half reuses the
     /// frozen real inference path, and the sparse half is produced by a
     /// deterministic stub derived from the same input (so the serialization,
     /// inverted-index and RRF code is fully exercisable + reproducible). When a
     /// real model IS present, dense uses it; sparse still uses the stub until
-    /// D3.5 wires the sparse output — is_real_model() reflects only the dense
+    /// integration wires the sparse output — is_real_model() reflects only the dense
     /// model state, callers must not assume sparse is model-derived in Phase 1.
     Status EmbedWithSparse(const std::string& text, EmbedWithSparseResult* result,
                            int top_k = 100);
@@ -119,7 +119,7 @@ private:
     /// (kBgeM3VocabSize), assigns a stable positive weight per term, then keeps
     /// the top-`top_k` by weight. Empty / whitespace-only text → empty map (the
     /// the "empty_content" path). Mirrors StubEmbed's determinism so tests
-    /// are reproducible; replaced by the real model sparse output at D3.5.
+    /// are reproducible; replaced by the real model sparse output at integration.
     std::map<uint32_t, float> StubSparse(const std::string& text, int top_k) const;
 };
 

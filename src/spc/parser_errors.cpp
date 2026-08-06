@@ -15,7 +15,7 @@ namespace {
 // a row" into a warning, which the project treats as a build failure — the
 // registry can't silently drift from the enum.
 //
-// kOk / kEmptyDocument are not errors (§5.1: empty doc => status=OK). They carry
+// kOk / kEmptyDocument are not errors (empty doc => status=OK). They carry
 // category kPermanent + retryable=false as inert placeholders so GetParserErrorInfo
 // stays total; call sites gate on IsParserOk() before building an error body.
 constexpr ParserErrorInfo kOk                {"CX_ERR_OK",                  ErrorCategory::kPermanent, false, std::nullopt};
@@ -71,7 +71,7 @@ const char* ParserErrorCodeString(ParserErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredParserStructuredDataKeys(ParserErrorCode code) {
-    // §5.2 "structured_data (key fields)" column, 1:1. Function-local statics →
+    // "structured_data (key fields)" column, 1:1. Function-local statics →
     // stable references. The `code` key is always present in the body; the lists
     // below name the *additional* required fields per row.
     static const std::vector<std::string> kEmpty{};
@@ -123,7 +123,7 @@ AgentFriendlyError MakeParserError(ParserErrorCode code,
                                    nlohmann::json structured_data,
                                    const std::string& message) {
     const ParserErrorInfo& info = GetParserErrorInfo(code);
-    // The CX_ERR_* identity also lands inside structured_data (the §5.2 "code"
+    // The CX_ERR_* identity also lands inside structured_data (the "code"
     // key) so a consumer reading only the structured payload still recovers it.
     if (structured_data.is_object() && !structured_data.contains("code")) {
         structured_data["code"] = info.cx_code;

@@ -6,7 +6,7 @@
 
 #include "cortrix/retrieval/sparse_rrf.h"
 
-// Sparse retrieval S8 — chunk-level 5-path RRF fusion (§9.1). dense + sparse + fts5 carry real
+// Sparse retrieval S8 — chunk-level 5-path RRF fusion. dense + sparse + fts5 carry real
 // structure; contextualized + hype are MOCK (empty lists) this round.
 namespace cortrix::retrieval {
 namespace {

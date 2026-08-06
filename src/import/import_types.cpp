@@ -13,7 +13,7 @@ const char* ToString(TextStrategy strategy) {
 std::optional<TextStrategy> ParseTextStrategy(const std::string& s) {
     if (s == "per_row") return TextStrategy::kPerRow;
     if (s == "merge") return TextStrategy::kMerge;
-    // "template" and everything else is rejected in V1.0 (D1 V3 resolution 13).
+    // "template" and everything else is rejected in V1.0 (V3 resolution 13).
     return std::nullopt;
 }
 

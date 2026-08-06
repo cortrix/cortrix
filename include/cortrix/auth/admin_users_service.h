@@ -60,11 +60,11 @@ public:
     AdminUsersService(sqlite3* platform_db, IPasswordHasher* hasher)
         : db_(platform_db), hasher_(hasher) {}
 
-    /// List users with optional q/status/role filters + pagination (§2.13-bis).
+    /// List users with optional q/status/role filters + pagination.
     Result<AdminUserListResult> List(const AdminUserListFilter& filter);
 
     /// Create a user in admin invite mode — no email-verification flow
-    /// (email_verified defaults true, §2.13-bis "no email verify"). Validates
+    /// (email_verified defaults true, "no email verify"). Validates
     /// email format / password complexity / role enum. Errors:
     /// CX_ERR_USER_VALIDATION (bad email/role/empty) / CX_ERR_INVALID_REQUEST
     /// (weak password) / CX_ERR_USER_EMAIL_EXISTS (duplicate email).
@@ -73,7 +73,7 @@ public:
                                    const std::string& role,
                                    const std::string& display_name);
 
-    /// Update display_name / role / email_verified (§2.13-bis PATCH). Each field
+    /// Update display_name / role / email_verified (PATCH). Each field
     /// is optional; absent fields are untouched. Errors: CX_ERR_USER_NOT_FOUND /
     /// CX_ERR_USER_VALIDATION (bad role / empty display_name).
     Result<AdminUserRecord> Update(const std::string& id,
@@ -81,11 +81,11 @@ public:
                                    const std::optional<std::string>& role,
                                    const std::optional<bool>& email_verified);
 
-    /// Disable a user: status active → disabled (soft, no delete, §2.13-bis).
+    /// Disable a user: status active → disabled (soft, no delete).
     /// Idempotent (already-disabled returns the row). Error: CX_ERR_USER_NOT_FOUND.
     Result<AdminUserRecord> Disable(const std::string& id);
 
-    /// Enable a user: status disabled → active (§2.13-bis). Idempotent. Error:
+    /// Enable a user: status disabled → active. Idempotent. Error:
     /// CX_ERR_USER_NOT_FOUND.
     Result<AdminUserRecord> Enable(const std::string& id);
 

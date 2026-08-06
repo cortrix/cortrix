@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { MemoryItem } from '../../types/api';
 import { Modal, Button } from '../ui';
 
-// Invalidate (soft-delete) confirmation (web UI design § 7.1 — second confirm).
+// Invalidate (soft-delete) confirmation (web UI design — second confirm).
 // Memory transparency: this is NOT a hard delete — the memory is marked
 // status=invalidated and stays in the transparency history.
 

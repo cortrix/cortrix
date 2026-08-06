@@ -8,7 +8,7 @@
 #include "cortrix/agent_friendly/error.h"
 #include "cortrix/onnx/onnx_error.h"
 
-// Exhaustive parameterized error-registry sweep for ONNX (§8.3, 3 codes).
+// Exhaustive parameterized error-registry sweep for ONNX (codes).
 // Distinct suite name (OnnxErrorMatrix) from test_onnx_error.cpp.
 namespace cortrix::onnx {
 namespace {

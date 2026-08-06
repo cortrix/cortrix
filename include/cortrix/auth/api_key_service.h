@@ -33,7 +33,7 @@ struct CreatedApiKey {
 /// Keys are `cortrix_sk_<64-char>`; only their SHA-256 hash + a 16-char
 /// prefix are persisted (plaintext returned once at creation). Borrows an open
 /// platform.db handle (does not own it). The REST routes that expose these are
-/// D3.5 wiring; this is the logic they call.
+/// integration wiring; this is the logic they call.
 class ApiKeyService {
 public:
     explicit ApiKeyService(sqlite3* db) : db_(db) {}

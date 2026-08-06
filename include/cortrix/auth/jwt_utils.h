@@ -50,13 +50,13 @@ public:
     ///   - alg == HS256;
     ///   - HMAC signature matches one accepted secret (constant-time compare);
     ///   - exp > now (expiry).
-    /// Errors map to §5.1: bad structure/sig → CX_ERR_UNAUTHORIZED;
+    /// Errors map to: bad structure/sig → CX_ERR_UNAUTHORIZED;
     /// expired → CX_ERR_AUTH_TOKEN_EXPIRED.
     static Result<JwtPayload> Decode(const std::string& token,
                                      const std::vector<std::string>& accept_secrets,
                                      int64_t now_sec);
 
-    // ---- base64url (RFC 7515 §2 — no padding, '-'/'_' alphabet). Exposed for tests.
+    // ---- base64url (RFC 7515 — no padding, '-'/'_' alphabet). Exposed for tests.
     static std::string Base64UrlEncode(const std::string& data);
     static Result<std::string> Base64UrlDecode(const std::string& in);
 

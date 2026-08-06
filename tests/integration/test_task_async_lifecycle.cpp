@@ -23,7 +23,7 @@
 // DocumentProcessor → parser (stub) → progress/cancel/cleanup — over a real
 // in-memory stack. The CROSS-feature E2E (real Docling subprocess, real SPC
 // Enricher/Chunk/Index, real write + RollbackCallback, real server routes)
-// is D3.5 deferred wiring; here the only mock is the injected stub IDocumentParser.
+// is integration deferred wiring; here the only mock is the injected stub IDocumentParser.
 namespace cortrix::async {
 namespace {
 

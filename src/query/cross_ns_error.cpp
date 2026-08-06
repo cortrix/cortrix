@@ -15,7 +15,7 @@ namespace {
 // code without a row" into a warning (treated as a build failure), so the registry
 // can't silently drift from the enum.
 //
-// retry_after_ms follows §3.2 Agent decision matrix: NS_TIMEOUT / SCATTER_TIMEOUT
+// retry_after_ms follows Agent decision matrix: NS_TIMEOUT / SCATTER_TIMEOUT
 // are retryable=true with 1000ms; everything else is non-retryable (null).
 constexpr CrossNsErrorInfo kAuthInvalidCredentials
     {"CX_ERR_AUTH_INVALID_CREDENTIALS", ErrorCategory::kAuth,      false, std::nullopt, 401};
@@ -51,7 +51,7 @@ const char* CrossNsErrorCodeString(CrossNsErrorCode code) {
 }
 
 const std::vector<std::string>& RequiredStructuredDataKeys(CrossNsErrorCode code) {
-    // §3.1 / §5 "structured_data required keys". Function-local statics → stable refs.
+    // "structured_data required keys". Function-local statics → stable refs.
     static const std::vector<std::string> kEmpty{};
     static const std::vector<std::string> kUnauthorized{"unauthorized_namespaces"};
     static const std::vector<std::string> kTooMany{"requested_count", "max_namespaces"};
@@ -62,9 +62,9 @@ const std::vector<std::string>& RequiredStructuredDataKeys(CrossNsErrorCode code
         // 401 unauthenticated: body is contextual (no required structured data).
         case CrossNsErrorCode::kAuthInvalidCredentials: return kEmpty;
         // 403: Agent extracts unauthorized_namespaces → re-queries authorized only
-        // (§3.2 / GEN-Agent #5).
+        // (/ GEN-Agent #5).
         case CrossNsErrorCode::kNsUnauthorized:         return kUnauthorized;
-        // 400: Agent slices to the cap + parallel re-queries (§3.2).
+        // 400: Agent slices to the cap + parallel re-queries.
         case CrossNsErrorCode::kTooManyNamespaces:      return kTooMany;
         // per-NS failures (live in meta.namespaces_failed[]):
         case CrossNsErrorCode::kNsTimeout:              return kNsId;

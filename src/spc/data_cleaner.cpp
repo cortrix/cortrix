@@ -14,7 +14,7 @@ namespace cortrix::spc {
 
 namespace {
 
-/// SHA-256(text) → 64-char lowercase hex (D2 exact dedup, §4.1 Step 1). Uses the
+/// SHA-256(text) → 64-char lowercase hex (exact dedup, Step 1). Uses the
 /// OpenSSL EVP the project already links (connector/file_utils.cpp uses it for
 /// file hashing); cleaning needs the in-memory string form.
 std::string Sha256Hex(const std::string& text) {

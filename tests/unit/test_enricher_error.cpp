@@ -33,7 +33,7 @@ TEST(EnricherErrorTest, EveryCodeHasStableCxString) {
 }
 
 TEST(EnricherErrorTest, RegistryMatchesDesignMatrix) {
-    // §5.1 matrix — retryable / category / retry_after_ms per code.
+    // matrix — retryable / category / retry_after_ms per code.
     struct Row {
         EnricherErrorCode code;
         const char* cx;
@@ -71,7 +71,7 @@ TEST(EnricherErrorTest, RegistryMatchesDesignMatrix) {
 }
 
 TEST(EnricherErrorTest, RequiredStructuredDataKeysPerCode) {
-    // Spot-check the §5.1 structured_data columns.
+    // Spot-check the structured_data columns.
     EXPECT_EQ(RequiredStructuredDataKeys(EnricherErrorCode::kInitFailed),
               (std::vector<std::string>{"reason", "endpoint", "fallback"}));
     EXPECT_EQ(RequiredStructuredDataKeys(EnricherErrorCode::kBudget),
@@ -114,7 +114,7 @@ TEST(EnricherErrorTest, MakeEnricherErrorFillsFromRegistry) {
 }
 
 TEST(EnricherErrorTest, MakeEnricherErrorJsonSerializesAgentFriendly) {
-    // Mirrors design §2.5b error JSON schema.
+    // Mirrors design error JSON schema.
     auto err = MakeEnricherError(
         EnricherErrorCode::kRateLimit,
         {{"model", "gpt-4o-mini"}, {"http_status", 429}, {"retry_after_sec", 60}},

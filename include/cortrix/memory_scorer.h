@@ -9,7 +9,7 @@
 //
 // MemoryScorer is an internal implementation class (NOT an I* interface);
 // its sole consumer is MemorySearcher. It performs no I/O, so it is fully
-// unit-testable in isolation (design § 9.3).
+// unit-testable in isolation (design).
 #include <cstdint>
 #include <string>
 #include <unordered_set>
@@ -18,7 +18,7 @@
 namespace cortrix {
 
 /// Decay configuration. Defaults come from the global GUC (config.yaml
-/// memory.decay.*); see design § 2.5. D5 lock: V1.0 is global-GUC only.
+/// memory.decay.*); see design lock: V1.0 is global-GUC only.
 struct MemoryDecayConfig {
     double lambda = 0.01;        // decay coefficient (default 0.01, half-life ~70d)
     double min_score = 0.0;      // decay floor (default 0, old events sink naturally)
@@ -37,8 +37,8 @@ struct MemoryCandidate {
     int64_t created_at = 0;      // Unix timestamp (blocks.created_at)
 };
 
-/// Scored memory with transparent score breakdown (design § 2.1).
-/// Field set is append-only across V1.0 -> Phase 2 (§ 10.2 stability promise).
+/// Scored memory with transparent score breakdown (design).
+/// Field set is append-only across V1.0 -> Phase 2 (stability promise).
 struct ScoredMemory {
     uint64_t block_id = 0;
     std::string content;
@@ -68,7 +68,7 @@ public:
     ScoredMemory Score(const MemoryCandidate& cand, int64_t now) const;
 
     /// Batch score + filter invalidated + rank by final_score (desc) + truncate.
-    /// @param include_invalidated  D4 lock: default false strictly filters
+    /// @param include_invalidated  lock: default false strictly filters
     ///                             status=="invalidated"; true keeps them
     ///                             (audit / debug / the memory-history page).
     /// Same final_score keeps the original (raw_score) order via stable_sort.
@@ -78,7 +78,7 @@ public:
                                            bool include_invalidated = false) const;
 
     /// True iff the memory_type is immune to time decay (fact / preference).
-    /// D3 lock: unknown (non-"event", non-"") types emit a WARN and fall back
+    /// lock: unknown (non-"event", non-"") types emit a WARN and fall back
     /// to event decay (returns false).
     bool IsDecayImmune(const std::string& memory_type) const;
 

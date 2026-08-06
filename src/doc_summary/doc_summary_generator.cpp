@@ -30,7 +30,7 @@ std::string JoinChunks(const std::vector<store::ChunkRecord>& chunks) {
 }
 
 /// UTF-8-safe truncation to at most `max_chars` Unicode code points (so we never
-/// cut a multi-byte sequence mid-character). summary_text is the §4.2 200-500
+/// cut a multi-byte sequence mid-character). summary_text is the 200-500
 /// char field; the LLM is asked to stay in range but we hard-cap defensively.
 std::string TruncateUtf8(const std::string& s, int max_chars) {
     if (max_chars <= 0) return std::string();
@@ -198,7 +198,7 @@ DocSummaryGenerator::~DocSummaryGenerator() = default;
 
 std::string DocSummaryGenerator::BuildPrompt(
     const std::string& doc_title, const std::string& chunks_concatenated) const {
-    // §9.1 Phase-1 English template v1 (structured JSON output).
+    // Phase-1 English template v1 (structured JSON output).
     std::ostringstream os;
     os << "System: You are a document summarizer for semantic search.\n"
        << "Return only one valid JSON object. Do not include analysis, reasoning, "
@@ -223,7 +223,7 @@ std::string DocSummaryGenerator::BuildPrompt(
 
 std::string DocSummaryGenerator::BuildGroupSummaryPrompt(
     const std::string& doc_title, const std::string& group_text) const {
-    // §9.2 Map stage — a plain-text partial summary for one chunk group.
+    // Map stage — a plain-text partial summary for one chunk group.
     std::ostringstream os;
     os << "System: You are a document summarizer.\n"
        << "User: Summarize this section of the document \"" << doc_title
@@ -234,7 +234,7 @@ std::string DocSummaryGenerator::BuildGroupSummaryPrompt(
 
 std::string DocSummaryGenerator::BuildReducePrompt(
     const std::string& doc_title, const std::vector<std::string>& partials) const {
-    // §9.2 Reduce stage — combine the Map partials into the final structured JSON.
+    // Reduce stage — combine the Map partials into the final structured JSON.
     std::ostringstream os;
     os << "System: You are a document summarizer for semantic search.\n"
        << "Return only one valid JSON object. Do not include analysis, reasoning, "
@@ -381,11 +381,11 @@ Result<DocSummaryStructured> DocSummaryGenerator::GenerateSummary(
     last_llm_failure_structured_data_ = json::object();
 
     if (static_cast<int>(chunks.size()) <= config_.chunk_threshold) {
-        // Short doc: one structured call (§9.2).
+        // Short doc: one structured call.
         return CallLlmStructured(BuildPrompt(doc_title, JoinChunks(chunks)));
     }
 
-    // Long doc: map-reduce (§9.2). Map each kMapGroupSize-chunk group to a partial.
+    // Long doc: map-reduce. Map each kMapGroupSize-chunk group to a partial.
     if (used_map_reduce) *used_map_reduce = true;
     std::vector<std::string> partials;
     for (size_t start = 0; start < chunks.size(); start += kMapGroupSize) {
@@ -442,7 +442,7 @@ GenerationResult DocSummaryGenerator::Generate(const std::string& doc_id,
 
     // doc_title: best-effort from the first chunk's content is not reliable, so
     // standalone leaves it empty unless the caller threads it (real DocumentMetadata
-    // join is D3.5 pipeline wiring). The prompt simply omits a blank title.
+    // join is integration pipeline wiring). The prompt simply omits a blank title.
     bool used_map_reduce = false;
     Result<DocSummaryStructured> summary =
         GenerateSummary(chunks, /*doc_title=*/"", &used_map_reduce);
@@ -466,7 +466,7 @@ GenerationResult DocSummaryGenerator::Generate(const std::string& doc_id,
     result.summary = std::move(summary.value());
     result.is_chunked = used_map_reduce;
     // embedding stays empty — the OnnxEmbedder re-embed + doc_summary Block write +
-    // P-HNSW index are D3.5 pipeline wiring.
+    // P-HNSW index are integration pipeline wiring.
     DocSummaryMetrics::Instance().AddSummariesGenerated(1);
     return result;
 }

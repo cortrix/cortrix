@@ -6,9 +6,9 @@
 #include "cortrix/agent_trace/agent_trace_metrics.h"
 #include "cortrix/agent_trace/http_observability_middleware.h"
 
-// S2 coverage: the HTTP observability middleware (§6.1) — three-header parse +
+// S2 coverage: the HTTP observability middleware — three-header parse +
 // validation, invalid-header warning + cortrix_invalid_header_total metric,
-// server-generated trace_id fallback, and the §6.2 CORS allowlists. Plus the
+// server-generated trace_id fallback, and the CORS allowlists. Plus the
 // UUID generator's validity (round-trips through ObservabilityValidator).
 namespace cortrix::agent_trace {
 namespace {

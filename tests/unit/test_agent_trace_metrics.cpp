@@ -4,8 +4,8 @@
 
 #include "cortrix/agent_trace/agent_trace_metrics.h"
 
-// S7 coverage: the 9 cortrix_* agent trace metrics (§13) — counters/gauge/histogram
-// recording + the OpenMetrics renderer + label-enum discipline (§3.2 no
+// S7 coverage: the 9 cortrix_* agent trace metrics — counters/gauge/histogram
+// recording + the OpenMetrics renderer + label-enum discipline (no
 // high-cardinality labels; long_session_count_total has no session_id label).
 namespace cortrix::agent_trace {
 namespace {

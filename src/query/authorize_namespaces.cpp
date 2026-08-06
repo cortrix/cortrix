@@ -9,7 +9,7 @@ namespace cortrix::query {
 namespace {
 
 // De-duplicate while preserving first-seen order (the response echoes
-// namespaces_queried in request order — §2.5).
+// namespaces_queried in request order).
 std::vector<std::string> DedupPreserveOrder(const std::vector<std::string>& in) {
     std::vector<std::string> out;
     std::unordered_set<std::string> seen;
@@ -24,7 +24,7 @@ bool IsWildcard(const std::vector<std::string>& requested) {
     return requested.size() == 1 && requested[0] == "*";
 }
 
-// The frozen AuthContext (auth/auth_context.h) carries no `role` field; §4.2's
+// The frozen AuthContext (auth/auth_context.h) carries no `role` field;'s
 // `auth.role` is resolved by the real tenant service once wired. Standalone we pass "" — the
 // MockPermissionService keys off user_id/tenant_id, so role is not load-bearing yet.
 std::string RoleOf(const AuthContext&) { return std::string(); }
@@ -61,7 +61,7 @@ std::vector<std::string> AuthorizeNamespaces(const std::vector<std::string>& req
                                              const AuthContext& auth,
                                              PermissionService* perm_service,
                                              int max_namespaces) {
-    // Step 1: authentication — empty user_id == unauthenticated (§4.2 v1.0.3).
+    // Step 1: authentication — empty user_id == unauthenticated (v1.0.3).
     if (auth.user_id.empty()) {
         throw CrossNsException(CrossNsErrorCode::kAuthInvalidCredentials, {},
                                "Request is not authenticated");
@@ -76,7 +76,7 @@ std::vector<std::string> AuthorizeNamespaces(const std::vector<std::string>& req
         auth.user_id, auth.tenant_id, RoleOf(auth), expanded, PermissionAction::kQuery);
 
     // Step 4: any unauthorized → reject the whole request (no partial query of a
-    // request that contains an unauthorized NS — §1 "reject the whole request on
+    // request that contains an unauthorized NS — "reject the whole request on
     // missing permission"). anti-enumeration: not-found NS arrive here as unauthorized.
     if (!check.unauthorized.empty()) {
         throw CrossNsException(

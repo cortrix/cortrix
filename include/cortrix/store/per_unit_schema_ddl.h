@@ -1,5 +1,5 @@
 #pragma once
-// [D3.5-B] Single source of truth for the per-Unit framework schema
+// [integration-B] Single source of truth for the per-Unit framework schema
 // (documents / blocks / blocks_fts + indices + triggers).
 //
 // Used by BOTH paths so they build byte-identical schema:
@@ -44,7 +44,7 @@ inline constexpr char kPerUnitFrameworkDdl[] = R"SQL(
         CREATE INDEX IF NOT EXISTS idx_doc_deleted_at ON documents(deleted_at) WHERE deleted_at IS NOT NULL;
 
         CREATE TABLE IF NOT EXISTS blocks (
-            block_id        INTEGER PRIMARY KEY,  -- app-provided uint64 = HashChildIdToBlockId (D3.5 wire⑤); rowid fallback when 0
+            block_id        INTEGER PRIMARY KEY,  -- app-provided uint64 = HashChildIdToBlockId (integration wire⑤); rowid fallback when 0
 
             doc_id          TEXT NOT NULL,
             chunk_index     INTEGER NOT NULL,
@@ -56,7 +56,7 @@ inline constexpr char kPerUnitFrameworkDdl[] = R"SQL(
             content_text    TEXT,
             -- [A unified-blocks #4] Queryable JSONB metadata column,
             -- shared by all block_types: MEM memory state (block_type=MEMORY, memory extraction
-            -- §4.2.1 jsonb_set/JSONB index), parent-child metadata (inherited NER/Summary),
+            -- jsonb_set/JSONB index), parent-child metadata (inherited NER/Summary),
             -- META 26-field doc metadata. Three-way split: data=binary block-framework block
             -- (reconstruction), metadata_json=queryable JSON, content_text=full-text.
             metadata_json   TEXT,

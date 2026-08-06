@@ -14,8 +14,8 @@
 
 // S2-S6 coverage: OptOutManager (the memory opt-out main service class) over a mock
 // ISessionOptOutStore + a capturing IOperationLogger, plus an end-to-end pass through
-// the real MemoryStoreOptOutAdapter (proves the §4.1/§4.2 migration + the three store
-// ops + the adapter all work against real SQLite). Standalone-D3: no cross-process
+// the real MemoryStoreOptOutAdapter (proves the migration + the three store
+// ops + the adapter all work against real SQLite). Standalone: no cross-process
 // Memory extraction wiring (that is integration).
 namespace cortrix::memory::immunity {
 namespace {
@@ -418,7 +418,7 @@ TEST_F(OptOutManagerTest, IsOptedOutPropagatesStoreError) {
 }
 
 // ============ End-to-end through the real MemoryStore adapter =============
-// Proves the §4.1/§4.2 migration (pure ADD COLUMN + partial index) + the three
+// Proves the migration (pure ADD COLUMN + partial index) + the three
 // MemoryStore opt-out methods + MemoryStoreOptOutAdapter all work on real SQLite.
 
 class OptOutAdapterE2ETest : public ::testing::Test {
