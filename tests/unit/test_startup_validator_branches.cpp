@@ -57,7 +57,7 @@ void AppendOpsetImport(std::vector<uint8_t>* out, const std::string& domain,
 
 std::string WriteTempModel(const std::string& name, const std::vector<uint8_t>& bytes) {
     std::string path =
-        (std::filesystem::temp_directory_path() / ("cortrix_f22b_" + name + ".onnx")).string();
+        (std::filesystem::temp_directory_path() / ("cortrix_onnxvalidator_b_" + name + ".onnx")).string();
     std::ofstream f(path, std::ios::binary | std::ios::trunc);
     f.write(reinterpret_cast<const char*>(bytes.data()),
             static_cast<std::streamsize>(bytes.size()));

@@ -139,7 +139,7 @@
     "rawJsonHint": "Edit any of the 11 *_config blocks directly. Invalid JSON blocks the save.",
     "invalidJson": "Invalid JSON — fix before saving.",
     "metadata": "Metadata",
-    "admissionState": "Admission (F05)",
+    "admissionState": "Admission (namespace pool)",
     "jsonView": "JSON view"
   },
   "common": {

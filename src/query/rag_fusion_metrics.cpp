@@ -209,7 +209,7 @@ std::string RagFusionMetrics::RenderOpenMetrics() const {
             if (m.empty() && cnt == 0) continue;  // unused slot
             const std::string label = m.empty() ? "other" : m;
             // Label order matches the codebase convention (model first, le last —
-            // cf. import_metrics RenderHist / mem02 llm latency histogram).
+            // cf. import_metrics RenderHist / memory_extract llm latency histogram).
             uint64_t cum = 0;
             for (int b = 0; b < kLatencyBuckets; ++b) {
                 cum += model_latency_bkt_[i][b].load(std::memory_order_relaxed);

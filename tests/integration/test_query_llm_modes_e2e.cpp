@@ -62,12 +62,12 @@ int ResultDocPosition(const json& body, const std::string& doc_id);
 // the original query matches the baseline doc metadata, while only the JSON LLM
 // variants match the variant-only doc metadata.
 std::string OriginalOnlyDoc() {
-  return "F36 baseline document. The discriminating query token is stored only in "
+  return "RAG-Fusion baseline document. The discriminating query token is stored only in "
          "upload metadata, not in this body.";
 }
 
 std::string VariantOnlyDoc() {
-  return "F36 variant document. The discriminating query tokens are stored only in "
+  return "RAG-Fusion variant document. The discriminating query tokens are stored only in "
          "upload metadata, not in this body.";
 }
 
@@ -154,10 +154,10 @@ class QueryLlmModesBase : public ::testing::Test {
   void IngestSeedDocs() {
     original_doc_id_ = IngestDoc(
         "original_only.txt", OriginalOnlyDoc(),
-        R"({"authors":["Baselinequarter"],"tags":["f36-original-only"]})");
+        R"({"authors":["Baselinequarter"],"tags":["rag_fusion-original-only"]})");
     variant_doc_id_ = IngestDoc(
         "variant_only.txt", VariantOnlyDoc(),
-        R"({"authors":["Zephyrmarker","Quasaranchor","Novatok"],"tags":["f36-variant-only"]})");
+        R"({"authors":["Zephyrmarker","Quasaranchor","Novatok"],"tags":["rag_fusion-variant-only"]})");
     ASSERT_FALSE(original_doc_id_.empty());
     ASSERT_FALSE(variant_doc_id_.empty());
   }
@@ -270,10 +270,10 @@ TEST_F(QueryWithoutLlm, NoLlmDegradesGracefully) {
 // design, but doc-level candidates were not guaranteed to enter the query candidate
 // path. The probe deliberately keeps "Lovelace" OUT of the document text/filename and
 // puts it only in upload metadata.authors, so a hit proves META block -> doc_fts5 -> query.
-constexpr const char* kBenchmarkNs = "f44_doc_fallback";
+constexpr const char* kBenchmarkNs = "benchmark_doc_fallback";
 
 std::string BenchmarkMetadataOnlyProbeDoc() {
-  return "F44 benchmark path validation note. The document discusses an analytical "
+  return "LLM benchmark path validation note. The document discusses an analytical "
          "engine, early computing machinery, and retrieval candidate ordering.\n\n"
          "The author name used by this regression is intentionally stored only in "
          "upload metadata, not in this document body.";
@@ -368,8 +368,8 @@ class BenchmarkDocFtsFallbackE2E : public ::testing::Test {
   std::string IngestProbeDoc() {
     auto c = h_->Client();
     httplib::MultipartFormDataItems items = {
-        {"file", BenchmarkMetadataOnlyProbeDoc(), "f44_metadata_probe.txt", "text/plain"},
-        {"metadata", R"({"authors":["Ada","Lovelace"],"tags":["f44","metadata-only"]})",
+        {"file", BenchmarkMetadataOnlyProbeDoc(), "benchmark_metadata_probe.txt", "text/plain"},
+        {"metadata", R"({"authors":["Ada","Lovelace"],"tags":["benchmark","metadata-only"]})",
          "metadata.json", "application/json"},
     };
     auto up = c.Post(std::string("/api/v1/namespaces/") + kBenchmarkNs + "/documents",
@@ -393,7 +393,7 @@ class BenchmarkDocFtsFallbackE2E : public ::testing::Test {
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-    ADD_FAILURE() << "F44 probe doc did not reach ready";
+    ADD_FAILURE() << "LLM benchmark path probe doc did not reach ready";
     return doc_id;
   }
 

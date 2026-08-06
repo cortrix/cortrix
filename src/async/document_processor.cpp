@@ -53,7 +53,7 @@ DocumentProcessor::DocumentProcessor(TaskManager* mgr,
 
 int DocumentProcessor::AsyncMaxPages() const {
     if (config_) {
-        auto r = config_->GetInt("f42.async_max_pages");
+        auto r = config_->GetInt("async.async_max_pages");
         if (r.ok()) return r.value();
     }
     return kDefaultAsyncMaxPages;

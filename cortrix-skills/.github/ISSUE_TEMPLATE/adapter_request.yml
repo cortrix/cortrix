@@ -1,6 +1,6 @@
 name: Framework adapter request
 description: Request support for an additional agent framework
-labels: ["enhancement", "adapter", "P14"]
+labels: ["enhancement", "adapter", "sdk"]
 body:
   - type: markdown
     attributes:

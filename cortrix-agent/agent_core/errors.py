@@ -67,7 +67,7 @@ ERROR_TABLE: dict[str, dict[str, Any]] = {
         "category": "transient",
         "retryable": True,
         "http_status": 503,
-        "message": "Writing the interaction log (F13) failed",
+        "message": "Writing the interaction log failed",
     },
 }
 

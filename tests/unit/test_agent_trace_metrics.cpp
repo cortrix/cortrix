@@ -71,12 +71,12 @@ TEST_F(AgentTraceMetricsTest, ActiveSessionsGaugeIncDec) {
 
 TEST_F(AgentTraceMetricsTest, ToolCallRetryAndWriteFailedByModule) {
     M().RecordToolCallRetry();
-    M().RecordWriteFailed(Module::kF13);
-    M().RecordWriteFailed(Module::kF18a);
-    M().RecordWriteFailed(Module::kF18a);
+    M().RecordWriteFailed(Module::kAgentTrace);
+    M().RecordWriteFailed(Module::kOperationLog);
+    M().RecordWriteFailed(Module::kOperationLog);
     EXPECT_EQ(M().ToolCallRetryCount(), 1u);
-    EXPECT_EQ(M().WriteFailedCount(Module::kF13), 1u);
-    EXPECT_EQ(M().WriteFailedCount(Module::kF18a), 2u);
+    EXPECT_EQ(M().WriteFailedCount(Module::kAgentTrace), 1u);
+    EXPECT_EQ(M().WriteFailedCount(Module::kOperationLog), 2u);
 }
 
 TEST_F(AgentTraceMetricsTest, QueryLatencyHistogramSumAndCount) {
@@ -146,8 +146,8 @@ TEST_F(AgentTraceMetricsTest, ToStringCoversAllEnumValues) {
     EXPECT_STREQ(ToString(Endpoint::kTraces), "traces");
     EXPECT_STREQ(ToString(Endpoint::kInteractions), "interactions");
     EXPECT_STREQ(ToString(Endpoint::kInteractionsSources), "interactions_sources");
-    EXPECT_STREQ(ToString(Module::kF13), "f13");
-    EXPECT_STREQ(ToString(Module::kF18a), "f18a");
+    EXPECT_STREQ(ToString(Module::kAgentTrace), "agent_trace");
+    EXPECT_STREQ(ToString(Module::kOperationLog), "oplog");
 }
 
 }  // namespace

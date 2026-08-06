@@ -6,7 +6,7 @@
 
 namespace cortrix::memory {
 
-/// The `mem05` subsystem metrics (observability naming
+/// The `memory_isolation` subsystem metrics (observability naming
 /// `cortrix_memory_isolation_<metric>_<unit>`). Self-contained dependency-free recorder
 /// (same pattern as MemoryExtractMetrics / ScoringMetrics): a process-wide singleton of
 /// atomic counters/gauges + an OpenMetrics text renderer.

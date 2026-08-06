@@ -20,22 +20,22 @@ namespace cortrix::spc {
 // is fixed enrich → contextualize → HyPE (the later stages consume the chunk text, not the enricher's
 // output, so the only ordering invariant is that the enricher leads).
 //
-// The chain is resolved from the `enricher.chain` GUC ("f03" default; e.g.
-// "f03,f35,f38") with an optional per-NS metadata override. Membership of an
+// The chain is resolved from the `enricher.chain` GUC ("enrich" default; e.g.
+// "enrich,contextual,hype") with an optional per-NS metadata override. Membership of an
 // enricher is gated by BOTH the chain list AND the enricher's own IsAvailable()
 // (an LLM-less contextualizer or HyPE stage degrades to a no-op).
 // =============================================================================
 
-/// Parse an `enricher.chain` spec ("f03,f35,f38") into a normalized, de-duplicated
+/// Parse an `enricher.chain` spec ("enrich,contextual,hype") into a normalized, de-duplicated
 /// token list. Tokens are lowercased + trimmed; unknown tokens are dropped
-/// (fail-soft). An empty / absent spec yields {"f03"} (the §7.1 default chain).
-/// f03 is always implied first when any token is present (the enricher leads), so
-/// "f35" alone resolves to {"f03","f35"}. Pure + static for unit testing.
+/// (fail-soft). An empty / absent spec yields {"enrich"} (the §7.1 default chain).
+/// enrich is always implied first when any token is present (the enricher leads), so
+/// "contextual" alone resolves to {"enrich","contextual"}. Pure + static for unit testing.
 std::vector<std::string> ParseEnricherChainSpec(const std::string& spec);
 
 /// Resolve the chain token list from IGlobalConfig (`enricher.chain` key) with an
 /// optional per-NS metadata override JSON (the NS layer wins when it carries an
-/// "enricher_chain" string). `global == nullptr` + empty ns_metadata → {"f03"}.
+/// "enricher_chain" string). `global == nullptr` + empty ns_metadata → {"enrich"}.
 std::vector<std::string> ResolveEnricherChain(const IGlobalConfig* global,
                                               const std::string& ns_metadata_json);
 
@@ -113,8 +113,8 @@ private:
     std::vector<std::shared_ptr<ISpcEnricher>> enrichers_;
 };
 
-/// Map an enricher's Name() to its chain-spec token ("f03" / "f35" / "f38").
-/// The head slot (LlmEnricher / LocalNer / test fakes) is "f03"; the token is the
+/// Map an enricher's Name() to its chain-spec token ("enrich" / "contextual" / "hype").
+/// The head slot (LlmEnricher / LocalNer / test fakes) is "enrich"; the token is the
 /// vocabulary of enricher.chain specs AND of enrich_state.failed_members.
 std::string ChainMemberToken(const std::string& enricher_name);
 

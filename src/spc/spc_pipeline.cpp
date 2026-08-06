@@ -395,7 +395,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     // Hype questions per source child (the write phase builds block_type=16 Blocks).
     std::unordered_map<std::string, std::vector<cortrix::spc::HypeQuestion>> hype_by_child;
     // [addendum §3.7] Per-child enrichment debt for the enrich_state coverage SoT:
-    // csv of owed-but-missing chain tokens (canonical f03,f35,f38 order) + the first
+    // csv of owed-but-missing chain tokens (canonical enrich,contextual,hype order) + the first
     // error detail. Filled by the enrich branches below (and the hype-embed drop
     // path); the write phase persists one enrich_state row per enriched-eligible
     // child so a fail-soft skip can never again be silent.
@@ -447,7 +447,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                 // step status; contextualization fail-softs with status==0 and records its outcome
                 // in contextualized_status (2 == failed), so the step status alone
                 // would miss it.
-                bool f03_failed = false, f35_failed = false, f38_failed = false;
+                bool enrich_failed = false, contextual_failed = false, hype_failed = false;
                 std::string first_err;
                 for (const auto& st : chain_res[i].steps) {
                     if (st.skipped) continue;
@@ -458,20 +458,20 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                         if (first_err.empty() && !st.error_code.empty()) first_err = st.error_code;
                         continue;
                     }
-                    if (st.name == "hype") f38_failed = true;
-                    else if (st.name == "f35_contextual_retrieval") f35_failed = true;
-                    else f03_failed = true;  // the enricher head slot (LlmEnricher / …)
+                    if (st.name == "hype") hype_failed = true;
+                    else if (st.name == "contextual_retrieval") contextual_failed = true;
+                    else enrich_failed = true;  // the enricher head slot (LlmEnricher / …)
                     if (first_err.empty() && !st.error_code.empty()) first_err = st.error_code;
                 }
-                if (chain_res[i].merged.contextualized_status == 2) f35_failed = true;
+                if (chain_res[i].merged.contextualized_status == 2) contextual_failed = true;
                 std::string owed;
                 auto owe = [&owed](const char* tok) {
                     if (!owed.empty()) owed += ",";
                     owed += tok;
                 };
-                if (f03_failed) owe("f03");
-                if (f35_failed) owe("f35");
-                if (f38_failed) owe("f38");
+                if (enrich_failed) owe("enrich");
+                if (contextual_failed) owe("contextual");
+                if (hype_failed) owe("hype");
                 if (!owed.empty()) {
                     if (first_err.empty()) first_err = "enrichment degraded (fail-soft)";
                     enrich_failed_by_child[cid] = std::move(owed);
@@ -490,8 +490,8 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             enrich_stage_ran = true;
             for (size_t i = 0; i < eres.size() && i < out.children.size(); ++i) {
                 if (eres[i].status != 0) {
-                    // Single-enricher path owes exactly the f03 slot on failure.
-                    enrich_failed_by_child[out.children[i].child_id] = "f03";
+                    // Single-enricher path owes exactly the enrich slot on failure.
+                    enrich_failed_by_child[out.children[i].child_id] = "enrich";
                     enrich_error_by_child[out.children[i].child_id] = eres[i].error_msg;
                 }
                 enrich_by_child.emplace(out.children[i].child_id, std::move(eres[i]));
@@ -689,14 +689,14 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             if (eit != enrich_by_child.end() && eit->second.ok())
                 enr_token = ScoringEnricherToken(eit->second.enricher_name);
         }
-        cortrix_block_header_t f07_hdr{};
+        cortrix_block_header_t scoring_hdr{};
         float semantic_score = 0.0f;
         cortrix::scoring::ScoringInput sin;
         sin.parser_name = d.parser_name;
         sin.enricher_name = enr_token;
         sin.is_anomalous = cortrix::spc::ShouldSkipIndex(b);
         sin.block_type = static_cast<uint16_t>(modality);
-        scorer_.AssignInitialScore(f07_hdr, semantic_score, sin);
+        scorer_.AssignInitialScore(scoring_hdr, semantic_score, sin);
         // flags_ext bit3 (has_contextualized_embedding): set when contextualization
         // produced a contextualized embedding for this child (double-vector coexistence).
         uint8_t child_flags_ext = 0;
@@ -709,7 +709,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             }
         }
         child_blocks.push_back(assembler_.AssembleChild(
-            child, emb, modality, f07_hdr.processing_level, b.metadata_json.dump(),
+            child, emb, modality, scoring_hdr.processing_level, b.metadata_json.dump(),
             child_flags_ext));
         score_by_block[child_blocks.back().block_id] = semantic_score;
         if (level >= 3 && !b.embedding.empty() && !cortrix::spc::ShouldSkipIndex(b)) {
@@ -768,12 +768,12 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                     task.doc_id, qes.message());
                 q_embs.clear();
                 // [addendum §3.7] The dropped hype blocks are silent coverage debt:
-                // mark f38 owed for every child that had questions so the backfill
+                // mark hype owed for every child that had questions so the backfill
                 // regenerates them.
                 for (const auto& kv : hype_by_child) {
                     std::string& owed = enrich_failed_by_child[kv.first];
-                    if (owed.find("f38") == std::string::npos) {
-                        owed += owed.empty() ? "f38" : ",f38";
+                    if (owed.find("hype") == std::string::npos) {
+                        owed += owed.empty() ? "hype" : ",hype";
                     }
                     std::string& err = enrich_error_by_child[kv.first];
                     if (err.empty()) err = "hype embedding failed: " + qes.message();
@@ -954,8 +954,8 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                 // re-owed in enrich_state below — a WARN alone loses the member
                 // silently, because the retry sweeper only repairs what the ledger
                 // owes (the backfill side already accounts this way).
-                bool f03_persist_owed = false;
-                bool f35_persist_owed = false;
+                bool enrich_persist_owed = false;
+                bool contextual_persist_owed = false;
                 std::string persist_err;
                 if (eit != enrich_by_child.end() && eit->second.ok()) {
                     Status we = cortrix::spc::WriteEnrichment(store_db, b.block_id, eit->second);
@@ -963,8 +963,8 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                         CORTRIX_LOG_WARN("spc",
                             "enrichment persist skipped for block_id={} (doc_id={}): {}",
                             b.block_id, task.doc_id, we.message());
-                        f03_persist_owed = true;
-                        persist_err = "CX_ERR_SPC_PERSIST_FAILED[f03]: " + we.message();
+                        enrich_persist_owed = true;
+                        persist_err = "CX_ERR_SPC_PERSIST_FAILED[enrich]: " + we.message();
                     }
                 }
                 // Contextualized_* columns (child rows only). Gated on the
@@ -978,14 +978,14 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                         CORTRIX_LOG_WARN("spc",
                             "contextualized persist skipped for block_id={} (doc_id={}): {}",
                             b.block_id, task.doc_id, wc.message());
-                        // Owe f35 only when the stage actually produced an outcome to
+                        // Owe contextual only when the stage actually produced an outcome to
                         // persist (engaged chains; chains without it no-op inside).
                         if (eit->second.contextualized_status != 0 ||
                             eit->second.contextualized_text.has_value()) {
-                            f35_persist_owed = true;
+                            contextual_persist_owed = true;
                             if (persist_err.empty()) {
                                 persist_err =
-                                    "CX_ERR_SPC_PERSIST_FAILED[f35]: " + wc.message();
+                                    "CX_ERR_SPC_PERSIST_FAILED[contextual]: " + wc.message();
                             }
                         }
                     }
@@ -1039,8 +1039,8 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                         if (!owed_members.empty()) owed_members += ",";
                         owed_members += m;
                     };
-                    if (f03_persist_owed) add_owed("f03");
-                    if (f35_persist_owed) add_owed("f35");
+                    if (enrich_persist_owed) add_owed("enrich");
+                    if (contextual_persist_owed) add_owed("contextual");
                     const bool owed = !owed_members.empty();
                     es.status = owed ? cortrix::spc::kEnrichStatusPendingRetry
                                      : cortrix::spc::kEnrichStatusOk;

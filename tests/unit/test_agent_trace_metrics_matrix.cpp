@@ -26,7 +26,7 @@ constexpr std::array<R, 2> kRoles{R::kUser, R::kAdmin};
 constexpr std::array<E, 3> kEndpoints{E::kTraces, E::kInteractions,
                                       E::kInteractionsSources};
 constexpr std::array<H, 3> kHeaders{H::kSessionId, H::kTraceId, H::kAgentId};
-constexpr std::array<M, 2> kModules{M::kF13, M::kF18a};
+constexpr std::array<M, 2> kModules{M::kAgentTrace, M::kOperationLog};
 
 class AgentTraceFx : public ::testing::Test {
 protected:
@@ -61,8 +61,8 @@ TEST_F(AgentTraceFx, ToStringEndpoint) {
     EXPECT_STREQ(ToString(E::kInteractionsSources), "interactions_sources");
 }
 TEST_F(AgentTraceFx, ToStringModule) {
-    EXPECT_STREQ(ToString(M::kF13), "f13");
-    EXPECT_STREQ(ToString(M::kF18a), "f18a");
+    EXPECT_STREQ(ToString(M::kAgentTrace), "agent_trace");
+    EXPECT_STREQ(ToString(M::kOperationLog), "oplog");
 }
 
 // ---- writes_total: every (source x status) combo independent --------------
@@ -207,7 +207,7 @@ TEST_F(AgentTraceFx, ResetClearsEverything) {
     m().RecordWrite(S::kHttp, W::kSuccess);
     m().RecordTracesQuery(R::kUser, E::kTraces);
     m().RecordInvalidHeader(H::kSessionId);
-    m().RecordWriteFailed(M::kF13);
+    m().RecordWriteFailed(M::kAgentTrace);
     m().RecordLongSession();
     m().RecordLongSessionDropped();
     m().RecordToolCallRetry();
@@ -217,7 +217,7 @@ TEST_F(AgentTraceFx, ResetClearsEverything) {
     EXPECT_EQ(m().WriteCount(S::kHttp, W::kSuccess), 0u);
     EXPECT_EQ(m().TracesQueryCount(R::kUser, E::kTraces), 0u);
     EXPECT_EQ(m().InvalidHeaderCount(H::kSessionId), 0u);
-    EXPECT_EQ(m().WriteFailedCount(M::kF13), 0u);
+    EXPECT_EQ(m().WriteFailedCount(M::kAgentTrace), 0u);
     EXPECT_EQ(m().LongSessionCount(), 0u);
     EXPECT_EQ(m().LongSessionDroppedCount(), 0u);
     EXPECT_EQ(m().ToolCallRetryCount(), 0u);

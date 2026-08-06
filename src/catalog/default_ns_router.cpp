@@ -58,9 +58,9 @@ void BindText(sqlite3_stmt* stmt, int idx, const std::string& v) {
 
 }  // namespace
 
-DefaultINSRouter::DefaultINSRouter(sqlite3* db, resource::INamespacePool* f05_pool)
+DefaultINSRouter::DefaultINSRouter(sqlite3* db, resource::INamespacePool* ns_pool)
     : db_(db),
-      f05_pool_(f05_pool),
+      ns_pool_(ns_pool),
       ns_cache_(kNsCacheCapacity, kCacheTtlMs),
       unit_cache_(kUnitCacheCapacity, kCacheTtlMs) {}
 
@@ -255,8 +255,8 @@ Status DefaultINSRouter::CreateNamespace(const NSMetadata& metadata) {
     Status catalog = InsertNamespaceCatalog(metadata);
     if (!catalog.ok()) return catalog;
 
-    if (f05_pool_ != nullptr) {
-        Status admit = f05_pool_->AdmitCreate(metadata.namespace_id, /*estimated_size_bytes=*/0);
+    if (ns_pool_ != nullptr) {
+        Status admit = ns_pool_->AdmitCreate(metadata.namespace_id, /*estimated_size_bytes=*/0);
         if (!admit.ok()) {  // CX_ERR_NS_QUOTA_EXCEEDED / RESOURCE_BUDGET / LOAD_FAILED
             RemoveNamespaceCatalogRows(metadata.namespace_id);
             return admit;
@@ -422,17 +422,17 @@ Status DefaultINSRouter::DeleteNamespace(const std::string& namespace_id) {
 
     // Pool eviction hook: after the catalog soft-delete,
     // release the NS's pool resources (index / WriteCoordinator / store.db). When
-    // f05_pool_ is null (Phase 1 standalone / catalog-standalone) this is skipped. Per
+    // ns_pool_ is null (Phase 1 standalone / catalog-standalone) this is skipped. Per
     // §3.1.bis the catalog delete is authoritative: an EvictForDelete failure is
     // logged but NOT rolled back (any pool residue is reclaimable via the admin API,
     // and self-heals on restart since StartupLoadAll skips deleted NS). EvictForDelete
     // itself is UAF-safe — if a request still holds the NS it defers the actual erase
     // to the last Release (pool refcount gate).
-    if (f05_pool_ != nullptr) {
-        const Status evict = f05_pool_->EvictForDelete(namespace_id);
+    if (ns_pool_ != nullptr) {
+        const Status evict = ns_pool_->EvictForDelete(namespace_id);
         if (!evict.ok()) {
-            CORTRIX_LOG_WARN("F12.DeleteNamespace",
-                             "catalog soft-deleted but F05 EvictForDelete failed: "
+            CORTRIX_LOG_WARN("catalog.DeleteNamespace",
+                             "catalog soft-deleted but namespace pool EvictForDelete failed: "
                              "ns={}, reason={}",
                              namespace_id, evict.message());
         }

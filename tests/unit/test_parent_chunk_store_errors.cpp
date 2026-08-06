@@ -158,14 +158,14 @@ TEST(ParentChunkStoreErrorTest, MetadataJsonInvalidParsesToDefault) {
 }
 
 TEST(ParentChunkStoreErrorTest, ReopenAfterCloseWorks) {
-    SqliteParentChunkStore store("/tmp/f34_reopen_test.db");
+    SqliteParentChunkStore store("/tmp/parent_child_reopen_test.db");
     ASSERT_TRUE(store.Open().ok());
     ASSERT_TRUE(store.PutParentWithChildren(P("RP"), {}).ok());
     store.Close();
     ASSERT_TRUE(store.Open().ok());  // schema migration is idempotent (IF NOT EXISTS)
     EXPECT_TRUE(store.GetParent("RP").ok());  // persisted across reopen
     store.Close();
-    std::remove("/tmp/f34_reopen_test.db");
+    std::remove("/tmp/parent_child_reopen_test.db");
 }
 
 }  // namespace

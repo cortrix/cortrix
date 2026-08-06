@@ -51,10 +51,10 @@ class TaskLifecycleTest : public ::testing::Test {
   protected:
     void SetUp() override {
         ASSERT_TRUE(mgr_.Init(":memory:").ok());
-        cfg_.Set("f42.worker_pool_size", "2");
-        cfg_.Set("f06.parser_max_concurrent", "4");
-        cfg_.Set("f42.async_threshold_pages", "200");
-        cfg_.Set("f42.async_max_pages", "2000");
+        cfg_.Set("async.worker_pool_size", "2");
+        cfg_.Set("parser.parser_max_concurrent", "4");
+        cfg_.Set("async.async_threshold_pages", "200");
+        cfg_.Set("async.async_max_pages", "2000");
         sched_ = std::make_unique<TaskScheduler>(&mgr_, &cfg_);
         factory_ = std::make_unique<spc::DocumentParserFactory>(fcfg_);
         proc_ = std::make_unique<DocumentProcessor>(&mgr_, factory_.get(), &cfg_);
@@ -66,7 +66,7 @@ class TaskLifecycleTest : public ::testing::Test {
         // concurrent processes — a sibling's TearDown/remove would yank a
         // shared stub mid-parse (observed live: CX_ERR_PARSE_FAILED file-not-
         // found on this very suite, QA 2026-07-12 F-13).
-        filepath_ = std::string(::testing::TempDir()) + "f42_lifecycle_" +
+        filepath_ = std::string(::testing::TempDir()) + "async_lifecycle_" +
                     cortrix::test::SanitizedTestName() +
                     ".pdf";
         std::ofstream(filepath_) << "%PDF-1.4 stub";
@@ -154,7 +154,7 @@ TEST_F(TaskLifecycleTest, CancelMidProcessingStopsAtCheckpoint) {
 // E2E #3: same-doc_id submitted twice (debounce off) → per-doc_id mutex serializes
 // them; both ultimately complete, never concurrently active.
 TEST_F(TaskLifecycleTest, SameDocSerializedThenBothComplete) {
-    cfg_.Set("f42.watcher_debounce_seconds", "0");  // force two distinct rows
+    cfg_.Set("async.watcher_debounce_seconds", "0");  // force two distinct rows
     factory_->SetPrimaryParser(MakeStreamingStub(6));
     ASSERT_TRUE(pool_->Start().ok());
 
@@ -178,8 +178,8 @@ TEST_F(TaskLifecycleTest, ZombieSweptByCronThenVisibleViaProgress) {
     std::string task_id = sub.body["task_id"];
     ASSERT_TRUE(mgr_.MarkProcessing(task_id, 1).ok());
 
-    cfg_.Set("f42.zombie_task_threshold_hours", "0");
-    cfg_.Set("f42.task_retention_days", "9999");  // don't delete, just flip to failed
+    cfg_.Set("async.zombie_task_threshold_hours", "0");
+    cfg_.Set("async.task_retention_days", "9999");  // don't delete, just flip to failed
     std::this_thread::sleep_for(std::chrono::milliseconds(1100));
     TaskCleanupCron cron(&mgr_, &cfg_);
     int deleted = 0, zombies = 0;

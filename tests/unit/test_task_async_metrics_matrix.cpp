@@ -2,6 +2,7 @@
 // QueueState + CancelPhase ToString, (task_type x status) combos, duration
 // histogram boundaries, queue_depth gauge, RenderOpenMetrics, ResetForTest).
 // Separate suite namespace from test_task_metrics.cpp.
+#include <regex>
 #include <gtest/gtest.h>
 
 #include <array>
@@ -152,8 +153,8 @@ TEST_F(TaskAsyncFx, RenderHasTypeHelpAndStableSeries) {
               std::string::npos);
     EXPECT_NE(out.find("# TYPE cortrix_tasks_cancel_total counter"),
               std::string::npos);
-    // names are cortrix_tasks_* (NOT cortrix_f42_*).
-    EXPECT_EQ(out.find("cortrix_f42_"), std::string::npos);
+    // Names are all cortrix_tasks_*; none may embed a tracking-style label.
+    EXPECT_FALSE(std::regex_search(out, std::regex(R"(cortrix_(f|mem|p)[0-9]{2})")));
 }
 
 TEST_F(TaskAsyncFx, RenderNoHighCardinalityLabels) {

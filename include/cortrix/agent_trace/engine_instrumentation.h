@@ -35,9 +35,9 @@ struct EngineCall {
 /// the business logic:
 ///   1. agent_trace FIRST, for ALL calls (incl. failures), inside a try/catch
 ///      so an observability fault never breaks the business path (C4 exception
-///      isolation); a thrown write bumps cortrix_observability_write_failed_total{f13}.
+///      isolation); a thrown write bumps cortrix_observability_write_failed_total{agent_trace}.
 ///   2. operation_log SECOND, only on success, in its own try/catch
-///      (write_failed{f18a} on throw). Skipped when no operation_logger is given.
+///      (write_failed{oplog} on throw). Skipped when no operation_logger is given.
 /// Identity (trace_id/session_id/agent_id/user_id) is read from the thread-local
 /// ObservabilityContext (C1). Pure helper — standalone: the real Engine call sites
 /// invoke this at D3.5; here it is fully testable with mock writers (incl. ones

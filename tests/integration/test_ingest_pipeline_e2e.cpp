@@ -289,15 +289,15 @@ TEST_F(IngestPipelineE2E, FullChainProducesAllArtifacts) {
 
   // (E) enrichment landed: enriched_score + entities (WriteEnrichment branch).
   EXPECT_GT(CountSql(kNsDedupOn, "SELECT COUNT(*) FROM blocks WHERE enriched_score > 0"), 0)
-      << "F03 enrichment missing — the EnricherChain seam did not take effect "
+      << "enricher enrichment missing — the EnricherChain seam did not take effect "
          "through the SPCManager proxy (live-only assembly gap — report, do not weaken)";
   EXPECT_GT(CountSql(kNsDedupOn, "SELECT COUNT(*) FROM entities"), 0)
-      << "F03 entities missing — chain seam not wired through the manager";
+      << "enricher entities missing — chain seam not wired through the manager";
 
   // (D) hype blocks landed (block_type=16=kBlockHypeQuestion). Their presence
   // proves the hype assembly + embed loop ran via the chain seam.
   EXPECT_GT(CountSql(kNsDedupOn, "SELECT COUNT(*) FROM blocks WHERE block_type = 16"), 0)
-      << "F38 hype blocks missing — chain seam (HyPEEnricher) did not run through "
+      << "hype blocks missing — chain seam (HyPEEnricher) did not run through "
          "the SPCManager proxy (live-only assembly gap — report, do not weaken)";
 
   // (C) sparse_vec persisted on at least one child (the SparseIndexRegistry seam).
@@ -305,7 +305,7 @@ TEST_F(IngestPipelineE2E, FullChainProducesAllArtifacts) {
                      "SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL "
                      "AND child_id != '' AND sparse_vec IS NOT NULL"),
             0)
-      << "F40 sparse_vec missing — the SparseIndexRegistry seam did not take effect "
+      << "sparse retrieval sparse_vec missing — the SparseIndexRegistry seam did not take effect "
          "through the SPCManager proxy (live-only assembly gap — report, do not weaken)";
 }
 

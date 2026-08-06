@@ -45,7 +45,7 @@ class WorkerPoolTest : public ::testing::Test {
         // Parser factory pre-check stat()s the file → seed a real temp .pdf.
         // Unique per test: parallel ctest processes must not share the stub
         // (a sibling's TearDown/remove yanks it mid-parse; F-1 race family).
-        filepath_ = std::string(::testing::TempDir()) + "f42_worker_test_" +
+        filepath_ = std::string(::testing::TempDir()) + "async_worker_test_" +
                     cortrix::test::SanitizedTestName() +
                     ".pdf";
         std::ofstream(filepath_) << "%PDF-1.4 stub";
@@ -100,8 +100,8 @@ TEST_F(WorkerPoolTest, DefaultPoolSizeIsTwo) {
 }
 
 TEST_F(WorkerPoolTest, PoolSizeReadFromConfig) {
-    cfg_.Set("f42.worker_pool_size", "3");
-    cfg_.Set("f06.parser_max_concurrent", "8");
+    cfg_.Set("async.worker_pool_size", "3");
+    cfg_.Set("parser.parser_max_concurrent", "8");
     WorkerPool pool(sched_.get(), &cfg_);
     EXPECT_EQ(pool.ConfiguredPoolSize(), 3);
     EXPECT_EQ(pool.ParserMaxConcurrent(), 8);
@@ -110,8 +110,8 @@ TEST_F(WorkerPoolTest, PoolSizeReadFromConfig) {
 // ---- Issue 1.2 startup enforce ----------------------------------------------
 
 TEST_F(WorkerPoolTest, StartSucceedsWhenWithinParserCap) {
-    cfg_.Set("f42.worker_pool_size", "4");
-    cfg_.Set("f06.parser_max_concurrent", "4");  // equal is allowed
+    cfg_.Set("async.worker_pool_size", "4");
+    cfg_.Set("parser.parser_max_concurrent", "4");  // equal is allowed
     WorkerPool pool(sched_.get(), &cfg_);
     Status s = pool.Start();
     EXPECT_TRUE(s.ok());
@@ -120,8 +120,8 @@ TEST_F(WorkerPoolTest, StartSucceedsWhenWithinParserCap) {
 }
 
 TEST_F(WorkerPoolTest, StartFailsWhenExceedingParserCap) {
-    cfg_.Set("f42.worker_pool_size", "5");
-    cfg_.Set("f06.parser_max_concurrent", "2");  // 5 > 2 → fatal misconfig
+    cfg_.Set("async.worker_pool_size", "5");
+    cfg_.Set("parser.parser_max_concurrent", "2");  // 5 > 2 → fatal misconfig
     WorkerPool pool(sched_.get(), &cfg_);
     Status s = pool.Start();
     EXPECT_FALSE(s.ok());
@@ -131,8 +131,8 @@ TEST_F(WorkerPoolTest, StartFailsWhenExceedingParserCap) {
 }
 
 TEST_F(WorkerPoolTest, StartFailsWhenPoolSizeZero) {
-    cfg_.Set("f42.worker_pool_size", "0");
-    cfg_.Set("f06.parser_max_concurrent", "4");
+    cfg_.Set("async.worker_pool_size", "0");
+    cfg_.Set("parser.parser_max_concurrent", "4");
     WorkerPool pool(sched_.get(), &cfg_);
     EXPECT_FALSE(pool.Start().ok());
 }
@@ -140,8 +140,8 @@ TEST_F(WorkerPoolTest, StartFailsWhenPoolSizeZero) {
 // ---- end-to-end drain ------------------------------------------------------
 
 TEST_F(WorkerPoolTest, DrainsQueuedTasksToCompletion) {
-    cfg_.Set("f42.worker_pool_size", "2");
-    cfg_.Set("f06.parser_max_concurrent", "4");
+    cfg_.Set("async.worker_pool_size", "2");
+    cfg_.Set("parser.parser_max_concurrent", "4");
     WorkerPool pool(sched_.get(), &cfg_);
     pool.RegisterHandler(kTaskDocParse, proc_.get());  // route doc-parse tasks
     ASSERT_TRUE(pool.Start().ok());
@@ -164,7 +164,7 @@ TEST_F(WorkerPoolTest, DrainsQueuedTasksToCompletion) {
 TEST_F(WorkerPoolTest, StopIsIdempotentAndSafeWithoutStart) {
     WorkerPool pool(sched_.get(), &cfg_);
     pool.Stop();  // never started → no-op
-    cfg_.Set("f06.parser_max_concurrent", "4");
+    cfg_.Set("parser.parser_max_concurrent", "4");
     ASSERT_TRUE(pool.Start().ok());
     pool.Stop();
     pool.Stop();  // double stop safe

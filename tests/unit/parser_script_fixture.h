@@ -18,7 +18,7 @@ namespace test {
 class ScriptFixture : public ::testing::Test {
 protected:
     std::string Write(const std::string& suffix, const std::string& content) {
-        char tmpl[] = "/tmp/cortrix_f06_fix_XXXXXX";
+        char tmpl[] = "/tmp/cortrix_parser_fix_XXXXXX";
         int fd = ::mkstemp(tmpl);
         if (fd >= 0) ::close(fd);
         std::string path = std::string(tmpl) + suffix;

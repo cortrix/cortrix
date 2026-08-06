@@ -60,7 +60,7 @@ public:
     /// post-retrieval IClassifier signature so the pipeline treats all classifiers
     /// uniformly.
     retrieval::ClassificationResult Classify(const retrieval::ClassifierInput& input) override;
-    std::string Name() const override { return "f39-complexity"; }
+    std::string Name() const override { return "routing-complexity"; }
     std::vector<std::string> Labels() const override {
         return {"simple", "complex", "chat"};
     }

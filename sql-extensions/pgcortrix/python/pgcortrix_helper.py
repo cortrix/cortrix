@@ -568,8 +568,8 @@ class PgcortrixClient:
         if not user_id:
             raise CortrixError(
                 "CX_ERR_USER_ID_MISSING",
-                "pgcortrix_memory_search requires user_id (MEM05 isolation)",
-                {"reason": "user_id_required_for_mem05_isolation"})
+                "pgcortrix_memory_search requires user_id (memory isolation)",
+                {"reason": "user_id_required_for_memory_isolation"})
         resp = self._post("/api/v1/memory/search", {
             "namespace": namespace,
             "query": query,
@@ -584,8 +584,8 @@ class PgcortrixClient:
         if not user_id:
             raise CortrixError(
                 "CX_ERR_USER_ID_MISSING",
-                "pgcortrix_list_interactions requires user_id (MEM05 D4)",
-                {"reason": "user_id_required_for_mem05_isolation"})
+                "pgcortrix_list_interactions requires user_id (memory isolation D4)",
+                {"reason": "user_id_required_for_memory_isolation"})
         validated = validate_filter(filter)  # raises CX_ERR_PGCORTRIX_INVALID_FILTER
         params = {
             "namespace": namespace,

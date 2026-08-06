@@ -9,8 +9,8 @@ namespace {
 
 // op_latency_seconds histogram bucket upper bounds (seconds), §8. CRUD endpoints are
 // sub-second metadata operations, so the bounds are tighter than the LLM-extraction
-// histogram (mem02). Parallel string array renders exact `le` labels; the trailing
-// +Inf bucket is implicit (index kNumDurBuckets). Mirrors the mem02 kDurBounds template.
+// histogram (memory_extract). Parallel string array renders exact `le` labels; the trailing
+// +Inf bucket is implicit (index kNumDurBuckets). Mirrors the memory_extract kDurBounds template.
 constexpr double kDurBounds[MemoryMetrics::kNumDurBuckets] =
     {0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0};
 constexpr const char* kDurBoundStr[MemoryMetrics::kNumDurBuckets] =
@@ -80,7 +80,7 @@ std::string MemoryMetrics::RenderOpenMetrics() const {
     std::ostringstream os;
 
     // cortrix_memory_transparency_op_total
-    os << "# HELP cortrix_memory_transparency_op_total MEM03 transparency operations by op and status.\n";
+    os << "# HELP cortrix_memory_transparency_op_total memory transparency operations by op and status.\n";
     os << "# TYPE cortrix_memory_transparency_op_total counter\n";
     for (int o = 0; o < kOpCount; ++o) {
         for (int s = 0; s < kOpStatusCount; ++s) {
@@ -93,7 +93,7 @@ std::string MemoryMetrics::RenderOpenMetrics() const {
 
     // cortrix_memory_transparency_op_latency_seconds — Prometheus histogram per op:
     // cumulative _bucket{le=...} for each bound + le="+Inf", then _sum + _count.
-    os << "# HELP cortrix_memory_transparency_op_latency_seconds MEM03 op latency in seconds.\n";
+    os << "# HELP cortrix_memory_transparency_op_latency_seconds memory transparency op latency in seconds.\n";
     os << "# TYPE cortrix_memory_transparency_op_latency_seconds histogram\n";
     for (int o = 0; o < kOpCount; ++o) {
         const uint64_t cnt = latency_count_[o].load(std::memory_order_relaxed);

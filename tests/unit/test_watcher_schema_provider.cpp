@@ -79,18 +79,18 @@ TEST(WatcherSchemaProviderTest, WatcherConfigColumnSuppliedByCatalogBaseSchema) 
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
 
-    cortrix::catalog::CatalogSchemaProvider f12;
-    WatcherSchemaProvider f21;
+    cortrix::catalog::CatalogSchemaProvider catalog;
+    WatcherSchemaProvider dir_watcher;
     cortrix::catalog::SchemaMigrator m;
-    m.Register(&f12);  // Catalog first (ARCH §1.3.bis.3 topological order)
-    m.Register(&f21);
+    m.Register(&catalog);  // Catalog first (ARCH §1.3.bis.3 topological order)
+    m.Register(&dir_watcher);
 
     Status st = m.MigrateCatalog(db);
     ASSERT_TRUE(st.ok()) << st.message();
 
     auto cols = ColumnNames(db, "namespaces");
     EXPECT_NE(cols.find("watcher_config"), cols.end())
-        << "namespaces.watcher_config must be present (F12 base schema)";
+        << "namespaces.watcher_config must be present (catalog base schema)";
 
     EXPECT_EQ(m.CurrentVersion(db, "catalog"), cortrix::catalog::kCatalogSchemaVersion);
     EXPECT_EQ(m.CurrentVersion(db, "watcher"), 1);

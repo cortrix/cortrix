@@ -33,17 +33,17 @@ EnrichRetrySweeper::~EnrichRetrySweeper() { Stop(); }
 
 int EnrichRetrySweeper::SweepIntervalSec() const {
     if (config_) {
-        auto r = config_->GetInt("f42.enrich_sweep_interval_sec");
+        auto r = config_->GetInt("async.enrich_sweep_interval_sec");
         if (r.ok() && r.value() > 0) return static_cast<int>(r.value());
     }
     return kDefaultSweepIntervalSec;
 }
 
 int EnrichRetrySweeper::MaxDocsPerSweep() const {
-    // Same seed path as the interval (yaml spc.enrich_sweep_batch → f42 KV).
+    // Same seed path as the interval (yaml spc.enrich_sweep_batch → async KV).
     // Absent/non-positive keeps the built-in 32 — byte-identical default.
     if (config_) {
-        auto r = config_->GetInt("f42.enrich_sweep_batch");
+        auto r = config_->GetInt("async.enrich_sweep_batch");
         if (r.ok() && r.value() > 0) return static_cast<int>(r.value());
     }
     return kMaxDocsPerSweep;

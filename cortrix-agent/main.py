@@ -189,7 +189,7 @@ def build_app(
 
     app = FastAPI(
         title="Cortrix Agent",
-        description="Cortrix built-in Agent (F48 V1.0 chat mode) over the P03 SDK.",
+        description="Cortrix built-in Agent (V1.0 chat mode) over the SDK.",
         version="1.0.0-rc.1",
         lifespan=lifespan,
     )

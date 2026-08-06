@@ -157,12 +157,12 @@ def main():
     q = "Why do plants appear green?"
     # Cross-NS query 8-field A-class meta on the array wire.
     r = query({"query": q, "namespaces": [args.ns], "top_k": 5, "rerank": True})
-    if check("P4 F04 wire 200", r.status_code == 200, r.text[:300]):
+    if check("P4 cross-NS query wire 200", r.status_code == 200, r.text[:300]):
         meta = r.json().get("meta", {})
         need = {"namespaces_queried", "namespaces_succeeded", "coverage_ratio", "latency_ms"}
-        check("P4 F04 meta A-fields", need.issubset(meta.keys()), json.dumps(meta)[:300])
+        check("P4 cross-NS query meta A-fields", need.issubset(meta.keys()), json.dumps(meta)[:300])
         items = r.json().get("results", [])
-        check("P4 F04 item shape (child_id+content)",
+        check("P4 cross-NS query item shape (child_id+content)",
               bool(items) and "child_id" in items[0] and "content" in items[0],
               json.dumps(items[0])[:250] if items else "no results")
 
@@ -193,16 +193,16 @@ def main():
     # CRAG runs only on the Complex route; with explain the verdict is surfaced.
     # Exercises the CRAG explain branch (crag_verdict / crag_score / ambiguous_action_taken).
     r = query({"query": q, "namespaces": [args.ns], "top_k": 5}, "?route=complex&explain=true")
-    if check("P4 F37 complex+explain 200", r.status_code == 200, r.text[:250]):
+    if check("P4 CRAG complex+explain 200", r.status_code == 200, r.text[:250]):
         ex = (r.json() or {}).get("explain", {}) or {}
         flat = json.dumps(ex)
         # crag_verdict appears somewhere in the explain tree when CRAG ran.
         has_crag = "crag_verdict" in flat
-        check("P4 F37 CRAG verdict surfaced in explain", has_crag, flat[:300])
+        check("P4 CRAG verdict surfaced in explain", has_crag, flat[:300])
         if has_crag:
             # verdict must be one of the known CRAG classes (not an empty/garbage value).
             verdict_ok = any(v in flat for v in ('"correct"', '"ambiguous"', '"incorrect"', '"disabled"'))
-            check("P4 F37 CRAG verdict is a known class", verdict_ok, flat[:300])
+            check("P4 CRAG verdict is a known class", verdict_ok, flat[:300])
 
     r = query({"query": q, "namespaces": ["no-such-ns-xyz"], "top_k": 3})
     if 400 <= r.status_code < 500:
@@ -262,7 +262,7 @@ def main():
             if r.status_code == 200 and "peanut" in r.text.lower():
                 hit = True
                 break
-        check("P5 memory search finds extracted fact (MEM02)", hit, last_resp)
+        check("P5 memory search finds extracted fact (memory extraction)", hit, last_resp)
         print("    memory search:", last_resp[:300])
 
         # Manual extract endpoint (M2) responds with the PartialSuccessById shape.
@@ -285,7 +285,7 @@ def main():
 
         # Agent trace observability (M6, per-NS): /interactions is live now.
         r = s.get(f"{api}/interactions", params={"namespace_id": args.ns, "session_id": sid}, timeout=15)
-        check("P5 F13 /interactions 200", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+        check("P5 agent trace /interactions 200", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
         # Agent trace sources view: if any interaction exists, its /sources sub-resource must
         # respond 200 with a source_count field (exercises the interaction-sources branch).
         if r.status_code == 200:
@@ -297,18 +297,18 @@ def main():
                 # contract addendum (observability_routes.cpp §TC4), so pass `namespace`.
                 rs = s.get(f"{api}/interactions/{iid}/sources",
                            params={"namespace": args.ns}, timeout=15)
-                check("P5 F13 /interactions/{id}/sources 200 + source_count",
+                check("P5 agent trace /interactions/{id}/sources 200 + source_count",
                       rs.status_code == 200 and "source_count" in (rs.text or ""),
                       f"{rs.status_code} {rs.text[:200]}")
         r = s.get(f"{api}/traces/{sid}", params={"namespace": args.ns}, timeout=15)
-        check("P5 F13 /traces (ns param) responds", r.status_code in (200, 404), f"{r.status_code} {r.text[:160]}")
+        check("P5 agent trace /traces (ns param) responds", r.status_code in (200, 404), f"{r.status_code} {r.text[:160]}")
         # /traces is the GLOBAL agent_trace read (agent trace / TC4): ?namespace is NOT
         # required (a session's calls span namespaces, aggregated by session_id). So
         # omitting it is NOT a 400 — it behaves like the ns-param case above (200 if the
         # session has traces, 404 CX_ERR_TRACE_SESSION_NOT_FOUND if it has none). The old
         # "missing ns → 400" assertion applied the per-NS /interactions contract here.
         r = s.get(f"{api}/traces/{sid}", timeout=15)
-        check("P5 F13 /traces no-ns (global, ns not required) responds", r.status_code in (200, 404), f"{r.status_code} {r.text[:160]}")
+        check("P5 agent trace /traces no-ns (global, ns not required) responds", r.status_code in (200, 404), f"{r.status_code} {r.text[:160]}")
 
         # Agent-trace WRITE path (folds in the 2026-06-24 standalone write check so it
         # is permanent sweep coverage): a /query carrying X-Session-Id/X-Agent-Id makes the
@@ -331,7 +331,7 @@ def main():
                     wrote = True
                     break
             time.sleep(2)
-        check("P5 F13 agent-trace write (X-Session-Id query → /traces trace_count>=1)",
+        check("P5 agent trace agent-trace write (X-Session-Id query → /traces trace_count>=1)",
               wrote, f"last={r.status_code} {r.text[:200]}")
 
         # Memory transparency CRUD on /memory.
@@ -339,20 +339,20 @@ def main():
                    json={"namespace": args.ns, "content": "User Alex speaks fluent French.",
                          "memory_type": "fact", "user_id": "alex"}, timeout=30)
         mem_id = (r.json() or {}).get("id") or (r.json() or {}).get("memory_id") if r.status_code in (200, 201) else None
-        check("P5 MEM03 create 2xx", r.status_code in (200, 201), f"{r.status_code} {r.text[:250]}")
+        check("P5 memory transparency create 2xx", r.status_code in (200, 201), f"{r.status_code} {r.text[:250]}")
         r = s.get(f"{api}/memory", params={"namespace": args.ns, "user_id": "alex"}, timeout=30)
-        check("P5 MEM03 list contains created", r.status_code == 200 and "French" in r.text,
+        check("P5 memory transparency list contains created", r.status_code == 200 and "French" in r.text,
               f"{r.status_code} {r.text[:250]}")
         if mem_id:
             r = s.delete(f"{api}/memory/{mem_id}", params={"namespace": args.ns, "user_id": "alex"}, timeout=30)
-            check("P5 MEM03 soft-delete 2xx", r.status_code in (200, 204), f"{r.status_code} {r.text[:200]}")
+            check("P5 memory transparency soft-delete 2xx", r.status_code in (200, 204), f"{r.status_code} {r.text[:200]}")
 
         # Memory opt-out immunity: opt-out is idempotent; revoke is admin (no-auth grants admin).
         r = s.post(f"{api}/memory/session/{sid}/opt-out", json={"namespace": args.ns}, timeout=30)
-        check("P5 MEM04 opt-out 2xx", r.status_code in (200, 201), f"{r.status_code} {r.text[:200]}")
+        check("P5 memory opt-out 2xx", r.status_code in (200, 201), f"{r.status_code} {r.text[:200]}")
         r = s.post(f"{api}/memory/session/{sid}/opt-out/revoke",
                    json={"namespace": args.ns, "reason": "e2e revoke check"}, timeout=30)
-        check("P5 MEM04 revoke responds", r.status_code in (200, 201, 403), f"{r.status_code} {r.text[:200]}")
+        check("P5 memory opt-out revoke responds", r.status_code in (200, 201, 403), f"{r.status_code} {r.text[:200]}")
     else:
         skip("P5 memory suite", "no session id")
 
@@ -366,22 +366,22 @@ def main():
     # namespace creates have logged rows. Exercises: list, namespace_id filter branch,
     # resource_type filter branch — and asserts the ns filter actually scopes results.
     r = s.get(f"{api}/operations", timeout=15)
-    if check("P6 F18a /operations 200", r.status_code == 200, f"{r.status_code} {r.text[:200]}"):
+    if check("P6 operation log /operations 200", r.status_code == 200, f"{r.status_code} {r.text[:200]}"):
         body = r.json() or {}
         ops = body.get("operations", [])
         total = (body.get("meta") or {}).get("total_count", body.get("total_count"))
-        check("P6 F18a /operations shape (operations[] + total_count)",
+        check("P6 operation log /operations shape (operations[] + total_count)",
               isinstance(ops, list) and total is not None, json.dumps(body)[:250])
         # namespace_id filter branch: every returned row must match the filter.
         rf = s.get(f"{api}/operations", params={"namespace_id": args.ns}, timeout=15)
-        if check("P6 F18a /operations?namespace_id 200", rf.status_code == 200, rf.text[:200]):
+        if check("P6 operation log /operations?namespace_id 200", rf.status_code == 200, rf.text[:200]):
             fops = (rf.json() or {}).get("operations", [])
             scoped = all((o.get("namespace_id") in (args.ns, None)) for o in fops)
-            check("P6 F18a /operations ns filter scopes rows", scoped,
+            check("P6 operation log /operations ns filter scopes rows", scoped,
                   json.dumps([o.get("namespace_id") for o in fops[:10]])[:200])
         # resource_type filter branch (memory ops were logged in P5).
         rt = s.get(f"{api}/operations", params={"resource_type": "memory"}, timeout=15)
-        check("P6 F18a /operations?resource_type=memory 200", rt.status_code == 200, rt.text[:200])
+        check("P6 operation log /operations?resource_type=memory 200", rt.status_code == 200, rt.text[:200])
 
     # CE auth api-keys CRUD (no-auth mode grants admin for local integration).
     r = s.post(f"{api}/auth/api-keys", json={"name": "e2e-key"}, timeout=15)

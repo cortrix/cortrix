@@ -431,7 +431,7 @@ TEST_F(SPCPipelineTest, UnifiedWrite_ParentsAndChildrenPersisted) {
         EXPECT_EQ(b.block_type, static_cast<int>(kBlockFile));
         parent_ids.push_back(b.parent_id);
     }
-    EXPECT_EQ(meta_count, 1) << "exactly one F08 META block per doc";
+    EXPECT_EQ(meta_count, 1) << "exactly one metadata block META block per doc";
 
     // Each referenced parent_id resolves to a real row in the `parents` table.
     ASSERT_FALSE(parent_ids.empty());
@@ -469,7 +469,7 @@ TEST_F(SPCPipelineTest, MetadataBlockPersisted) {
         EXPECT_NE(b.metadata_json.find(doc_id), std::string::npos)
             << "metadata_json should carry the doc_id";
     }
-    EXPECT_EQ(meta_count, 1) << "exactly one F08 META block per doc (idx_blocks_meta_doc)";
+    EXPECT_EQ(meta_count, 1) << "exactly one metadata block META block per doc (idx_blocks_meta_doc)";
 }
 
 // [benchmark/doc summary path validation] META block metadata must also populate the per-Unit
@@ -539,7 +539,7 @@ TEST_F(SPCPipelineTest, CLEANING_DedupRemovesDuplicateChildren) {
     for (size_t i = 0; i < texts.size(); ++i)
         for (size_t j = i + 1; j < texts.size(); ++j)
             EXPECT_NE(texts[i], texts[j])
-                << "F10 dedup: no two surviving child rows may share identical text";
+                << "dedup: no two surviving child rows may share identical text";
 }
 
 // The doc-processing response meta carries the 4 A-class cleaning

@@ -657,7 +657,7 @@ public:
         return out;
     }
     bool IsAvailable() const override { return true; }
-    std::string Name() const override { return "f35_contextual_retrieval"; }
+    std::string Name() const override { return "contextual_retrieval"; }
 };
 
 // All chain members succeed → every child row lands status='ok', no retry stamp,
@@ -687,7 +687,7 @@ TEST_F(SPCPipelineR7Test, EnrichState_OkChainWritesOkRowPerChild) {
 // [D10a] Persist failure AFTER a successful enrich stage must be re-owed in
 // enrich_state, not just WARN-logged: sabotage the entities table so
 // WriteEnrichment fails while the chain member itself succeeded. The row must
-// land pending_retry owing f03 with a persist-flavored last_error, so the
+// land pending_retry owing enrich with a persist-flavored last_error, so the
 // sweeper regenerates and re-persists it.
 TEST_F(SPCPipelineR7Test, EnrichState_PersistFailureAfterSuccessfulEnrichIsOwed) {
     cortrix::spc::EnricherChain chain;
@@ -706,11 +706,11 @@ TEST_F(SPCPipelineR7Test, EnrichState_PersistFailureAfterSuccessfulEnrichIsOwed)
     const int rows = CountSql("SELECT COUNT(*) FROM enrich_state");
     ASSERT_GT(rows, 0);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"), rows);
-    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members LIKE '%f03%'"),
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members LIKE '%enrich%'"),
               rows);
-    // QA 2026-07-12 F-6: the merge must owe EXACTLY f03 here — an over-owe
-    // ("f03,f35") would sail through the LIKE above unnoticed.
-    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members='f03'"),
+    // QA 2026-07-12 F-6: the merge must owe EXACTLY enrich here — an over-owe
+    // ("enrich,contextual") would sail through the LIKE above unnoticed.
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members='enrich'"),
               rows);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE last_error LIKE "
                        "'CX_ERR_SPC_PERSIST_FAILED%'"),
@@ -720,7 +720,7 @@ TEST_F(SPCPipelineR7Test, EnrichState_PersistFailureAfterSuccessfulEnrichIsOwed)
     pipeline_->SetEnricherChain(nullptr);
 }
 
-// Enricher slot fails (step status != 0) → pending_retry rows owing exactly f03, with
+// Enricher slot fails (step status != 0) → pending_retry rows owing exactly enrich, with
 // the retry stamp and the error detail.
 TEST_F(SPCPipelineR7Test, EnrichState_EnricherFailureOwedAsPendingRetry) {
     cortrix::spc::EnricherChain chain;
@@ -735,18 +735,18 @@ TEST_F(SPCPipelineR7Test, EnrichState_EnricherFailureOwedAsPendingRetry) {
     const int rows = CountSql("SELECT COUNT(*) FROM enrich_state");
     ASSERT_GT(rows, 0);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"), rows);
-    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members='f03'"), rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members='enrich'"), rows);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE next_retry_at IS NOT NULL"), rows);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE last_error LIKE 'CX_ERR%'"), rows);
     pipeline_->SetEnricherChain(nullptr);
 }
 
 // Contextual retrieval fail-soft (step status 0, contextualized_status 2) → the member-aware
-// detection still owes f35; the ok enricher head is NOT owed.
+// detection still owes contextual; the ok enricher head is NOT owed.
 TEST_F(SPCPipelineR7Test, EnrichState_ContextualSoftFailureDetectedViaContextualizedStatus) {
     cortrix::spc::EnricherChain chain;
     chain.Append(std::make_shared<FakeSummaryEnricher>());        // ok enricher
-    chain.Append(std::make_shared<FailingContextualEnricher>());  // f35 soft-fail
+    chain.Append(std::make_shared<FailingContextualEnricher>());  // contextual soft-fail
     pipeline_->SetEnricherChain(&chain);
 
     std::string doc_id = CreateDoc();
@@ -756,13 +756,13 @@ TEST_F(SPCPipelineR7Test, EnrichState_ContextualSoftFailureDetectedViaContextual
 
     const int rows = CountSql("SELECT COUNT(*) FROM enrich_state");
     ASSERT_GT(rows, 0);
-    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members='f35'"), rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members='contextual'"), rows);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"), rows);
     pipeline_->SetEnricherChain(nullptr);
 }
 
 // Hype degrade (LLM fails inside GenerateHypeQuestions → step status != 0)
-// → rows owe exactly f38 while the ok enricher head stays un-owed.
+// → rows owe exactly hype while the ok enricher head stays un-owed.
 TEST_F(SPCPipelineR7Test, EnrichState_HypeFailureOwedAsF38) {
     auto failing_llm = std::make_shared<llm::MockLlmClient>();
     llm::ChatCompletionResponse fail;
@@ -782,7 +782,7 @@ TEST_F(SPCPipelineR7Test, EnrichState_HypeFailureOwedAsF38) {
 
     const int rows = CountSql("SELECT COUNT(*) FROM enrich_state");
     ASSERT_GT(rows, 0);
-    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members='f38'"), rows);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members='hype'"), rows);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"), rows);
     pipeline_->SetEnricherChain(nullptr);
 }
@@ -854,7 +854,7 @@ TEST(EnrichBackfillSchedule, ExponentialCappedForwardOnly) {
     EXPECT_EQ(W::NextRetryDelaySec(-1), 60);     // clamped
 }
 
-// Full repair cycle: ingest under a fully-failing chain (debt f03,f35,f38) →
+// Full repair cycle: ingest under a fully-failing chain (debt enrich,contextual,hype) →
 // run the backfill worker with a WORKING chain → every artifact lands with
 // write-parity and the rows flip 'ok'. A second run is a no-op (idempotent).
 TEST_F(SPCPipelineR7Test, EnrichBackfill_RepairsPendingRowsEndToEnd) {
@@ -879,7 +879,7 @@ TEST_F(SPCPipelineR7Test, EnrichBackfill_RepairsPendingRowsEndToEnd) {
     const int rows = CountSql("SELECT COUNT(*) FROM enrich_state");
     ASSERT_GT(rows, 0);
     ASSERT_EQ(CountSql(
-        "SELECT COUNT(*) FROM enrich_state WHERE failed_members='f03,f35,f38'"), rows);
+        "SELECT COUNT(*) FROM enrich_state WHERE failed_members='enrich,contextual,hype'"), rows);
     ASSERT_EQ(CountSql("SELECT COUNT(*) FROM entities"), 0);
     ASSERT_EQ(CountSql("SELECT COUNT(*) FROM contextual_vec_labels"), 0);
     ASSERT_EQ(CountSql("SELECT COUNT(*) FROM blocks WHERE block_type=16"), 0);
@@ -952,10 +952,10 @@ TEST_F(SPCPipelineR7Test, EnrichBackfill_PersistFailureKeepsNonEmptyLastError) {
 
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"),
               rows);
-    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members LIKE '%f03%'"),
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE failed_members LIKE '%enrich%'"),
               rows);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE last_error LIKE "
-                       "'CX_ERR_SPC_PERSIST_FAILED[f03]%'"),
+                       "'CX_ERR_SPC_PERSIST_FAILED[enrich]%'"),
               rows);
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE last_error IS NULL "
                        "OR last_error=''"),
@@ -977,7 +977,7 @@ TEST_F(SPCPipelineR7Test, EnrichBackfill_PartialRepairKeepsOwedMember) {
     const int rows = CountSql("SELECT COUNT(*) FROM enrich_state");
     ASSERT_GT(rows, 0);
 
-    // Repair chain whose f03 STILL fails → still owed, attempts=1, future retry.
+    // Repair chain whose enrich STILL fails → still owed, attempts=1, future retry.
     cortrix::spc::EnricherChain still_broken;
     still_broken.Append(std::make_shared<FailingSummaryEnricher>());
     async::TaskManager mgr;
@@ -992,7 +992,7 @@ TEST_F(SPCPipelineR7Test, EnrichBackfill_PartialRepairKeepsOwedMember) {
     EXPECT_EQ(CountSql(
         "SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"), rows);
     EXPECT_EQ(CountSql(
-        "SELECT COUNT(*) FROM enrich_state WHERE failed_members='f03' AND attempts=1"),
+        "SELECT COUNT(*) FROM enrich_state WHERE failed_members='enrich' AND attempts=1"),
         rows);
     EXPECT_EQ(CountSql(
         "SELECT COUNT(*) FROM enrich_state WHERE next_retry_at IS NOT NULL"), rows);
@@ -1009,7 +1009,7 @@ TEST_F(SPCPipelineR7Test, EnrichSweeper_EnqueuesDueDocsAndLeases) {
         r.doc_id = doc;
         r.child_id = "c" + std::to_string(block_id);
         r.status = cortrix::spc::kEnrichStatusPendingRetry;
-        r.failed_members = "f03";
+        r.failed_members = "enrich";
         r.next_retry_at = due;
         r.updated_at = 1;
         ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());

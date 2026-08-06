@@ -50,7 +50,7 @@ public:
     enum class Endpoint { kTraces = 0, kInteractions, kInteractionsSources };
 
     /// module label for observability_write_failed_total (trace / operation log).
-    enum class Module { kF13 = 0, kF18a };
+    enum class Module { kAgentTrace = 0, kOperationLog };
 
     /// Process-wide instance (metrics are global counters/gauge/histogram).
     static AgentTraceMetrics& Instance();
@@ -110,7 +110,7 @@ private:
     static constexpr int kHeaderCount = 3;       // session_id / trace_id / agent_id
     static constexpr int kRoleCount = 2;         // user / admin
     static constexpr int kEndpointCount = 3;     // traces / interactions / interactions_sources
-    static constexpr int kModuleCount = 2;       // f13 / f18a
+    static constexpr int kModuleCount = 2;       // agent_trace / oplog
 
     // writes_total[source][status]
     std::array<std::array<std::atomic<uint64_t>, kWriteStatusCount>, kSourceCount> writes_{};

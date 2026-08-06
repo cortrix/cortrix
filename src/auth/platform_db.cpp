@@ -66,9 +66,9 @@ Status PlatformDb::Open(const std::string& db_path,
     // refresh_tokens / api_keys reference) exists before any extra provider.
     // NOTE: CatalogSchemaProvider is intentionally NOT registered here — catalog
     // tables live in catalog.db, a different file (D3.5 reconciles the two).
-    AuthSchemaProvider p08_provider;
+    AuthSchemaProvider auth_provider;
     catalog::SchemaMigrator migrator;
-    migrator.Register(&p08_provider);
+    migrator.Register(&auth_provider);
     for (catalog::ISchemaProvider* p : extra_providers) {
         migrator.Register(p);
     }

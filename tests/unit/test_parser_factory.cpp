@@ -27,7 +27,7 @@ public:
     TempFile(const std::string& suffix, size_t bytes) {
         // mkstemp creates+opens a unique file securely; we then rename to add the
         // extension the factory routes on (mkstemp itself can't take a suffix).
-        char tmpl[] = "/tmp/cortrix_f06_XXXXXX";
+        char tmpl[] = "/tmp/cortrix_parser_XXXXXX";
         int fd = ::mkstemp(tmpl);
         if (fd >= 0) ::close(fd);
         path_ = std::string(tmpl) + suffix;

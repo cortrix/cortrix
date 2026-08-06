@@ -48,7 +48,7 @@ TEST_F(EnrichStateStoreTest, MigrateIsIdempotentAndRejectsUnknownVersions) {
 
 TEST_F(EnrichStateStoreTest, UpsertInsertsThenOverwrites) {
     EnrichStateRow r = MakeRow(11, "doc-a", kEnrichStatusPendingRetry, 500);
-    r.failed_members = "f03,f38";
+    r.failed_members = "enrich,hype";
     r.last_error = "CX_ERR_ENRICHER_LLM_API: transport";
     ASSERT_TRUE(UpsertEnrichState(db_, r).ok());
 
@@ -201,14 +201,14 @@ TEST_F(EnrichAuditTest, SynthesizesOwedMembersOnly) {
     SeedChild(1, "child-full", /*score=*/true, /*ctx=*/1);   // fully covered
     SeedHypeFor("child-full");
     SeedChild(2, "child-bare", false, 0);                    // owes all three
-    SeedChild(3, "child-partial", true, 2);                  // owes f35,f38 (ctx failed)
+    SeedChild(3, "child-partial", true, 2);                  // owes contextual,hype (ctx failed)
     SeedChild(4, "child-tracked", false, 0);                 // already pending (attempts=3)
     EnrichStateRow tracked = MakeRow(4, "doc-a", kEnrichStatusPendingRetry, 99);
     tracked.attempts = 3;
-    tracked.failed_members = "f03";
+    tracked.failed_members = "enrich";
     ASSERT_TRUE(UpsertEnrichState(db_, tracked).ok());
 
-    auto n = SynthesizeEnrichAuditRows(db_, {"f03", "f35", "f38"}, /*now=*/500);
+    auto n = SynthesizeEnrichAuditRows(db_, {"enrich", "contextual", "hype"}, /*now=*/500);
     ASSERT_TRUE(n.ok());
     EXPECT_EQ(n.value(), 2);  // child-bare + child-partial
 
@@ -217,10 +217,10 @@ TEST_F(EnrichAuditTest, SynthesizesOwedMembersOnly) {
     ASSERT_EQ(rows.value().size(), 3u);  // 2 synthesized + 1 pre-tracked
     for (const auto& r : rows.value()) {
         if (r.block_id == 2) {
-            EXPECT_EQ(r.failed_members, "f03,f35,f38");
+            EXPECT_EQ(r.failed_members, "enrich,contextual,hype");
             EXPECT_EQ(r.next_retry_at, 500);
         } else if (r.block_id == 3) {
-            EXPECT_EQ(r.failed_members, "f35,f38");
+            EXPECT_EQ(r.failed_members, "contextual,hype");
         } else if (r.block_id == 4) {
             EXPECT_EQ(r.attempts, 3);           // untouched
             EXPECT_EQ(r.next_retry_at, 99);     // backoff kept
@@ -235,10 +235,10 @@ TEST_F(EnrichAuditTest, DoesNotResurrectFailedPermanent) {
     SeedChild(5, "child-doomed", /*score=*/false, /*ctx=*/0);  // bare: artifacts missing
     EnrichStateRow gaveup = MakeRow(5, "doc-a", kEnrichStatusFailedPermanent, 0);
     gaveup.attempts = 8;                    // hit the ceiling
-    gaveup.failed_members = "f38";
+    gaveup.failed_members = "hype";
     ASSERT_TRUE(UpsertEnrichState(db_, gaveup).ok());
 
-    auto n = SynthesizeEnrichAuditRows(db_, {"f03", "f35", "f38"}, /*now=*/500);
+    auto n = SynthesizeEnrichAuditRows(db_, {"enrich", "contextual", "hype"}, /*now=*/500);
     ASSERT_TRUE(n.ok());
     EXPECT_EQ(n.value(), 0);  // nothing synthesized — the terminal row is skipped
 
@@ -249,7 +249,7 @@ TEST_F(EnrichAuditTest, DoesNotResurrectFailedPermanent) {
     EXPECT_EQ(rows.value()[0].attempts, 8);                            // NOT reset to 0
 }
 
-// P7: f35 "done" requires the ANN label row too — columns-only data (pre-V2 store /
+// P7: contextual "done" requires the ANN label row too — columns-only data (pre-V2 store /
 // partial index loss) must be re-owed, or the contextualized path never gets votes.
 // When contextual_vec_labels is absent entirely (isolated pre-V2 store) the audit
 // keeps the legacy ctx_status-only semantics (covered by the other tests above,
@@ -269,7 +269,7 @@ TEST_F(EnrichAuditTest, OwesContextualWhenLabelMissingDespiteColumns) {
         " VALUES(7001, 21, 'child-labeled')",
         nullptr, nullptr, nullptr), SQLITE_OK);
 
-    auto n = SynthesizeEnrichAuditRows(db_, {"f03", "f35", "f38"}, /*now=*/500);
+    auto n = SynthesizeEnrichAuditRows(db_, {"enrich", "contextual", "hype"}, /*now=*/500);
     ASSERT_TRUE(n.ok());
     EXPECT_EQ(n.value(), 1);  // only the label-less child is re-owed
 
@@ -277,20 +277,20 @@ TEST_F(EnrichAuditTest, OwesContextualWhenLabelMissingDespiteColumns) {
     ASSERT_TRUE(rows.ok());
     ASSERT_EQ(rows.value().size(), 1u);
     EXPECT_EQ(rows.value()[0].block_id, 22u);
-    EXPECT_EQ(rows.value()[0].failed_members, "f35");
+    EXPECT_EQ(rows.value()[0].failed_members, "contextual");
 }
 
-// Members outside the configured chain are never owed (f38 unconfigured here).
+// Members outside the configured chain are never owed (hype unconfigured here).
 TEST_F(EnrichAuditTest, RespectsConfiguredMemberUniverse) {
     SeedChild(11, "child-x", /*score=*/true, /*ctx=*/1);  // no hype block anywhere
     SeedChild(12, "child-y", false, 1);
-    auto n = SynthesizeEnrichAuditRows(db_, {"f03", "f35"}, 500);
+    auto n = SynthesizeEnrichAuditRows(db_, {"enrich", "contextual"}, 500);
     ASSERT_TRUE(n.ok());
-    EXPECT_EQ(n.value(), 1);  // only child-y owes f03; f38 not in the universe
+    EXPECT_EQ(n.value(), 1);  // only child-y owes enrich; hype not in the universe
     auto rows = ListEnrichStateForDoc(db_, "doc-a", kEnrichStatusPendingRetry);
     ASSERT_TRUE(rows.ok());
     ASSERT_EQ(rows.value().size(), 1u);
-    EXPECT_EQ(rows.value()[0].failed_members, "f03");
+    EXPECT_EQ(rows.value()[0].failed_members, "enrich");
 }
 
 TEST_F(EnrichStateStoreTest, HelpersFailCleanlyWithoutTable) {

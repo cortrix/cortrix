@@ -107,7 +107,7 @@ struct RevokeResult {
 /// exposes is_session_opted_out() for that path, but the cross-process wiring is
 /// DEFERRED → D3.5.
 ///
-/// `mem04.enabled` (cortrix.yaml §4.3) gates opt_out/opt_out_revoke: when disabled the
+/// `memory_opt_out.enabled` (cortrix.yaml §4.3) gates opt_out/opt_out_revoke: when disabled the
 /// mutating calls fail OPT_OUT_DISABLED (503). is_session_opted_out is NOT gated — the
 /// worker must still honor existing opt-out stamps even if new opt-outs are off.
 ///
@@ -118,7 +118,7 @@ public:
     /// @param store      opt-out seam (D3.5 real MemoryStore adapter; UT mock)
     /// @param op_logger  operation logger (CE; real observability::IOperationLogger).
     ///                   OPTIONAL — nullptr skips the GEN-OperationLog audit hooks.
-    /// @param enabled    mem04.enabled (cortrix.yaml §4.3) — false ⇒ mutating calls 503.
+    /// @param enabled    memory_opt_out.enabled (cortrix.yaml §4.3) — false ⇒ mutating calls 503.
     explicit OptOutManager(std::shared_ptr<ISessionOptOutStore> store,
                            std::shared_ptr<observability::IOperationLogger> op_logger = nullptr,
                            bool enabled = true);
@@ -145,7 +145,7 @@ public:
                                       const observability::TraceContext* ctx = nullptr);
 
     /// Extraction-worker check (skip extraction). True iff `session_id` is currently
-    /// opted-out. NOT gated by mem04.enabled (existing stamps are always honored).
+    /// opted-out. NOT gated by memory_opt_out.enabled (existing stamps are always honored).
     /// A non-existent session is treated as not-opted-out (false) — the worker has an
     /// interaction for it, so absence is a benign race, not an error. On store failure
     /// returns the error Status (the worker fails open per its own policy).

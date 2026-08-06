@@ -78,7 +78,7 @@ TEST_F(TaskSchedulerTest, DebounceResetsSameDocDifferentHash) {
 }
 
 TEST_F(TaskSchedulerTest, NoDebounceWhenWindowDisabled) {
-    cfg_.Set("f42.watcher_debounce_seconds", "0");  // window 0 → never merge
+    cfg_.Set("async.watcher_debounce_seconds", "0");  // window 0 → never merge
     auto a = sched_->Enqueue(MakeReq("docA", "h1"));
     auto b = sched_->Enqueue(MakeReq("docA", "h1"));
     ASSERT_TRUE(a.ok());
@@ -102,7 +102,7 @@ TEST_F(TaskSchedulerTest, DequeueMarksProcessingAndReservesDoc) {
 TEST_F(TaskSchedulerTest, PerDocIdMutexDefersSameDoc) {
     // Issue 2.1/2.3: two tasks for the SAME doc_id; only one can be active at once.
     sched_->Enqueue(MakeReq("docA", "h1"));
-    cfg_.Set("f42.watcher_debounce_seconds", "0");  // avoid merge so we get 2 rows
+    cfg_.Set("async.watcher_debounce_seconds", "0");  // avoid merge so we get 2 rows
     sched_->Enqueue(MakeReq("docA", "h2"));
 
     auto first = sched_->Dequeue(1);
@@ -164,7 +164,7 @@ TEST_F(TaskSchedulerTest, NullConfigUsesDefaultDebounce) {
 // A config present but missing the key leaves DebounceSeconds() on the default
 // (GetInt not ok branch): debounce remains active.
 TEST_F(TaskSchedulerTest, MissingConfigKeyUsesDefaultDebounce) {
-    // cfg_ has no "f42.watcher_debounce_seconds" set -> GetInt fails -> default.
+    // cfg_ has no "async.watcher_debounce_seconds" set -> GetInt fails -> default.
     auto a = sched_->Enqueue(MakeReq("docK", "h1"));
     auto b = sched_->Enqueue(MakeReq("docK", "h1"));
     ASSERT_TRUE(a.ok());

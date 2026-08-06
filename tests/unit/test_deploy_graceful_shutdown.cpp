@@ -30,7 +30,7 @@ PendingTask MakeTask(const std::string& doc_id) {
 
 // A unique temp data_dir per test so the .pending_tasks.json files don't collide.
 std::string MakeTempDir(const std::string& tag) {
-    std::string dir = "/tmp/f24_gs_" + tag + "_" + std::to_string(::getpid());
+    std::string dir = "/tmp/deploy_gs_" + tag + "_" + std::to_string(::getpid());
     std::string cmd = "mkdir -p '" + dir + "'";
     (void)std::system(cmd.c_str());
     return dir;
@@ -208,10 +208,10 @@ TEST_F(GracefulShutdownTest, ResumeOnStartupCorruptFileLeavesItAndReturnsZero) {
 TEST_F(GracefulShutdownTest, AtomicWriteFileWritesContents) {
     std::string dir = MakeTempDir("atomic");
     std::string path = dir + "/out.json";
-    ASSERT_TRUE(AtomicWriteFile(path, "hello-f24"));
+    ASSERT_TRUE(AtomicWriteFile(path, "hello-deploy"));
     std::ifstream in(path);
     std::ostringstream ss; ss << in.rdbuf();
-    EXPECT_EQ(ss.str(), "hello-f24");
+    EXPECT_EQ(ss.str(), "hello-deploy");
     std::remove(path.c_str());
 }
 

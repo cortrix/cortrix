@@ -1,6 +1,6 @@
 # pgcortrix — Cortrix semantic retrieval / memory as a PostgreSQL extension.
 #
-# F14 V1 route (F14-pgcortrix.md §1, L0' 2026-05-07): a plpython3u wrapper layer
+# pgcortrix V1 route (pgcortrix-pgcortrix.md §1, L0' 2026-05-07): a plpython3u wrapper layer
 # over the Cortrix Server HTTP REST API — NOT a C extension + shared-memory IPC
 # (that is the V3+ roadmap). plpython3u keeps us PG-version-agnostic (13–17) and
 # lets a function body change ship without recompiling / restarting PG.

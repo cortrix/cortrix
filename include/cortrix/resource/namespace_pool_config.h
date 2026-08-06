@@ -21,7 +21,7 @@ struct SqlitePragmas {
 /// Global resource-pool configuration.
 ///
 /// Scope is **global only**: a namespace cannot decide its own quota
-/// rules, so there is no NS-level f05_config blob. In production this is sourced
+/// rules, so there is no NS-level ns_pool_config blob. In production this is sourced
 /// from IGlobalConfig::GetNamespacePoolConfig() — that getter is a D3.5 reverse hook into
 /// the shared scaffolding; standalone code (and tests) construct an
 /// NamespacePoolConfig directly and pass it to the pool, so the pool stays decoupled from the

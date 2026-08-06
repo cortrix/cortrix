@@ -18,7 +18,7 @@ namespace cortrix::async {
 ///     zombie_task_threshold_hours (default 24, topic 4.3 B) → failed +
 ///     CX_ERR_ZOMBIE_TASK_CLEANUP.
 ///
-/// Retention / zombie thresholds are read from IGlobalConfig (f42.* keys, §4.0)
+/// Retention / zombie thresholds are read from IGlobalConfig (async.* keys, §4.0)
 /// on each sweep, so an admin-API hot-reload takes effect on the next run. When a
 /// key is missing/malformed the documented default is used.
 ///
@@ -29,8 +29,8 @@ namespace cortrix::async {
 class TaskCleanupCron {
 public:
     /// @param mgr    borrowed TaskManager (must outlive this cron)
-    /// @param config borrowed IGlobalConfig for f42.task_retention_days /
-    ///               f42.zombie_task_threshold_hours (nullptr → use defaults)
+    /// @param config borrowed IGlobalConfig for async.task_retention_days /
+    ///               async.zombie_task_threshold_hours (nullptr → use defaults)
     TaskCleanupCron(TaskManager* mgr, const IGlobalConfig* config);
     ~TaskCleanupCron();
 
@@ -55,7 +55,7 @@ public:
     /// always in (0, 24h]. (Same contract as CleanupScheduler::NextRunDelayMs.)
     static int64_t NextRunDelayMs(int64_t now_unix_ms);
 
-    /// f42.* default thresholds (§4.0) when config is absent / malformed.
+    /// async.* default thresholds (§4.0) when config is absent / malformed.
     static constexpr int kDefaultRetentionDays = 30;
     static constexpr int kDefaultZombieHours = 24;
     static constexpr int kDefaultTimeoutSeconds = 1800;  // §4.0 — 30 min

@@ -35,7 +35,7 @@ Status Exec(sqlite3* db, const char* ddl, const char* what) {
         std::string detail = err ? err : "unknown";
         sqlite3_free(err);
         return Status::Internal(
-            std::string("CX_ERR_SCHEMA_MIGRATION_FAILED: F35 ") + what + ": " + detail);
+            std::string("CX_ERR_SCHEMA_MIGRATION_FAILED: contextual enricher ") + what + ": " + detail);
     }
     return Status::Ok();
 }

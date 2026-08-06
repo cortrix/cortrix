@@ -353,7 +353,7 @@ TEST(MemoryScorerRank, DefaultIncludeInvalidatedIsFalse) {
 TEST(MemoryScorerLog, UnknownType_LogsWarn) {
     std::ostringstream oss;
     auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(oss);
-    auto captured = std::make_shared<spdlog::logger>("mem01_test_capture", sink);
+    auto captured = std::make_shared<spdlog::logger>("memory_decay_test_capture", sink);
     captured->set_level(spdlog::level::trace);
     auto prev = spdlog::default_logger();
     spdlog::set_default_logger(captured);
@@ -369,7 +369,7 @@ TEST(MemoryScorerLog, UnknownType_LogsWarn) {
     // reference to the stack-local oss destroyed at function exit) lingers in the
     // registry, and the flush_every() background thread's flush_all() later
     // dereferences the dead ostream -> use-after-free / SIGSEGV.
-    spdlog::drop("mem01_test_capture");
+    spdlog::drop("memory_decay_test_capture");
     const std::string logged = oss.str();
     EXPECT_NE(logged.find("Unknown memory_type"), std::string::npos) << logged;
     EXPECT_NE(logged.find("opinion"), std::string::npos) << logged;
@@ -378,7 +378,7 @@ TEST(MemoryScorerLog, UnknownType_LogsWarn) {
 TEST(MemoryScorerLog, KnownTypes_DoNotWarn) {
     std::ostringstream oss;
     auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(oss);
-    auto captured = std::make_shared<spdlog::logger>("mem01_test_capture2", sink);
+    auto captured = std::make_shared<spdlog::logger>("memory_decay_test_capture2", sink);
     captured->set_level(spdlog::level::trace);
     auto prev = spdlog::default_logger();
     spdlog::set_default_logger(captured);
@@ -392,7 +392,7 @@ TEST(MemoryScorerLog, KnownTypes_DoNotWarn) {
     }
 
     spdlog::set_default_logger(prev);
-    spdlog::drop("mem01_test_capture2");  // see UnknownType_LogsWarn: avoid dead-sink UAF
+    spdlog::drop("memory_decay_test_capture2");  // see UnknownType_LogsWarn: avoid dead-sink UAF
     EXPECT_EQ(oss.str().find("Unknown memory_type"), std::string::npos) << oss.str();
 }
 

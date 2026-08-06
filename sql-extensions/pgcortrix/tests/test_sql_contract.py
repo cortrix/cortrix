@@ -92,7 +92,7 @@ class TestCompositeTypes(unittest.TestCase):
                 got = self._parse_columns(self._type_body(name))
                 self.assertEqual(
                     got, expected,
-                    f"{name} columns drifted from F14 §2.1.1 SoT")
+                    f"{name} columns drifted from pgcortrix §2.1.1 SoT")
 
 
 class TestFunctionSignatures(unittest.TestCase):
@@ -206,7 +206,7 @@ class TestFunctionSignatures(unittest.TestCase):
             _, tail = self._fn(name)
             self.assertRegex(
                 tail, r"LANGUAGE\s+plpython3u",
-                f"{name} must be LANGUAGE plpython3u (F14 V1 route)")
+                f"{name} must be LANGUAGE plpython3u (pgcortrix V1 route)")
 
 
 class TestExtensionFraming(unittest.TestCase):

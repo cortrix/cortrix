@@ -79,13 +79,13 @@ TEST(ContextualEnricherTest, UsableViaBasePointer) {
     ContextualRetrievalEnricher e(ContextualRetrievalConfig{},
                                   std::make_shared<llm::MockLlmClient>(), MakeEmbedder());
     ISpcEnricher* base = &e;  // polymorphic use through the frozen interface
-    EXPECT_EQ(base->Name(), "f35_contextual_retrieval");
+    EXPECT_EQ(base->Name(), "contextual_retrieval");
 }
 
 TEST(ContextualEnricherTest, NameIsF35) {
     ContextualRetrievalEnricher e(ContextualRetrievalConfig{},
                                   std::make_shared<llm::MockLlmClient>(), MakeEmbedder());
-    EXPECT_EQ(e.Name(), "f35_contextual_retrieval");
+    EXPECT_EQ(e.Name(), "contextual_retrieval");
 }
 
 TEST(ContextualEnricherTest, AvailableWithClientAndEnabled) {
@@ -235,7 +235,7 @@ TEST(ContextualEnricherTest, EnrichSuccessPopulatesAllThreeFields) {
 
     EnrichResult res = e.Enrich("chunk body", DocMeta(), MakeCtx("chunk body"));
     EXPECT_TRUE(res.ok());                              // status 0 (Block still written)
-    EXPECT_EQ(res.enricher_name, "f35_contextual_retrieval");
+    EXPECT_EQ(res.enricher_name, "contextual_retrieval");
     EXPECT_EQ(res.contextualized_status, 1);            // generated
     ASSERT_TRUE(res.contextualized_text.has_value());
     // contextualized_text = prefix + "\n" + original chunk (§1.1).

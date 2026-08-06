@@ -55,9 +55,9 @@ inline constexpr char kPerUnitFrameworkDdl[] = R"SQL(
             data            BLOB NOT NULL,
             content_text    TEXT,
             -- [A unified-blocks #4] Queryable JSONB metadata column,
-            -- shared by all block_types: MEM memory state (block_type=MEMORY, MEM02
-            -- §4.2.1 jsonb_set/JSONB index), F34 child metadata (inherited NER/Summary),
-            -- F08 META 26-field doc metadata. Three-way split: data=binary F09 block
+            -- shared by all block_types: MEM memory state (block_type=MEMORY, memory extraction
+            -- §4.2.1 jsonb_set/JSONB index), parent-child metadata (inherited NER/Summary),
+            -- META 26-field doc metadata. Three-way split: data=binary block-framework block
             -- (reconstruction), metadata_json=queryable JSON, content_text=full-text.
             metadata_json   TEXT,
             FOREIGN KEY (doc_id) REFERENCES documents(doc_id)

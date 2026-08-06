@@ -29,7 +29,7 @@ mcp = CortrixMCPServer(
     version=__version__,
     instructions=(
         "Cortrix semantic storage — document indexing, hybrid semantic search "
-        "(vector + BM25), conversation memory (MEM02/03/04/05), async ingestion, "
+        "(vector + BM25), conversation memory, async ingestion, "
         "directory watchers, operation audit, and admin DB import. Every tool returns "
         "a GEN-Agent envelope: {data, meta:{retryable, category, retry_after_ms, "
         "structured_data}}; tool failures return a model-visible structured error "

@@ -234,7 +234,7 @@ class NamespacePoolTest : public ::testing::Test {
 protected:
     void SetUp() override {
         tmp_root_ = std::filesystem::temp_directory_path() /
-                    ("f05_pool_" + std::to_string(::testing::UnitTest::GetInstance()
+                    ("ns_pool_" + std::to_string(::testing::UnitTest::GetInstance()
                                                        ->random_seed()) +
                      "_" + std::to_string(reinterpret_cast<uintptr_t>(this)));
         std::filesystem::create_directories(tmp_root_);
@@ -381,7 +381,7 @@ TEST(NamespaceResourceBundleTest, DestructorReleasesResources) {
     // A bundle with all three real resources; leaving scope must not leak / crash
     // (run under ASan in CI). We also assert the memory estimate aggregates the
     // Index-footprint + pwl-size hooks.
-    auto tmp = std::filesystem::temp_directory_path() / "f05_bundle_dtor";
+    auto tmp = std::filesystem::temp_directory_path() / "ns_pool_bundle_dtor";
     std::filesystem::create_directories(tmp);
     FakeVectorStore vs;
     FakeMetadataStore ms;

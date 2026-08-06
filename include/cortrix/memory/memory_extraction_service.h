@@ -34,7 +34,7 @@ public:
     /// @param llm        shared extraction LLM (null → service disabled, log-only).
     /// @param embedder   embeds memory content for search (shared with the pipeline).
     /// @param op_logger  operation logger (memory_extract / _skipped audit).
-    /// @param config     mem02.* config.
+    /// @param config     memory_extract.* config.
     /// @param queue_cfg  worker pool + reliability config (worker_count etc).
     ///
     /// The opt-out check is built per-item over the interaction's NS façade

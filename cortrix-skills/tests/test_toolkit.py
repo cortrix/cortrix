@@ -374,7 +374,7 @@ def test_error_passthrough_on_http_fallback(kit, fake_client):
     assert ei.value.category == "quota" and ei.value.retry_after_ms == 1500
 
 
-def test_mem03_error_codes_passthrough(kit, fake_client):
+def test_memory_error_codes_passthrough(kit, fake_client):
     fake_client.set_http_error(
         CortrixError(
             "already invalidated",

@@ -4,7 +4,7 @@
 
 namespace cortrix::metadata {
 
-/// Metadata-block observability metrics (subsystem `f08`).
+/// Metadata-block observability metrics (subsystem `metadata`).
 /// Naming `cortrix_metadata_<metric>_<unit>`. Self-contained dependency-free recorder
 /// (same pattern as ImportMetrics / RerankerMetrics / OnnxMetrics); registering into
 /// the `/metrics` scrape endpoint is wired separately.

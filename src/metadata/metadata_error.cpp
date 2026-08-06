@@ -52,7 +52,7 @@ const std::vector<std::string>& RequiredStructuredDataKeys(MetadataErrorCode cod
     // what is missing + the parse status + what downstream was blocked.
     static const std::vector<std::string> kGenFailedKeys{
         "doc_id", "namespace_id", "stage", "missing_fields",
-        "f06_parse_status", "downstream_blocked"};
+        "parser_parse_status", "downstream_blocked"};
     // FIELD_IMMUTABLE (§5.1.1 example B): which fields were attempted + the full
     // immutable set + the Phase 2 feature + the re-upload workaround.
     static const std::vector<std::string> kFieldImmutableKeys{

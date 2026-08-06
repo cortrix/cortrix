@@ -342,7 +342,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
             return 1;
         }
     }
-    cortrix::catalog::DefaultINSRouter ns_router(catalog_db.db(), /*f05_pool=*/nullptr);
+    cortrix::catalog::DefaultINSRouter ns_router(catalog_db.db(), /*ns_pool=*/nullptr);
     cortrix::catalog::DefaultUnitRouter unit_router(catalog_db.db());
 
     // GC layer 1 — catalog.db / blob_gc_queue. The Stage 3 sink resolves
@@ -367,11 +367,11 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         return cortrix::Result<std::unique_ptr<cortrix::store::WriteCoordinator>>(
             std::move(coord));
     };
-    cortrix::resource::NamespacePoolConfig f05_config;
-    f05_config.data_root = config.ns.data_dir + "/units";  // per-Unit layout root
-    f05_config.load_timeout_ms_per_ns = config.ns.load_timeout_ms_per_ns;  // configurable startup-load guard
+    cortrix::resource::NamespacePoolConfig ns_pool_config;
+    ns_pool_config.data_root = config.ns.data_dir + "/units";  // per-Unit layout root
+    ns_pool_config.load_timeout_ms_per_ns = config.ns.load_timeout_ms_per_ns;  // configurable startup-load guard
     cortrix::resource::DefaultNamespacePool ns_pool(
-        &index_factory, std::move(wc_factory), &ns_router, &unit_router, f05_config);
+        &index_factory, std::move(wc_factory), &ns_router, &unit_router, ns_pool_config);
     {
         auto startup = ns_pool.StartupLoadAll();
         if (startup.ok()) {
@@ -447,13 +447,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // dir, feeds cortrix_disk_usage_ratio + the write-reject flag. Constructed
     // BEFORE SPCManager / route registration so both can hold it (probe lambda /
     // pointer) — RAII then tears them down first while the monitor is still alive.
-    cortrix::deploy::DiskMonitor f24_disk_monitor(
+    cortrix::deploy::DiskMonitor deploy_disk_monitor(
         cortrix::deploy::DiskMonitorConfig::FromGlobalConfig(nullptr, config.ns.data_dir),
         [](const cortrix::deploy::DiskUsage& u) {
             CORTRIX_LOG_WARN("disk", "Disk stage {} at {:.1f}%",
                              cortrix::deploy::ToString(u.stage), u.usage_ratio * 100.0);
         });
-    f24_disk_monitor.Start();
+    deploy_disk_monitor.Start();
 
     // 7. SPC pipeline components — structured parser (owns OCR/VLM internally)
     //    + parent-child chunker (Inc 4-3: A unified-blocks ingest swap).
@@ -503,18 +503,18 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     parser_factory_config.enable_paddleocr = true;
     parser_factory_config.fallback_confidence_threshold = config.spc.ocr_confidence_threshold;
 
-    cortrix::spc::DocumentParserFactory f06_factory(parser_factory_config);
+    cortrix::spc::DocumentParserFactory parser_factory(parser_factory_config);
     {
         cortrix::spc::DoclingParserConfig dc;
         dc.python_path = config.spc.python_bin;
         dc.script_path = docling_script;
         dc.subprocess_timeout_ms = config.spc.parser_timeout_s * 1000;
-        f06_factory.SetPrimaryParser(std::make_unique<cortrix::spc::DoclingParser>(dc));
+        parser_factory.SetPrimaryParser(std::make_unique<cortrix::spc::DoclingParser>(dc));
         cortrix::spc::PaddleOCRParserConfig pc;
         pc.python_path = config.spc.python_bin;
         pc.script_path = parser_factory_config.paddleocr.script_path;
         pc.subprocess_timeout_ms = config.spc.ocr_timeout_s * 1000;
-        f06_factory.SetFallbackParser(std::make_unique<cortrix::spc::PaddleOCRParser>(pc));
+        parser_factory.SetFallbackParser(std::make_unique<cortrix::spc::PaddleOCRParser>(pc));
     }
 
     cortrix::chunker::ParentChildChunker pc_chunker(cortrix::chunker::ChunkerConfig{});
@@ -563,13 +563,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
 
     // Enricher chain (enrich → contextualize → HyPE, fail-soft serial). The chain
     // supersedes the single enricher above when it has any available member.
-    // It is resolved from the `enricher.chain` GUC (default "f03"); when the
+    // It is resolved from the `enricher.chain` GUC (default "enrich"); when the
     // enricher LLM is configured we seed the GUC to the full chain so contextual enrichment and HyPE join
     // (they share that LLM). The chain + its enrichers live at function scope so
     // they outlive spc_mgr (which holds a non-owning pointer via the pipeline).
     auto enricher_chain_config = std::make_shared<cortrix::InMemoryGlobalConfig>();
     if (config.enricher_llm.IsConfigured()) {
-        enricher_chain_config->Set("enricher.chain", "f03,f35,f38");
+        enricher_chain_config->Set("enricher.chain", "enrich,contextual,hype");
     }
     std::shared_ptr<cortrix::llm::ILlmClient> enricher_chain_llm;
     if (config.enricher_llm.IsConfigured()) {
@@ -592,26 +592,26 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         std::vector<std::string> chain_tokens =
             cortrix::spc::ResolveEnricherChain(enricher_chain_config.get(), "");
         for (const auto& tok : chain_tokens) {
-            if (tok == "f03") {
+            if (tok == "enrich") {
                 // enricher head: reuse the single enricher already created above (shared, so
                 // the chain and the pipeline ctor arg point at the same object).
                 enricher_chain.Append(
                     std::shared_ptr<cortrix::spc::ISpcEnricher>(enricher.get(), [](auto*) {}));
-            } else if (tok == "f35" && enricher_chain_llm) {
-                auto f35_cfg =
+            } else if (tok == "contextual" && enricher_chain_llm) {
+                auto contextual_cfg =
                     cortrix::spc::ResolveContextualConfig(enricher_chain_config.get());
                 // Wire the configured enricher_llm model through (mirrors the doc-summary
                 // DEFECT#3 fix): the built-in "gpt-4o-mini" default is rejected
                 // with HTTP 400 by non-OpenAI providers (GLM/Claude/local), which
                 // silently zeroed all contextual-enrichment output.
                 if (!config.enricher_llm.model.empty()) {
-                    f35_cfg.llm_model = config.enricher_llm.model;
+                    contextual_cfg.llm_model = config.enricher_llm.model;
                 }
                 // Same wiring for the per-call deadline: a configured
                 // enricher_llm.timeout_ms overrides the §6.1 10s built-in,
                 // which slow providers exceed on every large-prompt call.
                 if (config.enricher_llm.timeout_ms > 0) {
-                    f35_cfg.timeout_ms = std::max(config.enricher_llm.timeout_ms,
+                    contextual_cfg.timeout_ms = std::max(config.enricher_llm.timeout_ms,
                                                   cortrix::spc::kContextualTimeoutMsMin);
                 }
                 // Contextual-enrichment knobs without a yaml alias until 2026-07-10 (deep-QA):
@@ -619,22 +619,22 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                 // fixed 2 rejected legitimate >160-byte contexts and silently
                 // dropped their contextualized vectors). 0 = built-in defaults.
                 if (config.enricher_llm.ctx_max_output_tokens > 0) {
-                    f35_cfg.max_output_tokens =
+                    contextual_cfg.max_output_tokens =
                         std::clamp(config.enricher_llm.ctx_max_output_tokens,
                                    cortrix::spc::kContextualMaxOutputTokensMin,
                                    cortrix::spc::kContextualMaxOutputTokensMax);
                 }
                 if (config.enricher_llm.ctx_guard_chars_per_token > 0) {
-                    f35_cfg.guard_chars_per_token =
+                    contextual_cfg.guard_chars_per_token =
                         std::clamp(config.enricher_llm.ctx_guard_chars_per_token,
                                    cortrix::spc::kContextualGuardCharsPerTokenMin,
                                    cortrix::spc::kContextualGuardCharsPerTokenMax);
                 }
-                auto f35 = std::make_shared<cortrix::spc::ContextualRetrievalEnricher>(
-                    f35_cfg, enricher_chain_llm,
+                auto contextual = std::make_shared<cortrix::spc::ContextualRetrievalEnricher>(
+                    contextual_cfg, enricher_chain_llm,
                     std::make_shared<cortrix::spc::ContextualOnnxEmbedder>(embedder_alias));
-                enricher_chain.Append(std::move(f35));
-            } else if (tok == "f38" && enricher_chain_llm) {
+                enricher_chain.Append(std::move(contextual));
+            } else if (tok == "hype" && enricher_chain_llm) {
                 cortrix::spc::HyPEConfig hype_cfg;  // K=3 default; parent_text bound in pipeline
                 // Same wiring as contextual enrichment above: send the configured
                 // model, not the OpenAI-only built-in default.
@@ -659,10 +659,10 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                 if (config.enricher_llm.timeout_ms > 0) {
                     hype_cfg.timeout_ms = std::max(config.enricher_llm.timeout_ms, 1000);
                 }
-                auto f38 = std::make_shared<cortrix::spc::HyPEEnricher>(
+                auto hype = std::make_shared<cortrix::spc::HyPEEnricher>(
                     hype_cfg, enricher_chain_llm,
                     /*parent_store=*/nullptr);  // parent_text supplied per-chunk by the pipeline
-                enricher_chain.Append(std::move(f38));
+                enricher_chain.Append(std::move(hype));
             }
         }
         CORTRIX_LOG_INFO("main", "enricher chain resolved: [{}]",
@@ -681,13 +681,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     //     moves into SPCManager. TaskManager (tasks.db) → TaskScheduler → WorkerPool
     //     dispatch (kTaskDocParse → DocumentProcessor; kTaskDocSummary →
     //     DocSummaryAsyncWorker, only when doc_summary_llm is configured).
-    auto f42_config = std::make_shared<cortrix::InMemoryGlobalConfig>();
-    f42_config->Set("f42.worker_pool_size",
+    auto async_config = std::make_shared<cortrix::InMemoryGlobalConfig>();
+    async_config->Set("async.worker_pool_size",
                     std::to_string(config.spc.worker_count > 0 ? config.spc.worker_count : 2));
     // Default 4 (parser-subprocess memory protection); explicitly raisable via
     // spc.parser_max_concurrent for workloads that spawn no parsers (the worker
     // pool-size gate compares against this value).
-    f42_config->Set("f06.parser_max_concurrent",
+    async_config->Set("parser.parser_max_concurrent",
                     std::to_string(config.spc.parser_max_concurrent > 0
                                        ? config.spc.parser_max_concurrent
                                        : 4));
@@ -695,11 +695,11 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // reads these keys but nothing ever seeded them, freezing the 60s x 32
     // built-ins (a multi-hour drain at 5000-doc scale). 0/absent = unchanged.
     if (config.spc.enrich_sweep_interval_sec > 0) {
-        f42_config->Set("f42.enrich_sweep_interval_sec",
+        async_config->Set("async.enrich_sweep_interval_sec",
                         std::to_string(config.spc.enrich_sweep_interval_sec));
     }
     if (config.spc.enrich_sweep_batch > 0) {
-        f42_config->Set("f42.enrich_sweep_batch",
+        async_config->Set("async.enrich_sweep_batch",
                         std::to_string(config.spc.enrich_sweep_batch));
     }
 
@@ -709,14 +709,14 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         cortrix::ShutdownLogging();
         return 1;
     }
-    cortrix::async::TaskScheduler task_scheduler(&task_mgr, f42_config.get());
+    cortrix::async::TaskScheduler task_scheduler(&task_mgr, async_config.get());
 
     // 8. SPCPipeline + SPCManager — constructed BEFORE doc_processor (Plan B):
     // the doc-parse handler borrows &spc_mgr to hand its parsed doc to ProcessParsedDoc.
     // The doc-summary seam is installed LATER (after the WorkerPool exists) via the spc_mgr
     // proxy, breaking the doc_processor → spc_mgr → pipeline(seam) → worker_pool cycle.
     auto pipeline = std::make_unique<cortrix::SPCPipeline>(
-        f06_factory, pc_chunker, embedder, assembler, *enricher);
+        parser_factory, pc_chunker, embedder, assembler, *enricher);
     cortrix::SPCManager spc_mgr(config.spc, ns_pool, std::move(pipeline));
     // Install the enricher chain on the managed pipeline (no-op when the
     // chain has no available member → pipeline keeps the single-enricher path).
@@ -731,12 +731,12 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // disk gate on task admission (catch-all for watcher /
     // CDC paths that Submit() directly; the HTTP upload route rejects earlier).
     spc_mgr.SetWriteRejectProbe(
-        [&f24_disk_monitor] { return f24_disk_monitor.ShouldRejectWrites(); });
+        [&deploy_disk_monitor] { return deploy_disk_monitor.ShouldRejectWrites(); });
 
     // The last argument releases each batch-materialized input file once its task
     // is terminal (SEC/lifecycle: those files exist only to feed the parser).
     cortrix::async::DocumentProcessor doc_processor(
-        &task_mgr, &f06_factory, f42_config.get(), nullptr, &spc_mgr,
+        &task_mgr, &parser_factory, async_config.get(), nullptr, &spc_mgr,
         cortrix::server::BatchTempDir(config.ns.data_dir));
 
     // doc-summary worker — built only when an LLM is configured; otherwise the
@@ -760,7 +760,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         // Claude, local) then returns HTTP 400 and every summary silently fails. Wire
         // the configured model through here (mirrors LlmEnricher, which uses its real
         // config_.model). See qa DEFECT#3.
-        auto ds_cfg = cortrix::doc_summary::ResolveDocSummaryConfig(f42_config.get());
+        auto ds_cfg = cortrix::doc_summary::ResolveDocSummaryConfig(async_config.get());
         if (!config.doc_summary_llm.model.empty()) {
             ds_cfg.llm_model = config.doc_summary_llm.model;
         }
@@ -781,7 +781,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // The pool is the LAST async object constructed → the FIRST destroyed (its dtor
     // Stop()s + joins the workers), so the scheduler + both handlers (doc_processor /
     // doc_summary_worker) it dispatches to outlive the worker threads.
-    cortrix::async::WorkerPool worker_pool(&task_scheduler, f42_config.get());
+    cortrix::async::WorkerPool worker_pool(&task_scheduler, async_config.get());
     worker_pool.RegisterHandler(cortrix::async::kTaskDocParse, &doc_processor);
     if (doc_summary_worker) {
         worker_pool.RegisterHandler(cortrix::async::kTaskDocSummary, doc_summary_worker.get());
@@ -825,7 +825,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // Declared after the WorkerPool (destroyed before it; its dtor joins the
     // sweep thread) and Start()ed only after worker_pool.Start() succeeds below.
     cortrix::spc::EnrichRetrySweeper enrich_sweeper(ns_pool, &task_scheduler,
-                                                    &worker_pool, f42_config.get());
+                                                    &worker_pool, async_config.get());
 
     // 8b. ConnectorState holds a single DirWatcherRegistry (fan-out), built
     // lazily by RegisterConnectorRoutes. The config watch_dir is subscribed AFTER
@@ -933,9 +933,9 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         // The registrar is transient: RegisterAgentTrace's callback captures at_writer
         // (shared_ptr), not the registrar. db=nullptr — interaction_log is per-NS (swept
         // below), not reachable through one catalog.db handle.
-        cortrix::agent_trace::AgentTraceCleanupRegistrar f13_cleanup(at_writer, /*db=*/nullptr,
+        cortrix::agent_trace::AgentTraceCleanupRegistrar agent_trace_cleanup(at_writer, /*db=*/nullptr,
                                                               global_config);
-        f13_cleanup.RegisterAgentTrace(obs_module.scheduler());
+        agent_trace_cleanup.RegisterAgentTrace(obs_module.scheduler());
     }
     auto il_sweeper = std::make_shared<cortrix::agent_trace::InteractionLogSweeper>(
         &ns_router, &ns_pool, global_config);
@@ -1034,7 +1034,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // Register document, query, and memory routes on the raw httplib::Server.
     // [gap②] Document upload consults the disk monitor (507 CX_ERR_DISK_FULL at CRIT).
     cortrix::RegisterDocumentRoutes(server.server(), upload_handler, ns_pool, auth,
-                                    &f24_disk_monitor);
+                                    &deploy_disk_monitor);
     // cross-NS query: POST /api/v1/query is now the
     // ScatterGather link (namespaces[] array + 8-field meta + child_id/content_hash
     // ResultItems), replacing the MVP single-NS route. The wiring owns the cross-NS query stack
@@ -1077,13 +1077,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // per-namespace MemoryExtractors. Reuses the enricher-chain LLM (OpenAiLlmClient
     // shared) + obs_module's operation logger. Disabled (no enricher LLM) =>
     // interaction_log only. Started after registration so the route can enqueue.
-    cortrix::memory::MemoryExtractorConfig mem02_cfg;
-    mem02_cfg.enabled = (enricher_chain_llm != nullptr);
+    cortrix::memory::MemoryExtractorConfig memory_extract_cfg;
+    memory_extract_cfg.enabled = (enricher_chain_llm != nullptr);
     // The extractor reuses the enricher LLM client, so the model id
     // must follow that provider too - the struct default (gpt-4o-mini) 400s on
     // any non-OpenAI endpoint ("model does not exist").
     if (config.enricher_llm.IsConfigured()) {
-        mem02_cfg.llm_model = config.enricher_llm.model;
+        memory_extract_cfg.llm_model = config.enricher_llm.model;
     }
     // Plumb the extraction LLM timeout from config — it was hardcoded at the
     // 30s struct default with no override path, too short for slow structured
@@ -1091,16 +1091,16 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // black-box hit as an extraction timeout). enricher_llm.timeout_ms > 0 overrides
     // the 60s default; the extractor reuses that same LLM client.
     if (config.enricher_llm.timeout_ms > 0) {
-        mem02_cfg.llm_timeout_ms = config.enricher_llm.timeout_ms;
+        memory_extract_cfg.llm_timeout_ms = config.enricher_llm.timeout_ms;
     }
-    cortrix::memory::MemoryQueue::Config mem02_queue_cfg;  // worker_count=4, 1h periodic
-    cortrix::memory::MemoryExtractionService mem02_service(
-        ns_pool, enricher_chain_llm, embedder, obs_module.logger(), mem02_cfg,
-        mem02_queue_cfg);
+    cortrix::memory::MemoryQueue::Config memory_extract_queue_cfg;  // worker_count=4, 1h periodic
+    cortrix::memory::MemoryExtractionService memory_extract_service(
+        ns_pool, enricher_chain_llm, embedder, obs_module.logger(), memory_extract_cfg,
+        memory_extract_queue_cfg);
     cortrix::MemoryServices mem_services;
-    mem_services.extraction = &mem02_service;
+    mem_services.extraction = &memory_extract_service;
     mem_services.op_logger = obs_module.logger();  // audit for memory-transparency CRUD
-    mem02_service.Start();
+    memory_extract_service.Start();
 
     // POST /api/v1/documents/batch — mount the batch submit
     // batch submit route. The service fans each doc out through the frozen task
@@ -1146,15 +1146,15 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // DocumentTaskHandler over the already-wired scheduler/task_mgr/worker_pool (must
     // outlive `server`, so declared here at end-of-scope).
     cortrix::async::DocumentTaskHandler doc_task_handler(
-        &task_scheduler, &task_mgr, &worker_pool, f42_config.get(),
+        &task_scheduler, &task_mgr, &worker_pool, async_config.get(),
         cortrix::server::BatchTempDir(config.ns.data_dir));
     // GET /api/v1/documents/discover — doc-summary granularity recall (HNSW
     // over doc_summary blocks + FTS5 fallback). MUST be mounted BEFORE RegisterFlatDocumentRoutes
     // below, whose GET /documents/{id} catch-all would otherwise swallow the literal
-    // "discover" path segment. The DocSummaryConfig is resolved once from f42_config — the
+    // "discover" path segment. The DocSummaryConfig is resolved once from async_config — the
     // same source the DocSummaryAsyncWorker write side uses (~line 560), so read and write agree.
     {
-        auto ds_cfg = cortrix::doc_summary::ResolveDocSummaryConfig(f42_config.get());
+        auto ds_cfg = cortrix::doc_summary::ResolveDocSummaryConfig(async_config.get());
         server.server().Get(
             "/api/v1/documents/discover",
             cortrix::WithAuth(auth, cortrix::kPermRead,
@@ -1255,10 +1255,10 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::health::ReadinessRegistry readiness;
 
     // disk (real): DiskMonitor admission gate.
-    readiness.Register("disk", [&f24_disk_monitor]() {
+    readiness.Register("disk", [&deploy_disk_monitor]() {
         cortrix::health::ComponentReadiness r;
-        r.ready = !f24_disk_monitor.ShouldRejectWrites();
-        r.detail["stage"] = std::string(cortrix::deploy::ToString(f24_disk_monitor.Usage().stage));
+        r.ready = !deploy_disk_monitor.ShouldRejectWrites();
+        r.detail["stage"] = std::string(cortrix::deploy::ToString(deploy_disk_monitor.Usage().stage));
         return r;
     });
 
@@ -1397,14 +1397,14 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
             return 1;
         }
     }
-    auto f24_metrics_server = cortrix::deploy::RegisterMetricsServer(metrics_port);
-    if (f24_metrics_server) {
+    auto deploy_metrics_server = cortrix::deploy::RegisterMetricsServer(metrics_port);
+    if (deploy_metrics_server) {
         // [D3.5 wire · gap④] Aggregate the §5.3 subsystem metric recorders into the
         // /metrics body. Each is a process-wide singleton (MET round standalone recorders);
         // AddSource captures its render fn, concatenated by MetricsServer::RenderAll().
         // The catalog IBloomFilter source needs a BF accessor → deferred alongside the
         // health catalog component.
-        auto& ms = *f24_metrics_server;
+        auto& ms = *deploy_metrics_server;
         ms.AddSource([] { return cortrix::async::TaskMetrics::Instance().RenderOpenMetrics(); });
         ms.AddSource([] { return cortrix::query::ScatterMetrics::Instance().RenderOpenMetrics(); });
         ms.AddSource([] { return cortrix::query::RagFusionMetrics::Instance().RenderOpenMetrics(); });
@@ -1494,7 +1494,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         cortrix::ShutdownLogging();
         return 1;
     }
-    CORTRIX_LOG_INFO("main", "SPC + F42 workers started ({} SPC threads)", config.spc.worker_count);
+    CORTRIX_LOG_INFO("main", "SPC + async task workers started ({} SPC threads)", config.spc.worker_count);
     if (enrich_backfill_worker) {
         enrich_sweeper.Start();
         // D7b: report the EFFECTIVE interval (KV-seeded knob or default), not the
@@ -1564,8 +1564,8 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     gc_thread.Stop();
     // stop the deployment background services (also handled by RAII, but
     // stop explicitly so scrapes/disk checks quiesce before final teardown).
-    if (f24_metrics_server) f24_metrics_server->Stop();
-    f24_disk_monitor.Stop();
+    if (deploy_metrics_server) deploy_metrics_server->Stop();
+    deploy_disk_monitor.Stop();
     // Embedder extension teardown (mirror of on_assembled) — before core drain.
     if (extensions.on_shutdown) {
         extensions.on_shutdown();

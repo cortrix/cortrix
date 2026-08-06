@@ -128,7 +128,7 @@ void AgentTraceWriterImpl::Write(const AgentTraceEntry& entry,
                                            : AgentTraceMetrics::Source::kHttp;
     AgentTraceMetrics::Instance().RecordWrite(src, ms);
     if (!ok) {
-        AgentTraceMetrics::Instance().RecordWriteFailed(AgentTraceMetrics::Module::kF13);
+        AgentTraceMetrics::Instance().RecordWriteFailed(AgentTraceMetrics::Module::kAgentTrace);
     }
 }
 

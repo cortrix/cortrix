@@ -18,7 +18,7 @@ TEST(IGlobalConfigTest, PodReservedFieldDefaults) {
     EXPECT_EQ(cfg.operation_log_max_rows, 100000);
     EXPECT_EQ(cfg.agent_trace_retention_days, 90);
     EXPECT_EQ(cfg.interaction_log_retention_days, 180);
-    EXPECT_EQ(cfg.f13_mcp_idle_timeout_seconds, 1800);
+    EXPECT_EQ(cfg.agent_trace_mcp_idle_timeout_seconds, 1800);
 }
 
 TEST(InMemoryGlobalConfigTest, TypedGettersParse) {

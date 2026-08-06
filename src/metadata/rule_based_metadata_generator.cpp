@@ -182,12 +182,12 @@ Result<GeneratorOutput> RuleBasedMetadataGenerator::Generate(
             {"namespace_id", input.namespace_id},
             {"stage", "block_text_assembly"},
             {"missing_fields", {"doc_metadata", "page_count", "chunk_count"}},
-            {"f06_parse_status", "failed"},
-            {"downstream_blocked", {"f34_chunker", "f25_pwl"}},
+            {"parser_parse_status", "failed"},
+            {"downstream_blocked", {"parent_child_chunker", "pwl_ranker"}},
         };
         return MetadataStatus(
             MetadataErrorCode::kGenFailed,
-            "Failed to generate metadata block: doc_metadata is empty (F06 parse failed)");
+            "Failed to generate metadata block: doc_metadata is empty (parser parse failed)");
     }
 
     // §5.bis cortrix_metadata_block_generate_duration_seconds — time block_text assembly +

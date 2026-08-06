@@ -21,7 +21,7 @@ WorkerPool::~WorkerPool() { Stop(); }
 
 int WorkerPool::ConfiguredPoolSize() const {
     if (config_) {
-        auto r = config_->GetInt("f42.worker_pool_size");
+        auto r = config_->GetInt("async.worker_pool_size");
         if (r.ok()) return r.value();
     }
     return kDefaultPoolSize;
@@ -29,7 +29,7 @@ int WorkerPool::ConfiguredPoolSize() const {
 
 int WorkerPool::ParserMaxConcurrent() const {
     if (config_) {
-        auto r = config_->GetInt("f06.parser_max_concurrent");
+        auto r = config_->GetInt("parser.parser_max_concurrent");
         if (r.ok()) return r.value();
     }
     return kDefaultParserMaxConcurrent;
@@ -46,18 +46,18 @@ Status WorkerPool::Start() {
     if (pool_size > parser_max) {
         nlohmann::json sd = {
             {"rules_violated",
-             {"f42.worker_pool_size must be <= f06.parser_max_concurrent"}},
+             {"async.worker_pool_size must be <= parser.parser_max_concurrent"}},
             {"worker_pool_size", pool_size},
             {"parser_max_concurrent", parser_max},
         };
         return TaskStatus(TaskErrorCode::kInvalidRequest,
-                         "f42.worker_pool_size (" + std::to_string(pool_size) +
-                             ") > f06.parser_max_concurrent (" +
+                         "async.worker_pool_size (" + std::to_string(pool_size) +
+                             ") > parser.parser_max_concurrent (" +
                              std::to_string(parser_max) + ")");
     }
     if (pool_size < 1) {
         return TaskStatus(TaskErrorCode::kInvalidRequest,
-                         "f42.worker_pool_size must be >= 1");
+                         "async.worker_pool_size must be >= 1");
     }
 
     stop_.store(false);

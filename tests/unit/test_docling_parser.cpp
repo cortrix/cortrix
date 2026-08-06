@@ -26,7 +26,7 @@ class ScriptEnv : public ::testing::Test {
 protected:
     std::string Write(const std::string& suffix, const std::string& content,
                       bool executable = false) {
-        char tmpl[] = "/tmp/cortrix_f06s2_XXXXXX";
+        char tmpl[] = "/tmp/cortrix_docling_XXXXXX";
         int fd = ::mkstemp(tmpl);
         if (fd >= 0) ::close(fd);
         std::string path = std::string(tmpl) + suffix;

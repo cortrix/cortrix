@@ -52,7 +52,7 @@ struct McpClientCapability {
 ///   - OnConnectionClosed: write a session_end row + call writer.OnSessionEnd,
 ///     drop the active-session gauge.
 ///   - CheckIdleSessions: deterministic idle sweep (topic 5 idle timeout) — sessions
-///     idle beyond f13_mcp_idle_timeout_seconds get a session_timeout row and are
+///     idle beyond agent_trace_mcp_idle_timeout_seconds get a session_timeout row and are
 ///     evicted. The real wall-clock watcher thread wiring is D3.5; tests call this
 ///     directly (mirrors CleanupScheduler.RunCleanupNow).
 ///
@@ -69,7 +69,7 @@ public:
     static constexpr int kHardLimitToolCalls = 10000;
 
     /// @param writer  the trace writer (borrowed via shared_ptr; double-write sink).
-    /// @param idle_timeout_seconds  topic 5 idle window (IGlobalConfig.f13_mcp_idle_timeout_seconds).
+    /// @param idle_timeout_seconds  topic 5 idle window (IGlobalConfig.agent_trace_mcp_idle_timeout_seconds).
     McpSessionHandler(std::shared_ptr<IAgentTraceWriter> writer,
                       int idle_timeout_seconds);
 

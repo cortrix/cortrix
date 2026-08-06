@@ -124,7 +124,7 @@ TEST(DocSummaryFts5IndexLifecycleTest, OpenOnUncreatablePathErrors) {
     // A path under a non-existent directory cannot be created → sqlite3_open
     // (with the default create flags) fails → CX_ERR_DOCSUMMARY_FTS5_FALLBACK_FAILED.
     DocFts5Index idx;
-    Status st = idx.Open("/nonexistent_dir_f41_xyz/sub/doc.sqlite");
+    Status st = idx.Open("/nonexistent_dir_docsummary_xyz/sub/doc.sqlite");
     EXPECT_FALSE(st.ok());
     EXPECT_NE(st.message().find("CX_ERR_DOCSUMMARY_FTS5_FALLBACK_FAILED"),
               std::string::npos);

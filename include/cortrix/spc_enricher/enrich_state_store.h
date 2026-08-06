@@ -31,7 +31,7 @@ struct EnrichStateRow {
     std::string doc_id;
     std::string child_id;
     std::string status;          // one of the kEnrichStatus* constants
-    std::string failed_members;  // csv of owed chain tokens, e.g. "f03,f38"
+    std::string failed_members;  // csv of owed chain tokens, e.g. "enrich,hype"
     int attempts = 0;
     std::string last_error;
     int64_t next_retry_at = 0;   // unix seconds; 0 ⇔ SQL NULL (non-pending rows)
@@ -70,8 +70,8 @@ Result<EnrichStateCounts> CountEnrichStates(sqlite3* db);
 /// addendum §3.7 G4 — legacy/silent-degrade audit. Scans the namespace's child
 /// blocks against the CONFIGURED chain members and synthesizes 'pending_retry'
 /// rows (due at now_unix) for chunks whose artifacts are missing:
-///   f03 ⇔ blocks.enriched_score non-NULL; f35 ⇔ contextualized_status == 1;
-///   f38 ⇔ a block_type=16 row whose metadata source_child_id == the child.
+///   enrich ⇔ blocks.enriched_score non-NULL; contextual ⇔ contextualized_status == 1;
+///   hype ⇔ a block_type=16 row whose metadata source_child_id == the child.
 /// Chunks already tracked as 'pending_retry' keep their attempts/backoff (not
 /// clobbered); fully-covered chunks get no row. Returns the synthesized count.
 Result<int> SynthesizeEnrichAuditRows(

@@ -123,7 +123,7 @@ std::string ScoringMetrics::Render() const {
     os << "# TYPE cortrix_scoring_anomalous_blocks_total counter\n";
     os << "cortrix_scoring_anomalous_blocks_total " << AnomalousCount() << "\n";
 
-    os << "# HELP cortrix_scoring_final_score_total ComputeFinalScore invocations (F02 fusion).\n";
+    os << "# HELP cortrix_scoring_final_score_total ComputeFinalScore invocations (score fusion).\n";
     os << "# TYPE cortrix_scoring_final_score_total counter\n";
     os << "cortrix_scoring_final_score_total " << FinalScoreCount() << "\n";
 
@@ -131,7 +131,7 @@ std::string ScoringMetrics::Render() const {
     os << "# TYPE cortrix_scoring_assign_duration_seconds histogram\n";
     RenderHist(os, "cortrix_scoring_assign_duration_seconds", S().assign_dur);
 
-    os << "# HELP cortrix_scoring_error_total F07 errors by CX_ERR_SCORING_* code (§4.4).\n";
+    os << "# HELP cortrix_scoring_error_total scoring errors by CX_ERR_SCORING_* code (§4.4).\n";
     os << "# TYPE cortrix_scoring_error_total counter\n";
     for (int i = 0; i < kScoringErrorCodeCount; ++i) {
         const auto code = static_cast<ScoringErrorCode>(i);

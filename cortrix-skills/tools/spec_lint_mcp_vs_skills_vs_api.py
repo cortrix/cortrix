@@ -24,7 +24,7 @@ section 10.4) — it is NOT part of the standalone unit suite. Exit code 0 = pas
 
 Usage::
 
-    python tools/spec_lint_p12_vs_p14_vs_p04.py [--repo-root PATH] [--json]
+    python tools/spec_lint_mcp_vs_sdk_toolkit_vs_p04.py [--repo-root PATH] [--json]
 """
 
 from __future__ import annotations
@@ -120,7 +120,7 @@ def collect_p12(repo_root: str) -> Dict[str, Set[str]]:
 # API spec: parse OpenAPI paths
 # --------------------------------------------------------------------------- #
 
-def collect_p04_paths(repo_root: str) -> Optional[Set[str]]:
+def collect_api_spec_paths(repo_root: str) -> Optional[Set[str]]:
     """Return the set of OpenAPI path templates, or ``None`` if PyYAML is absent."""
     try:
         import yaml  # type: ignore
@@ -170,49 +170,49 @@ def run_checks(repo_root: str) -> Tuple[List[str], List[str]]:
     errors: List[str] = []
     warnings: List[str] = []
 
-    p14 = collect_p14(repo_root)
-    p12_all = collect_p12(repo_root)
-    if not p12_all:
-        errors.append("P12: no cortrix-mcp tools found (check cortrix-mcp/src/.../tools/).")
+    sdk_toolkit = collect_p14(repo_root)
+    mcp_all = collect_p12(repo_root)
+    if not mcp_all:
+        errors.append("MCP: no cortrix-mcp tools found (check cortrix-mcp/src/.../tools/).")
         return errors, warnings
-    p12 = {k: v for k, v in p12_all.items() if k not in ADMIN_TOOLS}
+    mcp = {k: v for k, v in mcp_all.items() if k not in ADMIN_TOOLS}
 
     # Rule 1 — name set equality.
-    only_p14 = set(p14) - set(p12)
-    only_p12 = set(p12) - set(p14)
+    only_p14 = set(sdk_toolkit) - set(mcp)
+    only_p12 = set(mcp) - set(sdk_toolkit)
     if only_p14:
-        errors.append(f"P14 methods with no P12 tool: {sorted(only_p14)}")
+        errors.append(f"SDK toolkit methods with no MCP tool: {sorted(only_p14)}")
     if only_p12:
-        errors.append(f"P12 tools with no P14 method: {sorted(only_p12)}")
-    if len(p14) != 29:
-        errors.append(f"P14 method count = {len(p14)} (expected 29).")
-    if len(p12) != 29:
-        warnings.append(f"P12 non-admin tool count = {len(p12)} (expected 29).")
+        errors.append(f"MCP tools with no SDK toolkit method: {sorted(only_p12)}")
+    if len(sdk_toolkit) != 29:
+        errors.append(f"SDK toolkit method count = {len(sdk_toolkit)} (expected 29).")
+    if len(mcp) != 29:
+        warnings.append(f"MCP non-admin tool count = {len(mcp)} (expected 29).")
 
     # Rule 2 — per-name param-set equality.
-    for name in sorted(set(p14) & set(p12)):
-        a, b = _normalise(p14[name]), _normalise(p12[name])
+    for name in sorted(set(sdk_toolkit) & set(mcp)):
+        a, b = _normalise(sdk_toolkit[name]), _normalise(mcp[name])
         if a != b:
             errors.append(
-                f"param drift in {name}: P14-only={sorted(a - b)} P12-only={sorted(b - a)}"
+                f"param drift in {name}: SDK toolkit-only={sorted(a - b)} MCP-only={sorted(b - a)}"
             )
 
     # Rule 3 — API spec path coverage (best-effort; needs PyYAML).
-    p04_paths = collect_p04_paths(repo_root)
-    if p04_paths is None:
-        warnings.append("P04: PyYAML not installed — skipped OpenAPI path coverage check.")
+    api_spec_paths = collect_api_spec_paths(repo_root)
+    if api_spec_paths is None:
+        warnings.append("API spec: PyYAML not installed — skipped OpenAPI path coverage check.")
     else:
         for path in sorted(D3_5_DEFERRED_PATHS):
-            if path in p04_paths:
+            if path in api_spec_paths:
                 warnings.append(
-                    f"P04 now defines {path!r} — remove it from D3.5_DEFERRED_PATHS and wire the SDK verb."
+                    f"API spec now defines {path!r} — remove it from D3.5_DEFERRED_PATHS and wire the SDK verb."
                 )
 
     return errors, warnings
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="P14<->P12<->P04 three-way spec lint.")
+    parser = argparse.ArgumentParser(description="SDK toolkit<->MCP<->API spec three-way spec lint.")
     parser.add_argument(
         "--repo-root",
         default=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")),
@@ -240,7 +240,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"WARN  {w}")
         for e in errors:
             print(f"ERROR {e}")
-        print("spec_lint: PASS (P14 == P12, params aligned)" if not errors else "spec_lint: FAIL")
+        print("spec_lint: PASS (SDK toolkit == MCP, params aligned)" if not errors else "spec_lint: FAIL")
     return 0 if not errors else 1
 
 

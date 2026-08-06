@@ -132,8 +132,8 @@ protected:
         ASSERT_TRUE(harness_->Admit("test-ns").ok());
 
         ASSERT_TRUE(mgr_.Init(":memory:").ok());
-        cfg_.Set("f42.worker_pool_size", "2");      // for the async-dispatch test (Test3)
-        cfg_.Set("f06.parser_max_concurrent", "4");
+        cfg_.Set("async.worker_pool_size", "2");      // for the async-dispatch test (Test3)
+        cfg_.Set("parser.parser_max_concurrent", "4");
 
         embedder_ = std::make_unique<OnnxEmbedder>("", 128);
         embedder_->Init();
@@ -241,7 +241,7 @@ TEST_F(DocParseSpcE2ETest, ParsedDocReachesSpcPipelineAndWritesBlocks) {
         if (b.block_type == static_cast<int>(kBlockMeta)) ++meta;
         else if (b.block_type == static_cast<int>(kBlockFile)) ++children;
     }
-    EXPECT_EQ(meta, 1) << "exactly one F08 META block per doc";
+    EXPECT_EQ(meta, 1) << "exactly one metadata block META block per doc";
     EXPECT_GT(children, 0) << "the chunked children landed as blocks";
 
     // L3 (default for async large docs) embedded + indexed → the P-HNSW index saw points.

@@ -249,7 +249,7 @@ TEST_F(LoginTest, ValidateInvalidAndExpired) {
 }
 
 TEST_F(LoginTest, BlacklistSurvivesReloadFromDb) {
-    const std::string path = std::string(::testing::TempDir()) + "p08_blacklist.db";
+    const std::string path = std::string(::testing::TempDir()) + "auth_blacklist.db";
     std::remove(path.c_str());
 
     std::string access;

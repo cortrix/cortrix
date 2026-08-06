@@ -32,7 +32,7 @@ Status EnrichStateSchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver)
     if (!db) return Status::InvalidArgument("EnrichState migrate: null db");
 
     // status: 'ok' | 'pending_retry' | 'failed_permanent'.
-    // failed_members: csv of owed chain tokens still missing (e.g. "f03,f38").
+    // failed_members: csv of owed chain tokens still missing (e.g. "enrich,hype").
     // next_retry_at: unix seconds; set only while status='pending_retry' (the
     // sweeper's due gate + lease field).
     return Exec(db,

@@ -151,9 +151,9 @@ TEST_F(EngineInstrumentationTest, ThrowingTraceWriterIsIsolated) {
     c.is_success = true;
     // Must NOT throw out of Record (C4 isolation).
     EXPECT_NO_THROW(instr.Record(c));
-    // write_failed{f13} bumped; operation_log still attempted (success path) and ok.
+    // write_failed{agent_trace} bumped; operation_log still attempted (success path) and ok.
     EXPECT_EQ(AgentTraceMetrics::Instance().WriteFailedCount(
-                  AgentTraceMetrics::Module::kF13), 1u);
+                  AgentTraceMetrics::Module::kAgentTrace), 1u);
     EXPECT_EQ(ol->logged.size(), 1u);
 }
 
@@ -167,10 +167,10 @@ TEST_F(EngineInstrumentationTest, ThrowingOpLoggerIsIsolated) {
     c.method = "query";
     c.is_success = true;
     EXPECT_NO_THROW(instr.Record(c));
-    // agent_trace still written; write_failed{f18a} bumped.
+    // agent_trace still written; write_failed{oplog} bumped.
     EXPECT_EQ(tw->written.size(), 1u);
     EXPECT_EQ(AgentTraceMetrics::Instance().WriteFailedCount(
-                  AgentTraceMetrics::Module::kF18a), 1u);
+                  AgentTraceMetrics::Module::kOperationLog), 1u);
 }
 
 TEST_F(EngineInstrumentationTest, NoOpLoggerTracesOnly) {
@@ -182,9 +182,9 @@ TEST_F(EngineInstrumentationTest, NoOpLoggerTracesOnly) {
     c.is_success = true;
     EXPECT_NO_THROW(instr.Record(c));
     EXPECT_EQ(tw->written.size(), 1u);
-    // No operation logger => no write_failed for f18a, no crash.
+    // No operation logger => no write_failed for oplog, no crash.
     EXPECT_EQ(AgentTraceMetrics::Instance().WriteFailedCount(
-                  AgentTraceMetrics::Module::kF18a), 0u);
+                  AgentTraceMetrics::Module::kOperationLog), 0u);
 }
 
 }  // namespace

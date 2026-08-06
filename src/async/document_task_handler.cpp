@@ -35,7 +35,7 @@ DocumentTaskHandler::DocumentTaskHandler(TaskScheduler* scheduler, TaskManager* 
 
 int DocumentTaskHandler::AsyncThresholdPages() const {
     if (config_) {
-        auto r = config_->GetInt("f42.async_threshold_pages");
+        auto r = config_->GetInt("async.async_threshold_pages");
         if (r.ok()) return r.value();
     }
     return kDefaultAsyncThresholdPages;
@@ -43,7 +43,7 @@ int DocumentTaskHandler::AsyncThresholdPages() const {
 
 int DocumentTaskHandler::AsyncMaxPages() const {
     if (config_) {
-        auto r = config_->GetInt("f42.async_max_pages");
+        auto r = config_->GetInt("async.async_max_pages");
         if (r.ok()) return r.value();
     }
     return kDefaultAsyncMaxPages;

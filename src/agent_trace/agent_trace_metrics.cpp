@@ -258,8 +258,8 @@ const char* ToString(AgentTraceMetrics::Endpoint endpoint) {
 
 const char* ToString(AgentTraceMetrics::Module module) {
     switch (module) {
-        case AgentTraceMetrics::Module::kF13:  return "f13";
-        case AgentTraceMetrics::Module::kF18a: return "f18a";
+        case AgentTraceMetrics::Module::kAgentTrace:  return "agent_trace";
+        case AgentTraceMetrics::Module::kOperationLog: return "oplog";
     }
     return "unknown";
 }

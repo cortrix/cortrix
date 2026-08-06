@@ -1,6 +1,6 @@
 name: Bug report
 description: Report a problem with cortrix-skills (CortrixToolKit or a framework adapter)
-labels: ["bug", "P14"]
+labels: ["bug", "sdk"]
 body:
   - type: markdown
     attributes:

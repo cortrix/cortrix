@@ -17,7 +17,7 @@
 //
 // Unreachable / ERROR-INJECTION-ONLY arms left uncovered ON PURPOSE (a healthy
 // :memory: DB never fails prepare/step; §4.1.bis#4 — do not force):
-//   - f35/contextual_store: the sqlite3_prepare / sqlite3_step != OK error returns.
+//   - contextual/contextual_store: the sqlite3_prepare / sqlite3_step != OK error returns.
 //
 // Standalone NEW file; touches no existing test.
 #include <gtest/gtest.h>
@@ -43,7 +43,7 @@ namespace {
 
 // Migrate(nullptr, 0, 1): the init pair passes the version check, then the !db
 // guard (line 58) fires → InvalidArgument "contextual migrate: null db". The existing
-// f35 test never passes a null db.
+// contextual test never passes a null db.
 TEST(ContextualSchemaProviderBranchR7b, NullDbInvalidArgument) {
     spc::ContextualSchemaProvider p;
     Status st = p.Migrate(nullptr, 0, 1);
@@ -87,18 +87,18 @@ TEST(ContextualStoreBranchR7b, NullDbInvalidArgument) {
     EXPECT_NE(st.message().find("null db"), std::string::npos);
 }
 
-// No contextual retrieval output (status 0, no optionals) → the !f35_ran early-Ok (line 28); the
+// No contextual retrieval output (status 0, no optionals) → the !contextual_ran early-Ok (line 28); the
 // row is left untouched (status stays its DEFAULT 0).
 TEST(ContextualStoreBranchR7b, NoContextualOutputEarlyOk) {
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
     CreateBlocksForContextual(db);
-    spc::EnrichResult r;  // status 0, both optionals empty → f35_ran == false
+    spc::EnrichResult r;  // status 0, both optionals empty → contextual_ran == false
     EXPECT_TRUE(spc::WriteContextualized(db, 7, r).ok());
     sqlite3_close(db);
 }
 
-// Embedding present + status=failed(2): f35_ran is true (status != 0), the text
+// Embedding present + status=failed(2): contextual_ran is true (status != 0), the text
 // optional is ABSENT (bind_null arm, line 47), the embedding optional is PRESENT
 // and non-empty (bind_blob arm, line 56). Covers the has_value() false-for-text /
 // true-for-embedding combination the existing test doesn't reach together.
@@ -108,7 +108,7 @@ TEST(ContextualStoreBranchR7b, EmbeddingPresentTextAbsentStatusFailed) {
     CreateBlocksForContextual(db);
 
     spc::EnrichResult r;
-    r.contextualized_status = 2;  // failed → f35_ran true even with no text
+    r.contextualized_status = 2;  // failed → contextual_ran true even with no text
     r.contextualized_embedding = std::vector<float>{0.5f, 0.25f};  // present + non-empty
     // contextualized_text intentionally left unset → bind_null arm.
     EXPECT_TRUE(spc::WriteContextualized(db, 7, r).ok());
@@ -151,8 +151,8 @@ TEST(ContextualStoreBranchR7b, TextPresentEmbeddingAbsent) {
     sqlite3_close(db);
 }
 
-// f35_ran driven by the contextualized_text optional alone (status 0, no embedding):
-// the `result.contextualized_text.has_value()` disjunct of the f35_ran test (line
+// contextual_ran driven by the contextualized_text optional alone (status 0, no embedding):
+// the `result.contextualized_text.has_value()` disjunct of the contextual_ran test (line
 // 26) — distinct from the status!=0 trigger above.
 TEST(ContextualStoreBranchR7b, ContextualRanViaTextOptionalOnly) {
     sqlite3* db = nullptr;
@@ -160,7 +160,7 @@ TEST(ContextualStoreBranchR7b, ContextualRanViaTextOptionalOnly) {
     CreateBlocksForContextual(db);
 
     spc::EnrichResult r;
-    r.contextualized_text = "only text, status 0";  // engages f35_ran via has_value()
+    r.contextualized_text = "only text, status 0";  // engages contextual_ran via has_value()
     EXPECT_TRUE(spc::WriteContextualized(db, 7, r).ok());
     sqlite3_close(db);
 }

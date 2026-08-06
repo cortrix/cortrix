@@ -226,7 +226,7 @@ TEST(ParentChildSchemaProviderTest, ReadOnlyDbFailsParentsExec) {
     // Materialize an on-disk DB first (read-only :memory: is not meaningful), then
     // reopen it read-only.
     const std::string path =
-        (std::string(::testing::TempDir()) + "f34_ro_" +
+        (std::string(::testing::TempDir()) + "parent_child_ro_" +
          std::to_string(reinterpret_cast<uintptr_t>(&db)) + ".db");
     ASSERT_EQ(sqlite3_open(path.c_str(), &db), SQLITE_OK);
     ASSERT_EQ(sqlite3_close(db), SQLITE_OK);

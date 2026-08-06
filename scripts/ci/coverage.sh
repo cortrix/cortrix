@@ -265,7 +265,7 @@ printf "  core-17  line   : %6s%%  (gate ≥ %s%%)\n" "$CORE_LINE" "$CORE_LINE_M
 printf "  core-17  branch : %6s%%  (gcov — INFORMATIONAL only)\n" "$CORE_BRANCH"
 echo "  html: $OUT/html/index.html"
 echo "=================================================="
-echo "  NOTE (F23 §4.1.bis dual-track gate): this script gates the LINE metrics on"
+echo "  NOTE (test plan §4.1.bis dual-track gate): this script gates the LINE metrics on"
 echo "  gcov (where line counting is accurate). The BRANCH gate is enforced by"
 echo "  scripts/ci/llvmcov.sh on the clang region/branch metric — gcov's branch %"
 echo "  above is phantom-inflated (no_exception filter can't strip mixed-line arms)"

@@ -57,7 +57,7 @@ Status OnnxComplexityBackend::Init() {
 #ifdef CORTRIX_HAS_ONNXRUNTIME
     if (model_path_.empty() || !fs::exists(model_path_)) {
         spdlog::info("OnnxComplexityBackend: model not found at '{}', backend unavailable "
-                     "(F39 L2 default-Complex path)", model_path_);
+                     "(query routing L2 default-Complex path)", model_path_);
         return Status::Ok();  // unavailable, not an error (offline-friendly)
     }
 

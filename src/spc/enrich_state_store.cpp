@@ -154,7 +154,7 @@ Result<int> SynthesizeEnrichAuditRows(
     int64_t now_unix) {
     if (!db) return Status::InvalidArgument("SynthesizeEnrichAuditRows: null db");
 
-    // Pass 1: child_ids that already have hype blocks (f38 done set).
+    // Pass 1: child_ids that already have hype blocks (hype done set).
     std::unordered_set<std::string> hype_sources;
     {
         sqlite3_stmt* st = nullptr;
@@ -172,7 +172,7 @@ Result<int> SynthesizeEnrichAuditRows(
     }
 
     // Pass 1.5 (P7): block_ids whose contextual dual-vector LABEL row exists.
-    // f35 "done" requires BOTH the columns (ctx_status==1) AND the ANN label —
+    // contextual "done" requires BOTH the columns (ctx_status==1) AND the ANN label —
     // a store that wrote the columns but never indexed the vector (pre-V2 data,
     // or a partially-lost index) must be re-owed or the contextualized path
     // never gets its votes. Defensive: when the table is absent (isolated
@@ -237,16 +237,16 @@ Result<int> SynthesizeEnrichAuditRows(
             if (!owed.empty()) owed += ",";
             owed += tok;
         };
-        if (configured_members.count("f03") && !has_score) owe("f03");
-        // f35 done ⇔ columns written AND the ANN label indexed (P7): columns-only
+        if (configured_members.count("enrich") && !has_score) owe("enrich");
+        // contextual done ⇔ columns written AND the ANN label indexed (P7): columns-only
         // data (pre-V2 / partial loss) is invisible to the contextualized path.
-        const bool f35_done =
+        const bool contextual_done =
             ctx_status == 1 &&
             (!ctx_labels_available || ctx_labels.count(block_id) > 0);
-        if (configured_members.count("f35") && !f35_done) owe("f35");
-        if (configured_members.count("f38") &&
+        if (configured_members.count("contextual") && !contextual_done) owe("contextual");
+        if (configured_members.count("hype") &&
             hype_sources.find(child_id) == hype_sources.end()) {
-            owe("f38");
+            owe("hype");
         }
         if (owed.empty()) continue;
         if (audit_skip.count(block_id)) continue;

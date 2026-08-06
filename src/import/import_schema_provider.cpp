@@ -14,13 +14,13 @@ namespace cortrix::import {
 // catalog SoT — V6 Stage 3 A32 aligned both to TEXT). IF NOT EXISTS everywhere so a
 // re-run on an already-migrated db is a no-op outside the migrator's version gate.
 const char* const kImportSchemaSql = R"SQL(
--- db_connections (F16a §4.1, D1): pre-registered DB credential refs. Stores only an
+-- db_connections (DB import §4.1, D1): pre-registered DB credential refs. Stores only an
 -- encrypted secret reference + non-sensitive metadata, never the raw DSN.
 CREATE TABLE IF NOT EXISTS db_connections (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     ref_id        TEXT UNIQUE NOT NULL,                          -- "db_conn_<ulid>"
     name          TEXT NOT NULL,                                 -- business-readable name
-    tenant_id     TEXT NOT NULL REFERENCES tenants(tenant_id),   -- F12 catalog SoT (TEXT PK)
+    tenant_id     TEXT NOT NULL REFERENCES tenants(tenant_id),   -- catalog SoT (TEXT PK)
 
     -- encrypted credential: a key id into the secret store, NOT the DSN itself.
     secret_key_id TEXT NOT NULL,
@@ -44,13 +44,13 @@ CREATE INDEX IF NOT EXISTS idx_db_connections_tenant ON db_connections(tenant_id
 CREATE INDEX IF NOT EXISTS idx_db_connections_active ON db_connections(tenant_id, expires_at)
     WHERE revoked_at IS NULL;
 
--- import_tasks (F16a §4.2, D6): one row per async import task (mimics the F42 task
--- table shape, but is F16a-owned — no dependency on F42's schema).
+-- import_tasks (DB import §4.2, D6): one row per async import task (mimics the async task
+-- table shape, but is DB import-owned — no dependency on async task's schema).
 CREATE TABLE IF NOT EXISTS import_tasks (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     task_id               TEXT UNIQUE NOT NULL,                        -- "import_<ulid>"
-    ns_id                 TEXT NOT NULL REFERENCES namespaces(ns_id),  -- F12 catalog SoT (TEXT PK)
-    tenant_id             TEXT NOT NULL REFERENCES tenants(tenant_id), -- F12 catalog SoT (TEXT PK)
+    ns_id                 TEXT NOT NULL REFERENCES namespaces(ns_id),  -- catalog SoT (TEXT PK)
+    tenant_id             TEXT NOT NULL REFERENCES tenants(tenant_id), -- catalog SoT (TEXT PK)
 
     -- request parameters.
     connection_ref_id     TEXT NOT NULL,                               -- references db_connections.ref_id

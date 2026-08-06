@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS parents (
     byte_offset_end   INTEGER NOT NULL,
     metadata_json    TEXT NOT NULL,
     created_at   INTEGER NOT NULL,
-    -- D8 reserved (V1.0 neither written nor read, Phase 2 F43 per-parent hotness)
+    -- D8 reserved (V1.0 neither written nor read, Phase 2 per-parent hotness)
     access_count    INTEGER NOT NULL DEFAULT 0,
     last_access_at  INTEGER,
     hotness_score   REAL NOT NULL DEFAULT 0.0

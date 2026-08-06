@@ -27,7 +27,7 @@ void MemoryExtractionService::Start() {
     if (started_ || !enabled()) return;
     queue_.StartWorkers([this](const MemoryQueueItem& item) { return HandleItem(item); });
     started_ = true;
-    CORTRIX_LOG_INFO("mem02", "memory extraction workers started ({} workers)",
+    CORTRIX_LOG_INFO("memory", "memory extraction workers started ({} workers)",
                      queue_.worker_count());
 }
 
@@ -64,7 +64,7 @@ MemoryExtractionResult MemoryExtractionService::ExtractOne(
     // all NS-scoped). A vanished / unavailable namespace is not retryable.
     resource::NamespaceFacade facade(pool_, ns);
     if (Status acq = facade.Acquire(); !acq.ok()) {
-        CORTRIX_LOG_WARN("mem02",
+        CORTRIX_LOG_WARN("memory",
             "extraction skipped — namespace '{}' not available: {}", ns, acq.message());
         return result;  // ok() == true → no retry
     }
@@ -112,7 +112,7 @@ MemoryExtractionResult MemoryExtractionService::ExtractOne(
     // turn is the minimal correct extraction unit.
     result = extractor.Extract(interaction, ctx);
     if (!result.ok()) {
-        CORTRIX_LOG_WARN("mem02", "extraction failed for interaction {}: {}",
+        CORTRIX_LOG_WARN("memory", "extraction failed for interaction {}: {}",
                          interaction.id, result.error->message);
     }
     return result;

@@ -41,7 +41,7 @@ for i in $(seq 1 60); do
 done
 [ -n "$ok" ] && pass "health reachable (HTTP $code)" || die "health unreachable after 180s"
 
-echo "── 2. /ready structure (F20 ReadinessRegistry via F24 route)"
+echo "── 2. /ready structure (ReadinessRegistry via the deploy route)"
 curl -s "$BASE/api/v1/system/health/ready" > /tmp/smoke_ready
 python3 - <<'EOF' || die "/ready structure"
 import json

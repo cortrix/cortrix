@@ -36,7 +36,7 @@ public:
     /// @param scheduler borrowed task scheduler (Enqueue; debounces by doc_id).
     /// @param workers   borrowed worker pool (Notify after enqueues); may be
     ///                  nullptr in tests (enqueue still happens, no wake).
-    /// @param config    borrowed IGlobalConfig for f42.enrich_sweep_interval_sec
+    /// @param config    borrowed IGlobalConfig for async.enrich_sweep_interval_sec
     ///                  (nullptr → default).
     EnrichRetrySweeper(resource::INamespacePool& pool,
                        async::TaskScheduler* scheduler,
@@ -65,7 +65,7 @@ public:
     /// TEST-ONLY: wake every `ms` instead of the configured interval.
     void set_test_interval_ms(int64_t ms) { test_interval_ms_ = ms; }
 
-    /// Effective sweep interval: `f42.enrich_sweep_interval_sec` KV when seeded
+    /// Effective sweep interval: `async.enrich_sweep_interval_sec` KV when seeded
     /// (yaml spc.enrich_sweep_interval_sec), else kDefaultSweepIntervalSec.
     /// Public so startup logging can report the value actually in force —
     /// the old log printed the compile-time constant and masked live knob
@@ -74,7 +74,7 @@ public:
 
 private:
     void RunLoop();
-    /// Per-NS per-tick doc cap: `f42.enrich_sweep_batch` KV when seeded (yaml
+    /// Per-NS per-tick doc cap: `async.enrich_sweep_batch` KV when seeded (yaml
     /// spc.enrich_sweep_batch), else the built-in kMaxDocsPerSweep.
     int MaxDocsPerSweep() const;
 

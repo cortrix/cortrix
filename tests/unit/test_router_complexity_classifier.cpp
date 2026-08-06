@@ -62,7 +62,7 @@ protected:
 TEST_F(RouterClassifierTest, IClassifierIdentity) {
     auto backend = std::make_shared<HeuristicComplexityBackend>();
     QueryComplexityClassifier c(backend, DefaultConfig());
-    EXPECT_EQ(c.Name(), "f39-complexity");
+    EXPECT_EQ(c.Name(), "routing-complexity");
     EXPECT_EQ(c.Labels(), (std::vector<std::string>{"simple", "complex", "chat"}));
     EXPECT_TRUE(c.IsAvailable());
 }

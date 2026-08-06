@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS operation_log (
     summary       TEXT,
 
     -- correlation chain (v1.0.6) — NULL allowed (cron / internal cleanup has no trace)
-    trace_id      VARCHAR(128),                -- topic 6 — F13 agent_trace.trace_id (same call)
-    session_id    VARCHAR(128)                 -- C2     — F13 agent_trace.session_id (same session)
+    trace_id      VARCHAR(128),                -- topic 6 — agent trace agent_trace.trace_id (same call)
+    session_id    VARCHAR(128)                 -- C2     — agent trace agent_trace.session_id (same session)
 );
 
 -- indices (§5.1: 2 baseline + 3 added by topic 2/6 + C2)

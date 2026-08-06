@@ -167,7 +167,7 @@ EnrichResult HyPEEnricher::Enrich(const std::string& chunk_text,
         result.status = 1;  // non-zero = failed (S5 maps to the EnricherErrorCode/§7)
         result.error_msg = q.status().message();
         result.error_meta.structured_data =
-            std::string("{\"enricher\":\"f38_hype\"}");
+            std::string("{\"enricher\":\"hype\"}");
     }
     return result;
 }

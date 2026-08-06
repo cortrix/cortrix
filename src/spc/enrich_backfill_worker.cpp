@@ -214,7 +214,7 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
     std::map<std::string, std::vector<const EnrichStateRow*>> groups;
     for (const auto& row : pending) {
         if (child_pos.find(row.child_id) == child_pos.end()) continue;  // stale row
-        groups[row.failed_members.empty() ? "f03,f35,f38" : row.failed_members]
+        groups[row.failed_members.empty() ? "enrich,contextual,hype" : row.failed_members]
             .push_back(&row);
     }
 
@@ -262,13 +262,13 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
             rep.block = children[child_pos[rep.row->child_id]];
             rep.owed_before = SplitCsv(members_csv);
             // Member-aware outcome (same rules as the ingest write phase).
-            bool f03_failed = false, f35_failed = false, f38_failed = false;
+            bool enrich_failed = false, contextual_failed = false, hype_failed = false;
             for (const auto& st : res[i].steps) {
                 if (st.skipped) continue;
                 if (st.status == 0) {
                     // Contextual fail-soft: status==0 with a populated error_code (see
                     // enricher_chain). Harvest it — this was the writer that left
-                    // 4,139 f35 debt rows with a blank last_error on the 2026-07-11
+                    // 4,139 contextual debt rows with a blank last_error on the 2026-07-11
                     // live 5k ingest (D12).
                     if (rep.last_error.empty() && !st.error_code.empty()) {
                         rep.last_error = st.error_code;
@@ -276,17 +276,17 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
                     continue;
                 }
                 const std::string tok = ChainMemberToken(st.name);
-                if (tok == "f38") f38_failed = true;
-                else if (tok == "f35") f35_failed = true;
-                else f03_failed = true;
+                if (tok == "hype") hype_failed = true;
+                else if (tok == "contextual") contextual_failed = true;
+                else enrich_failed = true;
                 if (rep.last_error.empty() && !st.error_code.empty()) {
                     rep.last_error = st.error_code;
                 }
             }
-            if (res[i].merged.contextualized_status == 2) f35_failed = true;
+            if (res[i].merged.contextualized_status == 2) contextual_failed = true;
             for (const auto& tok : rep.owed_before) {
-                if ((tok == "f03" && f03_failed) || (tok == "f35" && f35_failed) ||
-                    (tok == "f38" && f38_failed)) {
+                if ((tok == "enrich" && enrich_failed) || (tok == "contextual" && contextual_failed) ||
+                    (tok == "hype" && hype_failed)) {
                     rep.still_owed.push_back(tok);
                 }
             }
@@ -313,7 +313,7 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
     for (auto& rep : repairs) {
         // Contextual dual-vector point + label (skip when already indexed —
         // the crash-window guard; the columns update below is idempotent anyway).
-        if (owes(rep, "f35") && rep.merged.contextualized_embedding.has_value() &&
+        if (owes(rep, "contextual") && rep.merged.contextualized_embedding.has_value() &&
             !rep.merged.contextualized_embedding->empty()) {
             const uint64_t label = DeriveContextualVecLabel(rep.block->child_id);
             if (!GetContextualVecLabel(db, label).ok()) {
@@ -323,15 +323,15 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
             }
         }
         // HyPE blocks (skip children that already have them).
-        if (owes(rep, "f38") && !rep.hype.empty() &&
+        if (owes(rep, "hype") && !rep.hype.empty() &&
             existing_hype.find(rep.block->child_id) == existing_hype.end()) {
             std::vector<std::string> q_texts;
             for (const auto& q : rep.hype) q_texts.push_back(q.question_text);
             std::vector<EmbeddingResult> q_embs;
             Status qes = embedder_.EmbedBatch(q_texts, &q_embs);
             if (!qes.ok()) {
-                // Hype embed failure keeps f38 owed for the next retry round.
-                rep.still_owed.push_back("f38");
+                // Hype embed failure keeps hype owed for the next retry round.
+                rep.still_owed.push_back("hype");
                 if (rep.last_error.empty()) {
                     rep.last_error = "hype embedding failed: " + qes.message();
                 }
@@ -397,34 +397,34 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
     // the next round re-runs the idempotent write, instead of flipping the row to ok
     // with the columns permanently missing.
     for (auto& rep : repairs) {
-        if (owes(rep, "f03") && rep.merged.ok() &&
+        if (owes(rep, "enrich") && rep.merged.ok() &&
         !BlockHasEnrichedScore(db, rep.block->block_id)) {
             Status we = WriteEnrichment(db, rep.block->block_id, rep.merged);
             if (!we.ok()) {
-                CORTRIX_LOG_WARN("spc", "backfill F03 persist failed, keep owed block_id={}: {}",
+                CORTRIX_LOG_WARN("spc", "backfill enricher persist failed, keep owed block_id={}: {}",
                                  rep.block->block_id, we.message());
-                rep.still_owed.push_back("f03");
+                rep.still_owed.push_back("enrich");
                 // QA 2026-07-12 F-5: without this, the unconditional flip below
                 // rewrites the row's last_error from an empty rep.last_error and
                 // blanks the diagnosis ingest already recorded (the exact blank-
                 // last_error shape D12 closed on the ingest side).
                 if (rep.last_error.empty()) {
                     rep.last_error =
-                        "CX_ERR_SPC_PERSIST_FAILED[f03]: " + we.message();
+                        "CX_ERR_SPC_PERSIST_FAILED[enrich]: " + we.message();
                 }
             } else {
                 UpdateBlockMetadataSummary(db, rep.block->block_id, rep.merged.summary);
             }
         }
-        if (owes(rep, "f35")) {
+        if (owes(rep, "contextual")) {
             Status wc = WriteContextualized(db, rep.block->block_id, rep.merged);
             if (!wc.ok()) {
-                CORTRIX_LOG_WARN("spc", "backfill F35 persist failed, keep owed block_id={}: {}",
+                CORTRIX_LOG_WARN("spc", "backfill contextual enricher persist failed, keep owed block_id={}: {}",
                                  rep.block->block_id, wc.message());
-                rep.still_owed.push_back("f35");
+                rep.still_owed.push_back("contextual");
                 if (rep.last_error.empty()) {
                     rep.last_error =
-                        "CX_ERR_SPC_PERSIST_FAILED[f35]: " + wc.message();
+                        "CX_ERR_SPC_PERSIST_FAILED[contextual]: " + wc.message();
                 }
             }
         }

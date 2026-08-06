@@ -81,7 +81,7 @@ public:
         return out;
     }
     bool IsAvailable() const override { return true; }
-    std::string Name() const override { return "f35_contextual_retrieval"; }
+    std::string Name() const override { return "contextual_retrieval"; }
 };
 
 // A fake contextual-style enricher whose member FAILS while the step stays OK
@@ -95,7 +95,7 @@ public:
         r.contextualized_status = 2;  // failed (fail-soft: step status stays 0)
         r.error_msg = "output length 300 exceeds 2x max_output_tokens 80";
         r.error_meta.structured_data =
-            "{\"enricher\":\"f35_contextual_retrieval\"}";
+            "{\"enricher\":\"contextual_retrieval\"}";
         return r;
     }
     std::vector<EnrichResult> EnrichBatch(const std::vector<ChunkContext>& c) override {
@@ -105,7 +105,7 @@ public:
         return out;
     }
     bool IsAvailable() const override { return true; }
-    std::string Name() const override { return "f35_contextual_retrieval"; }
+    std::string Name() const override { return "contextual_retrieval"; }
 };
 
 // A fake enricher that always throws (exercises the fail-soft catch).
@@ -125,50 +125,50 @@ public:
 // ---------- ParseEnricherChainSpec ----------
 
 TEST(EnricherChainSpec, EmptyDefaultsToF03) {
-    EXPECT_EQ(ParseEnricherChainSpec(""), (std::vector<std::string>{"f03"}));
+    EXPECT_EQ(ParseEnricherChainSpec(""), (std::vector<std::string>{"enrich"}));
 }
 
 TEST(EnricherChainSpec, FullChainOrdered) {
-    EXPECT_EQ(ParseEnricherChainSpec("f03,f35,f38"),
-              (std::vector<std::string>{"f03", "f35", "f38"}));
+    EXPECT_EQ(ParseEnricherChainSpec("enrich,contextual,hype"),
+              (std::vector<std::string>{"enrich", "contextual", "hype"}));
 }
 
 TEST(EnricherChainSpec, EnricherAlwaysLeads) {
-    // f35 alone implies f03 first (GS-2: enricher leads).
-    EXPECT_EQ(ParseEnricherChainSpec("f35"), (std::vector<std::string>{"f03", "f35"}));
-    // f03 mentioned out of order is moved to the front.
-    EXPECT_EQ(ParseEnricherChainSpec("f38,f03"),
-              (std::vector<std::string>{"f03", "f38"}));
+    // contextual alone implies enrich first (GS-2: enricher leads).
+    EXPECT_EQ(ParseEnricherChainSpec("contextual"), (std::vector<std::string>{"enrich", "contextual"}));
+    // enrich mentioned out of order is moved to the front.
+    EXPECT_EQ(ParseEnricherChainSpec("hype,enrich"),
+              (std::vector<std::string>{"enrich", "hype"}));
 }
 
 TEST(EnricherChainSpec, UnknownTokensDropped) {
-    EXPECT_EQ(ParseEnricherChainSpec("f03, bogus ,f38"),
-              (std::vector<std::string>{"f03", "f38"}));
+    EXPECT_EQ(ParseEnricherChainSpec("enrich, bogus ,hype"),
+              (std::vector<std::string>{"enrich", "hype"}));
 }
 
 TEST(EnricherChainSpec, DedupAndTrimAndCase) {
-    EXPECT_EQ(ParseEnricherChainSpec(" F03 , f35 , f35 "),
-              (std::vector<std::string>{"f03", "f35"}));
+    EXPECT_EQ(ParseEnricherChainSpec(" enricher , contextual , contextual "),
+              (std::vector<std::string>{"enrich", "contextual"}));
 }
 
 // ---------- ResolveEnricherChain ----------
 
 TEST(EnricherChainResolve, NsOverrideWins) {
     InMemoryGlobalConfig g;
-    g.Set("enricher.chain", "f03");
-    auto out = ResolveEnricherChain(&g, R"({"enricher_chain":"f03,f35,f38"})");
-    EXPECT_EQ(out, (std::vector<std::string>{"f03", "f35", "f38"}));
+    g.Set("enricher.chain", "enrich");
+    auto out = ResolveEnricherChain(&g, R"({"enricher_chain":"enrich,contextual,hype"})");
+    EXPECT_EQ(out, (std::vector<std::string>{"enrich", "contextual", "hype"}));
 }
 
 TEST(EnricherChainResolve, GucUsedWhenNoNsOverride) {
     InMemoryGlobalConfig g;
-    g.Set("enricher.chain", "f03,f35");
+    g.Set("enricher.chain", "enrich,contextual");
     auto out = ResolveEnricherChain(&g, "");
-    EXPECT_EQ(out, (std::vector<std::string>{"f03", "f35"}));
+    EXPECT_EQ(out, (std::vector<std::string>{"enrich", "contextual"}));
 }
 
 TEST(EnricherChainResolve, DefaultWhenNothingSet) {
-    EXPECT_EQ(ResolveEnricherChain(nullptr, ""), (std::vector<std::string>{"f03"}));
+    EXPECT_EQ(ResolveEnricherChain(nullptr, ""), (std::vector<std::string>{"enrich"}));
 }
 
 // ---------- EnrichChunks (merge + fail-soft) ----------
@@ -209,14 +209,14 @@ TEST(EnricherChainRun, ContextualFailSoftCarriesErrorCodeInStepRecord) {
     // The member failure is recorded in the merged result...
     EXPECT_EQ(res[0].merged.contextualized_status, 2);
     // ...the step itself stays OK (fail-soft: chunk keeps original embedding)...
-    const EnricherStepOutcome* f35 = nullptr;
+    const EnricherStepOutcome* contextual = nullptr;
     for (const auto& s : res[0].steps)
-        if (s.name == "f35_contextual_retrieval") f35 = &s;
-    ASSERT_NE(f35, nullptr);
-    EXPECT_EQ(f35->status, 0);
-    EXPECT_FALSE(f35->skipped);
+        if (s.name == "contextual_retrieval") contextual = &s;
+    ASSERT_NE(contextual, nullptr);
+    EXPECT_EQ(contextual->status, 0);
+    EXPECT_FALSE(contextual->skipped);
     // ...but the cause is preserved for the debt-row writers (the fix).
-    EXPECT_EQ(f35->error_code, "output length 300 exceeds 2x max_output_tokens 80");
+    EXPECT_EQ(contextual->error_code, "output length 300 exceeds 2x max_output_tokens 80");
     // Enricher output unaffected by the contextual retrieval member failure.
     EXPECT_EQ(res[0].merged.summary, "kept");
 }

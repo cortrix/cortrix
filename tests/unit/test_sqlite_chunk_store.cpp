@@ -23,8 +23,8 @@ protected:
         ASSERT_EQ(sqlite3_open(":memory:", &db_), SQLITE_OK);
         ASSERT_EQ(sqlite3_exec(db_, kPerUnitFrameworkDdl, nullptr, nullptr, nullptr),
                   SQLITE_OK);
-        ParentChildSchemaProvider f34;
-        ASSERT_TRUE(f34.Migrate(db_, 0, 1).ok());
+        ParentChildSchemaProvider parent_child;
+        ASSERT_TRUE(parent_child.Migrate(db_, 0, 1).ok());
     }
     void TearDown() override { sqlite3_close(db_); }
 

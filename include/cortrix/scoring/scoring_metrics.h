@@ -13,7 +13,7 @@ namespace cortrix::scoring {
 ///
 /// v1.0.2: no ns_id label (on the OBS_SPEC §3.2 absolute deny list for high-cardinality labels) —
 /// per-NS data goes through the OBS_SPEC §3.4 system stats API
-/// (GET /api/v1/system/namespaces/<id>/f07_stats), not metric labels.
+/// (GET /api/v1/system/namespaces/<id>/scoring_stats), not metric labels.
 class ScoringMetrics {
 public:
     /// Process-wide instance (metrics are global counters).

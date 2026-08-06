@@ -340,5 +340,5 @@ std::unique_ptr<FileWatcher> FileWatcher::Create() {
 }  // namespace cortrix
 
 #else
-#error "Unsupported platform: F05 requires macOS or Linux"
+#error "Unsupported platform: namespace pool requires macOS or Linux"
 #endif

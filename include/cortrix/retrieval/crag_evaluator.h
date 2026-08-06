@@ -39,7 +39,7 @@ public:
 
     // --- IClassifier ---
     ClassificationResult Classify(const ClassifierInput& input) override;
-    std::string Name() const override { return "f37-crag"; }
+    std::string Name() const override { return "crag-crag"; }
     std::vector<std::string> Labels() const override {
         return {"correct", "ambiguous", "incorrect"};
     }

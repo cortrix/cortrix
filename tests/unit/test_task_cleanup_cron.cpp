@@ -59,8 +59,8 @@ TEST(TaskCleanupCronRunTest, RunCleanupNowSweepsZombiesAndDeletesExpired) {
     // < now - threshold). With threshold 0 the cutoff == now, so we let ~1.1s
     // elapse to push the rows' updated_at strictly before "now" on the sweep.
     InMemoryGlobalConfig cfg;
-    cfg.Set("f42.task_retention_days", "0");          // delete terminal older than now
-    cfg.Set("f42.zombie_task_threshold_hours", "0");  // processing older than now = zombie
+    cfg.Set("async.task_retention_days", "0");          // delete terminal older than now
+    cfg.Set("async.zombie_task_threshold_hours", "0");  // processing older than now = zombie
     std::this_thread::sleep_for(std::chrono::milliseconds(1100));
 
     TaskCleanupCron cron(&mgr, &cfg);
@@ -116,9 +116,9 @@ TEST(TaskCleanupCronRunTest, RunCleanupNowReportsTimedOutViaOutParam) {
     InMemoryGlobalConfig cfg;
     // Negative timeout pushes the cutoff into the future so started_at < cutoff is
     // unconditionally true (avoids same-second flakiness with timeout=0).
-    cfg.Set("f42.task_timeout_seconds", "-10");
-    cfg.Set("f42.zombie_task_threshold_hours", "9999");  // zombie window far out → no zombie
-    cfg.Set("f42.task_retention_days", "9999");          // nothing deleted
+    cfg.Set("async.task_timeout_seconds", "-10");
+    cfg.Set("async.zombie_task_threshold_hours", "9999");  // zombie window far out → no zombie
+    cfg.Set("async.task_retention_days", "9999");          // nothing deleted
     TaskCleanupCron cron(&mgr, &cfg);
 
     int deleted = -1, zombies = -1, timed_out = -1;

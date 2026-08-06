@@ -123,7 +123,7 @@ Result<std::string> MemoryBlockAdapter::InsertMemoryBlock(const MemoryBlockRecor
         std::vector<std::pair<const float*, uint64_t>> pts{{emb.vector.data(), bid}};
         Status av = vec_index_->AddPoints(pts);
         if (!av.ok()) {
-            CORTRIX_LOG_WARN("mem02",
+            CORTRIX_LOG_WARN("memory",
                 "memory vector index add failed for block {}: {}", block.block_id,
                 av.message());
         }

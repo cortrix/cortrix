@@ -6,7 +6,7 @@
 
 namespace cortrix::memory::immunity {
 
-/// The `mem04` subsystem metrics (observability naming,
+/// The `memory_opt_out` subsystem metrics (observability naming,
 /// naming `cortrix_memory_opt_out_<event>_<unit>`). Mirrors the memory_metrics.h /
 /// memory_extract_metrics.h template (process-wide singleton, atomic counters, OpenMetrics
 /// renderer).

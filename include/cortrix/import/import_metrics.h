@@ -4,7 +4,7 @@
 
 namespace cortrix::import {
 
-/// Database-import observability metrics (subsystem `f16a`).
+/// Database-import observability metrics (subsystem `import`).
 /// Naming `cortrix_import_<metric>_<unit>`. Self-contained dependency-free recorder
 /// (same pattern as RerankerMetrics / OnnxMetrics); registering into the
 /// `/metrics` scrape endpoint is cross-Feature wiring → D3.5.

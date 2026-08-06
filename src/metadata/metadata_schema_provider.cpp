@@ -22,9 +22,9 @@ CREATE TABLE IF NOT EXISTS metadata_blocks (
     metadata_json TEXT NOT NULL,                       -- D2/D9 + V2 remediation: complete 26-field JSON
     created_at    INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER) * 1000)
     -- D9 B' compromise: V1.0 immutable schema; Phase 2 adds block_version / updated_at
-    --             + F08 Block Versioning + Update API Feature.
+    --             + Block Versioning + Update API Feature.
     -- D3.5: FOREIGN KEY (doc_id) REFERENCES documents(doc_id) — pending doc_id type
-    --       reconciliation (documents.doc_id INTEGER vs F08 TEXT ULID).
+    --       reconciliation (documents.doc_id INTEGER vs metadata block TEXT ULID).
 );
 
 CREATE INDEX IF NOT EXISTS idx_metablocks_ns ON metadata_blocks(namespace_id, created_at);

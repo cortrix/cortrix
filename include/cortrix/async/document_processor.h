@@ -54,7 +54,7 @@ public:
 
     /// @param mgr     borrowed TaskManager (progress persistence + finalization)
     /// @param factory borrowed parser factory (the real parse engine)
-    /// @param config  borrowed IGlobalConfig for f42.async_max_pages (parser cap);
+    /// @param config  borrowed IGlobalConfig for async.async_max_pages (parser cap);
     ///                nullptr → kDefaultAsyncMaxPages
     /// @param cancel_checker how to poll the cancel flag (defaults to GetTask)
     /// @param spc_mgr  optional SPC entry: when set, a successful
@@ -78,7 +78,7 @@ public:
     /// the error Status otherwise) so the caller (worker) can log/observe.
     Status ProcessTask(const TaskInfo& task) override;
 
-    /// f42.async_max_pages default (§4.0 topic 1.3 — async-path page cap).
+    /// async.async_max_pages default (§4.0 topic 1.3 — async-path page cap).
     static constexpr int kDefaultAsyncMaxPages = 2000;
 
 private:

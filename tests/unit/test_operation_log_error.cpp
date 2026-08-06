@@ -58,7 +58,7 @@ TEST(OplogErrorTest, NoQuotaExceededCode) {
         const OplogErrorInfo& info = GetOplogErrorInfo(code);
         EXPECT_STRNE(info.cx_code, "CX_ERR_OPLOG_QUOTA_EXCEEDED");
         EXPECT_NE(info.category, ErrorCategory::kQuota)
-            << info.cx_code << ": F18a §7.2 has no quota-category code";
+            << info.cx_code << ": operation log §7.2 has no quota-category code";
     }
 }
 

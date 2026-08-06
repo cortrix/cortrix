@@ -135,7 +135,7 @@ TEST(JwtRotateTest, AcceptSecretsSkipsExpiredPrevBeforeCron) {
 // `JwtSecret_Persist_AcrossRestart` after a rotation: the rotated current loads.
 TEST(JwtRotateTest, RotatedCurrentPersistsAcrossRestart) {
     ::unsetenv("CORTRIX_JWT_SECRET");
-    const std::string path = std::string(::testing::TempDir()) + "p08_rotate_restart.db";
+    const std::string path = std::string(::testing::TempDir()) + "auth_rotate_restart.db";
     std::remove(path.c_str());
 
     std::string rotated;

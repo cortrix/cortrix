@@ -15,7 +15,7 @@
 
 // Additional branch coverage for DefaultINSRouter targeting regions that earlier
 // tests left untouched (confirmed via gcov line-by-line):
-//   - the namespace pool admission hook (f05_pool_ != nullptr): both the admit-success arm AND
+//   - the namespace pool admission hook (ns_pool_ != nullptr): both the admit-success arm AND
 //     the admit-failure compensation arm (RemoveNamespaceCatalogRows, lines 256-260
 //     + 375-393) — earlier tests used a NULL pool so this whole region was
 //     dead.
@@ -108,7 +108,7 @@ protected:
 // ── namespace pool admission hook: success arm ───────────────────────────────
 
 // With an injected pool whose AdmitCreate succeeds, CreateNamespace runs the
-// catalog INSERT THEN calls pool.AdmitCreate (the f05_pool_ != nullptr true arm +
+// catalog INSERT THEN calls pool.AdmitCreate (the ns_pool_ != nullptr true arm +
 // admit.ok() arm) and returns Ok. Existing tests did not wire a pool, so this arm was
 // dead.
 TEST_F(NsRouterBranch2Test, CreateWithPoolAdmitSuccess) {
@@ -296,10 +296,10 @@ TEST_F(NsRouterBranch2Test, ListNamespacesLimitOnlyNoOffset) {
     EXPECT_EQ(r.value().results[0], "a");
 }
 
-// ── DeleteNamespace: the f05_pool_ present path ──────────────────────────────
+// ── DeleteNamespace: the ns_pool_ present path ──────────────────────────────
 
 // DeleteNamespace with an injected pool still soft-deletes (Phase-1 the eviction
-// hook is a no-op (void)f05_pool_ — but the pointer-present state differs from the
+// hook is a no-op (void)ns_pool_ — but the pointer-present state differs from the
 // NULL-pool round-1 path).
 TEST_F(NsRouterBranch2Test, DeleteNamespaceWithPoolPresent) {
     DefaultINSRouter router(catalog_.db(), &pool_);

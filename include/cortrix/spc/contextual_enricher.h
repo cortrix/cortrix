@@ -86,7 +86,7 @@ ContextualRetrievalConfig MergeNsOverride(const ContextualRetrievalConfig& base,
 /// use the self-contained ContextualRetrievalMetrics recorder (S7), not an
 /// IMetricsRegistry (which does not exist in the frozen tree — same reconcile
 /// made). Three-layer fallback (§7): L1 NullEnricher zero-config (the chain simply
-/// omits f35), L2 startup LLM-unavailable skip (IsAvailable()==false →
+/// omits contextual), L2 startup LLM-unavailable skip (IsAvailable()==false →
 /// status=skipped_no_llm), L3 transient retry+degrade (LLM/embedding failure →
 /// status=failed, fall back to the original child embedding).
 class ContextualRetrievalEnricher : public ISpcEnricher {
@@ -110,7 +110,7 @@ public:
     /// leaves entities/summary empty (this stage does no NER). status=0 even on a degrade
     /// (the chunk Block is still written upstream with the original embedding); the
     /// contextualized_status field carries the outcome (1/2/3) and error_meta
-    /// the Agent-friendly detail. enricher_name="f35_contextual_retrieval".
+    /// the Agent-friendly detail. enricher_name="contextual_retrieval".
     EnrichResult Enrich(const std::string& chunk_text,
                         const DocumentMetadata& doc_meta,
                         const ChunkContext& ctx) override;
@@ -124,7 +124,7 @@ public:
     bool IsAvailable() const override;
 
     /// Enricher name (EnrichResult.enricher_name, §5.1).
-    std::string Name() const override { return "f35_contextual_retrieval"; }
+    std::string Name() const override { return "contextual_retrieval"; }
 
     // --- contextual-specific API ---
 

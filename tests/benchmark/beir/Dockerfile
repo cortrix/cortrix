@@ -1,7 +1,7 @@
 # =============================================================
 # Test suite W2: BEIR benchmark container (design: test-suite-tests.md §3.2)
 # Owned by Benchmark Suite (D-R3 #481 cloud track); test suite provides
-# the integration point only — Release Gate triggers f44-benchmark.yml
+# the integration point only — Release Gate triggers benchmark-benchmark.yml
 # after D4 PASS (topic 5 coordination timing).
 # =============================================================
 FROM python:3.10-slim

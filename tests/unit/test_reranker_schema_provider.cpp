@@ -76,18 +76,18 @@ TEST(RerankerSchemaProviderTest, RerankerConfigColumnSuppliedByCatalogBaseSchema
     sqlite3* db = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
 
-    cortrix::catalog::CatalogSchemaProvider f12;
-    RerankerSchemaProvider f02;
+    cortrix::catalog::CatalogSchemaProvider catalog;
+    RerankerSchemaProvider score_fusion;
     cortrix::catalog::SchemaMigrator m;
-    m.Register(&f12);  // Catalog first (ARCH §1.3.bis.3 topological order)
-    m.Register(&f02);
+    m.Register(&catalog);  // Catalog first (ARCH §1.3.bis.3 topological order)
+    m.Register(&score_fusion);
 
     Status st = m.MigrateCatalog(db);
     ASSERT_TRUE(st.ok()) << st.message();
 
     auto cols = ColumnNames(db, "namespaces");
     EXPECT_NE(cols.find("reranker_config"), cols.end())
-        << "namespaces.reranker_config must be present (F12 base schema)";
+        << "namespaces.reranker_config must be present (catalog base schema)";
 
     EXPECT_EQ(m.CurrentVersion(db, "catalog"), cortrix::catalog::kCatalogSchemaVersion);
     EXPECT_EQ(m.CurrentVersion(db, "reranker"), 1);

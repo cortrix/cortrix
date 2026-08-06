@@ -43,7 +43,7 @@ Status SparseSchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
     if (from_ver == 0 && to_ver == 1) {
         if (db == nullptr) {
             return Status::InvalidArgument(
-                "CX_ERR_SCHEMA_VERSION_MISMATCH: F40 Migrate got null db");
+                "CX_ERR_SCHEMA_VERSION_MISMATCH: sparse retrieval Migrate got null db");
         }
         // sparse_inverted_index (per-NS SPLADE postings; child_id is a logical FK to
         // blocks.child_id under A — partial unique index can't bind a hard FK).

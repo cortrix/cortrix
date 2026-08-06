@@ -835,8 +835,8 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             // bad-request body. On success run the scatter (or the RagFusionStage
             // when Complex + rag_fusion enabled), then apply CRAG before
             // serializing. CragStage is a no-op on the Simple route (ShouldSkipF37).
-            QueryRequest f04_req;
-            Status parsed = CrossNsQueryHandler::ParseRequest(body, &f04_req);
+            QueryRequest cross_ns_req;
+            Status parsed = CrossNsQueryHandler::ParseRequest(body, &cross_ns_req);
             if (parsed.ok()) {
                 // ?explain (B/C-class transparency, QUERY_CONTEXT_SPEC §2 / GEN-Agent):
                 // the cross-NS request contract (ParseRequest) carries the retrieval
@@ -875,19 +875,19 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                 // needs top_n candidates, so widen the retrieval top_k and trim
                 // back to the Agent's requested top_k after the stage.
                 const bool use_llm_rerank = lr_cfg.enabled && llm_rerank_available;
-                const int requested_top_k = f04_req.top_k;
-                if (use_llm_rerank && f04_req.top_k < lr_cfg.top_n) {
-                    f04_req.top_k = lr_cfg.top_n;
+                const int requested_top_k = cross_ns_req.top_k;
+                if (use_llm_rerank && cross_ns_req.top_k < lr_cfg.top_n) {
+                    cross_ns_req.top_k = lr_cfg.top_n;
                     qctx.top_k = lr_cfg.top_n;
                 }
                 try {
                     CrossNsResponse resp =
                         use_rag_fusion
-                            ? rag_stage->Run(f04_req, auth_ctx, qctx, rag_cfg)
-                            : scatter->Execute(f04_req, auth_ctx, &qctx);
+                            ? rag_stage->Run(cross_ns_req, auth_ctx, qctx, rag_cfg)
+                            : scatter->Execute(cross_ns_req, auth_ctx, &qctx);
                     LlmRerankStage::ExplainState lr_es;
                     if (use_llm_rerank) {
-                        lr_es = llm_rerank_stage->Apply(&resp, f04_req.query, lr_cfg);
+                        lr_es = llm_rerank_stage->Apply(&resp, cross_ns_req.query, lr_cfg);
                         if (static_cast<int>(resp.results.size()) > requested_top_k) {
                             resp.results.resize(
                                 static_cast<std::size_t>(requested_top_k));
@@ -1029,7 +1029,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
         }
     ));
     CORTRIX_LOG_INFO("main",
-                     "cross-NS query + F39 routing mounted on POST /api/v1/query");
+                     "cross-NS query + query routing mounted on POST /api/v1/query");
 }
 
 }  // namespace cortrix::query

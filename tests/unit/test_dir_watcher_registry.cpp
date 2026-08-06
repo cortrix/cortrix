@@ -103,7 +103,7 @@ protected:
     void SetUp() override {
         namespace fs = std::filesystem;
         test_dir_ = fs::temp_directory_path() /
-                    ("cortrix_f21_reg_" + std::to_string(::getpid()));
+                    ("cortrix_dirwatch_reg_" + std::to_string(::getpid()));
         fs::remove_all(test_dir_);
         fs::create_directories(test_dir_);
         CreateFile("a.txt", "alpha");
@@ -114,7 +114,7 @@ protected:
         // store.db / catalog files are never seen by the importers' recursive scans.
         harness_ = std::make_unique<cortrix::test::NsPoolHarness>(
             fs::temp_directory_path() /
-            ("cortrix_f21_pool_" + std::to_string(::getpid())));
+            ("cortrix_dirwatch_pool_" + std::to_string(::getpid())));
 
         // The registry now creates namespaces through an INSRouter (catalog INSERT
         // + namespace pool AdmitCreate). Wire the mock router's CreateNamespace to actually
@@ -384,7 +384,7 @@ TEST_F(DirWatcherRegistryTest, ListWatches_MultiDir) {
 
     namespace fs = std::filesystem;
     auto dir2 = fs::temp_directory_path() /
-                ("cortrix_f21_dir2_" + std::to_string(::getpid()));
+                ("cortrix_dirwatch_dir2_" + std::to_string(::getpid()));
     fs::create_directories(dir2);
     { std::ofstream(dir2 / "c.txt") << "gamma"; }
     std::string canon2 = fs::canonical(dir2).string();
@@ -437,7 +437,7 @@ TEST_F(DirWatcherRegistryTest, SaveLoad_RoundTrip_V2) {
     EXPECT_CALL(spc_, Submit(_)).WillRepeatedly(Return(Status::Ok()));
     namespace fs = std::filesystem;
     auto dir2 = fs::temp_directory_path() /
-                ("cortrix_f21_rt2_" + std::to_string(::getpid()));
+                ("cortrix_dirwatch_rt2_" + std::to_string(::getpid()));
     fs::create_directories(dir2);
     { std::ofstream(dir2 / "c.txt") << "gamma"; }
 

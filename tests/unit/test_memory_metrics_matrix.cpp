@@ -14,7 +14,7 @@
 
 // ============================== memory extraction ============================
 namespace cortrix::memory {
-namespace mem02_matrix {
+namespace memory_extract_matrix {
 
 using ES = MemoryExtractMetrics::ExtractStatus;
 using TD = MemoryExtractMetrics::TokenDirection;
@@ -136,11 +136,11 @@ TEST_F(MemoryExtractFx, Reset) {
     EXPECT_EQ(m().QueueDepth(), 0);
 }
 
-}  // namespace mem02_matrix
+}  // namespace memory_extract_matrix
 
 // ============================== memory opt-out ===============================
 namespace immunity {
-namespace mem04_matrix {
+namespace memory_opt_out_matrix {
 
 using TB = MemoryOptOutMetrics::TriggeredBy;
 
@@ -197,11 +197,11 @@ TEST_F(MemoryOptOutFx, Reset) {
     EXPECT_EQ(m().ExtractSkippedCount(), 0u);
 }
 
-}  // namespace mem04_matrix
+}  // namespace memory_opt_out_matrix
 }  // namespace immunity
 
 // ============================== memory isolation =============================
-namespace mem05_matrix {
+namespace memory_isolation_matrix {
 
 using CR = MemoryIsolationMetrics::CheckResult;
 using AC = MemoryIsolationMetrics::Action;
@@ -319,12 +319,12 @@ TEST_F(MemoryIsolationFx, Reset) {
     EXPECT_EQ(m().MatchScopeExcludedCount(RE::kMismatch), 0u);
 }
 
-}  // namespace mem05_matrix
+}  // namespace memory_isolation_matrix
 }  // namespace cortrix::memory
 
 // ============================== memory transparency ==========================
 namespace cortrix::memory::transparency {
-namespace mem03_matrix {
+namespace memory_matrix {
 
 using Op = MemoryMetrics::Op;
 using OS = MemoryMetrics::OpStatus;
@@ -426,5 +426,5 @@ TEST_F(MemoryFx, Reset) {
     EXPECT_EQ(m().EditConflictCount(), 0u);
 }
 
-}  // namespace mem03_matrix
+}  // namespace memory_matrix
 }  // namespace cortrix::memory::transparency

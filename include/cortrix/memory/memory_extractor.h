@@ -184,7 +184,7 @@ public:
     }
 };
 
-/// Memory-extraction configuration (cortrix.yaml `mem02.*`). Defaults match the spec.
+/// Memory-extraction configuration (cortrix.yaml `memory_extract.*`). Defaults match the spec.
 struct MemoryExtractorConfig {
     bool enabled = true;                       ///< false = NullEnricher mode (LLM disabled)
     std::string llm_model = "gpt-4o-mini";     ///< default extraction model
@@ -215,7 +215,7 @@ public:
     /// @param block_store memory-block persistence seam (D3.5 real adapter)
     /// @param contradiction_query contradiction-retrieval seam over the read pipeline (D5)
     /// @param op_logger  operation logger (CE; real cortrix::observability::IOperationLogger)
-    /// @param config     mem02.* config
+    /// @param config     memory_extract.* config
     MemoryExtractor(std::shared_ptr<llm::ILlmClient> llm,
                     std::shared_ptr<IMemoryBlockStore> block_store,
                     std::shared_ptr<IContradictionQuery> contradiction_query,

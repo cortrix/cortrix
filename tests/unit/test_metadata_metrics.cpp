@@ -4,7 +4,7 @@
 
 #include "cortrix/metadata/metadata_metrics.h"
 
-// META block coverage: MetadataMetrics (OBSERVABILITY_SPEC subsystem `f08`) — the
+// META block coverage: MetadataMetrics (OBSERVABILITY_SPEC subsystem `metadata`) — the
 // metadata_block lifecycle counters/gauges/histograms META block drives standalone, and the
 // OpenMetrics Render() naming. Mirrors tests/unit/test_import_metrics.cpp style.
 namespace cortrix::metadata {

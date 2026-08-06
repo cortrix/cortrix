@@ -54,7 +54,7 @@ enum class MetricReason {
     kNsRoutingUnauthorized,
     kNsRoutingInvalidNs,
     kNsRoutingQuotaExceeded,
-    // f42_async.*
+    // async.*
     kTaskAsyncTaskCancelled,
     kTaskAsyncSchedulerBusy,
 };

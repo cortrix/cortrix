@@ -1,22 +1,21 @@
 import type { NamespaceConfigKey } from '../../types/api';
 
 // Catalog 11 *_config registry (catalog — schema section locks 11 columns). Each
-// entry maps a config column to its owning Feature, a human label, and an
+// entry maps a config column to a human label and an
 // example JSON shape (used as a placeholder / "insert example" hint in the
 // structured form). The UI treats every config as an opaque JSON blob — these
 // examples are guidance only, never enforced validation.
 //
 // Tab assignment follows web UI design § 8.2 (5 tabs). The original § 8.2 table
 // predates sparse_config + doc_summary_config (catalog→v1.0.8 added 4 of the
-// 11); we slot them by Feature semantics: sparse_config → Retrieval (sparse
-// retrieval), doc_summary_config → Processing (doc summary document summary index).
+// 11); we slot them by capability: sparse_config → Retrieval, doc_summary_config
+// → Processing.
 
 export type ConfigTab = 'retrieval' | 'processing' | 'memory' | 'advanced';
 
 export interface ConfigMeta {
   key: NamespaceConfigKey;
   label: string;
-  feature: string;
   tab: ConfigTab;
   example: Record<string, unknown>;
 }
@@ -25,21 +24,18 @@ export const CONFIG_META: ConfigMeta[] = [
   {
     key: 'reranker_config',
     label: 'Reranker',
-    feature: 'F02',
     tab: 'retrieval',
     example: { enabled: true, model: 'zerank-1-small', top_n: 20 },
   },
   {
     key: 'rag_fusion_config',
     label: 'RAG Fusion',
-    feature: 'F36',
     tab: 'retrieval',
     example: { enabled: true, variant_count: 3 },
   },
   {
     key: 'crag_config',
     label: 'CRAG',
-    feature: 'F37',
     tab: 'retrieval',
     example: {
       enabled: true,
@@ -51,7 +47,6 @@ export const CONFIG_META: ConfigMeta[] = [
   {
     key: 'complexity_config',
     label: 'Query Complexity',
-    feature: 'F39',
     tab: 'retrieval',
     example: {
       enabled: true,
@@ -63,7 +58,6 @@ export const CONFIG_META: ConfigMeta[] = [
   {
     key: 'sparse_config',
     label: 'Sparse Retrieval',
-    feature: 'F40',
     tab: 'retrieval',
     example: {
       enabled: true,
@@ -76,28 +70,24 @@ export const CONFIG_META: ConfigMeta[] = [
   {
     key: 'parser_config',
     label: 'Parser',
-    feature: 'F06',
     tab: 'processing',
     example: { strategy: 'layout-aware', ocr: false },
   },
   {
     key: 'enricher_config',
     label: 'Enricher',
-    feature: 'F03',
     tab: 'processing',
     example: { enabled: false },
   },
   {
     key: 'cleaning_config',
     label: 'Cleaning',
-    feature: 'F10',
     tab: 'processing',
     example: {},
   },
   {
     key: 'doc_summary_config',
     label: 'Document Summary Index',
-    feature: 'F41',
     tab: 'processing',
     example: {
       enabled: true,
@@ -110,14 +100,12 @@ export const CONFIG_META: ConfigMeta[] = [
   {
     key: 'memory_config',
     label: 'Memory',
-    feature: 'MEM01',
     tab: 'memory',
     example: { enabled: false },
   },
   {
     key: 'watcher_config',
     label: 'Watcher',
-    feature: 'F21',
     tab: 'advanced',
     example: { enabled: false },
   },

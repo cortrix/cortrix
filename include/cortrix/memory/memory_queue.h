@@ -51,7 +51,7 @@ using MemoryUnextractedSource = std::function<std::vector<InteractionLog>()>;
 
 class MemoryQueue {
 public:
-    /// Worker-pool + reliability config (`mem02.queue`).
+    /// Worker-pool + reliability config (`memory_extract.queue`).
     struct Config {
         int worker_count = 4;                 ///< resident worker threads (NS-level configurable)
         size_t queue_max_size = 10000;        ///< backpressure cap; push past it is rejected

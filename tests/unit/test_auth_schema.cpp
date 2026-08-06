@@ -85,7 +85,7 @@ TEST(AuthSchemaTest, AllIndexesCreated) {
 // the migrator's schema_version gate). Use an on-disk file so the second Open
 // re-reads a persisted schema_version row.
 TEST(AuthSchemaTest, Idempotent) {
-    const std::string path = std::string(::testing::TempDir()) + "p08_idempotent.db";
+    const std::string path = std::string(::testing::TempDir()) + "auth_idempotent.db";
     std::remove(path.c_str());
 
     {

@@ -18,8 +18,8 @@ namespace cortrix::async {
 /// ProcessTask → TaskScheduler::OnTaskCompleted(doc_id). When the queue is empty
 /// a worker blocks on a condition variable until Notify() (a new Enqueue) or Stop().
 ///
-/// Sizing (topic 1.1 / 1.2 B): worker count = f42.worker_pool_size (default 2),
-/// and Start() ENFORCES worker_pool_size ≤ f06.parser_max_concurrent — exceeding
+/// Sizing (topic 1.1 / 1.2 B): worker count = async.worker_pool_size (default 2),
+/// and Start() ENFORCES worker_pool_size ≤ parser.parser_max_concurrent — exceeding
 /// it is a fatal misconfiguration (Start returns CX_ERR_INVALID_REQUEST rather
 /// than the spec's LOG_FATAL/exit, so the server/tests fail fast without aborting
 /// the process under test). Hot-reload of the pool size via the admin API is
@@ -34,8 +34,8 @@ namespace cortrix::async {
 class WorkerPool {
 public:
     /// @param scheduler borrowed TaskScheduler (the queue + per-doc_id mutex)
-    /// @param config    borrowed IGlobalConfig for f42.worker_pool_size /
-    ///                  f06.parser_max_concurrent (nullptr → defaults)
+    /// @param config    borrowed IGlobalConfig for async.worker_pool_size /
+    ///                  parser.parser_max_concurrent (nullptr → defaults)
     /// Register per-task_type handlers via RegisterHandler() before Start().
     WorkerPool(TaskScheduler* scheduler, const IGlobalConfig* config);
 
@@ -51,7 +51,7 @@ public:
 
     /// Start `worker_pool_size` worker threads after enforcing the parser-cap
     /// invariant (topic 1.2). Returns CX_ERR_INVALID_REQUEST (InvalidArgument) if
-    /// worker_pool_size > f06.parser_max_concurrent. No-op if already started.
+    /// worker_pool_size > parser.parser_max_concurrent. No-op if already started.
     Status Start();
 
     /// Stop and join all workers (drains nothing new; in-flight ProcessTask runs
@@ -68,12 +68,12 @@ public:
     /// before Start() for the enforce check + tests.
     int ConfiguredPoolSize() const;
 
-    /// f06.parser_max_concurrent as seen by the enforce check (topic 1.2).
+    /// parser.parser_max_concurrent as seen by the enforce check (topic 1.2).
     int ParserMaxConcurrent() const;
 
-    /// f42.* / f06.* defaults (§4.0) when config absent / malformed.
-    static constexpr int kDefaultPoolSize = 2;            ///< f42.worker_pool_size
-    static constexpr int kDefaultParserMaxConcurrent = 4; ///< f06.parser_max_concurrent
+    /// async.* / parser.* defaults (§4.0) when config absent / malformed.
+    static constexpr int kDefaultPoolSize = 2;            ///< async.worker_pool_size
+    static constexpr int kDefaultParserMaxConcurrent = 4; ///< parser.parser_max_concurrent
 
 private:
     void WorkerLoop(int worker_id);

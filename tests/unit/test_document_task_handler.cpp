@@ -75,7 +75,7 @@ TEST_F(DocumentTaskHandlerTest, CeLargeDocRejected403MaxPages) {
 }
 
 TEST_F(DocumentTaskHandlerTest, OverEntCapRejectedForEveryone) {
-    cfg_.Set("f42.async_max_pages", "2000");
+    cfg_.Set("async.async_max_pages", "2000");
     auto r = handler_->SubmitAsync(MakeParams("docHuge", /*pages=*/3000, /*ent=*/true));
     EXPECT_EQ(r.status, 403);
     EXPECT_EQ(r.body["error"]["code"], "CX_ERR_MAX_PAGES_EXCEEDED");
@@ -114,7 +114,7 @@ TEST_F(DocumentTaskHandlerTest, MissingFilenameRejected400) {
 // async-overflow arm (round-1 used the sync-only path; this pins the
 // async_overflow==true label explicitly).
 TEST_F(DocumentTaskHandlerTest, OverHardCapLabelsAsyncOverflow) {
-    cfg_.Set("f42.async_max_pages", "1000");
+    cfg_.Set("async.async_max_pages", "1000");
     auto r = handler_->SubmitAsync(MakeParams("docHugeEnt", 5000, /*ent=*/true));
     EXPECT_EQ(r.status, 403);
     EXPECT_EQ(r.body["error"]["structured_data"]["async_overflow"], true);
@@ -122,14 +122,14 @@ TEST_F(DocumentTaskHandlerTest, OverHardCapLabelsAsyncOverflow) {
 
 // Over the Ent hard cap as a CE caller: the edition ternary's "CE" arm.
 TEST_F(DocumentTaskHandlerTest, OverEntCapAsCeLabelsCe) {
-    cfg_.Set("f42.async_max_pages", "1000");
+    cfg_.Set("async.async_max_pages", "1000");
     auto r = handler_->SubmitAsync(MakeParams("docHugeCe", 5000, /*ent=*/false));
     EXPECT_EQ(r.status, 403);
     EXPECT_EQ(r.body["error"]["structured_data"]["async_overflow"], false);
 }
 
 TEST_F(DocumentTaskHandlerTest, ThresholdConfigurable) {
-    cfg_.Set("f42.async_threshold_pages", "100");
+    cfg_.Set("async.async_threshold_pages", "100");
     // 150 pages > 100 threshold → async overflow path.
     auto r = handler_->SubmitAsync(MakeParams("docT", 150, true));
     EXPECT_EQ(r.status, 202);

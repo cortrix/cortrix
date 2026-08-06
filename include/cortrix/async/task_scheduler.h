@@ -25,14 +25,14 @@ namespace cortrix::async {
 /// table (TaskManager::RequeueStaleProcessing / SweepZombies).
 ///
 /// Standalone (D3): real and fully tested against an in-memory TaskManager. The
-/// debounce window comes from IGlobalConfig f42.watcher_debounce_seconds (§4.0)
+/// debounce window comes from IGlobalConfig async.watcher_debounce_seconds (§4.0)
 /// with a documented default; admin-API hot-reload → next Enqueue picks it up.
 ///
 /// Thread-safe: Enqueue / Dequeue / OnTaskCompleted serialize on mutex_.
 class TaskScheduler {
 public:
     /// @param mgr    borrowed TaskManager (must outlive this scheduler)
-    /// @param config borrowed IGlobalConfig for f42.watcher_debounce_seconds
+    /// @param config borrowed IGlobalConfig for async.watcher_debounce_seconds
     ///               (nullptr → kDefaultDebounceSeconds)
     TaskScheduler(TaskManager* mgr, const IGlobalConfig* config);
 
@@ -78,7 +78,7 @@ public:
         unadopted_input_releaser_ = std::move(fn);
     }
 
-    /// f42.watcher_debounce_seconds default (§4.0, topic 2.2 C) when config absent.
+    /// async.watcher_debounce_seconds default (§4.0, topic 2.2 C) when config absent.
     static constexpr int kDefaultDebounceSeconds = 5;
 
 private:

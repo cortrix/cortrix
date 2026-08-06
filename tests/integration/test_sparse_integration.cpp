@@ -17,7 +17,7 @@
 // 7/8 (the ones that don't need a real model/BEIR dataset — those are D3.5):
 //   embed (dense+sparse) -> serialize round-trip -> index Add -> Search ->
 //   5-path RRF fuse -> L2 fallback degrade.
-// Real ONNX inference + BEIR Recall@10 (+3pp) = D3.5 (see bench_f40_sparse +
+// Real ONNX inference + BEIR Recall@10 (+3pp) = D3.5 (see bench_sparse +
 // detailed-design §13.bis 2.3).
 namespace cortrix::retrieval {
 namespace {

@@ -129,7 +129,7 @@ Status MemoryStore::Init(const std::string& db_path) {
     // can read a session whose calls span namespaces. Idempotent; failure here is
     // non-fatal to the memory path — source attribution degrades but
     // sessions/interactions keep working.
-    if (Status f13 = CreateAgentTraceObservabilityTables(); !f13.ok()) {
+    if (Status st = CreateAgentTraceObservabilityTables(); !st.ok()) {
         // log-and-continue: do not block memory.db init on the observability tables.
     }
 
@@ -226,12 +226,12 @@ Status MemoryStore::MigrateMemoryOptOutColumns() {
     if (!add_column_if_missing(
             "memory_sessions", "opt_out_at",
             "ALTER TABLE memory_sessions ADD COLUMN opt_out_at TEXT DEFAULT NULL")) {
-        return Status::Internal("MEM04: add memory_sessions.opt_out_at failed");
+        return Status::Internal("memory opt-out: add memory_sessions.opt_out_at failed");
     }
     if (!add_column_if_missing(
             "memory_sessions", "opted_out_by",
             "ALTER TABLE memory_sessions ADD COLUMN opted_out_by TEXT DEFAULT NULL")) {
-        return Status::Internal("MEM04: add memory_sessions.opted_out_by failed");
+        return Status::Internal("memory opt-out: add memory_sessions.opted_out_by failed");
     }
     // Partial index on opted-out sessions only (keeps the
     // is_session_opted_out + opted-out enumeration cheap without bloating the index
@@ -240,7 +240,7 @@ Status MemoryStore::MigrateMemoryOptOutColumns() {
             "CREATE INDEX IF NOT EXISTS idx_memory_sessions_opt_out_at "
             "ON memory_sessions(opt_out_at) WHERE opt_out_at IS NOT NULL")
         != SQLITE_OK) {
-        return Status::Internal("MEM04: index memory_sessions.opt_out_at failed");
+        return Status::Internal("memory opt-out: index memory_sessions.opt_out_at failed");
     }
 
     // interaction_log += remember (opt-out migration). DEFAULT TRUE: existing rows and
@@ -248,7 +248,7 @@ Status MemoryStore::MigrateMemoryOptOutColumns() {
     if (!add_column_if_missing(
             "interaction_log", "remember",
             "ALTER TABLE interaction_log ADD COLUMN remember BOOLEAN DEFAULT 1")) {
-        return Status::Internal("MEM04: add interaction_log.remember failed");
+        return Status::Internal("memory opt-out: add interaction_log.remember failed");
     }
     return Status::Ok();
 }

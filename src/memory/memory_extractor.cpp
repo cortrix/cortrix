@@ -171,7 +171,7 @@ MemoryExtractor::ParseJudgmentJson(const std::string& llm_output) const {
 
 MemoryExtractionResult MemoryExtractor::DisabledResult(const std::string& interaction_id) const {
     MemoryExtractionResult r;
-    nlohmann::json sd = {{"reason", "mem02.enabled=false (NullEnricher mode)"}};
+    nlohmann::json sd = {{"reason", "memory_extract.enabled=false (NullEnricher mode)"}};
     if (!interaction_id.empty()) sd["interaction_id"] = interaction_id;
     r.error = MakeMemoryExtractError(MemoryExtractErrorCode::kLlmDisabled, sd,
                              "LLM memory extraction is disabled for this namespace");

@@ -1,3 +1,4 @@
+#include <regex>
 #include <gtest/gtest.h>
 
 #include <string>
@@ -7,7 +8,7 @@
 // MET-10 coverage: the 6 cortrix_tasks_* metrics — counters/gauge/
 // histogram recording + the OpenMetrics renderer + label-enum discipline
 // (OBS_SPEC §3.2 no high-cardinality labels). Note metric names are
-// `cortrix_tasks_*`, NOT `cortrix_f42_*` (the locked OBS_SPEC §2.3 names).
+// `cortrix_tasks_*` (the locked OBS_SPEC §2.3 names).
 namespace cortrix::async {
 namespace {
 
@@ -73,14 +74,15 @@ TEST_F(TaskMetricsTest, RenderOpenMetricsHasAllSixMetricsAndTypes) {
     M().RecordCancel(CancelPhase::kPreDequeue);
 
     std::string out = M().RenderOpenMetrics();
-    // All 6 metric names present (cortrix_tasks_*, NOT cortrix_f42_*).
+    // All 6 metric names present, all under the cortrix_tasks_ prefix.
     EXPECT_NE(out.find("cortrix_tasks_submitted_total"), std::string::npos);
     EXPECT_NE(out.find("cortrix_tasks_completed_total"), std::string::npos);
     EXPECT_NE(out.find("cortrix_tasks_duration_seconds"), std::string::npos);
     EXPECT_NE(out.find("cortrix_tasks_queue_depth"), std::string::npos);
     EXPECT_NE(out.find("cortrix_tasks_zombie_cleaned_total"), std::string::npos);
     EXPECT_NE(out.find("cortrix_tasks_cancel_total"), std::string::npos);
-    EXPECT_EQ(out.find("cortrix_f42_"), std::string::npos);  // never the f42 prefix
+    // No metric name may embed a tracking-style label.
+    EXPECT_FALSE(std::regex_search(out, std::regex(R"(cortrix_(f|mem|p)[0-9]{2})")));
     // TYPE lines (counter / gauge / histogram).
     EXPECT_NE(out.find("# TYPE cortrix_tasks_submitted_total counter"), std::string::npos);
     EXPECT_NE(out.find("# TYPE cortrix_tasks_queue_depth gauge"), std::string::npos);

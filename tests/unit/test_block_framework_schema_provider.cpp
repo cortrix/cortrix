@@ -129,7 +129,7 @@ TEST(BlockFrameworkSchemaProviderTest, FrameworkDdlExecFailureReported) {
     // so sqlite3_exec != SQLITE_OK and Migrate returns CX_ERR_SCHEMA_MIGRATION_FAILED
     // (the DDL exec error branch). Materialize an on-disk DB, then reopen read-only.
     const std::string path =
-        std::string(::testing::TempDir()) + "f09_ro_" +
+        std::string(::testing::TempDir()) + "block_ro_" +
         std::to_string(reinterpret_cast<uintptr_t>(&path)) + ".db";
     sqlite3* seed = nullptr;
     ASSERT_EQ(sqlite3_open(path.c_str(), &seed), SQLITE_OK);

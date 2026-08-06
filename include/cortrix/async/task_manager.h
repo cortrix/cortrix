@@ -149,7 +149,7 @@ public:
     /// → set status=failed + error_code=CX_ERR_TASK_TIMEOUT. Run AFTER SweepZombies
     /// so a 24h-stale (no-progress) row is recorded as a zombie rather than a
     /// timeout. Returns the row count timed out. (Driven by TaskCleanupCron, reading
-    /// f42.task_timeout_seconds; sub-daily prompt enforcement → D3.5 server runtime.)
+    /// async.task_timeout_seconds; sub-daily prompt enforcement → D3.5 server runtime.)
     Result<int> SweepTimedOut(int64_t now_unix, int timeout_seconds);
 
     /// Boundary — tasks left status=processing on a crash but younger than the zombie

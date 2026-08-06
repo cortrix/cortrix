@@ -129,7 +129,7 @@ StatusCode MemoryOptOutErrorToStatusCode(MemoryOptOutErrorCode code) {
         // missing admin scope → kPermissionDenied (the 403 surface).
         case MemoryOptOutErrorCode::kRevokeDenied:     return StatusCode::kPermissionDenied;
         // feature disabled by config (503) → kUnavailable (the request can succeed once
-        // mem04.enabled flips); rich category=permanent preserved via the CX_ERR_ token.
+        // memory_opt_out.enabled flips); rich category=permanent preserved via the CX_ERR_ token.
         case MemoryOptOutErrorCode::kOptOutDisabled:   return StatusCode::kUnavailable;
         // malformed session id / oversize metadata (422) → kInvalidArgument (the
         // request itself is invalid; not retryable as-is).

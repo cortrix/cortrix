@@ -207,7 +207,7 @@ AS $$
             r.get('created_at'),
             r.get('memory_type'),
             r.get('status'),
-            r.get('final_score'),    # MEM01: decayed ranking key
+            r.get('final_score'),    # memory decay: decayed ranking key
         )
 $$;
 

@@ -21,7 +21,7 @@ Two facts make self-correction safe:
   `blocks.metadata_json` and stamps the reason / confidence / triggering block —
   the content stays. Revoking restores `status = active`.
 - **Low-confidence invalidations are flagged.** When the judge's confidence is
-  below `mem02.invalidation.auto_revoke_confidence_threshold` (default `0.7`),
+  below `memory_extract.invalidation.auto_revoke_confidence_threshold` (default `0.7`),
   the old block is marked `auto_revoke_eligible = true`, so an Agent can find the
   shaky calls and review them proactively.
 

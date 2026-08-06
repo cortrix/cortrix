@@ -92,15 +92,15 @@ TEST(MetadataErrorTest, MakeErrorPopulatesAgentFriendlyFields) {
          {"namespace_id", "default"},
          {"stage", "block_text_assembly"},
          {"missing_fields", {"doc_metadata"}},
-         {"f06_parse_status", "failed"},
-         {"downstream_blocked", {"f34_chunker"}}},
+         {"parser_parse_status", "failed"},
+         {"downstream_blocked", {"parent_child_chunker"}}},
         "Failed to generate metadata block: doc_metadata is empty");
     EXPECT_EQ(err.code, "CX_ERR_METADATA_GEN_FAILED");
     EXPECT_FALSE(err.retryable);
     EXPECT_EQ(err.category, ErrorCategory::kPermanent);
     EXPECT_FALSE(err.retry_after_ms.has_value());
     ASSERT_TRUE(err.structured_data.has_value());
-    EXPECT_EQ((*err.structured_data)["f06_parse_status"], "failed");
+    EXPECT_EQ((*err.structured_data)["parser_parse_status"], "failed");
 
     // Serializes to the §3.1 error body shape (retry_after_ms → JSON null).
     auto body = agent_friendly::ToJson(err);
@@ -126,7 +126,7 @@ TEST(MetadataErrorTest, RequiredStructuredDataContract) {
     nlohmann::json gen_full = {
         {"doc_id", "d"}, {"namespace_id", "n"}, {"stage", "s"},
         {"missing_fields", nlohmann::json::array()},
-        {"f06_parse_status", "failed"},
+        {"parser_parse_status", "failed"},
         {"downstream_blocked", nlohmann::json::array()}};
     EXPECT_TRUE(HasRequiredStructuredData(MetadataErrorCode::kGenFailed, gen_full));
     nlohmann::json gen_partial = {{"doc_id", "d"}};
@@ -137,7 +137,7 @@ TEST(MetadataErrorTest, RequiredStructuredDataContract) {
         {"doc_id", "d"}, {"namespace_id", "n"},
         {"attempted_fields", nlohmann::json::array()},
         {"v1_immutable_fields", nlohmann::json::array()},
-        {"phase2_feature", "F08 Block Versioning"},
+        {"phase2_feature", "Block Versioning"},
         {"workaround", "re-upload"}};
     EXPECT_TRUE(HasRequiredStructuredData(MetadataErrorCode::kFieldImmutable, imm_full));
     EXPECT_FALSE(HasRequiredStructuredData(MetadataErrorCode::kFieldImmutable,

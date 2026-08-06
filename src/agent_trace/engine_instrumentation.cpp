@@ -46,7 +46,7 @@ void EngineInstrumentation::Record(const EngineCall& call) {
             if (trace_writer_) trace_writer_->Write(e);
         } catch (...) {
             // C4: an observability fault must not break the business path.
-            metrics.RecordWriteFailed(AgentTraceMetrics::Module::kF13);
+            metrics.RecordWriteFailed(AgentTraceMetrics::Module::kAgentTrace);
         }
     }
 
@@ -68,7 +68,7 @@ void EngineInstrumentation::Record(const EngineCall& call) {
         try {
             op_logger_->Log(op);
         } catch (...) {
-            metrics.RecordWriteFailed(AgentTraceMetrics::Module::kF18a);
+            metrics.RecordWriteFailed(AgentTraceMetrics::Module::kOperationLog);
         }
     }
 }

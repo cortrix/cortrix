@@ -136,7 +136,7 @@ class NsPoolBranchTest : public ::testing::Test {
 protected:
     void SetUp() override {
         tmp_root_ = std::filesystem::temp_directory_path() /
-                    ("f05_pool_branch_" +
+                    ("ns_pool_branch_" +
                      std::to_string(reinterpret_cast<uintptr_t>(this)));
         std::filesystem::create_directories(tmp_root_);
         config_.data_root = tmp_root_.string();

@@ -37,7 +37,7 @@ enum class MemoryOptOutErrorCode {
     kAlreadyOptedOut,    ///< 409 CX_ERR_MEMOPTOUT_ALREADY_OPTED_OUT — permanent, not retryable (idempotent repeat)
     kNotOptedOut,        ///< 409 CX_ERR_MEMOPTOUT_NOT_OPTED_OUT — permanent, not retryable (revoke on an active session)
     kRevokeDenied,       ///< 403 CX_ERR_MEMOPTOUT_REVOKE_DENIED — auth, not retryable (revoke needs admin)
-    kOptOutDisabled,     ///< 503 CX_ERR_MEMOPTOUT_DISABLED — permanent, not retryable (mem04.enabled = false)
+    kOptOutDisabled,     ///< 503 CX_ERR_MEMOPTOUT_DISABLED — permanent, not retryable (memory_opt_out.enabled = false)
     kInvalidSessionId,   ///< 422 CX_ERR_MEMOPTOUT_INVALID_SESSION_ID — permanent, not retryable (not ULID/UUID)
     kMetadataTooLarge,   ///< 422 CX_ERR_MEMOPTOUT_METADATA_TOO_LARGE — permanent, not retryable (metadata JSON > 4KB)
 };

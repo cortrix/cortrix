@@ -32,7 +32,7 @@ class SpladeWriteTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // Temp file DB so a 2nd connection can verify row counts independently.
-        db_path_ = std::string(testing::TempDir()) + "/f40_splade_" +
+        db_path_ = std::string(testing::TempDir()) + "/sparse_splade_" +
                    std::to_string(reinterpret_cast<uintptr_t>(this)) + ".db";
         std::remove(db_path_.c_str());
         r_ = std::make_unique<SpladeSparseRetriever>(SpladeConfig{}, db_path_);

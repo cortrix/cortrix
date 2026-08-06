@@ -1042,7 +1042,7 @@ void RegisterMemoryRoutes(
         // trigger). The worker applies the double-check (opt-out / remember) and runs
         // the NS-scoped extractor. Disabled (no LLM) => no-op, interaction_log only. The
         // user turn carries `remember`; absent defaults to true (extract).
-        bool mem02_enqueued = false;
+        bool memory_extract_enqueued = false;
         if (extraction_svc && extraction_svc->enabled()) {
             InteractionLog turn;
             // Diagnostic identity for worker logs / dead-letter audit (the writer
@@ -1058,14 +1058,14 @@ void RegisterMemoryRoutes(
             turn.query_type = write_req.query_type;
             turn.status = write_req.response_status;
             turn.remember = body.value("remember", true);
-            mem02_enqueued = extraction_svc->Enqueue(turn);
+            memory_extract_enqueued = extraction_svc->Enqueue(turn);
         }
 
         json resp;
         resp["session_id"] = session_id;
         resp["turn"] = static_cast<int>(count / 2);
         resp["spc_enqueued"] = true;
-        resp["memory_extraction_enqueued"] = mem02_enqueued;
+        resp["memory_extraction_enqueued"] = memory_extract_enqueued;
         WriteJsonResponse(res, 201, resp);
     }));
 

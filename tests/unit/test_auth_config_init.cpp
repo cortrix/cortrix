@@ -56,7 +56,7 @@ TEST(JwtSecretServiceTest, AutoGenerateFirstStart) {
 // db loads the SAME secret, does NOT generate a new row.
 TEST(JwtSecretServiceTest, LoadExistingAcrossRestart) {
     ::unsetenv("CORTRIX_JWT_SECRET");
-    const std::string path = std::string(::testing::TempDir()) + "p08_jwt_restart.db";
+    const std::string path = std::string(::testing::TempDir()) + "auth_jwt_restart.db";
     std::remove(path.c_str());
 
     std::string first;
@@ -82,7 +82,7 @@ TEST(JwtSecretServiceTest, LoadExistingAcrossRestart) {
 // `JwtSecret_EnvOverride`: CORTRIX_JWT_SECRET set → that value is used + written
 // through as the sole current secret (advanced K8s/docker path, §2.11 step 1).
 TEST(JwtSecretServiceTest, EnvOverride) {
-    const std::string path = std::string(::testing::TempDir()) + "p08_jwt_env.db";
+    const std::string path = std::string(::testing::TempDir()) + "auth_jwt_env.db";
     std::remove(path.c_str());
 
     // Seed an auto-generated secret first, then restart WITH the env set: the env
@@ -158,7 +158,7 @@ TEST(AuthConfigServiceTest, LoadDefaultsFirstStart) {
 // Idempotent: a second LoadOrInitDefaults does not duplicate rows (already
 // populated → reload only).
 TEST(AuthConfigServiceTest, LoadDefaultsIdempotent) {
-    const std::string path = std::string(::testing::TempDir()) + "p08_cfg_idem.db";
+    const std::string path = std::string(::testing::TempDir()) + "auth_cfg_idem.db";
     std::remove(path.c_str());
 
     {

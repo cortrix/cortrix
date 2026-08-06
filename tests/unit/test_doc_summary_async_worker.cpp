@@ -65,7 +65,7 @@ protected:
 
         harness_ = std::make_unique<test::NsPoolHarness>(
             std::filesystem::temp_directory_path() /
-            ("f41_worker_" + std::to_string(reinterpret_cast<uintptr_t>(this))));
+            ("doc_summary_worker_" + std::to_string(reinterpret_cast<uintptr_t>(this))));
         ASSERT_TRUE(harness_->Admit("test-ns").ok());
 
         embedder_ = std::make_unique<OnnxEmbedder>("", 128);
@@ -83,7 +83,7 @@ protected:
         EXPECT_TRUE(f.Acquire().ok());
         CortrixDoc doc;
         doc.source_type = "test";
-        doc.source_path = "/f41/doc.txt";
+        doc.source_path = "/doc_summary/doc.txt";
         EXPECT_EQ(f.store().doc_create(doc), 0);
         BlockAssembler assembler;
         for (int i = 0; i < n_chunks; ++i) {

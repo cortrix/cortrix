@@ -54,8 +54,8 @@ class WorkerPoolDispatchTest : public ::testing::Test {
 protected:
     void SetUp() override {
         ASSERT_TRUE(mgr_.Init(":memory:").ok());
-        cfg_.Set("f42.worker_pool_size", "2");
-        cfg_.Set("f06.parser_max_concurrent", "4");
+        cfg_.Set("async.worker_pool_size", "2");
+        cfg_.Set("parser.parser_max_concurrent", "4");
         sched_ = std::make_unique<TaskScheduler>(&mgr_, &cfg_);
     }
 

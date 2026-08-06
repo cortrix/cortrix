@@ -223,7 +223,7 @@ EnrichResult ContextualRetrievalEnricher::Enrich(const std::string& chunk_text,
         result.contextualized_status = 2;  // failed
         result.error_msg = text.status().message();
         result.error_meta.structured_data =
-            std::string("{\"enricher\":\"f35_contextual_retrieval\"}");
+            std::string("{\"enricher\":\"contextual_retrieval\"}");
         metrics.RecordChunk(ContextualRetrievalMetrics::ChunkStatus::kFailed);
         return result;
     }

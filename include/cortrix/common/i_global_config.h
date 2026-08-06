@@ -55,7 +55,7 @@ public:
     int operation_log_max_rows         = 100000;  ///< CE 100K / Ent 0 (no limit)
     int agent_trace_retention_days     = 90;      ///< same for CE+Ent
     int interaction_log_retention_days = 180;     ///< CE 180 / Ent 365
-    int f13_mcp_idle_timeout_seconds   = 1800;    ///< 30 min
+    int agent_trace_mcp_idle_timeout_seconds   = 1800;    ///< 30 min
 };
 
 }  // namespace cortrix

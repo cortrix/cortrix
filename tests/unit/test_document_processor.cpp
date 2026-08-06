@@ -58,7 +58,7 @@ class DocumentProcessorTest : public ::testing::Test {
         // otherwise), so seed a real temp .pdf the injected stub will "parse".
         // Unique per test: parallel ctest processes must not share the stub
         // (a sibling's TearDown/remove yanks it mid-parse; F-1 race family).
-        filepath_ = std::string(::testing::TempDir()) + "f42_proc_test_" +
+        filepath_ = std::string(::testing::TempDir()) + "async_proc_test_" +
                     cortrix::test::SanitizedTestName() +
                     ".pdf";
         std::ofstream(filepath_) << "%PDF-1.4 stub";
@@ -219,7 +219,7 @@ TEST_F(DocumentProcessorTest, UsesEntMaxPagesFromConfig) {
         if (opts.on_page_progress) opts.on_page_progress(1, 1, true);
     });
     factory_->SetPrimaryParser(std::move(stub));
-    cfg_.Set("f42.async_max_pages", "1234");
+    cfg_.Set("async.async_max_pages", "1234");
     DocumentProcessor proc(&mgr_, factory_.get(), &cfg_);
     proc.ProcessTask(SeedProcessingTask("docMax"));
     EXPECT_EQ(seen_max, 1234);  // Issue 1.3 — async page cap from config

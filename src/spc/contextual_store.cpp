@@ -24,10 +24,10 @@ Status WriteContextualized(sqlite3* db, uint64_t block_id, const EnrichResult& r
     // default / pre-LLM state). contextualized_status != 0 means the stage ran (1
     // generated / 2 failed / 3 skipped_no_llm); an engaged contextualized_text /
     // embedding optional also signals real output even at status 0 transiently.
-    const bool f35_ran = result.contextualized_status != 0 ||
+    const bool contextual_ran = result.contextualized_status != 0 ||
                          result.contextualized_text.has_value() ||
                          result.contextualized_embedding.has_value();
-    if (!f35_ran) return Status::Ok();
+    if (!contextual_ran) return Status::Ok();
 
     // Pack the contextualized embedding (and the original dense embedding, dual-vector
     // double-vector coexistence) as contiguous float32 BLOBs. The original dense

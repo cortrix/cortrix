@@ -37,7 +37,7 @@ int64_t TaskCleanupCron::NextRunDelayMs(int64_t now_unix_ms) {
 
 int TaskCleanupCron::RetentionDays() const {
     if (config_) {
-        auto r = config_->GetInt("f42.task_retention_days");
+        auto r = config_->GetInt("async.task_retention_days");
         if (r.ok()) return r.value();
     }
     return kDefaultRetentionDays;
@@ -45,7 +45,7 @@ int TaskCleanupCron::RetentionDays() const {
 
 int TaskCleanupCron::ZombieHours() const {
     if (config_) {
-        auto r = config_->GetInt("f42.zombie_task_threshold_hours");
+        auto r = config_->GetInt("async.zombie_task_threshold_hours");
         if (r.ok()) return r.value();
     }
     return kDefaultZombieHours;
@@ -53,7 +53,7 @@ int TaskCleanupCron::ZombieHours() const {
 
 int TaskCleanupCron::TimeoutSeconds() const {
     if (config_) {
-        auto r = config_->GetInt("f42.task_timeout_seconds");
+        auto r = config_->GetInt("async.task_timeout_seconds");
         if (r.ok()) return r.value();
     }
     return kDefaultTimeoutSeconds;

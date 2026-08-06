@@ -28,7 +28,7 @@ std::string Lower(std::string s) {
 
 // Known enricher tokens (GS-2). Unknown tokens are dropped (fail-soft).
 bool IsKnownToken(const std::string& t) {
-    return t == "f03" || t == "f35" || t == "f38";
+    return t == "enrich" || t == "contextual" || t == "hype";
 }
 
 }  // namespace
@@ -43,15 +43,15 @@ std::vector<std::string> ParseEnricherChainSpec(const std::string& spec) {
         if (t.empty() || !IsKnownToken(t)) continue;
         if (seen.insert(t).second) out.push_back(t);
     }
-    // The `f03` enricher always leads. If any token is present but f03 is not, prepend it
-    // (`f35`/`f38` are chain peers AFTER `f03`). An empty/all-unknown spec defaults to
-    // the single-enricher {"f03"} chain (§7.1 L1).
-    if (out.empty()) return {"f03"};
-    if (std::find(out.begin(), out.end(), "f03") == out.end()) {
-        out.insert(out.begin(), "f03");
-    } else if (out.front() != "f03") {
-        out.erase(std::remove(out.begin(), out.end(), "f03"), out.end());
-        out.insert(out.begin(), "f03");
+    // The `enrich` enricher always leads. If any token is present but enrich is not, prepend it
+    // (`contextual`/`hype` are chain peers AFTER `enrich`). An empty/all-unknown spec defaults to
+    // the single-enricher {"enrich"} chain (§7.1 L1).
+    if (out.empty()) return {"enrich"};
+    if (std::find(out.begin(), out.end(), "enrich") == out.end()) {
+        out.insert(out.begin(), "enrich");
+    } else if (out.front() != "enrich") {
+        out.erase(std::remove(out.begin(), out.end(), "enrich"), out.end());
+        out.insert(out.begin(), "enrich");
     }
     return out;
 }
@@ -76,7 +76,7 @@ std::vector<std::string> ResolveEnricherChain(const IGlobalConfig* global,
             return ParseEnricherChainSpec(r.value());
         }
     }
-    return {"f03"};
+    return {"enrich"};
 }
 
 void EnricherChain::Append(std::shared_ptr<ISpcEnricher> enricher) {
@@ -100,9 +100,9 @@ std::vector<std::string> EnricherChain::Names() const {
 }
 
 std::string ChainMemberToken(const std::string& enricher_name) {
-    if (enricher_name == "hype") return "f38";
-    if (enricher_name == "f35_contextual_retrieval") return "f35";
-    return "f03";  // the head slot (LlmEnricher / LocalNer / test fakes)
+    if (enricher_name == "hype") return "hype";
+    if (enricher_name == "contextual_retrieval") return "contextual";
+    return "enrich";  // the head slot (LlmEnricher / LocalNer / test fakes)
 }
 
 std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
@@ -228,7 +228,7 @@ std::vector<ChunkChainResult> EnricherChain::EnrichChunks(
             } else if (step.contextualized_status == 2 && !step.error_msg.empty()) {
                 // Contextual fail-soft: the step reports OK (the chunk keeps its original
                 // embedding) but the member outcome is a failure recorded only in
-                // contextualized_status. Without this, the f35 debt row is written
+                // contextualized_status. Without this, the contextual debt row is written
                 // with an empty last_error and the real cause (e.g. the §8
                 // injection-guard byte limit) is unobservable — 2026-07-11 live 5k
                 // ingest: 4,139 such rows, all blank (D12).

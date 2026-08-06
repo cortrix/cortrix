@@ -75,11 +75,11 @@ bool TableExists(sqlite3* db, const std::string& table) {
 TEST(CatalogProvidersTest, MultiProviderStartupMigration) {
     std::vector<std::string> order;
     // Two downstream stand-ins, the first FK-referencing units (needs catalog first).
-    FakeFeatureProvider f09("block_framework", &order, /*fk_to_units=*/true);
-    FakeFeatureProvider f03("enricher", &order);
+    FakeFeatureProvider block("block_framework", &order, /*fk_to_units=*/true);
+    FakeFeatureProvider enrich("enricher", &order);
 
     CatalogDb catalog;
-    Status st = catalog.Open(":memory:", {&f09, &f03});
+    Status st = catalog.Open(":memory:", {&block, &enrich});
     ASSERT_TRUE(st.ok()) << st.message();
 
     sqlite3* db = catalog.db();
@@ -144,7 +144,7 @@ TEST(CatalogProvidersTest, FailedBatchLeavesNoPartialSchemaOnDisk) {
     sqlite3* probe = nullptr;
     ASSERT_EQ(sqlite3_open(path.c_str(), &probe), SQLITE_OK);
     EXPECT_FALSE(TableExists(probe, "units"))
-        << "rollback left F12 base tables behind — batch was not atomic";
+        << "rollback left catalog base tables behind — batch was not atomic";
     sqlite3_close(probe);
 
     // A subsequent clean Open (no failing provider) succeeds and builds catalog.
@@ -169,9 +169,9 @@ TEST(CatalogProvidersTest, SingleArgOpenIsCatalogOnly) {
 // SchemaMigrator::Register skipping nullptr).
 TEST(CatalogProvidersTest, NullProvidersIgnored) {
     std::vector<std::string> order;
-    FakeFeatureProvider f09("block_framework", &order);
+    FakeFeatureProvider block("block_framework", &order);
     CatalogDb catalog;
-    Status st = catalog.Open(":memory:", {nullptr, &f09, nullptr});
+    Status st = catalog.Open(":memory:", {nullptr, &block, nullptr});
     ASSERT_TRUE(st.ok()) << st.message();
     EXPECT_TRUE(TableExists(catalog.db(), "feat_block_framework"));
     ASSERT_EQ(order.size(), 1u);

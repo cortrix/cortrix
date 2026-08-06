@@ -70,7 +70,7 @@ std::vector<uint8_t> BuildModelProto(int64_t opset, const std::string& domain = 
 // Write bytes to a unique temp .onnx file; returns its path.
 std::string WriteTempModel(const std::string& name, const std::vector<uint8_t>& bytes) {
     std::string path =
-        (std::filesystem::temp_directory_path() / ("cortrix_f22_" + name + ".onnx")).string();
+        (std::filesystem::temp_directory_path() / ("cortrix_onnxvalidator_" + name + ".onnx")).string();
     std::ofstream f(path, std::ios::binary | std::ios::trunc);
     f.write(reinterpret_cast<const char*>(bytes.data()),
             static_cast<std::streamsize>(bytes.size()));
@@ -319,7 +319,7 @@ TEST_F(OnnxCollectModelsTest, SparseReusesBgeM3SingleRegistration) {
     config.embedding.model_path = "/models/bge-m3/model.onnx";
     auto cfg = StartupValidator::CollectRegisteredOnnxModels(config);
     ASSERT_EQ(cfg.registered_model_paths.size(), 1u)
-        << "F40 must NOT add a 2nd model path — it reuses bge-m3";
+        << "sparse retrieval must NOT add a 2nd model path — it reuses bge-m3";
     EXPECT_EQ(cfg.registered_model_paths[0], "/models/bge-m3/model.onnx");
 }
 

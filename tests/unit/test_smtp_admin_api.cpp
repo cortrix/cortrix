@@ -104,7 +104,7 @@ TEST(SmtpAdminTest, SetSmtpFiresOnChange) {
 // Re-loading from a fresh service over the same db reflects the SMTP config
 // (persistence across restart).
 TEST(SmtpAdminTest, ConfigPersistsAcrossRestart) {
-    const std::string path = std::string(::testing::TempDir()) + "p08_smtp_restart.db";
+    const std::string path = std::string(::testing::TempDir()) + "auth_smtp_restart.db";
     std::remove(path.c_str());
     {
         PlatformDb p1;

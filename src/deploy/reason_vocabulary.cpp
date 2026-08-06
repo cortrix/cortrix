@@ -34,8 +34,8 @@ const char* ReasonStringImpl(MetricReason r) {
         case MetricReason::kNsRoutingUnauthorized:       return "ns_routing.unauthorized";
         case MetricReason::kNsRoutingInvalidNs:          return "ns_routing.invalid_ns";
         case MetricReason::kNsRoutingQuotaExceeded:      return "ns_routing.quota_exceeded";
-        case MetricReason::kTaskAsyncTaskCancelled:       return "f42_async.task_cancelled";
-        case MetricReason::kTaskAsyncSchedulerBusy:       return "f42_async.scheduler_busy";
+        case MetricReason::kTaskAsyncTaskCancelled:       return "async.task_cancelled";
+        case MetricReason::kTaskAsyncSchedulerBusy:       return "async.scheduler_busy";
     }
     return "";  // unreachable for a valid enum
 }
@@ -70,7 +70,7 @@ const char* ReasonSubsystem(MetricReason reason) {
         case MetricReason::kNsRoutingInvalidNs:
         case MetricReason::kNsRoutingQuotaExceeded:      return "ns_routing";
         case MetricReason::kTaskAsyncTaskCancelled:
-        case MetricReason::kTaskAsyncSchedulerBusy:       return "f42_async";
+        case MetricReason::kTaskAsyncSchedulerBusy:       return "async";
     }
     return "";  // unreachable
 }

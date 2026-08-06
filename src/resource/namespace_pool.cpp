@@ -262,22 +262,22 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
     //     replaces the MVP per-Acquire CortrixStoreSqlite::CreateTables on the
     //     production (external-conn) path.
     {
-        cortrix::store::BlockFrameworkSchemaProvider f09_provider;
-        cortrix::store::ParentChildSchemaProvider f34_provider;  // unified-blocks: after the block header (needs blocks)
-        cortrix::spc::EnricherSchemaProvider f03_provider;    // [A unified-blocks] enriched_score +3 cols + entities + FTS5
-        cortrix::scoring::ScoringSchemaProvider f07_provider;  // [A unified-blocks] semantic_score col (§1.3.bis.3 #6, gap-fill 2026-06-08)
-        cortrix::spc::ContextualSchemaProvider f35_provider;    // [A unified-blocks] contextualized/embedding cols
-        cortrix::doc_summary::DocSummarySchemaProvider f41_provider;  // [A unified-blocks] doc-level doc_fts5_index (block_type=17 reuses blocks)
-        cortrix::retrieval::SparseSchemaProvider f40_provider;  // [A unified-blocks] sparse_vec + inverted index
+        cortrix::store::BlockFrameworkSchemaProvider block_provider;
+        cortrix::store::ParentChildSchemaProvider parent_child_provider;  // unified-blocks: after the block header (needs blocks)
+        cortrix::spc::EnricherSchemaProvider enrich_provider;    // [A unified-blocks] enriched_score +3 cols + entities + FTS5
+        cortrix::scoring::ScoringSchemaProvider scoring_provider;  // [A unified-blocks] semantic_score col (§1.3.bis.3 #6, gap-fill 2026-06-08)
+        cortrix::spc::ContextualSchemaProvider contextual_provider;    // [A unified-blocks] contextualized/embedding cols
+        cortrix::doc_summary::DocSummarySchemaProvider doc_summary_provider;  // [A unified-blocks] doc-level doc_fts5_index (block_type=17 reuses blocks)
+        cortrix::retrieval::SparseSchemaProvider sparse_provider;  // [A unified-blocks] sparse_vec + inverted index
         cortrix::spc::EnrichStateSchemaProvider enrich_state_provider;  // enrich_state sidecar (coverage SoT)
         cortrix::catalog::SchemaMigrator unit_migrator;
-        unit_migrator.Register(&f09_provider);   // #3 framework: documents/blocks/blocks_fts
-        unit_migrator.Register(&f34_provider);   // #4 child cols + parents + idx (incl idx_blocks_meta_doc)
-        unit_migrator.Register(&f03_provider);   // #5 blocks +enriched_score/at/metadata + entities + FTS5
-        unit_migrator.Register(&f07_provider);   // #6 blocks +semantic_score + idx (ColumnExists guard → order-insensitive vs the enricher migration)
-        unit_migrator.Register(&f35_provider);   // #7 blocks +embedding/contextualized_*
-        unit_migrator.Register(&f41_provider);   // #10 doc_fts5_index (doc-level FTS5; doc_summary block reuses blocks)
-        unit_migrator.Register(&f40_provider);   // #11 blocks +sparse_vec + sparse_inverted_index
+        unit_migrator.Register(&block_provider);   // #3 framework: documents/blocks/blocks_fts
+        unit_migrator.Register(&parent_child_provider);   // #4 child cols + parents + idx (incl idx_blocks_meta_doc)
+        unit_migrator.Register(&enrich_provider);   // #5 blocks +enriched_score/at/metadata + entities + FTS5
+        unit_migrator.Register(&scoring_provider);   // #6 blocks +semantic_score + idx (ColumnExists guard → order-insensitive vs the enricher migration)
+        unit_migrator.Register(&contextual_provider);   // #7 blocks +embedding/contextualized_*
+        unit_migrator.Register(&doc_summary_provider);   // #10 doc_fts5_index (doc-level FTS5; doc_summary block reuses blocks)
+        unit_migrator.Register(&sparse_provider);   // #11 blocks +sparse_vec + sparse_inverted_index
         unit_migrator.Register(&enrich_state_provider);  // #12 enrich_state (standalone table, no blocks dep)
         Status migrated = unit_migrator.MigrateUnit(store_db->handle(), unit.unit_id);
         if (!migrated.ok()) {

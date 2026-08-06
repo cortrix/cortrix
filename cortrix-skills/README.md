@@ -58,7 +58,7 @@ tools = as_langchain_tools(kit)                       # 29 StructuredTools
 
 agent = create_react_agent(ChatAnthropic(model="claude-..."), tools)
 executor = AgentExecutor(agent=agent, tools=tools)
-print(executor.invoke({"input": "find last week's notes on the P12 design"})["output"])
+print(executor.invoke({"input": "find last week's notes on the MCP design"})["output"])
 ```
 
 ### Claude Tools (Anthropic Messages API)
@@ -75,7 +75,7 @@ tools = as_claude_tools(kit)                          # 29 tool definitions (JSO
 client = Anthropic(api_key="sk-ant-...")
 resp = client.messages.create(
     model="claude-...", max_tokens=4096, tools=tools,
-    messages=[{"role": "user", "content": "find last week's notes on the P12 design"}],
+    messages=[{"role": "user", "content": "find last week's notes on the MCP design"}],
 )
 for block in resp.content:
     if block.type == "tool_use":
@@ -97,7 +97,7 @@ tools = as_openai_functions(kit)                      # 29 function definitions 
 client = OpenAI(api_key="sk-...")
 resp = client.chat.completions.create(
     model="gpt-4o-mini", tools=tools,
-    messages=[{"role": "user", "content": "find last week's notes on the P12 design"}],
+    messages=[{"role": "user", "content": "find last week's notes on the MCP design"}],
 )
 for call in resp.choices[0].message.tool_calls or []:
     content = dispatch_openai_tool_call(kit, call)     # JSON string for a role:"tool" message

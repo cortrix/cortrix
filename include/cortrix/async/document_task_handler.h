@@ -55,7 +55,7 @@ public:
     /// @param mgr       borrowed (progress read / cancel)
     /// @param pool      borrowed; Notify() after a successful enqueue (nullptr ok
     ///                  in tests that don't run workers)
-    /// @param config    borrowed; f42.async_threshold_pages / f42.ent_max_pages
+    /// @param config    borrowed; async.async_threshold_pages / async.ent_max_pages
     /// @param managed_input_dir where server-materialized task inputs live. A
     ///                  queued task cancels terminally inside CancelTask without
     ///                  ever reaching a worker, so TaskFinalizer never sees it and
@@ -83,7 +83,7 @@ public:
     /// or 423 CX_ERR_TASK_CANCELLING on a repeat cancel of a cancelling/terminal task.
     HttpResult CancelTask(const std::string& task_id);
 
-    /// f42.* thresholds (§4.0) when config absent / malformed.
+    /// async.* thresholds (§4.0) when config absent / malformed.
     static constexpr int kDefaultAsyncThresholdPages = 200;  // topic: sync threshold
     static constexpr int kDefaultAsyncMaxPages = 2000;        // topic 1.3
 

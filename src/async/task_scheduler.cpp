@@ -11,7 +11,7 @@ TaskScheduler::TaskScheduler(TaskManager* mgr, const IGlobalConfig* config)
 
 int TaskScheduler::DebounceSeconds() const {
     if (config_) {
-        auto r = config_->GetInt("f42.watcher_debounce_seconds");
+        auto r = config_->GetInt("async.watcher_debounce_seconds");
         if (r.ok()) return r.value();
     }
     return kDefaultDebounceSeconds;

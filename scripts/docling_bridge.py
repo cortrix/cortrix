@@ -297,7 +297,7 @@ def parse_document(filepath, timeout, max_pages, lang_hint):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Docling parser bridge (F06)")
+    parser = argparse.ArgumentParser(description="Docling parser bridge")
     parser.add_argument("--filepath", required=True)
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--max-pages", type=int, default=200)

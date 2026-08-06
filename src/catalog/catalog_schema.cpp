@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS ns_acl (
     PRIMARY KEY (ns_id, grantee_tenant_id, grantee_user_id)
 );
 
--- ===== V1.0 OSS bootstrap rows (P09 §10.1, idempotent) =====
+-- ===== V1.0 OSS bootstrap rows (tenant management §10.1, idempotent) =====
 -- Single-tenant OSS runs as 'default_tenant'; namespaces.tenant_id is NOT NULL
 -- with an FK (foreign_keys=ON), so these placeholders must exist before the
 -- first CreateNamespace. INSERT OR IGNORE keeps restarts idempotent.

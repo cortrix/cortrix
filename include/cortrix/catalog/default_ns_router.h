@@ -15,7 +15,7 @@ namespace cortrix::resource {
 // (Layer 0). The catalog HEADER MUST compile standalone, so we never #include a pool
 // header here; the dependency direction is strictly pool → catalog. The .cpp DOES
 // include namespace_pool.h to make the admission calls (it is compiled in
-// the full build where the pool exists). The Phase-1 default (f05_pool_ == nullptr)
+// the full build where the pool exists). The Phase-1 default (ns_pool_ == nullptr)
 // skips admission.
 class INamespacePool;
 }  // namespace cortrix::resource
@@ -36,15 +36,15 @@ namespace cortrix::catalog {
 class DefaultINSRouter : public INSRouter {
 public:
     /// Construct over an already-opened catalog.db handle (from CatalogDb::db()).
-    /// `f05_pool` is the optional Layer-1 admission hook (nullptr in Phase 1 /
+    /// `ns_pool` is the optional Layer-1 admission hook (nullptr in Phase 1 /
     /// catalog-standalone → admission is skipped). Cache sizes/TTL default to §6.3.
-    explicit DefaultINSRouter(sqlite3* db, resource::INamespacePool* f05_pool = nullptr);
+    explicit DefaultINSRouter(sqlite3* db, resource::INamespacePool* ns_pool = nullptr);
 
     /// Late-bind the admission hook after construction. Breaks the
     /// pool↔router ctor cycle (the pool ctor needs the router to load the catalog;
     /// the router needs the pool to AdmitCreate on CreateNamespace). main calls this
     /// once, after the pool is built + StartupLoadAll. nullptr = admission skipped.
-    void SetPool(resource::INamespacePool* pool) { f05_pool_ = pool; }
+    void SetPool(resource::INamespacePool* pool) { ns_pool_ = pool; }
 
     Result<std::vector<UnitDescriptor>> LookupUnits(
         const std::string& namespace_id) const override;
@@ -75,7 +75,7 @@ private:
     void RemoveNamespaceCatalogRows(const std::string& ns_id);
 
     sqlite3* db_;                    // borrowed, not owned
-    resource::INamespacePool* f05_pool_;  // optional Layer-1 hook (may be null)
+    resource::INamespacePool* ns_pool_;  // optional Layer-1 hook (may be null)
     mutable std::mutex mu_;
     mutable TtlLruCache<std::string, NSMetadata> ns_cache_;
     mutable TtlLruCache<std::string, UnitDescriptor> unit_cache_;

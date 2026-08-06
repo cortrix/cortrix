@@ -22,7 +22,7 @@ _E2E_ENABLED = os.environ.get("CORTRIX_SKILLS_E2E") == "1"
 
 pytestmark = pytest.mark.skipif(
     not _E2E_ENABLED,
-    reason="D3.5-deferred: real LLM round-trips run at integration / P05 gate "
+    reason="D3.5-deferred: real LLM round-trips run at the integration gate "
     "(set CORTRIX_SKILLS_E2E=1 + API keys to enable).",
 )
 

@@ -470,11 +470,11 @@ def profile_matrix(
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Run a local F36/F02 rerank-loop diagnostic.")
+    ap = argparse.ArgumentParser(description="Run a local RAG-Fusion/F02 rerank-loop diagnostic.")
     ap.add_argument("--base-url", default="http://127.0.0.1:18485")
     ap.add_argument("--sample-dir", type=Path, required=True)
     ap.add_argument("--work-dir", type=Path, default=Path("/tmp/cortrix-min-llm-bench"))
-    ap.add_argument("--run-id", default=time.strftime("f36-rerank-loop-%Y%m%dT%H%M%SZ", time.gmtime()))
+    ap.add_argument("--run-id", default=time.strftime("rag_fusion-rerank-loop-%Y%m%dT%H%M%SZ", time.gmtime()))
     ap.add_argument("--dataset", default="scifact")
     ap.add_argument("--top-k", type=int, default=10)
     ap.add_argument(
@@ -487,7 +487,7 @@ def main() -> int:
         "--crag",
         choices=("true", "false"),
         default="true",
-        help="Enable F37 CRAG post-processing; use false for pure retrieval/rerank/LLM ablations.",
+        help="Enable CRAG post-processing; use false for pure retrieval/rerank/LLM ablations.",
     )
     ap.add_argument("--batch-size", type=int, default=30)
     ap.add_argument("--max-candidates", type=int, default=50)
@@ -496,12 +496,12 @@ def main() -> int:
     ap.add_argument("--activation-min-results", type=int, default=10)
     ap.add_argument("--llm-rerank-top-n", type=int, default=20)
     ap.add_argument("--llm-rerank-model", default="",
-                    help="Per-call model override for the F36-LR listwise rerank profiles.")
+                    help="Per-call model override for the RAG-Fusion-LR listwise rerank profiles.")
     ap.add_argument("--llm-rerank-timeout-ms", type=int, default=60000)
     ap.add_argument("--llm-rerank-consensus-runs", type=int, default=1,
                     help="Presentation-order consensus votes per listwise window (1-3).")
     ap.add_argument("--rag-fusion-model", default="",
-                    help="Per-call model override for F36 variant generation profiles.")
+                    help="Per-call model override for RAG-Fusion variant generation profiles.")
     ap.add_argument("--target-score", type=float, default=0.80)
     ap.add_argument("--namespace", default="")
     ap.add_argument("--max-queries", type=int, default=0)
@@ -527,7 +527,7 @@ def main() -> int:
     health = get_json(args.base_url, "/api/v1/health")
     readiness = get_json(args.base_url, "/api/v1/system/health/ready")
 
-    namespace = args.namespace or safe_name(f"f36-loop-{args.dataset}-{args.run_id}")
+    namespace = args.namespace or safe_name(f"rag_fusion-loop-{args.dataset}-{args.run_id}")
     create_namespace(args.base_url, namespace)
 
     docs = corpus_to_docs(args.dataset, load_jsonl(corpus_path))

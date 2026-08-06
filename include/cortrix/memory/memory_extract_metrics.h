@@ -7,7 +7,7 @@
 
 namespace cortrix::memory {
 
-/// The `mem02` subsystem metrics (observability naming
+/// The `memory_extract` subsystem metrics (observability naming
 /// `cortrix_memory_extract_<metric>_<unit>`). Mirrors the RagFusionMetrics /
 /// ScatterMetrics template (process-wide singleton, atomic counters/histograms,
 /// OpenMetrics renderer).

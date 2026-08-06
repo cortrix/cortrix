@@ -224,16 +224,16 @@ class FullStackE2E {
     // Real catalog routers over the global db (CreateNamespace does the catalog
     // INSERT + — once SetPool is wired below — the namespace pool AdmitCreate).
     ns_router_ = std::make_unique<cortrix::catalog::DefaultINSRouter>(
-        catalog_db_->db(), /*f05_pool=*/nullptr);
+        catalog_db_->db(), /*ns_pool=*/nullptr);
     unit_router_ =
         std::make_unique<cortrix::catalog::DefaultUnitRouter>(catalog_db_->db());
 
     // Real namespace pool with the production PhnswIndexFactory (a real, searchable
     // P-HNSW per Unit) + a real WriteCoordinator factory.
-    f05_config_.data_root = (root_ / "units").string();
+    ns_pool_config_.data_root = (root_ / "units").string();
     pool_ = std::make_unique<cortrix::resource::DefaultNamespacePool>(
         &index_factory_, MakeRealCoordFactory(), ns_router_.get(),
-        unit_router_.get(), f05_config_);
+        unit_router_.get(), ns_pool_config_);
     // Late-bind the pool into the router (breaks the pool↔router ctor cycle, as
     // bootstrap does) so CreateNamespace admits into the pool.
     ns_router_->SetPool(pool_.get());
@@ -492,7 +492,7 @@ class FullStackE2E {
   std::unique_ptr<cortrix::catalog::DefaultINSRouter> ns_router_;
   std::unique_ptr<cortrix::catalog::DefaultUnitRouter> unit_router_;
   cortrix::store::PhnswIndexFactory index_factory_;
-  cortrix::resource::NamespacePoolConfig f05_config_;
+  cortrix::resource::NamespacePoolConfig ns_pool_config_;
   std::unique_ptr<cortrix::resource::DefaultNamespacePool> pool_;
   std::unique_ptr<ApiKeyAuth> auth_;
   // [V6] Runtime NS-authz service over catalog_db_ (borrowed handle); the seams

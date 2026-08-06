@@ -108,7 +108,7 @@ Result<OptOutResult> OptOutManager::OptOut(const std::string& session_id,
     }
     if (!enabled_) {
         return MemoryOptOutStatus(MemoryOptOutErrorCode::kOptOutDisabled,
-                           "mem04.enabled is false");
+                           "memory_opt_out.enabled is false");
     }
 
     Result<SessionOptOutState> state = store_->GetOptOutState(session_id);
@@ -150,7 +150,7 @@ Result<RevokeResult> OptOutManager::OptOutRevoke(const std::string& session_id,
     }
     if (!enabled_) {
         return MemoryOptOutStatus(MemoryOptOutErrorCode::kOptOutDisabled,
-                           "mem04.enabled is false");
+                           "memory_opt_out.enabled is false");
     }
     if (reason.empty()) {
         // §6.2 revoke requestBody: reason is required (recorded in operation_log).

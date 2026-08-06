@@ -185,7 +185,7 @@ def _ocr_lines(results):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="PaddleOCR parser bridge (F06)")
+    parser = argparse.ArgumentParser(description="PaddleOCR parser bridge")
     parser.add_argument("--filepath", required=True)
     parser.add_argument("--timeout", type=int, default=120)
     parser.add_argument("--max-pages", type=int, default=200)

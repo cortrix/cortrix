@@ -349,8 +349,8 @@ int CortrixStoreSqlite::CreateTables() {
     // not carried by CortrixBlock/block_insert, so they are intentionally not applied
     // here (added in production MigrateUnit; would be a store→spc/retrieval layering
     // violation to apply from the store).
-    store::ParentChildSchemaProvider f34;
-    if (Status s = f34.Migrate(db_, 0, 1); !s.ok()) {
+    store::ParentChildSchemaProvider parent_child;
+    if (Status s = parent_child.Migrate(db_, 0, 1); !s.ok()) {
         CORTRIX_LOG_ERROR("store", "schema (standalone): {}", s.message());
         return -1;
     }
