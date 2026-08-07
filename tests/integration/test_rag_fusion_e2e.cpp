@@ -219,13 +219,19 @@ TEST_F(RagFusionE2ETest, E2E_RagFusion_ExplainEndpoint_Active) {
     EXPECT_EQ(rf["degraded"], false);
 }
 
-// IT 29 (rewritten): NS disabled → the inactive block still serializes.
+// IT 29 (rewritten): serializer contract for the inactive state.
 //
 // The old test here asserted an explain.potential_improvements array that it
 // had built itself — nothing in src/ emits potential_improvements, so the
-// test verified only its own construction. This replacement asserts what the
-// serializer really produces for the inactive state.
-TEST_F(RagFusionE2ETest, E2E_RagFusion_ExplainEndpoint_Inactive) {
+// test verified only its own construction.
+//
+// Scope: this is a SERIALIZER-contract test, not an endpoint test. The /query
+// route calls BuildRagFusionExplain only when use_rag_fusion is true, and the
+// ns_disabled state arises exactly when it is false — so the route never emits
+// this block in a response today. What this pins is the builder's contract for
+// the inactive state, so that if the route ever starts emitting it (or another
+// caller serializes it), the shape is already fixed.
+TEST_F(RagFusionE2ETest, RagFusionExplainSerializer_InactiveStateContract) {
     auto mock = std::make_shared<MockLlmClient>();
     EXPECT_CALL(*mock, Chat(_, _)).Times(0);
     auto svc = Service(mock);
