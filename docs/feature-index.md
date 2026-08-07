@@ -11,6 +11,10 @@ as-is.
 The index is versioned. Each release line gets its own feature list; a new
 release appends a new section and earlier sections are kept unchanged, so an
 identifier can always be resolved against the release it was written for.
+Within a release section, the tables list only capabilities shipped and
+verifiable in this repository at that release; identifiers that appear in the
+tree but name unshipped work are listed separately at the end of the section,
+so nothing unreleased is presented as part of the shipped surface.
 
 ---
 
@@ -45,7 +49,9 @@ identifier can always be resolved against the release it was written for.
 ## v1.0
 
 The feature set of the `v1.0.x` release line (first published as
-`v1.0.0-rc.1`).
+`v1.0.0-rc.1`). Every row below names a capability shipped in this repository
+in that line; identifiers referenced by the code but not shipped are in the
+final subsection.
 
 ### Storage and ingest engine
 
@@ -58,7 +64,6 @@ The feature set of the `v1.0.x` release line (first published as
 | F08 | Metadata block | Per-document metadata block, embedded and indexed so documents are discoverable by their own description. |
 | F09 | Block header | Self-describing binary block header with CRC over all fields. |
 | F10 | Data cleaning | Exact (BM25) and semantic dedup plus anomaly detection inside the ingest pipeline. |
-| F11 | Cleaning plugin API | Future work; v1.0 ships only the `ICleaningPlugin` seam and stub inside F10. |
 | F12 | Namespace→unit mapping | Two-layer mapping that introduces the storage-unit abstraction and routing database; also carries per-namespace config overrides. |
 | F16a | DB manual import | Import rows from an external database table (per-row and merge modes, JSON-DSL filters, parameterized queries). |
 | F21 | Watcher fan-out | A single filesystem watcher fanned out to all namespaces. |
@@ -80,7 +85,6 @@ The feature set of the `v1.0.x` release line (first published as
 | F39 | Query complexity router | Routes each query — simple, complex, or chat — to a lighter or fuller pipeline. |
 | F40 | BGE-M3 sparse retrieval | Sparse vectors from the same BGE-M3 forward pass, served by a SPLADE-style inverted index and fused with dense and FTS results. |
 | F41 | Document summary index | Asynchronously generated document summaries indexed as searchable blocks, with text-match fallback when the LLM is unavailable. |
-| F43 | Block hotness self-learning | Future work; comments reference the hooks reserved for it. |
 
 ### Memory system
 
@@ -103,14 +107,12 @@ The feature set of the `v1.0.x` release line (first published as
 | F22 | ONNX Runtime upgrades | Runtime version detection, opset validation and an API compatibility layer. |
 | F23 | Test suite | Unit, integration and end-to-end test infrastructure and the quality gates built on it. |
 | F24 | docker-compose deployment | One-command startup of the full stack. |
-| F44 | Benchmark suite | BEIR-based evaluation harness used to qualify releases. |
 | F48 | Cortrix Agent | Bundled reference agent: REST + SSE middleware with a chat UI, so the engine can be tried without wiring up an external agent. |
 
 ### Product surfaces
 
 | # | Name | What it is |
 |---|---|---|
-| P01 | Multi-tenancy and quota | Referenced by auth and tenant scaffolding. |
 | P02a | Web UI | The self-hosted web interface under `web/`. |
 | P03 | Python SDK | The `cortrix` PyPI package under `sdk/python/`. |
 | P04 | API documentation | The OpenAPI 3.0 spec under `api/` as the single source of truth, including the `CX_ERR_*` error-code registry. |
@@ -118,3 +120,16 @@ The feature set of the `v1.0.x` release line (first published as
 | P09 | Tenant management | Tenant model and namespace permission assignment. |
 | P12 | MCP server | The `cortrix-mcp` package: Cortrix tools for MCP-compatible clients and IDE agents. |
 | P14 | Skill SDK | The `cortrix-skills` package: the same tool surface as P12 exposed as framework adapters. |
+
+### Referenced in the tree, not shipped in v1.0
+
+These identifiers appear in comments and reserved seams but name work that is
+not part of this release. They are indexed here only so the references can be
+resolved; nothing in this subsection is a shipped capability.
+
+| # | Name | Where the reference lives |
+|---|---|---|
+| F11 | Cleaning plugin API | v1.0 ships only the `ICleaningPlugin` seam and stub inside F10; the plugin ecosystem itself is unreleased. |
+| F43 | Block hotness self-learning | Comments mark the hooks reserved for it; no shipped behavior. |
+| F44 | Benchmark suite | The BEIR evaluation harness is maintained outside this repository; comments and a placeholder Dockerfile under `tests/benchmark/beir/` reference it. |
+| P01 | Multi-tenancy and quota | Interface-reserved seams only (e.g. scatter-plan coordination); the capability is unreleased. |
