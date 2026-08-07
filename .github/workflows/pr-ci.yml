@@ -33,12 +33,34 @@ on:
   pull_request:
 
 jobs:
+  # Stage S3: the classifier now routes the heavy jobs. Fail-closed on every
+  # edge: push events (post-merge main) classify as full; a classifier crash
+  # fails this job, which skips the dependent jobs and turns pr-gate red
+  # (a failed `needs` counts as failure, not skipped, in the gate).
+  changes:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: classify
+        name: Classify change set
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            VERDICT="$(./scripts/ci/classify_changes.sh               "${{ github.event.pull_request.base.sha }}"               "${{ github.event.pull_request.head.sha }}")"
+          else
+            VERDICT="docs_only=false"
+          fi
+          echo "$VERDICT"
+          echo "$VERDICT" >> "$GITHUB_OUTPUT"
+
   # Runs the executable cases for the docs-only classifier on every PR, so a
   # regression in scripts/ci/classify_changes.sh fails CI before the classifier
-  # is ever allowed to skip anything. Stage S1 of the staged rollout
-  # (RC-PERIODIC-CI-CADENCE / hub #21): the classifier is present and tested
-  # but not yet wired into any job condition; wiring lands in stage S3 after
-  # the pr-gate required check (S2) is in place and verified.
+  # is allowed to skip anything. Runs unconditionally — the cases guard the
+  # very mechanism that decides skipping, so they are never skipped themselves.
   classifier_test:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
@@ -48,6 +70,8 @@ jobs:
         run: ./tests/ci/test_classify_changes.sh
 
   cpp_unit:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 90
     steps:
@@ -103,6 +127,8 @@ jobs:
         run: ctest --test-dir build -L unit -j 2 --output-on-failure
 
   frontend_unit:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
@@ -119,6 +145,8 @@ jobs:
           npm test
 
   python_unit:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
@@ -185,7 +213,7 @@ jobs:
   # the gate, and `if: always()` guarantees the check always reports.
   pr-gate:
     if: always()
-    needs: [classifier_test, cpp_unit, python_unit, frontend_unit, lint]
+    needs: [changes, classifier_test, cpp_unit, python_unit, frontend_unit, lint]
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
