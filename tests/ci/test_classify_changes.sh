@@ -52,7 +52,7 @@ run_case() {
   rm -rf "$dir"
 }
 
-run_case "01 root markdown"                false README.md  # S2 VERIFICATION: deliberately wrong, reverted before close
+run_case "01 root markdown"                true  README.md
 run_case "02 docs markdown"                true  docs/usage/quickstart.md
 run_case "03 LICENSE"                      true  LICENSE
 run_case "04 two doc files"                true  README.md docs/a.md
