@@ -174,6 +174,7 @@ add_library(cortrix_core STATIC
     src/query/cross_ns_query_handler.cpp
     # --- F04 cross-NS query live wiring (D3.5-R2 Wave Q1/Q2) ---
     src/query/live_single_unit_executor.cpp
+    src/query/query_explain_json.cpp
     src/query/query_wiring.cpp
     # --- F36 RAG-Fusion (Wave B) ---
     src/query/rag_fusion_error.cpp
