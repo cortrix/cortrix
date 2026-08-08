@@ -10,9 +10,12 @@
 #include <string>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #include "cortrix/query/cross_ns_response.h"
 #include "cortrix/query/llm_rerank_stage.h"
 #include "cortrix/query/llm_rerank_types.h"
+#include "cortrix/query/query_explain_json.h"
 #include "mocks/mock_llm_client.h"
 
 namespace cortrix::query {
@@ -487,6 +490,69 @@ TEST(LlmRerankApplyTest, CallCarriesConfiguredModelAndStructuredOutput) {
     LlmRerankConfig cfg = EnabledConfig(2);
     cfg.model = "glm-4.6";
     stage.Apply(&resp, "q", cfg);
+}
+
+// --- explain serialization -------------------------------------------------
+// The listwise explain block had no coverage at all: the route built the JSON
+// inline, so nothing could assert what it emitted. These exercise
+// BuildListwiseRerankExplain, the serializer /query now calls.
+
+TEST(LlmRerankExplainTest, ActiveBlockCarriesTheCallCounters) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Return(OkResponse(R"({"ranking":[3,1,2]})", "glm-test")));
+    LlmRerankStage stage(mock);
+    CrossNsResponse resp = MakeResponse(5);
+
+    const auto es = stage.Apply(&resp, "q", EnabledConfig(/*top_n=*/3));
+    ASSERT_TRUE(es.active);
+
+    const nlohmann::json lr = BuildListwiseRerankExplain(es);
+    EXPECT_EQ(lr["active"], true);
+    EXPECT_EQ(lr["feature_id"], "F36-LR");
+    EXPECT_EQ(lr["reason"], "active");
+    EXPECT_EQ(lr["top_n_effective"], 3);
+    EXPECT_EQ(lr["order_changed"], true);
+    EXPECT_EQ(lr["degraded"], false);
+    EXPECT_EQ(lr["model"], "glm-test");
+    // Call counters are present only while active.
+    EXPECT_TRUE(lr.contains("llm_calls"));
+    EXPECT_TRUE(lr.contains("votes_ok"));
+    EXPECT_TRUE(lr.contains("llm_latency_ms"));
+}
+
+TEST(LlmRerankExplainTest, DegradedBlockCarriesTheReason) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _)).WillRepeatedly(Return(FailResponse("boom")));
+    LlmRerankStage stage(mock);
+    CrossNsResponse resp = MakeResponse(5);
+
+    const auto es = stage.Apply(&resp, "q", EnabledConfig(/*top_n=*/3));
+    // A failed call still counts as active: the stage ran, it just could not
+    // produce an order, so the original ranking is kept.
+    ASSERT_TRUE(es.active);
+    ASSERT_TRUE(es.degraded);
+
+    const nlohmann::json lr = BuildListwiseRerankExplain(es);
+    EXPECT_EQ(lr["active"], true);
+    EXPECT_EQ(lr["degraded"], true);
+    EXPECT_EQ(lr["order_changed"], false);
+    EXPECT_FALSE(lr["degrade_reason"].get<std::string>().empty());
+}
+
+TEST(LlmRerankExplainTest, DisabledBlockStillSerializes) {
+    LlmRerankStage stage(nullptr);
+    CrossNsResponse resp = MakeResponse(5);
+    LlmRerankConfig off;
+
+    const auto es = stage.Apply(&resp, "q", off);
+    ASSERT_FALSE(es.active);
+
+    const nlohmann::json lr = BuildListwiseRerankExplain(es);
+    EXPECT_EQ(lr["active"], false);
+    EXPECT_EQ(lr["feature_id"], "F36-LR");
+    EXPECT_FALSE(lr["reason"].get<std::string>().empty());
+    EXPECT_FALSE(lr.contains("model"));
 }
 
 }  // namespace
