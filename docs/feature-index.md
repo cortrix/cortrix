@@ -27,7 +27,8 @@ so nothing unreleased is presented as part of the shipped surface.
 | `P01`–`P14` | Product-surface features: SDK, API docs, auth, MCP, web UI. |
 | `M-###` / `m-###` | Small fixes carried over from the pre-1.0 codebase. |
 | `TD-*` | Deferred-work labels (e.g. `TD-F42-BULK-SUBMIT`): work identified during design and scheduled for a later release. |
-| `D0`–`D6` | Phases of the internal development cycle: D0 scope, D1 detailed design, D2 planning, D3 implementation, D3.5 integration, D4 testing, D5 acceptance, D6 delivery. A comment like “D3 wiring” dates the code to the phase that produced it. |
+| `D0`–`D6` (phase context) | Phases of the internal development cycle: D0 scope, D1 detailed design, D2 planning, D3 implementation, D3.5 integration, D4 testing, D5 acceptance, D6 delivery. A comment like “D3 wiring” or “D3.5 deferred” dates the code to the phase that produced it. The phase series ends at D6. |
+| `D1`, `D2`, … (decision context) | Numbered decisions inside one feature’s detailed-design discussion — e.g. `MEM02 D8` (the preference-immunity threshold), the chunker’s `D9 lock` (per-parent granularity), the import layer’s `D7` tenant guard. Numbering restarts for every feature, so a decision number resolves against the nearest feature context in the surrounding code. Values above `D6` (`D7`–`D12` in this release) are always decision numbers, never phases; for `D6` and below, phase references name process activities (scope, wiring, testing) while decision references sit next to a concrete design choice. |
 | `Wave A`–`Wave E` | Design and implementation batches within a phase. |
 | `GEN-*` | Cross-cutting principles applied to every feature (see below). |
 | `§` (e.g. `ARCH § 4.1`) | A section reference into an internal design document. The code statement it accompanies stands on its own; the reference records where the decision was made. |
