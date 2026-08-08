@@ -29,6 +29,7 @@
 // [OPEN-2] three-stage GC manager + background thread + ops routes
 #include "cortrix/catalog/gc/blob_gc_sink.h"
 #include "cortrix/catalog/gc/gc_manager.h"
+#include "cortrix/async/task_cleanup_cron.h"
 #include "cortrix/catalog/gc/gc_thread.h"
 #include "cortrix/server/gc_cli.h"
 #include "cortrix/server/routes/gc_routes.h"
@@ -710,6 +711,13 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         return 1;
     }
     cortrix::async::TaskScheduler task_scheduler(&task_mgr, f42_config.get());
+    // [F42 §4.4 / #34] The tasks-table cleanup cron. Until this was constructed
+    // here, none of its three sweeps (retention / zombie / timeout) ever ran in
+    // production: the tasks table grew unbounded and a task whose worker died
+    // stayed `processing` forever. Thresholds are read from f42.* keys on every
+    // sweep, so admin hot-reloads apply on the next run. Started below with the
+    // other background loops; declared here so task_mgr outlives it.
+    cortrix::async::TaskCleanupCron task_cleanup_cron(&task_mgr, f42_config.get());
 
     // 8. SPCPipeline + SPCManager — constructed BEFORE doc_processor (Plan B · F42 §4.1.2):
     // the F42 doc-parse handler borrows &spc_mgr to hand its parsed doc to ProcessParsedDoc.
@@ -945,8 +953,8 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // recovery path: it skips files inside its grace window and then does not run
     // again until the next restart, so a fresh orphan could survive indefinitely.
     // Riding the daily 02:00 UTC sweep bounds that without adding a thread.
-    // (F42's own TaskCleanupCron is not constructed anywhere in production, so it
-    // is not an option here.)
+    // (TaskCleanupCron stays single-purpose over the tasks table — topic 4.2, its
+    // own cron — so this directory sweep rides the shared scheduler instead.)
     {
         const std::string batch_tmp = cortrix::server::BatchTempDir(config.ns.data_dir);
         cortrix::async::TaskManager* tm = &task_mgr;
@@ -1510,6 +1518,12 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
                          config.gc.scan_interval_hours);
     }
 
+    // [F42 §4.4 / #34] Start the daily 02:00 UTC tasks-table cleanup loop
+    // (DeleteExpired / SweepZombies / SweepTimedOut). Per topic 4.2 the loop is
+    // scheduled-only: no catch-up sweep at startup.
+    task_cleanup_cron.Start();
+    CORTRIX_LOG_INFO("main", "F42 task cleanup cron started (daily 02:00 UTC sweep)");
+
     // [gap⑤] Resume SPC tasks persisted by a prior forced shutdown
     // (.pending_tasks.json, F24 §7.2). Lossy PendingTask fields (mime/metadata/
     // size) are re-hydrated from the documents row; vanished namespace/doc → skip.
@@ -1562,6 +1576,9 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // [OPEN-2] stop the GC thread (also RAII-handled, but explicit so an in-flight
     // sweep finishes + the thread joins before the catalog handle is torn down).
     gc_thread.Stop();
+    // [F42 §4.4 / #34] stop the tasks-table cleanup cron (also RAII-handled, but
+    // explicit so an in-flight sweep joins before task_mgr teardown).
+    task_cleanup_cron.Stop();
     // [F24] stop the deployment background services (also handled by RAII, but
     // stop explicitly so scrapes/disk checks quiesce before final teardown).
     if (f24_metrics_server) f24_metrics_server->Stop();
