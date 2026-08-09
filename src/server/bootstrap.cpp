@@ -3,6 +3,7 @@
 #include "cortrix/config/config.h"
 
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <stdexcept>
 #include <system_error>
@@ -718,6 +719,30 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // sweep, so admin hot-reloads apply on the next run. Started below with the
     // other background loops; declared here so task_mgr outlives it.
     cortrix::async::TaskCleanupCron task_cleanup_cron(&task_mgr, f42_config.get());
+
+    // [F42 §6.1 / #34] Crash recovery, the second never-called path from the same
+    // issue: rows a previous run left status=processing (its workers are gone by
+    // definition — this process just started) are re-queued when younger than the
+    // zombie threshold; older rows are left for the cron's SweepZombies → failed.
+    // Runs before the worker pool starts so re-queued rows are immediately
+    // dispatchable.
+    {
+        int zombie_hours = cortrix::async::TaskCleanupCron::kDefaultZombieHours;
+        if (auto zh = f42_config->GetInt("f42.zombie_task_threshold_hours"); zh.ok()) {
+            zombie_hours = zh.value();
+        }
+        auto requeued = task_mgr.RequeueStaleProcessing(
+            static_cast<int64_t>(std::time(nullptr)), zombie_hours);
+        if (requeued.ok()) {
+            if (requeued.value() > 0) {
+                CORTRIX_LOG_INFO("main", "F42 crash recovery re-queued {} stale processing task(s)",
+                                 requeued.value());
+            }
+        } else {
+            CORTRIX_LOG_WARN("main", "F42 crash-recovery requeue failed: {}",
+                             requeued.status().message());
+        }
+    }
 
     // 8. SPCPipeline + SPCManager — constructed BEFORE doc_processor (Plan B · F42 §4.1.2):
     // the F42 doc-parse handler borrows &spc_mgr to hand its parsed doc to ProcessParsedDoc.
