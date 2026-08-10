@@ -11,10 +11,10 @@
 // missing-verdict via the MemoryExtractor delegate; this suite pins every
 // reachable arm of the parser directly: the bool/numeric verdict accept, the
 // confidence clamp (both directions + boundaries), reason optionality/typing,
-// the array-instead-of-object reject, and the (DIVERGENCE-from-hypothesis)
-// behavior for code-fenced + {"result":{...}}-wrapped inputs — which this
-// parser does NOT unwrap (no fence-strip / no result-unwrap in the impl), so
-// they are rejected. Suite name is globally unique (ContradictionParseDepth).
+// the array-instead-of-object reject, and the fence/{"result":{...}} handling:
+// a COMPLETE ```json fence is unwrapped (shared common::UnwrapCompleteJsonFence
+// repair layer), while truncated fences and result-wrapped objects stay
+// rejected. Suite name is globally unique (ContradictionParseDepth).
 namespace cortrix::memory {
 namespace {
 
@@ -193,18 +193,30 @@ TEST(ContradictionParseDepthTest, IntegerConfidenceCoercedToDouble) {
     EXPECT_DOUBLE_EQ(r.value().confidence, 1.0);
 }
 
-// ---------- DIVERGENCE notes: the impl does NOT unwrap fences / {"result":...} ----------
-// The DEPTH brief hypothesized the parser handles a ```json fenced single-object
-// and an object-wrapped {"result":{...}}. The frozen impl does NEITHER — it feeds
-// the raw string straight to nlohmann::parse. These tests pin the ACTUAL contract
-// (both rejected) so a future fence/unwrap addition is a deliberate, test-visible
-// change rather than silent drift.
+// ---------- Fence handling + {"result":...} contract ----------
+// ParseJudgmentJson now runs common::UnwrapCompleteJsonFence before parsing —
+// the same repair layer the other LLM-output parsers use (enricher_response_
+// parser.cpp, doc_summary_generator.cpp), added after the #32 test-suite audit
+// flagged the old rejected-fence pin as a wall around a real robustness gap.
+// Only a COMPLETE fence is unwrapped; a truncated fence and a {"result":...}
+// wrapper stay rejected.
 
-TEST(ContradictionParseDepthTest, CodeFencedObjectIsRejected_NoFenceStrip) {
+TEST(ContradictionParseDepthTest, CodeFencedObjectIsUnwrappedAndParsed) {
     const std::string fenced =
         "```json\n{\"is_contradiction\":true,\"confidence\":0.9}\n```";
     auto r = ContradictionDetector::ParseJudgmentJson(fenced);
-    ASSERT_FALSE(r.ok());  // leading ``` makes the whole string invalid JSON
+    ASSERT_TRUE(r.ok());
+    EXPECT_TRUE(r.value().is_contradiction);
+    EXPECT_DOUBLE_EQ(r.value().confidence, 0.9);
+}
+
+TEST(ContradictionParseDepthTest, TruncatedFenceStillRejected) {
+    // No closing ``` — UnwrapCompleteJsonFence deliberately refuses partial
+    // fences, so the string reaches the parser as-is and fails.
+    const std::string truncated =
+        "```json\n{\"is_contradiction\":true,\"confidence\":0.9}";
+    auto r = ContradictionDetector::ParseJudgmentJson(truncated);
+    ASSERT_FALSE(r.ok());
     EXPECT_TRUE(IsInvalidOutput(r.status()));
 }
 
