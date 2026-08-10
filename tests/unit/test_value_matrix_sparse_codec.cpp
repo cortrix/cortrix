@@ -20,8 +20,8 @@
 //     duplicate keys at construction, so on-disk ids are unique by definition.
 //   - Deserialize: empty/nullptr buffer -> empty vector (NOT an error).
 //     len < 2 -> reject. len < declared(2+n*6) -> reject (truncation).
-//     OVERSIZE (extra trailing bytes) is IGNORED, not rejected (len < expected
-//     is the only guard) -> asserted as documented behavior below.
+//     len > declared -> reject (oversize = corruption; the serializer always
+//     writes exactly the declared size).
 //   - weights are memcpy'd both ways: NaN/Inf/negative are bit-preserved.
 //
 // All suite + fixture names are globally unique (SparseCodecValMatrix* prefix).
