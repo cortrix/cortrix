@@ -1021,17 +1021,40 @@ TEST_F(ConfigTest, ValidateEmbeddingDimensionNegative) {
     EXPECT_TRUE(found) << "dimension=-1 should fail";
 }
 
-TEST_F(ConfigTest, ValidateMaxQueueSizeZeroValid) {
+TEST_F(ConfigTest, ValidateMaxQueueSizeZeroRejected) {
+    // max_queue_size=0 makes SPCTaskQueue::Push reject every submission
+    // (spc_task_queue.cpp: size() >= max_size_), so 0 must fail validation
+    // like its siblings (chunk_size, embedding_batch_size).
     CortrixConfig config;
     config.spc.max_queue_size = 0;
-    // max_queue_size doesn't have a validation rule currently
     auto errors = ValidateConfig(config);
-    // Should pass (no validation for max_queue_size)
     bool found = false;
     for (const auto& e : errors) {
         if (e.find("max_queue_size") != std::string::npos) { found = true; break; }
     }
-    EXPECT_FALSE(found);
+    EXPECT_TRUE(found) << "max_queue_size=0 should fail validation";
+}
+
+TEST_F(ConfigTest, ValidateMaxQueueSizeNegativeRejected) {
+    CortrixConfig config;
+    config.spc.max_queue_size = -5;
+    auto errors = ValidateConfig(config);
+    bool found = false;
+    for (const auto& e : errors) {
+        if (e.find("max_queue_size") != std::string::npos) { found = true; break; }
+    }
+    EXPECT_TRUE(found) << "max_queue_size=-5 should fail validation";
+}
+
+TEST_F(ConfigTest, ValidateMaxQueueSizePositiveValid) {
+    CortrixConfig config;
+    config.spc.max_queue_size = 1;
+    auto errors = ValidateConfig(config);
+    bool found = false;
+    for (const auto& e : errors) {
+        if (e.find("max_queue_size") != std::string::npos) { found = true; break; }
+    }
+    EXPECT_FALSE(found) << "max_queue_size=1 should pass validation";
 }
 
 TEST_F(ConfigTest, LoadConfigNonexistentPathReturnsDefaults) {
