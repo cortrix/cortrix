@@ -1,18 +1,16 @@
 // JSON parse-tolerance matrix for ContradictionDetector::ParseJudgmentJson (MEM02 D5).
 //
 // Real parser (src/memory/contradiction_detector.cpp ParseJudgmentJson, static):
-//   1. json::parse(allow_exceptions=false). If discarded OR not an object ->
+//   1. common::UnwrapCompleteJsonFence strips a COMPLETE ``` fence (the shared
+//      repair layer also used by enricher_response_parser / doc_summary), then
+//      json::parse(allow_exceptions=false). If discarded OR not an object ->
 //      error Result (Mem02Status kExtractInvalidOutput, message carries
-//      "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT").  *** NO fence / wrapper / span
-//      recovery here *** (unlike ParseExtractionJson). A fenced or prose-wrapped
-//      body is NOT a JSON object -> rejected.
+//      "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT"). No wrapper / prose-span recovery
+//      (unlike ParseExtractionJson): a prose-wrapped or {"result":...}-wrapped
+//      body is still rejected, as is a truncated fence.
 //   2. "is_contradiction" REQUIRED: bool, or a number (!=0 -> true). Missing or a
 //      non-bool/non-number type -> error.
 //   3. "reason" string optional; "confidence" number optional, clamped [0,1].
-//
-// So the tolerance contract is STRICTER than the extractor: only a clean JSON
-// object with a usable is_contradiction parses; everything wrapped/fenced/truncated
-// is gracefully rejected (no crash).
 
 #include <gtest/gtest.h>
 
@@ -71,11 +69,13 @@ const std::vector<JudgmentJsonCase> kJudgmentCases = {
      R"({"is_contradiction":true,"explanation":"x","unrelated":[1,2]})",
      JTol::kParsed, true},
 
-    // ---- ```json fenced -> NOT an object, rejected ----
+    // ---- COMPLETE fences are unwrapped by the shared repair layer -> parsed ----
     {"fenced_json",
-     "```json\n{\"is_contradiction\":true}\n```", JTol::kRejected, false},
-    // ---- ``` bare-fenced -> rejected ----
-    {"fenced_bare", "```\n{\"is_contradiction\":false}\n```", JTol::kRejected, false},
+     "```json\n{\"is_contradiction\":true}\n```", JTol::kParsed, true},
+    {"fenced_bare", "```\n{\"is_contradiction\":false}\n```", JTol::kParsed, false},
+    // ---- truncated fence (no closing ```) -> not unwrapped -> rejected ----
+    {"fenced_truncated",
+     "```json\n{\"is_contradiction\":true}", JTol::kRejected, false},
 
     // ---- object-wrapped (extra nesting; top-level object lacks is_contradiction) ----
     {"wrapped_result",
