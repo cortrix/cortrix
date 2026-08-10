@@ -291,11 +291,20 @@ TEST_F(HttpServerTest, StopIsIdempotent) {
     // No assertion needed, just verifying no crash
 }
 
-TEST_F(HttpServerTest, ServerReferenceAccessible) {
-    auto& svr = server_->server();
-    // Should compile and return a valid reference
-    EXPECT_TRUE(true);  // Just verifying it compiles and doesn't throw
-    (void)svr;
+// server() exposes the LIVE underlying httplib server (the one Start() serves),
+// not a copy: a route registered through the reference is served. (The old test
+// asserted EXPECT_TRUE(true).)
+TEST_F(HttpServerTest, ServerReferenceIsTheLiveUnderlyingServer) {
+    server_->server().Get("/test_server_ref_probe",
+                          [](const httplib::Request&, httplib::Response& res) {
+                              res.set_content("ref-probe-ok", "text/plain");
+                          });
+    StartServer();
+    httplib::Client cli("127.0.0.1", config_.server.port);
+    auto res = cli.Get("/test_server_ref_probe");
+    ASSERT_TRUE(res);
+    EXPECT_EQ(res->status, 200);
+    EXPECT_EQ(res->body, "ref-probe-ok");
 }
 
 // ---------------------------------------------------------------------------

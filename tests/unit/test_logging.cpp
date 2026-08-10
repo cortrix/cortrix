@@ -69,18 +69,32 @@ TEST_F(LoggingTest, InitWithTextFormat) {
 }
 
 TEST_F(LoggingTest, LogLevelFiltering) {
+    const std::string log_file = "/tmp/cortrix_test_log_filter.txt";
+    std::remove(log_file.c_str());
+
     LogConfig config;
     config.level = "warn";  // Set to warn level
-    config.format = "json";
-    config.output = "stdout";
+    config.format = "text";
+    config.output = log_file;
 
     InitLogging(config);
+    CORTRIX_LOG_DEBUG("test", "debug-marker-filtered");
+    CORTRIX_LOG_INFO("test", "info-marker-filtered");
+    CORTRIX_LOG_WARN("test", "warn-marker-kept");
+    CORTRIX_LOG_ERROR("test", "error-marker-kept");
+    ShutdownLogging();
 
-    // These should not crash, but info/debug should be filtered
-    CORTRIX_LOG_DEBUG("test", "Debug message - should be filtered");
-    CORTRIX_LOG_INFO("test", "Info message - should be filtered");
-    CORTRIX_LOG_WARN("test", "Warn message - should appear");
-    CORTRIX_LOG_ERROR("test", "Error message - should appear");
+    std::ifstream file(log_file);
+    ASSERT_TRUE(file.is_open());
+    std::stringstream ss;
+    ss << file.rdbuf();
+    const std::string content = ss.str();
+    EXPECT_EQ(content.find("debug-marker-filtered"), std::string::npos);
+    EXPECT_EQ(content.find("info-marker-filtered"), std::string::npos);
+    EXPECT_NE(content.find("warn-marker-kept"), std::string::npos);
+    EXPECT_NE(content.find("error-marker-kept"), std::string::npos);
+
+    std::remove(log_file.c_str());
 }
 
 TEST_F(LoggingTest, AllLogLevels) {
@@ -144,17 +158,35 @@ TEST_F(LoggingTest, FileOutput) {
 }
 
 TEST_F(LoggingTest, ModuleTagging) {
+    const std::string log_file = "/tmp/cortrix_test_log_module.txt";
+    std::remove(log_file.c_str());
+
     LogConfig config;
     config.level = "info";
-    config.format = "json";
-    config.output = "stdout";
+    config.format = "text";
+    config.output = log_file;
 
     InitLogging(config);
-
-    // Each log should include module tag
     CORTRIX_LOG_INFO("server", "Server message");
     CORTRIX_LOG_INFO("auth", "Auth message");
     CORTRIX_LOG_INFO("storage", "Storage message");
+    ShutdownLogging();
+
+    std::ifstream file(log_file);
+    ASSERT_TRUE(file.is_open());
+    std::stringstream ss;
+    ss << file.rdbuf();
+    const std::string content = ss.str();
+    // Each line carries its "[module]" tag next to its message (the CORTRIX_LOG
+    // macros render "[{module}] {message}").
+    EXPECT_NE(content.find("[server]"), std::string::npos);
+    EXPECT_NE(content.find("[auth]"), std::string::npos);
+    EXPECT_NE(content.find("[storage]"), std::string::npos);
+    EXPECT_NE(content.find("Server message"), std::string::npos);
+    EXPECT_NE(content.find("Auth message"), std::string::npos);
+    EXPECT_NE(content.find("Storage message"), std::string::npos);
+
+    std::remove(log_file.c_str());
 }
 
 TEST_F(LoggingTest, ShutdownIsIdempotent) {
@@ -189,14 +221,30 @@ TEST_F(LoggingTest, ReinitializeAfterShutdown) {
     ShutdownLogging();
 }
 
-TEST_F(LoggingTest, InvalidLogLevel) {
-    LogConfig config;
-    config.level = "invalid_level";  // Invalid level should default to info
-    config.format = "json";
-    config.output = "stdout";
+TEST_F(LoggingTest, InvalidLogLevelDefaultsToInfo) {
+    const std::string log_file = "/tmp/cortrix_test_log_badlevel.txt";
+    std::remove(log_file.c_str());
 
-    // Should not crash with invalid log level
-    EXPECT_NO_THROW(InitLogging(config));
+    LogConfig config;
+    config.level = "invalid_level";  // ParseLevel falls back to info
+    config.format = "text";
+    config.output = log_file;
+
+    InitLogging(config);
+    // At the info default: debug is filtered, info passes.
+    CORTRIX_LOG_DEBUG("test", "badlevel-debug-filtered");
+    CORTRIX_LOG_INFO("test", "badlevel-info-kept");
+    ShutdownLogging();
+
+    std::ifstream file(log_file);
+    ASSERT_TRUE(file.is_open());
+    std::stringstream ss;
+    ss << file.rdbuf();
+    const std::string content = ss.str();
+    EXPECT_EQ(content.find("badlevel-debug-filtered"), std::string::npos);
+    EXPECT_NE(content.find("badlevel-info-kept"), std::string::npos);
+
+    std::remove(log_file.c_str());
 }
 
 TEST_F(LoggingTest, DefaultLogConfig) {

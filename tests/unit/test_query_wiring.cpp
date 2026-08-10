@@ -225,27 +225,14 @@ TEST_F(QueryWiringTest, RagFusionConfigDefaultsDisabled) {
     EXPECT_EQ(cfg.activation_min_results, 2);
 }
 
-// use_rag_fusion = (routing_path=="complex") && cfg.enabled && llm_available. With
-// the default config disabled, the gate is off regardless of route — the closure
-// runs plain scatter.
-TEST_F(QueryWiringTest, RagFusionGateOffWhenConfigDisabled) {
-    RagFusionConfig cfg;  // enabled=false
-    const bool llm_available = true;
-    const std::string routing_path = "complex";
-    const bool use_rag_fusion = routing_path == "complex" && cfg.enabled && llm_available;
-    EXPECT_FALSE(use_rag_fusion);
-}
-
-// Opt-in (cfg.enabled=true) + complex route + LLM present => gate on.
-TEST_F(QueryWiringTest, RagFusionGateOnWhenEnabledComplexAndLlm) {
-    RagFusionConfig cfg;
-    cfg.enabled = true;
-    EXPECT_TRUE(std::string("complex") == "complex" && cfg.enabled && /*llm=*/true);
-    // No LLM -> off even when enabled (the [R7] null-LLM degrade).
-    EXPECT_FALSE(std::string("complex") == "complex" && cfg.enabled && /*llm=*/false);
-    // Simple route -> off even when enabled (F36 only on Complex).
-    EXPECT_FALSE(std::string("simple") == "complex" && cfg.enabled && /*llm=*/true);
-}
+// (Removed: RagFusionGateOffWhenConfigDisabled + RagFusionGateOnWhenEnabledComplexAndLlm
+// re-implemented the closure's gate expression on string/bool literals inside
+// the test — `std::string("complex") == "complex"` cannot fail and the real
+// closure never ran. The gate is now pinned on the PRODUCTION closure by the
+// QueryWiringHttpCoverage live tests below: gate-on inside
+// RequestMatrixExercisesProductionClosure (rag_fusion.active=true), gate-off
+// per leg in RagFusionGateStaysOffOnSimpleRouteAndWithoutOptIn, and the [R7]
+// null-LLM leg in RagFusionGateOffWithoutLlm.)
 
 // ValidateRagFusionConfig accepts the default and rejects an out-of-range count
 // (the config the resolver hands downstream must be valid).
@@ -668,6 +655,84 @@ TEST_F(QueryWiringHttpCoverage, RequestMatrixExercisesProductionClosure) {
 
     json missing_query = {{"namespaces", json::array({kNamespace})}};
     expect_status("/api/v1/query", missing_query, 400, "CX_ERR_BAD_REQUEST");
+}
+
+// The production gate (use_rag_fusion = complex && enabled && llm_available)
+// stays OFF on its first two legs, asserted through the live closure via
+// ?explain: (a) simple route + opt-in → inactive; (b) complex route without
+// opt-in (config default disabled) → inactive. The gate-ON case is pinned by
+// RequestMatrixExercisesProductionClosure above (rag_fusion.active=true).
+TEST_F(QueryWiringHttpCoverage, RagFusionGateStaysOffOnSimpleRouteAndWithoutOptIn) {
+    // (a) simple route, rag_fusion opted in → gate off (F36 only on Complex).
+    json simple = BaseBody();
+    simple["route"] = "simple";
+    simple["explain"] = true;
+    simple["rag_fusion"] = true;
+    auto simple_res = PostJson("/api/v1/query", simple);
+    ASSERT_TRUE(simple_res);
+    ASSERT_EQ(simple_res->status, 200) << simple_res->body;
+    const json simple_json = json::parse(simple_res->body);
+    EXPECT_EQ(simple_json["explain"]["routing_path"], "simple");
+    // Gate off → the route never runs the rag-fusion stage, so the explain
+    // carries NO rag_fusion feature block (the block appears only when
+    // use_rag_fusion is true — the serializer-contract decision on the
+    // inactive-state tests).
+    EXPECT_FALSE(simple_json["explain"].contains("llm_dependent_features"))
+        << simple_res->body;
+
+    // (b) complex route, no opt-in → default-disabled config keeps the gate off.
+    json complex_no_optin = BaseBody();
+    complex_no_optin["route"] = "complex";
+    complex_no_optin["explain"] = true;
+    auto complex_res = PostJson("/api/v1/query", complex_no_optin);
+    ASSERT_TRUE(complex_res);
+    ASSERT_EQ(complex_res->status, 200) << complex_res->body;
+    const json complex_json = json::parse(complex_res->body);
+    EXPECT_EQ(complex_json["explain"]["routing_path"], "complex");
+    EXPECT_FALSE(complex_json["explain"].contains("llm_dependent_features"))
+        << complex_res->body;
+}
+
+// Third gate leg ([R7]): rag_fusion opted in on the complex route but the
+// wiring has NO LLM client → the gate stays off and the request degrades to
+// plain scatter (200) instead of crashing on a null LLM. Uses a second wiring
+// built without an LLM on its own port.
+TEST_F(QueryWiringHttpCoverage, RagFusionGateOffWithoutLlm) {
+    httplib::Server no_llm_server;
+    CrossNsQueryWiring no_llm_wiring(
+        harness_->ipool(), *embedder_, *fusion_, *permission_,
+        /*sparse_registry=*/nullptr, /*llm=*/nullptr, /*engine_instr=*/nullptr,
+        /*reranker_model_dir=*/"",
+        /*query_complexity_model_dir=*/"/definitely/missing/query-complexity",
+        /*candidate_multiplier=*/3, /*max_candidates=*/50,
+        /*reranker_execution_provider=*/"cpu");
+    ASSERT_TRUE(no_llm_wiring.IsReady());
+    no_llm_wiring.Register(no_llm_server, auth_);
+    const int port = no_llm_server.bind_to_any_port("127.0.0.1");
+    ASSERT_GT(port, 0);
+    std::thread listen_thread([&] { no_llm_server.listen_after_bind(); });
+    for (int i = 0; i < 50 && !no_llm_server.is_running(); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+
+    json body = BaseBody();
+    body["route"] = "complex";
+    body["explain"] = true;
+    body["rag_fusion"] = true;
+    httplib::Client client("127.0.0.1", port);
+    auto res = client.Post("/api/v1/query", body.dump(), "application/json");
+
+    no_llm_server.stop();
+    listen_thread.join();
+
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 200) << res->body;
+    const json j = json::parse(res->body);
+    EXPECT_EQ(j["explain"]["routing_path"], "complex");
+    // Gate off (no LLM) → plain scatter ran; no rag_fusion feature block.
+    EXPECT_FALSE(j["explain"].contains("llm_dependent_features"))
+        << "no-LLM wiring must keep the rag-fusion gate off (degrade to scatter): "
+        << res->body;
 }
 
 }  // namespace

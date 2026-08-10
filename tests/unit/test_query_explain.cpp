@@ -188,12 +188,10 @@ TEST(QueryExplainMarshalTest, RouteAutoLetsClassifierDecideComplex) {
     EXPECT_EQ(node["granularity"], "chunk");
 }
 
-TEST(QueryExplainMarshalTest, GranularityIsEchoedVerbatim) {
-    for (const std::string g : {"auto", "chunk", "doc", "both"}) {
-        nlohmann::json node = MarshalExplain("q", "ns", "auto", g);
-        EXPECT_EQ(node["granularity"], g);
-    }
-}
+// (Removed: GranularityIsEchoedVerbatim asserted the `node["granularity"] = g`
+// line of this file's own MarshalExplain helper — a self-assertion; the real
+// echo in query_wiring.cpp is covered live by QueryWiringHttpCoverage's
+// explain["granularity"] check in test_query_wiring.cpp.)
 
 // ---------------- F39 ?route validation contract ------------------------------
 

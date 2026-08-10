@@ -209,13 +209,17 @@ TEST_F(BootstrapTest, JsonRenderShape) {
     EXPECT_EQ(r["scopes"][0], "admin:*");
 }
 
-// `Bootstrap_ExpiredToken`.
-TEST_F(BootstrapTest, ExpiredTokenRejected) {
+// A never-issued token is rejected with reason=not_found.
+//
+// COVERAGE GAP (was mislabeled `Bootstrap_ExpiredToken`): the TTL-expiry arm
+// (NowMs() >= token_expires_ms_ → reason=expired) is NOT covered — the handler
+// has no clock seam and kTokenTtlMs=60s cannot be waited out in a unit test.
+// Covering the DoD case Bootstrap_ExpiredToken needs a clock-injection seam in
+// BootstrapHandler (product change, tracked in the #32 audit).
+TEST_F(BootstrapTest, UnknownTokenNotFound) {
     BootstrapHandler bh(pdb_.db(), keys_.get());
     const std::string tok = bh.GenerateToken().value();
-    // Can't easily fast-forward the in-memory clock; instead assert a wrong token
-    // is not_found and rely on the TTL constant for expiry (documented). Here we
-    // check the not_found path (a token never issued).
+    ASSERT_FALSE(tok.empty());
     auto r = bh.Consume("ctx_bootstrap_wrongwrongwrong");
     ASSERT_FALSE(r.ok());
     EXPECT_NE(r.status().message().find("reason=not_found"), std::string::npos);

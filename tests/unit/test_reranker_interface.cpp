@@ -25,21 +25,9 @@ TEST(RetrievalTypesTest, ScoredResultHoldsChildIdAndScore) {
     EXPECT_FLOAT_EQ(r.score, 0.42f);
 }
 
-TEST(RetrievalTypesTest, RankedChunkCarriesFullContentFields) {
-    RankedChunk rc;
-    rc.child_id = "01J0CHILDBBBBBBBBBBBBBBBBB";
-    rc.chunk_text = "hello world";
-    rc.parent_text = "the parent paragraph";
-    rc.score = 0.1f;          // pre-rerank (RRF) score
-    rc.rerank_score = 0.9f;   // cross-encoder score
-    rc.metadata["source"] = "doc_1";
-
-    EXPECT_EQ(rc.chunk_text, "hello world");
-    EXPECT_EQ(rc.parent_text, "the parent paragraph");
-    EXPECT_FLOAT_EQ(rc.score, 0.1f);
-    EXPECT_FLOAT_EQ(rc.rerank_score, 0.9f);
-    EXPECT_EQ(rc.metadata.at("source"), "doc_1");
-}
+// (Removed: RankedChunkCarriesFullContentFields assigned struct fields and read
+// its own assignments back — a self-assertion; the field surface is pinned by
+// compilation at every real use site.)
 
 // --- IReranker interface: a concrete subclass is instantiable through the
 // interface pointer (S1.1 DoD "subclass inheritance is instantiable"). ---

@@ -283,20 +283,32 @@ TEST(BlockHeaderTest, MetadataOnlyPayload) {
     EXPECT_NE(hdr->flags & kFlagHasMetadata, 0);
 }
 
-// Test 17: CRC32 is deterministic for same input
-TEST(BlockHeaderTest, Crc32Deterministic) {
-    auto blob1 = BlockBuild(CortrixBlockType::kBlockFile, ProcessingLevel::kLevelL0,
-                             "test", "{}", "chain");
-    auto blob2 = BlockBuild(CortrixBlockType::kBlockFile, ProcessingLevel::kLevelL0,
-                             "test", "{}", "chain");
+// Test 17: CRC32 coverage structure — the checksum covers the header minus its
+// own field ([0..79] + [84..127]) plus the payload. Pinned by sensitivity:
+// flipping a covered byte changes the CRC; flipping a byte inside the skipped
+// crc32 field (offset 80-83) does not. (The old Crc32Deterministic computed
+// f(x)==f(x) on the same buffer, which cannot fail.)
+TEST(BlockHeaderTest, Crc32CoversHeaderAndPayloadSkipsOwnField) {
+    auto blob = BlockBuild(CortrixBlockType::kBlockFile, ProcessingLevel::kLevelL0,
+                            "test", "{}", "chain");
+    ASSERT_GT(blob.size(), 128u);  // header + payload
+    const uint32_t base = BlockComputeCrc32(blob.data(), blob.size());
+    EXPECT_EQ(BlockComputeCrc32(blob.data(), blob.size()), base);  // deterministic
 
-    // CRC32 should be the same for same data (timestamps differ, but CRC
-    // covers header[0..79] which includes timestamps at offset 56-71.
-    // Since builds happen at different times, CRC will differ.
-    // Instead, verify CRC is consistent for a single blob.
-    uint32_t crc1 = BlockComputeCrc32(blob1.data(), blob1.size());
-    uint32_t crc2 = BlockComputeCrc32(blob1.data(), blob1.size());
-    EXPECT_EQ(crc1, crc2);
+    auto mutated = blob;
+    mutated[0] ^= 0xFF;  // covered header byte [0..79]
+    EXPECT_NE(BlockComputeCrc32(mutated.data(), mutated.size()), base)
+        << "header byte 0 must be covered by the CRC";
+
+    mutated = blob;
+    mutated.back() ^= 0xFF;  // payload byte
+    EXPECT_NE(BlockComputeCrc32(mutated.data(), mutated.size()), base)
+        << "payload must be covered by the CRC";
+
+    mutated = blob;
+    mutated[81] ^= 0xFF;  // inside the skipped crc32 field [80..83]
+    EXPECT_EQ(BlockComputeCrc32(mutated.data(), mutated.size()), base)
+        << "the crc32 field itself must be excluded from the CRC";
 }
 
 // Test 18: Payload offset alignment (relative to header end)

@@ -127,50 +127,13 @@ TEST(SecretProviderReadinessTest, IntegratesIntoRegistry) {
 
 // ---- Real-probe semantics (bootstrap /ready components, F20 §8.4) ----
 //
-// These mirror the exact lambda logic registered in bootstrap.cpp for the catalog
-// and spc_pipeline components, guarding the contract that each probe reflects REAL
-// state (never a constant 200) — i.e. not_ready BEFORE the component is up.
-
-// catalog: ready iff the global catalog.db handle is open (non-null after Open()).
-TEST(BootstrapProbeTest, CatalogNotReadyBeforeOpen) {
-    void* catalog_db_handle = nullptr;  // models CatalogDb::db() before Open()
-    auto probe = [&catalog_db_handle] {
-        ComponentReadiness r;
-        r.ready = (catalog_db_handle != nullptr);
-        r.detail["catalog_db_open"] = r.ready;
-        return r;
-    };
-    EXPECT_FALSE(probe().ready);  // honest 503 while catalog unopened
-
-    int dummy = 0;
-    catalog_db_handle = &dummy;  // models a successful Open()
-    EXPECT_TRUE(probe().ready);
-    EXPECT_EQ(probe().detail["catalog_db_open"], true);
-}
-
-// spc_pipeline: ready iff worker_count() > 0 (true only after WorkerPool::Start()).
-TEST(BootstrapProbeTest, SpcPipelineNotReadyBeforeWorkersStart) {
-    int worker_count = 0;     // models WorkerPool::worker_count() pre-Start
-    size_t queue_size = 3;    // models SPCManager::QueueSize()
-    auto probe = [&worker_count, &queue_size] {
-        ComponentReadiness r;
-        r.ready = (worker_count > 0);
-        r.detail["workers"] = worker_count;
-        r.detail["queue_depth"] = static_cast<int64_t>(queue_size);
-        if (!r.ready) r.detail["reason"] = "workers_not_started";
-        return r;
-    };
-    ComponentReadiness before = probe();
-    EXPECT_FALSE(before.ready);  // honest 503 before spc_mgr.Start()
-    EXPECT_EQ(before.detail["reason"], "workers_not_started");
-    EXPECT_EQ(before.detail["queue_depth"], 3);
-
-    worker_count = 2;  // models post-Start
-    ComponentReadiness after = probe();
-    EXPECT_TRUE(after.ready);
-    EXPECT_EQ(after.detail["workers"], 2);
-    EXPECT_FALSE(after.detail.contains("reason"));
-}
+// (Removed: CatalogNotReadyBeforeOpen + SpcPipelineNotReadyBeforeWorkersStart
+// built test-local lambdas "mirroring" the probes registered in bootstrap.cpp
+// and asserted their own mirrors — the real registered probes never ran. The
+// live probes are now exercised on the STARTED SERVER path by
+// BootstrapF42WiringTest.StartedServerServesRealReadinessProbes in
+// test_bootstrap_f42_wiring.cpp, which hits /api/v1/system/health/ready on a
+// booted server and asserts the catalog / spc_pipeline component details.)
 
 // Registry-level: a not-yet-started component (e.g. spc_pipeline pre-Start) drives the
 // whole /ready to not_ready → F24 maps it to 503, exactly the warming-up contract.
