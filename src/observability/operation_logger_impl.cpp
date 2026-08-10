@@ -297,8 +297,9 @@ void OperationLogger::Cleanup() {
         const int64_t cutoff = NowMs() - static_cast<int64_t>(retention_days) * 86400000LL;
 
         // 1. age-based deletion (rows older than the retention window). A prepare
-        //    failure (e.g. the table is absent) is SILENTLY tolerated — only a step
-        //    failure is a real error (records last_error_ + the cleanup_failed metric).
+        //    failure (e.g. the table is absent) records last_error_ + the
+        //    cleanup_failed metric just like a step failure — retention silently
+        //    never running is exactly what Health() exists to surface.
         {
             sqlite3_stmt* stmt = nullptr;
             if (sqlite3_prepare_v2(db_,
@@ -307,16 +308,24 @@ void OperationLogger::Cleanup() {
                 if (sqlite3_step(stmt) == SQLITE_DONE) deleted_age += sqlite3_changes(db_);
                 else { last_error_ = sqlite3_errmsg(db_); failed = true; }
                 sqlite3_finalize(stmt);
+            } else {
+                last_error_ = sqlite3_errmsg(db_);
+                failed = true;
             }
         }
 
         // 2. row-cap: delete the oldest rows beyond max_rows (0 = unbounded, Ent).
+        //    Prepare failures on the retention path record last_error_ like step
+        //    failures (a failed COUNT would otherwise silently skip the cap).
         if (max_rows > 0) {
             int64_t count = 0;
             sqlite3_stmt* cnt = nullptr;
             if (sqlite3_prepare_v2(db_, "SELECT COUNT(*) FROM operation_log", -1, &cnt, nullptr) == SQLITE_OK) {
                 if (sqlite3_step(cnt) == SQLITE_ROW) count = sqlite3_column_int64(cnt, 0);
                 sqlite3_finalize(cnt);
+            } else {
+                last_error_ = sqlite3_errmsg(db_);
+                failed = true;
             }
             if (count > max_rows) {
                 sqlite3_stmt* del = nullptr;
@@ -328,6 +337,9 @@ void OperationLogger::Cleanup() {
                     if (sqlite3_step(del) == SQLITE_DONE) deleted_quota += sqlite3_changes(db_);
                     else { last_error_ = sqlite3_errmsg(db_); failed = true; }
                     sqlite3_finalize(del);
+                } else {
+                    last_error_ = sqlite3_errmsg(db_);
+                    failed = true;
                 }
             }
         }

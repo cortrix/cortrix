@@ -1677,11 +1677,23 @@ TEST_F(StoreSqliteTest, DocFindByHash_MultipleDocsDifferentHash) {
     EXPECT_EQ(found.source_path, "/tmp/file2.txt");
 }
 
-// (PragmaAutoVacuumIncremental moved out of this test-only batch: reading the
-// pragma back exposed a REAL product defect — `PRAGMA auto_vacuum` runs after
-// `journal_mode=WAL` has already initialized a fresh db, so it is silently a
-// no-op and every store db has auto_vacuum=NONE. The product fix (pragma
-// ordering) + the honest read-back test ship together in a separate PR.)
+// Test: PRAGMA auto_vacuum = INCREMENTAL actually takes effect on a fresh
+// store-created db (design spec). Read the pragma back through a second raw
+// connection — the old test never queried it, which hid that the pragma ran
+// after journal_mode had already initialized the file and was silently a no-op.
+TEST_F(StoreSqliteTest, PragmaAutoVacuumIncremental) {
+    sqlite3* raw = nullptr;
+    ASSERT_EQ(sqlite3_open(db_path_.c_str(), &raw), SQLITE_OK);
+    sqlite3_stmt* stmt = nullptr;
+    ASSERT_EQ(sqlite3_prepare_v2(raw, "PRAGMA auto_vacuum", -1, &stmt, nullptr),
+              SQLITE_OK);
+    ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+    // 0 = NONE, 1 = FULL, 2 = INCREMENTAL
+    EXPECT_EQ(sqlite3_column_int(stmt, 0), 2)
+        << "auto_vacuum must be INCREMENTAL on a store-created db";
+    sqlite3_finalize(stmt);
+    sqlite3_close(raw);
+}
 
 // D3.5 wire⑤ step①: block_insert honors a caller-provided uint64 block_id (the
 // HashChildIdToBlockId hash), not the rowid. A high-bit-set id stores as a negative

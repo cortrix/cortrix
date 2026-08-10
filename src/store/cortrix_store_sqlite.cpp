@@ -311,12 +311,18 @@ int CortrixStoreSqlite::ExecutePragma() {
         // first-opens (per-facade connections, D-I1.bis) would fail immediately
         // with "database is locked" if journal_mode ran before the timeout.
         "PRAGMA busy_timeout = 5000",
+        // auto_vacuum BEFORE journal_mode: the setting only takes effect if it
+        // runs before the database file is initialized, and on a fresh db the
+        // WAL conversion writes the header. With auto_vacuum last (the old
+        // order) the pragma was silently a no-op and every store db ended up
+        // auto_vacuum=NONE. Existing dbs keep NONE (changing them needs a full
+        // VACUUM, deliberately not done at open).
+        "PRAGMA auto_vacuum = INCREMENTAL",
         "PRAGMA journal_mode = WAL",
         "PRAGMA synchronous = NORMAL",
         "PRAGMA cache_size = -8000",
         "PRAGMA mmap_size = 268435456",
         "PRAGMA foreign_keys = ON",
-        "PRAGMA auto_vacuum = INCREMENTAL",
     };
     for (const char* sql : pragmas) {
         char* err = nullptr;

@@ -474,16 +474,30 @@ TEST_F(OperationLoggerTest, GetStatsToleratesMissingTable) {
     EXPECT_EQ(s.oldest_timestamp, 0);
 }
 
-// Cleanup's DELETE prepare fails closed (the `== SQLITE_OK` guard is false) and
-// is SILENTLY tolerated: the whole DELETE block is skipped, so no rows delete and
-// no last_error_ is recorded (only a step failure records one).
-TEST_F(OperationLoggerTest, CleanupToleratesMissingTable) {
+// Cleanup's DELETE prepare failure (e.g. the table is absent) records
+// last_error_ like a step failure — retention silently never running is exactly
+// what Health() exists to surface (#32 audit item A3; the old pin asserted the
+// silent swallow as required behavior).
+TEST_F(OperationLoggerTest, CleanupMissingTableRecordsError) {
     config_->operation_log_max_rows = 0;  // skip the row-cap branch (no count query)
     ASSERT_EQ(sqlite3_exec(db_, "DROP TABLE operation_log", nullptr, nullptr, nullptr),
               SQLITE_OK);
     logger_->Cleanup();
     EXPECT_EQ(logger_->last_cleanup_deleted(), 0);
-    EXPECT_TRUE(logger_->Health().last_error.empty());  // prepare failure is silent
+    auto h = logger_->Health();
+    EXPECT_FALSE(h.last_error.empty()) << "prepare failure must surface via Health()";
+    EXPECT_FALSE(h.is_healthy);
+}
+
+// Same surfacing on the row-cap branch: with the table dropped and max_rows > 0,
+// the COUNT prepare fails and must record last_error_ (a silent skip would let
+// the cap silently never enforce).
+TEST_F(OperationLoggerTest, CleanupRowCapCountPrepareFailureRecordsError) {
+    config_->operation_log_max_rows = 10;
+    ASSERT_EQ(sqlite3_exec(db_, "DROP TABLE operation_log", nullptr, nullptr, nullptr),
+              SQLITE_OK);
+    logger_->Cleanup();
+    EXPECT_FALSE(logger_->Health().last_error.empty());
 }
 
 // Cleanup's age-DELETE step failure (prepares fine, fails at step) via a BEFORE

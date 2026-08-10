@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "cortrix/common/json_contract.h"
 #include "cortrix/memory/mem02_error.h"
 #include "cortrix/memory/prompt_templates.h"
 
@@ -15,7 +16,10 @@ ContradictionDetector::ContradictionDetector(std::shared_ptr<llm::ILlmClient> ll
     : llm_(std::move(llm)), model_(std::move(model)), timeout_ms_(timeout_ms) {}
 
 Result<Judgment> ContradictionDetector::ParseJudgmentJson(const std::string& llm_output) {
-    nlohmann::json j = nlohmann::json::parse(llm_output, /*cb=*/nullptr,
+    // Strip a complete ```json fence before parsing — the same repair layer the
+    // other LLM-output parsers use (enricher_response_parser, doc_summary_generator).
+    const std::string normalized = common::UnwrapCompleteJsonFence(llm_output);
+    nlohmann::json j = nlohmann::json::parse(normalized, /*cb=*/nullptr,
                                              /*allow_exceptions=*/false);
     if (j.is_discarded() || !j.is_object()) {
         return Mem02Status(Mem02ErrorCode::kExtractInvalidOutput,

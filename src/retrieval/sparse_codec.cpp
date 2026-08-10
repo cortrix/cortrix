@@ -80,6 +80,16 @@ Result<SparseVector> DeserializeSparseVec(const uint8_t* data, size_t len) {
                 " terms need " + std::to_string(expected) + " bytes, have " +
                 std::to_string(len));
     }
+    // An oversize blob is corruption too: the serializer always writes exactly
+    // `expected` bytes, so trailing bytes read back from storage mean the blob
+    // was damaged (or the header was) — reject like truncation.
+    if (len > expected) {
+        return SparseStatus(
+            SparseErrorCode::kSparseSerializeFailed,
+            "blob oversize: declared " + std::to_string(num_terms) +
+                " terms need " + std::to_string(expected) + " bytes, have " +
+                std::to_string(len));
+    }
     size_t off = sizeof(uint16_t);
     for (uint16_t i = 0; i < num_terms; ++i) {
         uint16_t term_id = ReadLE<uint16_t>(data + off);
