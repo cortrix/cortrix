@@ -301,18 +301,16 @@ TEST_F(AgentProxyRoutesFull, BufferedForwardsQueryParams) {
     EXPECT_EQ(body["params"]["q"], "hello world");
 }
 
-// strip_prefix consuming the whole path -> UpstreamPath returns "/" (empty->"/").
-TEST_F(AgentProxyRoutesFull, BufferedRootPathBecomesSlash) {
-    // "/api/v1/agent/x" with x = single char still has a path; to hit the empty
-    // branch we need req.path == strip_prefix exactly, but the route pattern
-    // requires "/.+" so the shortest match is "/api/v1/agent/" -> substr -> "/".
+// The proxy route pattern is R"(/api/v1/agent/.+)" — `.+` needs at least one
+// character after the prefix, so a bare "/api/v1/agent/" does NOT match the
+// route and falls through to the server's 404. This pins that the empty-path
+// branch of UpstreamPath (path=="" -> "/") is unreachable via this route
+// pattern. (The old test accepted 200 or 404, which any outcome satisfies.)
+TEST_F(AgentProxyRoutesFull, BufferedBarePrefixDoesNotMatchRoute) {
     auto cli = ProxyClient();
-    auto res = cli.Get("/api/v1/agent/");  // path after strip == "" -> "/"
-    // The route pattern is /api/v1/agent/.+ ; a trailing-slash-only path may not
-    // match (.+ needs >=1 char). Accept either a 200 (matched, path "/") or 404
-    // (pattern miss) -- both are valid, this asserts no crash / clean status.
+    auto res = cli.Get("/api/v1/agent/");  // nothing after the prefix
     ASSERT_TRUE(res);
-    EXPECT_TRUE(res->status == 200 || res->status == 404) << res->status;
+    EXPECT_EQ(res->status, 404) << res->body;
 }
 
 // =========================================================================

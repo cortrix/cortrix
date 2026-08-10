@@ -14,7 +14,6 @@ namespace cortrix::store {
 namespace {
 
 using ::testing::_;
-using ::testing::Return;
 
 // Minimal IIndex stand-in so factory tests can hand back a working instance.
 class FakeIndex : public IIndex {
@@ -48,19 +47,11 @@ public:
     MOCK_METHOD((Result<std::unique_ptr<IIndex>>), Open, (const std::string&), (override));
 };
 
-// Mirrors F12 OpenUnitIndex: hold an IIndexFactory*, Open(unit_path), use IIndex.
-TEST(IIndexFactoryTest, F12StyleOpenUnitIndexThroughMock) {
-    MockIndexFactory factory;
-    EXPECT_CALL(factory, Open("/data/units/unit_legal_0")).WillOnce([](const std::string&) {
-        return Result<std::unique_ptr<IIndex>>(std::make_unique<FakeIndex>());
-    });
-
-    IIndexFactory* f = &factory;  // F12 holds only the interface pointer
-    auto opened = f->Open("/data/units/unit_legal_0");
-    ASSERT_TRUE(opened.ok());
-    ASSERT_NE(opened.value(), nullptr);
-    EXPECT_TRUE(opened.value()->Exists(1));
-}
+// (Removed: F12StyleOpenUnitIndexThroughMock asserted a gmock's canned FakeIndex
+// through the mock it configured — mock-asserts-mock; its Exists(1) check hit a
+// hardcoded `return true`. The Result<unique_ptr<IIndex>> error plumbing is
+// pinned by OpenErrorPropagatesAsResultStatus below; the real factory behavior
+// is covered by the PHnswFactory tests.)
 
 TEST(IIndexFactoryTest, OpenErrorPropagatesAsResultStatus) {
     MockIndexFactory factory;

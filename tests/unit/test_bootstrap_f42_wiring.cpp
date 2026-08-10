@@ -28,6 +28,7 @@
 #include <thread>
 
 #include <httplib.h>
+#include <nlohmann/json.hpp>
 #include <sqlite3.h>
 #include <unistd.h>
 
@@ -171,6 +172,56 @@ TEST_F(BootstrapF42WiringTest, StartedServerRunsRequeueAndStartsCron) {
     EXPECT_EQ(stale.value().status, std::string(async::task_status::kProcessing))
         << "beyond-threshold row must be left for the zombie sweep, not re-queued";
     EXPECT_EQ(stale.value().worker_id, kSeedWorker);
+}
+
+// The /ready endpoint on the STARTED server executes the real probes registered
+// in bootstrap.cpp (catalog, spc_pipeline, disk, secret_provider) — replacing
+// the deleted test_readiness.cpp tests that asserted test-local lambda
+// "mirrors" of these probes without ever running the real ones. Asserts the
+// live component details the mirrors used to fake: catalog_db_open=true on the
+// open handle, workers>0 + queue_depth after spc_mgr.Start().
+TEST_F(BootstrapF42WiringTest, StartedServerServesRealReadinessProbes) {
+    std::string program = "cortrix-server";
+    std::string flag = "--config";
+    char* argv[] = {program.data(), flag.data(), config_path_.data()};
+    int rc = -1;
+    std::thread server([&] { rc = server::RunServer(3, argv); });
+
+    httplib::Response ready_res;
+    bool got = false;
+    for (int i = 0; i < 300 && !got; ++i) {
+        httplib::Client cli("127.0.0.1", port_);
+        cli.set_connection_timeout(0, 200000);
+        if (auto r = cli.Get("/api/v1/system/health/ready")) {
+            ready_res = *r;
+            got = true;
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
+    ASSERT_TRUE(got) << "server did not answer /ready on port " << port_;
+
+    ::raise(SIGTERM);
+    server.join();
+    EXPECT_EQ(rc, 0);
+
+    nlohmann::json body = nlohmann::json::parse(ready_res.body,
+                                                /*cb=*/nullptr,
+                                                /*allow_exceptions=*/false);
+    ASSERT_FALSE(body.is_discarded()) << ready_res.body;
+    ASSERT_TRUE(body.contains("components")) << ready_res.body;
+    const auto& comps = body["components"];
+
+    // catalog: the REAL probe reads the open catalog.db handle.
+    ASSERT_TRUE(comps.contains("catalog")) << ready_res.body;
+    EXPECT_EQ(comps["catalog"]["status"], "ok") << ready_res.body;
+    EXPECT_EQ(comps["catalog"]["catalog_db_open"], true) << ready_res.body;
+
+    // spc_pipeline: the REAL probe reads the started WorkerPool + SPC queue.
+    ASSERT_TRUE(comps.contains("spc_pipeline")) << ready_res.body;
+    EXPECT_EQ(comps["spc_pipeline"]["status"], "ok") << ready_res.body;
+    EXPECT_GT(comps["spc_pipeline"]["workers"].get<int>(), 0) << ready_res.body;
+    EXPECT_TRUE(comps["spc_pipeline"].contains("queue_depth")) << ready_res.body;
 }
 
 }  // namespace

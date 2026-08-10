@@ -1209,10 +1209,11 @@ TEST_F(StoreSqliteTest, BlockContentHashBlobGetByDoc) {
     EXPECT_EQ(blocks[0].content_hash, binary_hash);
 }
 
-// Test 48: FTS5 update trigger handles NULL→text transition
+// Test 48: FTS5 update trigger handles NULL→text transition — the blocks_au
+// trigger must index a row whose content_text goes from NULL to a value. The
+// old test never performed the update; here we drive it via a raw connection
+// (no store API updates content_text) and assert the FTS index picks it up.
 TEST_F(StoreSqliteTest, FTS5UpdateNullToText) {
-    // This tests the unified update trigger handles the case where
-    // content_text goes from NULL to a value
     CortrixDoc doc;
     doc.source_type = "test";
     doc.source_path = "test.txt";
@@ -1229,15 +1230,30 @@ TEST_F(StoreSqliteTest, FTS5UpdateNullToText) {
     // content_text is empty → NULL
     store_->block_insert(block);
 
-    // Verify no FTS results for "searchterm"
+    // NULL content_text → not in the FTS index.
     std::vector<SearchResult> results;
     store_->search_fulltext("searchterm", 10, results);
     EXPECT_TRUE(results.empty());
 
-    // Verify the block was created (this test mainly verifies no crash)
-    CortrixBlock retrieved;
-    int ret = store_->block_get(block.block_id, retrieved);
-    EXPECT_EQ(ret, 0);
+    // NULL → text transition through the blocks_au trigger.
+    {
+        sqlite3* raw = nullptr;
+        ASSERT_EQ(sqlite3_open(db_path_.c_str(), &raw), SQLITE_OK);
+        const std::string sql =
+            "UPDATE blocks SET content_text='unique searchterm content' "
+            "WHERE block_id=" + std::to_string(block.block_id);
+        char* err = nullptr;
+        ASSERT_EQ(sqlite3_exec(raw, sql.c_str(), nullptr, nullptr, &err), SQLITE_OK)
+            << (err ? err : "");
+        sqlite3_close(raw);
+    }
+
+    // The trigger inserted the new text into blocks_fts → the search now hits.
+    results.clear();
+    store_->search_fulltext("searchterm", 10, results);
+    ASSERT_EQ(results.size(), 1u)
+        << "blocks_au trigger must index the NULL->text transition";
+    EXPECT_EQ(results[0].block_id, static_cast<uint64_t>(block.block_id));
 }
 
 // ============================================================
@@ -1661,35 +1677,11 @@ TEST_F(StoreSqliteTest, DocFindByHash_MultipleDocsDifferentHash) {
     EXPECT_EQ(found.source_path, "/tmp/file2.txt");
 }
 
-// Test: PRAGMA auto_vacuum = INCREMENTAL is set (design spec)
-TEST_F(StoreSqliteTest, PragmaAutoVacuumIncremental) {
-    // After Open(), auto_vacuum should be set to INCREMENTAL (value = 2)
-    // We verify by querying the pragma through a new store on same DB
-    // The store is already open from SetUp.
-    // Re-open and check pragma value via a raw SQL query isn't possible
-    // through the CortrixStore interface, but we can verify the store
-    // opened successfully with the pragma set.
-    // A more targeted approach: close and re-open, verify it still works.
-    store_->Close();
-    store_.reset();
-
-    auto store2 = std::make_unique<CortrixStoreSqlite>(db_path_);
-    EXPECT_EQ(store2->Open(), 0);
-
-    // Verify the store is functional after re-open with auto_vacuum pragma
-    CortrixDoc doc;
-    doc.source_type = "test";
-    doc.source_path = "auto_vacuum_test.txt";
-    EXPECT_EQ(store2->doc_create(doc), 0);
-    EXPECT_FALSE(doc.doc_id.empty());
-
-    store2->Close();
-    store2.reset();
-
-    // Re-create store_ for TearDown
-    store_ = std::make_unique<CortrixStoreSqlite>(db_path_);
-    store_->Open();
-}
+// (PragmaAutoVacuumIncremental moved out of this test-only batch: reading the
+// pragma back exposed a REAL product defect — `PRAGMA auto_vacuum` runs after
+// `journal_mode=WAL` has already initialized a fresh db, so it is silently a
+// no-op and every store db has auto_vacuum=NONE. The product fix (pragma
+// ordering) + the honest read-back test ship together in a separate PR.)
 
 // D3.5 wire⑤ step①: block_insert honors a caller-provided uint64 block_id (the
 // HashChildIdToBlockId hash), not the rowid. A high-bit-set id stores as a negative

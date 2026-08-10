@@ -467,7 +467,13 @@ TEST_F(SPCManagerRealTest, WorkerLoop_CancelledTask) {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-    // Task should still be cancelled (worker skips it without setting error)
+    // The worker's cancelled-guard skips the task BEFORE acquiring the
+    // namespace: the task must not advance past its submitted stage and must
+    // carry no error. (Without the guard the worker would process it — the
+    // facade Acquire/parse path would move stage to kError or beyond.)
+    EXPECT_EQ(task->stage, SPCStage::kQueued)
+        << "cancelled task must be skipped, not processed";
+    EXPECT_TRUE(task->error_message.empty()) << task->error_message;
     EXPECT_TRUE(task->cancelled.load());
 
     mgr_->Stop();

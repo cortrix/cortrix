@@ -817,47 +817,71 @@ TEST_F(MemoryRoutesTest, WriteInteractionNamespaceNotFound) {
     EXPECT_EQ(res->status, 404);
 }
 
+// Metadata survives the write path end to end: written on a REAL session (201)
+// and read back verbatim from GET /sessions/{sid}/interactions. (The old test
+// posted to a nonexistent session and asserted only the 404 any body produces.)
 TEST_F(MemoryRoutesTest, WriteInteractionWithMetadata) {
-    // Tests that metadata JSON field is correctly parsed from request body.
-    // Session id was never created -> 404, but we verify the handler reaches
-    // the writer (not rejected at JSON parsing).
     ON_CALL(mock_spc_, Submit(_)).WillByDefault(Return(Status::Ok()));
+    std::string sid = CreateSession("default", "meta_u");
+    ASSERT_FALSE(sid.empty());
 
     httplib::Client cli("127.0.0.1", port_);
     json body;
     body["namespace"] = "default";
+    body["user_id"] = "meta_u";
     body["query_text"] = "test query";
     body["response_text"] = "test response";
     body["metadata"] = {{"custom_field", "custom_value"}};
 
-    auto res = cli.Post("/api/v1/memory/sessions/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/interactions",
+    auto res = cli.Post("/api/v1/memory/sessions/" + sid + "/interactions",
                         AuthHeaders(), body.dump(), "application/json");
-
     ASSERT_TRUE(res);
-    // Session was never created -> 404 (but body was parsed OK)
-    EXPECT_EQ(res->status, 404);
+    ASSERT_EQ(res->status, 201) << res->body;
+
+    // Read back: the stored interaction carries the metadata (the session
+    // detail route returns the session + its interactions).
+    auto list = cli.Get("/api/v1/memory/sessions/" + sid +
+                            "?namespace=default&user_id=meta_u",
+                        AuthHeaders());
+    ASSERT_TRUE(list);
+    ASSERT_EQ(list->status, 200) << list->body;
+    auto resp = json::parse(list->body);
+    ASSERT_FALSE(resp["interactions"].empty()) << list->body;
+    bool found = false;
+    for (const auto& it : resp["interactions"]) {
+        if (it.contains("metadata") &&
+            it["metadata"].value("custom_field", "") == "custom_value") {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found) << "metadata must round-trip through the writer: "
+                       << list->body;
 }
 
+// ttl_seconds is accepted on the real success path (201) — the writer takes it
+// without a parse/validation error. (The old test posted to a nonexistent
+// session and asserted only the 404 any body produces.)
 TEST_F(MemoryRoutesTest, WriteInteractionWithTTL) {
-    // Verify TTL field is accepted in the request body without parse errors.
-    // Session id was never created -> 404, but the handler correctly parses
-    // and passes ttl_seconds to the MemoryWriter.
     ON_CALL(mock_spc_, Submit(_)).WillByDefault(Return(Status::Ok()));
+    std::string sid = CreateSession("default", "ttl_u");
+    ASSERT_FALSE(sid.empty());
 
     httplib::Client cli("127.0.0.1", port_);
     json body;
     body["namespace"] = "default";
+    body["user_id"] = "ttl_u";
     body["query_text"] = "test";
     body["response_text"] = "response";
     body["result_source"] = "text_to_sql";
     body["ttl_seconds"] = 3600;
 
-    auto res = cli.Post("/api/v1/memory/sessions/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/interactions",
+    auto res = cli.Post("/api/v1/memory/sessions/" + sid + "/interactions",
                         AuthHeaders(), body.dump(), "application/json");
-
     ASSERT_TRUE(res);
-    // Session was never created -> 404
-    EXPECT_EQ(res->status, 404);
+    ASSERT_EQ(res->status, 201) << res->body;
+    auto resp = json::parse(res->body);
+    EXPECT_EQ(resp["session_id"], sid);
+    EXPECT_TRUE(resp.contains("turn"));
 }
 
 // Write to a REAL (existing) session: the writer succeeds and the handler returns
@@ -1029,10 +1053,14 @@ TEST_F(MemoryRoutesTest, SearchWithIncludeExpired) {
                         body.dump(), "application/json");
 
     ASSERT_TRUE(res);
-    // With stub components, search may degrade or return 200/500 depending
-    // on whether QueryPipeline handles the dummy embedder gracefully.
-    // We accept 200 (degraded search) or 500 (if pipeline crashes).
-    EXPECT_TRUE(res->status == 200 || res->status == 500);
+    // Same deterministic contract as SearchBasicSuccess: the stub components
+    // degrade gracefully, never 500. (The old accept-200-or-500 hedge let a
+    // pipeline crash pass.)
+    EXPECT_EQ(res->status, 200) << res->body;
+    auto resp = json::parse(res->body);
+    EXPECT_TRUE(resp.contains("results"));
+    EXPECT_TRUE(resp["results"].is_array());
+    EXPECT_TRUE(resp.contains("degraded"));
 }
 
 TEST_F(MemoryRoutesTest, SearchEmptyResults) {
@@ -1208,16 +1236,17 @@ TEST_F(MemoryRoutesTest, SearchResponseFormat) {
     auto res = cli.Post("/api/v1/memory/search", AuthHeaders(),
                         body.dump(), "application/json");
     ASSERT_TRUE(res);
-    // May return 200 (degraded) due to stub embedder components
-    if (res->status == 200) {
-        auto resp = json::parse(res->body);
-        EXPECT_TRUE(resp.contains("results"));
-        EXPECT_TRUE(resp["results"].is_array());
-        EXPECT_TRUE(resp.contains("total_results"));
-        EXPECT_TRUE(resp.contains("latency_ms"));
-        EXPECT_TRUE(resp.contains("degraded"));
-        EXPECT_GE(resp["latency_ms"].get<int64_t>(), 0);
-    }
+    // Deterministic 200 (stub components degrade gracefully — same contract as
+    // SearchBasicSuccess). The old `if (status == 200)` guard made every field
+    // assertion vacuous on any non-200.
+    ASSERT_EQ(res->status, 200) << res->body;
+    auto resp = json::parse(res->body);
+    EXPECT_TRUE(resp.contains("results"));
+    EXPECT_TRUE(resp["results"].is_array());
+    EXPECT_TRUE(resp.contains("total_results"));
+    EXPECT_TRUE(resp.contains("latency_ms"));
+    EXPECT_TRUE(resp.contains("degraded"));
+    EXPECT_GE(resp["latency_ms"].get<int64_t>(), 0);
 }
 
 // ===== Cross-request roundtrip test =====

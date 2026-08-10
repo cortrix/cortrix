@@ -242,17 +242,13 @@ TEST_F(QueryRoutesIntegrationTest, ValidQuery_ExistingNamespace_Returns200) {
     auto res = cli.Post("/api/v1/query", AuthHeaders(),
                         req_body.dump(), "application/json");
     ASSERT_TRUE(res);
-    // The query should succeed (even if results are empty since namespace is empty)
-    // Or it might return 503 if all routes fail on empty namespace
-    EXPECT_TRUE(res->status == 200 || res->status == 503);
-
+    // Deterministic: an existing-but-empty namespace answers 200 with empty
+    // results — emptiness is not an outage. (The old accept-200-or-503 hedge
+    // let an all-routes-failed regression pass.)
+    ASSERT_EQ(res->status, 200) << res->body;
     auto body = json::parse(res->body);
-    if (res->status == 200) {
-        EXPECT_TRUE(body.contains("data") || body.contains("results") || body.contains("meta"));
-    } else {
-        // 503 = L3 all routes failed (expected for empty namespace)
-        EXPECT_EQ(body["error"]["code"], "UNAVAILABLE");
-    }
+    EXPECT_TRUE(body.contains("results")) << res->body;
+    EXPECT_TRUE(body["results"].is_array());
 }
 
 // ── F39 ?route enum validation (Agent-friendly error) ────────────────────────

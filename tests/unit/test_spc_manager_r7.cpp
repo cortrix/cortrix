@@ -231,37 +231,48 @@ protected:
 // ============================================================
 
 // On a manager WITH a real pipeline, SetCleaningConfigResolver forwards to the
-// pipeline (the `if (pipeline_)` TRUE arm) and the resolved NS config takes effect
-// on the next ProcessParsedDoc — verified indirectly here by simply not crashing and
-// completing an L0 ProcessParsedDoc afterward (the resolver runs inside the pipeline).
+// pipeline (the `if (pipeline_)` TRUE arm): an L2 doc (chunks, no embedding)
+// reaches the cleaning stage, which invokes the installed resolver for the
+// task's namespace. resolver_calls > 0 is the forwarding proof — if the manager
+// proxy dropped the resolver instead of forwarding, the count would stay 0.
+// (The old test ran an L0 doc, which skips cleaning entirely, and never read
+// its own resolver_calls counter.)
 TEST_F(SPCManagerR7Test, SetCleaningConfigResolver_ForwardsToPipeline) {
     int resolver_calls = 0;
+    std::string resolved_ns;
     mgr_->SetCleaningConfigResolver(
-        [&resolver_calls](const std::string&) {
+        [&resolver_calls, &resolved_ns](const std::string& ns_id) {
             ++resolver_calls;
+            resolved_ns = ns_id;
             cortrix::spc::CleaningConfig c;
             c.dedup_enabled = false;
             return c;
         });
 
-    // L0 skips processing entirely, so the resolver may not be invoked — the point is
-    // the proxy installed without crashing (TRUE arm of `if (pipeline_)`).
     AdmitNs("ccr_ns");
     cortrix::spc::ParsedDoc d;
     d.status = cortrix::spc::ParserErrorCode::kOk;
     d.parser_name = "docling";
     d.metadata.filename = "f.txt";
+    cortrix::spc::ParsedPage page;
+    page.page_num = 1;
+    page.page_text = "Cleaning resolver forwarding test content, long enough "
+                     "to survive chunking as at least one child chunk.";
+    d.pages.push_back(page);
     SPCTask task;
     task.doc_id = "01JTESTDOC00000000000000C1";
     task.namespace_name = "ccr_ns";
     task.source_path = "/tmp/f.txt";
     task.mime_type = "text/plain";
-    task.processing_level = 0;
+    task.processing_level = 2;  // L2: chunking + cleaning, no embedding
     task.source_type = "file";
 
     int rc = mgr_->ProcessParsedDoc(d, task);
     EXPECT_EQ(rc, 0) << task.error_message;
     EXPECT_EQ(task.stage, SPCStage::kDone);
+    EXPECT_GT(resolver_calls, 0)
+        << "resolver must be forwarded to the pipeline and invoked by cleaning";
+    EXPECT_EQ(resolved_ns, "ccr_ns");
 }
 
 // ============================================================

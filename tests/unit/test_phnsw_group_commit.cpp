@@ -120,7 +120,11 @@ TEST_F(PHnswGroupCommitTest, AddPointsBatchAllDurable) {
     EXPECT_EQ(index.GetWalStats().entry_count, 50u);
 }
 
-TEST_F(PHnswGroupCommitTest, ConcurrentAddPointsAllSucceedAndCoalesce) {
+// Note: coalescing (batches < records) is NOT asserted here — PHnsw does not
+// expose GroupCommitStats, so the batch count is unobservable from a test.
+// This pins what IS observable: all concurrent AddPoints succeed and every
+// record is durable in the WAL.
+TEST_F(PHnswGroupCommitTest, ConcurrentAddPointsAllSucceedDurably) {
     PHnsw index(dir_, config_);
     constexpr int kThreads = 8;
     constexpr int kPerThread = 50;
@@ -151,12 +155,6 @@ TEST_F(PHnswGroupCommitTest, ConcurrentAddPointsAllSucceedAndCoalesce) {
     ASSERT_TRUE(recs.ok());
     EXPECT_EQ(recs.value().size(), static_cast<size_t>(kThreads * kPerThread));
 
-    // Coalescing actually happened: far fewer fsync batches than 400 individual
-    // writes (group commit merged concurrent submits). We assert via the
-    // committer's effect — at least some batches held >1 entry — by checking the
-    // batch count is well under the record count. (GroupCommitWriter stats are
-    // internal; here we just sanity-check throughput succeeded.)
-    SUCCEED();
 }
 
 TEST_F(PHnswGroupCommitTest, NotReady_RejectsWritesWhenWalUnopenable) {

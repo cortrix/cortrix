@@ -25,7 +25,6 @@ namespace {
 using ::testing::_;
 using ::testing::Return;
 using ::testing::Throw;
-using retrieval::RankedChunk;
 using retrieval::ScoredResult;
 
 RerankerConfig StubConfig() {
@@ -240,26 +239,9 @@ TEST(RerankerCoverageTest, MockScoreBatchAllZero) {
     for (float v : s) EXPECT_FLOAT_EQ(v, 0.0f);
 }
 
-// "varied score distribution": a varied distribution, and Rerank canned to return them
-// sorted (a unit downstream of IReranker can assert on ordering).
-TEST(RerankerCoverageTest, MockRerankVariedScoreDistribution) {
-    MockReranker mock;
-    std::vector<RankedChunk> canned{
-        RankedChunk{"01C1", "t1", "p1", 0.30f, 0.95f, {}, {}},
-        RankedChunk{"01C2", "t2", "p2", 0.40f, 0.50f, {}, {}},
-        RankedChunk{"01C3", "t3", "p3", 0.10f, 0.05f, {}, {}},
-    };
-    EXPECT_CALL(mock, Rerank(_, _)).WillOnce(Return(canned));
-    std::vector<ScoredResult> cands{{"01C1", 0.3f}, {"01C2", 0.4f}, {"01C3", 0.1f}};
-    auto out = mock.Rerank(cands, "q");
-    ASSERT_EQ(out.size(), 3u);
-    // The canned distribution is monotonically decreasing in rerank_score.
-    for (size_t i = 0; i + 1 < out.size(); ++i) {
-        EXPECT_GE(out[i].rerank_score, out[i + 1].rerank_score);
-    }
-    EXPECT_FLOAT_EQ(out[0].rerank_score, 0.95f);
-    EXPECT_FLOAT_EQ(out[2].rerank_score, 0.05f);
-}
+// (Removed: MockRerankVariedScoreDistribution asserted the ordering of its own
+// canned literal returned through a gmock — mock-asserts-mock, no src/ behavior
+// exercised. Real ordering behavior is covered by the OnnxReranker tests.)
 
 // ===================== ScoreBatch null/empty input guards =====================
 
