@@ -224,6 +224,7 @@ add_executable(cortrix_unit_tests
     unit/test_connector_routes.cpp
     unit/test_execution_provider.cpp
     unit/test_config_execution_provider.cpp
+    unit/test_bootstrap_f42_wiring.cpp
     unit/test_directory_importer.cpp
     unit/test_http_transport_unit.cpp
     unit/test_flat_document_routes.cpp
