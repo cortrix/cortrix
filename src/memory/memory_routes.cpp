@@ -1131,12 +1131,21 @@ void RegisterMemoryRoutes(
         search_req.user_id = user_id;
 
         // MEM05: scope is session or user only (kAll removed). Default = user.
+        // Unknown values are rejected 400 — scope is an enumerable state
+        // (GEN-Agent principle 4) and the MEM05 design's wire-compat note says
+        // an unrecognized scope string gets 400, matching the siblings that
+        // already 400 on bad ?route/?granularity. No compat alias for the
+        // legacy "all" (Phase 1 carries no wire-compat logic per MEM05 D1).
         std::string scope_str = body.value("scope", "user");
         if (scope_str == "session") {
             search_req.scope = MemoryScope::kSession;
             search_req.session_id = body.value("session_id", "");
-        } else {
+        } else if (scope_str == "user") {
             search_req.scope = MemoryScope::kUser;
+        } else {
+            WriteJsonError(res, Status::InvalidArgument(
+                "scope must be one of {session, user}, got '" + scope_str + "'"));
+            return;
         }
 
         auto valid = search_req.Validate();

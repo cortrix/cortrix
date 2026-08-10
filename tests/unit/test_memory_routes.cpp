@@ -988,9 +988,12 @@ TEST_F(MemoryRoutesTest, SearchWithScopeUser) {
     EXPECT_EQ(res->status, 200);
 }
 
-// MEM05: legacy scope="all" is no longer a distinct mode; it falls through to
-// kUser (kAll removed). Still 200 because user_id defaults to "default".
-TEST_F(MemoryRoutesTest, SearchWithLegacyScopeAllFallsBackToUser) {
+// MEM05: legacy scope="all" was removed (kAll violates user isolation) and the
+// design carries NO wire-compat alias for it (Phase 1 wire-compat note: an
+// unrecognized scope string gets 400). The old pin let "all" silently become
+// kUser — a caller expecting cross-user results got silently narrowed instead
+// of told (#32 audit item A6).
+TEST_F(MemoryRoutesTest, SearchWithLegacyScopeAllRejected400) {
     httplib::Client cli("127.0.0.1", port_);
     json body;
     body["namespace"] = "default";
@@ -1001,7 +1004,7 @@ TEST_F(MemoryRoutesTest, SearchWithLegacyScopeAllFallsBackToUser) {
                         body.dump(), "application/json");
 
     ASSERT_TRUE(res);
-    EXPECT_EQ(res->status, 200);
+    EXPECT_EQ(res->status, 400);
 }
 
 TEST_F(MemoryRoutesTest, SearchWithTopK) {
@@ -1112,19 +1115,21 @@ TEST_F(MemoryRoutesTest, SearchTopKOver100) {
     EXPECT_EQ(res->status, 400);
 }
 
-// MEM05: any scope other than "session" defaults to kUser (kAll removed).
-// user_id defaults to "default" (CE no-auth), so this succeeds with 200.
-TEST_F(MemoryRoutesTest, SearchUnknownScopeDefaultsToUser) {
+// MEM05: scope is an enumerable state — session|user. An unknown value is a
+// 400, not a silent kUser fallback (GEN-Agent principle 4; siblings ?route/
+// ?granularity already 400 on bad values). Absent scope still defaults to
+// user (covered by the scope-less search tests above).
+TEST_F(MemoryRoutesTest, SearchUnknownScopeRejected400) {
     httplib::Client cli("127.0.0.1", port_);
     json body;
     body["namespace"] = "default";
     body["query"] = "test";
-    body["scope"] = "unknown_scope";  // anything not "session" -> kUser
+    body["scope"] = "unknown_scope";
 
     auto res = cli.Post("/api/v1/memory/search", AuthHeaders(),
                         body.dump(), "application/json");
     ASSERT_TRUE(res);
-    EXPECT_EQ(res->status, 200);  // MEM05: defaults to kUser + default user
+    EXPECT_EQ(res->status, 400);
 }
 
 // ===== Delete session namespace not found (lines 260-264) =====
