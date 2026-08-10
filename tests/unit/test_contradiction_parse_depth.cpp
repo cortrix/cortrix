@@ -11,10 +11,10 @@
 // missing-verdict via the MemoryExtractor delegate; this suite pins every
 // reachable arm of the parser directly: the bool/numeric verdict accept, the
 // confidence clamp (both directions + boundaries), reason optionality/typing,
-// the array-instead-of-object reject, and the (DIVERGENCE-from-hypothesis)
-// behavior for code-fenced + {"result":{...}}-wrapped inputs — which this
-// parser does NOT unwrap (no fence-strip / no result-unwrap in the impl), so
-// they are rejected. Suite name is globally unique (ContradictionParseDepth).
+// the array-instead-of-object reject, and the fence/{"result":{...}} handling:
+// a COMPLETE ```json fence is unwrapped (shared common::UnwrapCompleteJsonFence
+// repair layer), while truncated fences and result-wrapped objects stay
+// rejected. Suite name is globally unique (ContradictionParseDepth).
 namespace cortrix::memory {
 namespace {
 
