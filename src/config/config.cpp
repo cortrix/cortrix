@@ -546,6 +546,10 @@ std::vector<std::string> ValidateConfig(const CortrixConfig& config) {
                          std::to_string(config.spc.chunk_size) + "), got " +
                          std::to_string(config.spc.chunk_overlap));
     }
+    if (config.spc.max_queue_size < 1) {
+        errors.push_back("spc.max_queue_size must be >= 1, got " +
+                         std::to_string(config.spc.max_queue_size));
+    }
 
     // Log validation
     {
