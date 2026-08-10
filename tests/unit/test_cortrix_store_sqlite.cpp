@@ -1661,34 +1661,22 @@ TEST_F(StoreSqliteTest, DocFindByHash_MultipleDocsDifferentHash) {
     EXPECT_EQ(found.source_path, "/tmp/file2.txt");
 }
 
-// Test: PRAGMA auto_vacuum = INCREMENTAL is set (design spec)
+// Test: PRAGMA auto_vacuum = INCREMENTAL actually takes effect on a fresh
+// store-created db (design spec). Read the pragma back through a second raw
+// connection — the old test never queried it, which hid that the pragma ran
+// after journal_mode had already initialized the file and was silently a no-op.
 TEST_F(StoreSqliteTest, PragmaAutoVacuumIncremental) {
-    // After Open(), auto_vacuum should be set to INCREMENTAL (value = 2)
-    // We verify by querying the pragma through a new store on same DB
-    // The store is already open from SetUp.
-    // Re-open and check pragma value via a raw SQL query isn't possible
-    // through the CortrixStore interface, but we can verify the store
-    // opened successfully with the pragma set.
-    // A more targeted approach: close and re-open, verify it still works.
-    store_->Close();
-    store_.reset();
-
-    auto store2 = std::make_unique<CortrixStoreSqlite>(db_path_);
-    EXPECT_EQ(store2->Open(), 0);
-
-    // Verify the store is functional after re-open with auto_vacuum pragma
-    CortrixDoc doc;
-    doc.source_type = "test";
-    doc.source_path = "auto_vacuum_test.txt";
-    EXPECT_EQ(store2->doc_create(doc), 0);
-    EXPECT_FALSE(doc.doc_id.empty());
-
-    store2->Close();
-    store2.reset();
-
-    // Re-create store_ for TearDown
-    store_ = std::make_unique<CortrixStoreSqlite>(db_path_);
-    store_->Open();
+    sqlite3* raw = nullptr;
+    ASSERT_EQ(sqlite3_open(db_path_.c_str(), &raw), SQLITE_OK);
+    sqlite3_stmt* stmt = nullptr;
+    ASSERT_EQ(sqlite3_prepare_v2(raw, "PRAGMA auto_vacuum", -1, &stmt, nullptr),
+              SQLITE_OK);
+    ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+    // 0 = NONE, 1 = FULL, 2 = INCREMENTAL
+    EXPECT_EQ(sqlite3_column_int(stmt, 0), 2)
+        << "auto_vacuum must be INCREMENTAL on a store-created db";
+    sqlite3_finalize(stmt);
+    sqlite3_close(raw);
 }
 
 // D3.5 wire⑤ step①: block_insert honors a caller-provided uint64 block_id (the
