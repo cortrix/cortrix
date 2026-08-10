@@ -20,8 +20,8 @@
 //     duplicate keys at construction, so on-disk ids are unique by definition.
 //   - Deserialize: empty/nullptr buffer -> empty vector (NOT an error).
 //     len < 2 -> reject. len < declared(2+n*6) -> reject (truncation).
-//     OVERSIZE (extra trailing bytes) is IGNORED, not rejected (len < expected
-//     is the only guard) -> asserted as documented behavior below.
+//     len > declared -> reject (oversize = corruption; the serializer always
+//     writes exactly the declared size).
 //   - weights are memcpy'd both ways: NaN/Inf/negative are bit-preserved.
 //
 // All suite + fixture names are globally unique (SparseCodecValMatrix* prefix).
@@ -355,25 +355,22 @@ TEST(SparseCodecValMatrixTruncated, ExactLengthSucceeds) {
 }
 
 // ==========================================================================
-// Oversize blob matrix: extra trailing bytes are IGNORED (documented: the
-// impl only guards len < expected, never len > expected). Assert it does NOT
-// reject and decodes exactly the declared terms.
+// Oversize blob matrix: extra trailing bytes are REJECTED. The serializer
+// always writes exactly `expected` bytes, so a longer blob read back from
+// storage is corruption just like a shorter one (#32 audit item A5; the old
+// pin asserted the tolerated junk as required behavior).
 // ==========================================================================
 class SparseCodecValMatrixOversize : public ::testing::TestWithParam<size_t> {};
 
-TEST_P(SparseCodecValMatrixOversize, ExtraTrailingBytesIgnored) {
+TEST_P(SparseCodecValMatrixOversize, ExtraTrailingBytesRejected) {
     const size_t extra = GetParam();
     SparseVector v = VecOf({{1u, 1.5f}, {2u, 2.5f}, {3u, 3.5f}});
     std::vector<uint8_t> blob = SerializeSparseVec(v);
     ASSERT_EQ(blob.size(), 20u);  // 2 + 3*6
     blob.resize(blob.size() + extra, 0xAB);  // append junk
     Result<SparseVector> got = DeserializeSparseVec(blob);
-    ASSERT_TRUE(got.ok()) << "oversize blob must be accepted, trailing ignored";
-    const SparseVector& out = got.value();
-    ASSERT_EQ(out.size(), 3u);
-    EXPECT_TRUE(BitEq(out.terms.at(1u), 1.5f));
-    EXPECT_TRUE(BitEq(out.terms.at(2u), 2.5f));
-    EXPECT_TRUE(BitEq(out.terms.at(3u), 3.5f));
+    ASSERT_FALSE(got.ok()) << "oversize blob is corruption and must be rejected";
+    EXPECT_NE(got.status().message().find("oversize"), std::string::npos);
 }
 
 INSTANTIATE_TEST_SUITE_P(Matrix, SparseCodecValMatrixOversize,
