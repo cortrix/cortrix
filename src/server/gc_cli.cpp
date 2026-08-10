@@ -17,11 +17,18 @@ namespace {
 
 // Parse `--config <path>` out of argv (same flag the server honors) so the CLI
 // resolves the data dir + gc windows from the same config the server would use.
-std::string ParseConfigPath(int argc, char* argv[]) {
+// Returns false on a dangling `--config` with no value: silently falling back
+// to the DEFAULT data dir would let a typoed invocation of a destructive
+// command (purge) operate the wrong catalog with no warning.
+bool ParseConfigPath(int argc, char* argv[], std::string* out) {
     for (int i = 1; i < argc; ++i) {
-        if (std::string(argv[i]) == "--config" && i + 1 < argc) return argv[i + 1];
+        if (std::string(argv[i]) == "--config") {
+            if (i + 1 >= argc) return false;
+            *out = argv[i + 1];
+            ++i;
+        }
     }
-    return "";
+    return true;
 }
 
 void PrintJson(const nlohmann::json& j) { std::printf("%s\n", j.dump(2).c_str()); }
@@ -51,7 +58,11 @@ std::optional<int> MaybeRunGcCli(int argc, char* argv[]) {
         (cmd == "gc-status" || cmd == "gc-run" || cmd == "purge" || cmd == "restore");
     if (!is_gc) return std::nullopt;
 
-    const std::string config_path = ParseConfigPath(argc, argv);
+    std::string config_path;
+    if (!ParseConfigPath(argc, argv, &config_path)) {
+        std::fprintf(stderr, "gc-cli: --config requires a path argument\n");
+        return 2;
+    }
     auto config = cortrix::LoadConfig(config_path);
 
     catalog::CatalogDb catalog;

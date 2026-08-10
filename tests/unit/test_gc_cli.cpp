@@ -109,18 +109,24 @@ TEST_F(GcCliTest, CatalogOpenFailureReturnsOne) {
     EXPECT_EQ(*rc, 1);
 }
 
-// --- a recognized gc subcommand is detected even with a dangling --config (the
-//     missing value is tolerated by ParseConfigPath → empty path → default dir) ---
-TEST_F(GcCliTest, GcStatusWithDanglingConfigFlagStillRuns) {
-    const std::string cfg = WriteConfig(data_dir_);
-    // Use CORTRIX_DATA_DIR so the default-config path still resolves to our temp
-    // dir even though --config has no value here.
-    setenv("CORTRIX_DATA_DIR", data_dir_.c_str(), 1);
+// --- a dangling --config (no value) is a usage error, exit 2 — silently
+//     falling back to the DEFAULT data dir would let a typoed invocation of a
+//     destructive command operate the wrong catalog (#32 audit item A4; the old
+//     pin asserted the silent fallback as required behavior) ---
+TEST_F(GcCliTest, GcStatusWithDanglingConfigFlagIsUsageError) {
     Argv a({"cortrix-server", "gc-status", "--config"});  // dangling flag
     auto rc = MaybeRunGcCli(a.argc(), a.argv());
-    unsetenv("CORTRIX_DATA_DIR");
     ASSERT_TRUE(rc.has_value());  // still treated as a gc subcommand (not nullopt)
-    EXPECT_EQ(*rc, 0);
+    EXPECT_EQ(*rc, 2);
+}
+
+// The destructive subcommand is the reason the fallback is dangerous — pin it
+// directly: purge with a dangling --config must not touch any catalog.
+TEST_F(GcCliTest, PurgeWithDanglingConfigFlagIsUsageError) {
+    Argv a({"cortrix-server", "purge", "--config"});
+    auto rc = MaybeRunGcCli(a.argc(), a.argv());
+    ASSERT_TRUE(rc.has_value());
+    EXPECT_EQ(*rc, 2);
 }
 
 }  // namespace
