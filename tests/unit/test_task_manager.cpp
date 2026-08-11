@@ -746,26 +746,39 @@ TEST_F(TaskManagerFaultTest, CreateTaskStepFailureIsStorageError) {
 
 // A BEFORE UPDATE trigger aborts → the step-failure arm of every UPDATE-based
 // state transition (MarkProcessing / MarkCompleted / MarkFailed / MarkCancelled /
-// UpdateProgress / UpdateTaskForDebounce). Each UPDATE targets the existing
-// (queued) row by task_id, so a row matches and the trigger fires at step time.
+// UpdateProgress / UpdateTaskForDebounce). With the guarded Marks, each UPDATE
+// must target a row in a LEGAL source state so its predicate matches and the
+// trigger fires at step time — otherwise the call fails via the changes==0
+// conflict arm instead (the wrong arm for this test). Two rows: one stays
+// queued (MarkProcessing / MarkCancelled / UpdateProgress / debounce), one is
+// moved to processing BEFORE the trigger is armed (MarkCompleted / MarkFailed).
 TEST_F(TaskManagerFaultTest, UpdateStepFailuresAreStorageErrors) {
-    auto c = mgr_.CreateTask(MakeTask("ns1", "doc1"));
-    ASSERT_TRUE(c.ok());
-    const std::string id = c.value().task_id;
+    auto a = mgr_.CreateTask(MakeTask("ns1", "doc1"));
+    ASSERT_TRUE(a.ok());
+    const std::string qid = a.value().task_id;  // stays queued
+    auto b = mgr_.CreateTask(MakeTask("ns1", "doc2", "h2"));
+    ASSERT_TRUE(b.ok());
+    const std::string pid = b.value().task_id;
+    ASSERT_TRUE(mgr_.MarkProcessing(pid, 1).ok());  // legal source for completed/failed
     Exec("CREATE TRIGGER t_block_upd BEFORE UPDATE ON tasks "
          "BEGIN SELECT RAISE(ABORT, 'blocked'); END;");
 
-    EXPECT_FALSE(mgr_.MarkProcessing(id, 1).ok());
-    EXPECT_FALSE(mgr_.MarkCompleted(id, "d").ok());
-    EXPECT_FALSE(mgr_.MarkFailed(id, "CX_ERR_PARSE_FAILED", "x").ok());
-    EXPECT_FALSE(mgr_.MarkCancelled(id).ok());
-    TaskInfo upd = c.value();
+    auto expect_storage_error = [](const Status& s) {
+        EXPECT_FALSE(s.ok());
+        EXPECT_NE(s.message().find("CX_ERR_STORAGE_FAILED"), std::string::npos)
+            << "expected the step-failure arm, got: " << s.message();
+    };
+    expect_storage_error(mgr_.MarkProcessing(qid, 1));
+    expect_storage_error(mgr_.MarkCompleted(pid, "d"));
+    expect_storage_error(mgr_.MarkFailed(pid, "CX_ERR_PARSE_FAILED", "x"));
+    expect_storage_error(mgr_.MarkCancelled(qid));
+    TaskInfo upd = a.value();
     upd.processed_pages = 1;
     EXPECT_FALSE(mgr_.UpdateProgress(upd).ok());
     SubmitRequest req;
     req.content_hash = "h";
     req.filepath = "/tmp/x.pdf";
-    EXPECT_FALSE(mgr_.UpdateTaskForDebounce(id, req).ok());
+    EXPECT_FALSE(mgr_.UpdateTaskForDebounce(qid, req).ok());
 }
 
 // The cleanup UPDATE sweeps (SweepZombies / SweepTimedOut / RequeueStaleProcessing)
@@ -802,10 +815,14 @@ TEST_F(TaskManagerFaultTest, RequestCancelUpdateStepFailureIsStorageError) {
     EXPECT_FALSE(s.ok());
 }
 
-// A BEFORE DELETE trigger aborts → DeleteExpired's step-failure arm.
+// A BEFORE DELETE trigger aborts → DeleteExpired's step-failure arm. The row
+// must actually be terminal (DeleteExpired only matches terminal statuses), so
+// go through the legal processing -> completed path and assert both writes.
 TEST_F(TaskManagerFaultTest, DeleteExpiredStepFailureIsStorageError) {
     auto c = mgr_.CreateTask(MakeTask("ns1", "doc1"));
-    mgr_.MarkCompleted(c.value().task_id, "d");
+    ASSERT_TRUE(c.ok());
+    ASSERT_TRUE(mgr_.MarkProcessing(c.value().task_id, 1).ok());
+    ASSERT_TRUE(mgr_.MarkCompleted(c.value().task_id, "d").ok());
     Exec("CREATE TRIGGER t_block_del BEFORE DELETE ON tasks "
          "BEGIN SELECT RAISE(ABORT, 'blocked'); END;");
     auto del = mgr_.DeleteExpired(NowUnix() + 100LL * 86400, 30);
