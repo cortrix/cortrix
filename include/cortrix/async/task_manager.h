@@ -180,6 +180,12 @@ public:
     mutable std::mutex mutex_;
 
     Status CreateTasksTable();
+
+    /// Shared 0-rows handling for the guarded Mark* terminal transitions:
+    /// missing row -> CX_ERR_TASK_NOT_FOUND, live row in a forbidding status ->
+    /// CX_ERR_DOC_PROCESSING_IN_PROGRESS (same conflict identity MarkProcessing
+    /// uses) + a warn log. Call with mutex_ held.
+    Status RejectedTransitionStatus(const std::string& task_id, const char* target);
 };
 
 }  // namespace cortrix::async

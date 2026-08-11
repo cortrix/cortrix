@@ -200,6 +200,8 @@ TEST_F(BatchIngestFx, ReleaseSkipsAPathAnotherLiveTaskStillReferences) {
     const async::TaskInfo t2 = make("d2");
 
     async::TaskFinalizer fin(&mgr_, dir_);
+    ASSERT_TRUE(mgr_.MarkProcessing(t1.task_id, 1).ok());
+    ASSERT_TRUE(mgr_.MarkProcessing(t2.task_id, 2).ok());
     fin.Complete(t1, "doc-1", std::chrono::steady_clock::now());
     EXPECT_TRUE(fs::exists(shared))
         << "an input another live task still references was deleted";
@@ -526,9 +528,10 @@ TEST_F(BatchIngestFx, ReferenceCheckMatchesOnFilesystemIdentityNotStringForm) {
         return mgr_.CreateTask(std::move(t)).value();
     };
     const async::TaskInfo t1 = make("d1", plain);
-    make("d2", dotted);
+    make("d2", dotted);  // stays queued — still a live reference
 
     async::TaskFinalizer fin(&mgr_, dir_);
+    ASSERT_TRUE(mgr_.MarkProcessing(t1.task_id, 1).ok());
     fin.Complete(t1, "doc-1", std::chrono::steady_clock::now());
     EXPECT_TRUE(fs::exists(real))
         << "a live task's input was deleted because its row spelled the path differently";

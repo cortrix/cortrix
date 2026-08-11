@@ -132,10 +132,14 @@ TEST_F(DocumentProcessorTest, CancelAtCheckpointFinalizesCancelled) {
     // Drive 10 pages, but the cancel checker flips true after page 3 is observed.
     int pages_seen = 0;
     factory_->SetPrimaryParser(MakeDrivingStub(10, MakeOnePageDoc("docling", 0.9f)));
+    // Model the real cancel: when the request lands it moves the row
+    // processing -> cancelling (RequestCancel) and the checker observes it —
+    // the guarded MarkCancelled only accepts queued|cancelling rows.
     DocumentProcessor::CancelChecker checker =
-        [&pages_seen](const std::string&) {
+        [&pages_seen, this](const std::string& task_id) {
             // cancel becomes true once we've already processed 3 pages
-            return ++pages_seen > 3;
+            if (++pages_seen == 4) mgr_.RequestCancel(task_id, nullptr);
+            return pages_seen > 3;
         };
     DocumentProcessor proc(&mgr_, factory_.get(), &cfg_, checker);
 
@@ -152,20 +156,22 @@ TEST_F(DocumentProcessorTest, CancelAfterParseStillCancels) {
     // No cancel observed during pages, but the flag flips true by the time parsing
     // finishes (cancel arrived on the very last page). The post-parse re-check wins.
     bool cancel = false;
+    TaskInfo task = SeedProcessingTask("docLate");
     auto stub = std::make_unique<StubParser>("docling", std::vector<std::string>{"pdf"});
     stub->SetResult(MakeOnePageDoc("docling", 0.9f));
-    stub->SetOnParse([&cancel](const std::string&, const ParserOptions& opts) {
+    stub->SetOnParse([&cancel, &task, this](const std::string&, const ParserOptions& opts) {
         if (opts.on_page_progress) {
             opts.on_page_progress(1, 2, true);
             opts.on_page_progress(2, 2, true);
         }
-        cancel = true;  // observed only at the post-parse re-check
+        // Cancel lands after the last page: processing -> cancelling in the DB,
+        // observed only at the post-parse re-check.
+        mgr_.RequestCancel(task.task_id, nullptr);
+        cancel = true;
     });
     factory_->SetPrimaryParser(std::move(stub));
     DocumentProcessor::CancelChecker checker = [&cancel](const std::string&) { return cancel; };
     DocumentProcessor proc(&mgr_, factory_.get(), &cfg_, checker);
-
-    TaskInfo task = SeedProcessingTask("docLate");
     Status s = proc.ProcessTask(task);
     EXPECT_FALSE(s.ok());
     auto got = mgr_.GetTask(task.task_id);

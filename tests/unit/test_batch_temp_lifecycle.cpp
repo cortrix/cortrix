@@ -78,17 +78,25 @@ TEST_F(BatchTempLifecycleTest, FinalizerReleasesInputOnAllTerminalExits) {
     async::TaskFinalizer fin(&mgr_, dir_);
     const auto t0 = std::chrono::steady_clock::now();
 
+    // The guarded Marks only persist from legal source states (completed/failed
+    // need processing; cancelled needs queued|cancelling), and the finalizer
+    // releases the input only on a persisted terminal write — so each task must
+    // walk its legal path here.
     const std::string done = MakeInput("completed.txt");
-    fin.Complete(MakeTask(done, async::task_status::kQueued), "doc-1", t0);
+    async::TaskInfo t_done = MakeTask(done, async::task_status::kQueued);
+    ASSERT_TRUE(mgr_.MarkProcessing(t_done.task_id, 1).ok());
+    fin.Complete(t_done, "doc-1", t0);
     EXPECT_FALSE(fs::exists(done)) << "Complete must release the materialized input";
 
     const std::string failed = MakeInput("failed.txt");
-    fin.Fail(MakeTask(failed, async::task_status::kQueued), "CX_ERR_PARSE_FAILED",
+    async::TaskInfo t_failed = MakeTask(failed, async::task_status::kQueued);
+    ASSERT_TRUE(mgr_.MarkProcessing(t_failed.task_id, 2).ok());
+    fin.Fail(t_failed, "CX_ERR_PARSE_FAILED",
              "boom", nlohmann::json::object(), t0);
     EXPECT_FALSE(fs::exists(failed)) << "Fail must release the materialized input";
 
     const std::string cancelled = MakeInput("cancelled.txt");
-    fin.Cancel(MakeTask(cancelled, async::task_status::kQueued), t0);
+    fin.Cancel(MakeTask(cancelled, async::task_status::kQueued), t0);  // queued -> cancelled is legal
     EXPECT_FALSE(fs::exists(cancelled)) << "Cancel must release the materialized input";
 }
 
@@ -99,8 +107,12 @@ TEST_F(BatchTempLifecycleTest, FinalizerNeverTouchesCallerOwnedPaths) {
     std::ofstream(outside) << "caller owned";
 
     async::TaskFinalizer fin(&mgr_, dir_);
-    fin.Complete(MakeTask(outside.string(), async::task_status::kQueued), "doc-1",
-                 std::chrono::steady_clock::now());
+    // Walk the legal path so the terminal write persists and the release logic
+    // actually runs — otherwise the file would survive for the wrong reason
+    // (rejected write -> release skipped).
+    async::TaskInfo t = MakeTask(outside.string(), async::task_status::kQueued);
+    ASSERT_TRUE(mgr_.MarkProcessing(t.task_id, 1).ok());
+    fin.Complete(t, "doc-1", std::chrono::steady_clock::now());
 
     EXPECT_TRUE(fs::exists(outside))
         << "a path outside the managed dir must never be deleted";
@@ -110,8 +122,9 @@ TEST_F(BatchTempLifecycleTest, FinalizerNeverTouchesCallerOwnedPaths) {
 TEST_F(BatchTempLifecycleTest, FinalizerIsInertWithoutManagedDir) {
     const std::string kept = MakeInput("kept.txt");
     async::TaskFinalizer fin(&mgr_);  // no managed dir
-    fin.Complete(MakeTask(kept, async::task_status::kQueued), "doc-1",
-                 std::chrono::steady_clock::now());
+    async::TaskInfo t = MakeTask(kept, async::task_status::kQueued);
+    ASSERT_TRUE(mgr_.MarkProcessing(t.task_id, 1).ok());  // persist the terminal write
+    fin.Complete(t, "doc-1", std::chrono::steady_clock::now());
     EXPECT_TRUE(fs::exists(kept));
 }
 
