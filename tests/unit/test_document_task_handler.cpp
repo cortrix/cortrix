@@ -169,6 +169,7 @@ TEST_F(DocumentTaskHandlerTest, GetProgressReturnsBodyWithMeta) {
 TEST_F(DocumentTaskHandlerTest, GetProgressCompletedHint) {
     auto sub = handler_->SubmitAsync(MakeParams("docDone", 800, true));
     std::string task_id = sub.body["task_id"];
+    mgr_.MarkProcessing(task_id, 1);  // completed requires processing first
     mgr_.MarkCompleted(task_id, "final-doc");
     auto r = handler_->GetProgress(task_id);
     EXPECT_EQ(r.status, 200);
@@ -358,6 +359,7 @@ TEST_F(DocumentTaskHandlerTest, GetProgressCancelledHint) {
 TEST_F(DocumentTaskHandlerTest, GetProgressFailedHint) {
     auto sub = handler_->SubmitAsync(MakeParams("docFail", 800, true));
     std::string task_id = sub.body["task_id"];
+    mgr_.MarkProcessing(task_id, 1);  // failed requires processing first
     mgr_.MarkFailed(task_id, "CX_ERR_PARSE_FAILED", "boom", "{}");
     auto r = handler_->GetProgress(task_id);
     EXPECT_EQ(r.status, 200);

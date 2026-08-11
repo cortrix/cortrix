@@ -413,12 +413,47 @@ Status TaskManager::MarkProcessing(const std::string& task_id, int worker_id) {
     return Status::Ok();
 }
 
+Status TaskManager::RejectedTransitionStatus(const std::string& task_id,
+                                             const char* target) {
+    // 0 rows changed on a guarded terminal transition: distinguish a missing row
+    // (keeps the established CX_ERR_TASK_NOT_FOUND contract) from a live row
+    // whose current status forbids the transition — same conflict identity
+    // MarkProcessing uses. Called with mutex_ held.
+    sqlite3_stmt* probe = nullptr;
+    std::string current;
+    if (sqlite3_prepare_v2(db_, "SELECT status FROM tasks WHERE task_id=?", -1,
+                           &probe, nullptr) == SQLITE_OK) {
+        BindText(probe, 1, task_id);
+        if (sqlite3_step(probe) == SQLITE_ROW) {
+            const unsigned char* s = sqlite3_column_text(probe, 0);
+            current = s ? reinterpret_cast<const char*>(s) : "";
+        }
+        sqlite3_finalize(probe);
+    }
+    if (current.empty()) return F42Status(F42ErrorCode::kTaskNotFound, task_id);
+    spdlog::warn(
+        "F42 TaskManager: rejected illegal transition task_id={} {} -> {} "
+        "(terminal states are immutable)",
+        task_id, current, target);
+    return F42Status(F42ErrorCode::kDocProcessingInProgress,
+                     "task " + task_id + " status=" + current +
+                         " cannot transition to " + target);
+}
+
 Status TaskManager::MarkCompleted(const std::string& task_id,
                                   const std::string& doc_id) {
     std::lock_guard<std::mutex> lock(mutex_);
+    // Legal sources only (same guard family as MarkProcessing, fixed for the
+    // terminal transitions after the #32 audit / issue #57): `processing` is the
+    // normal path; `cancelling` is the late-cancel race — the cancel request
+    // landed after the worker's last checkpoint, the work IS done, and the
+    // best-effort cancel loses (rejecting here would strand the row in
+    // `cancelling` forever and leak its managed input). Terminal rows
+    // (completed/failed/cancelled) and `queued` are never overwritten.
     const char* sql =
         "UPDATE tasks SET status='completed', doc_id=?, progress_pct=100.0, "
-        "completed_at=?, updated_at=? WHERE task_id=?";
+        "completed_at=?, updated_at=? "
+        "WHERE task_id=? AND status IN ('processing','cancelling')";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         return F42Status(F42ErrorCode::kStorageFailed, "MarkCompleted prepare");
@@ -432,7 +467,7 @@ Status TaskManager::MarkCompleted(const std::string& task_id,
     int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
     if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "MarkCompleted step");
-    if (changes == 0) return F42Status(F42ErrorCode::kTaskNotFound, task_id);
+    if (changes == 0) return RejectedTransitionStatus(task_id, "completed");
     return Status::Ok();
 }
 
@@ -441,9 +476,13 @@ Status TaskManager::MarkFailed(const std::string& task_id,
                                const std::string& error_msg,
                                const std::string& structured_data) {
     std::lock_guard<std::mutex> lock(mutex_);
+    // Same legal-source guard as MarkCompleted: `processing` (normal) or
+    // `cancelling` (worker errored after a late cancel — the honest terminal is
+    // `failed` with the error preserved; rejecting would strand the row).
     const char* sql =
         "UPDATE tasks SET status='failed', error_code=?, error_msg=?, "
-        "structured_data=?, completed_at=?, updated_at=? WHERE task_id=?";
+        "structured_data=?, completed_at=?, updated_at=? "
+        "WHERE task_id=? AND status IN ('processing','cancelling')";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         return F42Status(F42ErrorCode::kStorageFailed, "MarkFailed prepare");
@@ -459,7 +498,7 @@ Status TaskManager::MarkFailed(const std::string& task_id,
     int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
     if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "MarkFailed step");
-    if (changes == 0) return F42Status(F42ErrorCode::kTaskNotFound, task_id);
+    if (changes == 0) return RejectedTransitionStatus(task_id, "failed");
     return Status::Ok();
 }
 
@@ -531,9 +570,14 @@ Status TaskManager::RequestCancel(const std::string& task_id, TaskInfo* out) {
 
 Status TaskManager::MarkCancelled(const std::string& task_id) {
     std::lock_guard<std::mutex> lock(mutex_);
+    // Legal sources = the two state-machine edges into `cancelled`: `queued`
+    // (a never-started task) and `cancelling` (the worker acknowledged the
+    // cancel checkpoint). A completed/failed row is immutable — a late cancel
+    // must not overwrite it, and a `processing` row must go through
+    // RequestCancel's processing -> cancelling edge first.
     const char* sql =
         "UPDATE tasks SET status='cancelled', completed_at=?, updated_at=? "
-        "WHERE task_id=?";
+        "WHERE task_id=? AND status IN ('queued','cancelling')";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         return F42Status(F42ErrorCode::kStorageFailed, "MarkCancelled prepare");
@@ -546,7 +590,7 @@ Status TaskManager::MarkCancelled(const std::string& task_id) {
     int changes = sqlite3_changes(db_);
     sqlite3_finalize(stmt);
     if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "MarkCancelled step");
-    if (changes == 0) return F42Status(F42ErrorCode::kTaskNotFound, task_id);
+    if (changes == 0) return RejectedTransitionStatus(task_id, "cancelled");
     return Status::Ok();
 }
 

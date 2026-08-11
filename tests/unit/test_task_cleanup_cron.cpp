@@ -51,6 +51,7 @@ TEST(TaskCleanupCronRunTest, RunCleanupNowSweepsZombiesAndDeletesExpired) {
 
     // one completed (will expire), one stale processing (zombie).
     auto done = mgr.CreateTask(MakeTask("d-done"));
+    mgr.MarkProcessing(done.value().task_id, 1);  // completed requires processing first
     mgr.MarkCompleted(done.value().task_id, "doc-done");
     auto zomb = mgr.CreateTask(MakeTask("d-zomb"));
     mgr.MarkProcessing(zomb.value().task_id, 1);

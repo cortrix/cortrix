@@ -163,6 +163,7 @@ TEST_F(TaskManagerTest, MarkProcessingSetsWorkerAndStartedAt) {
 
 TEST_F(TaskManagerTest, MarkCompletedSetsDocIdAnd100Pct) {
     auto c = mgr_.CreateTask(MakeTask("ns1", "doc1"));
+    ASSERT_TRUE(mgr_.MarkProcessing(c.value().task_id, 1).ok());
     ASSERT_TRUE(mgr_.MarkCompleted(c.value().task_id, "final-doc").ok());
     auto got = mgr_.GetTask(c.value().task_id);
     EXPECT_EQ(got.value().status, std::string(task_status::kCompleted));
@@ -173,6 +174,7 @@ TEST_F(TaskManagerTest, MarkCompletedSetsDocIdAnd100Pct) {
 
 TEST_F(TaskManagerTest, MarkFailedPersistsGenAgentFields) {
     auto c = mgr_.CreateTask(MakeTask("ns1", "doc1"));
+    ASSERT_TRUE(mgr_.MarkProcessing(c.value().task_id, 1).ok());
     ASSERT_TRUE(mgr_.MarkFailed(c.value().task_id, "CX_ERR_PARSE_FAILED",
                                 "bad page", R"({"page_number":42})")
                     .ok());
@@ -227,6 +229,95 @@ TEST_F(TaskManagerTest, MarkCancelledTerminalFromCancelling) {
     EXPECT_FALSE(got.value().completed_at.empty());
 }
 
+// ---- Terminal-transition guards (issue #57, same family as the #31
+// MarkProcessing guard): terminal rows are immutable, queued cannot jump
+// straight to completed/failed, and the late-cancel race edges
+// (cancelling -> completed/failed) stay legal so the row never strands.
+
+TEST_F(TaskManagerTest, MarkCancelledRejectedOnCompletedRow) {
+    auto c = mgr_.CreateTask(MakeTask("ns1", "doc1"));
+    const std::string id = c.value().task_id;
+    ASSERT_TRUE(mgr_.MarkProcessing(id, 1).ok());
+    ASSERT_TRUE(mgr_.MarkCompleted(id, "final-doc").ok());
+    auto st = mgr_.MarkCancelled(id);
+    EXPECT_FALSE(st.ok()) << "a completed row was flipped to cancelled";
+    EXPECT_NE(st.message().find("CX_ERR_DOC_PROCESSING_IN_PROGRESS"),
+              std::string::npos);
+    auto got = mgr_.GetTask(id);
+    EXPECT_EQ(got.value().status, std::string(task_status::kCompleted));
+    EXPECT_EQ(got.value().doc_id, "final-doc");
+}
+
+TEST_F(TaskManagerTest, MarkCompletedRejectedOnCancelledRow) {
+    auto c = mgr_.CreateTask(MakeTask("ns1", "doc1"));
+    const std::string id = c.value().task_id;
+    ASSERT_TRUE(mgr_.RequestCancel(id, nullptr).ok());  // queued -> cancelled
+    auto st = mgr_.MarkCompleted(id, "late-doc");
+    EXPECT_FALSE(st.ok()) << "a cancelled row was resurrected to completed";
+    EXPECT_NE(st.message().find("CX_ERR_DOC_PROCESSING_IN_PROGRESS"),
+              std::string::npos);
+    auto got = mgr_.GetTask(id);
+    EXPECT_EQ(got.value().status, std::string(task_status::kCancelled));
+    EXPECT_TRUE(got.value().doc_id != "late-doc");
+}
+
+TEST_F(TaskManagerTest, MarkFailedRejectedOnCompletedRow) {
+    auto c = mgr_.CreateTask(MakeTask("ns1", "doc1"));
+    const std::string id = c.value().task_id;
+    ASSERT_TRUE(mgr_.MarkProcessing(id, 1).ok());
+    ASSERT_TRUE(mgr_.MarkCompleted(id, "final-doc").ok());
+    auto st = mgr_.MarkFailed(id, "CX_ERR_PARSE_FAILED", "late error", "{}");
+    EXPECT_FALSE(st.ok()) << "a completed row was flipped to failed";
+    auto got = mgr_.GetTask(id);
+    EXPECT_EQ(got.value().status, std::string(task_status::kCompleted));
+    EXPECT_TRUE(got.value().error_code.empty());
+}
+
+TEST_F(TaskManagerTest, MarkCompletedRejectedFromQueued) {
+    // completed is only reachable through processing (the dequeue claim).
+    auto c = mgr_.CreateTask(MakeTask("ns1", "doc1"));
+    auto st = mgr_.MarkCompleted(c.value().task_id, "shortcut-doc");
+    EXPECT_FALSE(st.ok()) << "a queued row skipped processing to completed";
+    auto got = mgr_.GetTask(c.value().task_id);
+    EXPECT_EQ(got.value().status, std::string(task_status::kQueued));
+}
+
+TEST_F(TaskManagerTest, MarkCompletedAllowedFromCancellingLateCancelRace) {
+    // The cancel request landed after the worker's last checkpoint: the work IS
+    // done, the best-effort cancel loses, and the row must not strand in
+    // cancelling (F42 §3.1 race-edge note).
+    auto c = mgr_.CreateTask(MakeTask("ns1", "doc1"));
+    const std::string id = c.value().task_id;
+    ASSERT_TRUE(mgr_.MarkProcessing(id, 1).ok());
+    ASSERT_TRUE(mgr_.RequestCancel(id, nullptr).ok());  // processing -> cancelling
+    ASSERT_TRUE(mgr_.MarkCompleted(id, "raced-doc").ok());
+    auto got = mgr_.GetTask(id);
+    EXPECT_EQ(got.value().status, std::string(task_status::kCompleted));
+    EXPECT_EQ(got.value().doc_id, "raced-doc");
+}
+
+TEST_F(TaskManagerTest, MarkFailedAllowedFromCancellingLateCancelRace) {
+    auto c = mgr_.CreateTask(MakeTask("ns1", "doc1"));
+    const std::string id = c.value().task_id;
+    ASSERT_TRUE(mgr_.MarkProcessing(id, 1).ok());
+    ASSERT_TRUE(mgr_.RequestCancel(id, nullptr).ok());
+    ASSERT_TRUE(mgr_.MarkFailed(id, "CX_ERR_PARSE_FAILED", "boom", "{}").ok());
+    auto got = mgr_.GetTask(id);
+    EXPECT_EQ(got.value().status, std::string(task_status::kFailed));
+    EXPECT_EQ(got.value().error_code, "CX_ERR_PARSE_FAILED");
+}
+
+TEST_F(TaskManagerTest, MarkCancelledAllowedFromQueued) {
+    // queued -> cancelled is a legal state-machine edge (never-started task).
+    auto c = mgr_.CreateTask(MakeTask("ns1", "doc1"));
+    ASSERT_TRUE(mgr_.MarkCancelled(c.value().task_id).ok());
+    auto got = mgr_.GetTask(c.value().task_id);
+    EXPECT_EQ(got.value().status, std::string(task_status::kCancelled));
+}
+
+// (Missing-row NOT_FOUND for all three guarded Marks stays pinned by
+// StateTransitionsOnMissingTaskReturnNotFound below.)
+
 // State transitions on a missing task_id all return CX_ERR_TASK_NOT_FOUND (the
 // changes==0 branch of each UPDATE).
 TEST_F(TaskManagerTest, StateTransitionsOnMissingTaskReturnNotFound) {
@@ -248,6 +339,7 @@ TEST_F(TaskManagerTest, StateTransitionsOnMissingTaskReturnNotFound) {
 TEST_F(TaskManagerTest, RequestCancelOnTerminalStatusesReturns423) {
     // completed
     auto comp = mgr_.CreateTask(MakeTask("ns1", "dc"));
+    ASSERT_TRUE(mgr_.MarkProcessing(comp.value().task_id, 1).ok());
     ASSERT_TRUE(mgr_.MarkCompleted(comp.value().task_id, "doc").ok());
     auto s_comp = mgr_.RequestCancel(comp.value().task_id, nullptr);
     EXPECT_FALSE(s_comp.ok());
@@ -255,6 +347,7 @@ TEST_F(TaskManagerTest, RequestCancelOnTerminalStatusesReturns423) {
 
     // failed
     auto fail = mgr_.CreateTask(MakeTask("ns1", "df"));
+    ASSERT_TRUE(mgr_.MarkProcessing(fail.value().task_id, 1).ok());
     ASSERT_TRUE(mgr_.MarkFailed(fail.value().task_id, "CX_ERR_PARSE_FAILED", "x").ok());
     EXPECT_FALSE(mgr_.RequestCancel(fail.value().task_id, nullptr).ok());
 
@@ -281,6 +374,7 @@ TEST_F(TaskManagerTest, RequestCancelQueuedWithNullOutStillTransitions) {
 // success cases above always pass a non-empty doc_id).
 TEST_F(TaskManagerTest, MarkCompletedWithEmptyDocIdLeavesDocIdNull) {
     auto c = mgr_.CreateTask(MakeTask("ns1", "")); // doc_id empty from the start
+    ASSERT_TRUE(mgr_.MarkProcessing(c.value().task_id, 1).ok());
     ASSERT_TRUE(mgr_.MarkCompleted(c.value().task_id, "").ok());
     auto got = mgr_.GetTask(c.value().task_id);
     ASSERT_TRUE(got.ok());
@@ -292,6 +386,7 @@ TEST_F(TaskManagerTest, MarkCompletedWithEmptyDocIdLeavesDocIdNull) {
 // arm of BindNullableText for all three optional columns.
 TEST_F(TaskManagerTest, MarkFailedWithEmptyFieldsBindsNull) {
     auto c = mgr_.CreateTask(MakeTask("ns1", "de"));
+    ASSERT_TRUE(mgr_.MarkProcessing(c.value().task_id, 1).ok());
     ASSERT_TRUE(mgr_.MarkFailed(c.value().task_id, "", "", "").ok());
     auto got = mgr_.GetTask(c.value().task_id);
     ASSERT_TRUE(got.ok());
@@ -468,6 +563,8 @@ TEST_F(TaskManagerTest, DeleteExpiredRemovesOldTerminalTasksOnly) {
     // Two completed tasks; backdate one's updated_at past the 30-day cutoff.
     auto keep = mgr_.CreateTask(MakeTask("ns1", "dkeep"));
     auto old = mgr_.CreateTask(MakeTask("ns1", "dold"));
+    mgr_.MarkProcessing(keep.value().task_id, 1);
+    mgr_.MarkProcessing(old.value().task_id, 2);
     mgr_.MarkCompleted(keep.value().task_id, "doc-keep");
     mgr_.MarkCompleted(old.value().task_id, "doc-old");
 

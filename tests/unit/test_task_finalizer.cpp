@@ -77,6 +77,9 @@ TEST_F(TaskFinalizerTest, FailMarksFailedWithDomainCodeAndRecordsFailed) {
 
 TEST_F(TaskFinalizerTest, CancelMarksCancelledAndRecordsCancelled) {
     TaskInfo t = MakeProcessingTask(kTaskDocParse);
+    // Model the real path: Cancel only runs after a cancel request moved the row
+    // processing -> cancelling (the guarded MarkCancelled rejects `processing`).
+    ASSERT_TRUE(mgr_.RequestCancel(t.task_id, nullptr).ok());
     Status s = finalizer_.Cancel(t, std::chrono::steady_clock::now());
     EXPECT_FALSE(s.ok());
     EXPECT_NE(s.message().find("CX_ERR_TASK_CANCELLING"), std::string::npos);
