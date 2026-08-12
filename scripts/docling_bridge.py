@@ -35,6 +35,14 @@ import os
 import sys
 import time
 
+# The C++ side parses this bridge's stdout as exactly one JSON object, but the
+# inference stacks loaded below can print straight to fd 1 from native code
+# (observed with paddlepaddle 3.1/3.2 in the sibling paddleocr bridge), which a
+# Python-level sys.stdout redirect cannot intercept. Reserve the real stdout
+# for the envelope and repoint fd 1 at stderr for everything else.
+_ENVELOPE_FD = os.dup(1)
+os.dup2(2, 1)
+
 # ParserError integer codes (mirror parser_errors.h §2.7).
 OK = 0
 FILE_NOT_FOUND = 1
@@ -47,10 +55,9 @@ CORRUPTED_FILE = 14
 
 
 def _emit(obj):
-    """Write one JSON object to stdout (UTF-8, no ASCII escaping)."""
-    json.dump(obj, sys.stdout, ensure_ascii=False)
-    sys.stdout.write("\n")
-    sys.stdout.flush()
+    """Write one JSON object to the reserved envelope fd (UTF-8, no escaping)."""
+    payload = json.dumps(obj, ensure_ascii=False) + "\n"
+    os.write(_ENVELOPE_FD, payload.encode("utf-8"))
 
 
 def _error(status, msg, *, retryable=False, category="PERMANENT",

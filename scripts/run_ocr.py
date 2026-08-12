@@ -12,6 +12,14 @@ import os
 import tempfile
 import gc
 
+# The caller parses this script's stdout as JSON, but paddlepaddle's native
+# core printf()s diagnostic lines straight to fd 1 (observed on 3.1/3.2).
+# Reserve the real stdout for the JSON result and repoint fd 1 at stderr for
+# everything else — native writes bypass sys.stdout, so a Python-level
+# redirect is not enough.
+_RESULT_FD = os.dup(1)
+os.dup2(2, 1)
+
 os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
 
 from paddleocr import PaddleOCR
@@ -165,7 +173,7 @@ def run_ocr(file_path):
                 if tmp_path and os.path.exists(tmp_path):
                     os.unlink(tmp_path)
 
-        print(json.dumps(all_lines, ensure_ascii=False))
+        os.write(_RESULT_FD, (json.dumps(all_lines, ensure_ascii=False) + "\n").encode("utf-8"))
         return 0
     except Exception as e:
         print(json.dumps({"error": str(e)}), file=sys.stderr)

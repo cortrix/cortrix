@@ -16,4 +16,9 @@ onnxruntime>=1.20.0
 
 # PaddleOCR fallback for scanned / image documents (F06 S3).
 paddleocr>=2.8
-paddlepaddle>=2.6
+# Verified window on Linux x86_64 CPU (2026-08-12, PP-OCRv6 models):
+#   3.0.x  -> model attribute incompatibility (strides not Int32Attribute)
+#   3.1/3.2 -> inference correct (native stdout noise handled by the bridges)
+#   3.3.1  -> hard crash: ConvertPirAttribute2RuntimeAttribute unsupported
+#             pir::ArrayAttribute<DoubleAttribute> (onednn instruction path)
+paddlepaddle>=3.1,<3.3
