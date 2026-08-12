@@ -100,7 +100,7 @@ curl -fsS -H 'Content-Type: application/json' \
 
 You need Git, Docker, and Docker Compose. No `.env` file, LLM provider key, host-side model tooling, manual model download, model conversion, or separate bootstrap command is required. The first start downloads about 1.17 GB of pinned model assets and can take several minutes; later starts reuse the cached volume.
 
-The Quick Start publishes only the loopback API at `127.0.0.1:8420`. It uses BGE-M3 embedding and bge-reranker-v2-m3 reranking on CPU, while external LLM roles and the built-in Agent remain disabled. For model provenance, checks, expected output, cleanup, and scope boundaries, see [Quick Start](docs/QUICKSTART.md). For the deeper source-build evidence workflow, see the [First-value SupportOps demo](examples/first-value-supportops/README.md).
+The Quick Start publishes only the loopback API at `127.0.0.1:8420` (publishing on a LAN address for shared test hosts is an explicit opt-in — see [Quick Start](docs/QUICKSTART.md#publishing-on-a-lan-address-opt-in)). It uses BGE-M3 embedding and bge-reranker-v2-m3 reranking on CPU, while external LLM roles and the built-in Agent remain disabled. For model provenance, checks, expected output, cleanup, and scope boundaries, see [Quick Start](docs/QUICKSTART.md). For the deeper source-build evidence workflow, see the [First-value SupportOps demo](examples/first-value-supportops/README.md).
 
 If you are using a terminal-capable AI Agent, use the
 [Agent-assisted setup contract](docs/AGENT_QUICKSTART.md). It pins the release

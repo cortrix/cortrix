@@ -80,6 +80,34 @@ docker compose -f deploy/docker-compose.yml down --volumes
 
 The Quick Start publishes only `127.0.0.1:8420`. It does not publish the metrics or Agent ports. Treat it as a local first-value path, not an internet-facing deployment recipe.
 
+## Publishing on a LAN address (opt-in)
+
+By default nothing outside the host can reach the stack — a loopback-only
+publish means teammates cannot open the web UI or API from their own machines,
+which is usually the first thing a shared test deployment needs. To publish on
+a routable address, set `CORTRIX_PUBLISH_HOST` (and preferably a distinctive
+port) when starting the stack:
+
+```bash
+CORTRIX_PUBLISH_HOST=10.0.0.5 CORTRIX_HTTP_PORT=18420 \
+  docker compose -f deploy/docker-compose.yml up -d
+```
+
+The web UI and API are then reachable at `http://10.0.0.5:18420/` from any
+machine that can route to that address.
+
+Scope and safety:
+
+- The default stays loopback-only; this is an explicit opt-in, and the
+  loopback-only Quick Start contract above is unchanged when the variable is
+  unset.
+- Everything the API allows becomes available to that network segment. The
+  Quick Start profile runs without API-key authentication, so publish beyond
+  loopback only on an isolated or trusted test network — or configure
+  API-key auth first (see `config.yaml.example`, `auth` section).
+- Pick a distinctive high port (for example `18420`) rather than `80`/`8080`
+  to avoid colliding with other services on shared test hosts.
+
 ## Model provenance and integrity
 
 [`deploy/model-manifest.tsv`](../deploy/model-manifest.tsv) pins the repository, revision, source path, expected size, SHA-256, upstream repository, upstream revision, and upstream license for every downloaded asset.
