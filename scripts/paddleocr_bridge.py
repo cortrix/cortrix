@@ -27,6 +27,17 @@ import os
 import sys
 import time
 
+# The C++ side parses this bridge's stdout as exactly one JSON object, but the
+# inference libraries loaded below do not honor that: paddlepaddle's C++ core
+# printf()s diagnostic lines straight to fd 1 (observed on 3.1/3.2:
+# "ReduceMeanCheckIfOneDNNSupport" x11 ahead of the envelope), which breaks the
+# protocol with INVALID_OUTPUT. Reserve the real stdout for the envelope and
+# repoint fd 1 at stderr for everything else — including native code that
+# bypasses sys.stdout entirely, which is why a Python-level redirect is not
+# enough.
+_ENVELOPE_FD = os.dup(1)
+os.dup2(2, 1)
+
 OK = 0
 FILE_NOT_FOUND = 1
 UNSUPPORTED_FORMAT = 3
@@ -39,9 +50,8 @@ _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp")
 
 
 def _emit(obj):
-    json.dump(obj, sys.stdout, ensure_ascii=False)
-    sys.stdout.write("\n")
-    sys.stdout.flush()
+    payload = json.dumps(obj, ensure_ascii=False) + "\n"
+    os.write(_ENVELOPE_FD, payload.encode("utf-8"))
 
 
 def _error(status, msg, *, retryable=False, category="PERMANENT",
