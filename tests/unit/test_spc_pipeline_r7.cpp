@@ -1031,6 +1031,56 @@ TEST_F(SPCPipelineR7Test, EnrichSweeper_EnqueuesDueDocsAndLeases) {
         "SELECT COUNT(*) FROM enrich_state WHERE doc_id='doc-later' AND next_retry_at > 32503670000"), 1);
 }
 
+// §3.7.6 enqueue dedup: while a doc's backfill task is still queued/processing,
+// a lease expiry must NOT enqueue a second one — the queue-side invariant is at
+// most one active backfill task per doc. Once the task reaches a terminal state,
+// a due doc is enqueued again (recovery is not blocked by history).
+TEST_F(SPCPipelineR7Test, EnrichSweeper_SkipsDocsWithActiveBackfillTask) {
+    sqlite3* db = facade_->store().db_handle();
+    ASSERT_NE(db, nullptr);
+    cortrix::spc::EnrichStateRow r;
+    r.block_id = 911;
+    r.doc_id = "doc-dup";
+    r.child_id = "c911";
+    r.status = cortrix::spc::kEnrichStatusPendingRetry;
+    r.failed_members = "f03";
+    r.next_retry_at = 1;  // long past → due
+    r.updated_at = 1;
+    ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());
+
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks4.db").string()).ok());
+    cortrix::InMemoryGlobalConfig cfg;
+    // Disable the 5s Enqueue debounce so the assertions below exercise ONLY the
+    // sweeper-side dedup guard (with debounce on, the recovery enqueue would
+    // merge into the just-completed task and hide the row-count signal).
+    cfg.Set("f42.watcher_debounce_seconds", "0");
+    async::TaskScheduler sched(&mgr, &cfg);
+    cortrix::spc::EnrichRetrySweeper sweeper(*pool_, &sched, /*workers=*/nullptr,
+                                             /*config=*/nullptr);
+
+    ASSERT_EQ(sweeper.RunSweepNow("test-ns"), 1);
+    auto first = mgr.FindRecentTaskByDocId("test-ns", "doc-dup",
+                                           async::kTaskEnrichBackfill, 3600);
+    ASSERT_TRUE(first.ok() && first.value().has_value());
+    const std::string task_id = first.value()->task_id;
+
+    // Simulate lease expiry while the task is still queued: the doc is due again,
+    // but the sweeper must skip it instead of stacking a duplicate.
+    r.next_retry_at = 1;
+    ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());
+    EXPECT_EQ(sweeper.RunSweepNow("test-ns"), 0);
+    EXPECT_EQ(mgr.CountAll().value(), 1);
+
+    // Terminal task + still-due doc → enqueue works again.
+    ASSERT_TRUE(mgr.MarkProcessing(task_id, 1).ok());
+    ASSERT_TRUE(mgr.MarkCompleted(task_id, "doc-dup").ok());
+    r.next_retry_at = 1;
+    ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());
+    EXPECT_EQ(sweeper.RunSweepNow("test-ns"), 1);
+    EXPECT_EQ(mgr.CountAll().value(), 2);
+}
+
 // ============================================================
 // SparseIndexRegistry (Q4 F40) path.
 // ============================================================

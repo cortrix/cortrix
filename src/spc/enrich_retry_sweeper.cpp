@@ -112,6 +112,17 @@ int EnrichRetrySweeper::RunSweepNow(const std::string& only_ns) {
             continue;
         }
         for (const auto& doc_id : due.value()) {
+            // §3.7.6 enqueue dedup: at most one active backfill task per doc.
+            // The 600s lease cannot bound duplicates once queue latency exceeds
+            // it (field-observed: 35k+ queued duplicates under a flapping LLM
+            // provider), so skip — without consuming the lease — while a
+            // queued/processing task for this doc still exists; the doc stays
+            // due and the next tick re-checks.
+            if (scheduler_) {
+                auto active = scheduler_->HasActiveTaskFor(
+                    ns, doc_id, async::kTaskEnrichBackfill);
+                if (active.ok() && active.value()) continue;
+            }
             // Lease first: even if Enqueue is debounced/fails, the doc simply
             // waits out the lease instead of hot-looping every tick.
             Status ls = LeaseDocRetries(db, doc_id, now + kLeaseSeconds, now);

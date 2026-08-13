@@ -95,6 +95,21 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
     return created;
 }
 
+Result<bool> TaskScheduler::HasActiveTaskFor(const std::string& namespace_id,
+                                             const std::string& doc_id,
+                                             int task_type) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    // A week comfortably exceeds any realistic queue latency; this is a dedup
+    // guard against a producer outpacing queue drain, not an audit query.
+    auto recent = mgr_->FindRecentTaskByDocId(namespace_id, doc_id, task_type,
+                                              /*window_seconds=*/7 * 86400);
+    if (!recent.ok()) return recent.status();
+    if (!recent.value().has_value()) return false;
+    const std::string& s = recent.value()->status;
+    return s == task_status::kQueued || s == task_status::kProcessing ||
+           s == task_status::kCancelling;
+}
+
 Result<std::optional<TaskInfo>> TaskScheduler::Dequeue(int worker_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 
