@@ -13,6 +13,7 @@
 #include "cortrix/common/json_depth.h"  // metadata depth guard (DoS: deep-JSON dump)
 #include "cortrix/doc_summary/discover_handler.h"  // RecallDocSummaryHnsw (granularity=doc/both)
 #include "cortrix/doc_summary/doc_summary_types.h"  // DocDiscoveryHit
+#include "cortrix/id/hash.h"
 #include "cortrix/query/bm25_searcher.h"
 #include "cortrix/query/cross_ns_error.h"
 #include "cortrix/query/vector_searcher.h"
@@ -33,6 +34,33 @@ namespace cortrix::query {
 
 using retrieval::NamespaceQueryResult;
 using retrieval::RankedChunk;
+
+bool ResolveSourceChildBlock(CortrixStore& store, const std::string& child_id,
+                             CortrixBlock* out) {
+    if (out == nullptr || child_id.empty()) return false;
+
+    CortrixBlock source;
+    const uint64_t source_block_id = id::HashChildIdToBlockId(child_id);
+    if (store.block_get(source_block_id, source) == 0 && source.child_id == child_id) {
+        *out = std::move(source);
+        return true;
+    }
+
+    // Older or externally populated stores might not use the deterministic
+    // child-to-block key. Preserve the existing reverse-index fallback so these
+    // rows remain queryable, even though legacy rows cannot recover fields the
+    // compact index never stored.
+    cortrix::store::SqliteChunkStore reverse_store(store.db_handle());
+    auto record = reverse_store.Get(child_id);
+    if (!record.ok()) return false;
+    *out = CortrixBlock{};
+    out->child_id = record.value().child_id;
+    out->parent_id = record.value().parent_id;
+    out->chunk_index = record.value().chunk_index;
+    out->content_text = record.value().content;
+    out->score_signals = record.value().score_signals;
+    return true;
+}
 
 namespace {
 
@@ -502,16 +530,15 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             return hits;
         };
 
-        // Ensure the SOURCE child of a hype/contextual vote is resolvable for the
-        // final assembly (same reverse-lookup contract as the sparse route: text +
-        // score_signals; block metadata joins when the child was also a dense hit).
-        cortrix::store::SqliteChunkStore reverse_chunk_store(store.db_handle());
+        // Resolve derived retrieval votes through the complete source block so
+        // document identity and caller metadata survive response assembly.
         auto resolve_child_row = [&](const std::string& child_id) -> bool {
             if (by_child.find(child_id) != by_child.end()) return true;
-            auto rec = reverse_chunk_store.Get(child_id);
-            if (!rec.ok()) return false;
-            by_child.emplace(child_id, ChunkRow{rec.value().content, std::string(),
-                                                std::string(), rec.value().score_signals});
+            CortrixBlock source;
+            if (!ResolveSourceChildBlock(store, child_id, &source)) return false;
+            by_child.emplace(child_id,
+                             ChunkRow{source.content_text, source.metadata_json,
+                                      source.doc_id, source.score_signals});
             return true;
         };
 

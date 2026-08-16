@@ -431,6 +431,9 @@ class FullStackE2E {
   cortrix::catalog::DefaultINSRouter& ns_router() { return *ns_router_; }
   cortrix::SPCManager& spc_mgr() { return *spc_mgr_; }
   cortrix::spc::EnricherChain& enricher_chain() { return enricher_chain_; }
+  cortrix::retrieval::SparseIndexRegistry& sparse_index_registry() {
+    return *sparse_index_registry_;
+  }
   // HTTP-facing components (BuildIngest only).
   cortrix::UploadHandler& upload_handler() { return *upload_handler_; }
   cortrix::OnnxEmbedder& embedder() { return *embedder_; }

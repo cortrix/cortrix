@@ -25,9 +25,13 @@
 #include <vector>
 
 #include "cortrix/common/json_depth.h"
+#include "cortrix/common/block_header.h"
+#include "cortrix/common/block_types.h"
+#include "cortrix/id/hash.h"
 #include "cortrix/query/live_single_unit_executor.h"
 #include "cortrix/query/rrf_fusion.h"
 #include "cortrix/spc/onnx_embedder.h"
+#include "cortrix/store/cortrix_store_sqlite.h"
 
 #include "ns_pool_test_helper.h"  // cortrix::test::NsPoolHarness (real offline F05 pool)
 
@@ -187,6 +191,67 @@ TEST_F(LiveExecutorTest, ClassifyVectorHitHypeWithoutSourceDropped) {
     EXPECT_EQ(ClassifyVectorHit(16, "", R"({"source_child_id":7})", &child),
               VectorHitPath::kDropped);
     EXPECT_EQ(ClassifyVectorHit(16, "", "{bad", &child), VectorHitPath::kDropped);
+}
+
+TEST_F(LiveExecutorTest, DerivedVoteResolutionPreservesSourceIdentity) {
+    CortrixStoreSqlite store(":memory:");
+    ASSERT_EQ(store.Open(), 0);
+
+    CortrixDoc doc;
+    doc.source_type = "unit";
+    doc.source_path = "source-a.md";
+    doc.metadata_json = R"({"input_id":"source-a","scenario":"duplicate-text"})";
+    ASSERT_EQ(store.doc_create(doc), 0);
+
+    CortrixBlock source;
+    source.child_id = "01SOURCECHILD0000000000001";
+    source.block_id = id::HashChildIdToBlockId(source.child_id);
+    source.doc_id = doc.doc_id;
+    source.parent_id = "01SOURCEPARENT000000000001";
+    source.block_type = kBlockFile;
+    source.processing_level = kLevelL3;
+    source.content_text = "Repeated passage shared by two source documents.";
+    source.metadata_json = R"({"chunk_source":"source-a"})";
+    source.data = BlockBuild(kBlockFile, kLevelL3, source.content_text,
+                             source.metadata_json, "", 0, 0);
+    ASSERT_EQ(store.block_insert(source), 0);
+
+    CortrixBlock resolved;
+    ASSERT_TRUE(ResolveSourceChildBlock(store, source.child_id, &resolved));
+    EXPECT_EQ(resolved.child_id, source.child_id);
+    EXPECT_EQ(resolved.doc_id, doc.doc_id);
+    EXPECT_EQ(resolved.parent_id, source.parent_id);
+    EXPECT_EQ(resolved.metadata_json, source.metadata_json);
+    EXPECT_EQ(resolved.content_text, source.content_text);
+}
+
+TEST_F(LiveExecutorTest, DerivedVoteResolutionKeepsLegacyLookupCompatible) {
+    CortrixStoreSqlite store(":memory:");
+    ASSERT_EQ(store.Open(), 0);
+
+    CortrixDoc doc;
+    doc.source_type = "unit";
+    doc.source_path = "legacy-source.md";
+    ASSERT_EQ(store.doc_create(doc), 0);
+
+    CortrixBlock legacy;
+    legacy.child_id = "01LEGACYCHILD0000000000001";
+    legacy.parent_id = "01LEGACYPARENT00000000001";
+    legacy.doc_id = doc.doc_id;
+    legacy.chunk_index = 7;
+    legacy.block_type = kBlockFile;
+    legacy.processing_level = kLevelL3;
+    legacy.content_text = "Legacy source content.";
+    legacy.data = BlockBuild(kBlockFile, kLevelL3, legacy.content_text, "", "", 0, 0);
+    ASSERT_EQ(store.block_insert(legacy), 0);
+    ASSERT_NE(legacy.block_id, id::HashChildIdToBlockId(legacy.child_id));
+
+    CortrixBlock resolved;
+    ASSERT_TRUE(ResolveSourceChildBlock(store, legacy.child_id, &resolved));
+    EXPECT_EQ(resolved.child_id, legacy.child_id);
+    EXPECT_EQ(resolved.parent_id, legacy.parent_id);
+    EXPECT_EQ(resolved.chunk_index, legacy.chunk_index);
+    EXPECT_EQ(resolved.content_text, legacy.content_text);
 }
 
 // String values are kept verbatim (no surrounding quotes); non-strings dump().
