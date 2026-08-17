@@ -1081,6 +1081,72 @@ TEST_F(SPCPipelineR7Test, EnrichSweeper_SkipsDocsWithActiveBackfillTask) {
     EXPECT_EQ(mgr.CountAll().value(), 2);
 }
 
+// §3.7.6 guard must see EVERY live status, with no age cutoff (review of PR #63):
+// a task in `cancelling` and a queued task older than any recency window are
+// both still active — a duplicate behind either would break the invariant.
+TEST_F(SPCPipelineR7Test, EnrichSweeper_GuardSeesCancellingAndOldActiveTasks) {
+    sqlite3* db = facade_->store().db_handle();
+    ASSERT_NE(db, nullptr);
+    auto seed_due = [&](uint64_t block_id, const std::string& doc) {
+        cortrix::spc::EnrichStateRow r;
+        r.block_id = block_id;
+        r.doc_id = doc;
+        r.child_id = "c" + std::to_string(block_id);
+        r.status = cortrix::spc::kEnrichStatusPendingRetry;
+        r.failed_members = "f03";
+        r.next_retry_at = 1;
+        r.updated_at = 1;
+        ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());
+    };
+    seed_due(921, "doc-cancelling");
+    seed_due(922, "doc-old");
+
+    const std::string tasks_db = (tmp_root_ / "tasks5.db").string();
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init(tasks_db).ok());
+    cortrix::InMemoryGlobalConfig cfg;
+    cfg.Set("f42.watcher_debounce_seconds", "0");
+    async::TaskScheduler sched(&mgr, &cfg);
+    cortrix::spc::EnrichRetrySweeper sweeper(*pool_, &sched, /*workers=*/nullptr,
+                                             /*config=*/nullptr);
+
+    ASSERT_EQ(sweeper.RunSweepNow("test-ns"), 2);
+    ASSERT_EQ(mgr.CountAll().value(), 2);
+
+    // doc-cancelling: processing -> cancelling (RequestCancel on a processing row).
+    auto t1 = mgr.FindRecentTaskByDocId("test-ns", "doc-cancelling",
+                                        async::kTaskEnrichBackfill, 3600);
+    ASSERT_TRUE(t1.ok() && t1.value().has_value());
+    ASSERT_TRUE(mgr.MarkProcessing(t1.value()->task_id, 1).ok());
+    ASSERT_TRUE(mgr.RequestCancel(t1.value()->task_id, nullptr).ok());
+    ASSERT_EQ(mgr.GetTask(t1.value()->task_id).value().status,
+              std::string(async::task_status::kCancelling));
+
+    // doc-old: still queued, but created far in the past (older than any recency
+    // window). Backdate through a second connection; the manager runs WAL so a
+    // concurrent writer is fine.
+    {
+        sqlite3* raw = nullptr;
+        ASSERT_EQ(sqlite3_open(tasks_db.c_str(), &raw), SQLITE_OK);
+        ASSERT_EQ(sqlite3_exec(raw,
+                      "UPDATE tasks SET created_at='2000-01-01T00:00:00.000Z' "
+                      "WHERE doc_id='doc-old'", nullptr, nullptr, nullptr),
+                  SQLITE_OK);
+        sqlite3_close(raw);
+    }
+    auto old_visible = mgr.FindRecentTaskByDocId("test-ns", "doc-old",
+                                                 async::kTaskEnrichBackfill, 3600);
+    ASSERT_TRUE(old_visible.ok());
+    ASSERT_FALSE(old_visible.value().has_value())
+        << "precondition: the recency lookup no longer sees the backdated task";
+
+    // Both docs due again; both still have an active task → nothing enqueued.
+    seed_due(921, "doc-cancelling");
+    seed_due(922, "doc-old");
+    EXPECT_EQ(sweeper.RunSweepNow("test-ns"), 0);
+    EXPECT_EQ(mgr.CountAll().value(), 2);
+}
+
 // ============================================================
 // SparseIndexRegistry (Q4 F40) path.
 // ============================================================
