@@ -80,12 +80,12 @@ docker compose -f deploy/docker-compose.yml down --volumes
 
 The Quick Start publishes only `127.0.0.1:8420`. It does not publish the metrics or Agent ports. Treat it as a local first-value path, not an internet-facing deployment recipe.
 
-## Publishing on a LAN address (opt-in)
+## Publishing on an isolated test network (opt-in)
 
 By default nothing outside the host can reach the stack — a loopback-only
 publish means teammates cannot open the web UI or API from their own machines,
-which is usually the first thing a shared test deployment needs. To publish on
-a routable address, set `CORTRIX_PUBLISH_HOST` (and preferably a distinctive
+which is usually the first thing a shared test box needs. To publish on a
+routable address, set `CORTRIX_PUBLISH_HOST` (and preferably a distinctive
 port) when starting the stack:
 
 ```bash
@@ -96,17 +96,22 @@ CORTRIX_PUBLISH_HOST=10.0.0.5 CORTRIX_HTTP_PORT=18420 \
 The web UI and API are then reachable at `http://10.0.0.5:18420/` from any
 machine that can route to that address.
 
-Scope and safety:
+Boundary — read before you use it:
 
-- The default stays loopback-only; this is an explicit opt-in, and the
-  loopback-only Quick Start contract above is unchanged when the variable is
-  unset.
-- Everything the API allows becomes available to that network segment. The
-  Quick Start profile runs without API-key authentication, so publish beyond
-  loopback only on an isolated or trusted test network — or configure
-  API-key auth first (see `config.yaml.example`, `auth` section).
-- Pick a distinctive high port (for example `18420`) rather than `80`/`8080`
-  to avoid colliding with other services on shared test hosts.
+- **This path is unauthenticated.** The Quick Start stack runs without API-key
+  authentication and keeps the container-bind exception enabled; whatever can
+  reach the published address gets full API access. It is intended **only for
+  isolated test networks you control** — never a shared corporate LAN, a cloud
+  VPC with other tenants, or anything internet-facing.
+- The default stays loopback-only; with the variable unset the rendered stack
+  is unchanged (pinned by `tests/ci/test_compose_publish_host.sh`, which also
+  pins the explicit override and that setting only the port never widens the
+  bind).
+- Prefer a distinctive high port (for example `18420`) over `80`/`8080` to
+  avoid colliding with other services on shared test hosts.
+- An authenticated LAN publishing path for this Compose stack (API-key
+  provisioning without a hand-edited config) is tracked as a separate change;
+  until it lands, do not treat this section as a deployment recipe.
 
 ## Model provenance and integrity
 

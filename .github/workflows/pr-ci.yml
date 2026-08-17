@@ -189,6 +189,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Release version consistency
         run: python3 scripts/sync_version.py --check
+      - name: Compose publish-address contract
+        run: ./tests/ci/test_compose_publish_host.sh
       - name: clang-format (changed files only)
         continue-on-error: true
         run: |
