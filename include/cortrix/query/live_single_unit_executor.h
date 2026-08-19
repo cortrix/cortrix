@@ -13,9 +13,19 @@
 
 namespace cortrix {
 class OnnxEmbedder;
+class CortrixStore;
+struct CortrixBlock;
 }  // namespace cortrix
 
 namespace cortrix::query {
+
+/// Resolve a derived retrieval vote back to the complete source child row.
+///
+/// HyPE and contextualized-vector hits carry a source child ID rather than the
+/// source block ID. The returned block must retain document and metadata fields
+/// so the public query response can reconstruct caller-supplied source identity.
+bool ResolveSourceChildBlock(CortrixStore& store, const std::string& child_id,
+                             CortrixBlock* out);
 
 /// Parse a block's raw metadata_json and flatten its top-level fields into a
 /// RankedChunk.metadata map (string→string). Each top-level key becomes a map

@@ -37,6 +37,8 @@
 #include "cortrix/server/routes/document_routes.h"     // RegisterDocumentRoutes (seed ingest)
 #include "cortrix/query/query_wiring.h"                // CrossNsQueryWiring
 #include "cortrix/query/rag_fusion_metrics.h"          // RagFusionMetrics (corroboration)
+#include "cortrix/spc/cleaning_types.h"                // CleaningConfig
+#include "cortrix/spc/hype_enricher.h"                 // HyPEEnricher / HyPEConfig
 #include "cortrix/tenant/permission_service.h"         // PermissionService
 
 #include "mock_llm_client.h"                           // llm::MockLlmClient
@@ -52,6 +54,7 @@ using ::testing::HasSubstr;
 using ::testing::Return;
 
 constexpr const char* kNs = "sales";
+constexpr const char* kHypeProvenanceNs = "hype-provenance";
 
 bool HasResultDocId(const json& body, const std::string& doc_id);
 int ResultDocPosition(const json& body, const std::string& doc_id);
@@ -92,6 +95,139 @@ std::shared_ptr<llm::MockLlmClient> MakeVariantLlm() {
       .Times(AtLeast(1))
       .WillRepeatedly(Return(ok));
   return mock;
+}
+
+std::shared_ptr<llm::MockLlmClient> MakeHypeProvenanceLlm() {
+  auto mock = std::make_shared<llm::MockLlmClient>();
+  llm::ChatCompletionResponse ok;
+  ok.status = Status::Ok();
+  ok.finish_reason = "stop";
+  ok.model = "gpt-4o-mini";
+  ok.content = "What is alpha?\nWhy beta?\nHow gamma?";
+  EXPECT_CALL(*mock, Chat(_, _)).Times(AtLeast(1)).WillRepeatedly(Return(ok));
+  return mock;
+}
+
+class HypeSourceIdentityE2E : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    h_ = std::make_unique<cortrix::test::FullStackE2E>();
+    h_->BuildIngest(/*embedding_dim=*/128);
+    h_->enricher_chain().Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, MakeHypeProvenanceLlm(),
+        /*parent_store=*/nullptr));
+    h_->spc_mgr().SetCleaningConfigResolver(
+        [](const std::string&) -> cortrix::spc::CleaningConfig {
+          cortrix::spc::CleaningConfig config;
+          config.dedup_enabled = false;
+          return config;
+        });
+    ASSERT_TRUE(h_->CreateNamespaceOwnedBy(kHypeProvenanceNs, "alice").ok());
+
+    cortrix::RegisterDocumentRoutes(h_->server(), h_->upload_handler(), h_->pool(),
+                                    h_->auth());
+    perm_svc_ = std::make_unique<cortrix::tenant::PermissionService>(h_->global_db());
+    wiring_ = std::make_unique<cortrix::query::CrossNsQueryWiring>(
+        h_->pool(), h_->embedder(), h_->fusion(), *perm_svc_,
+        &h_->sparse_index_registry(), /*llm=*/nullptr, /*engine_instr=*/nullptr);
+    wiring_->Register(h_->server(), h_->auth());
+    h_->Start();
+  }
+
+  std::string IngestDoc(const std::string& filename, const std::string& content,
+                        const std::string& source_token) {
+    auto c = h_->Client();
+    httplib::MultipartFormDataItems items = {
+        {"file", content, filename, "text/plain"},
+        {"metadata", json{{"source_token", source_token},
+                           {"scenario", "hype-source-identity"}}
+                         .dump(),
+         "metadata.json", "application/json"},
+    };
+    auto upload = c.Post(
+        std::string("/api/v1/namespaces/") + kHypeProvenanceNs + "/documents",
+        h_->Bearer(h_->user_key()), items);
+    EXPECT_TRUE(upload);
+    EXPECT_EQ(upload ? upload->status : 0, 201)
+        << (upload ? upload->body : "no response");
+    if (!upload || upload->status != 201) return "";
+    const std::string doc_id = json::parse(upload->body)["doc_id"].get<std::string>();
+    for (int i = 0; i < 100; ++i) {
+      auto status = c.Get(
+          std::string("/api/v1/namespaces/") + kHypeProvenanceNs + "/documents/" +
+              doc_id + "/status",
+          h_->Bearer(h_->user_key()));
+      if (status && status->status == 200) {
+        const std::string state = json::parse(status->body).value("status", "");
+        if (state == "ready") return doc_id;
+        if (state == "error") {
+          ADD_FAILURE() << status->body;
+          return "";
+        }
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    ADD_FAILURE() << filename << " did not reach ready";
+    return doc_id;
+  }
+
+  std::unique_ptr<cortrix::test::FullStackE2E> h_;
+  std::unique_ptr<cortrix::tenant::PermissionService> perm_svc_;
+  std::unique_ptr<cortrix::query::CrossNsQueryWiring> wiring_;
+};
+
+TEST_F(HypeSourceIdentityE2E, DerivedResultsPreserveSourceDocumentIdentity) {
+  const std::string doc_a = IngestDoc(
+      "source-a.txt",
+      "Alpha source A describes a project decision, its owner, and its approval record.",
+      "source-a");
+  const std::string doc_b = IngestDoc(
+      "source-b.txt",
+      "Alpha source B describes a different decision, owner, and approval record.",
+      "source-b");
+  ASSERT_FALSE(doc_a.empty());
+  ASSERT_FALSE(doc_b.empty());
+  ASSERT_NE(doc_a, doc_b);
+
+  auto c = h_->Client();
+  json body = {{"query", "What is alpha?"},
+               {"namespaces", json::array({kHypeProvenanceNs})},
+               {"top_k", 20},
+               {"route", "complex"},
+               {"granularity", "chunk"},
+               {"explain", true}};
+  auto response = c.Post("/api/v1/query?granularity=chunk&explain=true",
+                         h_->Bearer(h_->user_key()), body.dump(),
+                         "application/json");
+  ASSERT_TRUE(response);
+  ASSERT_EQ(response->status, 200) << response->body;
+  const json result = json::parse(response->body);
+  ASSERT_TRUE(result.contains("results"));
+
+  int attributed_hype_results = 0;
+  for (const auto& item : result["results"]) {
+    if (!item.contains("metadata") || !item["metadata"].is_object()) continue;
+    const auto& metadata = item["metadata"];
+    if (metadata.value("rrf_paths", "").find("hype_question") ==
+        std::string::npos) {
+      continue;
+    }
+
+    ++attributed_hype_results;
+    const std::string doc_id = item.value(
+        "doc_id", metadata.value("source_doc_id", metadata.value("doc_id", "")));
+    const std::string source_token = metadata.value("source_token", "");
+    if (doc_id == doc_a) {
+      EXPECT_EQ(source_token, "source-a");
+    } else if (doc_id == doc_b) {
+      EXPECT_EQ(source_token, "source-b");
+    } else {
+      ADD_FAILURE() << "HyPE result referenced an unknown source document: " << doc_id;
+    }
+  }
+  EXPECT_GT(attributed_hype_results, 0)
+      << "The production query route returned no HyPE-derived source result: "
+      << response->body;
 }
 
 // Base fixture: real ingest assembly; derived tests seed two queryable documents in
