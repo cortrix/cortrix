@@ -634,6 +634,26 @@ Result<std::optional<TaskInfo>> TaskManager::FindRecentTaskByDocId(
     return out;
 }
 
+Result<bool> TaskManager::HasActiveTask(const std::string& namespace_id,
+                                        const std::string& doc_id, int task_type) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const char* sql =
+        "SELECT 1 FROM tasks WHERE namespace_id = ? AND doc_id = ? AND task_type = ? "
+        "AND status IN ('queued','processing','cancelling') LIMIT 1";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        return F42Status(F42ErrorCode::kStorageFailed, "HasActiveTask prepare");
+    }
+    BindText(stmt, 1, namespace_id);
+    BindText(stmt, 2, doc_id);
+    sqlite3_bind_int(stmt, 3, task_type);
+    const int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc == SQLITE_ROW) return true;
+    if (rc == SQLITE_DONE) return false;
+    return F42Status(F42ErrorCode::kStorageFailed, "HasActiveTask step");
+}
+
 Result<TaskInfo> TaskManager::TryClaimDebounceMerge(const std::string& task_id) {
     std::lock_guard<std::mutex> lock(mutex_);
     // Claim with a write so the merge is a real linearization point rather than a

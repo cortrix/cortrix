@@ -95,6 +95,17 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
     return created;
 }
 
+Result<bool> TaskScheduler::HasActiveTaskFor(const std::string& namespace_id,
+                                             const std::string& doc_id,
+                                             int task_type) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    // Direct live-status probe: every non-terminal status, no age cutoff. The
+    // debounce lookup (FindRecentTaskByDocId) is the wrong shape for this — it
+    // excludes cancelling and windows on created_at, so an old queued or a
+    // cancelling backfill would read as inactive and get a duplicate.
+    return mgr_->HasActiveTask(namespace_id, doc_id, task_type);
+}
+
 Result<std::optional<TaskInfo>> TaskScheduler::Dequeue(int worker_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 

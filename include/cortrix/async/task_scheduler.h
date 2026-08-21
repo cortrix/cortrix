@@ -45,6 +45,15 @@ public:
     ///     processing is allowed; the per-doc_id mutex defers it at Dequeue).
     Result<TaskInfo> Enqueue(const SubmitRequest& req);
 
+    /// Whether the most recent task for (namespace_id, doc_id, task_type) is still
+    /// non-terminal (queued/processing/cancelling). Periodic producers use this as
+    /// an enqueue-dedup guard (F36-LR addendum §3.7.6): the 5s Enqueue debounce
+    /// window cannot catch re-submissions whose period is minutes, so without this
+    /// check a producer that outpaces queue drain accumulates unbounded duplicate
+    /// rows for the same doc.
+    Result<bool> HasActiveTaskFor(const std::string& namespace_id,
+                                  const std::string& doc_id, int task_type);
+
     /// topic 2.3 B — pop the oldest queued task whose (namespace, doc) pair is not
     /// reserved, mark it processing for `worker_id`, and reserve the pair. nullopt
     /// if the queue is empty or all queued docs are active.
