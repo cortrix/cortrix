@@ -22,22 +22,21 @@ bool ReleaseManagedPath(const std::string& managed_dir, const std::string& filep
     // Rules 2 and 3 — never remove a path another live task still needs, and treat
     // an unanswerable check as "still referenced".
     //
-    // The comparison resolves BOTH sides. Task rows store whatever string was
-    // handed to F42, so the same file can appear as "d/x.txt" for one task and
-    // "d/./x.txt" for another; comparing the stored strings would report "nobody
-    // else needs it" and delete a live input. The identity used here is the same
-    // one used to remove the file below.
-    auto live = mgr->LiveTaskInputs();
-    if (!live.ok()) return false;
-    for (const auto& [task_id, other_path] : live.value()) {
-        if (task_id == exclude_task_id) continue;
-        std::error_code oec;
-        const std::filesystem::path other = std::filesystem::weakly_canonical(other_path, oec);
-        if (oec) return false;           // unresolvable → assume it could be this file
-        if (other == path) return false;  // still referenced
-    }
-
-    return std::filesystem::remove(path, ec) && !ec;
+    // The comparison is on resolved paths, not stored strings: task rows hold
+    // whatever was handed to F42, so the same file can appear as "d/x.txt" for one
+    // task and "d/./x.txt" for another. That identity is resolved once at task
+    // creation and indexed (tasks.filepath_canonical), so this is a point lookup
+    // rather than resolving every live row on every completion — the O(live tasks)
+    // scan that gated the whole worker pool at depth (issue #74).
+    //
+    // The check and the removal happen under one lock, so a task created in between
+    // cannot have its input deleted out from under it.
+    auto released = mgr->ReleaseInputIfUnreferenced(
+        path.string(), exclude_task_id, [&path]() {
+            std::error_code rec;
+            return std::filesystem::remove(path, rec) && !rec;
+        });
+    return released.ok() && released.value();
 }
 
 }  // namespace cortrix::async

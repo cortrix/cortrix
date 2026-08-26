@@ -4,9 +4,11 @@
 #include <sqlite3.h>
 
 #include <chrono>
+#include <filesystem>
 #include <cstdio>
 #include <ctime>
 #include <utility>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
@@ -216,6 +218,13 @@ Status TaskManager::CreateTasksTable() {
             started_at       TEXT,
             completed_at     TEXT,
             metadata_json    TEXT,
+            -- filepath resolved once at task creation (weakly_canonical). The
+            -- managed-input reaper needs "does any other live task still need this
+            -- file", and rows spell the same file differently ("d/x", "d/./x"), so
+            -- the comparison has to happen on resolved paths. Resolving them at
+            -- creation makes that an indexed point lookup instead of resolving every
+            -- live row on every task completion (issue #74).
+            filepath_canonical TEXT,
             CHECK (status IN ('queued','processing','cancelling','completed','failed','cancelled'))
         );
         CREATE INDEX IF NOT EXISTS idx_tasks_namespace  ON tasks(namespace_id);
@@ -236,6 +245,15 @@ Status TaskManager::CreateTasksTable() {
         -- lookup. CREATE INDEX IF NOT EXISTS runs on every Init, so this doubles as
         -- the migration for tasks.db files created before the index existed.
         CREATE INDEX IF NOT EXISTS idx_tasks_status_created ON tasks(status, created_at);
+        -- Managed-input reference check (issue #74): "is this resolved path still
+        -- referenced by a live task other than the one releasing it". Indexed so
+        -- that check is a point lookup; NULLs are indexed too, which is what the
+        -- un-backfilled-row guard below probes.
+        CREATE INDEX IF NOT EXISTS idx_tasks_filepath_canonical ON tasks(filepath_canonical);
+        -- Managed-input reference check (issue #74): "is this resolved path still
+        -- referenced by a live task other than the one releasing it". Indexed so
+        -- that check is a point lookup; NULLs are indexed too, which is what the
+        -- un-backfilled-row guard below probes.
     )";
     if (ExecSQL(db_, sql) != SQLITE_OK) {
         return F42Status(F42ErrorCode::kStorageFailed, "create tasks table");
@@ -247,7 +265,58 @@ Status TaskManager::CreateTasksTable() {
     if (!ColumnExists(db_, "tasks", "metadata_json")) {
         ExecSQL(db_, "ALTER TABLE tasks ADD COLUMN metadata_json TEXT");
     }
+    // Same idempotent shape for filepath_canonical. ALTER cannot backfill it —
+    // resolving a path needs the filesystem — so rows written by an older binary
+    // arrive here with NULL. BackfillCanonicalInputsLocked() fills the live ones;
+    // any that remain NULL are treated as "could be this file" by the reference
+    // check, which keeps the reaper failing closed on a partially migrated DB.
+    if (!ColumnExists(db_, "tasks", "filepath_canonical")) {
+        ExecSQL(db_, "ALTER TABLE tasks ADD COLUMN filepath_canonical TEXT");
+        ExecSQL(db_,
+                "CREATE INDEX IF NOT EXISTS idx_tasks_filepath_canonical "
+                "ON tasks(filepath_canonical)");
+    }
+    BackfillCanonicalInputsLocked();
     return Status::Ok();
+}
+
+void TaskManager::BackfillCanonicalInputsLocked() {
+    // Only live rows matter: a terminal task's input has already been released, and
+    // resolving thousands of historical paths on every start would be pure cost.
+    const char* select_sql =
+        "SELECT task_id, filepath FROM tasks "
+        "WHERE status NOT IN ('completed','failed','cancelled') "
+        "AND filepath IS NOT NULL AND filepath <> '' "
+        "AND (filepath_canonical IS NULL OR filepath_canonical = '')";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, select_sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        spdlog::warn("F42 filepath_canonical backfill skipped: {}", sqlite3_errmsg(db_));
+        return;
+    }
+    std::vector<std::pair<std::string, std::string>> pending;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        pending.emplace_back(SafeColText(stmt, 0), SafeColText(stmt, 1));
+    }
+    sqlite3_finalize(stmt);
+    if (pending.empty()) return;
+
+    const char* update_sql = "UPDATE tasks SET filepath_canonical = ? WHERE task_id = ?";
+    int filled = 0;
+    for (const auto& [task_id, filepath] : pending) {
+        std::error_code ec;
+        const std::string canonical = std::filesystem::weakly_canonical(filepath, ec).string();
+        // An unresolvable path stays NULL rather than getting a guessed value: the
+        // reference check reads NULL as "might be this file" and declines to delete.
+        if (ec || canonical.empty()) continue;
+        sqlite3_stmt* up = nullptr;
+        if (sqlite3_prepare_v2(db_, update_sql, -1, &up, nullptr) != SQLITE_OK) continue;
+        BindText(up, 1, canonical);
+        BindText(up, 2, task_id);
+        if (sqlite3_step(up) == SQLITE_DONE) ++filled;
+        sqlite3_finalize(up);
+    }
+    spdlog::info("F42 filepath_canonical backfill: {}/{} live task input(s) resolved",
+                 filled, pending.size());
 }
 
 // ---------------------------------------------------------------------------
@@ -267,8 +336,8 @@ Result<TaskInfo> TaskManager::CreateTask(TaskInfo task) {
         " status, task_type, cancel_requested, total_pages, processed_pages, "
         " failed_pages, progress_pct, eta_seconds, current_phase, worker_id, "
         " trace_id, error_code, error_msg, structured_data, created_at, updated_at, "
-        " started_at, completed_at, metadata_json) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        " started_at, completed_at, metadata_json, filepath_canonical) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -301,6 +370,19 @@ Result<TaskInfo> TaskManager::CreateTask(TaskInfo task) {
     BindNullableText(stmt, 23, task.started_at);
     BindNullableText(stmt, 24, task.completed_at);
     BindNullableText(stmt, 25, task.metadata_json);
+    // Resolve the input path once, here, so the managed-input reaper can compare
+    // resolved identities with a point lookup instead of resolving every live row
+    // on every completion (issue #74). Unresolvable → NULL, which the reference
+    // check reads as "might be this file" and refuses to delete on.
+    {
+        std::string canonical;
+        if (!task.filepath.empty()) {
+            std::error_code ec;
+            canonical = std::filesystem::weakly_canonical(task.filepath, ec).string();
+            if (ec) canonical.clear();
+        }
+        BindNullableText(stmt, 26, canonical);
+    }
 
     int rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
@@ -867,6 +949,59 @@ Result<int> TaskManager::RequeueStaleProcessing(int64_t now_unix, int zombie_hou
     sqlite3_finalize(stmt);
     if (rc != SQLITE_DONE) return F42Status(F42ErrorCode::kStorageFailed, "RequeueStaleProcessing step");
     return changes;
+}
+
+Result<bool> TaskManager::ReleaseInputIfUnreferenced(
+    const std::string& canonical_path, const std::string& exclude_task_id,
+    const std::function<bool()>& release) {
+    if (canonical_path.empty() || !release) return false;
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    // Two point lookups instead of resolving every live row (issue #74). Both are
+    // served by idx_tasks_filepath_canonical.
+    //
+    // 1. Does another live task name this exact resolved path?
+    const char* referenced_sql =
+        "SELECT 1 FROM tasks "
+        "WHERE filepath_canonical = ? AND task_id <> ? "
+        "AND status NOT IN ('completed','failed','cancelled') LIMIT 1";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, referenced_sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        return F42Status(F42ErrorCode::kStorageFailed, "ReleaseInputIfUnreferenced prepare");
+    }
+    BindText(stmt, 1, canonical_path);
+    BindText(stmt, 2, exclude_task_id);
+    const int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc == SQLITE_ROW) return false;  // still referenced
+    if (rc != SQLITE_DONE) {
+        return F42Status(F42ErrorCode::kStorageFailed, "ReleaseInputIfUnreferenced step");
+    }
+
+    // 2. Is any live row's identity unknown? A row whose path could not be resolved
+    // (older binary, or a path that failed to canonicalize at creation) carries NULL
+    // here, so the lookup above cannot rule it out — treat it as "might be this file"
+    // and keep the input. Fail closed, exactly as the full scan did.
+    const char* unresolved_sql =
+        "SELECT 1 FROM tasks "
+        "WHERE (filepath_canonical IS NULL OR filepath_canonical = '') "
+        "AND filepath IS NOT NULL AND filepath <> '' AND task_id <> ? "
+        "AND status NOT IN ('completed','failed','cancelled') LIMIT 1";
+    sqlite3_stmt* guard = nullptr;
+    if (sqlite3_prepare_v2(db_, unresolved_sql, -1, &guard, nullptr) != SQLITE_OK) {
+        return F42Status(F42ErrorCode::kStorageFailed, "ReleaseInputIfUnreferenced guard prepare");
+    }
+    BindText(guard, 1, exclude_task_id);
+    const int grc = sqlite3_step(guard);
+    sqlite3_finalize(guard);
+    if (grc == SQLITE_ROW) return false;  // unknown identity in flight -> keep
+    if (grc != SQLITE_DONE) {
+        return F42Status(F42ErrorCode::kStorageFailed, "ReleaseInputIfUnreferenced guard step");
+    }
+
+    // Unreferenced, and still holding the lock: a CreateTask naming this path cannot
+    // interleave between the decision and the removal.
+    return release();
 }
 
 Result<std::vector<std::pair<std::string, std::string>>> TaskManager::LiveTaskInputs() {

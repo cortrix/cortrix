@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -171,6 +172,25 @@ public:
     /// Fails closed: an interrupted scan is an error, never a shorter list.
     Result<std::vector<std::pair<std::string, std::string>>> LiveTaskInputs();
 
+    /// Releases a managed input file iff no live task other than `exclude_task_id`
+    /// still references it, deciding and releasing under the same lock.
+    ///
+    /// `canonical_path` must already be resolved by the caller (weakly_canonical),
+    /// because that is the identity stored in filepath_canonical at task creation;
+    /// the comparison is then an indexed point lookup rather than a resolve-every-
+    /// live-row scan on each completion (issue #74).
+    ///
+    /// `release` runs only when the path is unreferenced, while the task-table lock
+    /// is held, so a task created in between cannot lose its input. It MUST NOT call
+    /// back into TaskManager. Its return value is passed through as the result.
+    ///
+    /// Fails closed: a lookup error, or a live row whose canonical path could not be
+    /// resolved (NULL after migration), reports the path as still referenced and
+    /// `release` is not called.
+    Result<bool> ReleaseInputIfUnreferenced(const std::string& canonical_path,
+                                           const std::string& exclude_task_id,
+                                           const std::function<bool()>& release);
+
     /// Total row count (test aid).
     Result<int> CountAll();
 
@@ -180,6 +200,12 @@ public:
     mutable std::mutex mutex_;
 
     Status CreateTasksTable();
+
+    /// Fills filepath_canonical for live rows written before the column existed.
+    /// Runs once per Init with the lock already held; rows whose path cannot be
+    /// resolved stay NULL and are read as "might be this file" by the reference
+    /// check, so a partially migrated DB keeps the reaper failing closed.
+    void BackfillCanonicalInputsLocked();
 
     /// Shared 0-rows handling for the guarded Mark* terminal transitions:
     /// missing row -> CX_ERR_TASK_NOT_FOUND, live row in a forbidding status ->
