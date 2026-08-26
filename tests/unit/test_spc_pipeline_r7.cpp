@@ -1147,6 +1147,81 @@ TEST_F(SPCPipelineR7Test, EnrichSweeper_GuardSeesCancellingAndOldActiveTasks) {
     EXPECT_EQ(mgr.CountAll().value(), 2);
 }
 
+// §3.7.6 the dedup lookup must fail CLOSED (review round 2 of PR #63): when
+// HasActiveTaskFor cannot answer — a transient task-store read error, SQLITE_BUSY
+// under load being the realistic one — the doc must be skipped with its lease
+// INTACT. Failing open leases the doc and re-enqueues it, which is precisely the
+// duplicate this guard exists to prevent.
+TEST_F(SPCPipelineR7Test, EnrichSweeper_DedupLookupFailureFailsClosed) {
+    sqlite3* db = facade_->store().db_handle();
+    ASSERT_NE(db, nullptr);
+    auto seed_due = [&](uint64_t block_id, const std::string& doc) {
+        cortrix::spc::EnrichStateRow r;
+        r.block_id = block_id;
+        r.doc_id = doc;
+        r.child_id = "c" + std::to_string(block_id);
+        r.status = cortrix::spc::kEnrichStatusPendingRetry;
+        r.failed_members = "f03";
+        r.next_retry_at = 1;  // long past → due
+        r.updated_at = 1;
+        ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());
+    };
+    seed_due(931, "doc-lookupfail");
+
+    const std::string tasks_db = (tmp_root_ / "tasks6.db").string();
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init(tasks_db).ok());
+    cortrix::InMemoryGlobalConfig cfg;
+    cfg.Set("f42.watcher_debounce_seconds", "0");
+    async::TaskScheduler sched(&mgr, &cfg);
+    cortrix::spc::EnrichRetrySweeper sweeper(*pool_, &sched, /*workers=*/nullptr,
+                                             /*config=*/nullptr);
+
+    ASSERT_EQ(sweeper.RunSweepNow("test-ns"), 1);
+    ASSERT_EQ(mgr.CountAll().value(), 1);
+
+    // Break the dedup lookup by renaming the table out from under it, so
+    // HasActiveTaskFor's prepare fails. RENAME rather than DROP so the outage can
+    // be reversed below and proven transient-safe.
+    auto exec_on_tasks_db = [&](const char* sql) {
+        sqlite3* raw = nullptr;
+        ASSERT_EQ(sqlite3_open(tasks_db.c_str(), &raw), SQLITE_OK);
+        ASSERT_EQ(sqlite3_exec(raw, sql, nullptr, nullptr, nullptr), SQLITE_OK);
+        sqlite3_close(raw);
+    };
+    exec_on_tasks_db("ALTER TABLE tasks RENAME TO tasks_hidden");
+
+    // Lease expiry while the lookup is broken.
+    seed_due(931, "doc-lookupfail");
+    sweeper.RunSweepNow("test-ns");
+
+    // THE discriminating assertion. RunSweepNow returns 0 in BOTH builds here —
+    // once the table is gone Enqueue fails too — so the return value proves
+    // nothing about which behaviour ran. What separates them is the LEASE, which
+    // lives in the namespace store and is untouched by the rename: failing open
+    // consumes it (next_retry_at jumps to now+600); failing closed leaves the doc
+    // due at 1. Do not weaken this to a return-value check.
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state "
+                       "WHERE doc_id='doc-lookupfail' AND next_retry_at = 1"), 1)
+        << "lease was consumed on an unanswerable dedup lookup — guard failed open";
+
+    // Restore. The outage must have cost nothing: the original task is still the
+    // only one, and the guard now skips for the right reason.
+    exec_on_tasks_db("ALTER TABLE tasks_hidden RENAME TO tasks");
+    EXPECT_EQ(sweeper.RunSweepNow("test-ns"), 0);
+    EXPECT_EQ(mgr.CountAll().value(), 1) << "outage left a duplicate behind";
+
+    // And nothing was lost: once that task goes terminal the doc enqueues again.
+    auto t = mgr.FindRecentTaskByDocId("test-ns", "doc-lookupfail",
+                                       async::kTaskEnrichBackfill, 3600);
+    ASSERT_TRUE(t.ok() && t.value().has_value());
+    ASSERT_TRUE(mgr.MarkProcessing(t.value()->task_id, 1).ok());
+    ASSERT_TRUE(mgr.MarkCompleted(t.value()->task_id, "doc-lookupfail").ok());
+    seed_due(931, "doc-lookupfail");
+    EXPECT_EQ(sweeper.RunSweepNow("test-ns"), 1);
+    EXPECT_EQ(mgr.CountAll().value(), 2);
+}
+
 // ============================================================
 // SparseIndexRegistry (Q4 F40) path.
 // ============================================================
