@@ -253,7 +253,7 @@ TEST_F(ManagedInputReleaseFx, InitUpgradesADatabaseWhoseTableLacksTheColumn) {
 
     ASSERT_EQ(sqlite3_prepare_v2(
                   raw, "SELECT count(*) FROM sqlite_master WHERE type='index' "
-                       "AND name='idx_tasks_filepath_canonical'", -1, &stmt, nullptr),
+                       "AND name='idx_tasks_live_canonical'", -1, &stmt, nullptr),
               SQLITE_OK);
     ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
     EXPECT_EQ(sqlite3_column_int(stmt, 0), 1);
@@ -299,8 +299,64 @@ TEST_F(ManagedInputReleaseFx, ResolvedIdentityIsPersistedAndIndexed) {
     }
     sqlite3_finalize(plan);
     sqlite3_close(raw);
-    EXPECT_NE(detail.find("idx_tasks_filepath_canonical"), std::string::npos) << detail;
+    EXPECT_NE(detail.find("idx_tasks_live_canonical"), std::string::npos) << detail;
     EXPECT_EQ(detail.find("SCAN tasks"), std::string::npos) << detail;
+}
+
+// The unknown-identity guard must stay cheap as history accumulates. Terminal rows
+// keep a NULL identity forever -- they have already released their input and the
+// backfill deliberately skips them -- so an index that covers them makes the guard
+// walk every historical NULL before status can rule it out. Measured on a real
+// 801k-row database: 1.109s per probe with a full index versus 0.003s with the
+// live-only one, and the full-index cost grows with total history rather than with
+// the live set. The plan is pinned against a table whose NULLs are overwhelmingly
+// terminal, which is the shape that exposed it.
+TEST_F(ManagedInputReleaseFx, UnknownIdentityGuardDoesNotWalkTerminalHistory) {
+    CreateTaskFor(MakeFile("01LIVEONE.pdf"), "live1");
+
+    sqlite3* raw = nullptr;
+    ASSERT_EQ(sqlite3_open(db_path_.c_str(), &raw), SQLITE_OK);
+    ASSERT_EQ(sqlite3_exec(raw, "BEGIN", nullptr, nullptr, nullptr), SQLITE_OK);
+    for (int i = 0; i < 2000; ++i) {
+        const std::string sql =
+            "INSERT INTO tasks (task_id, namespace_id, filename, filepath, status,"
+            " created_at, updated_at, filepath_canonical) VALUES ('hist-" +
+            std::to_string(i) + "','ns','d.pdf','/tmp/hist" + std::to_string(i) +
+            ".pdf','completed','2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z',NULL)";
+        ASSERT_EQ(sqlite3_exec(raw, sql.c_str(), nullptr, nullptr, nullptr), SQLITE_OK);
+    }
+    ASSERT_EQ(sqlite3_exec(raw, "COMMIT", nullptr, nullptr, nullptr), SQLITE_OK);
+
+    sqlite3_stmt* plan = nullptr;
+    ASSERT_EQ(sqlite3_prepare_v2(raw,
+                                 "EXPLAIN QUERY PLAN SELECT 1 FROM tasks "
+                                 "WHERE filepath_canonical IS NULL "
+                                 "AND filepath IS NOT NULL AND filepath <> '' AND task_id <> ? "
+                                 "AND status NOT IN ('completed','failed','cancelled') LIMIT 1",
+                                 -1, &plan, nullptr),
+              SQLITE_OK);
+    std::string detail;
+    while (sqlite3_step(plan) == SQLITE_ROW) {
+        detail += reinterpret_cast<const char*>(sqlite3_column_text(plan, 3));
+        detail += "\n";
+    }
+    sqlite3_finalize(plan);
+
+    // The index must be the live-only one; a full index over filepath_canonical
+    // would also satisfy "uses an index" while walking all 2000 terminal NULLs.
+    EXPECT_NE(detail.find("idx_tasks_live_canonical"), std::string::npos) << detail;
+    EXPECT_EQ(detail.find("SCAN tasks"), std::string::npos) << detail;
+
+    sqlite3_stmt* cnt = nullptr;
+    ASSERT_EQ(sqlite3_prepare_v2(
+                  raw, "SELECT count(*) FROM sqlite_master WHERE type='index' "
+                       "AND name='idx_tasks_live_canonical' AND sql LIKE '%WHERE%status%'",
+                  -1, &cnt, nullptr),
+              SQLITE_OK);
+    ASSERT_EQ(sqlite3_step(cnt), SQLITE_ROW);
+    EXPECT_EQ(sqlite3_column_int(cnt, 0), 1) << "index must be partial (live rows only)";
+    sqlite3_finalize(cnt);
+    sqlite3_close(raw);
 }
 
 }  // namespace

@@ -273,9 +273,19 @@ Status TaskManager::CreateTasksTable() {
     // one: CREATE TABLE IF NOT EXISTS leaves the old table alone, so the index
     // statement hits "no such column", the whole batch reports failure, and Init
     // fails before the ALTER that would have added the column ever runs.
+    // Partial index, restricted to live rows. A full index on filepath_canonical is
+    // useless here and actively harmful: every historical row carries NULL (the
+    // backfill only resolves live ones, and terminal rows have already released
+    // their input), so the "is any live identity still unknown" probe walks every
+    // NULL entry in the table before status can rule it out. Measured on a
+    // 801k-row tasks.db with 722k NULLs: 1.109s per probe with the full index,
+    // 0.003s with this one -- and the full-index cost grows with total history,
+    // which is worse than the scan it replaced.
+    ExecSQL(db_, "DROP INDEX IF EXISTS idx_tasks_filepath_canonical");
     ExecSQL(db_,
-            "CREATE INDEX IF NOT EXISTS idx_tasks_filepath_canonical "
-            "ON tasks(filepath_canonical)");
+            "CREATE INDEX IF NOT EXISTS idx_tasks_live_canonical "
+            "ON tasks(filepath_canonical) "
+            "WHERE status NOT IN ('completed','failed','cancelled')");
     BackfillCanonicalInputsLocked();
     return Status::Ok();
 }
@@ -982,9 +992,12 @@ Result<bool> TaskManager::ReleaseInputIfUnreferenced(
     // (older binary, or a path that failed to canonicalize at creation) carries NULL
     // here, so the lookup above cannot rule it out — treat it as "might be this file"
     // and keep the input. Fail closed, exactly as the full scan did.
+    // IS NULL only: CreateTask binds empty as SQL NULL, so '' never reaches the
+    // column. Spelling it as one predicate keeps this a single indexed search
+    // against idx_tasks_live_canonical instead of a two-branch OR.
     const char* unresolved_sql =
         "SELECT 1 FROM tasks "
-        "WHERE (filepath_canonical IS NULL OR filepath_canonical = '') "
+        "WHERE filepath_canonical IS NULL "
         "AND filepath IS NOT NULL AND filepath <> '' AND task_id <> ? "
         "AND status NOT IN ('completed','failed','cancelled') LIMIT 1";
     sqlite3_stmt* guard = nullptr;
