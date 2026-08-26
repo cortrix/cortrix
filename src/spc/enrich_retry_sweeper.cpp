@@ -90,6 +90,14 @@ void EnrichRetrySweeper::RunLoop() {
 }
 
 int EnrichRetrySweeper::RunSweepNow(const std::string& only_ns) {
+    // One sweep at a time. The per-doc guard below spans HasActiveTaskFor →
+    // LeaseDocRetries → Enqueue while holding no lock across them, so two
+    // overlapping sweeps (timer thread vs the backfill route, or two concurrent
+    // route calls) could each observe "no active task" for the same doc and each
+    // enqueue one. Serializing the body makes that sequence a linearization
+    // point for the only producer of kTaskEnrichBackfill.
+    std::lock_guard<std::mutex> sweep(sweep_mu_);
+
     std::vector<std::string> namespaces;
     if (!only_ns.empty()) {
         namespaces.push_back(only_ns);

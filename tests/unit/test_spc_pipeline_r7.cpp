@@ -29,11 +29,13 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <atomic>
 #include <filesystem>
 #include <fstream>
 #include <map>
 #include <memory>
 #include <string>
+#include <thread>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -1220,6 +1222,100 @@ TEST_F(SPCPipelineR7Test, EnrichSweeper_DedupLookupFailureFailsClosed) {
     seed_due(931, "doc-lookupfail");
     EXPECT_EQ(sweeper.RunSweepNow("test-ns"), 1);
     EXPECT_EQ(mgr.CountAll().value(), 2);
+}
+
+// §3.7.6 the at-most-one-active invariant must hold under CONCURRENT sweeps
+// (review round 3 of PR #63). RunSweepNow has two production callers — the timer
+// thread and the backfill ops route — and the per-doc guard spans
+// HasActiveTaskFor → LeaseDocRetries → Enqueue with no lock held across them, so
+// without serialization both sweeps can observe "no active task" for the same doc
+// and both enqueue. Debounce is disabled here exactly as the review asked, so the
+// sweeper-side guard is the only thing under test.
+TEST_F(SPCPipelineR7Test, EnrichSweeper_ConcurrentSweepsCreateOneTask) {
+    sqlite3* db = facade_->store().db_handle();
+    ASSERT_NE(db, nullptr);
+
+    const std::string tasks_db = (tmp_root_ / "tasks7.db").string();
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init(tasks_db).ok());
+    cortrix::InMemoryGlobalConfig cfg;
+    // Review's own repro condition: with the debounce on, the loser's Enqueue
+    // merges into the winner's row and hides whether the guard did anything.
+    cfg.Set("f42.watcher_debounce_seconds", "0");
+    async::TaskScheduler sched(&mgr, &cfg);
+    cortrix::spc::EnrichRetrySweeper sweeper(*pool_, &sched, /*workers=*/nullptr,
+                                             /*config=*/nullptr);
+
+    auto seed_due = [&](uint64_t block_id, const std::string& doc) {
+        cortrix::spc::EnrichStateRow r;
+        r.block_id = block_id;
+        r.doc_id = doc;
+        r.child_id = "c" + std::to_string(block_id);
+        r.status = cortrix::spc::kEnrichStatusPendingRetry;
+        r.failed_members = "f03";
+        r.next_retry_at = 1;  // long past → due
+        r.updated_at = 1;
+        ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());
+    };
+
+    // Counts rows in the TASKS db (the fixture's CountSql reads the namespace
+    // store instead), which is where a duplicate would actually appear.
+    auto count_tasks_for = [&](const std::string& doc) -> int {
+        sqlite3* raw = nullptr;
+        EXPECT_EQ(sqlite3_open(tasks_db.c_str(), &raw), SQLITE_OK);
+        sqlite3_stmt* st = nullptr;
+        EXPECT_EQ(sqlite3_prepare_v2(raw,
+                      "SELECT COUNT(*) FROM tasks"
+                      " WHERE namespace_id=?1 AND doc_id=?2 AND task_type=?3",
+                      -1, &st, nullptr),
+                  SQLITE_OK);
+        sqlite3_bind_text(st, 1, "test-ns", -1, SQLITE_STATIC);
+        sqlite3_bind_text(st, 2, doc.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(st, 3, async::kTaskEnrichBackfill);
+        int n = (sqlite3_step(st) == SQLITE_ROW) ? sqlite3_column_int(st, 0) : -1;
+        sqlite3_finalize(st);
+        sqlite3_close(raw);
+        return n;
+    };
+
+    // Each round uses a fresh doc: the previous round's doc is leased 600s
+    // forward, so exactly one doc is due per round and the signal stays clean.
+    // Repeated because the interleaving is probabilistic — one round proves
+    // nothing, and the defect-injection run below is what pins the count down.
+    constexpr int kRounds = 120;
+    for (int round = 0; round < kRounds; ++round) {
+        const std::string doc = "doc-race-" + std::to_string(round);
+        seed_due(940 + static_cast<uint64_t>(round), doc);
+
+        // Barrier, not sleep: both threads spin until each has arrived, so they
+        // enter RunSweepNow as close together as the scheduler allows.
+        std::atomic<int> arrived{0};
+        std::atomic<bool> go{false};
+        int r1 = -1, r2 = -1;
+        auto body = [&](int* out) {
+            arrived.fetch_add(1, std::memory_order_release);
+            while (!go.load(std::memory_order_acquire)) {
+            }
+            // Single-namespace form = the shape the backfill route calls.
+            *out = sweeper.RunSweepNow("test-ns");
+        };
+        std::thread t1(body, &r1);
+        std::thread t2(body, &r2);
+        while (arrived.load(std::memory_order_acquire) < 2) {
+        }
+        go.store(true, std::memory_order_release);
+        t1.join();
+        t2.join();
+
+        // THE discriminating assertion: the row count in the tasks table. The
+        // return value alone is not enough — the debounce merge branch also
+        // counts toward `enqueued`, so a returned 1 can still hide a second row.
+        ASSERT_EQ(count_tasks_for(doc), 1)
+            << "round " << round << ": concurrent sweeps created "
+            << count_tasks_for(doc) << " backfill tasks for " << doc;
+        // Exactly one sweep did the work; the other skipped without enqueueing.
+        ASSERT_EQ(r1 + r2, 1) << "round " << round << ": r1=" << r1 << " r2=" << r2;
+    }
 }
 
 // ============================================================
