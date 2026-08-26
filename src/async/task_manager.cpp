@@ -225,6 +225,17 @@ Status TaskManager::CreateTasksTable() {
         -- so the per-submit lookup stays a point query as the table grows.
         CREATE INDEX IF NOT EXISTS idx_tasks_ns_doc_type ON tasks(namespace_id, doc_id, task_type, created_at);
         CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
+        -- Dispatch access pattern (SelectOldestQueuedTaskExcluding): filter on
+        -- status='queued', order by created_at, LIMIT 1 — issued by every worker on
+        -- every dequeue attempt while the TaskManager mutex is held. The separate
+        -- status / created_at indexes cannot serve both halves, so SQLite either
+        -- scans the queued rows or sorts them; at a deep queue that scan is O(queued)
+        -- per dequeue and gates the whole worker pool (issue #72: in-flight tasks
+        -- stayed at 2-5 regardless of worker count at ~71k queued). The composite
+        -- index satisfies the filter and the ordering, turning dispatch into a point
+        -- lookup. CREATE INDEX IF NOT EXISTS runs on every Init, so this doubles as
+        -- the migration for tasks.db files created before the index existed.
+        CREATE INDEX IF NOT EXISTS idx_tasks_status_created ON tasks(status, created_at);
     )";
     if (ExecSQL(db_, sql) != SQLITE_OK) {
         return F42Status(F42ErrorCode::kStorageFailed, "create tasks table");
