@@ -249,11 +249,6 @@ Status TaskManager::CreateTasksTable() {
         -- referenced by a live task other than the one releasing it". Indexed so
         -- that check is a point lookup; NULLs are indexed too, which is what the
         -- un-backfilled-row guard below probes.
-        CREATE INDEX IF NOT EXISTS idx_tasks_filepath_canonical ON tasks(filepath_canonical);
-        -- Managed-input reference check (issue #74): "is this resolved path still
-        -- referenced by a live task other than the one releasing it". Indexed so
-        -- that check is a point lookup; NULLs are indexed too, which is what the
-        -- un-backfilled-row guard below probes.
     )";
     if (ExecSQL(db_, sql) != SQLITE_OK) {
         return F42Status(F42ErrorCode::kStorageFailed, "create tasks table");
@@ -272,10 +267,15 @@ Status TaskManager::CreateTasksTable() {
     // check, which keeps the reaper failing closed on a partially migrated DB.
     if (!ColumnExists(db_, "tasks", "filepath_canonical")) {
         ExecSQL(db_, "ALTER TABLE tasks ADD COLUMN filepath_canonical TEXT");
-        ExecSQL(db_,
-                "CREATE INDEX IF NOT EXISTS idx_tasks_filepath_canonical "
-                "ON tasks(filepath_canonical)");
     }
+    // Only now is the column guaranteed to exist. Indexing it inside the CREATE
+    // batch above would be correct on a fresh database and fatal on an existing
+    // one: CREATE TABLE IF NOT EXISTS leaves the old table alone, so the index
+    // statement hits "no such column", the whole batch reports failure, and Init
+    // fails before the ALTER that would have added the column ever runs.
+    ExecSQL(db_,
+            "CREATE INDEX IF NOT EXISTS idx_tasks_filepath_canonical "
+            "ON tasks(filepath_canonical)");
     BackfillCanonicalInputsLocked();
     return Status::Ok();
 }

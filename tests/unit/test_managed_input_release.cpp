@@ -201,6 +201,68 @@ TEST_F(ManagedInputReleaseFx, BackfillResolvesLiveRowsOnReinit) {
     EXPECT_TRUE(reopened.GetTask(live).ok());  // the live task is untouched
 }
 
+// A database written by a binary that predates filepath_canonical has the column
+// missing, not merely NULL. Init must add it and still come up: indexing the column
+// in the same batch as CREATE TABLE IF NOT EXISTS looks correct on a fresh database
+// and fails on every existing one ("no such column"), taking the whole DDL batch --
+// and Init -- down with it before the ALTER can run.
+TEST_F(ManagedInputReleaseFx, InitUpgradesADatabaseWhoseTableLacksTheColumn) {
+    const std::string legacy = (root_ / "legacy_tasks.db").string();
+    sqlite3* raw = nullptr;
+    ASSERT_EQ(sqlite3_open(legacy.c_str(), &raw), SQLITE_OK);
+    // The pre-#74 shape: every column except filepath_canonical.
+    ASSERT_EQ(sqlite3_exec(raw,
+                           "CREATE TABLE tasks ("
+                           " task_id TEXT PRIMARY KEY, namespace_id TEXT NOT NULL,"
+                           " filename TEXT NOT NULL, filepath TEXT NOT NULL, doc_id TEXT,"
+                           " content_hash TEXT, status TEXT NOT NULL DEFAULT 'queued',"
+                           " task_type INTEGER NOT NULL DEFAULT 1,"
+                           " cancel_requested INTEGER NOT NULL DEFAULT 0,"
+                           " total_pages INTEGER DEFAULT 0, processed_pages INTEGER DEFAULT 0,"
+                           " failed_pages TEXT DEFAULT '[]', progress_pct REAL DEFAULT 0.0,"
+                           " eta_seconds INTEGER DEFAULT -1, current_phase TEXT,"
+                           " worker_id INTEGER, trace_id TEXT, error_code TEXT, error_msg TEXT,"
+                           " structured_data TEXT, created_at TEXT NOT NULL,"
+                           " updated_at TEXT NOT NULL, started_at TEXT, completed_at TEXT,"
+                           " metadata_json TEXT)",
+                           nullptr, nullptr, nullptr),
+              SQLITE_OK);
+    ASSERT_EQ(sqlite3_exec(raw,
+                           "INSERT INTO tasks (task_id, namespace_id, filename, filepath,"
+                           " doc_id, status, created_at, updated_at) VALUES"
+                           " ('t-old','ns','doc.pdf','/tmp/old.pdf','doc-old','queued',"
+                           "  '2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z')",
+                           nullptr, nullptr, nullptr),
+              SQLITE_OK);
+    sqlite3_close(raw);
+
+    TaskManager upgraded;
+    const Status init = upgraded.Init(legacy);
+    ASSERT_TRUE(init.ok()) << init.message();
+
+    // Column added, index built on it, and the pre-existing row still readable.
+    ASSERT_EQ(sqlite3_open(legacy.c_str(), &raw), SQLITE_OK);
+    sqlite3_stmt* stmt = nullptr;
+    ASSERT_EQ(sqlite3_prepare_v2(
+                  raw, "SELECT count(*) FROM pragma_table_info('tasks') "
+                       "WHERE name='filepath_canonical'", -1, &stmt, nullptr),
+              SQLITE_OK);
+    ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+    EXPECT_EQ(sqlite3_column_int(stmt, 0), 1);
+    sqlite3_finalize(stmt);
+
+    ASSERT_EQ(sqlite3_prepare_v2(
+                  raw, "SELECT count(*) FROM sqlite_master WHERE type='index' "
+                       "AND name='idx_tasks_filepath_canonical'", -1, &stmt, nullptr),
+              SQLITE_OK);
+    ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+    EXPECT_EQ(sqlite3_column_int(stmt, 0), 1);
+    sqlite3_finalize(stmt);
+    sqlite3_close(raw);
+
+    EXPECT_TRUE(upgraded.GetTask("t-old").ok());
+}
+
 // The resolved identity has to be persisted and indexed -- that is what keeps the
 // reference check a point lookup rather than a per-completion scan.
 TEST_F(ManagedInputReleaseFx, ResolvedIdentityIsPersistedAndIndexed) {
