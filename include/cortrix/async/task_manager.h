@@ -119,6 +119,17 @@ public:
     /// leave that row alone and give the resubmission its own task.
     Result<TaskInfo> TryClaimDebounceMerge(const std::string& task_id);
 
+    /// Whether ANY task for (namespace_id, doc_id, task_type) is currently
+    /// non-terminal (queued / processing / cancelling), regardless of age.
+    ///
+    /// Distinct from FindRecentTaskByDocId on purpose: that query is the debounce
+    /// candidate lookup (excludes cancelling, applies a created_at window). A
+    /// dedup guard for periodic producers (F36-LR addendum §3.7.6) needs the exact
+    /// opposite shape — every live status, no cutoff — or an old queued task or a
+    /// cancelling one is misreported as inactive and a duplicate is enqueued.
+    Result<bool> HasActiveTask(const std::string& namespace_id,
+                               const std::string& doc_id, int task_type);
+
     /// topic 2.2 — a debounced re-submit with a *different* content_hash: refresh
     /// content_hash + filepath and reset progress to a fresh queued state.
     Result<TaskInfo> UpdateTaskForDebounce(const std::string& task_id,

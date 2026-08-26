@@ -90,6 +90,14 @@ void EnrichRetrySweeper::RunLoop() {
 }
 
 int EnrichRetrySweeper::RunSweepNow(const std::string& only_ns) {
+    // One sweep at a time. The per-doc guard below spans HasActiveTaskFor →
+    // LeaseDocRetries → Enqueue while holding no lock across them, so two
+    // overlapping sweeps (timer thread vs the backfill route, or two concurrent
+    // route calls) could each observe "no active task" for the same doc and each
+    // enqueue one. Serializing the body makes that sequence a linearization
+    // point for the only producer of kTaskEnrichBackfill.
+    std::lock_guard<std::mutex> sweep(sweep_mu_);
+
     std::vector<std::string> namespaces;
     if (!only_ns.empty()) {
         namespaces.push_back(only_ns);
@@ -112,6 +120,31 @@ int EnrichRetrySweeper::RunSweepNow(const std::string& only_ns) {
             continue;
         }
         for (const auto& doc_id : due.value()) {
+            // §3.7.6 enqueue dedup: at most one active backfill task per doc.
+            // The 600s lease cannot bound duplicates once queue latency exceeds
+            // it (field-observed: 35k+ queued duplicates under a flapping LLM
+            // provider), so skip — without consuming the lease — while a
+            // queued/processing task for this doc still exists; the doc stays
+            // due and the next tick re-checks.
+            // The lookup fails closed: an unanswerable dedup check is treated as
+            // "an active task may exist", so the doc is skipped with its lease
+            // intact rather than leased and re-enqueued. Failing open here would
+            // reintroduce the duplicate this guard exists to prevent — a
+            // transient task-store read error (SQLITE_BUSY under load is the
+            // realistic one) followed by a successful Enqueue is exactly the
+            // sequence that produces a second live task for the same doc.
+            if (scheduler_) {
+                auto active = scheduler_->HasActiveTaskFor(
+                    ns, doc_id, async::kTaskEnrichBackfill);
+                if (!active.ok()) {
+                    CORTRIX_LOG_WARN("spc",
+                                     "enrich sweep dedup lookup failed ns={} doc={}: {} - "
+                                     "skipping with lease intact, next tick re-checks",
+                                     ns, doc_id, active.status().message());
+                    continue;
+                }
+                if (active.value()) continue;
+            }
             // Lease first: even if Enqueue is debounced/fails, the doc simply
             // waits out the lease instead of hot-looping every tick.
             Status ls = LeaseDocRetries(db, doc_id, now + kLeaseSeconds, now);
