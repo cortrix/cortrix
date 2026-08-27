@@ -53,9 +53,14 @@ protected:
         // so seeding block_type=17 would leave `ranked` empty and the assertions
         // would pass for the wrong reason. block_id must be the child_id hash --
         // that is the identity the executor resolves candidates through.
-        SeedChunk("doc-a", "chunk-a", "alpha passage");
-        SeedChunk("doc-b", "chunk-b", "bravo passage");
-        SeedChunk("doc-c", "chunk-c", "charlie passage");
+        // Term frequency differs so the retrieval ranking is a strict order rather
+        // than a three-way tie. Equal-scoring candidates order by internal block id,
+        // which shifts with process-global state (the deployment hash key is set by
+        // whichever test runs first), so a tie makes the expected sequence unstable
+        // in a full-suite run while passing in isolation.
+        SeedChunk("doc-a", "chunk-a", "match match match match alpha");
+        SeedChunk("doc-b", "chunk-b", "match match bravo");
+        SeedChunk("doc-c", "chunk-c", "match charlie");
 
         // Fixed dense hits, ascending distance -> this is the pre-rerank order.
         harness_->fake_index()->set_search_result(
@@ -89,9 +94,17 @@ protected:
         ids_.push_back(block_id);
     }
 
+    static std::vector<std::string> ChildIds(
+            const retrieval::NamespaceQueryResult& r) {
+        std::vector<std::string> out;
+        out.reserve(r.chunks.size());
+        for (const auto& c : r.chunks) out.push_back(std::string(c.child_id));
+        return out;
+    }
+
     QueryContext MakeCtx(bool rerank) {
         QueryContext ctx;
-        ctx.query = "alpha";
+        ctx.query = "match";
         ctx.top_k = 3;
         ctx.rerank = rerank;
         ctx.granularity = "chunk";  // pin the path reranking lives on
@@ -122,37 +135,54 @@ TEST_F(RerankOptOutExecutionFx, DisabledRerankNeverInvokesTheReranker) {
     EXPECT_TRUE(result.error_code.empty()) << result.error_code;
 }
 
-// Ordering must be the retrieval order, not an arbitrary one: a dedup caller turns
-// reranking off precisely to keep the dense ranking, where the near-identical
-// document sits first.
-TEST_F(RerankOptOutExecutionFx, DisabledRerankPreservesRetrievalOrder) {
+// rerank=false must return the retrieval ranking itself, by identity and in order.
+//
+// Asserting only that scores descend would pass on an executor that permuted the
+// documents and then handed out descending scores -- which is precisely the failure
+// a dedup caller cares about, since the document that moves is their answer.
+//
+// The expected sequence is the retrieval ranking for this query over the seeded
+// texts: chunk-a matches "match" four times, chunk-b twice, chunk-c once. The
+// enabled case below returns the reverse order from the same inputs, which is what
+// gives this assertion its meaning.
+TEST_F(RerankOptOutExecutionFx, DisabledRerankReturnsTheRetrievalRankingByIdentity) {
     reranker::MockReranker rr;
     EXPECT_CALL(rr, ScoreBatch(_, _)).Times(0);
 
     LiveSingleUnitExecutor exec(harness_->ipool(), embedder_, fusion_, &rr);
     const auto result = exec.ExecuteForNamespace(MakeCtx(/*rerank=*/false), kNs);
 
-    ASSERT_FALSE(result.chunks.empty());
-    // Scores must be non-increasing: the RRF ordering carried through untouched.
-    for (size_t i = 1; i < result.chunks.size(); ++i) {
-        EXPECT_LE(result.chunks[i].score, result.chunks[i - 1].score)
-            << "position " << i << " breaks the retrieval ordering";
-    }
+    EXPECT_EQ(ChildIds(result), (std::vector<std::string>{"chunk-a", "chunk-b", "chunk-c"}))
+        << "rerank=false must pass the retrieval ranking through untouched";
 }
 
-// The counterpart: with reranking enabled the executor must reach the reranker.
-// Without this, the two cases above would also pass on a build where reranking was
-// dead code, and the opt-out would be proving nothing.
-TEST_F(RerankOptOutExecutionFx, EnabledRerankReachesTheReranker) {
+// The counterpart, and the reason the case above means anything: with reranking on,
+// the same inputs come back in a different identity order -- the one the reranker
+// asked for. Without this, both disabled cases would also pass on a build where
+// reranking never ran at all.
+TEST_F(RerankOptOutExecutionFx, EnabledRerankReordersByRerankerScore) {
     reranker::MockReranker rr;
+    // Score by content so the reranker's preference is the exact inverse of the
+    // retrieval ranking: charlie > bravo > alpha.
     EXPECT_CALL(rr, ScoreBatch(_, _))
         .Times(::testing::AtLeast(1))
-        .WillRepeatedly(Return(std::vector<float>{0.1f, 0.2f, 0.3f}));
+        .WillRepeatedly([](const char*, const std::vector<const char*>& passages) {
+            std::vector<float> out;
+            out.reserve(passages.size());
+            for (const char* p : passages) {
+                const std::string text = p == nullptr ? "" : p;
+                if (text.find("charlie") != std::string::npos)      out.push_back(0.90f);
+                else if (text.find("bravo") != std::string::npos)   out.push_back(0.50f);
+                else                                                out.push_back(0.10f);
+            }
+            return out;
+        });
 
     LiveSingleUnitExecutor exec(harness_->ipool(), embedder_, fusion_, &rr);
     const auto result = exec.ExecuteForNamespace(MakeCtx(/*rerank=*/true), kNs);
 
-    EXPECT_TRUE(result.error_code.empty()) << result.error_code;
+    EXPECT_EQ(ChildIds(result), (std::vector<std::string>{"chunk-c", "chunk-b", "chunk-a"}))
+        << "rerank=true must return the reranker's ordering, not the retrieval one";
 }
 
 }  // namespace
