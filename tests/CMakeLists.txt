@@ -443,6 +443,7 @@ add_executable(cortrix_unit_tests
     # Test-expansion wave 3 (depth: store/async/import/agent_trace + breadth matrices)
     unit/test_store_depth.cpp
     unit/test_async_depth.cpp
+    unit/test_rerank_opt_out.cpp
     unit/test_import_depth.cpp
     unit/test_agent_trace_depth.cpp
     unit/test_text_matrix_fts5.cpp
