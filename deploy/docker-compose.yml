@@ -7,7 +7,17 @@ services:
       args:
         CORTRIX_SOURCE_REVISION: ${CORTRIX_SOURCE_REVISION:-local-source}
     ports:
-      - "127.0.0.1:${CORTRIX_HTTP_PORT:-8420}:8420"
+      # Default publishes to loopback only (the Quick Start contract). For an
+      # ISOLATED test network you control, opt in explicitly with a routable
+      # address and a distinctive port so other machines on that segment can
+      # reach the stack:
+      #   CORTRIX_PUBLISH_HOST=10.0.0.5 CORTRIX_HTTP_PORT=18420 docker compose up -d
+      # This stack has no authentication (the container-bind exception below
+      # stays enabled): anything reachable on that segment gets full API access.
+      # Isolated test LANs only — never a shared corporate network or the
+      # internet. Authenticated LAN publishing is tracked separately (see
+      # docs/QUICKSTART.md § "Publishing on an isolated test network").
+      - "${CORTRIX_PUBLISH_HOST:-127.0.0.1}:${CORTRIX_HTTP_PORT:-8420}:8420"
     volumes:
       - cortrix-data:/data
     environment:

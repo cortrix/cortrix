@@ -89,6 +89,17 @@ private:
     bool stop_ = false;
     bool started_ = false;
     int64_t test_interval_ms_ = 0;
+
+    /// Serializes the sweep body. RunSweepNow has two production callers — the
+    /// timer thread and the backfill ops route — and the dedup guard inside it
+    /// spans a check, a lease and an enqueue with no lock held across them, so
+    /// overlapping sweeps could each see "no active task" and each enqueue.
+    /// Held for the whole body rather than try_lock'd: a missed try_lock could
+    /// only report zero enqueued, which the route cannot distinguish from
+    /// "nothing was due" — and that route exists precisely to force a backfill.
+    /// Distinct from cv_mu_, which RunLoop holds across its wait and releases
+    /// before calling RunSweepNow, so Stop() cannot deadlock against a sweep.
+    std::mutex sweep_mu_;
 };
 
 }  // namespace spc

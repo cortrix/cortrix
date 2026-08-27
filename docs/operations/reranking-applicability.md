@@ -92,8 +92,13 @@ support tickets searched for solutions, documentation search, claim verification
 retrieval feeding a RAG answer.
 
 Do not rerank when query and corpus are the same kind of short item and the task is
-to find matches: duplicate-question or duplicate-ticket detection, near-duplicate
-product listings, "find similar" surfaces, deduplication passes over an import.
+to find matches. This is **measured** for duplicate-question detection (the Quora row
+above). For the neighbouring cases — duplicate tickets, near-duplicate product
+listings, "find similar" surfaces, deduplication passes over an import — the same
+criterion mismatch is a **hypothesis**, not a measurement: they share the shape
+(short items, query and corpus of the same kind, ground truth being identity rather
+than relevance), but we have not measured them. Treat them as worth testing on your
+own data, not as established results.
 
 If you are unsure, measure both on your own data — the direction is a property of
 the task, not of the corpus size or language. The reranker also dominates query
@@ -101,8 +106,20 @@ latency on CPU (9–17 s of a typical 10–20 s query in the measurements above)
 switching it off for a workload that does not benefit is a latency and cost win as
 well as a quality one.
 
-## Reproducing these numbers
+## Measurement conditions
 
-The comparison is reproducible with the public BEIR runner; see
-`benchmarks/beir-retrieval-quality/` in the `cortrix-benchmarks` repository for the
-profiles and the exact invocations.
+These numbers come from an internal benchmark campaign; the result package is not
+published yet, so treat them as vendor-reported rather than independently
+reproducible today. They are stated in full so you can repeat the comparison with
+your own BEIR harness:
+
+- **Corpora**: BEIR SciFact (5,183 docs / 300 queries), NFCorpus (3,633 / 323),
+  FiQA (57,638 / 648), Quora (522,927 docs; the reported row is 2,000 queries).
+- **Models**: bge-m3 embeddings and bge-reranker-v2-m3, both ONNX fp32 on CPU.
+- **Hardware**: 32-core Xeon Silver 4110, 192 GB RAM, no GPU.
+- **Query shape**: serial (one query at a time), `top_k=10`, scored as nDCG@10 and
+  recall@10 after de-duplicating results by `doc_id`.
+- **The only variable between the two columns** is the `rerank` flag.
+
+The direction, not the absolute values, is what this page asks you to act on — and
+the direction is what you should verify on your own corpus before choosing.
