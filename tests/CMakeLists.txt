@@ -445,6 +445,8 @@ add_executable(cortrix_unit_tests
     unit/test_async_depth.cpp
     unit/test_f42_dispatch_index.cpp
     unit/test_managed_input_release.cpp
+    unit/test_rerank_opt_out.cpp
+    unit/test_rerank_opt_out_execution.cpp
     unit/test_import_depth.cpp
     unit/test_agent_trace_depth.cpp
     unit/test_text_matrix_fts5.cpp
