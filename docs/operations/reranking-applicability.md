@@ -3,8 +3,8 @@
 Cortrix runs a cross-encoder reranker (bge-reranker-v2-m3) over the candidates a
 query retrieves. It is on by default, and on question-answering style workloads it
 earns its place. On duplicate-detection and similar-item workloads it does not:
-measured on BEIR Quora it costs **62% of nDCG@10** and **59% of recall@10** while
-adding roughly 15 seconds of CPU per query.
+measured on BEIR Quora it costs about **59% of nDCG@10** and **57% of recall@10**
+while adding roughly 17 seconds of mean CPU query latency.
 
 This page explains when that happens, why, and how to turn reranking off.
 
@@ -19,15 +19,15 @@ Measured on a 32-core CPU-only box, full corpora, serial queries:
 
 | Dataset | Task | Dense only | + cross-encoder rerank |
 |---|---|---|---|
-| SciFact | scientific claim verification | 0.5949 | **0.6200** |
-| NFCorpus | nutrition/medical QA | 0.3037 | **0.3160** |
-| FiQA | financial forum QA | 0.2623 | **0.3221** |
-| Quora | duplicate-question detection | **0.4923** | 0.1862 |
+| SciFact | scientific claim verification | 0.5942 | **0.6184** |
+| NFCorpus | nutrition/medical QA | 0.2991 | **0.3121** |
+| FiQA | financial forum QA | 0.2540 | **0.3125** |
+| Quora | duplicate-question detection | **0.5003** | 0.2031 |
 
-(nDCG@10. The Quora row is 2,000 queries against 522,927 documents; the others are
+(nDCG@10. The Quora row is 2,000 queries against 522,931 documents; the others are
 the full query set against the full corpus.)
 
-The three QA-style datasets gain 0.02–0.06. Quora loses 0.306.
+The three QA-style datasets gain 0.013–0.059. Quora loses 0.297.
 
 ### Why the same model helps and hurts
 
@@ -51,7 +51,7 @@ above the near-identical one, and the executor over-fetches candidates and trunc
 only *after* reranking, so a document that was first before reranking can fall out
 of the result set entirely rather than merely moving down.
 
-Adding LLM listwise reranking on top recovers part of the loss (0.1862 → 0.2763 on
+Adding LLM listwise reranking on top recovers part of the loss (0.2031 → 0.3039 on
 Quora) but does not reach the dense-only baseline. Reranking is the wrong stage for
 this workload, not a stage that needs a better model.
 
@@ -101,25 +101,36 @@ than relevance), but we have not measured them. Treat them as worth testing on y
 own data, not as established results.
 
 If you are unsure, measure both on your own data — the direction is a property of
-the task, not of the corpus size or language. The reranker also dominates query
-latency on CPU (9–17 s of a typical 10–20 s query in the measurements above), so
-switching it off for a workload that does not benefit is a latency and cost win as
-well as a quality one.
+the task, not of the corpus size or language. On the shared-namespace Quora cells,
+mean latency increases from 1.7 s without reranking to 19.0 s with the
+cross-encoder. Switching it off for a workload that does not benefit is a latency
+and cost win as well as a quality one.
 
 ## Measurement conditions
 
-These numbers come from an internal benchmark campaign; the result package is not
-published yet, so treat them as vendor-reported rather than independently
-reproducible today. They are stated in full so you can repeat the comparison with
-your own BEIR harness:
+These numbers are published in the immutable
+[four-corpus CPU measurement bundle](https://github.com/cortrix/cortrix-benchmarks/tree/4b94390c1d5f7be95065e7483362ec7f93774ed7/results/published/beir-four-corpus-cpu-2026-08-v1),
+measured against Core `79a4eb17c62521338d1ac47a9749e6230e87e69b`.
+The public runner is pinned at
+`9490520c24a96ed97b80073ed3ebab096b80550b`.
 
 - **Corpora**: BEIR SciFact (5,183 docs / 300 queries), NFCorpus (3,633 / 323),
-  FiQA (57,638 / 648), Quora (522,927 docs; the reported row is 2,000 queries).
+  FiQA (57,638 / 648), Quora (522,931 docs; the reported row is the first 2,000
+  of 10,000 judged queries).
 - **Models**: bge-m3 embeddings and bge-reranker-v2-m3, both ONNX fp32 on CPU.
 - **Hardware**: 32-core Xeon Silver 4110, 192 GB RAM, no GPU.
 - **Query shape**: serial (one query at a time), `top_k=10`, scored as nDCG@10 and
   recall@10 after de-duplicating results by `doc_id`.
-- **The only variable between the two columns** is the `rerank` flag.
+- **Comparability**: the Quora arms query the same eight namespaces, so the
+  `rerank` flag is the only variable there. The SciFact, NFCorpus, and FiQA arms
+  use independently ingested namespaces; their small differences carry the
+  bundle's measured variation floor of roughly 0.001–0.003 nDCG.
+
+The bundle measures retrieval quality at `top_k=10`. It is not evidence of answer
+quality, concurrent production latency or capacity, security or compliance,
+competitive ranking, or business outcomes. Historical p50/p95 values use the
+documented measuring-runner percentile convention; the mean latencies quoted on
+this page are unaffected.
 
 The direction, not the absolute values, is what this page asks you to act on — and
 the direction is what you should verify on your own corpus before choosing.
