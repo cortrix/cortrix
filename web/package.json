@@ -19,7 +19,7 @@
     "@opentelemetry/sdk-metrics": "^2.9.0",
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "@tanstack/react-query": "^5.100.14",
-    "dompurify": "^3.4.12",
+    "dompurify": "^3.4.14",
     "i18next": "^25.8.10",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -28,7 +28,7 @@
     "react-hot-toast": "^2.4.1",
     "react-i18next": "^16.5.4",
     "react-markdown": "^9.0.1",
-    "react-router-dom": "^7.16.0",
+    "react-router-dom": "^7.18.3",
     "rehype-sanitize": "^6.0.0",
     "zustand": "^4.5.5"
   },
