@@ -16,7 +16,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install build backend + the package itself from source.
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE NOTICE.md ./
 COPY src ./src
 RUN pip install --no-cache-dir .
 

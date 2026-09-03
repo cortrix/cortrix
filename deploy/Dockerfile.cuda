@@ -141,6 +141,9 @@ RUN mkdir -p /app /app/config /app/web-ui /app/python /data /data/blobs /data/p-
 
 WORKDIR /app
 
+# Apache-2.0 redistribution materials for the runtime image.
+COPY LICENSE NOTICE.md /app/
+
 # The GPU distribution requires the provider shared objects in addition to the
 # core ONNX Runtime library. entrypoint.sh checks this provider with ldd.
 COPY --from=builder /build/build/cortrix-server /app/cortrix_server
