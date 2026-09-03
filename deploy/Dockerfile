@@ -177,6 +177,9 @@ WORKDIR /app
 
 # --- Copy artifacts from builder stages ---
 
+# Apache-2.0 redistribution materials for the runtime image.
+COPY LICENSE NOTICE.md /app/
+
 # C++ server binary + the ONNX Runtime shared lib it links against
 # (FetchContent ships a prebuilt .so; without it the server exits 127)
 COPY --from=builder /build/build/cortrix-server /app/cortrix_server
