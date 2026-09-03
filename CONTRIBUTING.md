@@ -165,13 +165,15 @@ Do not edit a derived version field by itself. CI runs the check command and rej
 ## Pull Request Workflow
 
 1. **Open an issue first** for anything non-trivial.
-2. **Branch** from `main`: `feat/<short-name>` or `fix/<short-name>`.
+2. **Branch** from the intended base using a short-lived name such as `feat/<issue-or-topic>`, `fix/<issue-or-topic>`, `docs/<issue-or-topic>`, `security/<issue-or-topic>`, or `legal/<issue-or-topic>`. See [Branching and release lines](docs/BRANCHING.md).
 3. **Keep it focused** — one logical change per PR.
 4. **Add tests** for new behavior and keep existing tests green.
 5. **Update docs** — if you change the API, update both `api/openapi.yaml` and the affected docs.
 6. **Sign off every commit** under DCO 1.1.
 7. **Run the full test suite locally** before pushing.
 8. **Open the PR** against `main` with a clear description: what changed, why, and how it was tested.
+
+After a pull request is merged or closed, delete its remote topic branch. Published versions are preserved by annotated tags and GitHub Releases, not by keeping one branch per release candidate.
 
 ### PR Checklist
 
