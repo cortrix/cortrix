@@ -28,8 +28,8 @@ info:
     name: Cortrix
     url: https://cortrix.ai
   license:
-    name: AGPL-3.0-only
-    url: https://spdx.org/licenses/AGPL-3.0-only.html
+    name: Apache-2.0
+    url: https://spdx.org/licenses/Apache-2.0.html
 
 servers:
   - url: https://api.cortrix.io/api/v1
