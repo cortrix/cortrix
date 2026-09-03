@@ -5,7 +5,7 @@
 
   Agent-native semantic storage for retrieval, memory, and API-driven AI applications.
 
-  [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](LICENSE)
+  [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
   [![Version](https://img.shields.io/badge/version-v1.0.0--rc.1-orange.svg)](https://github.com/cortrix/cortrix/releases)
   [![C++17](https://img.shields.io/badge/C%2B%2B-17-blueviolet.svg)](https://en.cppreference.com/w/cpp/17)
 
@@ -194,4 +194,4 @@ Roadmap items are not current capabilities.
 
 ## License
 
-Cortrix-authored material is licensed under [AGPL-3.0-only](LICENSE); third-party material retains its own license. See [NOTICE.md](NOTICE.md) for copyright and exception boundaries and [CONTRIBUTING.md](CONTRIBUTING.md) for the no-CLA, DCO 1.1 contribution policy.
+Cortrix-authored material in `v1.0.0-rc.2` and later releases is licensed under the [Apache License 2.0](LICENSE); the historical `v1.0.0-rc.1` release remains under `AGPL-3.0-only`, and third-party material retains its own license. See [NOTICE.md](NOTICE.md) for copyright and exception boundaries and [CONTRIBUTING.md](CONTRIBUTING.md) for the no-CLA, DCO 1.1 contribution policy.

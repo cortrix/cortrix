@@ -1,6 +1,6 @@
 // Open-Core boundary guard (ARCHITECTURE Sec.1.0.10 / GEN-OpenCore-Boundary).
 //
-// The CE (AGPL) tree must contain ZERO enterprise coupling: no enterprise build
+// The CE tree must contain ZERO enterprise coupling: no enterprise build
 // macros, no #ifdef on an enterprise flag, no `namespace enterprise`, no IEnterprise*
 // interface, no #include of an enterprise header, and no CREATE TABLE for an Ent
 // extension table (audit_log_extension / agent_trace_extension /

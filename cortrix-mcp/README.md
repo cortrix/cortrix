@@ -239,4 +239,4 @@ pytest --cov=cortrix_mcp
 
 ## License
 
-AGPL-3.0-only.
+Apache-2.0. Historical `v1.0.0-rc.1` release artifacts remain under `AGPL-3.0-only`.

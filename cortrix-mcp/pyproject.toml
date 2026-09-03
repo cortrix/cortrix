@@ -8,12 +8,13 @@ version = "1.0.0rc1"
 description = "Cortrix MCP Server — expose the Cortrix HTTP API as MCP tools for IDE agents (Claude Code / Cline / Cursor)."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "AGPL-3.0-only" }
+license = { text = "Apache-2.0" }
 authors = [{ name = "Cortrix" }]
 keywords = ["mcp", "model-context-protocol", "cortrix", "rag", "semantic-search", "agent"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",

@@ -2,7 +2,7 @@
 
 Thanks for your interest in Cortrix — an Agent-Native Semantic Storage Engine. This guide covers how to set up a dev environment, the project layout, and the workflow for landing a change.
 
-Cortrix does not require a Contributor License Agreement. Contributions to Cortrix-authored material are accepted under [AGPL-3.0-only](LICENSE), the same license under which that material is made available, and must be certified under the [Developer Certificate of Origin 1.1](DCO). Third-party material remains under the license identified in its file or directory and must not be relicensed by a contribution.
+Cortrix does not require a Contributor License Agreement. Contributions to Cortrix-authored material are accepted under the [Apache License 2.0](LICENSE), the same license under which the current development line is made available, and must be certified under the [Developer Certificate of Origin 1.1](DCO). Third-party material remains under the license identified in its file or directory and must not be relicensed by a contribution. Historical `v1.0.0-rc.1` release objects remain under `AGPL-3.0-only`.
 
 ---
 
@@ -197,4 +197,4 @@ Participation is governed by the [Contributor Covenant Code of Conduct](CODE_OF_
 
 ## License
 
-Cortrix-authored material is licensed under [AGPL-3.0-only](LICENSE). Contributions use the applicable license, are certified under [DCO 1.1](DCO), and do not require a CLA. Third-party material retains its own license. See [NOTICE.md](NOTICE.md) for copyright and exception boundaries.
+Cortrix-authored material in the current development line is licensed under the [Apache License 2.0](LICENSE). Contributions use the applicable license, are certified under [DCO 1.1](DCO), and do not require a CLA. Historical `v1.0.0-rc.1` release objects remain under `AGPL-3.0-only`; third-party material retains its own license. See [NOTICE.md](NOTICE.md) for copyright and exception boundaries.
