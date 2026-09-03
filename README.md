@@ -72,7 +72,7 @@ High-signal current status:
 | Tenant/member/ACL/quota | `Blocked` | Runtime behavior and documented contract are still being reconciled. |
 | MEM02 memory extraction | `Blocked` | Latest verification observed an LLM transport timeout path. |
 | RBAC and tenant isolation denial matrix | `Blocked` | Cannot be proven in the current auth-disabled local runtime. |
-| Full-corpus BEIR retrieval quality | `Verified` | Accepted SciFact, FiQA, and NFCorpus measurements, method, and provenance are published in the [pinned benchmark bundle](https://github.com/cortrix/cortrix-benchmarks/tree/7bc29aa840c20db3935dfcf80eb048e553ebe2b0/results/published/beir-three-full-corpus-2026-07-v1). This does not establish answer quality or production performance. |
+| BEIR retrieval quality | `Verified` | An immutable [four-corpus CPU measurement bundle](https://github.com/cortrix/cortrix-benchmarks/tree/4b94390c1d5f7be95065e7483362ec7f93774ed7/results/published/beir-four-corpus-cpu-2026-08-v1) records 16 cells against Core `79a4eb17c62521338d1ac47a9749e6230e87e69b`. SciFact, NFCorpus, and FiQA use every judged test query; Quora uses its full 522,931-document corpus and the first 2,000 of 10,000 judged queries. These retrieval measurements do not establish answer quality, production performance, security, competitive ranking, or business outcomes. |
 
 See [Compatibility and known status](docs/compatibility.md) before making production, security, benchmark, or integration claims.
 

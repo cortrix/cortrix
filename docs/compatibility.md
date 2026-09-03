@@ -32,7 +32,7 @@ Cortrix is in active pre-release development. Some API surfaces are present in t
 | OCR / parser paths | `Verification required` | Parser and OCR behavior depends on optional configuration and should be verified per deployment. |
 | Linux NVIDIA CUDA execution provider | `Verification required` | A separate Linux x86_64 image and runbook exist; require a platform capability smoke before treating CUDA as verified in a target deployment. |
 | Log redaction / LogSanitizer defaults | `Blocked` | Runtime hardening is still under review; do not claim sanitized startup logs by default. |
-| Full-corpus BEIR retrieval quality | `Verified` | Accepted SciFact, FiQA, and NFCorpus results are bound to a [pinned measured bundle](https://github.com/cortrix/cortrix-benchmarks/tree/7bc29aa840c20db3935dfcf80eb048e553ebe2b0/results/published/beir-three-full-corpus-2026-07-v1). The bundle does not establish answer quality or production performance. |
+| BEIR retrieval quality | `Verified` | The immutable [four-corpus CPU measurement bundle](https://github.com/cortrix/cortrix-benchmarks/tree/4b94390c1d5f7be95065e7483362ec7f93774ed7/results/published/beir-four-corpus-cpu-2026-08-v1) records 16 cells against Core `79a4eb17c62521338d1ac47a9749e6230e87e69b`. SciFact, NFCorpus, and FiQA use every judged test query; Quora uses the full corpus and a deterministic 2,000-query subset. The bundle does not establish answer quality or production performance. |
 | Production readiness | `Verification required` | Treat deployment, auth, tenant isolation, limits, and security controls as review-required. |
 
 ## Auth And Security Boundaries
@@ -72,9 +72,9 @@ The built-in Agent's advanced autonomous executors are roadmap items.
 
 ## Benchmark Boundary
 
-Published benchmark numbers must link to accepted measured artifacts and methodology. The current accepted scope is full-corpus SciFact, FiQA, and NFCorpus retrieval quality in the pinned Cortrix-Benchmarks bundle.
+Published benchmark numbers must link to immutable measured artifacts and methodology. The current accepted scope is the pinned [four-corpus CPU measurement bundle](https://github.com/cortrix/cortrix-benchmarks/tree/4b94390c1d5f7be95065e7483362ec7f93774ed7/results/published/beir-four-corpus-cpu-2026-08-v1): full-corpus SciFact, NFCorpus, and FiQA with every judged test query, plus full-corpus Quora with the first 2,000 of 10,000 judged queries. It was measured against Core `79a4eb17c62521338d1ac47a9749e6230e87e69b` with public runner commit `9490520c24a96ed97b80073ed3ebab096b80550b`.
 
-Keep other datasets, answer quality, latency, cost, security, and production-performance claims as `Verification required` until separately accepted evidence exists.
+The bundle measures retrieval quality at `top_k=10`. It is not evidence of end-to-end answer quality, concurrent production latency or capacity, security or compliance properties, competitive ranking, or business outcomes. Comparisons across independently ingested namespaces carry the bundle's measured variation floor; Quora is the only strictly controlled shared-namespace arm comparison.
 
 ## Production Boundary
 
