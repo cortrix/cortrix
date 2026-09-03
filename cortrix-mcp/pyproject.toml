@@ -38,6 +38,13 @@ cortrix-mcp = "cortrix_mcp.server:main"
 Homepage = "https://github.com/cortrix/cortrix"
 Documentation = "https://github.com/cortrix/cortrix/tree/main/cortrix-mcp"
 
+[tool.hatch.build]
+include = [
+    "LICENSE",
+    "NOTICE.md",
+    "src/cortrix_mcp/**",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/cortrix_mcp"]
 

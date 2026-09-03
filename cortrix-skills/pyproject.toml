@@ -57,6 +57,9 @@ dev = [
 Homepage = "https://github.com/cortrix/cortrix"
 Repository = "https://github.com/cortrix/cortrix/tree/main/cortrix-skills"
 
+[tool.setuptools]
+license-files = ["LICENSE", "NOTICE.md"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["cortrix_skills*"]

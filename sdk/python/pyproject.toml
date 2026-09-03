@@ -47,6 +47,9 @@ dev = [
 Homepage = "https://github.com/cortrix/cortrix"
 Repository = "https://github.com/cortrix/cortrix/tree/main/sdk/python"
 
+[tool.setuptools]
+license-files = ["LICENSE", "NOTICE.md"]
+
 [tool.setuptools.packages.find]
 include = ["cortrix*"]
 
