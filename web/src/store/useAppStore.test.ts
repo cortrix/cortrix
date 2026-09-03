@@ -178,7 +178,7 @@ describe('useAppStore', () => {
   it('loads system status with LLM info', async () => {
     // First call: /api/v1/health
     mockFetch.mockReturnValueOnce(jsonResponse({
-      version: '1.0.0-rc.1',
+      version: '1.0.0-rc.2',
       status: 'healthy',
       uptime_seconds: 120,
       llm_enabled: true,
@@ -198,7 +198,7 @@ describe('useAppStore', () => {
     await useAppStore.getState().loadSystemStatus();
     const status = useAppStore.getState().systemStatus;
     expect(status).toBeTruthy();
-    expect(status!.version).toBe('1.0.0-rc.1');
+    expect(status!.version).toBe('1.0.0-rc.2');
     // F4: mock API returns LLM fields
     expect(status!.llm_enabled).toBeDefined();
     expect(status!.llm_provider).toBeDefined();
