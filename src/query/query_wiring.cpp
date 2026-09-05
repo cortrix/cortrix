@@ -350,6 +350,7 @@ QueryContext MakeRoutingContext(const json& body, const AuthContext& auth) {
         }
     }
     if (qctx.top_k < 1) qctx.top_k = 1;
+    if (qctx.top_k > 100) qctx.top_k = 100;  // documented max; ParseRequest 400s out-of-range
     qctx.user_id = auth.user_id;
     qctx.tenant_id = auth.tenant_id;
     return qctx;
