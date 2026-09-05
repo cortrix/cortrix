@@ -86,6 +86,10 @@ Status CrossNsQueryHandler::ParseRequest(const nlohmann::json& body,
     // Optional: top_k (default 10), rerank (default true), filter (flat string map).
     if (body.contains("top_k") && body["top_k"].is_number_integer()) {
         out->top_k = body["top_k"].get<int>();
+        if (out->top_k < 1 || out->top_k > 100) {
+            return Status::InvalidArgument(
+                "'top_k' must be between 1 and 100");
+        }
     }
     if (body.contains("rerank") && body["rerank"].is_boolean()) {
         out->rerank = body["rerank"].get<bool>();

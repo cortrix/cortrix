@@ -88,5 +88,35 @@ TEST(RerankOptOutTest, OptOutSurvivesAlongsideSearchConfig) {
     EXPECT_FALSE(parsed.search_config.enable_bm25);
 }
 
+
+// top_k boundary contract (issue #87). cross_ns_request.h documents top_k as
+// range 1-100; ParseRequest must enforce it at the request boundary so an
+// out-of-range value is a 400, not silently accepted and carried into retrieval.
+TEST(CrossNsTopKBoundTest, RejectsTopKAboveMax) {
+    nlohmann::json body = BaseBody();
+    body["top_k"] = 100000000;  // the unbounded value that drove the finding
+    QueryRequest out;
+    const Status s = CrossNsQueryHandler::ParseRequest(body, &out);
+    EXPECT_FALSE(s.ok());
+    EXPECT_TRUE(s.message().find("top_k") != std::string::npos) << s.message();
+}
+
+TEST(CrossNsTopKBoundTest, RejectsTopKBelowMin) {
+    nlohmann::json body = BaseBody();
+    body["top_k"] = 0;
+    QueryRequest out;
+    EXPECT_FALSE(CrossNsQueryHandler::ParseRequest(body, &out).ok());
+}
+
+TEST(CrossNsTopKBoundTest, AcceptsTopKAtTheBoundaries) {
+    for (int k : {1, 50, 100}) {
+        nlohmann::json body = BaseBody();
+        body["top_k"] = k;
+        QueryRequest out;
+        EXPECT_TRUE(CrossNsQueryHandler::ParseRequest(body, &out).ok())
+            << "top_k=" << k << " should be accepted";
+        EXPECT_EQ(out.top_k, k);
+    }
+}
 }  // namespace
 }  // namespace cortrix::query
