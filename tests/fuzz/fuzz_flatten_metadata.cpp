@@ -20,6 +20,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "cortrix/common/json_depth.h"
+
 using json = nlohmann::json;
 
 namespace {
@@ -31,6 +33,10 @@ void FlattenMetadataIntoMap(const std::string& metadata_json,
     try {
         json parsed = json::parse(metadata_json);
         if (!parsed.is_object()) return;  // only object-shaped metadata flattens
+        // Defense-in-depth, mirroring production FlattenMetadataIntoMap: skip
+        // over-deep metadata rather than recurse into it.dump() and overflow the
+        // stack (a SIGSEGV the catch below cannot stop).
+        if (cortrix::JsonExceedsMaxDepth(parsed)) return;
         for (auto it = parsed.begin(); it != parsed.end(); ++it) {
             out[it.key()] = it.value().is_string()
                                 ? it.value().get<std::string>()
