@@ -7,7 +7,7 @@ set -euo pipefail
 # ==============================================================
 
 echo "============================================"
-echo "  Cortrix v1.0.0-rc.1"
+echo "  Cortrix v1.0.0-rc.2"
 echo "  Semantic Storage for the Agentic Era"
 echo "============================================"
 

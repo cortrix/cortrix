@@ -6,7 +6,7 @@
   Agent-native semantic storage for retrieval, memory, and API-driven AI applications.
 
   [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
-  [![Version](https://img.shields.io/badge/version-v1.0.0--rc.1-orange.svg)](https://github.com/cortrix/cortrix/releases)
+  [![Version](https://img.shields.io/badge/version-v1.0.0--rc.2-orange.svg)](https://github.com/cortrix/cortrix/releases)
   [![C++17](https://img.shields.io/badge/C%2B%2B-17-blueviolet.svg)](https://en.cppreference.com/w/cpp/17)
 
   [Quickstart](docs/QUICKSTART.md) · [Install with an AI Agent](docs/AGENT_QUICKSTART.md) · [Agent access](docs/agent-access.md) · [Compatibility](docs/compatibility.md) · [OpenAPI](api/openapi.yaml)
@@ -39,6 +39,8 @@ Start here:
 - [Stack fit and adoption boundaries](docs/adoption/stack-fit.md): review evidence-backed keep/add/replace/unknown decision cards.
 - [Agent access](docs/agent-access.md): choose between HTTP/OpenAPI, MCP, Python SDK, and the built-in Agent.
 - [Compatibility and known status](docs/compatibility.md): current public status for API, MCP, SDK, Agent, auth, tenant/RBAC, memory extraction, benchmarks, and security hardening.
+- [v1.0.0-rc.2 release notes](docs/releases/v1.0.0-rc.2.md): release scope, FiQA retrieval evidence, compatibility boundaries, gate evidence, and license.
+- [Upgrade to v1.0.0-rc.2](docs/releases/v1.0.0-rc.2-upgrade.md): migration checks, rollback, and RC1-to-RC2 behavior and license notes.
 - [OpenAPI spec](api/openapi.yaml): endpoint paths, schemas, security schemes, and response contracts.
 - [MCP README](cortrix-mcp/README.md): MCP server setup and tool reference.
 - [Python SDK README](sdk/python/README.md): Python client setup and resource model.
@@ -102,10 +104,7 @@ You need Git, Docker, and Docker Compose. No `.env` file, LLM provider key, host
 
 The Quick Start publishes only the loopback API at `127.0.0.1:8420` (publishing on an isolated test network is an explicit, unauthenticated opt-in — see [Quick Start](docs/QUICKSTART.md#publishing-on-an-isolated-test-network-opt-in)). It uses BGE-M3 embedding and bge-reranker-v2-m3 reranking on CPU, while external LLM roles and the built-in Agent remain disabled. For model provenance, checks, expected output, cleanup, and scope boundaries, see [Quick Start](docs/QUICKSTART.md). For the deeper source-build evidence workflow, see the [First-value SupportOps demo](examples/first-value-supportops/README.md).
 
-If you are using a terminal-capable AI Agent, use the
-[Agent-assisted setup contract](docs/AGENT_QUICKSTART.md). It pins the release
-and commit, limits the agent to the same loopback-only Docker path, and requires
-a structured verification report.
+If you are using a terminal-capable AI Agent, use the [Agent-assisted setup contract](docs/AGENT_QUICKSTART.md). It pins the release tag, records the full commit resolved by that tag, limits the agent to the same loopback-only Docker path, and requires a structured verification report.
 
 ## API Reference
 

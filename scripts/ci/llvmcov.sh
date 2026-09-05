@@ -33,9 +33,11 @@ PROF="$BUILD/prof"
 # F23 §4.1.bis dual-track gate: this script owns the core-17 BRANCH gate on the
 # clang region/branch metric (the line gates are owned by coverage.sh on gcov).
 CORE_BRANCH_MIN=80
-CORE_TARGET_TU_EXPECTED=317
-CORE_MAPPED_TU_EXPECTED=314
-CORE_TARGET_SOURCE_SHA256_EXPECTED="4e86934e2109eff7f536e4e538e9ae033109bf7fbb167aa0404c59fc7437b978"
+# RC2 adds the reviewed production units from PRs #31 and #44:
+# managed_input.cpp, batch_temp_store.cpp, and query_explain_json.cpp.
+CORE_TARGET_TU_EXPECTED=320
+CORE_MAPPED_TU_EXPECTED=317
+CORE_TARGET_SOURCE_SHA256_EXPECTED="58c995b0141a824ffdd5057e169beb6e94456e4d77f9c1df409f5d6a4ecfffe7"
 
 CORE_DIRS=(
   src/store src/reranker src/spc src/query src/resource src/async

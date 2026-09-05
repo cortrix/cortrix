@@ -236,7 +236,7 @@ TEST_F(HttpServerTest, HealthEndpointReturnsHealthy) {
 
     auto body = json::parse(res->body);
     EXPECT_EQ(body["status"], "healthy");
-    EXPECT_EQ(body["version"], cortrix::kCortrixVersion);  // [P5] version SoT (1.0.0-rc.1)
+    EXPECT_EQ(body["version"], cortrix::kCortrixVersion);  // [P5] version SoT (1.0.0-rc.2)
     EXPECT_TRUE(body.contains("uptime_seconds"));
     EXPECT_TRUE(body.contains("components"));
 }

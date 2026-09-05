@@ -111,7 +111,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 LABEL maintainer="Cortrix Team <team@cortrix.ai>"
 LABEL description="Cortrix CUDA — Semantic Storage for the Agentic Era"
-LABEL version="1.0.0-rc.1"
+LABEL version="1.0.0-rc.2"
 
 ENV CORTRIX_ONNX_RUNTIME_FLAVOR=cuda \
     NVIDIA_VISIBLE_DEVICES=all \
@@ -140,6 +140,9 @@ RUN mkdir -p /app /app/config /app/web-ui /app/python /data /data/blobs /data/p-
     chown -R cortrix:cortrix /app /data
 
 WORKDIR /app
+
+# Apache-2.0 redistribution materials for the runtime image.
+COPY LICENSE NOTICE.md /app/
 
 # The GPU distribution requires the provider shared objects in addition to the
 # core ONNX Runtime library. entrypoint.sh checks this provider with ldd.

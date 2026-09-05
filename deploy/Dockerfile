@@ -135,7 +135,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 LABEL maintainer="Cortrix Team <team@cortrix.ai>"
 LABEL description="Cortrix — Semantic Storage for the Agentic Era"
-LABEL version="1.0.0-rc.1"
+LABEL version="1.0.0-rc.2"
 
 # Runtime dependencies only — no compilers.
 # curl + python3.10-venv are needed by the first-run provisioning in
@@ -176,6 +176,9 @@ RUN mkdir -p /app /app/config /app/web-ui /app/python /data /data/blobs /data/p-
 WORKDIR /app
 
 # --- Copy artifacts from builder stages ---
+
+# Apache-2.0 redistribution materials for the runtime image.
+COPY LICENSE NOTICE.md /app/
 
 # C++ server binary + the ONNX Runtime shared lib it links against
 # (FetchContent ships a prebuilt .so; without it the server exits 127)

@@ -360,7 +360,7 @@ def main():
     # ---------- P6 platform surfaces (D3.5 r2 Wave P) ----------
     r = s.get(f"{api}/system/version", timeout=10)
     if check("P6 /system/version 200", r.status_code == 200, r.text[:160]):
-        check("P6 version == 1.0.0-rc.1", (r.json() or {}).get("version") == "1.0.0-rc.1", r.text[:160])
+        check("P6 version == 1.0.0-rc.2", (r.json() or {}).get("version") == "1.0.0-rc.2", r.text[:160])
 
     # F18a operation_log read surface (/operations). By now uploads + memory CRUD +
     # namespace creates have logged rows. Exercises: list, namespace_id filter branch,

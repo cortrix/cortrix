@@ -19,13 +19,12 @@ or production deployment procedure.
 ```text
 Contract: cortrix-agent-quickstart/v1
 Repository: https://github.com/cortrix/cortrix.git
-Release: v1.0.0-rc.1
-Commit: e159974f936bd987d5718195d54cd70ff3acc2e5
+Release: v1.0.0-rc.2
+Commit: resolve and record the full commit referenced by the release tag
 API bind: 127.0.0.1:8420
 ```
 
-The release tag and commit are both required. A mutable `main` checkout does not
-satisfy this contract.
+The immutable release tag and its observed full commit are both required. The commit is resolved from the checked-out tag after cloning and recorded in the final report. A mutable `main` checkout does not satisfy this contract.
 
 ## What the agent may do
 
@@ -67,8 +66,8 @@ Install Cortrix locally under the cortrix-agent-quickstart/v1 contract.
 
 Use only this repository and installation target:
 - Repository: https://github.com/cortrix/cortrix.git
-- Release: v1.0.0-rc.1
-- Expected commit: e159974f936bd987d5718195d54cd70ff3acc2e5
+- Release: v1.0.0-rc.2
+- Resolved commit: record the full commit from the exact release tag
 
 Work in a new local directory. Do not modify, reset, delete, or reuse an
 existing Cortrix checkout.
@@ -80,9 +79,7 @@ another service. If a prerequisite is missing or the target directory already
 exists, stop and report the blocker. Do not use sudo or install system-level
 dependencies without asking me.
 
-Clone the exact release, verify the origin URL, verify the exact tag, and verify
-that HEAD equals the expected commit. Start only the documented loopback Docker
-Compose path with CORTRIX_SOURCE_REVISION set to the checked-out commit.
+Clone the exact release, verify the origin URL, verify the exact tag, and record the full commit resolved by that tag. Start only the documented loopback Docker Compose path with CORTRIX_SOURCE_REVISION set to the checked-out commit.
 
 Do not request or use any LLM or cloud provider key. Do not change firewall,
 DNS, proxy, VPN, or system security settings. Do not expose a non-loopback
@@ -106,13 +103,14 @@ directory. If `cortrix` already exists there, it must stop instead of overwritin
 or reusing it.
 
 ```bash
-git clone --branch v1.0.0-rc.1 --depth 1 \
+git clone --branch v1.0.0-rc.2 --depth 1 \
   https://github.com/cortrix/cortrix.git cortrix
 cd cortrix
 test "$(git remote get-url origin)" = "https://github.com/cortrix/cortrix.git"
-test "$(git describe --tags --exact-match)" = "v1.0.0-rc.1"
-test "$(git rev-parse HEAD)" = "e159974f936bd987d5718195d54cd70ff3acc2e5"
-CORTRIX_SOURCE_REVISION="$(git rev-parse HEAD)" \
+test "$(git describe --tags --exact-match)" = "v1.0.0-rc.2"
+CORTRIX_SOURCE_REVISION="$(git rev-parse HEAD)"
+test "$(printf '%s' "$CORTRIX_SOURCE_REVISION" | wc -c | tr -d ' ')" = "40"
+CORTRIX_SOURCE_REVISION="$CORTRIX_SOURCE_REVISION" \
   docker compose -f deploy/docker-compose.yml up --build --wait
 ```
 
@@ -153,8 +151,8 @@ The agent must finish with this schema:
 CORTRIX_AGENT_QUICKSTART=PASS|FAIL
 contract=cortrix-agent-quickstart/v1
 repository=https://github.com/cortrix/cortrix.git
-release=v1.0.0-rc.1
-commit=e159974f936bd987d5718195d54cd70ff3acc2e5
+release=v1.0.0-rc.2
+commit=<observed full commit resolved by the exact release tag>
 installation_directory=<absolute path>
 platform=<os and architecture>
 docker_version=<observed version>
@@ -173,9 +171,7 @@ warnings=<none or exact warnings>
 blocker=<none or exact blocker>
 ```
 
-`PASS` requires the exact repository, release and commit; a loopback-only bind;
-readiness; source content; numeric reranking scores; disabled external LLM
-roles; and a running service.
+`PASS` requires the exact repository and release, the observed 40-character commit resolved by that tag, a loopback-only bind, readiness, source content, numeric reranking scores, disabled external LLM roles, and a running service.
 
 ## Failure behavior
 

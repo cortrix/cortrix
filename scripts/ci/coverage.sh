@@ -29,8 +29,10 @@ OUT="$BUILD/coverage"
 
 OVERALL_LINE_MIN=80
 CORE_LINE_MIN=90
-CORE_TARGET_TU_EXPECTED=317
-CORE_TARGET_SOURCE_SHA256_EXPECTED="4e86934e2109eff7f536e4e538e9ae033109bf7fbb167aa0404c59fc7437b978"
+# RC2 adds the reviewed production units from PRs #31 and #44:
+# managed_input.cpp, batch_temp_store.cpp, and query_explain_json.cpp.
+CORE_TARGET_TU_EXPECTED=320
+CORE_TARGET_SOURCE_SHA256_EXPECTED="58c995b0141a824ffdd5057e169beb6e94456e4d77f9c1df409f5d6a4ecfffe7"
 
 # F01(store/phnsw) F25(store) F02 F03+F07(spc) F04(query) F05(resource)
 # F08(async) F12(catalog) F13(observability+agent_trace) F18a(logging)

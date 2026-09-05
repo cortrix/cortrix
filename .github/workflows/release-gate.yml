@@ -67,8 +67,72 @@ jobs:
           fi
           python3 scripts/sync_version.py --check
 
-  stage2_full:
+  release_preflight:
     needs: identity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SOURCE_REVISION: ${{ inputs.source_revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_revision }}
+          persist-credentials: false
+
+      - name: Validate preflight source identity
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+
+      - name: Validate release version consistency
+        run: python3 scripts/sync_version.py --check
+
+      - name: CE/Ent isolation scan (0 leaks, MUST)
+        run: python3 scripts/ci/check_open_core_isolation.py
+
+      - name: Validate health and static Docker contracts
+        run: |
+          bash deploy/test_healthcheck.sh
+          CORTRIX_TEST_DOCKER_BUILD=0 bash deploy/test_docker_build.sh
+
+      - name: Validate license and build-context contracts
+        run: |
+          grep -Fqx '!NOTICE.md' .dockerignore
+          grep -Fqx 'COPY LICENSE NOTICE.md /app/' deploy/Dockerfile
+          grep -Fqx 'COPY LICENSE NOTICE.md /app/' deploy/Dockerfile.cuda
+          grep -Fqx 'COPY pyproject.toml README.md LICENSE NOTICE.md ./' cortrix-mcp/Dockerfile
+          test -s LICENSE
+          test -s NOTICE.md
+
+      - name: Validate preflight test contracts
+        run: |
+          python3 tests/ci/test_open_core_isolation.py
+          python3 tests/ci/test_npm_production_audit.py
+          python3 tests/ci/test_release_gate_topology.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.20.2
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install production web dependency tree
+        working-directory: web
+        run: npm ci --ignore-scripts --no-audit
+
+      - name: Audit production web dependencies
+        working-directory: web
+        run: >-
+          python3 ../scripts/ci/npm_production_audit.py
+          --attempts 3
+          --timeout-seconds 90
+          --retry-delay-seconds 10
+          --output-dir ../artifacts/npm-audit
+
+      - name: Build production web
+        working-directory: web
+        run: npm run build
+
+  stage2_full:
+    needs: release_preflight
     if: ${{ inputs.validation_scope == 'full' }}
     uses: ./.github/workflows/nightly-ci.yml
     with:
@@ -95,20 +159,17 @@ jobs:
       - name: E2E
         run: |
           cd web
-          npm ci --ignore-scripts
+          npm ci --ignore-scripts --no-audit
           npx playwright install --with-deps
           npx playwright test
 
   isolation_and_image:
-    needs: [identity, stage2_full]
+    needs: [identity, release_preflight]
     if: >-
       ${{
         always() &&
         needs.identity.result == 'success' &&
-        (
-          inputs.validation_scope == 'isolation_and_image' ||
-          (inputs.validation_scope == 'full' && needs.stage2_full.result == 'success')
-        )
+        needs.release_preflight.result == 'success'
       }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -138,116 +199,16 @@ jobs:
       - name: Validate release version consistency
         run: python3 scripts/sync_version.py --check
 
-      - name: CE/Ent isolation scan (0 leaks, MUST)
-        run: |
-          # Public feature-contract names are allowed. Executable coupling to the
-          # commercial edition is not.
-          python3 - <<'PY'
-          import re
-          from pathlib import Path
-
-          roots = (Path("src"), Path("include"))
-          suffixes = {".cpp", ".cc", ".h", ".hpp"}
-          sources = sorted(
-              path
-              for root in roots
-              for path in root.rglob("*")
-              if path.is_file() and path.suffix in suffixes
-          )
-
-          if len(sources) <= 100:
-              raise SystemExit(
-                  f"open-core scan expected more than 100 source files; found {len(sources)}"
-              )
-
-          rules = (
-              (
-                  "enterprise qualified reference",
-                  re.compile(r"\bcortrix[.:/_-]+enterprise\b", re.IGNORECASE),
-                  "cortrix.enterprise",
-              ),
-              (
-                  "enterprise build macro",
-                  re.compile(
-                      r"\b(CORTRIX_ENTERPRISE|WITH_ENTERPRISE|CORTRIX_ENT|ENABLE_ENTERPRISE)\b"
-                  ),
-                  "CORTRIX_ENTERPRISE",
-              ),
-              (
-                  "enterprise conditional compilation",
-                  re.compile(
-                      r"#\s*if(?:def|ndef)?\b.*\b(ENTERPRISE|ENT_|WITH_ENT)",
-                      re.IGNORECASE,
-                  ),
-                  "#ifdef WITH_ENTERPRISE",
-              ),
-              (
-                  "enterprise namespace",
-                  re.compile(r"namespace\s+enterprise\b"),
-                  "namespace enterprise",
-              ),
-              (
-                  "enterprise class or interface",
-                  re.compile(r"\b(class|struct)\s+(I?Enterprise[A-Za-z0-9_]*)\b"),
-                  "class IEnterpriseConnector",
-              ),
-              (
-                  "enterprise header include",
-                  re.compile(
-                      r"#\s*include\s*[<\"][^>\"]*enterprise[^>\"]*[>\"]",
-                      re.IGNORECASE,
-                  ),
-                  '#include "cortrix/enterprise/connector.h"',
-              ),
-              (
-                  "enterprise extension table",
-                  re.compile(
-                      r"CREATE\s+TABLE[^;]*\b(audit_log_extension|agent_trace_extension|interaction_sources_extension)\b",
-                      re.IGNORECASE,
-                  ),
-                  "CREATE TABLE audit_log_extension (id INTEGER)",
-              ),
-          )
-
-          for label, pattern, sentinel in rules:
-              if pattern.search(sentinel) is None:
-                  raise SystemExit(f"open-core scan rule is ineffective: {label}")
-
-          if not any(
-              "namespace cortrix" in path.read_text(encoding="utf-8", errors="replace")
-              for path in sources
-          ):
-              raise SystemExit("open-core scan did not read the CE source tree")
-
-          violations = []
-          for path in sources:
-              for line_number, line in enumerate(
-                  path.read_text(encoding="utf-8", errors="replace").splitlines(),
-                  start=1,
-              ):
-                  for label, pattern, _ in rules:
-                      if pattern.search(line):
-                          violations.append(f"{path}:{line_number}: [{label}] {line}")
-
-          if violations:
-              print("CE tree references commercial internals:")
-              print("\n".join(violations))
-              raise SystemExit(1)
-
-          print(f"isolation OK: scanned {len(sources)} CE source files")
-          PY
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 20.20.2
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Production web audit and build
+      - name: Production web install and build
         working-directory: web
         run: |
-          npm ci --ignore-scripts
-          npm audit --omit=dev --audit-level=high
+          npm ci --ignore-scripts --no-audit
           npm run build
 
       - name: Health and Docker contracts
@@ -258,11 +219,16 @@ jobs:
       - name: Build release image
         id: build
         run: |
+          grep -Fqx 'COPY LICENSE NOTICE.md /app/' deploy/Dockerfile
+          grep -Fqx 'COPY LICENSE NOTICE.md /app/' deploy/Dockerfile.cuda
+          grep -Fqx 'COPY pyproject.toml README.md LICENSE NOTICE.md ./' cortrix-mcp/Dockerfile
           docker build \
             --build-arg "CORTRIX_SOURCE_REVISION=$SOURCE_REVISION" \
             -t "$IMAGE_TAG" \
             -f deploy/Dockerfile .
           test "$(docker image inspect "$IMAGE_TAG" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$SOURCE_REVISION"
+          docker run --rm --entrypoint /bin/sh "$IMAGE_TAG" -c \
+            'test -f /app/LICENSE && test -f /app/NOTICE.md'
 
       - name: Generate SPDX and CycloneDX SBOMs
         if: ${{ always() && steps.build.outcome == 'success' }}
@@ -396,15 +362,17 @@ jobs:
             --exit-code 1 \
             "$IMAGE_TAG"
 
-      - name: Cleanup release-gate runtime
-        if: always()
+      - name: Validate release evidence completeness
+        if: ${{ success() && steps.build.outcome == 'success' }}
         run: |
-          docker compose -f deploy/docker-compose.yml down --remove-orphans || true
-          docker rm -f cortrix-network-none cortrix-negative-1 cortrix-negative-2 2>/dev/null || true
-          docker volume rm cortrix_release_gate_cortrix-data 2>/dev/null || true
+          test -s artifacts/sbom.spdx.json
+          test -s artifacts/sbom.cdx.json
+          test -s artifacts/trivy.json
+          test -s artifacts/negative-controls/1.log
+          test -s artifacts/negative-controls/2.log
 
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ success() }}
         with:
           name: sbom-${{ inputs.release_tag }}
           path: |
@@ -412,6 +380,13 @@ jobs:
             artifacts/trivy.json
             artifacts/negative-controls/*.log
           if-no-files-found: error
+
+      - name: Cleanup release-gate runtime
+        if: always()
+        run: |
+          docker compose -f deploy/docker-compose.yml down --remove-orphans || true
+          docker rm -f cortrix-network-none cortrix-negative-1 cortrix-negative-2 2>/dev/null || true
+          docker volume rm cortrix_release_gate_cortrix-data 2>/dev/null || true
 
   lighthouse:
     needs: stage2_full
@@ -428,7 +403,7 @@ jobs:
       - name: Lighthouse CI (Perf ≥ 80 / A11y ≥ 90)
         run: |
           cd web
-          npm ci --ignore-scripts
+          npm ci --ignore-scripts --no-audit
           npm run build
           npx @lhci/cli autorun --config=lighthouserc.json
 

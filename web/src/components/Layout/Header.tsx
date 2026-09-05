@@ -25,7 +25,7 @@ export function Header() {
         <img src="/logo-mark.svg" alt="Cortrix" className="w-8 h-8 shrink-0" />
         <span className="text-lg font-extrabold tracking-tight text-txt">{t('header.title')}</span>
         <span className="text-xs text-muted font-mono ml-0.5">
-          v{systemStatus?.version ?? '1.0.0-rc.1'}
+          v{systemStatus?.version ?? '1.0.0-rc.2'}
         </span>
       </div>
 
