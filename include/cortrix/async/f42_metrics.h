@@ -98,8 +98,8 @@ public:
 private:
     F42Metrics() = default;
 
-    // The async::TaskType enum is closed (1/2/3); index it 0-based via TaskTypeIndex.
-    static constexpr int kTaskTypeCount = 3;
+    // The async::TaskType enum has 4 values (1..4); index it 0-based via TaskTypeIndex.
+    static constexpr int kTaskTypeCount = 4;
     static constexpr int kStatusCount = 4;   // success / failed / cancelled / timeout
     static constexpr int kStateCount = 2;    // queued / processing
     static constexpr int kPhaseCount = 3;    // pre_dequeue / mid_processing / post_chunk_idx
