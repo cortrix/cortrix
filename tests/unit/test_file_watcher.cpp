@@ -400,7 +400,7 @@ TEST_F(FileWatcherTest, EmptyDirectoryWatching) {
     EXPECT_FALSE(watcher_->IsRunning());
 }
 
-TEST_F(FileWatcherTest, DISABLED_NewSubdirectoryCreatedThenFileInIt) {
+TEST_F(FileWatcherTest, NewSubdirectoryCreatedThenFileInIt) {
     watcher_->Init(test_dir_.string(),
         [this](const std::vector<FileEvent>& evts) {
             std::lock_guard<std::mutex> lock(mu_);
