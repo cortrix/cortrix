@@ -156,5 +156,27 @@ TEST_F(F42MetricsTest, LabelStringsMatchSpec) {
     EXPECT_STREQ(ToString(CancelPhase::kPostChunkIdx), "post_chunk_idx");
 }
 
+
+// Regression guard for the enrich-backfill task type (issue #91). Before the fix,
+// kTaskEnrichBackfill(=4) folded into slot 0, so its submits/completions were
+// counted under kTaskDocParse and RenderOpenMetrics emitted no series for it.
+// This is the assertion that was missing when the drift went unnoticed.
+TEST_F(F42MetricsTest, EnrichBackfillHasItsOwnSlotAndLabel) {
+    // Distinct slot: a backfill submit must NOT contaminate the doc-parse counter.
+    M().RecordSubmitted(kTaskEnrichBackfill);
+    EXPECT_EQ(M().SubmittedCount(kTaskEnrichBackfill), 1u);
+    EXPECT_EQ(M().SubmittedCount(kTaskDocParse), 0u);
+
+    // Distinct completion + duration accounting.
+    M().RecordCompleted(kTaskEnrichBackfill, CompletionStatus::kSuccess);
+    M().ObserveDuration(kTaskEnrichBackfill, 7.0);
+    EXPECT_EQ(M().CompletedCount(kTaskEnrichBackfill, CompletionStatus::kSuccess), 1u);
+    EXPECT_EQ(M().CompletedCount(kTaskDocParse, CompletionStatus::kSuccess), 0u);
+
+    // Distinct label, and an emitted OpenMetrics series of its own.
+    EXPECT_STREQ(ToString(kTaskEnrichBackfill), "kTaskEnrichBackfill");
+    const std::string out = M().RenderOpenMetrics();
+    EXPECT_NE(out.find("task_type=\"kTaskEnrichBackfill\""), std::string::npos);
+}
 }  // namespace
 }  // namespace cortrix::async

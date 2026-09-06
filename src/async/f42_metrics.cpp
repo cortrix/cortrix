@@ -31,8 +31,9 @@ int TaskTypeIndex(TaskType task_type) {
         case kTaskDocParse:      return 0;
         case kTaskWatcherFanout: return 1;
         case kTaskDocSummary:    return 2;
+        case kTaskEnrichBackfill: return 3;
     }
-    return 0;  // unknown folds into doc-parse slot (bounded)
+    return 0;  // out-of-range TaskType folds into slot 0 (bounded)
 }
 
 F42Metrics& F42Metrics::Instance() {
@@ -97,7 +98,7 @@ std::string F42Metrics::RenderOpenMetrics() const {
     // cortrix_tasks_submitted_total (counter, label: task_type)
     os << "# HELP cortrix_tasks_submitted_total Async tasks submitted by task_type.\n";
     os << "# TYPE cortrix_tasks_submitted_total counter\n";
-    for (TaskType tt : {kTaskDocParse, kTaskWatcherFanout, kTaskDocSummary}) {
+    for (TaskType tt : {kTaskDocParse, kTaskWatcherFanout, kTaskDocSummary, kTaskEnrichBackfill}) {
         os << "cortrix_tasks_submitted_total{task_type=\"" << ToString(tt) << "\"} "
            << SubmittedCount(tt) << "\n";
     }
@@ -105,7 +106,7 @@ std::string F42Metrics::RenderOpenMetrics() const {
     // cortrix_tasks_completed_total (counter, labels: task_type, status)
     os << "# HELP cortrix_tasks_completed_total Async tasks completed by task_type and status.\n";
     os << "# TYPE cortrix_tasks_completed_total counter\n";
-    for (TaskType tt : {kTaskDocParse, kTaskWatcherFanout, kTaskDocSummary}) {
+    for (TaskType tt : {kTaskDocParse, kTaskWatcherFanout, kTaskDocSummary, kTaskEnrichBackfill}) {
         for (int s = 0; s < kStatusCount; ++s) {
             os << "cortrix_tasks_completed_total{task_type=\"" << ToString(tt)
                << "\",status=\"" << ToString(static_cast<CompletionStatus>(s)) << "\"} "
@@ -118,7 +119,7 @@ std::string F42Metrics::RenderOpenMetrics() const {
     // then _sum + _count. Only emit task_types that have observations.
     os << "# HELP cortrix_tasks_duration_seconds Task execution latency in seconds.\n";
     os << "# TYPE cortrix_tasks_duration_seconds histogram\n";
-    for (TaskType tt : {kTaskDocParse, kTaskWatcherFanout, kTaskDocSummary}) {
+    for (TaskType tt : {kTaskDocParse, kTaskWatcherFanout, kTaskDocSummary, kTaskEnrichBackfill}) {
         const Hist& h = duration_[TaskTypeIndex(tt)];
         const uint64_t cnt = h.count.load(std::memory_order_relaxed);
         if (cnt == 0) continue;
@@ -184,6 +185,7 @@ const char* ToString(TaskType task_type) {
         case kTaskDocParse:      return "kTaskDocParse";
         case kTaskWatcherFanout: return "kTaskWatcherFanout";
         case kTaskDocSummary:    return "kTaskDocSummary";
+        case kTaskEnrichBackfill: return "kTaskEnrichBackfill";
     }
     return "kTaskDocParse";
 }
