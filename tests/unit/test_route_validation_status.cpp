@@ -18,6 +18,10 @@
 #include <string>
 #include <thread>
 
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 #include "httplib.h"
 #include <nlohmann/json.hpp>
 
@@ -33,6 +37,27 @@ using json = nlohmann::json;
 
 // Auth-disabled full server (namespace CRUD reachable without keys), matching
 // the HttpServerTest harness in test_http_server.cpp.
+// Ask the OS for a free ephemeral port instead of hashing the pid into a
+// 500-slot window shared by 8 test files. Under `ctest -j4` that window
+// collided, and cpp-httplib's default SO_REUSEPORT turned a collision into a
+// silent kernel load-balancing group rather than an EADDRINUSE, so a fixture's
+// client could land on a foreign server that never installed the JSON-404
+// handler and answered with an empty body (issue #90). An OS-assigned port from
+// the full ephemeral range makes that collision negligible.
+inline int PickFreePort() {
+    int s = ::socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;  // OS assigns
+    ::bind(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+    socklen_t len = sizeof(addr);
+    ::getsockname(s, reinterpret_cast<sockaddr*>(&addr), &len);
+    int port = ntohs(addr.sin_port);
+    ::close(s);
+    return port;
+}
+
 class StatusRouteValMatrix : public ::testing::Test {
 protected:
     void SetUp() override {
@@ -40,7 +65,7 @@ protected:
         system(("mkdir -p " + tmp_dir_).c_str());
 
         config_.server.host = "127.0.0.1";
-        config_.server.port = 18000 + (getpid() % 500);
+        config_.server.port = PickFreePort();
         config_.server.thread_count = 2;
         config_.auth.enabled = false;
         config_.ns.data_dir = tmp_dir_;
@@ -55,7 +80,8 @@ protected:
         httplib::Client cli("127.0.0.1", config_.server.port);
         for (int i = 0; i < 50; ++i) {
             auto res = cli.Get("/api/v1/health");
-            if (res) break;
+            if (res && res->status == 200 &&
+                res->body.find("healthy") != std::string::npos) break;
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
