@@ -46,22 +46,19 @@ Random fuzzing: all four clean.
 2.13M (~9.8M total exec, 0 random crashes). WordPiece is robust against malformed /
 truncated UTF-8, control chars, combining marks, and astral code points.
 
-### Found: deep-nested-JSON stack overflow (DoS)
+### Fixed: deep-nested-JSON stack overflow (DoS)
 
-Directed deep-nesting input crashes `FlattenMetadataIntoMap` (and the ingest routes
-that `.dump()` user `metadata`) with `AddressSanitizer: stack-overflow` in the
-nlohmann serializer. Root cause: `nlohmann::json::dump()` recurses per nesting level
-with no depth bound; a stack overflow is a SIGSEGV, so the surrounding `catch (...)`
-cannot catch it. (`json::parse` itself is iterative and survives; only `dump` -- and,
-at extreme depth, the deep tree's destructor -- overflow.)
+Directed deep-nesting input used to crash `FlattenMetadataIntoMap` (and the ingest
+routes that `.dump()` user `metadata`) with `AddressSanitizer: stack-overflow` in the
+nlohmann serializer: `nlohmann::json::dump()` recurses per nesting level with no depth
+bound, and a stack overflow is a SIGSEGV that the surrounding `catch (...)` cannot stop.
 
-Reproducer (replays the crash): `crashes/flatten_deep_nesting_stackoverflow.json`
-```bash
-build-fuzz/fuzz_flatten_metadata crashes/flatten_deep_nesting_stackoverflow.json
-```
+**Fixed.** Ingest now rejects over-deep metadata at the boundary, and
+`FlattenMetadataIntoMap` has a defensive `JsonExceedsMaxDepth` guard
+(`include/cortrix/common/json_depth.h`) -- an iterative, stack-based, overflow-proof
+depth check -- for any data stored before that guard existed. This harness mirrors that
+guard so it stays in sync with production.
 
-Tracked under the team task list as the metadata deep-nesting DoS. Fix = depth-bounded
-validation at the ingest boundary (reject before storing) + a defensive depth check in
-`FlattenMetadataIntoMap` for already-stored data. An iterative (stack-based, itself
-overflow-proof) `JsonExceedsMaxDepth` guard was prototyped against this harness and
-defeats the crash while leaving valid input unaffected.
+The former reproducer is retained as a corpus seed, not a live crash:
+`seeds/flatten_metadata/deep_nesting_20k.json`. It no longer crashes the guarded code;
+it exercises the depth-limit path.
