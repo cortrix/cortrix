@@ -1,4 +1,8 @@
 #include <cstdint>
+#include <cerrno>
+#include <cstring>
+
+#include <spdlog/spdlog.h>
 #include "cortrix/connector/file_watcher.h"
 
 #if defined(__APPLE__)
@@ -237,7 +241,14 @@ private:
         uint32_t mask =
             IN_CREATE | IN_MODIFY | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO | IN_DELETE_SELF;
         int wd = inotify_add_watch(inotify_fd_, dir_path.c_str(), mask);
-        if (wd < 0) return -1;
+        if (wd < 0) {
+            const int e = errno;
+            spdlog::warn(
+                "file watcher: inotify_add_watch failed for '{}', subtree left "
+                "unwatched: {} (errno={})",
+                dir_path, std::strerror(e), e);
+            return -1;
+        }
 
         {
             std::lock_guard<std::mutex> lock(wd_mu_);
