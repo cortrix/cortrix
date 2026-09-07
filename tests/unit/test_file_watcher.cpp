@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "cortrix/connector/file_watcher.h"
 #include <algorithm>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <filesystem>
 #include <fstream>
@@ -8,6 +9,10 @@
 #include <chrono>
 #include <mutex>
 #include <condition_variable>
+#include <sstream>
+
+#include <spdlog/sinks/ostream_sink.h>
+#include <spdlog/spdlog.h>
 
 namespace cortrix {
 namespace {
@@ -578,5 +583,39 @@ TEST_F(FileWatcherTest, ManySmallFilesCreatedQuickly) {
     EXPECT_GT(create_count, 0);
 }
 
+
+// Regression guard for issue #89: a failed inotify_add_watch must no longer be
+// silent. Init() validates that the ROOT exists, so a missing root never reaches
+// inotify_add_watch. Instead, use a valid root containing a subdirectory the
+// process cannot read: the recursive descent inside AddWatchRecursive calls
+// inotify_add_watch on it and gets EACCES -- exactly the "subtree dropped" path.
+TEST_F(FileWatcherTest, FailedAddWatchIsLoggedNotSilent) {
+    if (::geteuid() == 0) GTEST_SKIP() << "root bypasses the EACCES this test relies on";
+
+    const auto unreadable = test_dir_ / "unreadable-subdir";
+    std::filesystem::create_directory(unreadable);
+    ::chmod(unreadable.c_str(), 0000);
+
+    std::ostringstream oss;
+    auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(oss);
+    auto captured = std::make_shared<spdlog::logger>("fw_test_capture", sink);
+    captured->set_level(spdlog::level::warn);
+    auto prev = spdlog::default_logger();
+    spdlog::set_default_logger(captured);
+
+    auto w = FileWatcher::Create();
+    const int rc = w->Init(test_dir_.string(), [](const std::vector<FileEvent>&) {});
+
+    spdlog::set_default_logger(prev);  // restore for other tests
+    spdlog::drop("fw_test_capture");
+    ::chmod(unreadable.c_str(), 0755);  // so TearDown can remove it
+
+    EXPECT_EQ(rc, 0) << "the root is watchable; only the unreadable subtree is dropped";
+    const std::string logged = oss.str();
+    EXPECT_NE(logged.find("inotify_add_watch failed"), std::string::npos)
+        << "the dropped subtree must be logged, not silent; got: [" << logged << "]";
+    EXPECT_NE(logged.find("unreadable-subdir"), std::string::npos)
+        << "the warning must name the unwatchable path";
+}
 }  // namespace
 }  // namespace cortrix
