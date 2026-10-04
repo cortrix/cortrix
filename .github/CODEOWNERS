@@ -4,14 +4,20 @@
 # from the listed owner. This file routes review requests; it does not change
 # who may approve or merge. The last matching pattern wins.
 
-# HTTP API contract and server implementation
-/api/         @miles0521
-/src/         @miles0521
-/include/     @miles0521
+# HTTP API contract, server implementation, and shipped packages
+/api/             @miles0521
+/src/             @miles0521
+/include/         @miles0521
+/cortrix-mcp/     @miles0521
+/sdk/             @miles0521
+/cortrix-skills/  @miles0521
+/sql-extensions/  @miles0521
 
-# Documentation site and the project README
-/docs/        @ScottSiu1983
-/README.md    @ScottSiu1983
+# Documentation, the documentation site, and the project README
+/docs/            @ScottSiu1983
+/docs-site/       @ScottSiu1983
+/README.md        @ScottSiu1983
 
-# Maintainer runbooks published in the documentation site
-/docs/content/docs/maintainers/  @miles0521
+# Public status sources: a change here is a claim about what the server does
+/docs/compatibility.md  @miles0521
+/docs/feature-index.md  @miles0521
