@@ -5,9 +5,9 @@ over the Model Context Protocol (stdio), so IDE agents like **Claude Code**, **C
 and **Cursor** can index documents, run hybrid semantic search, manage conversation
 memory, and trigger admin database imports.
 
-> Status: `Verification required`. The MCP package and tool groups are documented and
-> test-covered, but public-readiness labeling still depends on the target
-> cortrix-server runtime and API compatibility. See
+> Status: `Preview`. The MCP package and tool groups are documented and
+> test-covered. Verify them against your target cortrix-server runtime and API
+> before production use. See
 > [Agent access](../docs/agent-access.md) and
 > [Compatibility](../docs/compatibility.md).
 
@@ -221,8 +221,7 @@ unchanged.
 - Legacy protocol: `2025-11-25` via the initialize handshake.
 - Transport: local stdio. Cortrix does not currently expose a remote or
   loopback Streamable HTTP MCP endpoint.
-- MEM02 memory extraction is currently `Blocked` in the latest public status
-  baseline because the runtime verification found an LLM transport timeout path.
+- Memory extraction is `In development`.
 - Auth, tenant/member/ACL/quota, RBAC, and tenant isolation behavior must be
   checked against [Compatibility](../docs/compatibility.md) before making a
   production or security claim.

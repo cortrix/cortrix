@@ -5,8 +5,8 @@ storage. Synchronous (`Cortrix`) and asynchronous (`AsyncCortrix`) clients with
 a Resource-style API, full type hints (`py.typed`), and structured error
 handling.
 
-> Status: `Verification required`. The SDK surface is documented and test-covered,
-> but public-readiness labeling still depends on live API compatibility. See
+> Status: `Preview`. The SDK surface is documented and test-covered. Verify it
+> against your live API before production use. See
 > [Agent access](../../docs/agent-access.md) and
 > [Compatibility](../../docs/compatibility.md).
 
@@ -44,7 +44,7 @@ client.close()
 Expected success signal: the client can reach the configured server and returns
 resource objects or typed `CortrixError` exceptions. Check the server status in
 [Compatibility](../../docs/compatibility.md) before relying on auth, tenant,
-RBAC, quota, or MEM02 extraction paths.
+RBAC, quota, or memory extraction paths.
 
 ### Async
 
@@ -80,7 +80,7 @@ The async client mirrors the sync API exactly — every resource method has an
 | `client.ops.gc` | `status` / `run` / `restore` / `purge` |
 | `client.import_database(...)` | manual database import |
 
-Some resources map to API areas that are currently blocked or awaiting verification.
+Some resources map to API areas that are still in development.
 Do not treat resource presence as a production-readiness claim.
 
 ## Ops namespace
@@ -147,11 +147,8 @@ the minimal SDK path.
 
 ## Compatibility Notes
 
-- Auth login is currently `Blocked` in the public status baseline.
-- Tenant/member/ACL/quota behavior is currently `Blocked` pending contract
-  reconciliation.
-- MEM02 extraction is currently `Blocked` because the latest runtime verification
-  found an LLM transport timeout path.
+- Auth login, tenant/member/ACL/quota behavior, and memory extraction are
+  `In development`.
 - Built-in retry/error behavior should be verified against your target
   cortrix-server build.
 

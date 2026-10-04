@@ -8,10 +8,10 @@ Read [Compatibility and known status](compatibility.md) before using any integra
 
 | Path | Use when | Entry point | Current status |
 |---|---|---|---|
-| HTTP API / OpenAPI | You are building your own client, service, or Agent integration. | [OpenAPI spec](../api/openapi.yaml) | `Verification required` |
-| MCP server | You want an IDE Agent or MCP-compatible client to call Cortrix tools. | [MCP README](../cortrix-mcp/README.md) | `Verification required` |
-| Python SDK | You are building a Python app, RAG pipeline, or test harness. | [Python SDK README](../sdk/python/README.md) | `Verification required` |
-| Built-in Agent | You want local fixed-flow chat over Cortrix storage. | [Built-in Agent README](../cortrix-agent/README.md) | `Verification required` |
+| HTTP API / OpenAPI | You are building your own client, service, or Agent integration. | [OpenAPI spec](../api/openapi.yaml) | `Preview` |
+| MCP server | You want an IDE Agent or MCP-compatible client to call Cortrix tools. | [MCP README](../cortrix-mcp/README.md) | `Preview` |
+| Python SDK | You are building a Python app, RAG pipeline, or test harness. | [Python SDK README](../sdk/python/README.md) | `Preview` |
+| Built-in Agent | You want local fixed-flow chat over Cortrix storage. | [Built-in Agent README](../cortrix-agent/README.md) | `Preview` |
 
 ## HTTP API / OpenAPI
 
@@ -67,7 +67,7 @@ export CORTRIX_API_KEY=your-cortrix-api-key
 cortrix-mcp
 ```
 
-The MCP package documents tool groups for health, query, upload, namespace management, memory, task status, watchers, and admin database import. Treat tool availability as `Verification required` until your target server/runtime is verified.
+The MCP package documents tool groups for health, query, upload, namespace management, memory, task status, watchers, and admin database import. Some tools map to capabilities that are still in development; see [Compatibility](compatibility.md).
 
 ## Python SDK
 
@@ -86,7 +86,7 @@ print(health)
 client.close()
 ```
 
-The SDK exposes resources for documents, namespaces, search, memory, watchers, auth, tenants, system, operations, and database import. Some resources map to API areas that are currently blocked or awaiting verification.
+The SDK exposes resources for documents, namespaces, search, memory, watchers, auth, tenants, system, operations, and database import. Some resources map to API areas that are still in development.
 
 ## Built-in Agent
 
@@ -100,7 +100,7 @@ Minimal health check:
 curl http://localhost:8001/health
 ```
 
-Chat mode is the current documented path. Advanced autonomous executor modes, including tool-use and plan-execute flows, are roadmap items and must not be described as current production capabilities.
+Chat mode is the current documented path. Advanced autonomous executor modes, including tool-use and plan-execute flows, are planned and must not be described as current production capabilities.
 
 ## Choosing A Path
 
