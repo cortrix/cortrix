@@ -103,8 +103,10 @@ be given as an absolute path.
 
 ### Claude Desktop
 
-Add the server to `claude_desktop_config.json`. The file's location depends on
-your operating system:
+Add the server to `claude_desktop_config.json`:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
