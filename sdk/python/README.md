@@ -44,7 +44,7 @@ client.close()
 Expected success signal: the client can reach the configured server and returns
 resource objects or typed `CortrixError` exceptions. Check the server status in
 [Compatibility](../../docs/compatibility.md) before relying on auth, tenant,
-RBAC, quota, or MEM02 extraction paths.
+RBAC, quota, or memory extraction paths.
 
 ### Async
 
@@ -147,7 +147,7 @@ the minimal SDK path.
 
 ## Compatibility Notes
 
-- Auth login, tenant/member/ACL/quota behavior, and MEM02 extraction are
+- Auth login, tenant/member/ACL/quota behavior, and memory extraction are
   `In development`.
 - Built-in retry/error behavior should be verified against your target
   cortrix-server build.

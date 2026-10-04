@@ -55,7 +55,7 @@ Start here:
 Cortrix is in active pre-release development. The public documentation uses these status labels:
 
 - `Preview`: available and documented. Cortrix is in pre-release, so verify it against your own runtime before production use.
-- `In development`: being built and not available yet.
+- `In development`: present in part or being built; not supported yet. Do not rely on it.
 - `Planned`: reserved for a later version.
 
 High-signal current status:
@@ -67,11 +67,11 @@ High-signal current status:
 | MCP server | `Preview` | MCP tooling exists and has test coverage, with release-readiness still under review. |
 | Python SDK | `Preview` | SDK resources and tests exist, with compatibility still tied to the live API contract. |
 | Built-in Agent chat | `Preview` | Fixed-flow chat mode exists; advanced autonomous executors are planned. |
-| Auth login | `In development` | Not available yet. |
-| Tenant/member/ACL/quota | `In development` | Not available yet. |
-| MEM02 memory extraction | `In development` | Not available yet. |
-| RBAC and tenant isolation | `In development` | Not available yet. |
-| Database import | `In development` | Not available yet. |
+| Auth login | `In development` | Not supported yet. |
+| Tenant/member/ACL/quota | `In development` | Not supported yet. |
+| Memory extraction | `In development` | Not supported yet. |
+| RBAC and tenant isolation | `In development` | Not supported yet. |
+| Database import | `In development` | Not supported yet. |
 
 Published retrieval-quality evidence: an immutable [four-corpus CPU measurement bundle](https://github.com/cortrix/cortrix-benchmarks/tree/4b94390c1d5f7be95065e7483362ec7f93774ed7/results/published/beir-four-corpus-cpu-2026-08-v1) records 16 cells against Core `79a4eb17c62521338d1ac47a9749e6230e87e69b`. SciFact, NFCorpus, and FiQA use every judged test query; Quora uses its full 522,931-document corpus and the first 2,000 of 10,000 judged queries. These retrieval measurements do not establish answer quality, production performance, security, competitive ranking, or business outcomes.
 

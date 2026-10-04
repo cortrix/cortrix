@@ -221,7 +221,7 @@ unchanged.
 - Legacy protocol: `2025-11-25` via the initialize handshake.
 - Transport: local stdio. Cortrix does not currently expose a remote or
   loopback Streamable HTTP MCP endpoint.
-- MEM02 memory extraction is `In development`.
+- Memory extraction is `In development`.
 - Auth, tenant/member/ACL/quota, RBAC, and tenant isolation behavior must be
   checked against [Compatibility](../docs/compatibility.md) before making a
   production or security claim.

@@ -9,7 +9,7 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 | Status | Meaning |
 |---|---|
 | `Preview` | Available and documented. Cortrix is in pre-release, so verify it against your own runtime before production use. |
-| `In development` | Being built and not available yet. |
+| `In development` | Present in part or being built; not supported yet. Do not rely on it. |
 | `Planned` | Reserved for a later version. |
 
 ## Current Status Matrix
@@ -23,15 +23,15 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 | Python SDK | `Preview` | SDK resources are documented and test-covered, but compatibility follows the live API contract. |
 | Built-in Agent fixed-flow chat | `Preview` | Chat mode is documented; deployment and LLM provider behavior should be verified in your runtime. |
 | Built-in Agent tool-use and plan-execute modes | `Planned` | These executor modes are not current production capabilities. |
-| Auth login | `In development` | Not available yet. |
-| Tenant/member/ACL/quota | `In development` | Not available yet. |
-| RBAC | `In development` | Not available yet. |
-| Tenant isolation | `In development` | Not available yet. |
-| MEM02 memory extraction | `In development` | Not available yet. |
+| Auth login | `In development` | Not supported yet. |
+| Tenant/member/ACL/quota | `In development` | Not supported yet. |
+| RBAC | `In development` | Not supported yet. |
+| Tenant isolation | `In development` | Not supported yet. |
+| Memory extraction | `In development` | Not supported yet. |
 | OCR / parser paths | `Preview` | Parser and OCR behavior depends on optional configuration and should be verified per deployment. |
 | Linux NVIDIA CUDA execution provider | `Preview` | A separate Linux x86_64 image and runbook exist; run a platform capability smoke test in your target deployment. |
-| Log redaction / LogSanitizer defaults | `In development` | Not available yet. |
-| Database import | `In development` | Not available yet. |
+| Log redaction / LogSanitizer defaults | `In development` | Not supported yet. |
+| Database import | `In development` | Not supported yet. |
 
 ## Auth And Security Boundaries
 
