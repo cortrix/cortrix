@@ -173,6 +173,14 @@ Do not edit a derived version field by itself. CI runs the check command and rej
 7. **Run the full test suite locally** before pushing.
 8. **Open the PR** against `main` with a clear description: what changed, why, and how it was tested.
 
+### Writing for the public record
+
+Commits, pull requests, issues, and review comments in this repository are public and permanent. Write them so that a reader with access to this repository alone can follow them:
+
+- **Write in English.** This applies to commit messages, pull request titles and descriptions, issues, and review comments.
+- **Cite only what a reader can check here.** Give reasons and evidence from this repository: code, tests, documentation, CI results, and public issues or pull requests. Don't refer to private repositories, internal tracking numbers, or unpublished discussions.
+- **Leave out AI tool attribution.** Don't add a `Co-Authored-By` trailer that names an AI assistant, or a "Generated with" footer. You may use any tools you like. The `Signed-off-by` line names the person who certifies the contribution and answers for it.
+
 After a pull request is merged or closed, delete its remote topic branch. Published versions are preserved by annotated tags and GitHub Releases, not by keeping one branch per release candidate.
 
 ### PR Checklist
@@ -184,6 +192,7 @@ After a pull request is merged or closed, delete its remote topic branch. Publis
 - [ ] Source is English-only and follows the surrounding style.
 - [ ] Commit messages are clear and imperative ("Add cross-namespace filter", not "added stuff").
 - [ ] Every new commit contains a valid `Signed-off-by` trailer.
+- [ ] Commit messages and the PR description are in English, cite only public evidence, and carry no AI tool attribution.
 
 ---
 
