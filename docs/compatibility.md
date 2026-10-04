@@ -18,9 +18,16 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 |---|---|---|
 | OpenAPI spec file | `Preview` | `api/openapi.yaml` is the canonical public contract file. |
 | Local health endpoints | `Preview` | Use them for local checks; do not infer full production readiness from health alone. |
+| Docker Quick Start | `Preview` | The Compose deployment builds from source, downloads the pinned local models, and serves the loopback API; it is for local evaluation, without authentication. |
 | Namespaces, documents, and query | `Preview` | Core surfaces exist and are documented; verify against your runtime before production use. |
+| Directory watchers | `Preview` | Adding, listing, and removing a watcher are documented; removing a watcher also purges the documents it imported. |
+| Explicit memory write, list, edit, and delete | `Preview` | The memory endpoints exist and are documented; verify request and response shapes against your runtime. |
+| Self-service memory correction | `Preview` | The invalidation trail and restore flow are documented in [Agent Memory Correction](agent-memory-correction.md); verify against your runtime. |
 | MCP server | `Preview` | The local stdio adapter supports modern `2026-07-28` (`server/discover`) and legacy `2025-11-25` (initialize); verify it against your target server and API. |
+| Remote MCP access (Streamable HTTP) | `Planned` | Local stdio is the only public MCP transport. |
 | Python SDK | `Preview` | SDK resources are documented and test-covered, but compatibility follows the live API contract. |
+| Framework adapters (`cortrix-skills`) | `Preview` | Tool definitions for LangChain, Claude, and OpenAI are documented and test-covered; a full round trip depends on your LLM provider. |
+| pgcortrix | `Preview` | The SQL contract and helper are covered by standalone tests; loading into a live PostgreSQL and `pg_regress` integration are not yet validated. |
 | Built-in Agent fixed-flow chat | `Preview` | Chat mode is documented; deployment and LLM provider behavior should be verified in your runtime. |
 | Built-in Agent tool-use and plan-execute modes | `Planned` | These executor modes are not current production capabilities. |
 | Auth login | `In development` | Not supported yet. |
