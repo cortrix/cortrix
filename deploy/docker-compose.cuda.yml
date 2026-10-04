@@ -8,6 +8,15 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.cuda
+    environment:
+      # The base file pins the CPU Quick Start. A CUDA deployment takes these
+      # from the shell or from deploy/.env, which Compose reads for
+      # substitution, so the values in the runbook reach the container.
+      CORTRIX_PROFILE: ${CORTRIX_PROFILE:-quickstart}
+      CORTRIX_EMBEDDING_EXECUTION_PROVIDER: ${CORTRIX_EMBEDDING_EXECUTION_PROVIDER:-auto}
+      CORTRIX_RERANKER_EXECUTION_PROVIDER: ${CORTRIX_RERANKER_EXECUTION_PROVIDER:-auto}
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
     deploy:
       resources:
         reservations:
