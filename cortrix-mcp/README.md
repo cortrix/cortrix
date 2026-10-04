@@ -30,23 +30,19 @@ transport, retries, deployment, or custom auth handling.
 
 ## Install
 
-`cortrix-mcp` is not published to PyPI or a container registry yet. Install it
-from a checkout of this repository.
-
 ### pip
 
-From the repository root:
-
 ```bash
-pip install ./cortrix-mcp
+pip install cortrix-mcp
 ```
 
-This installs the `cortrix-mcp` console command (the MCP stdio server entry point).
-It requires Python 3.10 or later.
+This installs the latest pre-release from PyPI and the `cortrix-mcp` console
+command (the MCP stdio server entry point). It requires Python 3.10 or later.
 
 ### Docker
 
-Build the image from this directory, then run it:
+The image is not published to a container registry yet. Build it from a
+checkout of this repository, from the repository root, then run it:
 
 ```bash
 docker build -t cortrix/mcp:v1.0.0-rc.1 cortrix-mcp

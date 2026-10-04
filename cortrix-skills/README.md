@@ -20,17 +20,12 @@ Cortrix with zero hand-written tool glue.
 
 ## Install
 
-`cortrix-skills` is not published to PyPI yet, and it depends on the Cortrix
-Python SDK. Install both from a checkout of this repository, from the repository
-root:
-
 ```bash
-pip install ./sdk/python                     # the Cortrix Python SDK
-pip install ./cortrix-skills                 # CortrixToolKit + Claude/OpenAI tool builders
-pip install './cortrix-skills[langchain]'    # + LangChain adapter
-pip install './cortrix-skills[claude]'       # + anthropic SDK (real Messages round-trip)
-pip install './cortrix-skills[openai]'       # + openai SDK (real Chat round-trip)
-pip install './cortrix-skills[all]'          # everything
+pip install cortrix-skills                 # CortrixToolKit + Claude/OpenAI tool builders
+pip install cortrix-skills[langchain]      # + LangChain adapter
+pip install cortrix-skills[claude]         # + anthropic SDK (real Messages round-trip)
+pip install cortrix-skills[openai]         # + openai SDK (real Chat round-trip)
+pip install cortrix-skills[all]            # everything
 ```
 
 The framework SDKs are **soft dependencies**: importing `cortrix_skills` never

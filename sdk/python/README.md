@@ -12,14 +12,11 @@ handling.
 
 ## Installation
 
-The SDK is not published to PyPI yet. Install it from a checkout of this
-repository, from the repository root:
-
 ```bash
-pip install ./sdk/python
+pip install cortrix
 ```
 
-Requires Python 3.9+. The only runtime dependency is [`httpx`](https://www.python-httpx.org/).
+This installs the latest pre-release from PyPI. Requires Python 3.9+. The only runtime dependency is [`httpx`](https://www.python-httpx.org/).
 
 ## Quick start
 
