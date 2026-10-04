@@ -36,11 +36,16 @@ transport, retries, deployment, or custom auth handling.
 pip install cortrix-mcp
 ```
 
-This installs the `cortrix-mcp` console command (the MCP stdio server entry point).
+This installs the latest pre-release from PyPI and the `cortrix-mcp` console
+command (the MCP stdio server entry point). It requires Python 3.10 or later.
 
 ### Docker
 
+The image is not published to a container registry yet. Build it from a
+checkout of this repository, from the repository root, then run it:
+
 ```bash
+docker build -t cortrix/mcp:v1.0.0-rc.1 cortrix-mcp
 docker run -i --rm \
   -e CORTRIX_URL=http://host.docker.internal:8420 \
   -e CORTRIX_API_KEY=your-cortrix-api-key \
@@ -78,7 +83,26 @@ Use placeholder values in examples. Do not commit real API keys.
 
 ### Claude Code
 
-`~/.config/Claude/claude_desktop_config.json`:
+Register the server with the `claude` CLI from your project directory:
+
+```bash
+claude mcp add cortrix --scope project \
+  --env CORTRIX_URL=http://127.0.0.1:8420 \
+  --env CORTRIX_API_KEY=your-cortrix-api-key \
+  -- cortrix-mcp
+```
+
+This writes a `.mcp.json` file in the project. Claude Code asks you to approve a
+project-scoped server the first time you start it; run `/mcp` to check the
+connection. `cortrix-mcp` must be on the `PATH` that Claude Code starts with, or
+be given as an absolute path.
+
+### Claude Desktop
+
+Add the server to `claude_desktop_config.json`:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
@@ -94,7 +118,7 @@ Use placeholder values in examples. Do not commit real API keys.
 }
 ```
 
-Docker variant:
+Docker variant, using the image built in [Install](#docker):
 
 ```json
 {

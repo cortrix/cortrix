@@ -83,7 +83,7 @@ RULES = (
         "cortrix-mcp/README.md",
         rf"cortrix/mcp:v(?P<value>{SEMVER_TOKEN})",
         "semver",
-        2,
+        3,
     ),
     Rule(
         "cortrix-mcp/tests/test_core.py",

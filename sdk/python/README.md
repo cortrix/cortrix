@@ -16,7 +16,7 @@ handling.
 pip install cortrix
 ```
 
-Requires Python 3.9+. The only runtime dependency is [`httpx`](https://www.python-httpx.org/).
+This installs the latest pre-release from PyPI. Requires Python 3.9+. The only runtime dependency is [`httpx`](https://www.python-httpx.org/).
 
 ## Quick start
 
