@@ -18,9 +18,15 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 |---|---|---|
 | OpenAPI spec file | `Preview` | `api/openapi.yaml` is the canonical public contract file. |
 | Local health endpoints | `Preview` | Use them for local checks; do not infer full production readiness from health alone. |
+| Docker Quick Start | `Preview` | The Compose deployment builds from source, downloads the pinned local models, and serves the loopback API; it is for local evaluation, without authentication. |
 | Namespaces, documents, and query | `Preview` | Core surfaces exist and are documented; verify against your runtime before production use. |
+| Directory watchers | `Preview` | Adding, listing, and removing a watcher are documented; removing a watcher also purges the documents it imported. `GET /watch/{id}/events` is not implemented on this line and returns 404. |
+| Explicit memory write, list, edit, and delete | `Preview` | The four endpoints exist and are documented. Read explicit memories back with `GET /memory`; semantic search over them (`POST /memory/search` and `/query`) does not return results on this line. |
+| Self-service memory correction | `Preview` | The manual invalidate and restore flow and its audit trail are documented in [Agent Memory Correction](agent-memory-correction.md) and present; automatic contradiction handling depends on memory extraction, which is `In development`. |
 | MCP server | `Preview` | The local stdio adapter supports modern `2026-07-28` (`server/discover`) and legacy `2025-11-25` (initialize); verify it against your target server and API. |
 | Python SDK | `Preview` | SDK resources are documented and test-covered, but compatibility follows the live API contract. |
+| Framework adapters (`cortrix-skills`) | `Preview` | Tool definitions for LangChain, Claude, and OpenAI install from PyPI and are test-covered; a full round trip depends on your LLM provider. |
+| pgcortrix | `In development` | The SQL contract and helper exist with standalone tests; loading into a live PostgreSQL and `pg_regress` integration have not been run on this line. |
 | Built-in Agent fixed-flow chat | `Preview` | Chat mode is documented; deployment and LLM provider behavior should be verified in your runtime. |
 | Built-in Agent tool-use and plan-execute modes | `Planned` | These executor modes are not current production capabilities. |
 | Auth login | `In development` | Not supported yet. |
