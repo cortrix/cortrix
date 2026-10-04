@@ -1,0 +1,17 @@
+# Review routing for cortrix/cortrix.
+#
+# A pull request that changes a path below automatically requests a review
+# from the listed owner. This file routes review requests; it does not change
+# who may approve or merge. The last matching pattern wins.
+
+# HTTP API contract and server implementation
+/api/         @miles0521
+/src/         @miles0521
+/include/     @miles0521
+
+# Documentation site and the project README
+/docs/        @ScottSiu1983
+/README.md    @ScottSiu1983
+
+# Maintainer runbooks published in the documentation site
+/docs/content/docs/maintainers/  @miles0521
