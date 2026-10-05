@@ -56,25 +56,25 @@ Start here:
 
 Cortrix is in active pre-release development. The public documentation uses these status labels:
 
-- `Verified`: directly supported by current code/spec evidence and exercised in the latest validation scope.
-- `Verification required`: present in code, spec, or docs, but not yet confirmed enough for a public-readiness claim.
-- `Blocked`: known broken, blocked, or not provable in the current runtime.
-- `Roadmap`: planned or reserved for a later version.
+- `Preview`: available and documented. Cortrix is in pre-release, so verify it against your own runtime before production use.
+- `In development`: present in part or being built; not supported yet. Do not rely on it.
 
 High-signal current status:
 
 | Area | Status | Notes |
 |---|---|---|
-| OpenAPI file | `Verified` | `api/openapi.yaml` is present and declares the public API surface. |
-| Local server, health endpoints, namespaces, documents, query | `Verification required` | Core surfaces exist, but public-readiness labeling still depends on end-to-end verification. |
-| MCP server | `Verification required` | MCP tooling exists and has test coverage, with release-readiness still under review. |
-| Python SDK | `Verification required` | SDK resources and tests exist, with compatibility still tied to the live API contract. |
-| Built-in Agent chat | `Verification required` | Fixed-flow chat mode exists; advanced autonomous executors are roadmap items. |
-| Auth login | `Blocked` | The public spec defines login, but the latest runtime verification found contract drift. |
-| Tenant/member/ACL/quota | `Blocked` | Runtime behavior and documented contract are still being reconciled. |
-| MEM02 memory extraction | `Blocked` | Latest verification observed an LLM transport timeout path. |
-| RBAC and tenant isolation denial matrix | `Blocked` | Cannot be proven in the current auth-disabled local runtime. |
-| BEIR retrieval quality | `Verified` | An immutable [four-corpus CPU measurement bundle](https://github.com/cortrix/cortrix-benchmarks/tree/4b94390c1d5f7be95065e7483362ec7f93774ed7/results/published/beir-four-corpus-cpu-2026-08-v1) records 16 cells against Core `79a4eb17c62521338d1ac47a9749e6230e87e69b`. SciFact, NFCorpus, and FiQA use every judged test query; Quora uses its full 522,931-document corpus and the first 2,000 of 10,000 judged queries. These retrieval measurements do not establish answer quality, production performance, security, competitive ranking, or business outcomes. |
+| OpenAPI file | `Preview` | `api/openapi.yaml` is present and declares the public API surface. |
+| Local server, health endpoints, namespaces, documents, query | `Preview` | Core surfaces exist and are documented. |
+| MCP server | `Preview` | MCP tooling exists and has test coverage, with release-readiness still under review. |
+| Python SDK | `Preview` | SDK resources and tests exist, with compatibility still tied to the live API contract. |
+| Built-in Agent chat | `Preview` | Fixed-flow chat mode exists. It is the only executor mode. |
+| Auth login | `In development` | Not supported yet. |
+| Tenant/member/ACL/quota | `In development` | Not supported yet. |
+| Memory extraction | `In development` | Not supported yet. |
+| RBAC and tenant isolation | `In development` | Not supported yet. |
+| Database import | `In development` | Not supported yet. |
+
+Published retrieval-quality evidence: an immutable [four-corpus CPU measurement bundle](https://github.com/cortrix/cortrix-benchmarks/tree/4b94390c1d5f7be95065e7483362ec7f93774ed7/results/published/beir-four-corpus-cpu-2026-08-v1) records 16 cells against Core `79a4eb17c62521338d1ac47a9749e6230e87e69b`. SciFact, NFCorpus, and FiQA use every judged test query; Quora uses its full 522,931-document corpus and the first 2,000 of 10,000 judged queries. These retrieval measurements do not establish answer quality, production performance, security, competitive ranking, or business outcomes.
 
 See [Compatibility and known status](docs/compatibility.md) before making production, security, benchmark, or integration claims.
 
@@ -117,7 +117,7 @@ The spec includes:
 - namespaces, documents, query, memory, watch, import, auth, admin, tenant, Agent, system, GC, and maintenance paths;
 - request/response schemas and error schemas.
 
-OpenAPI presence is not the same as runtime verification. If an endpoint is listed as `Verification required` or `Blocked` in [Compatibility](docs/compatibility.md), use that status as the public claim boundary.
+OpenAPI presence is not the same as runtime verification. Use the status in [Compatibility](docs/compatibility.md) as the public claim boundary for an endpoint.
 
 ## Agent Access
 
@@ -163,7 +163,7 @@ Use placeholder values in documentation and real provider keys only in local ign
 
 Cortrix is pre-release. Before using it outside local development, review:
 
-- [Compatibility and known status](docs/compatibility.md) for blocked and review-required areas.
+- [Compatibility and known status](docs/compatibility.md) for what is in preview and what is still in development.
 - [Security policy](SECURITY.md) for reporting.
 - `config.yaml.example` for auth and API key configuration.
 - `deploy/` for deployment templates.
