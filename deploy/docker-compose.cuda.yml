@@ -17,6 +17,8 @@ services:
       CORTRIX_RERANKER_EXECUTION_PROVIDER: ${CORTRIX_RERANKER_EXECUTION_PROVIDER:-auto}
       NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
       NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      # Empty means "let the entrypoint decide by profile": on for quickstart, off otherwise.
+      CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED: ${CORTRIX_QUICKSTART_BOOTSTRAP_ENABLED:-}
     deploy:
       resources:
         reservations:
