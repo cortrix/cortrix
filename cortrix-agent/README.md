@@ -15,7 +15,7 @@ Web UI chat -> Cortrix Agent (:8001) -> Python SDK -> cortrix-server (:8420)
 ```
 
 The current public path is chat mode: a fixed RAG flow with no autonomous tool
-selection. Advanced tool-use and plan-execute modes are planned.
+selection. It is the only executor mode.
 
 ## Layout
 
@@ -120,7 +120,6 @@ Returns service status, backend reachability, and LLM reachability.
 ## Compatibility Notes
 
 - Built-in Agent chat is the current documented path.
-- Advanced autonomous executor modes are `Planned`.
 - Live persistence for `PUT /config/agent_llm` is not a current verified
   capability.
 - Auth and tenant/RBAC claims should follow
