@@ -1,0 +1,88 @@
+# Cortrix documentation site, built with the OINK Hugo theme.
+# Preview: hugo server    Strict build: see README.md in this directory.
+
+title: &siteTitle Cortrix
+baseURL: https://cortrix.ai/docs/
+
+# The site is served under /docs/, so pages in content/docs/ drop the section
+# name from their URL: content/docs/get-started/quickstart.md is published at
+# /docs/get-started/quickstart/.
+permalinks:
+  page:
+    docs: /:sections[1:]/:contentbasename/
+  section:
+    docs: /:sections[1:]/
+defaultContentLanguage: en
+enableGitInfo: true
+enableRobotsTXT: true
+enableEmoji: true
+timeZone: UTC
+
+languages:
+  en:
+    label: English
+    locale: en-US
+    weight: 1
+    title: *siteTitle
+    params:
+      description: Agent-native semantic storage for retrieval, memory, and API-driven AI applications.
+
+# OINK's Markdown components depend on these three Goldmark settings.
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
+    parser:
+      attribute:
+        block: true
+      wrapStandAloneImageWithinParagraph: false
+  highlight:
+    noClasses: false
+
+outputs:
+  home: [HTML, RSS, markdown, LLMS]
+  page: [HTML, markdown]
+  section: [HTML, RSS, print, markdown]
+
+params:
+  offline_search: true
+  copyright:
+    authors: Cortrix contributors
+    from_year: 2026
+  footer_center_info: ''
+  logo: icons/logo.svg
+  github_repo: https://github.com/cortrix/cortrix
+  github_branch: release/1.0
+  github_subdir: docs-site
+  ui:
+    dark_mode: true
+    # Magma Orange (#FF6405) fails AA contrast on the light canvas, so the
+    # light accent is a darker shade of it; the dark accent is the brand color.
+    theme_color: '#C2410C'
+    theme_color_dark: '#FF6405'
+    fonts:
+      ui: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif"
+      code: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace"
+    section_index: cards
+    sidebar_menu_foldable: true
+    # One docs root only, so the root switcher would just repeat the tree root.
+    sidebar_root_menu: false
+    sidebar_icon_policy: groups
+    backlinks: true
+
+module:
+  imports:
+    - path: github.com/pgsty/oink
+  hugoVersion:
+    extended: true
+    min: 0.160.1
+  # Declaring any mount replaces Hugo's defaults, so the standard ones are
+  # restated. The last three publish the OpenAPI contract for the API reference.
+  mounts:
+    - { source: content, target: content }
+    - { source: data, target: data }
+    - { source: assets, target: assets }
+    - { source: static, target: static }
+    - { source: layouts, target: layouts }
+    # The filtered copy of the spec, written by scripts/filter_openapi.py.
+    - { source: .openapi, target: static/openapi }

@@ -78,3 +78,6 @@ models/
 **/.venv/
 sdk/python/dist/
 sdk/python/*.egg-info/
+
+# Documentation site (built separately with Hugo; never needed in the image)
+docs-site/

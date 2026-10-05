@@ -1,0 +1,10 @@
+/public/
+/resources/
+/.hugo_cache/
+/.hugo_build.lock
+/.openapi/
+.DS_Store
+
+# The repository root ignores every `data/` directory (server runtime state).
+# This one holds Hugo data files and must be tracked.
+!/data/

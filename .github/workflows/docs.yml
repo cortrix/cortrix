@@ -1,0 +1,81 @@
+# Builds the documentation site in docs-site/ with warnings treated as errors.
+# A broken internal link, a missing anchor, or an internal marker left in the
+# filtered OpenAPI copy fails the build. Pull requests are built only. A push to
+# release/1.0 is built and then published to GitHub Pages.
+name: Docs
+
+on:
+  pull_request:
+    paths:
+      - "docs-site/**"
+      - "api/**"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [release/1.0]
+    paths:
+      - "docs-site/**"
+      - "api/**"
+      - ".github/workflows/docs.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HUGO_VERSION: 0.167.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # page dates come from Git history
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: docs-site/go.mod
+          cache-dependency-path: docs-site/go.sum
+
+      - name: Install Hugo Extended
+        run: |
+          curl -fsSL -o "${RUNNER_TEMP}/hugo.deb" \
+            "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.deb"
+          sudo dpkg -i "${RUNNER_TEMP}/hugo.deb"
+          hugo version
+
+      - name: Filter the OpenAPI spec
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 docs-site/scripts/filter_openapi.py api docs-site/.openapi
+
+      - name: Build
+        working-directory: docs-site
+        run: |
+          test -f .openapi/openapi.yaml
+          hugo --cleanDestinationDir --gc --minify --environment production \
+            --printPathWarnings --panicOnWarning
+
+      - name: Upload the site
+        if: github.event_name == 'push'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-site/public
+
+  publish:
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

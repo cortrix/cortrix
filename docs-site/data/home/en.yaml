@@ -1,0 +1,48 @@
+sections: [hero, cards, cta]
+
+hero:
+  align: center
+  eyebrow: Agent-native semantic storage · Open source, Apache-2.0
+  title_lines:
+    - words: [{ text: Semantic Storage }]
+    - words: [{ text: Built for AI Agents }]
+  lead: Open source semantic storage for AI agents, with retrieval, reviewable records, and source context. Cortrix is in active pre-release; the maturity of each interface and feature is reported separately.
+  actions:
+    - { label: Quickstart, url: get-started/, icon: fa-solid fa-rocket, style: primary }
+    - { label: Read the docs, url: all/, icon: fa-solid fa-book, style: ghost }
+
+cards:
+  eyebrow: Start here
+  title: Find your way in by what you want to do
+  columns: 3
+  items:
+    - title: Get started
+      desc: Start Cortrix locally with Docker and run your first query.
+      icon: fa-solid fa-rocket
+      url: get-started/
+    - title: Guides
+      desc: Upload documents, query and rerank, and work with memory.
+      icon: fa-solid fa-compass
+      url: guides/
+    - title: Integrations
+      desc: Choose between the HTTP API, MCP, the Python SDK, and framework adapters.
+      icon: fa-solid fa-plug
+      url: integrations/
+    - title: Deploy
+      desc: Docker Compose, configuration, models, and GPU execution.
+      icon: fa-solid fa-server
+      url: deploy/
+    - title: Reference
+      desc: The HTTP API, MCP tools, configuration keys, and error codes.
+      icon: fa-solid fa-book-open
+      url: reference/
+    - title: Compatibility and status
+      desc: The current status of every capability.
+      icon: fa-solid fa-circle-check
+      url: resources/
+cta:
+  title: Running locally in about five minutes.
+  text: All you need is Git, Docker, and Docker Compose.
+  label: Quickstart
+  url: get-started/
+  style: primary
