@@ -10,7 +10,6 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 |---|---|
 | `Preview` | Available and documented. Cortrix is in pre-release, so verify it against your own runtime before production use. |
 | `In development` | Present in part or being built; not supported yet. Do not rely on it. |
-| `Planned` | Reserved for a later version. |
 
 ## Current Status Matrix
 
@@ -28,7 +27,6 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 | Framework adapters (`cortrix-skills`) | `Preview` | Tool definitions for LangChain, Claude, and OpenAI install from PyPI and are test-covered; a full round trip depends on your LLM provider. |
 | pgcortrix | `In development` | The SQL contract and helper exist with standalone tests; loading into a live PostgreSQL and `pg_regress` integration have not been run on this line. |
 | Built-in Agent fixed-flow chat | `Preview` | Chat mode is documented; deployment and LLM provider behavior should be verified in your runtime. |
-| Built-in Agent tool-use and plan-execute modes | `Planned` | These executor modes are not current production capabilities. |
 | Auth login | `In development` | Not supported yet. |
 | Tenant/member/ACL/quota | `In development` | Not supported yet. |
 | RBAC | `In development` | Not supported yet. |
@@ -66,7 +64,7 @@ MCP, Python SDK, and the built-in Agent are all documented access paths. They ar
 - The Python SDK exposes Cortrix resources to Python applications.
 - The built-in Agent exposes a fixed-flow chat service over FastAPI.
 
-The built-in Agent's advanced autonomous executors are `Planned`.
+The built-in Agent offers fixed-flow chat only.
 
 ## Benchmark Boundary
 

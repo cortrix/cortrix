@@ -100,7 +100,7 @@ Minimal health check:
 curl http://localhost:8001/health
 ```
 
-Chat mode is the current documented path. Advanced autonomous executor modes, including tool-use and plan-execute flows, are planned and must not be described as current production capabilities.
+Chat mode is the current documented path. Chat is the only executor mode. Tool-use and plan-execute flows are not available.
 
 ## Choosing A Path
 
