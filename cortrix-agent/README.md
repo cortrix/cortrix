@@ -4,9 +4,9 @@ Cortrix Agent is the built-in FastAPI service for fixed-flow chat over Cortrix
 semantic storage. It uses the public Python SDK path to query cortrix-server and
 does not use a privileged backend channel.
 
-> Status: `Verification required`. Fixed-flow chat mode is documented, but
-> deployment, LLM provider behavior, and API compatibility should be verified
-> against your target runtime. See [Agent access](../docs/agent-access.md) and
+> Status: `Preview`. Fixed-flow chat mode is documented. Verify deployment,
+> LLM provider behavior, and API compatibility against your target runtime
+> before production use. See [Agent access](../docs/agent-access.md) and
 > [Compatibility](../docs/compatibility.md).
 
 ```text
@@ -15,7 +15,7 @@ Web UI chat -> Cortrix Agent (:8001) -> Python SDK -> cortrix-server (:8420)
 ```
 
 The current public path is chat mode: a fixed RAG flow with no autonomous tool
-selection. Advanced tool-use and plan-execute modes are roadmap items.
+selection. It is the only executor mode.
 
 ## Layout
 
@@ -120,7 +120,6 @@ Returns service status, backend reachability, and LLM reachability.
 ## Compatibility Notes
 
 - Built-in Agent chat is the current documented path.
-- Advanced autonomous executor modes are `Roadmap`.
 - Live persistence for `PUT /config/agent_llm` is not a current verified
   capability.
 - Auth and tenant/RBAC claims should follow

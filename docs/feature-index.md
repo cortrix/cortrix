@@ -66,7 +66,6 @@ final subsection.
 | F09 | Block header | Self-describing binary block header with CRC over all fields. |
 | F10 | Data cleaning | Exact (BM25) and semantic dedup plus anomaly detection inside the ingest pipeline. |
 | F12 | Namespace→unit mapping | Two-layer mapping that introduces the storage-unit abstraction and routing database; also carries per-namespace config overrides. |
-| F16a | DB manual import | Import rows from an external database table (per-row and merge modes, JSON-DSL filters, parameterized queries). |
 | F21 | Watcher fan-out | A single filesystem watcher fanned out to all namespaces. |
 | F25 | Write coordinator | Pending-write log giving atomic writes across the vector index, SQLite and blob storage. |
 | F42 | Async document processing | Background task queue with persisted tasks, progress and cancel APIs. |
@@ -131,6 +130,7 @@ resolved; nothing in this subsection is a shipped capability.
 | # | Name | Where the reference lives |
 |---|---|---|
 | F11 | Cleaning plugin API | v1.0 ships only the `ICleaningPlugin` seam and stub inside F10; the plugin ecosystem itself is unreleased. |
+| F16a | DB manual import | The import endpoints and task model are in the tree, but import against a live external database is not wired in this line. Listed as `In development` in [Compatibility](compatibility.md). |
 | F43 | Block hotness self-learning | Comments mark the hooks reserved for it; no shipped behavior. |
 | F44 | Benchmark suite | The BEIR evaluation harness is maintained outside this repository; comments and a placeholder Dockerfile under `tests/benchmark/beir/` reference it. |
 | P01 | Multi-tenancy and quota | Interface-reserved seams only (e.g. scatter-plan coordination); the capability is unreleased. |
