@@ -6,7 +6,7 @@ does not use a privileged backend channel.
 
 > Status: `Preview`. Fixed-flow chat mode is documented. Verify deployment,
 > LLM provider behavior, and API compatibility against your target runtime
-> before production use. See [Agent access](../docs/agent-access.md) and
+> before production use. See [Agent access](https://cortrix.ai/docs/integrations/overview/) and
 > [Compatibility](../docs/compatibility.md).
 
 ```text

@@ -68,7 +68,7 @@ wildcard listener needed for that loopback publication.
 This path is intended to provide a first local result. It does not establish
 parser coverage, authentication, internet-facing deployment, benchmark quality,
 or production readiness. See the canonical
-[Quick Start](../docs/QUICKSTART.md) for provenance, integrity checks, and next
+[Quick Start](https://cortrix.ai/docs/get-started/quickstart/) for provenance, integrity checks, and next
 steps. Maintainers who need the deeper source-build
 evidence workflow can use the
 [First-value SupportOps demo](../examples/first-value-supportops/README.md).

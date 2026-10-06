@@ -12,8 +12,8 @@ Status follows [docs/compatibility.md](../docs/compatibility.md).
 | Page | Sources | Status |
 |---|---|---|
 | `get-started/overview` | `README.md` | — |
-| `get-started/quickstart` | `docs/QUICKSTART.md`, `deploy/docker-compose.yml`, `deploy/quickstart-bootstrap.sh` | Preview |
-| `get-started/agent-quickstart` | `docs/AGENT_QUICKSTART.md` | Preview |
+| `get-started/quickstart` | `docs/archive/QUICKSTART.md`, `deploy/docker-compose.yml`, `deploy/quickstart-bootstrap.sh` | Preview |
+| `get-started/agent-quickstart` | `docs/archive/AGENT_QUICKSTART.md` | Preview |
 | `get-started/core-concepts` | `README.md`, `api/components/schemas.yaml` | — |
 
 ## Guides
@@ -30,7 +30,7 @@ Status follows [docs/compatibility.md](../docs/compatibility.md).
 
 | Page | Sources | Status |
 |---|---|---|
-| `integrations/overview` | `docs/agent-access.md` | Preview |
+| `integrations/overview` | `docs/archive/agent-access.md` | Preview |
 | `integrations/mcp` | `cortrix-mcp/README.md` | Preview |
 | `integrations/python-sdk` | `sdk/python/README.md` | Preview |
 | `integrations/skills` | `cortrix-skills/README.md` | Preview |
@@ -55,7 +55,7 @@ Status follows [docs/compatibility.md](../docs/compatibility.md).
 |---|---|---|
 | `concepts/architecture` | `README.md`, `src/`, `CMakeLists.txt` | — |
 | `concepts/data-flow` | `src/`, `api/paths/documents.yaml`, `api/paths/query.yaml` | — |
-| `concepts/interfaces` | `api/components/errors.yaml`, `api/components/x-cortrix.yaml`, `docs/agent-access.md` | — |
+| `concepts/interfaces` | `api/components/errors.yaml`, `api/components/x-cortrix.yaml`, `docs/archive/agent-access.md` | — |
 
 ## Reference
 
@@ -72,8 +72,8 @@ Status follows [docs/compatibility.md](../docs/compatibility.md).
 | Page | Sources | Status |
 |---|---|---|
 | `resources/compatibility` | `docs/compatibility.md` | — |
-| `resources/stack-fit` | `docs/adoption/stack-fit.md` | — |
+| `resources/stack-fit` | `docs/archive/adoption/stack-fit.md` | — |
 | `resources/benchmarks` | `docs/compatibility.md` (benchmark boundary), linked `cortrix-benchmarks` bundle | Preview |
-| `resources/troubleshooting` | `docs/QUICKSTART.md`, `deploy/healthcheck.sh`, component READMEs | — |
+| `resources/troubleshooting` | `docs/archive/QUICKSTART.md`, `deploy/healthcheck.sh`, component READMEs | — |
 | `resources/releases` | `docs/releases/v1.0.0-rc.2.md` | — |
 | `resources/contributing` | `CONTRIBUTING.md`, `DCO`, `docs/BRANCHING.md`, `CODE_OF_CONDUCT.md` | — |
