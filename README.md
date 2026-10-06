@@ -9,7 +9,7 @@
   [![Version](https://img.shields.io/badge/version-v1.0.0--rc.1-orange.svg)](https://github.com/cortrix/cortrix/releases)
   [![C++17](https://img.shields.io/badge/C%2B%2B-17-blueviolet.svg)](https://en.cppreference.com/w/cpp/17)
 
-  [Quickstart](docs/QUICKSTART.md) · [Install with an AI Agent](docs/AGENT_QUICKSTART.md) · [Agent access](docs/agent-access.md) · [Compatibility](docs/compatibility.md) · [OpenAPI](api/openapi.yaml)
+  [Documentation](https://cortrix.ai/docs/) · [Quickstart](https://cortrix.ai/docs/get-started/quickstart/) · [Install with an AI Agent](https://cortrix.ai/docs/get-started/agent-quickstart/) · [Agent access](https://cortrix.ai/docs/integrations/overview/) · [Compatibility](docs/compatibility.md) · [OpenAPI](api/openapi.yaml)
 </div>
 
 Cortrix provides a local-first semantic storage server with namespaces, documents, blocks, hybrid search, memory APIs, and Agent-oriented access paths. It is designed for applications and Agents that need a programmable retrieval layer rather than a one-off vector database wrapper.
@@ -33,11 +33,11 @@ The repository includes:
 
 Start here:
 
-- [Quickstart](docs/QUICKSTART.md): start Cortrix with Docker, check readiness, and run a source-backed reranked query.
-- [Install with an AI Agent](docs/AGENT_QUICKSTART.md): give a terminal-capable AI Agent a version-pinned local setup and verification contract.
+- [Quickstart](https://cortrix.ai/docs/get-started/quickstart/): start Cortrix with Docker, check readiness, and run a source-backed reranked query.
+- [Install with an AI Agent](https://cortrix.ai/docs/get-started/agent-quickstart/): give a terminal-capable AI Agent a version-pinned local setup and verification contract.
 - [First-value SupportOps demo](examples/first-value-supportops/README.md): run the deeper source-build verification path with versioned assertions, trace evidence, and zero-residual cleanup.
-- [Stack fit and adoption boundaries](docs/adoption/stack-fit.md): review evidence-backed keep/add/replace/unknown decision cards.
-- [Agent access](docs/agent-access.md): choose between HTTP/OpenAPI, MCP, Python SDK, and the built-in Agent.
+- [Stack fit and adoption boundaries](https://cortrix.ai/docs/resources/stack-fit/): review evidence-backed keep/add/replace/unknown decision cards.
+- [Agent access](https://cortrix.ai/docs/integrations/overview/): choose between HTTP/OpenAPI, MCP, Python SDK, and the built-in Agent.
 - [Compatibility and known status](docs/compatibility.md): current public status for API, MCP, SDK, Agent, auth, tenant/RBAC, memory extraction, benchmarks, and security hardening.
 - [OpenAPI spec](api/openapi.yaml): endpoint paths, schemas, security schemes, and response contracts.
 - [MCP README](cortrix-mcp/README.md): MCP server setup and tool reference.
@@ -100,10 +100,10 @@ curl -fsS -H 'Content-Type: application/json' \
 
 You need Git, Docker, and Docker Compose. No `.env` file, LLM provider key, host-side model tooling, manual model download, model conversion, or separate bootstrap command is required. The first start downloads about 1.17 GB of pinned model assets and can take several minutes; later starts reuse the cached volume.
 
-The Quick Start publishes only the loopback API at `127.0.0.1:8420` (publishing on an isolated test network is an explicit, unauthenticated opt-in — see [Quick Start](docs/QUICKSTART.md#publishing-on-an-isolated-test-network-opt-in)). It uses BGE-M3 embedding and bge-reranker-v2-m3 reranking on CPU, while external LLM roles and the built-in Agent remain disabled. For model provenance, checks, expected output, cleanup, and scope boundaries, see [Quick Start](docs/QUICKSTART.md). For the deeper source-build evidence workflow, see the [First-value SupportOps demo](examples/first-value-supportops/README.md).
+The Quick Start publishes only the loopback API at `127.0.0.1:8420` (publishing on an isolated test network is an explicit, unauthenticated opt-in — see [Quick Start](https://cortrix.ai/docs/deploy/docker-compose/#publish)). It uses BGE-M3 embedding and bge-reranker-v2-m3 reranking on CPU, while external LLM roles and the built-in Agent remain disabled. For model provenance, checks, expected output, cleanup, and scope boundaries, see [Quick Start](https://cortrix.ai/docs/get-started/quickstart/). For the deeper source-build evidence workflow, see the [First-value SupportOps demo](examples/first-value-supportops/README.md).
 
 If you are using a terminal-capable AI Agent, use the
-[Agent-assisted setup contract](docs/AGENT_QUICKSTART.md). It pins the release
+[Agent-assisted setup contract](https://cortrix.ai/docs/get-started/agent-quickstart/). It pins the release
 and commit, limits the agent to the same loopback-only Docker path, and requires
 a structured verification report.
 
@@ -131,7 +131,7 @@ Cortrix exposes four access paths:
 | Python SDK | Python applications and RAG pipelines | [sdk/python/README.md](sdk/python/README.md) |
 | Built-in Agent | Local fixed-flow chat over Cortrix storage | [cortrix-agent/README.md](cortrix-agent/README.md) |
 
-See [Agent access](docs/agent-access.md) for selection guidance and current support status.
+See [Agent access](https://cortrix.ai/docs/integrations/overview/) for selection guidance and current support status.
 
 ## Core Concepts
 

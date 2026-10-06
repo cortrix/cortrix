@@ -8,7 +8,7 @@ memory, and trigger admin database imports.
 > Status: `Preview`. The MCP package and tool groups are documented and
 > test-covered. Verify them against your target cortrix-server runtime and API
 > before production use. See
-> [Agent access](../docs/agent-access.md) and
+> [Agent access](https://cortrix.ai/docs/integrations/overview/) and
 > [Compatibility](../docs/compatibility.md).
 
 Built on the official MCP Python SDK v2 `MCPServer` + [httpx](https://www.python-httpx.org/).
