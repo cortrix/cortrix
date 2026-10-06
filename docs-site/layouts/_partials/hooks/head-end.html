@@ -1,0 +1,18 @@
+{{/* A reader who has never picked a theme gets the one their system asks
+     for, and dark when the system states no preference. Any stored choice,
+     including "auto", is left alone. */ -}}
+<link rel="preload" href="{{ "fonts/InterVariable.woff2" | relURL }}" as="font" type="font/woff2" crossorigin>
+<script>
+  (function () {
+    try {
+      if (localStorage.getItem('td-color-theme')) return;
+    } catch (_) {
+      // Storage blocked: fall through and paint from the system preference.
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return;
+    const root = document.documentElement;
+    root.setAttribute('data-bs-theme', 'dark');
+    root.setAttribute('data-theme', 'dark');
+    root.classList.add('dark-mode');
+  })();
+</script>

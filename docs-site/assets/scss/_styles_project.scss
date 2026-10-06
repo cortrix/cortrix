@@ -1,0 +1,427 @@
+// Cortrix visual identity: Magma Orange on slate, in a light and a dark
+// palette. The dark values match cortrix.ai.
+
+[data-bs-theme='light'] {
+  --bs-body-bg: #f8fafc;
+  --bs-body-bg-rgb: 248, 250, 252;
+  --bs-body-color: #0f172a;
+  --bs-body-color-rgb: 15, 23, 42;
+  --bs-secondary-color: #64748b;
+  --bs-secondary-color-rgb: 100, 116, 139;
+  --bs-tertiary-bg: #f1f5f9;
+  --bs-tertiary-bg-rgb: 241, 245, 249;
+  --bs-border-color: #e2e8f0;
+  --bs-border-color-translucent: #e2e8f0;
+  // Magma Orange itself is too light for running text on a light ground, so
+  // links use a darker shade of it that meets WCAG AA.
+  --bs-link-color: #c2410c;
+  --bs-link-color-rgb: 194, 65, 12;
+  --bs-link-hover-color: #ea5000;
+  --bs-link-hover-color-rgb: 234, 80, 0;
+  --bs-code-color: #c2410c;
+  --td-pre-bg: #f1f5f9;
+  --td-brand-elev: #fff;
+  --td-brand-silk: #64748b;
+  --td-brand-copper: #d97706;
+  --td-brand-copper-dim: rgba(217, 119, 6, 0.6);
+  --td-brand-line-strong: #cbd5e1;
+  --td-brand-header-bg: rgba(255, 255, 255, 0.88);
+  --td-brand-mark-from: #ff6405;
+  --td-brand-mark-to: #d97706;
+  --td-brand-mark-gradient: linear-gradient(135deg, #ff6405, #d97706);
+}
+
+[data-bs-theme='dark'] {
+  --bs-body-bg: #0b0f19;
+  --bs-body-bg-rgb: 11, 15, 25;
+  --bs-body-color: #f1f5f9;
+  --bs-body-color-rgb: 241, 245, 249;
+  --bs-secondary-color: #94a3b8;
+  --bs-secondary-color-rgb: 148, 163, 184;
+  --bs-tertiary-bg: #131b2a;
+  --bs-tertiary-bg-rgb: 19, 27, 42;
+  --bs-border-color: #1e293b;
+  --bs-border-color-translucent: #1e293b;
+  --bs-link-color: #ff6405;
+  --bs-link-color-rgb: 255, 100, 5;
+  --bs-link-hover-color: #ff8a30;
+  --bs-link-hover-color-rgb: 255, 138, 48;
+  --bs-code-color: #ffb020;
+  --td-pre-bg: #0a0e17;
+  --td-brand-elev: #131b2a;
+  --td-brand-silk: #94a3b8;
+  --td-brand-copper: #ffb020;
+  --td-brand-copper-dim: rgba(255, 176, 32, 0.55);
+  --td-brand-line-strong: #334155;
+  --td-brand-header-bg: rgba(14, 18, 33, 0.92);
+  --td-brand-mark-from: #ff6405;
+  --td-brand-mark-to: #ffb020;
+  --td-brand-mark-gradient: linear-gradient(135deg, #ff6405, #ffb020);
+}
+
+// Primary call to action, as on cortrix.ai: Magma Orange with white text.
+.td-landing-button--primary {
+  background: linear-gradient(135deg, #ff6405, #ff8a30);
+  color: #fff;
+  box-shadow: 0 6px 22px rgba(255, 100, 5, 0.3);
+
+  &:hover {
+    background: linear-gradient(135deg, #ea5000, #ff6405);
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(255, 100, 5, 0.38);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Typography: Inter for text, JetBrains Mono for code and data. Self-hosted.
+// ---------------------------------------------------------------------------
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../fonts/InterVariable.woff2') format('woff2');
+}
+
+@each $weight, $file in (400: 'Regular', 500: 'Medium', 700: 'Bold') {
+  @font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: $weight;
+    font-display: swap;
+    src: url('../fonts/JetBrainsMono-#{$file}.woff2') format('woff2');
+  }
+}
+
+:root {
+  --cx-font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  --cx-radius: 8px;
+  --cx-radius-lg: 12px;
+  --cx-transition: 0.2s ease;
+}
+
+[data-bs-theme='light'] {
+  --cx-magma: #ff6405;
+  --cx-magma-text: #c2410c;
+  --cx-magma-rgb: 255, 100, 5;
+  --cx-surface: #fff;
+  --cx-surface-2: #f1f5f9;
+  --cx-bg-alt: #fff;
+  --cx-line: #e2e8f0;
+  --cx-muted: #64748b;
+  --cx-code-bg: #f1f5f9;
+  --cx-ok: #059669;
+  --cx-warn: #d97706;
+  --cx-err: #dc2626;
+  --cx-info: #2563eb;
+  --cx-card-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --cx-dot: rgba(255, 100, 5, 0.1);
+}
+
+[data-bs-theme='dark'] {
+  --cx-magma: #ff6405;
+  --cx-magma-text: #ff8a30;
+  --cx-magma-rgb: 255, 100, 5;
+  --cx-surface: #131b2a;
+  --cx-surface-2: #1a2236;
+  --cx-bg-alt: #0e1221;
+  --cx-line: #1e293b;
+  --cx-muted: #94a3b8;
+  --cx-code-bg: #0a0e17;
+  --cx-ok: #34d399;
+  --cx-warn: #ffb020;
+  --cx-err: #f87171;
+  --cx-info: #60a5fa;
+  --cx-card-shadow: none;
+  --cx-dot: rgba(255, 100, 5, 0.07);
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  // Faint Magma dot grid, as on cortrix.ai.
+  background-image: radial-gradient(var(--cx-dot) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.td-content {
+  line-height: 1.7;
+
+  h1 {
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    margin-top: 2.5rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  h4 {
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+
+  a:not([class]) {
+    text-decoration: none;
+    transition: color var(--cx-transition);
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  // Inline code, as on cortrix.ai: tinted Magma chip.
+  :not(pre) > code {
+    padding: 1px 5px;
+    border: 1px solid rgba(var(--cx-magma-rgb), 0.18);
+    border-radius: 6px;
+    background: rgba(var(--cx-magma-rgb), 0.08);
+    color: var(--cx-magma-text);
+    font-family: var(--cx-font-mono);
+    font-size: 0.88em;
+  }
+
+  blockquote:not(.td-callout) {
+    border-left: 3px solid rgba(var(--cx-magma-rgb), 0.5);
+    color: var(--cx-muted);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shell: sidebar and top bar sit on the alternate ground.
+// ---------------------------------------------------------------------------
+
+.td-shell-sidebar__panel,
+.td-site-header,
+.td-shell-topline {
+  background-color: var(--cx-bg-alt);
+}
+
+.td-shell-tree__row {
+  border-radius: var(--cx-radius);
+  transition: background-color var(--cx-transition), color var(--cx-transition);
+}
+
+.td-shell-tree__item.td-active > .td-shell-tree__row,
+.td-shell-tree__row[aria-current='page'],
+.td-shell-tree__link[aria-current='page'] {
+  color: var(--cx-magma-text);
+  font-weight: 500;
+}
+
+// ---------------------------------------------------------------------------
+// Components
+// ---------------------------------------------------------------------------
+
+// Code blocks
+.td-code,
+.td-content pre {
+  border: 1px solid var(--cx-line);
+  border-radius: var(--cx-radius);
+  background: var(--cx-code-bg);
+}
+
+.td-code pre,
+.td-code .chroma,
+.td-content .highlight pre {
+  border: 0;
+  background: transparent;
+  font-family: var(--cx-font-mono);
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+.td-code__title,
+.td-tab-block__title {
+  font-family: var(--cx-font-mono);
+  font-size: 0.8125rem;
+}
+
+// Badges: pill with a translucent ground.
+.td-badge {
+  --cx-badge: var(--cx-muted);
+  padding: 2px 10px;
+  border: 1px solid color-mix(in srgb, var(--cx-badge) 30%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cx-badge) 14%, transparent);
+  color: var(--cx-badge);
+  font-family: var(--cx-font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+
+  &[class*='success'] {
+    --cx-badge: var(--cx-ok);
+  }
+
+  &[class*='warning'] {
+    --cx-badge: var(--cx-warn);
+  }
+
+  &[class*='danger'] {
+    --cx-badge: var(--cx-err);
+  }
+
+  &[class*='info'] {
+    --cx-badge: var(--cx-info);
+  }
+}
+
+// Callouts use the semantic colors.
+.td-callout {
+  --cx-callout: var(--cx-info);
+  border: 1px solid color-mix(in srgb, var(--cx-callout) 30%, transparent);
+  border-left-width: 3px;
+  border-left-color: var(--cx-callout);
+  border-radius: var(--cx-radius);
+  background: color-mix(in srgb, var(--cx-callout) 8%, transparent);
+
+  &[class*='tip'],
+  &[class*='success'] {
+    --cx-callout: var(--cx-ok);
+  }
+
+  &[class*='important'] {
+    --cx-callout: var(--cx-magma);
+  }
+
+  &[class*='warning'] {
+    --cx-callout: var(--cx-warn);
+  }
+
+  &[class*='caution'],
+  &[class*='danger'] {
+    --cx-callout: var(--cx-err);
+  }
+
+  .td-callout__title,
+  .td-callout__icon {
+    color: var(--cx-callout);
+  }
+}
+
+// Cards
+.td-content-card,
+.td-landing-card,
+.td-section-card {
+  border: 1px solid var(--cx-line);
+  border-radius: var(--cx-radius-lg);
+  background: var(--cx-surface);
+  box-shadow: var(--cx-card-shadow);
+  transition: border-color var(--cx-transition), transform var(--cx-transition);
+
+  &:hover {
+    border-color: rgba(var(--cx-magma-rgb), 0.4);
+  }
+}
+
+// Tables
+.td-content table {
+  border: 1px solid var(--cx-line);
+  border-radius: var(--cx-radius);
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+
+  th {
+    background: var(--cx-surface-2);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  th,
+  td {
+    border-color: var(--cx-line);
+  }
+}
+
+// Tabs
+[role='tab'] {
+  transition: color var(--cx-transition);
+
+  &[aria-selected='true'] {
+    color: var(--cx-magma-text);
+    box-shadow: inset 0 -2px 0 var(--cx-magma);
+  }
+}
+
+// Focus rings and form fields
+:focus-visible {
+  outline: 2px solid rgba(var(--cx-magma-rgb), 0.55);
+  outline-offset: 2px;
+}
+
+.td-shell-sidebar__search input,
+.td-search input {
+  border-radius: var(--cx-radius);
+
+  &:focus {
+    border-color: var(--cx-magma);
+    box-shadow: 0 0 0 3px rgba(var(--cx-magma-rgb), 0.2);
+  }
+}
+
+// Landing page
+.td-landing-button {
+  border-radius: var(--cx-radius);
+  transition: background var(--cx-transition), border-color var(--cx-transition),
+    color var(--cx-transition);
+}
+
+
+.td-landing-button--ghost:hover {
+  border-color: rgba(var(--cx-magma-rgb), 0.5);
+  color: var(--cx-magma-text);
+}
+
+// Sidebar and top bar section icons take the accent, like the landing cards.
+.td-shell-tree__link > i,
+.td-navbar-entry i,
+.td-nav-menu__item-link i {
+  color: var(--bs-link-color);
+}
+
+// Table columns: never break inside a word, keep headers and code on one
+// line, and give every column enough room that short cells don't wrap.
+.td-content table {
+  th,
+  td {
+    min-width: 7.5em;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  th {
+    white-space: nowrap;
+  }
+
+  th:first-child,
+  td:first-child {
+    min-width: 11em;
+  }
+
+  code {
+    white-space: nowrap;
+  }
+}
+
+// On narrow screens the minimum widths would force every table to scroll
+// sideways, so let the columns shrink there.
+@media (max-width: 575.98px) {
+  .td-content table {
+    th,
+    td,
+    th:first-child,
+    td:first-child {
+      min-width: 0;
+    }
+  }
+}
