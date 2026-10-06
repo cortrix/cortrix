@@ -74,8 +74,7 @@ NVIDIA_VISIBLE_DEVICES=all
 NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ```
 
-> [!WARNING]
-> In `v1.0.0-rc.2`, `deploy/docker-compose.yml` sets `CORTRIX_PROFILE` to `quickstart` and both execution providers to `cpu`, and it doesn't load `deploy/.env`. The CUDA override file changes only the image, platform, build, and device reservation. As written, the values above don't reach the container, and the stack starts on the CPU. Check the provider with the verification steps below, and expect to edit the Compose environment yourself until this is fixed in the repository.
+The CUDA override file passes these values into the container. When the profile is `full`, the Quick Start demo data isn't loaded.
 
 To use only one GPU, set `NVIDIA_VISIBLE_DEVICES` to its index or UUID. Cortrix needs only the `compute` and `utility` capabilities.
 
