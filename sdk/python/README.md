@@ -7,7 +7,7 @@ handling.
 
 > Status: `Preview`. The SDK surface is documented and test-covered. Verify it
 > against your live API before production use. See
-> [Agent access](../../docs/agent-access.md) and
+> [Agent access](https://cortrix.ai/docs/integrations/overview/) and
 > [Compatibility](../../docs/compatibility.md).
 
 ## Installation

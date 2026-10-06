@@ -16,7 +16,7 @@ services:
       # stays enabled): anything reachable on that segment gets full API access.
       # Isolated test LANs only — never a shared corporate network or the
       # internet. Authenticated LAN publishing is tracked separately (see
-      # docs/QUICKSTART.md § "Publishing on an isolated test network").
+      # https://cortrix.ai/docs/deploy/docker-compose/#publish).
       - "${CORTRIX_PUBLISH_HOST:-127.0.0.1}:${CORTRIX_HTTP_PORT:-8420}:8420"
     volumes:
       - cortrix-data:/data

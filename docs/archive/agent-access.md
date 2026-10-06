@@ -2,16 +2,16 @@
 
 Cortrix is designed to be used by humans, services, and Agents. This page explains the public access paths and their current support boundaries.
 
-Read [Compatibility and known status](compatibility.md) before using any integration in production.
+Read [Compatibility and known status](../compatibility.md) before using any integration in production.
 
 ## Access Paths
 
 | Path | Use when | Entry point | Current status |
 |---|---|---|---|
-| HTTP API / OpenAPI | You are building your own client, service, or Agent integration. | [OpenAPI spec](../api/openapi.yaml) | `Preview` |
-| MCP server | You want an IDE Agent or MCP-compatible client to call Cortrix tools. | [MCP README](../cortrix-mcp/README.md) | `Preview` |
-| Python SDK | You are building a Python app, RAG pipeline, or test harness. | [Python SDK README](../sdk/python/README.md) | `Preview` |
-| Built-in Agent | You want local fixed-flow chat over Cortrix storage. | [Built-in Agent README](../cortrix-agent/README.md) | `Preview` |
+| HTTP API / OpenAPI | You are building your own client, service, or Agent integration. | [OpenAPI spec](../../api/openapi.yaml) | `Preview` |
+| MCP server | You want an IDE Agent or MCP-compatible client to call Cortrix tools. | [MCP README](../../cortrix-mcp/README.md) | `Preview` |
+| Python SDK | You are building a Python app, RAG pipeline, or test harness. | [Python SDK README](../../sdk/python/README.md) | `Preview` |
+| Built-in Agent | You want local fixed-flow chat over Cortrix storage. | [Built-in Agent README](../../cortrix-agent/README.md) | `Preview` |
 
 ## HTTP API / OpenAPI
 
@@ -19,9 +19,9 @@ Use the HTTP API when you want full control over requests, retries, auth, loggin
 
 Start with:
 
-- [OpenAPI spec](../api/openapi.yaml)
+- [OpenAPI spec](../../api/openapi.yaml)
 - [Quickstart](QUICKSTART.md)
-- [Compatibility](compatibility.md)
+- [Compatibility](../compatibility.md)
 
 Example health check:
 
@@ -46,13 +46,13 @@ Auth schemes are defined in the OpenAPI spec:
 - `X-API-Key`
 - Bearer token
 
-Auth login and several tenant/RBAC surfaces are currently not safe to label as verified. See [Compatibility](compatibility.md).
+Auth login and several tenant/RBAC surfaces are currently not safe to label as verified. See [Compatibility](../compatibility.md).
 
 ## MCP Server
 
 Use MCP when your Agent client supports Model Context Protocol over stdio.
 
-Setup starts in [cortrix-mcp/README.md](../cortrix-mcp/README.md).
+Setup starts in [cortrix-mcp/README.md](../../cortrix-mcp/README.md).
 
 The local stdio server supports modern MCP `2026-07-28` through
 `server/discover` and the legacy `2025-11-25` initialize path. Cortrix does not
@@ -67,13 +67,13 @@ export CORTRIX_API_KEY=your-cortrix-api-key
 cortrix-mcp
 ```
 
-The MCP package documents tool groups for health, query, upload, namespace management, memory, task status, watchers, and admin database import. Some tools map to capabilities that are still in development; see [Compatibility](compatibility.md).
+The MCP package documents tool groups for health, query, upload, namespace management, memory, task status, watchers, and admin database import. Some tools map to capabilities that are still in development; see [Compatibility](../compatibility.md).
 
 ## Python SDK
 
 Use the Python SDK when you want typed Python access to Cortrix resources.
 
-Setup starts in [sdk/python/README.md](../sdk/python/README.md).
+Setup starts in [sdk/python/README.md](../../sdk/python/README.md).
 
 Minimal example:
 
@@ -92,7 +92,7 @@ The SDK exposes resources for documents, namespaces, search, memory, watchers, a
 
 Use the built-in Agent when you want local fixed-flow chat against Cortrix storage without wiring a separate Agent framework.
 
-Setup starts in [cortrix-agent/README.md](../cortrix-agent/README.md).
+Setup starts in [cortrix-agent/README.md](../../cortrix-agent/README.md).
 
 Minimal health check:
 
@@ -111,4 +111,4 @@ Use this rule of thumb:
 - Choose Python SDK for Python-first application code.
 - Choose the built-in Agent for local chat/RAG flows where a fixed flow is acceptable.
 
-For any production claim, check [Compatibility](compatibility.md) and verify your target runtime.
+For any production claim, check [Compatibility](../compatibility.md) and verify your target runtime.

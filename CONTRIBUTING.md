@@ -63,7 +63,7 @@ the versioned public index that explains all of them.
 
 ## Development Setup
 
-For the shortest first-value path, use the [Docker Quick Start](docs/QUICKSTART.md). The manual source build below is intended for contributors working on Cortrix itself.
+For the shortest first-value path, use the [Docker Quick Start](https://cortrix.ai/docs/get-started/quickstart/). The manual source build below is intended for contributors working on Cortrix itself.
 
 ### Prerequisites
 
