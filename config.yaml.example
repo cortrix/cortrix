@@ -36,7 +36,6 @@ auth:
   # api_keys:
   #   - key_hash: "<echo -n 'your-key' | shasum -a 256 | cut -d' ' -f1>"
   #     tenant_id: "default"
-  #     allowed_namespaces: []   # empty = allow all namespaces
   #     permissions: 7           # READ=1, WRITE=2, ADMIN=4; 7=all
   #     expires_at: 0            # 0 = never expires
 
@@ -44,7 +43,7 @@ auth:
 # log — logging
 # -----------------------------------------------------------------------------
 log:
-  level: "info"          # debug / info / warning / error
+  level: "info"          # trace / debug / info / warn / error / critical / off
   format: "text"         # text (development) / json (production / log collection)
   output: "stdout"       # stdout / stderr / /path/to/file.log
 

@@ -6,7 +6,7 @@ configuration is independent: the Quick Start keeps every LLM role disabled.
 
 | Model | Role | Downloaded assets | Pinned source | Upstream source and license recorded in the manifest |
 |---|---|---:|---|---|
-| BGE-M3 | embedding | 585,562,394 bytes | [`onnx-community/bge-m3-ONNX@25b9af8…`](https://huggingface.co/onnx-community/bge-m3-ONNX/tree/25b9af8e87a38eb120cfe87125383677b9cd309e) | [`BAAI/bge-m3@5617a9f…`](https://huggingface.co/BAAI/bge-m3/tree/5617a9f61b028005a4858fdac845db406aefb181), MIT |
+| BGE-M3 | embedding | 585,562,194 bytes | [`onnx-community/bge-m3-ONNX@25b9af8…`](https://huggingface.co/onnx-community/bge-m3-ONNX/tree/25b9af8e87a38eb120cfe87125383677b9cd309e) | [`BAAI/bge-m3@5617a9f…`](https://huggingface.co/BAAI/bge-m3/tree/5617a9f61b028005a4858fdac845db406aefb181), MIT |
 | bge-reranker-v2-m3 | reranking | 587,809,994 bytes | [`onnx-community/bge-reranker-v2-m3-ONNX@6f5ff65…`](https://huggingface.co/onnx-community/bge-reranker-v2-m3-ONNX/tree/6f5ff65298512715a1e669753bc754d2bc8f367b) | [`BAAI/bge-reranker-v2-m3@953dc6f…`](https://huggingface.co/BAAI/bge-reranker-v2-m3/tree/953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e), Apache-2.0 |
 
 The canonical machine-readable identity is
