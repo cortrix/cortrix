@@ -12,5 +12,8 @@ The current documentation is at <https://cortrix.ai/docs/>.
 | [agent-access.md](agent-access.md) | [Choose an access path](https://cortrix.ai/docs/integrations/overview/) |
 | [adoption/stack-fit.md](adoption/stack-fit.md) | [Stack fit](https://cortrix.ai/docs/resources/stack-fit/) |
 
+Each archived file also has a short pointer at its old path, so existing links
+still resolve.
+
 `docs/compatibility.md` is not archived. It remains the source for the status
 of each capability, and the documentation site follows it.
