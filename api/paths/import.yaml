@@ -11,8 +11,8 @@ paths:
       summary: Start database import (async)
       description: |
         Start an asynchronous database import into a namespace (F16a, Admin+). Rows are fetched via a
-        registered connection_ref, textualized (per_row | merge), and fed to the SPC pipeline. Returns a
-        task_id whose status is deterministically "queued"; poll progress via
+        registered connection_ref, textualized (per_row | merge), and fed to the Semantic Processing Chain
+        (SPC). Returns a task_id whose status is deterministically "queued"; poll progress via
         GET /import/tasks/{task_id}/progress. Exactly one of {table, sql} must be provided.
       x-cortrix-agent-workflow: admin
       x-cortrix-retryable: false

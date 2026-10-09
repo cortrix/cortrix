@@ -77,7 +77,7 @@ See [Performance tuning](/docs/deploy/performance-tuning/#candidate-pool).
 
 ## spc {#spc}
 
-The document processing pipeline. It supports PDF, DOCX, TXT, MD, CSV, JSON, and images (through OCR).
+The Semantic Processing Chain (SPC), the document processing pipeline. It supports PDF, DOCX, TXT, MD, CSV, JSON, and images (through OCR).
 
 | Key | Default | Description |
 |---|---|---|
