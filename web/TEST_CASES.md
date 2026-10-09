@@ -98,7 +98,7 @@ The upload feature is the primary data ingestion path. All tests must pass.
 
 **Expected Results**:
 - Page title "Upload Documents" visible as `<h1>`
-- Subtitle "Upload files to process through the Semantic Processing Pipeline" visible
+- Subtitle "Upload files to process through the Semantic Processing Chain (SPC)" visible
 - Upload drop zone rendered
 
 **Test Result**: PASS

@@ -21,7 +21,7 @@
   },
   "upload": {
     "title": "Upload Documents",
-    "subtitle": "Upload files to process through the Semantic Processing Pipeline",
+    "subtitle": "Upload files to process through the Semantic Processing Chain (SPC)",
     "dropActive": "Drop files here...",
     "dropDefault": "Drag & drop files here",
     "browseHint": "or click to browse",
