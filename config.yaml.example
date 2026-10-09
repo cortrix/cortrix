@@ -120,7 +120,7 @@ retrieval:
   max_candidates: 50          # hard ceiling on the candidate pool (>=1)
 
 # -----------------------------------------------------------------------------
-# spc — document processing pipeline
+# spc — Semantic Processing Chain (SPC), the document processing pipeline
 # Supports: PDF, DOCX, TXT, MD, CSV, JSON, images (OCR)
 # -----------------------------------------------------------------------------
 spc:
