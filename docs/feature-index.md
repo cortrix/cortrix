@@ -31,6 +31,7 @@ so nothing unreleased is presented as part of the shipped surface.
 | `D1`, `D2`, … (decision context) | Numbered decisions inside one feature’s detailed-design discussion — e.g. `MEM02 D8` (the preference-immunity threshold), the chunker’s `D9 lock` (per-parent granularity), the import layer’s `D7` tenant guard. Numbering restarts for every feature, so a decision number resolves against the nearest feature context in the surrounding code. Values above `D6` (`D7`–`D12` in this release) are always decision numbers, never phases; for `D6` and below, phase references name process activities (scope, wiring, testing) while decision references sit next to a concrete design choice. |
 | `Wave A`–`Wave E` | Design and implementation batches within a phase. |
 | `GEN-*` | Cross-cutting principles applied to every feature (see below). |
+| `SPC` | Semantic Processing Chain: the ingestion pipeline that parses, chunks, enriches, embeds, and indexes a document. It names the `spc` configuration section, the `src/spc` module, and the `spc_pipeline` readiness entry. |
 | `§` (e.g. `ARCH § 4.1`) | A section reference into an internal design document. The code statement it accompanies stands on its own; the reference records where the decision was made. |
 | `CX_ERR_F##_*` | Wire error codes carry the number of the feature that owns them. |
 

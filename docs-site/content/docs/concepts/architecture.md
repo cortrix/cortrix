@@ -52,7 +52,7 @@ Two things follow directly from this shape:
 
 Once a document enters Cortrix, it's parsed, chunked, embedded, and indexed in the background. This is an asynchronous queue with persisted tasks: the upload request returns quickly, and you check progress through the task API.
 
-The repository calls this pipeline SPC. The readiness check reports its queue depth and worker count under `spc_pipeline`.
+The repository calls this pipeline SPC, short for [Semantic Processing Chain](/docs/reference/glossary/#product). The readiness check reports its queue depth and worker count under `spc_pipeline`.
 
 ### Query pipeline {#query}
 
