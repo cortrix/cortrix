@@ -40,6 +40,21 @@ struct DeduplicatedChunkInfo {
     std::vector<DedupSourceNs> namespaces;   ///< brief multi-source array (NS + score), >= 2 entries
 };
 
+/// One meta.document_coverage[] entry: how much of ONE document this response
+/// actually carried. Positioned as a server-side judgement + audit field, NOT as a
+/// decision input the caller is expected to act on.
+///
+/// Counted in CHILD BLOCKS, not bytes, and that is deliberate: the per-document byte
+/// size is not populated on the ingest path (documents.file_size is 0 on a document
+/// that imported successfully), and a child block's absolute byte span can only be
+/// derived from its parent row, which this response does not fetch unless parent
+/// expansion was requested. A block count is available without any extra read.
+struct DocumentCoverageInfo {
+    std::string source_path;         ///< friendly document name (already surfaced on results)
+    int returned_child_blocks = 0;   ///< distinct child blocks of this doc present in results
+    int64_t total_child_blocks = 0;  ///< the document's total child-block count (0 = unknown)
+};
+
 /// F04 cross-NS response meta — exactly the **8 A/C-class fields** (F04 §2.5 / topic 3.5
 /// v1.0.2; rerank_enabled + dedup_applied B2 fields were deleted). All present on
 /// every response (GEN-Agent #2 A-class "always included"); warnings is C-class (only populated
@@ -53,9 +68,21 @@ struct CrossNsMeta {
     std::vector<DeduplicatedChunkInfo> deduplicated_chunks;  ///< A — multi-source merge detail
     int deduplicated_chunks_count = 0;                 ///< A — # chunks collapsed
     std::vector<nlohmann::json> warnings;              ///< C — only under trigger (e.g. rerank_disabled)
+    /// A — how much of each returned document this response carried. One entry per
+    /// DISTINCT document in `results`. Deliberately NOT named coverage_ratio: that
+    /// name is taken, at this very level, by the namespace partial-success ratio
+    /// above, and two meanings under one name would mislead exactly the caller this
+    /// field is meant to inform.
+    std::vector<DocumentCoverageInfo> document_coverage;
 
     nlohmann::json ToJson() const;
 };
+
+/// Serialize explain.document_coverage[]. Lives next to the response types because
+/// the route (not the response body) is what attaches it: it is a B-class diagnostic
+/// under AGENT_FRIENDLY principle 2, so it belongs under `explain`, while `meta` stays
+/// the fixed set of 8 A/C-class fields.
+nlohmann::json DocumentCoverageArrayToJson(const std::vector<DocumentCoverageInfo>& coverage);
 
 /// F04 cross-NS query response (F04 §2.5). `error` is set ONLY for the overall
 /// scatter-timeout partial case (CX_ERR_SCATTER_TIMEOUT, still HTTP 200 with

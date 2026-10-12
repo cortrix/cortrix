@@ -36,6 +36,12 @@ struct NamespaceQueryResult {
     /// (cross_ns_error.h RequiredStructuredDataKeys). e.g. kIndexCorrupt needs
     /// {index_state}; "namespace" is injected at serialization. Empty on success.
     nlohmann::json structured_data = nlohmann::json::object();
+    /// doc_id → the document's TOTAL child-block count, for the documents this NS
+    /// actually returned. Carried up because document coverage can only be computed
+    /// after the cross-NS gather truncates to the caller's top_k, and the gather has
+    /// no store handle; the per-NS executor is the only layer that can read the
+    /// denominator. Empty when the NS returned nothing or the store cannot count.
+    std::map<std::string, int64_t> doc_child_block_totals;
 };
 
 /// F04 client-facing top-level item — fuses RankedChunk + content_hash + dedupe
@@ -53,6 +59,11 @@ struct ResultItem {
     ScoreSignals score_signals;        ///< optional F03/F07 signals used for score
     std::string content_hash;          ///< "sha256:<32-hex>" (§6 unified representation)
     std::map<std::string, std::string> metadata;  ///< primary NS full metadata
+    /// What `content` holds, passed through from RankedChunk (SPEC §1 v1.3):
+    /// "chunk" | "document_summary" | "document_label" | "parent" (reserved, not
+    /// produced in V1.0). Lets a caller tell a real passage from a generated
+    /// summary, and both from a bare label that carries no body evidence at all.
+    std::string evidence_kind;
 };
 
 /// RankedChunk → ResultItem (RETRIEVAL_TYPES_SPEC §1-bis ToResultItem). `ns_id` is

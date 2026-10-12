@@ -20,6 +20,10 @@ nlohmann::json ResultItemToJson(const retrieval::ResultItem& it) {
     j["namespace"] = it.namespace_id;
     j["content_hash"] = it.content_hash;
     j["metadata"] = it.metadata;  // std::map<string,string> → JSON object
+    // SPEC §1 v1.3. Always present: a caller that cannot tell a passage from a
+    // document label is the problem this field exists to fix, so it must not be
+    // conditional on anything the caller has to remember to ask for.
+    j["evidence_kind"] = it.evidence_kind;
     if (it.score_signals.HasAny()) {
         nlohmann::json signals = nlohmann::json::object();
         if (it.score_signals.enriched_score.has_value()) {
@@ -122,6 +126,23 @@ void EnforceParentExpansionBudget(CrossNsResponse& resp, int expand_top_k, int m
     }
 }
 
+// explain.document_coverage[] — a B-class diagnostic, so the route attaches it under
+// `explain` rather than meta.
+nlohmann::json DocumentCoverageArrayToJson(const std::vector<DocumentCoverageInfo>& coverage) {
+    nlohmann::json arr = nlohmann::json::array();
+    for (const auto& d : coverage) {
+        nlohmann::json j;
+        j["source_path"] = d.source_path;
+        j["returned_child_blocks"] = d.returned_child_blocks;
+        // A successful count of 0 is a real answer (an empty document), so it must
+        // serialize as 0. null means one thing only: the count was unavailable.
+        j["total_child_blocks"] =
+            d.total_known ? nlohmann::json(d.total_child_blocks) : nlohmann::json(nullptr);
+        arr.push_back(std::move(j));
+    }
+    return arr;
+}
+
 nlohmann::json CrossNsMeta::ToJson() const {
     nlohmann::json j;
     j["namespaces_queried"] = namespaces_queried;
@@ -140,6 +161,10 @@ nlohmann::json CrossNsMeta::ToJson() const {
 
     j["deduplicated_chunks_count"] = deduplicated_chunks_count;
     j["warnings"] = warnings;
+    // document_coverage is deliberately NOT here. It is a B-class diagnostic
+    // (AGENT_FRIENDLY principle 2), and meta is the fixed set of 8 A/C-class fields
+    // (F04 §2.5); the route emits it under `explain` instead. Keeping it out leaves
+    // the 8-field meta contract — and the guard test that pins it — untouched.
     return j;
 }
 

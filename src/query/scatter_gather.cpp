@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <chrono>
 #include <future>
+#include <map>
+#include <string>
 #include <unordered_map>
 #include <utility>
 
@@ -171,9 +173,15 @@ CrossNsResponse ScatterGather::GatherAndRerank(std::vector<NamespaceQueryResult>
 
     // Collect successful chunks → ResultItems; failures → meta.namespaces_failed[].
     std::vector<ResultItem> items;
+    // doc_id → the document's total child-block count, unioned across namespaces.
+    // The per-NS executors are the only layer with a store handle, so they carry the
+    // denominator up; the numerator is counted here, over the FINAL (deduped,
+    // truncated) result set, because that is the only set the caller actually sees.
+    std::map<std::string, int64_t> doc_totals;
     for (auto& r : results) {
         if (r.error_code.empty()) {
             meta.namespaces_succeeded.push_back(r.namespace_id);
+            for (auto& kv : r.doc_child_block_totals) doc_totals.emplace(kv.first, kv.second);
             for (auto& rc : r.chunks) {
                 // content_hash (F09-4 hook, R3 closed): the authoritative source is
                 // the per-Unit blocks.content_hash column (idx_block_hash) — written
@@ -225,6 +233,10 @@ CrossNsResponse ScatterGather::GatherAndRerank(std::vector<NamespaceQueryResult>
     // compliant response. The route applies it again after the stages that re-order and
     // trim `results`; it is idempotent.
     EnforceParentExpansionBudget(resp, parent_expand_top_k, parent_max_bytes);
+
+    // Coverage over the gathered set, for the same reason. Recomputed from scratch by
+    // the same function the route calls after CRAG, so the two cannot drift.
+    FinalizeDocumentCoverage(resp);
 
     // RRF fallback status notice (topic 3.2): when rerank is off, surface the C-class
     // warning so an Agent knows ordering came from RRF, not the cross-encoder.

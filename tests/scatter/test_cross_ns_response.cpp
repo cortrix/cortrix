@@ -229,6 +229,64 @@ TEST(CrossNsResponseTest, ToResultItemMapsRankedChunk) {
     EXPECT_EQ(it.parent_id, "p1");
 }
 
+// evidence_kind rides through the conversion verbatim: the executor decides it at the
+// point where chunk_text is assigned, which is the only place that knows what went in.
+TEST(CrossNsResponseTest, ToResultItemPassesEvidenceKindThrough) {
+    for (const char* kind : {"chunk", "document_summary", "document_label"}) {
+        retrieval::RankedChunk rc;
+        rc.child_id = "c1";
+        rc.chunk_text = "whatever";
+        rc.evidence_kind = kind;
+        auto it = retrieval::ToResultItem(rc, "ns_x", "sha256:beef");
+        EXPECT_EQ(it.evidence_kind, kind);
+    }
+}
+
+// evidence_kind is A-class: always serialized, never conditional on the caller
+// remembering to ask. A caller that cannot tell a passage from a document label is
+// exactly the problem this field exists to fix.
+TEST(CrossNsResponseTest, EvidenceKindIsAlwaysSerialized) {
+    CrossNsResponse resp;
+    retrieval::ResultItem item;
+    item.child_id = "01HXYZ";
+    item.content = "a generated summary";
+    item.evidence_kind = "document_summary";
+    resp.results.push_back(std::move(item));
+
+    auto j = resp.ToJson();
+    ASSERT_EQ(j["results"].size(), 1u);
+    ASSERT_TRUE(j["results"][0].contains("evidence_kind"));
+    EXPECT_EQ(j["results"][0]["evidence_kind"], "document_summary");
+}
+
+// document_coverage must NOT appear in meta: it is a B-class diagnostic, and meta is
+// the fixed set of 8 A/C-class fields. This pins the decision so a later change has
+// to argue with a failing test rather than quietly growing meta.
+TEST(CrossNsResponseTest, DocumentCoverageIsNotInMeta) {
+    CrossNsMeta meta;
+    meta.document_coverage.push_back({"spec.md", 2, 7});
+
+    auto j = meta.ToJson();
+    EXPECT_EQ(j.size(), 8u);
+    EXPECT_FALSE(j.contains("document_coverage"));
+}
+
+// An unknown denominator serializes as null, never as 0 — "0 of 0" would read as
+// full coverage, which is the opposite of what an unknown total means.
+TEST(CrossNsResponseTest, UnknownCoverageTotalSerializesAsNull) {
+    std::vector<DocumentCoverageInfo> coverage;
+    coverage.push_back({"known.md", 2, 7});
+    coverage.push_back({"unknown.md", 1, 0});
+
+    auto j = DocumentCoverageArrayToJson(coverage);
+    ASSERT_EQ(j.size(), 2u);
+    EXPECT_EQ(j[0]["source_path"], "known.md");
+    EXPECT_EQ(j[0]["returned_child_blocks"], 2);
+    EXPECT_EQ(j[0]["total_child_blocks"], 7);
+    EXPECT_EQ(j[1]["returned_child_blocks"], 1);
+    EXPECT_TRUE(j[1]["total_child_blocks"].is_null());
+}
+
 // A hit with no owning parent (doc-level pseudo-result, or a legacy non-child row)
 // still maps cleanly: parent_id stays empty rather than becoming a dangling id.
 TEST(CrossNsResponseTest, ToResultItemLeavesParentIdEmptyWhenHitHasNoParent) {

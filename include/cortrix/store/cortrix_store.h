@@ -72,6 +72,20 @@ public:
     virtual int block_count_by_doc(const std::string& doc_id, int64_t* count) {
         (void)doc_id; *count = 0; return 0;
     }
+    // Count only the CHILD blocks of a document — the retrievable text units.
+    //
+    // Distinct from block_count_by_doc on purpose: that one is a bare COUNT(*) over
+    // `blocks`, so it also counts the F08 metadata block and, once enrichment runs,
+    // the hype-question and doc-summary blocks. Using it as a coverage denominator
+    // would make the SAME document report different coverage on an LLM-enabled and
+    // an LLM-free deployment, which is the one property a coverage number must not
+    // have. A child block is identified by a non-empty child_id.
+    // Default impl returns 0 so the lightweight test fakes need not override.
+    virtual int child_block_count_by_doc(const std::string& doc_id, int64_t* count) {
+        (void)doc_id;
+        *count = 0;
+        return 0;
+    }
 
     // ---- Parent CRUD (F34 `parents` table; A unified-blocks) ----
     // parents is a per-Unit table KEPT under A (child chunks moved to `blocks`). The

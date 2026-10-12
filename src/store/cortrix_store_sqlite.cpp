@@ -1131,6 +1131,30 @@ int CortrixStoreSqlite::block_count_by_doc(const std::string& doc_id, int64_t* c
     return (rc == SQLITE_ROW) ? 0 : -1;
 }
 
+int CortrixStoreSqlite::child_block_count_by_doc(const std::string& doc_id, int64_t* count) {
+    if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
+    std::lock_guard<std::mutex> lock(mu_);
+
+    // Only child blocks: a non-empty child_id is what makes a row a retrievable text
+    // unit. Deliberately NOT a bare COUNT(*) — that would also count the F08 metadata
+    // block and, once enrichment runs, the hype-question and doc-summary blocks, so the
+    // same document would report different coverage with and without an LLM configured.
+    const char* sql =
+        "SELECT COUNT(*) FROM blocks WHERE doc_id = ? AND child_id IS NOT NULL "
+        "AND child_id <> ''";
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) return -1;
+
+    sqlite3_bind_text(stmt, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW) {
+        *count = sqlite3_column_int64(stmt, 0);
+    }
+    sqlite3_finalize(stmt);
+    return (rc == SQLITE_ROW) ? 0 : -1;
+}
+
 // --- Parent CRUD (F34 `parents` table; A unified-blocks) ---
 
 int CortrixStoreSqlite::parent_insert(CortrixParent& parent) {

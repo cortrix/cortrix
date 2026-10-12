@@ -370,5 +370,181 @@ TEST(ScatterGatherTest, GlobalCapEnforcedAtEffectiveLimit) {
     }
 }
 
+// --- meta.document_coverage[] --------------------------------------------------
+//
+// How much of each returned document the response actually carried. The numerator is
+// counted HERE rather than in the per-NS executor because only the gather knows the
+// final (deduped, truncated) set; the denominator rides up on the per-NS result
+// because only the executor has a store handle.
+
+namespace {
+
+// One chunk-evidence hit belonging to `doc_id`.
+retrieval::RankedChunk ChunkHit(const std::string& child_id, const std::string& doc_id,
+                                const std::string& source_path, float score) {
+    retrieval::RankedChunk c;
+    c.child_id = child_id;
+    c.chunk_text = "body of " + child_id;
+    c.score = score;
+    c.rerank_score = score;
+    c.evidence_kind = "chunk";
+    c.metadata["doc_id"] = doc_id;
+    c.metadata["source_path"] = source_path;
+    return c;
+}
+
+// A doc-route hit: selected the document but carries none of its text.
+retrieval::RankedChunk DocHit(const std::string& doc_id, const std::string& source_path,
+                              float score) {
+    retrieval::RankedChunk c;
+    c.child_id = doc_id;
+    c.chunk_text = "a generated summary";
+    c.score = score;
+    c.rerank_score = score;
+    c.evidence_kind = "document_summary";
+    c.metadata["doc_id"] = doc_id;
+    c.metadata["source_path"] = source_path;
+    return c;
+}
+
+}  // namespace
+
+// Two chunks of one document, out of seven it has → "2 of 7".
+TEST(DocumentCoverageTest, CountsReturnedChunksAgainstTheDocumentTotal) {
+    Harness h({"ns_a"});
+    retrieval::NamespaceQueryResult r;
+    r.namespace_id = "ns_a";
+    r.chunks.push_back(ChunkHit("c1", "doc_1", "spec.md", 0.9f));
+    r.chunks.push_back(ChunkHit("c2", "doc_1", "spec.md", 0.8f));
+    r.doc_child_block_totals["doc_1"] = 7;
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _)).WillOnce(Return(r));
+
+    auto sg = h.Make();
+    auto resp = sg.Execute(Req({"ns_a"}, /*top_k=*/10), Auth());
+
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].source_path, "spec.md");
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 2);
+    EXPECT_EQ(resp.meta.document_coverage[0].total_child_blocks, 7);
+}
+
+// A doc-route hit is NOT a piece of the document's text, so it must read "0 of N".
+// Counting it as 1 would claim evidence that was never returned.
+TEST(DocumentCoverageTest, DocRouteHitContributesZeroReturnedBlocks) {
+    Harness h({"ns_a"});
+    retrieval::NamespaceQueryResult r;
+    r.namespace_id = "ns_a";
+    r.chunks.push_back(DocHit("doc_2", "guide.md", 0.7f));
+    r.doc_child_block_totals["doc_2"] = 12;
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _)).WillOnce(Return(r));
+
+    auto sg = h.Make();
+    auto resp = sg.Execute(Req({"ns_a"}, /*top_k=*/10), Auth());
+
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 0);
+    EXPECT_EQ(resp.meta.document_coverage[0].total_child_blocks, 12);
+}
+
+// Mixed evidence for the same document: only the chunk counts toward the numerator.
+TEST(DocumentCoverageTest, MixedEvidenceCountsOnlyTheChunk) {
+    Harness h({"ns_a"});
+    retrieval::NamespaceQueryResult r;
+    r.namespace_id = "ns_a";
+    r.chunks.push_back(ChunkHit("c1", "doc_3", "mixed.md", 0.9f));
+    r.chunks.push_back(DocHit("doc_3", "mixed.md", 0.5f));
+    r.doc_child_block_totals["doc_3"] = 4;
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _)).WillOnce(Return(r));
+
+    auto sg = h.Make();
+    auto resp = sg.Execute(Req({"ns_a"}, /*top_k=*/10), Auth());
+
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 1);
+    EXPECT_EQ(resp.meta.document_coverage[0].total_child_blocks, 4);
+}
+
+// An unknown denominator stays 0 in the struct, which the serializer emits as null.
+// It must never silently become a real number.
+TEST(DocumentCoverageTest, UnknownTotalStaysZeroRatherThanGuessed) {
+    Harness h({"ns_a"});
+    retrieval::NamespaceQueryResult r;
+    r.namespace_id = "ns_a";
+    r.chunks.push_back(ChunkHit("c1", "doc_4", "nototal.md", 0.9f));
+    // doc_child_block_totals deliberately left empty (store could not count).
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _)).WillOnce(Return(r));
+
+    auto sg = h.Make();
+    auto resp = sg.Execute(Req({"ns_a"}, /*top_k=*/10), Auth());
+
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 1);
+    EXPECT_EQ(resp.meta.document_coverage[0].total_child_blocks, 0);
+}
+
+// The numerator reflects the TRUNCATED set: a chunk cut by top_k is not "returned".
+TEST(DocumentCoverageTest, NumeratorFollowsTheTopKCut) {
+    Harness h({"ns_a"});
+    retrieval::NamespaceQueryResult r;
+    r.namespace_id = "ns_a";
+    r.chunks.push_back(ChunkHit("c1", "doc_5", "cut.md", 0.9f));
+    r.chunks.push_back(ChunkHit("c2", "doc_5", "cut.md", 0.8f));
+    r.chunks.push_back(ChunkHit("c3", "doc_5", "cut.md", 0.7f));
+    r.doc_child_block_totals["doc_5"] = 9;
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _)).WillOnce(Return(r));
+
+    auto sg = h.Make();
+    auto resp = sg.Execute(Req({"ns_a"}, /*top_k=*/2), Auth());
+
+    ASSERT_EQ(resp.results.size(), 2u);
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 2);
+}
+
+// Several documents: one entry each, in first-appearance order, so the response is
+// deterministic for a caller diffing two runs.
+TEST(DocumentCoverageTest, OneEntryPerDocumentInFirstAppearanceOrder) {
+    Harness h({"ns_a"});
+    retrieval::NamespaceQueryResult r;
+    r.namespace_id = "ns_a";
+    r.chunks.push_back(ChunkHit("c1", "doc_hi", "high.md", 0.9f));
+    r.chunks.push_back(ChunkHit("c2", "doc_lo", "low.md", 0.5f));
+    r.chunks.push_back(ChunkHit("c3", "doc_hi", "high.md", 0.4f));
+    r.doc_child_block_totals["doc_hi"] = 3;
+    r.doc_child_block_totals["doc_lo"] = 6;
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _)).WillOnce(Return(r));
+
+    auto sg = h.Make();
+    auto resp = sg.Execute(Req({"ns_a"}, /*top_k=*/10), Auth());
+
+    ASSERT_EQ(resp.meta.document_coverage.size(), 2u);
+    EXPECT_EQ(resp.meta.document_coverage[0].source_path, "high.md");
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 2);
+    EXPECT_EQ(resp.meta.document_coverage[1].source_path, "low.md");
+    EXPECT_EQ(resp.meta.document_coverage[1].returned_child_blocks, 1);
+}
+
+// A hit with no doc_id cannot be attributed, so it produces no entry rather than an
+// entry keyed on an empty string.
+TEST(DocumentCoverageTest, HitWithoutDocIdProducesNoEntry) {
+    Harness h({"ns_a"});
+    retrieval::NamespaceQueryResult r;
+    r.namespace_id = "ns_a";
+    retrieval::RankedChunk orphan;
+    orphan.child_id = "orphan";
+    orphan.chunk_text = "no document";
+    orphan.score = 0.9f;
+    orphan.rerank_score = 0.9f;
+    orphan.evidence_kind = "chunk";
+    r.chunks.push_back(std::move(orphan));
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _)).WillOnce(Return(r));
+
+    auto sg = h.Make();
+    auto resp = sg.Execute(Req({"ns_a"}, /*top_k=*/10), Auth());
+
+    ASSERT_EQ(resp.results.size(), 1u);
+    EXPECT_TRUE(resp.meta.document_coverage.empty());
+}
+
 }  // namespace
 }  // namespace cortrix::query

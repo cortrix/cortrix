@@ -79,6 +79,7 @@ public:
     int block_delete_by_doc(const std::string& doc_id) override;
     int block_count(int64_t* count) override;
     int block_count_by_doc(const std::string& doc_id, int64_t* count) override;
+    int child_block_count_by_doc(const std::string& doc_id, int64_t* count) override;
 
     int parent_insert(CortrixParent& parent) override;
     int parent_get(const std::string& parent_id, CortrixParent& out) override;
