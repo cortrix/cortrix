@@ -49,6 +49,47 @@ If anything doesn't match, or a download fails, the container doesn't report rea
 
 Later starts reuse the models already in the volume.
 
+## Start without access to Hugging Face {#offline}
+
+The first start downloads the model files from Hugging Face. On a machine that can't reach it, copy the files in before the first start. The downloader verifies every file it finds in `/data/models` against the manifest and downloads only what is missing or doesn't match, so a complete, valid copy means nothing is downloaded.
+
+1. On a machine where the quickstart has already started once, copy the model directory out of the container:
+
+   ```bash
+   docker cp "$(docker compose -f deploy/docker-compose.yml ps -q cortrix)":/data/models ./models
+   ```
+
+   The `models` directory holds `bge-m3/`, `bge-reranker-v2-m3/`, and `MANIFEST.tsv`, about 1.17 GB in total.
+
+2. Move the `models` directory to the machine that has no access.
+
+3. On that machine, create the container without starting it, copy the directory in, and then start:
+
+   ```bash
+   docker compose -f deploy/docker-compose.yml create
+   docker cp ./models/. "$(docker compose -f deploy/docker-compose.yml ps -aq cortrix)":/data/models/
+   docker compose -f deploy/docker-compose.yml up --wait
+   ```
+
+The log shows that the cached files were verified and nothing was downloaded:
+
+```text
+[provision] verifying pinned embedding and reranker assets
+[models] verified cached embedding_model
+[models] verified cached embedding_tokenizer
+[models] verified cached reranker_model
+[models] verified cached reranker_tokenizer
+[models] model directory is read-only; manifest snapshot not written
+[models] all pinned embedding and reranker assets verified
+```
+
+The `read-only` line is expected here. The copied files belong to a different user than the one the service runs as, so the downloader skips rewriting `MANIFEST.tsv`. The models still load.
+
+A copied file that fails the size or SHA-256 check isn't used. Without network access the container can't replace it, so it exits without starting the service. Copy the directory again from a machine where the quickstart reports ready.
+
+> [!NOTE]
+> Building the image still needs network access, for the base images and the build dependencies. This section covers only the model download at first start.
+
 ## Remove the cached models {#remove}
 
 ```bash

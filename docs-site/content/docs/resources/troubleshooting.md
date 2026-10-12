@@ -22,6 +22,63 @@ docker compose -f deploy/docker-compose.yml logs -f cortrix
 
 The container's health check allows a 30-minute start period. If a model download hits a missing file or a size or checksum mismatch, the service doesn't report ready, and the log says why.
 
+### The model download fails because the machine can't reach Hugging Face {#no-hugging-face}
+
+Copy the model files in before the first start. See [Start without access to Hugging Face](/docs/deploy/models/#offline).
+
+### The service never becomes ready and the log says `demo upload returned HTTP 507` {#disk-full}
+
+Cortrix stops accepting writes when the disk that holds its data is at least 90% full. The quickstart then can't import its demo document, so the service never reports ready. The log has one line about it:
+
+```text
+ERROR: QuickStart bootstrap: demo upload returned HTTP 507
+```
+
+The readiness response shows the disk at the `crit` stage:
+
+```bash
+curl -sS http://127.0.0.1:8420/api/v1/system/health/ready
+```
+
+```json
+"disk": { "stage": "crit", "status": "not_ready" }
+```
+
+A file upload in this state returns 507 with the measured usage:
+
+```json
+{
+  "error": {
+    "category": "permanent",
+    "code": "CX_ERR_DISK_FULL",
+    "message": "Disk usage critical (>= crit threshold). Operations rejected.",
+    "retry_after_ms": null,
+    "retryable": false,
+    "structured_data": {
+      "crit_threshold": 0.9,
+      "data_path": "/data",
+      "disk_usage_ratio": 0.9723306231355636,
+      "free_bytes": 1745616896,
+      "warn_threshold": 0.8
+    }
+  }
+}
+```
+
+The disk in question is the one behind the `cortrix-data` volume. With Docker Desktop, Colima, or a similar tool, that is the virtual machine's disk, not your computer's, and it fills up with images, build cache, and other volumes. Check it from inside the container:
+
+```bash
+docker compose -f deploy/docker-compose.yml exec cortrix df -h /data
+```
+
+Free space on that disk, or give the virtual machine a larger one. `docker system df` shows what is using it. Then restart the container so the quickstart imports its demo document again:
+
+```bash
+docker compose -f deploy/docker-compose.yml restart cortrix
+```
+
+At 80% the stage is `warn` and writes still work, which is why the readiness example in the [Quickstart](/docs/get-started/quickstart/#check-readiness) can show `warn` with status `ok`.
+
 ### Port 8420 is in use {#port-in-use}
 
 Start on a different port:

@@ -91,6 +91,7 @@ These are the error codes that came up in testing for this documentation:
 | `CX_ERR_DEPRECATED_FIELD` | 400 | A query request used the singular `namespace` |
 | `CX_ERR_NS_NOT_FOUND` | 404 | A file was uploaded to a namespace that doesn't exist |
 | `CX_ERR_ADMIN_LOOPBACK_REQUIRED` | 403 | An admin endpoint was called from a non-loopback address |
+| `CX_ERR_DISK_FULL` | 507 | A file was uploaded while the data disk was at least 90% full. See [Troubleshooting](/docs/resources/troubleshooting/#disk-full) |
 | `CX_ERR_SPC_PROCESS_FAILED` | — | An asynchronous processing task failed. It appears in the task progress |
 
 For the MCP adapter's own error codes, see [MCP server](/docs/integrations/mcp/#response-schema).
