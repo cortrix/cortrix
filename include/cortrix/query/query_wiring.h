@@ -5,6 +5,7 @@
 #include "httplib.h"
 
 #include "cortrix/auth/api_key_auth.h"
+#include "cortrix/common/status.h"
 #include "cortrix/query/rrf_fusion.h"
 #include "cortrix/resource/namespace_pool.h"
 
@@ -25,6 +26,20 @@ class EngineInstrumentation;
 }  // namespace cortrix
 
 namespace cortrix::query {
+
+/// Validate the bounded parent-expansion request controls (RETRIEVAL_TYPES_SPEC
+/// §2 v1.2). Exposed here (rather than living in the route's translation unit)
+/// because the RULE is the part worth pinning in a unit test; reading the values
+/// off the query string / JSON body is plumbing.
+///
+/// `include_parent` defaults to false, so an absent control leaves the response
+/// byte-identical to before. When it is true, `expand_top_k >= 1` is REQUIRED: the
+/// bound is a measurement outcome, not a design constant, so the API refuses to
+/// invent one rather than silently expanding the whole result set (a full top_k of
+/// ~1024-token parents is roughly 80 KB, past the agent-side single-response
+/// budget, where the host truncates and the answer ends up less complete).
+/// `max_bytes` is optional (0 = no extra byte cap). Negative values are rejected.
+Status ValidateParentExpansion(bool include_parent, int expand_top_k, int max_bytes);
 
 /// CrossNsQueryWiring — the D3.5 assembly that mounts the F04 cross-NS query stack
 /// (LiveNamespacePipeline → SingleUnitExecutor → ScatterGather → CrossNsQueryHandler)

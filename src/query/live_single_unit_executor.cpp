@@ -163,6 +163,59 @@ void ApplyDocEvidenceMetadata(HybridCandidate& cand) {
 
 }  // namespace
 
+int ExpandParentTextBounded(CortrixStore& store, std::vector<RankedChunk>& ranked, int expand_top_k,
+                            int max_bytes) {
+    if (expand_top_k <= 0 || ranked.empty()) return 0;
+
+    const std::size_t window = std::min(ranked.size(), static_cast<std::size_t>(expand_top_k));
+
+    // One parent_get per DISTINCT parent_id; `missing` remembers the ids that are
+    // absent (or whose store does not implement parent_get) so a shared dangling id
+    // is not retried per hit.
+    std::unordered_map<std::string, CortrixParent> by_parent;
+    std::unordered_set<std::string> missing;
+    long long used_bytes = 0;
+    int expanded = 0;
+
+    for (std::size_t i = 0; i < window; ++i) {
+        RankedChunk& rc = ranked[i];
+        if (rc.parent_id.empty()) continue;  // doc-level pseudo-result / legacy row
+        if (missing.count(rc.parent_id) != 0) continue;
+
+        auto it = by_parent.find(rc.parent_id);
+        if (it == by_parent.end()) {
+            CortrixParent parent;
+            if (store.parent_get(rc.parent_id, parent) != 0) {
+                // Absent row or a store without parent support — skip this hit. A
+                // dangling link must degrade the expansion, never fail the query.
+                missing.insert(rc.parent_id);
+                continue;
+            }
+            it = by_parent.emplace(rc.parent_id, std::move(parent)).first;
+        }
+        const CortrixParent& parent = it->second;
+
+        // Budget accounting is PER RESULT, not per distinct parent: two hits sharing
+        // a parent each carry their own copy of the text in the response, so the wire
+        // cost is charged twice even though the lookup happened once.
+        const long long cost = static_cast<long long>(parent.parent_text.size());
+        if (max_bytes > 0 && used_bytes + cost > static_cast<long long>(max_bytes)) {
+            break;  // bound reached — the remaining hits keep chunk_text only
+        }
+        used_bytes += cost;
+
+        rc.parent_text = parent.parent_text;
+        // Where the expanded span sits in the document. Written only for expanded
+        // hits, and deliberately authoritative over a caller metadata key of the same
+        // name — the same doc→block precedence this TU already applies to source_path.
+        rc.metadata["parent_token_count"] = std::to_string(parent.token_count);
+        rc.metadata["parent_byte_start"] = std::to_string(parent.byte_offset_start);
+        rc.metadata["parent_byte_end"] = std::to_string(parent.byte_offset_end);
+        ++expanded;
+    }
+    return expanded;
+}
+
 std::vector<RankedChunk> FuseHybridChunksByDocId(std::vector<RankedChunk> chunk_chunks,
                                                  std::vector<RankedChunk> doc_chunks,
                                                  int top_k) {
@@ -482,6 +535,11 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             std::string metadata_json;
             std::string doc_id;  // owning document, for doc-level metadata round-trip
             ScoreSignals score_signals;
+            // F34 child→parent link. Carried through because the source CortrixBlock
+            // has both and dropping them here is what left RankedChunk.parent_text
+            // permanently empty and ResultItem.parent_id permanently defaulted.
+            std::string parent_id;       // FK → parents.parent_id ("" = not a child)
+            int64_t parent_offset = -1;  // byte offset of this child inside parent_text (-1 = NULL)
         };
         std::unordered_map<std::string, ChunkRow> by_child;
         // doc_id → owning-document fields cache. The friendly source_path (the original
@@ -522,9 +580,9 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
                 retrieval::SparseHit h;
                 h.child_id = block.child_id;
                 h.score = it.raw_score;
-                by_child.emplace(block.child_id,
-                                 ChunkRow{block.content_text, block.metadata_json,
-                                          block.doc_id, block.score_signals});
+                by_child.emplace(block.child_id, ChunkRow{block.content_text, block.metadata_json,
+                                                          block.doc_id, block.score_signals,
+                                                          block.parent_id, block.parent_offset});
                 hits.push_back(std::move(h));
             }
             return hits;
@@ -536,9 +594,9 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             if (by_child.find(child_id) != by_child.end()) return true;
             CortrixBlock source;
             if (!ResolveSourceChildBlock(store, child_id, &source)) return false;
-            by_child.emplace(child_id,
-                             ChunkRow{source.content_text, source.metadata_json,
-                                      source.doc_id, source.score_signals});
+            by_child.emplace(
+                child_id, ChunkRow{source.content_text, source.metadata_json, source.doc_id,
+                                   source.score_signals, source.parent_id, source.parent_offset});
             return true;
         };
 
@@ -563,7 +621,8 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
                             h.score = it.raw_score;
                             by_child.emplace(hit_child,
                                              ChunkRow{block.content_text, block.metadata_json,
-                                                      block.doc_id, block.score_signals});
+                                                      block.doc_id, block.score_signals,
+                                                      block.parent_id, block.parent_offset});
                             rrf_in.dense.push_back(std::move(h));
                             break;
                         }
@@ -642,10 +701,10 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             RankedChunk rc;
             rc.child_id = fh.child_id;
             rc.chunk_text = row.content_text;
-            // parent_text reverse-lookup (F34 ParentChunkStore) is a separate seam;
-            // left empty here per RETRIEVAL_TYPES_SPEC §1 ("empty until F34 wires in").
-            // RankedChunk carries no parent_id field — ToResultItem sets ResultItem.
-            // parent_id to its default until that F34 reverse-lookup lands (D3.5+).
+            // F34 child→parent link (SPEC §1 v1.2). parent_text itself is filled
+            // after the top_k cut, and only for the opted-in bounded window — see
+            // the bounded-expansion step below.
+            rc.parent_id = row.parent_id;
             rc.score = fh.rrf_score;        // pre-rerank (multi-path RRF) score
             rc.rerank_score = fh.rrf_score;  // overwritten below when reranking
             rc.score_signals = row.score_signals;
@@ -722,6 +781,17 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         const int top_k = ctx.top_k < 1 ? 1 : ctx.top_k;
         if (static_cast<int>(ranked.size()) > top_k) {
             ranked.resize(static_cast<std::size_t>(top_k));
+        }
+
+        // 6. Bounded parent expansion (SPEC §2 v1.2) — AFTER the cut, so a lookup is
+        //    only spent on hits that are actually being returned. Opt-in: with
+        //    include_parent off (the default) this is a no-op and the response is
+        //    byte-identical to before. Under granularity=auto/both the hybrid fuse
+        //    runs after this and may drop some expanded hits; that redundancy is
+        //    bounded by top_k and is accepted for V1.0 (moving the expansion past the
+        //    fuse needs the facade re-acquired there — tracked as D-base work).
+        if (ctx.include_parent) {
+            ExpandParentTextBounded(store, ranked, ctx.parent_expand_top_k, ctx.parent_max_bytes);
         }
 
         out.chunks = std::move(ranked);

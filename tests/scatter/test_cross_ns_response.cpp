@@ -205,6 +205,7 @@ TEST(CrossNsResponseTest, ScatterTimeoutSerializesErrorBlock) {
 TEST(CrossNsResponseTest, ToResultItemMapsRankedChunk) {
     retrieval::RankedChunk rc;
     rc.child_id = "c1";
+    rc.parent_id = "p1";
     rc.chunk_text = "hello";
     rc.parent_text = "parent";
     rc.score = 0.4f;
@@ -222,6 +223,23 @@ TEST(CrossNsResponseTest, ToResultItemMapsRankedChunk) {
     EXPECT_FLOAT_EQ(*it.score_signals.enriched_score, 0.75f);
     EXPECT_EQ(it.content_hash, "sha256:deadbeef");
     EXPECT_EQ(it.metadata.at("k"), "v");
+    // SPEC §1 v1.2: parent_id is sourced from the hit. Before the F34 link was
+    // threaded through the executor this field could only ever be the default, so
+    // the V5 #6A primary identifier was unusable.
+    EXPECT_EQ(it.parent_id, "p1");
+}
+
+// A hit with no owning parent (doc-level pseudo-result, or a legacy non-child row)
+// still maps cleanly: parent_id stays empty rather than becoming a dangling id.
+TEST(CrossNsResponseTest, ToResultItemLeavesParentIdEmptyWhenHitHasNoParent) {
+    retrieval::RankedChunk rc;
+    rc.child_id = "c2";
+    rc.chunk_text = "doc summary";
+
+    auto it = retrieval::ToResultItem(rc, "ns_y", "sha256:cafe");
+    EXPECT_EQ(it.child_id, "c2");
+    EXPECT_TRUE(it.parent_id.empty());
+    EXPECT_TRUE(it.parent_content.empty());
 }
 
 }  // namespace

@@ -735,5 +735,38 @@ TEST_F(QueryWiringHttpCoverage, RagFusionGateOffWithoutLlm) {
         << res->body;
 }
 
+// --- ValidateParentExpansion (RETRIEVAL_TYPES_SPEC §2 v1.2) ---------------------
+//
+// The rule that matters is "opting in requires stating the bound". Expanding the
+// whole result set is the failure mode the controls exist to prevent, so the API
+// must not invent a bound when the caller omits one.
+
+TEST(ParentExpansionControlsTest, AbsentControlsAreValidAndMeanOff) {
+    EXPECT_TRUE(ValidateParentExpansion(false, 0, 0).ok());
+}
+
+TEST(ParentExpansionControlsTest, OptInWithoutABoundIsRejected) {
+    const Status s = ValidateParentExpansion(true, 0, 0);
+    ASSERT_FALSE(s.ok());
+    EXPECT_NE(s.message().find("parent_expand_top_k"), std::string::npos) << s.message();
+}
+
+TEST(ParentExpansionControlsTest, OptInWithABoundIsAccepted) {
+    EXPECT_TRUE(ValidateParentExpansion(true, 1, 0).ok());
+    EXPECT_TRUE(ValidateParentExpansion(true, 4, 8192).ok());
+}
+
+// A bound supplied WITHOUT opting in is accepted and inert — it lets a caller
+// park the value in a config template without changing behavior.
+TEST(ParentExpansionControlsTest, BoundWithoutOptInIsInertNotAnError) {
+    EXPECT_TRUE(ValidateParentExpansion(false, 4, 8192).ok());
+}
+
+TEST(ParentExpansionControlsTest, NegativeBoundsAreRejected) {
+    EXPECT_FALSE(ValidateParentExpansion(true, -1, 0).ok());
+    EXPECT_FALSE(ValidateParentExpansion(false, -1, 0).ok());
+    EXPECT_FALSE(ValidateParentExpansion(true, 2, -1).ok());
+}
+
 }  // namespace
 }  // namespace cortrix::query

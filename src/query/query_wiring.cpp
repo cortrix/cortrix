@@ -158,6 +158,22 @@ std::shared_ptr<IComplexityClassifierBackend> MakeComplexityBackend(
 
 }  // namespace
 
+Status ValidateParentExpansion(bool include_parent, int expand_top_k, int max_bytes) {
+    if (expand_top_k < 0) {
+        return Status::InvalidArgument("parent_expand_top_k must not be negative");
+    }
+    if (max_bytes < 0) {
+        return Status::InvalidArgument("parent_max_bytes must not be negative");
+    }
+    if (include_parent && expand_top_k < 1) {
+        return Status::InvalidArgument(
+            "include_parent=true requires parent_expand_top_k >= 1 (how many of the "
+            "returned hits to expand); expanding the whole result set overflows the "
+            "single-response budget");
+    }
+    return Status::Ok();
+}
+
 struct CrossNsQueryWiring::Impl {
     Impl(cortrix::resource::INamespacePool& pool, cortrix::OnnxEmbedder& embedder,
          RRFFusion& fusion, cortrix::tenant::PermissionService& perm_svc,
@@ -318,6 +334,69 @@ Status ReadCragEnabled(const httplib::Request& req, const json& body, bool* out)
         *out = *parsed;
     }
     return Status::Ok();
+}
+
+// Read one integer request control (query-string wins over the JSON body, same
+// precedence as ?route / ?granularity / ?crag). Absent leaves *out untouched so the
+// caller keeps its own default. Range checking belongs to the rule function
+// (ValidateParentExpansion), not here.
+Status ReadIntControl(const httplib::Request& req, const json& body, const char* name, int* out) {
+    if (out == nullptr) return Status::InvalidArgument("int output pointer is null");
+    const std::string field(name);
+    if (body.is_object() && body.contains(field)) {
+        if (!body[field].is_number_integer()) {
+            return Status::InvalidArgument(field + " must be an integer when supplied in body");
+        }
+        *out = body[field].get<int>();
+    }
+    if (req.has_param(field)) {
+        try {
+            *out = std::stoi(req.get_param_value(field));
+        } catch (const std::exception&) {
+            return Status::InvalidArgument(field + " must be an integer");
+        }
+    }
+    return Status::Ok();
+}
+
+// Read the bounded parent-expansion controls (RETRIEVAL_TYPES_SPEC §2 v1.2).
+//
+// `include_parent` defaults to false, so an absent param leaves the response
+// byte-identical to before. When it IS true, `parent_expand_top_k` is REQUIRED:
+// the bound is a measurement outcome rather than a design constant, so the API
+// refuses to invent one instead of silently expanding a whole top_k (~80 KB of
+// ~1024-token parents, past the agent-side single-response budget, truncated by
+// the host). `parent_max_bytes` stays optional (0 = no extra byte cap).
+Status ReadParentExpansion(const httplib::Request& req, const json& body, bool* include_parent,
+                           int* expand_top_k, int* max_bytes) {
+    if (include_parent == nullptr || expand_top_k == nullptr || max_bytes == nullptr) {
+        return Status::InvalidArgument("parent expansion output pointer is null");
+    }
+    *include_parent = false;
+    *expand_top_k = 0;
+    *max_bytes = 0;
+
+    if (body.is_object() && body.contains("include_parent")) {
+        if (!body["include_parent"].is_boolean()) {
+            return Status::InvalidArgument(
+                "include_parent must be a boolean when supplied in body");
+        }
+        *include_parent = body["include_parent"].get<bool>();
+    }
+    if (req.has_param("include_parent")) {
+        std::optional<bool> parsed = ParseBoolToken(req.get_param_value("include_parent"));
+        if (!parsed.has_value()) {
+            return Status::InvalidArgument("include_parent must be one of: true, false, 1, 0");
+        }
+        *include_parent = *parsed;
+    }
+
+    Status s = ReadIntControl(req, body, "parent_expand_top_k", expand_top_k);
+    if (!s.ok()) return s;
+    s = ReadIntControl(req, body, "parent_max_bytes", max_bytes);
+    if (!s.ok()) return s;
+
+    return ValidateParentExpansion(*include_parent, *expand_top_k, *max_bytes);
 }
 
 // Build the per-request QueryContext that carries both the F04 execution fields
@@ -784,6 +863,15 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                 return;
             }
             qctx.enable_crag = crag_enabled;
+
+            // Bounded parent expansion (RETRIEVAL_TYPES_SPEC §2 v1.2). Validated here
+            // so a missing bound is a clean 400 before any retrieval work starts.
+            Status parent_status = ReadParentExpansion(
+                req, body, &qctx.include_parent, &qctx.parent_expand_top_k, &qctx.parent_max_bytes);
+            if (!parent_status.ok()) {
+                WriteJsonError(res, parent_status, ctx.request_id);
+                return;
+            }
 
             std::optional<std::string> route_override = ReadRouteOverride(req, body);
             Status routed = classifier->RouteAndUpdateContext(qctx, route_override);
