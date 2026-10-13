@@ -64,7 +64,7 @@ Status follows [docs/compatibility.md](../docs/compatibility.md).
 | `reference/api` | `api/openapi.yaml`, `api/paths/`, `api/components/` (rendered directly) | Per endpoint |
 | `reference/mcp-tools` | `cortrix-mcp/README.md`, `cortrix-mcp/` tool definitions | Preview |
 | `reference/configuration` | `config.yaml.example` | — |
-| `reference/errors` | `api/components/errors.yaml`, `include/cortrix/deploy/f24_error.h` | — |
+| `reference/errors` | `api/components/errors.yaml`, `src/server/routes/document_routes.cpp` | — |
 | `reference/glossary` | `README.md`, `api/components/schemas.yaml`, `config.yaml.example`, `docs/feature-index.md` | — |
 
 ## Resources

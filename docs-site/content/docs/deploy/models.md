@@ -53,23 +53,27 @@ Later starts reuse the models already in the volume.
 
 The first start downloads the model files from Hugging Face. On a machine that can't reach it, copy the files in before the first start. The downloader verifies every file it finds in `/data/models` against the manifest and downloads only what is missing or doesn't match, so a complete, valid copy means nothing is downloaded.
 
-1. On a machine where the quickstart has already started once, copy the model directory out of the container:
+1. On a machine where the quickstart has already started once, copy the model directory out of the container. The container can be stopped. Make sure `./models` doesn't exist yet, or the files land one level too deep:
 
    ```bash
-   docker cp "$(docker compose -f deploy/docker-compose.yml ps -q cortrix)":/data/models ./models
+   docker cp "$(docker compose -f deploy/docker-compose.yml ps -aq cortrix)":/data/models ./models
    ```
 
    The `models` directory holds `bge-m3/`, `bge-reranker-v2-m3/`, and `MANIFEST.tsv`, about 1.17 GB in total.
 
 2. Move the `models` directory to the machine that has no access.
 
-3. On that machine, create the container without starting it, copy the directory in, and then start:
+3. On that machine, create the container without starting it, copy the directory in, hand the files to the user the service runs as, and then start:
 
    ```bash
    docker compose -f deploy/docker-compose.yml create
    docker cp ./models/. "$(docker compose -f deploy/docker-compose.yml ps -aq cortrix)":/data/models/
+   docker compose -f deploy/docker-compose.yml run --rm --no-deps --user root \
+     --entrypoint chown cortrix -R cortrix:cortrix /data/models
    docker compose -f deploy/docker-compose.yml up --wait
    ```
+
+   `docker cp` creates the copied files as root, and the service runs as `cortrix`. Without the `chown`, the service can read the models but can never replace one, so the container would exit at start the first time a file fails verification or a later release pins a different model revision.
 
 The log shows that the cached files were verified and nothing was downloaded:
 
@@ -79,13 +83,10 @@ The log shows that the cached files were verified and nothing was downloaded:
 [models] verified cached embedding_tokenizer
 [models] verified cached reranker_model
 [models] verified cached reranker_tokenizer
-[models] model directory is read-only; manifest snapshot not written
 [models] all pinned embedding and reranker assets verified
 ```
 
-The `read-only` line is expected here. The copied files belong to a different user than the one the service runs as, so the downloader skips rewriting `MANIFEST.tsv`. The models still load.
-
-A copied file that fails the size or SHA-256 check isn't used. Without network access the container can't replace it, so it exits without starting the service. Copy the directory again from a machine where the quickstart reports ready.
+A copied file that fails the size or SHA-256 check isn't used. The downloader tries to fetch it again, and without network access it can't download a replacement, so the container exits without starting the service. Copy the directory again from a machine where the quickstart reports ready.
 
 > [!NOTE]
 > Building the image still needs network access, for the base images and the build dependencies. This section covers only the model download at first start.
