@@ -42,6 +42,7 @@
 #include "cortrix/llm/i_llm_client.h"
 #include "cortrix/logging/logging.h"
 #include "cortrix/memory/memory_block_adapter.h"
+#include "cortrix/query/parent_expansion.h"
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/reranker.h"
 #include "cortrix/reranker/reranker_config.h"
@@ -806,11 +807,45 @@ std::string BuildQueryParamsSummary(const QueryContext& qctx) {
 // Serialize a scatter response, applying the F37 CRAG verdict action + surfacing
 // meta.crag_verdict (B-class) when F37 ran (Complex route). CragStage is a no-op on
 // simple/chat (ShouldSkipF37) so this is safe to call on every scatter path.
-json SerializeWithCrag(CrossNsResponse& resp, QueryContext& qctx, CragStage* crag) {
+// Fetch the selected parents for one namespace. The facade lives exactly as long as
+// that namespace's lookups, so there is never a store pointer outliving its acquire.
+// An unresolvable namespace yields nothing: a parent that cannot be read degrades the
+// expansion, it never fails a query that already has its chunk text.
+std::vector<CortrixParent> FetchNamespaceParents(cortrix::resource::INamespacePool& pool,
+                                                 const std::string& namespace_id,
+                                                 const std::vector<std::string>& parent_ids) {
+    std::vector<CortrixParent> rows;
+    if (parent_ids.empty()) return rows;
+    cortrix::resource::NamespaceFacade facade(pool, namespace_id);
+    if (!facade.Acquire().ok()) return rows;
+    rows.reserve(parent_ids.size());
+    for (const std::string& id : parent_ids) {
+        CortrixParent parent;
+        if (facade.store().parent_get(id, parent) != 0) continue;  // dangling / unsupported
+        rows.push_back(std::move(parent));
+    }
+    return rows;
+}
+
+json SerializeWithCrag(CrossNsResponse& resp, QueryContext& qctx, CragStage* crag,
+                       cortrix::resource::INamespacePool* pool) {
     crag->Apply(resp, qctx);
     // LAST point at which `results` changes: RAG-fusion re-ordering, listwise rerank and
-    // its trim, and CRAG's halving have all run. The parent-expansion budget is applied
-    // here so it bounds the response rather than each namespace separately.
+    // its trim, and CRAG's halving have all run. Parent expansion is RESOLVED here, not
+    // inside a namespace, because which results deserve parent text can only be read off
+    // the order the caller actually receives — a hit promoted by the listwise rerank has
+    // to be the one that gets expanded, and no later pass can fetch text, only clear it.
+    if (qctx.include_parent && pool != nullptr) {
+        const auto targets = SelectParentExpansionTargets(resp, qctx.parent_expand_top_k);
+        const ParentTextByKey parents = FetchParentsForTargets(
+            targets, [pool](const std::string& ns, const std::vector<std::string>& ids) {
+                return FetchNamespaceParents(*pool, ns, ids);
+            });
+        ApplyParentExpansion(resp, targets, parents, qctx.parent_max_bytes);
+    }
+    // Authoritative post-condition, recomputed from scratch rather than trusted: any
+    // path that fills parent text somewhere else still cannot push the response past
+    // the caller's depth or byte bound.
     EnforceParentExpansionBudget(resp, qctx.parent_expand_top_k, qctx.parent_max_bytes);
     json out = resp.ToJson();
     if (!qctx.crag_verdict.empty()) {
@@ -1029,7 +1064,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                         "results=" + std::to_string(resp.results.size()) +
                             " coverage=" + std::to_string(resp.meta.coverage_ratio),
                         QueryTextSummary(qctx), std::nullopt, "");
-                    json out = SerializeWithCrag(resp, qctx, crag_stage);
+                    json out = SerializeWithCrag(resp, qctx, crag_stage, pool);
                     if (explain) {
                         // C-class debug fields surface only when a capability ran AND
                         // failed (SPEC §3); on this path the router's transient-inference

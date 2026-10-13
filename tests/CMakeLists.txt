@@ -401,6 +401,7 @@ add_executable(cortrix_unit_tests
     unit/test_query_variant_generator.cpp
     unit/test_query_wiring.cpp
     unit/test_live_single_unit_executor.cpp
+    unit/test_parent_expansion.cpp
     unit/test_query_tiebreak.cpp
     unit/test_metrics_server.cpp
     unit/test_gc_cli.cpp

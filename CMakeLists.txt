@@ -164,6 +164,7 @@ add_library(cortrix_core STATIC
     src/query/content_hash.cpp
     src/query/cross_ns_types.cpp
     src/query/cross_ns_response.cpp
+    src/query/parent_expansion.cpp
     src/query/single_unit_executor.cpp
     src/query/authorize_namespaces.cpp
     src/query/cross_ns_dedup.cpp

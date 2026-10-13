@@ -163,59 +163,6 @@ void ApplyDocEvidenceMetadata(HybridCandidate& cand) {
 
 }  // namespace
 
-int ExpandParentTextBounded(CortrixStore& store, std::vector<RankedChunk>& ranked, int expand_top_k,
-                            int max_bytes) {
-    if (expand_top_k <= 0 || ranked.empty()) return 0;
-
-    const std::size_t window = std::min(ranked.size(), static_cast<std::size_t>(expand_top_k));
-
-    // One parent_get per DISTINCT parent_id; `missing` remembers the ids that are
-    // absent (or whose store does not implement parent_get) so a shared dangling id
-    // is not retried per hit.
-    std::unordered_map<std::string, CortrixParent> by_parent;
-    std::unordered_set<std::string> missing;
-    long long used_bytes = 0;
-    int expanded = 0;
-
-    for (std::size_t i = 0; i < window; ++i) {
-        RankedChunk& rc = ranked[i];
-        if (rc.parent_id.empty()) continue;  // doc-level pseudo-result / legacy row
-        if (missing.count(rc.parent_id) != 0) continue;
-
-        auto it = by_parent.find(rc.parent_id);
-        if (it == by_parent.end()) {
-            CortrixParent parent;
-            if (store.parent_get(rc.parent_id, parent) != 0) {
-                // Absent row or a store without parent support — skip this hit. A
-                // dangling link must degrade the expansion, never fail the query.
-                missing.insert(rc.parent_id);
-                continue;
-            }
-            it = by_parent.emplace(rc.parent_id, std::move(parent)).first;
-        }
-        const CortrixParent& parent = it->second;
-
-        // Budget accounting is PER RESULT, not per distinct parent: two hits sharing
-        // a parent each carry their own copy of the text in the response, so the wire
-        // cost is charged twice even though the lookup happened once.
-        const long long cost = static_cast<long long>(parent.parent_text.size());
-        if (max_bytes > 0 && used_bytes + cost > static_cast<long long>(max_bytes)) {
-            break;  // bound reached — the remaining hits keep chunk_text only
-        }
-        used_bytes += cost;
-
-        rc.parent_text = parent.parent_text;
-        // Where the expanded span sits in the document. Written only for expanded
-        // hits, and deliberately authoritative over a caller metadata key of the same
-        // name — the same doc→block precedence this TU already applies to source_path.
-        rc.metadata["parent_token_count"] = std::to_string(parent.token_count);
-        rc.metadata["parent_byte_start"] = std::to_string(parent.byte_offset_start);
-        rc.metadata["parent_byte_end"] = std::to_string(parent.byte_offset_end);
-        ++expanded;
-    }
-    return expanded;
-}
-
 std::vector<RankedChunk> FuseHybridChunksByDocId(std::vector<RankedChunk> chunk_chunks,
                                                  std::vector<RankedChunk> doc_chunks,
                                                  int top_k) {
@@ -790,9 +737,16 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         //    runs after this and may drop some expanded hits; that redundancy is
         //    bounded by top_k and is accepted for V1.0 (moving the expansion past the
         //    fuse needs the facade re-acquired there — tracked as D-base work).
-        if (ctx.include_parent) {
-            ExpandParentTextBounded(store, ranked, ctx.parent_expand_top_k, ctx.parent_max_bytes);
-        }
+        //
+        //    SUPERSEDED: the expansion is no longer done here at all. This layer only
+        //    knows its own namespace's order, and three later stages re-order or drop
+        //    results — RAG-fusion re-ordering, the LLM listwise rerank plus its trim
+        //    to the requested top_k, and CRAG's halving on an ambiguous verdict.
+        //    Expanding here attaches parent text to a hit that may end up ranked lower
+        //    or dropped, while the hit the caller sees first carries none; the later
+        //    budget pass can only clear text, never fetch it. Resolution now happens
+        //    against the final response in query_wiring — see query/parent_expansion.h.
+        //    What this layer owes that step is `parent_id` on every chunk, set above.
 
         out.chunks = std::move(ranked);
         out.error_code.clear();  // success

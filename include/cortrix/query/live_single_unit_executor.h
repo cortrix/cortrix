@@ -51,37 +51,6 @@ VectorHitPath ClassifyVectorHit(int block_type, const std::string& block_child_i
                                 const std::string& metadata_json,
                                 std::string* out_child_id);
 
-/// Hybrid RRF for granularity=auto/both. The fusion identity is the owning doc_id
-/// (metadata.doc_id / source_doc_id), not child_id, so a doc-summary candidate and
-/// its best chunk candidate reinforce each other instead of remaining disjoint. If a
-/// document has both chunk and doc-summary evidence, the chunk is kept as the
-/// user-facing representative and the doc evidence is preserved in metadata.
-/// Bounded query-time parent expansion — the F34 §2.5 ParentChunkStore reverse
-/// lookup, applied to the hits that are actually being RETURNED
-/// (RETRIEVAL_TYPES_SPEC §2 v1.2, normative).
-///
-/// Fills `RankedChunk.parent_text` for the first `expand_top_k` hits that carry a
-/// `parent_id`, and records the parent's span in result metadata
-/// (`parent_token_count` / `parent_byte_start` / `parent_byte_end`) so a caller can
-/// tell where the expanded span sits inside the document. Those keys appear ONLY on
-/// hits that were actually expanded, so a request that does not opt in is
-/// byte-identical to before. One `parent_get` per DISTINCT parent_id (hits sharing
-/// a parent reuse the lookup), mirroring the one-doc_get-per-document cache.
-///
-/// Bounded on purpose, and that is the whole point: a parent is ~1024 tokens, so
-/// expanding a full top_k of 16 is roughly 80 KB — past the agent-side
-/// single-response budget, where the host truncates and the answer ends up LESS
-/// complete than before. `expand_top_k <= 0` is a no-op (the default), and
-/// `max_bytes > 0` stops the walk before the accumulated parent_text would exceed
-/// it. No tuned constant is baked in: both bounds come from the caller, because
-/// their values are a measurement outcome rather than a design constant.
-///
-/// A missing parent row (`parent_get != 0`) is skipped, not an error: a non-child
-/// block legitimately has no parent, and a dangling id must not fail the query.
-///
-/// @return how many hits had parent_text filled.
-int ExpandParentTextBounded(CortrixStore& store, std::vector<retrieval::RankedChunk>& ranked,
-                            int expand_top_k, int max_bytes);
 
 std::vector<retrieval::RankedChunk> FuseHybridChunksByDocId(
     std::vector<retrieval::RankedChunk> chunk_chunks,
