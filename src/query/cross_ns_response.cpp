@@ -1,5 +1,6 @@
 #include "cortrix/query/cross_ns_response.h"
 
+#include <map>
 #include <utility>
 
 namespace cortrix::query {
@@ -123,6 +124,36 @@ void EnforceParentExpansionBudget(CrossNsResponse& resp, int expand_top_k, int m
         }
         used_bytes += cost;
         ++kept;
+    }
+}
+
+void FinalizeDocumentCoverage(CrossNsResponse& resp) {
+    resp.meta.document_coverage.clear();
+    std::map<std::string, std::size_t> index_by_doc;
+    for (const auto& item : resp.results) {
+        auto doc_it = item.metadata.find("doc_id");
+        if (doc_it == item.metadata.end() || doc_it->second.empty()) continue;
+        const std::string& doc_id = doc_it->second;
+
+        auto found = index_by_doc.find(doc_id);
+        if (found == index_by_doc.end()) {
+            DocumentCoverageInfo info;
+            auto path_it = item.metadata.find("source_path");
+            if (path_it != item.metadata.end()) info.source_path = path_it->second;
+            auto total_it = resp.meta.doc_child_block_totals.find(doc_id);
+            if (total_it != resp.meta.doc_child_block_totals.end()) {
+                info.total_child_blocks = total_it->second;
+                info.total_known = true;  // including a genuine zero
+            }
+            index_by_doc.emplace(doc_id, resp.meta.document_coverage.size());
+            found = index_by_doc.find(doc_id);
+            resp.meta.document_coverage.push_back(std::move(info));
+        }
+        // Only chunk evidence counts: a doc-route hit is not a piece of the document's
+        // text, so a document selected that way correctly reads "0 of N".
+        if (item.evidence_kind == "chunk") {
+            resp.meta.document_coverage[found->second].returned_child_blocks += 1;
+        }
     }
 }
 

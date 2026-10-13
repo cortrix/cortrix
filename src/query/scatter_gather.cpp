@@ -181,7 +181,9 @@ CrossNsResponse ScatterGather::GatherAndRerank(std::vector<NamespaceQueryResult>
     for (auto& r : results) {
         if (r.error_code.empty()) {
             meta.namespaces_succeeded.push_back(r.namespace_id);
-            for (auto& kv : r.doc_child_block_totals) doc_totals.emplace(kv.first, kv.second);
+            for (auto& kv : r.doc_child_block_totals) {
+                meta.doc_child_block_totals.emplace(kv.first, kv.second);
+            }
             for (auto& rc : r.chunks) {
                 // content_hash (F09-4 hook, R3 closed): the authoritative source is
                 // the per-Unit blocks.content_hash column (idx_block_hash) — written

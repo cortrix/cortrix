@@ -1,5 +1,6 @@
 #include "cortrix/query/rag_fusion_stage.h"
 
+#include <map>
 #include <algorithm>
 #include <unordered_map>
 #include <utility>
@@ -192,6 +193,8 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
     per_variant.reserve(all_queries.size());
     CrossNsResponse base;
     std::unordered_map<std::string, ResultItem> items_by_child;  // union across variants
+    // doc_id → total child blocks, unioned across all variants (filled in the loop).
+    std::map<std::string, int64_t> variant_doc_totals;
     // In final-rerank mode, keep the original query's normal reranked baseline
     // signal, but treat LLM variants as candidate generation only. Running the
     // reranker inside every LLM variant would multiply latency and prematurely
@@ -218,6 +221,11 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
         for (auto& it : vresp.results) {
             items_by_child.emplace(it.child_id, it);  // first occurrence wins (rich item)
         }
+        // Carry every variant's document denominators, not just the original query's.
+        // A document only a variant retrieved would otherwise reach the fused results
+        // with no total, and its coverage would read as unknown.
+        variant_doc_totals.insert(vresp.meta.doc_child_block_totals.begin(),
+                                  vresp.meta.doc_child_block_totals.end());
     }
 
     // 3. Global RRF second-pass fusion across variants (§4.3 step 9 / topic 2 B).
@@ -243,6 +251,8 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
             reordered.resize(static_cast<std::size_t>(k));
         }
         base.results = std::move(reordered);
+        base.meta.doc_child_block_totals.insert(variant_doc_totals.begin(),
+                                                variant_doc_totals.end());
     }
 
     if (degraded) base.meta.warnings.push_back(DegradedWarning());

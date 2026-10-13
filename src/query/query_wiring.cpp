@@ -851,6 +851,8 @@ json SerializeWithCrag(CrossNsResponse& resp, QueryContext& qctx, CragStage* cra
     // path that fills parent text somewhere else still cannot push the response past
     // the caller's depth or byte bound.
     EnforceParentExpansionBudget(resp, qctx.parent_expand_top_k, qctx.parent_max_bytes);
+    // Same seam, same reason: coverage must describe the list that is actually sent.
+    FinalizeDocumentCoverage(resp);
     json out = resp.ToJson();
     if (!qctx.crag_verdict.empty()) {
         out["meta"]["crag_verdict"] = qctx.crag_verdict;  // F37 §6.3 B-class

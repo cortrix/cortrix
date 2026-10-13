@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -52,7 +53,13 @@ struct DeduplicatedChunkInfo {
 struct DocumentCoverageInfo {
     std::string source_path;         ///< friendly document name (already surfaced on results)
     int returned_child_blocks = 0;   ///< distinct child blocks of this doc present in results
-    int64_t total_child_blocks = 0;  ///< the document's total child-block count (0 = unknown)
+    int64_t total_child_blocks = 0;  ///< the document's total child-block count
+    /// Whether total_child_blocks is a real count. A document with no child blocks
+    /// legitimately counts 0, so 0 must NOT double as "unknown" — that would conflate
+    /// an empty document with a count the store could not produce, and a caller
+    /// reading "0 of 0" would take it for full coverage. The serializer emits null
+    /// only when this is false.
+    bool total_known = false;
 };
 
 /// F04 cross-NS response meta — exactly the **8 A/C-class fields** (F04 §2.5 / topic 3.5
@@ -74,6 +81,11 @@ struct CrossNsMeta {
     /// above, and two meanings under one name would mislead exactly the caller this
     /// field is meant to inform.
     std::vector<DocumentCoverageInfo> document_coverage;
+    /// doc_id → that document's total child-block count, carried up from the per-NS
+    /// executors (the only layer with a store handle) so the denominator survives
+    /// RAG-fusion variant merging and is still available when coverage is finalized.
+    /// Internal accounting input; never serialized.
+    std::map<std::string, int64_t> doc_child_block_totals;
 
     nlohmann::json ToJson() const;
 };
@@ -110,5 +122,17 @@ struct CrossNsResponse {
 /// Store-free and idempotent: the budget is applied by CLEARING parent text beyond the
 /// limits. `expand_top_k <= 0` clears all of it; `max_bytes <= 0` means no byte cap.
 void EnforceParentExpansionBudget(CrossNsResponse& resp, int expand_top_k, int max_bytes);
+
+/// Recompute meta.document_coverage from the response's FINAL result set.
+///
+/// Must run after the last stage that mutates `results`: RAG-fusion re-ordering,
+/// listwise rerank and its trim, and CRAG's halving all change the list, so a count
+/// taken earlier can describe chunks that were since dropped or miss a document that
+/// only a variant retrieved. Recomputed rather than adjusted, so calling it at the
+/// gather and again in the route cannot drift.
+///
+/// Denominators come from meta.doc_child_block_totals; a document absent from that map
+/// is reported with total_known = false rather than a fabricated zero.
+void FinalizeDocumentCoverage(CrossNsResponse& resp);
 
 }  // namespace cortrix::query

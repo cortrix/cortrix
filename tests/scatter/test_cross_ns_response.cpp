@@ -264,7 +264,7 @@ TEST(CrossNsResponseTest, EvidenceKindIsAlwaysSerialized) {
 // to argue with a failing test rather than quietly growing meta.
 TEST(CrossNsResponseTest, DocumentCoverageIsNotInMeta) {
     CrossNsMeta meta;
-    meta.document_coverage.push_back({"spec.md", 2, 7});
+    meta.document_coverage.push_back({"spec.md", 2, 7, /*total_known=*/true});
 
     auto j = meta.ToJson();
     EXPECT_EQ(j.size(), 8u);
@@ -275,8 +275,8 @@ TEST(CrossNsResponseTest, DocumentCoverageIsNotInMeta) {
 // full coverage, which is the opposite of what an unknown total means.
 TEST(CrossNsResponseTest, UnknownCoverageTotalSerializesAsNull) {
     std::vector<DocumentCoverageInfo> coverage;
-    coverage.push_back({"known.md", 2, 7});
-    coverage.push_back({"unknown.md", 1, 0});
+    coverage.push_back({"known.md", 2, 7, /*total_known=*/true});
+    coverage.push_back({"unknown.md", 1, 0, /*total_known=*/false});
 
     auto j = DocumentCoverageArrayToJson(coverage);
     ASSERT_EQ(j.size(), 2u);
@@ -386,6 +386,92 @@ TEST(EnforceParentExpansionBudgetTest, EmptyResultSetIsANoOp) {
     CrossNsResponse resp;
     EXPECT_NO_THROW(EnforceParentExpansionBudget(resp, 4, 1024));
     EXPECT_TRUE(resp.results.empty());
+}
+
+// --- FinalizeDocumentCoverage ---------------------------------------------------
+//
+// Coverage has to describe the list that is actually sent. Three stages after the
+// cross-NS gather mutate `results`, so a count taken earlier can describe chunks that
+// were since dropped.
+
+namespace {
+
+retrieval::ResultItem CoverageItem(const std::string& child_id, const std::string& doc_id,
+                                   const std::string& kind) {
+    retrieval::ResultItem it;
+    it.child_id = child_id;
+    it.content = "body of " + child_id;
+    it.evidence_kind = kind;
+    it.metadata["doc_id"] = doc_id;
+    it.metadata["source_path"] = doc_id + ".md";
+    return it;
+}
+
+}  // namespace
+
+// A later stage trimming results must leave the count describing what remains.
+TEST(FinalizeDocumentCoverageTest, FollowsALaterTrim) {
+    CrossNsResponse resp;
+    resp.results.push_back(CoverageItem("c1", "doc_a", "chunk"));
+    resp.results.push_back(CoverageItem("c2", "doc_a", "chunk"));
+    resp.results.push_back(CoverageItem("c3", "doc_a", "chunk"));
+    resp.meta.doc_child_block_totals["doc_a"] = 9;
+
+    FinalizeDocumentCoverage(resp);
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 3);
+
+    // Listwise rerank's trim, or CRAG's halving, drops two results.
+    resp.results.resize(1);
+    FinalizeDocumentCoverage(resp);
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 1);
+}
+
+// Called twice on the same list, nothing drifts — the route calls it after the gather
+// already did.
+TEST(FinalizeDocumentCoverageTest, IsIdempotent) {
+    CrossNsResponse resp;
+    resp.results.push_back(CoverageItem("c1", "doc_a", "chunk"));
+    resp.results.push_back(CoverageItem("c2", "doc_a", "chunk"));
+    resp.meta.doc_child_block_totals["doc_a"] = 4;
+
+    FinalizeDocumentCoverage(resp);
+    FinalizeDocumentCoverage(resp);
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 2);
+}
+
+// A denominator that is genuinely 0 is NOT the same as one that could not be read.
+TEST(FinalizeDocumentCoverageTest, SuccessfulZeroIsDistinctFromUnknown) {
+    CrossNsResponse resp;
+    resp.results.push_back(CoverageItem("c1", "doc_empty", "chunk"));
+    resp.results.push_back(CoverageItem("c2", "doc_unreadable", "chunk"));
+    resp.meta.doc_child_block_totals["doc_empty"] = 0;  // counted, and the answer is 0
+    // doc_unreadable deliberately absent: the store could not count it.
+
+    FinalizeDocumentCoverage(resp);
+    ASSERT_EQ(resp.meta.document_coverage.size(), 2u);
+    EXPECT_TRUE(resp.meta.document_coverage[0].total_known);
+    EXPECT_EQ(resp.meta.document_coverage[0].total_child_blocks, 0);
+    EXPECT_FALSE(resp.meta.document_coverage[1].total_known);
+
+    auto j = DocumentCoverageArrayToJson(resp.meta.document_coverage);
+    ASSERT_EQ(j.size(), 2u);
+    EXPECT_EQ(j[0]["total_child_blocks"], 0) << "a counted zero must stay 0, not null";
+    EXPECT_TRUE(j[1]["total_child_blocks"].is_null());
+}
+
+// Only chunk evidence counts toward the numerator.
+TEST(FinalizeDocumentCoverageTest, DocRouteEvidenceContributesZero) {
+    CrossNsResponse resp;
+    resp.results.push_back(CoverageItem("doc_b", "doc_b", "document_summary"));
+    resp.meta.doc_child_block_totals["doc_b"] = 12;
+
+    FinalizeDocumentCoverage(resp);
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 0);
+    EXPECT_EQ(resp.meta.document_coverage[0].total_child_blocks, 12);
 }
 
 }  // namespace
