@@ -43,7 +43,7 @@ Status follows [docs/compatibility.md](../docs/compatibility.md).
 |---|---|---|
 | `deploy/docker-compose` | `deploy/docker-compose.yml`, `deploy/Dockerfile`, `deploy/QUICKSTART.md` | Preview |
 | `deploy/configuration` | `config.yaml.example`, `deploy/cortrix.yaml`, `deploy/.env.example` | Preview |
-| `deploy/models` | `deploy/MODELS.md`, `deploy/model-manifest.tsv`, `docs/operations/onnx-upgrade.md` | Preview |
+| `deploy/models` | `deploy/MODELS.md`, `deploy/model-manifest.tsv`, `deploy/download-models.sh`, `docs/operations/onnx-upgrade.md` | Preview |
 | `deploy/performance-tuning` | `docs/operations/reranking-applicability.md`, `config.yaml.example`, `src/config/config.cpp`, `deploy/entrypoint.sh`, `api/components/schemas.yaml` | Preview |
 | `deploy/cuda` | `docs/operations/cuda-execution-provider.md`, `deploy/docker-compose.cuda.yml` | Preview |
 | `deploy/security` | `docs/compatibility.md`, `SECURITY.md`, `config.yaml.example` | In-development areas stated as such |
@@ -64,7 +64,7 @@ Status follows [docs/compatibility.md](../docs/compatibility.md).
 | `reference/api` | `api/openapi.yaml`, `api/paths/`, `api/components/` (rendered directly) | Per endpoint |
 | `reference/mcp-tools` | `cortrix-mcp/README.md`, `cortrix-mcp/` tool definitions | Preview |
 | `reference/configuration` | `config.yaml.example` | — |
-| `reference/errors` | `api/components/errors.yaml` | — |
+| `reference/errors` | `api/components/errors.yaml`, `src/server/routes/document_routes.cpp` | — |
 | `reference/glossary` | `README.md`, `api/components/schemas.yaml`, `config.yaml.example`, `docs/feature-index.md` | — |
 
 ## Resources
@@ -74,6 +74,6 @@ Status follows [docs/compatibility.md](../docs/compatibility.md).
 | `resources/compatibility` | `docs/compatibility.md` | — |
 | `resources/stack-fit` | `docs/archive/adoption/stack-fit.md` | — |
 | `resources/benchmarks` | `docs/compatibility.md` (benchmark boundary), linked `cortrix-benchmarks` bundle | Preview |
-| `resources/troubleshooting` | `docs/archive/QUICKSTART.md`, `deploy/healthcheck.sh`, component READMEs | — |
+| `resources/troubleshooting` | `docs/archive/QUICKSTART.md`, `deploy/healthcheck.sh`, `deploy/quickstart-bootstrap.sh`, `include/cortrix/deploy/disk_monitor.h`, component READMEs | — |
 | `resources/releases` | `docs/releases/v1.0.0-rc.2.md` | — |
 | `resources/contributing` | `CONTRIBUTING.md`, `DCO`, `docs/BRANCHING.md`, `CODE_OF_CONDUCT.md` | — |
