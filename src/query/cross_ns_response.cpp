@@ -129,24 +129,28 @@ void EnforceParentExpansionBudget(CrossNsResponse& resp, int expand_top_k, int m
 
 void FinalizeDocumentCoverage(CrossNsResponse& resp) {
     resp.meta.document_coverage.clear();
-    std::map<std::string, std::size_t> index_by_doc;
+    std::map<DocKey, std::size_t> index_by_doc;
     for (const auto& item : resp.results) {
         auto doc_it = item.metadata.find("doc_id");
         if (doc_it == item.metadata.end() || doc_it->second.empty()) continue;
-        const std::string& doc_id = doc_it->second;
+        // Grouping key and denominator key are the SAME DocKey. Using doc_id for one
+        // and (namespace, doc_id) for the other is how a result ends up counted
+        // against another namespace's document.
+        const DocKey key{item.namespace_id, doc_it->second};
 
-        auto found = index_by_doc.find(doc_id);
+        auto found = index_by_doc.find(key);
         if (found == index_by_doc.end()) {
             DocumentCoverageInfo info;
+            info.namespace_id = item.namespace_id;
             auto path_it = item.metadata.find("source_path");
             if (path_it != item.metadata.end()) info.source_path = path_it->second;
-            auto total_it = resp.meta.doc_child_block_totals.find(doc_id);
+            auto total_it = resp.meta.doc_child_block_totals.find(key);
             if (total_it != resp.meta.doc_child_block_totals.end()) {
                 info.total_child_blocks = total_it->second;
                 info.total_known = true;  // including a genuine zero
             }
-            index_by_doc.emplace(doc_id, resp.meta.document_coverage.size());
-            found = index_by_doc.find(doc_id);
+            index_by_doc.emplace(key, resp.meta.document_coverage.size());
+            found = index_by_doc.find(key);
             resp.meta.document_coverage.push_back(std::move(info));
         }
         // Only chunk evidence counts: a doc-route hit is not a piece of the document's
@@ -163,6 +167,7 @@ nlohmann::json DocumentCoverageArrayToJson(const std::vector<DocumentCoverageInf
     nlohmann::json arr = nlohmann::json::array();
     for (const auto& d : coverage) {
         nlohmann::json j;
+        j["namespace"] = d.namespace_id;
         j["source_path"] = d.source_path;
         j["returned_child_blocks"] = d.returned_child_blocks;
         // A successful count of 0 is a real answer (an empty document), so it must

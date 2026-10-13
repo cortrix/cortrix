@@ -193,8 +193,10 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
     per_variant.reserve(all_queries.size());
     CrossNsResponse base;
     std::unordered_map<std::string, ResultItem> items_by_child;  // union across variants
-    // doc_id → total child blocks, unioned across all variants (filled in the loop).
-    std::map<std::string, int64_t> variant_doc_totals;
+    // (namespace_id, doc_id) → total child blocks, unioned across all variants
+    // (filled in the loop). Same key as the gather produced: collapsing it to doc_id
+    // here would re-introduce the cross-namespace collision one layer down.
+    std::map<DocKey, int64_t> variant_doc_totals;
     // In final-rerank mode, keep the original query's normal reranked baseline
     // signal, but treat LLM variants as candidate generation only. Running the
     // reranker inside every LLM variant would multiply latency and prematurely

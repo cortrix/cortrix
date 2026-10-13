@@ -173,16 +173,18 @@ CrossNsResponse ScatterGather::GatherAndRerank(std::vector<NamespaceQueryResult>
 
     // Collect successful chunks → ResultItems; failures → meta.namespaces_failed[].
     std::vector<ResultItem> items;
-    // doc_id → the document's total child-block count, unioned across namespaces.
-    // The per-NS executors are the only layer with a store handle, so they carry the
-    // denominator up; the numerator is counted here, over the FINAL (deduped,
-    // truncated) result set, because that is the only set the caller actually sees.
-    std::map<std::string, int64_t> doc_totals;
+    // The per-NS executors are the only layer with a store handle, so they carry each
+    // document's total child-block count up; the numerator is counted later, over the
+    // FINAL (deduped, truncated) result set, because that is the only set the caller
+    // actually sees. Each denominator is qualified with the namespace it came from —
+    // a per-NS map is keyed by doc_id alone, which is only unique inside that one
+    // namespace's store (see DocKey).
     for (auto& r : results) {
         if (r.error_code.empty()) {
             meta.namespaces_succeeded.push_back(r.namespace_id);
             for (auto& kv : r.doc_child_block_totals) {
-                meta.doc_child_block_totals.emplace(kv.first, kv.second);
+                meta.doc_child_block_totals.emplace(DocKey{r.namespace_id, kv.first},
+                                                    kv.second);
             }
             for (auto& rc : r.chunks) {
                 // content_hash (F09-4 hook, R3 closed): the authoritative source is

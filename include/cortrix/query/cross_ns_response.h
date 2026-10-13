@@ -1,7 +1,9 @@
 #pragma once
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -10,6 +12,16 @@
 #include "cortrix/retrieval/cross_ns_types.h"  // cortrix::retrieval::ResultItem
 
 namespace cortrix::query {
+
+/// Identity of a document inside a cross-namespace response: (namespace_id, doc_id).
+///
+/// The namespace is part of the identity, not decoration. Batch ingestion lets the
+/// caller choose doc_id, so the same id can name different documents in different
+/// namespaces. Keyed on doc_id alone, two such documents collapse into one coverage
+/// entry — one returned chunk from each, with totals of 2 and 10, reads as a single
+/// "2 of 2", i.e. full coverage of a document that is 80% missing. Trimming makes it
+/// worse: the surviving result can end up paired with the other document's denominator.
+using DocKey = std::pair<std::string, std::string>;
 
 /// One failed namespace inside meta.namespaces_failed[] (F04 §2.5 / topic 2.4 + 2.7).
 /// Carries the full GEN-Agent error contract so an Agent can decide per-NS whether
@@ -60,6 +72,13 @@ struct DocumentCoverageInfo {
     /// reading "0 of 0" would take it for full coverage. The serializer emits null
     /// only when this is false.
     bool total_known = false;
+    /// Which namespace this document lives in. Carried so two documents that share a
+    /// caller-selected doc_id across namespaces stay distinguishable in the output;
+    /// without it the two entries would look like duplicates of one document.
+    ///
+    /// APPENDED LAST on purpose: this struct is positionally aggregate-initialized in
+    /// tests, so a field inserted anywhere else silently re-binds every one of them.
+    std::string namespace_id;
 };
 
 /// F04 cross-NS response meta — exactly the **8 A/C-class fields** (F04 §2.5 / topic 3.5
@@ -81,11 +100,12 @@ struct CrossNsMeta {
     /// above, and two meanings under one name would mislead exactly the caller this
     /// field is meant to inform.
     std::vector<DocumentCoverageInfo> document_coverage;
-    /// doc_id → that document's total child-block count, carried up from the per-NS
-    /// executors (the only layer with a store handle) so the denominator survives
-    /// RAG-fusion variant merging and is still available when coverage is finalized.
-    /// Internal accounting input; never serialized.
-    std::map<std::string, int64_t> doc_child_block_totals;
+    /// (namespace_id, doc_id) → that document's total child-block count, carried up
+    /// from the per-NS executors (the only layer with a store handle) so the
+    /// denominator survives RAG-fusion variant merging and is still available when
+    /// coverage is finalized. Keyed by DocKey rather than doc_id for the reason given
+    /// on DocKey. Internal accounting input; never serialized.
+    std::map<DocKey, int64_t> doc_child_block_totals;
 
     nlohmann::json ToJson() const;
 };

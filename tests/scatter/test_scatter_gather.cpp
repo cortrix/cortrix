@@ -524,6 +524,61 @@ TEST(DocumentCoverageTest, OneEntryPerDocumentInFirstAppearanceOrder) {
     EXPECT_EQ(resp.meta.document_coverage[1].returned_child_blocks, 1);
 }
 
+// Two namespaces, two different documents that happen to share a caller-selected
+// doc_id. Through the real gather: the denominators must not be unioned into one
+// entry, and the one surviving a trim must keep its own namespace's total.
+TEST(DocumentCoverageTest, SharedDocIdAcrossNamespacesStaysTwoDocuments) {
+    Harness h({"ns_a", "ns_b"});
+    retrieval::NamespaceQueryResult a;
+    a.namespace_id = "ns_a";
+    a.chunks.push_back(ChunkHit("c_a", "shared-doc-id", "a.md", 0.9f));
+    a.doc_child_block_totals["shared-doc-id"] = 2;
+    retrieval::NamespaceQueryResult b;
+    b.namespace_id = "ns_b";
+    b.chunks.push_back(ChunkHit("c_b", "shared-doc-id", "b.md", 0.8f));
+    b.doc_child_block_totals["shared-doc-id"] = 10;
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _)).WillOnce(Return(a));
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_b", _)).WillOnce(Return(b));
+
+    auto sg = h.Make();
+    auto resp = sg.Execute(Req({"ns_a", "ns_b"}, /*top_k=*/10), Auth());
+
+    ASSERT_EQ(resp.results.size(), 2u);
+    ASSERT_EQ(resp.meta.document_coverage.size(), 2u)
+        << "one returned chunk from each must not read as a single 2-of-2";
+    EXPECT_EQ(resp.meta.document_coverage[0].namespace_id, "ns_a");
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 1);
+    EXPECT_EQ(resp.meta.document_coverage[0].total_child_blocks, 2);
+    EXPECT_EQ(resp.meta.document_coverage[1].namespace_id, "ns_b");
+    EXPECT_EQ(resp.meta.document_coverage[1].returned_child_blocks, 1);
+    EXPECT_EQ(resp.meta.document_coverage[1].total_child_blocks, 10);
+}
+
+// Same shape, but top_k keeps only the lower-scored namespace's hit: it must carry
+// ITS denominator (10), not the other document's (2).
+TEST(DocumentCoverageTest, SharedDocIdSurvivorKeepsItsOwnDenominator) {
+    Harness h({"ns_a", "ns_b"});
+    retrieval::NamespaceQueryResult a;
+    a.namespace_id = "ns_a";
+    a.chunks.push_back(ChunkHit("c_a", "shared-doc-id", "a.md", 0.4f));
+    a.doc_child_block_totals["shared-doc-id"] = 2;
+    retrieval::NamespaceQueryResult b;
+    b.namespace_id = "ns_b";
+    b.chunks.push_back(ChunkHit("c_b", "shared-doc-id", "b.md", 0.9f));
+    b.doc_child_block_totals["shared-doc-id"] = 10;
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _)).WillOnce(Return(a));
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_b", _)).WillOnce(Return(b));
+
+    auto sg = h.Make();
+    auto resp = sg.Execute(Req({"ns_a", "ns_b"}, /*top_k=*/1), Auth());
+
+    ASSERT_EQ(resp.results.size(), 1u);
+    EXPECT_EQ(resp.results[0].namespace_id, "ns_b");
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].namespace_id, "ns_b");
+    EXPECT_EQ(resp.meta.document_coverage[0].total_child_blocks, 10);
+}
+
 // A hit with no doc_id cannot be attributed, so it produces no entry rather than an
 // entry keyed on an empty string.
 TEST(DocumentCoverageTest, HitWithoutDocIdProducesNoEntry) {
