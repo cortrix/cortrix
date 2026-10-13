@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -340,21 +341,54 @@ Status ReadCragEnabled(const httplib::Request& req, const json& body, bool* out)
 // precedence as ?route / ?granularity / ?crag). Absent leaves *out untouched so the
 // caller keeps its own default. Range checking belongs to the rule function
 // (ValidateParentExpansion), not here.
+// Parse a query-string integer in FULL, rejecting anything with leftover characters.
+//
+// std::stoi stops at the first non-digit, so "0.5" parses as 0 and "12abc" as 12. For a
+// safety limit that is the worst failure mode available: `parent_max_bytes=0.5` would
+// silently become 0, and 0 means "no byte cap" — a typo would switch the cap OFF rather
+// than be reported. Parsed wide so the range check happens before any narrowing.
+bool ParseStrictInt(const std::string& text, long long* out) {
+    if (out == nullptr || text.empty()) return false;
+    std::size_t i = (text[0] == '+' || text[0] == '-') ? 1u : 0u;
+    if (i >= text.size()) return false;  // a lone sign
+    for (std::size_t k = i; k < text.size(); ++k) {
+        if (text[k] < '0' || text[k] > '9') return false;  // no partial acceptance
+    }
+    try {
+        *out = std::stoll(text);
+    } catch (const std::exception&) {
+        return false;  // beyond long long
+    }
+    return true;
+}
+
 Status ReadIntControl(const httplib::Request& req, const json& body, const char* name, int* out) {
     if (out == nullptr) return Status::InvalidArgument("int output pointer is null");
     const std::string field(name);
+    const std::string range_msg = field + " is out of range (must fit in a 32-bit signed integer)";
     if (body.is_object() && body.contains(field)) {
         if (!body[field].is_number_integer()) {
             return Status::InvalidArgument(field + " must be an integer when supplied in body");
         }
-        *out = body[field].get<int>();
+        // Read wide, check, then narrow. Reading as int first would silently truncate a
+        // JSON integer that does not fit, turning an out-of-range request into a
+        // plausible-looking small one.
+        const long long wide = body[field].get<long long>();
+        if (wide < std::numeric_limits<int>::min() || wide > std::numeric_limits<int>::max()) {
+            return Status::InvalidArgument(range_msg);
+        }
+        *out = static_cast<int>(wide);
     }
     if (req.has_param(field)) {
-        try {
-            *out = std::stoi(req.get_param_value(field));
-        } catch (const std::exception&) {
-            return Status::InvalidArgument(field + " must be an integer");
+        long long wide = 0;
+        if (!ParseStrictInt(req.get_param_value(field), &wide)) {
+            return Status::InvalidArgument(field +
+                                           " must be an integer with no trailing characters");
         }
+        if (wide < std::numeric_limits<int>::min() || wide > std::numeric_limits<int>::max()) {
+            return Status::InvalidArgument(range_msg);
+        }
+        *out = static_cast<int>(wide);
     }
     return Status::Ok();
 }
@@ -774,6 +808,10 @@ std::string BuildQueryParamsSummary(const QueryContext& qctx) {
 // simple/chat (ShouldSkipF37) so this is safe to call on every scatter path.
 json SerializeWithCrag(CrossNsResponse& resp, QueryContext& qctx, CragStage* crag) {
     crag->Apply(resp, qctx);
+    // LAST point at which `results` changes: RAG-fusion re-ordering, listwise rerank and
+    // its trim, and CRAG's halving have all run. The parent-expansion budget is applied
+    // here so it bounds the response rather than each namespace separately.
+    EnforceParentExpansionBudget(resp, qctx.parent_expand_top_k, qctx.parent_max_bytes);
     json out = resp.ToJson();
     if (!qctx.crag_verdict.empty()) {
         out["meta"]["crag_verdict"] = qctx.crag_verdict;  // F37 §6.3 B-class

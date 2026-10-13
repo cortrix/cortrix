@@ -425,6 +425,69 @@ protected:
     int port_ = -1;
 };
 
+// --- Parent-expansion controls over HTTP ---------------------------------------
+//
+// These controls are a safety limit, so a malformed value must be REPORTED, never
+// quietly coerced. The dangerous coercion is specific: std::stoi stops at the first
+// non-digit, so `parent_max_bytes=0.5` would parse as 0 — and 0 means "no byte cap",
+// which turns a typo into the cap being switched off.
+TEST_F(QueryWiringHttpCoverage, ParentExpansionControlsRejectMalformedValues) {
+    auto expect_400 = [this](const std::string& path, const json& body) {
+        auto response = PostJson(path, body);
+        ASSERT_TRUE(response) << path;
+        EXPECT_EQ(response->status, 400) << path << "\n" << response->body;
+        const json err = json::parse(response->body, nullptr, false);
+        ASSERT_FALSE(err.is_discarded()) << response->body;
+        ASSERT_TRUE(err.contains("error")) << response->body;
+        EXPECT_EQ(err["error"]["code"], "INVALID_ARGUMENT") << response->body;
+    };
+
+    json opted_in = BaseBody();
+    opted_in["include_parent"] = true;
+    opted_in["parent_expand_top_k"] = 1;
+
+    // A fractional byte cap must not degrade to 0 ("no cap").
+    expect_400("/api/v1/query?parent_max_bytes=0.5", opted_in);
+    // Trailing characters are not a number.
+    expect_400("/api/v1/query?parent_max_bytes=100abc", opted_in);
+    expect_400("/api/v1/query?parent_expand_top_k=2x", opted_in);
+    // A lone sign is not a number either.
+    expect_400("/api/v1/query?parent_expand_top_k=-", opted_in);
+    // Beyond a 32-bit signed integer: reported, not wrapped into something plausible.
+    expect_400("/api/v1/query?parent_max_bytes=99999999999999", opted_in);
+
+    json body_fractional = BaseBody();
+    body_fractional["include_parent"] = true;
+    body_fractional["parent_expand_top_k"] = 1;
+    body_fractional["parent_max_bytes"] = 0.5;  // a JSON number, but not an integer
+    expect_400("/api/v1/query", body_fractional);
+
+    json body_out_of_range = BaseBody();
+    body_out_of_range["include_parent"] = true;
+    body_out_of_range["parent_expand_top_k"] = 99999999999999LL;
+    expect_400("/api/v1/query", body_out_of_range);
+
+    json negative = BaseBody();
+    negative["include_parent"] = true;
+    negative["parent_expand_top_k"] = -1;
+    expect_400("/api/v1/query", negative);
+
+    // Opting in without stating the bound: the API asks rather than inventing one.
+    json no_bound = BaseBody();
+    no_bound["include_parent"] = true;
+    expect_400("/api/v1/query", no_bound);
+
+    // The accepted shape still works, so the guards above are not simply rejecting
+    // everything.
+    json valid = BaseBody();
+    valid["include_parent"] = true;
+    valid["parent_expand_top_k"] = 1;
+    valid["parent_max_bytes"] = 4096;
+    auto ok = PostJson("/api/v1/query", valid);
+    ASSERT_TRUE(ok);
+    EXPECT_EQ(ok->status, 200) << ok->body;
+}
+
 TEST_F(QueryWiringHttpCoverage, RequestMatrixExercisesProductionClosure) {
     auto expect_status = [this](const std::string& path, const json& body, int status,
                                 const char* expected_code = nullptr) {

@@ -76,6 +76,25 @@ nlohmann::json DedupToJson(const DeduplicatedChunkInfo& d) {
 
 }  // namespace
 
+void EnforceParentExpansionBudget(CrossNsResponse& resp, int expand_top_k, int max_bytes) {
+    const std::size_t window = expand_top_k > 0 ? static_cast<std::size_t>(expand_top_k) : 0u;
+    long long used_bytes = 0;
+    for (std::size_t i = 0; i < resp.results.size(); ++i) {
+        retrieval::ResultItem& item = resp.results[i];
+        if (item.parent_content.empty()) continue;
+        if (i >= window) {
+            item.parent_content.clear();  // outside the requested depth
+            continue;
+        }
+        const long long cost = static_cast<long long>(item.parent_content.size());
+        if (max_bytes > 0 && used_bytes + cost > static_cast<long long>(max_bytes)) {
+            item.parent_content.clear();  // would push the response past the budget
+            continue;
+        }
+        used_bytes += cost;
+    }
+}
+
 nlohmann::json CrossNsMeta::ToJson() const {
     nlohmann::json j;
     j["namespaces_queried"] = namespaces_queried;

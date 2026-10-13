@@ -70,4 +70,18 @@ struct CrossNsResponse {
     nlohmann::json ToJson() const;
 };
 
+/// Enforce the parent-expansion budget against the response as it will actually be
+/// sent, and nothing earlier.
+///
+/// The per-namespace pass fetches parent text under its own copy of the limits, which
+/// is not a limit on the response: with N namespaces each spending the byte budget, N
+/// times the budget goes on the wire. The stages after the cross-NS gather — RAG-fusion
+/// re-ordering, listwise rerank and its trim back to the requested top_k, CRAG's
+/// ambiguous-verdict halving — also re-order and drop items, so a decision made before
+/// them describes a different list than the caller receives.
+///
+/// Store-free and idempotent: the budget is applied by CLEARING parent text beyond the
+/// limits. `expand_top_k <= 0` clears all of it; `max_bytes <= 0` means no byte cap.
+void EnforceParentExpansionBudget(CrossNsResponse& resp, int expand_top_k, int max_bytes);
+
 }  // namespace cortrix::query

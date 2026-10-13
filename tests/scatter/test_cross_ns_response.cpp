@@ -242,5 +242,93 @@ TEST(CrossNsResponseTest, ToResultItemLeavesParentIdEmptyWhenHitHasNoParent) {
     EXPECT_TRUE(it.parent_content.empty());
 }
 
+// --- EnforceParentExpansionBudget ----------------------------------------------
+//
+// The budget has to bound the RESPONSE. A per-namespace pass honouring the same numbers
+// independently is not a bound: with N namespaces each spending it, N times the budget
+// reaches the caller. And the stages after the gather re-order and drop items, so a
+// decision made before them describes a different list than the one sent.
+
+namespace {
+
+retrieval::ResultItem WithParent(const std::string& child_id, std::size_t parent_bytes) {
+    retrieval::ResultItem it;
+    it.child_id = child_id;
+    it.content = "body of " + child_id;
+    it.parent_content = std::string(parent_bytes, 'x');
+    return it;
+}
+
+}  // namespace
+
+// Two 80-byte parents arriving from two namespaces, each of which honoured a 100-byte
+// budget on its own, must not leave 160 bytes on the wire.
+TEST(EnforceParentExpansionBudgetTest, ByteCapBoundsTheResponseNotEachNamespace) {
+    CrossNsResponse resp;
+    resp.results.push_back(WithParent("c1", 80));
+    resp.results.push_back(WithParent("c2", 80));
+
+    EnforceParentExpansionBudget(resp, /*expand_top_k=*/2, /*max_bytes=*/100);
+
+    EXPECT_EQ(resp.results[0].parent_content.size(), 80u);
+    EXPECT_TRUE(resp.results[1].parent_content.empty())
+        << "the second parent would push the response past the caller's byte budget";
+}
+
+// The depth bound applies to the final ordering, not to whatever each namespace ranked
+// first before the gather re-sorted everything.
+TEST(EnforceParentExpansionBudgetTest, DepthBoundAppliesToTheFinalOrdering) {
+    CrossNsResponse resp;
+    resp.results.push_back(WithParent("c1", 10));
+    resp.results.push_back(WithParent("c2", 10));
+    resp.results.push_back(WithParent("c3", 10));
+
+    EnforceParentExpansionBudget(resp, /*expand_top_k=*/1, /*max_bytes=*/0);
+
+    EXPECT_FALSE(resp.results[0].parent_content.empty());
+    EXPECT_TRUE(resp.results[1].parent_content.empty());
+    EXPECT_TRUE(resp.results[2].parent_content.empty());
+}
+
+// No depth requested keeps no parent text, including text a per-namespace pass already
+// fetched.
+TEST(EnforceParentExpansionBudgetTest, ZeroDepthClearsEverything) {
+    CrossNsResponse resp;
+    resp.results.push_back(WithParent("c1", 10));
+    EnforceParentExpansionBudget(resp, /*expand_top_k=*/0, /*max_bytes=*/0);
+    EXPECT_TRUE(resp.results[0].parent_content.empty());
+}
+
+// A cap below even the first parent keeps none, rather than emitting a partial span.
+TEST(EnforceParentExpansionBudgetTest, CapBelowFirstParentKeepsNone) {
+    CrossNsResponse resp;
+    resp.results.push_back(WithParent("c1", 80));
+    EnforceParentExpansionBudget(resp, /*expand_top_k=*/1, /*max_bytes=*/10);
+    EXPECT_TRUE(resp.results[0].parent_content.empty());
+}
+
+// Called twice with the same limits, nothing further changes — the route applies it
+// after the gather already did.
+TEST(EnforceParentExpansionBudgetTest, IsIdempotent) {
+    CrossNsResponse resp;
+    resp.results.push_back(WithParent("c1", 40));
+    resp.results.push_back(WithParent("c2", 40));
+
+    EnforceParentExpansionBudget(resp, 2, 50);
+    const std::string first = resp.results[0].parent_content;
+    const bool second_cleared = resp.results[1].parent_content.empty();
+
+    EnforceParentExpansionBudget(resp, 2, 50);
+    EXPECT_EQ(resp.results[0].parent_content, first);
+    EXPECT_EQ(resp.results[1].parent_content.empty(), second_cleared);
+}
+
+// An empty result set is a no-op, not a crash.
+TEST(EnforceParentExpansionBudgetTest, EmptyResultSetIsANoOp) {
+    CrossNsResponse resp;
+    EXPECT_NO_THROW(EnforceParentExpansionBudget(resp, 4, 1024));
+    EXPECT_TRUE(resp.results.empty());
+}
+
 }  // namespace
 }  // namespace cortrix::query
