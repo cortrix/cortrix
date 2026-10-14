@@ -592,6 +592,23 @@ TEST_F(FileWatcherTest, ManySmallFilesCreatedQuickly) {
 // process cannot read: the recursive descent inside AddWatchRecursive calls
 // inotify_add_watch on it and gets EACCES -- exactly the "subtree dropped" path.
 TEST_F(FileWatcherTest, FailedAddWatchIsLoggedNotSilent) {
+#if !defined(__linux__)
+    // The condition mirrors the one that SELECTS the implementation
+    // (file_watcher.cpp:173 `#elif defined(__linux__)`), because what this test
+    // exercises is the inotify watcher, not "a platform that is not macOS".
+    //
+    // There is no equivalent to assert elsewhere, and the reason is structural rather
+    // than an omission: the inotify watcher registers a watch per directory while
+    // descending (AddWatchRecursive), so one of those registrations can fail and leave
+    // a subtree unwatched -- which is the whole point of the warning at
+    // file_watcher.cpp:247. The FSEvents watcher creates ONE recursive stream on the
+    // root (file_watcher.cpp:44, kFSEventStreamCreateFlagFileEvents) and never
+    // registers per directory, so the failure mode this test is a regression guard
+    // for cannot occur there. The FSEvents branch logs nothing at all.
+    GTEST_SKIP() << "the dropped-subtree warning is specific to the inotify watcher; "
+                    "FSEvents watches the subtree through one stream on the root and "
+                    "has no per-directory registration that can fail";
+#endif
     if (::geteuid() == 0) GTEST_SKIP() << "root bypasses the EACCES this test relies on";
 
     const auto unreadable = test_dir_ / "unreadable-subdir";
