@@ -396,8 +396,12 @@ Status ReadIntControl(const httplib::Request& req, const json& body, const char*
 
 // Read the bounded parent-expansion controls (RETRIEVAL_TYPES_SPEC §2 v1.2).
 //
-// `include_parent` defaults to false, so an absent param leaves the response
-// byte-identical to before. When it IS true, `parent_expand_top_k` is REQUIRED:
+// `include_parent` defaults to false, so an absent param leaves parent-text
+// expansion off. Note what that does and does not promise: the response is NOT
+// byte-identical to a pre-F34 server, because `parent_id` is now populated on every
+// result regardless of this switch (that is the link itself, not the expansion).
+// What is off by default is the parent TEXT and its span metadata. When
+// `include_parent` IS true, `parent_expand_top_k` is REQUIRED:
 // the bound is a measurement outcome rather than a design constant, so the API
 // refuses to invent one instead of silently expanding a whole top_k (~80 KB of
 // ~1024-token parents, past the agent-side single-response budget, truncated by

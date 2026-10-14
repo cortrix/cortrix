@@ -12,7 +12,15 @@ std::vector<ParentExpansionTarget> SelectParentExpansionTargets(const CrossNsRes
     if (expand_top_k <= 0) return targets;
 
     const std::size_t window = static_cast<std::size_t>(expand_top_k);
-    targets.reserve(window);
+    // Reserve against what can ACTUALLY be selected, never against the raw request
+    // value. `expand_top_k` is a caller-supplied int with no upper bound (there is no
+    // sensible one to pick: "expand everything you return" is a legitimate ask), so
+    // reserving `window` lets parent_expand_top_k=2147483647 request capacity for two
+    // billion entries on a response that holds one result -- or none. The byte budget
+    // cannot stop it either, because it is applied to text that this allocation
+    // precedes. The selected set can never exceed the result count, so that is the
+    // bound.
+    targets.reserve(std::min(window, resp.results.size()));
     for (std::size_t i = 0; i < resp.results.size() && targets.size() < window; ++i) {
         const retrieval::ResultItem& item = resp.results[i];
         if (item.parent_id.empty()) continue;  // nothing to look up; does not use depth

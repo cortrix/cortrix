@@ -100,7 +100,10 @@ struct QueryContext {
     // trip. Opt-in and bounded on purpose: expanding a whole top_k of parents is
     // roughly 80 KB, which overflows the agent-side single-response budget and is
     // truncated by the host, making the answer LESS complete rather than more.
-    bool include_parent = false;  ///< master switch; false = responses byte-identical to before
+    /// Master switch for parent TEXT. false (the default) means no parent_content and
+    /// no span metadata; it does NOT mean the response matches a pre-F34 server, since
+    /// `parent_id` is populated either way.
+    bool include_parent = false;
     int parent_expand_top_k = 0;  ///< how many top-ranked hits to expand; REQUIRED when
                                   ///< include_parent is true (no tuned default is baked in —
                                   ///< the value is a measurement outcome, not a constant)

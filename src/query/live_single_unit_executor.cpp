@@ -732,8 +732,8 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
 
         // 6. Bounded parent expansion (SPEC §2 v1.2) — AFTER the cut, so a lookup is
         //    only spent on hits that are actually being returned. Opt-in: with
-        //    include_parent off (the default) this is a no-op and the response is
-        //    byte-identical to before. Under granularity=auto/both the hybrid fuse
+        //    include_parent off (the default) no parent text is fetched. Under
+        //    granularity=auto/both the hybrid fuse
         //    runs after this and may drop some expanded hits; that redundancy is
         //    bounded by top_k and is accepted for V1.0 (moving the expansion past the
         //    fuse needs the facade re-acquired there — tracked as D-base work).

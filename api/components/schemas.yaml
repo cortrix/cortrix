@@ -263,9 +263,12 @@ components:
           default: false
           description: >-
             Opt in to parent-block expansion: the highest-ranked results also carry the
-            surrounding parent span in `parent_content`. Off by default, and when off the
-            response is byte-identical to one from a server without this control.
-            Requires `parent_expand_top_k` >= 1.
+            surrounding parent span in `parent_content`, plus the span's position in
+            `metadata.parent_token_count` / `parent_byte_start` / `parent_byte_end`.
+            Off by default. What "off" guarantees is precisely that: no parent text and
+            no span metadata. It does not mean the response is unchanged in every field,
+            because `parent_id` is populated on results either way -- that is the link
+            to the parent, not its content. Requires `parent_expand_top_k` >= 1.
         parent_expand_top_k:
           type: integer
           minimum: 0

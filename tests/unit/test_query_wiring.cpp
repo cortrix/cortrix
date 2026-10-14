@@ -600,6 +600,52 @@ TEST_F(QueryWiringHttpCoverage, ParentExpansionHonoursTheByteBoundOverHttp) {
     }
 }
 
+// The depth control reaches the server as an unbounded int. INT_MAX is a legal value
+// meaning "expand everything you return", so it must be SERVED, not rejected -- and
+// serving it must not let the request size an allocation. Over HTTP because that is
+// the surface an unbounded value actually arrives on.
+TEST_F(QueryWiringHttpCoverage, ParentExpansionDepthAtIntMaxIsServedAndBounded) {
+    ASSERT_NO_FATAL_FAILURE(SeedChildBlocksWithParents());
+
+    json body = BaseBody();
+    body["query"] = "semantic memory expansion marker";
+    body["granularity"] = "chunk";
+    body["rerank"] = false;
+    body["top_k"] = 2;
+    body["include_parent"] = true;
+    body["parent_expand_top_k"] = 2147483647;  // INT_MAX
+    body["parent_max_bytes"] = 1024;
+
+    auto response = PostJson("/api/v1/query", body);
+    ASSERT_TRUE(response);
+    ASSERT_EQ(response->status, 200) << response->body;
+    const json parsed = json::parse(response->body);
+    ASSERT_EQ(parsed["results"].size(), 2u) << response->body;
+    // "Expand everything" with both parents inside the byte budget means both carry
+    // text; the depth is honoured, it is only the allocation that is bounded.
+    for (const auto& r : parsed["results"]) {
+        EXPECT_FALSE(r["parent_content"].get<std::string>().empty()) << response->body;
+    }
+}
+
+// Same boundary with nothing to expand: a response that selects no targets must not
+// size anything off the requested depth either.
+TEST_F(QueryWiringHttpCoverage, ParentExpansionDepthAtIntMaxWithNoExpandableResults) {
+    json body = BaseBody();  // the fixture's doc-summary hits carry no parent_id
+    body["granularity"] = "doc";
+    body["include_parent"] = true;
+    body["parent_expand_top_k"] = 2147483647;  // INT_MAX
+    body["parent_max_bytes"] = 1024;
+
+    auto response = PostJson("/api/v1/query", body);
+    ASSERT_TRUE(response);
+    ASSERT_EQ(response->status, 200) << response->body;
+    const json parsed = json::parse(response->body);
+    for (const auto& r : parsed["results"]) {
+        EXPECT_TRUE(r["parent_content"].get<std::string>().empty()) << response->body;
+    }
+}
+
 TEST_F(QueryWiringHttpCoverage, ParentExpansionControlsRejectMalformedValues) {
     auto expect_400 = [this](const std::string& path, const json& body) {
         auto response = PostJson(path, body);

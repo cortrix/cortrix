@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <functional>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -106,6 +107,42 @@ TEST(SelectParentExpansionTargetsTest, ResultsWithoutAParentDoNotConsumeDepth) {
     EXPECT_EQ(targets[0].result_index, 1u);
     EXPECT_EQ(targets[1].parent_id, "p2");
     EXPECT_EQ(targets[1].result_index, 2u);
+}
+
+// The depth is a caller-supplied int with no upper bound, and there is no sensible
+// one to pick -- "expand everything you return" is a legitimate request. So the
+// RESERVATION has to be bounded by what can actually be selected, not by the raw
+// value: reserving the request value lets parent_expand_top_k=INT_MAX ask for two
+// billion entries' worth of capacity on a response that holds one result, or none.
+// The byte budget cannot stop it, because it governs text this allocation precedes.
+//
+// Asserted on capacity rather than on "it did not crash": an allocator that
+// overcommits would hide the defect from a no-throw assertion.
+TEST(SelectParentExpansionTargetsTest, HugeDepthOnAnEmptyResponseReservesNothing) {
+    CrossNsResponse resp;  // no results at all
+    const auto targets = SelectParentExpansionTargets(resp, std::numeric_limits<int>::max());
+    EXPECT_TRUE(targets.empty());
+    EXPECT_EQ(targets.capacity(), 0u) << "nothing can be selected, so nothing may be reserved";
+}
+
+TEST(SelectParentExpansionTargetsTest, HugeDepthWithOneResultReservesOne) {
+    CrossNsResponse resp;
+    resp.results.push_back(Item("c1", "ns_a", "p1"));
+    const auto targets = SelectParentExpansionTargets(resp, std::numeric_limits<int>::max());
+    ASSERT_EQ(targets.size(), 1u);
+    EXPECT_LE(targets.capacity(), resp.results.size())
+        << "capacity must follow the result count, not the requested depth";
+}
+
+// Same bound when most results cannot be expanded at all: the ceiling is the result
+// count, which is what the reservation is allowed to assume.
+TEST(SelectParentExpansionTargetsTest, HugeDepthWithUnexpandableResultsStaysBounded) {
+    CrossNsResponse resp;
+    for (int i = 0; i < 4; ++i) resp.results.push_back(Item("d" + std::to_string(i), "ns_a", ""));
+    resp.results.push_back(Item("c1", "ns_a", "p1"));
+    const auto targets = SelectParentExpansionTargets(resp, std::numeric_limits<int>::max());
+    ASSERT_EQ(targets.size(), 1u);
+    EXPECT_LE(targets.capacity(), resp.results.size());
 }
 
 TEST(SelectParentExpansionTargetsTest, DepthLargerThanTheResultSetIsClamped) {

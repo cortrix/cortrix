@@ -32,8 +32,10 @@ namespace cortrix::query {
 /// because the RULE is the part worth pinning in a unit test; reading the values
 /// off the query string / JSON body is plumbing.
 ///
-/// `include_parent` defaults to false, so an absent control leaves the response
-/// byte-identical to before. When it is true, `expand_top_k >= 1` is REQUIRED: the
+/// `include_parent` defaults to false, so an absent control leaves parent-text
+/// expansion off. It does NOT leave the response byte-identical to a pre-F34 server:
+/// `parent_id` is populated on every result either way. What the switch gates is the
+/// parent TEXT and its span metadata. When it is true, `expand_top_k >= 1` is REQUIRED: the
 /// bound is a measurement outcome, not a design constant, so the API refuses to
 /// invent one rather than silently expanding the whole result set (a full top_k of
 /// ~1024-token parents is roughly 80 KB, past the agent-side single-response
