@@ -120,12 +120,12 @@ async def test_async_upload_and_wait(api_base: str, aclient: AsyncCortrix) -> No
     prog = respx.get(api_base + "/documents/tasks/t1/progress")
     prog.side_effect = [
         httpx.Response(200, json={"task_id": "t1", "status": "processing"}),
-        httpx.Response(200, json={"task_id": "t1", "status": "ready"}),
+        httpx.Response(200, json={"task_id": "t1", "status": "completed"}),
     ]
     task = await aclient.documents.upload_and_wait(
         "ns", io.BytesIO(b"hi"), filename="f.txt", poll_interval=0.0
     )
-    assert task.status == "ready" and prog.call_count == 2
+    assert task.status == "completed" and prog.call_count == 2
 
 
 @respx.mock

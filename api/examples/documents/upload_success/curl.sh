@@ -9,4 +9,4 @@ curl -X POST "https://api.cortrix.io/api/v1/documents" \
     "content": "...",
     "metadata": {"source": "legal_dept", "tags": ["contract", "2026"]}
   }'
-# → HTTP 202 { "task_id": "task_xxx_001", "status": "submitted", ... }
+# → HTTP 202 { "task_id": "task_xxx_001", "namespace": "contracts", "status": "queued" }

@@ -78,7 +78,23 @@ class Document:
 class DocumentTask:
     """F42 async upload task."""
     task_id: str
-    status: Literal["submitted", "queued", "processing", "ready", "failed", "cancelled"]
+    # Hand-applied, against this file's own rule, and deliberately so.
+    #
+    # This file has never matched the generator's output: the last commit to touch it
+    # (6ac60d4) edited one line by hand without touching the spec. Running
+    # scripts/generate_types.py today produces a ~320-line diff, and that regeneration
+    # DELETES four models -- SqlRequest, SqlResult, SyncStatus and MemoryLogRequest --
+    # because the spec no longer describes them. The first three are not merely
+    # re-exported: they are the `response_model` of eight public SDK methods
+    # (resources/sync.py x6, resources/sql.py x2), so regenerating would take
+    # cortrix.sql.* and cortrix.sync.* out of the package entirely.
+    #
+    # The regeneration would also fix a real defect this file carries today --
+    # GcStatus.last_gc_at is declared Optional[str] while the spec and the server both
+    # use int64 epoch milliseconds -- which is a reason to do it properly rather than
+    # to keep hand-editing. Both halves of that drift are reported in issue #142; neither should hold up correcting a status set that is
+    # actively telling callers to wait for a value the server cannot send.
+    status: Literal["queued", "processing", "cancelling", "completed", "failed", "cancelled"]
     document_id: Optional[str] = None
     namespace: Optional[str] = None
     progress: Optional["DocumentProgress"] = None

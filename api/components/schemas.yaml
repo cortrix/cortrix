@@ -173,8 +173,36 @@ components:
           type: string
         status:
           type: string
-          enum: [submitted, queued, processing, ready, failed, cancelled]
+          enum: [queued, processing, cancelling, completed, failed, cancelled]
           example: processing
+          description: >-
+            The task's lifecycle state, as reported by
+            `GET /documents/tasks/{task_id}/progress`. On that endpoint these are
+            exactly the values you can receive: the status is read straight from the
+            tasks table, whose CHECK constraint admits this set and no other.
+
+            The acceptance response of `POST /documents` also uses this schema, and
+            there `status` is always `queued` — it is a fresh enqueue, not a reading
+            of the table.
+
+            `completed` is the terminal success state — wait for it, not for `ready`.
+
+            `cancelling` is transient and observable, but it is not the only way a
+            cancel resolves. Cancelling a task that has not started yet moves it
+            straight to `cancelled`; cancelling one that is already running marks it
+            and lets the worker stop at its next checkpoint, so a poll in between can
+            observe `cancelling`. A cancel that arrives late can still finish as
+            `completed` or `failed` — requesting cancellation is not a guarantee of
+            the outcome, only of the request being recorded.
+
+            Two values were listed here previously and are removed because the server
+            never emitted either, and listing them led callers to wait for a value that
+            never arrives. `ready` belongs to `Document.status`, which is a separate
+            state machine for the document rather than for the task that processes it.
+            `submitted` is the per-item acceptance marker in the `POST /documents/batch`
+            response, not a task state; a task created by that endpoint starts at
+            `queued` like any other. If you wrote code against either value on this
+            field, it has been unreachable since the endpoint shipped.
         progress:
           $ref: '#/components/schemas/DocumentProgress'
         created_at:

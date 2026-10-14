@@ -21,7 +21,7 @@ def test_upload_filepath_sends_content_json(api_base: str, client: Cortrix, tmp_
     p = tmp_path / "report.txt"
     p.write_text("hello world", encoding="utf-8")
     route = respx.post(api_base + "/documents").mock(
-        return_value=httpx.Response(202, json={"task_id": "task_1", "status": "submitted"})
+        return_value=httpx.Response(202, json={"task_id": "task_1", "status": "queued"})
     )
     task = client.documents.upload("contracts", str(p), metadata={"src": "legal"})
     assert isinstance(task, DocumentTask) and task.task_id == "task_1"
@@ -126,10 +126,10 @@ def test_upload_and_wait_polls_to_terminal(api_base: str, client: Cortrix, tmp_p
     prog = respx.get(api_base + "/documents/tasks/t1/progress")
     prog.side_effect = [
         httpx.Response(200, json={"task_id": "t1", "status": "processing"}),
-        httpx.Response(200, json={"task_id": "t1", "status": "ready"}),
+        httpx.Response(200, json={"task_id": "t1", "status": "completed"}),
     ]
     task = client.documents.upload_and_wait("ns", str(p), poll_interval=0.0)
-    assert task.status == "ready"
+    assert task.status == "completed"
     assert prog.call_count == 2
 
 
@@ -166,13 +166,16 @@ def test_upload_and_wait_timeout_raises(api_base: str, client: Cortrix, tmp_path
     assert ei.value.category == "timeout"
 
 
-# The two names for a finished upload. The server reports "completed"
-# (include/cortrix/async/task_info.h) while the OpenAPI DocumentTask.status enum
-# names it "ready", and upload_and_wait stops on either. Pinning both means a change
-# on one side cannot quietly reintroduce the hang this helper exists to avoid.
+# Every terminal state ends the wait, and the success one is `completed`.
+#
+# This replaces a guard that parametrized ["completed", "ready"] and claimed that
+# pinning both meant "a change on one side cannot quietly reintroduce the hang".
+# It could not: `ready` was never a task status, so the pair pinned a real value
+# against a fictional one, and the guard stayed green through the very change it
+# was written to catch. Pinning the real set is what actually guards it.
 @respx.mock
-@pytest.mark.parametrize("terminal", ["completed", "ready"])
-def test_upload_and_wait_stops_on_either_finished_name(
+@pytest.mark.parametrize("terminal", ["completed", "failed", "cancelled"])
+def test_upload_and_wait_stops_on_every_terminal_state(
     api_base: str, client: Cortrix, tmp_path, terminal: str
 ) -> None:
     p = tmp_path / "a.txt"
@@ -188,6 +191,46 @@ def test_upload_and_wait_stops_on_either_finished_name(
     task = client.documents.upload_and_wait("ns", str(p), poll_interval=0.0)
     assert task.status == terminal
     assert prog.call_count == 2
+
+
+# The terminal set pinned directly, in both directions.
+#
+# A behavioural test cannot catch a value being added back: no server sends `ready`,
+# so re-adding it to the set breaks nothing a mock can show. Only asserting the set
+# itself catches that -- which is the same hole that let the previous guard here stay
+# green while the declaration it was guarding changed underneath it.
+def test_terminal_task_states_is_exactly_the_servers_terminal_set() -> None:
+    from cortrix.resources.documents import _TERMINAL_TASK_STATES
+
+    assert _TERMINAL_TASK_STATES == {"completed", "failed", "cancelled"}
+    assert "ready" not in _TERMINAL_TASK_STATES, "`ready` is Document.status, not a task state"
+    assert "cancelling" not in _TERMINAL_TASK_STATES, "`cancelling` is transient, not terminal"
+    assert "queued" not in _TERMINAL_TASK_STATES and "processing" not in _TERMINAL_TASK_STATES
+
+
+# `cancelling` must NOT end the wait. It is the window between a cancel request and
+# the worker stopping at its next checkpoint, so a helper that treated it as terminal
+# would hand back a task that is still running and still writing. Nothing pinned this
+# before; the status was simply absent from the declaration it was being checked
+# against, so the correct behaviour held by accident rather than by assertion.
+@respx.mock
+def test_upload_and_wait_keeps_waiting_through_cancelling(
+    api_base: str, client: Cortrix, tmp_path
+) -> None:
+    p = tmp_path / "a.txt"
+    p.write_text("hi", encoding="utf-8")
+    respx.post(api_base + "/documents").mock(
+        return_value=httpx.Response(202, json={"task_id": "t1", "status": "queued"})
+    )
+    prog = respx.get(api_base + "/documents/tasks/t1/progress")
+    prog.side_effect = [
+        httpx.Response(200, json={"task_id": "t1", "status": "processing"}),
+        httpx.Response(200, json={"task_id": "t1", "status": "cancelling"}),
+        httpx.Response(200, json={"task_id": "t1", "status": "cancelled"}),
+    ]
+    task = client.documents.upload_and_wait("ns", str(p), poll_interval=0.0)
+    assert task.status == "cancelled", "the wait must resolve past cancelling"
+    assert prog.call_count == 3, "cancelling must not short-circuit the poll"
 
 
 # The unhappy terminal states end the wait too, and are RETURNED rather than raised:

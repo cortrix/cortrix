@@ -69,3 +69,33 @@ def test_generated_module_exports_34_models() -> None:
 
     assert len(_generated.__all__) == 34
     assert "QueryResult" in _generated.__all__ and "GcStatus" in _generated.__all__
+
+
+# The declared task-status set must be exactly what the server can emit. The server's
+# set is enforced by a CHECK constraint on the tasks table, so it cannot drift at
+# runtime; what has drifted historically is this declaration.
+#
+# It mattered: the published spec listed `ready` and `submitted`, which the server
+# never emits on this field (`ready` belongs to Document.status, a different state
+# machine; `submitted` is the batch endpoint's per-item acceptance marker), and it
+# omitted `completed`, which is the only terminal success value there is. A caller
+# following the declaration waited for a value that never arrives, and a type checker
+# reported the correct comparison -- `task.status == "completed"` -- as impossible.
+def test_document_task_status_literal_is_exactly_the_server_emitted_set() -> None:
+    import typing
+
+    from cortrix.types._generated import DocumentTask
+
+    declared = set(typing.get_args(typing.get_type_hints(DocumentTask)["status"]))
+    assert declared == {
+        "queued",
+        "processing",
+        "cancelling",
+        "completed",
+        "failed",
+        "cancelled",
+    }
+    # Stated separately so a failure says which way it drifted.
+    assert "completed" in declared, "the terminal success value must be declared"
+    assert "ready" not in declared, "`ready` is Document.status, not DocumentTask.status"
+    assert "submitted" not in declared, "`submitted` is a batch-response marker"

@@ -40,10 +40,24 @@ PATH_BATCH = "/documents/batch"
 # on_duplicate policy values (TD-F42-BULK §2.2 options.on_duplicate).
 _ON_DUPLICATE_VALUES = frozenset({"skip", "overwrite", "error"})
 
-# Terminal async-task states. The server reports a finished task as "completed"
-# (include/cortrix/async/task_info.h); the OpenAPI DocumentTask.status enum names
-# it "ready". Both end the wait.
-_TERMINAL_TASK_STATES = frozenset({"completed", "ready", "failed", "cancelled"})
+# Terminal async-task states, i.e. the ones that end a wait.
+#
+# Authority is the server's own state machine (include/cortrix/async/task_info.h),
+# which the tasks table pins with a CHECK constraint -- not the OpenAPI enum, which
+# named a value the server has never emitted and omitted the only terminal success
+# state. `completed` is that success state.
+#
+# `cancelling` is deliberately NOT here: it is the transient state a RUNNING task
+# enters when cancellation is requested, so a wait must keep going until it resolves.
+# What it resolves to is not fixed -- a late cancel can still land on `completed` or
+# `failed`. (A task cancelled before it starts never passes through `cancelling` at
+# all; it goes straight to `cancelled` -- src/async/task_manager.cpp:629-632.)
+#
+# `ready` was previously in this set. It is removed rather than kept as tolerance
+# because no server version has ever emitted it on a task: it belongs to
+# Document.status, a different state machine. Keeping a dead member here is what let
+# the declaration and the runtime disagree in the first place.
+_TERMINAL_TASK_STATES = frozenset({"completed", "failed", "cancelled"})
 _DEFAULT_POLL_INTERVAL = 1.0
 _DEFAULT_WAIT_TIMEOUT = 300.0
 
@@ -153,12 +167,12 @@ class Documents(SyncResource):
     ) -> DocumentTask:
         """Sync sugar: upload then poll until the task reaches a terminal state.
 
-        Returns the final ``DocumentTask``. A finished upload arrives as either
-        ``completed`` or ``ready`` -- the server reports the first
-        (``include/cortrix/async/task_info.h``) while the OpenAPI
-        ``DocumentTask.status`` enum names the second, and this waits for either,
-        so compare against both rather than hard-coding one. The other terminal
-        states are ``failed`` and ``cancelled``.
+        Returns the final ``DocumentTask``. A finished upload arrives as
+        ``completed``; the other terminal states are ``failed`` and ``cancelled``.
+        ``cancelling`` does not end the wait. It is the window after cancelling a
+        task that is already running; a task cancelled before it starts goes straight
+        to ``cancelled``, and a cancel that arrives late can still finish as
+        ``completed`` or ``failed``.
 
         Raises ``cortrix.TimeoutError`` if ``timeout`` elapses first. It subclasses
         ``CortrixError`` and carries ``category="timeout"`` and ``retryable=True``,
@@ -278,9 +292,8 @@ class AsyncDocuments(AsyncResource):
     ) -> DocumentTask:
         """Async sugar: upload then poll until a terminal state.
 
-        Terminal states are ``completed`` or ``ready`` (the same finished upload
-        under two names -- see the sync version), plus ``failed`` and ``cancelled``.
-        Raises ``cortrix.TimeoutError`` on timeout, as the sync version does.
+        Terminal states are ``completed``, ``failed`` and ``cancelled``; see the
+        sync version. Raises ``cortrix.TimeoutError`` on timeout, as it does.
         """
         task = await self.upload(namespace, file, filename=filename, metadata=metadata)
         deadline = time.monotonic() + timeout
