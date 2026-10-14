@@ -9,7 +9,10 @@ import httpx
 import pytest
 import respx
 
-from cortrix import AsyncCortrix, AuthenticationError
+# Imported as a module, not `from cortrix import TimeoutError`: the bare name would
+# shadow the builtin here and make the assertion ambiguous to a reader.
+import cortrix
+from cortrix import AsyncCortrix, AuthenticationError, CortrixError
 from cortrix.types import DocumentTask, MemorySearchResponse, QueryResult
 
 _QUERY_OK = {
@@ -139,6 +142,43 @@ async def test_async_upload_and_wait_stops_on_completed(api_base: str, aclient: 
         "ns", io.BytesIO(b"hi"), filename="f.txt", poll_interval=0.0
     )
     assert task.status == "completed" and prog.call_count == 2
+
+
+@respx.mock
+@pytest.mark.parametrize("terminal", ["failed", "cancelled"])
+async def test_async_upload_and_wait_returns_on_unhappy_terminal_states(
+    api_base: str, aclient: AsyncCortrix, terminal: str
+) -> None:
+    respx.post(api_base + "/documents").mock(
+        return_value=httpx.Response(202, json={"task_id": "t1", "status": "queued"})
+    )
+    prog = respx.get(api_base + "/documents/tasks/t1/progress")
+    prog.side_effect = [
+        httpx.Response(200, json={"task_id": "t1", "status": "processing"}),
+        httpx.Response(200, json={"task_id": "t1", "status": terminal}),
+    ]
+    task = await aclient.documents.upload_and_wait(
+        "ns", io.BytesIO(b"hi"), filename="f.txt", poll_interval=0.0
+    )
+    assert task.status == terminal and prog.call_count == 2
+
+
+@respx.mock
+async def test_async_upload_and_wait_timeout_raises_the_documented_type(
+    api_base: str, aclient: AsyncCortrix
+) -> None:
+    respx.post(api_base + "/documents").mock(
+        return_value=httpx.Response(202, json={"task_id": "t1", "status": "queued"})
+    )
+    respx.get(api_base + "/documents/tasks/t1/progress").mock(
+        return_value=httpx.Response(200, json={"task_id": "t1", "status": "processing"})
+    )
+    with pytest.raises(cortrix.TimeoutError) as ei:
+        await aclient.documents.upload_and_wait(
+            "ns", io.BytesIO(b"hi"), filename="f.txt", poll_interval=0.0, timeout=0.0
+        )
+    assert isinstance(ei.value, CortrixError), "must stay catchable as the base class"
+    assert ei.value.category == "timeout"
 
 
 @respx.mock

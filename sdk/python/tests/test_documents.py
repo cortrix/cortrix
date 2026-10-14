@@ -9,6 +9,9 @@ import httpx
 import pytest
 import respx
 
+# Imported as a module, not `from cortrix import TimeoutError`: the bare name would
+# shadow the builtin here and make the assertion ambiguous to a reader.
+import cortrix
 from cortrix import Cortrix, CortrixError, InvalidRequestError
 from cortrix.types import Document, DocumentList, DocumentTask
 
@@ -161,6 +164,77 @@ def test_upload_and_wait_timeout_raises(api_base: str, client: Cortrix, tmp_path
     with pytest.raises(CortrixError) as ei:
         client.documents.upload_and_wait("ns", str(p), poll_interval=0.0, timeout=0.0)
     assert ei.value.category == "timeout"
+
+
+# The two names for a finished upload. The server reports "completed"
+# (include/cortrix/async/task_info.h) while the OpenAPI DocumentTask.status enum
+# names it "ready", and upload_and_wait stops on either. Pinning both means a change
+# on one side cannot quietly reintroduce the hang this helper exists to avoid.
+@respx.mock
+@pytest.mark.parametrize("terminal", ["completed", "ready"])
+def test_upload_and_wait_stops_on_either_finished_name(
+    api_base: str, client: Cortrix, tmp_path, terminal: str
+) -> None:
+    p = tmp_path / "a.txt"
+    p.write_text("hi", encoding="utf-8")
+    respx.post(api_base + "/documents").mock(
+        return_value=httpx.Response(202, json={"task_id": "t1", "status": "queued"})
+    )
+    prog = respx.get(api_base + "/documents/tasks/t1/progress")
+    prog.side_effect = [
+        httpx.Response(200, json={"task_id": "t1", "status": "processing"}),
+        httpx.Response(200, json={"task_id": "t1", "status": terminal}),
+    ]
+    task = client.documents.upload_and_wait("ns", str(p), poll_interval=0.0)
+    assert task.status == terminal
+    assert prog.call_count == 2
+
+
+# The unhappy terminal states end the wait too, and are RETURNED rather than raised:
+# a document that failed to process is an outcome the caller inspects, not an error
+# in the call. Previously only the success and timeout paths were covered, so a
+# regression that left "failed" out of the terminal set would have hung until the
+# timeout with no test noticing.
+@respx.mock
+@pytest.mark.parametrize("terminal", ["failed", "cancelled"])
+def test_upload_and_wait_returns_on_unhappy_terminal_states(
+    api_base: str, client: Cortrix, tmp_path, terminal: str
+) -> None:
+    p = tmp_path / "a.txt"
+    p.write_text("hi", encoding="utf-8")
+    respx.post(api_base + "/documents").mock(
+        return_value=httpx.Response(202, json={"task_id": "t1", "status": "queued"})
+    )
+    prog = respx.get(api_base + "/documents/tasks/t1/progress")
+    prog.side_effect = [
+        httpx.Response(200, json={"task_id": "t1", "status": "processing"}),
+        httpx.Response(200, json={"task_id": "t1", "status": terminal}),
+    ]
+    task = client.documents.upload_and_wait("ns", str(p), poll_interval=0.0)
+    assert task.status == terminal
+    assert prog.call_count == 2
+
+
+# The docstring promises TimeoutError. A caller who follows it and writes
+# `except cortrix.TimeoutError` must actually catch the timeout -- and because that
+# class subclasses CortrixError, a caller who catches the base class still does too.
+@respx.mock
+def test_upload_and_wait_timeout_raises_the_documented_type(
+    api_base: str, client: Cortrix, tmp_path
+) -> None:
+    p = tmp_path / "a.txt"
+    p.write_text("hi", encoding="utf-8")
+    respx.post(api_base + "/documents").mock(
+        return_value=httpx.Response(202, json={"task_id": "t1", "status": "queued"})
+    )
+    respx.get(api_base + "/documents/tasks/t1/progress").mock(
+        return_value=httpx.Response(200, json={"task_id": "t1", "status": "processing"})
+    )
+    with pytest.raises(cortrix.TimeoutError) as ei:
+        client.documents.upload_and_wait("ns", str(p), poll_interval=0.0, timeout=0.0)
+    assert isinstance(ei.value, CortrixError), "must stay catchable as the base class"
+    assert ei.value.category == "timeout"
+    assert ei.value.retryable is True
 
 
 # --- batch_submit (TD-F42-BULK) ---
