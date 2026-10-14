@@ -123,11 +123,26 @@ def test_upload_and_wait_polls_to_terminal(api_base: str, client: Cortrix, tmp_p
     prog = respx.get(api_base + "/documents/tasks/t1/progress")
     prog.side_effect = [
         httpx.Response(200, json={"task_id": "t1", "status": "processing"}),
-        httpx.Response(200, json={"task_id": "t1", "status": "ready"}),
+        httpx.Response(200, json={"task_id": "t1", "status": "completed"}),
     ]
     task = client.documents.upload_and_wait("ns", str(p), poll_interval=0.0)
-    assert task.status == "ready"
+    assert task.status == "completed"
     assert prog.call_count == 2
+
+
+# Guards the set directly, because the behavioural test above cannot.
+#
+# Before this fix, that test mocked "ready" and asserted "ready" -- so it passed
+# while every real upload ran to the timeout, because the server reports
+# "completed" and "completed" was not in the terminal set. A test that supplies
+# its own fixture can agree with a wrong constant indefinitely. Asserting the set
+# itself is what catches that.
+def test_terminal_task_states_matches_what_the_server_reports() -> None:
+    from cortrix.resources.documents import _TERMINAL_TASK_STATES
+
+    assert _TERMINAL_TASK_STATES == {"completed", "failed", "cancelled"}
+    assert "ready" not in _TERMINAL_TASK_STATES, "`ready` is Document.status, not a task state"
+    assert "cancelling" not in _TERMINAL_TASK_STATES, "`cancelling` is transient"
 
 
 @respx.mock

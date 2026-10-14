@@ -36,8 +36,18 @@ PATH_BATCH = "/documents/batch"
 # on_duplicate policy values (TD-F42-BULK §2.2 options.on_duplicate).
 _ON_DUPLICATE_VALUES = frozenset({"skip", "overwrite", "error"})
 
-# Terminal async-task states (F42 DocumentTask.status enum).
-_TERMINAL_TASK_STATES = frozenset({"ready", "failed", "cancelled"})
+# Terminal async-task states, i.e. the ones that end a wait.
+#
+# Authority is the server's own state machine (include/cortrix/async/task_info.h),
+# which the tasks table pins with a CHECK constraint. A finished task reports
+# `completed`. The OpenAPI enum used to name `ready` instead and omit `completed`,
+# and this set was built from the enum rather than from the server -- so every
+# successful upload ran to the timeout. `ready` belongs to Document.status, a
+# different state machine, and has never been emitted on a task.
+#
+# `cancelling` is deliberately absent: it is transient, and a wait must continue
+# until it resolves.
+_TERMINAL_TASK_STATES = frozenset({"completed", "failed", "cancelled"})
 _DEFAULT_POLL_INTERVAL = 1.0
 _DEFAULT_WAIT_TIMEOUT = 300.0
 
@@ -147,7 +157,7 @@ class Documents(SyncResource):
     ) -> DocumentTask:
         """Sync sugar: upload then poll until the task reaches a terminal state.
 
-        Returns the final ``DocumentTask`` (status ready/failed/cancelled).
+        Returns the final ``DocumentTask`` (status completed/failed/cancelled).
         Raises ``TimeoutError`` if ``timeout`` elapses first.
         """
         task = self.upload(namespace, file, filename=filename, metadata=metadata)
@@ -262,7 +272,7 @@ class AsyncDocuments(AsyncResource):
         poll_interval: float = _DEFAULT_POLL_INTERVAL,
         timeout: float = _DEFAULT_WAIT_TIMEOUT,
     ) -> DocumentTask:
-        """Async sugar: upload then poll until a terminal state (ready/failed/cancelled)."""
+        """Async sugar: upload then poll until a terminal state (completed/failed/cancelled)."""
         task = await self.upload(namespace, file, filename=filename, metadata=metadata)
         deadline = time.monotonic() + timeout
         while task.status not in _TERMINAL_TASK_STATES:
