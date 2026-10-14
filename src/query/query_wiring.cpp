@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -41,6 +42,7 @@
 #include "cortrix/llm/i_llm_client.h"
 #include "cortrix/logging/logging.h"
 #include "cortrix/memory/memory_block_adapter.h"
+#include "cortrix/query/parent_expansion.h"
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/reranker.h"
 #include "cortrix/reranker/reranker_config.h"
@@ -157,6 +159,22 @@ std::shared_ptr<IComplexityClassifierBackend> MakeComplexityBackend(
 }
 
 }  // namespace
+
+Status ValidateParentExpansion(bool include_parent, int expand_top_k, int max_bytes) {
+    if (expand_top_k < 0) {
+        return Status::InvalidArgument("parent_expand_top_k must not be negative");
+    }
+    if (max_bytes < 0) {
+        return Status::InvalidArgument("parent_max_bytes must not be negative");
+    }
+    if (include_parent && expand_top_k < 1) {
+        return Status::InvalidArgument(
+            "include_parent=true requires parent_expand_top_k >= 1 (how many of the "
+            "returned hits to expand); expanding the whole result set overflows the "
+            "single-response budget");
+    }
+    return Status::Ok();
+}
 
 struct CrossNsQueryWiring::Impl {
     Impl(cortrix::resource::INamespacePool& pool, cortrix::OnnxEmbedder& embedder,
@@ -318,6 +336,106 @@ Status ReadCragEnabled(const httplib::Request& req, const json& body, bool* out)
         *out = *parsed;
     }
     return Status::Ok();
+}
+
+// Read one integer request control (query-string wins over the JSON body, same
+// precedence as ?route / ?granularity / ?crag). Absent leaves *out untouched so the
+// caller keeps its own default. Range checking belongs to the rule function
+// (ValidateParentExpansion), not here.
+// Parse a query-string integer in FULL, rejecting anything with leftover characters.
+//
+// std::stoi stops at the first non-digit, so "0.5" parses as 0 and "12abc" as 12. For a
+// safety limit that is the worst failure mode available: `parent_max_bytes=0.5` would
+// silently become 0, and 0 means "no byte cap" — a typo would switch the cap OFF rather
+// than be reported. Parsed wide so the range check happens before any narrowing.
+bool ParseStrictInt(const std::string& text, long long* out) {
+    if (out == nullptr || text.empty()) return false;
+    std::size_t i = (text[0] == '+' || text[0] == '-') ? 1u : 0u;
+    if (i >= text.size()) return false;  // a lone sign
+    for (std::size_t k = i; k < text.size(); ++k) {
+        if (text[k] < '0' || text[k] > '9') return false;  // no partial acceptance
+    }
+    try {
+        *out = std::stoll(text);
+    } catch (const std::exception&) {
+        return false;  // beyond long long
+    }
+    return true;
+}
+
+Status ReadIntControl(const httplib::Request& req, const json& body, const char* name, int* out) {
+    if (out == nullptr) return Status::InvalidArgument("int output pointer is null");
+    const std::string field(name);
+    const std::string range_msg = field + " is out of range (must fit in a 32-bit signed integer)";
+    if (body.is_object() && body.contains(field)) {
+        if (!body[field].is_number_integer()) {
+            return Status::InvalidArgument(field + " must be an integer when supplied in body");
+        }
+        // Read wide, check, then narrow. Reading as int first would silently truncate a
+        // JSON integer that does not fit, turning an out-of-range request into a
+        // plausible-looking small one.
+        const long long wide = body[field].get<long long>();
+        if (wide < std::numeric_limits<int>::min() || wide > std::numeric_limits<int>::max()) {
+            return Status::InvalidArgument(range_msg);
+        }
+        *out = static_cast<int>(wide);
+    }
+    if (req.has_param(field)) {
+        long long wide = 0;
+        if (!ParseStrictInt(req.get_param_value(field), &wide)) {
+            return Status::InvalidArgument(field +
+                                           " must be an integer with no trailing characters");
+        }
+        if (wide < std::numeric_limits<int>::min() || wide > std::numeric_limits<int>::max()) {
+            return Status::InvalidArgument(range_msg);
+        }
+        *out = static_cast<int>(wide);
+    }
+    return Status::Ok();
+}
+
+// Read the bounded parent-expansion controls (RETRIEVAL_TYPES_SPEC §2 v1.2).
+//
+// `include_parent` defaults to false, so an absent param leaves parent-text
+// expansion off. Note what that does and does not promise: the response is NOT
+// byte-identical to a pre-F34 server, because `parent_id` is now populated on every
+// result regardless of this switch (that is the link itself, not the expansion).
+// What is off by default is the parent TEXT and its span metadata. When
+// `include_parent` IS true, `parent_expand_top_k` is REQUIRED:
+// the bound is a measurement outcome rather than a design constant, so the API
+// refuses to invent one instead of silently expanding a whole top_k (~80 KB of
+// ~1024-token parents, past the agent-side single-response budget, truncated by
+// the host). `parent_max_bytes` stays optional (0 = no extra byte cap).
+Status ReadParentExpansion(const httplib::Request& req, const json& body, bool* include_parent,
+                           int* expand_top_k, int* max_bytes) {
+    if (include_parent == nullptr || expand_top_k == nullptr || max_bytes == nullptr) {
+        return Status::InvalidArgument("parent expansion output pointer is null");
+    }
+    *include_parent = false;
+    *expand_top_k = 0;
+    *max_bytes = 0;
+
+    if (body.is_object() && body.contains("include_parent")) {
+        if (!body["include_parent"].is_boolean()) {
+            return Status::InvalidArgument(
+                "include_parent must be a boolean when supplied in body");
+        }
+        *include_parent = body["include_parent"].get<bool>();
+    }
+    if (req.has_param("include_parent")) {
+        std::optional<bool> parsed = ParseBoolToken(req.get_param_value("include_parent"));
+        if (!parsed.has_value()) {
+            return Status::InvalidArgument("include_parent must be one of: true, false, 1, 0");
+        }
+        *include_parent = *parsed;
+    }
+
+    Status s = ReadIntControl(req, body, "parent_expand_top_k", expand_top_k);
+    if (!s.ok()) return s;
+    s = ReadIntControl(req, body, "parent_max_bytes", max_bytes);
+    if (!s.ok()) return s;
+
+    return ValidateParentExpansion(*include_parent, *expand_top_k, *max_bytes);
 }
 
 // Build the per-request QueryContext that carries both the F04 execution fields
@@ -693,8 +811,46 @@ std::string BuildQueryParamsSummary(const QueryContext& qctx) {
 // Serialize a scatter response, applying the F37 CRAG verdict action + surfacing
 // meta.crag_verdict (B-class) when F37 ran (Complex route). CragStage is a no-op on
 // simple/chat (ShouldSkipF37) so this is safe to call on every scatter path.
-json SerializeWithCrag(CrossNsResponse& resp, QueryContext& qctx, CragStage* crag) {
+// Fetch the selected parents for one namespace. The facade lives exactly as long as
+// that namespace's lookups, so there is never a store pointer outliving its acquire.
+// An unresolvable namespace yields nothing: a parent that cannot be read degrades the
+// expansion, it never fails a query that already has its chunk text.
+std::vector<CortrixParent> FetchNamespaceParents(cortrix::resource::INamespacePool& pool,
+                                                 const std::string& namespace_id,
+                                                 const std::vector<std::string>& parent_ids) {
+    std::vector<CortrixParent> rows;
+    if (parent_ids.empty()) return rows;
+    cortrix::resource::NamespaceFacade facade(pool, namespace_id);
+    if (!facade.Acquire().ok()) return rows;
+    rows.reserve(parent_ids.size());
+    for (const std::string& id : parent_ids) {
+        CortrixParent parent;
+        if (facade.store().parent_get(id, parent) != 0) continue;  // dangling / unsupported
+        rows.push_back(std::move(parent));
+    }
+    return rows;
+}
+
+json SerializeWithCrag(CrossNsResponse& resp, QueryContext& qctx, CragStage* crag,
+                       cortrix::resource::INamespacePool* pool) {
     crag->Apply(resp, qctx);
+    // LAST point at which `results` changes: RAG-fusion re-ordering, listwise rerank and
+    // its trim, and CRAG's halving have all run. Parent expansion is RESOLVED here, not
+    // inside a namespace, because which results deserve parent text can only be read off
+    // the order the caller actually receives — a hit promoted by the listwise rerank has
+    // to be the one that gets expanded, and no later pass can fetch text, only clear it.
+    if (qctx.include_parent && pool != nullptr) {
+        const auto targets = SelectParentExpansionTargets(resp, qctx.parent_expand_top_k);
+        const ParentTextByKey parents = FetchParentsForTargets(
+            targets, [pool](const std::string& ns, const std::vector<std::string>& ids) {
+                return FetchNamespaceParents(*pool, ns, ids);
+            });
+        ApplyParentExpansion(resp, targets, parents, qctx.parent_max_bytes);
+    }
+    // Authoritative post-condition, recomputed from scratch rather than trusted: any
+    // path that fills parent text somewhere else still cannot push the response past
+    // the caller's depth or byte bound.
+    EnforceParentExpansionBudget(resp, qctx.parent_expand_top_k, qctx.parent_max_bytes);
     json out = resp.ToJson();
     if (!qctx.crag_verdict.empty()) {
         out["meta"]["crag_verdict"] = qctx.crag_verdict;  // F37 §6.3 B-class
@@ -784,6 +940,15 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                 return;
             }
             qctx.enable_crag = crag_enabled;
+
+            // Bounded parent expansion (RETRIEVAL_TYPES_SPEC §2 v1.2). Validated here
+            // so a missing bound is a clean 400 before any retrieval work starts.
+            Status parent_status = ReadParentExpansion(
+                req, body, &qctx.include_parent, &qctx.parent_expand_top_k, &qctx.parent_max_bytes);
+            if (!parent_status.ok()) {
+                WriteJsonError(res, parent_status, ctx.request_id);
+                return;
+            }
 
             std::optional<std::string> route_override = ReadRouteOverride(req, body);
             Status routed = classifier->RouteAndUpdateContext(qctx, route_override);
@@ -903,7 +1068,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                         "results=" + std::to_string(resp.results.size()) +
                             " coverage=" + std::to_string(resp.meta.coverage_ratio),
                         QueryTextSummary(qctx), std::nullopt, "");
-                    json out = SerializeWithCrag(resp, qctx, crag_stage);
+                    json out = SerializeWithCrag(resp, qctx, crag_stage, pool);
                     if (explain) {
                         // C-class debug fields surface only when a capability ran AND
                         // failed (SPEC §3); on this path the router's transient-inference

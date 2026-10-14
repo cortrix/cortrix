@@ -35,6 +35,9 @@
 #include "httplib.h"
 
 #include "cortrix/auth/api_key_auth.h"
+#include "cortrix/common/block_header.h"
+#include "cortrix/common/block_types.h"
+#include "cortrix/id/hash.h"
 #include "cortrix/llm/i_llm_client.h"
 #include "cortrix/memory/memory_block_adapter.h"
 #include "cortrix/query/complexity_config.h"
@@ -402,6 +405,57 @@ protected:
         }
     }
 
+    // Two documents, one child block each, each child linked to its OWN parent, all
+    // in the real facade store. Separate documents on purpose: under granularity=auto
+    // the hybrid fuse keeps one representative per document, which would collapse two
+    // children of the same document before the expansion is ever reached.
+    //
+    // The parents are different sizes so a byte cap can be aimed between them, and
+    // their text is distinguishable so the assertions can say WHICH parent arrived.
+    void SeedChildBlocksWithParents() {
+        cortrix::resource::NamespaceFacade facade(harness_->ipool(), kNamespace);
+        ASSERT_TRUE(facade.Acquire().ok());
+        cortrix::CortrixStore& store = facade.store();
+
+        for (int i = 1; i <= 2; ++i) {
+            const std::string n = std::to_string(i);
+            cortrix::CortrixDoc d;
+            d.source_type = "unit";
+            d.source_path = "parent-expansion-" + n + ".md";
+            ASSERT_EQ(store.doc_create(d), 0);
+
+            cortrix::CortrixParent p;
+            p.parent_id = "01HXPARENTEXPAND000000000" + n;
+            p.doc_id = d.doc_id;
+            p.namespace_id = kNamespace;
+            // 40 and 80 bytes: a cap of 60 admits the first and refuses the second.
+            p.parent_text = std::string(i == 1 ? 40u : 80u, i == 1 ? 'A' : 'B');
+            p.token_count = 10 * i;
+            p.byte_offset_start = 1000 * i;
+            p.byte_offset_end = p.byte_offset_start +
+                                static_cast<int64_t>(p.parent_text.size());
+            ASSERT_EQ(store.parent_insert(p), 0);
+
+            cortrix::CortrixBlock b;
+            b.doc_id = d.doc_id;
+            b.chunk_index = 0;
+            b.block_type = cortrix::kBlockFile;
+            b.processing_level = cortrix::kLevelL2;
+            b.child_id = "01HXCHILDEXPAND0000000000" + n;
+            // The query path resolves a child by HashChildIdToBlockId(child_id), so the
+            // seeded row has to carry that exact block_id rather than a rowid.
+            b.block_id = cortrix::id::HashChildIdToBlockId(b.child_id);
+            b.parent_id = p.parent_id;
+            b.content_text = "semantic memory expansion marker " + n;
+            b.data = cortrix::BlockBuild(cortrix::kBlockFile, cortrix::kLevelL2,
+                                         b.content_text, "", "", 0, 0);
+            ASSERT_EQ(store.block_insert(b), 0);
+            seeded_child_ids_.push_back(b.child_id);
+        }
+    }
+
+    std::vector<std::string> seeded_child_ids_;
+
     json BaseBody() const {
         return json{{"query", "semantic memory for agents"},
                     {"namespaces", json::array({kNamespace})},
@@ -424,6 +478,230 @@ protected:
     std::thread server_thread_;
     int port_ = -1;
 };
+
+// --- Parent-expansion controls over HTTP ---------------------------------------
+//
+// These controls are a safety limit, so a malformed value must be REPORTED, never
+// quietly coerced. The dangerous coercion is specific: std::stoi stops at the first
+// non-digit, so `parent_max_bytes=0.5` would parse as 0 — and 0 means "no byte cap",
+// which turns a typo into the cap being switched off.
+// --- The expansion must follow the FINAL ordering, over HTTP ---------------------
+//
+// The defect: expansion used to be chosen inside a namespace, before the LLM listwise
+// rerank re-ordered the results. With parent_expand_top_k=1 the caller's top hit could
+// therefore arrive with no parent text while the demoted one carried it, and the budget
+// pass could not repair it — clearing text is all it can do.
+//
+// This drives the real route end to end (real store, real blocks and parents, real
+// rerank stage) rather than the pure helpers, because what broke was WHERE the
+// resolution ran, not what it computed. The fixture's mock LLM answers the listwise
+// rerank with {"ranking":[2,1]}, i.e. it swaps the two results.
+TEST_F(QueryWiringHttpCoverage, ParentExpansionFollowsTheListwiseRerankOrder) {
+    ASSERT_NO_FATAL_FAILURE(SeedChildBlocksWithParents());
+
+    auto query = [this](bool llm_rerank, int max_bytes, json* out) {
+        json body = BaseBody();
+        body["query"] = "semantic memory expansion marker";
+        body["granularity"] = "chunk";
+        body["rerank"] = false;  // keep the local cross-encoder out of the ordering
+        body["top_k"] = 2;
+        body["include_parent"] = true;
+        body["parent_expand_top_k"] = 1;
+        body["parent_max_bytes"] = max_bytes;
+        if (llm_rerank) {
+            body["llm_rerank"] = true;
+            body["llm_rerank_config"] = {{"enabled", true},    {"top_n", 2},
+                                         {"max_doc_chars", 200}, {"timeout_ms", 5000},
+                                         {"model", "unit-rerank-model"}, {"locale", "en"},
+                                         {"consensus_runs", 1}};
+        }
+        auto response = PostJson("/api/v1/query", body);
+        ASSERT_TRUE(response);
+        ASSERT_EQ(response->status, 200) << response->body;
+        *out = json::parse(response->body, nullptr, /*allow_exceptions=*/false);
+        ASSERT_FALSE(out->is_discarded()) << response->body;
+    };
+
+    // Exactly one result carries parent text, it is the FIRST one, and the text belongs
+    // to that result's own child.
+    auto expect_expanded_head_only = [](const json& body, std::string* head_child,
+                                        std::string* head_parent_text) {
+        ASSERT_TRUE(body.contains("results")) << body.dump();
+        ASSERT_EQ(body["results"].size(), 2u) << body.dump();
+        const auto& head = body["results"][0];
+        const auto& tail = body["results"][1];
+
+        ASSERT_TRUE(head.contains("parent_content")) << body.dump();
+        const std::string text = head["parent_content"].get<std::string>();
+        ASSERT_FALSE(text.empty()) << "the hit the caller sees first must carry the parent";
+        // Which parent arrived is derivable from its own text, so this cannot pass by
+        // accidentally reading the other document's span.
+        const bool is_first_doc = text == std::string(40, 'A');
+        const bool is_second_doc = text == std::string(80, 'B');
+        EXPECT_TRUE(is_first_doc || is_second_doc) << text.size();
+        // Expansion metadata must describe THAT span, not the other one.
+        EXPECT_EQ(head["metadata"]["parent_token_count"], is_first_doc ? "10" : "20");
+        EXPECT_EQ(head["metadata"]["parent_byte_start"], is_first_doc ? "1000" : "2000");
+
+        EXPECT_TRUE(!tail.contains("parent_content") ||
+                    tail["parent_content"].get<std::string>().empty())
+            << "depth 1 must not expand the second result";
+        EXPECT_EQ(tail["metadata"].count("parent_byte_start"), 0u)
+            << "no span metadata without the span";
+        *head_child = head["child_id"].get<std::string>();
+        *head_parent_text = text;
+    };
+
+    json plain;
+    ASSERT_NO_FATAL_FAILURE(query(/*llm_rerank=*/false, /*max_bytes=*/1024, &plain));
+    std::string plain_child;
+    std::string plain_text;
+    ASSERT_NO_FATAL_FAILURE(expect_expanded_head_only(plain, &plain_child, &plain_text));
+
+    json swapped;
+    ASSERT_NO_FATAL_FAILURE(query(/*llm_rerank=*/true, /*max_bytes=*/1024, &swapped));
+    std::string swapped_child;
+    std::string swapped_text;
+    ASSERT_NO_FATAL_FAILURE(
+        expect_expanded_head_only(swapped, &swapped_child, &swapped_text));
+
+    // The rerank reversed the pair, so a different child leads — and the parent text
+    // moved with it. Before the fix the text stayed on the demoted result.
+    EXPECT_NE(plain_child, swapped_child)
+        << "the mock listwise rerank returns [2,1]; the order should have changed";
+    EXPECT_NE(plain_text, swapped_text)
+        << "the expansion must follow the promoted hit, not stay on the demoted one";
+}
+
+// The byte bound is enforced against the response. A cap below the leading parent
+// expands nothing rather than emitting a truncated span.
+TEST_F(QueryWiringHttpCoverage, ParentExpansionHonoursTheByteBoundOverHttp) {
+    ASSERT_NO_FATAL_FAILURE(SeedChildBlocksWithParents());
+
+    json body = BaseBody();
+    body["query"] = "semantic memory expansion marker";
+    body["granularity"] = "chunk";
+    body["rerank"] = false;
+    body["top_k"] = 2;
+    body["include_parent"] = true;
+    body["parent_expand_top_k"] = 2;
+    body["parent_max_bytes"] = 20;  // smaller than either parent (40 and 80 bytes)
+
+    auto response = PostJson("/api/v1/query", body);
+    ASSERT_TRUE(response);
+    ASSERT_EQ(response->status, 200) << response->body;
+    const json parsed = json::parse(response->body);
+    ASSERT_EQ(parsed["results"].size(), 2u) << response->body;
+    for (const auto& r : parsed["results"]) {
+        EXPECT_TRUE(!r.contains("parent_content") ||
+                    r["parent_content"].get<std::string>().empty())
+            << "no parent fits in 20 bytes, so none may be sent";
+        EXPECT_EQ(r["metadata"].count("parent_byte_start"), 0u);
+    }
+}
+
+// The depth control reaches the server as an unbounded int. INT_MAX is a legal value
+// meaning "expand everything you return", so it must be SERVED, not rejected -- and
+// serving it must not let the request size an allocation. Over HTTP because that is
+// the surface an unbounded value actually arrives on.
+TEST_F(QueryWiringHttpCoverage, ParentExpansionDepthAtIntMaxIsServedAndBounded) {
+    ASSERT_NO_FATAL_FAILURE(SeedChildBlocksWithParents());
+
+    json body = BaseBody();
+    body["query"] = "semantic memory expansion marker";
+    body["granularity"] = "chunk";
+    body["rerank"] = false;
+    body["top_k"] = 2;
+    body["include_parent"] = true;
+    body["parent_expand_top_k"] = 2147483647;  // INT_MAX
+    body["parent_max_bytes"] = 1024;
+
+    auto response = PostJson("/api/v1/query", body);
+    ASSERT_TRUE(response);
+    ASSERT_EQ(response->status, 200) << response->body;
+    const json parsed = json::parse(response->body);
+    ASSERT_EQ(parsed["results"].size(), 2u) << response->body;
+    // "Expand everything" with both parents inside the byte budget means both carry
+    // text; the depth is honoured, it is only the allocation that is bounded.
+    for (const auto& r : parsed["results"]) {
+        EXPECT_FALSE(r["parent_content"].get<std::string>().empty()) << response->body;
+    }
+}
+
+// Same boundary with nothing to expand: a response that selects no targets must not
+// size anything off the requested depth either.
+TEST_F(QueryWiringHttpCoverage, ParentExpansionDepthAtIntMaxWithNoExpandableResults) {
+    json body = BaseBody();  // the fixture's doc-summary hits carry no parent_id
+    body["granularity"] = "doc";
+    body["include_parent"] = true;
+    body["parent_expand_top_k"] = 2147483647;  // INT_MAX
+    body["parent_max_bytes"] = 1024;
+
+    auto response = PostJson("/api/v1/query", body);
+    ASSERT_TRUE(response);
+    ASSERT_EQ(response->status, 200) << response->body;
+    const json parsed = json::parse(response->body);
+    for (const auto& r : parsed["results"]) {
+        EXPECT_TRUE(r["parent_content"].get<std::string>().empty()) << response->body;
+    }
+}
+
+TEST_F(QueryWiringHttpCoverage, ParentExpansionControlsRejectMalformedValues) {
+    auto expect_400 = [this](const std::string& path, const json& body) {
+        auto response = PostJson(path, body);
+        ASSERT_TRUE(response) << path;
+        EXPECT_EQ(response->status, 400) << path << "\n" << response->body;
+        const json err = json::parse(response->body, nullptr, false);
+        ASSERT_FALSE(err.is_discarded()) << response->body;
+        ASSERT_TRUE(err.contains("error")) << response->body;
+        EXPECT_EQ(err["error"]["code"], "INVALID_ARGUMENT") << response->body;
+    };
+
+    json opted_in = BaseBody();
+    opted_in["include_parent"] = true;
+    opted_in["parent_expand_top_k"] = 1;
+
+    // A fractional byte cap must not degrade to 0 ("no cap").
+    expect_400("/api/v1/query?parent_max_bytes=0.5", opted_in);
+    // Trailing characters are not a number.
+    expect_400("/api/v1/query?parent_max_bytes=100abc", opted_in);
+    expect_400("/api/v1/query?parent_expand_top_k=2x", opted_in);
+    // A lone sign is not a number either.
+    expect_400("/api/v1/query?parent_expand_top_k=-", opted_in);
+    // Beyond a 32-bit signed integer: reported, not wrapped into something plausible.
+    expect_400("/api/v1/query?parent_max_bytes=99999999999999", opted_in);
+
+    json body_fractional = BaseBody();
+    body_fractional["include_parent"] = true;
+    body_fractional["parent_expand_top_k"] = 1;
+    body_fractional["parent_max_bytes"] = 0.5;  // a JSON number, but not an integer
+    expect_400("/api/v1/query", body_fractional);
+
+    json body_out_of_range = BaseBody();
+    body_out_of_range["include_parent"] = true;
+    body_out_of_range["parent_expand_top_k"] = 99999999999999LL;
+    expect_400("/api/v1/query", body_out_of_range);
+
+    json negative = BaseBody();
+    negative["include_parent"] = true;
+    negative["parent_expand_top_k"] = -1;
+    expect_400("/api/v1/query", negative);
+
+    // Opting in without stating the bound: the API asks rather than inventing one.
+    json no_bound = BaseBody();
+    no_bound["include_parent"] = true;
+    expect_400("/api/v1/query", no_bound);
+
+    // The accepted shape still works, so the guards above are not simply rejecting
+    // everything.
+    json valid = BaseBody();
+    valid["include_parent"] = true;
+    valid["parent_expand_top_k"] = 1;
+    valid["parent_max_bytes"] = 4096;
+    auto ok = PostJson("/api/v1/query", valid);
+    ASSERT_TRUE(ok);
+    EXPECT_EQ(ok->status, 200) << ok->body;
+}
 
 TEST_F(QueryWiringHttpCoverage, RequestMatrixExercisesProductionClosure) {
     auto expect_status = [this](const std::string& path, const json& body, int status,
@@ -733,6 +1011,39 @@ TEST_F(QueryWiringHttpCoverage, RagFusionGateOffWithoutLlm) {
     EXPECT_FALSE(j["explain"].contains("llm_dependent_features"))
         << "no-LLM wiring must keep the rag-fusion gate off (degrade to scatter): "
         << res->body;
+}
+
+// --- ValidateParentExpansion (RETRIEVAL_TYPES_SPEC §2 v1.2) ---------------------
+//
+// The rule that matters is "opting in requires stating the bound". Expanding the
+// whole result set is the failure mode the controls exist to prevent, so the API
+// must not invent a bound when the caller omits one.
+
+TEST(ParentExpansionControlsTest, AbsentControlsAreValidAndMeanOff) {
+    EXPECT_TRUE(ValidateParentExpansion(false, 0, 0).ok());
+}
+
+TEST(ParentExpansionControlsTest, OptInWithoutABoundIsRejected) {
+    const Status s = ValidateParentExpansion(true, 0, 0);
+    ASSERT_FALSE(s.ok());
+    EXPECT_NE(s.message().find("parent_expand_top_k"), std::string::npos) << s.message();
+}
+
+TEST(ParentExpansionControlsTest, OptInWithABoundIsAccepted) {
+    EXPECT_TRUE(ValidateParentExpansion(true, 1, 0).ok());
+    EXPECT_TRUE(ValidateParentExpansion(true, 4, 8192).ok());
+}
+
+// A bound supplied WITHOUT opting in is accepted and inert — it lets a caller
+// park the value in a config template without changing behavior.
+TEST(ParentExpansionControlsTest, BoundWithoutOptInIsInertNotAnError) {
+    EXPECT_TRUE(ValidateParentExpansion(false, 4, 8192).ok());
+}
+
+TEST(ParentExpansionControlsTest, NegativeBoundsAreRejected) {
+    EXPECT_FALSE(ValidateParentExpansion(true, -1, 0).ok());
+    EXPECT_FALSE(ValidateParentExpansion(false, -1, 0).ok());
+    EXPECT_FALSE(ValidateParentExpansion(true, 2, -1).ok());
 }
 
 }  // namespace

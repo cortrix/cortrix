@@ -76,6 +76,52 @@ nlohmann::json DedupToJson(const DeduplicatedChunkInfo& d) {
 
 }  // namespace
 
+namespace {
+
+// The three keys that describe where an expanded span sits in its document. They are
+// only meaningful next to the text itself, so they are dropped wherever the text is:
+// leaving them behind advertises an expansion that is not in the payload.
+void DropExpansionMetadata(retrieval::ResultItem& item) {
+    item.metadata.erase("parent_token_count");
+    item.metadata.erase("parent_byte_start");
+    item.metadata.erase("parent_byte_end");
+}
+
+}  // namespace
+
+void EnforceParentExpansionBudget(CrossNsResponse& resp, int expand_top_k, int max_bytes) {
+    const std::size_t depth = expand_top_k > 0 ? static_cast<std::size_t>(expand_top_k) : 0u;
+    std::size_t kept = 0;
+    long long used_bytes = 0;
+    bool budget_spent = false;
+
+    for (retrieval::ResultItem& item : resp.results) {
+        if (item.parent_content.empty()) {
+            DropExpansionMetadata(item);  // nothing to describe
+            continue;
+        }
+        // Depth counts EXPANDED results, not result positions. A result with no
+        // parent to look up cannot be expanded, so letting it consume a slot would
+        // silently shrink the window the caller asked for — and would disagree with
+        // the selection in parent_expansion.h, which skips those results too.
+        const long long cost = static_cast<long long>(item.parent_content.size());
+        const bool over_depth = kept >= depth;
+        const bool over_bytes =
+            max_bytes > 0 && used_bytes + cost > static_cast<long long>(max_bytes);
+        if (budget_spent || over_depth || over_bytes) {
+            // Prefix semantics: once the byte budget is reached, nothing below keeps
+            // its text either. Admitting a smaller, lower-ranked parent instead would
+            // leave a higher-ranked result without what a lower one has.
+            if (over_bytes) budget_spent = true;
+            item.parent_content.clear();
+            DropExpansionMetadata(item);
+            continue;
+        }
+        used_bytes += cost;
+        ++kept;
+    }
+}
+
 nlohmann::json CrossNsMeta::ToJson() const {
     nlohmann::json j;
     j["namespaces_queried"] = namespaces_queried;

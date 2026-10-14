@@ -32,11 +32,26 @@ struct ScoredResult {
 struct RankedChunk {
     ChildId     child_id;
     std::string chunk_text;
-    std::string parent_text;   ///< F34 §2.5 ParentChunkStore reverse-lookup (empty until F34 wires in)
+    /// F34 §2.5 ParentChunkStore reverse-lookup. Filled at query time only when the
+    /// request opts in (`include_parent`) and the hit is inside the expansion bound;
+    /// empty otherwise. SPEC §2 v1.2: the expansion is bounded by request-scoped
+    /// controls and defaults to off, because expanding a whole top_k of ~1024-token
+    /// parents overflows the agent-side single-response budget and gets truncated.
+    std::string parent_text;
     float       score = 0.0f;        ///< final ordering score after F02/F07 composition
     float       rerank_score = 0.0f; ///< F02 cross-encoder score
     ScoreSignals score_signals;      ///< optional F03/F07 query-time scoring signals
     std::map<std::string, std::string> metadata;
+    /// Owning parent block ULID — the F34 §2.5 reverse-lookup key (SPEC §1 v1.2).
+    /// Added because `ResultItem.parent_id` is a V5 ruling #6A primary identifier
+    /// whose only producer (`ToResultItem(const RankedChunk&)`) had no source field,
+    /// so it could only ever emit the default. Empty when the hit is not a child
+    /// block (e.g. a doc-level pseudo-result).
+    ///
+    /// Deliberately LAST: SPEC §3.3 routes a field-order change through a
+    /// cross-language ABI review, and appending keeps every existing positional
+    /// aggregate initializer (`RankedChunk{child, text, parent_text, ...}`) valid.
+    ParentId parent_id;
 };
 
 }  // namespace cortrix::retrieval

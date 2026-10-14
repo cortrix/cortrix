@@ -93,6 +93,21 @@ struct QueryContext {
     bool explain = false;  ///< ?explain=true — per-NS executors attach B/C-class
                            ///< explain detail (e.g. chunk-level RRF `rrf_paths`,
                            ///< §3.8 W2) only when set. Default off (no overhead).
+
+    // --- Bounded query-time parent expansion (RETRIEVAL_TYPES_SPEC §2 v1.2) ---
+    // The F34 §2.5 ParentChunkStore reverse-lookup, performed on the RETURNED hits
+    // so a caller can read the surrounding ~1024-token span without a second round
+    // trip. Opt-in and bounded on purpose: expanding a whole top_k of parents is
+    // roughly 80 KB, which overflows the agent-side single-response budget and is
+    // truncated by the host, making the answer LESS complete rather than more.
+    /// Master switch for parent TEXT. false (the default) means no parent_content and
+    /// no span metadata; it does NOT mean the response matches a pre-F34 server, since
+    /// `parent_id` is populated either way.
+    bool include_parent = false;
+    int parent_expand_top_k = 0;  ///< how many top-ranked hits to expand; REQUIRED when
+                                  ///< include_parent is true (no tuned default is baked in —
+                                  ///< the value is a measurement outcome, not a constant)
+    int parent_max_bytes = 0;     ///< optional extra cap on total parent_text bytes; 0 = unset
 };
 
 }  // namespace cortrix::query

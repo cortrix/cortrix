@@ -7,9 +7,10 @@ ResultItem ToResultItem(const RankedChunk& rc,
                         const std::string& content_hash_str) {
     ResultItem item;
     item.child_id = rc.child_id;
-    // parent_id is not on RankedChunk (parent_text is the reverse-looked-up body);
-    // it stays empty until F34/F09 wiring (D3.5) supplies the parent ULID.
-    item.parent_id = ParentId();
+    // SPEC §1 v1.2: RankedChunk now carries the owning parent ULID, so this V5
+    // ruling #6A primary identifier is sourced from the hit instead of defaulted.
+    // Empty when the hit is not a child block (e.g. a doc-level pseudo-result).
+    item.parent_id = rc.parent_id;
     item.namespace_id = ns_id;
     item.content = rc.chunk_text;
     item.parent_content = rc.parent_text;

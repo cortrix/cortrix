@@ -51,11 +51,7 @@ VectorHitPath ClassifyVectorHit(int block_type, const std::string& block_child_i
                                 const std::string& metadata_json,
                                 std::string* out_child_id);
 
-/// Hybrid RRF for granularity=auto/both. The fusion identity is the owning doc_id
-/// (metadata.doc_id / source_doc_id), not child_id, so a doc-summary candidate and
-/// its best chunk candidate reinforce each other instead of remaining disjoint. If a
-/// document has both chunk and doc-summary evidence, the chunk is kept as the
-/// user-facing representative and the doc evidence is preserved in metadata.
+
 std::vector<retrieval::RankedChunk> FuseHybridChunksByDocId(
     std::vector<retrieval::RankedChunk> chunk_chunks,
     std::vector<retrieval::RankedChunk> doc_chunks,

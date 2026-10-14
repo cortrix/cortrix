@@ -106,10 +106,9 @@ private:
     /// (§3.3) → top_k; failures → meta.namespaces_failed[]; the 8-field meta (incl.
     /// deduplicated_chunks + warnings) is filled; §3.4 metrics recorded.
     CrossNsResponse GatherAndRerank(std::vector<retrieval::NamespaceQueryResult> results,
-                                    const std::vector<std::string>& queried_order,
-                                    int top_k,
-                                    bool rerank,
-                                    bool scatter_timed_out);
+                                    const std::vector<std::string>& queried_order, int top_k,
+                                    bool rerank, bool scatter_timed_out, int parent_expand_top_k,
+                                    int parent_max_bytes);
 
     /// Build a QueryContext from request + auth + trace (used when qctx is null).
     QueryContext MakeContext(const QueryRequest& request,

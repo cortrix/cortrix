@@ -100,7 +100,8 @@ CrossNsResponse ScatterGather::ExecuteSingleNs(const QueryContext& ctx,
     std::vector<NamespaceQueryResult> results;
     results.push_back(std::move(r));
     return GatherAndRerank(std::move(results), {ns}, ctx.top_k, ctx.rerank,
-                           /*scatter_timed_out=*/false);
+                           /*scatter_timed_out=*/false, ctx.parent_expand_top_k,
+                           ctx.parent_max_bytes);
 }
 
 CrossNsResponse ScatterGather::ExecuteMultiNs(const QueryContext& ctx,
@@ -156,16 +157,14 @@ CrossNsResponse ScatterGather::ExecuteMultiNs(const QueryContext& ctx,
         }
     }
 
-    return GatherAndRerank(std::move(results), nss, ctx.top_k, ctx.rerank,
-                           scatter_timed_out);
+    return GatherAndRerank(std::move(results), nss, ctx.top_k, ctx.rerank, scatter_timed_out,
+                           ctx.parent_expand_top_k, ctx.parent_max_bytes);
 }
 
-CrossNsResponse ScatterGather::GatherAndRerank(
-    std::vector<NamespaceQueryResult> results,
-    const std::vector<std::string>& queried_order,
-    int top_k,
-    bool rerank,
-    bool scatter_timed_out) {
+CrossNsResponse ScatterGather::GatherAndRerank(std::vector<NamespaceQueryResult> results,
+                                               const std::vector<std::string>& queried_order,
+                                               int top_k, bool rerank, bool scatter_timed_out,
+                                               int parent_expand_top_k, int parent_max_bytes) {
     CrossNsResponse resp;
     CrossNsMeta& meta = resp.meta;
     meta.namespaces_queried = queried_order;
@@ -221,6 +220,11 @@ CrossNsResponse ScatterGather::GatherAndRerank(
         items.resize(static_cast<std::size_t>(k));
     }
     resp.results = std::move(items);
+
+    // Budget over the gathered set, so a direct ScatterGather consumer already sees a
+    // compliant response. The route applies it again after the stages that re-order and
+    // trim `results`; it is idempotent.
+    EnforceParentExpansionBudget(resp, parent_expand_top_k, parent_max_bytes);
 
     // RRF fallback status notice (topic 3.2): when rerank is off, surface the C-class
     // warning so an Agent knows ordering came from RRF, not the cross-encoder.

@@ -258,6 +258,36 @@ components:
           type: boolean
           default: false
           description: "F36 RAG-Fusion opt-in (also accepted as ?rag_fusion=true). Off by default until the NS-config resolver lands (D3.5)."
+        include_parent:
+          type: boolean
+          default: false
+          description: >-
+            Opt in to parent-block expansion: the highest-ranked results also carry the
+            surrounding parent span in `parent_content`, plus the span's position in
+            `metadata.parent_token_count` / `parent_byte_start` / `parent_byte_end`.
+            Off by default. What "off" guarantees is precisely that: no parent text and
+            no span metadata. It does not mean the response is unchanged in every field,
+            because `parent_id` is populated on results either way -- that is the link
+            to the parent, not its content. Requires `parent_expand_top_k` >= 1.
+        parent_expand_top_k:
+          type: integer
+          minimum: 0
+          default: 0
+          description: >-
+            How many of the returned results may carry parent text, counted down the FINAL
+            ordering. Results with no parent to look up do not consume a slot. 0 means no
+            expansion. There is no tuned default: the useful value depends on the caller's
+            own response budget, so the caller supplies it.
+        parent_max_bytes:
+          type: integer
+          minimum: 0
+          default: 0
+          description: >-
+            Upper bound on the TOTAL bytes of parent text in one response (not per
+            namespace, not per result). Results are expanded in final order until the next
+            one would exceed this, so the expanded set is always a prefix of the ordering.
+            0 means no byte cap. A malformed value is rejected with 400 rather than coerced,
+            because coercing it to 0 would silently switch the cap off.
         search_config:
           $ref: '#/components/schemas/SearchConfig'
         timeout_ms:
