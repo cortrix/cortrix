@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "cortrix/spc/hype_enricher.h"
+#include "cortrix/spc/hype_metrics.h"
 #include "cortrix/store/store_errors.h"
 #include "mock_llm_client.h"
 #include "mock_parent_chunk_store.h"
@@ -290,6 +291,145 @@ TEST(F38HyPEEnricherTest, GenerateRespectsConfiguredK) {
     auto r = e.GenerateHypeQuestions("chunk", "", DocMeta(), "c", "p");
     ASSERT_TRUE(r.ok());
     EXPECT_EQ(r.value().size(), 5u);
+}
+
+// ---------- §11 metrics on the provider call ----------
+//
+// These assert DELTAS, never absolute values: HypeMetrics is a process-wide
+// singleton (hype_metrics.h), so other tests in the same binary move the same
+// counters and an absolute assertion would pass or fail depending on gtest ordering.
+//
+// The gap being closed: the enricher did not reference HypeMetrics at all, so
+// /metrics exported cortrix_hype_index_llm_calls_total and _llm_duration_seconds
+// while production never wrote them -- permanently zero in any real process, which
+// reads exactly like "no failures" rather than "no data".
+
+namespace {
+
+// One snapshot of every series this seam touches, so each test states what it expects
+// to move AND what it expects to stay still.
+struct HypeMetricsSnapshot {
+    uint64_t success = 0;
+    uint64_t failed = 0;
+    uint64_t duration_count = 0;
+    double duration_sum = 0.0;
+    uint64_t questions = 0;
+
+    static HypeMetricsSnapshot Take(const std::string& model) {
+        const HypeMetrics& m = HypeMetrics::Instance();
+        HypeMetricsSnapshot s;
+        s.success = m.LlmCallCount(HypeMetrics::LlmCallStatus::kSuccess);
+        s.failed = m.LlmCallCount(HypeMetrics::LlmCallStatus::kFailed);
+        s.duration_count = m.LlmDurationCount(model);
+        s.duration_sum = m.LlmDurationSum(model);
+        s.questions = m.QuestionsGeneratedCount();
+        return s;
+    }
+};
+
+}  // namespace
+
+TEST(F38HyPEMetricsSeamTest, SuccessfulCallRecordsSuccessDurationAndQuestions) {
+    const HyPEConfig cfg;  // default model label
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    EXPECT_CALL(*llm, Chat(_, _)).WillOnce(Return(OkChat("q1\nq2\nq3")));
+    HyPEEnricher e(cfg, llm, nullptr);
+
+    const auto before = HypeMetricsSnapshot::Take(cfg.llm_model);
+    auto r = e.GenerateHypeQuestions("chunk", "", DocMeta(), "c", "p");
+    const auto after = HypeMetricsSnapshot::Take(cfg.llm_model);
+
+    ASSERT_TRUE(r.ok());
+    EXPECT_EQ(after.success - before.success, 1u);
+    EXPECT_EQ(after.failed - before.failed, 0u);
+    EXPECT_EQ(after.duration_count - before.duration_count, 1u);
+    EXPECT_GE(after.duration_sum, before.duration_sum) << "a duration is never negative";
+    EXPECT_EQ(after.questions - before.questions, 3u) << "exactly K, not a fixed 1";
+}
+
+// A count mismatch is a failed CALL: the transport succeeded but the answer is
+// unusable. Counting it as a success would hide the single failure mode the strict
+// parser exists to catch.
+TEST(F38HyPEMetricsSeamTest, CountMismatchIsAFailedCallAndGeneratesNoQuestions) {
+    const HyPEConfig cfg;
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    EXPECT_CALL(*llm, Chat(_, _)).WillOnce(Return(OkChat("only one")));  // 1 != 3
+    HyPEEnricher e(cfg, llm, nullptr);
+
+    const auto before = HypeMetricsSnapshot::Take(cfg.llm_model);
+    auto r = e.GenerateHypeQuestions("chunk", "", DocMeta(), "c", "p");
+    const auto after = HypeMetricsSnapshot::Take(cfg.llm_model);
+
+    EXPECT_FALSE(r.ok());
+    EXPECT_EQ(after.failed - before.failed, 1u);
+    EXPECT_EQ(after.success - before.success, 0u);
+    EXPECT_EQ(after.duration_count - before.duration_count, 1u)
+        << "the provider call happened, so its latency is part of the picture";
+    EXPECT_EQ(after.questions - before.questions, 0u);
+}
+
+// A transport failure is the other failed outcome, and it must still contribute its
+// latency -- a timeout is precisely the duration worth seeing.
+TEST(F38HyPEMetricsSeamTest, TransportFailureIsAFailedCallAndStillTimed) {
+    const HyPEConfig cfg;
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    llm::ChatCompletionResponse down;
+    down.status = Status::Unavailable("provider unreachable");
+    EXPECT_CALL(*llm, Chat(_, _)).WillOnce(Return(down));
+    HyPEEnricher e(cfg, llm, nullptr);
+
+    const auto before = HypeMetricsSnapshot::Take(cfg.llm_model);
+    auto r = e.GenerateHypeQuestions("chunk", "", DocMeta(), "c", "p");
+    const auto after = HypeMetricsSnapshot::Take(cfg.llm_model);
+
+    EXPECT_FALSE(r.ok());
+    EXPECT_EQ(after.failed - before.failed, 1u);
+    EXPECT_EQ(after.duration_count - before.duration_count, 1u);
+    EXPECT_EQ(after.questions - before.questions, 0u);
+}
+
+// No client means no provider call, so nothing may be recorded -- otherwise a
+// misconfigured deployment reports a 100% LLM failure rate against a provider it
+// never contacted.
+TEST(F38HyPEMetricsSeamTest, MissingClientRecordsNothing) {
+    const HyPEConfig cfg;
+    HyPEEnricher e(cfg, nullptr, nullptr);
+
+    const auto before = HypeMetricsSnapshot::Take(cfg.llm_model);
+    auto r = e.GenerateHypeQuestions("chunk", "", DocMeta(), "c", "p");
+    const auto after = HypeMetricsSnapshot::Take(cfg.llm_model);
+
+    EXPECT_FALSE(r.ok());
+    EXPECT_EQ(after.success - before.success, 0u);
+    EXPECT_EQ(after.failed - before.failed, 0u);
+    EXPECT_EQ(after.duration_count - before.duration_count, 0u);
+}
+
+// The invariant that makes the two series readable together: every completed call
+// contributes exactly one duration observation, so the histogram count and the
+// counter total move in lockstep. This is what a per-branch histogram update loses.
+TEST(F38HyPEMetricsSeamTest, EveryCompletedCallIsTimedExactlyOnce) {
+    const HyPEConfig cfg;
+    auto llm = std::make_shared<llm::MockLlmClient>();
+    llm::ChatCompletionResponse down;
+    down.status = Status::Unavailable("provider unreachable");
+    EXPECT_CALL(*llm, Chat(_, _))
+        .WillOnce(Return(OkChat("q1\nq2\nq3")))   // success
+        .WillOnce(Return(OkChat("only one")))      // parse failure
+        .WillOnce(Return(down));                   // transport failure
+    HyPEEnricher e(cfg, llm, nullptr);
+
+    const auto before = HypeMetricsSnapshot::Take(cfg.llm_model);
+    (void)e.GenerateHypeQuestions("chunk", "", DocMeta(), "c", "p");
+    (void)e.GenerateHypeQuestions("chunk", "", DocMeta(), "c", "p");
+    (void)e.GenerateHypeQuestions("chunk", "", DocMeta(), "c", "p");
+    const auto after = HypeMetricsSnapshot::Take(cfg.llm_model);
+
+    const uint64_t calls =
+        (after.success - before.success) + (after.failed - before.failed);
+    EXPECT_EQ(calls, 3u);
+    EXPECT_EQ(after.duration_count - before.duration_count, calls)
+        << "histogram count must equal the call counter total";
 }
 
 // ---------- S2: parent_text omission in prompt (reconcile 2) ----------

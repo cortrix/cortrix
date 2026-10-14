@@ -1,8 +1,10 @@
 #include "cortrix/spc/hype_enricher.h"
 
+#include <chrono>
 #include <sstream>
 
 #include "cortrix/spc/hype_error.h"
+#include "cortrix/spc/hype_metrics.h"
 
 namespace cortrix::spc {
 
@@ -115,11 +117,27 @@ Result<std::vector<HypeQuestion>> HyPEEnricher::GenerateHypeQuestions(
     if (config_.timeout_ms > 0) {
         call.timeout_ms = config_.timeout_ms;  // 0 = keep the client default
     }
+    // §11 metrics. The early return above is NOT recorded: a missing client means no
+    // provider call happened, and counting it would inflate the failure rate with
+    // something the provider never saw.
+    HypeMetrics& metrics = HypeMetrics::Instance();
+    const auto call_started = std::chrono::steady_clock::now();
     llm::ChatCompletionResponse resp =
         llm_client_->Chat(BuildPrompt(chunk_text, parent_text, doc_meta, k), call);
+    // Observed once, here, for every outcome rather than in each branch below. That is
+    // deliberate: a histogram updated per-branch silently loses whichever branch
+    // someone forgets, and then reports the latency of only part of the traffic while
+    // looking healthy. Recorded this way, the histogram count always equals the call
+    // counter total, which is itself checkable.
+    metrics.ObserveLlmDuration(
+        config_.llm_model,
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - call_started)
+            .count());
+
     if (!resp.ok()) {
         // LLM transport/timeout failure → CX_ERR_F38_LLM_TIMEOUT (transparent
         // degrade upstream, F38-8).
+        metrics.RecordLlmCall(HypeMetrics::LlmCallStatus::kFailed);
         return HypeStatus(HypeErrorCode::kLlmTimeout, resp.status.message());
     }
 
@@ -127,8 +145,18 @@ Result<std::vector<HypeQuestion>> HyPEEnricher::GenerateHypeQuestions(
     // CX_ERR_F38_LLM_INVALID_OUTPUT (S2).
     Result<std::vector<std::string>> parsed = ParseQuestions(resp.content, k);
     if (!parsed.ok()) {
+        // A count mismatch is a FAILED call even though the transport succeeded: the
+        // provider answered, but not with the K questions the contract requires, and
+        // nothing downstream can use the response. Counting it as a success would make
+        // the one failure mode this parser exists to catch invisible on the dashboard.
+        metrics.RecordLlmCall(HypeMetrics::LlmCallStatus::kFailed);
         return parsed.status();
     }
+    metrics.RecordLlmCall(HypeMetrics::LlmCallStatus::kSuccess);
+    // Only after an exact-K parse — the questions are not "generated" until they are
+    // the K the caller asked for.
+    metrics.AddQuestionsGenerated(static_cast<uint64_t>(parsed.value().size()));
+
     std::vector<HypeQuestion> questions;
     questions.reserve(parsed.value().size());
     for (int i = 0; i < static_cast<int>(parsed.value().size()); ++i) {
