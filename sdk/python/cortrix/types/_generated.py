@@ -78,7 +78,14 @@ class Document:
 class DocumentTask:
     """F42 async upload task."""
     task_id: str
-    status: Literal["submitted", "queued", "processing", "ready", "failed", "cancelled"]
+    # Hand-applied, against this file's own rule, and deliberately so. Regenerating
+    # from the spec today produces a ~318-line diff because this file has not been
+    # regenerated since 2026-06-20 while the spec moved on, and that regeneration
+    # DELETES SqlRequest, SqlResult and SyncStatus, which the SDK still imports in 34
+    # places -- it would break the package on import. That drift is a separate problem
+    # and is tracked separately; it must not hold up correcting a status set that
+    # currently tells the type checker a correct comparison is impossible.
+    status: Literal["queued", "processing", "cancelling", "completed", "failed", "cancelled"]
     document_id: Optional[str] = None
     namespace: Optional[str] = None
     progress: Optional["DocumentProgress"] = None

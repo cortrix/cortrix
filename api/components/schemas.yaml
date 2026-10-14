@@ -173,8 +173,26 @@ components:
           type: string
         status:
           type: string
-          enum: [submitted, queued, processing, ready, failed, cancelled]
+          enum: [queued, processing, cancelling, completed, failed, cancelled]
           example: processing
+          description: >-
+            The task's lifecycle state. These are exactly the values the server can
+            emit on this field: the tasks table enforces the same set with a CHECK
+            constraint, so no other value can be stored, let alone returned.
+
+            `completed` is the terminal success state — wait for it, not for `ready`.
+            `cancelling` is transient and observable: a cancel request marks the task
+            and the worker finishes at its next checkpoint, so a poll in between sees
+            it before `cancelled`.
+
+            Two values were listed here previously and are removed because the server
+            never emitted either, and listing them led callers to wait for a value that
+            never arrives. `ready` belongs to `Document.status`, which is a separate
+            state machine for the document rather than for the task that processes it.
+            `submitted` is the per-item acceptance marker in the `POST /documents/batch`
+            response, not a task state; a task created by that endpoint starts at
+            `queued` like any other. If you wrote code against either value on this
+            field, it has been unreachable since the endpoint shipped.
         progress:
           $ref: '#/components/schemas/DocumentProgress'
         created_at:
