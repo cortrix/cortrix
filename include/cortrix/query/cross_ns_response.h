@@ -1,6 +1,9 @@
 #pragma once
+#include <cstdint>
+#include <map>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -9,6 +12,16 @@
 #include "cortrix/retrieval/cross_ns_types.h"  // cortrix::retrieval::ResultItem
 
 namespace cortrix::query {
+
+/// Identity of a document inside a cross-namespace response: (namespace_id, doc_id).
+///
+/// The namespace is part of the identity, not decoration. Batch ingestion lets the
+/// caller choose doc_id, so the same id can name different documents in different
+/// namespaces. Keyed on doc_id alone, two such documents collapse into one coverage
+/// entry — one returned chunk from each, with totals of 2 and 10, reads as a single
+/// "2 of 2", i.e. full coverage of a document that is 80% missing. Trimming makes it
+/// worse: the surviving result can end up paired with the other document's denominator.
+using DocKey = std::pair<std::string, std::string>;
 
 /// One failed namespace inside meta.namespaces_failed[] (F04 §2.5 / topic 2.4 + 2.7).
 /// Carries the full GEN-Agent error contract so an Agent can decide per-NS whether
@@ -40,6 +53,34 @@ struct DeduplicatedChunkInfo {
     std::vector<DedupSourceNs> namespaces;   ///< brief multi-source array (NS + score), >= 2 entries
 };
 
+/// One meta.document_coverage[] entry: how much of ONE document this response
+/// actually carried. Positioned as a server-side judgement + audit field, NOT as a
+/// decision input the caller is expected to act on.
+///
+/// Counted in CHILD BLOCKS, not bytes, and that is deliberate: the per-document byte
+/// size is not populated on the ingest path (documents.file_size is 0 on a document
+/// that imported successfully), and a child block's absolute byte span can only be
+/// derived from its parent row, which this response does not fetch unless parent
+/// expansion was requested. A block count is available without any extra read.
+struct DocumentCoverageInfo {
+    std::string source_path;         ///< friendly document name (already surfaced on results)
+    int returned_child_blocks = 0;   ///< distinct child blocks of this doc present in results
+    int64_t total_child_blocks = 0;  ///< the document's total child-block count
+    /// Whether total_child_blocks is a real count. A document with no child blocks
+    /// legitimately counts 0, so 0 must NOT double as "unknown" — that would conflate
+    /// an empty document with a count the store could not produce, and a caller
+    /// reading "0 of 0" would take it for full coverage. The serializer emits null
+    /// only when this is false.
+    bool total_known = false;
+    /// Which namespace this document lives in. Carried so two documents that share a
+    /// caller-selected doc_id across namespaces stay distinguishable in the output;
+    /// without it the two entries would look like duplicates of one document.
+    ///
+    /// APPENDED LAST on purpose: this struct is positionally aggregate-initialized in
+    /// tests, so a field inserted anywhere else silently re-binds every one of them.
+    std::string namespace_id;
+};
+
 /// F04 cross-NS response meta — exactly the **8 A/C-class fields** (F04 §2.5 / topic 3.5
 /// v1.0.2; rerank_enabled + dedup_applied B2 fields were deleted). All present on
 /// every response (GEN-Agent #2 A-class "always included"); warnings is C-class (only populated
@@ -53,9 +94,27 @@ struct CrossNsMeta {
     std::vector<DeduplicatedChunkInfo> deduplicated_chunks;  ///< A — multi-source merge detail
     int deduplicated_chunks_count = 0;                 ///< A — # chunks collapsed
     std::vector<nlohmann::json> warnings;              ///< C — only under trigger (e.g. rerank_disabled)
+    /// A — how much of each returned document this response carried. One entry per
+    /// DISTINCT document in `results`. Deliberately NOT named coverage_ratio: that
+    /// name is taken, at this very level, by the namespace partial-success ratio
+    /// above, and two meanings under one name would mislead exactly the caller this
+    /// field is meant to inform.
+    std::vector<DocumentCoverageInfo> document_coverage;
+    /// (namespace_id, doc_id) → that document's total child-block count, carried up
+    /// from the per-NS executors (the only layer with a store handle) so the
+    /// denominator survives RAG-fusion variant merging and is still available when
+    /// coverage is finalized. Keyed by DocKey rather than doc_id for the reason given
+    /// on DocKey. Internal accounting input; never serialized.
+    std::map<DocKey, int64_t> doc_child_block_totals;
 
     nlohmann::json ToJson() const;
 };
+
+/// Serialize explain.document_coverage[]. Lives next to the response types because
+/// the route (not the response body) is what attaches it: it is a B-class diagnostic
+/// under AGENT_FRIENDLY principle 2, so it belongs under `explain`, while `meta` stays
+/// the fixed set of 8 A/C-class fields.
+nlohmann::json DocumentCoverageArrayToJson(const std::vector<DocumentCoverageInfo>& coverage);
 
 /// F04 cross-NS query response (F04 §2.5). `error` is set ONLY for the overall
 /// scatter-timeout partial case (CX_ERR_SCATTER_TIMEOUT, still HTTP 200 with
@@ -83,5 +142,17 @@ struct CrossNsResponse {
 /// Store-free and idempotent: the budget is applied by CLEARING parent text beyond the
 /// limits. `expand_top_k <= 0` clears all of it; `max_bytes <= 0` means no byte cap.
 void EnforceParentExpansionBudget(CrossNsResponse& resp, int expand_top_k, int max_bytes);
+
+/// Recompute meta.document_coverage from the response's FINAL result set.
+///
+/// Must run after the last stage that mutates `results`: RAG-fusion re-ordering,
+/// listwise rerank and its trim, and CRAG's halving all change the list, so a count
+/// taken earlier can describe chunks that were since dropped or miss a document that
+/// only a variant retrieved. Recomputed rather than adjusted, so calling it at the
+/// gather and again in the route cannot drift.
+///
+/// Denominators come from meta.doc_child_block_totals; a document absent from that map
+/// is reported with total_known = false rather than a fabricated zero.
+void FinalizeDocumentCoverage(CrossNsResponse& resp);
 
 }  // namespace cortrix::query

@@ -19,6 +19,9 @@ ResultItem ToResultItem(const RankedChunk& rc,
     item.score_signals = rc.score_signals;
     item.content_hash = content_hash_str;
     item.metadata = rc.metadata;
+    // SPEC §1 v1.3: passed through verbatim. The executor decides it at the point
+    // where chunk_text is assigned, which is the only place that knows what went in.
+    item.evidence_kind = rc.evidence_kind;
     return item;
 }
 

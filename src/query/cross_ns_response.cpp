@@ -1,5 +1,6 @@
 #include "cortrix/query/cross_ns_response.h"
 
+#include <map>
 #include <utility>
 
 namespace cortrix::query {
@@ -20,6 +21,10 @@ nlohmann::json ResultItemToJson(const retrieval::ResultItem& it) {
     j["namespace"] = it.namespace_id;
     j["content_hash"] = it.content_hash;
     j["metadata"] = it.metadata;  // std::map<string,string> → JSON object
+    // SPEC §1 v1.3. Always present: a caller that cannot tell a passage from a
+    // document label is the problem this field exists to fix, so it must not be
+    // conditional on anything the caller has to remember to ask for.
+    j["evidence_kind"] = it.evidence_kind;
     if (it.score_signals.HasAny()) {
         nlohmann::json signals = nlohmann::json::object();
         if (it.score_signals.enriched_score.has_value()) {
@@ -122,6 +127,58 @@ void EnforceParentExpansionBudget(CrossNsResponse& resp, int expand_top_k, int m
     }
 }
 
+void FinalizeDocumentCoverage(CrossNsResponse& resp) {
+    resp.meta.document_coverage.clear();
+    std::map<DocKey, std::size_t> index_by_doc;
+    for (const auto& item : resp.results) {
+        auto doc_it = item.metadata.find("doc_id");
+        if (doc_it == item.metadata.end() || doc_it->second.empty()) continue;
+        // Grouping key and denominator key are the SAME DocKey. Using doc_id for one
+        // and (namespace, doc_id) for the other is how a result ends up counted
+        // against another namespace's document.
+        const DocKey key{item.namespace_id, doc_it->second};
+
+        auto found = index_by_doc.find(key);
+        if (found == index_by_doc.end()) {
+            DocumentCoverageInfo info;
+            info.namespace_id = item.namespace_id;
+            auto path_it = item.metadata.find("source_path");
+            if (path_it != item.metadata.end()) info.source_path = path_it->second;
+            auto total_it = resp.meta.doc_child_block_totals.find(key);
+            if (total_it != resp.meta.doc_child_block_totals.end()) {
+                info.total_child_blocks = total_it->second;
+                info.total_known = true;  // including a genuine zero
+            }
+            index_by_doc.emplace(key, resp.meta.document_coverage.size());
+            found = index_by_doc.find(key);
+            resp.meta.document_coverage.push_back(std::move(info));
+        }
+        // Only chunk evidence counts: a doc-route hit is not a piece of the document's
+        // text, so a document selected that way correctly reads "0 of N".
+        if (item.evidence_kind == "chunk") {
+            resp.meta.document_coverage[found->second].returned_child_blocks += 1;
+        }
+    }
+}
+
+// explain.document_coverage[] — a B-class diagnostic, so the route attaches it under
+// `explain` rather than meta.
+nlohmann::json DocumentCoverageArrayToJson(const std::vector<DocumentCoverageInfo>& coverage) {
+    nlohmann::json arr = nlohmann::json::array();
+    for (const auto& d : coverage) {
+        nlohmann::json j;
+        j["namespace"] = d.namespace_id;
+        j["source_path"] = d.source_path;
+        j["returned_child_blocks"] = d.returned_child_blocks;
+        // A successful count of 0 is a real answer (an empty document), so it must
+        // serialize as 0. null means one thing only: the count was unavailable.
+        j["total_child_blocks"] =
+            d.total_known ? nlohmann::json(d.total_child_blocks) : nlohmann::json(nullptr);
+        arr.push_back(std::move(j));
+    }
+    return arr;
+}
+
 nlohmann::json CrossNsMeta::ToJson() const {
     nlohmann::json j;
     j["namespaces_queried"] = namespaces_queried;
@@ -140,6 +197,10 @@ nlohmann::json CrossNsMeta::ToJson() const {
 
     j["deduplicated_chunks_count"] = deduplicated_chunks_count;
     j["warnings"] = warnings;
+    // document_coverage is deliberately NOT here. It is a B-class diagnostic
+    // (AGENT_FRIENDLY principle 2), and meta is the fixed set of 8 A/C-class fields
+    // (F04 §2.5); the route emits it under `explain` instead. Keeping it out leaves
+    // the 8-field meta contract — and the guard test that pins it — untouched.
     return j;
 }
 

@@ -1736,6 +1736,58 @@ TEST_F(StoreSqliteTest, ExplicitBlockIdRoundTripIncludingNegativeRowid) {
 // CreateTables()). The SPC write path uses this so parents + child-blocks commit in
 // one F25 transaction (ARCH §3.2). CortrixParent is the storage twin of
 // chunker::ParentChunk; the store treats metadata_json as opaque text.
+// child_block_count_by_doc counts ONLY child blocks, while block_count_by_doc counts
+// every row. That difference is the whole reason the method exists: the plain COUNT(*)
+// also counts the F08 metadata block and, once enrichment runs, the hype-question and
+// doc-summary blocks, so using it as a coverage denominator would make the SAME
+// document report different coverage on an LLM-enabled and an LLM-free deployment.
+TEST_F(StoreSqliteTest, ChildBlockCountExcludesNonChildBlocks) {
+    CortrixDoc doc;
+    doc.source_type = "test";
+    doc.source_path = "coverage.md";
+    ASSERT_EQ(store_->doc_create(doc), 0);
+
+    auto insert = [&](const std::string& child_id, CortrixBlockType block_type, int chunk_index) {
+        CortrixBlock b;
+        b.doc_id = doc.doc_id;
+        b.chunk_index = chunk_index;
+        b.block_type = static_cast<int>(block_type);
+        b.processing_level = 2;
+        b.content_text = "body " + std::to_string(chunk_index);
+        b.child_id = child_id;
+        b.data = BlockBuild(block_type, kLevelL2, b.content_text, "", "", 0, 0);
+        ASSERT_EQ(store_->block_insert(b), 0);
+    };
+
+    insert("01CHILD0000000000000000A1", kBlockFile, 0);
+    insert("01CHILD0000000000000000A2", kBlockFile, 1);
+    insert("01CHILD0000000000000000A3", kBlockFile, 2);
+    insert("", kBlockMeta, 3);          // F08 document-metadata block: not a child
+    insert("", kBlockHypeQuestion, 4);  // enrichment artefact: not a child either
+
+    int64_t all_blocks = 0;
+    ASSERT_EQ(store_->block_count_by_doc(doc.doc_id, &all_blocks), 0);
+    EXPECT_EQ(all_blocks, 5);  // the undiscriminating count
+
+    int64_t child_blocks = 0;
+    ASSERT_EQ(store_->child_block_count_by_doc(doc.doc_id, &child_blocks), 0);
+    EXPECT_EQ(child_blocks, 3) << "the denominator must not move when enrichment adds "
+                                  "non-child blocks to the same document";
+}
+
+// A document with no child blocks counts 0 rather than failing, so a doc-route-only
+// result can still report "0 of 0" distinctly from an unknown denominator.
+TEST_F(StoreSqliteTest, ChildBlockCountIsZeroForDocumentWithoutChildren) {
+    CortrixDoc doc;
+    doc.source_type = "test";
+    doc.source_path = "empty.md";
+    ASSERT_EQ(store_->doc_create(doc), 0);
+
+    int64_t child_blocks = -1;
+    ASSERT_EQ(store_->child_block_count_by_doc(doc.doc_id, &child_blocks), 0);
+    EXPECT_EQ(child_blocks, 0);
+}
+
 TEST_F(StoreSqliteTest, ParentInsertGetRoundTripAndDuplicate) {
     CortrixParent p;
     p.parent_id    = "01HXPARENT000000000000042";

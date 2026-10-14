@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "cortrix/doc_summary/doc_summary_types.h"  // DocDiscoveryHit (ResolveDocEvidence)
 #include "cortrix/query/i_scatter_executor.h"
 #include "cortrix/query/query_context.h"
 #include "cortrix/query/rrf_fusion.h"
@@ -51,6 +52,31 @@ VectorHitPath ClassifyVectorHit(int block_type, const std::string& block_child_i
                                 const std::string& metadata_json,
                                 std::string* out_child_id);
 
+/// Resolve what a doc-discovery hit can actually show as `content`, and say which it
+/// is (SPEC §1 v1.3 evidence_kind).
+///
+/// Extracted as a pure function because this five-level fallback is the whole reason
+/// evidence_kind exists, and it is otherwise only reachable through a live
+/// doc-summary index: without this seam the branch that returns an internal document
+/// id as "content" could not be tested at all.
+///
+/// Precedence, highest first: the generated summary; the hit's title; a title carried
+/// on the document metadata; the document's filename; the internal document id. Only
+/// the first is a description of the document — the other four are labels that carry
+/// no body evidence, so they all report "document_label". The caller's question is
+/// "can I cite this?", and for those four the answer is no.
+struct DocEvidence {
+    std::string content;
+    std::string evidence_kind;
+};
+DocEvidence ResolveDocEvidence(const cortrix::doc_summary::DocDiscoveryHit& hit,
+                               const std::map<std::string, std::string>& metadata);
+
+/// Hybrid RRF for granularity=auto/both. The fusion identity is the owning doc_id
+/// (metadata.doc_id / source_doc_id), not child_id, so a doc-summary candidate and
+/// its best chunk candidate reinforce each other instead of remaining disjoint. If a
+/// document has both chunk and doc-summary evidence, the chunk is kept as the
+/// user-facing representative and the doc evidence is preserved in metadata.
 
 std::vector<retrieval::RankedChunk> FuseHybridChunksByDocId(
     std::vector<retrieval::RankedChunk> chunk_chunks,

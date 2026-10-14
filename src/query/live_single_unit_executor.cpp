@@ -161,7 +161,43 @@ void ApplyDocEvidenceMetadata(HybridCandidate& cand) {
     }
 }
 
+// Fill the per-document child-block denominator for the documents a per-NS result
+// actually returned. One COUNT per DISTINCT document, mirroring the
+// one-doc_get-per-document cache in the chunk path.
+//
+// It has to happen here rather than at the cross-NS gather: coverage is only
+// meaningful over the FINAL result set, but the gather has no store handle, so the
+// denominator is carried up on NamespaceQueryResult and the numerator is counted
+// there. A store that cannot count leaves the document out, and the response then
+// emits a null total rather than a misleading zero.
+void FillDocChildBlockTotals(CortrixStore& store, const std::vector<RankedChunk>& chunks,
+                             std::map<std::string, int64_t>& out) {
+    for (const auto& rc : chunks) {
+        auto it = rc.metadata.find("doc_id");
+        if (it == rc.metadata.end() || it->second.empty()) continue;
+        if (out.find(it->second) != out.end()) continue;  // one COUNT per document
+        int64_t total = 0;
+        if (store.child_block_count_by_doc(it->second, &total) == 0) {
+            out[it->second] = total;
+        }
+    }
+}
+
 }  // namespace
+
+DocEvidence ResolveDocEvidence(const cortrix::doc_summary::DocDiscoveryHit& hit,
+                               const std::map<std::string, std::string>& metadata) {
+    if (!hit.summary_text.empty()) return {hit.summary_text, "document_summary"};
+    if (!hit.doc_title.empty()) return {hit.doc_title, "document_label"};
+    auto title = metadata.find("doc_title");
+    if (title != metadata.end()) return {title->second, "document_label"};
+    auto path = metadata.find("source_path");
+    if (path != metadata.end()) return {path->second, "document_label"};
+    // Last resort: an internal id. Returning it as content is itself questionable —
+    // it is useless to a reader and to a model — but changing that behavior is a
+    // separate decision; here we only make it identifiable.
+    return {hit.doc_id, "document_label"};
+}
 
 std::vector<RankedChunk> FuseHybridChunksByDocId(std::vector<RankedChunk> chunk_chunks,
                                                  std::vector<RankedChunk> doc_chunks,
@@ -648,6 +684,9 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             RankedChunk rc;
             rc.child_id = fh.child_id;
             rc.chunk_text = row.content_text;
+            // SPEC §1 v1.3: this path always resolves a real child block, so the
+            // content is a genuine passage.
+            rc.evidence_kind = "chunk";
             // F34 child→parent link (SPEC §1 v1.2). parent_text itself is filled
             // after the top_k cut, and only for the opted-in bounded window — see
             // the bounded-expansion step below.
@@ -748,6 +787,9 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         //    against the final response in query_wiring — see query/parent_expansion.h.
         //    What this layer owes that step is `parent_id` on every chunk, set above.
 
+        // 7. Document-coverage denominator for the documents being returned.
+        FillDocChildBlockTotals(store, ranked, out.doc_child_block_totals);
+
         out.chunks = std::move(ranked);
         out.error_code.clear();  // success
         finish_latency();
@@ -834,17 +876,11 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteDocRetrieval(
             }
             if (!h.doc_title.empty()) rc.metadata["doc_title"] = h.doc_title;
 
-            if (!h.summary_text.empty()) {
-                rc.chunk_text = h.summary_text;
-            } else if (!h.doc_title.empty()) {
-                rc.chunk_text = h.doc_title;
-            } else if (rc.metadata.find("doc_title") != rc.metadata.end()) {
-                rc.chunk_text = rc.metadata["doc_title"];
-            } else if (rc.metadata.find("source_path") != rc.metadata.end()) {
-                rc.chunk_text = rc.metadata["source_path"];
-            } else {
-                rc.chunk_text = h.doc_id;
-            }
+            // SPEC §1 v1.3: one place decides both what to show and what to call
+            // it, so the two can never disagree.
+            DocEvidence evidence = ResolveDocEvidence(h, rc.metadata);
+            rc.chunk_text = std::move(evidence.content);
+            rc.evidence_kind = std::move(evidence.evidence_kind);
             // Re-assert internal provenance after flattening caller-supplied document
             // metadata so a user metadata key named doc_id/source_doc_id/via_path cannot
             // break query-time candidate identity.
@@ -860,6 +896,11 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteDocRetrieval(
             }
             out.chunks.push_back(std::move(rc));
         }
+
+        // Document-coverage denominator. A doc-path hit is NOT a child block, so its
+        // numerator stays 0 and the response reads "0 of N" — which is the honest
+        // signal: the document was selected but none of its text came back.
+        FillDocChildBlockTotals(facade.store(), out.chunks, out.doc_child_block_totals);
 
         out.error_code.clear();  // success (an empty doc-summary set is still success)
         finish_latency();
@@ -911,15 +952,25 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteHybridRetrieval(
 
     if (!chunk_ok) {
         out.chunks = std::move(doc_part.chunks);
+        out.doc_child_block_totals = std::move(doc_part.doc_child_block_totals);
         out.error_code.clear();
         out.latency_ms = elapsed_ms();
         return out;
     }
     if (!doc_ok) {
         out.chunks = std::move(chunk_part.chunks);
+        out.doc_child_block_totals = std::move(chunk_part.doc_child_block_totals);
         out.error_code.clear();
         out.latency_ms = elapsed_ms();
         return out;
+    }
+
+    // Union the two branches' denominators before the fuse picks representatives:
+    // both branches counted the same documents the same way, so a merge cannot
+    // disagree, and the fuse only drops items, never introduces a new document.
+    out.doc_child_block_totals = std::move(chunk_part.doc_child_block_totals);
+    for (auto& kv : doc_part.doc_child_block_totals) {
+        out.doc_child_block_totals.emplace(kv.first, kv.second);
     }
 
     out.chunks = FuseHybridChunksByDocId(std::move(chunk_part.chunks),

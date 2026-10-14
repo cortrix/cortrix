@@ -229,6 +229,64 @@ TEST(CrossNsResponseTest, ToResultItemMapsRankedChunk) {
     EXPECT_EQ(it.parent_id, "p1");
 }
 
+// evidence_kind rides through the conversion verbatim: the executor decides it at the
+// point where chunk_text is assigned, which is the only place that knows what went in.
+TEST(CrossNsResponseTest, ToResultItemPassesEvidenceKindThrough) {
+    for (const char* kind : {"chunk", "document_summary", "document_label"}) {
+        retrieval::RankedChunk rc;
+        rc.child_id = "c1";
+        rc.chunk_text = "whatever";
+        rc.evidence_kind = kind;
+        auto it = retrieval::ToResultItem(rc, "ns_x", "sha256:beef");
+        EXPECT_EQ(it.evidence_kind, kind);
+    }
+}
+
+// evidence_kind is A-class: always serialized, never conditional on the caller
+// remembering to ask. A caller that cannot tell a passage from a document label is
+// exactly the problem this field exists to fix.
+TEST(CrossNsResponseTest, EvidenceKindIsAlwaysSerialized) {
+    CrossNsResponse resp;
+    retrieval::ResultItem item;
+    item.child_id = "01HXYZ";
+    item.content = "a generated summary";
+    item.evidence_kind = "document_summary";
+    resp.results.push_back(std::move(item));
+
+    auto j = resp.ToJson();
+    ASSERT_EQ(j["results"].size(), 1u);
+    ASSERT_TRUE(j["results"][0].contains("evidence_kind"));
+    EXPECT_EQ(j["results"][0]["evidence_kind"], "document_summary");
+}
+
+// document_coverage must NOT appear in meta: it is a B-class diagnostic, and meta is
+// the fixed set of 8 A/C-class fields. This pins the decision so a later change has
+// to argue with a failing test rather than quietly growing meta.
+TEST(CrossNsResponseTest, DocumentCoverageIsNotInMeta) {
+    CrossNsMeta meta;
+    meta.document_coverage.push_back({"spec.md", 2, 7, /*total_known=*/true});
+
+    auto j = meta.ToJson();
+    EXPECT_EQ(j.size(), 8u);
+    EXPECT_FALSE(j.contains("document_coverage"));
+}
+
+// An unknown denominator serializes as null, never as 0 — "0 of 0" would read as
+// full coverage, which is the opposite of what an unknown total means.
+TEST(CrossNsResponseTest, UnknownCoverageTotalSerializesAsNull) {
+    std::vector<DocumentCoverageInfo> coverage;
+    coverage.push_back({"known.md", 2, 7, /*total_known=*/true});
+    coverage.push_back({"unknown.md", 1, 0, /*total_known=*/false});
+
+    auto j = DocumentCoverageArrayToJson(coverage);
+    ASSERT_EQ(j.size(), 2u);
+    EXPECT_EQ(j[0]["source_path"], "known.md");
+    EXPECT_EQ(j[0]["returned_child_blocks"], 2);
+    EXPECT_EQ(j[0]["total_child_blocks"], 7);
+    EXPECT_EQ(j[1]["returned_child_blocks"], 1);
+    EXPECT_TRUE(j[1]["total_child_blocks"].is_null());
+}
+
 // A hit with no owning parent (doc-level pseudo-result, or a legacy non-child row)
 // still maps cleanly: parent_id stays empty rather than becoming a dangling id.
 TEST(CrossNsResponseTest, ToResultItemLeavesParentIdEmptyWhenHitHasNoParent) {
@@ -328,6 +386,160 @@ TEST(EnforceParentExpansionBudgetTest, EmptyResultSetIsANoOp) {
     CrossNsResponse resp;
     EXPECT_NO_THROW(EnforceParentExpansionBudget(resp, 4, 1024));
     EXPECT_TRUE(resp.results.empty());
+}
+
+// --- FinalizeDocumentCoverage ---------------------------------------------------
+//
+// Coverage has to describe the list that is actually sent. Three stages after the
+// cross-NS gather mutate `results`, so a count taken earlier can describe chunks that
+// were since dropped.
+
+namespace {
+
+retrieval::ResultItem CoverageItem(const std::string& child_id, const std::string& doc_id,
+                                   const std::string& kind,
+                                   const std::string& ns = "ns_a") {
+    retrieval::ResultItem it;
+    it.child_id = child_id;
+    it.namespace_id = ns;
+    it.content = "body of " + child_id;
+    it.evidence_kind = kind;
+    it.metadata["doc_id"] = doc_id;
+    it.metadata["source_path"] = doc_id + ".md";
+    return it;
+}
+
+}  // namespace
+
+// A later stage trimming results must leave the count describing what remains.
+TEST(FinalizeDocumentCoverageTest, FollowsALaterTrim) {
+    CrossNsResponse resp;
+    resp.results.push_back(CoverageItem("c1", "doc_a", "chunk"));
+    resp.results.push_back(CoverageItem("c2", "doc_a", "chunk"));
+    resp.results.push_back(CoverageItem("c3", "doc_a", "chunk"));
+    resp.meta.doc_child_block_totals[{"ns_a", "doc_a"}] = 9;
+
+    FinalizeDocumentCoverage(resp);
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 3);
+
+    // Listwise rerank's trim, or CRAG's halving, drops two results.
+    resp.results.resize(1);
+    FinalizeDocumentCoverage(resp);
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 1);
+}
+
+// Called twice on the same list, nothing drifts — the route calls it after the gather
+// already did.
+TEST(FinalizeDocumentCoverageTest, IsIdempotent) {
+    CrossNsResponse resp;
+    resp.results.push_back(CoverageItem("c1", "doc_a", "chunk"));
+    resp.results.push_back(CoverageItem("c2", "doc_a", "chunk"));
+    resp.meta.doc_child_block_totals[{"ns_a", "doc_a"}] = 4;
+
+    FinalizeDocumentCoverage(resp);
+    FinalizeDocumentCoverage(resp);
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 2);
+}
+
+// A denominator that is genuinely 0 is NOT the same as one that could not be read.
+TEST(FinalizeDocumentCoverageTest, SuccessfulZeroIsDistinctFromUnknown) {
+    CrossNsResponse resp;
+    resp.results.push_back(CoverageItem("c1", "doc_empty", "chunk"));
+    resp.results.push_back(CoverageItem("c2", "doc_unreadable", "chunk"));
+    resp.meta.doc_child_block_totals[{"ns_a", "doc_empty"}] = 0;  // counted, and the answer is 0
+    // doc_unreadable deliberately absent: the store could not count it.
+
+    FinalizeDocumentCoverage(resp);
+    ASSERT_EQ(resp.meta.document_coverage.size(), 2u);
+    EXPECT_TRUE(resp.meta.document_coverage[0].total_known);
+    EXPECT_EQ(resp.meta.document_coverage[0].total_child_blocks, 0);
+    EXPECT_FALSE(resp.meta.document_coverage[1].total_known);
+
+    auto j = DocumentCoverageArrayToJson(resp.meta.document_coverage);
+    ASSERT_EQ(j.size(), 2u);
+    EXPECT_EQ(j[0]["total_child_blocks"], 0) << "a counted zero must stay 0, not null";
+    EXPECT_TRUE(j[1]["total_child_blocks"].is_null());
+}
+
+// Only chunk evidence counts toward the numerator.
+TEST(FinalizeDocumentCoverageTest, DocRouteEvidenceContributesZero) {
+    CrossNsResponse resp;
+    resp.results.push_back(CoverageItem("doc_b", "doc_b", "document_summary"));
+    resp.meta.doc_child_block_totals[{"ns_a", "doc_b"}] = 12;
+
+    FinalizeDocumentCoverage(resp);
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 0);
+    EXPECT_EQ(resp.meta.document_coverage[0].total_child_blocks, 12);
+}
+
+
+// --- Same caller-selected doc_id in two namespaces ------------------------------
+//
+// Batch ingestion lets the caller choose doc_id, so the same id can name different
+// documents in different namespaces. Keyed on doc_id alone these collapse into one
+// entry: one returned chunk from each, with totals of 2 and 10, reads as a single
+// "2 of 2" — full coverage of a document that is 80% missing.
+
+TEST(FinalizeDocumentCoverageTest, SameDocIdInTwoNamespacesStaysTwoDocuments) {
+    CrossNsResponse resp;
+    resp.results.push_back(CoverageItem("c1", "shared-doc-id", "chunk", "ns_a"));
+    resp.results.push_back(CoverageItem("c2", "shared-doc-id", "chunk", "ns_b"));
+    resp.meta.doc_child_block_totals[{"ns_a", "shared-doc-id"}] = 2;
+    resp.meta.doc_child_block_totals[{"ns_b", "shared-doc-id"}] = 10;
+
+    FinalizeDocumentCoverage(resp);
+
+    ASSERT_EQ(resp.meta.document_coverage.size(), 2u)
+        << "two documents that merely share an id must not merge into one entry";
+    EXPECT_EQ(resp.meta.document_coverage[0].namespace_id, "ns_a");
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 1);
+    EXPECT_EQ(resp.meta.document_coverage[0].total_child_blocks, 2);
+    EXPECT_EQ(resp.meta.document_coverage[1].namespace_id, "ns_b");
+    EXPECT_EQ(resp.meta.document_coverage[1].returned_child_blocks, 1);
+    EXPECT_EQ(resp.meta.document_coverage[1].total_child_blocks, 10);
+
+    const auto j = DocumentCoverageArrayToJson(resp.meta.document_coverage);
+    ASSERT_EQ(j.size(), 2u);
+    EXPECT_EQ(j[0]["namespace"], "ns_a");
+    EXPECT_EQ(j[1]["namespace"], "ns_b");
+}
+
+// After a trim leaves only the SECOND namespace's result, it must keep its own
+// denominator. Pairing it with the first namespace's total is how a 1-of-10 document
+// gets reported as 1-of-2.
+TEST(FinalizeDocumentCoverageTest, TrimKeepsEachResultWithItsOwnDenominator) {
+    CrossNsResponse resp;
+    resp.results.push_back(CoverageItem("c1", "shared-doc-id", "chunk", "ns_a"));
+    resp.results.push_back(CoverageItem("c2", "shared-doc-id", "chunk", "ns_b"));
+    resp.meta.doc_child_block_totals[{"ns_a", "shared-doc-id"}] = 2;
+    resp.meta.doc_child_block_totals[{"ns_b", "shared-doc-id"}] = 10;
+
+    // The listwise rerank promoted ns_b's hit and the trim dropped ns_a's.
+    resp.results.erase(resp.results.begin());
+    FinalizeDocumentCoverage(resp);
+
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_EQ(resp.meta.document_coverage[0].namespace_id, "ns_b");
+    EXPECT_EQ(resp.meta.document_coverage[0].returned_child_blocks, 1);
+    EXPECT_EQ(resp.meta.document_coverage[0].total_child_blocks, 10)
+        << "the surviving result must not inherit the other namespace's denominator";
+}
+
+// A document present in only one of the two namespaces still reports unknown rather
+// than borrowing the other namespace's count for the same id.
+TEST(FinalizeDocumentCoverageTest, MissingDenominatorIsNotBorrowedAcrossNamespaces) {
+    CrossNsResponse resp;
+    resp.results.push_back(CoverageItem("c1", "shared-doc-id", "chunk", "ns_b"));
+    resp.meta.doc_child_block_totals[{"ns_a", "shared-doc-id"}] = 2;  // the OTHER namespace
+
+    FinalizeDocumentCoverage(resp);
+
+    ASSERT_EQ(resp.meta.document_coverage.size(), 1u);
+    EXPECT_FALSE(resp.meta.document_coverage[0].total_known);
 }
 
 }  // namespace

@@ -306,6 +306,70 @@ retrieval::RankedChunk MakeDocHit(const std::string& doc_id,
     return rc;
 }
 
+// --- ResolveDocEvidence: what a doc-discovery hit can actually show ------------
+//
+// The five-level fallback is the whole reason evidence_kind exists. Only the first
+// level is a description of the document; the other four are labels that carry no
+// body evidence, down to an internal id being handed back as "content".
+
+TEST(ResolveDocEvidenceTest, GeneratedSummaryWinsAndIsLabelledAsSuch) {
+    cortrix::doc_summary::DocDiscoveryHit hit;
+    hit.doc_id = "01DOC";
+    hit.summary_text = "This document specifies the retry contract.";
+    hit.doc_title = "Retry contract";
+    auto ev = ResolveDocEvidence(hit, {{"source_path", "retry.md"}});
+    EXPECT_EQ(ev.content, "This document specifies the retry contract.");
+    EXPECT_EQ(ev.evidence_kind, "document_summary");
+}
+
+TEST(ResolveDocEvidenceTest, HitTitleIsALabelNotASummary) {
+    cortrix::doc_summary::DocDiscoveryHit hit;
+    hit.doc_id = "01DOC";
+    hit.doc_title = "Retry contract";
+    auto ev = ResolveDocEvidence(hit, {});
+    EXPECT_EQ(ev.content, "Retry contract");
+    EXPECT_EQ(ev.evidence_kind, "document_label");
+}
+
+TEST(ResolveDocEvidenceTest, MetadataTitleIsTheThirdLevel) {
+    cortrix::doc_summary::DocDiscoveryHit hit;
+    hit.doc_id = "01DOC";
+    auto ev = ResolveDocEvidence(hit, {{"doc_title", "From metadata"}});
+    EXPECT_EQ(ev.content, "From metadata");
+    EXPECT_EQ(ev.evidence_kind, "document_label");
+}
+
+TEST(ResolveDocEvidenceTest, FilenameIsStillOnlyALabel) {
+    cortrix::doc_summary::DocDiscoveryHit hit;
+    hit.doc_id = "01DOC";
+    auto ev = ResolveDocEvidence(hit, {{"source_path", "retry.md"}});
+    EXPECT_EQ(ev.content, "retry.md");
+    EXPECT_EQ(ev.evidence_kind, "document_label");
+}
+
+// The worst case, and the one that motivated the field: with no summary, no title and
+// no filename, `content` is an internal id. Before evidence_kind a caller could not
+// tell that apart from a real passage.
+TEST(ResolveDocEvidenceTest, InternalIdIsTheLastResortAndIsLabelled) {
+    cortrix::doc_summary::DocDiscoveryHit hit;
+    hit.doc_id = "01HXINTERNALDOCID00000000";
+    auto ev = ResolveDocEvidence(hit, {});
+    EXPECT_EQ(ev.content, "01HXINTERNALDOCID00000000");
+    EXPECT_EQ(ev.evidence_kind, "document_label");
+}
+
+// An LLM-free deployment never has summary_text, so this fallback chain is its normal
+// path — not an edge case. Pinning it keeps that visible.
+TEST(ResolveDocEvidenceTest, LlmFreeDeploymentNeverReportsASummary) {
+    cortrix::doc_summary::DocDiscoveryHit hit;
+    hit.doc_id = "01DOC";
+    hit.via_path = "fts5_fallback";
+    hit.doc_title = "Some title";
+    auto ev = ResolveDocEvidence(hit, {{"source_path", "x.md"}});
+    EXPECT_NE(ev.evidence_kind, "document_summary");
+    EXPECT_EQ(ev.evidence_kind, "document_label");
+}
+
 TEST(LiveHybridFusionTest, FusesChunkAndDocEvidenceByDocIdNotChildId) {
     std::vector<retrieval::RankedChunk> chunks;
     chunks.push_back(MakeChunkHit("child-1", "doc-1", 0.90f));

@@ -851,6 +851,8 @@ json SerializeWithCrag(CrossNsResponse& resp, QueryContext& qctx, CragStage* cra
     // path that fills parent text somewhere else still cannot push the response past
     // the caller's depth or byte bound.
     EnforceParentExpansionBudget(resp, qctx.parent_expand_top_k, qctx.parent_max_bytes);
+    // Same seam, same reason: coverage must describe the list that is actually sent.
+    FinalizeDocumentCoverage(resp);
     json out = resp.ToJson();
     if (!qctx.crag_verdict.empty()) {
         out["meta"]["crag_verdict"] = qctx.crag_verdict;  // F37 §6.3 B-class
@@ -1082,6 +1084,14 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                         // F41 §6.2: echo the resolved granularity so the Agent sees the
                         // effective value (mirrors the single-NS query_routes.cpp echo).
                         out["explain"]["granularity"] = qctx.granularity;
+                        // explain.document_coverage[]: how much of each returned
+                        // document this response actually carried. A B-class
+                        // diagnostic (AGENT_FRIENDLY principle 2), so it is attached
+                        // here rather than in meta — meta stays the fixed set of 8
+                        // A/C-class fields. Emitted even when empty so the schema is
+                        // stable for a caller that asked for explain.
+                        out["explain"]["document_coverage"] =
+                            DocumentCoverageArrayToJson(resp.meta.document_coverage);
                         // [addendum §3.8 W2 · P5] Aggregate per-path vote counts over
                         // the RETURNED results: rrf_path_counts = how many results each
                         // of the five chunk-level paths helped rank (dense / fts5 /

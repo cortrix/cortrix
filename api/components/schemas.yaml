@@ -335,6 +335,14 @@ components:
         parent_content:
           type: string
           description: "F34 parent full text"
+        evidence_kind:
+          type: string
+          enum: [chunk, document_summary, document_label]
+          description: >-
+            What `content` actually holds. `chunk` is a real passage from the document;
+            `document_summary` is generated text about the document, not text from it;
+            `document_label` is a bare name with no body evidence at all. Present so a
+            caller can tell a quotable passage from a summary before relying on it.
         score:
           type: number
           format: float

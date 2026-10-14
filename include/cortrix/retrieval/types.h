@@ -52,6 +52,18 @@ struct RankedChunk {
     /// cross-language ABI review, and appending keeps every existing positional
     /// aggregate initializer (`RankedChunk{child, text, parent_text, ...}`) valid.
     ParentId parent_id;
+    /// What `chunk_text` actually holds (SPEC §1 v1.3). The doc-discovery path has a
+    /// five-level fallback that can put a generated summary, a title, a filename or
+    /// even an internal document id into this same field, so a caller previously had
+    /// no way to tell a real passage from a bare identifier. One of:
+    ///   "chunk"            — a real passage from the document
+    ///   "document_summary" — a generated summary of the document, not its text
+    ///   "document_label"   — only a label for the document (title / filename /
+    ///                        internal id): this hit carries NO body evidence
+    ///   "parent"           — a parent span; NOT produced in V1.0 (parents travel in
+    ///                        the separate `parent_text` field), reserved
+    /// Appended last for the same ABI reason as `parent_id`.
+    std::string evidence_kind;
 };
 
 }  // namespace cortrix::retrieval
