@@ -17,7 +17,11 @@ import time
 from pathlib import Path
 from typing import Any, BinaryIO, Optional, Union
 
-from .._exceptions import CortrixError, InvalidRequestError
+from .._exceptions import InvalidRequestError
+# Aliased on purpose: `TimeoutError` unqualified would shadow the builtin inside
+# this module. The SDK class subclasses CortrixError, so raising it keeps every
+# existing `except CortrixError` handler working.
+from .._exceptions import TimeoutError as CortrixTimeoutError
 from ..types import Document, DocumentTask
 from ..types.lists import DocumentList
 from ._base import AsyncResource, SyncResource
@@ -149,14 +153,22 @@ class Documents(SyncResource):
     ) -> DocumentTask:
         """Sync sugar: upload then poll until the task reaches a terminal state.
 
-        Returns the final ``DocumentTask`` (status completed/failed/cancelled).
-        Raises ``TimeoutError`` if ``timeout`` elapses first.
+        Returns the final ``DocumentTask``. A finished upload arrives as either
+        ``completed`` or ``ready`` -- the server reports the first
+        (``include/cortrix/async/task_info.h``) while the OpenAPI
+        ``DocumentTask.status`` enum names the second, and this waits for either,
+        so compare against both rather than hard-coding one. The other terminal
+        states are ``failed`` and ``cancelled``.
+
+        Raises ``cortrix.TimeoutError`` if ``timeout`` elapses first. It subclasses
+        ``CortrixError`` and carries ``category="timeout"`` and ``retryable=True``,
+        so handlers catching either one still work.
         """
         task = self.upload(namespace, file, filename=filename, metadata=metadata)
         deadline = time.monotonic() + timeout
         while task.status not in _TERMINAL_TASK_STATES:
             if time.monotonic() >= deadline:
-                raise CortrixError(
+                raise CortrixTimeoutError(
                     f"upload task {task.task_id} did not finish within {timeout}s",
                     category="timeout",
                     retryable=True,
@@ -264,12 +276,17 @@ class AsyncDocuments(AsyncResource):
         poll_interval: float = _DEFAULT_POLL_INTERVAL,
         timeout: float = _DEFAULT_WAIT_TIMEOUT,
     ) -> DocumentTask:
-        """Async sugar: upload then poll until a terminal state (completed/failed/cancelled)."""
+        """Async sugar: upload then poll until a terminal state.
+
+        Terminal states are ``completed`` or ``ready`` (the same finished upload
+        under two names -- see the sync version), plus ``failed`` and ``cancelled``.
+        Raises ``cortrix.TimeoutError`` on timeout, as the sync version does.
+        """
         task = await self.upload(namespace, file, filename=filename, metadata=metadata)
         deadline = time.monotonic() + timeout
         while task.status not in _TERMINAL_TASK_STATES:
             if time.monotonic() >= deadline:
-                raise CortrixError(
+                raise CortrixTimeoutError(
                     f"upload task {task.task_id} did not finish within {timeout}s",
                     category="timeout",
                     retryable=True,
