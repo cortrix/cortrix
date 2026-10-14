@@ -3,10 +3,12 @@
 
 It starts `cortrix-mcp` over stdio, lists the tools, checks health, and runs
 one query across the Quick Start's `demo` namespace and one that doesn't exist.
-Every tool result has the same two layers: `data` and `meta`.
+A successful tool result has the same two layers: `data` and `meta`; a failure comes
+back with `isError` set instead -- a one-line message followed by the structured error
+as JSON.
 
 Usage:
-    pip install cortrix-mcp
+    pip install cortrix-mcp mcp
     python mcp_client.py [--base-url http://127.0.0.1:8420]
 """
 
@@ -39,7 +41,8 @@ def payload(result) -> dict:
 
 
 async def run(base_url: str) -> int:
-    command = shutil.which("cortrix-mcp") or os.path.join(os.path.dirname(sys.executable), "cortrix-mcp")
+    bin_dir = os.path.dirname(sys.executable)
+    command = shutil.which("cortrix-mcp") or os.path.join(bin_dir, "cortrix-mcp")
     server = StdioServerParameters(
         command=command,
         env={**os.environ, "CORTRIX_URL": base_url, "CORTRIX_NAMESPACE": "demo"},
@@ -63,7 +66,8 @@ async def run(base_url: str) -> int:
             print(f"results: {len(answer['data']['results'])}")
             for failed in details["namespaces_failed"]:
                 print(f"not searched: {failed['namespace']} "
-                      f"(retryable={json.dumps(failed['retryable'])}, category={failed['category']})")
+                      f"(retryable={json.dumps(failed['retryable'])}, "
+                      f"category={failed['category']})")
             print(f"session_id: {details['session_id']}")
         except ToolError as error:
             print(f"Cortrix tool error: {error}", file=sys.stderr)

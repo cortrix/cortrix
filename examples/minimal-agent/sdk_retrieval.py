@@ -18,7 +18,8 @@ import time
 import uuid
 from pathlib import Path
 
-from cortrix import Cortrix, CortrixError
+# TimeoutError is aliased: the bare name would shadow the builtin in this module.
+from cortrix import Cortrix, CortrixError, TimeoutError as CortrixTimeoutError
 
 NOTES = Path(__file__).parent / "notes"
 QUESTION = "How long does a customer have to request a refund?"
@@ -30,7 +31,9 @@ def load(client: Cortrix, namespace: str, path: Path, timeout: float = 60.0) -> 
     deadline = time.monotonic() + timeout
     while task.status not in ("completed", "failed", "cancelled"):
         if time.monotonic() >= deadline:
-            raise RuntimeError(f"{path.name} was still {task.status} after {timeout:.0f} s")
+            raise CortrixTimeoutError(
+                f"{path.name} was still {task.status} after {timeout:.0f} s",
+                category="timeout", retryable=True)
         time.sleep(0.5)
         task = client.documents.task_progress(task.task_id)
     return task.status
@@ -80,10 +83,12 @@ def main() -> int:
         for name, category in outcome["missing"]:
             print(f"not searched: {name} ({category})")
         if not outcome["complete"]:
-            print("The agent should answer from the context above and say which part it could not search.")
+            print("The agent should answer from the context above"
+                  " and say which part it could not search.")
         return 0
     except CortrixError as error:
-        print(f"Cortrix error: {error} (category={error.category}, retryable={error.retryable})", file=sys.stderr)
+        print(f"Cortrix error: {error} "
+              f"(category={error.category}, retryable={error.retryable})", file=sys.stderr)
         return 1
     finally:
         if not args.keep:
