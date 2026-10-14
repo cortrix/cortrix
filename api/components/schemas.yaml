@@ -176,14 +176,24 @@ components:
           enum: [queued, processing, cancelling, completed, failed, cancelled]
           example: processing
           description: >-
-            The task's lifecycle state. These are exactly the values the server can
-            emit on this field: the tasks table enforces the same set with a CHECK
-            constraint, so no other value can be stored, let alone returned.
+            The task's lifecycle state, as reported by
+            `GET /documents/tasks/{task_id}/progress`. On that endpoint these are
+            exactly the values you can receive: the status is read straight from the
+            tasks table, whose CHECK constraint admits this set and no other.
+
+            The acceptance response of `POST /documents` also uses this schema, and
+            there `status` is always `queued` — it is a fresh enqueue, not a reading
+            of the table.
 
             `completed` is the terminal success state — wait for it, not for `ready`.
-            `cancelling` is transient and observable: a cancel request marks the task
-            and the worker finishes at its next checkpoint, so a poll in between sees
-            it before `cancelled`.
+
+            `cancelling` is transient and observable, but it is not the only way a
+            cancel resolves. Cancelling a task that has not started yet moves it
+            straight to `cancelled`; cancelling one that is already running marks it
+            and lets the worker stop at its next checkpoint, so a poll in between can
+            observe `cancelling`. A cancel that arrives late can still finish as
+            `completed` or `failed` — requesting cancellation is not a guarantee of
+            the outcome, only of the request being recorded.
 
             Two values were listed here previously and are removed because the server
             never emitted either, and listing them led callers to wait for a value that

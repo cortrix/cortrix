@@ -78,13 +78,22 @@ class Document:
 class DocumentTask:
     """F42 async upload task."""
     task_id: str
-    # Hand-applied, against this file's own rule, and deliberately so. Regenerating
-    # from the spec today produces a ~318-line diff because this file has not been
-    # regenerated since 2026-06-20 while the spec moved on, and that regeneration
-    # DELETES SqlRequest, SqlResult and SyncStatus, which the SDK still imports in 34
-    # places -- it would break the package on import. That drift is a separate problem
-    # and is tracked separately; it must not hold up correcting a status set that
-    # currently tells the type checker a correct comparison is impossible.
+    # Hand-applied, against this file's own rule, and deliberately so.
+    #
+    # This file has never matched the generator's output: the last commit to touch it
+    # (6ac60d4) edited one line by hand without touching the spec. Running
+    # scripts/generate_types.py today produces a ~320-line diff, and that regeneration
+    # DELETES four models -- SqlRequest, SqlResult, SyncStatus and MemoryLogRequest --
+    # because the spec no longer describes them. The first three are not merely
+    # re-exported: they are the `response_model` of eight public SDK methods
+    # (resources/sync.py x6, resources/sql.py x2), so regenerating would take
+    # cortrix.sql.* and cortrix.sync.* out of the package entirely.
+    #
+    # The regeneration would also fix a real defect this file carries today --
+    # GcStatus.last_gc_at is declared Optional[str] while the spec and the server both
+    # use int64 epoch milliseconds -- which is a reason to do it properly rather than
+    # to keep hand-editing. Both halves of that drift are reported in issue #142; neither should hold up correcting a status set that is
+    # actively telling callers to wait for a value the server cannot send.
     status: Literal["queued", "processing", "cancelling", "completed", "failed", "cancelled"]
     document_id: Optional[str] = None
     namespace: Optional[str] = None

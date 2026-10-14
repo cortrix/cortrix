@@ -25,7 +25,9 @@ from typing import Any
 RUNNER_VERSION = "2.0.0"
 PRIMARY_PROFILE = "real-onnx-embedding-reranker-no-llm"
 SECONDARY_PROFILE = "onnx-off-contract"
-TERMINAL_SUCCESS = {"completed", "ready"}
+# `completed` is the only terminal success state a task reports; `ready` belongs to
+# Document.status, a different state machine, and was never emitted here.
+TERMINAL_SUCCESS = {"completed"}
 TERMINAL_FAILURE = {"failed", "cancelled"}
 
 
