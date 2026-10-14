@@ -173,7 +173,15 @@ components:
           type: string
         status:
           type: string
-          enum: [submitted, queued, processing, ready, failed, cancelled]
+          enum: [queued, processing, cancelling, completed, failed, cancelled]
+          description: >-
+            The task's lifecycle state as reported by
+            `GET /documents/tasks/{task_id}/progress`, read straight from the tasks
+            table, whose CHECK constraint admits this set and no other. `completed`
+            is the terminal success state. `cancelling` is transient. Two values
+            previously listed here were never emitted on this field: `ready` belongs
+            to `Document.status`, a different state machine, and `submitted` is the
+            per-item marker in the `POST /documents/batch` response.
           example: processing
         progress:
           $ref: '#/components/schemas/DocumentProgress'

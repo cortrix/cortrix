@@ -78,7 +78,7 @@ class Document:
 class DocumentTask:
     """F42 async upload task."""
     task_id: str
-    status: Literal["submitted", "queued", "processing", "ready", "failed", "cancelled"]
+    status: Literal["queued", "processing", "cancelling", "completed", "failed", "cancelled"]
     document_id: Optional[str] = None
     namespace: Optional[str] = None
     progress: Optional["DocumentProgress"] = None
