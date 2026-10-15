@@ -37,8 +37,10 @@ ERROR: QuickStart bootstrap: demo upload returned HTTP 507
 The disk monitor logs its own line the first time it samples, which is worth grepping for as well because it names the stage and the measured percentage:
 
 ```text
-WARN  disk  Disk stage crit at 97.2%
+[2026-01-01 00:00:00.000] [warning] [tid:1] [disk] Disk stage crit at 97.2%
 ```
+
+With JSON logging the same text appears in the `message` field. The stable part to search for is `Disk stage`.
 
 The readiness response shows the disk at the `crit` stage:
 
@@ -81,7 +83,7 @@ docker compose -f deploy/docker-compose.yml exec cortrix df -h /data
 
 Free space on that disk, or give the virtual machine a larger one. `docker system df` shows what is using it.
 
-Once there is space, the `disk` component recovers on its own at the next check — every 30 seconds by default, configurable as `disk_check_interval_sec` (10 to 300) — and no restart is needed for that. A restart is only needed here because the demo import already failed, and the quickstart imports it at startup:
+Once there is space, the `disk` component recovers on its own at the next check, which happens every 30 seconds, and no restart is needed for that. A restart is only needed here because the demo import already failed, and the quickstart imports it at startup:
 
 ```bash
 docker compose -f deploy/docker-compose.yml restart cortrix
