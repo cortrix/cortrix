@@ -6,6 +6,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -210,12 +211,80 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
         return parent_text_by_id.emplace(parent_id, std::move(text)).first->second;
     };
 
-    // ---- Group pending rows by owed members; re-run only those members --------
+    // ---- Classify the debt: provider work versus label-only ------------------
+    // A row owing f35 whose block already holds the contextual columns and the
+    // stored vector (kBlockHasStoredContextualVectorSql — the audit classifies
+    // with the same predicate) needs no provider call for that member: the point
+    // is re-added from the stored vector and the label row written. Such a row is
+    // never sent to the chain for f35; when nothing else is owed it skips the
+    // chain entirely and is charged without a give-up bound, because the cap
+    // bounds provider work and this delivery costs none.
     std::map<std::string, std::vector<const EnrichStateRow*>> groups;
+    std::unordered_map<uint64_t, std::vector<float>> stored_ctx_by_block;
+    std::vector<const EnrichStateRow*> label_only_rows;
+    std::vector<uint64_t> provider_ids, label_only_ids;
+    int ended_here = 0;
     for (const auto& row : pending) {
-        if (child_pos.find(row.child_id) == child_pos.end()) continue;  // stale row
-        groups[row.failed_members.empty() ? "f03,f35,f38" : row.failed_members]
-            .push_back(&row);
+        if (child_pos.find(row.child_id) == child_pos.end()) {
+            // Stale row (its chunk is gone): never repaired, still counted, so it
+            // does not stay due for ever at attempts 0.
+            provider_ids.push_back(row.block_id);
+            if (row.attempts + 1 > kMaxAttempts + 1) ++ended_here;
+            continue;
+        }
+        std::vector<std::string> members =
+            row.failed_members.empty() ? std::vector<std::string>{"f03", "f35", "f38"}
+                                       : SplitCsv(row.failed_members);
+        auto f35_it = std::find(members.begin(), members.end(), "f35");
+        if (f35_it != members.end()) {
+            auto stored = ReadStoredContextualVector(db, row.block_id);
+            if (stored.ok()) {
+                stored_ctx_by_block[row.block_id] = std::move(stored.value());
+                members.erase(f35_it);
+            } else if (stored.status().code() != StatusCode::kNotFound) {
+                // Fail closed before anything is charged or called: a row that
+                // cannot be classified must not be treated as provider debt.
+                return finalizer_.Fail(task, "CX_ERR_ENRICH_BACKFILL_STORE",
+                                       stored.status().message(),
+                                       {{"doc_id", task.doc_id}}, t_start);
+            }
+        }
+        if (members.empty()) {
+            label_only_rows.push_back(&row);
+            label_only_ids.push_back(row.block_id);
+        } else {
+            groups[JoinCsv(members)].push_back(&row);
+            provider_ids.push_back(row.block_id);
+            if (row.attempts + 1 > kMaxAttempts + 1) ++ended_here;
+        }
+    }
+
+    // ---- Count this delivery before the first provider call ------------------
+    // Keyed on the snapshot's rows, not the document, so a row the audit writes
+    // between the snapshot and here is not charged for a delivery it did not get.
+    // Failing closed: a provider call that is not counted is the defect this is
+    // here to prevent. Two statements, each its own autocommit: a crash between
+    // them leaves the label-only rows uncharged for this delivery, which is
+    // harmless — they are never given up on, and the next delivery charges them.
+    {
+        auto charged = ChargeEnrichAttempts(db, provider_ids, NowUnix(), kMaxAttempts + 1);
+        if (!charged.ok()) {
+            return finalizer_.Fail(task, "CX_ERR_ENRICH_BACKFILL_STORE",
+                                   charged.status().message(),
+                                   {{"doc_id", task.doc_id}}, t_start);
+        }
+        auto counted = ChargeEnrichAttempts(db, label_only_ids, NowUnix(), kEnrichNoTerminal);
+        if (!counted.ok()) {
+            return finalizer_.Fail(task, "CX_ERR_ENRICH_BACKFILL_STORE",
+                                   counted.status().message(),
+                                   {{"doc_id", task.doc_id}}, t_start);
+        }
+        if (ended_here > 0) {
+            CORTRIX_LOG_WARN("spc",
+                "enrich backfill gave up on {} row(s) of doc={} at delivery: the previous "
+                "deliveries never finished (a repair in this run still overrides it)",
+                ended_here, task.doc_id);
+        }
     }
 
     struct Repair {
@@ -223,11 +292,26 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
         const CortrixBlock* block = nullptr;
         EnrichResult merged;
         std::vector<HypeQuestion> hype;
-        std::vector<std::string> owed_before;
+        std::vector<std::string> owed_before;  // members the chain was asked for
         std::vector<std::string> still_owed;
         std::string last_error;
+        // Label-only contextual debt: the stored vector the point is re-added
+        // from (no provider call). ctx_columns_present is also set when this
+        // delivery wrote the columns with a vector, so the flip knows that any
+        // remaining f35 debt is label-only. write_label marks a point that was
+        // added this delivery and still needs its label row.
+        std::vector<float> stored_ctx;
+        bool ctx_label_only = false;
+        bool ctx_columns_present = false;
+        bool write_label = false;
+        ContextualVecLabelRow label_row;
     };
     std::vector<Repair> repairs;
+    auto owe_again = [](Repair& r, const char* tok) {
+        if (std::find(r.still_owed.begin(), r.still_owed.end(), tok) == r.still_owed.end()) {
+            r.still_owed.push_back(tok);
+        }
+    };
 
     for (auto& [members_csv, rows] : groups) {
         std::unordered_set<std::string> filter;
@@ -292,8 +376,25 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
             }
             rep.merged = std::move(res[i].merged);
             rep.hype = std::move(res[i].hype_questions);
+            // A chain row whose f35 is label-only (stripped from the filter above).
+            auto sc = stored_ctx_by_block.find(rep.row->block_id);
+            if (sc != stored_ctx_by_block.end()) {
+                rep.ctx_label_only = true;
+                rep.ctx_columns_present = true;
+                rep.stored_ctx = std::move(sc->second);
+            }
             repairs.push_back(std::move(rep));
         }
+    }
+    // Rows whose whole debt is label-only: no chain call at all.
+    for (const EnrichStateRow* row : label_only_rows) {
+        Repair rep;
+        rep.row = row;
+        rep.block = children[child_pos[row->child_id]];
+        rep.ctx_label_only = true;
+        rep.ctx_columns_present = true;
+        rep.stored_ctx = std::move(stored_ctx_by_block[row->block_id]);
+        repairs.push_back(std::move(rep));
     }
 
     // ---- Assemble the write set (hype blocks + vector points) -----------------
@@ -304,22 +405,52 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
                std::find(r.still_owed.begin(), r.still_owed.end(), tok) ==
                    r.still_owed.end();
     };
+    // The index's own width: a stored vector of another width is refused before
+    // AddPoints would read past it. 0 = unknown (test doubles), check skipped.
+    const int index_dim = facade.vec_index().GetStats().dim;
 
     std::vector<CortrixBlock> new_blocks;
     std::vector<std::pair<const float*, uint64_t>> vec_points;
-    std::vector<ContextualVecLabelRow> label_rows;
     std::vector<BlockId> new_block_ids;
 
     for (auto& rep : repairs) {
-        // F35: contextual dual-vector point + label (skip when already indexed —
-        // the crash-window guard; the columns update below is idempotent anyway).
+        // F35 from the chain: contextual dual-vector point + label (skip when
+        // already indexed — the crash-window guard; the columns update below is
+        // idempotent anyway). The label row is written after the columns, below.
         if (owes(rep, "f35") && rep.merged.contextualized_embedding.has_value() &&
             !rep.merged.contextualized_embedding->empty()) {
             const uint64_t label = DeriveContextualVecLabel(rep.block->child_id);
             if (!GetContextualVecLabel(db, label).ok()) {
                 vec_points.push_back(
                     {rep.merged.contextualized_embedding->data(), label});
-                label_rows.push_back({label, rep.block->block_id, rep.block->child_id});
+                rep.label_row = ContextualVecLabelRow{label, rep.block->block_id,
+                                                      rep.block->child_id};
+                rep.write_label = true;
+            }
+        }
+        // F35 label-only: the point is re-added from the stored vector, no provider
+        // call. A vector the index cannot take is left on the row as a named error
+        // — it is not provider debt, and the row stays due with zero provider cost.
+        if (rep.ctx_label_only) {
+            const uint64_t label = DeriveContextualVecLabel(rep.block->child_id);
+            if (!GetContextualVecLabel(db, label).ok()) {
+                if (index_dim > 0 &&
+                    rep.stored_ctx.size() != static_cast<size_t>(index_dim)) {
+                    owe_again(rep, "f35");
+                    if (rep.last_error.empty()) {
+                        rep.last_error =
+                            "CX_ERR_ENRICH_BACKFILL_VECTOR_DIM: stored contextual vector has " +
+                            std::to_string(rep.stored_ctx.size()) + " floats, index takes " +
+                            std::to_string(index_dim);
+                    }
+                    CORTRIX_LOG_WARN("spc", "backfill ctx label skipped child={}: {}",
+                                     rep.block->child_id, rep.last_error);
+                } else {
+                    vec_points.push_back({rep.stored_ctx.data(), label});
+                    rep.label_row = ContextualVecLabelRow{label, rep.block->block_id,
+                                                          rep.block->child_id};
+                    rep.write_label = true;
+                }
             }
         }
         // F38: hype blocks (skip children that already have them).
@@ -426,14 +557,28 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
                     rep.last_error =
                         "CX_ERR_SPC_PERSIST_FAILED[f35]: " + wc.message();
                 }
+                // No label for columns that did not land: the point is live, and
+                // the next delivery re-runs the member and re-adds it in place.
+                rep.write_label = false;
+            } else if (rep.merged.contextualized_embedding.has_value() &&
+                       !rep.merged.contextualized_embedding->empty()) {
+                rep.ctx_columns_present = true;
             }
         }
-    }
-    for (const auto& lr : label_rows) {
-        Status wl = WriteContextualVecLabel(db, lr);
-        if (!wl.ok()) {
-            CORTRIX_LOG_WARN("spc", "backfill ctx label persist skipped child={}: {}",
-                             lr.child_id, wl.message());
+        // The label row resolves the ANN point back to this chunk. A failure here
+        // keeps f35 owed: the row must not read `ok` while the contextualized path
+        // cannot see the chunk. The next delivery is label-only (no provider call).
+        if (rep.write_label) {
+            Status wl = WriteContextualVecLabel(db, rep.label_row);
+            if (!wl.ok()) {
+                CORTRIX_LOG_WARN("spc", "backfill ctx label persist failed, keep owed child={}: {}",
+                                 rep.label_row.child_id, wl.message());
+                owe_again(rep, "f35");
+                if (rep.last_error.empty()) {
+                    rep.last_error =
+                        "CX_ERR_SPC_PERSIST_FAILED[f35]: label: " + wl.message();
+                }
+            }
         }
     }
 
@@ -461,7 +606,14 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
         } else {
             row.failed_members = JoinCsv(rep.still_owed);
             row.last_error = rep.last_error.substr(0, 200);
-            if (row.attempts >= kMaxAttempts) {
+            // The cap bounds provider work. When the only remaining debt is the
+            // contextual index label and the columns with the stored vector are in
+            // place, the next delivery calls no provider, so the row is not given
+            // up on at the cap: it stays due on the normal backoff.
+            const bool only_label_owed = rep.still_owed.size() == 1 &&
+                                         rep.still_owed[0] == "f35" &&
+                                         rep.ctx_columns_present;
+            if (row.attempts >= kMaxAttempts && !only_label_owed) {
                 row.status = kEnrichStatusFailedPermanent;
                 row.next_retry_at = 0;
                 ++gave_up;

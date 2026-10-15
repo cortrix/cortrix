@@ -164,7 +164,8 @@ protected:
         ASSERT_EQ(sqlite3_exec(db_,
             "CREATE TABLE blocks (block_id INTEGER PRIMARY KEY, doc_id TEXT,"
             " child_id TEXT, block_type INTEGER DEFAULT 1, enriched_score REAL,"
-            " contextualized_status SMALLINT DEFAULT 0, metadata_json TEXT)",
+            " contextualized_status SMALLINT DEFAULT 0,"
+            " contextualized_embedding BLOB DEFAULT NULL, metadata_json TEXT)",
             nullptr, nullptr, nullptr), SQLITE_OK);
     }
 
