@@ -160,6 +160,16 @@ python3 scripts/sync_version.py --check
 
 Do not edit a derived version field by itself. CI runs the check command and rejects version drift. Human-facing releases use the `v` prefix, SemVer and API fields omit it, and Python package metadata uses the equivalent PEP 440 spelling.
 
+## Generated SDK Types
+
+`sdk/python/cortrix/types/_generated.py` is produced by `sdk/python/scripts/generate_types.py` from `api/openapi.yaml`, and CI checks both against a recorded baseline:
+
+```bash
+python3 sdk/python/scripts/check_generated_types.py
+```
+
+The committed file and the generator's output currently differ (see the baseline's `drift_reason`), so the check freezes that difference rather than requiring equality. If you change `api/components/schemas.yaml` or the generator, either regenerate the file and commit it, or record the new state with `python3 sdk/python/scripts/check_generated_types.py --update --reason "<why>"` and explain it in the PR. Do not edit `_generated.py` by hand. When you regenerate, also update `tests/test_types.py` (`test_generated_module_exports_34_models`).
+
 ---
 
 ## Pull Request Workflow
@@ -188,7 +198,7 @@ After a pull request is merged or closed, delete its remote topic branch. Publis
 - [ ] Builds cleanly (`cmake` + `make`) with no new warnings.
 - [ ] `ctest --output-on-failure` passes; SDK `pytest` passes if the SDK changed.
 - [ ] New code has tests.
-- [ ] API changes are reflected in `api/openapi.yaml` and the Python SDK.
+- [ ] API changes are reflected in `api/openapi.yaml` and the Python SDK, and `sdk/python/scripts/check_generated_types.py` passes.
 - [ ] Source is English-only and follows the surrounding style.
 - [ ] Commit messages are clear and imperative ("Add cross-namespace filter", not "added stuff").
 - [ ] Every new commit contains a valid `Signed-off-by` trailer.
