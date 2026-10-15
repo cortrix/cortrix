@@ -160,6 +160,7 @@ pytest --cov=cortrix          # unit tests (httpx mocked)
 mypy --strict cortrix
 ruff check cortrix
 python scripts/generate_types.py   # regenerate types from the OpenAPI spec
+python scripts/check_generated_types.py   # CI gate: generator output and _generated.py must match scripts/generated_types_baseline.json
 ```
 
 ## License
