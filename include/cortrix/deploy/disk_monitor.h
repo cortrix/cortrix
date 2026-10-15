@@ -6,8 +6,8 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
-#include "cortrix/common/i_global_config.h"
 #include "cortrix/deploy/f24_error.h"
 
 namespace cortrix::deploy {
@@ -33,25 +33,32 @@ struct DiskUsage {
     DiskStage stage = DiskStage::kNormal;
 };
 
-/// The IGlobalConfig keys + documented defaults the monitor reads (F24 §6.4).
-/// Generic KV accessors (IGlobalConfig::GetFloat/GetInt) keep the canonical
-/// config header dependency-free; an admin hot-reload (P08) is picked up on the
-/// next check tick. Standalone (D3): real + tested against InMemoryGlobalConfig.
+/// Thresholds and sampling period of the monitor (F24 §6.4). The defaults below
+/// are what every build ran with before the three environment variables existed.
+/// A variable that is set and non-empty overrides its field when the server
+/// constructs the monitor (FromEnvironment); the values are read once at start
+/// and never again — there is no hot reload. An out-of-range value is clamped to
+/// the documented range, warn is kept strictly below crit, and a value that is
+/// not a number is ignored; every such correction is reported through the
+/// `notes` out-parameter so the caller can log what actually took effect.
 struct DiskMonitorConfig {
-    std::string data_dir = "./data";   ///< path passed to statvfs (CORTRIX_DATA_DIR)
-    double warn_threshold = 0.80;      ///< key "disk_warn_threshold"      (range 0.5–0.95)
-    double crit_threshold = 0.90;      ///< key "disk_crit_threshold"      (range 0.6–0.99)
-    int    check_interval_sec = 30;    ///< key "disk_check_interval_sec"  (range 10–300)
+    std::string data_dir = "./data";   ///< path passed to statvfs (namespace.data_dir / CORTRIX_DATA_DIR)
+    double warn_threshold = 0.80;      ///< CORTRIX_DISK_WARN_THRESHOLD      (range 0.5–0.95)
+    double crit_threshold = 0.90;      ///< CORTRIX_DISK_CRIT_THRESHOLD      (range 0.6–0.99)
+    int    check_interval_sec = 30;    ///< CORTRIX_DISK_CHECK_INTERVAL_SEC  (range 10–300 s)
 
-    static constexpr const char* kWarnKey     = "disk_warn_threshold";
-    static constexpr const char* kCritKey     = "disk_crit_threshold";
-    static constexpr const char* kIntervalKey = "disk_check_interval_sec";
+    static constexpr const char* kWarnEnv     = "CORTRIX_DISK_WARN_THRESHOLD";
+    static constexpr const char* kCritEnv     = "CORTRIX_DISK_CRIT_THRESHOLD";
+    static constexpr const char* kIntervalEnv = "CORTRIX_DISK_CHECK_INTERVAL_SEC";
 
-    /// Read the three keys from `config` over the defaults above (each key absent
-    /// → keep the default). Out-of-range values are clamped to the §6.4 ranges.
-    /// `config` may be nullptr (all defaults). `data_dir` is set by the caller.
-    static DiskMonitorConfig FromGlobalConfig(const IGlobalConfig* config,
-                                              const std::string& data_dir);
+    /// The defaults above, overridden by the three variables where set and
+    /// non-empty; a value is accepted only when the whole string is a finite
+    /// number (`60s` or `0.8x` is a typo, not a value). `data_dir` is set by the
+    /// caller. `notes` (may be null) receives one plain sentence per value that
+    /// was ignored, clamped or corrected: the deploy library does not log, the
+    /// caller does.
+    static DiskMonitorConfig FromEnvironment(const std::string& data_dir,
+                                             std::vector<std::string>* notes = nullptr);
 };
 
 /// Periodic disk-space watchdog (F24 §6, F24-4 decision A). Owns a background

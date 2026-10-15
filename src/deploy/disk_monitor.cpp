@@ -4,7 +4,14 @@
 #include <sys/statvfs.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <chrono>
+#include <climits>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+#include <vector>
 
 #include "cortrix/deploy/deploy_metrics.h"
 
@@ -31,6 +38,44 @@ DiskStage StageFor(double ratio, double warn, double crit) {
     return DiskStage::kNormal;
 }
 
+// Whole-string parses for the environment variables: surrounding ASCII blanks
+// are allowed, nothing else is. A partial parse ("60s", "0.8x") is a typo, not a
+// value, so it is rejected instead of being read as 60 or 0.8.
+const char* SkipBlanks(const char* p) {
+    while (*p == ' ' || *p == '\t') ++p;
+    return p;
+}
+
+bool ParseWholeDouble(const char* text, double* out) {
+    const char* p = SkipBlanks(text);
+    if (*p == '\0') return false;
+    char* end = nullptr;
+    errno = 0;
+    const double v = std::strtod(p, &end);
+    if (end == p || errno == ERANGE || !std::isfinite(v)) return false;
+    if (*SkipBlanks(end) != '\0') return false;
+    *out = v;
+    return true;
+}
+
+bool ParseWholeInt(const char* text, int* out) {
+    const char* p = SkipBlanks(text);
+    if (*p == '\0') return false;
+    char* end = nullptr;
+    errno = 0;
+    const long v = std::strtol(p, &end, 10);
+    if (end == p || errno == ERANGE || v < INT_MIN || v > INT_MAX) return false;
+    if (*SkipBlanks(end) != '\0') return false;
+    *out = static_cast<int>(v);
+    return true;
+}
+
+std::string Two(double v) {
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%.2f", v);
+    return buf;
+}
+
 }  // namespace
 
 bool SampleDiskUsage(const std::string& data_dir, DiskUsage* out) {
@@ -53,25 +98,54 @@ bool SampleDiskUsage(const std::string& data_dir, DiskUsage* out) {
     return true;
 }
 
-DiskMonitorConfig DiskMonitorConfig::FromGlobalConfig(const IGlobalConfig* config,
-                                                      const std::string& data_dir) {
+DiskMonitorConfig DiskMonitorConfig::FromEnvironment(const std::string& data_dir,
+                                                     std::vector<std::string>* notes) {
     DiskMonitorConfig c;
     c.data_dir = data_dir;
-    if (config) {
-        if (auto r = config->GetFloat(kWarnKey); r.ok()) {
-            c.warn_threshold = Clamp(static_cast<double>(*r), 0.5, 0.95);
+    auto note = [notes](std::string text) {
+        if (notes) notes->push_back(std::move(text));
+    };
+    // Unset or empty keeps the default silently: that is the documented way of
+    // saying "the default", and it is what every deployment without the
+    // variables has always done.
+    auto read_ratio = [&](const char* env, double lo, double hi, double* field) {
+        const char* raw = std::getenv(env);
+        if (!raw || !*raw) return;
+        double v = 0.0;
+        if (!ParseWholeDouble(raw, &v)) {
+            note(std::string(env) + "=\"" + raw + "\" is not a number; keeping " + Two(*field));
+            return;
         }
-        if (auto r = config->GetFloat(kCritKey); r.ok()) {
-            c.crit_threshold = Clamp(static_cast<double>(*r), 0.6, 0.99);
+        const double clamped = Clamp(v, lo, hi);
+        if (clamped != v) {
+            note(std::string(env) + "=" + Two(v) + " is outside " + Two(lo) + "-" + Two(hi) +
+                 "; clamped to " + Two(clamped));
         }
-        if (auto r = config->GetInt(kIntervalKey); r.ok()) {
-            c.check_interval_sec = static_cast<int>(Clamp(static_cast<double>(*r), 10, 300));
+        *field = clamped;
+    };
+    read_ratio(kWarnEnv, 0.5, 0.95, &c.warn_threshold);
+    read_ratio(kCritEnv, 0.6, 0.99, &c.crit_threshold);
+    if (const char* raw = std::getenv(kIntervalEnv); raw && *raw) {
+        int v = 0;
+        if (!ParseWholeInt(raw, &v)) {
+            note(std::string(kIntervalEnv) + "=\"" + raw + "\" is not a whole number of seconds; keeping " +
+                 std::to_string(c.check_interval_sec));
+        } else {
+            const int clamped = std::min(std::max(v, 10), 300);
+            if (clamped != v) {
+                note(std::string(kIntervalEnv) + "=" + std::to_string(v) +
+                     " is outside 10-300; clamped to " + std::to_string(clamped));
+            }
+            c.check_interval_sec = clamped;
         }
     }
     // Guard against a misconfigured warn >= crit: keep warn strictly below crit so
     // the WARN band exists (clamp warn down to crit if inverted).
     if (c.warn_threshold >= c.crit_threshold) {
+        const double before = c.warn_threshold;
         c.warn_threshold = std::max(0.5, c.crit_threshold - 0.01);
+        note("warn threshold " + Two(before) + " is not below crit threshold " +
+             Two(c.crit_threshold) + "; warn lowered to " + Two(c.warn_threshold));
     }
     return c;
 }

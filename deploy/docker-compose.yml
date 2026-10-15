@@ -22,6 +22,15 @@ services:
       - cortrix-data:/data
     environment:
       CORTRIX_DATA_DIR: /data
+      # Disk pressure thresholds (optional). Writes are refused once the data
+      # volume's usage reaches the critical ratio; the warning ratio only logs.
+      # Compose forwards only the keys listed in this map, so the three are
+      # passed through from the shell or deploy/.env; empty means the default:
+      # warn 0.80 (0.5-0.95), crit 0.90 (0.6-0.99), check interval 30 s
+      # (10-300). The server logs the values that took effect at startup.
+      CORTRIX_DISK_WARN_THRESHOLD: ${CORTRIX_DISK_WARN_THRESHOLD:-}
+      CORTRIX_DISK_CRIT_THRESHOLD: ${CORTRIX_DISK_CRIT_THRESHOLD:-}
+      CORTRIX_DISK_CHECK_INTERVAL_SEC: ${CORTRIX_DISK_CHECK_INTERVAL_SEC:-}
       CORTRIX_HTTP_PORT: "8420"
       # The API listens on the container interface, while Compose publishes it
       # exclusively to host loopback above. Core rejects this exception unless
