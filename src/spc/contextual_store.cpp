@@ -120,4 +120,32 @@ Result<ContextualVecLabelRow> GetContextualVecLabel(sqlite3* db, uint64_t label)
     return row;
 }
 
+Result<std::vector<float>> ReadStoredContextualVector(sqlite3* db, uint64_t block_id) {
+    if (!db) return Status::InvalidArgument("ReadStoredContextualVector: null db");
+    // The WHERE clause is the shared predicate itself, so "a row came back" means
+    // exactly what the audit's column means.
+    const std::string sql =
+        std::string("SELECT contextualized_embedding FROM blocks WHERE block_id=?1 AND ") +
+        kBlockHasStoredContextualVectorSql;
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        return SqlErr(db, "prepare read stored contextual vector");
+    }
+    sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(block_id));
+    const int rc = sqlite3_step(stmt);
+    if (rc != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        if (rc == SQLITE_DONE) {
+            return Status::NotFound("CX_ERR_CONTEXTUAL_STORE: no stored contextual vector");
+        }
+        return SqlErr(db, "read stored contextual vector");
+    }
+    const void* bytes = sqlite3_column_blob(stmt, 0);
+    const int n = sqlite3_column_bytes(stmt, 0);  // > 0 and a multiple of 4 by the predicate
+    std::vector<float> vec(static_cast<size_t>(n) / sizeof(float));
+    if (bytes && n > 0) std::memcpy(vec.data(), bytes, static_cast<size_t>(n));
+    sqlite3_finalize(stmt);
+    return vec;
+}
+
 }  // namespace cortrix::spc

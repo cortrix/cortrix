@@ -1,5 +1,10 @@
 #include "cortrix/spc_enricher/enrich_state_store.h"
 
+#include <algorithm>
+#include <utility>
+
+#include "cortrix/spc/contextual_store.h"  // kBlockHasStoredContextualVectorSql
+
 namespace cortrix::spc {
 
 namespace {
@@ -170,12 +175,9 @@ Result<int> MakeAllPendingDueNow(sqlite3* db, int64_t now_unix) {
 }
 
 Result<int> ChargeEnrichAttempts(sqlite3* db, const std::vector<uint64_t>& block_ids,
-                                 int64_t now_unix) {
+                                 int64_t now_unix, int terminal_at_attempts) {
     if (!db) return Status::InvalidArgument("ChargeEnrichAttempts: null db");
     if (block_ids.empty()) return 0;
-    // One over the flip's cap: the flip at kEnrichMaxAttempts is the real give-up
-    // for provider failures; this bound only ends rows no flip ever reaches.
-    const int entry_cap = kEnrichMaxAttempts + 1;
     int changed = 0;
     constexpr size_t kChunk = 400;  // well under SQLite's bound-parameter limit
     for (size_t start = 0; start < block_ids.size(); start += kChunk) {
@@ -194,7 +196,7 @@ Result<int> ChargeEnrichAttempts(sqlite3* db, const std::vector<uint64_t>& block
             return SqlErr(db, "prepare charge enrich attempts");
         }
         sqlite3_bind_int64(stmt, 1, now_unix);
-        sqlite3_bind_int(stmt, 2, entry_cap);
+        sqlite3_bind_int(stmt, 2, terminal_at_attempts);
         sqlite3_bind_text(stmt, 3, kEnrichStatusPendingRetry, -1, SQLITE_STATIC);
         for (size_t i = 0; i < n; ++i) {
             sqlite3_bind_int64(stmt, static_cast<int>(4 + i),
@@ -292,34 +294,45 @@ Result<int> SynthesizeEnrichAuditRows(
         }
     }
 
-    // Pass 2: rows the audit must NOT re-synthesize. Two cases: in-flight
-    // pending_retry (keep their attempts/backoff) AND failed_permanent (a
-    // terminal give-up must stay terminal). Rows in `ok` are re-owed below
-    // through ReoweEnrichState, which keeps their attempts — rewriting them with
-    // attempts=0 let a chunk whose head member kept being skipped cycle for ever
-    // without the cap ever being reached.
-    std::unordered_set<uint64_t> audit_skip;
+    // Pass 2: rows the audit must NOT re-synthesize. In-flight pending_retry rows
+    // keep their attempts/backoff. failed_permanent rows stay terminal — except
+    // when the only missing artifact is the contextual index label while the
+    // columns and the stored vector are present: that repair costs no provider
+    // call, so a spent count is no reason to leave the chunk invisible to the
+    // contextualized path (decided per row below, once the owed members are
+    // known). Rows in `ok` are re-owed below through ReoweEnrichState, which
+    // keeps their attempts — rewriting them with attempts=0 let a chunk whose
+    // head member kept being skipped cycle for ever without the cap ever being
+    // reached.
+    std::unordered_set<uint64_t> in_flight, given_up;
     {
         sqlite3_stmt* st = nullptr;
         const char* sql =
-            "SELECT block_id FROM enrich_state WHERE status=?1 OR status=?2";
+            "SELECT block_id, status FROM enrich_state WHERE status=?1 OR status=?2";
         if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
             return SqlErr(db, "prepare audit tracked");
         }
         sqlite3_bind_text(st, 1, kEnrichStatusPendingRetry, -1, SQLITE_STATIC);
         sqlite3_bind_text(st, 2, kEnrichStatusFailedPermanent, -1, SQLITE_STATIC);
         while (sqlite3_step(st) == SQLITE_ROW) {
-            audit_skip.insert(static_cast<uint64_t>(sqlite3_column_int64(st, 0)));
+            const uint64_t id = static_cast<uint64_t>(sqlite3_column_int64(st, 0));
+            const unsigned char* s = sqlite3_column_text(st, 1);
+            const bool pending =
+                s && std::string(reinterpret_cast<const char*>(s)) == kEnrichStatusPendingRetry;
+            (pending ? in_flight : given_up).insert(id);
         }
         sqlite3_finalize(st);
     }
 
-    // Pass 3: child rows vs configured artifacts → synthesize.
+    // Pass 3: child rows vs configured artifacts → synthesize. The last column is
+    // the shared label-only predicate (the worker classifies with the same SQL);
+    // it can be NULL for a NULL status, which sqlite3_column_int reads as 0.
     sqlite3_stmt* st = nullptr;
-    const char* sql =
-        "SELECT block_id, child_id, doc_id, enriched_score, contextualized_status"
+    const std::string sql =
+        std::string("SELECT block_id, child_id, doc_id, enriched_score, contextualized_status, ") +
+        kBlockHasStoredContextualVectorSql +
         " FROM blocks WHERE child_id IS NOT NULL AND child_id != ''";
-    if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
         return SqlErr(db, "prepare audit children");
     }
     int synthesized = 0;
@@ -332,6 +345,7 @@ Result<int> SynthesizeEnrichAuditRows(
         const int ctx_status = sqlite3_column_type(st, 4) == SQLITE_NULL
                                    ? 0
                                    : sqlite3_column_int(st, 4);
+        const bool has_stored_vector = sqlite3_column_int(st, 5) != 0;
         const std::string child_id = cid ? reinterpret_cast<const char*>(cid) : "";
         std::string owed;
         auto owe = [&owed](const char* tok) {
@@ -345,18 +359,21 @@ Result<int> SynthesizeEnrichAuditRows(
             ctx_status == 1 &&
             (!ctx_labels_available || ctx_labels.count(block_id) > 0);
         if (configured_members.count("f35") && !f35_done) owe("f35");
-        // The columns are there and only the index label is missing: the provider
-        // work for this member is complete, so this miss must not count toward
-        // the provider cap — one more delivery writes the label.
-        const bool f35_label_only = configured_members.count("f35") && !f35_done &&
-                                    ctx_status == 1;
+        // The columns and the stored vector are there and only the index label is
+        // missing: the provider work for this member is complete, so this miss
+        // must not count toward the provider cap — one more delivery re-adds the
+        // point from the stored vector and writes the label. A status of 1 with no
+        // usable vector is NOT this case: the label needs the provider again.
+        const bool f35_label_only =
+            configured_members.count("f35") && !f35_done && has_stored_vector;
         if (configured_members.count("f38") &&
             hype_sources.find(child_id) == hype_sources.end()) {
             owe("f38");
         }
         if (owed.empty()) continue;
-        if (audit_skip.count(block_id)) continue;
         const bool label_only_miss = f35_label_only && owed == "f35";
+        if (in_flight.count(block_id)) continue;
+        if (given_up.count(block_id) && !label_only_miss) continue;
         EnrichStateRow row;
         row.block_id = block_id;
         row.doc_id = did ? reinterpret_cast<const char*>(did) : "";
@@ -367,8 +384,7 @@ Result<int> SynthesizeEnrichAuditRows(
         row.last_error = "audit: artifacts missing";
         row.next_retry_at = now_unix;
         row.updated_at = now_unix;
-        const int terminal_at = label_only_miss ? std::numeric_limits<int>::max()
-                                                : kEnrichMaxAttempts;
+        const int terminal_at = label_only_miss ? kEnrichNoTerminal : kEnrichMaxAttempts;
         if (ReoweEnrichState(db, row, terminal_at).ok()) ++synthesized;
     }
     sqlite3_finalize(st);

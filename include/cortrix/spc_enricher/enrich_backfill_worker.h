@@ -26,9 +26,14 @@ class EnricherChain;
 ///       Complete (idempotent — sweeper double-enqueue / crash replay safe);
 ///   (3) rebuilds ChunkContexts from the persisted blocks/parents/documents rows
 ///       (text + prev/next neighbors from the full child order + doc metadata);
-///   (4) groups rows by their owed failed_members csv and re-runs the production
-///       EnricherChain with the matching member_filter — repaired members are
-///       never re-run (duplicate-artifact guard), still-owed members are;
+///   (4) counts the delivery against every row of the snapshot (the entry
+///       charge), then groups rows by their owed members and re-runs the
+///       production EnricherChain with the matching member_filter — repaired
+///       members are never re-run (duplicate-artifact guard), still-owed
+///       members are. A row owing f35 whose block already holds the contextual
+///       columns and the stored vector (kBlockHasStoredContextualVectorSql) is
+///       label-only: f35 is dropped from the filter and the point is re-added
+///       from the stored vector, so no provider is called for it;
 ///   (5) writes the repaired artifacts with ingest write-parity, in one F25
 ///       WriteCoordinator txn when blocks/vectors are added: F03 enrichment +
 ///       entities (+ summary into blocks.metadata_json), F35 contextualized
@@ -37,7 +42,10 @@ class EnricherChain;
 ///       between commit and the state flip cannot double-write;
 ///   (6) flips enrich_state: fully repaired → 'ok'; still owed → attempts+1 and
 ///       next_retry_at += NextRetryDelaySec(attempts), or 'failed_permanent'
-///       past kMaxAttempts.
+///       past kMaxAttempts — except when the only remaining debt is the
+///       contextual index label with the columns and stored vector in place,
+///       which needs no provider call and stays due. A label row that fails to
+///       persist keeps f35 owed; it is never dropped with a warning.
 ///
 /// The F07 semantic_score is NOT recomputed for repaired chunks (the write-time
 /// score keeps its no-enricher value): the parser identity needed by the scorer

@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include <sqlite3.h>
 
@@ -52,5 +53,29 @@ Status WriteContextualVecLabel(sqlite3* db, const ContextualVecLabelRow& row);
 /// Resolve one ANN label. Ok(row) on hit; CX_ERR-style NotFound when absent
 /// (the caller treats an unknown label as a dropped hit, same as a missing block).
 Result<ContextualVecLabelRow> GetContextualVecLabel(sqlite3* db, uint64_t label);
+
+// --- label-only contextual debt ----------------------------------------------
+// When a child's contextual columns are complete but its index label row is
+// missing, the provider work for the member is done: the point can be re-added
+// from the stored vector and the label row written, without calling the provider.
+// The enrichment audit (which owes such a chunk) and the backfill worker (which
+// repairs it) must agree on exactly which rows that is, so both evaluate the one
+// SQL expression below — never two hand-written variants of it.
+
+/// SQL over one `blocks` row: the contextual member's provider work is complete
+/// and the stored vector is usable (status generated, a non-empty float32 blob).
+/// As a SELECT column it can be NULL (a NULL status), which readers take as false:
+/// read it with sqlite3_column_int (NULL reads as 0), never with a type check.
+inline constexpr char kBlockHasStoredContextualVectorSql[] =
+    "(contextualized_status = 1 AND contextualized_embedding IS NOT NULL"
+    " AND length(contextualized_embedding) > 0"
+    " AND length(contextualized_embedding) % 4 = 0)";
+
+/// The stored contextual vector of a block that satisfies
+/// kBlockHasStoredContextualVectorSql, decoded from its float32 blob. NotFound
+/// when the block does not satisfy it (or does not exist); any other status is a
+/// store error. The width is not checked here: the caller compares it with the
+/// index it is about to add the point to.
+Result<std::vector<float>> ReadStoredContextualVector(sqlite3* db, uint64_t block_id);
 
 }  // namespace cortrix::spc

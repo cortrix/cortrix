@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -29,6 +30,12 @@ inline constexpr int kEnrichRetryFirstDelaySec = 60;
 /// Provider-attempt cap: the backfill worker gives up on a chunk once this many
 /// deliveries have been counted and the artifact is still owed.
 inline constexpr int kEnrichMaxAttempts = 8;
+
+/// Give-up bound that no count ever reaches. Passed where a delivery costs no
+/// provider call and must therefore never end a row: label-only contextual debt,
+/// where the columns and the stored vector exist and only the index label is
+/// missing (kBlockHasStoredContextualVectorSql in cortrix/spc/contextual_store.h).
+inline constexpr int kEnrichNoTerminal = std::numeric_limits<int>::max();
 
 struct EnrichStateRow {
     uint64_t block_id = 0;
@@ -71,21 +78,24 @@ Result<int> MakeAllPendingDueNow(sqlite3* db, int64_t now_unix);
 /// The worker's end-of-run flip is the only other writer of `attempts`, and a
 /// task that dies before the flip (a storage failure after the provider ran, a
 /// handler that throws, a worker crash) left the count untouched — so the cap
-/// could never be reached on exactly the paths it exists for. Rows whose count
-/// would pass kEnrichMaxAttempts + 1 are given up on here: one over the flip's
-/// cap, so a row that has spent its attempts gets exactly one further delivery
-/// to heal (a crash after a successful last attempt, a missing index label)
-/// before the entry charge ends it. Returns rows changed.
+/// could never be reached on exactly the paths it exists for. A row whose new
+/// count exceeds `terminal_at_attempts` is given up on here. Provider deliveries
+/// pass kEnrichMaxAttempts + 1: one over the flip's cap, so a row that has spent
+/// its attempts gets exactly one further delivery to heal (a crash after a
+/// successful last attempt) before the entry charge ends it. Label-only
+/// deliveries pass kEnrichNoTerminal: they call no provider, so the cap does not
+/// apply to them, but the delivery is still counted. Returns rows changed.
 Result<int> ChargeEnrichAttempts(sqlite3* db, const std::vector<uint64_t>& block_ids,
-                                 int64_t now_unix);
+                                 int64_t now_unix, int terminal_at_attempts);
 
 /// Audit re-owe. A new row is inserted as given. An existing row KEEPS its
 /// attempts (the audit observes a missing artifact; it did not deliver anything)
 /// and, once its attempts have reached `terminal_at_attempts`, is marked
 /// failed_permanent instead of being re-owed — a row that spent its attempts is
-/// not resurrected. Pass a value above any count to exempt the row, which the
-/// audit does when the only missing artifact is an index label: the provider
-/// work is done, and one more delivery writes the label.
+/// not resurrected. Pass kEnrichNoTerminal to exempt the row, which the audit
+/// does when the only missing artifact is the contextual index label while the
+/// columns and the stored vector are present: the provider work is done, and one
+/// more delivery re-adds the point from the stored vector and writes the label.
 Status ReoweEnrichState(sqlite3* db, const EnrichStateRow& row, int terminal_at_attempts);
 
 struct EnrichStateCounts {
@@ -101,10 +111,17 @@ Result<EnrichStateCounts> CountEnrichStates(sqlite3* db);
 /// addendum §3.7 G4 — legacy/silent-degrade audit. Scans the namespace's child
 /// blocks against the CONFIGURED chain members and synthesizes 'pending_retry'
 /// rows (due at now_unix) for chunks whose artifacts are missing:
-///   f03 ⇔ blocks.enriched_score non-NULL; f35 ⇔ contextualized_status == 1;
-///   f38 ⇔ a block_type=16 row whose metadata source_child_id == the child.
+///   f03 ⇔ blocks.enriched_score non-NULL; f35 ⇔ contextualized_status == 1 AND
+///   the contextual index label row exists; f38 ⇔ a block_type=16 row whose
+///   metadata source_child_id == the child.
 /// Chunks already tracked as 'pending_retry' keep their attempts/backoff (not
-/// clobbered); fully-covered chunks get no row. Returns the synthesized count.
+/// clobbered). An 'ok' chunk with a missing artifact is re-owed with its count
+/// kept and is given up on at kEnrichMaxAttempts. 'failed_permanent' chunks stay
+/// terminal, with one exception: when the contextual columns and the stored
+/// vector are present and only the index label is missing
+/// (kBlockHasStoredContextualVectorSql), the repair costs no provider call, so
+/// the chunk is re-owed whatever its count. Fully-covered chunks get no row.
+/// Returns the synthesized count.
 Result<int> SynthesizeEnrichAuditRows(
     sqlite3* db, const std::unordered_set<std::string>& configured_members,
     int64_t now_unix);

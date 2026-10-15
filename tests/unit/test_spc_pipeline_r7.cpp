@@ -126,7 +126,13 @@ public:
     Status Snapshot() override { return Status::Ok(); }
     Status Recover() override { return Status::Ok(); }
     Status Shutdown() override { return Status::Ok(); }
-    cortrix::store::IndexStats GetStats() override { return cortrix::store::IndexStats{}; }
+    // Reports the fixture's vector width (the embedder and the fakes are 128 wide)
+    // so a stored vector of another width is refused the way production would.
+    cortrix::store::IndexStats GetStats() override {
+        cortrix::store::IndexStats s;
+        s.dim = 128;
+        return s;
+    }
     std::size_t GetMemoryFootprintBytes() const override { return footprint_; }
     std::vector<std::pair<uint64_t, float>> Search(const float*, int,
                                                    const observability::TraceContext*) override {
@@ -255,6 +261,20 @@ public:
 class SucceedingContextualEnricher : public FakeContextualEnricher {
 public:
     std::string Name() const override { return "f35_contextual_retrieval"; }
+};
+
+// Counts provider calls, one per chunk (the base EnrichBatch calls the virtual
+// Enrich per chunk), under the production member name so a filter to f35 alone
+// still reaches it — which is exactly what a label-only repair must not do.
+class CountingContextualEnricher : public SucceedingContextualEnricher {
+public:
+    cortrix::spc::EnrichResult Enrich(const std::string& text,
+                                      const cortrix::spc::DocumentMetadata& dm,
+                                      const cortrix::spc::ChunkContext& ctx) override {
+        ++calls;
+        return SucceedingContextualEnricher::Enrich(text, dm, ctx);
+    }
+    std::atomic<int> calls{0};
 };
 
 const char* kDoclingMultiPara = R"JSON({
@@ -1625,19 +1645,35 @@ TEST_F(SPCPipelineR7Test, EnrichSweeper_CountsOnlyCreatedTasksAndReturnsLease) {
 // ---------------------------------------------------------------------------
 
 namespace {
-// Rows of one document as (block_id, status, attempts).
-struct LedgerRow { uint64_t block_id; std::string status; int attempts; };
+// Rows of one document as (block_id, status, attempts, child_id, last_error).
+// last_error is NULL on ok rows; both text columns are read NULL-safe.
+struct LedgerRow {
+    uint64_t block_id = 0;
+    std::string status;
+    int attempts = 0;
+    std::string child_id;
+    std::string last_error;
+};
 std::vector<LedgerRow> LedgerOf(sqlite3* db, const std::string& doc_id) {
     std::vector<LedgerRow> out;
     sqlite3_stmt* st = nullptr;
     if (sqlite3_prepare_v2(db,
-            "SELECT block_id, status, attempts FROM enrich_state WHERE doc_id=?1 ORDER BY block_id",
+            "SELECT block_id, status, attempts, child_id, last_error FROM enrich_state"
+            " WHERE doc_id=?1 ORDER BY block_id",
             -1, &st, nullptr) != SQLITE_OK) return out;
     sqlite3_bind_text(st, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
+    auto text = [&](int col) {
+        const unsigned char* t = sqlite3_column_text(st, col);
+        return std::string(t ? reinterpret_cast<const char*>(t) : "");
+    };
     while (sqlite3_step(st) == SQLITE_ROW) {
-        out.push_back({static_cast<uint64_t>(sqlite3_column_int64(st, 0)),
-                       reinterpret_cast<const char*>(sqlite3_column_text(st, 1)),
-                       sqlite3_column_int(st, 2)});
+        LedgerRow r;
+        r.block_id = static_cast<uint64_t>(sqlite3_column_int64(st, 0));
+        r.status = text(1);
+        r.attempts = sqlite3_column_int(st, 2);
+        r.child_id = text(3);
+        r.last_error = text(4);
+        out.push_back(std::move(r));
     }
     sqlite3_finalize(st);
     return out;
@@ -1924,11 +1960,13 @@ TEST_F(SPCPipelineR7Test, EnrichAudit_UnavailableHeadMemberTerminates) {
 
 // A chunk whose provider work is complete and only the index label is missing
 // is re-owed and healed in one lap, keeping its count — including at the cap,
-// where a provider failure would have been given up on.
+// where a provider failure would have been given up on. The repair calls no
+// provider: the point is re-added from the stored vector.
 TEST_F(SPCPipelineR7Test, EnrichAudit_LabelOnlyMissHealsAndIsExemptAtCap) {
+    auto f35 = std::make_shared<CountingContextualEnricher>();
     cortrix::spc::EnricherChain chain;
     chain.Append(std::make_shared<FakeSummaryEnricher>());
-    chain.Append(std::make_shared<SucceedingContextualEnricher>());
+    chain.Append(f35);
     chain.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
         cortrix::spc::HyPEConfig{}, MakeHypeLlm(), nullptr));
     pipeline_->SetEnricherChain(&chain);
@@ -1941,6 +1979,8 @@ TEST_F(SPCPipelineR7Test, EnrichAudit_LabelOnlyMissHealsAndIsExemptAtCap) {
     auto ledger = LedgerOf(db, doc_id);
     ASSERT_FALSE(ledger.empty());
     ASSERT_GT(CountSql("SELECT COUNT(*) FROM contextual_vec_labels"), 0);
+    const int calls_after_ingest = f35->calls.load();
+    ASSERT_GT(calls_after_ingest, 0) << "positive control: ingest called the provider";
     auto drop_label = [&](uint64_t block_id) {
         sqlite3_stmt* st = nullptr;
         ASSERT_EQ(sqlite3_prepare_v2(db, "DELETE FROM contextual_vec_labels WHERE block_id=?1",
@@ -1950,6 +1990,11 @@ TEST_F(SPCPipelineR7Test, EnrichAudit_LabelOnlyMissHealsAndIsExemptAtCap) {
         sqlite3_finalize(st);
     };
     const uint64_t a = ledger[0].block_id;
+    const uint64_t ctx_label = cortrix::spc::DeriveContextualVecLabel(ledger[0].child_id);
+    auto label_adds = [&]() {
+        const auto& ids = fake_index_->added_ids();
+        return static_cast<int>(std::count(ids.begin(), ids.end(), ctx_label));
+    };
     const std::unordered_set<std::string> members{"f03", "f35", "f38"};
     async::TaskManager mgr;
     ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks_label.db").string()).ok());
@@ -1963,6 +2008,7 @@ TEST_F(SPCPipelineR7Test, EnrichAudit_LabelOnlyMissHealsAndIsExemptAtCap) {
 
     // Below the cap: re-owed with its count kept, healed in one delivery.
     drop_label(a); SetLedger(db, a, cortrix::spc::kEnrichStatusOk, 3);
+    int adds = label_adds();
     auto synth = cortrix::spc::SynthesizeEnrichAuditRows(db, members, 1000);
     ASSERT_TRUE(synth.ok()) << synth.status().message();
     EXPECT_EQ(synth.value(), 1);
@@ -1972,10 +2018,13 @@ TEST_F(SPCPipelineR7Test, EnrichAudit_LabelOnlyMissHealsAndIsExemptAtCap) {
     EXPECT_EQ(after[0].status, cortrix::spc::kEnrichStatusOk);
     EXPECT_EQ(after[0].attempts, 4);
     EXPECT_EQ(CountSql(label_sql.c_str()), 1);
+    EXPECT_EQ(f35->calls.load(), calls_after_ingest) << "a label repair calls no provider";
+    EXPECT_EQ(label_adds(), adds + 1) << "the point is re-added from the stored vector";
 
     // At the cap: the provider work is done and only the label is missing, so
     // the row is not given up on — one more delivery writes the label.
     drop_label(a); SetLedger(db, a, cortrix::spc::kEnrichStatusOk, 8);
+    adds = label_adds();
     synth = cortrix::spc::SynthesizeEnrichAuditRows(db, members, 1001);
     ASSERT_TRUE(synth.ok()) << synth.status().message();
     EXPECT_EQ(synth.value(), 1);
@@ -1986,6 +2035,282 @@ TEST_F(SPCPipelineR7Test, EnrichAudit_LabelOnlyMissHealsAndIsExemptAtCap) {
         << "a label-only miss must stay repairable at the cap";
     EXPECT_EQ(after[0].attempts, 9);
     EXPECT_EQ(CountSql(label_sql.c_str()), 1);
+    EXPECT_EQ(f35->calls.load(), calls_after_ingest) << "a label repair calls no provider";
+    EXPECT_EQ(label_adds(), adds + 1);
+}
+
+// A label write that keeps failing. The row keeps its debt (never reads `ok`),
+// climbs past the cap without being given up on — the repair needs no provider —
+// calls the provider zero times, and heals as soon as the failure is removed.
+TEST_F(SPCPipelineR7Test, EnrichAudit_LabelInsertFailureKeepsDebtBeyondCapAndRecovers) {
+    auto f35 = std::make_shared<CountingContextualEnricher>();
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    chain.Append(f35);
+    chain.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, MakeHypeLlm(), nullptr));
+    pipeline_->SetEnricherChain(&chain);
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+    pipeline_->SetEnricherChain(nullptr);
+    sqlite3* db = facade_->store().db_handle();
+    auto ledger = LedgerOf(db, doc_id);
+    ASSERT_FALSE(ledger.empty());
+    const uint64_t a = ledger[0].block_id;
+    const std::string a_lit = std::to_string(static_cast<int64_t>(a));
+    const uint64_t ctx_label = cortrix::spc::DeriveContextualVecLabel(ledger[0].child_id);
+    const int calls_after_ingest = f35->calls.load();
+    ASSERT_GT(calls_after_ingest, 0) << "positive control: ingest called the provider";
+    auto exec = [&](const std::string& sql) {
+        ASSERT_EQ(sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr), SQLITE_OK)
+            << sqlite3_errmsg(db);
+    };
+    auto row_a = [&]() {
+        for (const auto& r : LedgerOf(db, doc_id)) if (r.block_id == a) return r;
+        return LedgerRow{};
+    };
+    auto label_adds = [&]() {
+        const auto& ids = fake_index_->added_ids();
+        return static_cast<int>(std::count(ids.begin(), ids.end(), ctx_label));
+    };
+    const std::string label_sql = "SELECT COUNT(*) FROM contextual_vec_labels WHERE block_id=" + a_lit;
+    const std::string on_backoff_sql =
+        "SELECT COUNT(*) FROM enrich_state WHERE block_id=" + a_lit + " AND next_retry_at IS NOT NULL";
+
+    // Every label insert fails from here on; the label is missing at the cap.
+    exec("CREATE TRIGGER t_label_fail BEFORE INSERT ON contextual_vec_labels "
+         "BEGIN SELECT RAISE(ABORT, 'synthetic label failure'); END;");
+    exec("DELETE FROM contextual_vec_labels WHERE block_id=" + a_lit);
+    SetLedger(db, a, cortrix::spc::kEnrichStatusOk, 8);
+    const std::unordered_set<std::string> members{"f03", "f35", "f38"};
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks_label_fail.db").string()).ok());
+    cortrix::spc::EnrichBackfillWorker worker(*pool_, &chain, *embedder_, &mgr);
+    async::TaskInfo t; t.task_id = 1; t.namespace_id = "test-ns"; t.doc_id = doc_id;
+
+    int adds = label_adds();
+    for (int lap = 1; lap <= 4; ++lap) {
+        auto synth = cortrix::spc::SynthesizeEnrichAuditRows(db, members, 1000 + lap);
+        ASSERT_TRUE(synth.ok()) << synth.status().message();
+        EXPECT_EQ(synth.value(), lap == 1 ? 1 : 0) << "lap " << lap << ": re-owed once, then in flight";
+        ASSERT_TRUE(worker.ProcessTask(t).ok()) << "lap " << lap;
+        const LedgerRow r = row_a();
+        EXPECT_EQ(r.status, cortrix::spc::kEnrichStatusPendingRetry) << "lap " << lap;
+        EXPECT_EQ(r.attempts, 8 + lap) << "lap " << lap << ": every delivery is counted";
+        EXPECT_NE(r.last_error.find("f35"), std::string::npos) << "lap " << lap << ": " << r.last_error;
+        EXPECT_EQ(CountSql(label_sql.c_str()), 0) << "lap " << lap;
+        EXPECT_EQ(f35->calls.load(), calls_after_ingest) << "lap " << lap << ": a label repair calls no provider";
+        EXPECT_EQ(label_adds(), adds + 1) << "lap " << lap << ": the point is re-added in place";
+        adds = label_adds();
+        EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='failed_permanent'"), 0) << "lap " << lap;
+        EXPECT_EQ(CountSql(on_backoff_sql.c_str()), 1) << "lap " << lap << ": on backoff, not hot";
+    }
+    // Failure removed: one delivery heals it, still without the provider.
+    exec("DROP TRIGGER t_label_fail;");
+    ASSERT_TRUE(worker.ProcessTask(t).ok());
+    const LedgerRow healed = row_a();
+    EXPECT_EQ(healed.status, cortrix::spc::kEnrichStatusOk);
+    EXPECT_EQ(healed.attempts, 13);
+    EXPECT_EQ(CountSql(label_sql.c_str()), 1);
+    EXPECT_EQ(f35->calls.load(), calls_after_ingest);
+}
+
+// Contextual status says generated but no vector is stored: the label cannot be
+// rebuilt without the provider, so this is ordinary provider debt — given up on
+// at the cap by the audit, healed through the chain below it.
+TEST_F(SPCPipelineR7Test, EnrichAudit_ContextColumnsWithoutVectorAreProviderDebt) {
+    auto f35 = std::make_shared<CountingContextualEnricher>();
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    chain.Append(f35);
+    chain.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, MakeHypeLlm(), nullptr));
+    pipeline_->SetEnricherChain(&chain);
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+    pipeline_->SetEnricherChain(nullptr);
+    sqlite3* db = facade_->store().db_handle();
+    auto ledger = LedgerOf(db, doc_id);
+    ASSERT_FALSE(ledger.empty());
+    const uint64_t a = ledger[0].block_id;
+    const std::string a_lit = std::to_string(static_cast<int64_t>(a));
+    const int calls_after_ingest = f35->calls.load();
+    ASSERT_GT(calls_after_ingest, 0);
+    auto exec = [&](const std::string& sql) {
+        ASSERT_EQ(sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr), SQLITE_OK)
+            << sqlite3_errmsg(db);
+    };
+    auto row_a = [&]() {
+        for (const auto& r : LedgerOf(db, doc_id)) if (r.block_id == a) return r;
+        return LedgerRow{};
+    };
+    const std::string label_sql = "SELECT COUNT(*) FROM contextual_vec_labels WHERE block_id=" + a_lit;
+    const std::string blob_sql =
+        "SELECT COUNT(*) FROM blocks WHERE block_id=" + a_lit + " AND contextualized_embedding IS NOT NULL";
+    exec("UPDATE blocks SET contextualized_embedding=NULL WHERE block_id=" + a_lit);
+    exec("DELETE FROM contextual_vec_labels WHERE block_id=" + a_lit);
+    ASSERT_EQ(CountSql(blob_sql.c_str()), 0);
+    const std::unordered_set<std::string> members{"f03", "f35", "f38"};
+
+    // At the cap: provider debt is given up on, not exempted.
+    SetLedger(db, a, cortrix::spc::kEnrichStatusOk, 8);
+    auto synth = cortrix::spc::SynthesizeEnrichAuditRows(db, members, 1000);
+    ASSERT_TRUE(synth.ok()) << synth.status().message();
+    EXPECT_EQ(synth.value(), 1);
+    EXPECT_EQ(row_a().status, cortrix::spc::kEnrichStatusFailedPermanent)
+        << "no stored vector: the label needs the provider, so the cap applies";
+    EXPECT_EQ(row_a().attempts, 8);
+
+    // Below the cap: re-owed, then repaired through the provider (one call).
+    SetLedger(db, a, cortrix::spc::kEnrichStatusOk, 3);
+    synth = cortrix::spc::SynthesizeEnrichAuditRows(db, members, 1001);
+    ASSERT_TRUE(synth.ok()) << synth.status().message();
+    EXPECT_EQ(synth.value(), 1);
+    EXPECT_EQ(row_a().status, cortrix::spc::kEnrichStatusPendingRetry);
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks_no_vector.db").string()).ok());
+    cortrix::spc::EnrichBackfillWorker worker(*pool_, &chain, *embedder_, &mgr);
+    async::TaskInfo t; t.task_id = 1; t.namespace_id = "test-ns"; t.doc_id = doc_id;
+    ASSERT_TRUE(worker.ProcessTask(t).ok());
+    EXPECT_EQ(row_a().status, cortrix::spc::kEnrichStatusOk);
+    EXPECT_EQ(row_a().attempts, 4);
+    EXPECT_EQ(f35->calls.load(), calls_after_ingest + 1) << "the provider rebuilt the vector";
+    EXPECT_EQ(CountSql(blob_sql.c_str()), 1);
+    EXPECT_EQ(CountSql(label_sql.c_str()), 1);
+}
+
+// A row that was given up on while its contextual columns and stored vector are
+// intact and only the label is missing: the repair costs no provider call, so the
+// audit re-owes it. A given-up row whose debt needs the provider stays terminal.
+TEST_F(SPCPipelineR7Test, EnrichAudit_GivenUpLabelOnlyRowIsReowed) {
+    auto f35 = std::make_shared<CountingContextualEnricher>();
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    chain.Append(f35);
+    chain.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, MakeHypeLlm(), nullptr));
+    pipeline_->SetEnricherChain(&chain);
+    // Two single-chunk documents: one label-only given-up row, one provider-debt
+    // control (the fixture's document yields exactly one chunk).
+    std::string doc_a = CreateDoc("/spc/doc-a.txt");
+    auto task_a = MakeTask(txt_path_, "text/plain", doc_a);
+    task_a->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task_a, *facade_), 0) << task_a->error_message;
+    std::string doc_b = CreateDoc("/spc/doc-b.txt");
+    auto task_b = MakeTask(txt_path_, "text/plain", doc_b);
+    task_b->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task_b, *facade_), 0) << task_b->error_message;
+    pipeline_->SetEnricherChain(nullptr);
+    sqlite3* db = facade_->store().db_handle();
+    auto ledger_a = LedgerOf(db, doc_a);
+    auto ledger_b = LedgerOf(db, doc_b);
+    ASSERT_FALSE(ledger_a.empty());
+    ASSERT_FALSE(ledger_b.empty());
+    const uint64_t a = ledger_a[0].block_id, b = ledger_b[0].block_id;
+    const std::string a_lit = std::to_string(static_cast<int64_t>(a));
+    const std::string b_lit = std::to_string(static_cast<int64_t>(b));
+    const int calls_after_ingest = f35->calls.load();
+    ASSERT_GT(calls_after_ingest, 0);
+    auto exec = [&](const std::string& sql) {
+        ASSERT_EQ(sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr), SQLITE_OK)
+            << sqlite3_errmsg(db);
+    };
+    auto row_in = [&](const std::string& doc, uint64_t id) {
+        for (const auto& r : LedgerOf(db, doc)) if (r.block_id == id) return r;
+        return LedgerRow{};
+    };
+    const std::unordered_set<std::string> members{"f03", "f35", "f38"};
+
+    // Label-only and given up: re-owed with its count kept, healed without the provider.
+    exec("DELETE FROM contextual_vec_labels WHERE block_id=" + a_lit);
+    SetLedger(db, a, cortrix::spc::kEnrichStatusFailedPermanent, 8);
+    auto synth = cortrix::spc::SynthesizeEnrichAuditRows(db, members, 1000);
+    ASSERT_TRUE(synth.ok()) << synth.status().message();
+    EXPECT_EQ(synth.value(), 1) << "a given-up row whose repair needs no provider is re-owed";
+    EXPECT_EQ(row_in(doc_a, a).status, cortrix::spc::kEnrichStatusPendingRetry);
+    EXPECT_EQ(row_in(doc_a, a).attempts, 8);
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks_given_up.db").string()).ok());
+    cortrix::spc::EnrichBackfillWorker worker(*pool_, &chain, *embedder_, &mgr);
+    async::TaskInfo t; t.task_id = 1; t.namespace_id = "test-ns"; t.doc_id = doc_a;
+    ASSERT_TRUE(worker.ProcessTask(t).ok());
+    EXPECT_EQ(row_in(doc_a, a).status, cortrix::spc::kEnrichStatusOk);
+    EXPECT_EQ(row_in(doc_a, a).attempts, 9);
+    EXPECT_EQ(CountSql(("SELECT COUNT(*) FROM contextual_vec_labels WHERE block_id=" + a_lit).c_str()), 1);
+    EXPECT_EQ(f35->calls.load(), calls_after_ingest);
+
+    // Control: a given-up row owing provider work stays given up on.
+    exec("UPDATE blocks SET enriched_score=NULL WHERE block_id=" + b_lit);
+    SetLedger(db, b, cortrix::spc::kEnrichStatusFailedPermanent, 8);
+    synth = cortrix::spc::SynthesizeEnrichAuditRows(db, members, 1001);
+    ASSERT_TRUE(synth.ok()) << synth.status().message();
+    EXPECT_EQ(synth.value(), 0) << "provider debt that was given up on is not resurrected";
+    EXPECT_EQ(row_in(doc_b, b).status, cortrix::spc::kEnrichStatusFailedPermanent);
+}
+
+// A stored vector the index cannot take (wrong width) is not provider debt: the
+// row keeps a named error, stays due with zero provider calls, and adds no point.
+TEST_F(SPCPipelineR7Test, EnrichBackfill_StoredVectorOfWrongWidthIsNotProviderDebt) {
+    auto f35 = std::make_shared<CountingContextualEnricher>();
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    chain.Append(f35);
+    chain.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, MakeHypeLlm(), nullptr));
+    pipeline_->SetEnricherChain(&chain);
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+    pipeline_->SetEnricherChain(nullptr);
+    sqlite3* db = facade_->store().db_handle();
+    auto ledger = LedgerOf(db, doc_id);
+    ASSERT_FALSE(ledger.empty());
+    const uint64_t a = ledger[0].block_id;
+    const std::string a_lit = std::to_string(static_cast<int64_t>(a));
+    const uint64_t ctx_label = cortrix::spc::DeriveContextualVecLabel(ledger[0].child_id);
+    const int calls_after_ingest = f35->calls.load();
+    ASSERT_GT(calls_after_ingest, 0);
+    auto exec = [&](const std::string& sql) {
+        ASSERT_EQ(sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr), SQLITE_OK)
+            << sqlite3_errmsg(db);
+    };
+    auto row_a = [&]() {
+        for (const auto& r : LedgerOf(db, doc_id)) if (r.block_id == a) return r;
+        return LedgerRow{};
+    };
+    auto label_adds = [&]() {
+        const auto& ids = fake_index_->added_ids();
+        return static_cast<int>(std::count(ids.begin(), ids.end(), ctx_label));
+    };
+    const std::string label_sql = "SELECT COUNT(*) FROM contextual_vec_labels WHERE block_id=" + a_lit;
+    // 64 floats where the index takes 128: well-formed, wrong width.
+    exec("UPDATE blocks SET contextualized_embedding=zeroblob(64*4) WHERE block_id=" + a_lit);
+    exec("DELETE FROM contextual_vec_labels WHERE block_id=" + a_lit);
+    SetLedger(db, a, cortrix::spc::kEnrichStatusOk, 3);
+    const std::unordered_set<std::string> members{"f03", "f35", "f38"};
+    auto synth = cortrix::spc::SynthesizeEnrichAuditRows(db, members, 1000);
+    ASSERT_TRUE(synth.ok()) << synth.status().message();
+    EXPECT_EQ(synth.value(), 1);
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks_wrong_width.db").string()).ok());
+    cortrix::spc::EnrichBackfillWorker worker(*pool_, &chain, *embedder_, &mgr);
+    async::TaskInfo t; t.task_id = 1; t.namespace_id = "test-ns"; t.doc_id = doc_id;
+    const int adds = label_adds();
+    for (int lap = 1; lap <= 2; ++lap) {
+        ASSERT_TRUE(worker.ProcessTask(t).ok()) << "lap " << lap;
+        EXPECT_EQ(f35->calls.load(), calls_after_ingest) << "lap " << lap << ": not provider debt";
+        const LedgerRow r = row_a();
+        EXPECT_EQ(r.status, cortrix::spc::kEnrichStatusPendingRetry) << "lap " << lap;
+        EXPECT_EQ(r.attempts, 3 + lap) << "lap " << lap;
+        EXPECT_NE(r.last_error.find("VECTOR_DIM"), std::string::npos) << "lap " << lap << ": " << r.last_error;
+        EXPECT_EQ(CountSql(label_sql.c_str()), 0) << "lap " << lap;
+        EXPECT_EQ(label_adds(), adds) << "lap " << lap << ": no point of the wrong width is added";
+    }
 }
 
 // Re-ingest gives every chunk a fresh identity; the previous rows become stale.
