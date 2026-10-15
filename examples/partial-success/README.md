@@ -36,21 +36,23 @@ To send your own query text, set `CORTRIX_QUERY`.
 
 `nope` and `nope-2` stand for namespaces that don't exist.
 
+This is written for the Quick Start's no-auth posture. With API-key authentication enabled, a namespace you cannot read -- including one that does not exist -- rejects the whole request with HTTP 403 `CX_ERR_NS_UNAUTHORIZED`, so the response never reveals whether a namespace exists. Checks 2 and 3 do not apply in that configuration.
+
 Each check prints one line with the fields an agent acts on, then `PASS` or `FAIL`. The script exits with 0 when all four pass, 1 when a check fails, and 2 when Cortrix isn't ready at the address.
 
 ## Expected output
 
-This output is from `v1.0.0-rc.2`:
+This is what the script prints. It has not been re-captured against a tagged release since the output format last changed, so treat it as the shape to expect rather than as a transcript of a specific version:
 
 ```text
 == 1. Every namespace answers
-   http=200 coverage_ratio=1.0 results=1 succeeded=demo failed=-
+   http=200 coverage_ratio=1.0 results=1 succeeded=demo failed_ns=- failed=-
    PASS
 == 2. One namespace cannot be queried: still HTTP 200, coverage_ratio drops
-   http=200 coverage_ratio=0.5 results=1 succeeded=demo failed=nope(CX_ERR_INDEX_CORRUPT retryable=false category=permanent)
+   http=200 coverage_ratio=0.5 results=1 succeeded=demo failed_ns=nope failed=nope(CX_ERR_INDEX_CORRUPT retryable=false category=permanent)
    PASS
 == 3. No namespace can be queried: still HTTP 200, coverage_ratio is 0 and results are empty
-   http=200 coverage_ratio=0.0 results=0 succeeded=- failed=nope(CX_ERR_INDEX_CORRUPT retryable=false category=permanent),nope-2(CX_ERR_INDEX_CORRUPT retryable=false category=permanent)
+   http=200 coverage_ratio=0.0 results=0 succeeded=- failed_ns=nope,nope-2 failed=nope(CX_ERR_INDEX_CORRUPT retryable=false category=permanent),nope-2(CX_ERR_INDEX_CORRUPT retryable=false category=permanent)
    PASS
 == 4. A malformed request is different: it gets a 4xx, not a partial result
    http=400 code=CX_ERR_DEPRECATED_FIELD retryable=false category=permanent

@@ -12,7 +12,7 @@ Neither script calls a model. They stop where your agent takes over: with the pa
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install cortrix cortrix-mcp
+pip install cortrix cortrix-mcp mcp
 ```
 
 Both scripts target `http://127.0.0.1:8420`. Pass `--base-url` to use another address.
@@ -48,7 +48,7 @@ not searched: not-a-real-namespace (permanent)
 The agent should answer from the context above and say which part it could not search.
 ```
 
-The `retrieve` function is the part to copy. It reads `coverage_ratio` and each entry in `namespaces_failed`, and decides from `retryable` and `category`, not from the text of an error code.
+The `retrieve` function is the part to copy. It reads `coverage_ratio` and each entry in `namespaces_failed`, and decides from `retryable` -- not from the text of an error code. `category` is not part of the decision; it is carried through so the message to the user can say why a namespace was skipped.
 
 The script waits for each upload by polling `documents.task_progress` itself. `documents.upload_and_wait` does the same in one call, but in `cortrix` 1.0.0rc2 it doesn't return for a finished task. See [#121](https://github.com/cortrix/cortrix/issues/121).
 
@@ -78,6 +78,8 @@ session_id: mcp-session-87cd89523ad8
 ```
 
 The `session_id` changes on every run.
+
+The server also logs one `HTTP Request: ...` line to stderr per backend call -- two for this script. The block above is stdout only; add `2>/dev/null` to suppress the log.
 
 Every tool result has two layers. `data` is the result of the call. `meta` tells the agent whether it can retry, and for a query its `structured_data` carries `coverage_ratio` and `namespaces_failed`, the same fields the HTTP API returns. A tool call that fails comes back with `isError` set: a one-line message followed by the structured error as JSON.
 

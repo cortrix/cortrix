@@ -206,7 +206,7 @@ jobs:
         continue-on-error: true
         run: |
           pip install -q ruff
-          ruff check cortrix-agent cortrix-mcp sdk/python
+          ruff check cortrix-agent cortrix-mcp sdk/python examples
 
   # Aggregate gate. This is the job the ruleset will require (stage S2), so
   # the required-check name stays stable when later stages shard jobs into a
