@@ -4,6 +4,7 @@
 #include <string>
 
 #include "cortrix/async/task_finalizer.h"
+#include "cortrix/spc_enricher/enrich_state_store.h"
 #include "cortrix/async/task_handler.h"
 #include "cortrix/async/task_info.h"
 #include "cortrix/common/status.h"
@@ -60,7 +61,7 @@ public:
     static int64_t NextRetryDelaySec(int attempts);
 
     /// Give-up threshold → 'failed_permanent' (addendum §3.7 default).
-    static constexpr int kMaxAttempts = 8;
+    static constexpr int kMaxAttempts = kEnrichMaxAttempts;  // the flip's give-up point
 
 private:
     resource::INamespacePool& pool_;

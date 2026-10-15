@@ -26,6 +26,10 @@ inline constexpr char kEnrichStatusFailedPermanent[] = "failed_permanent";
 /// enrichment debt; the backfill worker owns the subsequent exponential schedule.
 inline constexpr int kEnrichRetryFirstDelaySec = 60;
 
+/// Provider-attempt cap: the backfill worker gives up on a chunk once this many
+/// deliveries have been counted and the artifact is still owed.
+inline constexpr int kEnrichMaxAttempts = 8;
+
 struct EnrichStateRow {
     uint64_t block_id = 0;
     std::string doc_id;
@@ -62,6 +66,27 @@ Status LeaseDocRetries(sqlite3* db, const std::string& doc_id, int64_t lease_unt
 /// same due time, and the sweep that follows would then serve the same first
 /// batch on every call while the rest wait for ever (#149). Returns rows changed.
 Result<int> MakeAllPendingDueNow(sqlite3* db, int64_t now_unix);
+
+/// Count one delivery against these pending rows, before the first provider call.
+/// The worker's end-of-run flip is the only other writer of `attempts`, and a
+/// task that dies before the flip (a storage failure after the provider ran, a
+/// handler that throws, a worker crash) left the count untouched — so the cap
+/// could never be reached on exactly the paths it exists for. Rows whose count
+/// would pass kEnrichMaxAttempts + 1 are given up on here: one over the flip's
+/// cap, so a row that has spent its attempts gets exactly one further delivery
+/// to heal (a crash after a successful last attempt, a missing index label)
+/// before the entry charge ends it. Returns rows changed.
+Result<int> ChargeEnrichAttempts(sqlite3* db, const std::vector<uint64_t>& block_ids,
+                                 int64_t now_unix);
+
+/// Audit re-owe. A new row is inserted as given. An existing row KEEPS its
+/// attempts (the audit observes a missing artifact; it did not deliver anything)
+/// and, once its attempts have reached `terminal_at_attempts`, is marked
+/// failed_permanent instead of being re-owed — a row that spent its attempts is
+/// not resurrected. Pass a value above any count to exempt the row, which the
+/// audit does when the only missing artifact is an index label: the provider
+/// work is done, and one more delivery writes the label.
+Status ReoweEnrichState(sqlite3* db, const EnrichStateRow& row, int terminal_at_attempts);
 
 struct EnrichStateCounts {
     int64_t total = 0;

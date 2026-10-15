@@ -169,6 +169,86 @@ Result<int> MakeAllPendingDueNow(sqlite3* db, int64_t now_unix) {
     return sqlite3_changes(db);
 }
 
+Result<int> ChargeEnrichAttempts(sqlite3* db, const std::vector<uint64_t>& block_ids,
+                                 int64_t now_unix) {
+    if (!db) return Status::InvalidArgument("ChargeEnrichAttempts: null db");
+    if (block_ids.empty()) return 0;
+    // One over the flip's cap: the flip at kEnrichMaxAttempts is the real give-up
+    // for provider failures; this bound only ends rows no flip ever reaches.
+    const int entry_cap = kEnrichMaxAttempts + 1;
+    int changed = 0;
+    constexpr size_t kChunk = 400;  // well under SQLite's bound-parameter limit
+    for (size_t start = 0; start < block_ids.size(); start += kChunk) {
+        const size_t n = std::min(kChunk, block_ids.size() - start);
+        std::string sql =
+            "UPDATE enrich_state SET attempts=attempts+1, updated_at=?1,"
+            " status=CASE WHEN attempts+1>?2 THEN '";
+        sql += kEnrichStatusFailedPermanent;
+        sql += "' ELSE status END,"
+               " next_retry_at=CASE WHEN attempts+1>?2 THEN NULL ELSE next_retry_at END"
+               " WHERE status=?3 AND block_id IN (";
+        for (size_t i = 0; i < n; ++i) sql += (i ? ",?" : "?") + std::to_string(4 + i);
+        sql += ")";
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+            return SqlErr(db, "prepare charge enrich attempts");
+        }
+        sqlite3_bind_int64(stmt, 1, now_unix);
+        sqlite3_bind_int(stmt, 2, entry_cap);
+        sqlite3_bind_text(stmt, 3, kEnrichStatusPendingRetry, -1, SQLITE_STATIC);
+        for (size_t i = 0; i < n; ++i) {
+            sqlite3_bind_int64(stmt, static_cast<int>(4 + i),
+                               static_cast<sqlite3_int64>(block_ids[start + i]));
+        }
+        const int rc = sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+        if (rc != SQLITE_DONE) return SqlErr(db, "charge enrich attempts");
+        changed += sqlite3_changes(db);
+    }
+    return changed;
+}
+
+Status ReoweEnrichState(sqlite3* db, const EnrichStateRow& row, int terminal_at_attempts) {
+    if (!db) return Status::InvalidArgument("ReoweEnrichState: null db");
+    if (row.status.empty()) return Status::InvalidArgument("ReoweEnrichState: empty status");
+    sqlite3_stmt* stmt = nullptr;
+    // Same shape as UpsertEnrichState, minus `attempts=excluded.attempts`: the
+    // row's count is the worker's, not the audit's.
+    std::string sql =
+        "INSERT INTO enrich_state(block_id, doc_id, child_id, status, failed_members,"
+        " attempts, last_error, next_retry_at, updated_at)"
+        " VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
+        " ON CONFLICT(block_id) DO UPDATE SET"
+        " doc_id=excluded.doc_id, child_id=excluded.child_id,"
+        " status=CASE WHEN enrich_state.attempts>=?10 THEN '";
+    sql += kEnrichStatusFailedPermanent;
+    sql += "' ELSE excluded.status END,"
+           " failed_members=excluded.failed_members, last_error=excluded.last_error,"
+           " next_retry_at=CASE WHEN enrich_state.attempts>=?10 THEN NULL"
+           " ELSE excluded.next_retry_at END,"
+           " updated_at=excluded.updated_at";
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        return SqlErr(db, "prepare reowe enrich_state");
+    }
+    sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(row.block_id));
+    sqlite3_bind_text(stmt, 2, row.doc_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, row.child_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, row.status.c_str(), -1, SQLITE_TRANSIENT);
+    if (row.failed_members.empty()) sqlite3_bind_null(stmt, 5);
+    else sqlite3_bind_text(stmt, 5, row.failed_members.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 6, row.attempts);
+    if (row.last_error.empty()) sqlite3_bind_null(stmt, 7);
+    else sqlite3_bind_text(stmt, 7, row.last_error.c_str(), -1, SQLITE_TRANSIENT);
+    if (row.next_retry_at <= 0) sqlite3_bind_null(stmt, 8);
+    else sqlite3_bind_int64(stmt, 8, row.next_retry_at);
+    sqlite3_bind_int64(stmt, 9, row.updated_at);
+    sqlite3_bind_int(stmt, 10, terminal_at_attempts);
+    const int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) return SqlErr(db, "reowe enrich_state");
+    return Status::Ok();
+}
+
 Result<int> SynthesizeEnrichAuditRows(
     sqlite3* db, const std::unordered_set<std::string>& configured_members,
     int64_t now_unix) {
@@ -213,10 +293,11 @@ Result<int> SynthesizeEnrichAuditRows(
     }
 
     // Pass 2: rows the audit must NOT re-synthesize. Two cases: in-flight
-    // pending_retry (keep their attempts/backoff) AND failed_permanent (P4: a
-    // terminal give-up must stay terminal — re-synthesizing via INSERT OR REPLACE
-    // would reset attempts=0 and resurrect a chunk that already hit the 8x/48h
-    // ceiling, spinning it forever).
+    // pending_retry (keep their attempts/backoff) AND failed_permanent (a
+    // terminal give-up must stay terminal). Rows in `ok` are re-owed below
+    // through ReoweEnrichState, which keeps their attempts — rewriting them with
+    // attempts=0 let a chunk whose head member kept being skipped cycle for ever
+    // without the cap ever being reached.
     std::unordered_set<uint64_t> audit_skip;
     {
         sqlite3_stmt* st = nullptr;
@@ -264,23 +345,31 @@ Result<int> SynthesizeEnrichAuditRows(
             ctx_status == 1 &&
             (!ctx_labels_available || ctx_labels.count(block_id) > 0);
         if (configured_members.count("f35") && !f35_done) owe("f35");
+        // The columns are there and only the index label is missing: the provider
+        // work for this member is complete, so this miss must not count toward
+        // the provider cap — one more delivery writes the label.
+        const bool f35_label_only = configured_members.count("f35") && !f35_done &&
+                                    ctx_status == 1;
         if (configured_members.count("f38") &&
             hype_sources.find(child_id) == hype_sources.end()) {
             owe("f38");
         }
         if (owed.empty()) continue;
         if (audit_skip.count(block_id)) continue;
+        const bool label_only_miss = f35_label_only && owed == "f35";
         EnrichStateRow row;
         row.block_id = block_id;
         row.doc_id = did ? reinterpret_cast<const char*>(did) : "";
         row.child_id = child_id;
         row.status = kEnrichStatusPendingRetry;
         row.failed_members = std::move(owed);
-        row.attempts = 0;
+        row.attempts = 0;  // used only when the row is new; an existing row keeps its count
         row.last_error = "audit: artifacts missing";
         row.next_retry_at = now_unix;
         row.updated_at = now_unix;
-        if (UpsertEnrichState(db, row).ok()) ++synthesized;
+        const int terminal_at = label_only_miss ? std::numeric_limits<int>::max()
+                                                : kEnrichMaxAttempts;
+        if (ReoweEnrichState(db, row, terminal_at).ok()) ++synthesized;
     }
     sqlite3_finalize(st);
     if (rc != SQLITE_DONE) return SqlErr(db, "audit children scan");

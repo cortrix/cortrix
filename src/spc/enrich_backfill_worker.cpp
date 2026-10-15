@@ -218,6 +218,35 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
             .push_back(&row);
     }
 
+    // ---- Count this delivery before the first provider call ------------------
+    // Every row of the snapshot, stale ones included: a row whose chunk is gone is
+    // never repaired, and without this it would be due for ever at attempts 0.
+    // Keyed on the snapshot's rows, not the document, so a row the audit writes
+    // between the snapshot and here is not charged for a delivery it did not get.
+    // Failing closed: a provider call that is not counted is the defect this is
+    // here to prevent.
+    {
+        std::vector<uint64_t> charged_ids;
+        charged_ids.reserve(pending.size());
+        int ended_here = 0;
+        for (const auto& row : pending) {
+            charged_ids.push_back(row.block_id);
+            if (row.attempts + 1 > kMaxAttempts + 1) ++ended_here;
+        }
+        auto charged = ChargeEnrichAttempts(db, charged_ids, NowUnix());
+        if (!charged.ok()) {
+            return finalizer_.Fail(task, "CX_ERR_ENRICH_BACKFILL_STORE",
+                                   charged.status().message(),
+                                   {{"doc_id", task.doc_id}}, t_start);
+        }
+        if (ended_here > 0) {
+            CORTRIX_LOG_WARN("spc",
+                "enrich backfill gave up on {} row(s) of doc={} at delivery: the previous "
+                "deliveries never finished (a repair in this run still overrides it)",
+                ended_here, task.doc_id);
+        }
+    }
+
     struct Repair {
         const EnrichStateRow* row = nullptr;
         const CortrixBlock* block = nullptr;
