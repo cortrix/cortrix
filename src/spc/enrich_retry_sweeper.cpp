@@ -1,6 +1,7 @@
 #include "cortrix/spc_enricher/enrich_retry_sweeper.h"
 
 #include <chrono>
+#include <limits>
 
 #include "cortrix/async/task_info.h"
 #include "cortrix/async/task_scheduler.h"
@@ -106,6 +107,7 @@ int EnrichRetrySweeper::RunSweepNow(const std::string& only_ns) {
     }
 
     const int64_t now = NowUnix();
+    const int cap = MaxDocsPerSweep();
     int enqueued = 0;
     for (const auto& ns : namespaces) {
         resource::NamespaceFacade facade(pool_, ns);
@@ -113,13 +115,26 @@ int EnrichRetrySweeper::RunSweepNow(const std::string& only_ns) {
         sqlite3* db = facade.store().db_handle();
         if (!db) continue;
 
-        auto due = ListDueDocs(db, now, MaxDocsPerSweep());
+        // Fetch EVERY due document and let the cap bound how many this tick
+        // attempts. A document skipped below keeps its place at the front of the
+        // due-ordering — the skip happens before the lease advances next_retry_at —
+        // so a batch sized at `cap` would be filled by the same skipped documents
+        // on every tick once `cap` of them exist, and nothing behind them would
+        // ever be served (#149). The query's cost is in the scan and the GROUP BY,
+        // not the LIMIT, so fetching all due documents costs the same.
+        auto due = ListDueDocs(db, now, std::numeric_limits<int>::max());
         if (!due.ok()) {
             CORTRIX_LOG_WARN("spc", "enrich sweep ListDueDocs failed ns={}: {}", ns,
                              due.status().message());
             continue;
         }
+        int attempted = 0, skipped_active = 0, lookup_failed = 0, lease_failed = 0;
+        int created = 0, merged = 0, submit_failed = 0;
         for (const auto& doc_id : due.value()) {
+            // The cap bounds attempts (leases taken plus dedup lookups that could
+            // not be answered), never the cheap "already has a task" skips — those
+            // are exactly the documents that must not consume the batch.
+            if (attempted >= cap) break;
             // §3.7.6 enqueue dedup: at most one active backfill task per doc.
             // The 600s lease cannot bound duplicates once queue latency exceeds
             // it (field-observed: 35k+ queued duplicates under a flapping LLM
@@ -141,27 +156,60 @@ int EnrichRetrySweeper::RunSweepNow(const std::string& only_ns) {
                                      "enrich sweep dedup lookup failed ns={} doc={}: {} - "
                                      "skipping with lease intact, next tick re-checks",
                                      ns, doc_id, active.status().message());
+                    ++lookup_failed;
+                    ++attempted;  // a failing task store must not be probed without bound
                     continue;
                 }
-                if (active.value()) continue;
+                if (active.value()) {
+                    ++skipped_active;
+                    continue;
+                }
             }
+            ++attempted;
             // Lease first: even if Enqueue is debounced/fails, the doc simply
             // waits out the lease instead of hot-looping every tick.
             Status ls = LeaseDocRetries(db, doc_id, now + kLeaseSeconds, now);
-            if (!ls.ok()) continue;
+            if (!ls.ok()) {
+                ++lease_failed;
+                continue;
+            }
+            if (!scheduler_) continue;
             async::SubmitRequest req;
             req.namespace_id = ns;
             req.doc_id = doc_id;
             req.content_hash = doc_id;
             req.filename = "enrich-backfill";
             req.task_type = async::kTaskEnrichBackfill;
-            if (scheduler_ && scheduler_->Enqueue(req).ok()) ++enqueued;
+            async::EnqueueDisposition disposition = async::EnqueueDisposition::kMerged;
+            auto submitted = scheduler_->Enqueue(req, &disposition);
+            if (submitted.ok() && disposition == async::EnqueueDisposition::kCreated) {
+                ++created;
+                ++enqueued;
+                continue;
+            }
+            // Nothing was created for this document: the submission merged into a
+            // task that already exists (a just-completed one, under the default
+            // debounce), was refreshed, or failed. Counting it would report work
+            // that does not exist, and keeping the lease would park the document
+            // for 600 s behind a task that will never run for it (#145). Hand the
+            // lease back — the same statement with lease_until = now.
+            if (submitted.ok()) ++merged; else ++submit_failed;
+            Status unlease = LeaseDocRetries(db, doc_id, now, now);
+            if (!unlease.ok()) {
+                CORTRIX_LOG_WARN("spc", "enrich sweep could not return lease ns={} doc={}: {}",
+                                 ns, doc_id, unlease.message());
+            }
+        }
+        if (!due.value().empty()) {
+            CORTRIX_LOG_INFO("spc",
+                             "enrich sweep ns={} due={} attempted={} skipped_active={} "
+                             "lookup_failed={} lease_failed={} created={} merged={} "
+                             "submit_failed={}",
+                             ns, due.value().size(), attempted, skipped_active,
+                             lookup_failed, lease_failed, created, merged, submit_failed);
         }
     }
-    if (enqueued > 0) {
-        CORTRIX_LOG_INFO("spc", "enrich sweep enqueued {} backfill task(s)", enqueued);
-        if (workers_) workers_->Notify();
-    }
+    if (enqueued > 0 && workers_) workers_->Notify();
     return enqueued;
 }
 

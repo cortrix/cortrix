@@ -149,6 +149,26 @@ Status LeaseDocRetries(sqlite3* db, const std::string& doc_id, int64_t lease_unt
     return Status::Ok();
 }
 
+Result<int> MakeAllPendingDueNow(sqlite3* db, int64_t now_unix) {
+    if (!db) return Status::InvalidArgument("MakeAllPendingDueNow: null db");
+    sqlite3_stmt* stmt = nullptr;
+    // Only rows not yet due move. A row that is already due keeps its older
+    // next_retry_at, so ListDueDocs' ORDER BY still puts the longest-waiting
+    // document first instead of an arbitrary tie-break among equals.
+    const char* sql =
+        "UPDATE enrich_state SET next_retry_at=?1, updated_at=?1"
+        " WHERE status=?2 AND (next_retry_at IS NULL OR next_retry_at>?1)";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        return SqlErr(db, "prepare make pending due");
+    }
+    sqlite3_bind_int64(stmt, 1, now_unix);
+    sqlite3_bind_text(stmt, 2, kEnrichStatusPendingRetry, -1, SQLITE_STATIC);
+    const int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) return SqlErr(db, "make pending due");
+    return sqlite3_changes(db);
+}
+
 Result<int> SynthesizeEnrichAuditRows(
     sqlite3* db, const std::unordered_set<std::string>& configured_members,
     int64_t now_unix) {

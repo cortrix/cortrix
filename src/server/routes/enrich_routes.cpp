@@ -25,17 +25,6 @@ int64_t NowUnix() {
         .count();
 }
 
-void MakeAllPendingDueNow(sqlite3* db, int64_t now) {
-    sqlite3_stmt* st = nullptr;
-    const char* sql =
-        "UPDATE enrich_state SET next_retry_at=?1, updated_at=?1"
-        " WHERE status='pending_retry'";
-    if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) return;
-    sqlite3_bind_int64(st, 1, now);
-    sqlite3_step(st);
-    sqlite3_finalize(st);
-}
-
 }  // namespace
 
 void RegisterEnrichRoutes(httplib::Server& server,
@@ -110,7 +99,11 @@ void RegisterEnrichRoutes(httplib::Server& server,
                     synthesized = synth.value();
                 }
 
-                MakeAllPendingDueNow(db, now);
+                auto made_due = spc::MakeAllPendingDueNow(db, now);
+                if (!made_due.ok()) {
+                    CORTRIX_LOG_WARN("spc", "enrich backfill: make-due failed ns={}: {}",
+                                     ns_name, made_due.status().message());
+                }
                 const int enqueued = sweeper ? sweeper->RunSweepNow(ns_name) : 0;
 
                 auto counts = spc::CountEnrichStates(db);

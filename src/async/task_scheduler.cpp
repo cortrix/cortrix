@@ -17,7 +17,8 @@ int TaskScheduler::DebounceSeconds() const {
     return kDefaultDebounceSeconds;
 }
 
-Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
+Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req,
+                                        EnqueueDisposition* disposition) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     // topic 2.2 C — 5s Watcher debounce. Only meaningful when we have a doc_id to
@@ -52,6 +53,7 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
                         req.filepath != claimed.value().filepath) {
                         ReleaseUnadoptedInput(req.filepath, claimed.value().task_id);
                     }
+                    if (disposition) *disposition = EnqueueDisposition::kMerged;
                     return claimed;
                 }
             } else if (r.status == task_status::kQueued) {
@@ -69,6 +71,7 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
                     if (!superseded.empty() && superseded != req.filepath) {
                         ReleaseUnadoptedInput(superseded, r.task_id);
                     }
+                    if (disposition) *disposition = EnqueueDisposition::kRefreshed;
                     return refreshed;
                 }
             }
@@ -91,6 +94,7 @@ Result<TaskInfo> TaskScheduler::Enqueue(const SubmitRequest& req) {
     auto created = mgr_->CreateTask(std::move(task));
     if (created.ok()) {
         F42Metrics::Instance().RecordSubmitted(static_cast<TaskType>(req.task_type));
+        if (disposition) *disposition = EnqueueDisposition::kCreated;
     }
     return created;
 }

@@ -13,6 +13,12 @@
 
 namespace cortrix::async {
 
+/// What Enqueue did with a submission. The returned TaskInfo cannot tell a
+/// created task from a merge into a still-queued carrier (both report status
+/// queued), so a producer that must not count or lease work it did not create —
+/// the enrich retry sweeper — asks for this explicitly. Set only on the ok path.
+enum class EnqueueDisposition { kCreated, kMerged, kRefreshed };
+
 /// TaskScheduler — per-doc_id mutual exclusion + Watcher debounce over the tasks
 /// queue (F42 §4.2, topic 2). Sits on top of TaskManager: Enqueue applies the 5s
 /// Watcher debounce (topic 2.2 C) and FIFO same-doc_id queueing (topic 2.1 A);
@@ -43,7 +49,10 @@ public:
     ///     content_hash + reset progress (UpdateTaskForDebounce);
     ///   - otherwise → create a new queued task (topic 2.1 A: same doc_id already
     ///     processing is allowed; the per-doc_id mutex defers it at Dequeue).
-    Result<TaskInfo> Enqueue(const SubmitRequest& req);
+    /// `disposition`, when given, receives what happened (created / merged /
+    /// refreshed); it is left untouched when the call fails.
+    Result<TaskInfo> Enqueue(const SubmitRequest& req,
+                             EnqueueDisposition* disposition = nullptr);
 
     /// Whether the most recent task for (namespace_id, doc_id, task_type) is still
     /// non-terminal (queued/processing/cancelling). Periodic producers use this as
