@@ -34,6 +34,14 @@ Cortrix stops accepting writes when the disk that holds its data is at least 90%
 ERROR: QuickStart bootstrap: demo upload returned HTTP 507
 ```
 
+The disk monitor logs its own line the first time it samples, which is worth grepping for as well because it names the stage and the measured percentage:
+
+```text
+[2026-01-01 00:00:00.000] [warning] [tid:1] [disk] Disk stage crit at 97.2%
+```
+
+With JSON logging the same text appears in the `message` field. The stable part to search for is `Disk stage`.
+
 The readiness response shows the disk at the `crit` stage:
 
 ```bash
@@ -43,6 +51,8 @@ curl -sS http://127.0.0.1:8420/api/v1/system/health/ready
 ```json
 "disk": { "stage": "crit", "status": "not_ready" }
 ```
+
+At the critical stage Cortrix rejects document uploads and new processing tasks, but **creating a namespace still succeeds** — which is why the quickstart gets as far as the upload before it fails.
 
 A file upload in this state returns 507 with the measured usage:
 
@@ -71,13 +81,19 @@ The disk in question is the one behind the `cortrix-data` volume. With Docker De
 docker compose -f deploy/docker-compose.yml exec cortrix df -h /data
 ```
 
-Free space on that disk, or give the virtual machine a larger one. `docker system df` shows what is using it. Then restart the container so the quickstart imports its demo document again:
+Free space on that disk, or give the virtual machine a larger one. `docker system df` shows what is using it.
+
+Once there is space, the `disk` component recovers on its own at the next check, which happens every 30 seconds, and no restart is needed for that. A restart is only needed here because the demo import already failed, and the quickstart imports it at startup:
 
 ```bash
 docker compose -f deploy/docker-compose.yml restart cortrix
 ```
 
 At 80% the stage is `warn` and writes still work, which is why the readiness example in the [Quickstart](/docs/get-started/quickstart/#check-readiness) can show `warn` with status `ok`.
+
+### Why `df -h` can disagree with the reported percentage
+
+Cortrix measures usage against the filesystem's total size and the space actually available to it. `df -h` computes its `Use%` a little differently, and on a filesystem that keeps blocks in reserve it can read a percentage point or so lower. If the two disagree, **`disk_usage_ratio` in the 507 body is the figure the threshold is applied to** — that is the number to compare against `crit_threshold`, not the one from `df`.
 
 ### Port 8420 is in use {#port-in-use}
 
