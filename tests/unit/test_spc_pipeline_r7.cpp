@@ -34,6 +34,8 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <cstdio>
+#include <ctime>
 #include <string>
 #include <thread>
 #include <unordered_set>
@@ -1411,6 +1413,182 @@ TEST_F(SPCPipelineR7Test, EnricherChainHype_VecAddFailure_RollsBackAll) {
     EXPECT_EQ(task->stage, SPCStage::kError);
     EXPECT_NE(task->error_message.find("AddPoints"), std::string::npos);
     EXPECT_EQ(BlocksOf(doc_id).size(), 0u);  // rolled back incl. hype + META blocks
+}
+
+// ---------------------------------------------------------------------------
+// Sweeper liveness and accounting (issues #145, #149). Each test below is first
+// run against the unmodified sweeper and must FAIL there; the fix makes it pass,
+// and removing the fix must make it fail again (defect re-injection).
+// ---------------------------------------------------------------------------
+
+// #149: documents skipped by the active-task guard keep the front of the
+// due-ordering because the skip happens before the lease advances next_retry_at.
+// With more skipped documents than the per-sweep cap, every other document is
+// starved. Seeded so the stuck documents are strictly earlier in the ordering
+// (due=1 vs due=2) — this does not depend on how SQLite breaks ties.
+TEST_F(SPCPipelineR7Test, EnrichSweeper_StarvationThresholdServesHealthyDocs) {
+    sqlite3* db = facade_->store().db_handle();
+    ASSERT_NE(db, nullptr);
+    auto seed = [&](uint64_t block_id, const std::string& doc, int64_t due) {
+        cortrix::spc::EnrichStateRow r;
+        r.block_id = block_id;
+        r.doc_id = doc;
+        r.child_id = "c" + std::to_string(block_id);
+        r.status = cortrix::spc::kEnrichStatusPendingRetry;
+        r.failed_members = "f03";
+        r.next_retry_at = due;
+        r.updated_at = 1;
+        ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());
+    };
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks_starve.db").string()).ok());
+    cortrix::InMemoryGlobalConfig cfg;
+    cfg.Set("f42.watcher_debounce_seconds", "0");
+    async::TaskScheduler sched(&mgr, &cfg);
+
+    // 40 stuck documents: due first, each already holding a queued backfill task.
+    for (int i = 0; i < 40; ++i) {
+        char name[32];
+        std::snprintf(name, sizeof name, "doc-stuck-%02d", i);
+        seed(2000 + i, name, /*due=*/1);
+        async::SubmitRequest req;
+        req.namespace_id = "test-ns";
+        req.doc_id = name;
+        req.content_hash = name;
+        req.filename = "enrich-backfill";
+        req.task_type = async::kTaskEnrichBackfill;
+        ASSERT_TRUE(sched.Enqueue(req).ok());
+    }
+    ASSERT_EQ(mgr.CountAll().value(), 40);
+    // 10 healthy documents: due, no task.
+    for (int i = 0; i < 10; ++i) {
+        char name[32];
+        std::snprintf(name, sizeof name, "doc-healthy-%02d", i);
+        seed(3000 + i, name, /*due=*/2);
+    }
+
+    cortrix::spc::EnrichRetrySweeper sweeper(*pool_, &sched, /*workers=*/nullptr,
+                                             /*config=*/nullptr);
+    // Every healthy document gets a task in ONE sweep. Shipped: the 32-document
+    // batch is filled entirely by stuck documents, so this returns 0.
+    EXPECT_EQ(sweeper.RunSweepNow("test-ns"), 10);
+    EXPECT_EQ(mgr.CountAll().value(), 50);
+}
+
+// #149, operator path: the backfill route makes every pending row due "now" and
+// sweeps immediately. If that flatten also rewrites the rows that were just
+// swept, every document's due time is equal again on the next call and the same
+// first 32 win every time. With tasks completing between calls and repairs
+// failing (rows stay pending), 18 of 50 documents never receive a task.
+// The flatten is the store function the route calls.
+TEST_F(SPCPipelineR7Test, EnrichSweeper_OperatorStormReachesEveryDoc) {
+    sqlite3* db = facade_->store().db_handle();
+    ASSERT_NE(db, nullptr);
+    const int64_t now = static_cast<int64_t>(std::time(nullptr));
+    for (int i = 0; i < 50; ++i) {
+        char name[32];
+        std::snprintf(name, sizeof name, "doc-storm-%02d", i);
+        cortrix::spc::EnrichStateRow r;
+        r.block_id = 4000 + i;
+        r.doc_id = name;
+        r.child_id = "c" + std::to_string(4000 + i);
+        r.status = cortrix::spc::kEnrichStatusPendingRetry;
+        r.failed_members = "f03";
+        r.next_retry_at = now - 100 + i;  // all due, distinct
+        r.updated_at = 1;
+        ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());
+    }
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks_storm.db").string()).ok());
+    cortrix::InMemoryGlobalConfig cfg;
+    cfg.Set("f42.watcher_debounce_seconds", "0");
+    async::TaskScheduler sched(&mgr, &cfg);
+    cortrix::spc::EnrichRetrySweeper sweeper(*pool_, &sched, /*workers=*/nullptr,
+                                             /*config=*/nullptr);
+
+    auto flatten_like_the_route = [&](int64_t at) {
+        auto r = cortrix::spc::MakeAllPendingDueNow(db, at);  // what the route calls
+        ASSERT_TRUE(r.ok()) << r.status().message();
+    };
+    // A second connection to the task database, as test_task_scheduler does:
+    // the worker "ran and failed the repair", so tasks go terminal while the
+    // ledger rows stay pending.
+    const std::string tasks_path = (tmp_root_ / "tasks_storm.db").string();
+    auto complete_all_tasks = [&]() {
+        sqlite3* probe = nullptr;
+        ASSERT_EQ(sqlite3_open(tasks_path.c_str(), &probe), SQLITE_OK);
+        ASSERT_EQ(sqlite3_exec(probe,
+            "UPDATE tasks SET status='completed' WHERE status='queued'",
+            nullptr, nullptr, nullptr), SQLITE_OK) << sqlite3_errmsg(probe);
+        sqlite3_close(probe);
+    };
+    auto distinct_docs_with_a_task = [&]() -> int {
+        sqlite3* probe = nullptr;
+        if (sqlite3_open(tasks_path.c_str(), &probe) != SQLITE_OK) return -1;
+        sqlite3_stmt* st = nullptr;
+        int n = -1;
+        if (sqlite3_prepare_v2(probe, "SELECT COUNT(DISTINCT doc_id) FROM tasks",
+                               -1, &st, nullptr) == SQLITE_OK &&
+            sqlite3_step(st) == SQLITE_ROW) {
+            n = sqlite3_column_int(st, 0);
+        }
+        sqlite3_finalize(st);
+        sqlite3_close(probe);
+        return n;
+    };
+
+    for (int round = 0; round < 3; ++round) {
+        flatten_like_the_route(now + round);
+        sweeper.RunSweepNow("test-ns");
+        complete_all_tasks();
+    }
+    // After three operator calls every document has been given at least one task.
+    EXPECT_EQ(distinct_docs_with_a_task(), 50);
+}
+
+// #145: a submission that merges into a just-completed task created nothing.
+// The sweeper must not count it and must not keep the 600 s lease it took.
+// Default debounce window (5 s) — that is the shipped configuration under which
+// the merge happens.
+TEST_F(SPCPipelineR7Test, EnrichSweeper_CountsOnlyCreatedTasksAndReturnsLease) {
+    sqlite3* db = facade_->store().db_handle();
+    ASSERT_NE(db, nullptr);
+    cortrix::spc::EnrichStateRow r;
+    r.block_id = 5001;
+    r.doc_id = "doc-merge";
+    r.child_id = "c5001";
+    r.status = cortrix::spc::kEnrichStatusPendingRetry;
+    r.failed_members = "f03";
+    r.next_retry_at = 1;
+    r.updated_at = 1;
+    ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());
+
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks_merge.db").string()).ok());
+    cortrix::InMemoryGlobalConfig cfg;  // default debounce: 5 s
+    async::TaskScheduler sched(&mgr, &cfg);
+    cortrix::spc::EnrichRetrySweeper sweeper(*pool_, &sched, /*workers=*/nullptr,
+                                             /*config=*/nullptr);
+
+    ASSERT_EQ(sweeper.RunSweepNow("test-ns"), 1);
+    auto first = mgr.FindRecentTaskByDocId("test-ns", "doc-merge",
+                                           async::kTaskEnrichBackfill, 3600);
+    ASSERT_TRUE(first.ok() && first.value().has_value());
+    const std::string task_id = first.value()->task_id;
+    ASSERT_TRUE(mgr.MarkProcessing(task_id, 1).ok());
+    ASSERT_TRUE(mgr.MarkCompleted(task_id, "doc-merge").ok());
+
+    // Row due again within the debounce window of the completed task.
+    r.next_retry_at = 1;
+    ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());
+    const int64_t before = static_cast<int64_t>(std::time(nullptr));
+    // Shipped: the submission merges into the completed task, is counted as 1,
+    // and the row is leased to now+600 although no task exists.
+    EXPECT_EQ(sweeper.RunSweepNow("test-ns"), 0);
+    EXPECT_EQ(mgr.CountAll().value(), 1) << "no second task should exist";
+    EXPECT_EQ(CountSql(("SELECT COUNT(*) FROM enrich_state WHERE doc_id='doc-merge'"
+                        " AND next_retry_at <= " + std::to_string(before + 5)).c_str()), 1)
+        << "lease must be returned when nothing was created";
 }
 
 }  // namespace

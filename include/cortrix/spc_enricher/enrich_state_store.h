@@ -57,6 +57,12 @@ Result<std::vector<std::string>> ListDueDocs(sqlite3* db, int64_t now_unix, int 
 Status LeaseDocRetries(sqlite3* db, const std::string& doc_id, int64_t lease_until,
                        int64_t now_unix);
 
+/// Operator backfill: make every pending row due at `now_unix`. Rows that are
+/// already due are left untouched — rewriting them would give every document the
+/// same due time, and the sweep that follows would then serve the same first
+/// batch on every call while the rest wait for ever (#149). Returns rows changed.
+Result<int> MakeAllPendingDueNow(sqlite3* db, int64_t now_unix);
+
 struct EnrichStateCounts {
     int64_t total = 0;
     int64_t ok = 0;

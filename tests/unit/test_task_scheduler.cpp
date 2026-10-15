@@ -241,4 +241,28 @@ TEST(TaskSchedulerDequeueFaultTest, MarkProcessingFailureRollsBackReservation) {
 }
 
 }  // namespace
+
+// A producer that must not count or lease work it did not create needs to know
+// what Enqueue did. The returned TaskInfo cannot tell: a created task and a merge
+// into a still-queued carrier both report status queued.
+TEST_F(TaskSchedulerTest, EnqueueReportsDisposition) {
+    EnqueueDisposition d = EnqueueDisposition::kMerged;
+    auto a = sched_->Enqueue(MakeReq("docD", "h1"), &d);
+    ASSERT_TRUE(a.ok());
+    EXPECT_EQ(d, EnqueueDisposition::kCreated);
+
+    d = EnqueueDisposition::kCreated;
+    auto b = sched_->Enqueue(MakeReq("docD", "h1"), &d);  // same hash in window → merge
+    ASSERT_TRUE(b.ok());
+    EXPECT_EQ(d, EnqueueDisposition::kMerged);
+    EXPECT_EQ(b.value().task_id, a.value().task_id);
+
+    d = EnqueueDisposition::kCreated;
+    auto c = sched_->Enqueue(MakeReq("docD", "h2", "/tmp/v2.pdf"), &d);  // new hash → refresh
+    ASSERT_TRUE(c.ok());
+    EXPECT_EQ(d, EnqueueDisposition::kRefreshed);
+    EXPECT_EQ(c.value().task_id, a.value().task_id);
+    EXPECT_EQ(mgr_.CountAll().value(), 1);
+}
+
 }  // namespace cortrix::async

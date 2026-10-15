@@ -59,7 +59,9 @@ public:
     /// worker overwrites the real next_retry_at when it finishes. Must exceed the
     /// worst-case queue wait + per-doc repair time.
     static constexpr int kLeaseSeconds = 600;
-    /// Per-NS per-sweep doc cap (bounds one tick's enqueue burst).
+    /// Per-NS per-sweep cap on documents ATTEMPTED (leased, or whose dedup lookup
+    /// failed). Every due document is fetched; documents skipped because they
+    /// already hold a task do not count, so they cannot fill the batch (#149).
     static constexpr int kMaxDocsPerSweep = 32;
 
     /// TEST-ONLY: wake every `ms` instead of the configured interval.
