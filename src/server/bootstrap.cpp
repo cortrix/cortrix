@@ -449,8 +449,19 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // dir, feeds cortrix_disk_usage_ratio + the write-reject flag. Constructed
     // BEFORE SPCManager / route registration so both can hold it (probe lambda /
     // pointer) — RAII then tears them down first while the monitor is still alive.
+    // Thresholds and interval come from the environment (#148): no configuration
+    // object exists this early in startup, and a variable is there before any
+    // object is. The effective values are logged once, clamps included, so an
+    // operator reads what took effect instead of inferring it.
+    std::vector<std::string> disk_notes;
+    const cortrix::deploy::DiskMonitorConfig disk_cfg =
+        cortrix::deploy::DiskMonitorConfig::FromEnvironment(config.ns.data_dir, &disk_notes);
+    for (const auto& n : disk_notes) CORTRIX_LOG_WARN("disk", "{}", n);
+    CORTRIX_LOG_INFO("disk", "Disk monitor: warn={:.2f} crit={:.2f} interval={}s data_dir={}",
+                     disk_cfg.warn_threshold, disk_cfg.crit_threshold,
+                     disk_cfg.check_interval_sec, disk_cfg.data_dir);
     cortrix::deploy::DiskMonitor f24_disk_monitor(
-        cortrix::deploy::DiskMonitorConfig::FromGlobalConfig(nullptr, config.ns.data_dir),
+        disk_cfg,
         [](const cortrix::deploy::DiskUsage& u) {
             CORTRIX_LOG_WARN("disk", "Disk stage {} at {:.1f}%",
                              cortrix::deploy::ToString(u.stage), u.usage_ratio * 100.0);

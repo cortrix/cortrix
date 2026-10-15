@@ -1,9 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdlib>
 #include <set>
 #include <string>
+#include <vector>
 
-#include "cortrix/common/in_memory_global_config.h"
 #include "cortrix/deploy/deploy_metrics.h"
 #include "cortrix/deploy/disk_monitor.h"
 #include "cortrix/deploy/f24_error.h"
@@ -11,7 +12,7 @@
 // F24-S3 coverage: the disk-space management model — the 4 CX_ERR_* identities
 // (§12 registry table + structured_data keys + AgentFriendlyError builder), the
 // DiskMonitor NORMAL/WARN/CRIT FSM + write-rejection flag (§6.1, F24-4 decision A),
-// the IGlobalConfig threshold loader (§6.4), and the disk_usage_ratio gauge feed.
+// the environment threshold loader (§6.4), and the disk_usage_ratio gauge feed.
 namespace cortrix::deploy {
 namespace {
 
@@ -178,38 +179,109 @@ TEST_F(DiskMonitorTest, MakeDiskFullErrorHasCompleteBody) {
 }
 
 // ------------------------- threshold loader (§6.4) -------------------------
+// The server builds its monitor from DiskMonitorConfig::FromEnvironment with
+// nothing but the data dir — there is no configuration object to hand in — so
+// these cases set the process environment and call exactly that. Every case
+// starts and ends with the three variables unset. (The wiring itself, that the
+// started server reads them, is test_bootstrap_disk_monitor_wiring.cpp.)
 
-TEST(DiskConfigTest, DefaultsWhenConfigNull) {
-    auto c = DiskMonitorConfig::FromGlobalConfig(nullptr, "/data");
+class DiskEnvConfigTest : public ::testing::Test {
+protected:
+    void SetUp() override { Clear(); }
+    void TearDown() override { Clear(); }
+    static void Clear() {
+        unsetenv(DiskMonitorConfig::kWarnEnv);
+        unsetenv(DiskMonitorConfig::kCritEnv);
+        unsetenv(DiskMonitorConfig::kIntervalEnv);
+    }
+    static void Set(const char* env, const char* value) { setenv(env, value, 1); }
+    static bool Mentions(const std::vector<std::string>& notes, const char* needle) {
+        for (const auto& n : notes) {
+            if (n.find(needle) != std::string::npos) return true;
+        }
+        return false;
+    }
+    static std::string Joined(const std::vector<std::string>& notes) {
+        std::string out;
+        for (const auto& n : notes) out += "\n  " + n;
+        return out;
+    }
+};
+
+TEST_F(DiskEnvConfigTest, DefaultsWhenUnset) {
+    std::vector<std::string> notes;
+    auto c = DiskMonitorConfig::FromEnvironment("/data", &notes);
     EXPECT_EQ(c.data_dir, "/data");
     EXPECT_DOUBLE_EQ(c.warn_threshold, 0.80);
     EXPECT_DOUBLE_EQ(c.crit_threshold, 0.90);
     EXPECT_EQ(c.check_interval_sec, 30);
+    EXPECT_TRUE(notes.empty()) << Joined(notes);
 }
 
-TEST(DiskConfigTest, ReadsKeysFromGlobalConfig) {
-    InMemoryGlobalConfig cfg;
-    cfg.Set(DiskMonitorConfig::kWarnKey, "0.70");
-    cfg.Set(DiskMonitorConfig::kCritKey, "0.85");
-    cfg.Set(DiskMonitorConfig::kIntervalKey, "60");
-    auto c = DiskMonitorConfig::FromGlobalConfig(&cfg, "/data");
-    // IGlobalConfig::GetFloat returns a 32-bit float, so compare with a float
-    // epsilon rather than DOUBLE_EQ (0.70f != 0.70 at double precision).
-    EXPECT_NEAR(c.warn_threshold, 0.70, 1e-6);
-    EXPECT_NEAR(c.crit_threshold, 0.85, 1e-6);
+TEST_F(DiskEnvConfigTest, ReadsTheThreeVariables) {
+    Set(DiskMonitorConfig::kWarnEnv, "0.70");
+    Set(DiskMonitorConfig::kCritEnv, "0.85");
+    Set(DiskMonitorConfig::kIntervalEnv, "60");
+    std::vector<std::string> notes;
+    auto c = DiskMonitorConfig::FromEnvironment("/data", &notes);
+    EXPECT_DOUBLE_EQ(c.warn_threshold, 0.70);
+    EXPECT_DOUBLE_EQ(c.crit_threshold, 0.85);
     EXPECT_EQ(c.check_interval_sec, 60);
+    EXPECT_TRUE(notes.empty()) << Joined(notes);
 }
 
-TEST(DiskConfigTest, ClampsOutOfRangeAndFixesInversion) {
-    InMemoryGlobalConfig cfg;
-    cfg.Set(DiskMonitorConfig::kWarnKey, "0.99");   // > 0.95 → clamp to 0.95
-    cfg.Set(DiskMonitorConfig::kCritKey, "0.50");   // < 0.6  → clamp to 0.6
-    cfg.Set(DiskMonitorConfig::kIntervalKey, "5");  // < 10   → clamp to 10
-    auto c = DiskMonitorConfig::FromGlobalConfig(&cfg, "/data");
+TEST_F(DiskEnvConfigTest, ClampsOutOfRangeFixesInversionAndSaysSo) {
+    Set(DiskMonitorConfig::kWarnEnv, "0.99");   // > 0.95 → clamp to 0.95
+    Set(DiskMonitorConfig::kCritEnv, "0.50");   // < 0.6  → clamp to 0.6
+    Set(DiskMonitorConfig::kIntervalEnv, "5");  // < 10   → clamp to 10
+    std::vector<std::string> notes;
+    auto c = DiskMonitorConfig::FromEnvironment("/data", &notes);
     EXPECT_EQ(c.check_interval_sec, 10);
     EXPECT_DOUBLE_EQ(c.crit_threshold, 0.60);
     // warn (clamped 0.95) >= crit (0.60) → inversion fix pulls warn below crit.
     EXPECT_LT(c.warn_threshold, c.crit_threshold);
+    // One note per correction, each naming what it corrected: three clamps and
+    // the inversion. The operator reads these as WARN lines at startup.
+    ASSERT_EQ(notes.size(), 4u) << Joined(notes);
+    EXPECT_TRUE(Mentions(notes, DiskMonitorConfig::kWarnEnv)) << Joined(notes);
+    EXPECT_TRUE(Mentions(notes, DiskMonitorConfig::kCritEnv)) << Joined(notes);
+    EXPECT_TRUE(Mentions(notes, DiskMonitorConfig::kIntervalEnv)) << Joined(notes);
+    EXPECT_TRUE(Mentions(notes, "lowered")) << Joined(notes);
+}
+
+TEST_F(DiskEnvConfigTest, IgnoresValuesThatAreNotNumbers) {
+    Set(DiskMonitorConfig::kWarnEnv, "abc");
+    Set(DiskMonitorConfig::kCritEnv, "0.8x");  // a partial parse is a typo, not 0.8
+    Set(DiskMonitorConfig::kIntervalEnv, "");  // empty means unset: no note
+    std::vector<std::string> notes;
+    auto c = DiskMonitorConfig::FromEnvironment("/data", &notes);
+    EXPECT_DOUBLE_EQ(c.warn_threshold, 0.80);
+    EXPECT_DOUBLE_EQ(c.crit_threshold, 0.90);
+    EXPECT_EQ(c.check_interval_sec, 30);
+    ASSERT_EQ(notes.size(), 2u) << Joined(notes);
+    EXPECT_TRUE(Mentions(notes, DiskMonitorConfig::kWarnEnv)) << Joined(notes);
+    EXPECT_TRUE(Mentions(notes, DiskMonitorConfig::kCritEnv)) << Joined(notes);
+
+    // Not finite is not a number either; "60s" is not a whole number of seconds.
+    Clear();
+    Set(DiskMonitorConfig::kCritEnv, "nan");
+    Set(DiskMonitorConfig::kIntervalEnv, "60s");
+    notes.clear();
+    c = DiskMonitorConfig::FromEnvironment("/data", &notes);
+    EXPECT_DOUBLE_EQ(c.crit_threshold, 0.90);
+    EXPECT_EQ(c.check_interval_sec, 30);
+    EXPECT_EQ(notes.size(), 2u) << Joined(notes);
+}
+
+TEST_F(DiskEnvConfigTest, DiskFullErrorReportsTheEffectiveThresholds) {
+    Set(DiskMonitorConfig::kCritEnv, "0.85");
+    DiskMonitor mon(DiskMonitorConfig::FromEnvironment("/cortrix-data"));
+    mon.CheckWithSample(RawAtRatio(0.95));
+    auto err = mon.MakeDiskFullError();
+    EXPECT_EQ(err.code, "CX_ERR_DISK_FULL");
+    ASSERT_TRUE(err.structured_data.has_value());
+    EXPECT_DOUBLE_EQ((*err.structured_data)["crit_threshold"].get<double>(), 0.85);
+    EXPECT_DOUBLE_EQ((*err.structured_data)["warn_threshold"].get<double>(), 0.80);
 }
 
 TEST(DiskConfigTest, RealStatvfsSampleSucceedsOnTmp) {
