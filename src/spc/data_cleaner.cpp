@@ -9,6 +9,7 @@
 #include <openssl/evp.h>
 
 #include "cortrix/common/block_types.h"  // kFlagExtIsAnomalous (SoT)
+#include "cortrix/spc/index_gates.h"     // MetadataSkipsIndex (the stored form of the mark)
 
 namespace cortrix::spc {
 
@@ -218,14 +219,32 @@ void DataCleaner::ApplyPlugins(std::vector<Block>& blocks,
     }
 }
 
+namespace {
+
+// The one reading of the cleaner's mark, shared by the in-memory form and the
+// stored-text form so the two cannot drift apart: the key is present and its
+// value is the JSON boolean true. Anything else — absent, false, a string, a
+// number — is not the mark. (index_gates.h documents the agreement with the SQL
+// form, kBlockSkipsIndexSql.)
+bool JsonSaysSkipIndex(const nlohmann::json& metadata) {
+    if (!metadata.is_object()) return false;
+    auto it = metadata.find("cleaning.skip_index");
+    return it != metadata.end() && it->is_boolean() && it->get<bool>();
+}
+
+}  // namespace
+
 bool ShouldSkipIndex(const Block& block) {
     if (block.flags_ext & kBlockFlagExtAnomalous) return true;
-    if (block.metadata_json.is_object() &&
-        block.metadata_json.contains("cleaning.skip_index")) {
-        const auto& v = block.metadata_json["cleaning.skip_index"];
-        return v.is_boolean() && v.get<bool>();
-    }
-    return false;
+    return JsonSaysSkipIndex(block.metadata_json);
+}
+
+bool MetadataSkipsIndex(const std::string& metadata_json) {
+    if (metadata_json.empty()) return false;
+    const nlohmann::json parsed =
+        nlohmann::json::parse(metadata_json, nullptr, /*allow_exceptions=*/false);
+    if (parsed.is_discarded()) return false;
+    return JsonSaysSkipIndex(parsed);
 }
 
 }  // namespace cortrix::spc

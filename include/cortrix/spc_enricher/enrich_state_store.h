@@ -111,9 +111,15 @@ Result<EnrichStateCounts> CountEnrichStates(sqlite3* db);
 /// addendum §3.7 G4 — legacy/silent-degrade audit. Scans the namespace's child
 /// blocks against the CONFIGURED chain members and synthesizes 'pending_retry'
 /// rows (due at now_unix) for chunks whose artifacts are missing:
-///   f03 ⇔ blocks.enriched_score non-NULL; f35 ⇔ contextualized_status == 1 AND
-///   the contextual index label row exists; f38 ⇔ a block_type=16 row whose
-///   metadata source_child_id == the child.
+///   f03 ⇔ blocks.enriched_score non-NULL; f35 ⇔ contextualized_status == 1 AND,
+///   where the ingest indexes the chunk at all, the contextual index label row
+///   exists; f38 ⇔ a block_type=16 row whose metadata source_child_id == the
+///   child, owed only where the ingest writes hype blocks at all.
+///   "At all" is the ingest's own index gate (index_gates.h): IndexPointsExpected
+///   (the document's processing level from its row, and the cleaner's skip-index
+///   mark read with kBlockSkipsIndexSql) and HypeBlocksExpected (the level). The
+///   backfill worker applies the same gate, so what the audit does not owe the
+///   worker does not add.
 /// Chunks already tracked as 'pending_retry' keep their attempts/backoff (not
 /// clobbered). An 'ok' chunk with a missing artifact is re-owed with its count
 /// kept and is given up on at kEnrichMaxAttempts. 'failed_permanent' chunks stay

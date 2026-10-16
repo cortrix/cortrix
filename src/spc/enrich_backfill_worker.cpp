@@ -19,6 +19,7 @@
 #include "cortrix/spc/contextual_store.h"
 #include "cortrix/spc/enricher_chain.h"
 #include "cortrix/spc/hype_block.h"
+#include "cortrix/spc/index_gates.h"  // the ingest's index gates (shared with the pipeline and the audit)
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/spc/parser.h"  // DocumentMetadata
 #include "cortrix/spc_enricher/enrich_state_store.h"
@@ -191,7 +192,22 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
 
     CortrixDoc doc;
     DocumentMetadata dm;  // best-effort rebuild (parse-time metadata is not persisted)
-    if (facade.store().doc_get(task.doc_id, doc) == 0) {
+    // The document's processing level is the first half of the ingest's index gate
+    // (index_gates.h), so it is read the way the audit reads it: the row's value.
+    // -2 (no row — the store reports a step error the same way) reads as the full
+    // level, conservative and as before; -1 (a prepare failure, or the fault seam)
+    // fails the delivery before anything is charged, because a row that cannot be
+    // classified must not be treated as debt. The invariant both sides rest on:
+    // every shipped producer persists the task's level on the documents row.
+    const int doc_rc = facade.store().doc_get(task.doc_id, doc);
+    if (doc_rc != 0 && doc_rc != -2) {
+        return finalizer_.Fail(task, "CX_ERR_ENRICH_BACKFILL_STORE",
+                               "doc_get failed rc=" + std::to_string(doc_rc),
+                               {{"doc_id", task.doc_id}}, t_start);
+    }
+    const int doc_level = doc_rc == 0 ? doc.processing_level : 3;
+    const bool hype_expected = HypeBlocksExpected(doc_level);
+    if (doc_rc == 0) {
         dm.filename = doc.source_path;
         dm.doc_title = doc.title;
         dm.mime_type = doc.mime_type;
@@ -219,9 +235,17 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
     // never sent to the chain for f35; when nothing else is owed it skips the
     // chain entirely and is charged without a give-up bound, because the cap
     // bounds provider work and this delivery costs none.
+    // The ingest's index gate per chunk (index_gates.h). No contextual point and
+    // no label where the document is below the full level or the cleaner marked
+    // the chunk skip-index; no hype blocks below the full level. The two decisions
+    // taken here — which rows are label-only, and dropping the hype member — are
+    // load-bearing: every later gate on the write set is defence in depth behind
+    // them, except the chain path's point add, which this loop does not reach.
     std::map<std::string, std::vector<const EnrichStateRow*>> groups;
     std::unordered_map<uint64_t, std::vector<float>> stored_ctx_by_block;
+    std::unordered_map<uint64_t, bool> label_expected_by_block;
     std::vector<const EnrichStateRow*> label_only_rows;
+    std::vector<const EnrichStateRow*> settled_rows;
     std::vector<uint64_t> provider_ids, label_only_ids;
     int ended_here = 0;
     for (const auto& row : pending) {
@@ -232,15 +256,27 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
             if (row.attempts + 1 > kMaxAttempts + 1) ++ended_here;
             continue;
         }
+        const CortrixBlock* block = children[child_pos[row.child_id]];
+        const bool label_expected =
+            IndexPointsExpected(doc_level, MetadataSkipsIndex(block->metadata_json));
+        label_expected_by_block[row.block_id] = label_expected;
         std::vector<std::string> members =
             row.failed_members.empty() ? std::vector<std::string>{"f03", "f35", "f38"}
                                        : SplitCsv(row.failed_members);
+        if (!hype_expected) {
+            // Below the full level the ingest writes no hype blocks: nothing to owe.
+            members.erase(std::remove(members.begin(), members.end(), "f38"), members.end());
+        }
+        bool label_only = false;
         auto f35_it = std::find(members.begin(), members.end(), "f35");
         if (f35_it != members.end()) {
             auto stored = ReadStoredContextualVector(db, row.block_id);
             if (stored.ok()) {
                 stored_ctx_by_block[row.block_id] = std::move(stored.value());
                 members.erase(f35_it);
+                // The columns are complete; the label is owed only where the
+                // ingest would have indexed the chunk.
+                label_only = label_expected;
             } else if (stored.status().code() != StatusCode::kNotFound) {
                 // Fail closed before anything is charged or called: a row that
                 // cannot be classified must not be treated as provider debt.
@@ -249,13 +285,37 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
                                        {{"doc_id", task.doc_id}}, t_start);
             }
         }
-        if (members.empty()) {
-            label_only_rows.push_back(&row);
-            label_only_ids.push_back(row.block_id);
-        } else {
+        if (!members.empty()) {
             groups[JoinCsv(members)].push_back(&row);
             provider_ids.push_back(row.block_id);
             if (row.attempts + 1 > kMaxAttempts + 1) ++ended_here;
+        } else if (label_only) {
+            label_only_rows.push_back(&row);
+            label_only_ids.push_back(row.block_id);
+        } else {
+            settled_rows.push_back(&row);  // nothing the ingest would have written is missing
+        }
+    }
+
+    // ---- Settle rows that owe nothing the ingest would have written -----------
+    // Flipped before any charge or provider call, so a later failure of this
+    // delivery cannot leave them due; not charged and attempts unchanged, because
+    // no delivery happens for them. The audit applies the same gate and will not
+    // re-owe them.
+    int settled = 0;
+    for (const EnrichStateRow* row : settled_rows) {
+        EnrichStateRow s = *row;
+        s.status = kEnrichStatusOk;
+        s.failed_members.clear();
+        s.last_error.clear();
+        s.next_retry_at = 0;
+        s.updated_at = NowUnix();
+        Status us = UpsertEnrichState(db, s);
+        if (!us.ok()) {
+            CORTRIX_LOG_WARN("spc", "enrich_state settle failed child={}: {}",
+                             s.child_id, us.message());
+        } else {
+            ++settled;
         }
     }
 
@@ -303,6 +363,10 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
         std::vector<float> stored_ctx;
         bool ctx_label_only = false;
         bool ctx_columns_present = false;
+        // The ingest's index gate for this chunk (index_gates.h): false where the
+        // ingest would have written no contextual point and no label, so neither
+        // may be added here on any path.
+        bool label_expected = true;
         bool write_label = false;
         ContextualVecLabelRow label_row;
     };
@@ -344,6 +408,7 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
             Repair rep;
             rep.row = group_rows[i];
             rep.block = children[child_pos[rep.row->child_id]];
+            rep.label_expected = label_expected_by_block[rep.row->block_id];
             rep.owed_before = SplitCsv(members_csv);
             // Member-aware outcome (same rules as the ingest write phase).
             bool f03_failed = false, f35_failed = false, f38_failed = false;
@@ -379,8 +444,10 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
             // A chain row whose f35 is label-only (stripped from the filter above).
             auto sc = stored_ctx_by_block.find(rep.row->block_id);
             if (sc != stored_ctx_by_block.end()) {
-                rep.ctx_label_only = true;
                 rep.ctx_columns_present = true;
+                // The label is re-added only where the ingest would have indexed
+                // the chunk; elsewhere the stored columns are the whole member.
+                rep.ctx_label_only = rep.label_expected;
                 rep.stored_ctx = std::move(sc->second);
             }
             repairs.push_back(std::move(rep));
@@ -391,6 +458,10 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
         Repair rep;
         rep.row = row;
         rep.block = children[child_pos[row->child_id]];
+        // True by construction (admitted to this list only where the gate holds),
+        // carried from the gate rather than written as a literal so the write-set
+        // check below stays a real second line behind the classification.
+        rep.label_expected = label_expected_by_block[row->block_id];
         rep.ctx_label_only = true;
         rep.ctx_columns_present = true;
         rep.stored_ctx = std::move(stored_ctx_by_block[row->block_id]);
@@ -417,7 +488,11 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
         // F35 from the chain: contextual dual-vector point + label (skip when
         // already indexed — the crash-window guard; the columns update below is
         // idempotent anyway). The label row is written after the columns, below.
-        if (owes(rep, "f35") && rep.merged.contextualized_embedding.has_value() &&
+        // The index gate is load-bearing here: a chain row that re-ran the member
+        // did not pass through the label-only classification, and the columns it
+        // wrote are the whole member where the ingest would not have indexed it.
+        if (rep.label_expected && owes(rep, "f35") &&
+            rep.merged.contextualized_embedding.has_value() &&
             !rep.merged.contextualized_embedding->empty()) {
             const uint64_t label = DeriveContextualVecLabel(rep.block->child_id);
             if (!GetContextualVecLabel(db, label).ok()) {
@@ -431,7 +506,9 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
         // F35 label-only: the point is re-added from the stored vector, no provider
         // call. A vector the index cannot take is left on the row as a named error
         // — it is not provider debt, and the row stays due with zero provider cost.
-        if (rep.ctx_label_only) {
+        // (ctx_label_only is set only where the gate holds; the conjunct is
+        // defence in depth.)
+        if (rep.ctx_label_only && rep.label_expected) {
             const uint64_t label = DeriveContextualVecLabel(rep.block->child_id);
             if (!GetContextualVecLabel(db, label).ok()) {
                 if (index_dim > 0 &&
@@ -453,8 +530,10 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
                 }
             }
         }
-        // F38: hype blocks (skip children that already have them).
-        if (owes(rep, "f38") && !rep.hype.empty() &&
+        // F38: hype blocks (skip children that already have them). Below the full
+        // level the member was dropped from the debt at classification, so
+        // owes() cannot see it; the conjunct is defence in depth.
+        if (hype_expected && owes(rep, "f38") && !rep.hype.empty() &&
             existing_hype.find(rep.block->child_id) == existing_hype.end()) {
             std::vector<std::string> q_texts;
             for (const auto& q : rep.hype) q_texts.push_back(q.question_text);
@@ -638,8 +717,8 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
     }
 
     CORTRIX_LOG_INFO("spc",
-        "enrich backfill doc={} ns={} repaired={} still_pending={} gave_up={}",
-        task.doc_id, task.namespace_id, repaired, still_pending, gave_up);
+        "enrich backfill doc={} ns={} repaired={} still_pending={} gave_up={} settled={}",
+        task.doc_id, task.namespace_id, repaired, still_pending, gave_up, settled);
     return finalizer_.Complete(task, task.doc_id, t_start);
 }
 
