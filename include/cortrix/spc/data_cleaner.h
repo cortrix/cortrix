@@ -105,7 +105,9 @@ public:
 constexpr uint8_t kBlockFlagExtAnomalous = 0x04;
 
 /// True iff `block` was marked anomalous (Storage Write reads this to skip
-/// P-HNSW — D5). Equivalent to the metadata "cleaning.skip_index" == true.
+/// P-HNSW — D5). Equivalent to the metadata "cleaning.skip_index" == true, read
+/// with the same rule as MetadataSkipsIndex (index_gates.h), which is the
+/// stored-text form the enrichment audit and the backfill worker use.
 bool ShouldSkipIndex(const Block& block);
 
 }  // namespace cortrix::spc

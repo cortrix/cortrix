@@ -18,6 +18,7 @@
 #include "cortrix/spc/contextual_store.h"
 #include "cortrix/spc/enricher_chain.h"
 #include "cortrix/spc/hype_block.h"
+#include "cortrix/spc/index_gates.h"  // the ingest's index gates (shared with the pipeline and the audit)
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/spc/parser.h"  // DocumentMetadata
 #include "cortrix/spc_enricher/enrich_state_store.h"
@@ -190,7 +191,22 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
 
     CortrixDoc doc;
     DocumentMetadata dm;  // best-effort rebuild (parse-time metadata is not persisted)
-    if (facade.store().doc_get(task.doc_id, doc) == 0) {
+    // The document's processing level is the first half of the ingest's index gate
+    // (index_gates.h), so it is read the way the audit reads it: the row's value.
+    // -2 (no row — the store reports a step error the same way) reads as the full
+    // level, conservative and as before; -1 (a prepare failure, or the fault seam)
+    // fails the delivery before anything is written, because a row that cannot be
+    // classified must not be treated as debt. Every shipped producer persists the
+    // task's level on the documents row.
+    const int doc_rc = facade.store().doc_get(task.doc_id, doc);
+    if (doc_rc != 0 && doc_rc != -2) {
+        return finalizer_.Fail(task, "CX_ERR_ENRICH_BACKFILL_STORE",
+                               "doc_get failed rc=" + std::to_string(doc_rc),
+                               {{"doc_id", task.doc_id}}, t_start);
+    }
+    const int doc_level = doc_rc == 0 ? doc.processing_level : 3;
+    const bool hype_expected = HypeBlocksExpected(doc_level);
+    if (doc_rc == 0) {
         dm.filename = doc.source_path;
         dm.doc_title = doc.title;
         dm.mime_type = doc.mime_type;
@@ -210,12 +226,75 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
         return parent_text_by_id.emplace(parent_id, std::move(text)).first->second;
     };
 
-    // ---- Group pending rows by owed members; re-run only those members --------
+    // ---- Apply the ingest's index gate, then group by what is really owed ------
+    // The contextual columns of the document's chunks, read once: a chunk whose
+    // columns are complete and whose label the ingest would not have written owes
+    // nothing for the contextual member.
+    std::unordered_map<uint64_t, int> ctx_status_by_block;
+    {
+        sqlite3_stmt* st = nullptr;
+        if (sqlite3_prepare_v2(db,
+                "SELECT block_id, contextualized_status FROM blocks"
+                " WHERE doc_id=?1 AND child_id IS NOT NULL AND child_id != ''",
+                -1, &st, nullptr) != SQLITE_OK) {
+            return finalizer_.Fail(task, "CX_ERR_ENRICH_BACKFILL_STORE",
+                                   "prepare contextual status read failed",
+                                   {{"doc_id", task.doc_id}}, t_start);
+        }
+        sqlite3_bind_text(st, 1, task.doc_id.c_str(), -1, SQLITE_TRANSIENT);
+        while (sqlite3_step(st) == SQLITE_ROW) {
+            const uint64_t id = static_cast<uint64_t>(sqlite3_column_int64(st, 0));
+            ctx_status_by_block[id] = sqlite3_column_type(st, 1) == SQLITE_NULL
+                                          ? 0
+                                          : sqlite3_column_int(st, 1);
+        }
+        sqlite3_finalize(st);
+    }
+
+    // Per row: no contextual point and no label where the document is below the
+    // full level or the cleaner marked the chunk skip-index; no hype blocks below
+    // the full level. A row left owing nothing is settled to ok right here — not
+    // charged, attempts unchanged, never sent to the chain. The gates on the write
+    // set below are defence in depth behind these decisions, except the contextual
+    // point add, which this loop does not reach for rows that still owe the member.
     std::map<std::string, std::vector<const EnrichStateRow*>> groups;
+    std::unordered_map<uint64_t, bool> label_expected_by_block;
+    int settled = 0;
     for (const auto& row : pending) {
-        if (child_pos.find(row.child_id) == child_pos.end()) continue;  // stale row
-        groups[row.failed_members.empty() ? "f03,f35,f38" : row.failed_members]
-            .push_back(&row);
+        auto pos_it = child_pos.find(row.child_id);
+        if (pos_it == child_pos.end()) continue;  // stale row
+        const CortrixBlock* block = children[pos_it->second];
+        const bool label_expected =
+            IndexPointsExpected(doc_level, MetadataSkipsIndex(block->metadata_json));
+        label_expected_by_block[row.block_id] = label_expected;
+        std::vector<std::string> members =
+            row.failed_members.empty() ? std::vector<std::string>{"f03", "f35", "f38"}
+                                       : SplitCsv(row.failed_members);
+        if (!hype_expected) {
+            members.erase(std::remove(members.begin(), members.end(), "f38"), members.end());
+        }
+        auto cs = ctx_status_by_block.find(row.block_id);
+        const bool ctx_complete = cs != ctx_status_by_block.end() && cs->second == 1;
+        if (!label_expected && ctx_complete) {
+            members.erase(std::remove(members.begin(), members.end(), "f35"), members.end());
+        }
+        if (members.empty()) {
+            EnrichStateRow s = row;
+            s.status = kEnrichStatusOk;
+            s.failed_members.clear();
+            s.last_error.clear();
+            s.next_retry_at = 0;
+            s.updated_at = NowUnix();
+            Status us = UpsertEnrichState(db, s);
+            if (!us.ok()) {
+                CORTRIX_LOG_WARN("spc", "enrich_state settle failed child={}: {}",
+                                 s.child_id, us.message());
+            } else {
+                ++settled;
+            }
+            continue;
+        }
+        groups[JoinCsv(members)].push_back(&row);
     }
 
     struct Repair {
@@ -313,7 +392,11 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
     for (auto& rep : repairs) {
         // F35: contextual dual-vector point + label (skip when already indexed —
         // the crash-window guard; the columns update below is idempotent anyway).
-        if (owes(rep, "f35") && rep.merged.contextualized_embedding.has_value() &&
+        // The index gate is load-bearing here: a chain row that re-ran the member
+        // for its columns must get no point and no label where the ingest would
+        // not have indexed the chunk.
+        if (label_expected_by_block[rep.row->block_id] && owes(rep, "f35") &&
+            rep.merged.contextualized_embedding.has_value() &&
             !rep.merged.contextualized_embedding->empty()) {
             const uint64_t label = DeriveContextualVecLabel(rep.block->child_id);
             if (!GetContextualVecLabel(db, label).ok()) {
@@ -322,8 +405,10 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
                 label_rows.push_back({label, rep.block->block_id, rep.block->child_id});
             }
         }
-        // F38: hype blocks (skip children that already have them).
-        if (owes(rep, "f38") && !rep.hype.empty() &&
+        // F38: hype blocks (skip children that already have them). Below the full
+        // level the member was dropped from the debt at classification, so owes()
+        // cannot see it; the conjunct is defence in depth.
+        if (hype_expected && owes(rep, "f38") && !rep.hype.empty() &&
             existing_hype.find(rep.block->child_id) == existing_hype.end()) {
             std::vector<std::string> q_texts;
             for (const auto& q : rep.hype) q_texts.push_back(q.question_text);
@@ -486,8 +571,8 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
     }
 
     CORTRIX_LOG_INFO("spc",
-        "enrich backfill doc={} ns={} repaired={} still_pending={} gave_up={}",
-        task.doc_id, task.namespace_id, repaired, still_pending, gave_up);
+        "enrich backfill doc={} ns={} repaired={} still_pending={} gave_up={} settled={}",
+        task.doc_id, task.namespace_id, repaired, still_pending, gave_up, settled);
     return finalizer_.Complete(task, task.doc_id, t_start);
 }
 
