@@ -3008,5 +3008,81 @@ TEST_F(SPCPipelineR7Test, EnrichSweeper_TaskStoreFlapChargesNothing) {
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE doc_id LIKE 'doc-flap-%' AND status<>'pending_retry'"), 0);
 }
 
+// The stored header's flags_ext records the cleaner's mark (bit2) next to the
+// contextual bit (bit3). The byte depends on the mark and on the contextual member,
+// never on the processing level; the level-2 rows catch a bit taken from the index
+// gate, which also reads the level. One document per row (the fixture yields one
+// chunk per document). Each row runs in its own lambda, so a failed precondition ends
+// only that row, and checks its stored preconditions before the byte, so a fixture
+// change cannot leave the byte unchecked or checked against the wrong expectation.
+TEST_F(SPCPipelineR7Test, StoredHeaderFlagsRecordTheMarkAndTheContextualMember) {
+    struct Row {
+        const char* name;
+        uint8_t level;
+        bool marked;
+        bool contextual;
+        uint8_t expected;
+    };
+    const Row rows[] = {
+        {"level 3, unmarked, no contextual member", 3, false, false, 0x00},
+        {"level 3, marked, no contextual member", 3, true, false, 0x04},
+        {"level 3, unmarked, contextual member", 3, false, true, 0x08},
+        {"level 3, marked, contextual member", 3, true, true, 0x0C},
+        {"level 2, unmarked, no contextual member", 2, false, false, 0x00},
+        {"level 2, marked, no contextual member", 2, true, false, 0x04},
+        {"level 2, unmarked, contextual member", 2, false, true, 0x08},
+        {"level 2, marked, contextual member", 2, true, true, 0x0C},
+    };
+    for (const Row& r : rows) {
+        SCOPED_TRACE(r.name);
+        [&] {
+            cortrix::spc::EnricherChain chain;
+            chain.Append(std::make_shared<CountingContextualEnricher>());
+            pipeline_->SetEnricherChain(r.contextual ? &chain : nullptr);
+            // An explicit resolver on every row: clearing it would not restore the
+            // default, so an unmarked row after a marked one would still be marked.
+            const bool marked = r.marked;
+            pipeline_->SetCleaningConfigResolver([marked](const std::string&) {
+                cortrix::spc::CleaningConfig c;
+                if (marked) c.max_chunk_chars = 1;
+                return c;
+            });
+            const std::string doc_id = CreateDoc();
+            auto task = MakeTask(txt_path_, "text/plain", doc_id);
+            task->processing_level = r.level;
+            const int rc = pipeline_->Process(*task, *facade_);
+            pipeline_->SetEnricherChain(nullptr);  // before any assertion: chain is a local
+            ASSERT_EQ(rc, 0) << task->error_message;
+
+            int children = 0;
+            for (const auto& b : BlocksOf(doc_id)) {
+                if (b.child_id.empty()) continue;  // META and hype blocks carry 0 by design
+                ++children;
+                // Selected by child_id: a block_id of 2^63 or more is stored as a
+                // negative INTEGER, so its unsigned decimal form would match no row.
+                const std::string by_child =
+                    std::string("SELECT COUNT(*) FROM blocks WHERE child_id = '") +
+                    b.child_id + "'";
+                ASSERT_EQ(CountSql(by_child.c_str()), 1) << "stored row found by child_id";
+                // The stored row as the readers read it: the key, and the contextual columns.
+                cortrix::spc::Block view;
+                view.metadata_json = nlohmann::json::parse(b.metadata_json, nullptr, false);
+                ASSERT_EQ(cortrix::spc::ShouldSkipIndex(view), r.marked) << "stored mark";
+                const std::string has_vector_sql =
+                    by_child + " AND " + cortrix::spc::kBlockHasStoredContextualVectorSql;
+                ASSERT_EQ(CountSql(has_vector_sql.c_str()), r.contextual ? 1 : 0)
+                    << "stored contextual columns";
+                const cortrix_block_header_t* hdr = nullptr;
+                ASSERT_TRUE(BlockParse(b.data.data(), b.data.size(), &hdr))
+                    << "stored header parses";
+                EXPECT_EQ(static_cast<int>(hdr->flags_ext), static_cast<int>(r.expected))
+                    << "stored flags_ext";
+            }
+            ASSERT_EQ(children, 1) << "one chunk per fixture document";
+        }();
+    }
+    pipeline_->SetCleaningConfigResolver(nullptr);
+}
+
 }  // namespace
 }  // namespace cortrix

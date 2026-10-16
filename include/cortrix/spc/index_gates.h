@@ -24,8 +24,11 @@ inline bool HypeBlocksExpected(int doc_level) { return doc_level >= 3; }
 
 /// The cleaner's mark as stored on a block: `"cleaning.skip_index": true`, boolean
 /// only. A string, a number, a missing key, a non-object or malformed text read as
-/// false. This is the only durable evidence of the mark — the block header's
-/// anomaly bit is never persisted — so it is what the audit and the worker read.
+/// false. This is the form of the mark on every marked block, so it is what the
+/// audit and the worker read. The block header's anomaly bit is stored too, but
+/// only on blocks written by a version that persists it; blocks written by any
+/// other version, earlier releases and the 1.0 line included, have it clear and
+/// nothing back-fills it, so no reader may switch to it.
 /// Shares its reading with ShouldSkipIndex's metadata branch, and agrees with
 /// kBlockSkipsIndexSql on every well-formed object with a single such key.
 bool MetadataSkipsIndex(const std::string& metadata_json);

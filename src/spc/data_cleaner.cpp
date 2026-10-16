@@ -9,9 +9,14 @@
 #include <openssl/evp.h>
 
 #include "cortrix/common/block_types.h"  // kFlagExtIsAnomalous (SoT)
-#include "cortrix/spc/index_gates.h"     // MetadataSkipsIndex (the stored form of the mark)
+#include "cortrix/spc/index_gates.h"     // MetadataSkipsIndex (the stored-text form of the mark)
 
 namespace cortrix::spc {
+
+// ShouldSkipIndex reads the cleaner's in-memory bit through this mirror; keep it
+// equal to the bit the cleaner sets and the pipeline stores.
+static_assert(kBlockFlagExtAnomalous == cortrix::kFlagExtIsAnomalous,
+              "kBlockFlagExtAnomalous must equal BlockFlagsExt bit2");
 
 namespace {
 
