@@ -39,7 +39,6 @@ Add `?explain=true` to see which retrieval paths a query used. See [Query and re
 |---|---|---|---|
 | `rerank` | Query request | `true` | Query latency and result ordering |
 | `top_k` | Query request | `10` | How many results come back, and the candidate pool size |
-| `timeout_ms` | Query request | — | The time limit for one query |
 | `retrieval.candidate_multiplier` | Configuration file | `3` | Candidate pool size |
 | `retrieval.max_candidates` | Configuration file | `50` | The candidate pool ceiling, and so the recall ceiling |
 | `embedding.execution_provider` | Configuration file | `auto` | Where embedding runs |
@@ -110,9 +109,9 @@ You can also override these with the `CORTRIX_RETRIEVAL_CANDIDATE_MULTIPLIER` an
 
 List only the namespaces you actually need in `namespaces`. `["*"]` queries every namespace you have access to, up to 100.
 
-### Time budget {#timeout}
+### Time limits {#timeout}
 
-`timeout_ms` caps how long one query can take. The spec defines a range of 100 to 30000 milliseconds, and the budget is shared across the retrieval paths that run in parallel. It keeps an occasional query from running too long. It doesn't make queries faster.
+A query request has no time budget of its own on this release. A query over several namespaces gives each namespace up to 5 seconds and the whole query up to 30 seconds. A namespace that runs out of time is listed among the failed namespaces with `CX_ERR_NS_TIMEOUT`, and the results from the other namespaces still come back. A query over a single namespace runs until it finishes.
 
 ## Execution providers {#execution-provider}
 

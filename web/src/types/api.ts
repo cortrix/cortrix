@@ -81,7 +81,6 @@ export interface QueryRequest {
   query: string;
   namespaces: string[];
   top_k?: number;
-  timeout_ms?: number;
   // F04 §2.4 — the live cross-NS handler reads the singular `filter` key (a
   // JSONB pass-through). The plural `filters` was MVP-era drift that hit a dead
   // parser. Inner block_type[] is forwarded as-is; structured block_type

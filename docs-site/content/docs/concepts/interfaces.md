@@ -95,7 +95,6 @@ These conventions are design goals. In `v1.0.0-rc.2` there are still places wher
 - Some error codes don't use the unified `CX_ERR_` prefix.
 - The memory edit and delete endpoints require parameters that differ from the OpenAPI definition.
 - The watcher events endpoint exists in the spec but returns 404.
-- A query `timeout_ms` outside the range the spec defines was accepted in testing with the `namespaces` array, although the server's request validation checks the range.
 
 So when you integrate, go by the `retryable` and `category` in the actual response, and rerun your own smoke tests after each upgrade.
 

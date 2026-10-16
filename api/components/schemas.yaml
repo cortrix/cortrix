@@ -268,15 +268,6 @@ components:
           description: "F36 RAG-Fusion opt-in (also accepted as ?rag_fusion=true). Off by default until the NS-config resolver lands (D3.5)."
         search_config:
           $ref: '#/components/schemas/SearchConfig'
-        timeout_ms:
-          type: integer
-          minimum: 100
-          maximum: 30000
-          description: >-
-            Per-query wall-clock budget in milliseconds, distributed across the parallel
-            vector / BM25 / SQL routes (F08 CalculateRouteTimeout). Must be in [100, 30000];
-            out-of-range → 400 CX_ERR_QUERY_INVALID_ARGUMENT.
-          example: 5000
 
     SearchConfig:
       type: object

@@ -69,7 +69,6 @@ The refund policy, which is relevant to the question, comes first with a rerank 
 | `rerank` | boolean | `true` | Whether to reorder candidates with the reranker model |
 | `include_sources` | boolean | — | When `true`, results include source information |
 | `filter` | object | — | Filter conditions |
-| `timeout_ms` | integer | — | A time budget for the query. The spec defines a range of 100 to 30000 milliseconds. The server's request validation enforces the range, but in testing a value of 50 sent with the `namespaces` array was accepted. Don't rely on the server to enforce it |
 
 For the full request shape, see the [HTTP API reference](/docs/reference/api/).
 
