@@ -179,6 +179,9 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
     doc.content_hash = content_hash;
     doc.file_size = static_cast<int64_t>(req.file_size);
     doc.mime_type = mime_type;
+    // The row carries the task's processing level (as the async path's row does),
+    // so the enrichment audit and the backfill read the level the ingest used.
+    doc.processing_level = SPCRouter::InferProcessingLevel(mime_type);
     doc.status = DocStatus::kPending;
     doc.title = req.title.empty() ? req.filename : req.title;
     doc.metadata_json = req.metadata_json;

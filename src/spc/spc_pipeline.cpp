@@ -17,6 +17,7 @@
 #include "cortrix/doc_summary/doc_fts5_index.h"   // F41 doc-level FTS5 product write hook
 #include "cortrix/metadata/metadata_types.h"      // F08 GeneratorInput / MetadataBlock
 #include "cortrix/spc/data_cleaner.h"              // F10 DataCleaner / spc::Block / ShouldSkipIndex
+#include "cortrix/spc/index_gates.h"               // the ingest's index gates, shared with the audit and the backfill
 #include "cortrix/spc_enricher.h"                  // F03 ISpcEnricher / CreateEnricher / EnrichResult
 #include "cortrix/spc/enricher_chain.h"            // I1 EnricherChain (F03→F35→F38 fail-soft serial)
 #include "cortrix/spc/hype_block.h"                // I3 BuildHypeQuestionBlock / FillHypeEmbedding (F38)
@@ -694,7 +695,12 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         cortrix::scoring::ScoringInput sin;
         sin.parser_name = d.parser_name;
         sin.enricher_name = enr_token;
-        sin.is_anomalous = cortrix::spc::ShouldSkipIndex(b);
+        // The cleaner's mark, and the index gate it feeds (index_gates.h): the gate
+        // is shared with the enrichment audit and the backfill worker, so what is
+        // not indexed here is never reported as missing or added later.
+        const bool skip_index = cortrix::spc::ShouldSkipIndex(b);
+        const bool index_points = cortrix::spc::IndexPointsExpected(level, skip_index);
+        sin.is_anomalous = skip_index;
         sin.block_type = static_cast<uint16_t>(modality);
         scorer_.AssignInitialScore(f07_hdr, semantic_score, sin);
         // [I2 · F35 §4.1] flags_ext bit3 (has_contextualized_embedding): set when F35
@@ -712,7 +718,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             child, emb, modality, f07_hdr.processing_level, b.metadata_json.dump(),
             child_flags_ext));
         score_by_block[child_blocks.back().block_id] = semantic_score;
-        if (level >= 3 && !b.embedding.empty() && !cortrix::spc::ShouldSkipIndex(b)) {
+        if (index_points && !b.embedding.empty()) {
             // vec_points borrows the embedding storage inside clean_blocks (stable
             // through the write below).
             vec_points.push_back({b.embedding.data(), child_blocks.back().block_id});
@@ -722,9 +728,9 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         // label; the mapping row resolves ANN hits back to this child at query
         // time. The embedding storage lives in enrich_by_child (function scope,
         // stable node addresses) so the borrowed pointer survives the write.
-        // Anomalous (skip-index) chunks skip their contextual point too.
-        if (level >= 3 && (child_flags_ext & kFlagExtHasContextualized) &&
-            !cortrix::spc::ShouldSkipIndex(b)) {
+        // Anomalous (skip-index) chunks skip their contextual point too — the same
+        // gate as the primary point; its label row is written only alongside it.
+        if (index_points && (child_flags_ext & kFlagExtHasContextualized)) {
             auto ctx_it = enrich_by_child.find(b.id);
             if (ctx_it != enrich_by_child.end()) {
                 cortrix::spc::ContextualVecLabelRow lr;
@@ -747,7 +753,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     // keyed by source child_id (provenance in metadata_json.source_child_id) so recall can
     // expand a hype hit back to its child (F38-4). L3 only (hype Blocks index into P-HNSW);
     // for L2 the questions carry no vector and are skipped (no enrich-only doc has them).
-    if (level >= 3 && !hype_by_child.empty()) {
+    if (cortrix::spc::HypeBlocksExpected(level) && !hype_by_child.empty()) {
         // Flatten the question texts to embed in one batch (cheap when the chain ran).
         std::vector<cortrix::spc::HypeQuestion*> all_questions;
         std::vector<std::string> q_texts;

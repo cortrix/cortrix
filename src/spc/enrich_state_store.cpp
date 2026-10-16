@@ -1,5 +1,11 @@
 #include "cortrix/spc_enricher/enrich_state_store.h"
 
+#include <string>
+#include <unordered_map>
+
+#include "cortrix/logging/logging.h"
+#include "cortrix/spc/index_gates.h"  // the ingest's index gates (shared with the pipeline and the worker)
+
 namespace cortrix::spc {
 
 namespace {
@@ -149,6 +155,45 @@ Status LeaseDocRetries(sqlite3* db, const std::string& doc_id, int64_t lease_unt
     return Status::Ok();
 }
 
+namespace {
+
+// Each document's processing level, keyed by doc_id — the first half of the
+// ingest's index gate (index_gates.h). A document without a row reads as the full
+// level (the caller's lookup default); a store without the table (isolated
+// fixtures) yields an empty map, logged so a production store in that state is
+// visible rather than silent; a scan that breaks off is an error, because leaving
+// some documents at the default would misjudge them.
+Result<std::unordered_map<std::string, int>> LoadDocumentLevels(sqlite3* db) {
+    std::unordered_map<std::string, int> doc_levels;
+    sqlite3_stmt* st = nullptr;
+    const char* sql = "SELECT doc_id, processing_level FROM documents";
+    if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
+        CORTRIX_LOG_DEBUG("spc",
+            "enrich audit: documents table unavailable, every document read as "
+            "full processing level: {}", sqlite3_errmsg(db));
+        return doc_levels;
+    }
+    int drc = SQLITE_OK;
+    while ((drc = sqlite3_step(st)) == SQLITE_ROW) {
+        const unsigned char* d = sqlite3_column_text(st, 0);
+        if (!d) continue;
+        const int level = sqlite3_column_type(st, 1) == SQLITE_NULL
+                              ? 3
+                              : sqlite3_column_int(st, 1);
+        doc_levels[reinterpret_cast<const char*>(d)] = level;
+    }
+    sqlite3_finalize(st);
+    if (drc != SQLITE_DONE) return SqlErr(db, "audit documents scan");
+    return doc_levels;
+}
+
+int DocLevelOf(const std::unordered_map<std::string, int>& levels, const std::string& doc_id) {
+    const auto it = levels.find(doc_id);
+    return it == levels.end() ? 3 : it->second;
+}
+
+}  // namespace
+
 Result<int> SynthesizeEnrichAuditRows(
     sqlite3* db, const std::unordered_set<std::string>& configured_members,
     int64_t now_unix) {
@@ -192,6 +237,13 @@ Result<int> SynthesizeEnrichAuditRows(
         }
     }
 
+    // Pass 1.7: each document's processing level — the first half of the ingest's
+    // index gate (index_gates.h). Below the full level the ingest writes neither
+    // the contextual index point nor hype blocks, so neither may be owed.
+    auto levels = LoadDocumentLevels(db);
+    if (!levels.ok()) return levels.status();
+    const std::unordered_map<std::string, int>& doc_levels = levels.value();
+
     // Pass 2: rows the audit must NOT re-synthesize. Two cases: in-flight
     // pending_retry (keep their attempts/backoff) AND failed_permanent (P4: a
     // terminal give-up must stay terminal — re-synthesizing via INSERT OR REPLACE
@@ -213,12 +265,16 @@ Result<int> SynthesizeEnrichAuditRows(
         sqlite3_finalize(st);
     }
 
-    // Pass 3: child rows vs configured artifacts → synthesize.
+    // Pass 3: child rows vs configured artifacts → synthesize. The last column is
+    // the cleaner's skip-index mark — the second half of the ingest's index gate;
+    // it can be NULL (a NULL or malformed metadata_json), which sqlite3_column_int
+    // reads as 0.
     sqlite3_stmt* st = nullptr;
-    const char* sql =
-        "SELECT block_id, child_id, doc_id, enriched_score, contextualized_status"
+    const std::string sql =
+        std::string("SELECT block_id, child_id, doc_id, enriched_score, contextualized_status, ") +
+        kBlockSkipsIndexSql +
         " FROM blocks WHERE child_id IS NOT NULL AND child_id != ''";
-    if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
         return SqlErr(db, "prepare audit children");
     }
     int synthesized = 0;
@@ -231,20 +287,32 @@ Result<int> SynthesizeEnrichAuditRows(
         const int ctx_status = sqlite3_column_type(st, 4) == SQLITE_NULL
                                    ? 0
                                    : sqlite3_column_int(st, 4);
+        const bool skip_index = sqlite3_column_int(st, 5) != 0;
         const std::string child_id = cid ? reinterpret_cast<const char*>(cid) : "";
+        const std::string doc_id = did ? reinterpret_cast<const char*>(did) : "";
+        // The ingest's index gate for this chunk: the document's level (a missing
+        // row reads as the full level) and the cleaner's mark. What the gate
+        // excluded was never written and is not missing.
+        const int doc_level = DocLevelOf(doc_levels, doc_id);
+        const bool label_expected = IndexPointsExpected(doc_level, skip_index);
+        const bool hype_expected = HypeBlocksExpected(doc_level);
         std::string owed;
         auto owe = [&owed](const char* tok) {
             if (!owed.empty()) owed += ",";
             owed += tok;
         };
         if (configured_members.count("f03") && !has_score) owe("f03");
-        // f35 done ⇔ columns written AND the ANN label indexed (P7): columns-only
-        // data (pre-V2 / partial loss) is invisible to the contextualized path.
+        // f35 done ⇔ columns written AND, where the ingest indexes the chunk at
+        // all, the ANN label indexed (P7): columns-only data on an indexed chunk
+        // (pre-V2 / partial loss) is invisible to the contextualized path, while a
+        // chunk the gate excluded has no label to miss.
         const bool f35_done =
             ctx_status == 1 &&
-            (!ctx_labels_available || ctx_labels.count(block_id) > 0);
+            (!label_expected || !ctx_labels_available || ctx_labels.count(block_id) > 0);
         if (configured_members.count("f35") && !f35_done) owe("f35");
-        if (configured_members.count("f38") &&
+        // f38 done ⇔ a hype block names the child — owed only where the ingest
+        // writes hype blocks at all (the full processing level).
+        if (configured_members.count("f38") && hype_expected &&
             hype_sources.find(child_id) == hype_sources.end()) {
             owe("f38");
         }
@@ -252,7 +320,7 @@ Result<int> SynthesizeEnrichAuditRows(
         if (audit_skip.count(block_id)) continue;
         EnrichStateRow row;
         row.block_id = block_id;
-        row.doc_id = did ? reinterpret_cast<const char*>(did) : "";
+        row.doc_id = doc_id;
         row.child_id = child_id;
         row.status = kEnrichStatusPendingRetry;
         row.failed_members = std::move(owed);

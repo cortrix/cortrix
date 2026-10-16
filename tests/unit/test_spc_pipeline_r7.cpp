@@ -49,6 +49,8 @@
 #include "cortrix/spc_enricher.h"            // NullEnricher (ctor injection)
 #include "cortrix/spc/enricher_chain.h"      // I1 EnricherChain
 #include "cortrix/spc/contextual_store.h"    // §3.8 W2 DeriveContextualVecLabel
+#include "cortrix/spc/data_cleaner.h"        // ShouldSkipIndex / spc::Block (the ingest's own reading of the mark)
+#include <atomic>
 #include "cortrix/spc_enricher/enrich_backfill_worker.h"  // §3.7 backfill worker
 #include "cortrix/spc_enricher/enrich_retry_sweeper.h"    // §3.7 retry sweeper
 #include "cortrix/spc_enricher/enrich_state_store.h"      // §3.7 coverage SoT helpers
@@ -225,6 +227,27 @@ public:
     }
     bool IsAvailable() const override { return true; }
     std::string Name() const override { return "ContextualRetrievalEnricher"; }
+};
+
+// The succeeding contextual fake under the production member name, so a repair
+// that filters to the contextual member alone still reaches it (the chain maps any
+// other name to the head member).
+class SucceedingContextualEnricher : public FakeContextualEnricher {
+public:
+    std::string Name() const override { return "f35_contextual_retrieval"; }
+};
+
+// Counts provider calls, one per chunk (the base EnrichBatch calls the virtual
+// Enrich per chunk), under the production member name.
+class CountingContextualEnricher : public SucceedingContextualEnricher {
+public:
+    cortrix::spc::EnrichResult Enrich(const std::string& text,
+                                      const cortrix::spc::DocumentMetadata& dm,
+                                      const cortrix::spc::ChunkContext& ctx) override {
+        ++calls;
+        return SucceedingContextualEnricher::Enrich(text, dm, ctx);
+    }
+    std::atomic<int> calls{0};
 };
 
 const char* kDoclingMultiPara = R"JSON({
@@ -416,6 +439,39 @@ std::shared_ptr<llm::MockLlmClient> MakeHypeLlm() {
     ok.content = "What is alpha?\nWhy beta?\nHow gamma?";  // exactly 3 lines (K default)
     EXPECT_CALL(*mock, Chat(_, _)).WillRepeatedly(Return(ok));
     return mock;
+}
+
+// The enrichment ledger rows of a document, in block order.
+struct LedgerRow {
+    uint64_t block_id = 0;
+    std::string status;
+    int attempts = 0;
+    std::string child_id;
+    std::string last_error;
+};
+std::vector<LedgerRow> LedgerOf(sqlite3* db, const std::string& doc_id) {
+    std::vector<LedgerRow> out;
+    sqlite3_stmt* st = nullptr;
+    if (sqlite3_prepare_v2(db,
+            "SELECT block_id, status, attempts, child_id, last_error FROM enrich_state"
+            " WHERE doc_id=?1 ORDER BY block_id",
+            -1, &st, nullptr) != SQLITE_OK) return out;
+    sqlite3_bind_text(st, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
+    auto text = [&](int col) {
+        const unsigned char* t = sqlite3_column_text(st, col);
+        return std::string(t ? reinterpret_cast<const char*>(t) : "");
+    };
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        LedgerRow r;
+        r.block_id = static_cast<uint64_t>(sqlite3_column_int64(st, 0));
+        r.status = text(1);
+        r.attempts = sqlite3_column_int(st, 2);
+        r.child_id = text(3);
+        r.last_error = text(4);
+        out.push_back(std::move(r));
+    }
+    sqlite3_finalize(st);
+    return out;
 }
 
 // ============================================================
@@ -859,6 +915,247 @@ TEST(EnrichBackfillSchedule, ExponentialCappedForwardOnly) {
 // Full repair cycle: ingest under a fully-failing chain (debt f03,f35,f38) →
 // run the backfill worker with a WORKING chain → every artifact lands with
 // write-parity and the rows flip 'ok'. A second run is a no-op (idempotent).
+// The ingest indexes a chunk's contextual point and writes its label row only for
+// chunks the cleaner did not mark skip-index. The audit and the backfill must
+// apply that same rule: a skip-index chunk with complete contextual columns owes
+// no label, and no delivery may add a point for it — whether the stale row owes
+// the contextual member with its columns complete (settled without a delivery),
+// re-runs the member because its columns are gone, or owes the head member too.
+TEST_F(SPCPipelineR7Test, EnrichAudit_SkipIndexChunkOwesNoLabelAndGetsNoPoint) {
+    auto f35 = std::make_shared<CountingContextualEnricher>();
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    chain.Append(f35);
+    chain.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, MakeHypeLlm(), nullptr));
+    pipeline_->SetEnricherChain(&chain);
+    // Every chunk is oversized → the cleaner marks each one skip-index (kept, not indexed).
+    pipeline_->SetCleaningConfigResolver([](const std::string&) {
+        cortrix::spc::CleaningConfig c;
+        c.max_chunk_chars = 1;
+        return c;
+    });
+    std::vector<std::string> docs;
+    for (int i = 0; i < 3; ++i) {
+        std::string doc_id = CreateDoc();
+        auto task = MakeTask(txt_path_, "text/plain", doc_id);
+        task->processing_level = 3;
+        ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+        docs.push_back(doc_id);
+    }
+    pipeline_->SetEnricherChain(nullptr);
+    pipeline_->SetCleaningConfigResolver(nullptr);
+    sqlite3* db = facade_->store().db_handle();
+
+    // The facts this test rests on, asserted so a fixture change cannot make it vacuous.
+    struct Child { uint64_t block_id; std::string child_id; uint64_t label; };
+    std::vector<Child> children;
+    for (const auto& doc_id : docs) {
+        int n = 0;
+        for (const auto& b : BlocksOf(doc_id)) {
+            if (b.child_id.empty()) continue;
+            ++n;
+            cortrix::spc::Block view;  // the ingest's own reading of the stored mark
+            view.metadata_json = nlohmann::json::parse(b.metadata_json, nullptr, false);
+            ASSERT_TRUE(cortrix::spc::ShouldSkipIndex(view))
+                << "the cleaner marked every chunk skip-index";
+            children.push_back({b.block_id, b.child_id,
+                                cortrix::spc::DeriveContextualVecLabel(b.child_id)});
+        }
+        ASSERT_EQ(n, 1) << "one chunk per fixture document";
+    }
+    const char* columns_sql =
+        "SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL AND child_id != ''"
+        " AND contextualized_status = 1 AND contextualized_embedding IS NOT NULL";
+    ASSERT_EQ(CountSql(columns_sql), 3) << "the chain wrote the contextual columns";
+    ASSERT_GT(CountSql("SELECT COUNT(*) FROM blocks WHERE block_type=16"), 0)
+        << "hype blocks are written for skip-index chunks (the ingest's rule)";
+    ASSERT_EQ(CountSql("SELECT COUNT(*) FROM contextual_vec_labels"), 0)
+        << "positive control: the ingest wrote no label for a skip-index chunk";
+    auto label_adds = [&](uint64_t label) {
+        const auto& ids = fake_index_->added_ids();
+        return static_cast<int>(std::count(ids.begin(), ids.end(), label));
+    };
+    for (const auto& c : children) {
+        ASSERT_EQ(label_adds(c.label), 0) << "the ingest indexed no contextual point";
+    }
+    const int calls_after_ingest = f35->calls.load();
+    ASSERT_GT(calls_after_ingest, 0) << "positive control: the chain ran the contextual member";
+
+    // The audit applies the ingest's rule: nothing is owed.
+    auto synth = cortrix::spc::SynthesizeEnrichAuditRows(db, {"f03", "f35", "f38"}, 1000);
+    ASSERT_TRUE(synth.ok()) << synth.status().message();
+    EXPECT_EQ(synth.value(), 0) << "a skip-index chunk has no label to miss";
+
+    // Stale rows an earlier audit left behind, one shape per document: doc 0 owes
+    // the contextual member with its columns complete; doc 1 owes it with its
+    // columns removed; doc 2 owes the head member and the contextual member.
+    auto seed = [&](const Child& c, const std::string& doc_id, const char* owed) {
+        cortrix::spc::EnrichStateRow r;
+        r.block_id = c.block_id;
+        r.doc_id = doc_id;
+        r.child_id = c.child_id;
+        r.status = cortrix::spc::kEnrichStatusPendingRetry;
+        r.failed_members = owed;
+        r.attempts = 3;
+        r.next_retry_at = 0;
+        r.updated_at = 1000;
+        ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());
+    };
+    seed(children[0], docs[0], "f35");
+    seed(children[1], docs[1], "f35");
+    seed(children[2], docs[2], "f03,f35");
+    {
+        sqlite3_stmt* st = nullptr;
+        ASSERT_EQ(sqlite3_prepare_v2(db,
+            "UPDATE blocks SET contextualized_status=0, contextualized_text=NULL,"
+            " contextualized_embedding=NULL WHERE block_id=?1",
+            -1, &st, nullptr), SQLITE_OK);
+        sqlite3_bind_int64(st, 1, static_cast<sqlite3_int64>(children[1].block_id));
+        ASSERT_EQ(sqlite3_step(st), SQLITE_DONE);
+        sqlite3_finalize(st);
+    }
+    ASSERT_EQ(CountSql(columns_sql), 2);
+
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks_skip.db").string()).ok());
+    cortrix::spc::EnrichBackfillWorker worker(*pool_, &chain, *embedder_, &mgr);
+    for (size_t i = 0; i < docs.size(); ++i) {
+        async::TaskInfo t;
+        t.task_id = 1 + static_cast<int>(i);
+        t.namespace_id = "test-ns";
+        t.doc_id = docs[i];
+        ASSERT_TRUE(worker.ProcessTask(t).ok()) << docs[i];
+    }
+
+    // No delivery indexed an excluded chunk, on any of the three paths.
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM contextual_vec_labels"), 0)
+        << "a backfill must not write a label the ingest deliberately did not";
+    for (const auto& c : children) {
+        EXPECT_EQ(label_adds(c.label), 0) << "no contextual point for child " << c.child_id;
+    }
+    // Doc 0 was settled without a delivery (not charged); docs 1 and 2 were delivered.
+    auto l0 = LedgerOf(db, docs[0]);
+    ASSERT_EQ(l0.size(), 1u);
+    EXPECT_EQ(l0[0].status, cortrix::spc::kEnrichStatusOk);
+    EXPECT_EQ(l0[0].attempts, 3) << "a settled row is not charged";
+    auto l1 = LedgerOf(db, docs[1]);
+    ASSERT_EQ(l1.size(), 1u);
+    EXPECT_EQ(l1[0].status, cortrix::spc::kEnrichStatusOk);
+    EXPECT_EQ(l1[0].attempts, 4);
+    auto l2 = LedgerOf(db, docs[2]);
+    ASSERT_EQ(l2.size(), 1u);
+    EXPECT_EQ(l2[0].status, cortrix::spc::kEnrichStatusOk);
+    EXPECT_EQ(l2[0].attempts, 4);
+    EXPECT_EQ(f35->calls.load(), calls_after_ingest + 1)
+        << "only the row whose columns were removed needed the provider";
+    EXPECT_EQ(CountSql(columns_sql), 3) << "the contextual columns are restored, without a point";
+}
+
+// Below processing level 3 the ingest writes no points and no hype blocks (and, on
+// this line, its chunks carry no embedding and the cleaner marks them skip-index).
+// The audit must not owe the index-side artifacts for such a document, and a
+// stale row owing hype must settle without a provider call or a hype block.
+TEST_F(SPCPipelineR7Test, EnrichAudit_LevelTwoDocOwesNoHypeBlocks) {
+    auto hype_llm = std::make_shared<llm::MockLlmClient>();
+    std::atomic<int> hype_calls{0};
+    llm::ChatCompletionResponse ok;
+    ok.status = Status::Ok();
+    ok.finish_reason = "stop";
+    ok.model = "gpt-4o-mini";
+    ok.content = "What is alpha?\nWhy beta?\nHow gamma?";
+    EXPECT_CALL(*hype_llm, Chat(_, _))
+        .WillRepeatedly(Invoke([&](const std::string&, const llm::LlmCallConfig&) {
+            ++hype_calls;
+            return ok;
+        }));
+    auto f35 = std::make_shared<CountingContextualEnricher>();
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    chain.Append(f35);
+    chain.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, hype_llm, nullptr));
+    pipeline_->SetEnricherChain(&chain);
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 2;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+    pipeline_->SetEnricherChain(nullptr);
+    sqlite3* db = facade_->store().db_handle();
+    {
+        // The document row carries the task's level, as the manager writes it.
+        sqlite3_stmt* st = nullptr;
+        ASSERT_EQ(sqlite3_prepare_v2(db,
+            "UPDATE documents SET processing_level=2 WHERE doc_id=?1", -1, &st, nullptr),
+            SQLITE_OK);
+        sqlite3_bind_text(st, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
+        ASSERT_EQ(sqlite3_step(st), SQLITE_DONE);
+        sqlite3_finalize(st);
+    }
+
+    // The facts this test rests on.
+    uint64_t block_id = 0;
+    std::string child_id;
+    int n = 0;
+    for (const auto& b : BlocksOf(doc_id)) {
+        if (b.child_id.empty()) continue;
+        ++n;
+        block_id = b.block_id;
+        child_id = b.child_id;
+        cortrix::spc::Block view;
+        view.metadata_json = nlohmann::json::parse(b.metadata_json, nullptr, false);
+        ASSERT_TRUE(cortrix::spc::ShouldSkipIndex(view))
+            << "on this line a level-2 chunk has no embedding and is marked skip-index";
+    }
+    ASSERT_EQ(n, 1) << "one chunk per fixture document";
+    ASSERT_EQ(CountSql("SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL AND child_id != ''"
+                       " AND contextualized_status = 1"), 1)
+        << "the chain wrote the contextual columns";
+    const int hype_calls_after_ingest = hype_calls.load();
+    ASSERT_GT(hype_calls_after_ingest, 0) << "positive control: the chain ran hype at level 2";
+    ASSERT_EQ(CountSql("SELECT COUNT(*) FROM blocks WHERE block_type=16"), 0)
+        << "positive control: no hype blocks below level 3";
+    ASSERT_EQ(CountSql("SELECT COUNT(*) FROM contextual_vec_labels"), 0);
+    ASSERT_TRUE(fake_index_->added_ids().empty()) << "no points at level 2";
+
+    // The audit applies the ingest's rule: nothing index-side is owed.
+    auto synth = cortrix::spc::SynthesizeEnrichAuditRows(db, {"f03", "f35", "f38"}, 1000);
+    ASSERT_TRUE(synth.ok()) << synth.status().message();
+    EXPECT_EQ(synth.value(), 0) << "a level-2 document owes no label and no hype blocks";
+
+    // A stale row owing hype, as an earlier audit would have left it.
+    cortrix::spc::EnrichStateRow r;
+    r.block_id = block_id;
+    r.doc_id = doc_id;
+    r.child_id = child_id;
+    r.status = cortrix::spc::kEnrichStatusPendingRetry;
+    r.failed_members = "f38";
+    r.attempts = 3;
+    r.next_retry_at = 0;
+    r.updated_at = 1000;
+    ASSERT_TRUE(cortrix::spc::UpsertEnrichState(db, r).ok());
+
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks_l2.db").string()).ok());
+    cortrix::spc::EnrichBackfillWorker worker(*pool_, &chain, *embedder_, &mgr);
+    async::TaskInfo t;
+    t.task_id = 1;
+    t.namespace_id = "test-ns";
+    t.doc_id = doc_id;
+    ASSERT_TRUE(worker.ProcessTask(t).ok());
+
+    EXPECT_EQ(hype_calls.load(), hype_calls_after_ingest)
+        << "settling a stale hype debt below level 3 calls no provider";
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM blocks WHERE block_type=16"), 0)
+        << "no hype blocks for a level-2 document";
+    EXPECT_TRUE(fake_index_->added_ids().empty());
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM contextual_vec_labels"), 0);
+    auto after = LedgerOf(db, doc_id);
+    ASSERT_EQ(after.size(), 1u);
+    EXPECT_EQ(after[0].status, cortrix::spc::kEnrichStatusOk);
+    EXPECT_EQ(after[0].attempts, 3) << "a settled row is not charged";
+}
+
 TEST_F(SPCPipelineR7Test, EnrichBackfill_RepairsPendingRowsEndToEnd) {
     // (1) ingest with everything failing → pending rows owing all three members.
     auto failing_llm = std::make_shared<llm::MockLlmClient>();
