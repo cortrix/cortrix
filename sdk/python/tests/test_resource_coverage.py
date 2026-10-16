@@ -26,7 +26,7 @@ _SWEEP_JSON = {
     "memory_type": "fact", "document_id": "d", "watchers": [], "memories": [],
     "documents": [], "access_token": "a", "refresh_token": "r", "expires_in": 3600,
     "email": "u@e.com", "user_id": "u1", "role": "member",
-    "sql": "SELECT 1", "results": [], "row_count": 0, "path": "/d",
+    "results": [], "path": "/d",
 }
 
 
@@ -36,13 +36,6 @@ CASES = [
     ("auth.logout", "POST", "/auth/logout", (), {}),
     ("auth.refresh", "POST", "/auth/refresh", ("rtok",), {}),
     ("auth.password_reset", "POST", "/auth/password-reset", ("u@e.com",), {}),
-    # sql schema (§2.12-only wire: /namespaces/{ns}/sql/schema)
-    ("sql.register_schema", "POST", "/namespaces/ns/sql/schema", ("ns", {"t": []}), {}),
-    ("sql.get_schema", "GET", "/namespaces/ns/sql/schema", ("ns",), {}),
-    ("sql.delete_schema", "DELETE", "/namespaces/ns/sql/schema", ("ns",), {}),
-    # sync
-    ("sync.stop", "POST", "/sync/stop", ("ns",), {}),
-    ("sync.trigger", "POST", "/sync/trigger", ("ns",), {}),
     # system
     ("system.version", "GET", "/system/version", (), {}),
     ("system.namespace_stats", "GET", "/system/namespaces/ns/stats", ("ns",), {}),
@@ -126,10 +119,9 @@ async def test_async_resource_sweep() -> None:
     for m, p in [
         ("post", "/documents"), ("get", "/documents"), ("delete", "/documents/d1"),
         ("get", "/documents/tasks/t1/progress"), ("delete", "/documents/tasks/t1"),
-        ("post", "/sql"), ("post", "/memory"), ("get", "/memory"),
+        ("post", "/memory"), ("get", "/memory"),
         ("post", "/memory/sessions/s1/interactions"), ("post", "/memory/extract"),
         ("post", "/watch"), ("get", "/watch"), ("delete", "/watch/w1"),
-        ("post", "/sync/start"), ("get", "/sync/status"),
         ("post", "/auth/register"), ("post", "/auth/login"), ("get", "/auth/me"),
         ("get", "/tenants/t1"), ("post", "/admin/tenants"),
         ("post", "/import/database"), ("get", "/system/health/live"),
@@ -142,15 +134,12 @@ async def test_async_resource_sweep() -> None:
     await c.documents.delete("d1")
     await c.documents.task_progress("t1")
     await c.documents.cancel_task("t1")
-    await c.sql.query(question="q")
     await c.memory.create("n", "c", memory_type="fact")
     await c.memory.list(namespace="n")
     await c.memory.log("n", query="q", response="r", user_id="u", session_id="s1")
     await c.watchers.add("/d", ["n"])
     await c.watchers.list()
     await c.watchers.remove("w1")
-    await c.sync.configure("n")
-    await c.sync.status()
     await c.auth.register("u@e.com", "p")
     await c.auth.login("u@e.com", "p")
     await c.auth.me()

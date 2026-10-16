@@ -18,8 +18,6 @@ from .resources.memory import Memory_
 from .resources.namespaces import Namespaces
 from .resources.ops import OpsNamespace
 from .resources.query import Query
-from .resources.sql import SQL
-from .resources.sync import Sync
 from .resources.system import System
 from .resources.tenants import Tenants
 from .resources.watchers import Watchers
@@ -64,9 +62,7 @@ class Cortrix(BaseClient):
         self._namespaces: Optional[Namespaces] = None
         self._query: Optional[Query] = None
         self._memory: Optional[Memory_] = None
-        self._sql: Optional[SQL] = None
         self._watchers: Optional[Watchers] = None
-        self._sync: Optional[Sync] = None
         self._auth: Optional[Auth] = None
         self._system: Optional[System] = None
         self._tenants: Optional[Tenants] = None
@@ -197,22 +193,10 @@ class Cortrix(BaseClient):
         return self._memory
 
     @property
-    def sql(self) -> SQL:
-        if self._sql is None:
-            self._sql = SQL(self)
-        return self._sql
-
-    @property
     def watchers(self) -> Watchers:
         if self._watchers is None:
             self._watchers = Watchers(self)
         return self._watchers
-
-    @property
-    def sync(self) -> Sync:
-        if self._sync is None:
-            self._sync = Sync(self)
-        return self._sync
 
     @property
     def auth(self) -> Auth:
