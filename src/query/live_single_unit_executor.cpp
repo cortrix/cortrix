@@ -14,6 +14,7 @@
 #include "cortrix/doc_summary/discover_handler.h"  // RecallDocSummaryHnsw (granularity=doc/both)
 #include "cortrix/doc_summary/doc_summary_types.h"  // DocDiscoveryHit
 #include "cortrix/id/hash.h"
+#include "cortrix/logging/logging.h"
 #include "cortrix/query/bm25_searcher.h"
 #include "cortrix/query/cross_ns_error.h"
 #include "cortrix/query/vector_searcher.h"
@@ -25,6 +26,7 @@
 #include "cortrix/spc/contextual_store.h"  // GetContextualVecLabel (F35-9 B dual-vector, §3.8 W2)
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/store/cortrix_store.h"
+#include "cortrix/store/doc_status_lookup.h"
 #include "cortrix/store/sqlite_chunk_store.h"
 
 #include <unordered_map>
@@ -617,6 +619,47 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
                         rrf_in.sparse.push_back(h);
                     }
                 }
+            }
+        }
+
+        // A soft-deleted document is invisible on every route, as it is to the list
+        // and status endpoints; BM25 already excludes it in SQL. Its entries leave
+        // all five lists BEFORE fusion, so the survivors are ranked as though the
+        // deleted entries had never been retrieved. An entry whose row carries no
+        // doc_id (the legacy reverse lookup) is kept. A lookup error leaves the lists
+        // as they were before this filter existed, and is logged.
+        {
+            std::vector<std::string> hit_doc_ids;
+            for (const auto* list : {&rrf_in.dense, &rrf_in.fts5, &rrf_in.sparse,
+                                     &rrf_in.contextualized, &rrf_in.hype}) {
+                for (const auto& h : *list) {
+                    auto it = by_child.find(h.child_id);
+                    if (it != by_child.end() && !it->second.doc_id.empty()) {
+                        hit_doc_ids.push_back(it->second.doc_id);
+                    }
+                }
+            }
+            auto deleted_docs =
+                cortrix::store::LoadDeletedDocIds(store.db_handle(), hit_doc_ids);
+            if (!deleted_docs.ok()) {
+                CORTRIX_LOG_WARN("query", "deleted-document filter skipped for ns={}: {}",
+                                 namespace_id, deleted_docs.status().message());
+            } else if (!deleted_docs.value().empty()) {
+                const auto& gone = deleted_docs.value();
+                auto drop = [&](std::vector<retrieval::SparseHit>& list) {
+                    list.erase(std::remove_if(list.begin(), list.end(),
+                                              [&](const retrieval::SparseHit& h) {
+                                                  auto it = by_child.find(h.child_id);
+                                                  return it != by_child.end() &&
+                                                         gone.count(it->second.doc_id) > 0;
+                                              }),
+                               list.end());
+                };
+                drop(rrf_in.dense);
+                drop(rrf_in.fts5);
+                drop(rrf_in.sparse);
+                drop(rrf_in.contextualized);
+                drop(rrf_in.hype);
             }
         }
 

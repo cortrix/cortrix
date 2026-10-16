@@ -68,6 +68,7 @@ add_library(cortrix_core STATIC
     src/store/phnsw/wal_writer.cpp
     src/store/phnsw/snapshot_manager.cpp
     src/store/cortrix_store_sqlite.cpp
+    src/store/doc_status_lookup.cpp
     src/store/cortrix_blob_local.cpp
     src/spc/parser_errors.cpp
     src/spc/parser.cpp
