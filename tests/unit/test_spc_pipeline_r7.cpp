@@ -111,7 +111,10 @@ public:
         added_ids_.push_back(id);
         return Status::Ok();
     }
-    Status MarkDelete(uint64_t, const observability::TraceContext*) override { return Status::Ok(); }
+    Status MarkDelete(uint64_t id, const observability::TraceContext*) override {
+        deleted_ids_.push_back(id);
+        return Status::Ok();
+    }
     Status AddPoints(const std::vector<std::pair<const float*, uint64_t>>& pts,
                      const observability::TraceContext*) override {
         if (add_should_fail_) return Status(StatusCode::kUnavailable, "forced add failure");
@@ -144,10 +147,12 @@ public:
 
     void set_add_should_fail(bool v) { add_should_fail_ = v; }
     const std::vector<uint64_t>& added_ids() const { return added_ids_; }
+    const std::vector<uint64_t>& deleted_ids() const { return deleted_ids_; }
 
 private:
     std::size_t footprint_;
     std::vector<uint64_t> added_ids_;
+    std::vector<uint64_t> deleted_ids_;
     bool add_should_fail_ = false;
 };
 
@@ -2306,6 +2311,78 @@ TEST_F(SPCPipelineR7Test, EnrichAudit_SkipIndexChunkOwesNoLabelAndGetsNoPoint) {
         << "only the row whose columns were removed needed the provider";
     EXPECT_EQ(CountSql(with_vector_sql.c_str()), 3)
         << "the contextual columns are restored, without a point";
+}
+
+// Before the gates existed, every audit + backfill added a contextual point and a
+// label row for chunks the cleaner excluded. The audit now removes those entries
+// through the namespace's own index: the point is marked deleted, the label row
+// goes, the chunk's columns and stored vector stay, and nothing is re-owed.
+TEST_F(SPCPipelineR7Test, EnrichAudit_ReconcileRemovesPointsOfSkipIndexChunks) {
+    ASSERT_EQ(&facade_->vec_index(), static_cast<cortrix::store::IIndex*>(fake_index_))
+        << "the facade's index is the fixture's fake, so its recorders see the deletes";
+    auto f35 = std::make_shared<CountingContextualEnricher>();
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    chain.Append(f35);
+    chain.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, MakeHypeLlm(), nullptr));
+    pipeline_->SetEnricherChain(&chain);
+    pipeline_->SetCleaningConfigResolver([](const std::string&) {
+        cortrix::spc::CleaningConfig c;
+        c.max_chunk_chars = 1;  // every chunk oversized → skip-index
+        return c;
+    });
+    std::vector<std::string> docs;
+    for (int i = 0; i < 3; ++i) {
+        std::string doc_id = CreateDoc();
+        auto task = MakeTask(txt_path_, "text/plain", doc_id);
+        task->processing_level = 3;
+        ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+        docs.push_back(doc_id);
+    }
+    pipeline_->SetEnricherChain(nullptr);
+    pipeline_->SetCleaningConfigResolver(nullptr);
+    sqlite3* db = facade_->store().db_handle();
+
+    // Emulate the pre-gate state: a label row and an index point per excluded chunk.
+    std::vector<uint64_t> labels;
+    const std::vector<float> vec(128, 0.01f);
+    for (const auto& doc_id : docs) {
+        for (const auto& b : BlocksOf(doc_id)) {
+            if (b.child_id.empty()) continue;
+            cortrix::spc::Block view;
+            view.metadata_json = nlohmann::json::parse(b.metadata_json, nullptr, false);
+            ASSERT_TRUE(cortrix::spc::ShouldSkipIndex(view)) << "fact: the chunk is skip-index";
+            const uint64_t label = cortrix::spc::DeriveContextualVecLabel(b.child_id);
+            ASSERT_TRUE(cortrix::spc::WriteContextualVecLabel(
+                            db, cortrix::spc::ContextualVecLabelRow{label, b.block_id, b.child_id}).ok());
+            ASSERT_TRUE(facade_->vec_index().AddPoints({{vec.data(), label}}).ok());
+            labels.push_back(label);
+        }
+    }
+    ASSERT_EQ(labels.size(), 3u) << "one chunk per fixture document";
+    const std::string with_vector_sql =
+        std::string("SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL"
+                    " AND child_id != '' AND ") + cortrix::spc::kBlockHasStoredContextualVectorSql;
+    ASSERT_EQ(CountSql(with_vector_sql.c_str()), 3);
+    ASSERT_EQ(CountSql("SELECT COUNT(*) FROM contextual_vec_labels"), 3) << "positive control";
+    ASSERT_TRUE(fake_index_->deleted_ids().empty());
+
+    auto removed = cortrix::spc::ReconcileExcludedContextualLabels(
+        db, [&](uint64_t label) { return facade_->vec_index().MarkDelete(label); });
+    ASSERT_TRUE(removed.ok()) << removed.status().message();
+    EXPECT_EQ(removed.value(), 3);
+    std::vector<uint64_t> deleted = fake_index_->deleted_ids();
+    std::sort(deleted.begin(), deleted.end());
+    std::sort(labels.begin(), labels.end());
+    EXPECT_EQ(deleted, labels) << "every excluded label's point was marked deleted";
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM contextual_vec_labels"), 0);
+    EXPECT_EQ(CountSql(with_vector_sql.c_str()), 3) << "columns and stored vectors stay";
+
+    // Nothing is re-owed afterwards: the audit's gate excludes the same chunks.
+    auto synth = cortrix::spc::SynthesizeEnrichAuditRows(db, {"f03", "f35", "f38"}, 1000);
+    ASSERT_TRUE(synth.ok()) << synth.status().message();
+    EXPECT_EQ(synth.value(), 0);
 }
 
 // Below processing level 3 the ingest writes no points and no hype blocks (and,

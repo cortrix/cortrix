@@ -371,6 +371,79 @@ TEST_F(EnrichAuditTest, DoesNotOweIndexArtifactsBelowLevelThree) {
     EXPECT_EQ(FailedMembersOf(42), "f35,f38");
 }
 
+// The other direction of the audit: contextual labels (and their points) that the
+// ingest's rule excludes are removed — a skip-index chunk's, and a chunk's whose
+// document is below the full level — while a plain chunk's label stays. The point
+// is marked deleted before the row goes; the chunk's columns stay. A document
+// without a row reads as the full level, and a string "true" is not the mark.
+TEST_F(EnrichAuditTest, ReconcileRemovesOnlyExcludedLabels) {
+    CreateLabelsTable();
+    // Only doc-l2 has a documents row (level 2); doc-a has none → read as level 3.
+    ASSERT_EQ(sqlite3_exec(db_,
+        "CREATE TABLE documents (doc_id TEXT PRIMARY KEY, processing_level INTEGER);"
+        "INSERT INTO documents(doc_id, processing_level) VALUES('doc-l2', 2)",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    SeedChildWithVector(31, "child-skip", true, 1,
+                        R"({"cleaning.anomaly_reason":"empty","cleaning.skip_index":true})");
+    SeedChildWithVector(32, "child-plain", true, 1, nullptr);
+    SeedChildWithVector(33, "child-l2", true, 1, nullptr);
+    ASSERT_EQ(sqlite3_exec(db_, "UPDATE blocks SET doc_id='doc-l2' WHERE block_id=33",
+                           nullptr, nullptr, nullptr), SQLITE_OK);
+    SeedChildWithVector(34, "child-stringy", true, 1, R"({"cleaning.skip_index":"true"})");
+    ASSERT_EQ(sqlite3_exec(db_,
+        "INSERT INTO contextual_vec_labels(label, block_id, child_id) VALUES"
+        " (7001, 31, 'child-skip'), (7002, 32, 'child-plain'),"
+        " (7003, 33, 'child-l2'), (7004, 34, 'child-stringy')",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    auto count = [&](const char* sql) {
+        sqlite3_stmt* st = nullptr;
+        EXPECT_EQ(sqlite3_prepare_v2(db_, sql, -1, &st, nullptr), SQLITE_OK);
+        int n = 0;
+        if (st && sqlite3_step(st) == SQLITE_ROW) n = sqlite3_column_int(st, 0);
+        sqlite3_finalize(st);
+        return n;
+    };
+    ASSERT_EQ(count("SELECT COUNT(*) FROM contextual_vec_labels"), 4);  // positive control
+
+    // A callback that fails on the first excluded label: nothing is removed, and
+    // nothing after it is touched (the row stays, so the next audit retries).
+    std::vector<uint64_t> seen;
+    auto failing = ReconcileExcludedContextualLabels(db_, [&](uint64_t label) {
+        seen.push_back(label);
+        return Status::Unavailable("index not ready");
+    });
+    EXPECT_FALSE(failing.ok());
+    EXPECT_EQ(seen, (std::vector<uint64_t>{7001}));
+    EXPECT_EQ(count("SELECT COUNT(*) FROM contextual_vec_labels"), 4);
+
+    seen.clear();
+    auto n = ReconcileExcludedContextualLabels(db_, [&](uint64_t label) {
+        seen.push_back(label);
+        return Status::Ok();
+    });
+    ASSERT_TRUE(n.ok()) << n.status().message();
+    EXPECT_EQ(n.value(), 2);
+    EXPECT_EQ(seen, (std::vector<uint64_t>{7001, 7003}));  // label order
+    EXPECT_EQ(count("SELECT COUNT(*) FROM contextual_vec_labels WHERE label IN (7001, 7003)"), 0);
+    EXPECT_EQ(count("SELECT COUNT(*) FROM contextual_vec_labels WHERE label IN (7002, 7004)"), 2);
+    // The chunks keep their contextual columns and stored vector.
+    EXPECT_EQ(count("SELECT COUNT(*) FROM blocks WHERE block_id IN (31, 33)"
+                    " AND contextualized_status = 1 AND contextualized_embedding IS NOT NULL"), 2);
+    // A second pass finds nothing left to remove.
+    auto again = ReconcileExcludedContextualLabels(db_, [](uint64_t) { return Status::Ok(); });
+    ASSERT_TRUE(again.ok());
+    EXPECT_EQ(again.value(), 0);
+}
+
+TEST_F(EnrichAuditTest, ReconcileWithoutLabelsTableRemovesNothing) {
+    SeedChildWithVector(41, "child-skip", true, 1, R"({"cleaning.skip_index":true})");
+    int calls = 0;
+    auto n = ReconcileExcludedContextualLabels(db_, [&](uint64_t) { ++calls; return Status::Ok(); });
+    ASSERT_TRUE(n.ok()) << n.status().message();
+    EXPECT_EQ(n.value(), 0);
+    EXPECT_EQ(calls, 0);
+}
+
 // Members outside the configured chain are never owed (f38 unconfigured here).
 TEST_F(EnrichAuditTest, RespectsConfiguredMemberUniverse) {
     SeedChild(11, "child-x", /*score=*/true, /*ctx=*/1);  // no hype block anywhere

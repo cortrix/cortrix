@@ -15,13 +15,17 @@ namespace cortrix {
 ///
 ///   POST /api/v1/namespaces/:name/enrich/backfill   (admin)
 ///     body (optional): {"audit": true}
-///     1. audit (default on): scan the namespace's child blocks against the
-///        CONFIGURED chain members and synthesize enrich_state rows for legacy /
-///        silently-degraded chunks (f03 ⇔ enriched_score, f35 ⇔
-///        contextualized_status==1, f38 ⇔ a hype block with this source child);
+///     1. audit (default on): reconcile the namespace with the ingest's index
+///        rule in both directions — remove contextual index entries the rule
+///        excludes (skip-index chunks, documents below the full processing
+///        level), then scan the child blocks against the CONFIGURED chain members
+///        and synthesize enrich_state rows for legacy / silently-degraded chunks
+///        (f03 ⇔ enriched_score, f35 ⇔ contextualized_status==1 plus the index
+///        label where one is expected, f38 ⇔ a hype block with this source child);
 ///     2. make every 'pending_retry' row due now;
 ///     3. run one sweep for this namespace → kTaskEnrichBackfill tasks.
-///     Response: {namespace, synthesized, enqueued, counts{...}}.
+///     Response: {namespace, audited, removed, synthesized, enqueued, counts{...}};
+///     `removed` is 0 when audit is false.
 ///
 /// `chain_tokens` = the tokens of the CURRENTLY configured enricher chain
 /// ("f03"/"f35"/"f38") — the owed universe for the audit; empty ⇒ the endpoint

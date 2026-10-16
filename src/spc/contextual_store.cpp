@@ -94,6 +94,20 @@ Status WriteContextualVecLabel(sqlite3* db, const ContextualVecLabelRow& row) {
     return Status::Ok();
 }
 
+Status DeleteContextualVecLabel(sqlite3* db, uint64_t label) {
+    if (!db) return Status::InvalidArgument("DeleteContextualVecLabel: null db");
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql = "DELETE FROM contextual_vec_labels WHERE label=?1";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        return SqlErr(db, "prepare delete contextual_vec_labels");
+    }
+    sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(label));
+    const int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) return SqlErr(db, "delete contextual_vec_labels");
+    return Status::Ok();  // idempotent: an absent row is already gone
+}
+
 Result<ContextualVecLabelRow> GetContextualVecLabel(sqlite3* db, uint64_t label) {
     if (!db) return Status::InvalidArgument("GetContextualVecLabel: null db");
     sqlite3_stmt* stmt = nullptr;

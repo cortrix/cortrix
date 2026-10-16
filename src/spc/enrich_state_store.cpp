@@ -255,6 +255,95 @@ Status ReoweEnrichState(sqlite3* db, const EnrichStateRow& row, int terminal_at_
     return Status::Ok();
 }
 
+namespace {
+
+// Each document's processing level, keyed by doc_id — the first half of the
+// ingest's index gate (index_gates.h), read the same way by the audit and the
+// reconciliation. A document without a row reads as the full level (the caller's
+// lookup default); a store without the table (isolated fixtures) yields an empty
+// map, logged so a production store in that state is visible rather than silent;
+// a scan that breaks off is an error, because leaving some documents at the
+// default would misjudge them.
+Result<std::unordered_map<std::string, int>> LoadDocumentLevels(sqlite3* db) {
+    std::unordered_map<std::string, int> doc_levels;
+    sqlite3_stmt* st = nullptr;
+    const char* sql = "SELECT doc_id, processing_level FROM documents";
+    if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
+        CORTRIX_LOG_DEBUG("spc",
+            "enrich audit: documents table unavailable, every document read as "
+            "full processing level: {}", sqlite3_errmsg(db));
+        return doc_levels;
+    }
+    int drc = SQLITE_OK;
+    while ((drc = sqlite3_step(st)) == SQLITE_ROW) {
+        const unsigned char* d = sqlite3_column_text(st, 0);
+        if (!d) continue;
+        const int level = sqlite3_column_type(st, 1) == SQLITE_NULL
+                              ? 3
+                              : sqlite3_column_int(st, 1);
+        doc_levels[reinterpret_cast<const char*>(d)] = level;
+    }
+    sqlite3_finalize(st);
+    if (drc != SQLITE_DONE) return SqlErr(db, "audit documents scan");
+    return doc_levels;
+}
+
+int DocLevelOf(const std::unordered_map<std::string, int>& levels, const std::string& doc_id) {
+    const auto it = levels.find(doc_id);
+    return it == levels.end() ? 3 : it->second;
+}
+
+}  // namespace
+
+Result<int> ReconcileExcludedContextualLabels(
+    sqlite3* db, const std::function<Status(uint64_t label)>& mark_point_deleted) {
+    if (!db) return Status::InvalidArgument("ReconcileExcludedContextualLabels: null db");
+    if (!mark_point_deleted) {
+        return Status::InvalidArgument("ReconcileExcludedContextualLabels: null callback");
+    }
+    auto levels = LoadDocumentLevels(db);
+    if (!levels.ok()) return levels.status();
+
+    // Collect first, act afterwards: no DELETE while the SELECT is stepping. The
+    // mark is read with the same SQL predicate the audit's pass 3 uses; the join
+    // adds only label/block_id/child_id columns, so metadata_json is unambiguous.
+    struct Excluded { uint64_t label; };
+    std::vector<Excluded> excluded;
+    {
+        sqlite3_stmt* st = nullptr;
+        const std::string sql =
+            std::string("SELECT l.label, b.doc_id, ") + kBlockSkipsIndexSql +
+            " FROM contextual_vec_labels l JOIN blocks b ON b.block_id = l.block_id"
+            " ORDER BY l.label";
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
+            // No labels table (isolated pre-V2 store or fixture): nothing to remove.
+            return 0;
+        }
+        int rc = SQLITE_OK;
+        while ((rc = sqlite3_step(st)) == SQLITE_ROW) {
+            const uint64_t label = static_cast<uint64_t>(sqlite3_column_int64(st, 0));
+            const unsigned char* did = sqlite3_column_text(st, 1);
+            const std::string doc_id = did ? reinterpret_cast<const char*>(did) : "";
+            const bool skip_index = sqlite3_column_int(st, 2) != 0;
+            if (!IndexPointsExpected(DocLevelOf(levels.value(), doc_id), skip_index)) {
+                excluded.push_back({label});
+            }
+        }
+        sqlite3_finalize(st);
+        if (rc != SQLITE_DONE) return SqlErr(db, "reconcile labels scan");
+    }
+
+    int removed = 0;
+    for (const Excluded& e : excluded) {
+        Status mark = mark_point_deleted(e.label);
+        if (!mark.ok()) return mark;  // the row stays; the next audit retries it
+        Status del = DeleteContextualVecLabel(db, e.label);
+        if (!del.ok()) return del;
+        ++removed;
+    }
+    return removed;
+}
+
 Result<int> SynthesizeEnrichAuditRows(
     sqlite3* db, const std::unordered_set<std::string>& configured_members,
     int64_t now_unix) {
@@ -300,34 +389,10 @@ Result<int> SynthesizeEnrichAuditRows(
 
     // Pass 1.7: each document's processing level — the first half of the ingest's
     // index gate (index_gates.h). Below the full level the ingest writes neither
-    // the contextual index point nor hype blocks, so neither may be owed. A
-    // document without a row reads as the full level (conservative: owed exactly
-    // as before); a store without the table (isolated fixtures) likewise, logged
-    // so a production store in that state is visible rather than silent.
-    std::unordered_map<std::string, int> doc_levels;
-    {
-        sqlite3_stmt* st = nullptr;
-        const char* sql = "SELECT doc_id, processing_level FROM documents";
-        if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) == SQLITE_OK) {
-            int drc = SQLITE_OK;
-            while ((drc = sqlite3_step(st)) == SQLITE_ROW) {
-                const unsigned char* d = sqlite3_column_text(st, 0);
-                if (!d) continue;
-                const int level = sqlite3_column_type(st, 1) == SQLITE_NULL
-                                      ? 3
-                                      : sqlite3_column_int(st, 1);
-                doc_levels[reinterpret_cast<const char*>(d)] = level;
-            }
-            sqlite3_finalize(st);
-            // Only the absent table is tolerated; a scan that breaks off would
-            // leave some documents at the default and owe them wrongly.
-            if (drc != SQLITE_DONE) return SqlErr(db, "audit documents scan");
-        } else {
-            CORTRIX_LOG_DEBUG("spc",
-                "enrich audit: documents table unavailable, every document read as "
-                "full processing level: {}", sqlite3_errmsg(db));
-        }
-    }
+    // the contextual index point nor hype blocks, so neither may be owed.
+    auto levels = LoadDocumentLevels(db);
+    if (!levels.ok()) return levels.status();
+    const std::unordered_map<std::string, int>& doc_levels = levels.value();
 
     // Pass 2: rows the audit must NOT re-synthesize. In-flight pending_retry rows
     // keep their attempts/backoff. failed_permanent rows stay terminal — except
