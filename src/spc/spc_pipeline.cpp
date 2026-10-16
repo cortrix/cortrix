@@ -6,6 +6,7 @@
 #include <optional>
 #include <utility>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "cortrix/spc/parser_factory.h"          // F06 cortrix::spc::DocumentParserFactory
 #include "cortrix/spc/parser.h"                   // ParsedDoc / ParserOptions / DocumentMetadata
@@ -661,6 +662,23 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         data_cleaner_.DetectAnomaly(clean_blocks);  // marks skip-index (kept, not indexed)
     task.cleaning_summary = cortrix::spc::DataCleaner::Summarize(
         cleaning_input_count, dedup_result, anomaly_result);
+
+    // The chain ran before cleaning, over every chunk. A chunk the cleaner dropped
+    // as a duplicate has no stored block for a hype question to point back to, so
+    // it gets no hype blocks and no hype debt: keep only the survivors' questions.
+    // (A surviving duplicate had its own chain run, so nothing is lost.)
+    if (!hype_by_child.empty()) {
+        std::unordered_set<std::string> surviving;
+        surviving.reserve(clean_blocks.size());
+        for (const auto& b : clean_blocks) surviving.insert(b.id);
+        for (auto it = hype_by_child.begin(); it != hype_by_child.end();) {
+            if (surviving.count(it->first) == 0) {
+                it = hype_by_child.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
 
     for (auto& b : clean_blocks) {
         const cortrix::chunker::ChildChunk& child = out.children[child_idx_by_id[b.id]];

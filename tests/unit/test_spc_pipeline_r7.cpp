@@ -550,6 +550,65 @@ TEST_F(SPCPipelineR7Test, F10_DefaultResolverEnablesDedup_CollapsesDuplicates) {
         << "default config dedup on → no two surviving children share text";
 }
 
+// The enrichment chain runs before cleaning, so a chunk the cleaner then drops
+// as a duplicate has hype questions but no stored block for them to point back
+// to. Such a chunk must get no hype blocks: a question block whose source chunk
+// does not exist is a hit that resolves to nothing.
+TEST_F(SPCPipelineR7Test, Hype_NoBlocksForChildrenDroppedByDedup) {
+    const std::string para(4400, 'x');
+    const std::string json =
+        std::string(R"JSON({"status":0,"parser":"docling",)JSON") +
+        R"JSON("metadata":{"filename":"dup.txt","page_count":1,"doc_language":"en"},)JSON" +
+        R"JSON("pages":[{"page_num":1,"page_text":"x","page_metadata":{"page_num":1,)JSON" +
+        R"JSON("parser_used":"docling","page_confidence":0.95,"is_scan_page":false,"char_count":1},)JSON" +
+        R"JSON("paragraphs":[{"text":")JSON" + para +
+        R"JSON(","page":1,"type":"TEXT","confidence":0.95,"language":"en"},)JSON" +
+        R"JSON({"text":")JSON" + para +
+        R"JSON(","page":1,"type":"TEXT","confidence":0.95,"language":"en"}]}]})JSON";
+    RebuildFactory(json);
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    chain.Append(std::make_shared<FakeContextualEnricher>());
+    chain.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, MakeHypeLlm(), nullptr));
+    pipeline_->SetEnricherChain(&chain);
+    // No cleaning resolver installed → dedup on (the default).
+
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+    pipeline_->SetEnricherChain(nullptr);
+
+    // Positive controls: duplicates were dropped, chunks were stored, hype ran.
+    ASSERT_GT(task->cleaning_summary.chunks_skipped_dedup, 0)
+        << "the cleaner dropped the second paragraph's chunks as duplicates";
+    const int stored = CountSql(
+        "SELECT COUNT(*) FROM blocks WHERE child_id IS NOT NULL AND child_id != ''");
+    ASSERT_GT(stored, 0);
+    ASSERT_EQ(task->cleaning_summary.chunks_input,
+              stored + task->cleaning_summary.chunks_skipped_dedup)
+        << "every chunk fed into cleaning was either stored or dropped as a duplicate";
+    const int hype = CountSql("SELECT COUNT(*) FROM blocks WHERE block_type=16");
+    ASSERT_GT(hype, 0) << "positive control: hype blocks were written";
+    ASSERT_EQ(CountSql("SELECT COUNT(*) FROM blocks WHERE block_type=16"
+                       " AND json_extract(metadata_json, '$.source_child_id') IS NOT NULL"),
+              hype)
+        << "every hype block carries a source chunk id (so the check below cannot be"
+           " masked by a missing key)";
+
+    EXPECT_EQ(hype, stored * 3)
+        << "three questions per stored chunk, none for the dropped duplicates";
+    EXPECT_EQ(CountSql(
+                  "SELECT COUNT(*) FROM blocks WHERE block_type=16"
+                  " AND json_extract(metadata_json, '$.source_child_id') NOT IN"
+                  " (SELECT child_id FROM blocks WHERE child_id IS NOT NULL AND child_id != '')"),
+              0)
+        << "every hype block must name a chunk that exists";
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state"), stored)
+        << "the ledger covers stored chunks only, as before";
+}
+
 // Resolver that turns anomaly detection OFF (the other §3.4 boolean field). Exercises
 // the resolver SetConfig branch with anomaly_detection_enabled=false (DetectAnomaly
 // early-returns). The doc still writes; no child carries a cleaning.* anomaly key.
