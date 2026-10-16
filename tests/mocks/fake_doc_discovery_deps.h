@@ -19,6 +19,9 @@
 //
 // Deterministic: no network / no real model / no real clock.
 
+#include <atomic>
+#include <chrono>
+#include <thread>
 #include <gmock/gmock.h>
 
 #include <filesystem>
@@ -61,10 +64,23 @@ public:
     }
     void set_search_throws(bool v) { search_throws_ = v; }
 
+    // Optional hold: while *hold is true, the IIndex search waits (after counting
+    // itself in *entered), so a test can keep a namespace task running.
+    void set_search_hold(std::atomic<bool>* hold, std::atomic<int>* entered) {
+        search_hold_ = hold;
+        search_entered_ = entered;
+    }
+
     // --- IIndex search ---
     std::vector<std::pair<uint64_t, float>> Search(
         const float*, int, int,
         const cortrix::observability::TraceContext*) override {
+        if (search_hold_ != nullptr) {
+            if (search_entered_ != nullptr) search_entered_->fetch_add(1);
+            while (search_hold_->load()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+        }
         if (search_throws_) throw std::runtime_error("forced hnsw search fault");
         return search_result_;
     }
@@ -111,6 +127,8 @@ public:
 private:
     std::vector<std::pair<uint64_t, float>> search_result_;
     bool search_throws_ = false;
+    std::atomic<bool>* search_hold_ = nullptr;
+    std::atomic<int>* search_entered_ = nullptr;
 };
 
 // ---------------------------------------------------------------------------
