@@ -66,8 +66,10 @@ public:
         submitted_tasks.push_back(t);
         return Status::Ok();
     }
-    int CancelBySourcePath(const std::string& p) override {
+    int CancelQueuedVersions(const std::string& ns, const std::string& type,
+                             const std::string& p) override {
         cancelled_paths.push_back(p);
+        cancelled_scopes.push_back(ns + "|" + type);
         return 0;
     }
     void Start() override {}
@@ -77,6 +79,7 @@ public:
 
     std::vector<std::shared_ptr<SPCTask>> submitted_tasks;
     std::vector<std::string> cancelled_paths;
+    std::vector<std::string> cancelled_scopes;  // "namespace|source_type" per call
 };
 
 // Write a small text file to `path`.
@@ -395,6 +398,37 @@ TEST_F(DirectoryImporterTest, ModifiedThenDeletedMergesAsDeleted) {
     di.HandleFileEvents({ev_mod, ev_del});
     // The merged event should be kDeleted, triggering HandleFileDeletion.
     EXPECT_GT(di.GetStats().deleted, deleted_before);
+}
+
+// #178: the importer cancels queued work within its own namespace and producer only,
+// at both of its call sites: a changed file and a deleted one.
+TEST_F(DirectoryImporterTest, CancelsAreScopedToItsNamespaceAndWatchDir) {
+    WriteFile(watch_dir_ / "scoped.txt", "first content");
+    auto cfg = MakeCfg();
+    DirectoryImporter di(cfg, harness_->ipool(), *spc_);
+    ASSERT_TRUE(di.Start().ok());
+    ASSERT_EQ(MarkAllDocsReady(), 1);
+    const std::string path = fs::canonical(watch_dir_ / "scoped.txt").string();
+
+    // A changed file: the changed-content branch cancels the path's queued versions.
+    WriteFile(watch_dir_ / "scoped.txt", "second content");
+    FileEvent ev_mod;
+    ev_mod.type = FileEventType::kModified;
+    ev_mod.path = path;
+    di.HandleFileEvents({ev_mod});
+    ASSERT_EQ(spc_->cancelled_paths.size(), 1u);
+    EXPECT_EQ(spc_->cancelled_paths[0], path);
+    EXPECT_EQ(spc_->cancelled_scopes[0], "default|watch_dir");
+
+    // A deleted file: the deletion handler cancels them as well.
+    fs::remove(watch_dir_ / "scoped.txt");
+    FileEvent ev_del;
+    ev_del.type = FileEventType::kDeleted;
+    ev_del.path = path;
+    di.HandleFileEvents({ev_del});
+    ASSERT_EQ(spc_->cancelled_paths.size(), 2u);
+    EXPECT_EQ(spc_->cancelled_paths[1], path);
+    EXPECT_EQ(spc_->cancelled_scopes[1], "default|watch_dir");
 }
 
 TEST_F(DirectoryImporterTest, CreatedThenModifiedTreatedAsCreated) {

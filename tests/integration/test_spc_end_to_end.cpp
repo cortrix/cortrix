@@ -233,7 +233,7 @@ TEST_F(SPCEndToEndTest, TaskQueueIntegration) {
     EXPECT_EQ(queue.Size(), 10u);
 
     // Cancel some tasks
-    int cancelled = queue.CancelBySourcePath("file_3.txt");
+    int cancelled = queue.CancelQueuedVersions("", "", "file_3.txt");
     EXPECT_EQ(cancelled, 1);
 
     // Drain queue — P0 tasks should come first

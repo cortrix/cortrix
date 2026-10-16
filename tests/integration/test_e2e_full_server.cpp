@@ -173,7 +173,10 @@ protected:
     public:
         StubSPCManager() : SPCManager() {}
         Status Submit(std::shared_ptr<SPCTask>) override { return Status::Ok(); }
-        int CancelBySourcePath(const std::string&) override { return 0; }
+        int CancelQueuedVersions(const std::string&, const std::string&,
+                                 const std::string&) override {
+            return 0;
+        }
         void Start() override {}
         void Stop() override {}
         size_t QueueSize() const override { return 0; }

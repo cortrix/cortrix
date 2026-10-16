@@ -360,7 +360,7 @@ Status DirectoryImporter::ProcessFile(const std::string& file_path) {
         }
 
         // Content changed - update
-        spc_mgr_.CancelBySourcePath(effective_path);
+        spc_mgr_.CancelQueuedVersions(config_.namespace_name, "watch_dir", effective_path);
 
         facade.store().doc_update_status(existing_doc.doc_id, DocStatus::kStale);
         facade.store().doc_update_status(existing_doc.doc_id, DocStatus::kPending);
@@ -452,7 +452,7 @@ Status DirectoryImporter::HandleFileDeletion(const std::string& file_path) {
     }
 
     // Cancel any in-flight SPC tasks
-    spc_mgr_.CancelBySourcePath(file_path);
+    spc_mgr_.CancelQueuedVersions(config_.namespace_name, "watch_dir", file_path);
 
     // Per D5 design: set Document status to 'deleting' before cascade
     int urc = facade.store().doc_update_status(doc.doc_id, DocStatus::kDeleting);

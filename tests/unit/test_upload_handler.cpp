@@ -166,8 +166,10 @@ public:
         return Status::Ok();
     }
 
-    int CancelBySourcePath(const std::string& path) override {
+    int CancelQueuedVersions(const std::string& ns, const std::string& type,
+                             const std::string& path) override {
         cancelled_paths_.push_back(path);
+        cancelled_scopes_.push_back(ns + "|" + type);
         return 0;
     }
 
@@ -179,10 +181,12 @@ public:
     void set_should_fail(bool v) { should_fail_ = v; }
     const std::vector<std::shared_ptr<SPCTask>>& submitted() const { return submitted_; }
     const std::vector<std::string>& cancelled_paths() const { return cancelled_paths_; }
+    const std::vector<std::string>& cancelled_scopes() const { return cancelled_scopes_; }
 
 private:
     std::vector<std::shared_ptr<SPCTask>> submitted_;
     std::vector<std::string> cancelled_paths_;
+    std::vector<std::string> cancelled_scopes_;  // "namespace|source_type" per call
     bool should_fail_ = false;
 };
 
@@ -672,9 +676,12 @@ TEST_F(UploadHandlerTest, HandleUpload_UpdatedHash_Updating) {
     EXPECT_FALSE(result2.is_duplicate);
     EXPECT_NE(result2.content_hash, result1.content_hash);
 
-    // CancelBySourcePath was called
+    // The update cancelled the file's queued versions, and only within the upload's
+    // own namespace and producer (#178).
     ASSERT_EQ(spc_->cancelled_paths().size(), 1u);
     EXPECT_EQ(spc_->cancelled_paths()[0], "report.txt");
+    ASSERT_EQ(spc_->cancelled_scopes().size(), 1u);
+    EXPECT_EQ(spc_->cancelled_scopes()[0], "test-ns|http_upload");
 
     // Two SPC submissions
     EXPECT_EQ(spc_->submitted().size(), 2u);

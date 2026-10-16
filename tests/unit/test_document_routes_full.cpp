@@ -60,7 +60,10 @@ public:
                    ? Status(StatusCode::kUnavailable, "queue saturated")
                    : Status::Ok();
     }
-    int CancelBySourcePath(const std::string&) override { return 0; }
+    int CancelQueuedVersions(const std::string&, const std::string&,
+                             const std::string&) override {
+        return 0;
+    }
     void Start() override {}
     void Stop() override {}
     size_t QueueSize() const override { return 0; }
