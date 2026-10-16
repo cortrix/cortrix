@@ -8,11 +8,13 @@
 #include "cortrix/doc_summary/doc_summary_config.h"     // kDocDiscoveryRrfK
 #include "cortrix/doc_summary/doc_summary_generator.h"  // DocSummaryConfig (full def for config.fts5_fallback_enabled)
 #include "cortrix/doc_summary/doc_summary_metrics.h"
+#include "cortrix/logging/logging.h"
 #include "cortrix/resource/namespace_facade.h"
 #include "cortrix/server/http_server.h"           // WriteJsonError / WriteJsonResponse
 #include "cortrix/server/request_context.h"
 #include "cortrix/spc/onnx_embedder.h"            // OnnxEmbedder / EmbeddingResult
 #include "cortrix/store/cortrix_store.h"           // CortrixStore
+#include "cortrix/store/doc_status_lookup.h"      // LoadDeletedDocIds
 #include "cortrix/store/iindex.h"                  // IIndex
 
 #include "httplib.h"
@@ -86,15 +88,38 @@ std::vector<DocDiscoveryHit> RecallDocSummaryHnsw(store::IIndex& index,
             }
         }
         out.push_back(std::move(hit));
-        if (static_cast<int>(out.size()) >= top_k) break;
     }
 
-    // Already in ascending-distance (descending-similarity) order from the index, but
-    // sort defensively by match_score DESC so the RRF rank is well-defined.
-    std::sort(out.begin(), out.end(),
-              [](const DocDiscoveryHit& a, const DocDiscoveryHit& b) {
-                  return a.match_score > b.match_score;
-              });
+    // A soft-deleted document is invisible here as on every retrieval route. Its
+    // summaries leave BEFORE the top_k cut, so the cut keeps top_k live documents
+    // whenever the over-fetch holds them. A lookup error keeps the candidates
+    // unfiltered, as before this filter existed, and is logged.
+    {
+        std::vector<std::string> doc_ids;
+        doc_ids.reserve(out.size());
+        for (const auto& h : out) doc_ids.push_back(h.doc_id);
+        auto deleted = cortrix::store::LoadDeletedDocIds(store.db_handle(), doc_ids);
+        if (!deleted.ok()) {
+            CORTRIX_LOG_WARN("doc_summary", "deleted-document filter skipped: {}",
+                             deleted.status().message());
+        } else if (!deleted.value().empty()) {
+            const auto& gone = deleted.value();
+            out.erase(std::remove_if(out.begin(), out.end(),
+                                     [&gone](const DocDiscoveryHit& h) {
+                                         return gone.count(h.doc_id) > 0;
+                                     }),
+                      out.end());
+        }
+    }
+
+    // Already in ascending-distance (descending-similarity) order from the index;
+    // the stable sort by match_score DESC keeps that order among equal scores, so
+    // the cut below keeps the hits the early stop at top_k used to keep.
+    std::stable_sort(out.begin(), out.end(),
+                     [](const DocDiscoveryHit& a, const DocDiscoveryHit& b) {
+                         return a.match_score > b.match_score;
+                     });
+    if (static_cast<int>(out.size()) > top_k) out.resize(static_cast<std::size_t>(top_k));
     return out;
 }
 
@@ -125,7 +150,7 @@ DocDiscoveryCoreResult RunDocDiscoveryCore(store::IIndex& index,
     std::vector<DocFtsHit> fts5_hits;
     if (options.fts5_fallback_enabled) {
         result.fts5_ran = true;
-        auto fts5 = SearchDocFts5(store.db_handle(), query, k);
+        auto fts5 = SearchDocFts5(store.db_handle(), query, k, /*live_documents_only=*/true);
         if (fts5.ok()) {
             fts5_hits = std::move(fts5.value());
             result.fts5_hit_count = static_cast<int>(fts5_hits.size());

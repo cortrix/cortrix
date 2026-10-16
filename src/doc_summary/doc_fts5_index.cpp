@@ -112,7 +112,7 @@ Status DeleteDocFts5Row(sqlite3* db, const std::string& doc_id) {
 }
 
 Result<std::vector<DocFtsHit>> SearchDocFts5(sqlite3* db, const std::string& query,
-                                             int top_k) {
+                                             int top_k, bool live_documents_only) {
     std::vector<DocFtsHit> hits;
     if (top_k <= 0) return hits;
     if (!db) {
@@ -127,11 +127,22 @@ Result<std::vector<DocFtsHit>> SearchDocFts5(sqlite3* db, const std::string& que
     // §8.2 BM25 column weights: filename 1.0 / doc_title 2.0 / topics 1.5 /
     // authors 1.0. doc_id is UNINDEXED (weight 0). bm25() is lower-is-better; we
     // negate to a positive score, then squash into (0,1] so it joins RRF cleanly.
-    const char* sql =
+    const char* index_only_sql =
         "SELECT doc_id, filename, doc_title, "
         "bm25(doc_fts5_index, 0.0, 1.0, 2.0, 1.5, 1.0) AS rank "
         "FROM doc_fts5_index WHERE doc_fts5_index MATCH ? "
         "ORDER BY rank LIMIT ?";
+    // Only rows whose document exists and is not soft-deleted. Every column is
+    // qualified: documents has its own doc_id, so a bare one would be ambiguous and
+    // the statement would fail to prepare.
+    const char* live_documents_sql =
+        "SELECT doc_fts5_index.doc_id, doc_fts5_index.filename, "
+        "doc_fts5_index.doc_title, "
+        "bm25(doc_fts5_index, 0.0, 1.0, 2.0, 1.5, 1.0) AS rank "
+        "FROM doc_fts5_index JOIN documents ON documents.doc_id = doc_fts5_index.doc_id "
+        "WHERE doc_fts5_index MATCH ? AND documents.status != 'deleted' "
+        "ORDER BY rank LIMIT ?";
+    const char* sql = live_documents_only ? live_documents_sql : index_only_sql;
     sqlite3_stmt* st = nullptr;
     if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
         return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
