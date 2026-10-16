@@ -60,7 +60,10 @@ Result<ContextualVecLabelRow> GetContextualVecLabel(sqlite3* db, uint64_t label)
 // from the stored vector and the label row written, without calling the provider.
 // The enrichment audit (which owes such a chunk) and the backfill worker (which
 // repairs it) must agree on exactly which rows that is, so both evaluate the one
-// SQL expression below — never two hand-written variants of it.
+// SQL expression below — never two hand-written variants of it — and on which of
+// those rows a label is expected at all, which is the ingest's index gate
+// (index_gates.h: IndexPointsExpected over the document's level and the cleaner's
+// skip-index mark, read as MetadataSkipsIndex / kBlockSkipsIndexSql).
 
 /// SQL over one `blocks` row: the contextual member's provider work is complete
 /// and the stored vector is usable (status generated, a non-empty float32 blob).

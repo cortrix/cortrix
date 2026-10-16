@@ -193,6 +193,46 @@ protected:
         ASSERT_EQ(sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, nullptr), SQLITE_OK);
     }
 
+    // A child whose contextual member is complete on disk: status 1 plus a stored
+    // vector (two floats, so the shared stored-vector predicate holds), with the
+    // given metadata_json (nullptr → NULL). Used for the index-gate cases, where
+    // what matters is what the ingest deliberately did not write.
+    void SeedChildWithVector(uint64_t block_id, const std::string& child, bool score,
+                             int ctx_status, const char* metadata_json) {
+        sqlite3_stmt* st = nullptr;
+        ASSERT_EQ(sqlite3_prepare_v2(db_,
+            "INSERT INTO blocks(block_id, doc_id, child_id, block_type, enriched_score,"
+            " contextualized_status, contextualized_embedding, metadata_json)"
+            " VALUES(?1,'doc-a',?2,1,?3,?4,?5,?6)",
+            -1, &st, nullptr), SQLITE_OK);
+        static const float kVec[2] = {0.25f, -0.5f};
+        sqlite3_bind_int64(st, 1, static_cast<sqlite3_int64>(block_id));
+        sqlite3_bind_text(st, 2, child.c_str(), -1, SQLITE_TRANSIENT);
+        if (score) sqlite3_bind_double(st, 3, 0.5); else sqlite3_bind_null(st, 3);
+        sqlite3_bind_int(st, 4, ctx_status);
+        sqlite3_bind_blob(st, 5, kVec, sizeof(kVec), SQLITE_STATIC);
+        if (metadata_json) sqlite3_bind_text(st, 6, metadata_json, -1, SQLITE_TRANSIENT);
+        else sqlite3_bind_null(st, 6);
+        ASSERT_EQ(sqlite3_step(st), SQLITE_DONE);
+        sqlite3_finalize(st);
+    }
+
+    void CreateLabelsTable() {
+        ASSERT_EQ(sqlite3_exec(db_,
+            "CREATE TABLE contextual_vec_labels (label INTEGER PRIMARY KEY,"
+            " block_id INTEGER NOT NULL, child_id TEXT NOT NULL)",
+            nullptr, nullptr, nullptr), SQLITE_OK);
+    }
+
+    std::string FailedMembersOf(uint64_t block_id) {
+        auto rows = ListEnrichStateForDoc(db_, "doc-a", "");
+        if (!rows.ok()) return "<error>";
+        for (const auto& r : rows.value()) {
+            if (r.block_id == block_id) return r.failed_members;
+        }
+        return "<no row>";
+    }
+
     int next_hype_id_ = 0;
 };
 
@@ -279,6 +319,56 @@ TEST_F(EnrichAuditTest, OwesF35WhenLabelMissingDespiteColumns) {
     ASSERT_EQ(rows.value().size(), 1u);
     EXPECT_EQ(rows.value()[0].block_id, 22u);
     EXPECT_EQ(rows.value()[0].failed_members, "f35");
+}
+
+// The ingest indexes a chunk's contextual point, and writes its label row, only
+// for chunks the cleaner did not mark skip-index. A skip-index chunk with complete
+// contextual columns and no label is therefore done, not owed: the audit must
+// apply the ingest's own rule, or every audit re-owes the label and the backfill
+// then indexes a chunk the cleaner excluded. The mark is the boolean metadata key
+// the cleaner writes; a string "true" is not the mark.
+TEST_F(EnrichAuditTest, DoesNotOweLabelForSkipIndexChunk) {
+    CreateLabelsTable();
+    SeedChildWithVector(31, "child-skip", /*score=*/true, /*ctx=*/1,
+                        R"({"cleaning.anomaly_reason":"oversized","cleaning.skip_index":true})");
+    SeedChildWithVector(32, "child-indexed", true, 1, nullptr);          // positive control
+    SeedChildWithVector(33, "child-stringy", true, 1,
+                        R"({"cleaning.skip_index":"true"})");          // not the mark
+
+    auto n = SynthesizeEnrichAuditRows(db_, {"f35"}, /*now=*/500);
+    ASSERT_TRUE(n.ok()) << n.status().message();
+    EXPECT_EQ(n.value(), 2) << "only the two chunks whose label the ingest would have written";
+    EXPECT_EQ(FailedMembersOf(31), "<no row>") << "a skip-index chunk has no label to miss";
+    EXPECT_EQ(FailedMembersOf(32), "f35");
+    EXPECT_EQ(FailedMembersOf(33), "f35");
+}
+
+// Below processing level 3 the ingest writes neither vector points nor hype
+// blocks, only the enrichment columns. The audit must not owe the index-side
+// artifacts for such a document; the document's level is what its row says.
+TEST_F(EnrichAuditTest, DoesNotOweIndexArtifactsBelowLevelThree) {
+    CreateLabelsTable();
+    ASSERT_EQ(sqlite3_exec(db_,
+        "CREATE TABLE documents (doc_id TEXT PRIMARY KEY, processing_level INTEGER);"
+        "INSERT INTO documents(doc_id, processing_level) VALUES('doc-a', 2)",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    SeedChildWithVector(41, "child-l2-a", /*score=*/true, /*ctx=*/1, nullptr);
+    SeedChildWithVector(42, "child-l2-b", true, 1, nullptr);
+
+    auto n = SynthesizeEnrichAuditRows(db_, {"f03", "f35", "f38"}, /*now=*/500);
+    ASSERT_TRUE(n.ok()) << n.status().message();
+    EXPECT_EQ(n.value(), 0) << "a level-2 document owes no label and no hype blocks";
+    EXPECT_EQ(FailedMembersOf(41), "<no row>");
+    EXPECT_EQ(FailedMembersOf(42), "<no row>");
+
+    // Positive control: the same rows at level 3 owe both index-side members.
+    ASSERT_EQ(sqlite3_exec(db_, "UPDATE documents SET processing_level = 3",
+                           nullptr, nullptr, nullptr), SQLITE_OK);
+    n = SynthesizeEnrichAuditRows(db_, {"f03", "f35", "f38"}, /*now=*/501);
+    ASSERT_TRUE(n.ok()) << n.status().message();
+    EXPECT_EQ(n.value(), 2);
+    EXPECT_EQ(FailedMembersOf(41), "f35,f38");
+    EXPECT_EQ(FailedMembersOf(42), "f35,f38");
 }
 
 // Members outside the configured chain are never owed (f38 unconfigured here).
