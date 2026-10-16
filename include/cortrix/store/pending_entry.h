@@ -28,17 +28,36 @@ namespace cortrix::store {
 ///   doc_id       bytes (doc_id_len)
 ///   block_count  u32
 ///   block_ids    u64 * block_count   (only meaningful for PENDING)
-///   has_blob     u8    0/1   (PENDING only — v1.0.2 D3.5 #1; gates Recover blob check)
-///   checksum     u32   CRC32 over entry_type..has_blob
+///   has_blob     u8    0/1   (PENDING only — v1.0.2 D3.5 #1; gates Recover blob check;
+///                      required: a PENDING frame without it is corrupt)
+///   scope        u8    0 = document, 1 = blocks-only (PENDING only; the first OPTIONAL
+///                      trailing field: records written before it existed end at
+///                      has_blob and read as document; an unknown value also reads
+///                      as document, never as corrupt, because a rejected record
+///                      truncates the log at that point)
+///   checksum     u32   CRC32 over the whole body (entry_type..last body byte)
 ///
-/// COMMITTED / ROLLBACK records carry an empty doc_id, no block_ids and no
-/// has_blob byte; they reference the originating PENDING purely by txn_id
-/// (design § 3.1) and end right after block_count.
+/// The reader never requires the parse position to reach the body's end, so a
+/// binary that predates `scope` reads a frame carrying it exactly as before (the
+/// CRC covers the stored body either way). COMMITTED / ROLLBACK records carry an
+/// empty doc_id, no block_ids, no has_blob and no scope byte; they reference the
+/// originating PENDING purely by txn_id (design § 3.1) and end right after
+/// block_count.
 struct PendingEntry {
     enum class State : uint8_t {
         kPending = 1,
         kCommitted = 2,
         kRollback = 3,
+    };
+
+    /// What the transaction may have written beyond the blocks it lists. Rollback
+    /// compensation — explicit or at recovery — is limited to this scope. Only
+    /// the ingest transaction writes the document's parents and its
+    /// document-level full-text row; a repair (enrichment backfill, document
+    /// summary) writes only the blocks it lists and their vector points.
+    enum class Scope : uint8_t {
+        kDocument = 0,    ///< ingest: the listed blocks, the parents, the full-text row
+        kBlocksOnly = 1,  ///< repairs: only the listed blocks and their vector points
     };
 
     State state = State::kPending;
@@ -49,6 +68,7 @@ struct PendingEntry {
     bool has_blob = false;  ///< v1.0.2 (D3.5 #1): did this txn write a blob? Only
                             ///< meaningful for PENDING; gates the Recover three-way
                             ///< blob check (§4.4). On-disk only for PENDING records.
+    Scope scope = Scope::kDocument;  ///< PENDING only; optional trailing byte, see above.
 
     /// Serialize into the on-disk frame above (length-prefixed, CRC-suffixed).
     /// The returned buffer is one self-describing, caller-framed WAL record —

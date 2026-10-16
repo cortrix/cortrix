@@ -175,6 +175,29 @@ TEST_F(WriteCoordinatorTest, RollbackInvokesCallbackWithOriginalPayload) {
     EXPECT_EQ(stats->rollback, 1u);
 }
 
+TEST_F(WriteCoordinatorTest, RollbackCallbackReceivesScope) {
+    // The scope declared at BeginWrite must reach the rollback callback: it is
+    // what lets the layer above limit a repair's compensation to its own blocks
+    // instead of the whole document.
+    auto wc = MakeCoordinator();
+    std::vector<PendingEntry::Scope> seen;
+    wc->SetRollbackCallback([&](const PendingEntry& e) {
+        seen.push_back(e.scope);
+        return Status::Ok();
+    });
+
+    TxnHandle repair, ingest;
+    ASSERT_TRUE(wc->BeginWrite("doc-repair", {5}, /*writes_blob=*/false, &repair,
+                               PendingEntry::Scope::kBlocksOnly)
+                    .ok());
+    ASSERT_TRUE(wc->BeginWrite("doc-ingest", {6}, /*writes_blob=*/true, &ingest).ok());
+    ASSERT_TRUE(wc->Rollback(repair).ok());
+    ASSERT_TRUE(wc->Rollback(ingest).ok());
+    ASSERT_EQ(seen.size(), 2u);
+    EXPECT_EQ(seen[0], PendingEntry::Scope::kBlocksOnly);
+    EXPECT_EQ(seen[1], PendingEntry::Scope::kDocument);  // the default: an ingest
+}
+
 TEST_F(WriteCoordinatorTest, RollbackCallbackFailureSurfaces) {
     auto wc = MakeCoordinator();
     wc->SetRollbackCallback([](const PendingEntry&) {

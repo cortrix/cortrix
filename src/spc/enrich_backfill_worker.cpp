@@ -367,8 +367,12 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
     const bool needs_txn = !new_blocks.empty() || !vec_points.empty();
     store::TxnHandle txn;
     if (needs_txn) {
+        // A repair on a committed document: the rollback may compensate only the
+        // blocks listed here and their points, never the document's parents or
+        // its full-text row, which the ingest wrote and still owns.
         Status bw = facade.write_coordinator().BeginWrite(
-            task.doc_id, new_block_ids, /*writes_blob=*/false, &txn);
+            task.doc_id, new_block_ids, /*writes_blob=*/false, &txn,
+            store::PendingEntry::Scope::kBlocksOnly);
         if (!bw.ok()) {
             return finalizer_.Fail(task, "CX_ERR_ENRICH_BACKFILL_WRITE",
                                    bw.message(), {{"doc_id", task.doc_id}}, t_start);

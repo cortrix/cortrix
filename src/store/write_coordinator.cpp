@@ -188,7 +188,8 @@ Status WriteCoordinator::Recover() {
 
 Status WriteCoordinator::BeginWrite(const std::string& doc_id,
                                     const std::vector<BlockId>& block_ids,
-                                    bool writes_blob, TxnHandle* out_txn) {
+                                    bool writes_blob, TxnHandle* out_txn,
+                                    PendingEntry::Scope scope) {
     if (!wal_) {
         return PwlStatus(StatusCode::kUnavailable, pwl_errors::kWriteFailed,
                          "WriteCoordinator not initialized");
@@ -206,7 +207,7 @@ Status WriteCoordinator::BeginWrite(const std::string& doc_id,
                              "doc_id already has a live transaction: " + doc_id);
         }
         txn_id = next_txn_id_.fetch_add(1, std::memory_order_relaxed);
-        active_txns_[txn_id] = TxnState{PendingEntry::State::kPending, doc_id, block_ids};
+        active_txns_[txn_id] = TxnState{PendingEntry::State::kPending, doc_id, block_ids, scope};
         active_docs_[doc_id] = txn_id;
     }
 
@@ -217,6 +218,7 @@ Status WriteCoordinator::BeginWrite(const std::string& doc_id,
     e.doc_id = doc_id;
     e.block_ids = block_ids;
     e.has_blob = writes_blob;
+    e.scope = scope;
 
     Status w = wal_->Append(e);
     if (!w.ok()) {
@@ -368,17 +370,20 @@ Status WriteCoordinator::Rollback(TxnHandle txn) {
         if (!orig.doc_id.empty()) active_docs_.erase(orig.doc_id);
     }
 
-    // Invoke the cleanup callback with the original PENDING payload (doc_id +
-    // block_ids) so the layer above can drop partial writes idempotently (Q6):
-    // block_ids drive the vector-index per-block delete, doc_id the SQLite /
-    // blob delete-by-doc. A callback failure leaves the txn durably ROLLBACK;
-    // recovery retries cleanup on next startup.
+    // Invoke the cleanup callback with the original PENDING payload (doc_id,
+    // block_ids, scope) so the layer above can drop partial writes idempotently
+    // (Q6): block_ids drive the vector-index per-block delete and the blocks
+    // delete; doc_id and a document scope drive the parents / full-text-row
+    // delete. (No blob is deleted on rollback: the blob is written by the upload
+    // handler outside any transaction.) A callback failure leaves the txn
+    // durably ROLLBACK; recovery retries cleanup on next startup.
     if (rollback_cb_) {
         PendingEntry payload;
         payload.state = PendingEntry::State::kPending;
         payload.txn_id = txn.txn_id;
         payload.doc_id = orig.doc_id;
         payload.block_ids = orig.block_ids;
+        payload.scope = orig.scope;
         Status cb = rollback_cb_(payload);
         if (!cb.ok()) {
             return PwlStatus(StatusCode::kInternal, pwl_errors::kRollbackCallbackFailed,

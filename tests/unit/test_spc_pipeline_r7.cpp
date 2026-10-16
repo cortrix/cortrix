@@ -919,6 +919,71 @@ TEST_F(SPCPipelineR7Test, EnrichBackfill_RepairsPendingRowsEndToEnd) {
     EXPECT_EQ(CountSql("SELECT COUNT(*) FROM blocks WHERE block_type=16"), hype_before);
 }
 
+// A repair whose vector add fails rolls its own transaction back (the worker's
+// Rollback after AddPoints), and that rollback must not cost the document the
+// rows its ingest wrote — the parents and the document-level full-text row. On
+// this line the ledger is left untouched by a failed write (rows stay
+// pending_retry at their count), which the test records as well.
+TEST_F(SPCPipelineR7Test, EnrichBackfill_FailedWriteKeepsParentsAndDocFts5Row) {
+    // (1) ingest with everything failing → pending rows owing all three members.
+    auto failing_llm = std::make_shared<llm::MockLlmClient>();
+    llm::ChatCompletionResponse fail;
+    fail.status = Status::Unavailable("LLM_TRANSPORT: synthetic burst");
+    EXPECT_CALL(*failing_llm, Chat(_, _)).WillRepeatedly(Return(fail));
+    cortrix::spc::EnricherChain broken;
+    broken.Append(std::make_shared<FailingSummaryEnricher>());
+    broken.Append(std::make_shared<FailingContextualEnricher>());
+    broken.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, failing_llm, nullptr));
+    pipeline_->SetEnricherChain(&broken);
+
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+    pipeline_->SetEnricherChain(nullptr);
+    const int pending_before =
+        CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry' AND attempts=0");
+    ASSERT_GT(pending_before, 0) << "positive control: the ingest left debt to repair";
+
+    // What the committed ingest left behind, captured so the checks below are not
+    // vacuous: parent rows and the one document-level full-text row.
+    const std::string parents_sql = "SELECT COUNT(*) FROM parents WHERE doc_id='" + doc_id + "'";
+    const std::string fts_sql = "SELECT COUNT(*) FROM doc_fts5_index WHERE doc_id='" + doc_id + "'";
+    const int parents_before = CountSql(parents_sql.c_str());
+    ASSERT_GT(parents_before, 0) << "positive control: the ingest left parent rows";
+    ASSERT_EQ(CountSql(fts_sql.c_str()), 1) << "positive control: the ingest left the full-text row";
+
+    // (2) repair with a working chain, but the vector add fails after the chain ran
+    //     → the worker rolls its own transaction back and fails the task.
+    cortrix::spc::EnricherChain working;
+    working.Append(std::make_shared<FakeSummaryEnricher>());
+    working.Append(std::make_shared<FakeContextualEnricher>());
+    working.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, MakeHypeLlm(), nullptr));
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks_rb.db").string()).ok());
+    cortrix::spc::EnrichBackfillWorker worker(*pool_, &working, *embedder_, &mgr);
+    async::TaskInfo t;
+    t.task_id = 1;
+    t.namespace_id = "test-ns";
+    t.doc_id = doc_id;
+    fake_index_->set_add_should_fail(true);
+    Status s = worker.ProcessTask(t);
+    fake_index_->set_add_should_fail(false);
+    ASSERT_FALSE(s.ok()) << "positive control: the write failed and the repair rolled back";
+    EXPECT_NE(s.message().find("CX_ERR_ENRICH_BACKFILL_WRITE"), std::string::npos) << s.message();
+
+    // (3) the rollback compensated only the repair's own writes.
+    EXPECT_EQ(CountSql(parents_sql.c_str()), parents_before)
+        << "a failed repair must not delete the document's parent rows";
+    EXPECT_EQ(CountSql(fts_sql.c_str()), 1)
+        << "a failed repair must not delete the document's full-text row";
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry' AND attempts=0"),
+              pending_before)
+        << "a failed write leaves the ledger as it was on this line";
+}
+
 // QA 2026-07-12 F-5: a backfill whose enrich SUCCEEDS but whose persist fails
 // must leave a non-empty last_error on the row — the unconditional flip used
 // to rewrite it from an empty rep.last_error, blanking the diagnosis ingest
