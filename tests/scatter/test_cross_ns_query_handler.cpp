@@ -181,5 +181,28 @@ TEST(CrossNsQueryHandlerTest, UnauthenticatedReturns401) {
     EXPECT_EQ(r.body["error"]["code"], "CX_ERR_AUTH_INVALID_CREDENTIALS");
 }
 
+
+// #191: an integer that does not fit in an int must be rejected, not narrowed into a
+// value inside [1, 100]; the bounds themselves stay accepted.
+TEST(CrossNsQueryHandlerTest, TopKOutsideTheRangeIsRejectedEvenWhenItWouldWrap) {
+    for (const char* raw : {"4294967297", "4294967396", "-4294967295", "2147483648",
+                            "18446744073709551615", "0", "101"}) {
+        SCOPED_TRACE(raw);
+        const nlohmann::json body = nlohmann::json::parse(
+            std::string(R"({"query":"q","namespaces":["ns"],"top_k":)") + raw + "}");
+        ASSERT_TRUE(body["top_k"].is_number_integer());
+        QueryRequest req;
+        const Status s = CrossNsQueryHandler::ParseRequest(body, &req);
+        EXPECT_FALSE(s.ok());
+        EXPECT_NE(s.message().find("'top_k' must be between 1 and 100"), std::string::npos);
+    }
+    for (int k : {1, 100}) {
+        const nlohmann::json body = {{"query", "q"}, {"namespaces", {"ns"}}, {"top_k", k}};
+        QueryRequest req;
+        ASSERT_TRUE(CrossNsQueryHandler::ParseRequest(body, &req).ok());
+        EXPECT_EQ(req.top_k, k);
+    }
+}
+
 }  // namespace
 }  // namespace cortrix::query
