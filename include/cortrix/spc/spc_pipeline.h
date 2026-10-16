@@ -46,7 +46,10 @@ public:
     /// L2/L3 writes are transactional (C2): assemble all child blocks (block_id =
     /// HashChildIdToBlockId(child_id)) → BeginWrite(writes_blob=false) → AddPoints
     /// (L3) → parent_insert (per parent) → block_insert (per child) → Commit,
-    /// Rollback on any failure (design §10.2).
+    /// Rollback on any failure (design §10.2). The ingest keeps the default
+    /// document scope, so its rollback also drops the parents and the doc-level
+    /// full-text row it wrote; later repairs on the committed document (the
+    /// enrichment backfill, the document summary) begin blocks-only transactions.
     /// @return 0 = success, -1 = error (task.error_message filled)
     int Process(SPCTask& task, resource::NamespaceFacade& facade);
 

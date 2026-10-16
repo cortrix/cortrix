@@ -1721,6 +1721,14 @@ TEST_F(SPCPipelineR7Test, EnrichBackfill_ChargeSurvivesPostCallWriteFailure) {
     async::TaskManager mgr;
     ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks_charge1.db").string()).ok());
     cortrix::spc::EnrichBackfillWorker worker(*pool_, &working, *embedder_, &mgr);
+    // The ingest wrote the document's parent rows and its document-level
+    // full-text row long before this repair; a failed repair must not take them.
+    const std::string parents_sql = "SELECT COUNT(*) FROM parents WHERE doc_id='" + doc_id + "'";
+    const std::string fts_sql = "SELECT COUNT(*) FROM doc_fts5_index WHERE doc_id='" + doc_id + "'";
+    const int parents_before = CountSql(parents_sql.c_str());
+    const int fts_before = CountSql(fts_sql.c_str());
+    ASSERT_GT(parents_before, 0) << "positive control: the ingest left parent rows";
+    ASSERT_GT(fts_before, 0) << "positive control: the ingest left the full-text row";
     fake_index_->set_add_should_fail(true);  // the vector add fails after the provider ran
     async::TaskInfo t; t.task_id = 1; t.namespace_id = "test-ns"; t.doc_id = doc_id;
     EXPECT_FALSE(worker.ProcessTask(t).ok());
@@ -1730,6 +1738,12 @@ TEST_F(SPCPipelineR7Test, EnrichBackfill_ChargeSurvivesPostCallWriteFailure) {
         EXPECT_EQ(r.status, cortrix::spc::kEnrichStatusPendingRetry);
         EXPECT_EQ(r.attempts, 1) << "block " << r.block_id;
     }
+    // The rollback compensates only what the repair itself wrote: the parents and
+    // the full-text row belong to the committed ingest and survive.
+    EXPECT_EQ(CountSql(parents_sql.c_str()), parents_before)
+        << "a failed repair must not delete the document's parent rows";
+    EXPECT_EQ(CountSql(fts_sql.c_str()), fts_before)
+        << "a failed repair must not delete the document's full-text row";
 }
 
 // Rows whose chunk no longer exists are never repaired and, shipped, never
