@@ -1258,7 +1258,9 @@ int CortrixStoreSqlite::search_fulltext(const std::string& query, int top_k,
 
     // [OPEN-2] Join documents to exclude blocks of soft-deleted docs (status=
     // 'deleted'): a soft-deleted doc is invisible to retrieval at the SQL level,
-    // so BM25/FTS never surfaces it (the dense path filters in PostFilter).
+    // so BM25/FTS never surfaces it. The served query route drops a deleted
+    // document's hits from its other routes before fusion
+    // (live_single_unit_executor.cpp, LoadDeletedDocIds).
     const char* sql = R"SQL(
         SELECT b.block_id, b.doc_id, rank, b.content_text
         FROM blocks_fts
