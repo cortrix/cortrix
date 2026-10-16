@@ -9,8 +9,8 @@ presented as working SDK examples.
 
 ## Directory structure
 
-One directory per resource domain (aligned with `paths/*.yaml`). One subdirectory per
-endpoint contains success, unsupported, and error reference files:
+One directory per resource domain listed below. One subdirectory per endpoint contains
+success, unsupported, and error reference files:
 
 ```
 examples/<domain>/<endpoint>/
@@ -45,7 +45,7 @@ examples/<domain>/<endpoint>/
   as runnable examples.
 - Error scenarios remain categorized by retryability and error category.
 
-## 15 resource domains
+## Resource domains
 
-namespaces · documents · query · memory · sql · sync · watch ·
+namespaces · documents · query · memory · watch ·
 auth · admin · gdpr · system · tenants · acl · agent · ops

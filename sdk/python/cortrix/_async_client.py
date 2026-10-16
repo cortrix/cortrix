@@ -17,8 +17,6 @@ from .resources.memory import AsyncMemory
 from .resources.namespaces import AsyncNamespaces
 from .resources.ops import AsyncOpsNamespace
 from .resources.query import AsyncQuery
-from .resources.sql import AsyncSQL
-from .resources.sync import AsyncSync
 from .resources.system import AsyncSystem
 from .resources.tenants import AsyncTenants
 from .resources.watchers import AsyncWatchers
@@ -65,9 +63,7 @@ class AsyncCortrix(AsyncBaseClient):
         self._namespaces: Optional[AsyncNamespaces] = None
         self._query: Optional[AsyncQuery] = None
         self._memory: Optional[AsyncMemory] = None
-        self._sql: Optional[AsyncSQL] = None
         self._watchers: Optional[AsyncWatchers] = None
-        self._sync: Optional[AsyncSync] = None
         self._auth: Optional[AsyncAuth] = None
         self._system: Optional[AsyncSystem] = None
         self._tenants: Optional[AsyncTenants] = None
@@ -177,22 +173,10 @@ class AsyncCortrix(AsyncBaseClient):
         return self._memory
 
     @property
-    def sql(self) -> AsyncSQL:
-        if self._sql is None:
-            self._sql = AsyncSQL(self)
-        return self._sql
-
-    @property
     def watchers(self) -> AsyncWatchers:
         if self._watchers is None:
             self._watchers = AsyncWatchers(self)
         return self._watchers
-
-    @property
-    def sync(self) -> AsyncSync:
-        if self._sync is None:
-            self._sync = AsyncSync(self)
-        return self._sync
 
     @property
     def auth(self) -> AsyncAuth:
