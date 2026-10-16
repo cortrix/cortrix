@@ -319,11 +319,12 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
         s.last_error.clear();
         s.next_retry_at = 0;
         s.updated_at = NowUnix();
-        Status us = UpsertEnrichState(db, s);
-        if (!us.ok()) {
+        // Conditional on the generation the snapshot carried, like the flip below.
+        auto written = FlipEnrichStateIfGeneration(db, s, row->generation);
+        if (!written.ok()) {
             CORTRIX_LOG_WARN("spc", "enrich_state settle failed child={}: {}",
-                             s.child_id, us.message());
-        } else {
+                             s.child_id, written.status().message());
+        } else if (written.value()) {
             ++settled;
         }
     }
@@ -684,7 +685,7 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
 
     // ---- Flip enrich_state ----------------------------------------------------
     const int64_t now = NowUnix();
-    int repaired = 0, still_pending = 0, gave_up = 0;
+    int repaired = 0, still_pending = 0, gave_up = 0, superseded = 0;
     for (const auto& rep : repairs) {
         EnrichStateRow row = *rep.row;
         row.attempts += 1;
@@ -718,16 +719,27 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
                 ++still_pending;
             }
         }
-        Status us = UpsertEnrichState(db, row);
-        if (!us.ok()) {
+        // Conditional on the generation the snapshot carried: an operator reset
+        // that landed while the provider ran bumped it, and this outcome then
+        // describes a row that no longer exists; the reset's fresh budget wins.
+        auto written = FlipEnrichStateIfGeneration(db, row, rep.row->generation);
+        if (!written.ok()) {
             CORTRIX_LOG_WARN("spc", "enrich_state flip failed child={}: {}",
-                             row.child_id, us.message());
+                             row.child_id, written.status().message());
+        } else if (!written.value()) {
+            ++superseded;
+            CORTRIX_LOG_WARN("spc",
+                "enrich backfill child={} doc={}: the ledger row changed during the "
+                "delivery (reset by an operator, or settled or re-owed by the audit); "
+                "the delivery's outcome is dropped",
+                row.child_id, row.doc_id);
         }
     }
 
     CORTRIX_LOG_INFO("spc",
-        "enrich backfill doc={} ns={} repaired={} still_pending={} gave_up={} settled={}",
-        task.doc_id, task.namespace_id, repaired, still_pending, gave_up, settled);
+        "enrich backfill doc={} ns={} repaired={} still_pending={} gave_up={} settled={} "
+        "superseded={}",
+        task.doc_id, task.namespace_id, repaired, still_pending, gave_up, settled, superseded);
     return finalizer_.Complete(task, task.doc_id, t_start);
 }
 

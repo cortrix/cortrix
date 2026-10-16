@@ -94,12 +94,14 @@ TEST_F(EnrichResetTest, MovesLiveRowsAndSkipsOrphans) {
     EXPECT_EQ(live.last_error, "reset by operator");
     EXPECT_EQ(live.failed_members, "f03,f35,f38");  // the debt itself is kept
     EXPECT_EQ(live.updated_at, 900);
+    EXPECT_EQ(live.generation, 1);                 // a delivery in flight cannot overwrite this
 
     const EnrichStateRow orphan = RowOf(72);
     EXPECT_EQ(orphan.status, kEnrichStatusFailedPermanent);  // left terminal
     EXPECT_EQ(orphan.attempts, 8);
     EXPECT_EQ(orphan.next_retry_at, 0);
     EXPECT_EQ(orphan.last_error, "provider timeout");
+    EXPECT_EQ(orphan.generation, 0);
 
     const EnrichStateRow pending = RowOf(73);
     EXPECT_EQ(pending.status, kEnrichStatusPendingRetry);
@@ -110,11 +112,21 @@ TEST_F(EnrichResetTest, MovesLiveRowsAndSkipsOrphans) {
     EXPECT_EQ(ok.status, kEnrichStatusOk);
     EXPECT_EQ(ok.attempts, 1);
 
-    // A second reset has nothing live left to move; the orphan is still reported.
+    // A second reset has nothing live left to move; the orphan is still reported,
+    // and the moved row's generation is not bumped again.
     auto r2 = ResetGivenUpEnrichRows(db_, 950);
     ASSERT_TRUE(r2.ok());
     EXPECT_EQ(r2.value().moved, 0);
     EXPECT_EQ(r2.value().orphaned, 1);
+    EXPECT_EQ(RowOf(71).generation, 1);
+
+    // Give up again, reset again: the generation keeps counting.
+    SeedRow(71, kEnrichStatusFailedPermanent, 8, "f03", 0);  // upsert keeps generation 1
+    EXPECT_EQ(RowOf(71).generation, 1);
+    auto r3 = ResetGivenUpEnrichRows(db_, 1000);
+    ASSERT_TRUE(r3.ok());
+    EXPECT_EQ(r3.value().moved, 1);
+    EXPECT_EQ(RowOf(71).generation, 2);
 }
 
 TEST_F(EnrichResetTest, NothingToResetIsZeroes) {
@@ -163,6 +175,97 @@ TEST_F(EnrichResetTest, AuditReportsSettledCount) {
     auto n2 = SynthesizeEnrichAuditRows(db_, {"f03", "f35"}, 600, &settled);
     ASSERT_TRUE(n2.ok());
     EXPECT_EQ(settled, 0);
+}
+
+// A recovery delivery is charged to failed_permanent/10 before its provider call
+// (generation 0 in its snapshot). While the call is open the audit finds every
+// configured artifact present and settles the row. The delivery then fails and
+// tries to write failed_permanent/10 from its snapshot: that write must be dropped,
+// or the audit's "settled 1" is followed by a terminal row again.
+TEST_F(EnrichResetTest, AuditSettleInvalidatesAStaleDelivery) {
+    SeedChild(95, /*score=*/true, /*ctx=*/1);  // complete for a chain of f03,f35
+    SeedRow(95, kEnrichStatusFailedPermanent, 10, "f03", 0);
+    ASSERT_EQ(RowOf(95).generation, 0);
+
+    int settled = -1;
+    auto n = SynthesizeEnrichAuditRows(db_, {"f03", "f35"}, /*now=*/500, &settled);
+    ASSERT_TRUE(n.ok());
+    EXPECT_EQ(settled, 1);
+    EXPECT_EQ(RowOf(95).status, kEnrichStatusOk);
+    EXPECT_EQ(RowOf(95).generation, 1);
+
+    EnrichStateRow stale = RowOf(95);
+    stale.status = kEnrichStatusFailedPermanent;
+    stale.failed_members = "f03";
+    stale.attempts = 10;
+    stale.last_error = "synthetic provider failure";
+    stale.next_retry_at = 0;
+    stale.updated_at = 600;
+    auto w = FlipEnrichStateIfGeneration(db_, stale, /*expected_generation=*/0);
+    ASSERT_TRUE(w.ok());
+    EXPECT_FALSE(w.value());
+    EXPECT_EQ(RowOf(95).status, kEnrichStatusOk);
+    EXPECT_EQ(RowOf(95).failed_members, "");
+    EXPECT_EQ(RowOf(95).updated_at, 500);
+
+    // A delivery that read the settled row's generation may still write.
+    auto w2 = FlipEnrichStateIfGeneration(db_, stale, /*expected_generation=*/1);
+    ASSERT_TRUE(w2.ok());
+    EXPECT_TRUE(w2.value());
+    EXPECT_EQ(RowOf(95).status, kEnrichStatusFailedPermanent);
+}
+
+// The same race through the audit's re-owe: the only missing artifact is the
+// contextual index label while the columns and the stored vector are present, so
+// the audit re-owes the terminal row (label-only exception) whatever its count. A
+// recovery delivery charged to failed_permanent/10 before the audit looked must not
+// put the row back to failed_permanent when it finishes.
+TEST_F(EnrichResetTest, AuditReoweInvalidatesAStaleDelivery) {
+    ASSERT_EQ(sqlite3_exec(db_,
+        "CREATE TABLE contextual_vec_labels (label INTEGER PRIMARY KEY,"
+        " block_id INTEGER NOT NULL, child_id TEXT NOT NULL)",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    {
+        // Columns complete and a stored vector (two floats), no label row.
+        sqlite3_stmt* st = nullptr;
+        ASSERT_EQ(sqlite3_prepare_v2(db_,
+            "INSERT INTO blocks(block_id, doc_id, child_id, block_type, enriched_score,"
+            " contextualized_status, contextualized_embedding)"
+            " VALUES(96,'doc-a','child-96',1,0.5,1,?1)",
+            -1, &st, nullptr), SQLITE_OK);
+        static const float kVec[2] = {0.25f, -0.5f};
+        sqlite3_bind_blob(st, 1, kVec, sizeof(kVec), SQLITE_STATIC);
+        ASSERT_EQ(sqlite3_step(st), SQLITE_DONE);
+        sqlite3_finalize(st);
+    }
+    SeedRow(96, kEnrichStatusFailedPermanent, 10, "f35", 0);
+
+    auto n = SynthesizeEnrichAuditRows(db_, {"f03", "f35"}, /*now=*/500);
+    ASSERT_TRUE(n.ok());
+    EXPECT_EQ(n.value(), 1);  // re-owed: label-only debt, no provider call needed
+    EXPECT_EQ(RowOf(96).status, kEnrichStatusPendingRetry);
+    EXPECT_EQ(RowOf(96).attempts, 10);  // the audit does not touch the count
+    EXPECT_EQ(RowOf(96).generation, 1);
+
+    EnrichStateRow stale = RowOf(96);
+    stale.status = kEnrichStatusFailedPermanent;
+    stale.failed_members = "f03,f35";
+    stale.last_error = "synthetic provider failure";
+    stale.next_retry_at = 0;
+    stale.updated_at = 600;
+    auto w = FlipEnrichStateIfGeneration(db_, stale, /*expected_generation=*/0);
+    ASSERT_TRUE(w.ok());
+    EXPECT_FALSE(w.value());
+    EXPECT_EQ(RowOf(96).status, kEnrichStatusPendingRetry);
+    EXPECT_EQ(RowOf(96).failed_members, "f35");
+    EXPECT_EQ(RowOf(96).generation, 1);
+
+    // A brand-new row synthesized by the audit starts at generation 0.
+    SeedChild(97, /*score=*/false, /*ctx=*/0);
+    auto n2 = SynthesizeEnrichAuditRows(db_, {"f03"}, 600);
+    ASSERT_TRUE(n2.ok());
+    EXPECT_EQ(RowOf(97).status, kEnrichStatusPendingRetry);
+    EXPECT_EQ(RowOf(97).generation, 0);
 }
 
 }  // namespace

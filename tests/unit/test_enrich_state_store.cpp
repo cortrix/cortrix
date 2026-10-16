@@ -37,13 +37,119 @@ protected:
 
 TEST_F(EnrichStateStoreTest, MigrateIsIdempotentAndRejectsUnknownVersions) {
     EnrichStateSchemaProvider provider;
-    // Second run over an existing table is a no-op success.
+    EXPECT_EQ(provider.CurrentVersion(), 2);
+    // Second run over an existing table is a no-op success, at either version.
     EXPECT_TRUE(provider.Migrate(db_, 0, 1).ok());
+    EXPECT_TRUE(provider.Migrate(db_, 0, 2).ok());
+    EXPECT_TRUE(provider.Migrate(db_, 1, 2).ok());
     // from == to is tolerated (migrator skip contract).
     EXPECT_TRUE(provider.Migrate(db_, 1, 1).ok());
-    // Any other pair is a version mismatch.
-    EXPECT_FALSE(provider.Migrate(db_, 1, 2).ok());
+    EXPECT_TRUE(provider.Migrate(db_, 2, 2).ok());
+    // Backward or beyond-current steps are a version mismatch.
+    EXPECT_FALSE(provider.Migrate(db_, 2, 1).ok());
+    EXPECT_FALSE(provider.Migrate(db_, 2, 3).ok());
+    EXPECT_FALSE(provider.Migrate(db_, -1, 2).ok());
     EXPECT_FALSE(provider.Migrate(nullptr, 0, 1).ok());
+}
+
+// A table created at V1 (no generation column) gains the column on 1 → 2, with
+// every existing row at generation 0; a second 1 → 2 is a no-op.
+TEST(EnrichStateSchemaUpgrade, AddsGenerationToAVersionOneTable) {
+    sqlite3* db = nullptr;
+    ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    ASSERT_EQ(sqlite3_exec(db,
+        "CREATE TABLE enrich_state (block_id INTEGER PRIMARY KEY, doc_id TEXT NOT NULL,"
+        " child_id TEXT NOT NULL, status TEXT NOT NULL, failed_members TEXT,"
+        " attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT, next_retry_at INTEGER,"
+        " updated_at INTEGER NOT NULL);"
+        "INSERT INTO enrich_state(block_id, doc_id, child_id, status, attempts, updated_at)"
+        " VALUES(7, 'd', 'c', 'pending_retry', 3, 100)",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    EnrichStateSchemaProvider provider;
+    ASSERT_TRUE(provider.Migrate(db, 1, 2).ok());
+    ASSERT_TRUE(provider.Migrate(db, 1, 2).ok());  // idempotent
+    auto rows = ListEnrichStateForDoc(db, "d", "");
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 1u);
+    EXPECT_EQ(rows.value()[0].attempts, 3);
+    EXPECT_EQ(rows.value()[0].generation, 0);
+    sqlite3_close(db);
+}
+
+// The worker's end-of-run write lands only while the row still carries the
+// generation the delivery read; after a reset bumped it, the write is dropped and
+// the row is left exactly as the reset put it. An upsert never changes the
+// generation of an existing row.
+TEST_F(EnrichStateStoreTest, FlipAppliesOnlyToTheGenerationItRead) {
+    EnrichStateRow r = MakeRow(31, "doc-a", kEnrichStatusPendingRetry, 500);
+    r.attempts = 9;
+    r.failed_members = "f03";
+    ASSERT_TRUE(UpsertEnrichState(db_, r).ok());
+
+    // Matching generation: written.
+    EnrichStateRow flip = r;
+    flip.status = kEnrichStatusFailedPermanent;
+    flip.attempts = 10;
+    flip.last_error = "provider timeout";
+    flip.next_retry_at = 0;
+    flip.updated_at = 600;
+    auto w1 = FlipEnrichStateIfGeneration(db_, flip, /*expected_generation=*/0);
+    ASSERT_TRUE(w1.ok());
+    EXPECT_TRUE(w1.value());
+    auto rows = ListEnrichStateForDoc(db_, "doc-a", "");
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 1u);
+    EXPECT_EQ(rows.value()[0].status, kEnrichStatusFailedPermanent);
+    EXPECT_EQ(rows.value()[0].attempts, 10);
+    EXPECT_EQ(rows.value()[0].generation, 0);
+
+    // The row is reset meanwhile: generation 1, fresh budget.
+    ASSERT_EQ(sqlite3_exec(db_,
+        "CREATE TABLE blocks (block_id INTEGER PRIMARY KEY); INSERT INTO blocks VALUES(31)",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    auto reset = ResetGivenUpEnrichRows(db_, 700);
+    ASSERT_TRUE(reset.ok());
+    EXPECT_EQ(reset.value().moved, 1);
+
+    // A stale delivery (still holding generation 0) tries to flip: dropped.
+    flip.updated_at = 800;
+    auto w2 = FlipEnrichStateIfGeneration(db_, flip, /*expected_generation=*/0);
+    ASSERT_TRUE(w2.ok());
+    EXPECT_FALSE(w2.value());
+    rows = ListEnrichStateForDoc(db_, "doc-a", "");
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 1u);
+    EXPECT_EQ(rows.value()[0].status, kEnrichStatusPendingRetry);
+    EXPECT_EQ(rows.value()[0].attempts, 0);
+    EXPECT_EQ(rows.value()[0].last_error, "reset by operator");
+    EXPECT_EQ(rows.value()[0].next_retry_at, 700);
+    EXPECT_EQ(rows.value()[0].generation, 1);
+
+    // A delivery that read generation 1 may write.
+    flip.status = kEnrichStatusOk;
+    flip.attempts = 1;
+    flip.last_error.clear();
+    flip.failed_members.clear();
+    auto w3 = FlipEnrichStateIfGeneration(db_, flip, /*expected_generation=*/1);
+    ASSERT_TRUE(w3.ok());
+    EXPECT_TRUE(w3.value());
+    rows = ListEnrichStateForDoc(db_, "doc-a", kEnrichStatusOk);
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 1u);
+    EXPECT_EQ(rows.value()[0].generation, 1);  // the flip never touches generation
+
+    // An upsert of an existing row keeps its generation whatever the caller holds.
+    EnrichStateRow stale = r;  // generation 0 in the struct
+    stale.status = kEnrichStatusPendingRetry;
+    ASSERT_TRUE(UpsertEnrichState(db_, stale).ok());
+    rows = ListEnrichStateForDoc(db_, "doc-a", "");
+    ASSERT_TRUE(rows.ok());
+    EXPECT_EQ(rows.value()[0].generation, 1);
+
+    EXPECT_FALSE(FlipEnrichStateIfGeneration(nullptr, flip, 0).ok());
+    EnrichStateRow empty = flip;
+    empty.status.clear();
+    EXPECT_FALSE(FlipEnrichStateIfGeneration(db_, empty, 1).ok());
 }
 
 TEST_F(EnrichStateStoreTest, UpsertInsertsThenOverwrites) {

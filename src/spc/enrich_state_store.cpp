@@ -36,12 +36,13 @@ EnrichStateRow RowFromStmt(sqlite3_stmt* stmt) {
                           ? 0
                           : sqlite3_column_int64(stmt, 7);
     r.updated_at = sqlite3_column_int64(stmt, 8);
+    r.generation = sqlite3_column_int(stmt, 9);
     return r;
 }
 
 constexpr char kRowColumns[] =
     "block_id, doc_id, child_id, status, failed_members, attempts, last_error, "
-    "next_retry_at, updated_at";
+    "next_retry_at, updated_at, generation";
 
 }  // namespace
 
@@ -53,16 +54,17 @@ Status UpsertEnrichState(sqlite3* db, const EnrichStateRow& row) {
     sqlite3_stmt* stmt = nullptr;
     const char* sql =
         "INSERT INTO enrich_state(block_id, doc_id, child_id, status, failed_members,"
-        " attempts, last_error, next_retry_at, updated_at)"
-        " VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
+        " attempts, last_error, next_retry_at, updated_at, generation)"
+        " VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"
         " ON CONFLICT(block_id) DO UPDATE SET"
         " doc_id=excluded.doc_id, child_id=excluded.child_id, status=excluded.status,"
         " failed_members=excluded.failed_members, attempts=excluded.attempts,"
         " last_error=excluded.last_error, next_retry_at=excluded.next_retry_at,"
-        " updated_at=excluded.updated_at";
+        " updated_at=excluded.updated_at";  // generation: the row keeps its own
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         return SqlErr(db, "prepare upsert enrich_state");
     }
+    sqlite3_bind_int(stmt, 10, row.generation);
     sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(row.block_id));
     sqlite3_bind_text(stmt, 2, row.doc_id.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 3, row.child_id.c_str(), -1, SQLITE_TRANSIENT);
@@ -219,7 +221,11 @@ Status ReoweEnrichState(sqlite3* db, const EnrichStateRow& row, int terminal_at_
     if (row.status.empty()) return Status::InvalidArgument("ReoweEnrichState: empty status");
     sqlite3_stmt* stmt = nullptr;
     // Same shape as UpsertEnrichState, minus `attempts=excluded.attempts`: the
-    // row's count is the worker's, not the audit's.
+    // row's count is the worker's, not the audit's. An existing row's generation
+    // is bumped: the audit re-owes a terminal row (the label-only exception) while
+    // a recovery delivery charged to that terminal state may still be running, and
+    // that delivery's end-of-run write, computed before the audit looked, must not
+    // undo the re-owe. A new row starts at generation 0.
     std::string sql =
         "INSERT INTO enrich_state(block_id, doc_id, child_id, status, failed_members,"
         " attempts, last_error, next_retry_at, updated_at)"
@@ -232,7 +238,7 @@ Status ReoweEnrichState(sqlite3* db, const EnrichStateRow& row, int terminal_at_
            " failed_members=excluded.failed_members, last_error=excluded.last_error,"
            " next_retry_at=CASE WHEN enrich_state.attempts>=?10 THEN NULL"
            " ELSE excluded.next_retry_at END,"
-           " updated_at=excluded.updated_at";
+           " updated_at=excluded.updated_at, generation=enrich_state.generation+1";
     if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
         return SqlErr(db, "prepare reowe enrich_state");
     }
@@ -253,6 +259,46 @@ Status ReoweEnrichState(sqlite3* db, const EnrichStateRow& row, int terminal_at_
     sqlite3_finalize(stmt);
     if (rc != SQLITE_DONE) return SqlErr(db, "reowe enrich_state");
     return Status::Ok();
+}
+
+Result<bool> FlipEnrichStateIfGeneration(sqlite3* db, const EnrichStateRow& row,
+                                         int expected_generation) {
+    if (!db) return Status::InvalidArgument("FlipEnrichStateIfGeneration: null db");
+    if (row.status.empty()) {
+        return Status::InvalidArgument("FlipEnrichStateIfGeneration: empty status");
+    }
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "UPDATE enrich_state SET status=?1, failed_members=?2, attempts=?3,"
+        " last_error=?4, next_retry_at=?5, updated_at=?6"
+        " WHERE block_id=?7 AND generation=?8";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        return SqlErr(db, "prepare flip enrich_state");
+    }
+    sqlite3_bind_text(stmt, 1, row.status.c_str(), -1, SQLITE_TRANSIENT);
+    if (row.failed_members.empty()) {
+        sqlite3_bind_null(stmt, 2);
+    } else {
+        sqlite3_bind_text(stmt, 2, row.failed_members.c_str(), -1, SQLITE_TRANSIENT);
+    }
+    sqlite3_bind_int(stmt, 3, row.attempts);
+    if (row.last_error.empty()) {
+        sqlite3_bind_null(stmt, 4);
+    } else {
+        sqlite3_bind_text(stmt, 4, row.last_error.c_str(), -1, SQLITE_TRANSIENT);
+    }
+    if (row.next_retry_at <= 0) {
+        sqlite3_bind_null(stmt, 5);
+    } else {
+        sqlite3_bind_int64(stmt, 5, row.next_retry_at);
+    }
+    sqlite3_bind_int64(stmt, 6, row.updated_at);
+    sqlite3_bind_int64(stmt, 7, static_cast<sqlite3_int64>(row.block_id));
+    sqlite3_bind_int(stmt, 8, expected_generation);
+    const int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) return SqlErr(db, "flip enrich_state");
+    return sqlite3_changes(db) > 0;
 }
 
 Result<EnrichResetCounts> ResetGivenUpEnrichRows(sqlite3* db, int64_t now_unix) {
@@ -278,7 +324,7 @@ Result<EnrichResetCounts> ResetGivenUpEnrichRows(sqlite3* db, int64_t now_unix) 
         sqlite3_stmt* st = nullptr;
         const char* sql =
             "UPDATE enrich_state SET status=?1, attempts=0, next_retry_at=?2,"
-            " last_error='reset by operator', updated_at=?2"
+            " last_error='reset by operator', updated_at=?2, generation=generation+1"
             " WHERE status=?3 AND block_id IN (SELECT block_id FROM blocks)";
         if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
             return SqlErr(db, "prepare reset given-up rows");
@@ -336,11 +382,15 @@ int DocLevelOf(const std::unordered_map<std::string, int>& levels, const std::st
 // Settle one terminal row whose configured artifacts are all present: status ok,
 // debt and error cleared, attempts kept (they record history). A dedicated UPDATE
 // keyed on the terminal status, so a row the worker flipped meanwhile is left alone.
+// The generation is bumped: a recovery delivery that was charged to the terminal
+// state before its provider call may still be running, and its end-of-run write
+// must not put the row back to failed_permanent after the audit found it complete.
 Status SettleTerminalRow(sqlite3* db, uint64_t block_id, int64_t now_unix) {
     sqlite3_stmt* st = nullptr;
     const char* sql =
         "UPDATE enrich_state SET status=?1, failed_members=NULL, last_error=NULL,"
-        " next_retry_at=NULL, updated_at=?2 WHERE block_id=?3 AND status=?4";
+        " next_retry_at=NULL, updated_at=?2, generation=generation+1"
+        " WHERE block_id=?3 AND status=?4";
     if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
         return SqlErr(db, "prepare settle terminal row");
     }
