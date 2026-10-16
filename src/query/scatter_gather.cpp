@@ -5,6 +5,7 @@
 #include <chrono>
 #include <future>
 #include <map>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -114,14 +115,19 @@ CrossNsResponse ScatterGather::ExecuteMultiNs(const QueryContext& ctx,
         start + std::chrono::milliseconds(timeouts_.total_timeout_ms);
 
     // Fan out: one task per NS onto the shared ExecutorEngine (topic 1.2 / 1.3).
-    // Each task captures ns by value; the executor is reentrant per NS.
+    // Each task captures ns by value; the executor is reentrant per NS. The tasks
+    // share one copy of the context that they own: the join stops waiting for a
+    // namespace that misses its deadline, but that task keeps running on the pool
+    // after this call has returned and the caller's context may be gone.
+    auto owned_ctx = std::make_shared<const QueryContext>(ctx);
     std::vector<std::future<NamespaceQueryResult>> futures;
     futures.reserve(nss.size());
     for (const std::string& ns : nss) {
         IScatterExecutor* exec = executor_;
-        const QueryContext* cptr = &ctx;
         futures.push_back(engine_->Submit<NamespaceQueryResult>(
-            [exec, cptr, ns]() { return exec->ExecuteForNamespace(*cptr, ns, 1.0f); }));
+            [exec, owned_ctx, ns]() {
+                return exec->ExecuteForNamespace(*owned_ctx, ns, 1.0f);
+            }));
     }
 
     // Dual-layer timeout join (topic 2.5): each NS gets ns_query_timeout_ms, but never
