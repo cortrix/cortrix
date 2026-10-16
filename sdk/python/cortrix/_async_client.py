@@ -213,6 +213,12 @@ class AsyncCortrix(AsyncBaseClient):
         include_sources: bool = False,
         filters: Optional[dict[str, Any]] = None,
         search_config: Optional[Union[SearchConfig, dict[str, Any]]] = None,
+        route: Optional[str] = None,
+        rag_fusion: Optional[bool] = None,
+        include_parent: Optional[bool] = None,
+        parent_expand_top_k: Optional[int] = None,
+        parent_max_bytes: Optional[int] = None,
+        explain: Optional[bool] = None,
     ) -> Any:
         """Semantic search. ``POST /query``. See :meth:`Cortrix.search`."""
         return await self.query.run(
@@ -223,6 +229,12 @@ class AsyncCortrix(AsyncBaseClient):
             include_sources=include_sources,
             filters=filters,
             search_config=search_config,
+            route=route,
+            rag_fusion=rag_fusion,
+            include_parent=include_parent,
+            parent_expand_top_k=parent_expand_top_k,
+            parent_max_bytes=parent_max_bytes,
+            explain=explain,
         )
 
     async def get_sources(self, interaction_id: str) -> Any:

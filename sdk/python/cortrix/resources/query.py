@@ -33,6 +33,13 @@ def _query_body(
     include_sources: bool,
     filters: Optional[dict[str, Any]],
     search_config: Optional[Union[SearchConfig, dict[str, Any]]] = None,
+    *,
+    route: Optional[str] = None,
+    rag_fusion: Optional[bool] = None,
+    include_parent: Optional[bool] = None,
+    parent_expand_top_k: Optional[int] = None,
+    parent_max_bytes: Optional[int] = None,
+    explain: Optional[bool] = None,
 ) -> dict[str, Any]:
     namespaces = [namespace] if isinstance(namespace, str) else list(namespace)
     body: dict[str, Any] = {
@@ -47,6 +54,18 @@ def _query_body(
         body["filter"] = filters  # spec field is singular ``filter``
     if search_config is not None:
         body["search_config"] = _search_config_body(search_config)
+    # The remaining documented request fields go out unchanged when given and are
+    # left out when not, so the server's defaults and its validation apply.
+    for key, value in (
+        ("route", route),
+        ("rag_fusion", rag_fusion),
+        ("include_parent", include_parent),
+        ("parent_expand_top_k", parent_expand_top_k),
+        ("parent_max_bytes", parent_max_bytes),
+        ("explain", explain),
+    ):
+        if value is not None:
+            body[key] = value
     return body
 
 
@@ -130,12 +149,21 @@ class Query(SyncResource):
         include_sources: bool = False,
         filters: Optional[dict[str, Any]] = None,
         search_config: Optional[Union[SearchConfig, dict[str, Any]]] = None,
+        route: Optional[str] = None,
+        rag_fusion: Optional[bool] = None,
+        include_parent: Optional[bool] = None,
+        parent_expand_top_k: Optional[int] = None,
+        parent_max_bytes: Optional[int] = None,
+        explain: Optional[bool] = None,
     ) -> QueryResult:
         raw = self._client._request(
             "POST",
             PATH_QUERY,
             json=_query_body(
-                namespace, query, top_k, rerank, include_sources, filters, search_config
+                namespace, query, top_k, rerank, include_sources, filters, search_config,
+                route=route, rag_fusion=rag_fusion, include_parent=include_parent,
+                parent_expand_top_k=parent_expand_top_k,
+                parent_max_bytes=parent_max_bytes, explain=explain,
             ),
         )
         return parse_model(QueryResult, _adapt_wire_result(raw, namespace))
@@ -161,12 +189,21 @@ class AsyncQuery(AsyncResource):
         include_sources: bool = False,
         filters: Optional[dict[str, Any]] = None,
         search_config: Optional[Union[SearchConfig, dict[str, Any]]] = None,
+        route: Optional[str] = None,
+        rag_fusion: Optional[bool] = None,
+        include_parent: Optional[bool] = None,
+        parent_expand_top_k: Optional[int] = None,
+        parent_max_bytes: Optional[int] = None,
+        explain: Optional[bool] = None,
     ) -> QueryResult:
         raw = await self._client._request(
             "POST",
             PATH_QUERY,
             json=_query_body(
-                namespace, query, top_k, rerank, include_sources, filters, search_config
+                namespace, query, top_k, rerank, include_sources, filters, search_config,
+                route=route, rag_fusion=rag_fusion, include_parent=include_parent,
+                parent_expand_top_k=parent_expand_top_k,
+                parent_max_bytes=parent_max_bytes, explain=explain,
             ),
         )
         return parse_model(QueryResult, _adapt_wire_result(raw, namespace))
