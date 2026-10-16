@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <string>
 #include <unordered_set>
@@ -131,5 +132,20 @@ Result<EnrichStateCounts> CountEnrichStates(sqlite3* db);
 Result<int> SynthesizeEnrichAuditRows(
     sqlite3* db, const std::unordered_set<std::string>& configured_members,
     int64_t now_unix);
+
+/// The other direction of the audit: contextual index labels — and the points
+/// they resolve — that the ingest's rule excludes (index_gates.h: the chunk is
+/// skip-index, or its document is below the full processing level). Such entries
+/// were written by audits and backfills before the gates existed. For each, in
+/// label order, `mark_point_deleted(label)` is called first (the index delete is
+/// idempotent) and only then the label row removed, so a failure leaves a row the
+/// next audit retries rather than a point nothing can resolve; the first failure
+/// is returned and nothing after it is touched. The chunk's contextual columns
+/// and stored vector stay, so the label-only repair can restore the point should
+/// the gate ever admit the chunk. Labels whose block no longer exists are not this
+/// function's concern. An absent labels table reads as nothing to remove.
+/// Returns the number removed.
+Result<int> ReconcileExcludedContextualLabels(
+    sqlite3* db, const std::function<Status(uint64_t label)>& mark_point_deleted);
 
 }  // namespace cortrix::spc
