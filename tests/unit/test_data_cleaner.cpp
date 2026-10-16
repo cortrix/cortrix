@@ -245,6 +245,20 @@ TEST(DataCleanerAnomalyTest, InvalidEmbedding_AllZero) {
     EXPECT_EQ(r.by_reason["invalid_embedding"], 1);
 }
 
+// An absent embedding (none was computed, as for a document ingested below the
+// full processing level) is not an invalid one: there is no NaN and no zero norm
+// to judge, so the chunk must not be marked anomalous or skip-index for it.
+TEST(DataCleanerAnomalyTest, AbsentEmbeddingIsNotInvalid) {
+    DataCleaner c(DefaultCfg());
+    Block b; b.id = "a"; b.chunk_text = "text";  // embedding left empty on purpose
+    std::vector<Block> blocks = {b};
+    AnomalyResult r = c.DetectAnomaly(blocks);
+    EXPECT_EQ(r.by_reason["invalid_embedding"], 0);
+    EXPECT_EQ(r.total_marked, 0);
+    EXPECT_FALSE(blocks[0].flags_ext & kFlagExtIsAnomalous);
+    EXPECT_FALSE(blocks[0].metadata_json.contains("cleaning.skip_index"));
+}
+
 TEST(DataCleanerAnomalyTest, DuplicateBlockId) {
     DataCleaner c(DefaultCfg());
     std::vector<Block> blocks = {

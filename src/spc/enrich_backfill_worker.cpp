@@ -75,7 +75,16 @@ void UpdateBlockMetadataSummary(sqlite3* db, uint64_t block_id,
     nlohmann::json j = meta.empty()
                            ? nlohmann::json::object()
                            : nlohmann::json::parse(meta, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) j = nlohmann::json::object();
+    if (j.is_discarded() || !j.is_object()) {
+        // Stored text we cannot read as an object is left as it is: replacing it
+        // with a fresh object would drop every other key (the cleaner's mark among
+        // them). No writer produces such text; this keeps a repair from making it
+        // worse if one ever does.
+        CORTRIX_LOG_WARN("spc",
+            "backfill: metadata_json of block_id={} is not a JSON object, summary not folded in",
+            block_id);
+        return;
+    }
     j["summary"] = summary;
     const std::string updated = j.dump();
     sqlite3_stmt* upd = nullptr;
