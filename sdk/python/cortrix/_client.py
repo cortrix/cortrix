@@ -235,14 +235,23 @@ class Cortrix(BaseClient):
         include_sources: bool = False,
         filters: Optional[dict[str, Any]] = None,
         search_config: Optional[Union[SearchConfig, dict[str, Any]]] = None,
+        route: Optional[str] = None,
+        rag_fusion: Optional[bool] = None,
+        include_parent: Optional[bool] = None,
+        parent_expand_top_k: Optional[int] = None,
+        parent_max_bytes: Optional[int] = None,
+        explain: Optional[bool] = None,
     ) -> Any:
         """Semantic search. ``POST /query`` (real-arch wire).
 
         ``namespace`` may be a single string, a list (cross-NS), or ``["*"]``
         (all namespaces). ``search_config`` turns individual retrieval routes off
         (a :class:`~cortrix.types.SearchConfig` or a dict, for example
-        ``SearchConfig(enable_bm25=False)``). Returns a ``QueryResult``
-        (``results`` + ``meta``).
+        ``SearchConfig(enable_bm25=False)``). ``route`` (``"auto"``, ``"simple"``,
+        ``"complex"`` or ``"chat"``), ``rag_fusion``, ``include_parent``,
+        ``parent_expand_top_k``, ``parent_max_bytes`` and ``explain`` are sent
+        unchanged when given and left out when not, so the server's defaults
+        apply. Returns a ``QueryResult`` (``results`` + ``meta``).
         """
         return self.query.run(
             namespace,
@@ -252,6 +261,12 @@ class Cortrix(BaseClient):
             include_sources=include_sources,
             filters=filters,
             search_config=search_config,
+            route=route,
+            rag_fusion=rag_fusion,
+            include_parent=include_parent,
+            parent_expand_top_k=parent_expand_top_k,
+            parent_max_bytes=parent_max_bytes,
+            explain=explain,
         )
 
     def get_sources(self, interaction_id: str) -> Any:
