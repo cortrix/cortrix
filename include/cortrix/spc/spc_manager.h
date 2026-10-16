@@ -70,8 +70,12 @@ public:
     /// binds it to DiskMonitor::ShouldRejectWrites; unset (default) = no gating.
     virtual void SetWriteRejectProbe(std::function<bool()> probe);
 
-    /// Cancel all tasks for a given source_path
-    virtual int CancelBySourcePath(const std::string& source_path);
+    /// Cancel the queued tasks of one source in one namespace: those whose
+    /// namespace_name, source_type and source_path all match. A queued task still
+    /// carries the source path it was submitted with. Returns the number cancelled.
+    virtual int CancelQueuedVersions(const std::string& namespace_name,
+                                     const std::string& source_type,
+                                     const std::string& source_path);
 
     /// Start worker threads
     virtual void Start();

@@ -66,14 +66,41 @@ TEST(SPCTaskQueueTest, QueueFullReturnsError) {
     EXPECT_EQ(queue.Push(MakeTask(SPCPriority::kP1, 3)), -1);  // Full
 }
 
-TEST(SPCTaskQueueTest, CancelBySourcePath) {
+TEST(SPCTaskQueueTest, CancelQueuedVersionsByPath) {
     SPCTaskQueue queue(100);
     queue.Push(MakeTask(SPCPriority::kP1, 1, "file_a.txt"));
     queue.Push(MakeTask(SPCPriority::kP1, 2, "file_b.txt"));
     queue.Push(MakeTask(SPCPriority::kP1, 3, "file_a.txt"));
 
-    int cancelled = queue.CancelBySourcePath("file_a.txt");
+    // These tasks carry no namespace or source type.
+    int cancelled = queue.CancelQueuedVersions("", "", "file_a.txt");
     EXPECT_EQ(cancelled, 2);
+}
+
+// #178: one queue serves every namespace, so a cancel must match the namespace and the
+// producer as well as the path.
+TEST(SPCTaskQueueTest, CancelQueuedVersionsMatchesNamespaceTypeAndPath) {
+    SPCTaskQueue queue(100);
+    auto make = [](const std::string& ns, const std::string& type, const std::string& path,
+                   int64_t at) {
+        auto t = MakeTask(SPCPriority::kP1, at, path);
+        t->namespace_name = ns;
+        t->source_type = type;
+        return t;
+    };
+    auto own = make("ns-a", "http_upload", "report.txt", 1);
+    auto other_ns = make("ns-b", "http_upload", "report.txt", 2);
+    auto other_type = make("ns-a", "watch_dir", "report.txt", 3);
+    auto other_path = make("ns-a", "http_upload", "notes.txt", 4);
+    for (const auto& t : {own, other_ns, other_type, other_path}) {
+        ASSERT_EQ(queue.Push(t), 0);
+    }
+
+    EXPECT_EQ(queue.CancelQueuedVersions("ns-a", "http_upload", "report.txt"), 1);
+    EXPECT_TRUE(own->cancelled.load());
+    EXPECT_FALSE(other_ns->cancelled.load());
+    EXPECT_FALSE(other_type->cancelled.load());
+    EXPECT_FALSE(other_path->cancelled.load());
 }
 
 TEST(SPCTaskQueueTest, StopUnblocksWaiters) {

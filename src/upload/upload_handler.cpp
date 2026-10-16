@@ -169,7 +169,7 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
 
     // Cancel old tasks if updating
     if (is_update) {
-        spc_mgr_.CancelBySourcePath(req.filename);
+        spc_mgr_.CancelQueuedVersions(req.namespace_name, "http_upload", req.filename);
     }
 
     // Create Document
