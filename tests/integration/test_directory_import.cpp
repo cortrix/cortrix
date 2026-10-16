@@ -1219,8 +1219,10 @@ TEST_F(DirectoryImportTest, UpdateCancelsPreviousSPCTask) {
     // Track CancelQueuedVersions calls
     std::vector<std::string> cancelled_paths;
     EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _))
-        .WillRepeatedly(Invoke([&](const std::string& path) -> int {
-            cancelled_paths.push_back(path);
+        .WillRepeatedly(Invoke([&](const std::string& /*namespace_name*/,
+                                   const std::string& /*source_type*/,
+                                   const std::string& source_path) -> int {
+            cancelled_paths.push_back(source_path);
             return 0;
         }));
 
