@@ -647,7 +647,8 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     }
     // [F10 §3.4 · D3.5] Apply the per-NS effective CleaningConfig (global ← NS
     // cleaning_config) before cleaning. The seam resolves from the catalog (which
-    // the façade does not expose); unset → data_cleaner_ keeps its default config.
+    // the façade does not expose); unset → data_cleaner_ keeps the config last
+    // applied to it (its default when no resolver has ever run).
     if (cleaning_config_resolver_) {
         data_cleaner_.SetConfig(cleaning_config_resolver_(facade.namespace_id()));
     }
@@ -721,9 +722,15 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         sin.is_anomalous = skip_index;
         sin.block_type = static_cast<uint16_t>(modality);
         scorer_.AssignInitialScore(f07_hdr, semantic_score, sin);
+        // flags_ext bit2 (is_anomalous) records the cleaner's mark, taken from
+        // skip_index so the stored bit equals the index gate's input; the stored
+        // metadata key is the cleaner's own write. Blocks written by any other
+        // version have bit2 clear and nothing back-fills it, so readers keep reading
+        // the key (index_gates.h).
         // [I2 · F35 §4.1] flags_ext bit3 (has_contextualized_embedding): set when F35
         // produced a contextualized embedding for this child (double-vector coexistence).
         uint8_t child_flags_ext = 0;
+        if (skip_index) child_flags_ext |= kFlagExtIsAnomalous;
         {
             auto eit = enrich_by_child.find(b.id);
             if (eit != enrich_by_child.end() &&

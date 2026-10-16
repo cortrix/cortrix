@@ -70,8 +70,9 @@ public:
     /// INSRouter::GetNamespace(ns).cleaning_config + the global defaults
     /// (ResolveCleaningConfig); the NS metadata lives in the catalog, which the
     /// per-request NamespaceFacade does not expose, so this seam (not the façade)
-    /// carries it. Unset / nullptr = feature off: the DataCleaner keeps its default
-    /// CleaningConfig{} (F10 standalone behavior, backward compatible). The bound
+    /// carries it. Unset / nullptr = feature off: the DataCleaner keeps the config
+    /// last applied to it, its default CleaningConfig{} if none ever was (the
+    /// standalone cleaner's behavior, backward compatible). The bound
     /// callable must outlive the pipeline (bootstrap owns the router + config).
     void SetCleaningConfigResolver(
         std::function<cortrix::spc::CleaningConfig(const std::string& ns_id)> fn);
@@ -135,7 +136,8 @@ private:
     // nullable (left null here) — so no ctor ripple.
     cortrix::spc::DataCleaner data_cleaner_{cortrix::spc::CleaningConfig{}};
     // [F10 §3.4] Optional per-NS CleaningConfig resolver (nullable = feature off →
-    // default CleaningConfig{}). Production wires it to INSRouter::GetNamespace +
+    // the config last applied, CleaningConfig{} if none ever was). Production wires
+    // it to INSRouter::GetNamespace +
     // ResolveCleaningConfig (bootstrap); given a ns_id it returns the resolved
     // effective config, applied to data_cleaner_ before each cleaning run.
     std::function<cortrix::spc::CleaningConfig(const std::string& ns_id)>

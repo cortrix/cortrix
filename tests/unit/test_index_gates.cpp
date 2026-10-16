@@ -78,8 +78,9 @@ TEST(IndexGatesTest, MetadataHelperAgreesWithSqlPredicateAndCleaner) {
         EXPECT_EQ(MetadataSkipsIndex(s.text ? s.text : ""), s.skip) << shown;
         EXPECT_EQ(SqlSkipIndex(db, s.text), s.skip ? 1 : 0) << shown;
         if (s.text) {
-            // The cleaner's in-memory reading with the header bit clear — the bit is
-            // never persisted, so the stored forms cannot rely on it.
+            // The cleaner's in-memory reading with the header bit clear — blocks
+            // written by a version that does not persist the bit carry the key
+            // alone, so the stored forms cannot rely on the bit.
             Block b;
             b.metadata_json =
                 nlohmann::json::parse(s.text, nullptr, /*allow_exceptions=*/false);

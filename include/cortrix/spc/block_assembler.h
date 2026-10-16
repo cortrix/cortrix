@@ -30,9 +30,10 @@ public:
     /// is the inherited per-child metadata (caller-serialized from child.metadata).
     /// `flags_ext` is the F09 BlockFlagsExt bitmask baked into the header (default 0
     /// = no flags; existing callers unchanged). The SPC pipeline passes
+    /// kFlagExtIsAnomalous (bit2) when the cleaner marked the child skip-index, and
     /// kFlagExtHasContextualized (bit3, F35 §4.1) when the child carries an F35
-    /// contextualized embedding so the read path can branch on the header without a
-    /// column read.
+    /// contextualized embedding. No reader consults the stored bits today; the
+    /// readers use the columns and the metadata key.
     CortrixBlock AssembleChild(const cortrix::chunker::ChildChunk& child,
                                const EmbeddingResult& embedding,
                                CortrixBlockType modality,
