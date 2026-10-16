@@ -98,10 +98,26 @@ void RegisterEnrichRoutes(httplib::Server& server,
                 const std::unordered_set<std::string> configured(
                     chain_tokens.begin(), chain_tokens.end());
                 int synthesized = 0;
+                int removed = 0;
 
                 if (audit) {
-                    // Synthesize pending rows for legacy / silently-degraded chunks
-                    // (shared with tests; rows already pending keep their backoff).
+                    // The audit reconciles both directions of the ingest's index
+                    // rule. First remove contextual index entries the rule excludes
+                    // (written by audits and backfills before the gates existed),
+                    // then synthesize pending rows for legacy / silently-degraded
+                    // chunks (shared with tests; rows already pending keep their
+                    // backoff). Each removal waits on the index's own delete, so a
+                    // large affected namespace makes its first audit slow; later
+                    // audits remove nothing.
+                    auto rec = spc::ReconcileExcludedContextualLabels(
+                        db, [&facade](uint64_t label) {
+                            return facade.vec_index().MarkDelete(label);
+                        });
+                    if (!rec.ok()) {
+                        WriteJsonError(res, rec.status(), rctx.request_id);
+                        return;
+                    }
+                    removed = rec.value();
                     auto synth = spc::SynthesizeEnrichAuditRows(db, configured, now);
                     if (!synth.ok()) {
                         WriteJsonError(res, synth.status(), rctx.request_id);
@@ -117,6 +133,7 @@ void RegisterEnrichRoutes(httplib::Server& server,
                 nlohmann::json body;
                 body["namespace"] = ns_name;
                 body["audited"] = audit;
+                body["removed"] = removed;  // 0 when audit is false
                 body["synthesized"] = synthesized;
                 body["enqueued"] = enqueued;
                 if (counts.ok()) {
@@ -133,7 +150,8 @@ void RegisterEnrichRoutes(httplib::Server& server,
                     e.resource_type = "namespace";
                     e.resource_id = ns_name;
                     e.namespace_id = ns_name;
-                    e.summary = "synthesized=" + std::to_string(synthesized) +
+                    e.summary = "removed=" + std::to_string(removed) +
+                                " synthesized=" + std::to_string(synthesized) +
                                 " enqueued=" + std::to_string(enqueued);
                     e.trace_id = rctx.request_id;
                     oplog->Log(e);

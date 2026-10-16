@@ -53,4 +53,9 @@ Status WriteContextualVecLabel(sqlite3* db, const ContextualVecLabelRow& row);
 /// (the caller treats an unknown label as a dropped hit, same as a missing block).
 Result<ContextualVecLabelRow> GetContextualVecLabel(sqlite3* db, uint64_t label);
 
+/// Remove the label row (idempotent: an absent row is already gone). The caller
+/// marks the index point deleted first, so a failure here leaves a row the next
+/// reconciliation retries rather than a point nothing can resolve.
+Status DeleteContextualVecLabel(sqlite3* db, uint64_t label);
+
 }  // namespace cortrix::spc
