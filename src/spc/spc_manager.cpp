@@ -46,8 +46,10 @@ Status SPCManager::Submit(std::shared_ptr<SPCTask> task) {
     return Status::Ok();
 }
 
-int SPCManager::CancelBySourcePath(const std::string& source_path) {
-    return queue_.CancelBySourcePath(source_path);
+int SPCManager::CancelQueuedVersions(const std::string& namespace_name,
+                                      const std::string& source_type,
+                                      const std::string& source_path) {
+    return queue_.CancelQueuedVersions(namespace_name, source_type, source_path);
 }
 
 int SPCManager::ProcessParsedDoc(spc::ParsedDoc& parsed, SPCTask& task) {

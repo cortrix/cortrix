@@ -183,7 +183,7 @@ TEST(SPCManagerTest, QueueCancelAndSize) {
     queue.Push(t3);
 
     EXPECT_EQ(queue.Size(), 3u);
-    int cancelled = queue.CancelBySourcePath("a.txt");
+    int cancelled = queue.CancelQueuedVersions("", "", "a.txt");
     EXPECT_EQ(cancelled, 2);
 
     // Size doesn't change (tasks are still in queue, just marked cancelled)
@@ -192,7 +192,7 @@ TEST(SPCManagerTest, QueueCancelAndSize) {
 
 // ============================================================
 // Real SPCManager tests - exercises constructor, Start, Stop,
-// Submit, QueueSize, GetTaskStage, CancelBySourcePath, WorkerLoop
+// Submit, QueueSize, GetTaskStage, CancelQueuedVersions, WorkerLoop
 // ============================================================
 
 class SPCManagerRealTest : public ::testing::Test {
@@ -346,8 +346,8 @@ TEST_F(SPCManagerRealTest, GetTaskStageReturnsQueued) {
     EXPECT_EQ(stage, SPCStage::kQueued);
 }
 
-// Coverage: Submit after start, CancelBySourcePath
-TEST_F(SPCManagerRealTest, SubmitAndCancelBySourcePath) {
+// Coverage: Submit after start, CancelQueuedVersions
+TEST_F(SPCManagerRealTest, SubmitAndCancelQueuedVersions) {
     mgr_->Start();
 
     auto task = std::make_shared<SPCTask>();
@@ -358,7 +358,7 @@ TEST_F(SPCManagerRealTest, SubmitAndCancelBySourcePath) {
     Status s = mgr_->Submit(task);
     EXPECT_TRUE(s.ok());
 
-    int cancelled = mgr_->CancelBySourcePath("cancel_me.txt");
+    int cancelled = mgr_->CancelQueuedVersions("nonexistent_ns", "", "cancel_me.txt");
     EXPECT_GE(cancelled, 0);
 
     mgr_->Stop();
@@ -379,7 +379,7 @@ TEST(SPCManagerTest, QueueDrainRemaining) {
     ASSERT_EQ(queue.Push(mk("a.txt")), 0);
     ASSERT_EQ(queue.Push(mk("b.txt")), 0);
     ASSERT_EQ(queue.Push(mk("c.txt")), 0);
-    ASSERT_EQ(queue.CancelBySourcePath("b.txt"), 1);
+    ASSERT_EQ(queue.CancelQueuedVersions("", "", "b.txt"), 1);
 
     queue.Stop();
     auto remaining = queue.DrainRemaining();
@@ -424,7 +424,7 @@ TEST_F(SPCManagerRealTest, SubmitRejectedWhenDiskCritical) {
     Status s2 = mgr_->Submit(task);
     EXPECT_TRUE(s2.ok());
 
-    mgr_->CancelBySourcePath("disk_full.txt");
+    mgr_->CancelQueuedVersions("nonexistent_ns", "", "disk_full.txt");
     mgr_->Stop();
 }
 
