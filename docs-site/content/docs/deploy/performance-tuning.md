@@ -111,7 +111,9 @@ List only the namespaces you actually need in `namespaces`. `["*"]` queries ever
 
 ### Time limits {#timeout}
 
-A query request has no time budget of its own on this release. A query over several namespaces gives each namespace up to 5 seconds and the whole query up to 30 seconds. A namespace that runs out of time is listed among the failed namespaces with `CX_ERR_NS_TIMEOUT`, and the results from the other namespaces still come back. A query over a single namespace runs until it finishes.
+A query request has no time budget of its own on this release. A query over several namespaces has two default wait limits in the step that collects the namespaces' results: that step waits up to 5 seconds for each namespace in turn, counted from when it reaches that namespace, and stops waiting altogether 30 seconds after it started. A namespace it stops waiting for is listed among the failed namespaces with `CX_ERR_NS_TIMEOUT`, and the results from the other namespaces still come back.
+
+These limits bound waiting, not work. A namespace can take longer than 5 seconds and still succeed when the collection reaches it later. The 30 seconds are not an end-to-end limit for the request: waiting for a free worker, RAG-Fusion and reranking come on top. The work of a namespace the collection stopped waiting for is not cancelled. A query over a single namespace has no wait limit.
 
 ## Execution providers {#execution-provider}
 
