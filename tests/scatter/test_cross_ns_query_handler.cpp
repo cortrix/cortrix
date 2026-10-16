@@ -181,5 +181,33 @@ TEST(CrossNsQueryHandlerTest, UnauthenticatedReturns401) {
     EXPECT_EQ(r.body["error"]["code"], "CX_ERR_AUTH_INVALID_CREDENTIALS");
 }
 
+
+// #191: an integer that does not fit in an int must be rejected, not narrowed into a
+// different value. This line has no top_k range check, so every value that fits keeps
+// its current handling.
+TEST(CrossNsQueryHandlerTest, TopKThatDoesNotFitInAnIntIsRejectedNotNarrowed) {
+    auto parse = [](const std::string& raw, QueryRequest* req) {
+        const nlohmann::json body = nlohmann::json::parse(
+            std::string(R"({"query":"q","namespaces":["ns"],"top_k":)") + raw + "}");
+        EXPECT_TRUE(body["top_k"].is_number_integer());
+        return CrossNsQueryHandler::ParseRequest(body, req);
+    };
+    for (const char* raw : {"2147483648", "-2147483649", "4294967297", "4294967396",
+                            "-4294967295", "9223372036854775808", "18446744073709551615"}) {
+        SCOPED_TRACE(raw);
+        QueryRequest req;
+        const Status s = parse(raw, &req);
+        EXPECT_FALSE(s.ok());
+        EXPECT_NE(s.message().find("'top_k' must fit in a 32-bit signed integer"),
+                  std::string::npos);
+    }
+    for (const char* raw : {"2147483647", "-2147483648", "1000", "101", "100", "1", "0", "-5"}) {
+        SCOPED_TRACE(raw);
+        QueryRequest req;
+        ASSERT_TRUE(parse(raw, &req).ok());
+        EXPECT_EQ(req.top_k, std::stoi(raw));
+    }
+}
+
 }  // namespace
 }  // namespace cortrix::query
