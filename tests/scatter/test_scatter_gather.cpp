@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <utility>
@@ -599,6 +601,58 @@ TEST(DocumentCoverageTest, HitWithoutDocIdProducesNoEntry) {
 
     ASSERT_EQ(resp.results.size(), 1u);
     EXPECT_TRUE(resp.meta.document_coverage.empty());
+}
+
+
+// A namespace that misses its deadline is abandoned by the join, but its task keeps
+// running on the pool after Execute has returned. It must read its own copy of the
+// context, never the caller's, which by then may be gone: the served route's context
+// is a local of the request handler. Here the caller changes its context after the
+// call returns, then lets the slow task go on; the task must still see the value the
+// query was made with.
+TEST(ScatterGatherTest, TimedOutTaskReadsItsOwnCopyOfTheContext) {
+    Harness h({"ns_fast", "ns_slow"});
+    std::mutex m;
+    std::condition_variable cv;
+    bool release = false;
+    bool done = false;
+    std::string seen_query;
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_fast", _))
+        .WillOnce(Return(ScatterMockResponseBuilder::Normal("ns_fast", 1)));
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_slow", _))
+        .WillOnce(Invoke([&](const QueryContext& ctx, const std::string& ns, float) {
+            std::unique_lock<std::mutex> lk(m);
+            cv.wait(lk, [&] { return release; });
+            seen_query = ctx.query;  // read only after Execute has returned
+            done = true;
+            cv.notify_all();
+            return ScatterMockResponseBuilder::Normal(ns, 1);
+        }));
+    auto sg = h.Make();
+    ScatterTimeouts t;
+    t.ns_query_timeout_ms = 1000;
+    t.total_timeout_ms = 50;
+    sg.SetTimeouts(t);
+
+    QueryContext ctx;
+    ctx.query = "the query as made";
+    ctx.top_k = 10;
+    auto resp = sg.Execute(Req({"ns_fast", "ns_slow"}, 10), Auth(), &ctx);
+    ASSERT_TRUE(resp.error.has_value());
+    ASSERT_EQ(resp.error->code, "CX_ERR_SCATTER_TIMEOUT")
+        << "precondition: the join returned before the slow namespace finished";
+
+    ctx.query = "changed by the caller after Execute returned";
+    {
+        std::lock_guard<std::mutex> lk(m);
+        release = true;
+    }
+    cv.notify_all();
+    {
+        std::unique_lock<std::mutex> lk(m);
+        ASSERT_TRUE(cv.wait_for(lk, std::chrono::seconds(5), [&] { return done; }));
+    }
+    EXPECT_EQ(seen_query, "the query as made");
 }
 
 }  // namespace
