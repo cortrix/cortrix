@@ -197,6 +197,8 @@ jobs:
           python3 sdk/python/scripts/check_generated_types.py
       - name: Compose publish-address contract
         run: ./tests/ci/test_compose_publish_host.sh
+      - name: Publish Image verification script
+        run: ./tests/ci/test_publish_image_verify.sh
       - name: clang-format (changed files only)
         continue-on-error: true
         run: |
