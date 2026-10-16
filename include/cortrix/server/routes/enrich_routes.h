@@ -14,7 +14,10 @@ namespace cortrix {
 /// addendum §3.7 G4 — the enrichment-backfill ops surface (Agent self-service):
 ///
 ///   POST /api/v1/namespaces/:name/enrich/backfill   (admin)
-///     body (optional): {"audit": true}
+///     body (optional): {"audit": true, "reset_given_up": false}; when present it
+///     must be a JSON object with only these two boolean keys, anything else is a
+///     400 CX_ERR_ENRICH_BACKFILL_INVALID_BODY (a misspelled key must not pass as
+///     "nothing to do").
 ///     1. audit (default on): reconcile the namespace with the ingest's index
 ///        rule in both directions — remove contextual index entries the rule
 ///        excludes (skip-index chunks, documents below the full processing
@@ -22,14 +25,20 @@ namespace cortrix {
 ///        and synthesize enrich_state rows for legacy / silently-degraded chunks
 ///        (f03 ⇔ enriched_score, f35 ⇔ contextualized_status==1 plus the index
 ///        label where one is expected, f38 ⇔ a hype block with this source child);
-///     2. make every 'pending_retry' row due now;
-///     3. run one sweep for this namespace → kTaskEnrichBackfill tasks.
-///     Response: {namespace, audited, removed, synthesized, enqueued, counts{...}};
-///     `removed` is 0 when audit is false.
+///        terminal rows whose artifacts are all present are settled to 'ok';
+///     2. reset_given_up (default off): move every 'failed_permanent' row whose
+///        chunk still exists back to 'pending_retry', attempts 0, due now; rows
+///        whose chunk is gone are left as they are and counted;
+///     3. make every 'pending_retry' row due now;
+///     4. run one sweep for this namespace → kTaskEnrichBackfill tasks.
+///     Response: {namespace, audited, reset_given_up, removed, synthesized, settled,
+///                reset, orphaned_skipped, enqueued, counts{...}}; every count is
+///                present on every 200, 0 when its step did not run.
 ///
 /// `chain_tokens` = the tokens of the CURRENTLY configured enricher chain
 /// ("f03"/"f35"/"f38") — the owed universe for the audit; empty ⇒ the endpoint
-/// answers 409 (enrichment not configured, nothing to backfill toward).
+/// answers 400 (CX_ERR_ENRICH_BACKFILL_NOT_CONFIGURED: enrichment not configured,
+/// nothing to backfill toward).
 void RegisterEnrichRoutes(httplib::Server& server,
                           resource::INamespacePool& pool,
                           ApiKeyAuth& auth,

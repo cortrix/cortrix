@@ -66,6 +66,8 @@ paths:
     $ref: './paths/namespaces.yaml#/paths/~1namespaces'
   /namespaces/{ns}:
     $ref: './paths/namespaces.yaml#/paths/~1namespaces~1{ns}'
+  /namespaces/{ns}/enrich/backfill:
+    $ref: './paths/namespaces.yaml#/paths/~1namespaces~1{ns}~1enrich~1backfill'
   # ---- Document domain ----
   /documents:
     $ref: './paths/documents.yaml#/paths/~1documents'

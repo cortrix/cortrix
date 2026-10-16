@@ -457,6 +457,70 @@ TEST_F(EnrichAuditTest, RespectsConfiguredMemberUniverse) {
     EXPECT_EQ(rows.value()[0].failed_members, "f03");
 }
 
+// A terminal row whose chunk owes nothing to the configured chain is stale: its
+// artifacts landed in a run that died before the flip, or it gave up on a member
+// the chain no longer asks for. The audit settles it to 'ok' without a delivery;
+// a terminal row that still owes something stays terminal, so the settled count
+// is exact.
+TEST_F(EnrichAuditTest, SettlesTerminalRowsWhoseArtifactsAreComplete) {
+    SeedChild(61, "child-landed", /*score=*/true, /*ctx=*/1);  // fully covered
+    SeedHypeFor("child-landed");
+    EnrichStateRow landed = MakeRow(61, "doc-a", kEnrichStatusFailedPermanent, 0);
+    landed.attempts = 8;
+    landed.failed_members = "f38";
+    landed.last_error = "provider timeout";
+    ASSERT_TRUE(UpsertEnrichState(db_, landed).ok());
+
+    SeedChild(62, "child-unconfigured", true, 1);  // no hype block: owes f38 only if configured
+    EnrichStateRow unconfigured = MakeRow(62, "doc-a", kEnrichStatusFailedPermanent, 0);
+    unconfigured.attempts = 8;
+    unconfigured.failed_members = "f38";
+    ASSERT_TRUE(UpsertEnrichState(db_, unconfigured).ok());
+
+    SeedChild(63, "child-still-owing", false, 0);  // positive control: stays terminal
+    EnrichStateRow owing = MakeRow(63, "doc-a", kEnrichStatusFailedPermanent, 0);
+    owing.attempts = 8;
+    owing.failed_members = "f03,f35";
+    ASSERT_TRUE(UpsertEnrichState(db_, owing).ok());
+
+    SeedChild(64, "child-pending-covered", true, 1);  // in flight: the worker's to flip
+    SeedHypeFor("child-pending-covered");
+    EnrichStateRow pending = MakeRow(64, "doc-a", kEnrichStatusPendingRetry, 900);
+    pending.attempts = 2;
+    pending.failed_members = "f38";
+    ASSERT_TRUE(UpsertEnrichState(db_, pending).ok());
+
+    // Chain without f38: child-unconfigured owes nothing and settles too. Nothing
+    // is synthesized: the only chunk with a missing artifact is terminal.
+    auto n = SynthesizeEnrichAuditRows(db_, {"f03", "f35"}, /*now=*/500);
+    ASSERT_TRUE(n.ok());
+    EXPECT_EQ(n.value(), 0);
+
+    auto rows = ListEnrichStateForDoc(db_, "doc-a", "");
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 4u);
+    for (const auto& r : rows.value()) {
+        if (r.block_id == 61 || r.block_id == 62) {
+            EXPECT_EQ(r.status, kEnrichStatusOk) << r.block_id;
+            EXPECT_EQ(r.attempts, 8) << r.block_id;       // history kept
+            EXPECT_EQ(r.failed_members, "") << r.block_id;
+            EXPECT_EQ(r.last_error, "") << r.block_id;
+            EXPECT_EQ(r.next_retry_at, 0) << r.block_id;
+            EXPECT_EQ(r.updated_at, 500) << r.block_id;
+        } else if (r.block_id == 63) {
+            EXPECT_EQ(r.status, kEnrichStatusFailedPermanent);
+            EXPECT_EQ(r.attempts, 8);
+            EXPECT_EQ(r.failed_members, "f03,f35");
+        } else {
+            EXPECT_EQ(r.block_id, 64u);
+            EXPECT_EQ(r.status, kEnrichStatusPendingRetry);  // untouched
+            EXPECT_EQ(r.attempts, 2);
+            EXPECT_EQ(r.next_retry_at, 900);
+        }
+    }
+
+}
+
 TEST_F(EnrichStateStoreTest, HelpersFailCleanlyWithoutTable) {
     sqlite3* bare = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &bare), SQLITE_OK);

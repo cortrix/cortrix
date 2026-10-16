@@ -154,3 +154,83 @@ paths:
         '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
         '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
         '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+
+  /namespaces/{ns}/enrich/backfill:
+    parameters:
+      - name: ns
+        in: path
+        required: true
+        schema: { type: string }
+        description: namespace name
+    post:
+      tags: [admin]
+      operationId: enrichBackfill
+      summary: Audit and backfill chunk enrichment
+      description: |
+        Operator entry point for the chunk-level enrichment ledger (Admin+).
+        With `audit` on (the default) the namespace's chunks are compared against the
+        configured enricher chain: chunks missing an artifact get a pending ledger row,
+        and rows that gave up although every configured artifact is now present are
+        settled. With `reset_given_up` on, every row that gave up and whose chunk still
+        exists is moved back to pending with a fresh attempt count; rows whose chunk no
+        longer exists are left as they are and reported in `orphaned_skipped`. The reset
+        runs after the audit, so with both on a row that gave up but is complete is
+        settled rather than re-delivered; with `audit` off such a row is re-delivered at
+        provider cost. Every pending row is then made due and one backfill sweep runs
+        for this namespace.
+        The body is optional; when present it must be a JSON object holding only these
+        two boolean fields, otherwise the request is rejected with
+        `CX_ERR_ENRICH_BACKFILL_INVALID_BODY`. When no enricher chain is configured the
+        request is rejected with `CX_ERR_ENRICH_BACKFILL_NOT_CONFIGURED`.
+      x-cortrix-agent-workflow: admin
+      x-cortrix-retryable: false
+      x-cortrix-retry-strategy: no_retry
+      x-cortrix-auth-required: true
+      x-cortrix-auth-scope: "tenant:admin"
+      x-cortrix-side-effects: write
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                audit:
+                  type: boolean
+                  default: true
+                  description: Compare chunks against the configured chain; synthesize owed rows and settle complete ones.
+                reset_given_up:
+                  type: boolean
+                  default: false
+                  description: Move rows that gave up, and whose chunk still exists, back to pending with a fresh attempt count.
+      responses:
+        '200':
+          description: Backfill ran; every count is present on every response, 0 when its step did not run.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [namespace, audited, reset_given_up, removed, synthesized, settled, reset, orphaned_skipped, enqueued]
+                properties:
+                  namespace: { type: string }
+                  audited: { type: boolean, description: whether the audit step ran }
+                  reset_given_up: { type: boolean, description: whether the reset step ran }
+                  removed: { type: integer, description: contextual index entries removed by the audit for chunks the ingest excludes }
+                  synthesized: { type: integer, description: ledger rows created or re-owed by the audit }
+                  settled: { type: integer, description: rows that had given up but are complete, settled by the audit }
+                  reset: { type: integer, description: rows that had given up, moved back to pending by the reset }
+                  orphaned_skipped: { type: integer, description: rows that had given up whose chunk no longer exists, left as they are }
+                  enqueued: { type: integer, description: backfill tasks enqueued by the sweep that followed }
+                  counts:
+                    type: object
+                    description: ledger totals after this call
+                    properties:
+                      total: { type: integer }
+                      ok: { type: integer }
+                      pending_retry: { type: integer }
+                      failed_permanent: { type: integer }
+        '400': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

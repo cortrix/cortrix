@@ -78,6 +78,7 @@ add_executable(cortrix_unit_tests
     unit/test_f34_schema_provider.cpp
     unit/test_f35_schema_provider.cpp
     unit/test_enrich_state_store.cpp
+    unit/test_enrich_reset_and_settle.cpp
     unit/test_index_gates.cpp
     unit/test_f38_schema_provider.cpp
     unit/test_f38_hype_enricher.cpp
@@ -223,6 +224,7 @@ add_executable(cortrix_unit_tests
     unit/test_document_routes.cpp
     unit/test_document_routes_extra.cpp
     unit/test_connector_routes.cpp
+    unit/test_enrich_routes.cpp
     unit/test_execution_provider.cpp
     unit/test_config_execution_provider.cpp
     unit/test_bootstrap_f42_wiring.cpp

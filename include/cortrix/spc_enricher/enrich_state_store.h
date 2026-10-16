@@ -75,6 +75,20 @@ Status LeaseDocRetries(sqlite3* db, const std::string& doc_id, int64_t lease_unt
 /// batch on every call while the rest wait for ever (#149). Returns rows changed.
 Result<int> MakeAllPendingDueNow(sqlite3* db, int64_t now_unix);
 
+struct EnrichResetCounts {
+    int moved = 0;     ///< failed_permanent rows moved back to pending_retry, due now
+    int orphaned = 0;  ///< failed_permanent rows left as they are: their chunk no longer exists
+};
+
+/// Operator exit for rows that gave up (#154): every 'failed_permanent' row whose
+/// chunk still exists goes back to 'pending_retry' with attempts 0, due at
+/// `now_unix`, last_error "reset by operator". Each moved row gets a fresh run of
+/// up to kEnrichMaxAttempts provider deliveries, so this is an explicit decision,
+/// never automatic. Rows whose block row is gone are left terminal and counted
+/// separately: a delivery can never repair them, and moving them would read as a
+/// reset that did not work.
+Result<EnrichResetCounts> ResetGivenUpEnrichRows(sqlite3* db, int64_t now_unix);
+
 /// Count one delivery against these pending rows, before the first provider call.
 /// The worker's end-of-run flip is the only other writer of `attempts`, and a
 /// task that dies before the flip (a storage failure after the provider ran, a
@@ -127,11 +141,15 @@ Result<EnrichStateCounts> CountEnrichStates(sqlite3* db);
 /// terminal, with one exception: when the contextual columns and the stored
 /// vector are present and only the index label is missing
 /// (kBlockHasStoredContextualVectorSql), the repair costs no provider call, so
-/// the chunk is re-owed whatever its count. Fully-covered chunks get no row.
-/// Returns the synthesized count.
+/// the chunk is re-owed whatever its count. Fully-covered chunks get no row —
+/// and a 'failed_permanent' chunk that is fully covered (nothing the configured
+/// chain asks for is missing: its artifacts landed in a run that died before the
+/// flip, or it gave up on a member the chain or the index gates no longer owe) is
+/// settled to 'ok' here, without a delivery or a charge; `settled_out`, when
+/// given, receives that count. Returns the synthesized count.
 Result<int> SynthesizeEnrichAuditRows(
     sqlite3* db, const std::unordered_set<std::string>& configured_members,
-    int64_t now_unix);
+    int64_t now_unix, int* settled_out = nullptr);
 
 /// The other direction of the audit: contextual index labels — and the points
 /// they resolve — that the ingest's rule excludes (index_gates.h: the chunk is

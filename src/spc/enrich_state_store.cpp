@@ -255,6 +255,45 @@ Status ReoweEnrichState(sqlite3* db, const EnrichStateRow& row, int terminal_at_
     return Status::Ok();
 }
 
+Result<EnrichResetCounts> ResetGivenUpEnrichRows(sqlite3* db, int64_t now_unix) {
+    if (!db) return Status::InvalidArgument("ResetGivenUpEnrichRows: null db");
+    EnrichResetCounts counts;
+    // Orphans first (a count, nothing moves): terminal rows whose chunk is gone.
+    {
+        sqlite3_stmt* st = nullptr;
+        const char* sql =
+            "SELECT COUNT(*) FROM enrich_state WHERE status=?1"
+            " AND block_id NOT IN (SELECT block_id FROM blocks)";
+        if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
+            return SqlErr(db, "prepare reset orphan count");
+        }
+        sqlite3_bind_text(st, 1, kEnrichStatusFailedPermanent, -1, SQLITE_STATIC);
+        const int rc = sqlite3_step(st);
+        if (rc == SQLITE_ROW) counts.orphaned = sqlite3_column_int(st, 0);
+        sqlite3_finalize(st);
+        if (rc != SQLITE_ROW) return SqlErr(db, "reset orphan count");
+    }
+    // Then the move, limited to rows a delivery can still repair.
+    {
+        sqlite3_stmt* st = nullptr;
+        const char* sql =
+            "UPDATE enrich_state SET status=?1, attempts=0, next_retry_at=?2,"
+            " last_error='reset by operator', updated_at=?2"
+            " WHERE status=?3 AND block_id IN (SELECT block_id FROM blocks)";
+        if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
+            return SqlErr(db, "prepare reset given-up rows");
+        }
+        sqlite3_bind_text(st, 1, kEnrichStatusPendingRetry, -1, SQLITE_STATIC);
+        sqlite3_bind_int64(st, 2, now_unix);
+        sqlite3_bind_text(st, 3, kEnrichStatusFailedPermanent, -1, SQLITE_STATIC);
+        const int rc = sqlite3_step(st);
+        sqlite3_finalize(st);
+        if (rc != SQLITE_DONE) return SqlErr(db, "reset given-up rows");
+        counts.moved = sqlite3_changes(db);
+    }
+    return counts;
+}
+
 namespace {
 
 // Each document's processing level, keyed by doc_id — the first half of the
@@ -291,6 +330,28 @@ Result<std::unordered_map<std::string, int>> LoadDocumentLevels(sqlite3* db) {
 int DocLevelOf(const std::unordered_map<std::string, int>& levels, const std::string& doc_id) {
     const auto it = levels.find(doc_id);
     return it == levels.end() ? 3 : it->second;
+}
+
+
+// Settle one terminal row whose configured artifacts are all present: status ok,
+// debt and error cleared, attempts kept (they record history). A dedicated UPDATE
+// keyed on the terminal status, so a row the worker flipped meanwhile is left alone.
+Status SettleTerminalRow(sqlite3* db, uint64_t block_id, int64_t now_unix) {
+    sqlite3_stmt* st = nullptr;
+    const char* sql =
+        "UPDATE enrich_state SET status=?1, failed_members=NULL, last_error=NULL,"
+        " next_retry_at=NULL, updated_at=?2 WHERE block_id=?3 AND status=?4";
+    if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
+        return SqlErr(db, "prepare settle terminal row");
+    }
+    sqlite3_bind_text(st, 1, kEnrichStatusOk, -1, SQLITE_STATIC);
+    sqlite3_bind_int64(st, 2, now_unix);
+    sqlite3_bind_int64(st, 3, static_cast<sqlite3_int64>(block_id));
+    sqlite3_bind_text(st, 4, kEnrichStatusFailedPermanent, -1, SQLITE_STATIC);
+    const int rc = sqlite3_step(st);
+    sqlite3_finalize(st);
+    if (rc != SQLITE_DONE) return SqlErr(db, "settle terminal row");
+    return Status::Ok();
 }
 
 }  // namespace
@@ -346,8 +407,9 @@ Result<int> ReconcileExcludedContextualLabels(
 
 Result<int> SynthesizeEnrichAuditRows(
     sqlite3* db, const std::unordered_set<std::string>& configured_members,
-    int64_t now_unix) {
+    int64_t now_unix, int* settled_out) {
     if (!db) return Status::InvalidArgument("SynthesizeEnrichAuditRows: null db");
+    if (settled_out) *settled_out = 0;
 
     // Pass 1: child_ids that already have hype blocks (f38 done set).
     std::unordered_set<std::string> hype_sources;
@@ -485,7 +547,19 @@ Result<int> SynthesizeEnrichAuditRows(
             hype_sources.find(child_id) == hype_sources.end()) {
             owe("f38");
         }
-        if (owed.empty()) continue;
+        if (owed.empty()) {
+            // Nothing the configured chain asks for is missing. A terminal row for
+            // such a chunk is stale — its artifacts landed in a run that died
+            // before the flip, or it gave up on a member no longer owed — and would
+            // otherwise sit in counts.failed_permanent for ever; settle it. In-flight
+            // rows are the worker's to flip on their next delivery.
+            if (given_up.count(block_id)) {
+                Status s = SettleTerminalRow(db, block_id, now_unix);
+                if (!s.ok()) return s;
+                if (settled_out) ++*settled_out;
+            }
+            continue;
+        }
         const bool label_only_miss = f35_label_only && owed == "f35";
         if (in_flight.count(block_id)) continue;
         if (given_up.count(block_id) && !label_only_miss) continue;
