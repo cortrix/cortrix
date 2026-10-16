@@ -1073,6 +1073,63 @@ TEST_F(SPCPipelineR7Test, EnrichBackfill_PersistFailureKeepsNonEmptyLastError) {
               0);
 }
 
+// The summary repair folds the summary into the block's metadata column. Stored
+// metadata that does not parse as a JSON object is left untouched rather than
+// replaced: a replacement would drop every other key, the cleaner's mark among
+// them. The enrichment itself (score, entities) is still persisted.
+TEST_F(SPCPipelineR7Test, EnrichBackfill_MalformedMetadataIsLeftUntouchedBySummaryRepair) {
+    cortrix::spc::EnricherChain broken;
+    broken.Append(std::make_shared<FailingSummaryEnricher>());
+    pipeline_->SetEnricherChain(&broken);
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+    pipeline_->SetEnricherChain(nullptr);
+    ASSERT_GT(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"), 0);
+
+    // Damage one child's metadata by hand (no writer produces this; the repair
+    // must still not make it worse).
+    uint64_t block_id = 0;
+    for (const auto& b : BlocksOf(doc_id)) {
+        if (!b.child_id.empty()) { block_id = b.block_id; break; }
+    }
+    ASSERT_NE(block_id, 0u);
+    sqlite3* db = facade_->store().db_handle();
+    {
+        sqlite3_stmt* st = nullptr;
+        ASSERT_EQ(sqlite3_prepare_v2(db, "UPDATE blocks SET metadata_json='{' WHERE block_id=?1",
+                                     -1, &st, nullptr), SQLITE_OK);
+        sqlite3_bind_int64(st, 1, static_cast<sqlite3_int64>(block_id));
+        ASSERT_EQ(sqlite3_step(st), SQLITE_DONE);
+        sqlite3_finalize(st);
+    }
+    const std::string id = std::to_string(static_cast<int64_t>(block_id));
+    const std::string malformed_sql =
+        "SELECT COUNT(*) FROM blocks WHERE block_id=" + id + " AND metadata_json='{'";
+    ASSERT_EQ(CountSql(malformed_sql.c_str()), 1) << "positive control: the malformed text is in place";
+
+    cortrix::spc::EnricherChain working;
+    working.Append(std::make_shared<FakeSummaryEnricher>());
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks_meta.db").string()).ok());
+    cortrix::spc::EnrichBackfillWorker worker(*pool_, &working, *embedder_, &mgr);
+    async::TaskInfo t;
+    t.task_id = 1;
+    t.namespace_id = "test-ns";
+    t.doc_id = doc_id;
+    ASSERT_TRUE(worker.ProcessTask(t).ok());
+
+    EXPECT_EQ(CountSql(malformed_sql.c_str()), 1)
+        << "metadata that does not parse is left untouched, not replaced by the summary";
+    const std::string scored_sql =
+        "SELECT COUNT(*) FROM blocks WHERE block_id=" + id + " AND enriched_score IS NOT NULL";
+    EXPECT_EQ(CountSql(scored_sql.c_str()), 1) << "the enrichment itself was persisted";
+    const std::string ok_sql =
+        "SELECT COUNT(*) FROM enrich_state WHERE block_id=" + id + " AND status='ok'";
+    EXPECT_EQ(CountSql(ok_sql.c_str()), 1) << "the repaired row reads ok";
+}
+
 // Partial repair: the working chain still fails one member (hype LLM down) →
 // only that member stays owed, attempts advance, next_retry_at follows the
 // backoff schedule.
@@ -2252,7 +2309,8 @@ TEST_F(SPCPipelineR7Test, EnrichAudit_SkipIndexChunkOwesNoLabelAndGetsNoPoint) {
 }
 
 // Below processing level 3 the ingest writes no points and no hype blocks (and,
-// having no embeddings, the cleaner marks every chunk skip-index). The audit must
+// its chunks carry no embedding, which is not an invalid embedding, so they are
+// not skip-index either — the level gate alone does the work). The audit must
 // not owe the index-side artifacts for such a document, and a stale row owing
 // hype must settle without a provider call or a hype block.
 TEST_F(SPCPipelineR7Test, EnrichAudit_LevelTwoDocOwesNoHypeBlocks) {
@@ -2303,8 +2361,9 @@ TEST_F(SPCPipelineR7Test, EnrichAudit_LevelTwoDocOwesNoHypeBlocks) {
         child_id = b.child_id;
         cortrix::spc::Block view;  // the ingest's own reading of the stored mark
         view.metadata_json = nlohmann::json::parse(b.metadata_json, nullptr, false);
-        ASSERT_TRUE(cortrix::spc::ShouldSkipIndex(view))
-            << "a level-2 chunk has no embedding, so the cleaner marks it skip-index";
+        ASSERT_FALSE(cortrix::spc::ShouldSkipIndex(view))
+            << "a missing embedding is not an invalid one: a level-2 chunk is not skip-index,"
+               " so the level gate alone must keep the audit from owing the label";
     }
     ASSERT_EQ(n, 1) << "one chunk per fixture document";
     const std::string with_vector_sql =

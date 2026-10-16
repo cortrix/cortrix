@@ -38,8 +38,8 @@ std::string Sha256Hex(const std::string& text) {
 }
 
 /// Cosine similarity of two equal-length vectors. Returns 0 for empty / mismatched
-/// dims / zero-norm (those are handled as anomalies elsewhere; here they simply
-/// don't count as "similar").
+/// dims / zero-norm: here they simply don't count as "similar" (a NaN or zero-norm
+/// vector is also marked anomalous by DetectAnomaly; an absent one is not).
 double Cosine(const std::vector<float>& a, const std::vector<float>& b) {
     if (a.empty() || a.size() != b.size()) return 0.0;
     double dot = 0.0, na = 0.0, nb = 0.0;
@@ -116,7 +116,8 @@ DedupResult DataCleaner::Dedup(std::vector<Block>& blocks,
 
     // Step 2 — semantic dedup (O(M²) over the survivors). A candidate marked
     // similar to an earlier survivor is dropped. Vectors with NaN/zero norm yield
-    // cosine 0 (never "similar"); those are caught by DetectAnomaly instead.
+    // cosine 0 (never "similar"); those are caught by DetectAnomaly instead. Absent
+    // vectors (no embedding computed) also yield 0 and are not anomalies.
     std::vector<Block*> candidates;
     candidates.reserve(blocks.size());
     for (Block& b : blocks) if (!b.marked_for_removal) candidates.push_back(&b);
@@ -171,7 +172,10 @@ AnomalyResult DataCleaner::DetectAnomaly(std::vector<Block>& blocks,
                  !m["meta.parse_failed_page"].is_null());
             if (parse_failed) reasons.push_back(AnomalyReason::PARSE_FAILED);
         }
-        if (HasNaN(b.embedding) || AllZero(b.embedding)) {
+        // An absent embedding (none was computed — the document is below the full
+        // processing level) is not an invalid one: only a vector that exists and
+        // carries NaN or a zero norm is.
+        if (!b.embedding.empty() && (HasNaN(b.embedding) || AllZero(b.embedding))) {
             reasons.push_back(AnomalyReason::INVALID_EMBEDDING);
         }
         if (!b.id.empty() && !seen_ids.insert(b.id).second) {
