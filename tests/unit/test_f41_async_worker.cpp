@@ -18,6 +18,7 @@
 #include <nlohmann/json.hpp>
 
 #include "cortrix/async/task_info.h"
+#include "cortrix/doc_summary/doc_fts5_index.h"
 #include "cortrix/async/task_manager.h"
 #include "cortrix/async/task_type.h"
 #include "cortrix/chunker/types.h"          // chunker::ChildChunk
@@ -167,6 +168,56 @@ TEST_F(F41AsyncWorkerTest, WritesDocSummaryBlockOnSuccess) {
     // The summary embedding went into the P-HNSW index (captured FakeIndex).
     EXPECT_FALSE(harness_->fake_index()->added_ids().empty());
     EXPECT_EQ(DocSummaryMetrics::Instance().SummariesGeneratedCount(), 1u);
+}
+
+// A summary write that fails after the transaction opened (the vector add) rolls
+// back. The rollback must compensate only what the summary wrote — its one block
+// and point — and leave the document's parents and document-level full-text row,
+// which the ingest committed long before, in place.
+TEST_F(F41AsyncWorkerTest, FailedSummaryWriteKeepsParentsAndDocFts5Row) {
+    const std::string doc_id = SeedDoc(3);
+    const std::string parent_id = "par-" + doc_id;
+    {
+        resource::NamespaceFacade f(harness_->ipool(), "test-ns");
+        ASSERT_TRUE(f.Acquire().ok());
+        CortrixParent p;
+        p.parent_id = parent_id;
+        p.doc_id = doc_id;
+        p.namespace_id = f.namespace_id();
+        p.parent_text = "parent body";
+        p.metadata_json = "{}";
+        ASSERT_EQ(f.store().parent_insert(p), 0);
+        doc_summary::DocFtsRow row;
+        row.doc_id = doc_id;
+        row.filename = "doc.txt";
+        row.doc_title = "Summary Sentinel";
+        row.topics_rule_extracted = "summarysentinel";
+        ASSERT_TRUE(doc_summary::UpsertDocFts5Row(f.store().db_handle(), row).ok());
+        auto before = doc_summary::SearchDocFts5(f.store().db_handle(), "summarysentinel", 10);
+        ASSERT_TRUE(before.ok()) << before.status().message();
+        ASSERT_EQ(before.value().size(), 1u) << "positive control: the full-text row is there";
+    }
+
+    harness_->fake_index()->set_add_should_fail(true);
+    F41AsyncWorker worker = MakeWorker(MakeLlm(kSummaryJson));
+    Status s = worker.ProcessTask(SummaryTask(doc_id));
+    harness_->fake_index()->set_add_should_fail(false);
+    EXPECT_FALSE(s.ok()) << "the failed vector add must fail the task";
+    EXPECT_FALSE(DocSummaryBlockOf(doc_id).has_value()) << "no summary block persisted";
+    // Per-block compensation still runs: the summary block's point was tombstoned.
+    EXPECT_FALSE(harness_->fake_index()->deleted_ids().empty());
+
+    {
+        resource::NamespaceFacade f(harness_->ipool(), "test-ns");
+        ASSERT_TRUE(f.Acquire().ok());
+        CortrixParent got;
+        EXPECT_EQ(f.store().parent_get(parent_id, got), 0)
+            << "a failed summary write must not delete the document's parent rows";
+        auto after = doc_summary::SearchDocFts5(f.store().db_handle(), "summarysentinel", 10);
+        ASSERT_TRUE(after.ok()) << after.status().message();
+        EXPECT_EQ(after.value().size(), 1u)
+            << "a failed summary write must not delete the document's full-text row";
+    }
 }
 
 TEST_F(F41AsyncWorkerTest, EmptyDocumentCompletesWithoutWritingBlock) {

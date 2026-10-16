@@ -1279,6 +1279,64 @@ TEST_F(SPCPipelineTest, RollbackCallbackDeletesDocFts5IndexRowInProcess) {
         << "rollback callback must delete doc_fts5_index rows by doc_id";
 }
 
+// A blocks-only transaction — an enrichment backfill or a document summary
+// repairing a document committed long before — must not cost that document the
+// rows its ingest wrote. Only the repair's own blocks (and points) are
+// compensated; the parents and the doc-level full-text row stay.
+TEST_F(SPCPipelineTest, RollbackOfBlocksOnlyTxnKeepsParentsAndDocFts5Row) {
+    std::string doc_id = CreateDoc();
+
+    // What a committed ingest leaves behind: a parent row and the doc-level
+    // full-text row, both outside any live transaction.
+    cortrix::CortrixParent p;
+    p.parent_id = id::GenerateUlid();
+    p.doc_id = doc_id;
+    p.namespace_id = facade_->namespace_id();
+    p.parent_text = "parent body";
+    p.metadata_json = "{}";
+    ASSERT_EQ(facade_->store().parent_insert(p), 0);
+
+    cortrix::doc_summary::DocFtsRow row;
+    row.doc_id = doc_id;
+    row.filename = "repair.txt";
+    row.doc_title = "Repair Sentinel";
+    row.topics_rule_extracted = "repairtoken";
+    ASSERT_TRUE(cortrix::doc_summary::UpsertDocFts5Row(
+                    facade_->store().db_handle(), row)
+                    .ok());
+
+    // The repair: one new block inside a blocks-only transaction that fails.
+    cortrix::CortrixBlock b;
+    b.doc_id = doc_id;
+    b.chunk_index = 0;
+    b.block_type = static_cast<int>(kBlockFile);
+    b.processing_level = 3;
+    b.block_id = id::HashChildIdToBlockId(id::GenerateUlid());
+    b.data = BlockBuild(kBlockFile, kLevelL3, "repair", "", "", 0, 0);
+    b.content_text = "repair";
+    b.child_id = id::GenerateUlid();
+
+    store::TxnHandle txn;
+    ASSERT_TRUE(facade_->write_coordinator()
+                    .BeginWrite(doc_id, {b.block_id}, /*writes_blob=*/false, &txn,
+                                store::PendingEntry::Scope::kBlocksOnly)
+                    .ok());
+    ASSERT_EQ(facade_->store().block_insert(b), 0);
+    ASSERT_EQ(BlocksOf(doc_id).size(), 1u);  // really persisted in SQLite
+
+    ASSERT_TRUE(facade_->write_coordinator().Rollback(txn).ok());
+
+    EXPECT_EQ(BlocksOf(doc_id).size(), 0u) << "the repair's own block is compensated";
+    cortrix::CortrixParent got;
+    EXPECT_EQ(facade_->store().parent_get(p.parent_id, got), 0)
+        << "a blocks-only rollback must leave the document's parent rows alone";
+    auto after = cortrix::doc_summary::SearchDocFts5(
+        facade_->store().db_handle(), "repairtoken", /*top_k=*/10);
+    ASSERT_TRUE(after.ok()) << after.status().message();
+    EXPECT_EQ(after.value().size(), 1u)
+        << "a blocks-only rollback must leave the document-level full-text row alone";
+}
+
 // ============================================================
 // metadata_json flow — child blocks carry the F34-inherited DocumentMetadata
 // (NOT task.metadata_json; that path is the F06/F34 doc-meta inheritance). The

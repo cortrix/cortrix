@@ -112,8 +112,11 @@ Status F41AsyncWorker::ProcessTask(const async::TaskInfo& task) {
     }
 
     store::TxnHandle txn;
+    // A repair on a committed document: the rollback may compensate only this
+    // block and its point, never the document's parents or its full-text row.
     Status bw = facade.write_coordinator().BeginWrite(task.doc_id, {block.block_id},
-                                                      /*writes_blob=*/false, &txn);
+                                                      /*writes_blob=*/false, &txn,
+                                                      store::PendingEntry::Scope::kBlocksOnly);
     if (!bw.ok())
         return finalizer_.Fail(task, "CX_ERR_F41_WRITE_FAILED", bw.message(),
                                {{"doc_id", task.doc_id}}, t_start);

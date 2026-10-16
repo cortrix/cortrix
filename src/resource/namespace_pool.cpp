@@ -347,12 +347,24 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
                         sqlite3_finalize(stmt);
                     }
                 }
+                // Document-scoped compensation applies to the ingest transaction only.
+                // The ingest writes the doc's `parents` rows and its document-level
+                // full-text row inside its transaction, so its rollback must drop
+                // them. A blocks-only transaction — an enrichment backfill or a
+                // document summary repairing a document committed long before —
+                // never wrote those rows; deleting them here took a committed
+                // document's parent context and document-level search away on any
+                // failed repair, and again at recovery for a repair left pending by
+                // a crash. The scope rides in the PENDING record, so recovery sees
+                // the same decision the explicit rollback does.
+                const bool doc_scoped =
+                    e.scope == cortrix::store::PendingEntry::Scope::kDocument;
                 // [A unified-blocks Inc 4-3] The SPC ingest write also inserts the
                 // doc's `parents` rows in the same txn (parent_insert); the rollback
                 // must drop them too. doc-scoped DELETE is idempotent (absent rows =
                 // no-op) and safe even for blob-only / metadata-only txns with no
                 // parents. Runs on the same store.db handle as the blocks DELETE.
-                if (db_handle && !e.doc_id.empty()) {
+                if (db_handle && doc_scoped && !e.doc_id.empty()) {
                     sqlite3_stmt* pstmt = nullptr;
                     if (sqlite3_prepare_v2(db_handle,
                                            "DELETE FROM parents WHERE doc_id = ?",
@@ -366,8 +378,8 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
                 // [F44/F41 path validation] SPC now also syncs one F08-derived row
                 // into doc_fts5_index for doc-level fallback retrieval. Rollback must
                 // drop it by doc_id, otherwise failed ingest can leave a benchmark-visible
-                // orphan doc candidate with no committed blocks.
-                if (db_handle && !e.doc_id.empty()) {
+                // orphan doc candidate with no committed blocks. Ingest scope only.
+                if (db_handle && doc_scoped && !e.doc_id.empty()) {
                     (void)cortrix::doc_summary::DeleteDocFts5Row(db_handle, e.doc_id);
                 }
                 return Status::Ok();

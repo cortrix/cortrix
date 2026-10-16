@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -90,13 +91,15 @@ protected:
     }
 
     static PendingEntry Pending(uint64_t txn, const std::string& doc,
-                                std::vector<BlockId> blocks, bool has_blob = false) {
+                                std::vector<BlockId> blocks, bool has_blob = false,
+                                PendingEntry::Scope scope = PendingEntry::Scope::kDocument) {
         PendingEntry e;
         e.state = State::kPending;
         e.txn_id = txn;
         e.doc_id = doc;
         e.block_ids = std::move(blocks);
         e.has_blob = has_blob;  // v1.0.2: gates the Recover blob check (§4.4)
+        e.scope = scope;        // bounds the rollback compensation (see pending_entry.h)
         return e;
     }
     static PendingEntry Terminal(State s, uint64_t txn) {
@@ -159,6 +162,31 @@ TEST_F(RecoveryTest, AllRollbackReplaysCleanup) {
     ASSERT_TRUE(stats.ok());
     EXPECT_EQ(stats->pending, 0u);
     EXPECT_EQ(stats->rollback, 0u);  // compacted away
+}
+
+TEST_F(RecoveryTest, PendingOnlyBlocksOnlyCleanupCarriesScope) {
+    // A repair (blocks-only scope) left PENDING by a crash, with its block absent
+    // from every store, is rolled back at recovery. The scope must survive the
+    // round trip through pending.wal and reach the cleanup callback, so the
+    // recovery-time compensation is bounded exactly like the in-process one. The
+    // second transaction was begun without a scope argument and rolled back
+    // explicitly: its replayed cleanup must still see document scope.
+    SeedWal({Pending(7, "doc-7", {10}, /*has_blob=*/false, PendingEntry::Scope::kBlocksOnly),
+             Pending(8, "doc-8", {11}), Terminal(State::kRollback, 8)});
+
+    FakeVectorStore vs; FakeMetadataStore ms; FakeBlobStore bs;
+    WriteCoordinator wc(dir_, {}, &vs, &ms, &bs);
+    std::map<uint64_t, PendingEntry::Scope> seen;
+    wc.SetRollbackCallback([&](const PendingEntry& e) {
+        seen[e.txn_id] = e.scope;
+        return Status::Ok();
+    });
+    ASSERT_TRUE(wc.Init().ok());
+    ASSERT_TRUE(wc.Recover().ok());
+
+    ASSERT_EQ(seen.size(), 2u);
+    EXPECT_EQ(seen.at(7), PendingEntry::Scope::kBlocksOnly);
+    EXPECT_EQ(seen.at(8), PendingEntry::Scope::kDocument);
 }
 
 TEST_F(RecoveryTest, PendingOnlyAllStoresPresentInfersCommitted) {

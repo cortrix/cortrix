@@ -4,12 +4,32 @@
 #include <string>
 #include <vector>
 
+#include "cortrix/store/group_commit_writer.h"  // Crc32, to hand-build frames
 #include "cortrix/store/pending_entry.h"
 
 namespace cortrix::store {
 namespace {
 
 using State = PendingEntry::State;
+
+// The CRC-covered body of a serialized frame: strip the 4B entry_size prefix and
+// the trailing 4B CRC.
+std::vector<uint8_t> BodyOf(const std::vector<uint8_t>& frame) {
+    return std::vector<uint8_t>(frame.begin() + 4, frame.end() - 4);
+}
+
+// Frame a (mutated) body the way Serialize does: entry_size = body + CRC bytes,
+// then the body, then CRC32 over the body — so the parser sees a well-formed
+// record of the new shape and any rejection is about the content, not the frame.
+std::vector<uint8_t> ReframeBody(const std::vector<uint8_t>& body) {
+    const uint32_t crc = Crc32(body.data(), body.size());
+    const uint32_t follow = static_cast<uint32_t>(body.size() + 4);
+    std::vector<uint8_t> frame;
+    for (int i = 0; i < 4; ++i) frame.push_back(static_cast<uint8_t>((follow >> (8 * i)) & 0xFF));
+    frame.insert(frame.end(), body.begin(), body.end());
+    for (int i = 0; i < 4; ++i) frame.push_back(static_cast<uint8_t>((crc >> (8 * i)) & 0xFF));
+    return frame;
+}
 
 PendingEntry MakePending() {
     PendingEntry e;
@@ -88,6 +108,62 @@ TEST(PendingEntryTest, HasBlobByteIsPendingOnly) {
     pend.has_blob = true;
     EXPECT_GT(pend.Serialize().size(), 31u);
     EXPECT_TRUE(PendingEntry::Deserialize(pend.Serialize()).ok());
+}
+
+TEST(PendingEntryTest, ScopeByteRoundTripsDefaultsAndTolerates) {
+    // The scope byte trails has_blob, PENDING only, and is the first OPTIONAL
+    // trailing field: a record written before it existed ends at has_blob and
+    // must read as document scope; an unknown value must also read as document,
+    // never as corrupt — a rejected record truncates the log at that point and
+    // would discard every later transaction's records over one unknown byte.
+    PendingEntry in = MakePending();
+    in.scope = PendingEntry::Scope::kBlocksOnly;
+    const std::vector<uint8_t> with_scope = in.Serialize();
+
+    // (1) blocks-only round-trips; a record built without touching scope reads
+    //     as document.
+    auto out = PendingEntry::Deserialize(with_scope);
+    ASSERT_TRUE(out.ok()) << out.status().message();
+    EXPECT_EQ(out->scope, PendingEntry::Scope::kBlocksOnly);
+    EXPECT_TRUE(out->has_blob);
+    auto dflt = PendingEntry::Deserialize(MakePending().Serialize());
+    ASSERT_TRUE(dflt.ok()) << dflt.status().message();
+    EXPECT_EQ(dflt->scope, PendingEntry::Scope::kDocument);
+
+    // (2) A frame of the previous shape — has_blob as the last body byte, no
+    //     scope byte — parses and reads as document. Built by hand from the
+    //     current frame: drop the scope byte, recompute entry_size and the CRC.
+    std::vector<uint8_t> legacy_body = BodyOf(with_scope);
+    ASSERT_EQ(static_cast<int>(legacy_body.back()),
+              static_cast<int>(PendingEntry::Scope::kBlocksOnly));
+    legacy_body.pop_back();
+    ASSERT_EQ(static_cast<int>(legacy_body.back()), 1);  // has_blob=true is last again
+    const std::vector<uint8_t> legacy = ReframeBody(legacy_body);
+    EXPECT_EQ(legacy.size() + 1, with_scope.size());
+    auto old = PendingEntry::Deserialize(legacy);
+    ASSERT_TRUE(old.ok()) << old.status().message();
+    EXPECT_EQ(old->scope, PendingEntry::Scope::kDocument);
+    EXPECT_TRUE(old->has_blob);
+    EXPECT_EQ(old->block_ids, in.block_ids);
+    EXPECT_EQ(old->doc_id, in.doc_id);
+
+    // (3) An unknown scope value reads as document, not as corruption.
+    std::vector<uint8_t> odd_body = BodyOf(with_scope);
+    odd_body.back() = 7;
+    auto odd = PendingEntry::Deserialize(ReframeBody(odd_body));
+    ASSERT_TRUE(odd.ok()) << odd.status().message();
+    EXPECT_EQ(odd->scope, PendingEntry::Scope::kDocument);
+    EXPECT_TRUE(odd->has_blob);
+
+    // (4) Terminal records carry no scope byte: still the fixed 31-byte frame,
+    //     and they read as document.
+    PendingEntry term;
+    term.state = State::kRollback;
+    term.txn_id = 1;
+    EXPECT_EQ(term.Serialize().size(), 31u);
+    auto t = PendingEntry::Deserialize(term.Serialize());
+    ASSERT_TRUE(t.ok()) << t.status().message();
+    EXPECT_EQ(t->scope, PendingEntry::Scope::kDocument);
 }
 
 TEST(PendingEntryTest, RollbackRoundTrip) {
