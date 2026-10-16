@@ -37,13 +37,119 @@ protected:
 
 TEST_F(EnrichStateStoreTest, MigrateIsIdempotentAndRejectsUnknownVersions) {
     EnrichStateSchemaProvider provider;
-    // Second run over an existing table is a no-op success.
+    EXPECT_EQ(provider.CurrentVersion(), 2);
+    // Second run over an existing table is a no-op success, at either version.
     EXPECT_TRUE(provider.Migrate(db_, 0, 1).ok());
+    EXPECT_TRUE(provider.Migrate(db_, 0, 2).ok());
+    EXPECT_TRUE(provider.Migrate(db_, 1, 2).ok());
     // from == to is tolerated (migrator skip contract).
     EXPECT_TRUE(provider.Migrate(db_, 1, 1).ok());
-    // Any other pair is a version mismatch.
-    EXPECT_FALSE(provider.Migrate(db_, 1, 2).ok());
+    EXPECT_TRUE(provider.Migrate(db_, 2, 2).ok());
+    // Backward or beyond-current steps are a version mismatch.
+    EXPECT_FALSE(provider.Migrate(db_, 2, 1).ok());
+    EXPECT_FALSE(provider.Migrate(db_, 2, 3).ok());
+    EXPECT_FALSE(provider.Migrate(db_, -1, 2).ok());
     EXPECT_FALSE(provider.Migrate(nullptr, 0, 1).ok());
+}
+
+// A table created at V1 (no generation column) gains the column on 1 → 2, with
+// every existing row at generation 0; a second 1 → 2 is a no-op.
+TEST(EnrichStateSchemaUpgrade, AddsGenerationToAVersionOneTable) {
+    sqlite3* db = nullptr;
+    ASSERT_EQ(sqlite3_open(":memory:", &db), SQLITE_OK);
+    ASSERT_EQ(sqlite3_exec(db,
+        "CREATE TABLE enrich_state (block_id INTEGER PRIMARY KEY, doc_id TEXT NOT NULL,"
+        " child_id TEXT NOT NULL, status TEXT NOT NULL, failed_members TEXT,"
+        " attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT, next_retry_at INTEGER,"
+        " updated_at INTEGER NOT NULL);"
+        "INSERT INTO enrich_state(block_id, doc_id, child_id, status, attempts, updated_at)"
+        " VALUES(7, 'd', 'c', 'pending_retry', 3, 100)",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    EnrichStateSchemaProvider provider;
+    ASSERT_TRUE(provider.Migrate(db, 1, 2).ok());
+    ASSERT_TRUE(provider.Migrate(db, 1, 2).ok());  // idempotent
+    auto rows = ListEnrichStateForDoc(db, "d", "");
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 1u);
+    EXPECT_EQ(rows.value()[0].attempts, 3);
+    EXPECT_EQ(rows.value()[0].generation, 0);
+    sqlite3_close(db);
+}
+
+// The worker's end-of-run write lands only while the row still carries the
+// generation the delivery read; after a reset bumped it, the write is dropped and
+// the row is left exactly as the reset put it. An upsert never changes the
+// generation of an existing row.
+TEST_F(EnrichStateStoreTest, FlipAppliesOnlyToTheGenerationItRead) {
+    EnrichStateRow r = MakeRow(31, "doc-a", kEnrichStatusPendingRetry, 500);
+    r.attempts = 9;
+    r.failed_members = "f03";
+    ASSERT_TRUE(UpsertEnrichState(db_, r).ok());
+
+    // Matching generation: written.
+    EnrichStateRow flip = r;
+    flip.status = kEnrichStatusFailedPermanent;
+    flip.attempts = 10;
+    flip.last_error = "provider timeout";
+    flip.next_retry_at = 0;
+    flip.updated_at = 600;
+    auto w1 = FlipEnrichStateIfGeneration(db_, flip, /*expected_generation=*/0);
+    ASSERT_TRUE(w1.ok());
+    EXPECT_TRUE(w1.value());
+    auto rows = ListEnrichStateForDoc(db_, "doc-a", "");
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 1u);
+    EXPECT_EQ(rows.value()[0].status, kEnrichStatusFailedPermanent);
+    EXPECT_EQ(rows.value()[0].attempts, 10);
+    EXPECT_EQ(rows.value()[0].generation, 0);
+
+    // The row is reset meanwhile: generation 1, fresh budget.
+    ASSERT_EQ(sqlite3_exec(db_,
+        "CREATE TABLE blocks (block_id INTEGER PRIMARY KEY); INSERT INTO blocks VALUES(31)",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    auto reset = ResetGivenUpEnrichRows(db_, 700);
+    ASSERT_TRUE(reset.ok());
+    EXPECT_EQ(reset.value().moved, 1);
+
+    // A stale delivery (still holding generation 0) tries to flip: dropped.
+    flip.updated_at = 800;
+    auto w2 = FlipEnrichStateIfGeneration(db_, flip, /*expected_generation=*/0);
+    ASSERT_TRUE(w2.ok());
+    EXPECT_FALSE(w2.value());
+    rows = ListEnrichStateForDoc(db_, "doc-a", "");
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 1u);
+    EXPECT_EQ(rows.value()[0].status, kEnrichStatusPendingRetry);
+    EXPECT_EQ(rows.value()[0].attempts, 0);
+    EXPECT_EQ(rows.value()[0].last_error, "reset by operator");
+    EXPECT_EQ(rows.value()[0].next_retry_at, 700);
+    EXPECT_EQ(rows.value()[0].generation, 1);
+
+    // A delivery that read generation 1 may write.
+    flip.status = kEnrichStatusOk;
+    flip.attempts = 1;
+    flip.last_error.clear();
+    flip.failed_members.clear();
+    auto w3 = FlipEnrichStateIfGeneration(db_, flip, /*expected_generation=*/1);
+    ASSERT_TRUE(w3.ok());
+    EXPECT_TRUE(w3.value());
+    rows = ListEnrichStateForDoc(db_, "doc-a", kEnrichStatusOk);
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 1u);
+    EXPECT_EQ(rows.value()[0].generation, 1);  // the flip never touches generation
+
+    // An upsert of an existing row keeps its generation whatever the caller holds.
+    EnrichStateRow stale = r;  // generation 0 in the struct
+    stale.status = kEnrichStatusPendingRetry;
+    ASSERT_TRUE(UpsertEnrichState(db_, stale).ok());
+    rows = ListEnrichStateForDoc(db_, "doc-a", "");
+    ASSERT_TRUE(rows.ok());
+    EXPECT_EQ(rows.value()[0].generation, 1);
+
+    EXPECT_FALSE(FlipEnrichStateIfGeneration(nullptr, flip, 0).ok());
+    EnrichStateRow empty = flip;
+    empty.status.clear();
+    EXPECT_FALSE(FlipEnrichStateIfGeneration(db_, empty, 1).ok());
 }
 
 TEST_F(EnrichStateStoreTest, UpsertInsertsThenOverwrites) {
@@ -455,6 +561,70 @@ TEST_F(EnrichAuditTest, RespectsConfiguredMemberUniverse) {
     ASSERT_TRUE(rows.ok());
     ASSERT_EQ(rows.value().size(), 1u);
     EXPECT_EQ(rows.value()[0].failed_members, "f03");
+}
+
+// A terminal row whose chunk owes nothing to the configured chain is stale: its
+// artifacts landed in a run that died before the flip, or it gave up on a member
+// the chain no longer asks for. The audit settles it to 'ok' without a delivery;
+// a terminal row that still owes something stays terminal, so the settled count
+// is exact.
+TEST_F(EnrichAuditTest, SettlesTerminalRowsWhoseArtifactsAreComplete) {
+    SeedChild(61, "child-landed", /*score=*/true, /*ctx=*/1);  // fully covered
+    SeedHypeFor("child-landed");
+    EnrichStateRow landed = MakeRow(61, "doc-a", kEnrichStatusFailedPermanent, 0);
+    landed.attempts = 8;
+    landed.failed_members = "f38";
+    landed.last_error = "provider timeout";
+    ASSERT_TRUE(UpsertEnrichState(db_, landed).ok());
+
+    SeedChild(62, "child-unconfigured", true, 1);  // no hype block: owes f38 only if configured
+    EnrichStateRow unconfigured = MakeRow(62, "doc-a", kEnrichStatusFailedPermanent, 0);
+    unconfigured.attempts = 8;
+    unconfigured.failed_members = "f38";
+    ASSERT_TRUE(UpsertEnrichState(db_, unconfigured).ok());
+
+    SeedChild(63, "child-still-owing", false, 0);  // positive control: stays terminal
+    EnrichStateRow owing = MakeRow(63, "doc-a", kEnrichStatusFailedPermanent, 0);
+    owing.attempts = 8;
+    owing.failed_members = "f03,f35";
+    ASSERT_TRUE(UpsertEnrichState(db_, owing).ok());
+
+    SeedChild(64, "child-pending-covered", true, 1);  // in flight: the worker's to flip
+    SeedHypeFor("child-pending-covered");
+    EnrichStateRow pending = MakeRow(64, "doc-a", kEnrichStatusPendingRetry, 900);
+    pending.attempts = 2;
+    pending.failed_members = "f38";
+    ASSERT_TRUE(UpsertEnrichState(db_, pending).ok());
+
+    // Chain without f38: child-unconfigured owes nothing and settles too. Nothing
+    // is synthesized: the only chunk with a missing artifact is terminal.
+    auto n = SynthesizeEnrichAuditRows(db_, {"f03", "f35"}, /*now=*/500);
+    ASSERT_TRUE(n.ok());
+    EXPECT_EQ(n.value(), 0);
+
+    auto rows = ListEnrichStateForDoc(db_, "doc-a", "");
+    ASSERT_TRUE(rows.ok());
+    ASSERT_EQ(rows.value().size(), 4u);
+    for (const auto& r : rows.value()) {
+        if (r.block_id == 61 || r.block_id == 62) {
+            EXPECT_EQ(r.status, kEnrichStatusOk) << r.block_id;
+            EXPECT_EQ(r.attempts, 8) << r.block_id;       // history kept
+            EXPECT_EQ(r.failed_members, "") << r.block_id;
+            EXPECT_EQ(r.last_error, "") << r.block_id;
+            EXPECT_EQ(r.next_retry_at, 0) << r.block_id;
+            EXPECT_EQ(r.updated_at, 500) << r.block_id;
+        } else if (r.block_id == 63) {
+            EXPECT_EQ(r.status, kEnrichStatusFailedPermanent);
+            EXPECT_EQ(r.attempts, 8);
+            EXPECT_EQ(r.failed_members, "f03,f35");
+        } else {
+            EXPECT_EQ(r.block_id, 64u);
+            EXPECT_EQ(r.status, kEnrichStatusPendingRetry);  // untouched
+            EXPECT_EQ(r.attempts, 2);
+            EXPECT_EQ(r.next_retry_at, 900);
+        }
+    }
+
 }
 
 TEST_F(EnrichStateStoreTest, HelpersFailCleanlyWithoutTable) {

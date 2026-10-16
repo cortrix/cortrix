@@ -30,10 +30,12 @@
 
 #include <algorithm>
 #include <atomic>
+#include <condition_variable>
 #include <filesystem>
 #include <fstream>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <cstdio>
 #include <ctime>
 #include <set>
@@ -968,6 +970,161 @@ TEST(EnrichBackfillSchedule, ExponentialCappedForwardOnly) {
     EXPECT_EQ(W::NextRetryDelaySec(4), 21600);
     EXPECT_EQ(W::NextRetryDelaySec(7), 21600);   // capped
     EXPECT_EQ(W::NextRetryDelaySec(-1), 60);     // clamped
+}
+
+// A summary provider that blocks inside the call until the test lets it go, then
+// fails. It models a delivery that is in flight while an operator resets the row.
+class PausingFailingSummaryEnricher : public FakeSummaryEnricher {
+public:
+    cortrix::spc::EnrichResult Enrich(const std::string&,
+                                      const cortrix::spc::DocumentMetadata&,
+                                      const cortrix::spc::ChunkContext&) override {
+        {
+            std::lock_guard<std::mutex> lk(mu_);
+            called_ = true;
+        }
+        cv_.notify_all();
+        {
+            std::unique_lock<std::mutex> lk(mu_);
+            cv_.wait(lk, [&] { return resume_; });
+        }
+        cortrix::spc::EnrichResult r;
+        r.status = 1;  // non-zero: the member failed, nothing is written for it
+        r.error_msg = "synthetic provider failure";
+        r.enricher_name = "LlmEnricher";
+        return r;
+    }
+    void WaitUntilCalled() {
+        std::unique_lock<std::mutex> lk(mu_);
+        cv_.wait(lk, [&] { return called_; });
+    }
+    void Resume() {
+        {
+            std::lock_guard<std::mutex> lk(mu_);
+            resume_ = true;
+        }
+        cv_.notify_all();
+    }
+
+private:
+    std::mutex mu_;
+    std::condition_variable cv_;
+    bool called_ = false;
+    bool resume_ = false;
+};
+
+// The sequence a reviewer reproduced on the production SQL: a recovery delivery
+// (pending, attempts 9, one over the cap) is charged to failed_permanent/10 before
+// the provider call; an operator reset lands during the call (pending/0); the
+// provider then fails. Without a guard the worker's end-of-run write put its
+// pre-call snapshot (failed_permanent/10) over the reset. With the generation
+// guard the stale write is dropped and the reset keeps its fresh budget.
+TEST_F(SPCPipelineR7Test, EnrichBackfill_ResetDuringDeliveryKeepsItsFreshBudget) {
+    auto failing_llm = std::make_shared<llm::MockLlmClient>();
+    llm::ChatCompletionResponse fail;
+    fail.status = Status::Unavailable("LLM_TRANSPORT: synthetic burst");
+    EXPECT_CALL(*failing_llm, Chat(_, _)).WillRepeatedly(Return(fail));
+    cortrix::spc::EnricherChain broken;
+    broken.Append(std::make_shared<FailingSummaryEnricher>());
+    broken.Append(std::make_shared<FailingContextualEnricher>());
+    broken.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, failing_llm, nullptr));
+    pipeline_->SetEnricherChain(&broken);
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+    pipeline_->SetEnricherChain(nullptr);
+    sqlite3* db = facade_->store().db_handle();
+    ASSERT_NE(db, nullptr);
+    // One pending row, one over the cap: the next delivery is the recovery one.
+    ASSERT_EQ(sqlite3_exec(db,
+        "DELETE FROM enrich_state WHERE block_id NOT IN"
+        " (SELECT MIN(block_id) FROM enrich_state);"
+        "UPDATE enrich_state SET attempts=9, next_retry_at=1",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    ASSERT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state"), 1);
+    ASSERT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"
+                       " AND attempts=9 AND generation=0"), 1);
+
+    auto pausing = std::make_shared<PausingFailingSummaryEnricher>();
+    cortrix::spc::EnricherChain chain;
+    chain.Append(pausing);
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks.db").string()).ok());
+    cortrix::spc::EnrichBackfillWorker worker(*pool_, &chain, *embedder_, &mgr);
+    async::TaskInfo t;
+    t.task_id = 1;
+    t.namespace_id = "test-ns";
+    t.doc_id = doc_id;
+    std::thread delivery([&] { (void)worker.ProcessTask(t); });
+
+    // The provider has been called: the row was charged to the terminal state.
+    pausing->WaitUntilCalled();
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='failed_permanent'"
+                       " AND attempts=10 AND generation=0"), 1);
+
+    // The operator resets while the provider call is still open.
+    auto reset = cortrix::spc::ResetGivenUpEnrichRows(db, /*now=*/4242);
+    ASSERT_TRUE(reset.ok());
+    EXPECT_EQ(reset.value().moved, 1);
+    EXPECT_EQ(reset.value().orphaned, 0);
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"
+                       " AND attempts=0 AND generation=1"), 1);
+
+    // The failing delivery completes; its outcome must not overwrite the reset.
+    pausing->Resume();
+    delivery.join();
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='pending_retry'"
+                       " AND attempts=0 AND next_retry_at=4242"
+                       " AND last_error='reset by operator' AND generation=1"), 1)
+        << "the delivery's stale snapshot overwrote the operator's reset";
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='failed_permanent'"), 0);
+}
+
+// Positive control for the test above: the same delivery without a reset ends
+// the row as failed_permanent with 10 attempts, so the guard is what keeps the
+// reset, not an accident of the sequence.
+TEST_F(SPCPipelineR7Test, EnrichBackfill_RecoveryDeliveryWithoutResetGivesUp) {
+    auto failing_llm = std::make_shared<llm::MockLlmClient>();
+    llm::ChatCompletionResponse fail;
+    fail.status = Status::Unavailable("LLM_TRANSPORT: synthetic burst");
+    EXPECT_CALL(*failing_llm, Chat(_, _)).WillRepeatedly(Return(fail));
+    cortrix::spc::EnricherChain broken;
+    broken.Append(std::make_shared<FailingSummaryEnricher>());
+    broken.Append(std::make_shared<FailingContextualEnricher>());
+    broken.Append(std::make_shared<cortrix::spc::HyPEEnricher>(
+        cortrix::spc::HyPEConfig{}, failing_llm, nullptr));
+    pipeline_->SetEnricherChain(&broken);
+    std::string doc_id = CreateDoc();
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    ASSERT_EQ(pipeline_->Process(*task, *facade_), 0) << task->error_message;
+    pipeline_->SetEnricherChain(nullptr);
+    sqlite3* db = facade_->store().db_handle();
+    ASSERT_NE(db, nullptr);
+    ASSERT_EQ(sqlite3_exec(db,
+        "DELETE FROM enrich_state WHERE block_id NOT IN"
+        " (SELECT MIN(block_id) FROM enrich_state);"
+        "UPDATE enrich_state SET attempts=9, next_retry_at=1",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+
+    auto pausing = std::make_shared<PausingFailingSummaryEnricher>();
+    cortrix::spc::EnricherChain chain;
+    chain.Append(pausing);
+    async::TaskManager mgr;
+    ASSERT_TRUE(mgr.Init((tmp_root_ / "tasks.db").string()).ok());
+    cortrix::spc::EnrichBackfillWorker worker(*pool_, &chain, *embedder_, &mgr);
+    async::TaskInfo t;
+    t.task_id = 1;
+    t.namespace_id = "test-ns";
+    t.doc_id = doc_id;
+    std::thread delivery([&] { (void)worker.ProcessTask(t); });
+    pausing->WaitUntilCalled();
+    pausing->Resume();
+    delivery.join();
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM enrich_state WHERE status='failed_permanent'"
+                       " AND attempts=10 AND generation=0"), 1);
 }
 
 // Full repair cycle: ingest under a fully-failing chain (debt f03,f35,f38) →

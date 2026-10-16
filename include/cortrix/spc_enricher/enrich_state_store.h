@@ -48,10 +48,34 @@ struct EnrichStateRow {
     std::string last_error;
     int64_t next_retry_at = 0;   // unix seconds; 0 ⇔ SQL NULL (non-pending rows)
     int64_t updated_at = 0;      // unix seconds; caller stamps (testable clock)
+    int generation = 0;          // see "Generation" below
 };
 
-/// Insert-or-replace the row for row.block_id (all fields overwritten).
+/// Generation. A delivery reads its rows, charges them, calls the provider and then
+/// writes each row's outcome; between the read and the write, three transitions
+/// that are not the delivery's own can land on a row it holds: the operator reset
+/// (ResetGivenUpEnrichRows), the audit's settle of a complete terminal row and the
+/// audit's re-owe of an existing row (both inside SynthesizeEnrichAuditRows). Each
+/// bumps the row's `generation`, and the delivery's write applies only to the
+/// generation it read (FlipEnrichStateIfGeneration), so an outcome computed from a
+/// snapshot that no longer describes the row is dropped instead of undoing the
+/// transition. Writes that only move the due time (the sweeper's lease,
+/// MakeAllPendingDueNow) and the delivery's own charge leave it unchanged.
+
+/// Insert-or-replace the row for row.block_id. Every field is overwritten except
+/// `generation`, which belongs to the row's lifetime: a new row takes
+/// row.generation, an existing row keeps its own (an upsert never undoes a reset).
 Status UpsertEnrichState(sqlite3* db, const EnrichStateRow& row);
+
+/// The worker's end-of-run write for one row: status, failed_members, attempts,
+/// last_error, next_retry_at and updated_at from `row`, applied only while the
+/// stored row still carries `expected_generation`, the value the delivery read
+/// before it called the provider. A reset, settle or re-owe that landed during the
+/// call bumped the generation, so the delivery's outcome is dropped and the row
+/// keeps what that transition wrote. Returns true when the row was written, false
+/// when it was left alone (also when the row no longer exists: it is not recreated).
+Result<bool> FlipEnrichStateIfGeneration(sqlite3* db, const EnrichStateRow& row,
+                                         int expected_generation);
 
 /// All rows for one document, ordered by block_id. status_filter: exact match,
 /// empty = all statuses.
@@ -75,6 +99,22 @@ Status LeaseDocRetries(sqlite3* db, const std::string& doc_id, int64_t lease_unt
 /// batch on every call while the rest wait for ever (#149). Returns rows changed.
 Result<int> MakeAllPendingDueNow(sqlite3* db, int64_t now_unix);
 
+struct EnrichResetCounts {
+    int moved = 0;     ///< failed_permanent rows moved back to pending_retry, due now
+    int orphaned = 0;  ///< failed_permanent rows left as they are: their chunk no longer exists
+};
+
+/// Operator exit for rows that gave up (#154): every 'failed_permanent' row whose
+/// chunk still exists goes back to 'pending_retry' with attempts 0, due at
+/// `now_unix`, last_error "reset by operator", and its `generation` bumped so a
+/// delivery that was in flight when the reset happened cannot write its stale
+/// outcome over the fresh budget (FlipEnrichStateIfGeneration). Each moved row
+/// gets a fresh run of up to kEnrichMaxAttempts provider deliveries, so this is an
+/// explicit decision, never automatic. Rows whose block row is gone are left
+/// terminal and counted separately: a delivery can never repair them, and moving
+/// them would read as a reset that did not work.
+Result<EnrichResetCounts> ResetGivenUpEnrichRows(sqlite3* db, int64_t now_unix);
+
 /// Count one delivery against these pending rows, before the first provider call.
 /// The worker's end-of-run flip is the only other writer of `attempts`, and a
 /// task that dies before the flip (a storage failure after the provider ran, a
@@ -97,6 +137,7 @@ Result<int> ChargeEnrichAttempts(sqlite3* db, const std::vector<uint64_t>& block
 /// does when the only missing artifact is the contextual index label while the
 /// columns and the stored vector are present: the provider work is done, and one
 /// more delivery re-adds the point from the stored vector and writes the label.
+/// An existing row's generation is bumped (see "Generation"); a new row starts at 0.
 Status ReoweEnrichState(sqlite3* db, const EnrichStateRow& row, int terminal_at_attempts);
 
 struct EnrichStateCounts {
@@ -127,11 +168,16 @@ Result<EnrichStateCounts> CountEnrichStates(sqlite3* db);
 /// terminal, with one exception: when the contextual columns and the stored
 /// vector are present and only the index label is missing
 /// (kBlockHasStoredContextualVectorSql), the repair costs no provider call, so
-/// the chunk is re-owed whatever its count. Fully-covered chunks get no row.
-/// Returns the synthesized count.
+/// the chunk is re-owed whatever its count. Fully-covered chunks get no row —
+/// and a 'failed_permanent' chunk that is fully covered (nothing the configured
+/// chain asks for is missing: its artifacts landed in a run that died before the
+/// flip, or it gave up on a member the chain or the index gates no longer owe) is
+/// settled to 'ok' here, without a delivery or a charge, and its generation bumped
+/// (see "Generation"); `settled_out`, when given, receives that count. Returns the
+/// synthesized count.
 Result<int> SynthesizeEnrichAuditRows(
     sqlite3* db, const std::unordered_set<std::string>& configured_members,
-    int64_t now_unix);
+    int64_t now_unix, int* settled_out = nullptr);
 
 /// The other direction of the audit: contextual index labels — and the points
 /// they resolve — that the ingest's rule excludes (index_gates.h: the chunk is

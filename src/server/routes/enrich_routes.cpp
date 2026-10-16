@@ -59,12 +59,39 @@ void RegisterEnrichRoutes(httplib::Server& server,
                     return;
                 }
 
+                // The body is optional; when present it must be a JSON object whose
+                // keys are the two boolean flags. Anything else is rejected with a
+                // named error rather than ignored: a misspelled key or a string
+                // "true" used to get a 200 that did nothing, and that nothing
+                // looked exactly like "nothing to do".
                 bool audit = true;
+                bool reset_given_up = false;
                 if (!req.body.empty()) {
                     auto body = nlohmann::json::parse(req.body, nullptr, false);
-                    if (!body.is_discarded() && body.is_object() &&
-                        body.contains("audit") && body["audit"].is_boolean()) {
-                        audit = body["audit"].get<bool>();
+                    auto bad = [&](const std::string& what) {
+                        WriteJsonError(res,
+                                       Status::InvalidArgument(
+                                           "CX_ERR_ENRICH_BACKFILL_INVALID_BODY: " + what),
+                                       rctx.request_id);
+                    };
+                    if (body.is_discarded() || !body.is_object()) {
+                        bad("request body must be a JSON object with the optional boolean "
+                            "fields audit and reset_given_up");
+                        return;
+                    }
+                    for (auto it = body.begin(); it != body.end(); ++it) {
+                        if (it.key() != "audit" && it.key() != "reset_given_up") {
+                            bad("unknown field '" + it.key() + "'");
+                            return;
+                        }
+                        if (!it.value().is_boolean()) {
+                            bad("field '" + it.key() + "' must be a boolean");
+                            return;
+                        }
+                    }
+                    if (body.contains("audit")) audit = body["audit"].get<bool>();
+                    if (body.contains("reset_given_up")) {
+                        reset_given_up = body["reset_given_up"].get<bool>();
                     }
                 }
 
@@ -88,6 +115,9 @@ void RegisterEnrichRoutes(httplib::Server& server,
                     chain_tokens.begin(), chain_tokens.end());
                 int synthesized = 0;
                 int removed = 0;
+                int settled = 0;
+                int reset = 0;
+                int orphaned = 0;
 
                 if (audit) {
                     // The audit reconciles both directions of the ingest's index
@@ -95,7 +125,8 @@ void RegisterEnrichRoutes(httplib::Server& server,
                     // (written by audits and backfills before the gates existed),
                     // then synthesize pending rows for legacy / silently-degraded
                     // chunks (shared with tests; rows already pending keep their
-                    // backoff). Each removal waits on the index's own delete, so a
+                    // backoff) and settle terminal rows whose artifacts are all
+                    // present. Each removal waits on the index's own delete, so a
                     // large affected namespace makes its first audit slow; later
                     // audits remove nothing.
                     auto rec = spc::ReconcileExcludedContextualLabels(
@@ -107,12 +138,26 @@ void RegisterEnrichRoutes(httplib::Server& server,
                         return;
                     }
                     removed = rec.value();
-                    auto synth = spc::SynthesizeEnrichAuditRows(db, configured, now);
+                    auto synth = spc::SynthesizeEnrichAuditRows(db, configured, now, &settled);
                     if (!synth.ok()) {
                         WriteJsonError(res, synth.status(), rctx.request_id);
                         return;
                     }
                     synthesized = synth.value();
+                }
+
+                if (reset_given_up) {
+                    // The operator's explicit exit for rows that gave up: back to
+                    // pending with a fresh count, due now; rows whose chunk is gone
+                    // are left terminal and reported, not moved. Runs after the audit
+                    // so a row the audit just settled is not re-delivered.
+                    auto rr = spc::ResetGivenUpEnrichRows(db, now);
+                    if (!rr.ok()) {
+                        WriteJsonError(res, rr.status(), rctx.request_id);
+                        return;
+                    }
+                    reset = rr.value().moved;
+                    orphaned = rr.value().orphaned;
                 }
 
                 auto made_due = spc::MakeAllPendingDueNow(db, now);
@@ -127,7 +172,11 @@ void RegisterEnrichRoutes(httplib::Server& server,
                 body["namespace"] = ns_name;
                 body["audited"] = audit;
                 body["removed"] = removed;  // 0 when audit is false
+                body["reset_given_up"] = reset_given_up;
                 body["synthesized"] = synthesized;
+                body["settled"] = settled;            // 0 when audit is false
+                body["reset"] = reset;                // 0 when reset_given_up is false
+                body["orphaned_skipped"] = orphaned;  // terminal rows whose chunk is gone
                 body["enqueued"] = enqueued;
                 if (counts.ok()) {
                     body["counts"] = {
@@ -145,6 +194,9 @@ void RegisterEnrichRoutes(httplib::Server& server,
                     e.namespace_id = ns_name;
                     e.summary = "removed=" + std::to_string(removed) +
                                 " synthesized=" + std::to_string(synthesized) +
+                                " settled=" + std::to_string(settled) +
+                                " reset=" + std::to_string(reset) +
+                                " orphaned=" + std::to_string(orphaned) +
                                 " enqueued=" + std::to_string(enqueued);
                     e.trace_id = rctx.request_id;
                     oplog->Log(e);

@@ -15,10 +15,13 @@ namespace cortrix::spc {
 class EnrichStateSchemaProvider : public cortrix::catalog::ISchemaProvider {
 public:
     std::string FeatureName() const override { return "EnrichState"; }
-    int CurrentVersion() const override { return 1; }
+    int CurrentVersion() const override { return 2; }
 
-    /// 0 → 1: create enrich_state + its scan indexes. Idempotent
-    /// (CREATE TABLE/INDEX IF NOT EXISTS); no dependency on other tables.
+    /// 0 → 1: create enrich_state + its scan indexes. 1 → 2: add `generation`,
+    /// the counter the operator reset and the audit's settle and re-owe bump so a
+    /// delivery that was in flight cannot write its stale outcome over them.
+    /// Forward-only and idempotent (CREATE ... IF NOT EXISTS; the column is added
+    /// only when absent); no dependency on other tables.
     Status Migrate(sqlite3* db, int from_ver, int to_ver) override;
 };
 
