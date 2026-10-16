@@ -23,7 +23,7 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 | Explicit memory write, list, edit, and delete | `Preview` | The four endpoints exist and are documented. Read explicit memories back with `GET /memory`; semantic search over them (`POST /memory/search` and `/query`) does not return results on this line. |
 | Self-service memory correction | `Preview` | The manual invalidate and restore flow and its audit trail are documented in [Agent Memory Correction](agent-memory-correction.md) and present; automatic contradiction handling depends on memory extraction, which is `In development`. |
 | MCP server | `Preview` | The local stdio adapter supports modern `2026-07-28` (`server/discover`) and legacy `2025-11-25` (initialize); verify it against your target server and API. |
-| Python SDK | `Preview` | SDK resources are documented and test-covered, but compatibility follows the live API contract. |
+| Python SDK | `Preview` | The typed models are generated from the published specification, and CI fails when the two drift. The resource methods are tested against mocked responses rather than a live server, so compatibility follows the live API contract. |
 | Framework adapters (`cortrix-skills`) | `Preview` | Tool definitions for LangChain, Claude, and OpenAI install from PyPI and are test-covered; a full round trip depends on your LLM provider. |
 | pgcortrix | `In development` | The SQL contract and helper exist with standalone tests; loading into a live PostgreSQL and `pg_regress` integration have not been run on this line. |
 | Built-in Agent fixed-flow chat | `Preview` | Chat mode is documented; deployment and LLM provider behavior should be verified in your runtime. |

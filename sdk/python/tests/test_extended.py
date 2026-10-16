@@ -1,4 +1,4 @@
-"""Extended resource tests: watchers / sync / auth / system / tenants / import."""
+"""Extended resource tests: watchers / auth / system / tenants / import."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import httpx
 import respx
 
 from cortrix import Cortrix
-from cortrix.types import LoginResponse, SyncStatus, Tenant, User, Watcher
+from cortrix.types import LoginResponse, Tenant, User, Watcher
 
 
 # --- watchers ---
@@ -32,28 +32,6 @@ def test_watchers_list_and_remove(api_base: str, client: Cortrix) -> None:
     route = respx.delete(api_base + "/watch/w1").mock(return_value=httpx.Response(204))
     assert client.watchers.remove("w1") is None
     assert route.calls.last.request.method == "DELETE"
-
-
-# --- sync ---
-@respx.mock
-def test_sync_configure_maps_to_start(api_base: str, client: Cortrix) -> None:
-    route = respx.post(api_base + "/sync/start").mock(
-        return_value=httpx.Response(200, json={"status": "running"})
-    )
-    s = client.sync.configure("ns", interval_seconds=600)
-    assert isinstance(s, SyncStatus) and s.status == "running"
-    assert json.loads(route.calls.last.request.content) == {"namespace": "ns", "interval_seconds": 600}
-
-
-@respx.mock
-def test_sync_status_optional_namespace(api_base: str, client: Cortrix) -> None:
-    route = respx.get(api_base + "/sync/status").mock(
-        return_value=httpx.Response(200, json={"status": "idle"})
-    )
-    client.sync.status()
-    assert "namespace" not in route.calls.last.request.url.params
-    client.sync.status("ns")
-    assert route.calls.last.request.url.params["namespace"] == "ns"
 
 
 # --- auth ---

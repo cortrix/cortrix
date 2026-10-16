@@ -160,7 +160,7 @@ components:
 
     DocumentTask:
       type: object
-      description: "F42 asynchronous upload task"
+      description: "Asynchronous upload task."
       required: [task_id, status]
       properties:
         task_id:
@@ -331,9 +331,9 @@ components:
     SearchConfig:
       type: object
       description: >-
-        Per-query route toggles (F07/F08). Each route defaults to enabled; set a flag false
-        to skip that route (e.g. {"enable_sql": false} runs vector + BM25 only). Disabling a
-        route is reflected in the response meta.routes_used / degradation fields.
+        Per-query retrieval route toggles. Each route runs unless its flag is false;
+        for example {"enable_bm25": false} skips the lexical route. A flag that is
+        not a boolean is ignored.
       properties:
         enable_vector:
           type: boolean
@@ -343,10 +343,10 @@ components:
           type: boolean
           default: true
           description: "Run the lexical BM25 route."
-        enable_sql:
+        enable_sparse:
           type: boolean
           default: true
-          description: "Allow the SQL route to fire when the query intent is SQL/hybrid (F08; otherwise skipped)."
+          description: "Run the sparse (learned lexical) route, where the namespace has a sparse index."
 
     QueryResultItem:
       type: object
@@ -371,6 +371,9 @@ components:
             `document_summary` is generated text about the document, not text from it;
             `document_label` is a bare name with no body evidence at all. Present so a
             caller can tell a quotable passage from a summary before relying on it.
+            Present on every item of the retrieval routes; items of the chat route
+            (`route: chat`) have their own shape (`child_id`, `content`, `memory_type`,
+            `created_at`, `confidence`) and do not carry it.
         score:
           type: number
           format: float
@@ -389,10 +392,25 @@ components:
         metadata:
           type: object
           additionalProperties: true
+        score_signals:
+          type: object
+          description: >-
+            The quality signals recorded for this chunk when it was ingested. Present
+            only when at least one of them exists; each member is present only when
+            that signal was recorded.
+          properties:
+            enriched_score:
+              type: number
+              format: float
+              description: "Quality score recorded when the chunk was enriched."
+            semantic_score:
+              type: number
+              format: float
+              description: "Semantic quality score recorded when the chunk was written."
 
     QueryMeta:
       type: object
-      description: "Class-A fields (data integrity) — mandatory; cross-NS partial-success semantics."
+      description: "Metadata present on every query result: which namespaces were queried and answered, coverage and latency, and per-namespace failures."
       required: [namespaces_queried, namespaces_succeeded, coverage_ratio, latency_ms]
       properties:
         namespaces_queried:
@@ -421,6 +439,12 @@ components:
                 type: integer
                 nullable: true
               message: { type: string }
+              structured_data:
+                type: object
+                additionalProperties: true
+                description: >-
+                  Machine-readable details of the failure. Always carries `namespace`;
+                  other keys depend on `error_code`.
         coverage_ratio:
           type: number
           format: float
@@ -430,8 +454,22 @@ components:
           type: integer
         deduplicated_chunks:
           type: array
+          description: >-
+            One entry per chunk that several namespaces returned with the same content;
+            the chunk appears once in `results`, from `primary_namespace`.
           items:
-            type: string
+            type: object
+            properties:
+              content_hash: { type: string }
+              primary_namespace: { type: string }
+              namespaces:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    namespace: { type: string }
+                    score: { type: number, format: float }
+                    rerank_score: { type: number, format: float }
         deduplicated_chunks_count:
           type: integer
         warnings:
@@ -458,6 +496,35 @@ components:
             $ref: '#/components/schemas/QueryResultItem'
         meta:
           $ref: '#/components/schemas/QueryMeta'
+        explain:
+          type: object
+          additionalProperties: true
+          description: >-
+            Diagnostics about how the result was produced. Present only when the request
+            asked for them (`?explain=true`).
+        error:
+          type: object
+          additionalProperties: true
+          description: >-
+            Present, with HTTP 200, when the query as a whole ran out of its time budget
+            and `results` and `meta` hold what completed. Same shape as the `error` object
+            of the standard error response, without `request_id`: `code`, `message`,
+            `retryable`, `category`, `retry_after_ms` and `structured_data` (the last
+            two may be null).
+          properties:
+            code: { type: string }
+            message: { type: string }
+            retryable: { type: boolean }
+            category:
+              type: string
+              enum: [auth, quota, transient, permanent, timeout]
+            retry_after_ms:
+              type: integer
+              nullable: true
+            structured_data:
+              type: object
+              nullable: true
+              additionalProperties: true
 
     # ============ Memory domain (ARCH § 4.1.5 + MEM01/02/03/05) ============
     MemorySearchRequest:
@@ -480,7 +547,7 @@ components:
 
     MemorySearchResultItem:
       type: object
-      description: "One MEM02 conversation-memory search hit (live MemorySearcher result)."
+      description: "One conversation-memory search hit."
       required: [interaction_id, session_id, query_text, response_text, score, expired, created_at]
       properties:
         interaction_id: { type: string }
@@ -497,7 +564,7 @@ components:
 
     MemorySearchResponse:
       type: object
-      description: "POST /memory/search body (live MemorySearchResponse). Semantic search over conversation memory with MEM05 user isolation."
+      description: "POST /memory/search body. Semantic search over conversation memory, isolated per user."
       required: [results, total_results, latency_ms, degraded]
       properties:
         results:
@@ -525,7 +592,7 @@ components:
 
     MemoryExtractResponse:
       type: object
-      description: "POST /memory/extract body (live ExtractOne result). error is always null on success (GEN-Agent stable schema)."
+      description: "POST /memory/extract body. error is always null on success (stable schema)."
       required: [extracted_memories, error]
       properties:
         extracted_memories:
@@ -597,7 +664,7 @@ components:
     ImportRequest:
       type: object
       description: |
-        Database import request (POST /import/database, F16a §6.2). Exactly one of {table, sql} must be
+        Database import request (POST /import/database). Exactly one of {table, sql} must be
         provided; table mode additionally accepts a filter JSON DSL (NOT raw SQL) + columns projection.
       required: [namespace, connection_ref]
       properties:
@@ -636,7 +703,7 @@ components:
 
     ImportTaskStarted:
       type: object
-      description: "Acceptance ack for POST /import/database (F16a §5.1). status is always 'queued'; live status comes from GET /import/tasks/{task_id}/progress."
+      description: "Acceptance ack for POST /import/database. status is always 'queued'; live status comes from GET /import/tasks/{task_id}/progress."
       required: [task_id, status, namespace, connection_ref, estimated_rows, queued_at, progress_endpoint, cancel_endpoint, error]
       properties:
         task_id:
@@ -669,7 +736,7 @@ components:
 
     ImportTaskProgress:
       type: object
-      description: "Import task progress snapshot (F16a §5.2). error is set only in the FAILED terminal state; cancel resolves to status=cancelled with no error."
+      description: "Import task progress snapshot. error is set only in the FAILED terminal state; cancel resolves to status=cancelled with no error."
       required: [task_id, status, progress, rows_imported, rows_total, rows_failed, started_at, estimated_completion_at, error]
       properties:
         task_id:
@@ -720,7 +787,7 @@ components:
 
     DbConnection:
       type: object
-      description: "A registered import connection as listed by GET /admin/db-connections. The DSN is never returned (R2)."
+      description: "A registered import connection as listed by GET /admin/db-connections. The DSN is never returned."
       required: [ref_id, name, host, db_name, registered_by, revoked]
       properties:
         ref_id:
@@ -743,7 +810,7 @@ components:
     # Timestamps are raw stored Unix-ms integers (the writer stamps Unix ms).
     TraceEntry:
       type: object
-      description: "One agent_trace row (F13 §8.1). Optional columns are JSON null when unset (GEN-Agent stable schema)."
+      description: "One agent trace row. Optional columns are JSON null when unset (stable schema)."
       required: [session_id, trace_id, agent_id, method, params, result_summary, duration_ms, source, status, error_code, namespace_id, created_at]
       properties:
         session_id: { type: string, nullable: true }
@@ -783,7 +850,7 @@ components:
 
     TraceSession:
       type: object
-      description: "GET /traces/{session_id} body (F13 §8.1)."
+      description: "GET /traces/{session_id} body."
       required: [session_id, trace_count, traces, meta]
       properties:
         session_id: { type: string }
@@ -825,7 +892,7 @@ components:
 
     InteractionList:
       type: object
-      description: "GET /interactions body (F13 §8.3)."
+      description: "GET /interactions body."
       required: [interactions, meta]
       properties:
         interactions:
@@ -848,7 +915,7 @@ components:
 
     InteractionSources:
       type: object
-      description: "GET /interactions/{id}/sources body (F13 §8.2). highlight_ranges is Enterprise-only (absent in CE)."
+      description: "GET /interactions/{id}/sources body."
       required: [interaction_id, source_count, deleted_sources_count, sources]
       properties:
         interaction_id: { type: string }
@@ -862,7 +929,7 @@ components:
     # ============ Operation log domain (F18a §6.1) ============
     OperationLogEntry:
       type: object
-      description: "One operation_log row (F18a §6.1). Optional columns are JSON null when unset."
+      description: "One operation log row. Optional columns are JSON null when unset."
       required: [id, timestamp, user_id, action, resource_type]
       properties:
         id: { type: string }
@@ -894,7 +961,7 @@ components:
 
     OperationLogPage:
       type: object
-      description: "GET /operations body (F18a §6.1). Pagination is offset-based (no opaque cursor)."
+      description: "GET /operations body. Pagination is offset-based (no opaque cursor)."
       required: [operations, total_count, limit, offset, meta]
       properties:
         operations:
@@ -1166,7 +1233,7 @@ components:
     # ============ System domain (ARCH § 4.1.11 + V14 J8) ============
     AgentLlmConfig:
       type: object
-      description: "F48 § 6.3 agent LLM config (GET reads redacted / PUT admin-only update)"
+      description: "Agent LLM configuration (GET returns it redacted; PUT is an admin-only update)."
       properties:
         provider:
           type: string
@@ -1183,7 +1250,7 @@ components:
 
     NsStats:
       type: object
-      description: "per-NS metrics dictionary (V3 resolution 10, replaces the PromQL ns_id label)"
+      description: "Per-namespace metrics dictionary."
       properties:
         namespace:
           type: string
@@ -1220,7 +1287,7 @@ components:
     # ============ Batch submit domain (TD-F42-BULK §2.2/§2.3, Wave D-R1) ============
     BatchSubmitDocument:
       type: object
-      description: "One document in a batch submission (TD-F42-BULK §2.2)."
+      description: "One document in a batch submission."
       required: [doc_id, content]
       properties:
         doc_id:
@@ -1236,7 +1303,7 @@ components:
 
     BatchSubmitOptions:
       type: object
-      description: "Batch submission options (TD-F42-BULK §2.2, topics 2/3)."
+      description: "Batch submission options."
       properties:
         async:
           type: boolean
@@ -1266,7 +1333,7 @@ components:
 
     BatchSubmitResultItem:
       type: object
-      description: "Accepted per-doc submission result (TD-F42-BULK §2.3 results[])."
+      description: "Accepted per-document submission result (an entry of results[])."
       required: [doc_id, task_id, status]
       properties:
         doc_id:
@@ -1284,7 +1351,7 @@ components:
 
     BatchSubmitFailureItem:
       type: object
-      description: "Per-doc failure with the GEN-Agent 5-field schema (TD-F42-BULK §2.3 / §2.4.2). error_code reuses the originating Feature's existing CX_ERR_* code."
+      description: "Per-document failure in the standard error fields. error_code is the existing CX_ERR_* code of the step that failed."
       required: [doc_id, error_code, category, retryable]
       properties:
         doc_id:
@@ -1309,7 +1376,7 @@ components:
 
     BatchSubmitMeta:
       type: object
-      description: "Class-A partial-success meta (TD-F42-BULK §2.3); coverage_ratio = succeeded / total_submitted."
+      description: "Partial-success meta; coverage_ratio = succeeded / total_submitted."
       required: [succeeded, failed, coverage_ratio, total_submitted]
       properties:
         succeeded:
@@ -1333,7 +1400,7 @@ components:
 
     BatchSubmitResponse:
       type: object
-      description: "Batch submission partial-success response (TD-F42-BULK §2.3). HTTP 200 even with per-doc failures; batch-level rejection returns a GEN-Agent error envelope (§2.4.1)."
+      description: "Batch submission partial-success response. HTTP 200 even with per-document failures; a rejection of the whole batch returns the standard error response."
       required: [results, meta]
       properties:
         results:

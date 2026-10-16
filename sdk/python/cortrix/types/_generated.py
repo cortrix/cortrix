@@ -66,7 +66,7 @@ class Document:
     status: Literal["pending", "parsing", "chunking", "embedding", "indexing", "ready", "failed"]
     namespace: Optional[str] = None
     filename: Optional[str] = None
-    source_type: Optional[str] = None
+    source_type: Optional[Literal["upload", "http_upload", "watch_dir", "memory_session", "memory"]] = None
     source_ref: Optional[str] = None
     progress: Optional["DocumentProgress"] = None
     content_hash: Optional[str] = None
@@ -76,29 +76,23 @@ class Document:
 
 @dataclass
 class DocumentTask:
-    """F42 async upload task."""
+    """Asynchronous upload task."""
     task_id: str
-    # Hand-applied, against this file's own rule, and deliberately so.
-    #
-    # This file has never matched the generator's output: the last commit to touch it
-    # (6ac60d4) edited one line by hand without touching the spec. Running
-    # scripts/generate_types.py today produces a ~320-line diff, and that regeneration
-    # DELETES four models -- SqlRequest, SqlResult, SyncStatus and MemoryLogRequest --
-    # because the spec no longer describes them. The first three are not merely
-    # re-exported: they are the `response_model` of eight public SDK methods
-    # (resources/sync.py x6, resources/sql.py x2), so regenerating would take
-    # cortrix.sql.* and cortrix.sync.* out of the package entirely.
-    #
-    # The regeneration would also fix a real defect this file carries today --
-    # GcStatus.last_gc_at is declared Optional[str] while the spec and the server both
-    # use int64 epoch milliseconds -- which is a reason to do it properly rather than
-    # to keep hand-editing. Both halves of that drift are reported in issue #142; neither should hold up correcting a status set that is
-    # actively telling callers to wait for a value the server cannot send.
     status: Literal["queued", "processing", "cancelling", "completed", "failed", "cancelled"]
     document_id: Optional[str] = None
     namespace: Optional[str] = None
     progress: Optional["DocumentProgress"] = None
     created_at: Optional[str] = None
+
+
+@dataclass
+class UploadDocumentResult:
+    """Synchronous result of the multipart POST /namespaces/{ns}/documents file upload. Unlike the async POST /documents (which returns a task_id), this returns the doc_id directly. status reflects the outcome (uploaded → processing queued; updating → reprocessing queued; unchanged → duplicate skipped)."""
+    doc_id: str
+    content_hash: str
+    status: str
+    source_path: str
+    message: str
 
 
 @dataclass
@@ -117,6 +111,21 @@ class QueryRequest:
     rerank: Optional[bool] = None
     filter: Optional["QueryFilter"] = None
     include_sources: Optional[bool] = None
+    route: Optional[Literal["auto", "simple", "complex", "chat"]] = None
+    rag_fusion: Optional[bool] = None
+    include_parent: Optional[bool] = None
+    parent_expand_top_k: Optional[int] = None
+    parent_max_bytes: Optional[int] = None
+    search_config: Optional["SearchConfig"] = None
+    timeout_ms: Optional[int] = None
+
+
+@dataclass
+class SearchConfig:
+    """Per-query retrieval route toggles. Each route runs unless its flag is false; for example {"enable_bm25": false} skips the lexical route. A flag that is not a boolean is ignored."""
+    enable_vector: Optional[bool] = None
+    enable_bm25: Optional[bool] = None
+    enable_sparse: Optional[bool] = None
 
 
 @dataclass
@@ -126,24 +135,29 @@ class QueryResultItem:
     parent_id: Optional[str] = None
     content: Optional[str] = None
     parent_content: Optional[str] = None
+    evidence_kind: Optional[Literal["chunk", "document_summary", "document_label"]] = None
     score: Optional[float] = None
     rerank_score: Optional[float] = None
     namespace: Optional[str] = None
     content_hash: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    score_signals: Optional[Dict[str, Any]] = None
 
 
 @dataclass
 class QueryMeta:
-    """Class-A fields (data integrity) — always present; cross-NS partial-success semantics."""
+    """Metadata present on every query result: which namespaces were queried and answered, coverage and latency, and per-namespace failures."""
     namespaces_queried: List[str]
     namespaces_succeeded: List[str]
     coverage_ratio: float
     latency_ms: int
     namespaces_failed: Optional[List[Dict[str, Any]]] = None
-    deduplicated_chunks: Optional[List[str]] = None
+    deduplicated_chunks: Optional[List[Dict[str, Any]]] = None
     deduplicated_chunks_count: Optional[int] = None
     warnings: Optional[List[Dict[str, Any]]] = None
+    via_path: Optional[str] = None
+    crag_verdict: Optional[str] = None
+    crag_action: Optional[str] = None
 
 
 @dataclass
@@ -151,6 +165,8 @@ class QueryResult:
     """QueryResult (generated)."""
     results: List["QueryResultItem"]
     meta: "QueryMeta"
+    explain: Optional[Dict[str, Any]] = None
+    error: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -163,14 +179,43 @@ class MemorySearchRequest:
 
 
 @dataclass
-class MemoryLogRequest:
-    """MemoryLogRequest (generated)."""
-    namespace: str
-    user_id: str
-    query: str
-    response: str
-    session_id: Optional[str] = None
-    context: Optional[Dict[str, Any]] = None
+class MemorySearchResultItem:
+    """One conversation-memory search hit."""
+    interaction_id: str
+    session_id: str
+    query_text: str
+    response_text: str
+    score: float
+    expired: bool
+    created_at: str
+    query_type: Optional[str] = None
+    metadata: Optional[str] = None
+
+
+@dataclass
+class MemorySearchResponse:
+    """POST /memory/search body. Semantic search over conversation memory, isolated per user."""
+    results: List["MemorySearchResultItem"]
+    total_results: int
+    latency_ms: int
+    degraded: bool
+
+
+@dataclass
+class MemoryExtractedItem:
+    """MemoryExtractedItem (generated)."""
+    block_id: str
+    type: Literal["fact", "preference", "event"]
+    content: str
+    confidence: float
+
+
+@dataclass
+class MemoryExtractResponse:
+    """POST /memory/extract body. error is always null on success (stable schema)."""
+    extracted_memories: List["MemoryExtractedItem"]
+    extract_meta: Optional[Dict[str, Any]] = None
+    error: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -196,30 +241,164 @@ class Memory:
 
 
 @dataclass
-class SqlRequest:
-    """SqlRequest (generated)."""
-    question: str
-    max_rows: Optional[int] = None
-    explain: Optional[bool] = None
+class ImportRequest:
+    """Database import request (POST /import/database). Exactly one of {table, sql} must be"""
+    namespace: str
+    connection_ref: str
+    text_strategy: Optional[Literal["per_row", "merge"]] = None
+    merge_size: Optional[int] = None
+    table: Optional[str] = None
+    filter: Optional[Dict[str, Any]] = None
+    columns: Optional[List[str]] = None
+    sql: Optional[str] = None
 
 
 @dataclass
-class SqlResult:
-    """SqlResult (generated)."""
-    sql: str
-    results: List[Dict[str, Any]]
-    row_count: int
-    explanation: Optional[str] = None
-    execution_time_ms: Optional[int] = None
+class ImportTaskStarted:
+    """Acceptance ack for POST /import/database. status is always 'queued'; live status comes from GET /import/tasks/{task_id}/progress."""
+    task_id: str
+    status: Literal["queued"]
+    namespace: str
+    connection_ref: str
+    estimated_rows: int
+    queued_at: str
+    progress_endpoint: str
+    cancel_endpoint: str
+    error: Optional[Dict[str, Any]] = None
 
 
 @dataclass
-class SyncStatus:
-    """SyncStatus (generated)."""
-    status: Literal["idle", "running", "stopped", "error"]
-    last_sync_at: Optional[str] = None
-    synced_documents: Optional[int] = None
-    pending_documents: Optional[int] = None
+class ImportTaskProgress:
+    """Import task progress snapshot. error is set only in the FAILED terminal state; cancel resolves to status=cancelled with no error."""
+    task_id: str
+    status: Literal["queued", "running", "completed", "failed", "cancelling", "cancelled"]
+    progress: float
+    rows_imported: int
+    rows_total: int
+    rows_failed: int
+    started_at: Optional[str] = None
+    estimated_completion_at: Optional[str] = None
+    error: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class DbConnection:
+    """A registered import connection as listed by GET /admin/db-connections. The DSN is never returned."""
+    ref_id: str
+    name: str
+    host: str
+    db_name: str
+    registered_by: str
+    revoked: bool
+
+
+@dataclass
+class TraceEntry:
+    """One agent trace row. Optional columns are JSON null when unset (stable schema)."""
+    method: str
+    duration_ms: int
+    source: str
+    status: str
+    created_at: int
+    session_id: Optional[str] = None
+    trace_id: Optional[str] = None
+    agent_id: Optional[str] = None
+    params: Optional[str] = None
+    result_summary: Optional[str] = None
+    error_code: Optional[str] = None
+    namespace_id: Optional[str] = None
+
+
+@dataclass
+class TraceSessionMeta:
+    """TraceSessionMeta (generated)."""
+    total_duration_ms: int
+    total_count: int
+    has_next: bool
+    response_size_warning: bool
+    session_start: Optional[int] = None
+    session_end: Optional[int] = None
+    next_offset: Optional[int] = None
+
+
+@dataclass
+class TraceSession:
+    """GET /traces/{session_id} body."""
+    session_id: str
+    trace_count: int
+    traces: List["TraceEntry"]
+    meta: "TraceSessionMeta"
+
+
+@dataclass
+class InteractionListItem:
+    """InteractionListItem (generated)."""
+    interaction_id: str
+    session_id: str
+    user_id: str
+    namespace_id: str
+    role: str
+    query_text: str
+    query_type: str
+    created_at: int
+
+
+@dataclass
+class InteractionListMeta:
+    """InteractionListMeta (generated)."""
+    total_count: int
+    has_next: bool
+    next_offset: Optional[int] = None
+
+
+@dataclass
+class InteractionList:
+    """GET /interactions body."""
+    interactions: List["InteractionListItem"]
+    meta: "InteractionListMeta"
+
+
+@dataclass
+class InteractionSource:
+    """InteractionSource (generated)."""
+    source_id: str
+    source_type: str
+    snippet: str
+    relevance_score: float
+
+
+@dataclass
+class InteractionSources:
+    """GET /interactions/{id}/sources body."""
+    interaction_id: str
+    source_count: int
+    deleted_sources_count: int
+    sources: List["InteractionSource"]
+
+
+@dataclass
+class OperationLogEntry:
+    """One operation log row. Optional columns are JSON null when unset."""
+    id: str
+    timestamp: int
+    user_id: str
+    action: str
+    resource_type: str
+    namespace_id: Optional[str] = None
+    resource_id: Optional[str] = None
+    summary: Optional[str] = None
+    trace_id: Optional[str] = None
+    session_id: Optional[str] = None
+
+
+@dataclass
+class OperationLogPage:
+    """GET /operations body. Pagination is offset-based (no opaque cursor)."""
+    operations: List["OperationLogEntry"]
+    total_count: int
+    limit: int
+    offset: int
+    meta: Dict[str, Any]
 
 
 @dataclass
@@ -347,7 +526,7 @@ class AgentSession:
 
 @dataclass
 class AgentLlmConfig:
-    """F48 § 6.3 agent LLM config (GET redacted read / PUT admin-only update)."""
+    """Agent LLM configuration (GET returns it redacted; PUT is an admin-only update)."""
     provider: Optional[Literal["openai", "deepseek", "azure"]] = None
     model: Optional[str] = None
     api_key_set: Optional[bool] = None
@@ -356,7 +535,7 @@ class AgentLlmConfig:
 
 @dataclass
 class NsStats:
-    """Per-NS metrics dict (V3 resolution 10, replaces the PromQL ns_id label)."""
+    """Per-namespace metrics dictionary."""
     namespace: Optional[str] = None
     document_count: Optional[int] = None
     chunk_count: Optional[int] = None
@@ -370,7 +549,65 @@ class GcStatus:
     status: Optional[Literal["idle", "running"]] = None
     soft_deleted_count: Optional[int] = None
     reclaimable_bytes: Optional[int] = None
-    last_gc_at: Optional[str] = None
+    last_gc_at: Optional[int] = None
 
 
-__all__ = ["ChunkStrategy", "NamespaceCreateRequest", "Namespace", "DocumentProgress", "Document", "DocumentTask", "QueryFilter", "QueryRequest", "QueryResultItem", "QueryMeta", "QueryResult", "MemorySearchRequest", "MemoryLogRequest", "MemoryCreateRequest", "Memory", "SqlRequest", "SqlResult", "SyncStatus", "Watcher", "WatchEvent", "RegisterRequest", "TenantRef", "User", "LoginResponse", "ApiKey", "Quota", "TenantMember", "Tenant", "NsAclEntry", "ChatRequest", "AgentSession", "AgentLlmConfig", "NsStats", "GcStatus"]
+@dataclass
+class BatchSubmitDocument:
+    """One document in a batch submission."""
+    doc_id: str
+    content: str
+    metadata: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class BatchSubmitOptions:
+    """Batch submission options."""
+    async_: Optional[bool] = None
+    on_duplicate: Optional[Literal["skip", "overwrite", "error"]] = None
+
+
+@dataclass
+class BatchSubmitRequest:
+    """BatchSubmitRequest (generated)."""
+    namespace: str
+    documents: List["BatchSubmitDocument"]
+    options: Optional["BatchSubmitOptions"] = None
+
+
+@dataclass
+class BatchSubmitResultItem:
+    """Accepted per-document submission result (an entry of results[])."""
+    doc_id: str
+    task_id: str
+    status: Literal["submitted", "skipped"]
+
+
+@dataclass
+class BatchSubmitFailureItem:
+    """Per-document failure in the standard error fields. error_code is the existing CX_ERR_* code of the step that failed."""
+    doc_id: str
+    error_code: str
+    category: Literal["auth", "quota", "transient", "permanent", "timeout"]
+    retryable: bool
+    retry_after_ms: Optional[int] = None
+    structured_data: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class BatchSubmitMeta:
+    """Partial-success meta; coverage_ratio = succeeded / total_submitted."""
+    succeeded: List[str]
+    failed: List["BatchSubmitFailureItem"]
+    coverage_ratio: float
+    total_submitted: int
+
+
+@dataclass
+class BatchSubmitResponse:
+    """Batch submission partial-success response. HTTP 200 even with per-document failures; a rejection of the whole batch returns the standard error response."""
+    results: List["BatchSubmitResultItem"]
+    meta: "BatchSubmitMeta"
+
+
+__all__ = ["ChunkStrategy", "NamespaceCreateRequest", "Namespace", "DocumentProgress", "Document", "DocumentTask", "UploadDocumentResult", "QueryFilter", "QueryRequest", "SearchConfig", "QueryResultItem", "QueryMeta", "QueryResult", "MemorySearchRequest", "MemorySearchResultItem", "MemorySearchResponse", "MemoryExtractedItem", "MemoryExtractResponse", "MemoryCreateRequest", "Memory", "ImportRequest", "ImportTaskStarted", "ImportTaskProgress", "DbConnection", "TraceEntry", "TraceSessionMeta", "TraceSession", "InteractionListItem", "InteractionListMeta", "InteractionList", "InteractionSource", "InteractionSources", "OperationLogEntry", "OperationLogPage", "Watcher", "WatchEvent", "RegisterRequest", "TenantRef", "User", "LoginResponse", "ApiKey", "Quota", "TenantMember", "Tenant", "NsAclEntry", "ChatRequest", "AgentSession", "AgentLlmConfig", "NsStats", "GcStatus", "BatchSubmitDocument", "BatchSubmitOptions", "BatchSubmitRequest", "BatchSubmitResultItem", "BatchSubmitFailureItem", "BatchSubmitMeta", "BatchSubmitResponse"]

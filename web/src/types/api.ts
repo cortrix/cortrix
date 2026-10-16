@@ -94,7 +94,7 @@ export interface QueryRequest {
   search_config?: {
     enable_vector?: boolean;
     enable_bm25?: boolean;
-    enable_sql?: boolean;
+    enable_sparse?: boolean;
   };
 }
 

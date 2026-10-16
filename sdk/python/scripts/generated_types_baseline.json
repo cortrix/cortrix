@@ -1,5 +1,4 @@
 {
-  "committed_file_sha256": "89fe3530cc0ee8ccf237e5f75b7eace405896750cb5b8db5f88ea568c722b284",
-  "drift_reason": "Frozen pending the surface decision in #142: the committed file predates the current spec and carries hand edits, and regenerating would remove four models the SDK still exports.",
-  "generator_output_sha256": "404062fcb822f8c6897f1b5c26794be6ca8e38ba5e9523db98fa3c4162a9251a"
+  "committed_file_sha256": "3b3ad065c24954496578b4026f2ad2329c5a393a3ac20984388b1eb4ec7c415b",
+  "generator_output_sha256": "3b3ad065c24954496578b4026f2ad2329c5a393a3ac20984388b1eb4ec7c415b"
 }

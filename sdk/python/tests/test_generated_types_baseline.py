@@ -1,4 +1,4 @@
-"""The ratchet gate on ``cortrix/types/_generated.py`` (issue #142, step 1).
+"""The drift gate on ``cortrix/types/_generated.py`` (issue #142).
 
 These cases run the same check CI runs (``scripts/check_generated_types.py``)
 against the real tree and against temporary copies of its inputs. The tree is
@@ -105,9 +105,10 @@ def test_regeneration_is_recognised(check, tmp_path):
     check.generator_output(str(GENERATOR_PATH), str(SPEC_PATH), str(regenerated))
     outcome = _real(check, generated=str(regenerated))
     assert outcome.g_equals_c
-    # Against today's baseline (file != generator) a regeneration is a move of the
-    # committed side that must be recorded, never a hand edit. Once a regeneration
-    # has been recorded, the same inputs are simply the frozen state.
+    # The committed file is itself a regeneration, so with its baseline recorded a
+    # fresh regeneration is the frozen state. Against a baseline recorded before a
+    # regeneration, the same inputs are a move of the committed side to record,
+    # never a hand edit.
     expected = check.CASE_FROZEN if outcome.c_matches_baseline else check.CASE_REGENERATED
     assert outcome.case == expected, outcome.messages
     if outcome.case == check.CASE_REGENERATED:
@@ -148,28 +149,31 @@ def test_update_records_the_current_state(check, tmp_path, monkeypatch):
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     monkeypatch.delenv("CI", raising=False)
     baseline = tmp_path / "baseline.json"
-    common = ["--spec", str(SPEC_PATH), "--generated", str(GENERATED_PATH),
-              "--generator", str(GENERATOR_PATH), "--baseline", str(baseline)]
+    # A hand-edited copy stands in for a committed file that differs from the
+    # generator; the committed file itself agrees with it.
+    drifting = ["--spec", str(SPEC_PATH), "--generated", str(_hand_edited_copy(tmp_path)),
+                "--generator", str(GENERATOR_PATH), "--baseline", str(baseline)]
     # No baseline yet: the bare check fails and says so.
-    assert check.main(common) == check.EXIT_DRIFT
-    # The recorded state has file != generator, so --update needs a reason.
-    assert check.main(common + ["--update"]) == check.EXIT_USAGE
+    assert check.main(drifting) == check.EXIT_DRIFT
+    # A pair with file != generator can only be recorded with a reason.
+    assert check.main(drifting + ["--update"]) == check.EXIT_USAGE
     assert not baseline.exists()
-    assert check.main(common + ["--update", "--reason", "frozen for the test"]) == check.EXIT_OK
+    assert check.main(drifting + ["--update", "--reason", "frozen for the test"]) == check.EXIT_OK
     first = baseline.read_bytes()
     record = json.loads(first)
     assert set(record) == {check.KEY_COMMITTED, check.KEY_GENERATOR, check.KEY_REASON}
     assert record[check.KEY_REASON] == "frozen for the test"
-    assert check.main(common) == check.EXIT_OK
+    assert check.main(drifting) == check.EXIT_OK
     # A second --update is byte-identical.
-    assert check.main(common + ["--update", "--reason", "frozen for the test"]) == check.EXIT_OK
+    assert check.main(drifting + ["--update", "--reason", "frozen for the test"]) == check.EXIT_OK
     assert baseline.read_bytes() == first
-    # Recording an agreeing pair drops the reason field.
-    regenerated = tmp_path / "_generated_fresh.py"
-    check.generator_output(str(GENERATOR_PATH), str(SPEC_PATH), str(regenerated))
-    agreeing = [a if a != str(GENERATED_PATH) else str(regenerated) for a in common]
+    # Recording the committed file, which agrees with the generator, needs no
+    # reason and drops the field.
+    agreeing = ["--spec", str(SPEC_PATH), "--generated", str(GENERATED_PATH),
+                "--generator", str(GENERATOR_PATH), "--baseline", str(baseline)]
     assert check.main(agreeing + ["--update"]) == check.EXIT_OK
     assert set(json.loads(baseline.read_text())) == {check.KEY_COMMITTED, check.KEY_GENERATOR}
+    assert check.main(agreeing) == check.EXIT_OK
 
 
 def test_update_refuses_in_ci(check, tmp_path, monkeypatch):
