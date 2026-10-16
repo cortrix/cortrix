@@ -71,9 +71,7 @@ The async client mirrors the sync API exactly — every resource method has an
 | `client.namespaces` | `create` / `list` / `get` / `update` / `delete` / `set_permission` |
 | `client.search(...)` | top-level semantic query (`POST /query`) |
 | `client.memory` | `search` / `log` / `list` / `create` / `update` (=`edit`) / `delete` (=`invalidate`) |
-| `client.sql` | `query` (Text-to-SQL — extended deployments) |
 | `client.watchers` | `add` / `list` / `remove` / `events` |
-| `client.sync` | `configure` / `status` / `stop` (extended deployments) |
 | `client.auth` | `register` / `login` / `logout` / `refresh` / `password_reset` / `me` |
 | `client.system` | `health` / `version` / `namespace_stats` / `agent_llm_config` |
 | `client.tenants` | `list` / `get` / `invite` / `update_role` / `quota` / `create` |

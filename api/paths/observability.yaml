@@ -130,8 +130,8 @@ paths:
       operationId: getInteractionSources
       summary: Get interaction sources
       description: |
-        Get the retrieval sources cited by an interaction (F13 §8.2, Read+). Per-namespace storage, so
-        namespace is required. highlight_ranges is an Enterprise-only field (absent in CE).
+        Get the retrieval sources cited by an interaction (Read+). Per-namespace storage, so
+        namespace is required.
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff

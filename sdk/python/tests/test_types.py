@@ -64,11 +64,31 @@ def test_document_list_iter_len() -> None:
     assert len(dl) == 1 and list(dl)[0].document_id == "d1"
 
 
-def test_generated_module_exports_34_models() -> None:
+def test_generated_module_exports_57_models() -> None:
     from cortrix.types import _generated
 
-    assert len(_generated.__all__) == 34
+    assert len(_generated.__all__) == 57
     assert "QueryResult" in _generated.__all__ and "GcStatus" in _generated.__all__
+    assert "SearchConfig" in _generated.__all__
+    # The removed surfaces are gone with their models.
+    for gone in ("SqlRequest", "SqlResult", "SyncStatus", "MemoryLogRequest"):
+        assert gone not in _generated.__all__
+
+
+def test_generated_types_carry_what_the_server_sends() -> None:
+    import dataclasses
+    import typing
+
+    from cortrix.types import GcStatus, QueryMeta, QueryResult, QueryResultItem
+
+    def fields(model):
+        return {f.name for f in dataclasses.fields(model)}
+
+    assert {"evidence_kind", "score_signals"} <= fields(QueryResultItem)
+    assert {"via_path", "crag_verdict", "crag_action"} <= fields(QueryMeta)
+    assert {"explain", "error"} <= fields(QueryResult)
+    # Epoch milliseconds, as the spec and the server use it (it used to say str).
+    assert typing.get_type_hints(GcStatus)["last_gc_at"] == typing.Optional[int]
 
 
 # The declared task-status set must be exactly what the server can emit. The server's

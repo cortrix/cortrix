@@ -14,9 +14,10 @@ F04-shaped responses pass through untouched.
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any, List, Optional, Union
 
-from ..types import QueryResult
+from ..types import QueryResult, SearchConfig
 from .._models import parse_model
 from ._base import AsyncResource, SyncResource
 
@@ -31,6 +32,7 @@ def _query_body(
     rerank: bool,
     include_sources: bool,
     filters: Optional[dict[str, Any]],
+    search_config: Optional[Union[SearchConfig, dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     namespaces = [namespace] if isinstance(namespace, str) else list(namespace)
     body: dict[str, Any] = {
@@ -43,7 +45,22 @@ def _query_body(
         body["include_sources"] = True
     if filters is not None:
         body["filter"] = filters  # spec field is singular ``filter``
+    if search_config is not None:
+        body["search_config"] = _search_config_body(search_config)
     return body
+
+
+def _search_config_body(search_config: Union[SearchConfig, dict[str, Any]]) -> dict[str, Any]:
+    """The ``search_config`` request object: a :class:`SearchConfig` is sent with
+    its unset (``None``) toggles left out, so the server's defaults apply to them;
+    a dict is sent as given."""
+    if isinstance(search_config, SearchConfig):
+        return {k: v for k, v in dataclasses.asdict(search_config).items() if v is not None}
+    if isinstance(search_config, dict):
+        return dict(search_config)
+    raise TypeError(
+        f"search_config must be a SearchConfig or a dict, not {type(search_config).__name__}"
+    )
 
 
 def _adapt_wire_result(body: Any, namespace: Union[str, List[str]]) -> Any:
@@ -112,11 +129,14 @@ class Query(SyncResource):
         rerank: bool = True,
         include_sources: bool = False,
         filters: Optional[dict[str, Any]] = None,
+        search_config: Optional[Union[SearchConfig, dict[str, Any]]] = None,
     ) -> QueryResult:
         raw = self._client._request(
             "POST",
             PATH_QUERY,
-            json=_query_body(namespace, query, top_k, rerank, include_sources, filters),
+            json=_query_body(
+                namespace, query, top_k, rerank, include_sources, filters, search_config
+            ),
         )
         return parse_model(QueryResult, _adapt_wire_result(raw, namespace))
 
@@ -140,11 +160,14 @@ class AsyncQuery(AsyncResource):
         rerank: bool = True,
         include_sources: bool = False,
         filters: Optional[dict[str, Any]] = None,
+        search_config: Optional[Union[SearchConfig, dict[str, Any]]] = None,
     ) -> QueryResult:
         raw = await self._client._request(
             "POST",
             PATH_QUERY,
-            json=_query_body(namespace, query, top_k, rerank, include_sources, filters),
+            json=_query_body(
+                namespace, query, top_k, rerank, include_sources, filters, search_config
+            ),
         )
         return parse_model(QueryResult, _adapt_wire_result(raw, namespace))
 

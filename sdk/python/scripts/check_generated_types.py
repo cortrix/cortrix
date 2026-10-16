@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Ratchet gate for ``cortrix/types/_generated.py`` (issue #142, step 1).
+"""Drift gate for ``cortrix/types/_generated.py`` (issue #142).
 
-The committed ``_generated.py`` has never matched the output of
-``scripts/generate_types.py``, and it has been edited by hand while its header
-says it must not be. The drift cannot be closed yet: regenerating would remove
-models the SDK still exports, and whether those surfaces stay is a product
-decision tracked in the issue. Until then this check freezes the drift where it
-is, so that neither side can move without a reviewer seeing it.
+The committed ``_generated.py`` is the output of ``scripts/generate_types.py``
+for the current spec, and its header says it must not be edited by hand. This
+check keeps both true: neither the spec, nor the generator, nor the file can
+move without a reviewer seeing a recorded baseline change. (Until #142 was
+settled the file and the generator differed, and the same check froze that
+drift; the ``--reason`` path below is what recorded it.)
 
 Four hashes, all sha256 over LF-normalised bytes (the same value ``shasum -a 256``
 prints for the LF files this repository contains):
@@ -35,9 +35,9 @@ the field is dropped once C == G. ``--update`` refuses to run in CI
 (``GITHUB_ACTIONS`` or ``CI`` set) and when the generator produced no output.
 
 When regenerating, also update ``tests/test_types.py``
-(``test_generated_module_exports_34_models``) and record the baseline. Once the
-file and the generator agree, this check is the plain equality gate; nothing
-else changes.
+(``test_generated_module_exports_57_models``) and record the baseline. With the
+file and the generator in agreement, as they are now, this check is the plain
+equality gate.
 
 Usage::
 
