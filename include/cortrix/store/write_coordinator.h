@@ -82,8 +82,11 @@ public:
     WriteCoordinator& operator=(const WriteCoordinator&) = delete;
 
     /// Rollback cleanup hook (design § 2.1). Receives the originating PENDING
-    /// entry (doc_id + block_ids) so the layer above can drop whatever it wrote.
-    /// Must be idempotent: cleaning data that is absent returns Ok (Q6).
+    /// entry (doc_id, block_ids and scope) so the layer above can drop whatever
+    /// that transaction may have written — and nothing more: a blocks-only
+    /// transaction (a repair on a committed document) must not cost the document
+    /// the rows its ingest wrote. Must be idempotent: cleaning data that is
+    /// absent returns Ok (Q6).
     using RollbackCallback = std::function<Status(const PendingEntry&)>;
 
     /// Open pending.wal (creates it on first use). Must succeed before any
@@ -116,10 +119,15 @@ public:
     /// in the state tables. `writes_blob` records whether this txn writes a blob
     /// (v1.0.2 D3.5 #1): a blob-less doc (watch_dir/CDC/memory) passes false so
     /// Recover does not read its (legitimately absent) blob as an incomplete write
-    /// (§4.4, the §10.4 data-loss fix). Returns CX_ERR_PWL_DOC_WRITE_IN_PROGRESS if
-    /// `doc_id` already has a live transaction (Q2), CX_ERR_PWL_WRITE_FAILED on I/O.
+    /// (§4.4, the §10.4 data-loss fix). `scope` declares what the transaction may
+    /// write beyond the listed blocks: the ingest keeps the default (it writes the
+    /// document's parents and full-text row too); a repair on a committed document
+    /// passes kBlocksOnly so a rollback compensates only its own blocks and points.
+    /// Returns CX_ERR_PWL_DOC_WRITE_IN_PROGRESS if `doc_id` already has a live
+    /// transaction (Q2), CX_ERR_PWL_WRITE_FAILED on I/O.
     Status BeginWrite(const std::string& doc_id, const std::vector<BlockId>& block_ids,
-                      bool writes_blob, TxnHandle* out_txn);
+                      bool writes_blob, TxnHandle* out_txn,
+                      PendingEntry::Scope scope = PendingEntry::Scope::kDocument);
 
     /// Commit a transaction: append COMMITTED (retried on transient WAL failure,
     /// Q1-B), then mark done and possibly compact (Q3). Returns
@@ -150,21 +158,23 @@ public:
     }
 
 private:
-    // Per-transaction in-memory record (Q5). doc_id + block_ids are retained so
-    // Rollback can hand the original PENDING payload to the cleanup callback
-    // (block_ids drive the vector-index per-block delete). block_ids are dropped
-    // once the txn finalizes (committed/rolled-back txns no longer need them),
-    // keeping the table within the design § 2.1 memory budget.
+    // Per-transaction in-memory record (Q5). doc_id, block_ids and scope are
+    // retained so Rollback can hand the original PENDING payload to the cleanup
+    // callback (block_ids drive the vector-index per-block delete; scope bounds
+    // the document-level compensation). block_ids are dropped once the txn
+    // finalizes (committed/rolled-back txns no longer need them), keeping the
+    // table within the design § 2.1 memory budget.
     struct TxnState {
         PendingEntry::State state;
         std::string doc_id;
         std::vector<BlockId> block_ids;
+        PendingEntry::Scope scope = PendingEntry::Scope::kDocument;
     };
 
     // Look up + advance the in-memory state for a finalizing op (Commit/
     // Rollback). On success the entry's state is updated so a repeat is
-    // rejected, and *out is set to the original PENDING payload (doc_id +
-    // block_ids) for doc-id release / rollback cleanup. Caller holds
+    // rejected, and *out is set to the original PENDING payload (doc_id,
+    // block_ids, scope) for doc-id release / rollback cleanup. Caller holds
     // txn_map_mu_. Returns an error Status for the bad-state cases (Q5).
     Status CheckAndMarkFinalizing(uint64_t txn_id, PendingEntry::State new_state,
                                   TxnState* out);

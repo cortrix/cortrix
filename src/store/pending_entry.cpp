@@ -76,6 +76,9 @@ std::vector<uint8_t> PendingEntry::Serialize() const {
         // has_blob (1B) trails block_ids, PENDING only (§3.1 v1.0.2). COMMITTED/
         // ROLLBACK frames stop at block_count, keeping their fixed 31-byte size.
         PutU8(body, has_blob ? 1 : 0);
+        // scope (1B), PENDING only: the first optional trailing field. Readers that
+        // predate it ignore it (the CRC covers the whole stored body).
+        PutU8(body, static_cast<uint8_t>(scope));
     }
 
     const uint32_t crc = Crc32(body.data(), body.size());
@@ -167,6 +170,19 @@ Result<PendingEntry> PendingEntry::DeserializeFrom(const uint8_t* data, size_t s
         }
         e.has_blob = (p[pos] != 0);
         pos += 1;
+
+        // scope (1B) — PENDING only, and the first OPTIONAL trailing field: every
+        // record written before it existed ends at has_blob and reads as
+        // document. The value is read tolerantly on purpose — 1 means blocks-only,
+        // anything else means document — because a rejected record makes
+        // PendingLogWriter::ReadAll truncate the log at that point, which would
+        // discard every later transaction's records over one unknown byte.
+        if (body_len >= pos + 1) {
+            e.scope = (p[pos] == static_cast<uint8_t>(Scope::kBlocksOnly))
+                          ? Scope::kBlocksOnly
+                          : Scope::kDocument;
+            pos += 1;
+        }
     }
 
     *offset = frame_end;
