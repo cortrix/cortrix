@@ -269,6 +269,13 @@ public:
         WithStore(ns, [&](cortrix::CortrixStore& store) {
             sqlite3* db = store.db_handle();
             ASSERT_NE(db, nullptr);
+            // The discovery core keeps only rows of a live document, so the seeded
+            // row gets its document row, as SeedDocSummaryBlock does; a duplicate
+            // insert for a document that already exists fails harmlessly.
+            cortrix::CortrixDoc doc;
+            doc.doc_id = doc_id;
+            doc.source_type = "test";
+            store.doc_create(doc);
             const char* ddl =
                 "CREATE VIRTUAL TABLE IF NOT EXISTS doc_fts5_index USING fts5("
                 "doc_id UNINDEXED, filename, doc_title, "
