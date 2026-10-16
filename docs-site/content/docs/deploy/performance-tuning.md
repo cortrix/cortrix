@@ -39,7 +39,6 @@ Add `?explain=true` to see which retrieval paths a query used. See [Query and re
 |---|---|---|---|
 | `rerank` | Query request | `true` | Query latency and result ordering |
 | `top_k` | Query request | `10` | How many results come back, and the candidate pool size |
-| `timeout_ms` | Query request | — | The time limit for one query |
 | `retrieval.candidate_multiplier` | Configuration file | `3` | Candidate pool size |
 | `retrieval.max_candidates` | Configuration file | `50` | The candidate pool ceiling, and so the recall ceiling |
 | `embedding.execution_provider` | Configuration file | `auto` | Where embedding runs |
@@ -110,9 +109,11 @@ You can also override these with the `CORTRIX_RETRIEVAL_CANDIDATE_MULTIPLIER` an
 
 List only the namespaces you actually need in `namespaces`. `["*"]` queries every namespace you have access to, up to 100.
 
-### Time budget {#timeout}
+### Time limits {#timeout}
 
-`timeout_ms` caps how long one query can take. The spec defines a range of 100 to 30000 milliseconds, and the budget is shared across the retrieval paths that run in parallel. It keeps an occasional query from running too long. It doesn't make queries faster.
+A query request has no time budget of its own on this release. A query over several namespaces has two default wait limits in the step that collects the namespaces' results: that step waits up to 5 seconds for each namespace in turn, counted from when it reaches that namespace, and stops waiting altogether 30 seconds after it started. A namespace it stops waiting for is listed among the failed namespaces with `CX_ERR_NS_TIMEOUT`, and the results from the other namespaces still come back.
+
+These limits bound waiting, not work. A namespace can take longer than 5 seconds and still succeed when the collection reaches it later. The 30 seconds are not an end-to-end limit for the request: waiting for a free worker, RAG-Fusion and reranking come on top. The work of a namespace the collection stopped waiting for is not cancelled. A query over a single namespace has no wait limit.
 
 ## Execution providers {#execution-provider}
 
