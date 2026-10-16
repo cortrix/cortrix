@@ -276,7 +276,13 @@ CrossNsQueryWiring::CrossNsQueryWiring(cortrix::resource::INamespacePool& pool,
                                    reranker_execution_provider)) {}
 
 CrossNsQueryWiring::~CrossNsQueryWiring() {
-    if (impl_ && impl_->reranker) delete impl_->reranker;
+    if (!impl_) return;
+    // A namespace task that the multi-namespace join stopped waiting for can still
+    // be running, and it uses the executor and the reranker. Join the workers first,
+    // while everything they use is alive; the engine's own destructor then finds
+    // nothing left to do.
+    impl_->engine.Shutdown();
+    if (impl_->reranker) delete impl_->reranker;
 }
 
 bool CrossNsQueryWiring::IsReady() const {
