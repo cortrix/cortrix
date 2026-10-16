@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <optional>
 #include "cortrix/common/data_types.h"
 
 // Opaque SQLite handle (forward-declared C type) — see CortrixStore::db_handle().
@@ -41,13 +42,35 @@ public:
 
     // ---- OPEN-2 three-stage GC (default impls return -1 so lightweight fakes
     //      need not override; CortrixStoreSqlite implements them). ----
-    /// Stage 1 soft delete: set status='deleted' + deleted_at=now_ms. 0 ok / -2 not found.
+    /// Stage 1 soft delete: set status='deleted' + deleted_at=now_ms, recording the
+    /// status the row had (a repeat keeps the first). 0 ok / -2 not found.
+    /// Soft deletion records that status only here and in doc_retire_older_versions;
+    /// doc_update_status(kDeleted) and doc_create with kDeleted record none.
     virtual int doc_soft_delete(const std::string& doc_id, int64_t now_ms) {
         (void)doc_id; (void)now_ms; return -1;
     }
     /// Stage 1 reversal (restore): clear deleted_at + set status='ready' (only if the
     /// doc is currently 'deleted'). 0 ok / -2 not found or not soft-deleted.
     virtual int doc_restore(const std::string& doc_id) { (void)doc_id; return -1; }
+    /// Retire the older versions of keep_doc_id's source: soft-delete every live row
+    /// with the same source_type and source_path that sorts before it (created_at,
+    /// then doc_id), recording each row's status. Newer rows are never touched.
+    /// *retired = rows retired by this call. 0 ok / -1 error.
+    virtual int doc_retire_older_versions(const std::string& keep_doc_id, int64_t now_ms,
+                                          int64_t* retired) {
+        (void)keep_doc_id; (void)now_ms;
+        if (retired) *retired = 0;
+        return -1;
+    }
+    /// The status a soft-deleted row had when it was deleted. nullopt means unknown:
+    /// a row deleted before the store recorded it, or a backend that does not record
+    /// it (the default). 0 ok / -1 error / -2 no such row.
+    virtual int doc_get_deleted_from_status(const std::string& doc_id,
+                                            std::optional<std::string>* out) {
+        (void)doc_id;
+        if (out) out->reset();
+        return 0;
+    }
     /// Stage 2 candidates: soft-deleted docs whose deleted_at <= cutoff_ms. 0 ok.
     virtual int doc_list_deleted_before(int64_t cutoff_ms, std::vector<CortrixDoc>& out) {
         (void)cutoff_ms; (void)out; return -1;

@@ -197,7 +197,8 @@ TEST_F(StoreFaultSweepTest, BlockInsertPwriteFaultSweep) {
         });
 }
 
-// doc_update_status: a separate UPDATE prepare/step write path.
+// doc_update_status: a separate UPDATE prepare/step write path. Its RETURNING row
+// comes back before the autocommit commits, so a failed commit must still fail it.
 TEST_F(StoreFaultSweepTest, DocUpdateStatusPwriteFaultSweep) {
     SweepStoreWrite(this, "doc_update_status",
         [](CortrixStoreSqlite& s, int k) {
@@ -231,6 +232,26 @@ TEST_F(StoreFaultSweepTest, DocRestorePwriteFaultSweep) {
         },
         [](CortrixStoreSqlite& s, int k) {
             return s.doc_restore("rdoc_" + std::to_string(k));
+        });
+}
+
+// doc_retire_older_versions: an UPDATE ... RETURNING over the older version of a
+// source. Its rows come back before the autocommit commits, so a failed commit must
+// fail the call rather than count them.
+TEST_F(StoreFaultSweepTest, DocRetireOlderVersionsPwriteFaultSweep) {
+    SweepStoreWrite(this, "doc_retire_older_versions",
+        [](CortrixStoreSqlite& s, int k) {
+            for (const char* version : {"vdoc1_", "vdoc2_"}) {
+                CortrixDoc d = MakeDoc(version + std::to_string(k));
+                d.source_type = "http_upload";
+                d.source_path = "/versions/" + std::to_string(k) + ".md";
+                ASSERT_EQ(s.doc_create(d), 0);
+            }
+        },
+        [](CortrixStoreSqlite& s, int k) {
+            int64_t retired = 0;
+            return s.doc_retire_older_versions("vdoc2_" + std::to_string(k),
+                                               1700000000000LL, &retired);
         });
 }
 

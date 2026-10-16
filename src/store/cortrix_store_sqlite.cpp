@@ -260,6 +260,110 @@ int CortrixStoreSqlite::Close() {
 // also captures and uses the bare handle); returning the pointer races with nothing.
 sqlite3* CortrixStoreSqlite::db_handle() { return db_; }
 
+CortrixStoreSqlite::ColumnProbe CortrixStoreSqlite::DeletedFromStatusColumnLocked() {
+    if (has_deleted_from_status_.has_value()) {
+        return *has_deleted_from_status_ ? ColumnProbe::kPresent : ColumnProbe::kAbsent;
+    }
+    if (db_ == nullptr) return ColumnProbe::kUnknown;
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, "PRAGMA table_info(documents)", -1, &stmt, nullptr) !=
+        SQLITE_OK) {
+        return ColumnProbe::kUnknown;
+    }
+    bool present = false;
+    int rc = SQLITE_OK;
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        const unsigned char* name = sqlite3_column_text(stmt, 1);
+        if (name != nullptr &&
+            std::string(reinterpret_cast<const char*>(name)) == "deleted_from_status") {
+            present = true;
+            break;
+        }
+    }
+    sqlite3_finalize(stmt);
+    if (!present && rc != SQLITE_DONE) return ColumnProbe::kUnknown;  // not cached
+    has_deleted_from_status_ = present;
+    return present ? ColumnProbe::kPresent : ColumnProbe::kAbsent;
+}
+
+int CortrixStoreSqlite::doc_retire_older_versions(const std::string& keep_doc_id,
+                                                  int64_t now_ms, int64_t* retired) {
+    if (retired) *retired = 0;
+    if (TryConsumeOpFault()) return -1;  // testing seam (SetFailNextOps)
+    std::lock_guard<std::mutex> lock(mu_);
+
+    // Every live row of the keep row's source that sorts before it in the order the
+    // source lookup uses (created_at, then doc_id). Newer rows are left alone, so a
+    // version that finishes late never retires one uploaded after it.
+    const bool marker = DeletedFromStatusColumnLocked() == ColumnProbe::kPresent;
+    const std::string sql =
+        std::string("UPDATE documents SET ") +
+        (marker ? "deleted_from_status = status, " : "") +
+        "status = 'deleted', deleted_at = ?1, "
+        "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') "
+        "WHERE doc_id IN ("
+        "  SELECT d.doc_id FROM documents d JOIN documents k ON k.doc_id = ?2"
+        "  WHERE d.source_type = k.source_type AND d.source_path = k.source_path"
+        "    AND d.status != 'deleted'"
+        "    AND (d.created_at < k.created_at"
+        "         OR (d.created_at = k.created_at AND d.doc_id < k.doc_id))) "
+        "RETURNING doc_id";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        CORTRIX_LOG_ERROR("store", "doc_retire_older_versions prepare: {}",
+                          sqlite3_errmsg(db_));
+        return -1;
+    }
+    sqlite3_bind_int64(stmt, 1, now_ms);
+    sqlite3_bind_text(stmt, 2, keep_doc_id.c_str(), -1, SQLITE_TRANSIENT);
+    int64_t n = 0;
+    int rc = SQLITE_OK;
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) ++n;
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        CORTRIX_LOG_ERROR("store", "doc_retire_older_versions step: {}",
+                          sqlite3_errmsg(db_));
+        return -1;
+    }
+    if (retired) *retired = n;
+    return 0;
+}
+
+int CortrixStoreSqlite::doc_get_deleted_from_status(const std::string& doc_id,
+                                                    std::optional<std::string>* out) {
+    if (out) out->reset();
+    if (TryConsumeOpFault()) return -1;  // testing seam (SetFailNextOps)
+    std::lock_guard<std::mutex> lock(mu_);
+
+    switch (DeletedFromStatusColumnLocked()) {
+        case ColumnProbe::kUnknown:
+            return -1;  // cannot tell; the caller refuses rather than guesses
+        case ColumnProbe::kAbsent:
+            return 0;   // a store created before the column records nothing
+        case ColumnProbe::kPresent:
+            break;
+    }
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, "SELECT deleted_from_status FROM documents WHERE doc_id = ?",
+                           -1, &stmt, nullptr) != SQLITE_OK) {
+        CORTRIX_LOG_ERROR("store", "doc_get_deleted_from_status prepare: {}",
+                          sqlite3_errmsg(db_));
+        return -1;
+    }
+    sqlite3_bind_text(stmt, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
+    const int rc = sqlite3_step(stmt);
+    int result = -1;
+    if (rc == SQLITE_ROW) {
+        const unsigned char* v = sqlite3_column_text(stmt, 0);
+        if (v != nullptr && out) *out = std::string(reinterpret_cast<const char*>(v));
+        result = 0;
+    } else if (rc == SQLITE_DONE) {
+        result = -2;
+    }
+    sqlite3_finalize(stmt);
+    return result;
+}
+
 void CortrixStoreSqlite::EnsureScoreColumnCacheLocked() {
     if (score_columns_checked_) return;
     has_enriched_score_ = ColumnExists(db_, "blocks", "enriched_score");
@@ -488,10 +592,15 @@ int CortrixStoreSqlite::doc_update_status(const std::string& doc_id, DocStatus s
     if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
     std::lock_guard<std::mutex> lock(mu_);
 
+    // A soft-deleted row stays deleted: a status write from a task that was still
+    // running when its document was deleted, or retired by a newer version, must
+    // not bring it back. RETURNING reports this statement's own outcome, which the
+    // connection-wide change count cannot do on a connection shared by requests.
     const char* sql = R"SQL(
         UPDATE documents SET status = ?, error_message = ?,
                updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-        WHERE doc_id = ?
+        WHERE doc_id = ? AND status != 'deleted'
+        RETURNING doc_id
     )SQL";
 
     sqlite3_stmt* stmt = nullptr;
@@ -506,6 +615,8 @@ int CortrixStoreSqlite::doc_update_status(const std::string& doc_id, DocStatus s
     sqlite3_bind_text(stmt, 3, doc_id.c_str(), -1, SQLITE_TRANSIENT);
 
     rc = sqlite3_step(stmt);
+    const bool updated = (rc == SQLITE_ROW);
+    if (updated) rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
 
     if (rc != SQLITE_DONE) {
@@ -513,8 +624,7 @@ int CortrixStoreSqlite::doc_update_status(const std::string& doc_id, DocStatus s
         return -1;
     }
 
-    if (sqlite3_changes(db_) == 0) return -2;  // not found
-    return 0;
+    return updated ? 0 : -2;  // -2: not found, or soft-deleted
 }
 
 int CortrixStoreSqlite::doc_delete(const std::string& doc_id) {
@@ -660,11 +770,26 @@ int CortrixStoreSqlite::doc_soft_delete(const std::string& doc_id, int64_t now_m
     if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
     std::lock_guard<std::mutex> lock(mu_);
 
-    const char* sql = R"SQL(
+    // With deleted_from_status present, record the status the row had; a repeat
+    // keeps the first value (every right-hand side reads the row as it was before
+    // this statement). A store without the column, or whose probe failed, keeps
+    // today's statement, and its rows later restore without the incomplete check.
+    const char* sql_with_marker = R"SQL(
+        UPDATE documents SET
+               deleted_from_status = CASE WHEN status = 'deleted'
+                                          THEN deleted_from_status ELSE status END,
+               status = 'deleted', deleted_at = ?,
+               updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        WHERE doc_id = ?
+    )SQL";
+    const char* sql_plain = R"SQL(
         UPDATE documents SET status = 'deleted', deleted_at = ?,
                updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
         WHERE doc_id = ?
     )SQL";
+    const char* sql = DeletedFromStatusColumnLocked() == ColumnProbe::kPresent
+                          ? sql_with_marker
+                          : sql_plain;
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         CORTRIX_LOG_ERROR("store", "doc_soft_delete prepare: {}", sqlite3_errmsg(db_));
@@ -688,11 +813,20 @@ int CortrixStoreSqlite::doc_restore(const std::string& doc_id) {
     if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
     std::lock_guard<std::mutex> lock(mu_);
 
-    const char* sql = R"SQL(
+    const char* sql_with_marker = R"SQL(
+        UPDATE documents SET status = 'ready', deleted_at = NULL,
+               deleted_from_status = NULL,
+               updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        WHERE doc_id = ? AND status = 'deleted'
+    )SQL";
+    const char* sql_plain = R"SQL(
         UPDATE documents SET status = 'ready', deleted_at = NULL,
                updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
         WHERE doc_id = ? AND status = 'deleted'
     )SQL";
+    const char* sql = DeletedFromStatusColumnLocked() == ColumnProbe::kPresent
+                          ? sql_with_marker
+                          : sql_plain;
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         CORTRIX_LOG_ERROR("store", "doc_restore prepare: {}", sqlite3_errmsg(db_));
@@ -781,7 +915,9 @@ int CortrixStoreSqlite::doc_find_by_source(const std::string& source_type,
                block_count, chunk_strategy, created_at, updated_at, processed_at,
                cdc_schema, cdc_position, cdc_last_sync,
                title, language, metadata_json
-        FROM documents WHERE source_type = ? AND source_path = ? LIMIT 1
+        FROM documents
+        WHERE source_type = ? AND source_path = ? AND status != 'deleted'
+        ORDER BY created_at DESC, doc_id DESC LIMIT 1
     )SQL";
 
     sqlite3_stmt* stmt = nullptr;

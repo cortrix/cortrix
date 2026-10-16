@@ -17,6 +17,7 @@
 #include <atomic>
 #include <filesystem>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -149,6 +150,14 @@ std::vector<OpFaultCase> AllOpFaultCases() {
     }});
     v.push_back({"doc_restore", [](StoreFaultOpsBase& f) {
         return f.store()->doc_restore("any");
+    }});
+    v.push_back({"doc_retire_older_versions", [](StoreFaultOpsBase& f) {
+        int64_t retired = -99;
+        return f.store()->doc_retire_older_versions("any", 1000, &retired);
+    }});
+    v.push_back({"doc_get_deleted_from_status", [](StoreFaultOpsBase& f) {
+        std::optional<std::string> s;
+        return f.store()->doc_get_deleted_from_status("any", &s);
     }});
     v.push_back({"doc_list_deleted_before", [](StoreFaultOpsBase& f) {
         std::vector<CortrixDoc> out; return f.store()->doc_list_deleted_before(9999, out);
