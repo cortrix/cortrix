@@ -1,5 +1,7 @@
 #include "cortrix/query/cross_ns_query_handler.h"
 
+#include <cstdint>
+#include <limits>
 #include <utility>
 
 #include "cortrix/agent_friendly/error.h"
@@ -85,7 +87,22 @@ Status CrossNsQueryHandler::ParseRequest(const nlohmann::json& body,
 
     // Optional: top_k (default 10), rerank (default true), filter (flat string map).
     if (body.contains("top_k") && body["top_k"].is_number_integer()) {
-        out->top_k = body["top_k"].get<int>();
+        // Check that the integer fits before narrowing: reading it as int directly
+        // would turn a value that does not fit into an unrelated one and serve the
+        // request as if that had been asked for. Non-negative JSON integers are
+        // stored unsigned, so they are compared unsigned.
+        const auto& top_k = body["top_k"];
+        const bool fits =
+            top_k.is_number_unsigned()
+                ? top_k.get<std::uint64_t>() <=
+                      static_cast<std::uint64_t>(std::numeric_limits<int>::max())
+                : top_k.get<std::int64_t>() >= std::numeric_limits<int>::min() &&
+                      top_k.get<std::int64_t>() <= std::numeric_limits<int>::max();
+        if (!fits) {
+            return Status::InvalidArgument(
+                "'top_k' must fit in a 32-bit signed integer");
+        }
+        out->top_k = top_k.get<int>();
     }
     if (body.contains("rerank") && body["rerank"].is_boolean()) {
         out->rerank = body["rerank"].get<bool>();
