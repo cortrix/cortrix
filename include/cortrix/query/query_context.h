@@ -1,5 +1,7 @@
 #pragma once
+#include <chrono>
 #include <map>
+#include <optional>
 #include <string>
 
 namespace cortrix::query {
@@ -40,6 +42,11 @@ struct QueryContext {
     int  top_k = 10;         ///< per-NS top_k requested by the caller (range 1-100)
     bool rerank = true;      ///< topic 4.3 — pass-through to all NS; false → RRF fallback path
     std::map<std::string, std::string> filter;  ///< topic 4.3 JSONB filter passed through (flattened)
+
+    /// The request's deadline, derived once from its `timeout_ms`. Every join, LLM
+    /// call and executor stage boundary of the request reads this one value, so a
+    /// later step never starts a fresh budget. Unset: the request has no budget.
+    std::optional<std::chrono::steady_clock::time_point> deadline;
 
     // --- Retrieval route switches ---
     // Cross-NS diagnostic/profile controls. Defaults preserve existing behavior:

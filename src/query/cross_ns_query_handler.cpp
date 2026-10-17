@@ -94,6 +94,18 @@ Status CrossNsQueryHandler::ParseRequest(const nlohmann::json& body,
         }
         out->top_k = static_cast<int>(wide);
     }
+    // Optional: timeout_ms, the query's time budget. Absent or null means no budget.
+    // Anything other than an integer in range is rejected rather than ignored, and the
+    // value is read wide and checked before it is narrowed, as top_k is.
+    if (body.contains("timeout_ms") && !body["timeout_ms"].is_null()) {
+        const auto& t = body["timeout_ms"];
+        const long long wide = t.is_number_integer() ? t.get<long long>() : 0;
+        if (!t.is_number_integer() || wide < 100 || wide > 30000) {
+            return Status::InvalidArgument(
+                "'timeout_ms' must be an integer between 100 and 30000");
+        }
+        out->timeout_ms = static_cast<int>(wide);
+    }
     if (body.contains("rerank") && body["rerank"].is_boolean()) {
         out->rerank = body["rerank"].get<bool>();
     }

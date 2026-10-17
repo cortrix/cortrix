@@ -92,6 +92,9 @@ std::string RandomSuffix() {
 std::string DegradeReasonToken(const Status& status) {
     const std::string m = ToLower(status.message());
     auto has = [&](const char* k) { return m.find(k) != std::string::npos; };
+    // First: a call that stopped for lack of time is neither a transport failure nor
+    // a timeout of the provider's, whatever substrings its detail holds.
+    if (has("cx_llm_budget_exhausted")) return "budget_exhausted";
     if (has("cx_llm_transport")) return "llm_transport";
     if (has("cx_llm_rate_limit") || has("quota") || has("429")) return "quota_exceeded";
     if (has("cx_llm_bad_body")) return "invalid_response";
@@ -298,9 +301,9 @@ bool LlmRerankStage::ParseRankingJson(const std::string& llm_content, std::size_
     return true;
 }
 
-LlmRerankStage::ExplainState LlmRerankStage::Apply(CrossNsResponse* resp,
-                                                   const std::string& original_query,
-                                                   const LlmRerankConfig& cfg) {
+LlmRerankStage::ExplainState LlmRerankStage::Apply(
+    CrossNsResponse* resp, const std::string& original_query, const LlmRerankConfig& cfg,
+    std::optional<std::chrono::steady_clock::time_point> deadline) {
     ExplainState es;
     if (resp == nullptr || !cfg.enabled) {
         es.reason = "disabled";
@@ -332,6 +335,7 @@ LlmRerankStage::ExplainState LlmRerankStage::Apply(CrossNsResponse* resp,
     call.timeout_ms = static_cast<int>(cfg.timeout_ms);
     call.response_format = "json_object";
     call.thinking_type = "disabled";  // ordering wants the final answer, not CoT
+    call.deadline = deadline;         // bounds each call's attempts by the time left
 
     const int consensus =
         std::max(kLlmRerankConsensusRunsMin,
@@ -374,6 +378,17 @@ LlmRerankStage::ExplainState LlmRerankStage::Apply(CrossNsResponse* resp,
         int window_votes = 0;
 
         for (int run = 0; run < consensus; ++run) {
+            // The request's budget is spent: make no call, with the client's floor.
+            // The vote counts as failed, and llm_calls keeps counting only calls that
+            // reached the client.
+            if (deadline &&
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    *deadline - std::chrono::steady_clock::now())
+                        .count() < llm::kLlmBudgetFloorMs) {
+                last_fail_reason = "budget_exhausted";
+                last_fail_detail.clear();
+                continue;
+            }
             // Presentation permutation over the window slots for this vote.
             const std::vector<std::size_t> presented_slots =
                 PresentationOrder(count, run);

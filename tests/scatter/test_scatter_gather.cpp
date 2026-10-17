@@ -2,9 +2,11 @@
 #include <gmock/gmock.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <utility>
@@ -12,6 +14,7 @@
 
 #include "cortrix/common/executor_engine.h"
 #include "cortrix/query/cross_ns_error.h"
+#include "cortrix/query/namespace_timeout.h"
 #include "cortrix/query/scatter_gather.h"
 #include "cortrix/query/scatter_guc.h"
 #include "mock_permission_service.h"
@@ -653,6 +656,255 @@ TEST(ScatterGatherTest, TimedOutTaskReadsItsOwnCopyOfTheContext) {
         ASSERT_TRUE(cv.wait_for(lk, std::chrono::seconds(5), [&] { return done; }));
     }
     EXPECT_EQ(seen_query, "the query as made");
+}
+
+// --- #173: the request's budget (QueryContext::deadline) ---------------------------
+
+std::chrono::steady_clock::time_point In(int ms) {
+    return std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+}
+
+int MsSince(std::chrono::steady_clock::time_point t0) {
+    return static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - t0)
+                                .count());
+}
+
+QueryContext BudgetCtx(std::chrono::steady_clock::time_point deadline) {
+    QueryContext ctx;
+    ctx.query = "q";
+    ctx.top_k = 10;
+    ctx.deadline = deadline;
+    return ctx;
+}
+
+// The same as above with a budget and a lone namespace: it goes through the timed
+// join, so its task is abandoned the same way and must read the same owned copy. The
+// task waits for the release for a bounded time only, so a join that does not stop
+// waiting fails the precondition instead of hanging.
+TEST(ScatterGatherTest, TimedOutLoneNamespaceTaskReadsItsOwnCopyOfTheContext) {
+    Harness h({"ns_slow"});
+    std::mutex m;
+    std::condition_variable cv;
+    bool release = false;
+    bool done = false;
+    std::string seen_query;
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_slow", _))
+        .WillOnce(Invoke([&](const QueryContext& ctx, const std::string& ns, float) {
+            std::unique_lock<std::mutex> lk(m);
+            cv.wait_for(lk, std::chrono::milliseconds(800), [&] { return release; });
+            seen_query = ctx.query;
+            done = true;
+            cv.notify_all();
+            return ScatterMockResponseBuilder::Normal(ns, 1);
+        }));
+    auto sg = h.Make();
+    QueryContext ctx = BudgetCtx(In(100));
+    ctx.query = "the query as made";
+    auto resp = sg.Execute(Req({"ns_slow"}, 10), Auth(), &ctx);
+    ASSERT_TRUE(resp.error.has_value())
+        << "precondition: the join returned before the namespace finished";
+    ASSERT_EQ(resp.error->code, "CX_ERR_SCATTER_TIMEOUT");
+
+    ctx.query = "changed by the caller after Execute returned";
+    {
+        std::lock_guard<std::mutex> lk(m);
+        release = true;
+    }
+    cv.notify_all();
+    {
+        std::unique_lock<std::mutex> lk(m);
+        ASSERT_TRUE(cv.wait_for(lk, std::chrono::seconds(5), [&] { return done; }));
+    }
+    EXPECT_EQ(seen_query, "the query as made");
+}
+
+// A lone namespace with a budget is cut at the deadline: no results, its timeout row
+// with the retry hint, and the top-level code. Its executor blocks for a bounded time,
+// several times the budget, so a join that ignores the budget fails here, not hangs.
+TEST(ScatterGatherTest, LoneNamespaceWithABudgetIsCutAtTheDeadline) {
+    Harness h({"ns_slow"});
+    std::atomic<bool> finished{false};
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_slow", _))
+        .WillOnce(Invoke([&](const QueryContext&, const std::string& ns, float) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(600));
+            finished = true;
+            return ScatterMockResponseBuilder::Normal(ns, 2);
+        }));
+    auto sg = h.Make();
+    QueryContext ctx = BudgetCtx(In(100));
+    const auto t0 = std::chrono::steady_clock::now();
+    auto resp = sg.Execute(Req({"ns_slow"}, 10), Auth(), &ctx);
+    EXPECT_LT(MsSince(t0), 500) << "the join waited past the deadline";
+    EXPECT_TRUE(resp.results.empty());
+    ASSERT_EQ(resp.meta.namespaces_failed.size(), 1u);
+    EXPECT_EQ(resp.meta.namespaces_failed[0].error_code, "CX_ERR_NS_TIMEOUT");
+    ASSERT_TRUE(resp.meta.namespaces_failed[0].retry_after_ms.has_value());
+    EXPECT_EQ(*resp.meta.namespaces_failed[0].retry_after_ms, 1000);
+    ASSERT_TRUE(resp.error.has_value());
+    EXPECT_EQ(resp.error->code, "CX_ERR_SCATTER_TIMEOUT");
+    for (int i = 0; i < 200 && !finished; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+}
+
+// Guard (unchanged behaviour): without a budget a lone namespace still takes the
+// direct path and is waited for, whatever the limits.
+TEST(ScatterGatherTest, LoneNamespaceWithoutABudgetIsStillWaitedFor) {
+    Harness h({"ns_a"});
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _))
+        .WillOnce(Invoke([](const QueryContext&, const std::string& ns, float) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            return ScatterMockResponseBuilder::Normal(ns, 1);
+        }));
+    auto sg = h.Make();
+    ScatterTimeouts t;
+    t.ns_query_timeout_ms = 10;
+    t.total_timeout_ms = 20;
+    sg.SetTimeouts(t);
+    auto resp = sg.Execute(Req({"ns_a"}, 10), Auth());
+    EXPECT_EQ(resp.results.size(), 1u);
+    EXPECT_TRUE(resp.meta.namespaces_failed.empty());
+    EXPECT_FALSE(resp.error.has_value());
+}
+
+// Guard: a lone namespace is limited by the budget only. Slower than the per-namespace
+// limit but within the budget, it succeeds.
+TEST(ScatterGatherTest, LoneNamespaceIsLimitedByTheBudgetNotThePerNamespaceLimit) {
+    Harness h({"ns_a"});
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _))
+        .WillOnce(Invoke([](const QueryContext&, const std::string& ns, float) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            return ScatterMockResponseBuilder::Normal(ns, 1);
+        }));
+    auto sg = h.Make();
+    ScatterTimeouts t;
+    t.ns_query_timeout_ms = 50;
+    t.total_timeout_ms = 30000;
+    sg.SetTimeouts(t);
+    QueryContext ctx = BudgetCtx(In(3000));
+    auto resp = sg.Execute(Req({"ns_a"}, 10), Auth(), &ctx);
+    EXPECT_EQ(resp.results.size(), 1u);
+    EXPECT_TRUE(resp.meta.namespaces_failed.empty());
+    EXPECT_FALSE(resp.error.has_value());
+}
+
+// A deadline that has already passed creates no task at all: every namespace gets
+// its timeout row directly, and the response carries the top-level code.
+TEST(ScatterGatherTest, PassedDeadlineSubmitsNoTask) {
+    Harness h({"ns_a", "ns_b"});
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, _, _)).Times(0);
+    auto sg = h.Make();
+    QueryContext ctx = BudgetCtx(std::chrono::steady_clock::now() - std::chrono::milliseconds(1));
+    auto resp = sg.Execute(Req({"ns_a", "ns_b"}, 10), Auth(), &ctx);
+    EXPECT_TRUE(resp.results.empty());
+    ASSERT_EQ(resp.meta.namespaces_failed.size(), 2u);
+    for (const auto& f : resp.meta.namespaces_failed) {
+        EXPECT_EQ(f.error_code, "CX_ERR_NS_TIMEOUT") << f.namespace_id;
+    }
+    ASSERT_TRUE(resp.error.has_value());
+    EXPECT_EQ(resp.error->code, "CX_ERR_SCATTER_TIMEOUT");
+}
+
+// With several namespaces, a deadline shorter than the per-namespace limit cuts the
+// slow one at the deadline; the fast one's results are kept.
+TEST(ScatterGatherTest, DeadlineShorterThanThePerNamespaceLimitCutsAtTheDeadline) {
+    Harness h({"ns_fast", "ns_slow"});
+    std::atomic<bool> finished{false};
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_fast", _))
+        .WillOnce(Return(ScatterMockResponseBuilder::Normal("ns_fast", 1)));
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_slow", _))
+        .WillOnce(Invoke([&](const QueryContext&, const std::string& ns, float) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(700));
+            finished = true;
+            return ScatterMockResponseBuilder::Normal(ns, 1);
+        }));
+    auto sg = h.Make();
+    ScatterTimeouts t;
+    t.ns_query_timeout_ms = 5000;
+    t.total_timeout_ms = 30000;
+    sg.SetTimeouts(t);
+    QueryContext ctx = BudgetCtx(In(100));
+    const auto t0 = std::chrono::steady_clock::now();
+    auto resp = sg.Execute(Req({"ns_fast", "ns_slow"}, 10), Auth(), &ctx);
+    EXPECT_LT(MsSince(t0), 500) << "the join waited past the deadline";
+    EXPECT_FALSE(resp.results.empty());
+    ASSERT_EQ(resp.meta.namespaces_failed.size(), 1u);
+    EXPECT_EQ(resp.meta.namespaces_failed[0].namespace_id, "ns_slow");
+    EXPECT_EQ(resp.meta.namespaces_failed[0].error_code, "CX_ERR_NS_TIMEOUT");
+    ASSERT_TRUE(resp.error.has_value());
+    EXPECT_EQ(resp.error->code, "CX_ERR_SCATTER_TIMEOUT");
+    for (int i = 0; i < 200 && !finished; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+}
+
+// Guard: a budget longer than the join's overall limit leaves the overall limit in
+// charge.
+TEST(ScatterGatherTest, BudgetLongerThanTheOverallLimitLeavesTheOverallLimitInCharge) {
+    Harness h({"ns_fast", "ns_slow"});
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_fast", _))
+        .WillOnce(Return(ScatterMockResponseBuilder::Normal("ns_fast", 1)));
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_slow", _))
+        .WillOnce(Invoke([](const QueryContext&, const std::string& ns, float) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+            return ScatterMockResponseBuilder::Normal(ns, 1);
+        }));
+    auto sg = h.Make();
+    ScatterTimeouts t;
+    t.ns_query_timeout_ms = 1000;
+    t.total_timeout_ms = 50;
+    sg.SetTimeouts(t);
+    QueryContext ctx = BudgetCtx(In(5000));
+    auto resp = sg.Execute(Req({"ns_fast", "ns_slow"}, 10), Auth(), &ctx);
+    ASSERT_EQ(resp.meta.namespaces_failed.size(), 1u);
+    EXPECT_EQ(resp.meta.namespaces_failed[0].namespace_id, "ns_slow");
+    ASSERT_TRUE(resp.error.has_value());
+    EXPECT_EQ(resp.error->code, "CX_ERR_SCATTER_TIMEOUT");
+}
+
+// A caller that passes no context gets the deadline from the request's timeout_ms,
+// counted from the call.
+TEST(ScatterGatherTest, BuiltContextTakesItsDeadlineFromTimeoutMs) {
+    Harness h({"ns_a"});
+    std::optional<std::chrono::steady_clock::time_point> seen;
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _))
+        .WillOnce(Invoke([&](const QueryContext& ctx, const std::string& ns, float) {
+            seen = ctx.deadline;
+            return ScatterMockResponseBuilder::Normal(ns, 1);
+        }));
+    auto sg = h.Make();
+    QueryRequest r = Req({"ns_a"}, 10);
+    r.timeout_ms = 2000;
+    const auto before = std::chrono::steady_clock::now();
+    auto resp = sg.Execute(r, Auth());
+    const auto after = std::chrono::steady_clock::now();
+    ASSERT_TRUE(seen.has_value());
+    EXPECT_GE(*seen, before + std::chrono::milliseconds(2000));
+    EXPECT_LE(*seen, after + std::chrono::milliseconds(2000));
+}
+
+TEST(NamespaceTimeoutTest, TimeoutRowCarriesTheErrorTableFields) {
+    const auto row = MakeNamespaceTimeoutRow("ns_a", std::chrono::steady_clock::now());
+    EXPECT_EQ(row.namespace_id, "ns_a");
+    EXPECT_EQ(row.error_code, "CX_ERR_NS_TIMEOUT");
+    EXPECT_EQ(row.error_category, "timeout");
+    EXPECT_TRUE(row.retryable);
+    EXPECT_EQ(row.retry_after_ms, 1000);
+    EXPECT_TRUE(row.chunks.empty());
+}
+
+// The top-level code applies to a timeout row the join saw at or after the overall
+// deadline, whoever wrote the row; never to a row that succeeded, and never before.
+TEST(NamespaceTimeoutTest, CutByOverallDeadlineOnlyForATimeoutRowAtOrAfterIt) {
+    const auto overall = std::chrono::steady_clock::now();
+    const auto timed = MakeNamespaceTimeoutRow("ns", overall);
+    EXPECT_TRUE(CutByOverallDeadline(timed, overall, overall));
+    EXPECT_TRUE(CutByOverallDeadline(timed, overall + std::chrono::milliseconds(1), overall));
+    EXPECT_FALSE(CutByOverallDeadline(timed, overall - std::chrono::milliseconds(1), overall));
+    EXPECT_TRUE(CutByOverallDeadline(ScatterMockResponseBuilder::Timeout("ns"), overall, overall));
+    EXPECT_FALSE(CutByOverallDeadline(ScatterMockResponseBuilder::Normal("ns", 1),
+                                      overall + std::chrono::milliseconds(1), overall));
 }
 
 }  // namespace

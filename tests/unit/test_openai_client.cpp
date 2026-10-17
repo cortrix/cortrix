@@ -1,8 +1,10 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include <nlohmann/json.hpp>
 
@@ -187,6 +189,73 @@ TEST(OpenAiLlmClientTest, RetriesTransportFailureThenParsesSuccess) {
     EXPECT_EQ(resp.content, "ok");
     EXPECT_EQ(calls, 2);
     EXPECT_EQ(cf.fake->requests.size(), 2u);
+}
+
+// --- #173: a call that carries the request's deadline ------------------------------
+
+std::chrono::steady_clock::time_point InMs(int ms) {
+    return std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+}
+
+// Guard (unchanged behaviour): without a deadline a transport failure gets all three
+// attempts, each with the client's own timeout.
+TEST(OpenAiLlmClientTest, WithoutADeadlineTransportFailureGetsEveryAttempt) {
+    auto cf = MakeClient();
+    cf.fake->canned = FakeHttpTransport::NetworkFail();
+    auto resp = cf.client->Chat("q", LlmCallConfig{});
+    EXPECT_FALSE(resp.ok());
+    EXPECT_EQ(resp.status.message().rfind(llm_tokens::kTransport, 0), 0u);
+    ASSERT_EQ(cf.fake->requests.size(), 3u);
+    for (const auto& r : cf.fake->requests) EXPECT_EQ(r.timeout_ms, 30000);
+}
+
+// No attempt is made once the deadline has passed, and the call says why.
+TEST(OpenAiLlmClientTest, PassedDeadlineMakesNoAttempt) {
+    auto cf = MakeClient();
+    cf.fake->canned = FakeHttpTransport::NetworkFail();
+    LlmCallConfig call;
+    call.deadline = InMs(-1);
+    auto resp = cf.client->Chat("q", call);
+    EXPECT_FALSE(resp.ok());
+    EXPECT_EQ(resp.status.code(), StatusCode::kUnavailable);
+    EXPECT_EQ(resp.status.message().rfind(llm_tokens::kBudgetExhausted, 0), 0u)
+        << resp.status.message();
+    EXPECT_TRUE(cf.fake->requests.empty());
+}
+
+// Each attempt's timeout is the time left, never more and never 0.
+TEST(OpenAiLlmClientTest, EachAttemptTimeoutIsBoundedByTheTimeLeft) {
+    auto cf = MakeClient();
+    cf.fake->canned = FakeHttpTransport::NetworkFail();
+    LlmCallConfig call;
+    call.deadline = InMs(1000);
+    auto resp = cf.client->Chat("q", call);
+    EXPECT_FALSE(resp.ok());
+    ASSERT_EQ(cf.fake->requests.size(), 3u);
+    for (const auto& r : cf.fake->requests) {
+        EXPECT_GE(r.timeout_ms, kLlmBudgetFloorMs);
+        EXPECT_LE(r.timeout_ms, 1000);
+    }
+}
+
+// The attempts stop once less than the floor is left, and the call then reports the
+// budget token alone: the earlier attempt's transport detail is not carried.
+TEST(OpenAiLlmClientTest, AttemptsStopWhenTheBudgetRunsOutAndReportOnlyTheBudget) {
+    auto cf = MakeClient();
+    cf.fake->responder = [](const HttpRequest&) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        HttpResponse failed = FakeHttpTransport::NetworkFail();
+        failed.transport_error = "SSL connection failed";
+        return failed;
+    };
+    LlmCallConfig call;
+    call.deadline = InMs(120);
+    auto resp = cf.client->Chat("q", call);
+    EXPECT_FALSE(resp.ok());
+    EXPECT_EQ(cf.fake->requests.size(), 1u);
+    EXPECT_EQ(resp.status.message().rfind(llm_tokens::kBudgetExhausted, 0), 0u)
+        << resp.status.message();
+    EXPECT_EQ(resp.status.message().find("SSL"), std::string::npos) << resp.status.message();
 }
 
 TEST(OpenAiLlmClientTest, Http5xxIsUnavailableHttpToken) {

@@ -115,9 +115,9 @@ using DR = RagFusionMetrics::DegradeReason;
 using TD = RagFusionMetrics::TokenDirection;
 
 constexpr std::array<R, 3> kResults{R::kSuccess, R::kDegraded, R::kDisabled};
-constexpr std::array<DR, 5> kReasons{DR::kLlmTimeout, DR::kCircuitOpen,
+constexpr std::array<DR, 6> kReasons{DR::kLlmTimeout, DR::kCircuitOpen,
                                      DR::kQuotaExceeded, DR::kInvalidResponse,
-                                     DR::kOther};
+                                     DR::kOther, DR::kBudgetExhausted};
 
 class RagFusionFx : public ::testing::Test {
 protected:
@@ -135,6 +135,7 @@ TEST_F(RagFusionFx, ToStringAll) {
     EXPECT_STREQ(ToString(DR::kQuotaExceeded), "quota_exceeded");
     EXPECT_STREQ(ToString(DR::kInvalidResponse), "invalid_response");
     EXPECT_STREQ(ToString(DR::kOther), "other");
+    EXPECT_STREQ(ToString(DR::kBudgetExhausted), "budget_exhausted");
     EXPECT_STREQ(ToString(TD::kInput), "input");
     EXPECT_STREQ(ToString(TD::kOutput), "output");
 }
