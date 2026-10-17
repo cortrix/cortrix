@@ -22,6 +22,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <memory>
@@ -1044,6 +1045,103 @@ TEST(ParentExpansionControlsTest, NegativeBoundsAreRejected) {
     EXPECT_FALSE(ValidateParentExpansion(true, -1, 0).ok());
     EXPECT_FALSE(ValidateParentExpansion(false, -1, 0).ok());
     EXPECT_FALSE(ValidateParentExpansion(true, 2, -1).ok());
+}
+
+
+// --- Teardown while a namespace task is still running ---------------------------
+//
+// The multi-namespace join stops waiting for a namespace after its wait limit, but the
+// task keeps running on the wiring's workers and goes on to use the executor and the
+// reranker. Destroying the wiring must wait for it with all of those still alive. The
+// old destructor deleted the reranker first and joined the workers last, so the task
+// read freed memory once it continued; under AddressSanitizer this test then fails.
+TEST(QueryWiringShutdownTest, TeardownWaitsForATaskTheJoinStoppedWaitingFor) {
+    using cortrix::doc_summary::test::DiscoveryPoolHarness;
+    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    auto harness = std::make_unique<DiscoveryPoolHarness>(
+        std::filesystem::temp_directory_path() /
+        ("query_wiring_teardown_" + std::to_string(stamp)));
+    const std::string kHeld = "teardown-held-ns";
+    const std::string kOther = "teardown-other-ns";
+    ASSERT_TRUE(harness->Admit(kOther).ok());
+    ASSERT_TRUE(harness->Admit(kHeld).ok());
+
+    // Two chunks in the held namespace, so its task reaches the rerank after the hold.
+    std::vector<std::pair<uint64_t, float>> hits;
+    harness->WithStore(kHeld, [&](cortrix::CortrixStore& store) {
+        for (int i = 1; i <= 2; ++i) {
+            const std::string n = std::to_string(i);
+            cortrix::CortrixDoc d;
+            d.source_type = "unit";
+            d.source_path = "teardown-" + n + ".md";
+            ASSERT_EQ(store.doc_create(d), 0);
+            cortrix::CortrixBlock b;
+            b.doc_id = d.doc_id;
+            b.chunk_index = 0;
+            b.block_type = cortrix::kBlockFile;
+            b.processing_level = cortrix::kLevelL2;
+            b.child_id = "01HXTEARDOWNHELD000000000" + n;
+            b.block_id = cortrix::id::HashChildIdToBlockId(b.child_id);
+            b.content_text = "semantic memory teardown marker " + n;
+            b.data = cortrix::BlockBuild(cortrix::kBlockFile, cortrix::kLevelL2,
+                                         b.content_text, "", "", 0, 0);
+            ASSERT_EQ(store.block_insert(b), 0);
+            hits.push_back({b.block_id, 0.1f * i});
+        }
+    });
+    auto* held_index = harness->fake_index();
+    ASSERT_NE(held_index, nullptr);
+    held_index->set_search_result(hits);
+    std::atomic<bool> hold{true};
+    std::atomic<int> entered{0};
+    held_index->set_search_hold(&hold, &entered);
+
+    cortrix::OnnxEmbedder embedder("", 128);
+    ASSERT_TRUE(embedder.Init().ok());
+    RRFFusion fusion(60);
+    cortrix::tenant::PermissionService permission(nullptr);
+    auto llm = std::make_shared<NiceMock<cortrix::llm::MockLlmClient>>();
+    ApiKeyAuth auth;
+    auth.set_enabled(false);
+    httplib::Server server;
+    auto wiring = std::make_unique<CrossNsQueryWiring>(
+        harness->ipool(), embedder, fusion, permission, /*sparse_registry=*/nullptr, llm,
+        /*engine_instr=*/nullptr, /*reranker_model_dir=*/"",
+        /*query_complexity_model_dir=*/"/definitely/missing/query-complexity",
+        /*candidate_multiplier=*/3, /*max_candidates=*/50,
+        /*reranker_execution_provider=*/"cpu");
+    ASSERT_TRUE(wiring->IsReady());
+    wiring->Register(server, auth);
+    const int port = server.bind_to_any_port("127.0.0.1");
+    ASSERT_GT(port, 0);
+    std::thread listen_thread([&] { server.listen_after_bind(); });
+
+    // The held namespace comes first, so the join waits out its limit on it and then
+    // answers without it.
+    httplib::Client client("127.0.0.1", port);
+    client.set_read_timeout(60, 0);
+    const json body = {{"query", "semantic memory teardown marker"},
+                       {"namespaces", json::array({kHeld, kOther})},
+                       {"granularity", "chunk"},
+                       {"top_k", 2}};
+    auto res = client.Post("/api/v1/query", body.dump(), "application/json");
+    ASSERT_TRUE(res);
+    EXPECT_EQ(entered.load(), 1) << "the held namespace's search must be the one waiting";
+
+    // As in production: the server stops, then the wiring is destroyed while the task
+    // the join stopped waiting for is still held.
+    server.stop();
+    listen_thread.join();
+    std::atomic<bool> destroyed{false};
+    std::thread destroyer([&] {
+        wiring.reset();
+        destroyed = true;
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    EXPECT_FALSE(destroyed.load()) << "teardown must wait for the running task";
+    hold = false;
+    destroyer.join();
+    EXPECT_TRUE(destroyed.load());
 }
 
 }  // namespace
