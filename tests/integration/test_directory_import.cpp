@@ -1161,15 +1161,10 @@ TEST_F(DirectoryImportTest, HandleFileEvents_FilteredFilesSkipped) {
     EXPECT_EQ(stats_before.skipped_error, stats_after.skipped_error);
 }
 
-// NOTE [wire5c semantics-adapted]: the pre-migration test intercepted every
-// doc_update_status call via a gmock store and asserted the exact (kStale, kPending)
-// transition pair x 3 files. The real CortrixStoreSqlite persists only the final
-// status (kStale is immediately overwritten by kPending), and the facade gives no way
-// to observe intermediate writes -- so the fine-grained transition sequence is not
-// observable through the harness. The migrated test verifies the observable end
-// state: each updated doc is left kPending (the post-update status) and the update
-// count is 3.
-TEST_F(DirectoryImportTest, UpdateSetsStatusStaleAndPending) {
+// A changed file is a new version (#157): each of the three seeded rows stays as it
+// was, and each file gets a new kPending row with its current content hash. The
+// previous version is retired only when the new one is ready.
+TEST_F(DirectoryImportTest, UpdateCreatesANewPendingVersionPerFile) {
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
     EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _)).WillRepeatedly(Return(0));
@@ -1195,12 +1190,21 @@ TEST_F(DirectoryImportTest, UpdateSetsStatusStaleAndPending) {
     auto stats = importer.GetStats();
     EXPECT_EQ(3, stats.updated);
 
-    // End state: all 3 updated docs are left kPending (kStale -> kPending).
     auto docs = ReadDocs(*harness, "default");
-    EXPECT_EQ(3u, docs.size());
+    EXPECT_EQ(6u, docs.size());
+    int seeded_ready = 0;
+    int new_pending = 0;
     for (const auto& d : docs) {
-        EXPECT_EQ(DocStatus::kPending, d.status);
+        if (d.content_hash == stale_hash) {
+            EXPECT_EQ(DocStatus::kReady, d.status);
+            ++seeded_ready;
+        } else {
+            EXPECT_EQ(DocStatus::kPending, d.status);
+            ++new_pending;
+        }
     }
+    EXPECT_EQ(3, seeded_ready);
+    EXPECT_EQ(3, new_pending);
 }
 
 TEST_F(DirectoryImportTest, UpdateCancelsPreviousSPCTask) {
@@ -1318,13 +1322,14 @@ TEST_F(DirectoryImportTest, UpdateSPCTask_HasCorrectFields) {
         EXPECT_FALSE(task->mime_type.empty());
         EXPECT_EQ(SPCPriority::kP1, task->priority);  // watch change = P1
         EXPECT_TRUE(task->is_update);
-        EXPECT_EQ(task->doc_id, task->old_doc_id);
+        EXPECT_NE(task->doc_id, task->old_doc_id);  // a new version, not the old row
     }
-    // The task for test.txt must carry the seeded doc's id.
+    // The task for test.txt names the seeded doc as the version it replaces.
     bool saw_seeded = false;
     for (const auto& task : submitted_tasks) {
         if (task->source_path == resolved_txt) {
-            EXPECT_EQ(seeded_id, task->doc_id);
+            EXPECT_EQ(seeded_id, task->old_doc_id);
+            EXPECT_NE(seeded_id, task->doc_id);
             saw_seeded = true;
         }
     }
