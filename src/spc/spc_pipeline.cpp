@@ -118,25 +118,11 @@ std::string F07EnricherToken(const std::string& enricher_name) {
     return "";
 }
 
-// A version that reaches ready retires the older versions of its source, for the two
-// producers whose repeated source is a new version of the same document. The source
-// is read from the row: while an upload is processed, its task's source_path holds a
-// temporary path.
-void RetireOlderVersions(const std::string& doc_id, CortrixStore& store) {
-    CortrixDoc row;
-    if (store.doc_get(doc_id, row) != 0) {
-        CORTRIX_LOG_WARN("spc", "retire older versions: cannot read doc_id={}", doc_id);
-        return;
-    }
-    if (row.source_type != "http_upload" && row.source_type != "watch_dir") return;
-    const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                               std::chrono::system_clock::now().time_since_epoch())
-                               .count();
-    int64_t retired = 0;
-    if (store.doc_retire_older_versions(doc_id, now_ms, &retired) != 0) {
-        CORTRIX_LOG_WARN("spc", "retire older versions failed for doc_id={}", doc_id);
-    }
-}
+// The task failure a withdrawn version reports. The API has no withdrawn state: the
+// version reads as deleted.
+constexpr const char* kWithdrawnMessage =
+    "could not mark this version ready, so it was deleted and the earlier version is "
+    "unchanged; add the document again";
 
 }  // namespace
 
@@ -153,11 +139,16 @@ SPCPipeline::SPCPipeline(cortrix::spc::DocumentParserFactory& parser_factory,
 
 int SPCPipeline::MarkDocumentReady(SPCTask& task, resource::NamespaceFacade& facade) {
     CortrixStore& store = facade.store();
-    const int rc = store.doc_update_status(task.doc_id, DocStatus::kReady);
-    if (rc == 0) {
-        RetireOlderVersions(task.doc_id, store);
-        return 0;
-    }
+    // A version that reaches ready retires the older versions of its source, for the
+    // two producers whose repeated source is a new version of the same document. The
+    // store does both in one transaction, and reads the source from the row: while an
+    // upload is processed, its task's source_path holds a temporary path.
+    const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::system_clock::now().time_since_epoch())
+                               .count();
+    int64_t retired = 0;
+    const int rc = store.doc_publish_version(task.doc_id, now_ms, &retired);
+    if (rc == 0) return 0;
     if (rc == -2) {
         // The write refuses a deleted row. A row that is there and deleted was
         // deleted, or retired by a newer version, while this task ran. A row that is
@@ -175,7 +166,31 @@ int SPCPipeline::MarkDocumentReady(SPCTask& task, resource::NamespaceFacade& fac
         }
         return 0;
     }
-    CORTRIX_LOG_WARN("spc", "ready write failed for doc_id={}", task.doc_id);
+    // The version could not be marked ready. A new version of an uploaded or watched
+    // file is then deleted while an earlier version of the file is live, so the two are
+    // never served together. The task's type decides, so a batch task that reuses the
+    // id of an uploaded or watched row never deletes it. In every other case the
+    // version keeps today's outcome: it stays processing until restart recovery, and
+    // no error is written.
+    if (task.source_type == "http_upload" || task.source_type == "watch_dir") {
+        const int wrc = store.doc_withdraw_version(task.doc_id, now_ms, kWithdrawnMessage);
+        if (wrc == 0) {
+            CORTRIX_LOG_WARN("spc",
+                             "ready write failed for doc_id={} ns={} rc={}: the version was "
+                             "withdrawn",
+                             task.doc_id, facade.namespace_id(), rc);
+            task.stage = SPCStage::kError;
+            task.error_message = kWithdrawnMessage;
+            return -1;
+        }
+        CORTRIX_LOG_WARN("spc",
+                         "ready write failed for doc_id={} ns={} rc={}; not withdrawn "
+                         "(rc={})",
+                         task.doc_id, facade.namespace_id(), rc, wrc);
+        return 0;
+    }
+    CORTRIX_LOG_WARN("spc", "ready write failed for doc_id={} ns={} rc={}", task.doc_id,
+                     facade.namespace_id(), rc);
     return 0;
 }
 
