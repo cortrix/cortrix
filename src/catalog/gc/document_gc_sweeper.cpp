@@ -141,16 +141,31 @@ DocumentGcSweeper::RestoreDecision DocumentGcSweeper::DecideRestore(
 
     // 2. For the two producers whose repeated source is a new version, a restore never
     //    leaves two live versions of one source: any live row of the source refuses it.
+    //    The check and the restore are one statement, so a version that finishes
+    //    meanwhile either refuses the restore or retires the restored row.
     if (row.source_type == "http_upload" || row.source_type == "watch_dir") {
+        const int rrc = store.doc_restore_unless_superseded(doc_id);
+        if (rrc == 0) {
+            RestoreDecision d;
+            d.kind = RestoreDecision::Kind::kRestored;
+            return d;
+        }
+        if (rrc != -2) return CheckFailed(doc_id);
+        // Nothing changed. Tell a row that is gone, or live again, from one that a live
+        // version of its source keeps deleted. A row still deleted with no live version
+        // lost it meanwhile, or a read failed: a retry decides.
+        CortrixDoc current;
+        const int again = store.doc_get(doc_id, current);
+        if (again == -2 || (again == 0 && current.status != DocStatus::kDeleted)) return {};
+        if (again != 0) return CheckFailed(doc_id);
         CortrixDoc live;
-        const int lrc = store.doc_find_by_source(row.source_type, row.source_path, live);
-        if (lrc == 0) {
+        if (store.doc_find_by_source(current.source_type, current.source_path, live) == 0) {
             return Refused(doc_id, "CX_ERR_GC_RESTORE_SUPERSEDED",
                            "another version is live: delete " + live.doc_id +
                                " in namespace " + ns_id + ", then restore " + doc_id,
                            live.doc_id, ns_id);
         }
-        if (lrc != -2) return CheckFailed(doc_id);
+        return CheckFailed(doc_id);
     }
 
     // 3. Restore.
