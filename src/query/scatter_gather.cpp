@@ -14,6 +14,7 @@
 #include "cortrix/query/content_hash.h"
 #include "cortrix/query/cross_ns_dedup.h"
 #include "cortrix/query/cross_ns_error.h"
+#include "cortrix/query/namespace_timeout.h"
 #include "cortrix/query/scatter_guc.h"
 #include "cortrix/query/scatter_metrics.h"
 #include "cortrix/query/scatter_plan.h"
@@ -95,8 +96,9 @@ CrossNsResponse ScatterGather::Execute(const QueryRequest& request,
     ScatterMetrics::Instance().RecordRequest(reason,
                                              agent_friendly::ErrorCategory::kPermanent);
 
-    // 2. Single / multi-NS path split (topic 1.6).
-    if (authorized.size() == 1) {
+    // 2. Single / multi-NS path split (topic 1.6). A request with a budget always takes
+    //    the timed join, a lone namespace included: the direct path cannot stop waiting.
+    if (authorized.size() == 1 && !ctx.deadline) {
         return ExecuteSingleNs(ctx, authorized.front());
     }
     return ExecuteMultiNs(ctx, authorized);
@@ -117,18 +119,29 @@ CrossNsResponse ScatterGather::ExecuteMultiNs(const QueryContext& ctx,
                                               const std::vector<std::string>& nss) {
     using clock = std::chrono::steady_clock;
     const auto start = clock::now();
-    const auto overall_deadline =
-        start + std::chrono::milliseconds(timeouts_.total_timeout_ms);
+    // With a budget the request's deadline bounds the join too; the join's own overall
+    // limit counts from here and so never comes first for a deadline set earlier.
+    auto overall_deadline = start + std::chrono::milliseconds(timeouts_.total_timeout_ms);
+    if (ctx.deadline) overall_deadline = std::min(overall_deadline, *ctx.deadline);
+    // A lone namespace is limited by the budget only; the per-namespace wait limit is
+    // there to keep one slow namespace from holding up the others.
+    const bool lone = nss.size() == 1;
 
     // Fan out: one task per NS onto the shared ExecutorEngine (topic 1.2 / 1.3).
     // Each task captures ns by value; the executor is reentrant per NS. The tasks
     // share one copy of the context that they own: the join stops waiting for a
     // namespace that misses its deadline, but that task keeps running on the pool
-    // after this call has returned and the caller's context may be gone.
+    // after this call has returned and the caller's context may be gone. With a
+    // budget, no task is created once the overall deadline has passed; that
+    // namespace gets its timeout row directly (an invalid future below).
     auto owned_ctx = std::make_shared<const QueryContext>(ctx);
     std::vector<std::future<NamespaceQueryResult>> futures;
     futures.reserve(nss.size());
     for (const std::string& ns : nss) {
+        if (ctx.deadline && clock::now() >= overall_deadline) {
+            futures.emplace_back();
+            continue;
+        }
         IScatterExecutor* exec = executor_;
         futures.push_back(engine_->Submit<NamespaceQueryResult>(
             [exec, owned_ctx, ns]() {
@@ -137,37 +150,37 @@ CrossNsResponse ScatterGather::ExecuteMultiNs(const QueryContext& ctx,
     }
 
     // Dual-layer timeout join (topic 2.5): each NS gets ns_query_timeout_ms, but never
-    // waits past the overall total_timeout_ms. A NS not ready by its deadline is
-    // recorded as CX_ERR_NS_TIMEOUT; if the overall deadline is what cut it off,
-    // the response also carries the top-level CX_ERR_SCATTER_TIMEOUT (partial).
+    // waits past the overall deadline. A NS not ready by its deadline is recorded as
+    // CX_ERR_NS_TIMEOUT; if the overall deadline is what cut it off, the response also
+    // carries the top-level CX_ERR_SCATTER_TIMEOUT (partial). A row the executor itself
+    // reported as timed out at or after the overall deadline counts the same.
     std::vector<NamespaceQueryResult> results(nss.size());
     bool scatter_timed_out = false;
 
     for (std::size_t i = 0; i < futures.size(); ++i) {
-        const auto ns_deadline =
-            clock::now() + std::chrono::milliseconds(timeouts_.ns_query_timeout_ms);
-        const auto deadline = std::min(ns_deadline, overall_deadline);
+        if (!futures[i].valid()) {
+            results[i] = MakeNamespaceTimeoutRow(nss[i], start);
+            if (CutByOverallDeadline(results[i], clock::now(), overall_deadline)) {
+                scatter_timed_out = true;
+            }
+            continue;
+        }
+        const auto deadline =
+            lone ? overall_deadline
+                 : std::min(clock::now() + std::chrono::milliseconds(timeouts_.ns_query_timeout_ms),
+                            overall_deadline);
 
         std::future_status st = futures[i].wait_until(deadline);
+        const auto ready_at = clock::now();
         if (st == std::future_status::ready) {
             results[i] = futures[i].get();
         } else {
-            // Timed out. Distinguish per-NS vs overall for the right top-level code.
-            const bool past_overall = clock::now() >= overall_deadline;
-            if (past_overall) scatter_timed_out = true;
-            const auto& info = GetCrossNsErrorInfo(CrossNsErrorCode::kNsTimeout);
-            NamespaceQueryResult timed;
-            timed.namespace_id = nss[i];
-            timed.error_code = info.cx_code;  // CX_ERR_NS_TIMEOUT for the per-NS row
-            timed.error_category = agent_friendly::ToString(info.category);
-            timed.retryable = info.retryable;
-            timed.retry_after_ms = info.retry_after_ms.value_or(0);
-            timed.latency_ms = static_cast<int>(
-                std::chrono::duration_cast<std::chrono::milliseconds>(clock::now() - start)
-                    .count());
-            results[i] = std::move(timed);
-            // NOTE: the detached task may still finish on the pool; its result is
-            // discarded. Cooperative per-NS cancellation = D3.5 (needs pipeline support).
+            // NOTE: the abandoned task may still finish on the pool; its result is
+            // discarded. With a budget it stops at its next stage boundary.
+            results[i] = MakeNamespaceTimeoutRow(nss[i], start);
+        }
+        if (CutByOverallDeadline(results[i], ready_at, overall_deadline)) {
+            scatter_timed_out = true;
         }
     }
 
