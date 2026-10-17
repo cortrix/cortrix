@@ -17,6 +17,7 @@
 #include "cortrix/logging/logging.h"
 #include "cortrix/query/bm25_searcher.h"
 #include "cortrix/query/cross_ns_error.h"
+#include "cortrix/query/namespace_timeout.h"
 #include "cortrix/query/vector_searcher.h"
 #include "cortrix/reranker/score_fusion.h"
 #include "cortrix/resource/namespace_facade.h"
@@ -456,8 +457,16 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         return out;
     }
 
+    // Cooperative stop: once the request's deadline has passed, the namespace returns
+    // its timeout row at the next stage boundary instead of starting that stage. A
+    // stage that has already started runs to its end.
+    auto past_deadline = [&ctx]() {
+        return ctx.deadline && clock::now() >= *ctx.deadline;
+    };
+
     try {
         // 1. Acquire the NS façade (F05 Pool.Acquire, RAII-released at scope exit).
+        if (past_deadline()) return MakeNamespaceTimeoutRow(namespace_id, t0);
         cortrix::resource::NamespaceFacade facade(pool_, namespace_id);
         Status acq = facade.Acquire();
         if (!acq.ok()) {
@@ -494,6 +503,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         RouteResult vector_result;
         vector_result.route_name = "vector";
         vector_result.status = RouteStatus::kSkipped;
+        if (past_deadline()) return MakeNamespaceTimeoutRow(namespace_id, t0);
         if (ctx.enable_vector) {
             VectorSearcher vec_searcher(facade.vec_index(), embedder_);
             // §3.8 W2: the ANN pool mixes chunk + hype (≤3) + contextual (≤1)
@@ -507,6 +517,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         RouteResult bm25_result;
         bm25_result.route_name = "bm25";
         bm25_result.status = RouteStatus::kSkipped;
+        if (past_deadline()) return MakeNamespaceTimeoutRow(namespace_id, t0);
         if (ctx.enable_bm25) {
             BM25Searcher bm25_searcher(facade.store());
             bm25_result = bm25_searcher.Search(ctx.query, candidate_k, kRouteTimeoutUs);
@@ -645,6 +656,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         // per-NS SPLADE inverted index. A NS with no indexed sparse vectors (or a
         // missing registry / index open failure) yields an empty list → the fusion
         // degrades to dense+FTS5 (F40 §7.2 L2 fallback), no error.
+        if (past_deadline()) return MakeNamespaceTimeoutRow(namespace_id, t0);
         if (ctx.enable_sparse && sparse_registry_ != nullptr) {
             retrieval::ISparseRetriever* sparse = sparse_registry_->GetOrOpen(namespace_id);
             if (sparse != nullptr && sparse->IsAvailable()) {
@@ -670,6 +682,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         // deleted entries had never been retrieved. An entry whose row carries no
         // doc_id (the legacy reverse lookup) is kept. A lookup error leaves the lists
         // as they were before this filter existed, and is logged.
+        if (past_deadline()) return MakeNamespaceTimeoutRow(namespace_id, t0);
         {
             std::vector<std::string> hit_doc_ids;
             for (const auto* list : {&rrf_in.dense, &rrf_in.fts5, &rrf_in.sparse,
@@ -770,6 +783,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
 
         // 4. Rerank (shared ScoreBatch + F02 RerankerScoreFusion ordering) when the
         //    request asks for it; otherwise keep the RRF order (RRF fallback path).
+        if (past_deadline()) return MakeNamespaceTimeoutRow(namespace_id, t0);
         if (ctx.rerank && !ranked.empty()) {
             std::vector<const char*> passages;
             passages.reserve(ranked.size());
@@ -861,11 +875,16 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteDocRetrieval(
             std::chrono::duration_cast<std::chrono::milliseconds>(clock::now() - t0)
                 .count());
     };
+    // Cooperative stop, as on the chunk path.
+    auto past_deadline = [&ctx]() {
+        return ctx.deadline && clock::now() >= *ctx.deadline;
+    };
 
     try {
         // Acquire the NS façade (F05 Pool.Acquire, RAII-released at scope exit) — same
         // contract as the chunk path; a missing NS / store fault folds in-band as
         // CX_ERR_INDEX_CORRUPT (topic 2.4 partial success), never thrown.
+        if (past_deadline()) return MakeNamespaceTimeoutRow(namespace_id, t0);
         cortrix::resource::NamespaceFacade facade(pool_, namespace_id);
         if (!facade.Acquire().ok()) {
             const auto& info = GetCrossNsErrorInfo(CrossNsErrorCode::kIndexCorrupt);
@@ -882,6 +901,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteDocRetrieval(
         cortrix::doc_summary::DocDiscoveryCoreOptions core_opts;
         core_opts.top_k = top_k;
         core_opts.fts5_fallback_enabled = doc_fts5_fallback_enabled_;
+        if (past_deadline()) return MakeNamespaceTimeoutRow(namespace_id, t0);
         cortrix::doc_summary::DocDiscoveryCoreResult core =
             cortrix::doc_summary::RunDocDiscoveryCore(
                 facade.vec_index(), facade.store(), embedder_, ctx.query, core_opts);
