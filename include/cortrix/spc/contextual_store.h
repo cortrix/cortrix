@@ -54,10 +54,14 @@ Status WriteContextualVecLabel(sqlite3* db, const ContextualVecLabelRow& row);
 /// (the caller treats an unknown label as a dropped hit, same as a missing block).
 Result<ContextualVecLabelRow> GetContextualVecLabel(sqlite3* db, uint64_t label);
 
-/// Remove the label row (idempotent: an absent row is already gone). The caller
-/// marks the index point deleted first, so a failure here leaves a row the next
-/// reconciliation retries rather than a point nothing can resolve.
-Status DeleteContextualVecLabel(sqlite3* db, uint64_t label);
+/// Remove the label row, saying whether this call removed it: true when its
+/// statement deleted the row, false when the row was already gone (an absent row is
+/// not an error). The statement returns the row before the autocommit commits, so
+/// the row counts as removed only once the statement has finished; a commit that
+/// fails is an error, and the row stays. The caller marks the index point deleted
+/// first, so a failure here leaves a row the next reconciliation retries rather
+/// than a point nothing can resolve.
+Result<bool> DeleteContextualVecLabel(sqlite3* db, uint64_t label);
 
 // --- label-only contextual debt ----------------------------------------------
 // When a child's contextual columns are complete but its index label row is

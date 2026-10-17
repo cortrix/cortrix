@@ -94,18 +94,22 @@ Status WriteContextualVecLabel(sqlite3* db, const ContextualVecLabelRow& row) {
     return Status::Ok();
 }
 
-Status DeleteContextualVecLabel(sqlite3* db, uint64_t label) {
+Result<bool> DeleteContextualVecLabel(sqlite3* db, uint64_t label) {
     if (!db) return Status::InvalidArgument("DeleteContextualVecLabel: null db");
     sqlite3_stmt* stmt = nullptr;
-    const char* sql = "DELETE FROM contextual_vec_labels WHERE label=?1";
+    // RETURNING says whether this statement removed the row, which the connection-wide
+    // change count cannot say for certain.
+    const char* sql = "DELETE FROM contextual_vec_labels WHERE label=?1 RETURNING label";
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         return SqlErr(db, "prepare delete contextual_vec_labels");
     }
     sqlite3_bind_int64(stmt, 1, static_cast<sqlite3_int64>(label));
-    const int rc = sqlite3_step(stmt);
+    int rc = sqlite3_step(stmt);
+    const bool deleted = (rc == SQLITE_ROW);
+    if (deleted) rc = sqlite3_step(stmt);  // the row counts once the statement is done
     sqlite3_finalize(stmt);
     if (rc != SQLITE_DONE) return SqlErr(db, "delete contextual_vec_labels");
-    return Status::Ok();  // idempotent: an absent row is already gone
+    return deleted;  // false: the row was already gone
 }
 
 Result<ContextualVecLabelRow> GetContextualVecLabel(sqlite3* db, uint64_t label) {
