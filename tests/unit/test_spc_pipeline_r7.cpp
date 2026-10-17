@@ -3189,6 +3189,15 @@ protected:
     static constexpr const char* kWithdrawn =
         "could not mark this version ready, so it was deleted and the earlier version is "
         "unchanged; add the document again";
+    static constexpr const char* kUnpublished =
+        "could not mark this version ready; any earlier version stays in place, and the "
+        "next upload of this file, or its next change or event, replaces it";
+
+    CortrixStoreSqlite& SqliteStore() {
+        auto* s = dynamic_cast<CortrixStoreSqlite*>(&facade_->store());
+        EXPECT_NE(s, nullptr);
+        return *s;
+    }
 };
 
 // Records the importer's submissions instead of queueing them.
@@ -3331,18 +3340,23 @@ TEST_F(SPCPipelineVersionsTest, FailedPublicationWithdrawsTheNewVersion) {
     EXPECT_EQ(LiveRows("http_upload", "a.txt"), 1);
 }
 
-TEST_F(SPCPipelineVersionsTest, FailedFirstVersionOrFileRowKeepsTodaysOutcome) {
-    // A first upload: no earlier version to protect.
+TEST_F(SPCPipelineVersionsTest, AFailedFirstVersionReportsTheFailure) {
+    // A first upload: no earlier version to protect, so nothing is withdrawn, but the
+    // task reports that the version was not marked ready. It is the only version, so
+    // it is still served.
     const std::string first =
         CreateVersion("http_upload", "first.txt", DocStatus::kProcessing,
                       "2026-10-01T00:00:00.000Z");
     AbortWhen("abort_first_ready", first, "ready");
-    const std::string message_before = Col(first, "error_message");
     auto upload = TaskAs(first, "http_upload");
-    EXPECT_EQ(pipeline_->Process(*upload, *facade_), 0);
-    EXPECT_EQ(upload->stage.load(), SPCStage::kDone);
+    EXPECT_EQ(pipeline_->Process(*upload, *facade_), -1);
+    EXPECT_EQ(upload->stage.load(), SPCStage::kError);
+    EXPECT_EQ(upload->error_message, kUnpublished);
+    EXPECT_TRUE(upload->error_code.empty());
     EXPECT_EQ(StatusOf(first), DocStatus::kProcessing);
-    EXPECT_EQ(Col(first, "error_message"), message_before);
+    EXPECT_TRUE(FullTextFinds(first));
+
+    // A file row beside an older live file row of the same path keeps today's outcome.
 
     // A file row beside an older live file row of the same path.
     const std::string f1 =
@@ -3372,20 +3386,75 @@ TEST_F(SPCPipelineVersionsTest, ABatchTaskNeverWithdrawsAnUploadedVersion) {
     EXPECT_EQ(StatusOf(v1), DocStatus::kReady);
 }
 
-TEST_F(SPCPipelineVersionsTest, AFailedWithdrawKeepsTodaysOutcome) {
+// The publication and the withdraw both fail. The task reports the failure, so
+// nothing reads the version as done, and the version is not served beside the one it
+// was to replace.
+TEST_F(SPCPipelineVersionsTest, AFailedWithdrawFailsTheTaskAndHidesTheVersion) {
     const std::string v1 =
-        CreateVersion("http_upload", "a.txt", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+        CreateVersion("http_upload", "a.txt", DocStatus::kPending, "2026-10-01T00:00:00.000Z");
+    auto first = TaskAs(v1, "http_upload");
+    ASSERT_EQ(pipeline_->Process(*first, *facade_), 0);
+    ASSERT_TRUE(FullTextFinds(v1));  // positive control
+
     const std::string v2 =
         CreateVersion("http_upload", "a.txt", DocStatus::kProcessing, "2026-10-02T00:00:00.000Z");
     AbortWhen("abort_retire", v1, "deleted");
     AbortWhen("abort_withdraw", v2, "deleted");
-    const std::string message_before = Col(v2, "error_message");
     auto task = TaskAs(v2, "http_upload");
-    EXPECT_EQ(pipeline_->Process(*task, *facade_), 0);
-    EXPECT_EQ(task->stage.load(), SPCStage::kDone);
-    EXPECT_EQ(StatusOf(v2), DocStatus::kProcessing);
-    EXPECT_EQ(Col(v2, "error_message"), message_before);  // no error is written
+    EXPECT_EQ(pipeline_->Process(*task, *facade_), -1);
+    EXPECT_EQ(task->stage.load(), SPCStage::kError);
+    EXPECT_EQ(task->error_message, kUnpublished);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kProcessing);  // no worker runs here to write error
+    EXPECT_FALSE(BlocksOf(v2).empty());  // its chunks were stored ...
+    EXPECT_FALSE(FullTextFinds(v2));     // ... and are not served
     EXPECT_EQ(StatusOf(v1), DocStatus::kReady);
+    EXPECT_TRUE(FullTextFinds(v1));
+}
+
+// When the version was not withdrawn, the row is read again: a deleted row reports
+// the deletion, a row another task published is done, and anything else, a failed
+// read included, reports the failure. An L0 task's first store call is the
+// publication, which the store's fault seam fails without touching the database.
+TEST_F(SPCPipelineVersionsTest, AFailedPublicationReadsTheRowAgain) {
+    auto l0 = [&](const std::string& doc_id) {
+        auto task = TaskAs(doc_id, "http_upload");
+        task->processing_level = 0;
+        return task;
+    };
+
+    const std::string deleted = CreateVersion("http_upload", "deleted.txt",
+                                              DocStatus::kProcessing, "2026-10-01T00:00:00.000Z");
+    ASSERT_EQ(facade_->store().doc_soft_delete(deleted, 1000), 0);
+    auto t1 = l0(deleted);
+    SqliteStore().SetFailNextOps(1);
+    EXPECT_EQ(pipeline_->Process(*t1, *facade_), -1);
+    EXPECT_EQ(t1->error_code, "CX_ERR_DOC_DELETED");
+
+    const std::string published = CreateVersion("http_upload", "ready.txt", DocStatus::kReady,
+                                                "2026-10-01T00:00:00.000Z");
+    auto t2 = l0(published);
+    SqliteStore().SetFailNextOps(1);
+    EXPECT_EQ(pipeline_->Process(*t2, *facade_), 0);
+    EXPECT_EQ(t2->stage.load(), SPCStage::kDone);
+
+    // The publication, the withdraw and the read all fail.
+    const std::string unread = CreateVersion("http_upload", "unread.txt",
+                                             DocStatus::kProcessing, "2026-10-01T00:00:00.000Z");
+    auto t3 = l0(unread);
+    SqliteStore().SetFailNextOps(3);
+    EXPECT_EQ(pipeline_->Process(*t3, *facade_), -1);
+    EXPECT_EQ(t3->stage.load(), SPCStage::kError);
+    EXPECT_EQ(t3->error_message, kUnpublished);
+
+    // The row is gone, so the read finds nothing: not a success either.
+    const std::string gone = CreateVersion("http_upload", "gone.txt", DocStatus::kProcessing,
+                                           "2026-10-01T00:00:00.000Z");
+    ASSERT_EQ(facade_->store().doc_delete(gone), 0);
+    auto t4 = l0(gone);
+    SqliteStore().SetFailNextOps(1);
+    EXPECT_EQ(pipeline_->Process(*t4, *facade_), -1);
+    EXPECT_EQ(t4->stage.load(), SPCStage::kError);
+    EXPECT_EQ(t4->error_message, kUnpublished);
 }
 
 // A watched file whose new version was withdrawn comes back as a new version on its
@@ -3433,6 +3502,70 @@ TEST_F(SPCPipelineVersionsTest, AWithdrawnWatchedVersionIsNotReprocessedInPlace)
     EXPECT_EQ(Col(v3, "content_hash"), Col(v2, "content_hash"));
     EXPECT_EQ(StatusOf(v3), DocStatus::kPending);
     EXPECT_EQ(StatusOf(v1), DocStatus::kReady);
+}
+
+// A watched file's new version can be neither published nor withdrawn. Its error
+// write may land (the row is then error) or fail too (it stays processing); either
+// way it holds a stored attempt and is hidden. Once the fault clears, the file's next
+// event makes a new version instead of processing that row in place, and the new
+// version publishes and retires both.
+TEST_F(SPCPipelineVersionsTest, AWatchedVersionThatFailedBothWritesIsReplacedOnTheNextEvent) {
+    const std::filesystem::path watch = tmp_root_ / "watch";
+    std::filesystem::create_directories(watch);
+    WatchDirConfig cfg;
+    cfg.data_dir = watch.string();
+    cfg.namespace_name = "test-ns";
+    cfg.watch_enabled = true;
+    cfg.allowed_extensions = {};  // every extension
+    RecordingSPC spc;
+    DirectoryImporter importer(cfg, *pool_, spc);
+    ASSERT_TRUE(importer.Start().ok());
+
+    for (const bool error_write_fails : {false, true}) {
+        SCOPED_TRACE(error_write_fails ? "the error write fails too" : "the error write lands");
+        const std::filesystem::path file = watch / (error_write_fails ? "stuck.txt" : "failed.txt");
+        { std::ofstream(file) << "content A"; }
+        FileEvent event;
+        event.type = FileEventType::kCreated;
+        event.path = std::filesystem::canonical(file).string();
+        importer.HandleFileEvents({event});
+        ASSERT_FALSE(spc.submitted_tasks.empty());
+        const auto first = spc.submitted_tasks.back();
+        const std::string v1 = first->doc_id;
+        ASSERT_EQ(RunAsWorker(*first), 0);
+        ASSERT_EQ(StatusOf(v1), DocStatus::kReady);
+
+        { std::ofstream(file) << "content B"; }
+        event.type = FileEventType::kModified;
+        importer.HandleFileEvents({event});
+        const auto second = spc.submitted_tasks.back();
+        const std::string v2 = second->doc_id;
+        ASSERT_NE(v2, v1);
+        AbortWhen("abort_retire", v1, "deleted");
+        AbortWhen("abort_withdraw", v2, "deleted");
+        if (error_write_fails) AbortWhen("abort_error", v2, "error");
+        EXPECT_EQ(RunAsWorker(*second), -1);
+        EXPECT_EQ(second->error_message, kUnpublished);
+        EXPECT_EQ(StatusOf(v2), error_write_fails ? DocStatus::kProcessing : DocStatus::kError);
+        EXPECT_FALSE(BlocksOf(v2).empty());
+        EXPECT_FALSE(FullTextFinds(v2));
+        EXPECT_TRUE(FullTextFinds(v1));
+        Exec("DROP TRIGGER abort_retire");
+        Exec("DROP TRIGGER abort_withdraw");
+        if (error_write_fails) Exec("DROP TRIGGER abort_error");
+
+        // The fault has cleared; the same content arrives again.
+        const std::size_t before = spc.submitted_tasks.size();
+        importer.HandleFileEvents({event});
+        ASSERT_EQ(spc.submitted_tasks.size(), before + 1) << "the event submitted nothing";
+        const auto third = spc.submitted_tasks.back();
+        EXPECT_NE(third->doc_id, v2) << "the failed row was processed in place";
+        ASSERT_EQ(RunAsWorker(*third), 0);
+        EXPECT_EQ(StatusOf(third->doc_id), DocStatus::kReady);
+        EXPECT_EQ(StatusOf(v1), DocStatus::kDeleted);
+        EXPECT_EQ(StatusOf(v2), DocStatus::kDeleted);
+        EXPECT_EQ(LiveRows("watch_dir", event.path), 1);
+    }
 }
 
 }  // namespace

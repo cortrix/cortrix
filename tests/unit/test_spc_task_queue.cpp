@@ -150,5 +150,57 @@ TEST(SPCTaskQueueTest, HasQueuedTaskSeesOnlyLiveWaitingTasks) {
     EXPECT_FALSE(queue.HasQueuedTask("doc-a"));  // a worker took it
 }
 
+// #157: a task counts as running from the moment it leaves the queue until it is
+// finished, so a document is never seen as neither queued nor running in between.
+TEST(SPCTaskQueueTest, APoppedTaskRunsUntilItIsFinished) {
+    SPCTaskQueue queue(10);
+    auto a = MakeTask(SPCPriority::kP1, 100, "a.txt");
+    a->doc_id = "doc-a";
+    ASSERT_EQ(queue.Push(a), 0);
+    EXPECT_FALSE(queue.IsRunning("doc-a"));
+
+    ASSERT_NE(queue.Pop(), nullptr);
+    EXPECT_FALSE(queue.HasQueuedTask("doc-a"));
+    EXPECT_TRUE(queue.IsRunning("doc-a"));
+    queue.FinishTask("doc-a");
+    EXPECT_FALSE(queue.IsRunning("doc-a"));
+    queue.FinishTask("doc-a");  // one too many is harmless
+    EXPECT_FALSE(queue.IsRunning("doc-a"));
+}
+
+TEST(SPCTaskQueueTest, RunningCountsEachTaskOfADocument) {
+    SPCTaskQueue queue(10);
+    for (int64_t at : {100, 200}) {
+        auto t = MakeTask(SPCPriority::kP1, at, "a.txt");
+        t->doc_id = "doc-a";
+        ASSERT_EQ(queue.Push(t), 0);
+    }
+    ASSERT_NE(queue.Pop(), nullptr);
+    ASSERT_NE(queue.Pop(), nullptr);
+    queue.FinishTask("doc-a");
+    EXPECT_TRUE(queue.IsRunning("doc-a")) << "the second task still runs";
+    queue.FinishTask("doc-a");
+    EXPECT_FALSE(queue.IsRunning("doc-a"));
+
+    queue.BeginRunning("doc-b");  // work that does not come through the queue
+    EXPECT_TRUE(queue.IsRunning("doc-b"));
+    EXPECT_FALSE(queue.IsRunning("doc-a"));
+    queue.FinishTask("doc-b");
+    EXPECT_FALSE(queue.IsRunning("doc-b"));
+}
+
+TEST(SPCTaskQueueTest, ACancelledTaskIsNeitherQueuedNorRunning) {
+    SPCTaskQueue queue(10);
+    auto a = MakeTask(SPCPriority::kP1, 100, "a.txt");
+    a->doc_id = "doc-a";
+    ASSERT_EQ(queue.Push(a), 0);
+    ASSERT_EQ(queue.CancelQueuedVersions("", "", "a.txt"), 1);
+    EXPECT_FALSE(queue.HasQueuedTask("doc-a"));
+    EXPECT_FALSE(queue.IsRunning("doc-a"));
+    queue.Stop();
+    EXPECT_EQ(queue.Pop(), nullptr);  // the cancelled task is skipped, not run
+    EXPECT_FALSE(queue.IsRunning("doc-a"));
+}
+
 }  // namespace
 }  // namespace cortrix

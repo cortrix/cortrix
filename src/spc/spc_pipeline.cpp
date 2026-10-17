@@ -124,6 +124,12 @@ constexpr const char* kWithdrawnMessage =
     "could not mark this version ready, so it was deleted and the earlier version is "
     "unchanged; add the document again";
 
+// The task failure a version reports when it could not be marked ready and was not
+// withdrawn.
+constexpr const char* kUnpublishedMessage =
+    "could not mark this version ready; any earlier version stays in place, and the "
+    "next upload of this file, or its next change or event, replaces it";
+
 }  // namespace
 
 SPCPipeline::SPCPipeline(cortrix::spc::DocumentParserFactory& parser_factory,
@@ -168,10 +174,9 @@ int SPCPipeline::MarkDocumentReady(SPCTask& task, resource::NamespaceFacade& fac
     }
     // The version could not be marked ready. A new version of an uploaded or watched
     // file is then deleted while an earlier version of the file is live, so the two are
-    // never served together. The task's type decides, so a batch task that reuses the
-    // id of an uploaded or watched row never deletes it. In every other case the
-    // version keeps today's outcome: it stays processing until restart recovery, and
-    // no error is written.
+    // never served together. The task's type decides: a task of another type, such as
+    // a batch task that reuses the id of an uploaded row, never deletes it, and keeps
+    // today's outcome (logged, done, the row left processing until restart recovery).
     if (task.source_type == "http_upload" || task.source_type == "watch_dir") {
         const int wrc = store.doc_withdraw_version(task.doc_id, now_ms, kWithdrawnMessage);
         if (wrc == 0) {
@@ -187,7 +192,27 @@ int SPCPipeline::MarkDocumentReady(SPCTask& task, resource::NamespaceFacade& fac
                          "ready write failed for doc_id={} ns={} rc={}; not withdrawn "
                          "(rc={})",
                          task.doc_id, facade.namespace_id(), rc, wrc);
-        return 0;
+        // Not withdrawn: there is no earlier version to protect, the withdraw failed
+        // too, or the row changed meanwhile. Read it again to tell which.
+        CortrixDoc row;
+        const int got = store.doc_get(task.doc_id, row);
+        if (got == 0 && row.status == DocStatus::kDeleted) {
+            task.stage = SPCStage::kError;
+            task.error_message = "document deleted or superseded during processing";
+            task.error_code = "CX_ERR_DOC_DELETED";
+            return -1;
+        }
+        // On the SQLite store a failed publication applied nothing, so a ready row was
+        // published by another task.
+        if (got == 0 && row.status == DocStatus::kReady) return 0;
+        // Otherwise the version reports the failure, so nothing reads it as done. It
+        // stays unpublished; while another version of the file should answer queries
+        // it is hidden from retrieval, and the next upload of the file, or its next
+        // change or event, replaces it. A read that fails also lands here: doc_get
+        // answers a failed read as not found.
+        task.stage = SPCStage::kError;
+        task.error_message = kUnpublishedMessage;
+        return -1;
     }
     CORTRIX_LOG_WARN("spc", "ready write failed for doc_id={} ns={} rc={}", task.doc_id,
                      facade.namespace_id(), rc);

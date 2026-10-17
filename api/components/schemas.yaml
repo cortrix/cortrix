@@ -231,8 +231,9 @@ components:
           type: string
           description: >-
             Set only when status is updating: the doc_id of the newest live version this
-            upload was compared against. That version keeps answering queries until the
-            new one is ready; then every older version of the filename is retired.
+            upload was compared against. The version that answers queries for the
+            filename keeps doing so until the new one is ready; then every older version
+            of the filename is retired.
         source_path:
           type: string
           description: The uploaded file's original filename.

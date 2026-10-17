@@ -153,15 +153,23 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
     bool found = FindExistingDocument(store, req.filename, &existing_doc);
 
     // Unchanged content is skipped only while that version is, or will be, processed:
-    // it is ready, it is processing, or it is pending with a live queued task. A
-    // version with the same content and no such future (a failed submit, a crash, a
-    // cancel, a failed run) is replaced by a new version, exactly as changed content is.
-    const bool will_be_processed =
-        found && (existing_doc.status == DocStatus::kReady ||
-                  existing_doc.status == DocStatus::kProcessing ||
-                  (existing_doc.status == DocStatus::kPending &&
-                   spc_mgr_.HasQueuedTask(existing_doc.doc_id)));
-    if (found && existing_doc.content_hash == content_hash && will_be_processed) {
+    // it is ready, or a task for it is queued or running. A version with the same
+    // content and no such future (a failed submit, a crash, a cancel, a failed run, or a
+    // version left processing after its task ended) is replaced by a new version,
+    // exactly as changed content is. The row is read again when no task is active, so
+    // a version whose task published it in between is still skipped.
+    const bool same_content = found && existing_doc.content_hash == content_hash;
+    bool will_be_processed =
+        same_content && (existing_doc.status == DocStatus::kReady ||
+                         spc_mgr_.HasActiveTask(existing_doc.doc_id));
+    if (same_content && !will_be_processed) {
+        CortrixDoc again;
+        if (store.doc_get(existing_doc.doc_id, again) == 0 &&
+            again.status == DocStatus::kReady) {
+            will_be_processed = true;
+        }
+    }
+    if (will_be_processed) {
         // Duplicate - skip
         result->doc_id = existing_doc.doc_id;
         result->content_hash = content_hash;

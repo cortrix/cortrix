@@ -318,16 +318,40 @@ Status DirectoryImporter::ProcessFile(const std::string& file_path) {
     } else if (rc == 0) {
         // Existing document - check for content change
         if (existing_doc.content_hash == content_hash) {
-            // Hash unchanged - but if status is pending/error, the doc was never
-            // successfully processed (e.g., server crashed mid-import). Re-enqueue.
-            if (existing_doc.status == DocStatus::kPending ||
-                existing_doc.status == DocStatus::kError) {
+            // Hash unchanged. A version that is pending, failed, or left processing, and
+            // that no task will process (the server stopped mid-import, a run failed, or
+            // a task ended without marking it ready), never finished: it is processed
+            // again. While a task for it is queued or running, that task will.
+            const bool unfinished = existing_doc.status == DocStatus::kPending ||
+                                    existing_doc.status == DocStatus::kError ||
+                                    existing_doc.status == DocStatus::kProcessing;
+            if (unfinished && spc_mgr_.HasActiveTask(existing_doc.doc_id)) {
+                CORTRIX_LOG_DEBUG(kModule, "file unchanged, its version will be processed: {}",
+                                  effective_path);
+                std::lock_guard<std::mutex> lock(stats_mu_);
+                stats_.skipped_unchanged++;
+                return Status::Ok();
+            }
+            // A version that already holds blocks stored an attempt that was never
+            // published. Processing it again in place would collide with its
+            // document-level metadata block, or store a second copy of its blocks, so it
+            // gets a new version below instead, as changed content does. The count is
+            // read after the active check, so no task can add blocks under it; a count
+            // that cannot be read is taken to mean blocks.
+            int64_t stored_blocks = 0;
+            const bool holds_attempt =
+                unfinished &&
+                (facade.store().block_count_by_doc(existing_doc.doc_id, &stored_blocks) != 0 ||
+                 stored_blocks > 0);
+            if (unfinished && !holds_attempt) {
                 CORTRIX_LOG_INFO(kModule, "re-enqueue unprocessed doc: doc_id={}, status={}, path={}",
                                 existing_doc.doc_id,
-                                existing_doc.status == DocStatus::kPending ? "pending" : "error",
+                                existing_doc.status == DocStatus::kPending ? "pending"
+                                : existing_doc.status == DocStatus::kError ? "error"
+                                                                           : "processing",
                                 effective_path);
-                // Cancel first: an earlier task for this path may still be queued,
-                // and processing the same content twice only adds a second copy.
+                // Cancel first, in case a task for this path is queued after the check
+                // above: processing the same content twice only adds a second copy.
                 spc_mgr_.CancelQueuedVersions(config_.namespace_name, "watch_dir",
                                               effective_path);
                 auto task = std::make_shared<SPCTask>();
@@ -346,16 +370,23 @@ Status DirectoryImporter::ProcessFile(const std::string& file_path) {
                 return Status::Ok();
             }
 
-            CORTRIX_LOG_DEBUG(kModule, "file unchanged: {}", effective_path);
-            std::lock_guard<std::mutex> lock(stats_mu_);
-            stats_.skipped_unchanged++;
-            return Status::Ok();
+            if (!unfinished) {
+                CORTRIX_LOG_DEBUG(kModule, "file unchanged: {}", effective_path);
+                std::lock_guard<std::mutex> lock(stats_mu_);
+                stats_.skipped_unchanged++;
+                return Status::Ok();
+            }
+            CORTRIX_LOG_INFO(kModule,
+                             "unfinished version holds a stored attempt, so a new version "
+                             "replaces it: doc_id={}, path={}",
+                             existing_doc.doc_id, effective_path);
         }
 
-        // Content changed: a new version, created exactly as a new file is. The
-        // previous version keeps answering queries until the new one is ready, which
-        // then retires it. Reprocessing the previous row in place would store a
-        // second set of chunks next to the first.
+        // A new version, created exactly as a new file is: for changed content, and
+        // for unchanged content whose unfinished version holds a stored attempt. The
+        // version that answers queries keeps doing so until the new one is ready,
+        // which then retires every older version. Reprocessing the previous row in
+        // place would store a second set of chunks next to the first.
         spc_mgr_.CancelQueuedVersions(config_.namespace_name, "watch_dir", effective_path);
 
         CortrixDoc version = MakeWatchedDocument(effective_path, content_hash);

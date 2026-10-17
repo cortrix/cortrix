@@ -44,7 +44,28 @@ std::shared_ptr<SPCTask> SPCTaskQueue::Pop() {
     }
     if (task && task->cancelled.load()) return nullptr;
 
+    // Running from the moment it leaves the queue, under the same lock, so the task is
+    // never seen as neither queued nor running.
+    if (task) ++running_[task->doc_id];
     return task;
+}
+
+void SPCTaskQueue::FinishTask(const std::string& doc_id) {
+    std::lock_guard<std::mutex> lock(mu_);
+    auto it = running_.find(doc_id);
+    if (it == running_.end()) return;
+    if (--it->second <= 0) running_.erase(it);
+}
+
+void SPCTaskQueue::BeginRunning(const std::string& doc_id) {
+    std::lock_guard<std::mutex> lock(mu_);
+    ++running_[doc_id];
+}
+
+bool SPCTaskQueue::IsRunning(const std::string& doc_id) const {
+    std::lock_guard<std::mutex> lock(mu_);
+    auto it = running_.find(doc_id);
+    return it != running_.end() && it->second > 0;
 }
 
 int SPCTaskQueue::CancelQueuedVersions(const std::string& namespace_name,

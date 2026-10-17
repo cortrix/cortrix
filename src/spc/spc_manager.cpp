@@ -5,8 +5,28 @@
 #include <chrono>
 #include <fstream>
 #include <cstdio>
+#include <string>
+#include <utility>
 
 namespace cortrix {
+
+namespace {
+
+// Ends one running task for doc_id when it goes out of scope, however the work ends.
+class RunningTaskGuard {
+public:
+    RunningTaskGuard(SPCTaskQueue& queue, std::string doc_id)
+        : queue_(queue), doc_id_(std::move(doc_id)) {}
+    ~RunningTaskGuard() { queue_.FinishTask(doc_id_); }
+    RunningTaskGuard(const RunningTaskGuard&) = delete;
+    RunningTaskGuard& operator=(const RunningTaskGuard&) = delete;
+
+private:
+    SPCTaskQueue& queue_;
+    std::string doc_id_;
+};
+
+}  // namespace
 
 SPCManager::SPCManager(const SPCConfig& config,
                        resource::INamespacePool& pool,
@@ -56,7 +76,18 @@ bool SPCManager::HasQueuedTask(const std::string& doc_id) const {
     return queue_.HasQueuedTask(doc_id);
 }
 
+bool SPCManager::HasActiveTask(const std::string& doc_id) const {
+    // Queued first, then running: a task moves from one to the other under the
+    // queue's lock and never back, so this order cannot miss it in between.
+    return HasQueuedTask(doc_id) || queue_.IsRunning(doc_id);
+}
+
 int SPCManager::ProcessParsedDoc(spc::ParsedDoc& parsed, SPCTask& task) {
+    // This work does not come through the queue, so it counts itself as running for
+    // its doc_id until it returns (HasActiveTask).
+    queue_.BeginRunning(task.doc_id);
+    RunningTaskGuard running(queue_, task.doc_id);
+
     // Per-task façade over the F05 pool, mirroring WorkerLoop — but the F42 async path has
     // already parsed (F06 in DocumentProcessor), so no blob→temp extraction is needed here.
     resource::NamespaceFacade facade(*pool_, task.namespace_name);
@@ -182,6 +213,9 @@ void SPCManager::WorkerLoop() {
             if (!running_.load()) break;
             continue;
         }
+        // Pop counted the task as running; it stays so until this iteration ends,
+        // after the error write, on every path below.
+        RunningTaskGuard running(queue_, task->doc_id);
 
         if (task->cancelled.load()) continue;
 
