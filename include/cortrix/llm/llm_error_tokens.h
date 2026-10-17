@@ -17,6 +17,10 @@ inline constexpr char kTransport[] = "CX_LLM_TRANSPORT";   ///< no HTTP status r
 inline constexpr char kHttp[] = "CX_LLM_HTTP";             ///< got an HTTP status (4xx/5xx)
 inline constexpr char kRateLimit[] = "CX_LLM_RATE_LIMIT";  ///< HTTP 429
 inline constexpr char kBadBody[] = "CX_LLM_BAD_BODY";      ///< 2xx but unparseable
+/// The request's budget left no time for an attempt. Emitted only for a call that
+/// carries a deadline (LlmCallConfig::deadline), and then on its own: it never
+/// carries an earlier attempt's transport detail.
+inline constexpr char kBudgetExhausted[] = "CX_LLM_BUDGET_EXHAUSTED";
 }  // namespace llm_tokens
 
 }  // namespace cortrix::llm

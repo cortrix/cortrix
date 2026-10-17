@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <chrono>
 #include <cstdlib>
 #include <limits>
 #include <utility>
@@ -106,11 +107,33 @@ ChatCompletionResponse OpenAiLlmClient::Chat(const std::string& prompt,
     // HTTP-level retry/backoff remains feature-owned. At the shared client layer,
     // retry only no-status transport failures because consumers such as F41 do not
     // have an outer retry shell.
+    // With a deadline, the time left is read before each attempt: below the floor no
+    // attempt is made, and otherwise the attempt's timeout is at most the time left
+    // (never 0, which would mean the client default). A call that stops for lack of
+    // time reports the budget token alone, whatever an earlier attempt returned.
     HttpResponse http;
     const int attempts = std::max(1, config_.max_retries + 1);
+    bool out_of_budget = false;
     for (int attempt = 0; attempt < attempts; ++attempt) {
+        if (call.deadline) {
+            const long long left_ms =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    *call.deadline - std::chrono::steady_clock::now())
+                    .count();
+            if (left_ms < kLlmBudgetFloorMs) {
+                out_of_budget = true;
+                break;
+            }
+            req.timeout_ms = static_cast<int>(std::min<long long>(timeout_ms, left_ms));
+        }
         http = transport_->Send(req);
         if (http.network_ok) break;
+    }
+
+    if (out_of_budget) {
+        resp.status = MakeStatus(StatusCode::kUnavailable, llm_tokens::kBudgetExhausted,
+                                 "no time left in the request's budget for an attempt");
+        return resp;
     }
 
     if (!http.network_ok) {
