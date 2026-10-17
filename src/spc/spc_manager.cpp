@@ -52,6 +52,10 @@ int SPCManager::CancelQueuedVersions(const std::string& namespace_name,
     return queue_.CancelQueuedVersions(namespace_name, source_type, source_path);
 }
 
+bool SPCManager::HasQueuedTask(const std::string& doc_id) const {
+    return queue_.HasQueuedTask(doc_id);
+}
+
 int SPCManager::ProcessParsedDoc(spc::ParsedDoc& parsed, SPCTask& task) {
     // Per-task façade over the F05 pool, mirroring WorkerLoop — but the F42 async path has
     // already parsed (F06 in DocumentProcessor), so no blob→temp extraction is needed here.
@@ -93,6 +97,16 @@ int SPCManager::ProcessParsedDoc(spc::ParsedDoc& parsed, SPCTask& task) {
                                              task.error_message);
             return -1;
         }
+    } else if (existing.status == DocStatus::kDeleted) {
+        // A re-submission of a deleted document's id is refused before any
+        // processing: going on would bring the row back with a second set of chunks
+        // next to the first, and the delete is the caller's latest intent.
+        task.stage = SPCStage::kError;
+        task.error_message = "document " + task.doc_id +
+                             " is deleted; restore it with POST /api/v1/gc/restore or "
+                             "submit it under a new doc_id";
+        task.error_code = "CX_ERR_DOC_DELETED";
+        return -1;
     } else {
         facade.store().doc_update_status(task.doc_id, DocStatus::kProcessing);
     }
@@ -182,8 +196,19 @@ void SPCManager::WorkerLoop() {
             continue;
         }
 
-        // Update doc status to processing
-        facade.store().doc_update_status(task->doc_id, DocStatus::kProcessing);
+        // Update doc status to processing. The write refuses a deleted row, and a task
+        // whose document was deleted while it waited is not processed: its blocks
+        // would only be left for the collector to remove.
+        if (facade.store().doc_update_status(task->doc_id, DocStatus::kProcessing) == -2) {
+            CortrixDoc row;
+            if (facade.store().doc_get(task->doc_id, row) == 0 &&
+                row.status == DocStatus::kDeleted) {
+                task->stage = SPCStage::kError;
+                task->error_message = "document deleted before processing";
+                task->error_code = "CX_ERR_DOC_DELETED";
+                continue;
+            }
+        }
 
         // For HTTP uploads, extract blob to temp file so the parser can read it
         std::string original_source_path = task->source_path;

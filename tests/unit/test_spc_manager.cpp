@@ -1,3 +1,5 @@
+#include "cortrix/resource/namespace_facade.h"
+#include <sqlite3.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include "cortrix/spc/spc_manager.h"
@@ -710,6 +712,193 @@ TEST_F(SPCManagerRealTest, WorkerLoop_HttpUpload_BlobLoadFail) {
     EXPECT_NE(task->error_message.find("blob load failed"), std::string::npos);
 
     mgr_->Stop();
+}
+
+
+// --- #157: deleted documents are not processed again --------------------------
+
+class SPCManagerVersionsTest : public SPCManagerRealTest {
+protected:
+    std::string CreateRow(const std::string& ns, const std::string& doc_id,
+                          const std::string& type, const std::string& path, DocStatus status,
+                          const std::string& created_at) {
+        resource::NamespaceFacade f(*pool_, ns);
+        EXPECT_TRUE(f.Acquire().ok());
+        CortrixDoc d;
+        d.doc_id = doc_id;
+        d.source_type = type;
+        d.source_path = path;
+        d.status = status;
+        EXPECT_EQ(f.store().doc_create(d), 0);
+        char* err = nullptr;
+        const std::string sql = "UPDATE documents SET created_at = '" + created_at +
+                                "' WHERE doc_id = '" + d.doc_id + "'";
+        EXPECT_EQ(sqlite3_exec(f.store().db_handle(), sql.c_str(), nullptr, nullptr, &err),
+                  SQLITE_OK);
+        sqlite3_free(err);
+        return d.doc_id;
+    }
+
+    DocStatus StatusOf(const std::string& ns, const std::string& doc_id) {
+        resource::NamespaceFacade f(*pool_, ns);
+        EXPECT_TRUE(f.Acquire().ok());
+        CortrixDoc d;
+        EXPECT_EQ(f.store().doc_get(doc_id, d), 0);
+        return d.status;
+    }
+
+    size_t BlockCount(const std::string& ns, const std::string& doc_id) {
+        resource::NamespaceFacade f(*pool_, ns);
+        EXPECT_TRUE(f.Acquire().ok());
+        std::vector<CortrixBlock> blocks;
+        EXPECT_EQ(f.store().block_get_by_doc(doc_id, blocks), 0);
+        return blocks.size();
+    }
+
+    void SoftDelete(const std::string& ns, const std::string& doc_id) {
+        resource::NamespaceFacade f(*pool_, ns);
+        ASSERT_TRUE(f.Acquire().ok());
+        ASSERT_EQ(f.store().doc_soft_delete(doc_id, 1000), 0);
+    }
+
+    static void WaitForEnd(const SPCTask& t) {
+        for (int i = 0; i < 100; ++i) {
+            const SPCStage s = t.stage.load();
+            if (s == SPCStage::kDone || s == SPCStage::kError) return;
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+    }
+};
+
+TEST_F(SPCManagerVersionsTest, ParsedDocForADeletedRowIsRefusedBeforeProcessing) {
+    AdmitNs("ver_ns");
+    const std::string id = CreateRow("ver_ns", "01JTESTDOCDELETED000000001", "file", "f.txt",
+                                     DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    SoftDelete("ver_ns", id);
+
+    cortrix::spc::ParsedDoc d;
+    d.status = cortrix::spc::ParserErrorCode::kOk;
+    d.parser_name = "docling";
+    SPCTask task;
+    task.doc_id = id;
+    task.namespace_name = "ver_ns";
+    task.source_path = "f.txt";
+    task.source_type = "file";
+    task.mime_type = "text/plain";
+    task.processing_level = 1;
+    EXPECT_EQ(mgr_->ProcessParsedDoc(d, task), -1);
+    EXPECT_EQ(task.stage.load(), SPCStage::kError);
+    EXPECT_EQ(task.error_code, "CX_ERR_DOC_DELETED");
+    EXPECT_NE(task.error_message.find("is deleted"), std::string::npos) << task.error_message;
+    EXPECT_EQ(StatusOf("ver_ns", id), DocStatus::kDeleted);
+    EXPECT_EQ(BlockCount("ver_ns", id), 0u);
+}
+
+TEST_F(SPCManagerVersionsTest, QueuedTaskOfADeletedDocumentIsSkipped) {
+    AdmitNs("ver_ns");
+    const std::string id = CreateRow("ver_ns", "01JTESTDOCDELETED000000002", "http_upload",
+                                     "a.txt", DocStatus::kPending, "2026-10-01T00:00:00.000Z");
+    SoftDelete("ver_ns", id);
+    mgr_->Start();
+    auto task = std::make_shared<SPCTask>();
+    task->doc_id = id;
+    task->namespace_name = "ver_ns";
+    task->source_type = "http_upload";
+    task->source_path = "a.txt";
+    task->mime_type = "text/plain";
+    task->processing_level = 1;
+    task->priority = SPCPriority::kP0;
+    ASSERT_TRUE(mgr_->Submit(task).ok());
+    WaitForEnd(*task);
+    EXPECT_EQ(task->stage.load(), SPCStage::kError);
+    EXPECT_EQ(task->error_code, "CX_ERR_DOC_DELETED");
+    EXPECT_EQ(StatusOf("ver_ns", id), DocStatus::kDeleted);
+    mgr_->Stop();
+}
+
+TEST_F(SPCManagerVersionsTest, UploadVersionThroughTheWorkerRetiresTheOlderOne) {
+    AdmitNs("ver_ns");
+    const std::string v1 = CreateRow("ver_ns", "01JTESTDOCVERSION000000001", "http_upload",
+                                     "a.txt", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    const std::string v2 = CreateRow("ver_ns", "01JTESTDOCVERSION000000002", "http_upload",
+                                     "a.txt", DocStatus::kPending, "2026-10-02T00:00:00.000Z");
+    {
+        resource::NamespaceFacade f(*pool_, "ver_ns");
+        ASSERT_TRUE(f.Acquire().ok());
+        const std::string body = "version two";
+        ASSERT_EQ(f.blob().store("ver_ns", v2, body.data(), body.size()), 0);
+    }
+    mgr_->Start();
+    auto task = std::make_shared<SPCTask>();
+    task->doc_id = v2;
+    task->namespace_name = "ver_ns";
+    task->source_type = "http_upload";
+    task->source_path = "a.txt";  // the worker swaps in a temporary path while processing
+    task->mime_type = "text/plain";
+    task->processing_level = 1;
+    task->priority = SPCPriority::kP0;
+    task->is_update = true;
+    task->old_doc_id = v1;
+    ASSERT_TRUE(mgr_->Submit(task).ok());
+    WaitForEnd(*task);
+    ASSERT_EQ(task->stage.load(), SPCStage::kDone) << task->error_message;
+    EXPECT_EQ(StatusOf("ver_ns", v2), DocStatus::kReady);
+    EXPECT_EQ(StatusOf("ver_ns", v1), DocStatus::kDeleted);
+    mgr_->Stop();
+}
+
+// The manager answers from its queue: a second task waits while a slow first task
+// holds the only worker.
+TEST_F(SPCManagerVersionsTest, HasQueuedTaskAnswersFromTheQueue) {
+    AdmitNs("ver_ns");
+    const fs::path script = test_dir_ / "slow_docling.py";
+    {
+        std::ofstream s(script);
+        s << "import time\ntime.sleep(3)\nprint('{\"status\": 0, \"parser\": \"docling\", "
+             "\"metadata\": {\"filename\": \"s.txt\", \"page_count\": 0}, \"pages\": []}')\n";
+    }
+    cortrix::spc::ParserFactoryConfig pf;
+    cortrix::spc::DocumentParserFactory factory(pf);
+    cortrix::spc::DoclingParserConfig dc;
+    dc.python_path = "python3";
+    dc.script_path = script.string();
+    factory.SetPrimaryParser(std::make_unique<cortrix::spc::DoclingParser>(dc));
+    cortrix::spc::PaddleOCRParserConfig pc;
+    pc.python_path = "python3";
+    pc.script_path = script.string();
+    factory.SetFallbackParser(std::make_unique<cortrix::spc::PaddleOCRParser>(pc));
+    auto pipeline = std::make_unique<SPCPipeline>(factory, *chunker_, *embedder_, *assembler_,
+                                                  enricher_);
+    SPCManager mgr(spc_config_, *pool_, std::move(pipeline));
+    mgr.Start();
+
+    const fs::path slow_file = test_dir_ / "s.txt";
+    { std::ofstream(slow_file) << "slow"; }
+    auto slow = std::make_shared<SPCTask>();
+    slow->doc_id = "01JTESTDOCSLOW000000000001";
+    slow->namespace_name = "ver_ns";
+    slow->source_type = "file";
+    slow->source_path = slow_file.string();
+    slow->mime_type = "text/plain";
+    slow->priority = SPCPriority::kP0;
+    ASSERT_TRUE(mgr.Submit(slow).ok());
+    for (int i = 0; i < 40 && slow->stage.load() == SPCStage::kQueued; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    }
+    ASSERT_NE(slow->stage.load(), SPCStage::kQueued) << "the worker never took the slow task";
+
+    auto waiting = std::make_shared<SPCTask>();
+    waiting->doc_id = "01JTESTDOCWAITING000000001";
+    waiting->namespace_name = "ver_ns";
+    waiting->source_type = "http_upload";
+    waiting->source_path = "w.txt";
+    waiting->priority = SPCPriority::kP1;
+    ASSERT_TRUE(mgr.Submit(waiting).ok());
+    EXPECT_TRUE(mgr.HasQueuedTask(waiting->doc_id));
+    EXPECT_FALSE(mgr.HasQueuedTask(slow->doc_id));  // already taken by the worker
+    EXPECT_EQ(mgr.CancelQueuedVersions("ver_ns", "http_upload", "w.txt"), 1);
+    EXPECT_FALSE(mgr.HasQueuedTask(waiting->doc_id));
+    mgr.Stop();
 }
 
 }  // namespace

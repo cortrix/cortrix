@@ -77,6 +77,9 @@ public:
                                      const std::string& source_type,
                                      const std::string& source_path);
 
+    /// True while a task for doc_id waits in the queue and has not been cancelled.
+    virtual bool HasQueuedTask(const std::string& doc_id) const;
+
     /// Start worker threads
     virtual void Start();
 

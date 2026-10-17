@@ -26,6 +26,10 @@ public:
                              const std::string& source_type,
                              const std::string& source_path);
 
+    /// True while a task for doc_id waits in the queue and has not been cancelled.
+    /// A task a worker has already popped is not queued.
+    bool HasQueuedTask(const std::string& doc_id) const;
+
     /// Stop the queue (unblock all waiting Pop calls)
     void Stop();
 

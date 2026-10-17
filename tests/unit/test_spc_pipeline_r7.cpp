@@ -3084,5 +3084,162 @@ TEST_F(SPCPipelineR7Test, StoredHeaderFlagsRecordTheMarkAndTheContextualMember) 
     pipeline_->SetCleaningConfigResolver(nullptr);
 }
 
+
+// --- #157: a version that reaches ready retires the older versions of its source ---
+
+class SPCPipelineVersionsTest : public SPCPipelineR7Test {
+protected:
+    std::string CreateVersion(const std::string& type, const std::string& path,
+                              DocStatus status, const std::string& created_at) {
+        cortrix::CortrixDoc d;
+        d.source_type = type;
+        d.source_path = path;
+        d.status = status;
+        EXPECT_EQ(facade_->store().doc_create(d), 0);
+        Exec("UPDATE documents SET created_at = '" + created_at + "' WHERE doc_id = '" +
+             d.doc_id + "'");
+        return d.doc_id;
+    }
+
+    void Exec(const std::string& sql) {
+        char* err = nullptr;
+        ASSERT_EQ(sqlite3_exec(facade_->store().db_handle(), sql.c_str(), nullptr, nullptr,
+                               &err),
+                  SQLITE_OK)
+            << (err ? err : "");
+        sqlite3_free(err);
+    }
+
+    DocStatus StatusOf(const std::string& doc_id) {
+        cortrix::CortrixDoc d;
+        EXPECT_EQ(facade_->store().doc_get(doc_id, d), 0);
+        return d.status;
+    }
+
+    std::string Col(const std::string& doc_id, const std::string& column) {
+        sqlite3_stmt* st = nullptr;
+        const std::string sql = "SELECT " + column + " FROM documents WHERE doc_id = ?";
+        EXPECT_EQ(sqlite3_prepare_v2(facade_->store().db_handle(), sql.c_str(), -1, &st,
+                                     nullptr),
+                  SQLITE_OK);
+        sqlite3_bind_text(st, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
+        std::string v = "<no row>";
+        if (sqlite3_step(st) == SQLITE_ROW) {
+            const unsigned char* t = sqlite3_column_text(st, 0);
+            v = t ? reinterpret_cast<const char*>(t) : "<null>";
+        }
+        sqlite3_finalize(st);
+        return v;
+    }
+
+    int Run(const std::string& doc_id) {
+        auto task = MakeTask(txt_path_, "text/plain", doc_id);
+        return pipeline_->Process(*task, *facade_);
+    }
+
+    bool FullTextFinds(const std::string& doc_id) {
+        std::vector<cortrix::SearchResult> hits;
+        // The fixture's parser returns the canned ALPHA/BETA paragraphs, not the file.
+        EXPECT_EQ(facade_->store().search_fulltext("ALPHA", 50, hits), 0);
+        for (const auto& h : hits) {
+            if (h.doc_id == doc_id) return true;
+        }
+        return false;
+    }
+};
+
+TEST_F(SPCPipelineVersionsTest, ReadyVersionRetiresTheOlderOne) {
+    const std::string v1 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kPending, "2026-10-01T00:00:00.000Z");
+    ASSERT_EQ(Run(v1), 0);
+    ASSERT_EQ(StatusOf(v1), DocStatus::kReady);
+    ASSERT_TRUE(FullTextFinds(v1));  // positive control
+
+    const std::string v2 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kPending, "2026-10-02T00:00:00.000Z");
+    ASSERT_EQ(Run(v2), 0);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kReady);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kDeleted);
+    EXPECT_NE(Col(v1, "deleted_at"), "<null>");
+    EXPECT_EQ(Col(v1, "deleted_from_status"), "ready");
+    EXPECT_FALSE(FullTextFinds(v1));
+    EXPECT_TRUE(FullTextFinds(v2));
+}
+
+TEST_F(SPCPipelineVersionsTest, StrandedErrorVersionIsRetiredToo) {
+    const std::string v1 =
+        CreateVersion("watch_dir", "/w/a.txt", DocStatus::kError, "2026-10-01T00:00:00.000Z");
+    const std::string v2 =
+        CreateVersion("watch_dir", "/w/a.txt", DocStatus::kPending, "2026-10-02T00:00:00.000Z");
+    ASSERT_EQ(Run(v2), 0);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kDeleted);
+    EXPECT_EQ(Col(v1, "deleted_from_status"), "error");
+}
+
+TEST_F(SPCPipelineVersionsTest, NewerVersionIsUntouchedUntilItIsReadyItself) {
+    const std::string v1 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    const std::string v2 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kPending, "2026-10-02T00:00:00.000Z");
+    const std::string v3 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kPending, "2026-10-03T00:00:00.000Z");
+    ASSERT_EQ(Run(v2), 0);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kDeleted);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kReady);
+    EXPECT_EQ(StatusOf(v3), DocStatus::kPending);
+    ASSERT_EQ(Run(v3), 0);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kDeleted);
+    EXPECT_EQ(StatusOf(v3), DocStatus::kReady);
+}
+
+TEST_F(SPCPipelineVersionsTest, VersionDeletedWhileProcessingStaysDeletedAndTheTaskFails) {
+    const std::string v1 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    const std::string v2 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kProcessing, "2026-10-02T00:00:00.000Z");
+    ASSERT_EQ(facade_->store().doc_soft_delete(v2, 1000), 0);  // deleted mid-flight
+
+    auto task = MakeTask(txt_path_, "text/plain", v2);
+    EXPECT_EQ(pipeline_->Process(*task, *facade_), -1);
+    EXPECT_EQ(task->stage.load(), SPCStage::kError);
+    EXPECT_EQ(task->error_code, "CX_ERR_DOC_DELETED");
+    EXPECT_EQ(StatusOf(v2), DocStatus::kDeleted);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kReady);  // nothing was retired
+}
+
+TEST_F(SPCPipelineVersionsTest, EmptyDocumentExitRetiresToo) {
+    const std::string v1 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    const std::string v2 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kPending, "2026-10-02T00:00:00.000Z");
+    cortrix::spc::ParsedDoc empty;  // no pages: one of the empty-document exits
+    auto task = MakeTask("a.txt", "text/plain", v2);
+    ASSERT_EQ(pipeline_->ProcessParsed(empty, *task, *facade_), 0);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kReady);
+    EXPECT_EQ(BlocksOf(v2).size(), 0u);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kDeleted);
+}
+
+TEST_F(SPCPipelineVersionsTest, OtherSourceTypesKeepEveryRowLive) {
+    const std::string f1 =
+        CreateVersion("file", "same.txt", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    const std::string f2 =
+        CreateVersion("file", "same.txt", DocStatus::kPending, "2026-10-02T00:00:00.000Z");
+    ASSERT_EQ(Run(f2), 0);
+    EXPECT_EQ(StatusOf(f1), DocStatus::kReady);
+    EXPECT_EQ(StatusOf(f2), DocStatus::kReady);
+
+    const std::string s1 = CreateVersion("memory_session", "session-1", DocStatus::kReady,
+                                         "2026-10-01T00:00:00.000Z");
+    const std::string s2 = CreateVersion("memory_session", "session-1", DocStatus::kPending,
+                                         "2026-10-02T00:00:00.000Z");
+    auto turn = MakeTask("session-1", "text/plain", s2);
+    turn->source_type = "memory_session";
+    turn->content_hash = "a question\n---\nan answer";
+    ASSERT_EQ(pipeline_->Process(*turn, *facade_), 0);
+    EXPECT_EQ(StatusOf(s1), DocStatus::kReady);
+    EXPECT_EQ(StatusOf(s2), DocStatus::kReady);
+}
+
 }  // namespace
 }  // namespace cortrix

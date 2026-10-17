@@ -20,6 +20,8 @@
 // ProcessParsedDoc is a synchronous post-parse entry (not the SPCManager worker queue),
 // so DocumentProcessor::ProcessTask runs the whole chain on the test thread — no worker
 // thread writes the Unit store concurrently, so reads need no WAL-lock dance.
+#include <nlohmann/json.hpp>
+#include "cortrix/async/document_task_handler.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -304,6 +306,29 @@ TEST_F(DocParseSpcE2ETest, DocParseTaskDispatchedThroughPoolWritesBlocks) {
     // The parse → SPC write really ran on the pool thread: blocks landed + a P-HNSW point.
     EXPECT_GT(BlocksOf(doc_id).size(), 0u);
     EXPECT_FALSE(harness_->fake_index()->added_ids().empty());
+}
+
+
+// #157: re-submitting a deleted document's id through the async path fails before any
+// processing, with its own code, and the progress body reports it as not retryable.
+TEST_F(DocParseSpcE2ETest, ResubmittedDeletedIdFailsWithItsOwnCode) {
+    const std::string doc_id = SeedDoc();
+    {
+        resource::NamespaceFacade f(harness_->ipool(), "test-ns");
+        ASSERT_TRUE(f.Acquire().ok());
+        ASSERT_EQ(f.store().doc_soft_delete(doc_id, 1000), 0);
+    }
+    async::DocumentProcessor proc(&mgr_, factory_.get(), &cfg_, nullptr, spc_mgr_.get());
+    async::TaskInfo task = SeedProcessingTask(doc_id);
+    Status s = proc.ProcessTask(task);
+    EXPECT_FALSE(s.ok());
+    const async::TaskInfo row = mgr_.GetTask(task.task_id).value();
+    EXPECT_EQ(row.status, async::task_status::kFailed);
+    EXPECT_EQ(row.error_code, "CX_ERR_DOC_DELETED");
+    EXPECT_EQ(BlocksOf(doc_id).size(), 0u);
+    const nlohmann::json body = async::DocumentTaskHandler::BuildProgressBody(row);
+    EXPECT_EQ(body["error_code"], "CX_ERR_DOC_DELETED");
+    EXPECT_EQ(body["meta"]["retryable_if_fail"], false);
 }
 
 }  // namespace
