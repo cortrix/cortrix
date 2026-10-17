@@ -6,8 +6,11 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <memory>
+#include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -472,6 +475,55 @@ TEST(LlmRerankWindowTest, TopN30RunsBottomUpWindowsAndPromotesTailItem) {
     for (std::size_t i = 1; i < resp.results.size(); ++i) {
         EXPECT_GE(resp.results[i - 1].score, resp.results[i].score);
     }
+}
+
+// #173: the request's deadline falls between the two windows of top_n = 30. The first
+// window's call is made and carries the deadline; it returns after the deadline, so
+// the second window makes no call, the stage degrades with "budget_exhausted", and
+// the order is untouched (the first window's permutation is never applied). Only
+// the call that reached the client is counted.
+TEST(LlmRerankWindowTest, DeadlineBetweenWindowsDegradesWithBudgetExhausted) {
+    auto mock = std::make_shared<MockLlmClient>();
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(150);
+    std::vector<std::optional<std::chrono::steady_clock::time_point>> seen;
+    EXPECT_CALL(*mock, Chat(_, _))
+        .Times(1)
+        .WillOnce(Invoke([&seen](const std::string&, const LlmCallConfig& call) {
+            seen.push_back(call.deadline);
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            return OkResponse(
+                R"({"ranking":[20,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]})");
+        }));
+    LlmRerankStage stage(mock);
+    CrossNsResponse resp = MakeResponse(30);
+    const std::vector<std::string> before = Ids(resp);
+
+    auto es = stage.Apply(&resp, "q", EnabledConfig(/*top_n=*/30), deadline);
+    EXPECT_TRUE(es.active);
+    EXPECT_TRUE(es.degraded);
+    EXPECT_EQ(es.degrade_reason, "budget_exhausted");
+    EXPECT_EQ(es.llm_calls, 1);
+    EXPECT_EQ(Ids(resp), before);
+    ASSERT_EQ(seen.size(), 1u);
+    ASSERT_TRUE(seen[0].has_value());
+    EXPECT_EQ(*seen[0], deadline);
+    ASSERT_EQ(resp.meta.warnings.size(), 1u);
+    EXPECT_EQ(resp.meta.warnings[0]["code"], "CX_WARN_LLM_RERANK_DEGRADED");
+}
+
+// A call that the client itself stopped for lack of time maps to the same reason.
+TEST(LlmRerankApplyTest, ClientBudgetTokenDegradesWithBudgetExhausted) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Return(FailResponse(
+            "CX_LLM_BUDGET_EXHAUSTED: no time left in the request's budget for an attempt")));
+    LlmRerankStage stage(mock);
+    CrossNsResponse resp = MakeResponse(3);
+    auto es = stage.Apply(&resp, "q", EnabledConfig(3),
+                          std::chrono::steady_clock::now() + std::chrono::seconds(5));
+    EXPECT_TRUE(es.degraded);
+    EXPECT_EQ(es.degrade_reason, "budget_exhausted");
+    EXPECT_EQ(Ids(resp), (std::vector<std::string>{"c1", "c2", "c3"}));
 }
 
 TEST(LlmRerankApplyTest, CallCarriesConfiguredModelAndStructuredOutput) {

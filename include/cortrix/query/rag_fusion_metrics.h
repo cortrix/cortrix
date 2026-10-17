@@ -54,6 +54,7 @@ public:
         kLlmTransport,
         kLlmHttp,
         kOther,
+        kBudgetExhausted,  ///< the request's budget left no time for the call
     };
 
     /// direction label for token_total (§8).
@@ -115,7 +116,7 @@ private:
     RagFusionMetrics() = default;
 
     static constexpr int kResultCount = 3;       // success / degraded / disabled
-    static constexpr int kDegradeReasonCount = 7;
+    static constexpr int kDegradeReasonCount = 8;
     static constexpr int kStrategyCount = 3;     // paraphrase / subquery / reverse
     static constexpr int kDirectionCount = 2;    // input / output
     // Per-model latency: a tiny fixed-size table keyed by model name (low

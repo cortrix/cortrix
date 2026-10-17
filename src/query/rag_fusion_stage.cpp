@@ -2,9 +2,11 @@
 
 #include <map>
 #include <algorithm>
+#include <optional>
 #include <unordered_map>
 #include <utility>
 
+#include "cortrix/query/cross_ns_error.h"
 #include "cortrix/query/rag_fusion_error.h"
 #include "cortrix/reranker/score_fusion.h"
 #include "cortrix/retrieval/types.h"
@@ -203,6 +205,9 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
     // truncate variant candidates before the global F36 union. The final pass then
     // reranks the union against the original query.
     const bool defer_inner_rerank = cfg.final_rerank && qctx.rerank && reranker_ != nullptr;
+    // Every join reads the request's one deadline (vctx copies qctx). The first join
+    // the overall deadline cut gives the fused response its top-level code.
+    std::optional<agent_friendly::AgentFriendlyError> cut_error;
     for (std::size_t i = 0; i < all_queries.size(); ++i) {
         QueryRequest vr = request;
         vr.query = all_queries[i];
@@ -217,6 +222,10 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
             vresp = original_preflight;
         } else {
             vresp = scatter_->Execute(vr, auth, &vctx);
+        }
+        if (!cut_error && vresp.error.has_value() &&
+            vresp.error->code == CrossNsErrorCodeString(CrossNsErrorCode::kScatterTimeout)) {
+            cut_error = vresp.error;
         }
         per_variant.push_back(ToScoredResults(vresp));
         if (i == 0) base = vresp;  // base meta + the original query's items
@@ -257,6 +266,13 @@ CrossNsResponse RagFusionStage::Run(const QueryRequest& request,
                                                 variant_doc_totals.end());
     }
 
+    // A join cut by the deadline makes the fusion partial: the fused response carries
+    // the top-level CX_ERR_SCATTER_TIMEOUT and the degraded warning, as the plain
+    // scatter's partial result does.
+    if (cut_error) {
+        base.error = cut_error;
+        degraded = true;
+    }
     if (degraded) base.meta.warnings.push_back(DegradedWarning());
     return base;
 }

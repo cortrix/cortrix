@@ -49,6 +49,7 @@ const char* ToString(RagFusionMetrics::DegradeReason reason) {
         case RagFusionMetrics::DegradeReason::kLlmTransport:    return "llm_transport";
         case RagFusionMetrics::DegradeReason::kLlmHttp:         return "llm_http";
         case RagFusionMetrics::DegradeReason::kOther:           return "other";
+        case RagFusionMetrics::DegradeReason::kBudgetExhausted: return "budget_exhausted";
     }
     return "other";
 }

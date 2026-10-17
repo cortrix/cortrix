@@ -15,8 +15,11 @@
 #include <algorithm>
 #include <chrono>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <set>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -35,6 +38,8 @@
 #include "cortrix/retrieval/cross_ns_types.h"
 #include "cortrix/retrieval/types.h"
 
+#include "cortrix/llm/openai_client.h"
+#include "mocks/fake_http_transport.h"
 #include "mocks/mock_llm_client.h"
 #include "mocks/mock_reranker.h"
 #include "scatter/mock_permission_service.h"
@@ -1275,6 +1280,201 @@ TEST_F(RagFusionTest, Metrics_RagFusionDegradedTotal_LabelEnum) {
     EXPECT_EQ(text.find("tenant_id"), std::string::npos);
     EXPECT_EQ(text.find("ns_id"), std::string::npos);
     EXPECT_EQ(text.find("user_id"), std::string::npos);
+}
+
+// #173: variant generation carries the request's deadline into its LLM call, and a
+// call the client stopped for lack of time degrades with its own reason: the timeout
+// identity, the "budget_exhausted" degrade reason and metric label, no detail. The
+// token is matched first, before the "rate" keyword its detail could hold.
+TEST_F(RagFusionTest, ExpandQueries_CarriesTheContextDeadlineIntoTheCall) {
+    auto mock = std::make_shared<MockLlmClient>();
+    std::optional<std::chrono::steady_clock::time_point> seen;
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Invoke([&seen](const std::string&, const LlmCallConfig& call) {
+            seen = call.deadline;
+            return OkResponse(ThreeVariantJson());
+        }));
+    auto svc = MakeService(mock);
+    QueryContext qctx;
+    qctx.query = "q";
+    qctx.deadline = std::chrono::steady_clock::now() + std::chrono::seconds(7);
+    auto out = svc->ExpandQueries("q", EnabledConfig(), nullptr, &qctx);
+    ASSERT_TRUE(out.ok());
+    ASSERT_TRUE(seen.has_value());
+    EXPECT_EQ(*seen, *qctx.deadline);
+}
+
+TEST_F(RagFusionTest, ExpandQueries_BudgetExhaustedDegradesWithItsOwnReason) {
+    auto mock = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock, Chat(_, _))
+        .WillOnce(Return(ErrResponse(
+            StatusCode::kUnavailable,
+            "CX_LLM_BUDGET_EXHAUSTED: no time left to generate at this rate")));
+    auto svc = MakeService(mock);
+    QueryContext qctx;
+    qctx.query = "q";
+    qctx.deadline = std::chrono::steady_clock::now();
+    auto out = svc->ExpandQueries("q", EnabledConfig(), nullptr, &qctx);
+    ASSERT_FALSE(out.ok());
+    EXPECT_NE(out.status().message().find("CX_ERR_RAG_FUSION_LLM_TIMEOUT"), std::string::npos)
+        << out.status().message();
+    const auto es = svc->GetExplainState();
+    EXPECT_TRUE(es.degraded);
+    EXPECT_EQ(es.degrade_reason, "budget_exhausted");
+    EXPECT_EQ(es.degrade_detail, "");
+    auto& m = RagFusionMetrics::Instance();
+    EXPECT_EQ(m.DegradedCount(RagFusionMetrics::DegradeReason::kBudgetExhausted), 1u);
+    EXPECT_EQ(m.DegradedCount(RagFusionMetrics::DegradeReason::kQuotaExceeded), 0u);
+    EXPECT_NE(m.RenderOpenMetrics().find(
+                  "cortrix_rag_fusion_degraded_total{reason=\"budget_exhausted\"} 1\n"),
+              std::string::npos);
+}
+
+// --- #173: the stage's joins under the request's one deadline ---------------------
+
+// Records every join's deadline; queries other than the original can be made slow.
+class DeadlineRecordingExecutor : public IScatterExecutor {
+public:
+    explicit DeadlineRecordingExecutor(std::string original, int variant_sleep_ms = 0)
+        : original_(std::move(original)), variant_sleep_ms_(variant_sleep_ms) {}
+
+    retrieval::NamespaceQueryResult ExecuteForNamespace(const QueryContext& ctx,
+                                                        const std::string& namespace_id,
+                                                        float) override {
+        {
+            std::lock_guard<std::mutex> lk(mu_);
+            seen_deadlines.push_back(ctx.deadline);
+        }
+        if (ctx.query != original_ && variant_sleep_ms_ > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(variant_sleep_ms_));
+        }
+        retrieval::NamespaceQueryResult out;
+        out.namespace_id = namespace_id;
+        out.chunks = {ChunkForStage(ctx.query + "_hit", "text for " + ctx.query, 0.9f)};
+        return out;
+    }
+
+    std::mutex mu_;
+    std::vector<std::optional<std::chrono::steady_clock::time_point>> seen_deadlines;
+
+private:
+    std::string original_;
+    int variant_sleep_ms_;
+};
+
+QueryRequest StageRequest(const std::string& query) {
+    QueryRequest req;
+    req.query = query;
+    req.namespaces = {"bench"};
+    req.top_k = 3;
+    req.rerank = false;
+    return req;
+}
+
+QueryContext StageCtx(const QueryRequest& req,
+                      std::chrono::steady_clock::time_point deadline) {
+    QueryContext qctx;
+    qctx.query = req.query;
+    qctx.top_k = req.top_k;
+    qctx.rerank = false;
+    qctx.routing_path = "complex";
+    qctx.deadline = deadline;
+    return qctx;
+}
+
+bool HasDegradedWarning(const CrossNsResponse& resp) {
+    for (const auto& w : resp.meta.warnings) {
+        if (w.value("reason", "") == "rag_fusion_degraded") return true;
+    }
+    return false;
+}
+
+// Every join of the stage reads the context's deadline. The request also carries a
+// timeout_ms whose re-derivation (now + 5000 ms) is far from that deadline, so a join
+// that started a fresh budget would record a different value.
+TEST_F(RagFusionTest, RagFusionStage_EveryJoinReadsTheContextDeadline) {
+    auto mock_llm = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock_llm, Chat(_, _)).WillOnce(Return(OkResponse(ThreeVariantJson())));
+    auto svc = MakeService(mock_llm);
+    DeadlineRecordingExecutor executor("company financial status");
+    ExecutorEngine engine(/*workers=*/2, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    QueryRequest req = StageRequest("company financial status");
+    req.timeout_ms = 5000;
+    const QueryContext qctx =
+        StageCtx(req, std::chrono::steady_clock::now() + std::chrono::seconds(20));
+    AuthContext auth;
+    auth.user_id = "user";
+    CrossNsResponse resp = stage.Run(req, auth, qctx, EnabledConfig());
+
+    EXPECT_FALSE(resp.error.has_value());
+    std::lock_guard<std::mutex> lk(executor.mu_);
+    ASSERT_GE(executor.seen_deadlines.size(), 2u);  // the original and its variants
+    for (const auto& d : executor.seen_deadlines) {
+        ASSERT_TRUE(d.has_value());
+        EXPECT_EQ(*d, *qctx.deadline);
+    }
+}
+
+// A variant join the deadline cuts makes the fusion partial: the fused response
+// carries the top-level CX_ERR_SCATTER_TIMEOUT together with rag_fusion_degraded.
+TEST_F(RagFusionTest, RagFusionStage_CutVariantJoinGivesThePartialSignal) {
+    auto mock_llm = std::make_shared<MockLlmClient>();
+    EXPECT_CALL(*mock_llm, Chat(_, _)).WillOnce(Return(OkResponse(ThreeVariantJson())));
+    auto svc = MakeService(mock_llm);
+    DeadlineRecordingExecutor executor("company financial status", /*variant_sleep_ms=*/400);
+    ExecutorEngine engine(/*workers=*/2, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    QueryRequest req = StageRequest("company financial status");
+    const QueryContext qctx =
+        StageCtx(req, std::chrono::steady_clock::now() + std::chrono::milliseconds(150));
+    AuthContext auth;
+    auth.user_id = "user";
+    CrossNsResponse resp = stage.Run(req, auth, qctx, EnabledConfig());
+
+    ASSERT_TRUE(resp.error.has_value());
+    EXPECT_EQ(resp.error->code, "CX_ERR_SCATTER_TIMEOUT");
+    EXPECT_TRUE(HasDegradedWarning(resp));
+    EXPECT_FALSE(resp.results.empty());  // the original query's join completed
+}
+
+// With no time left, the real client makes no attempt, variant generation degrades
+// with "budget_exhausted", and the single remaining join is cut as well.
+TEST_F(RagFusionTest, RagFusionStage_NoTimeLeftDegradesWithBudgetExhausted) {
+    llm::LlmClientConfig ccfg;
+    ccfg.endpoint = "https://api.example.com/v1";
+    auto transport = std::make_unique<llm::FakeHttpTransport>();
+    llm::FakeHttpTransport* sent = transport.get();
+    auto client = std::make_shared<llm::OpenAiLlmClient>(ccfg, std::move(transport));
+    auto gen = std::make_shared<QueryVariantGenerator>(client);
+    auto svc = std::make_shared<RagFusion>(gen, std::make_shared<RRFFusion>(60));
+    DeadlineRecordingExecutor executor("company financial status");
+    ExecutorEngine engine(/*workers=*/2, /*queue_size=*/16);
+    reranker::MockReranker reranker;
+    MockPermissionService perm({"bench"});
+    ScatterGather scatter(&executor, &engine, &reranker, &perm);
+    RagFusionStage stage(&scatter, svc.get(), &reranker);
+
+    QueryRequest req = StageRequest("company financial status");
+    const QueryContext qctx =
+        StageCtx(req, std::chrono::steady_clock::now() - std::chrono::milliseconds(1));
+    AuthContext auth;
+    auth.user_id = "user";
+    CrossNsResponse resp = stage.Run(req, auth, qctx, EnabledConfig());
+
+    EXPECT_TRUE(sent->requests.empty());
+    EXPECT_EQ(svc->GetExplainState().degrade_reason, "budget_exhausted");
+    EXPECT_TRUE(HasDegradedWarning(resp));
+    ASSERT_TRUE(resp.error.has_value());
+    EXPECT_EQ(resp.error->code, "CX_ERR_SCATTER_TIMEOUT");
 }
 
 // UT 22: every service method accepts a nullptr TraceContext (inject skipped).
