@@ -812,6 +812,9 @@ TEST_F(SPCManagerVersionsTest, QueuedTaskOfADeletedDocumentIsSkipped) {
     WaitForEnd(*task);
     EXPECT_EQ(task->stage.load(), SPCStage::kError);
     EXPECT_EQ(task->error_code, "CX_ERR_DOC_DELETED");
+    // Skipped before processing, not failed at the end: no block was written.
+    EXPECT_EQ(task->error_message, "document deleted before processing");
+    EXPECT_EQ(BlockCount("ver_ns", id), 0u);
     EXPECT_EQ(StatusOf("ver_ns", id), DocStatus::kDeleted);
     mgr_->Stop();
 }

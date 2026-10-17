@@ -170,6 +170,8 @@ paths:
         Soft delete (OPEN-2): the doc is marked
         status=deleted and stays recoverable for gc.soft_delete_retention_days (default 30; 0 = immediate).
         Inside the window, ops can restore via POST /gc/restore; after it, GC sweeps/purges it permanently.
+        The document of a watched file is imported again at the next scan or file event while the file
+        still exists in the watched directory, since the directory is the source of truth for it.
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry

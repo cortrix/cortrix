@@ -74,6 +74,12 @@ components:
           retry_after_ms: null
           typical_cause: "namespace name misspelled or already deleted"
           suggested_action: "GET /namespaces to confirm the name; or POST /namespaces to create it"
+        CX_ERR_DOC_DELETED:
+          retryable: false
+          category: permanent
+          retry_after_ms: null
+          typical_cause: "a batch submission reused the doc_id of a deleted document, or the document was deleted while it was processed"
+          suggested_action: "restore it with POST /gc/restore, or submit the content under a new doc_id"
         CX_ERR_NS_UNAUTHORIZED:
           retryable: false
           category: auth

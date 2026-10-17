@@ -197,7 +197,9 @@ TEST_F(DocumentGcSweeperTest, RestoreReactivates) {
     EXPECT_EQ(r.value().succeeded.size(), 1u);
     EXPECT_EQ(r.value().succeeded[0], "docF");
     ASSERT_EQ(r.value().failed.size(), 1u);
-    EXPECT_EQ(r.value().failed[0].first, "ghost");
+    EXPECT_EQ(r.value().failed[0].id, "ghost");
+    EXPECT_EQ(r.value().failed[0].code, "CX_ERR_GC_DOC_NOT_FOUND");
+    EXPECT_EQ(r.value().failed[0].message, "no deleted document with this id");
     EXPECT_EQ(DocStatusOf("docF"), static_cast<int>(DocStatus::kReady)) << "restored to live";
 }
 
