@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <optional>
 #include "cortrix/common/data_types.h"
 
 // Opaque SQLite handle (forward-declared C type) — see CortrixStore::db_handle().
@@ -41,13 +42,78 @@ public:
 
     // ---- OPEN-2 three-stage GC (default impls return -1 so lightweight fakes
     //      need not override; CortrixStoreSqlite implements them). ----
-    /// Stage 1 soft delete: set status='deleted' + deleted_at=now_ms. 0 ok / -2 not found.
+    /// Stage 1 soft delete: set status='deleted' + deleted_at=now_ms, recording the
+    /// status the row had (a repeat keeps the first). 0 ok / -2 not found.
+    /// Soft deletion records that status only here, in doc_retire_older_versions and
+    /// in doc_withdraw_version; doc_update_status(kDeleted) and doc_create with
+    /// kDeleted record none.
     virtual int doc_soft_delete(const std::string& doc_id, int64_t now_ms) {
         (void)doc_id; (void)now_ms; return -1;
     }
     /// Stage 1 reversal (restore): clear deleted_at + set status='ready' (only if the
     /// doc is currently 'deleted'). 0 ok / -2 not found or not soft-deleted.
     virtual int doc_restore(const std::string& doc_id) { (void)doc_id; return -1; }
+    /// Retire the older versions of keep_doc_id's source: soft-delete every live row
+    /// with the same source_type and source_path that sorts before it (created_at,
+    /// then doc_id), recording each row's status. Newer rows are never touched, and
+    /// only a keep row of type http_upload or watch_dir retires anything.
+    /// *retired = rows retired by this call. 0 ok / -1 error.
+    virtual int doc_retire_older_versions(const std::string& keep_doc_id, int64_t now_ms,
+                                          int64_t* retired) {
+        (void)keep_doc_id; (void)now_ms;
+        if (retired) *retired = 0;
+        return -1;
+    }
+    /// Mark a version ready and retire the older versions of its source (as
+    /// doc_retire_older_versions does) together. The SQLite store does both in one
+    /// transaction: 0 both applied / -2 the row is missing or deleted, nothing
+    /// applied / -1 error, nothing applied. *retired is set only on 0.
+    /// This default runs the existing calls one after another, so it can return -1
+    /// with the ready write already applied.
+    virtual int doc_publish_version(const std::string& doc_id, int64_t now_ms,
+                                    int64_t* retired) {
+        if (retired) *retired = 0;
+        const int rc = doc_update_status(doc_id, DocStatus::kReady);
+        if (rc != 0) return rc;
+        CortrixDoc row;
+        if (doc_get(doc_id, row) != 0) return -1;
+        if (row.source_type != "http_upload" && row.source_type != "watch_dir") return 0;
+        return doc_retire_older_versions(doc_id, now_ms, retired) == 0 ? 0 : -1;
+    }
+    /// Soft-delete a version of an uploaded or watched file whose publication failed,
+    /// recording its status and error_message, but only while it is neither deleted
+    /// nor ready and an older live version of its source exists. One statement in the
+    /// SQLite store, refused (-1) while the connection is inside a transaction.
+    /// 0 withdrawn / -2 not withdrawn / -1 error. This default withdraws nothing.
+    virtual int doc_withdraw_version(const std::string& doc_id, int64_t now_ms,
+                                     const std::string& error_message) {
+        (void)doc_id; (void)now_ms; (void)error_message;
+        return -2;
+    }
+    /// Restore a soft-deleted row (as doc_restore does) only while no other row of its
+    /// source is live. One statement in the SQLite store: 0 restored / -2 nothing
+    /// changed (no row, a row that is not deleted, or a live row of its source) /
+    /// -1 error. This default checks first and then restores, so it is not atomic.
+    virtual int doc_restore_unless_superseded(const std::string& doc_id) {
+        CortrixDoc row;
+        const int got = doc_get(doc_id, row);
+        if (got != 0) return got == -2 ? -2 : -1;
+        if (row.status != DocStatus::kDeleted) return -2;
+        CortrixDoc live;
+        const int lrc = doc_find_by_source(row.source_type, row.source_path, live);
+        if (lrc == 0) return -2;
+        if (lrc != -2) return -1;
+        return doc_restore(doc_id);
+    }
+    /// The status a soft-deleted row had when it was deleted. nullopt means unknown:
+    /// a row deleted before the store recorded it, or a backend that does not record
+    /// it (the default). 0 ok / -1 error / -2 no such row.
+    virtual int doc_get_deleted_from_status(const std::string& doc_id,
+                                            std::optional<std::string>* out) {
+        (void)doc_id;
+        if (out) out->reset();
+        return 0;
+    }
     /// Stage 2 candidates: soft-deleted docs whose deleted_at <= cutoff_ms. 0 ok.
     virtual int doc_list_deleted_before(int64_t cutoff_ms, std::vector<CortrixDoc>& out) {
         (void)cutoff_ms; (void)out; return -1;

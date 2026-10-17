@@ -77,6 +77,18 @@ public:
                                      const std::string& source_type,
                                      const std::string& source_path);
 
+    /// True while a task for doc_id waits in the queue and has not been cancelled.
+    virtual bool HasQueuedTask(const std::string& doc_id) const;
+
+    /// True while a task for doc_id is queued (HasQueuedTask) or running: popped by a
+    /// worker until the worker is done with it, error write included, or inside
+    /// ProcessParsedDoc. Asked in that order, a task queued or running when
+    /// HasQueuedTask takes the queue's lock is seen unless it finishes before the
+    /// running check, since a task moves from queued to running under that lock and
+    /// never back. A subclass that runs tasks outside this manager's queue must
+    /// override it.
+    virtual bool HasActiveTask(const std::string& doc_id) const;
+
     /// Start worker threads
     virtual void Start();
 

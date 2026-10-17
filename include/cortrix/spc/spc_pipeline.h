@@ -109,6 +109,13 @@ public:
     void OnDocumentWritten(const std::string& doc_id, const std::string& ns_id);
 
 private:
+    /// The ready write of every successful exit. 0: the exit goes on as before (done,
+    /// its written hook, return 0); a version of an upload or a watched file then
+    /// retires the older versions of its source. -1: the row was deleted, or retired
+    /// by a newer version, while this task ran; the task has failed with
+    /// CX_ERR_DOC_DELETED and the row stays deleted.
+    int MarkDocumentReady(SPCTask& task, resource::NamespaceFacade& facade);
+
     cortrix::spc::DocumentParserFactory& parser_factory_;
     cortrix::chunker::ParentChildChunker& chunker_;
     OnnxEmbedder& embedder_;

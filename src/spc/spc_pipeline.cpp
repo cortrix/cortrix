@@ -118,6 +118,18 @@ std::string F07EnricherToken(const std::string& enricher_name) {
     return "";
 }
 
+// The task failure a withdrawn version reports. The API has no withdrawn state: the
+// version reads as deleted.
+constexpr const char* kWithdrawnMessage =
+    "could not mark this version ready, so it was deleted and the earlier version is "
+    "unchanged; add the document again";
+
+// The task failure a version reports when it could not be marked ready and was not
+// withdrawn.
+constexpr const char* kUnpublishedMessage =
+    "could not mark this version ready; any earlier version stays in place, and the "
+    "next upload of this file, or its next change or event, replaces it";
+
 }  // namespace
 
 SPCPipeline::SPCPipeline(cortrix::spc::DocumentParserFactory& parser_factory,
@@ -130,6 +142,82 @@ SPCPipeline::SPCPipeline(cortrix::spc::DocumentParserFactory& parser_factory,
       embedder_(embedder),
       assembler_(assembler),
       enricher_(enricher) {}
+
+int SPCPipeline::MarkDocumentReady(SPCTask& task, resource::NamespaceFacade& facade) {
+    CortrixStore& store = facade.store();
+    // A version that reaches ready retires the older versions of its source, for the
+    // two producers whose repeated source is a new version of the same document. The
+    // store does both in one transaction, and reads the source from the row: while an
+    // upload is processed, its task's source_path holds a temporary path.
+    const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::system_clock::now().time_since_epoch())
+                               .count();
+    int64_t retired = 0;
+    const int rc = store.doc_publish_version(task.doc_id, now_ms, &retired);
+    if (rc == 0) return 0;
+    if (rc == -2) {
+        // The write refuses a deleted row. A row that is there and deleted was
+        // deleted, or retired by a newer version, while this task ran. A row that is
+        // gone, or live again after a restore, keeps the exit's usual outcome.
+        CortrixDoc row;
+        const int got = store.doc_get(task.doc_id, row);
+        if (got == 0 && row.status == DocStatus::kDeleted) {
+            task.stage = SPCStage::kError;
+            task.error_message = "document deleted or superseded during processing";
+            task.error_code = "CX_ERR_DOC_DELETED";
+            return -1;
+        }
+        if (got == -1) {
+            CORTRIX_LOG_WARN("spc", "ready write: cannot read doc_id={}", task.doc_id);
+        }
+        return 0;
+    }
+    // The version could not be marked ready. A new version of an uploaded or watched
+    // file is then deleted while an earlier version of the file is live, so the two are
+    // never served together. The task's type decides: a task of another type, such as
+    // a batch task that reuses the id of an uploaded row, never deletes it, and keeps
+    // today's outcome (logged, done, the row left processing until restart recovery).
+    if (task.source_type == "http_upload" || task.source_type == "watch_dir") {
+        const int wrc = store.doc_withdraw_version(task.doc_id, now_ms, kWithdrawnMessage);
+        if (wrc == 0) {
+            CORTRIX_LOG_WARN("spc",
+                             "ready write failed for doc_id={} ns={} rc={}: the version was "
+                             "withdrawn",
+                             task.doc_id, facade.namespace_id(), rc);
+            task.stage = SPCStage::kError;
+            task.error_message = kWithdrawnMessage;
+            return -1;
+        }
+        CORTRIX_LOG_WARN("spc",
+                         "ready write failed for doc_id={} ns={} rc={}; not withdrawn "
+                         "(rc={})",
+                         task.doc_id, facade.namespace_id(), rc, wrc);
+        // Not withdrawn: there is no earlier version to protect, the withdraw failed
+        // too, or the row changed meanwhile. Read it again to tell which.
+        CortrixDoc row;
+        const int got = store.doc_get(task.doc_id, row);
+        if (got == 0 && row.status == DocStatus::kDeleted) {
+            task.stage = SPCStage::kError;
+            task.error_message = "document deleted or superseded during processing";
+            task.error_code = "CX_ERR_DOC_DELETED";
+            return -1;
+        }
+        // On the SQLite store a failed publication applied nothing, so a ready row was
+        // published by another task.
+        if (got == 0 && row.status == DocStatus::kReady) return 0;
+        // Otherwise the version reports the failure, so nothing reads it as done. It
+        // stays unpublished; while another version of the file should answer queries
+        // it is hidden from retrieval, and the next upload of the file, or its next
+        // change or event, replaces it. A read that fails also lands here: doc_get
+        // answers a failed read as not found.
+        task.stage = SPCStage::kError;
+        task.error_message = kUnpublishedMessage;
+        return -1;
+    }
+    CORTRIX_LOG_WARN("spc", "ready write failed for doc_id={} ns={} rc={}", task.doc_id,
+                     facade.namespace_id(), rc);
+    return 0;
+}
 
 int SPCPipeline::Process(SPCTask& task, resource::NamespaceFacade& facade) {
     // Stage 1: Route
@@ -144,7 +232,7 @@ int SPCPipeline::Process(SPCTask& task, resource::NamespaceFacade& facade) {
     // L0: Skip entirely — no processing.
     if (level == 0) {
         task.stage = SPCStage::kDone;
-        facade.store().doc_update_status(task.doc_id, DocStatus::kReady);
+        if (MarkDocumentReady(task, facade) != 0) return -1;
         return 0;
     }
 
@@ -159,7 +247,7 @@ int SPCPipeline::Process(SPCTask& task, resource::NamespaceFacade& facade) {
         }
         const std::string& text = task.content_hash;  // Q+A: "query\n---\nresponse"
         if (text.empty()) {
-            facade.store().doc_update_status(task.doc_id, DocStatus::kReady);
+            if (MarkDocumentReady(task, facade) != 0) return -1;
             task.stage = SPCStage::kDone;
             return 0;
         }
@@ -217,7 +305,7 @@ int SPCPipeline::Process(SPCTask& task, resource::NamespaceFacade& facade) {
             task.error_message = "Commit (memory): " + cm.message();
             return -1;
         }
-        facade.store().doc_update_status(task.doc_id, DocStatus::kReady);
+        if (MarkDocumentReady(task, facade) != 0) return -1;
         task.stage = SPCStage::kDone;
         return 0;
     }
@@ -264,7 +352,7 @@ int SPCPipeline::Process(SPCTask& task, resource::NamespaceFacade& facade) {
             return -1;
         }
 
-        facade.store().doc_update_status(task.doc_id, DocStatus::kReady);
+        if (MarkDocumentReady(task, facade) != 0) return -1;
         task.stage = SPCStage::kDone;
         return 0;
     }
@@ -321,7 +409,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         const std::string& msg = chunked.status().message();
         if (msg.find("EMPTY_DOCUMENT") != std::string::npos ||
             msg.find("empty") != std::string::npos) {
-            facade.store().doc_update_status(task.doc_id, DocStatus::kReady);
+            if (MarkDocumentReady(task, facade) != 0) return -1;
             task.stage = SPCStage::kDone;
             OnDocumentWritten(task.doc_id, facade.namespace_id());
             return 0;
@@ -334,7 +422,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
 
     // Both empty → ready with 0 blocks (mirror existing empty-text handling).
     if (out.parents.empty() && out.children.empty()) {
-        facade.store().doc_update_status(task.doc_id, DocStatus::kReady);
+        if (MarkDocumentReady(task, facade) != 0) return -1;
         task.stage = SPCStage::kDone;
         OnDocumentWritten(task.doc_id, facade.namespace_id());
         return 0;
@@ -1117,7 +1205,7 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
     }
 
     // Phase 3 — document status.
-    facade.store().doc_update_status(task.doc_id, DocStatus::kReady);
+    if (MarkDocumentReady(task, facade) != 0) return -1;
     task.stage = SPCStage::kDone;
     // [⑤c] F41 doc-summary enqueue seam: a fully written document fires the hook
     // (no-op unless production installed the seam via SetDocSummaryEnqueue).

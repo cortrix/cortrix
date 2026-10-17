@@ -283,19 +283,8 @@ Status DirectoryImporter::ProcessFile(const std::string& file_path) {
 
     if (rc == -2) {
         // New file - create document and enqueue SPC
-        int64_t file_size = GetFileSize(effective_path);
-        std::string mime_type = DetectMimeType(effective_path);
-
-        CortrixDoc doc;
-        doc.source_type = "watch_dir";
-        doc.source_path = effective_path;
-        doc.source_ref = config_.data_dir;
-        doc.content_hash = content_hash;
-        doc.file_size = file_size;
-        doc.mime_type = mime_type;
-        doc.status = DocStatus::kPending;
-        doc.title = GetBasename(effective_path);
-        doc.processing_level = 3;
+        CortrixDoc doc = MakeWatchedDocument(effective_path, content_hash);
+        const std::string mime_type = doc.mime_type;
 
         rc = facade.store().doc_create(doc);
         if (rc != 0) {
@@ -329,14 +318,42 @@ Status DirectoryImporter::ProcessFile(const std::string& file_path) {
     } else if (rc == 0) {
         // Existing document - check for content change
         if (existing_doc.content_hash == content_hash) {
-            // Hash unchanged - but if status is pending/error, the doc was never
-            // successfully processed (e.g., server crashed mid-import). Re-enqueue.
-            if (existing_doc.status == DocStatus::kPending ||
-                existing_doc.status == DocStatus::kError) {
+            // Hash unchanged. A version that is pending, failed, or left processing, and
+            // that no task will process (the server stopped mid-import, a run failed, or
+            // a task ended without marking it ready), never finished: it is processed
+            // again. While a task for it is queued or running, that task will.
+            const bool unfinished = existing_doc.status == DocStatus::kPending ||
+                                    existing_doc.status == DocStatus::kError ||
+                                    existing_doc.status == DocStatus::kProcessing;
+            if (unfinished && spc_mgr_.HasActiveTask(existing_doc.doc_id)) {
+                CORTRIX_LOG_DEBUG(kModule, "file unchanged, its version will be processed: {}",
+                                  effective_path);
+                std::lock_guard<std::mutex> lock(stats_mu_);
+                stats_.skipped_unchanged++;
+                return Status::Ok();
+            }
+            // A version that already holds blocks stored an attempt that was never
+            // published. Processing it again in place would collide with its
+            // document-level metadata block, or store a second copy of its blocks, so it
+            // gets a new version below instead, as changed content does. The count is
+            // read after the active check, so no task can add blocks under it; a count
+            // that cannot be read is taken to mean blocks.
+            int64_t stored_blocks = 0;
+            const bool holds_attempt =
+                unfinished &&
+                (facade.store().block_count_by_doc(existing_doc.doc_id, &stored_blocks) != 0 ||
+                 stored_blocks > 0);
+            if (unfinished && !holds_attempt) {
                 CORTRIX_LOG_INFO(kModule, "re-enqueue unprocessed doc: doc_id={}, status={}, path={}",
                                 existing_doc.doc_id,
-                                existing_doc.status == DocStatus::kPending ? "pending" : "error",
+                                existing_doc.status == DocStatus::kPending ? "pending"
+                                : existing_doc.status == DocStatus::kError ? "error"
+                                                                           : "processing",
                                 effective_path);
+                // Cancel first, in case a task for this path is queued after the check
+                // above: processing the same content twice only adds a second copy.
+                spc_mgr_.CancelQueuedVersions(config_.namespace_name, "watch_dir",
+                                              effective_path);
                 auto task = std::make_shared<SPCTask>();
                 task->doc_id = existing_doc.doc_id;
                 task->namespace_name = config_.namespace_name;
@@ -353,25 +370,42 @@ Status DirectoryImporter::ProcessFile(const std::string& file_path) {
                 return Status::Ok();
             }
 
-            CORTRIX_LOG_DEBUG(kModule, "file unchanged: {}", effective_path);
-            std::lock_guard<std::mutex> lock(stats_mu_);
-            stats_.skipped_unchanged++;
-            return Status::Ok();
+            if (!unfinished) {
+                CORTRIX_LOG_DEBUG(kModule, "file unchanged: {}", effective_path);
+                std::lock_guard<std::mutex> lock(stats_mu_);
+                stats_.skipped_unchanged++;
+                return Status::Ok();
+            }
+            CORTRIX_LOG_INFO(kModule,
+                             "unfinished version holds a stored attempt, so a new version "
+                             "replaces it: doc_id={}, path={}",
+                             existing_doc.doc_id, effective_path);
         }
 
-        // Content changed - update
+        // A new version, created exactly as a new file is: for changed content, and
+        // for unchanged content whose unfinished version holds a stored attempt. The
+        // version that answers queries keeps doing so until the new one is ready,
+        // which then retires every older version. Reprocessing the previous row in
+        // place would store a second set of chunks next to the first.
         spc_mgr_.CancelQueuedVersions(config_.namespace_name, "watch_dir", effective_path);
 
-        facade.store().doc_update_status(existing_doc.doc_id, DocStatus::kStale);
-        facade.store().doc_update_status(existing_doc.doc_id, DocStatus::kPending);
+        CortrixDoc version = MakeWatchedDocument(effective_path, content_hash);
+        rc = facade.store().doc_create(version);
+        if (rc != 0) {
+            CORTRIX_LOG_WARN(kModule, "doc_create failed for new version of: {}",
+                             effective_path);
+            std::lock_guard<std::mutex> lock(stats_mu_);
+            stats_.skipped_error++;
+            return Status::Internal("doc_create failed");
+        }
 
         auto task = std::make_shared<SPCTask>();
-        task->doc_id = existing_doc.doc_id;
+        task->doc_id = version.doc_id;
         task->namespace_name = config_.namespace_name;
         task->source_path = effective_path;
         task->source_type = "watch_dir";
         task->content_hash = content_hash;
-        task->mime_type = DetectMimeType(effective_path);  // Re-detect: format may have changed
+        task->mime_type = version.mime_type;  // re-detected: the format may have changed
         task->priority = SPCPriority::kP1;  // watch change = medium priority
         task->is_update = true;
         task->old_doc_id = existing_doc.doc_id;
@@ -379,7 +413,7 @@ Status DirectoryImporter::ProcessFile(const std::string& file_path) {
         auto submit_status = spc_mgr_.Submit(task);
         if (!submit_status.ok()) {
             CORTRIX_LOG_WARN(kModule, "SPC submit failed for update doc_id={}: {}",
-                            existing_doc.doc_id, submit_status.message());
+                            version.doc_id, submit_status.message());
         }
 
         std::lock_guard<std::mutex> lock(stats_mu_);
@@ -434,6 +468,21 @@ void DirectoryImporter::HandleFileEvents(const std::vector<FileEvent>& events) {
     }
 }
 
+CortrixDoc DirectoryImporter::MakeWatchedDocument(const std::string& effective_path,
+                                                  const std::string& content_hash) const {
+    CortrixDoc doc;
+    doc.source_type = "watch_dir";
+    doc.source_path = effective_path;
+    doc.source_ref = config_.data_dir;
+    doc.content_hash = content_hash;
+    doc.file_size = GetFileSize(effective_path);
+    doc.mime_type = DetectMimeType(effective_path);
+    doc.status = DocStatus::kPending;
+    doc.title = GetBasename(effective_path);
+    doc.processing_level = 3;
+    return doc;
+}
+
 Status DirectoryImporter::HandleFileDeletion(const std::string& file_path) {
     cortrix::resource::NamespaceFacade facade(pool_, config_.namespace_name);
     cortrix::Status acq = facade.Acquire();
@@ -441,58 +490,76 @@ Status DirectoryImporter::HandleFileDeletion(const std::string& file_path) {
         return Status::NotFound("namespace not found");
     }
 
-    CortrixDoc doc;
-    int rc = facade.store().doc_find_by_source("watch_dir", file_path, doc);
-    if (rc == -2) {
+    // A file can have several live versions (a newer one still being processed), so
+    // every live row of the path is removed: the lookup only returns live rows, and
+    // each pass hard-deletes the one it found. Rows already retired are left for the
+    // collector.
+    int removed = 0;
+    std::string last_removed;
+    for (;;) {
+        CortrixDoc doc;
+        int rc = facade.store().doc_find_by_source("watch_dir", file_path, doc);
+        if (rc == -2) break;
+        if (rc != 0) {
+            return Status::Internal("doc_find_by_source failed");
+        }
+        if (doc.doc_id == last_removed) {
+            // doc_delete reported success but the row is still there; do not loop.
+            return Status::Internal("doc_delete left the row in place during cascade");
+        }
+
+        // Cancel any in-flight SPC tasks, once per file: the cancel matches by path,
+        // so it covers the queued task of every version.
+        if (removed == 0) {
+            spc_mgr_.CancelQueuedVersions(config_.namespace_name, "watch_dir", file_path);
+        }
+
+        // Per D5 design: set Document status to 'deleting' before cascade
+        int urc = facade.store().doc_update_status(doc.doc_id, DocStatus::kDeleting);
+        if (urc != 0) {
+            CORTRIX_LOG_WARN(kModule, "failed to set kDeleting for doc_id={}", doc.doc_id);
+            // Continue with best-effort cascade despite status update failure
+        }
+
+        // Cascade delete: blocks (vector index entries) + document. The vector index key
+        // is block_id; MarkDelete is idempotent (a missing id returns Ok), so we
+        // delete every block unconditionally — no hnsw_node_id guard needed.
+        std::vector<CortrixBlock> blocks;
+        facade.store().block_get_by_doc(doc.doc_id, blocks);
+
+        int hnsw_errors = 0;
+        for (const auto& block : blocks) {
+            cortrix::Status vrc = facade.vec_index().MarkDelete(block.block_id);
+            if (!vrc.ok()) {
+                CORTRIX_LOG_WARN(kModule, "vector MarkDelete failed for block_id={}: {}",
+                                 block.block_id, vrc.message());
+                hnsw_errors++;
+            }
+        }
+
+        // Delete document (cascades to blocks via SQLite)
+        int drc = facade.store().doc_delete(doc.doc_id);
+        if (drc != 0) {
+            CORTRIX_LOG_ERROR(kModule, "doc_delete failed for doc_id={}, cascade incomplete", doc.doc_id);
+            return Status::Internal("doc_delete failed during cascade");
+        }
+
+        // Defensive blob cleanup (watch_dir typically has no blob)
+        facade.blob().del(config_.namespace_name, doc.doc_id);
+
+        CORTRIX_LOG_INFO(kModule, "file deleted, cascade cleanup: doc_id={}, path={}",
+                        doc.doc_id, file_path);
+        last_removed = doc.doc_id;
+        ++removed;
+    }
+
+    if (removed == 0) {
         CORTRIX_LOG_DEBUG(kModule, "no document for deleted file: {}", file_path);
         return Status::Ok();
     }
-    if (rc != 0) {
-        return Status::Internal("doc_find_by_source failed");
-    }
-
-    // Cancel any in-flight SPC tasks
-    spc_mgr_.CancelQueuedVersions(config_.namespace_name, "watch_dir", file_path);
-
-    // Per D5 design: set Document status to 'deleting' before cascade
-    int urc = facade.store().doc_update_status(doc.doc_id, DocStatus::kDeleting);
-    if (urc != 0) {
-        CORTRIX_LOG_WARN(kModule, "failed to set kDeleting for doc_id={}", doc.doc_id);
-        // Continue with best-effort cascade despite status update failure
-    }
-
-    // Cascade delete: blocks (vector index entries) + document. F05/P-HNSW key
-    // is block_id; MarkDelete is idempotent (a missing id returns Ok), so we
-    // delete every block unconditionally — no hnsw_node_id guard needed.
-    std::vector<CortrixBlock> blocks;
-    facade.store().block_get_by_doc(doc.doc_id, blocks);
-
-    int hnsw_errors = 0;
-    for (const auto& block : blocks) {
-        cortrix::Status vrc = facade.vec_index().MarkDelete(block.block_id);
-        if (!vrc.ok()) {
-            CORTRIX_LOG_WARN(kModule, "vector MarkDelete failed for block_id={}: {}",
-                             block.block_id, vrc.message());
-            hnsw_errors++;
-        }
-    }
-
-    // Delete document (cascades to blocks via SQLite)
-    int drc = facade.store().doc_delete(doc.doc_id);
-    if (drc != 0) {
-        CORTRIX_LOG_ERROR(kModule, "doc_delete failed for doc_id={}, cascade incomplete", doc.doc_id);
-        return Status::Internal("doc_delete failed during cascade");
-    }
-
-    // Defensive blob cleanup (watch_dir typically has no blob)
-    facade.blob().del(config_.namespace_name, doc.doc_id);
-
-    CORTRIX_LOG_INFO(kModule, "file deleted, cascade cleanup: doc_id={}, path={}",
-                    doc.doc_id, file_path);
-
     {
         std::lock_guard<std::mutex> lock(stats_mu_);
-        stats_.deleted++;
+        stats_.deleted++;  // one per file, however many versions it had
     }
 
     return Status::Ok();

@@ -41,10 +41,15 @@
 
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
+#include <sqlite3.h>
+
+#include "cortrix/common/block_types.h"
 #include "cortrix/connector/directory_importer.h"
 #include "cortrix/config/config.h"
 #include "cortrix/connector/file_watcher.h"
@@ -64,22 +69,33 @@ public:
     RecordingSPC() : SPCManager() {}
     Status Submit(std::shared_ptr<SPCTask> t) override {
         submitted_tasks.push_back(t);
+        calls.push_back("submit:" + t->doc_id);
         return Status::Ok();
     }
     int CancelQueuedVersions(const std::string& ns, const std::string& type,
                              const std::string& p) override {
         cancelled_paths.push_back(p);
         cancelled_scopes.push_back(ns + "|" + type);
+        calls.push_back("cancel:" + p);
         return 0;
     }
     void Start() override {}
     void Stop() override {}
     size_t QueueSize() const override { return 0; }
     SPCStage GetTaskStage(int64_t) const override { return SPCStage::kQueued; }
+    // Nothing runs here: a document is active only when a test says so. The hook runs
+    // first, as a task that commits and finishes just then would.
+    bool HasActiveTask(const std::string& doc_id) const override {
+        if (on_has_active) on_has_active(doc_id);
+        return active_ids.count(doc_id) > 0;
+    }
 
     std::vector<std::shared_ptr<SPCTask>> submitted_tasks;
     std::vector<std::string> cancelled_paths;
     std::vector<std::string> cancelled_scopes;  // "namespace|source_type" per call
+    std::vector<std::string> calls;             // "submit:<doc_id>" / "cancel:<path>", in order
+    std::set<std::string> active_ids;
+    std::function<void(const std::string&)> on_has_active;
 };
 
 // Write a small text file to `path`.
@@ -519,6 +535,236 @@ TEST(ImportStatsTest, ToStringContainsKeyFields) {
     EXPECT_NE(str.find("total=10"), std::string::npos);
     EXPECT_NE(str.find("imported=5"), std::string::npos);
     EXPECT_NE(str.find("elapsed=1.23"), std::string::npos);
+}
+
+
+// --- #157: a changed file is a new version; deleting a file removes every live one ---
+
+class DirectoryImporterVersionsTest : public DirectoryImporterTest {
+protected:
+    std::vector<CortrixDoc> LiveDocs() {
+        cortrix::resource::NamespaceFacade facade(harness_->ipool(), "default");
+        EXPECT_TRUE(facade.Acquire().ok());
+        std::vector<CortrixDoc> all;
+        for (auto st : {DocStatus::kReady, DocStatus::kPending, DocStatus::kProcessing,
+                        DocStatus::kError, DocStatus::kStale, DocStatus::kDeleting}) {
+            std::vector<CortrixDoc> batch;
+            facade.store().doc_list_by_status(st, batch);
+            for (auto& d : batch) all.push_back(std::move(d));
+        }
+        return all;
+    }
+
+    static FileEvent Event(FileEventType type, const std::string& path) {
+        FileEvent ev;
+        ev.type = type;
+        ev.path = path;
+        return ev;
+    }
+
+    std::string PathOf(const std::string& name) {
+        return fs::canonical(watch_dir_ / name).string();
+    }
+
+    // The row the importer creates for a new file, and the task it submits for it.
+    std::string Import(DirectoryImporter& di, const std::string& name,
+                       const std::string& content) {
+        WriteFile(watch_dir_ / name, content);
+        const std::size_t before = spc_->submitted_tasks.size();
+        di.HandleFileEvents({Event(FileEventType::kCreated, PathOf(name))});
+        EXPECT_EQ(spc_->submitted_tasks.size(), before + 1) << name;
+        return spc_->submitted_tasks.empty() ? std::string()
+                                             : spc_->submitted_tasks.back()->doc_id;
+    }
+
+    void Exec(const std::string& sql) {
+        cortrix::resource::NamespaceFacade facade(harness_->ipool(), "default");
+        ASSERT_TRUE(facade.Acquire().ok());
+        char* err = nullptr;
+        ASSERT_EQ(sqlite3_exec(facade.store().db_handle(), sql.c_str(), nullptr, nullptr, &err),
+                  SQLITE_OK)
+            << (err ? err : "") << " :: " << sql;
+        sqlite3_free(err);
+    }
+
+    void SetStatus(const std::string& doc_id, DocStatus status) {
+        cortrix::resource::NamespaceFacade facade(harness_->ipool(), "default");
+        ASSERT_TRUE(facade.Acquire().ok());
+        ASSERT_EQ(facade.store().doc_update_status(doc_id, status), 0);
+    }
+
+    // One stored block for doc_id, as a processing attempt leaves.
+    void AddBlock(const std::string& doc_id) {
+        cortrix::resource::NamespaceFacade facade(harness_->ipool(), "default");
+        ASSERT_TRUE(facade.Acquire().ok());
+        CortrixBlock b;
+        b.doc_id = doc_id;
+        b.child_id = "child-" + std::to_string(++blocks_added_) + "-" + doc_id;
+        b.block_type = static_cast<int>(kBlockFile);
+        b.content_text = "stored attempt";
+        b.metadata_json = "{}";
+        b.data = {0x01};
+        ASSERT_EQ(facade.store().block_insert(b), 0);
+    }
+
+    // What one more event for the file's unchanged content does.
+    enum class Outcome { kSkipped, kInPlace, kNewVersion };
+    Outcome Again(DirectoryImporter& di, const std::string& name, const std::string& doc_id) {
+        const std::size_t before = spc_->submitted_tasks.size();
+        di.HandleFileEvents({Event(FileEventType::kModified, PathOf(name))});
+        if (spc_->submitted_tasks.size() == before) return Outcome::kSkipped;
+        EXPECT_EQ(spc_->submitted_tasks.size(), before + 1) << name;
+        return spc_->submitted_tasks.back()->doc_id == doc_id ? Outcome::kInPlace
+                                                               : Outcome::kNewVersion;
+    }
+
+    int blocks_added_ = 0;
+};
+
+TEST_F(DirectoryImporterVersionsTest, ChangedFileGetsANewPendingVersion) {
+    WriteFile(watch_dir_ / "v.txt", "first content");
+    const WatchDirConfig cfg = MakeCfg();
+    DirectoryImporter di(cfg, harness_->ipool(), *spc_);
+    ASSERT_TRUE(di.Start().ok());
+    ASSERT_EQ(MarkAllDocsReady(), 1);
+    const std::vector<CortrixDoc> before = LiveDocs();
+    ASSERT_EQ(before.size(), 1u);
+    const CortrixDoc v1 = before[0];
+    const std::string path = fs::canonical(watch_dir_ / "v.txt").string();
+
+    const std::string second = "second, longer content";
+    WriteFile(watch_dir_ / "v.txt", second);
+    di.HandleFileEvents({Event(FileEventType::kModified, path)});
+
+    const std::vector<CortrixDoc> after = LiveDocs();
+    ASSERT_EQ(after.size(), 2u);
+    const CortrixDoc* old = nullptr;
+    const CortrixDoc* v2 = nullptr;
+    for (const auto& d : after) (d.doc_id == v1.doc_id ? old : v2) = &d;
+    ASSERT_NE(old, nullptr);
+    ASSERT_NE(v2, nullptr);
+    EXPECT_EQ(old->status, DocStatus::kReady);  // untouched until the new one is ready
+    EXPECT_EQ(old->content_hash, v1.content_hash);
+    EXPECT_EQ(v2->status, DocStatus::kPending);
+    EXPECT_EQ(v2->source_type, "watch_dir");
+    EXPECT_EQ(v2->source_path, path);
+    EXPECT_FALSE(v1.source_ref.empty());
+    EXPECT_EQ(v2->source_ref, v1.source_ref);  // the importer's resolved data dir
+    EXPECT_EQ(v2->file_size, static_cast<int64_t>(second.size()));
+    EXPECT_EQ(v2->mime_type, v1.mime_type);
+    EXPECT_EQ(v2->title, "v.txt");
+    EXPECT_EQ(v2->processing_level, 3);
+    EXPECT_NE(v2->content_hash, v1.content_hash);
+
+    ASSERT_FALSE(spc_->submitted_tasks.empty());
+    const auto& task = spc_->submitted_tasks.back();
+    EXPECT_EQ(task->doc_id, v2->doc_id);
+    EXPECT_TRUE(task->is_update);
+    EXPECT_EQ(task->old_doc_id, v1.doc_id);
+}
+
+TEST_F(DirectoryImporterVersionsTest, PendingVersionWithNoActiveTaskIsResubmittedInPlace) {
+    WriteFile(watch_dir_ / "w.txt", "first content");
+    DirectoryImporter di(MakeCfg(), harness_->ipool(), *spc_);
+    ASSERT_TRUE(di.Start().ok());
+    ASSERT_EQ(MarkAllDocsReady(), 1);
+    const std::string path = fs::canonical(watch_dir_ / "w.txt").string();
+    WriteFile(watch_dir_ / "w.txt", "second content");
+    di.HandleFileEvents({Event(FileEventType::kModified, path)});  // v2 pending
+    ASSERT_FALSE(spc_->submitted_tasks.empty());
+    const std::string v2 = spc_->submitted_tasks.back()->doc_id;
+
+    // No task for v2 is active and it holds no blocks, so the same content again is
+    // processed in place, cancelling any task of the path that is still queued first.
+    spc_->calls.clear();
+    di.HandleFileEvents({Event(FileEventType::kModified, path)});
+    ASSERT_EQ(spc_->calls.size(), 2u);
+    EXPECT_EQ(spc_->calls[0], "cancel:" + path);
+    EXPECT_EQ(spc_->calls[1], "submit:" + v2);  // the resubmitted task is v2's
+}
+
+// #157: an unchanged file whose version never finished is processed again, unless a
+// task for it is queued or running. A version that holds blocks stored an attempt that
+// was never published; processing it in place would collide with its document-level
+// metadata block, so it gets a new version instead.
+TEST_F(DirectoryImporterVersionsTest, UnchangedFileFollowsItsVersionsState) {
+    DirectoryImporter di(MakeCfg(), harness_->ipool(), *spc_);
+    ASSERT_TRUE(di.Start().ok());
+    using O = Outcome;
+    struct Case {
+        const char* name;
+        DocStatus status;
+        bool blocks;
+        bool active;
+        Outcome expected;
+    };
+    const Case cases[] = {
+        {"error-blocks.txt", DocStatus::kError, true, false, O::kNewVersion},
+        {"error-empty.txt", DocStatus::kError, false, false, O::kInPlace},
+        {"error-active.txt", DocStatus::kError, true, true, O::kSkipped},
+        {"processing-blocks.txt", DocStatus::kProcessing, true, false, O::kNewVersion},
+        {"processing-empty.txt", DocStatus::kProcessing, false, false, O::kInPlace},
+        {"processing-active.txt", DocStatus::kProcessing, true, true, O::kSkipped},
+        {"pending-empty.txt", DocStatus::kPending, false, false, O::kInPlace},
+        {"pending-blocks.txt", DocStatus::kPending, true, false, O::kNewVersion},
+        {"pending-active.txt", DocStatus::kPending, false, true, O::kSkipped},
+        {"ready.txt", DocStatus::kReady, true, false, O::kSkipped},
+    };
+    for (const Case& c : cases) {
+        const std::string id = Import(di, c.name, std::string("content of ") + c.name);
+        if (c.status != DocStatus::kPending) SetStatus(id, c.status);
+        if (c.blocks) AddBlock(id);
+        if (c.active) spc_->active_ids.insert(id);
+        EXPECT_EQ(static_cast<int>(Again(di, c.name, id)), static_cast<int>(c.expected))
+            << c.name << " (0 skipped, 1 in place, 2 new version)";
+        spc_->active_ids.erase(id);
+    }
+}
+
+// A block count that cannot be read is taken to mean blocks, so the importer never
+// processes a version that may hold content in place.
+TEST_F(DirectoryImporterVersionsTest, AnUnreadableBlockCountMeansANewVersion) {
+    DirectoryImporter di(MakeCfg(), harness_->ipool(), *spc_);
+    ASSERT_TRUE(di.Start().ok());
+    const std::string id = Import(di, "count.txt", "content");
+    SetStatus(id, DocStatus::kError);
+    Exec("ALTER TABLE blocks RENAME TO blocks_hidden");  // the count's prepare fails
+    const Outcome outcome = Again(di, "count.txt", id);
+    Exec("ALTER TABLE blocks_hidden RENAME TO blocks");
+    EXPECT_EQ(static_cast<int>(outcome), static_cast<int>(Outcome::kNewVersion));
+}
+
+// The block count is read after the active check. A task that stores its blocks and
+// finishes just as the importer asks leaves blocks the count then sees, so the version
+// is not processed in place.
+TEST_F(DirectoryImporterVersionsTest, TheBlockCountIsReadAfterTheActiveCheck) {
+    DirectoryImporter di(MakeCfg(), harness_->ipool(), *spc_);
+    ASSERT_TRUE(di.Start().ok());
+    const std::string id = Import(di, "order.txt", "content");
+    SetStatus(id, DocStatus::kProcessing);
+    spc_->on_has_active = [&](const std::string& doc_id) {
+        if (doc_id == id) AddBlock(id);
+    };
+    const Outcome outcome = Again(di, "order.txt", id);
+    spc_->on_has_active = nullptr;
+    EXPECT_EQ(static_cast<int>(outcome), static_cast<int>(Outcome::kNewVersion));
+}
+
+TEST_F(DirectoryImporterVersionsTest, DeletedFileRemovesEveryLiveVersion) {
+    WriteFile(watch_dir_ / "d.txt", "first content");
+    DirectoryImporter di(MakeCfg(), harness_->ipool(), *spc_);
+    ASSERT_TRUE(di.Start().ok());
+    ASSERT_EQ(MarkAllDocsReady(), 1);
+    const std::string path = fs::canonical(watch_dir_ / "d.txt").string();
+    WriteFile(watch_dir_ / "d.txt", "second content");
+    di.HandleFileEvents({Event(FileEventType::kModified, path)});
+    ASSERT_EQ(LiveDocs().size(), 2u);  // v1 ready, v2 pending
+
+    const auto deleted_before = di.GetStats().deleted;
+    fs::remove(watch_dir_ / "d.txt");
+    di.HandleFileEvents({Event(FileEventType::kDeleted, path)});
+    EXPECT_TRUE(LiveDocs().empty());
+    EXPECT_EQ(di.GetStats().deleted, deleted_before + 1);
 }
 
 }  // namespace

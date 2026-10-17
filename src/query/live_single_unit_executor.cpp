@@ -676,12 +676,13 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             }
         }
 
-        // A soft-deleted document is invisible on every route, as it is to the list
-        // and status endpoints; BM25 already excludes it in SQL. Its entries leave
-        // all five lists BEFORE fusion, so the survivors are ranked as though the
-        // deleted entries had never been retrieved. An entry whose row carries no
-        // doc_id (the legacy reverse lookup) is kept. A lookup error leaves the lists
-        // as they were before this filter existed, and is logged.
+        // A hidden document (soft-deleted, or a version of a file that another version
+        // of it should answer for; store::HiddenDocPredicate) is invisible on every
+        // route; BM25 already excludes it in SQL. Its entries leave all five lists
+        // BEFORE fusion, so the survivors are ranked as though the hidden entries had
+        // never been retrieved. An entry whose row carries no doc_id (the legacy
+        // reverse lookup) is kept. A lookup error leaves the lists as they were before
+        // this filter existed, and is logged.
         if (past_deadline()) return MakeNamespaceTimeoutRow(namespace_id, t0);
         {
             std::vector<std::string> hit_doc_ids;
@@ -694,13 +695,13 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
                     }
                 }
             }
-            auto deleted_docs =
-                cortrix::store::LoadDeletedDocIds(store.db_handle(), hit_doc_ids);
-            if (!deleted_docs.ok()) {
-                CORTRIX_LOG_WARN("query", "deleted-document filter skipped for ns={}: {}",
-                                 namespace_id, deleted_docs.status().message());
-            } else if (!deleted_docs.value().empty()) {
-                const auto& gone = deleted_docs.value();
+            auto hidden_docs =
+                cortrix::store::LoadHiddenDocIds(store.db_handle(), hit_doc_ids);
+            if (!hidden_docs.ok()) {
+                CORTRIX_LOG_WARN("query", "hidden-document filter skipped for ns={}: {}",
+                                 namespace_id, hidden_docs.status().message());
+            } else if (!hidden_docs.value().empty()) {
+                const auto& gone = hidden_docs.value();
                 auto drop = [&](std::vector<retrieval::SparseHit>& list) {
                     list.erase(std::remove_if(list.begin(), list.end(),
                                               [&](const retrieval::SparseHit& h) {

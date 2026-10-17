@@ -12,6 +12,13 @@
 
 namespace cortrix::store {
 
+// documents.deleted_from_status holds the status a soft-deleted row had when it was
+// deleted; it is NULL for a live row and for a row deleted before the column existed.
+// Stores created earlier lack the column and no step adds it, so version 1 of this
+// schema exists in two shapes: every statement that names the column must go through
+// CortrixStoreSqlite's column probe. Keep commas out of SQL comments placed between
+// column definitions: SQLite's DROP COLUMN finds a column's start by scanning back
+// to the nearest comma, and a comma inside such a comment breaks the rewritten table.
 inline constexpr char kPerUnitFrameworkDdl[] = R"SQL(
         CREATE TABLE IF NOT EXISTS documents (
             doc_id          TEXT PRIMARY KEY,                  -- ULID (D-I6); app-minted, no AUTOINCREMENT
@@ -35,7 +42,8 @@ inline constexpr char kPerUnitFrameworkDdl[] = R"SQL(
             title           TEXT,
             language        TEXT,
             metadata_json   TEXT,
-            deleted_at      INTEGER                            -- OPEN-2 Stage 1 soft-delete timestamp (ms); NULL = live
+            deleted_at      INTEGER,                           -- OPEN-2 Stage 1 soft-delete timestamp (ms); NULL = live
+            deleted_from_status TEXT                           -- status when soft-deleted; NULL = live or unknown
         );
         CREATE INDEX IF NOT EXISTS idx_doc_source ON documents(source_type, source_path);
         CREATE INDEX IF NOT EXISTS idx_doc_status ON documents(status);

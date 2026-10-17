@@ -402,5 +402,21 @@ TEST(DocumentTaskHandlerSchemaTest, AllElevenCodesEmitFourFieldEnvelope) {
     EXPECT_EQ(codes.size(), 11u);  // all distinct
 }
 
+
+// #157: a task whose document is deleted fails the same way on every retry. Other
+// failures keep today's answer.
+TEST(DocumentTaskHandlerProgressTest, RetryableIfFailIsFalseOnlyForADeletedDocument) {
+    TaskInfo t;
+    t.task_id = "t-deleted";
+    t.status = task_status::kFailed;
+    t.error_code = "CX_ERR_DOC_DELETED";
+    EXPECT_EQ(DocumentTaskHandler::BuildProgressBody(t)["meta"]["retryable_if_fail"], false);
+    t.error_code = "CX_ERR_SPC_PROCESS_FAILED";
+    EXPECT_EQ(DocumentTaskHandler::BuildProgressBody(t)["meta"]["retryable_if_fail"], true);
+    t.status = task_status::kCompleted;
+    t.error_code = "CX_ERR_DOC_DELETED";  // not failed, so the code is not reported
+    EXPECT_EQ(DocumentTaskHandler::BuildProgressBody(t)["meta"]["retryable_if_fail"], true);
+}
+
 }  // namespace
 }  // namespace cortrix::async

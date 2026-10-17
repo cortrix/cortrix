@@ -1,3 +1,4 @@
+#include "cortrix/store/cortrix_store_sqlite.h"
 #include <gtest/gtest.h>
 #include "cortrix/upload/upload_handler.h"
 #include "cortrix/spc/spc_router.h"
@@ -14,7 +15,11 @@
 // transitively via upload_handler.h.
 
 #include <algorithm>
+#include <functional>
 #include <map>
+#include <optional>
+#include <string>
+#include <utility>
 #include <vector>
 #include <cstring>
 
@@ -170,7 +175,37 @@ public:
                              const std::string& path) override {
         cancelled_paths_.push_back(path);
         cancelled_scopes_.push_back(ns + "|" + type);
+        for (auto& t : submitted_) {
+            if (t->namespace_name == ns && t->source_type == type && t->source_path == path) {
+                t->cancelled.store(true);
+            }
+        }
         return 0;
+    }
+
+    // This fake never processes anything, so an accepted submission that was not
+    // cancelled is exactly what a real queue would still hold, unless a test says the
+    // task has left the queue.
+    bool HasQueuedTask(const std::string& doc_id) const override {
+        if (queued_override_.has_value()) return *queued_override_;
+        for (const auto& t : submitted_) {
+            if (t->doc_id == doc_id && !t->cancelled.load()) return true;
+        }
+        return false;
+    }
+
+    // Unset, it answers as SPCManager does: queued here, or running, which this fake
+    // never is. Set, it answers what the test says. The hook runs first either way.
+    bool HasActiveTask(const std::string& doc_id) const override {
+        if (on_has_active_) on_has_active_(doc_id);
+        if (active_override_.has_value()) return *active_override_;
+        return SPCManager::HasActiveTask(doc_id);
+    }
+
+    void set_queued(std::optional<bool> v) { queued_override_ = v; }
+    void set_active(std::optional<bool> v) { active_override_ = v; }
+    void set_on_has_active(std::function<void(const std::string&)> fn) {
+        on_has_active_ = std::move(fn);
     }
 
     void Start() override {}
@@ -188,6 +223,9 @@ private:
     std::vector<std::string> cancelled_paths_;
     std::vector<std::string> cancelled_scopes_;  // "namespace|source_type" per call
     bool should_fail_ = false;
+    std::optional<bool> queued_override_;
+    std::optional<bool> active_override_;
+    std::function<void(const std::string&)> on_has_active_;
 };
 
 // ============================================================
@@ -1240,6 +1278,166 @@ TEST_F(UploadHandlerTest, NullOpLoggerUploadStillSucceeds) {
     UploadResult result;
     EXPECT_TRUE(handler_->HandleUpload(req, *store_, *blob_, &result).ok());
     EXPECT_EQ(result.status, "pending");
+}
+
+
+// --- #157: one row per version; unchanged content is skipped only while that version
+// --- will still be processed. A real store, so the lookup returns the newest live row.
+
+class UploadVersionsTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        config_.max_file_size = 100 * 1024 * 1024;
+        config_.large_file_threshold = 100 * 1024 * 1024;
+        store_ = std::make_unique<CortrixStoreSqlite>(":memory:");
+        ASSERT_EQ(store_->Open(), 0);
+        handler_ = std::make_unique<UploadHandler>(config_, spc_);
+    }
+
+    UploadResult Upload(const std::string& content, Status* status = nullptr,
+                        const std::string& filename = "report.txt") {
+        UploadRequest req;
+        req.namespace_name = "test-ns";
+        req.filename = filename;
+        req.mime_type = "text/plain";
+        req.file_data = content.data();
+        req.file_size = content.size();
+        UploadResult r;
+        Status s = handler_->HandleUpload(req, *store_, blob_, &r);
+        if (status) {
+            *status = s;
+        } else {
+            EXPECT_TRUE(s.ok()) << s.message();
+        }
+        return r;
+    }
+
+    UploadConfig config_;
+    std::unique_ptr<CortrixStoreSqlite> store_;
+    FakeBlobStore blob_;
+    FakeSPCManager spc_;
+    std::unique_ptr<UploadHandler> handler_;
+};
+
+TEST_F(UploadVersionsTest, EachChangedUploadIsANewVersionComparedWithTheNewest) {
+    const UploadResult v1 = Upload("content A");
+    EXPECT_EQ(v1.status, "pending");
+    EXPECT_TRUE(v1.superseded_doc_id.empty());
+    const UploadResult v2 = Upload("content B");
+    EXPECT_EQ(v2.status, "updating");
+    EXPECT_EQ(v2.superseded_doc_id, v1.doc_id);
+    const UploadResult v3 = Upload("content A");  // v1's content again
+    EXPECT_EQ(v3.status, "updating");
+    EXPECT_EQ(v3.superseded_doc_id, v2.doc_id);
+    EXPECT_NE(v3.doc_id, v1.doc_id);
+}
+
+TEST_F(UploadVersionsTest, UploadAfterDeletingTheOnlyVersionIsANewDocument) {
+    const UploadResult v1 = Upload("content A");
+    ASSERT_EQ(store_->doc_soft_delete(v1.doc_id, 1000), 0);
+    const UploadResult again = Upload("content A");
+    EXPECT_EQ(again.status, "pending");
+    EXPECT_NE(again.doc_id, v1.doc_id);
+    EXPECT_TRUE(again.superseded_doc_id.empty());
+}
+
+// main answers updating here too, because it compares with v1; the test catches the
+// lookup change applied without the same-content rule.
+TEST_F(UploadVersionsTest, RetryAfterAFailedSubmitIsANewVersion) {
+    const UploadResult v1 = Upload("content A");
+    spc_.set_should_fail(true);
+    Status s;
+    const UploadResult v2 = Upload("content B", &s);
+    EXPECT_FALSE(s.ok());  // saved, not queued
+    spc_.set_should_fail(false);
+    const UploadResult retry = Upload("content B");
+    EXPECT_EQ(retry.status, "updating");
+    EXPECT_EQ(retry.superseded_doc_id, v2.doc_id);
+    EXPECT_NE(retry.doc_id, v2.doc_id);
+    EXPECT_FALSE(spc_.HasQueuedTask(v1.doc_id));  // the earlier queued version is cancelled
+}
+
+TEST_F(UploadVersionsTest, RetryOfAFailedVersionIsANewVersion) {
+    Upload("content A");
+    const UploadResult v2 = Upload("content B");
+    // The run failed: its task has ended, so it is no longer queued.
+    ASSERT_EQ(store_->doc_update_status(v2.doc_id, DocStatus::kError, "parse failed"), 0);
+    spc_.set_queued(false);
+    const UploadResult retry = Upload("content B");
+    EXPECT_EQ(retry.status, "updating");
+    EXPECT_EQ(retry.superseded_doc_id, v2.doc_id);
+}
+
+TEST_F(UploadVersionsTest, DuplicateOfAStrandedPendingVersionIsProcessedAsANewVersion) {
+    spc_.set_should_fail(true);
+    Status s;
+    const UploadResult v1 = Upload("content A", &s);
+    EXPECT_FALSE(s.ok());  // saved pending, never queued
+    spc_.set_should_fail(false);
+    const UploadResult again = Upload("content A");
+    EXPECT_EQ(again.status, "updating");
+    EXPECT_EQ(again.superseded_doc_id, v1.doc_id);
+    EXPECT_NE(again.doc_id, v1.doc_id);
+}
+
+TEST_F(UploadVersionsTest, UnchangedContentIsSkippedWhileItsVersionWillBeProcessed) {
+    const UploadResult v1 = Upload("content A");  // pending, its task queued
+    const UploadResult dup = Upload("content A");
+    EXPECT_EQ(dup.status, "skipped");
+    EXPECT_EQ(dup.doc_id, v1.doc_id);
+    EXPECT_TRUE(dup.superseded_doc_id.empty());
+    for (DocStatus st : {DocStatus::kProcessing, DocStatus::kReady}) {
+        ASSERT_EQ(store_->doc_update_status(v1.doc_id, st), 0);
+        const UploadResult d = Upload("content A");
+        EXPECT_EQ(d.status, "skipped") << static_cast<int>(st);
+        EXPECT_EQ(d.doc_id, v1.doc_id);
+    }
+}
+
+// A version that is not ready is a duplicate only while a task for it is queued or
+// running. One whose task ended without marking it ready, as when both of its last
+// writes failed, is replaced instead of blocking every identical upload until a
+// restart. The task here has left the queue, as a popped or finished one has.
+TEST_F(UploadVersionsTest, UnchangedContentIsADuplicateOnlyWhileATaskIsActive) {
+    struct Case {
+        DocStatus status;
+        bool active;
+        const char* expected;
+    };
+    int n = 0;
+    for (const Case c : {Case{DocStatus::kProcessing, false, "updating"},
+                         Case{DocStatus::kProcessing, true, "skipped"},
+                         Case{DocStatus::kPending, true, "skipped"},
+                         Case{DocStatus::kPending, false, "updating"}}) {
+        const std::string name = "case-" + std::to_string(n++) + ".txt";
+        const UploadResult v1 = Upload("content A", nullptr, name);
+        if (c.status != DocStatus::kPending) {
+            ASSERT_EQ(store_->doc_update_status(v1.doc_id, c.status), 0);
+        }
+        spc_.set_queued(false);
+        spc_.set_active(c.active);
+        const UploadResult dup = Upload("content A", nullptr, name);
+        EXPECT_EQ(dup.status, c.expected)
+            << "status " << static_cast<int>(c.status) << ", active " << c.active;
+        spc_.set_queued(std::nullopt);
+        spc_.set_active(std::nullopt);
+    }
+}
+
+// The row is read again when no task is active, so a version whose task published it
+// between the two reads is still a duplicate.
+TEST_F(UploadVersionsTest, AVersionPublishedDuringTheCheckIsStillADuplicate) {
+    const UploadResult v1 = Upload("content A");
+    ASSERT_EQ(store_->doc_update_status(v1.doc_id, DocStatus::kProcessing), 0);
+    spc_.set_queued(false);
+    spc_.set_active(false);
+    spc_.set_on_has_active([this](const std::string& doc_id) {
+        ASSERT_EQ(store_->doc_update_status(doc_id, DocStatus::kReady), 0);
+    });
+    const UploadResult dup = Upload("content A");
+    EXPECT_EQ(dup.status, "skipped");
+    EXPECT_EQ(dup.doc_id, v1.doc_id);
+    spc_.set_on_has_active(nullptr);
 }
 
 }  // namespace

@@ -152,7 +152,24 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
     CortrixDoc existing_doc;
     bool found = FindExistingDocument(store, req.filename, &existing_doc);
 
-    if (found && existing_doc.content_hash == content_hash) {
+    // Unchanged content is skipped only while that version is, or will be, processed:
+    // it is ready, or a task for it is queued or running. A version with the same
+    // content and no such future (a failed submit, a crash, a cancel, a failed run, or a
+    // version left processing after its task ended) is replaced by a new version,
+    // exactly as changed content is. The row is read again when no task is active, so
+    // a version whose task published it in between is still skipped.
+    const bool same_content = found && existing_doc.content_hash == content_hash;
+    bool will_be_processed =
+        same_content && (existing_doc.status == DocStatus::kReady ||
+                         spc_mgr_.HasActiveTask(existing_doc.doc_id));
+    if (same_content && !will_be_processed) {
+        CortrixDoc again;
+        if (store.doc_get(existing_doc.doc_id, again) == 0 &&
+            again.status == DocStatus::kReady) {
+            will_be_processed = true;
+        }
+    }
+    if (will_be_processed) {
         // Duplicate - skip
         result->doc_id = existing_doc.doc_id;
         result->content_hash = content_hash;
@@ -213,6 +230,7 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
         result->content_hash = content_hash;
         result->status = is_update ? "updating" : "pending";
         result->is_duplicate = false;
+        result->superseded_doc_id = is_update ? old_doc_id : std::string();
         // [gap②] Pass the disk-full rejection through unchanged — masking it as
         // "queue full" would mislead the caller (F24 §6 wants CX_ERR_DISK_FULL
         // surfaced). The doc + blob are already saved at this point either way.
@@ -226,6 +244,7 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
     result->content_hash = content_hash;
     result->status = is_update ? "updating" : "pending";
     result->is_duplicate = false;
+    result->superseded_doc_id = is_update ? old_doc_id : std::string();
 
     CORTRIX_LOG_INFO("upload", "Upload success: doc_id={}, filename={}, status={}",
                     doc.doc_id, req.filename, result->status);

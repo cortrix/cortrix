@@ -4,6 +4,7 @@
 #include <string>
 #include <atomic>
 #include <mutex>
+#include <optional>
 
 struct sqlite3;
 
@@ -64,6 +65,15 @@ public:
                                     int64_t* deleted_blocks) override;  // [F16a D3 · P2c]
     int doc_soft_delete(const std::string& doc_id, int64_t now_ms) override;
     int doc_restore(const std::string& doc_id) override;
+    int doc_retire_older_versions(const std::string& keep_doc_id, int64_t now_ms,
+                                  int64_t* retired) override;
+    int doc_publish_version(const std::string& doc_id, int64_t now_ms,
+                            int64_t* retired) override;
+    int doc_withdraw_version(const std::string& doc_id, int64_t now_ms,
+                             const std::string& error_message) override;
+    int doc_restore_unless_superseded(const std::string& doc_id) override;
+    int doc_get_deleted_from_status(const std::string& doc_id,
+                                    std::optional<std::string>* out) override;
     int doc_list_deleted_before(int64_t cutoff_ms, std::vector<CortrixDoc>& out) override;
     int doc_list_by_status(DocStatus status, std::vector<CortrixDoc>& out) override;
     int doc_find_by_source(const std::string& source_type,
@@ -107,6 +117,17 @@ private:
     int ExecutePragma();
     int CreateTables();
     void EnsureScoreColumnCacheLocked();
+    /// documents.deleted_from_status: present, absent, or unknown when the probe
+    /// itself failed. Present/absent is cached per instance; unknown is not, so the
+    /// next call probes again. Caller holds mu_.
+    enum class ColumnProbe { kPresent, kAbsent, kUnknown };
+    ColumnProbe DeletedFromStatusColumnLocked();
+    /// The statements of doc_update_status and doc_retire_older_versions, shared with
+    /// doc_publish_version, which runs both inside one transaction. Caller holds mu_.
+    int UpdateStatusLocked(const std::string& doc_id, DocStatus status,
+                           const std::string& error_message);
+    int RetireOlderVersionsLocked(const std::string& keep_doc_id, int64_t now_ms,
+                                  int64_t* retired);
     ScoreSignals LoadBlockScoreSignalsLocked(uint64_t block_id);
 
     /// Consume one injected op fault if armed (SetFailNextOps seam).
@@ -121,6 +142,7 @@ private:
     bool score_columns_checked_ = false;
     bool has_enriched_score_ = false;
     bool has_semantic_score_ = false;
+    std::optional<bool> has_deleted_from_status_;
 };
 
 }  // namespace cortrix

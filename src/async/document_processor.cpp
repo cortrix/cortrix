@@ -149,7 +149,11 @@ Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
         // cancel is Phase 2 (cancel's main checkpoint is the F06 per-page parse above).
         int rc = spc_mgr_->ProcessParsedDoc(result, spc_task);
         if (rc != 0) {
-            return finalizer_.Fail(task, "CX_ERR_SPC_PROCESS_FAILED", spc_task.error_message,
+            // A stage that knows why it failed sets its own code (a deleted document,
+            // for example); every other failure keeps the generic one.
+            const std::string code = spc_task.error_code.empty() ? "CX_ERR_SPC_PROCESS_FAILED"
+                                                                 : spc_task.error_code;
+            return finalizer_.Fail(task, code, spc_task.error_message,
                                    {{"doc_id", task.doc_id}}, t_start);
         }
     }

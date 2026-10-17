@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 namespace httplib { class Server; }
 
 namespace cortrix {
@@ -28,6 +30,14 @@ class DocumentGcSweeper;
 /// catalog.db. GC responses follow the GcStatus contract (status /
 /// soft_deleted_count / reclaimable_bytes / last_gc_at); errors use the GEN-Agent
 /// 4-field envelope.
+/// The retryable / category fields of a failed restore entry. A check that could not
+/// run is worth retrying; every refusal is not.
+struct GcRestoreFailureTraits {
+    bool retryable;
+    const char* category;
+};
+GcRestoreFailureTraits GcRestoreFailureTraitsFor(const std::string& error_code);
+
 void RegisterGcRoutes(httplib::Server& server,
                       catalog::gc::GcManager& gc,
                       catalog::gc::DocumentGcSweeper& sweeper,

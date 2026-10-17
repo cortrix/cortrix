@@ -224,5 +224,102 @@ TEST_F(GcRoutesTest, MaintenanceForbiddenForNonAdmin) {
     EXPECT_EQ(res->status, 403);
 }
 
+
+// #157: a refused restore says why and carries what an agent needs to act next.
+TEST_F(GcRoutesTest, RestoreRefusalsCarryTheirMessageAndDetail) {
+    {
+        cortrix::resource::NamespaceFacade facade(harness_->ipool(), kNs);
+        ASSERT_TRUE(facade.Acquire().ok());
+        CortrixDoc v1;
+        v1.doc_id = "upload-v1";
+        v1.source_type = "http_upload";
+        v1.source_path = "r.txt";
+        v1.status = DocStatus::kReady;
+        ASSERT_EQ(facade.store().doc_create(v1), 0);
+        ASSERT_EQ(facade.store().doc_soft_delete("upload-v1", 1000), 0);
+        CortrixDoc v2 = v1;
+        v2.doc_id = "upload-v2";
+        ASSERT_EQ(facade.store().doc_create(v2), 0);  // live
+        CortrixDoc pending;
+        pending.doc_id = "pending-file";
+        pending.source_type = "file";
+        pending.source_path = "p.txt";
+        pending.status = DocStatus::kPending;
+        ASSERT_EQ(facade.store().doc_create(pending), 0);
+        ASSERT_EQ(facade.store().doc_soft_delete("pending-file", 1000), 0);
+    }
+
+    httplib::Client cli("127.0.0.1", port_);
+    auto res = cli.Post("/api/v1/gc/restore", Admin(),
+                        R"({"document_ids":["upload-v1","pending-file","ghost"]})",
+                        "application/json");
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 200) << res->body;
+    const auto body = json::parse(res->body);
+    ASSERT_EQ(body["failed"].size(), 3u) << res->body;
+    const auto entry = [&](const std::string& id) {
+        for (const auto& e : body["failed"]) {
+            if (e["id"] == id) return e;
+        }
+        return json();
+    };
+
+    const json superseded = entry("upload-v1");
+    EXPECT_EQ(superseded["error_code"], "CX_ERR_GC_RESTORE_SUPERSEDED");
+    EXPECT_EQ(superseded["message"],
+              "another version is live: delete upload-v2 in namespace sales, then restore "
+              "upload-v1");
+    EXPECT_EQ(superseded["structured_data"]["live_doc_id"], "upload-v2");
+    EXPECT_EQ(superseded["structured_data"]["namespace"], "sales");
+    EXPECT_EQ(superseded["retryable"], false);
+    EXPECT_EQ(superseded["category"], "permanent");
+
+    const json incomplete = entry("pending-file");
+    EXPECT_EQ(incomplete["error_code"], "CX_ERR_GC_RESTORE_INCOMPLETE");
+    EXPECT_FALSE(incomplete["message"].get<std::string>().empty());
+    EXPECT_EQ(incomplete["structured_data"]["namespace"], "sales");
+    EXPECT_FALSE(incomplete["structured_data"].contains("live_doc_id"));
+
+    const json missing = entry("ghost");
+    EXPECT_EQ(missing["error_code"], "CX_ERR_GC_DOC_NOT_FOUND");
+    EXPECT_EQ(missing["message"], "no deleted document with this id");
+    EXPECT_FALSE(missing.contains("structured_data"));
+}
+
+// A store created before documents recorded the deleted status: deleting through the
+// facade (what the delete routes do) succeeds, and the restore route still restores.
+TEST_F(GcRoutesTest, StoreWithoutTheRecordedStatusDeletesAndRestores) {
+    {
+        cortrix::resource::NamespaceFacade facade(harness_->ipool(), kNs);
+        ASSERT_TRUE(facade.Acquire().ok());
+        char* err = nullptr;
+        ASSERT_EQ(sqlite3_exec(facade.store().db_handle(),
+                               "ALTER TABLE documents DROP COLUMN deleted_from_status",
+                               nullptr, nullptr, &err),
+                  SQLITE_OK)
+            << (err ? err : "");
+        sqlite3_free(err);
+    }
+    {
+        cortrix::resource::NamespaceFacade facade(harness_->ipool(), kNs);
+        ASSERT_TRUE(facade.Acquire().ok());
+        CortrixDoc doc;
+        doc.doc_id = "old-shape";
+        doc.source_type = "http_upload";
+        doc.source_path = "o.txt";
+        doc.status = DocStatus::kPending;
+        ASSERT_EQ(facade.store().doc_create(doc), 0);
+        EXPECT_EQ(facade.store().doc_soft_delete("old-shape", 1000), 0);  // the route's 204
+    }
+    httplib::Client cli("127.0.0.1", port_);
+    auto res = cli.Post("/api/v1/gc/restore", Admin(), R"({"document_ids":["old-shape"]})",
+                        "application/json");
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 200) << res->body;
+    const auto body = json::parse(res->body);
+    ASSERT_EQ(body["succeeded"].size(), 1u) << res->body;  // no recorded status to refuse on
+    EXPECT_EQ(body["succeeded"][0]["id"], "old-shape");
+}
+
 }  // namespace
 }  // namespace cortrix

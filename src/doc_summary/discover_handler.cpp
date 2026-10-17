@@ -14,7 +14,7 @@
 #include "cortrix/server/request_context.h"
 #include "cortrix/spc/onnx_embedder.h"            // OnnxEmbedder / EmbeddingResult
 #include "cortrix/store/cortrix_store.h"           // CortrixStore
-#include "cortrix/store/doc_status_lookup.h"      // LoadDeletedDocIds
+#include "cortrix/store/doc_status_lookup.h"      // LoadHiddenDocIds
 #include "cortrix/store/iindex.h"                  // IIndex
 
 #include "httplib.h"
@@ -90,20 +90,21 @@ std::vector<DocDiscoveryHit> RecallDocSummaryHnsw(store::IIndex& index,
         out.push_back(std::move(hit));
     }
 
-    // A soft-deleted document is invisible here as on every retrieval route. Its
-    // summaries leave BEFORE the top_k cut, so the cut keeps top_k live documents
-    // whenever the over-fetch holds them. A lookup error keeps the candidates
-    // unfiltered, as before this filter existed, and is logged.
+    // A hidden document (soft-deleted, or a version of a file that another version of
+    // it should answer for; store::HiddenDocPredicate) is invisible here as on every
+    // retrieval route. Its summaries leave BEFORE the top_k cut, so the cut keeps top_k
+    // served documents whenever the over-fetch holds them. A lookup error keeps the
+    // candidates unfiltered, as before this filter existed, and is logged.
     {
         std::vector<std::string> doc_ids;
         doc_ids.reserve(out.size());
         for (const auto& h : out) doc_ids.push_back(h.doc_id);
-        auto deleted = cortrix::store::LoadDeletedDocIds(store.db_handle(), doc_ids);
-        if (!deleted.ok()) {
-            CORTRIX_LOG_WARN("doc_summary", "deleted-document filter skipped: {}",
-                             deleted.status().message());
-        } else if (!deleted.value().empty()) {
-            const auto& gone = deleted.value();
+        auto hidden = cortrix::store::LoadHiddenDocIds(store.db_handle(), doc_ids);
+        if (!hidden.ok()) {
+            CORTRIX_LOG_WARN("doc_summary", "hidden-document filter skipped: {}",
+                             hidden.status().message());
+        } else if (!hidden.value().empty()) {
+            const auto& gone = hidden.value();
             out.erase(std::remove_if(out.begin(), out.end(),
                                      [&gone](const DocDiscoveryHit& h) {
                                          return gone.count(h.doc_id) > 0;

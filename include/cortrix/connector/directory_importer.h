@@ -4,6 +4,7 @@
 #include <memory>
 #include <atomic>
 #include <thread>
+#include "cortrix/common/data_types.h"
 #include "cortrix/common/status.h"
 #include "cortrix/config/config.h"
 #include "cortrix/connector/file_watcher.h"
@@ -87,6 +88,11 @@ private:
 
     /// Handle file deletion (cascade delete doc + blocks + hnsw + blob)
     Status HandleFileDeletion(const std::string& file_path);
+
+    /// The row of a watched file: the same fields for a new file and for a new
+    /// version of a changed one.
+    CortrixDoc MakeWatchedDocument(const std::string& effective_path,
+                                   const std::string& content_hash) const;
 
     /// After initial scan, remove DB docs whose files no longer exist on disk.
     /// Handles deletions that occurred while the server was offline (missed by FSEvents).

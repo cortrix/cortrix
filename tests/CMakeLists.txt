@@ -495,6 +495,8 @@ add_executable(cortrix_unit_tests
     unit/test_schema_matrix_observability_providers.cpp
     unit/test_schema_matrix_catalog_base.cpp
     unit/test_store_roundtrip_doc.cpp
+    unit/test_doc_versions_store.cpp
+    unit/test_restore_decisions.cpp
     unit/test_store_roundtrip_block.cpp
     unit/test_route_validation_query.cpp
     unit/test_route_validation_operations.cpp

@@ -329,6 +329,8 @@ INSTANTIATE_TEST_SUITE_P(
 // ============================================================================
 // (D) doc_update_status transition matrix: from every status to every status,
 //     asserting the read-back status (and error_message when targeting kError).
+//     A soft-deleted row is the exception: no status write brings it back, so the
+//     seven transitions out of kDeleted report -2 and leave it deleted.
 // ============================================================================
 
 struct DocStatusTransition {
@@ -355,6 +357,13 @@ TEST_P(DocRoundtripStatusTransitionMatrix, TransitionPersists) {
     ASSERT_EQ(mid.status, t.from);
 
     const std::string msg = (t.to == DocStatus::kError) ? "boom: parse failed" : "";
+    if (t.from == DocStatus::kDeleted) {
+        EXPECT_EQ(store_->doc_update_status(id, t.to, msg), -2);
+        CortrixDoc kept;
+        ASSERT_EQ(store_->doc_get(id, kept), 0);
+        EXPECT_EQ(kept.status, DocStatus::kDeleted) << "to=" << static_cast<int>(t.to);
+        return;
+    }
     ASSERT_EQ(store_->doc_update_status(id, t.to, msg), 0);
 
     CortrixDoc got;

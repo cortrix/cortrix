@@ -170,6 +170,8 @@ paths:
         Soft delete (OPEN-2): the doc is marked
         status=deleted and stays recoverable for gc.soft_delete_retention_days (default 30; 0 = immediate).
         Inside the window, ops can restore via POST /gc/restore; after it, GC sweeps/purges it permanently.
+        The document of a watched file is imported again at the next scan or file event while the file
+        still exists in the watched directory, since the directory is the source of truth for it.
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -250,6 +252,13 @@ paths:
         content of POST /documents. Returns the doc_id synchronously (201 created / 200 unchanged
         duplicate / 201 updating). At disk CRIT pressure the upload is rejected with 507 CX_ERR_DISK_FULL
         before any byte is written (F24 §6).
+
+        Uploading a filename that is already stored creates a new version (201 updating). The version
+        that answers queries for the filename keeps doing so until the new one is ready, and every older
+        version is then retired (soft-deleted); the new version is not served before then. Unchanged
+        content is answered 200 skipped while its version is ready, or queued or being processed; a
+        duplicate of a version that failed, was never queued, or was left unfinished is processed as a
+        new version instead (201 updating).
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff
