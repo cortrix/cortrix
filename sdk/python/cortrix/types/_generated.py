@@ -87,12 +87,13 @@ class DocumentTask:
 
 @dataclass
 class UploadDocumentResult:
-    """Synchronous result of the multipart POST /namespaces/{ns}/documents file upload. Unlike the async POST /documents (which returns a task_id), this returns the doc_id directly. status reflects the outcome (uploaded → processing queued; updating → reprocessing queued; unchanged → duplicate skipped)."""
+    """Synchronous result of the multipart POST /namespaces/{ns}/documents file upload. Unlike the async POST /documents (which returns a task_id), this returns the doc_id directly. status reflects the outcome: pending (a new document, processing queued), updating (a new version of a filename already stored, processing queued) or skipped (unchanged content, not processed again)."""
     doc_id: str
     content_hash: str
     status: str
     source_path: str
     message: str
+    superseded_doc_id: Optional[str] = None
 
 
 @dataclass

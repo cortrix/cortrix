@@ -214,8 +214,9 @@ components:
       description: >-
         Synchronous result of the multipart POST /namespaces/{ns}/documents file upload.
         Unlike the async POST /documents (which returns a task_id), this returns the doc_id
-        directly. status reflects the outcome (uploaded → processing queued; updating →
-        reprocessing queued; unchanged → duplicate skipped).
+        directly. status reflects the outcome: pending (a new document, processing queued),
+        updating (a new version of a filename already stored, processing queued) or skipped
+        (unchanged content, not processed again).
       required: [doc_id, content_hash, status, source_path, message]
       properties:
         doc_id:
@@ -225,7 +226,13 @@ components:
           description: Content hash used for duplicate detection.
         status:
           type: string
-          description: "Processing status (e.g. queued / updating / unchanged)."
+          description: "One of pending, updating or skipped."
+        superseded_doc_id:
+          type: string
+          description: >-
+            Set only when status is updating: the doc_id of the newest live version this
+            upload was compared against. That version keeps answering queries until the
+            new one is ready; then every older version of the filename is retired.
         source_path:
           type: string
           description: The uploaded file's original filename.

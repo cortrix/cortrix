@@ -36,6 +36,9 @@ components:
                 type: string
                 pattern: "^CX_ERR_[A-Z][A-Z_]*$"   # v1.0.1 option B: enforce the CX_ERR_ prefix
                 example: "CX_ERR_NS_QUOTA_EXCEEDED"
+              message:
+                type: string
+                description: What happened to this id, for a person; agents branch on error_code.
               retryable:
                 type: boolean
               category:

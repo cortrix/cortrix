@@ -17,6 +17,9 @@ Status F09SchemaProvider::Migrate(sqlite3* db, int from_ver, int to_ver) {
     if (from_ver == to_ver) {
         return Status::Ok();  // already current
     }
+    // Version 1 exists in two shapes: stores created before documents gained
+    // deleted_from_status lack the column, and there is no step that adds it. The
+    // store probes for the column before any statement that names it.
     if (from_ver == 0 && to_ver == 1) {
         char* err = nullptr;
         if (sqlite3_exec(db, kPerUnitFrameworkDdl, nullptr, nullptr, &err) != SQLITE_OK) {

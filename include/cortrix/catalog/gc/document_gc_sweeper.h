@@ -9,6 +9,9 @@
 #include "cortrix/common/status.h"
 #include "cortrix/config/config.h"
 
+namespace cortrix {
+class CortrixStore;
+}
 namespace cortrix::catalog {
 class INSRouter;
 }
@@ -58,13 +61,36 @@ public:
     /// soft-deleted doc qualifies). Honors dry_run + the per-run cap.
     Result<SweepReport> Purge();
 
+    /// One id that was not restored. message is set for every code; live_doc_id only
+    /// for CX_ERR_GC_RESTORE_SUPERSEDED; namespace_name for SUPERSEDED and
+    /// INCOMPLETE, the namespace in which the caller acts next.
+    struct RestoreFailure {
+        std::string id;
+        std::string code;  ///< CX_ERR_*
+        std::string message;
+        std::string live_doc_id;
+        std::string namespace_name;
+    };
+
     /// Restore soft-deleted documents by doc_id (Stage 1 reversal). doc_ids carry
-    /// no namespace, so each is searched across namespaces. Returns per-id outcome.
+    /// no namespace, so each is searched across namespaces; the first namespace that
+    /// holds the deleted row decides. Returns per-id outcome.
     struct RestoreOutcome {
-        std::vector<std::string> succeeded;                       ///< doc_ids restored
-        std::vector<std::pair<std::string, std::string>> failed;  ///< (doc_id, CX_ERR_*)
+        std::vector<std::string> succeeded;    ///< doc_ids restored
+        std::vector<RestoreFailure> failed;
     };
     Result<RestoreOutcome> Restore(const std::vector<std::string>& doc_ids);
+
+    /// The restore of one id in one namespace's store. kNotHere: the store holds no
+    /// deleted row with that id, look further. kRestored. kRefused: `failure` says
+    /// why, and the search for this id ends.
+    struct RestoreDecision {
+        enum class Kind { kNotHere, kRestored, kRefused };
+        Kind kind = Kind::kNotHere;
+        RestoreFailure failure;
+    };
+    static RestoreDecision DecideRestore(CortrixStore& store, const std::string& doc_id,
+                                         const std::string& ns_id);
 
     /// Count of currently soft-deleted docs across all namespaces (for GcStatus).
     Result<int64_t> CountSoftDeleted() const;

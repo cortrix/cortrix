@@ -126,5 +126,29 @@ TEST(SPCTaskQueueTest, PushAfterStopFails) {
     EXPECT_EQ(queue.Push(MakeTask(SPCPriority::kP1, 1)), -1);
 }
 
+
+// #157: an upload of unchanged content is skipped only while that version will still
+// be processed, so the queue answers whether a live task waits for a document.
+TEST(SPCTaskQueueTest, HasQueuedTaskSeesOnlyLiveWaitingTasks) {
+    SPCTaskQueue queue(10);
+    auto a = MakeTask(SPCPriority::kP1, 100, "a.txt");
+    a->doc_id = "doc-a";
+    auto b = MakeTask(SPCPriority::kP1, 200, "b.txt");
+    b->doc_id = "doc-b";
+    ASSERT_EQ(queue.Push(a), 0);
+    ASSERT_EQ(queue.Push(b), 0);
+    EXPECT_TRUE(queue.HasQueuedTask("doc-a"));
+    EXPECT_TRUE(queue.HasQueuedTask("doc-b"));
+    EXPECT_FALSE(queue.HasQueuedTask("doc-c"));
+
+    ASSERT_EQ(queue.CancelQueuedVersions("", "", "b.txt"), 1);
+    EXPECT_FALSE(queue.HasQueuedTask("doc-b"));  // cancelled
+
+    auto popped = queue.Pop();
+    ASSERT_NE(popped, nullptr);
+    EXPECT_EQ(popped->doc_id, "doc-a");
+    EXPECT_FALSE(queue.HasQueuedTask("doc-a"));  // a worker took it
+}
+
 }  // namespace
 }  // namespace cortrix

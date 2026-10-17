@@ -65,6 +65,14 @@ int SPCTaskQueue::CancelQueuedVersions(const std::string& namespace_name,
     return count;
 }
 
+bool SPCTaskQueue::HasQueuedTask(const std::string& doc_id) const {
+    std::lock_guard<std::mutex> lock(mu_);
+    for (const auto& task : queue_) {
+        if (task && task->doc_id == doc_id && !task->cancelled.load()) return true;
+    }
+    return false;
+}
+
 void SPCTaskQueue::Stop() {
     std::lock_guard<std::mutex> lock(mu_);
     stopped_ = true;

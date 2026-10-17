@@ -49,6 +49,9 @@ struct SPCTask {
     std::atomic<bool> cancelled{false};
 
     std::string error_message;
+    /// Machine-readable failure code, set by a stage that knows why it failed (for
+    /// example CX_ERR_DOC_DELETED). Empty leaves the caller's generic code in force.
+    std::string error_code;
 
     // Note: content_text is intentionally NOT a field of SPCTask.
     // Parsed text is a transient local in SPCPipeline::ProcessTask(), flowing

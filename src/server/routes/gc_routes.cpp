@@ -82,6 +82,11 @@ void WriteGcStatus(httplib::Response& res, GcManager& gc, DocumentGcSweeper& swe
 
 }  // namespace
 
+GcRestoreFailureTraits GcRestoreFailureTraitsFor(const std::string& error_code) {
+    if (error_code == "CX_ERR_GC_RESTORE_CHECK_FAILED") return {true, "transient"};
+    return {false, "permanent"};
+}
+
 void RegisterGcRoutes(httplib::Server& server, GcManager& gc,
                       DocumentGcSweeper& sweeper, ApiKeyAuth& auth) {
     // GET /api/v1/gc/status — read-only snapshot (ops:admin).
@@ -144,11 +149,20 @@ void RegisterGcRoutes(httplib::Server& server, GcManager& gc,
                 nlohmann::json succeeded = nlohmann::json::array();
                 for (const auto& id : out.succeeded) succeeded.push_back({{"id", id}});
                 nlohmann::json failed = nlohmann::json::array();
-                for (const auto& [id, code] : out.failed) {
-                    failed.push_back({{"id", id},
-                                      {"error_code", code},
-                                      {"retryable", false},
-                                      {"category", "permanent"}});
+                for (const auto& f : out.failed) {
+                    const GcRestoreFailureTraits traits = GcRestoreFailureTraitsFor(f.code);
+                    nlohmann::json entry = {{"id", f.id},
+                                            {"error_code", f.code},
+                                            {"message", f.message},
+                                            {"retryable", traits.retryable},
+                                            {"category", traits.category}};
+                    // Machine-readable detail for acting on a refusal, as the error
+                    // model asks: which version is live, and in which namespace.
+                    nlohmann::json detail = nlohmann::json::object();
+                    if (!f.live_doc_id.empty()) detail["live_doc_id"] = f.live_doc_id;
+                    if (!f.namespace_name.empty()) detail["namespace"] = f.namespace_name;
+                    if (!detail.empty()) entry["structured_data"] = std::move(detail);
+                    failed.push_back(std::move(entry));
                 }
                 const size_t total = out.succeeded.size() + out.failed.size();
                 const double coverage =

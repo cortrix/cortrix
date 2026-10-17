@@ -67,6 +67,11 @@
 #include "cortrix/chunker/parent_child_chunker.h"
 #include "cortrix/retrieval/sparse_index_registry.h"  // Q4 F40
 
+#include "cortrix/config/config.h"                // WatchDirConfig (versions: the importer)
+#include "cortrix/connector/directory_importer.h"  // versions: a watched file's next event
+#include "cortrix/connector/file_watcher.h"
+#include "cortrix/spc/spc_manager.h"
+
 #include "cortrix/catalog/batch_result.h"
 #include "cortrix/catalog/catalog_types.h"
 #include "cortrix/catalog/i_ns_router.h"
@@ -3082,6 +3087,352 @@ TEST_F(SPCPipelineR7Test, StoredHeaderFlagsRecordTheMarkAndTheContextualMember) 
         }();
     }
     pipeline_->SetCleaningConfigResolver(nullptr);
+}
+
+
+// --- #157: a version that reaches ready retires the older versions of its source ---
+
+class SPCPipelineVersionsTest : public SPCPipelineR7Test {
+protected:
+    std::string CreateVersion(const std::string& type, const std::string& path,
+                              DocStatus status, const std::string& created_at) {
+        cortrix::CortrixDoc d;
+        d.source_type = type;
+        d.source_path = path;
+        d.status = status;
+        EXPECT_EQ(facade_->store().doc_create(d), 0);
+        Exec("UPDATE documents SET created_at = '" + created_at + "' WHERE doc_id = '" +
+             d.doc_id + "'");
+        return d.doc_id;
+    }
+
+    void Exec(const std::string& sql) {
+        char* err = nullptr;
+        ASSERT_EQ(sqlite3_exec(facade_->store().db_handle(), sql.c_str(), nullptr, nullptr,
+                               &err),
+                  SQLITE_OK)
+            << (err ? err : "");
+        sqlite3_free(err);
+    }
+
+    DocStatus StatusOf(const std::string& doc_id) {
+        cortrix::CortrixDoc d;
+        EXPECT_EQ(facade_->store().doc_get(doc_id, d), 0);
+        return d.status;
+    }
+
+    std::string Col(const std::string& doc_id, const std::string& column) {
+        sqlite3_stmt* st = nullptr;
+        const std::string sql = "SELECT " + column + " FROM documents WHERE doc_id = ?";
+        EXPECT_EQ(sqlite3_prepare_v2(facade_->store().db_handle(), sql.c_str(), -1, &st,
+                                     nullptr),
+                  SQLITE_OK);
+        sqlite3_bind_text(st, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
+        std::string v = "<no row>";
+        if (sqlite3_step(st) == SQLITE_ROW) {
+            const unsigned char* t = sqlite3_column_text(st, 0);
+            v = t ? reinterpret_cast<const char*>(t) : "<null>";
+        }
+        sqlite3_finalize(st);
+        return v;
+    }
+
+    int Run(const std::string& doc_id) {
+        auto task = MakeTask(txt_path_, "text/plain", doc_id);
+        return pipeline_->Process(*task, *facade_);
+    }
+
+    bool FullTextFinds(const std::string& doc_id) {
+        std::vector<cortrix::SearchResult> hits;
+        // The fixture's parser returns the canned ALPHA/BETA paragraphs, not the file.
+        EXPECT_EQ(facade_->store().search_fulltext("ALPHA", 50, hits), 0);
+        for (const auto& h : hits) {
+            if (h.doc_id == doc_id) return true;
+        }
+        return false;
+    }
+
+    // A task of the type its producer gives it: the upload worker, the importer and the
+    // resume carry the row's type, and the async batch path carries "file".
+    std::unique_ptr<SPCTask> TaskAs(const std::string& doc_id, const std::string& type) {
+        auto task = MakeTask(txt_path_, "text/plain", doc_id);
+        task->source_type = type;
+        return task;
+    }
+
+    // Abort the statement that sets `doc_id` to `status`, as a failed write would.
+    void AbortWhen(const std::string& name, const std::string& doc_id,
+                   const std::string& status) {
+        Exec("CREATE TRIGGER " + name + " BEFORE UPDATE OF status ON documents WHEN OLD.doc_id = '" +
+             doc_id + "' AND NEW.status = '" + status +
+             "' BEGIN SELECT RAISE(ABORT, 'forced'); END");
+    }
+
+    int LiveRows(const std::string& type, const std::string& path) {
+        const std::string sql = "SELECT COUNT(*) FROM documents WHERE source_type = '" + type +
+                                "' AND source_path = '" + path + "' AND status != 'deleted'";
+        return CountSql(sql.c_str());
+    }
+
+    // As the worker runs a task: the processing write, the pipeline, and the error
+    // write after a failed run.
+    int RunAsWorker(SPCTask& task) {
+        facade_->store().doc_update_status(task.doc_id, DocStatus::kProcessing);
+        const int rc = pipeline_->Process(task, *facade_);
+        if (rc != 0 && task.stage.load() == SPCStage::kError) {
+            facade_->store().doc_update_status(task.doc_id, DocStatus::kError,
+                                               task.error_message);
+        }
+        return rc;
+    }
+
+    static constexpr const char* kWithdrawn =
+        "could not mark this version ready, so it was deleted and the earlier version is "
+        "unchanged; add the document again";
+};
+
+// Records the importer's submissions instead of queueing them.
+class RecordingSPC : public SPCManager {
+public:
+    RecordingSPC() : SPCManager() {}
+    Status Submit(std::shared_ptr<SPCTask> t) override {
+        submitted_tasks.push_back(t);
+        return Status::Ok();
+    }
+    int CancelQueuedVersions(const std::string&, const std::string&,
+                             const std::string&) override {
+        return 0;
+    }
+    void Start() override {}
+    void Stop() override {}
+    size_t QueueSize() const override { return 0; }
+    SPCStage GetTaskStage(int64_t) const override { return SPCStage::kQueued; }
+
+    std::vector<std::shared_ptr<SPCTask>> submitted_tasks;
+};
+
+TEST_F(SPCPipelineVersionsTest, ReadyVersionRetiresTheOlderOne) {
+    const std::string v1 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kPending, "2026-10-01T00:00:00.000Z");
+    ASSERT_EQ(Run(v1), 0);
+    ASSERT_EQ(StatusOf(v1), DocStatus::kReady);
+    ASSERT_TRUE(FullTextFinds(v1));  // positive control
+
+    const std::string v2 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kPending, "2026-10-02T00:00:00.000Z");
+    ASSERT_EQ(Run(v2), 0);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kReady);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kDeleted);
+    EXPECT_NE(Col(v1, "deleted_at"), "<null>");
+    EXPECT_EQ(Col(v1, "deleted_from_status"), "ready");
+    EXPECT_FALSE(FullTextFinds(v1));
+    EXPECT_TRUE(FullTextFinds(v2));
+}
+
+TEST_F(SPCPipelineVersionsTest, StrandedErrorVersionIsRetiredToo) {
+    const std::string v1 =
+        CreateVersion("watch_dir", "/w/a.txt", DocStatus::kError, "2026-10-01T00:00:00.000Z");
+    const std::string v2 =
+        CreateVersion("watch_dir", "/w/a.txt", DocStatus::kPending, "2026-10-02T00:00:00.000Z");
+    ASSERT_EQ(Run(v2), 0);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kDeleted);
+    EXPECT_EQ(Col(v1, "deleted_from_status"), "error");
+}
+
+TEST_F(SPCPipelineVersionsTest, NewerVersionIsUntouchedUntilItIsReadyItself) {
+    const std::string v1 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    const std::string v2 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kPending, "2026-10-02T00:00:00.000Z");
+    const std::string v3 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kPending, "2026-10-03T00:00:00.000Z");
+    ASSERT_EQ(Run(v2), 0);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kDeleted);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kReady);
+    EXPECT_EQ(StatusOf(v3), DocStatus::kPending);
+    ASSERT_EQ(Run(v3), 0);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kDeleted);
+    EXPECT_EQ(StatusOf(v3), DocStatus::kReady);
+}
+
+TEST_F(SPCPipelineVersionsTest, VersionDeletedWhileProcessingStaysDeletedAndTheTaskFails) {
+    const std::string v1 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    const std::string v2 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kProcessing, "2026-10-02T00:00:00.000Z");
+    ASSERT_EQ(facade_->store().doc_soft_delete(v2, 1000), 0);  // deleted mid-flight
+
+    auto task = MakeTask(txt_path_, "text/plain", v2);
+    EXPECT_EQ(pipeline_->Process(*task, *facade_), -1);
+    EXPECT_EQ(task->stage.load(), SPCStage::kError);
+    EXPECT_EQ(task->error_code, "CX_ERR_DOC_DELETED");
+    EXPECT_EQ(StatusOf(v2), DocStatus::kDeleted);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kReady);  // nothing was retired
+}
+
+TEST_F(SPCPipelineVersionsTest, EmptyDocumentExitRetiresToo) {
+    const std::string v1 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    const std::string v2 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kPending, "2026-10-02T00:00:00.000Z");
+    cortrix::spc::ParsedDoc empty;  // no pages: one of the empty-document exits
+    auto task = MakeTask("a.txt", "text/plain", v2);
+    ASSERT_EQ(pipeline_->ProcessParsed(empty, *task, *facade_), 0);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kReady);
+    EXPECT_EQ(BlocksOf(v2).size(), 0u);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kDeleted);
+}
+
+TEST_F(SPCPipelineVersionsTest, OtherSourceTypesKeepEveryRowLive) {
+    const std::string f1 =
+        CreateVersion("file", "same.txt", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    const std::string f2 =
+        CreateVersion("file", "same.txt", DocStatus::kPending, "2026-10-02T00:00:00.000Z");
+    ASSERT_EQ(Run(f2), 0);
+    EXPECT_EQ(StatusOf(f1), DocStatus::kReady);
+    EXPECT_EQ(StatusOf(f2), DocStatus::kReady);
+
+    const std::string s1 = CreateVersion("memory_session", "session-1", DocStatus::kReady,
+                                         "2026-10-01T00:00:00.000Z");
+    const std::string s2 = CreateVersion("memory_session", "session-1", DocStatus::kPending,
+                                         "2026-10-02T00:00:00.000Z");
+    auto turn = MakeTask("session-1", "text/plain", s2);
+    turn->source_type = "memory_session";
+    turn->content_hash = "a question\n---\nan answer";
+    ASSERT_EQ(pipeline_->Process(*turn, *facade_), 0);
+    EXPECT_EQ(StatusOf(s1), DocStatus::kReady);
+    EXPECT_EQ(StatusOf(s2), DocStatus::kReady);
+}
+
+// --- a version that cannot be marked ready -------------------------------------------
+
+TEST_F(SPCPipelineVersionsTest, FailedPublicationWithdrawsTheNewVersion) {
+    const std::string v1 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kPending, "2026-10-01T00:00:00.000Z");
+    auto first = TaskAs(v1, "http_upload");
+    ASSERT_EQ(pipeline_->Process(*first, *facade_), 0);
+    ASSERT_EQ(StatusOf(v1), DocStatus::kReady);
+    ASSERT_TRUE(FullTextFinds(v1));  // positive control
+
+    const std::string v2 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kProcessing, "2026-10-02T00:00:00.000Z");
+    AbortWhen("abort_retire", v1, "deleted");
+    auto task = TaskAs(v2, "http_upload");
+    EXPECT_EQ(pipeline_->Process(*task, *facade_), -1);
+    EXPECT_EQ(task->stage.load(), SPCStage::kError);
+    EXPECT_EQ(task->error_message, kWithdrawn);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kDeleted);
+    EXPECT_EQ(Col(v2, "deleted_from_status"), "processing");
+    EXPECT_EQ(Col(v2, "error_message"), kWithdrawn);
+    EXPECT_FALSE(BlocksOf(v2).empty());  // its chunks were stored ...
+    EXPECT_FALSE(FullTextFinds(v2));     // ... and are not served
+    EXPECT_EQ(StatusOf(v1), DocStatus::kReady);
+    EXPECT_TRUE(FullTextFinds(v1));
+    EXPECT_EQ(LiveRows("http_upload", "a.txt"), 1);
+}
+
+TEST_F(SPCPipelineVersionsTest, FailedFirstVersionOrFileRowKeepsTodaysOutcome) {
+    // A first upload: no earlier version to protect.
+    const std::string first =
+        CreateVersion("http_upload", "first.txt", DocStatus::kProcessing,
+                      "2026-10-01T00:00:00.000Z");
+    AbortWhen("abort_first_ready", first, "ready");
+    const std::string message_before = Col(first, "error_message");
+    auto upload = TaskAs(first, "http_upload");
+    EXPECT_EQ(pipeline_->Process(*upload, *facade_), 0);
+    EXPECT_EQ(upload->stage.load(), SPCStage::kDone);
+    EXPECT_EQ(StatusOf(first), DocStatus::kProcessing);
+    EXPECT_EQ(Col(first, "error_message"), message_before);
+
+    // A file row beside an older live file row of the same path.
+    const std::string f1 =
+        CreateVersion("file", "same.txt", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    const std::string f2 =
+        CreateVersion("file", "same.txt", DocStatus::kProcessing, "2026-10-02T00:00:00.000Z");
+    AbortWhen("abort_file_ready", f2, "ready");
+    auto file = TaskAs(f2, "file");
+    EXPECT_EQ(pipeline_->Process(*file, *facade_), 0);
+    EXPECT_EQ(file->stage.load(), SPCStage::kDone);
+    EXPECT_EQ(StatusOf(f2), DocStatus::kProcessing);
+    EXPECT_EQ(StatusOf(f1), DocStatus::kReady);
+}
+
+TEST_F(SPCPipelineVersionsTest, ABatchTaskNeverWithdrawsAnUploadedVersion) {
+    // The async batch path's task carries "file" even when it reuses the id of an
+    // uploaded row; the task's type decides.
+    const std::string v1 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    const std::string v2 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kProcessing, "2026-10-02T00:00:00.000Z");
+    AbortWhen("abort_retire", v1, "deleted");
+    auto task = TaskAs(v2, "file");
+    EXPECT_EQ(pipeline_->Process(*task, *facade_), 0);
+    EXPECT_EQ(task->stage.load(), SPCStage::kDone);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kProcessing);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kReady);
+}
+
+TEST_F(SPCPipelineVersionsTest, AFailedWithdrawKeepsTodaysOutcome) {
+    const std::string v1 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    const std::string v2 =
+        CreateVersion("http_upload", "a.txt", DocStatus::kProcessing, "2026-10-02T00:00:00.000Z");
+    AbortWhen("abort_retire", v1, "deleted");
+    AbortWhen("abort_withdraw", v2, "deleted");
+    const std::string message_before = Col(v2, "error_message");
+    auto task = TaskAs(v2, "http_upload");
+    EXPECT_EQ(pipeline_->Process(*task, *facade_), 0);
+    EXPECT_EQ(task->stage.load(), SPCStage::kDone);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kProcessing);
+    EXPECT_EQ(Col(v2, "error_message"), message_before);  // no error is written
+    EXPECT_EQ(StatusOf(v1), DocStatus::kReady);
+}
+
+// A watched file whose new version was withdrawn comes back as a new version on its
+// next event, not by reprocessing the withdrawn row in place.
+TEST_F(SPCPipelineVersionsTest, AWithdrawnWatchedVersionIsNotReprocessedInPlace) {
+    const std::filesystem::path watch = tmp_root_ / "watch";
+    std::filesystem::create_directories(watch);
+    WatchDirConfig cfg;
+    cfg.data_dir = watch.string();
+    cfg.namespace_name = "test-ns";
+    cfg.watch_enabled = true;
+    cfg.allowed_extensions = {};  // every extension
+    RecordingSPC spc;
+    DirectoryImporter importer(cfg, *pool_, spc);
+    ASSERT_TRUE(importer.Start().ok());
+
+    const std::filesystem::path file = watch / "a.txt";
+    { std::ofstream(file) << "content A"; }
+    FileEvent event;
+    event.type = FileEventType::kCreated;
+    event.path = std::filesystem::canonical(file).string();
+    importer.HandleFileEvents({event});
+    ASSERT_EQ(spc.submitted_tasks.size(), 1u);
+    const std::string v1 = spc.submitted_tasks[0]->doc_id;
+    ASSERT_EQ(RunAsWorker(*spc.submitted_tasks[0]), 0);
+    ASSERT_EQ(StatusOf(v1), DocStatus::kReady);
+
+    { std::ofstream(file) << "content B"; }
+    event.type = FileEventType::kModified;
+    importer.HandleFileEvents({event});
+    ASSERT_EQ(spc.submitted_tasks.size(), 2u);
+    const std::string v2 = spc.submitted_tasks[1]->doc_id;
+    ASSERT_NE(v2, v1);
+    AbortWhen("abort_retire", v1, "deleted");
+    EXPECT_EQ(RunAsWorker(*spc.submitted_tasks[1]), -1);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kDeleted);
+    Exec("DROP TRIGGER abort_retire");
+
+    // The same content again, as the file's next event brings it.
+    importer.HandleFileEvents({event});
+    ASSERT_EQ(spc.submitted_tasks.size(), 3u) << "the event submitted nothing";
+    const std::string v3 = spc.submitted_tasks[2]->doc_id;
+    EXPECT_NE(v3, v2) << "the withdrawn row was reprocessed in place";
+    EXPECT_NE(v3, v1);
+    EXPECT_EQ(Col(v3, "content_hash"), Col(v2, "content_hash"));
+    EXPECT_EQ(StatusOf(v3), DocStatus::kPending);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kReady);
 }
 
 }  // namespace

@@ -103,7 +103,9 @@ nlohmann::json DocumentTaskHandler::BuildProgressBody(const TaskInfo& task) {
     nlohmann::json meta;
     meta["worker_id"] = task.worker_id;
     meta["current_phase"] = task.current_phase;
-    meta["retryable_if_fail"] = true;  // async parse path is retryable by default
+    // A task whose document is deleted fails the same way on every retry; other
+    // failures still report true.
+    meta["retryable_if_fail"] = !(failed && task.error_code == "CX_ERR_DOC_DELETED");
     meta["agent_decision_hint"] = hint;
     // estimated_finish_at: filled when a real ETA exists (eta_seconds >= 0);
     // otherwise null (the streaming-ETA clock is wired in D3.5, §4.5 note).

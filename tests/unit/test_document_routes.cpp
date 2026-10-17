@@ -35,6 +35,9 @@ class StubSPCManager : public SPCManager {
 public:
     StubSPCManager() : SPCManager() {}
     Status Submit(std::shared_ptr<SPCTask>) override { return Status::Ok(); }
+    // Every submission is accepted and none is processed, so every pending version
+    // still has its task queued.
+    bool HasQueuedTask(const std::string&) const override { return true; }
     int CancelQueuedVersions(const std::string&, const std::string&,
                              const std::string&) override {
         return 0;
@@ -282,6 +285,7 @@ TEST_F(DocumentRoutesTest, UploadDuplicateSkipped) {
     auto body2 = json::parse(res2->body);
     EXPECT_EQ(body2["status"], "skipped");
     EXPECT_TRUE(body2.contains("message"));
+    EXPECT_FALSE(body2.contains("superseded_doc_id"));
 }
 
 TEST_F(DocumentRoutesTest, UploadContentChanged) {
@@ -293,6 +297,8 @@ TEST_F(DocumentRoutesTest, UploadContentChanged) {
     auto res1 = cli.Post("/api/v1/namespaces/default/documents", AuthHeaders(), items1);
     ASSERT_TRUE(res1);
     EXPECT_EQ(res1->status, 201);
+    const auto body1 = json::parse(res1->body);
+    EXPECT_FALSE(body1.contains("superseded_doc_id"));
 
     httplib::MultipartFormDataItems items2 = {
         {"file", "Version 2 different content", "changeme.txt", "text/plain"},
@@ -303,6 +309,7 @@ TEST_F(DocumentRoutesTest, UploadContentChanged) {
 
     auto body2 = json::parse(res2->body);
     EXPECT_EQ(body2["status"], "updating");
+    EXPECT_EQ(body2["superseded_doc_id"], body1["doc_id"]);
 }
 
 TEST_F(DocumentRoutesTest, UploadWithOptionalTitle) {

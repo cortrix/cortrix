@@ -70,7 +70,24 @@ paths:
       description: |
         Restore soft-deleted documents (ops). Only documents still inside the soft-delete retention
         window (gc.soft_delete_retention_days) are recoverable; purged/expired documents cannot be
-        restored. Partial success per document_id (PartialSuccessById).
+        restored. Partial success per document_id (PartialSuccessById). Each failed entry carries a
+        message.
+
+        Two refusals keep a restore from bringing back the wrong content:
+        - CX_ERR_GC_RESTORE_SUPERSEDED: another version of the same uploaded file or watched file
+          is live. structured_data.live_doc_id names it (the newest live version) and
+          structured_data.namespace its namespace: delete it there, then restore again. The refusal
+          repeats while any other version stays live. A restored older version of a watched file
+          lasts only until the next scan or file event, while the file's content differs from it.
+        - CX_ERR_GC_RESTORE_INCOMPLETE: the version never finished processing (it was deleted while
+          pending, processing or failed), so restoring it would bring back partial or no content.
+          structured_data.namespace names its namespace; add the document again instead. In a
+          namespace created by an earlier version, a version that never finished processing is
+          still restored as ready; the refusal while another version is live applies there too.
+
+        Every failed entry is permanent and not retryable, matching the operation's
+        x-cortrix-retryable: false, except CX_ERR_GC_RESTORE_CHECK_FAILED: the check could not run,
+        and the same request can succeed when it is retried.
       x-cortrix-agent-workflow: ops
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
