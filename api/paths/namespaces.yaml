@@ -168,7 +168,9 @@ paths:
       summary: Audit and backfill chunk enrichment
       description: |
         Operator entry point for the chunk-level enrichment ledger (Admin+).
-        With `audit` on (the default) the namespace's chunks are compared against the
+        With `audit` on (the default), contextual index entries for chunks the ingest
+        excludes (skip-index chunks, documents below the full processing level) are
+        removed first. Then the namespace's chunks are compared against the
         configured enricher chain: chunks missing an artifact get a pending ledger row,
         and rows that gave up although every configured artifact is now present are
         settled. With `reset_given_up` on, every row that gave up and whose chunk still
@@ -182,6 +184,13 @@ paths:
         two boolean fields, otherwise the request is rejected with
         `CX_ERR_ENRICH_BACKFILL_INVALID_BODY`. When no enricher chain is configured the
         request is rejected with `CX_ERR_ENRICH_BACKFILL_NOT_CONFIGURED`.
+        When the audit or the reset fails, the error carries `structured_data.removed`:
+        the number of contextual index entries this request removed before the
+        failure, 0 when it removed none. Those removals stay in place: the failure does
+        not undo them, and a later request removes what remains and reports only that.
+        A request that fails before the audit starts, for example because the
+        namespace's store cannot be opened, carries no `removed`, and nothing was
+        removed.
       x-cortrix-agent-workflow: admin
       x-cortrix-retryable: false
       x-cortrix-retry-strategy: no_retry
@@ -216,7 +225,7 @@ paths:
                   namespace: { type: string }
                   audited: { type: boolean, description: whether the audit step ran }
                   reset_given_up: { type: boolean, description: whether the reset step ran }
-                  removed: { type: integer, description: contextual index entries removed by the audit for chunks the ingest excludes }
+                  removed: { type: integer, description: contextual index entries removed by this request for chunks the ingest excludes }
                   synthesized: { type: integer, description: ledger rows created or re-owed by the audit }
                   settled: { type: integer, description: rows that had given up but are complete, settled by the audit }
                   reset: { type: integer, description: rows that had given up, moved back to pending by the reset }
@@ -234,3 +243,5 @@ paths:
         '401': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
         '403': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
         '404': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '500': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }
+        '503': { $ref: '../components/errors.yaml#/components/responses/ErrorResponseV1' }

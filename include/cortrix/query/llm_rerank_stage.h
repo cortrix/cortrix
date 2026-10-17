@@ -1,5 +1,7 @@
 #pragma once
+#include <chrono>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -53,8 +55,15 @@ public:
 
     /// Listwise-rerank the head of `resp->results` against `original_query`.
     /// In-place; see class contract. Total — never throws.
+    /// `deadline` is the request's, when it has a budget. Below the client's floor of
+    /// time left the stage makes no further call: that vote counts as failed with
+    /// "budget_exhausted" and is not counted in llm_calls, so a window left without
+    /// any vote degrades the stage as any failed window does. Each call that is made
+    /// carries the deadline, which bounds its attempts.
     ExplainState Apply(CrossNsResponse* resp, const std::string& original_query,
-                       const LlmRerankConfig& cfg);
+                       const LlmRerankConfig& cfg,
+                       std::optional<std::chrono::steady_clock::time_point> deadline =
+                           std::nullopt);
 
     // ---- testing seams (pure helpers) ----
 

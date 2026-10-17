@@ -22,6 +22,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <memory>
@@ -1044,6 +1045,240 @@ TEST(ParentExpansionControlsTest, NegativeBoundsAreRejected) {
     EXPECT_FALSE(ValidateParentExpansion(true, -1, 0).ok());
     EXPECT_FALSE(ValidateParentExpansion(false, -1, 0).ok());
     EXPECT_FALSE(ValidateParentExpansion(true, 2, -1).ok());
+}
+
+
+// --- Teardown while a namespace task is still running ---------------------------
+//
+// The multi-namespace join stops waiting for a namespace after its wait limit, but the
+// task keeps running on the wiring's workers and goes on to use the executor and the
+// reranker. Destroying the wiring must wait for it with all of those still alive. The
+// old destructor deleted the reranker first and joined the workers last, so the task
+// read freed memory once it continued; under AddressSanitizer this test then fails.
+TEST(QueryWiringShutdownTest, TeardownWaitsForATaskTheJoinStoppedWaitingFor) {
+    using cortrix::doc_summary::test::DiscoveryPoolHarness;
+    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    auto harness = std::make_unique<DiscoveryPoolHarness>(
+        std::filesystem::temp_directory_path() /
+        ("query_wiring_teardown_" + std::to_string(stamp)));
+    const std::string kHeld = "teardown-held-ns";
+    const std::string kOther = "teardown-other-ns";
+    ASSERT_TRUE(harness->Admit(kOther).ok());
+    ASSERT_TRUE(harness->Admit(kHeld).ok());
+
+    // Two chunks in the held namespace, so its task reaches the rerank after the hold.
+    std::vector<std::pair<uint64_t, float>> hits;
+    harness->WithStore(kHeld, [&](cortrix::CortrixStore& store) {
+        for (int i = 1; i <= 2; ++i) {
+            const std::string n = std::to_string(i);
+            cortrix::CortrixDoc d;
+            d.source_type = "unit";
+            d.source_path = "teardown-" + n + ".md";
+            ASSERT_EQ(store.doc_create(d), 0);
+            cortrix::CortrixBlock b;
+            b.doc_id = d.doc_id;
+            b.chunk_index = 0;
+            b.block_type = cortrix::kBlockFile;
+            b.processing_level = cortrix::kLevelL2;
+            b.child_id = "01HXTEARDOWNHELD000000000" + n;
+            b.block_id = cortrix::id::HashChildIdToBlockId(b.child_id);
+            b.content_text = "semantic memory teardown marker " + n;
+            b.data = cortrix::BlockBuild(cortrix::kBlockFile, cortrix::kLevelL2,
+                                         b.content_text, "", "", 0, 0);
+            ASSERT_EQ(store.block_insert(b), 0);
+            hits.push_back({b.block_id, 0.1f * i});
+        }
+    });
+    auto* held_index = harness->fake_index();
+    ASSERT_NE(held_index, nullptr);
+    held_index->set_search_result(hits);
+    std::atomic<bool> hold{true};
+    std::atomic<int> entered{0};
+    held_index->set_search_hold(&hold, &entered);
+
+    cortrix::OnnxEmbedder embedder("", 128);
+    ASSERT_TRUE(embedder.Init().ok());
+    RRFFusion fusion(60);
+    cortrix::tenant::PermissionService permission(nullptr);
+    auto llm = std::make_shared<NiceMock<cortrix::llm::MockLlmClient>>();
+    ApiKeyAuth auth;
+    auth.set_enabled(false);
+    httplib::Server server;
+    auto wiring = std::make_unique<CrossNsQueryWiring>(
+        harness->ipool(), embedder, fusion, permission, /*sparse_registry=*/nullptr, llm,
+        /*engine_instr=*/nullptr, /*reranker_model_dir=*/"",
+        /*query_complexity_model_dir=*/"/definitely/missing/query-complexity",
+        /*candidate_multiplier=*/3, /*max_candidates=*/50,
+        /*reranker_execution_provider=*/"cpu");
+    ASSERT_TRUE(wiring->IsReady());
+    wiring->Register(server, auth);
+    const int port = server.bind_to_any_port("127.0.0.1");
+    ASSERT_GT(port, 0);
+    std::thread listen_thread([&] { server.listen_after_bind(); });
+
+    // The held namespace comes first, so the join waits out its limit on it and then
+    // answers without it.
+    httplib::Client client("127.0.0.1", port);
+    client.set_read_timeout(60, 0);
+    const json body = {{"query", "semantic memory teardown marker"},
+                       {"namespaces", json::array({kHeld, kOther})},
+                       {"granularity", "chunk"},
+                       {"top_k", 2}};
+    auto res = client.Post("/api/v1/query", body.dump(), "application/json");
+    ASSERT_TRUE(res);
+    EXPECT_EQ(entered.load(), 1) << "the held namespace's search must be the one waiting";
+
+    // As in production: the server stops, then the wiring is destroyed while the task
+    // the join stopped waiting for is still held.
+    server.stop();
+    listen_thread.join();
+    std::atomic<bool> destroyed{false};
+    std::thread destroyer([&] {
+        wiring.reset();
+        destroyed = true;
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    EXPECT_FALSE(destroyed.load()) << "teardown must wait for the running task";
+    hold = false;
+    destroyer.join();
+    EXPECT_TRUE(destroyed.load());
+}
+
+// --- #173: the request's budget at the served route --------------------------------
+//
+// The served query route over two namespaces, the first of which can hold its search.
+// Torn down in production's order: the hold is released, the server stops, and the
+// wiring is destroyed, which joins any task the join stopped waiting for.
+class BudgetRoute {
+public:
+    static constexpr const char* kHeld = "budget-held-ns";
+    static constexpr const char* kOther = "budget-other-ns";
+
+    BudgetRoute() {
+        const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+        harness_ = std::make_unique<cortrix::doc_summary::test::DiscoveryPoolHarness>(
+            std::filesystem::temp_directory_path() /
+            ("query_budget_route_" + std::to_string(stamp)));
+        EXPECT_TRUE(harness_->Admit(kOther).ok());
+        EXPECT_TRUE(harness_->Admit(kHeld).ok());  // the most recently opened index
+        std::vector<std::pair<uint64_t, float>> hits;
+        harness_->WithStore(kHeld, [&](cortrix::CortrixStore& store) {
+            for (int i = 1; i <= 2; ++i) {
+                const std::string n = std::to_string(i);
+                cortrix::CortrixDoc d;
+                d.source_type = "unit";
+                d.source_path = "budget-" + n + ".md";
+                EXPECT_EQ(store.doc_create(d), 0);
+                cortrix::CortrixBlock b;
+                b.doc_id = d.doc_id;
+                b.chunk_index = 0;
+                b.block_type = cortrix::kBlockFile;
+                b.processing_level = cortrix::kLevelL2;
+                b.child_id = "01HXBUDGETROUTEHELD000000" + n;
+                b.block_id = cortrix::id::HashChildIdToBlockId(b.child_id);
+                b.content_text = "semantic memory budget marker " + n;
+                b.data = cortrix::BlockBuild(cortrix::kBlockFile, cortrix::kLevelL2,
+                                             b.content_text, "", "", 0, 0);
+                EXPECT_EQ(store.block_insert(b), 0);
+                hits.push_back({b.block_id, 0.1f * i});
+            }
+        });
+        harness_->fake_index()->set_search_result(hits);
+        EXPECT_TRUE(embedder_.Init().ok());
+        auth_.set_enabled(false);
+        wiring_ = std::make_unique<CrossNsQueryWiring>(
+            harness_->ipool(), embedder_, fusion_, permission_, /*sparse_registry=*/nullptr,
+            llm_, /*engine_instr=*/nullptr, /*reranker_model_dir=*/"",
+            /*query_complexity_model_dir=*/"/definitely/missing/query-complexity",
+            /*candidate_multiplier=*/3, /*max_candidates=*/50,
+            /*reranker_execution_provider=*/"cpu");
+        EXPECT_TRUE(wiring_->IsReady());
+        wiring_->Register(server_, auth_);
+        port_ = server_.bind_to_any_port("127.0.0.1");
+        EXPECT_GT(port_, 0);
+        listen_ = std::thread([this] { server_.listen_after_bind(); });
+    }
+
+    ~BudgetRoute() {
+        hold_ = false;
+        server_.stop();
+        if (listen_.joinable()) listen_.join();
+        wiring_.reset();
+    }
+
+    void HoldTheFirstNamespacesSearch() {
+        harness_->fake_index()->set_search_hold(&hold_, &entered_);
+    }
+    int held_searches() const { return entered_.load(); }
+
+    httplib::Result Post(const json& body) {
+        httplib::Client client("127.0.0.1", port_);
+        client.set_read_timeout(60, 0);
+        return client.Post("/api/v1/query", body.dump(), "application/json");
+    }
+
+private:
+    std::unique_ptr<cortrix::doc_summary::test::DiscoveryPoolHarness> harness_;
+    cortrix::OnnxEmbedder embedder_{"", 128};
+    RRFFusion fusion_{60};
+    cortrix::tenant::PermissionService permission_{nullptr};
+    std::shared_ptr<NiceMock<cortrix::llm::MockLlmClient>> llm_ =
+        std::make_shared<NiceMock<cortrix::llm::MockLlmClient>>();
+    ApiKeyAuth auth_;
+    httplib::Server server_;
+    std::unique_ptr<CrossNsQueryWiring> wiring_;
+    std::thread listen_;
+    int port_ = 0;
+    std::atomic<bool> hold_{true};
+    std::atomic<int> entered_{0};
+};
+
+// A budget of 100 ms with the first namespace's search held: 200 with the partial
+// result signal, well before the 5000 ms per-namespace limit would have answered, and
+// the held search is the one the join stopped waiting for. "chunk" keeps the document
+// branch, which would reach the hold a second time, out of it.
+TEST(QueryWiringBudgetTest, BudgetCutsAHeldNamespaceAndAnswersWithThePartialSignal) {
+    BudgetRoute route;
+    route.HoldTheFirstNamespacesSearch();
+    const auto t0 = std::chrono::steady_clock::now();
+    auto res = route.Post({{"query", "semantic memory budget marker"},
+                           {"namespaces", json::array({BudgetRoute::kHeld, BudgetRoute::kOther})},
+                           {"granularity", "chunk"},
+                           {"top_k", 2},
+                           {"timeout_ms", 100}});
+    const auto waited = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - t0)
+                            .count();
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 200) << res->body;
+    EXPECT_LT(waited, 3000) << "the join waited for the per-namespace limit, not the budget";
+    const json j = json::parse(res->body);
+    ASSERT_TRUE(j.contains("error")) << res->body;
+    EXPECT_EQ(j["error"]["code"], "CX_ERR_SCATTER_TIMEOUT");
+    bool held_failed = false;
+    for (const auto& f : j["meta"]["namespaces_failed"]) {
+        if (f["namespace"] == BudgetRoute::kHeld) {
+            held_failed = true;
+            EXPECT_EQ(f["error_code"], "CX_ERR_NS_TIMEOUT");
+        }
+    }
+    EXPECT_TRUE(held_failed) << res->body;
+    EXPECT_EQ(route.held_searches(), 1);
+}
+
+// An out-of-range budget is a 400 with the code the specification names, at the route.
+TEST(QueryWiringBudgetTest, OutOfRangeBudgetIsABadRequestAtTheRoute) {
+    BudgetRoute route;
+    for (const json& value : {json(4294967396LL), json(99), json("2000")}) {
+        SCOPED_TRACE(value.dump());
+        auto res = route.Post({{"query", "semantic memory budget marker"},
+                               {"namespaces", json::array({BudgetRoute::kOther})},
+                               {"timeout_ms", value}});
+        ASSERT_TRUE(res);
+        EXPECT_EQ(res->status, 400) << res->body;
+        const json j = json::parse(res->body);
+        EXPECT_EQ(j["error"]["code"], "CX_ERR_BAD_REQUEST") << res->body;
+    }
 }
 
 }  // namespace

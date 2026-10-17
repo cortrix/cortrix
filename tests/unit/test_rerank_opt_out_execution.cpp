@@ -18,8 +18,10 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <chrono>
 #include <filesystem>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "cortrix/query/live_single_unit_executor.h"
@@ -183,6 +185,89 @@ TEST_F(RerankOptOutExecutionFx, EnabledRerankReordersByRerankerScore) {
 
     EXPECT_EQ(ChildIds(result), (std::vector<std::string>{"chunk-c", "chunk-b", "chunk-a"}))
         << "rerank=true must return the reranker's ordering, not the retrieval one";
+}
+
+// #173: once the request's deadline has passed, the executor stops at its next stage
+// boundary. With a deadline already past, every path returns the namespace's timeout
+// row before its first stage, so the reranker is never reached. The control runs the
+// same call without a deadline: no error, and the chunk and hybrid paths reach the
+// reranker, so both observations would change if the deadline were ignored.
+std::vector<float> HalfScores(const char*, const std::vector<const char*>& passages) {
+    return std::vector<float>(passages.size(), 0.5f);
+}
+
+TEST_F(RerankOptOutExecutionFx, PassedDeadlineStopsEveryPathBeforeItsFirstStage) {
+    for (const char* granularity : {"chunk", "doc", "auto"}) {
+        SCOPED_TRACE(granularity);
+        const bool reaches_reranker = std::string(granularity) != "doc";
+        {
+            reranker::MockReranker rr;
+            if (reaches_reranker) {
+                EXPECT_CALL(rr, ScoreBatch(_, _))
+                    .Times(::testing::AtLeast(1))
+                    .WillRepeatedly(HalfScores);
+            } else {
+                EXPECT_CALL(rr, ScoreBatch(_, _)).Times(0);
+            }
+            LiveSingleUnitExecutor exec(harness_->ipool(), embedder_, fusion_, &rr);
+            QueryContext ctx = MakeCtx(/*rerank=*/true);
+            ctx.granularity = granularity;
+            const auto control = exec.ExecuteForNamespace(ctx, kNs);
+            ASSERT_TRUE(control.error_code.empty()) << "control: " << control.error_code;
+        }
+        reranker::MockReranker rr;
+        EXPECT_CALL(rr, ScoreBatch(_, _)).Times(0);
+        LiveSingleUnitExecutor exec(harness_->ipool(), embedder_, fusion_, &rr);
+        QueryContext ctx = MakeCtx(/*rerank=*/true);
+        ctx.granularity = granularity;
+        ctx.deadline = std::chrono::steady_clock::now() - std::chrono::milliseconds(1);
+        const auto result = exec.ExecuteForNamespace(ctx, kNs);
+        EXPECT_EQ(result.error_code, "CX_ERR_NS_TIMEOUT");
+        EXPECT_EQ(result.error_category, "timeout");
+        EXPECT_TRUE(result.retryable);
+        EXPECT_EQ(result.retry_after_ms, 1000);
+        EXPECT_TRUE(result.chunks.empty());
+    }
+}
+
+// On the hybrid path, when only the document branch is cut, the namespace returns the
+// chunk branch's results and is not marked failed. The reranker runs past the
+// deadline, so the chunk branch finishes and the document branch stops at its
+// acquire; nothing in the result marks the cut. The evidence that the document
+// branch did not run: with both branches the results are fused and each carries
+// "hybrid_paths" (the control); here they are the chunk branch's own, unfused.
+TEST_F(RerankOptOutExecutionFx, HybridPathKeepsTheChunkResultsWhenOnlyTheDocumentBranchIsCut) {
+    {
+        reranker::MockReranker rr;
+        EXPECT_CALL(rr, ScoreBatch(_, _)).WillRepeatedly(HalfScores);
+        LiveSingleUnitExecutor exec(harness_->ipool(), embedder_, fusion_, &rr);
+        QueryContext ctx = MakeCtx(/*rerank=*/true);
+        ctx.granularity = "auto";
+        const auto control = exec.ExecuteForNamespace(ctx, kNs);
+        ASSERT_FALSE(control.chunks.empty());
+        for (const auto& c : control.chunks) {
+            ASSERT_EQ(c.metadata.count("hybrid_paths"), 1u)
+                << "precondition: both branches ran and were fused";
+        }
+    }
+    reranker::MockReranker rr;
+    EXPECT_CALL(rr, ScoreBatch(_, _))
+        .Times(::testing::AtLeast(1))
+        .WillRepeatedly([](const char* q, const std::vector<const char*>& passages) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+            return HalfScores(q, passages);
+        });
+    LiveSingleUnitExecutor exec(harness_->ipool(), embedder_, fusion_, &rr);
+    QueryContext ctx = MakeCtx(/*rerank=*/true);
+    ctx.granularity = "auto";
+    ctx.deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(150);
+    const auto result = exec.ExecuteForNamespace(ctx, kNs);
+    EXPECT_TRUE(result.error_code.empty()) << result.error_code;
+    ASSERT_EQ(result.chunks.size(), 3u);
+    for (const auto& c : result.chunks) {
+        EXPECT_EQ(c.metadata.count("hybrid_paths"), 0u)
+            << "the document branch ran; it should have stopped at its acquire";
+    }
 }
 
 }  // namespace

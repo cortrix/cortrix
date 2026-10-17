@@ -62,7 +62,9 @@ std::string DegradeReasonToken(const Status& status) {
     auto has = [&](const char* k) { return m.find(k) != std::string::npos; };
     // Prefer generic transport/client diagnostics when present. Otherwise a
     // transport/auth/HTTP failure wrapped as CX_ERR_RAG_FUSION_LLM_TIMEOUT would
-    // be indistinguishable from a true deadline in benchmark explain output.
+    // be indistinguishable from a true deadline in benchmark explain output. First of
+    // all, a call that stopped because the request's budget was spent.
+    if (has("CX_LLM_BUDGET_EXHAUSTED")) return "budget_exhausted";
     if (has("CX_LLM_TRANSPORT")) return "llm_transport";
     if (has("CX_LLM_RATE_LIMIT")) return "quota_exceeded";
     if (has("CX_LLM_BAD_BODY")) return "invalid_response";
@@ -134,8 +136,7 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
     //   if (qctx && QueryComplexityClassifier::ShouldSkipF36(*qctx)) {
     //       explain_.reason = "skipped_by_F39_routing"; ... return {query};
     //   }
-    // Until then qctx is accepted + threaded but does not alter behavior.
-    (void)qctx;
+    // Until then qctx carries only the request's deadline into variant generation.
     (void)trace_ctx;  // §9: TraceContext interface-reserved in V1.0 OSS (always null)
 
     // topic 3: NS disabled → no LLM call, single query (§4.3).
@@ -149,7 +150,8 @@ Result<std::vector<std::string>> RagFusion::ExpandQueries(
     // Generate variants via the LLM (§4.2). Time the call for the explain latency.
     const auto t0 = std::chrono::steady_clock::now();
     Result<QueryVariants> gen = generator_->Generate(
-        query, ns_config, ns_config.locale, trace_ctx);
+        query, ns_config, ns_config.locale, trace_ctx,
+        qctx != nullptr ? qctx->deadline : std::nullopt);
     const auto t1 = std::chrono::steady_clock::now();
     const int latency_ms = static_cast<int>(
         std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());

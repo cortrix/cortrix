@@ -104,6 +104,11 @@ RagFusionErrorCode ClassifyLlmFailure(const Status& status) {
         }
     };
 
+    // First: a call that stopped because the request's budget was spent keeps the
+    // timeout identity, whatever substrings (such as "rate") its detail holds.
+    if (has("cx_llm_budget_exhausted")) {
+        return RagFusionErrorCode::kLlmTimeout;
+    }
     if (has("circuit") || has("cx_err_rag_fusion_llm_circuit_open")) {
         return RagFusionErrorCode::kLlmCircuitOpen;
     }
@@ -140,6 +145,9 @@ RagFusionMetrics::DegradeReason ToDegradeReason(RagFusionErrorCode code,
     if (llm_status != nullptr) {
         const std::string msg = ToLower(llm_status->message());
         auto has = [&](const char* k) { return msg.find(k) != std::string::npos; };
+        if (has("cx_llm_budget_exhausted")) {
+            return RagFusionMetrics::DegradeReason::kBudgetExhausted;
+        }
         if (has("cx_llm_transport")) return RagFusionMetrics::DegradeReason::kLlmTransport;
         if (has("cx_llm_rate_limit")) return RagFusionMetrics::DegradeReason::kQuotaExceeded;
         if (has("cx_llm_bad_body")) return RagFusionMetrics::DegradeReason::kInvalidResponse;
@@ -285,7 +293,8 @@ Result<QueryVariants> QueryVariantGenerator::Generate(
     const std::string& original_query,
     const RagFusionConfig& config,
     const std::string& locale,
-    const observability::TraceContext* ctx) {
+    const observability::TraceContext* ctx,
+    std::optional<std::chrono::steady_clock::time_point> deadline) {
     // [R7] No LLM configured (CE OSS default) → cannot expand. Degrade to single
     // query instead of dereferencing a null llm_ (defense-in-depth: the F36 gate in
     // query_wiring already skips rag-fusion when no LLM is available, but this guard
@@ -325,6 +334,7 @@ Result<QueryVariants> QueryVariantGenerator::Generate(
     // emitted — E-v2 measured 53/120 degrades with glm-4.5-air until this was
     // disabled. Variant expansion wants the schema'd answer, not CoT.
     call.thinking_type = "disabled";
+    call.deadline = deadline;  // the request's budget bounds the call's attempts
 
     llm::ChatCompletionResponse resp = llm_->Chat(prompt, call);
     if (!resp.ok()) {

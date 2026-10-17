@@ -406,14 +406,22 @@ Status SettleTerminalRow(sqlite3* db, uint64_t block_id, int64_t now_unix) {
 
 }  // namespace
 
-Result<int> ReconcileExcludedContextualLabels(
+ReconcileOutcome ReconcileExcludedContextualLabels(
     sqlite3* db, const std::function<Status(uint64_t label)>& mark_point_deleted) {
-    if (!db) return Status::InvalidArgument("ReconcileExcludedContextualLabels: null db");
+    ReconcileOutcome out;
+    if (!db) {
+        out.status = Status::InvalidArgument("ReconcileExcludedContextualLabels: null db");
+        return out;
+    }
     if (!mark_point_deleted) {
-        return Status::InvalidArgument("ReconcileExcludedContextualLabels: null callback");
+        out.status = Status::InvalidArgument("ReconcileExcludedContextualLabels: null callback");
+        return out;
     }
     auto levels = LoadDocumentLevels(db);
-    if (!levels.ok()) return levels.status();
+    if (!levels.ok()) {
+        out.status = levels.status();
+        return out;
+    }
 
     // Collect first, act afterwards: no DELETE while the SELECT is stepping. The
     // mark is read with the same SQL predicate the audit's pass 3 uses; the join
@@ -428,7 +436,7 @@ Result<int> ReconcileExcludedContextualLabels(
             " ORDER BY l.label";
         if (sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) {
             // No labels table (isolated pre-V2 store or fixture): nothing to remove.
-            return 0;
+            return out;
         }
         int rc = SQLITE_OK;
         while ((rc = sqlite3_step(st)) == SQLITE_ROW) {
@@ -441,18 +449,28 @@ Result<int> ReconcileExcludedContextualLabels(
             }
         }
         sqlite3_finalize(st);
-        if (rc != SQLITE_DONE) return SqlErr(db, "reconcile labels scan");
+        if (rc != SQLITE_DONE) {
+            out.status = SqlErr(db, "reconcile labels scan");
+            return out;
+        }
     }
 
-    int removed = 0;
     for (const Excluded& e : excluded) {
         Status mark = mark_point_deleted(e.label);
-        if (!mark.ok()) return mark;  // the row stays; the next audit retries it
-        Status del = DeleteContextualVecLabel(db, e.label);
-        if (!del.ok()) return del;
-        ++removed;
+        if (!mark.ok()) {  // the row stays; the next audit retries it
+            out.status = mark;
+            return out;
+        }
+        Result<bool> del = DeleteContextualVecLabel(db, e.label);
+        if (!del.ok()) {
+            out.status = del.status();
+            return out;
+        }
+        // Only a row this call deleted counts: another audit that removed it first
+        // reports it itself, so concurrent audits never report the same row twice.
+        if (del.value()) ++out.removed;
     }
-    return removed;
+    return out;
 }
 
 Result<int> SynthesizeEnrichAuditRows(

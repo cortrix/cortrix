@@ -204,5 +204,46 @@ TEST(CrossNsQueryHandlerTest, TopKOutsideTheRangeIsRejectedEvenWhenItWouldWrap) 
     }
 }
 
+// #173: timeout_ms is the query's budget. Absent and null both mean no budget (a guard:
+// it holds before the budget exists too).
+TEST(CrossNsQueryHandlerParseTest, AbsentOrNullTimeoutMeansNoBudget) {
+    for (const char* raw : {R"({"query":"q","namespaces":["ns"]})",
+                            R"({"query":"q","namespaces":["ns"],"timeout_ms":null})"}) {
+        SCOPED_TRACE(raw);
+        QueryRequest req;
+        ASSERT_TRUE(CrossNsQueryHandler::ParseRequest(nlohmann::json::parse(raw), &req).ok());
+        EXPECT_FALSE(req.timeout_ms.has_value());
+    }
+}
+
+TEST(CrossNsQueryHandlerParseTest, TimeoutBoundsAreAccepted) {
+    for (int t : {100, 30000}) {
+        const nlohmann::json body = {{"query", "q"}, {"namespaces", {"ns"}}, {"timeout_ms", t}};
+        QueryRequest req;
+        ASSERT_TRUE(CrossNsQueryHandler::ParseRequest(body, &req).ok());
+        ASSERT_TRUE(req.timeout_ms.has_value());
+        EXPECT_EQ(*req.timeout_ms, t);
+    }
+}
+
+// Anything that is not an integer in [100, 30000] is a 400 with the code the
+// specification names, never ignored: an integer that would wrap into the range when
+// narrowed (4294967396 is 100 modulo 2^32), a string, a float, an in-range float and a
+// boolean included. The request never reaches a namespace.
+TEST(CrossNsQueryHandlerTest, TimeoutThatIsNotAnIntegerInRangeIsABadRequest) {
+    Harness h({"ns"});
+    EXPECT_CALL(h.executor, ExecuteForNamespace(_, _, _)).Times(0);
+    for (const char* raw : {"99", "30001", "4294967396", "\"2000\"", "2.5", "1500.5", "true"}) {
+        SCOPED_TRACE(raw);
+        const nlohmann::json body = nlohmann::json::parse(
+            std::string(R"({"query":"q","namespaces":["ns"],"timeout_ms":)") + raw + "}");
+        HandlerResult r = h.handler.Handle(body, Auth());
+        EXPECT_EQ(r.status, 400);
+        EXPECT_EQ(r.body["error"]["code"], "CX_ERR_BAD_REQUEST");
+        EXPECT_EQ(r.body["error"]["message"],
+                  "'timeout_ms' must be an integer between 100 and 30000");
+    }
+}
+
 }  // namespace
 }  // namespace cortrix::query

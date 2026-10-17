@@ -1,5 +1,7 @@
 #pragma once
+#include <chrono>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -50,11 +52,14 @@ public:
     /// @param config         the resolved NS config (variant_count / strategies / timeout)
     /// @param locale         prompt locale ("zh" default, "en" for English corpora such as BEIR)
     /// @param ctx            optional TraceContext (V1.0 OSS always nullptr; §9)
+    /// @param deadline       the request's deadline when it has a budget; the LLM call
+    ///                       carries it, so its attempts are bounded by the time left
     Result<QueryVariants> Generate(
         const std::string& original_query,
         const RagFusionConfig& config,
         const std::string& locale = "zh",
-        const observability::TraceContext* ctx = nullptr);
+        const observability::TraceContext* ctx = nullptr,
+        std::optional<std::chrono::steady_clock::time_point> deadline = std::nullopt);
 
     /// Backward-compatible overload for existing callers that only pass a
     /// TraceContext; keeps the historical zh prompt default.

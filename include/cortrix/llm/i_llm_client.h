@@ -1,4 +1,6 @@
 #pragma once
+#include <chrono>
+#include <optional>
 #include <string>
 
 #include "cortrix/common/status.h"
@@ -17,7 +19,15 @@ struct LlmCallConfig {
     bool allow_reasoning_content_fallback = true;
     ///< If true, use message.reasoning_content when message.content is empty.
     ///  Disable for consumers that require a final answer in message.content.
+    /// The deadline of the request this call serves, when it has a budget. The client
+    /// then reads the time left before each attempt: below kLlmBudgetFloorMs it makes
+    /// no attempt, and otherwise the attempt's timeout is at most the time left.
+    /// Unset (the default) leaves every other consumer unchanged.
+    std::optional<std::chrono::steady_clock::time_point> deadline;
 };
+
+/// The least time left for which a call with a deadline still makes an attempt.
+inline constexpr int kLlmBudgetFloorMs = 50;
 
 /// Client-level configuration: endpoint, auth, defaults, resilience. Sourced
 /// from IGlobalConfig GUCs (enricher.endpoint / enricher.api_key, F03 topic 2.1).

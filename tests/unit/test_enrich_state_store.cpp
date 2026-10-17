@@ -3,6 +3,10 @@
 #include <gtest/gtest.h>
 
 #include <sqlite3.h>
+#include <unistd.h>
+
+#include <filesystem>
+#include <string>
 
 #include "cortrix/spc_enricher/enrich_state_schema_provider.h"
 #include "cortrix/spc_enricher/enrich_state_store.h"
@@ -330,6 +334,17 @@ protected:
             nullptr, nullptr, nullptr), SQLITE_OK);
     }
 
+    int LabelCount(const std::string& label) {
+        sqlite3_stmt* st = nullptr;
+        const std::string sql =
+            "SELECT COUNT(*) FROM contextual_vec_labels WHERE label=" + label;
+        EXPECT_EQ(sqlite3_prepare_v2(db_, sql.c_str(), -1, &st, nullptr), SQLITE_OK);
+        int n = -1;
+        if (st && sqlite3_step(st) == SQLITE_ROW) n = sqlite3_column_int(st, 0);
+        sqlite3_finalize(st);
+        return n;
+    }
+
     std::string FailedMembersOf(uint64_t block_id) {
         auto rows = ListEnrichStateForDoc(db_, "doc-a", "");
         if (!rows.ok()) return "<error>";
@@ -518,7 +533,8 @@ TEST_F(EnrichAuditTest, ReconcileRemovesOnlyExcludedLabels) {
         seen.push_back(label);
         return Status::Unavailable("index not ready");
     });
-    EXPECT_FALSE(failing.ok());
+    EXPECT_FALSE(failing.status.ok());
+    EXPECT_EQ(failing.removed, 0);
     EXPECT_EQ(seen, (std::vector<uint64_t>{7001}));
     EXPECT_EQ(count("SELECT COUNT(*) FROM contextual_vec_labels"), 4);
 
@@ -527,8 +543,8 @@ TEST_F(EnrichAuditTest, ReconcileRemovesOnlyExcludedLabels) {
         seen.push_back(label);
         return Status::Ok();
     });
-    ASSERT_TRUE(n.ok()) << n.status().message();
-    EXPECT_EQ(n.value(), 2);
+    ASSERT_TRUE(n.status.ok()) << n.status.message();
+    EXPECT_EQ(n.removed, 2);
     EXPECT_EQ(seen, (std::vector<uint64_t>{7001, 7003}));  // label order
     EXPECT_EQ(count("SELECT COUNT(*) FROM contextual_vec_labels WHERE label IN (7001, 7003)"), 0);
     EXPECT_EQ(count("SELECT COUNT(*) FROM contextual_vec_labels WHERE label IN (7002, 7004)"), 2);
@@ -537,17 +553,108 @@ TEST_F(EnrichAuditTest, ReconcileRemovesOnlyExcludedLabels) {
                     " AND contextualized_status = 1 AND contextualized_embedding IS NOT NULL"), 2);
     // A second pass finds nothing left to remove.
     auto again = ReconcileExcludedContextualLabels(db_, [](uint64_t) { return Status::Ok(); });
-    ASSERT_TRUE(again.ok());
-    EXPECT_EQ(again.value(), 0);
+    ASSERT_TRUE(again.status.ok());
+    EXPECT_EQ(again.removed, 0);
 }
 
 TEST_F(EnrichAuditTest, ReconcileWithoutLabelsTableRemovesNothing) {
     SeedChildWithVector(41, "child-skip", true, 1, R"({"cleaning.skip_index":true})");
     int calls = 0;
     auto n = ReconcileExcludedContextualLabels(db_, [&](uint64_t) { ++calls; return Status::Ok(); });
-    ASSERT_TRUE(n.ok()) << n.status().message();
-    EXPECT_EQ(n.value(), 0);
+    ASSERT_TRUE(n.status.ok()) << n.status.message();
+    EXPECT_EQ(n.removed, 0);
     EXPECT_EQ(calls, 0);
+}
+
+// #174: three excluded labels, and the index delete fails on the second. The first
+// removal stays in place and is reported with the failure; the second and the third
+// rows remain for the next audit.
+TEST_F(EnrichAuditTest, ReconcileKeepsTheCountAcrossAFailurePartWay) {
+    CreateLabelsTable();
+    for (uint64_t b : {51, 52, 53}) {
+        SeedChildWithVector(b, "child-" + std::to_string(b), true, 1,
+                            R"({"cleaning.skip_index":true})");
+    }
+    ASSERT_EQ(sqlite3_exec(db_,
+        "INSERT INTO contextual_vec_labels(label, block_id, child_id) VALUES"
+        " (7051, 51, 'child-51'), (7052, 52, 'child-52'), (7053, 53, 'child-53')",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    int calls = 0;
+    auto out = ReconcileExcludedContextualLabels(db_, [&](uint64_t) {
+        return ++calls == 2 ? Status::Unavailable("index not ready") : Status::Ok();
+    });
+    EXPECT_FALSE(out.status.ok());
+    EXPECT_EQ(out.removed, 1);
+    EXPECT_EQ(LabelCount("7051"), 0);
+    EXPECT_EQ(LabelCount("7052"), 1);
+    EXPECT_EQ(LabelCount("7053"), 1);
+}
+
+// A row another audit deleted first is not this call's removal: the callback for the
+// first label deletes that row directly, as a concurrent audit would, and only the
+// second label is counted.
+TEST_F(EnrichAuditTest, ReconcileCountsOnlyTheRowsThisCallDeleted) {
+    CreateLabelsTable();
+    for (uint64_t b : {61, 62}) {
+        SeedChildWithVector(b, "child-" + std::to_string(b), true, 1,
+                            R"({"cleaning.skip_index":true})");
+    }
+    ASSERT_EQ(sqlite3_exec(db_,
+        "INSERT INTO contextual_vec_labels(label, block_id, child_id) VALUES"
+        " (7061, 61, 'child-61'), (7062, 62, 'child-62')",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    auto out = ReconcileExcludedContextualLabels(db_, [&](uint64_t label) {
+        if (label == 7061) {
+            EXPECT_EQ(sqlite3_exec(db_, "DELETE FROM contextual_vec_labels WHERE label=7061",
+                                   nullptr, nullptr, nullptr), SQLITE_OK);
+        }
+        return Status::Ok();
+    });
+    ASSERT_TRUE(out.status.ok()) << out.status.message();
+    EXPECT_EQ(out.removed, 1);
+    EXPECT_EQ(LabelCount("7061"), 0);
+    EXPECT_EQ(LabelCount("7062"), 0);
+}
+
+// The same over two WAL connections to one file, as two concurrent audits of one
+// namespace run: the other connection's delete lands first, and this call's delete
+// then reports that it removed nothing.
+TEST(EnrichAuditTwoConnectionsTest, AConcurrentAuditsDeleteIsNotCounted) {
+    const auto path = std::filesystem::temp_directory_path() /
+                      ("cortrix_reconcile_two_conn_" + std::to_string(::getpid()) + ".db");
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+    sqlite3* a = nullptr;
+    sqlite3* b = nullptr;
+    ASSERT_EQ(sqlite3_open(path.string().c_str(), &a), SQLITE_OK);
+    ASSERT_EQ(sqlite3_open(path.string().c_str(), &b), SQLITE_OK);
+    ASSERT_EQ(sqlite3_exec(a,
+        "PRAGMA journal_mode=WAL;"
+        "CREATE TABLE blocks (block_id INTEGER PRIMARY KEY, doc_id TEXT, child_id TEXT,"
+        " block_type INTEGER DEFAULT 1, enriched_score REAL,"
+        " contextualized_status SMALLINT DEFAULT 0, contextualized_embedding BLOB,"
+        " metadata_json TEXT);"
+        "CREATE TABLE contextual_vec_labels (label INTEGER PRIMARY KEY,"
+        " block_id INTEGER NOT NULL, child_id TEXT NOT NULL);"
+        "INSERT INTO blocks(block_id, doc_id, child_id, metadata_json) VALUES"
+        " (71, 'doc-a', 'child-71', '{\"cleaning.skip_index\":true}'),"
+        " (72, 'doc-a', 'child-72', '{\"cleaning.skip_index\":true}');"
+        "INSERT INTO contextual_vec_labels VALUES (7071, 71, 'child-71'), (7072, 72, 'child-72')",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    auto out = ReconcileExcludedContextualLabels(a, [&](uint64_t label) {
+        if (label == 7071) {
+            EXPECT_EQ(sqlite3_exec(b, "DELETE FROM contextual_vec_labels WHERE label=7071",
+                                   nullptr, nullptr, nullptr), SQLITE_OK);
+        }
+        return Status::Ok();
+    });
+    EXPECT_TRUE(out.status.ok()) << out.status.message();
+    EXPECT_EQ(out.removed, 1);
+    sqlite3_close(b);
+    sqlite3_close(a);
+    for (const char* suffix : {"", "-wal", "-shm"}) {
+        std::filesystem::remove(path.string() + suffix, ec);
+    }
 }
 
 // Members outside the configured chain are never owed (f38 unconfigured here).

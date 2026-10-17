@@ -10,7 +10,7 @@
 /// Handle(), which transitively links ScatterGather / CrossNsResponse / the whole
 /// scatter-gather subsystem. Pulling that in for a 50-line parser is not worth it.
 /// The body below is copied VERBATIM from cross_ns_query_handler.cpp::ParseRequest
-/// (commit release/v1.0.0-rc.1). DRIFT GUARD: if you change the real ParseRequest,
+/// (last synced when `timeout_ms` was added). DRIFT GUARD: if you change the real ParseRequest,
 /// update this copy. The logic is intentionally byte-for-byte identical so the fuzzer
 /// exercises the production control flow.
 ///
@@ -66,10 +66,36 @@ cortrix::Status ParseRequest(const nlohmann::json& body,
     }
 
     if (body.contains("top_k") && body["top_k"].is_number_integer()) {
-        out->top_k = body["top_k"].get<int>();
+        const long long wide = body["top_k"].get<long long>();
+        if (wide < 1 || wide > 100) {
+            return cortrix::Status::InvalidArgument(
+                "'top_k' must be between 1 and 100");
+        }
+        out->top_k = static_cast<int>(wide);
+    }
+    if (body.contains("timeout_ms") && !body["timeout_ms"].is_null()) {
+        const auto& t = body["timeout_ms"];
+        const long long wide = t.is_number_integer() ? t.get<long long>() : 0;
+        if (!t.is_number_integer() || wide < 100 || wide > 30000) {
+            return cortrix::Status::InvalidArgument(
+                "'timeout_ms' must be an integer between 100 and 30000");
+        }
+        out->timeout_ms = static_cast<int>(wide);
     }
     if (body.contains("rerank") && body["rerank"].is_boolean()) {
         out->rerank = body["rerank"].get<bool>();
+    }
+    if (body.contains("search_config") && body["search_config"].is_object()) {
+        const auto& sc = body["search_config"];
+        if (sc.contains("enable_vector") && sc["enable_vector"].is_boolean()) {
+            out->search_config.enable_vector = sc["enable_vector"].get<bool>();
+        }
+        if (sc.contains("enable_bm25") && sc["enable_bm25"].is_boolean()) {
+            out->search_config.enable_bm25 = sc["enable_bm25"].get<bool>();
+        }
+        if (sc.contains("enable_sparse") && sc["enable_sparse"].is_boolean()) {
+            out->search_config.enable_sparse = sc["enable_sparse"].get<bool>();
+        }
     }
     if (body.contains("filter") && body["filter"].is_object()) {
         for (auto it = body["filter"].begin(); it != body["filter"].end(); ++it) {

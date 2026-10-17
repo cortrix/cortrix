@@ -276,7 +276,13 @@ CrossNsQueryWiring::CrossNsQueryWiring(cortrix::resource::INamespacePool& pool,
                                    reranker_execution_provider)) {}
 
 CrossNsQueryWiring::~CrossNsQueryWiring() {
-    if (impl_ && impl_->reranker) delete impl_->reranker;
+    if (!impl_) return;
+    // A namespace task that the multi-namespace join stopped waiting for can still
+    // be running, and it uses the executor and the reranker. Join the workers first,
+    // while everything they use is alive; the engine's own destructor then finds
+    // nothing left to do.
+    impl_->engine.Shutdown();
+    if (impl_->reranker) delete impl_->reranker;
 }
 
 bool CrossNsQueryWiring::IsReady() const {
@@ -1007,6 +1013,13 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             QueryRequest f04_req;
             Status parsed = CrossNsQueryHandler::ParseRequest(body, &f04_req);
             if (parsed.ok()) {
+                // The request's budget counts from when the server started handling it
+                // (the auth middleware's stamp). Every join, LLM call and executor stage
+                // below reads this one deadline.
+                if (f04_req.timeout_ms) {
+                    qctx.deadline =
+                        ctx.start_time + std::chrono::milliseconds(*f04_req.timeout_ms);
+                }
                 // ?explain (B/C-class transparency, QUERY_CONTEXT_SPEC §2 / GEN-Agent):
                 // the cross-NS request contract (ParseRequest) carries the retrieval
                 // fields only, so the explain presentation flag is read here from the
@@ -1056,7 +1069,8 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                             : scatter->Execute(f04_req, auth_ctx, &qctx);
                     LlmRerankStage::ExplainState lr_es;
                     if (use_llm_rerank) {
-                        lr_es = llm_rerank_stage->Apply(&resp, f04_req.query, lr_cfg);
+                        lr_es = llm_rerank_stage->Apply(&resp, f04_req.query, lr_cfg,
+                                                        qctx.deadline);
                         if (static_cast<int>(resp.results.size()) > requested_top_k) {
                             resp.results.resize(
                                 static_cast<std::size_t>(requested_top_k));
