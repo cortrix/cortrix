@@ -40,9 +40,11 @@ struct DocFtsHit {
 Status UpsertDocFts5Row(sqlite3* db, const DocFtsRow& row);
 Status DeleteDocFts5Row(sqlite3* db, const std::string& doc_id);
 /// `live_documents_only` joins `documents` and keeps only rows whose document
-/// exists and is not soft-deleted: the discovery core passes true, so a deleted
-/// or purged document is invisible on the document-level routes. The default
-/// queries the index alone, which the standalone DocFts5Index wrapper below uses.
+/// exists and is not hidden (soft-deleted, or a version of a file that another
+/// version of it should answer for; store::HiddenDocPredicate): the discovery core
+/// passes true, so such a document, or a purged one, is invisible on the
+/// document-level routes. The default queries the index alone, which the standalone
+/// DocFts5Index wrapper below uses.
 Result<std::vector<DocFtsHit>> SearchDocFts5(sqlite3* db, const std::string& query,
                                              int top_k, bool live_documents_only = false);
 

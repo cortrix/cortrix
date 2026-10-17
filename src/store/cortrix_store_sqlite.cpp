@@ -2,6 +2,7 @@
 #include "cortrix/store/cortrix_store_sqlite.h"
 #include "cortrix/store/per_unit_schema_ddl.h"  // [D3.5-B] kPerUnitFrameworkDdl (single DDL SoT)
 #include "cortrix/store/f34_schema_provider.h"  // [A unified-blocks] standalone child cols + parents
+#include "cortrix/store/doc_status_lookup.h"    // HiddenDocPredicate (BM25's visibility)
 #include "cortrix/logging/logging.h"
 #include <sqlite3.h>
 #include <algorithm>
@@ -1534,23 +1535,23 @@ int CortrixStoreSqlite::search_fulltext(const std::string& query, int top_k,
         return 0;  // empty/whitespace-only query returns no results
     }
 
-    // [OPEN-2] Join documents to exclude blocks of soft-deleted docs (status=
-    // 'deleted'): a soft-deleted doc is invisible to retrieval at the SQL level,
-    // so BM25/FTS never surfaces it. The served query route drops a deleted
+    // [OPEN-2] Join documents to exclude the blocks of hidden docs (soft-deleted, or
+    // a version of a file that another version of it should answer for;
+    // store::HiddenDocPredicate): such a doc is invisible to retrieval at the SQL
+    // level, so BM25/FTS never surfaces it. The served query route drops a hidden
     // document's hits from its other routes before fusion
-    // (live_single_unit_executor.cpp, LoadDeletedDocIds).
-    const char* sql = R"SQL(
-        SELECT b.block_id, b.doc_id, rank, b.content_text
-        FROM blocks_fts
-        JOIN blocks b ON b.block_id = blocks_fts.rowid
-        JOIN documents d ON d.doc_id = b.doc_id
-        WHERE blocks_fts MATCH ? AND d.status != 'deleted'
-        ORDER BY rank
-        LIMIT ?
-    )SQL";
+    // (live_single_unit_executor.cpp, LoadHiddenDocIds).
+    const std::string sql =
+        "SELECT b.block_id, b.doc_id, rank, b.content_text "
+        "FROM blocks_fts "
+        "JOIN blocks b ON b.block_id = blocks_fts.rowid "
+        "JOIN documents d ON d.doc_id = b.doc_id "
+        "WHERE blocks_fts MATCH ? AND NOT " + store::HiddenDocPredicate("d") + " "
+        "ORDER BY rank "
+        "LIMIT ?";
 
     sqlite3_stmt* stmt = nullptr;
-    int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    int rc = sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr);
     if (rc != SQLITE_OK) {
         CORTRIX_LOG_ERROR("store", "search_fulltext prepare: {}", sqlite3_errmsg(db_));
         return -1;

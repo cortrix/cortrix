@@ -1,6 +1,7 @@
 // #169: a soft-deleted document is invisible on every retrieval route and on the
 // document discovery endpoint, as it already is to the list and status endpoints,
-// and it comes back once restored.
+// and it comes back once restored. #157: so is a version of an uploaded or watched
+// file that another version of it should answer for.
 //
 // Deterministic: a real namespace pool and store over a temp dir, an injected index
 // returning fixed hits, the stub embedder (its sparse half hashes each token, so a
@@ -23,6 +24,7 @@
 #include "cortrix/doc_summary/discover_handler.h"
 #include "cortrix/doc_summary/doc_fts5_index.h"
 #include "cortrix/doc_summary/doc_summary_generator.h"  // DocSummaryConfig
+#include "cortrix/doc_summary/f41_schema_provider.h"    // kDocFts5IndexDdl
 #include "cortrix/id/hash.h"
 #include "cortrix/query/live_single_unit_executor.h"
 #include "cortrix/query/query_context.h"
@@ -313,6 +315,45 @@ TEST_F(DeletedDocsInvisibleTest, SurvivorsAreRankedAsIfTheDeletedHitWasNeverRetr
     }
 }
 
+// A new version of an uploaded file is not served while the version it replaces is
+// ready, even though its chunks are stored; once it is published, it is served and
+// the retired one is not.
+TEST_F(DeletedDocsInvisibleTest, UnpublishedReplacementIsHiddenBesideTheReadyVersion) {
+    auto version = [&](const std::string& doc_id, DocStatus status, const char* created_at) {
+        harness_->WithStore(kNs, [&](CortrixStore& store) {
+            CortrixDoc doc;
+            doc.doc_id = doc_id;
+            doc.source_type = "http_upload";
+            doc.source_path = "a.md";
+            doc.status = status;
+            ASSERT_EQ(store.doc_create(doc), 0);
+            const std::string sql = std::string("UPDATE documents SET created_at = '") +
+                                    created_at + "' WHERE doc_id = '" + doc_id + "'";
+            ASSERT_EQ(sqlite3_exec(store.db_handle(), sql.c_str(), nullptr, nullptr, nullptr),
+                      SQLITE_OK);
+        });
+    };
+    version("doc-v1", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
+    version("doc-v2", DocStatus::kProcessing, "2026-10-02T00:00:00.000Z");
+    const uint64_t v1 = SeedChunk("doc-v1", "c-v1", "match one");
+    const uint64_t v2 = SeedChunk("doc-v2", "c-v2", "match two");
+    harness_->fake_index()->set_search_result({{v1, 0.10f}, {v2, 0.20f}});
+    const QueryContext ctx = ChunkCtx(/*vector=*/true, /*bm25=*/false, /*sparse=*/false);
+
+    auto before = Ids(Run(ctx));
+    EXPECT_TRUE(Has(before, "c-v1"));
+    EXPECT_FALSE(Has(before, "c-v2")) << "the replacement is not served before it is ready";
+
+    harness_->WithStore(kNs, [&](CortrixStore& store) {
+        int64_t retired = 0;
+        ASSERT_EQ(store.doc_publish_version("doc-v2", /*now_ms=*/1, &retired), 0);
+        ASSERT_EQ(retired, 1);
+    });
+    auto after = Ids(Run(ctx));
+    EXPECT_TRUE(Has(after, "c-v2"));
+    EXPECT_FALSE(Has(after, "c-v1"));
+}
+
 // --- the document path: the summary recall and its full-text fallback --------------
 
 class DeletedDocsDocumentPathTest : public DeletedDocsInvisibleTest {
@@ -384,7 +425,7 @@ TEST_F(DeletedDocsDocumentPathTest, FullTextFallbackHidesDeletedAndPurgedDocumen
 
 // --- the helper ---------------------------------------------------------------------
 
-TEST(LoadDeletedDocIdsTest, ReturnsOnlySoftDeletedRows) {
+TEST(LoadHiddenDocIdsTest, ReturnsOnlySoftDeletedRows) {
     CortrixStoreSqlite store(":memory:");
     ASSERT_EQ(store.Open(), 0);
     CortrixDoc live;
@@ -395,13 +436,13 @@ TEST(LoadDeletedDocIdsTest, ReturnsOnlySoftDeletedRows) {
     ASSERT_EQ(store.doc_create(gone), 0);
     ASSERT_EQ(store.doc_soft_delete(gone.doc_id, 1), 0);
 
-    auto r = cortrix::store::LoadDeletedDocIds(
+    auto r = cortrix::store::LoadHiddenDocIds(
         store.db_handle(), {live.doc_id, gone.doc_id, gone.doc_id, "missing", ""});
     ASSERT_TRUE(r.ok()) << r.status().message();
     EXPECT_EQ(r.value(), (std::unordered_set<std::string>{gone.doc_id}));
 }
 
-TEST(LoadDeletedDocIdsTest, BindsMoreIdsThanOneStatementHolds) {
+TEST(LoadHiddenDocIdsTest, BindsMoreIdsThanOneStatementHolds) {
     CortrixStoreSqlite store(":memory:");
     ASSERT_EQ(store.Open(), 0);
     std::vector<std::string> ids;
@@ -416,21 +457,216 @@ TEST(LoadDeletedDocIdsTest, BindsMoreIdsThanOneStatementHolds) {
             expected.insert(d.doc_id);
         }
     }
-    auto r = cortrix::store::LoadDeletedDocIds(store.db_handle(), ids);
+    auto r = cortrix::store::LoadHiddenDocIds(store.db_handle(), ids);
     ASSERT_TRUE(r.ok()) << r.status().message();
     EXPECT_EQ(r.value(), expected);
 }
 
-TEST(LoadDeletedDocIdsTest, NullHandleIsAnEmptySetAndAMissingTableAnError) {
-    auto none = cortrix::store::LoadDeletedDocIds(nullptr, {"a"});
+TEST(LoadHiddenDocIdsTest, NullHandleIsAnEmptySetAndAMissingTableAnError) {
+    auto none = cortrix::store::LoadHiddenDocIds(nullptr, {"a"});
     ASSERT_TRUE(none.ok());
     EXPECT_TRUE(none.value().empty());
 
     sqlite3* bare = nullptr;
     ASSERT_EQ(sqlite3_open(":memory:", &bare), SQLITE_OK);
-    auto err = cortrix::store::LoadDeletedDocIds(bare, {"a"});
+    auto err = cortrix::store::LoadHiddenDocIds(bare, {"a"});
     EXPECT_FALSE(err.ok());
     sqlite3_close(bare);
+}
+
+// --- versions of one file: only the version that should answer is served ------------
+
+class HiddenVersionsTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        ASSERT_EQ(store_.Open(), 0);
+        Exec(cortrix::doc_summary::kDocFts5IndexDdl);
+    }
+
+    void Exec(const std::string& sql) {
+        char* err = nullptr;
+        ASSERT_EQ(sqlite3_exec(store_.db_handle(), sql.c_str(), nullptr, nullptr, &err),
+                  SQLITE_OK)
+            << (err ? err : "") << " :: " << sql;
+        sqlite3_free(err);
+    }
+
+    std::string Row(const std::string& type, const std::string& path, DocStatus status,
+                    const std::string& created_at) {
+        CortrixDoc d;
+        d.source_type = type;
+        d.source_path = path;
+        d.status = status;
+        EXPECT_EQ(store_.doc_create(d), 0);
+        Exec("UPDATE documents SET created_at = '" + created_at + "' WHERE doc_id = '" +
+             d.doc_id + "'");
+        return d.doc_id;
+    }
+
+    // A chunk, and a document-level full-text row, that both match "quarterly".
+    void Content(const std::string& doc_id, uint64_t block_id) {
+        CortrixBlock b;
+        b.block_id = block_id;
+        b.doc_id = doc_id;
+        b.child_id = "child-" + doc_id;
+        b.block_type = static_cast<int>(kBlockFile);
+        b.content_text = "quarterly report";
+        b.metadata_json = "{}";
+        b.data = {0x01};
+        ASSERT_EQ(store_.block_insert(b), 0);
+        Exec("INSERT INTO doc_fts5_index(doc_id, filename, doc_title, topics_rule_extracted,"
+             " authors) VALUES ('" + doc_id + "', 'report.txt', 'quarterly report', '', '')");
+    }
+
+    std::unordered_set<std::string> Hidden(const std::vector<std::string>& ids) {
+        auto r = cortrix::store::LoadHiddenDocIds(store_.db_handle(), ids);
+        EXPECT_TRUE(r.ok()) << r.status().message();
+        return r.ok() ? r.value() : std::unordered_set<std::string>{};
+    }
+
+    CortrixStoreSqlite store_{":memory:"};
+};
+
+constexpr const char* kD1 = "2026-10-01T00:00:00.000Z";
+constexpr const char* kD2 = "2026-10-02T00:00:00.000Z";
+constexpr const char* kD3 = "2026-10-03T00:00:00.000Z";
+constexpr const char* kD4 = "2026-10-04T00:00:00.000Z";
+
+TEST_F(HiddenVersionsTest, OnlyTheVersionThatShouldAnswerIsServed) {
+    std::vector<std::string> all;
+    auto row = [&](const std::string& type, const std::string& path, DocStatus status,
+                   const char* created_at) {
+        all.push_back(Row(type, path, status, created_at));
+        return all.back();
+    };
+    // Replacements beside a ready earlier version, in each unfinished status.
+    row("http_upload", "a.md", DocStatus::kReady, kD1);
+    const auto pending = row("http_upload", "a.md", DocStatus::kPending, kD2);
+    const auto processing = row("http_upload", "a.md", DocStatus::kProcessing, kD3);
+    const auto error = row("http_upload", "a.md", DocStatus::kError, kD4);
+    // An older unfinished row beside a newer ready one.
+    const auto older = row("watch_dir", "/w/b.md", DocStatus::kProcessing, kD1);
+    row("watch_dir", "/w/b.md", DocStatus::kReady, kD2);
+    // No version ready: the oldest live one is served, a newer attempt is not.
+    row("http_upload", "c.md", DocStatus::kError, kD1);
+    const auto retry = row("http_upload", "c.md", DocStatus::kProcessing, kD2);
+    // A first version, in any live status.
+    for (DocStatus s : {DocStatus::kPending, DocStatus::kProcessing, DocStatus::kError,
+                        DocStatus::kStale}) {
+        row("http_upload", "first-" + std::to_string(static_cast<int>(s)) + ".md", s, kD1);
+    }
+    // Other types, the other versioned type at the same path, and another path.
+    row("file", "e.md", DocStatus::kReady, kD1);
+    row("file", "e.md", DocStatus::kProcessing, kD2);
+    row("memory_session", "s-1", DocStatus::kReady, kD1);
+    row("memory_session", "s-1", DocStatus::kPending, kD2);
+    row("http_upload", "/w/f.md", DocStatus::kReady, kD1);
+    row("watch_dir", "/w/f.md", DocStatus::kProcessing, kD2);
+    row("http_upload", "g1.md", DocStatus::kReady, kD1);
+    row("http_upload", "g2.md", DocStatus::kProcessing, kD2);
+    // A legacy pair, both ready: both are served, as before.
+    row("http_upload", "h.md", DocStatus::kReady, kD1);
+    row("http_upload", "h.md", DocStatus::kReady, kD2);
+    // Two attempts created in the same millisecond: the lower doc_id sorts first.
+    const auto tie_a = row("http_upload", "t.md", DocStatus::kProcessing, kD1);
+    const auto tie_b = row("http_upload", "t.md", DocStatus::kProcessing, kD1);
+    // A deleted row.
+    const auto deleted = row("file", "d.md", DocStatus::kReady, kD1);
+    ASSERT_EQ(store_.doc_soft_delete(deleted, 1000), 0);
+
+    const std::unordered_set<std::string> expected = {
+        pending, processing, error, older, retry, std::max(tie_a, tie_b), deleted};
+    EXPECT_EQ(Hidden(all), expected);
+}
+
+TEST_F(HiddenVersionsTest, FullTextRoutesServeOnlyTheVersionThatShouldAnswer) {
+    const auto v1 = Row("http_upload", "a.md", DocStatus::kReady, kD1);
+    const auto v2 = Row("http_upload", "a.md", DocStatus::kProcessing, kD2);
+    const auto first = Row("http_upload", "z.md", DocStatus::kProcessing, kD1);
+    Content(v1, 101);
+    Content(v2, 102);
+    Content(first, 103);
+
+    std::vector<SearchResult> hits;
+    ASSERT_EQ(store_.search_fulltext("quarterly", 10, hits), 0);
+    std::unordered_set<std::string> bm25;
+    for (const auto& h : hits) bm25.insert(h.doc_id);
+    EXPECT_EQ(bm25, (std::unordered_set<std::string>{v1, first}));
+
+    auto live = cortrix::doc_summary::SearchDocFts5(store_.db_handle(), "quarterly", 10,
+                                                    /*live_documents_only=*/true);
+    ASSERT_TRUE(live.ok()) << live.status().message();
+    std::unordered_set<std::string> doc_level;
+    for (const auto& h : live.value()) doc_level.insert(h.doc_id);
+    EXPECT_EQ(doc_level, (std::unordered_set<std::string>{v1, first}));
+
+    // The index-only query, which the standalone wrapper uses, is unchanged.
+    auto all = cortrix::doc_summary::SearchDocFts5(store_.db_handle(), "quarterly", 10);
+    ASSERT_TRUE(all.ok());
+    EXPECT_EQ(all.value().size(), 3u);
+}
+
+// The condition keeps each statement on its indexes: the row's primary key or the
+// full-text join outside, idx_doc_source inside. Unpinned, a lookup of more than a few
+// ids turns into a scan of every versioned row. The statements are the production
+// ones, captured while they run; the lookup carries 500 ids, as a full chunk does.
+TEST_F(HiddenVersionsTest, QueryPlansStayOnTheirIndexes) {
+    sqlite3* db = store_.db_handle();
+    std::vector<std::string> captured;
+    ASSERT_EQ(sqlite3_trace_v2(
+                  db, SQLITE_TRACE_STMT,
+                  [](unsigned, void* ctx, void* p, void*) -> int {
+                      const char* sql = sqlite3_sql(static_cast<sqlite3_stmt*>(p));
+                      if (sql != nullptr) {
+                          static_cast<std::vector<std::string>*>(ctx)->push_back(sql);
+                      }
+                      return 0;
+                  },
+                  &captured),
+              SQLITE_OK);
+    std::vector<std::string> ids;
+    for (int i = 0; i < 500; ++i) ids.push_back("id-" + std::to_string(i));
+    ASSERT_TRUE(cortrix::store::LoadHiddenDocIds(db, ids).ok());
+    std::vector<SearchResult> hits;
+    ASSERT_EQ(store_.search_fulltext("quarterly", 10, hits), 0);
+    ASSERT_TRUE(cortrix::doc_summary::SearchDocFts5(db, "quarterly", 10, true).ok());
+    sqlite3_trace_v2(db, 0, nullptr, nullptr);
+
+    auto find = [&](const char* marker) {
+        for (const auto& s : captured) {
+            if (s.find(marker) != std::string::npos) return s;
+        }
+        ADD_FAILURE() << "statement not captured: " << marker;
+        return std::string();
+    };
+    for (const std::string& sql : {find("FROM documents d WHERE d.doc_id IN"),
+                                   find("FROM blocks_fts"),
+                                   find("FROM doc_fts5_index JOIN documents")}) {
+        if (sql.empty()) continue;
+        sqlite3_stmt* st = nullptr;
+        ASSERT_EQ(sqlite3_prepare_v2(db, ("EXPLAIN QUERY PLAN " + sql).c_str(), -1, &st,
+                                     nullptr),
+                  SQLITE_OK)
+            << sqlite3_errmsg(db);
+        std::vector<std::string> plan;
+        while (sqlite3_step(st) == SQLITE_ROW) {
+            const unsigned char* detail = sqlite3_column_text(st, 3);
+            plan.push_back(detail ? reinterpret_cast<const char*>(detail) : "");
+        }
+        sqlite3_finalize(st);
+        std::string text;
+        for (const auto& line : plan) text += line + "\n";
+        bool uses_source_index = false;
+        for (const auto& line : plan) {
+            if (line.find("idx_doc_source") != std::string::npos) uses_source_index = true;
+            EXPECT_EQ(line.find("MULTI-INDEX OR"), std::string::npos) << text;
+            if (line.rfind("SCAN ", 0) == 0) {
+                EXPECT_NE(line.find("VIRTUAL TABLE"), std::string::npos)
+                    << "only a full-text table may be scanned:\n" << text;
+            }
+        }
+        EXPECT_TRUE(uses_source_index) << text;
+    }
 }
 
 }  // namespace

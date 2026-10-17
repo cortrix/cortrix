@@ -10,6 +10,7 @@
 #include "cortrix/doc_summary/doc_summary_error.h"
 #include "cortrix/doc_summary/f41_schema_provider.h"  // kDocFts5IndexDdl SoT
 #include "cortrix/store/cortrix_store_sqlite.h"        // SanitizeFts5Query (M-SEC-001)
+#include "cortrix/store/doc_status_lookup.h"          // HiddenDocPredicate
 
 namespace cortrix::doc_summary {
 
@@ -132,17 +133,18 @@ Result<std::vector<DocFtsHit>> SearchDocFts5(sqlite3* db, const std::string& que
         "bm25(doc_fts5_index, 0.0, 1.0, 2.0, 1.5, 1.0) AS rank "
         "FROM doc_fts5_index WHERE doc_fts5_index MATCH ? "
         "ORDER BY rank LIMIT ?";
-    // Only rows whose document exists and is not soft-deleted. Every column is
-    // qualified: documents has its own doc_id, so a bare one would be ambiguous and
-    // the statement would fail to prepare.
-    const char* live_documents_sql =
+    // Only rows whose document exists and is not hidden (soft-deleted, or a version
+    // of a file that another version of it should answer for;
+    // store::HiddenDocPredicate). Every column is qualified: documents has its own
+    // doc_id, so a bare one would be ambiguous and the statement would fail to prepare.
+    const std::string live_documents_sql =
         "SELECT doc_fts5_index.doc_id, doc_fts5_index.filename, "
         "doc_fts5_index.doc_title, "
         "bm25(doc_fts5_index, 0.0, 1.0, 2.0, 1.5, 1.0) AS rank "
         "FROM doc_fts5_index JOIN documents ON documents.doc_id = doc_fts5_index.doc_id "
-        "WHERE doc_fts5_index MATCH ? AND documents.status != 'deleted' "
-        "ORDER BY rank LIMIT ?";
-    const char* sql = live_documents_only ? live_documents_sql : index_only_sql;
+        "WHERE doc_fts5_index MATCH ? AND NOT " +
+        cortrix::store::HiddenDocPredicate("documents") + " ORDER BY rank LIMIT ?";
+    const char* sql = live_documents_only ? live_documents_sql.c_str() : index_only_sql;
     sqlite3_stmt* st = nullptr;
     if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) != SQLITE_OK) {
         return DocSummaryStatus(DocSummaryErrorCode::kFts5FallbackFailed,
