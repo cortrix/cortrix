@@ -46,11 +46,12 @@ READ_NOT_SENT = {
     "llm_rerank_config": "not in the specification yet (#183)",
     "rag_fusion_config": "not in the specification yet (#183)",
     "locale": "not in the specification yet (#183)",
+    "timeout_ms": "the SDK does not send it yet (#205)",
 }
 # Sent by the SDK, not read by the route.
 SENT_NOT_READ = {"include_sources": "the route ignores it (#182)"}
 # Declared by the specification, not sent by the SDK.
-DECLARED_NOT_SENT = {"timeout_ms": "the route does not apply it yet (#173)"}
+DECLARED_NOT_SENT = {"timeout_ms": "the SDK does not send it yet (#205)"}
 
 _EMPTY = {
     "results": [],

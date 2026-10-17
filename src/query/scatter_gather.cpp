@@ -52,6 +52,12 @@ QueryContext ScatterGather::MakeContext(const QueryRequest& request,
     ctx.user_id = auth.user_id;
     ctx.tenant_id = auth.tenant_id;
     if (trace_ctx != nullptr) ctx.trace_id = trace_ctx->trace_id;
+    // A caller that passes no context gets the budget counted from here; the served
+    // route passes its own context, whose deadline counts from the request's start.
+    if (request.timeout_ms) {
+        ctx.deadline = std::chrono::steady_clock::now() +
+                       std::chrono::milliseconds(*request.timeout_ms);
+    }
     return ctx;
 }
 

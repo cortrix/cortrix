@@ -1,5 +1,6 @@
 #pragma once
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -26,6 +27,7 @@ struct QueryRequest {
     bool rerank = true;                         ///< topic 4.3 — passed through to all NS; false → RRF fallback
     SearchConfig search_config;                 ///< optional route switches for ablation/diagnostics
     std::map<std::string, std::string> filter;  ///< topic 4.3 JSONB filter passed through (flattened)
+    std::optional<int> timeout_ms;              ///< the query's time budget in ms, [100, 30000]; absent = none
 };
 
 }  // namespace cortrix::query
