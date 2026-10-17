@@ -2,7 +2,10 @@
 // returns the newest live row, a status write never brings back a deleted row,
 // older versions are retired by the newer one, and a soft delete records the
 // status the row had so a restore can tell a finished version from one that never
-// finished. Also covers a store created before documents gained that column.
+// finished. Publication (the ready write and the retirement), the withdraw of a
+// version whose publication failed, and the restore that refuses beside a live
+// version each change the rows together or not at all. Also covers a store created
+// before documents gained the status column.
 
 #include <gtest/gtest.h>
 
@@ -66,8 +69,33 @@ protected:
         return d.status;
     }
 
+    // Abort the statement that sets `doc_id` to `status`, as a failed write would.
+    void AbortWhen(const std::string& name, const std::string& doc_id,
+                   const std::string& status) {
+        Exec("CREATE TRIGGER " + name + " BEFORE UPDATE OF status ON documents WHEN OLD.doc_id = '" +
+             doc_id + "' AND NEW.status = '" + status +
+             "' BEGIN SELECT RAISE(ABORT, 'forced'); END");
+    }
+
+    // Break a deferred foreign key once `doc_id` takes `status`: the statement succeeds,
+    // and the commit that would end it fails with the transaction still open.
+    void FailCommitWhen(const std::string& doc_id, const std::string& status) {
+        Exec("CREATE TABLE guard_parent (id INTEGER PRIMARY KEY)");
+        Exec("CREATE TABLE guard_child (id INTEGER REFERENCES guard_parent(id) "
+             "DEFERRABLE INITIALLY DEFERRED)");
+        Exec("CREATE TRIGGER fail_commit AFTER UPDATE OF status ON documents WHEN NEW.doc_id = '" +
+             doc_id + "' AND NEW.status = '" + status +
+             "' BEGIN INSERT INTO guard_child VALUES (42); END");
+    }
+
+    bool InTransaction() { return sqlite3_get_autocommit(store_->db_handle()) == 0; }
+
     std::unique_ptr<CortrixStoreSqlite> store_;
 };
+
+constexpr const char* kDay1 = "2026-10-01T00:00:00.000Z";
+constexpr const char* kDay2 = "2026-10-02T00:00:00.000Z";
+constexpr const char* kDay3 = "2026-10-03T00:00:00.000Z";
 
 TEST_F(DocVersionsStoreTest, SourceLookupReturnsTheNewestLiveRow) {
     Create("http_upload", "a.md", DocStatus::kReady, "2026-10-01T00:00:00.000Z");
@@ -220,6 +248,204 @@ TEST_F(DocVersionsStoreTest, StoreWithoutTheColumnKeepsWorking) {
     EXPECT_EQ(StatusOf(v1), DocStatus::kReady);
     ASSERT_EQ(store_->doc_soft_delete(v2, 9000), 0);
     EXPECT_EQ(StatusOf(v2), DocStatus::kDeleted);
+
+    // The restore that refuses beside a live version, and the withdraw.
+    EXPECT_EQ(store_->doc_restore_unless_superseded(v2), -2);  // v1 is live
+    ASSERT_EQ(store_->doc_soft_delete(v1, 9100), 0);
+    EXPECT_EQ(store_->doc_restore_unless_superseded(v2), 0);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kReady);
+    const std::string v3 = Create("http_upload", "a.md", DocStatus::kProcessing, kDay3);
+    EXPECT_EQ(store_->doc_withdraw_version(v3, 9200, "not ready"), 0);
+    EXPECT_EQ(StatusOf(v3), DocStatus::kDeleted);
+    EXPECT_EQ(Column(v3, "error_message"), "not ready");
+    ASSERT_EQ(store_->doc_get_deleted_from_status(v3, &s), 0);
+    EXPECT_FALSE(s.has_value());
+}
+
+// --- publication: the ready write and the retirement, in one transaction ------------
+
+TEST_F(DocVersionsStoreTest, PublicationMarksReadyAndRetiresTogether) {
+    const std::string v1 = Create("http_upload", "a.md", DocStatus::kReady, kDay1);
+    const std::string v2 = Create("http_upload", "a.md", DocStatus::kProcessing, kDay2);
+    int64_t retired = -1;
+    ASSERT_EQ(store_->doc_publish_version(v2, 7000, &retired), 0);
+    EXPECT_EQ(retired, 1);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kReady);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kDeleted);
+    EXPECT_EQ(Column(v1, "deleted_from_status"), "ready");
+    EXPECT_EQ(Column(v1, "deleted_at"), "7000");
+    EXPECT_FALSE(InTransaction());
+}
+
+TEST_F(DocVersionsStoreTest, OnlyUploadedAndWatchedVersionsRetireOlderRows) {
+    const std::string f1 = Create("file", "f.md", DocStatus::kReady, kDay1);
+    const std::string f2 = Create("file", "f.md", DocStatus::kProcessing, kDay2);
+    int64_t retired = -1;
+    ASSERT_EQ(store_->doc_publish_version(f2, 7000, &retired), 0);
+    EXPECT_EQ(retired, 0);
+    EXPECT_EQ(StatusOf(f2), DocStatus::kReady);
+    EXPECT_EQ(StatusOf(f1), DocStatus::kReady);
+    ASSERT_EQ(store_->doc_retire_older_versions(f2, 8000, &retired), 0);
+    EXPECT_EQ(retired, 0);
+    EXPECT_EQ(StatusOf(f1), DocStatus::kReady);
+}
+
+TEST_F(DocVersionsStoreTest, PublicationOfADeletedOrMissingRowChangesNothing) {
+    const std::string v1 = Create("http_upload", "a.md", DocStatus::kReady, kDay1);
+    const std::string v2 = Create("http_upload", "a.md", DocStatus::kProcessing, kDay2);
+    ASSERT_EQ(store_->doc_soft_delete(v2, 1000), 0);
+    int64_t retired = -1;
+    EXPECT_EQ(store_->doc_publish_version(v2, 7000, &retired), -2);
+    EXPECT_EQ(retired, 0);
+    EXPECT_FALSE(InTransaction());  // the transaction it began is over
+    EXPECT_EQ(StatusOf(v2), DocStatus::kDeleted);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kReady);
+    EXPECT_EQ(store_->doc_publish_version("no-such-doc", 7000, &retired), -2);
+    EXPECT_FALSE(InTransaction());
+}
+
+TEST_F(DocVersionsStoreTest, FailedRetirementRollsBackTheReadyWrite) {
+    const std::string v1 = Create("http_upload", "a.md", DocStatus::kReady, kDay1);
+    const std::string v2 = Create("http_upload", "a.md", DocStatus::kProcessing, kDay2);
+    AbortWhen("abort_retire", v1, "deleted");
+    int64_t retired = -1;
+    EXPECT_EQ(store_->doc_publish_version(v2, 7000, &retired), -1);
+    EXPECT_EQ(retired, 0);
+    EXPECT_FALSE(InTransaction());
+    EXPECT_EQ(StatusOf(v1), DocStatus::kReady);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kProcessing);
+}
+
+TEST_F(DocVersionsStoreTest, RefusedCommitRollsBackBothChanges) {
+    const std::string v1 = Create("http_upload", "a.md", DocStatus::kReady, kDay1);
+    const std::string v2 = Create("http_upload", "a.md", DocStatus::kProcessing, kDay2);
+    FailCommitWhen(v2, "ready");
+    int64_t retired = -1;
+    EXPECT_EQ(store_->doc_publish_version(v2, 7000, &retired), -1);
+    EXPECT_EQ(retired, 0);
+    EXPECT_FALSE(InTransaction());
+    EXPECT_EQ(StatusOf(v1), DocStatus::kReady);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kProcessing);
+}
+
+TEST_F(DocVersionsStoreTest, PublicationInsideAnOpenTransactionLeavesItOpen) {
+    Create("http_upload", "a.md", DocStatus::kReady, kDay1);
+    const std::string v2 = Create("http_upload", "a.md", DocStatus::kProcessing, kDay2);
+    Exec("BEGIN");
+    int64_t retired = -1;
+    EXPECT_EQ(store_->doc_publish_version(v2, 7000, &retired), -1);
+    EXPECT_TRUE(InTransaction());  // not ours to end
+    Exec("ROLLBACK");
+    EXPECT_EQ(StatusOf(v2), DocStatus::kProcessing);
+}
+
+// --- the restore that refuses beside a live version -----------------------------------
+
+TEST_F(DocVersionsStoreTest, ConditionalRestoreRestoresOnlyWithoutALiveVersion) {
+    const std::string v1 = Create("http_upload", "a.md", DocStatus::kReady, kDay1);
+    ASSERT_EQ(store_->doc_soft_delete(v1, 1000), 0);
+    const std::string v2 = Create("http_upload", "a.md", DocStatus::kPending, kDay2);
+    EXPECT_EQ(store_->doc_restore_unless_superseded(v1), -2);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kDeleted);
+    EXPECT_EQ(Column(v1, "deleted_from_status"), "ready");
+
+    // Live rows of another source do not refuse it.
+    Create("watch_dir", "a.md", DocStatus::kReady, kDay3);
+    Create("http_upload", "b.md", DocStatus::kReady, kDay3);
+    ASSERT_EQ(store_->doc_soft_delete(v2, 2000), 0);
+    EXPECT_EQ(store_->doc_restore_unless_superseded(v1), 0);
+    EXPECT_EQ(StatusOf(v1), DocStatus::kReady);
+    EXPECT_EQ(Column(v1, "deleted_from_status"), "<null>");
+    EXPECT_EQ(Column(v1, "deleted_at"), "<null>");
+
+    EXPECT_EQ(store_->doc_restore_unless_superseded(v1), -2);  // not deleted
+    EXPECT_EQ(store_->doc_restore_unless_superseded("no-such-doc"), -2);
+}
+
+TEST_F(DocVersionsStoreTest, ConditionalRestoreCountsOnlyACommittedRestore) {
+    const std::string v1 = Create("http_upload", "a.md", DocStatus::kReady, kDay1);
+    ASSERT_EQ(store_->doc_soft_delete(v1, 1000), 0);
+    FailCommitWhen(v1, "ready");
+    EXPECT_EQ(store_->doc_restore_unless_superseded(v1), -1);
+    EXPECT_FALSE(InTransaction());
+    EXPECT_EQ(StatusOf(v1), DocStatus::kDeleted);
+}
+
+// --- the withdraw of a version whose publication failed ------------------------------
+
+TEST_F(DocVersionsStoreTest, WithdrawDeletesAFailedVersionWhileAnOlderOneIsLive) {
+    const std::string v1 = Create("http_upload", "a.md", DocStatus::kReady, kDay1);
+    const std::string v2 = Create("http_upload", "a.md", DocStatus::kProcessing, kDay2);
+    EXPECT_EQ(store_->doc_withdraw_version(v2, 7000, "not ready"), 0);
+    EXPECT_EQ(StatusOf(v2), DocStatus::kDeleted);
+    EXPECT_EQ(Column(v2, "deleted_from_status"), "processing");
+    EXPECT_EQ(Column(v2, "deleted_at"), "7000");
+    EXPECT_EQ(Column(v2, "error_message"), "not ready");
+    EXPECT_EQ(StatusOf(v1), DocStatus::kReady);
+    EXPECT_EQ(store_->doc_withdraw_version(v2, 8000, "again"), -2);  // already deleted
+    EXPECT_EQ(Column(v2, "deleted_at"), "7000");
+
+    // A pending version, beside an older version that is itself in error.
+    const std::string w1 = Create("watch_dir", "/w/b.md", DocStatus::kError, kDay1);
+    const std::string w2 = Create("watch_dir", "/w/b.md", DocStatus::kPending, kDay2);
+    EXPECT_EQ(store_->doc_withdraw_version(w2, 7000, "not ready"), 0);
+    EXPECT_EQ(Column(w2, "deleted_from_status"), "pending");
+    EXPECT_EQ(StatusOf(w1), DocStatus::kError);
+}
+
+TEST_F(DocVersionsStoreTest, WithdrawLeavesEveryOtherRowAlone) {
+    const std::string first = Create("http_upload", "first.md", DocStatus::kProcessing, kDay1);
+    EXPECT_EQ(store_->doc_withdraw_version(first, 7000, "x"), -2);  // nothing older
+    EXPECT_EQ(StatusOf(first), DocStatus::kProcessing);
+
+    Create("http_upload", "r.md", DocStatus::kReady, kDay1);
+    const std::string ready = Create("http_upload", "r.md", DocStatus::kReady, kDay2);
+    EXPECT_EQ(store_->doc_withdraw_version(ready, 7000, "x"), -2);
+    EXPECT_EQ(StatusOf(ready), DocStatus::kReady);
+
+    Create("file", "f.md", DocStatus::kReady, kDay1);
+    const std::string file = Create("file", "f.md", DocStatus::kProcessing, kDay2);
+    EXPECT_EQ(store_->doc_withdraw_version(file, 7000, "x"), -2);
+    EXPECT_EQ(StatusOf(file), DocStatus::kProcessing);
+
+    const std::string gone = Create("http_upload", "d.md", DocStatus::kReady, kDay1);
+    ASSERT_EQ(store_->doc_soft_delete(gone, 500), 0);
+    const std::string after_gone = Create("http_upload", "d.md", DocStatus::kProcessing, kDay2);
+    EXPECT_EQ(store_->doc_withdraw_version(after_gone, 7000, "x"), -2);
+
+    const std::string older = Create("http_upload", "n.md", DocStatus::kProcessing, kDay1);
+    Create("http_upload", "n.md", DocStatus::kPending, kDay2);  // only a newer one is live
+    EXPECT_EQ(store_->doc_withdraw_version(older, 7000, "x"), -2);
+    EXPECT_EQ(StatusOf(older), DocStatus::kProcessing);
+
+    Create("watch_dir", "o.md", DocStatus::kReady, kDay1);  // the other versioned type
+    const std::string other_type = Create("http_upload", "o.md", DocStatus::kProcessing, kDay2);
+    EXPECT_EQ(store_->doc_withdraw_version(other_type, 7000, "x"), -2);
+
+    Create("http_upload", "p1.md", DocStatus::kReady, kDay1);  // another path
+    const std::string other_path = Create("http_upload", "p2.md", DocStatus::kProcessing, kDay2);
+    EXPECT_EQ(store_->doc_withdraw_version(other_path, 7000, "x"), -2);
+    EXPECT_EQ(StatusOf(other_path), DocStatus::kProcessing);
+
+    EXPECT_EQ(store_->doc_withdraw_version("no-such-doc", 7000, "x"), -2);
+}
+
+TEST_F(DocVersionsStoreTest, WithdrawCountsOnlyACommittedChange) {
+    Create("http_upload", "a.md", DocStatus::kReady, kDay1);
+    const std::string v2 = Create("http_upload", "a.md", DocStatus::kProcessing, kDay2);
+    FailCommitWhen(v2, "deleted");
+    EXPECT_EQ(store_->doc_withdraw_version(v2, 7000, "x"), -1);
+    EXPECT_FALSE(InTransaction());
+    EXPECT_EQ(StatusOf(v2), DocStatus::kProcessing);
+}
+
+TEST_F(DocVersionsStoreTest, WithdrawInsideAnOpenTransactionIsRefused) {
+    Create("http_upload", "a.md", DocStatus::kReady, kDay1);
+    const std::string v2 = Create("http_upload", "a.md", DocStatus::kProcessing, kDay2);
+    Exec("BEGIN");
+    EXPECT_EQ(store_->doc_withdraw_version(v2, 7000, "x"), -1);
+    Exec("ROLLBACK");
+    EXPECT_EQ(StatusOf(v2), DocStatus::kProcessing);
 }
 
 TEST(DocVersionsStoreProbeTest, ReadOnANullHandleIsAnError) {

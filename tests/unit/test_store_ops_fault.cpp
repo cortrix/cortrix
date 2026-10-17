@@ -155,6 +155,16 @@ std::vector<OpFaultCase> AllOpFaultCases() {
         int64_t retired = -99;
         return f.store()->doc_retire_older_versions("any", 1000, &retired);
     }});
+    v.push_back({"doc_publish_version", [](StoreFaultOpsBase& f) {
+        int64_t retired = -99;
+        return f.store()->doc_publish_version("any", 1000, &retired);
+    }});
+    v.push_back({"doc_withdraw_version", [](StoreFaultOpsBase& f) {
+        return f.store()->doc_withdraw_version("any", 1000, "boom");
+    }});
+    v.push_back({"doc_restore_unless_superseded", [](StoreFaultOpsBase& f) {
+        return f.store()->doc_restore_unless_superseded("any");
+    }});
     v.push_back({"doc_get_deleted_from_status", [](StoreFaultOpsBase& f) {
         std::optional<std::string> s;
         return f.store()->doc_get_deleted_from_status("any", &s);

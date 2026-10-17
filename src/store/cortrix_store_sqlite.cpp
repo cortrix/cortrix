@@ -291,10 +291,16 @@ int CortrixStoreSqlite::doc_retire_older_versions(const std::string& keep_doc_id
     if (retired) *retired = 0;
     if (TryConsumeOpFault()) return -1;  // testing seam (SetFailNextOps)
     std::lock_guard<std::mutex> lock(mu_);
+    return RetireOlderVersionsLocked(keep_doc_id, now_ms, retired);
+}
 
+int CortrixStoreSqlite::RetireOlderVersionsLocked(const std::string& keep_doc_id,
+                                                  int64_t now_ms, int64_t* retired) {
     // Every live row of the keep row's source that sorts before it in the order the
     // source lookup uses (created_at, then doc_id). Newer rows are left alone, so a
-    // version that finishes late never retires one uploaded after it.
+    // version that finishes late never retires one uploaded after it. Only the two
+    // producers whose repeated source is a new version of the same document retire:
+    // a keep row of any other type matches nothing.
     const bool marker = DeletedFromStatusColumnLocked() == ColumnProbe::kPresent;
     const std::string sql =
         std::string("UPDATE documents SET ") +
@@ -303,6 +309,7 @@ int CortrixStoreSqlite::doc_retire_older_versions(const std::string& keep_doc_id
         "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') "
         "WHERE doc_id IN ("
         "  SELECT d.doc_id FROM documents d JOIN documents k ON k.doc_id = ?2"
+        "    AND k.source_type IN ('http_upload', 'watch_dir')"
         "  WHERE d.source_type = k.source_type AND d.source_path = k.source_path"
         "    AND d.status != 'deleted'"
         "    AND (d.created_at < k.created_at"
@@ -327,6 +334,136 @@ int CortrixStoreSqlite::doc_retire_older_versions(const std::string& keep_doc_id
     }
     if (retired) *retired = n;
     return 0;
+}
+
+int CortrixStoreSqlite::doc_publish_version(const std::string& doc_id, int64_t now_ms,
+                                            int64_t* retired) {
+    if (retired) *retired = 0;
+    if (TryConsumeOpFault()) return -1;  // testing seam (SetFailNextOps)
+    std::lock_guard<std::mutex> lock(mu_);
+
+    // The ready write and the retirement commit together or not at all, so a failure
+    // or a crash never leaves two ready versions of one source. A BEGIN that fails
+    // (after the busy timeout, or inside a transaction someone else left open) leaves
+    // any such transaction alone.
+    char* err = nullptr;
+    if (sqlite3_exec(db_, "BEGIN IMMEDIATE", nullptr, nullptr, &err) != SQLITE_OK) {
+        CORTRIX_LOG_ERROR("store", "doc_publish_version BEGIN: {}", err ? err : "unknown");
+        sqlite3_free(err);
+        return -1;
+    }
+    // Some errors end the transaction themselves; roll back only one still open.
+    auto rollback = [this] {
+        if (sqlite3_get_autocommit(db_) == 0) {
+            sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
+        }
+    };
+    const int urc = UpdateStatusLocked(doc_id, DocStatus::kReady, "");
+    if (urc != 0) {
+        rollback();
+        return urc;  // -2: missing or deleted, -1: error; nothing is applied either way
+    }
+    int64_t n = 0;
+    if (RetireOlderVersionsLocked(doc_id, now_ms, &n) != 0) {
+        rollback();
+        return -1;
+    }
+    if (sqlite3_exec(db_, "COMMIT", nullptr, nullptr, &err) != SQLITE_OK) {
+        CORTRIX_LOG_ERROR("store", "doc_publish_version COMMIT: {}", err ? err : "unknown");
+        sqlite3_free(err);
+        rollback();
+        return -1;
+    }
+    if (retired) *retired = n;
+    return 0;
+}
+
+int CortrixStoreSqlite::doc_withdraw_version(const std::string& doc_id, int64_t now_ms,
+                                             const std::string& error_message) {
+    if (TryConsumeOpFault()) return -1;  // testing seam (SetFailNextOps)
+    std::lock_guard<std::mutex> lock(mu_);
+
+    // Inside a transaction someone else left open, this change would be lost with that
+    // transaction while the caller acts on it.
+    if (sqlite3_get_autocommit(db_) == 0) {
+        CORTRIX_LOG_ERROR("store", "doc_withdraw_version: the connection is inside a "
+                                   "transaction");
+        return -1;
+    }
+    // One statement, so its checks and its write run under the same write lock: the row
+    // is a version of an uploaded or watched file that is neither deleted nor ready, and
+    // a version of its source that sorts before it (as in the retirement) is live.
+    // RETURNING says whether the row changed; it counts once the statement has finished.
+    const bool marker = DeletedFromStatusColumnLocked() == ColumnProbe::kPresent;
+    const std::string sql =
+        std::string("UPDATE documents SET ") +
+        (marker ? "deleted_from_status = status, " : "") +
+        "status = 'deleted', deleted_at = ?2, error_message = ?3, "
+        "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') "
+        "WHERE doc_id = ?1 AND status NOT IN ('deleted', 'ready')"
+        "  AND source_type IN ('http_upload', 'watch_dir')"
+        "  AND EXISTS (SELECT 1 FROM documents d"
+        "    WHERE d.source_type = documents.source_type"
+        "      AND d.source_path = documents.source_path"
+        "      AND d.doc_id != documents.doc_id AND d.status != 'deleted'"
+        "      AND (d.created_at < documents.created_at"
+        "           OR (d.created_at = documents.created_at"
+        "               AND d.doc_id < documents.doc_id))) "
+        "RETURNING doc_id";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        CORTRIX_LOG_ERROR("store", "doc_withdraw_version prepare: {}", sqlite3_errmsg(db_));
+        return -1;
+    }
+    sqlite3_bind_text(stmt, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(stmt, 2, now_ms);
+    sqlite3_bind_text(stmt, 3, error_message.c_str(), -1, SQLITE_TRANSIENT);
+    int rc = sqlite3_step(stmt);
+    const bool withdrawn = (rc == SQLITE_ROW);
+    if (withdrawn) rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        CORTRIX_LOG_ERROR("store", "doc_withdraw_version step: {}", sqlite3_errmsg(db_));
+        return -1;
+    }
+    return withdrawn ? 0 : -2;
+}
+
+int CortrixStoreSqlite::doc_restore_unless_superseded(const std::string& doc_id) {
+    if (TryConsumeOpFault()) return -1;  // testing seam (SetFailNextOps)
+    std::lock_guard<std::mutex> lock(mu_);
+
+    // doc_restore's write, guarded in the same statement on no other row of the source
+    // being live. The check and the write run under one write lock, so a version that
+    // another connection commits either refuses this restore or comes after it.
+    const bool marker = DeletedFromStatusColumnLocked() == ColumnProbe::kPresent;
+    const std::string sql =
+        std::string("UPDATE documents SET status = 'ready', deleted_at = NULL, ") +
+        (marker ? "deleted_from_status = NULL, " : "") +
+        "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') "
+        "WHERE doc_id = ?1 AND status = 'deleted'"
+        "  AND NOT EXISTS (SELECT 1 FROM documents o"
+        "    WHERE o.source_type = documents.source_type"
+        "      AND o.source_path = documents.source_path"
+        "      AND o.doc_id != documents.doc_id AND o.status != 'deleted') "
+        "RETURNING doc_id";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        CORTRIX_LOG_ERROR("store", "doc_restore_unless_superseded prepare: {}",
+                          sqlite3_errmsg(db_));
+        return -1;
+    }
+    sqlite3_bind_text(stmt, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
+    int rc = sqlite3_step(stmt);
+    const bool restored = (rc == SQLITE_ROW);
+    if (restored) rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_DONE) {
+        CORTRIX_LOG_ERROR("store", "doc_restore_unless_superseded step: {}",
+                          sqlite3_errmsg(db_));
+        return -1;
+    }
+    return restored ? 0 : -2;
 }
 
 int CortrixStoreSqlite::doc_get_deleted_from_status(const std::string& doc_id,
@@ -591,7 +728,11 @@ int CortrixStoreSqlite::doc_update_status(const std::string& doc_id, DocStatus s
                                           const std::string& error_message) {
     if (TryConsumeOpFault()) return -1;  // testing seam (F23 §4.5)
     std::lock_guard<std::mutex> lock(mu_);
+    return UpdateStatusLocked(doc_id, status, error_message);
+}
 
+int CortrixStoreSqlite::UpdateStatusLocked(const std::string& doc_id, DocStatus status,
+                                           const std::string& error_message) {
     // A soft-deleted row stays deleted: a status write from a task that was still
     // running when its document was deleted, or retired by a newer version, must
     // not bring it back. RETURNING says whether this statement changed the row; the

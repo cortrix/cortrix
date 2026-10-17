@@ -255,6 +255,88 @@ TEST_F(StoreFaultSweepTest, DocRetireOlderVersionsPwriteFaultSweep) {
         });
 }
 
+// doc_publish_version: the ready write and the retirement in one transaction. A failed
+// write anywhere in it fails the call and leaves both rows as they were, as a reopen
+// without crash recovery shows (recovery would turn the processing row pending).
+TEST_F(StoreFaultSweepTest, DocPublishVersionPwriteFaultSweep) {
+    bool any = false;
+    for (int k = 0;; ++k) {
+        const std::string v1 = "pub1_" + std::to_string(k);
+        const std::string v2 = "pub2_" + std::to_string(k);
+        auto store = OpenStoreRecordingFds();
+        fi::Disarm();
+        for (const std::string& id : {v1, v2}) {
+            CortrixDoc d = MakeDoc(id);
+            d.source_type = "http_upload";
+            d.source_path = "/publish/" + std::to_string(k) + ".md";
+            d.status = id == v1 ? DocStatus::kReady : DocStatus::kProcessing;
+            ASSERT_EQ(store->doc_create(d), 0);
+        }
+
+        fi::FailOp("pwrite", /*skip=*/k, /*count=*/1, EIO, "test.db");
+        int64_t retired = -1;
+        const int rc = store->doc_publish_version(v2, 1700000000000LL, &retired);
+        const int consumed = fi::ConsumedCount();
+        const int matched = fi::MatchedCount();
+        fi::Disarm();
+        store->Close();
+        store.reset();
+
+        CortrixStoreSqlite reopened(db_path_, CortrixStoreSqlite::OpenOptions{true, false});
+        ASSERT_EQ(reopened.Open(), 0);
+        CortrixDoc r1;
+        CortrixDoc r2;
+        ASSERT_EQ(reopened.doc_get(v1, r1), 0);
+        ASSERT_EQ(reopened.doc_get(v2, r2), 0);
+        if (consumed > 0) {
+            any = true;
+            EXPECT_NE(rc, 0) << "k=" << k << ": publication must fail on pwrite EIO";
+            EXPECT_EQ(r1.status, DocStatus::kReady) << "k=" << k;
+            EXPECT_EQ(r2.status, DocStatus::kProcessing) << "k=" << k;
+        } else {
+            EXPECT_EQ(rc, 0) << "k=" << k;
+            EXPECT_EQ(r1.status, DocStatus::kDeleted) << "k=" << k;
+            EXPECT_EQ(r2.status, DocStatus::kReady) << "k=" << k;
+        }
+        reopened.Close();
+        if (matched <= k && consumed == 0) break;
+        if (k > 512) { ADD_FAILURE() << "doc_publish_version sweep did not terminate"; break; }
+    }
+    EXPECT_TRUE(any) << "no interposable pwrite on the doc_publish_version path";
+}
+
+// doc_withdraw_version: one UPDATE ... RETURNING, counted only once it has committed.
+TEST_F(StoreFaultSweepTest, DocWithdrawVersionPwriteFaultSweep) {
+    SweepStoreWrite(this, "doc_withdraw_version",
+        [](CortrixStoreSqlite& s, int k) {
+            for (const char* version : {"wdoc1_", "wdoc2_"}) {
+                CortrixDoc d = MakeDoc(version + std::to_string(k));
+                d.source_type = "http_upload";
+                d.source_path = "/withdraw/" + std::to_string(k) + ".md";
+                ASSERT_EQ(s.doc_create(d), 0);
+            }
+        },
+        [](CortrixStoreSqlite& s, int k) {
+            return s.doc_withdraw_version("wdoc2_" + std::to_string(k), 1700000000000LL,
+                                          "not ready");
+        });
+}
+
+// doc_restore_unless_superseded: one UPDATE ... RETURNING, counted only once it has
+// committed.
+TEST_F(StoreFaultSweepTest, DocRestoreUnlessSupersededPwriteFaultSweep) {
+    SweepStoreWrite(this, "doc_restore_unless_superseded",
+        [](CortrixStoreSqlite& s, int k) {
+            CortrixDoc d = MakeDoc("cdoc_" + std::to_string(k));
+            d.source_type = "http_upload";
+            ASSERT_EQ(s.doc_create(d), 0);
+            ASSERT_EQ(s.doc_soft_delete(d.doc_id, 1700000000000LL), 0);
+        },
+        [](CortrixStoreSqlite& s, int k) {
+            return s.doc_restore_unless_superseded("cdoc_" + std::to_string(k));
+        });
+}
+
 // doc_delete_by_source_prefix: a prefix-scoped DELETE (its own prepare/step path).
 TEST_F(StoreFaultSweepTest, DocDeleteBySourcePrefixPwriteFaultSweep) {
     SweepStoreWrite(this, "doc_delete_by_source_prefix",
