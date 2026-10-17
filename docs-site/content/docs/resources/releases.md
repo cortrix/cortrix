@@ -44,6 +44,7 @@ For the scope and limits of the measurements, see [Benchmark evidence](/docs/res
 | The LAN publish-address option doesn't yet give you a complete authenticated setup without editing configuration by hand | [#71](https://github.com/cortrix/cortrix/issues/71) |
 | Ingestion into a single namespace is constrained by serialized durability and index updates | [#73](https://github.com/cortrix/cortrix/issues/73) |
 | Cross-encoder reranking is on by default, even for tasks where turning it off is the better choice | [#75](https://github.com/cortrix/cortrix/issues/75) |
+| Uploading a changed version of a file, or changing a watched file, can leave the previous version's passages in query results; the issue lists workarounds | [#157](https://github.com/cortrix/cortrix/issues/157) |
 
 ## Release artifacts {#artifacts}
 
