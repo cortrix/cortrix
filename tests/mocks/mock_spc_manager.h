@@ -10,7 +10,10 @@ public:
     MockSPCManager() : SPCManager() {}
 
     MOCK_METHOD(Status, Submit, (std::shared_ptr<SPCTask> task), (override));
-    MOCK_METHOD(int, CancelBySourcePath, (const std::string& source_path), (override));
+    MOCK_METHOD(int, CancelQueuedVersions,
+                (const std::string& namespace_name, const std::string& source_type,
+                 const std::string& source_path),
+                (override));
     MOCK_METHOD(void, Start, (), (override));
     MOCK_METHOD(void, Stop, (), (override));
     MOCK_METHOD(size_t, QueueSize, (), (const, override));

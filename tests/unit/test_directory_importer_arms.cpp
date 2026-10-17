@@ -77,7 +77,8 @@ public:
         }
         return Status::Ok();
     }
-    int CancelBySourcePath(const std::string& p) override {
+    int CancelQueuedVersions(const std::string&, const std::string&,
+                             const std::string& p) override {
         cancelled.push_back(p);
         return 0;
     }

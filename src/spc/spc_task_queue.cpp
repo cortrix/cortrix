@@ -47,11 +47,16 @@ std::shared_ptr<SPCTask> SPCTaskQueue::Pop() {
     return task;
 }
 
-int SPCTaskQueue::CancelBySourcePath(const std::string& source_path) {
+int SPCTaskQueue::CancelQueuedVersions(const std::string& namespace_name,
+                                        const std::string& source_type,
+                                        const std::string& source_path) {
     std::lock_guard<std::mutex> lock(mu_);
     int count = 0;
     for (auto& task : queue_) {
-        if (task->source_path == source_path && !task->cancelled.load()) {
+        // All three: one queue serves every namespace, and a path alone also matches
+        // a same-named file of another namespace or of another producer.
+        if (task->namespace_name == namespace_name && task->source_type == source_type &&
+            task->source_path == source_path && !task->cancelled.load()) {
             task->cancelled.store(true);
             task->stage = SPCStage::kCancelled;
             ++count;

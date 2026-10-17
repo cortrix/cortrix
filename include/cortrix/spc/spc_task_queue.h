@@ -20,8 +20,11 @@ public:
     /// @return nullptr if queue stopped
     std::shared_ptr<SPCTask> Pop();
 
-    /// Cancel all tasks matching source_path
-    int CancelBySourcePath(const std::string& source_path);
+    /// Cancel the queued tasks whose namespace_name, source_type and source_path
+    /// all match; returns the number cancelled.
+    int CancelQueuedVersions(const std::string& namespace_name,
+                             const std::string& source_type,
+                             const std::string& source_path);
 
     /// Stop the queue (unblock all waiting Pop calls)
     void Stop();

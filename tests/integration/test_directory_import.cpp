@@ -35,7 +35,7 @@ using cortrix::testing::MockSPCManager;
 //   * "new file" assertions just import against the real store (find->-2->create).
 //   * "unchanged"/"update" assertions PRE-SEED a doc into the harness store via a
 //     setup facade (SeedDoc), so the importer's real doc_find_by_source hits it.
-//   * SPC behavior (Submit / CancelBySourcePath) is still verified with MockSPCManager.
+//   * SPC behavior (Submit / CancelQueuedVersions) is still verified with MockSPCManager.
 //   * doc_id is a ULID string now (D-I6), not an int64.
 class DirectoryImportTest : public ::testing::Test {
 protected:
@@ -312,7 +312,7 @@ TEST_F(DirectoryImportTest, CascadeDeleteCallsAllComponents) {
 TEST_F(DirectoryImportTest, ContentUpdateDetected) {
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
-    EXPECT_CALL(mock_spc, CancelBySourcePath(_)).WillRepeatedly(Return(0));
+    EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _)).WillRepeatedly(Return(0));
 
     // Pre-seed docs with a STALE hash (different from actual) so the importer detects
     // an update for each file.
@@ -655,7 +655,7 @@ TEST_F(DirectoryImportTest, UpdateRedetectsMimeType) {
     // Verify D5 edge case #8: format change triggers MIME re-detection
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
-    EXPECT_CALL(mock_spc, CancelBySourcePath(_)).WillRepeatedly(Return(0));
+    EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _)).WillRepeatedly(Return(0));
 
     // Pre-seed docs with a stale hash + an OLD mime type so each file triggers update.
     namespace fs = std::filesystem;
@@ -699,7 +699,7 @@ TEST_F(DirectoryImportTest, HandleFileEvents_CreatedThenDeleted_Ignored) {
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
     EXPECT_CALL(mock_spc, Submit(_)).WillRepeatedly(Return(Status::Ok()));
-    EXPECT_CALL(mock_spc, CancelBySourcePath(_)).WillRepeatedly(Return(0));
+    EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _)).WillRepeatedly(Return(0));
 
     WatchDirConfig config;
     config.data_dir = test_dir_.string();
@@ -776,7 +776,7 @@ TEST_F(DirectoryImportTest, HandleFileDeletion_FullCascadeWithBlocks) {
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
     EXPECT_CALL(mock_spc, Submit(_)).WillRepeatedly(Return(Status::Ok()));
-    EXPECT_CALL(mock_spc, CancelBySourcePath(_)).WillRepeatedly(Return(0));
+    EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _)).WillRepeatedly(Return(0));
 
     WatchDirConfig config;
     config.data_dir = test_dir_.string();
@@ -827,7 +827,7 @@ TEST_F(DirectoryImportTest, HandleFileDeletion_DocNotFound_NoError) {
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
     EXPECT_CALL(mock_spc, Submit(_)).WillRepeatedly(Return(Status::Ok()));
-    EXPECT_CALL(mock_spc, CancelBySourcePath(_)).WillRepeatedly(Return(0));
+    EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _)).WillRepeatedly(Return(0));
 
     WatchDirConfig config;
     config.data_dir = test_dir_.string();
@@ -888,7 +888,7 @@ TEST_F(DirectoryImportTest, HandleFileDeletion_DocFindError_ReturnsInternal) {
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
     EXPECT_CALL(mock_spc, Submit(_)).WillRepeatedly(Return(Status::Ok()));
-    EXPECT_CALL(mock_spc, CancelBySourcePath(_)).WillRepeatedly(Return(0));
+    EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _)).WillRepeatedly(Return(0));
 
     WatchDirConfig config;
     config.data_dir = test_dir_.string();
@@ -924,7 +924,7 @@ TEST_F(DirectoryImportTest, HandleFileDeletion_HNSWRemoveFails_ContinuesCascade)
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
     EXPECT_CALL(mock_spc, Submit(_)).WillRepeatedly(Return(Status::Ok()));
-    EXPECT_CALL(mock_spc, CancelBySourcePath(_)).WillRepeatedly(Return(0));
+    EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _)).WillRepeatedly(Return(0));
 
     WatchDirConfig config;
     config.data_dir = test_dir_.string();
@@ -1023,7 +1023,7 @@ TEST_F(DirectoryImportTest, SPCSubmitFails_StillCountsImported) {
 TEST_F(DirectoryImportTest, SPCSubmitFails_DuringUpdate_StillCountsUpdated) {
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
-    EXPECT_CALL(mock_spc, CancelBySourcePath(_)).WillRepeatedly(Return(0));
+    EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _)).WillRepeatedly(Return(0));
     // SPC submit fails for the update path
     EXPECT_CALL(mock_spc, Submit(_))
         .WillRepeatedly(Return(Status::Unavailable("queue full")));
@@ -1082,7 +1082,7 @@ TEST_F(DirectoryImportTest, HandleFileEvents_ModifiedThenDeleted_BecomesDeleted)
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
     EXPECT_CALL(mock_spc, Submit(_)).WillRepeatedly(Return(Status::Ok()));
-    EXPECT_CALL(mock_spc, CancelBySourcePath(_)).WillRepeatedly(Return(0));
+    EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _)).WillRepeatedly(Return(0));
 
     WatchDirConfig config;
     config.data_dir = test_dir_.string();
@@ -1172,7 +1172,7 @@ TEST_F(DirectoryImportTest, HandleFileEvents_FilteredFilesSkipped) {
 TEST_F(DirectoryImportTest, UpdateSetsStatusStaleAndPending) {
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
-    EXPECT_CALL(mock_spc, CancelBySourcePath(_)).WillRepeatedly(Return(0));
+    EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _)).WillRepeatedly(Return(0));
     EXPECT_CALL(mock_spc, Submit(_)).WillRepeatedly(Return(Status::Ok()));
 
     namespace fs = std::filesystem;
@@ -1216,11 +1216,13 @@ TEST_F(DirectoryImportTest, UpdateCancelsPreviousSPCTask) {
         SeedDoc(*harness, "default", resolved, stale_hash);
     }
 
-    // Track CancelBySourcePath calls
+    // Track CancelQueuedVersions calls
     std::vector<std::string> cancelled_paths;
-    EXPECT_CALL(mock_spc, CancelBySourcePath(_))
-        .WillRepeatedly(Invoke([&](const std::string& path) -> int {
-            cancelled_paths.push_back(path);
+    EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _))
+        .WillRepeatedly(Invoke([&](const std::string& /*namespace_name*/,
+                                   const std::string& /*source_type*/,
+                                   const std::string& source_path) -> int {
+            cancelled_paths.push_back(source_path);
             return 0;
         }));
 
@@ -1234,7 +1236,7 @@ TEST_F(DirectoryImportTest, UpdateCancelsPreviousSPCTask) {
     auto status = importer.Start();
     EXPECT_TRUE(status.ok()) << status.message();
 
-    // 3 files were updated, so CancelBySourcePath should have been called 3 times.
+    // 3 files were updated, so CancelQueuedVersions should have been called 3 times.
     EXPECT_EQ(3u, cancelled_paths.size());
 }
 
@@ -1280,7 +1282,7 @@ TEST_F(DirectoryImportTest, UpdateSPCTask_HasCorrectFields) {
     // Verify the SPC task fields when updating an existing doc.
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
-    EXPECT_CALL(mock_spc, CancelBySourcePath(_)).WillRepeatedly(Return(0));
+    EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _)).WillRepeatedly(Return(0));
 
     namespace fs = std::filesystem;
     std::string stale_hash = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -1355,7 +1357,7 @@ TEST_F(DirectoryImportTest, HandleFileEvents_MultipleModifiesOnSamePath) {
     auto harness = MakeHarness();
     MockSPCManager mock_spc;
     EXPECT_CALL(mock_spc, Submit(_)).WillRepeatedly(Return(Status::Ok()));
-    EXPECT_CALL(mock_spc, CancelBySourcePath(_)).WillRepeatedly(Return(0));
+    EXPECT_CALL(mock_spc, CancelQueuedVersions(_, "watch_dir", _)).WillRepeatedly(Return(0));
 
     WatchDirConfig config;
     config.data_dir = test_dir_.string();

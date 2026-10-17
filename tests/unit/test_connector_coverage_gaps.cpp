@@ -12,7 +12,7 @@
 //     - namespace-acquire failure (importer bound to a never-admitted NS)
 //       -> skipped_error++
 //     - content-changed update path: re-scan after the file content changes
-//       -> CancelBySourcePath + kStale->kPending + SPC resubmit with is_update=true
+//       -> CancelQueuedVersions + kStale->kPending + SPC resubmit with is_update=true
 //
 //   HandleFileDeletion (via a Deleted event):
 //     - namespace-acquire failure -> NotFound, deleted stat unchanged
@@ -74,7 +74,8 @@ public:
         submitted.push_back(t);
         return Status::Ok();
     }
-    int CancelBySourcePath(const std::string& p) override {
+    int CancelQueuedVersions(const std::string&, const std::string&,
+                             const std::string& p) override {
         cancelled.push_back(p);
         return 0;
     }
