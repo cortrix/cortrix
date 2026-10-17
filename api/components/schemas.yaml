@@ -321,12 +321,39 @@ components:
           $ref: '#/components/schemas/SearchConfig'
         timeout_ms:
           type: integer
+          nullable: true
           minimum: 100
           maximum: 30000
           description: >-
-            Per-query wall-clock budget in milliseconds, distributed across the parallel
-            vector / BM25 / SQL routes (F08 CalculateRouteTimeout). Must be in [100, 30000];
-            out-of-range → 400 CX_ERR_QUERY_INVALID_ARGUMENT.
+            The query's time budget in milliseconds, counted from when the server starts
+            handling the request. It bounds waiting for the namespaces and the LLM calls
+            (query expansion and LLM reranking). When it runs out the response is still
+            HTTP 200 with what completed: the namespaces that had not answered are in
+            `meta.namespaces_failed` with `CX_ERR_NS_TIMEOUT`, and the top-level `error`
+            is `CX_ERR_SCATTER_TIMEOUT`. With RAG fusion, a join the budget cuts gives the
+            same signal together with the `rag_fusion_degraded` warning.
+            It must be an integer in [100, 30000]; anything else is a 400
+            `CX_ERR_BAD_REQUEST`, and `null` counts as absent.
+            With several namespaces the server also waits at most 5000 ms for each
+            namespace, counted from when it reaches that namespace; a lone namespace is
+            limited by the budget only. With a budget, every join's overall limit is the
+            request's deadline: the server's own 30000 ms limit, counted from the start of
+            the join, never comes first.
+            The budget bounds waiting and the LLM calls; it is not a cap on a namespace's
+            work. No step is interrupted, so a step that has started runs to its end and a
+            response can arrive up to about one step after the budget. Each LLM attempt's
+            connect, write and read phases are bounded by the time left, and no attempt
+            starts with less than 50 ms left. Without a budget, work the server stopped
+            waiting for runs to completion; with one, it stops at its next step once the
+            deadline has passed.
+            RAG fusion runs query expansion and its joins one after another against the
+            same deadline, with no share reserved for any of them. Under the `always`
+            activation policy expansion runs before any join, so a slow expansion can
+            leave every join cut and the response without results; under
+            `selective_margin` the original query's join runs first.
+            The budget does not cover a query routed to the chat path, parent expansion,
+            RAG fusion's final rerank, namespace authorization, a wait for a free worker,
+            or the time before the server starts handling the request.
           example: 5000
 
     SearchConfig:
@@ -508,7 +535,8 @@ components:
           additionalProperties: true
           description: >-
             Present, with HTTP 200, when the query as a whole ran out of its time budget
-            and `results` and `meta` hold what completed. Same shape as the `error` object
+            and `results` and `meta` hold what completed; its code is then
+            `CX_ERR_SCATTER_TIMEOUT`. Same shape as the `error` object
             of the standard error response, without `request_id`: `code`, `message`,
             `retryable`, `category`, `retry_after_ms` and `structured_data` (the last
             two may be null).

@@ -84,8 +84,14 @@ components:
           retryable: true
           category: timeout
           retry_after_ms: 1000
-          typical_cause: "single-NS query timed out (large index / high load)"
-          suggested_action: "Use partial results + optionally retry the single NS"
+          typical_cause: "the namespace did not answer within its wait limit or the request's timeout_ms budget (large index / high load)"
+          suggested_action: "Use the partial results; a retry with the same budget is likely to time out again, so raise timeout_ms or query fewer namespaces"
+        CX_ERR_BAD_REQUEST:
+          retryable: false
+          category: permanent
+          retry_after_ms: null
+          typical_cause: "the request body is malformed or a field is outside its range (for example, timeout_ms not an integer in [100, 30000])"
+          suggested_action: "Correct the field error.message names; the same request fails again unchanged"
         CX_ERR_RATE_LIMIT:
           retryable: true
           category: transient
