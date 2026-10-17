@@ -173,6 +173,9 @@ void RegisterDocumentRoutes(httplib::Server& server,
                     res.status = 200;
                 } else if (result.status == "updating") {
                     body["message"] = "Document updated, reprocessing queued";
+                    if (!result.superseded_doc_id.empty()) {
+                        body["superseded_doc_id"] = result.superseded_doc_id;
+                    }
                     res.status = 201;
                 } else {
                     body["message"] = "Document uploaded successfully, processing queued";

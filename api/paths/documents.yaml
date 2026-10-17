@@ -250,6 +250,12 @@ paths:
         content of POST /documents. Returns the doc_id synchronously (201 created / 200 unchanged
         duplicate / 201 updating). At disk CRIT pressure the upload is rejected with 507 CX_ERR_DISK_FULL
         before any byte is written (F24 §6).
+
+        Uploading a filename that is already stored creates a new version (201 updating). The previous
+        version keeps answering queries until the new one is ready, and is then retired (soft-deleted).
+        Unchanged content is answered 200 skipped while its version is ready, processing or queued; a
+        duplicate of a version that failed or was never queued is processed as a new version instead
+        (201 updating).
       x-cortrix-agent-workflow: public
       x-cortrix-retryable: true
       x-cortrix-retry-strategy: exponential_backoff

@@ -34,6 +34,9 @@ public:
         (void)task;
         return Status::Ok();
     }
+    // Every submission is accepted and none is processed, so every pending version
+    // still has its task queued.
+    bool HasQueuedTask(const std::string&) const override { return true; }
 
     int CancelQueuedVersions(const std::string&, const std::string&,
                              const std::string&) override {

@@ -152,7 +152,16 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
     CortrixDoc existing_doc;
     bool found = FindExistingDocument(store, req.filename, &existing_doc);
 
-    if (found && existing_doc.content_hash == content_hash) {
+    // Unchanged content is skipped only while that version is, or will be, processed:
+    // it is ready, it is processing, or it is pending with a live queued task. A
+    // version with the same content and no such future (a failed submit, a crash, a
+    // cancel, a failed run) is replaced by a new version, exactly as changed content is.
+    const bool will_be_processed =
+        found && (existing_doc.status == DocStatus::kReady ||
+                  existing_doc.status == DocStatus::kProcessing ||
+                  (existing_doc.status == DocStatus::kPending &&
+                   spc_mgr_.HasQueuedTask(existing_doc.doc_id)));
+    if (found && existing_doc.content_hash == content_hash && will_be_processed) {
         // Duplicate - skip
         result->doc_id = existing_doc.doc_id;
         result->content_hash = content_hash;
@@ -213,6 +222,7 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
         result->content_hash = content_hash;
         result->status = is_update ? "updating" : "pending";
         result->is_duplicate = false;
+        result->superseded_doc_id = is_update ? old_doc_id : std::string();
         // [gap②] Pass the disk-full rejection through unchanged — masking it as
         // "queue full" would mislead the caller (F24 §6 wants CX_ERR_DISK_FULL
         // surfaced). The doc + blob are already saved at this point either way.
@@ -226,6 +236,7 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
     result->content_hash = content_hash;
     result->status = is_update ? "updating" : "pending";
     result->is_duplicate = false;
+    result->superseded_doc_id = is_update ? old_doc_id : std::string();
 
     CORTRIX_LOG_INFO("upload", "Upload success: doc_id={}, filename={}, status={}",
                     doc.doc_id, req.filename, result->status);

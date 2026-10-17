@@ -29,6 +29,9 @@ struct UploadResult {
     std::string content_hash;         // SHA-256 hex
     std::string status;               // "pending" | "skipped" | "updating"
     bool is_duplicate = false;        // true = content_hash unchanged, skip processing
+    /// Set only on "updating": the newest live version this upload was compared
+    /// against. Every older version is retired when the new one is ready.
+    std::string superseded_doc_id;
 };
 
 class UploadHandler {

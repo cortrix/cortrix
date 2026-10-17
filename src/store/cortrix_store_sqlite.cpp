@@ -594,8 +594,9 @@ int CortrixStoreSqlite::doc_update_status(const std::string& doc_id, DocStatus s
 
     // A soft-deleted row stays deleted: a status write from a task that was still
     // running when its document was deleted, or retired by a newer version, must
-    // not bring it back. RETURNING reports this statement's own outcome, which the
-    // connection-wide change count cannot do on a connection shared by requests.
+    // not bring it back. RETURNING says whether this statement changed the row; the
+    // row is returned before the autocommit commits, so the outcome counts only once
+    // the statement has finished (SQLITE_DONE).
     const char* sql = R"SQL(
         UPDATE documents SET status = ?, error_message = ?,
                updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
