@@ -44,6 +44,7 @@
 #include "cortrix/store/i_vector_store.h"
 #include "cortrix/store/iindex.h"
 #include "cortrix/store/iindex_factory.h"
+#include "cortrix/store/phnsw_errors.h"
 #include "cortrix/store/write_coordinator.h"
 
 namespace cortrix::test {
@@ -64,6 +65,11 @@ public:
         return cortrix::Status::Ok();
     }
     cortrix::Status MarkDelete(uint64_t id, const cortrix::observability::TraceContext*) override {
+        if (mark_delete_fail_from_ > 0 && ++mark_delete_calls_ >= mark_delete_fail_from_) {
+            return cortrix::store::PhnswStatus(cortrix::StatusCode::kUnavailable,
+                                               cortrix::store::phnsw_errors::kNotReady,
+                                               "forced");
+        }
         deleted_ids_.push_back(id);
         return cortrix::Status::Ok();
     }
@@ -94,6 +100,12 @@ public:
     cortrix::Status Recover(const cortrix::observability::TraceContext*) override { return cortrix::Status::Ok(); }
 
     void set_add_should_fail(bool v) { add_should_fail_ = v; }
+    // From the nth MarkDelete call after this is set (counting from 1), every call
+    // fails with CX_ERR_PHNSW_NOT_READY and records nothing; 0 turns it off.
+    void set_mark_delete_fail_from(int n) {
+        mark_delete_fail_from_ = n;
+        mark_delete_calls_ = 0;
+    }
     void set_search_result(std::vector<std::pair<uint64_t, float>> r) { search_result_ = std::move(r); }
     const std::vector<uint64_t>& added_ids() const { return added_ids_; }
     const std::vector<uint64_t>& deleted_ids() const { return deleted_ids_; }
@@ -104,6 +116,8 @@ private:
     std::vector<uint64_t> deleted_ids_;
     std::vector<std::pair<uint64_t, float>> search_result_;
     bool add_should_fail_ = false;
+    int mark_delete_fail_from_ = 0;
+    int mark_delete_calls_ = 0;
 };
 
 class MockIndexFactory : public cortrix::store::IIndexFactory {

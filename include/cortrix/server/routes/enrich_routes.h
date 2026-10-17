@@ -33,7 +33,14 @@ namespace cortrix {
 ///     4. run one sweep for this namespace → kTaskEnrichBackfill tasks.
 ///     Response: {namespace, audited, reset_given_up, removed, synthesized, settled,
 ///                reset, orphaned_skipped, enqueued, counts{...}}; every count is
-///                present on every 200, 0 when its step did not run.
+///                present on every 200, 0 when its step did not run. `removed`
+///                counts the entries this request deleted; a concurrent audit's
+///                deletes are its own.
+///     A failure in step 1 or 2 answers the error with structured_data.removed:
+///     the entries this request removed before it, which stay in place (0 when
+///     none). When that is more than 0, the operation log gets an enrich_backfill
+///     entry "removed=N failed=<error.code>". A failure before step 1 carries no
+///     `removed`; nothing was removed.
 ///
 /// `chain_tokens` = the tokens of the CURRENTLY configured enricher chain
 /// ("f03"/"f35"/"f38") — the owed universe for the audit; empty ⇒ the endpoint
