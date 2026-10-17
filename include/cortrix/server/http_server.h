@@ -105,6 +105,16 @@ private:
 /// Write JSON error response
 void WriteJsonError(httplib::Response& res, const Status& status,
                     const std::string& request_id = "");
+/// The same error response with `structured_data` set to the given object, for an
+/// error that carries machine-readable detail. A name of its own, not an overload,
+/// so no existing call can resolve to it.
+void WriteJsonErrorWithData(httplib::Response& res, const Status& status,
+                            const nlohmann::json& structured_data,
+                            const std::string& request_id);
+/// The `error.code` the error writers send for `status`: its CX_ERR_* token, or the
+/// generic code of its status code. For a log entry that must name the same code
+/// as the response.
+std::string ResolvedErrorCode(const Status& status);
 void WriteJsonResponse(httplib::Response& res, int http_status, const nlohmann::json& body,
                        const std::string& request_id = "");
 

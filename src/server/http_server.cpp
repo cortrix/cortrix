@@ -316,21 +316,29 @@ ResolvedError ResolveError(const Status& status) {
 
 }  // namespace
 
+std::string ResolvedErrorCode(const Status& status) { return ResolveError(status).code; }
+
 void WriteJsonError(httplib::Response& res, const Status& status, const std::string& request_id) {
+    WriteJsonErrorWithData(res, status, nlohmann::json::object(), request_id);
+}
+
+void WriteJsonErrorWithData(httplib::Response& res, const Status& status,
+                            const nlohmann::json& structured_data,
+                            const std::string& request_id) {
     nlohmann::json body;
     // GEN-Agent error schema (AGENT_FRIENDLY sec.3.1 - 6 fields). The legacy
     // code/message/request_id/timestamp are preserved; retryable/category/
     // retry_after_ms/structured_data are added so Agents can route deterministically
     // (R2-C3). code/category/retryable resolve via the CX_ERR_* token + sec.3 SoT
-    // map (StatusCode fallback); structured_data defaults to an empty object
-    // (always present per principle 7's stable schema).
+    // map (StatusCode fallback); structured_data is an empty object unless the caller
+    // gives one (always present per principle 7's stable schema).
     const ResolvedError resolved = ResolveError(status);
     body["error"]["code"] = resolved.code;
     body["error"]["message"] = status.message();
     body["error"]["retryable"] = resolved.retryable;
     body["error"]["category"] = agent_friendly::ToString(resolved.category);
     body["error"]["retry_after_ms"] = nullptr;  // coarse Status carries no hint
-    body["error"]["structured_data"] = nlohmann::json::object();
+    body["error"]["structured_data"] = structured_data;
     if (!request_id.empty()) {
         body["error"]["request_id"] = request_id;
         res.set_header("X-Request-Id", request_id);

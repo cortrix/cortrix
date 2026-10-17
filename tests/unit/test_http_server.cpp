@@ -134,6 +134,35 @@ TEST(WriteJsonErrorTest, AllStatusCodesMapCorrectly) {
     }
 }
 
+// #174: the writer for an error with machine-readable detail puts the given object in
+// structured_data; the plain writer still writes an empty object, not null.
+TEST(WriteJsonErrorTest, StructuredDataIsAnEmptyObjectUnlessGiven) {
+    httplib::Response plain;
+    WriteJsonError(plain, Status::Internal("fail"), "req-1");
+    EXPECT_EQ(json::parse(plain.body)["error"]["structured_data"], json::object());
+
+    httplib::Response with_data;
+    WriteJsonErrorWithData(with_data, Status::Unavailable("CX_ERR_PHNSW_NOT_READY: forced"),
+                           json{{"removed", 3}}, "req-2");
+    const auto body = json::parse(with_data.body);
+    EXPECT_EQ(body["error"]["structured_data"], (json{{"removed", 3}}));
+    EXPECT_EQ(body["error"]["code"], "CX_ERR_PHNSW_NOT_READY");
+    EXPECT_EQ(body["error"]["request_id"], "req-2");
+    EXPECT_EQ(with_data.status, 503);
+}
+
+// The code a log entry names is the code the response carries.
+TEST(WriteJsonErrorTest, ResolvedErrorCodeIsTheResponsesCode) {
+    for (const Status& s : {Status::Unavailable("CX_ERR_PHNSW_NOT_READY: forced"),
+                            Status::Internal("CX_ERR_ENRICH_STATE_STORE: reset: forced"),
+                            Status::Internal("no token here")}) {
+        SCOPED_TRACE(s.message());
+        httplib::Response res;
+        WriteJsonError(res, s, "");
+        EXPECT_EQ(ResolvedErrorCode(s), json::parse(res.body)["error"]["code"]);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // WriteJsonResponse tests
 // ---------------------------------------------------------------------------

@@ -25,11 +25,18 @@ namespace cortrix {
 ///     2. make every 'pending_retry' row due now;
 ///     3. run one sweep for this namespace → kTaskEnrichBackfill tasks.
 ///     Response: {namespace, audited, removed, synthesized, enqueued, counts{...}};
-///     `removed` is 0 when audit is false.
+///     `removed` is 0 when audit is false, and counts the entries this request
+///     deleted; a concurrent audit's deletes are its own.
+///     A failure in step 1 answers the error with structured_data.removed: the
+///     entries this request removed before it, which stay in place (0 when none).
+///     When that is more than 0, the operation log gets an enrich_backfill entry
+///     "removed=N failed=<error.code>". A failure before step 1 carries no
+///     `removed`; nothing was removed.
 ///
 /// `chain_tokens` = the tokens of the CURRENTLY configured enricher chain
 /// ("f03"/"f35"/"f38") — the owed universe for the audit; empty ⇒ the endpoint
-/// answers 409 (enrichment not configured, nothing to backfill toward).
+/// answers 400 (CX_ERR_ENRICH_BACKFILL_NOT_CONFIGURED: enrichment not configured,
+/// nothing to backfill toward).
 void RegisterEnrichRoutes(httplib::Server& server,
                           resource::INamespacePool& pool,
                           ApiKeyAuth& auth,

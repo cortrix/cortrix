@@ -148,6 +148,53 @@ TEST_F(ContextualStoreTest, VecLabelNullDbRejected) {
     row.child_id = "c";
     EXPECT_FALSE(WriteContextualVecLabel(nullptr, row).ok());
     EXPECT_FALSE(GetContextualVecLabel(nullptr, 1).ok());
+    EXPECT_FALSE(DeleteContextualVecLabel(nullptr, 1).ok());
+}
+
+// #174: the delete says whether this call removed the row: true for an existing row,
+// then false for the same label, which is not an error.
+TEST_F(ContextualStoreTest, VecLabelDeleteSaysWhetherThisCallRemovedTheRow) {
+    ContextualVecLabelRow row;
+    row.label = 7101;
+    row.block_id = 7;
+    row.child_id = "c7101";
+    ASSERT_TRUE(WriteContextualVecLabel(db_, row).ok());
+    auto first = DeleteContextualVecLabel(db_, row.label);
+    ASSERT_TRUE(first.ok()) << first.status().message();
+    EXPECT_TRUE(first.value());
+    EXPECT_FALSE(GetContextualVecLabel(db_, row.label).ok());
+    auto second = DeleteContextualVecLabel(db_, row.label);
+    ASSERT_TRUE(second.ok()) << second.status().message();
+    EXPECT_FALSE(second.value());
+}
+
+// The statement hands its row back before the autocommit commits, so a commit that
+// fails must be an error with the row left in place, not a removal. A deferred
+// foreign key makes the commit fail after the row has come back; a trigger could
+// not, since it fails the statement before any row is returned. The control without
+// the pinning row shows the same call removing it.
+TEST_F(ContextualStoreTest, VecLabelDeleteWhoseCommitFailsIsAnErrorAndKeepsTheRow) {
+    ContextualVecLabelRow row;
+    row.label = 7102;
+    row.block_id = 7;
+    row.child_id = "c7102";
+    ASSERT_TRUE(WriteContextualVecLabel(db_, row).ok());
+    ASSERT_EQ(sqlite3_exec(db_,
+        "PRAGMA foreign_keys = ON;"
+        "CREATE TABLE pin(l INTEGER REFERENCES contextual_vec_labels(label)"
+        " DEFERRABLE INITIALLY DEFERRED);"
+        "INSERT INTO pin VALUES (7102)",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+
+    auto failed = DeleteContextualVecLabel(db_, row.label);
+    EXPECT_FALSE(failed.ok()) << "a failed commit was counted as a removal";
+    EXPECT_TRUE(GetContextualVecLabel(db_, row.label).ok()) << "the row must stay";
+
+    ASSERT_EQ(sqlite3_exec(db_, "DELETE FROM pin", nullptr, nullptr, nullptr), SQLITE_OK);
+    auto removed = DeleteContextualVecLabel(db_, row.label);
+    ASSERT_TRUE(removed.ok()) << removed.status().message();
+    EXPECT_TRUE(removed.value());
+    EXPECT_FALSE(GetContextualVecLabel(db_, row.label).ok());
 }
 
 }  // namespace

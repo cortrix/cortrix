@@ -100,8 +100,15 @@ Result<int> SynthesizeEnrichAuditRows(
 /// member through the provider, which re-adds the point under the same label and
 /// writes the label row. Labels whose block no longer exists are not this
 /// function's concern. An absent labels table reads as nothing to remove.
-/// Returns the number removed.
-Result<int> ReconcileExcludedContextualLabels(
+/// Returns the number of rows this call deleted, which another audit's deletes
+/// never count towards, and keeps that number across a failure (ReconcileOutcome).
+struct ReconcileOutcome {
+    int removed = 0;  ///< rows this call deleted, before `status` when it failed
+    Status status;    ///< the first failure, or Ok
+};
+/// Unlike Result<T>, the outcome carries the count with a failure: the removals
+/// made before it stay in place, and the caller reports them.
+ReconcileOutcome ReconcileExcludedContextualLabels(
     sqlite3* db, const std::function<Status(uint64_t label)>& mark_point_deleted);
 
 }  // namespace cortrix::spc
