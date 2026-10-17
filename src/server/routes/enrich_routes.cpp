@@ -100,6 +100,28 @@ void RegisterEnrichRoutes(httplib::Server& server,
                 int synthesized = 0;
                 int removed = 0;
 
+                // A failure once the audit has started answers the error with
+                // structured_data.removed, the entries this request removed before it:
+                // those removals stay in place. When there were any, they are logged
+                // first, as the success path logs them. The log entry and the response
+                // take the code from the same resolver.
+                auto audit_failure = [&](const Status& s, int removed_so_far) {
+                    if (oplog && removed_so_far > 0) {
+                        observability::OperationLogEntry e;
+                        e.user_id = rctx.auth.user_id;
+                        e.action = "enrich_backfill";
+                        e.resource_type = "namespace";
+                        e.resource_id = ns_name;
+                        e.namespace_id = ns_name;
+                        e.summary = "removed=" + std::to_string(removed_so_far) +
+                                    " failed=" + ResolvedErrorCode(s);
+                        e.trace_id = rctx.request_id;
+                        oplog->Log(e);
+                    }
+                    WriteJsonErrorWithData(res, s, nlohmann::json{{"removed", removed_so_far}},
+                                           rctx.request_id);
+                };
+
                 if (audit) {
                     // The audit reconciles both directions of the ingest's index
                     // rule. First remove contextual index entries the rule excludes
@@ -113,14 +135,14 @@ void RegisterEnrichRoutes(httplib::Server& server,
                         db, [&facade](uint64_t label) {
                             return facade.vec_index().MarkDelete(label);
                         });
-                    if (!rec.ok()) {
-                        WriteJsonError(res, rec.status(), rctx.request_id);
+                    if (!rec.status.ok()) {
+                        audit_failure(rec.status, rec.removed);
                         return;
                     }
-                    removed = rec.value();
+                    removed = rec.removed;
                     auto synth = spc::SynthesizeEnrichAuditRows(db, configured, now);
                     if (!synth.ok()) {
-                        WriteJsonError(res, synth.status(), rctx.request_id);
+                        audit_failure(synth.status(), removed);
                         return;
                     }
                     synthesized = synth.value();

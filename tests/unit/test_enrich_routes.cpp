@@ -214,5 +214,85 @@ TEST_F(EnrichRoutesTest, AuditOffRemovesNothing) {
     EXPECT_EQ(LastSummary(), "removed=0 synthesized=0 enqueued=0");
 }
 
+// --- #174: a failure after removals reports them ----------------------------------
+
+std::vector<uint64_t> SortedDeleted(cortrix::test::FakeIndex* index) {
+    std::vector<uint64_t> d = index->deleted_ids();
+    std::sort(d.begin(), d.end());
+    return d;
+}
+
+// The index delete fails from the second excluded entry: the error says the first
+// was removed, the removal is logged with the error's code, and the second entry's
+// row stays. A later request then removes what remains and reports only that.
+TEST_F(EnrichRoutesTest, AuditFailurePartWayReportsTheRemovalsMadeBeforeIt) {
+    sqlite3* db = Db();
+    ASSERT_NE(db, nullptr);
+    SeedLabelledChunk(db, "doc-skip", 3, 601, R"({"cleaning.skip_index":true})", 7601);
+    SeedLabelledChunk(db, "doc-l2", 2, 602, nullptr, 7602);
+    harness_->fake_index()->set_mark_delete_fail_from(2);
+
+    auto res = Post("");
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 503) << res->body;
+    auto j = json::parse(res->body);
+    EXPECT_EQ(j["error"]["code"], "CX_ERR_PHNSW_NOT_READY");
+    EXPECT_EQ(j["error"]["structured_data"]["removed"], 1) << res->body;
+    ASSERT_EQ(oplog_.entries.size(), 1u);
+    EXPECT_EQ(LastSummary(), "removed=1 failed=CX_ERR_PHNSW_NOT_READY");
+    EXPECT_EQ(SortedDeleted(harness_->fake_index()), (std::vector<uint64_t>{7601}));
+    EXPECT_EQ(Count(db, "SELECT COUNT(*) FROM contextual_vec_labels WHERE label=7601"), 0);
+    EXPECT_EQ(Count(db, "SELECT COUNT(*) FROM contextual_vec_labels WHERE label=7602"), 1);
+
+    harness_->fake_index()->set_mark_delete_fail_from(0);
+    auto later = Post("");
+    ASSERT_TRUE(later);
+    ASSERT_EQ(later->status, 200) << later->body;
+    EXPECT_EQ(json::parse(later->body)["removed"], 1);
+    EXPECT_EQ(SortedDeleted(harness_->fake_index()), (std::vector<uint64_t>{7601, 7602}));
+    EXPECT_EQ(LastSummary().rfind("removed=1 synthesized=", 0), 0u) << LastSummary();
+}
+
+// The removals succeed and the synthesis then fails: the error still reports them.
+// The synthesis fails deterministically on a dropped ledger table, which the
+// reconcile never reads.
+TEST_F(EnrichRoutesTest, SynthesisFailureAfterRemovalsReportsThem) {
+    sqlite3* db = Db();
+    ASSERT_NE(db, nullptr);
+    SeedLabelledChunk(db, "doc-skip", 3, 601, R"({"cleaning.skip_index":true})", 7601);
+    SeedLabelledChunk(db, "doc-l2", 2, 602, nullptr, 7602);
+    Exec(db, "DROP TABLE enrich_state");
+
+    auto res = Post("");
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 500) << res->body;
+    auto j = json::parse(res->body);
+    EXPECT_EQ(j["error"]["code"], "CX_ERR_ENRICH_STATE_STORE");
+    EXPECT_EQ(j["error"]["structured_data"]["removed"], 2) << res->body;
+    EXPECT_EQ(LastSummary(), "removed=2 failed=CX_ERR_ENRICH_STATE_STORE");
+    EXPECT_EQ(SortedDeleted(harness_->fake_index()), (std::vector<uint64_t>{7601, 7602}));
+    EXPECT_EQ(Count(db, "SELECT COUNT(*) FROM contextual_vec_labels"
+                        " WHERE label IN (7601, 7602)"), 0);
+}
+
+// A failure before any removal says so with removed = 0, and logs nothing: the log
+// records removals, and there were none.
+TEST_F(EnrichRoutesTest, AuditFailureBeforeAnyRemovalReportsZeroAndLogsNothing) {
+    sqlite3* db = Db();
+    ASSERT_NE(db, nullptr);
+    SeedLabelledChunk(db, "doc-skip", 3, 601, R"({"cleaning.skip_index":true})", 7601);
+    harness_->fake_index()->set_mark_delete_fail_from(1);
+
+    auto res = Post("");
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 503) << res->body;
+    auto j = json::parse(res->body);
+    EXPECT_EQ(j["error"]["code"], "CX_ERR_PHNSW_NOT_READY");
+    EXPECT_EQ(j["error"]["structured_data"]["removed"], 0) << res->body;
+    EXPECT_TRUE(oplog_.entries.empty());
+    EXPECT_TRUE(harness_->fake_index()->deleted_ids().empty());
+    EXPECT_EQ(Count(db, "SELECT COUNT(*) FROM contextual_vec_labels WHERE label=7601"), 1);
+}
+
 }  // namespace
 }  // namespace cortrix

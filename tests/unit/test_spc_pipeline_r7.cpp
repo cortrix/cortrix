@@ -1117,8 +1117,8 @@ TEST_F(SPCPipelineR7Test, EnrichAudit_ReconcileRemovesPointsOfSkipIndexChunks) {
 
     auto removed = cortrix::spc::ReconcileExcludedContextualLabels(
         db, [&](uint64_t label) { return facade_->vec_index().MarkDelete(label); });
-    ASSERT_TRUE(removed.ok()) << removed.status().message();
-    EXPECT_EQ(removed.value(), 3);
+    ASSERT_TRUE(removed.status.ok()) << removed.status.message();
+    EXPECT_EQ(removed.removed, 3);
     std::vector<uint64_t> deleted = fake_index_->deleted_ids();
     std::sort(deleted.begin(), deleted.end());
     std::sort(labels.begin(), labels.end());

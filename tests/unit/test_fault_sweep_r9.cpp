@@ -42,7 +42,9 @@
 #include "cortrix/memory/memory_block_adapter.h"
 #include "cortrix/memory/memory_extractor.h"  // memory::MemoryBlockRecord
 #include "cortrix/store/phnsw.h"
+#include "cortrix/spc/contextual_store.h"
 #include "cortrix/spc/onnx_embedder.h"
+#include "cortrix/spc_enricher/f35_schema_provider.h"
 #include "fault_inject/fault_inject.h"
 
 namespace cortrix {
@@ -263,6 +265,28 @@ TEST_F(StoreFaultSweepTest, BlockDeleteByDocPwriteFaultSweep) {
         },
         [](CortrixStoreSqlite& s, int k) {
             return s.block_delete_by_doc("kdoc_" + std::to_string(k));
+        });
+}
+
+// DeleteContextualVecLabel: a DELETE ... RETURNING whose row comes back before the
+// autocommit commits, so a commit that fails must fail the call rather than count
+// the row. The labels table comes from its schema provider, migrated on each fresh
+// store; its column additions are guarded, so re-running it is safe.
+TEST_F(StoreFaultSweepTest, ContextualLabelDeletePwriteFaultSweep) {
+    SweepStoreWrite(this, "DeleteContextualVecLabel",
+        [](CortrixStoreSqlite& s, int k) {
+            spc::F35SchemaProvider p;
+            ASSERT_TRUE(p.Migrate(s.db_handle(), 0, p.CurrentVersion()).ok());
+            spc::ContextualVecLabelRow row;
+            row.label = 8000 + static_cast<uint64_t>(k);
+            row.block_id = 1;
+            row.child_id = "lchild_" + std::to_string(k);
+            ASSERT_TRUE(spc::WriteContextualVecLabel(s.db_handle(), row).ok());
+        },
+        [](CortrixStoreSqlite& s, int k) {
+            auto removed =
+                spc::DeleteContextualVecLabel(s.db_handle(), 8000 + static_cast<uint64_t>(k));
+            return removed.ok() ? 0 : 1;
         });
 }
 
