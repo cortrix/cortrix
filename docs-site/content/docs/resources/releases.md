@@ -45,6 +45,8 @@ For the scope and limits of the measurements, see [Benchmark evidence](/docs/res
 | Ingestion into a single namespace is constrained by serialized durability and index updates | [#73](https://github.com/cortrix/cortrix/issues/73) |
 | Cross-encoder reranking is on by default, even for tasks where turning it off is the better choice | [#75](https://github.com/cortrix/cortrix/issues/75) |
 | Uploading a changed version of a file, or changing a watched file, can leave the previous version's passages in query results; the issue lists workarounds | [#157](https://github.com/cortrix/cortrix/issues/157) |
+| The server can crash with a segmentation fault while it exits, for example after a start that can't bind its port while document tasks are queued; make sure the port is free before you start it | [#196](https://github.com/cortrix/cortrix/issues/196) |
+| A failed task's progress always reports `retryable_if_fail: true`, even when resubmitting it will fail the same way; cap your retries | [#199](https://github.com/cortrix/cortrix/issues/199) |
 
 ## Release artifacts {#artifacts}
 
