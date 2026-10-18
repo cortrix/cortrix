@@ -9,6 +9,11 @@
 #include <thread>
 #include <chrono>
 #include <cstdio>
+#include <atomic>
+#include <cstdlib>
+#include <vector>
+
+#include <unistd.h>
 
 namespace cortrix {
 namespace {
@@ -326,6 +331,97 @@ TEST_F(LoggingTest, OffLevelSuppressesAllMessages) {
     EXPECT_TRUE(content.empty()) << "off level should suppress all messages";
     file.close();
     std::remove(log_file.c_str());
+}
+
+// ---------------------------------------------------------------------------
+// Logging after ShutdownLogging() (#196). ShutdownLogging() used to call
+// spdlog::shutdown(), which drops the default logger; the logging macros and
+// spdlog's free functions dereference it unchecked, so a line written afterwards
+// (a worker still finishing its task) killed the process. ShutdownLogging() now
+// flushes and keeps the loggers. Each statement runs in a re-executed child
+// (threadsafe style, so no flusher thread is inherited from earlier tests in this
+// process), initialises logging itself and reports through its exit code.
+// ---------------------------------------------------------------------------
+
+std::string AfterShutdownLogPath(pid_t parent, const char* tag) {
+    return ::testing::TempDir() + "cortrix_log_after_shutdown_" + tag + "_" +
+           std::to_string(parent) + ".txt";
+}
+
+[[noreturn]] void LogLinesAfterShutdown() {
+    alarm(60);
+    const std::string path = AfterShutdownLogPath(getppid(), "lines");
+    LogConfig cfg;
+    cfg.level = "info";
+    cfg.format = "text";
+    cfg.output = path;
+    InitLogging(cfg);
+    ShutdownLogging();
+    CORTRIX_LOG_WARN("test", "marker-warn-after-shutdown");
+    CORTRIX_LOG_ERROR("test", "marker-error-after-shutdown");
+    spdlog::warn("marker-direct-after-shutdown");
+    // Last, so that only the next ShutdownLogging() writes it out: WARN and ERROR
+    // flush on their own and would carry an earlier INFO line with them.
+    CORTRIX_LOG_INFO("test", "marker-info-after-shutdown");
+    ShutdownLogging();
+    std::ifstream in(path);
+    std::stringstream text;
+    text << in.rdbuf();
+    in.close();
+    std::remove(path.c_str());
+    const std::string s = text.str();
+    const bool all = s.find("marker-warn-after-shutdown") != std::string::npos &&
+                     s.find("marker-error-after-shutdown") != std::string::npos &&
+                     s.find("marker-direct-after-shutdown") != std::string::npos &&
+                     s.find("marker-info-after-shutdown") != std::string::npos;
+    std::_Exit(all ? 0 : 3);
+}
+
+[[noreturn]] void ThreadsLogAcrossShutdown() {
+    alarm(120);
+    const std::string path = AfterShutdownLogPath(getppid(), "threads");
+    LogConfig cfg;
+    cfg.level = "info";
+    cfg.format = "text";
+    cfg.output = path;
+    InitLogging(cfg);
+    std::atomic<bool> start{false};
+    std::atomic<int> done{0};
+    std::vector<std::thread> writers;
+    for (int t = 0; t < 4; ++t) {
+        writers.emplace_back([&start, &done, t] {
+            while (!start.load(std::memory_order_acquire)) {
+            }
+            for (int i = 0; i < 20000; ++i) {
+                if (i % 2 == 0) {
+                    spdlog::warn("writer {} line {}", t, i);
+                } else {
+                    CORTRIX_LOG_INFO("test", "writer {} line {}", t, i);
+                }
+            }
+            done.fetch_add(1, std::memory_order_acq_rel);
+        });
+    }
+    ShutdownLogging();
+    start.store(true, std::memory_order_release);
+    // Keep shutting down for as long as anyone writes, so the calls cover the whole
+    // write period whatever the scheduling.
+    while (done.load(std::memory_order_acquire) < 4) ShutdownLogging();
+    for (auto& w : writers) w.join();
+    std::remove(path.c_str());
+    std::_Exit(0);
+}
+
+TEST(LoggingAfterShutdownDeathTest, LinesAfterShutdownReachTheFile) {
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    EXPECT_EXIT(LogLinesAfterShutdown(), ::testing::ExitedWithCode(0), "");
+    std::remove(AfterShutdownLogPath(getpid(), "lines").c_str());
+}
+
+TEST(LoggingAfterShutdownDeathTest, ThreadsLoggingAcrossShutdownSurvive) {
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    EXPECT_EXIT(ThreadsLogAcrossShutdown(), ::testing::ExitedWithCode(0), "");
+    std::remove(AfterShutdownLogPath(getpid(), "threads").c_str());
 }
 
 }  // namespace

@@ -78,9 +78,9 @@ protected:
     void TearDown() override {
         for (const char* v : kDiskEnv) unsetenv(v);
         unsetenv("CORTRIX_METRICS_PORT");
-        // RunServer's exit path calls ShutdownLogging(), dropping the global
-        // spdlog state. Restore a default logger so later tests in a monolithic
-        // run keep a live logging backend.
+        // RunServer leaves its logger writing to this fixture's log file (its exit
+        // path only flushes). Restore a default logger before the file is removed,
+        // so later tests in a monolithic run log somewhere real.
         LogConfig lc;
         InitLogging(lc);
         std::error_code ec;
