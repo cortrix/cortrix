@@ -9,7 +9,13 @@ struct LogConfig;  // forward decl
 /// Initialize logging system
 void InitLogging(const LogConfig& config);
 
-/// Shutdown logging system (flush + drop)
+/// Flush every logger. The loggers stay in place until the process exits (or until
+/// the next InitLogging, which drops them first), because threads that are still
+/// stopping may write to them: a line logged after this call is written, not a crash.
+/// A log file therefore stays open until then; on a normal exit spdlog's registry
+/// closes it. Lines written after the last flush reach the file within a second
+/// (the periodic flusher) or at that exit, WARN and above at once; console output
+/// is flushed line by line.
 void ShutdownLogging();
 
 }  // namespace cortrix

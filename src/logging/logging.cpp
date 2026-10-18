@@ -66,7 +66,12 @@ void InitLogging(const LogConfig& config) {
 }
 
 void ShutdownLogging() {
-    spdlog::shutdown();
+    // Flush only. spdlog::shutdown() would drop the default logger, and the logging
+    // macros dereference it without a check, so any thread still logging (a worker
+    // finishing its task, an extraction draining its queue) would crash the process.
+    // The registry is a function-local static built by InitLogging, so it outlives
+    // every local of the server's run function and every thread they join.
+    spdlog::apply_all([](const std::shared_ptr<spdlog::logger>& logger) { logger->flush(); });
 }
 
 }  // namespace cortrix
