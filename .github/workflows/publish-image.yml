@@ -3,8 +3,9 @@
 # Registry as one multi-platform tag.
 #
 # It publishes only an existing annotated release tag, only when the tag
-# resolves to the full commit given as input, and only when that commit's
-# VERSION file names the tag. Each platform image is built once on a native
+# resolves to the full commit given as input, only when that commit's VERSION
+# file names the tag, and only when its LICENSE is the Apache License 2.0, which
+# the published image is labelled with. Each platform image is built once on a native
 # runner and must carry that commit in its revision label, pass the Quick
 # Start, and pass the same Trivy HIGH/CRITICAL gate the Release Gate uses. Only
 # then is it pushed, untagged and by digest, to the release package, and the
@@ -105,6 +106,19 @@ jobs:
           test "$RELEASE_TAG" = "$EXPECTED_TAG" \
             || { echo "release_tag must match VERSION: expected $EXPECTED_TAG"; exit 1; }
           python3 scripts/sync_version.py --check
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: ci-tooling
+          persist-credentials: false
+
+      - name: Require the Apache License 2.0
+        # The tag's index is annotated Apache-2.0 below. An earlier release
+        # candidate was published under another license, so the release commit's
+        # own LICENSE decides, before anything is built or pushed. The check comes
+        # from the dispatched commit, like the other checks this workflow runs.
+        run: python3 ci-tooling/scripts/ci/publish_image_verify.py license LICENSE
 
   build:
     needs: identity
@@ -246,9 +260,7 @@ jobs:
           python3 ci-tooling/scripts/ci/publish_image_verify.py bind \
             --load-meta "$RUNNER_TEMP/meta-load.json" \
             --push-meta "$RUNNER_TEMP/meta-push.json" \
-            --manifest "$RUNNER_TEMP/pushed-manifest.json" \
-            --diff-ids-local "$(docker image inspect "$CANDIDATE" --format '{{json .RootFS.Layers}}')" \
-            --remote-config "$RUNNER_TEMP/pushed-config.json"
+            --manifest "$RUNNER_TEMP/pushed-manifest.json"
           python3 ci-tooling/scripts/ci/publish_image_verify.py config "$RUNNER_TEMP/pushed-config.json" \
             --platform "$PLATFORM" --revision "$SOURCE_REVISION"
           {

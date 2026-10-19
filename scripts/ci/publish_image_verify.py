@@ -25,12 +25,16 @@ Subcommands
       `org.opencontainers.image.revision` label equals SHA.
 
   bind --load-meta FILE --push-meta FILE --manifest FILE
-       [--diff-ids-local JSON --remote-config FILE]
       The image that was gated is the image that was pushed: the config digest
       recorded by the `--load` build, the one recorded by the push-by-digest
-      export, and the `config.digest` of the pushed manifest are one value. When a
-      metadata file lacks the key, the fallback witness is the local image's
-      rootfs layer list against the remote config's `rootfs.diff_ids`.
+      export, and the `config.digest` of the pushed manifest are one value. The
+      config digest covers the whole image config (layers, Cmd, Entrypoint, Env,
+      User, labels), so nothing weaker is accepted: a digest either file records
+      must match, and a file that records none fails the check.
+
+  license FILE
+      FILE is the Apache License 2.0, the license the published image is
+      labelled with.
 
   index FILE --expect linux/amd64=DIGEST --expect linux/arm64=DIGEST
       FILE is the created tag's index (OCI index or Docker manifest list) and its
@@ -182,42 +186,37 @@ def cmd_bind(args: argparse.Namespace) -> int:
     load_digest = _config_digest_from_meta(args.load_meta)
     push_digest = _config_digest_from_meta(args.push_meta)
 
-    if load_digest is not None and push_digest is not None:
-        if not (load_digest == push_digest == remote):
+    # Every digest that is known must match, whether or not the other is known.
+    for path, digest in ((args.load_meta, load_digest), (args.push_meta, push_digest)):
+        if digest is not None and digest != remote:
             raise Violation(
                 "the gated image is not the pushed image: config digests differ "
-                f"(load {load_digest}, push {push_digest}, registry {remote})"
+                f"({path} names {digest}, registry {remote})"
             )
-        print(f"bound by config digest {remote}")
-        return 0
+    # Equal layers do not make equal images (Cmd, Entrypoint, Env and User live in
+    # the config), so a missing digest is not replaced by a weaker witness.
+    missing = [p for p, d in ((args.load_meta, load_digest), (args.push_meta, push_digest)) if d is None]
+    if missing:
+        raise Violation(
+            f"{', '.join(missing)}: no {CONFIG_DIGEST_KEY}; the gated image cannot be "
+            "bound to the pushed image"
+        )
+    print(f"bound by config digest {remote}")
+    return 0
 
-    # Fallback witness: the local image's layer list against the remote config.
-    if not args.diff_ids_local or not args.remote_config:
-        missing = [
-            p for p, d in ((args.load_meta, load_digest), (args.push_meta, push_digest)) if d is None
-        ]
-        raise Violation(
-            f"{', '.join(missing)}: no {CONFIG_DIGEST_KEY}; pass --diff-ids-local and "
-            "--remote-config for the layer-list witness"
-        )
+
+def cmd_license(args: argparse.Namespace) -> int:
     try:
-        local_layers = json.loads(args.diff_ids_local)
-    except json.JSONDecodeError as exc:
-        raise Violation(f"--diff-ids-local is not JSON ({exc})")
-    if not isinstance(local_layers, list) or not local_layers:
-        raise Violation("--diff-ids-local must be a non-empty JSON list of layer digests")
-    remote_cfg = _load_json(args.remote_config)
-    remote_layers = (remote_cfg.get("rootfs") or {}).get("diff_ids") if isinstance(remote_cfg, dict) else None
-    if not isinstance(remote_layers, list):
-        raise Violation(f"{args.remote_config}: no rootfs.diff_ids")
-    if local_layers != remote_layers:
+        with open(args.file, "r", encoding="utf-8", errors="replace") as fh:
+            head = " ".join(line.strip() for line in fh.read().splitlines()[:5] if line.strip())
+    except FileNotFoundError:
+        raise Violation(f"{args.file}: file not found")
+    if not (head.startswith("Apache License") and "Version 2.0" in head):
         raise Violation(
-            "the gated image is not the pushed image: layer lists differ "
-            f"(local {len(local_layers)} layers, registry {len(remote_layers)} layers, or different content)"
+            f"{args.file}: not the Apache License 2.0 (it begins {head[:60]!r}); "
+            "the image is labelled Apache-2.0, so this release cannot be published"
         )
-    if push_digest is not None and push_digest != remote:
-        raise Violation(f"push metadata names config {push_digest} but the registry has {remote}")
-    print(f"bound by layer list ({len(local_layers)} layers), registry config {remote}")
+    print("Apache-2.0")
     return 0
 
 
@@ -299,9 +298,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--load-meta", required=True)
     p.add_argument("--push-meta", required=True)
     p.add_argument("--manifest", required=True)
-    p.add_argument("--diff-ids-local")
-    p.add_argument("--remote-config")
     p.set_defaults(func=cmd_bind)
+
+    p = sub.add_parser("license", help="the release is licensed under the Apache License 2.0")
+    p.add_argument("file")
+    p.set_defaults(func=cmd_license)
 
     p = sub.add_parser("index", help="the created tag references exactly the gated digests")
     p.add_argument("file")

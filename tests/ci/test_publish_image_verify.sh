@@ -96,6 +96,9 @@ printf '{"containerimage.config.digest":"%s","containerimage.digest":"%s"}' "$CF
 printf '{"containerimage.config.digest":"%s","containerimage.digest":"%s"}' "$CFG" "$A" > "$TMP/meta_push.json"
 printf '{"containerimage.config.digest":"%s","containerimage.digest":"%s"}' "$CFG2" "$A" > "$TMP/meta_push_other.json"
 printf '{"containerimage.digest":"%s"}' "$A" > "$TMP/meta_no_config.json"
+printf '{"containerimage.config.digest":"%s","containerimage.digest":"%s"}' "$CFG2" "$A" > "$TMP/meta_load_other.json"
+printf '%s\n' '' '                                 Apache License' '                           Version 2.0, January 2004' '                        http://www.apache.org/licenses/' > "$TMP/license_apache"
+printf '%s\n' '                    GNU AFFERO GENERAL PUBLIC LICENSE' '                       Version 3, 19 November 2007' > "$TMP/license_agpl"
 mkdir -p "$TMP/d_good" "$TMP/d_missing" "$TMP/d_same" "$TMP/d_bad" "$TMP/d_extra"
 printf '%s\n' "$A" > "$TMP/d_good/amd64";  printf '%s\n' "$B" > "$TMP/d_good/arm64"
 printf '%s\n' "$A" > "$TMP/d_missing/amd64"
@@ -126,9 +129,21 @@ expect_fail "config: wrong revision label"              "$PY" "$SCRIPT" config "
 expect_ok   "bind: load, push and registry agree"       "$PY" "$SCRIPT" bind --load-meta "$TMP/meta_load.json" --push-meta "$TMP/meta_push.json" --manifest "$TMP/manifest_oci.json"
 expect_fail "bind: push metadata names another config"  "$PY" "$SCRIPT" bind --load-meta "$TMP/meta_load.json" --push-meta "$TMP/meta_push_other.json" --manifest "$TMP/manifest_oci.json"
 expect_fail "bind: registry holds another config"       "$PY" "$SCRIPT" bind --load-meta "$TMP/meta_load.json" --push-meta "$TMP/meta_push.json" --manifest "$TMP/manifest_other_config.json"
-expect_fail "bind: metadata lacks the key, no witness"  "$PY" "$SCRIPT" bind --load-meta "$TMP/meta_no_config.json" --push-meta "$TMP/meta_push.json" --manifest "$TMP/manifest_oci.json"
-expect_ok   "bind: layer-list witness agrees"           "$PY" "$SCRIPT" bind --load-meta "$TMP/meta_no_config.json" --push-meta "$TMP/meta_push.json" --manifest "$TMP/manifest_oci.json" --diff-ids-local "[\"$LAYER\"]" --remote-config "$TMP/config_amd64.json"
-expect_fail "bind: layer-list witness differs"          "$PY" "$SCRIPT" bind --load-meta "$TMP/meta_no_config.json" --push-meta "$TMP/meta_push.json" --manifest "$TMP/manifest_oci.json" --diff-ids-local "[\"$C\"]" --remote-config "$TMP/config_amd64.json"
+expect_fail_with "bind: load metadata lacks the key" "no containerimage.config.digest" "$PY" "$SCRIPT" bind --load-meta "$TMP/meta_no_config.json" --push-meta "$TMP/meta_push.json" --manifest "$TMP/manifest_oci.json"
+expect_fail_with "bind: push metadata lacks the key" "no containerimage.config.digest" "$PY" "$SCRIPT" bind --load-meta "$TMP/meta_load.json" --push-meta "$TMP/meta_no_config.json" --manifest "$TMP/manifest_oci.json"
+# Push metadata without the key, and a load digest that contradicts the registry:
+# the digest that is known is enforced, not set aside.
+expect_fail_with "bind: push lacks the key, load names another config" "config digests differ" "$PY" "$SCRIPT" bind --load-meta "$TMP/meta_load_other.json" --push-meta "$TMP/meta_no_config.json" --manifest "$TMP/manifest_oci.json"
+# Equal layers, different runtime configuration: the registry holds another config
+# (CFG2) than the gated image (CFG), whatever their layers, and the push metadata
+# says nothing. A layer-list comparison accepted this shape.
+expect_fail_with "bind: equal layers, different runtime config" "config digests differ" "$PY" "$SCRIPT" bind --load-meta "$TMP/meta_load.json" --push-meta "$TMP/meta_no_config.json" --manifest "$TMP/manifest_other_config.json"
+
+# --- license ----------------------------------------------------------------
+expect_ok   "license: Apache License 2.0"               "$PY" "$SCRIPT" license "$TMP/license_apache"
+expect_ok   "license: this repository's LICENSE"        "$PY" "$SCRIPT" license LICENSE
+expect_fail_with "license: GNU AGPL is refused" "not the Apache License 2.0" "$PY" "$SCRIPT" license "$TMP/license_agpl"
+expect_fail "license: missing file"                     "$PY" "$SCRIPT" license "$TMP/no_such_license"
 
 # --- index ------------------------------------------------------------------
 expect_ok   "index: Docker manifest list, both gated digests"   "$PY" "$SCRIPT" index "$TMP/index_docker_good.json" --expect "linux/amd64=$A" --expect "linux/arm64=$B"
