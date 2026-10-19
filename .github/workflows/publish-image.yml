@@ -2,16 +2,26 @@
 # linux/amd64 and linux/arm64 runners and pushes it to GitHub Container
 # Registry as one multi-platform tag.
 #
-# It publishes only an existing annotated release tag, and only when the tag
-# resolves to the full commit given as input. Each platform image must carry
-# that commit in its revision label, pass the Quick Start, and pass the same
-# Trivy HIGH/CRITICAL gate the Release Gate uses before it is pushed. Nothing
-# is tagged `latest`.
+# It publishes only an existing annotated release tag, only when the tag
+# resolves to the full commit given as input, only when that commit's VERSION
+# file names the tag, and only when its LICENSE is the Apache License 2.0, which
+# the published image is labelled with. Each platform image is built once on a native
+# runner and must carry that commit in its revision label, pass the Quick
+# Start, and pass the same Trivy HIGH/CRITICAL gate the Release Gate uses. Only
+# then is it pushed, untagged and by digest, to the release package, and the
+# pushed manifest is checked to be the gated image. The release tag is created
+# only after both gated digests are verified in the registry, and the created
+# tag is checked to reference exactly those two digests. Nothing is tagged
+# `latest`. A failed or cancelled run can leave gated, untagged manifests in the
+# package. Image content comes from `source_revision`; the scripts this workflow
+# runs come from the commit it was dispatched from, which must be `main` or a
+# `release/*` branch.
 #
-# Run the Release Gate for the same tag and commit first. This workflow does
-# not repeat its gates.
+# Run the Release Gate for the same tag and commit first. This workflow repeats
+# only the identity checks and the per-platform image gates.
 
 name: Publish Image
+run-name: Publish Image ${{ inputs.release_tag }} (${{ inputs.mode }})
 
 on:
   workflow_dispatch:
@@ -24,12 +34,30 @@ on:
         description: Full 40-character commit the tag must resolve to
         required: true
         type: string
+      mode:
+        description: >-
+          gate-only builds and gates both platform images and pushes nothing;
+          dry-run also pushes both images untagged by digest, verifies them in the
+          registry and prints the tag command without creating the tag; publish
+          also creates and verifies the release tag.
+        required: false
+        type: choice
+        default: dry-run
+        options:
+          - gate-only
+          - dry-run
+          - publish
 
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 env:
   REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
+  BUILDKIT_IMAGE: moby/buildkit:v0.34.0
 
 jobs:
   identity:
@@ -38,7 +66,18 @@ jobs:
     env:
       RELEASE_TAG: ${{ inputs.release_tag }}
       SOURCE_REVISION: ${{ inputs.source_revision }}
+      DISPATCH_REF: ${{ github.ref }}
     steps:
+      - name: Require a reviewed dispatch ref
+        # The verification steps below come from the dispatched ref, not from
+        # the release commit; limiting the ref to the reviewed branches is what
+        # makes "built by the reviewed workflow" true.
+        run: |
+          case "$DISPATCH_REF" in
+            refs/heads/main|refs/heads/release/*) echo "dispatched from $DISPATCH_REF" ;;
+            *) echo "this workflow may be dispatched only from main or a release/* branch, not $DISPATCH_REF"; exit 1 ;;
+          esac
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_revision }}
@@ -46,7 +85,7 @@ jobs:
           fetch-tags: true
           persist-credentials: false
 
-      - name: Validate the release tag and commit
+      - name: Validate the release tag, commit and version
         run: |
           if ! [[ "$SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
             echo "source_revision must be a full lowercase commit SHA"
@@ -61,6 +100,25 @@ jobs:
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$SOURCE_REVISION" \
             || { echo "$RELEASE_TAG does not resolve to $SOURCE_REVISION"; exit 1; }
           test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+          # The Release Gate makes the same check; repeating it here keeps a tag
+          # from being published for a commit whose VERSION names another release.
+          EXPECTED_TAG="v$(tr -d '\r\n' < VERSION)"
+          test "$RELEASE_TAG" = "$EXPECTED_TAG" \
+            || { echo "release_tag must match VERSION: expected $EXPECTED_TAG"; exit 1; }
+          python3 scripts/sync_version.py --check
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: ci-tooling
+          persist-credentials: false
+
+      - name: Require the Apache License 2.0
+        # The tag's index is annotated Apache-2.0 below. An earlier release
+        # candidate was published under another license, so the release commit's
+        # own LICENSE decides, before anything is built or pushed. The check comes
+        # from the dispatched commit, like the other checks this workflow runs.
+        run: python3 ci-tooling/scripts/ci/publish_image_verify.py license LICENSE
 
   build:
     needs: identity
@@ -81,30 +139,54 @@ jobs:
       packages: write
     env:
       SOURCE_REVISION: ${{ inputs.source_revision }}
-      CORTRIX_SOURCE_REVISION: ${{ inputs.source_revision }}
-      PLATFORM_IMAGE: ghcr.io/${{ github.repository }}:${{ inputs.release_tag }}-${{ matrix.arch }}
+      PLATFORM: ${{ matrix.platform }}
+      ARCH: ${{ matrix.arch }}
+      MODE: ${{ inputs.mode }}
+      CANDIDATE: cortrix:candidate
       COMPOSE_PROJECT_NAME: cortrix_publish_image
     steps:
+      # Image content: the release commit. Tooling: the commit this workflow was
+      # dispatched from, checked out beside it (the Dockerfile copies named
+      # paths only, so the extra directory does not touch the build cache).
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_revision }}
           persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: ci-tooling
+          persist-credentials: false
+
+      - name: Create the builder
+        # A docker-container builder is what push-by-digest needs. Garbage
+        # collection is off so the cache record of the gated build survives
+        # until the export re-reads it; the BuildKit image is pinned.
+        run: |
+          printf '[worker.oci]\n  gc = false\n' > "$RUNNER_TEMP/buildkitd.toml"
+          docker buildx create --name publish --driver docker-container --use \
+            --driver-opt "image=$BUILDKIT_IMAGE" \
+            --buildkitd-config "$RUNNER_TEMP/buildkitd.toml"
+          docker buildx inspect --bootstrap
 
       - name: Build the image
         run: |
-          docker build \
+          docker buildx build \
+            --platform "$PLATFORM" \
+            --provenance=false --sbom=false \
             --build-arg "CORTRIX_SOURCE_REVISION=$SOURCE_REVISION" \
-            -t "$PLATFORM_IMAGE" \
+            --load -t "$CANDIDATE" \
+            --metadata-file "$RUNNER_TEMP/meta-load.json" \
             -f deploy/Dockerfile .
 
       - name: Verify the image identity
         run: |
-          test "$(docker image inspect "$PLATFORM_IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$SOURCE_REVISION"
-          test "$(docker image inspect "$PLATFORM_IMAGE" --format '{{ .Os }}/{{ .Architecture }}')" = "${{ matrix.platform }}"
+          test "$(docker image inspect "$CANDIDATE" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$SOURCE_REVISION"
+          test "$(docker image inspect "$CANDIDATE" --format '{{ .Os }}/{{ .Architecture }}')" = "$PLATFORM"
 
       - name: Run the Quick Start from the built image
         run: |
-          docker tag "$PLATFORM_IMAGE" cortrix:quickstart
+          docker tag "$CANDIDATE" cortrix:quickstart
           docker compose -f deploy/docker-compose.yml up --no-build --wait
           curl -fsS http://127.0.0.1:8420/api/v1/system/health/ready > /tmp/ready.json
           python3 -c 'import json; ready = json.load(open("/tmp/ready.json")); assert ready["status"] == "ready", ready'
@@ -126,14 +208,14 @@ jobs:
             --severity HIGH,CRITICAL \
             --exit-code 0 \
             --format json \
-            --output /artifacts/trivy-${{ matrix.arch }}.json \
-            "$PLATFORM_IMAGE"
+            --output "/artifacts/trivy-$ARCH.json" \
+            "$CANDIDATE"
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             aquasec/trivy:0.72.0 image \
             --severity HIGH,CRITICAL \
             --exit-code 1 \
-            "$PLATFORM_IMAGE"
+            "$CANDIDATE"
 
       - name: Keep the scan report
         if: always()
@@ -142,45 +224,177 @@ jobs:
           name: trivy-${{ matrix.arch }}
           path: artifacts/trivy-${{ matrix.arch }}.json
           if-no-files-found: ignore
+          overwrite: true
 
-      - name: Push the platform image
+      - name: Push the gated image by digest
+        if: inputs.mode != 'gate-only'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker push "$PLATFORM_IMAGE"
-          docker image inspect "$PLATFORM_IMAGE" --format '{{ index .RepoDigests 0 }}' | tee -a "$GITHUB_STEP_SUMMARY"
+          printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          # The same build again, served from the builder's cache, exported to
+          # the registry untagged. Same platform, arguments and attestation
+          # flags as the gated build, so the config digest must come out equal.
+          docker buildx build \
+            --platform "$PLATFORM" \
+            --provenance=false --sbom=false \
+            --build-arg "CORTRIX_SOURCE_REVISION=$SOURCE_REVISION" \
+            --output "type=image,name=$REGISTRY_IMAGE,push-by-digest=true,name-canonical=true,push=true" \
+            --metadata-file "$RUNNER_TEMP/meta-push.json" \
+            -f deploy/Dockerfile .
+          DIGEST="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["containerimage.digest"])' "$RUNNER_TEMP/meta-push.json")"
+          echo "pushed $REGISTRY_IMAGE@$DIGEST"
+          mkdir -p "$RUNNER_TEMP/digests"
+          printf '%s\n' "$DIGEST" > "$RUNNER_TEMP/digests/$ARCH"
+
+      - name: Bind the scanned image to the pushed digest
+        if: inputs.mode != 'gate-only'
+        # Fails the job when the image behind the pushed digest is not the image
+        # that passed the gates above. The storage driver and the local image id
+        # are logged for the record; the decision is the config-digest chain.
+        run: |
+          DIGEST="$(cat "$RUNNER_TEMP/digests/$ARCH")"
+          docker buildx imagetools inspect --raw "$REGISTRY_IMAGE@$DIGEST" > "$RUNNER_TEMP/pushed-manifest.json"
+          docker buildx imagetools inspect --format '{{json .Image}}' "$REGISTRY_IMAGE@$DIGEST" > "$RUNNER_TEMP/pushed-config.json"
+          echo "storage driver: $(docker info --format '{{.Driver}}'); local image id: $(docker image inspect "$CANDIDATE" --format '{{.Id}}')"
+          python3 ci-tooling/scripts/ci/publish_image_verify.py bind \
+            --load-meta "$RUNNER_TEMP/meta-load.json" \
+            --push-meta "$RUNNER_TEMP/meta-push.json" \
+            --manifest "$RUNNER_TEMP/pushed-manifest.json"
+          python3 ci-tooling/scripts/ci/publish_image_verify.py config "$RUNNER_TEMP/pushed-config.json" \
+            --platform "$PLATFORM" --revision "$SOURCE_REVISION"
+          {
+            echo "- \`$PLATFORM\`: scanned image bound to pushed digest \`$DIGEST\` (Trivy report: artifact \`trivy-$ARCH\`)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Hand the digest to the manifest job
+        if: inputs.mode != 'gate-only'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
 
   manifest:
     needs: build
+    if: inputs.mode != 'gate-only'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
       packages: write
     env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
       RELEASE_IMAGE: ghcr.io/${{ github.repository }}:${{ inputs.release_tag }}
       SOURCE_REVISION: ${{ inputs.source_revision }}
+      MODE: ${{ inputs.mode }}
     steps:
-      - name: Create the multi-platform tag
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+
+      - name: Log in to the registry
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Verify the gated digests in the registry
         run: |
-          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          python3 scripts/ci/publish_image_verify.py digests "$RUNNER_TEMP/digests"
+          for arch in amd64 arm64; do
+            DIGEST="$(cat "$RUNNER_TEMP/digests/$arch")"
+            docker buildx imagetools inspect --raw "$REGISTRY_IMAGE@$DIGEST" > "$RUNNER_TEMP/manifest-$arch.json"
+            docker buildx imagetools inspect --format '{{json .Image}}' "$REGISTRY_IMAGE@$DIGEST" > "$RUNNER_TEMP/config-$arch.json"
+            python3 scripts/ci/publish_image_verify.py manifest "$RUNNER_TEMP/manifest-$arch.json"
+            python3 scripts/ci/publish_image_verify.py config "$RUNNER_TEMP/config-$arch.json" \
+              --platform "linux/$arch" --revision "$SOURCE_REVISION"
+          done
+
+      - name: Check that the release tag does not exist yet
+        # Best effort: the registry cannot tell "absent" from "not visible", so
+        # this is classified, not trusted. A positive control (a digest this run
+        # pushed) must be visible first; then the tag is probed unpiped with its
+        # stderr kept. publish refuses anything but a clear absence; dry-run
+        # reports what a publish run would do.
+        run: |
+          A="$(cat "$RUNNER_TEMP/digests/amd64")"
+          docker buildx imagetools inspect "$REGISTRY_IMAGE@$A" > /dev/null
+          set +e
+          docker buildx imagetools inspect "$RELEASE_IMAGE" > /dev/null 2> "$RUNNER_TEMP/probe.err"
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            STATE=present
+          elif grep -Eqi 'not found|MANIFEST_UNKNOWN|NAME_UNKNOWN' "$RUNNER_TEMP/probe.err"; then
+            STATE=absent
+          else
+            STATE=error
+          fi
+          echo "release tag $RELEASE_IMAGE: $STATE"
+          cat "$RUNNER_TEMP/probe.err"
+          case "$MODE:$STATE" in
+            publish:absent) ;;
+            publish:*) echo "publish refused: the release tag is $STATE"; exit 1 ;;
+            dry-run:error) echo "could not classify the release tag"; exit 1 ;;
+            dry-run:present) echo "a publish run would refuse: the tag exists" ;;
+            dry-run:absent) ;;
+          esac
+
+      - name: Create the release tag
+        if: inputs.mode == 'publish'
+        # The index gets its own annotations so the package page describes
+        # what it holds; the per-platform manifests keep their labels.
+        run: |
+          A="$(cat "$RUNNER_TEMP/digests/amd64")"
+          B="$(cat "$RUNNER_TEMP/digests/arm64")"
           docker buildx imagetools create \
             --tag "$RELEASE_IMAGE" \
-            "$RELEASE_IMAGE-amd64" \
-            "$RELEASE_IMAGE-arm64"
+            --annotation "index:org.opencontainers.image.title=Cortrix" \
+            --annotation "index:org.opencontainers.image.description=Cortrix server image, built from the ${RELEASE_TAG} release tag for linux/amd64 and linux/arm64." \
+            --annotation "index:org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --annotation "index:org.opencontainers.image.revision=${SOURCE_REVISION}" \
+            --annotation "index:org.opencontainers.image.version=${RELEASE_TAG}" \
+            --annotation "index:org.opencontainers.image.licenses=Apache-2.0" \
+            "$REGISTRY_IMAGE@$A" \
+            "$REGISTRY_IMAGE@$B"
 
-      - name: Verify the published tag
+      - name: Verify the created tag references exactly the gated digests
+        if: inputs.mode == 'publish'
         run: |
-          docker buildx imagetools inspect "$RELEASE_IMAGE" | tee /tmp/manifest.txt
-          grep -q 'linux/amd64' /tmp/manifest.txt
-          grep -q 'linux/arm64' /tmp/manifest.txt
-          for platform in linux/amd64 linux/arm64; do
-            docker pull --platform "$platform" "$RELEASE_IMAGE"
-            test "$(docker image inspect "$RELEASE_IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$SOURCE_REVISION"
-          done
+          A="$(cat "$RUNNER_TEMP/digests/amd64")"
+          B="$(cat "$RUNNER_TEMP/digests/arm64")"
+          docker buildx imagetools inspect --raw "$RELEASE_IMAGE" > "$RUNNER_TEMP/index.json"
+          python3 scripts/ci/publish_image_verify.py index "$RUNNER_TEMP/index.json" \
+            --expect "linux/amd64=$A" --expect "linux/arm64=$B"
+          INDEX_DIGEST="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$RELEASE_IMAGE")"
           {
-            echo "Published \`$RELEASE_IMAGE\` for linux/amd64 and linux/arm64 from \`$SOURCE_REVISION\`."
+            echo "Published \`$RELEASE_IMAGE\` (index \`$INDEX_DIGEST\`) from \`$SOURCE_REVISION\`:"
+            echo "- linux/amd64 \`$A\`"
+            echo "- linux/arm64 \`$B\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report the dry run
+        if: inputs.mode == 'dry-run'
+        run: |
+          A="$(cat "$RUNNER_TEMP/digests/amd64")"
+          B="$(cat "$RUNNER_TEMP/digests/arm64")"
+          {
+            echo "Dry run for \`$RELEASE_IMAGE\` from \`$SOURCE_REVISION\`: both platform images are pushed untagged and verified; no tag was created."
+            echo "- linux/amd64 \`$A\`"
+            echo "- linux/arm64 \`$B\`"
+            echo
+            echo "A publish run would execute:"
+            echo
+            echo '```'
+            echo "docker buildx imagetools create --tag $RELEASE_IMAGE $REGISTRY_IMAGE@$A $REGISTRY_IMAGE@$B"
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
