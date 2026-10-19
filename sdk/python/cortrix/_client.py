@@ -241,6 +241,7 @@ class Cortrix(BaseClient):
         parent_expand_top_k: Optional[int] = None,
         parent_max_bytes: Optional[int] = None,
         explain: Optional[bool] = None,
+        timeout_ms: Optional[int] = None,
     ) -> Any:
         """Semantic search. ``POST /query`` (real-arch wire).
 
@@ -249,9 +250,9 @@ class Cortrix(BaseClient):
         (a :class:`~cortrix.types.SearchConfig` or a dict, for example
         ``SearchConfig(enable_bm25=False)``). ``route`` (``"auto"``, ``"simple"``,
         ``"complex"`` or ``"chat"``), ``rag_fusion``, ``include_parent``,
-        ``parent_expand_top_k``, ``parent_max_bytes`` and ``explain`` are sent
-        unchanged when given and left out when not, so the server's defaults
-        apply. Returns a ``QueryResult`` (``results`` + ``meta``).
+        ``parent_expand_top_k``, ``parent_max_bytes``, ``explain`` and
+        ``timeout_ms`` (the query's time budget in milliseconds) are sent unchanged
+        when given and left out when not, so the server's defaults apply. Returns a ``QueryResult`` (``results`` + ``meta``).
         """
         return self.query.run(
             namespace,
@@ -267,6 +268,7 @@ class Cortrix(BaseClient):
             parent_expand_top_k=parent_expand_top_k,
             parent_max_bytes=parent_max_bytes,
             explain=explain,
+            timeout_ms=timeout_ms,
         )
 
     def get_sources(self, interaction_id: str) -> Any:
