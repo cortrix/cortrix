@@ -72,7 +72,7 @@ The async client mirrors the sync API exactly — every resource method has an
 | `client.search(...)` | top-level semantic query (`POST /query`) |
 | `client.memory` | `search` / `log` / `list` / `create` / `update` (=`edit`) / `delete` (=`invalidate`) |
 | `client.watchers` | `add` / `list` / `remove` / `events` |
-| `client.auth` | `register` / `login` / `logout` / `refresh` / `password_reset` / `me` |
+| `client.auth` | `me`; `register` / `login` / `logout` / `refresh` / `password_reset` need a server that provides account login, and raise `FeatureNotAvailableError` against the server in this repository, which authenticates with API keys |
 | `client.system` | `health` / `version` / `namespace_stats` / `agent_llm_config` |
 | `client.tenants` | `list` / `get` / `invite` / `update_role` / `quota` / `create` |
 | `client.ops.gc` | `status` / `run` / `restore` / `purge` |
