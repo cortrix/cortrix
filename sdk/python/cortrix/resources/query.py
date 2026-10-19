@@ -40,6 +40,7 @@ def _query_body(
     parent_expand_top_k: Optional[int] = None,
     parent_max_bytes: Optional[int] = None,
     explain: Optional[bool] = None,
+    timeout_ms: Optional[int] = None,
 ) -> dict[str, Any]:
     namespaces = [namespace] if isinstance(namespace, str) else list(namespace)
     body: dict[str, Any] = {
@@ -63,6 +64,7 @@ def _query_body(
         ("parent_expand_top_k", parent_expand_top_k),
         ("parent_max_bytes", parent_max_bytes),
         ("explain", explain),
+        ("timeout_ms", timeout_ms),
     ):
         if value is not None:
             body[key] = value
@@ -155,6 +157,7 @@ class Query(SyncResource):
         parent_expand_top_k: Optional[int] = None,
         parent_max_bytes: Optional[int] = None,
         explain: Optional[bool] = None,
+        timeout_ms: Optional[int] = None,
     ) -> QueryResult:
         raw = self._client._request(
             "POST",
@@ -164,6 +167,7 @@ class Query(SyncResource):
                 route=route, rag_fusion=rag_fusion, include_parent=include_parent,
                 parent_expand_top_k=parent_expand_top_k,
                 parent_max_bytes=parent_max_bytes, explain=explain,
+                timeout_ms=timeout_ms,
             ),
         )
         return parse_model(QueryResult, _adapt_wire_result(raw, namespace))
@@ -195,6 +199,7 @@ class AsyncQuery(AsyncResource):
         parent_expand_top_k: Optional[int] = None,
         parent_max_bytes: Optional[int] = None,
         explain: Optional[bool] = None,
+        timeout_ms: Optional[int] = None,
     ) -> QueryResult:
         raw = await self._client._request(
             "POST",
@@ -204,6 +209,7 @@ class AsyncQuery(AsyncResource):
                 route=route, rag_fusion=rag_fusion, include_parent=include_parent,
                 parent_expand_top_k=parent_expand_top_k,
                 parent_max_bytes=parent_max_bytes, explain=explain,
+                timeout_ms=timeout_ms,
             ),
         )
         return parse_model(QueryResult, _adapt_wire_result(raw, namespace))

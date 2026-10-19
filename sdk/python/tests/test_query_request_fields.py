@@ -7,7 +7,7 @@ ignores, or a property added to the specification cannot go unnoticed again:
 
 * the route reads every key the SDK sends, except the listed ones;
 * the SDK sends every key the route reads, except the listed ones;
-* the SDK sends every request property the specification declares, except the listed one.
+* the SDK sends every request property the specification declares, except the listed ones.
 """
 
 from __future__ import annotations
@@ -35,6 +35,7 @@ FIELDS = {
     "parent_expand_top_k": 3,
     "parent_max_bytes": 4096,
     "explain": True,
+    "timeout_ms": 1500,
 }
 
 # Read by the route, not sent by the SDK.
@@ -46,12 +47,11 @@ READ_NOT_SENT = {
     "llm_rerank_config": "not in the specification yet (#183)",
     "rag_fusion_config": "not in the specification yet (#183)",
     "locale": "not in the specification yet (#183)",
-    "timeout_ms": "the SDK does not send it yet (#205)",
 }
 # Sent by the SDK, not read by the route.
 SENT_NOT_READ = {"include_sources": "the route ignores it (#182)"}
 # Declared by the specification, not sent by the SDK.
-DECLARED_NOT_SENT = {"timeout_ms": "the SDK does not send it yet (#205)"}
+DECLARED_NOT_SENT: dict[str, str] = {}
 
 _EMPTY = {
     "results": [],
@@ -122,10 +122,10 @@ def test_false_and_zero_are_sent_not_dropped(api_base: str, client: Cortrix) -> 
     """Only ``None`` means "not given": an explicit false or 0 reaches the server."""
     route = respx.post(api_base + "/query").mock(return_value=httpx.Response(200, json=_EMPTY))
     client.search("ns", "q", rag_fusion=False, include_parent=False,
-                  parent_expand_top_k=0, parent_max_bytes=0, explain=False)
+                  parent_expand_top_k=0, parent_max_bytes=0, explain=False, timeout_ms=0)
     body = _sent(route)
     assert (body["rag_fusion"], body["include_parent"], body["explain"]) == (False, False, False)
-    assert (body["parent_expand_top_k"], body["parent_max_bytes"]) == (0, 0)
+    assert (body["parent_expand_top_k"], body["parent_max_bytes"], body["timeout_ms"]) == (0, 0, 0)
 
 
 # --- the sent set, pinned against the server and the specification -------------------

@@ -219,6 +219,7 @@ class AsyncCortrix(AsyncBaseClient):
         parent_expand_top_k: Optional[int] = None,
         parent_max_bytes: Optional[int] = None,
         explain: Optional[bool] = None,
+        timeout_ms: Optional[int] = None,
     ) -> Any:
         """Semantic search. ``POST /query``. See :meth:`Cortrix.search`."""
         return await self.query.run(
@@ -235,6 +236,7 @@ class AsyncCortrix(AsyncBaseClient):
             parent_expand_top_k=parent_expand_top_k,
             parent_max_bytes=parent_max_bytes,
             explain=explain,
+            timeout_ms=timeout_ms,
         )
 
     async def get_sources(self, interaction_id: str) -> Any:
