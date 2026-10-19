@@ -10,6 +10,7 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 |---|---|
 | `Preview` | Available and documented. Cortrix is in pre-release, so verify it against your own runtime before production use. |
 | `In development` | Present in part or being built; not supported yet. Do not rely on it. |
+| `Not provided` | The server in this repository does not serve it on this release line. Do not rely on it. |
 
 ## Current Status Matrix
 
@@ -27,7 +28,7 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 | Framework adapters (`cortrix-skills`) | `Preview` | Tool definitions for LangChain, Claude, and OpenAI install from PyPI and are test-covered; a full round trip depends on your LLM provider. |
 | pgcortrix | `In development` | The SQL contract and helper exist with standalone tests; loading into a live PostgreSQL and `pg_regress` integration have not been run on this line. |
 | Built-in Agent fixed-flow chat | `Preview` | Chat mode is documented; deployment and LLM provider behavior should be verified in your runtime. |
-| Auth login | `In development` | Not supported yet. |
+| Account login (email and password) | `Not provided` | The server authenticates with API keys. `POST /auth/register`, `/auth/login`, `/auth/logout`, `/auth/refresh`, `/auth/password-reset`, `/auth/password-reset/confirm`, and `/auth/verify-email` return 404. In the Python SDK, `client.auth.register`, `login`, `logout`, `refresh`, and `password_reset` raise `FeatureNotAvailableError` against this server; `client.auth.me` works. See [Auth and security boundaries](#auth-and-security-boundaries). |
 | Tenant/member/ACL/quota | `In development` | Not supported yet. |
 | RBAC | `In development` | Not supported yet. |
 | Tenant isolation | `In development` | Not supported yet. |
@@ -41,7 +42,9 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 
 The OpenAPI spec defines both API key and Bearer auth schemes. In local development, auth may be disabled. Do not use an auth-disabled local runtime to claim RBAC, tenant isolation, ACL, or quota enforcement.
 
-Auth login, tenant/member/ACL/quota, RBAC, tenant isolation, and log redaction defaults are `In development`. API key configuration exists in the docs and config templates. Until those capabilities are available, deploy Cortrix only on a network you control.
+Tenant/member/ACL/quota, RBAC, tenant isolation, and log redaction defaults are `In development`. Until those capabilities are available, deploy Cortrix only on a network you control.
+
+This server authenticates with API keys and does not serve email and password login. With `auth.enabled: false`, as set in `config.yaml.example` and `deploy/cortrix.yaml` (the built-in default without a config file is `true`; it is accepted only on a loopback `server.host` or an explicit container-internal bind published only to loopback), requests need no key. With auth enabled, the first key comes from an `auth.api_keys` entry in the config (see `config.yaml.example`; `permissions: 7` includes ADMIN), or from the one-time setup URL the server prints on first start. That URL is valid for 60 seconds, works once, and accepts loopback clients only by default; opening it shows an admin API key. Create further keys with `POST /api/v1/auth/api-keys` using the admin key from the setup URL. Requests without an admin key are rejected.
 
 ## API Compatibility Boundaries
 
