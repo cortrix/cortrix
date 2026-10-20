@@ -73,6 +73,19 @@ public:
                              const std::string& doc_id,
                              CortrixDoc* doc);
 
+    /// Submit again the uploads of one namespace that a stop left without a task. The
+    /// SPC queue lives in memory, so after a restart an upload that was queued, or
+    /// processing and reset to pending by the load-time recovery, waits for a task that
+    /// no longer exists. Called once at startup, after the namespaces are loaded.
+    ///
+    /// Submits each http_upload row that is pending, is the newest live version of its
+    /// file, and has no queued or running task. An older pending version is left as it
+    /// is: the newest version retires it when it is ready. Other sources are not
+    /// touched: watched directories re-enqueue their own unfinished files on rescan.
+    ///
+    /// @return the number of uploads submitted, or -1 when the pending rows cannot be read
+    int RequeuePendingUploads(CortrixStore& store, const std::string& namespace_name);
+
 private:
     static std::string ComputeContentHash(const void* data, size_t len);
     Status ValidateFileSize(size_t file_size) const;

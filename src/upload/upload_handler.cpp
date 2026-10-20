@@ -8,6 +8,7 @@
 #include <sstream>
 #include <iomanip>
 #include <utility>
+#include <vector>
 
 namespace cortrix {
 
@@ -267,6 +268,55 @@ Status UploadHandler::GetDocumentStatus(CortrixStore& store,
     }
     CORTRIX_LOG_ERROR("upload", "doc_get failed: rc={}, doc_id={}", rc, doc_id);
     return Status::Internal("failed to query document status");
+}
+
+int UploadHandler::RequeuePendingUploads(CortrixStore& store,
+                                         const std::string& namespace_name) {
+    std::vector<CortrixDoc> pending;
+    if (store.doc_list_by_status(DocStatus::kPending, pending) != 0) {
+        CORTRIX_LOG_WARN("upload", "requeue: listing pending documents failed, ns={}",
+                         namespace_name);
+        return -1;
+    }
+
+    int requeued = 0;
+    for (const CortrixDoc& doc : pending) {
+        if (doc.source_type != "http_upload") continue;
+
+        // Only the newest live version of the file. An older one was superseded by a
+        // later upload, and the newest version retires it when it is ready.
+        CortrixDoc newest;
+        if (!FindExistingDocument(store, doc.source_path, &newest) ||
+            newest.doc_id != doc.doc_id) {
+            continue;
+        }
+
+        // A task already queued or running for it is left alone. The row is read
+        // again when no task is active, so a task that finished in between is seen.
+        if (spc_mgr_.HasActiveTask(doc.doc_id)) continue;
+        CortrixDoc again;
+        if (store.doc_get(doc.doc_id, again) != 0 || again.status != DocStatus::kPending) {
+            continue;
+        }
+
+        auto task = CreateSpcTask(doc.doc_id, namespace_name, doc.source_path,
+                                  doc.content_hash, doc.mime_type,
+                                  DeterminePriority(static_cast<size_t>(doc.file_size)),
+                                  /*is_update=*/false, /*old_doc_id=*/"", doc.metadata_json);
+        Status s = spc_mgr_.Submit(task);
+        if (!s.ok()) {
+            CORTRIX_LOG_WARN("upload", "requeue: SPC submit failed, doc_id={}: {}",
+                             doc.doc_id, s.message());
+            continue;
+        }
+        ++requeued;
+    }
+
+    if (requeued > 0) {
+        CORTRIX_LOG_INFO("upload", "requeued {} pending upload(s) in ns={}", requeued,
+                         namespace_name);
+    }
+    return requeued;
 }
 
 }  // namespace cortrix
