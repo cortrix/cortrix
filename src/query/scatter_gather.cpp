@@ -240,9 +240,13 @@ CrossNsResponse ScatterGather::GatherAndRerank(std::vector<NamespaceQueryResult>
     // primary + records a brief multi-source note in meta), then truncate to
     // top_k. Sort-before-dedup keeps the deduped list in descending final score
     // (each group's primary is its first occurrence in the sorted list).
+    // Equal final scores go to the higher rerank_score: hybrid results score by
+    // rank inside their own namespace, so every namespace's top hit ties, and
+    // without this the request's namespace order would pick the winner.
     std::stable_sort(items.begin(), items.end(),
                      [](const ResultItem& a, const ResultItem& b) {
-                         return a.score > b.score;
+                         if (a.score != b.score) return a.score > b.score;
+                         return a.rerank_score > b.rerank_score;
                      });
 
     // §3.3 / §4.3: populates meta.deduplicated_chunks[] + deduplicated_chunks_count.
