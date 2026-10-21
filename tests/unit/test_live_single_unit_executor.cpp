@@ -484,5 +484,92 @@ TEST(LiveHybridFusionTest, TopKFloorReturnsAtLeastOneCandidate) {
     EXPECT_EQ(fused[0].metadata["doc_id"], "doc-b");
 }
 
+// A long document with several weakly related chunks must not outrank the single
+// chunk the reranker put first: the chunk path counts each document once, at its best
+// rank. Summing every chunk made the long document win 1/61 + 1/62 over 1/60.
+TEST(LiveHybridFusionTest, ManyWeakChunksOfOneDocDoNotOutrankTheBestChunk) {
+    std::vector<retrieval::RankedChunk> chunks;
+    chunks.push_back(MakeChunkHit("child-answer", "doc-answer", 0.78f));
+    chunks.push_back(MakeChunkHit("child-long-1", "doc-long", 0.01f));
+    chunks.push_back(MakeChunkHit("child-long-2", "doc-long", 0.01f));
+    chunks.push_back(MakeChunkHit("child-long-3", "doc-long", 0.01f));
+
+    std::vector<retrieval::RankedChunk> docs;
+    docs.push_back(MakeDocHit("doc-other", "fts5_fallback", 0.50f));
+
+    std::vector<retrieval::RankedChunk> fused =
+        FuseHybridChunksByDocId(std::move(chunks), std::move(docs), 10);
+
+    ASSERT_EQ(fused.size(), 3u);
+    EXPECT_EQ(fused[0].metadata["doc_id"], "doc-answer");
+    EXPECT_NEAR(fused[0].score, 1.0f / 60.0f, 1e-6f);
+    EXPECT_EQ(fused[1].metadata["doc_id"], "doc-other");  // doc-only, rank 0: 1/60, tie
+    EXPECT_EQ(fused[2].metadata["doc_id"], "doc-long");
+    EXPECT_EQ(fused[2].child_id, "child-long-1");
+    EXPECT_NEAR(fused[2].score, 1.0f / 61.0f, 1e-6f);
+}
+
+// Evidence from both paths still adds up, but each path contributes only its best
+// rank for the document, not one share per chunk.
+TEST(LiveHybridFusionTest, BothPathsAddTheirBestContributionOnce) {
+    std::vector<retrieval::RankedChunk> chunks;
+    chunks.push_back(MakeChunkHit("child-a", "doc-a", 0.90f));
+    chunks.push_back(MakeChunkHit("child-b1", "doc-b", 0.80f));
+    chunks.push_back(MakeChunkHit("child-b2", "doc-b", 0.70f));
+
+    std::vector<retrieval::RankedChunk> docs;
+    docs.push_back(MakeDocHit("doc-b", "llm_summary", 0.60f));
+
+    std::vector<retrieval::RankedChunk> fused =
+        FuseHybridChunksByDocId(std::move(chunks), std::move(docs), 10);
+
+    ASSERT_EQ(fused.size(), 2u);
+    EXPECT_EQ(fused[0].metadata["doc_id"], "doc-b");
+    EXPECT_EQ(fused[0].child_id, "child-b1");
+    EXPECT_NEAR(fused[0].score, (1.0f / 61.0f) + (1.0f / 60.0f), 1e-6f);
+    EXPECT_EQ(fused[1].metadata["doc_id"], "doc-a");
+    EXPECT_NEAR(fused[1].score, 1.0f / 60.0f, 1e-6f);
+}
+
+// The doc path counts a repeated document once too, at its best rank.
+TEST(LiveHybridFusionTest, RepeatedDocPathHitCountsOnce) {
+    std::vector<retrieval::RankedChunk> chunks;
+
+    std::vector<retrieval::RankedChunk> docs;
+    docs.push_back(MakeDocHit("doc-1", "llm_summary", 0.80f));
+    docs.push_back(MakeDocHit("doc-2", "llm_summary", 0.70f));
+    docs.push_back(MakeDocHit("doc-1", "fts5_fallback", 0.60f));
+
+    std::vector<retrieval::RankedChunk> fused =
+        FuseHybridChunksByDocId(std::move(chunks), std::move(docs), 10);
+
+    ASSERT_EQ(fused.size(), 2u);
+    EXPECT_EQ(fused[0].metadata["doc_id"], "doc-1");
+    EXPECT_NEAR(fused[0].score, 1.0f / 60.0f, 1e-6f);
+    EXPECT_EQ(fused[0].metadata["hybrid_paths"], "llm_summary,fts5_fallback");
+    EXPECT_EQ(fused[1].metadata["doc_id"], "doc-2");
+    EXPECT_NEAR(fused[1].score, 1.0f / 61.0f, 1e-6f);
+}
+
+// On equal fused scores the stronger best chunk wins, even over the document seen
+// first. Both documents here sit at chunk rank 0/1 and doc rank 1/0: 1/60 + 1/61.
+TEST(LiveHybridFusionTest, TiesGoToTheStrongerBestChunk) {
+    std::vector<retrieval::RankedChunk> chunks;
+    chunks.push_back(MakeChunkHit("child-weak", "doc-weak", 0.20f));
+    chunks.push_back(MakeChunkHit("child-strong", "doc-strong", 0.90f));
+
+    std::vector<retrieval::RankedChunk> docs;
+    docs.push_back(MakeDocHit("doc-strong", "llm_summary", 0.50f));
+    docs.push_back(MakeDocHit("doc-weak", "llm_summary", 0.40f));
+
+    std::vector<retrieval::RankedChunk> fused =
+        FuseHybridChunksByDocId(std::move(chunks), std::move(docs), 10);
+
+    ASSERT_EQ(fused.size(), 2u);
+    EXPECT_EQ(fused[0].score, fused[1].score);
+    EXPECT_EQ(fused[0].metadata["doc_id"], "doc-strong");
+    EXPECT_EQ(fused[1].metadata["doc_id"], "doc-weak");
+}
+
 }  // namespace
 }  // namespace cortrix::query
