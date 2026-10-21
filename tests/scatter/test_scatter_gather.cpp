@@ -153,6 +153,26 @@ TEST(ScatterGatherTest, MultiNsGatherSortedByFinalScoreOverRerankScore) {
     EXPECT_EQ(resp.results[1].namespace_id, "ns_b");
 }
 
+TEST(ScatterGatherTest, MultiNsEqualFinalScoresGoToHigherRerankScore) {
+    // Hybrid results score 1/(60 + rank) inside each namespace, so both top hits
+    // tie; the result must not depend on the order the namespaces were requested.
+    for (const auto& order : {std::vector<std::string>{"ns_a", "ns_b"},
+                              std::vector<std::string>{"ns_b", "ns_a"}}) {
+        Harness h({"ns_a", "ns_b"});
+        EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_a", _))
+            .WillOnce(Return(OneChunk("ns_a", "weak", 1.0f / 60.0f, 0.001f)));
+        EXPECT_CALL(h.executor, ExecuteForNamespace(_, "ns_b", _))
+            .WillOnce(Return(OneChunk("ns_b", "strong", 1.0f / 60.0f, 0.92f)));
+
+        auto sg = h.Make();
+        auto resp = sg.Execute(Req(order, /*top_k=*/2), Auth());
+
+        ASSERT_EQ(resp.results.size(), 2u);
+        EXPECT_EQ(resp.results[0].namespace_id, "ns_b");
+        EXPECT_EQ(resp.results[1].namespace_id, "ns_a");
+    }
+}
+
 // --- Partial success: one NS index-corrupt → meta.namespaces_failed + coverage<1. ---
 TEST(ScatterGatherTest, PartialSuccessRecordsFailedNamespace) {
     Harness h({"ns_a", "ns_b"});

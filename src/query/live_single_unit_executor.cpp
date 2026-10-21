@@ -259,8 +259,9 @@ std::vector<RankedChunk> FuseHybridChunksByDocId(std::vector<RankedChunk> chunk_
                 continue;
             }
 
+            // A repeat of a known document only updates its best evidence per path;
+            // the fused score is computed from those bests after both paths are read.
             HybridCandidate& cand = candidates[it->second];
-            cand.fused_score += contribution;
             AppendUniquePath(cand.paths, source_path);
 
             if (is_doc_path) {
@@ -302,9 +303,21 @@ std::vector<RankedChunk> FuseHybridChunksByDocId(std::vector<RankedChunk> chunk_
     add_path(chunk_chunks, "chunk");
     add_path(doc_chunks, "doc");
 
+    // RRF over doc_id: each path counts a document once, at its best rank (MaxP on
+    // the chunk path), and the two paths add up. Summing every chunk instead would
+    // let a document's chunk count decide its rank, so a long, loosely related
+    // document would outrank the passage the reranker put first.
+    for (HybridCandidate& cand : candidates) {
+        cand.fused_score = (cand.has_chunk ? cand.best_chunk_contribution : 0.0f) +
+                           (cand.has_doc ? cand.best_doc_contribution : 0.0f);
+    }
+
+    // Ties go to the stronger best chunk, then to the first seen.
     std::stable_sort(candidates.begin(), candidates.end(),
                      [](const HybridCandidate& a, const HybridCandidate& b) {
-                         return a.fused_score > b.fused_score;
+                         if (a.fused_score != b.fused_score) return a.fused_score > b.fused_score;
+                         if (a.has_chunk != b.has_chunk) return a.has_chunk;
+                         return a.has_chunk && a.best_chunk_score > b.best_chunk_score;
                      });
 
     const int k = top_k < 1 ? 1 : top_k;

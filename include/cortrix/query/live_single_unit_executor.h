@@ -76,7 +76,9 @@ DocEvidence ResolveDocEvidence(const cortrix::doc_summary::DocDiscoveryHit& hit,
 /// (metadata.doc_id / source_doc_id), not child_id, so a doc-summary candidate and
 /// its best chunk candidate reinforce each other instead of remaining disjoint. If a
 /// document has both chunk and doc-summary evidence, the chunk is kept as the
-/// user-facing representative and the doc evidence is preserved in metadata.
+/// user-facing representative and the doc evidence is preserved in metadata. Each
+/// path counts a document once, at its best rank, so a document's score is its best
+/// chunk contribution plus its best doc-path contribution, however many chunks it has.
 
 std::vector<retrieval::RankedChunk> FuseHybridChunksByDocId(
     std::vector<retrieval::RankedChunk> chunk_chunks,
