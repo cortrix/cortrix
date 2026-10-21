@@ -1440,5 +1440,115 @@ TEST_F(UploadVersionsTest, AVersionPublishedDuringTheCheckIsStillADuplicate) {
     spc_.set_on_has_active(nullptr);
 }
 
+// --- Restart: the SPC queue lives in memory, so an upload queued or processing when
+// --- the server stopped is submitted again at startup. A restart is a fresh manager
+// --- and handler over the same store.
+
+class RequeuePendingUploadsTest : public UploadVersionsTest {
+protected:
+    void SetUp() override {
+        UploadVersionsTest::SetUp();
+        restarted_handler_ = std::make_unique<UploadHandler>(config_, restarted_spc_);
+    }
+
+    UploadHandler& restarted() { return *restarted_handler_; }
+
+    FakeSPCManager restarted_spc_;
+    std::unique_ptr<UploadHandler> restarted_handler_;
+};
+
+TEST_F(RequeuePendingUploadsTest, UploadQueuedAtTheStopIsSubmittedAgain) {
+    const UploadResult v1 = Upload("content A", nullptr, "a.md");
+    EXPECT_EQ(restarted().RequeuePendingUploads(*store_, "test-ns"), 1);
+    ASSERT_EQ(restarted_spc_.submitted().size(), 1u);
+    const auto& task = restarted_spc_.submitted()[0];
+    const auto& original = spc_.submitted()[0];
+    EXPECT_EQ(task->doc_id, v1.doc_id);
+    EXPECT_EQ(task->namespace_name, "test-ns");
+    EXPECT_EQ(task->source_type, "http_upload");
+    EXPECT_EQ(task->source_path, "a.md");
+    EXPECT_EQ(task->content_hash, original->content_hash);
+    EXPECT_EQ(task->mime_type, original->mime_type);
+    EXPECT_EQ(task->processing_level, original->processing_level);
+    EXPECT_EQ(task->priority, original->priority);
+}
+
+TEST_F(RequeuePendingUploadsTest, UploadProcessingAtTheStopIsSubmittedAfterRecovery) {
+    const UploadResult v1 = Upload("content A");
+    ASSERT_EQ(store_->doc_update_status(v1.doc_id, DocStatus::kProcessing), 0);
+    ASSERT_EQ(store_->RecoverCrashedDocs(), 0);  // the load-time reset to pending
+    EXPECT_EQ(restarted().RequeuePendingUploads(*store_, "test-ns"), 1);
+    ASSERT_EQ(restarted_spc_.submitted().size(), 1u);
+    EXPECT_EQ(restarted_spc_.submitted()[0]->doc_id, v1.doc_id);
+}
+
+TEST_F(RequeuePendingUploadsTest, OnlyTheNewestVersionOfAFileIsSubmitted) {
+    Upload("content A");                         // v1, cancelled by v2, left pending
+    const UploadResult v2 = Upload("content B");
+    EXPECT_EQ(restarted().RequeuePendingUploads(*store_, "test-ns"), 1);
+    ASSERT_EQ(restarted_spc_.submitted().size(), 1u);
+    EXPECT_EQ(restarted_spc_.submitted()[0]->doc_id, v2.doc_id);
+}
+
+TEST_F(RequeuePendingUploadsTest, ReadyFailedAndDeletedUploadsAreNotSubmitted) {
+    const UploadResult ready = Upload("content A", nullptr, "ready.md");
+    ASSERT_EQ(store_->doc_update_status(ready.doc_id, DocStatus::kReady), 0);
+    const UploadResult failed = Upload("content B", nullptr, "failed.md");
+    ASSERT_EQ(store_->doc_update_status(failed.doc_id, DocStatus::kError, "parse failed"), 0);
+    const UploadResult deleted = Upload("content C", nullptr, "deleted.md");
+    ASSERT_EQ(store_->doc_soft_delete(deleted.doc_id, 1000), 0);
+    EXPECT_EQ(restarted().RequeuePendingUploads(*store_, "test-ns"), 0);
+    EXPECT_TRUE(restarted_spc_.submitted().empty());
+}
+
+// Watched directories re-enqueue their own files, session documents have their own
+// recovery, and the async document path keeps its tasks in the task table.
+TEST_F(RequeuePendingUploadsTest, PendingDocumentsOfOtherSourcesAreNotSubmitted) {
+    for (const char* type : {"watch_dir", "memory_session", "file", "db_import"}) {
+        CortrixDoc doc;
+        doc.source_type = type;
+        doc.source_path = std::string("/data/") + type;
+        doc.content_hash = "hash";
+        doc.status = DocStatus::kPending;
+        ASSERT_EQ(store_->doc_create(doc), 0) << type;
+    }
+    EXPECT_EQ(restarted().RequeuePendingUploads(*store_, "test-ns"), 0);
+    EXPECT_TRUE(restarted_spc_.submitted().empty());
+}
+
+// An upload whose task the startup resume already submitted is not queued twice, and a
+// second pass submits nothing new.
+TEST_F(RequeuePendingUploadsTest, UploadWithAnActiveTaskIsNotSubmittedAgain) {
+    Upload("content A");
+    EXPECT_EQ(handler_->RequeuePendingUploads(*store_, "test-ns"), 0);  // still queued
+    EXPECT_EQ(spc_.submitted().size(), 1u);
+    EXPECT_EQ(restarted().RequeuePendingUploads(*store_, "test-ns"), 1);
+    EXPECT_EQ(restarted().RequeuePendingUploads(*store_, "test-ns"), 0);
+    EXPECT_EQ(restarted_spc_.submitted().size(), 1u);
+}
+
+// No task is active, but the row is read again first: a version whose task published
+// it in between is left alone.
+TEST_F(RequeuePendingUploadsTest, UploadPublishedDuringTheCheckIsNotSubmitted) {
+    const UploadResult v1 = Upload("content A");
+    restarted_spc_.set_on_has_active([this](const std::string& doc_id) {
+        ASSERT_EQ(store_->doc_update_status(doc_id, DocStatus::kReady), 0);
+    });
+    EXPECT_EQ(restarted().RequeuePendingUploads(*store_, "test-ns"), 0);
+    EXPECT_TRUE(restarted_spc_.submitted().empty());
+    CortrixDoc row;
+    ASSERT_EQ(store_->doc_get(v1.doc_id, row), 0);
+    EXPECT_EQ(row.status, DocStatus::kReady);
+}
+
+TEST_F(RequeuePendingUploadsTest, ARefusedSubmitIsNotCounted) {
+    Upload("content A", nullptr, "a.md");
+    Upload("content B", nullptr, "b.md");
+    restarted_spc_.set_should_fail(true);
+    EXPECT_EQ(restarted().RequeuePendingUploads(*store_, "test-ns"), 0);
+    restarted_spc_.set_should_fail(false);
+    EXPECT_EQ(restarted().RequeuePendingUploads(*store_, "test-ns"), 2);
+}
+
 }  // namespace
 }  // namespace cortrix

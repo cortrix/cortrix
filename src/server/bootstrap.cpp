@@ -1586,6 +1586,31 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
         }
     }
 
+    // Re-queue uploads a stop left without a task. The resume above covers only a
+    // shutdown whose drain finished; after a kill, or a drain cut short, a queued
+    // upload stays pending, and so does one the load-time recovery reset from
+    // processing. Runs before the HTTP server starts, so no new upload races it;
+    // uploads the resume already submitted are skipped as active.
+    {
+        int requeued = 0;
+        auto ns_list = ns_router.ListNamespaces();
+        if (ns_list.ok()) {
+            for (const auto& ns_id : ns_list.value().results) {
+                cortrix::resource::NamespaceFacade facade(ns_pool, ns_id);
+                if (!facade.Acquire().ok()) continue;  // not loaded → skip
+                const int n = upload_handler.RequeuePendingUploads(facade.store(), ns_id);
+                if (n > 0) requeued += n;
+            }
+        } else {
+            CORTRIX_LOG_WARN("main", "Upload requeue skipped, listing namespaces failed: {}",
+                             ns_list.status().message());
+        }
+        if (requeued > 0) {
+            CORTRIX_LOG_INFO("main", "Re-queued {} pending upload(s) left by a prior stop",
+                             requeued);
+        }
+    }
+
     // 13b. [F21] Start all subscribed directory watchers (fan-out registry; one OS
     // watcher per directory, autostart was deferred to here at Subscribe time).
     if (connector_state.registry) {
