@@ -40,6 +40,7 @@ Start here:
 - [Stack fit and adoption boundaries](https://cortrix.ai/docs/resources/stack-fit/): review evidence-backed keep/add/replace/unknown decision cards.
 - [Agent access](https://cortrix.ai/docs/integrations/overview/): choose between HTTP/OpenAPI, MCP, Python SDK, and the built-in Agent.
 - [Minimal agent examples](examples/minimal-agent/README.md): two short scripts for the retrieval step of an agent, one with the Python SDK and one through the MCP server.
+- [Namespace recovery check](examples/namespace-recovery/README.md): kill the server in the middle of a batch write, restart it, and check that every document ends up whole; then query across two project namespaces.
 - [Compatibility and known status](docs/compatibility.md): current public status for API, MCP, SDK, Agent, auth, tenant/RBAC, memory extraction, benchmarks, and security hardening.
 - [OpenAPI spec](api/openapi.yaml): endpoint paths, schemas, security schemes, and response contracts.
 - [MCP README](cortrix-mcp/README.md): MCP server setup and tool reference.
