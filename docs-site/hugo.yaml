@@ -49,7 +49,7 @@ params:
   copyright:
     authors: Cortrix contributors
     from_year: 2026
-  footer_center_info: ''
+  footer_center_info: 'Docs theme: [OINK](https://github.com/pgsty/oink)'
   logo: icons/logo.svg
   github_repo: https://github.com/cortrix/cortrix
   github_branch: release/1.0
