@@ -79,7 +79,7 @@ TEST_F(HealthEndpointTest, ReturnsHealthy) {
 
     auto body = nlohmann::json::parse(res->body);
     EXPECT_EQ(body["status"], "healthy");
-    EXPECT_EQ(body["version"], cortrix::kCortrixVersion);  // [P5] version SoT (1.0.0-rc.1)
+    EXPECT_EQ(body["version"], cortrix::kCortrixVersion);  // [P5] version SoT (1.0.0-rc.2)
     EXPECT_TRUE(body.contains("uptime_seconds"));
     EXPECT_EQ(body["components"]["config"], "ok");
     EXPECT_EQ(body["components"]["logging"], "ok");
@@ -215,7 +215,7 @@ TEST(SystemVersionEndpointTest, ReturnsVersion) {
     EXPECT_EQ(res->status, 200);
     auto body = nlohmann::json::parse(res->body);
     EXPECT_EQ(body["version"], cortrix::kCortrixVersion);
-    EXPECT_EQ(std::string(cortrix::kCortrixVersion), "1.0.0-rc.1");
+    EXPECT_EQ(std::string(cortrix::kCortrixVersion), "1.0.0-rc.2");
 
     svr.stop();
     if (t.joinable()) t.join();

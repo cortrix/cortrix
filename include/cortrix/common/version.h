@@ -7,6 +7,6 @@ namespace cortrix {
 /// /system/health/{live,ready} probes, the /health endpoint, and the
 /// cortrix_build_info metric. This value is derived from the root VERSION file
 /// by scripts/sync_version.py; do not edit it independently.
-constexpr const char* kCortrixVersion = "1.0.0-rc.1";
+constexpr const char* kCortrixVersion = "1.0.0-rc.2";
 
 }  // namespace cortrix

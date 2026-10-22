@@ -36,7 +36,7 @@ def assert_envelope(out, expect_category="success"):
 # ---------------------------------------------------------------------------
 SUCCESS_CASES = [
     # --- core 12 ---
-    ("cortrix_health", {}, {"status": "ok", "version": "1.0.0-rc.1"}),
+    ("cortrix_health", {}, {"status": "ok", "version": "1.0.0-rc.2"}),
     ("cortrix_query", {"query": "hello"}, {"data": [{"score": 0.9}], "meta": {"coverage_ratio": 1.0}}),
     ("cortrix_upload", {"content": "doc body", "filename": "a.md"}, {"task_id": "t-1", "status": "queued"}),
     ("cortrix_list_documents", {}, {"documents": [{"id": "d1"}], "total": 1}),

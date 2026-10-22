@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cortrix-skills"
-version = "1.0.0rc1"
+version = "1.0.0rc2"
 description = "Cortrix Skill SDK — framework adapters (LangChain / Claude Tools / OpenAI Function Calling) over the Cortrix Python SDK"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -35,7 +35,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "cortrix>=1.0.0rc1,<2.0.0",
+    "cortrix>=1.0.0rc2,<2.0.0",
     "pydantic>=2.0,<3.0",
 ]
 

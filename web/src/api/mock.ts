@@ -147,7 +147,7 @@ export const mockApi = {
   async getSystemStatus(): Promise<SystemStatus> {
     await delay(100);
     return {
-      version: '1.0.0-rc.1',
+      version: '1.0.0-rc.2',
       uptime_seconds: 3600 + Math.floor(Math.random() * 100),
       namespace_count: 2,
       total_doc_count: 47,
@@ -174,7 +174,7 @@ export const mockApi = {
   // ─── Health probes (F20-7 — /live + /ready) ───────────────────────────────
   async getLive(): Promise<LiveResponse> {
     await delay(60);
-    return { status: 'alive', uptime_seconds: 4200 + Math.floor(Math.random() * 100), version: '1.0.0-rc.1' };
+    return { status: 'alive', uptime_seconds: 4200 + Math.floor(Math.random() * 100), version: '1.0.0-rc.2' };
   },
 
   async getReady(): Promise<ReadyResponse> {
