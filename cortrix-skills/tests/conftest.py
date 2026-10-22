@@ -121,7 +121,7 @@ class FakeClient:
         self._http_error: Optional[BaseException] = None
         self.closed = False
 
-        self.system = _Resource("system", self.calls, {"health": {"status": "ok", "version": "1.0.0-rc.1"}})
+        self.system = _Resource("system", self.calls, {"health": {"status": "ok", "version": "1.0.0-rc.2"}})
         self.documents = _Resource(
             "documents",
             self.calls,

@@ -45,11 +45,11 @@ The image is not published to a container registry yet. Build it from a
 checkout of this repository, from the repository root, then run it:
 
 ```bash
-docker build -t cortrix/mcp:v1.0.0-rc.1 cortrix-mcp
+docker build -t cortrix/mcp:v1.0.0-rc.2 cortrix-mcp
 docker run -i --rm \
   -e CORTRIX_URL=http://host.docker.internal:8420 \
   -e CORTRIX_API_KEY=your-cortrix-api-key \
-  cortrix/mcp:v1.0.0-rc.1
+  cortrix/mcp:v1.0.0-rc.2
 ```
 
 ## Configuration
@@ -129,7 +129,7 @@ Docker variant, using the image built in [Install](#docker):
         "run", "-i", "--rm",
         "-e", "CORTRIX_URL=http://host.docker.internal:8420",
         "-e", "CORTRIX_API_KEY=your-cortrix-api-key",
-        "cortrix/mcp:v1.0.0-rc.1"
+        "cortrix/mcp:v1.0.0-rc.2"
       ]
     }
   }

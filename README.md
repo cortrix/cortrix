@@ -6,7 +6,7 @@
   Agent-native semantic storage for retrieval, memory, and API-driven AI applications.
 
   [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
-  [![Version](https://img.shields.io/badge/version-v1.0.0--rc.1-orange.svg)](https://github.com/cortrix/cortrix/releases)
+  [![Version](https://img.shields.io/badge/version-v1.0.0--rc.2-orange.svg)](https://github.com/cortrix/cortrix/releases)
   [![C++17](https://img.shields.io/badge/C%2B%2B-17-blueviolet.svg)](https://en.cppreference.com/w/cpp/17)
 
   [Documentation](https://cortrix.ai/docs/) · [Quickstart](https://cortrix.ai/docs/get-started/quickstart/) · [Install with an AI Agent](https://cortrix.ai/docs/get-started/agent-quickstart/) · [Agent access](https://cortrix.ai/docs/integrations/overview/) · [Compatibility](docs/compatibility.md) · [OpenAPI](api/openapi.yaml)
