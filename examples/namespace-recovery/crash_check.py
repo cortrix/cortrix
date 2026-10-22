@@ -35,7 +35,7 @@ TERMINAL = ("completed", "failed", "cancelled")
 
 
 def make_docs(directory: Path, count: int) -> list[Path]:
-    """Write documents of about 24 KB, each split into many sections."""
+    """Write documents of about 29 KB, each split into many sections."""
     paths = []
     for i in range(count):
         rnd = random.Random(i)

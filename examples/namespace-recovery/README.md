@@ -38,7 +38,7 @@ By default it restarts the Quick Start's `cortrix` service with `docker compose 
 
 What it does:
 
-1. Creates a namespace and submits 40 Markdown documents of about 24 KB through the SDK.
+1. Creates a namespace and submits 40 Markdown documents of about 29 KB through the SDK.
 2. Watches the upload tasks. As soon as at least one document is done and another is still being written, it sends SIGKILL to the server and notes which documents were caught mid-write. The server gets no chance to clean up.
 3. Starts the server on the same data and waits until it is healthy. While the namespace loads, Cortrix checks every write that never committed: a write that reached every store is kept, a partial one is removed, and documents that were mid-write go back into the queue.
 4. Waits for all 40 tasks to finish and checks through the public API that all 40 documents are ready and that the namespace holds exactly the blocks its documents account for.
@@ -62,7 +62,7 @@ doc-003.md: 61 blocks after recovery, 61 in a clean upload
 PASS
 ```
 
-Which documents get caught mid-write, how long the server takes to come back, and how long the batch takes depend on your machine. On a CPU-only machine with two workers, the 40 documents take around 10 minutes.
+Which documents get caught mid-write, how long the server takes to come back, and how long the batch takes depend on your machine. On a CPU-only machine with two workers, the 40 documents take 10 to 15 minutes.
 
 Documents submitted through the SDK or MCP go back into the queue on restart. In `v1.0.0-rc.2`, documents uploaded as files through `POST /api/v1/namespaces/{name}/documents` (the Web UI uses this route) that were still queued at the restart were not resubmitted; that is fixed on `main` (#217).
 
