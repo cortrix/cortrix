@@ -135,6 +135,50 @@ private:
     std::string blob_dir_;
 };
 
+/// Step 8b companion. RecoverCrashedDocs deletes the block rows of documents a
+/// crash left 'processing' (ingested again from scratch) or 'deleting' (cascade
+/// completed), but it only sees SQLite. The vectors of those blocks — keyed by
+/// block_id, plus the contextual points mapped in contextual_vec_labels — are
+/// dropped here first, while the rows still name them. The WC Recover (step 8)
+/// does not cover this: a crash after a document's blocks were all written
+/// leaves a PENDING txn with every store present, which it finalizes as
+/// COMMITTED without the rollback cleanup, and a deletion is not a WC txn at
+/// all. Re-ingest mints new block ids, so the old vectors would otherwise stay
+/// in the index with no block behind them. MarkDelete is idempotent (an absent
+/// id is Ok). Returns the number of MarkDelete calls that failed.
+int DropCrashedDocVectors(sqlite3* db, cortrix::store::IVectorStore* vstore) {
+    if (!db || !vstore) return 0;
+    std::vector<uint64_t> ids;
+    auto collect = [&](const char* sql) {
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return;
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            ids.push_back(cortrix::id::FromSqliteInt(sqlite3_column_int64(stmt, 0)));
+        }
+        sqlite3_finalize(stmt);
+    };
+    collect("SELECT b.block_id FROM blocks b JOIN documents d ON d.doc_id = b.doc_id"
+            " WHERE d.status IN ('processing', 'deleting')");
+    collect("SELECT l.label FROM contextual_vec_labels l"
+            " JOIN blocks b ON b.block_id = l.block_id"
+            " JOIN documents d ON d.doc_id = b.doc_id"
+            " WHERE d.status IN ('processing', 'deleting')");
+    int failed = 0;
+    for (uint64_t id : ids) {
+        if (!vstore->MarkDelete(id).ok()) ++failed;
+    }
+    // The label rows, and the parent rows an interrupted ingest wrote, would
+    // outlive their blocks the same way; re-ingest writes fresh ones.
+    sqlite3_exec(db,
+                 "DELETE FROM contextual_vec_labels WHERE block_id IN ("
+                 " SELECT b.block_id FROM blocks b JOIN documents d ON d.doc_id = b.doc_id"
+                 " WHERE d.status IN ('processing', 'deleting'));"
+                 "DELETE FROM parents WHERE doc_id IN ("
+                 " SELECT doc_id FROM documents WHERE status = 'processing');",
+                 nullptr, nullptr, nullptr);
+    return failed;
+}
+
 }  // namespace
 
 DefaultNamespacePool::DefaultNamespacePool(
@@ -402,7 +446,16 @@ Result<NamespaceResourceBundle> DefaultNamespacePool::LoadOneNamespaceInner(
     //     the production path (the former external-conn mode skipped it).
     //     Failure tolerated: stuck docs degrade to a visible 'processing' state
     //     rather than blocking the NS load (same containment as ApplyPragmas).
+    //     The vectors of the blocks it is about to delete go first (see
+    //     DropCrashedDocVectors).
     {
+        const int vec_failed = DropCrashedDocVectors(store_db->handle(), vstore);
+        if (vec_failed > 0) {
+            CORTRIX_LOG_WARN("resource",
+                             "doc crash recovery could not drop {} vector(s) for unit {} "
+                             "(ns {})",
+                             vec_failed, unit.unit_id, ns_id);
+        }
         cortrix::CortrixStoreSqlite recovery_view(store_db->handle());
         if (recovery_view.RecoverCrashedDocs() != 0) {
             CORTRIX_LOG_WARN("resource",
