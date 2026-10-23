@@ -129,6 +129,7 @@ def main() -> int:
             if sum(len(by_status.get(s, [])) for s in TERMINAL) == len(tasks):
                 print("every document finished before the kill; rerun with more --docs")
                 return 1
+            time.sleep(0.2)
         docker(args, ["kill", "-s", "KILL"])
         interrupted = sorted(by_status["processing"])
         print(f"killed the server with SIGKILL: {summary(by_status)}")

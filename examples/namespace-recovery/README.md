@@ -1,6 +1,6 @@
 # Namespace recovery check
 
-Each Cortrix namespace keeps its own vector index, SQLite store, and write journal. A document's write to that namespace either completes everywhere or leaves nothing behind, and a restart checks and cleans up each namespace before serving it.
+Each Cortrix namespace keeps its own vector index, SQLite store, and write journal. A document's write to that namespace either completes everywhere or, if it is interrupted, is removed when the namespace loads again. A restart checks and cleans up each namespace before serving it.
 
 This example has two scripts:
 
@@ -64,7 +64,7 @@ PASS
 
 Which documents get caught mid-write, how long the server takes to come back, and how long the batch takes depend on your machine. On a CPU-only machine with two workers, the 40 documents take 10 to 15 minutes.
 
-Documents submitted through the SDK or MCP go back into the queue on restart. In `v1.0.0-rc.2`, documents uploaded as files through `POST /api/v1/namespaces/{name}/documents` (the Web UI uses this route) that were still queued at the restart were not resubmitted; that is fixed on `main` (#217).
+Documents submitted through the SDK or MCP go back into the queue on restart. In `v1.0.0-rc.2`, documents uploaded as files through `POST /api/v1/namespaces/{name}/documents` (the Web UI uses this route) that were still queued or being processed at the restart were not resubmitted; that is fixed on `main` (#217).
 
 ## Query across projects: `two_projects.py`
 
