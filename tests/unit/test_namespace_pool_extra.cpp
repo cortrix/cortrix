@@ -1,11 +1,16 @@
 #include <gtest/gtest.h>
+#include <sqlite3.h>
 
+#include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "cortrix/common/status.h"
 #include "cortrix/resource/namespace_pool.h"
+#include "cortrix/resource/namespace_resource_bundle.h"
 #include "cortrix/resource/pool_error.h"
 #include "ns_pool_test_helper.h"
 
@@ -135,6 +140,74 @@ TEST_F(NsPoolExtra, MultipleNamespacesIndependent) {
   EXPECT_EQ(pool.GetPoolStats().pool_size_current, 2u);
   EXPECT_TRUE(pool.Acquire("ns-3").ok());
   pool.Release("ns-3");
+}
+
+// A crash can leave documents 'processing' (to be ingested again) or 'deleting'
+// with their blocks and vectors on disk. Loading the namespace drops those
+// vectors (block ids and contextual labels) before the doc recovery deletes the
+// blocks, so re-ingest does not leave the old ones behind; a ready document's
+// vectors, label rows and parents are left alone.
+TEST_F(NsPoolExtra, LoadDropsVectorsOfCrashedDocuments) {
+  ASSERT_TRUE(harness_->Admit("ns-crash", 100).ok());
+  auto& pool = harness_->pool();
+  {
+    Result<resource::NamespaceResourceBundle*> acq = pool.Acquire("ns-crash");
+    ASSERT_TRUE(acq.ok());
+    sqlite3* db = acq.value()->primary().store_db->handle();
+    const char* seed =
+        "INSERT INTO documents(doc_id, source_type, source_path, status) VALUES"
+        " ('doc-processing', 'file', 'a.md', 'processing'),"
+        " ('doc-deleting', 'file', 'b.md', 'deleting'),"
+        " ('doc-ready', 'file', 'c.md', 'ready');"
+        "INSERT INTO blocks(block_id, doc_id, chunk_index, block_type,"
+        " processing_level, data) VALUES"
+        " (11, 'doc-processing', 0, 1, 3, x'00'),"
+        " (12, 'doc-processing', 1, 1, 3, x'00'),"
+        " (21, 'doc-deleting', 0, 1, 3, x'00'),"
+        " (31, 'doc-ready', 0, 1, 3, x'00');"
+        "INSERT INTO contextual_vec_labels(label, block_id, child_id) VALUES"
+        " (111, 11, 'child-11'), (311, 31, 'child-31');"
+        "INSERT INTO parents(parent_id, doc_id, namespace_id, parent_text, token_count,"
+        " page_start, page_end, byte_offset_start, byte_offset_end, metadata_json,"
+        " created_at) VALUES"
+        " ('parent-p', 'doc-processing', 'ns-crash', 't', 1, 0, 0, 0, 1, '{}', 0),"
+        " ('parent-r', 'doc-ready', 'ns-crash', 't', 1, 0, 0, 0, 1, '{}', 0);";
+    ASSERT_EQ(sqlite3_exec(db, seed, nullptr, nullptr, nullptr), SQLITE_OK)
+        << sqlite3_errmsg(db);
+    pool.Release("ns-crash");
+  }
+
+  // Restart: drop the resident namespace and load it again from disk.
+  ASSERT_TRUE(pool.EvictForDelete("ns-crash").ok());
+  ASSERT_TRUE(pool.AdmitCreate("ns-crash", 100).ok());
+
+  ASSERT_NE(harness_->fake_index(), nullptr);
+  std::vector<uint64_t> dropped = harness_->fake_index()->deleted_ids();
+  std::sort(dropped.begin(), dropped.end());
+  EXPECT_EQ(dropped, (std::vector<uint64_t>{11, 12, 21, 111}));
+
+  Result<resource::NamespaceResourceBundle*> acq = pool.Acquire("ns-crash");
+  ASSERT_TRUE(acq.ok());
+  sqlite3* db = acq.value()->primary().store_db->handle();
+  auto count = [db](const char* sql) {
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return -1;
+    const int n = sqlite3_step(stmt) == SQLITE_ROW ? sqlite3_column_int(stmt, 0) : -1;
+    sqlite3_finalize(stmt);
+    return n;
+  };
+  EXPECT_EQ(count("SELECT count(*) FROM contextual_vec_labels WHERE label = 111"), 0);
+  EXPECT_EQ(count("SELECT count(*) FROM contextual_vec_labels WHERE label = 311"), 1);
+  EXPECT_EQ(count("SELECT count(*) FROM parents WHERE doc_id = 'doc-processing'"), 0);
+  EXPECT_EQ(count("SELECT count(*) FROM parents WHERE doc_id = 'doc-ready'"), 1);
+  // The doc recovery itself still ran after the vectors were dropped.
+  EXPECT_EQ(count("SELECT count(*) FROM blocks WHERE doc_id = 'doc-processing'"), 0);
+  EXPECT_EQ(count("SELECT count(*) FROM documents"
+                  " WHERE doc_id = 'doc-processing' AND status = 'pending'"),
+            1);
+  EXPECT_EQ(count("SELECT count(*) FROM documents WHERE doc_id = 'doc-deleting'"), 0);
+  EXPECT_EQ(count("SELECT count(*) FROM blocks WHERE doc_id = 'doc-ready'"), 1);
+  pool.Release("ns-crash");
 }
 
 }  // namespace
