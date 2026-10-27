@@ -62,6 +62,17 @@ nlohmann::json DocToSpecJson(const CortrixDoc& doc, const std::string& namespace
     d["source_ref"] = doc.source_ref;
     d["status"] = DocStatusToSpec(doc.status);
     d["content_hash"] = doc.content_hash;
+    // The document metadata the caller supplied on upload / batch submit (or the
+    // import provenance a database import records), as stored on the documents
+    // row. Always an object so the shape is stable: {} when the row has none.
+    // The row only ever holds a dump of a parsed JSON value; anything that is not
+    // an object (e.g. a submitted `null`) is reported as {}.
+    nlohmann::json meta;
+    if (!doc.metadata_json.empty()) {
+        meta = nlohmann::json::parse(doc.metadata_json, /*cb=*/nullptr,
+                                     /*allow_exceptions=*/false);
+    }
+    d["metadata"] = meta.is_object() ? std::move(meta) : nlohmann::json::object();
     d["created_at"] = doc.created_at;
     return d;
 }
