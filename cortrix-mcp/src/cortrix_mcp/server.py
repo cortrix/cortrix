@@ -31,9 +31,9 @@ from .transport import CORTRIX_NAMESPACE
 _SEARCH_FIRST = (
     "When a question may be answered by the indexed documents, search before you read:\n"
     "1. Call cortrix_query with the question, or with the names, terms and IDs you "
-    "need. Each hit has `content` (the matching chunk), a score, and `metadata` with "
-    "the document's `doc_id`, `source_path` (the name it was indexed under) and any "
-    "fields set at upload.\n"
+    "need. Results are grouped by document: `doc_id`, `source_path` (the name it was "
+    "indexed under), `metadata` with the fields set at upload, and `evidence`, which is "
+    "the section around the best hit and the matching chunks of the others.\n"
     "2. Read only what the hits leave open. If you can open the original files, go to "
     "the ones the hits point to instead of reading files up front; otherwise query "
     "again with narrower terms.\n"
