@@ -150,10 +150,24 @@ components:
           $ref: '#/components/schemas/DocumentProgress'
         content_hash:
           type: string
-          example: "sha256:abc..."
+          description: >
+            SHA-256 of the content Cortrix received for this document. Its form
+            depends on how the document was ingested. A file uploaded with
+            `POST /namespaces/{ns}/documents` or picked up from a watched directory
+            carries the full digest of the file bytes: 64 lowercase hex characters,
+            no prefix. Text submitted with `POST /documents` or
+            `POST /documents/batch`, and rows from a database import, carry
+            `sha256:` followed by the first 32 hex characters (128 bits) of the
+            digest of the submitted text. To keep the digest of an original file
+            that was converted or redacted before ingestion, put it in `metadata`.
+          example: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
         metadata:
           type: object
           additionalProperties: true
+          description: >
+            The metadata supplied with the document on upload or submit (for a
+            database import, the import provenance), returned as stored. An empty
+            object when none was supplied.
         created_at:
           type: string
           format: date-time
