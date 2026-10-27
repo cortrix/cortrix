@@ -187,12 +187,18 @@ and fill in the placeholders:
 The documents in <which files, for example "docs/ and design/"> are indexed in
 Cortrix, namespace `<your-namespace>`. Search them through the `cortrix` MCP server.
 
-- Before you open those files to answer a question, search with `cortrix_query`.
-  Start with the question itself, or the names and terms you need.
+- Before you open those files to answer a question, search with `cortrix_query`
+  and pass `namespaces: ["<your-namespace>"]`. Start with the question itself, or
+  the names and terms you need.
 - Open a file only for what the hits leave open, and go to the files the hits point to.
 - Cite from each hit's `metadata`: `doc_id`, `filename`, and the fields this
   project sets at upload, such as `source_path`.
 ```
+
+Point `CORTRIX_NAMESPACE` at that same namespace when one namespace holds what the
+agent needs. With `*`, a query that names no namespace searches every namespace: it
+is slower, and a namespace that does not answer in time is left out of the results
+and listed in `namespaces_failed`.
 
 ## Tools
 
