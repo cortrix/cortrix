@@ -154,6 +154,26 @@ Once connected, ask the agent to call `cortrix_health`. The result's `meta.categ
 
 Then ask it to use `cortrix_query` to look up "What does semantic storage keep close to the agents that need it?". It should return content from `quickstart-demo.txt`.
 
+## Tell the agent how to use Cortrix {#project-instructions}
+
+Connecting the server gives the agent the tools. It doesn't tell the agent which of your files are indexed, or that it should search them before it opens them. Add a short section like this to your project's agent instructions, such as `CLAUDE.md` for Claude Code or `AGENTS.md`, and fill in the placeholders:
+
+```markdown
+## Cortrix
+
+The documents in <which files, for example "docs/ and design/"> are indexed in
+Cortrix, namespace `<your-namespace>`. Search them through the `cortrix` MCP server.
+
+- Before you open those files to answer a question, search with `cortrix_query`
+  and pass `namespaces: ["<your-namespace>"]`. Start with the question itself, or
+  the names and terms you need.
+- Open a file only for what the hits leave open, and go to the files the hits point to.
+- Cite from each hit's `metadata`: `doc_id`, `filename`, and the fields this
+  project sets at upload, such as `source_path`.
+```
+
+For the quickstart's demo data, the namespace is `demo`.
+
 ## Tools {#tools}
 
 | Group | Tools |
