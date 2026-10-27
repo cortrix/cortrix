@@ -173,6 +173,27 @@ Docker variant, using the image built in [Install](#docker):
 }
 ```
 
+## Tell your agent how to use Cortrix
+
+The server's instructions tell the agent to search with `cortrix_query` before it
+reads files, but the agent still doesn't know which of your files are indexed, or
+in which namespace. Add a short section like this to your project's agent
+instructions (`CLAUDE.md` for Claude Code, `AGENTS.md` for agents that read it)
+and fill in the placeholders:
+
+```markdown
+## Cortrix
+
+The documents in <which files, for example "docs/ and design/"> are indexed in
+Cortrix, namespace `<your-namespace>`. Search them through the `cortrix` MCP server.
+
+- Before you open those files to answer a question, search with `cortrix_query`.
+  Start with the question itself, or the names and terms you need.
+- Open a file only for what the hits leave open, and go to the files the hits point to.
+- Cite from each hit's `metadata`: `doc_id`, `filename`, and the fields this
+  project sets at upload, such as `source_path`.
+```
+
 ## Tools
 
 ### Core (12)
