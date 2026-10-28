@@ -191,8 +191,7 @@ Cortrix, namespace `<your-namespace>`. Search them through the `cortrix` MCP ser
   and pass `namespaces: ["<your-namespace>"]`. Start with the question itself, or
   the names and terms you need.
 - Open a file only for what the hits leave open, and go to the files the hits point to.
-- Cite from each hit's `metadata`: `doc_id`, `source_path`, and the fields this
-  project sets at upload.
+- Cite from each result: its `doc_id` and `source_path`, and the fields this project sets at upload in its `metadata`.
 ```
 
 Point `CORTRIX_NAMESPACE` at that same namespace when one namespace holds what the
