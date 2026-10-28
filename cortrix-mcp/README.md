@@ -200,6 +200,21 @@ agent needs. With `*`, a query that names no namespace searches every namespace:
 is slower, and a namespace that does not answer in time is left out of the results
 and listed in `namespaces_failed`.
 
+### When to turn off the agent's own file tools
+
+An agent that also has its own tools for reading and searching files, such as Claude
+Code's Read, Grep and Glob, may search Cortrix and then keep opening files on its own.
+Each extra turn sends the whole conversation again, so a long answer can cost several
+times more. For a session that only answers questions from the indexed documents,
+start Claude Code without those tools:
+
+```bash
+claude --disallowedTools "Read Grep Glob"
+```
+
+Keep them on in a session that also edits code: Claude Code reads a file before it
+edits it.
+
 ## Tools
 
 ### Core (12)
