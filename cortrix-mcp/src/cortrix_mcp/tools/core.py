@@ -52,8 +52,9 @@ def register(mcp) -> None:
 
         Search before you read: start with the question, or the names, terms and IDs
         you need. Each result has `content` (the matching chunk), `score` and
-        `rerank_score`, and `metadata` with the document's `doc_id`, `filename` and
-        any fields set at upload (for example a source path). Cite from `metadata`
+        `rerank_score`, and `metadata` with the document's `doc_id`, `source_path`
+        (the name it was indexed under, which cortrix_list_documents returns as
+        `filename`) and any fields set at upload. Cite from `metadata`
         rather than looking the document up again, and read the original only for
         what the chunks leave open.
 
