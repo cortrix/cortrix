@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import anyio
 import pytest
+
 from cortrix_mcp import server
 
 # Claude Code keeps the first 2,048 characters of a server's instructions and of each
