@@ -168,8 +168,8 @@ Cortrix, namespace `<your-namespace>`. Search them through the `cortrix` MCP ser
   and pass `namespaces: ["<your-namespace>"]`. Start with the question itself, or
   the names and terms you need.
 - Open a file only for what the hits leave open, and go to the files the hits point to.
-- Cite from each hit's `metadata`: `doc_id`, `filename`, and the fields this
-  project sets at upload, such as `source_path`.
+- Cite from each hit's `metadata`: `doc_id`, `source_path`, and the fields this
+  project sets at upload.
 ```
 
 For the quickstart's demo data, the namespace is `demo`.
