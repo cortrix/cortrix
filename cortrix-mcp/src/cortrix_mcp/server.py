@@ -23,19 +23,63 @@ from __future__ import annotations
 from . import __version__
 from .mcp_server import CortrixMCPServer
 from .tools import register_all
+from .transport import CORTRIX_NAMESPACE
 
-mcp = CortrixMCPServer(
-    "cortrix",
-    version=__version__,
-    instructions=(
-        "Cortrix semantic storage — document indexing, hybrid semantic search "
-        "(vector + BM25), conversation memory (MEM02/03/04/05), async ingestion, "
-        "directory watchers, operation audit, and admin DB import. Every tool returns "
-        "a GEN-Agent envelope: {data, meta:{retryable, category, retry_after_ms, "
-        "structured_data}}; tool failures return a model-visible structured error "
-        "result with the same retry and correlation fields."
-    ),
+# MCP clients show the instructions to the agent at the start of every session; they are
+# how the agent learns to search before it reads. Claude Code keeps only the first 2,048
+# characters of a server's instructions, so tests hold them under that.
+_SEARCH_FIRST = (
+    "When a question may be answered by the indexed documents, search before you read:\n"
+    "1. Call cortrix_query with the question, or with the names, terms and IDs you "
+    "need. Each hit has `content` (the matching chunk), a score, and `metadata` with "
+    "the document's `doc_id`, `source_path` (the name it was indexed under) and any "
+    "fields set at upload.\n"
+    "2. Read only what the hits leave open. If you can open the original files, go to "
+    "the ones the hits point to instead of reading files up front; otherwise query "
+    "again with narrower terms.\n"
+    "3. Cite from the hit: the identifiers in `metadata` come from the index, so there "
+    "is no need to look them up again.\n"
+    "4. To see what is indexed, call cortrix_list_namespaces, then "
+    "cortrix_list_documents for one namespace.\n\n"
+    "Only the tools that search, list or report status leave the store unchanged. "
+    "The others upload documents or change namespaces, watchers, interactions, "
+    "tasks, memory or database imports; call them only when the user asks for that.\n\n"
+    "Every tool returns a GEN-Agent envelope: {data, meta:{retryable, category, "
+    "retry_after_ms, structured_data}}; tool failures return a model-visible "
+    "structured error result with the same retry and correlation fields."
 )
+
+
+def _namespace_guidance(namespace: str) -> str:
+    if namespace == "*":
+        # "*" fans every query out to every namespace, and a namespace that misses the
+        # server's per-namespace deadline is dropped, so ask the agent to name one.
+        return (
+            "Documents are indexed in namespaces; cortrix_query searches every namespace "
+            "unless you pass `namespaces`. A search of every namespace is slower, and a "
+            "namespace that does not answer in time is left out of the results (it is "
+            "listed in `namespaces_failed`), so pass the namespace that holds the "
+            "documents you need: your project instructions may name it, or call "
+            "cortrix_list_namespaces."
+        )
+    return (
+        "Documents are indexed in namespaces; cortrix_query searches the "
+        f'"{namespace}" namespace unless you pass `namespaces`.'
+    )
+
+
+def build_instructions(namespace: str) -> str:
+    return (
+        "Cortrix is a semantic store for documents and agent memory. "
+        + _namespace_guidance(namespace)
+        + "\n\n"
+        + _SEARCH_FIRST
+    )
+
+
+INSTRUCTIONS = build_instructions(CORTRIX_NAMESPACE)
+
+mcp = CortrixMCPServer("cortrix", version=__version__, instructions=INSTRUCTIONS)
 
 # Register all tools at import time so test suites and the stdio runner share one server.
 register_all(mcp)

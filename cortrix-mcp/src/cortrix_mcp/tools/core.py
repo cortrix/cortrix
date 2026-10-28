@@ -48,10 +48,18 @@ def register(mcp) -> None:
         namespaces: Optional[list[str]] = None,
         rerank: bool = True,
     ) -> dict:
-        """Semantic search (vector + BM25) across one or more namespaces.
+        """Search the indexed documents and return the best-matching chunks (vector + BM25).
+
+        Search before you read: start with the question, or the names, terms and IDs
+        you need. Each result has `content` (the matching chunk), `score` and
+        `rerank_score`, and `metadata` with the document's `doc_id`, `source_path`
+        (the name it was indexed under, which cortrix_list_documents returns as
+        `filename`) and any fields set at upload. Cite from `metadata`
+        rather than looking the document up again, and read the original only for
+        what the chunks leave open.
 
         Args:
-            query: search query text.
+            query: what to look for, as a question or as key terms.
             top_k: number of results to return (default 5).
             namespaces: target namespaces; single / multiple / ["*"] for all (hard cap 100).
                 Defaults to the configured CORTRIX_NAMESPACE when omitted.
@@ -94,7 +102,10 @@ def register(mcp) -> None:
         limit: int = 50,
         offset: int = 0,
     ) -> dict:
-        """List indexed documents in a namespace (GET /documents)."""
+        """List indexed documents in a namespace, one page at a time (GET /documents).
+
+        Use it to see what a namespace holds; use cortrix_query to find content in it.
+        """
         ns = namespace or CORTRIX_NAMESPACE
         params = {"namespace": ns, "limit": limit, "offset": offset}
         return request("GET", "/documents", params=params, timeout=10.0)
