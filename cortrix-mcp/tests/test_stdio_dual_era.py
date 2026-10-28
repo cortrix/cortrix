@@ -16,7 +16,7 @@ from cortrix_mcp import __version__
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 HARNESS = Path(__file__).with_name("stdio_test_server.py")
-BASELINE_MANIFEST_SHA256 = "fc6fcd3e9d35e199e5849a6846983ea626f53ce6747212832b531b280c056775"
+BASELINE_MANIFEST_SHA256 = "ae173416b7cdfeae9a643fdef912e0c61bbeaf652131d27ebeeda84b1cd431ba"
 
 
 def _parameters(*, harness: bool = False, scenario: str = "success") -> StdioServerParameters:

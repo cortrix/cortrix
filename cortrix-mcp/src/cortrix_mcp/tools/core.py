@@ -66,8 +66,9 @@ def register(mcp) -> None:
         indexed under, which cortrix_list_documents returns as `filename`), `metadata`
         with the fields set at upload, a score, and `evidence`. The best hit comes with
         the section around it (`kind: "parent"`); the others with the matching chunk.
-        Cite from `metadata` rather than looking the document up again, and read the
-        original only for what the evidence leaves open.
+        Cite from each result: its `doc_id` and `source_path`, and the fields set at
+        upload in its `metadata`. Read the original only for what the evidence leaves
+        open, without looking the document up again for citation fields.
 
         Args:
             query: what to look for, as a question or as key terms.
