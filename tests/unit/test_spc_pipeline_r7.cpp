@@ -952,6 +952,46 @@ TEST_F(SPCPipelineR7Test, ContextualDualVector_LabelRowsAndIndexPoints) {
     pipeline_->SetEnricherChain(nullptr);
 }
 
+// §3.8 W2 + the F25 rollback: an ingest that fails after its points went in
+// leaves no contextual point behind. Each contextual point sits under its own
+// derived label, not one of the txn's block ids; the rollback reaches it
+// through the label row, written before the points and keyed by block id, and
+// drops the row too. Fails the block insert, so every point (primary and
+// contextual) was added before the rollback ran.
+TEST_F(SPCPipelineR7Test, ContextualDualVector_RollbackDropsContextualPoints) {
+    cortrix::spc::EnricherChain chain;
+    chain.Append(std::make_shared<FakeSummaryEnricher>());
+    chain.Append(std::make_shared<FakeContextualEnricher>());
+    pipeline_->SetEnricherChain(&chain);
+
+    std::string doc_id = CreateDoc();
+    sqlite3* db = facade_->store().db_handle();
+    ASSERT_EQ(sqlite3_exec(db,
+                           "CREATE TEMP TRIGGER force_block_insert_failure"
+                           " BEFORE INSERT ON blocks BEGIN SELECT RAISE(ABORT, 'forced'); END;",
+                           nullptr, nullptr, nullptr),
+              SQLITE_OK)
+        << sqlite3_errmsg(db);
+    auto task = MakeTask(txt_path_, "text/plain", doc_id);
+    task->processing_level = 3;
+    EXPECT_NE(pipeline_->Process(*task, *facade_), 0);
+    EXPECT_NE(task->error_message.find("block_insert"), std::string::npos)
+        << task->error_message;
+    ASSERT_EQ(sqlite3_exec(db, "DROP TRIGGER force_block_insert_failure",
+                           nullptr, nullptr, nullptr),
+              SQLITE_OK);
+
+    const std::vector<uint64_t> added = fake_index_->added_ids();
+    ASSERT_FALSE(added.empty());
+    const std::vector<uint64_t>& deleted = fake_index_->deleted_ids();
+    for (uint64_t id : added) {
+        EXPECT_NE(std::find(deleted.begin(), deleted.end(), id), deleted.end())
+            << "point " << id << " left in the index after the rollback";
+    }
+    EXPECT_EQ(CountSql("SELECT COUNT(*) FROM contextual_vec_labels"), 0);
+    pipeline_->SetEnricherChain(nullptr);
+}
+
 // No available enricher at all → the enrich stage never ran → no coverage debt
 // concept → zero enrich_state rows (rows would otherwise fake 'ok' coverage).
 TEST_F(SPCPipelineR7Test, EnrichState_NoEnricherWritesNoRows) {

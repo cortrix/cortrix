@@ -210,5 +210,107 @@ TEST_F(NsPoolExtra, LoadDropsVectorsOfCrashedDocuments) {
   pool.Release("ns-crash");
 }
 
+namespace {
+int CountRows(sqlite3* db, const char* sql) {
+  sqlite3_stmt* stmt = nullptr;
+  if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return -1;
+  const int n = sqlite3_step(stmt) == SQLITE_ROW ? sqlite3_column_int(stmt, 0) : -1;
+  sqlite3_finalize(stmt);
+  return n;
+}
+}  // namespace
+
+// A crash in the middle of an ingest leaves a PENDING txn, which the WC Recover
+// rolls back on the next load. The ingest writes its contextual label rows right
+// after BeginWrite, keyed by the txn's block ids, so the rollback finds the
+// contextual points through them whether no block row was written yet or only
+// some were.
+TEST_F(NsPoolExtra, LoadRollsBackContextualPointsOfPendingIngest) {
+  for (const bool partial : {false, true}) {
+    SCOPED_TRACE(partial ? "some block rows written" : "no block row written");
+    const std::string ns = partial ? "ns-pending-partial" : "ns-pending-none";
+    ASSERT_TRUE(harness_->Admit(ns, 100).ok());
+    auto& pool = harness_->pool();
+    {
+      Result<resource::NamespaceResourceBundle*> acq = pool.Acquire(ns);
+      ASSERT_TRUE(acq.ok());
+      auto& unit = acq.value()->primary();
+      sqlite3* db = unit.store_db->handle();
+      ASSERT_EQ(sqlite3_exec(db,
+                             "INSERT INTO documents(doc_id, source_type, source_path, status)"
+                             " VALUES ('doc-a', 'file', 'a.md', 'processing');",
+                             nullptr, nullptr, nullptr),
+                SQLITE_OK)
+          << sqlite3_errmsg(db);
+      store::TxnHandle txn;
+      ASSERT_TRUE(unit.pwl->BeginWrite("doc-a", {41, 42}, /*writes_blob=*/false, &txn).ok());
+      std::string seed =
+          "INSERT INTO contextual_vec_labels(label, block_id, child_id) VALUES"
+          " (141, 41, 'child-41'), (142, 42, 'child-42');";
+      if (partial) {
+        seed +=
+            "INSERT INTO blocks(block_id, doc_id, chunk_index, block_type,"
+            " processing_level, data) VALUES (41, 'doc-a', 0, 1, 3, x'00');";
+      }
+      ASSERT_EQ(sqlite3_exec(db, seed.c_str(), nullptr, nullptr, nullptr), SQLITE_OK)
+          << sqlite3_errmsg(db);
+      // No Commit: the process dies here.
+      pool.Release(ns);
+    }
+
+    ASSERT_TRUE(pool.EvictForDelete(ns).ok());
+    ASSERT_TRUE(pool.AdmitCreate(ns, 100).ok());
+
+    ASSERT_NE(harness_->fake_index(), nullptr);
+    std::vector<uint64_t> dropped = harness_->fake_index()->deleted_ids();
+    std::sort(dropped.begin(), dropped.end());
+    EXPECT_EQ(dropped, (std::vector<uint64_t>{41, 42, 141, 142}));
+
+    Result<resource::NamespaceResourceBundle*> acq = pool.Acquire(ns);
+    ASSERT_TRUE(acq.ok());
+    sqlite3* db = acq.value()->primary().store_db->handle();
+    EXPECT_EQ(CountRows(db, "SELECT count(*) FROM contextual_vec_labels"), 0);
+    EXPECT_EQ(CountRows(db, "SELECT count(*) FROM blocks WHERE doc_id = 'doc-a'"), 0);
+    pool.Release(ns);
+  }
+}
+
+// A label row whose block is gone can never resolve again: a rollback that ran
+// before the rollback dropped contextual points left it, or a hard delete, which
+// removes blocks but not their contextual points. The load drops the point and
+// the row, and leaves the rows of blocks that are still there.
+TEST_F(NsPoolExtra, LoadDropsContextualPointsWhoseBlockIsGone) {
+  ASSERT_TRUE(harness_->Admit("ns-stale", 100).ok());
+  auto& pool = harness_->pool();
+  {
+    Result<resource::NamespaceResourceBundle*> acq = pool.Acquire("ns-stale");
+    ASSERT_TRUE(acq.ok());
+    sqlite3* db = acq.value()->primary().store_db->handle();
+    const char* seed =
+        "INSERT INTO documents(doc_id, source_type, source_path, status) VALUES"
+        " ('doc-ready', 'file', 'c.md', 'ready');"
+        "INSERT INTO blocks(block_id, doc_id, chunk_index, block_type,"
+        " processing_level, data) VALUES (31, 'doc-ready', 0, 1, 3, x'00');"
+        "INSERT INTO contextual_vec_labels(label, block_id, child_id) VALUES"
+        " (311, 31, 'child-31'), (511, 51, 'child-51');";
+    ASSERT_EQ(sqlite3_exec(db, seed, nullptr, nullptr, nullptr), SQLITE_OK)
+        << sqlite3_errmsg(db);
+    pool.Release("ns-stale");
+  }
+
+  ASSERT_TRUE(pool.EvictForDelete("ns-stale").ok());
+  ASSERT_TRUE(pool.AdmitCreate("ns-stale", 100).ok());
+
+  ASSERT_NE(harness_->fake_index(), nullptr);
+  EXPECT_EQ(harness_->fake_index()->deleted_ids(), (std::vector<uint64_t>{511}));
+
+  Result<resource::NamespaceResourceBundle*> acq = pool.Acquire("ns-stale");
+  ASSERT_TRUE(acq.ok());
+  sqlite3* db = acq.value()->primary().store_db->handle();
+  EXPECT_EQ(CountRows(db, "SELECT count(*) FROM contextual_vec_labels WHERE label = 511"), 0);
+  EXPECT_EQ(CountRows(db, "SELECT count(*) FROM contextual_vec_labels WHERE label = 311"), 1);
+  pool.Release("ns-stale");
+}
+
 }  // namespace
 }  // namespace cortrix
