@@ -170,13 +170,14 @@ def register(mcp) -> None:
         ns = namespace or CORTRIX_NAMESPACE
         documents: list[dict] = []
         seen: set[str] = set()
-        offset, total, pages, out = 0, None, 0, None
-        while (total is None or offset < total) and pages < lookup.MAX_PAGES:
+        offset, total, pages, complete, out = 0, None, 0, False, None
+        while pages < lookup.MAX_PAGES:
             out = request("GET", "/documents", params={"namespace": ns, "limit": lookup.PAGE_SIZE, "offset": offset},
                           timeout=10.0)
             page_data = out.get("data") or {}
             page = page_data.get("documents") or []
-            total = int(page_data.get("total") or 0)
+            raw_total = page_data.get("total")
+            total = None if raw_total is None else int(raw_total)
             pages += 1
             for doc in page:
                 key = doc.get("document_id")
@@ -184,11 +185,17 @@ def register(mcp) -> None:
                     continue
                 seen.add(key)
                 documents.append(doc)
-            if not page:
+            offset += lookup.PAGE_SIZE
+            if total is None:
+                if len(page) < lookup.PAGE_SIZE:
+                    complete = True
+                    break
+            elif offset >= total:
+                complete = True
                 break
-            offset += len(page)
-        total = total or 0
-        out["data"] = lookup.find_documents_data(ns, paths, documents, total, len(documents), offset >= total)
+            elif not page:
+                break  # the list ended before ``total``: the store changed during the scan
+        out["data"] = lookup.find_documents_data(ns, paths, documents, total, len(documents), complete)
         return out
 
     @mcp.tool()

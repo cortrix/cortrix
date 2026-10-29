@@ -120,3 +120,35 @@ def test_several_exact_matches_for_one_path_are_all_listed(mock_request):
     assert entry["match"] == "exact" and entry["match_count"] == 25
     assert [d["document_id"] for d in entry["documents"]] == [str(30 - i) for i in range(25)]  # never truncated
     assert "truncated" not in entry
+
+
+def test_offset_advances_by_the_page_size_even_on_a_short_page(mock_request):
+    pages(mock_request, {"documents": [doc("1", "a.md")], "total": 300}, {"documents": [doc("2", "b.md")], "total": 300})
+    data = get_tool_fn("cortrix_find_documents")(paths=["b.md"])["data"]
+    offsets = [c.kwargs["params"]["offset"] for c in mock_request.client.request.call_args_list]
+    assert offsets == [0, 200]
+    assert data["scan_complete"] is True and data["scanned"] == 2 and data["not_found"] == []
+
+
+def test_total_none_pages_until_a_short_page(mock_request):
+    pages(mock_request,
+          {"documents": [doc(f"a{i}", f"a{i}.md") for i in range(200)], "total": None},
+          {"documents": [doc(f"b{i}", f"b{i}.md") for i in range(200)], "total": None},
+          {"documents": [doc(f"c{i}", f"c{i}.md") for i in range(50)], "total": None})
+    data = get_tool_fn("cortrix_find_documents")(paths=["c49.md"])["data"]
+    offsets = [c.kwargs["params"]["offset"] for c in mock_request.client.request.call_args_list]
+    assert offsets == [0, 200, 400]
+    assert all(c.kwargs["params"]["limit"] == 200 for c in mock_request.client.request.call_args_list)
+    assert data["scan_complete"] is True and data["scanned"] == 450 and data["total"] is None
+    assert data["results"][0]["match"] == "exact"
+
+
+def test_total_none_stops_at_the_page_cap_as_incomplete(mock_request, monkeypatch):
+    monkeypatch.setattr(lookup, "MAX_PAGES", 2)
+    pages(mock_request,
+          {"documents": [doc(f"a{i}", f"a{i}.md") for i in range(200)], "total": None},
+          {"documents": [doc(f"b{i}", f"b{i}.md") for i in range(200)], "total": None})
+    data = get_tool_fn("cortrix_find_documents")(paths=["zzz.md"])["data"]
+    assert mock_request.client.request.call_count == 2
+    assert data["scan_complete"] is False and data["scanned"] == 400 and data["total"] is None
+    assert data["not_found"] == ["zzz.md"]
