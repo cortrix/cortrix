@@ -1,7 +1,7 @@
 """Claude Tools adapter — ``as_claude_tools(kit)``.
 
 Converts a :class:`cortrix_skills.CortrixToolKit` into Anthropic Messages API
-tool definitions (29 -> 29 dicts of ``{name, description, input_schema}``,
+tool definitions (30 -> 30 dicts of ``{name, description, input_schema}``,
 feature design section 5.4). Because Claude tool definitions are plain JSON, the
 schema builder needs **no** ``anthropic`` SDK at all.
 
@@ -48,9 +48,9 @@ def require_anthropic() -> None:
 
 
 def as_claude_tools(kit: "CortrixToolKit") -> List[Dict[str, Any]]:
-    """Convert ``kit``'s 29 methods to Claude tool definitions.
+    """Convert ``kit``'s 30 methods to Claude tool definitions.
 
-    Returns a list of 29 dicts, each::
+    Returns a list of 30 dicts, each::
 
         {"name": "cortrix_query", "description": "...",
          "input_schema": {"type": "object", "properties": {...}, "required": [...]}}

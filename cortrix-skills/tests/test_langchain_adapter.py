@@ -2,7 +2,7 @@
 
 Real LangChain ReAct round-trips against a live LLM are D3.5-deferred and not
 run here. We inject a minimal fake ``langchain`` (StructuredTool + ToolException)
-into ``sys.modules`` to exercise: 29 -> 29 conversion, name/description/args_schema
+into ``sys.modules`` to exercise: 30 -> 30 conversion, name/description/args_schema
 wiring, CortrixError -> ToolException(4-field JSON), the missing-dependency
 ImportError, and the version guard (only 0.2.x supported).
 """
@@ -59,11 +59,11 @@ def fake_langchain(monkeypatch):
 
 # --- tests -------------------------------------------------------------------
 
-def test_29_langchain_tools(kit, fake_langchain):
+def test_30_langchain_tools(kit, fake_langchain):
     from cortrix_skills.adapters.langchain import as_langchain_tools
 
     tools = as_langchain_tools(kit)
-    assert len(tools) == 29
+    assert len(tools) == 30
     assert [t.name for t in tools] == list(TOOL_METHOD_NAMES)
 
 

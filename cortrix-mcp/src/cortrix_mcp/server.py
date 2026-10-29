@@ -1,6 +1,6 @@
 """Cortrix MCP Server — SDK v2 dual-era stdio entry point.
 
-Registers all 29 tools + 2 admin tools and runs in stdio mode for IDE agents
+Registers all 30 tools + 2 admin tools and runs in stdio mode for IDE agents
 (Claude Code / Cline / Cursor). The official ``MCPServer`` negotiates modern
 ``2026-07-28`` through ``server/discover`` and retains the legacy
 ``2025-11-25`` initialize path on the same server process.

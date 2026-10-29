@@ -13,10 +13,10 @@ import pytest
 from conftest import mcp
 from cortrix_mcp import __version__
 
-# Expected 29 main tools (feature design section 4) + 2 admin tools (section 4.6).
+# Expected 30 main tools (feature design section 4) + 2 admin tools (section 4.6).
 MAIN_TOOLS = {
     # core 12
-    "cortrix_health", "cortrix_query", "cortrix_upload", "cortrix_list_documents",
+    "cortrix_health", "cortrix_query", "cortrix_upload", "cortrix_list_documents", "cortrix_find_documents",
     "cortrix_list_namespaces", "cortrix_create_namespace", "cortrix_memory_search",
     "cortrix_log_interaction", "cortrix_list_interactions", "cortrix_document_status",
     "cortrix_add_watcher", "cortrix_list_watchers",
@@ -47,7 +47,7 @@ def test_server_identity():
 
 
 def test_total_tool_count_is_31(listed_tools):
-    assert len(listed_tools) == 31  # 29 main + 2 admin
+    assert len(listed_tools) == 32  # 30 main + 2 admin
 
 
 def test_exact_tool_names(listed_tools):
@@ -55,9 +55,9 @@ def test_exact_tool_names(listed_tools):
     assert names == MAIN_TOOLS | ADMIN_TOOLS
 
 
-def test_main_tool_count_is_29(listed_tools):
+def test_main_tool_count_is_30(listed_tools):
     names = {t.name for t in listed_tools}
-    assert len(names & MAIN_TOOLS) == 29
+    assert len(names & MAIN_TOOLS) == 30
 
 
 def test_every_tool_has_input_schema(listed_tools):

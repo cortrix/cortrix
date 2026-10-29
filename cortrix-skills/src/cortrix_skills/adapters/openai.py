@@ -1,7 +1,7 @@
 """OpenAI Function Calling adapter — ``as_openai_functions(kit)``.
 
 Converts a :class:`cortrix_skills.CortrixToolKit` into OpenAI Chat Completions
-tool definitions (29 -> 29, feature design section 5.4-bis). Reuses the same
+tool definitions (30 -> 30, feature design section 5.4-bis). Reuses the same
 JSON Schema builder as the Claude adapter; the only differences are the
 ``{"type": "function", "function": {...}}`` envelope and the ``parameters`` key
 (vs Claude's ``input_schema``). Building tool definitions needs **no** ``openai``
@@ -44,9 +44,9 @@ def require_openai() -> None:
 
 
 def as_openai_functions(kit: "CortrixToolKit") -> List[Dict[str, Any]]:
-    """Convert ``kit``'s 29 methods to OpenAI Chat Completions tool definitions.
+    """Convert ``kit``'s 30 methods to OpenAI Chat Completions tool definitions.
 
-    Returns a list of 29 dicts, each::
+    Returns a list of 30 dicts, each::
 
         {"type": "function",
          "function": {"name": "cortrix_query", "description": "...",

@@ -16,7 +16,7 @@ from cortrix_mcp import __version__
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 HARNESS = Path(__file__).with_name("stdio_test_server.py")
-BASELINE_MANIFEST_SHA256 = "ae173416b7cdfeae9a643fdef912e0c61bbeaf652131d27ebeeda84b1cd431ba"
+BASELINE_MANIFEST_SHA256 = "73a465f780356e0033b1ab83a32ac32723ed29bb2b1a53bc6a8307c2d10f4fd3"
 
 
 def _parameters(*, harness: bool = False, scenario: str = "success") -> StdioServerParameters:
@@ -67,7 +67,7 @@ def test_real_stdio_dual_era_surface_and_admin_denial(mode, expected_protocol):
             assert client.server_info is not None
             assert client.server_info.name == "cortrix"
             assert client.server_info.version == __version__
-            assert len(listed.tools) == 31
+            assert len(listed.tools) == 32
             assert _manifest_hash(listed.tools) == BASELINE_MANIFEST_SHA256
             assert denied.is_error is True
             assert denied.structured_content["code"] == "CX_ERR_MCP_ADMIN_REQUIRED"

@@ -1,4 +1,4 @@
-"""CortrixToolKit tests — all 29 methods, routing, transcoding, error passthrough.
+"""CortrixToolKit tests — all 30 methods, routing, transcoding, error passthrough.
 
 Each method has at least one test. We assert (a) the method returns a plain dict
 (``_to_dict`` normalized the P03 dataclass), (b) it took the expected path (P03
@@ -16,9 +16,9 @@ from cortrix_skills import TOOL_METHOD_NAMES, CortrixToolKit
 
 # --- structural -------------------------------------------------------------
 
-def test_exactly_29_methods():
-    assert len(TOOL_METHOD_NAMES) == 29
-    assert len(set(TOOL_METHOD_NAMES)) == 29
+def test_exactly_30_methods():
+    assert len(TOOL_METHOD_NAMES) == 30
+    assert len(set(TOOL_METHOD_NAMES)) == 30
 
 
 def test_all_names_are_callable_methods(kit):
@@ -89,6 +89,31 @@ def test_upload_uses_http_fallback(kit, fake_client):
     assert (method, path) == ("POST", "/documents")
     assert body == {"namespace": "default", "content": "hello", "filename": "a.txt", "metadata": {"k": "v"}}
     assert timeout == 120.0
+
+
+def test_find_documents_pages_the_list_and_matches_paths(kit, fake_client):
+    from cortrix.types import Document, DocumentList
+
+    pages = {0: DocumentList(documents=[Document(document_id=f"d{i}", status="ready", namespace="ns1", filename=f"dir/f{i}.md") for i in range(200)], total=201),
+             200: DocumentList(documents=[Document(document_id="d200", status="ready", namespace="ns1", filename="x/README.md")], total=201)}
+    fake_client.documents.list._return_value = lambda ns, limit, offset: pages[offset]
+    out = kit.cortrix_find_documents(paths=["dir/f0.md", "README.md", "nope.md", "dir/f0.md"], namespace="ns1")
+    assert out["scan_complete"] is True and out["scanned"] == 201 and out["total"] == 201
+    assert [r["match"] for r in out["results"]] == ["exact", "basename", "none"]
+    assert out["results"][0]["documents"][0]["document_id"] == "d0" and "namespace" not in out["results"][0]["documents"][0]
+    assert out["results"][1]["documents"][0]["content_hash_kind"] == "unknown"
+    assert out["not_found"] == ["nope.md"]
+    assert [c[2]["offset"] for c in fake_client.calls if c[0] == "documents.list"] == [0, 200]
+
+
+def test_find_documents_rejects_an_empty_or_oversized_list(kit, fake_client):
+    for paths in ([], [f"p{i}" for i in range(101)]):
+        with pytest.raises(CortrixError) as ei:
+            kit.cortrix_find_documents(paths=paths)
+        assert ei.value.error_code == "CX_ERR_VALIDATION_FAIL"
+        assert ei.value.category == "permanent" and ei.value.retryable is False
+        assert ei.value.structured_data["field"] == "paths" and ei.value.structured_data["given"] == len(paths)
+    assert not fake_client.calls
 
 
 def test_list_documents_uses_sdk(kit, fake_client):

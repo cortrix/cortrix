@@ -15,7 +15,7 @@ def _names(mcp):
 
 def test_default_server_registers_every_tool():
     assert READ_ONLY_TOOLS < _names(server.mcp)
-    assert len(_names(server.mcp)) == 31
+    assert len(_names(server.mcp)) == 32
 
 
 def test_read_only_server_registers_only_the_read_tools():

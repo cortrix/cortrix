@@ -1,6 +1,6 @@
 """Claude Tools adapter tests (mock; no anthropic SDK, no LLM round-trip).
 
-Covers: 29 -> 29 tool definitions, schema shape (input_schema), 1:1 names with
+Covers: 30 -> 30 tool definitions, schema shape (input_schema), 1:1 names with
 the toolkit, tool_use dispatch (dict + object), and is_error=True + 4-field
 passthrough on CortrixError (feature design section 5.4 / 6.3).
 """
@@ -20,9 +20,9 @@ from cortrix_skills.adapters.claude import (
 )
 
 
-def test_29_tool_definitions(kit):
+def test_30_tool_definitions(kit):
     tools = as_claude_tools(kit)
-    assert len(tools) == 29
+    assert len(tools) == 30
 
 
 def test_names_1to1_with_toolkit(kit):

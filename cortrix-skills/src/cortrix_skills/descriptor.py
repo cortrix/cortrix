@@ -58,7 +58,7 @@ def _model_name(method_name: str) -> str:
 def pydantic_model_from_method(method: Callable[..., Any]):
     """Build a ``pydantic.BaseModel`` subclass mirroring ``method``'s parameters.
 
-    ``self`` is skipped. ``*args`` / ``**kwargs`` are ignored (none of the 29
+    ``self`` is skipped. ``*args`` / ``**kwargs`` are ignored (none of the 30
     methods use them). A parameter without a default becomes a required field;
     a parameter with a default becomes optional with that default. Parameters
     without a type annotation fall back to ``Any``.

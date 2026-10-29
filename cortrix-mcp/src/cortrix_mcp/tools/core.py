@@ -32,6 +32,8 @@ from __future__ import annotations
 import os
 from typing import Optional
 
+from .. import lookup
+from ..errors import tool_error
 from ..results import compact_query_data
 from ..transport import CORTRIX_NAMESPACE, request
 
@@ -133,6 +135,68 @@ def register(mcp) -> None:
         ns = namespace or CORTRIX_NAMESPACE
         params = {"namespace": ns, "limit": limit, "offset": offset}
         return request("GET", "/documents", params=params, timeout=10.0)
+
+    @mcp.tool()
+    def cortrix_find_documents(paths: list[str], namespace: str = "") -> dict:
+        """Find indexed documents by path, many at once (read-only; GET /documents only).
+
+        Pass the names the documents were indexed under: the `source_path` of a
+        cortrix_query hit, which is the same value cortrix_list_documents returns as
+        `filename`. Each path is matched first exactly, then by its last segment
+        (`match: "basename"`); a path with neither match is in `not_found`. Every
+        result carries `match_count`, the real number of matching documents. An exact
+        match lists all of its documents; a basename match lists at most 20 documents
+        per path, and `truncated` is true when more exist, so retry with a more
+        specific path. Nothing is normalized, so case, a leading `./` and the separator
+        must be as indexed. Each document comes with its fields from the list
+        endpoint, its `metadata` as stored, and `content_hash_kind`: "sha256" is the
+        full digest of an uploaded file's bytes; "sha256_prefix128" is `sha256:` plus
+        the first 128 bits of the digest of submitted text, not the original file's
+        digest; "unknown" is anything else. The call scans the whole namespace, at
+        most 10,000 documents. A path in `not_found` is not necessarily missing from
+        the store: the scan may be incomplete (`scan_complete` false; call again or
+        narrow the namespace), or that document has no recorded source name (empty
+        `filename`), so it cannot be found by path.
+
+        Args:
+            paths: 1 to 100 paths as indexed; duplicates are looked up once.
+            namespace: target namespace. Defaults to the configured CORTRIX_NAMESPACE.
+        """
+        if not paths or len(paths) > lookup.MAX_PATHS:
+            raise tool_error(
+                "CX_ERR_MCP_SCHEMA_VALIDATION_FAIL",
+                structured_data={"field": "paths", "detail": f"1 to {lookup.MAX_PATHS} paths", "given": len(paths)},
+            )
+        ns = namespace or CORTRIX_NAMESPACE
+        documents: list[dict] = []
+        seen: set[str] = set()
+        offset, total, pages, complete, out = 0, None, 0, False, None
+        while pages < lookup.MAX_PAGES:
+            out = request("GET", "/documents", params={"namespace": ns, "limit": lookup.PAGE_SIZE, "offset": offset},
+                          timeout=10.0)
+            page_data = out.get("data") or {}
+            page = page_data.get("documents") or []
+            raw_total = page_data.get("total")
+            total = None if raw_total is None else int(raw_total)
+            pages += 1
+            for doc in page:
+                key = doc.get("document_id")
+                if key in seen:
+                    continue
+                seen.add(key)
+                documents.append(doc)
+            offset += lookup.PAGE_SIZE
+            if total is None:
+                if len(page) < lookup.PAGE_SIZE:
+                    complete = True
+                    break
+            elif offset >= total:
+                complete = True
+                break
+            elif not page:
+                break  # the list ended before ``total``: the store changed during the scan
+        out["data"] = lookup.find_documents_data(ns, paths, documents, total, len(documents), complete)
+        return out
 
     @mcp.tool()
     def cortrix_list_namespaces(limit: int = 50, offset: int = 0) -> dict:
