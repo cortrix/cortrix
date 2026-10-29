@@ -1,4 +1,4 @@
-"""CortrixToolKit — 29 methods, 1:1 mirror of the P12 MCP 29 main tools.
+"""CortrixToolKit — 30 methods, 1:1 mirror of the 30 main MCP tools.
 
 Naming SoT (feature design issue 1 / V6 D-15): ``kit.cortrix_<action>`` matches
 the P12 MCP ``cortrix_<action>`` tool names (number + business semantics, not
@@ -30,7 +30,7 @@ from __future__ import annotations
 import dataclasses
 from typing import Any, List, Optional
 
-from cortrix import Cortrix
+from cortrix import Cortrix, CortrixError
 
 from . import _lookup
 
@@ -44,7 +44,6 @@ TOOL_METHOD_NAMES: tuple[str, ...] = (
     "cortrix_query",
     "cortrix_upload",
     "cortrix_list_documents",
-    "cortrix_find_documents",
     "cortrix_list_namespaces",
     "cortrix_create_namespace",
     "cortrix_memory_search",
@@ -77,6 +76,8 @@ TOOL_METHOD_NAMES: tuple[str, ...] = (
     "cortrix_memory_create",
     "cortrix_memory_edit",
     "cortrix_memory_invalidate",
+    # lookup +1 (#30)
+    "cortrix_find_documents",
 )
 
 
@@ -98,7 +99,7 @@ def _to_dict(obj: Any) -> Any:
 
 
 class CortrixToolKit:
-    """Cortrix tool surface for framework Agents (29 methods).
+    """Cortrix tool surface for framework Agents (30 methods).
 
     Wraps a P03 ``cortrix.Cortrix`` client. Construction is lazy — no network
     call is made until the first method runs (feature design section 12.x:
@@ -238,44 +239,6 @@ class CortrixToolKit:
         return _to_dict(
             self._client.documents.list(self._ns(namespace), limit=limit, offset=offset)
         )
-
-    def cortrix_find_documents(self, paths: list[str], namespace: str = "") -> dict:
-        """Find indexed documents by path, many at once (pages documents.list; read-only).
-
-        Pass the names the documents were indexed under (a query hit's ``source_path``,
-        the list endpoint's ``filename``). Each path is matched first exactly, then by
-        its last segment (``match: "basename"``, every document of that name listed);
-        a path with neither match is in ``not_found``. Each document carries its list
-        fields, its ``metadata`` as stored and ``content_hash_kind`` (``"sha256"``,
-        ``"sha256_prefix128"`` or ``"unknown"``). The whole namespace is scanned, at
-        most 10,000 documents; when ``scan_complete`` is false a path in ``not_found``
-        may still be indexed. Same rules and result as the MCP tool of this name.
-
-        Raises ``ValueError`` for an empty list or more than 100 paths; a failed page
-        raises the SDK's error for that page.
-        """
-        if not paths or len(paths) > _lookup.MAX_PATHS:
-            raise ValueError(f"paths must hold 1 to {_lookup.MAX_PATHS} entries, got {len(paths)}")
-        ns = self._ns(namespace)
-        documents: list = []
-        seen: set = set()
-        offset, total, pages = 0, None, 0
-        while (total is None or offset < total) and pages < _lookup.MAX_PAGES:
-            page = _to_dict(self._client.documents.list(ns, limit=_lookup.PAGE_SIZE, offset=offset)) or {}
-            docs = page.get("documents") or []
-            total = int(page.get("total") or 0)
-            pages += 1
-            for doc in docs:
-                key = doc.get("document_id")
-                if key in seen:
-                    continue
-                seen.add(key)
-                documents.append(doc)
-            if not docs:
-                break
-            offset += len(docs)
-        total = total or 0
-        return _lookup.find_documents_data(ns, paths, documents, total, len(documents), offset >= total)
 
     def cortrix_list_namespaces(self, limit: int = 50, offset: int = 0) -> dict:
         """List authorized namespaces (GET /namespaces).
@@ -755,3 +718,68 @@ class CortrixToolKit:
         if reason:
             params["reason"] = reason
         return _to_dict(self._http("DELETE", f"/memory/{memory_id}", params=params, timeout=10.0))
+
+
+    # =========================================================================
+    # Lookup +1 (#30)
+    # =========================================================================
+
+    def cortrix_find_documents(self, paths: list[str], namespace: str = "") -> dict:
+        """Find indexed documents by path, many at once (pages documents.list; read-only).
+
+        Pass the names the documents were indexed under (a query hit's ``source_path``,
+        the list endpoint's ``filename``). Each path is matched first exactly, then by
+        its last segment (``match: "basename"``); a path with neither match is in
+        ``not_found``. Every result carries ``match_count``, the real number of
+        matching documents. An exact match lists all of its documents; a basename match
+        lists at most 20 documents per path, and ``truncated`` is true when more exist,
+        so retry with a more specific path. Each document carries the server's list
+        fields except ``namespace``, its ``metadata`` as stored and
+        ``content_hash_kind`` (``"sha256"``, ``"sha256_prefix128"`` or ``"unknown"``).
+        The whole namespace is scanned, 200 documents per page, at most 10,000
+        documents. A path in ``not_found`` is not necessarily missing from the store:
+        the scan may be incomplete (``scan_complete`` false), or that document has no
+        recorded source name (empty ``filename``), so it cannot be found by path. Same
+        rules and result as the MCP tool of this name.
+
+        Raises ``CortrixError`` (``CX_ERR_VALIDATION_FAIL``, category ``permanent``)
+        for an empty list or more than 100 paths, before any request; a failed page
+        raises the SDK's error for that page, so the whole call fails.
+        """
+        if not paths or len(paths) > _lookup.MAX_PATHS:
+            raise CortrixError(
+                f"paths must hold 1 to {_lookup.MAX_PATHS} entries, got {len(paths or [])}",
+                error_code="CX_ERR_VALIDATION_FAIL",
+                category="permanent",
+                retryable=False,
+                structured_data={"field": "paths", "detail": f"1 to {_lookup.MAX_PATHS} paths",
+                                 "given": len(paths or [])},
+            )
+        ns = self._ns(namespace)
+        documents: list = []
+        seen: set = set()
+        offset, total, pages, complete = 0, None, 0, False
+        while pages < _lookup.MAX_PAGES:
+            page = _to_dict(self._client.documents.list(ns, limit=_lookup.PAGE_SIZE, offset=offset)) or {}
+            docs = page.get("documents") or []
+            raw_total = page.get("total")
+            total = None if raw_total is None else int(raw_total)
+            pages += 1
+            for doc in docs:
+                key = doc.get("document_id")
+                if key in seen:
+                    continue
+                seen.add(key)
+                # The SDK type adds ``progress``, which the list endpoint never sends.
+                documents.append({k: v for k, v in doc.items() if k != "progress"})
+            offset += _lookup.PAGE_SIZE
+            if total is None:
+                if len(docs) < _lookup.PAGE_SIZE:
+                    complete = True
+                    break
+            elif offset >= total:
+                complete = True
+                break
+            elif not docs:
+                break  # the list ended before ``total``: the store changed during the scan
+        return _lookup.find_documents_data(ns, paths, documents, total, len(documents), complete)

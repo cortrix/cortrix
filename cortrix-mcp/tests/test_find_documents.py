@@ -27,6 +27,8 @@ def test_exact_basename_and_none(mock_request):
     data = out["data"]
     assert data["namespace"] == "default" and data["scan_complete"] is True and data["scanned"] == 3 and data["total"] == 3
     assert [r["match"] for r in data["results"]] == ["exact", "basename", "none"]  # the duplicate path is looked up once
+    assert [r["match_count"] for r in data["results"]] == [1, 2, 0]
+    assert all("truncated" not in r for r in data["results"])
     exact = data["results"][0]["documents"][0]
     assert exact["document_id"] == "1" and "namespace" not in exact and exact["content_hash_kind"] == "sha256"
     base = data["results"][1]["documents"]
@@ -86,3 +88,35 @@ def test_no_path_normalization(mock_request):
     data = get_tool_fn("cortrix_find_documents")(paths=["docs/a.md"])["data"]
     assert data["results"][0]["match"] == "basename"
     assert [d["document_id"] for d in data["results"][0]["documents"]] == ["2"]  # basename "a.md" vs "A.md": case kept
+
+
+def test_basename_matches_are_cut_at_twenty_with_the_real_count(mock_request):
+    many = [doc(str(100 - i), f"dir{i}/README.md") for i in range(25)]  # document_id descending, as the server lists
+    few = [doc(str(50 - i), f"pkg{i}/setup.py") for i in range(3)]
+    pages(mock_request, {"documents": many + few, "total": 28})
+    data = get_tool_fn("cortrix_find_documents")(paths=["README.md", "setup.py"])["data"]
+    cut, kept = data["results"]
+    assert cut["match"] == "basename" and cut["match_count"] == 25 and cut["truncated"] is True
+    assert [d["document_id"] for d in cut["documents"]] == [str(100 - i) for i in range(20)]  # the first 20 are kept
+    assert kept["match"] == "basename" and kept["match_count"] == 3 and len(kept["documents"]) == 3
+    assert "truncated" not in kept
+    assert data["not_found"] == []
+
+
+def test_documents_without_a_filename_are_never_matched(mock_request):
+    docs = [doc("1", ""), doc("2", None), doc("3", "dir/x.md")]
+    pages(mock_request, {"documents": docs, "total": 3})
+    data = get_tool_fn("cortrix_find_documents")(paths=["", "y.md", "x.md"])["data"]
+    assert [r["match"] for r in data["results"]] == ["none", "none", "basename"]
+    assert [r["match_count"] for r in data["results"]] == [0, 0, 1]
+    assert data["not_found"] == ["", "y.md"]  # the nameless documents are scanned but can never be found by path
+    assert data["scanned"] == 3 and data["scan_complete"] is True
+
+
+def test_several_exact_matches_for_one_path_are_all_listed(mock_request):
+    docs = [doc(str(30 - i), "notes/a.md") for i in range(25)] + [doc("1", "other/a.md")]
+    pages(mock_request, {"documents": docs, "total": 26})
+    entry = get_tool_fn("cortrix_find_documents")(paths=["notes/a.md"])["data"]["results"][0]
+    assert entry["match"] == "exact" and entry["match_count"] == 25
+    assert [d["document_id"] for d in entry["documents"]] == [str(30 - i) for i in range(25)]  # never truncated
+    assert "truncated" not in entry

@@ -107,12 +107,12 @@ def test_find_documents_pages_the_list_and_matches_paths(kit, fake_client):
 
 
 def test_find_documents_rejects_an_empty_or_oversized_list(kit, fake_client):
-    import pytest
-
-    with pytest.raises(ValueError):
-        kit.cortrix_find_documents(paths=[])
-    with pytest.raises(ValueError):
-        kit.cortrix_find_documents(paths=[f"p{i}" for i in range(101)])
+    for paths in ([], [f"p{i}" for i in range(101)]):
+        with pytest.raises(CortrixError) as ei:
+            kit.cortrix_find_documents(paths=paths)
+        assert ei.value.error_code == "CX_ERR_VALIDATION_FAIL"
+        assert ei.value.category == "permanent" and ei.value.retryable is False
+        assert ei.value.structured_data["field"] == "paths" and ei.value.structured_data["given"] == len(paths)
     assert not fake_client.calls
 
 

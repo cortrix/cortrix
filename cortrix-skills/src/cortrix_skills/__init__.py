@@ -11,7 +11,7 @@ Public surface::
     from cortrix_skills import CortrixToolKit
     from cortrix_skills.adapters import as_langchain_tools, as_claude_tools, as_openai_functions
 
-``CortrixToolKit`` exposes 29 methods that 1:1 mirror the P12 MCP 29 main tools
+``CortrixToolKit`` exposes 30 methods that 1:1 mirror the 30 main MCP tools
 and call the P03 Python SDK underneath (with a pass-through HTTP fallback for
 endpoints the SDK does not yet expose). The adapters convert the toolkit into
 LangChain Tools / Claude tool definitions / OpenAI function definitions.

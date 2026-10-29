@@ -13,7 +13,7 @@ openai. A missing framework only fails when its specific ``as_*`` helper runs
 (feature design section 5 issue 4 / section 12.x: ImportError with an install
 hint).
 
-``iter_descriptors(kit)`` yields the 29 :class:`ToolDescriptor` objects in the
+``iter_descriptors(kit)`` yields the 30 :class:`ToolDescriptor` objects in the
 canonical P12 tool order; all three adapters build on it.
 """
 
@@ -37,7 +37,7 @@ __all__ = [
 
 
 def iter_descriptors(kit: "CortrixToolKit") -> Iterator[ToolDescriptor]:
-    """Yield a :class:`ToolDescriptor` for each of the 29 toolkit methods.
+    """Yield a :class:`ToolDescriptor` for each of the 30 toolkit methods.
 
     Iterates :data:`TOOL_METHOD_NAMES` (deterministic P12 tool order) rather than
     ``dir(kit)`` so the 1:1 count and ordering are explicit and stable.

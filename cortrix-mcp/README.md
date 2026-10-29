@@ -1,6 +1,6 @@
 # cortrix-mcp
 
-Cortrix MCP Server — exposes the Cortrix HTTP API as **29 MCP tools + 2 admin tools**
+Cortrix MCP Server — exposes the Cortrix HTTP API as **30 MCP tools + 2 admin tools**
 over the Model Context Protocol (stdio), so IDE agents like **Claude Code**, **Cline**,
 and **Cursor** can index documents, run hybrid semantic search, manage conversation
 memory, and trigger admin database imports.
@@ -219,12 +219,12 @@ edits it.
 
 Set `CORTRIX_MCP_READ_ONLY=true` for a session that only answers questions from the
 indexed documents, such as an agent that reads a project's design notes. The server then
-registers only the tools that search, list or report status (`cortrix_query`,
+registers only the 16 tools that search, list or report status (`cortrix_query`,
 `cortrix_cross_ns_query`, `cortrix_query_explain`, `cortrix_list_documents`,
-`cortrix_list_namespaces`, `cortrix_document_status`, `cortrix_health`,
-`cortrix_memory_search`, `cortrix_memory_search_filter`, `cortrix_memory_list`,
-`cortrix_memory_get_audit`, `cortrix_list_interactions`, `cortrix_list_watchers`,
-`cortrix_list_operations`, `cortrix_task_status`). The others, which upload documents or
+`cortrix_find_documents`, `cortrix_list_namespaces`, `cortrix_document_status`,
+`cortrix_health`, `cortrix_memory_search`, `cortrix_memory_search_filter`,
+`cortrix_memory_list`, `cortrix_memory_get_audit`, `cortrix_list_interactions`,
+`cortrix_list_watchers`, `cortrix_list_operations`, `cortrix_task_status`). The others, which upload documents or
 change namespaces, watchers, interactions, tasks, memory or database imports, are not
 advertised to the client at all, so the agent cannot call them by mistake and the
 server instructions say so. Leave it unset for a session that is meant to upload or to
@@ -254,6 +254,10 @@ manage memory.
 
 `cortrix_find_documents`: find indexed documents by path, many at once (exact `filename`
 first, then the last segment), with each one's `metadata`, `content_hash` and its kind.
+A basename match lists at most 20 documents per path (`truncated` is true when more
+exist, `match_count` gives the real number). A path in `not_found` may still be in the
+store when the scan was incomplete (`scan_complete` false) or the document has no
+recorded source name.
 
 ### Extended (4)
 

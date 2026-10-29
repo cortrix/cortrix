@@ -1,6 +1,6 @@
 """F16a admin-scope tools (feature design section 4.6): A1 / A2.
 
-These run under an independent admin scope and are NOT counted in the 29 main tools.
+These run under an independent admin scope and are NOT counted in the 30 main tools.
 Bearer claim role=admin is required (V1.0 fallback: CORTRIX_MCP_ADMIN=true env var);
 otherwise CX_ERR_MCP_ADMIN_REQUIRED (403) is raised.
 

@@ -143,15 +143,20 @@ def register(mcp) -> None:
         Pass the names the documents were indexed under: the `source_path` of a
         cortrix_query hit, which is the same value cortrix_list_documents returns as
         `filename`. Each path is matched first exactly, then by its last segment
-        (`match: "basename"`, with every document of that name listed); a path with
-        neither match is in `not_found`. Nothing is normalized, so case, a leading `./`
-        and the separator must be as indexed. Each document comes with its fields from
-        the list endpoint, its `metadata` as stored, and `content_hash_kind`: "sha256"
-        is the full digest of an uploaded file's bytes; "sha256_prefix128" is `sha256:`
-        plus the first 128 bits of the digest of submitted text, not the original
-        file's digest; "unknown" is anything else. The call scans the whole namespace,
-        at most 10,000 documents: when `scan_complete` is false, a path in `not_found`
-        may still be indexed, so call again or narrow the namespace.
+        (`match: "basename"`); a path with neither match is in `not_found`. Every
+        result carries `match_count`, the real number of matching documents. An exact
+        match lists all of its documents; a basename match lists at most 20 documents
+        per path, and `truncated` is true when more exist, so retry with a more
+        specific path. Nothing is normalized, so case, a leading `./` and the separator
+        must be as indexed. Each document comes with its fields from the list
+        endpoint, its `metadata` as stored, and `content_hash_kind`: "sha256" is the
+        full digest of an uploaded file's bytes; "sha256_prefix128" is `sha256:` plus
+        the first 128 bits of the digest of submitted text, not the original file's
+        digest; "unknown" is anything else. The call scans the whole namespace, at
+        most 10,000 documents. A path in `not_found` is not necessarily missing from
+        the store: the scan may be incomplete (`scan_complete` false; call again or
+        narrow the namespace), or that document has no recorded source name (empty
+        `filename`), so it cannot be found by path.
 
         Args:
             paths: 1 to 100 paths as indexed; duplicates are looked up once.
