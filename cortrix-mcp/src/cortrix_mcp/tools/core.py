@@ -32,7 +32,14 @@ from __future__ import annotations
 import os
 from typing import Optional
 
+from ..results import compact_query_data
 from ..transport import CORTRIX_NAMESPACE, request
+
+# Parent expansion defaults, measured by replaying recorded agent queries: one
+# section for the top hit carried most of what more sections added, at a fraction
+# of the size, and 16 KiB keeps a raised parent_expand_top_k within one response.
+PARENT_EXPAND_TOP_K = 1
+PARENT_MAX_BYTES = 16384
 
 
 def register(mcp) -> None:
@@ -47,21 +54,46 @@ def register(mcp) -> None:
         top_k: int = 5,
         namespaces: Optional[list[str]] = None,
         rerank: bool = True,
+        include_parent: bool = True,
+        parent_expand_top_k: int = PARENT_EXPAND_TOP_K,
+        parent_max_bytes: int = PARENT_MAX_BYTES,
+        compact: bool = True,
     ) -> dict:
-        """Semantic search (vector + BM25) across one or more namespaces.
+        """Search the indexed documents and return the best matches, grouped by document.
+
+        Search before you read: start with the question, or the names, terms and IDs
+        you need. Each result is one document: `doc_id`, `source_path` (the name it was
+        indexed under, which cortrix_list_documents returns as `filename`), `metadata`
+        with the fields set at upload, a score, and `evidence`. The best hit comes with
+        the section around it (`kind: "parent"`); the others with the matching chunk.
+        Cite from each result: its `doc_id` and `source_path`, and the fields set at
+        upload in its `metadata`. Read the original only for what the evidence leaves
+        open, without looking the document up again for citation fields.
 
         Args:
-            query: search query text.
-            top_k: number of results to return (default 5).
+            query: what to look for, as a question or as key terms.
+            top_k: number of hits to return (default 5).
             namespaces: target namespaces; single / multiple / ["*"] for all (hard cap 100).
                 Defaults to the configured CORTRIX_NAMESPACE when omitted.
             rerank: enable reranking of fused results (default True).
+            include_parent: send the section around the top hits (default True).
+            parent_expand_top_k: how many of the top hits get their section (default 1);
+                raise it when one section is not enough.
+            parent_max_bytes: cap on the section text in one response (default 16384).
+            compact: group by document and drop the server's ranking fields (default
+                True); False returns the /query result unchanged.
 
         Partial failures return data + structured_data.namespaces_failed (degraded path).
         """
         ns = namespaces if namespaces else [CORTRIX_NAMESPACE]
         body = {"query": query, "namespaces": ns, "top_k": top_k, "rerank": rerank}
-        return request("POST", "/query", json_body=body)
+        if include_parent:
+            body.update(include_parent=True, parent_expand_top_k=parent_expand_top_k,
+                        parent_max_bytes=parent_max_bytes)
+        out = request("POST", "/query", json_body=body)
+        if compact:
+            out["data"] = compact_query_data(out["data"])
+        return out
 
     @mcp.tool()
     def cortrix_upload(
@@ -94,7 +126,10 @@ def register(mcp) -> None:
         limit: int = 50,
         offset: int = 0,
     ) -> dict:
-        """List indexed documents in a namespace (GET /documents)."""
+        """List indexed documents in a namespace, one page at a time (GET /documents).
+
+        Use it to see what a namespace holds; use cortrix_query to find content in it.
+        """
         ns = namespace or CORTRIX_NAMESPACE
         params = {"namespace": ns, "limit": limit, "offset": offset}
         return request("GET", "/documents", params=params, timeout=10.0)

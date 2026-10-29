@@ -28,8 +28,28 @@ def _caused_by_validation_error(error: BaseException) -> bool:
     return False
 
 
+# The tools that leave the store unchanged. In read-only mode only these are registered.
+READ_ONLY_TOOLS = frozenset({
+    "cortrix_health", "cortrix_query", "cortrix_list_documents", "cortrix_list_namespaces",
+    "cortrix_memory_search", "cortrix_list_interactions", "cortrix_document_status",
+    "cortrix_list_watchers", "cortrix_cross_ns_query", "cortrix_memory_search_filter",
+    "cortrix_memory_get_audit", "cortrix_list_operations", "cortrix_memory_list",
+    "cortrix_task_status", "cortrix_query_explain",
+})
+
+
 class CortrixMCPServer(MCPServer):
-    """MCPServer that preserves the Cortrix model-visible error contract."""
+    """MCPServer that preserves the Cortrix model-visible error contract.
+
+    With ``read_only=True`` the server registers only the tools in ``READ_ONLY_TOOLS``;
+    the others are never advertised to the client, so an agent in a question-answering
+    session cannot upload documents or change namespaces, watchers, interactions,
+    tasks, memory or database imports.
+    """
+
+    def __init__(self, *args: Any, read_only: bool = False, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.read_only = read_only
 
     def tool(
         self,
@@ -41,7 +61,10 @@ class CortrixMCPServer(MCPServer):
         meta: dict[str, Any] | None = None,
         structured_output: bool | None = None,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        """Register a tool and translate internal failures at the tool boundary."""
+        """Register a tool and translate internal failures at the tool boundary.
+
+        In read-only mode a tool outside ``READ_ONLY_TOOLS`` is returned unregistered.
+        """
         register = super().tool(
             name=name,
             title=title,
@@ -55,6 +78,8 @@ class CortrixMCPServer(MCPServer):
         )
 
         def decorator(function: Callable[..., Any]) -> Callable[..., Any]:
+            if self.read_only and (name or function.__name__) not in READ_ONLY_TOOLS:
+                return function
             if inspect.iscoroutinefunction(function):
 
                 @wraps(function)

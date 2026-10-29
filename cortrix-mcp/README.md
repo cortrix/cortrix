@@ -62,6 +62,7 @@ All configuration is via environment variables:
 | `CORTRIX_NAMESPACE` | default namespace | `default` |
 | `CORTRIX_API_KEY` | Bearer token or API key for the target server | *(empty)* |
 | `CORTRIX_MCP_ADMIN` | Enables admin-only tools when the server accepts the caller as admin | `false` |
+| `CORTRIX_MCP_READ_ONLY` | Registers only the tools that search, list or report status; see [Read-only mode](#read-only-mode) | `false` |
 | `CORTRIX_MCP_TIMEOUT` | HTTP timeout in seconds | `30` |
 | `CORTRIX_AGENT_ID` | Agent identity sent as `X-Agent-Id` on every backend request (charset `[A-Za-z0-9_.:/-]`, max 128 chars; invalid values fall back to the default) | `cortrix-mcp` |
 
@@ -168,6 +169,73 @@ Docker variant, using the image built in [Install](#docker):
         "CORTRIX_URL": "http://127.0.0.1:8420",
         "CORTRIX_API_KEY": "your-cortrix-api-key"
       }
+    }
+  }
+}
+```
+
+## Tell your agent how to use Cortrix
+
+The server's instructions tell the agent to search with `cortrix_query` before it
+reads files, but the agent still doesn't know which of your files are indexed, or
+in which namespace. Add a short section like this to your project's agent
+instructions (`CLAUDE.md` for Claude Code, `AGENTS.md` for agents that read it)
+and fill in the placeholders:
+
+```markdown
+## Cortrix
+
+The documents in <which files, for example "docs/ and design/"> are indexed in
+Cortrix, namespace `<your-namespace>`. Search them through the `cortrix` MCP server.
+
+- Before you open those files to answer a question, search with `cortrix_query`
+  and pass `namespaces: ["<your-namespace>"]`. Start with the question itself, or
+  the names and terms you need.
+- Open a file only for what the hits leave open, and go to the files the hits point to.
+- Cite from each result: its `doc_id` and `source_path`, and the fields this project sets at upload in its `metadata`.
+```
+
+Point `CORTRIX_NAMESPACE` at that same namespace when one namespace holds what the
+agent needs. With `*`, a query that names no namespace searches every namespace: it
+is slower, and a namespace that does not answer in time is left out of the results
+and listed in `namespaces_failed`.
+
+### When to turn off the agent's own file tools
+
+An agent that also has its own tools for reading and searching files, such as Claude
+Code's Read, Grep and Glob, may search Cortrix and then keep opening files on its own.
+Each extra turn sends the whole conversation again, so a long answer can cost several
+times more. For a session that only answers questions from the indexed documents,
+start Claude Code without those tools:
+
+```bash
+claude --disallowedTools "Read Grep Glob"
+```
+
+Keep them on in a session that also edits code: Claude Code reads a file before it
+edits it.
+
+## Read-only mode
+
+Set `CORTRIX_MCP_READ_ONLY=true` for a session that only answers questions from the
+indexed documents, such as an agent that reads a project's design notes. The server then
+registers only the tools that search, list or report status (`cortrix_query`,
+`cortrix_cross_ns_query`, `cortrix_query_explain`, `cortrix_list_documents`,
+`cortrix_list_namespaces`, `cortrix_document_status`, `cortrix_health`,
+`cortrix_memory_search`, `cortrix_memory_search_filter`, `cortrix_memory_list`,
+`cortrix_memory_get_audit`, `cortrix_list_interactions`, `cortrix_list_watchers`,
+`cortrix_list_operations`, `cortrix_task_status`). The others, which upload documents or
+change namespaces, watchers, interactions, tasks, memory or database imports, are not
+advertised to the client at all, so the agent cannot call them by mistake and the
+server instructions say so. Leave it unset for a session that is meant to upload or to
+manage memory.
+
+```json
+{
+  "mcpServers": {
+    "cortrix": {
+      "command": "cortrix-mcp",
+      "env": { "CORTRIX_NAMESPACE": "docs", "CORTRIX_MCP_READ_ONLY": "true" }
     }
   }
 }

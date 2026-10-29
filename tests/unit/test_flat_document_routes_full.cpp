@@ -171,7 +171,8 @@ protected:
     // status (doc_create mints the ULID + binds status), so the list/get reshaping
     // hits each DocStatusToSpec switch arm. Returns the minted doc_id.
     std::string SeedDoc(const std::string& ns, DocStatus status,
-                        const std::string& source_path) {
+                        const std::string& source_path,
+                        const std::string& metadata_json = "") {
         resource::NamespaceFacade facade(harness_->ipool(), ns);
         EXPECT_TRUE(facade.Acquire().ok());
         CortrixDoc doc;
@@ -179,6 +180,7 @@ protected:
         doc.source_path = source_path;
         doc.content_hash = "h_" + source_path;
         doc.status = status;
+        doc.metadata_json = metadata_json;
         EXPECT_EQ(facade.store().doc_create(doc), 0);
         return doc.doc_id;
     }
@@ -242,6 +244,55 @@ TEST_F(FlatDocRoutesFull, GetByIdReadyStatus) {
     auto j = json::parse(res->body);
     EXPECT_EQ(j["document_id"], id);
     EXPECT_EQ(j["status"], "ready");
+}
+
+// ---------------------------------------------------------------------------
+// Document.metadata: the stored caller metadata round-trips on get and list;
+// a row without metadata (or with a non-object value) reports {}.
+// ---------------------------------------------------------------------------
+
+TEST_F(FlatDocRoutesFull, GetByIdReturnsStoredMetadata) {
+    std::string id = SeedDoc("default", DocStatus::kReady, "meta_one.txt",
+                             R"({"source_sha256":"9f86d081","tags":["spec","v2"],"pages":3})");
+    httplib::Client cli("127.0.0.1", port_);
+    auto res = cli.Get("/api/v1/documents/" + id + "?namespace=default", ReadHeaders());
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 200) << res->body;
+    auto j = json::parse(res->body);
+    ASSERT_TRUE(j.contains("metadata")) << res->body;
+    EXPECT_EQ(j["metadata"],
+              json::parse(R"({"source_sha256":"9f86d081","tags":["spec","v2"],"pages":3})"));
+}
+
+TEST_F(FlatDocRoutesFull, GetByIdMetadataIsEmptyObjectWhenNoneStored) {
+    std::string none_id = SeedDoc("default", DocStatus::kReady, "meta_none.txt");
+    std::string null_id = SeedDoc("default", DocStatus::kReady, "meta_null.txt", "null");
+    httplib::Client cli("127.0.0.1", port_);
+    for (const auto& id : {none_id, null_id}) {
+        auto res = cli.Get("/api/v1/documents/" + id + "?namespace=default", ReadHeaders());
+        ASSERT_TRUE(res);
+        ASSERT_EQ(res->status, 200) << res->body;
+        auto j = json::parse(res->body);
+        ASSERT_TRUE(j.contains("metadata")) << res->body;
+        EXPECT_TRUE(j["metadata"].is_object()) << res->body;
+        EXPECT_TRUE(j["metadata"].empty()) << res->body;
+    }
+}
+
+TEST_F(FlatDocRoutesFull, ListReturnsEachDocumentsMetadata) {
+    SeedDoc("default", DocStatus::kReady, "list_meta_a.txt", R"({"source_sha256":"aaa"})");
+    SeedDoc("default", DocStatus::kReady, "list_meta_b.txt");
+    httplib::Client cli("127.0.0.1", port_);
+    auto res = cli.Get("/api/v1/documents?namespace=default", ReadHeaders());
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 200) << res->body;
+    auto j = json::parse(res->body);
+    ASSERT_EQ(j["documents"].size(), 2u) << res->body;
+    std::map<std::string, json> by_name;
+    for (const auto& d : j["documents"]) by_name[d["filename"].get<std::string>()] = d["metadata"];
+    EXPECT_EQ(by_name["list_meta_a.txt"], json::parse(R"({"source_sha256":"aaa"})"));
+    EXPECT_TRUE(by_name["list_meta_b.txt"].is_object());
+    EXPECT_TRUE(by_name["list_meta_b.txt"].empty());
 }
 
 // ---------------------------------------------------------------------------

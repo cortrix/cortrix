@@ -34,6 +34,9 @@ CORTRIX_URL = os.environ.get("CORTRIX_URL", "http://127.0.0.1:8420")
 CORTRIX_NAMESPACE = os.environ.get("CORTRIX_NAMESPACE", "default")
 CORTRIX_API_KEY = os.environ.get("CORTRIX_API_KEY", "")
 CORTRIX_MCP_ADMIN = os.environ.get("CORTRIX_MCP_ADMIN", "false").lower() == "true"
+# Read-only mode registers only the tools that search, list or report status, so a
+# session that only answers questions from the index cannot write to the store.
+CORTRIX_MCP_READ_ONLY = os.environ.get("CORTRIX_MCP_READ_ONLY", "false").lower() == "true"
 try:
     CORTRIX_MCP_TIMEOUT = float(os.environ.get("CORTRIX_MCP_TIMEOUT", "30"))
 except ValueError:
