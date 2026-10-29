@@ -180,6 +180,9 @@ public:
     cortrix::resource::DefaultNamespacePool& pool() { return *pool_; }
     cortrix::resource::INamespacePool& ipool() { return *pool_; }
     FakeIndex* fake_index() const { return fake_index_; }
+    /// The index the next load opens fails MarkDelete from its n-th call on
+    /// (FakeIndex::set_mark_delete_fail_from); later loads are unaffected.
+    void FailMarkDeleteOnNextLoad(int from_call) { next_mark_delete_fail_from_ = from_call; }
     const std::filesystem::path& data_root() const { return data_root_; }
 
     // Create the NS's per-Unit dir (store.db / pending.wal home) + admit it.
@@ -218,6 +221,10 @@ private:
         ON_CALL(index_factory_, Open(_))
             .WillByDefault(Invoke([this](const std::string&) {
                 auto idx = std::make_unique<FakeIndex>(0);
+                if (next_mark_delete_fail_from_ > 0) {
+                    idx->set_mark_delete_fail_from(next_mark_delete_fail_from_);
+                    next_mark_delete_fail_from_ = 0;
+                }
                 fake_index_ = idx.get();
                 return cortrix::Result<std::unique_ptr<cortrix::store::IIndex>>(std::move(idx));
             }));
@@ -230,6 +237,7 @@ private:
     ::testing::NiceMock<MockUnitRouter> unit_router_;
     ::testing::NiceMock<MockIndexFactory> index_factory_;
     FakeIndex* fake_index_ = nullptr;
+    int next_mark_delete_fail_from_ = 0;
     cortrix::resource::F05Config config_;
     std::unique_ptr<cortrix::resource::DefaultNamespacePool> pool_;
 };

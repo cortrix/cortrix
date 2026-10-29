@@ -1,6 +1,7 @@
 #include <cstdint>
 #include "cortrix/spc/spc_pipeline.h"
 
+#include <algorithm>
 #include <nlohmann/json.hpp>
 #include <chrono>
 #include <optional>
@@ -963,7 +964,9 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
 
     // Phase 2 — transactional write. SPC never writes a blob, so writes_blob=false
     // (F25 §10.4). P-HNSW first, then SQLite (parents + child blocks) (design §4.5);
-    // the rollback callback (§9.4) cleans blocks + parents idempotently on failure.
+    // the only rows ahead of P-HNSW are the doc-level FTS row and the contextual
+    // label rows, which the rollback needs to find what it must drop. The rollback
+    // callback (§9.4) cleans blocks + parents + contextual points idempotently.
     std::vector<BlockId> child_block_ids;
     child_block_ids.reserve(child_blocks.size());
     for (const auto& b : child_blocks) child_block_ids.push_back(b.block_id);
@@ -1003,6 +1006,37 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
         }
     }
 
+    // [addendum §3.8 W2] contextual dual-vector label mapping rows, written BEFORE
+    // any point. A contextual point is keyed by its own derived label, not by one
+    // of this txn's block ids, so its row is the only record of it: the rollback
+    // callback finds the point through the row by the txn's block ids, which works
+    // even when no block row was written yet (a crash or a failure before the
+    // block inserts). A point whose row did not land is left out of the index
+    // instead of being added with nothing to resolve or clean it. Non-fatal like
+    // the other auxiliary persists: the child's primary point still goes in, and
+    // the contextual path loses that chunk exactly as an unresolvable hit would.
+    if (!ctx_label_rows.empty()) {
+        sqlite3* label_db = facade.store().db_handle();
+        std::unordered_set<uint64_t> unlabeled;
+        for (const auto& lr : ctx_label_rows) {
+            Status wl = label_db ? cortrix::spc::WriteContextualVecLabel(label_db, lr)
+                                 : Status::Unavailable("store db unavailable");
+            if (!wl.ok()) {
+                CORTRIX_LOG_WARN("spc",
+                    "contextual point skipped for child_id={} (doc_id={}): label row not "
+                    "persisted: {}",
+                    lr.child_id, task.doc_id, wl.message());
+                unlabeled.insert(lr.label);
+            }
+        }
+        if (!unlabeled.empty()) {
+            vec_points.erase(
+                std::remove_if(vec_points.begin(), vec_points.end(),
+                               [&](const auto& p) { return unlabeled.count(p.second) > 0; }),
+                vec_points.end());
+        }
+    }
+
     if (!vec_points.empty()) {
         Status av = facade.vec_index().AddPoints(vec_points);
         if (!av.ok()) {
@@ -1010,23 +1044,6 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
             task.stage = SPCStage::kError;
             task.error_message = "AddPoints: " + av.message();
             return -1;
-        }
-    }
-
-    // [addendum §3.8 W2] contextual dual-vector label mapping rows (same PWL
-    // lifecycle as the block writes). Non-fatal like the other auxiliary persists:
-    // a missing row degrades that contextual point to an unresolvable (dropped)
-    // ANN hit, never the doc write.
-    if (!ctx_label_rows.empty()) {
-        if (sqlite3* label_db = facade.store().db_handle()) {
-            for (const auto& lr : ctx_label_rows) {
-                Status wl = cortrix::spc::WriteContextualVecLabel(label_db, lr);
-                if (!wl.ok()) {
-                    CORTRIX_LOG_WARN("spc",
-                        "contextual_vec_labels persist skipped for child_id={} (doc_id={}): {}",
-                        lr.child_id, task.doc_id, wl.message());
-                }
-            }
         }
     }
 
