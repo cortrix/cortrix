@@ -952,7 +952,7 @@ TEST_F(SPCPipelineR7Test, ContextualDualVector_LabelRowsAndIndexPoints) {
     pipeline_->SetEnricherChain(nullptr);
 }
 
-// §3.8 W2 + the F25 rollback: an ingest that fails after its points went in
+// Contextual points and the rollback: an ingest that fails after its points went in
 // leaves no contextual point behind. Each contextual point sits under its own
 // derived label, not one of the txn's block ids; the rollback reaches it
 // through the label row, written before the points and keyed by block id, and

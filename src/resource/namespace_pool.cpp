@@ -190,7 +190,7 @@ int DropCrashedDocVectors(sqlite3* db, cortrix::store::IVectorStore* vstore) {
     return failed;
 }
 
-/// Rollback companion (addendum §3.8 W2). A contextual point is keyed by its own
+/// Rollback companion. A contextual point is keyed by its own
 /// derived label, not by one of the txn's block ids, so MarkDelete over the block
 /// ids misses it. The ingest writes the label rows right after BeginWrite and
 /// before any point, keyed by block_id, so they name every contextual point the
