@@ -1,6 +1,6 @@
 """OpenAI Function Calling adapter tests (mock; no openai SDK, no LLM round-trip).
 
-Covers: 29 -> 29 function definitions, the {"type":"function","function":{...}}
+Covers: 30 -> 30 function definitions, the {"type":"function","function":{...}}
 envelope + "parameters" key, 1:1 names, tool_call dispatch (dict + object,
 JSON-encoded arguments), and 4-field error JSON on CortrixError (feature design
 section 5.4-bis).
@@ -21,9 +21,9 @@ from cortrix_skills.adapters.openai import (
 )
 
 
-def test_29_function_definitions(kit):
+def test_30_function_definitions(kit):
     tools = as_openai_functions(kit)
-    assert len(tools) == 29
+    assert len(tools) == 30
 
 
 def test_names_1to1_with_toolkit(kit):

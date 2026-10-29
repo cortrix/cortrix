@@ -3,7 +3,7 @@
 
 Checks that the three agent-access surfaces stay 1:1:
 
-  * **P14** ``CortrixToolKit`` — 29 methods + their parameter sets (introspected).
+  * **P14** ``CortrixToolKit`` — 30 methods + their parameter sets (introspected).
   * **P12** Cortrix MCP tools — ``cortrix_*`` ``@mcp.tool()`` functions + params
     (parsed from ``cortrix-mcp/src/cortrix_mcp/tools/*.py`` with the stdlib ``ast``
     module, so FastMCP need not be installed).
@@ -64,7 +64,7 @@ D3_5_DEFERRED_PATHS: Set[str] = {
 # --------------------------------------------------------------------------- #
 
 def collect_p14(repo_root: str) -> Dict[str, Set[str]]:
-    """Return ``{method_name: {param, ...}}`` for the 29 toolkit methods."""
+    """Return ``{method_name: {param, ...}}`` for the 30 toolkit methods."""
     import inspect
 
     src = os.path.join(repo_root, "cortrix-skills", "src")
@@ -184,10 +184,10 @@ def run_checks(repo_root: str) -> Tuple[List[str], List[str]]:
         errors.append(f"P14 methods with no P12 tool: {sorted(only_p14)}")
     if only_p12:
         errors.append(f"P12 tools with no P14 method: {sorted(only_p12)}")
-    if len(p14) != 29:
-        errors.append(f"P14 method count = {len(p14)} (expected 29).")
-    if len(p12) != 29:
-        warnings.append(f"P12 non-admin tool count = {len(p12)} (expected 29).")
+    if len(p14) != 30:
+        errors.append(f"P14 method count = {len(p14)} (expected 30).")
+    if len(p12) != 30:
+        warnings.append(f"P12 non-admin tool count = {len(p12)} (expected 30).")
 
     # Rule 2 — per-name param-set equality.
     for name in sorted(set(p14) & set(p12)):

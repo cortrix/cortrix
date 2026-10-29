@@ -250,6 +250,11 @@ manage memory.
 `cortrix_log_interaction` · `cortrix_list_interactions` · `cortrix_document_status` ·
 `cortrix_add_watcher` · `cortrix_list_watchers`
 
+### Lookup (1)
+
+`cortrix_find_documents`: find indexed documents by path, many at once (exact `filename`
+first, then the last segment), with each one's `metadata`, `content_hash` and its kind.
+
 ### Extended (4)
 
 `cortrix_cross_ns_query` · `cortrix_async_upload` · `cortrix_memory_search_filter` ·

@@ -32,9 +32,11 @@ from typing import Any, List, Optional
 
 from cortrix import Cortrix
 
+from . import _lookup
+
 __all__ = ["CortrixToolKit", "TOOL_METHOD_NAMES"]
 
-# The 29 method names, in P12 tool order. Adapters iterate this list (rather than
+# The 30 method names, in P12 tool order. Adapters iterate this list (rather than
 # ``dir(kit)``) so ordering is deterministic and the 1:1 count is explicit.
 TOOL_METHOD_NAMES: tuple[str, ...] = (
     # MVP 12 (#1-12)
@@ -42,6 +44,7 @@ TOOL_METHOD_NAMES: tuple[str, ...] = (
     "cortrix_query",
     "cortrix_upload",
     "cortrix_list_documents",
+    "cortrix_find_documents",
     "cortrix_list_namespaces",
     "cortrix_create_namespace",
     "cortrix_memory_search",
@@ -235,6 +238,44 @@ class CortrixToolKit:
         return _to_dict(
             self._client.documents.list(self._ns(namespace), limit=limit, offset=offset)
         )
+
+    def cortrix_find_documents(self, paths: list[str], namespace: str = "") -> dict:
+        """Find indexed documents by path, many at once (pages documents.list; read-only).
+
+        Pass the names the documents were indexed under (a query hit's ``source_path``,
+        the list endpoint's ``filename``). Each path is matched first exactly, then by
+        its last segment (``match: "basename"``, every document of that name listed);
+        a path with neither match is in ``not_found``. Each document carries its list
+        fields, its ``metadata`` as stored and ``content_hash_kind`` (``"sha256"``,
+        ``"sha256_prefix128"`` or ``"unknown"``). The whole namespace is scanned, at
+        most 10,000 documents; when ``scan_complete`` is false a path in ``not_found``
+        may still be indexed. Same rules and result as the MCP tool of this name.
+
+        Raises ``ValueError`` for an empty list or more than 100 paths; a failed page
+        raises the SDK's error for that page.
+        """
+        if not paths or len(paths) > _lookup.MAX_PATHS:
+            raise ValueError(f"paths must hold 1 to {_lookup.MAX_PATHS} entries, got {len(paths)}")
+        ns = self._ns(namespace)
+        documents: list = []
+        seen: set = set()
+        offset, total, pages = 0, None, 0
+        while (total is None or offset < total) and pages < _lookup.MAX_PAGES:
+            page = _to_dict(self._client.documents.list(ns, limit=_lookup.PAGE_SIZE, offset=offset)) or {}
+            docs = page.get("documents") or []
+            total = int(page.get("total") or 0)
+            pages += 1
+            for doc in docs:
+                key = doc.get("document_id")
+                if key in seen:
+                    continue
+                seen.add(key)
+                documents.append(doc)
+            if not docs:
+                break
+            offset += len(docs)
+        total = total or 0
+        return _lookup.find_documents_data(ns, paths, documents, total, len(documents), offset >= total)
 
     def cortrix_list_namespaces(self, limit: int = 50, offset: int = 0) -> dict:
         """List authorized namespaces (GET /namespaces).

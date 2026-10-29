@@ -11,7 +11,7 @@ strategy:
 | IDE | Cortrix MCP Server | Claude Desktop, Cursor, Qoder, … |
 | **Framework** | **`cortrix-skills`** | **LangChain, Claude Tools, OpenAI Function Calling** |
 
-It exposes a single `CortrixToolKit` with **29 methods** (1:1 with the Cortrix MCP
+It exposes a single `CortrixToolKit` with **30 methods** (1:1 with the Cortrix MCP
 tools) and three framework adapters that turn that toolkit into native tools for
 each framework — so a framework agent can search, upload, and manage memory in
 Cortrix with zero hand-written tool glue.
@@ -54,7 +54,7 @@ from cortrix_skills import CortrixToolKit
 from cortrix_skills.adapters import as_langchain_tools
 
 kit = CortrixToolKit(base_url="https://cortrix.example.com", api_key="sk-cortrix-...")
-tools = as_langchain_tools(kit)                       # 29 StructuredTools
+tools = as_langchain_tools(kit)                       # 30 StructuredTools
 
 agent = create_react_agent(ChatAnthropic(model="claude-..."), tools)
 executor = AgentExecutor(agent=agent, tools=tools)
@@ -70,7 +70,7 @@ from cortrix_skills.adapters import as_claude_tools
 from cortrix_skills.adapters.claude import dispatch_claude_tool_use
 
 kit = CortrixToolKit(base_url="https://cortrix.example.com", api_key="sk-cortrix-...")
-tools = as_claude_tools(kit)                          # 29 tool definitions (JSON)
+tools = as_claude_tools(kit)                          # 30 tool definitions (JSON)
 
 client = Anthropic(api_key="sk-ant-...")
 resp = client.messages.create(
@@ -92,7 +92,7 @@ from cortrix_skills.adapters import as_openai_functions
 from cortrix_skills.adapters.openai import dispatch_openai_tool_call
 
 kit = CortrixToolKit(base_url="https://cortrix.example.com", api_key="sk-cortrix-...")
-tools = as_openai_functions(kit)                      # 29 function definitions (JSON)
+tools = as_openai_functions(kit)                      # 30 function definitions (JSON)
 
 client = OpenAI(api_key="sk-...")
 resp = client.chat.completions.create(
@@ -105,7 +105,7 @@ for call in resp.choices[0].message.tool_calls or []:
 
 ---
 
-## The 29 methods
+## The 30 methods
 
 `CortrixToolKit` mirrors the Cortrix MCP tools 1:1 (same names, same semantics).
 Each method calls the Cortrix Python SDK (`cortrix`) underneath, falling back to
@@ -114,6 +114,7 @@ a direct HTTP call for endpoints the SDK does not expose yet.
 | Group | Methods |
 |---|---|
 | Core (12) | `cortrix_health` · `cortrix_query` · `cortrix_upload` · `cortrix_list_documents` · `cortrix_list_namespaces` · `cortrix_create_namespace` · `cortrix_memory_search` · `cortrix_log_interaction` · `cortrix_list_interactions` · `cortrix_document_status` · `cortrix_add_watcher` · `cortrix_list_watchers` |
+| Lookup (1) | `cortrix_find_documents` |
 | Extended (4) | `cortrix_cross_ns_query` · `cortrix_async_upload` · `cortrix_memory_search_filter` · `cortrix_memory_extract_trigger` |
 | New (4) | `cortrix_memory_extract` · `cortrix_task_status` · `cortrix_cancel_task` · `cortrix_query_explain` |
 | Memory audit (2) | `cortrix_memory_get_audit` · `cortrix_memory_revoke_fact` |

@@ -27,12 +27,12 @@ def test_iter_descriptors_yields_29_in_order(kit):
 
 def test_facade_as_claude_tools(kit):
     tools = adapters.as_claude_tools(kit)
-    assert len(tools) == 29 and tools[0]["name"] == TOOL_METHOD_NAMES[0]
+    assert len(tools) == 30 and tools[0]["name"] == TOOL_METHOD_NAMES[0]
 
 
 def test_facade_as_openai_functions(kit):
     tools = adapters.as_openai_functions(kit)
-    assert len(tools) == 29 and tools[0]["type"] == "function"
+    assert len(tools) == 30 and tools[0]["type"] == "function"
 
 
 def test_facade_dispatch_openai_tool_call(kit):
@@ -63,4 +63,4 @@ def test_facade_as_langchain_tools(kit, monkeypatch):
     monkeypatch.setitem(sys.modules, "langchain.tools", tools_mod)
 
     tools = adapters.as_langchain_tools(kit)
-    assert len(tools) == 29
+    assert len(tools) == 30

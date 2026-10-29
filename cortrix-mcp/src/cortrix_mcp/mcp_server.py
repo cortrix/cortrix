@@ -34,7 +34,7 @@ READ_ONLY_TOOLS = frozenset({
     "cortrix_memory_search", "cortrix_list_interactions", "cortrix_document_status",
     "cortrix_list_watchers", "cortrix_cross_ns_query", "cortrix_memory_search_filter",
     "cortrix_memory_get_audit", "cortrix_list_operations", "cortrix_memory_list",
-    "cortrix_task_status", "cortrix_query_explain",
+    "cortrix_task_status", "cortrix_query_explain", "cortrix_find_documents",
 })
 
 

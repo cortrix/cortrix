@@ -32,6 +32,8 @@ from __future__ import annotations
 import os
 from typing import Optional
 
+from .. import lookup
+from ..errors import tool_error
 from ..results import compact_query_data
 from ..transport import CORTRIX_NAMESPACE, request
 
@@ -133,6 +135,56 @@ def register(mcp) -> None:
         ns = namespace or CORTRIX_NAMESPACE
         params = {"namespace": ns, "limit": limit, "offset": offset}
         return request("GET", "/documents", params=params, timeout=10.0)
+
+    @mcp.tool()
+    def cortrix_find_documents(paths: list[str], namespace: str = "") -> dict:
+        """Find indexed documents by path, many at once (read-only; GET /documents only).
+
+        Pass the names the documents were indexed under: the `source_path` of a
+        cortrix_query hit, which is the same value cortrix_list_documents returns as
+        `filename`. Each path is matched first exactly, then by its last segment
+        (`match: "basename"`, with every document of that name listed); a path with
+        neither match is in `not_found`. Nothing is normalized, so case, a leading `./`
+        and the separator must be as indexed. Each document comes with its fields from
+        the list endpoint, its `metadata` as stored, and `content_hash_kind`: "sha256"
+        is the full digest of an uploaded file's bytes; "sha256_prefix128" is `sha256:`
+        plus the first 128 bits of the digest of submitted text, not the original
+        file's digest; "unknown" is anything else. The call scans the whole namespace,
+        at most 10,000 documents: when `scan_complete` is false, a path in `not_found`
+        may still be indexed, so call again or narrow the namespace.
+
+        Args:
+            paths: 1 to 100 paths as indexed; duplicates are looked up once.
+            namespace: target namespace. Defaults to the configured CORTRIX_NAMESPACE.
+        """
+        if not paths or len(paths) > lookup.MAX_PATHS:
+            raise tool_error(
+                "CX_ERR_MCP_SCHEMA_VALIDATION_FAIL",
+                structured_data={"field": "paths", "detail": f"1 to {lookup.MAX_PATHS} paths", "given": len(paths)},
+            )
+        ns = namespace or CORTRIX_NAMESPACE
+        documents: list[dict] = []
+        seen: set[str] = set()
+        offset, total, pages, out = 0, None, 0, None
+        while (total is None or offset < total) and pages < lookup.MAX_PAGES:
+            out = request("GET", "/documents", params={"namespace": ns, "limit": lookup.PAGE_SIZE, "offset": offset},
+                          timeout=10.0)
+            page_data = out.get("data") or {}
+            page = page_data.get("documents") or []
+            total = int(page_data.get("total") or 0)
+            pages += 1
+            for doc in page:
+                key = doc.get("document_id")
+                if key in seen:
+                    continue
+                seen.add(key)
+                documents.append(doc)
+            if not page:
+                break
+            offset += len(page)
+        total = total or 0
+        out["data"] = lookup.find_documents_data(ns, paths, documents, total, len(documents), offset >= total)
+        return out
 
     @mcp.tool()
     def cortrix_list_namespaces(limit: int = 50, offset: int = 0) -> dict:

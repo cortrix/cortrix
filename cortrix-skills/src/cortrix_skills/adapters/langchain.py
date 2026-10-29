@@ -1,7 +1,7 @@
 """LangChain adapter — ``as_langchain_tools(kit)``.
 
 Converts a :class:`cortrix_skills.CortrixToolKit` into LangChain
-``StructuredTool`` objects (29 -> 29). Each tool's ``args_schema`` is the pydantic
+``StructuredTool`` objects (30 -> 30). Each tool's ``args_schema`` is the pydantic
 model derived from the method signature (feature design section 5.3), and each
 call is wrapped so a P03 ``CortrixError`` is re-raised as a LangChain
 ``ToolException`` whose message is the GEN-Agent 4-field JSON payload (feature
@@ -84,9 +84,9 @@ def _wrap(method: Any, ToolException: Any):
 
 
 def as_langchain_tools(kit: "CortrixToolKit") -> List[Any]:
-    """Convert ``kit``'s 29 methods to LangChain ``StructuredTool`` objects.
+    """Convert ``kit``'s 30 methods to LangChain ``StructuredTool`` objects.
 
-    Returns a list of 29 tools (one per CortrixToolKit method). Each carries the
+    Returns a list of 30 tools (one per CortrixToolKit method). Each carries the
     method name, its docstring first line as ``description``, the pydantic
     ``args_schema``, and ``handle_tool_error=True`` so the framework surfaces the
     4-field error payload back to the agent loop.
