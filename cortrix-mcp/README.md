@@ -62,6 +62,7 @@ All configuration is via environment variables:
 | `CORTRIX_NAMESPACE` | default namespace | `default` |
 | `CORTRIX_API_KEY` | Bearer token or API key for the target server | *(empty)* |
 | `CORTRIX_MCP_ADMIN` | Enables admin-only tools when the server accepts the caller as admin | `false` |
+| `CORTRIX_MCP_READ_ONLY` | Registers only the tools that search, list or report status; see [Read-only mode](#read-only-mode) | `false` |
 | `CORTRIX_MCP_TIMEOUT` | HTTP timeout in seconds | `30` |
 | `CORTRIX_AGENT_ID` | Agent identity sent as `X-Agent-Id` on every backend request (charset `[A-Za-z0-9_.:/-]`, max 128 chars; invalid values fall back to the default) | `cortrix-mcp` |
 
@@ -213,6 +214,32 @@ claude --disallowedTools "Read Grep Glob"
 
 Keep them on in a session that also edits code: Claude Code reads a file before it
 edits it.
+
+## Read-only mode
+
+Set `CORTRIX_MCP_READ_ONLY=true` for a session that only answers questions from the
+indexed documents, such as an agent that reads a project's design notes. The server then
+registers only the tools that search, list or report status (`cortrix_query`,
+`cortrix_cross_ns_query`, `cortrix_query_explain`, `cortrix_list_documents`,
+`cortrix_list_namespaces`, `cortrix_document_status`, `cortrix_health`,
+`cortrix_memory_search`, `cortrix_memory_search_filter`, `cortrix_memory_list`,
+`cortrix_memory_get_audit`, `cortrix_list_interactions`, `cortrix_list_watchers`,
+`cortrix_list_operations`, `cortrix_task_status`). The others, which upload documents or
+change namespaces, watchers, interactions, tasks, memory or database imports, are not
+advertised to the client at all, so the agent cannot call them by mistake and the
+server instructions say so. Leave it unset for a session that is meant to upload or to
+manage memory.
+
+```json
+{
+  "mcpServers": {
+    "cortrix": {
+      "command": "cortrix-mcp",
+      "env": { "CORTRIX_NAMESPACE": "docs", "CORTRIX_MCP_READ_ONLY": "true" }
+    }
+  }
+}
+```
 
 ## Tools
 
