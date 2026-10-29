@@ -135,6 +135,25 @@ private:
     std::string blob_dir_;
 };
 
+/// Deletes the contextual_vec_labels rows of `labels`. Used only for points
+/// whose MarkDelete succeeded: the row of a point that could not be deleted is
+/// kept, so a later load finds it again (as a row whose block is gone) and
+/// retries the delete.
+void DeleteLabelRows(sqlite3* db, const std::vector<uint64_t>& labels) {
+    if (!db || labels.empty()) return;
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, "DELETE FROM contextual_vec_labels WHERE label = ?", -1,
+                           &stmt, nullptr) != SQLITE_OK) {
+        return;  // e.g. no contextual_vec_labels table on this Unit
+    }
+    for (uint64_t label : labels) {
+        sqlite3_bind_int64(stmt, 1, cortrix::id::ToSqliteInt(label));
+        sqlite3_step(stmt);  // idempotent: an absent row is a no-op
+        sqlite3_reset(stmt);
+    }
+    sqlite3_finalize(stmt);
+}
+
 /// Step 8b companion. RecoverCrashedDocs deletes the block rows of documents a
 /// crash left 'processing' (ingested again from scratch) or 'deleting' (cascade
 /// completed), but it only sees SQLite. The vectors of those blocks — keyed by
@@ -148,42 +167,53 @@ private:
 ///
 /// It also drops every contextual point whose label row names a block that is
 /// gone. Such a row can never resolve again; it is left by a rollback that ran
-/// before the rollback callback dropped contextual points, and by a hard delete,
-/// which removes the blocks but not their contextual points. Step 8 has already
-/// settled every pending txn by now, so no live write owns such a row.
-/// MarkDelete is idempotent (an absent id is Ok). Returns the number of
-/// MarkDelete calls that failed.
+/// before the rollback callback dropped contextual points, by a hard delete,
+/// which removes the blocks but not their contextual points, and by a delete
+/// that failed (below). Step 8 has already settled every pending txn by now, so
+/// no live write owns such a row.
+///
+/// A label row goes only once its point is deleted; when MarkDelete fails the
+/// row stays and the next load retries it. MarkDelete is idempotent (an absent
+/// id is Ok). Returns the number of MarkDelete calls that failed.
 int DropCrashedDocVectors(sqlite3* db, cortrix::store::IVectorStore* vstore) {
     if (!db || !vstore) return 0;
-    std::vector<uint64_t> ids;
-    auto collect = [&](const char* sql) {
+    auto collect = [&](const char* sql, std::vector<uint64_t>& out) {
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) return;
         while (sqlite3_step(stmt) == SQLITE_ROW) {
-            ids.push_back(cortrix::id::FromSqliteInt(sqlite3_column_int64(stmt, 0)));
+            out.push_back(cortrix::id::FromSqliteInt(sqlite3_column_int64(stmt, 0)));
         }
         sqlite3_finalize(stmt);
     };
+    std::vector<uint64_t> block_ids;
+    std::vector<uint64_t> labels;
     collect("SELECT b.block_id FROM blocks b JOIN documents d ON d.doc_id = b.doc_id"
-            " WHERE d.status IN ('processing', 'deleting')");
+            " WHERE d.status IN ('processing', 'deleting')",
+            block_ids);
     collect("SELECT l.label FROM contextual_vec_labels l"
             " JOIN blocks b ON b.block_id = l.block_id"
             " JOIN documents d ON d.doc_id = b.doc_id"
-            " WHERE d.status IN ('processing', 'deleting')");
+            " WHERE d.status IN ('processing', 'deleting')",
+            labels);
     collect("SELECT l.label FROM contextual_vec_labels l"
-            " WHERE NOT EXISTS (SELECT 1 FROM blocks b WHERE b.block_id = l.block_id)");
+            " WHERE NOT EXISTS (SELECT 1 FROM blocks b WHERE b.block_id = l.block_id)",
+            labels);
     int failed = 0;
-    for (uint64_t id : ids) {
+    for (uint64_t id : block_ids) {
         if (!vstore->MarkDelete(id).ok()) ++failed;
+    }
+    std::vector<uint64_t> dropped_labels;
+    for (uint64_t label : labels) {
+        if (vstore->MarkDelete(label).ok()) {
+            dropped_labels.push_back(label);
+        } else {
+            ++failed;
+        }
     }
     // The label rows, and the parent rows an interrupted ingest wrote, would
     // outlive their blocks the same way; re-ingest writes fresh ones.
+    DeleteLabelRows(db, dropped_labels);
     sqlite3_exec(db,
-                 "DELETE FROM contextual_vec_labels WHERE block_id IN ("
-                 " SELECT b.block_id FROM blocks b JOIN documents d ON d.doc_id = b.doc_id"
-                 " WHERE d.status IN ('processing', 'deleting'));"
-                 "DELETE FROM contextual_vec_labels WHERE NOT EXISTS ("
-                 " SELECT 1 FROM blocks b WHERE b.block_id = contextual_vec_labels.block_id);"
                  "DELETE FROM parents WHERE doc_id IN ("
                  " SELECT doc_id FROM documents WHERE status = 'processing');",
                  nullptr, nullptr, nullptr);
@@ -196,41 +226,37 @@ int DropCrashedDocVectors(sqlite3* db, cortrix::store::IVectorStore* vstore) {
 /// before any point, keyed by block_id, so they name every contextual point the
 /// txn could have added even when no block row was written. A txn's block ids
 /// are freshly minted, so only rows this txn wrote can match. Drops the points,
-/// then the rows. Returns the number of MarkDelete calls that failed.
+/// then the rows of the points it dropped; the row of a point whose delete
+/// failed stays, and the next load retries it (DropCrashedDocVectors). Returns
+/// the number of MarkDelete calls that failed.
 int DropContextualPointsOf(sqlite3* db, cortrix::store::IVectorStore* vstore,
                            const std::vector<cortrix::BlockId>& block_ids) {
     if (!db || !vstore || block_ids.empty()) return 0;
-    std::string in = "(";
-    for (size_t i = 0; i < block_ids.size(); ++i) in += (i ? ",?" : "?");
-    in += ")";
-    auto prepare = [&](const std::string& sql) -> sqlite3_stmt* {
-        sqlite3_stmt* stmt = nullptr;
-        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-            return nullptr;  // e.g. no contextual_vec_labels table on this Unit
-        }
-        for (size_t i = 0; i < block_ids.size(); ++i) {
-            sqlite3_bind_int64(stmt, static_cast<int>(i + 1),
-                               cortrix::id::ToSqliteInt(block_ids[i]));
-        }
-        return stmt;
-    };
+    std::string sql = "SELECT label FROM contextual_vec_labels WHERE block_id IN (";
+    for (size_t i = 0; i < block_ids.size(); ++i) sql += (i ? ",?" : "?");
+    sql += ")";
     std::vector<uint64_t> labels;
-    if (sqlite3_stmt* sel =
-            prepare("SELECT label FROM contextual_vec_labels WHERE block_id IN " + in)) {
-        while (sqlite3_step(sel) == SQLITE_ROW) {
-            labels.push_back(cortrix::id::FromSqliteInt(sqlite3_column_int64(sel, 0)));
-        }
-        sqlite3_finalize(sel);
+    sqlite3_stmt* sel = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &sel, nullptr) != SQLITE_OK) {
+        return 0;  // e.g. no contextual_vec_labels table on this Unit
     }
+    for (size_t i = 0; i < block_ids.size(); ++i) {
+        sqlite3_bind_int64(sel, static_cast<int>(i + 1), cortrix::id::ToSqliteInt(block_ids[i]));
+    }
+    while (sqlite3_step(sel) == SQLITE_ROW) {
+        labels.push_back(cortrix::id::FromSqliteInt(sqlite3_column_int64(sel, 0)));
+    }
+    sqlite3_finalize(sel);
     int failed = 0;
+    std::vector<uint64_t> dropped;
     for (uint64_t label : labels) {
-        if (!vstore->MarkDelete(label).ok()) ++failed;
+        if (vstore->MarkDelete(label).ok()) {
+            dropped.push_back(label);
+        } else {
+            ++failed;
+        }
     }
-    if (sqlite3_stmt* del =
-            prepare("DELETE FROM contextual_vec_labels WHERE block_id IN " + in)) {
-        sqlite3_step(del);  // idempotent: absent rows = no-op
-        sqlite3_finalize(del);
-    }
+    DeleteLabelRows(db, dropped);
     return failed;
 }
 

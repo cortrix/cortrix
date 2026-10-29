@@ -275,6 +275,62 @@ TEST_F(NsPoolExtra, LoadRollsBackContextualPointsOfPendingIngest) {
   }
 }
 
+// A contextual point whose delete fails keeps its label row, on both paths that
+// drop contextual points at load: the rollback of a pending ingest (doc-a, no
+// block row written) and the crashed-document step (doc-b, block present). Once
+// the vector store works again, the next load finds the rows, whose blocks are
+// gone by then, and finishes the cleanup.
+TEST_F(NsPoolExtra, LoadRetriesContextualPointsWhoseDeleteFailed) {
+  ASSERT_TRUE(harness_->Admit("ns-retry", 100).ok());
+  auto& pool = harness_->pool();
+  {
+    Result<resource::NamespaceResourceBundle*> acq = pool.Acquire("ns-retry");
+    ASSERT_TRUE(acq.ok());
+    auto& unit = acq.value()->primary();
+    sqlite3* db = unit.store_db->handle();
+    ASSERT_EQ(sqlite3_exec(db,
+                           "INSERT INTO documents(doc_id, source_type, source_path, status) VALUES"
+                           " ('doc-a', 'file', 'a.md', 'processing'),"
+                           " ('doc-b', 'file', 'b.md', 'processing');"
+                           "INSERT INTO blocks(block_id, doc_id, chunk_index, block_type,"
+                           " processing_level, data) VALUES (61, 'doc-b', 0, 1, 3, x'00');"
+                           "INSERT INTO contextual_vec_labels(label, block_id, child_id) VALUES"
+                           " (141, 41, 'child-41'), (142, 42, 'child-42'), (161, 61, 'child-61');",
+                           nullptr, nullptr, nullptr),
+              SQLITE_OK)
+        << sqlite3_errmsg(db);
+    store::TxnHandle txn;
+    ASSERT_TRUE(unit.pwl->BeginWrite("doc-a", {41, 42}, /*writes_blob=*/false, &txn).ok());
+    pool.Release("ns-retry");
+  }
+
+  // First load: every MarkDelete fails.
+  ASSERT_TRUE(pool.EvictForDelete("ns-retry").ok());
+  harness_->FailMarkDeleteOnNextLoad(1);
+  ASSERT_TRUE(pool.AdmitCreate("ns-retry", 100).ok());
+  ASSERT_NE(harness_->fake_index(), nullptr);
+  EXPECT_TRUE(harness_->fake_index()->deleted_ids().empty());
+  {
+    Result<resource::NamespaceResourceBundle*> acq = pool.Acquire("ns-retry");
+    ASSERT_TRUE(acq.ok());
+    sqlite3* db = acq.value()->primary().store_db->handle();
+    EXPECT_EQ(CountRows(db, "SELECT count(*) FROM contextual_vec_labels"), 3);
+    pool.Release("ns-retry");
+  }
+
+  // Second load: the vector store works again.
+  ASSERT_TRUE(pool.EvictForDelete("ns-retry").ok());
+  ASSERT_TRUE(pool.AdmitCreate("ns-retry", 100).ok());
+  std::vector<uint64_t> dropped = harness_->fake_index()->deleted_ids();
+  std::sort(dropped.begin(), dropped.end());
+  EXPECT_EQ(dropped, (std::vector<uint64_t>{141, 142, 161}));
+  Result<resource::NamespaceResourceBundle*> acq = pool.Acquire("ns-retry");
+  ASSERT_TRUE(acq.ok());
+  sqlite3* db = acq.value()->primary().store_db->handle();
+  EXPECT_EQ(CountRows(db, "SELECT count(*) FROM contextual_vec_labels"), 0);
+  pool.Release("ns-retry");
+}
+
 // A label row whose block is gone can never resolve again: a rollback that ran
 // before the rollback dropped contextual points left it, or a hard delete, which
 // removes blocks but not their contextual points. The load drops the point and
