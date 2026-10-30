@@ -58,3 +58,13 @@ def test_query_description_says_search_before_reading():
     description = _tools()["cortrix_query"].description
     assert "Search before you read" in description
     assert "metadata" in description
+
+
+@pytest.mark.parametrize("namespace", ["default", "*"])
+def test_instructions_prefer_the_later_passage_and_report_absence(namespace):
+    text = server.build_instructions(namespace)
+    assert "not the latest word" in text
+    assert "the later dated one is current" in text
+    assert "never conclude from its absence" in text
+    assert len(text) <= CLIENT_LIMIT
+    assert len(server.build_instructions(namespace, read_only=True)) <= CLIENT_LIMIT
