@@ -216,14 +216,18 @@ TEST_F(DefaultNSRouterTest, CreateWithoutOwnerReadsNullOwner) {
     EXPECT_FALSE(got.value().owner_user_id.has_value());
 }
 
-// FK violation (unknown tenant) makes the namespaces INSERT step fail — not a
-// UNIQUE/PK violation → the kInternalError branch (not kNsAlreadyExists).
-TEST_F(DefaultNSRouterTest, CreateWithUnknownTenantIsInternalError) {
+// FK violation (unknown tenant) makes the namespaces INSERT step fail. It is a
+// permanent caller/config error, not a retryable internal one: CX_ERR_TENANT_NOT_FOUND
+// naming the tenant, and the failed INSERT leaves no namespace behind.
+TEST_F(DefaultNSRouterTest, CreateWithUnknownTenantIsTenantNotFound) {
     NSMetadata m = MakeNs("ns-bad");
     m.tenant_id = "no-such-tenant";
     Status s = router_->CreateNamespace(m);
     EXPECT_FALSE(s.ok());
-    EXPECT_TRUE(HasCxCode(s, "CX_ERR_INTERNAL_ERROR")) << s.message();
+    EXPECT_TRUE(HasCxCode(s, "CX_ERR_TENANT_NOT_FOUND")) << s.message();
+    EXPECT_EQ(s.code(), StatusCode::kNotFound);
+    EXPECT_NE(s.message().find("no-such-tenant"), std::string::npos) << s.message();
+    EXPECT_FALSE(router_->GetNamespace("ns-bad").ok());
 }
 
 // Dropping namespaces makes the CreateNamespace INSERT prepare fail → kInternalError.

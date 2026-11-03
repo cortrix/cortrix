@@ -309,6 +309,15 @@ Status DefaultINSRouter::InsertNamespaceCatalog(const NSMetadata& metadata) {
                 return CatalogStatus(CatalogErrorCode::kNsAlreadyExists,
                                      "namespace '" + metadata.namespace_id + "'");
             }
+            // FK violation: tenant_id is the only foreign key on namespaces, so the
+            // caller's tenant does not exist (e.g. an API key configured with a
+            // tenant_id that was never created). Permanent, not retryable.
+            if (ext == SQLITE_CONSTRAINT_FOREIGNKEY) {
+                return CatalogStatus(CatalogErrorCode::kTenantNotFound,
+                                     "tenant '" + metadata.tenant_id +
+                                         "' does not exist; check the tenant_id of the "
+                                         "API key (single-tenant CE uses default_tenant)");
+            }
             return CatalogStatus(CatalogErrorCode::kInternalError, "insert ns failed");
         }
     }
