@@ -53,7 +53,7 @@ CASES = [
     # watchers
     ("watchers.events", "GET", "/watch/w1/events", ("w1",), {}),
     # documents
-    ("documents.status", "GET", "/documents/d1", ("d1",), {}),
+    ("documents.status", "GET", "/documents/d1", ("n", "d1"), {}),
     # query top-level get_sources (D3.5 endpoint)
     ("query.get_sources", "GET", "/interactions/i1/sources", ("i1",), {}),
     # ops
@@ -131,7 +131,7 @@ async def test_async_resource_sweep() -> None:
     c = AsyncCortrix(base_url=BASE, api_key="k")
     await c.documents.upload("n", io.BytesIO(b"hi"), filename="f.txt")
     await c.documents.list("n")
-    await c.documents.delete("d1")
+    await c.documents.delete("n", "d1")
     await c.documents.task_progress("t1")
     await c.documents.cancel_task("t1")
     await c.memory.create("n", "c", memory_type="fact")

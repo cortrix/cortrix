@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, BinaryIO, Optional, Union
 
 from .._exceptions import InvalidRequestError
+from .._models import parse_model
 # Aliased on purpose: `TimeoutError` unqualified would shadow the builtin inside
 # this module. The SDK class subclasses CortrixError, so raising it keeps every
 # existing `except CortrixError` handler working.
@@ -106,6 +107,23 @@ def _list_params(namespace: str, limit: int, offset: int) -> dict[str, Any]:
     return {"namespace": namespace, "limit": limit, "offset": offset}
 
 
+def _document_params(namespace: str) -> dict[str, Any]:
+    # GET/DELETE /documents/{id} require ?namespace=: documents are stored per
+    # namespace, and the server answers 400 without it.
+    return {"namespace": namespace}
+
+
+def _task_from_wire(raw: Any) -> DocumentTask:
+    """Parse a task body into :class:`DocumentTask`.
+
+    The progress endpoint reports the document id as ``doc_id``; the SDK exposes
+    it as ``DocumentTask.document_id`` (the same name ``Document`` uses).
+    """
+    if isinstance(raw, dict) and raw.get("document_id") is None and "doc_id" in raw:
+        raw = {**raw, "document_id": raw["doc_id"]}
+    return parse_model(DocumentTask, raw)
+
+
 def _batch_body(
     namespace: str,
     documents: list[dict[str, Any]],
@@ -148,12 +166,12 @@ class Documents(SyncResource):
         Poll progress via :meth:`task_progress`, or use :meth:`upload_and_wait`.
         """
         content, resolved = _read_content(file, filename)
-        return self._client._request(
+        raw = self._client._request(
             "POST",
             PATH_DOCUMENTS,
             json=_upload_body(namespace, content, resolved, metadata),
-            response_model=DocumentTask,
         )
+        return _task_from_wire(raw)
 
     def upload_and_wait(
         self,
@@ -233,22 +251,27 @@ class Documents(SyncResource):
             response_model=DocumentList,
         )
 
-    def get(self, document_id: str) -> Document:
-        """Get document detail. ``GET /documents/{id}``."""
+    def get(self, namespace: str, document_id: str) -> Document:
+        """Get document detail. ``GET /documents/{id}?namespace=``."""
         return self._client._request(
-            "GET", PATH_DOCUMENT.format(id=document_id), response_model=Document
+            "GET",
+            PATH_DOCUMENT.format(id=document_id),
+            params=_document_params(namespace),
+            response_model=Document,
         )
 
-    def status(self, document_id: str) -> Document:
+    def status(self, namespace: str, document_id: str) -> Document:
         """Document status — alias of :meth:`get` (status lives in the document's
         ``status`` / ``progress`` fields, real-arch wire has no ``/status`` subpath)."""
-        return self.get(document_id)
+        return self.get(namespace, document_id)
 
     def task_progress(self, task_id: str) -> DocumentTask:
-        """Async task progress. ``GET /documents/tasks/{task_id}/progress``."""
-        return self._client._request(
-            "GET", PATH_TASK_PROGRESS.format(task_id=task_id), response_model=DocumentTask
-        )
+        """Async task progress. ``GET /documents/tasks/{task_id}/progress``.
+
+        Once the task has a document, ``document_id`` carries its id.
+        """
+        raw = self._client._request("GET", PATH_TASK_PROGRESS.format(task_id=task_id))
+        return _task_from_wire(raw)
 
     def cancel_task(self, task_id: str) -> DocumentTask:
         """Cancel an async task. ``DELETE /documents/tasks/{task_id}``."""
@@ -256,9 +279,11 @@ class Documents(SyncResource):
             "DELETE", PATH_TASK.format(task_id=task_id), response_model=DocumentTask
         )
 
-    def delete(self, document_id: str) -> None:
-        """Delete a document and its blocks. ``DELETE /documents/{id}`` -> 204."""
-        self._client._request("DELETE", PATH_DOCUMENT.format(id=document_id))
+    def delete(self, namespace: str, document_id: str) -> None:
+        """Delete a document and its blocks. ``DELETE /documents/{id}?namespace=`` -> 204."""
+        self._client._request(
+            "DELETE", PATH_DOCUMENT.format(id=document_id), params=_document_params(namespace)
+        )
 
 
 class AsyncDocuments(AsyncResource):
@@ -273,12 +298,12 @@ class AsyncDocuments(AsyncResource):
         metadata: Optional[dict[str, Any]] = None,
     ) -> DocumentTask:
         content, resolved = _read_content(file, filename)
-        return await self._client._request(
+        raw = await self._client._request(
             "POST",
             PATH_DOCUMENTS,
             json=_upload_body(namespace, content, resolved, metadata),
-            response_model=DocumentTask,
         )
+        return _task_from_wire(raw)
 
     async def upload_and_wait(
         self,
@@ -338,23 +363,27 @@ class AsyncDocuments(AsyncResource):
             response_model=DocumentList,
         )
 
-    async def get(self, document_id: str) -> Document:
+    async def get(self, namespace: str, document_id: str) -> Document:
         return await self._client._request(
-            "GET", PATH_DOCUMENT.format(id=document_id), response_model=Document
+            "GET",
+            PATH_DOCUMENT.format(id=document_id),
+            params=_document_params(namespace),
+            response_model=Document,
         )
 
-    async def status(self, document_id: str) -> Document:
-        return await self.get(document_id)
+    async def status(self, namespace: str, document_id: str) -> Document:
+        return await self.get(namespace, document_id)
 
     async def task_progress(self, task_id: str) -> DocumentTask:
-        return await self._client._request(
-            "GET", PATH_TASK_PROGRESS.format(task_id=task_id), response_model=DocumentTask
-        )
+        raw = await self._client._request("GET", PATH_TASK_PROGRESS.format(task_id=task_id))
+        return _task_from_wire(raw)
 
     async def cancel_task(self, task_id: str) -> DocumentTask:
         return await self._client._request(
             "DELETE", PATH_TASK.format(task_id=task_id), response_model=DocumentTask
         )
 
-    async def delete(self, document_id: str) -> None:
-        await self._client._request("DELETE", PATH_DOCUMENT.format(id=document_id))
+    async def delete(self, namespace: str, document_id: str) -> None:
+        await self._client._request(
+            "DELETE", PATH_DOCUMENT.format(id=document_id), params=_document_params(namespace)
+        )

@@ -170,7 +170,13 @@ def test_document_status_uses_sdk(kit, fake_client):
     out = kit.cortrix_document_status("doc-1")
     assert out["document_id"] == "doc-1" and out["status"] == "ready"
     name, args, _ = fake_client.calls[0]
-    assert name == "documents.status" and args[0] == "doc-1"
+    assert name == "documents.status" and args == ("default", "doc-1")
+
+
+def test_document_status_passes_namespace(kit, fake_client):
+    kit.cortrix_document_status("doc-1", namespace="ns1")
+    name, args, _ = fake_client.calls[0]
+    assert name == "documents.status" and args == ("ns1", "doc-1")
 
 
 def test_add_watcher_uses_sdk(kit, fake_client):
