@@ -203,6 +203,23 @@ TEST_F(DocumentGcSweeperTest, RestoreReactivates) {
     EXPECT_EQ(DocStatusOf("docF"), static_cast<int>(DocStatus::kReady)) << "restored to live";
 }
 
+// A doc deleted longer ago than the window is not restored: the next sweep removes it.
+TEST_F(DocumentGcSweeperTest, RestoreRefusesPastTheRetentionWindow) {
+    SeedDoc("docX", 21);
+    SoftDelete("docX", NowMs() - 40LL * 24 * 3600 * 1000);  // 40 days ago
+    cfg_.soft_delete_retention_days = 30;
+    DocumentGcSweeper sweeper(&router_, &harness_->ipool(), cfg_);
+
+    auto r = sweeper.Restore({"docX"});
+    ASSERT_TRUE(r.ok());
+    EXPECT_TRUE(r.value().succeeded.empty());
+    ASSERT_EQ(r.value().failed.size(), 1u);
+    EXPECT_EQ(r.value().failed[0].id, "docX");
+    EXPECT_EQ(r.value().failed[0].code, "CX_ERR_GC_RESTORE_EXPIRED");
+    EXPECT_FALSE(r.value().failed[0].namespace_name.empty());
+    EXPECT_EQ(DocStatusOf("docX"), static_cast<int>(DocStatus::kDeleted)) << "still deleted";
+}
+
 // CountSoftDeleted reports the cross-NS soft-deleted backlog (for GcStatus).
 TEST_F(DocumentGcSweeperTest, CountSoftDeleted) {
     SeedDoc("docG", 17);

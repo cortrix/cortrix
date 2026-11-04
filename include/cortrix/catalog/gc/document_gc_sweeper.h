@@ -62,8 +62,8 @@ public:
     Result<SweepReport> Purge();
 
     /// One id that was not restored. message is set for every code; live_doc_id only
-    /// for CX_ERR_GC_RESTORE_SUPERSEDED; namespace_name for SUPERSEDED and
-    /// INCOMPLETE, the namespace in which the caller acts next.
+    /// for CX_ERR_GC_RESTORE_SUPERSEDED; namespace_name for SUPERSEDED, INCOMPLETE
+    /// and EXPIRED, the namespace in which the caller acts next.
     struct RestoreFailure {
         std::string id;
         std::string code;  ///< CX_ERR_*
@@ -83,14 +83,16 @@ public:
 
     /// The restore of one id in one namespace's store. kNotHere: the store holds no
     /// deleted row with that id, look further. kRestored. kRefused: `failure` says
-    /// why, and the search for this id ends.
+    /// why, and the search for this id ends. A row deleted at or before
+    /// expired_cutoff_ms is past the retention window, the same test the hard-delete
+    /// sweep applies, and is refused with CX_ERR_GC_RESTORE_EXPIRED.
     struct RestoreDecision {
         enum class Kind { kNotHere, kRestored, kRefused };
         Kind kind = Kind::kNotHere;
         RestoreFailure failure;
     };
     static RestoreDecision DecideRestore(CortrixStore& store, const std::string& doc_id,
-                                         const std::string& ns_id);
+                                         const std::string& ns_id, int64_t expired_cutoff_ms);
 
     /// Count of currently soft-deleted docs across all namespaces (for GcStatus).
     Result<int64_t> CountSoftDeleted() const;

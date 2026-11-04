@@ -117,11 +117,27 @@ DocumentGcSweeper::RestoreDecision CheckFailed(const std::string& id) {
 }  // namespace
 
 DocumentGcSweeper::RestoreDecision DocumentGcSweeper::DecideRestore(
-    CortrixStore& store, const std::string& doc_id, const std::string& ns_id) {
+    CortrixStore& store, const std::string& doc_id, const std::string& ns_id,
+    int64_t expired_cutoff_ms) {
     CortrixDoc row;
     const int got = store.doc_get(doc_id, row);
     if (got == -2 || (got == 0 && row.status != DocStatus::kDeleted)) return {};
     if (got != 0) return CheckFailed(doc_id);
+
+    // 0. Past the retention window the sweep hard-deletes the row on its next run, so
+    //    it is refused like a purged one. A row with no recorded deletion time is not.
+    {
+        std::optional<int64_t> deleted_at;
+        const int drc = store.doc_get_deleted_at(doc_id, &deleted_at);
+        if (drc == -2) return {};
+        if (drc != 0) return CheckFailed(doc_id);
+        if (deleted_at.has_value() && *deleted_at <= expired_cutoff_ms) {
+            return Refused(doc_id, "CX_ERR_GC_RESTORE_EXPIRED",
+                           "deleted longer ago than the retention window "
+                           "(gc.soft_delete_retention_days); add the document again",
+                           "", ns_id);
+        }
+    }
 
     // 1. A version that never finished processing comes back with partial or no
     //    content, so it is refused. A memory session is exempt: its status describes
@@ -187,6 +203,9 @@ Result<DocumentGcSweeper::RestoreOutcome> DocumentGcSweeper::Restore(
     auto ns_list = ns_router_->ListNamespaces();
     if (!ns_list.ok()) return ns_list.status();
 
+    // The cutoff RunOnce uses: a row deleted at or before it is past the window.
+    const int64_t expired_cutoff = NowMs() - DaysToMs(config_.soft_delete_retention_days);
+
     for (const auto& doc_id : doc_ids) {
         bool decided = false;
         // doc_id carries no NS, so search namespaces for a soft-deleted match; the
@@ -194,7 +213,8 @@ Result<DocumentGcSweeper::RestoreOutcome> DocumentGcSweeper::Restore(
         for (const auto& ns_id : ns_list.value().results) {
             resource::NamespaceFacade facade(*pool_, ns_id);
             if (!facade.Acquire().ok()) continue;
-            const RestoreDecision d = DecideRestore(facade.store(), doc_id, ns_id);
+            const RestoreDecision d =
+                DecideRestore(facade.store(), doc_id, ns_id, expired_cutoff);
             if (d.kind == RestoreDecision::Kind::kNotHere) continue;
             if (d.kind == RestoreDecision::Kind::kRestored) {
                 out.succeeded.push_back(doc_id);

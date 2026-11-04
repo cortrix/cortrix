@@ -106,8 +106,15 @@ protected:
     }
     httplib::Headers User() { return {{"Authorization", "Bearer " + user_key_}}; }
 
+    // Now in ms: restores are refused for rows deleted longer ago than the window.
+    static int64_t NowMs() {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::system_clock::now().time_since_epoch())
+            .count();
+    }
+
     // Seed a soft-deleted doc in the pool (for the restore test).
-    void SeedSoftDeletedDoc(const std::string& doc_id) {
+    void SeedSoftDeletedDoc(const std::string& doc_id, int64_t deleted_at_ms = NowMs()) {
         cortrix::resource::NamespaceFacade facade(harness_->ipool(), kNs);
         ASSERT_TRUE(facade.Acquire().ok());
         CortrixDoc doc;
@@ -116,7 +123,7 @@ protected:
         doc.source_path = doc_id + ".txt";
         doc.status = DocStatus::kReady;
         ASSERT_EQ(facade.store().doc_create(doc), 0);
-        ASSERT_EQ(facade.store().doc_soft_delete(doc_id, 1000), 0);
+        ASSERT_EQ(facade.store().doc_soft_delete(doc_id, deleted_at_ms), 0);
     }
 
     static constexpr const char* kNs = "sales";
@@ -247,6 +254,26 @@ TEST_F(GcRoutesTest, RestoreForbiddenForNonAdminSaysWhoCanRestore) {
 }
 
 
+// A document deleted longer ago than the window is refused, permanent, with the
+// namespace to add it again in.
+TEST_F(GcRoutesTest, RestorePastTheRetentionWindowIsRefused) {
+    SeedSoftDeletedDoc("docOld", /*deleted_at_ms=*/1000);
+    httplib::Client cli("127.0.0.1", port_);
+    auto res = cli.Post("/api/v1/gc/restore", Admin(), R"({"document_ids":["docOld"]})",
+                        "application/json");
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 200) << res->body;
+    auto body = json::parse(res->body);
+    EXPECT_EQ(body["succeeded"].size(), 0u);
+    ASSERT_EQ(body["failed"].size(), 1u) << res->body;
+    const auto& f = body["failed"][0];
+    EXPECT_EQ(f["id"], "docOld");
+    EXPECT_EQ(f["error_code"], "CX_ERR_GC_RESTORE_EXPIRED");
+    EXPECT_EQ(f["retryable"], false);
+    EXPECT_EQ(f["category"], "permanent");
+    EXPECT_EQ(f["structured_data"]["namespace"], kNs);
+}
+
 // #157: a refused restore says why and carries what an agent needs to act next.
 TEST_F(GcRoutesTest, RestoreRefusalsCarryTheirMessageAndDetail) {
     {
@@ -258,7 +285,7 @@ TEST_F(GcRoutesTest, RestoreRefusalsCarryTheirMessageAndDetail) {
         v1.source_path = "r.txt";
         v1.status = DocStatus::kReady;
         ASSERT_EQ(facade.store().doc_create(v1), 0);
-        ASSERT_EQ(facade.store().doc_soft_delete("upload-v1", 1000), 0);
+        ASSERT_EQ(facade.store().doc_soft_delete("upload-v1", NowMs()), 0);
         CortrixDoc v2 = v1;
         v2.doc_id = "upload-v2";
         ASSERT_EQ(facade.store().doc_create(v2), 0);  // live
@@ -268,7 +295,7 @@ TEST_F(GcRoutesTest, RestoreRefusalsCarryTheirMessageAndDetail) {
         pending.source_path = "p.txt";
         pending.status = DocStatus::kPending;
         ASSERT_EQ(facade.store().doc_create(pending), 0);
-        ASSERT_EQ(facade.store().doc_soft_delete("pending-file", 1000), 0);
+        ASSERT_EQ(facade.store().doc_soft_delete("pending-file", NowMs()), 0);
     }
 
     httplib::Client cli("127.0.0.1", port_);
@@ -331,7 +358,7 @@ TEST_F(GcRoutesTest, StoreWithoutTheRecordedStatusDeletesAndRestores) {
         doc.source_path = "o.txt";
         doc.status = DocStatus::kPending;
         ASSERT_EQ(facade.store().doc_create(doc), 0);
-        EXPECT_EQ(facade.store().doc_soft_delete("old-shape", 1000), 0);  // the route's 204
+        EXPECT_EQ(facade.store().doc_soft_delete("old-shape", NowMs()), 0);  // the route's 204
     }
     httplib::Client cli("127.0.0.1", port_);
     auto res = cli.Post("/api/v1/gc/restore", Admin(), R"({"document_ids":["old-shape"]})",

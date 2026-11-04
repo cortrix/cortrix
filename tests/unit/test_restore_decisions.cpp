@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -25,6 +26,9 @@ namespace {
 
 using Kind = DocumentGcSweeper::RestoreDecision::Kind;
 
+// A cutoff no deletion time reaches: the retention window never refuses.
+constexpr int64_t kNoExpiry = std::numeric_limits<int64_t>::min();
+
 class FaultyStore : public CortrixStoreSqlite {
 public:
     explicit FaultyStore(const std::string& path = ":memory:") : CortrixStoreSqlite(path) {}
@@ -32,6 +36,7 @@ public:
     bool fail_marker = false;
     bool fail_lookup = false;
     bool fail_restore = false;  // both restores: the plain one and the conditional one
+    bool fail_deleted_at = false;
     // Each hook runs once, just before the base call: another writer finishing between
     // two of the decision's steps.
     std::function<void()> before_lookup;
@@ -52,6 +57,13 @@ public:
             return -1;
         }
         return CortrixStoreSqlite::doc_get_deleted_from_status(id, out);
+    }
+    int doc_get_deleted_at(const std::string& id, std::optional<int64_t>* out) override {
+        if (fail_deleted_at) {
+            if (out) out->reset();
+            return -1;
+        }
+        return CortrixStoreSqlite::doc_get_deleted_at(id, out);
     }
     int doc_find_by_source(const std::string& type, const std::string& path,
                            CortrixDoc& d) override {
@@ -122,7 +134,7 @@ protected:
     }
 
     DocumentGcSweeper::RestoreDecision Decide(const std::string& id) {
-        return DocumentGcSweeper::DecideRestore(store_, id, "ns-1");
+        return DocumentGcSweeper::DecideRestore(store_, id, "ns-1", kNoExpiry);
     }
 
     DocStatus StatusOf(const std::string& id) {
@@ -159,6 +171,71 @@ void ExpectCheckFailed(const DocumentGcSweeper::RestoreDecision& d) {
     ASSERT_EQ(d.kind, Kind::kRefused);
     EXPECT_EQ(d.failure.code, "CX_ERR_GC_RESTORE_CHECK_FAILED");
     EXPECT_EQ(d.failure.message, "could not check this document's versions; retry");
+}
+
+// --- retention window --------------------------------------------------------------
+
+// A row deleted at or before the cutoff is past the window: refused and left deleted,
+// with the namespace to add it again in. A millisecond earlier cutoff restores it.
+TEST_F(RestoreDecisionTest, DeletedAtOrBeforeTheCutoffIsExpired) {
+    const std::string id = DeletedFrom("file", "f.txt", DocStatus::kReady);  // deleted_at 1000
+    const auto d = DocumentGcSweeper::DecideRestore(store_, id, "ns-1", 1000);
+    ASSERT_EQ(d.kind, Kind::kRefused);
+    EXPECT_EQ(d.failure.id, id);
+    EXPECT_EQ(d.failure.code, "CX_ERR_GC_RESTORE_EXPIRED");
+    EXPECT_EQ(d.failure.namespace_name, "ns-1");
+    EXPECT_TRUE(d.failure.live_doc_id.empty());
+    EXPECT_EQ(d.failure.message,
+              "deleted longer ago than the retention window "
+              "(gc.soft_delete_retention_days); add the document again");
+    EXPECT_EQ(StatusOf(id), DocStatus::kDeleted);
+
+    EXPECT_EQ(DocumentGcSweeper::DecideRestore(store_, id, "ns-1", 999).kind,
+              Kind::kRestored);
+    EXPECT_EQ(StatusOf(id), DocStatus::kReady);
+}
+
+// The window is checked before the version checks: an expired row that a live version
+// would also supersede is reported as expired.
+TEST_F(RestoreDecisionTest, ExpiryIsReportedBeforeSupersession) {
+    const std::string id = DeletedFrom("http_upload", "a.txt", DocStatus::kReady);
+    Live("http_upload", "a.txt");
+    EXPECT_EQ(DocumentGcSweeper::DecideRestore(store_, id, "ns-1", 1000).failure.code,
+              "CX_ERR_GC_RESTORE_EXPIRED");
+}
+
+// A deleted row with no recorded deletion time is not refused as expired.
+TEST_F(RestoreDecisionTest, NoRecordedDeletionTimeIsNotExpired) {
+    const std::string id = DeletedFrom("file", "f.txt", DocStatus::kReady);
+    char* err = nullptr;
+    const std::string sql = "UPDATE documents SET deleted_at = NULL WHERE doc_id = '" + id + "'";
+    ASSERT_EQ(sqlite3_exec(store_.db_handle(), sql.c_str(), nullptr, nullptr, &err), SQLITE_OK);
+    sqlite3_free(err);
+    EXPECT_EQ(DocumentGcSweeper::DecideRestore(store_, id, "ns-1",
+                                               std::numeric_limits<int64_t>::max())
+                  .kind,
+              Kind::kRestored);
+}
+
+// A deletion time that cannot be read refuses as a failed check, retryable.
+TEST_F(RestoreDecisionTest, UnreadableDeletionTimeIsACheckFailure) {
+    const std::string id = DeletedFrom("file", "f.txt", DocStatus::kReady);
+    store_.fail_deleted_at = true;
+    ExpectCheckFailed(Decide(id));
+    EXPECT_EQ(StatusOf(id), DocStatus::kDeleted);
+}
+
+TEST_F(RestoreDecisionTest, DeletedAtReadsTheSoftDeleteTime) {
+    const std::string live = Live("file", "l.txt");
+    std::optional<int64_t> at = 7;
+    EXPECT_EQ(store_.doc_get_deleted_at(live, &at), 0);
+    EXPECT_FALSE(at.has_value());
+    const std::string gone = DeletedFrom("file", "g.txt", DocStatus::kReady);
+    EXPECT_EQ(store_.doc_get_deleted_at(gone, &at), 0);
+    ASSERT_TRUE(at.has_value());
+    EXPECT_EQ(*at, 1000);
+    EXPECT_EQ(store_.doc_get_deleted_at("ghost", &at), -2);
+    EXPECT_FALSE(at.has_value());
 }
 
 // --- unknown status (deleted before the store recorded it) ----------------------
@@ -367,7 +444,7 @@ TEST_F(RestoreInterleavingTest, AnUploadFinishedJustBeforeTheRestoreRefusesIt) {
     store_->before_conditional_restore = upload_v2;
     store_->before_restore = upload_v2;
 
-    const auto d = DocumentGcSweeper::DecideRestore(*store_, v1.doc_id, "ns-1");
+    const auto d = DocumentGcSweeper::DecideRestore(*store_, v1.doc_id, "ns-1", kNoExpiry);
     ASSERT_FALSE(v2.empty()) << "the other connection never wrote";
     ExpectSuperseded(d, v1.doc_id, v2);
     CortrixDoc row;
@@ -381,7 +458,7 @@ TEST(GcRestoreFailureTraitsTest, OnlyAFailedCheckIsRetryable) {
     EXPECT_TRUE(check.retryable);
     EXPECT_STREQ(check.category, "transient");
     for (const char* code : {"CX_ERR_GC_RESTORE_SUPERSEDED", "CX_ERR_GC_RESTORE_INCOMPLETE",
-                             "CX_ERR_GC_DOC_NOT_FOUND"}) {
+                             "CX_ERR_GC_RESTORE_EXPIRED", "CX_ERR_GC_DOC_NOT_FOUND"}) {
         const auto t = GcRestoreFailureTraitsFor(code);
         EXPECT_FALSE(t.retryable) << code;
         EXPECT_STREQ(t.category, "permanent") << code;

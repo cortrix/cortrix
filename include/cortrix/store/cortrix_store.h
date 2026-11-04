@@ -114,6 +114,13 @@ public:
         if (out) out->reset();
         return 0;
     }
+    /// When the row was soft-deleted (deleted_at, ms). nullopt for a live row, or for a
+    /// backend that does not record it (the default). 0 ok / -1 error / -2 no such row.
+    virtual int doc_get_deleted_at(const std::string& doc_id, std::optional<int64_t>* out) {
+        (void)doc_id;
+        if (out) out->reset();
+        return 0;
+    }
     /// Stage 2 candidates: soft-deleted docs whose deleted_at <= cutoff_ms. 0 ok.
     virtual int doc_list_deleted_before(int64_t cutoff_ms, std::vector<CortrixDoc>& out) {
         (void)cutoff_ms; (void)out; return -1;
