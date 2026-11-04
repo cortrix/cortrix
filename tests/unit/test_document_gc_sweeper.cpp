@@ -220,6 +220,24 @@ TEST_F(DocumentGcSweeperTest, RestoreRefusesPastTheRetentionWindow) {
     EXPECT_EQ(DocStatusOf("docX"), static_cast<int>(DocStatus::kDeleted)) << "still deleted";
 }
 
+// With a zero window nothing deleted is restorable, even a row whose deletion is
+// stamped later than any cutoff the restore could have taken: a DELETE that lands
+// after the cutoff is computed and before the row is read. The stamp a minute ahead
+// stands for that DELETE, deterministically.
+TEST_F(DocumentGcSweeperTest, ZeroWindowRefusesADeletionStampedAfterTheCutoff) {
+    SeedDoc("docZ", 23);
+    SoftDelete("docZ", NowMs() + 60LL * 1000);
+    cfg_.soft_delete_retention_days = 0;
+    DocumentGcSweeper sweeper(&router_, &harness_->ipool(), cfg_);
+
+    auto r = sweeper.Restore({"docZ"});
+    ASSERT_TRUE(r.ok());
+    EXPECT_TRUE(r.value().succeeded.empty());
+    ASSERT_EQ(r.value().failed.size(), 1u);
+    EXPECT_EQ(r.value().failed[0].code, "CX_ERR_GC_RESTORE_EXPIRED");
+    EXPECT_EQ(DocStatusOf("docZ"), static_cast<int>(DocStatus::kDeleted)) << "still deleted";
+}
+
 // CountSoftDeleted reports the cross-NS soft-deleted backlog (for GcStatus).
 TEST_F(DocumentGcSweeperTest, CountSoftDeleted) {
     SeedDoc("docG", 17);

@@ -203,8 +203,13 @@ Result<DocumentGcSweeper::RestoreOutcome> DocumentGcSweeper::Restore(
     auto ns_list = ns_router_->ListNamespaces();
     if (!ns_list.ok()) return ns_list.status();
 
-    // The cutoff RunOnce uses: a row deleted at or before it is past the window.
-    const int64_t expired_cutoff = NowMs() - DaysToMs(config_.soft_delete_retention_days);
+    // The cutoff RunOnce uses: a row deleted at or before it is past the window. A zero
+    // window has no restorable rows at all, including one a DELETE stamps after this
+    // line (deletes do not take mu_), so it refuses every deleted row.
+    const int64_t expired_cutoff =
+        config_.soft_delete_retention_days == 0
+            ? std::numeric_limits<int64_t>::max()
+            : NowMs() - DaysToMs(config_.soft_delete_retention_days);
 
     for (const auto& doc_id : doc_ids) {
         bool decided = false;
