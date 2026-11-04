@@ -3,6 +3,11 @@
 Source for the Cortrix documentation site at <https://cortrix.ai/docs/>, built
 with the [OINK](https://oink.pgsty.com/) Hugo theme.
 
+OINK is a separate project under the Apache License 2.0, derived from
+[Docsy](https://github.com/google/docsy). Its license and notices are in the
+[theme repository](https://github.com/pgsty/oink), and every page credits the
+theme in the footer.
+
 ## Requirements
 
 - Hugo Extended 0.160.1 or newer (the `Docs` workflow uses 0.167.0)
