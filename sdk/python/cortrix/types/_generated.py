@@ -123,7 +123,7 @@ class QueryRequest:
 
 @dataclass
 class SearchConfig:
-    """Per-query retrieval route toggles. Each route runs unless its flag is false; for example {"enable_bm25": false} skips the lexical route. A flag that is not a boolean is ignored."""
+    """Per-query retrieval route toggles. The dense-vector and BM25 routes run unless their flag is false, for example {"enable_bm25": false} skips the lexical route; the sparse route runs only when enable_sparse is true. A flag that is not a boolean is ignored."""
     enable_vector: Optional[bool] = None
     enable_bm25: Optional[bool] = None
     enable_sparse: Optional[bool] = None

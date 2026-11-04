@@ -381,9 +381,10 @@ components:
     SearchConfig:
       type: object
       description: >-
-        Per-query retrieval route toggles. Each route runs unless its flag is false;
-        for example {"enable_bm25": false} skips the lexical route. A flag that is
-        not a boolean is ignored.
+        Per-query retrieval route toggles. The dense-vector and BM25 routes run
+        unless their flag is false, for example {"enable_bm25": false} skips the
+        lexical route; the sparse route runs only when enable_sparse is true. A flag
+        that is not a boolean is ignored.
       properties:
         enable_vector:
           type: boolean
@@ -395,8 +396,8 @@ components:
           description: "Run the lexical BM25 route."
         enable_sparse:
           type: boolean
-          default: true
-          description: "Run the sparse (learned lexical) route, where the namespace has a sparse index."
+          default: false
+          description: "Run the sparse route, where the namespace has a sparse index. Off by default."
 
     QueryResultItem:
       type: object
