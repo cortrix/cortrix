@@ -7,6 +7,7 @@
 
 #include "cortrix/common/executor_engine.h"
 #include "cortrix/query/cross_ns_query_handler.h"
+#include "cortrix/query/query_context.h"
 #include "mock_permission_service.h"
 #include "mock_reranker.h"
 #include "mock_response_builder.h"
@@ -71,6 +72,22 @@ TEST(CrossNsQueryHandlerParseTest, DefaultsTopKAndRerank) {
     ASSERT_TRUE(CrossNsQueryHandler::ParseRequest(body, &req).ok());
     EXPECT_EQ(req.top_k, 10);
     EXPECT_TRUE(req.rerank);
+}
+
+// The sparse route is opt-in: without search_config only dense and BM25 run.
+TEST(CrossNsQueryHandlerParseTest, DefaultsLeaveSparseRouteOff) {
+    auto body = nlohmann::json{{"query", "q"}, {"namespaces", {"ns_a"}}};
+    QueryRequest req;
+    ASSERT_TRUE(CrossNsQueryHandler::ParseRequest(body, &req).ok());
+    EXPECT_TRUE(req.search_config.enable_vector);
+    EXPECT_TRUE(req.search_config.enable_bm25);
+    EXPECT_FALSE(req.search_config.enable_sparse);
+    EXPECT_FALSE(QueryContext{}.enable_sparse);
+
+    body["search_config"] = {{"enable_sparse", true}};
+    QueryRequest opted_in;
+    ASSERT_TRUE(CrossNsQueryHandler::ParseRequest(body, &opted_in).ok());
+    EXPECT_TRUE(opted_in.search_config.enable_sparse);
 }
 
 // B' Issue 4.1: the deprecated MVP single `namespace` field → CX_ERR_DEPRECATED_FIELD.

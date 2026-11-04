@@ -9,7 +9,7 @@ namespace cortrix::query {
 struct SearchConfig {
     bool enable_vector = true;  ///< dense embedding/HNSW route
     bool enable_bm25 = true;    ///< FTS5/BM25 route
-    bool enable_sparse = true;  ///< F40 sparse/SPLADE route when available
+    bool enable_sparse = false; ///< sparse route when available; off unless requested
 };
 
 /// F04 cross-NS QueryRequest (F04 §2.4 — B' incompatible-with-MVP schema). The
