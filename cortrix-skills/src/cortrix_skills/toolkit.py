@@ -312,11 +312,11 @@ class CortrixToolKit:
 
         Args:
             doc_id: document id returned from upload.
-            namespace: reserved for forward compatibility (resolved by id).
+            namespace: namespace that holds the document (uses default if empty).
 
         Pass-through GEN-Agent 4-field error response.
         """
-        return _to_dict(self._client.documents.status(doc_id))
+        return _to_dict(self._client.documents.status(self._ns(namespace), doc_id))
 
     def cortrix_add_watcher(
         self,

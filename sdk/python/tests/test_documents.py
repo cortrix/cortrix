@@ -79,15 +79,17 @@ def test_list_pagination_params(api_base: str, client: Cortrix) -> None:
 
 @respx.mock
 def test_get_document(api_base: str, client: Cortrix) -> None:
-    respx.get(api_base + "/documents/doc_9").mock(
+    route = respx.get(api_base + "/documents/doc_9").mock(
         return_value=httpx.Response(
             200,
             json={"document_id": "doc_9", "status": "ready", "filename": "x.pdf",
                   "progress": {"stage": "ready", "chunks_total": 4, "chunks_done": 4}},
         )
     )
-    doc = client.documents.get("doc_9")
+    doc = client.documents.get("ns1", "doc_9")
     assert isinstance(doc, Document) and doc.document_id == "doc_9"
+    # The server rejects GET /documents/{id} without ?namespace= (400).
+    assert route.calls.last.request.url.params["namespace"] == "ns1"
     assert doc.progress is not None and doc.progress.stage == "ready"
 
 
@@ -98,6 +100,29 @@ def test_task_progress(api_base: str, client: Cortrix) -> None:
     )
     t = client.documents.task_progress("task_5")
     assert t.status == "processing"
+    assert t.document_id is None
+
+
+@respx.mock
+def test_task_progress_maps_doc_id_to_document_id(api_base: str, client: Cortrix) -> None:
+    # The progress body names the document id `doc_id`; the SDK exposes it as
+    # DocumentTask.document_id, so a finished upload yields its document id.
+    respx.get(api_base + "/documents/tasks/task_6/progress").mock(
+        return_value=httpx.Response(
+            200, json={"task_id": "task_6", "status": "completed", "doc_id": "doc_42"}
+        )
+    )
+    t = client.documents.task_progress("task_6")
+    assert t.status == "completed" and t.document_id == "doc_42"
+
+
+@respx.mock
+def test_status_sends_namespace(api_base: str, client: Cortrix) -> None:
+    route = respx.get(api_base + "/documents/doc_9").mock(
+        return_value=httpx.Response(200, json={"document_id": "doc_9", "status": "ready"})
+    )
+    assert client.documents.status("ns1", "doc_9").status == "ready"
+    assert route.calls.last.request.url.params["namespace"] == "ns1"
 
 
 @respx.mock
@@ -112,8 +137,9 @@ def test_cancel_task(api_base: str, client: Cortrix) -> None:
 @respx.mock
 def test_delete_returns_none(api_base: str, client: Cortrix) -> None:
     route = respx.delete(api_base + "/documents/doc_9").mock(return_value=httpx.Response(204))
-    assert client.documents.delete("doc_9") is None
+    assert client.documents.delete("ns1", "doc_9") is None
     assert route.calls.last.request.method == "DELETE"
+    assert route.calls.last.request.url.params["namespace"] == "ns1"
 
 
 @respx.mock
