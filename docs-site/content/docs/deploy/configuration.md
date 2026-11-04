@@ -74,7 +74,7 @@ auth:
   enabled: true
   api_keys:
     - key_hash: "<SHA-256 of your key>"
-      tenant_id: "default"
+      tenant_id: "default_tenant"  # must be an existing tenant; CE creates default_tenant
       permissions: 7           # READ=1, WRITE=2, ADMIN=4; 7 is all of them
       expires_at: 0            # 0 never expires
 ```
