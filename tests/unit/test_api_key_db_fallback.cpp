@@ -1,7 +1,7 @@
 // 🔒 api_key_auth.cpp db_keys_ fallback (l.38-47) — unit-pin the over-grant path.
 // On a static-config MISS, Authenticate() falls through to the platform.db-backed
 // ApiKeyService::ValidateApiKey; a valid DB key yields an ADMIN AuthContext with
-// tenant_id="default" (CE single-user model). A regression here silently
+// tenant_id="default_tenant" (CE single-user model; the tenant seeded at startup). A regression here silently
 // over-grants, so each branch is asserted in isolation: DB-key valid → admin ctx,
 // DB-key invalid/revoked → Unauthenticated, static-config hit short-circuits DB,
 // and no-service-bound preserves the original "Invalid API key".
@@ -42,7 +42,7 @@ protected:
     ApiKeyAuth auth_;
 };
 
-// --- A valid DB key (no static-config match) → admin ctx, tenant=default ---
+// --- A valid DB key (no static-config match) → admin ctx, tenant=default_tenant ---
 TEST_F(ApiKeyDbFallbackTest, ValidDbKeyGrantsAdminDefaultTenant) {
     auto created = svc_->CreateApiKey("usr_owner", "agent-1");
     ASSERT_TRUE(created.ok()) << created.status().message();
@@ -52,7 +52,7 @@ TEST_F(ApiKeyDbFallbackTest, ValidDbKeyGrantsAdminDefaultTenant) {
     AuthContext ctx;
     Status s = auth_.Authenticate(created.value().plaintext, &ctx);
     ASSERT_TRUE(s.ok()) << s.message();
-    EXPECT_EQ(ctx.tenant_id, "default");           // CE single-tenant fallback
+    EXPECT_EQ(ctx.tenant_id, "default_tenant");    // CE single-tenant fallback
     EXPECT_EQ(ctx.user_id, "usr_owner");           // owning user_id from the row
     EXPECT_TRUE(ctx.agent_id.empty());
     EXPECT_EQ(ctx.permissions, kPermRead | kPermWrite | kPermAdmin);  // FULL admin
@@ -109,7 +109,7 @@ TEST_F(ApiKeyDbFallbackTest, StaticConfigHitShortCircuitsDb) {
     AuthContext ctx;
     Status s = auth_.Authenticate(static_key, &ctx);
     ASSERT_TRUE(s.ok());
-    EXPECT_EQ(ctx.tenant_id, "tenant_static");  // static, not the "default" fallback
+    EXPECT_EQ(ctx.tenant_id, "tenant_static");  // static, not the "default_tenant" fallback
     EXPECT_EQ(ctx.permissions, kPermRead);      // read-only, not the admin over-grant
     EXPECT_FALSE(ctx.is_admin());
 }

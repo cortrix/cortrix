@@ -38,7 +38,7 @@ Status ApiKeyAuth::Authenticate(const std::string& bearer_token, AuthContext* co
         if (db_keys_ != nullptr) {
             auto v = db_keys_->ValidateApiKey(bearer_token);
             if (v.ok()) {
-                context->tenant_id = "default";  // CE single tenant (R1 fallback)
+                context->tenant_id = "default_tenant";  // CE single tenant (R1 fallback)
                 context->user_id = v.value();    // owning user_id from api_keys row
                 context->agent_id = "";
                 context->permissions = kPermRead | kPermWrite | kPermAdmin;
