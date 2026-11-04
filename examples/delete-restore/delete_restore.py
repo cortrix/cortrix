@@ -6,7 +6,7 @@ A small support knowledge base holds the current refund policy and a retired
 the retired policy. Deleting is a soft delete, so restoring the document by its
 id brings it back with the same score it had before, without reprocessing.
 
-With --purge the script also shows a permanent delete: it deletes the retired
+With --purge the script also shows a purge: it deletes the retired
 policy on purpose, purges, and checks that the purged document can't be
 restored.
 """
@@ -68,9 +68,9 @@ def main() -> int:
     parser.add_argument("--current", default="refund-policy.md",
                         help="the document that gets deleted by mistake")
     parser.add_argument("--retired", default="refund-policy-2024.md",
-                        help="the document --purge deletes for good")
+                        help="the document --purge deletes and then purges")
     parser.add_argument("--purge", action="store_true",
-                        help="also purge; this permanently removes EVERY soft-deleted document on the server")
+                        help="also purge; this purges EVERY soft-deleted document on the server, and none of them can be restored")
     parser.add_argument("--keep", action="store_true", help="keep the namespace afterwards")
     args = parser.parse_args()
 
