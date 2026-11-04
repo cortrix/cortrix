@@ -204,7 +204,8 @@ TEST_F(RestoreDecisionTest, ExpiryIsReportedBeforeSupersession) {
               "CX_ERR_GC_RESTORE_EXPIRED");
 }
 
-// A deleted row with no recorded deletion time is not refused as expired.
+// A deleted row with no recorded deletion time is not refused as expired, even by the
+// cutoff a zero window uses: the sweep never removes such a row either (ops.yaml).
 TEST_F(RestoreDecisionTest, NoRecordedDeletionTimeIsNotExpired) {
     const std::string id = DeletedFrom("file", "f.txt", DocStatus::kReady);
     char* err = nullptr;

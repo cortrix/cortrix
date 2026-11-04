@@ -125,7 +125,8 @@ DocumentGcSweeper::RestoreDecision DocumentGcSweeper::DecideRestore(
     if (got != 0) return CheckFailed(doc_id);
 
     // 0. Past the retention window the sweep hard-deletes the row on its next run, so
-    //    it is refused like a purged one. A row with no recorded deletion time is not.
+    //    it is refused like a purged one. A row with no recorded deletion time is not,
+    //    at any window: the sweep never selects it (deleted_at IS NOT NULL) either.
     {
         std::optional<int64_t> deleted_at;
         const int drc = store.doc_get_deleted_at(doc_id, &deleted_at);
