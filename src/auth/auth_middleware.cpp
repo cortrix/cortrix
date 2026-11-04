@@ -47,8 +47,14 @@ void InstallObservabilityContext(const httplib::Request& req, httplib::Response&
 }  // namespace
 
 httplib::Server::Handler WithAuth(ApiKeyAuth& auth, int required_permission, HttpHandler handler) {
+    return WithAuth(auth, required_permission, std::move(handler), std::string());
+}
+
+httplib::Server::Handler WithAuth(ApiKeyAuth& auth, int required_permission, HttpHandler handler,
+                                  std::string denied_hint) {
     return
-        [&auth, required_permission, handler](const httplib::Request& req, httplib::Response& res) {
+        [&auth, required_permission, handler, denied_hint](const httplib::Request& req,
+                                                           httplib::Response& res) {
             RequestContext rctx;
             rctx.request_id = GenerateRequestId();
             rctx.start_time = std::chrono::steady_clock::now();
@@ -106,6 +112,12 @@ httplib::Server::Handler WithAuth(ApiKeyAuth& auth, int required_permission, Htt
             // Authorize
             s = auth.Authorize(actx, ns, required_permission);
             if (!s.ok()) {
+                // Only the permission-bit refusal gets the hint; the namespace refusal
+                // stays the bare CX_ERR_NS_UNAUTHORIZED token (anti-enumeration).
+                if (!denied_hint.empty() && s.code() == StatusCode::kPermissionDenied &&
+                    s.message().rfind("CX_ERR_", 0) != 0) {
+                    s = Status::PermissionDenied(s.message() + "; " + denied_hint);
+                }
                 WriteJsonError(res, s, rctx.request_id);
                 return;
             }

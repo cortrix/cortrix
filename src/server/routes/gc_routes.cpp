@@ -173,7 +173,10 @@ void RegisterGcRoutes(httplib::Server& server, GcManager& gc,
                 body["failed"] = std::move(failed);
                 body["coverage_ratio"] = coverage;
                 WriteJsonResponse(res, 200, body, rctx.request_id);
-            }));
+            },
+            // A read-write key can delete but not restore; say who can.
+            "restoring needs an admin key: hand the document_ids to an administrator, "
+            "who can restore them with POST /api/v1/gc/restore"));
 
     // POST /api/v1/gc/purge — immediate purge, bypasses windows (X-Ops-Confirm).
     server.Post("/api/v1/gc/purge",

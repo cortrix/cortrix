@@ -224,6 +224,28 @@ TEST_F(GcRoutesTest, MaintenanceForbiddenForNonAdmin) {
     EXPECT_EQ(res->status, 403);
 }
 
+// A read-write key that tries to restore is told who can, not only what it lacks.
+TEST_F(GcRoutesTest, RestoreForbiddenForNonAdminSaysWhoCanRestore) {
+    httplib::Client cli("127.0.0.1", port_);
+    auto res = cli.Post("/api/v1/gc/restore", User(), R"({"document_ids":["docA"]})",
+                        "application/json");
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 403) << res->body;
+    auto body = json::parse(res->body);
+    const std::string msg = body["error"]["message"].get<std::string>();
+    EXPECT_EQ(msg.rfind("ADMIN permission required; ", 0), 0u) << msg;
+    EXPECT_NE(msg.find("administrator"), std::string::npos) << msg;
+    EXPECT_NE(msg.find("POST /api/v1/gc/restore"), std::string::npos) << msg;
+    EXPECT_EQ(body["error"]["category"], "auth");
+    EXPECT_FALSE(body["error"]["retryable"].get<bool>());
+
+    // The other admin routes keep the bare message.
+    auto status = cli.Get("/api/v1/gc/status", User());
+    ASSERT_TRUE(status);
+    ASSERT_EQ(status->status, 403);
+    EXPECT_EQ(json::parse(status->body)["error"]["message"], "ADMIN permission required");
+}
+
 
 // #157: a refused restore says why and carries what an agent needs to act next.
 TEST_F(GcRoutesTest, RestoreRefusalsCarryTheirMessageAndDetail) {
