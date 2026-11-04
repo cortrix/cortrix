@@ -1,10 +1,10 @@
 # Delete and restore
 
-Deleting a document in Cortrix is a soft delete. The document disappears from queries, document lists, and reads by id at once, but its blocks, vectors, and original file stay on disk for 30 days (`gc.soft_delete_retention_days`). Inside that window, `POST /api/v1/gc/restore` brings it back by id, with no reprocessing. Data is removed for good only by a purge or by the daily cleanup after the window, and a purge has to be confirmed with the `X-Ops-Confirm: true` header.
+Deleting a document in Cortrix is a soft delete. The document disappears from queries, document lists, and reads by id at once, but its blocks, vectors, and original file stay on disk for 30 days (`gc.soft_delete_retention_days`). Inside that window, `POST /api/v1/gc/restore` brings it back by id, with no reprocessing. After a purge, or after the daily cleanup once the window has passed, the document can no longer be restored. A manual purge has to be confirmed with the `X-Ops-Confirm: true` header.
 
 This example has two scripts:
 
-- `delete_restore.py` deletes the wrong document from a small support knowledge base, watches the query answer go wrong, and restores the document by id. With `--purge` it also shows a permanent delete.
+- `delete_restore.py` deletes the wrong document from a small support knowledge base, watches the query answer go wrong, and restores the document by id. With `--purge` it also shows a purge, after which the document can't be restored.
 - `new_version.py` uploads a file again under the same name and shows what happens when you try to restore the version it replaced.
 
 Neither script needs an LLM key.
@@ -79,7 +79,7 @@ after the restore:
 
 The ids are new on every run. The scores depend on the models in your build.
 
-### Purge for good: `--purge`
+### Purge: `--purge`
 
 > `POST /api/v1/gc/purge` removes every soft-deleted document on the server, in every namespace, and can't be undone. Run `--purge` only against a server where nothing else is waiting to be restored.
 
