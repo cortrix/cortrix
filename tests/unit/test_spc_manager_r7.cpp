@@ -353,5 +353,37 @@ TEST_F(SPCManagerR7Test, ProcessParsedDoc_ExistingDocRow_UpdatesStatusBranch) {
     EXPECT_EQ(got.status, DocStatus::kReady);
 }
 
+// ProcessParsedDoc — the doc-create arm writes the task's MIME type and file size onto
+// the new row, as the upload path's row has them.
+TEST_F(SPCManagerR7Test, ProcessParsedDoc_NewDocRow_RecordsMimeTypeAndFileSize) {
+    AdmitNs("pp_new_ns");
+    const std::string doc_id = "01JTESTDOC00000000000000N1";
+
+    cortrix::spc::ParsedDoc d;
+    d.status = cortrix::spc::ParserErrorCode::kOk;
+    d.parser_name = "docling";
+    d.metadata.filename = "notes.md";
+    d.metadata.page_count = 0;
+
+    SPCTask task;
+    task.doc_id = doc_id;  // no documents row yet → doc-create arm
+    task.namespace_name = "pp_new_ns";
+    task.source_path = "notes.md";
+    task.mime_type = "text/markdown";
+    task.file_size = 1234;
+    task.processing_level = 0;  // L0 → done
+    task.source_type = "file";
+
+    int rc = mgr_->ProcessParsedDoc(d, task);
+    EXPECT_EQ(rc, 0) << task.error_message;
+
+    resource::NamespaceFacade facade(*pool_, "pp_new_ns");
+    ASSERT_TRUE(facade.Acquire().ok());
+    cortrix::CortrixDoc got;
+    ASSERT_EQ(facade.store().doc_get(doc_id, got), 0);
+    EXPECT_EQ(got.mime_type, "text/markdown");
+    EXPECT_EQ(got.file_size, 1234);
+}
+
 }  // namespace
 }  // namespace cortrix

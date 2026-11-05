@@ -1,7 +1,9 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -66,10 +68,11 @@ class DocumentProcessorTest : public ::testing::Test {
     void TearDown() override { std::remove(filepath_.c_str()); }
 
     // Create a queued task, mark it processing (as the worker would), return it.
-    TaskInfo SeedProcessingTask(const std::string& doc = "docA") {
+    TaskInfo SeedProcessingTask(const std::string& doc = "docA",
+                                const std::string& filename = "big.pdf") {
         TaskInfo t;
         t.namespace_id = "ns1";
-        t.filename = "big.pdf";
+        t.filename = filename;
         t.filepath = filepath_;
         t.doc_id = doc;
         t.content_hash = "h1";
@@ -259,6 +262,42 @@ TEST_F(DocumentProcessorTest, WiredToSpcHandsParsedDocToProcessParsedDoc) {
     EXPECT_TRUE(s.ok()) << s.message();
     EXPECT_EQ(mgr_.GetTask(task.task_id).value().status,
               std::string(task_status::kCompleted));
+}
+
+// The task handed to SPC carries the MIME type the file name implies and the size of
+// the parsed file; SPCManager writes both onto a new document row.
+TEST_F(DocumentProcessorTest, SpcTaskCarriesTypeFromFilenameAndFileSize) {
+    struct Case {
+        const char* filename;
+        const char* mime_type;
+    };
+    const Case cases[] = {
+        {"notes.md", "text/markdown"},      {"readme.TXT", "text/plain"},
+        {"report.pdf", "application/pdf"},  {"Scan.PNG", "image/png"},
+        {"README", "application/octet-stream"},
+    };
+    const auto expected_size = static_cast<int64_t>(std::filesystem::file_size(filepath_));
+    ASSERT_GT(expected_size, 0);
+    int n = 0;
+    for (const auto& c : cases) {
+        factory_->SetPrimaryParser(MakeDrivingStub(1, MakeOnePageDoc("docling", 0.9f)));
+        ::testing::NiceMock<cortrix::testing::MockSPCManager> spc;
+        std::string seen_mime;
+        int64_t seen_size = -1;
+        EXPECT_CALL(spc, ProcessParsedDoc(::testing::_, ::testing::_))
+            .WillOnce([&seen_mime, &seen_size](ParsedDoc&, SPCTask& t) {
+                seen_mime = t.mime_type;
+                seen_size = t.file_size;
+                return 0;
+            });
+        DocumentProcessor proc(&mgr_, factory_.get(), &cfg_, nullptr, &spc);
+
+        TaskInfo task = SeedProcessingTask("docMime" + std::to_string(n++), c.filename);
+        Status s = proc.ProcessTask(task);
+        ASSERT_TRUE(s.ok()) << c.filename << ": " << s.message();
+        EXPECT_EQ(seen_mime, c.mime_type) << c.filename;
+        EXPECT_EQ(seen_size, expected_size) << c.filename;
+    }
 }
 
 // SPC post-parse failure (rc=-1) finalizes the task failed with CX_ERR_SPC_PROCESS_FAILED.
