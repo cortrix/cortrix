@@ -69,6 +69,7 @@ The refund policy, which is relevant to the question, comes first with a rerank 
 | `rerank` | boolean | `true` | Whether to reorder candidates with the reranker model |
 | `include_sources` | boolean | — | When `true`, results include source information |
 | `filter` | object | — | Filter conditions |
+{.wide .expand}
 
 For the full request shape, see the [HTTP API reference](/docs/reference/api/).
 
