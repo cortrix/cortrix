@@ -74,6 +74,7 @@ public:
     int doc_restore_unless_superseded(const std::string& doc_id) override;
     int doc_get_deleted_from_status(const std::string& doc_id,
                                     std::optional<std::string>* out) override;
+    int doc_get_deleted_at(const std::string& doc_id, std::optional<int64_t>* out) override;
     int doc_list_deleted_before(int64_t cutoff_ms, std::vector<CortrixDoc>& out) override;
     int doc_list_by_status(DocStatus status, std::vector<CortrixDoc>& out) override;
     int doc_find_by_source(const std::string& source_type,

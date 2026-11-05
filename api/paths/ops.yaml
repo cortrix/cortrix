@@ -73,6 +73,13 @@ paths:
         restored. Partial success per document_id (PartialSuccessById). Each failed entry carries a
         message.
 
+        A document deleted at or before now minus gc.soft_delete_retention_days is refused with
+        CX_ERR_GC_RESTORE_EXPIRED, the same test the background sweep uses to remove it for good;
+        structured_data.namespace names its namespace, and the document has to be added again. With
+        gc.soft_delete_retention_days set to 0 no deleted document is restorable, with one exception
+        at every window: a deleted row with no recorded deletion time is never refused as expired,
+        because the background sweep never removes such a row either.
+
         Two refusals keep a restore from bringing back the wrong content:
         - CX_ERR_GC_RESTORE_SUPERSEDED: another version of the same uploaded file or watched file
           is live. structured_data.live_doc_id names it (the newest live version) and

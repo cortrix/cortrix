@@ -127,4 +127,5 @@ The refusal also carries the live version's id and namespace in `structured_data
 - Restoring needs ADMIN permission; deleting needs only WRITE. With authentication on, a read-write key gets `403 ADMIN permission required` from `/gc/restore`, so hand the ids to whoever holds an admin key.
 - Documents imported by a directory watcher follow their source files. Deleting the file from the watched folder, or removing the watcher with its documents, deletes those documents outright, without the 30-day window. To get one back, restore the file in the folder.
 - A document deleted before it finished processing can't be restored: `/gc/restore` answers `CX_ERR_GC_RESTORE_INCOMPLETE`. Upload the file again.
+- A document deleted longer ago than `gc.soft_delete_retention_days` (30 by default) can't be restored either: `/gc/restore` answers `CX_ERR_GC_RESTORE_EXPIRED`, even if the daily cleanup has not removed it yet. Upload the file again.
 - On `v1.0.0-rc.2`, a deleted document can still come back from vector search until it is purged (#169). That's fixed on `main`, which is why this example asks for a build of `main`.

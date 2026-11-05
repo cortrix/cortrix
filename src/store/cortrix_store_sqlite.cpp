@@ -502,6 +502,33 @@ int CortrixStoreSqlite::doc_get_deleted_from_status(const std::string& doc_id,
     return result;
 }
 
+int CortrixStoreSqlite::doc_get_deleted_at(const std::string& doc_id,
+                                           std::optional<int64_t>* out) {
+    if (out) out->reset();
+    if (TryConsumeOpFault()) return -1;  // testing seam (SetFailNextOps)
+    std::lock_guard<std::mutex> lock(mu_);
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db_, "SELECT deleted_at FROM documents WHERE doc_id = ?", -1,
+                           &stmt, nullptr) != SQLITE_OK) {
+        CORTRIX_LOG_ERROR("store", "doc_get_deleted_at prepare: {}", sqlite3_errmsg(db_));
+        return -1;
+    }
+    sqlite3_bind_text(stmt, 1, doc_id.c_str(), -1, SQLITE_TRANSIENT);
+    const int rc = sqlite3_step(stmt);
+    int result = -1;
+    if (rc == SQLITE_ROW) {
+        if (sqlite3_column_type(stmt, 0) != SQLITE_NULL && out) {
+            *out = static_cast<int64_t>(sqlite3_column_int64(stmt, 0));
+        }
+        result = 0;
+    } else if (rc == SQLITE_DONE) {
+        result = -2;
+    }
+    sqlite3_finalize(stmt);
+    return result;
+}
+
 void CortrixStoreSqlite::EnsureScoreColumnCacheLocked() {
     if (score_columns_checked_) return;
     has_enriched_score_ = ColumnExists(db_, "blocks", "enriched_score");
