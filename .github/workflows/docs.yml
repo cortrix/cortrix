@@ -1,7 +1,9 @@
 # Builds the documentation site in docs-site/ with warnings treated as errors,
-# except Hugo's LibSass deprecation notice (see docs-site/scripts/build_strict.sh).
-# A broken internal link, a missing anchor, or an internal marker left in the
-# filtered OpenAPI copy fails the build. Pull requests are built only. A push to
+# except Hugo's LibSass deprecation notice (see docs-site/scripts/build_strict.sh),
+# then checks every internal link and anchor in the output, including the
+# Markdown copies for agents (see docs-site/scripts/check_links.py). A broken
+# internal link, a missing anchor, or an internal marker left in the filtered
+# OpenAPI copy fails the build. Pull requests are built only. A push to
 # release/1.0 is built and then published to GitHub Pages.
 name: Docs
 
@@ -59,6 +61,10 @@ jobs:
         run: |
           test -f .openapi/openapi.yaml
           scripts/build_strict.sh
+
+      - name: Check internal links
+        working-directory: docs-site
+        run: python3 scripts/check_links.py public
 
       - name: Upload the site
         if: github.event_name == 'push'
