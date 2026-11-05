@@ -148,5 +148,23 @@ TEST_F(PreRoutingServerTest, ServerStagesWithLimiterRateLimit) {
     EXPECT_EQ(Get("/api/v1/health"), 429);
 }
 
+// The per-API-key bucket follows the Bearer key when the X-API-Key header keeps
+// changing (the credential WithAuth authenticates; see RequestCredential).
+TEST_F(PreRoutingServerTest, ApiKeyBucketFollowsTheBearerKey) {
+    RateLimiter limiter(Unreachable(), RateLimitRule{0.0, 2.0, "60s", 2}, Unreachable());
+    Start({RateLimitHandler(limiter)});
+    httplib::Client cli("127.0.0.1", port_);
+    int last = 0;
+    for (int i = 0; i < 3; ++i) {
+        auto res = cli.Get("/api/v1/health",
+                           httplib::Headers{{"Authorization", "Bearer bearer-key"},
+                                            {"X-API-Key", "rotating-" + std::to_string(i)}});
+        ASSERT_TRUE(res);
+        last = res->status;
+        if (i < 2) EXPECT_EQ(last, 200) << "request " << i;
+    }
+    EXPECT_EQ(last, 429);
+}
+
 }  // namespace
 }  // namespace cortrix::middleware

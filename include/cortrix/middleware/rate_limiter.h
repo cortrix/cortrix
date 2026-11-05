@@ -122,10 +122,10 @@ private:
 };
 
 /// The limiter as a pre-routing stage: a denied request gets 429 with
-/// BuildErrorBody and is handled; an allowed one passes on. The API key is read
-/// from X-API-Key, else from an `Authorization: Bearer` header, as WithAuth reads
-/// it; either input may be empty (that stratum is skipped). `limiter` must
-/// outlive the server.
+/// BuildErrorBody and is handled; an allowed one passes on. The per-API-key
+/// bucket is keyed by RequestCredential (auth/request_credential.h), the same
+/// credential WithAuth authenticates; an empty one skips that stratum. `limiter`
+/// must outlive the server.
 httplib::Server::HandlerWithResponse RateLimitHandler(RateLimiter& limiter);
 
 }  // namespace cortrix::middleware

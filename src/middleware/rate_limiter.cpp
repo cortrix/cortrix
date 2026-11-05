@@ -7,6 +7,7 @@
 #include <ctime>
 
 #include "cortrix/agent_friendly/error.h"
+#include "cortrix/auth/request_credential.h"
 
 namespace cortrix::middleware {
 
@@ -206,14 +207,7 @@ RateLimitRule PerSecondRule(double rate_per_sec, double burst) {
 
 httplib::Server::HandlerWithResponse RateLimitHandler(RateLimiter& limiter) {
     return [&limiter](const httplib::Request& req, httplib::Response& res) {
-        std::string api_key = req.get_header_value("X-API-Key");
-        if (api_key.empty()) {
-            const std::string ah = req.get_header_value("Authorization");
-            const std::string pfx = "Bearer ";
-            if (ah.size() > pfx.size() && ah.compare(0, pfx.size(), pfx) == 0)
-                api_key = ah.substr(pfx.size());
-        }
-        const auto d = limiter.Allow(req.remote_addr, api_key);
+        const auto d = limiter.Allow(req.remote_addr, RequestCredential(req));
         if (!d.allowed) {
             res.status = 429;
             res.set_content(RateLimiter::BuildErrorBody(d).dump(), "application/json");
