@@ -53,8 +53,6 @@ log:
 # -----------------------------------------------------------------------------
 namespace:
   data_dir: "./build/data"   # Data root directory (SQLite, vector index, Blob files)
-  max_active: 10             # Max number of namespaces kept active simultaneously
-  idle_timeout_s: 300        # Auto-unload after this many idle seconds; 0=never unload
 
 # -----------------------------------------------------------------------------
 # embedding — semantic vector model (bge-m3 ONNX)
