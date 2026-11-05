@@ -2,6 +2,7 @@
 title: MCP tools
 description: Every tool the MCP server provides, with its parameters.
 weight: 20
+search_keywords: [cortrix_query]
 ---
 
 `cortrix-mcp` provides 31 tools in `v1.0.0-rc.2`. The tool names and parameters come from the tool list returned by a running MCP server.

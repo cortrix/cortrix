@@ -2,6 +2,7 @@
 title: Query and rerank
 description: Run hybrid retrieval over one or more namespaces, with reranking.
 weight: 20
+search_keywords: [top_k, filter, namespace, namespaces, rerank_score]
 ---
 
 On this page you'll query one namespace and then several, learn to read the scores and metadata in a response, and see what to do when part of a query fails.
