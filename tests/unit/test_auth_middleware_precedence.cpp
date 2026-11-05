@@ -17,6 +17,8 @@
 
 #include "cortrix/auth/api_key_auth.h"
 #include "cortrix/auth/auth_middleware.h"
+#include "cortrix/auth/request_credential.h"
+#include "cortrix/middleware/rate_limiter.h"
 #include "cortrix/server/request_context.h"
 
 namespace cortrix {
@@ -202,6 +204,64 @@ TEST(AuthMiddlewarePrecedence, InsufficientPermission403) {
     EXPECT_EQ(res.status, 403);
     auto body = json::parse(res.body);
     EXPECT_EQ(body["error"]["code"], "FORBIDDEN");
+}
+
+// --- RequestCredential: the precedence WithAuth applies ---
+TEST(AuthMiddlewarePrecedence, RequestCredentialReadsBearerThenApiKey) {
+    httplib::Request both;
+    both.set_header("Authorization", "Bearer bearer-key");
+    both.set_header("X-API-Key", "xapikey-key");
+    EXPECT_EQ(RequestCredential(both), "bearer-key");
+
+    httplib::Request empty_bearer;
+    empty_bearer.set_header("Authorization", "Bearer ");
+    empty_bearer.set_header("X-API-Key", "xapikey-key");
+    EXPECT_EQ(RequestCredential(empty_bearer), "xapikey-key");
+
+    httplib::Request other_scheme;
+    other_scheme.set_header("Authorization", "Basic dXNlcjpwYXNz");
+    other_scheme.set_header("X-API-Key", "xapikey-key");
+    EXPECT_EQ(RequestCredential(other_scheme), "xapikey-key");
+
+    EXPECT_EQ(RequestCredential(httplib::Request{}), "");
+}
+
+// --- The rate limiter counts the key WithAuth authenticates ---
+// A caller that keeps one Bearer key and sends a different X-API-Key each time is
+// authenticated with the Bearer key every time, and the per-API-key bucket of that
+// key runs out: the X-API-Key values do not open fresh buckets.
+TEST(AuthMiddlewarePrecedence, RateLimiterCountsTheBearerKeyDespiteRotatingApiKeyHeaders) {
+    ApiKeyAuth auth;
+    MakeAuth(auth, "bearer-key", "tenant_bearer", kPermRead);
+    Capture cap;
+    auto handler = WithAuth(auth, kPermRead, RecordingHandler(&cap));
+
+    const middleware::RateLimitRule unreachable{0.0, 1e9, "60s", 1000000000};
+    middleware::RateLimiter limiter(unreachable,
+                                    middleware::RateLimitRule{0.0, 2.0, "60s", 2},
+                                    unreachable);
+    auto limit = middleware::RateLimitHandler(limiter);
+
+    for (int i = 0; i < 3; ++i) {
+        httplib::Request req;
+        req.remote_addr = "10.0.0.7";
+        req.set_header("Authorization", "Bearer bearer-key");
+        req.set_header("X-API-Key", "rotating-" + std::to_string(i));
+        httplib::Response res;
+        if (limit(req, res) == httplib::Server::HandlerResponse::Handled) {
+            ASSERT_EQ(i, 2) << "limited too early";
+            EXPECT_EQ(res.status, 429);
+            const json body = json::parse(res.body);
+            EXPECT_EQ(body["error"]["code"], "CX_ERR_RATE_LIMITED");
+            EXPECT_EQ(body["error"]["structured_data"]["stratum"], "per_api_key");
+            return;
+        }
+        cap = Capture{};
+        handler(req, res);
+        ASSERT_TRUE(cap.called) << "request " << i;
+        EXPECT_EQ(cap.ctx.tenant_id, "tenant_bearer");  // authenticated with the Bearer key
+    }
+    FAIL() << "the third request with the same Bearer key was not rate limited";
 }
 
 }  // namespace

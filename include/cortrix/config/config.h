@@ -209,6 +209,23 @@ struct SecurityConfig {
     bool allow_public_admin = false;       ///< CORTRIX_ALLOW_PUBLIC_ADMIN — V3-E-06 ack
 };
 
+// Request rate limiting before routing: three token buckets (per client IP, per
+// API key, global). A request that finds a bucket empty gets 429
+// CX_ERR_RATE_LIMITED and that bucket stays locked for 5 minutes. Off by default:
+// every request counts, authenticated and loopback ones too, and behind a reverse
+// proxy every client shares the proxy's address, so a deployment turns it on and
+// sizes the buckets for its traffic.
+struct RateLimitStratumConfig {
+    double rate_per_sec = 0.0;  ///< sustained requests per second (bucket refill)
+    double burst = 0.0;         ///< bucket capacity: requests accepted at once
+};
+struct RateLimitConfig {
+    bool enabled = false;                            ///< CORTRIX_RATE_LIMIT_ENABLED
+    RateLimitStratumConfig per_ip{1.0, 100.0};       ///< 60 requests/min, burst 100
+    RateLimitStratumConfig per_api_key{5.0, 500.0};  ///< 300 requests/min, burst 500
+    RateLimitStratumConfig global{1000.0, 1500.0};   ///< 1000 requests/s, burst 1500
+};
+
 struct CortrixConfig {
     ServerConfig server;
     AuthConfig auth;
@@ -239,6 +256,7 @@ struct CortrixConfig {
     QueryComplexityTopConfig query_complexity;  // F39 complexity classifier model dir
     RetrievalConfig retrieval;               // candidate-pool sizing (over-fetch cap)
     SecurityConfig security;  // [F20] admin access policy
+    RateLimitConfig rate_limit;  // request rate limiting (off by default)
     GcConfig gc;              // [OPEN-2] three-stage GC + ops endpoints
 };
 

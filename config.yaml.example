@@ -298,3 +298,18 @@ gc:
   max_run_duration_minutes: 5      # Cap on a single run's wall time (IO guard)
   dry_run: false                   # Scan but do not delete (test/inspection)
   immediate_purge_enabled: false   # GDPR immediate-purge API (Cloud V1+; CE keeps false)
+
+# -----------------------------------------------------------------------------
+# rate_limit — request rate limiting before routing (off by default)
+# Three token buckets: per client IP, per API key, and global. A request that
+# finds a bucket empty gets 429 CX_ERR_RATE_LIMITED, and that bucket stays locked
+# for 5 minutes. Every request counts, including authenticated and loopback ones,
+# and behind a reverse proxy every client shares the proxy's address. Size the
+# buckets for your traffic before you turn it on.
+# Environment variable: CORTRIX_RATE_LIMIT_ENABLED=true
+# -----------------------------------------------------------------------------
+rate_limit:
+  enabled: false
+  per_ip:      { rate_per_sec: 1, burst: 100 }       # 60 requests/min per client IP
+  per_api_key: { rate_per_sec: 5, burst: 500 }       # 300 requests/min per API key
+  global:      { rate_per_sec: 1000, burst: 1500 }   # across all requests

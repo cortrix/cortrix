@@ -369,6 +369,7 @@ add_library(cortrix_core STATIC
     src/security/env_secret_provider.cpp
     src/logging/sanitizer.cpp
     src/middleware/admin_guard.cpp
+    src/middleware/pre_routing.cpp
     src/middleware/rate_limiter.cpp
     src/health/readiness.cpp
     # --- F24 docker-compose Deployment (Wave D-R1) ---

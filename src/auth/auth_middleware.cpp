@@ -1,4 +1,5 @@
 #include "cortrix/auth/auth_middleware.h"
+#include "cortrix/auth/request_credential.h"
 #include "cortrix/server/http_server.h"
 #include "cortrix/logging/logging.h"
 // [F13 S2 · D3.5 wiring] Populate the thread-local ObservabilityContext on every
@@ -72,21 +73,9 @@ httplib::Server::Handler WithAuth(ApiKeyAuth& auth, int required_permission, Htt
                 return;
             }
 
-            // Extract token from Authorization header or X-API-Key
-            std::string auth_header = req.get_header_value("Authorization");
-            std::string api_key = req.get_header_value("X-API-Key");
-
-            std::string token;
-            if (!auth_header.empty()) {
-                const std::string prefix = "Bearer ";
-                if (auth_header.size() > prefix.size() &&
-                    auth_header.substr(0, prefix.size()) == prefix) {
-                    token = auth_header.substr(prefix.size());
-                }
-            }
-            if (token.empty()) {
-                token = api_key;
-            }
+            // Bearer token, else X-API-Key (RequestCredential; the rate limiter's
+            // per-key bucket reads the same one).
+            const std::string token = RequestCredential(req);
             if (token.empty()) {
                 WriteJsonError(res,
                                Status::Unauthenticated("Missing Authorization header or X-API-Key"),
