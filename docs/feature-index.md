@@ -117,7 +117,7 @@ final subsection.
 | P02a | Web UI | The self-hosted web interface under `web/`. |
 | P03 | Python SDK | The `cortrix` PyPI package under `sdk/python/`. |
 | P04 | API documentation | The OpenAPI 3.0 spec under `api/` as the single source of truth, including the `CX_ERR_*` error-code registry. |
-| P08 | Auth system | Email + password accounts, one-time bootstrap URL, admin API keys, JWT. |
+| P08 | Auth system | API-key authentication, a one-time bootstrap URL that mints the first admin API key, API-key create, list, and revoke, the `/auth/me` session probe, and admin user management under `/admin/users`. Email and password login (register, login, logout, refresh, password reset) is not served on this line; see [Compatibility](compatibility.md). |
 | P09 | Tenant management | Tenant model and namespace permission assignment. |
 | P12 | MCP server | The `cortrix-mcp` package: Cortrix tools for MCP-compatible clients and IDE agents. |
 | P14 | Skill SDK | The `cortrix-skills` package: the same tool surface as P12 exposed as framework adapters. |

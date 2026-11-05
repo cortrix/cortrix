@@ -59,6 +59,7 @@ Cortrix is in active pre-release development. The public documentation uses thes
 
 - `Preview`: available and documented. Cortrix is in pre-release, so verify it against your own runtime before production use.
 - `In development`: present in part or being built; not supported yet. Do not rely on it.
+- `Not provided`: the server in this repository does not serve it on this release line. Do not rely on it.
 
 High-signal current status:
 
@@ -69,7 +70,7 @@ High-signal current status:
 | MCP server | `Preview` | MCP tooling exists and has test coverage, with release-readiness still under review. |
 | Python SDK | `Preview` | SDK resources and tests exist, with compatibility still tied to the live API contract. |
 | Built-in Agent chat | `Preview` | Fixed-flow chat mode exists. It is the only executor mode. |
-| Auth login | `In development` | Not supported yet. |
+| Account login (email and password) | `Not provided` | The server authenticates with API keys; see [Compatibility](docs/compatibility.md). |
 | Tenant/member/ACL/quota | `In development` | Not supported yet. |
 | Memory extraction | `In development` | Not supported yet. |
 | RBAC and tenant isolation | `In development` | Not supported yet. |
