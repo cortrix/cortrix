@@ -46,6 +46,20 @@ Tenant/member/ACL/quota, RBAC, tenant isolation, and log redaction defaults are 
 
 This server authenticates with API keys and does not serve email and password login. With `auth.enabled: false`, as set in `config.yaml.example` and `deploy/cortrix.yaml` (the built-in default without a config file is `true`; it is accepted only on a loopback `server.host` or an explicit container-internal bind published only to loopback), requests need no key. With auth enabled, the first key comes from an `auth.api_keys` entry in the config (see `config.yaml.example`; `permissions: 7` includes ADMIN), or from the one-time setup URL the server prints on first start. That URL is valid for 60 seconds, works once, and accepts loopback clients only by default; opening it shows an admin API key. Create further keys with `POST /api/v1/auth/api-keys` using the admin key from the setup URL. Requests without an admin key are rejected.
 
+### Namespace not found vs. not authorized
+
+With API-key authentication enabled, a request naming a namespace the key cannot read, including a namespace that does not exist, returns HTTP 403 with `error.code` set to `CX_ERR_NS_UNAUTHORIZED` and `error.category` set to `auth`. This is intentional: the response does not reveal which namespaces exist.
+
+This namespace check applies at every key permission level, including keys with admin permissions. It covers single-namespace routes such as `GET /api/v1/namespaces/{name}` and `GET /api/v1/namespaces/{name}/documents`, as well as `POST /api/v1/query`.
+
+For a cross-namespace query, any failed namespace check rejects the whole request. `error.structured_data.unauthorized_namespaces` lists the requested names that failed the check, which can include both namespaces the key cannot read and namespaces that do not exist. The list only echoes names the caller sent.
+
+Agents should not retry this error with a different or higher-permission key. Call `GET /api/v1/namespaces` with the same key first; it lists only namespaces that key can read. A name missing from that list may be nonexistent or unreadable; the list does not prove nonexistence.
+
+Treat a missing name as a wrong or missing namespace first: fix the name, or create it with `POST /api/v1/namespaces` if that is the intent and the key has admin permission. Only then consider access permissions.
+
+With auth disabled (the Quick Start's loopback default), this namespace authorization rule does not apply. A missing namespace on `GET /api/v1/namespaces/{name}` returns HTTP 404 with `error.code` set to `CX_ERR_NS_NOT_FOUND`. Cross-namespace queries instead report missing namespaces in `meta.namespaces_failed` in an HTTP 200 response, as shown in the [partial success example](../examples/partial-success/README.md).
+
 ## API Compatibility Boundaries
 
 OpenAPI presence means an endpoint is part of the documented API surface. It does not prove that the endpoint is verified in the current runtime.
