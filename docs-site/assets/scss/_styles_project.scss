@@ -59,6 +59,28 @@
   --td-brand-mark-gradient: linear-gradient(135deg, #ff6405, #ffb020);
 }
 
+// Wordmark beside the logo, per the Cortrix visual identity: Inter ExtraBold,
+// white on dark and black on light, without the theme's tracking or gradient.
+// The mark keeps its colors. currentColor lets forced-colors mode take over.
+[data-bs-theme='light'] {
+  --cx-wordmark: #000;
+}
+
+[data-bs-theme='dark'] {
+  --cx-wordmark: #fff;
+}
+
+.td-shell-wordmark,
+.td-site-header .td-nav-title {
+  margin-inline-end: 0;
+  background: none;
+  color: var(--cx-wordmark);
+  -webkit-text-fill-color: currentColor;
+  font-family: 'Inter', var(--td-ui-font-family);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
 // Primary call to action, as on cortrix.ai: Magma Orange with white text.
 // The theme paints a button's fill and border on a layer behind its label,
 // read from --td-control-bg and --td-control-border, so set those rather than
