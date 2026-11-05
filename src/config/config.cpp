@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <utility>
 
 #include "yaml-cpp/yaml.h"
 #include "cortrix/logging/logging.h"
@@ -317,6 +318,20 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
         if (sec["allow_public_admin"]) config.security.allow_public_admin = sec["allow_public_admin"].as<bool>();
     }
 
+    // Request rate limiting (off by default)
+    if (root["rate_limit"]) {
+        auto rl = root["rate_limit"];
+        if (rl["enabled"]) config.rate_limit.enabled = rl["enabled"].as<bool>();
+        auto stratum = [](const YAML::Node& node, RateLimitStratumConfig& out) {
+            if (!node) return;
+            if (node["rate_per_sec"]) out.rate_per_sec = node["rate_per_sec"].as<double>();
+            if (node["burst"]) out.burst = node["burst"].as<double>();
+        };
+        stratum(rl["per_ip"], config.rate_limit.per_ip);
+        stratum(rl["per_api_key"], config.rate_limit.per_api_key);
+        stratum(rl["global"], config.rate_limit.global);
+    }
+
     // F02 reranker model dir
     if (root["reranker"]) {
         auto r = root["reranker"];
@@ -431,6 +446,10 @@ void ApplyEnvOverrides(CortrixConfig& config) {
     if (!val.empty()) config.security.admin_bind = val;
     val = GetEnv("CORTRIX_ALLOW_PUBLIC_ADMIN");
     if (!val.empty()) config.security.allow_public_admin = GetEnvBool("CORTRIX_ALLOW_PUBLIC_ADMIN", config.security.allow_public_admin);
+
+    // Request rate limiting
+    val = GetEnv("CORTRIX_RATE_LIMIT_ENABLED");
+    if (!val.empty()) config.rate_limit.enabled = GetEnvBool("CORTRIX_RATE_LIMIT_ENABLED", config.rate_limit.enabled);
 }
 
 }  // namespace
@@ -650,6 +669,24 @@ std::vector<std::string> ValidateConfig(const CortrixConfig& config) {
     if (config.gc.max_run_duration_minutes < 1) {
         errors.push_back("gc.max_run_duration_minutes must be >= 1, got " +
                          std::to_string(config.gc.max_run_duration_minutes));
+    }
+
+    // Request rate limiting: when on, every bucket needs a positive rate and room
+    // for at least one request.
+    if (config.rate_limit.enabled) {
+        const std::pair<const char*, const RateLimitStratumConfig*> strata[] = {
+            {"per_ip", &config.rate_limit.per_ip},
+            {"per_api_key", &config.rate_limit.per_api_key},
+            {"global", &config.rate_limit.global},
+        };
+        for (const auto& [name, s] : strata) {
+            if (!(s->rate_per_sec > 0.0) || !(s->burst >= 1.0)) {
+                errors.push_back(std::string("rate_limit.") + name +
+                                 " needs rate_per_sec > 0 and burst >= 1, got rate_per_sec=" +
+                                 std::to_string(s->rate_per_sec) +
+                                 ", burst=" + std::to_string(s->burst));
+            }
+        }
     }
 
     return errors;

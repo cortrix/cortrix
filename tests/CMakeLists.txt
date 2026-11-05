@@ -367,6 +367,8 @@ add_executable(cortrix_unit_tests
     unit/test_env_secret_provider.cpp
     unit/test_log_sanitizer.cpp
     unit/test_admin_guard.cpp
+    unit/test_config_rate_limit.cpp
+    unit/test_pre_routing.cpp
     unit/test_rate_limiter.cpp
     unit/test_readiness.cpp
     # --- F24 docker-compose Deployment (Wave D-R1) ---

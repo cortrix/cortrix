@@ -166,5 +166,18 @@ TEST(RateLimiterTest, ErrorBodySchema) {
     EXPECT_TRUE(body["error"]["structured_data"].contains("locked_until"));
 }
 
+// The rules the server builds from the rate_limit config reproduce the defaults.
+TEST(RateLimitRuleFromRate, ConfigDefaultsMatchTheDefaultRules) {
+    const auto same = [](const RateLimitRule& a, const RateLimitRule& b) {
+        EXPECT_DOUBLE_EQ(a.refill_per_sec, b.refill_per_sec);
+        EXPECT_DOUBLE_EQ(a.burst, b.burst);
+        EXPECT_EQ(a.window, b.window);
+        EXPECT_EQ(a.limit, b.limit);
+    };
+    same(PerMinuteRule(1.0, 100.0), DefaultIpRule());
+    same(PerMinuteRule(5.0, 500.0), DefaultApiKeyRule());
+    same(PerSecondRule(1000.0, 1500.0), DefaultGlobalRule());
+}
+
 }  // namespace
 }  // namespace cortrix::middleware

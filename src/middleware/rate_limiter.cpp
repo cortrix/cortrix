@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <ctime>
 
 #include "cortrix/agent_friendly/error.h"
@@ -187,11 +188,39 @@ nlohmann::json RateLimiter::BuildErrorBody(const RateLimitDecision& decision) {
         {"reset_at", unix_ms_to_iso(decision.reset_at_unix_ms)},
         {"locked_until", unix_ms_to_iso(decision.locked_until_unix_ms)},
     };
-    // R2-M8: wrapped envelope ("error" key) for consumer consistency once this
-    // limiter is wired (currently built but not yet installed as a handler).
+    // R2-M8: wrapped envelope ("error" key), as every other error response.
     nlohmann::json body;
     body["error"] = agent_friendly::ToJson(err);
     return body;
+}
+
+RateLimitRule PerMinuteRule(double rate_per_sec, double burst) {
+    return RateLimitRule{rate_per_sec, burst, "60s",
+                         static_cast<int64_t>(std::llround(rate_per_sec * 60.0))};
+}
+
+RateLimitRule PerSecondRule(double rate_per_sec, double burst) {
+    return RateLimitRule{rate_per_sec, burst, "1s",
+                         static_cast<int64_t>(std::llround(rate_per_sec))};
+}
+
+httplib::Server::HandlerWithResponse RateLimitHandler(RateLimiter& limiter) {
+    return [&limiter](const httplib::Request& req, httplib::Response& res) {
+        std::string api_key = req.get_header_value("X-API-Key");
+        if (api_key.empty()) {
+            const std::string ah = req.get_header_value("Authorization");
+            const std::string pfx = "Bearer ";
+            if (ah.size() > pfx.size() && ah.compare(0, pfx.size(), pfx) == 0)
+                api_key = ah.substr(pfx.size());
+        }
+        const auto d = limiter.Allow(req.remote_addr, api_key);
+        if (!d.allowed) {
+            res.status = 429;
+            res.set_content(RateLimiter::BuildErrorBody(d).dump(), "application/json");
+            return httplib::Server::HandlerResponse::Handled;
+        }
+        return httplib::Server::HandlerResponse::Unhandled;
+    };
 }
 
 }  // namespace cortrix::middleware

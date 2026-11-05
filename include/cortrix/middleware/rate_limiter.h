@@ -53,6 +53,13 @@ RateLimitRule DefaultIpRule();
 RateLimitRule DefaultApiKeyRule();
 RateLimitRule DefaultGlobalRule();
 
+/// A per-IP or per-API-key rule from a sustained rate in requests per second; the
+/// error body reports it as a 60s window with a limit of rate × 60.
+RateLimitRule PerMinuteRule(double rate_per_sec, double burst);
+/// A global rule from a sustained rate in requests per second; the error body
+/// reports it as a 1s window with a limit of rate.
+RateLimitRule PerSecondRule(double rate_per_sec, double burst);
+
 /// Outcome of an Allow() check.
 struct RateLimitDecision {
     bool allowed = true;
@@ -113,5 +120,12 @@ private:
     Bucket global_bucket_;
     Clock clock_;
 };
+
+/// The limiter as a pre-routing stage: a denied request gets 429 with
+/// BuildErrorBody and is handled; an allowed one passes on. The API key is read
+/// from X-API-Key, else from an `Authorization: Bearer` header, as WithAuth reads
+/// it; either input may be empty (that stratum is skipped). `limiter` must
+/// outlive the server.
+httplib::Server::HandlerWithResponse RateLimitHandler(RateLimiter& limiter);
 
 }  // namespace cortrix::middleware

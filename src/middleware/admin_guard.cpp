@@ -123,36 +123,32 @@ void AdminGuard::ValidateConfigOrAbort() {
         cfg.admin_bind_whitelist.c_str());
 }
 
-namespace {
-
-void InstallGuard(httplib::Server& server, AdminGuard guard) {
-    server.set_pre_routing_handler(
-        [guard](const httplib::Request& req, httplib::Response& res) {
-            if (!IsAdminPath(req.path)) {
-                return httplib::Server::HandlerResponse::Unhandled;  // pass through
-            }
-            if (guard.IsClientAllowed(req.remote_addr)) {
-                return httplib::Server::HandlerResponse::Unhandled;  // allowed -> route
-            }
-            // Denied: 403 with the GEN-Agent 4-field error body.
-            res.status = 403;
-            res.set_content(BuildAdminDeniedBody(req.remote_addr).dump(),
-                            "application/json");
-            return httplib::Server::HandlerResponse::Handled;  // short-circuit
-        });
+httplib::Server::HandlerWithResponse AdminGuardHandler(AdminGuardConfig config) {
+    CORTRIX_LOG_INFO("security",
+                     "AdminGuard installed (whitelist={}, public={})",
+                     config.admin_bind_whitelist, config.allow_public);
+    AdminGuard guard(std::move(config));
+    return [guard](const httplib::Request& req, httplib::Response& res) {
+        if (!IsAdminPath(req.path)) {
+            return httplib::Server::HandlerResponse::Unhandled;  // pass through
+        }
+        if (guard.IsClientAllowed(req.remote_addr)) {
+            return httplib::Server::HandlerResponse::Unhandled;  // allowed -> route
+        }
+        // Denied: 403 with the GEN-Agent 4-field error body.
+        res.status = 403;
+        res.set_content(BuildAdminDeniedBody(req.remote_addr).dump(),
+                        "application/json");
+        return httplib::Server::HandlerResponse::Handled;  // short-circuit
+    };
 }
-
-}  // namespace
 
 void InstallAdminGuard(httplib::Server& server) {
     InstallAdminGuard(server, AdminGuardConfig::FromEnv());
 }
 
 void InstallAdminGuard(httplib::Server& server, AdminGuardConfig config) {
-    CORTRIX_LOG_INFO("security",
-                     "AdminGuard installed (whitelist={}, public={})",
-                     config.admin_bind_whitelist, config.allow_public);
-    InstallGuard(server, AdminGuard(std::move(config)));
+    server.set_pre_routing_handler(AdminGuardHandler(std::move(config)));
 }
 
 }  // namespace cortrix::middleware

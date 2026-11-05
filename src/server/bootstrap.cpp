@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <filesystem>
+#include <optional>
 #include <stdexcept>
 #include <system_error>
 #include <vector>
@@ -121,6 +122,7 @@
 #include "cortrix/server/http_server.h"
 // [F20] security hardening
 #include "cortrix/middleware/admin_guard.h"
+#include "cortrix/middleware/pre_routing.h"
 #include "cortrix/middleware/rate_limiter.h"               // [F20 §8.bis] pre-routing rate-limit gate
 #include "cortrix/logging/sanitizer.h"
 // [F24] deployment: dual health endpoint + OpenMetrics :9091 + disk monitor + graceful shutdown
@@ -1027,38 +1029,31 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::server::ImportHandler import_handler(import_mgr, import_conn_mgr);
 
     // 11. Create HTTP server and register all routes
-    // [F20 §8.bis] Rate limiter is declared before the server so the pre-routing
-    // handler's capture outlives every in-flight request the server may dispatch.
-    cortrix::middleware::RateLimiter rate_limiter;
+    // Rate limiter (rate_limit.enabled, off by default), declared before the server
+    // so the pre-routing handler's capture outlives every in-flight request the
+    // server may dispatch.
+    std::optional<cortrix::middleware::RateLimiter> rate_limiter;
+    if (config.rate_limit.enabled) {
+        const auto& rl = config.rate_limit;
+        rate_limiter.emplace(
+            cortrix::middleware::PerMinuteRule(rl.per_ip.rate_per_sec, rl.per_ip.burst),
+            cortrix::middleware::PerMinuteRule(rl.per_api_key.rate_per_sec, rl.per_api_key.burst),
+            cortrix::middleware::PerSecondRule(rl.global.rate_per_sec, rl.global.burst));
+        CORTRIX_LOG_INFO("security",
+                         "Rate limiting on (per_ip {}/s burst {}, per_api_key {}/s burst {}, "
+                         "global {}/s burst {})",
+                         rl.per_ip.rate_per_sec, rl.per_ip.burst, rl.per_api_key.rate_per_sec,
+                         rl.per_api_key.burst, rl.global.rate_per_sec, rl.global.burst);
+    } else {
+        CORTRIX_LOG_INFO("security", "Rate limiting off (rate_limit.enabled=false)");
+    }
     cortrix::CortrixHttpServer server(config, auth, ns_mgr);
     server.SetNamespacePool(&ns_pool);       // [wire⑤c] live doc/block counts via per-request façade
     server.SetNamespaceRouter(&ns_router);   // [wire⑤c/F13] namespace-create path
     server.SetOperationLogger(obs_module.logger().get());  // [F18a M2] ns_create/ns_delete operation_log
     server.RegisterRoutes();
-    // [F20 §8.bis] Pre-routing rate-limit gate (per-ip / per-api-key / global token
-    // buckets). A denied request short-circuits with 429 + the GEN-Agent error
-    // envelope before any route handler runs — defends unauthenticated DDoS /
-    // brute force. api_key is read from the same headers as WithAuth so per-key
-    // strata key off the real caller; both inputs may be empty (that stratum skips).
-    server.server().set_pre_routing_handler(
-        [&rate_limiter](const httplib::Request& req, httplib::Response& res) {
-            std::string api_key = req.get_header_value("X-API-Key");
-            if (api_key.empty()) {
-                const std::string ah = req.get_header_value("Authorization");
-                const std::string pfx = "Bearer ";
-                if (ah.size() > pfx.size() && ah.compare(0, pfx.size(), pfx) == 0)
-                    api_key = ah.substr(pfx.size());
-            }
-            const auto d = rate_limiter.Allow(req.remote_addr, api_key);
-            if (!d.allowed) {
-                res.status = 429;
-                res.set_content(
-                    cortrix::middleware::RateLimiter::BuildErrorBody(d).dump(),
-                    "application/json");
-                return httplib::Server::HandlerResponse::Handled;
-            }
-            return httplib::Server::HandlerResponse::Unhandled;
-        });
+    // The pre-routing rate-limit gate (when on) is installed below, together
+    // with AdminGuard (InstallPreRouting): httplib keeps one pre-routing handler.
 
     // P02a web UI: serve the SPA bundle when a dist dir is provided (container
     // entrypoint exports CORTRIX_WEB_UI_DIR=/app/web-ui; unset = headless).
@@ -1280,11 +1275,20 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     // [OPEN-2] GC + maintenance ops routes (/api/v1/gc/*, /api/v1/maintenance/*).
     cortrix::RegisterGcRoutes(server.server(), gc_manager, gc_doc_sweeper, auth);
 
-    // [F20] Install AdminGuard pre-routing filter: admin paths are restricted to
-    // the configured client-IP whitelist (loopback-only by default). Runs before
-    // route dispatch / API-key auth. Config comes from CORTRIX_ADMIN_BIND.
-    cortrix::middleware::InstallAdminGuard(server.server(),
-        {config.security.admin_bind, config.security.allow_public_admin});
+    // Pre-routing, in this order, before route dispatch / API-key auth:
+    //   1. Rate limit, when rate_limit.enabled (per-ip / per-api-key / global token
+    //      buckets): a denied request short-circuits with 429 + the GEN-Agent error
+    //      envelope. Admin-path requests count too, including the ones AdminGuard
+    //      then refuses.
+    //   2. AdminGuard: admin paths are restricted to the configured client-IP
+    //      whitelist (loopback-only by default). Config from CORTRIX_ADMIN_BIND.
+    // httplib keeps one pre-routing handler (a later set_pre_routing_handler
+    // replaces the earlier one), so both stages go through one InstallPreRouting.
+    cortrix::middleware::InstallPreRouting(
+        server.server(),
+        cortrix::middleware::ServerPreRoutingStages(
+            rate_limiter ? &*rate_limiter : nullptr,
+            {config.security.admin_bind, config.security.allow_public_admin}));
     // [F24] Deployment wiring (Wave D-R1, additive). The DiskMonitor itself is
     // constructed earlier (6b) so the SPC admission gate + upload route hold it.
     // Dual health endpoint (F24 main impl): /api/v1/system/health/{live,ready}.

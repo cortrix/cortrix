@@ -71,12 +71,17 @@ private:
     AdminGuardConfig config_;
 };
 
-/// Install AdminGuard as a pre-routing handler on `server`. Runs before route
-/// dispatch (and before API-key auth) so admin paths are IP-filtered first.
+/// AdminGuard as a pre-routing stage: a request to an admin path from a client the
+/// whitelist does not allow gets 403 CX_ERR_ADMIN_LOOPBACK_REQUIRED and is handled;
+/// every other request passes on. A server with other pre-routing stages installs
+/// it with InstallPreRouting (pre_routing.h).
+httplib::Server::HandlerWithResponse AdminGuardHandler(AdminGuardConfig config);
+
+/// Install AdminGuard as the only pre-routing handler on `server`. Runs before
+/// route dispatch (and before API-key auth) so admin paths are IP-filtered first.
 /// Non-admin paths are untouched. The config is read from env (FromEnv()).
-///
-/// main.cpp adds a single call to this after route registration (shared-file
-/// pure-ADD per D-R1 brief sec 2).
+/// httplib keeps one pre-routing handler, so this replaces any earlier one; the
+/// server binary installs AdminGuardHandler next to the rate limiter instead.
 void InstallAdminGuard(httplib::Server& server);
 
 /// Test/DI overload: install with an explicit config instead of reading env.

@@ -679,8 +679,8 @@ void InstallCors(httplib::Server& server,
                  const std::vector<std::string>& allowed_origins) {
     // Preflight: a catch-all OPTIONS *route* (not a pre-routing handler). httplib
     // dispatches OPTIONS from its own handler table, so this answers every preflight
-    // WITHOUT consuming the single set_pre_routing_handler slot — which the
-    // admin_guard (main.cpp) already owns. For an allowed origin we answer 204 + the
+    // WITHOUT consuming the single set_pre_routing_handler slot — which
+    // InstallPreRouting (bootstrap.cpp) owns. For an allowed origin we answer 204 + the
     // CORS headers; otherwise 204 with no ACAO (the browser then blocks the call).
     server.Options(R"(.*)",
         [allowed_origins](const httplib::Request& req, httplib::Response& res) {
