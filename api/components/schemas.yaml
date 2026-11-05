@@ -257,13 +257,24 @@ components:
     # ============ Query domain (ARCH § 4.1.3 + F04 v1.0.3) ============
     QueryFilter:
       type: object
+      description: >-
+        Restricts results to documents that match every condition given. Keys other
+        than `tags` and `date_range` are not applied; the response lists them in a
+        `meta.warnings` entry with code `CX_WARN_FILTER_KEY_IGNORED`. A wrong type or
+        date format is rejected with 400 `CX_ERR_BAD_REQUEST`.
       properties:
         tags:
           type: array
+          description: >-
+            A document matches when the `tags` value in its upload metadata (a string
+            or an array of strings) contains at least one of these tags.
           items:
             type: string
         date_range:
           type: object
+          description: >-
+            A document matches when the UTC date of its upload time (`created_at`) is
+            within [start, end]. Both bounds are inclusive; either may be omitted.
           properties:
             start:
               type: string

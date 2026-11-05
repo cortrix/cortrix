@@ -47,6 +47,7 @@ QueryContext ScatterGather::MakeContext(const QueryRequest& request,
     ctx.top_k = request.top_k < 1 ? 1 : request.top_k;
     ctx.rerank = request.rerank;
     ctx.filter = request.filter;
+    ctx.filter_spec = request.filter_spec;
     ctx.enable_vector = request.search_config.enable_vector;
     ctx.enable_bm25 = request.search_config.enable_bm25;
     ctx.enable_sparse = request.search_config.enable_sparse;
@@ -98,10 +99,20 @@ CrossNsResponse ScatterGather::Execute(const QueryRequest& request,
 
     // 2. Single / multi-NS path split (topic 1.6). A request with a budget always takes
     //    the timed join, a lone namespace included: the direct path cannot stop waiting.
-    if (authorized.size() == 1 && !ctx.deadline) {
-        return ExecuteSingleNs(ctx, authorized.front());
+    CrossNsResponse resp = (authorized.size() == 1 && !ctx.deadline)
+                               ? ExecuteSingleNs(ctx, authorized.front())
+                               : ExecuteMultiNs(ctx, authorized);
+
+    // Filter keys outside the QueryFilter contract are not applied; say so, so a
+    // caller does not read unfiltered results as filtered ones.
+    if (!ctx.filter_spec.ignored_keys.empty()) {
+        resp.meta.warnings.push_back({{"code", "CX_WARN_FILTER_KEY_IGNORED"},
+                                      {"reason", "filter_key_not_supported"},
+                                      {"category", "permanent"},
+                                      {"ignored_keys", ctx.filter_spec.ignored_keys},
+                                      {"supported_keys", {"tags", "date_range"}}});
     }
-    return ExecuteMultiNs(ctx, authorized);
+    return resp;
 }
 
 CrossNsResponse ScatterGather::ExecuteSingleNs(const QueryContext& ctx,

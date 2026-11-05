@@ -128,6 +128,10 @@ Status CrossNsQueryHandler::ParseRequest(const nlohmann::json& body,
             }
         }
     }
+    if (body.contains("filter")) {
+        Status fs = ParseQueryFilter(body["filter"], &out->filter_spec);
+        if (!fs.ok()) return fs;
+    }
     return Status::Ok();
 }
 
