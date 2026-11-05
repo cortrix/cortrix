@@ -318,6 +318,37 @@ ResolvedError ResolveError(const Status& status) {
 
 std::string ResolvedErrorCode(const Status& status) { return ResolveError(status).code; }
 
+void AddErrorRequestFields(httplib::Response& res, nlohmann::json& body,
+                           const std::string& request_id) {
+    if (!body.is_object() || !body.contains("error") || !body["error"].is_object()) return;
+    if (!request_id.empty()) {
+        body["error"]["request_id"] = request_id;
+        res.set_header("X-Request-Id", request_id);
+    }
+    // Per API_GATEWAY_DESIGN.md section 2.5.1: include ISO 8601 timestamp
+    auto now = std::chrono::system_clock::now();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    struct tm tm_buf;
+    gmtime_r(&time_t_now, &tm_buf);
+    char buf[32];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &tm_buf);
+    std::ostringstream ts;
+    ts << buf << "." << std::setfill('0') << std::setw(3) << ms.count() << "Z";
+    body["error"]["timestamp"] = ts.str();
+}
+
+void WriteAgentFriendlyError(httplib::Response& res, int http_status,
+                             const agent_friendly::AgentFriendlyError& error,
+                             const std::string& request_id) {
+    nlohmann::json body;
+    body["error"] = agent_friendly::ToJson(error);
+    AddErrorRequestFields(res, body, request_id);
+    ApplyBaselineSecurityHeaders(res);
+    res.set_content(body.dump(), "application/json");
+    res.status = http_status;
+}
+
 void WriteJsonError(httplib::Response& res, const Status& status, const std::string& request_id) {
     WriteJsonErrorWithData(res, status, nlohmann::json::object(), request_id);
 }
@@ -339,24 +370,7 @@ void WriteJsonErrorWithData(httplib::Response& res, const Status& status,
     body["error"]["category"] = agent_friendly::ToString(resolved.category);
     body["error"]["retry_after_ms"] = nullptr;  // coarse Status carries no hint
     body["error"]["structured_data"] = structured_data;
-    if (!request_id.empty()) {
-        body["error"]["request_id"] = request_id;
-        res.set_header("X-Request-Id", request_id);
-    }
-    // Per API_GATEWAY_DESIGN.md section 2.5.1: include ISO 8601 timestamp
-    {
-        auto now = std::chrono::system_clock::now();
-        auto ms =
-            std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-        auto time_t_now = std::chrono::system_clock::to_time_t(now);
-        struct tm tm_buf;
-        gmtime_r(&time_t_now, &tm_buf);
-        char buf[32];
-        std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &tm_buf);
-        std::ostringstream ts;
-        ts << buf << "." << std::setfill('0') << std::setw(3) << ms.count() << "Z";
-        body["error"]["timestamp"] = ts.str();
-    }
+    AddErrorRequestFields(res, body, request_id);
     ApplyBaselineSecurityHeaders(res);
     res.set_content(body.dump(), "application/json");
     res.status = status.http_status();

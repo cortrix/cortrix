@@ -190,6 +190,7 @@ add_executable(cortrix_unit_tests
     unit/test_wordpiece_unicode_r8.cpp
     unit/test_query_request_r8.cpp
     unit/test_memory_routes_success_r8.cpp
+    unit/test_memory_routes_error_envelope.cpp
     unit/test_memory_routes_transparency_r8.cpp
     unit/test_f40_onnx_embedder_sparse.cpp
     unit/test_f40_sparse_error.cpp

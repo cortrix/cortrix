@@ -91,11 +91,9 @@ bool RequireNamespaceParam(const httplib::Request& req, httplib::Response& res,
         err.category = agent_friendly::ErrorCategory::kPermanent;
         err.retryable = false;
         err.structured_data = nlohmann::json{{"missing_param", "namespace"}};
-        // R2-M8: wrapped envelope ("error" key) to match WriteJsonError + all
-        // other error responses (the GET/DELETE flat surface stays consistent).
-        nlohmann::json error_body;
-        error_body["error"] = agent_friendly::ToJson(err);
-        WriteJsonResponse(res, 400, error_body, request_id);
+        // R2-M8: wrapped envelope ("error" key) with the same request_id/timestamp
+        // fields as WriteJsonError (the GET/DELETE flat surface stays consistent).
+        WriteAgentFriendlyError(res, 400, err, request_id);
         return false;
     }
     *out_ns = req.get_param_value("namespace");
@@ -106,11 +104,9 @@ bool RequireNamespaceParam(const httplib::Request& req, httplib::Response& res,
         err.category = agent_friendly::ErrorCategory::kPermanent;
         err.retryable = false;
         err.structured_data = nlohmann::json{{"missing_param", "namespace"}};
-        // R2-M8: wrapped envelope ("error" key) to match WriteJsonError + all
-        // other error responses (the GET/DELETE flat surface stays consistent).
-        nlohmann::json error_body;
-        error_body["error"] = agent_friendly::ToJson(err);
-        WriteJsonResponse(res, 400, error_body, request_id);
+        // R2-M8: wrapped envelope ("error" key) with the same request_id/timestamp
+        // fields as WriteJsonError (the GET/DELETE flat surface stays consistent).
+        WriteAgentFriendlyError(res, 400, err, request_id);
         return false;
     }
     return true;

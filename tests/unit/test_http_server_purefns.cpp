@@ -268,5 +268,48 @@ TEST_F(HttpServerPureFnServer, ErrorHandlerServesSpaIndexWhenWebUiEnabled) {
     EXPECT_EQ(api->status, 404);
 }
 
+// WriteAgentFriendlyError: the AgentFriendlyError fields as given, plus the same
+// request-scoped fields WriteJsonError adds.
+TEST(HttpServerPureFnAgentError, CarriesErrorFieldsAndRequestFields) {
+    agent_friendly::AgentFriendlyError err;
+    err.code = "CX_ERR_EXAMPLE";
+    err.message = "example";
+    err.retryable = true;
+    err.category = agent_friendly::ErrorCategory::kTimeout;
+    err.retry_after_ms = 5000;
+    err.structured_data = json{{"k", "v"}};
+    httplib::Response res;
+    WriteAgentFriendlyError(res, 504, err, "0123456789abcdef0123456789abcdef");
+    EXPECT_EQ(res.status, 504);
+    EXPECT_EQ(res.get_header_value("X-Request-Id"), "0123456789abcdef0123456789abcdef");
+    const json e = json::parse(res.body)["error"];
+    EXPECT_EQ(e["code"], "CX_ERR_EXAMPLE");
+    EXPECT_EQ(e["category"], "timeout");
+    EXPECT_TRUE(e["retryable"].get<bool>());
+    EXPECT_EQ(e["retry_after_ms"], 5000);
+    EXPECT_EQ(e["structured_data"]["k"], "v");
+    EXPECT_EQ(e["request_id"], "0123456789abcdef0123456789abcdef");
+    EXPECT_TRUE(e.contains("timestamp"));
+}
+
+TEST(HttpServerPureFnAgentError, NoRequestIdMeansNoHeaderNoBodyField) {
+    agent_friendly::AgentFriendlyError err;
+    err.code = "CX_ERR_EXAMPLE";
+    httplib::Response res;
+    WriteAgentFriendlyError(res, 400, err, "");
+    EXPECT_FALSE(res.has_header("X-Request-Id"));
+    const json e = json::parse(res.body)["error"];
+    EXPECT_FALSE(e.contains("request_id"));
+    EXPECT_TRUE(e.contains("timestamp"));
+}
+
+TEST(HttpServerPureFnAgentError, AddErrorRequestFieldsLeavesNonErrorBodyAlone) {
+    httplib::Response res;
+    json body = {{"results", json::array()}};
+    AddErrorRequestFields(res, body, "0123456789abcdef0123456789abcdef");
+    EXPECT_EQ(body, (json{{"results", json::array()}}));
+    EXPECT_FALSE(res.has_header("X-Request-Id"));
+}
+
 }  // namespace
 }  // namespace cortrix

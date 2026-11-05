@@ -253,6 +253,18 @@ TEST_F(FlatDocumentRoutesTest, ListMissingNamespace400WithStructuredData) {
     EXPECT_EQ(j["error"]["structured_data"]["missing_param"], "namespace");
 }
 
+TEST_F(FlatDocumentRoutesTest, MissingNamespaceErrorCarriesRequestId) {
+    httplib::Client cli("127.0.0.1", port_);
+    auto res = cli.Get("/api/v1/documents", ReadHeaders());
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 400);
+    const std::string header = res->get_header_value("X-Request-Id");
+    ASSERT_FALSE(header.empty());
+    auto j = json::parse(res->body);
+    EXPECT_EQ(j["error"]["request_id"], header);
+    EXPECT_TRUE(j["error"].contains("timestamp"));
+}
+
 TEST_F(FlatDocumentRoutesTest, ListReturnsSpecShape) {
     UploadDoc("default", "doc one", "one.txt");
     UploadDoc("default", "doc two", "two.txt");

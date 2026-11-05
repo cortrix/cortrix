@@ -4,6 +4,7 @@
 #include <chrono>
 #include "httplib.h"
 #include <nlohmann/json.hpp>
+#include "cortrix/agent_friendly/error.h"
 #include "cortrix/config/config.h"
 #include "cortrix/auth/api_key_auth.h"
 #include "cortrix/namespace/namespace_manager.h"
@@ -115,6 +116,19 @@ void WriteJsonErrorWithData(httplib::Response& res, const Status& status,
 /// generic code of its status code. For a log entry that must name the same code
 /// as the response.
 std::string ResolvedErrorCode(const Status& status);
+/// Write an error whose code/category/retryable/retry_after_ms are already known
+/// (an AgentFriendlyError from a feature's error table) with the same
+/// request-scoped fields WriteJsonError adds: `error.request_id` plus the
+/// X-Request-Id header when `request_id` is non-empty, and `error.timestamp`.
+void WriteAgentFriendlyError(httplib::Response& res, int http_status,
+                             const agent_friendly::AgentFriendlyError& error,
+                             const std::string& request_id);
+/// Add the request-scoped fields of an error response to an already built
+/// `{"error": {...}}` body: `error.request_id` plus the X-Request-Id header when
+/// `request_id` is non-empty, and `error.timestamp`. No-op on a body without an
+/// "error" object.
+void AddErrorRequestFields(httplib::Response& res, nlohmann::json& body,
+                           const std::string& request_id);
 void WriteJsonResponse(httplib::Response& res, int http_status, const nlohmann::json& body,
                        const std::string& request_id = "");
 
