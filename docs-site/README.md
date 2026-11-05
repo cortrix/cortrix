@@ -10,8 +10,8 @@ theme in the footer.
 
 ## Requirements
 
-- Hugo Extended 0.160.1 or newer (the `Docs` workflow uses 0.167.0)
-- Go 1.27 or newer
+- Hugo Extended 0.168.0 or newer (the `Docs` workflow uses 0.168.0)
+- Go 1.27.3 or newer
 - Git
 - Python 3 with PyYAML
 
@@ -31,10 +31,12 @@ Open `http://localhost:1313/docs/`.
 ## Strict build
 
 ```bash
-cd docs-site
-hugo --cleanDestinationDir --gc --minify --environment production \
-  --printPathWarnings --panicOnWarning
+docs-site/scripts/build_strict.sh
 ```
+
+The script runs the production build and fails on any Hugo warning or error
+except one: Hugo 0.168 reports that LibSass is deprecated, because the OINK
+theme compiles its styles with the LibSass built into Hugo Extended.
 
 ## Layout
 
@@ -42,7 +44,8 @@ hugo --cleanDestinationDir --gc --minify --environment production \
 docs-site/
 ├── hugo.yaml          site configuration
 ├── go.mod             pins the OINK theme module
-├── scripts/           filter_openapi.py, which writes the spec copy the site renders
+├── scripts/           filter_openapi.py writes the spec copy the site renders;
+│                      build_strict.sh runs the strict build
 ├── data/home/         landing page content
 ├── assets/            logo and theme styles
 └── content/docs/      documentation pages

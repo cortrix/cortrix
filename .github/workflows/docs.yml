@@ -1,4 +1,5 @@
-# Builds the documentation site in docs-site/ with warnings treated as errors.
+# Builds the documentation site in docs-site/ with warnings treated as errors,
+# except Hugo's LibSass deprecation notice (see docs-site/scripts/build_strict.sh).
 # A broken internal link, a missing anchor, or an internal marker left in the
 # filtered OpenAPI copy fails the build. Pull requests are built only. A push to
 # release/1.0 is built and then published to GitHub Pages.
@@ -29,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      HUGO_VERSION: 0.167.0
+      HUGO_VERSION: 0.168.0
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,10 +55,10 @@ jobs:
 
       - name: Build
         working-directory: docs-site
+        shell: bash
         run: |
           test -f .openapi/openapi.yaml
-          hugo --cleanDestinationDir --gc --minify --environment production \
-            --printPathWarnings --panicOnWarning
+          scripts/build_strict.sh
 
       - name: Upload the site
         if: github.event_name == 'push'

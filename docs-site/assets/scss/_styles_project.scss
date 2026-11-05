@@ -60,13 +60,16 @@
 }
 
 // Primary call to action, as on cortrix.ai: Magma Orange with white text.
+// The theme paints a button's fill and border on a layer behind its label,
+// read from --td-control-bg and --td-control-border, so set those rather than
+// background or border-color on the button itself.
 .td-landing-button--primary {
-  background: linear-gradient(135deg, #ff6405, #ff8a30);
+  --td-control-bg: linear-gradient(135deg, #ff6405, #ff8a30);
   color: #fff;
   box-shadow: 0 6px 22px rgba(255, 100, 5, 0.3);
 
   &:hover {
-    background: linear-gradient(135deg, #ea5000, #ff6405);
+    --td-control-bg: linear-gradient(135deg, #ea5000, #ff6405);
     color: #fff;
     box-shadow: 0 10px 30px rgba(255, 100, 5, 0.38);
   }
@@ -378,7 +381,7 @@ body {
 
 
 .td-landing-button--ghost:hover {
-  border-color: rgba(var(--cx-magma-rgb), 0.5);
+  --td-control-border: rgba(var(--cx-magma-rgb), 0.5);
   color: var(--cx-magma-text);
 }
 
