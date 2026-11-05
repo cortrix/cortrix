@@ -83,6 +83,7 @@ These are the high-frequency codes registered in the spec, with the suggested wa
 | `CX_ERR_RATE_LIMIT` | Yes | `transient` | The rate limit was exceeded. The `v1.0.0-rc.2` server doesn't emit this code | Wait for `retry_after_ms` and retry, or lower your request rate |
 | `CX_ERR_AUTH_INVALID_API_KEY` | No | `auth` | The API key is invalid or revoked | Use a different API key |
 | `CX_ERR_INDEX_CORRUPT` | No | `permanent` | The vector index is unavailable | Use the partial results and notify whoever operates the service |
+{.wide .expand}
 
 These are the error codes that came up in testing for this documentation:
 

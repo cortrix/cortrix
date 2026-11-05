@@ -42,6 +42,7 @@ For how to configure Cortrix and for common scenarios, see [Configuration](/docs
 | `data_dir` | `"./build/data"` | The data root, holding databases, the vector index, and files. A relative path is resolved from the directory of the `cortrix-server` binary |
 | `max_active` | `10` | The maximum number of namespaces kept loaded at once |
 | `idle_timeout_s` | `300` | Seconds of idleness before a namespace is unloaded automatically. `0` never unloads |
+{.wide .expand}
 
 ## embedding {#embedding}
 
@@ -59,12 +60,14 @@ For how to configure Cortrix and for common scenarios, see [Configuration](/docs
 |---|---|---|
 | `model_dir` | `"./models/bge-reranker-v2-m3"` | The reranker model directory. Leave it empty to select the stub explicitly. Environment variable: `CORTRIX_RERANKER_MODEL_DIR` |
 | `execution_provider` | `"auto"` | `auto`, `cpu`, `coreml`, or `cuda`. Environment variable: `CORTRIX_RERANKER_EXECUTION_PROVIDER` |
+{.wide .expand}
 
 ## query_complexity {#query-complexity}
 
 | Key | Default | Description |
 |---|---|---|
 | `model_dir` | `"./models/query-complexity"` | The directory of the query-complexity classifier. If the model is absent, a heuristic is used instead. Environment variable: `CORTRIX_QUERY_COMPLEXITY_MODEL_DIR` |
+{.wide .expand}
 
 ## retrieval {#retrieval}
 

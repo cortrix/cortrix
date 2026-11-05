@@ -2,6 +2,7 @@
 title: NVIDIA CUDA
 description: Run embedding and reranking on an NVIDIA GPU on Linux.
 weight: 40
+search_keywords: [coreml]
 ---
 
 Build and run the Cortrix CUDA image, then confirm that the models are really running on the GPU.

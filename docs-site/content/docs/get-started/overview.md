@@ -2,6 +2,7 @@
 title: Overview
 description: What Cortrix is, what it's made of, and where it stands today.
 weight: 10
+search_keywords: [cortrix-server]
 ---
 
 Cortrix is open source semantic storage built for AI agents. It's agent-native storage for retrieval, memory, and API-driven AI applications.
