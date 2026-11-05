@@ -497,6 +497,31 @@ protected:
 // rerank stage) rather than the pure helpers, because what broke was WHERE the
 // resolution ran, not what it computed. The fixture's mock LLM answers the listwise
 // rerank with {"ranking":[2,1]}, i.e. it swaps the two results.
+// Error bodies from the production query route carry the same request_id as the
+// X-Request-Id header, plus a timestamp: both the handler's parse-fault body and a
+// cross-namespace error raised while authorizing the namespaces.
+TEST_F(QueryWiringHttpCoverage, ErrorBodiesCarryRequestIdAndTimestamp) {
+    httplib::Client client("127.0.0.1", port_);
+    json too_many = json::array();  // over the per-query namespace cap
+    for (int i = 0; i < 500; ++i) too_many.push_back("ns-" + std::to_string(i));
+    const json bodies[] = {
+        json{{"namespaces", json::array({kNamespace})}},  // no query text
+        json{{"query", "semantic memory"}, {"namespaces", too_many}},
+    };
+    for (const auto& body : bodies) {
+        auto res = client.Post("/api/v1/query", body.dump(), "application/json");
+        ASSERT_TRUE(res);
+        ASSERT_GE(res->status, 400) << body.dump() << " -> " << res->body;
+        const std::string header = res->get_header_value("X-Request-Id");
+        ASSERT_FALSE(header.empty());
+        EXPECT_EQ(res->get_header_value_count("X-Request-Id"), 1u) << body.dump();
+        const json j = json::parse(res->body);
+        ASSERT_TRUE(j.contains("error")) << res->body;
+        EXPECT_EQ(j["error"].value("request_id", ""), header) << res->body;
+        EXPECT_TRUE(j["error"].contains("timestamp")) << res->body;
+    }
+}
+
 TEST_F(QueryWiringHttpCoverage, ParentExpansionFollowsTheListwiseRerankOrder) {
     ASSERT_NO_FATAL_FAILURE(SeedChildBlocksWithParents());
 

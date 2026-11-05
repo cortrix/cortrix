@@ -20,6 +20,7 @@
 #include "cortrix/spc/onnx_embedder.h"
 #include "cortrix/server/http_server.h"
 #include "cortrix/agent_friendly/error.h"
+#include "cortrix/memory/mem02_error.h"
 #include "cortrix/common/json_depth.h"  // metadata depth guard (DoS: deep-JSON dump)
 #include "cortrix/memory/mem05_metrics.h"
 // M1/M2/M4/M5 — MEM02 extraction + MEM03 transparency + MEM04 opt-out runtime
@@ -120,23 +121,33 @@ static bool EnforceSessionOwner(const RequestContext& rc, MemoryStore& store,
     return owned;
 }
 
-// Write a GEN-Agent 4-field error envelope (code/retryable/category + structured_data)
-// with an explicit HTTP status. Used by the M-wave endpoints whose errors carry a
-// CX_ERR_MEM0x_* identity rather than a generic Status.
+// Write a GEN-Agent error envelope with an explicit HTTP status, through the shared
+// writer so it carries the same request_id / X-Request-Id / timestamp / retry_after_ms
+// fields as every other error response. Used by the M-wave endpoints whose errors
+// carry a CX_ERR_MEM0x_* identity rather than a generic Status.
 static void WriteAgentError(httplib::Response& res, int http_status,
                             const std::string& code, const std::string& message,
-                            bool retryable, const std::string& category,
+                            bool retryable, agent_friendly::ErrorCategory category,
+                            const std::string& request_id,
                             const json& structured_data = json::object()) {
-    json err;
-    err["code"] = code;
-    err["message"] = message;
-    err["retryable"] = retryable;
-    err["category"] = category;
-    err["structured_data"] = structured_data;
-    json body;
-    body["error"] = err;
-    res.status = http_status;
-    res.set_content(body.dump(), "application/json");
+    agent_friendly::AgentFriendlyError err;
+    err.code = code;
+    err.message = message;
+    err.retryable = retryable;
+    err.category = category;
+    err.structured_data = structured_data;
+    WriteAgentFriendlyError(res, http_status, err, request_id);
+}
+
+// HTTP status for an extraction failure: the MEM02 §5.3 registry row for its code
+// (504 timeout, 429 budget, 500 invalid output / ambiguous, 503 disabled), 500 for
+// a code outside the registry.
+static int ExtractionErrorHttpStatus(const std::string& code) {
+    for (int i = 0; i < memory::kMem02ErrorCodeCount; ++i) {
+        const auto c = static_cast<memory::Mem02ErrorCode>(i);
+        if (code == memory::Mem02ErrorCodeString(c)) return memory::Mem02ErrorHttpStatus(c);
+    }
+    return 500;
 }
 
 // ── M2: MEM02 LLM extraction HTTP surface ────────────────────────────────────
@@ -153,25 +164,25 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
     (void)pool;
     (void)embedder;
     (void)config;
-    auto extract_disabled = [](httplib::Response& res) {
+    auto extract_disabled = [](httplib::Response& res, const std::string& request_id) {
         WriteAgentError(res, 503, "CX_ERR_MEM02_LLM_DISABLED",
                         "memory extraction is disabled (no LLM configured)",
-                        false, "permanent");
+                        false, agent_friendly::ErrorCategory::kPermanent, request_id);
     };
 
     // POST /api/v1/memory/extract — extract from one interaction supplied in the body.
     svr.Post("/api/v1/memory/extract", WithAuth(auth, kPermWrite,
         [extraction, extract_disabled](const httplib::Request& req, httplib::Response& res,
                                       const RequestContext& rc) {
-        if (!extraction || !extraction->enabled()) { extract_disabled(res); return; }
+        if (!extraction || !extraction->enabled()) { extract_disabled(res, rc.request_id); return; }
         json body;
         try { body = json::parse(req.body); } catch (...) {
             WriteAgentError(res, 400, "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT",
-                            "invalid JSON body", false, "permanent");
+                            "invalid JSON body", false, agent_friendly::ErrorCategory::kPermanent, rc.request_id);
             return;
         }
         std::string ns = body.value("ns", body.value("namespace", ""));
-        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
+        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required"), rc.request_id); return; }
 
         InteractionLog turn;
         turn.namespace_name = ns;
@@ -190,7 +201,10 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         auto result = extraction->ExtractOne(turn);
         if (!result.ok()) {
             const auto& e = *result.error;
-            WriteAgentError(res, 500, e.code, e.message, false, "transient");
+            // The extractor's error already carries the MEM02 §5.3 category /
+            // retryable / retry_after_ms for its code; send them as-is with the
+            // registry's HTTP status (e.g. 504 for EXTRACT_LLM_TIMEOUT).
+            WriteAgentFriendlyError(res, ExtractionErrorHttpStatus(e.code), e, rc.request_id);
             return;
         }
         json resp;
@@ -210,23 +224,23 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
             };
         }
         resp["error"] = nullptr;
-        WriteJsonResponse(res, 200, resp);
+        WriteJsonResponse(res, 200, resp, rc.request_id);
     }));
 
     // POST /api/v1/memory/extract/batch — PartialSuccessById over a list of interactions.
     svr.Post("/api/v1/memory/extract/batch", WithAuth(auth, kPermWrite,
         [extraction, extract_disabled](const httplib::Request& req, httplib::Response& res,
                                       const RequestContext& rc) {
-        if (!extraction || !extraction->enabled()) { extract_disabled(res); return; }
+        if (!extraction || !extraction->enabled()) { extract_disabled(res, rc.request_id); return; }
         json body;
         try { body = json::parse(req.body); } catch (...) {
             WriteAgentError(res, 400, "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT",
-                            "invalid JSON body", false, "permanent");
+                            "invalid JSON body", false, agent_friendly::ErrorCategory::kPermanent, rc.request_id);
             return;
         }
         std::string ns = body.value("ns", body.value("namespace", ""));
         if (ns.empty() || !body.contains("interactions") || !body["interactions"].is_array()) {
-            WriteJsonError(res, Status::InvalidArgument("ns + interactions[] are required"));
+            WriteJsonError(res, Status::InvalidArgument("ns + interactions[] are required"), rc.request_id);
             return;
         }
         json results = json::array();
@@ -253,22 +267,22 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         resp["results"] = results;
         resp["succeeded"] = succeeded;
         resp["failed"] = failed;
-        WriteJsonResponse(res, 200, resp);  // PartialSuccessById: 200 with per-item status
+        WriteJsonResponse(res, 200, resp, rc.request_id);  // PartialSuccessById: 200 with per-item status
     }));
 
     // POST /api/v1/memory/extract/run_for_ns — NS-level backfill (scheduled task stub).
     svr.Post("/api/v1/memory/extract/run_for_ns", WithAuth(auth, kPermWrite,
         [extraction, extract_disabled](const httplib::Request& req, httplib::Response& res,
-                                      const RequestContext&) {
-        if (!extraction || !extraction->enabled()) { extract_disabled(res); return; }
+                                      const RequestContext& rc) {
+        if (!extraction || !extraction->enabled()) { extract_disabled(res, rc.request_id); return; }
         json body;
         try { body = json::parse(req.body); } catch (...) {
             WriteAgentError(res, 400, "CX_ERR_MEM02_EXTRACT_INVALID_OUTPUT",
-                            "invalid JSON body", false, "permanent");
+                            "invalid JSON body", false, agent_friendly::ErrorCategory::kPermanent, rc.request_id);
             return;
         }
         std::string ns = body.value("ns", body.value("namespace", ""));
-        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
+        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required"), rc.request_id); return; }
         // The backfill enumerates unextracted interactions and enqueues them; the
         // enumeration source is the MemoryQueue periodic-scan wiring (D2 fallback). Here
         // we accept the request and report it scheduled (async, non-blocking).
@@ -276,12 +290,12 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         resp["ns"] = ns;
         resp["status"] = "scheduled";
         resp["note"] = "backfill runs through the async extraction queue";
-        WriteJsonResponse(res, 202, resp);
+        WriteJsonResponse(res, 202, resp, rc.request_id);
     }));
 
     // GET /api/v1/memory/invalidations — D6/D9 audit list (over operation_log).
     svr.Get("/api/v1/memory/invalidations", WithAuth(auth, kPermRead,
-        [](const httplib::Request& req, httplib::Response& res, const RequestContext&) {
+        [](const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         // The invalidation audit trail lives in F18a operation_log (memory_invalidate /
         // memory_revoke actions). Querying it is the /operations surface's job; here we
         // return the canonical pointer so the SDK can follow it (the dedicated filtered
@@ -290,7 +304,7 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         resp["invalidations"] = json::array();
         resp["source"] = "/api/v1/operations?action_in=memory_invalidate,memory_revoke";
         (void)req;
-        WriteJsonResponse(res, 200, resp);
+        WriteJsonResponse(res, 200, resp, rc.request_id);
     }));
 
     // POST /api/v1/memory/invalidations/{id}/revoke — D9 admin revoke.
@@ -303,13 +317,13 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
         std::string block_id = req.matches[1].str();
         if (!extraction) {
             WriteAgentError(res, 503, "CX_ERR_MEM02_LLM_DISABLED",
-                            "memory service unavailable", false, "permanent");
+                            "memory service unavailable", false, agent_friendly::ErrorCategory::kPermanent, rc.request_id);
             return;
         }
         json body = json::object();
         try { if (!req.body.empty()) body = json::parse(req.body); } catch (...) {}
         std::string ns = body.value("ns", body.value("namespace", ""));
-        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
+        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required"), rc.request_id); return; }
         std::string reason = body.value("reason", "");
         const std::string revoked_by =
             rc.auth.user_id.empty() ? "anonymous" : rc.auth.user_id;
@@ -322,7 +336,7 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
             WriteAgentError(res, http,
                             http == 404 ? "CX_ERR_MEM02_BLOCK_NOT_FOUND"
                                         : "CX_ERR_MEM02_REVOKE_FAILED",
-                            s.message(), false, "permanent");
+                            s.message(), false, agent_friendly::ErrorCategory::kPermanent, rc.request_id);
             return;
         }
         const memory::MemoryBlockRecord& blk = r.value();
@@ -334,7 +348,7 @@ static void RegisterMemoryExtractRoutes(httplib::Server& svr, ApiKeyAuth& auth,
             resp["revoked_at"] = blk.metadata_json["revoked_at"];
         }
         resp["namespace"] = ns;
-        WriteJsonResponse(res, 200, resp);
+        WriteJsonResponse(res, 200, resp, rc.request_id);
     }));
 }
 
@@ -358,18 +372,18 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
                            const RequestContext& rc) {
         std::string ns = req.get_param_value("ns");
         if (ns.empty()) ns = req.get_param_value("namespace");
-        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
+        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required"), rc.request_id); return; }
         // MEM05 L1: the requester may only list their own user_id (admin may query any).
         std::string user_id = req.get_param_value("user_id");
         if (!EnforceOwnUserId(rc, user_id, memory::Mem05Metrics::Action::kSearch)) {
             // Empty-result mask: do not reveal another user's memories exist.
             json resp; resp["memories"] = json::array(); resp["total"] = 0;
-            WriteJsonResponse(res, 200, resp);
+            WriteJsonResponse(res, 200, resp, rc.request_id);
             return;
         }
         resource::NamespaceFacade facade(pool, ns);
         if (Status acq = facade.Acquire(); !acq.ok()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found")); return;
+            WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found"), rc.request_id); return;
         }
         auto block_store = std::make_shared<memory::MemoryBlockAdapter>(
             facade.store(), &embedder, &facade.vec_index());
@@ -422,7 +436,7 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
             resp["page"] = filter.page < 0 ? 0 : filter.page;
             resp["page_size"] = filter.page_size;
         }
-        WriteJsonResponse(res, 200, resp);
+        WriteJsonResponse(res, 200, resp, rc.request_id);
     }));
 
     // POST /api/v1/memory — create a memory fact (user self-service).
@@ -431,12 +445,12 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
                            const RequestContext& rc) {
         json body;
         try { body = json::parse(req.body); } catch (...) {
-            WriteJsonError(res, Status::InvalidArgument("invalid JSON body")); return;
+            WriteJsonError(res, Status::InvalidArgument("invalid JSON body"), rc.request_id); return;
         }
         std::string ns = body.value("ns", body.value("namespace", ""));
         std::string content = body.value("content", "");
         if (ns.empty() || content.empty()) {
-            WriteJsonError(res, Status::InvalidArgument("ns + content are required")); return;
+            WriteJsonError(res, Status::InvalidArgument("ns + content are required"), rc.request_id); return;
         }
         // MEM05 L1: a non-admin may only create memories under its own user_id;
         // a spoofed body user_id is a cross-user write and is refused. 404 (not 403)
@@ -444,11 +458,11 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         // confirm/deny anything about the target user.
         std::string user_id = body.value("user_id", "");
         if (!EnforceOwnUserId(rc, user_id, memory::Mem05Metrics::Action::kEdit)) {
-            WriteJsonError(res, Status::NotFound("Cannot create memory for the requested user")); return;
+            WriteJsonError(res, Status::NotFound("Cannot create memory for the requested user"), rc.request_id); return;
         }
         resource::NamespaceFacade facade(pool, ns);
         if (Status acq = facade.Acquire(); !acq.ok()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found")); return;
+            WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found"), rc.request_id); return;
         }
         auto block_store = std::make_shared<memory::MemoryBlockAdapter>(
             facade.store(), &embedder, &facade.vec_index());
@@ -458,9 +472,9 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         creq.content = content;
         creq.memory_type = body.value("memory_type", "fact");
         auto r = transparency.Create(creq, user_id);
-        if (!r.ok()) { WriteJsonError(res, r.status()); return; }
+        if (!r.ok()) { WriteJsonError(res, r.status(), rc.request_id); return; }
         json resp; resp["memory_id"] = r.value(); resp["status"] = "active";
-        WriteJsonResponse(res, 201, resp);
+        WriteJsonResponse(res, 201, resp, rc.request_id);
     }));
 
     // PATCH /api/v1/memory/{id} — edit = new fact + invalidate old (MEM03-4).
@@ -470,22 +484,22 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         std::string mem_id = req.matches[1].str();
         json body;
         try { body = json::parse(req.body); } catch (...) {
-            WriteJsonError(res, Status::InvalidArgument("invalid JSON body")); return;
+            WriteJsonError(res, Status::InvalidArgument("invalid JSON body"), rc.request_id); return;
         }
         std::string ns = body.value("ns", body.value("namespace", ""));
         std::string content = body.value("content", "");
         if (ns.empty() || content.empty()) {
-            WriteJsonError(res, Status::InvalidArgument("ns + content are required")); return;
+            WriteJsonError(res, Status::InvalidArgument("ns + content are required"), rc.request_id); return;
         }
         // MEM05 L1: a non-admin may only edit memories under its own user_id; a
         // spoofed body user_id would let A invalidate+rewrite B's memory → 404-mask.
         std::string user_id = body.value("user_id", "");
         if (!EnforceOwnUserId(rc, user_id, memory::Mem05Metrics::Action::kEdit)) {
-            WriteJsonError(res, Status::NotFound("Memory not found: " + mem_id)); return;
+            WriteJsonError(res, Status::NotFound("Memory not found: " + mem_id), rc.request_id); return;
         }
         resource::NamespaceFacade facade(pool, ns);
         if (Status acq = facade.Acquire(); !acq.ok()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found")); return;
+            WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found"), rc.request_id); return;
         }
         auto block_store = std::make_shared<memory::MemoryBlockAdapter>(
             facade.store(), &embedder, &facade.vec_index());
@@ -494,11 +508,11 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         ereq.memory_id = mem_id;
         ereq.new_content = content;
         auto r = transparency.Edit(ereq, user_id);
-        if (!r.ok()) { WriteJsonError(res, r.status()); return; }
+        if (!r.ok()) { WriteJsonError(res, r.status(), rc.request_id); return; }
         json resp;
         resp["new_memory_id"] = r.value().new_memory_id;
         resp["invalidated_memory_id"] = r.value().old_memory_id;
-        WriteJsonResponse(res, 200, resp);
+        WriteJsonResponse(res, 200, resp, rc.request_id);
     }));
 
     // DELETE /api/v1/memory/{id} — soft-delete (status=invalidated, user_manual).
@@ -508,24 +522,24 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
         std::string mem_id = req.matches[1].str();
         std::string ns = req.get_param_value("ns");
         if (ns.empty()) ns = req.get_param_value("namespace");
-        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
+        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required"), rc.request_id); return; }
         // MEM05 L1: a non-admin may only soft-delete memories under its own user_id;
         // a spoofed user_id would let A invalidate B's memory → 404-mask.
         std::string user_id = req.get_param_value("user_id");
         if (!EnforceOwnUserId(rc, user_id, memory::Mem05Metrics::Action::kDelete)) {
-            WriteJsonError(res, Status::NotFound("Memory not found: " + mem_id)); return;
+            WriteJsonError(res, Status::NotFound("Memory not found: " + mem_id), rc.request_id); return;
         }
         resource::NamespaceFacade facade(pool, ns);
         if (Status acq = facade.Acquire(); !acq.ok()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found")); return;
+            WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found"), rc.request_id); return;
         }
         auto block_store = std::make_shared<memory::MemoryBlockAdapter>(
             facade.store(), &embedder, &facade.vec_index());
         memory::transparency::MemoryTransparency transparency(block_store, block_store, op_logger);
         auto r = transparency.Delete(mem_id, user_id);
-        if (!r.ok()) { WriteJsonError(res, r); return; }
+        if (!r.ok()) { WriteJsonError(res, r, rc.request_id); return; }
         json resp; resp["block_id"] = mem_id; resp["status"] = "invalidated";
-        WriteJsonResponse(res, 200, resp);
+        WriteJsonResponse(res, 200, resp, rc.request_id);
     }));
 }
 
@@ -545,46 +559,46 @@ static void RegisterMemoryOptOutRoutes(httplib::Server& svr, ApiKeyAuth& auth,
     };
 
     svr.Post(R"(/api/v1/memory/session/([A-Za-z0-9_\-]+)/opt-out/revoke)", WithAuth(auth, kPermAdmin,
-        [&pool](const httplib::Request& req, httplib::Response& res, const RequestContext&) {
+        [&pool](const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         std::string session_id = req.matches[1].str();
         json body = json::object();
         try { if (!req.body.empty()) body = json::parse(req.body); } catch (...) {}
         std::string ns = body.value("ns", body.value("namespace", ""));
         std::string reason = body.value("reason", "");
-        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
-        if (reason.empty()) { WriteJsonError(res, Status::InvalidArgument("reason is required")); return; }
+        if (ns.empty()) { WriteJsonError(res, Status::InvalidArgument("ns is required"), rc.request_id); return; }
+        if (reason.empty()) { WriteJsonError(res, Status::InvalidArgument("reason is required"), rc.request_id); return; }
         resource::NamespaceFacade facade(pool, ns);
         if (Status acq = facade.Acquire(); !acq.ok()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found")); return;
+            WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found"), rc.request_id); return;
         }
         memory::immunity::MemoryStoreOptOutAdapter opt_store(facade.memory());
         memory::immunity::OptOutManager opt_out(
             std::shared_ptr<memory::immunity::ISessionOptOutStore>(&opt_store, [](auto*) {}),
             nullptr, /*enabled=*/true);
         auto r = opt_out.OptOutRevoke(session_id, reason);
-        if (!r.ok()) { WriteJsonError(res, r.status()); return; }
+        if (!r.ok()) { WriteJsonError(res, r.status(), rc.request_id); return; }
         json resp; resp["session_id"] = r.value().session_id; resp["revoked_at"] = r.value().revoked_at;
-        WriteJsonResponse(res, 200, resp);
+        WriteJsonResponse(res, 200, resp, rc.request_id);
     }));
 
     svr.Post(R"(/api/v1/memory/session/([A-Za-z0-9_\-]+)/opt-out)", WithAuth(auth, kPermWrite,
         [&pool, resolve_ns](const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         std::string session_id = req.matches[1].str();
         std::string ns;
-        if (!resolve_ns(req, ns)) { WriteJsonError(res, Status::InvalidArgument("ns is required")); return; }
+        if (!resolve_ns(req, ns)) { WriteJsonError(res, Status::InvalidArgument("ns is required"), rc.request_id); return; }
         json body = json::object();
         try { if (!req.body.empty()) body = json::parse(req.body); } catch (...) {}
         std::string reason = body.value("reason", "");
         resource::NamespaceFacade facade(pool, ns);
         if (Status acq = facade.Acquire(); !acq.ok()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found")); return;
+            WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found"), rc.request_id); return;
         }
         // MEM05 L2: a non-admin may only opt out a session it owns; opting out
         // another user's session is 404-masked (anti-enumeration). (The revoke
         // sibling is kPermAdmin, so it is already restricted to admins.)
         if (!EnforceSessionOwner(rc, facade.memory(), session_id,
                                  memory::Mem05Metrics::Action::kSession)) {
-            WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+            WriteJsonError(res, Status::NotFound("Session not found: " + session_id), rc.request_id);
             return;
         }
         memory::immunity::MemoryStoreOptOutAdapter opt_store(facade.memory());
@@ -593,14 +607,14 @@ static void RegisterMemoryOptOutRoutes(httplib::Server& svr, ApiKeyAuth& auth,
             nullptr, /*enabled=*/true);
         auto r = opt_out.OptOut(session_id, memory::immunity::OptOutActor::kUserManual, reason);
         if (!r.ok()) {
-            WriteJsonError(res, r.status());  // ALREADY_OPTED_OUT → 409 / NOT_FOUND → 404 via Status
+            WriteJsonError(res, r.status(), rc.request_id);  // ALREADY_OPTED_OUT → 409 / NOT_FOUND → 404 via Status
             return;
         }
         json resp;
         resp["session_id"] = r.value().session_id;
         resp["opt_out_at"] = r.value().opt_out_at;
         resp["opted_out_by"] = r.value().opted_out_by;
-        WriteJsonResponse(res, 200, resp);
+        WriteJsonResponse(res, 200, resp, rc.request_id);
     }));
 }
 
@@ -622,13 +636,13 @@ void RegisterMemoryRoutes(
         try {
             body = json::parse(req.body);
         } catch (...) {
-            WriteJsonError(res, Status::InvalidArgument("Invalid JSON body"));
+            WriteJsonError(res, Status::InvalidArgument("Invalid JSON body"), rc.request_id);
             return;
         }
 
         std::string ns_name = body.value("namespace", "");
         if (ns_name.empty()) {
-            WriteJsonError(res, Status::InvalidArgument("namespace is required"));
+            WriteJsonError(res, Status::InvalidArgument("namespace is required"), rc.request_id);
             return;
         }
 
@@ -637,7 +651,7 @@ void RegisterMemoryRoutes(
         resource::NamespaceFacade facade(pool, ns_name);
         Status acq = facade.Acquire();
         if (!acq.ok()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()));
+            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()), rc.request_id);
             return;
         }
         MemoryStore* mem_store = &facade.memory();
@@ -648,7 +662,7 @@ void RegisterMemoryRoutes(
         if (session_count >= config.max_sessions_per_namespace) {
             WriteJsonError(res, Status::InvalidArgument(
                 "Max sessions per namespace limit reached (" +
-                std::to_string(config.max_sessions_per_namespace) + ")"));
+                std::to_string(config.max_sessions_per_namespace) + ")"), rc.request_id);
             return;
         }
 
@@ -675,7 +689,7 @@ void RegisterMemoryRoutes(
             MemorySession existing;
             if (mem_store->SessionGet(session.session_id, existing).ok()) {
                 WriteAgentError(res, 409, "CX_ERR_MEMORY_SESSION_EXISTS",
-                                "session_id already exists", false, "permanent",
+                                "session_id already exists", false, agent_friendly::ErrorCategory::kPermanent, rc.request_id,
                                 json{{"session_id", session.session_id}});
                 return;
             }
@@ -688,11 +702,11 @@ void RegisterMemoryRoutes(
             if (s.message().find("UNIQUE") != std::string::npos ||
                 s.message().find("already exists") != std::string::npos) {
                 WriteAgentError(res, 409, "CX_ERR_MEMORY_SESSION_EXISTS",
-                                "session_id already exists", false, "permanent",
+                                "session_id already exists", false, agent_friendly::ErrorCategory::kPermanent, rc.request_id,
                                 json{{"session_id", session.session_id}});
                 return;
             }
-            WriteJsonError(res, s);
+            WriteJsonError(res, s, rc.request_id);
             return;
         }
 
@@ -702,7 +716,7 @@ void RegisterMemoryRoutes(
         resp["user_id"] = session.user_id;
         resp["title"] = session.title;
         resp["created_at"] = session.created_at;
-        WriteJsonResponse(res, 201, resp);
+        WriteJsonResponse(res, 201, resp, rc.request_id);
     }));
 
     // GET /api/v1/memory/sessions — List sessions
@@ -710,14 +724,14 @@ void RegisterMemoryRoutes(
         [&](const httplib::Request& req, httplib::Response& res, const RequestContext& rc) {
         std::string ns_name = req.get_param_value("namespace");
         if (ns_name.empty()) {
-            WriteJsonError(res, Status::InvalidArgument("namespace query param is required"));
+            WriteJsonError(res, Status::InvalidArgument("namespace query param is required"), rc.request_id);
             return;
         }
 
         resource::NamespaceFacade facade(pool, ns_name);
         Status acq = facade.Acquire();
         if (!acq.ok()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()));
+            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()), rc.request_id);
             return;
         }
 
@@ -728,7 +742,7 @@ void RegisterMemoryRoutes(
                 limit = std::min(std::stoi(req.get_param_value("limit")), 100);
                 if (limit < 1) limit = 20;
             } catch (const std::exception&) {
-                WriteJsonError(res, Status::InvalidArgument("invalid 'limit' query parameter: must be an integer"));
+                WriteJsonError(res, Status::InvalidArgument("invalid 'limit' query parameter: must be an integer"), rc.request_id);
                 return;
             }
         }
@@ -737,7 +751,7 @@ void RegisterMemoryRoutes(
                 offset = std::stoi(req.get_param_value("offset"));
                 if (offset < 0) offset = 0;
             } catch (const std::exception&) {
-                WriteJsonError(res, Status::InvalidArgument("invalid 'offset' query parameter: must be an integer"));
+                WriteJsonError(res, Status::InvalidArgument("invalid 'offset' query parameter: must be an integer"), rc.request_id);
                 return;
             }
         }
@@ -764,7 +778,7 @@ void RegisterMemoryRoutes(
         std::vector<MemorySession> sessions;
         auto s = mem_store->SessionList(ns_name, limit, offset, sessions, req_user_id);
         if (!s.ok()) {
-            WriteJsonError(res, s);
+            WriteJsonError(res, s, rc.request_id);
             return;
         }
 
@@ -790,7 +804,7 @@ void RegisterMemoryRoutes(
         resp["has_more"] = (offset + static_cast<int>(sessions.size())) < static_cast<int>(total_count);
         resp["limit"] = limit;
         resp["offset"] = offset;
-        WriteJsonResponse(res, 200, resp);
+        WriteJsonResponse(res, 200, resp, rc.request_id);
     }));
 
     // GET /api/v1/memory/sessions/:session_id — Get session detail
@@ -801,14 +815,14 @@ void RegisterMemoryRoutes(
 
         std::string ns_name = req.get_param_value("namespace");
         if (ns_name.empty()) {
-            WriteJsonError(res, Status::InvalidArgument("namespace query param is required"));
+            WriteJsonError(res, Status::InvalidArgument("namespace query param is required"), rc.request_id);
             return;
         }
 
         resource::NamespaceFacade facade(pool, ns_name);
         Status acq = facade.Acquire();
         if (!acq.ok()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()));
+            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()), rc.request_id);
             return;
         }
         MemoryStore* mem_store = &facade.memory();
@@ -816,7 +830,7 @@ void RegisterMemoryRoutes(
         MemorySession session;
         auto s = mem_store->SessionGet(session_id, session);
         if (!s.ok()) {
-            WriteJsonError(res, s);
+            WriteJsonError(res, s, rc.request_id);
             return;
         }
 
@@ -831,7 +845,7 @@ void RegisterMemoryRoutes(
         // (CE single-user compat) — the legacy param check below covers that case.
         if (!EnforceSessionOwner(rc, *mem_store, session_id,
                                  memory::Mem05Metrics::Action::kSessionAccess)) {
-            WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+            WriteJsonError(res, Status::NotFound("Session not found: " + session_id), rc.request_id);
             return;
         }
         // CE no-auth / admin: the authenticated principal is absent or unrestricted,
@@ -843,7 +857,7 @@ void RegisterMemoryRoutes(
             const bool owned = (session.user_id == req_user_id);
             RecordIsolationDecision(memory::Mem05Metrics::Action::kSessionAccess, owned);
             if (!owned) {
-                WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+                WriteJsonError(res, Status::NotFound("Session not found: " + session_id), rc.request_id);
                 return;
             }
         }
@@ -880,7 +894,7 @@ void RegisterMemoryRoutes(
             resp["interactions"].push_back(j);
         }
 
-        WriteJsonResponse(res, 200, resp);
+        WriteJsonResponse(res, 200, resp, rc.request_id);
     }));
 
     // DELETE /api/v1/memory/sessions/:session_id — Delete session
@@ -890,14 +904,14 @@ void RegisterMemoryRoutes(
         std::string session_id = req.matches[1].str();
         std::string ns_name = req.get_param_value("namespace");
         if (ns_name.empty()) {
-            WriteJsonError(res, Status::InvalidArgument("namespace query param is required"));
+            WriteJsonError(res, Status::InvalidArgument("namespace query param is required"), rc.request_id);
             return;
         }
 
         resource::NamespaceFacade facade(pool, ns_name);
         Status acq = facade.Acquire();
         if (!acq.ok()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()));
+            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()), rc.request_id);
             return;
         }
         MemoryStore* mem_store = &facade.memory();
@@ -909,13 +923,13 @@ void RegisterMemoryRoutes(
         // back to the param self-identification below.
         if (!EnforceSessionOwner(rc, *mem_store, session_id,
                                  memory::Mem05Metrics::Action::kDelete)) {
-            WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+            WriteJsonError(res, Status::NotFound("Session not found: " + session_id), rc.request_id);
             return;
         }
         MemorySession session;
         auto get_s = mem_store->SessionGet(session_id, session);
         if (!get_s.ok()) {  // unknown session → not-found (no cross-user signal).
-            WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+            WriteJsonError(res, Status::NotFound("Session not found: " + session_id), rc.request_id);
             return;
         }
         // CE no-auth / admin self-identify via the query param (EnforceSessionOwner
@@ -925,7 +939,7 @@ void RegisterMemoryRoutes(
             const bool owned = (session.user_id == req_user_id);
             RecordIsolationDecision(memory::Mem05Metrics::Action::kDelete, owned);
             if (!owned) {
-                WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+                WriteJsonError(res, Status::NotFound("Session not found: " + session_id), rc.request_id);
                 return;
             }
         }
@@ -935,7 +949,7 @@ void RegisterMemoryRoutes(
 
         auto s = mem_store->SessionDelete(session_id);
         if (!s.ok()) {
-            WriteJsonError(res, s);
+            WriteJsonError(res, s, rc.request_id);
             return;
         }
 
@@ -943,7 +957,7 @@ void RegisterMemoryRoutes(
         resp["deleted"] = true;
         resp["session_id"] = session_id;
         resp["interactions_deleted"] = count;
-        WriteJsonResponse(res, 200, resp);
+        WriteJsonResponse(res, 200, resp, rc.request_id);
     }));
 
     // POST /api/v1/memory/sessions/:session_id/interactions — Write interaction
@@ -959,27 +973,27 @@ void RegisterMemoryRoutes(
         try {
             body = json::parse(req.body);
         } catch (...) {
-            WriteJsonError(res, Status::InvalidArgument("Invalid JSON body"));
+            WriteJsonError(res, Status::InvalidArgument("Invalid JSON body"), rc.request_id);
             return;
         }
 
         std::string ns_name = body.value("namespace", "");
         if (ns_name.empty()) {
-            WriteJsonError(res, Status::InvalidArgument("namespace is required"));
+            WriteJsonError(res, Status::InvalidArgument("namespace is required"), rc.request_id);
             return;
         }
 
         std::string query_text = body.value("query_text", "");
         std::string response_text = body.value("response_text", "");
         if (query_text.empty() || response_text.empty()) {
-            WriteJsonError(res, Status::InvalidArgument("query_text and response_text are required"));
+            WriteJsonError(res, Status::InvalidArgument("query_text and response_text are required"), rc.request_id);
             return;
         }
 
         resource::NamespaceFacade facade(pool, ns_name);
         Status acq = facade.Acquire();
         if (!acq.ok()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()));
+            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()), rc.request_id);
             return;
         }
         MemoryStore* mem_store = &facade.memory();
@@ -988,7 +1002,7 @@ void RegisterMemoryRoutes(
         // writing into another user's session is 404-masked (anti-enumeration).
         if (!EnforceSessionOwner(rc, *mem_store, session_id,
                                  memory::Mem05Metrics::Action::kSession)) {
-            WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+            WriteJsonError(res, Status::NotFound("Session not found: " + session_id), rc.request_id);
             return;
         }
 
@@ -998,7 +1012,7 @@ void RegisterMemoryRoutes(
         if (interaction_count >= config.max_interactions_per_session) {
             WriteJsonError(res, Status::InvalidArgument(
                 "Max interactions per session limit reached (" +
-                std::to_string(config.max_interactions_per_session) + ")"));
+                std::to_string(config.max_interactions_per_session) + ")"), rc.request_id);
             return;
         }
 
@@ -1023,7 +1037,7 @@ void RegisterMemoryRoutes(
                 nlohmann::json error_body;
                 error_body["error"] =
                     agent_friendly::ToJson(MakeMetadataTooDeepError(meta_depth));
-                WriteJsonResponse(res, 422, error_body);
+                WriteJsonResponse(res, 422, error_body, rc.request_id);
                 return;
             }
             write_req.metadata_json = body["metadata"].dump();
@@ -1031,7 +1045,7 @@ void RegisterMemoryRoutes(
 
         auto s = writer.Write(write_req);
         if (!s.ok()) {
-            WriteJsonError(res, s);
+            WriteJsonError(res, s, rc.request_id);
             return;
         }
 
@@ -1066,7 +1080,7 @@ void RegisterMemoryRoutes(
         resp["turn"] = static_cast<int>(count / 2);
         resp["spc_enqueued"] = true;
         resp["memory_extraction_enqueued"] = mem02_enqueued;
-        WriteJsonResponse(res, 201, resp);
+        WriteJsonResponse(res, 201, resp, rc.request_id);
     }));
 
     // POST /api/v1/memory/search — Memory semantic search
@@ -1078,26 +1092,26 @@ void RegisterMemoryRoutes(
         try {
             body = json::parse(req.body);
         } catch (...) {
-            WriteJsonError(res, Status::InvalidArgument("Invalid JSON body"));
+            WriteJsonError(res, Status::InvalidArgument("Invalid JSON body"), rc.request_id);
             return;
         }
 
         std::string ns_name = body.value("namespace", "");
         if (ns_name.empty()) {
-            WriteJsonError(res, Status::InvalidArgument("namespace is required"));
+            WriteJsonError(res, Status::InvalidArgument("namespace is required"), rc.request_id);
             return;
         }
 
         std::string query = body.value("query", "");
         if (query.empty()) {
-            WriteJsonError(res, Status::InvalidArgument("query is required"));
+            WriteJsonError(res, Status::InvalidArgument("query is required"), rc.request_id);
             return;
         }
 
         resource::NamespaceFacade facade(pool, ns_name);
         Status acq = facade.Acquire();
         if (!acq.ok()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()));
+            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()), rc.request_id);
             return;
         }
 
@@ -1122,7 +1136,7 @@ void RegisterMemoryRoutes(
         if (!EnforceOwnUserId(rc, user_id, memory::Mem05Metrics::Action::kSearch)) {
             json resp; resp["results"] = json::array();
             resp["total_results"] = 0; resp["latency_ms"] = 0; resp["degraded"] = false;
-            WriteJsonResponse(res, 200, resp);
+            WriteJsonResponse(res, 200, resp, rc.request_id);
             return;
         }
         if (!user_id_was_supplied && user_id == "default") {
@@ -1144,13 +1158,13 @@ void RegisterMemoryRoutes(
             search_req.scope = MemoryScope::kUser;
         } else {
             WriteJsonError(res, Status::InvalidArgument(
-                "scope must be one of {session, user}, got '" + scope_str + "'"));
+                "scope must be one of {session, user}, got '" + scope_str + "'"), rc.request_id);
             return;
         }
 
         auto valid = search_req.Validate();
         if (!valid.ok()) {
-            WriteJsonError(res, valid);
+            WriteJsonError(res, valid, rc.request_id);
             return;
         }
 
@@ -1208,7 +1222,7 @@ void RegisterMemoryRoutes(
         resp["total_results"] = search_resp.total_results;
         resp["latency_ms"] = search_resp.latency_ms;
         resp["degraded"] = search_resp.degraded;
-        WriteJsonResponse(res, 200, resp);
+        WriteJsonResponse(res, 200, resp, rc.request_id);
     }));
 
     // POST /api/v1/memory/inject — Context injection
@@ -1221,26 +1235,26 @@ void RegisterMemoryRoutes(
         try {
             body = json::parse(req.body);
         } catch (...) {
-            WriteJsonError(res, Status::InvalidArgument("Invalid JSON body"));
+            WriteJsonError(res, Status::InvalidArgument("Invalid JSON body"), rc.request_id);
             return;
         }
 
         std::string ns_name = body.value("namespace", "");
         if (ns_name.empty()) {
-            WriteJsonError(res, Status::InvalidArgument("namespace is required"));
+            WriteJsonError(res, Status::InvalidArgument("namespace is required"), rc.request_id);
             return;
         }
 
         std::string session_id = body.value("session_id", "");
         if (session_id.empty()) {
-            WriteJsonError(res, Status::InvalidArgument("session_id is required"));
+            WriteJsonError(res, Status::InvalidArgument("session_id is required"), rc.request_id);
             return;
         }
 
         resource::NamespaceFacade facade(pool, ns_name);
         Status acq = facade.Acquire();
         if (!acq.ok()) {
-            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()));
+            WriteJsonError(res, Status::NotFound("Namespace '" + ns_name + "' not found: " + acq.message()), rc.request_id);
             return;
         }
         MemoryStore* mem_store = &facade.memory();
@@ -1250,7 +1264,7 @@ void RegisterMemoryRoutes(
         // (anti-enumeration), consistent with GET /sessions/{id}.
         if (!EnforceSessionOwner(rc, *mem_store, session_id,
                                  memory::Mem05Metrics::Action::kSessionAccess)) {
-            WriteJsonError(res, Status::NotFound("Session not found: " + session_id));
+            WriteJsonError(res, Status::NotFound("Session not found: " + session_id), rc.request_id);
             return;
         }
 
@@ -1262,7 +1276,7 @@ void RegisterMemoryRoutes(
         resp["context_text"] = ctx.context_text;
         resp["turn_count"] = ctx.turn_count;
         resp["token_count_approx"] = ctx.token_count_approx;
-        WriteJsonResponse(res, 200, resp);
+        WriteJsonResponse(res, 200, resp, rc.request_id);
     }));
 
     RegisterMemoryExtractRoutes(svr, auth, pool, embedder, config, services.extraction);

@@ -1161,11 +1161,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
                                      elapsed_ms(), /*is_success=*/false, "",
                                      QueryTextSummary(qctx), e.GetError().code,
                                      e.GetError().message);
-                    json eb;
-                    eb["error"] = agent_friendly::ToJson(e.GetError());
-                    res.status = http;
-                    res.set_header("X-Request-Id", ctx.request_id);
-                    res.set_content(eb.dump(), "application/json");
+                    WriteAgentFriendlyError(res, http, e.GetError(), ctx.request_id);
                     return;
                 }
             }
@@ -1174,6 +1170,7 @@ void CrossNsQueryWiring::Register(httplib::Server& svr, ApiKeyAuth& auth) {
             HandlerResult hr = handler->Handle(body, auth_ctx, &qctx);
             res.status = hr.status;
             res.set_header("X-Request-Id", ctx.request_id);
+            if (hr.status >= 400) AddErrorRequestFields(res, hr.body, ctx.request_id);
             res.set_content(hr.body.dump(), "application/json");
         }
     ));
