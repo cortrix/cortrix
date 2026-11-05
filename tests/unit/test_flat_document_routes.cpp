@@ -260,6 +260,7 @@ TEST_F(FlatDocumentRoutesTest, MissingNamespaceErrorCarriesRequestId) {
     ASSERT_EQ(res->status, 400);
     const std::string header = res->get_header_value("X-Request-Id");
     ASSERT_FALSE(header.empty());
+    EXPECT_EQ(res->get_header_value_count("X-Request-Id"), 1u);
     auto j = json::parse(res->body);
     EXPECT_EQ(j["error"]["request_id"], header);
     EXPECT_TRUE(j["error"].contains("timestamp"));

@@ -323,7 +323,9 @@ void AddErrorRequestFields(httplib::Response& res, nlohmann::json& body,
     if (!body.is_object() || !body.contains("error") || !body["error"].is_object()) return;
     if (!request_id.empty()) {
         body["error"]["request_id"] = request_id;
-        res.set_header("X-Request-Id", request_id);
+        // set_header appends, so a caller that already set the header (the query
+        // route does, for every response) must not get a second X-Request-Id line.
+        if (!res.has_header("X-Request-Id")) res.set_header("X-Request-Id", request_id);
     }
     // Per API_GATEWAY_DESIGN.md section 2.5.1: include ISO 8601 timestamp
     auto now = std::chrono::system_clock::now();

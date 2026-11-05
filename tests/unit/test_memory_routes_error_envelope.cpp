@@ -129,6 +129,7 @@ protected:
         ASSERT_TRUE(res);
         const std::string header = res->get_header_value("X-Request-Id");
         EXPECT_EQ(header.size(), 32u) << "X-Request-Id header missing";
+        EXPECT_EQ(res->get_header_value_count("X-Request-Id"), 1u);
         const json j = json::parse(res->body);
         ASSERT_TRUE(j.contains("error"));
         EXPECT_EQ(j["error"].value("request_id", ""), header);

@@ -125,8 +125,8 @@ void WriteAgentFriendlyError(httplib::Response& res, int http_status,
                              const std::string& request_id);
 /// Add the request-scoped fields of an error response to an already built
 /// `{"error": {...}}` body: `error.request_id` plus the X-Request-Id header when
-/// `request_id` is non-empty, and `error.timestamp`. No-op on a body without an
-/// "error" object.
+/// `request_id` is non-empty (unless the response already has that header), and
+/// `error.timestamp`. No-op on a body without an "error" object.
 void AddErrorRequestFields(httplib::Response& res, nlohmann::json& body,
                            const std::string& request_id);
 void WriteJsonResponse(httplib::Response& res, int http_status, const nlohmann::json& body,

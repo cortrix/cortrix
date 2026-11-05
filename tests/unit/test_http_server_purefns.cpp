@@ -303,6 +303,15 @@ TEST(HttpServerPureFnAgentError, NoRequestIdMeansNoHeaderNoBodyField) {
     EXPECT_TRUE(e.contains("timestamp"));
 }
 
+TEST(HttpServerPureFnAgentError, AddErrorRequestFieldsKeepsAnExistingHeaderSingle) {
+    httplib::Response res;
+    res.set_header("X-Request-Id", "0123456789abcdef0123456789abcdef");
+    json body = {{"error", {{"code", "CX_ERR_EXAMPLE"}}}};
+    AddErrorRequestFields(res, body, "0123456789abcdef0123456789abcdef");
+    EXPECT_EQ(res.get_header_value_count("X-Request-Id"), 1u);
+    EXPECT_EQ(body["error"]["request_id"], "0123456789abcdef0123456789abcdef");
+}
+
 TEST(HttpServerPureFnAgentError, AddErrorRequestFieldsLeavesNonErrorBodyAlone) {
     httplib::Response res;
     json body = {{"results", json::array()}};

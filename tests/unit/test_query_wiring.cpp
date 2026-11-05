@@ -514,6 +514,7 @@ TEST_F(QueryWiringHttpCoverage, ErrorBodiesCarryRequestIdAndTimestamp) {
         ASSERT_GE(res->status, 400) << body.dump() << " -> " << res->body;
         const std::string header = res->get_header_value("X-Request-Id");
         ASSERT_FALSE(header.empty());
+        EXPECT_EQ(res->get_header_value_count("X-Request-Id"), 1u) << body.dump();
         const json j = json::parse(res->body);
         ASSERT_TRUE(j.contains("error")) << res->body;
         EXPECT_EQ(j["error"].value("request_id", ""), header) << res->body;
