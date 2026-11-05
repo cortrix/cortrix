@@ -56,6 +56,12 @@ params:
   github_subdir: docs-site
   ui:
     dark_mode: true
+    # Slate keeps the accent colors below on links and icons in both modes;
+    # the theme's default Paper preset recolors them in dark mode.
+    preset: slate
+    # Offers a side-by-side reader once a page has a translation. Pages without
+    # one show no entry.
+    compare: true
     # Magma Orange (#FF6405) fails AA contrast on the light canvas, so the
     # light accent is a darker shade of it; the dark accent is the brand color.
     theme_color: '#C2410C'
@@ -75,7 +81,7 @@ module:
     - path: github.com/pgsty/oink
   hugoVersion:
     extended: true
-    min: 0.160.1
+    min: 0.168.0
   # Declaring any mount replaces Hugo's defaults, so the standard ones are
   # restated. The last three publish the OpenAPI contract for the API reference.
   mounts:
