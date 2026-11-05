@@ -112,6 +112,7 @@ int SPCManager::ProcessParsedDoc(spc::ParsedDoc& parsed, SPCTask& task) {
         doc.source_path = task.source_path;
         doc.content_hash = task.content_hash;
         doc.mime_type = task.mime_type;
+        doc.file_size = task.file_size;
         doc.processing_level = task.processing_level;
         doc.status = DocStatus::kProcessing;
         // Persist caller-supplied document metadata onto the row, mirroring

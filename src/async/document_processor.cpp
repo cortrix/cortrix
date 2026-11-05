@@ -2,6 +2,10 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
+#include <filesystem>
+#include <string>
+#include <system_error>
 
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
@@ -10,23 +14,18 @@
 #include "cortrix/spc/parser.h"
 #include "cortrix/spc/parser_errors.h"
 #include "cortrix/spc/spc_manager.h"
+#include "cortrix/spc/spc_router.h"
 #include "cortrix/spc/spc_task.h"
 
 namespace cortrix::async {
 
 namespace {
-// [Plan B · F42 §4.1.2 ①] Async TaskInfo lacks mime_type; derive just enough from the
-// filename for SPCRouter::InferBlockType (which only distinguishes image scans from files).
-std::string InferMimeFromFilename(const std::string& fn) {
-    auto ends = [&](const char* s) {
-        const size_t n = std::char_traits<char>::length(s);
-        return fn.size() >= n && fn.compare(fn.size() - n, n, s) == 0;
-    };
-    if (ends(".png")) return "image/png";
-    if (ends(".jpg") || ends(".jpeg")) return "image/jpeg";
-    if (ends(".tiff") || ends(".tif")) return "image/tiff";
-    if (ends(".bmp")) return "image/bmp";
-    return "application/pdf";  // non-image → kBlockFile
+// Size in bytes of the file the task parsed; 0 when there is none or it can't be read.
+int64_t FileSizeOrZero(const std::string& path) {
+    if (path.empty()) return 0;
+    std::error_code ec;
+    const auto size = std::filesystem::file_size(path, ec);
+    return ec ? 0 : static_cast<int64_t>(size);
 }
 }  // namespace
 
@@ -141,7 +140,14 @@ Status DocumentProcessor::ProcessTask(const TaskInfo& task) {
         spc_task.content_hash = task.content_hash;
         spc_task.processing_level = 3;  // L3 full processing for async large docs
         spc_task.source_type = "file";
-        spc_task.mime_type = InferMimeFromFilename(task.filename);
+        // The row's type and size, as an uploaded file's row records them: the type
+        // from the file name (SPCRouter::InferMimeType, the upload path's fallback) and
+        // the size of the parsed file. Async TaskInfo carries no MIME type.
+        // SPCRouter::InferBlockType tells image scans from files only, and
+        // InferMimeType gives image names the same image types.
+        spc_task.mime_type =
+            SPCRouter::InferMimeType(task.filename.empty() ? task.filepath : task.filename);
+        spc_task.file_size = FileSizeOrZero(task.filepath);
         // Carry caller-supplied document metadata (e.g. an external corpus id) so it
         // round-trips to query results (post_filter reads documents.metadata_json).
         spc_task.metadata_json = task.metadata_json;

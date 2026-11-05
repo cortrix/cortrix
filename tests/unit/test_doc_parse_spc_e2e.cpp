@@ -195,7 +195,7 @@ protected:
     async::TaskInfo SeedProcessingTask(const std::string& doc_id) {
         async::TaskInfo t;
         t.namespace_id = "test-ns";
-        t.filename = "big.pdf";   // → InferMimeFromFilename → application/pdf → kBlockFile
+        t.filename = "big.pdf";   // → SPCRouter::InferMimeType → application/pdf → kBlockFile
         t.filepath = filepath_;
         t.doc_id = doc_id;        // SPC writes under this doc_id (must match the seeded doc)
         t.content_hash = "h-b3";
