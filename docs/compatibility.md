@@ -9,6 +9,7 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 | Status | Meaning |
 |---|---|
 | `Preview` | Available and documented. Cortrix is in pre-release, so verify it against your own runtime before production use. |
+| `Off by default` | Implemented, but not active in the shipped configuration (`auth.enabled: false`). Turn on authentication to use it, and read what happens while it is off. |
 | `In development` | Present in part or being built; not supported yet. Do not rely on it. |
 
 ## Current Status Matrix
@@ -28,9 +29,11 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 | pgcortrix | `In development` | The SQL contract and helper exist with standalone tests; loading into a live PostgreSQL and `pg_regress` integration have not been run on this line. |
 | Built-in Agent fixed-flow chat | `Preview` | Chat mode is documented; deployment and LLM provider behavior should be verified in your runtime. |
 | Auth login | `In development` | Not supported yet. |
-| Tenant/member/ACL/quota | `In development` | Not supported yet. |
-| RBAC | `In development` | Not supported yet. |
-| Tenant isolation | `In development` | Not supported yet. |
+| Tenants, members, and namespace ACLs | `Off by default` | The tenant and member endpoints are always served. Namespace ACLs are checked only with `auth.enabled: true`; with auth off, every request acts as an admin of `default_tenant`, including on these endpoints. See [Auth and security boundaries](#auth-and-security-boundaries). |
+| Tenant isolation | `Off by default` | Enforced only with `auth.enabled: true`. With auth off, every request runs in `default_tenant` and can read every namespace. |
+| API key permissions (READ, WRITE, ADMIN) | `Off by default` | Checked on every request with `auth.enabled: true`. With auth off, every request has all three. |
+| Roles (RBAC) | `In development` | Roles are not implemented; access is decided by a key's permission bits. |
+| Quotas | `In development` | Quota values can be read and updated through the tenant endpoints, but requests are not checked against them. |
 | Memory extraction | `In development` | Not supported yet. |
 | OCR / parser paths | `Preview` | Parser and OCR behavior depends on optional configuration and should be verified per deployment. |
 | Linux NVIDIA CUDA execution provider | `Preview` | A separate Linux x86_64 image and runbook exist; run a platform capability smoke test in your target deployment. |
@@ -41,7 +44,7 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 
 The OpenAPI spec defines both API key and Bearer auth schemes. In local development, auth may be disabled. Do not use an auth-disabled local runtime to claim RBAC, tenant isolation, ACL, or quota enforcement.
 
-Auth login, tenant/member/ACL/quota, RBAC, tenant isolation, and log redaction defaults are `In development`. API key configuration exists in the docs and config templates. Until those capabilities are available, deploy Cortrix only on a network you control.
+Tenant isolation, namespace ACLs, and API key permissions are `Off by default`: the server enforces them only with `auth.enabled: true`. With auth off, every request is treated as an admin of `default_tenant`. It can read and write every namespace, call the tenant, member, and maintenance endpoints, and restore or purge deleted documents. The server accepts auth off only on a loopback `server.host` or an explicit container-internal bind published only to loopback, so anyone who can reach that port has full access. Auth login, roles, quotas, and log redaction defaults are `In development`. API key configuration exists in the docs and config templates. Until those are available, deploy Cortrix only on a network you control.
 
 ## API Compatibility Boundaries
 

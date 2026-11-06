@@ -14,6 +14,7 @@ Check here for the status of each Cortrix capability before you make a productio
 | Status | Meaning |
 |---|---|
 | {{< badge text="Preview" tone="success" >}} | Available and documented. Verify it in your own environment before production use |
+| {{< badge text="Off by default" tone="warning" >}} | Implemented, but not active in the shipped configuration, where authentication is off. Turn on authentication to use it, and read what happens while it's off |
 | {{< badge text="In development" tone="info" >}} | Present in part or being built. Not supported yet. Don't rely on it |
 
 ## Current status {#status-matrix}
@@ -36,10 +37,20 @@ Check here for the status of each Cortrix capability before you make a productio
 | The NVIDIA CUDA execution provider on Linux | [NVIDIA CUDA](/docs/deploy/cuda/) |
 | OCR and document parsers | — |
 
+### Off by default {#off-by-default}
+
+These work only after you [turn on authentication](/docs/deploy/configuration/#auth).
+
+| Capability | With authentication off |
+|---|---|
+| Tenants, members, and namespace access control | The tenant and member endpoints are always served. Access control is checked only with authentication on; with it off, every request acts as an admin of the default tenant, including on these endpoints |
+| Tenant isolation | Every request runs in the default tenant and can read every namespace |
+| API key permissions (read, write, admin) | Every request has all three |
+
 ### In development {#in-development}
 
-- Tenants, members, access control, and quotas
-- Tenant isolation
+- Roles (RBAC). Access is decided by an API key's permissions
+- Quotas. Quota values can be read and updated, but requests aren't checked against them
 - Memory extraction, including automatic handling of contradicting memories
 - pgcortrix
 - Database import
@@ -54,7 +65,7 @@ An endpoint that appears in the OpenAPI spec is part of the documented API surfa
 
 ## Authentication and security {#auth-and-security}
 
-Tenant isolation and access control are in development, and API key authentication hasn't been verified for this documentation. Until they're available, deploy Cortrix only on a network you control. See [Security boundaries](/docs/deploy/security/).
+Tenant isolation, access control, and API key permissions are off by default: Cortrix enforces them only with authentication on, and with it off anyone who can reach the server's port acts as an admin. API key authentication itself hasn't been verified for this documentation. Deploy Cortrix only on a network you control. See [Security boundaries](/docs/deploy/security/).
 
 A namespace is a logical query scope. It isn't an authentication or tenant-security boundary.
 
