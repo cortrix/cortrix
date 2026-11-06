@@ -145,8 +145,7 @@ the minimal SDK path.
 
 ## Compatibility Notes
 
-- Tenant, member, and ACL behavior and tenant isolation are `Off by default`:
-  the server enforces them only with authentication on. Roles, quotas, and
+- Tenant, member, and ACL behavior, tenant isolation, roles, quotas, and
   memory extraction are `In development`.
 - `client.auth.register`, `login`, `logout`, `refresh`, and `password_reset`
   need a server that provides account login. The server in this repository
