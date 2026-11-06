@@ -280,7 +280,12 @@ class Documents(SyncResource):
         )
 
     def delete(self, namespace: str, document_id: str) -> None:
-        """Delete a document and its blocks. ``DELETE /documents/{id}?namespace=`` -> 204."""
+        """Soft-delete a document. ``DELETE /documents/{id}?namespace=`` -> 204.
+
+        The document drops out of listings and queries at once and can be restored
+        with ``client.ops.gc.restore`` (ADMIN) until ``gc.soft_delete_retention_days``
+        (default 30) has passed; after that it is removed for good.
+        """
         self._client._request(
             "DELETE", PATH_DOCUMENT.format(id=document_id), params=_document_params(namespace)
         )
@@ -384,6 +389,7 @@ class AsyncDocuments(AsyncResource):
         )
 
     async def delete(self, namespace: str, document_id: str) -> None:
+        """Soft-delete a document. See :meth:`Documents.delete`."""
         await self._client._request(
             "DELETE", PATH_DOCUMENT.format(id=document_id), params=_document_params(namespace)
         )

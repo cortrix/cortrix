@@ -47,7 +47,12 @@ class GcOps:
         )
 
     def restore(self, document_ids: List[str]) -> Any:
-        """Restore soft-deleted documents. ``POST /gc/restore`` -> PartialSuccessById."""
+        """Restore soft-deleted documents. ``POST /gc/restore`` -> PartialSuccessById.
+
+        Needs ADMIN permission. A document deleted longer ago than
+        ``gc.soft_delete_retention_days`` is refused with ``CX_ERR_GC_RESTORE_EXPIRED``;
+        each refusal is reported per id under ``failed``.
+        """
         return self._client._request(
             "POST", PATH_GC_RESTORE, json={"document_ids": document_ids}
         )
