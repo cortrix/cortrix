@@ -81,7 +81,7 @@ final subsection.
 | F34 | Parent-child chunking | Two-level chunking: retrieval matches small child chunks, responses expand to the parent for LLM context. |
 | F35 | Contextual retrieval | LLM-generated context prepended to chunks before embedding; contextualized and plain embeddings coexist and fuse at query time. |
 | F36 | RAG-Fusion | LLM-generated query variants merged with reciprocal-rank fusion. |
-| F37 | CRAG evaluation | A small classifier judges retrieval quality per query; ambiguous results are filtered, failures degrade transparently. |
+| F37 | CRAG evaluation | A heuristic score over retrieval signals (the top-1 result score and the share of high-scoring results) judges retrieval quality per query; ambiguous results are trimmed to the top half, and backend failures degrade transparently. |
 | F38 | HyPE index | Hypothetical questions pre-generated at index time and indexed alongside the chunks they describe. |
 | F39 | Query complexity router | Routes each query — simple, complex, or chat — to a lighter or fuller pipeline. |
 | F40 | BGE-M3 sparse retrieval | Sparse retrieval route: sparse vectors served by a SPLADE-style inverted index and fused with dense and FTS results. On this line the sparse vectors are placeholders, not output of the BGE-M3 forward pass: text is split on whitespace and each token is hashed to a term ID and a weight, so text without spaces, such as Chinese, becomes a single term. Queries skip this route unless the request sets `search_config.enable_sparse: true`. |
