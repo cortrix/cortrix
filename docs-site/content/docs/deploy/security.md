@@ -7,7 +7,7 @@ weight: 50
 Read this before you deploy Cortrix anywhere beyond your own machine. It covers what Cortrix can and can't guarantee about security today.
 
 > [!IMPORTANT]
-> Cortrix is in pre-release. Tenant isolation, access control, and log redaction are in development. API key configuration exists, but its behavior hasn't been verified for this documentation. See [Compatibility and status](/docs/resources/compatibility/). Until they're available, deploy Cortrix only on a network you control.
+> Cortrix is in pre-release. Tenant isolation, access control, and log redaction are in development. API key permissions are off by default: Cortrix checks them only with authentication on. API key configuration exists, but its behavior hasn't been verified for this documentation. See [Compatibility and status](/docs/resources/compatibility/). Until these are available, deploy Cortrix only on a network you control.
 
 ## Default protections {#defaults}
 
@@ -19,6 +19,10 @@ The bundled Compose deployment is configured this way in `v1.0.0-rc.2`:
 - **External LLMs are off by default.** The quickstart sends no documents or queries to any external LLM service.
 
 The configuration template also states that running without authentication is accepted only when the server binds to the loopback address, and that authentication must be on before the server binds to a non-loopback address.
+
+## With authentication off {#auth-off}
+
+The bundled configuration ships with authentication off. In that mode every request is treated as an admin of the default tenant: it can read and write every namespace, call the tenant, member, and maintenance endpoints, and restore or purge deleted documents. The server accepts this only on the loopback address or a container-internal bind published only to loopback, so anyone who can reach that port has full access.
 
 ## What not to do {#do-not}
 
