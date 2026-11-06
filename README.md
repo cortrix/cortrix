@@ -42,6 +42,7 @@ Start here:
 - [Minimal agent examples](examples/minimal-agent/README.md): two short scripts for the retrieval step of an agent, one with the Python SDK and one through the MCP server.
 - [Namespace recovery check](examples/namespace-recovery/README.md): kill the server in the middle of a batch write, restart it, and check that every document ends up whole; then query across two project namespaces.
 - [Compatibility and known status](docs/compatibility.md): current public status for API, MCP, SDK, Agent, auth, tenant/RBAC, memory extraction, benchmarks, and security hardening.
+- [Deleting and restoring documents](docs/delete-and-restore.md): soft delete, the restore window, cleanup, and which keys can restore.
 - [OpenAPI spec](api/openapi.yaml): endpoint paths, schemas, security schemes, and response contracts.
 - [MCP README](cortrix-mcp/README.md): MCP server setup and tool reference.
 - [Python SDK README](sdk/python/README.md): Python client setup and resource model.

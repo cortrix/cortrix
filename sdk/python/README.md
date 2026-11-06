@@ -94,6 +94,11 @@ client.ops.gc.restore(["doc_abc"]) # restore soft-deleted documents
 client.ops.gc.purge()              # permanent (irreversible) -> X-Ops-Confirm: true
 ```
 
+`client.documents.delete` is a soft delete: the document can be restored with
+`client.ops.gc.restore` until `gc.soft_delete_retention_days` (default 30) has
+passed. `run`, `restore` and `purge` need an admin key. See
+[Deleting and restoring documents](../../docs/delete-and-restore.md).
+
 ## Agent-friendly error handling
 
 Every exception derives from `CortrixError` and carries structured fields so
