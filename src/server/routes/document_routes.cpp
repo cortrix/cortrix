@@ -18,6 +18,9 @@ namespace cortrix {
 
 namespace {
 
+// Matches the queue-full retry delay in the error table.
+constexpr int kSpcQueueFullRetryAfterMs = 1000;
+
 std::string DocStatusToString(DocStatus status) {
     switch (status) {
         case DocStatus::kPending:    return "pending";
@@ -150,6 +153,17 @@ void RegisterDocumentRoutes(httplib::Server& server,
                 Status s = handler.HandleUpload(upload_req, facade.store(), facade.blob(), &result);
 
                 if (!s.ok()) {
+                    if (ResolvedErrorCode(s) == "CX_ERR_SPC_QUEUE_FULL") {
+                        agent_friendly::AgentFriendlyError err;
+                        err.code = "CX_ERR_SPC_QUEUE_FULL";
+                        err.message = s.message();
+                        err.retryable = true;
+                        err.category = agent_friendly::ErrorCategory::kTransient;
+                        err.retry_after_ms = kSpcQueueFullRetryAfterMs;
+                        err.structured_data = nlohmann::json::object();
+                        WriteAgentFriendlyError(res, 503, err, rctx.request_id);
+                        return;
+                    }
                     int http_code = MapStatusToHttp(s);
                     // Use standard error envelope per API_GATEWAY_DESIGN.md 2.5.1
                     // WriteJsonError includes timestamp per spec
