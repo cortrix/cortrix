@@ -7,7 +7,7 @@ weight: 50
 Read this before you deploy Cortrix anywhere beyond your own machine. It covers what Cortrix can and can't guarantee about security today.
 
 > [!IMPORTANT]
-> Cortrix is in pre-release. Tenant isolation, access control, and API key permissions are off by default: Cortrix enforces them only with authentication on. Log redaction is in development. API key configuration exists, but its behavior hasn't been verified for this documentation. See [Compatibility and status](/docs/resources/compatibility/). Until these are available, deploy Cortrix only on a network you control.
+> Cortrix is in pre-release. Tenant isolation, access control, and log redaction are in development. API key permissions are off by default: Cortrix checks them only with authentication on. API key configuration exists, but its behavior hasn't been verified for this documentation. See [Compatibility and status](/docs/resources/compatibility/). Until these are available, deploy Cortrix only on a network you control.
 
 ## Default protections {#defaults}
 
