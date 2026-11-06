@@ -431,6 +431,85 @@ TEST_F(DirWatcherRegistryTest, TriggerScan_FanOut) {
               reg.TriggerScan("/no/such/dir").code());
 }
 
+TEST_F(DirWatcherRegistryTest, TriggerScan_NonRecursiveSkipsSubdirectories) {
+    CreateFile("sub/deep.md", "deep");
+    std::map<std::string, int> submits_per_ns;
+    std::vector<std::string> submitted_paths;
+    EXPECT_CALL(spc_, Submit(_))
+        .WillRepeatedly(Invoke([&](std::shared_ptr<SPCTask> t) -> Status {
+            submits_per_ns[t->namespace_name]++;
+            submitted_paths.push_back(t->source_path);
+            return Status::Ok();
+        }));
+    AdmitNs("team_a");
+    DirWatcherRegistry reg(pool(), router(), spc_);
+    ASSERT_TRUE(reg.Subscribe(test_dir_.string(), {"team_a"}, false, false).ok());
+
+    ASSERT_TRUE(reg.TriggerScan(test_dir_.string()).ok());
+    EXPECT_EQ(2, submits_per_ns["team_a"]);
+    EXPECT_THAT(submitted_paths, ::testing::UnorderedElementsAre(
+        canonical_dir_ + "/a.txt", canonical_dir_ + "/b.md"));
+}
+
+TEST_F(DirWatcherRegistryTest, FanOut_NonRecursiveDropsSubdirectoryEvents) {
+    CreateFile("sub/deep.md", "deep");
+    std::vector<std::string> submitted_paths;
+    EXPECT_CALL(spc_, Submit(_))
+        .WillRepeatedly(Invoke([&](std::shared_ptr<SPCTask> t) -> Status {
+            submitted_paths.push_back(t->source_path);
+            return Status::Ok();
+        }));
+    AdmitNs("team_a");
+    DirWatcherRegistry reg(pool(), router(), spc_);
+    ASSERT_TRUE(reg.Subscribe(test_dir_.string(), {"team_a"}, false, false).ok());
+
+    std::vector<FileEvent> events;
+    for (const char* name : {"a.txt", "sub/deep.md"}) {
+        FileEvent ev;
+        ev.path = canonical_dir_ + "/" + name;
+        ev.type = FileEventType::kCreated;
+        ev.is_directory = false;
+        events.push_back(ev);
+    }
+    DirWatcherRegistryPrivateTest::FanOut(reg, canonical_dir_, events);
+    EXPECT_THAT(submitted_paths, ::testing::ElementsAre(canonical_dir_ + "/a.txt"));
+}
+
+TEST_F(DirWatcherRegistryTest, TriggerScan_RecursiveIncludesSubdirectories) {
+    CreateFile("sub/deep.md", "deep");
+    std::map<std::string, int> submits_per_ns;
+    EXPECT_CALL(spc_, Submit(_))
+        .WillRepeatedly(Invoke([&](std::shared_ptr<SPCTask> t) -> Status {
+            submits_per_ns[t->namespace_name]++;
+            return Status::Ok();
+        }));
+    AdmitNs("team_a");
+    DirWatcherRegistry reg(pool(), router(), spc_);
+    ASSERT_TRUE(reg.Subscribe(test_dir_.string(), {"team_a"}, true, false).ok());
+
+    ASSERT_TRUE(reg.TriggerScan(test_dir_.string()).ok());
+    EXPECT_EQ(3, submits_per_ns["team_a"]);
+}
+
+TEST_F(DirWatcherRegistryTest, Subscribe_ExistingWatcherKeepsRecursive) {
+    CreateFile("sub/deep.md", "deep");
+    std::map<std::string, int> submits_per_ns;
+    EXPECT_CALL(spc_, Submit(_))
+        .WillRepeatedly(Invoke([&](std::shared_ptr<SPCTask> t) -> Status {
+            submits_per_ns[t->namespace_name]++;
+            return Status::Ok();
+        }));
+    AdmitNs("team_a");
+    AdmitNs("team_b");
+    DirWatcherRegistry reg(pool(), router(), spc_);
+    ASSERT_TRUE(reg.Subscribe(test_dir_.string(), {"team_a"}, true, false).ok());
+    ASSERT_TRUE(reg.Subscribe(test_dir_.string(), {"team_b"}, false, false).ok());
+
+    ASSERT_TRUE(reg.TriggerScan(test_dir_.string()).ok());
+    EXPECT_EQ(3, submits_per_ns["team_a"]);
+    EXPECT_EQ(3, submits_per_ns["team_b"]);
+}
+
 // ---- Persistence (SaveState / LoadState v2 + v1 migration) ----
 
 TEST_F(DirWatcherRegistryTest, SaveLoad_RoundTrip_V2) {

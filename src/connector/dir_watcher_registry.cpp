@@ -44,11 +44,12 @@ std::string CanonicalDir(const std::string& directory) {
 /// Build a WatchDirConfig for one (directory, namespace) importer. The registry
 /// owns OS watching, so watch_enabled is always false here.
 WatchDirConfig MakeImporterConfig(const std::string& canonical_dir,
-                                  const std::string& ns) {
+                                  const std::string& ns, bool recursive) {
     WatchDirConfig cfg;
     cfg.data_dir = canonical_dir;
     cfg.namespace_name = ns;
     cfg.watch_enabled = false;  // F21: OS watcher owned by the registry
+    cfg.recursive = recursive;
     cfg.ignore_patterns = kIgnorePatterns;
     return cfg;
 }
@@ -134,8 +135,19 @@ void DirWatcherRegistry::FanOutEvents(WatcherSlot& slot,
 
     std::vector<FileEvent> filtered;
     filtered.reserve(events.size());
+    std::filesystem::path watched_root;
+    if (!slot.recursive) {
+        watched_root = std::filesystem::path(slot.canonical_dir).lexically_normal();
+        if (watched_root != watched_root.root_path() && !watched_root.has_filename()) {
+            watched_root = watched_root.parent_path();
+        }
+    }
     for (const auto& ev : events) {
         if (ev.is_directory) continue;
+        if (!slot.recursive &&
+            std::filesystem::path(ev.path).lexically_normal().parent_path() != watched_root) {
+            continue;
+        }
         if (!filter.ShouldImport(ev.path)) continue;
         filtered.push_back(ev);
     }
@@ -262,7 +274,7 @@ Status DirWatcherRegistry::Subscribe(
         }
 
         auto importer = std::make_shared<DirectoryImporter>(
-            MakeImporterConfig(canonical_dir, ns), pool_, spc_mgr_);
+            MakeImporterConfig(canonical_dir, ns, slot->recursive), pool_, spc_mgr_);
         new_importers.push_back(importer.get());
         slot->target_namespaces.push_back(ns);
         slot->importers.push_back(std::move(importer));
