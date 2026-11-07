@@ -9,6 +9,7 @@
 
 #include "cortrix/common/json_contract.h"
 #include "cortrix/common/i_global_config.h"
+#include "cortrix/common/utf8_utils.h"
 #include "cortrix/doc_summary/doc_summary_error.h"
 #include "cortrix/doc_summary/doc_summary_metrics.h"
 #include "cortrix/logging/logging.h"
@@ -73,8 +74,10 @@ json ParseJsonObjectWithLlmStringEscapeRepair(const std::string& value) {
 }
 
 std::string TruncateForDiagnostics(const std::string& value, size_t max_bytes) {
-    if (value.size() <= max_bytes) return value;
-    return value.substr(0, max_bytes) + "...[truncated]";
+    // These previews land in a strict-dumped diagnostics json; LLM/provider raw
+    // output can carry ill-formed bytes and the byte cut could split a sequence.
+    if (value.size() <= max_bytes) return common::SanitizeUtf8(value);
+    return common::SanitizeUtf8(common::Utf8SafeTruncate(value, max_bytes)) + "...[truncated]";
 }
 
 json BuildLlmInvalidOutputDiagnostics(const llm::ChatCompletionResponse& resp,

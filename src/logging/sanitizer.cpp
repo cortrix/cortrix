@@ -7,6 +7,7 @@
 #include <openssl/evp.h>
 #include "yaml-cpp/yaml.h"
 
+#include "cortrix/common/utf8_utils.h"
 #include "cortrix/logging/logging.h"
 
 namespace cortrix::logging {
@@ -73,7 +74,9 @@ std::string MaskPartial(const std::string& value) {
     if (value.size() <= kHead + kTail) {
         return "***";  // too short to reveal anything safely
     }
-    return value.substr(0, kHead) + "***" + value.substr(value.size() - kTail);
+    // Boundary-aligned head/tail so a non-ASCII key never yields a mid-sequence
+    // cut (log sinks may JSON-encode strictly).
+    return common::Utf8SafeHeadTail(value, kHead, "***", kTail);
 }
 
 /// Content truncation: query_text keeps a 50-char preview + full hash; the
@@ -81,8 +84,9 @@ std::string MaskPartial(const std::string& value) {
 std::string TruncateContent(const std::string& field, const std::string& value) {
     if (field == "query_text") {
         constexpr size_t kPreview = 50;
-        std::string preview =
-            value.size() > kPreview ? value.substr(0, kPreview) : value;
+        // CJK query text byte-cut at 50 used to emit a malformed preview; log
+        // sinks JSON-encode strictly, so cut on a character boundary.
+        std::string preview = common::Utf8SafeTruncate(value, kPreview);
         return preview + "...[sha256:" + Sha256Hex(value) + "]";
     }
     // document_content / memory_text / prompt -> hash only.

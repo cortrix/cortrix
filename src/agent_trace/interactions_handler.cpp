@@ -10,6 +10,7 @@
 #include "cortrix/agent_trace/agent_trace_error.h"
 #include "cortrix/agent_trace/agent_trace_metrics.h"
 #include "cortrix/agent_trace/observability_audit_log.h"
+#include "cortrix/common/utf8_utils.h"
 
 namespace cortrix::agent_trace {
 
@@ -65,9 +66,12 @@ bool BlockExists(sqlite3* db, const std::string& block_id, bool* blocks_table_pr
 }  // namespace
 
 std::string InteractionsHandler::TruncateSnippet(const std::string& snippet) {
-    if (snippet.size() <= kSnippetMaxBytes) return snippet;
-    return snippet.substr(0, kSnippetHeadBytes) + kSnippetMid +
-           snippet.substr(snippet.size() - kSnippetTailBytes);
+    // Snippets are caller-supplied query text stored and later re-serialized:
+    // boundary-align the head/tail cuts and sanitize any raw invalid bytes
+    // (strict nlohmann dump would otherwise throw type_error.316).
+    if (snippet.size() <= kSnippetMaxBytes) return common::SanitizeUtf8(snippet);
+    return common::SanitizeUtf8(
+        common::Utf8SafeHeadTail(snippet, kSnippetHeadBytes, kSnippetMid, kSnippetTailBytes));
 }
 
 InteractionsHandler::InteractionsHandler(sqlite3* db) : db_(db) {}

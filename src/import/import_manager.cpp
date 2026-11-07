@@ -4,6 +4,7 @@
 #include <ctime>
 
 #include "cortrix/id/ulid.h"
+#include "cortrix/common/utf8_utils.h"
 #include "cortrix/import/import_error.h"
 #include "cortrix/import/import_metrics.h"
 #include "cortrix/import/import_response.h"
@@ -36,7 +37,9 @@ std::string QuerySignature(const QueryRequest& q) {
     }
     if (q.sql) {
         const std::string& s = *q.sql;
-        return "sql:" + (s.size() > 64 ? s.substr(0, 64) : s);
+        // Error digest flows into strict-dumped task-status bodies; a CJK SQL
+        // string byte-cut at 64 would have poisoned it (type_error.316 class).
+        return "sql:" + common::Utf8SafeTruncate(s, 64);
     }
     return "";
 }

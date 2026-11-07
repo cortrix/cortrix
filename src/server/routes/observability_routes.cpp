@@ -21,6 +21,7 @@
 #include "cortrix/agent_trace/traces_handler.h"
 #include "cortrix/auth/auth_middleware.h"
 #include "cortrix/common/i_global_config.h"
+#include "cortrix/common/utf8_utils.h"
 #include "cortrix/memory/memory_store.h"                   // MemoryStore::db_handle (per-NS memory.db)
 #include "cortrix/observability/observability_context.h"
 #include "cortrix/resource/namespace_facade.h"             // per-request NS façade
@@ -163,7 +164,11 @@ void WriteF13InvalidFilter(httplib::Response& res, const std::string& request_id
     json sd;
     sd["invalid_field"] = field;
     sd["reason"] = reason;
-    sd["value_preview"] = value.substr(0, 100);  // PII guard — first 100 chars only
+    // PII guard — first 100 bytes only. `value` is an UNTRUSTED query-param:
+    // sanitize before the byte cut (sanitize may widen a bad subpart to 3-byte
+    // U+FFFD, so truncate after) — a raw 0x80 here used to take the error path
+    // itself down via strict dump type_error.316.
+    sd["value_preview"] = common::Utf8SafeTruncate(common::SanitizeUtf8(value), 100);
     json body;
     body["error"] = agent_friendly::ToJson(agent_trace::MakeF13Error(
         F13ErrorCode::kInvalidFilter, std::move(sd),

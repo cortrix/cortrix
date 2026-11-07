@@ -7,6 +7,7 @@
 
 #include "cortrix/agent_trace/agent_trace_metrics.h"
 #include "cortrix/agent_trace/http_observability_middleware.h"  // GenerateUuidV4
+#include "cortrix/common/utf8_utils.h"
 #include "cortrix/observability/observability_context.h"
 
 namespace cortrix::agent_trace {
@@ -35,16 +36,18 @@ constexpr size_t kErrorMsgMaxBytes = 256;         // first 256 chars of error me
 }  // namespace
 
 std::string McpSessionHandler::TruncateParams(const std::string& params) {
-    if (params.size() <= kParamsMaxBytes) return params;
+    if (params.size() <= kParamsMaxBytes) return common::SanitizeUtf8(params);
     // Keep head + tail with a middle marker (§3 — preserve first 1.5KB + last 0.5KB).
-    return params.substr(0, kParamsHeadBytes) + kTruncMid +
-           params.substr(params.size() - kParamsTailBytes);
+    // Head/tail byte cuts used to split multi-byte chars and client payloads can
+    // carry raw invalid bytes; the row is later re-serialized into JSON.
+    return common::SanitizeUtf8(
+        common::Utf8SafeHeadTail(params, kParamsHeadBytes, kTruncMid, kParamsTailBytes));
 }
 
 std::string McpSessionHandler::TruncateResult(const std::string& summary) {
-    if (summary.size() <= kResultMaxBytes) return summary;
-    return summary.substr(0, kResultHeadBytes) + kTruncTail +
-           summary.substr(summary.size() - kResultTailBytes);
+    if (summary.size() <= kResultMaxBytes) return common::SanitizeUtf8(summary);
+    return common::SanitizeUtf8(
+        common::Utf8SafeHeadTail(summary, kResultHeadBytes, kTruncTail, kResultTailBytes));
 }
 
 std::string McpSessionHandler::FormatError(const std::optional<std::string>& error_code,
@@ -52,9 +55,9 @@ std::string McpSessionHandler::FormatError(const std::optional<std::string>& err
     // §3: on failure keep only the error_code + first 256 chars of the message.
     std::string code = error_code.value_or("CX_ERR_F13_INTERNAL");
     std::string msg = error_message.size() > kErrorMsgMaxBytes
-                          ? error_message.substr(0, kErrorMsgMaxBytes)
+                          ? common::Utf8SafeTruncate(error_message, kErrorMsgMaxBytes)
                           : error_message;
-    return code + ": " + msg;
+    return code + ": " + common::SanitizeUtf8(msg);
 }
 
 McpSessionHandler::McpSessionHandler(std::shared_ptr<IAgentTraceWriter> writer,

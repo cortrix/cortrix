@@ -12,6 +12,7 @@
 #include <openssl/sha.h>
 
 #include "cortrix/common/i_global_config.h"
+#include "cortrix/common/utf8_utils.h"
 
 namespace cortrix {
 namespace agent_llm_codec {
@@ -171,7 +172,9 @@ void Store(const AgentLlmConfig& in,
 std::string MaskApiKey(const std::string& api_key) {
     if (api_key.empty()) return "";
     if (api_key.size() <= 4) return "...";
-    return api_key.substr(0, 4) + "...";
+    // Masked preview is re-serialized into config GET bodies: align the cut and
+    // sanitize (an operator-entered key is arbitrary bytes).
+    return common::SanitizeUtf8(common::Utf8SafeTruncate(api_key, 4)) + "...";
 }
 
 }  // namespace agent_llm_codec

@@ -2,6 +2,8 @@
 
 #include <utility>
 
+#include "cortrix/common/utf8_utils.h"
+
 namespace cortrix::observability {
 
 namespace {
@@ -30,7 +32,12 @@ const char* ResourceTypeFor(EmitSite site, const std::string& action) {
 std::optional<std::string> TruncateSummary(const std::optional<std::string>& summary) {
     if (!summary.has_value()) return std::nullopt;
     if (summary->size() <= kSummaryMaxBytes) return summary;
-    return summary->substr(0, kSummaryMaxBytes);
+    // Byte-cut at 100 used to split multi-byte characters mid-sequence; the
+    // malformed summary was stored verbatim and GET /api/v1/operations threw
+    // json type_error.316 -> 500 CX_ERR_INTERNAL_ERROR when re-serializing it.
+    // Cap at <=100 bytes on a UTF-8 boundary instead. (Keep bytes as the budget
+    // so a 4-byte code-point input cannot expand a row to 400 bytes.)
+    return common::Utf8SafeTruncate(*summary, kSummaryMaxBytes);
 }
 
 OperationLogEntry MakeEngineEntry(EmitSite site,

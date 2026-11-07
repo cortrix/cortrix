@@ -39,6 +39,7 @@
 #include "cortrix/retrieval/heuristic_guard_backend.h"
 #include "cortrix/retrieval/sparse_index_registry.h"
 #include "cortrix/common/executor_engine.h"
+#include "cortrix/common/utf8_utils.h"
 #include "cortrix/llm/i_llm_client.h"
 #include "cortrix/logging/logging.h"
 #include "cortrix/memory/memory_block_adapter.h"
@@ -798,9 +799,12 @@ void RecordQueryTrace(agent_trace::EngineInstrumentation* engine_instr,
     engine_instr->Record(call);
 }
 
-// First 100 chars of the query text — the F18a operation_log summary shape (§11).
+// First 100 bytes of the query text -- the F18a operation_log summary shape.
+// Align on a UTF-8 character boundary so multi-byte queries never store a
+// truncated trailing sequence that would throw json type_error.316 when
+// GET /api/v1/operations serializes the row.
 std::string QueryTextSummary(const QueryContext& qctx) {
-    return qctx.query.size() > 100 ? qctx.query.substr(0, 100) : qctx.query;
+    return common::Utf8SafeTruncate(qctx.query, 100);
 }
 
 // Build the compact params JSON for the trace row (§4.1 — params ≤2KB, the writer
