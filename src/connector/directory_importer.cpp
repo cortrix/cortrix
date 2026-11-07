@@ -125,7 +125,7 @@ Status DirectoryImporter::InitialScan() {
 
         if (entry.is_directory(ec)) {
             std::string dir_name = entry.path().filename().string();
-            if (!filter_->ShouldTraverse(dir_name)) {
+            if (!config_.recursive || !filter_->ShouldTraverse(dir_name)) {
                 it.disable_recursion_pending();
             }
             ++it;
