@@ -1,4 +1,5 @@
 #pragma once
+#include "cortrix/query/query_filter.h"
 #include <chrono>
 #include <map>
 #include <optional>
@@ -42,6 +43,7 @@ struct QueryContext {
     int  top_k = 10;         ///< per-NS top_k requested by the caller (range 1-100)
     bool rerank = true;      ///< topic 4.3 — pass-through to all NS; false → RRF fallback path
     std::map<std::string, std::string> filter;  ///< topic 4.3 JSONB filter passed through (flattened)
+    QueryFilterSpec filter_spec;  ///< parsed `filter` (tags, date_range); applied by the executor
 
     /// The request's deadline, derived once from its `timeout_ms`. Every join, LLM
     /// call and executor stage boundary of the request reads this one value, so a

@@ -162,6 +162,8 @@ add_executable(cortrix_unit_tests
     unit/test_rrf_fusion.cpp
     unit/test_intent_classifier.cpp
     unit/test_post_filter.cpp
+    unit/test_query_filter.cpp
+    unit/test_query_filter_executor.cpp
     unit/test_degradation_manager.cpp
     unit/test_query_pipeline.cpp
     unit/test_query_request.cpp

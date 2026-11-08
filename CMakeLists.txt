@@ -174,6 +174,7 @@ add_library(cortrix_core STATIC
     src/query/scatter_guc.cpp
     src/query/scatter_plan.cpp
     src/query/cross_ns_query_handler.cpp
+    src/query/query_filter.cpp
     # --- F04 cross-NS query live wiring (D3.5-R2 Wave Q1/Q2) ---
     src/query/live_single_unit_executor.cpp
     src/query/query_explain_json.cpp
