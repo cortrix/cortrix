@@ -157,7 +157,7 @@ cp config.yaml.example build/config.yaml
 
 LLM-backed features are configured by role:
 
-- `semantic_llm`: optional LLM-backed semantic processing. It is separate from the local ONNX embedding and cross-encoder reranker used by the primary Quick Start.
+- `semantic_llm`: the query-time LLM steps a request asks for, query variants (`rag_fusion`) and LLM rerank (`llm_rerank`). It is separate from the local ONNX embedding and cross-encoder reranker used by the primary Quick Start.
 - `vision_llm`: OCR image enhancement.
 - `agent_llm`: built-in Agent chat.
 - `doc_summary_llm`: ingest-side summaries.

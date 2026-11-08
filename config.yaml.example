@@ -146,7 +146,10 @@ spc:
 # LLM configuration — five independent roles, each a flat section
 #
 # The server parses exactly these sections (src/config/config.cpp):
-#   semantic_llm     — intent classification & reranking (every query; fast/cheap)
+#   semantic_llm     — query-time LLM steps a request asks for: query variants
+#                      (rag_fusion: true) and LLM rerank (llm_rerank: true).
+#                      Unset, those requests run without the LLM step. Intent
+#                      routing is keyword-based and does not call it.
 #   vision_llm       — OCR image refinement (model must support vision input)
 #   agent_llm        — conversational RAG/chat
 #   doc_summary_llm  — F41 ingest-side document summary (async via F42)
