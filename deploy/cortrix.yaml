@@ -60,7 +60,7 @@ spc:
 # --- LLM roles (all optional; unset = feature stays off) ---
 # Connection trio per role: provider / api_key / model / base_url.
 #
-# semantic_llm:      # intent classification & reranking
+# semantic_llm:      # per-request query variants (rag_fusion) & LLM rerank (llm_rerank)
 # vision_llm:        # image/PDF visual parsing
 # agent_llm:         # agent demo chat
 # doc_summary_llm:   # F41 document summary index

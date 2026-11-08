@@ -195,7 +195,7 @@ void LoadFromYaml(const std::string& path, CortrixConfig& config) {
             cfg.ctx_guard_chars_per_token = n["ctx_guard_chars_per_token"].as<int>();
     };
 
-    // semantic_llm — fast/cheap model for intent classification & reranking
+    // semantic_llm — query variants (rag_fusion) and LLM rerank (llm_rerank) per request
     if (root["semantic_llm"]) parseLlm(root["semantic_llm"], config.semantic_llm);
 
     // vision_llm — multimodal model for OCR image enhancement

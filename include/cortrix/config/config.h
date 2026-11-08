@@ -233,8 +233,8 @@ struct CortrixConfig {
     NamespaceConfig ns;
     EmbeddingConfig embedding;
     // Three independent LLM roles, each can use a different model/provider:
-    LlmConfig semantic_llm;  // Intent classification, reranking (future), query expansion (future)
-                              // Should be fast & cheap — called on every query
+    LlmConfig semantic_llm;  // Query variants (rag_fusion) and LLM rerank (llm_rerank), when a
+                              // request asks for them; intent routing does not call it
     LlmConfig vision_llm;    // OCR image enhancement — must be a multimodal model
                               // Inherits semantic_llm's provider/api_key/base_url if not set
     LlmConfig agent_llm;     // Conversational RAG & chat generation
