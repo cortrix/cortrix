@@ -33,9 +33,11 @@ PROF="$BUILD/prof"
 # F23 §4.1.bis dual-track gate: this script owns the core-17 BRANCH gate on the
 # clang region/branch metric (the line gates are owned by coverage.sh on gcov).
 CORE_BRANCH_MIN=80
-CORE_TARGET_TU_EXPECTED=317
-CORE_MAPPED_TU_EXPECTED=314
-CORE_TARGET_SOURCE_SHA256_EXPECTED="4e86934e2109eff7f536e4e538e9ae033109bf7fbb167aa0404c59fc7437b978"
+# Pinned cortrix_core source universe; scripts/ci/check_core_universe.py
+# checks it against CMakeLists.txt on every PR.
+CORE_TARGET_TU_EXPECTED=323
+CORE_MAPPED_TU_EXPECTED=320
+CORE_TARGET_SOURCE_SHA256_EXPECTED="7486542b50ee9f410ae7c2d4b4e8a236a7d9402eb38f1c7bd6d7fbb21c9ee27a"
 
 CORE_DIRS=(
   src/store src/reranker src/spc src/query src/resource src/async
