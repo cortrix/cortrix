@@ -37,7 +37,7 @@ class MemorySessionSearchE2E : public ::testing::Test {
  protected:
   void SetUp() override {
     h_ = std::make_unique<cortrix::test::FullStackE2E>();
-    h_->BuildIngest(/*embedding_dim=*/128);
+    h_->BuildIngest(/*embedding_dim=*/128, /*embedder_model_path=*/"", SpcWorkers());
     // Every memory-session write passes this gate just before its block is written.
     // It is open unless a test closes it to hold a write while it deletes or
     // recreates the session.
@@ -57,6 +57,22 @@ class MemorySessionSearchE2E : public ::testing::Test {
   }
 
   void TearDown() override { OpenGate(); }  // never leave a worker parked at the gate
+
+  virtual int SpcWorkers() const { return 0; }  // the manager's minimum of one
+
+  int GateArrivals() {
+    std::lock_guard<std::mutex> lk(gate_mu_);
+    return gate_arrivals_;
+  }
+  bool WaitForMemoryBlocks(int n, int timeout_ms = 15000) {
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+    while (std::chrono::steady_clock::now() < deadline) {
+      if (MemoryBlockCount() >= n) return true;
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    return false;
+  }
 
   void CloseGate() {
     std::lock_guard<std::mutex> lk(gate_mu_);
@@ -275,6 +291,40 @@ TEST_F(MemorySessionSearchE2E, WriteProcessedAfterDeleteAndRecreateIsNotSearchab
   ASSERT_TRUE(WaitForMemoryBlock()) << "the held write was never written";
   EXPECT_FALSE(MentionsAnswer(Search(h_->user_key(), "alice")));
   EXPECT_FALSE(MentionsAnswer(Search(h_->user_key(), "alice", sid)));
+}
+
+// Two SPC workers, as production runs by default: consecutive writes to one session
+// are separate tasks for the same session document.
+class MemorySessionTwoWorkersE2E : public MemorySessionSearchE2E {
+ protected:
+  int SpcWorkers() const override { return 2; }
+};
+
+TEST_F(MemorySessionTwoWorkersE2E, WritesToOneSessionAreProcessedOneAtATime) {
+  // With a worker free for each, two writes to one session must still not be
+  // processed at the same time: the second one's write would be refused while the
+  // first holds the document's write transaction, and its block lost.
+  CloseGate();
+  const std::string sid = CreateAliceSession();
+  ASSERT_FALSE(sid.empty());
+  ASSERT_EQ(AppendInteraction(sid, "alice"), 201);
+  ASSERT_EQ(AppendInteraction(sid, "alice"), 201);
+  ASSERT_TRUE(WaitForWriteAtGate());
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+  EXPECT_EQ(GateArrivals(), 1) << "two writes for one session were processed at once";
+  OpenGate();
+  ASSERT_TRUE(WaitForMemoryBlocks(2));
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  EXPECT_EQ(MemoryBlockCount(), 2);
+}
+
+TEST_F(MemorySessionTwoWorkersE2E, TenWritesInARowToOneSessionAreAllKept) {
+  const std::string sid = CreateAliceSession();
+  ASSERT_FALSE(sid.empty());
+  for (int i = 0; i < 10; ++i) ASSERT_EQ(AppendInteraction(sid, "alice"), 201);
+  EXPECT_TRUE(WaitForMemoryBlocks(10)) << "only " << MemoryBlockCount() << " of 10 kept";
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  EXPECT_EQ(MemoryBlockCount(), 10);
 }
 
 }  // namespace
