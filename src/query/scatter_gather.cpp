@@ -68,7 +68,7 @@ CrossNsResponse ScatterGather::Execute(const QueryRequest& request,
                                        const QueryContext* qctx,
                                        const TraceContext* trace_ctx) {
     // 1. Authorization (§4.2 5 steps). The effective per-query cap is min(global GUC
-    //    cap, AuthContext plan cap) — S4.3 Cloud P01-3 plan coordination (topic 1.5). Throws
+    //    cap, AuthContext plan cap) — S4.3 P01-3 plan coordination (topic 1.5). Throws
     //    CrossNsException on auth / too-many / unauthorized — the handler serializes
     //    GetError() to the §2.6 body.
     const int effective_cap = EffectiveMaxNamespaces(max_namespaces_, auth);

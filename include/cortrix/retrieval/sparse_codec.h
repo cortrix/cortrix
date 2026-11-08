@@ -33,7 +33,7 @@ struct SparseVector {
 /// term_id is stored as uint16 per §4.2. The real BGE-M3 vocab is 250K (needs
 /// ~18 bits) — a term_id ≥ 65536 is rejected by Serialize with
 /// CX_ERR_F40_SPARSE_SERIALIZE_FAILED (the standalone stub keeps ids in-range;
-/// the wider real-vocab encoding is Phase 2, see PHASE2_BACKLOG / F40 §4.2 note).
+/// the wider real-vocab encoding is not done yet).
 std::vector<uint8_t> SerializeSparseVec(const SparseVector& vec, bool* ok = nullptr);
 
 /// Parse a sparse_vec BLOB produced by SerializeSparseVec. Returns the vector on

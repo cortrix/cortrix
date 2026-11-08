@@ -184,7 +184,7 @@ struct RetrievalConfig {
 // === [OPEN-2] three-stage GC (ARCH §5.x, A6 §10.8) ===
 // Config for the built-in background GC thread + manual ops endpoints. Defaults
 // mirror the ARCH `gc:` section. CE runs with immediate_purge_enabled=false
-// (the GDPR immediate-purge API is a Cloud V1 feature, not built in CE).
+// (the GDPR immediate-purge API is not built in CE).
 struct GcConfig {
     bool enabled = true;                     ///< background GC thread on/off (default on, can disable)
     int soft_delete_retention_days = 30;     ///< Stage 1 → 2 window (soft-delete retention)
@@ -193,7 +193,7 @@ struct GcConfig {
     int max_purge_per_run = 10000;           ///< cap on blobs unlinked per run (runaway guard)
     int max_run_duration_minutes = 5;        ///< cap on a single run's wall time (IO guard)
     bool dry_run = false;                    ///< scan but do not delete (test/inspection)
-    // Compliance path (Cloud V1+; CE default false — not built in CE).
+    // Compliance path (CE default false — not built in CE).
     bool immediate_purge_enabled = false;    ///< GDPR immediate-purge API switch
 };
 

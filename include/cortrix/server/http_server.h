@@ -52,9 +52,9 @@ public:
     void SetOperationLogger(cortrix::observability::IOperationLogger* op_logger);
 
     /// Open-Core edition seam (ARCH OPEN-6 / §8.2.7). The stock CE binary leaves
-    /// this at the default "ce". An enterprise embedder sets "enterprise" from its
-    /// on_assembled hook, so GET /api/v1/system/features advertises the enterprise
-    /// edition; the web UI gates the Enterprise nav group on this value. Must be
+    /// this at the default "ce". An embedder can set a different edition string from
+    /// its on_assembled hook, so GET /api/v1/system/features advertises that
+    /// edition; the web UI gates edition-specific navigation on this value. Must be
     /// called before Start() — on_assembled runs before the listener, so the value
     /// is in place by the time any request reads it (no concurrent write/read).
     void SetEdition(const std::string& edition);

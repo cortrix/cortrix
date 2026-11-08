@@ -11,7 +11,7 @@
 // retry_after_ms and a structured_data block (stratum/limit/window/remaining/
 // reset_at/locked_until), per design sec 8.bis.3.
 //
-// A 4th per-tenant stratum (design sec 8.bis.6) is Cloud V1.5+ and intentionally
+// A 4th per-tenant stratum (design sec 8.bis.6) is intentionally
 // not built here. Wiring the limiter into the request path is a single ADD in
 // main.cpp; the limiter itself is standalone and fully unit-tested.
 

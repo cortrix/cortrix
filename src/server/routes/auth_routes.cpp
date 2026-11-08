@@ -255,14 +255,14 @@ void RegisterApiKeyRoutes(httplib::Server& server, ApiKeyService& keys,
 void RegisterAuthSessionRoute(httplib::Server& server, ApiKeyAuth& auth) {
     // GET /api/v1/auth/me — CE Web UI session probe (P02a §9.2 / quick-experience mode).
     //
-    // The JWT email/password /auth/me is a cloud-enterprise endpoint, absent in CE (an
+    // The JWT email/password /auth/me endpoint is not served by this edition (an
     // un-shimmed CE would 404 here). The self-hosted Web UI probes this on startup to
     // decide isAuthenticated. When auth is DISABLED (the V1 default — out-of-the-box
     // "quick experience"), report a synthetic single-operator identity so the probe
     // authenticates and the app shell renders; otherwise the UI dead-ends on a login
-    // wall whose email/password backend is itself cloud-enterprise. When auth is
+    // wall whose email/password backend is itself not served here. When auth is
     // ENABLED, return 401 so the UI shows login (the full CE auth-on Web UI login flow
-    // is a V1.5 multi-user item — hub PHASE2_BACKLOG TD-CE-WEBUI-AUTH-ON).
+    // is not implemented yet).
     //
     // Not WithAuth-wrapped by design: this IS the pre-auth probe; its only gate is
     // reading auth.enabled().

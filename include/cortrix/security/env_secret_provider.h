@@ -4,7 +4,7 @@
 // EnvSecretProvider reads secrets straight from process environment variables.
 // This is the Phase 1 default and matches how Postgres / Redis / Weaviate take
 // credentials. K8s Secret -> env mounts and docker-compose env_file both funnel
-// through here. Cloud providers are added later behind ISecretProvider.
+// through here. Other providers can be added behind ISecretProvider.
 
 #include <future>
 #include <optional>
@@ -29,7 +29,7 @@ public:
 
 /// Selects the secret provider from CORTRIX_SECRET_PROVIDER (default "env").
 /// Phase 1 only knows "env"; unknown values fall back to env with a warning.
-/// Cloud providers ("aws", ...) are registered here in Phase 1.5 / Phase 2.
+/// Other providers ("aws", ...) would be registered here.
 std::shared_ptr<ISecretProvider> CreateSecretProvider();
 
 }  // namespace cortrix::security

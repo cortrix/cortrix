@@ -102,7 +102,7 @@ async def chat_endpoint(
     debug = _truthy(request.query_params.get("debug"))
 
     # Bearer token is parsed for forward-compat (P-5); V1.0 CE does not validate it
-    # and tenant_id comes from the header. In V1.5 Cloud the JWT claim takes priority
+    # and tenant_id comes from the header. Once wired, the JWT claim takes priority
     # (design section 8.2 anti-BOLA) — TODO(D3.5) wire JWT claim extraction.
     _ = authorization  # reserved (design F48-rev-3)
 

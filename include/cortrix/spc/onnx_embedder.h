@@ -125,8 +125,8 @@ private:
 
 /// BGE-M3 token vocabulary size (250K). term_id values returned by the sparse
 /// path are < this; the serializer (F40 §4.2) stores term_id as uint16, so the
-/// stub keeps ids in a 16-bit window — the real vocab needs the Phase-2 wider
-/// term_id encoding tracked in PHASE2_BACKLOG (F40 §4.2 note "18 bits actual").
+/// stub keeps ids in a 16-bit window — the real vocab needs a wider term_id
+/// encoding, which is not done yet.
 inline constexpr uint32_t kBgeM3VocabSize = 250000u;
 
 }  // namespace cortrix
