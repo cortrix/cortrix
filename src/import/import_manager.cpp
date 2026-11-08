@@ -39,7 +39,13 @@ std::string QuerySignature(const QueryRequest& q) {
         const std::string& s = *q.sql;
         // Error digest flows into strict-dumped task-status bodies; a CJK SQL
         // string byte-cut at 64 would have poisoned it (type_error.316 class).
-        return "sql:" + common::Utf8SafeTruncate(s, 64);
+        // Sanitize first, then cap the sanitized text, and count the "sql:"
+        // prefix against the 64-byte budget.
+        constexpr const char* kPrefix = "sql:";
+        constexpr size_t kDigestMaxBytes = 64;
+        const size_t prefix_len = std::string(kPrefix).size();
+        const size_t room = (kDigestMaxBytes > prefix_len) ? kDigestMaxBytes - prefix_len : 0;
+        return std::string(kPrefix) + common::Utf8SafeTruncateSanitized(s, room);
     }
     return "";
 }

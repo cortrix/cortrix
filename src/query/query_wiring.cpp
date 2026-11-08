@@ -804,7 +804,9 @@ void RecordQueryTrace(agent_trace::EngineInstrumentation* engine_instr,
 // truncated trailing sequence that would throw json type_error.316 when
 // GET /api/v1/operations serializes the row.
 std::string QueryTextSummary(const QueryContext& qctx) {
-    return common::Utf8SafeTruncate(qctx.query, 100);
+    // Sanitize first, then cap the sanitized text: an ill-formed byte widens to
+    // a 3-byte U+FFFD, so the 100-byte budget has to be applied afterwards.
+    return common::Utf8SafeTruncateSanitized(qctx.query, 100);
 }
 
 // Build the compact params JSON for the trace row (§4.1 — params ≤2KB, the writer

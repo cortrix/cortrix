@@ -76,8 +76,15 @@ json ParseJsonObjectWithLlmStringEscapeRepair(const std::string& value) {
 std::string TruncateForDiagnostics(const std::string& value, size_t max_bytes) {
     // These previews land in a strict-dumped diagnostics json; LLM/provider raw
     // output can carry ill-formed bytes and the byte cut could split a sequence.
-    if (value.size() <= max_bytes) return common::SanitizeUtf8(value);
-    return common::SanitizeUtf8(common::Utf8SafeTruncate(value, max_bytes)) + "...[truncated]";
+    // Sanitize first (one ill-formed byte widens to a 3-byte U+FFFD), then cap
+    // the SANITIZED text so the preview including its "...[truncated]" marker
+    // stays inside max_bytes.
+    constexpr const char* kMarker = "...[truncated]";
+    const std::string sanitized = common::SanitizeUtf8(value);
+    if (sanitized.size() <= max_bytes) return sanitized;
+    const size_t marker_len = std::string(kMarker).size();
+    const size_t room = (max_bytes > marker_len) ? max_bytes - marker_len : 0;
+    return common::Utf8SafeTruncate(sanitized, room) + kMarker;
 }
 
 json BuildLlmInvalidOutputDiagnostics(const llm::ChatCompletionResponse& resp,

@@ -1184,10 +1184,10 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                     if (owed) {
                         es.failed_members = owed_members;
                         auto eit2 = enrich_error_by_child.find(b.child_id);
-                        if (eit2 != enrich_error_by_child.end()) {
-                            es.last_error = common::Utf8SafeTruncate(eit2->second, 200);
+                        if (eit2 != enrich_error_by_child.end() && !eit2->second.empty()) {
+                            es.last_error = common::Utf8SafeTruncateSanitized(eit2->second, 200);
                         } else if (!persist_err.empty()) {
-                            es.last_error = common::Utf8SafeTruncate(persist_err, 200);
+                            es.last_error = common::Utf8SafeTruncateSanitized(persist_err, 200);
                         }
                         es.next_retry_at =
                             enrich_now_unix + cortrix::spc::kEnrichRetryFirstDelaySec;

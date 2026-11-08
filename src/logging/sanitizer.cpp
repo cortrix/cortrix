@@ -75,8 +75,9 @@ std::string MaskPartial(const std::string& value) {
         return "***";  // too short to reveal anything safely
     }
     // Boundary-aligned head/tail so a non-ASCII key never yields a mid-sequence
-    // cut (log sinks may JSON-encode strictly).
-    return common::Utf8SafeHeadTail(value, kHead, "***", kTail);
+    // cut (log sinks may JSON-encode strictly), and sanitize so raw invalid
+    // bytes never reach a strict encoder.
+    return common::Utf8SafeHeadTailSanitized(value, kHead, "***", kTail);
 }
 
 /// Content truncation: query_text keeps a 50-char preview + full hash; the
@@ -85,8 +86,10 @@ std::string TruncateContent(const std::string& field, const std::string& value) 
     if (field == "query_text") {
         constexpr size_t kPreview = 50;
         // CJK query text byte-cut at 50 used to emit a malformed preview; log
-        // sinks JSON-encode strictly, so cut on a character boundary.
-        std::string preview = common::Utf8SafeTruncate(value, kPreview);
+        // sinks JSON-encode strictly, so cut on a character boundary and
+        // sanitize (an ill-formed byte widens to a 3-byte U+FFFD, so the cap
+        // is applied to the sanitized text).
+        std::string preview = common::Utf8SafeTruncateSanitized(value, kPreview);
         return preview + "...[sha256:" + Sha256Hex(value) + "]";
     }
     // document_content / memory_text / prompt -> hash only.

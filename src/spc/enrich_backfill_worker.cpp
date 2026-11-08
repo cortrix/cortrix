@@ -701,7 +701,8 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
             row.failed_members = JoinCsv(rep.still_owed);
             // Byte-cut at 200 could split a multi-byte char inside provider/
             // enricher error text that later reaches a strict JSON dump.
-            row.last_error = common::Utf8SafeTruncate(rep.last_error, 200);
+            // Sanitize first, then cap the sanitized text.
+            row.last_error = common::Utf8SafeTruncateSanitized(rep.last_error, 200);
             // The cap bounds provider work. When the only remaining debt is the
             // contextual index label and the columns with the stored vector are in
             // place, the next delivery calls no provider, so the row is not given

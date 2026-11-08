@@ -168,7 +168,7 @@ void WriteF13InvalidFilter(httplib::Response& res, const std::string& request_id
     // sanitize before the byte cut (sanitize may widen a bad subpart to 3-byte
     // U+FFFD, so truncate after) — a raw 0x80 here used to take the error path
     // itself down via strict dump type_error.316.
-    sd["value_preview"] = common::Utf8SafeTruncate(common::SanitizeUtf8(value), 100);
+    sd["value_preview"] = common::Utf8SafeTruncateSanitized(value, 100);
     json body;
     body["error"] = agent_friendly::ToJson(agent_trace::MakeF13Error(
         F13ErrorCode::kInvalidFilter, std::move(sd),

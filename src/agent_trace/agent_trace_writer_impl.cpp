@@ -9,6 +9,7 @@
 
 #include "cortrix/agent_trace/agent_trace_error.h"
 #include "cortrix/agent_trace/agent_trace_metrics.h"
+#include "cortrix/common/utf8_utils.h"
 
 namespace cortrix::agent_trace {
 
@@ -28,14 +29,34 @@ void BindOptText(sqlite3_stmt* stmt, int idx, const std::optional<std::string>& 
     }
 }
 
+// Bind a text column that may carry ill-formed bytes: normalize it before it
+// reaches SQLite. Sanitizing widens a value (one ill-formed byte becomes a
+// 3-byte U+FFFD), so this does NOT enforce the §3 size budgets — those belong
+// to the caller that produces the value (§3 — "caller truncates").
+void BindSanitizedText(sqlite3_stmt* stmt, int idx, const std::optional<std::string>& v) {
+    if (!v.has_value()) {
+        sqlite3_bind_null(stmt, idx);
+        return;
+    }
+    const std::string stored = common::SanitizeUtf8(*v);
+    sqlite3_bind_text(stmt, idx, stored.c_str(), -1, SQLITE_TRANSIENT);
+}
+
 std::string ColText(sqlite3_stmt* stmt, int col) {
     const char* t = reinterpret_cast<const char*>(sqlite3_column_text(stmt, col));
     return t ? t : "";
 }
 
+// Read-side healing: a row written before the UTF-8 contract (or by an
+// out-of-tree writer) can hold byte-truncated text. Normalize it here so a
+// later strict JSON dump cannot throw type_error.316.
+std::string ColSanitizedText(sqlite3_stmt* stmt, int col) {
+    return common::SanitizeUtf8(ColText(stmt, col));
+}
+
 std::optional<std::string> ColOptText(sqlite3_stmt* stmt, int col) {
     if (sqlite3_column_type(stmt, col) == SQLITE_NULL) return std::nullopt;
-    return ColText(stmt, col);
+    return ColSanitizedText(stmt, col);
 }
 
 // SELECT column order ReadRow() depends on (matches agent_trace §4.1, minus id
@@ -49,7 +70,7 @@ AgentTraceEntry ReadRow(sqlite3_stmt* stmt) {
     e.session_id     = ColOptText(stmt, 0);
     e.trace_id       = ColOptText(stmt, 1);
     e.agent_id       = ColOptText(stmt, 2);
-    e.method         = ColText(stmt, 3);
+    e.method         = ColSanitizedText(stmt, 3);
     e.params         = ColOptText(stmt, 4);
     e.result_summary = ColOptText(stmt, 5);
     e.duration_ms    = sqlite3_column_int(stmt, 6);
@@ -90,8 +111,11 @@ bool AgentTraceWriterImpl::InsertLocked(const AgentTraceEntry& entry,
     BindOptText(stmt, 2, trace);
     BindOptText(stmt, 3, entry.agent_id);
     sqlite3_bind_text(stmt, 4, entry.method.c_str(), -1, SQLITE_TRANSIENT);
-    BindOptText(stmt, 5, entry.params);
-    BindOptText(stmt, 6, entry.result_summary);
+    // Ill-formed bytes are normalized before they reach SQLite so no stored
+    // value can break a later strict JSON dump (type_error.316). The §3 size
+    // budgets are the caller's responsibility (§3 — "caller truncates").
+    BindSanitizedText(stmt, 5, entry.params);
+    BindSanitizedText(stmt, 6, entry.result_summary);
     sqlite3_bind_int(stmt, 7, entry.duration_ms);
     sqlite3_bind_text(stmt, 8, entry.source.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 9, entry.status.c_str(), -1, SQLITE_TRANSIENT);

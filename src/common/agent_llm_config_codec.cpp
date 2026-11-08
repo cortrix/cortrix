@@ -172,9 +172,10 @@ void Store(const AgentLlmConfig& in,
 std::string MaskApiKey(const std::string& api_key) {
     if (api_key.empty()) return "";
     if (api_key.size() <= 4) return "...";
-    // Masked preview is re-serialized into config GET bodies: align the cut and
-    // sanitize (an operator-entered key is arbitrary bytes).
-    return common::SanitizeUtf8(common::Utf8SafeTruncate(api_key, 4)) + "...";
+    // Masked preview is re-serialized into config GET bodies: sanitize (an
+    // operator-entered key is arbitrary bytes) and then align the cut, so the
+    // preview is always well-formed UTF-8.
+    return common::Utf8SafeTruncateSanitized(api_key, 4) + "...";
 }
 
 }  // namespace agent_llm_codec
