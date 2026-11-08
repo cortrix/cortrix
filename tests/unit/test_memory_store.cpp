@@ -207,6 +207,38 @@ TEST_F(MemoryStoreTest, SessionDeleteCascade) {
     EXPECT_EQ(count, 0);
 }
 
+TEST_F(MemoryStoreTest, InteractionExistsUntilItsSessionIsDeleted) {
+    MemorySession session;
+    session.namespace_name = "default";
+    ASSERT_TRUE(store_->SessionCreate(session).ok());
+
+    InteractionLog log;
+    log.session_id = session.session_id;
+    log.namespace_name = "default";
+    log.role = "user";
+    log.content = "x";
+    ASSERT_TRUE(store_->InteractionInsert(log).ok());
+    ASSERT_FALSE(log.id.empty());
+
+    bool exists = false;
+    ASSERT_TRUE(store_->InteractionExists(log.id, &exists).ok());
+    EXPECT_TRUE(exists);
+    ASSERT_TRUE(store_->InteractionExists("no-such-interaction", &exists).ok());
+    EXPECT_FALSE(exists);
+
+    // Deleting the session removes the row; recreating a session with the same id
+    // does not bring it back.
+    ASSERT_TRUE(store_->SessionDelete(session.session_id).ok());
+    ASSERT_TRUE(store_->InteractionExists(log.id, &exists).ok());
+    EXPECT_FALSE(exists);
+    MemorySession again;
+    again.session_id = session.session_id;
+    again.namespace_name = "default";
+    ASSERT_TRUE(store_->SessionCreate(again).ok());
+    ASSERT_TRUE(store_->InteractionExists(log.id, &exists).ok());
+    EXPECT_FALSE(exists);
+}
+
 TEST_F(MemoryStoreTest, SessionDeleteNotFound) {
     auto s = store_->SessionDelete("nonexistent-id");
     EXPECT_EQ(s.code(), StatusCode::kNotFound);

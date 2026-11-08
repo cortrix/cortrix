@@ -47,9 +47,11 @@ class MemorySessionSearchE2E : public ::testing::Test {
 
   // Create a session owned by alice and append one interaction to it; returns the
   // session id (asserts both writes succeed).
-  std::string CreateAliceSession() {
+  // Create a session owned by alice; `sid` non-empty asks for that session id.
+  std::string CreateAliceSession(const std::string& sid = "") {
     auto c = h_->Client();
     json sess = {{"namespace", kNs}, {"user_id", "alice"}};
+    if (!sid.empty()) sess["session_id"] = sid;
     auto sr = c.Post("/api/v1/memory/sessions", h_->Bearer(h_->user_key()), sess.dump(),
                      "application/json");
     EXPECT_TRUE(sr && sr->status == 201) << (sr ? sr->body : "no response");
@@ -102,11 +104,17 @@ class MemorySessionSearchE2E : public ::testing::Test {
   }
 
   // POST /api/v1/memory/search as `key` for `user_id`; returns the results array.
-  json Search(const std::string& key, const std::string& user_id) {
+  // `session_id` non-empty searches that session (scope=session) instead of the user.
+  json Search(const std::string& key, const std::string& user_id,
+              const std::string& session_id = "") {
     auto c = h_->Client();
     json body = {{"namespace", kNs},
                  {"user_id", user_id},
                  {"query", "billing service database"}};
+    if (!session_id.empty()) {
+      body["scope"] = "session";
+      body["session_id"] = session_id;
+    }
     auto res = c.Post("/api/v1/memory/search", h_->Bearer(key), body.dump(),
                       "application/json");
     EXPECT_TRUE(res && res->status == 200) << (res ? res->body : "no response");
@@ -191,6 +199,35 @@ TEST_F(MemorySessionSearchE2E, WriteProcessedAfterDeleteIsNotSearchable) {
   }
   ASSERT_GT(MemoryBlockCount(), 0) << "the write was never processed";
   EXPECT_FALSE(MentionsAnswer(Search(h_->user_key(), "alice")));
+}
+
+TEST_F(MemorySessionSearchE2E, RecreatedSessionIdDoesNotBringBackDeletedInteractions) {
+  const std::string sid = "reused-session-1";
+  ASSERT_EQ(CreateAliceSession(sid), sid);
+  ASSERT_EQ(AppendInteraction(sid, "alice"), 201);
+  ASSERT_TRUE(WaitUntilAliceFindsIt());
+  ASSERT_EQ(DeleteAliceSession(sid), 200);
+  ASSERT_EQ(CreateAliceSession(sid), sid);  // same id, new session
+  EXPECT_FALSE(MentionsAnswer(Search(h_->user_key(), "alice")));
+  EXPECT_FALSE(MentionsAnswer(Search(h_->user_key(), "alice", sid)));
+  // The recreated session itself works: a new interaction in it is found.
+  ASSERT_EQ(AppendInteraction(sid, "alice"), 201);
+  EXPECT_TRUE(WaitUntilAliceFindsIt());
+}
+
+TEST_F(MemorySessionSearchE2E, WriteProcessedAfterDeleteAndRecreateIsNotSearchable) {
+  const std::string sid = "reused-session-2";
+  ASSERT_EQ(CreateAliceSession(sid), sid);
+  ASSERT_EQ(AppendInteraction(sid, "alice"), 201);
+  ASSERT_EQ(DeleteAliceSession(sid), 200);
+  ASSERT_EQ(CreateAliceSession(sid), sid);
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  while (MemoryBlockCount() == 0 && std::chrono::steady_clock::now() < deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+  ASSERT_GT(MemoryBlockCount(), 0) << "the write was never processed";
+  EXPECT_FALSE(MentionsAnswer(Search(h_->user_key(), "alice")));
+  EXPECT_FALSE(MentionsAnswer(Search(h_->user_key(), "alice", sid)));
 }
 
 }  // namespace
