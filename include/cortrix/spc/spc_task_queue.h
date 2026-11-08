@@ -18,8 +18,11 @@ public:
     /// @return 0 = success, -1 = queue full
     int Push(std::shared_ptr<SPCTask> task);
 
-    /// Pop highest priority task (blocks until available or stopped)
-    /// @return nullptr if queue stopped
+    /// Pop the highest priority task whose document has no running task (blocks until
+    /// one is available or the queue is stopped). Tasks for one document therefore run
+    /// one at a time, in queue order; a task for another document can go first. A task
+    /// with an empty doc_id is never held back.
+    /// @return nullptr if the queue is stopped and no task is runnable
     /// The returned task counts as running for its doc_id from the moment it leaves
     /// the queue, under the same lock, until FinishTask(doc_id): every popped task
     /// must be paired with one FinishTask, or its document reads as active for good.

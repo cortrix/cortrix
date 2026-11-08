@@ -28,33 +28,45 @@ int SPCTaskQueue::Push(std::shared_ptr<SPCTask> task) {
 
 std::shared_ptr<SPCTask> SPCTaskQueue::Pop() {
     std::unique_lock<std::mutex> lock(mu_);
-    cv_.wait(lock, [this] { return stopped_ || !queue_.empty(); });
+    for (;;) {
+        // Drop cancelled tasks.
+        queue_.erase(std::remove_if(queue_.begin(), queue_.end(),
+                                    [](const std::shared_ptr<SPCTask>& t) {
+                                        return !t || t->cancelled.load();
+                                    }),
+                     queue_.end());
 
-    if (stopped_ && queue_.empty()) return nullptr;
-    if (queue_.empty()) return nullptr;
-
-    // Take highest priority (front of sorted queue)
-    auto task = queue_.front();
-    queue_.erase(queue_.begin());
-
-    // Skip cancelled tasks
-    while (task && task->cancelled.load() && !queue_.empty()) {
-        task = queue_.front();
-        queue_.erase(queue_.begin());
+        // Take the first task (in priority order) whose document has nothing running.
+        // Two tasks for one document must not run at once: the second one's write is
+        // refused while the first holds the document's write transaction, and its work
+        // is lost (several interactions written to one memory session in a row).
+        // A task without a document id has nothing to wait for.
+        auto it = std::find_if(queue_.begin(), queue_.end(),
+                               [this](const std::shared_ptr<SPCTask>& t) {
+                                   return t->doc_id.empty() ||
+                                          running_.find(t->doc_id) == running_.end();
+                               });
+        if (it != queue_.end()) {
+            auto task = *it;
+            queue_.erase(it);
+            // Running from the moment it leaves the queue, under the same lock, so the
+            // task is never seen as neither queued nor running.
+            ++running_[task->doc_id];
+            return task;
+        }
+        if (stopped_) return nullptr;
+        cv_.wait(lock);  // Push, FinishTask and Stop notify
     }
-    if (task && task->cancelled.load()) return nullptr;
-
-    // Running from the moment it leaves the queue, under the same lock, so the task is
-    // never seen as neither queued nor running.
-    if (task) ++running_[task->doc_id];
-    return task;
 }
 
 void SPCTaskQueue::FinishTask(const std::string& doc_id) {
     std::lock_guard<std::mutex> lock(mu_);
     auto it = running_.find(doc_id);
     if (it == running_.end()) return;
-    if (--it->second <= 0) running_.erase(it);
+    if (--it->second <= 0) {
+        running_.erase(it);
+        cv_.notify_all();  // a queued task for this document may be runnable now
+    }
 }
 
 void SPCTaskQueue::BeginRunning(const std::string& doc_id) {

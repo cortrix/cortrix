@@ -286,9 +286,13 @@ class FullStackE2E {
   ///        NOTE: the F05 pool opens each Unit's P-HNSW at the snapshot/default
   ///        dim (1024); for a REAL semantic-recall test use embedding_dim=1024 so the
   ///        embedder and index dimensions agree.
+  /// @param spc_workers  SPC worker threads (0 = the manager's minimum of one).
   void BuildIngest(int embedding_dim = 128,
-                   const std::string& embedder_model_path = "") {
+                   const std::string& embedder_model_path = "",
+                   int spc_workers = 0) {
     BuildCore(embedding_dim);
+    // 0 = SPCManager's minimum of one worker; production resolves 0 to two.
+    spc_config_.worker_count = spc_workers;
 
     // Real SPC components (mirrors bootstrap §7).
     cortrix::spc::ParserFactoryConfig pf_cfg;
