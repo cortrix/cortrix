@@ -627,6 +627,7 @@ add_executable(cortrix_integration_tests
     integration/test_health_endpoint.cpp
     integration/test_f13_observability_e2e.cpp
     integration/test_ingest_pipeline_e2e.cpp
+    integration/test_memory_session_search_e2e.cpp
     integration/test_multi_ns_fanout_e2e.cpp
     integration/test_query_llm_modes_e2e.cpp
     integration/test_real_model_query_e2e.cpp
