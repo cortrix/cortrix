@@ -129,6 +129,15 @@ void WriteAgentFriendlyError(httplib::Response& res, int http_status,
 /// `error.timestamp`. No-op on a body without an "error" object.
 void AddErrorRequestFields(httplib::Response& res, nlohmann::json& body,
                            const std::string& request_id);
+/// Complete an error response that a handler has already written: when `res` has a
+/// status of 400 or more and a JSON body with an "error" object, fill in whatever
+/// of `error.request_id`, `error.timestamp` and a single X-Request-Id header is
+/// missing. An id already in the body or the header is kept, and the body and the
+/// header end up with the same id; `request_id` is used only when neither has one.
+/// Anything else (a success, a non-JSON or streamed body, an "error" that is not an
+/// object) is left untouched. Run by the route wrappers after every handler, so a
+/// handler that builds its own error body cannot leave these fields out.
+void CompleteErrorEnvelope(httplib::Response& res, const std::string& request_id);
 void WriteJsonResponse(httplib::Response& res, int http_status, const nlohmann::json& body,
                        const std::string& request_id = "");
 

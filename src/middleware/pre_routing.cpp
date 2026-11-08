@@ -3,6 +3,9 @@
 #include <utility>
 #include <vector>
 
+#include "cortrix/server/http_server.h"
+#include "cortrix/server/request_context.h"
+
 namespace cortrix::middleware {
 
 void InstallPreRouting(httplib::Server& server,
@@ -11,6 +14,9 @@ void InstallPreRouting(httplib::Server& server,
         [stages = std::move(stages)](const httplib::Request& req, httplib::Response& res) {
             for (const auto& stage : stages) {
                 if (stage && stage(req, res) == httplib::Server::HandlerResponse::Handled) {
+                    // A stage that answers (rate limit 429, admin loopback 403) runs
+                    // before any route wrapper mints a request id, so mint one here.
+                    CompleteErrorEnvelope(res, GenerateRequestId());
                     return httplib::Server::HandlerResponse::Handled;
                 }
             }

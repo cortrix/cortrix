@@ -164,6 +164,7 @@ add_executable(cortrix_unit_tests
     unit/test_post_filter.cpp
     unit/test_query_filter.cpp
     unit/test_query_filter_executor.cpp
+    unit/test_error_envelope_completion.cpp
     unit/test_degradation_manager.cpp
     unit/test_query_pipeline.cpp
     unit/test_query_request.cpp
