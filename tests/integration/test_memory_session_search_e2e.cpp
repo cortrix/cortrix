@@ -11,7 +11,9 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <condition_variable>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -36,6 +38,15 @@ class MemorySessionSearchE2E : public ::testing::Test {
   void SetUp() override {
     h_ = std::make_unique<cortrix::test::FullStackE2E>();
     h_->BuildIngest(/*embedding_dim=*/128);
+    // Every memory-session write passes this gate just before its block is written.
+    // It is open unless a test closes it to hold a write while it deletes or
+    // recreates the session.
+    h_->spc_mgr().SetMemoryBlockWriteHook([this](const cortrix::SPCTask&) {
+      std::unique_lock<std::mutex> lk(gate_mu_);
+      ++gate_arrivals_;
+      gate_cv_.notify_all();
+      gate_cv_.wait(lk, [this] { return gate_open_; });
+    });
     // Owned by the tenant of user_key() ("alice"), so alice's requests pass the
     // namespace check on the routes that have one.
     ASSERT_TRUE(h_->CreateNamespaceOwnedBy(kNs, "alice").ok());
@@ -43,6 +54,34 @@ class MemorySessionSearchE2E : public ::testing::Test {
                                   h_->embedder(), h_->classifier(), h_->fusion(),
                                   config_);
     h_->Start();
+  }
+
+  void TearDown() override { OpenGate(); }  // never leave a worker parked at the gate
+
+  void CloseGate() {
+    std::lock_guard<std::mutex> lk(gate_mu_);
+    gate_open_ = false;
+  }
+  void OpenGate() {
+    std::lock_guard<std::mutex> lk(gate_mu_);
+    gate_open_ = true;
+    gate_cv_.notify_all();
+  }
+  // Wait until a write is parked at the closed gate, i.e. its block is not written yet.
+  bool WaitForWriteAtGate(int timeout_ms = 10000) {
+    std::unique_lock<std::mutex> lk(gate_mu_);
+    return gate_cv_.wait_for(lk, std::chrono::milliseconds(timeout_ms),
+                             [this] { return gate_arrivals_ > 0; });
+  }
+  // After opening the gate: wait until the held write's block is in the store.
+  bool WaitForMemoryBlock(int timeout_ms = 10000) {
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+    while (std::chrono::steady_clock::now() < deadline) {
+      if (MemoryBlockCount() > 0) return true;
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    return false;
   }
 
   // Create a session owned by alice and append one interaction to it; returns the
@@ -144,6 +183,11 @@ class MemorySessionSearchE2E : public ::testing::Test {
   }
 
   cortrix::MemoryConfig config_;
+  // Declared before h_ so the harness (and its workers) is destroyed first.
+  std::mutex gate_mu_;
+  std::condition_variable gate_cv_;
+  bool gate_open_ = true;
+  int gate_arrivals_ = 0;
   std::unique_ptr<cortrix::test::FullStackE2E> h_;
 };
 
@@ -187,18 +231,19 @@ TEST_F(MemorySessionSearchE2E, DeletedSessionIsNotSearchable) {
 }
 
 TEST_F(MemorySessionSearchE2E, WriteProcessedAfterDeleteIsNotSearchable) {
-  // Delete the session right after the write is accepted, then wait until the
-  // pipeline has written the block anyway: the search must still not return it.
+  // Hold the write before its block is written, delete the session, then let the
+  // write finish: the block lands after the delete and must not be returned.
+  CloseGate();
   const std::string sid = CreateAliceSession();
   ASSERT_FALSE(sid.empty());
   ASSERT_EQ(AppendInteraction(sid, "alice"), 201);
+  ASSERT_TRUE(WaitForWriteAtGate()) << "the write never reached the block write";
+  EXPECT_EQ(MemoryBlockCount(), 0);
   ASSERT_EQ(DeleteAliceSession(sid), 200);
-  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
-  while (MemoryBlockCount() == 0 && std::chrono::steady_clock::now() < deadline) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  }
-  ASSERT_GT(MemoryBlockCount(), 0) << "the write was never processed";
+  OpenGate();
+  ASSERT_TRUE(WaitForMemoryBlock()) << "the held write was never written";
   EXPECT_FALSE(MentionsAnswer(Search(h_->user_key(), "alice")));
+  EXPECT_FALSE(MentionsAnswer(Search(h_->user_key(), "alice", sid)));
 }
 
 TEST_F(MemorySessionSearchE2E, RecreatedSessionIdDoesNotBringBackDeletedInteractions) {
@@ -216,16 +261,18 @@ TEST_F(MemorySessionSearchE2E, RecreatedSessionIdDoesNotBringBackDeletedInteract
 }
 
 TEST_F(MemorySessionSearchE2E, WriteProcessedAfterDeleteAndRecreateIsNotSearchable) {
+  // Hold the write, delete the session and create it again with the same id, then
+  // let the write finish: neither the user nor the recreated session sees it.
   const std::string sid = "reused-session-2";
+  CloseGate();
   ASSERT_EQ(CreateAliceSession(sid), sid);
   ASSERT_EQ(AppendInteraction(sid, "alice"), 201);
+  ASSERT_TRUE(WaitForWriteAtGate()) << "the write never reached the block write";
+  EXPECT_EQ(MemoryBlockCount(), 0);
   ASSERT_EQ(DeleteAliceSession(sid), 200);
   ASSERT_EQ(CreateAliceSession(sid), sid);
-  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
-  while (MemoryBlockCount() == 0 && std::chrono::steady_clock::now() < deadline) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  }
-  ASSERT_GT(MemoryBlockCount(), 0) << "the write was never processed";
+  OpenGate();
+  ASSERT_TRUE(WaitForMemoryBlock()) << "the held write was never written";
   EXPECT_FALSE(MentionsAnswer(Search(h_->user_key(), "alice")));
   EXPECT_FALSE(MentionsAnswer(Search(h_->user_key(), "alice", sid)));
 }

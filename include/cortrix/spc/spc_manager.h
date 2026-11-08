@@ -42,6 +42,9 @@ public:
     /// doc_processor → spc_mgr → pipeline(seam) → worker_pool → doc_processor cycle.
     virtual void SetDocSummaryEnqueue(std::function<void(const async::SubmitRequest&)> fn);
 
+    /// Testing seam: forwards SPCPipeline::SetMemoryBlockWriteHook. Set before Start().
+    virtual void SetMemoryBlockWriteHook(std::function<void(const SPCTask&)> fn);
+
     /// [I1 · GS-2] Install the enricher chain (F03 → F35 → F38) on the managed
     /// pipeline. The chain (+ its enrichers) is owned by the caller (bootstrap) and
     /// must outlive this manager; nullptr = single-enricher path. Proxy because the

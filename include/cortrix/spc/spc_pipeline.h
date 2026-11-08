@@ -85,6 +85,11 @@ public:
     /// a separate step because F42 productization is handled independently.
     void SetDocSummaryEnqueue(std::function<void(const async::SubmitRequest&)> fn);
 
+    /// Testing seam: called on the memory-session path after the block is assembled
+    /// and before it is written, on the worker thread. Lets a test hold a write until
+    /// it has changed state around it. Set before Start(); nullptr (default) = off.
+    void SetMemoryBlockWriteHook(std::function<void(const SPCTask&)> fn);
+
     /// [I1 · GS-2] Install the ISpcEnricher chain (F03 → F35 → F38, fail-soft
     /// serial). When set, the Stage-3.6 enrich step runs the whole chain (F03
     /// entities/summary + F35 contextualized_* re-embedding + F38 hype_question
@@ -155,6 +160,7 @@ private:
     // [⑤c] F41 doc-summary enqueue seam (nullable = feature off). Production wires
     // it to F42 TaskScheduler::Enqueue; unset leaves OnDocumentWritten a no-op.
     std::function<void(const async::SubmitRequest&)> doc_summary_enqueue_;
+    std::function<void(const SPCTask&)> memory_block_write_hook_;  // testing seam; null = off
 };
 
 }  // namespace cortrix
