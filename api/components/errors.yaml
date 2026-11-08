@@ -104,6 +104,12 @@ components:
           retry_after_ms: 60000
           typical_cause: "rate limit exceeded"
           suggested_action: "Retry after sleep(retry_after_ms); or lower QPS"
+        CX_ERR_SPC_QUEUE_FULL:
+          retryable: true
+          category: transient
+          retry_after_ms: 1000
+          typical_cause: "the processing queue is full; the document is saved"
+          suggested_action: "retry the same upload after retry_after_ms"
         CX_ERR_AUTH_INVALID_API_KEY:
           retryable: false
           category: auth

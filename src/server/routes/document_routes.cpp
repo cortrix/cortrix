@@ -18,7 +18,8 @@ namespace cortrix {
 
 namespace {
 
-// Matches the queue-full retry delay in the error table.
+// Matches retry_after_ms of CX_ERR_SPC_QUEUE_FULL in the x-cortrix-error-codes
+// registry (api/components/errors.yaml).
 constexpr int kSpcQueueFullRetryAfterMs = 1000;
 
 std::string DocStatusToString(DocStatus status) {
@@ -160,8 +161,12 @@ void RegisterDocumentRoutes(httplib::Server& server,
                         err.retryable = true;
                         err.category = agent_friendly::ErrorCategory::kTransient;
                         err.retry_after_ms = kSpcQueueFullRetryAfterMs;
-                        err.structured_data = nlohmann::json::object();
+                        // The document is already saved; tell the client which one.
+                        err.structured_data = nlohmann::json{{"doc_id", result.doc_id}};
                         WriteAgentFriendlyError(res, 503, err, rctx.request_id);
+                        // Retry-After is in whole seconds (rounded up from retry_after_ms).
+                        res.set_header("Retry-After",
+                                       std::to_string((kSpcQueueFullRetryAfterMs + 999) / 1000));
                         return;
                     }
                     int http_code = MapStatusToHttp(s);
