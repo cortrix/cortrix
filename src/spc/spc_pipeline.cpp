@@ -271,6 +271,11 @@ int SPCPipeline::Process(SPCTask& task, resource::NamespaceFacade& facade) {
         CortrixBlock block = assembler_.Assemble(
             task.doc_id, chunk, emb, kBlockMemory, /*processing_level=*/3,
             task.metadata_json);
+        // The flat Assemble() writes metadata only into the BLOB payload. Retrieval's
+        // PostFilter reads the blocks row's metadata_json, and the memory searcher's
+        // scope filter drops a row without user_id, so carry it on the row too.
+        block.metadata_json = task.metadata_json;
+        if (memory_block_write_hook_) memory_block_write_hook_(task);
 
         std::vector<std::pair<const float*, uint64_t>> vec_points;
         if (!emb.vector.empty()) {
@@ -1242,6 +1247,10 @@ void SPCPipeline::SetEnricherChain(cortrix::spc::EnricherChain* chain) {
 void SPCPipeline::SetSparseIndexRegistry(
     cortrix::retrieval::SparseIndexRegistry* registry) {
     sparse_registry_ = registry;
+}
+
+void SPCPipeline::SetMemoryBlockWriteHook(std::function<void(const SPCTask&)> fn) {
+    memory_block_write_hook_ = std::move(fn);
 }
 
 void SPCPipeline::SetCleaningConfigResolver(

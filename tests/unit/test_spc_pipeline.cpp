@@ -934,6 +934,8 @@ TEST_F(SPCPipelineTest, MemorySession_WritesOneFlatBlock) {
         reinterpret_cast<const char*>(blocks[0].data.data() + meta_start),
         hdr->metadata_length);
     EXPECT_EQ(extracted_meta, task.metadata_json);
+    // ...and onto the blocks row, which retrieval's PostFilter reads.
+    EXPECT_EQ(blocks[0].metadata_json, task.metadata_json);
 }
 
 // ============================================================

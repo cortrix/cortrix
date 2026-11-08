@@ -154,6 +154,10 @@ void SPCManager::SetDocSummaryEnqueue(
     if (pipeline_) pipeline_->SetDocSummaryEnqueue(std::move(fn));
 }
 
+void SPCManager::SetMemoryBlockWriteHook(std::function<void(const SPCTask&)> fn) {
+    if (pipeline_) pipeline_->SetMemoryBlockWriteHook(std::move(fn));
+}
+
 void SPCManager::SetEnricherChain(cortrix::spc::EnricherChain* chain) {
     if (pipeline_) pipeline_->SetEnricherChain(chain);
 }

@@ -78,6 +78,10 @@ public:
     /// Count interactions in a session
     Status InteractionCount(const std::string& session_id, int64_t* count);
 
+    /// Does an interaction_log row with this id exist? Ids are minted on insert, and a
+    /// session delete removes the session's rows.
+    Status InteractionExists(const std::string& interaction_id, bool* exists);
+
     /// Search interactions by content text (SQL LIKE '%query%')
     /// Returns matching interactions sorted by created_at descending
     /// @param namespace_name: namespace to search within

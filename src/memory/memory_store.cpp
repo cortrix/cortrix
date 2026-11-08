@@ -734,6 +734,27 @@ Status MemoryStore::InteractionSearch(const std::string& namespace_name,
     return Status::Ok();
 }
 
+Status MemoryStore::InteractionExists(const std::string& interaction_id, bool* exists) {
+    if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
+    std::lock_guard<std::mutex> lock(mu_);
+
+    const char* sql = "SELECT 1 FROM interaction_log WHERE id = ? LIMIT 1";
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        return Status::Internal("InteractionExists prepare: " + std::string(sqlite3_errmsg(db_)));
+    }
+
+    sqlite3_bind_text(stmt, 1, interaction_id.c_str(), -1, SQLITE_TRANSIENT);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    if (rc != SQLITE_ROW && rc != SQLITE_DONE) {
+        return Status::Internal("InteractionExists step: " + std::string(sqlite3_errmsg(db_)));
+    }
+    *exists = (rc == SQLITE_ROW);
+    return Status::Ok();
+}
+
 Status MemoryStore::InteractionCount(const std::string& session_id, int64_t* count) {
     if (TryConsumeOpFault()) return Status::Internal("injected store failure");  // testing seam (F23 §4.5)
     std::lock_guard<std::mutex> lock(mu_);
