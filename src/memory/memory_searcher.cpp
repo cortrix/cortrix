@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdio>
 #include <ctime>
+#include <unordered_map>
 
 #include "cortrix/memory/mem05_metrics.h"
 
@@ -128,6 +129,7 @@ MemorySearchResponse MemorySearcher::Search(const MemorySearchRequest& request) 
     kept.reserve(qresp.results.size());
     candidates.reserve(qresp.results.size());
 
+    std::unordered_map<std::string, bool> session_alive;  // session_id -> still exists
     for (const auto& item : qresp.results) {
         // 4a. Scope filter (MEM05: always applied — items without user_id in
         //     metadata, including null metadata, fail the user_id check and are
@@ -155,6 +157,21 @@ MemorySearchResponse MemorySearcher::Search(const MemorySearchRequest& request) 
         // the MEMORY block_type filter — drop it.
         if (result.interaction_id.empty() && result.content.empty()) {
             continue;
+        }
+
+        // A raw interaction row lives only as long as its session. Deleting a session
+        // removes its memory_sessions and interaction_log rows but not the indexed
+        // block, and a write still being processed lands its block after the delete,
+        // so drop interaction rows whose session no longer exists.
+        if (!result.interaction_id.empty()) {
+            auto known = session_alive.find(result.session_id);
+            if (known == session_alive.end()) {
+                MemorySession session;
+                const bool alive = !result.session_id.empty() &&
+                                   memory_store_.SessionGet(result.session_id, session).ok();
+                known = session_alive.emplace(result.session_id, alive).first;
+            }
+            if (!known->second) continue;
         }
 
         // 5b. MEM01 (scorer path only): build the scoring candidate parallel to
