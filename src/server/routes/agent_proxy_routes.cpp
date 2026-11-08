@@ -10,11 +10,25 @@
 
 #include <httplib.h>
 
+#include "cortrix/agent_friendly/error.h"
 #include "cortrix/logging/logging.h"
+#include "cortrix/server/http_server.h"
+#include "cortrix/server/request_context.h"
 
 namespace cortrix {
 
 namespace {
+
+// The agent service is unreachable. These proxy routes have no route wrapper, so
+// the request id is minted here.
+void WriteUpstreamUnreachable(httplib::Response& res) {
+    agent_friendly::AgentFriendlyError err;
+    err.code = "CX_ERR_AGENT_UPSTREAM";
+    err.message = "agent service unreachable";
+    err.retryable = true;
+    err.category = agent_friendly::ErrorCategory::kTransient;
+    WriteAgentFriendlyError(res, 502, err, GenerateRequestId());
+}
 
 bool IEquals(const std::string& a, const char* b) {
     size_t n = std::strlen(b);
@@ -112,10 +126,7 @@ void ProxyChatStreaming(const std::string& base, const httplib::Request& req,
         std::unique_lock<std::mutex> lk(st->mu);
         st->cv.wait(lk, [&] { return !st->pending.empty() || st->upstream_done; });
         if (st->upstream_failed && st->pending.empty()) {
-            res.status = 502;
-            res.set_content(
-                R"({"error":{"code":"CX_ERR_AGENT_UPSTREAM","message":"agent service unreachable","retryable":true,"category":"transient"}})",
-                "application/json");
+            WriteUpstreamUnreachable(res);
             return;
         }
         if (!st->pending.empty() &&
@@ -178,10 +189,7 @@ void ProxyBuffered(const std::string& base, const std::string& strip_prefix,
     }
 
     if (!result) {
-        res.status = 502;
-        res.set_content(
-            R"({"error":{"code":"CX_ERR_AGENT_UPSTREAM","message":"agent service unreachable","retryable":true,"category":"transient"}})",
-            "application/json");
+        WriteUpstreamUnreachable(res);
         return;
     }
     res.status = result->status;

@@ -318,16 +318,10 @@ ResolvedError ResolveError(const Status& status) {
 
 std::string ResolvedErrorCode(const Status& status) { return ResolveError(status).code; }
 
-void AddErrorRequestFields(httplib::Response& res, nlohmann::json& body,
-                           const std::string& request_id) {
-    if (!body.is_object() || !body.contains("error") || !body["error"].is_object()) return;
-    if (!request_id.empty()) {
-        body["error"]["request_id"] = request_id;
-        // set_header appends, so a caller that already set the header (the query
-        // route does, for every response) must not get a second X-Request-Id line.
-        if (!res.has_header("X-Request-Id")) res.set_header("X-Request-Id", request_id);
-    }
-    // Per API_GATEWAY_DESIGN.md section 2.5.1: include ISO 8601 timestamp
+namespace {
+
+// Per API_GATEWAY_DESIGN.md section 2.5.1: ISO 8601 UTC with milliseconds.
+std::string ErrorTimestampNow() {
     auto now = std::chrono::system_clock::now();
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
     auto time_t_now = std::chrono::system_clock::to_time_t(now);
@@ -337,7 +331,53 @@ void AddErrorRequestFields(httplib::Response& res, nlohmann::json& body,
     std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &tm_buf);
     std::ostringstream ts;
     ts << buf << "." << std::setfill('0') << std::setw(3) << ms.count() << "Z";
-    body["error"]["timestamp"] = ts.str();
+    return ts.str();
+}
+
+bool NonEmptyString(const nlohmann::json& obj, const char* key) {
+    auto it = obj.find(key);
+    return it != obj.end() && it->is_string() && !it->get_ref<const std::string&>().empty();
+}
+
+}  // namespace
+
+void AddErrorRequestFields(httplib::Response& res, nlohmann::json& body,
+                           const std::string& request_id) {
+    if (!body.is_object() || !body.contains("error") || !body["error"].is_object()) return;
+    if (!request_id.empty()) {
+        body["error"]["request_id"] = request_id;
+        // set_header appends, so a caller that already set the header (the query
+        // route does, for every response) must not get a second X-Request-Id line.
+        if (!res.has_header("X-Request-Id")) res.set_header("X-Request-Id", request_id);
+    }
+    body["error"]["timestamp"] = ErrorTimestampNow();
+}
+
+void CompleteErrorEnvelope(httplib::Response& res, const std::string& request_id) {
+    if (res.status < 400 || res.body.empty() || res.has_header("Content-Encoding")) return;
+    if (res.get_header_value("Content-Type").rfind("application/json", 0) != 0) return;
+    nlohmann::json body = nlohmann::json::parse(res.body, nullptr, /*allow_exceptions=*/false);
+    if (!body.is_object()) return;
+    auto err_it = body.find("error");
+    if (err_it == body.end() || !err_it->is_object()) return;
+    nlohmann::json& err = *err_it;
+
+    const bool has_header = res.has_header("X-Request-Id");
+    const bool has_rid = NonEmptyString(err, "request_id");
+    const bool has_ts = NonEmptyString(err, "timestamp");
+    if (has_header && has_rid && has_ts) return;
+
+    // Keep the id the response already carries, so the body, the header and the
+    // handler's own log lines name the same request.
+    const std::string rid = has_rid      ? err["request_id"].get<std::string>()
+                            : has_header ? res.get_header_value("X-Request-Id")
+                                         : request_id;
+    if (!has_header && !rid.empty()) res.set_header("X-Request-Id", rid);
+    if (has_rid && has_ts) return;
+    if (!has_rid && !rid.empty()) err["request_id"] = rid;
+    if (!has_ts) err["timestamp"] = ErrorTimestampNow();
+    // httplib sets Content-Length from the body after the handler returns.
+    res.body = body.dump();
 }
 
 void WriteAgentFriendlyError(httplib::Response& res, int http_status,
@@ -380,7 +420,8 @@ void WriteJsonErrorWithData(httplib::Response& res, const Status& status,
 
 void WriteJsonResponse(httplib::Response& res, int http_status, const nlohmann::json& body,
                        const std::string& request_id) {
-    if (!request_id.empty()) {
+    // set_header appends: never add a second X-Request-Id line.
+    if (!request_id.empty() && !res.has_header("X-Request-Id")) {
         res.set_header("X-Request-Id", request_id);
     }
     ApplyBaselineSecurityHeaders(res);
@@ -450,8 +491,7 @@ void CortrixHttpServer::RegisterRoutes() {
                                                             : GenerateRequestId();
         nlohmann::json body;
         body["error"] = agent_friendly::ToJson(err);
-        body["error"]["request_id"] = req_id;
-        res.set_header("X-Request-Id", req_id);
+        AddErrorRequestFields(res, body, req_id);
         res.set_content(body.dump(), "application/json");
         res.status = 500;
     });
