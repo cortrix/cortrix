@@ -6,10 +6,11 @@ import { useAppStore } from '../../store/useAppStore';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { ProgrammaticBanner } from '../Common/ProgrammaticBanner';
+import { formatInTimezone } from '../../utils/timezone';
 
 export function ChatPage() {
   const { messages, sendMessage, isStreaming, stopStreaming, newSession, sessions, loadSessions, switchSession, deleteSession, sessionId } = useChatStore();
-  const { systemStatus, currentNamespace } = useAppStore();
+  const { systemStatus, currentNamespace, timezone } = useAppStore();
   const namespaceReady = useAppStore((s) =>
     s.namespaces.some((ns) => ns.name === s.currentNamespace),
   );
@@ -45,8 +46,9 @@ export function ChatPage() {
           ) : (
             sessions.map((s) => {
               const date = new Date(s.created_at);
-              const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-              const dateStr = date.toLocaleDateString();
+              const formatted = formatInTimezone(date, timezone);
+              const timeStr = formatted.slice(11);
+              const dateStr = formatted.slice(0, 10);
               const displayTitle = s.title && s.title !== 'New Chat'
                 ? s.title
                 : `${t('chat.untitled', { defaultValue: 'Chat' })}`;

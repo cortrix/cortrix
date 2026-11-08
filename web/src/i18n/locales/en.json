@@ -232,7 +232,10 @@
     "apiKeyLastUsed": "Last used",
     "apiKeyRevoke": "Revoke",
     "apiKeyRevoked": "API key revoked",
-    "apiKeyShownOnce": "Copy this key now — it is shown only once and cannot be retrieved later."
+    "apiKeyShownOnce": "Copy this key now — it is shown only once and cannot be retrieved later.",
+    "timezoneSection": "Timezone",
+    "timezoneLabel": "Display timezone",
+    "timezoneHint": "Timestamps across the UI (operation log, users, documents, chat) are converted from UTC to this timezone."
   },
   "llm": {
     "status": "LLM",

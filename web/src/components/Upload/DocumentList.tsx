@@ -11,6 +11,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { listWatchers } from '../../api/connector';
 import type { WatcherEntry } from '../../api/connector';
 import { formatFileSize } from '../../utils/formatters';
+import { formatInTimezone } from '../../utils/timezone';
 import type { DocumentStatus } from '../../types/api';
 
 // ── Status config ────────────────────────────────────────────────────────────
@@ -32,9 +33,10 @@ function getFileIcon(doc: DocumentStatus) {
   return DocumentTextIcon;
 }
 
-function formatDate(val: string | number): string {
+function formatDate(val: string | number, timezone: string): string {
   const d = typeof val === 'number' ? new Date(val * 1000) : new Date(val);
-  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (Number.isNaN(d.getTime())) return '—';
+  return formatInTimezone(d, timezone);
 }
 
 // ── Tree data structures ─────────────────────────────────────────────────────
@@ -155,6 +157,7 @@ function FileRow({
 }) {
   const { t } = useTranslation();
   const doc = node.doc;
+  const timezone = useAppStore((s) => s.timezone);
   const Icon = getFileIcon(doc);
   const sCfg = statusConfig[doc.status] || statusConfig.pending;
   const StatusIcon = sCfg.icon;
@@ -200,7 +203,7 @@ function FileRow({
 
       {/* Date */}
       <p className="text-[10px] text-muted text-right tabular-nums">
-        {formatDate(doc.created_at)}
+        {formatDate(doc.created_at, timezone)}
       </p>
 
       {/* Delete */}

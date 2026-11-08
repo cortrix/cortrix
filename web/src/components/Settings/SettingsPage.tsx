@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   CpuChipIcon, EyeIcon, ChatBubbleLeftRightIcon, CheckIcon, ArrowPathIcon, EyeSlashIcon,
   Cog6ToothIcon, ServerIcon, CircleStackIcon, FolderIcon, ShieldCheckIcon, KeyIcon,
-  LockClosedIcon, PlusIcon, ClipboardIcon, TrashIcon, ExclamationTriangleIcon,
+  LockClosedIcon, PlusIcon, ClipboardIcon, TrashIcon, ExclamationTriangleIcon, GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -10,8 +10,9 @@ import { useAppStore } from '../../store/useAppStore';
 import type { LLMProvider } from '../../types/api';
 import { listApiKeys, createApiKey, revokeApiKey } from '../../api/apiKeys';
 import { parseAgentError } from '../../api/errors';
-import { Button, Input, Modal, Badge, notify } from '../ui';
+import { Button, Input, Modal, Badge, notify, Select } from '../ui';
 import { ProgrammaticBanner } from '../Common/ProgrammaticBanner';
+import { listTimezones, formatDateOnly } from '../../utils/timezone';
 
 const AGENT_URL = '/agent';
 
@@ -343,7 +344,7 @@ const EMPTY_AGENT_LLM: AgentLlmConfig = { llm_provider: '', model: '', base_url:
 
 export function SettingsPage() {
   const { t } = useTranslation();
-  const { systemStatus } = useAppStore();
+  const { systemStatus, timezone, setTimezone } = useAppStore();
 
   const [loading,   setLoading]   = useState(true);
   const [providers, setProviders] = useState<LLMProvider[]>([]);
@@ -377,6 +378,14 @@ export function SettingsPage() {
 
   const semanticEnabled = !!systemStatus?.llm_enabled;
 
+  // The picker must always offer the zone the browser is in, even when the
+  // runtime does not expose the full IANA list.
+  const timezoneOptions = useMemo(() => {
+    const zones = listTimezones();
+    if (!zones.includes(timezone)) zones.push(timezone);
+    return zones;
+  }, [timezone]);
+
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
       {/* Page header */}
@@ -407,7 +416,20 @@ export function SettingsPage() {
         )}
       </Section>
 
-      {/* ── Section 2: LLM Role Configuration ── */}
+      {/* ── Section 2: Display timezone ── */}
+      <Section icon={<GlobeAltIcon className="w-4 h-4" />} title={t('settings.timezoneSection')}>
+        <div className="bg-surface rounded-xl border border-line px-5 py-4">
+          <Select
+            label={t('settings.timezoneLabel')}
+            value={timezone}
+            onChange={setTimezone}
+            options={timezoneOptions.map((tz) => ({ value: tz, label: tz }))}
+          />
+          <p className="mt-3 text-xs text-muted">{t('settings.timezoneHint')}</p>
+        </div>
+      </Section>
+
+      {/* ── Section 3: LLM Role Configuration ── */}
       <Section icon={<CpuChipIcon className="w-4 h-4" />} title={t('settings.llmSection')}>
         {loading ? (
           <div className="flex items-center gap-2 text-muted py-4">
@@ -503,6 +525,7 @@ export function SettingsPage() {
 function ApiKeysSection() {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const timezone = useAppStore((s) => s.timezone);
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [createdKey, setCreatedKey] = useState<string | null>(null);
@@ -601,7 +624,7 @@ function ApiKeysSection() {
                     <Badge variant={k.status === 'active' ? 'ok' : 'warning'}>{k.status}</Badge>
                   </td>
                   <td className="py-2.5 pr-3 font-mono text-xs text-muted">
-                    {k.last_used_at ? k.last_used_at.slice(0, 10) : '—'}
+                    {formatDateOnly(k.last_used_at, timezone)}
                   </td>
                   <td className="py-2.5 text-right">
                     {k.status === 'active' && (

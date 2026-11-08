@@ -10,6 +10,8 @@ import { LoadingSpinner } from '../../components/Common/LoadingSpinner';
 import { ProgrammaticBanner } from '../../components/Common/ProgrammaticBanner';
 import { ErrorDisplay } from '../../components/Common/ErrorDisplay';
 import { DynamicColumns, type ColumnDef } from '../../components/Table/DynamicColumns';
+import { useAppStore } from '../../store/useAppStore';
+import { dateToMs as toDateMs, formatInTimezone } from '../../utils/timezone';
 
 // OperationLogPage (P02a design § 9-bis.2 — CE simplified). Integrates the F18a
 // CE operation_log via GET /api/v1/operations (business prefix — NOT
@@ -25,19 +27,9 @@ const PAGE_SIZE = 50;
 // Distinct resource_type values surfaced as a filter (F18a § 4.1 enum).
 const RESOURCE_TYPES = ['document', 'namespace', 'memory', 'query', 'user', 'db_connection', 'db_import'];
 
-function fmtTimestamp(ms: number): string {
-  const d = new Date(ms);
-  return d.toISOString().replace('T', ' ').slice(0, 19) + 'Z';
-}
-
-function dateToMs(value: string, endOfDay: boolean): number | undefined {
-  if (!value) return undefined;
-  const d = new Date(value + (endOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z'));
-  return Number.isNaN(d.getTime()) ? undefined : d.getTime();
-}
-
 export function OperationLogPage() {
   const { t } = useTranslation();
+  const timezone = useAppStore((s) => s.timezone);
 
   const [userId, setUserId] = useState('');
   const [action, setAction] = useState('');
@@ -50,8 +42,8 @@ export function OperationLogPage() {
     user_id: userId || undefined,
     action: action || undefined,
     resource_type: resourceType === 'all' ? undefined : resourceType,
-    from_timestamp: dateToMs(fromDate, false),
-    to_timestamp: dateToMs(toDate, true),
+    from_timestamp: toDateMs(fromDate, false, timezone),
+    to_timestamp: toDateMs(toDate, true, timezone),
     limit: PAGE_SIZE,
     offset,
   };
@@ -73,7 +65,7 @@ export function OperationLogPage() {
         key: 'timestamp',
         header: t('admin.operations.colTimestamp'),
         className: 'whitespace-nowrap font-mono text-xs text-muted',
-        render: (o) => fmtTimestamp(o.timestamp),
+        render: (o) => formatInTimezone(new Date(o.timestamp), timezone),
       },
       { key: 'user_id', header: t('admin.operations.colUser'), className: 'font-mono text-xs', render: (o) => o.user_id },
       {
@@ -110,7 +102,7 @@ export function OperationLogPage() {
         render: (o) => o.trace_id ?? '—',
       },
     ],
-    [t],
+    [t, timezone],
   );
 
   const columns = ceColumns;
