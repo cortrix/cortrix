@@ -35,9 +35,9 @@ PROF="$BUILD/prof"
 CORE_BRANCH_MIN=80
 # Pinned cortrix_core source universe; scripts/ci/check_core_universe.py
 # checks it against CMakeLists.txt on every PR.
-CORE_TARGET_TU_EXPECTED=323
-CORE_MAPPED_TU_EXPECTED=320
-CORE_TARGET_SOURCE_SHA256_EXPECTED="7486542b50ee9f410ae7c2d4b4e8a236a7d9402eb38f1c7bd6d7fbb21c9ee27a"
+CORE_TARGET_TU_EXPECTED=324
+CORE_MAPPED_TU_EXPECTED=321
+CORE_TARGET_SOURCE_SHA256_EXPECTED="48df15efd9865a83fe3308654dc6383d372aa046c57e9fd7a40fcdbac9634814"
 
 CORE_DIRS=(
   src/store src/reranker src/spc src/query src/resource src/async
