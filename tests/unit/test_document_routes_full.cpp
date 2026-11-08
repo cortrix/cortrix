@@ -240,6 +240,14 @@ TEST_F(DocRoutesFull, UploadQueueFull503) {
     auto res = cli.Post("/api/v1/namespaces/default/documents", AuthHeaders(), items);
     ASSERT_TRUE(res);
     EXPECT_EQ(res->status, 503) << res->body;
+    const auto error = json::parse(res->body).at("error");
+    EXPECT_EQ(error.at("code"), "CX_ERR_SPC_QUEUE_FULL");
+    EXPECT_EQ(error.at("category"), "transient");
+    EXPECT_EQ(error.at("retryable"), true);
+    EXPECT_EQ(error.at("retry_after_ms"), 1000);
+    EXPECT_EQ(res->get_header_value("Retry-After"), "1");
+    ASSERT_TRUE(error.at("structured_data").at("doc_id").is_string());
+    EXPECT_FALSE(error.at("structured_data").at("doc_id").get<std::string>().empty());
 }
 
 // ---------------------------------------------------------------------------

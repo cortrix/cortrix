@@ -18,6 +18,10 @@ namespace cortrix {
 
 namespace {
 
+// Matches retry_after_ms of CX_ERR_SPC_QUEUE_FULL in the x-cortrix-error-codes
+// registry (api/components/errors.yaml).
+constexpr int kSpcQueueFullRetryAfterMs = 1000;
+
 std::string DocStatusToString(DocStatus status) {
     switch (status) {
         case DocStatus::kPending:    return "pending";
@@ -150,6 +154,21 @@ void RegisterDocumentRoutes(httplib::Server& server,
                 Status s = handler.HandleUpload(upload_req, facade.store(), facade.blob(), &result);
 
                 if (!s.ok()) {
+                    if (ResolvedErrorCode(s) == "CX_ERR_SPC_QUEUE_FULL") {
+                        agent_friendly::AgentFriendlyError err;
+                        err.code = "CX_ERR_SPC_QUEUE_FULL";
+                        err.message = s.message();
+                        err.retryable = true;
+                        err.category = agent_friendly::ErrorCategory::kTransient;
+                        err.retry_after_ms = kSpcQueueFullRetryAfterMs;
+                        // The document is already saved; tell the client which one.
+                        err.structured_data = nlohmann::json{{"doc_id", result.doc_id}};
+                        WriteAgentFriendlyError(res, 503, err, rctx.request_id);
+                        // Retry-After is in whole seconds (rounded up from retry_after_ms).
+                        res.set_header("Retry-After",
+                                       std::to_string((kSpcQueueFullRetryAfterMs + 999) / 1000));
+                        return;
+                    }
                     int http_code = MapStatusToHttp(s);
                     // Use standard error envelope per API_GATEWAY_DESIGN.md 2.5.1
                     // WriteJsonError includes timestamp per spec
