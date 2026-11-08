@@ -176,8 +176,8 @@ Result<Tenant> TenantService::CreateOrganization(const std::string& name,
     if (db_ == nullptr) {
         return TenantStatus(TenantErrorCode::kTenantTransactionFailed, "no database connection");
     }
-    // V1.0 OSS: plan-based org-creation quota is enforced by QuotaService at the
-    // Cloud-V1 layer (UnlimitedPlanProvider here). Cross-feature wiring of that
+    // V1.0 OSS: no plan-based org-creation quota is checked here (QuotaService
+    // runs on UnlimitedPlanProvider). Cross-feature wiring of that
     // check is D3.5 deferred -- this Wave performs the structural INSERTs only.
 
     const std::string tenant_id = "tenant-" + UuidV4();

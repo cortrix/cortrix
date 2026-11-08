@@ -56,10 +56,10 @@ public:
         sqlite3* conn,
         const observability::TraceContext* ctx = nullptr);
 
-    /// Organization tenant -- Cloud V1+ admin / self-serve. INSERT tenants(type=
+    /// Organization tenant -- admin-created. INSERT tenants(type=
     /// 'organization') + INSERT user_tenants(creator, role='owner'). Errors:
     /// CX_ERR_TENANT_NAME_DUPLICATE / CX_ERR_TENANT_ALREADY_EXISTS /
-    /// CX_ERR_TENANT_QUOTA_EXCEEDED (Cloud V1) / CX_ERR_TENANT_TRANSACTION_FAILED.
+    /// CX_ERR_TENANT_QUOTA_EXCEEDED (not raised by this build) / CX_ERR_TENANT_TRANSACTION_FAILED.
     Result<Tenant> CreateOrganization(
         const std::string& name,
         const AuthContext& owner_ctx,

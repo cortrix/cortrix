@@ -7,14 +7,14 @@
 
 namespace cortrix::auth {
 
-/// The authentication decision for a Cloud request (P08 §2.16 / §4.3),
+/// The authentication decision for a request (P08 §2.16 / §4.3),
 /// as a pure, httplib-independent unit so it is fully testable standalone. It
 /// turns the request's auth headers into either an AuthContext or an
 /// Agent-friendly error, by delegating JWT validation to AuthService.
 ///
 /// 🚩 D3.5 (route wiring): mounting this on the real httplib server — the
 /// `Authenticate(httplib::Request) -> optional<Response>` wrapper, protecting the
-/// existing routes, the CE-vs-Cloud edition switch (CE keeps the MVP ApiKeyAuth
+/// existing routes, the edition switch (CE keeps the MVP ApiKeyAuth
 /// path untouched), and the Bearer-cortrix_sk_* API-Key branch (S6) — is
 /// cross-Feature server wiring and lands at D3.5. This class is the logic those
 /// will call.

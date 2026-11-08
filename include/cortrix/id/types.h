@@ -3,7 +3,8 @@
 #include <string>
 // SoT: ARCHITECTURE.md § 1.8 global ID system (D1 V3 ruling 3). This header = the code realization of the §1.8.1 ID type definitions
 // (missed by the Sprint 0 scaffolding, backfilled in Batch β F02 as a D2-pre-residual).
-// Note: currently a type alias (=std::string), providing no compile-time mix-up protection; distinct strong types = Phase 2 (see PHASE2_BACKLOG TD-ID-DISTINCT-STRONGTYPE).
+// Note: currently a type alias (=std::string), providing no compile-time mix-up
+// protection; distinct strong types are not done yet.
 namespace cortrix::id {
 using ChildId     = std::string;   // ULID, 26 chars, time-ordered
 using ParentId    = std::string;   // ULID, 26 chars

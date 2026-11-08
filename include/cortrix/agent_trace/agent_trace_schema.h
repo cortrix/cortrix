@@ -21,7 +21,7 @@ constexpr int kAgentTraceSchemaVersion = 1;
 /// does NOT alter this table (GEN-OpenCore-Boundary). cortrix/ has no
 /// conditional compilation and does not know that table exists. This boundary is
 /// enforced by tests/unit/test_open_core_boundary.cpp (scans the CE tree, fails on
-/// any enterprise macro / namespace / interface / #include / *_extension DDL).
+/// any edition-specific macro / namespace / interface / #include / *_extension DDL).
 ///
 /// SQLite dialect note (cortrix_global.db is SQLite WAL): the §4.1 spec spells
 /// session_id/trace_id/agent_id as VARCHAR(128); SQLite is dynamically typed and

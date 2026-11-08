@@ -49,15 +49,14 @@ bool QuotaService::CheckQuota(const TenantId& tenant_id, QuotaType type, int64_t
                               const observability::TraceContext* /*ctx*/) {
     QuotaLimit limit = provider_->GetLimit(tenant_id, type);
     if (limit.IsUnlimited()) return true;
-    // V1.0 OSS tracks no usage, so the comparison is against amount alone; Cloud V1
-    // adds the persisted usage from platform.db (D3.5/Cloud-V1 wiring).
+    // V1.0 OSS tracks no usage, so the comparison is against amount alone.
     return amount <= limit.limit;
 }
 
 void QuotaService::RecordUsage(const TenantId& /*tenant_id*/, QuotaType /*type*/,
                                int64_t /*amount*/, const observability::TraceContext* /*ctx*/) {
-    // V1.0 OSS: no-op (topic 4 -- quota_usage table is not created). Cloud V1 persists
-    // to platform.db here. cortrix_quota_record_total{result=noop} metric is D3.5.
+    // V1.0 OSS: no-op (topic 4 -- quota_usage table is not created). Nothing is
+    // persisted here. cortrix_quota_record_total{result=noop} metric is D3.5.
 }
 
 Status QuotaService::UpdateQuotaOverride(const TenantId& tenant_id, QuotaType /*type*/,
@@ -67,8 +66,7 @@ Status QuotaService::UpdateQuotaOverride(const TenantId& tenant_id, QuotaType /*
         return TenantStatus(TenantErrorCode::kTenantNotFound, tenant_id);
     }
     // V1.0 OSS: the platform.db quota_override table does not exist yet, so the
-    // override is validated (tenant exists) and the persistence is a Cloud-V1
-    // no-op. Wiring the write is Cloud V1 (StripePlanProvider).
+    // override is validated (tenant exists) and the persistence is a no-op.
     return Status::Ok();
 }
 

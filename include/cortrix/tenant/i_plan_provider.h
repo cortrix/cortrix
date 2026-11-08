@@ -4,7 +4,7 @@
 namespace cortrix::tenant {
 
 /// Plan-quota source (P09 sec 4.1, topic 4 -- dependency inversion). V1.0 OSS injects
-/// UnlimitedPlanProvider; Cloud V1 injects StripePlanProvider (Phase 1.5) with no
+/// UnlimitedPlanProvider; another provider can be injected with no
 /// change to QuotaService / the HTTP layer (P09 sec 4.7 DI seam).
 class IPlanProvider {
 public:

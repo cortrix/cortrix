@@ -14,8 +14,8 @@ typedef struct sqlite3 sqlite3;
 namespace cortrix::tenant {
 
 /// Quota service (P09 sec 4.4, topic 4). Reads limits from the injected IPlanProvider;
-/// usage tracking (RecordUsage) is a no-op in V1.0 OSS (quota_usage lives in
-/// platform.db only from Cloud V1 -- P09 sec 3 / sec 6).
+/// usage tracking (RecordUsage) is a no-op in V1.0 OSS (no quota_usage table is
+/// created -- P09 sec 3 / sec 6).
 ///
 /// The optional catalog.db handle lets GetQuota verify the tenant exists; pass
 /// nullptr in pure provider-only tests.
@@ -36,12 +36,11 @@ public:
                     const observability::TraceContext* ctx = nullptr);
 
     /// V1.0 OSS: no-op (does NOT write quota_usage; the table is not created).
-    /// Cloud V1: persists to platform.db quota_usage.
     void RecordUsage(const TenantId& tenant_id, QuotaType type, int64_t amount,
                      const observability::TraceContext* ctx = nullptr);
 
-    /// Admin override (Cloud V1+). Errors: CX_ERR_TENANT_NOT_FOUND. Writing the
-    /// platform.db quota_override row is Cloud V1 -- V1.0 OSS validates + no-ops the
+    /// Admin override. Errors: CX_ERR_TENANT_NOT_FOUND. No platform.db
+    /// quota_override row is written -- V1.0 OSS validates + no-ops the
     /// persistence (returns Ok when the tenant exists).
     Status UpdateQuotaOverride(const TenantId& tenant_id, QuotaType type, QuotaLimit new_limit,
                                const AuthContext& admin_ctx,

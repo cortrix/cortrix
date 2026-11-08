@@ -14,7 +14,7 @@ namespace cortrix::onnx {
 ///
 /// Phase 1: static methods (one runtime instance per Cortrix binary, build-time
 /// locked per D1=A). A future multi-runtime mode would require a breaking change
-/// to an instance-based API; see PHASE2_BACKLOG F22-MULTI-RUNTIME.
+/// to an instance-based API.
 class Runtime {
  public:
     /// The ONNX Runtime version actually loaded into this process, e.g.

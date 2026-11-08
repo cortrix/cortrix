@@ -175,7 +175,7 @@ void RegisterTenantRoutes(httplib::Server& server, tenant::TenantService& tenant
                                      "admin API key required", rctx.request_id);
                     return;
                 }
-                // The admin list-all enumeration is a Cloud-V1 admin surface; V1.0
+                // The admin list-all enumeration is not implemented here; V1.0
                 // OSS returns the structurally-correct empty envelope (single
                 // default_tenant deployments do not enumerate). D3.5 wires the
                 // full SELECT once admin list semantics are integrated.
