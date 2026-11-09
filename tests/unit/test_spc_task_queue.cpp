@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "cortrix/spc/spc_task_queue.h"
+#include <atomic>
 #include <thread>
 #include <chrono>
 
@@ -170,15 +171,13 @@ TEST(SPCTaskQueueTest, APoppedTaskRunsUntilItIsFinished) {
 
 TEST(SPCTaskQueueTest, RunningCountsEachTaskOfADocument) {
     SPCTaskQueue queue(10);
-    for (int64_t at : {100, 200}) {
-        auto t = MakeTask(SPCPriority::kP1, at, "a.txt");
-        t->doc_id = "doc-a";
-        ASSERT_EQ(queue.Push(t), 0);
-    }
+    auto t = MakeTask(SPCPriority::kP1, 100, "a.txt");
+    t->doc_id = "doc-a";
+    ASSERT_EQ(queue.Push(t), 0);
     ASSERT_NE(queue.Pop(), nullptr);
-    ASSERT_NE(queue.Pop(), nullptr);
+    queue.BeginRunning("doc-a");  // work outside the queue for the same document
     queue.FinishTask("doc-a");
-    EXPECT_TRUE(queue.IsRunning("doc-a")) << "the second task still runs";
+    EXPECT_TRUE(queue.IsRunning("doc-a")) << "the second piece of work still runs";
     queue.FinishTask("doc-a");
     EXPECT_FALSE(queue.IsRunning("doc-a"));
 
@@ -187,6 +186,119 @@ TEST(SPCTaskQueueTest, RunningCountsEachTaskOfADocument) {
     EXPECT_FALSE(queue.IsRunning("doc-a"));
     queue.FinishTask("doc-b");
     EXPECT_FALSE(queue.IsRunning("doc-b"));
+}
+
+// Pop on another thread; `done` turns true once it has returned.
+// The destructor stops the queue first, so a Pop that never returns (a regression)
+// fails the test instead of hanging it.
+struct AsyncPop {
+    SPCTaskQueue& queue;
+    std::shared_ptr<SPCTask> task;
+    std::atomic<bool> done{false};
+    std::thread thread;
+    explicit AsyncPop(SPCTaskQueue& q)
+        : queue(q), thread([this] { task = queue.Pop(); done = true; }) {}
+    ~AsyncPop() {
+        queue.Stop();
+        if (thread.joinable()) thread.join();
+    }
+    bool WaitDone(int ms) {
+        for (int i = 0; i < ms / 10 && !done; ++i) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        return done;
+    }
+};
+
+// Two tasks for one document (two interactions of one memory session) must not run at
+// once: the second waits until the first is finished.
+TEST(SPCTaskQueueTest, TasksForOneDocumentRunOneAtATime) {
+    SPCTaskQueue queue(10);
+    auto first = MakeTask(SPCPriority::kP1, 100, "a.txt");
+    first->doc_id = "doc-a";
+    auto second = MakeTask(SPCPriority::kP1, 200, "a.txt");
+    second->doc_id = "doc-a";
+    ASSERT_EQ(queue.Push(first), 0);
+    ASSERT_EQ(queue.Push(second), 0);
+    ASSERT_EQ(queue.Pop(), first);
+
+    AsyncPop pop(queue);
+    EXPECT_FALSE(pop.WaitDone(200)) << "the second task ran while the first was running";
+    EXPECT_TRUE(queue.HasQueuedTask("doc-a"));
+    queue.FinishTask("doc-a");
+    ASSERT_TRUE(pop.WaitDone(2000));
+    EXPECT_EQ(pop.task, second);
+    EXPECT_TRUE(queue.IsRunning("doc-a"));
+    queue.FinishTask("doc-a");
+}
+
+TEST(SPCTaskQueueTest, ATaskForAnotherDocumentGoesFirst) {
+    SPCTaskQueue queue(10);
+    auto a1 = MakeTask(SPCPriority::kP0, 100, "a.txt");
+    a1->doc_id = "doc-a";
+    auto a2 = MakeTask(SPCPriority::kP0, 200, "a.txt");
+    a2->doc_id = "doc-a";
+    auto c = MakeTask(SPCPriority::kP2, 300, "c.txt");  // lower priority, other document
+    c->doc_id = "doc-c";
+    ASSERT_EQ(queue.Push(a1), 0);
+    ASSERT_EQ(queue.Push(a2), 0);
+    ASSERT_EQ(queue.Push(c), 0);
+    ASSERT_EQ(queue.Pop(), a1);
+    EXPECT_EQ(queue.Pop(), c) << "doc-a is busy, so doc-c's task is the next runnable one";
+    queue.FinishTask("doc-a");
+    EXPECT_EQ(queue.Pop(), a2);
+    queue.FinishTask("doc-a");
+    queue.FinishTask("doc-c");
+}
+
+TEST(SPCTaskQueueTest, TasksWithoutADocumentIdAreNotHeldBack) {
+    SPCTaskQueue queue(10);
+    auto first = MakeTask(SPCPriority::kP1, 100);
+    auto second = MakeTask(SPCPriority::kP1, 200);
+    ASSERT_EQ(queue.Push(first), 0);
+    ASSERT_EQ(queue.Push(second), 0);
+    ASSERT_EQ(queue.Pop(), first);
+    AsyncPop pop(queue);
+    ASSERT_TRUE(pop.WaitDone(2000)) << "no document id, so nothing to wait for";
+    EXPECT_EQ(pop.task, second);
+    queue.FinishTask("");
+    queue.FinishTask("");
+}
+
+TEST(SPCTaskQueueTest, WorkOutsideTheQueueHoldsItsDocument) {
+    SPCTaskQueue queue(10);
+    queue.BeginRunning("doc-a");
+    auto t = MakeTask(SPCPriority::kP1, 100, "a.txt");
+    t->doc_id = "doc-a";
+    ASSERT_EQ(queue.Push(t), 0);
+
+    AsyncPop pop(queue);
+    EXPECT_FALSE(pop.WaitDone(200));
+    queue.FinishTask("doc-a");
+    ASSERT_TRUE(pop.WaitDone(2000));
+    EXPECT_EQ(pop.task, t);
+    queue.FinishTask("doc-a");
+}
+
+TEST(SPCTaskQueueTest, StopReleasesAPopThatOnlyHasABusyDocumentsTask) {
+    SPCTaskQueue queue(10);
+    auto first = MakeTask(SPCPriority::kP1, 100, "a.txt");
+    first->doc_id = "doc-a";
+    auto second = MakeTask(SPCPriority::kP1, 200, "a.txt");
+    second->doc_id = "doc-a";
+    ASSERT_EQ(queue.Push(first), 0);
+    ASSERT_EQ(queue.Push(second), 0);
+    ASSERT_EQ(queue.Pop(), first);
+
+    AsyncPop pop(queue);
+    EXPECT_FALSE(pop.WaitDone(100));
+    queue.Stop();
+    ASSERT_TRUE(pop.WaitDone(2000));
+    EXPECT_EQ(pop.task, nullptr);
+    // The task that never ran is still there for the shutdown drain.
+    auto remaining = queue.DrainRemaining();
+    ASSERT_EQ(remaining.size(), 1u);
+    EXPECT_EQ(remaining[0], second);
 }
 
 TEST(SPCTaskQueueTest, ACancelledTaskIsNeitherQueuedNorRunning) {

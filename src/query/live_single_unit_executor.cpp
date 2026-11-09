@@ -559,6 +559,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
         struct DocFields {
             std::string metadata_json;
             std::string source_path;
+            std::string created_at;
         };
         std::unordered_map<std::string, DocFields> doc_meta_cache;
         auto doc_fields = [&](const std::string& doc_id) -> const DocFields& {
@@ -571,6 +572,7 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
             if (store.doc_get(doc_id, doc) == 0) {
                 df.metadata_json = doc.metadata_json;
                 df.source_path = doc.source_path;
+                df.created_at = doc.created_at;
             }
             return doc_meta_cache.emplace(doc_id, std::move(df)).first->second;
         };
@@ -729,6 +731,26 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteChunkRetrieval(
                 drop(rrf_in.sparse);
                 drop(rrf_in.contextualized);
                 drop(rrf_in.hype);
+            }
+        }
+
+        // The request's filter (tags, date_range) is a property of the document, so it
+        // is applied the same way and at the same point as the hidden-document filter:
+        // non-matching entries leave all five lists BEFORE fusion, and the survivors are
+        // ranked as though the others had never been retrieved. An entry with no doc_id
+        // cannot be checked and is dropped while a filter is active.
+        if (ctx.filter_spec.active()) {
+            auto keep = [&](const retrieval::SparseHit& h) {
+                auto it = by_child.find(h.child_id);
+                if (it == by_child.end() || it->second.doc_id.empty()) return false;
+                const DocFields& df = doc_fields(it->second.doc_id);
+                return DocumentMatchesFilter(ctx.filter_spec, df.created_at, df.metadata_json);
+            };
+            for (auto* list : {&rrf_in.dense, &rrf_in.fts5, &rrf_in.sparse,
+                               &rrf_in.contextualized, &rrf_in.hype}) {
+                list->erase(std::remove_if(list->begin(), list->end(),
+                                           [&](const retrieval::SparseHit& h) { return !keep(h); }),
+                            list->end());
             }
         }
 
@@ -913,7 +935,9 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteDocRetrieval(
         const int top_k = ctx.top_k < 1 ? 1 : ctx.top_k;
 
         cortrix::doc_summary::DocDiscoveryCoreOptions core_opts;
-        core_opts.top_k = top_k;
+        // With a filter, over-fetch so documents removed by it leave room for others.
+        const bool filtered = ctx.filter_spec.active();
+        core_opts.top_k = filtered ? std::min(top_k * 4, 100) : top_k;
         core_opts.fts5_fallback_enabled = doc_fts5_fallback_enabled_;
         if (past_deadline()) return MakeNamespaceTimeoutRow(namespace_id, t0);
         cortrix::doc_summary::DocDiscoveryCoreResult core =
@@ -926,6 +950,14 @@ NamespaceQueryResult LiveSingleUnitExecutor::ExecuteDocRetrieval(
         // doc-level pseudo-result with the best available title/filename text.
         out.chunks.reserve(core.hits.size());
         for (const auto& h : core.hits) {
+            if (static_cast<int>(out.chunks.size()) >= top_k) break;
+            if (filtered) {
+                CortrixDoc fdoc;
+                if (facade.store().doc_get(h.doc_id, fdoc) != 0 ||
+                    !DocumentMatchesFilter(ctx.filter_spec, fdoc.created_at, fdoc.metadata_json)) {
+                    continue;
+                }
+            }
             RankedChunk rc;
             rc.child_id = h.doc_id;             // doc-level identity for this path
             rc.score = h.match_score;           // doc-discovery RRF score

@@ -157,6 +157,19 @@ MemorySearchResponse MemorySearcher::Search(const MemorySearchRequest& request) 
             continue;
         }
 
+        // A raw interaction row lives only as long as its interaction_log row. Deleting
+        // a session removes those rows but not the indexed block; a write still being
+        // processed lands its block after the delete; and a client may create a session
+        // with the deleted session's id again. The log row's id is minted on insert, so
+        // checking it, rather than the session id, keeps a deleted conversation out in
+        // all three cases. A failed lookup drops the row.
+        if (!result.interaction_id.empty()) {
+            bool exists = false;
+            if (!memory_store_.InteractionExists(result.interaction_id, &exists).ok() || !exists) {
+                continue;
+            }
+        }
+
         // 5b. MEM01 (scorer path only): build the scoring candidate parallel to
         //     `kept`. block_id is repurposed as a back-correlation index into
         //     `kept` (real block ids are ULID strings carried on the result item;

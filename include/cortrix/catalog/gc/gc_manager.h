@@ -75,7 +75,7 @@ public:
 
     /// Immediate purge (ops /gc/purge): bypass the time windows and run Stage 2 +
     /// Stage 3 on every currently soft-deleted item. Honors dry_run + the per-run
-    /// caps. Distinct from the GDPR immediate-purge API (Cloud V1).
+    /// caps. Distinct from the GDPR immediate-purge API (not built in this edition).
     Result<GcRunReport> Purge();
 
     /// Stage 2 hook used by delete paths: enqueue a blob_uri for GC with

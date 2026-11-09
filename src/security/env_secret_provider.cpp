@@ -25,7 +25,7 @@ std::future<SecretResult> EnvSecretProvider::GetAsync(const std::string& key) {
     return std::async(std::launch::deferred, [key]() {
         const char* val = std::getenv(key.c_str());
         // Var absent -> Ok(nullopt), NOT an error: the provider answered, the
-        // key just has no value. Cloud providers reserve kNotFound for the
+        // key just has no value. Vault-backed providers reserve kNotFound for the
         // distinct "key does not exist in the vault" case.
         if (val == nullptr) {
             return SecretResult::Ok(std::nullopt);

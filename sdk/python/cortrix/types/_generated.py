@@ -98,7 +98,7 @@ class UploadDocumentResult:
 
 @dataclass
 class QueryFilter:
-    """QueryFilter (generated)."""
+    """Restricts results to documents that match every condition given. Keys other than `tags` and `date_range` are not applied; the response lists them in a `meta.warnings` entry with code `CX_WARN_FILTER_KEY_IGNORED`. A wrong type or date format is rejected with 400 `CX_ERR_BAD_REQUEST`."""
     tags: Optional[List[str]] = None
     date_range: Optional[Dict[str, Any]] = None
 

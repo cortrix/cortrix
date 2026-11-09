@@ -70,6 +70,7 @@ httplib::Server::Handler WithAuth(ApiKeyAuth& auth, int required_permission, Htt
                 InstallObservabilityContext(req, res, /*user_id=*/rctx.auth.user_id,
                                             /*agent_id=*/rctx.auth.agent_id);
                 handler(req, res, rctx);
+                CompleteErrorEnvelope(res, rctx.request_id);
                 return;
             }
 
@@ -117,6 +118,9 @@ httplib::Server::Handler WithAuth(ApiKeyAuth& auth, int required_permission, Htt
             // decision so it cannot influence authn/authz (pure-ADD).
             InstallObservabilityContext(req, res, actx.user_id, actx.agent_id);
             handler(req, res, rctx);
+            // Whatever error body the handler wrote, it leaves with request_id,
+            // timestamp and one X-Request-Id header.
+            CompleteErrorEnvelope(res, rctx.request_id);
         };
 }
 
@@ -130,6 +134,7 @@ httplib::Server::Handler NoAuth(HttpHandler handler) {
         rctx.auth.user_id = "anonymous";
         rctx.auth.permissions = kPermRead | kPermWrite | kPermAdmin;
         handler(req, res, rctx);
+        CompleteErrorEnvelope(res, rctx.request_id);
     };
 }
 

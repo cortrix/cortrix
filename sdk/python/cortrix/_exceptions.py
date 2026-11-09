@@ -204,7 +204,7 @@ class LlmCircuitOpenError(ServiceUnavailableError):
 
 
 class QuotaExceededError(RateLimitError):
-    """429 — CX_ERR_QUOTA_* — per-tenant quota exceeded (Cloud V1.5+)."""
+    """429 — CX_ERR_QUOTA_* — per-tenant quota exceeded."""
 
 
 class CsrfMismatchError(ForbiddenError):

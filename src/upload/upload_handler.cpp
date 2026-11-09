@@ -238,7 +238,7 @@ Status UploadHandler::HandleUpload(const UploadRequest& req,
         if (s.message().find("CX_ERR_DISK_FULL") != std::string::npos) {
             return s;
         }
-        return Status::Unavailable("processing queue full, document saved");
+        return Status::Unavailable("CX_ERR_SPC_QUEUE_FULL: processing queue full, document saved");
     }
 
     result->doc_id = doc.doc_id;

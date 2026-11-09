@@ -890,9 +890,8 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
 
     // 10b. [D3.5 batch1] P09 tenant/permission/quota services over the F12 catalog.
     // All three borrow the already-open catalog.db handle (they do not own it) and
-    // must outlive `server` below. Phase-1 OSS uses UnlimitedPlanProvider (no paid
-    // plan tiers yet — matches the P09 integration default); paid quota providers
-    // land in Cloud-V1.5.
+    // must outlive `server` below. Phase-1 OSS uses UnlimitedPlanProvider (no plan
+    // tiers — matches the P09 integration default).
     cortrix::tenant::TenantService tenant_svc(catalog_db.db());
     cortrix::tenant::PermissionService perm_svc(catalog_db.db());
     cortrix::tenant::QuotaService quota_svc(
@@ -1257,7 +1256,7 @@ int RunServer(int argc, char* argv[], const ServerExtensions& extensions) {
     cortrix::RegisterApiKeyRoutes(server.server(), api_key_service, auth);
     // CE Web UI session probe (GET /auth/me): auth-disabled → 200 single-operator so
     // the self-hosted UI is usable out-of-the-box; auth-enabled → 401 (login). The
-    // JWT /auth/me is cloud-enterprise; this CE shim avoids the no-auth login dead-end.
+    // JWT /auth/me is not served here; this CE shim avoids the no-auth login dead-end.
     cortrix::RegisterAuthSessionRoute(server.server(), auth);
     // [FA1 R11] P08 §2.13-bis admin/users 5 endpoints (admin-gated; mutations write
     // operation_log) + §2.11 JWT secret rotation endpoint. AdminGuard adds the

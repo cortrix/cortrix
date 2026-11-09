@@ -777,6 +777,7 @@ TEST_F(UploadHandlerTest, HandleUpload_SubmitFail_QueueFull) {
     EXPECT_FALSE(s.ok());
     EXPECT_EQ(s.code(), StatusCode::kUnavailable);
     EXPECT_NE(s.message().find("queue full"), std::string::npos);
+    EXPECT_EQ(s.message().rfind("CX_ERR_SPC_QUEUE_FULL", 0), 0u);
 
     // Doc and blob are preserved (crash recovery will handle)
     EXPECT_EQ(store_->docs().size(), 1u);

@@ -137,6 +137,7 @@ struct WatchDirConfig {
     std::string data_dir;
     std::string namespace_name = "default";
     bool watch_enabled = true;
+    bool recursive = true;
     double fsevents_latency_s = 0.5;
     int scan_batch_size = 100;
     int max_concurrent_imports = 50;
@@ -184,7 +185,7 @@ struct RetrievalConfig {
 // === [OPEN-2] three-stage GC (ARCH §5.x, A6 §10.8) ===
 // Config for the built-in background GC thread + manual ops endpoints. Defaults
 // mirror the ARCH `gc:` section. CE runs with immediate_purge_enabled=false
-// (the GDPR immediate-purge API is a Cloud V1 feature, not built in CE).
+// (the GDPR immediate-purge API is not built in CE).
 struct GcConfig {
     bool enabled = true;                     ///< background GC thread on/off (default on, can disable)
     int soft_delete_retention_days = 30;     ///< Stage 1 → 2 window (soft-delete retention)
@@ -193,7 +194,7 @@ struct GcConfig {
     int max_purge_per_run = 10000;           ///< cap on blobs unlinked per run (runaway guard)
     int max_run_duration_minutes = 5;        ///< cap on a single run's wall time (IO guard)
     bool dry_run = false;                    ///< scan but do not delete (test/inspection)
-    // Compliance path (Cloud V1+; CE default false — not built in CE).
+    // Compliance path (CE default false — not built in CE).
     bool immediate_purge_enabled = false;    ///< GDPR immediate-purge API switch
 };
 
@@ -233,8 +234,8 @@ struct CortrixConfig {
     NamespaceConfig ns;
     EmbeddingConfig embedding;
     // Three independent LLM roles, each can use a different model/provider:
-    LlmConfig semantic_llm;  // Intent classification, reranking (future), query expansion (future)
-                              // Should be fast & cheap — called on every query
+    LlmConfig semantic_llm;  // Query variants (rag_fusion) and LLM rerank (llm_rerank), when a
+                              // request asks for them; intent routing does not call it
     LlmConfig vision_llm;    // OCR image enhancement — must be a multimodal model
                               // Inherits semantic_llm's provider/api_key/base_url if not set
     LlmConfig agent_llm;     // Conversational RAG & chat generation

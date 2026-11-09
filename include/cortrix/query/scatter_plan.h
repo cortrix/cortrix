@@ -5,17 +5,17 @@
 
 namespace cortrix::query {
 
-/// S4.3 — Cloud V1 P01-3 plan coordination (F04 §4.1 Step 2 / §2.7 / topic 1.5 + 4.5).
+/// S4.3 — P01-3 plan coordination (F04 §4.1 Step 2 / §2.7 / topic 1.5 + 4.5).
 ///
 /// The per-query NS hard cap is `min(global GUC scatter.max_namespaces_per_query,
-/// AuthContext.plan_max_namespaces)` so a Cloud plan can cap a tenant *below* the
+/// AuthContext.plan_max_namespaces)` so a plan can cap a tenant *below* the
 /// global limit. This function computes that effective cap; ScatterGather then
 /// passes it to AuthorizeNamespaces (which throws CX_ERR_TOO_MANY_NAMESPACES when
 /// the request — or the ["*"] expansion — exceeds it).
 ///
 /// 🚩 D3.5 FLAG: the frozen `cortrix::AuthContext` (auth/auth_context.h) does NOT yet
-/// carry a `plan_max_namespaces` field (it is the CE single-tenant struct). P01-3
-/// will inject it on the Cloud auth path. Standalone, the plan cap is supplied
+/// carry a `plan_max_namespaces` field (it is the CE single-tenant struct), and no
+/// auth path in this build supplies one. Standalone, the plan cap is supplied
 /// out-of-band (PlanMaxNamespacesOf returns nullopt = "no plan cap" → effective cap
 /// == the global GUC), so the min (take-smaller) logic is fully unit-testable now and drops in
 /// unchanged once the field exists.

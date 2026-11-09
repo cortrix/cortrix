@@ -162,6 +162,9 @@ add_executable(cortrix_unit_tests
     unit/test_rrf_fusion.cpp
     unit/test_intent_classifier.cpp
     unit/test_post_filter.cpp
+    unit/test_query_filter.cpp
+    unit/test_query_filter_executor.cpp
+    unit/test_error_envelope_completion.cpp
     unit/test_degradation_manager.cpp
     unit/test_query_pipeline.cpp
     unit/test_query_request.cpp
@@ -627,6 +630,7 @@ add_executable(cortrix_integration_tests
     integration/test_health_endpoint.cpp
     integration/test_f13_observability_e2e.cpp
     integration/test_ingest_pipeline_e2e.cpp
+    integration/test_memory_session_search_e2e.cpp
     integration/test_multi_ns_fanout_e2e.cpp
     integration/test_query_llm_modes_e2e.cpp
     integration/test_real_model_query_e2e.cpp

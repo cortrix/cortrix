@@ -472,6 +472,9 @@ QueryContext MakeRoutingContext(const json& body, const AuthContext& auth) {
                 if (it.value().is_string()) qctx.filter[it.key()] = it.value().get<std::string>();
             }
         }
+        // A malformed filter is rejected by the handler's ParseRequest before this
+        // context is used, so a parse failure here leaves the spec empty.
+        if (body.contains("filter")) (void)ParseQueryFilter(body["filter"], &qctx.filter_spec);
     }
     if (qctx.top_k < 1) qctx.top_k = 1;
     if (qctx.top_k > 100) qctx.top_k = 100;  // documented max; ParseRequest 400s out-of-range

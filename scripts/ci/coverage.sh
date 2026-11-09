@@ -29,8 +29,10 @@ OUT="$BUILD/coverage"
 
 OVERALL_LINE_MIN=80
 CORE_LINE_MIN=90
-CORE_TARGET_TU_EXPECTED=317
-CORE_TARGET_SOURCE_SHA256_EXPECTED="4e86934e2109eff7f536e4e538e9ae033109bf7fbb167aa0404c59fc7437b978"
+# Pinned cortrix_core source universe; scripts/ci/check_core_universe.py
+# checks it against CMakeLists.txt on every PR.
+CORE_TARGET_TU_EXPECTED=324
+CORE_TARGET_SOURCE_SHA256_EXPECTED="48df15efd9865a83fe3308654dc6383d372aa046c57e9fd7a40fcdbac9634814"
 
 # F01(store/phnsw) F25(store) F02 F03+F07(spc) F04(query) F05(resource)
 # F08(async) F12(catalog) F13(observability+agent_trace) F18a(logging)

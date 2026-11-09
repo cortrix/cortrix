@@ -3,10 +3,9 @@
 //
 // ISecretProvider abstracts where runtime secrets come from. Phase 1 ships only
 // EnvSecretProvider (reads process environment variables, the industry default
-// used by Postgres / Redis / Weaviate). Cloud providers (AWS Secrets Manager,
-// GCP Secret Manager, Azure Key Vault, HashiCorp Vault) are deferred to Phase
-// 1.5 / Phase 2 behind this same interface — see PHASE2_BACKLOG
-// TD-F20-SECRET-PROVIDERS. The async-first shape mirrors mainstream SaaS SDKs so
+// used by Postgres / Redis / Weaviate). Other providers (AWS Secrets Manager,
+// GCP Secret Manager, Azure Key Vault, HashiCorp Vault) can be added later
+// behind this same interface. The async-first shape mirrors mainstream SaaS SDKs so
 // a network-backed provider drops in without changing call sites.
 
 #include <future>
@@ -16,15 +15,15 @@
 namespace cortrix::security {
 
 /// Failure modes a secret lookup can report. Phase 1's EnvSecretProvider only
-/// ever surfaces kNotFound (env var absent); the remaining values exist so Cloud
-/// providers added later need no interface change. These map 1:1 to the
+/// ever surfaces kNotFound (env var absent); the remaining values exist so
+/// network-backed providers added later need no interface change. These map 1:1 to the
 /// CX_ERR_SECRET_* codes in the F20 design (only CX_ERR_SECRET_INVALID_CONFIG
 /// and CX_ERR_SECRET_NOT_FOUND are wired in Phase 1).
 enum class SecretError {
     kNotFound,             ///< secret key does not exist
-    kProviderUnavailable,  ///< backing provider unreachable (Cloud, Phase 2)
-    kPermissionDenied,     ///< IAM / ACL denied (Cloud, Phase 2)
-    kNetworkTimeout,       ///< provider call timed out (Cloud, Phase 2)
+    kProviderUnavailable,  ///< backing provider unreachable (network-backed providers)
+    kPermissionDenied,     ///< IAM / ACL denied (network-backed providers)
+    kNetworkTimeout,       ///< provider call timed out (network-backed providers)
     kInvalidConfig,        ///< provider misconfigured
 };
 
@@ -69,7 +68,7 @@ public:
     virtual ~ISecretProvider() = default;
 
     /// Async fetch — the canonical method (mirrors mainstream SaaS SDKs). For a
-    /// network-backed Cloud provider this runs the call off-thread; for the
+    /// network-backed provider this runs the call off-thread; for the
     /// env provider it is a trivially-ready future.
     virtual std::future<SecretResult> GetAsync(const std::string& key) = 0;
 

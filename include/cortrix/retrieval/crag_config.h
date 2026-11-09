@@ -23,7 +23,7 @@ struct CragConfig {
     /// Below this classifier confidence, fall back to HeuristicGuard (§6.2 step 3).
     float classifier_min_confidence = 0.5f;
 
-    /// §4.2 "small_classifier" (F37-1 B) / "hybrid" (F37-1 E LLM judge, Cloud V2).
+    /// §4.2 "small_classifier" (F37-1 B) / "hybrid" (F37-1 E LLM judge, not implemented here).
     std::string evaluation_method = "small_classifier";
 
     bool fallback_to_correct_on_failure = true;  ///< §4.2 / §7.3 F37-8 default
