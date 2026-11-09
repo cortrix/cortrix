@@ -12,11 +12,11 @@ Every Cortrix error response has the same shape, so an agent can decide what to 
 
 `message` is for people and can change between releases. `structured_data` holds the machine-readable detail, such as the name of a missing parameter. The full schema is in [`api/components/errors.yaml`](../../api/components/errors.yaml).
 
-Some operations answer HTTP 200 even when part of the work failed. `POST /api/v1/gc/restore` and cross-namespace queries list the failures per item (`failed[]`), with the same fields (`error_code` instead of `code`), and report how much succeeded in `coverage_ratio`. See [`../partial-success`](../partial-success) for the same contract on queries.
+Some operations answer HTTP 200 even when part of the work failed, list the failures per item with the same fields (`error_code` instead of `code`), and report how much succeeded in `coverage_ratio`. The shape differs by endpoint: `POST /api/v1/gc/restore` puts the failures in a top-level `failed[]`, one entry per document `id`; a query puts them in `meta.namespaces_failed[]`, one entry per `namespace`, next to `meta.coverage_ratio`. See [`../partial-success`](../partial-success) for the query side.
 
 This example has two files:
 
-- `decide.py` is the whole decision logic, about 60 lines of standard library Python. `decide()` takes one error object and returns an action. `decide_items()` applies it to every entry of a 200 response's `failed[]`. Copy it into your own agent.
+- `decide.py` is the whole decision logic, about 70 lines of standard library Python. `decide()` takes one error object and returns an action. `decide_items()` applies it to every failed entry of a 200 response, in either shape. Copy it into your own agent.
 - `demo.py` sends six requests that fail on purpose, prints each response, asks `decide()` what to do, and does it. It uses `urllib` and prints the raw fields, so you can see exactly what the server sends.
 
 Neither needs an LLM key or the SDK.
@@ -31,7 +31,8 @@ Neither needs an LLM key or the SDK.
 | `retryable` is true, or `category` is `timeout` | `retry` | Wait `retry_after_ms`, or back off 1 s, 2 s, 4 s when it is null. After 3 retries, `give_up`. |
 | `category` is `auth` | `check_then_escalate` | Check the request first (does the namespace exist, is the name right). Only then ask for a key with more permission. |
 | `category` is `quota` | `stop` | Retrying will not help. Report it. |
-| `category` is `permanent` and `structured_data` names the next step | `fix_and_retry` | Do that step and send the request again. `missing_param` names a parameter to add; `live_doc_id` names a document to delete first. |
+| `category` is `permanent` and `structured_data` has `live_doc_id` | `ask_human` | Restoring this version means deleting the live one first, which changes what the namespace returns. A person decides. |
+| `category` is `permanent` and `structured_data` names a missing parameter | `fix_and_retry` | Add the parameter named in `missing_param` and send the request again. |
 | `category` is `permanent` otherwise | `give_up` | Report the failure. The same request fails again. |
 
 The demo doesn't trigger a retryable error; `decide()` handles it as in the table.

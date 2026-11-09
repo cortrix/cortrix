@@ -40,20 +40,28 @@ def decide(error, attempt=0):
     if category == "permanent":
         if isinstance(data.get("missing_param"), str):
             return {**base, "action": "fix_and_retry", "add_param": data["missing_param"]}
+        # Restoring an older version would replace the live one: a person decides.
         if isinstance(data.get("live_doc_id"), str):
-            return {**base, "action": "fix_and_retry", "delete_first": data["live_doc_id"]}
+            return {**base, "action": "ask_human", "live_doc_id": data["live_doc_id"]}
         return {**base, "action": "give_up", "why": "no next step in structured_data"}
     return {**base, "action": "give_up", "why": "unknown category"}
 
 
 def decide_items(body):
-    """Handle an HTTP 200 response that lists per-item failures in `failed`.
+    """Handle an HTTP 200 response that reports per-item failures.
 
     The status is 200 even when some items failed, so read coverage_ratio and
-    apply the same rules to every failed item.
+    apply the same rules to every failed item. Two shapes exist:
+    - POST /gc/restore: top-level "failed" entries keyed by "id".
+    - queries: "meta.namespaces_failed" entries keyed by "namespace",
+      with "meta.coverage_ratio".
     """
-    failed = body.get("failed") or []
+    if "failed" in body:
+        failed, ratio, key = body.get("failed") or [], body.get("coverage_ratio"), "id"
+    else:
+        meta = body.get("meta") or {}
+        failed, ratio, key = meta.get("namespaces_failed") or [], meta.get("coverage_ratio"), "namespace"
     return {
-        "coverage_ratio": body.get("coverage_ratio"),
-        "items": [{"id": f.get("id"), **decide(f)} for f in failed],
+        "coverage_ratio": ratio,
+        "items": [{key: f.get(key), **decide(f)} for f in failed],
     }
