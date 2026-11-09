@@ -16,6 +16,7 @@ CMakeFiles/
 docs/
 *.md
 !README.md
+!NOTICE.md
 
 # IDE and editor files
 .vscode

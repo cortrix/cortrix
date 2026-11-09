@@ -258,11 +258,16 @@ jobs:
       - name: Build release image
         id: build
         run: |
+          grep -Fqx 'COPY LICENSE NOTICE.md /app/' deploy/Dockerfile
+          grep -Fqx 'COPY LICENSE NOTICE.md /app/' deploy/Dockerfile.cuda
+          grep -Fqx 'COPY pyproject.toml README.md LICENSE NOTICE.md ./' cortrix-mcp/Dockerfile
           docker build \
             --build-arg "CORTRIX_SOURCE_REVISION=$SOURCE_REVISION" \
             -t "$IMAGE_TAG" \
             -f deploy/Dockerfile .
           test "$(docker image inspect "$IMAGE_TAG" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$SOURCE_REVISION"
+          docker run --rm --entrypoint /bin/sh "$IMAGE_TAG" -c \
+            'test -f /app/LICENSE && test -f /app/NOTICE.md'
 
       - name: Generate SPDX and CycloneDX SBOMs
         if: ${{ always() && steps.build.outcome == 'success' }}
