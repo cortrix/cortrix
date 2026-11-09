@@ -31,7 +31,7 @@ Cortrix is in active pre-release development. Nothing on this page is a producti
 | Auth login | `In development` | Not supported yet. |
 | Tenants, members, and namespace ACLs | `In development` | Not supported yet. |
 | Tenant isolation | `In development` | Not supported yet. |
-| API key permissions (READ, WRITE, ADMIN) | `Off by default` | Checked on every request with `auth.enabled: true`. With auth off, every request has all three. |
+| API key permissions (READ, WRITE, ADMIN) | `Off by default` | Checked on every request to an authenticated endpoint when `auth.enabled: true`. With auth off, every request has all three. |
 | Roles (RBAC) | `In development` | Roles are not implemented; access is decided by a key's permission bits. |
 | Quotas | `In development` | Quota values can be read and updated through the tenant endpoints, but requests are not checked against them. |
 | Memory extraction | `In development` | Not supported yet. |
