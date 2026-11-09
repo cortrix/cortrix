@@ -117,9 +117,10 @@ ENV CORTRIX_ONNX_RUNTIME_FLAVOR=cuda \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-# apt / libapt-pkg6.0 are upgraded explicitly: the base image can ship a version
-# with a fixed advisory (CVE-2026-109518), and installing other packages does not
-# upgrade them, so the release gate's Trivy scan would fail on the image.
+# The pinned CUDA base was last published in 2023 and never picks up Ubuntu
+# security updates, so the runtime stage upgrades the installed system packages.
+# NVIDIA holds libcudnn8, libcublas-11-8 and libnccl2 in this base, so the CUDA
+# libraries the ONNX Runtime 1.17.1 GPU build links against stay as they are.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     libsqlite3-0 \
@@ -135,7 +136,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     ca-certificates \
     tzdata \
-    && apt-get install -y --no-install-recommends --only-upgrade apt libapt-pkg6.0 \
+    && apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -u 1000 -s /bin/bash cortrix
