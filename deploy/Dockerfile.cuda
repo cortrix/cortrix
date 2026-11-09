@@ -117,6 +117,9 @@ ENV CORTRIX_ONNX_RUNTIME_FLAVOR=cuda \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
+# apt / libapt-pkg6.0 are upgraded explicitly: the base image can ship a version
+# with a fixed advisory (CVE-2026-109518), and installing other packages does not
+# upgrade them, so the release gate's Trivy scan would fail on the image.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     libsqlite3-0 \
@@ -132,6 +135,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     ca-certificates \
     tzdata \
+    && apt-get install -y --no-install-recommends --only-upgrade apt libapt-pkg6.0 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -u 1000 -s /bin/bash cortrix
