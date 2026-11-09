@@ -31,8 +31,8 @@ Neither needs an LLM key or the SDK.
 | `retryable` is true, or `category` is `timeout` | `retry` | Wait `retry_after_ms`, or back off 1 s, 2 s, 4 s when it is null. After 3 retries, `give_up`. |
 | `category` is `auth` | `check_then_escalate` | Check the request first (does the namespace exist, is the name right). Only then ask for a key with more permission. |
 | `category` is `quota` | `stop` | Retrying will not help. Report it. |
-| `category` is `permanent` and `structured_data` has `live_doc_id` | `ask_human` | Restoring this version means deleting the live one first, which changes what the namespace returns. A person decides. |
 | `category` is `permanent` and `structured_data` names a missing parameter | `fix_and_retry` | Add the parameter named in `missing_param` and send the request again. |
+| `category` is `permanent` and `structured_data` has `live_doc_id` | `ask_human` | Restoring this version means deleting the live one first, which changes what the namespace returns. A person decides. |
 | `category` is `permanent` otherwise | `give_up` | Report the failure. The same request fails again. |
 
 The demo doesn't trigger a retryable error; `decide()` handles it as in the table.
