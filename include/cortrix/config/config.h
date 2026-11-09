@@ -137,6 +137,7 @@ struct WatchDirConfig {
     std::string data_dir;
     std::string namespace_name = "default";
     bool watch_enabled = true;
+    bool recursive = true;
     double fsevents_latency_s = 0.5;
     int scan_batch_size = 100;
     int max_concurrent_imports = 50;
