@@ -144,6 +144,9 @@ LABEL version="1.0.0-rc.2"
 # libgl1 / libglib2.0-0 / libgomp1: paddleocr imports opencv (libGL.so.1) and
 # paddlepaddle needs OpenMP — without them the provisioned parser venv installs
 # but fails to import at runtime, breaking PDF/image OCR + the vision_llm path.
+# apt / libapt-pkg6.0 are upgraded explicitly: the base image can ship a version
+# with a fixed advisory (CVE-2026-109518), and installing other packages does not
+# upgrade them, so the release gate's Trivy scan would fail on the image.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     libsqlite3-0 \
@@ -159,6 +162,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     ca-certificates \
     tzdata \
+    && apt-get install -y --no-install-recommends --only-upgrade apt libapt-pkg6.0 \
     && rm -rf /var/lib/apt/lists/*
 
 ARG CORTRIX_SOURCE_REVISION
