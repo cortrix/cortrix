@@ -48,8 +48,6 @@ Add `?explain=true` to see which retrieval paths a query used. See [Query and re
 | `spc.embedding_batch_size` | Configuration file | `1` | Blocks embedded per batch |
 | `spc.onnx_intra_threads` | Configuration file | `4` | Intra-op threads for ONNX inference |
 | `spc.onnx_inter_threads` | Configuration file | `1` | Parallel ONNX inferences |
-| `namespace.max_active` | Configuration file | `10` | How many namespaces stay loaded at once |
-| `namespace.idle_timeout_s` | Configuration file | `300` | How long a namespace sits idle before it's unloaded |
 {.wide .expand}
 
 The configuration file defaults come from `config.yaml.example` in the repository.
@@ -186,15 +184,9 @@ The readiness check reports the current queue depth and worker count under `spc_
 ```yaml {title="config.yaml"}
 server:
   thread_count: 4
-
-namespace:
-  max_active: 10
-  idle_timeout_s: 300
 ```
 
 - `server.thread_count` is the number of worker threads handling requests. The recommended value is your CPU core count. You can override it with `CORTRIX_SERVER_THREADS`.
-- `namespace.max_active` is how many namespaces stay loaded at once.
-- `namespace.idle_timeout_s` is how long a namespace sits idle before it's unloaded automatically. Set it to `0` to never unload.
 
 ## What these numbers do and don't tell you {#boundaries}
 

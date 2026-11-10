@@ -78,7 +78,7 @@ Each namespace has its own data:
 
 A single write touches the vector index, the database, and file storage. A write coordinator makes sure all three succeed or none of them takes effect.
 
-Namespaces are loaded on demand. There's a limit on how many stay loaded at once, and a namespace is unloaded after it's been idle for a while.
+Every namespace is loaded when the server starts or when it's created, and it stays loaded until it's deleted.
 
 ### Local models {#models}
 

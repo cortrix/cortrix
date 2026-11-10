@@ -40,8 +40,6 @@ For how to configure Cortrix and for common scenarios, see [Configuration](/docs
 | Key | Default | Description |
 |---|---|---|
 | `data_dir` | `"./build/data"` | The data root, holding databases, the vector index, and files. A relative path is resolved from the directory of the `cortrix-server` binary |
-| `max_active` | `10` | The maximum number of namespaces kept loaded at once |
-| `idle_timeout_s` | `300` | Seconds of idleness before a namespace is unloaded automatically. `0` never unloads |
 {.wide .expand}
 
 ## embedding {#embedding}
