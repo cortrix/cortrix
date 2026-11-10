@@ -194,8 +194,6 @@ log:
 
 namespace:
   data_dir: "{data_dir}"
-  max_active: 10
-  idle_timeout_s: 300
 
 embedding:
   model_path: {json.dumps(embedding_model)}
