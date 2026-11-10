@@ -78,7 +78,7 @@ final subsection.
 | F02 | Reranker | Cross-encoder reranking stage (bge-reranker-v2-m3 over ONNX Runtime) with a resident worker pool and circuit breaker. |
 | F03 | SPC enricher | LLM enrichment of ingested content — entity extraction and summaries — through a pluggable enricher chain with budget caps and fallbacks. |
 | F04 | Cross-namespace query | Scatter-gather querying across namespaces with merged reranking and de-duplication. |
-| F34 | Parent-child chunking | Two-level chunking: retrieval matches small child chunks, responses expand to the parent for LLM context. |
+| F34 | Parent-child chunking | Two-level chunking at ingest: documents are split into parent blocks and smaller child chunks, and retrieval matches the child chunks. In v1.0.x, query results are not expanded to the parent: `parent_id` and `parent_content` are returned empty. |
 | F35 | Contextual retrieval | LLM-generated context prepended to chunks before embedding; contextualized and plain embeddings coexist and fuse at query time. |
 | F36 | RAG-Fusion | LLM-generated query variants merged with reciprocal-rank fusion. |
 | F37 | CRAG evaluation | A small classifier judges retrieval quality per query; ambiguous results are filtered, failures degrade transparently. |
