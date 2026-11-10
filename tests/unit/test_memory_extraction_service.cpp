@@ -463,6 +463,13 @@ TEST_F(MemoryExtractionServiceTest, RevokeInvalidationRestoresActiveOnRealStore)
 
     // The D9 revoke wrote exactly one memory_revoke audit entry.
     EXPECT_EQ(oplog->CountAction("memory_revoke"), 1);
+    // The audit entry carries the namespace name (queryable by namespace_id).
+    for (const auto& e : oplog->logged) {
+        if (e.action == "memory_revoke") {
+            ASSERT_TRUE(e.namespace_id.has_value());
+            EXPECT_EQ(*e.namespace_id, "default");
+        }
+    }
 }
 
 // A revoke against a non-existent namespace is a NotFound (CX_ERR_NS_NOT_FOUND),

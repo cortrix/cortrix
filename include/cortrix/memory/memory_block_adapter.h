@@ -36,8 +36,10 @@ public:
     ///                  (nullptr → memory rows are stored without a vector).
     /// @param vec_index the per-NS P-HNSW index the memory vector is added to
     ///                  (nullptr → no vector indexing).
+    /// @param ns_id     namespace name stamped on every MemoryBlockRecord read back
+    ///                  (so audit entries carry it); empty → records have no ns_id.
     MemoryBlockAdapter(CortrixStore& store, OnnxEmbedder* embedder,
-                       store::IIndex* vec_index);
+                       store::IIndex* vec_index, std::string ns_id = "");
 
     // --- IMemoryBlockStore (MEM02) ---
     Result<std::string> InsertMemoryBlock(const MemoryBlockRecord& block) override;
@@ -51,6 +53,7 @@ private:
     CortrixStore& store_;
     OnnxEmbedder* embedder_;
     store::IIndex* vec_index_;
+    std::string ns_id_;
 };
 
 /// Contradiction-retrieval seam (D5) over the per-NS memory blocks. Standalone MEM02

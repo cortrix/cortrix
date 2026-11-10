@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <map>
+#include <optional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -166,6 +167,62 @@ protected:
 
     static constexpr const char* kUser = "user_xxx";
 };
+
+// Audit entries carry the namespace name: a service built with an ns_id stamps it on the
+// create entry, and on edit / delete entries when the stored record has no ns_id.
+class MemoryTransparencyNsTest : public MemoryTransparencyTest {
+protected:
+    void SetUp() override {
+        MemoryTransparencyTest::SetUp();
+        mt_ = std::make_unique<MemoryTransparency>(lister_, block_store_, oplog_, "ns_a");
+    }
+};
+
+TEST_F(MemoryTransparencyNsTest, CreateAuditCarriesNamespace) {
+    MemoryCreateRequest req;
+    req.user_id = kUser;
+    req.content = "user switched to Go";
+    req.memory_type = "fact";
+    ASSERT_TRUE(mt_->Create(req, kUser).ok());
+    const auto* e = oplog_->LastWithAction("memory_create");
+    ASSERT_NE(e, nullptr);
+    EXPECT_EQ(e->namespace_id, std::optional<std::string>("ns_a"));
+}
+
+TEST_F(MemoryTransparencyNsTest, EditAuditEntriesCarryNamespace) {
+    auto old_rec = MakeMemory("m_old", kUser, "user uses TensorFlow", "preference", "active");
+    old_rec.ns_id = "ns_a";  // the real adapter stamps this on read
+    store_->Put(old_rec);
+    MemoryEditRequest req;
+    req.memory_id = "m_old";
+    req.new_content = "user prefers PyTorch";
+    ASSERT_TRUE(mt_->Edit(req, kUser).ok());
+    const auto* ed = oplog_->LastWithAction("memory_edit");
+    const auto* inv = oplog_->LastWithAction("memory_invalidate");
+    ASSERT_NE(ed, nullptr);
+    ASSERT_NE(inv, nullptr);
+    EXPECT_EQ(ed->namespace_id, std::optional<std::string>("ns_a"));
+    EXPECT_EQ(inv->namespace_id, std::optional<std::string>("ns_a"));
+}
+
+TEST_F(MemoryTransparencyNsTest, DeleteAuditCarriesNamespace) {
+    auto rec = MakeMemory("m1", kUser, "c", "fact", "active");
+    rec.ns_id = "ns_a";
+    store_->Put(rec);
+    ASSERT_TRUE(mt_->Delete("m1", kUser).ok());
+    const auto* e = oplog_->LastWithAction("memory_invalidate");
+    ASSERT_NE(e, nullptr);
+    EXPECT_EQ(e->namespace_id, std::optional<std::string>("ns_a"));
+}
+
+TEST_F(MemoryTransparencyTest, CreateAuditWithoutNamespaceLeavesItUnset) {
+    MemoryCreateRequest req;
+    req.user_id = kUser;
+    req.content = "c";
+    req.memory_type = "fact";
+    ASSERT_TRUE(mt_->Create(req, kUser).ok());
+    EXPECT_FALSE(oplog_->LastWithAction("memory_create")->namespace_id.has_value());
+}
 
 // ---------- List ----------
 

@@ -61,6 +61,22 @@ TEST_F(MemoryBlockAdapterTest, InsertAndGetRoundTrip) {
     EXPECT_EQ(got.value().metadata_json.value("memory_type", ""), "fact");
 }
 
+TEST_F(MemoryBlockAdapterTest, RecordsCarryAdapterNamespace) {
+    MemoryBlockAdapter ns_adapter(*store_, nullptr, nullptr, "ns_a");
+    ASSERT_TRUE(ns_adapter.InsertMemoryBlock(MakeRec(
+        "01MEMNS1", "alice", "in Shanghai",
+        FactMeta("alice", "fact", "active", "2026-06-12T09:00:00Z", 0.9))).ok());
+    auto got = ns_adapter.GetMemoryBlock("01MEMNS1");
+    ASSERT_TRUE(got.ok());
+    EXPECT_EQ(got.value().ns_id, "ns_a");
+    auto listed = ns_adapter.ListByUser("alice");
+    ASSERT_TRUE(listed.ok());
+    ASSERT_EQ(listed.value().size(), 1u);
+    EXPECT_EQ(listed.value()[0].ns_id, "ns_a");
+    // Default adapter leaves ns_id empty.
+    EXPECT_TRUE(adapter_->GetMemoryBlock("01MEMNS1").value().ns_id.empty());
+}
+
 TEST_F(MemoryBlockAdapterTest, ListByUserFiltersByOwnerAndOrdersNewestFirst) {
     ASSERT_TRUE(adapter_->InsertMemoryBlock(MakeRec(
         "01MEMA1", "alice", "in Shanghai",

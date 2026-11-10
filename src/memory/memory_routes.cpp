@@ -386,8 +386,8 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
             WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found"), rc.request_id); return;
         }
         auto block_store = std::make_shared<memory::MemoryBlockAdapter>(
-            facade.store(), &embedder, &facade.vec_index());
-        memory::transparency::MemoryTransparency transparency(block_store, block_store, op_logger);
+            facade.store(), &embedder, &facade.vec_index(), ns);
+        memory::transparency::MemoryTransparency transparency(block_store, block_store, op_logger, ns);
         memory::transparency::MemoryListFilter filter;
         filter.user_id = user_id;
         filter.include_invalidated = req.get_param_value("status") == "invalidated" ||
@@ -465,8 +465,8 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
             WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found"), rc.request_id); return;
         }
         auto block_store = std::make_shared<memory::MemoryBlockAdapter>(
-            facade.store(), &embedder, &facade.vec_index());
-        memory::transparency::MemoryTransparency transparency(block_store, block_store, op_logger);
+            facade.store(), &embedder, &facade.vec_index(), ns);
+        memory::transparency::MemoryTransparency transparency(block_store, block_store, op_logger, ns);
         memory::transparency::MemoryCreateRequest creq;
         creq.user_id = user_id;
         creq.content = content;
@@ -502,8 +502,8 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
             WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found"), rc.request_id); return;
         }
         auto block_store = std::make_shared<memory::MemoryBlockAdapter>(
-            facade.store(), &embedder, &facade.vec_index());
-        memory::transparency::MemoryTransparency transparency(block_store, block_store, op_logger);
+            facade.store(), &embedder, &facade.vec_index(), ns);
+        memory::transparency::MemoryTransparency transparency(block_store, block_store, op_logger, ns);
         memory::transparency::MemoryEditRequest ereq;
         ereq.memory_id = mem_id;
         ereq.new_content = content;
@@ -534,8 +534,8 @@ static void RegisterMemoryTransparencyRoutes(httplib::Server& svr, ApiKeyAuth& a
             WriteJsonError(res, Status::NotFound("Namespace '" + ns + "' not found"), rc.request_id); return;
         }
         auto block_store = std::make_shared<memory::MemoryBlockAdapter>(
-            facade.store(), &embedder, &facade.vec_index());
-        memory::transparency::MemoryTransparency transparency(block_store, block_store, op_logger);
+            facade.store(), &embedder, &facade.vec_index(), ns);
+        memory::transparency::MemoryTransparency transparency(block_store, block_store, op_logger, ns);
         auto r = transparency.Delete(mem_id, user_id);
         if (!r.ok()) { WriteJsonError(res, r, rc.request_id); return; }
         json resp; resp["block_id"] = mem_id; resp["status"] = "invalidated";

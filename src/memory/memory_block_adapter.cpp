@@ -46,9 +46,11 @@ void EnsureMemoryDoc(CortrixStore& store) {
 }
 
 // Build a MemoryBlockRecord from a stored CortrixBlock (content_text + metadata_json).
-// The ULID id is read back from metadata_json.block_id (fallback: empty).
-MemoryBlockRecord ToRecord(const CortrixBlock& b) {
+// The ULID id is read back from metadata_json.block_id (fallback: empty). ns_id is the
+// owning namespace name supplied by the adapter (not stored in the row).
+MemoryBlockRecord ToRecord(const CortrixBlock& b, const std::string& ns_id) {
     MemoryBlockRecord rec;
+    rec.ns_id = ns_id;
     rec.content = b.content_text;
     auto j = nlohmann::json::parse(b.metadata_json, nullptr, /*allow_exceptions=*/false);
     if (!j.is_discarded() && j.is_object()) {
@@ -77,8 +79,9 @@ MemoryType ParseTypeStr(const std::string& s) { return ParseMemoryType(s); }
 // ---------------------------------------------------------------------------
 
 MemoryBlockAdapter::MemoryBlockAdapter(CortrixStore& store, OnnxEmbedder* embedder,
-                                       store::IIndex* vec_index)
-    : store_(store), embedder_(embedder), vec_index_(vec_index) {}
+                                       store::IIndex* vec_index, std::string ns_id)
+    : store_(store), embedder_(embedder), vec_index_(vec_index),
+      ns_id_(std::move(ns_id)) {}
 
 Result<std::string> MemoryBlockAdapter::InsertMemoryBlock(const MemoryBlockRecord& block) {
     // The MEM02 metadata already carries block_id/user_id; ensure block_id is present
@@ -162,7 +165,7 @@ Result<MemoryBlockRecord> MemoryBlockAdapter::GetMemoryBlock(const std::string& 
         return Result<MemoryBlockRecord>(
             Status::NotFound("CX_ERR_MEM02_STORE: memory block not found"));
     }
-    MemoryBlockRecord rec = ToRecord(cb);
+    MemoryBlockRecord rec = ToRecord(cb, ns_id_);
     if (rec.block_id.empty()) rec.block_id = block_id;
     return Result<MemoryBlockRecord>(std::move(rec));
 }
@@ -192,7 +195,7 @@ Result<std::vector<MemoryBlockRecord>> MemoryBlockAdapter::ListByUser(
         const unsigned char* mj = sqlite3_column_text(stmt, 1);
         cb.content_text = ct ? reinterpret_cast<const char*>(ct) : "";
         cb.metadata_json = mj ? reinterpret_cast<const char*>(mj) : "{}";
-        out.push_back(ToRecord(cb));
+        out.push_back(ToRecord(cb, ns_id_));
     }
     sqlite3_finalize(stmt);
     return Result<std::vector<MemoryBlockRecord>>(std::move(out));
