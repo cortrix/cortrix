@@ -137,8 +137,7 @@ The current query request uses a plural array:
   "query": "How should an agent recover from an expired setup token?",
   "namespaces": ["your_namespace"],
   "top_k": 5,
-  "rerank": true,
-  "include_sources": true
+  "rerank": true
 }
 ```
 
