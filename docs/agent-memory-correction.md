@@ -38,9 +38,7 @@ The audit trail is the F18a operation_log (CE) — there is **no** separate
 3. **Agent explains and asks** — surface the human-readable reason ("on May 15
    you said you were 'traveling to Beijing', so I retired 'user is in Shanghai'
    — but that reads as a trip, not a move. Restore it?").
-4. **On confirmation, Agent revokes** — `client.memory.revoke_fact(...)`. The old
-   block's `status` goes `invalidated → active`; a `memory_revoke` entry is
-   written with `revoked_by = "agent_self"`.
+4. **On confirmation, Agent hands the revoke to an admin** — revoking is an admin action. An Agent using a normal read/write key cannot revoke: the route returns HTTP 403 with code `FORBIDDEN`, message `ADMIN permission required`, category `auth`, and `retryable: false`. After the user confirms, the Agent passes the invalidated memory's `block_id`, namespace, and reason to a human operator or a separate admin-keyed service trusted by the deployment. The admin calls `POST /api/v1/memory/invalidations/{id}/revoke`, where `{id}` is that `block_id`, with body `{"ns": "<namespace>", "reason": "<why>"}`. The old block's `status` goes `invalidated → active`, and a `memory_revoke` entry is written. In the response and audit, `revoked_by` identifies the authenticated admin caller; any `revoked_by` in the request body is ignored.
 5. **Agent fixes the misclassification if needed** — e.g. re-type the offending
    memory from `fact` to `event` via `client.memory.update(memory_id=..., ...)`.
 
@@ -50,6 +48,8 @@ The audit trail is the F18a operation_log (CE) — there is **no** separate
 > SDK keys memories by `memory_id` (the SDK abstraction), not the internal
 > C++ `block_id`.
 
+`cortrix_memory_revoke_fact` calls the same admin route. It succeeds only when the MCP server runs with an admin key; a read/write key gets the same HTTP 403 `FORBIDDEN` response.
+
 ```python
 from cortrix import Cortrix
 client = Cortrix(base_url="http://localhost:8420/api/v1")
@@ -58,12 +58,18 @@ client = Cortrix(base_url="http://localhost:8420/api/v1")
 recent = client.memory.get_audit(ns="memory", user_id="user_123",
                                  since="2026-05-15T00:00:00Z", limit=20)
 
-# 4. revoke a wrong one (after user confirmation)
-client.memory.revoke_fact(
-    invalidation_id="inv_abc",
-    reason="agent + user confirmed: travel is a temporary event, not an address change",
-    revoked_by="agent_self",
+# 4. admin side: revoke a wrong one after user confirmation and Agent handoff
+# A read/write key gets HTTP 403 FORBIDDEN; use the admin caller's key.
+import os
+import httpx
+
+block_id = "memory_old_fact"  # The invalidated memory's block_id from the handoff.
+response = httpx.post(
+    f"http://localhost:8420/api/v1/memory/invalidations/{block_id}/revoke",
+    headers={"X-API-Key": os.environ["CORTRIX_ADMIN_API_KEY"]},
+    json={"ns": "memory", "reason": "user confirmed: travel is not an address change"},
 )
+response.raise_for_status()
 
 # 5. correct the type of the memory that caused the bad invalidation
 client.memory.update(memory_id="memory_travel_bj", memory_type="event")
@@ -77,7 +83,7 @@ An Agent does not have to wait for a complaint. It can pull the
 ```python
 candidates = client.memory.get_audit(auto_revoke_eligible=True,
                                      include_revoked=False)
-# review each low-confidence invalidation → batch-revoke the wrong ones
+# Review each low-confidence invalidation; hand the wrong ones to an admin for revoke.
 ```
 
 ## Error handling the Agent should expect
@@ -92,6 +98,8 @@ data) with these `CX_ERR_MEM02_*` codes:
 | `CX_ERR_MEM02_EXTRACT_BUDGET_EXCEEDED` | quota | no | back off; raise the day's budget |
 | `CX_ERR_MEM02_CONTRADICTION_AMBIGUOUS` | transient | yes | retry; the judge was unsure |
 | `CX_ERR_MEM02_LLM_DISABLED` | permanent | no | extraction is off (NullEnricher); only `interaction_log` is kept |
+
+Revoke can also return `FORBIDDEN` (category `auth`, retryable: no): it needs an admin key. Hand the invalidation to an admin instead of retrying.
 
 ## Implementation status
 
