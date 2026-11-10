@@ -60,6 +60,8 @@ Some operations return HTTP 200 even when part of the work failed. The details a
 | Cross-namespace query | `meta.namespaces_failed[]` |
 | Batch document submit | `meta.failed[]` |
 
+A query can also succeed with degraded results, reported in `meta.warnings` with the same `code` and `category` fields and, when applicable, `retry_after_ms`. See [Check for degraded results](/docs/guides/query/#warnings) for the warning codes and what to do.
+
 When an asynchronous task fails, the failure appears in the task progress as `error_code` and `error_msg`, not in the response to the request that submitted it.
 
 So don't judge whether an operation fully succeeded from the HTTP status code alone.
