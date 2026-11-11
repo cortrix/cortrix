@@ -3,9 +3,6 @@
 > Best-practice guide for an Agent to find and undo a wrong memory invalidation
 > (MEM02 D6 + D9 self-correction loop). This is the public counterpart of
 > `cortrix.ai/docs/agent-memory-correction` (MEM02-rev-1b).
->
-> Source of truth for the mechanism: `design/features/MEM02-llm-extraction.md`
-> §6 (HTTP API), §7 (SDK), §8 (the full self-correction scenario).
 
 ## Background — why invalidations are reversible
 
@@ -32,15 +29,12 @@ The audit trail is the F18a operation_log (CE) — there is **no** separate
 ## The self-correction loop (Agent-driven)
 
 1. **User signals a problem** — e.g. "your memory of me seems wrong lately."
-2. **Agent reads the audit log** — `client.memory.get_audit(...)` lists recent
-   invalidations with the invalidated block, the block that caused it, the
-   reason, confidence, timestamp, and `auto_revoke_eligible`.
+2. **Agent reads the audit log** — the Python SDK has no dedicated memory audit method. Memory invalidations and revokes are recorded in the operations log: `GET /api/v1/operations?action_in=memory_invalidate,memory_revoke` (SDK: `client.ops.list_operations(action_in="memory_invalidate,memory_revoke")`; MCP: `cortrix_memory_get_audit`, which also includes extraction entries). Entries expose `action`, `resource_id`, `user_id`, `namespace_id`, `summary`, and `timestamp`; queries default to the caller's own user, and querying another user requires an admin key. `GET /api/v1/memory/invalidations` currently returns an empty list and a `source` pointer to this operations query.
 3. **Agent explains and asks** — surface the human-readable reason ("on May 15
    you said you were 'traveling to Beijing', so I retired 'user is in Shanghai'
    — but that reads as a trip, not a move. Restore it?").
 4. **On confirmation, Agent hands the revoke to an admin** — revoking is an admin action. An Agent using a normal read/write key cannot revoke: the route returns HTTP 403 with code `FORBIDDEN`, message `ADMIN permission required`, category `auth`, and `retryable: false`. After the user confirms, the Agent passes the invalidated memory's `block_id`, namespace, and reason to a human operator or a separate admin-keyed service trusted by the deployment. The admin calls `POST /api/v1/memory/invalidations/{id}/revoke`, where `{id}` is that `block_id`, with body `{"ns": "<namespace>", "reason": "<why>"}`. The old block's `status` goes `invalidated → active`, and a `memory_revoke` entry is written. In the response and audit, `revoked_by` identifies the authenticated admin caller; any `revoked_by` in the request body is ignored.
-5. **Agent fixes the misclassification if needed** — e.g. re-type the offending
-   memory from `fact` to `event` via `client.memory.update(memory_id=..., ...)`.
+5. **Agent fixes the misclassification if needed** — PATCH cannot change `memory_type`. Create a corrected memory with `client.memory.create(namespace, content, memory_type="event")`, then invalidate the wrong one with `client.memory.delete(memory_id, namespace=namespace)`. To correct only the content, use `client.memory.update(memory_id, content=content, namespace=namespace)`.
 
 > SDK / MCP naming (P12 v1.0.4 SoT): the audit + revoke tools are
 > `cortrix_memory_get_audit` (#21) and `cortrix_memory_revoke_fact` (#22). The
@@ -55,8 +49,9 @@ from cortrix import Cortrix
 client = Cortrix(base_url="http://localhost:8420/api/v1")
 
 # 2. read recent invalidations
-recent = client.memory.get_audit(ns="memory", user_id="user_123",
-                                 since="2026-05-15T00:00:00Z", limit=20)
+recent = client.ops.list_operations(
+    action_in="memory_invalidate,memory_revoke", limit=20
+)
 
 # 4. admin side: revoke a wrong one after user confirmation and Agent handoff
 # A read/write key gets HTTP 403 FORBIDDEN; use the admin caller's key.
@@ -71,19 +66,20 @@ response = httpx.post(
 )
 response.raise_for_status()
 
-# 5. correct the type of the memory that caused the bad invalidation
-client.memory.update(memory_id="memory_travel_bj", memory_type="event")
+# 5. create the corrected event, then invalidate the misclassified memory
+client.memory.create(
+    "memory", "User traveled to Beijing on May 15, 2026.", memory_type="event"
+)
+client.memory.delete("memory_travel_bj", namespace="memory")
 ```
 
 ## Proactive review of low-confidence invalidations
 
-An Agent does not have to wait for a complaint. It can pull the
-`auto_revoke_eligible` set and review the judge's weakest calls:
+An Agent does not have to wait for a complaint. There is currently no server-side `auto_revoke_eligible` filter in the operations query, so the Agent reviews recent invalidations itself:
 
 ```python
-candidates = client.memory.get_audit(auto_revoke_eligible=True,
-                                     include_revoked=False)
-# Review each low-confidence invalidation; hand the wrong ones to an admin for revoke.
+candidates = client.ops.list_operations(action="memory_invalidate")
+# Review recent invalidations; hand the wrong ones to an admin for revoke.
 ```
 
 ## Error handling the Agent should expect
@@ -106,4 +102,4 @@ Revoke can also return `FORBIDDEN` (category `auth`, retryable: no): it needs an
 This guide describes a design contract. The live endpoints, Query-pipeline contradiction
 path, Python-middleware async worker, and MEM04 opt-out integration are not currently
 implemented as one supported workflow. Do not treat the examples above as an executable
-Quick Start. Implementation notes remain in `design/features/MEM02-llm-extraction.md`.
+Quick Start.
