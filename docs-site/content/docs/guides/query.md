@@ -170,7 +170,28 @@ curl -fsS -H 'Content-Type: application/json' \
 
 In testing, the response still carried a `rerank_score` field with reranking off, but with completely different values. In the example above, the first result went from 0.824 to 0.033. Don't compare scores across the two modes.
 
+The response also carries a [`CX_WARN_RERANK_DISABLED` warning](#warnings).
+
 For when reranking helps and when it doesn't, see [When to rerank](https://github.com/cortrix/cortrix/blob/release/1.0/docs/operations/reranking-applicability.md).
+
+## Check for degraded results {#warnings}
+
+`meta.warnings` is an array of JSON objects with string fields `code`, `reason`, and `category`; some entries also include an integer `retry_after_ms` in milliseconds. These warnings don't change the HTTP status: the response still returns HTTP 200 with results.
+
+For example, a request with `"rerank": false` adds this entry to `meta.warnings`:
+
+```json
+{"code":"CX_WARN_RERANK_DISABLED","reason":"rerank_disabled","category":"permanent"}
+```
+
+| Code | When it appears | `reason` | `category` | `retry_after_ms` | What to do |
+|---|---|---|---|---|---|
+| `CX_WARN_RERANK_DISABLED` | The request sets `"rerank": false`. Ordering uses the fused retrieval score instead of the reranker model. | `rerank_disabled` | `permanent` | — | Expected when you asked for it. Don't retry. Set `rerank` to `true` or omit it if you want reranked order. |
+| `CX_WARN_LLM_RERANK_DEGRADED` | The request sets `"llm_rerank": true`, a query-time LLM is configured, and there are at least two results. LLM calls fail, time out, or return unusable rankings, leaving a window without any usable vote. | `llm_rerank_degraded` | `transient` | `1000` | Results are usable and keep their order from before LLM reranking, never a partial LLM order. If LLM ordering matters, wait `retry_after_ms` and send the same request again. |
+| `CX_WARN_RAG_FUSION_DEGRADED` | The request sets `"rag_fusion": true`, a query-time LLM is configured, the query takes the multi-query path, and the LLM call that generates query variants fails. | `rag_fusion_degraded` | `transient` | `5000` | Results are usable but come from the original query alone, without variants. To get fused results, wait `retry_after_ms` and retry. |
+{.wide .expand}
+
+The two LLM warnings report a failure of a step that ran. A missing warning doesn't prove the step ran. To confirm, use [`?explain=true`](#explain) and look for `llm_rerank` or `rag_fusion` under `explain.llm_dependent_features`; each key is present only when that step ran.
 
 ## See how a query ran {#explain}
 
