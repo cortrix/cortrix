@@ -103,7 +103,7 @@ MemoryExtractionResult MemoryExtractionService::ExtractOne(
     }
 
     auto block_store = std::make_shared<MemoryBlockAdapter>(
-        facade.store(), &embedder_, &facade.vec_index());
+        facade.store(), &embedder_, &facade.vec_index(), ns);
     auto contradiction = std::make_shared<MemoryContradictionAdapter>(facade.store());
 
     MemoryExtractor extractor(llm_, block_store, contradiction, op_logger_, config_);
@@ -136,7 +136,7 @@ Result<MemoryBlockRecord> MemoryExtractionService::RevokeInvalidation(
     // unused by RevokeInvalidation (a store-only path) but the extractor ctor requires
     // them; passing the real wiring keeps the object identical to the extract path.
     auto block_store = std::make_shared<MemoryBlockAdapter>(
-        facade.store(), &embedder_, &facade.vec_index());
+        facade.store(), &embedder_, &facade.vec_index(), ns);
     auto contradiction = std::make_shared<MemoryContradictionAdapter>(facade.store());
     MemoryExtractor extractor(llm_, block_store, contradiction, op_logger_, config_);
     return extractor.RevokeInvalidation(invalidated_block_id, reason, revoked_by, ctx);

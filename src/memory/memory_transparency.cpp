@@ -137,10 +137,12 @@ const char* ToString(TriggeredBy triggered_by) {
 MemoryTransparency::MemoryTransparency(
     std::shared_ptr<IMemoryBlockLister> lister,
     std::shared_ptr<IMemoryBlockStore> block_store,
-    std::shared_ptr<observability::IOperationLogger> op_logger)
+    std::shared_ptr<observability::IOperationLogger> op_logger,
+    std::string ns_id)
     : lister_(std::move(lister)),
       block_store_(std::move(block_store)),
-      op_logger_(std::move(op_logger)) {}
+      op_logger_(std::move(op_logger)),
+      ns_id_(std::move(ns_id)) {}
 
 bool MemoryTransparency::IsEffectiveStatus(const MemoryBlockRecord& rec) {
     // J5: a memory's effective (valid) state aligns with MEM02's write side = active;
@@ -293,6 +295,7 @@ Result<std::string> MemoryTransparency::Create(const MemoryCreateRequest& req,
     const int64_t now_ms = NowEpochMs();
     MemoryBlockRecord rec;
     rec.block_id = id::GenerateUlid(now_ms);  // reuse F34 ULID (no other id minting)
+    rec.ns_id = ns_id_;
     rec.user_id = req.user_id;
     rec.content = req.content;
     // issue-3 A: POST path writes directly, NO LLM — extraction_method="explicit".

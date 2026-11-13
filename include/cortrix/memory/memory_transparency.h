@@ -171,9 +171,13 @@ public:
     /// @param lister      list-by-user seam (D3.5 real adapter)
     /// @param block_store memory-block read/write seam (MEM02 IMemoryBlockStore)
     /// @param op_logger   F18a operation logger (CE; real observability::IOperationLogger)
+    /// @param ns_id       namespace name recorded on the memory_create audit entry;
+    ///                    edit / delete entries use the stored record's own ns_id,
+    ///                    which the block adapter stamps on read; empty → unset
     MemoryTransparency(std::shared_ptr<IMemoryBlockLister> lister,
                        std::shared_ptr<IMemoryBlockStore> block_store,
-                       std::shared_ptr<observability::IOperationLogger> op_logger);
+                       std::shared_ptr<observability::IOperationLogger> op_logger,
+                       std::string ns_id = "");
 
     /// GET /memory (issue-1 A' + issue-5 A + issue-6 phased rollout). Lists the
     /// session user's memories with status / memory_type filtering + pagination.
@@ -228,6 +232,7 @@ private:
     std::shared_ptr<IMemoryBlockLister> lister_;
     std::shared_ptr<IMemoryBlockStore> block_store_;
     std::shared_ptr<observability::IOperationLogger> op_logger_;
+    std::string ns_id_;
 };
 
 }  // namespace cortrix::memory::transparency
