@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "cortrix/common/utf8_utils.h"
 #include "cortrix/observability/operation_log_error.h"
 #include "cortrix/observability/oplog_metrics.h"
 
@@ -29,9 +30,15 @@ void BindOptText(sqlite3_stmt* stmt, int idx, const std::optional<std::string>& 
     }
 }
 
+// Read-side sanitize: SQLite TEXT holds raw bytes, so rows written before
+// boundary-safe summary truncation may carry incomplete UTF-8 sequences.
+// Re-serializing them in GET /api/v1/operations would otherwise throw json
+// type_error.316 inside dump() -> 500 CX_ERR_INTERNAL_ERROR. Normalizing to
+// U+FFFD keeps legacy rows readable and is an allocation-free identity on
+// well-formed text.
 std::string ColText(sqlite3_stmt* stmt, int col) {
     const char* t = reinterpret_cast<const char*>(sqlite3_column_text(stmt, col));
-    return t ? t : "";
+    return t ? common::SanitizeUtf8(std::string(t)) : std::string();
 }
 
 // Read an optional<string>: NULL column → nullopt, else the text.

@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 
 #include "cortrix/common/block_types.h"
+#include "cortrix/common/utf8_utils.h"
 #include "cortrix/id/hash.h"
 #include "cortrix/id/ulid.h"
 #include "cortrix/logging/logging.h"
@@ -698,7 +699,10 @@ Status EnrichBackfillWorker::ProcessTask(const async::TaskInfo& task) {
             ++repaired;
         } else {
             row.failed_members = JoinCsv(rep.still_owed);
-            row.last_error = rep.last_error.substr(0, 200);
+            // Byte-cut at 200 could split a multi-byte char inside provider/
+            // enricher error text that later reaches a strict JSON dump.
+            // Sanitize first, then cap the sanitized text.
+            row.last_error = common::Utf8SafeTruncateSanitized(rep.last_error, 200);
             // The cap bounds provider work. When the only remaining debt is the
             // contextual index label and the columns with the stored vector are in
             // place, the next delivery calls no provider, so the row is not given

@@ -296,6 +296,27 @@ TEST_F(OperationsRoutesTest, OffsetPastEndIsPaginationOutOfRange) {
     EXPECT_EQ(body["error"]["structured_data"]["total_count"], 3);
 }
 
+TEST_F(OperationsRoutesTest, LegacyByteTruncatedSummarySerializesCleanly) {
+    // A legacy operation_log row whose summary was byte-cut at 100 bytes in the
+    // middle of a 3-byte UTF-8 character must not make GET /api/v1/operations
+    // throw nlohmann::json::type_error (316) during response serialization.
+    std::string multi_byte;
+    while (multi_byte.size() < 120) multi_byte += "\xE7\x94\xA8\xE6\x88\xB7\xE9\x97\xAE\xE9\xA2\x98";
+    Seed("alice", "query", "query", "sales", "ix-legacy", multi_byte.substr(0, 100), 4000);
+
+    httplib::Client cli("127.0.0.1", port_);
+    auto res = cli.Get("/api/v1/operations?limit=10", Alice());
+    ASSERT_TRUE(res);
+    ASSERT_EQ(res->status, 200) << res->body;
+    auto body = json::parse(res->body);
+    ASSERT_TRUE(body.contains("operations"));
+    ASSERT_FALSE(body["operations"].empty());
+    EXPECT_EQ(body["operations"][0]["resource_id"], "ix-legacy");
+    // 99 valid bytes + 1 incomplete lead byte normalized to 3-byte U+FFFD.
+    EXPECT_NE(body["operations"][0]["summary"].get<std::string>().find("\xEF\xBF\xBD"),
+              std::string::npos);
+}
+
 // ---- auth gate ----------------------------------------------------------------
 
 TEST_F(OperationsRoutesTest, NoAuthIsUnauthenticated) {

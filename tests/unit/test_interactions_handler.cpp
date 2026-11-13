@@ -9,6 +9,7 @@
 #include "cortrix/agent_trace/interaction_sources_schema.h"
 #include "cortrix/agent_trace/interactions_handler.h"
 #include "cortrix/catalog/schema_provider.h"
+#include "cortrix/common/utf8_utils.h"
 
 // S5 coverage: GET /interactions/{id}/sources business logic (§8.2) — permission
 // (own vs admin vs UNAUTHORIZED), INTERACTION_NOT_FOUND, deleted-source counting
@@ -145,6 +146,25 @@ TEST_F(InteractionsHandlerTest, TruncateSnippetKeepsHeadAndTail) {
     EXPECT_NE(out.find("[...]"), std::string::npos);
     EXPECT_EQ(out.substr(0, 5), std::string(5, 'a'));
     EXPECT_LE(out.size(), 400u + 5u + 100u);
+}
+
+// The §6/§8.2 snippet budget is a byte budget on the value that is persisted.
+// Sanitizing an ill-formed byte widens it to a 3-byte U+FFFD, so the cap must
+// be applied after sanitizing — otherwise an ill-formed input silently blows
+// past the documented limit.
+
+TEST_F(InteractionsHandlerTest, TruncateSnippetKeepsMalformedInputInsideTheBudget) {
+    // Short ill-formed input (early-return branch).
+    const std::string poison_short(400, static_cast<char>(0x80));
+    const std::string out_short = InteractionsHandler::TruncateSnippet(poison_short);
+    EXPECT_LE(out_short.size(), 500u);
+    EXPECT_TRUE(common::IsWellFormedUtf8(out_short));
+
+    // Longer ill-formed input (head + marker + tail branch).
+    const std::string poison_long(900, static_cast<char>(0x80));
+    const std::string out_long = InteractionsHandler::TruncateSnippet(poison_long);
+    EXPECT_LE(out_long.size(), 500u);
+    EXPECT_TRUE(common::IsWellFormedUtf8(out_long));
 }
 
 // A NULL interaction_log.user_id is treated as owned-by-nobody: a non-admin

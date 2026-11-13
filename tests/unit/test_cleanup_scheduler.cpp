@@ -148,6 +148,15 @@ TEST(OperationLogEmitterTest, SummaryTruncatedTo100) {
     EXPECT_EQ(t->size(), 100u);
     EXPECT_FALSE(TruncateSummary(std::nullopt).has_value());
     EXPECT_EQ(TruncateSummary(std::string("short")), std::optional<std::string>("short"));
+
+    // Multi-byte UTF-8 summaries cut on a character boundary (<= 100 bytes):
+    // 34 * 3 bytes = 102 bytes; naive substr(0, 100) splits the 34th character,
+    // whereas boundary-safe truncation stops at 99 bytes (33 full characters).
+    std::string cjk;
+    for (int i = 0; i < 34; ++i) cjk += "\xE4\xB8\xAD";
+    auto tc = TruncateSummary(cjk);
+    ASSERT_TRUE(tc.has_value());
+    EXPECT_EQ(tc->size(), 99u);
 }
 
 TEST(OperationLogEmitterTest, MakeEngineEntryReadsThreadLocalTrace) {

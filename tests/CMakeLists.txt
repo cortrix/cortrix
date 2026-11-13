@@ -122,6 +122,7 @@ add_executable(cortrix_unit_tests
     unit/test_operation_logger.cpp
     unit/test_oplog_metrics.cpp
     unit/test_operations_routes.cpp
+    unit/test_utf8_utils.cpp
     unit/test_cleanup_scheduler.cpp
     unit/test_schema_migrator.cpp
     unit/test_catalog_schema.cpp

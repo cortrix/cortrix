@@ -10,6 +10,7 @@
 #include "cortrix/agent_trace/agent_trace_error.h"
 #include "cortrix/agent_trace/agent_trace_metrics.h"
 #include "cortrix/agent_trace/observability_audit_log.h"
+#include "cortrix/common/utf8_utils.h"
 
 namespace cortrix::agent_trace {
 
@@ -22,7 +23,10 @@ constexpr const char* kSnippetMid = "[...]";
 
 std::string ColText(sqlite3_stmt* stmt, int col) {
     const char* t = reinterpret_cast<const char*>(sqlite3_column_text(stmt, col));
-    return t ? t : "";
+    // Read-side healing: a row written before the UTF-8 contract can hold
+    // byte-truncated text; normalize it so a later strict JSON dump cannot
+    // throw type_error.316.
+    return t ? common::SanitizeUtf8(std::string(t)) : std::string();
 }
 
 // Format Unix ms as the ISO-8601 UTC string the interaction_log.created_at column
@@ -65,9 +69,13 @@ bool BlockExists(sqlite3* db, const std::string& block_id, bool* blocks_table_pr
 }  // namespace
 
 std::string InteractionsHandler::TruncateSnippet(const std::string& snippet) {
-    if (snippet.size() <= kSnippetMaxBytes) return snippet;
-    return snippet.substr(0, kSnippetHeadBytes) + kSnippetMid +
-           snippet.substr(snippet.size() - kSnippetTailBytes);
+    // Snippets are caller-supplied query text stored and later re-serialized:
+    // sanitize any raw invalid bytes (strict nlohmann dump would otherwise
+    // throw type_error.316) and keep the result inside the §6/§8.2 budget.
+    // Sanitizing widens an ill-formed byte to a 3-byte U+FFFD, so the budget is
+    // applied to the sanitized text and the "[...]" marker counts against it.
+    return common::Utf8SafeHeadTailBudgeted(snippet, kSnippetHeadBytes, kSnippetMid,
+                                            kSnippetTailBytes, kSnippetMaxBytes);
 }
 
 InteractionsHandler::InteractionsHandler(sqlite3* db) : db_(db) {}

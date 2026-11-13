@@ -7,6 +7,7 @@
 
 #include "cortrix/agent_trace/agent_trace_metrics.h"
 #include "cortrix/agent_trace/http_observability_middleware.h"  // GenerateUuidV4
+#include "cortrix/common/utf8_utils.h"
 #include "cortrix/observability/observability_context.h"
 
 namespace cortrix::agent_trace {
@@ -35,25 +36,35 @@ constexpr size_t kErrorMsgMaxBytes = 256;         // first 256 chars of error me
 }  // namespace
 
 std::string McpSessionHandler::TruncateParams(const std::string& params) {
-    if (params.size() <= kParamsMaxBytes) return params;
-    // Keep head + tail with a middle marker (§3 — preserve first 1.5KB + last 0.5KB).
-    return params.substr(0, kParamsHeadBytes) + kTruncMid +
-           params.substr(params.size() - kParamsTailBytes);
+    // Sanitizing an ill-formed byte widens it to a 3-byte U+FFFD, so the byte
+    // budget has to be applied to the sanitized text — and the middle marker
+    // counts against that budget (§3 — preserve first 1.5KB + last 0.5KB).
+    return common::Utf8SafeHeadTailBudgeted(params, kParamsHeadBytes, kTruncMid, kParamsTailBytes,
+                                            kParamsMaxBytes);
 }
 
 std::string McpSessionHandler::TruncateResult(const std::string& summary) {
-    if (summary.size() <= kResultMaxBytes) return summary;
-    return summary.substr(0, kResultHeadBytes) + kTruncTail +
-           summary.substr(summary.size() - kResultTailBytes);
+    // Same rule as TruncateParams: the stored value stays well-formed UTF-8
+    // and never exceeds kResultMaxBytes (§3), whatever the caller passed in.
+    return common::Utf8SafeHeadTailBudgeted(summary, kResultHeadBytes, kTruncTail, kResultTailBytes,
+                                            kResultMaxBytes);
 }
 
 std::string McpSessionHandler::FormatError(const std::optional<std::string>& error_code,
                                            const std::string& error_message) {
     // §3: on failure keep only the error_code + first 256 chars of the message.
-    std::string code = error_code.value_or("CX_ERR_F13_INTERNAL");
-    std::string msg = error_message.size() > kErrorMsgMaxBytes
-                          ? error_message.substr(0, kErrorMsgMaxBytes)
-                          : error_message;
+    // Sanitize before capping: an ill-formed byte becomes a 3-byte U+FFFD, so a
+    // cap applied to the raw message would not bound the stored bytes.
+    std::string code = common::SanitizeUtf8(error_code.value_or("CX_ERR_F13_INTERNAL"));
+    std::string msg = common::Utf8SafeTruncateSanitized(error_message, kErrorMsgMaxBytes);
+    // The "code: " prefix is part of the result_summary, so it counts against
+    // the §3 result budget too.
+    const std::size_t prefix_bytes = code.size() + 2;  // "code" + ": "
+    if (prefix_bytes + msg.size() > kResultMaxBytes) {
+        const std::size_t room =
+            (kResultMaxBytes > prefix_bytes) ? kResultMaxBytes - prefix_bytes : 0;
+        msg = common::Utf8SafeTruncate(msg, room);
+    }
     return code + ": " + msg;
 }
 

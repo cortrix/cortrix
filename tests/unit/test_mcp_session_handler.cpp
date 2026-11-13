@@ -13,6 +13,7 @@
 #include "cortrix/agent_trace/mcp_session_handler.h"
 #include "cortrix/catalog/schema_provider.h"
 #include "cortrix/common/i_global_config.h"
+#include "cortrix/common/utf8_utils.h"
 
 // S3 coverage: the MCP session handler (§7.1) — session_id resolution (generated
 // vs validated client id), per-tool_call agent_trace double-write, the Phase-1
@@ -248,6 +249,45 @@ TEST_F(McpSessionHandlerTest, TruncateResultAndFormatError) {
     // null error_code falls back to CX_ERR_F13_INTERNAL.
     EXPECT_EQ(McpSessionHandler::FormatError(std::nullopt, "boom"),
               "CX_ERR_F13_INTERNAL: boom");
+}
+
+// The §3 budgets are byte budgets on the value that is actually persisted.
+// Sanitizing an ill-formed byte widens it to a 3-byte U+FFFD, so the cap must
+// be applied after sanitizing — otherwise an ill-formed input silently blows
+// past the documented limit.
+
+TEST_F(McpSessionHandlerTest, TruncateResultKeepsMalformedInputInsideTheBudget) {
+    // Short ill-formed input (early-return branch): 512 invalid bytes.
+    const std::string poison(512, static_cast<char>(0x80));
+    const std::string out = McpSessionHandler::TruncateResult(poison);
+    EXPECT_LE(out.size(), 512u);
+    EXPECT_TRUE(common::IsWellFormedUtf8(out));
+
+    // Longer ill-formed input (head + marker + tail branch).
+    const std::string poison_long(5000, static_cast<char>(0x80));
+    const std::string out_long = McpSessionHandler::TruncateResult(poison_long);
+    EXPECT_LE(out_long.size(), 512u);
+    EXPECT_TRUE(common::IsWellFormedUtf8(out_long));
+}
+
+TEST_F(McpSessionHandlerTest, TruncateParamsKeepsMalformedInputInsideTheBudget) {
+    const std::string poison_short(100, static_cast<char>(0x80));
+    const std::string out_short = McpSessionHandler::TruncateParams(poison_short);
+    EXPECT_LE(out_short.size(), 2048u);
+    EXPECT_TRUE(common::IsWellFormedUtf8(out_short));
+
+    const std::string poison_long(5000, static_cast<char>(0x80));
+    const std::string out_long = McpSessionHandler::TruncateParams(poison_long);
+    EXPECT_LE(out_long.size(), 2048u);
+    EXPECT_TRUE(common::IsWellFormedUtf8(out_long));
+}
+
+TEST_F(McpSessionHandlerTest, FormatErrorKeepsMalformedInputInsideTheBudget) {
+    const std::string poison(2000, static_cast<char>(0x80));
+    const std::string fe = McpSessionHandler::FormatError(std::string("CX_ERR_X"), poison);
+    EXPECT_LE(fe.size(), 512u);
+    EXPECT_TRUE(common::IsWellFormedUtf8(fe));
+    EXPECT_EQ(fe.substr(0, 9), "CX_ERR_X:");
 }
 
 }  // namespace

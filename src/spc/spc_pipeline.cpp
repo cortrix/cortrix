@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "cortrix/common/utf8_utils.h"
 #include "cortrix/spc/parser_factory.h"          // F06 cortrix::spc::DocumentParserFactory
 #include "cortrix/spc/parser.h"                   // ParsedDoc / ParserOptions / DocumentMetadata
 #include "cortrix/spc/onnx_embedder.h"
@@ -1188,10 +1189,10 @@ int SPCPipeline::ProcessParsed(cortrix::spc::ParsedDoc& d, SPCTask& task,
                     if (owed) {
                         es.failed_members = owed_members;
                         auto eit2 = enrich_error_by_child.find(b.child_id);
-                        if (eit2 != enrich_error_by_child.end()) {
-                            es.last_error = eit2->second.substr(0, 200);
+                        if (eit2 != enrich_error_by_child.end() && !eit2->second.empty()) {
+                            es.last_error = common::Utf8SafeTruncateSanitized(eit2->second, 200);
                         } else if (!persist_err.empty()) {
-                            es.last_error = persist_err.substr(0, 200);
+                            es.last_error = common::Utf8SafeTruncateSanitized(persist_err, 200);
                         }
                         es.next_retry_at =
                             enrich_now_unix + cortrix::spc::kEnrichRetryFirstDelaySec;
