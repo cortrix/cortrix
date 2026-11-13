@@ -169,7 +169,8 @@ protected:
 };
 
 // Audit entries carry the namespace name: a service built with an ns_id stamps it on the
-// create entry, and on edit / delete entries when the stored record has no ns_id.
+// create entry; edit / delete entries take the stored record's ns_id, which the block
+// adapter stamps on read.
 class MemoryTransparencyNsTest : public MemoryTransparencyTest {
 protected:
     void SetUp() override {

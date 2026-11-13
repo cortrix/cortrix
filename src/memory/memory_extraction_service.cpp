@@ -103,7 +103,7 @@ MemoryExtractionResult MemoryExtractionService::ExtractOne(
     }
 
     auto block_store = std::make_shared<MemoryBlockAdapter>(
-        facade.store(), &embedder_, &facade.vec_index());
+        facade.store(), &embedder_, &facade.vec_index(), ns);
     auto contradiction = std::make_shared<MemoryContradictionAdapter>(facade.store());
 
     MemoryExtractor extractor(llm_, block_store, contradiction, op_logger_, config_);
