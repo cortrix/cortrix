@@ -2,7 +2,8 @@ import { ExclamationTriangleIcon, PencilIcon, TrashIcon } from '@heroicons/react
 import { useTranslation } from 'react-i18next';
 import type { MemoryItem } from '../../types/api';
 import { Badge, Button } from '../ui';
-import { formatEpoch } from '../../utils/formatters';
+import { useAppStore } from '../../store/useAppStore';
+import { formatInTimezone } from '../../utils/timezone';
 import { ExtractionMethodBadge } from './ExtractionMethodBadge';
 
 // One memory record card (P02a design § 7.1). Shows A-class fields by default;
@@ -25,6 +26,7 @@ const TYPE_VARIANT = {
 
 export function MemoryCard({ memory, explain, onEdit, onInvalidate }: MemoryCardProps) {
   const { t } = useTranslation();
+  const timezone = useAppStore((s) => s.timezone);
   const invalidated = memory.status === 'invalidated';
 
   return (
@@ -51,7 +53,9 @@ export function MemoryCard({ memory, explain, onEdit, onInvalidate }: MemoryCard
                 data-testid="memory-revoked-badge"
               >
                 <ExclamationTriangleIcon className="h-4 w-4" aria-hidden="true" />
-                {t('memory.revokedAt', { date: formatEpoch(memory.revoked_at) })}
+                {t('memory.revokedAt', {
+                  date: formatInTimezone(new Date(memory.revoked_at), timezone),
+                })}
               </span>
             )}
           </div>
@@ -59,7 +63,8 @@ export function MemoryCard({ memory, explain, onEdit, onInvalidate }: MemoryCard
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
             <span className="font-mono">{memory.memory_id}</span>
             <span>
-              {t('memory.extractedAt')}: {formatEpoch(memory.extracted_at)}
+              {t('memory.extractedAt')}:{' '}
+              {formatInTimezone(new Date(memory.extracted_at), timezone)}
             </span>
             {explain && memory.extraction_method && (
               <ExtractionMethodBadge method={memory.extraction_method} />

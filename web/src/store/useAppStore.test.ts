@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useAppStore } from './useAppStore';
 import { useFeatureFlagsStore } from '../hooks/useFeatureFlags';
+import { getSystemTimezone } from '../utils/timezone';
 
 // Mock fetch for API calls in jsdom environment.
 //
@@ -202,5 +203,30 @@ describe('useAppStore', () => {
     // F4: mock API returns LLM fields
     expect(status!.llm_enabled).toBeDefined();
     expect(status!.llm_provider).toBeDefined();
+  });
+});
+
+describe('timezone preference', () => {
+  const TZ_KEY = 'cortrix-timezone';
+
+  it('defaults to the browser timezone when nothing is stored', () => {
+    const stored = window.localStorage.getItem(TZ_KEY);
+    expect(stored).toBeNull();
+    expect(useAppStore.getState().timezone).toBe(getSystemTimezone());
+  });
+
+  it('persists the selected timezone to localStorage', () => {
+    useAppStore.getState().setTimezone('Asia/Shanghai');
+    expect(useAppStore.getState().timezone).toBe('Asia/Shanghai');
+    expect(window.localStorage.getItem(TZ_KEY)).toBe('Asia/Shanghai');
+  });
+
+  it('reads a stored timezone back on initialization', async () => {
+    window.localStorage.setItem(TZ_KEY, 'Europe/Berlin');
+    // The store initializer only runs when the module is first evaluated, so
+    // a fresh import is required to observe the persisted value.
+    vi.resetModules();
+    const fresh = await import('./useAppStore');
+    expect(fresh.useAppStore.getState().timezone).toBe('Europe/Berlin');
   });
 });

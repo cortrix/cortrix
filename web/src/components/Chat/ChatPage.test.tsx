@@ -6,6 +6,7 @@ import { ChatPage } from './ChatPage';
 vi.mock('../../store/useAppStore', () => ({
   useAppStore: vi.fn(() => ({
     systemStatus: { llm_enabled: true, llm_provider: 'GLM-4' },
+    timezone: 'UTC',
   })),
 }));
 
@@ -16,6 +17,7 @@ describe('ChatPage', () => {
   beforeEach(() => {
     mockUseAppStore.mockReturnValue({
       systemStatus: { llm_enabled: true, llm_provider: 'GLM-4' },
+      timezone: 'UTC',
     } as any);
   });
 

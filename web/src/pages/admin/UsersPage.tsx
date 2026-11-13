@@ -13,6 +13,8 @@ import type { UserRecord, UserRole, UserStatus } from '../../types/api';
 import { listUsers, createUser, updateUser, disableUser, enableUser } from '../../api/admin';
 import { parseAgentError } from '../../api/errors';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useAppStore } from '../../store/useAppStore';
+import { formatInTimezone } from '../../utils/timezone';
 import { Button, Badge, Input, Select, notify } from '../../components/ui';
 import { LoadingSpinner } from '../../components/Common/LoadingSpinner';
 import { ProgrammaticBanner } from '../../components/Common/ProgrammaticBanner';
@@ -28,15 +30,17 @@ import { UserFormModal, type UserFormValues } from './UserFormModal';
 
 const PAGE_SIZE = 20;
 
-function formatCreatedDate(value?: string | number): string {
+function formatCreatedDate(value?: string | number, timezone?: string): string {
   if (value == null) return '—';
   if (typeof value === 'number') {
     const millis = value < 1_000_000_000_000 ? value * 1000 : value;
     const date = new Date(millis);
-    return Number.isNaN(date.getTime()) ? '—' : date.toISOString().slice(0, 10);
+    if (Number.isNaN(date.getTime())) return '—';
+    return timezone ? formatInTimezone(date, timezone).slice(0, 10) : date.toISOString().slice(0, 10);
   }
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value.slice(0, 10) : date.toISOString().slice(0, 10);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  return timezone ? formatInTimezone(date, timezone).slice(0, 10) : date.toISOString().slice(0, 10);
 }
 
 function StatusBadge({ status }: { status: UserStatus }) {
@@ -52,6 +56,7 @@ export function UsersPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const currentUser = useAuthStore((s) => s.currentUser);
+  const timezone = useAppStore((s) => s.timezone);
 
   const [q, setQ] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | UserRole>('all');
@@ -236,7 +241,7 @@ export function UsersPage() {
                       <StatusBadge status={u.status} />
                     </td>
                     <td className="px-5 py-3.5 font-mono text-xs text-muted">
-                      {formatCreatedDate(u.created_at)}
+                      {formatCreatedDate(u.created_at, timezone)}
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-end gap-2">

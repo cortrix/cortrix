@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { NamespaceInfo, SystemStatus } from '../types/api';
 import { listNamespaces } from '../api/namespaces';
 import { get } from '../api/client';
+import { getSystemTimezone, isValidTimezone } from '../utils/timezone';
 
 interface HealthResponse {
   version: string;
@@ -21,6 +22,14 @@ interface HealthResponse {
 // middleware). Without it a full reload / remount reverted the selection to
 // 'default', losing the user's working namespace across chat / search / upload.
 const NAMESPACE_KEY = 'cortrix-namespace';
+
+// The timezone preference is persisted the same hand-rolled way as the
+// namespace: the backend stores every timestamp as Unix epoch-ms UTC, so the
+// *only* place a timezone can be applied is the UI. Without a persisted
+// preference a reload would silently fall back to the browser zone and the
+// user would lose the setting they picked in Settings.
+const THEME_KEY = 'cortrix-theme';
+const TZ_KEY = 'cortrix-timezone';
 
 function browserStorage(): Storage | null {
   if (typeof window === 'undefined') return null;
@@ -65,6 +74,11 @@ interface AppState {
 
   theme: 'light' | 'dark';
   toggleTheme: () => void;
+
+  // IANA timezone used to render every user-visible timestamp. Persisted in
+  // localStorage; defaults to the browser's zone.
+  timezone: string;
+  setTimezone: (tz: string) => void;
 }
 
 export const useAppStore = create<AppState>((set, _get) => ({
@@ -135,14 +149,14 @@ export const useAppStore = create<AppState>((set, _get) => ({
 
   theme: (() => {
     if (typeof window === 'undefined') return 'light';
-    const stored = browserStorage()?.getItem('cortrix-theme');
+    const stored = browserStorage()?.getItem(THEME_KEY);
     if (stored === 'dark' || stored === 'light') return stored;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   })(),
   toggleTheme: () =>
     set((s) => {
       const next = s.theme === 'dark' ? 'light' : 'dark';
-      browserStorage()?.setItem('cortrix-theme', next);
+      browserStorage()?.setItem(THEME_KEY, next);
       if (next === 'dark') {
         document.documentElement.classList.add('dark');
       } else {
@@ -150,6 +164,19 @@ export const useAppStore = create<AppState>((set, _get) => ({
       }
       return { theme: next };
     }),
+
+  timezone: (() => {
+    if (typeof window === 'undefined') return 'UTC';
+    const stored = browserStorage()?.getItem(TZ_KEY);
+    // A stale or hand-edited value must not break every timestamp on screen.
+    if (stored && isValidTimezone(stored)) return stored;
+    return getSystemTimezone();
+  })(),
+  setTimezone: (tz) => {
+    if (!isValidTimezone(tz)) return;
+    browserStorage()?.setItem(TZ_KEY, tz);
+    set({ timezone: tz });
+  },
 }));
 
 export function isCurrentNamespaceResolved(): boolean {

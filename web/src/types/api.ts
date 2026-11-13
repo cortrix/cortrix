@@ -484,7 +484,8 @@ export interface ApiKeySummary {
   name: string;
   key_prefix: string;
   created_at: string;
-  last_used_at?: string | null;
+  /** Epoch-ms (number) or ISO string, depending on the server surface. */
+  last_used_at?: string | number | null;
   expires_at?: string | null;
   status: ApiKeyStatus;
 }
