@@ -67,13 +67,29 @@ public:
         cli.set_read_timeout(timeout_sec, timeout_usec);
         cli.set_write_timeout(timeout_sec, timeout_usec);
 
+        // cpp-httplib adds its own Content-Type header when Post() is given a
+        // non-empty content_type, and Headers is a multimap, so a caller-supplied
+        // Content-Type would be sent twice (strict providers answer HTTP 415).
+        // Pull it out of the header set and pass it as the Post() argument instead.
         httplib::Headers headers;
-        for (const auto& [k, v] : request.headers) headers.emplace(k, v);
+        std::string content_type;
+        bool has_content_type = false;
+        for (const auto& [k, v] : request.headers) {
+            if (request.method == HttpMethod::kPost && ToLower(k) == "content-type") {
+                if (!has_content_type) {
+                    content_type = v;
+                    has_content_type = true;
+                }
+                continue;
+            }
+            headers.emplace(k, v);
+        }
+        if (content_type.empty()) content_type = "application/json";
 
         httplib::Result result =
             request.method == HttpMethod::kGet
                 ? cli.Get(split.path, headers)
-                : cli.Post(split.path, headers, request.body, "application/json");
+                : cli.Post(split.path, headers, request.body, content_type);
         if (!result) {
             // DNS / connect / TLS / timeout — no HTTP status. network_ok stays false.
             resp.transport_error = httplib::to_string(result.error());
