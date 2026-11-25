@@ -1,6 +1,6 @@
 // Unit tests for http_transport.cpp (src/llm/http_transport.cpp).
-// Current coverage: 22.4%.  The real HttplibTransport requires a live network
-// connection that cannot exist in unit tests, so those paths are skipped.
+// Paths that need a remote endpoint are skipped. POST through the real
+// HttplibTransport is covered against a loopback httplib::Server.
 //
 // What CAN be tested without a network:
 //   - SplitBaseAndPath (static helper inside the .cpp) via the public behavior
@@ -14,16 +14,23 @@
 //       - Send() records the request + returns the canned response.
 //       - Builders (Json2xx / Http / RateLimited / NetworkFail) produce correct fields.
 //   - IHttpTransport polymorphism: a lambda-backed stub satisfies the interface.
+//   - Real POST through HttplibTransport to a loopback httplib::Server: the
+//     server receives exactly one Content-Type header.
 //
-// Paths SKIPPED (require a live httplib server):
-//   - Real GET / POST through HttplibTransport
+// Paths SKIPPED:
+//   - Real GET through HttplibTransport
 //   - HTTPS (CPPHTTPLIB_OPENSSL_SUPPORT deferred to D3.5)
 //   - Timeout / connection failure through the real transport
 
 #include <gtest/gtest.h>
 
+#include <httplib.h>
+
+#include <map>
 #include <memory>
 #include <string>
+#include <thread>
+#include <vector>
 
 #include "cortrix/llm/http_transport.h"
 #include "fake_http_transport.h"
@@ -316,6 +323,67 @@ TEST(HttplibTransportTest, UrlWithSchemeButNoPathGetsSlashPath) {
 
     // We only verify it does NOT throw / crash.
     EXPECT_NO_FATAL_FAILURE({ transport->Send(req); });
+}
+
+// ---------------------------------------------------------------------------
+// Real transport: POST must carry exactly one Content-Type header, whether or
+// not the caller supplied one (cpp-httplib adds its own when given a content
+// type argument, so a copied caller header used to produce two).
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Starts a loopback server, POSTs through the default transport with the given
+/// request headers, and returns every Content-Type value the server received.
+std::vector<std::string> PostAndCollectContentTypes(
+    const std::map<std::string, std::string>& request_headers) {
+    httplib::Server server;
+    std::vector<std::string> seen;
+    server.Post("/echo", [&](const httplib::Request& req, httplib::Response& res) {
+        auto range = req.headers.equal_range("Content-Type");
+        for (auto it = range.first; it != range.second; ++it) seen.push_back(it->second);
+        res.set_content("{}", "application/json");
+    });
+
+    const int port = server.bind_to_any_port("127.0.0.1");
+    EXPECT_GT(port, 0);
+    if (port <= 0) return seen;
+    std::thread th([&server] { server.listen_after_bind(); });
+    server.wait_until_ready();
+
+    auto transport = MakeDefaultHttpTransport();
+    HttpRequest req;
+    req.url        = "http://127.0.0.1:" + std::to_string(port) + "/echo";
+    req.method     = HttpMethod::kPost;
+    req.body       = "{}";
+    req.headers    = request_headers;
+    req.timeout_ms = 5000;
+    auto resp      = transport->Send(req);
+    EXPECT_TRUE(resp.network_ok) << resp.transport_error;
+
+    server.stop();
+    th.join();  // join before reading observations written by the handler
+    return seen;
+}
+
+}  // namespace
+
+TEST(HttplibTransportTest, PostSendsSingleContentTypeWhenCallerSetsIt) {
+    auto seen = PostAndCollectContentTypes({{"Content-Type", "application/json"}});
+    ASSERT_EQ(seen.size(), 1u);
+    EXPECT_EQ(seen[0], "application/json");
+}
+
+TEST(HttplibTransportTest, PostSendsSingleContentTypeWhenCallerUsesLowercase) {
+    auto seen = PostAndCollectContentTypes({{"content-type", "application/json"}});
+    ASSERT_EQ(seen.size(), 1u);
+    EXPECT_EQ(seen[0], "application/json");
+}
+
+TEST(HttplibTransportTest, PostDefaultsContentTypeToJsonWhenCallerOmitsIt) {
+    auto seen = PostAndCollectContentTypes({});
+    ASSERT_EQ(seen.size(), 1u);
+    EXPECT_EQ(seen[0], "application/json");
 }
 
 }  // namespace
