@@ -279,6 +279,12 @@ recorded source name.
 
 `cortrix_admin_db_credential_register` · `cortrix_admin_db_import_run`
 
+> `cortrix_admin_db_credential_register` takes the database connection string, password included, as a tool argument.
+> The password therefore passes through the model and stays in the agent's conversation. To keep it out, register the
+> connection yourself with `POST /api/v1/admin/db-connections` (by default the server accepts this only from the
+> server host), then give the agent only the returned `ref_id` to pass as `connection_ref` to
+> `cortrix_admin_db_import_run`.
+
 ## Response schema
 
 Every tool returns a structured two-layer envelope:
